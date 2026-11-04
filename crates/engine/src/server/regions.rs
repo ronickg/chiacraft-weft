@@ -35,9 +35,9 @@ pub struct DimSet {
     pub manual_until: u64,
     /// Changed: players hear at once.
     pub weather_moved: bool,
-    /// The air a mod says its biomes have (`set_air`): (biome, fog 0..1, wind m/s), and where the
-    /// wind blows to, in degrees clockwise from north.
-    pub air: Arc<(Vec<(u32, f32, f32)>, f32)>,
+    /// The air a mod says its biomes have (`set_air`): (biome, fog 0..1, wind m/s, snow lying 0..1,
+    /// `air_flags`) sorted by biome, and where the wind blows to, in degrees clockwise from north.
+    pub air: Arc<(Vec<(u32, f32, f32, f32, u32)>, f32)>,
     /// Changed: players hear at once.
     pub air_moved: bool,
     seed: u64,
@@ -86,6 +86,7 @@ impl DimSet {
         d.raining = self.raining;
         d.thunder = self.thunder;
         d.rain_in = self.rain_here();
+        d.air = self.air.clone();
         self.regions.push(d);
         self.regions.len() - 1
     }
@@ -389,7 +390,7 @@ impl DimSet {
     /// Where it rains when it rains: the mod's biomes, or everywhere (no mod saying, or a
     /// `/weather` command's time).
     /// The air in its biomes from now on (`air`); players hear only of a change.
-    pub fn set_air(&mut self, mut air: Vec<(u32, f32, f32)>, heading: f32) {
+    pub fn set_air(&mut self, mut air: Vec<(u32, f32, f32, f32, u32)>, heading: f32) {
         air.sort_unstable_by_key(|a| a.0);
         air.dedup_by_key(|a| a.0);
         let heading = heading.rem_euclid(360.0);
@@ -398,6 +399,9 @@ impl DimSet {
         }
         self.air = Arc::new((air, heading));
         self.air_moved = true;
+        for r in &mut self.regions {
+            r.air = self.air.clone();
+        }
     }
 
     pub fn rain_here(&self) -> Option<Arc<Vec<u32>>> {

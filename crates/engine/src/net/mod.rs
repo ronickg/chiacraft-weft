@@ -237,9 +237,10 @@ messages! {
         Using(Option<u32>),
         /// `only`: the biomes it rains in (a mod's weather by place); `None`: everywhere.
         Weather { raining: bool, thunder: bool, only: Option<Vec<u32>> },
-        /// The air in the dimension's biomes (a mod's, `set_air`): (biome, fog 0..1, wind m/s),
-        /// and where the wind blows to, degrees clockwise from north (-z).
-        Air { air: Vec<(u32, f32, f32)>, heading: f32 },
+        /// The air in the dimension's biomes (a mod's, `set_air`): (biome, fog 0..1, wind m/s,
+        /// snow lying 0..1, `air_flags`), and where the wind blows to, degrees clockwise from
+        /// north (-z).
+        Air { air: Vec<(u32, f32, f32, f32, u32)>, heading: f32 },
         /// A white flash on an entity.
         Flash(u64),
         /// Someone else's arm swings: a hit, a use, mining.

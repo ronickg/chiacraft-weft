@@ -420,6 +420,11 @@ pub struct Client {
     /// over a few seconds (`ToClient::Air`).
     fog: f32,
     wind: Vec2,
+    /// Snow lying where the player is (0..1), and how much of what falls there is snow and how
+    /// much dust blows, all eased (`air_flags`).
+    snow_cover: f32,
+    snowing: f32,
+    dust: f32,
     frame_dt: f32,
     /// Seconds left of a lightning's flash.
     lightning: f32,
@@ -687,6 +692,9 @@ impl Client {
             thunder: 0.0,
             fog: 0.0,
             wind: Vec2::ZERO,
+            snow_cover: 0.0,
+            snowing: 0.0,
+            dust: 0.0,
             lightning: 0.0,
             using: None,
             burning: false,
@@ -2143,8 +2151,12 @@ impl Client {
         self.lightning = (self.lightning - dt).max(0.0);
         // The air where the player is: fog rolls in over a few seconds (the weather itself changes
         // it slowly), the wind turns in seconds.
-        let (fog, speed) = self.world.air_at(self.player.pos.floor().as_ivec3());
+        let (fog, speed, cover, flags) = self.world.air_at(self.player.pos.floor().as_ivec3());
         self.fog += (fog - self.fog).clamp(-dt / 8.0, dt / 8.0);
+        self.snow_cover += (cover - self.snow_cover).clamp(-dt / 20.0, dt / 20.0);
+        let on = |f: u32| if flags & f != 0 { 1.0 } else { 0.0 };
+        self.snowing += (on(weft_abi::air_flags::SNOWING) - self.snowing).clamp(-dt / 5.0, dt / 5.0);
+        self.dust += (on(weft_abi::air_flags::DUST) - self.dust).clamp(-dt / 5.0, dt / 5.0);
         let heading = self.world.air.1.to_radians();
         let wind = Vec2::new(heading.sin(), -heading.cos()) * speed;
         self.wind += (wind - self.wind) * (1.0 - (-dt / 4.0).exp());
@@ -2200,6 +2212,7 @@ impl Client {
             sun: self.sun(),
             weather: [self.wind.x, self.wind.y, self.fog, self.thunder],
             eye: [cam.pos.x.rem_euclid(8192.0) as f32, cam.pos.y as f32, cam.pos.z.rem_euclid(8192.0) as f32, 0.0],
+            ground: [self.snow_cover, self.snowing, self.dust, 0.0],
         }
     }
 

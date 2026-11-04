@@ -340,6 +340,14 @@ pub mod tool_tier {
 
 // ---------------------------------------------------------------- content descriptors
 
+/// What falls and blows in a biome's air (`Host::set_air`).
+pub mod air_flags {
+    /// What falls is snow, not rain.
+    pub const SNOWING: u32 = 1;
+    /// Dust or sand blows (the fog is dust).
+    pub const DUST: u32 = 2;
+}
+
 pub mod block_flags {
     /// Entities collide with it.
     pub const SOLID: u32 = 1;
@@ -2101,10 +2109,22 @@ pub struct Host {
     /// mod says where (`set_rain`).
     pub raining_at: unsafe extern "C" fn(world: *mut WorldCtx, pos: *const [i32; 3]) -> u32,
     /// The air in this dimension's biomes from now on, until the next call: for each of the `len`
-    /// biomes, how foggy it is (`fog`, 0 clear to 1 thick) and the wind's speed (`wind`, m/s), and
-    /// for all of them where the wind blows to (`heading`, degrees clockwise from north, -z). What
-    /// players see; biomes not named are clear and still.
-    pub set_air: unsafe extern "C" fn(world: *mut WorldCtx, biomes: *const u32, fog: *const f32, wind: *const f32, len: u32, heading: f32),
+    /// biomes, how foggy it is (`fog`, 0 clear to 1 thick), the wind's speed (`wind`, m/s), how much
+    /// snow lies on the ground (`snow`, 0 to 1) and `air_flags`; for all of them where the wind
+    /// blows to (`heading`, degrees clockwise from north, -z). Biomes not named are clear and still.
+    pub set_air: unsafe extern "C" fn(
+        world: *mut WorldCtx,
+        biomes: *const u32,
+        fog: *const f32,
+        wind: *const f32,
+        snow: *const f32,
+        flags: *const u32,
+        len: u32,
+        heading: f32,
+    ),
+    /// The air a mod set (`set_air`) in the biome at `pos`: fog, wind m/s, snow lying and
+    /// `air_flags` (as a number), in `out`. 0 if no mod set any (all zero).
+    pub air_at: unsafe extern "C" fn(world: *mut WorldCtx, pos: *const [i32; 3], out: *mut [f32; 4]) -> u32,
     /// A white flash on an entity for everyone who sees it.
     pub entity_flash: unsafe extern "C" fn(world: *mut WorldCtx, id: u64),
     /// A player's `permission` level.

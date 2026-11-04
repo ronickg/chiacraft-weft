@@ -142,14 +142,23 @@ fn climates(w: &mut String) {
     let _ = writeln!(w);
     let _ = writeln!(
         w,
-        "## Wind and fog\n\nEach place's mean wind in m/s and its share of days with fog, in spring, summer, autumn and winter (`reports/ecology/Wind and fog.md`), and when its fog lies (`vitals::air`). A day blows from {:.0}% to {:.0}% of the mean, a quarter more mid afternoon than before dawn, {:.1} times under a thunderstorm; still fog clears from {} to {} m/s, sea fog from {} to {}.\n\n| biome | wind: spring | summer | autumn | winter | fog: spring | summer | autumn | winter | fog lies |\n|---|---|---|---|---|---|---|---|---|---|",
+        "## Wind and fog\n\nEach place's mean wind in m/s and its share of days with fog, in spring, summer, autumn and winter (`reports/ecology/Wind and fog.md`), and when its fog lies (`vitals::air`). A day blows from {:.0}% to {:.0}% of the mean, a quarter more mid afternoon than before dawn, {:.1} times under a thunderstorm; still fog clears from {} to {} m/s, sea fog from {} to {}. Under {} °C what falls is snow; a day of it lays {} of a deep cover and each degree of a day's mean above freezing melts {}; falling snow in {} to {} m/s of wind is a blizzard, dry ground (humidity under {}) lifts dust from {} to {} m/s. Out in the open the wind chills the cold (the wind chill index, 10 °C and under), and in thick fog animals see {:.0}% as far.\n\n| biome | wind: spring | summer | autumn | winter | fog: spring | summer | autumn | winter | fog lies |\n|---|---|---|---|---|---|---|---|---|---|",
         air::DAY_SPREAD.0 * 100.0,
         air::DAY_SPREAD.1 * 100.0,
         air::STORM,
         air::CLEARS.0,
         air::CLEARS.1,
         air::SEA_CLEARS.0,
-        air::SEA_CLEARS.1
+        air::SEA_CLEARS.1,
+        air::SNOWS_BELOW,
+        air::SNOWFALL,
+        air::MELT,
+        air::BLIZZARD.0,
+        air::BLIZZARD.1,
+        air::DRY,
+        air::DUST.0,
+        air::DUST.1,
+        air::FOG_SIGHT * 100.0
     );
     for c in climate::BIOMES.iter().filter(|c| !c.underground) {
         let wind = c.wind.map(|v| format!("{v:.1}")).join(" | ");

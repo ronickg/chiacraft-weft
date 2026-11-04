@@ -180,6 +180,7 @@ pub static HOST: Host = Host {
     set_rain,
     raining_at,
     set_air,
+    air_at,
     entity_flash,
     reg_command_permission,
     player_permission,
@@ -2181,18 +2182,43 @@ unsafe extern "C" fn set_rain(w: *mut abi::WorldCtx, biomes: *const u32, len: u3
     }
 }
 
-unsafe extern "C" fn set_air(w: *mut abi::WorldCtx, biomes: *const u32, fog: *const f32, wind: *const f32, len: u32, heading: f32) {
+unsafe extern "C" fn set_air(
+    w: *mut abi::WorldCtx,
+    biomes: *const u32,
+    fog: *const f32,
+    wind: *const f32,
+    snow: *const f32,
+    flags: *const u32,
+    len: u32,
+    heading: f32,
+) {
     unsafe {
         let d = dim(w);
         let n = len as usize;
         let air = if n == 0 {
             Vec::new()
         } else {
-            let (b, f, s) = (std::slice::from_raw_parts(biomes, n), std::slice::from_raw_parts(fog, n), std::slice::from_raw_parts(wind, n));
-            (0..n).map(|i| (b[i], f[i].clamp(0.0, 1.0), s[i].max(0.0))).collect()
+            let (b, f, s, sn, fl) = (
+                std::slice::from_raw_parts(biomes, n),
+                std::slice::from_raw_parts(fog, n),
+                std::slice::from_raw_parts(wind, n),
+                std::slice::from_raw_parts(snow, n),
+                std::slice::from_raw_parts(flags, n),
+            );
+            (0..n).map(|i| (b[i], f[i].clamp(0.0, 1.0), s[i].max(0.0), sn[i].clamp(0.0, 1.0), fl[i])).collect()
         };
         d.events
             .push(crate::server::DimEvent::SetAir { dim: d.id, air, heading });
+    }
+}
+
+unsafe extern "C" fn air_at(w: *mut abi::WorldCtx, pos: *const [i32; 3], out: *mut [f32; 4]) -> u32 {
+    unsafe {
+        let d = dim(w);
+        let biome = biome_at(w, pos);
+        let found = d.air.0.binary_search_by_key(&biome, |a| a.0).ok().map(|i| d.air.0[i]);
+        *out = found.map_or([0.0; 4], |a| [a.1, a.2, a.3, a.4 as f32]);
+        (!d.air.0.is_empty()) as u32
     }
 }
 

@@ -4,7 +4,8 @@
 //! kills, it eats its fill (`ENTITY_DIED`), and what the kill drops is left as the carcass. It
 //! gives up a long chase. Animals of its own family it leaves alone, and players for now.
 //!
-//! Prey keep watch (`wary`): a wild animal that sees a hunter able to take it runs off.
+//! Prey keep watch (`wary`): a wild animal that sees a hunter able to take it runs off. In fog
+//! both see less far (`base_api::sight`).
 
 use weft_sdk::*;
 
@@ -16,7 +17,8 @@ static HUNT: Component<[u64; 3]> = Component::named("animal_hunt");
 /// Until when it runs from a hunter (not saved).
 static WARY: Component<u64> = Component::named("animal_wary");
 
-/// Blocks a hunter looks for prey and prey watches for hunters.
+/// Blocks a hunter looks for prey and prey watches for hunters, in clear air: fog, a blizzard or
+/// a dust storm close both in (`base_api::sight`).
 const LOOK: f64 = 16.0;
 const WATCH: f64 = 10.0;
 /// It hunts under this share of its food, until this full (as foraging, `forage.rs`).
@@ -132,7 +134,7 @@ pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
     h[2] = now + LOOK_EVERY;
     let own = mass(w, id).unwrap_or(s.bio.mass);
     let prey = w
-        .near_bodies(st.pos, LOOK)
+        .near_bodies(st.pos, LOOK * base_api::sight(w, st.pos) as f64)
         .into_iter()
         .filter(|&t| t != id && family(w, t) != Some(s.family.name))
         .filter_map(|t| Some((t, w.entity(t)?, mass(w, t)?)))
@@ -168,7 +170,7 @@ pub fn wary(w: &World, id: u64, st: &EntityState) -> bool {
     let Some(me) = mass(w, id) else { return false };
     let mine = family(w, id);
     let hunter = w
-        .near_bodies(st.pos, WATCH)
+        .near_bodies(st.pos, WATCH * base_api::sight(w, st.pos) as f64)
         .into_iter()
         .filter(|&t| t != id && family(w, t) != mine && !animal::tamed(w, t))
         .filter_map(|t| {

@@ -226,19 +226,26 @@ fn fog_floor() -> f32 {
 
 // How foggy the air is at `p` (world): a layer lying on the ground and in the valleys, broken into
 // banks that drift with the wind and thin out higher up. 0 in clear weather. Per block.
+// A storm's share of the fog (blowing snow or dust: `scene.ground` y and z): it fills the air
+// high up and races with the wind instead of lying low.
+fn storm() -> f32 {
+    return clamp(max(scene.ground.y * smoothstep(5.0, 9.0, length(wind_now())), scene.ground.z), 0.0, 1.0);
+}
+
 fn fog_density(p: vec3<f32>) -> f32 {
     let f = scene.weather.z;
+    let s = storm();
     let h = p.y - fog_floor();
-    let low = exp(-max(h - 3.0, 0.0) / 7.0);
+    let low = exp(-max(h - 3.0, 0.0) / mix(7.0, 40.0, s));
     let high = exp(-max(h, 0.0) / 45.0);
-    let drift = vec3(wind_now().x, 0.0, wind_now().y) * scene.params.w * 0.6;
+    let drift = vec3(wind_now().x, 0.0, wind_now().y) * scene.params.w * mix(0.6, 2.0, s);
     let q = p - drift;
     let shape = noise3(q * vec3(1.0 / 38.0, 1.0 / 12.0, 1.0 / 38.0)) * 0.7 + noise3(q * vec3(1.0 / 15.0, 1.0 / 8.0, 1.0 / 15.0)) * 0.3;
     let eaten = noise3(q * vec3(1.0 / 6.0, 1.0 / 4.0, 1.0 / 6.0) + vec3(0.0, scene.params.w * 0.04, 0.0));
-    let banks = smoothstep(0.42, 0.7, shape - 0.25 * eaten + 0.12);
+    let banks = smoothstep(0.45, 0.66, shape - 0.25 * eaten + 0.12);
     // Deep under it, in the ground, there is none.
     let open = smoothstep(-24.0, -10.0, h);
-    return f * open * (low * (0.12 + 1.5 * banks) + 0.08 * high) * 0.11;
+    return f * open * (low * (mix(0.05, 0.7, s) + mix(1.7, 0.6, s) * banks) + 0.06 * high) * 0.11;
 }
 
 // Light the fog sends toward the eye: the sky's from all around, the sun's mostly forward, so it
@@ -249,7 +256,9 @@ fn fog_light(dir: vec3<f32>) -> vec3<f32> {
     let g = 0.6;
     let hg = (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * mu, 1.5) / 12.566;
     let phase = hg * 6.0 + 0.25;
-    return (p.ambient * 1.25 + p.horizon * 0.2) * 0.9 + p.sun * light_strength() * phase * 0.9;
+    // Droplets are white, snow whiter, dust the color of sand.
+    let tint = mix(mix(vec3(0.9), vec3(1.0, 1.0, 1.03), scene.ground.y), vec3(0.95, 0.68, 0.42), scene.ground.z);
+    return ((p.ambient * 1.25 + p.horizon * 0.2) + p.sun * light_strength() * phase) * 0.9 * tint;
 }
 
 // The fog between the eye and a point `rel` away (camera relative), walked in a few steps that are
@@ -277,6 +286,18 @@ fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
         last = at;
     }
     return c * through + gained;
+}
+
+// How much snow lies on a surface with normal `n` at `pos` (world) with `sky` light: on what
+// faces up under the open sky, in patches that join up as it deepens.
+fn snow_on(n: vec3<f32>, pos: vec3<f32>, sky: f32) -> f32 {
+    let deep = scene.ground.x;
+    if deep <= 0.0 {
+        return 0.0;
+    }
+    let q = vec3<i32>(floor(pos * 16.0));
+    let spot = noise3(pos * 0.35) * 0.8 + hash3(q) * 0.2;
+    return smoothstep(0.85, 1.0, sky) * smoothstep(0.55, 0.9, n.y) * smoothstep(1.0 - deep * 1.3, 1.05 - deep * 1.3, spot);
 }
 
 // ---- haze and fog ----

@@ -3,7 +3,8 @@
 //! not, the same on every machine; the hour shapes both. The weather (`mods/base/src/weather.rs`)
 //! tells the engine (`set_air`), shader packs draw it.
 
-use crate::climate::Fog;
+use crate::climate::{self, Fog};
+use crate::{calendar, temperature};
 
 /// How windy a day is against the season's mean: from 0.45 to 1.55 of it, even odds.
 pub const DAY_SPREAD: (f32, f32) = (0.45, 1.55);
@@ -87,6 +88,126 @@ pub fn fog(days: [f32; 4], kind: Fog, season: Option<usize>, key: u64, day: u64,
     thick * fog_hours(kind, hour) * (1.0 - blown)
 }
 
+// ---- snow, blizzards and dust ----
+
+/// Below this air (°C, out in the open, the rain's cooling counted) what falls is snow.
+pub const SNOWS_BELOW: f32 = 1.0;
+
+/// Snow lying, 0 bare to 1 deep: a day of snow adds `SNOWFALL`, and each day's mean above
+/// freezing melts `MELT` a degree (a degree-day factor: about 4 mm of water, 1.2 cm of fresh
+/// snow, a degree a day). Counted over the last `SNOW_DAYS` days.
+pub const SNOWFALL: f32 = 0.4;
+pub const MELT: f32 = 0.05;
+pub const SNOW_DAYS: u64 = 12;
+
+/// Snow in a wind is a blizzard: from `BLIZZARD.0` m/s the snow hides the land, all of it by
+/// `BLIZZARD.1`.
+pub const BLIZZARD: (f32, f32) = (6.0, 12.0);
+
+/// Dry ground (humidity under `DRY`) lifts dust and sand from `DUST.0` m/s (loose sand's
+/// threshold at 10 m), a storm of it by `DUST.1`.
+pub const DRY: f32 = 0.35;
+pub const DUST: (f32, f32) = (7.0, 11.0);
+
+/// A place's air as the weather needs it: its climate (`Climate`'s numbers) and whether the world
+/// has seasons.
+#[derive(Clone, Copy, Debug)]
+pub struct Place {
+    pub celsius: f32,
+    pub humidity: f32,
+    pub seasons: f32,
+    pub rain: [f32; 4],
+    pub calendar: bool,
+}
+
+impl Place {
+    /// The air in the open at sea level at `hour` of `day` (days since the world began), raining
+    /// or not.
+    pub fn air(&self, day: u64, hour: f32, raining: bool) -> f32 {
+        let year = if self.calendar { calendar::from_midwinter((day % calendar::YEAR_DAYS as u64) as f32 + hour / 24.0) } else { 0.25 };
+        temperature::air(&temperature::Place {
+            biome_c: self.celsius,
+            humidity: self.humidity,
+            altitude: 0.0,
+            hour,
+            open_sky: true,
+            raining,
+            snowing: false,
+            in_water: false,
+            fire: 0.0,
+            season: temperature::season(self.seasons, year),
+            underground: false,
+            wind: 0.0,
+        })
+    }
+
+    fn season(&self, day: u64) -> Option<usize> {
+        self.calendar
+            .then(|| ((day % calendar::YEAR_DAYS as u64) / calendar::SEASON_DAYS as u64) as usize)
+    }
+
+    /// Whether what falls at `hour` of `day` is snow (it rains or snows then, `climate::rains`).
+    pub fn snows(&self, key: u64, day: u64, hour: f32) -> bool {
+        climate::rains(self.rain, self.season(day), key, day, hour) && self.air(day, hour, true) < SNOWS_BELOW
+    }
+
+    /// The snow lying at `hour` of `day`: the last days' snowfalls, melted by the warm days since.
+    pub fn snow_lying(&self, key: u64, day: u64, hour: f32) -> f32 {
+        let mut snow: f32 = 0.0;
+        for d in day.saturating_sub(SNOW_DAYS)..=day {
+            let (fell, warmth) = if d == day {
+                // Today so far: what has fallen by now, and the melt of the hours gone.
+                let fell = climate::spell(self.rain, self.season(d), key, d)
+                    .filter(|&(from, to)| self.air(d, (from + to) / 2.0, true) < SNOWS_BELOW)
+                    .map_or(0.0, |(from, to)| ((hour - from) / (to - from)).clamp(0.0, 1.0));
+                (fell, self.air(d, hour, false).max(0.0) * hour / 24.0)
+            } else {
+                let fell = climate::spell(self.rain, self.season(d), key, d)
+                    .is_some_and(|(from, to)| self.air(d, (from + to) / 2.0, true) < SNOWS_BELOW);
+                // The day's mean: before dawn and mid afternoon, halved.
+                let mean = (self.air(d, 4.0, false) + self.air(d, 15.0, false)) / 2.0;
+                (if fell { 1.0 } else { 0.0 }, mean.max(0.0))
+            };
+            snow = (snow + fell * SNOWFALL - warmth * MELT).clamp(0.0, 1.0);
+        }
+        snow
+    }
+}
+
+/// How thick a blizzard is in falling snow with the wind at `wind` m/s, 0 to 1.
+pub fn blizzard(wind: f32) -> f32 {
+    ((wind - BLIZZARD.0) / (BLIZZARD.1 - BLIZZARD.0)).clamp(0.0, 1.0)
+}
+
+/// How much dust blows on ground of that `humidity`, dry (not raining), at `wind` m/s, 0 to 1.
+pub fn dust(humidity: f32, wind: f32, raining: bool) -> f32 {
+    if humidity >= DRY || raining {
+        return 0.0;
+    }
+    ((wind - DUST.0) / (DUST.1 - DUST.0)).clamp(0.0, 1.0)
+}
+
+/// In thick fog an animal sees this share of what it sees in clear air (proposed: real fog under
+/// 1 km is a fog day, the game's thick fog hides the land past about 20 blocks).
+pub const FOG_SIGHT: f32 = 0.35;
+
+/// How far one sees in fog `fog` (0..1) against clear air.
+pub fn sight(fog: f32) -> f32 {
+    1.0 - (1.0 - FOG_SIGHT) * fog.clamp(0.0, 1.0)
+}
+
+/// The wind chill (°C) in air `celsius` with the wind at `wind` m/s at 10 m: the North American
+/// wind chill index (Environment Canada and the US National Weather Service, 2001), only in the cold
+/// (10 °C and under) and a wind over 4.8 km/h; the air itself elsewhere.
+pub fn feels(celsius: f32, wind: f32) -> f32 {
+    let kmh = wind * 3.6;
+    if celsius > 10.0 || kmh <= 4.8 {
+        return celsius;
+    }
+    let v = kmh.powf(0.16);
+    (13.12 + 0.6215 * celsius - 11.37 * v + 0.3965 * celsius * v).min(celsius)
+}
+
 /// SplitMix64: a hash every machine agrees on.
 fn mix(mut z: u64) -> u64 {
     z = z.wrapping_add(0x9E37_79B9_7F4A_7C15);
@@ -118,6 +239,27 @@ mod tests {
                 assert!((mean - c.wind[s]).abs() < c.wind[s] * 0.05 + 0.05, "{} season {s}: wind {mean} against {}", c.biome, c.wind[s]);
             }
         }
+    }
+
+    /// The wind chill index's own table: -10 °C in a 30 km/h wind feels -20.
+    #[test]
+    fn wind_chill_matches_the_table() {
+        assert!((feels(-10.0, 30.0 / 3.6) - -19.5).abs() < 0.6, "{}", feels(-10.0, 30.0 / 3.6));
+        assert_eq!(feels(20.0, 10.0), 20.0);
+        assert_eq!(feels(-5.0, 1.0), -5.0);
+    }
+
+    /// Snow lies in a taiga winter and is gone by its summer.
+    #[test]
+    fn snow_lies_in_winter_and_melts_in_summer() {
+        let c = BIOMES.iter().find(|c| c.biome == "base:taiga").unwrap();
+        let p = Place { celsius: c.celsius, humidity: c.humidity, seasons: c.seasons, rain: c.rain, calendar: true };
+        let winter = 3 * calendar::SEASON_DAYS as u64 + 7;
+        let summer = calendar::SEASON_DAYS as u64 + 7;
+        let years = 0..20u64;
+        let lying = |day: u64| years.clone().map(|y| p.snow_lying(9, day + y * calendar::YEAR_DAYS as u64, 12.0)).sum::<f32>() / 20.0;
+        assert!(lying(winter) > 0.2, "winter {}", lying(winter));
+        assert!(lying(summer) < 0.01, "summer {}", lying(summer));
     }
 
     /// Dawn fog is gone by noon and the wind clears it.

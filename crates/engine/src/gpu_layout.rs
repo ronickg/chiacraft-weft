@@ -455,6 +455,9 @@ gpu_struct! {
         /// The camera in the world: x and z wrapped every 8192 blocks (enough for noise to tile
         /// unseen), y as it is; w unused. For shader packs.
         pub eye: [f32; 4],
+        /// Where the player is: x snow lying on the ground (0..1), y how much of what falls is
+        /// snow, z how much dust blows (0..1); from a mod's weather (`set_air`). For shader packs.
+        pub ground: [f32; 4],
     }
 }
 

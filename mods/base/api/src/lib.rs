@@ -155,6 +155,11 @@ pub struct Air {
     pub open_sky: bool,
     pub raining: bool,
     pub snowing: bool,
+    /// The weather's air in this biome (`World::air_at`): the wind in m/s (it chills the cold out in
+    /// the open), the fog 0..1 (it shortens how far animals see, `sight`) and the snow lying.
+    pub wind: f32,
+    pub fog: f32,
+    pub snow: f32,
     /// Today in the dimension's calendar (`vitals::calendar`), and its kind (0: none).
     pub day: u16,
     pub calendar: u8,
@@ -190,6 +195,7 @@ pub fn air_at(w: &World, pos: [f64; 3], height: f32, in_water: bool, reach: i32,
     let kind = SEASONS.on_dimension(w.dimension()).unwrap_or(0);
     let date = calendar::date(w.day_time());
     let year = if kind > 0 { date.from_midwinter() } else { 0.25 };
+    let weather = w.air_at(eye);
     let mut place = temperature::Place {
         biome_c: climate.celsius,
         humidity: climate.humidity,
@@ -203,6 +209,7 @@ pub fn air_at(w: &World, pos: [f64; 3], height: f32, in_water: bool, reach: i32,
         fire,
         season: temperature::season(climate.seasons, year),
         underground,
+        wind: weather.wind,
     };
     if place.raining && temperature::air(&place) < 1.0 {
         (place.raining, place.snowing) = (false, true);
@@ -215,9 +222,18 @@ pub fn air_at(w: &World, pos: [f64; 3], height: f32, in_water: bool, reach: i32,
         open_sky: place.open_sky,
         raining: place.raining,
         snowing: place.snowing,
+        wind: weather.wind,
+        fog: weather.fog,
+        snow: weather.snow,
         day: if kind > 0 { date.day as u16 + 1 } else { 0 },
         calendar: kind,
     }
+}
+
+/// How far an animal sees at `pos` against clear air, 1 to `vitals::air::FOG_SIGHT`: fog, a
+/// blizzard or a dust storm (`World::air_at`) close it in.
+pub fn sight(w: &World, pos: [f64; 3]) -> f32 {
+    vitals::air::sight(w.air_at(pos.map(|v| v.floor() as i32)).fog)
 }
 
 /// What the ground offers a plant at `pos` (`ground_at`): the day's mean air, how wet the soil

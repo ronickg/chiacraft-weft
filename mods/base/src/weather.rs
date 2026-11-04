@@ -18,20 +18,26 @@ use weft_sdk::*;
 /// Ticks between looks: rain starts and stops within a few seconds of its hour.
 const EVERY: u64 = 50;
 
-/// `/air <fog> <wind> [heading]`: fog 0..1 and wind m/s everywhere until the tick it ends.
-static SET: Mutex<Option<(f32, f32, f32, u64)>> = Mutex::new(None);
+/// `/air <fog> <wind> [heading] [kind]`: fog 0..1, wind m/s and `air_flags` (snow also lies)
+/// everywhere until the tick it ends.
+static SET: Mutex<Option<(f32, f32, f32, u32, u64)>> = Mutex::new(None);
 
 /// How long `/air` holds: ten minutes.
 const SET_TICKS: u64 = 12_000;
 
 pub fn register(r: &mut Registry) {
     r.world_tick(tick);
-    r.command("air", "[fog:float] [wind:float] [heading:float]", |cmd| {
+    r.command("air", "[fog:float] [wind:float] [heading:float] [kind:word(mist,snow,dust)]", |cmd| {
         let w = cmd.world();
         if let Some(fog) = cmd.float("fog") {
             let wind = cmd.float("wind").unwrap_or(0.0) as f32;
             let heading = cmd.float("heading").map_or_else(|| now_heading(&w), |h| h as f32);
-            *SET.lock().unwrap() = Some((fog.clamp(0.0, 1.0) as f32, wind.max(0.0), heading, w.time() + SET_TICKS));
+            let flags = match cmd.text("kind") {
+                Some("snow") => air_flags::SNOWING,
+                Some("dust") => air_flags::DUST,
+                _ => 0,
+            };
+            *SET.lock().unwrap() = Some((fog.clamp(0.0, 1.0) as f32, wind.max(0.0), heading, flags, w.time() + SET_TICKS));
             send(&w);
             cmd.reply("command.base.air.set", &[Arg::Int((fog.clamp(0.0, 1.0) * 100.0).round() as i64), Arg::Int(wind.round() as i64)]);
             return;
@@ -39,7 +45,7 @@ pub fn register(r: &mut Registry) {
         let Some(st) = w.entity(cmd.player()) else { return };
         let id = w.biome(st.pos.map(|v| v.floor() as i32));
         let Some(c) = CLIMATE.on_biome(id) else { return };
-        let (fog, wind) = air_of(&w, id, &c);
+        let BiomeAir { fog, wind, .. } = air_of(&w, id, &c);
         let share = Arg::Int((air::fog_share(c.fog, now(&w).2) * 100.0).round() as i64);
         cmd.reply(
             "command.base.air.now",
@@ -104,32 +110,45 @@ fn now_heading(w: &World) -> f32 {
     air::heading(w.seed(), day, hour)
 }
 
-/// The fog (0..1) and the wind (m/s) in biome `id` now.
-fn air_of(w: &World, id: u32, c: &Climate) -> (f32, f32) {
-    if let Some((fog, wind, _, until)) = *SET.lock().unwrap() {
-        if w.time() < until {
-            return (fog, wind);
-        }
-    }
+/// The air in biome `id` now: fog (blizzards and dust storms count as fog), wind, snow lying,
+/// and whether it snows or dust blows.
+fn air_of(w: &World, id: u32, c: &Climate) -> BiomeAir {
     let (day, hour, season) = now(w);
     let key = base_api::rain_key(w, id);
-    let storm = climate::rains(c.rain, season, key, day, hour) && climate::thunders(c.celsius, c.seasons, season, key, day);
+    let place = air::Place { celsius: c.celsius, humidity: c.humidity, seasons: c.seasons, rain: c.rain, calendar: season.is_some() };
+    let snow = place.snow_lying(key, day, hour);
+    if let Some((fog, wind, _, flags, until)) = *SET.lock().unwrap() {
+        if w.time() < until {
+            let snow = if flags & air_flags::SNOWING != 0 { snow.max(0.8) } else { snow };
+            return BiomeAir { biome: id, fog, wind, snow, flags };
+        }
+    }
+    let raining = climate::rains(c.rain, season, key, day, hour);
+    // A thunderstorm's wind, and in dry country the hour before it: its gust front.
+    let storm = climate::spell(c.rain, season, key, day)
+        .is_some_and(|(from, to)| ((from - if c.humidity < air::DRY { 1.0 } else { 0.0 })..to).contains(&hour))
+        && climate::thunders(c.celsius, c.seasons, season, key, day);
     let wind = air::wind(c.wind, season, key, day, hour, storm);
-    (air::fog(c.fog, climate::Fog::from_index(c.fog_kind), season, key, day, hour, wind), wind)
+    let mut fog = air::fog(c.fog, climate::Fog::from_index(c.fog_kind), season, key, day, hour, wind);
+    let mut flags = 0;
+    if raining && place.air(day, hour, true) < air::SNOWS_BELOW {
+        flags |= air_flags::SNOWING;
+        fog = fog.max(air::blizzard(wind) * 0.9);
+    }
+    let dust = air::dust(c.humidity, wind, raining);
+    if dust > 0.0 {
+        flags |= air_flags::DUST;
+        fog = fog.max(dust * 0.95);
+    }
+    BiomeAir { biome: id, fog, wind, snow, flags }
 }
 
 /// Tells the engine the air in every biome.
 fn send(w: &World) {
     let heading = match *SET.lock().unwrap() {
-        Some((_, _, h, until)) if w.time() < until => h,
+        Some((_, _, h, _, until)) if w.time() < until => h,
         _ => now_heading(w),
     };
-    let list: Vec<(u32, f32, f32)> = biomes()
-        .iter()
-        .map(|&(id, c)| {
-            let (fog, wind) = air_of(w, id, &c);
-            (id, fog, wind)
-        })
-        .collect();
+    let list: Vec<BiomeAir> = biomes().iter().map(|&(id, c)| air_of(w, id, &c)).collect();
     w.set_air(&list, heading);
 }

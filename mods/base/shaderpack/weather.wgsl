@@ -45,5 +45,6 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         discard;
     }
     let light = light_round(unpack_light(in.data.y), vec3(0.0));
-    return vec4(display(haze(color.rgb * light, in.rel)), color.a * in.alpha);
+    // A little darker and stronger than the texture, so drops show against the pale rainy sky.
+    return vec4(display(haze(color.rgb * light * 0.75, in.rel)), min(color.a * in.alpha * 1.4, 1.0));
 }

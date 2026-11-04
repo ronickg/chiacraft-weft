@@ -121,6 +121,7 @@ pub fn air(c: &Climate, day: f32, hour: f32) -> f32 {
         fire: 0.0,
         season: temperature::season(c.seasons, calendar::from_midwinter(day)),
         underground: c.underground,
+        wind: 0.0,
     })
 }
 

@@ -91,7 +91,7 @@ Each biome's real place (`reports/ecology/Biome climates.md`), year mean, humidi
 
 ## Wind and fog
 
-Each place's mean wind in m/s and its share of days with fog, in spring, summer, autumn and winter (`reports/ecology/Wind and fog.md`), and when its fog lies (`vitals::air`). A day blows from 45% to 155% of the mean, a quarter more mid afternoon than before dawn, 1.8 times under a thunderstorm; still fog clears from 3.5 to 7 m/s, sea fog from 9 to 14.
+Each place's mean wind in m/s and its share of days with fog, in spring, summer, autumn and winter (`reports/ecology/Wind and fog.md`), and when its fog lies (`vitals::air`). A day blows from 45% to 155% of the mean, a quarter more mid afternoon than before dawn, 1.8 times under a thunderstorm; still fog clears from 3.5 to 7 m/s, sea fog from 9 to 14. Under 1 °C what falls is snow; a day of it lays 0.4 of a deep cover and each degree of a day's mean above freezing melts 0.05; falling snow in 6 to 12 m/s of wind is a blizzard, dry ground (humidity under 0.35) lifts dust from 7 to 11 m/s. Out in the open the wind chills the cold (the wind chill index, 10 °C and under), and in thick fog animals see 35% as far.
 
 | biome | wind: spring | summer | autumn | winter | fog: spring | summer | autumn | winter | fog lies |
 |---|---|---|---|---|---|---|---|---|---|

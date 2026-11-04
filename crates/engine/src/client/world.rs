@@ -58,9 +58,10 @@ pub struct ClientWorld {
     pub time: u64,
     /// The biomes it rains in when a mod says where (`ToClient::Weather`); `None`: everywhere.
     pub rain_in: Option<Vec<u32>>,
-    /// The air a mod says its biomes have (`ToClient::Air`): (biome, fog 0..1, wind m/s) sorted
-    /// by biome, and where the wind blows to, degrees clockwise from north.
-    pub air: (Vec<(u32, f32, f32)>, f32),
+    /// The air a mod says its biomes have (`ToClient::Air`): (biome, fog 0..1, wind m/s, snow
+    /// lying 0..1, `air_flags`) sorted by biome, and where the wind blows to, degrees clockwise
+    /// from north.
+    pub air: (Vec<(u32, f32, f32, f32, u32)>, f32),
     /// Dirty cubes whose six neighbors are all known: meshable now. Kept up to date as cubes
     /// come and go, so a frame never walks every dirty cube (tens of thousands while loading).
     ready: FxHashSet<IVec3>,
@@ -263,15 +264,19 @@ impl ClientWorld {
         only.contains(&(biome as u32))
     }
 
-    /// The fog (0..1) and the wind (m/s) a mod says the biome at `p` has: clear and still if none.
-    pub fn air_at(&self, p: IVec3) -> (f32, f32) {
+    /// What a mod says the air in the biome at `p` is (`ToClient::Air`): fog 0..1, wind m/s, snow
+    /// lying 0..1 and `air_flags`; clear, still and bare if it says nothing.
+    pub fn air_at(&self, p: IVec3) -> (f32, f32, f32, u32) {
         let biome = self
             .cube(p >> 4i32)
             .map_or(0, |c| c.biome((p.x & 15) as usize, (p.z & 15) as usize)) as u32;
         self.air
             .0
             .binary_search_by_key(&biome, |a| a.0)
-            .map_or((0.0, 0.0), |i| (self.air.0[i].1, self.air.0[i].2))
+            .map_or((0.0, 0.0, 0.0, 0), |i| {
+                let a = self.air.0[i];
+                (a.1, a.2, a.3, a.4)
+            })
     }
 
     pub fn cube(&self, p: IVec3) -> Option<&Arc<Cube>> {

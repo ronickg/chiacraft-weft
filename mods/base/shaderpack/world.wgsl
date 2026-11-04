@@ -299,8 +299,14 @@ fn surface_light(in: VOut, n: vec3<f32>) -> vec3<f32> {
     return light;
 }
 
-fn shade(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
+fn shade(in: VOut, albedo_in: vec4<f32>) -> vec4<f32> {
     let n = normalize(in.normal);
+    var albedo = albedo_in;
+    // Snow lying on the tops of blocks and leaves (not on plants, which it buries).
+    if in.kind.z == 0u {
+        let snow = snow_on(n, in.pos, in.light.x);
+        albedo = vec4(mix(albedo.rgb, vec3(0.86, 0.9, 0.95), snow), albedo.a);
+    }
     var light = surface_light(in, n);
     if in.glow != 0xffffffffu {
         let e = textureSampleLevel(textures[in.glow], nearest_clamp, in.uv, 0.0).r;
