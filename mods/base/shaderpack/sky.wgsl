@@ -193,7 +193,7 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
         lit += p.glow * (pow(mu, 3.0) * 0.5 + pow(mu, 12.0) * 0.8) * light_strength();
         color = albedo * lit;
         color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0), dir.z))), smoothstep(0.3, 1.0, dist));
-        color = display(color);
+        color = display(fog_through(color, dir * 220.0, 1.0));
     } else {
         var shade = select(0.9, 0.8, side == 1u);
         if side == 0u {
@@ -214,6 +214,8 @@ fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
             // From below sea level, vanilla's dark of the void.
             c *= 1.0 - s.uv.x * smoothstep(0.0, 0.08, -dir.y);
         }
+        // The fog on the land hides the horizon and fades upward.
+        c = fog_through(c, dir * 220.0, 1.0);
         return vec4(display(c), 1.0);
     }
     if dir.y <= 0.0 {

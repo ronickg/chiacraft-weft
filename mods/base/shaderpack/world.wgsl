@@ -136,12 +136,22 @@ fn finish(local: vec3<f32>, origin: vec4<i32>) -> vec4<f32> {
 
 // How far the wind moves what stands at `p` (world blocks) now; a function of the place alone, so
 // leaves sharing a corner move together and show no cracks.
+// How far the wind moves what sways at `p`: a lean the way it blows, stronger in its gusts, and a
+// flutter that quickens with it. Calm air keeps a little life in the leaves.
 fn wind(p: vec3<f32>) -> vec3<f32> {
     let t = scene.params.w;
-    let gust = 0.65 + 0.35 * sin(t * 0.37 + p.x * 0.031 + p.z * 0.027);
-    let a = sin(t * 1.7 + p.x * 0.63 + p.z * 0.41 + p.y * 0.2) * 0.6 + sin(t * 2.9 + p.x * 1.21 - p.z * 0.83) * 0.25;
-    let b = sin(t * 1.3 + p.z * 0.71 - p.x * 0.37) * 0.5 + sin(t * 3.4 + p.z * 1.4 + p.x * 0.6) * 0.2;
-    return vec3(a, 0.0, b) * gust * (1.0 + rain_amount());
+    let w = wind_now();
+    let speed = length(w);
+    let dir = select(vec2(1.0, 0.0), w / max(speed, 1e-4), speed > 0.01);
+    // A fresh breeze (9 m/s) bends things as far as they go, a gale a little further.
+    let s = clamp(speed / 9.0, 0.0, 1.6);
+    let g = gust(p);
+    let q = t * (1.0 + 0.8 * s);
+    let a = sin(q * 1.7 + p.x * 0.63 + p.z * 0.41 + p.y * 0.2) * 0.6 + sin(q * 2.9 + p.x * 1.21 - p.z * 0.83) * 0.25;
+    let b = sin(q * 1.3 + p.z * 0.71 - p.x * 0.37) * 0.5 + sin(q * 3.4 + p.z * 1.4 + p.x * 0.6) * 0.2;
+    let flutter = vec3(a, 0.0, b) * (0.35 + 0.65 * s) * g;
+    let lean = vec3(dir.x, 0.0, dir.y) * s * g * 1.3;
+    return flutter + lean;
 }
 
 @vertex
@@ -302,7 +312,14 @@ fn shade(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
     } else {
         lit = block_shade(in.slot, BlockPixel(in.uv, albedo, light, in.pos, scene.params.w));
     }
-    return vec4(display(haze(lit.rgb, in.rel)), lit.a);
+    // Out in the rain, the ground goes dark and wet, with a little of the sky on it (not plants).
+    let wet = rain_amount() * smoothstep(0.85, 1.0, in.light.x) * smoothstep(0.3, 0.9, n.y) * select(1.0, 0.0, in.kind.z != 0u || in.kind.x == TINT_FOLIAGE);
+    if wet > 0.0 {
+        let v = -normalize(in.rel);
+        let sheen = pow(1.0 - max(dot(n, v), 0.0), 5.0) * 0.12;
+        lit = vec4(lit.rgb * mix(1.0, 0.7, wet) + sky_color(reflect(-v, n)) * sheen * wet, lit.a);
+    }
+    return vec4(display(haze_lit(lit.rgb, in.rel, in.light.x)), lit.a);
 }
 
 // ---- water ----
@@ -323,11 +340,38 @@ fn ripple_normal(p: vec2<f32>) -> vec3<f32> {
     return normalize(vec3(-d.x, 1.0, -d.y));
 }
 
+// Rain on water: each drop's ring spreads and fades in its own cell, at its own time. The slope
+// it gives the surface, on the texture's pixel grid.
+fn rain_rings(p: vec2<f32>) -> vec2<f32> {
+    let q = floor(p * 16.0) / 16.0 / 0.8;
+    let base = floor(q);
+    var slope = vec2(0.0);
+    for (var j = -1; j <= 1; j++) {
+        for (var i = -1; i <= 1; i++) {
+            let cell = vec2<i32>(base) + vec2(i, j);
+            let h = hash3(vec3(cell.x, 7, cell.y));
+            let k = hash3(vec3(cell.x, 13, cell.y));
+            let t = fract(scene.params.w * 0.9 + h * 7.31);
+            let v = q - (vec2<f32>(cell) + vec2(0.2 + 0.6 * h, 0.2 + 0.6 * k));
+            let d = length(v);
+            let x = d - t * 1.1;
+            let wave = sin(x * 26.0) * exp(-x * x * 70.0) * (1.0 - t) * (1.0 - t);
+            slope += v / max(d, 1e-3) * wave;
+        }
+    }
+    return slope * 0.3;
+}
+
 fn water(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
     let v = -normalize(in.rel);
     var n = normalize(in.normal);
     if n.y > 0.5 {
         n = ripple_normal(in.pos.xz);
+        let rain = rain_amount() * smoothstep(0.85, 1.0, in.light.x);
+        if rain > 0.0 {
+            let s = rain_rings(in.pos.xz) * rain;
+            n = normalize(n + vec3(-s.x, 0.0, -s.y));
+        }
     }
     let ndv = dot(n, v);
     if ndv <= 0.0 || in_liquid() {
@@ -343,7 +387,7 @@ fn water(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
     let f = clamp(fresnel * 0.9 + 0.08, 0.0, 1.0);
     let c = mix(body, refl, f) + glint;
     let a = clamp(mix(albedo.a, 1.0, f) + luma(glint), 0.0, 1.0);
-    return vec4(display(haze(c, in.rel)), a);
+    return vec4(display(haze_lit(c, in.rel, in.light.x)), a);
 }
 
 // ---- texture sampling (the engine's) ----

@@ -542,6 +542,16 @@ impl World {
         unsafe { (host().set_rain)(self.raw(), biomes.as_ptr(), biomes.len() as u32, thunder as u32) }
     }
 
+    /// The air players see in this dimension's biomes until the next call: (biome, fog 0..1, wind
+    /// m/s) for each, and where the wind blows to (`heading`, degrees clockwise from north, -z).
+    /// Biomes not named are clear and still. Shader packs draw it (`scene.weather`).
+    pub fn set_air(&self, air: &[(u32, f32, f32)], heading: f32) {
+        let biomes: Vec<u32> = air.iter().map(|a| a.0).collect();
+        let fog: Vec<f32> = air.iter().map(|a| a.1).collect();
+        let wind: Vec<f32> = air.iter().map(|a| a.2).collect();
+        unsafe { (host().set_air)(self.raw(), biomes.as_ptr(), fog.as_ptr(), wind.as_ptr(), air.len() as u32, heading) }
+    }
+
     pub fn thundering(&self) -> bool {
         unsafe { (host().thundering)(self.raw()) != 0 }
     }

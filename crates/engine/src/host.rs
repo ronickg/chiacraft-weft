@@ -179,6 +179,7 @@ pub static HOST: Host = Host {
     thundering,
     set_rain,
     raining_at,
+    set_air,
     entity_flash,
     reg_command_permission,
     player_permission,
@@ -2177,6 +2178,21 @@ unsafe extern "C" fn set_rain(w: *mut abi::WorldCtx, biomes: *const u32, len: u3
         let biomes = if len == 0 { Vec::new() } else { std::slice::from_raw_parts(biomes, len as usize).to_vec() };
         d.events
             .push(crate::server::DimEvent::SetRain { dim: d.id, biomes, thunder: thunder != 0 });
+    }
+}
+
+unsafe extern "C" fn set_air(w: *mut abi::WorldCtx, biomes: *const u32, fog: *const f32, wind: *const f32, len: u32, heading: f32) {
+    unsafe {
+        let d = dim(w);
+        let n = len as usize;
+        let air = if n == 0 {
+            Vec::new()
+        } else {
+            let (b, f, s) = (std::slice::from_raw_parts(biomes, n), std::slice::from_raw_parts(fog, n), std::slice::from_raw_parts(wind, n));
+            (0..n).map(|i| (b[i], f[i].clamp(0.0, 1.0), s[i].max(0.0))).collect()
+        };
+        d.events
+            .push(crate::server::DimEvent::SetAir { dim: d.id, air, heading });
     }
 }
 

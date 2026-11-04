@@ -51,6 +51,12 @@ pub enum DimEvent {
         biomes: Vec<u32>,
         thunder: bool,
     },
+    /// The air in its biomes from now on (`DimSet::set_air`).
+    SetAir {
+        dim: u32,
+        air: Vec<(u32, f32, f32)>,
+        heading: f32,
+    },
     /// A white flash on it for those who see it.
     Flash {
         id: u64,

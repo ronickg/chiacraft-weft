@@ -90,8 +90,10 @@ value! {
     /// humidity 0 dry to 1 wet (dry air swings more between day and night), half the range
     /// between summer and winter, and the share of days with rain in each season (spring
     /// first). Set on biomes (`r.biome(..).set(&CLIMATE, ..)`); body temperature and the weather
-    /// read it (`notes/SURVIVAL.md`, `notes/ECOLOGY.md`).
-    pub struct Climate { pub celsius: f32, pub humidity: f32, pub seasons: f32, pub rain: [f32; 4] }
+    /// read it (`notes/SURVIVAL.md`, `notes/ECOLOGY.md`). And its air (`vitals::air`): the mean
+    /// wind in m/s and the days with fog in each season, and the kind of fog
+    /// (`vitals::climate::Fog::index`).
+    pub struct Climate { pub celsius: f32, pub humidity: f32, pub seasons: f32, pub rain: [f32; 4], pub wind: [f32; 4], pub fog: [f32; 4], pub fog_kind: u8 }
 }
 pub static CLIMATE: Component<Climate> = Component::named("base:climate");
 /// The calendar a dimension has (`vitals::calendar`): spring, summer, autumn and winter, or a
@@ -119,11 +121,12 @@ pub mod calendars {
 /// on it: every biome's numbers in one place, where the checks across systems read them.
 pub fn climate(biome: &str) -> Climate {
     let c = vitals::climate::of(biome).unwrap_or_else(|| panic!("no climate for {biome} in vitals::climate::BIOMES"));
-    Climate { celsius: c.celsius, humidity: c.humidity, seasons: c.seasons, rain: c.rain }
+    Climate { celsius: c.celsius, humidity: c.humidity, seasons: c.seasons, rain: c.rain, wind: c.wind, fog: c.fog, fog_kind: c.fog_kind.index() }
 }
 
-/// A biome without one: a mild, temperate place, raining a quarter of the days.
-pub const TEMPERATE: Climate = Climate { celsius: 12.0, humidity: 0.5, seasons: 10.0, rain: [0.25; 4] };
+/// A biome without one: a mild, temperate place, raining a quarter of the days, a light breeze
+/// and a few foggy mornings.
+pub const TEMPERATE: Climate = Climate { celsius: 12.0, humidity: 0.5, seasons: 10.0, rain: [0.25; 4], wind: [4.0; 4], fog: [8.0; 4], fog_kind: 0 };
 
 /// How hard survival is in this world (`vitals::difficulty::ALL`: gentle, normal, harsh), a
 /// game rule picked when the world is made and changed with `/rule difficulty`.

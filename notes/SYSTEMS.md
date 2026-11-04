@@ -15,6 +15,8 @@ flowchart LR
   climate --> weather["Rain by season<br/>base weather.rs"]
   calendar --> weather
   weather --> air
+  climate --> wind["Wind and fog<br/>vitals::air"]
+  wind --> weather
   weather --> plants["Plants grow<br/>base growth.rs"]
   climate --> plants
   plants --> forage["Foraging<br/>animals forage.rs"]
@@ -77,6 +79,7 @@ built, it gets its row below and its arrows above.
 | Capacity | `vitals::forage::season_lushness`, `forage.rs` (`NATURAL_SPAWN`), `animal::arrive` | `SPAWN_FLOOR`, `ARRIVES_FED`, `YOUNG_PERCENT`, `STARVES_SECS` | plants, climates, calendar, breeding seasons | natural spawning, how fed wild ones arrive, young in season, starving |
 | Plants, soil water | `vitals::plants` (`PLANTS`, `rate`, `soil_water`), `base_api::ground_at`, `mods/base/src/growth.rs` | `PLANTS` rows, `GROWING` | climates, rain schedule, calendar, height, water within 4 blocks | the growing blocks' steps (wheat, berry bush, sapling, sugar cane, cactus) |
 | Rain by season | `mods/base/src/weather.rs`, `vitals::climate::{spell, rains, thunders}` | `rain` per season in `BIOMES` | climates, calendar, the world's seed | the engine (`set_rain`: rain drawn only where it falls), the air (`raining_at`) |
+| Wind and fog | `vitals::air`, `mods/base/src/weather.rs` (`/air`) | `wind`, `fog`, `fog_kind` per biome in `BIOMES`; `DAY_SPREAD`, `DAY_SWING`, `STORM`, `CLEARS` | climates, calendar, thunder (storms), the world's seed | the engine (`set_air` → `scene.weather`: the shader pack's fog, swaying plants, slanting rain); not yet bodies or animals |
 | Calendar, seasons | `vitals::calendar` | `SEASON_DAYS`, `MIDSUMMER` | engine day time | the air, breeding seasons, day length (`.seasons(..)` on dimensions), the HUD clock |
 | The air | `base_api::air_at`, `vitals::temperature::air` | `temperature.rs` | climate, season, hour, height, sky light, rain here (`raining_at`), water, fires (`base_api::heat_of`) | player's body, animals' bodies, eggs |
 | Player's body | `mods/base/src/survival/` (a file per part: breath, food, temperature, camp, stamina, body, load, health) | `vitals` | air, stomach, stats, effects, armor, difficulty | HUD, health and speed modifiers, death |

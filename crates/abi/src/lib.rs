@@ -2100,6 +2100,11 @@ pub struct Host {
     /// Whether it rains at `pos` (in the open or not): in this dimension, and in that biome when a
     /// mod says where (`set_rain`).
     pub raining_at: unsafe extern "C" fn(world: *mut WorldCtx, pos: *const [i32; 3]) -> u32,
+    /// The air in this dimension's biomes from now on, until the next call: for each of the `len`
+    /// biomes, how foggy it is (`fog`, 0 clear to 1 thick) and the wind's speed (`wind`, m/s), and
+    /// for all of them where the wind blows to (`heading`, degrees clockwise from north, -z). What
+    /// players see; biomes not named are clear and still.
+    pub set_air: unsafe extern "C" fn(world: *mut WorldCtx, biomes: *const u32, fog: *const f32, wind: *const f32, len: u32, heading: f32),
     /// A white flash on an entity for everyone who sees it.
     pub entity_flash: unsafe extern "C" fn(world: *mut WorldCtx, id: u64),
     /// A player's `permission` level.

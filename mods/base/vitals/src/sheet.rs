@@ -7,7 +7,7 @@ use std::fmt::Write;
 use crate::effects;
 use crate::food::{self, NUTRIENT_NAMES};
 use crate::stats::{self, Growth};
-use crate::{calendar, climate, difficulty, forage, levels, plants, soil, temperature};
+use crate::{air, calendar, climate, difficulty, forage, levels, plants, soil, temperature};
 
 pub fn markdown() -> String {
     let mut w = String::new();
@@ -138,6 +138,28 @@ fn climates(w: &mut String) {
         let rain = c.rain.map(|r| format!("{:.0}%", r * 100.0)).join(" | ");
         let _ =
             writeln!(w, "| {} | {} | {} | {} | {} | {cold:.0} | {hot:.0} | {rain} |", c.biome, c.place, c.celsius, c.humidity, c.seasons);
+    }
+    let _ = writeln!(w);
+    let _ = writeln!(
+        w,
+        "## Wind and fog\n\nEach place's mean wind in m/s and its share of days with fog, in spring, summer, autumn and winter (`reports/ecology/Wind and fog.md`), and when its fog lies (`vitals::air`). A day blows from {:.0}% to {:.0}% of the mean, a quarter more mid afternoon than before dawn, {:.1} times under a thunderstorm; still fog clears from {} to {} m/s, sea fog from {} to {}.\n\n| biome | wind: spring | summer | autumn | winter | fog: spring | summer | autumn | winter | fog lies |\n|---|---|---|---|---|---|---|---|---|---|",
+        air::DAY_SPREAD.0 * 100.0,
+        air::DAY_SPREAD.1 * 100.0,
+        air::STORM,
+        air::CLEARS.0,
+        air::CLEARS.1,
+        air::SEA_CLEARS.0,
+        air::SEA_CLEARS.1
+    );
+    for c in climate::BIOMES.iter().filter(|c| !c.underground) {
+        let wind = c.wind.map(|v| format!("{v:.1}")).join(" | ");
+        let fog = (0..4).map(|s| format!("{:.0}%", air::fog_share(c.fog, Some(s)) * 100.0)).collect::<Vec<_>>().join(" | ");
+        let kind = match c.fog_kind {
+            climate::Fog::Dawn => "before dawn to mid morning",
+            climate::Fog::Sea => "off the sea, any hour",
+            climate::Fog::Ice => "ice fog, cold nights and the dark",
+        };
+        let _ = writeln!(w, "| {} | {wind} | {fog} | {kind} |", c.biome);
     }
     let _ = writeln!(w);
 }

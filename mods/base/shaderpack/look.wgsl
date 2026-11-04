@@ -178,12 +178,119 @@ fn light_round(light: vec4<f32>, pos: vec3<f32>) -> vec3<f32> {
     return c;
 }
 
+// ---- the air: wind and fog (`scene.weather`, from the weather in `mods/base/src/weather.rs`) ----
+
+// Sea level in chiacraft's worlds (`base_api::SEA`): low fog lies on it and in the valleys.
+const SEA_LEVEL: f32 = 63.0;
+
+fn hash3(p: vec3<i32>) -> f32 {
+    var h = bitcast<u32>(p.x) * 73856093u ^ bitcast<u32>(p.y) * 19349663u ^ bitcast<u32>(p.z) * 83492791u;
+    h = (h ^ (h >> 16u)) * 0x45d9f3bu;
+    h = (h ^ (h >> 16u)) * 0x45d9f3bu;
+    h = h ^ (h >> 16u);
+    return f32(h & 0xffffffu) / 16777215.0;
+}
+
+// Smooth noise 0..1: random values at whole points, blended between.
+fn noise3(p: vec3<f32>) -> f32 {
+    let i = vec3<i32>(floor(p));
+    let f = fract(p);
+    let u = f * f * (3.0 - 2.0 * f);
+    let a = mix(mix(hash3(i), hash3(i + vec3(1, 0, 0)), u.x), mix(hash3(i + vec3(0, 1, 0)), hash3(i + vec3(1, 1, 0)), u.x), u.y);
+    let b = mix(mix(hash3(i + vec3(0, 0, 1)), hash3(i + vec3(1, 0, 1)), u.x), mix(hash3(i + vec3(0, 1, 1)), hash3(i + vec3(1, 1, 1)), u.x), u.y);
+    return mix(a, b, u.z);
+}
+
+// The wind where the player is: m/s along the world's x and z, the way it blows.
+fn wind_now() -> vec2<f32> {
+    return scene.weather.xy;
+}
+
+// How hard the wind pushes at `p` now, about 1 for its mean: gusts are bands of stronger wind that
+// sweep across the land the way it blows, so a field bends in waves.
+fn gust(p: vec3<f32>) -> f32 {
+    let w = wind_now();
+    let speed = length(w);
+    let dir = select(vec2(1.0, 0.0), w / max(speed, 1e-4), speed > 0.01);
+    let t = scene.params.w;
+    let along = dot(p.xz, dir) - t * max(speed, 1.0) * 0.9;
+    let band = noise3(vec3(along / 14.0, t * 0.05, dot(p.xz, vec2(-dir.y, dir.x)) / 30.0));
+    return 0.55 + 1.1 * smoothstep(0.35, 0.85, band);
+}
+
+// Where the fog lies: on the ground about the player (a few blocks under the eye), or on the sea
+// if that is higher. Valleys under it fill, hills stand out of it.
+fn fog_floor() -> f32 {
+    return max(SEA_LEVEL, scene.eye.y - 5.0);
+}
+
+// How foggy the air is at `p` (world): a layer lying on the ground and in the valleys, broken into
+// banks that drift with the wind and thin out higher up. 0 in clear weather. Per block.
+fn fog_density(p: vec3<f32>) -> f32 {
+    let f = scene.weather.z;
+    let h = p.y - fog_floor();
+    let low = exp(-max(h - 3.0, 0.0) / 7.0);
+    let high = exp(-max(h, 0.0) / 45.0);
+    let drift = vec3(wind_now().x, 0.0, wind_now().y) * scene.params.w * 0.6;
+    let q = p - drift;
+    let shape = noise3(q * vec3(1.0 / 38.0, 1.0 / 12.0, 1.0 / 38.0)) * 0.7 + noise3(q * vec3(1.0 / 15.0, 1.0 / 8.0, 1.0 / 15.0)) * 0.3;
+    let eaten = noise3(q * vec3(1.0 / 6.0, 1.0 / 4.0, 1.0 / 6.0) + vec3(0.0, scene.params.w * 0.04, 0.0));
+    let banks = smoothstep(0.42, 0.7, shape - 0.25 * eaten + 0.12);
+    // Deep under it, in the ground, there is none.
+    let open = smoothstep(-24.0, -10.0, h);
+    return f * open * (low * (0.12 + 1.5 * banks) + 0.08 * high) * 0.11;
+}
+
+// Light the fog sends toward the eye: the sky's from all around, the sun's mostly forward, so it
+// glows white-gold looking toward the sun.
+fn fog_light(dir: vec3<f32>) -> vec3<f32> {
+    let p = palette();
+    let mu = dot(dir, light_dir());
+    let g = 0.6;
+    let hg = (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * mu, 1.5) / 12.566;
+    let phase = hg * 6.0 + 0.25;
+    return (p.ambient * 1.25 + p.horizon * 0.2) * 0.9 + p.sun * light_strength() * phase * 0.9;
+}
+
+// The fog between the eye and a point `rel` away (camera relative), walked in a few steps that are
+// closer together near the eye; `sky` (0..1) the sky light at the point, so caves stay clear.
+fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
+    if scene.weather.z < 0.005 || in_liquid() || !open_sky() || sky <= 0.0 {
+        return c;
+    }
+    let dist = min(length(rel), 220.0);
+    let dir = rel / max(length(rel), 1e-4);
+    let eye = scene.eye.xyz;
+    let light = fog_light(dir);
+    let steps = 12u;
+    var through = 1.0;
+    var gained = vec3(0.0);
+    var last = 0.0;
+    for (var i = 1u; i <= steps; i++) {
+        let k = f32(i) / f32(steps);
+        let at = dist * (exp(2.2 * k) - 1.0) / (exp(2.2) - 1.0);
+        let step = at - last;
+        let d = fog_density(eye + dir * (at - step * 0.5)) * sky;
+        let kept = exp(-d * step);
+        gained += through * (1.0 - kept) * light;
+        through *= kept;
+        last = at;
+    }
+    return c * through + gained;
+}
+
 // ---- haze and fog ----
 
 // The air between the eye and a point `rel` away (camera relative): a haze the color of the sky
 // behind it that thickens with distance and thins with height, full where the terrain ends. In a
 // liquid or a dimension without sky, the engine's fog.
 fn haze(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
+    return haze_lit(c, rel, 1.0);
+}
+
+// `haze` for a point with `sky` (0..1) sky light: fog gathers only out under the sky.
+fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
+    let c = fog_through(c_in, rel, smoothstep(0.25, 0.75, sky));
     let dist = length(rel);
     if in_liquid() || !open_sky() {
         return mix(c, scene.fog_color.rgb, fog_amount(dist, scene.params.x, scene.params.y));

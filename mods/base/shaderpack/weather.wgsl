@@ -20,7 +20,9 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
     let w = columns[ii];
     let c = CORNER[vi % 6u];
     let across = normalize(vec2(w.place.z, -w.place.x) + vec2(1e-4, 0.0));
-    let world = vec3(w.place.x + across.x * (c.x - 0.5), mix(w.place.w, w.place.y, c.y), w.place.z + across.y * (c.x - 0.5));
+    var world = vec3(w.place.x + across.x * (c.x - 0.5), mix(w.place.w, w.place.y, c.y), w.place.z + across.y * (c.x - 0.5));
+    // Drops come in on the wind: higher up they are further upwind (rain falls about 7 m/s).
+    world = vec3(world.x - wind_now().x / 7.0 * (world.y - w.place.w), world.y, world.z - wind_now().y / 7.0 * (world.y - w.place.w));
     var out: VOut;
     out.clip = scene.view_proj * vec4(world, 1.0);
     out.uv = vec2(w.uv.x + c.x * 0.25, w.uv.y + (c.y - 1.0) * w.uv.z);

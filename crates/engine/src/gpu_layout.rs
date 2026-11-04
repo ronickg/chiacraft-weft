@@ -448,6 +448,13 @@ gpu_struct! {
         /// dimension without sky light). For shader packs' shadows; follows the day, whatever
         /// bodies mods put in the sky.
         pub sun: [f32; 4],
+        /// x and y the wind where the player is along the world's x and z (m/s, the way it
+        /// blows), z how foggy it is there (0..1), w how hard it thunders (0..1); from a mod's
+        /// weather (`set_air`), still and clear without one. For shader packs.
+        pub weather: [f32; 4],
+        /// The camera in the world: x and z wrapped every 8192 blocks (enough for noise to tile
+        /// unseen), y as it is; w unused. For shader packs.
+        pub eye: [f32; 4],
     }
 }
 
