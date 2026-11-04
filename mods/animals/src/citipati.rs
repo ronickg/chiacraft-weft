@@ -12,7 +12,6 @@ pub(crate) static CITIPATI: Entity = Entity::named("citipati");
 static BODY: Body = Body {
     model: "citipati",
     texture: "citipati/citipati",
-    size: (0.7, 1.7),
     health: 40.0,
     // A long-legged runner, as an emu (est.).
     speed: 6.0,

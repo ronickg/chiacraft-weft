@@ -7,6 +7,7 @@ use std::sync::Mutex;
 
 pub mod balance;
 pub mod biology;
+pub mod bodies;
 pub mod coats;
 pub mod evolution;
 pub mod hides;

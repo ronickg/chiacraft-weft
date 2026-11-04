@@ -15,7 +15,6 @@ pub(crate) static PINACOSAURUS: Entity = Entity::named("pinacosaurus");
 static BODY: Body = Body {
     model: "ankylosaur",
     texture: "ankylosaur/ankylosaur",
-    size: (1.8, 1.3),
     health: 120.0,
     // Slow and heavy: a walk, and a lumbering trot at most (est.).
     speed: 2.8,

@@ -13,7 +13,6 @@ pub(crate) static IGUANODONT: Entity = Entity::named("iguanodont");
 static BODY: Body = Body {
     model: "iguanodont",
     texture: "iguanodont/iguanodont",
-    size: (1.8, 2.7),
     health: 150.0,
     // A heavy trot on all fours at most (est.).
     speed: 4.5,

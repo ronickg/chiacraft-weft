@@ -10,16 +10,20 @@ or partially".
 The research behind the pick (Valheim, the Minecraft mods, Vintage Story, how a falling tree is drawn,
 game feel) is below it, with a source for every number.
 
-## Where it stands (11-05)
+## Where it stands (11-05, done)
 
-Built on `claude/tree-felling-df4d15`, each seen on the PC (`~/Coding/chiacraft-archive/images/tree-felling/2026-11-05/`):
-chop time and axe tiers (`fell_chop_v6`), the fall as the real tree with Ronald's yes to the engine
-change ("Yes, the real tree falls"; `fell_fall4`, sheets `fall_sheet_v1..v3.jpg`), the trunk on the
-ground in pieces (`fell_land2`), knock-on, no floating trees (Planner: any lost foot or trunk log
-fells what it held; bare hands slow and fruitless; `fell_nofloat`), and stripping (one log makes
-planks; an axe strips a log, oak gives bark; `fell_strip3`). Not yet: a tree hanging up on a trunk
-it can't fell, damage to what it sweeps, the fall's sounds, a falling tree's shadow (the engine's
-shadow pass skips structures), bark chips and a stump top (Art, later).
+All built on `claude/tree-felling-df4d15` and merged into dev, each seen on the PC
+(`~/Coding/chiacraft-archive/images/tree-felling/2026-11-05/`): chop time and axe tiers (`fell_chop_v6`);
+the fall as the real tree, with Ronald's yes to the engine change ("Yes, the real tree falls";
+`fell_fall4`, `fell_fall6`, sheets `fall_sheet_v1..v4`); the trunk on the ground in pieces
+(`fell_land2`); knock-on; no floating trees (Planner: any lost foot or trunk log fells what it held;
+`fell_nofloat`); stripping (one log makes planks, an axe strips a log, oak gives bark; `fell_strip3`);
+hang-ups that settle as blocks and come down with their holder (`fell_hang3`, `hang_sheet_v1`); damage to
+what it hits (2 + logs/10, up to 20); its sounds (creak, rush, thud: `reports/sound-files/fall_sounds.py`,
+not yet listened to by a person); its shadow (an engine change); a reach of 12 for the tropical giants;
+and a STOPGAP until first-hours, bare hands keeping the wood of trees of up to 10 logs (`fell_stopgap`).
+Still open: a hung tree remembered across a restart, bark chips, stump tops and landing dust (Art,
+when someone wires them).
 
 ## The pick
 

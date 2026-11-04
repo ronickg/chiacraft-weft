@@ -101,7 +101,7 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
         }
         let Some(t) = w.component(id, &TAMING).copied() else { return false };
         if t.scared > 0 {
-            set(w, id, |t| t.scared -= 1);
+            set(w, id, |t| t.scared = t.scared.saturating_sub(w.tick_elapsed(id)));
             if (w.time() + id) % 20 == 0 || !w.navigating(id) {
                 flee(w, id, st);
             }
@@ -140,7 +140,7 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             return true;
         }
         if t.wait > 0 {
-            set(w, id, |t| t.wait -= 1);
+            set(w, id, |t| t.wait = t.wait.saturating_sub(w.tick_elapsed(id)));
             return false;
         }
         if (w.time() + id) % 20 == 0 && near_player(w, st).is_some() {

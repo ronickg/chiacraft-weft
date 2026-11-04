@@ -14,7 +14,6 @@ pub(crate) static SAVANNA_HAWK: Entity = Entity::named("savanna_hawk");
 static WINGS: Wings = Wings {
     model: "eagle",
     texture: "eagle/eagle",
-    size: (0.55, 0.65),
     fly_size: (1.2, 0.4),
     health: 16.0,
     // It walks little; it soars at about 14 m/s.

@@ -614,6 +614,10 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::number("core:listing_deposit", ck::INT, 100_000_000.0, 1.0, 1e15, 1.0),
         // Where others reach this game by address; forward it, TCP and UDP.
         ConfigDef::number("core:server_port", ck::INT, 27182.0, 1.0, 65535.0, 1.0),
+        // A test setting, on no screen (Ronald, 11-04: "Yes, relay-only test"): every connection goes
+        // through the relay, never a direct path, to see joins work over the internet from one
+        // home network (`--config core:net_relay_only=true`; `net: path to` then reads `relay`).
+        ConfigDef::number("core:net_relay_only", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         ConfigDef::text("core:resource_packs", ""),
         ConfigDef::text("core:shader_pack", ""),
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:mob_spawning", ck::BOOL, 1.0, 0.0, 1.0, 0.0) },

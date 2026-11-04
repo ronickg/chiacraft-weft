@@ -73,7 +73,7 @@ pub fn init(r: &mut Registry) {
     // blue-green with brown blotches like its relative Deinonychus's); a bigger species' scaled up.
     r.entity(&EGG_ENTITY)
         .no_egg()
-        .size(0.1, 0.14)
+        .size(animals_core::bodies::of("egg").0, animals_core::bodies::of("egg").1)
         .health(4.0)
         .speed(0.0)
         .passive()
@@ -93,7 +93,7 @@ pub fn init(r: &mut Registry) {
     // egg in hand.
     r.entity(&NEST)
         .no_egg()
-        .size(NEST_WIDTH, 0.15)
+        .size(animals_core::bodies::of("nest").0, animals_core::bodies::of("nest").1)
         .health(6.0)
         .speed(0.0)
         .passive()
@@ -177,8 +177,10 @@ pub(crate) fn egg_size(index: usize) -> f32 {
     (SPECIES[index].height.0 / SPECIES[crate::species::of(&crate::raptor::RAPTOR)].height.0).powf(EGG_GROWTH)
 }
 
-/// A nest's width.
-const NEST_WIDTH: f32 = 0.9;
+/// A nest's width (its box, `animals_core::bodies`).
+fn nest_width() -> f32 {
+    animals_core::bodies::of("nest").0
+}
 /// A bigger species' nest is its eggs' size bigger (a wyvern's, about 3 m across).
 fn nest_size(index: usize) -> f32 {
     egg_size(index).max(1.0)
@@ -188,7 +190,7 @@ fn nest_size(index: usize) -> f32 {
 fn nest_scale(w: &World, at: [f64; 3]) -> f64 {
     nest_near(w, at, 0.1)
         .and_then(|(n, _)| w.entity(n))
-        .map_or(1.0, |e| (e.size[0] / NEST_WIDTH) as f64)
+        .map_or(1.0, |e| (e.size[0] / nest_width()) as f64)
 }
 
 /// The nest within `r` blocks of `at`, if any: its id and position.
@@ -202,7 +204,7 @@ fn nest_near(w: &World, at: [f64; 3], r: f64) -> Option<(u64, [f64; 3])> {
 fn in_nest(w: &World, at: [f64; 3]) -> bool {
     w.near(at, 2.5, Some(&NEST)).into_iter().any(|n| {
         w.entity(n).is_some_and(|e| {
-            let r = 0.6 * (e.size[0] / NEST_WIDTH) as f64;
+            let r = 0.6 * (e.size[0] / nest_width()) as f64;
             (e.pos[0] - at[0]).powi(2) + (e.pos[2] - at[2]).powi(2) < r * r
         })
     })

@@ -66,6 +66,8 @@ pub static MUSHROOMS: Component<BlockList> = Component::named("mushrooms");
 pub static MUSHROOM_COVER: Component<f32> = Component::named("mushroom_cover");
 /// The share of a biome's trees with lianas hanging from their crowns (`vitals::layers`).
 pub static LIANAS: Component<f32> = Component::named("lianas");
+/// Treefall gaps (`vitals::layers`): the chance a 48-block cell holds one.
+pub static TREEFALL: Component<f32> = Component::named("treefall");
 /// The share of a biome's tall grass that grows two blocks tall (`TALL_GRASS_DOUBLE`).
 pub static TALL_GRASS_SHARE: Component<f32> = Component::named("tall_grass_share");
 /// Big-leaved plants two blocks tall (`vitals::layers`): the share of the bare soil, and which.
@@ -397,6 +399,9 @@ pub fn register(r: &mut Registry) {
         if l.lianas > 0.0 {
             r.set_on(b(), &LIANAS, l.lianas);
         }
+        if l.gaps > 0.0 {
+            r.set_on(b(), &TREEFALL, l.gaps);
+        }
         if l.big_leaves > 0.0 {
             r.set_on(b(), &BIG_LEAVES, l.big_leaves);
             r.set_text_on(b(), &BIG_LEAF_KINDS, l.big_leaf_kinds);
@@ -564,6 +569,13 @@ fn giant(s: &mut Site) {
         return;
     };
     let [x, y, z] = s.pos();
+    if TREEFALL
+        .on_biome(s.biome())
+        .and_then(|share| in_gap(s.seed(), x, z, share, GAP_MARGIN_GIANT))
+        .is_some()
+    {
+        return;
+    }
     // One sequoia in twelve lies fallen, mossy, along the ground (the overworld's: its height is
     // known).
     if (h >> 4).is_multiple_of(12) && s.dimension() == crate::OVERWORLD.id() && Block::lookup("base:sequoia_log") == Some(log) {
@@ -627,6 +639,59 @@ fn giant_foot(s: &mut Site, [x, y, z]: [i32; 3], h: u64) {
                 s.force([fx, y + dy, fz], BRAZIL_NUT_BUTTRESS.id());
             }
         }
+    }
+}
+
+/// Whether (`x`, `z`) lies in a treefall gap: each 48-block cell holds one at chance `share`, a
+/// round opening 8 to 20 blocks across somewhere in it (its own and its neighbours' cells looked
+/// at, so a gap may cross a cell's edge). `Some(true)` inside it, `Some(false)` in the ring
+/// `margin` wide round it where no tree may stand, `None` elsewhere.
+fn in_gap(seed: u64, x: i32, z: i32, share: f32, margin: i32) -> Option<bool> {
+    const CELL: i32 = 48;
+    let (cx, cz) = (x.div_euclid(CELL), z.div_euclid(CELL));
+    for dz in -1..=1 {
+        for dx in -1..=1 {
+            let (gx, gz) = (cx + dx, cz + dz);
+            let h = hash(seed ^ 0x6A9F, gx as i64, 0, gz as i64);
+            if (h & 1023) as f32 / 1024.0 >= share {
+                continue;
+            }
+            let px = gx * CELL + ((h >> 10) % CELL as u64) as i32;
+            let pz = gz * CELL + ((h >> 20) % CELL as u64) as i32;
+            let r = 4 + ((h >> 30) % 7) as i32;
+            let (ex, ez) = (x - px, z - pz);
+            let d2 = ex * ex + ez * ez;
+            if d2 <= (r + margin) * (r + margin) {
+                return Some(d2 <= r * r);
+            }
+        }
+    }
+    None
+}
+
+/// How far round a gap trees are kept back so their crowns don't close it over: a canopy tree's
+/// crown reaches 8 from its trunk, a giant's 12 (the scatters' reaches); a little less, so the
+/// edge's crowns overhang it as real ones do.
+const GAP_MARGIN: i32 = 6;
+const GAP_MARGIN_GIANT: i32 = 10;
+
+/// What stands where a canopy tree would in a treefall gap: one in three a trunk lying fallen
+/// (five to nine long, the way it fell), one in three a young tree of its kind coming up, the rest
+/// open ground for the light (the ferns and big leaves the floor's layers put).
+fn gap_growth(s: &mut Site, log: u32, [x, y, z]: [i32; 3], h: u64) {
+    match (h >> 50) % 3 {
+        0 => {
+            let (dx, dz) = [(1, 0), (-1, 0), (0, 1), (0, -1)][((h >> 40) % 4) as usize];
+            let lying = state_with(log, "axis", if dx != 0 { "x" } else { "z" }).unwrap_or(log);
+            for k in 0..5 + ((h >> 44) % 5) as i32 {
+                s.put([x + dx * k, y, z + dz * k], lying);
+            }
+        }
+        1 => base_api::trees::young_tree_blocks(log, x, y, z, h >> 8, |x, y, z, state, force| {
+            let state = made_leaves(state);
+            if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
+        }),
+        _ => {}
     }
 }
 
@@ -736,6 +801,16 @@ fn tree(s: &mut Site) {
         .and_then(|l| l.pick(s.random() >> 40))
         .unwrap_or(OAK_LOG.id());
     let h = s.random();
+    // In a treefall gap no canopy tree stands: one lies fallen, or young growth comes up.
+    if let Some(inside) = TREEFALL
+        .on_biome(s.biome())
+        .and_then(|share| in_gap(s.seed(), x, z, share, GAP_MARGIN))
+    {
+        if inside {
+            gap_growth(s, log, [x, y, z], h);
+        }
+        return;
+    }
     let Some(t) = wild_tree_at(log, x, y, z, h >> 32) else { return };
     let mut crown = Vec::new();
     let climbers = LIANAS.on_biome(s.biome()).is_some();

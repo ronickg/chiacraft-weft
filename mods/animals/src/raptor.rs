@@ -48,7 +48,7 @@ fn register(r: &mut Registry, kind: &'static Entity, index: usize, texture: &str
     let settle = crate::rest::Settle { chance: 300, ticks: (400, 1200), lie_after: 0 };
     crate::rest::register(r, kind, settle, "raptor", texture, (0.6, 0.9), &[("_rest", &rest_look(kind))]);
     r.entity(kind)
-        .size(0.6, 0.9)
+        .size(animals_core::bodies::of("raptor").0, animals_core::bodies::of("raptor").1)
         .health(14.0)
         .speed(4.0)
         .attack_damage(4.0)

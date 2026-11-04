@@ -927,6 +927,30 @@ season), and `/animal room` (the guard's own count) turned a pack away at 30 nea
 at 13. Without water (aw_wolves2) or food (aw_wolves) a pen dies of thirst or hunger within days
 instead, as it should.
 
+**Hitboxes fit their models** (2026-11-05; Ronald: "do the hitboxes from our animals, mobs, etc.,
+all work correctly?"). A creature's box is what a sword, an arrow or a click hits, what a rider
+sits on, and what bumps into the world; it is square, stands on the feet, and scales with the
+model (genes, growth). Measured against the models, the big Cretaceous animals' boxes were half
+their size or less (an iguanodont 1.8 wide round a 9-block body, a sauropod 4.2 high under an
+8.6-block neck, a utahraptor 1.2 round 4.8), the dogs', wolves' and jaguars' a little small, and
+the caimans' and fish's too tall. Every box is now a row in `animals_core::bodies` by model, at
+Minecraft's proportions: its height the model's top, its width about the geometric mean of the
+model's width and length (a wolf's box is its body's average, not nose to tail), the model
+centred on it. `core/tests/boxes.rs` measures each `geo.json` at rest (the engine's bone
+rotations) and holds every box to that (0.75-1.35 of the top, 0.75-1.5 of the mean, centred
+within 0.3 of the width; the tiniest a tenth of a block more, to click). The wyvern's width is
+excused: its wings are most of its bounds, and its box is its body. Base's vanilla mobs keep
+vanilla's boxes. A long animal's head and tail still stick out of its box (one box can't follow
+a 9-block body); the bigger boxes also need wider gaps to walk through.
+
+**Far animals keep time** (2026-11-05). With the engine's activation ranges an animal no player
+is within 48 blocks of rests, ticking only every `core:inactive_entity_interval` ticks (20). Its
+countdowns run down by the ticks elapsed (`World::tick_elapsed`: breeding, gifts, anger, taming's
+fright and wait, a dog's sitting; the last three still counted one a call, so a far one stayed
+frightened twenty times as long), and its once-a-second body, hunger and thirst run on the tick a
+second turns over for it and cover the seconds that passed (`life::seconds_due`, `steps_in`):
+before, they lived one second a wake, right only at the default interval.
+
 **Time away** (2026-11-02; Ronald: "my animals should die even while I'm gone"). Animals only
 live where a player is: the engine spawns them 20-45 blocks from players (at most 6 passive ones
 within 64) and ticks only loaded areas. So what happens elsewhere is caught up when an area loads,

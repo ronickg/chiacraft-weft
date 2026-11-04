@@ -109,6 +109,7 @@ pub fn terrain(r: &mut Registry) {
     r.decorate(rock_faces).dimension(&crate::OVERWORLD);
     r.decorate(cave_mouths).dimension(&crate::OVERWORLD);
     r.decorate(glaciers).dimension(&crate::OVERWORLD);
+    r.decorate(tarn_water).dimension(&crate::OVERWORLD);
     r.decorate(fray_borders).dimension(&crate::OVERWORLD);
     r.decorate(sea_sand).dimension(&crate::OVERWORLD);
     r.decorate(coral).dimension(&crate::OVERWORLD);
@@ -546,6 +547,41 @@ fn tropical_water(g: &mut Gen) {
             for wy in (SEA - depth + 1)..=SEA {
                 if (oy..oy + 16).contains(&wy) {
                     g.set(xu, (wy - oy) as usize, zu, WATER.id());
+                }
+            }
+        }
+    }
+}
+
+/// The tarns' water (`base_api::land::tarn_level`, `TARN_*`): from the bowl's bed up to its level,
+/// still; the ring round it holds it. A cave under the bed is closed with stone so the water can't
+/// run out. After the glaciers, before the plants.
+fn tarn_water(g: &mut Gen) {
+    let Some(&cols) = g.columns() else { return };
+    let [ox, oy, oz] = g.origin();
+    let lowest = cols.iter().map(|c| c.height).min().unwrap_or(0);
+    // Tarns stand high: under the lowest snow line, in the mountains; nothing here under the sea.
+    if oy + 15 < lowest - 1 || oy + 15 <= SEA {
+        return;
+    }
+    let f = l::fields(g.seed());
+    for z in 0..16i32 {
+        for x in 0..16i32 {
+            let h = cols[(z * 16 + x) as usize].height;
+            if h - 1 > oy + 15 {
+                continue;
+            }
+            let Some(level) = l::tarn_level(&f, ox + x, oz + z) else { continue };
+            let (xu, zu) = (x as usize, z as usize);
+            for wy in (h - 1)..=level {
+                if !(oy..oy + 16).contains(&wy) {
+                    continue;
+                }
+                let y = (wy - oy) as usize;
+                if wy > h {
+                    g.set(xu, y, zu, WATER.id());
+                } else if g.get(xu, y, zu) == 0 {
+                    g.set(xu, y, zu, STONE.id());
                 }
             }
         }

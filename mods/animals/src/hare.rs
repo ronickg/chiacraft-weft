@@ -13,7 +13,6 @@ pub(crate) static MOUNTAIN_HARE: Entity = Entity::named("mountain_hare");
 static BODY: Body = Body {
     model: "hare",
     texture: "hare/hare",
-    size: (0.4, 0.45),
     health: 5.0,
     // Lolloping about slowly, flat out when it bolts: faster than a running player.
     speed: 4.0,

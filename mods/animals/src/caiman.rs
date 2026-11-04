@@ -18,7 +18,6 @@ pub(crate) static CROCODYLIFORM: Entity = Entity::named("crocodyliform");
 static BODY: Body = Body {
     model: "caiman",
     texture: "caiman/caiman",
-    size: (0.9, 0.45),
     health: 30.0,
     // A slow walk on land, a short rush at prey.
     speed: 3.0,

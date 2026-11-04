@@ -31,6 +31,7 @@ for now is bug fixes only, written and opened by him.
 | Under water the sky's gradient is drawn (2562a0cd) | Navy streaks where the sea floor ends | Maybe |
 | Sky pictures upright on a leaned sun path (81ff2dcc) | The moon drew as a tilted diamond | With the leaned path only |
 | clippy allows for `mut_from_ref` (0d111b9a, d7ff2255) | A newer clippy made them errors | Trivial |
+| Client: water drips (a solid block under water, air under that) read the block under with `get`: a cube not arrived yet is `u32::MAX` (`client/mod.rs`) | It indexed past the block states and crashed the client a second after arriving by a tarn (water above the sea's level, near the top of what had arrived) | Yes: a plain bug fix |
 
 ## 2. Rendering, for our shader pack (Bliss-like look)
 
@@ -44,6 +45,7 @@ Weft's shader packs could only replace shaders. Our pack needed data the engine 
 - **Canopy light** (e40f323e, on look-canopy): a biome's air flags carry how closed its canopy is (`weft_abi::air_flags::CANOPY_SHIFT`, bits 16-23, 0-255). The client eases it over 10 s into a new `Scene.canopy` field, the same path the aurora takes. *Why:* the tropical forest's shade and sunflecks under closed crowns.
 - **Performance:** render scale (519dbf32, 14a00a37), a pipeline cache on disk (b1867503), a bounded, depth-only shadow pass (409d70ed), screen effects in one pass (716acfd8, ce011d36), the water's grid only when changed (bdb745ef), small frame-thread steps in place (ac4995f3), the frame thread culling its own draws (c31f6d34), skin painters off the frame thread (1041e730). *Why:* Ronald's Mac lagged at 3456x2234; these took it from about 96-124 fps to 128-154 fps uncapped.
 - **Diagnostics:** GPU time per pass in benches (ee147880), slow frames name their step (2394267c), where "submit" goes each second (9ab54ee5, bf07e118), the size the world draws at (ce993538), PACING lines (dcde2415). *Why:* to find the lag and the hitches.
+- **Breaking cracks at 32 px** (Art, claude/art-cracks 3fa5964f, merged 0800ffb5): `crates/engine/assets/textures/block/destroy_0-9.png` redrawn 32x32 in place (grown by `notes/blocks/destroy.py`), same names, so `core:block/destroy_N` is unchanged. The pack darkens the face with them (`entity.wgsl` `fs_overlay`). *Why:* the 16 px near-black cracks stamped a chunky black maze on our 32 px blocks (Ronald: "glitchy").
 
 ## 3. Distant terrain (LOD) and world generation hooks
 
@@ -94,6 +96,7 @@ These are the biggest changes. They live mostly in our crates, but each needed h
 ## 8. Test kit and settings for runs
 
 - **Settings set for a run hold for the whole run** (2fa0beff), **and in the worlds it opens** (b091ac8b), **`--config` and `--no-shadows`** (ee147880). *Why:* scripted PC looks and benches need fixed settings.
+- **The network path in the log** (0a11b0ee): `net: path to <id> relay|direct|mixed <kind>` on every join, portal arrival and player coming in, and again on each change. **A relay-only test setting** (`core:net_relay_only`, on no screen): the endpoint gets no IP transport, so every connection goes through n0's relay. *Why:* Ronald asked whether joins really cross the network, and every two-machine check ran on one home network.
 
 ## 9. Removed
 

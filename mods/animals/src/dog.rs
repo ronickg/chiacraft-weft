@@ -99,9 +99,10 @@ pub fn init(r: &mut Registry) {
                     .to_string(),
             );
             let model = if puppy { "chihuahua_pup" } else { "chihuahua" };
+            let (w, h) = animals_core::bodies::of(model);
             drop(
                 r.entity(kind)
-                    .size(0.25, 0.36)
+                    .size(w, h)
                     .passive()
                     .model_file(model)
                     .animations(&format!("{model}{}", pose.suffix()))
@@ -110,7 +111,7 @@ pub fn init(r: &mut Registry) {
         }
     }
     r.entity(&CHIHUAHUA)
-        .size(0.25, 0.36)
+        .size(animals_core::bodies::of("chihuahua").0, animals_core::bodies::of("chihuahua").1)
         .health(8.0)
         .speed(2.8)
         .attack_damage(2.0)
@@ -171,7 +172,7 @@ fn upkeep(w: &World, id: u64, _st: &EntityState) -> bool {
     // A tame told to stay sits (once it is there).
     let sitting = d.tamed != 0 && commands::command(w, id) == commands::STAY && !w.navigating(id);
     let Some(s) = w.component_mut(id, &SEEN) else { return false };
-    s.sat = if sitting { s.sat.saturating_add(1) } else { 0 };
+    s.sat = if sitting { s.sat.saturating_add(w.tick_elapsed(id)) } else { 0 };
     let pose = match (sitting, s.sat > LIE_TICKS) {
         (false, _) => Pose::Stand,
         (true, false) => Pose::Sit,
@@ -182,7 +183,9 @@ fn upkeep(w: &World, id: u64, _st: &EntityState) -> bool {
     if s.look != look {
         s.look = look;
         w.set_look(id, Some(&look_name(puppy, pose)));
-        w.set_size(id, puppy.then_some([0.15, 0.18, 0.15]));
+        // A puppy's box is its own model's (`animals_core::bodies`), its eyes at its middle.
+        let (pw, ph) = animals_core::bodies::of("chihuahua_pup");
+        w.set_size(id, puppy.then_some([pw, ph, ph * 0.6]));
     }
     false
 }

@@ -13,8 +13,7 @@ pub struct Body {
     /// Its model and animation files (`<model>.geo.json`, `<model>.animation.json`), and texture.
     pub model: &'static str,
     pub texture: &'static str,
-    /// Its box, width and height in blocks, and its health.
-    pub size: (f32, f32),
+    /// Its health (its box is its model's: `animals_core::bodies`).
     pub health: f32,
     /// Its full speed (fleeing), and the share of it it wanders at.
     pub speed: f32,
@@ -54,10 +53,11 @@ pub fn register(r: &mut Registry, kinds: &[&'static Entity], body: &'static Body
             .animations(look)
             .texture(body.texture),
     );
+    let (bw, bh) = animals_core::bodies::of(body.model);
     for &kind in kinds {
         let index = crate::species::of(kind);
         r.entity(kind)
-            .size(body.size.0, body.size.1)
+            .size(bw, bh)
             .health(body.health)
             .speed(body.speed)
             .attack_damage(body.damage)

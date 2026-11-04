@@ -137,6 +137,13 @@ to source/blocks/tiles and the game folder, then `regrade.py --all` (the leaves 
 source/blocks/bloom/, outside the grade); copy the results to the game folder. Cloudberry keeps its
 one flower to a stem.
 
+**Block-breaking cracks** (`notes/blocks/destroy.py <out>`, into `crates/engine/assets/textures/block/
+destroy_0..9.png`; Ronald, 11-05: approved "as drawn", after "the block break animation looks pretty bad,
+glitchy"): 32 px, never 16 (16 px pixels come out twice our blocks' own and read as chunky noise). Thin
+one-pixel cracks grown from one point near the middle that fork outward, each stage holding the last,
+reaching about a sixth of the face at stage 9 (the old set covered half). One dark colour (20, 20, 20)
+with alpha on clear: the pack reads only the alpha and darkens the block, so the cracks work on every block.
+
 ## Colour ramps (dark to light)
 
 From Ronald's guide, Part 3 B (measured, then lifted with gamma 0.85). Wood and metal may lean

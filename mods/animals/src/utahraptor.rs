@@ -11,8 +11,6 @@ use weft_sdk::*;
 
 pub(crate) static UTAHRAPTOR: Entity = Entity::named("utahraptor");
 const TEXTURE: &str = "utahraptor/utahraptor";
-/// Its box: wide and tall enough for the body and the raised head.
-const SIZE: (f32, f32) = (1.2, 2.4);
 
 /// What it hunts.
 
@@ -25,11 +23,11 @@ pub fn init(r: &mut Registry) {
         crate::rest::Settle { chance: 400, ticks: (600, 1600), lie_after: 0 },
         "utahraptor",
         TEXTURE,
-        (SIZE.0, SIZE.1),
+        animals_core::bodies::of("utahraptor"),
         &[("_rest", "utahraptor_rest")],
     );
     r.entity(&UTAHRAPTOR)
-        .size(SIZE.0, SIZE.1)
+        .size(animals_core::bodies::of("utahraptor").0, animals_core::bodies::of("utahraptor").1)
         .health(60.0)
         .speed(3.6)
         .attack_damage(10.0)
