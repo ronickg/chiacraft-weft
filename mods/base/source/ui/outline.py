@@ -14,7 +14,10 @@ import sys
 
 import numpy as np
 from PIL import Image
-from scipy import ndimage
+try:
+    from scipy import ndimage
+except ImportError:  # scipy isn't installed everywhere (the Mac's python has none): share() works without it
+    ndimage = None
 
 
 def hsv(rgb):
@@ -52,8 +55,15 @@ def own_color(rgb, keep, dark=0.38):
 
 def share(rgb, keep):
     """How much of the items' outer edge (a band a few pixels deep) is the red outline."""
-    d = ndimage.distance_transform_edt(keep)
-    band = keep & (d <= max(2, 0.01 * max(keep.shape)))
+    k = max(2, 0.01 * max(keep.shape))
+    if ndimage is not None:
+        band = keep & (ndimage.distance_transform_edt(keep) <= k)
+    else:  # the same band by erosion: a pixel deeper than k from the background is in no k-step cross
+        inner = keep.copy()
+        for _ in range(int(k)):
+            p = np.pad(inner, 1)
+            inner = inner & p[:-2, 1:-1] & p[2:, 1:-1] & p[1:-1, :-2] & p[1:-1, 2:]
+        band = keep & ~inner
     return float(red_line(rgb, keep)[band].mean()) if band.any() else 0.0
 
 
