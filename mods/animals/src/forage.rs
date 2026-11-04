@@ -67,16 +67,10 @@ pub fn init(r: &mut Registry) {
             return Verdict::Abstain;
         };
         let w = q.world();
-        let at = q.pos().map(|v| v as f64 + 0.5);
-        let near: f64 = w
-            .near(at, animals_core::life::CROWD_RADIUS, Some(s.kind))
-            .into_iter()
-            .filter_map(|o| w.component(o, &ANIMAL))
-            .map(|o| animals_core::life::crowding(o.stage))
-            .sum();
         let coming = q.query().amount.max(1.0) as u32;
+        let near = kind_near(&w, s, q.pos());
         if !animals_core::life::room_for(near, coming, s.crowd()) {
-            weft_sdk::debug!("no room for {coming} {} at {:?}: {near:.1} near, room for {}", s.name, q.pos(), s.crowd());
+            weft_sdk::info!("no room for {coming} {} at {:?}: {near:.1} near, room for {}", s.name, q.pos(), s.crowd());
             return Verdict::Deny;
         }
         if !s.forages_wild() {
@@ -86,6 +80,16 @@ pub fn init(r: &mut Registry) {
         let come = floor + (1.0 - floor) * season_lush(&w, s, q.pos());
         if (w.random_below(10_000) as f32) < come * 10_000.0 { Verdict::Abstain } else { Verdict::Deny }
     });
+}
+
+/// How much its kind crowds the spot `pos` (`life::crowding` each, within `life::CROWD_RADIUS`):
+/// what natural spawning weighs against its room (`life::room_for`; `/animal room` shows it).
+pub fn kind_near(w: &World, s: &Species, pos: [i32; 3]) -> f64 {
+    w.near(pos.map(|v| v as f64 + 0.5), animals_core::life::CROWD_RADIUS, Some(s.kind))
+        .into_iter()
+        .filter_map(|o| w.component(o, &ANIMAL))
+        .map(|o| animals_core::life::crowding(o.stage))
+        .sum()
 }
 
 /// How much of its food its biome grows through this season, 0 to 1

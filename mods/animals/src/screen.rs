@@ -59,7 +59,7 @@ pub fn init(r: &mut Registry) {
         }
     });
     r.shaped(&CRAFTING, "spyglass", 1, &["  g", " i ", "i  "], &[('g', "#glass"), ('i', "#ingots/iron")]);
-    r.command("animal", "[action:word(show,tame,points,wild,here,gift,bite,ko,love,hurry,nest,evolve,fire,frost,lightning,venom,scar,age,speed,census,reset,away,habitats,hungry,thirsty)] [count:int] [habitat:word(grassland,forest,taiga,snow,desert,mountains)]", command)
+    r.command("animal", "[action:word(show,tame,points,wild,here,gift,bite,ko,love,hurry,nest,evolve,fire,frost,lightning,venom,scar,age,speed,census,reset,room,away,habitats,hungry,thirsty)] [count:int] [habitat:word(grassland,forest,taiga,snow,desert,mountains)]", command)
         .permission(permission::GAME_MASTER);
 }
 
@@ -1163,6 +1163,33 @@ fn command(cmd: &mut ServerCommand) {
                 weft_sdk::info!("habitats: {line}");
                 cmd.reply("command.animals.line", &[Arg::Text(&line)]);
             }
+            return;
+        }
+        // Whether natural spawning would bring a group of the nearest animal's kind (`count`, its
+        // biggest group by default) to where the player stands (`forage::kind_near`,
+        // `life::room_for`): how a full place turns them away, without waiting on the spawner.
+        Some("room") => {
+            let Some(p) = w.entity(player) else { return };
+            let Some(s) = nearest(&w, player, 64.0)
+                .and_then(|id| w.entity(id))
+                .and_then(|e| species::SPECIES.iter().find(|s| s.kind.id() == e.kind))
+            else {
+                return;
+            };
+            let at = p.pos.map(|v| v.floor() as i32);
+            let coming = cmd
+                .int("count")
+                .map_or(s.bio.social.group().1, |n| n.max(1) as u32);
+            let near = crate::forage::kind_near(&w, s, at);
+            let comes = animals_core::life::room_for(near, coming, s.crowd());
+            let line = format!(
+                "room: {} at {at:?}: {near:.1} near, room for {}: a group of {coming} {}",
+                s.name,
+                s.crowd(),
+                if comes { "would come" } else { "is turned away" }
+            );
+            weft_sdk::info!("{line}");
+            cmd.reply("command.animals.line", &[Arg::Text(&line)]);
             return;
         }
         Some("census") => {
