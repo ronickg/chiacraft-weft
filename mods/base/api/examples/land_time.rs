@@ -4,14 +4,13 @@
 //!     cargo run -p base_api --example land_time -- <seed>
 
 use base_api::land as l;
-use weft_sdk::noise::fixed::Fields;
 
 fn main() {
     let seed = std::env::args()
         .nth(1)
         .and_then(|s| s.parse().ok())
         .unwrap_or(1);
-    let f = Fields { seed };
+    let f = l::fields(seed);
     // The river network, a region at a time (each worked out once and kept): fresh regions far
     // from the columns timed below.
     let region = l::RIVER_REGION * l::RIVER_NODE;

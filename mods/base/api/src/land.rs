@@ -197,6 +197,16 @@ pub const SEQUOIA_AREA: Area = Area {
 
 /// Oceans and land masses, this many blocks above or below the sea.
 pub const CONTINENTS: f64 = 18.0;
+/// How many blocks across the overworld's land masses and seas are: the continent noise's scale
+/// (the engine's default is 900). At 1800 (Ronald, 11-04) the seas join into real seas between
+/// bigger land and rivers run longer.
+pub const CONTINENT_SCALE: f64 = 1800.0;
+
+/// The overworld's noise fields for world `seed` (its continent scale): what the engine hands
+/// base's features, for everything here that asks the climate outside of them.
+pub const fn fields(seed: u64) -> Fields {
+    Fields::with_continent_scale(seed, (CONTINENT_SCALE * 16.0) as i32)
+}
 
 /// Rolling hills (height, size), flattened in the cold into tundra and calmed by the coast:
 /// `COAST_CALM` of them everywhere (`HILLS_AREA`), the rest only inland from the coast
@@ -299,7 +309,7 @@ pub const RIVER_SINK_RADIUS: (i32, i32) = (24, 80);
 pub const RIVER_RAIN: (f64, f64, f64) = (-0.25, 0.05, 0.15);
 /// Flow, in wet nodes' rain: a dry gully starts at `.0`, the river reaches the water at `.1`
 /// (between, the gully deepens), and it is full size at `.2`.
-pub const RIVER_FLOW: (f64, f64, f64) = (2.5, 6.0, 80.0);
+pub const RIVER_FLOW: (f64, f64, f64) = (4.0, 9.0, 110.0);
 /// The channel's half width and its depth under the sea in the middle, and the floodplain beside
 /// it, flush with the water (blocks; the smallest river's, the full one's).
 pub const RIVER_HALF_WIDTH: (i32, i32) = (3, 12);
@@ -1016,7 +1026,7 @@ fn sequoia_fits(t: i32, hu: i32, h: i32) -> bool {
 /// `radius` from the middle, and how near the middle it first turns up (blocks, the larger of
 /// x and z).
 pub fn biome_shares(seed: u64, radius: i32, step: usize) -> Vec<(&'static str, f64, i32)> {
-    let f = Fields { seed };
+    let f = fields(seed);
     let mut n: Vec<(&'static str, usize, i32)> = Vec::new();
     let mut land = 0;
     for z in (-radius..=radius).step_by(step) {
@@ -1045,7 +1055,7 @@ mod tests {
 
     #[test]
     fn rivers_only_cut_and_reach_under_the_sea() {
-        let f = Fields { seed: 7 };
+        let f = fields(7);
         let mut wet = 0;
         for i in 0..20_000 {
             let (x, z) = ((i % 200) * 16 * 16, (i / 200) * 16 * 16);
@@ -1060,7 +1070,7 @@ mod tests {
 
     #[test]
     fn river_regions_agree_and_rivers_meet() {
-        let f = Fields { seed: 2 };
+        let f = fields(2);
         let region = RIVER_REGION * RIVER_NODE;
         let mut seen = std::collections::HashMap::new();
         let mut shared = 0;
@@ -1084,7 +1094,7 @@ mod tests {
 
     #[test]
     fn coasts_have_cliffs_and_islands() {
-        let f = Fields { seed: 1 };
+        let f = fields(1);
         let (mut cliffs, mut islands) = (0, 0);
         for i in 0..40_000 {
             let (bx, bz) = ((i % 200) * 16 - 1600, (i / 200) * 16 - 1600);
@@ -1107,7 +1117,7 @@ mod tests {
 
     #[test]
     fn lakes_only_cut_and_hold_water() {
-        let f = Fields { seed: 1 };
+        let f = fields(1);
         let (mut wet, mut lakes_seen) = (0, 0);
         for i in 0..40_000 {
             let (x, z) = ((i % 200) * 12 * 16, (i / 200) * 12 * 16);
@@ -1138,7 +1148,7 @@ mod tests {
 
     #[test]
     fn banks_lie_by_their_water() {
-        let f = Fields { seed: 1 };
+        let f = fields(1);
         let (mut river, mut lake) = (0, 0);
         for i in 0..40_000 {
             let (x, z) = ((i % 200) * 12 * 16, (i / 200) * 12 * 16);
@@ -1159,7 +1169,7 @@ mod tests {
 
     #[test]
     fn biome_edges_name_another_biome() {
-        let f = Fields { seed: 2 };
+        let f = fields(2);
         let mut seen = 0;
         for i in 0..5_000 {
             let (x, z) = ((i % 100) * 40 * 16, (i / 100) * 40 * 16);
@@ -1174,7 +1184,7 @@ mod tests {
 
     #[test]
     fn mesas_are_tiers_no_higher_than_their_height() {
-        let f = Fields { seed: 3 };
+        let f = fields(3);
         for i in 0..20_000 {
             let (x, z) = ((i % 200) * 8 * 16, (i / 200) * 8 * 16);
             let m = mesa(&f, x, z);

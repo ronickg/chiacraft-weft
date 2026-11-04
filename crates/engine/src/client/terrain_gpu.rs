@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use crossbeam_channel::{Receiver, Sender};
 use glam::IVec3;
 use weft_abi::TerrainColumn;
-use weft_noise::fixed::{Fields, seed32};
+use weft_noise::fixed::seed32;
 use weft_render::{Backend, BufferId, Cmd, CommandList, ComputeDesc, PipelineId, usage};
 
 use crate::content::{Content, content};
@@ -54,6 +54,7 @@ pub fn describe(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<usize
     let mut put = |at: u32, v: i32| w[at as usize] = v;
     put(d::STONE, t.stone as i32);
     put(d::BASE, t.base);
+    put(d::CONT_SCALE, t.continent_scale);
     if let Some((level, water)) = t.sea {
         put(d::HAS_SEA, 1);
         put(d::SEA, level);
@@ -283,7 +284,7 @@ pub fn custom_heights(c: &Content, dim: u32, seed: u64, x: i32, z: i32, custom: 
     let def = &c.dims[dim as usize];
     def.custom_cache.get(seed, x, z, || {
         let Some(t) = def.terrain.as_ref() else { return Vec::new() };
-        let f = Fields { seed };
+        let f = t.fields(seed);
         let (ox, oz) = (x * 16, z * 16);
         let mut out = Vec::with_capacity(custom.len() * CUSTOM_WORDS);
         for &i in custom {

@@ -6,7 +6,6 @@
 
 use base_api::SEA;
 use base_api::land as l;
-use weft_sdk::noise::fixed::Fields;
 
 fn main() {
     let a: Vec<String> = std::env::args().collect();
@@ -19,7 +18,7 @@ fn main() {
         .get(6)
         .cloned()
         .unwrap_or_else(|| "land_rivers.png".into());
-    let f = Fields { seed };
+    let f = l::fields(seed);
     let n = (across / step) as usize;
     let (x0, z0) = (cx - across / 2, cz - across / 2);
     let mut img = vec![0u8; n * n * 3];

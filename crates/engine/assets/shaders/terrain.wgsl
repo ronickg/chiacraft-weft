@@ -129,7 +129,7 @@ fn ridge(s: u32, x: i32, z: i32, scale: i32) -> i32 {
 }
 
 fn continent(x: i32, z: i32) -> i32 {
-    return ((fbm(seed(S_CONT), x, z, 900 * 16, 4u) * 6554) >> 12u) + 614;
+    return ((fbm(seed(S_CONT), x, z, desc[D_CONT_SCALE], 4u) * 6554) >> 12u) + 614;
 }
 
 fn temperature(x: i32, z: i32) -> i32 {

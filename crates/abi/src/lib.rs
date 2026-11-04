@@ -3612,6 +3612,8 @@ defaults!(FeatureDesc { name: Str::EMPTY, preset: 0, params: [0.0; 4], height: C
 #[repr(C)]
 pub struct FeatureArgs {
     pub seed: u64,
+    /// The dimension's continent scale (Q4, `terrain_op::CONTINENT_SCALE`), for the fields.
+    pub continent_scale: i32,
     pub x: i32,
     pub z: i32,
     /// Output: the height added at (x, z) at full strength.
@@ -3721,6 +3723,10 @@ pub mod terrain_op {
     /// (`FaceArgs`) for ground falling `level` blocks or more to a neighbour. Distant terrain,
     /// which runs no decorations, asks it, and puts no scattered things there.
     pub const FACES: u32 = 15;
+    /// `value`: how many blocks across the continent noise's land and sea are (900 when not
+    /// given). Larger makes bigger land masses and seas; every mask and rule on continentalness
+    /// follows it.
+    pub const CONTINENT_SCALE: u32 = 16;
 }
 
 /// A steep column's top as distant terrain sees it (`terrain_op::FACES`).

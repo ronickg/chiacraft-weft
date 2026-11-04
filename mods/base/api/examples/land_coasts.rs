@@ -6,7 +6,7 @@
 
 use base_api::SEA;
 use base_api::land as l;
-use weft_sdk::noise::fixed::{Fields, q12};
+use weft_sdk::noise::fixed::q12;
 
 fn main() {
     let a: Vec<i64> = std::env::args()
@@ -16,7 +16,7 @@ fn main() {
     let seed = a.first().copied().unwrap_or(1) as u64;
     let radius = a.get(1).copied().unwrap_or(4096) as i32;
     let step = a.get(2).copied().unwrap_or(8) as usize;
-    let f = Fields { seed };
+    let f = l::fields(seed);
     let (mut shore, mut cliff, mut beach, mut island, mut deep, mut sea) = (0usize, 0usize, 0usize, 0usize, 0usize, 0usize);
     let mut spots: Vec<(&str, i32, i32)> = Vec::new();
     let far = |s: &[(&str, i32, i32)], k: &str, x: i32, z: i32| {

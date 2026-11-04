@@ -740,7 +740,7 @@ impl Lod {
 /// Heights of the mod features `custom` at the tile's columns, for its job.
 fn custom_heights(c: &Content, dim: u32, seed: u64, key: TileKey, custom: &[usize]) -> Vec<i32> {
     let Some(t) = c.dims[dim as usize].terrain.as_ref() else { return Vec::new() };
-    let f = weft_noise::fixed::Fields { seed };
+    let f = t.fields(seed);
     let (o, s) = (key.origin(), 1 << key.level);
     // At the cells' middles, or a smooth tile's corners (as `terrain.wgsl` samples them).
     let mid = if key.smooth() { 0 } else { s / 2 };

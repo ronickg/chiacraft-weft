@@ -6,14 +6,13 @@
 
 use base_api::SEA;
 use base_api::land as l;
-use weft_sdk::noise::fixed::Fields;
 
 fn main() {
     let a: Vec<i32> = std::env::args()
         .skip(1)
         .filter_map(|s| s.parse().ok())
         .collect();
-    let f = Fields { seed: a.first().copied().unwrap_or(1) as u64 };
+    let f = l::fields(a.first().copied().unwrap_or(1) as u64);
     let (x0, z0, x1, z1) = (a[1], a[2], a[3], a[4]);
     let step = a.get(5).copied().unwrap_or(2).max(1);
     let n = ((x1 - x0).abs().max((z1 - z0).abs()) / step).max(1);
