@@ -1,6 +1,6 @@
 //! Client halves (API 1.2) against a fake player's game: the bell's committed `code/client.wasm`
 //! registers, builds its HUD as parts, answers its bindings, takes a packet and a key, and may
-//! not act from a binding.
+//! not act from a binding; it counts what it costs a frame.
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
@@ -163,4 +163,30 @@ fn malformed_parts_are_refused() {
     nan.style.width = Some(f32::NAN);
     assert!(!well_formed(&[nan]));
     assert!(!well_formed(&vec![part(0); PARTS + 1]));
+}
+
+#[test]
+fn counts_its_cost_by_frame() {
+    let seen: Arc<Mutex<Seen>> = Arc::default();
+    let game = || Box::new(Fake { seen: seen.clone(), act: false }) as Box<dyn ClientGame>;
+    let mut inst = ClientInstance::new(bell());
+    assert_eq!(inst.cost().frames, 0);
+    // A frame with a build and two bindings, then one with nothing.
+    let parts = inst.build(game(), 0);
+    inst.value(game(), parts[3].bind);
+    inst.text(game(), parts[1].bind);
+    inst.end_frame();
+    inst.end_frame();
+    let c = inst.cost();
+    assert_eq!((c.calls, c.frames), (3, 2));
+    assert!((c.calls_per_frame - 1.5).abs() < 1e-9);
+    assert!(c.worst_frame > std::time::Duration::ZERO && c.worst_frame <= c.total);
+    assert_eq!(c.per_frame, c.total / 2);
+    assert_eq!(inst.frame_times()[1], std::time::Duration::ZERO);
+    // Only the last FRAMES frames count.
+    for _ in 0..FRAMES {
+        inst.end_frame();
+    }
+    let c = inst.cost();
+    assert_eq!((c.frames, c.worst_frame, c.calls), (FRAMES, std::time::Duration::ZERO, 3));
 }

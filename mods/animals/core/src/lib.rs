@@ -15,6 +15,7 @@ pub mod meat;
 pub mod needs;
 pub mod sheet;
 pub mod species;
+pub mod voices;
 pub mod web;
 
 static PROBLEMS: Mutex<Vec<String>> = Mutex::new(Vec::new());

@@ -155,6 +155,11 @@ const BLEND: i32 = 4;
 /// About 9 us each, blended on every core; while loading, columns get redone as neighbors
 /// arrive.
 const TINTS_PER_FRAME: usize = 256;
+/// Fewer than twice this many items, the frame thread does a parallel step itself: each item
+/// costs about a microsecond, while handing them to the pool means waiting for a worker to wake
+/// and get a core (milliseconds on a busy Mac). `start_jobs` runs three times a frame, mostly
+/// with a handful of cubes.
+const PAR_MIN: usize = 128;
 
 /// Grass, foliage and water colors of one block column, 0xFFRRGGBB.
 /// Blended colors of a column: per block (z, x), one per tint kind.
@@ -393,6 +398,7 @@ impl ClientWorld {
         let cubes = &self.cubes;
         let masks: Vec<(IVec3, u32)> = resent
             .par_iter()
+            .with_min_len(PAR_MIN)
             .filter_map(|(p, old)| {
                 cubes
                     .get(p)
@@ -403,6 +409,7 @@ impl ClientWorld {
         b.touched.extend(masks);
         let mut members: Vec<IVec3> = std::mem::take(&mut b.touched)
             .into_par_iter()
+            .with_min_len(PAR_MIN)
             .flat_map_iter(|(p, mask)| around(p, mask))
             .filter(|p| self.cubes.contains_key(p))
             .collect();
@@ -416,6 +423,7 @@ impl ClientWorld {
         let cubes = &self.cubes;
         let todo: Vec<(IVec3, Option<bool>)> = members
             .par_iter()
+            .with_min_len(PAR_MIN)
             .map(|&p| {
                 let new_air = cubes[&p].cube.uniform_state() == Some(AIR)
                     && fresh
@@ -828,6 +836,7 @@ impl ClientWorld {
         let cubes = &self.cubes;
         let jobs: Vec<(IVec3, [Option<Arc<Cube>>; 27], u32, u32)> = start
             .par_iter()
+            .with_min_len(PAR_MIN)
             .map(|&pos| {
                 let around = std::array::from_fn(|i| {
                     cubes

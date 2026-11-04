@@ -119,6 +119,12 @@ impl Post {
         self.pipeline.is_some() && !self.active.is_empty()
     }
 
+    /// Whether it can put a world drawn smaller than the screen onto it (`apply` with no effect
+    /// on draws it across, filtered).
+    pub fn can_scale(&self) -> bool {
+        self.pipeline.is_some()
+    }
+
     /// The image the scene is drawn into, sized to the frame.
     pub fn scene_target(&mut self, gpu: &mut dyn Backend, w: u32, h: u32) -> TextureId {
         if self.targets.is_none_or(|t| t.2 != (w, h)) {
@@ -183,7 +189,8 @@ impl Post {
     }
 
     /// Runs the effects over the scene; the last one draws onto the screen and leaves that pass
-    /// open for the UI.
+    /// open for the UI. `frame` is the world's size: the screen's, or less (`render_scale`), when
+    /// the last pass also scales it up. With no effect on, that is one plain pass.
     /// `scene` is the buffer the world was drawn with (`gpu_layout::Scene`).
     pub fn apply(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, frame: &FrameInfo, scene: Option<BufferId>, depth: u32) {
         let (Some(pipe), Some((tex, idx, _))) = (self.pipeline, self.targets) else { return };
@@ -201,8 +208,11 @@ impl Post {
                 .push(gpu.create_buffer((size_of::<Pass>() * MAX_PASSES) as u64, usage::STORAGE | usage::HOST, "post passes"));
         }
         let time = crate::shaders::time();
-        let n = self.active.len().min(MAX_PASSES);
-        let passes: Vec<Pass> = self.active[..n]
+        // No effect on: one pass that only draws the scene across the screen (slot 0 returns it).
+        let plain = [(String::new(), 1.0)];
+        let active = if self.active.is_empty() { &plain[..] } else { &self.active[..] };
+        let n = active.len().min(MAX_PASSES);
+        let passes: Vec<Pass> = active[..n]
             .iter()
             .enumerate()
             .map(|(i, (name, strength))| Pass {

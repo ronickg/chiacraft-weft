@@ -454,6 +454,8 @@ pub struct Client {
     frame_dt: f32,
     /// Seconds left of a lightning's flash.
     lightning: f32,
+    /// Lightning flashes seen so far: mods hear a new one as thunder.
+    lightnings: u32,
     /// Holding the use button on an item that takes time: ticks left, ticks in all.
     using: Option<(f32, f32)>,
     /// On fire, as the server says.
@@ -740,6 +742,7 @@ impl Client {
             dust: 0.0,
             aurora: 0.0,
             lightning: 0.0,
+            lightnings: 0,
             using: None,
             burning: false,
             others_mining: Vec::new(),
@@ -2224,7 +2227,13 @@ impl Client {
         self.wind += (wind - self.wind) * (1.0 - (-dt / 4.0).exp());
         if here && self.weather.1 && self.chance() < dt / 12.0 {
             self.lightning = 0.15;
+            self.lightnings = self.lightnings.wrapping_add(1);
         }
+    }
+
+    /// The weather where the player is, as drawn (`ClientState::rain` and on, for mods' sound).
+    pub fn weather_now(&self) -> (f32, f32, [f32; 2], f32, u32) {
+        (self.rain, self.thunder, self.wind.to_array(), self.snowing, self.lightnings)
     }
 
     /// Game ticks now, with the fraction of the current one.
@@ -2288,7 +2297,9 @@ impl Client {
                 _ => [0.0; 4],
             },
             shadow: match self.shadow_map {
-                Some(t) if self.shadow.1 => [self.shadow_index(t) as f32, self.shadow_size as f32, 1.0, 2.0 * SHADOW_REACH / self.shadow_size as f32],
+                Some(t) if self.shadow.1 => {
+                    [self.shadow_index(t) as f32, self.shadow_size as f32, 1.0, 2.0 * SHADOW_REACH / self.shadow_size as f32]
+                }
                 _ => [0.0; 4],
             },
         }
@@ -2365,29 +2376,24 @@ impl Client {
             _ => 4096,
         };
         if size != self.shadow_size {
-            for t in [self.shadow_map.take(), self.shadow_far_map.take()].into_iter().flatten() {
+            for t in [self.shadow_map.take(), self.shadow_far_map.take()]
+                .into_iter()
+                .flatten()
+            {
                 gpu.destroy_texture(t);
             }
             self.shadow_size = size;
         }
         let sun = self.sun();
-        let dir = settled(
-            if sun[1] > -0.06 { Vec3::new(sun[0], sun[1], sun[2]) } else { -Vec3::new(sun[0], sun[1], sun[2]) },
-            self.sun_plane(),
-        );
+        let dir =
+            settled(if sun[1] > -0.06 { Vec3::new(sun[0], sun[1], sun[2]) } else { -Vec3::new(sun[0], sun[1], sun[2]) }, self.sun_plane());
         // So low the shadows would run off the map (the pack fades them out above this).
         if dir.y < 0.02 {
             return;
         }
         let map = |gpu: &mut dyn Backend, label: &str| {
             gpu.create_texture(
-                &weft_render::TextureDesc {
-                    width: size,
-                    height: size,
-                    mips: 1,
-                    format: weft_render::Format::Depth32,
-                    render_target: true,
-                },
+                &weft_render::TextureDesc { width: size, height: size, mips: 1, format: weft_render::Format::Depth32, render_target: true },
                 label,
             )
         };

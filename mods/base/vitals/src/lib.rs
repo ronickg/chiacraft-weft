@@ -19,6 +19,7 @@ pub mod effects;
 pub mod foliage;
 pub mod food;
 pub mod forage;
+pub mod layers;
 pub mod levels;
 pub mod meals;
 pub mod plants;
@@ -30,6 +31,7 @@ pub mod stamina;
 pub mod stats;
 pub mod stomach;
 pub mod temperature;
+pub mod weather_sound;
 pub mod wild;
 
 /// Ticks a second, as the game's.
