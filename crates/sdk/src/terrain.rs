@@ -581,7 +581,7 @@ impl ScatterBuilder<'_> {
         self.desc.cell = blocks;
         self
     }
-    /// How far the shape puts blocks sideways from its site. Up and down it may go 32 and 16.
+    /// How far the shape puts blocks sideways from its site. Up and down it may go 96 and 16.
     pub fn reach(mut self, blocks: i32) -> Self {
         self.desc.reach = blocks;
         self

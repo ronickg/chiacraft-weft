@@ -61,7 +61,7 @@ const ANY: u8 = 15;
 const SUMMER: u8 = 2;
 const SUMMER_AUTUMN: u8 = 2 | 4;
 
-pub const PLANTS: [Plant; 28] = [
+pub const PLANTS: [Plant; 29] = [
     // Frost (`reports/ecology/Plants and crops.md`, A1): spring wheat is sensitive (a hard frost,
     // about -2 °C, kills it; winter wheat, hardy, comes later); a blueberry's dormant bush is
     // hardy but its flowers and fruit die at -2; sugar cane takes none (the stalk dies, the base
@@ -108,6 +108,10 @@ pub const PLANTS: [Plant; 28] = [
     // frost below about -15 kills; the tropical palms, killed by any frost.
     p("base:mesquite_sapling", "mesquite", (12.0, 25.0, 38.0, 48.0), Water::Dry, 0.0, ANY, -15.0),
     p("base:acuri_palm_sapling", "acuri palm (Attalea phalerata)", (15.0, 24.0, 32.0, 40.0), Water::Moderate, 0.0, ANY, 0.0),
+    // The giant sequoia: the Sierra Nevada's western slopes at 1,400-2,000 m, growing from about
+    // 5 degrees, best in a mild summer, hardy to about -24 under snow; its seedlings need the
+    // soil kept moist (Weatherspoon 1990, Silvics of North America).
+    p("base:sequoia_sapling", "giant sequoia (Sequoiadendron giganteum)", (5.0, 15.0, 24.0, 35.0), Water::Moderate, 0.0, ANY, -24.0),
     p("base:moriche_palm_sapling", "moriche palm (Mauritia flexuosa)", (15.0, 24.0, 32.0, 40.0), Water::Wet, 0.0, ANY, 0.0),
     // The Cretaceous's saplings (the animals mod's), at the game's time: its greenhouse warmth
     // suits them all; living kin give the frost they take (Araucaria about -5, ginkgo hardy, the

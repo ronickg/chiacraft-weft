@@ -409,8 +409,10 @@ pub fn scatter_site(
     Some((IVec3::new(x, col.height + 1, z), col.biome, random))
 }
 
-/// How far above and below its site a scattered thing may put blocks.
-const SCATTER_UP: i32 = 32;
+/// How far above and below its site a scattered thing may put blocks: up to a giant sequoia's
+/// 60-80 blocks (base's `tree_recipes::SEQUOIA`). The box of each thing is its own blocks', so a
+/// small tree costs no more for it.
+const SCATTER_UP: i32 = 96;
 const SCATTER_DOWN: i32 = 16;
 
 /// A scattered thing: where it stands and its blocks (the shape callback's, made once and
