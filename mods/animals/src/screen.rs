@@ -482,17 +482,27 @@ fn life_bar(ui: &mut Ui, class: &'static str, value: impl Fn(&ClientView) -> Opt
 }
 
 /// The life bars and stat bars' sizes in GUI pixels (the kit's `life_*` and `stat_q*`), and the
-/// columns beside them: an icon, then the bar, then the value (left column 108 wide: 8 + 3 + 56 + 3 + 38).
+/// columns beside them: an icon, then the bar, then the value (left column `LEFT_W`: 8 + 3 + 56 + 3 + 34).
 const LIFE_BAR: (f32, f32) = (56.0, 6.0);
-const LIFE_VALUE_W: f32 = 38.0;
+const LIFE_VALUE_W: f32 = 34.0;
+/// The Overview's left column (the portrait, name, chips and life), and the window's padding and
+/// the gap between its three columns, GUI px: the whole window is 6 + 104 + 6 + 150 (`STAT_ROW_W`) + 6
+/// + 100 + 6 = 378, inside the 380 a 760 px wide window has at GUI scale 2 (Playtest B9c: at 396 it lost 8 px
+/// each side).
+const LEFT_W: f32 = 104.0;
+const OVERVIEW_PAD: f32 = 6.0;
+const OVERVIEW_GAP: f32 = 6.0;
 /// The genes list (on the Genes page): how many lines it can hold.
 const GENE_LINES: usize = 40;
 /// The Genes page's list: taller, it has the page to itself.
 const GENES_PAGE_H: f32 = 110.0;
-const STAT_BAR: (f32, f32) = (32.0, 6.0);
+/// (28 wide, from 32, so the window fits 380 with its columns as wide as their headings.)
+const STAT_BAR: (f32, f32) = (28.0, 6.0);
 /// The stat rows' columns after the bar: the value (right-aligned), wild and tamed points
 /// (centred), then the + (GUI pixels).
 const STAT_VALUE_W: f32 = 18.0;
+/// (as wide as their headings, "Wild" 13.5 and "Tamed" 19.5 GUI px: narrower, the row shrank them,
+/// PC runs fit1280 and fit760b)
 const STAT_WILD_W: f32 = 14.0;
 const STAT_TAMED_W: f32 = 20.0;
 /// A stat row's whole width, for the divider over torpor.
@@ -501,12 +511,12 @@ const STAT_ROW_W: f32 = 8.0 + 3.0 + 34.0 + 3.0 + STAT_BAR.0 + 3.0 + STAT_VALUE_W
 /// The screen of a tame animal (`notes/ui/BATCHES.md`, the taming and stats upgrade): who it is
 /// and how it is on the left, its stats as bars in the middle, its coat and orders on the right.
 fn animal_screen(ui: &mut Ui) {
-    window_page(ui, 0, S::row().pad(8.0).gap(10.0), |ui| {
+    window_page(ui, 0, S::row().pad(OVERVIEW_PAD).gap(OVERVIEW_GAP), |ui| {
         // Left: the level on a badge, the name, life, how it feels, and the facts.
-        ui.column(S::col().gap(3.0).w(108.0), |ui| {
+        ui.column(S::col().gap(3.0).w(LEFT_W), |ui| {
             // The animal itself, turning with the mouse, its level on a badge in the corner.
-            ui.panel("portrait", S::row().size(108.0, 70.0), |ui| {
-                ui.entity_model(106.0, 68.0);
+            ui.panel("portrait", S::row().size(LEFT_W, 70.0), |ui| {
+                ui.entity_model(LEFT_W - 2.0, 68.0);
                 ui.panel("hud_badge", S::row().size(20.0, 24.0).center().at(2.0, 2.0), |ui| {
                     ui.text_bind_styled(S::default().no_wrap(), |c, t| {
                         let Some(a) = c.menu_component(&ANIMAL) else { return };
@@ -526,9 +536,9 @@ fn animal_screen(ui: &mut Ui) {
             });
             // Its coat, what its kind does and its temperament, as chips, one under another (a row
             // can't wrap, and "Hunts in packs" alone nearly fills the column).
-            ui.column(S::col().gap(2.0).max_w(108.0), |ui| {
+            ui.column(S::col().gap(2.0).max_w(LEFT_W), |ui| {
                 ui.panel("chip", S::row().pad(2.0), |ui| {
-                    ui.text_bind_styled(S::default().max_w(94.0), |c, t| {
+                    ui.text_bind_styled(S::default().max_w(LEFT_W - 14.0), |c, t| {
                         let Some(look) = c
                             .menu_component(&crate::coats::GENOME)
                             .and_then(|g| crate::coats::phenotype(&g))
@@ -539,7 +549,7 @@ fn animal_screen(ui: &mut Ui) {
                     });
                 });
                 ui.panel("chip", S::row().pad(2.0), |ui| {
-                    ui.text_bind_styled(S::default().max_w(94.0), |c, t| {
+                    ui.text_bind_styled(S::default().max_w(LEFT_W - 14.0), |c, t| {
                         let Some(s) = c.menu_component(&ANIMAL).and_then(|a| a.species()) else { return };
                         t.set("screen.animals.chip", &[Arg::Key(&format!("screen.animals.signature.{}", s.signature))]);
                     });
@@ -609,7 +619,7 @@ fn animal_screen(ui: &mut Ui) {
                 );
             }
             // How it feels in this air, against its comfort, and its condition.
-            ui.text_bind_styled(S::default().max_w(108.0), |c, t| {
+            ui.text_bind_styled(S::default().max_w(LEFT_W), |c, t| {
                 let (Some(a), Some(b)) = (c.menu_component(&ANIMAL), c.menu_component(&crate::comfort::BODY)) else { return };
                 let Some(s) = a.species().filter(|_| b.core > 0.0) else { return };
                 let (lo, hi) = s.bio.comfort;
