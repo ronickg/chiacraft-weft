@@ -62,11 +62,11 @@ y += 34 + 230
 
 d.text((20, y), "2. Ground plants on grass: bracken fern, the two-block tall grass (A my pick, B, and the first try that broke up), today's tallgrass", font=F, fill=AMBER)
 g = np.array([0x7F, 0xB0, 0x48])
-scene = standing([[t("fern", "plant")], [tint(t("tall_grass_lower"), g), tint(t("tall_grass_upper"), g)], [],
+scene = standing([[t("bracken", "plant")], [tint(t("tall_grass_lower"), g), tint(t("tall_grass_upper"), g)], [],
                   [tint(t("tall_grass_lower_b"), g), tint(t("tall_grass_upper_b"), g)], [],
                   [tint(t("tall_grass_lower_v1"), g), tint(t("tall_grass_upper_v1"), g)], [], [tint(t("tallgrass"), g)]], k=3)
 sheet.alpha_composite(scene, (20, y + 34))
-for i, lab in ((0, "fern"), (1, "tall grass A *"), (3, "tall grass B"), (5, "first try"), (7, "tallgrass now")):
+for i, lab in ((0, "bracken (base:fern)"), (1, "tall grass A *"), (3, "tall grass B"), (5, "first try"), (7, "tallgrass now")):
     d.text((20 + i * 96, y + 34 + scene.height + 4), lab, font=S, fill=IVORY)
 y += 34 + scene.height + 40
 
