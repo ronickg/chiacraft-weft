@@ -350,6 +350,7 @@ hud.animals.taming.who = Приручение: {0}
 hud.element.animals.taming = Приручение
 menu.animals.animal = Ваше животное
 menu.animals.scout = В подзорную трубу
+menu.animals.look = Поближе
 screen.animals.badge = {0}
 screen.animals.chip = {0}
 screen.animals.coat_title = Окрас и порода

@@ -600,6 +600,19 @@ gpu_struct! {
         /// Where the camera is under it: x and z (in `xy`) its place in its cell, 0..1, and the
         /// cell in the picture (`zw`), as the sky's cloud pass reads them.
         pub cloud_cells: [f32; 4],
+        /// xyz toward the moon where the sky draws it (it lags the day by its phase: up all night
+        /// when full, only by day when new), w the light it gives: its phase times how high it
+        /// stands, 0 below the horizon. For packs' night light and moon shadows.
+        pub moon: [f32; 4],
+        /// The values of the settings the pack names in its `pack.cfg` (`options = a, b, ...`), 16
+        /// at most, four to a row in that order (`packs::pack_options`); 0 for one not found.
+        pub options: [[f32; 4]; 4],
+        /// The light the player holds (a torch, a lantern), for packs' dynamic light: xyz where it
+        /// is (camera relative, by the hand), w unused.
+        pub hand: [f32; 4],
+        /// Its light per channel (r, g, b) as block light levels 0..1 (a torch 14/15); zeros
+        /// when what is held gives none. It falls off like block light, a level a block.
+        pub hand_light: [f32; 4],
     }
 }
 

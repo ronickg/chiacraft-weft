@@ -13,6 +13,9 @@ use crate::taming::TAMING;
 
 static ANIMAL_MENU: Menu = Menu::named("animal");
 static SCOUT_MENU: Menu = Menu::named("scout");
+/// The same view opened without the spyglass in hand (`/animal show` on one you don't own): its
+/// title says so (Playtest B6: it said "Through the spyglass" with no spyglass used).
+static LOOK_MENU: Menu = Menu::named("look");
 /// The animal screen's other pages (round 2: what was a wall of text moves to tabs): its genes
 /// and kind, and its family and life. Each is a menu of its own on the same animal; a tab asks
 /// the server to open the page (`PAGE`).
@@ -36,6 +39,7 @@ pub fn init(r: &mut Registry) {
     r.menu(&ANIMAL_MENU).screen(animal_screen);
     taming_hud(r);
     r.menu(&SCOUT_MENU).screen(scout_screen);
+    r.menu(&LOOK_MENU).screen(scout_screen);
     r.menu(&GENES_MENU).screen(genes_screen);
     r.menu(&FAMILY_MENU).screen(family_screen);
     r.packet(&PAGE, |p, [id, page]| {
@@ -66,7 +70,18 @@ pub fn open(w: &World, player: u64, id: u64) -> bool {
         return false;
     }
     let full = crate::commands::can_command(w, id, player) || w.creative(player);
-    w.open_menu(player, if full { &ANIMAL_MENU } else { &SCOUT_MENU }, id);
+    let spyglass = w.inventory(player).get(w.selected_slot(player)).item == SPYGLASS.id();
+    w.open_menu(
+        player,
+        if full {
+            &ANIMAL_MENU
+        } else if spyglass {
+            &SCOUT_MENU
+        } else {
+            &LOOK_MENU
+        },
+        id,
+    );
     true
 }
 

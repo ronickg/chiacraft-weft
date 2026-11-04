@@ -308,7 +308,7 @@ fn fs_shadow(in: VOut) {
 
 fn surface_light(in: VOut, n: vec3<f32>) -> vec3<f32> {
     let shadow = sun_shadow(in, n);
-    var light = in.color * light_on(n, in.light, shadow, in.ao, in.pos);
+    var light = in.color * light_on(n, in.light, shadow, in.ao, in.pos, in.rel);
     // Leaves and plants let some sun through when it is behind them.
     if in.kind.x == TINT_FOLIAGE || in.kind.z != 0u {
         let back = max(-dot(normalize(in.rel), light_dir()), 0.0);
@@ -545,9 +545,10 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
     let ndv = max(dot(n, v), 0.02);
     // A near mirror at an ordinary look, as in the reference pictures: most of what it shows is
     // what it reflects (the screen's reflections, `post/reflect.wgsl`, use the same).
-    let fresnel = 0.08 + 0.92 * pow(1.0 - ndv, 2.5);
+    // (^2: more of a mirror at a slant, toward Bliss's pale sky-mirror lakes; Water 12.)
+    let fresnel = 0.08 + 0.92 * pow(1.0 - ndv, 2.0);
     let shadow = sun_shadow(in, vec3(0.0, 1.0, 0.0));
-    let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, shadow, 1.0, in.pos);
+    let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, shadow, 1.0, in.pos, in.rel);
     // What the light in the water sends back up: a muted teal-green, light in the shallows and dark
     // further down so that what it mirrors carries, in a little of the biome's own tint (a swamp's
     // brown-green; the plain blue of most biomes' water is half taken out), with a little of the
@@ -563,12 +564,18 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
     // brightness, a dark navy).
     let deep = vec3(0.022, 0.072, 0.066);
     let deepness = 1.0 - exp(-0.35 * depth);
-    let scatter = mix(shallow, deep, deepness) * mix(vec3(1.0), tint, mix(0.15, 0.35, deepness)) * pattern * lit;
+    let scatter_raw = mix(shallow, deep, deepness) * mix(vec3(1.0), tint, mix(0.15, 0.35, deepness)) * pattern * lit;
+    // The water's own colour 40 % toward grey: at a slant ours read 0.31 saturation against Bliss's
+    // 0.10-0.19 (Terrain's water sheet; Water 12).
+    let scatter = mix(vec3(luma(scatter_raw)), scatter_raw, 0.6);
     // How much of the bottom shows: the way through the water to it, longer at a slant; never all
     // of it, so even the shallowest water tints what lies under it.
     let through = exp(-0.28 * depth / max(v.y, 0.2)) * 0.82;
     let r = reflect(-v, n);
-    let refl = sky_color(normalize(vec3(r.x, max(r.y, 0.03), r.z))) * mix(0.15, 1.0, brightness_curve(in.light.x));
+    // The sky toward the horizon more than the ripples' tilt would give: they tipped it up into the
+    // darker blue overhead, where Bliss's lakes mirror the pale, hazy low sky (Tester 2's shots:
+    // our lake's water 0.45 mean brightness against Bliss's 0.62).
+    let refl = sky_color(normalize(vec3(r.x, max(r.y * 0.5, 0.03), r.z))) * mix(0.15, 1.0, brightness_curve(in.light.x));
     // The sun's glitter: a narrow highlight (GGX) on the waves, so it lies in a path toward the sun.
     let l = light_dir();
     // Never a zero vector (light exactly behind the eye): its normalize would be NaN.
