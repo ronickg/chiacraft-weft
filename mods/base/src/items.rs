@@ -110,8 +110,9 @@ pub fn register(r: &mut Registry) {
         let i = if vitals::preserve::PRODUCTS.contains(&f.name) { i.tag("preserved") } else { i };
         // Any raw meat salts (`cooking.rs`).
         let i = if tag.starts_with("raw_meat/") { i.tag("raw_meat") } else { i };
-        // Berries are planted like seeds: a new bush; so are the wild plants' fruit and seeds.
-        let i = match crate::wild::planted_by(name) {
+        // Berries are planted like seeds: a new bush; so are the wild plants' fruit and seeds,
+        // and the roots a crop is sown from (`crops.rs`).
+        let i = match crate::wild::planted_by(name).or_else(|| crate::crops::planted_by(name)) {
             Some(b) => i.placed_block(b),
             None => i,
         };

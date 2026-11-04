@@ -18,7 +18,9 @@ pub fn register(r: &mut Registry) {
     r.shaped(C, "chest", 1, &["###", "# #", "###"], &[('#', "#planks")]);
     r.shaped(C, "torch", 4, &["c", "s"], &[('c', "#gems/coal"), ('s', "#stick")]);
     r.shaped(C, "ladder", 3, &["s s", "sss", "s s"], &[('s', "#stick")]);
-    r.shaped(C, "bread", 1, &["www"], &[('w', "#crops/wheat")]);
+    // Any grain bakes into bread (`vitals::crops::BREAD_GRAINS`): rye, barley, sorghum and millet
+    // breads as wheat's.
+    r.shaped(C, "bread", 1, &["www"], &[('w', "#bread_grain")]);
     // Sugar cane's uses: sugar, and paper for books, which make bookshelves (camp comfort).
     r.shapeless(C, "sugar", 1, &["#sugar_cane"], 0);
     r.shaped(C, "paper", 3, &["###"], &[('#', "#sugar_cane")]);

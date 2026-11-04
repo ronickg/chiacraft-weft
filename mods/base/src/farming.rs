@@ -23,14 +23,15 @@ pub fn register(r: &mut Registry) {
         .on_use(fertilize)
         .tab(&crate::tabs::NATURAL);
     r.shaped(&base_api::CRAFTING, "compost_bin", 1, &["# #", "# #", "###"], &[('#', "#planks")]);
-    // A ripe harvest wears the farmland under it.
+    // A ripe harvest wears the farmland under it, or feeds it (beans; `vitals::crops`).
     r.on(&BLOCK_BROKEN, |b| {
         let w = b.world();
         for e in b.iter() {
             let name = block_name(e.state).split('[').next().unwrap_or("");
-            if soil::TIRES.contains(&name) && state_prop(e.state, "age") == Some("7") {
+            let Some(c) = vitals::crops::of(name) else { continue };
+            if state_prop(e.state, "age").and_then(|a| a.parse::<u32>().ok()) == Some(c.ripe) {
                 let below = [e.pos[0], e.pos[1] - 1, e.pos[2]];
-                wear(&w, below, 1);
+                wear(&w, below, if c.soil == vitals::crops::Soil::Tires { 1 } else { -1 });
             }
         }
     });

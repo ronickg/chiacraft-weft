@@ -886,6 +886,78 @@ pub fn karst(f: &Fields, x: i32, z: i32) -> i32 {
     if KARST_AREA.at(&h) == 0 { 0 } else { karst::add(&h, base_ground(&h)) }
 }
 
+/// A fair first place (Ronald, 11-04: "All 3: 1, 2, 3"): the nearest spot to the world's middle,
+/// searched in rings `SPAWN_STEP` blocks apart out to `SPAWN_REACH`, that is plains (few trees to
+/// spawn in), temperate (`SPAWN_TEMPERATURE`: away from the taiga's cold and the desert's heat),
+/// `SPAWN_RISE` over the sea, level (no neighbour two blocks off more than a block higher or
+/// lower), out of the mountains, with water (a lake or a river, not the sea) within
+/// `SPAWN_WATER` blocks and woods within `SPAWN_WOODS`. The engine's own search took the first
+/// plains column near the middle: on seeds 1, 7, 42 and 1234 that stood 34-54 blocks up a hill,
+/// two of them without water within 96 blocks.
+pub const SPAWN_STEP: i32 = 16;
+pub const SPAWN_REACH: i32 = 1600;
+pub const SPAWN_TEMPERATURE: (f64, f64) = (-0.06, 0.12);
+pub const SPAWN_RISE: (i32, i32) = (2, 30);
+pub const SPAWN_WATER: i32 = 48;
+pub const SPAWN_WOODS: i32 = 64;
+
+/// The first block's column (x, height, z in blocks) of the fair first place for world `seed`,
+/// or, failing that within `SPAWN_REACH`, the first level plains, then the first land above the
+/// sea, on the same rings.
+pub fn spawn(seed: u64) -> [i32; 3] {
+    spawn_where(seed, &|_, _| true)
+}
+
+/// `spawn`, only where `open` (blocks) also holds: what the terrain here can't see, as the
+/// engine's caves (seed 42's first fair place stood over a cave's mouth, PC look fv_new_42: the
+/// player fell 15 blocks).
+pub fn spawn_where(seed: u64, open: &dyn Fn(i32, i32) -> bool) -> [i32; 3] {
+    let f = fields(seed);
+    let h = |x: i32, z: i32| height(&f, x * 16, z * 16) >> 4;
+    let biome = |x: i32, z: i32| overworld_biome(&f, x * 16, z * 16);
+    let level = |x: i32, z: i32, hh: i32| {
+        [(2, 0), (-2, 0), (0, 2), (0, -2)]
+            .iter()
+            .all(|(dx, dz)| (h(x + dx, z + dz) - hh).abs() <= 1)
+    };
+    let near = |x: i32, z: i32, reach: i32, step: i32, hit: &dyn Fn(i32, i32) -> bool| {
+        (0..=reach).step_by(step as usize).any(|d| {
+            (0..16).any(|k| {
+                let a = k as f64 / 16.0 * std::f64::consts::TAU;
+                let (px, pz) = (x + (d as f64 * a.cos()).round() as i32, z + (d as f64 * a.sin()).round() as i32);
+                hit(px, pz)
+            })
+        })
+    };
+    let fair = |x: i32, z: i32| -> bool {
+        let hh = h(x, z);
+        let t = f.temperature(x * 16, z * 16);
+        biome(x, z) == "plains"
+            && (q12(SPAWN_TEMPERATURE.0)..q12(SPAWN_TEMPERATURE.1)).contains(&t)
+            && (SEA + SPAWN_RISE.0..=SEA + SPAWN_RISE.1).contains(&hh)
+            && level(x, z, hh)
+            && MOUNTAINS_AREA.value(&f, x * 16, z * 16) < q12(0.2)
+            && near(x, z, SPAWN_WATER, 4, &|px, pz| h(px, pz) < SEA && biome(px, pz) != "ocean")
+            && near(x, z, SPAWN_WOODS, 8, &|px, pz| matches!(biome(px, pz), "forest" | "birch_forest" | "taiga" | "sequoia_grove"))
+    };
+    let plains = |x: i32, z: i32| biome(x, z) == "plains" && h(x, z) > SEA + 1 && level(x, z, h(x, z));
+    let land = |x: i32, z: i32| h(x, z) > SEA + 1;
+    for test in [&fair as &dyn Fn(i32, i32) -> bool, &plains, &land] {
+        for r in 0..=SPAWN_REACH / SPAWN_STEP {
+            let n = (r * 8).max(1);
+            for k in 0..n {
+                let a = k as f64 / n as f64 * std::f64::consts::TAU;
+                let (x, z) = ((r * SPAWN_STEP) as f64 * a.cos(), (r * SPAWN_STEP) as f64 * a.sin());
+                let (x, z) = (x.round() as i32, z.round() as i32);
+                if test(x, z) && open(x, z) {
+                    return [x, h(x, z), z];
+                }
+            }
+        }
+    }
+    [0, h(0, 0).max(SEA), 0]
+}
+
 /// Which water a bank belongs to (`bank`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Water {
@@ -1366,6 +1438,19 @@ mod tests {
             }
         }
         assert!(deep > 0, "no canyon 20 deep in 3.2 km");
+    }
+
+    #[test]
+    fn spawns_are_fair() {
+        for seed in [1, 2, 3, 7, 42, 1234] {
+            let [x, y, z] = spawn(seed);
+            let f = fields(seed);
+            assert_eq!(overworld_biome(&f, x * 16, z * 16), "plains", "seed {seed}: spawn at {x} {z}");
+            assert!((SEA + SPAWN_RISE.0..=SEA + SPAWN_RISE.1).contains(&y), "seed {seed}: spawn {y} high");
+            let t = f.temperature(x * 16, z * 16);
+            assert!((q12(SPAWN_TEMPERATURE.0)..q12(SPAWN_TEMPERATURE.1)).contains(&t), "seed {seed}: too cold or hot");
+            assert!(x.abs().max(z.abs()) <= SPAWN_REACH, "seed {seed}: spawn {x} {z} far out");
+        }
     }
 
     #[test]

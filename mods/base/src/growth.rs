@@ -55,6 +55,15 @@ pub fn grow(e: &mut BlockEvent, block: &str, last: bool, step: impl FnOnce(&mut 
     }
 }
 
+/// A ripe plant's step that bears beside it (`base_api::grow::bear`): `step` when it does.
+pub fn bear(e: &mut BlockEvent, block: &str, step: impl FnOnce(&mut BlockEvent)) {
+    match base_api::grow::bear(e, block) {
+        base_api::grow::Step::Grow => step(e),
+        base_api::grow::Step::Frost => frost(e, block),
+        base_api::grow::Step::Rest => {}
+    }
+}
+
 /// What a frost does to the plant at `e` (`grow`).
 fn frost(e: &mut BlockEvent, block: &str) {
     let w = e.world();
@@ -62,8 +71,8 @@ fn frost(e: &mut BlockEvent, block: &str) {
     let below = [pos[0], pos[1] - 1, pos[2]];
     let above = [pos[0], pos[1] + 1, pos[2]];
     match block {
-        // The crop dies; the farmland stays.
-        "base:wheat" => {
+        // A crop dies; the farmland stays.
+        b if vitals::crops::of(b).is_some() => {
             w.set(pos, 0);
         }
         // The stalk dies from the top, down to the base, which sprouts again in spring.

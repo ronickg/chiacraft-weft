@@ -61,12 +61,33 @@ const ANY: u8 = 15;
 const SUMMER: u8 = 2;
 const SUMMER_AUTUMN: u8 = 2 | 4;
 
-pub const PLANTS: [Plant; 30] = [
+pub const PLANTS: [Plant; 43] = [
     // Frost (`reports/ecology/Plants and crops.md`, A1): spring wheat is sensitive (a hard frost,
     // about -2 °C, kills it; winter wheat, hardy, comes later); a blueberry's dormant bush is
     // hardy but its flowers and fruit die at -2; sugar cane takes none (the stalk dies, the base
     // sprouts again); a saguaro takes brief frost down to about -7.
     p("base:wheat", "spring wheat", (0.0, 15.0, 23.0, 34.0), Water::Moderate, 110.0, ANY, -2.0),
+    // The crops (`crops::CROPS`), the research's middle days. Cool-season ones grow from about
+    // freezing (barley, rye) or 4-7 °C (carrot, beetroot, potato) and suffer past 30; warm-season
+    // ones need about 10 °C and die at a frost; sorghum and pearl millet take drought (half speed
+    // on dry ground), paddy rice grows only by water. Winter rye is hardy to -30 and needs a
+    // winter's cold to set grain: sown in autumn, it ripens only in summer. Cassava takes 8-18
+    // months.
+    p("base:barley", "barley", (0.0, 15.0, 20.0, 32.0), Water::Moderate, 105.0, ANY, -4.0),
+    p("base:rye", "winter rye", (0.0, 12.0, 20.0, 30.0), Water::Moderate, 300.0, SUMMER, -30.0),
+    p("base:carrots", "carrot", (4.0, 16.0, 21.0, 30.0), Water::Moderate, 95.0, ANY, -5.0),
+    p("base:potatoes", "potato", (7.0, 15.0, 20.0, 30.0), Water::Moderate, 135.0, ANY, -1.0),
+    p("base:beetroots", "beetroot", (4.5, 15.0, 20.0, 30.0), Water::Moderate, 72.0, ANY, -3.0),
+    p("base:maize", "maize", (10.0, 24.0, 30.0, 38.0), Water::Moderate, 150.0, ANY, 0.0),
+    p("base:paddy_rice", "paddy rice", (10.0, 25.0, 30.0, 35.0), Water::Wet, 120.0, ANY, 0.0),
+    p("base:beans", "common bean", (10.0, 18.0, 25.0, 30.0), Water::Moderate, 100.0, ANY, 0.0),
+    p("base:sorghum", "sorghum", (8.0, 27.0, 34.0, 42.0), Water::Dry, 125.0, ANY, 0.0),
+    p("base:millet", "pearl millet", (10.0, 30.0, 34.0, 45.0), Water::Dry, 105.0, ANY, 0.0),
+    p("base:cassava", "cassava", (12.0, 25.0, 29.0, 37.0), Water::Moderate, 390.0, ANY, 0.0),
+    // Pumpkin and melon stems (the research's rows): warm-season, killed by frost; the fruit sets
+    // in summer and autumn (`SUMMER_AUTUMN`, the stem's last step).
+    p("base:pumpkin_stem", "pumpkin, squash", (10.0, 20.0, 30.0, 35.0), Water::Moderate, 110.0, SUMMER_AUTUMN, 0.0),
+    p("base:melon_stem", "melon", (12.0, 25.0, 30.0, 38.0), Water::Moderate, 140.0, SUMMER_AUTUMN, 0.0),
     p("base:berry_bush", "blueberry", (7.0, 20.0, 26.0, 32.0), Water::Moderate, 75.0, SUMMER_AUTUMN, -2.0),
     p("base:sugar_cane", "sugar cane", (12.0, 22.0, 30.0, 38.0), Water::Wet, 0.0, ANY, -1.0),
     // Kelp (Laminaria, Saccharina): cold-water seaweed, growing best at 5-15 °C and failing
