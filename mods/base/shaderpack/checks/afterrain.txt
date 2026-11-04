@@ -1,0 +1,67 @@
+# After the rain and torches in the mist (Research round 15, 5 and 6). Seed 1, --view 12, 1280x720,
+# --shader-pack chiacraft, a fresh world, mobs off. Yaw 0 faces -z; at evening the sun is at yaw 90.
+# 1. Night mist on a grass floor high in the open (x 40 y 200 z 40, torch.txt's): nothing in hand,
+#    a torch, then two placed torches and a campfire.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /weather clear 99999
+chat /tk mode creative
+chat /time set 6000
+chat /tp 40 205 52
+loaded
+idle
+wait 6
+chat /tk fill 26 199 30 54 199 64 grass
+chat /tk fill 36 200 44 36 203 44 oak_log
+chat /tk fill 44 200 43 45 201 43 cobblestone
+chat /tk fill 30 200 38 30 202 38 spruce_log
+chat /tp 40 200.2 50
+wait 3
+chat /time set 18000
+chat /air 0.6 0
+wait 10
+look 0 -8
+wait 2
+shot ar_1_mist_nothing.png
+chat /tk put me 0 torch
+wait 2
+shot ar_2_mist_torch.png
+look 180 -8
+wait 2
+shot ar_3_mist_torch_back.png
+chat /tk put me 0 stick
+chat /tk fill 37 200 44 37 200 44 torch
+chat /tk fill 44 200 42 44 200 42 torch
+chat /tk fill 40 200 40 40 200 40 campfire
+look 0 -8
+wait 3
+shot ar_4_mist_placed.png
+chat /air 0 0
+wait 10
+shot ar_5_clear_placed.png
+# 2. A shower in the evening, the sun low behind: the rainbow as the rain comes (its amount rises
+#    over a few seconds), then as it clears.
+chat /tp -689 120 -122
+loaded
+idle
+wait 10
+chat /time set 10800
+look 270 12
+wait 3
+shot ar_6_bow_dry.png
+chat /weather rain 99999
+wait 1
+shot ar_7_bow_rain_1s.png
+wait 1
+shot ar_8_bow_rain_2s.png
+wait 1
+shot ar_9_bow_rain_3s.png
+wait 8
+shot ar_10_bow_rain_full.png
+chat /weather clear 99999
+wait 2
+shot ar_11_bow_clearing_2s.png
+wait 2
+shot ar_12_bow_clearing_4s.png
+quit

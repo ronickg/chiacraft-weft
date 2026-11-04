@@ -804,7 +804,51 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // In rain everything takes a little grey-blue wash, near too.
     let pale = mix(mix(c, vec3(luma(c)), clamp(veil.b * 0.6, 0.0, 0.3)), vec3(luma(c)) * vec3(0.92, 0.97, 1.05), rain * 0.08);
     let seen = mix(pale, lit, veil);
-    return mix(seen, lit, edge);
+    return mix(seen, lit, edge) + held_in_fog(rel, fog_here(sky));
+}
+
+// ---- light in the fog: torches (Research round 15, 6: Valheim's warm firelight in the mist) ----
+
+// How thick the air is about the eye, per block: the weather's mist where the player stands, rain's
+// own, and a little always; `sky` (0..1) the sky light where it is seen, as the mist and the rain
+// are out under the sky only.
+fn fog_here(sky: f32) -> f32 {
+    let mist = fog_density(scene.eye.xyz, fog_floor(vec3(0.0)));
+    let rain = rain_amount() * (0.0035 + 0.0055 * scene.weather.w);
+    return (mist + rain) * smoothstep(0.2, 0.7, sky) + 0.0015;
+}
+
+// The held light (`scene.hand`) scattered by the air between the eye and `rel`, `sigma` the air's
+// thickness (`fog_here`). A point light in even fog has a closed form along a straight look (the
+// airlight integral, without its dimming): the light falls off as the square of the distance, so
+// the integral of 1 / (h^2 + (t - t0)^2) over the look, h how far the look passes the light. The
+// flame is no point: h is never under about 0.7. Looking where the torch is held the glow is
+// strongest; looking back, half as much.
+fn held_in_fog(rel: vec3<f32>, sigma: f32) -> vec3<f32> {
+    let l = scene.hand_light.rgb;
+    if max(max(l.x, l.y), l.z) <= 0.0 {
+        return vec3(0.0);
+    }
+    let len = length(rel);
+    let dist = min(len, 48.0);
+    let dir = rel / max(len, 1e-4);
+    let at = scene.hand.xyz;
+    let t0 = dot(at, dir);
+    let h = sqrt(max(dot(at, at) - t0 * t0, 0.0) + 0.5);
+    let along = (atan((dist - t0) / h) + atan(t0 / h)) / h;
+    // Lit as surfaces are (a block away, its full light), scattered all round (a quarter of what a
+    // surface sends back).
+    return block_light(l, scene.eye.xyz + at) * sigma * along * 0.3;
+}
+
+// Placed lights in the fog: the air just before a lit surface glows with the light there (`b`, its
+// block light levels), as deep as a few blocks of fog. Cheaper than walking the light: it stops at
+// the silhouettes, which the bloom softens.
+fn placed_in_fog(b: vec3<f32>, rel: vec3<f32>, pos: vec3<f32>, sigma: f32) -> vec3<f32> {
+    if max(max(b.x, b.y), b.z) <= 0.0 {
+        return vec3(0.0);
+    }
+    return block_light(b, pos) * sigma * min(length(rel), 3.0) * 0.3;
 }
 
 // ---- to the screen ----

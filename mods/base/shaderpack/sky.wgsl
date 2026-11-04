@@ -389,6 +389,43 @@ fn aurora(dir: vec3<f32>) -> vec3<f32> {
     return color * curtain * height * north * strength * 0.12;
 }
 
+// A rainbow opposite the sun while a shower passes with the sun out (Research round 15, 5): the
+// primary bow 40-42.5° from the point opposite the sun, red outside, and a faint second one at
+// 50.5-53.5° with its colours the other way; the sky inside the primary a little brighter. Six flat
+// bands, pixel-snapped as the aurora is, to suit the blocks (Complementary's pixel rainbow). Only in
+// light rain: a downpour hides the sun, and a thunderstorm makes none. Once the scene carries how
+// wet the land still is (after the sync), it lingers as the rain clears.
+const BOW: array<vec3<f32>, 6> = array<vec3<f32>, 6>(
+    vec3(0.45, 0.2, 0.9), vec3(0.2, 0.35, 1.0), vec3(0.25, 0.9, 0.35), vec3(1.0, 0.95, 0.25), vec3(1.0, 0.55, 0.12), vec3(1.0, 0.18, 0.1),
+);
+
+fn rainbow(dir: vec3<f32>) -> vec3<f32> {
+    let r = rain_amount();
+    let showers = smoothstep(0.03, 0.2, r) * (1.0 - smoothstep(0.4, 0.85, r)) * (1.0 - scene.weather.w);
+    // The sun out and under 42°, so the bow stands above the horizon.
+    let low_sun = smoothstep(0.0, 0.08, scene.sun.y) * (1.0 - smoothstep(0.5, 0.67, scene.sun.y));
+    let strength = showers * low_sun;
+    if strength <= 0.0 || dir.y <= 0.0 {
+        return vec3(0.0);
+    }
+    let d = normalize(floor(dir * 140.0) / 140.0);
+    let deg = degrees(acos(clamp(dot(d, -scene.sun.xyz), -1.0, 1.0)));
+    var c = vec3(0.0);
+    let one = (deg - 40.0) / (2.5 / 6.0);
+    if one >= 0.0 && one < 6.0 {
+        c = BOW[u32(one)];
+    }
+    let two = (deg - 50.5) / (3.0 / 6.0);
+    if two >= 0.0 && two < 6.0 {
+        c = BOW[5u - u32(two)] * 0.4;
+    }
+    // Inside the bow the sky is lit a little by the light it bends there.
+    c += vec3(0.12) * (1.0 - smoothstep(30.0, 40.0, deg));
+    // It thins toward the horizon, where less rain lies along the look.
+    let p = palette();
+    return c * luma(p.sun) * light_strength() * strength * smoothstep(0.0, 0.06, d.y) * 0.08;
+}
+
 // Vanilla's sky is a disc 16 blocks above the eye fading into fog with distance.
 fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
     // Under water, the water's own color all round (`look.wgsl`), not the engine's dark fog.
@@ -401,13 +438,16 @@ fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
     }
     if open_sky() && !in_liquid() {
         var c = sky_color(dir) + milky_way(dir) + aurora(dir);
-        c = cirrus(c, dir);
+        // The rainbow in the rain, in front of the high cirrus.
+        c = cirrus(c, dir) + rainbow(dir);
         if dir.y < 0.0 {
             // From below sea level, vanilla's dark of the void.
             c *= 1.0 - s.uv.x * smoothstep(0.0, 0.08, -dir.y);
         }
         // The fog on the land hides the horizon and fades upward.
         c = fog_through(c, dir * 220.0, 1.0);
+        // A held torch's glow in the mist goes on over the sky (`haze_lit` gives it the land's).
+        c += held_in_fog(dir * 48.0, fog_here(1.0));
         return vec4(display(c), 1.0);
     }
     if dir.y <= 0.0 {
