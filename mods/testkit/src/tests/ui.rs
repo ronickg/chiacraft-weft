@@ -428,7 +428,9 @@ pub async fn chat(t: T) -> R {
     t.world(3).await?;
     t.press("core:command");
     t.screen("core:chat").await?;
-    t.until("the command list", Duration::from_secs(2), |t| t.c().ui_rect("text:gamemode").is_some())
+    // The list itself (its first ten, alphabetical: with every mod's commands "gamemode" is
+    // not among them any more).
+    t.until("the command list", Duration::from_secs(2), |t| t.c().ui_rect("class:suggest").is_some())
         .await?;
     t.check_eq(t.c().input_text(), "/".to_string(), "the line");
     // A mod's key does not fire while the chat has the input.
