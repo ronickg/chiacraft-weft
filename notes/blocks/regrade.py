@@ -36,15 +36,18 @@ MODS = ("base", "animals")
 TABLE = os.path.join(ROOT, "mods", "base", "source", "blocks", "grade.toml")
 LOCK = os.path.join(ROOT, "mods", "base", "source", "blocks", "grade.lock.json")
 W = np.array([0.2126, 0.7152, 0.0722])
-NEUTRAL = dict(gamma=1.0, gain=1.0, contrast=1.0, spread=None, saturation=1.0, hue=0.0, pull=None, pull_amount=0.0)
+NEUTRAL = dict(gamma=1.0, gain=1.0, contrast=1.0, spread=None, saturation=1.0, hue=0.0, pull=None, pull_amount=0.0, outline=1.0)
+# What the grade covers: block tiles and item icons, each with its sources and its table sections.
+KINDS = {"block": dict(game="block", src=("blocks", "tiles"), groups="groups", tiles="tiles"),
+         "item": dict(game="item", src=("items", "tiles"), groups="item_groups", tiles="items")}
 
 
-def src_dir(mod):
-    return os.path.join(ROOT, "mods", mod, "source", "blocks", "tiles")
+def src_dir(mod, kind="block"):
+    return os.path.join(ROOT, "mods", mod, "source", *KINDS[kind]["src"])
 
 
-def game_dir(mod):
-    return os.path.join(ROOT, "mods", mod, "assets", "textures", "block")
+def game_dir(mod, kind="block"):
+    return os.path.join(ROOT, "mods", mod, "assets", "textures", KINDS[kind]["game"])
 
 
 def sha(p):
@@ -125,32 +128,38 @@ def grade(a, kn, k=None):
         ref = ref / (ref @ W)
         rgb = rgb * (1 - kn["pull_amount"]) + lum * ref * kn["pull_amount"]
     b[..., :3] = np.clip(rgb, 0, 1)
+    if kn.get("outline", 1.0) != 1.0:  # the 1-px edge (opaque pixels beside a transparent one) darkened or lightened
+        s = b[..., 3] > 0.5
+        pad = np.pad(s, 1)
+        inner = pad[:-2, 1:-1] & pad[2:, 1:-1] & pad[1:-1, :-2] & pad[1:-1, 2:]
+        edge = s & ~inner
+        b[..., :3][edge] = np.clip(b[..., :3][edge] * kn["outline"], 0, 1)
     return b
 
 
 # --- the table --------------------------------------------------------------------------------------
 
 def load_table(paths):
-    t = {"groups": {}, "tiles": {}}
+    t = {"groups": {}, "tiles": {}, "item_groups": {}, "items": {}}
     for p in paths:
         d = tomllib.load(open(p, "rb"))
-        for g, row in d.get("groups", {}).items():
-            t["groups"].setdefault(g, {}).update(row)
-        for n, row in d.get("tiles", {}).items():
-            t["tiles"].setdefault(n, {}).update(row)
+        for sec in t:
+            for n, row in d.get(sec, {}).items():
+                t[sec].setdefault(n, {}).update(row)
     return t
 
 
-def knobs(t, key):
+def knobs(t, key, kind="block"):
+    groups, tiles = t[KINDS[kind]["groups"]], t[KINDS[kind]["tiles"]]
     name = key.split(":", 1)[1] if ":" in key else key
     kn = dict(NEUTRAL)
-    for g, row in t["groups"].items():
+    for g, row in groups.items():
         if any(fnmatch.fnmatch(name, m) for m in row.get("match", [])):
             kn.update({k: v for k, v in row.items() if k in NEUTRAL})
             break
-    kn.update({k: v for k, v in t["tiles"].get(key, {}).items() if k in NEUTRAL})
-    if "contrast" in t["tiles"].get(key, {}):
-        kn["spread"] = None if "spread" not in t["tiles"].get(key, {}) else kn["spread"]
+    kn.update({k: v for k, v in tiles.get(key, {}).items() if k in NEUTRAL})
+    if "contrast" in tiles.get(key, {}):
+        kn["spread"] = None if "spread" not in tiles.get(key, {}) else kn["spread"]
     return kn
 
 
@@ -188,24 +197,38 @@ def measure(a):
 def build(table_paths, dry=False):
     t = load_table(table_paths)
     lock = json.load(open(LOCK)) if os.path.exists(LOCK) else {}
+    done = []
+    for kind in KINDS:
+        done += build_kind(t, lock, dry, kind)
+    done += overlays(t, lock, dry)
+    if not dry:
+        json.dump(dict(sorted(lock.items())), open(LOCK, "w"), indent=1)
+    return done
+
+
+OVERLAYS = os.path.join(ROOT, "mods", "base", "source", "blocks", "overlays")
+def build_kind(t, lock, dry, kind):
+    """Every tile (block) or icon (item) a group or row grades, and every one that has a source."""
+    tiles = t[KINDS[kind]["tiles"]]
     keys = set()
-    for mod in MODS:  # every tile a group or row grades, and every tile that has a source
-        for p in glob.glob(os.path.join(game_dir(mod), "*.png")):
+    for mod in MODS:
+        for p in glob.glob(os.path.join(game_dir(mod, kind), "*.png")):
             n = os.path.basename(p)[:-4]
             if n.endswith("_e"):
                 continue
             key = n if mod == "base" else f"{mod}:{n}"
-            if "base" in t["tiles"].get(key, {}):  # built from its host by overlays()
+            if "base" in tiles.get(key, {}):  # built from its host by overlays()
                 continue
-            if not neutral(knobs(t, key)) or os.path.exists(os.path.join(src_dir(mod), n + ".png")):
+            if not neutral(knobs(t, key, kind)) or os.path.exists(os.path.join(src_dir(mod, kind), n + ".png")):
                 keys.add((mod, n, key))
     done = []
+    lockpre = "" if kind == "block" else kind + "/"
     for mod, n, key in sorted(keys):
-        kn = knobs(t, key)
-        gd, sd = game_dir(mod), src_dir(mod)
+        kn = knobs(t, key, kind)
+        gd, sd = game_dir(mod, kind), src_dir(mod, kind)
         for rel in files_of(mod, n, gd):
             g, s = os.path.join(gd, rel), os.path.join(sd, rel)
-            lk = f"{mod}/{rel}"
+            lk = f"{mod}/{lockpre}{rel}"
             if not os.path.exists(s):  # graded for the first time: the game's tile is the drawing
                 if dry:
                     continue
@@ -230,15 +253,11 @@ def build(table_paths, dry=False):
             g = os.path.join(gd, rel)
             if not dry:
                 save(out, g, os.path.join(sd, rel))
-                lock[f"{mod}/{rel}"] = sha(g)
-        done.append((mod, n, key, kn, main, grade(main, kn, k)))
-    done += overlays(t, lock, dry)
-    if not dry:
-        json.dump(dict(sorted(lock.items())), open(LOCK, "w"), indent=1)
+                lock[f"{mod}/{lockpre}{rel}"] = sha(g)
+        done.append((mod, n, key if kind == "block" else f"item:{key}", kn, main, grade(main, kn, k)))
     return done
 
 
-OVERLAYS = os.path.join(ROOT, "mods", "base", "source", "blocks", "overlays")
 def inside_shifts(ov):
     """Where each variant's marks sit: moved within the overlay's own margins, so no mark wraps round the
     tile's edge and shows cut in half at a block border (a seam sets its own sideways `shifts`)."""
@@ -300,7 +319,7 @@ def report(done, packs):
     for mod, n, key, kn, before, after in done:
         b, a = measure(before), measure(after)
         band = ""
-        if vc:
+        if vc and not key.startswith("item:"):
             vname, kind = vc.vanilla_name(n)
             tint = vc.tint_for(vname)
             rm = [vc.measure(vc.load(f"{d}/{vname}.png"), tint) for d in refs.values() if os.path.exists(f"{d}/{vname}.png")]
@@ -358,7 +377,10 @@ if __name__ == "__main__":
     ap.add_argument("--preview")
     ap.add_argument("--packs", default=os.environ.get("VANILLA_PACKS"))
     ap.add_argument("--dry", action="store_true", help="measure and preview, write nothing")
+    ap.add_argument("--only", choices=["block", "item"], help="preview only blocks or only items")
     o = ap.parse_args()
     rows = report(build([TABLE] + o.extra, o.dry), o.packs)
+    if o.only:
+        rows = [r for r in rows if r[0].startswith("item:") == (o.only == "item")]
     if o.preview:
         preview(rows, o.preview, " + ".join(["grade.toml"] + [os.path.basename(p) for p in o.extra]))

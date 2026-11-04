@@ -773,6 +773,32 @@ item.base.sole_leather = Подошвенная кожа
 item.base.sole_leather.tooltip = Дублёная корой в яме: жёсткая и прочная, для кожаных доспехов.
 item.base.oak_bark = Дубовая кора
 item.base.oak_bark.tooltip = Снята с дубовых брёвен: её дубильные вещества выделывают шкуры в яме.
+
+# The look's knobs (look.rs), in Mod Settings
+config.base.look_exposure = Экспозиция днём
+config.base.look_exposure.tooltip = Насколько светлым снят день (1: как задумано)
+config.base.look_sun = Солнечный свет
+config.base.look_sun.tooltip = Сила солнца днём
+config.base.look_sun_warmth = Теплота солнца
+config.base.look_sun_warmth.tooltip = -1 белее, +1 теплее и оранжевее
+config.base.look_fill = Свет в тени
+config.base.look_fill.tooltip = Свет неба в тени днём
+config.base.look_fill_cool = Холод тени
+config.base.look_fill_cool.tooltip = -1 нейтральнее, +1 синее
+config.base.look_contrast = Контраст
+config.base.look_contrast.tooltip = Контраст картинки днём
+config.base.look_saturation = Цвет
+config.base.look_saturation.tooltip = Насыщенность после тональной кривой
+config.base.look_shade = Тень под укрытием
+config.base.look_shade.tooltip = Как быстро гаснет свет неба под листвой и крышами: больше — темнее
+config.base.look_haze = Дымка
+config.base.look_haze.tooltip = Дымка вдали
+config.base.look_fog = Свет тумана
+config.base.look_fog.tooltip = Насколько светел туман
+config.base.night_light = Свет ночи
+config.base.night_light.tooltip = Свет ночного неба (ночи тёмные по задумке)
+config.base.night_moon = Лунный свет
+config.base.night_moon.tooltip = Свет луны ночью
 # Книга рецептов рядом с сеткой крафта (book.rs)
 crafting.book.title = Рецепты
 crafting.book.all = Все

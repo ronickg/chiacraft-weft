@@ -1,0 +1,84 @@
+# Nights by the moon (Ronald, 11-04: a full moon lights the night, no moon is dark, torches light
+# the way). The moon lags the day by its phase (a turn every 8/7 day): day 0 of 8 full and up all
+# night, day 3 a waning crescent before dawn, day 4 new (up by day only). Each case with nothing in
+# hand, then a torch. Seed 1, --view 12, 1280x720, --shader-pack chiacraft, a fresh world.
+# Creative on a grass floor high in the open (x 40 y 200 z 40), mobs off. Yaw 0 faces -z; the moon sets in the west (yaw 90).
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /weather clear 99999
+chat /tk mode creative
+chat /time set 6000
+chat /tp 40 205 52
+loaded
+idle
+wait 6
+chat /tk fill 26 199 30 54 199 64 grass
+chat /tk fill 36 200 44 36 203 44 oak_log
+chat /tk fill 44 200 43 45 201 43 cobblestone
+chat /tk fill 40 200 41 40 200 41 mossy_cobblestone
+chat /tk fill 30 200 38 30 202 38 spruce_log
+chat /tp 40 200.2 50
+wait 3
+chat /tk put me 0 stick
+# 1. Full moon high (day 8, midnight).
+chat /time set 210000
+wait 4
+look 0 -12
+wait 2
+shot moon_1_full_high.png
+chat /tk put me 0 torch
+wait 2
+shot moon_1b_full_high_torch.png
+chat /tk put me 0 stick
+look 0 40
+wait 2
+shot moon_1c_full_sky.png
+# 2. The full moon low in the west before dawn (day 8, 21500: 03:30; 23000 is already day in summer).
+chat /time set 213500
+wait 4
+look 90 -8
+wait 2
+shot moon_2_full_low.png
+chat /tk put me 0 torch
+wait 2
+shot moon_2b_full_low_torch.png
+chat /tk put me 0 stick
+# 3. A thin waning crescent before dawn (day 3, 21000: 03:00).
+chat /time set 93000
+wait 4
+look 0 -12
+wait 2
+shot moon_3_crescent.png
+chat /tk put me 0 torch
+wait 2
+shot moon_3b_crescent_torch.png
+chat /tk put me 0 stick
+look 270 30
+wait 2
+shot moon_3c_crescent_sky.png
+# 4. New moon, midnight (day 4).
+chat /time set 114000
+wait 4
+look 0 -12
+wait 2
+shot moon_4_new.png
+wait 1
+bench 4 moon_new_nothing
+chat /tk put me 0 torch
+wait 2
+shot moon_4b_new_torch.png
+wait 1
+bench 4 moon_new_torch
+chat /tk put me 0 stick
+# 5. Full moon in rain (day 8, midnight).
+chat /time set 210000
+chat /weather rain 99999
+wait 6
+look 0 -12
+wait 2
+shot moon_5_full_rain.png
+chat /tk put me 0 torch
+wait 2
+shot moon_5b_full_rain_torch.png
+quit

@@ -32,15 +32,17 @@ pub fn render_scale(density: f64) -> f32 {
 /// small or high-density screen (a 3456 x 2234 MacBook: 6, where 320 x 240 gave 9).
 pub const GUI_MIN: (u32, u32) = (400, 320);
 
-/// The largest GUI scale at which a window of `window` physical pixels still holds `GUI_MIN`:
-/// an even number, or 1 only for a window too small for 2. A UI pixel (a frame's, an item's, a
+/// The largest GUI scale at which a window of `window` physical pixels still holds `GUI_MIN`: an
+/// even number, and never under 2 (a window too small for 2 at `GUI_MIN` scrolls its screens,
+/// `App::open`, rather than drop to 1, where the text came out twice its boxes' size: Playtest B9 at
+/// 760 x 600 and 640 x 360). A UI pixel (a frame's, an item's, a
 /// letter's) is half a GUI pixel, so only at the even scales does it land on whole screen pixels:
 /// at 3 a frame pixel is 1.5, and at 1 it is half a screen pixel, so the text, which is never drawn
 /// smaller than a screen pixel a font pixel, came out twice the size its boxes were laid out for
 /// (Playtest B9: the animal screen at GUI scale 1, its buttons' labels over each other; Researcher,
 /// round 13; Minecraft keeps to even scales for the same reason with its half-size font).
 pub fn max_gui_scale(window: (u32, u32)) -> u32 {
-    even_scale((window.0 / GUI_MIN.0).min(window.1 / GUI_MIN.1))
+    even_scale((window.0 / GUI_MIN.0).min(window.1 / GUI_MIN.1)).max(2)
 }
 
 /// `s` rounded down to a scale the UI pixel sits whole on: 2, 4, 6... (1 below 2).
@@ -50,20 +52,18 @@ pub fn even_scale(s: u32) -> u32 {
 
 /// The scale the GUI is drawn at for the setting `setting` (0: auto) in a window that allows up to
 /// `max`: auto is `max`; a setting is kept even, at least 2 (a 1 or a 3 saved before scales were
-/// kept even shows at 2), and no more than `max` (1 only where the window allows no more).
+/// kept even shows at 2), and no more than `max`.
 pub fn applied_gui_scale(setting: u32, max: u32) -> u32 {
     if setting == 0 { max } else { even_scale(setting.max(2)).min(max) }
 }
 
-/// The GUI scale setting's next step: auto (0), then the even scales up to `max`, then auto (1
-/// only for a window too small for 2).
+/// The GUI scale setting's next step: auto (0), then the even scales up to `max`, then auto.
 pub fn next_gui_scale(now: u32, max: u32) -> u32 {
     let next = match now {
-        0 if max < 2 => 1,
         0 => 2,
         n => even_scale(n.max(2)) + 2,
     };
-    if next > max { 0 } else { next }
+    if next > max.max(2) { 0 } else { next }
 }
 
 #[cfg(test)]
@@ -76,7 +76,9 @@ mod gui_scale_tests {
         assert_eq!(max_gui_scale((1920, 1080)), 2);
         assert_eq!(max_gui_scale((2560, 1440)), 4);
         assert_eq!(max_gui_scale((3456, 2234)), 6);
-        assert_eq!(max_gui_scale((640, 480)), 1);
+        // too small for 2 at `GUI_MIN`: still 2, its screens scroll
+        assert_eq!(max_gui_scale((640, 480)), 2);
+        assert_eq!(max_gui_scale((640, 360)), 2);
         assert_eq!(even_scale(3), 2);
         assert_eq!(even_scale(7), 6);
     }
@@ -87,9 +89,9 @@ mod gui_scale_tests {
         assert_eq!(applied_gui_scale(3, 6), 2);
         assert_eq!(applied_gui_scale(0, 6), 6);
         assert_eq!(applied_gui_scale(8, 6), 6);
-        // a window too small for 2
-        assert_eq!(applied_gui_scale(1, 1), 1);
-        assert_eq!(applied_gui_scale(0, 1), 1);
+        // a window too small for 2 at `GUI_MIN` still gets 2
+        assert_eq!(applied_gui_scale(1, max_gui_scale((760, 600))), 2);
+        assert_eq!(applied_gui_scale(0, max_gui_scale((640, 360))), 2);
     }
 
     #[test]
@@ -101,8 +103,8 @@ mod gui_scale_tests {
             seen.push(s);
         }
         assert_eq!(seen, vec![2, 4, 6, 0, 2]);
-        assert_eq!(next_gui_scale(0, 1), 1);
-        assert_eq!(next_gui_scale(1, 1), 0);
+        assert_eq!(next_gui_scale(0, 2), 2);
+        assert_eq!(next_gui_scale(2, 2), 0);
     }
 }
 

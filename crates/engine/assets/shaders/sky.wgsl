@@ -181,6 +181,10 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
 
 // Vanilla's sky is a disc 16 blocks above the eye fading into fog with distance.
 fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
+    // From inside a liquid (`extra.x` 1): its fog all round.
+    if s.extra.x > 0.5 {
+        return vec4(scene.fog_color.rgb, 1.0);
+    }
     if dir.y <= 0.0 {
         // Under the horizon: fog, and from below sea level the dark of vanilla's void.
         let dark = s.uv.x * smoothstep(0.0, 0.08, -dir.y);
