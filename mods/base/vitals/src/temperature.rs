@@ -76,9 +76,12 @@ pub fn fire_heat(distance: f32) -> f32 {
 pub struct Body {
     /// Comfortable air, °C (a person 15 to 28 unclothed; `PERSON`).
     pub comfort: (f32, f32),
-    /// Degrees of cold and heat insulation from what one wears (`insulation`), or a coat.
+    /// Degrees of cold and heat insulation from what one wears (armor `set_insulation`, clothes
+    /// `clothing::Worn`), or a coat; and the cold insulation still kept wet (wool keeps most of
+    /// its warmth soaked, linen almost none).
     pub cold_insulation: f32,
     pub heat_insulation: f32,
+    pub wet_cold_insulation: f32,
     /// The fortitude stat.
     pub fortitude: f32,
     /// Fat's fullness in the stomach, 0 to 1: up to 4 °C warmer in the cold.
@@ -90,6 +93,8 @@ pub struct Body {
 }
 
 pub const PERSON: (f32, f32) = (15.0, 28.0);
+/// Degrees colder being wet feels, whatever one wears (water on the skin takes heat away).
+pub const WET_CHILL: f32 = 6.0;
 /// A body's core temperature at rest.
 pub const CORE: f32 = 37.0;
 
@@ -97,9 +102,8 @@ impl Body {
     /// The air's range that feels comfortable to this body.
     pub fn comfort_range(&self) -> (f32, f32) {
         let wide = stats::fortitude_degrees(self.fortitude);
-        let wet = if self.wet { 0.35 } else { 1.0 };
-        let lo = self.comfort.0 - wide - self.cold_insulation * wet - 4.0 * self.fat.clamp(0.0, 1.0) - self.meal
-            + if self.wet { 6.0 } else { 0.0 };
+        let cold = if self.wet { self.wet_cold_insulation.min(self.cold_insulation) } else { self.cold_insulation };
+        let lo = self.comfort.0 - wide - cold - 4.0 * self.fat.clamp(0.0, 1.0) - self.meal + if self.wet { WET_CHILL } else { 0.0 };
         let hi = self.comfort.1 + wide + self.heat_insulation - self.meal;
         (lo, hi)
     }
@@ -150,12 +154,13 @@ pub fn feeling(core: f32) -> Feeling {
     }
 }
 
-/// Cold and heat insulation of a full set of armor of that material (proposed): leather and fur
-/// warm, metal cold to wear in snow and hot in the sun. A piece gives its share (`PIECE_SHARE`).
+/// Cold and heat insulation of a full set of armor of that material (proposed): leather warm and a
+/// little hot (heat -3: the sign was wrong, the content plan's research), metal cold to wear in
+/// snow and hot in the sun. A piece gives its share (`PIECE_SHARE`). Fur,
+/// wool, hide and linen are clothes (`clothing`), worn under armor.
 pub fn set_insulation(material: &str) -> (f32, f32) {
     match material {
-        "leather" => (8.0, 3.0),
-        "fur" => (16.0, -6.0),
+        "leather" => (8.0, -3.0),
         "iron" | "chainmail" => (4.0, -4.0),
         "gold" => (3.0, -5.0),
         "diamond" => (5.0, -2.0),
@@ -163,8 +168,17 @@ pub fn set_insulation(material: &str) -> (f32, f32) {
     }
 }
 
-/// Each piece's share of a set's insulation: helmet, chestplate, leggings, boots.
+/// Each piece's share of a set's insulation: helmet, chestplate, leggings, boots (and a hat, a
+/// coat, trousers, boots of clothes).
 pub const PIECE_SHARE: [f32; 4] = [0.15, 0.4, 0.3, 0.15];
+/// The share of armor's cold insulation kept wet.
+pub const ARMOR_WET_KEEPS: f32 = 0.35;
+
+/// The air one feels out in the wind, through clothes that stop `windproof` of it (0 to 1): the
+/// wind chill (`chilled`, `air::feels`) only on what still gets through to the skin.
+pub fn through_clothes(still: f32, chilled: f32, windproof: f32) -> f32 {
+    chilled + (still - chilled) * windproof.clamp(0.0, 1.0)
+}
 
 /// A cold-blooded animal's speed in that air: full at its liking and above, slower below, down to
 /// 40% fifteen degrees colder.

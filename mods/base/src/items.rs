@@ -87,6 +87,12 @@ pub fn register(r: &mut Registry) {
         ("cooked_egg", 5, 6.0, ""),
         ("apple_pie", 8, 4.8, ""),
         ("berries", 2, 1.2, ""),
+        // Preserved (`cooking.rs`, `vitals::preserve`).
+        ("dried_meat", 6, 7.2, ""),
+        ("smoked_meat", 7, 9.6, ""),
+        ("salted_meat", 6, 6.0, ""),
+        ("dried_apple", 3, 2.4, ""),
+        ("dried_berries", 2, 1.6, ""),
         // The wild foods (`vitals::wild`): the north's berries, brambles' raspberries, prickly
         // pears and rose hips; nuts and seeds, small but rich; mushrooms, the red one poisonous.
         ("lingonberries", 2, 1.2, ""),
@@ -118,6 +124,8 @@ pub fn register(r: &mut Registry) {
             .on_use(base_api::eat)
             .tab(&crate::tabs::FOOD);
         let i = if tag.starts_with("cooked_meat/") { i.tag("cooked_meat") } else { i };
+        // Any raw meat salts (`cooking.rs`).
+        let i = if tag.starts_with("raw_meat/") { i.tag("raw_meat") } else { i };
         // Berries are planted like seeds: a new bush; so are the wild plants' fruit and seeds.
         let i = if name == "berries" { i.placed_block(&crate::blocks::BERRY_BUSH) } else { i };
         let i = match crate::wild::planted_by(name) {

@@ -24,6 +24,9 @@ pub const PORTIONS: usize = vitals::stomach::PORTIONS;
 /// The engine counts health as the base game's 20 points, which keeps every creature's damage
 /// in balance; the vitals count 100 (`notes/SURVIVAL.md`). A health point is this many.
 pub const HEALTH_SCALE: f32 = 5.0;
+/// A new player's stamina before the first tick sets its max (`survival/stamina.rs` clamps it):
+/// over any max, so one starts full. Dying still leaves one at 0.
+pub const NEW_STAMINA: f32 = 1.0e6;
 
 value! {
     #[derive(Default)]
@@ -156,6 +159,11 @@ const ALTITUDE: f32 = 6.0;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Air {
     pub celsius: f32,
+    /// The same air out of the wind: what it is through windproof clothes
+    /// (`vitals::temperature::through_clothes`).
+    pub still: f32,
+    /// The biome's humidity, 0 dry to 1 wet (drying racks).
+    pub humidity: f32,
     /// Degrees from the nearest fire (lava, a lit furnace, torches).
     pub fire: f32,
     /// Sky light at the eyes: under 13 a roof, 0 deep inside.
@@ -225,6 +233,8 @@ pub fn air_at(w: &World, pos: [f64; 3], height: f32, in_water: bool, reach: i32,
     }
     Air {
         celsius: temperature::air(&place),
+        still: temperature::air(&temperature::Place { wind: 0.0, ..place }),
+        humidity: climate.humidity,
         fire,
         sky,
         underground,
@@ -294,8 +304,30 @@ pub fn rain_key(w: &World, biome: u32) -> u64 {
     w.seed() ^ (biome as u64).wrapping_mul(0xD6E8_FEB8_6659_FD93)
 }
 
-/// How much a block heats the air near it (1 lava's).
+/// How much a block heats the air near it (1 lava's). Looked up by name once per block state and
+/// kept in a table (`HEATS`): the air's scan (7×7×7 a player a second) and the animals' search for
+/// a fire (33×7×33) ask it for every block they pass.
 pub fn heat_of(state: u32) -> f32 {
+    use std::sync::OnceLock;
+    use std::sync::atomic::{AtomicU8, Ordering};
+    // Hundredths of heat + 1 per state; 0 not looked up yet.
+    static HEATS: OnceLock<Box<[AtomicU8]>> = OnceLock::new();
+    let table = HEATS.get_or_init(|| (0..HEAT_STATES).map(|_| AtomicU8::new(0)).collect());
+    let Some(slot) = table.get(state as usize) else { return heat_by_name(state) };
+    match slot.load(Ordering::Relaxed) {
+        0 => {
+            let h = heat_by_name(state);
+            slot.store((h * 100.0).round().clamp(0.0, 254.0) as u8 + 1, Ordering::Relaxed);
+            h
+        }
+        v => (v - 1) as f32 / 100.0,
+    }
+}
+
+/// Block states `heat_of` keeps in its table (a byte each); any past it are looked up by name.
+const HEAT_STATES: usize = 1 << 20;
+
+fn heat_by_name(state: u32) -> f32 {
     // The state's name without its properties (`base:lava[level=0]`).
     match block_name(state).split('[').next().unwrap_or("") {
         "base:lava" => 1.0,
@@ -306,9 +338,12 @@ pub fn heat_of(state: u32) -> f32 {
 }
 
 impl Vitals {
-    /// A new player: breath full, the body at 37 °C, an empty stomach.
+    /// A new player: breath full, stamina full (the first tick brings it down to what the stomach
+    /// allows), the body at 37 °C, a light meal in the stomach (`vitals::stomach::arrival`).
     pub fn new(air: f32) -> Vitals {
-        Vitals { core: vitals::temperature::CORE, air, ..Vitals::default() }
+        let mut v = Vitals { core: vitals::temperature::CORE, air, stamina: NEW_STAMINA, ..Vitals::default() };
+        v.set_stomach(&vitals::stomach::arrival());
+        v
     }
 
     pub fn stomach(&self) -> vitals::stomach::Stomach {
@@ -390,6 +425,19 @@ pub static NUTRITION: Component<Nutrition> = Component::named("base:nutrition");
 pub static MADE: Component<u32> = Component::named("base:made");
 pub static HOT: Component<u32> = Component::named("base:hot");
 pub static FRESHNESS: Component<u8> = Component::named("base:freshness");
+/// A stew's ingredients (`vitals::meals::pack`), and what it holds, shown in its tooltip; both on
+/// the stack, as a stew is what went into it.
+pub static MEAL: Component<u64> = Component::named("base:meal");
+pub static MEAL_NUTRITION: Component<Nutrition> = Component::named("base:meal_nutrition");
+/// The empty bowl a stew is eaten from.
+pub static BOWL: Item = Item::named("base:bowl");
+
+value! {
+    /// A piece of clothing's warmth (`vitals::clothing`), for its tooltip: degrees of cold and heat
+    /// insulation, the share kept wet and the share of the wind stopped, in percent.
+    pub struct Warmth { pub cold: u32, pub heat: i32, pub wet: u32, pub wind: u32 }
+}
+pub static WARMTH: Component<Warmth> = Component::named("base:warmth");
 pub mod freshness {
     pub const FRESH: u8 = 0;
     pub const STALE: u8 = 1;
@@ -446,6 +494,33 @@ pub fn eat(u: &mut ItemUse) -> bool {
     true
 }
 
+/// Eating a stew for `.on_use`: its ingredients go into the stomach together (`vitals::meals`), as
+/// good as the stew is fresh (it keeps as its shortest-keeping ingredient), the cooking's bonus on
+/// top; hot, it warms. The bowl is left. Refused when it doesn't all fit.
+pub fn eat_meal(u: &mut ItemUse) -> bool {
+    let stack = u.stack();
+    let foods = vitals::meals::ingredients(MEAL.stack_only(&stack).unwrap_or(0));
+    if foods.is_empty() {
+        return false;
+    }
+    let w = u.world();
+    let (age, hot) = food_age(&stack, w.day_time());
+    let fresh = vitals::food::freshness_of(vitals::meals::keeps(&foods), age, difficulty().keep);
+    let roll = w.random_below(1000) as f32 / 1000.0;
+    let Some(v) = w.component_mut(u.player(), &VITALS) else { return false };
+    let mut s = v.stomach();
+    if s.eat_meal(&foods, fresh.quality(), if hot { 0.0 } else { vitals::food::HOT_FOR }, v.capacity()).is_err() {
+        return false;
+    }
+    v.set_stomach(&s);
+    let resist = vitals::stats::fortitude_resists(v.stats()[vitals::stats::Stat::Fortitude.index()]);
+    if roll < vitals::meals::poisoning_chance(&foods, fresh) * (1.0 - resist) {
+        v.sick = v.sick.max(vitals::food::SICK_SECS);
+    }
+    u.set_stack(weft_sdk::use_one(stack));
+    true
+}
+
 /// Poisons `player` for `secs` (venom, a poisonous thing eaten), less with fortitude; nothing in
 /// creative. Poison takes health a while (`vitals::effects::Effect::Poisoned`).
 pub fn poison(w: &World, player: u64, secs: f32) {
@@ -483,6 +558,13 @@ pub fn give_xp(w: &World, player: u64, amount: u64) {
     v.xp += (amount as f32 * rate).round() as u64;
 }
 
+/// Whether there's room in `player`'s stomach for all of a stew.
+pub fn has_room_for_meal(w: &World, player: u64, stack: &ItemStack) -> bool {
+    let foods = vitals::meals::ingredients(MEAL.stack_only(stack).unwrap_or(0));
+    w.component(player, &VITALS)
+        .is_some_and(|v| v.stomach().room(v.capacity()) + 1e-4 >= vitals::meals::units(&foods))
+}
+
 /// Whether there's room in `player`'s stomach for a portion of that item.
 pub fn has_room(w: &World, player: u64, item: u32) -> bool {
     let Some(food) = vitals::food::find(weft_sdk::item_name(item)) else { return false };
@@ -506,6 +588,12 @@ pub static HEAD: EquipmentSlot = EquipmentSlot::named("base:head");
 pub static CHEST: EquipmentSlot = EquipmentSlot::named("base:chest");
 pub static LEGS: EquipmentSlot = EquipmentSlot::named("base:legs");
 pub static FEET: EquipmentSlot = EquipmentSlot::named("base:feet");
+/// Clothes' slots, head to feet, worn under armor (`vitals::clothing`).
+pub static HAT: EquipmentSlot = EquipmentSlot::named("base:hat");
+pub static COAT: EquipmentSlot = EquipmentSlot::named("base:coat");
+pub static TROUSERS: EquipmentSlot = EquipmentSlot::named("base:trousers");
+pub static SHOES: EquipmentSlot = EquipmentSlot::named("base:shoes");
+pub const CLOTHES: [&EquipmentSlot; 4] = [&HAT, &COAT, &TROUSERS, &SHOES];
 
 pub static OVERWORLD: Dimension = Dimension::named("base:overworld");
 pub static FLATLANDS: Dimension = Dimension::named("base:flatlands");
@@ -529,4 +617,24 @@ pub mod tabs {
     pub static FOOD: CreativeTab = CreativeTab::named("base:food");
     pub static INGREDIENTS: CreativeTab = CreativeTab::named("base:ingredients");
     pub static REDSTONE: CreativeTab = CreativeTab::named("base:redstone");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A new player starts with full stamina (Tester, 2026-11-03: it started at 0 and took 14 s to
+    /// fill), however many points are placed in it.
+    #[test]
+    fn a_new_player_starts_with_full_stamina() {
+        let most = vitals::stats::player(&[u32::from(u16::MAX); vitals::stats::STATS])[vitals::stats::Stat::Stamina.index()];
+        assert!(Vitals::new(10.0).stamina >= most, "a new player's stamina {} under a max of {most}", Vitals::new(10.0).stamina);
+    }
+
+    /// A new player arrives with its light meal in it.
+    #[test]
+    fn a_new_player_arrives_fed() {
+        assert_eq!(Vitals::new(10.0).stomach(), vitals::stomach::arrival());
+        assert!(vitals::stomach::arrival().used() > 0.0);
+    }
 }

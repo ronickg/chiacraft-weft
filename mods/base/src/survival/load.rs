@@ -55,6 +55,14 @@ pub fn weight(name: &str) -> f32 {
     if let Some(f) = food::find(name) {
         return food::FOODS[f].grams / 1000.0;
     }
+    // A bowl of stew about half a kilo; clothes by their piece (a fur coat 2 kg).
+    if name == "base:stew" {
+        return 0.5;
+    }
+    if let Some((m, piece)) = vitals::clothing::piece_of(name) {
+        let per = if m.name == "fur" { 1.0 } else { 0.5 };
+        return per * [0.5, 2.0, 1.5, 1.0][piece];
+    }
     let n = name.split_once(':').map_or(name, |(_, n)| n);
     let piece = |p: &str| n.ends_with(p);
     if piece("_helmet") || piece("_chestplate") || piece("_leggings") || piece("_boots") {
