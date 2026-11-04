@@ -81,6 +81,32 @@ fn always_wear(traits: &[&Trait]) -> f32 {
         .product()
 }
 
+/// How long a part lasts by itself, in uses at full health: a working part its material's uses, a
+/// holding part `HAFT_WEAR` times that, a fitting its fitting uses; all × its grade, ÷ its wear.
+pub fn life_of(role: Role, id: &str, grade_n: u8) -> f32 {
+    let Some(m) = material(id) else { return 0.0 };
+    let g = grade(grade_n).mult;
+    let wear = always_wear(&of_material(m.id));
+    match role {
+        Role::Working => m.uses * g / wear,
+        Role::Holding => m.uses * g * HAFT_WEAR / wear,
+        Role::Fitting => m.fitting_uses * g / wear,
+        Role::Extra => 0.0,
+    }
+}
+
+/// Share of a part's life one unit of its material gives back in a repair: half, scaled by a
+/// repair-cost trait (chert's half cost gives twice as much; copper's free hammering all of it).
+pub const REPAIR_SHARE: f32 = 0.5;
+
+pub fn repair_share(id: &str) -> f32 {
+    let cost: f32 = of_material(id)
+        .iter()
+        .map(|t| if let Effect::RepairCost(f) = t.effect { f } else { 1.0 })
+        .product();
+    if cost <= 0.0 { 1.0 } else { (REPAIR_SHARE / cost).min(1.0) }
+}
+
 /// The numbers of a `kind` built from `parts`, one for each of its slots.
 pub fn combine(kind_id: &str, parts: &[Part]) -> Result<ToolStats, Missing> {
     let k = kind(kind_id).ok_or_else(|| Missing::Kind(kind_id.to_string()))?;
@@ -219,6 +245,15 @@ mod tests {
         };
         assert!(sword(9).damage > sword(4).damage);
         assert_eq!(sword(9).stat, sword(4).stat);
+    }
+
+    #[test]
+    fn repairs_by_material() {
+        assert_eq!(repair_share("wrought_iron"), 0.5);
+        assert_eq!(repair_share("chert"), 1.0, "half the cost, twice the repair");
+        assert_eq!(repair_share("copper"), 1.0, "hammered back for free");
+        assert!(life_of(Role::Holding, "oak", 4) > life_of(Role::Working, "oak", 4), "hafts outlast heads");
+        assert_eq!(life_of(Role::Extra, "gold", 4), 0.0);
     }
 
     #[test]

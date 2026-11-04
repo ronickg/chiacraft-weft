@@ -275,6 +275,11 @@ pub fn assembled(stacks: &[ItemStack]) -> ItemStack {
 /// A built item back into its parts, each with its share of the item's wear; fittings that are
 /// cut come back as nothing.
 pub fn apart(stack: &ItemStack) -> Vec<ItemStack> {
+    apart_into(stack, true)
+}
+
+/// As `apart`; with `cut` false every part comes back (for a repair that puts it back together).
+fn apart_into(stack: &ItemStack, cut: bool) -> Vec<ItemStack> {
     let Some(p) = PARTS.stack_only(stack) else { return Vec::new() };
     let Some(kind) = kind_of(p.kind) else { return Vec::new() };
     // The item's wear since it was put together goes to each part by its wear rate.
@@ -303,7 +308,7 @@ pub fn apart(stack: &ItemStack) -> Vec<ItemStack> {
             .iter()
             .find(|s| s.name == part.slot)
             .map(|s| s.role);
-        if role == Some(Role::Fitting) && cut_when_apart(part.material) {
+        if cut && role == Some(Role::Fitting) && cut_when_apart(part.material) {
             continue;
         }
         let worn = (p.worn[i] as f32).max(share * life) as u32;
@@ -317,10 +322,83 @@ fn damage_of(stack: &ItemStack) -> u32 {
     DAMAGE.stack_only(stack).unwrap_or(0)
 }
 
+// ---------------------------------------------------------------- repair
+
+/// Whether `item` is the material `material` is made from here (`SOURCES`).
+fn is_source(material: &str, item: u32) -> bool {
+    SOURCES
+        .iter()
+        .filter(|(id, _)| *id == material)
+        .any(|(_, from)| match from.strip_prefix('#') {
+            Some(tag) => item_has_tag(item, tag),
+            None => item_name(item) == format!("base:{from}"),
+        })
+}
+
+/// The role of part item `item` (its shape's slot, in the first kind that has it).
+fn role_of_item(item: u32) -> Option<Role> {
+    let id = shape_id(item)?;
+    let s = SHAPES.iter().find(|s| s.id == id)?;
+    KINDS
+        .iter()
+        .find(|k| k.id == s.kind)?
+        .slots
+        .iter()
+        .find(|x| x.name == s.slot)
+        .map(|x| x.role)
+}
+
+/// A worn part with one unit of its material: the part with `repair_share` of its life back.
+fn repair_part(part: &ItemStack, with: &ItemStack) -> Option<ItemStack> {
+    let p = PART.stack_only(part)?;
+    let m = material_of(p.material)?;
+    if p.worn == 0 || !is_source(m.id, with.item) {
+        return None;
+    }
+    let life = crafting::combine::life_of(role_of_item(part.item)?, m.id, p.grade as u8);
+    let back = (life * crafting::combine::repair_share(m.id)).ceil() as u32;
+    Some(ItemStack { count: 1, ..*part }.with(&PART, PartOf { worn: p.worn.saturating_sub(back.max(1)), ..p }))
+}
+
+/// A tool with one unit of a material: its most worn part of that material repaired, the tool
+/// put back together.
+fn repair_tool(tool: &ItemStack, with: &ItemStack) -> Option<ItemStack> {
+    PARTS.stack_only(tool)?;
+    let mut parts = apart_into(tool, false);
+    let worst = parts
+        .iter()
+        .enumerate()
+        .filter_map(|(i, s)| {
+            let p = PART.stack_only(s)?;
+            let m = material_of(p.material)?;
+            let life = crafting::combine::life_of(role_of_item(s.item)?, m.id, p.grade as u8).max(1.0);
+            (p.worn > 0 && is_source(m.id, with.item)).then_some((i, p.worn as f32 / life))
+        })
+        .max_by(|a, b| a.1.total_cmp(&b.1))?
+        .0;
+    parts[worst] = repair_part(&parts[worst], with)?;
+    let again = assembled(&parts);
+    (!again.is_empty()).then_some(again)
+}
+
+/// Two stacks in the assembly slots, a worn part or tool and a unit of its material: what the
+/// repair makes.
+fn repaired(stacks: &[ItemStack]) -> ItemStack {
+    let full: Vec<&ItemStack> = stacks.iter().filter(|s| !s.is_empty()).collect();
+    let [a, b] = full[..] else { return ItemStack::EMPTY };
+    for (thing, with) in [(a, b), (b, a)] {
+        if let Some(r) = repair_part(thing, with).or_else(|| repair_tool(thing, with)) {
+            return r;
+        }
+    }
+    ItemStack::EMPTY
+}
+
 // ---------------------------------------------------------------- the crafting table's slots
 
 /// The table's parts slots changed: a tool in "apart" comes apart into empty assembly slots, and
-/// "assembled" shows what the assembly slots make.
+/// "assembled" shows what the assembly slots make: a tool from parts, or a repair (a worn part
+/// or tool and one unit of its material).
 pub fn on_change(m: &MenuCtx) {
     let (asm, apart_slot, out) = (m.group("assembly"), m.group("apart"), m.group("assembled"));
     if asm.is_empty() {
@@ -338,7 +416,9 @@ pub fn on_change(m: &MenuCtx) {
         apart_slot.set(0, ItemStack::EMPTY);
     }
     let stacks: Vec<ItemStack> = (0..asm.len()).map(|i| asm.get(i)).collect();
-    out.set(0, assembled(&stacks));
+    // A tool from its parts, else a repair: a worn part or tool and a unit of its material.
+    let built = assembled(&stacks);
+    out.set(0, if built.is_empty() { repaired(&stacks) } else { built });
 }
 
 /// Something was taken: true if it was the assembled tool (its parts are used up), so the grid's
