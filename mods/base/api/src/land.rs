@@ -1742,7 +1742,10 @@ mod tests {
         for i in 0..40_000 {
             let (x, z) = ((i % 200) * 12 * 16 - 1200 * 16, (i / 200) * 12 * 16 - 1200 * 16);
             let add = karst(&f, x, z);
-            assert!((0..=q4(KARST_WIDE_HEIGHT.1 as f64 + 9.0)).contains(&add), "{add}");
+            // Down only into a sinkhole: to `SINK_FLOOR` under the sea from ground at most
+            // `SINK_LAND.1` over it (Tester 2, 11-04: the sinkholes made this fail at -410).
+            let deepest = -q4((SINK_LAND.1 + SINK_FLOOR + 1) as f64);
+            assert!((deepest..=q4(KARST_WIDE_HEIGHT.1 as f64 + 9.0)).contains(&add), "{add}");
             if add > q4(8.0) {
                 towers += 1;
                 if KARST_AREA.value(&f, x, z) == 0 {
