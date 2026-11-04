@@ -146,10 +146,9 @@ fn title(ui: &mut Ui, with_level: bool) {
         let Some(a) = c.menu_component(&ANIMAL) else { return };
         match a.species() {
             // A breed with its species: "Chihuahua (dog)".
-            Some(s) if s.breed.is_some() && !with_level => t.set(
-                "screen.animals.name_breed",
-                &[Arg::Key(&species_key(&a)), Arg::Key(&format!("species.animals.{}", s.name))],
-            ),
+            Some(s) if s.breed.is_some() && !with_level => {
+                t.set("screen.animals.name_breed", &[Arg::Key(&species_key(&a)), Arg::Key(&format!("species.animals.{}", s.name))])
+            }
             Some(s) if s.breed.is_some() => t.set(
                 "screen.animals.heading_breed",
                 &[Arg::Key(&species_key(&a)), Arg::Key(&format!("species.animals.{}", s.name)), Arg::Int(a.level() as i64)],
@@ -318,9 +317,15 @@ fn window(ui: &mut Ui, s: S, body: impl FnOnce(&mut Ui)) {
             ui.row(S::row().w(6.0), |_| {});
             ui.panel("tab_pressed", S::row().pad(2.0).h(13.0).center(), |ui| ui.title());
             ui.spacer();
-            ui.button("window.base.close", S::default().class("close").size(7.0, 7.0).pad(0.5).tooltip("window.base.close_tip"), |c| {
-                c.client().close_screen()
-            });
+            ui.button(
+                "window.base.close",
+                S::default()
+                    .class("close")
+                    .size(7.0, 7.0)
+                    .pad(0.5)
+                    .tooltip("window.base.close_tip"),
+                |c| c.client().close_screen(),
+            );
             ui.row(S::row().w(4.0), |_| {});
         });
         ui.panel("panel", s, body);
@@ -347,12 +352,15 @@ fn life_bar(ui: &mut Ui, class: &'static str, value: impl Fn(&ClientView) -> Opt
     let v2 = value.clone();
     ui.row(S::row().size(LIFE_BAR.0, LIFE_BAR.1), move |ui| {
         ui.progress_bind(class, S::default().size(LIFE_BAR.0, LIFE_BAR.1), move |c| value(c).map_or(-1.0, |v| v.0.clamp(0.0, 1.0)));
-        ui.text_bind_styled(S::default().no_wrap().at_pivot(LIFE_BAR.0 - 3.0, LIFE_BAR.1 / 2.0, [1.0, 0.5]), move |c, t| {
-            match v2(c) {
+        ui.text_bind_styled(
+            S::default()
+                .no_wrap()
+                .at_pivot(LIFE_BAR.0 - 3.0, LIFE_BAR.1 / 2.0, [1.0, 0.5]),
+            move |c, t| match v2(c) {
                 Some((_, s)) => t.text(&s),
                 None => t.text(""),
-            }
-        });
+            },
+        );
     });
 }
 
@@ -406,7 +414,9 @@ fn animal_screen(ui: &mut Ui) {
                         }),
                         "water" => life_bar(ui, class, |c| {
                             let a = c.menu_component(&ANIMAL)?;
-                            if a.species().is_none_or(|s| animals_core::needs::drinks(s) <= 0.0) {
+                            if a.species()
+                                .is_none_or(|s| animals_core::needs::drinks(s) <= 0.0)
+                            {
                                 return None;
                             }
                             let w = 1.0 - a.thirst.clamp(0.0, 1.0);
@@ -425,7 +435,10 @@ fn animal_screen(ui: &mut Ui) {
                 let Some(s) = a.species().filter(|_| b.core > 0.0) else { return };
                 let (lo, hi) = s.bio.comfort;
                 if s.bio.cold_blooded {
-                    t.set("screen.animals.body_cold", &[Arg::Int(b.air.round() as i64), Arg::Int(b.warmth as i64), Arg::Int(b.condition as i64)]);
+                    t.set(
+                        "screen.animals.body_cold",
+                        &[Arg::Int(b.air.round() as i64), Arg::Int(b.warmth as i64), Arg::Int(b.condition as i64)],
+                    );
                     return;
                 }
                 let feel = crate::comfort::FEELING_NAMES[(b.feel as usize).min(6)];
@@ -449,7 +462,10 @@ fn animal_screen(ui: &mut Ui) {
                 ui.panel("chip_points", S::row().pad(2.0), |ui| {
                     ui.text_bind_styled(S::default().no_wrap(), |c, t| {
                         let Some(a) = c.menu_component(&ANIMAL) else { return };
-                        t.set("screen.animals.points_chip", &[Arg::Int(a.unspent as i64), Arg::Int(a.tamed_points() as i64), Arg::Int(animal::MAX_TAMED_POINTS as i64)]);
+                        t.set(
+                            "screen.animals.points_chip",
+                            &[Arg::Int(a.unspent as i64), Arg::Int(a.tamed_points() as i64), Arg::Int(animal::MAX_TAMED_POINTS as i64)],
+                        );
                     });
                 });
             });
@@ -457,7 +473,9 @@ fn animal_screen(ui: &mut Ui) {
             ui.row(S::row().gap(3.0), |ui| {
                 ui.row(S::row().w(8.0 + 3.0 + 34.0 + 3.0 + STAT_BAR.0), |_| {});
                 ui.row(S::row().w(14.0).end(), |ui| ui.text_styled(S::default().class("dim").no_wrap(), "screen.animals.wild_points", &[]));
-                ui.row(S::row().w(18.0).end(), |ui| ui.text_styled(S::default().class("dim").no_wrap(), "screen.animals.tamed_points", &[]));
+                ui.row(S::row().w(18.0).end(), |ui| {
+                    ui.text_styled(S::default().class("dim").no_wrap(), "screen.animals.tamed_points", &[])
+                });
                 ui.row(S::row().w(10.0), |_| {});
             });
             for (i, name) in STAT_NAMES.iter().enumerate() {
@@ -476,11 +494,16 @@ fn animal_screen(ui: &mut Ui) {
                                 },
                             );
                         }
-                        ui.text_bind_styled(S::default().no_wrap().at_pivot(STAT_BAR.0 - 3.0, STAT_BAR.1 / 2.0, [1.0, 0.5]), move |c, t| {
-                            if let Some(a) = c.menu_component(&ANIMAL) {
-                                t.text(&shown(&a, i));
-                            }
-                        });
+                        ui.text_bind_styled(
+                            S::default()
+                                .no_wrap()
+                                .at_pivot(STAT_BAR.0 - 3.0, STAT_BAR.1 / 2.0, [1.0, 0.5]),
+                            move |c, t| {
+                                if let Some(a) = c.menu_component(&ANIMAL) {
+                                    t.text(&shown(&a, i));
+                                }
+                            },
+                        );
                     });
                     ui.row(S::row().w(14.0).end(), move |ui| {
                         ui.text_bind_styled(S::default().no_wrap(), move |c, t| {
@@ -497,11 +520,18 @@ fn animal_screen(ui: &mut Ui) {
                         });
                     });
                     if i != species::TORPOR {
-                        ui.button("screen.animals.plus", S::default().size(10.0, 9.0).pad(0.5).tooltip("screen.animals.place"), move |c| {
-                            if let Some(id) = c.menu_owner() {
-                                c.client().send(&PLACE, &[id, i as u64]);
-                            }
-                        });
+                        ui.button(
+                            "screen.animals.plus",
+                            S::default()
+                                .size(10.0, 9.0)
+                                .pad(0.5)
+                                .tooltip("screen.animals.place"),
+                            move |c| {
+                                if let Some(id) = c.menu_owner() {
+                                    c.client().send(&PLACE, &[id, i as u64]);
+                                }
+                            },
+                        );
                     } else {
                         ui.row(S::row().w(10.0), |_| {});
                     }
@@ -514,7 +544,12 @@ fn animal_screen(ui: &mut Ui) {
             ui.text_styled(S::default().class("title").no_wrap(), "screen.animals.coat_title", &[]);
             ui.panel("chip", S::row().pad(2.0), |ui| {
                 ui.text_bind_styled(S::default().max_w(94.0), |c, t| {
-                    let Some(look) = c.menu_component(&crate::coats::GENOME).and_then(|g| crate::coats::phenotype(&g)) else { return };
+                    let Some(look) = c
+                        .menu_component(&crate::coats::GENOME)
+                        .and_then(|g| crate::coats::phenotype(&g))
+                    else {
+                        return;
+                    };
                     t.set("screen.animals.chip", &[Arg::Text(&look.name)]);
                 });
             });
@@ -529,7 +564,13 @@ fn animal_screen(ui: &mut Ui) {
                 ui.text_bind_styled(S::default().no_wrap(), |c, t| {
                     let Some(g) = c.menu_component(&crate::coats::GENOME) else { return };
                     let v = animals_core::coats::temperament(&g);
-                    let word = if v < 0.34 { "calm" } else if v < 0.67 { "steady" } else { "skittish" };
+                    let word = if v < 0.34 {
+                        "calm"
+                    } else if v < 0.67 {
+                        "steady"
+                    } else {
+                        "skittish"
+                    };
                     t.set("screen.animals.temper", &[Arg::Key(&format!("screen.animals.temper.{word}"))]);
                 });
             });
@@ -556,7 +597,11 @@ fn animal_screen(ui: &mut Ui) {
                 let stance = format!("screen.animals.stance.{}", STANCE_NAMES[(o.stance as usize).min(3)]);
                 let shared = c
                     .menu_component(&SHARED)
-                    .map(|s| String::from_utf8_lossy(&s.name).trim_end_matches('\0').to_string())
+                    .map(|s| {
+                        String::from_utf8_lossy(&s.name)
+                            .trim_end_matches('\0')
+                            .to_string()
+                    })
                     .unwrap_or_default();
                 if shared.is_empty() {
                     t.set("screen.animals.orders", &[Arg::Key(&command), Arg::Key(&stance)]);
@@ -962,7 +1007,10 @@ fn taming_hud(r: &mut Registry) {
                     let Some((id, g, k)) = being_tamed(c) else { return t.text("") };
                     let eff = Arg::Int((g.effectiveness * 100.0).round() as i64);
                     match k {
-                        Some(k) if k.count > 0 => t.set("hud.animals.taming.asleep_food", &[eff, Arg::Int(k.torpor as i64), Arg::Item(k.food), Arg::Int(k.count as i64)]),
+                        Some(k) if k.count > 0 => t.set(
+                            "hud.animals.taming.asleep_food",
+                            &[eff, Arg::Int(k.torpor as i64), Arg::Item(k.food), Arg::Int(k.count as i64)],
+                        ),
                         Some(k) => t.set("hud.animals.taming.asleep", &[eff, Arg::Int(k.torpor as i64)]),
                         None => match species_of(c, id).and_then(|s| s.foods.get((g.want as usize).wrapping_sub(1))) {
                             Some(f) if g.asking > 0 => t.set("hud.animals.taming.asks", &[eff, Arg::Name(&format!("item:{}", f.item))]),

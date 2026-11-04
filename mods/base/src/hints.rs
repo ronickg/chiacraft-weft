@@ -222,7 +222,11 @@ fn client(r: &mut Registry) {
     r.client_frame(|c| {
         let mut q = QUEUE.lock().unwrap();
         let now = Instant::now();
-        let dt = LAST_FRAME.lock().unwrap().replace(now).map_or(Duration::ZERO, |l| now - l);
+        let dt = LAST_FRAME
+            .lock()
+            .unwrap()
+            .replace(now)
+            .map_or(Duration::ZERO, |l| now - l);
         let Some((key, args, at)) = q.front_mut() else { return };
         // Not over a screen (it ran across the inventory's grid): it waits until the screen
         // closes, and one already showing pauses (its start moves on with the time), so a

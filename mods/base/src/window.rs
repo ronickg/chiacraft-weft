@@ -37,9 +37,15 @@ fn framed(ui: &mut Ui, s: S, title: Option<&str>, tabs: &[Tab], body: impl FnOnc
             }
             ui.spacer();
             // (a button's padding of 0 means the engine's own; half a GUI pixel is none here)
-            ui.button("window.base.close", S::default().class("close").size(7.0, 7.0).pad(0.5).tooltip("window.base.close_tip"), |c| {
-                c.client().close_screen()
-            });
+            ui.button(
+                "window.base.close",
+                S::default()
+                    .class("close")
+                    .size(7.0, 7.0)
+                    .pad(0.5)
+                    .tooltip("window.base.close_tip"),
+                |c| c.client().close_screen(),
+            );
             ui.row(S::row().w(4.0), |_| {});
         });
         ui.panel("panel", s, body);

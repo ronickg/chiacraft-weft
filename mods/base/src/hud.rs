@@ -193,11 +193,9 @@ pub fn register(r: &mut Registry) {
                 let args: Vec<Arg> = on.iter().map(|k| Arg::Key(k)).collect();
                 t.set(&format!("hud.base.effects_{}", args.len()), &args);
             });
-            ui.text_bind_styled(S::default().no_wrap(), |c, t| {
-                match vitals_of(c).filter(|v| v.has(effects::Effect::Rested)) {
-                    Some(v) => t.set("hud.base.effect.rested", &[Arg::Int((v.rested / 60.0).ceil() as i64)]),
-                    None => t.text(""),
-                }
+            ui.text_bind_styled(S::default().no_wrap(), |c, t| match vitals_of(c).filter(|v| v.has(effects::Effect::Rested)) {
+                Some(v) => t.set("hud.base.effect.rested", &[Arg::Int((v.rested / 60.0).ceil() as i64)]),
+                None => t.text(""),
             });
             // Resting by a fire: the seconds until rested; rested: the comfort that sets how long.
             ui.text_bind_styled(S::default().no_wrap(), |c, t| {

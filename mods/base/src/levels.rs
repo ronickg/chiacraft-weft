@@ -268,14 +268,23 @@ fn client(r: &mut Registry) {
                         ui.image(&format!("base:gui/stat_icon_{}", stat.name()), 8.0, 8.0);
                         ui.text_styled(S::default().w(40.0).no_wrap(), &format!("stat.base.{}", stat.name()), &[]);
                         ui.row(S::row().size(STAT_BAR.0, STAT_BAR.1), |ui| {
-                            ui.progress_bind(Box::leak(format!("stat_{}", stat.name()).into_boxed_str()), S::default().size(STAT_BAR.0, STAT_BAR.1), move |c| {
-                                let Some(v) = c.component(&VITALS) else { return -1.0 };
-                                (2.0 + (BAR_BASE + (1.0 - BAR_BASE) * (v.points[i] as f32 / POINTS_FULL).min(1.0)) * 146.0) / 150.0
-                            });
-                            ui.text_bind_styled(S::default().no_wrap().at_pivot(STAT_BAR.0 - 3.0, STAT_BAR.1 / 2.0, [1.0, 0.5]), move |c, t| {
-                                let Some(v) = c.component(&VITALS) else { return };
-                                t.text(&shown(stat, v.stats()[i]));
-                            });
+                            ui.progress_bind(
+                                Box::leak(format!("stat_{}", stat.name()).into_boxed_str()),
+                                S::default().size(STAT_BAR.0, STAT_BAR.1),
+                                move |c| {
+                                    let Some(v) = c.component(&VITALS) else { return -1.0 };
+                                    (2.0 + (BAR_BASE + (1.0 - BAR_BASE) * (v.points[i] as f32 / POINTS_FULL).min(1.0)) * 146.0) / 150.0
+                                },
+                            );
+                            ui.text_bind_styled(
+                                S::default()
+                                    .no_wrap()
+                                    .at_pivot(STAT_BAR.0 - 3.0, STAT_BAR.1 / 2.0, [1.0, 0.5]),
+                                move |c, t| {
+                                    let Some(v) = c.component(&VITALS) else { return };
+                                    t.text(&shown(stat, v.stats()[i]));
+                                },
+                            );
                         });
                         ui.row(S::row().w(12.0).end(), move |ui| {
                             ui.text_bind_styled(S::default().no_wrap(), move |c, t| {
@@ -285,7 +294,10 @@ fn client(r: &mut Registry) {
                         });
                         ui.button(
                             "levels.base.plus",
-                            S::default().size(10.0, 9.0).pad(0.5).tooltip(&format!("stat.base.{}.desc", stat.name())),
+                            S::default()
+                                .size(10.0, 9.0)
+                                .pad(0.5)
+                                .tooltip(&format!("stat.base.{}.desc", stat.name())),
                             move |c| {
                                 c.client().send(&PLACE, &(i as u32));
                             },

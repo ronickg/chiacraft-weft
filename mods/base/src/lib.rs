@@ -11,7 +11,6 @@ mod farming;
 mod growth;
 mod hints;
 mod hud;
-mod window;
 mod items;
 mod levels;
 mod machines;
@@ -24,6 +23,7 @@ mod sounds;
 mod survival;
 mod weather;
 mod wild;
+mod window;
 mod worldgen;
 
 use weft_sdk::*;
