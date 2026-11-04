@@ -1,5 +1,5 @@
 # The recipe book with a tag missing (Playtest B12): only a stick held, so the club's log (any log)
-# is lacking: "Log or similar: 0/1", not one wood's name alone.
+# is lacking: "Any Logs: 0/1" (B12 again: a group held none of is named as one).
 loaded
 idle
 chat /tk mode survival

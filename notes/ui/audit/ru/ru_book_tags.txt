@@ -1,0 +1,14 @@
+# The same in Russian (--config core:language=ru_ru).
+# The recipe book with a tag missing (Playtest B12): only a stick held, so the club's log (any log)
+# is lacking: "Any Logs: 0/1" (B12 again: a group held none of is named as one).
+loaded
+idle
+chat /tk mode survival
+chat /tk time 6000
+wait 2
+chat /tk give base:stick 1
+wait 1
+press core:inventory
+wait 1.5
+shot bt_01_hands.png
+quit

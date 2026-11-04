@@ -205,6 +205,20 @@ fn first_missing(r: &Recipe, have: &[(u32, u32)]) -> Option<(u32, u32, bool)> {
     })
 }
 
+/// Tags recipes take any of, by name (`crafting.book.group.<tag>`, "Any Planks"), so a line for
+/// one the player holds none of names the group, not the tag's first item ("Acacia Planks or
+/// similar: 0/2" with an empty bag, Playtest B12 again). Others keep "<first item> or similar".
+const GROUPS: [&str; 12] =
+    ["planks", "logs", "sand", "cobblestone", "glass", "leather", "pelts", "hides", "raw_meat", "cooked_meat", "cloth", "plant_fibre"];
+
+/// The group `shown` (a tag's first item) stands for, as a lang key.
+fn group_of(shown: u32) -> Option<String> {
+    GROUPS
+        .iter()
+        .find(|t| item_has_tag(shown, t))
+        .map(|t| format!("crafting.book.group.{t}"))
+}
+
 /// Fits the inventory's 2 x 2: a shape at most 2 wide and 2 high, or 4 ingredients.
 fn fits_hands(r: &Recipe) -> bool {
     match r.shape() {
@@ -635,8 +649,22 @@ pub fn book(ui: &mut Ui, station: Station) {
                         } else if table_only(station, r) {
                             s.tooltip_args("crafting.book.needs_table_tip", &[Arg::Name(&name)])
                         } else if let Some((item, more, tag)) = lack {
-                            let key = if tag { "crafting.book.lacks_any" } else { "crafting.book.lacks" };
-                            s.tooltip_args(key, &[Arg::Name(&name), Arg::Int(more as i64), Arg::Name(&name_of(item))])
+                            // A tag held none of names its group, or its first item "or similar".
+                            let held = have.iter().any(|(i, _)| *i == item);
+                            match (tag, tag.then(|| group_of(item)).flatten()) {
+                                (true, Some(group)) if !held => s.tooltip_args(
+                                    "crafting.book.lacks_group",
+                                    &[Arg::Name(&name), Arg::Int(more as i64), Arg::Key(&group)],
+                                ),
+                                (true, _) => s.tooltip_args(
+                                    "crafting.book.lacks_any",
+                                    &[Arg::Name(&name), Arg::Int(more as i64), Arg::Name(&name_of(item))],
+                                ),
+                                (false, _) => s.tooltip_args(
+                                    "crafting.book.lacks",
+                                    &[Arg::Name(&name), Arg::Int(more as i64), Arg::Name(&name_of(item))],
+                                ),
+                            }
                         } else {
                             s.tooltip_args("crafting.book.missing", &[Arg::Name(&name)])
                         };
@@ -716,14 +744,22 @@ fn picked_recipe(ui: &mut Ui, station: Station, r: &Recipe, have: &[(u32, u32)])
         // "Acacia Planks: 0/2" where any planks do).
         let any = matches!(inputs[n as usize].kind, abi::recipe_input_kind::TAG | abi::recipe_input_kind::ANY)
             && !have.iter().any(|(i, _)| r.accepts(n, *i));
-        let key = match (got >= need, any) {
-            (true, _) => "crafting.book.have",
-            (false, true) => "crafting.book.lack_any",
-            (false, false) => "crafting.book.lack",
+        // Named as a group where it is one ("Any Planks: 0/2").
+        let group = any.then(|| group_of(shown)).flatten();
+        let key = match (got >= need, any, group.is_some()) {
+            (true, _, _) => "crafting.book.have",
+            (false, true, true) => "crafting.book.lack",
+            (false, true, false) => "crafting.book.lack_any",
+            (false, false, _) => "crafting.book.lack",
+        };
+        let name = name_of(shown);
+        let what = match &group {
+            Some(g) => Arg::Key(g),
+            None => Arg::Name(&name),
         };
         ui.row(S::row().gap(3.0), |ui| {
             ui.item(shown, 1, S::default().size(16.0, 16.0));
-            ui.text_args(key, &[Arg::Name(&name_of(shown)), Arg::Int(got as i64), Arg::Int(need as i64)]);
+            ui.text_args(key, &[what, Arg::Int(got as i64), Arg::Int(need as i64)]);
         });
     }
     if station == Station::Hands && !fits_hands(r) {
