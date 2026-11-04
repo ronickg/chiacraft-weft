@@ -105,6 +105,9 @@ impl Screen for Achievements {
                                 if !c.achievement.description.is_empty() {
                                     label(ui, cx, "achievements.desc", &[shown(cx, &c.achievement.description)], "dim");
                                 }
+                                if store.revoked(c) {
+                                    label(ui, cx, "achievements.withdrawn", &[], "dim");
+                                }
                             }
                         });
                     }

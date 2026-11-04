@@ -131,6 +131,7 @@ fn record(dir: &std::path::Path, c: &Credential) {
         "day": chiacraft_wallet::achievement::day_of(c.issued),
         "player": c.subject.key,
         "id": c.achievement.id,
+        "nonce": c.nonce,
     });
     let d = dir.join("achievements");
     let r = std::fs::create_dir_all(&d).and_then(|_| {
@@ -150,6 +151,9 @@ struct Issued {
     hash: [u8; 32],
     day: u64,
     player: String,
+    id: String,
+    /// What a revocation names (lines from before it was recorded have none).
+    nonce: String,
 }
 
 fn issued(dir: &std::path::Path) -> Vec<Issued> {
@@ -163,6 +167,16 @@ fn issued(dir: &std::path::Path) -> Vec<Issued> {
                     .ok()?,
                 day: v.get("day")?.as_u64()?,
                 player: v.get("player")?.as_str()?.to_string(),
+                id: v
+                    .get("id")
+                    .and_then(|i| i.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+                nonce: v
+                    .get("nonce")
+                    .and_then(|i| i.as_str())
+                    .unwrap_or("")
+                    .to_string(),
             })
         })
         .collect()
@@ -235,8 +249,39 @@ impl Server {
             });
     }
 
+    /// Withdraws what this world signed for the player known as `identity` for achievement `id`
+    /// (all of them: `*`): the issuer's list signed again and sent to everyone here. How many.
+    pub(super) fn revoke_achievements(&mut self, identity: &str, id: &str) -> Result<usize, String> {
+        let dir = self
+            .storage
+            .as_ref()
+            .map(|s| s.lock().meta.dir.clone())
+            .ok_or("this world isn't saved")?;
+        let nonces: Vec<String> = issued(&dir)
+            .into_iter()
+            .filter(|l| l.player == identity && (id == "*" || l.id == id) && !l.nonce.is_empty())
+            .map(|l| l.nonce)
+            .collect();
+        if nonces.is_empty() {
+            return Ok(0);
+        }
+        let list = crate::chiacraft::achievements::revoke(&nonces)?;
+        log::info!("{} achievement(s) withdrawn (revocation list version {})", nonces.len(), list.seq);
+        let json = list.to_json();
+        for p in self.players.iter_mut().filter(|p| p.joined) {
+            p.conn.send(ToClient::Revocations(json.clone()));
+        }
+        Ok(nonces.len())
+    }
+
     /// Sends player `pi` the proofs for their achievements from this world on the days anchored.
     pub(super) fn send_anchor_proofs(&mut self, pi: usize) {
+        // And the issuer's list of withdrawn ones.
+        if let Some(r) = crate::chiacraft::achievements::issuer_list() {
+            self.players[pi]
+                .conn
+                .send(ToClient::Revocations(r.to_json()));
+        }
         let Some(dir) = self.storage.as_ref().map(|s| s.lock().meta.dir.clone()) else { return };
         let Some(me) = self.players[pi].identity.clone() else { return };
         let done = anchors(&dir);

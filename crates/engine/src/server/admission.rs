@@ -713,3 +713,22 @@ pub(super) fn achievementrule(s: &mut Server, x: &Ctx) -> Vec<Msg> {
         None => say("achievement_rule_off", Vec::new()),
     }
 }
+
+/// `/revoke <who> <achievement id | *>`: withdraws what this world signed for that player (phase
+/// 4): its issuer's revocation list grows, every player here gets it, and it no longer counts at
+/// the door.
+pub(super) fn revoke(s: &mut Server, x: &Ctx) -> Vec<Msg> {
+    let what = x.a.text("who").unwrap_or("").to_string();
+    let id = x.a.text("id").unwrap_or("").to_string();
+    let Some((who, _)) = s.whom(&what) else {
+        return say("unknown_player", vec![text(&what)]);
+    };
+    let Some(identity) = who.identity else {
+        return say("no_identity", vec![text(&what)]);
+    };
+    match s.revoke_achievements(&identity, &id) {
+        Ok(0) => say("nothing_to_revoke", vec![text(&what), text(&id)]),
+        Ok(n) => say("revoked", vec![text(&what), text(&id), Arg::Int(n as i64)]),
+        Err(e) => failed(e),
+    }
+}

@@ -293,6 +293,9 @@ messages! {
         /// The world's rules ask for this achievement (chiacraft): the joining game answers with
         /// its credentials for it (`ToServer::Proofs`), and only those.
         AskAchievement { id: String },
+        /// The signed list of achievements the world's issuer withdrew (chiacraft: JSON,
+        /// `achievement::Revocations`), sent on joining and whenever it changes.
+        Revocations(String),
     }
 }
 

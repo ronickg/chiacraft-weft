@@ -115,12 +115,15 @@ impl Server {
                     return;
                 }
                 let me = self.players[pi].identity.clone().unwrap_or_default();
+                // What this world's issuer withdrew doesn't count.
+                let withdrawn = crate::chiacraft::achievements::issuer_list();
                 let shown: Vec<(String, String)> = list
                     .iter()
                     .take(8)
                     .filter(|j| j.len() <= 8 << 10)
                     .filter_map(|j| chiacraft_wallet::achievement::Credential::from_json(j).ok())
                     .filter(|c| c.subject.key == me && c.verify().is_ok())
+                    .filter(|c| !withdrawn.as_ref().is_some_and(|r| r.revokes(c)))
                     .map(|c| (c.achievement.id, c.issuer.key))
                     .collect();
                 log::info!("{} showed {} achievement(s)", self.players[pi].key, shown.len());

@@ -86,6 +86,7 @@ pub const COMMANDS: &[(&str, &str, Handler, u32)] = &[
         super::admission::probation,
         p::ADMIN,
     ),
+    ("revoke", "<who:word> <id:word>", super::admission::revoke, p::ADMIN),
     ("achievementrule", "show | off | <id:word> [from:text]", super::admission::achievementrule, p::ADMIN),
     ("didrule", "show | required <on:word(on,off)> | age <days:int>", super::admission::didrule, p::ADMIN),
     (

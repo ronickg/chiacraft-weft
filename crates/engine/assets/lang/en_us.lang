@@ -653,3 +653,7 @@ admission.achievement_required = This world lets in only players who earned "{0}
 admission.summary.achievement = an achievement required
 admission.achievement_rule_set = Only players who earned {0} get in now ({1} issuers trusted)
 admission.achievement_rule_off = No achievement is asked of players coming in
+admission.no_identity = {0} has no account identity here, so this world signed them nothing
+admission.nothing_to_revoke = This world signed nothing for {0} as {1}
+admission.revoked = Withdrawn: {2} of {0}'s {1}
+achievements.withdrawn =   (withdrawn by the world)
