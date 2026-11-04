@@ -8,7 +8,7 @@
 
 use std::collections::VecDeque;
 use std::sync::Mutex;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use base_api::{GRAVE, VITALS};
 use vitals::effects::Effect;
@@ -192,6 +192,8 @@ const FADE_SECS: f32 = 0.6;
 
 /// Hints waiting (lang key and arguments), the first with when it appeared.
 static QUEUE: Mutex<VecDeque<(String, Vec<i64>, Option<Instant>)>> = Mutex::new(VecDeque::new());
+/// The last frame's time, for pausing a hint while a screen is open.
+static LAST_FRAME: Mutex<Option<Instant>> = Mutex::new(None);
 
 /// Queues a hint on the client, unless hints are off or the same one is waiting already.
 fn queue(key: String, args: Vec<i64>) {
@@ -219,10 +221,16 @@ fn client(r: &mut Registry) {
     });
     r.client_frame(|c| {
         let mut q = QUEUE.lock().unwrap();
+        let now = Instant::now();
+        let dt = LAST_FRAME.lock().unwrap().replace(now).map_or(Duration::ZERO, |l| now - l);
         let Some((key, args, at)) = q.front_mut() else { return };
-        // Not over a screen (it ran across the inventory's grid): a hint not yet shown waits
-        // until the screen closes.
+        // Not over a screen (it ran across the inventory's grid): it waits until the screen
+        // closes, and one already showing pauses (its start moves on with the time), so a
+        // hint shown once per player is never used up unseen.
         if !c.screen().is_empty() {
+            if let Some(a) = at {
+                *a += dt;
+            }
             return;
         }
         let since = at.get_or_insert_with(Instant::now).elapsed().as_secs_f32();
