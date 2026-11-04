@@ -5,7 +5,7 @@
 - foxfire: three long uneven runs of mycelium thread (RUNS), one texel wide, wavering and wrapping at
   the edges (the tile stays seamless). By day they are a dull pale cream, a little lighter than the wood
   (Plants: real foxfire is invisible by day); the glow is in `foxfire_e`.
-- goblins_gold: the generated fleck spots, recoloured only a little lighter and more olive than the moss; the
+- goblins_gold: the grey stone chips filled with moss (Plants: they repeated in a grid); the generated fleck spots, recoloured only a little lighter and more olive than the moss; the
   gold-green sheen is in `goblins_gold_e`.
 
 An `_e` mask sets how much a pixel glows, not its colour: a glowing pixel shines in its own colour. So the
@@ -112,7 +112,9 @@ def foxfire(sq, seed):
 
 def goblins_gold(sq):
     m = FLECK(sq[..., 0], sq[..., 1], sq[..., 2])
-    base = cut(fill(sq, grow(m, 2)))
+    r, g, b = sq[..., 0], sq[..., 1], sq[..., 2]
+    chips = (np.abs(r - g) < 14) & (np.abs(g - b) < 16) & (sq @ W > 60)  # grey stone showing through: repeats as a grid
+    base = cut(fill(sq, grow(m, 2) | grow(chips, 3)))
     h = sq.shape[0]
     edges = np.linspace(0, h, N + 1).astype(int)
     fl = np.zeros((N, N), bool)
