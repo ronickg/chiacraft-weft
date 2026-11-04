@@ -119,9 +119,9 @@ pub const LAYERS: [Layers; 11] = [
     },
 ];
 
-/// Biomes with layers here that the world doesn't register yet: the tropical forest is Terrain's
-/// (its own branch). Their rows wait; take a biome out once it's registered.
-pub const PENDING: &[&str] = &["base:tropical_forest"];
+/// Biomes with layers here that the world doesn't register yet (a biome on another branch): their
+/// rows wait; take a biome out once it's registered.
+pub const PENDING: &[&str] = &[];
 
 /// A biome's layers, if it has any.
 pub fn of(biome: &str) -> Option<&'static Layers> {

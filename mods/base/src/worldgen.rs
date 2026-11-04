@@ -226,8 +226,9 @@ pub fn register(r: &mut Registry) {
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:swamp").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         // The Pantanal's acuri palms on the ground above the flood, a few moriches and oaks.
         .set_text(&TREE_KINDS, "base:acuri_palm_log:3 base:moriche_palm_log:1 base:oak_log:1");
-    // Rainforest (Ronald, 11-04: "all four"): a dense canopy over palms; its trees, undergrowth,
-    // lianas and Manaus's climate are Plants' (`vitals`), these are a start.
+    // Rainforest (Ronald, 11-04: "all four"), Manaus's terra firme: Brazil nuts as the emergents
+    // over the canopy (the giant scatter, about five a hectare), young ones in the canopy with the
+    // palms, cacao under them; its floor, shrubs and lianas are its `vitals::layers` row.
     r.biome(&TROPICAL_FOREST)
         .tint(water, 0x5d7f6a)
         .set(&CLIMATE, base_api::climate("base:tropical_forest"))
@@ -245,7 +246,9 @@ pub fn register(r: &mut Registry) {
         .set(&TREES, 0.6)
         .set(&STAND_TREES, 0.15)
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:tropical_forest").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
-        .set_text(&TREE_KINDS, "base:acuri_palm_log:2 base:moriche_palm_log:2 base:oak_log:3");
+        .set_text(&TREE_KINDS, "base:brazil_nut_log:3 base:cacao_log:2 base:acuri_palm_log:1 base:moriche_palm_log:1")
+        .set(&GIANT_TREES, 0.3)
+        .set_text(&GIANT_KINDS, "base:brazil_nut_log");
     r.biome(&MOUNTAINS)
         .tint(water, WATER_TINT)
         .set(&CLIMATE, base_api::climate("base:mountains"))
