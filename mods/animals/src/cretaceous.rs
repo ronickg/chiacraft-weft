@@ -33,6 +33,8 @@ static GRASS_COVER: Component<f32> = Component::named("grass");
 static TREE_KINDS: Component<BlockList> = Component::named("tree_kinds");
 /// Extra trees where a forest stands thick, in stands with clearings between (base's worldgen).
 static STAND_TREES: Component<f32> = Component::named("stand_trees");
+/// Boulders, a heap of stone per 12 x 12 cell (base's worldgen).
+static BOULDERS: Component<f32> = Component::named("boulders");
 static FLOWERS: Component<BlockList> = Component::named("flowers");
 /// On a log, the leaves of the tree base's worldgen grows from it; tags `cone_tree`, `flat_tree`,
 /// `palm_tree` give its shape.
@@ -125,6 +127,7 @@ pub fn init(r: &mut Registry) {
     // Dry, open land with a few conifers and ferns: between the dunes and the wet.
     r.biome(&SCRUBLAND)
         .set(&CLIMATE, base_api::climate("animals:scrubland"))
+        .set(&BOULDERS, 0.08)
         .humidity(-0.12..0.05)
         .surface("base:grass", "base:dirt", 3)
         .tint(grass, 0xb5ad5a)
@@ -167,6 +170,7 @@ pub fn init(r: &mut Registry) {
     // High rock: the wyverns'.
     r.biome(&CRAGS)
         .set(&CLIMATE, base_api::climate("animals:crags"))
+        .set(&BOULDERS, 0.3)
         .surface("base:grass", "base:dirt", 3)
         .bare_above(115)
         .tint(grass, 0x8aa864)
