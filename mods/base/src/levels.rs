@@ -265,6 +265,13 @@ fn client(r: &mut Registry) {
     r.client_frame(|c| {
         let mut banners = BANNERS.lock().unwrap();
         let Some((level, shown)) = banners.first_mut() else { return };
+        // Never over a window (Tester's Retina run: "Level 3!" printed over the stats window's
+        // header, the animal screen's chip): it waits while a screen is open, and starts over,
+        // sound and all, once it closes.
+        if !c.screen().is_empty() {
+            *shown = None;
+            return;
+        }
         let start = *shown.get_or_insert_with(|| {
             c.play_sound(&FANFARE, None, 1.0);
             Instant::now()
