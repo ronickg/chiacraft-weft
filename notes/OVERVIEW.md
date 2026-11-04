@@ -4,7 +4,7 @@ Written by `notes/overview/build.py` from `notes/overview/pieces.json`; edit tha
 
 **The goal.** Players open their own worlds, find other people's without any central service, link them with portals and walk between them; missing mods download on the way; identity and achievements live on Chia. The game in those worlds: survival in the Valheim spirit with real temperatures and seasons, and animals to tame, breed and raise, from real facts.
 
-■ built and seen working: 71 · ◧ partly built: 34 · □ not built yet: 11 · ◌ planned for later: 6
+■ built and seen working: 73 · ◧ partly built: 34 · □ not built yet: 10 · ◌ planned for later: 6
 
 ## Core next
 
@@ -21,7 +21,6 @@ What's missing that the rest leans on (marked `core` in the data).
 - **Living world: Food web per biome**. Researched: every biome's web is whole with 2 new full creatures and 14 simple ones in the overworld (wolf, jaguar; hare, rodent, small bird, deer, reindeer, fish, caiman, fox, coyote, eagle, owl, vulture, raven, gull), the farm animals as their wild forms, and Protoceratops, an iguanodont and 8 simple ones in the Cretaceous. Wave one: hare, rodent, deer, fish, fox, raven; Protoceratops, a small mammal, a lizard. Wave two: reindeer, coyote, small bird, owl, eagle, vulture, gull, caiman (13 species on 8 models), and both full creatures: the wolf (a natural tame, fed from the hand) and the jaguar (tamed by knock-out); the Cretaceous's fish (tier 3): lungfish in the floodplain, Lycoptera in the fern forest's lakes. The Cretaceous's tier 2 so far (11-04, at 32 texels): Psittacosaurus (the fern forest), the ankylosaurs Gastonia and Pinacosaurus on one model (the floodplain, the Gobi's scrub and the crags' foot), and the iguanodont (Iguanacolossus, the floodplain and forest's big plant eater, wild for now; Utahraptor packs take it): every Cretaceous gap in the web check is closed. Then the rest of the tier: the crocodyliform (on the caiman's model), Citipati, the early birds Confuciusornis and Gobipteryx, and the sauropod Cedarosaurus; insect eaters take spoiled carcasses for their insects. Termite mounds (Ronald's pick, red laterite) on the red dunes and the scrub, their termites the insect eaters'; eggs in nests the egg eaters' food; the young of big animals the hunters' (a grown sauropod has none).
 - **World content: Crafting system**. Decided by Ronald 2026-11-04 (1A 2A 3A 4B, notes/CRAFTING.md). Built, waiting for game runs: the recipe book beside the 2x2 and the crafting table, crafting from the bag and chests within 7 blocks (book.rs); parts (parts.rs, crate mods/base/crafting): part items with material, rolled grade and wear, made from the book's Parts tab; tools built from parts in the table's assembly row, taken apart, repaired per part with their material; engine hooks for a stack's own tool numbers, tools that stay when broken (keep_broken) and a stack's look from layers (core:look, with placeholder axe art). Next: discovery, skills, history, knapping, armour from parts.
 - **World content: Our own content plan**. The plan leaves game content out until the foundations stand; survival and animals now need it. For food, the living world's research is the plan: the species' diets and the biomes' plants and crops.
-- **Tools and checks: Tests on CI**. This branch's CI checks formatting only; a workflow that runs the tests is on the claude/ci-workflow branch, not merged.
 
 ## Engine
 
@@ -230,7 +229,7 @@ Code: `mods/base/source/ui`, `mods/base/source/items`, `mods/animals/source`. Do
 
 ## Tools and checks
 
-What keeps it all working: game scripts and tests, balance and cross-system checks, generated sheets, this map. 5 of 7 parts built.
+What keeps it all working: game scripts and tests, balance and cross-system checks, generated sheets, this map. 7 of 8 parts built.
 
 | | Part | Notes |
 |---|---|---|
@@ -238,8 +237,9 @@ What keeps it all working: game scripts and tests, balance and cross-system chec
 | ■ | Balance checks | Code: `mods/base/vitals/src/balance.rs`, `mods/animals/core/src/balance.rs`. |
 | ■ | Cross-system checks | Code: `mods/animals/core/tests/places.rs`. |
 | ■ | Generated sheets | Code: `mods/base/vitals/src/sheet.rs`, `mods/animals/core/src/sheet.rs`. |
-| ◧ | Tests on CI (core) | This branch's CI checks formatting only; a workflow that runs the tests is on the claude/ci-workflow branch, not merged. |
-| □ | Fuzzing on CI |  |
+| ■ | Tests on CI | ci.yml: build, clippy, unit tests, sheets and the testkit on software Vulkan, on pushes to dev and main and on pull requests; runs on GitHub only once those branches are pushed. Code: `.github/workflows/ci.yml`. |
+| ■ | Fuzzing on CI | fuzz.yml: packages and sandbox targets, five minutes each, weekly. Code: `.github/workflows/fuzz.yml`. |
+| ◧ | Release builds | chiacraft-build.yml: Windows, Linux and macOS archives by hand or on a chiacraft-v* tag, optional macOS signing and notarization (docs/release-builds.md). Not yet run on GitHub. Windows signing not set up. Code: `.github/workflows/chiacraft-build.yml`, `tools/release`. Docs: `docs/release-builds.md`. |
 | ■ | Species website | The animals' logic as WASM. Code: `mods/animals/web`. |
 
 Code: `mods/testkit`, `mods/animals/core/tests`, `mods/base/vitals/tests`, `.github/workflows`. Docs: `notes/SYSTEMS.md`, `CLAUDE.md`.

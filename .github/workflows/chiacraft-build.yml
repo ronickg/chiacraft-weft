@@ -1,0 +1,255 @@
+# Builds chiacraft (the `weft` game with our mods) for Windows, Linux and macOS and packs each
+# into one archive to unpack and run (tools/release/package.sh). docs/release-builds.md has the
+# whole story: how to start it, what comes out, and the secrets for signed macOS builds.
+#   - by hand: Actions > "chiacraft build" > Run workflow, optionally with a branch, tag or commit;
+#     the archives are the run's artifacts.
+#   - on a tag like chiacraft-v0.1.0: the same, then a GitHub pre-release with every archive.
+#     (Plain v* tags belong to upstream Weft's release.yml, which checks Weft's own version.)
+# macOS builds come out unsigned. When the signing secrets are set, a second job signs (and
+# notarizes) them, and those replace the unsigned ones in the release.
+name: chiacraft build
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or commit to build (empty = the branch picked above)
+        required: false
+        default: ""
+      platforms:
+        description: >-
+          Which to build, space-separated: windows-x64 linux-x64 macos-arm64 macos-x64.
+          Mac minutes count ten times on a private repository, so Intel Macs are left out unless
+          asked for; a tag builds all four.
+        required: false
+        default: windows-x64 linux-x64 macos-arm64
+  push:
+    tags: ["chiacraft-v*"]
+
+concurrency:
+  group: chiacraft-build-${{ github.ref }}-${{ inputs.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # Upstream Weft's release.yml pins the same MoltenVK; its library is universal (arm64 + x64).
+  MOLTENVK: v1.4.2
+  MOLTENVK_SHA256: f95765a6229cb7b915990a2890ce12ebe36a730b021545d3d52ae69ce4c4024e
+
+jobs:
+  # Which platforms to build, and whether the macOS signing secrets exist (a job's `if` can't read
+  # secrets itself), so no Mac runner starts for nothing.
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.plan.outputs.build }}
+      macs: ${{ steps.plan.outputs.macs }}
+      sign: ${{ steps.plan.outputs.sign }}
+    steps:
+      - id: plan
+        env:
+          PLATFORMS: ${{ inputs.platforms || 'windows-x64 linux-x64 macos-arm64 macos-x64' }}
+          CERT: ${{ secrets.MACOS_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          # The runner for each platform. ubuntu-22.04: the oldest, since a Linux build only runs
+          # on its glibc or newer.
+          declare -A os=([windows-x64]=windows-latest [linux-x64]=ubuntu-22.04 [macos-arm64]=macos-latest [macos-x64]=macos-15-intel)
+          build=() macs=()
+          for p in $PLATFORMS; do
+            [ -n "${os[$p]:-}" ] || { echo "unknown platform $p (one of ${!os[*]})"; exit 1; }
+            build+=("{\"platform\":\"$p\",\"os\":\"${os[$p]}\"}")
+            [[ $p != macos-* ]] || macs+=("\"$p\"")
+          done
+          [ ${#build[@]} -gt 0 ] || { echo "no platforms"; exit 1; }
+          (IFS=,; echo "build={\"include\":[${build[*]}]}"; echo "macs=[${macs[*]}]") >> "$GITHUB_OUTPUT"
+          if [ ${#macs[@]} -gt 0 ] && [ -n "$CERT" ] && [ -n "$CERT_PASSWORD" ]; then
+            echo "sign=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "sign=false" >> "$GITHUB_OUTPUT"
+            [ ${#macs[@]} -eq 0 ] || echo "No MACOS_CERT_P12 / MACOS_CERT_PASSWORD secrets: the macOS builds stay unsigned." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          cat "$GITHUB_OUTPUT"
+
+  build:
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.build) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 1
+
+      # chiacraft-v0.1.0 -> 0.1.0; a branch -> <branch>-<commit>; a bare commit -> <commit>.
+      - name: Name
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+          WANTED: ${{ inputs.ref || github.ref_name }}
+        run: |
+          sha=$(git rev-parse --short=8 HEAD)
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ -z "$INPUT_REF" ]; then
+            label=${GITHUB_REF_NAME#chiacraft-v}
+          elif [[ "$sha" == "${WANTED:0:8}" ]]; then
+            label=$sha
+          else
+            label="$(printf %s "$WANTED" | tr -c 'A-Za-z0-9._-' '-')-$sha"
+          fi
+          echo "LABEL=$label" >> "$GITHUB_ENV"
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.platform }}
+          cache-on-failure: true
+
+      - name: System libraries (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev pkg-config
+
+      # aws-lc-sys (the wallet's TLS) assembles with NASM on Windows.
+      - name: NASM (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/setup-nasm@v1
+
+      # Macs have no Vulkan of their own: the game carries the official MoltenVK and its license.
+      - name: MoltenVK (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/moltenvk.tar" "https://github.com/KhronosGroup/MoltenVK/releases/download/$MOLTENVK/MoltenVK-macos.tar"
+          echo "$MOLTENVK_SHA256  $RUNNER_TEMP/moltenvk.tar" | shasum -a 256 -c -
+          tar -xf "$RUNNER_TEMP/moltenvk.tar" -C "$RUNNER_TEMP"
+          echo "MOLTENVK_DYLIB=$RUNNER_TEMP/MoltenVK/MoltenVK/dynamic/dylib/macOS/libMoltenVK.dylib" >> "$GITHUB_ENV"
+          echo "MOLTENVK_LICENSE=$RUNNER_TEMP/MoltenVK/LICENSE" >> "$GITHUB_ENV"
+
+      # The workspace's default members: the game (crates/app) and every mod in mods/.
+      - name: Build
+        run: cargo build --release
+
+      - name: Package
+        id: package
+        run: tools/release/package.sh "${{ matrix.platform }}" "$LABEL"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.platform }}
+          path: ${{ steps.package.outputs.archive }}
+          if-no-files-found: error
+          compression-level: 0
+
+  sign-macos:
+    needs: [plan, build]
+    if: needs.plan.outputs.sign == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ${{ fromJSON(needs.plan.outputs.macs) }}
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          sparse-checkout: tools/release
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ matrix.platform }}
+          path: unsigned
+
+      # A keychain of its own for this run, deleted at the end.
+      - name: Certificate
+        env:
+          CERT: ${{ secrets.MACOS_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          pass="$(openssl rand -base64 24)"
+          printf %s "$CERT" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$pass" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$pass" "$keychain"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$CERT_PASSWORD" -f pkcs12 -A -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$pass" "$keychain" > /dev/null
+          # shellcheck disable=SC2046 # one word per keychain already on the list
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/cert.p12"
+          ids=$(security find-identity -v -p codesigning "$keychain" | grep "Developer ID Application" || true)
+          [ -z "$TEAM_ID" ] || ids=$(printf '%s\n' "$ids" | grep -F "($TEAM_ID)" || true)
+          identity=$(printf '%s\n' "$ids" | head -n 1 | awk '{print $2}')
+          [ -n "$identity" ] || { echo "no Developer ID Application certificate in MACOS_CERT_P12"; security find-identity -v -p codesigning "$keychain"; exit 1; }
+          echo "SIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
+          echo "KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+
+      # The App Store Connect API key if it is set, otherwise the Apple ID; neither: signed only.
+      - name: Sign and notarize
+        env:
+          API_KEY: ${{ secrets.APPLE_API_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          NOTARY_ISSUER: ${{ secrets.APPLE_API_ISSUER_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          NOTARY_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          NOTARY_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "$API_KEY" ]; then
+            printf '%s\n' "$API_KEY" > "$RUNNER_TEMP/AuthKey.p8"
+            export NOTARY_KEY="$RUNNER_TEMP/AuthKey.p8"
+          elif [ -n "$APPLE_ID" ]; then
+            export NOTARY_APPLE_ID="$APPLE_ID"
+          fi
+          archive=$(ls unsigned/*.tar.gz)
+          tools/release/macos-sign.sh "$archive" "signed/$(basename "$archive")"
+          rm -f "$RUNNER_TEMP/AuthKey.p8"
+
+      - name: Clean up
+        if: always()
+        run: |
+          [ -z "${KEYCHAIN:-}" ] || security delete-keychain "$KEYCHAIN" || true
+          rm -f "$RUNNER_TEMP/cert.p12" "$RUNNER_TEMP/AuthKey.p8"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.platform }}-signed
+          path: signed/*.tar.gz
+          if-no-files-found: error
+          compression-level: 0
+
+  # Only for a pushed chiacraft-v* tag: a pre-release with every archive, the signed macOS ones
+  # in place of the unsigned when signing ran. Nothing is published unless every build passed.
+  publish:
+    needs: [build, sign-macos]
+    if: >-
+      always() && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/chiacraft-v')
+      && needs.build.result == 'success'
+      && (needs.sign-macos.result == 'success' || needs.sign-macos.result == 'skipped')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+
+      - name: Publish
+        run: |
+          mkdir release
+          for dir in artifacts/*; do
+            case "$dir" in *-signed) continue ;; esac
+            if [ -d "$dir-signed" ]; then cp "$dir-signed"/* release/; else cp "$dir"/* release/; fi
+          done
+          ls -l release
+          gh release create "$GITHUB_REF_NAME" release/* --verify-tag --prerelease \
+            --title "chiacraft ${GITHUB_REF_NAME#chiacraft-v}" --generate-notes
