@@ -33,7 +33,12 @@ wait 1
 chat /animal ko
 wait 2
 shot 16a_taming_plate.png
+# The teleport keeps its height: in creative, so a lower ground there is no fatal fall; back to
+# survival once landed (the inventory and workstation shots are survival's).
+chat /tk mode creative
 chat /tp ~40 ~ ~
+wait 3
+chat /tk mode survival
 wait 4
 loaded
 look 0 5
