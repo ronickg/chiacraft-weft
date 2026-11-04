@@ -262,12 +262,16 @@ Checked with two copies (run by the Tester session, scripts in the shared notes'
 hosted a world with `--packages examples/packages`; bob, with no packages, was asked, downloaded
 clans (with its code) and gems, and loaded them with no error; on alice's world `/clan create
 Wolves` ran in the sandbox ("clan Wolves founded" in the log, "Clan Wolves founded." in chat), no
-strikes. The invite and join between the two weren't seen yet: the first run's scripts were out of
-step, and in the rerun bob's game froze when alice's invite reached it. That was a deadlock in
-the `packages` mod (the client's `packages:say` handler held its lock while running
-`/packages_say`, which takes it again), fixed; a second possible one (two packages on two region
-threads each waiting for the other's lock through a nested question) is avoided by nested calls
-only trying the lock. Rerun pending (Mac runs paused after the freeze).
+strikes. In the second run bob's game froze when alice's invite reached it: a deadlock in the
+`packages` mod (the client's `packages:say` handler held its lock while running `/packages_say`,
+which takes it again), fixed in 5223d51; a second possible one (two packages on two region threads
+each waiting for the other's lock through a nested question) is avoided by nested calls only
+trying the lock. The third run (Linux PC, two copies, 5223d51, `run/test-results/phase6_pc3/`)
+passed it all: the join sheet listed clans with "runs sandboxed code", bob downloaded and loaded
+it, alice founded Wolves and invited bob, bob joined ("player 7 joined clan Wolves" in alice's
+log), both saw "Your clan: Wolves, 2 members.", alice was told "A new member joined Wolves.", no
+strikes, panics or errors. Not seen: the invite line in bob's chat; it was sent while bob's world
+was still loading in, and a line that reaches a client then may be lost (not looked into).
 Slice 2 (consent marks code), after Ronald agreed the report's decisions: protocol 6, the
 `Offer` tuple's sixth field says whether the package carries `code/server.wasm`
 (`modloader::current_packages`); `download` refuses a package whose manifest says otherwise; the
