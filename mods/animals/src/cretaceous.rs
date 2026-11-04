@@ -244,6 +244,9 @@ pub fn init(r: &mut Registry) {
         .base_height(SEA as f64)
         .continent_scale(base_api::land::CONTINENT_SCALE)
         .sea(SEA, "base:water");
+    for (name, field) in base_api::land::rule_fields() {
+        t = t.field(name, field);
+    }
     for f in base_api::land::features() {
         t = t.feature(f);
     }
@@ -272,7 +275,7 @@ pub fn init(r: &mut Registry) {
             .height(..=SEA + 1)
             .continent(..0.1),
     )
-    .biome(BiomeRule::new("crags").feature("mountains", base_api::land::MOUNTAIN_BIOME..))
+    .biome(BiomeRule::new("crags").field(base_api::land::MOUNTAINS_FIELD, base_api::land::MOUNTAIN_BIOME..))
     .biome(
         BiomeRule::new("floodplain")
             .height(..=SEA + FLOODPLAIN_RISE)
