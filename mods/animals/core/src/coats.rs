@@ -258,7 +258,7 @@ fn with_core(mut g: GeneFile, core: &GeneFile, name: &str) -> GeneFile {
 
 const CORE: &str = include_str!("../../genetics/core.json");
 
-const FILES: [(&str, &str); 33] = [
+const FILES: [(&str, &str); 34] = [
     ("dog", include_str!("../../genetics/dog.json")),
     ("cat", include_str!("../../genetics/cat.json")),
     ("capybara", include_str!("../../genetics/capybara.json")),
@@ -292,6 +292,7 @@ const FILES: [(&str, &str); 33] = [
     ("herring_gull", include_str!("../../genetics/herring_gull.json")),
     ("yacare_caiman", include_str!("../../genetics/yacare_caiman.json")),
     ("spectacled_caiman", include_str!("../../genetics/spectacled_caiman.json")),
+    ("grey_wolf", include_str!("../../genetics/grey_wolf.json")),
 ];
 
 /// A species' gene file (by `Species::name`).
@@ -1371,6 +1372,46 @@ fn caiman(r: &Read, spectacled: bool) -> Look {
     }
 }
 
+/// The grey wolf: grizzled grey (from tawny grey to dark), the saddle darker (a mark), the legs,
+/// ears' backs and muzzle buff (its points), cream below; black wolves (a dominant black, from dogs
+/// long ago, common in the woods) and white Arctic wolves.
+fn wolf(r: &Read) -> Look {
+    let tone = r.qv("Tn");
+    if r.shows("Kb") == "Kb" {
+        return Look {
+            name: "Black".into(),
+            base: [44.0, 40.0, 40.0],
+            under: [70.0, 64.0, 60.0],
+            points: Some([40.0, 36.0, 36.0]),
+            ..Look::default()
+        };
+    }
+    if r.copies("Ar", "ar") == 2 {
+        return Look {
+            name: "White".into(),
+            base: [232.0, 228.0, 218.0],
+            under: [240.0, 236.0, 228.0],
+            points: Some([226.0, 220.0, 206.0]),
+            ..Look::default()
+        };
+    }
+    let base = mix([126.0, 124.0, 118.0], [168.0, 150.0, 124.0], tone);
+    Look {
+        name: if tone > 0.62 {
+            "Tawny grey".into()
+        } else if tone < 0.38 {
+            "Dark grey".into()
+        } else {
+            "Grey".into()
+        },
+        base,
+        under: [228.0, 222.0, 208.0],
+        points: Some(mix([170.0, 156.0, 130.0], [190.0, 160.0, 116.0], tone)),
+        pattern: Some(Pattern { kind: "saddle", color: darken(base, 0.5), amount: 0.7 }),
+        ..Look::default()
+    }
+}
+
 /// Dromaeosaurs: feather colors of ground birds (every raptor species has these loci).
 fn raptor(r: &Read) -> Look {
     let (pigment, mut name): (Rgb, String) = match r.shows("Pg") {
@@ -1545,6 +1586,7 @@ pub fn phenotype(genome: &Genome) -> Option<Look> {
         "herring_gull" => gull(&r),
         "yacare_caiman" => caiman(&r, false),
         "spectacled_caiman" => caiman(&r, true),
+        "grey_wolf" => wolf(&r),
         _ => raptor(&r),
     };
     core(&r, &mut look);
@@ -2126,7 +2168,7 @@ macro_rules! model_layers {
 }
 
 type ModelLayers = (&'static str, [&'static [u8]; 4], &'static str);
-const MODEL_LAYERS: [ModelLayers; 24] = model_layers!(
+const MODEL_LAYERS: [ModelLayers; 25] = model_layers!(
     "chihuahua",
     "cat",
     "capybara",
@@ -2150,7 +2192,8 @@ const MODEL_LAYERS: [ModelLayers; 24] = model_layers!(
     "eagle",
     "vulture",
     "gull",
-    "caiman"
+    "caiman",
+    "wolf"
 );
 
 fn decode(png_bytes: &[u8]) -> Option<(usize, usize, Vec<u8>)> {

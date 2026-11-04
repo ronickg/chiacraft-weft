@@ -1,4 +1,4 @@
-//! The animals mod: dogs by breed (`dog.rs`: the chihuahua), cats (`cat.rs`), capybaras
+//! The animals mod: dogs by breed (`dog.rs`: the chihuahua), cats (`cat.rs`), grey wolves (`wolf.rs`), capybaras
 //! (`capybara.rs`), velociraptors of two species (`raptor.rs`), Utahraptors (`utahraptor.rs`),
 //! wyverns (`wyvern.rs`, a fantasy animal, and their breath: `breath.rs`), and the living world's
 //! simple wild creatures (`wild.rs`): hares of two species (`hare.rs`), wood mice (`mouse.rs`),
@@ -70,6 +70,7 @@ mod utahraptor;
 mod vole;
 mod vulture;
 mod wild;
+mod wolf;
 mod wyvern;
 mod xp;
 
@@ -143,6 +144,7 @@ fn init(r: &mut Registry) {
     vulture::init(r);
     gull::init(r);
     caiman::init(r);
+    wolf::init(r);
     breath::init(r);
     animal::init(r);
     comfort::init(r);
@@ -190,6 +192,7 @@ fn wake(w: &World, id: u64, index: usize) {
         3 | 5 => raptor::wake(w, id),
         4 => utahraptor::wake(w, id),
         6 => wyvern::wake(w, id),
+        33 => wolf::wake(w, id),
         7..=12 | 15 | 16 | 18..=22 | 31 | 32 => wild::wake(w, id),
         _ => {}
     }

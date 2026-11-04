@@ -43,6 +43,7 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | herring_gull | *Larus argentatus* | common | small | 0.45 m | 1 kg | herd | carnivore | wild | 0.7 d | 4.58 d | 46 d | 1-4 | 24 |
 | yacare_caiman | *Caiman yacare* | common | large | 2.2 m | 35 kg | herd | carnivore | wild | eggs, hatch 1.4 d | 6.25 d | 75 d | 6-12 | 17 |
 | spectacled_caiman | *Caiman crocodilus* | common | large | 2.2 m | 25 kg | herd | carnivore | wild | eggs, hatch 1.4 d | 6.25 d | 75 d | 6-12 | 18 |
+| grey_wolf | *Canis lupus* | uncommon | medium | 0.8 m | 42 kg | pack | carnivore | passive | 1.25 d | 6.07 d | 46 d | 2-8 | 10 |
 
 ## Stats at level 1
 
@@ -83,6 +84,7 @@ Damage and speed are each kind's own (1 = 100%).
 | herring_gull | 8 | 130 | 40 | 1.5 | 1 | 10 | 70 | 20 | 8 | 30 |
 | yacare_caiman | 30 | 160 | 120 | 5 | 1 | 80 | 300 | 60 | 30 | 60 |
 | spectacled_caiman | 26 | 150 | 100 | 4.5 | 1 | 60 | 300 | 50 | 26 | 60 |
+| grey_wolf | 30 | 220 | 120 | 6 | 1 | 60 | 80 | 90 | 20 | 40 |
 
 ## dog (chihuahua)
 
@@ -2069,6 +2071,68 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | ridden | no |
 | flies ridden | no |
 | camouflage (cost of a coat that stands out) | 0.8 |
+
+## grey_wolf
+
+*Canis lupus*, Mammalia › Carnivora › Canidae › Caninae. Model `wolf`, entity `animals:grey_wolf`.
+
+| Where it lives | how common there |
+|---|---|
+| `base:taiga` | commonest |
+| `base:forest` | 60% |
+| `base:birch_forest` | 60% |
+| `base:mountains` | 50% |
+| `base:snowy_plains` | 40% |
+| `base:plains` | 10% |
+
+Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.8% of spawn attempts that pick it where commonest (uncommon).
+
+| Body | |
+|---|---|
+| size class | medium |
+| height (grown, average) | 0.8 m at the shoulder |
+| males against females | 1.07x as tall |
+| size spread (an individual's, either way) | 20% |
+| newborn's size | 20% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 42 kg | |
+| carries her young | 63 d | 1.25 d |
+| litter or clutch | 5.5 on average | 2-8 |
+| between litters | 1 y | rests 5.07 d |
+| breeds in | winter | out of it, only a tame well cared for |
+| comfortable in | -40 to 28 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
+| grows up in | 1.8 y | 6.07 d |
+| lives | 12 y | 46 d, give or take a fifth; an elder from 80% of it |
+| lives in | pack | room for 10 within 48 blocks |
+
+**Balance** (uncommon): a generation 7.3 d; a line four deep in 22 d (7 h of play); 7.9 young per mother in 10 days, 24 in her life.
+
+- ✓ fourth generation: 22.0 days (want 20-40 days (uncommon))
+- ✓ grown most of its life: grows 6.1 of 46 days (want under a fifth)
+- ✓ young in a life: 24.3 (want 6-40)
+- ✓ litter: 2-8 (want 1-12, fewest first)
+- ✓ room near: 10 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | passive |
+| diet | carnivore |
+| eats | meat 85%, carrion 15% |
+| hunts | 2.0%-200% of its mass alone (0.84-84 kg); at home: cat, capybara, hare, mountain_hare, white_tailed_deer, raven, great_horned_owl, snowy_owl, golden_eagle, turkey_vulture, herring_gull, base:chicken, base:pig, base:sheep |
+| feedings to tame at level 1 | 10 (2.5x at level 150) |
+| scared by a walking player within | 20 blocks (twice that running) |
+| eats (food points) | `base:beef` 10; `base:porkchop` 10; `base:chicken` 6; `base:cooked_beef` 14; `base:cooked_mutton` 14; `base:mutton` 12, favorite; `animals:kibble` 30, kibble |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | yes: pounce, bite |
+| reach past its body | 0.9 blocks |
+| signature | pack |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 0.5 |
 
 ## Shared by every species
 

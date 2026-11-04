@@ -252,3 +252,5 @@ species.animals.spectacled_caiman = spectacled caiman
 item.animals.spectacled_caiman_egg = Spectacled Caiman Egg
 screen.animals.signature.ambush = Lies still with only its eyes above the water, and snaps up what comes near
 screen.animals.height.length = length, from the snout
+entity.animals.grey_wolf = Grey Wolf
+species.animals.grey_wolf = grey wolf

@@ -44,20 +44,6 @@
     1
    ],
    "range": 0.06
-  },
-  "Wg": {
-   "bones": [
-    "wing_L",
-    "wing_R",
-    "hand_L",
-    "hand_R"
-   ],
-   "axes": [
-    1,
-    1,
-    1
-   ],
-   "range": 0.05
   }
  }
 }

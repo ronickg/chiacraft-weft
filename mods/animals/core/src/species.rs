@@ -308,7 +308,7 @@ impl Species {
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
-pub static SPECIES: [Species; 33] = [
+pub static SPECIES: [Species; 34] = [
     Species {
         model: "chihuahua",
         name: "dog",
@@ -2420,6 +2420,87 @@ pub static SPECIES: [Species; 33] = [
         // (`balance::checks`: a fourth generation in 25 days, at most 40 young in a life).
         tune: Tune { litter: Some((6, 12)), growth: Some(150_000), lifespan: Some(1_800_000), recovery: Some(400_000), ..Tune::NONE },
         birth_size: 0.15,
+    },
+    // The grey wolf (`reports/ecology/Overworld food webs.md`: the top hunter of the forests, the
+    // taiga, the tundra and the mountains, the deer's, the reindeer's and the boar's): a full creature
+    // on its own model built on the coyote's (`source/wolf`), and the dog's ancestor, so a natural
+    // tame: fed from the hand it comes round, as the cat does (`wolf.rs`).
+    Species {
+        model: "wolf",
+        name: "grey_wolf",
+        binomial: "Canis lupus",
+        family: &CANIDAE,
+        subfamily: "Caninae",
+        breed: None,
+        size: Size::Medium,
+        // Hoofed animals above all (red and roe deer, moose and reindeer, boar, bison calves), hares
+        // and beavers; carrion, its own kills' and others'.
+        eats: &[(Meat, 0.85), (Carrion, 0.15)],
+        // A hare to a deer near twice its mass alone (a pack takes moose and bison).
+        prey: (0.02, 2.0),
+        taming: Taming::Passive,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [30.0, 220.0, 120.0, 6.0, 1.0, 60.0, 80.0, 90.0, 20.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 40.0,
+        foods: &[
+            eats("base:beef", 10),
+            eats("base:porkchop", 10),
+            eats("base:chicken", 6),
+            eats("base:cooked_beef", 14),
+            eats("base:cooked_mutton", 14),
+            favorite("base:mutton", 12),
+            KIBBLE,
+        ],
+        // Shy of people and slow to trust: twice the cat's feedings.
+        feedings: 10.0,
+        shy: 20.0,
+        fights: true,
+        attacks: &["pounce", "bite"],
+        reach: 0.9,
+        signature: "pack",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.5,
+        // Males a little bigger (about a fifth heavier).
+        dimorphism: 1.07,
+        size_spread: 0.2,
+        height: (0.8, "shoulder"),
+        // The taiga first, the forests and birch woods, the mountains, the tundra; rare on the prairie
+        // now.
+        habitats: &[
+            ("base:taiga", 1.0),
+            ("base:forest", 0.6),
+            ("base:birch_forest", 0.6),
+            ("base:mountains", 0.5),
+            ("base:snowy_plains", 0.4),
+            ("base:plains", 0.1),
+        ],
+        bio: Biology {
+            mass: 42.0,
+            gestation: 63.0,
+            incubation: 0.0,
+            // Breeding at about 22 months, often later in a pack (only the leading pair breeds).
+            maturity: 660.0,
+            // Five to seven years in the wild, 12-16 kept: a tame's (the game's wolves are the dog's
+            // ancestor, raised and kept), so it is grown most of its life (`balance::checks`).
+            lifespan: 4380.0,
+            interval: 365.0,
+            // 4-6 pups, up to 11.
+            litter: 5.5,
+            social: Social::Pack,
+            rarity: Rarity::Uncommon,
+            // Mating from January to March, the pups born in spring.
+            breeds: seasons::WINTER,
+            peak: seasons::WINTER,
+            // At ease far below -40 in its winter coat; it pants and lies in the shade in summer.
+            comfort: (-40.0, 28.0),
+            cold_blooded: false,
+        },
+        tune: Tune::NONE,
+        birth_size: 0.2,
     },
 ];
 
