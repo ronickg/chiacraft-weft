@@ -19,7 +19,10 @@ TITLES = {"1_tools": "Tools and weapons", "2_armour": "Armour", "3_materials": "
           "4_food": "Food", "5_plants": "Plants, nuts, berries and seeds", "6_misc": "Containers, tools, creatures, eggs",
           "7_survival": "Survival's new items (for its branch)",
           "2b_redo": "Redos: hoes, leather cap, boots",
-          "3b_redo": "Redos: coal, gunpowder, stick, three hoes, five foods"}
+          "3b_redo": "Redos: coal, gunpowder, stick, three hoes, five foods",
+          "5b_hoes": "Hoes, third try",
+          "5c_wild": "New wild foods (for the Voxel dog handoff)",
+          "5d_redo": "Redos: crowberries, beans, barley, rye, melon seeds, diamond hoe"}
 
 
 def uri(im, scale=1):

@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a moriche palm fruit: an egg-shaped fruit covered in glossy red-brown scales like a pine cone, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.564,
+   "outline": 0.77,
+   "red_line": 0.07,
+   "fill": 0.43,
+   "passed": true
+  }
+ ]
+}

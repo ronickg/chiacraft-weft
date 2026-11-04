@@ -1,0 +1,26 @@
+{
+ "kind": "item",
+ "what": "a bundle of ripe wheat: golden stalks with plump bearded ears, tied, lying diagonally",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.599,
+   "outline": 1.06,
+   "red_line": 0.0,
+   "fill": 0.4,
+   "passed": false
+  },
+  {
+   "grid": 0.614,
+   "outline": 0.81,
+   "red_line": 0.0,
+   "fill": 0.39,
+   "passed": true
+  }
+ ]
+}

@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a small cluster of amber-orange cloudberries made of large soft drupelets, two or three green leaves, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.238,
+   "outline": 0.65,
+   "red_line": 0.0,
+   "fill": 0.47,
+   "passed": true
+  }
+ ]
+}
