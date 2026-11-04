@@ -105,8 +105,13 @@ fn nearest_water(w: &World, pos: [f64; 3]) -> Option<[f64; 3]> {
 
 /// Whether it is drinking or on its way to water (a resting animal settles only when it isn't).
 pub fn busy(w: &World, id: u64) -> bool {
-    w.component(id, &DRINK)
-        .is_some_and(|d| d[3] != 0.0 && !d[0].is_nan())
+    // As foraging (`forage::busy`): a trip left from before it was slaked isn't one.
+    let thirsty = w
+        .component(id, &ANIMAL)
+        .is_some_and(|a| a.thirst > 1.0 - animals_core::needs::SLAKED);
+    thirsty
+        && w.component(id, &DRINK)
+            .is_some_and(|d| d[3] != 0.0 && !d[0].is_nan())
 }
 
 /// A goal (run first by the forage goal, `forage::forage`): thirsty, it goes to the nearest water
