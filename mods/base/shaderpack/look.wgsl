@@ -71,7 +71,7 @@ fn palette() -> Palette {
     // Night is dark and blue, a little lighter than vanilla's, so lanterns carry the scene.
     // Night is dark and blue, so firelight's orange stands out against it. (A blue-teal shade, as
     // Valheim's, mixed with the orange of a fire into olive on the ground: Tester 2's campfire.)
-    let night = key(vec3(0.006, 0.010, 0.030), vec3(0.025, 0.035, 0.070), vec3(0.10, 0.13, 0.22), vec3(0.045, 0.07, 0.15), vec3(0.010, 0.017, 0.050));
+    let night = key(vec3(0.006, 0.010, 0.030), vec3(0.025, 0.035, 0.070), vec3(0.10, 0.13, 0.22), vec3(0.07, 0.11, 0.24), vec3(0.010, 0.017, 0.050));
     var p: Palette;
     if e > 0.08 {
         p = blend(golden, day, smoothstep(0.08, 0.28, e));
@@ -86,7 +86,9 @@ fn palette() -> Palette {
     // The night follows the moon (Ronald, 11-04: "if the moon is light, then it can be lighter, and
     // if there's no moon, it should be darker"): under a full moon high up a dim cool light to
     // walk by, darker as it sets or wanes, near black with no moon up (a torch needed).
-    p.ambient *= mix(1.0, mix(0.25, 1.8, scene.moon.w), smoothstep(-0.14, -0.3, e));
+    // (Full and high 3x the night's sky light, new or down a quarter: at 1.8x a full moon's night
+    // measured only a little brighter than a new moon's, luma 0.115 against 0.100.)
+    p.ambient *= mix(1.0, mix(0.25, 3.0, scene.moon.w), smoothstep(-0.14, -0.3, e));
     // Overcast: grey and dim, and the sun no more than a brighter part of the sky.
     let r = rain_amount();
     let grey = vec3(luma(p.horizon)) * vec3(0.92, 0.95, 1.0);
