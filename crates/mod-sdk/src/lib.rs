@@ -63,6 +63,12 @@ pub use types::{
     BlockUpdateEvent as __BlockUpdate, BlockUseEvent as __BlockUse, ItemUseEvent as __ItemUse, ItemUseResult as __ItemUseResult,
 };
 
+/// Permission levels (`permission::EVERYONE` .. `permission::OWNER`), value-chain stages and
+/// component flags: Weft's own, so each has one name. A sandboxed component takes `SAVE`,
+/// `SYNC_OWNER`, `SYNC_WATCHERS` and `KEEP` (`SYNC_MENU` is for machines' menus, which a sandboxed
+/// mod has none of).
+pub use weft_abi::{component_flags, permission, stage};
+
 /// The API version this SDK builds for.
 pub const API: &str = "1.2.0";
 
@@ -542,19 +548,7 @@ pub mod chain {
     pub static ATTACK_DAMAGE: Chain = Chain(C::AttackDamage);
 }
 
-pub mod stage {
-    pub const ADD: u32 = 100;
-    pub const MULTIPLY: u32 = 200;
-    pub const FINAL: u32 = 300;
-}
 
-pub mod permission {
-    pub const EVERYONE: u32 = 0;
-    pub const MODERATOR: u32 = 1;
-    pub const GAME_MASTER: u32 = 2;
-    pub const ADMIN: u32 = 3;
-    pub const HOST: u32 = 4;
-}
 
 /// A named thing of the game's content, looked up in the world the mod runs in. Each world has
 /// its own ids, but a mod runs anew in each world, so a looked-up id is kept.
@@ -1393,17 +1387,6 @@ impl<T: Value> Component<T> {
     }
 }
 
-/// Weft's `component_flags`.
-pub mod component_flags {
-    /// Kept in the save.
-    pub const SAVE: u32 = 1;
-    /// Sent to the entity's own player.
-    pub const SYNC_OWNER: u32 = 2;
-    /// Sent to every player who sees it.
-    pub const SYNC_WATCHERS: u32 = 4;
-    /// Kept when a player respawns.
-    pub const KEEP: u32 = 16;
-}
 
 /// A sound, by full name (`Sound::named("base:block.stone.break")`).
 pub struct Sound(&'static str);

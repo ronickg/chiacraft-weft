@@ -7,4 +7,6 @@ rust-version.workspace = true
 description = "Write sandboxed chiacraft mods in Rust: Weft's SDK names over the chiacraft:mods@1.2.0 WIT world, built for wasm32-unknown-unknown (docs/sandboxed-mods.md)"
 
 [dependencies]
+# Weft's permission levels, stages and component flags, re-exported: one name each.
+weft_abi = { path = "../abi" }
 wit-bindgen = { version = "0.57.1", default-features = false, features = ["macros", "realloc"] }
