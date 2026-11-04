@@ -434,7 +434,8 @@ and cactus.**
     flowering shrubs and water lilies' kin.
   - **The tropical forest** (2026-11-04, Terrain's biome, Manaus's terra firme): the Brazil nut,
     an emergent over the canopy whose nuts fall in the rains (agoutis bury them; people eat them),
-    cacao in the understorey (its pods' sweet pulp for monkeys, birds and people), the acuri and
+    cacao in the understorey (its pods' sweet pulp for monkeys, birds and people; its beans dried
+    and roasted), wild bananas (a hand of fruit from about one in three), the acuri and
     moriche palms, lianas hanging from four crowns in ten (cordage), a deep leaf litter with ferns
     and fungi. Its animals (jaguar, ocelot, harpy eagle, king vulture) are the web's waiting gaps.
   - **The warm reefs** (2026-11-05, Terrain's lagoons and coral reefs, Key West's climate):

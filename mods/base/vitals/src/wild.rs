@@ -274,6 +274,10 @@ pub const POND_LANDS: [(&str, f32); 2] = [("base:swamp", 0.35), ("animals:floodp
 /// the tundra and the marshes have fibre too (Research round 3, B3).
 pub const FIBRE: [(&str, f32); 4] = [("base:sedge", 0.5), ("base:cottongrass", 0.5), ("base:cattail", 1.0), ("base:dune_grass", 0.3)];
 
+/// The chance a wild banana, cut, gives a hand of its fruit (`food`'s `bananas`): a stem fruits once
+/// and dies back, so at any time about one plant in three of a stand carries a bunch.
+pub const BANANA_FRUIT: f32 = 0.3;
+
 /// The most of one ground all its wild plants cover in a biome (the world rolls for them first).
 pub const MOST: f32 = 0.3;
 
