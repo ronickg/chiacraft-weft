@@ -14,3 +14,13 @@ log_spruce
 log_spruce_top
 log_birch
 log_birch_top
+seagrass
+lily_pad
+kelp_top
+reed
+sword_fern
+lupine
+leaves_dogwood
+log_dogwood
+log_dogwood_top
+log_sequoia_mossy
