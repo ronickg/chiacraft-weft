@@ -134,8 +134,10 @@ pub mod terrain {
             /// Distant terrain: from what fall (`lod::fall`) the ground is a bare face, where no
             /// scattered things stand (`Terrain::faces`; `i32::MAX`: none).
             FACE_FALL = 30,
+            /// The continent noise's scale (Q4, `Terrain::continent_scale`).
+            CONT_SCALE = 31,
             /// The header's length.
-            LEN = 31,
+            LEN = 32,
         }
         /// Words per record of the description, per cube's mods' heights and per cube made.
         words {

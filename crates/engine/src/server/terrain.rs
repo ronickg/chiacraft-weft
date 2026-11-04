@@ -230,7 +230,7 @@ impl Feature {
                 _ => 0,
             },
             Height::Custom(owner, cb) => {
-                let mut args = abi::FeatureArgs { seed: f.seed, x, z, height: 0 };
+                let mut args = abi::FeatureArgs { seed: f.seed, continent_scale: f.continent_scale, x, z, height: 0 };
                 host::invoke(owner, cb, &mut args);
                 args.height
             }
@@ -299,6 +299,8 @@ pub struct Terrain {
     pub cave_biomes: Vec<CaveBiome>,
     /// What steep faces show (`abi::terrain_op::FACES`): from what fall, whose callback.
     pub faces: Option<Faces>,
+    /// The continent noise's scale (Q4, `abi::terrain_op::CONTINENT_SCALE`).
+    pub continent_scale: i32,
     cache: ColumnCache<Columns>,
     /// Column heights every 4 blocks over a cube's columns and its +X/+Z edge (5 x 5): caves
     /// measure depth from this smoothed surface, so steep slopes do not leave single-column
@@ -316,6 +318,7 @@ struct Draft {
     rules: Vec<RawRule>,
     cave_biomes: Vec<(String, i32, f64, f64)>,
     faces: Option<Faces>,
+    continent_scale: f64,
 }
 
 /// Steep faces as the generator's own passes make them (`abi::terrain_op::FACES`), for distant
@@ -364,6 +367,7 @@ pub fn build(
         rules: Vec::new(),
         cave_biomes: Vec::new(),
         faces: None,
+        continent_scale: weft_noise::fixed::CONTINENT_SCALE as f64 / 16.0,
     };
     let rule_name = |r: &RawRule| if r.name.is_empty() { r.biome.clone() } else { r.name.clone() };
     for o in ops {
@@ -442,6 +446,10 @@ pub fn build(
                 None => missing("cave biome"),
             },
             op::FACES => d.faces = Some(Faces { fall: o.level, owner: o.owner, face: o.face }),
+            op::CONTINENT_SCALE if o.value >= 1.0 => d.continent_scale = o.value,
+            op::CONTINENT_SCALE => {
+                errors.push(format!("{who}: the continent scale of {dimension} must be at least a block, not {}", o.value))
+            }
 
             n => errors.push(format!("{who}: unknown terrain edit {n} for {dimension}")),
         }
@@ -543,10 +551,16 @@ pub fn build(
         .collect();
     let mut t = Terrain::new(stone, q4(d.base), sea, features, rules, caves, cave_biomes);
     t.faces = d.faces;
+    t.continent_scale = q4(d.continent_scale).min(1 << 24);
     t
 }
 
 impl Terrain {
+    /// The noise fields of world `seed` in this terrain (its continent scale).
+    pub fn fields(&self, seed: u64) -> Fields {
+        Fields::with_continent_scale(seed, self.continent_scale)
+    }
+
     fn new(
         stone: u32,
         base: i32,
@@ -565,6 +579,7 @@ impl Terrain {
             caves,
             cave_biomes,
             faces: None,
+            continent_scale: weft_noise::fixed::CONTINENT_SCALE,
             cache: ColumnCache::new(32768),
             corners: ColumnCache::new(32768),
         }
@@ -576,7 +591,7 @@ impl Terrain {
 
     /// Height, biome and rule of column (`x`, `z`).
     fn compute(&self, seed: u64, x: i32, z: i32) -> (TerrainColumn, u32) {
-        let f = Fields { seed };
+        let f = self.fields(seed);
         let (fx, fz) = (x * 16, z * 16);
         let mut h = self.base;
         let mut strengths = [0i32; 16];
@@ -1153,6 +1168,34 @@ mod tests {
         let mut errors = Vec::new();
         let t = build("a:dim", &|m| format!("mod{}", m.0), ops, &names, &mut errors);
         (t.rules.iter().map(|r| r.biome).collect(), errors)
+    }
+
+    /// A dimension's continent scale is 900 blocks unless its terrain sets one; the fields, the
+    /// `continents` preset and continent masks all follow it.
+    #[test]
+    fn continent_scale_defaults_and_follows_its_op() {
+        let names = Names { block: &|n| (n == "a:stone").then_some(1), biome: &|_| Some(0), biome_rule: &|_| None };
+        let make = |scale: Option<f64>| {
+            let mut ops = vec![raw(0, op::STONE, "", None)];
+            if let Some(v) = scale {
+                ops.push(RawTerrain { value: v, ..raw(0, op::CONTINENT_SCALE, "", None) });
+            }
+            let mut errors = Vec::new();
+            let t = build("a:dim", &|m| format!("mod{}", m.0), ops, &names, &mut errors);
+            (t, errors)
+        };
+        let (plain, errors) = make(None);
+        assert!(errors.is_empty(), "{errors:?}");
+        assert_eq!(plain.continent_scale, weft_noise::fixed::CONTINENT_SCALE);
+        assert_eq!(plain.fields(7), Fields::new(7));
+        let (wide, _) = make(Some(1800.0));
+        assert_eq!(wide.continent_scale, 1800 * 16);
+        // Twice as wide: the same continentalness twice as far out.
+        let (n, w) = (plain.fields(7), wide.fields(7));
+        for (x, z) in [(0, 0), (300, -500), (-1200, 800)] {
+            assert_eq!(w.continent(2 * x * 16, 2 * z * 16), n.continent(x * 16, z * 16));
+        }
+        assert_eq!(make(Some(0.0)).1.len(), 1, "a scale under a block is an error");
     }
 
     /// Edits find rules by name (a biome's own name by default) and keep the owner's order around them.

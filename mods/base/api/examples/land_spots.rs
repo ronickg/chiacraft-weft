@@ -12,7 +12,7 @@ fn main() {
     let a: Vec<String> = std::env::args().collect();
     let seed: u64 = a.get(1).and_then(|s| s.parse().ok()).unwrap_or(1);
     let radius: i32 = a.get(2).and_then(|s| s.parse().ok()).unwrap_or(1500);
-    let f = Fields { seed };
+    let f = l::fields(seed);
     let after = |x: i32, z: i32| l::height(&f, x * 16, z * 16) >> 4;
     let before = |x: i32, z: i32| old_height(&f, x * 16, z * 16) >> 4;
     let q = |x: i32, z: i32| (f.temperature(x * 16, z * 16), f.humidity(x * 16, z * 16), f.continent(x * 16, z * 16));

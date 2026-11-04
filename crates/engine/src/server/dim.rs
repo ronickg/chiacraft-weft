@@ -402,7 +402,7 @@ pub fn scatter_site(
     let random = hash(h, 1, 2, 3);
     if s.thin
         .as_ref()
-        .is_some_and(|t| t.removes(c, seed, x, z, col.biome, random))
+        .is_some_and(|t| t.removes(c, &def.fields(seed), x, z, col.biome, random))
     {
         return None;
     }

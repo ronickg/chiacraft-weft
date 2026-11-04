@@ -394,22 +394,25 @@ pub struct ScatterThin {
 
 impl ScatterThin {
     /// Whether it takes away the site at (`x`, `z`) in `biome` with random bits `random`.
-    pub fn removes(&self, c: &Content, seed: u64, x: i32, z: i32, biome: u32, random: u64) -> bool {
+    pub fn removes(&self, c: &Content, f: &weft_noise::fixed::Fields, x: i32, z: i32, biome: u32, random: u64) -> bool {
         if self
             .biomes
             .is_some_and(|b| !c.components.has(crate::components::BIOME, biome, b))
         {
             return false;
         }
-        (self.keep == 0 || random % self.keep as u64 != 0)
-            && self
-                .mask
-                .value(&weft_noise::fixed::Fields { seed }, x * 16, z * 16)
-                > 0
+        (self.keep == 0 || random % self.keep as u64 != 0) && self.mask.value(f, x * 16, z * 16) > 0
     }
 }
 
 impl DimensionDef {
+    /// The noise fields of world `seed` here: its terrain's continent scale, else the default.
+    pub fn fields(&self, seed: u64) -> weft_noise::fixed::Fields {
+        self.terrain
+            .as_ref()
+            .map_or(weft_noise::fixed::Fields::new(seed), |t| t.fields(seed))
+    }
+
     /// The 256 columns of cube column (`cx`, `cz`), index z * 16 + x: its terrain's or its
     /// `column` callback's. None for a dimension with neither.
     pub fn columns(&self, seed: u64, cx: i32, cz: i32) -> Option<std::sync::Arc<[abi::TerrainColumn; 256]>> {

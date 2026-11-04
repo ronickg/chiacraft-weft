@@ -168,13 +168,28 @@ pub fn q4(v: f64) -> i32 {
     (v * 16.0).round().clamp(i32::MIN as f64, i32::MAX as f64) as i32
 }
 
-/// The world's noise fields at Q4 positions, Q12 values.
-#[derive(Clone, Copy)]
+/// How wide the continent noise's land and sea are by default (Q4: 900 blocks).
+pub const CONTINENT_SCALE: i32 = 900 * 16;
+
+/// The world's noise fields at Q4 positions, Q12 values. A dimension can make its land masses
+/// larger or smaller (`continent_scale`, Q4; `abi::terrain_op::CONTINENT_SCALE`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Fields {
     pub seed: u64,
+    pub continent_scale: i32,
 }
 
 impl Fields {
+    /// The fields of `seed` with the default continent scale.
+    pub const fn new(seed: u64) -> Fields {
+        Fields { seed, continent_scale: CONTINENT_SCALE }
+    }
+
+    /// The fields of `seed` with land masses `continent_scale` (Q4) across.
+    pub const fn with_continent_scale(seed: u64, continent_scale: i32) -> Fields {
+        Fields { seed, continent_scale }
+    }
+
     pub fn fbm(&self, salt: u64, x: i32, z: i32, scale: i32, octaves: u32) -> i32 {
         fbm(seed32(self.seed, salt), x, z, scale, octaves)
     }
@@ -184,7 +199,7 @@ impl Fields {
     }
 
     pub fn continent(&self, x: i32, z: i32) -> i32 {
-        ((self.fbm(salt::CONTINENT, x, z, 900 * 16, 4) * 6554) >> 12) + 614
+        ((self.fbm(salt::CONTINENT, x, z, self.continent_scale, 4) * 6554) >> 12) + 614
     }
 
     pub fn temperature(&self, x: i32, z: i32) -> i32 {
