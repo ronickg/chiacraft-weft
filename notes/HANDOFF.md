@@ -517,6 +517,12 @@ dogs in love: aiming `press core:use` at wandering dogs from a script is too hit
 game aborts at start with "unable to open IOSurface kernel service", the Mac has run out of
 IOSurface clients (leaked by hung `simctl` runs); only a reboot clears it.
 
+Server identity (2026-11-04, branch `claude/server-identity-519f6e`, off `dev`): `weft --server`
+exited with "has no address of its own: no account is open". `chiacraft_account::open_server`
+opens (making it once) an account called "Server" in `<run dir>/server-account` (file store),
+and `dedicated.rs` opens it before the world's key; the world's keys and certificate derive from it
+as from a player's account. Phase 7's part (an owner certifying their server) is in the plan.
+
 ## Next steps
 
 1. Phase 4 (DIDs and achievements) per `notes/PLAN.md`.

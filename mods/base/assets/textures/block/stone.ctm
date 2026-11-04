@@ -1,0 +1,4 @@
+# Chiacraft's three variants beside the plain stone, picked at random and turned four ways, so ground of it doesn't show its tile repeating.
+method = random
+tiles = <default> stone/1-3
+symmetry = all

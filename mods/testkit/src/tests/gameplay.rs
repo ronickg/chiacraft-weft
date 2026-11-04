@@ -1866,6 +1866,7 @@ pub async fn base_alone(t: T) -> R {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let mut server = std::process::Command::new(exe)
         .args(["--server", "--world", "w", "--seed", "1", "--view", "4", "--port", &port.to_string(), "--run-dir", &dir])
+        .args(crate::package_args())
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -1913,6 +1914,8 @@ pub async fn dedicated_server(t: T) -> R {
         let exe = std::env::current_exe().map_err(|e| e.to_string())?;
         std::process::Command::new(exe)
             .args(["--server", "--world", "w", "--seed", "1", "--view", "4", "--port", &port.to_string(), "--run-dir", &dir])
+            .args(crate::package_args())
+            .args(crate::package_args())
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())

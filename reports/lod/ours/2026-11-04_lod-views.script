@@ -1,0 +1,43 @@
+# LOD views and frame times (Researcher round 10). Fresh world, seed 1, creative, clear.
+# Run twice: once with core:lod_distance 256 (default), once with 0 (LOD off), same view distance.
+# If time allows, a third run with view distance 24.
+loaded
+chat /gamemode creative
+chat /weather clear
+chat /time set 6000
+# 1. High over hills, looking at the horizon: where cubes end and LOD tiles begin.
+chat /tp -450 220 535
+loaded
+idle
+look 45 -8
+wait 3
+shot lod_high_noon.png
+bench 5 high_noon
+chat /time set 12700
+wait 3
+shot lod_high_sunset.png
+chat /time set 6000
+# 2. On the ground looking across open land to far hills (the view-distance border at eye level).
+chat /tp -689 75 -122
+loaded
+idle
+look 45 -3
+wait 3
+shot lod_ground_noon.png
+bench 5 ground_noon
+# 3. Over the sea toward a coast (water on LOD tiles).
+chat /tp -1677 140 3071
+loaded
+idle
+look 200 -6
+wait 3
+shot lod_coast.png
+# 4. A fast flight (100 blocks a second), then the frame time while tiles and cubes catch up.
+origin
+via 0 200 0 45 -8
+via 600 200 600 45 -8
+via 1200 200 1200 45 -8
+travel 12
+shot lod_after_flight.png
+bench 5 after_flight   # right after the flight, while tiles and cubes still load
+quit

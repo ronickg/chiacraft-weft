@@ -395,6 +395,13 @@ The smallest version that works is phases 1-4.
 7. **Headless server and administration.** No window or GPU (Weft's CPU terrain path),
    `server.toml`, console, operators and command permissions (today any player can `/give`),
    movement checks, our own relay, load tests (`horizon-bots`).
+   Built ahead (2026-11-04, decided by Planner): a server's own identity. A headless server runs
+   without anyone's account: `chiacraft_account::open_server` makes an account named "Server"
+   once, in the server's folder (`server-account`, encrypted file store), and its worlds' keys
+   and certificates come from it as a player's do, so addresses, status, links and admission work
+   unchanged; nobody who connects owns the world. Left for this phase: an owner certifying a
+   server they run (the server's identity vouched for by the owner's, so links and admission see
+   the owner), moving a world between a game and a server, and the server's DID.
 8. **Later.** Wallet view and spending with the confirm dialog, items on chain, offers, passes,
    paid links, portal-rights NFTs; launcher and signed updates.
 

@@ -438,8 +438,10 @@ fn display(c: vec3<f32>) -> vec3<f32> {
     // Only true darks go cool (most daylit ground is mid-tone and keeps its color).
     let lights = smoothstep(0.02, 0.22, luma(t));
     t *= mix(vec3(0.975, 0.99, 1.03), mix(vec3(1.0), vec3(1.12, 1.0, 0.82), golden()), lights);
+    // Colour held back in the mid-tones and darks (the land), not in what glows bright (lava, fire,
+    // lamps keep their fire).
     let y = luma(t);
-    t = max(mix(vec3(y), t, 0.98), vec3(0.0));
+    t = max(mix(vec3(y), t, mix(0.98, 1.06, smoothstep(0.35, 0.7, y))), vec3(0.0));
     t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034);
     return clamp(t, vec3(0.0), vec3(1.0));
 }

@@ -1,0 +1,69 @@
+[
+ {
+  "name": "rock_granite",
+  "what": "speckled warm-grey granite: a mid warm grey (#8c8682 to #b2aaa4) packed with small 1-2 px flecks of soft pink feldspar (#c99a8e), pale grey quartz (#cfcac4) and dark grey-black mica (#4c4644), a few faint rounded fractures with a deep warm-grey shade; the speckle evenly spread, the overall brightness of a sage-grey stone block, not lighter. Not slabs or cobbles: one solid speckled rock. Seamless on all four edges, every cell filled, no border.",
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "name": "rock_slate_top",
+  "what": "the flat top of dark blue-grey slate (#3e4652 to #5c6573): a smooth plain surface with a few faint lighter streaks and two or three tiny chipped flakes, no clumps or cobbles, calm and dark so it reads beside snow. Seamless on all four edges, every cell filled, no border.",
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "name": "rock_slate_side",
+  "what": "the side of dark blue-grey slate (#3a424e to #5e6876) in thin flat layers: exactly four thin dark cleavage lines (#2a3038) running perfectly straight and level across the whole tile from the left edge to the right edge, at pixel rows 7, 15, 23 and 31 (counting from 0 at the top), each with a 1 px lighter line (#6e7886) right above it; between the lines, fine level streaks and a few small chips. Seamless on all four edges, every cell filled, no border.",
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "name": "rock_limestone_top",
+  "what": "the top of pale cream-grey limestone (#b8b2a0 to #d8d2c0): a soft smooth surface with faint shallow pits, a few worn rounded chips and two or three tiny pale shell-fossil flecks; softer and paler than a sage-grey stone block, with gentle low contrast. Seamless on all four edges, every cell filled, no border.",
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "name": "rock_limestone_side",
+  "what": "the side of pale cream-grey limestone (#b4ae9c to #d6d0be) with faint horizontal bedding: three soft, slightly darker level bands (#a49e8c) running straight across the whole tile from the left edge to the right edge at pixel rows 10, 20 and 31 (counting from 0 at the top), small pits and worn rounded chips between them; soft and low contrast. Seamless on all four edges, every cell filled, no border.",
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "name": "rock_ochre_sandstone_top",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/likes/sandstone_top.png",
+  "what": "the top of ochre sandstone: exactly like the attached sandstone top (the same smooth fine grain, the same faint soft ripples, the same low contrast and light) but yellow-orange ochre (#c8862e to #ecb860). Seamless on all four edges, every cell filled, no border.",
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "name": "rock_ochre_sandstone_side",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/likes/sandstone_side.png",
+  "what": "the side of ochre sandstone in the style of the attached sandstone side (the same fine grain and light) but yellow-orange ochre (#c4822c to #e6b058). One even band colour across the whole tile (it is one layer of a stacked cliff): fine horizontal grain and a few small pits, NO darker bands through the middle, and a slightly darker 1-2 px line along the bottom edge only. Seamless on all four edges, every cell filled, no border.",
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "name": "rock_ochre_sandstone_bottom",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/likes/sandstone_bottom.png",
+  "what": "the bottom of ochre sandstone: exactly like the attached sandstone bottom (the same speckled fine grain and contrast) but yellow-orange ochre (#c0802a to #e2aa54). Seamless on all four edges, every cell filled, no border.",
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "name": "rock_red_sandstone_side",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/likes/red_sandstone_side.png",
+  "what": "the side of red sandstone in the colours of the attached red sandstone side (deep rust red, #8e3a1e to #c8683a) and the fine grain of the sandstone family. One even band colour across the whole tile (it is one layer of a stacked cliff): fine horizontal grain and a few small pits, NO darker bands through the middle, and a slightly darker 1-2 px line along the bottom edge only. Seamless on all four edges, every cell filled, no border.",
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ }
+]
