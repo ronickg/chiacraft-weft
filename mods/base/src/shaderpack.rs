@@ -10,8 +10,8 @@
 use std::path::Path;
 use std::sync::Once;
 
-use weft_sdk::*;
 use weft_sdk::settings::SHADER_PACK;
+use weft_sdk::*;
 
 pub const ID: &str = "chiacraft";
 
@@ -38,11 +38,18 @@ pub fn register_for_scripts(r: &mut Registry) {
     static TIMES: AtomicU32 = AtomicU32::new(0);
     r.client_frame(|c| {
         let Some(pack) = weft_sdk::client::launch_option("shader-pack") else { return };
-        let after: f32 = weft_sdk::client::launch_option("shader-pack-after").and_then(|s| s.parse().ok()).unwrap_or(0.0);
+        let after: f32 = weft_sdk::client::launch_option("shader-pack-after")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0.0);
         if c.state().flags & weft_sdk::client::client_flags::JOINED == 0 {
             return;
         }
-        if STARTED.get_or_init(std::time::Instant::now).elapsed().as_secs_f32() < after {
+        if STARTED
+            .get_or_init(std::time::Instant::now)
+            .elapsed()
+            .as_secs_f32()
+            < after
+        {
             return;
         }
         // The testkit turns packs off when a test begins, which on a slow start comes after the
@@ -93,7 +100,9 @@ pub fn register(r: &mut Registry) {
 fn install(c: &Client) {
     let dir = Path::new(&c.run_dir()).join("shaderpacks").join(ID);
     let offered = dir.join(".offered");
-    let automated = ["test", "script"].iter().any(|o| weft_sdk::client::launch_option(o).is_some());
+    let automated = ["test", "script"]
+        .iter()
+        .any(|o| weft_sdk::client::launch_option(o).is_some());
     if let Err(e) = std::fs::create_dir_all(&dir) {
         weft_sdk::warn!("shader pack: {}: {e}", dir.display());
         return;

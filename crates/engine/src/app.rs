@@ -2609,13 +2609,10 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
             }
         }
     }
-    let clear = r
-        .game
-        .as_ref()
-        .map_or([0.02, 0.02, 0.03, 1.0], |g| {
-            let [r, g, b, _rain] = g.client.fog_color();
-            [r, g, b, 1.0]
-        });
+    let clear = r.game.as_ref().map_or([0.02, 0.02, 0.03, 1.0], |g| {
+        let [r, g, b, _rain] = g.client.fog_color();
+        [r, g, b, 1.0]
+    });
     // Screen effects need the world in an image they can read.
     let post = r.post.on() && r.game.is_some();
     let world_target = if post { Target::Texture(r.post.scene_target(&mut *r.gpu, info.width, info.height)) } else { Target::Surface };
@@ -2641,7 +2638,10 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
     }
     r.list.push(Cmd::EndPass);
     if post {
-        let scene = r.game.as_ref().and_then(|g| g.client.scene_buffer(info.slot));
+        let scene = r
+            .game
+            .as_ref()
+            .and_then(|g| g.client.scene_buffer(info.slot));
         r.post.apply(&mut *r.gpu, &mut r.list, info, scene);
     } else {
         // The UI pipeline has no depth, so it cannot draw in a pass that has one.

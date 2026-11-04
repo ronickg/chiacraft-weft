@@ -302,7 +302,9 @@ fn animal_screen(ui: &mut Ui) {
         // Its water, for one that drinks (`drink.rs`).
         ui.text_bind(|c, t| {
             let Some(a) = c.menu_component(&ANIMAL) else { return };
-            if a.species().is_none_or(|s| animals_core::needs::drinks(s) <= 0.0) {
+            if a.species()
+                .is_none_or(|s| animals_core::needs::drinks(s) <= 0.0)
+            {
                 return;
             }
             t.set("screen.animals.water", &[Arg::Int(((1.0 - a.thirst.clamp(0.0, 1.0)) * 100.0).round() as i64)]);

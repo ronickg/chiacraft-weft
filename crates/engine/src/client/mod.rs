@@ -2357,7 +2357,9 @@ impl Client {
     }
 
     pub fn fog_color(&self) -> [f32; 4] {
-        self.fog_linear().extend(self.rain.clamp(0.0, 1.0)).to_array()
+        self.fog_linear()
+            .extend(self.rain.clamp(0.0, 1.0))
+            .to_array()
     }
 }
 

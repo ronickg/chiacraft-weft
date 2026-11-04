@@ -163,7 +163,10 @@ fn climates(w: &mut String) {
     );
     for c in climate::BIOMES.iter().filter(|c| !c.underground) {
         let wind = c.wind.map(|v| format!("{v:.1}")).join(" | ");
-        let fog = (0..4).map(|s| format!("{:.0}%", air::fog_share(c.fog, Some(s)) * 100.0)).collect::<Vec<_>>().join(" | ");
+        let fog = (0..4)
+            .map(|s| format!("{:.0}%", air::fog_share(c.fog, Some(s)) * 100.0))
+            .collect::<Vec<_>>()
+            .join(" | ");
         let kind = match c.fog_kind {
             climate::Fog::Dawn => "before dawn to mid morning",
             climate::Fog::Sea => "off the sea, any hour",
