@@ -652,8 +652,9 @@ pub unsafe extern "C" fn client_draw(
             (DVec3::from_array(*a), DVec3::from_array(*b), crate::ui::text::Msg::new(key.as_str(), crate::client::modui::args(args)));
         match kind {
             abi::gizmo_kind::SCREEN_LABEL => {
+                // b: its size, and the width it wraps to (GUI px; 0, one line).
                 r.mod_screen_text
-                    .push((a.x as f32, a.y as f32, text, color, if b.x > 0.0 { b.x as f32 } else { 1.0 }))
+                    .push((a.x as f32, a.y as f32, text, color, if b.x > 0.0 { b.x as f32 } else { 1.0 }, b.y.max(0.0) as f32))
             }
             k if k <= abi::gizmo_kind::FILL => {
                 r.mod_gizmos

@@ -1,0 +1,12 @@
+# The same in Russian (--config core:language=ru_ru).
+# The longest hint (hint.base.night, ~150 characters) wrapped under the crosshair, clear of the
+# HUD's top-left column: dusk, in survival, no campfire built.
+loaded
+idle
+chat /tk mode survival
+chat /tk time 10500
+wait 4
+shot ru_hn_01_night_hint.png
+wait 2
+shot ru_hn_02_night_hint_later.png
+quit

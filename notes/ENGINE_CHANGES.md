@@ -78,6 +78,7 @@ Weft's shader packs could only replace shaders. Our pack needed data the engine 
 - **Smooth text: Alegreya Sans** (0e1ba79e); **slots with frames** (06bd9414); **the title screen in our theme** (e0edc189); **Select World as a list** (bf9427c5). *Why:* the UI redo.
 - **Chat fits small windows; no crosshair over a screen** (claude/audit-rest, merged a0fc9a41; `hud.rs`, `game_screens.rs`). *Why:* at 760x600 the chat covered the Inventory/Recipes/Stats buttons (B9c), and the crosshair stood over the sleeping screen.
 - **Block outline thin and faint** (look-outline ba37dc6d, merged 9a5398eb): `client/entity_render.rs` draws the selection outline's 12 edge boxes see-through (alpha `OUTLINE_DARK` 0.4) in the overlay pass, each sized to `OUTLINE_PX` 1.25 screen pixels from its distance, the camera's fov and the frame height, instead of solid black boxes 0.012 blocks thick. *Why:* Ronald: "thin and faint like vanilla"; the old frame was about 3 px solid black.
+- **Mods' screen text can wrap** (claude/hint-wrap; `app.rs`, `app/api.rs`, sdk `Client::screen_text_wrapped`): a screen label may carry a width it wraps to, its lines centred; zero keeps one line. *Why:* the base game's long hint ("Press [E]: logs make planks…") ran over the HUD's top-left column in a narrow window (760x600).
 
 ## 6. Sound
 
