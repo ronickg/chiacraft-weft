@@ -308,6 +308,10 @@ fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
     if in_water() {
         return vec4(display(underwater_color()), 1.0);
     }
+    // In another liquid (lava): its fog all round (the engine draws the gradient alone then).
+    if s.extra.x > 0.5 {
+        return vec4(scene.fog_color.rgb, 1.0);
+    }
     if open_sky() && !in_liquid() {
         var c = sky_color(dir) + milky_way(dir) + aurora(dir);
         if dir.y < 0.0 {

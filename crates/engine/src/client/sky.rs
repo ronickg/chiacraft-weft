@@ -375,23 +375,32 @@ impl Sky {
         let Some(pipe) = self.pipe else { return };
         let c = content();
         let d = &c.dims[dim];
-        // From inside a liquid its fog hides the sky.
+        // From inside a liquid its fog hides the sky: only the gradient is drawn, marked so
+        // (`extra.x` 1), which the engine's sky draws as the fog and a pack as its own water (the
+        // world's gaps showed the clear colour, a band of navy streaks where the near sea floor
+        // ended, the world playtester's under-water shots).
         if in_liquid {
             self.list.clear();
-            let n = self.overlay_entries(gpu, overlays);
-            if n > 0 {
-                let buf = crate::gpu_layout::frame_buffer(
-                    gpu,
-                    &mut self.buffers,
-                    frame.slot,
-                    n,
-                    size_of::<GpuSky>() as u64,
-                    usage::STORAGE,
-                    "sky",
-                );
-                gpu.mapped(buf)[..self.list.len() * size_of::<GpuSky>()].copy_from_slice(bytemuck::cast_slice(&self.list));
-                self.overlay = Some((buf, 0, n));
-            }
+            let aspect = frame.width as f32 / frame.height.max(1) as f32;
+            let (o, px, py) = screen_rays(cam, aspect);
+            let m = Mat3::from_cols(px - o, py - o, o);
+            self.list.push(GpuSky {
+                axes: [m.x_axis.extend(0.0).to_array(), m.y_axis.extend(0.0).to_array(), m.z_axis.extend(0.0).to_array()],
+                uv: [0.0; 4],
+                color: [0.0, 0.0, 0.0, 1.0],
+                ids: [u32::MAX, kind::GRADIENT, 0, 0],
+                extra: [1.0, 0.0, 0.0, 0.0],
+            });
+            let over = self.overlay_entries(gpu, overlays);
+            let n = self.list.len() as u32;
+            let stride = size_of::<GpuSky>() as u64;
+            let buf = crate::gpu_layout::frame_buffer(gpu, &mut self.buffers, frame.slot, n, stride, usage::STORAGE, "sky");
+            gpu.mapped(buf)[..self.list.len() * stride as usize].copy_from_slice(bytemuck::cast_slice(&self.list));
+            self.overlay = (over > 0).then_some((buf, 1, over));
+            list.pipeline(pipe);
+            list.bind(bind::sky::OBJECTS, buf);
+            list.bind(bind::sky::SCENE, scene);
+            list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: 0 });
             return;
         }
         let turn = d.day_turn(time);
