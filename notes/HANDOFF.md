@@ -447,8 +447,13 @@ mod's init): each server half running in this world (by the bridge's run) with i
 average and slowest time and strikes in ten minutes (`Instance::stats`), and why one stopped;
 `/mods resume <package>` for admins (`Instance::resume`). Every `Runs` is kept in `ALL` (weak).
 Left: the `required` flag (agreed: at the next `package.toml` change), callcost for questions
-and chain steps, cached compiled components and a per-tick budget across mods, `/mods` for
-client halves, the engine's settings hazard on a content switch (Planner).
+and chain steps, cached compiled components and a per-tick budget across mods.
+What a client half costs a frame (Planner, for Ronald's lag work; built, not yet seen in the
+game): `ClientInstance` times every call (`Meter`), a frame ends for every half in the packages
+mod's `client_frame` (`client_half::register`; halves kept in `HALVES`, weak), and `cost()`
+gives the time a frame on average and in the worst of the last `FRAMES` (240), calls a frame,
+the slowest call and strikes. `/client_mods` (a client command) lists each half's, personal
+ones marked, and all together. Test `counts_its_cost_by_frame` (tests/client.rs).
 
 ## Phase 4: achievements (2026-11-04 overnight, built, not yet seen in a game)
 
