@@ -1842,11 +1842,10 @@ pub static SPECIES: [Species; 37] = [
         // Standing, at the crown.
         height: (0.1, "crown"),
         // Wherever people farm and build, from the prairie to the desert's towns and the coast; few in
-        // the deep woods. Not in the birch woods' and the Alps' winters, where it lives only on what
-        // people leave (`web`: nothing of its diet there then).
+        // the deep woods. Not in the birch woods', the Alps' or the llanos' dry-season winters, where
+        // it lives only on what people leave (`web`: nothing of its diet there then).
         habitats: &[
             ("base:plains", 1.0),
-            ("base:savanna", 0.6),
             ("base:desert", 0.5),
             ("base:beach", 0.5),
             ("base:forest", 0.4),
