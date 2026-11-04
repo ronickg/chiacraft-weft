@@ -2851,7 +2851,7 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         let depth = r.gpu.texture_index(r.depth.0);
         let _s = crate::diag::span("effects");
         r.post
-            .apply(&mut *r.gpu, &mut r.list, world_info, scene, depth);
+            .apply(&mut *r.gpu, &mut r.list, world_info, scene, depth, scaled);
         r.list.push(Cmd::Mark);
     } else {
         r.list.push(Cmd::Mark);
