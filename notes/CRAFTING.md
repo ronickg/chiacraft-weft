@@ -438,6 +438,25 @@ As Tinkers' Construct 3 does it, which our prototype already proved at 32 px:
   - grades 1, 5 and 10
   - shown beside the approved full icons
 
+### The engine hook for looks (to build)
+
+One stack component, `core:look`, says how a stack is drawn: its layers back to front, each
+`<texture>` (painted, used as it is) or `<map>@<ramp>,<ramp>...` (a shade map painted with one
+ramp per region), separated by `;`. Base writes it when it assembles an item (`crafting::looks`
+names the textures). The engine:
+1. **Composes the picture once per distinct look.** A texture entry of a new kind, built from its
+   layer files and ramps (red / 36 is the step, green the region), cached by the look's text,
+   loaded on first use like any texture.
+2. **Draws icons by the stack:** `item_icon` and `slot_draw` take the stack, not the item id, and
+   use the composed texture when the stack has a look. They take the item's own icon otherwise.
+3. **Builds held models by the stack:** the texel boxes are keyed by (item, look) and read the
+   composed pixels.
+4. **Syncs the look for other players:** today only their held item id travels; the look's text
+   goes with it.
+
+It's rendering, so it goes to the PC first. It's general: any mod can draw a stack from layers.
+An upstream candidate (PLAN.md rule 4).
+
 ### Fewer pieces in the picture
 
 Ronald found the first part icons too busy at 32 px. The parts in the data stay as they are; the
