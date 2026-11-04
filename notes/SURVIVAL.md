@@ -474,4 +474,10 @@ sword, about 100 XP.
   linen is cooler than bare skin in the desert sun and fur hotter, wet wool warmer than wet linen,
   fur keeps out the wind.
 - Not yet: clothes wearing out, dyes, flax for linen (the plants work), generated art.
+- From the Researcher's round 1 (F1, `reports/Research round 1.md` on `claude/researcher-c31668`):
+  used per-item warmth, windproof and warm-when-wet (`MATERIALS`, the body's shares). Not yet:
+  waterproof (clothes that keep one dry, the research's sealskin and gut parka), and wetness in
+  steps (DayZ's damp, wet, soaked, drenched cutting insulation by 10, 50, 90%) instead of wet or
+  dry. Preserving is foods of their own with real nutrition and keeps rather than TerraFirmaCraft's
+  decay multipliers (salted 0.5 and so on): our salted meat keeps over twenty times raw meat's.
 
