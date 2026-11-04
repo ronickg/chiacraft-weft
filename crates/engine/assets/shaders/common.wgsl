@@ -117,6 +117,8 @@ struct PostPixel {
     // Pixels.
     size: vec2<f32>,
     scene: u32,
+    // The world's depth image (`post_depth`, `post_position`).
+    depth: u32,
 }
 
 // What a sky shader (`shaders/sky/<name>.wgsl`, `fn shade(p: SkyPixel) -> vec4<f32>`) gets; it

@@ -42,13 +42,15 @@ chat /tp ~ ~60 ~
 wait 4
 look 30 -40
 shot 07_above_the_fog.png
-chat /tp 30000 140 30000
+chat /gamemode spectator
+chat /tp 30000 90 30000
 wait 8
-chat /tp ~ ~30 ~
 chat /tk fill ~-4 ~-1 ~-4 ~4 ~-1 ~4 grass
 chat /tk fill ~-4 ~ ~-4 ~4 ~ ~4 tall_grass
 chat /tk fill ~-1 ~ ~-1 ~1 ~ ~1 core:air
 chat /tk fill ~3 ~1 ~-4 ~4 ~3 ~-2 oak_leaves
+chat /gamemode creative
+wait 1
 chat /air 0 12 90 mist
 wait 8
 look 30 -10

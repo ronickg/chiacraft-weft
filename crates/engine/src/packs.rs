@@ -66,6 +66,17 @@ pub fn set_shader_pack(dir: Option<PathBuf>) {
     *SHADER_PACK.write().unwrap() = dir;
 }
 
+/// The chosen pack's `pack.cfg` says `translucent_depth = true`: see-through blocks (water,
+/// glass) write depth, so screen effects find the water's surface (reflections), at the price of
+/// hiding blended particles behind them.
+pub fn translucent_depth() -> bool {
+    let Some(dir) = SHADER_PACK.read().unwrap().clone() else { return false };
+    std::fs::read_to_string(dir.join("pack.cfg"))
+        .unwrap_or_default()
+        .lines()
+        .any(|l| l.replace(' ', "") == "translucent_depth=true")
+}
+
 /// The chosen pack's `name` mentions `what` (features the engine only pays for when used).
 pub fn pack_uses(name: &str, what: &str) -> bool {
     pack_source(name).is_some_and(|s| s.contains(what))

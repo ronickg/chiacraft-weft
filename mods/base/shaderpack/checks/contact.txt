@@ -1,0 +1,21 @@
+loaded
+idle
+chat /tk mode creative
+chat /weather clear
+chat /air 0 1 90 mist
+chat /time set 5000
+chat /tk fill ~3 ~3 ~-4 ~8 ~3 ~2 stone
+chat /tk fill ~8 ~ ~-4 ~8 ~2 ~-4 oak_log
+chat /tk fill ~8 ~ ~2 ~8 ~2 ~2 oak_log
+chat /tk fill ~3 ~ ~-4 ~8 ~2 ~-4 stone
+chat /tk fill ~5 ~ ~-1 ~5 ~ ~-1 oak_planks
+look 250 5
+wait 4
+shot 1_overhang.png
+look 225 -15
+wait 2
+shot 2_corner.png
+look 60 -10
+wait 2
+shot 3_open_ground.png
+quit

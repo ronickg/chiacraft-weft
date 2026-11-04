@@ -121,7 +121,7 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         discard;
     }
     if in.graded != 0u {
-        return vec4(display(haze_lit(c.rgb, in.rel, in.sky)), 1.0);
+        return vec4(display(haze_lit(c.rgb, in.rel, in.sky)), SOLID_ALPHA);
     }
     let f = fog_amount(in.dist, scene.params.x, scene.params.y);
     return vec4(mix(c.rgb, scene.fog_color.rgb, f), 1.0);

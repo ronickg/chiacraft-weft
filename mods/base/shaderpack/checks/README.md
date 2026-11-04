@@ -57,7 +57,16 @@ gathered, in blue how near the sun; a plain picture means it gave up everywhere 
 the camera, rain, water). Keep the mouse off the game window while a script runs: it turns the
 view.
 
-## 4. Known traps (from other packs' bugs)
+## 4. Reflections and contact shadows: `water.txt`, `contact.txt`
+
+`water.txt` looks over a big lake 30,000 blocks out (spectator while it loads, then a platform),
+high up at noon and golden hour and from two blocks above the water; run it normal and with
+`--no-reflect`. The far hills should mirror as a band under the far shore, tall from the low view.
+`contact.txt` is a stone roof on log posts with a back wall, seen from the side; run it normal and
+with `--no-contact`: corners, the foot of the posts and the bases of plants darken a little, the hand
+and open ground do not. On the PC (Tester's runs) both pairs showed that, with no halos.
+
+## 5. Known traps (from other packs' bugs)
 
 - **Zero vectors**: `normalize` of a flattened or crossed vector that can be zero (looking straight
   down, a squashed quad): add a small offset first. MoltenVK compiles with fast math, so `isnan`
