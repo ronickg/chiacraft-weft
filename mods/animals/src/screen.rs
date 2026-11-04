@@ -481,13 +481,15 @@ const OVERVIEW_GAP: f32 = 6.0;
 const GENE_LINES: usize = 40;
 /// The Genes page's list: taller, it has the page to itself.
 const GENES_PAGE_H: f32 = 110.0;
-const STAT_BAR: (f32, f32) = (32.0, 6.0);
+/// (28 wide, from 32, so the window fits 380 with its columns as wide as their headings.)
+const STAT_BAR: (f32, f32) = (28.0, 6.0);
 /// The stat rows' columns after the bar: the value (right-aligned), wild and tamed points
 /// (centred), then the + (GUI pixels).
 const STAT_VALUE_W: f32 = 18.0;
-const STAT_WILD_W: f32 = 12.0;
-/// ("Tamed" is 17 GUI px: at 16 the row shrank it, PC run fit760.)
-const STAT_TAMED_W: f32 = 18.0;
+/// (as wide as their headings, "Wild" 13.5 and "Tamed" 19.5 GUI px: narrower, the row shrank them,
+/// PC runs fit1280 and fit760b)
+const STAT_WILD_W: f32 = 14.0;
+const STAT_TAMED_W: f32 = 20.0;
 /// A stat row's whole width, for the divider over torpor.
 const STAT_ROW_W: f32 = 8.0 + 3.0 + 34.0 + 3.0 + STAT_BAR.0 + 3.0 + STAT_VALUE_W + 3.0 + STAT_WILD_W + 3.0 + STAT_TAMED_W + 3.0 + 10.0;
 
