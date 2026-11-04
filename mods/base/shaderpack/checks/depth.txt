@@ -1,0 +1,63 @@
+# Depth (Ronald: "shadows missing ... it all seems so flat"): far hills casting into the far
+# shadow map (fs_lod_shadow), and the clouds' shadows on near and far land. Before/after from
+# the same spots: run once on the build before the change and once after, same everything.
+# Seed 1, --view 12, core:lod_distance 256 (default), 1280x720, --shader-pack chiacraft.
+# A fresh world name per run. Spectator, absolute /tp, mobs off (nothing walks into a shot).
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode spectator
+chat /weather clear 99999
+# 1. High over hills, noon: cloud shadows on the land out to the horizon.
+chat /time set 6000
+chat /tp -450 210 535
+loaded
+idle
+wait 12
+look 45 -20
+wait 3
+shot depth_1_noon_ne.png
+look 225 -20
+wait 2
+shot depth_1_noon_sw.png
+# 2. The same, golden hour: long shadows of far hills, both away from and toward the sun.
+chat /time set 10800
+wait 4
+look 90 -10
+wait 2
+shot depth_2_golden_away.png
+look 270 -10
+wait 2
+shot depth_2_golden_toward.png
+look 0 -10
+wait 2
+shot depth_2_golden_side.png
+# 3. Morning: the sun low in the east, the slopes facing west in shade.
+chat /time set 1000
+wait 4
+look 270 -10
+wait 2
+shot depth_3_morning_away.png
+look 0 -10
+wait 2
+shot depth_3_morning_side.png
+# 4. Lower, along the ground to far hills at golden hour (where the near map hands over).
+chat /tp -689 120 -122
+loaded
+idle
+wait 10
+chat /time set 10800
+wait 3
+look 45 -4
+wait 2
+shot depth_4_ground_golden.png
+look 225 -4
+wait 2
+shot depth_4_ground_golden_back.png
+chat /time set 6000
+wait 3
+look 45 -4
+wait 2
+shot depth_4_ground_noon.png
+bench 5 depth_ground
+quit

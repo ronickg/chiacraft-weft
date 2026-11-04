@@ -561,12 +561,18 @@ impl Lod {
         };
         let mut shown: FxHashSet<TileKey> = made.into_iter().filter(|&k| !under_standing(k)).collect();
         shown.extend(standing.iter().copied());
-        render.lod_draw.clear();
         // It is a shell over the land with nothing under it: from deep below, its walls would hang
         // in the sky. Only rock is that way anyway.
-        if !self.deep_underground(c, cam) {
-            render.lod_draw.extend(shown);
+        if self.deep_underground(c, cam) {
+            shown.clear();
         }
+        // Other tiles shown (a cached one back, a level swapped) change what casts into the far
+        // shadow map, which is kept while the terrain stays (`terrain_epoch`).
+        if shown.len() != render.lod_draw.len() || render.lod_draw.iter().any(|k| !shown.contains(k)) {
+            render.terrain_epoch += 1;
+        }
+        render.lod_draw.clear();
+        render.lod_draw.extend(shown);
         // Tiles no longer wanted wait in the cache, the oldest freed past `CACHE`.
         for &key in &self.ready {
             if !keep.contains(&key) && self.cached.insert(key) {
