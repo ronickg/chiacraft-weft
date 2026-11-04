@@ -1,0 +1,38 @@
+# Round 2's animal pages and Keep/Undo (UI redo): a tamed wolf's Overview, Genes and Family tabs,
+# a point placed and waiting (green) on it, then the player's stats with a point waiting.
+# Fresh world name each run. Shots go to --shot-dir.
+loaded
+idle
+chat /tk mode survival
+chat /tk time 6000
+wait 2
+chat /tk spawn animals:grey_wolf ~ ~ ~-4
+wait 2
+look 0 -10
+chat /animal tame
+wait 1
+chat /animal points 3
+wait 1
+chat /animal show
+wait 1.5
+shot pages_overview.png
+# One point placed, not kept yet: its value and points show green, the chip counts 2 left.
+tap_once animals:animal text:+
+wait 0.5
+shot pages_overview_waiting.png
+tap_once animals:animal text:Genes
+wait 1.5
+shot pages_genes.png
+tap_once animals:animal_genes text:Family
+wait 1.5
+shot pages_family.png
+key Escape
+wait 0.5
+press base:stats
+wait 1.5
+tap_once base:stats text:+
+wait 0.5
+shot pages_stats_waiting.png
+key Escape
+wait 0.5
+quit
