@@ -14,6 +14,8 @@ struct VOut {
     @location(0) at: vec3<f32>,
     @location(1) uv: vec2<f32>,
     @location(2) @interpolate(flat) index: u32,
+    // A star's number (stars only).
+    @location(3) @interpolate(flat) star: u32,
 }
 
 fn mat(s: Sky) -> mat3x3<f32> {
@@ -41,6 +43,7 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
     let s = sky[ii];
     var out: VOut;
     out.index = ii;
+    out.star = 0u;
     if s.ids.y == SKY_BODY {
         let c = CORNER[vi % 6u];
         let local = vec3(1.0, (0.5 - c.y) * 2.0 * s.extra.x, (c.x - 0.5) * 2.0 * s.extra.x);
@@ -69,6 +72,7 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
         out.clip = far_point(dir);
         out.at = dir;
         out.uv = CORNER[vi % 6u];
+        out.star = star;
     } else {
         let p = vec2<f32>(f32((vi << 1u) & 2u), f32(vi & 2u)) * 2.0 - 1.0;
         // The overlay of a liquid goes over everything, the hand too; depth 1 is the near plane.
@@ -225,10 +229,66 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
     return CloudPixel(vec4(color * alpha, alpha), clip.z / clip.w);
 }
 
+// A star as the pack sees it: round, of its own brightness (few bright, many faint) and color (its
+// temperature: orange, white, blue-white), twinkling more low down, and showing only once the sky
+// is dark enough for it (the brightest first at dusk). rgb tints, a scales the engine's star.
+fn star_look(star: u32, uv: vec2<f32>, dir: vec3<f32>) -> vec4<f32> {
+    let bright = pow(unit(star * 9u + 5u), 3.0);
+    let warmth = unit(star * 9u + 6u);
+    var tint = mix(vec3(1.0, 0.72, 0.5), vec3(1.0), smoothstep(0.0, 0.3, warmth));
+    tint = mix(tint, vec3(0.78, 0.86, 1.0), smoothstep(0.55, 1.0, warmth));
+    let r = length(uv - vec2(0.5)) * 2.0;
+    let shape = pow(1.0 - smoothstep(0.0, 1.0, r), 2.0);
+    let speed = 2.0 + 3.0 * unit(star * 9u + 7u);
+    let twinkle = 1.0 - (0.15 + 0.3 * (1.0 - clamp(dir.y, 0.0, 1.0))) * (0.5 + 0.5 * sin(scene.params.w * speed + unit(star * 9u + 8u) * 40.0));
+    let dark = smoothstep(0.05, -0.18, scene.sun.y);
+    let needs = 1.0 - (0.25 + 0.75 * bright);
+    let shows = smoothstep(needs, needs + 0.15, dark);
+    return vec4(tint, shape * (0.4 + 1.2 * bright) * twinkle * shows);
+}
+
+// The Milky Way: a faint band across the night, fixed among the stars (it turns with the sky, as the
+// sun does), mottled, with dark lanes along its middle; washed out by a bright moon and haze low down.
+fn milky_way(dir: vec3<f32>) -> vec3<f32> {
+    let dark = smoothstep(-0.08, -0.25, scene.sun.y);
+    if dark <= 0.0 || dir.y <= 0.0 {
+        return vec3(0.0);
+    }
+    let a = atan2(scene.sun.y, scene.sun.x);
+    let local = vec3(dir.x * cos(a) + dir.y * sin(a), -dir.x * sin(a) + dir.y * cos(a), dir.z);
+    let d = dot(local, normalize(vec3(0.25, 0.35, 0.9)));
+    let band = exp(-(d / 0.16) * (d / 0.16));
+    let mottle = noise3(local * 6.0) * 0.6 + noise3(local * 14.0) * 0.4;
+    let lane = smoothstep(0.55, 0.75, noise3(local * 9.0 + vec3(3.0))) * exp(-(d / 0.05) * (d / 0.05));
+    let glow = band * (0.4 + 0.8 * mottle) * (1.0 - 0.6 * lane);
+    let clear = (1.0 - rain_amount()) * (1.0 - 0.6 * moon_light()) * smoothstep(0.0, 0.25, dir.y);
+    return vec3(0.75, 0.78, 0.95) * glow * 0.03 * dark * clear;
+}
+
+// An aurora on clear nights where the place lies under the auroral oval (`scene.ground.w`, by
+// latitude): curtains of ridged noise in the northern sky, green low and purple higher up, drifting
+// slowly, on a coarse grid of directions so they stay blocky.
+fn aurora(dir: vec3<f32>) -> vec3<f32> {
+    let strength = scene.ground.w * smoothstep(-0.1, -0.25, scene.sun.y) * (1.0 - rain_amount()) * (1.0 - scene.weather.z);
+    if strength <= 0.0 || dir.y <= 0.02 {
+        return vec3(0.0);
+    }
+    let d = floor(dir * 160.0) / 160.0;
+    let north = smoothstep(-0.1, 0.6, -d.z);
+    let t = scene.params.w;
+    // On a ceiling over the land, so the curtains run along the sky and close toward the horizon.
+    let p = d.xz / max(d.y, 0.05);
+    let ridge = 1.0 - abs(noise3(vec3(p.x * 0.35 + t * 0.03, t * 0.05, p.y * 0.12)) * 2.0 - 1.0);
+    let curtain = pow(ridge, 6.0) * (0.6 + 0.4 * noise3(vec3(p.x * 1.3, t * 0.2, p.y * 0.4)));
+    let height = smoothstep(0.02, 0.15, d.y) * (1.0 - smoothstep(0.35, 0.75, d.y));
+    let color = mix(vec3(0.1, 0.9, 0.45), vec3(0.55, 0.25, 0.85), smoothstep(0.15, 0.55, d.y));
+    return color * curtain * height * north * strength * 0.12;
+}
+
 // Vanilla's sky is a disc 16 blocks above the eye fading into fog with distance.
 fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
     if open_sky() && !in_liquid() {
-        var c = sky_color(dir);
+        var c = sky_color(dir) + milky_way(dir) + aurora(dir);
         if dir.y < 0.0 {
             // From below sea level, vanilla's dark of the void.
             c *= 1.0 - s.uv.x * smoothstep(0.0, 0.08, -dir.y);
@@ -321,6 +381,11 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
     var c = sky_shade(s.ids.z, SkyPixel(dir, local, uv, albedo, vec4(s.color.rgb, 1.0), scene.params.z, scene.params.w));
     var a = c.a * s.color.a;
     var rgb = c.rgb;
+    if s.ids.y == SKY_STARS && open_sky() && !in_liquid() {
+        let star = star_look(in.star, in.uv, dir);
+        rgb *= star.rgb;
+        a *= star.a;
+    }
     if open_sky() && !in_liquid() {
         // Bodies shine through the tone curve; stars dim in the haze low down.
         // The sun shines through the tone curve; the moon keeps its markings.

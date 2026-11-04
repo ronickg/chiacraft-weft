@@ -70,6 +70,8 @@ fn palette() -> Palette {
     } else {
         p = blend(night, dusk, smoothstep(-0.3, -0.14, e));
     }
+    // A new moon's night is darker than a full moon's.
+    p.ambient *= mix(1.0, mix(0.55, 1.0, moon_light()), smoothstep(-0.14, -0.3, e));
     // Overcast: grey and dim, and the sun no more than a brighter part of the sky.
     let r = rain_amount();
     let grey = vec3(luma(p.horizon)) * vec3(0.92, 0.95, 1.0);
@@ -88,6 +90,11 @@ fn golden() -> f32 {
     return (1.0 - smoothstep(0.08, 0.35, e)) * smoothstep(-0.06, 0.03, e);
 }
 
+// The moon's light by its phase: 1 full, 0 new (`scene.eye.w`, the engine's).
+fn moon_light() -> f32 {
+    return clamp(scene.eye.w, 0.0, 1.0);
+}
+
 // Where direct light comes from: the sun while it is up, then the moon opposite it.
 fn light_dir() -> vec3<f32> {
     return select(-scene.sun.xyz, scene.sun.xyz, scene.sun.y > -0.06);
@@ -97,7 +104,7 @@ fn light_dir() -> vec3<f32> {
 // up a little after.
 fn light_strength() -> f32 {
     let e = scene.sun.y;
-    return select(smoothstep(0.06, 0.2, -e), smoothstep(-0.04, 0.05, e), e > -0.06);
+    return select(smoothstep(0.06, 0.2, -e) * mix(0.2, 1.0, moon_light()), smoothstep(-0.04, 0.05, e), e > -0.06);
 }
 
 // ---- the sky ----

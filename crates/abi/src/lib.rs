@@ -346,6 +346,8 @@ pub mod air_flags {
     pub const SNOWING: u32 = 1;
     /// Dust or sand blows (the fog is dust).
     pub const DUST: u32 = 2;
+    /// Bits 8 to 15: how strong an aurora is on clear nights there, 0 to 255.
+    pub const AURORA_SHIFT: u32 = 8;
 }
 
 pub mod block_flags {
