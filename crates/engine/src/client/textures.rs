@@ -484,6 +484,5 @@ fn upload(gpu: &mut dyn Backend, i: &mut Inner, l: Loaded) {
     for t in std::mem::replace(&mut en.images, images) {
         gpu.destroy_texture(t);
     }
-    (en.frames, en.glow, en.anim, en.stamp, en.requested, en.size, en.pixels) =
-        (frames, glows, l.tex.anim, l.stamp, false, size, l.pixels);
+    (en.frames, en.glow, en.anim, en.stamp, en.requested, en.size, en.pixels) = (frames, glows, l.tex.anim, l.stamp, false, size, l.pixels);
 }

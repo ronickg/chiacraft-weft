@@ -1958,7 +1958,10 @@ impl Client {
         } else if comp == held {
             e.held = words(bytes).next().map_or(0, u32::from_le_bytes);
         } else if comp == held_look {
-            e.held_look = std::str::from_utf8(bytes).ok().filter(|l| !l.is_empty()).map(str::to_string);
+            e.held_look = std::str::from_utf8(bytes)
+                .ok()
+                .filter(|l| !l.is_empty())
+                .map(str::to_string);
         } else if comp == shape {
             (e.size, e.look, e.scale) = shaped();
         }

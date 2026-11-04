@@ -691,13 +691,18 @@ impl EntityRenderer {
         if let Some(t) = sprite {
             let l = textures.texture(t);
             // A look's pixels come with its texture, once it has loaded (a load remakes models).
-            let own = look.and_then(|t| textures.look_pixels(t)).map(|(size, rgba)| sprite_of(size, &rgba));
+            let own = look
+                .and_then(|t| textures.look_pixels(t))
+                .map(|(size, rgba)| sprite_of(size, &rgba));
             let from_file = || {
                 sprite_name(item)
                     .and_then(|n| self.sprites.get(&n))
                     .and_then(|s| s.as_ref())
             };
-            match own.as_ref().or_else(|| look.is_none().then(from_file).flatten()) {
+            match own
+                .as_ref()
+                .or_else(|| look.is_none().then(from_file).flatten())
+            {
                 Some(sp) => {
                     let n = sp.size as f32;
                     // Only the outline: a side face against a neighboring pixel would fight

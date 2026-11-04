@@ -919,7 +919,10 @@ pub fn item_tooltip(lang: &Lang, input: &crate::input::Input, stack: weft_abi::I
     // What a tag or component says of every item with it, its numbers from this one; then the
     // components only this stack carries (a part's grade, a tool's parts).
     let c = content();
-    let mut comps: Vec<u32> = c.components.of(crate::components::ITEM, stack.item).collect();
+    let mut comps: Vec<u32> = c
+        .components
+        .of(crate::components::ITEM, stack.item)
+        .collect();
     for &(comp, _) in crate::stack::get(stack.data).iter() {
         if !comps.contains(&comp) {
             comps.push(comp);
