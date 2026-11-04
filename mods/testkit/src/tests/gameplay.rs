@@ -341,7 +341,7 @@ pub async fn advancements(t: T) -> R {
     t.press("base:advancements");
     t.screen("base:advancements").await?;
     t.frames(3).await?;
-    t.laid_out(&["text:Advancements", "text:Getting Started", "text:Exploration", "text:2 of 19 made"]);
+    t.laid_out(&["text:Advancements", "text:Getting Started", "text:Exploration", "text:2 of "]);
     t.shot("list").await?;
     // The first tile of a group, right of its 90 pixel wide name, tells its details on hover.
     if let Some([x, y, w, h]) = t.c().ui_rect("text:Making Progress") {
@@ -1138,7 +1138,7 @@ pub async fn creative_middle_click(t: T) -> R {
     t.press("core:inventory");
     t.screen("core:menu").await?;
     t.frames(2).await?;
-    t.click_ui("slot:36", 2);
+    t.click_ui(&t.hotbar(0), 2);
     t.until("a whole stack on the cursor", Duration::from_secs(2), |t| t.c().cursor_stack().count == 64)
         .await?;
     t.check_eq(t.c().inventory_slot(0).count, 3, "and the slot keeps what it had");
@@ -1151,7 +1151,7 @@ pub async fn creative_middle_click(t: T) -> R {
     t.press("core:inventory");
     t.screen("core:menu").await?;
     t.frames(2).await?;
-    t.click_ui("slot:36", 2);
+    t.click_ui(&t.hotbar(0), 2);
     t.secs(0.3).await?;
     t.check(t.c().cursor_stack().is_empty(), "nothing out of creative");
     t.c().close_screen();

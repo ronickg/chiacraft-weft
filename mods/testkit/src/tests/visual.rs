@@ -114,8 +114,8 @@ pub async fn tooltips(t: T) -> R {
     t.frames(4).await?;
     let plain = t.grab().await?;
     let (w, h) = (t.state().window[0], t.state().window[1]);
-    for (slot, name) in [(36, "furnace"), (37, "coal"), (38, "sword"), (39, "bread"), (40, "chestplate")] {
-        let Some([x, y, sw, sh]) = t.c().ui_rect(&format!("slot:{slot}")) else {
+    for (slot, name) in [(0, "furnace"), (1, "coal"), (2, "sword"), (3, "bread"), (4, "chestplate")] {
+        let Some([x, y, sw, sh]) = t.c().ui_rect(&t.hotbar(slot)) else {
             t.fail(format!("no slot {slot}"));
             continue;
         };
