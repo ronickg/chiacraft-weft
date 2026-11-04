@@ -184,7 +184,7 @@ struct Placed {
 #[derive(Default)]
 pub struct Hud {
     pub ui: Ui,
-    key: Option<(bool, usize, [u32; 3], usize, bool, u32, u8, (i32, i32), (u32, u32, u8))>,
+    key: Option<(bool, usize, [u32; 4], usize, bool, u32, u8, (i32, i32), (u32, u32, u8))>,
     /// Player overrides from `config/hud.txt` by element name.
     layout: rustc_hash::FxHashMap<String, Placement>,
     file: std::path::PathBuf,
@@ -286,6 +286,23 @@ impl Hud {
     /// Returns true if the tree was rebuilt.
     /// `chat_open`: the chat screen shows the messages itself.
     /// `groups`: bit per `DEBUG_GROUPS` entry shown with the debug overlay.
+    /// The height the chat over the game has between the bottom of what stands at the top left
+    /// and the hotbar's row, from the last layout (neither depends on the chat). A short window
+    /// had the chat's lines over the shortcuts and effects there (760 x 600, Tester, 11-04).
+    fn chat_room(&self) -> Option<f32> {
+        let left = self.ui.find(LEFT_COLUMN)?;
+        let row = self.ui.find(BOTTOM_ROW)?;
+        let top = self.ui.nodes[left]
+            .children
+            .iter()
+            .map(|&c| self.ui.nodes[c].rect)
+            .filter(|r| r.h > 0.0)
+            .map(|r| r.y + r.h)
+            .fold(self.ui.nodes[left].rect.y, f32::max);
+        // The bottom half's gap above the row and the chat's own padding.
+        Some((self.ui.nodes[row].rect.y - top - 3.0).max(0.0))
+    }
+
     pub fn update(&mut self, client: &Client, debug: bool, groups: u32, chat_open: bool, lang: &Lang, input: &crate::input::Input) -> bool {
         let chat_visible = if chat_open {
             0
@@ -304,10 +321,11 @@ impl Hud {
         // Tab, and only over the game: in the chat it completes.
         let list_shown = input.captured && input.held("core:player_list");
         let chat = crate::settings::chat_look();
+        let chat_room = self.chat_room();
         let key = (
             debug,
             chat_visible,
-            [chat.width as u32, chat.closed_height as u32, chat.dim as u32],
+            [chat.width as u32, chat.closed_height as u32, chat.dim as u32, chat_room.map_or(u32::MAX, |h| h as u32)],
             client.chat.len() | (list_shown as usize) << 32,
             client.dead,
             groups,
@@ -426,7 +444,7 @@ impl Hud {
                 });
             }
             Part::PlayerList => {}
-            Part::Chat if chat_visible > 0 => crate::game_screens::chat_lines(ui, client, lang, input, false),
+            Part::Chat if chat_visible > 0 => crate::game_screens::chat_lines(ui, client, lang, input, false, chat_room),
             Part::Chat if editing => drop(ui.text(text::rich(lang.get("hud.edit.sample_chat"), lang, None), "chat")),
             Part::Chat => {}
             Part::DebugGroup(i) => debug_group(ui, i, align, &|id| line_shown(id, Some(i))),
@@ -477,7 +495,7 @@ impl Hud {
         ui.container(Style::row().h(0.0).grow().pad(4.0).align(Align::Start), |ui| {
             // Half the screen each, so wide text on one side never pushes the other off screen
             // (the two may overlap on narrow screens, like vanilla's).
-            ui.container(Style::default().w(0.0).grow().gap(1.0).align(Align::Start), |ui| {
+            let left = ui.container(Style::default().w(0.0).grow().gap(1.0).align(Align::Start), |ui| {
                 for e in at(a::DEBUG_LEFT, false)
                     .into_iter()
                     .chain(at(a::TOP_LEFT, false))
@@ -485,6 +503,7 @@ impl Hud {
                     emit(ui, e, Style::default(), Align::Start);
                 }
             });
+            ui.set_id(left, LEFT_COLUMN);
             ui.container(Style::default().w(0.0).grow().gap(1.0).align(Align::End), |ui| {
                 for e in at(a::DEBUG_RIGHT, false)
                     .into_iter()
@@ -523,7 +542,7 @@ impl Hud {
                 for e in at(CHAT, false) {
                     emit(ui, e, Style::default().self_align(Align::Start), Align::Start);
                 }
-                ui.container(Style::row().align(Align::End), |ui| {
+                let row = ui.container(Style::row().align(Align::End), |ui| {
                     ui.container(Style::default().w(0.0).gap(1.0).align(Align::Start), |ui| {
                         for e in at(a::BOTTOM_LEFT, true) {
                             emit(ui, e, Style::default(), Align::Start);
@@ -558,6 +577,7 @@ impl Hud {
                         }
                     });
                 });
+                ui.set_id(row, BOTTOM_ROW);
             },
         );
         for e in placed.iter().filter(|p| p.at.is_some()) {
@@ -571,6 +591,9 @@ impl Hud {
 /// The engine's own anchors, which mods have no use for.
 const CENTER: &str = "core:center";
 const CHAT: &str = "core:chat";
+/// The column at the top left and the row along the bottom, by which the chat is fitted between.
+const LEFT_COLUMN: &str = "hud_left_column";
+const BOTTOM_ROW: &str = "hud_bottom_row";
 
 type DebugLine = (&'static str, fn(&Ctx) -> Vec<Arg>);
 
