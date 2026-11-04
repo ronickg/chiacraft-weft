@@ -901,6 +901,11 @@ players a little apart, a big species whose group is larger than its crowd). Now
 only while it fits its room (`life::room_for`: its kind within `CROWD_RADIUS`, counted by
 `crowding`, plus the group, at most its crowd; a group bigger than the room still comes to an
 empty place), checked for every species, hunters too, before the food roll (`forage.rs`).
+PC run aw_wolves3 (30 wild grey wolves in one pen with water, venison every quarter day, 10 game
+days by `/tick sprint`): 30 down to 15, ten of them dying of want one by one, no births (out of
+season), and `/animal room` (the guard's own count) turned a pack away at 30 near and let one come
+at 13. Without water (aw_wolves2) or food (aw_wolves) a pen dies of thirst or hunger within days
+instead, as it should.
 
 **Time away** (2026-11-02; Ronald: "my animals should die even while I'm gone"). Animals only
 live where a player is: the engine spawns them 20-45 blocks from players (at most 6 passive ones
