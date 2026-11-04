@@ -51,7 +51,9 @@ pub fn init(r: &mut Registry) {
         for d in b.iter() {
             let Some(a) = w.component(d.killer, &ANIMAL).copied() else { continue };
             let Some(s) = a.species().filter(|s| s.hunts()) else { continue };
-            let (Some(own), Some(prey)) = (mass(&w, d.killer), kind_mass(d.kind, None)) else { continue };
+            // The prey's own mass if it can still be read (its genes and growth), its kind's if not.
+            let prey = mass(&w, d.entity).or_else(|| kind_mass(d.kind, None));
+            let (Some(own), Some(prey)) = (mass(&w, d.killer), prey) else { continue };
             let max = a.stat(species::FOOD);
             let meal = (max * animals_core::needs::fills(own, prey))
                 .round()

@@ -1,5 +1,5 @@
 
-entity.animals.crocodyliform = Крокодиломорф
-species.animals.crocodyliform = крокодиломорф
-family.animals.neosuchia = неозухии
-item.animals.crocodyliform_egg = Яйцо крокодиломорфа
+entity.animals.cedarosaurus = Цедарозавр
+species.animals.cedarosaurus = цедарозавр
+family.animals.brachiosauridae = семейство брахиозаврид
+item.animals.cedarosaurus_egg = Яйцо цедарозавра
