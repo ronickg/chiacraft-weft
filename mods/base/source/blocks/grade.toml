@@ -222,7 +222,7 @@ saturation = 0.0
 
 [tiles.log_acacia_top]  # luma 0.45->0.39, sat 0.68->0.68, hue 22->22; ~ acacia_log_top
 gain = 0.868
-
+saturation = 0.906  # wood pass: luma 0.39->0.39, sat 0.68->0.63; ~ acacia_log_top (0.39-0.39, 0.41-0.63)
 [tiles.observer_back]  # luma 0.47 -> 0.35; ~ observer_back (0.27-0.31)
 gain = 0.75
 
@@ -507,6 +507,20 @@ overlay = "ore_gold_b"
 [items.tepary_beans]  # outline 0.60 -> 0.40 (new, Plants' batch 3: pale beans, the edge too light)
 outline = 0.67
 
+# The tropical forest (11-04): cacao's pale bark down into our logs' range (0.24-0.36); its grey bark
+# and the Brazil nut's are the species' own (identity, like the sequoia), so they keep it.
+[tiles.log_cacao]  # luma 0.43 -> 0.36
+gain = 0.84
+
+[tiles.log_cacao_top]  # luma 0.52 -> 0.47
+gain = 0.894  # wood pass: luma 0.46->0.46, sat 0.41->0.47; ~ jungle_log_top (0.34-0.46, 0.53-0.54) half way
+saturation = 1.172  # wood pass: luma 0.46->0.46, sat 0.41->0.47; ~ jungle_log_top (0.34-0.46, 0.53-0.54) half way
+[tiles.planks_andiroba]  # sat 0.68 -> 0.60, into jungle planks' band (0.49-0.52 +0.10)
+saturation = 0.757  # wood pass: luma 0.32->0.33, sat 0.63->0.57; ~ jungle_planks (0.34-0.50, 0.49-0.52) half way
+gain = 1.028  # wood pass: luma 0.32->0.33, sat 0.63->0.57; ~ jungle_planks (0.34-0.50, 0.49-0.52) half way
+[items.ipe_seed]  # outline 0.64 -> 0.40 (new, the tropical forest: pale papery wings, the edge too light)
+outline = 0.62
+
 # Walked-on ground (Planner, 11-04: the red sand floor read very saturated orange in the PC looks).
 # Vanilla's red sand is 0.83 and Pixel Perfection's 0.50; ours moves to the middle, with base's graded
 # red sandstone (0.62), so a canyon floor and its walls match. The Cretaceous copies (animals) had no rows.
@@ -535,20 +549,20 @@ saturation = 0.76
 # spruce 0.35-0.36, acacia sat 0.45-0.66).
 [tiles.log_oak_stripped]  # 0.56/0.62 -> ~0.50/0.52
 gain = 0.9
-saturation = 0.8
+saturation = 0.788  # wood pass: luma 0.51->0.51, sat 0.52->0.52; ~ stripped_oak_log (0.40-0.58, 0.42-0.52)
 
 [tiles.log_birch_stripped]  # luma 0.76 -> ~0.71
-gain = 0.94
-
+gain = 0.914  # wood pass: luma 0.72->0.70, sat 0.27->0.34; ~ stripped_birch_log (0.57-0.70, 0.34-0.40)
+saturation = 1.339  # wood pass: luma 0.72->0.70, sat 0.27->0.34; ~ stripped_birch_log (0.57-0.70, 0.34-0.40)
 [tiles.log_spruce_stripped]  # luma 0.29 -> ~0.33
-gain = 1.15
-
+gain = 1.191  # wood pass: luma 0.34->0.35, sat 0.49->0.51; ~ stripped_spruce_log (0.35-0.36, 0.51-0.55)
+saturation = 1.043  # wood pass: luma 0.34->0.35, sat 0.49->0.51; ~ stripped_spruce_log (0.35-0.36, 0.51-0.55)
 [tiles.log_acacia_stripped]  # sat 0.74 -> ~0.66
-saturation = 0.85
-
+saturation = 0.836  # wood pass: luma 0.42->0.42, sat 0.67->0.66; ~ stripped_acacia_log (0.42-0.45, 0.45-0.66)
+gain = 1.01  # wood pass: luma 0.42->0.42, sat 0.67->0.66; ~ stripped_acacia_log (0.42-0.45, 0.45-0.66)
 [tiles.log_dogwood_stripped]  # luma 0.74 -> ~0.63, near its top (0.58)
 gain = 0.85
-
+saturation = 0.925  # wood pass: luma 0.63->0.63, sat 0.37->0.35; ~ stripped_cherry_log (0.63-0.63, 0.32-0.33) half way
 [tiles.log_acuri_palm_stripped]  # luma 0.63 -> ~0.50, toward its planks (0.42)
 gain = 0.8
 
@@ -560,11 +574,158 @@ gain = 0.92
 saturation = 0.78
 
 [tiles.log_andiroba_stripped]  # sat 0.73 -> ~0.65, as its planks' row
-saturation = 0.86
-
+saturation = 0.761  # wood pass: luma 0.37->0.39, sat 0.67->0.62; ~ stripped_jungle_log (0.40-0.55, 0.50-0.57) half way
+gain = 1.052  # wood pass: luma 0.37->0.39, sat 0.67->0.62; ~ stripped_jungle_log (0.40-0.55, 0.50-0.57) half way
 [tiles.log_matamata_stripped]  # 0.65/0.51 -> ~0.58/0.44
-gain = 0.9
-saturation = 0.84
+gain = 0.874  # wood pass: luma 0.58->0.56, sat 0.45->0.47; ~ stripped_jungle_log (0.40-0.55, 0.50-0.57) half way
+saturation = 0.904  # wood pass: luma 0.58->0.56, sat 0.45->0.47; ~ stripped_jungle_log (0.40-0.55, 0.50-0.57) half way
 
 [tiles.log_ipe_stripped]  # sat 0.61 -> ~0.55
-saturation = 0.88
+saturation = 0.842  # wood pass: luma 0.39->0.37, sat 0.55->0.53; ~ stripped_dark_oak_log (0.23-0.35, 0.28-0.51) half way
+gain = 0.956  # wood pass: luma 0.39->0.37, sat 0.55->0.53; ~ stripped_dark_oak_log (0.23-0.35, 0.28-0.51) half way
+
+# The wood pass (Planner, 11-05; the ground pass's way): each wood's log, top, planks and stripped log into the
+# packs' band (vanilla, Faithful 32x, Pixel Perfection CE); a wood without a vanilla twin half way toward its
+# nearest relative (notes/blocks/woods_pass.py). Identity kept: sequoia bark and planks, mesquite planks, the
+# palms', dogwood's and spruce's bark (spruce's lift was Ronald's).
+[tiles.log_oak]  # luma 0.28->0.31, sat 0.48->0.48; ~ oak_log (0.31-0.34, 0.34-0.54)
+gain = 1.1
+
+[tiles.log_oak_top]  # luma 0.48->0.48, sat 0.55->0.52; ~ oak_log_top (0.38-0.49, 0.41-0.52)
+saturation = 0.922
+
+[tiles.planks_oak]  # luma 0.38->0.39, sat 0.46->0.46; ~ oak_planks (0.39-0.55, 0.41-0.52)
+gain = 1.016
+
+[tiles.log_oak_stripped_top]  # luma 0.61->0.52, sat 0.59->0.52; ~ stripped_oak_log_top (0.39-0.52, 0.41-0.52)
+saturation = 0.845
+gain = 0.851
+
+[tiles.log_birch]  # luma 0.71->0.74, sat 0.08->0.08; ~ birch_log (0.74-0.88, 0.02-0.11)
+gain = 1.051
+
+[tiles.log_birch_top]  # luma 0.69->0.69, sat 0.25->0.26; ~ birch_log_top (0.55-0.73, 0.26-0.30)
+saturation = 1.073
+
+[tiles.planks_birch]  # luma 0.73->0.70, sat 0.29->0.32; ~ birch_planks (0.45-0.70, 0.32-0.38)
+saturation = 1.129
+gain = 0.966
+
+[tiles.log_birch_stripped_top]  # luma 0.74->0.67, sat 0.31->0.32; ~ stripped_birch_log_top (0.47-0.67, 0.32-0.39)
+saturation = 1.065
+gain = 0.912
+
+[tiles.planks_spruce]  # luma 0.29->0.29, sat 0.43->0.44; ~ spruce_planks (0.26-0.36, 0.44-0.58)
+saturation = 1.014
+
+[tiles.log_acacia]  # luma 0.36->0.37, sat 0.31->0.25; ~ acacia_log (0.37-0.39, 0.16-0.25)
+saturation = 0.785
+gain = 1.039
+
+[tiles.planks_acacia]  # luma 0.44->0.43, sat 0.73->0.70; ~ acacia_planks (0.41-0.43, 0.44-0.70)
+saturation = 0.949
+gain = 0.991
+
+[tiles.log_acacia_stripped_top]  # luma 0.44->0.42, sat 0.74->0.69; ~ stripped_acacia_log_top (0.41-0.42, 0.43-0.69)
+saturation = 0.886
+gain = 0.953
+
+[tiles.log_mesquite]  # luma 0.26->0.32, sat 0.44->0.34; ~ acacia_log (0.37-0.39, 0.16-0.25) half way
+saturation = 0.726
+gain = 1.22
+
+[tiles.log_mesquite_top]  # luma 0.34->0.37, sat 0.68->0.66; ~ acacia_log_top (0.39-0.39, 0.41-0.63) half way
+saturation = 0.953
+gain = 1.073
+
+[tiles.log_mesquite_stripped]  # luma 0.35->0.39, sat 0.72->0.69; ~ stripped_acacia_log (0.42-0.45, 0.45-0.66) half way
+saturation = 0.931
+gain = 1.099
+
+[tiles.log_mesquite_stripped_top]  # luma 0.39->0.40, sat 0.72->0.70; ~ stripped_acacia_log_top (0.41-0.42, 0.43-0.69) half way
+saturation = 0.972
+gain = 1.023
+
+[tiles.log_sequoia_top]  # luma 0.34->0.34, sat 0.73->0.65; ~ spruce_log_top (0.28-0.33, 0.47-0.57) half way
+saturation = 0.816
+gain = 0.985
+
+[tiles.log_sequoia_stripped]  # luma 0.36->0.36, sat 0.76->0.65; ~ stripped_spruce_log (0.35-0.36, 0.51-0.55) half way
+saturation = 0.765
+
+[tiles.log_sequoia_stripped_top]  # luma 0.40->0.37, sat 0.75->0.66; ~ stripped_spruce_log_top (0.32-0.35, 0.49-0.56) half way
+saturation = 0.791
+gain = 0.944
+
+[tiles.log_dogwood_top]  # luma 0.58->0.58, sat 0.40->0.33; ~ cherry_log_top (0.59-0.59, 0.26-0.26) half way
+saturation = 0.793
+gain = 1.009
+
+[tiles.log_dogwood_stripped_top]  # luma 0.72->0.71, sat 0.39->0.34; ~ stripped_cherry_log_top (0.69-0.69, 0.28-0.29) half way
+saturation = 0.848
+gain = 0.982
+
+[tiles.log_acuri_palm_top]  # luma 0.52->0.49, sat 0.47->0.50; ~ jungle_log_top (0.34-0.46, 0.53-0.54) half way
+saturation = 1.074
+gain = 0.939
+
+[tiles.planks_acuri_palm]  # luma 0.42->0.42, sat 0.55->0.54; ~ jungle_planks (0.34-0.50, 0.49-0.52) half way
+saturation = 0.958
+
+[tiles.log_acuri_palm_stripped_top]  # luma 0.66->0.58, sat 0.47->0.49; ~ stripped_jungle_log_top (0.37-0.51, 0.51-0.54) half way
+saturation = 1.051
+gain = 0.883
+
+[tiles.log_moriche_palm_top]  # luma 0.48->0.47, sat 0.44->0.48; ~ jungle_log_top (0.34-0.46, 0.53-0.54) half way
+saturation = 1.138
+gain = 0.977
+
+[tiles.log_moriche_palm_stripped_top]  # luma 0.57->0.54, sat 0.50->0.50; ~ stripped_jungle_log_top (0.37-0.51, 0.51-0.54) half way
+saturation = 1.014
+gain = 0.941
+
+[tiles.log_brazil_nut_stripped_top]  # luma 0.47->0.47, sat 0.56->0.55; ~ stripped_jungle_log_top (0.37-0.51, 0.51-0.54) half way
+saturation = 0.97
+
+[tiles.log_cacao_stripped_top]  # luma 0.57->0.54, sat 0.58->0.56; ~ stripped_jungle_log_top (0.37-0.51, 0.51-0.54) half way
+saturation = 0.954
+gain = 0.944
+
+[tiles.log_andiroba_stripped_top]  # luma 0.41->0.41, sat 0.70->0.62; ~ stripped_jungle_log_top (0.37-0.51, 0.51-0.54) half way
+saturation = 0.815
+
+[tiles.log_matamata_stripped_top]  # luma 0.64->0.57, sat 0.46->0.48; ~ stripped_jungle_log_top (0.37-0.51, 0.51-0.54) half way
+saturation = 1.061
+gain = 0.895
+
+[tiles.log_ipe_stripped_top]  # luma 0.45->0.39, sat 0.58->0.58; ~ stripped_dark_oak_log_top (0.18-0.33, 0.27-0.66) half way
+gain = 0.861
+
+# The wood pass for the tropical woods (Planner, 11-05; from art-tropical 6457dfb4): tops and planks half way to
+# jungle's (dark oak's for ipe) band; their grey barks are the species' own (approved), kept.
+[tiles.log_brazil_nut_top]  # luma 0.43->0.43, sat 0.52->0.52; ~ jungle_log_top (0.34-0.46, 0.53-0.54) half way
+saturation = 1.016
+
+[tiles.planks_brazil_nut]  # luma 0.39->0.39, sat 0.56->0.54; ~ jungle_planks (0.34-0.50, 0.49-0.52) half way
+saturation = 0.938
+
+[tiles.planks_cacao]  # luma 0.47->0.47, sat 0.47->0.48; ~ jungle_planks (0.34-0.50, 0.49-0.52) half way
+saturation = 1.023
+
+[tiles.log_andiroba_top]  # luma 0.33->0.33, sat 0.63->0.59; ~ jungle_log_top (0.34-0.46, 0.53-0.54) half way
+saturation = 0.892
+gain = 1.015
+
+[tiles.log_matamata_top]  # luma 0.56->0.51, sat 0.39->0.46; ~ jungle_log_top (0.34-0.46, 0.53-0.54) half way
+saturation = 1.211
+gain = 0.909
+
+[tiles.planks_matamata]  # luma 0.54->0.52, sat 0.44->0.47; ~ jungle_planks (0.34-0.50, 0.49-0.52) half way
+saturation = 1.073
+gain = 0.963
+
+[tiles.log_ipe_top]  # luma 0.37->0.34, sat 0.53->0.53; ~ dark_oak_log_top (0.18-0.30, 0.27-0.67) half way
+gain = 0.906
+
+[tiles.planks_ipe]  # luma 0.32->0.31, sat 0.53->0.53; ~ dark_oak_planks (0.18-0.29, 0.31-0.70) half way
+gain = 0.965

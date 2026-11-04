@@ -249,7 +249,7 @@ pub const SOURCES: [Source; 75] = [
 /// Food on the ground (`notes/ECOLOGY.md`, parts 5 and 8): items animals eat that aren't a
 /// player's food (`food::FOODS` has those, each with its kind and weight): grain and seeds, as
 /// they fall from a field or a hand. By name, kind and grams.
-pub const DROPPED: [(&str, Category, f32); 10] = [
+pub const DROPPED: [(&str, Category, f32); 14] = [
     // A handful of seed, and an ear's grain.
     ("base:wheat_seeds", Category::Seeds, 10.0),
     ("base:wheat", Category::Seeds, 50.0),
@@ -263,6 +263,14 @@ pub const DROPPED: [(&str, Category, f32); 10] = [
     ("base:mesquite_pod", Category::Seeds, 30.0),
     ("base:acuri_nut", Category::Seeds, 30.0),
     ("base:moriche_fruit", Category::Fruit, 50.0),
+    // The tropical forest's: a handful of Brazil nuts (agoutis open the pods and bury the nuts),
+    // a cacao pod's sweet pulp (monkeys and birds).
+    ("base:brazil_nut", Category::Seeds, 30.0),
+    ("base:cacao_pod", Category::Fruit, 40.0),
+    // Andiroba's oily seeds (pacas and agoutis), matamatá's seeds from their woody capsules
+    // (monkeys and parrots).
+    ("base:andiroba_seed", Category::Seeds, 20.0),
+    ("base:matamata_fruit", Category::Seeds, 20.0),
     ("animals:araucaria_cone", Category::Seeds, 50.0),
     ("animals:ginkgo_seed", Category::Fruit, 10.0),
 ];
@@ -300,7 +308,7 @@ pub fn of(block: &str, age: Option<u8>, eats: impl Fn(Category) -> bool, season:
 /// `cretaceous.rs` read it): the grass that grazers eat and that grows back. A biome not listed
 /// gets the world's default (`GRASS_COVER_ELSE`) wherever its ground takes plants; frozen ground
 /// and sand take none (`grass_grows`).
-pub const GRASS_COVER: [(&str, f32); 12] = [
+pub const GRASS_COVER: [(&str, f32); 13] = [
     ("base:plains", 0.25),
     ("base:forest", 0.12),
     ("base:birch_forest", 0.12),
@@ -310,6 +318,8 @@ pub const GRASS_COVER: [(&str, f32); 12] = [
     ("base:mountains", 0.05),
     // The groves' floor is duff and ferns; the grass is in the clearings and the meadows.
     ("base:sequoia_grove", 0.06),
+    // The rainforest's canopy shades out grass: a little in its gaps.
+    ("base:tropical_forest", 0.03),
     ("animals:red_dunes", 0.0),
     ("animals:scrubland", 0.1),
     ("animals:floodplain", 0.05),

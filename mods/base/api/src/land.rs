@@ -34,6 +34,7 @@ mod karst;
 pub mod landmarks;
 mod net;
 mod reefs;
+mod tarns;
 
 /// Salts of our own noises (the engine's are in `weft_noise::fixed::salt`).
 pub mod salt {
@@ -66,6 +67,7 @@ pub mod salt {
     pub const FALLS: u64 = 0xFA11;
     pub const SINKS: u64 = 0x4A9;
     pub const CRATERS: u64 = 0xC4A7;
+    pub const TARNS: u64 = 0x7A27;
     pub const FACE_COAL: u64 = 0x0C0A;
     pub const FACE_IRONSTONE: u64 = 0x0F3A;
     pub const FACE_MAGNETITE: u64 = 0x0F3B;
@@ -448,6 +450,19 @@ pub const CRATER_DEPTH: f64 = 0.65;
 pub const CRATER_RIM: (i32, i32) = (5, 8);
 pub const CRATER_RIM_OUT: f64 = 1.8;
 
+/// Cirque tarns (Planner, 11-04: mountain lakes, water above the sea's level): one per `TARN_CELL`
+/// square at most, kept with `TARN_CHANCE`, in a hollow of the mountains (their biome's strength)
+/// from `TARN_BAND.0` to `TARN_BAND.1` blocks under the snow line (under the glaciers), found in
+/// `TARN_TRIES` tries; `TARN_RADIUS` blocks across the water, `TARN_DEPTH` deep in the middle;
+/// the ground inside its ring at most `TARN_CARVE` over its water (cut to the bowl).
+pub const TARN_CELL: i32 = 256;
+pub const TARN_CHANCE: f64 = 0.7;
+pub const TARN_BAND: (i32, i32) = (60, 10);
+pub const TARN_TRIES: u32 = 24;
+pub const TARN_RADIUS: (i32, i32) = (5, 10);
+pub const TARN_DEPTH: (i32, i32) = (2, 5);
+pub const TARN_CARVE: i32 = 10;
+
 /// Natural arches (Ronald, 11-04: "all four"; `land::landmarks`): at most one per `ARCH_CELL`
 /// square, kept with `ARCH_CHANCE` where it fits: in the strata land on level ground, or in the
 /// shallow sea off a cliff coast (a sea arch, of the cliffs' rock). A half ring `ARCH_INNER` blocks
@@ -716,6 +731,8 @@ pub fn features() -> Vec<Feature> {
         Feature::new(rivers).named("rivers"),
         // Last: a crater is measured from its ground, the rivers' cut included (none reach one).
         Feature::new(craters).named("craters"),
+        // After the craters: a tarn is measured from the ground they leave (none meet).
+        Feature::new(tarns).named("tarns"),
         // No height: their masks say where the snow drifts and where the sequoias stand (rules
         // ask for them).
         preset::hills(0.0, 64.0)
@@ -771,8 +788,33 @@ fn base_ground(h: &Here) -> i32 {
 
 /// The ground's height (Q4) with the rivers: what the engine makes of `features`.
 pub fn height(f: &Fields, x: i32, z: i32) -> i32 {
+    let ground = before_tarns(f, x, z);
+    ground + tarns::cut(f, x, z, ground, &|x, z| before_tarns(f, x * 16, z * 16) >> 4)
+}
+
+/// The ground (Q4) before the tarns: the rest of `height`.
+fn before_tarns(f: &Fields, x: i32, z: i32) -> i32 {
     let ground = land_height(f, x, z) + rivers(f, x, z);
     ground + craters::add(&Here::new(f, x, z), || ground)
+}
+
+/// What the tarns take off the ground (Q4, zero or less) at (`x`, `z`) (Q4), as the engine adds it.
+pub fn tarns(f: &Fields, x: i32, z: i32) -> i32 {
+    tarns::cut(f, x, z, before_tarns(f, x, z), &|x, z| before_tarns(f, x * 16, z * 16) >> 4)
+}
+
+/// The water's level (y of its top block) of the tarn column (`x`, `z`) (blocks) is in, if any:
+/// water stands there from the ground up to it (`tarns`).
+pub fn tarn_level(f: &Fields, x: i32, z: i32) -> Option<i32> {
+    tarns::at(f, x, z, &|x, z| before_tarns(f, x * 16, z * 16) >> 4).map(|t| t.level)
+}
+
+/// The tarns (middle x, z, radius, water level; blocks) within `r` blocks of (`x`, `z`) (blocks).
+pub fn tarns_near(f: &Fields, x: i32, z: i32, r: i32) -> Vec<(i32, i32, i32, i32)> {
+    tarns::near(f, x, z, r, &|x, z| before_tarns(f, x * 16, z * 16) >> 4)
+        .into_iter()
+        .map(|t| (t.x, t.z, t.radius, t.level))
+        .collect()
 }
 
 /// The mesas' height (Q4) at (`x`, `z`).
@@ -1896,6 +1938,32 @@ mod tests {
                 flank[0]
             );
             assert!(spine[0] < 200 || share(spine) > 0.15, "seed {seed}: the spines are {:.1}% faces", share(spine) * 100.0);
+        }
+    }
+
+    /// Tarns stand in the mountains' hollows, and every one holds its water: its bed under the
+    /// level all over, the ring round it over the level all round.
+    #[test]
+    fn tarns_hold_their_water() {
+        for seed in [1, 2, 3] {
+            let f = fields(seed);
+            let h = |x: i32, z: i32| height(&f, x * 16, z * 16) >> 4;
+            let tarns = tarns_near(&f, 0, 0, 3000);
+            assert!(tarns.len() >= 5, "seed {seed}: {} tarns", tarns.len());
+            for (x, z, r, level) in tarns {
+                assert!(level > SEA, "seed {seed}: tarn at {x} {z} at {level}");
+                for dz in -r - 2..=r + 2 {
+                    for dx in -r - 2..=r + 2 {
+                        let d2 = dx * dx + dz * dz;
+                        let g = h(x + dx, z + dz);
+                        if d2 <= r * r {
+                            assert!(g < level, "seed {seed}: tarn at {x} {z}: bed {g} at {dx} {dz}, water {level}");
+                        } else if d2 <= (2 * r + 3) * (2 * r + 3) / 4 {
+                            assert!(g > level, "seed {seed}: tarn at {x} {z}: rim {g} at {dx} {dz}, water {level}");
+                        }
+                    }
+                }
+            }
         }
     }
 
