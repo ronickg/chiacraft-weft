@@ -47,7 +47,9 @@ pub fn register(r: &mut Registry) {
 
 /// How many layers `state` (a snow layer's) has.
 fn layers(state: u32) -> u8 {
-    state_prop(state, "layers").and_then(|v| v.parse().ok()).unwrap_or(1)
+    state_prop(state, "layers")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1)
 }
 
 /// A snow layer block of `n` layers, air at none.
