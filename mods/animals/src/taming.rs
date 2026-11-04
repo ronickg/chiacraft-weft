@@ -314,6 +314,8 @@ fn mistake(w: &World, id: u64, st: &EntityState, scares: bool) {
 /// `id` becomes `player`'s, with `floor(level * effectiveness / 2)` bonus levels placed on
 /// random stats (never torpor).
 pub fn tame(w: &World, id: u64, player: u64, effectiveness: f32) {
+    // Its level first: the bonus levels and the XP go by it.
+    crate::animal::ensure_rolled(w, id);
     // Out of the wild: its genes leave its place's pool.
     if !crate::animal::tamed(w, id) {
         crate::evolution::count(w, id, -1.0);

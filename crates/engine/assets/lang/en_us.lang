@@ -420,6 +420,10 @@ command.regions.done = regions {0}
 command.seed.done = seed: {0}
 command.rule.value = {0} = {1}
 command.rule.unknown = no rule {0}
+command.rule.not_bool = {0} is true or false, not {1}
+command.rule.not_choice = {0} is one of {2}, not {1}
+command.rule.not_number = {0} is a number from {2} to {3}, not {1}
+command.rule.held = {0} is set for this run (--config) and stays {1}
 command.error.no_player = no player {0}
 command.error.unknown_selector = unknown selector {0}
 command.error.bad_selector = bad selector {0}
