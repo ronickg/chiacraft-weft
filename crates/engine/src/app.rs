@@ -460,6 +460,13 @@ impl App {
             debug: self.opts.gpu_debug,
         })
         .map_err(|e| e.to_string())?;
+        // The pipelines the driver compiled last time, before any is made (saved at exit).
+        let cache = self.opts.cache_dir.join("pipelines.bin");
+        if let Ok(data) = std::fs::read(&cache) {
+            gpu.load_pipeline_cache(&data);
+            log::info!("pipeline cache: {} KB from the last start", data.len() / 1024);
+        }
+        let _ = PIPELINE_CACHE.set(cache);
 
         let mut roots: Vec<(String, PathBuf)> = vec![("core".into(), engine_assets(self.opts.dev))];
         // Code mods' and data packages' assets alike.
@@ -614,6 +621,29 @@ fn make_depth(gpu: &mut dyn Backend, w: u32, h: u32) -> (TextureId, u32, u32) {
     let t = gpu
         .create_texture(&TextureDesc { width: w.max(1), height: h.max(1), mips: 1, format: Format::Depth32, render_target: true }, "depth");
     (t, w, h)
+}
+
+/// Where the driver's compiled pipelines are kept between starts (`Backend::pipeline_cache_data`).
+static PIPELINE_CACHE: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
+/// Keeps the driver's compiled pipelines for the next start: the shaders then skip most of their
+/// compiling (on the Mac, MoltenVK's translation too). Written aside and moved, never half.
+fn save_pipeline_cache(gpu: &dyn Backend) {
+    let Some(path) = PIPELINE_CACHE.get() else { return };
+    let data = gpu.pipeline_cache_data();
+    if data.is_empty() {
+        return;
+    }
+    let tmp = path.with_extension("bin.tmp");
+    let saved = path
+        .parent()
+        .map_or(Ok(()), std::fs::create_dir_all)
+        .and_then(|_| std::fs::write(&tmp, &data))
+        .and_then(|_| std::fs::rename(&tmp, path));
+    match saved {
+        Ok(()) => log::debug!("pipeline cache: {} KB saved", data.len() / 1024),
+        Err(e) => log::warn!("pipeline cache {}: {e}", path.display()),
+    }
 }
 
 impl Running {
@@ -2069,6 +2099,7 @@ impl ApplicationHandler for App {
             r.gpu.wait_idle();
             r.leave_world_silent();
             r.close_home();
+            save_pipeline_cache(&*r.gpu);
             drop(r.gpu);
         }
     }
