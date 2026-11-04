@@ -504,22 +504,18 @@ fn repaired(stacks: &[ItemStack]) -> ItemStack {
 /// "assembled" shows what the assembly slots make: a tool from parts, or a repair (a worn part
 /// or tool and one unit of its material).
 pub fn on_change(m: &MenuCtx) {
-    let (asm, apart_slot, out) = (m.group("assembly"), m.group("apart"), m.group("assembled"));
-    if asm.is_empty() {
+    let (apart_slot, out) = (m.group("apart"), m.group("assembled"));
+    if m.group(ASSEMBLY[0]).is_empty() {
         return;
     }
     let held = apart_slot.get(0);
-    if !held.is_empty() && PARTS.stack_only(&held).is_some() && (0..asm.len()).all(|i| asm.get(i).is_empty()) {
-        for (i, part) in apart(&held)
-            .into_iter()
-            .enumerate()
-            .take(asm.len() as usize)
-        {
-            asm.set(i as u32, part);
+    if !held.is_empty() && PARTS.stack_only(&held).is_some() && (0..ASSEMBLY.len()).all(|i| asm_get(m, i).is_empty()) {
+        for (i, part) in apart(&held).into_iter().enumerate().take(ASSEMBLY.len()) {
+            asm_set(m, i, part);
         }
         apart_slot.set(0, ItemStack::EMPTY);
     }
-    let stacks: Vec<ItemStack> = (0..asm.len()).map(|i| asm.get(i)).collect();
+    let stacks: Vec<ItemStack> = (0..ASSEMBLY.len()).map(|i| asm_get(m, i)).collect();
     // A tool from its parts, else a repair: a worn part or tool and a unit of its material.
     let built = assembled(&stacks);
     out.set(0, if built.is_empty() { repaired(&stacks) } else { built });
@@ -531,14 +527,25 @@ pub fn on_take(m: &MenuCtx) -> bool {
     if m.group("assembled").index_of(m.slot()).is_none() {
         return false;
     }
-    let asm = m.group("assembly");
-    for i in 0..asm.len() {
-        let s = asm.get(i);
+    for i in 0..ASSEMBLY.len() {
+        let s = asm_get(m, i);
         if !s.is_empty() {
-            asm.set(i, if s.count > 1 { ItemStack { count: s.count - 1, ..s } } else { ItemStack::EMPTY });
+            asm_set(m, i, if s.count > 1 { ItemStack { count: s.count - 1, ..s } } else { ItemStack::EMPTY });
         }
     }
     true
+}
+
+/// The table's four assembly slots, a group each so each shows its own ghost while empty (a
+/// head, a haft, a fitting, the UI redo; parts go in any order).
+pub const ASSEMBLY: [&str; 4] = ["assembly_head", "assembly_haft", "assembly_fitting", "assembly_more"];
+
+fn asm_get(m: &MenuCtx, i: usize) -> ItemStack {
+    m.group(ASSEMBLY[i]).get(0)
+}
+
+fn asm_set(m: &MenuCtx, i: usize, s: ItemStack) {
+    m.group(ASSEMBLY[i]).set(0, s);
 }
 
 /// The table's parts row: four assembly slots, what they make, and the slot that takes a tool
@@ -546,7 +553,11 @@ pub fn on_take(m: &MenuCtx) -> bool {
 pub fn ui(ui: &mut Ui) {
     ui.row(S::row().gap(4.0), |ui| {
         ui.text_styled(S::col().class("dim"), "crafting.parts.assemble", &[]);
-        ui.group("assembly");
+        ui.row(S::row(), |ui| {
+            for g in ASSEMBLY {
+                ui.group(g);
+            }
+        });
         ui.recipe_arrow();
         ui.group("assembled");
         ui.spacer();
