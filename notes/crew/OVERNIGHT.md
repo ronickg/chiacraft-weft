@@ -1,0 +1,43 @@
+# Overnight decisions (2026-11-04)
+
+Ronald, asleep: "just accept and choose for us, but keep it noted" and "dont do any pushes".
+Each session logs here the choices that would have gone to him, with the alternatives, so he can
+change any of them in the morning.
+
+## Crafting (claude/crafting-d352ab)
+
+1. **Tool numbers per stack as values on the stack, not callback chains.**
+   - Chosen: a stack carries its own durability, mining speed, tool level and attack damage,
+     and the engine prefers them over the item's. It's simple, and the client's mining
+     prediction still works.
+   - Alternative: value chains a mod answers each time (more flexible, a call each frame).
+   - Planner agreed.
+2. **Grade 10 (Legendary) needs 92 points.**
+   - Chosen: work from memory tops out at 90 (40 + 30 + 20), so only hands-on work reaches 10.
+   - Alternative: 90, which lets luck lift a from-memory part to Legendary.
+3. **Hafts wear a tenth as fast as heads.**
+   - Chosen: so a steel head outlasts its haft, and a worn haft is replaced, not the tool.
+   - Alternative: a quarter, which made steel axes last no longer than iron ones.
+4. **Hafts, grips and shafts are split from a log of their wood; wooden heads are cut from
+   planks.**
+   - Chosen: real, and it lets the book tell an oak haft from an oak head.
+   - Alternative: everything from planks.
+5. **Worn-out tools built from parts stay, broken, and work like an empty hand until repaired.**
+   - Chosen: an engine tag, `keep_broken`.
+   - Alternative: they vanish, as today's tools do.
+6. **Repair: one unit of a part's material gives back half its life.**
+   - Chosen: chert's trait (half the cost) gives twice as much; copper is hammered back fully
+     for free. For now there's no loss of maximum per repair.
+   - Alternative: Valheim's free repair, or a loss of maximum per repair.
+7. **Diamond's harvest level is 400, one tier above steel's 300.**
+   - Chosen: following Ronald's "more ores / items with higher tiers".
+   - Alternative: 300, level with steel.
+8. **Tools built from parts sit beside today's wood-to-diamond tools.**
+   - Chosen: until Content's ladder replaces them (Content's decision 1).
+   - Alternative: replace them now.
+9. **Most book-made parts come out about Sound (grade 4) for now.**
+   - Chosen: a beginner's work from memory (10) + material (20–30) + a table (10). Skills will
+     raise it.
+   - Alternative: start higher, so early parts feel better.
+10. **The book's categories use UI redo's `category` class.**
+    - Chosen: the top tabs stay for Inventory and Crafting.

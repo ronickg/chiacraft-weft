@@ -48,6 +48,7 @@ pub const BUILTIN: &[(&str, &str)] = &[
     (abi::comp::WORN, <abi::Worn as abi::Schema>::SCHEMA),
     (abi::comp::WORN_TEXTURE, "str"),
     (abi::comp::WEAR_PER_HIT, "u32"),
+    (abi::comp::LOOK, "bytes"),
     (abi::attribute::MAX_HEALTH, "f64"),
 ];
 

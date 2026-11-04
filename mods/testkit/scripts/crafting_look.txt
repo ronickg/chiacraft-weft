@@ -1,0 +1,89 @@
+# Crafting: the look hook (core:look). Builds a stone axe on an oak haft from parts (as crafting_parts.txt),
+# then shows its composed icon in the inventory and the hotbar, and held in first and third person.
+# One copy, a fresh world. Placeholder art only (cut from today's stone axe); Chiacraft's replaces it.
+# The table menu's slots: grid 0-8, result 9, assembly 10-13, assembled 14, apart 15,
+loaded
+idle
+chat /tk mode survival
+until mode survival within 10
+chat /tk fill ~-3 ~-1 ~-3 ~3 ~-1 ~3 base:stone
+chat /tk fill ~-3 ~ ~-3 ~3 ~3 ~3 base:air
+chat /tk set ~ ~1 ~-2 base:crafting_table
+until block ~ ~1 ~-2 base:crafting_table within 10
+look 0 0
+# 1. The head: 3 cobblestone.
+chat /tk give base:cobblestone 3
+press core:use
+until screen core:menu within 10
+wait 1
+tap core:menu text:parts
+wait 1
+shot parts_tab
+tap core:menu class:slot
+wait 1
+shot parts_head_picked
+tap core:menu text:all (
+wait 1
+key Escape
+until screen none within 10
+# 2. The haft: split from 1 oak log.
+chat /tk give base:oak_log 1
+press core:use
+until screen core:menu within 10
+wait 1
+tap core:menu text:parts
+tap core:menu class:slot
+wait 1
+shot parts_haft_picked
+tap core:menu text:all (
+wait 1
+key Escape
+until screen none within 10
+# 3. The lashing: 1 string.
+chat /tk give base:string 1
+press core:use
+until screen core:menu within 10
+wait 1
+tap core:menu text:parts
+tap core:menu class:slot
+wait 1
+tap core:menu text:all (
+wait 1
+chat /tk inv @s
+shot parts_made
+# 4. Build: head, haft and lashing from the hotbar into the assembly slots, take the axe.
+tap_once core:menu slot:43
+tap_once core:menu slot:10
+tap_once core:menu slot:44
+tap_once core:menu slot:11
+tap_once core:menu slot:45
+tap_once core:menu slot:12
+wait 1
+shot parts_assembly
+tap_once core:menu slot:14
+tap_once core:menu slot:43
+wait 1
+shot parts_built
+chat /tk slot @s 0
+key Escape
+until screen none within 10
+# 5. The axe's composed icon in the inventory and the hotbar, then held.
+press core:inventory
+until screen core:menu within 10
+wait 1
+shot look_inventory
+key Escape
+until screen none within 10
+key Digit1
+wait 1
+shot look_held_first
+look 0 -30
+wait 1
+shot look_held_down
+press core:perspective
+wait 1
+shot look_held_third
+press core:perspective
+press core:perspective
+wait 1
+quit

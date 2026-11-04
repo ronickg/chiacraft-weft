@@ -285,6 +285,11 @@ pub mod comp {
     /// The own name of one stack or block entity (UTF-8), as a player gave it: shown instead of
     /// the item's or block's, and carried from the stack to the placed block and back.
     pub const NAME: &str = "core:name";
+    /// How one stack is drawn, as text (UTF-8): layers back to front, separated by `;`. A layer is
+    /// a texture (`base:parts/axe/head/flint`, painted as it is) or `<map>@<ramp>,<ramp>...`: a
+    /// shade map whose red / 36 is the step (0..7) and green the region, painted with that
+    /// region's ramp (an 8 x 1 texture, one colour per step). Without it the item's icon shows.
+    pub const LOOK: &str = "core:look";
     /// Blocks connecting energy networks.
     pub const CONDUCTOR: &str = "conductor";
     /// Entity component, layout `Energy`.

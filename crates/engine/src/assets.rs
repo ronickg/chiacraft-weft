@@ -363,6 +363,18 @@ pub fn load_texture(assets: &Assets, name: &str) -> LoadedTexture {
     LoadedTexture { size, frames, glow, anim }
 }
 
+/// A texture's width and pixels by name, as the file has them (no frames, no scaling).
+pub fn read_image(assets: &Assets, name: &str) -> Option<(u32, Vec<u8>)> {
+    let img = decode_png(&assets.read(name, "textures", "png")?)?;
+    Some((img.width, img.rgba))
+}
+
+/// One square still image made in the game (a stack's composed look), ready like a file's.
+pub fn image_texture(size: u32, rgba: Vec<u8>) -> LoadedTexture {
+    let to = size.max(1).next_power_of_two();
+    LoadedTexture { size: to, frames: vec![mip_chain(scale_nearest(&rgba, size, to), to)], glow: vec![None], anim: None }
+}
+
 pub fn missing_texture() -> LoadedTexture {
     LoadedTexture { size: 16, frames: vec![mip_chain(missing(16), 16)], glow: vec![None], anim: None }
 }

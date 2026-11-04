@@ -258,8 +258,40 @@ fn tool_stack(kind: &Kind, parts: &[(Part, u32)], stats: &ToolStats) -> ItemStac
         .with(&MINING_SPEED, stats.stat)
         .with(&TOOL_LEVEL, stats.harvest)
         .with(&ATTACK_DAMAGE, stats.damage);
+    // Drawn from its parts (the engine's `core:look`).
+    let plain: Vec<Part> = parts.iter().map(|p| p.0).collect();
+    let look = look_text(kind.id, &plain);
+    let stack = with_look(stack, (!look.is_empty()).then_some(look.as_str()));
     let worn = (used * uses as f32) as u32;
     if worn > 0 { stack.with(&DAMAGE, worn) } else { stack }
+}
+
+/// How a tool of `kind` built from `parts` is drawn (`crafting::looks`, the engine's `core:look`):
+/// its layers back to front; the layer with the working part is that material's painted layer,
+/// the others a shade map with one ramp per region. Empty for a kind with no layers yet.
+pub fn look_text(kind: &str, parts: &[Part]) -> String {
+    let Some(look) = crafting::looks::look(kind) else { return String::new() };
+    let working = KINDS
+        .iter()
+        .find(|k| k.id == kind)
+        .and_then(|k| k.slots.iter().find(|s| s.role == Role::Working))
+        .map(|s| s.name);
+    let material = |slot: &str| parts.iter().find(|p| p.slot == slot).map(|p| p.material);
+    look.layers
+        .iter()
+        .filter_map(|layer| {
+            if let Some(w) = working.filter(|w| layer.regions.contains(w)) {
+                return Some(crafting::looks::painted(kind, layer.name, material(w)?));
+            }
+            let ramps: Vec<String> = layer
+                .regions
+                .iter()
+                .map(|r| material(r).map(crafting::looks::ramp))
+                .collect::<Option<_>>()?;
+            Some(format!("{}@{}", crafting::looks::map(kind, layer.name), ramps.join(",")))
+        })
+        .collect::<Vec<_>>()
+        .join(";")
 }
 
 /// What the assembly slots make, for the output slot (empty when nothing).
