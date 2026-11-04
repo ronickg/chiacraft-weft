@@ -136,3 +136,54 @@ fn aged(stack: ItemStack, now: u64) -> ItemStack {
     }
     new
 }
+
+/// Game days a food stack keeps fresh, then stale (a stew by its ingredients), if it is a food.
+fn keeps_of(stack: &ItemStack) -> Option<(f32, f32)> {
+    if let Some(packed) = MEAL.stack_only(stack) {
+        return Some(meals::keeps(&meals::ingredients(packed)));
+    }
+    food::find(item_name(stack.item)).map(|f| food::FOODS[f].keeps)
+}
+
+/// The share of its life (fresh and stale days) a food stack has used by `now`: 0 new (or not
+/// stamped yet), past 1 spoiled; `None` if it isn't a food. Hot food is new.
+pub fn life_used(stack: &ItemStack, now: u64) -> Option<f32> {
+    let keeps = keeps_of(stack)?;
+    let (age, hot) = base_api::food_age(stack, now);
+    if hot {
+        return Some(0.0);
+    }
+    let days = age / vitals::DAY_SECS / base_api::difficulty().keep.max(0.01);
+    Some(days / (keeps.0 + keeps.1).max(0.01))
+}
+
+/// Whether a food stack has spoiled by `now`.
+pub fn spoiled(stack: &ItemStack, now: u64) -> bool {
+    life_used(stack, now).is_some_and(|u| u >= 1.0)
+}
+
+/// The day stamp (`MADE`) for a new food keeping `keeps` that starts with `used` of its life gone
+/// (Research round 3, D1: what is made of stale food is as far along as its stalest part, never
+/// fresh again; spoiled food isn't taken at all).
+pub fn made_for(used: f32, keeps: (f32, f32), now: u64) -> u32 {
+    let today = (now / calendar::DAY_TICKS) as u32 + 1;
+    let days = (used.clamp(0.0, 1.0) * (keeps.0 + keeps.1) * base_api::difficulty().keep).floor() as u32;
+    today.saturating_sub(days).max(1)
+}
+
+/// A crafted food (salted meat, a pie) from these cells: refused if any food in them has spoiled,
+/// else stamped as far along as its stalest ingredient.
+pub fn crafted(cells: &[ItemStack], result: ItemStack, now: u64) -> ItemStack {
+    let Some(keeps) = keeps_of(&result) else { return result };
+    let mut used = 0.0f32;
+    for c in cells.iter().filter(|c| !c.is_empty()) {
+        if let Some(u) = life_used(c, now) {
+            if u >= 1.0 {
+                return ItemStack::EMPTY;
+            }
+            used = used.max(u);
+        }
+    }
+    if used > 0.0 { result.with(&MADE, made_for(used, keeps, now)) } else { result }
+}
+

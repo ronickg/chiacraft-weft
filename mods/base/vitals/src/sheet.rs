@@ -46,10 +46,11 @@ fn stats_table(w: &mut String) {
     let (health, stamina) = crate::stomach::max_health_stamina(100.0, 100.0, &arrival, cap);
     let _ = writeln!(
         w,
-        "A new player arrives with {} in the stomach ({:.0} units): max health {health:.0} and stamina {stamina:.0} of 100, wearing off as it digests (an empty stomach: {:.0}).\n",
+        "A new player arrives with {} in the stomach ({:.0} units): max health {health:.0} and stamina {stamina:.0} of 100, wearing off as it digests (an empty stomach: {:.0}). A new world begins on spring's day {}, a quarter of the year from midwinter.\n",
         crate::stomach::ARRIVAL.join(" and "),
         arrival.used(),
-        crate::stomach::FLOOR * 100.0
+        crate::stomach::FLOOR * 100.0,
+        calendar::START_DAY + 1
     );
 }
 
@@ -129,29 +130,27 @@ fn cooking(w: &mut String) {
 fn clothes(w: &mut String) {
     let _ = writeln!(
         w,
-        "## Clothing\n\nWorn in four slots of their own under armor ({}), no armor value. A full set's real insulation in clo at {} °C of comfort each; a piece gives its share ({:?}, head to feet). Wet, armor keeps {:.0}% of its warmth; being wet itself feels {} °C colder. What each piece takes: {}.\n\n| material | clo | cold °C | heat °C | kept wet | windproof | from |\n|---|---|---|---|---|---|---|",
+        "## Clothing\n\nWorn in four slots of their own under armor ({}), no armor value; armor and clothes stack, and leather armor is hide. A full set's real insulation in clo at {} °C of comfort each; a piece gives its share ({:?}, head to feet). Wet, armor keeps {:.0}% of its warmth; being wet itself feels {} °C colder. Each piece is sewn with {:?} string, a string is {} plant fibre. A new player arrives in {}.\n\n| material | clo | cold °C | heat °C | kept wet | windproof | pieces to make | from |\n|---|---|---|---|---|---|---|---|",
         clothing::PIECES.join(", "),
         clothing::PER_CLO,
         temperature::PIECE_SHARE,
         temperature::ARMOR_WET_KEEPS * 100.0,
         temperature::WET_CHILL,
-        clothing::PIECES
-            .iter()
-            .zip(clothing::MAKES)
-            .map(|(p, (m, s))| format!("{p} {m} + {s} string"))
-            .collect::<Vec<_>>()
-            .join(", ")
+        clothing::STRING,
+        clothing::FIBRE_PER_STRING,
+        clothing::ARRIVAL.iter().map(|(m, p)| format!("{m} {}", clothing::PIECES[*p])).collect::<Vec<_>>().join(", ")
     );
     for m in clothing::MATERIALS {
         let _ = writeln!(
             w,
-            "| {} | {} | {:.0} | {} | {:.0}% | {:.0}% | {} |",
+            "| {} | {} | {:.0} | {} | {:.0}% | {:.0}% | {:?} | {} |",
             m.name,
             m.clo,
             m.cold(),
             m.heat,
             m.wet_keeps * 100.0,
             m.windproof * 100.0,
+            m.makes,
             m.from
         );
     }

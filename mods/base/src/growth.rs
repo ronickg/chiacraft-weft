@@ -59,7 +59,9 @@ pub fn grow(e: &mut BlockEvent, block: &str, last: bool, step: impl FnOnce(&mut 
     let w = e.world();
     if p.frost > plants::HARDY {
         let at = e.pos().map(|v| v as f64 + 0.5);
-        let air = base_api::air_at(&w, [at[0], at[1] - 0.5, at[2]], 0.5, false, 3, |_| {}).celsius;
+        // The still air: wind chill is what a body loses, a plant doesn't fall below the air
+        // (Research round 3, B5).
+        let air = base_api::air_at(&w, [at[0], at[1] - 0.5, at[2]], 0.5, false, 3, |_| {}).still;
         if plants::frosted(p, air) {
             frost(e, block);
             return;

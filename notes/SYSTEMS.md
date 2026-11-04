@@ -30,7 +30,7 @@ flowchart LR
   soil --> plants
   capacity --> animal
   calendar["Calendar and seasons<br/>vitals::calendar"] --> air
-  fires["Fires, roofs, water<br/>blocks in the world"] --> air
+  fires["Fires, campfires, roofs, water<br/>blocks in the world"] --> air
   air --> player["Player's body<br/>base survival/"]
   air --> animal["Animal's body<br/>animals comfort.rs"]
   air --> eggs["Eggs<br/>animals eggs.rs"]
@@ -97,8 +97,10 @@ built, it gets its row below and its arrows above.
 | Player's body | `mods/base/src/survival/` (a file per part: breath, food, temperature, camp, stamina, body, load, health) | `vitals` | air, stomach, stats, effects, armor, clothes, difficulty | HUD, health and speed modifiers, death |
 | Stomach, food | `vitals::food`, `vitals::stomach`, `base_api::eat` | `FOODS` | food items (`NUTRITION`, `FRESHNESS`) | max health and stamina, regen, warmth, food poisoning |
 | Meals | `vitals::meals`, `base_api::eat_meal`, `mods/base/src/cooking.rs` (the cooking pot) | `BONUS`, `MIN`, `MAX`, `COOK_TICKS` | the foods that go in (`FOODS`), fuel | the stomach (a portion an ingredient), well fed, warmth, freshness by the shortest-keeping ingredient |
-| Preserving | `vitals::preserve`, `cooking.rs` (drying rack, salt) | `DRY_SECS`, `SMOKE_SECS`, `SMOKE_REACH`, `SALT_TICKS`, `dry_rate`; the preserved foods' `FOODS` rows | the air at the rack (`air_at`: warmth, humidity, wind, rain), fires below, raw meat, apples, berries | food that keeps for weeks, lighter to carry |
-| Clothing | `vitals::clothing`, `mods/base/src/clothing.rs`, `survival/temperature.rs` (`worn`) | `MATERIALS`, `PER_CLO`, `MAKES`, `FIBRE_CHANCE`; `temperature::{PIECE_SHARE, ARMOR_WET_KEEPS, WET_CHILL}` | pelts (`animals_core::hides`), leather, wool, plant fibre | body temperature: the comfort range, what's kept wet, the wind chill felt (`through_clothes`) |
+| Preserving | `vitals::preserve`, `cooking.rs` (drying rack, salt) | `DRY_SECS`, `SMOKE_SECS`, `SMOKE_REACH`, `SMOKE_HEAT`, `SALT_TICKS`, `dry_rate`, `PRODUCTS`; the preserved foods' `FOODS` rows | the still air at the rack (`air_at`: warmth, humidity, wind, rain), fires below (a campfire, a lit furnace, lava), raw meat and fish, fruit | food that keeps for weeks, lighter to carry |
+| Food's age through cooking | `survival/food.rs` (`life_used`, `made_for`, `crafted`) | the foods' and meals' keeps | the stamps of what goes in | the pot, the rack and the crafting grid: spoiled refused, stale carried |
+| Arrival | `vitals::clothing::ARRIVAL`, `vitals::stomach::ARRIVAL`, `vitals::calendar::START_DAY`, `clothing.rs`, `survival/mod.rs` | those | first joining, a new world | a new player's clothes and stomach, the world's first day |
+| Clothing | `vitals::clothing`, `mods/base/src/clothing.rs`, `survival/temperature.rs` (`worn`) | `MATERIALS` (with `makes`), `PER_CLO`, `STRING`, `FIBRE_PER_STRING`, `FIBRE_CHANCE`, `armor_cloth`; `temperature::{PIECE_SHARE, ARMOR_WET_KEEPS, WET_CHILL}` | pelts (`animals_core::hides`), leather (leather armor is hide), wool, plant fibre | body temperature: the comfort range, what's kept wet, the wind chill felt (`through_clothes`) |
 | Effects | `vitals::effects` | `modifiers()` | | player's body, animals (cold, heat), HUD icons (`install.py` `EFFECT_ICONS`) |
 | Body effects | `base_api::{poison, bleed, sedate}`, `survival/body.rs` | `survival/body.rs` constants | animals' venom (`breath.rs`), darts (`knockout.rs`), spider eye, heavy blows | player's body |
 | Carried weight | `survival/load.rs` | `weight` there | inventory | effects (encumbered), stats screen |

@@ -20,6 +20,9 @@ pub use base_api::{CRAFTING, SMELTING};
 
 pub static COOKING_POT: Block = Block::named("cooking_pot");
 pub static DRYING_RACK: Block = Block::named("drying_rack");
+/// Logs and sticks burning, no stone needed: a fire to warm by (`base_api::heat_of`, +20 °C
+/// beside it), to rest by (`survival::camp`) and to smoke over (Research round 3, B1).
+pub static CAMPFIRE: Block = Block::named("campfire");
 pub static POT_MENU: Menu = Menu::named("cooking_pot");
 pub static RACK_MENU: Menu = Menu::named("drying_rack");
 pub static STEW: Item = Item::named("stew");
@@ -67,6 +70,15 @@ pub fn register(r: &mut Registry) {
     r.shapeless(&CRAFTING, "salted_meat", 1, &["#raw_meat", "#salt"], 0);
     r.shaped(&CRAFTING, "cooking_pot", 1, &["i i", "i i", "iii"], &[('i', "#ingots/iron")]);
     r.shaped(&CRAFTING, "drying_rack", 1, &["sss", "s s"], &[('s', "#stick")]);
+    r.shaped(&CRAFTING, "campfire", 1, &[" s ", "sls", "lll"], &[('s', "#stick"), ('l', "#logs")]);
+    r.block(&CAMPFIRE)
+        .sound_group("wood")
+        .textures("campfire_top", "campfire_side", "campfire_side")
+        .model_box([0.0, 0.0, 0.0], [16.0, 7.0, 16.0])
+        .light_rgb(15, 11, 6)
+        .hardness(2.0)
+        .mineable("axe")
+        .tab(&crate::tabs::FUNCTIONAL);
 
     r.entity_component(&COOKING, Cooking { burn: 0, burn_max: 0, cook: 0, cooking: 0 }, component_flags::SAVE | component_flags::SYNC_MENU);
     r.entity_component(&DRYING, Drying { done: [0; 4], items: [0; 4], wait: 0, smoking: 0 }, component_flags::SAVE | component_flags::SYNC_MENU);
@@ -142,17 +154,13 @@ fn ratio(a: u32, b: u32) -> f32 {
     if b == 0 { 0.0 } else { (a as f32 / b as f32).min(1.0) }
 }
 
-/// Today's stamp (`MADE`): the day + 1.
-fn today(w: &World) -> u32 {
-    (w.day_time() / vitals::calendar::DAY_TICKS) as u32 + 1
-}
-
 fn food_of(item: u32) -> Option<usize> {
     if item == 0 { None } else { food::find(item_name(item)) }
 }
 
-/// A fresh stew of these foods (`FOODS` indexes, as they went in), hot off the fire.
-pub fn stew(w: &World, foods: &[usize]) -> ItemStack {
+/// A stew of these foods (`FOODS` indexes, as they went in), hot off the fire, `used` of its life
+/// gone (its stalest ingredient's share, `survival::made_for`).
+pub fn stew(w: &World, foods: &[usize], used: f32) -> ItemStack {
     let packed = meals::pack(foods);
     let cooked = meals::ingredients(packed);
     let n = meals::nutrients(&cooked).map(|g| g.round() as u16);
@@ -167,7 +175,7 @@ pub fn stew(w: &World, foods: &[usize]) -> ItemStack {
     ItemStack::new(STEW.id(), 1)
         .with(&MEAL, packed)
         .with(&MEAL_NUTRITION, nutrition)
-        .with(&MADE, today(w))
+        .with(&MADE, crate::survival::made_for(used, meals::keeps(&cooked), w.day_time()))
         .with(&HOT, (w.day_time() / 20) as u32)
         .with(&FRESHNESS, freshness::HOT)
 }
@@ -188,7 +196,10 @@ fn tick_pots(b: &mut SystemBatch<Cooking>) {
 fn pot_step(w: &World, id: u64, s: &mut Cooking) -> bool {
     let inv = w.inventory(id);
     let (ings, bowl, fuel, output) = (inv.group("ingredients"), inv.group("bowl"), inv.group("fuel"), inv.group("output"));
-    let foods: Vec<usize> = (0..ings.len()).filter_map(|i| food_of(ings.get(i).item)).collect();
+    // Spoiled food doesn't go in (Research round 3, D1).
+    let now = w.day_time();
+    let good = |st: &ItemStack| food_of(st.item).is_some() && !crate::survival::spoiled(st, now);
+    let foods: Vec<usize> = (0..ings.len()).map(|i| ings.get(i)).filter(&good).filter_map(|st| food_of(st.item)).collect();
     let can = foods.len() >= meals::MIN && !bowl.get(0).is_empty() && output.get(0).is_empty();
     let key = meals::pack(&foods) as u32 ^ (meals::pack(&foods) >> 32) as u32;
     if key != s.cooking {
@@ -208,14 +219,16 @@ fn pot_step(w: &World, id: u64, s: &mut Cooking) -> bool {
         s.cook += 1;
         if s.cook >= meals::COOK_TICKS {
             s.cook = 0;
+            let mut used = 0.0f32;
             for i in 0..ings.len() {
                 let st = ings.get(i);
-                if food_of(st.item).is_some() {
+                if good(&st) {
+                    used = used.max(crate::survival::life_used(&st, now).unwrap_or(0.0));
                     ings.set(i, use_one(st));
                 }
             }
             bowl.set(0, use_one(bowl.get(0)));
-            output.set(0, stew(w, &foods));
+            output.set(0, stew(w, &foods, used));
         }
         true
     } else {
@@ -242,7 +255,9 @@ fn tick_racks(b: &mut SystemBatch<Drying>) {
             preserve::smoke_rate()
         } else {
             let air = base_api::air_at(&w, [pos[0] as f64 + 0.5, pos[1] as f64, pos[2] as f64 + 0.5], 1.0, false, 0, |_| {});
-            preserve::dry_rate(air.celsius, air.humidity, air.wind, air.raining && air.open_sky)
+            // The still air: wind chill is a body's, food on a rack doesn't fall below the air (the
+            // wind's drying is `dry_rate`'s breeze).
+            preserve::dry_rate(air.still, air.humidity, air.wind, air.raining && air.open_sky)
         };
         let inv = w.inventory(id);
         let rack = inv.group("rack");
@@ -252,13 +267,19 @@ fn tick_racks(b: &mut SystemBatch<Drying>) {
                 (s.items[i], s.done[i]) = (stack.item, 0);
             }
             let Some(f) = food_of(stack.item) else { continue };
+            let now = w.day_time();
+            if crate::survival::spoiled(&stack, now) {
+                continue;
+            }
             // Over a fire meat smokes and fruit dries the faster; in the air both dry.
             let method = if smoking && preserve::product(Method::Smoked, f).is_some() { Method::Smoked } else { Method::Dried };
             let Some(product) = preserve::product(method, f) else { continue };
             s.done[i] = (s.done[i] as f32 + rate * secs * 1000.0).round() as u32;
             if s.done[i] >= 1000 {
                 let Some(item) = PRODUCTS.iter().find(|p| item_name(p.id()) == product) else { continue };
-                let made = ItemStack::new(item.id(), stack.count).with(&MADE, today(&w)).with(&FRESHNESS, freshness::FRESH);
+                let used = crate::survival::life_used(&stack, now).unwrap_or(0.0);
+                let keeps = food::find(product).map_or((1.0, 1.0), |p| food::FOODS[p].keeps);
+                let made = ItemStack::new(item.id(), stack.count).with(&MADE, crate::survival::made_for(used, keeps, now));
                 rack.set(i as u32, made);
                 (s.items[i], s.done[i]) = (made.item, 0);
             }

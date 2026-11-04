@@ -184,8 +184,10 @@ fn armor_applies(cause: u32) -> bool {
 fn craft_result(m: &MenuCtx) {
     let grid = m.group("grid");
     let cells: Vec<ItemStack> = (0..grid.len()).map(|i| grid.get(i)).collect();
-    m.group("result")
-        .set(0, recipe_match(&crate::recipes::CRAFTING, &cells, grid.cols(), grid.rows()));
+    let made = recipe_match(&crate::recipes::CRAFTING, &cells, grid.cols(), grid.rows());
+    // Food made of food is as far along as its stalest part, and nothing comes of spoiled food.
+    let made = crate::survival::crafted(&cells, made, m.world().day_time());
+    m.group("result").set(0, made);
 }
 
 /// Takes one of each ingredient; the last of a stack leaves its `remainder` (a bucket). Crafting

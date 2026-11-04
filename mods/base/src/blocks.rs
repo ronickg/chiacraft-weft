@@ -298,7 +298,8 @@ pub fn register(r: &mut Registry) {
         .opacity(2)
         .friction(0.98)
         .mineable("pickaxe")
-        .drops_nothing()
+        // Itself with a pickaxe (Research round 3, U1: it's the only blue dye).
+        .needs_tool(0)
         .tab(&crate::tabs::NATURAL);
     r.block(&OBSIDIAN)
         .immovable()

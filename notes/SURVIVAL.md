@@ -497,3 +497,35 @@ sword, about 100 XP.
   hour as it digests. One spider at dusk had killed a fresh player in 11 s. Dying still empties
   the stomach. The rule stays: food sets how much of the stat is reached.
 - A new player also starts with full stamina (it started at 0 and took 14 s to fill).
+
+**12. Research round 3's survival fixes** (2026-11-04, decided by Ronald via Planner; `reports/Research round 3.md`):
+
+- **B1, a first week one can live through.** A new player arrives in plain clothes once
+  (`vitals::clothing::ARRIVAL`: a linen hood, a wool sweater, buckskin trousers, moccasins, 11 °C,
+  about 0.9 clo), put in the empty clothing slots on first joining (`base:dressed`). A **campfire**
+  (three logs, four sticks, no stone) heats like lava (+20 °C beside it), counts as a fire for rest,
+  and smokes food on a rack above it; it burns without fuel and gives light. A new world with
+  seasons begins on spring's 8th day (`vitals::calendar::START_DAY`, a quarter of the year from
+  midwinter): its clock moves there in its first second, so the engine's day length agrees.
+- **D1, spoiled food never comes back.** The pot, the rack and the crafting grid refuse spoiled
+  food. What is made of stale food starts as far through its own life as its stalest part was
+  (`survival::made_for`): a half-gone beef makes a half-gone stew. Carrying the oldest age as it
+  stands would spoil a fresh stew at once for an old apple, so the share of life is carried.
+- **B3, clothes within reach.** Hide and wool pieces take 1, 2, 1, 1 of their material (fur and
+  linen 2, 4, 3, 2), each sewn with 1, 2, 1, 1 string, and a string is 2 plant fibre. Each piece
+  has its own shape in the grid, since a hat and boots of the same stuff took the same things.
+- **C1.** Leather armor is hide: the same warmth, wet share and windproofing as a hide coat
+  (`clothing::armor_cloth`). Armor and clothes stack.
+- **B5.** Plant frost (`growth.rs`) and drying read the still air: wind chill is what a body loses.
+  The animals session does eggs.
+- **B6.** Meals warm by the warmest dish, not the sum (four hot steaks are +4 °C, not +16), and
+  cooling food only widens the hot side of comfort, it doesn't chill one in the cold.
+- The rack dries every raw meat and fish and every fruit that doesn't keep half as long as dried
+  fruit already (rose hips don't need it); `preserve::PRODUCTS`.
+- **U1.** Ice drops itself when mined with a pickaxe (the only blue dye).
+- **T1.** Base `ru_ru` has every key `en_us` has (106 added).
+- Checks (`vitals::balance`): arrival clothes 8 to 14 °C and not freezing on a plains night at the
+  world's start; four hot steaks warm as one; leather armor and hide clothes alike.
+- Not done from round 3: B7 (the warm effects' water use), B8 (salt from sea water only), B12 (a
+  cheaper pot), the stations in the recipe viewer, "from" lines on fur, fibre and salt, the
+  compost bin's drawn textures, first-week advancements.

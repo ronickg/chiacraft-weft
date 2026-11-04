@@ -330,7 +330,7 @@ const HEAT_STATES: usize = 1 << 20;
 fn heat_by_name(state: u32) -> f32 {
     // The state's name without its properties (`base:lava[level=0]`).
     match block_name(state).split('[').next().unwrap_or("") {
-        "base:lava" => 1.0,
+        "base:lava" | "base:campfire" => 1.0,
         "base:furnace" if state_prop(state, "lit") == Some("true") => 0.7,
         "base:torch" | "base:wall_torch" => 0.25,
         _ => 0.0,

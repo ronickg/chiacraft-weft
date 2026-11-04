@@ -75,7 +75,8 @@ pub fn feel(w: &World, id: u64, st: &EntityState, v: &mut Vitals, s: &stomach::S
         wet_cold_insulation: worn.cold_wet,
         fortitude,
         fat,
-        meal: s.meal_warmth(),
+        meal: s.meal_warming(),
+        meal_cool: s.meal_cooling(),
         wet: v.wet > 0.0,
     };
     if v.core < 20.0 {
