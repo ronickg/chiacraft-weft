@@ -56,6 +56,11 @@ match = ["banded_clay_*", "termite_mound*"]
 [groups.plants]
 match = ["sapling_*", "mushroom_*", "honey_fungus", "chanterelle", "porcini", "lupine", "kelp*", "seagrass", "reed*", "cattail", "lily_pad"]
 
+[groups.observer]
+match = ["observer_*"]
+# Closer to vanilla's dark observer, in our sage stone (Planner, 11-04: the observer and piston pass).
+gain = 0.8
+
 [groups.liquids]
 match = ["water_*", "lava_*"]
 
@@ -187,6 +192,18 @@ saturation = 0.0
 
 [tiles.log_acacia_top]  # luma 0.45->0.39, sat 0.68->0.68, hue 22->22; ~ acacia_log_top
 gain = 0.868
+
+[tiles.observer_back]  # luma 0.47 -> 0.35; ~ observer_back (0.27-0.31)
+gain = 0.75
+
+[tiles.observer_back_on]  # the same back, its socket lit (derive.py)
+gain = 0.75
+
+[tiles.piston_bottom]  # sat 0.19 -> 0.11: grey stone, not mossy; ~ piston_bottom
+saturation = 0.55
+
+[tiles.piston_inner]  # the bottom's stone with the shaft (derive.py), graded as the bottom
+saturation = 0.55
 
 [tiles.piston_side]  # luma 0.40->0.40, sat 0.42->0.20, hue 32->32; ~ piston_side
 saturation = 0.443
