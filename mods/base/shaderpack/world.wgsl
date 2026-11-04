@@ -558,7 +558,8 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
     let a2 = 0.0016;
     let dd = nh * nh * (a2 - 1.0) + 1.0;
     let spec = a2 / (3.14159 * dd * dd) * (0.02 + 0.98 * pow(1.0 - max(dot(v, hv), 0.0), 5.0)) * 0.25;
-    let glint = palette().sun * light_strength() * min(spec, 40.0) * shadow * smoothstep(0.0, 0.1, l.y + 0.05);
+    // Toward a low sun the path stays orange: capped lower, so only its red reaches white.
+    let glint = palette().sun * light_strength() * min(spec, mix(40.0, 8.0, golden())) * shadow * smoothstep(0.0, 0.1, l.y + 0.05);
     // Foam where it laps the land, in a wobbling line on the pixel grid.
     let px = floor(in.pos.xz * 16.0) / 16.0;
     let wobble = noise3(vec3(px.x * 2.0, scene.params.w * 0.6, px.y * 2.0));

@@ -55,7 +55,8 @@ fn blend(a: Palette, b: Palette, t: f32) -> Palette {
 fn palette() -> Palette {
     let e = scene.sun.y;
     let day = key(vec3(0.09, 0.26, 0.85), vec3(0.42, 0.60, 0.95), vec3(1.0, 0.92, 0.78), vec3(1.15, 0.98, 0.76), vec3(0.20, 0.27, 0.42));
-    let golden = key(vec3(0.11, 0.25, 0.78), vec3(0.78, 0.66, 0.62), vec3(1.0, 0.72, 0.42), vec3(1.45, 0.95, 0.52), vec3(0.22, 0.24, 0.38));
+    // Golden hour is orange, not white: a warm horizon, an orange glow and sun.
+    let golden = key(vec3(0.11, 0.25, 0.78), vec3(0.92, 0.62, 0.42), vec3(1.0, 0.58, 0.26), vec3(1.55, 0.80, 0.38), vec3(0.22, 0.24, 0.38));
     let sunset = key(vec3(0.08, 0.10, 0.38), vec3(1.05, 0.46, 0.34), vec3(1.0, 0.50, 0.26), vec3(1.50, 0.76, 0.38), vec3(0.27, 0.22, 0.36));
     let dusk = key(vec3(0.045, 0.05, 0.16), vec3(0.30, 0.15, 0.27), vec3(0.45, 0.20, 0.25), vec3(0.0, 0.0, 0.0), vec3(0.10, 0.09, 0.17));
     // Night is dark and blue, a little lighter than vanilla's, so lanterns carry the scene.
@@ -112,7 +113,9 @@ fn light_strength() -> f32 {
 fn sun_glow(dir: vec3<f32>, p: Palette) -> vec3<f32> {
     let mu = max(dot(dir, scene.sun.xyz), 0.0);
     let horizon = 1.0 - clamp(dir.y, 0.0, 1.0);
-    let wide = pow(mu, 5.0) * (0.2 + 0.28 * horizon);
+    // Less of the wide glow in golden hour, so the sky round a low sun stays orange instead of
+    // washing out to white.
+    let wide = pow(mu, 5.0) * (0.2 + 0.28 * horizon) * (1.0 - 0.35 * golden());
     let near = pow(mu, 60.0) * 0.75;
     return p.glow * (wide + near);
 }
