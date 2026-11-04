@@ -95,6 +95,7 @@ const COMMANDS: &[&str] = &[
     "tap_once",
     "origin",
     "where",
+    "entities",
     "rec",
     "via",
     "travel",
