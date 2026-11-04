@@ -237,7 +237,7 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
         let albedo = s.color.rgb / max(dimmed, vec3(0.005));
         color = albedo * light / alpha_cloud;
         color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) + 1e-3, dir.z))), smoothstep(0.3, 1.0, dist));
-        color = display(fog_through(color, dir * 220.0, 1.0));
+        color = display(fog_through(color, dir * 220.0, 1.0, 0.0));
     } else {
         color = mix(s.color.rgb * light / alpha_cloud, scene.fog_color.rgb, smoothstep(0.5, 1.0, dist));
     }
@@ -319,7 +319,7 @@ fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
             c *= 1.0 - s.uv.x * smoothstep(0.0, 0.08, -dir.y);
         }
         // The fog on the land hides the horizon and fades upward.
-        c = fog_through(c, dir * 220.0, 1.0);
+        c = fog_through(c, dir * 220.0, 1.0, 0.0);
         return vec4(display(c), 1.0);
     }
     if dir.y <= 0.0 {

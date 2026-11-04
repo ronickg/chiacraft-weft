@@ -546,8 +546,11 @@ fn fog_light(dir: vec3<f32>) -> vec3<f32> {
 }
 
 // The fog between the eye and a point `rel` away (camera relative), walked in a few steps that are
-// closer together near the eye; `sky` (0..1) the sky light at the point, so caves stay clear.
-fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
+// closer together near the eye; `sky` (0..1) the sky light at the point, so caves stay clear;
+// `leaf` how far under a forest's leaves the point is (`under_leaves`): mist there is lit by the dim
+// green light that comes through them, not the open sky's (in a rainforest's morning mist it was a
+// white wall between the trunks, Lighting's canopy check 11-04), so the light shafts stand out in it.
+fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32, leaf: f32) -> vec3<f32> {
     if scene.weather.z < 0.005 || in_liquid() || !open_sky() || sky <= 0.0 {
         return c;
     }
@@ -555,7 +558,7 @@ fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let dir = rel / max(length(rel), 1e-4);
     let eye = scene.eye.xyz;
     let floor = fog_floor(rel);
-    let light = fog_light(dir);
+    let light = fog_light(dir) * mix(vec3(1.0), LEAF_LIGHT * 0.2, leaf);
     let steps = 12u;
     var through = 1.0;
     var gained = vec3(0.0);
@@ -644,7 +647,7 @@ fn under_water(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
 }
 
 fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
-    let c = fog_through(c_in, rel, smoothstep(0.25, 0.75, sky));
+    let c = fog_through(c_in, rel, smoothstep(0.25, 0.75, sky), under_leaves(sky));
     let dist = length(rel);
     if in_water() {
         return under_water(c, rel);
