@@ -82,8 +82,8 @@ pub static HAY_BALE: Block = Block::named("hay_bale");
 pub static PODZOL: Block = Block::named("podzol");
 /// The desert's scrub: a few sticks where there is no wood.
 pub static DEAD_BUSH: Block = Block::named("dead_bush");
-/// Game seconds between a dogwood leaf's looks at the season, on average.
-const DOGWOOD_BLOOM_SECS: f32 = 300.0;
+/// Game seconds between a blooming leaf's looks at the season, on average (`bloom`).
+const BLOOM_SECS: f32 = 300.0;
 /// The sequoia grove's understory (`grove`).
 pub static SWORD_FERN: Block = Block::named("sword_fern");
 pub static LUPINE: Block = Block::named("lupine");
@@ -210,20 +210,10 @@ fn grove(r: &mut Registry) {
     );
     plant(r, &LUPINE, "lupine");
     log(r, &DOGWOOD_LOG, "dogwood", "base:dogwood_leaves", None);
-    // The dogwood is white with its bracts in spring and plain green the rest of the year: a
-    // growth step every few minutes looks at the season, as the wild flowers do (`wild.rs`).
-    r.block(&DOGWOOD_LEAVES)
-        .sound_group("grass")
-        .prop("bloom", 0..=1)
-        .states(|p, s| s.texture(if p.get("bloom") == "1" { "leaves_dogwood" } else { "leaves_dogwood_green" }))
-        .growth(DOGWOOD_BLOOM_SECS, 0)
-        .on_grow(|e| {
-            let spring = base_api::ground_at(&e.world(), e.pos()).season == Some(0);
-            let want = if spring { "1" } else { "0" };
-            if state_prop(e.state(), "bloom") != Some(want) {
-                e.world().set_prop(e.pos(), "bloom", want);
-            }
-        })
+    // The dogwood is white with its bracts in spring and plain green the rest of the year
+    // (`vitals::wild::BLOOMS`), both drawn in their own colours.
+    let b = r.block(&DOGWOOD_LEAVES).sound_group("grass");
+    bloom(b, DOGWOOD_LEAVES.name(), "leaves_dogwood", "leaves_dogwood_green")
         .hardness(0.2)
         .cutout()
         .cull_same()
@@ -283,9 +273,8 @@ fn planks(r: &mut Registry, h: &'static Block, wood: &str) {
 
 /// Leaves that drop `sapling` (a time in 20) and, for our trees, `fruit` (a time in 20).
 fn leaves(r: &mut Registry, handle: &'static Block, tex: &str, sapling: &str, fruit: Option<&str>) {
-    r.block(handle)
-        .sound_group("grass")
-        .texture(tex)
+    let b = r.block(handle).sound_group("grass").texture(tex);
+    bloom(b, handle.name(), leak(format!("{tex}_bloom")), leak(tex.to_string()))
         .hardness(0.2)
         .cutout()
         // Faces between two leaves of one tree kind aren't drawn (each was drawn twice): a crown
@@ -315,6 +304,28 @@ fn leaves(r: &mut Registry, handle: &'static Block, tex: &str, sapling: &str, fr
     } else if std::ptr::eq(handle, &SPRUCE_LEAVES) {
         table.pool(Pool::new().when(Cond::Chance(0.03)).item("pine_nut"));
     }
+}
+
+/// Leaves that flower (`vitals::wild::BLOOMS`): `bloom` 1 in their seasons, drawn as `open`, and
+/// `shut` the rest of the year, a growth step every few minutes looking at the season as the wild
+/// flowers do (`wild.rs`). Leaves that don't bloom are left as they are.
+fn bloom<'a>(b: BlockBuilder<'a>, leaves: &str, open: &'static str, shut: &'static str) -> BlockBuilder<'a> {
+    let Some(seasons) = vitals::wild::blooms(leaves) else { return b };
+    b.prop("bloom", 0..=1)
+        .states(move |p, s| s.texture(if p.get("bloom") == "1" { open } else { shut }))
+        .growth(BLOOM_SECS, 0)
+        .on_grow(move |e| {
+            let open = vitals::wild::in_bloom(seasons, base_api::ground_at(&e.world(), e.pos()).season);
+            let want = if open { "1" } else { "0" };
+            if state_prop(e.state(), "bloom") != Some(want) {
+                e.world().set_prop(e.pos(), "bloom", want);
+            }
+        })
+}
+
+/// A name kept for the game's life (registration's textures).
+fn leak(s: String) -> &'static str {
+    Box::leak(s.into_boxed_str())
 }
 
 fn plant(r: &mut Registry, handle: &'static Block, tex: &str) {
@@ -803,9 +814,8 @@ pub fn register(r: &mut Registry) {
     }
     // The shrubs' leaves (`vitals::layers`), drawn in their own colours: not tinted.
     for (b, tex) in [(&WILLOW_LEAVES, "leaves_willow"), (&JUNIPER_LEAVES, "leaves_juniper"), (&CREOSOTE_LEAVES, "leaves_creosote")] {
-        r.block(b)
-            .sound_group("grass")
-            .texture(tex)
+        let builder = r.block(b).sound_group("grass").texture(tex);
+        bloom(builder, b.name(), leak(format!("{tex}_bloom")), tex)
             .hardness(0.2)
             .cutout()
             .cull_same()
