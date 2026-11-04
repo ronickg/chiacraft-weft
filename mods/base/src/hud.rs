@@ -51,7 +51,12 @@ fn fill_of(share: f32, rim: f32, texels: f32) -> f32 {
 /// The points chip's pulse: lit for half of every second.
 fn pulse_lit() -> bool {
     static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
-    START.get_or_init(std::time::Instant::now).elapsed().as_millis() % 1000 < 500
+    START
+        .get_or_init(std::time::Instant::now)
+        .elapsed()
+        .as_millis()
+        % 1000
+        < 500
 }
 
 /// Where a bar's fill ends for a share filled: the kit's fill starts `rim` of the bar's 192 texels
@@ -219,11 +224,17 @@ pub fn register(r: &mut Registry) {
     // that pulses. Everything is a gauge, so it hides with the bars (creative, dead).
     r.hud_element(&HUD_LEVEL, hud_anchor::HOTBAR, 1, |ui| {
         ui.row(S::row().size(LEVEL_ROW.0, LEVEL_ROW.1), |ui| {
-            ui.progress_bind("hud_xpbar", S::default().size(LEVEL_ROW.0, XPBAR_H).at(0.0, (LEVEL_ROW.1 - XPBAR_H) / 2.0), |c| {
-                let Some(v) = vitals_of(c) else { return -1.0 };
-                let (level, into) = vitals::levels::level_of(v.xp);
-                fill_of(into as f32 / vitals::levels::to_next(level).max(1) as f32, XPBAR_RIM, XPBAR_TEXELS)
-            });
+            ui.progress_bind(
+                "hud_xpbar",
+                S::default()
+                    .size(LEVEL_ROW.0, XPBAR_H)
+                    .at(0.0, (LEVEL_ROW.1 - XPBAR_H) / 2.0),
+                |c| {
+                    let Some(v) = vitals_of(c) else { return -1.0 };
+                    let (level, into) = vitals::levels::level_of(v.xp);
+                    fill_of(into as f32 / vitals::levels::to_next(level).max(1) as f32, XPBAR_RIM, XPBAR_TEXELS)
+                },
+            );
             // the level's chip, centred on the bar
             let chip_x = down_half((LEVEL_ROW.0 - CHIP.0) / 2.0);
             ui.progress_bind("hud_level_chip", S::default().size(CHIP.0, CHIP.1).at(chip_x, 0.0), |c| {
