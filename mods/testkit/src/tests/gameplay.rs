@@ -1138,7 +1138,7 @@ pub async fn creative_middle_click(t: T) -> R {
     t.press("core:inventory");
     t.screen("core:menu").await?;
     t.frames(2).await?;
-    t.click_ui("slot:36", 2);
+    t.click_ui("slot:41", 2);
     t.until("a whole stack on the cursor", Duration::from_secs(2), |t| t.c().cursor_stack().count == 64)
         .await?;
     t.check_eq(t.c().inventory_slot(0).count, 3, "and the slot keeps what it had");
@@ -1151,7 +1151,7 @@ pub async fn creative_middle_click(t: T) -> R {
     t.press("core:inventory");
     t.screen("core:menu").await?;
     t.frames(2).await?;
-    t.click_ui("slot:36", 2);
+    t.click_ui("slot:41", 2);
     t.secs(0.3).await?;
     t.check(t.c().cursor_stack().is_empty(), "nothing out of creative");
     t.c().close_screen();
@@ -1866,6 +1866,7 @@ pub async fn base_alone(t: T) -> R {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let mut server = std::process::Command::new(exe)
         .args(["--server", "--world", "w", "--seed", "1", "--view", "4", "--port", &port.to_string(), "--run-dir", &dir])
+        .args(crate::package_args())
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -1913,6 +1914,8 @@ pub async fn dedicated_server(t: T) -> R {
         let exe = std::env::current_exe().map_err(|e| e.to_string())?;
         std::process::Command::new(exe)
             .args(["--server", "--world", "w", "--seed", "1", "--view", "4", "--port", &port.to_string(), "--run-dir", &dir])
+            .args(crate::package_args())
+            .args(crate::package_args())
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())

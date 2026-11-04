@@ -297,23 +297,23 @@ pub async fn inventory_crafting(t: T) -> R {
     t.op("put me 0 oak_log 16").await?;
     t.press("core:inventory");
     t.screen("core:menu").await?;
-    // Menu slots: 0-3 grid, 4 result, 5-8 armor, 9-35 main, 36-44 hotbar.
+    // Menu slots: 0-3 grid, 4 result, 5-13 equipment (armor, clothes, cloak), 14-40 main, 41-49 hotbar.
     let (log, planks) = (id("base:oak_log"), id("base:oak_planks"));
-    t.click_ui("slot:36", 0);
+    t.click_ui("slot:41", 0);
     t.until("logs on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().item == log)
         .await?;
     t.click_ui("slot:0", 1);
     t.until("planks in the result", Duration::from_secs(5), |t| t.c().menu_slot(4).item == planks)
         .await?;
     t.check_eq(t.c().menu_slot(4).count, 4, "planks from one log");
-    t.click_ui("slot:36", 0);
+    t.click_ui("slot:41", 0);
     t.until("cursor empty", Duration::from_secs(5), |t| t.c().cursor_stack().is_empty())
         .await?;
     t.shot("grid").await?;
     t.click_ui("slot:4", 0);
     t.until("planks on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().item == planks)
         .await?;
-    t.click_ui("slot:37", 0);
+    t.click_ui("slot:42", 0);
     t.until("planks in the hotbar", Duration::from_secs(5), |t| t.c().inventory_slot(1).item == planks)
         .await?;
     t.c().close_screen();
@@ -335,7 +335,7 @@ pub async fn creative_inventory(t: T) -> R {
     if t.click_ui(&format!("item:{stone}"), 0) {
         t.until("bricks on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().item == stone)
             .await?;
-        t.click_ui("slot:36", 0);
+        t.click_ui("slot:41", 0);
         t.until("bricks in the hotbar", Duration::from_secs(5), |t| t.c().inventory_slot(0).item == stone)
             .await?;
     }
@@ -560,7 +560,7 @@ pub async fn recipe_viewer(t: T) -> R {
     t.op("put me 0 iron_ingot 3").await?;
     t.press("core:inventory");
     t.screen("core:menu").await?;
-    let Some([x, y, w, h]) = t.c().ui_rect("slot:36") else { return Err("no hotbar slot".into()) };
+    let Some([x, y, w, h]) = t.c().ui_rect("slot:41") else { return Err("no hotbar slot".into()) };
     t.c().cursor(x + w / 2.0, y + h / 2.0);
     t.frames(3).await?;
     t.press("core:recipes");
@@ -606,7 +606,7 @@ pub async fn recipe_viewer(t: T) -> R {
     // A kind laid out by its mod, with a fluid.
     t.op("put me 1 diamond 1").await?;
     t.frames(3).await?;
-    let Some([x, y, w, h]) = t.c().ui_rect("slot:37") else { return Err("no hotbar slot".into()) };
+    let Some([x, y, w, h]) = t.c().ui_rect("slot:42") else { return Err("no hotbar slot".into()) };
     t.c().cursor(x + w / 2.0, y + h / 2.0);
     t.frames(3).await?;
     t.press("core:uses");
