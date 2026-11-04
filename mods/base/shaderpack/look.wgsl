@@ -147,32 +147,34 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
 // map: x 1 lit to 0 in shadow (a 3x3 of texels softens the edge), y how far to trust it, 1 well
 // inside the map and fading to 0 at its edge and where it holds nothing this frame (the caller
 // then guesses as it would without one).
-fn shadow_at(rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
-    if scene.shadow.z < 0.5 {
+// One cascade of the sun's shadows: its matrix `m`, `info` (bindless index, size, 1 when it holds
+// this frame's, the blocks a texel covers), its round reach and depth (blocks).
+fn shadow_in(m: mat4x4<f32>, info: vec4<f32>, round: f32, depth: f32, rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
+    if info.z < 0.5 {
         return vec2(1.0, 0.0);
     }
-    let texel = scene.shadow.w;
+    let texel = info.w;
     // Off the surface along its normal so it does not shade itself, twice as far where the light
     // grazes it (Complementary's and Photon's normal offset), and a hair along the light.
     let ndl = clamp(dot(n, light_dir()), 0.0, 1.0);
-    let c = scene.shadow_view_proj * vec4(rel + n * texel * 1.2 * (2.0 - ndl), 1.0);
+    let c = m * vec4(rel + n * texel * 1.2 * (2.0 - ndl), 1.0);
     let ndc = c.xyz / c.w;
-    // The nearer of the box's edge and its round reach (80 blocks), so the corners fade too.
-    let reach = max(max(abs(ndc.x), abs(ndc.y)), length(rel.xz) / 80.0);
+    // The nearer of the box's edge and its round reach, so the corners fade too.
+    let reach = max(max(abs(ndc.x), abs(ndc.y)), length(rel.xz) / round);
     if reach > 0.97 || ndc.z <= 0.0 || ndc.z >= 1.0 {
         return vec2(1.0, 0.0);
     }
-    let size = i32(scene.shadow.y);
+    let size = i32(info.y);
     // Rows run down the map as y runs up the light's view: the engine's shaders draw with y up, the
     // way the screen effects read the screen (`0.5 - ndc.y * 0.5`). Read the other way up, every
     // shadow was mirrored across the camera's row of the map, and one side of open ground lay in
     // the mirror image of the ground itself.
     let at = vec2<i32>(vec2(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5) * f32(size));
-    let index = u32(scene.shadow.x);
+    let index = u32(info.x);
     // A few hundredths of a block along the light, more on surfaces the light grazes, in the map's
-    // depth (it spans 400 blocks): no floating shadows at the foot of things.
+    // depth: no floating shadows at the foot of things.
     let slope = min(sqrt(max(1.0 - ndl * ndl, 0.0)) / max(ndl, 0.05), 4.0);
-    let bias = (0.03 + texel * 0.5 * slope) / 400.0;
+    let bias = (0.03 + texel * 0.5 * slope) / depth;
     // A 4x4 of the map about the point; each of the 3x3 taps takes the nearest to the light of its
     // texel and the ones right and below. That closes the one-texel cracks between neighbouring
     // meshes, through which sunlight would draw thin dotted lines across a shadow.
@@ -197,6 +199,22 @@ fn shadow_at(rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
     // horizon (long smeared shadows, then the swap from the sun to the moon).
     let low = smoothstep(0.02, 0.06, light_dir().y);
     return vec2(lit, (1.0 - smoothstep(0.85, 0.97, reach)) * low);
+}
+
+// How much of the sun reaches `rel` (camera relative) facing `n`: the near cascade's map (80 blocks
+// about the player, fine) where it holds, the far one's (400 blocks, coarser) beyond, handing over
+// smoothly; x 1 lit to 0 in shadow, y how far to trust it.
+fn shadow_at(rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
+    let near = shadow_in(scene.shadow_view_proj, scene.shadow, 80.0, 400.0, rel, n);
+    if near.y >= 0.999 {
+        return near;
+    }
+    let far = shadow_in(scene.shadow_far_view_proj, scene.shadow_far, 400.0, 1200.0, rel, n);
+    let trust = max(near.y, far.y);
+    if trust <= 0.0 {
+        return vec2(1.0, 0.0);
+    }
+    return vec2(mix(far.x, near.x, near.y / trust), trust);
 }
 
 // The sun on a mob or a model at `rel` facing `n` with sky light `sky`: the shadow map where it

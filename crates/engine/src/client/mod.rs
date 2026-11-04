@@ -305,6 +305,11 @@ pub struct Client {
     shadow_bufs: Vec<BufferId>,
     shadow: (glam::Mat4, bool),
     shadow_index: u32,
+    /// The far cascade: map, light, scene buffers and bindless index, as the near one's.
+    shadow_far_map: Option<weft_render::TextureId>,
+    shadow_far: (glam::Mat4, bool),
+    shadow_far_bufs: Vec<BufferId>,
+    shadow_far_index: u32,
     pub target: Option<Hit>,
     pub target_entity: Option<u64>,
     pub selected: usize,
@@ -637,6 +642,10 @@ impl Client {
             shadow_bufs: Vec::new(),
             shadow: (glam::Mat4::IDENTITY, false),
             shadow_index: 0,
+            shadow_far_map: None,
+            shadow_far: (glam::Mat4::IDENTITY, false),
+            shadow_far_bufs: Vec::new(),
+            shadow_far_index: 0,
             target: None,
             target_entity: None,
             selected: 0,
@@ -2155,6 +2164,12 @@ impl Client {
         if let Some(t) = self.shadow_map.take() {
             gpu.destroy_texture(t);
         }
+        if let Some(t) = self.shadow_far_map.take() {
+            gpu.destroy_texture(t);
+        }
+        for b in self.shadow_far_bufs.drain(..) {
+            gpu.destroy_buffer(b);
+        }
         for b in self.shadow_bufs.drain(..) {
             gpu.destroy_buffer(b);
         }
@@ -2255,6 +2270,13 @@ impl Client {
             ground: [self.snow_cover, self.snowing, self.dust, self.aurora],
             behind: self.behind,
             shadow_view_proj: self.shadow.0.to_cols_array_2d(),
+            shadow_far_view_proj: self.shadow_far.0.to_cols_array_2d(),
+            shadow_far: match self.shadow_far_map {
+                Some(_) if self.shadow_far.1 => {
+                    [self.shadow_far_index as f32, SHADOW_SIZE as f32, 1.0, 2.0 * FAR_REACH / SHADOW_SIZE as f32]
+                }
+                _ => [0.0; 4],
+            },
             shadow: match self.shadow_map {
                 Some(t) if self.shadow.1 => [self.shadow_index(t) as f32, SHADOW_SIZE as f32, 1.0, 2.0 * SHADOW_REACH / SHADOW_SIZE as f32],
                 _ => [0.0; 4],
@@ -2294,6 +2316,7 @@ impl Client {
     /// its edges do not crawl as the camera moves. `render_shadows` then draws the map.
     pub fn prepare_shadows(&mut self, gpu: &mut dyn Backend) {
         self.shadow.1 = false;
+        self.shadow_far.1 = false;
         if !self.render.has_shadows() || !content().dims[self.world.dim as usize].sky_light {
             return;
         }
@@ -2303,8 +2326,8 @@ impl Client {
         if dir.y < 0.02 {
             return;
         }
-        if self.shadow_map.is_none() {
-            let t = gpu.create_texture(
+        let map = |gpu: &mut dyn Backend, label: &str| {
+            gpu.create_texture(
                 &weft_render::TextureDesc {
                     width: SHADOW_SIZE,
                     height: SHADOW_SIZE,
@@ -2312,41 +2335,22 @@ impl Client {
                     format: weft_render::Format::Depth32,
                     render_target: true,
                 },
-                "shadow map",
-            );
+                label,
+            )
+        };
+        if self.shadow_map.is_none() {
+            let t = map(gpu, "shadow map");
             self.shadow_index = gpu.texture_index(t);
             self.shadow_map = Some(t);
         }
+        if self.shadow_far_map.is_none() {
+            let t = map(gpu, "far shadow map");
+            self.shadow_far_index = gpu.texture_index(t);
+            self.shadow_far_map = Some(t);
+        }
         let cam = self.render_camera();
-        let up = if dir.y.abs() > 0.99 { Vec3::Z } else { Vec3::Y };
-        // Looking from the light's side of the camera toward it (right-handed, -z forward).
-        let eye = dir * SHADOW_DEPTH * 0.5;
-        let f = -dir;
-        let s = f.cross(up).normalize();
-        let u = s.cross(f);
-        let view = glam::Mat4::from_cols(
-            glam::Vec4::new(s.x, u.x, -f.x, 0.0),
-            glam::Vec4::new(s.y, u.y, -f.y, 0.0),
-            glam::Vec4::new(s.z, u.z, -f.z, 0.0),
-            glam::Vec4::new(-s.dot(eye), -u.dot(eye), f.dot(eye), 1.0),
-        );
-        // The camera's place across the light, in whole texels of the world (doubles: far from
-        // the world's origin a float would lose them).
-        let texel = 2.0 * SHADOW_REACH as f64 / SHADOW_SIZE as f64;
-        let right = view.row(0).truncate().as_dvec3();
-        let upward = view.row(1).truncate().as_dvec3();
-        let across = glam::DVec2::new(cam.pos.dot(right), cam.pos.dot(upward));
-        let off = (across - (across / texel).floor() * texel).as_vec2();
-        // x and y over the box (moved back by the camera's part of a texel), z reverse depth:
-        // 1 nearest the light, 0 `SHADOW_DEPTH` along it.
-        let (r, d) = (SHADOW_REACH, SHADOW_DEPTH);
-        let proj = glam::Mat4::from_cols(
-            glam::Vec4::new(1.0 / r, 0.0, 0.0, 0.0),
-            glam::Vec4::new(0.0, 1.0 / r, 0.0, 0.0),
-            glam::Vec4::new(0.0, 0.0, 1.0 / d, 0.0),
-            glam::Vec4::new(off.x / r, off.y / r, 1.0, 1.0),
-        );
-        self.shadow = (proj * view, true);
+        self.shadow = (light_box(dir, cam.pos, SHADOW_REACH, SHADOW_DEPTH), true);
+        self.shadow_far = (light_box(dir, cam.pos, FAR_REACH, FAR_DEPTH), true);
     }
 
     /// The sun's shadow map, after `render` posed this frame's models (the pass is put before the
@@ -2369,8 +2373,26 @@ impl Client {
         let buf = self.shadow_bufs[frame.slot];
         gpu.mapped(buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
         list.push(weft_render::Cmd::BeginPass { color: None, depth: Some((map, Some(0.0))) });
-        self.render.draw_shadow(gpu, list, frame, &cam, light, buf);
+        self.render
+            .draw_shadow(gpu, list, frame, &cam, light, buf, 0);
         self.entity_render.draw_shadow(gpu, list, frame, buf);
+        list.push(weft_render::Cmd::EndPass);
+        // The far cascade: the terrain alone, coarser, to where hills stand far off.
+        let (Some(far_map), (far, true)) = (self.shadow_far_map, self.shadow_far) else { return };
+        while self.shadow_far_bufs.len() < gpu.frames_in_flight() {
+            self.shadow_far_bufs.push(gpu.create_buffer(
+                size_of::<Scene>() as u64,
+                weft_render::usage::STORAGE | weft_render::usage::HOST,
+                "far shadow scene",
+            ));
+        }
+        scene.view_proj = far.to_cols_array_2d();
+        scene.shadow_far = [0.0; 4];
+        let far_buf = self.shadow_far_bufs[frame.slot];
+        gpu.mapped(far_buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
+        list.push(weft_render::Cmd::BeginPass { color: None, depth: Some((far_map, Some(0.0))) });
+        self.render
+            .draw_shadow(gpu, list, frame, &cam, far, far_buf, 1);
         list.push(weft_render::Cmd::EndPass);
     }
 
@@ -2524,6 +2546,41 @@ impl Client {
 /// The sun's shadow map: texels a side, blocks it reaches to each side of the camera, and the
 /// depth of its box along the light (half of it on the sun's side of the camera).
 const SHADOW_SIZE: u32 = 2048;
+/// The far cascade's reach and depth (blocks): hills a few hundred blocks off have shadows too.
+const FAR_REACH: f32 = 400.0;
+const FAR_DEPTH: f32 = 1200.0;
+
+/// From camera-relative positions to an orthographic box along the light `dir` (toward it), `reach`
+/// blocks to each side of the camera and `depth` deep (reverse depth: 1 nearest the light), moved in
+/// whole texels of the world so its edges do not crawl as the camera moves.
+fn light_box(dir: Vec3, cam: glam::DVec3, reach: f32, depth: f32) -> glam::Mat4 {
+    let up = if dir.y.abs() > 0.99 { Vec3::Z } else { Vec3::Y };
+    // Looking from the light's side of the camera toward it (right-handed, -z forward).
+    let eye = dir * depth * 0.5;
+    let f = -dir;
+    let s = f.cross(up).normalize();
+    let u = s.cross(f);
+    let view = glam::Mat4::from_cols(
+        glam::Vec4::new(s.x, u.x, -f.x, 0.0),
+        glam::Vec4::new(s.y, u.y, -f.y, 0.0),
+        glam::Vec4::new(s.z, u.z, -f.z, 0.0),
+        glam::Vec4::new(-s.dot(eye), -u.dot(eye), f.dot(eye), 1.0),
+    );
+    // The camera's place across the light, in whole texels of the world (doubles: far from the
+    // world's origin a float would lose them).
+    let texel = 2.0 * reach as f64 / SHADOW_SIZE as f64;
+    let right = view.row(0).truncate().as_dvec3();
+    let upward = view.row(1).truncate().as_dvec3();
+    let across = glam::DVec2::new(cam.dot(right), cam.dot(upward));
+    let off = (across - (across / texel).floor() * texel).as_vec2();
+    let proj = glam::Mat4::from_cols(
+        glam::Vec4::new(1.0 / reach, 0.0, 0.0, 0.0),
+        glam::Vec4::new(0.0, 1.0 / reach, 0.0, 0.0),
+        glam::Vec4::new(0.0, 0.0, 1.0 / depth, 0.0),
+        glam::Vec4::new(off.x / reach, off.y / reach, 1.0, 1.0),
+    );
+    proj * view
+}
 const SHADOW_REACH: f32 = 80.0;
 const SHADOW_DEPTH: f32 = 400.0;
 

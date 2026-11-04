@@ -291,9 +291,10 @@ pub struct WorldRenderer {
     /// Depth only, from the sun, for `sun_shadows` packs (their `fs_shadow`): faces, quads.
     shadow_pipes: Option<[PipelineId; 2]>,
     /// The shadow pass's own per-frame draws (`draw_shadow`), apart from the camera's.
-    shadow_origins: Vec<(BufferId, u32)>,
-    shadow_indirect: Vec<(BufferId, u32)>,
-    shadow_offsets: Vec<(BufferId, u32)>,
+    /// Per shadow cascade (near, far): each pass writes its own draws.
+    shadow_origins: [Vec<(BufferId, u32)>; 2],
+    shadow_indirect: [Vec<(BufferId, u32)>; 2],
+    shadow_offsets: [Vec<(BufferId, u32)>; 2],
     face_pipes: [PipelineId; 3],
     quad_pipes: [PipelineId; 3],
     lod_pipe: PipelineId,
@@ -435,9 +436,9 @@ impl WorldRenderer {
             .collect();
         Ok(WorldRenderer {
             shadow_pipes,
-            shadow_origins: Vec::new(),
-            shadow_indirect: Vec::new(),
-            shadow_offsets: Vec::new(),
+            shadow_origins: Default::default(),
+            shadow_indirect: Default::default(),
+            shadow_offsets: Default::default(),
             face_pipes,
             quad_pipes,
             lod_pipe,
@@ -578,6 +579,7 @@ impl WorldRenderer {
         cam: &Camera,
         light: Mat4,
         scene: BufferId,
+        cascade: usize,
     ) {
         let Some([face_pipe, quad_pipe]) = self.shadow_pipes else { return };
         let cam_block = cam.pos.floor();
@@ -628,9 +630,12 @@ impl WorldRenderer {
         if n == 0 {
             return;
         }
-        let obuf = crate::gpu_layout::frame_buffer(gpu, &mut self.shadow_origins, frame.slot, n, 16, usage::STORAGE, "shadow origins");
-        let ibuf = crate::gpu_layout::frame_buffer(gpu, &mut self.shadow_indirect, frame.slot, n, 20, usage::INDIRECT, "shadow indirect");
-        let fbuf = crate::gpu_layout::frame_buffer(gpu, &mut self.shadow_offsets, frame.slot, 1, 16, usage::STORAGE, "shadow offsets");
+        let obuf =
+            crate::gpu_layout::frame_buffer(gpu, &mut self.shadow_origins[cascade], frame.slot, n, 16, usage::STORAGE, "shadow origins");
+        let ibuf =
+            crate::gpu_layout::frame_buffer(gpu, &mut self.shadow_indirect[cascade], frame.slot, n, 20, usage::INDIRECT, "shadow indirect");
+        let fbuf =
+            crate::gpu_layout::frame_buffer(gpu, &mut self.shadow_offsets[cascade], frame.slot, 1, 16, usage::STORAGE, "shadow offsets");
         gpu.mapped(fbuf)[..16].fill(0);
         {
             let origins = gpu.mapped(obuf);
@@ -784,9 +789,9 @@ impl WorldRenderer {
             .drain(..)
             .chain(self.indirect.drain(..))
             .chain(self.offsets.drain(..))
-            .chain(self.shadow_origins.drain(..))
-            .chain(self.shadow_indirect.drain(..))
-            .chain(self.shadow_offsets.drain(..))
+            .chain(self.shadow_origins.iter_mut().flat_map(|v| v.drain(..)))
+            .chain(self.shadow_indirect.iter_mut().flat_map(|v| v.drain(..)))
+            .chain(self.shadow_offsets.iter_mut().flat_map(|v| v.drain(..)))
         {
             gpu.destroy_buffer(b);
         }
