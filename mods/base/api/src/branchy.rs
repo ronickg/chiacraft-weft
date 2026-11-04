@@ -237,8 +237,9 @@ fn block(p: V) -> (i32, i32, i32) {
 
 // ------------------------------------------------------------------ growing
 
-/// The blocks so far: each block's part, wood over leaves; and the tree's reach and height.
-struct Out(std::collections::HashMap<(i32, i32, i32), Part>, i32, i32);
+/// The blocks so far: each block's part, wood over leaves; the tree's reach and height; and each
+/// wood block's width (the widest limb through it) with the width being drawn now.
+struct Out(std::collections::HashMap<(i32, i32, i32), Part>, i32, i32, std::collections::HashMap<(i32, i32, i32), f32>, f32);
 
 impl Out {
     fn put(&mut self, k: (i32, i32, i32), part: Part) {
@@ -249,6 +250,10 @@ impl Out {
             (Some(Part::Log { .. }), Part::Leaves) => {}
             _ => {
                 self.0.insert(k, part);
+                if let Part::Log { .. } = part {
+                    let w = self.3.entry(k).or_insert(0.0);
+                    *w = w.max(self.4);
+                }
             }
         }
     }
@@ -385,6 +390,7 @@ impl Grow<'_> {
                 // A round trunk flares at its foot into buttresses (`flare`, `lobes`).
                 let foot = if order == 0 { (1.0 - grown / r.flare_up.max(STEP)).max(0.0) } else { 0.0 };
                 let w = shown * (1.0 + r.flare * foot * foot);
+                self.out.4 = w;
                 last = Some(if w >= ROUND {
                     self.out
                         .wood_round(p, d, w, r.lobes * foot, self.turn, last)
@@ -481,6 +487,21 @@ impl Grow<'_> {
 /// The blocks of one tree of `recipe` from `seed`, relative to its base (see the module's notes),
 /// in a fixed order.
 pub fn blocks(recipe: &Recipe, seed: u64) -> Vec<(i32, i32, i32, Part)> {
+    grown(recipe, seed).0
+}
+
+/// Each wood block of `blocks(recipe, seed)` with the width of the widest limb through it (in
+/// blocks): for a look at thin branch blocks, the tree-look study.
+pub fn wood_widths(recipe: &Recipe, seed: u64) -> Vec<(i32, i32, i32, f32)> {
+    let (b, w) = grown(recipe, seed);
+    b.iter()
+        .filter(|b| matches!(b.3, Part::Log { .. }))
+        .map(|&(x, y, z, _)| (x, y, z, w.get(&(x, y, z)).copied().unwrap_or(1.0)))
+        .collect()
+}
+
+#[allow(clippy::type_complexity)]
+fn grown(recipe: &Recipe, seed: u64) -> (Vec<(i32, i32, i32, Part)>, std::collections::HashMap<(i32, i32, i32), f32>) {
     let mut rng = Rng(seed.wrapping_mul(0x2545_F491_4F6C_DD1D) ^ 0x5DEE_CE66);
     let size = 1.0 + recipe.size_var * rng.s();
     let height = recipe.height * size;
@@ -493,7 +514,7 @@ pub fn blocks(recipe: &Recipe, seed: u64) -> Vec<(i32, i32, i32, Part)> {
     let two = (1.5..ROUND).contains(&width);
     let foot = if two { [1.0, 0.0, 1.0] } else { [0.5, 0.0, 0.5] };
     let turn = if recipe.lobes > 0.0 { rng.f() * 90.0 } else { 0.0 };
-    let mut g = Grow { r: recipe, rng, out: Out(Default::default(), reach, max_height), seed, size, turn };
+    let mut g = Grow { r: recipe, rng, out: Out(Default::default(), reach, max_height, Default::default(), 0.0), seed, size, turn };
     g.limb(foot, start, width, 0, height.min(max_height as f32 - 2.0), lean);
     // The reach is measured from the trunk's middle: a 2 x 2's is at 1, so 1 more on the plus side.
     let lo = -reach;
@@ -506,7 +527,7 @@ pub fn blocks(recipe: &Recipe, seed: u64) -> Vec<(i32, i32, i32, Part)> {
         .map(|((x, y, z), p)| (x, y, z, p))
         .collect();
     out.sort_unstable_by_key(|b| (b.0, b.1, b.2)); // a fixed order, whatever the map's
-    out
+    (out, g.out.3)
 }
 
 /// Grows a tree of `recipe` at (`x`, `y`, `z`) (its base) from `seed`: `put(x, y, z, part)` for
