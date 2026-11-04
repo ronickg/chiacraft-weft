@@ -368,6 +368,11 @@ fn coat_line(ui: &mut Ui) {
     });
 }
 
+/// A gene's name as a translation key: `gene.<its name, spaces as _>` ("Dominant black").
+fn gene_key(name: &str) -> String {
+    format!("gene.{}", name.replace(' ', "_"))
+}
+
 /// A piece of a text put together in the client: a translation, or text as it is (numbers,
 /// spaces, commas).
 enum Piece {
@@ -982,11 +987,14 @@ fn genes_screen(ui: &mut Ui) {
                 ui.text_bind_styled(S::default().max_w(206.0), move |c, t| {
                     let Some(g) = c.menu_component(&crate::coats::GENOME) else { return t.text("") };
                     let Some(l) = animals_core::coats::genes_of(&g).into_iter().nth(i) else { return t.text("") };
+                    // Its name in the player's language (`gene.<name>`; the gene files name it in
+                    // English); the alleles as they are written.
+                    let name = gene_key(&l.name);
                     match l.value {
-                        Some(v) => t.set("screen.animals.gene_value", &[Arg::Text(&l.name), Arg::Int((v * 100.0).round() as i64)]),
+                        Some(v) => t.set("screen.animals.gene_value", &[Arg::Key(&name), Arg::Int((v * 100.0).round() as i64)]),
                         None => {
                             let pair = l.alleles.join("/");
-                            t.set("screen.animals.gene_alleles", &[Arg::Text(&l.name), Arg::Text(&l.shows), Arg::Text(&pair)]);
+                            t.set("screen.animals.gene_alleles", &[Arg::Key(&name), Arg::Text(&l.shows), Arg::Text(&pair)]);
                         }
                     }
                 });
@@ -1448,5 +1456,37 @@ mod coat_name_tests {
         }
         assert!(missing.is_empty(), "coat words without a translation: {missing:?}");
         assert!(en.contains(&format!("screen.animals.join_{JOIN_MAX}")) && ru.contains(&format!("screen.animals.join_{JOIN_MAX}")));
+    }
+}
+
+#[cfg(test)]
+mod gene_name_tests {
+    use super::*;
+
+    /// Every gene line every species' Genes page shows has its name translated in English and
+    /// Russian (its own loci and the core traits).
+    #[test]
+    fn every_gene_name_has_a_translation() {
+        let keys = |lang: &str| -> std::collections::HashSet<String> {
+            lang.lines().filter_map(|l| l.split_once(" = ").map(|(k, _)| k.trim().to_string())).collect()
+        };
+        let (en, ru) = (keys(include_str!("../assets/lang/en_us.lang")), keys(include_str!("../assets/lang/ru_ru.lang")));
+        let mut seed = 777u32;
+        let mut rng = move || {
+            seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            (seed >> 8) as f32 / (1u32 << 24) as f32
+        };
+        let mut missing = std::collections::BTreeSet::new();
+        for index in 0..crate::species::SPECIES.len() {
+            let Some(pool) = crate::coats::wild_pool(index, "") else { continue };
+            let Some(g) = crate::coats::sample(index, true, &pool, &mut rng) else { continue };
+            for l in animals_core::coats::genes_of(&g) {
+                let k = gene_key(&l.name);
+                if !en.contains(&k) || !ru.contains(&k) {
+                    missing.insert(k);
+                }
+            }
+        }
+        assert!(missing.is_empty(), "gene names without a translation: {missing:?}");
     }
 }
