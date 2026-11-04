@@ -1954,6 +1954,13 @@ pub async fn dedicated_server(t: T) -> R {
     t.secs(0.5).await?;
     let allowed = t.cmd("/time query").await?;
     t.check(allowed.contains("time is"), format!("op from the console: {allowed}"));
+    // Operators always get in, past the allow list too (admission's `verdict`): `deop` makes
+    // the player an ordinary one again, whom the whitelist below keeps out.
+    writeln!(console, "deop {}", NAME.get()).map_err(|e| e.to_string())?;
+    let _ = console.flush();
+    t.secs(0.5).await?;
+    let refused_again = t.cmd("/time query").await?;
+    t.check(!refused_again.contains("time is"), format!("deop from the console: {refused_again}"));
     t.c().leave_world();
     t.screen("core:title").await?;
     t.check_eq(SPARKS.get(), own_sparks, "the player's own setting after leaving");
