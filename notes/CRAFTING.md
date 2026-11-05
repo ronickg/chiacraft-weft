@@ -182,8 +182,9 @@ diamond ... I kind of wanted to be a bit more realistic, but not completely". So
   each its own colours, copper and bronze muted toward their ingots), diamond painted like the rest
   with its quilted lattice on the plates. The piece's gems sit at their spots (`looks::worn_look`,
   `WORN_GEM_SPOTS`; a helmet shows one, on the brow), over an under-layer where the painting rounds the helmet's
-  and pauldrons' corners (no skin shows there): a mail coif and sleeves in the fastening's dark
-  steps for a metal fastening, padding for leather, sinew and cord (`entity/armor/parts/under_*`), carried on the stack as `core:worn_look` (an engine
+  and pauldrons' corners (no skin shows there): a mail coif and sleeves for a metal fastening,
+  always iron-dark (steel's dark steps; Ronald: "Always iron-dark"), padding for leather, sinew and
+  cord in the fastening's own dark steps (`entity/armor/parts/under_*`), carried on the stack as `core:worn_look` (an engine
   addition, `notes/ENGINE_CHANGES.md`). A new shell material wears steel's set until it has its own
   (a check names it). The four look families (`parts::ARMOUR_LOOKS`: `_mail`, `_scale`, `_gem`)
   stay as items, their own worn sets the fallback, and the pieces' icons.

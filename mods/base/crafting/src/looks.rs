@@ -247,13 +247,20 @@ pub const WORN_SETS: [&str; 11] =
 /// set at their spots. A shell without a set of its own (a new material) wears steel's until it
 /// has one. Under a helmet and a chestplate's pauldrons, where the painting rounds their corners
 /// off, an under-layer of the fastening's (Ronald, 11-05: "Fix it", no skin showing there): a mail
-/// coif and sleeves for a metal fastening, padding for leather, sinew and cord, in its dark steps.
+/// coif and sleeves for a metal fastening (always in steel's dark steps), padding for leather, sinew
+/// and cord in the fastening's own.
 pub fn worn_look(slot: usize, shell: &str, fastening: &str, gems: &[&str]) -> String {
     let layer = if slot == 2 { 2 } else { 1 };
     let set = if WORN_SETS.contains(&shell) { shell } else { "steel" };
     let under = if slot <= 1 {
         let metal = fastening == "gold" || crate::materials::material(fastening).is_some_and(|m| m.works == crate::materials::Works::Metal);
-        format!("base:entity/armor/parts/under_{}_1@{};", if metal { "mail" } else { "padded" }, ramp(fastening))
+        // Mail is always iron-dark, whatever metal fastens the piece (Ronald, 11-05: "Always
+        // iron-dark"; copper or gold mail read loud under the plates).
+        if metal {
+            format!("base:entity/armor/parts/under_mail_1@{};", ramp("steel"))
+        } else {
+            format!("base:entity/armor/parts/under_padded_1@{};", ramp(fastening))
+        }
     } else {
         String::new()
     };
@@ -377,7 +384,7 @@ mod tests {
         assert!(gem_look("axe", 3, "diamond").is_none() && gem_look("sword", 3, "diamond").is_none());
         assert_eq!(
             worn_look(1, "bronze", "gold", &["amber"]),
-            "base:entity/armor/parts/under_mail_1@base:ramps/gold;base:entity/armor/worn/bronze_1;base:entity/armor/parts/gem_set@base:ramps/gem_amber+46,44"
+            "base:entity/armor/parts/under_mail_1@base:ramps/steel;base:entity/armor/worn/bronze_1;base:entity/armor/parts/gem_set@base:ramps/gem_amber+46,44"
         );
     }
 
