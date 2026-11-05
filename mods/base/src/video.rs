@@ -99,12 +99,12 @@ struct Row {
 /// The presets, Low to Ultra, per row (in `ROWS` order). Contact shadows on at Ultra only and
 /// light shafts low below it (Ronald, 11-05, on the speed Researcher's Mac numbers: contact
 /// shadows cost ~2.2 ms under trees, full shafts ~1.1-1.5 ms more than low).
-const PRESETS: [[f64; 12]; 4] = [
-    // scale shadows size  reflect contact volume shafts bloom view lod   vsync cap
-    [0.5, 0.0, 1024.0, 0.0, 0.0, 0.0, 0.0, 0.0, 6.0, 64.0, 1.0, 60.0],
-    [0.67, 1.0, 1024.0, 1.0, 0.0, 1.0, 1.0, 0.0, 8.0, 128.0, 1.0, 60.0],
-    [0.0, 2.0, 2048.0, 2.0, 0.0, 2.0, 1.0, 1.0, 12.0, 192.0, 1.0, 0.0],
-    [1.0, 2.0, 4096.0, 2.0, 2.0, 2.0, 2.0, 1.0, 16.0, 256.0, 1.0, 0.0],
+const PRESETS: [[f64; 13]; 4] = [
+    // scale shadows size  reflect contact volume shafts bloom fireflies view lod   vsync cap
+    [0.5, 0.0, 1024.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 6.0, 64.0, 1.0, 60.0],
+    [0.67, 1.0, 1024.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 8.0, 128.0, 1.0, 60.0],
+    [0.0, 2.0, 2048.0, 2.0, 0.0, 2.0, 1.0, 1.0, 1.0, 12.0, 192.0, 1.0, 0.0],
+    [1.0, 2.0, 4096.0, 2.0, 2.0, 2.0, 2.0, 1.0, 1.0, 16.0, 256.0, 1.0, 0.0],
 ];
 const PRESET_NAMES: [&str; 4] = ["low", "medium", "high", "ultra"];
 
@@ -116,7 +116,7 @@ fn number(v: f64) -> (String, i64) {
     (String::new(), v.round() as i64)
 }
 
-const ROWS: [Row; 12] = [
+const ROWS: [Row; 13] = [
     Row {
         key: "render_scale",
         // 0 is Auto (Distant terrain's render pass: 0.67 on a high-density screen, 1 elsewhere).
@@ -143,6 +143,14 @@ const ROWS: [Row; 12] = [
         get: || FX_BLOOM.get() as f64,
         set: |v| FX_BLOOM.set(v as i32),
         shown: |v| word(if v > 0.0 { "on" } else { "off" }),
+    },
+    // Fireflies on warm nights (`fireflies.rs`): few at every preset; many is a taste.
+    Row {
+        key: "fireflies",
+        values: &[0.0, 1.0, 2.0],
+        get: || crate::fireflies::FX_FIREFLIES.get() as f64,
+        set: |v| crate::fireflies::FX_FIREFLIES.set(v as i32),
+        shown: |v| word(["off", "few", "many"][(v as usize).min(2)]),
     },
     Row {
         key: "view",

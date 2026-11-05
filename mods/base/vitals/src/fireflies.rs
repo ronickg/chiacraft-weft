@@ -95,15 +95,20 @@ pub fn day_mean(c: &climate::Climate, day: f32) -> f32 {
         / 24.0
 }
 
-/// How many fly round a player now: `most` for the setting (`COUNTS`), in `biome`, with the air
-/// `air` there, the day's mean `mean`, the soil water `soil`, rain or not, at `hour` on a day
-/// whose sun sets at `sunset`.
+/// The share of a setting's full count (`COUNTS`) that fly round a player now, 0 to 1: in
+/// `biome`, with the air `air` there, the day's mean `mean`, the soil water `soil`, rain or not,
+/// at `hour` on a day whose sun sets at `sunset`. The server works it out; the client multiplies.
+pub fn share(biome: &str, air: f32, mean: f32, soil: f32, raining: bool, hour: f32, sunset: f32) -> f32 {
+    if raining || air < FLY_MIN_C || mean < SEASON_MIN_C {
+        return 0.0;
+    }
+    weight(biome) * wet_share(soil) * hour_share(hour, sunset)
+}
+
+/// How many fly round a player now: `most` for the setting (`COUNTS`) times the `share`.
 #[allow(clippy::too_many_arguments)]
 pub fn count(most: u32, biome: &str, air: f32, mean: f32, soil: f32, raining: bool, hour: f32, sunset: f32) -> u32 {
-    if raining || air < FLY_MIN_C || mean < SEASON_MIN_C {
-        return 0;
-    }
-    (most as f32 * weight(biome) * wet_share(soil) * hour_share(hour, sunset)).round() as u32
+    (most as f32 * share(biome, air, mean, soil, raining, hour, sunset)).round() as u32
 }
 
 #[cfg(test)]
