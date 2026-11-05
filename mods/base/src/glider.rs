@@ -124,7 +124,7 @@ fn toggle(w: &World, id: u64) {
         close(w, id, &st, "closed");
         return;
     }
-    if st.on_ground != 0 || st.in_liquid != 0 || st.flying != 0 || st.health <= 0.0 || st.fall_distance < OPENS_AFTER {
+    if st.on_ground != 0 || st.in_liquid != 0 || st.flying != 0 || st.health <= 0.0 || st.fall_distance < OPENS_AFTER || crate::grapple::attached(id) {
         return;
     }
     let Some((_, wing)) = carried(w, id) else { return };

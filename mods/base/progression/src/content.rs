@@ -256,6 +256,8 @@ pub const RULES: &[Rule] = &[
     r(&["base:leather_helmet", "base:leather_chestplate", "base:leather_leggings", "base:leather_boots"], 0, Tech, Armour, Made),
     // glider.rs: leather on a frame of sticks (`vitals::glide::HIDE`).
     r(&["base:glider"], 0, Tech, Tool, Made),
+    // grapple.rs: wrought-iron flukes on a string cord (`vitals::grapple::IRON`).
+    r(&["base:grappling_hook"], 2, Tech, Tool, Made),
     r(&["base:iron_pickaxe", "base:iron_axe", "base:iron_shovel", "base:iron_hoe", "base:iron_sword"], 2, Tech, Tool, Made),
     r(&["base:iron_helmet", "base:iron_chestplate", "base:iron_leggings", "base:iron_boots"], 2, Tech, Armour, Made),
     r(&["base:gold_pickaxe", "base:gold_axe", "base:gold_shovel", "base:gold_hoe", "base:gold_sword"], 1, Tech, Tool, Made),

@@ -26,7 +26,7 @@ Power grows Ã—1.6 an age: `g(L) = 1.6^(L/10)` over area and item level L (tier Ã
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 490 | 148 | 49 | 34 % | 260 EM |
 | 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 31 | 24 | 76 | 26 % | 164 EM |
-| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 27 | 25 | 62 | 16 % | 270 EM |
+| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 28 | 26 | 62 | 16 % | 274 EM |
 | 3 | Age of Steam | 18 | 1080 | 4.10 | 31.1 / 104 / 130 | 30 | 27 | 94 | 22 % | 512 EM |
 | 4 | Age of Lightning | 20 | 1200 | 6.55 | 49.7 / 166 / 207 | 0 | 0 | 0 | 0 % | 0 EM |
 | 5 | Age of the Future | 18 | 1080 | 10.49 | 79.6 / 265 / 332 | 0 | 0 | 0 | 0 % | 0 EM |
@@ -329,13 +329,13 @@ Notes:
 - base:meteoric_iron: hammered cold, iron-grade before a player can smelt (Research round 17)
 - base:raw_gold, base:gold_ingot, base:gold_block: cast and soft: the Bronze Age's (Ronald, 11-07: "move them to fit")
 
-### Iron Age (27)
+### Iron Age (28)
 
-**tech** (19)
+**tech** (20)
 
 - ground: redstone_ore (-), star_steel_ore (-)
 - material: bucket (3.5), iron_block (11), iron_ingot (1.2), lava_bucket (4.1), raw_iron (1.0), star_steel_ingot (12), star_steel_lump (12), water_bucket (3.7)
-- tool: iron_axe (3.6), iron_hoe (2.5), iron_pickaxe (3.6), iron_shovel (1.3), iron_sword (2.4)
+- tool: grappling_hook (3.8), iron_axe (3.6), iron_hoe (2.5), iron_pickaxe (3.6), iron_shovel (1.3), iron_sword (2.4)
 - armour: iron_boots (4.7), iron_chestplate (9.4), iron_helmet (5.9), iron_leggings (8.2)
 
 **magic** (4)

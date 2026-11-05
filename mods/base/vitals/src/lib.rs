@@ -29,6 +29,7 @@ pub mod food;
 pub mod forage;
 pub mod gear;
 pub mod glide;
+pub mod grapple;
 pub mod impact;
 pub mod layers;
 pub mod levels;
