@@ -79,6 +79,10 @@ pub fn register(r: &mut Registry) {
     r.block(&STAR_LANTERN)
         .sound_group("metal")
         .texture("star_lantern")
+        // A lantern a hand tall in a cage (Art's `models/block/star_lantern.json`, picked up by
+        // its name): not a solid cube, see-through, so its neighbours keep their faces.
+        .not_solid()
+        .cutout()
         .hardness(1.0)
         .mineable("pickaxe")
         .light_rgb(10, 12, 15)
