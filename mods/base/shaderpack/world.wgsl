@@ -326,9 +326,16 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
 // shadows that move with the sun), the sky light alone beyond it, and never deep under cover. This
 // file must not name the engine's block lookup: its name anywhere in it makes the engine upload
 // the blocks around the camera every frame.
+const PLANT_SHADOW_LIFT: f32 = 0.7;
+
 fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
     let sky = smoothstep(0.75, 1.0, in.light.x);
-    let mapped = shadow_at(in.rel, n);
+    // A plant's blade asks the map from most of a block toward the sun: the blades round it, as
+    // thin as a few of the map's texels, shaded each other in fine crossing stripes, pale and
+    // banded tall grass up close at 3456 px (Ronald's Mac, 11-06; gone with shadows off). Trees,
+    // walls and the player still shade it; the ground under it keeps the grass's shade.
+    let lift = select(0.0, PLANT_SHADOW_LIFT, in.kind.z != 0u);
+    let mapped = shadow_at(in.rel + light_dir() * lift, n);
     // Under a forest's canopy the map's gaps let the sun through where the leaves cut the sky light
     // (`light_on`'s sunflecks).
     let c = min(canopy(), 1.0);
