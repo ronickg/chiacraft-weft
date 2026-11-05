@@ -63,6 +63,7 @@ pub fn register(r: &mut Registry) {
 }
 
 /// A rope made fast: its anchor's block (it lets go when that is gone), anchor, length and pace.
+#[derive(Clone, Copy)]
 struct Line {
     block: BlockPos,
     anchor: Vec3,
@@ -186,8 +187,7 @@ fn tick(w: &World) {
     for id in ids {
         // In another region (each ticks this), or gone: its attributes run out by themselves.
         let Some(st) = w.entity(id) else { continue };
-        let Some((block, anchor, length, reel, last)) = state(|s| s.lines.get(&id).map(|l| (l.block, l.anchor, l.length, l.reel, l.last)))
-        else {
+        let Some(Line { block, anchor, length, reel, last }) = state(|s| s.lines.get(&id).copied()) else {
             continue;
         };
         if st.health <= 0.0 {
@@ -247,7 +247,8 @@ const IRON: u32 = 0x5E6068FF;
 const IRON_LIT: u32 = 0x8A8C94FF;
 
 /// Throws seen per entity and when a missed one began (client side).
-static SEEN: Mutex<Option<HashMap<u64, (u32, Option<std::time::Instant>)>>> = Mutex::new(None);
+type Seen = HashMap<u64, (u32, Option<std::time::Instant>)>;
+static SEEN: Mutex<Option<Seen>> = Mutex::new(None);
 
 fn draw(c: &Client) {
     let st = c.state();
