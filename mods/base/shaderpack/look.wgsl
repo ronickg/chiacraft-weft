@@ -1050,7 +1050,9 @@ fn haze_veil(rel: vec3<f32>, dist: f32) -> vec3<f32> {
     // blue, about a fifth of the way to the sky's colour at 1000 blocks). Grey haze (Mie) comes
     // with the conditions: rain, the weather's fog, a forest's damp air, and a little always.
     let k = look_opt(OPT_HAZE, 1.6) * mix(0.45, 1.0, thin);
-    let rayleigh = vec3(0.35, 0.6, 1.0) * 2.6e-4 * k;
+    // A third thicker than it was (Far view, 11-05: Bliss's far land is about two thirds sky-blue
+    // at 2000 blocks, ours was under 0.6): far land reads as far, the near stays as clear.
+    let rayleigh = vec3(0.35, 0.6, 1.0) * 3.4e-4 * k;
     let mie = (0.4e-4 + 2.0e-4 * scene.weather.z + 0.8e-4 * min(canopy(), 1.0)) * k;
     let far = dist * smoothstep(90.0, 450.0, dist);
     // Rain's own mist starts at the eye (Ronald, 11-05: "when raining shouldn't it be more
@@ -1087,7 +1089,14 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // Straight down there is no level direction left: never a zero vector (its normalize is NaN,
     // and the Mac's fast math has no safety net).
     let air = vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z);
-    let color = sky_color(normalize(air));
+    let horizon = sky_color(normalize(air));
+    // Aerial perspective: the air's own blue, the sky's a little above the horizon (about 6°, a
+    // third of the way to the zenith's colour), not the horizon's pale band: veiled toward that, far
+    // land went milky white and lost its contrast, where Bliss's goes a deep sky blue (Far view, the
+    // Distant Horizons comparison, 11-05). It hands over to the horizon's colour where the terrain
+    // ends, so the last ridges still meet the sky without a line, standing a little bluer than it.
+    let blue = sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 0.1, dir.z)));
+    let color = mix(blue, horizon, smoothstep(end * 0.55, end, dist));
     let rain = rain_amount();
     // Thinner looking up at what is high, so hills stand out against a hazy valley (`haze_veil`).
     let veil = haze_veil(rel, dist);
@@ -1112,8 +1121,22 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // Far ridges still lose a little colour (as before, but only where the veil has begun), then
     // the veil per channel (its blue thicker than its red), then the handover at the end.
     // In rain everything takes a little grey-blue wash, near too.
-    let pale = mix(mix(c, vec3(luma(c)), clamp(veil.b * 0.6, 0.0, 0.3)), vec3(luma(c)) * vec3(0.92, 0.97, 1.05), rain * 0.08);
-    let seen = mix(pale, lit, veil);
+    // (Clear air takes less of its colour: a fifth of the veil, a tenth at most, as far biome colours
+    // under Bliss stay saturated, a snowfield white and a forest green; rain's grey as before.)
+    let grey = mix(clamp(veil.b * 0.2, 0.0, 0.1), clamp(veil.b * 0.6, 0.0, 0.3), max(rain, scene.weather.z));
+    let pale = mix(mix(c, vec3(luma(c)), grey), vec3(luma(c)) * vec3(0.92, 0.97, 1.05), rain * 0.08);
+    // Haze keeps the land's colour (Ronald, 11-05, on the glass slabs: "Haze keeps land colour"):
+    // in clear air the veil stops at four fifths, the land veils toward a tenth under the sky's
+    // brightness, and its hue and saturation take only seven tenths of the veil (its brightness all
+    // of it). Veiled all the way to the sky's own colour, pale bare rock 400-500 blocks off read as
+    // glass, the land behind seen through it. Rain and the weather's fog veil as before (the Shader
+    // session's), and the handover where the terrain ends is still the sky's.
+    let wet = clamp(max(rain, scene.weather.z), 0.0, 1.0);
+    let v = mix(min(veil, vec3(0.8)), veil, wet);
+    let toward = lit * mix(0.9, 1.0, wet);
+    let mixed = mix(pale, toward, v);
+    let own = mix(pale, toward, v * mix(0.7, 1.0, wet));
+    let seen = max(vec3(luma(mixed)) + own - vec3(luma(own)), vec3(0.0));
     return mix(seen, lit, edge) + held_in_fog(rel, sky);
 }
 
