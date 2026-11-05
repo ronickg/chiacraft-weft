@@ -166,7 +166,7 @@ fn tick(w: &World) {
             let worn = DAMAGE.on_stack_own(&s).unwrap_or(0) + 1;
             inv.set(slot, s.with(&DAMAGE, worn));
         }
-        if w.game_time() % glide::AIR_EVERY == 0 {
+        if w.game_time().is_multiple_of(glide::AIR_EVERY) {
             air(w, id, &st);
         }
     }

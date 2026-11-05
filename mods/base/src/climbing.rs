@@ -132,7 +132,7 @@ fn tick(w: &World) {
             if h.spent || v.out != 0 || st.health <= 0.0 { 0.0 } else { climb::speed(b) }
         };
         // Respawning drops modifiers: said again now and then.
-        if (speed - h.speed).abs() > 1e-3 || w.game_time() % 100 == 0 {
+        if (speed - h.speed).abs() > 1e-3 || w.game_time().is_multiple_of(100) {
             h.speed = speed;
             w.attribute_add_modifier(id, &attribute::CLIMB_SPEED, "base:climbing", attr_op::ADD, speed as f64, 0);
         }
