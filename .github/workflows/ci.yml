@@ -1,6 +1,6 @@
 # Builds the workspace, lints it and runs every check that has no person in it, on every push to
 # dev and main and every pull request: the unit tests, the mods' checks (including the sheets that fail
-# when SHEET.md or SPECIES.md is stale), the animals' rules through WASM, and the testkit against
+# when SHEET.md, SPECIES.md or NAMES.md is stale), the animals' rules through WASM, and the testkit against
 # the real game. Linux has no GPU here: the game draws with Mesa's software Vulkan (lavapipe)
 # into a virtual X screen.
 name: CI
@@ -121,6 +121,17 @@ jobs:
           path: |
             health.md
             health.json
+
+  # The invented words (mods/base/lore/lexicon.toml): every name re-derives from its roots, keeps
+  # its people's sound rules, matches no banned pattern or bad word, and notes/NAMES.md is what the
+  # lexicon says (`python3 tools/names/names.py sheet > notes/NAMES.md`).
+  names:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Names
+        run: python3 -I tools/names/names.py check
 
   animals-web:
     runs-on: ubuntu-latest
