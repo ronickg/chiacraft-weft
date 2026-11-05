@@ -15,6 +15,8 @@ use weft_sdk::*;
 use crate::blocks::{COBBLESTONE, DIRT, GRASS, GRAVEL, OBSIDIAN, SNOWY_GRASS};
 
 static COARSE_DIRT: Block = Block::named("coarse_dirt");
+/// First hours' block (the sky events); a crater holds none until it is there.
+static METEORITE: Block = Block::named("base:meteorite");
 static LOGS: Tag = Tag::named("logs");
 static LEAVES: Tag = Tag::named("leaves");
 
@@ -33,6 +35,39 @@ struct Carve {
     /// Edits made so far, columns skipped (not loaded or water).
     edits: usize,
     skipped: usize,
+    /// The core: (dx, dz, blocks under the bowl's lining) and its block; the rim's meteorites:
+    /// (dx, dz) and theirs. No block (`u32::MAX`), none placed.
+    core: Vec<(i32, i32, i32)>,
+    core_state: u32,
+    rim_spots: Vec<(i32, i32)>,
+    rim_state: u32,
+}
+
+/// What a crater holds: the core's block (full name) and how many, and the meteorites in the
+/// rim. A block that isn't registered is left out.
+#[derive(Clone, Copy, Debug)]
+pub struct Loot {
+    pub core: &'static str,
+    pub core_count: i32,
+    pub rim_count: i32,
+}
+
+impl Loot {
+    /// Meteorites only, `IMPACT_CORE` in the core times `share` (the sky events' share for the
+    /// players nearby, 1 alone) and `IMPACT_RIM_METEORITES` in the rim, picked by `seed`.
+    pub fn meteorites(seed: u64, share: f64) -> Loot {
+        let pick = |v: u64, (lo, hi): (i32, i32)| lo + (v % (hi - lo + 1) as u64) as i32;
+        Loot {
+            core: "base:meteorite",
+            core_count: (pick(seed >> 8, n::IMPACT_CORE) as f64 * share.max(1.0)).round() as i32,
+            rim_count: pick(seed >> 24, n::IMPACT_RIM_METEORITES),
+        }
+    }
+}
+
+/// The state of block `name` (full name), `u32::MAX` while nothing registers it.
+fn state_named(name: &'static str) -> u32 {
+    if name == METEORITE.name() { METEORITE.id() } else { Block::generated(name.to_string()).id() }
 }
 
 static CARVES: Mutex<Vec<Carve>> = Mutex::new(Vec::new());
@@ -58,9 +93,15 @@ pub fn register(r: &mut Registry) {
     });
 }
 
-/// Starts a crater of `radius` at (`x`, `z`), carved over `ticks` ticks; the number of columns
-/// it will carve, or None where the middle isn't loaded land.
+/// Starts a crater of `radius` at (`x`, `z`), carved over `ticks` ticks, holding meteorites for
+/// one player (`Loot::meteorites`); the number of columns it will carve, or None where the
+/// middle isn't loaded land.
 pub fn start(w: &World, x: i32, z: i32, radius: i32, ticks: u32) -> Option<usize> {
+    start_with(w, x, z, radius, ticks, None)
+}
+
+/// `start` with what the crater holds (`loot`; None for `Loot::meteorites` alone).
+pub fn start_with(w: &World, x: i32, z: i32, radius: i32, ticks: u32, loot: Option<Loot>) -> Option<usize> {
     let guess = base_api::land::height(&base_api::land::fields(w.seed()), x * 16, z * 16) >> 4;
     let y = ground(w, x, z, guess)?;
     let seed = w.seed_at([x, y, z]);
@@ -83,7 +124,42 @@ pub fn start(w: &World, x: i32, z: i32, radius: i32, ticks: u32) -> Option<usize
         .sum();
     let budget = (total / ticks as f64).ceil() as usize;
     let count = columns.len();
-    CARVES.lock().unwrap().push(Carve { dim: w.dimension(), at: [x, y, z], radius, rim, seed, columns, budget, edits: 0, skipped: 0 });
+    let loot = loot.unwrap_or_else(|| Loot::meteorites(seed, 1.0));
+    // The core in a 3 by 3 under the middle, layer by layer; the rim's meteorites round the
+    // crest, a little outside it, in its rubble.
+    const ROUND: [(i32, i32); 9] = [(0, 0), (1, 0), (0, 1), (-1, 0), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1)];
+    let core = (0..loot.core_count.max(0))
+        .map(|i| {
+            let (dx, dz) = ROUND[(i % n::IMPACT_CORE_LAYER) as usize % ROUND.len()];
+            (dx, dz, 2 + i / n::IMPACT_CORE_LAYER)
+        })
+        .collect();
+    let mut rim_spots: Vec<(i32, i32)> = Vec::new();
+    for i in 0..loot.rim_count.max(0) as i64 {
+        let h = weft_sdk::noise::hash(seed, i, 7, 0);
+        let a = (h % 3600) as f64 / 3600.0 * std::f64::consts::TAU;
+        let u = 1.0 + ((h >> 16) % 30) as f64 / 100.0;
+        let spot = ((a.cos() * u * radius as f64).round() as i32, (a.sin() * u * radius as f64).round() as i32);
+        if !rim_spots.contains(&spot) {
+            rim_spots.push(spot);
+        }
+    }
+    let (core_state, rim_state) = (state_named(loot.core), METEORITE.id());
+    CARVES.lock().unwrap().push(Carve {
+        dim: w.dimension(),
+        at: [x, y, z],
+        radius,
+        rim,
+        seed,
+        columns,
+        budget,
+        edits: 0,
+        skipped: 0,
+        core,
+        core_state,
+        rim_spots,
+        rim_state,
+    });
     Some(count)
 }
 
@@ -194,6 +270,15 @@ fn column(w: &World, c: &Carve, dx: i32, dz: i32, gone: &mut Vec<[i32; 3]>) -> O
         // Lined with melt (impact glass, for now obsidian), broken rock under it.
         set([x, floor, z], OBSIDIAN.id());
         set([x, floor - 1, z], rubble(hash(floor - 1, 2)));
+        // The core, under a block or two of broken rock.
+        if c.core_state != u32::MAX {
+            for &(_, _, below) in c.core.iter().filter(|m| (m.0, m.1) == (dx, dz)) {
+                for y in floor - below + 1..floor - 1 {
+                    set([x, y, z], rubble(hash(y, 5)));
+                }
+                set([x, floor - below, z], c.core_state);
+            }
+        }
     } else if u < n::IMPACT_RIM_OUT {
         // The rim: thrown-out rock over the land, scorched on top.
         let top = g + surface(u, c.radius, c.rim);
@@ -205,6 +290,10 @@ fn column(w: &World, c: &Carve, dx: i32, dz: i32, gone: &mut Vec<[i32; 3]>) -> O
             clear_plant(w, [x, top + 1, z], &mut set);
         } else {
             scorch(w, [x, g, z], &mut set);
+        }
+        // A meteorite in the rubble, under its top.
+        if c.rim_state != u32::MAX && c.rim_spots.contains(&(dx, dz)) {
+            set([x, (top - 1).max(g), z], c.rim_state);
         }
     } else {
         // Round it: the grass scorched, thinning outward.

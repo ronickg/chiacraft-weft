@@ -30,6 +30,19 @@ pub const IMPACT_CLEAR_UP: i32 = 40;
 /// Shares of the rim's thrown-out rock (out of 100): gravel, then cobblestone; the rest dirt.
 pub const IMPACT_RUBBLE: (u32, u32) = (45, 40);
 
+/// Meteorites in the core at the bowl's bottom, under a block or two of broken rock (before
+/// the sky events' share for more players nearby), fewest and most (addendum 2's core; the
+/// star-steel mass takes their place once crafting has it).
+pub const IMPACT_CORE: (i32, i32) = (3, 6);
+
+/// Meteorites scattered in the rim's rubble, fewest and most (their drops are addendum 2's 6-12
+/// rim lumps).
+pub const IMPACT_RIM_METEORITES: (i32, i32) = (2, 4);
+
+/// The core's meteorites lie in a 3 by 3 under the middle, a second layer under the first when
+/// there are more than nine.
+pub const IMPACT_CORE_LAYER: i32 = 9;
+
 // The live crater stays small enough to carve in a second, and shallower than wide.
 const _: () = {
     assert!(IMPACT_RADIUS.0 <= IMPACT_RADIUS.1 && IMPACT_RADIUS.1 <= 12);
@@ -37,4 +50,6 @@ const _: () = {
     assert!(IMPACT_RIM.0 <= IMPACT_RIM.1 && IMPACT_RIM.1 < IMPACT_RADIUS.0);
     assert!(IMPACT_RIM_OUT > 1.0 && IMPACT_SCORCH >= IMPACT_RIM_OUT);
     assert!(IMPACT_RUBBLE.0 + IMPACT_RUBBLE.1 <= 100);
+    assert!(IMPACT_CORE.0 <= IMPACT_CORE.1 && IMPACT_CORE.1 <= IMPACT_CORE_LAYER);
+    assert!(IMPACT_RIM_METEORITES.0 <= IMPACT_RIM_METEORITES.1);
 };
