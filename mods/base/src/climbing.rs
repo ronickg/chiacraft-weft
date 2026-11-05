@@ -67,7 +67,9 @@ pub fn register(r: &mut Registry) {
     // size so its pixels stay whole), gone the moment the hands let go.
     r.hud_element(&HUD_CLIMB, hud_anchor::UNDER_CROSSHAIR, 5, |ui| {
         ui.progress_bind("hud_stamina", S::default().size(HINT.0, HINT.1), |c| {
-            let on = c.player_state().is_some_and(|me| me.pose == CLIMB.id() && me.health > 0.0);
+            let on = c
+                .player_state()
+                .is_some_and(|me| me.pose == CLIMB.id() && me.health > 0.0);
             let v = c.component(&VITALS).filter(|v| v.max_stamina > 0.0);
             match v {
                 Some(v) if on && !c.outside_survival() => (3.0 + (v.stamina / v.max_stamina).clamp(0.0, 1.0) * 186.0) / 192.0,
@@ -106,7 +108,9 @@ fn tick(w: &World) {
     let d = base_api::difficulty();
     for id in w.players() {
         let Some(st) = w.entity(id) else { continue };
-        let h = holds.entry(id).or_insert(Hold { last: st.pos, spent: false, speed: f32::NAN });
+        let h = holds
+            .entry(id)
+            .or_insert(Hold { last: st.pos, spent: false, speed: f32::NAN });
         let on_wall = st.pose == CLIMB.id();
         let moved = moving(st.pos, h.last);
         h.last = st.pos;

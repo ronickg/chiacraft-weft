@@ -34,7 +34,10 @@ const HOLD: u64 = 40;
 
 pub fn register(r: &mut Registry) {
     let wing = glide::HIDE;
-    r.item(&GLIDER).max_stack(1).durability(wing.durability()).tab(&crate::tabs::TOOLS);
+    r.item(&GLIDER)
+        .max_stack(1)
+        .durability(wing.durability())
+        .tab(&crate::tabs::TOOLS);
     // Leather stretched on a frame of sticks, lashed with string.
     r.shaped(&base_api::CRAFTING, "glider", 1, &["LLL", "sTs", "s s"], &[('L', "base:leather"), ('s', "#stick"), ('T', "#string")]);
     r.pose(&GLIDE)
