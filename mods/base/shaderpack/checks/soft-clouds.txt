@@ -1,0 +1,70 @@
+# Soft clouds (core:soft_clouds, Ronald's "Soft clouds first", storms first) beside Bliss and
+# Photon: a clear day, rain and a thunderstorm, from the clouds check's hill (149.5 75 -166.5) and
+# from y 120; then a look while flying (the history must not smear). Run with --config
+# "core:soft_clouds=1" (and without, for the blocky ones). Seed 1, --view 12, --shader-pack chiacraft,
+# a fresh world, spectator, mobs off. Yaw 90 faces the evening sun.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode spectator
+chat /weather clear 99999
+chat /tp 149.5 120 -166.5
+loaded
+idle
+wait 10
+chat /time set 6000
+look 0 20
+wait 3
+shot sc_1_clear_noon.png
+look 90 35
+wait 2
+shot sc_1b_clear_up.png
+look 0 20
+wait 1
+bench 4 soft_clear
+chat /time set 11300
+look 90 8
+wait 3
+shot sc_2_clear_evening_tosun.png
+look 270 12
+wait 2
+shot sc_2b_clear_evening_away.png
+chat /time set 12100
+look 90 8
+wait 3
+shot sc_3_sunset.png
+chat /time set 9500
+chat /tp 149.5 75 -166.5
+chat /weather rain 99999
+wait 12
+look 90 12
+wait 3
+shot sc_4_rain_tosun.png
+look 270 12
+wait 2
+shot sc_4b_rain_away.png
+chat /weather thunder 99999
+wait 12
+look 90 12
+wait 3
+shot sc_5_storm_tosun.png
+look 270 12
+wait 2
+shot sc_5b_storm_away.png
+look 90 55
+wait 2
+shot sc_5c_storm_up.png
+look 90 12
+wait 1
+bench 4 soft_storm
+chat /weather clear 99999
+chat /time set 6000
+chat /tp 149.5 120 -166.5
+wait 8
+look 0 15
+wait 2
+hold core:forward 3 nowait
+wait 1
+shot sc_6_flying.png
+wait 2
+quit
