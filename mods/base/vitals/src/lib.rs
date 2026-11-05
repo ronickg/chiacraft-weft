@@ -24,6 +24,7 @@ pub mod first;
 pub mod foliage;
 pub mod food;
 pub mod forage;
+pub mod impact;
 pub mod layers;
 pub mod levels;
 pub mod meals;

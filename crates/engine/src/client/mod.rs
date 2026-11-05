@@ -1099,7 +1099,10 @@ impl Client {
         input.mute_moves = m.has(weft_abi::camera_flags::DETACHED);
         input.mute_hands = m.has(weft_abi::camera_flags::NO_INTERACT);
         let input = &*input;
+        crate::diag::end_parts();
+        let p = crate::diag::part("messages and terrain");
         self.take_messages(dt);
+        drop(p);
         self.read_look(input);
         self.read_controls(input);
         self.fly_speed(input);
@@ -1117,14 +1120,20 @@ impl Client {
         if input.pressed("core:inventory") && input.captured {
             self.conn.send(ToServer::OpenInventory);
         }
+        let p = crate::diag::part("physics, camera, act");
         self.step_physics(input, dt);
         self.update_camera(input, dt as f32);
         let look = self.aim(input);
         self.act(input, dt, look);
         self.send_move(dt);
+        drop(p);
+        let p = crate::diag::part("entities");
         self.animate_entities(dt);
+        drop(p);
         self.chip_block(dt);
+        let p = crate::diag::part("particles");
         self.particles.update(dt as f32);
+        drop(p);
         self.creature_sounds(dt as f32, moved);
         self.me.hurt = (self.me.hurt - dt as f32).max(0.0);
         self.dead_for = self.dead.then(|| self.dead_for.unwrap_or(0.0) + dt as f32);
@@ -1803,12 +1812,14 @@ impl Client {
         if std::mem::take(&mut self.world.tints_changed) {
             self.render.set_biome_table(gpu, self.world.biome_tints());
         }
+        let p = crate::diag::part("tints");
         for (col, tints) in self
             .world
             .take_tints(glam::IVec2::new(center.x, center.z), reach)
         {
             self.render.upload_tints(gpu, col, &tints);
         }
+        drop(p);
         if self.joined && self.terrain_view != (center, self.view_radius) {
             self.terrain_view = (center, self.view_radius);
             let _ = self
@@ -1818,18 +1829,25 @@ impl Client {
         }
         // Enough jobs that meshing keeps up at 50 frames per second too (results are taken once
         // a frame), not only at hundreds.
+        let p = crate::diag::part("schedule meshing");
         self.world
             .schedule_meshing(center, crate::meshing().current_num_threads() * 512);
+        drop(p);
+        let p = crate::diag::part("solid cells");
         self.render.update_solid(gpu, &self.world, center);
+        drop(p);
         self.world.set_eye(center.y);
         // Uploads too, oldest first; the rest wait for the next frame (dropped if their cube
         // changed or left meanwhile). Edits and what is around the player go right away.
+        let p = crate::diag::part("uploads near (no budget)");
         let (now, later) = self.world.take_meshes(center);
         for r in now {
             self.render.upload(gpu, textures, (0, r.pos), &r.mesh);
             self.world.mark_shown(r.pos);
         }
         self.meshes.extend(later);
+        drop(p);
+        let _p = crate::diag::part("uploads (budget)");
         let start = Instant::now();
         while start.elapsed() < self.budget {
             let Some(r) = self.meshes.pop_front() else { break };
