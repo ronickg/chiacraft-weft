@@ -437,7 +437,9 @@ fn held_light(rel: vec3<f32>, n: vec3<f32>) -> vec3<f32> {
 // summed, a lamp's level 15 at noon washed the stone about it out to a pale, glassy blue (First
 // hours' Starheart lantern, 11-05).
 fn block_by_day(sky: f32) -> f32 {
-    return 1.0 - 0.75 * smoothstep(0.5, 1.0, sky) * smoothstep(0.3, 0.8, scene.params.z);
+    // By the sun's height, not the daylight value: that stays above zero at night, and a torch
+    // at midnight lost some of its warmth.
+    return 1.0 - 0.75 * smoothstep(0.5, 1.0, sky) * smoothstep(0.0, 0.25, scene.sun.y);
 }
 
 fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
