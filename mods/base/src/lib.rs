@@ -37,6 +37,7 @@ mod ley;
 mod look;
 mod machines;
 mod meteors;
+mod metals;
 mod mobs;
 mod parts;
 mod plants3d;
@@ -124,6 +125,7 @@ fn init(r: &mut Registry) {
     recipes::register(r);
     book::register(r);
     discovery::register(r);
+    metals::register(r);
     parts::register(r);
     gems::register(r);
     first::register(r);

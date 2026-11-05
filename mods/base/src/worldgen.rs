@@ -367,6 +367,9 @@ pub fn register(r: &mut Registry) {
             .exposed(exposed);
     }
 
+    // Copper and tin by rock and biome (`metals.rs`).
+    crate::metals::ores(r);
+
     // The layers under the trees, each biome's (`vitals::layers`).
     for l in vitals::layers::LAYERS
         .iter()
