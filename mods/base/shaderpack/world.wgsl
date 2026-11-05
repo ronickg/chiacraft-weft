@@ -393,7 +393,7 @@ fn shade(in: VOut, albedo_in: vec4<f32>) -> vec4<f32> {
         lit = vec4(lit.rgb * mix(1.0, 0.7, wet) + sky_color(reflect(-v, n)) * sheen * wet, lit.a);
     }
     // The air before it glows with the placed lights' light (the held one is in `haze_lit`).
-    let glow = placed_in_fog(in.light.yzw, in.rel, in.pos, fog_here(in.light.x));
+    let glow = placed_in_fog(in.light.yzw, in.rel, in.pos, in.light.x);
     return vec4(display(haze_lit(lit.rgb + glow, in.rel, in.light.x)), lit.a);
 }
 
@@ -622,7 +622,7 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
     // coarse texels shaded far water wrongly (duller, no sun's path), and the near map's edge, a
     // square seen at a slant, showed as a hard-edged rectangle of bright water (the LOD worker's
     // sea views, very likely Ronald's lake; it went with shadows off, 11-05).
-    let near_map = shadow_in(scene.shadow_view_proj, scene.shadow, 80.0, 400.0, in.rel, vec3(0.0, 1.0, 0.0));
+    let near_map = shadow_in(scene.shadow_view_proj, scene.shadow, 80.0, 400.0, in.rel, vec3(0.0, 1.0, 0.0), false);
     let shadow = mix(1.0, min(near_map.x, smoothstep(0.3, 0.8, in.light.x)), near_map.y) * smoothstep(0.75, 1.0, max(in.light.x, near_map.y)) * cloud_shadow(in.rel);
     let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, shadow, 1.0, in.pos, in.rel);
     // What the light in the water sends back up: a muted teal-green, light in the shallows and dark
