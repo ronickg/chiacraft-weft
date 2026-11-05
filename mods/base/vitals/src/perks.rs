@@ -477,24 +477,6 @@ pub fn road_to(skill: Skill) -> u16 {
         .map_or(gate_id(skill.group()), |j| JUNCTION_FROM + j as u16)
 }
 
-/// Saved builds from before the hub (11-05) took a region's entry straight from the start: give
-/// such a build its road (junction and gate), so the entry still hangs from it. True if it changed.
-pub fn migrate(taken: &mut Taken) -> bool {
-    let mut changed = false;
-    for s in SKILLS {
-        if !has(taken, id(s, 0)) {
-            continue;
-        }
-        for n in [road_to(s), gate_id(s.group())] {
-            if !has(taken, n) {
-                set(taken, n, true);
-                changed = true;
-            }
-        }
-    }
-    changed
-}
-
 /// A point `ring` rings out at `angle` (the first web's wheel).
 fn polar(ring: f32, angle: f32) -> (f32, f32) {
     let r = radius(ring);
