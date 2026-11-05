@@ -36,10 +36,14 @@ h2 small{color:var(--dim);font-weight:400}
 .grid.big{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 6px 6px;text-align:center;cursor:pointer;content-visibility:auto;contain-intrinsic-size:132px 132px;min-width:0}
 .card:hover,.card:focus{border-color:var(--acc);outline:none}
+.card{position:relative}.card.new{border:2px solid #6fc3ff;box-shadow:0 0 0 1px #6fc3ff55}
+.badge{position:absolute;top:4px;right:4px;background:#6fc3ff;color:#10202c;font-size:10px;font-weight:700;border-radius:3px;padding:0 4px;text-transform:uppercase}
 .card .pic{height:72px;display:flex;align-items:center;justify-content:center}
 .big .card .pic{height:170px}
 .card img{max-width:64px;max-height:64px;width:64px;height:64px;object-fit:contain}
 .card img.cube{image-rendering:auto}
+.card img.wide{width:112px;height:56px}
+.dpic img.pix.wide{width:512px;height:256px;max-width:86vw}
 .big .card img{width:auto;height:auto;max-width:100%;max-height:170px}
 .pix{image-rendering:pixelated;image-rendering:crisp-edges}
 .card .nm{font-size:13px;margin-top:4px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.25}
@@ -70,6 +74,25 @@ ul{margin:0;padding-left:18px;font-size:14px}
 .v img{width:64px;height:64px}
 .v .dim,.dim{color:var(--dim);font-size:11px}
 .scroll{overflow-x:auto}
+
+.screens{display:flex;flex-wrap:wrap;gap:10px}
+.scr{display:inline-flex;flex-direction:column;gap:4px;padding:10px 12px;border:12px solid transparent;border-image-slice:6 fill;border-image-width:12px;border-image-repeat:stretch;image-rendering:pixelated;color:#e9dcc6;max-width:100%}
+.scr .st{font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;color:#f0c27a}
+.scr .st img{width:20px;height:20px}
+.scr .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sgrid{display:grid;gap:0}
+.slot{width:44px;height:44px;background-size:100% 100%;image-rendering:pixelated;position:relative;display:flex;align-items:center;justify-content:center;cursor:default}
+.slot img{width:32px;height:32px}
+.slot.link{cursor:pointer}
+.slot .n{position:absolute;right:3px;bottom:1px;font-size:11px;font-weight:700;color:#fff;text-shadow:1px 1px 0 #000}
+.slot .any{position:absolute;left:2px;top:0;font-size:9px;color:#fff;text-shadow:1px 1px 0 #000}
+.slot .lbl{position:absolute;bottom:-14px;left:-6px;right:-6px;text-align:center;font-size:9px;color:#e9dcc6}
+.arrow{display:flex;flex-direction:column;align-items:center;font-size:11px;color:#e9dcc6}
+.arrow img{width:48px;height:32px;image-rendering:pixelated}
+.knap{display:grid;grid-template-columns:repeat(5,22px)}
+.knap img{width:22px;height:22px;image-rendering:pixelated}
+.scr .need{font-size:11px}
+details.more summary{cursor:pointer;color:var(--acc);font-size:13px;margin:4px 0}
 @media (max-width:600px){
   header{padding:8px 12px 6px;position:static}main{padding:10px 12px 50px}
   .facet{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
@@ -87,6 +110,7 @@ ul{margin:0;padding-left:18px;font-size:14px}
   <div class="searchrow">
     <input id="q" type="search" placeholder="Search names, ids, notes, biomes…" autocomplete="off">
     <select id="sort" aria-label="Sort"><option value="group">by group</option><option value="name">by name</option><option value="age">by age</option><option value="mod">by mod</option></select>
+    <select id="mark" aria-label="Mark new art"><option value="">mark new art: off</option><option value="today">mark art changed today</option><option value="this week">mark art changed this week</option><option value="this month">mark art changed this month</option></select>
     <button id="clear">Clear</button>
     <span id="count"></span>
   </div>
@@ -98,18 +122,22 @@ ul{margin:0;padding-left:18px;font-size:14px}
 <script>
 const DATA = /*DATA*/null;
 const E = DATA.entries;
-const GROUPS = ["items","blocks","parts","gems","food","tools and weapons","armour","clothing","plants","animals","monsters"];
+const GROUPS = ["items","blocks","parts","gems","food","tools and weapons","armour","clothing","plants","animals","monsters","skills","features"];
 const FACETS = [
   {key:"group", label:"Group", get:e=>e.group, order:GROUPS},
   {key:"mod", label:"Mod", get:e=>e.mod},
   {key:"age", label:"Age", get:e=>e.age||"no age", order:[...DATA.ages,"no age"]},
   {key:"path", label:"Path", get:e=>e.path||"none", order:["tech","magic","beasts","shared","none"]},
+  {key:"art", label:"Art", get:e=>artAge(e), order:["today","this week","this month","older","—"]},
+  {key:"status", label:"Status", get:e=>e.is==="feature"?e.status:null, extra:true},
   {key:"tab", label:"Tab", get:e=>e.tab||(e.is==="creature"?"—":"not in creative"), extra:true},
   {key:"kind", label:"Kind", get:e=>e.kind, extra:true},
   {key:"size", label:"Size", get:e=>e.is==="creature"?(e.size||"—"):null, extra:true},
   {key:"diet", label:"Diet", get:e=>e.is==="creature"?(e.diet||"—"):null, extra:true},
   {key:"tame", label:"Tame", get:e=>e.is==="creature"?(e.tame?"tameable":"wild"):null, extra:true},
 ];
+const BUILT = Date.parse(DATA.built.replace(" ","T"))/1000;
+function artAge(e){ if(!e.art) return "—"; const d=(BUILT-e.art)/86400; return d<1?"today":d<7?"this week":d<31?"this month":"older"; }
 const sel = {}; FACETS.forEach(f=>sel[f.key]=new Set());
 let showExtra = false;
 const $ = s=>document.querySelector(s);
@@ -121,12 +149,14 @@ function readHash(){
   const h = new URLSearchParams(location.hash.slice(1));
   $("#q").value = h.get("q")||"";
   $("#sort").value = h.get("sort")||"group";
+  $("#mark").value = h.get("mark")||"";
   FACETS.forEach(f=>{sel[f.key]=new Set((h.get(f.key)||"").split("|").filter(Boolean)); if(f.extra&&sel[f.key].size) showExtra=true;});
 }
 function writeHash(){
   const h = new URLSearchParams();
   if($("#q").value) h.set("q",$("#q").value);
   if($("#sort").value!=="group") h.set("sort",$("#sort").value);
+  if($("#mark").value) h.set("mark",$("#mark").value);
   FACETS.forEach(f=>{if(sel[f.key].size) h.set(f.key,[...sel[f.key]].join("|"))});
   history.replaceState(null,"","#"+h.toString());
 }
@@ -156,10 +186,11 @@ function renderFacets(){
   $("#more").textContent = showExtra?"fewer filters":"more filters (tab, kind, size, diet, tame)";
 }
 function cardHTML(e,i){
-  const cls = e.pix?"pix":(e.is==="creature"?"":"cube");
+  const cls = (e.pix?"pix":(e.is==="creature"?"":"cube"))+(e.wide?" wide":"");
   const pic = e.img?`<img loading="lazy" decoding="async" class="${cls}" src="${e.img}" alt="">`:`<div class="noimg">?</div>`;
-  const sub = e.is==="creature"?[e.size,e.role,e.diet].filter(Boolean).join(" · "):e.id;
-  return `<div class="card" tabindex="0" data-i="${i}"><div class="pic">${pic}</div><div class="nm">${esc(e.name)}</div><div class="sub">${esc(sub)}</div></div>`;
+  const sub = e.is==="creature"?[e.size,e.role,e.diet].filter(Boolean).join(" · "):e.is==="feature"?`${e.kind} · ${e.status}`:e.id;
+  const m=$("#mark").value, a=artAge(e), isNew = m && (a==="today" || (m!=="today" && a==="this week") || (m==="this month" && a==="this month"));
+  return `<div class="card${isNew?" new":""}" tabindex="0" data-i="${i}">${isNew?`<span class="badge">${a==="today"?"today":"new"}</span>`:""}<div class="pic">${pic}</div><div class="nm">${esc(e.name)}</div><div class="sub">${esc(sub)}</div></div>`;
 }
 function render(){
   renderFacets();
@@ -177,24 +208,92 @@ function render(){
   writeHash();
 }
 function table(rows){return `<div class="scroll"><table>${rows.map(r=>`<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join("")}</table></div>`}
+
+const BYID = new Map(E.map((e,i)=>[e.id,i]));
+const G = DATA.gui||{};
+function slotHTML(c, bg, label){
+  const st = `style="background-image:url(${bg||G.slot})"`;
+  if(!c) return `<div class="slot" ${st}>${label?`<span class="lbl">${esc(label)}</span>`:""}</div>`;
+  const [id,n,any]=c; const i=BYID.get(id); const e=i!==undefined?E[i]:null;
+  const pic = e&&e.img?`<img class="${e.pix?"pix":""}" src="${e.img}" alt="" loading="lazy">`:`<span class="any" style="position:static;color:#3b3127;font-size:9px">${esc(String(id).replace(/^#/,"").split(":").pop())}</span>`;
+  return `<div class="slot${e?" link":""}" ${st} ${e?`data-go="${i}"`:""} title="${esc((e?e.name:id)+(any?" (or any of its kind)":"")+(n>1?" × "+n:""))}">${pic}${n>1?`<span class="n">${Number.isInteger(n)?n:n.toFixed(1)}</span>`:""}${any?`<span class="any">any</span>`:""}${label?`<span class="lbl">${esc(label)}</span>`:""}</div>`;
+}
+function stationName(st){ if(DATA.stations[st]) return DATA.stations[st]; const i=BYID.get(st); return i!==undefined?E[i].name:st; }
+function screenHTML(x){
+  const head = (()=>{const i=BYID.get(x.st); const ic=i!==undefined&&E[i].img?`<img class="${E[i].pix?"pix":""}" src="${E[i].img}" alt="">`:""; return `<div class="st">${ic}${esc(stationName(x.st))}</div>`;})();
+  let left="";
+  if(x.st==="knapping"){
+    left=`<div class="knap">${x.outline.join("").split("").map(ch=>`<img src="${ch==="X"?G.knap_stone:G.knap_free}" alt="">`).join("")}</div>`;
+  } else if(x.st==="furnace"){
+    left=`<div class="sgrid">${slotHTML(x.cells[0])}<div style="height:32px;display:flex;justify-content:center"><img src="${G.flame}" style="width:28px;height:32px;image-rendering:pixelated" alt=""></div>${slotHTML(null)}</div>`;
+  } else if(x.st==="fire"){
+    left=`<div class="sgrid">${x.cells.map(c=>slotHTML(c)).join("")}<div style="display:flex;justify-content:center"><img src="${G.flame}" style="width:28px;height:32px;image-rendering:pixelated" alt=""></div></div>`;
+  } else if(x.st==="assembly"){
+    const bgs={head:G.slot_part_head,blade:G.slot_part_head,point:G.slot_part_head,stave:G.slot_part_head,shell:G.slot_part_head,haft:G.slot_part_haft,grip:G.slot_part_haft,shaft:G.slot_part_haft};
+    left=`<div class="sgrid" style="grid-template-columns:repeat(${x.cells.length},44px);gap:2px;padding-bottom:14px">${x.cells.map((c,k)=>slotHTML(c,null,(x.slots||[])[k])).join("")}</div>`;
+  } else {
+    const w=x.w||x.cells.length, cells=[...x.cells]; while(cells.length<w*(x.h||1)) cells.push(null);
+    left=`<div class="sgrid" style="grid-template-columns:repeat(${w},44px)">${cells.map(c=>slotHTML(c)).join("")}</div>`;
+  }
+  const t = x.secs?`${x.secs>=60?(x.secs/60).toFixed(1)+" min":(+x.secs.toFixed(1))+" s"}`:"";
+  const need = x.needs?`<div class="need">${esc(x.needs)}</div>`:"";
+  const out = slotHTML([x.out[0],x.out[1],false], G.recipe_slot||G.slot);
+  return `<div class="scr" style="border-image-source:url(${G.panel})">${head}<div class="row">${left}<div class="arrow"><img src="${G.arrow}" alt="">${t}${need}</div>${out}${x.out[2]<1?`<span style="font-size:11px">${Math.round(x.out[2]*100)}%</span>`:""}</div></div>`;
+}
+function screensHTML(list, title, cap=24){
+  if(!list||!list.length) return "";
+  const first=list.slice(0,cap).map(screenHTML).join(""), rest=list.slice(cap).map(screenHTML).join("");
+  return `<div class="sec"><h4>${esc(title)} <span class="dim">${list.length}</span></h4><div class="screens">${first}</div>${rest?`<details class="more"><summary>${list.length-cap} more</summary><div class="screens">${rest}</div></details>`:""}</div>`;
+}
+
+const REGION_COLORS=["#e8734a","#e8b04a","#c9c26a","#8fc96a","#5fc9a0","#4ab8c9","#4a8fe8","#7a6ae8","#b06ae8","#e86ad0","#e86a8f","#c98f6a","#a0a0a0","#6ab0e8","#d0d06a","#6ae8b8"];
+function webHTML(region){
+  const W=DATA.web; if(!W) return `<p class="dim">The web's layout comes with the next registry dump.</p>`;
+  const regs=[...new Set(W.nodes.map(n=>n.region).filter(Boolean))];
+  const col=r=>r?REGION_COLORS[regs.indexOf(r)%REGION_COLORS.length]:"#fff";
+  const xs=W.nodes.map(n=>n.x), ys=W.nodes.map(n=>n.y), pad=30;
+  const x0=Math.min(...xs)-pad, y0=Math.min(...ys)-pad, w=Math.max(...xs)-x0+pad, h=Math.max(...ys)-y0+pad;
+  const byId=new Map(W.nodes.map(n=>[n.id,n]));
+  const size={Small:8,Notable:13,Keystone:17,Socket:12};
+  const dim=n=>region&&n.region!==region&&n.bridge!==region;
+  const lines=W.links.map(([a,b])=>{const p=byId.get(a),q=byId.get(b); if(!p||!q) return ""; const d=dim(p)&&dim(q); return `<line x1="${p.x}" y1="${p.y}" x2="${q.x}" y2="${q.y}" stroke="${d?"#3a3128":"#7d6a52"}" stroke-width="1.5"/>`}).join("");
+  const nodes=W.nodes.map(n=>{
+    const k=(n.kind||"").replace(/\W/g,""), r=n.region===null&&n.id===0?11:(size[k]||8), d=dim(n);
+    const nm=W.names[n.key]||n.key, gives=(n.gives||[]).map(([f,u])=>`${u>0?"+":""}${u} ${f}`).join(", ");
+    const tip=`${nm}${n.socket!==null?" (socket)":""} — ${k}${gives?": "+gives+" units (a unit is +2%)":""}${n.special?" · "+n.special.replace("_"," "):""}${n.needs?` · needs ${n.region||""} ${n.needs}`:""}${n.bridge?` and ${n.bridge} ${n.needs}`:""}`;
+    const sprite=n.id===0?W.start:(W.sprites[k.toLowerCase()]||W.sprites.small);
+    return `<g opacity="${d?0.25:1}"><circle cx="${n.x}" cy="${n.y}" r="${r*0.62}" fill="${col(n.region)}" opacity=".55"/>${sprite?`<image href="${sprite}" x="${n.x-r/2}" y="${n.y-r/2}" width="${r}" height="${r}" style="image-rendering:pixelated"/>`:""}<title>${esc(tip)}</title></g>`;
+  }).join("");
+  const legend=regs.map(r=>`<span class="tag" style="border-color:${col(r)}"><span style="color:${col(r)}">●</span> ${esc(r.replace(/_/g," "))}</span>`).join(" ");
+  return `<div class="sec"><h4>The perk web ${region?"(its region lit)":""}</h4><div class="tags">${legend}</div><div style="background:var(--well);border:1px solid var(--line);border-radius:6px;overflow:auto;max-height:80vh"><svg viewBox="${x0} ${y0} ${w} ${h}" style="width:100%;min-width:640px;display:block">${lines}${nodes}</svg></div><div class="dim">Hover a node for its name and effect. ${W.nodes.length} nodes, ${W.links.length} links.</div></div>`;
+}
 function open(i){
   const e=E[i]; const b=[];
-  b.push(`<button class="close" onclick="dlg.close()">Close</button><div class="dhead"><div class="dpic" id="dpic">${e.img?`<img class="${e.pix?"pix":""}" src="${e.img}" alt="">`:`<div class="noimg">?</div>`}</div><div class="dinfo"><h3>${esc(e.name)}</h3><div class="id">${esc(e.id)}</div>`);
+  b.push(`<button class="close" onclick="dlg.close()">Close</button><div class="dhead"><div class="dpic" id="dpic">${e.img?`<img class="${e.pix?"pix":""}${e.wide?" wide":""}" src="${e.img}" alt="">`:`<div class="noimg">?</div>`}</div><div class="dinfo"><h3>${esc(e.name)}</h3><div class="id">${esc(e.id)}</div>`);
   if(e.img_side) b.push(`<div class="views"><button onclick="view('${e.img}')">3/4</button><button onclick="view('${e.img_side}')">side</button></div>`);
   const tags=[e.group,e.kind,e.mod,e.age,e.path&&("path: "+e.path),e.tab&&("tab: "+e.tab),e.size,e.role,e.diet,e.taming&&("taming: "+e.taming),e.rarity].filter(Boolean);
   b.push(`<div class="tags">${tags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`);
   if(e.sci) b.push(`<div><i>${esc(e.sci)}</i> <span class="dim">${esc(e.lineage)}</span></div>`);
   if(e.desc) b.push(`<p>${esc(e.desc)}</p>`);
+  if(e.how) b.push(`<p><b>How a player uses it:</b> ${esc(e.how)}</p>`);
+  if(e.status) b.push(`<div class="tags"><span class="tag">status: ${esc(e.status)}</span></div>`);
   const kv=[];
   if(e.get) kv.push(["how it's had",e.get]);
   if(e.em!==undefined&&e.em!==null) kv.push(["effort, cheapest way",e.em+" EM (effort minutes)"]);
   if(e.note) kv.push(["note",e.note]);
+  if(e.art) kv.push(["art last changed",new Date(e.art*1000).toISOString().slice(0,16).replace("T"," ")+" ("+artAge(e)+")"]);
   if(e.danger) kv.push(["health / armour / hit",e.danger]);
   if(e.biomes&&e.biomes.length) kv.push(["lives in",e.biomes.join(", ")]);
   if(e.spawns) kv.push(["spawns",e.spawns.replace(/^Spawns /,"")]);
   if(kv.length) b.push(table(kv));
   b.push(`</div></div>`);
-  if(e.made&&e.made.length) b.push(`<div class="sec"><h4>What makes it</h4><ul>${e.made.map(m=>`<li>${esc(m)}</li>`).join("")}</ul></div>`);
+  if(e.links&&e.links.length) b.push(`<div class="sec"><h4>Its things <span class="dim">${e.links.length}</span></h4><div class="vgrid">${e.links.map(id=>{const i=BYID.get(id); if(i===undefined) return ""; const x=E[i]; return `<div class="v link" data-go="${i}" style="cursor:pointer">${x.img?`<img class="${x.pix?"pix":""}" loading="lazy" src="${x.img}" alt="">`:""}<div>${esc(x.name)}</div></div>`}).join("")}</div></div>`);
+  if(e.features&&e.features.length) b.push(`<div class="sec"><h4>Part of</h4><div class="tags">${e.features.map(id=>{const i=BYID.get(id); return i===undefined?"":`<span class="tag link" data-go="${i}" style="cursor:pointer">${esc(E[i].name)}</span>`}).join("")}</div></div>`);
+  if(e.web) b.push(webHTML(null));
+  if(e.region&&DATA.web) b.push(webHTML(DATA.web.nodes.find(n=>n.region&&n.region.replace(/_/g," ")===e.region.toLowerCase())?.region || null));
+  b.push(screensHTML(e.screens,"How it's made"));
+  if(e.made&&e.made.length) b.push(`<div class="sec"><h4>${e.screens&&e.screens.length?"In the progression graph":"What makes it"}</h4><ul>${e.made.map(m=>`<li>${esc(m)}</li>`).join("")}</ul></div>`);
+  b.push(screensHTML(e.makes,"Made here",12));
   if(e.uses&&e.uses.length) b.push(`<div class="sec"><h4>Used to make</h4><div>${e.uses.map(esc).join(", ")}</div></div>`);
   if(e.variants&&e.variants.length) b.push(`<div class="sec"><h4>${esc(e.variants_title||"Looks")}</h4><div class="vgrid">${e.variants.map(v=>`<div class="v"><img class="pix" loading="lazy" src="${v.img}" alt=""><div>${esc(v.label)}</div>${v.age?`<div class="dim">${esc(v.age)}</div>`:""}${v.note?`<div class="dim">${esc(v.note)}</div>`:""}</div>`).join("")}</div></div>`);
   if(e.gear){
@@ -203,6 +302,7 @@ function open(i){
   }
   if(e.clips&&Object.keys(e.clips).length) b.push(`<div class="sec"><h4>Clips</h4>${table(Object.entries(e.clips).map(([f,c])=>[f,c.join(", ")]))}</div>`);
   for(const [t,rows] of (e.facts||[])) if(rows.length) b.push(`<div class="sec"><h4>${esc(t)}</h4>${table(rows)}</div>`);
+  if(e.art_files&&e.art_files.length) b.push(`<div class="sec"><h4>Its art files, last changed</h4>${table(e.art_files)}</div>`);
   $("#dlgbody").innerHTML=b.join("");
   dlg.showModal(); $("#dlgbody").scrollTop=0;
   history.replaceState(null,"",location.hash.split("&open=")[0].replace(/^#?/,"#")+"&open="+encodeURIComponent(e.id));
@@ -211,11 +311,13 @@ function view(src){const im=$("#dpic img"); if(im) im.src=src;}
 const dlg=$("#dlg");
 dlg.addEventListener("close",()=>writeHash());
 dlg.addEventListener("click",ev=>{if(ev.target===dlg) dlg.close();});
+$("#dlgbody").addEventListener("click",ev=>{const g=ev.target.closest("[data-go]"); if(g) open(+g.dataset.go);});
 $("#main").addEventListener("click",ev=>{const c=ev.target.closest(".card"); if(c) open(+c.dataset.i);});
 $("#main").addEventListener("keydown",ev=>{if(ev.key==="Enter"){const c=ev.target.closest(".card"); if(c) open(+c.dataset.i);}});
 $("#facets").addEventListener("click",ev=>{const c=ev.target.closest(".chip"); if(!c) return; const s=sel[c.dataset.f]; s.has(c.dataset.v)?s.delete(c.dataset.v):s.add(c.dataset.v); render();});
 let t; $("#q").addEventListener("input",()=>{clearTimeout(t);t=setTimeout(render,120)});
 $("#sort").addEventListener("change",render);
+$("#mark").addEventListener("change",render);
 $("#clear").addEventListener("click",()=>{$("#q").value="";FACETS.forEach(f=>sel[f.key].clear());render();});
 $("#more").addEventListener("click",()=>{showExtra=!showExtra;renderFacets();});
 window.addEventListener("hashchange",()=>{if(location.hash.includes("open=")) return; readHash(); render();});

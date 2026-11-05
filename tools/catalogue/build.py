@@ -70,7 +70,21 @@ def export(rev):
         members = [m for m in t.getmembers() if not any(s in "/" + m.name for s in SKIP) and not m.name.startswith("/") and ".." not in m.name]
         t.extractall(tmp, members=members, filter="data")
     subj = subprocess.check_output(["git", "-C", REPO, "log", "-1", "--format=%cd %s", "--date=format:%Y-%m-%d %H:%M", full], text=True).strip()
-    return tmp, commit, subj
+    return tmp, commit, subj, full
+
+
+def art_dates(full):
+    """{repo path: unix time of the last commit that changed it} for every texture and model at
+    commit `full`."""
+    out = subprocess.run(["git", "-C", REPO, "log", "--format=@%ct", "--name-only", full, "--",
+                          ":(glob)mods/*/assets/textures/**", ":(glob)mods/*/assets/models/**"], capture_output=True, text=True).stdout
+    dates, t = {}, 0
+    for line in out.split("\n"):
+        if line.startswith("@"):
+            t = int(line[1:])
+        elif line and line not in dates:
+            dates[line] = t
+    return dates
 
 
 def newest_registry(commit):
@@ -93,6 +107,9 @@ class Builder:
         self.L = S.lang(root)
         self.rules = S.rules(root)
         self.recipes = S.recipes(root)
+        self.raw_recipes = S.recipe_raw(root)
+        # The clothes macro's (`recipes` adds them after the list): at the table.
+        self.raw_recipes += [(r["out"], "Table", 3.0) for r in self.recipes[len(self.raw_recipes):]]
         self.prog = S.progression_sheet(root)
         self.rows = S.sheet_rows(root)
         self.mats, self.gems = S.crafting_sheet(root)
@@ -121,6 +138,16 @@ class Builder:
                 for r in rows:
                     out[r[0]] = {"age": r[1], "from": "" if r[2] == "-" else r[2]}
         return out
+
+    def add(self, e):
+        """An entry, stamped with when its art last changed (the newest of the files drawn)."""
+        files = sorted(os.path.relpath(p, self.root) for p in self.tex.used)
+        self.tex.used = set()
+        ts = [self.dates.get(f, 0) for f in files]
+        if ts and max(ts):
+            e["art"] = max(ts)
+            e["art_files"] = [[f, time.strftime("%Y-%m-%d %H:%M", time.localtime(self.dates.get(f, 0)))] for f in files][:12]
+        self.entries.append(e)
 
     def name(self, i):
         ns, n = i.split(":", 1)
@@ -434,7 +461,7 @@ class Builder:
                 if e["variants"]:
                     e["variants_title"] = "In each material it takes"
             e["group"] = self.group_of(i, kind, how)
-            self.entries.append(e)
+            self.add(e)
 
     def part_variants(self, shape):
         """A loose part drawn in each material its slot takes, where it has a drawing."""
@@ -470,6 +497,231 @@ class Builder:
                         "note": self.mat_note(m), "age": self.mat_from.get(m, {}).get("age", "")})
         return out
 
+    def worn_entries(self):
+        """Worn armour skins (`textures/entity/armor/<look>_<layer>`), flat at 4x."""
+        self.tex.used = set()
+        for p in sorted(glob.glob(f"{self.root}/mods/base/assets/textures/entity/armor/*.png")):
+            stem = os.path.basename(p)[:-4]
+            look, _, layer = stem.rpartition("_")
+            a = self.tex.get(f"base:entity/armor/{stem}")
+            if a is None:
+                continue
+            big = np.array(Image.fromarray(a).resize((a.shape[1] * 4, a.shape[0] * 4), Image.NEAREST))
+            sets = {"leather": "leather look (leather, rawhide, bone shells)", "iron": "mail (iron or steel shells)",
+                    "gold": "scale (bronze or copper shells)", "diamond": "gem scale (diamond shells)"}
+            self.add({"id": f"base:armor/{stem}", "mod": "base", "name": f"Worn armour: {look} {'outer' if layer == '1' else 'leggings'} layer",
+                      "is": "skin", "group": "armour", "kind": "worn skin", "tier": None, "age": "", "path": "tech", "tab": "",
+                      "img": self.img(big, f"worn/{stem}.png"), "pix": True, "wide": True,
+                      "note": f"the {sets.get(look, look)} set as it's worn: layer {layer} ({'helmet, chestplate, boots' if layer == '1' else 'leggings'})",
+                      "made": [], "uses": [], "facts": []})
+
+    # ------------------------------------------------------------ recipes as screens
+
+    STATION_NAMES = {"hand": "By hand (the inventory's 2 × 2)", "table": "Crafting table", "furnace": "Furnace",
+                     "parts": "Crafting table: parts", "assembly": "Crafting table: assembly row",
+                     "knapping": "Knapping (a flint nodule struck with a rock)", "fire": "Over a fire (campfire or furnace)",
+                     "world": "In the world", "fill": "Filled at water"}
+
+    def screens(self):
+        """Every way each thing is made, as the game's screens draw it: {output id: [screen]}.
+        A screen: {st (station), name, w, h, cells [[id, n, any] or None], out [id, n, chance], secs,
+        slots (the assembly's slot names), outline (knapping)}."""
+        out = {}
+        have = set()
+
+        def add(o, scr):
+            out.setdefault(o, []).append(scr)
+
+        for r in self.reg.get("recipes", []):
+            if r.get("hidden") or not r["out"]:
+                continue
+            o, n, ch = r["out"][0]
+            cells = []
+            for kind, count, shown in r["in"]:
+                cells.append(None if kind == 0 or not shown else [shown, count, kind in (2, 3)])
+            if r["kind"] == "base:crafting":
+                w, h = r["w"], r["h"]
+                if not w:
+                    k = len(cells)
+                    w, h = (2, 2) if k <= 4 else (3, 3)
+                st = "hand" if w <= 2 and h <= 2 else "table"
+            elif r["kind"] == "base:smelting":
+                st, w, h = "furnace", 1, 1
+            else:
+                st, w, h = "parts", len(cells), 1
+            add(o, {"st": st, "w": w, "h": h, "cells": cells, "out": [o, n, ch], "secs": r["time"] / 20 if r["time"] else None})
+            have.add(o)
+        kinds_out = {f"base:{k}" for k in self.kinds}
+        for r, (ro, raw, secs) in zip(self.recipes, self.raw_recipes):
+            o = r["out"]
+            if "*" in o:
+                continue
+            cells = [[x, n, x.startswith("#")] for x, n in r["ins"]]
+            for c in cells:
+                if c[2]:
+                    c[0] = self.tag_example(c[0][1:]) or c[0]
+            if raw.startswith("Station"):
+                st = re.search(r'"([^"]+)"', raw).group(1)
+            elif raw.startswith("Break"):
+                st = "world"
+            elif raw == "Fill":
+                st = "fill"
+            elif raw == "Fire":
+                st = "fire"
+            elif o in kinds_out and raw == "Table":
+                k = o.split(":")[1]
+                slots = [sl for sl, _ in self.kinds[k]]
+                add(o, {"st": "assembly", "w": len(cells), "h": 1, "cells": cells, "out": [o, r["n"], 1], "secs": None,
+                        "slots": slots[:len(cells)]})
+                continue
+            elif o in have:
+                continue
+            else:
+                st = "hand" if raw == "Hand" else ("table" if raw == "Table" else "furnace")
+            w = len(cells) if st not in ("hand", "table") else (2 if st == "hand" else 3)
+            h = 1 if st not in ("hand", "table") else max(1, -(-len(cells) // w))
+            add(o, {"st": st, "w": w, "h": h, "cells": cells, "out": [o, r["n"], 1], "secs": secs, "needs": raw[6:-1].replace("_", " ").lower() if st == "world" else None})
+        for shape, kind, outline in S.knapped(self.root):
+            add(f"base:part_{shape}", {"st": "knapping", "w": 5, "h": 5, "cells": [], "outline": outline,
+                                       "out": [f"base:part_{shape}", 1, 1], "secs": None})
+        return out
+
+    GUI = ["panel", "slot", "recipe_slot", "arrow", "arrow_fill", "flame", "flame_fill", "slot_part_head", "slot_part_haft",
+           "slot_part_fitting", "slot_part_tool", "knap_stone", "knap_free", "knap_flint", "well"]
+
+    def gui(self):
+        """The game's screen parts the page draws recipes with."""
+        self.gui_urls = {}
+        for n in self.GUI:
+            p = self.tex.path(f"base:gui/{n}")
+            if p:
+                a = np.array(Image.open(p).convert("RGBA"))
+                self.gui_urls[n] = self.img(a, f"gui/{n}.png")
+
+    def tag_example(self, tag):
+        """An item carrying `tag` (the dump's tags), to show in a slot."""
+        for i, it in sorted(self.reg_items.items()):
+            if tag in it.get("comps", []) and not i.startswith("core:"):
+                return i
+        return None
+
+    def attach_screens(self):
+        scr = self.screens()
+        by = {e["id"]: e for e in self.entries}
+        station_of = {"table": "base:crafting_table", "parts": "base:crafting_table", "assembly": "base:crafting_table",
+                      "hand": "base:crafting_table", "furnace": "base:furnace", "fire": "base:campfire_laid"}
+        makes = {}
+        for o, ss in scr.items():
+            if o in by:
+                by[o]["screens"] = ss
+            for x in ss:
+                for c in x["cells"]:
+                    if c and c[0] in by and o in by and by[o]["name"] not in by[c[0]]["uses"]:
+                        by[c[0]]["uses"].append(by[o]["name"])
+                home = station_of.get(x["st"], x["st"])
+                makes.setdefault(home, []).append(x)
+        for home, ss in makes.items():
+            if home in by:
+                by[home]["makes"] = ss
+        self.screen_count = sum(len(v) for v in scr.values())
+
+    # ------------------------------------------------------------ skills and the perk web
+
+    def skill_entries(self):
+        md = open(f"{self.root}/mods/base/vitals/WEB_SHEET.md").read()
+        T = {(h[-1] if h else ""): (head, rows) for h, head, rows in S.tables(md)}
+        skills = T.get("Skills", ([], []))
+        regions = {r[0]: dict(zip(T["Regions"][0], r)) for r in T.get("Regions", ([], []))[1]}
+        icon = self.tex.get("base:gui/perk_notable_open")
+        key_icon = self.tex.get("base:gui/perk_keystone_open")
+        sk_url = self.img(icon, "gui/perk_notable_open.png") if icon is not None else None
+        web_url = self.img(key_icon, "gui/perk_keystone_open.png") if key_icon is not None else None
+        ages = T.get("What each age's levels cost", ([], []))
+        pays = T.get("What doing pays (EM, before tier against skill)", ([], []))
+        for r in skills[1]:
+            row = dict(zip(skills[0], r))
+            name = row["Skill"]
+            reg = regions.get(name, {})
+            facts = [["The skill", [["group", row.get("Group", "")], ["path", row.get("Path", "")], ["raised by", row.get("Raised by", "")]]]]
+            if reg:
+                facts.append(["Its region of the perk web", [[k, v] for k, v in reg.items() if k != "Region"]])
+            facts.append(["Its levels by age", [[a[0], f"levels {a[1]}, {a[2]} EM a level, {a[4]} hours from 0"] for a in ages[1]]])
+            self.tex.used = set()
+            self.add({"id": "skill:" + re.sub(r"\W+", "_", name.lower()).strip("_"), "mod": "base", "name": name, "is": "skill",
+                      "group": "skills", "kind": row.get("Group", "").lower(), "tier": None, "age": "", "path": row.get("Path", ""),
+                      "tab": "", "img": sk_url, "pix": True, "note": "raised by " + row.get("Raised by", ""), "made": [], "uses": [],
+                      "facts": facts, "region": name})
+        web = self.reg.get("web")
+        facts = []
+        for h in ("Families", "Sockets and stones"):
+            if h in T:
+                head, rows = T[h]
+                facts.append([h, [[r[0], " · ".join(f"{a}: {b}" for a, b in zip(head[1:], r[1:]))] for r in rows]])
+        self.tex.used = set()
+        self.add({"id": "skill:perk_web", "mod": "base", "name": "The perk web", "is": "web", "group": "skills", "kind": "web",
+                  "tier": None, "age": "", "path": "shared", "tab": "", "img": web_url, "pix": True,
+                  "desc": re.sub(r"\s+", " ", md[md.index("## The web") + 11:].split("\n\n")[1]) if "## The web" in md else "",
+                  "web": bool(web), "made": [], "uses": [], "facts": facts})
+        if web:
+            names = {}
+            for n in web["nodes"]:
+                k = n["key"]
+                names[k] = self.L.get(f"perk.base.{k}") or k.split(".")[-1].replace("_", " ").capitalize()
+            fam = {k.split(".")[-1]: v for k, v in self.L.items() if k.startswith("perk.base.family.")}
+            self.web = {"nodes": web["nodes"], "links": web["links"], "names": names, "families": fam,
+                        "sprites": {k: self.img(self.tex.get(f"base:gui/perk_{k}_open"), f"gui/perk_{k}_open.png")
+                                    for k in ("small", "notable", "keystone", "socket") if self.tex.get(f"base:gui/perk_{k}_open") is not None},
+                        "start": self.img(self.tex.get("base:gui/perk_start_taken"), "gui/perk_start_taken.png")
+                        if self.tex.get("base:gui/perk_start_taken") is not None else None}
+        # The stones' own rows.
+        if "Sockets and stones" in T:
+            head, rows = T["Sockets and stones"]
+            by = {e["id"]: e for e in self.entries}
+            for r in rows:
+                e = by.get(f"base:{r[0]}")
+                if e:
+                    e["facts"].insert(0, ["In a socket of the perk web", [[head[1], r[1]]]])
+
+    # ------------------------------------------------------------ features
+
+    SYSTEMS = os.path.join(REPO, "notes/crew/systems-map/systems.json")
+
+    def feature_entries(self):
+        """A card per system of Planner's map (`notes/crew/systems-map/systems.json`), with
+        `features.json`'s how-to, its sheet tables and the things it links to."""
+        if not os.path.exists(self.SYSTEMS):
+            log("no systems map: no features")
+            return
+        sysmap = json.load(open(self.SYSTEMS))
+        groups = {g["id"]: g["name"] for g in sysmap.get("groups", [])}
+        extra = json.load(open(os.path.join(HERE, "features.json")))
+        sheets = {"survival": f"{self.root}/mods/base/vitals/SHEET.md", "crafting": f"{self.root}/mods/base/crafting/SHEET.md",
+                  "progression": f"{self.root}/mods/base/progression/PROGRESSION_SHEET.md"}
+        tabs = {k: S.tables(open(v).read()) for k, v in sheets.items() if os.path.exists(v)}
+        ids = [e["id"] for e in self.entries]
+        names = {e["id"]: e["name"] for e in self.entries}
+        icon = self.tex.get("base:gui/hud_stats")
+        url = self.img(icon, "gui/hud_stats.png") if icon is not None else None
+        for x in sysmap.get("systems", []):
+            f = extra.get(x["id"], {})
+            facts = [["The system", [["status", x.get("status", "")], ["code", x.get("code", "")],
+                                     ["feeds", ", ".join(x.get("feeds", []))]]]]
+            for h in f.get("sheets", []):
+                for heads, head, rows in tabs.get(f.get("sheet", "survival"), []):
+                    if heads and heads[-1] == h:
+                        facts.append([f"{h} (numbers)", [[r[0].strip("`"), " · ".join(f"{a}: {b}" for a, b in zip(head[1:], r[1:]) if b)] for r in rows[:40]]])
+                        break
+            links = [i for i in f.get("links", []) if i in names]
+            for w in f.get("match", []):
+                links += [i for i in ids if w in i.split(":", 1)[-1] and i not in links and not i.startswith(("skill:", "feature:"))]
+            self.tex.used = set()
+            first = next((e for e in self.entries if links and e["id"] == links[0]), None)
+            self.add({"id": f"feature:{x['id']}", "mod": "", "name": x["name"], "is": "feature", "group": "features",
+                      "kind": groups.get(x.get("group"), x.get("group", "")), "status": x.get("status", ""), "tier": None, "age": "",
+                      "path": "", "tab": "", "img": first["img"] if first and first.get("img") else url,
+                      "pix": first["pix"] if first and first.get("img") else True, "desc": x.get("what", ""), "how": f.get("how", ""),
+                      "links": links[:80], "made": [], "uses": [], "facts": facts})
+
     # ------------------------------------------------------------ creatures
 
     def render_mod(self):
@@ -493,6 +745,10 @@ class Builder:
 
     def render_geo(self, geo, anim, texture, key, model=""):
         out = []
+        if texture:
+            self.tex.used.add(texture)
+        for g in glob.glob(f"{self.root}/mods/*/assets/models/{model}.geo.json") if model else []:
+            self.tex.used.add(g)
         for view, box in (("3q", 320), ("side", 480)):
             rel = f"models/{key}_{view}.png"
             p = os.path.join(self.outdir, rel)
@@ -541,7 +797,7 @@ class Builder:
                  "danger": row.get("health / armour / hit (level 0)", ""),
                  "sci": sp["scientific"], "lineage": sp["lineage"], "spawns": sp.get("spawns", ""),
                  "clips": clips, "facts": facts, "made": [], "uses": [], "species": key}
-            self.entries.append(e)
+            self.add(e)
         # Drenkaun, the first biome boss.
         tex = f"{self.root}/mods/animals/assets/textures/entity/drenkaun/drenkaun.png"
         img, side = self.model_pictures("drenkaun", tex, "drenkaun")
@@ -554,7 +810,7 @@ class Builder:
         note = self.prog["boss_notes"].get("drenkaun", "")
         if note:
             facts.append(["The fight", [[p.split(" ")[0], p] for p in re.split(r";\s*", note)]])
-        self.entries.append({
+        self.add({
             "id": "animals:drenkaun", "mod": "animals", "name": self.L.get("entity.animals.drenkaun.title", "Drenkaun"),
             "is": "creature", "group": "monsters", "kind": "boss", "tier": 0, "age": "Stone Age", "path": "shared", "tab": "",
             "img": img, "img_side": side, "pix": False, "model": "drenkaun", "size": "titan", "role": "apex (boss)",
@@ -571,7 +827,7 @@ class Builder:
             if img is None:
                 a = self.tex.get(f"{ns}:entity/{n}")
                 img = self.img(a, f"skins/{n}.png") if a is not None else None
-            self.entries.append({
+            self.add({
                 "id": ent, "mod": ns, "name": self.L.get(f"entity.{ns}.{n}", title_case(ent)), "is": "creature",
                 "group": "monsters" if ent in HOSTILE else "animals", "kind": "monster" if ent in HOSTILE else "farm animal",
                 "tier": 0, "age": "", "path": "shared", "tab": "", "img": img, "img_side": side, "pix": False,
@@ -584,6 +840,7 @@ class Builder:
     def page(self, subj):
         tpl = open(os.path.join(HERE, "page.html")).read()
         data = {"commit": self.commit, "subject": subj, "built": time.strftime("%Y-%m-%d %H:%M"),
+                "gui": getattr(self, "gui_urls", {}), "stations": self.STATION_NAMES, "web": getattr(self, "web", None),
                 "ages": AGES, "entries": self.entries,
                 "registry": os.path.basename(self.registry) if self.registry else ""}
         js = json.dumps(data, separators=(",", ":"), ensure_ascii=False).replace("</", "<\\/")
@@ -606,7 +863,7 @@ def main():
         subprocess.run(["scp", "-q", f"{PC}:looktest/t2_{a.fetch_dump}/registry.json", dst], check=True)
         log(f"registry {dst}")
     t0 = time.time()
-    root, commit, subj = export(a.rev)
+    root, commit, subj, full = export(a.rev)
     try:
         outdir = os.path.join(ARCHIVE, "catalogue", commit)
         if a.fresh and os.path.isdir(outdir):
@@ -616,8 +873,19 @@ def main():
         log(f"commit {commit} ({subj[:60]}), registry {reg}")
         b = Builder(root, commit, outdir, reg)
         b.registry = reg
+        b.dates = art_dates(full)
         b.item_entries()
+        b.worn_entries()
         b.creature_entries()
+        b.skill_entries()
+        b.feature_entries()
+        by = {e["id"]: e for e in b.entries}
+        for e in b.entries:
+            for l in e.get("links", []):
+                if l in by and l != e["id"]:
+                    by[l].setdefault("features", []).append(e["id"])
+        b.attach_screens()
+        b.gui()
         html = b.page(subj)
         os.makedirs(os.path.dirname(a.page), exist_ok=True)
         with open(a.page, "w") as f:

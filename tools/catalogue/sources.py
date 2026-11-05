@@ -481,3 +481,39 @@ def springs(root):
     t = strip_comments(open(f"{root}/mods/base/crafting/src/materials.rs").read())
     m = re.search(r"SPRING: &\[\(&str, f32\)\]\s*=\s*&\[(.*?)\];", t, re.S)
     return {a: float(b) for a, b in re.findall(r'\("(\w+)", ([\d.]+)\)', m.group(1))} if m else {}
+
+
+def knapped(root):
+    """`vitals::first::KNAPPED`: [(part shape, kind, 5 rows of '.'/'X')]."""
+    t = open(f"{root}/mods/base/vitals/src/first.rs").read()
+    return [(a, b, strings(c)) for a, b, c in re.findall(r'Knapped \{ shape: "(\w+)", kind: "(\w+)", outline: \[(.*?)\]', t)]
+
+
+def recipe_raw(root):
+    """graph.rs recipes with their `at` kept raw (Hand, Table, Fire, Furnace, Station, Break, Fill)."""
+    text = strip_comments(open(f"{root}/mods/base/progression/src/graph.rs").read())
+    body = text[text.index("const RECIPES_LIST"):]
+    body = body[body.index("= &[") + 4:]
+    body = body[:body.index("\n];")]
+    out = []
+    for name, inner in calls(body, ["c", "s", "b", "Recipe"]):
+        if name == "Recipe":
+            f = {}
+            for part in split_top(inner):
+                if ":" in part:
+                    k, v = part.split(":", 1)
+                    f[k.strip()] = v.strip()
+            if "out" in f:
+                out.append((unstr(f["out"]), f.get("at", "").strip(), float(f.get("secs", "3"))))
+            continue
+        a = split_top(inner)
+        try:
+            if name == "c":
+                out.append((unstr(a[0]), a[3].strip(), 3.0))
+            elif name == "s":
+                out.append((unstr(a[0]), a[2].strip(), 10.0))
+            elif name == "b":
+                out.append((unstr(a[0]), f"Break({a[3]})", float(a[4])))
+        except IndexError:
+            pass
+    return out

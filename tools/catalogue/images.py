@@ -21,6 +21,8 @@ class Textures:
     def __init__(self, root):
         self.root = root
         self.cache = {}
+        # The files read since `used` was last emptied (an entry's art, for its dates).
+        self.used = set()
 
     def path(self, name):
         ns, rest = name.split(":", 1) if ":" in name else ("base", name)
@@ -32,9 +34,11 @@ class Textures:
 
     def get(self, name):
         """RGBA array of the texture's first frame (a strip's top square), or None."""
+        p = self.path(name)
+        if p:
+            self.used.add(p)
         if name in self.cache:
             return self.cache[name]
-        p = self.path(name)
         a = None
         if p:
             im = Image.open(p).convert("RGBA")
@@ -48,6 +52,8 @@ class Textures:
     def raw(self, name):
         """The whole image (a ramp's row), not cut to a frame."""
         p = self.path(name)
+        if p:
+            self.used.add(p)
         return np.array(Image.open(p).convert("RGBA")) if p else None
 
 
