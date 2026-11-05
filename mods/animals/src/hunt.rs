@@ -10,7 +10,8 @@
 //! arrives as fed as its prey are (`animal::arrive`), and a full one leaves them be.
 //!
 //! Prey keep watch (`wary`): a wild animal that sees a hunter able to take it runs off. In fog
-//! both see less far (`base_api::sight`).
+//! both see less far (`base_api::sight`). In a blood moon's totality (`animals_core::sky`) they
+//! watch half again as far, and a herd animal strayed from its herd walks back to its middle.
 
 use weft_sdk::*;
 
@@ -36,6 +37,8 @@ use animals_core::needs::{FULL, HUNGRY};
 const GIVE_UP: u64 = 600;
 const LOOK_EVERY: u64 = 60;
 const RUN: u64 = 80;
+/// Ticks a herd animal walks back to its herd before it looks again (`huddle`).
+const HUDDLE_WALK: u64 = 40;
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&HUNT, [0u64; 4], 0);
@@ -271,8 +274,10 @@ pub fn wary(w: &World, id: u64, st: &EntityState) -> bool {
     }
     let Some(me) = mass(w, id) else { return false };
     let mine = family(w, id);
+    let blood = animals_core::sky::totality(w.seed(), w.day_time());
+    let watch = WATCH * base_api::sight(w, st.pos.to_array()) as f64 * if blood { animals_core::sky::BLOOD_MOON_WATCH as f64 } else { 1.0 };
     let hunter = w
-        .targets_near(st.pos, WATCH * base_api::sight(w, st.pos.to_array()) as f64, None)
+        .targets_near(st.pos, watch, None)
         .into_iter()
         .filter(|&t| t != id && family(w, t) != mine && !animal::tamed(w, t))
         .filter_map(|t| {
@@ -281,10 +286,43 @@ pub fn wary(w: &World, id: u64, st: &EntityState) -> bool {
             s.takes_at_most(mass(w, t)?, me).then_some(e) // a pack's kind with its pack's reach
         })
         .min_by(|a, b| dist2(a.pos, st.pos).total_cmp(&dist2(b.pos, st.pos)));
-    let Some(h) = hunter else { return false };
+    let Some(h) = hunter else { return blood && huddle(w, id, st, now) };
     let (x, z) = (st.pos.x - h.pos.x, st.pos.z - h.pos.z);
     let n = (x * x + z * z).sqrt().max(0.01);
     w.navigate(id, [st.pos.x + x / n * 10.0, st.pos.y, st.pos.z + z / n * 10.0], 1.6);
     w.component_mut(id, &WARY).map(|u| *u = now + RUN);
+    true
+}
+
+/// In a blood moon's totality: a herd animal more than `HUDDLE` from the middle of its herd near
+/// walks back to it (held, as a flight, for `HUDDLE_WALK` ticks).
+fn huddle(w: &World, id: u64, st: &EntityState, now: u64) -> bool {
+    use animals_core::sky::{HUDDLE, HUDDLE_LOOK};
+    let herd = w
+        .component(id, &ANIMAL)
+        .and_then(|a| a.species())
+        .is_some_and(|s| s.bio.social == animals_core::biology::Social::Herd);
+    if !herd {
+        return false;
+    }
+    let kind = w.entity(id).map(|e| e.kind);
+    let (mut sum, mut n) = ([0.0f64; 3], 0.0);
+    for o in w.entities_near(st.pos, HUDDLE_LOOK as f64, None) {
+        if o == id || animal::tamed(w, o) {
+            continue;
+        }
+        let Some(e) = w.entity(o).filter(|e| Some(e.kind) == kind) else { continue };
+        sum = [sum[0] + e.pos.x, sum[1] + e.pos.y, sum[2] + e.pos.z];
+        n += 1.0;
+    }
+    if n == 0.0 {
+        return false;
+    }
+    let mid = [sum[0] / n, sum[1] / n, sum[2] / n];
+    if dist2(mid, st.pos) <= (HUDDLE * HUDDLE) as f64 {
+        return false;
+    }
+    w.navigate(id, mid, 1.2);
+    w.component_mut(id, &WARY).map(|u| *u = now + HUDDLE_WALK);
     true
 }
