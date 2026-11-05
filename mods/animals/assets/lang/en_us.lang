@@ -121,7 +121,6 @@ family.animals.caviidae = cavy family
 family.animals.dromaeosauridae = raptor family
 family.animals.wyvernidae = wyvern family, fantasy
 screen.animals.coat = Coat: {0}
-command.animals.pool = {0}
 screen.animals.release = Release
 screen.animals.height = Size: {0} at the {1}
 screen.animals.breeds_all = Breeds all year {0}

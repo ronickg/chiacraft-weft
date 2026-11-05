@@ -121,7 +121,6 @@ family.animals.caviidae = семейство морских свинок
 family.animals.dromaeosauridae = семейство дромеозаврид
 family.animals.wyvernidae = семейство виверн, фэнтези
 screen.animals.coat = Окрас: {0}
-command.animals.pool = {0}
 screen.animals.release = Отпустить
 screen.animals.height = Размер: {0} ({1})
 screen.animals.breeds_all = Размножается круглый год {0}
