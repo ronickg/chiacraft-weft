@@ -332,7 +332,7 @@ pub async fn break_refused(t: T) -> R {
 pub async fn creative_sword_no_flicker(t: T) -> R {
     t.flat().await?;
     t.op("mode creative").await?;
-    t.op("put me 0 iron_sword 1").await?;
+    t.cmd("/gear sword wrought_iron slot=0").await?;
     t.c().select_slot(0);
     let b = add(t.feet(), [2, 0, 0]);
     t.set(b, "stone").await?;

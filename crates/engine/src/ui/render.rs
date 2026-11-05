@@ -780,9 +780,9 @@ impl UiRenderer {
     }
 
     /// An item's own picture, what it shows until its model has one or without a model.
-    // SYNC: our stack look (`abi::comp::LOOK`, drawn through `GameTextures::look`) is not drawn
-    // here any more: a stack's own pictures are upstream's `layers` (`abi::comp::LAYERS`). Mods
-    // that set LOOK (base's parts tools) must set LAYERS.
+    // A stack's own pictures: upstream's `layers`, or chiacraft's look (`abi::comp::LOOK`), which
+    // `stack::layers` falls back to and `GameTextures::layered` composes (lost in the Weft sync,
+    // back 11-05).
     fn plain_icon(&mut self, c: &Content, tex: &GameTextures, x: f32, y: f32, size: f32, stack: &weft_abi::ItemStack) {
         let item = stack.item;
         let looks = crate::client::looks::current();

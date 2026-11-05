@@ -176,6 +176,12 @@ impl GameTextures {
     /// The texture id of a stack's `layers` text, made the first time it is asked for; loaded like
     /// any texture once drawn.
     pub fn layered(&self, spec: &str) -> u32 {
+        // Chiacraft's look (shade maps and ramps) composes on its own.
+        if crate::stack::is_look(spec)
+            && let Some(id) = self.look(spec)
+        {
+            return id;
+        }
         let mut i = self.inner.borrow_mut();
         if let Some(&id) = i.layered.get(spec) {
             return id;

@@ -137,6 +137,10 @@ pub fn cloak_of(item: &str) -> Option<&'static Cloak> {
     CLOAKS.iter().find(|c| c.name == n)
 }
 
+/// How much of a piece of clothing an armour lining of its cloth is (a gambeson's padding under
+/// mail, a fur-lined helmet; proposed).
+pub const LINING_SHARE: f32 = 0.5;
+
 /// What a body has on, summed over its armor and its clothes.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Worn {
@@ -168,6 +172,16 @@ impl Worn {
     /// Puts on a piece of clothing.
     pub fn clothes(&mut self, m: &Material, piece: usize) {
         let share = PIECE_SHARE[piece.min(3)];
+        self.cold += m.cold() * share;
+        self.heat += m.heat * share;
+        self.cold_wet += m.cold() * share * m.wet_keeps;
+        self.windproof = (self.windproof + m.windproof * share).min(1.0);
+    }
+
+    /// An armour piece's lining in slot `piece` (`crafting`: a lining is clothing in numbers):
+    /// `LINING_SHARE` of a piece of clothing of its cloth, a padded layer thinner than a coat.
+    pub fn lining(&mut self, m: &Material, piece: usize) {
+        let share = PIECE_SHARE[piece.min(3)] * LINING_SHARE;
         self.cold += m.cold() * share;
         self.heat += m.heat * share;
         self.cold_wet += m.cold() * share * m.wet_keeps;

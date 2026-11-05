@@ -72,6 +72,22 @@ pub fn weight(name: &str) -> f32 {
     }
     let n = name.split_once(':').map_or(name, |(_, n)| n);
     let piece = |p: &str| n.ends_with(p);
+    // Armour built from parts, by the set it looks like (`parts::ARMOUR_LOOKS`) as the old whole
+    // pieces were: a leather look 0.5 a piece unit, mail 2, scales 2.5, gems 2.
+    if let Some(slot) = crafting::materials::ARMOUR
+        .iter()
+        .position(|k| n == *k || n.strip_prefix(k).is_some_and(|r| r.starts_with('_')))
+    {
+        let per = match n.rsplit_once('_').map(|x| x.1) {
+            Some("mail") | Some("gem") => 2.0,
+            Some("scale") => 2.5,
+            _ => 0.5,
+        };
+        return per * [1.0, 2.0, 1.5, 1.0][slot];
+    }
+    if matches!(n, "pickaxe" | "axe" | "shovel" | "hoe" | "sword" | "knife" | "spear") {
+        return 1.0;
+    }
     if piece("_helmet") || piece("_chestplate") || piece("_leggings") || piece("_boots") {
         let per = match n.split('_').next().unwrap_or("") {
             "leather" => 0.5,

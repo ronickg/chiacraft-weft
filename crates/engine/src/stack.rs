@@ -87,12 +87,23 @@ pub fn damage(stack: &ItemStack) -> u32 {
     u32_of(stack, crate::content::try_content().and_then(|c| c.ids.damage))
 }
 
-/// The pictures a stack shows as, if it has its own (`abi::comp::LAYERS`): a tool made of parts.
+/// The pictures a stack shows as, if it has its own: upstream's `layers` (`abi::comp::LAYERS`),
+/// else chiacraft's look (`abi::comp::LOOK`, shade maps painted with ramps: `is_look`), which
+/// every place that draws a stack's own pictures takes the same way.
 pub fn layers(stack: &ItemStack) -> Option<&'static str> {
     let c = crate::content::try_content()?;
-    value(stack.data, c.ids.layers?)
+    c.ids
+        .layers
+        .and_then(|id| value(stack.data, id))
         .and_then(|b| std::str::from_utf8(b).ok())
         .filter(|s| !s.trim().is_empty())
+        .or_else(|| look(stack))
+}
+
+/// Whether a stack's pictures are chiacraft's look text (several layers by `;`, or a shade map
+/// with its ramps by `@`), composed by `client::stack_look`, not upstream's `layers`.
+pub fn is_look(spec: &str) -> bool {
+    spec.contains(';') || spec.contains('@')
 }
 
 /// `layers` text as (texture name, tint 0xRRGGBB) pairs, white where none is given.

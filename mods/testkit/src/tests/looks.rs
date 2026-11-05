@@ -464,7 +464,7 @@ pub async fn clouds(t: T) -> R {
 /// charges, filling, gone when charged, and the crosshair stays in the middle of the window.
 pub async fn attack_indicator(t: T) -> R {
     t.flat().await?;
-    t.op("put me 0 iron_sword 1").await?;
+    t.cmd("/gear sword wrought_iron slot=0").await?;
     t.c().select_slot(0);
     // A swing that hits nothing spends the charge; looking down, nothing bright is behind the bar.
     t.op("attr_mod me core:block_reach no_reach 0 -10 0")
