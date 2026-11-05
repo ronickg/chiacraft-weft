@@ -62,6 +62,9 @@ pub const COMMANDS: &[(&str, &str, Handler, u32)] = &[
     ("give", "<who:targets> <item:item> [count:int] | <item:item> [count:int]", give, p::GAME_MASTER),
     ("time", "set <time:time> | add <ticks:int> | query", time, p::GAME_MASTER),
     ("summon", "<entity:entity> [pos:pos] [count:int]", summon, p::GAME_MASTER),
+    // chiacraft: `/kill` as before Weft folded it into `/clear <targets>` (the crew's tests and
+    // scripts use it).
+    ("kill", "[who:targets]", kill, p::GAME_MASTER),
     ("clear", "[who:targets] | [item:item]", clear, p::GAME_MASTER),
     ("setblock", "<pos:pos> <block:block>", set_block, p::GAME_MASTER),
     ("insert", "<pos:pos> <item:item> [count:int]", insert, p::GAME_MASTER),
@@ -298,6 +301,18 @@ fn summon(s: &mut Server, x: &Ctx) -> Vec<Msg> {
 
 /// `/clear <targets>`: kills them. `/clear [item]`: empties the player's own inventory, or only
 /// the stacks of `item`.
+/// `/kill [targets]`: kills them, or the player.
+fn kill(s: &mut Server, x: &Ctx) -> Vec<Msg> {
+    let c = x.c;
+    let who = x.targets(s, "who");
+    for &(d, id) in &who {
+        if let Some(r) = s.dims[d as usize].entity_region(id) {
+            r.damage(c, id, f32::MAX, 0, damage::VOID);
+        }
+    }
+    say("clear.killed", vec![int(who.len())])
+}
+
 fn clear(s: &mut Server, x: &Ctx) -> Vec<Msg> {
     let c = x.c;
     if x.a.get("who").is_some() {
