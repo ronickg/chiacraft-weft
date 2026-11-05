@@ -1644,18 +1644,24 @@ impl WorldRenderer {
             self.table.cull(gpu, early, frame.slot, pipe, vbuf, depths);
         }
         let groups = self.table.groups();
+        let capped = !gpu.indirect_count() && cap_draws();
+        let mut issued = (0u64, 0u64);
         for &(kind, layer, page, id, base, max) in &groups {
             let (pipe, buf) = self.pipe_of(kind, layer, page);
             self.bind_run(list, pipe, buf, self.table.out.as_ref().map_or(obuf, |o| o.origins));
             let Some(o) = self.table.out.as_ref() else { continue };
+            let seen = self.table.seen.get(id as usize).copied().flatten();
+            let draws = if capped { capped_draws(seen, max) } else { max };
+            issued = (issued.0 + draws as u64, issued.1 + max as u64);
             list.push(Cmd::DrawIndexedIndirectCount {
                 buffer: o.draws,
                 offset: base as u64 * 20,
                 count_buffer: self.table.buckets[frame.slot].0,
                 count_offset: id as u64 * 8,
-                max,
+                max: draws,
             });
         }
+        self.table.log_draws(gpu.indirect_count(), capped, issued);
         self.emit(list, 0..self.translucent);
     }
 
@@ -1727,6 +1733,14 @@ struct CubeTable {
     buckets: Vec<(BufferId, u32)>,
     views: Vec<(BufferId, u32)>,
     out: Option<TableOut>,
+    /// Without `drawIndirectCount` (`Backend::indirect_count`): per bucket how many draws the
+    /// culling wrote the last time this frame slot ran, read back before it is reset; `None`
+    /// while unknown (a slot's buffer just made). A draw then issues about that many, not all.
+    seen: Vec<Option<u32>>,
+    /// What the last frame issued and the culling had written: (draws issued, all records,
+    /// written), for the once-a-second log line.
+    issued: (u64, u64, u64, u32),
+    logged: Option<std::time::Instant>,
 }
 
 /// What `cull` writes: draws and where each one's cube is. One of each serves all frames in flight,
@@ -1769,6 +1783,23 @@ fn groups_of(per_bucket: &[u32]) -> Vec<(u8, u8, u32, u32, u32, u32)> {
     out
 }
 
+/// Whether a GPU without `drawIndirectCount` draws about as many records as the culling wrote
+/// last time (`capped_draws`), not all of them: on by default, off with `--no-indirect-cap`
+/// (`WEFT_NO_INDIRECT_CAP`), to compare.
+fn cap_draws() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("WEFT_NO_INDIRECT_CAP").is_none())
+}
+
+/// How many of a group's `max` records to draw when the GPU can't read the count: what the
+/// culling wrote the last time this frame slot ran, `seen`, with room for half again as many and
+/// 256 more (turning, or coming nearer to more), all while it isn't known. A record past the count
+/// is zeroed and draws nothing, so drawing more is only slower; drawing fewer would leave cubes
+/// out for a frame, so the room is generous.
+fn capped_draws(seen: Option<u32>, max: u32) -> u32 {
+    seen.map_or(max, |n| n.saturating_add(n / 2).saturating_add(256).min(max))
+}
+
 impl CubeTable {
     fn new(gpu: &mut dyn Backend) -> CubeTable {
         CubeTable {
@@ -1781,6 +1812,9 @@ impl CubeTable {
             buckets: Vec::new(),
             views: Vec::new(),
             out: None,
+            seen: Vec::new(),
+            issued: (0, 0, 0, 0),
+            logged: None,
         }
     }
 
@@ -1908,6 +1942,7 @@ impl CubeTable {
             });
         }
         let Some(o) = &self.out else { return };
+        let before = self.buckets.get(slot).map(|b| b.0);
         let buckets = crate::gpu_layout::frame_buffer(
             gpu,
             &mut self.buckets,
@@ -1919,6 +1954,13 @@ impl CubeTable {
         );
         {
             let words: &mut [u32] = bytemuck::cast_slice_mut(gpu.mapped(buckets));
+            // What this slot's culling wrote last time (its frame is done on the GPU by now): a
+            // buffer made just now holds nothing yet.
+            let same = before == Some(buckets);
+            self.seen.resize(self.per_bucket.len(), None);
+            for (id, seen) in self.seen.iter_mut().enumerate() {
+                *seen = same.then(|| words[id * 2]);
+            }
             let mut base = 0;
             for (id, &n) in self.per_bucket.iter().enumerate() {
                 words[id * 2] = 0;
@@ -1956,6 +1998,30 @@ impl CubeTable {
     /// bucket, where its draws start and how many it may have.
     fn groups(&self) -> Vec<(u8, u8, u32, u32, u32, u32)> {
         groups_of(&self.per_bucket)
+    }
+
+    /// Adds a frame's indirect draws, and once a second (`--log frame=debug`) says how many
+    /// records the terrain's draws issued, of all there are and of what the culling wrote.
+    fn log_draws(&mut self, count: bool, capped: bool, (issued, all): (u64, u64)) {
+        let written: u64 = self.seen.iter().map(|s| s.unwrap_or(0) as u64).sum();
+        let t = &mut self.issued;
+        (t.0, t.1, t.2, t.3) = (t.0 + issued, t.1 + all, t.2 + written, t.3 + 1);
+        let now = std::time::Instant::now();
+        let since = *self.logged.get_or_insert(now);
+        if now - since < std::time::Duration::from_secs(1) {
+            return;
+        }
+        let (i, a, w, n) = std::mem::take(&mut self.issued);
+        let n = n.max(1) as u64;
+        let how = if count {
+            "count from the GPU"
+        } else if capped {
+            "capped at last time's"
+        } else {
+            "every record"
+        };
+        log::debug!(target: "frame", "terrain draws: {} records issued a frame of {}, {} written ({how})", i / n, a / n, w / n);
+        self.logged = Some(now);
     }
 
     fn destroy(&mut self, gpu: &mut dyn Backend) {
@@ -2124,6 +2190,15 @@ fn box_planes(m: Mat4) -> [Vec4; 6] {
 #[cfg(test)]
 mod indirect_count_tests {
     use super::*;
+
+    #[test]
+    fn capped_draws_keep_room_and_stay_in_the_group() {
+        assert_eq!(capped_draws(None, 5000), 5000, "unknown: all");
+        assert_eq!(capped_draws(Some(0), 5000), 256);
+        assert_eq!(capped_draws(Some(1000), 5000), 1756);
+        assert_eq!(capped_draws(Some(4000), 5000), 5000, "never past the group");
+        assert_eq!(capped_draws(Some(u32::MAX), 7), 7);
+    }
 
     /// Without `drawIndirectCount` every group draws all its records, so each must lie in the
     /// zeroed `TableOut` (`records_of`) and no two may overlap.
