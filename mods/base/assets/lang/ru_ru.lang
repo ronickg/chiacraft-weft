@@ -1522,3 +1522,17 @@ ley.base.feel.strong = сильно тянет
 ley.base.feel.on_line = на линии
 ley.base.feel.at_node = в узле
 command.base.ley = лей здесь {0} ({1}); ближайшая линия в {2} блоках, у {3} {4}; ближайший узел {5} {6} ({7} линий), в {8} блоках; ближайший путевой камень {9} {10}, в {11} блоках
+web.base.tip.pick0 = {color:title}{0}{/} {color:dim}(уровень предмета {1}){/}
+    {color:dim}Нажмите, чтобы вставить.{/}
+web.base.tip.pick1 = {color:title}{0}{/} {color:dim}(уровень предмета {1}){/}
+    {2} {3}
+    {color:dim}Нажмите, чтобы вставить.{/}
+web.base.tip.pick2 = {color:title}{0}{/} {color:dim}(уровень предмета {1}){/}
+    {2} {3}
+    {4} {5}
+    {color:dim}Нажмите, чтобы вставить.{/}
+web.base.tip.pick3 = {color:title}{0}{/} {color:dim}(уровень предмета {1}){/}
+    {2} {3}
+    {4} {5}
+    {6} {7}
+    {color:dim}Нажмите, чтобы вставить.{/}

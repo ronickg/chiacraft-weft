@@ -564,7 +564,10 @@ that and came out looking like a wooden crate with polka dots. What fixed it:
   ones, bark along a twig; things kicked out of a scrape land outside its rim.
 - **Small props** (an egg is 10 units, 5 texels at 32 a block): taper both ends a unit a layer so it reads
   round, keep marks one or two texels (hairlines don't read at this size), and review it scaled
-  up six times in a copy of the spec (Blockbench frames tiny models too small to see).
+  up six times in a copy of the spec (Blockbench frames tiny models too small to see). The one
+  allowed exception to "No thin lines" (Planner, 11-05): the half-texel steps of such a stacked
+  taper are its round outline, so name the layers in `linecheck_allow.txt` beside its source
+  (`egg*`) or in the build's `allow`. Only on small round props; a body steps by two texels.
 - **Show a prop as it is used** (a nest with eggs in it, half sunk and leaning as they are laid).
 
 Worked examples: `mods/animals/source/nest` (`build.py --variants`: a bare, lined and grassy

@@ -9,7 +9,8 @@ fn main() {
     let style = match std::env::args().nth(1).as_deref() {
         Some("branches") => Style::Branches,
         Some("wheel") => Style::Wheel,
-        _ => Style::Clusters,
+        Some("clusters") => Style::Clusters,
+        _ => Style::Islands,
     };
     let web = perks::build_with(style);
     let mut out = String::from("{\"nodes\":[");
