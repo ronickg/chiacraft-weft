@@ -40,6 +40,17 @@ if __name__ == "__main__":
     spec = json.load(open(os.path.join(OUT, "spec.json")))
     loose = joints(spec)  # every joint inside both parts it joins, or they come apart when it turns
     assert not loose, f"loose joints: {loose}"
+    # No thin lines (Ronald, 11-05): no strip of a box under two texels showing beside another.
+    # Meant: parts that are this narrow all through, not a strip of a covered face: the folded
+    # wing's forearm and hand (a texel or so across, their tops beside the part before them) and
+    # the crest's top tier (a texel across, its front and back above the tier below).
+    from linecheck import boxes_from_spec, lines  # noqa: E402
+    from PIL import Image  # noqa: E402
+    import numpy as np  # noqa: E402
+    meant = ("forearm_L.up", "forearm_R.up", "hand_L.up", "hand_R.up", "crest_top.north", "crest_top.south")
+    thin = [h for h in lines(boxes_from_spec(spec), np.array(Image.open(os.path.join(OUT, "texture.png")).convert("RGBA")),
+                             allow=meant) if h["kind"] == "line"]
+    assert not thin, f"thin lines: {[(h['box'], h['face'], h['cover'], h['width']) for h in thin]}"
     poking = pokes(spec, AXIS)  # no neck corner through the head or chest
     assert not poking, f"poking through: {sorted(poking)}"
     for anim in ("walk", "run"):  # a foot in the air must swing forward, or it moonwalks

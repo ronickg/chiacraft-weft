@@ -64,9 +64,10 @@ EYES.update({
 for _k in [k for k in EYES if k.startswith("citi_px")]:
     EYES[_k + "_m"] = dict(EYES[_k], pattern=[row[::-1] for row in EYES[_k]["pattern"]])
 EYE_STYLE = os.environ.get("CITIPATI_EYES", "citi_px3")
-SKULL = ((-5.0, 92.0, 38.0), (5.0, 104.0, 52.0))  # short and deep, behind the beak and under the crest
+SKULL = ((-6.4, 92.0, 38.0), (6.4, 104.0, 52.0))  # short and deep, behind the beak and under the crest
+# Its sides two texels out from the crest and the snout (at 5.0, its top and front showed 1.5-texel rims beside them; linecheck).
 EYE_Z, EYE_Y = 47.0, 99.0  # high on the side, behind the crest's foot
-LID_X = 5.25  # the eyelids' hinge plane, just outside the head's side
+LID_X = 6.65  # the eyelids' hinge plane, just outside the head's side
 LID_UP = 0.3  # the hinge a little over the eye's top, so a turned head shows no rim of it
 
 # ------------------------------------------------------------------ the model
@@ -168,24 +169,36 @@ def bones():
 
 def elements():
     npts = neck_points()
-    E = [el("hips", "spine_0", (-8.5, 55, -14), (8.5, 72, 10)),
+    # The hips half a unit inside the chest's sides, the thighs 0.4 inside theirs (at 8.5, 1.7 units of the thighs'
+    # backs showed past them; linecheck).
+    E = [el("hips", "spine_0", (-10.0, 55, -14), (10.0, 72, 10)),
          el("chest", "spine_1", (-10.5, 48, 6), (10.5, 72.6, 30)),  # a deep, bird's body
-         el("breast", "spine_1", (-8.0, 44, 15.5), (8.0, 62, 33.5))]  # the breast, lower and forward
+         # The breast, lower and forward: two texels in from the chest's sides and out in front (at 8 wide and 3.5 out,
+         # 1.2-1.8-texel bands of the chest beside it and of it before the chest; linecheck).
+         el("breast", "spine_1", (-6.5, 44, 15.5), (6.5, 62, 34.2))]
     for k, ((ang, length, hw), p) in enumerate(zip(NECK, npts)):
         back, front = (3.0, 0.5) if k == 0 else (2.0, 4.0)  # the last reaches deep into the skull
         E.append(el(f"neck_{k}", f"neck_{k}", p + np.array([-hw, -hw, -back]), p + np.array([hw, hw, length + front]),
                     rot=(-ang, 0, 0), origin=tuple(p)))
     E += [el("skull", "head", *SKULL),
-          el("snout", "head", (-3.8, 91.0, 50.5), (3.8, 99.5, 56.5)),  # the upper beak's deep base
-          el("beak", "head", (-2.6, 88.0, 55.6), (2.6, 96.5, 59.4)),  # its hooked tip, a parrot's
+          # The upper beak's deep base: flush under the crest, two texels in from the skull (at 3.8 a rim; linecheck).
+          el("snout", "head", (-2.3, 91.0, 50.5), (2.3, 99.5, 58.2)),  # its front 0.4 behind the crest's (flush)
+          # Its hooked tip, a parrot's: narrower than the snout, 2.2 texels below it, its front half a unit past it and
+          # its top inside it (at 2.6 wide, 88-96.5 and 55.6-59.4, bands of it showed beside the snout and the crest; linecheck).
+          el("beak", "head", (-1.5, 86.6, 55.4), (1.5, 95.9, 58.7)),
           el("mouth", "head", (-3.0, 90.4, 42.0), (3.0, 92.2, 54.4)),
           el("jaw", "jaw", (-4.3, 87.0, 41.5), (4.3, 92.6, 55.0)),  # deep, shorter than the upper beak
           # The crest: a tall, rounded casque over the beak, as a cassowary's, rising straight from the
           # beak in front and stepping down behind; three boxes, each narrower and shorter than the
           # one below, so it reads round.
-          el("crest", "head", (-2.1, 96.0, 44.0), (2.1, 106.0, 58.6)),
-          el("crest_1", "head", (-1.7, 105.5, 47.0), (1.7, 110.5, 58.0)),
-          el("crest_top", "head", (-1.3, 110.0, 50.0), (1.3, 113.5, 57.0))]
+          # Each 0.4 narrower than the one below and its front flush, its back two texels short (at 2.1 wide, rims of
+          # skull showed beside it; at 1.5-texel steps behind, bands; linecheck).
+          # Two texels over the skull (at 106, one texel of its side showed above it; linecheck).
+          el("crest", "head", (-1.9, 96.0, 44.0), (1.9, 108.0, 58.6)),
+          # Deeper in the crest and each showing two texels over the one below (crest_1 showed 1.8 over the crest,
+          # crest_top 1.5 over crest_1; linecheck): crest_top half a unit higher, both sunk deeper.
+          el("crest_1", "head", (-1.5, 104.5, 48.0), (1.5, 112.0, 58.2)),
+          el("crest_top", "head", (-1.1, 110.9, 52.0), (1.1, 116.0, 57.8))]
     for s, n in ((1, "L"), (-1, "R")):
         za, zb, top, bottom = eye_box(s)
         h = top + LID_UP - bottom + 0.4  # a little over the eye all round, so no rim of it shows when shut
@@ -194,7 +207,9 @@ def elements():
         # The wing, folded along the flank: the upper arm back from the shoulder, the forearm and hand
         # on back, each thinner than the last; the feathers hang from forearm and hand as panels.
         ax = ARM_X * s
-        E.append(el(f"arm_{n}", f"arm_{n}", (ax - 1.6, 60.0, 12.5), (ax + 1.6, 65.5, 27.5)))
+        # Two texels out from the chest's side (at ax + 1.6, its top showed a 1.25-texel strip beside the chest; linecheck).
+        a0, a1 = sorted((ax - 1.6 * s, ax + 3.6 * s))
+        E.append(el(f"arm_{n}", f"arm_{n}", (a0, 60.0, 12.5), (a1, 65.5, 27.5)))
         E.append(el(f"forearm_{n}", f"forearm_{n}", (ax - 1.1, 60.5, 0.0), (ax + 1.1, 64.5, 15.0)))
         E.append(el(f"hand_{n}", f"hand_{n}", (ax - 0.6, 61.0, -11.0), (ax + 0.6, 64.0, 2.5)))
         q = "east" if s > 0 else "west"
@@ -215,7 +230,9 @@ def elements():
                     quad="up", cut="fan", rot=(10, 0, s * 26), origin=o))
     for s, n in ((1, "L"), (-1, "R")):
         x = LEG_X * s
-        E.append(el(f"thigh_{n}", f"leg_{n}_thigh", (x - 4.0, 40, -6), (x + 4.0, 66, 6)))  # feathered drumstick
+        # A feathered drumstick, 0.4 inside the hips' side (flush; linecheck), half a unit clear of the chest's.
+        t0, t1 = sorted((x - 4.0 * s, x + 3.4 * s))
+        E.append(el(f"thigh_{n}", f"leg_{n}_thigh", (t0, 40, -6), (t1, 66, 6)))
         E.append(el(f"shin_{n}", f"leg_{n}_shin", (x - 2.8, 14, -3.2), (x + 2.8, 42.5, 2.4)))
         E.append(el(f"foot_{n}", f"leg_{n}_foot", (x - 2.1, 2, -2.6), (x + 2.1, 16.5, 1.4)))
         E.append(el(f"toes_{n}", f"leg_{n}_toes", (x - 3.6, 0, -2.2), (x + 3.6, 2.8, 9.5)))

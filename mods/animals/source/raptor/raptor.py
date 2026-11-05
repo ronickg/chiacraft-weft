@@ -85,7 +85,8 @@ LID_X = 4.4  # the eyelids' hinge plane, just outside the head's side (x = 4)
 
 # ------------------------------------------------------------------ the model
 
-TAIL = [(10, 8.0), (10, 6.4), (9, 5.0), (8, 3.8), (7, 2.8)]  # length, width (0.6+ a side thinner each)
+TAIL = [(10, 8.0), (10, 6.4), (9, 5.0), (8, 3.8), (7, 3.0)]  # length, width (0.6+ a side thinner each)
+# The tip flush in the one before (0.4 a side) and two texels tall (at 2.8, its sides one texel: a line; linecheck).
 TAIL0 = np.array([0.0, 31.0, -5.5])
 
 
@@ -167,7 +168,8 @@ def elements():
             rot=(-NECK_ANGLE, 0, 0), origin=tuple(NECK_BASE)),
          el("skull", "head", *SKULL),
          el("snout", "head", (-3, 38, 28.5), (3, 42, 38), rot=(-6, 0, 0), origin=(0, 40, 28.5)),
-         el("mouth", "head", (-2, 37, 29), (2, 39.4, 35.5)),
+         # To 0.4 short of the jaw's front (at 35.5, 1.5 units of the jaw's top showed before it as a lip; linecheck).
+         el("mouth", "head", (-2, 37, 29), (2, 39.4, 36.6)),
          el("jaw", "jaw", (-2.5, 35.5, 28.5), (2.5, 38, 37)),
          # A crest of feathers along the top of the head and neck: one cut-out panel.
          el("crest", "head", (0, 41, 13), (0, 48, 29), quad="east", cut="crest")]
@@ -177,7 +179,9 @@ def elements():
         x0, x1 = (LID_X - h, LID_X) if s > 0 else (-LID_X, -LID_X + h)
         E.append(el(f"eyelid_{n}", f"eyelid_{n}", (x0, top, za), (x1, top, zb), quad="down"))
         ax = 6.75 * s  # the shoulder (x = 6) inside both the chest and the arm
-        E.append(el(f"arm_{n}", f"arm_{n}", (ax - 1.25, 24, 12), (ax + 1.25, 30, 15)))
+        # Out two texels from the chest's side (at ax + 1.25, 1.2 texels of its front showed beside the chest; linecheck).
+        a0, a1 = sorted((ax - 1.25 * s, ax + 2.95 * s))
+        E.append(el(f"arm_{n}", f"arm_{n}", (a0, 24, 12), (a1, 30, 15)))
         E.append(el(f"forearm_{n}", f"forearm_{n}", (ax - 0.9, 23, 13.5), (ax + 0.9, 25.5, 21.5)))
         wx = ax + s * 1.6  # the wing feathers hang from the forearm, outside it
         E.append(el(f"wing_{n}", f"forearm_{n}", (wx, 16.5, 11.5), (wx, 25, 21.5), quad="east" if s > 0 else "west", cut="wing"))
@@ -190,7 +194,9 @@ def elements():
     E.append(el("tail_fan", f"tail_{len(TAIL) - 1}", (-5, tip[1] + 0.2, tip[2] - 9.5), (5, tip[1] + 0.2, tip[2] - 1), quad="up", cut="fan"))
     for s, n in ((1, "L"), (-1, "R")):
         x = 4.5 * s
-        E.append(el(f"thigh_{n}", f"leg_{n}_thigh", (x - 3.5, 18, -4), (x + 3.5, 30, 5)))
+        # A unit wider outward: two texels past the hips' side (at x + 3.5, a 1.5-texel band beside them; linecheck).
+        t0, t1 = sorted((x - 3.5 * s, x + 4.5 * s))
+        E.append(el(f"thigh_{n}", f"leg_{n}_thigh", (t0, 18, -4), (t1, 30, 5)))
         E.append(el(f"shin_{n}", f"leg_{n}_shin", (x - 2, 8, -2.5), (x + 2, 19.5, 1.5)))
         E.append(el(f"foot_{n}", f"leg_{n}_foot", (x - 1.5, 2, -2), (x + 1.5, 9, 1)))
         E.append(el(f"toes_{n}", f"leg_{n}_toes", (x - 2.5, 0, -1.5), (x + 2.5, 2.2, 6)))
