@@ -239,7 +239,10 @@ fn auto_exposure(mean: f32) -> f32 {
     let ref_at = 0.18 / log2(2.5 * EXPOSURE_REF + 1.045);
     let k = pow(target_at / ref_at, 0.5);
     let night = smoothstep(0.0, -0.15, scene.sun.y) * select(1.0, 0.0, !open_sky());
-    return clamp(k, 0.6, mix(2.0, 1.2, night));
+    // Under rain the view is darker and stays so (a storm's mood; brought up, its mist went milky):
+    // no brighter than as made, in a storm a little darker.
+    let wet = rain_amount() * select(1.0, 0.0, !open_sky());
+    return clamp(k, 0.6, mix(mix(2.0, 1.2, night), 1.0 - 0.1 * scene.weather.w, wet));
 }
 
 // How strong the bloom is: a share of the glow mixed in (it keeps the light's sum), more in rain
@@ -272,8 +275,10 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
         // Bloomy fog (Bliss's): where mist covers the view (the mist volume's own opacity there,
         // `froxels`), it takes much more of the glow, so thick mist reads as soft light rather than
         // a grey wall, and its banks' noise melts.
-        let fog = mist_over(uv, pass_);
-        col = mix(col, glow, clamp((BLOOM_MIX * (1.0 + air) + fog * 0.6) * fantasy_opt(OPT_BLOOM), 0.0, 0.8));
+        // Not in rain: its mist taking the glow too turned a storm's land to milk (the storm sheet,
+        // 11-05), where Bliss's stays dark and readable.
+        let fog = mist_over(uv, pass_) * (1.0 - 0.85 * rain_amount());
+        col = mix(col, glow, clamp((BLOOM_MIX * (1.0 + air * (1.0 - rain_amount())) + fog * 0.6) * fantasy_opt(OPT_BLOOM), 0.0, 0.8));
     }
     if pass_.exposure != 0u {
         let e = textureLoad(textures[pass_.exposure - 1u], vec2(0, 0), 0).g;
