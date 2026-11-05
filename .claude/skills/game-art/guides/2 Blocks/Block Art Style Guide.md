@@ -281,6 +281,13 @@ These describe **how the reference builds each kind of block**, not exact design
 - Cobblestone is rounded stones stacked in rough horizontal rows. Deepslate is dark grey, cut into rectangular tiles.
 - **Make it yours:** keep the scale (6–9 big shapes per face) and seamless tiling. The shapes and colours are free.
 
+**Grass and moss** (`02`, `09`)
+- The grass top is small leaf-shaped tufts in 3–4 greens, scattered evenly so they tile without a pattern.
+- The grass side is the dirt texture with a **grass fringe hanging over the top edge**: about a quarter of the height, with a ragged lower edge that drips down in uneven points.
+- Moss is fine, soft noise in dark olive greens, with no shapes at all.
+- Loose grass and ferns are plants growing from the bottom edge: thin blades for grass, a full leafy fan for ferns. They're drawn grey and coloured by biome.
+- **Make it yours:** keep the overhanging fringe on the side and the grey base. The tuft and blade shapes are free.
+
 **Ores** (`03`)
 - The background is **exactly the stone texture, unchanged**. The ore sits on top of it.
 - The ore is one bold cluster in the centre covering about half the face, with a darker socket shadow around it. Metals are rounded nuggets, gems are crystal shards pointing outwards, and coal is black lumps.
@@ -319,7 +326,7 @@ These describe **how the reference builds each kind of block**, not exact design
 
 **Crops** (`10`, `17`)
 - Bushy clumps of leaves fill the lower half to two-thirds of the face. The crop itself (root, fruit) peeks out at the base in the final stage.
-- Each growth stage is the same plant, taller and fuller, ending in a clear "ripe" colour.
+- Stage 0 is a few tiny sprouts on the bottom edge. Each stage after it is the same plant, taller and fuller. Only the last stage shows the crop: a root top, a beet or a grain head.
 - Pumpkin and melon sides use strong vertical ribs or stripes.
 - **Make it yours:** you can design any plant. Keep "each stage taller and fuller, ripe at the end".
 
@@ -351,6 +358,7 @@ These describe **how the reference builds each kind of block**, not exact design
 **Doors, trapdoors and thin blocks** (`16`, `18`)
 - Doors are the wood of their type in an iron frame with hinges and a window. Trapdoors use the same design squashed into one square.
 - Thin blocks (ladders, rails, bars) are drawn only where solid. Everything else is transparent.
+- Metal thin blocks are dark iron rods with **bright bolted joints** where pieces cross. Rails are two silver rails on wooden sleepers. Cobwebs are thin pale lines in a rough web. Scaffolding is a bamboo-coloured frame round the edge with lashings.
 - **Make it yours:** keep the door and trapdoor of one wood type matching. The window shapes and ironwork are free.
 
 ---

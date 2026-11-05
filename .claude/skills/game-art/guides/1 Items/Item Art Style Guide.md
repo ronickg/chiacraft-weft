@@ -181,15 +181,17 @@ These describe **how the reference builds each kind of item**, not exact designs
 - **Make it yours:** keep the fixed position across states and the pale 1-px string. The limbs and decoration can be anything.
 
 **Raw ores, ingots and nuggets** (`04`, `15`)
-- Raw ore is a lumpy cluster of 3–5 rounded nuggets, each with its own highlight, sometimes with a speck of grey rock.
-- Ingots are a trapezoid bar seen slightly from above: a bright top face, a mid front face and a dark side face.
-- Nuggets are 2–3 small lumps, the same colours as the ingot.
+- Raw ore is a lumpy cluster of 3–5 rounded nuggets, each with its own highlight. Copper shows green patina between the lumps.
+- Ingots are a bar lying on the diagonal, seen slightly from above, with a small **stamped mark** on the top face. The top is bright, the long side mid-tone and the end dark. Bricks use the same bar shape with no stamp.
+- Nuggets are one small lump plus a tiny detached speck, the same colours as the ingot.
+- Fuel (coal, charcoal) is matte, never glossy: coal is a heap of round black lumps, charcoal is a burnt stick.
 - **Make it yours:** the bar shape and lump count are free. Keep the three-face lighting.
 
 **Gems and minerals** (`05`, `15`)
 - Gems are faceted, with flat planes of 3–4 shades, white facet tips and one white plus-sign sparkle.
-- Crystals come as shard clusters, 2–4 shards pointing outwards. Cut gems are symmetric.
-- Powders (redstone, glowstone, sugar) are a small heap of bright grains on a darker base.
+- Each gem gets its own **form**, so they read apart even without colour: a cluster of small cubes (diamond), a star of long crystals (emerald), a pile of round beads (lapis), a fan of thin spikes (quartz), a single long shard (amethyst).
+- Powders (redstone, glowstone, sugar) are a heap or cluster of bright grains, with darker grains underneath.
+- Shards and flakes (prismarine, flint) are flat angular plates with one bright edge.
 - **Make it yours:** choose your own cut and cluster shape. Keep the white tips and the single sparkle.
 
 **Food** (`07`, `16`)
@@ -223,6 +225,7 @@ These describe **how the reference builds each kind of item**, not exact designs
 - Sherds are a terracotta tile with a carved top rim and a simple dark-red pictogram.
 - Templates are a rounded slab in a material colour with a glowing line rune.
 - Spawn eggs are an egg with the mob's face and colours painted on the front.
+- Music discs are a black vinyl disc **tilted into an ellipse**, with fine groove rings, one bright rim highlight and a small coloured centre label. Special discs swap the black vinyl for a coloured or patterned one.
 - **Make it yours:** design your own base. Keep pictures to 1–2 colours so they read at 32 px.
 
 **Mob drops and rare materials** (`06`, `21`)
@@ -230,6 +233,12 @@ These describe **how the reference builds each kind of item**, not exact designs
 - Glowing drops (blaze rod, ender pearl) have a bright core and a darker rim.
 - Rare items get the most detail and contrast, plus a small sparkle: a star, a heart orb, a totem.
 - **Make it yours:** the materials can be whatever your creatures drop. Keep "rarer means brighter and more detailed".
+
+**Seeds and plant items** (`22`)
+- Seeds are 3–5 small grains **scattered apart**, not touching, each with a highlight. Their colour says what they grow into.
+- Harvested plants are tied in a bundle with a pale cord (wheat, sugar cane) or shown as a single stalk or leaf (bamboo, kelp).
+- Small plants as items are the whole plant, centred, growing from the bottom edge.
+- **Make it yours:** keep "scattered grains" for seeds and "tied bundle" for harvests. The species are free.
 
 **Placeables and gadgets** (`23`)
 - Signs are a pale parchment board on a post, and only the post colour changes between wood types. Hanging signs use the same board on two chains.

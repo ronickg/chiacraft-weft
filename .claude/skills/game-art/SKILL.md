@@ -6,6 +6,12 @@ description: Generate any art for the game from Ronald's style guides — item i
 # Game art: generate anything from the style guides
 
 **Changes**
+- 2026-11-05 (later): Ronald's guides 3, added the same way: new family notes for raw ores and
+  ingots (a stamped bar on the diagonal, matte fuel), gems (each gem its own form), seeds (scattered
+  grains), grass and moss (a fringe over the dirt's top edge), crop stages, thin blocks, wool and
+  big animals. The reference sheets are unchanged. Every guide set is archived in
+  `~/Coding/chiacraft-archive/references/style-guides/guides-<N>/`; `blocks.py` batches attach the
+  block sheets too.
 - 2026-11-05: Ronald's guides 2 are in (`~/Downloads/Game Art Style Guides 2`): every guide gains
   "How each family looks" with a "Make it yours" line per family, the item guide gains set sheets
   13-26, and the monster guide armour worn on the body. Our own additions (lessons, our facts, Part 4)

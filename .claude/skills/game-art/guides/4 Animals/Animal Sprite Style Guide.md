@@ -89,6 +89,12 @@ These describe the reference's construction in words, not exact designs. Copy th
   - Legs often end in darker "socks" (fox) or keep the body colour.
 - **Tails, manes and ears:** these carry most of the character. Fluffy tails get a lighter tip, and manes are a band of darker, shaggier fur.
 - **Smooth-skinned animals** (pig, axolotl): soft pink or pastel with gentle shading and almost no texture.
+- **Wool and thick fur:**
+  - Big blocky noise in pale greys with no shapes. Wool is drawn pale so it can be dyed.
+  - The body under the wool is darker, so a sheared sheep reads clearly.
+- **Big animals:**
+  - Polar bears are cream fur that darkens softly toward the edges of each body part, so the bulk reads without an outline.
+  - Pandas use bold black-and-white regions with hard edges between them and soft fur noise inside each region.
 - **Make it yours:** keep the big eyes, the light belly and muzzle, the patch-or-gradient coats and the soft noise texture. Body shapes, markings and species are free.
 
 ---
