@@ -1938,15 +1938,12 @@ impl Backend for VulkanBackend {
                     }
                     Cmd::CopyDepthToBuffer { depth, buffer } => {
                         let t = self.textures.get(depth.0);
-                        let (image, width, height) = (t.image, t.desc.width, t.desc.height);
+                        // From the layout it is in (`EndPass` leaves a sampled depth target
+                        // shader-readable), and back to it: assuming the attachment layout was
+                        // wrong, and left the effects sampling it in the attachment layout.
+                        let (image, width, height, was) = (t.image, t.desc.width, t.desc.height, t.layout);
                         let raw = self.buffers.get(buffer.0).raw;
-                        self.barrier_image(
-                            cmd,
-                            image,
-                            depth_range(),
-                            vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL,
-                            vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-                        );
+                        self.barrier_image(cmd, image, depth_range(), was, vk::ImageLayout::TRANSFER_SRC_OPTIMAL);
                         let region = vk::BufferImageCopy::default()
                             .image_subresource(vk::ImageSubresourceLayers {
                                 aspect_mask: vk::ImageAspectFlags::DEPTH,
@@ -1957,13 +1954,10 @@ impl Backend for VulkanBackend {
                             .image_extent(vk::Extent3D { width, height, depth: 1 });
                         self.device
                             .cmd_copy_image_to_buffer(cmd, image, vk::ImageLayout::TRANSFER_SRC_OPTIMAL, raw, &[region]);
-                        self.barrier_image(
-                            cmd,
-                            image,
-                            depth_range(),
-                            vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-                            vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL,
-                        );
+                        // An image never used yet goes back to being a depth attachment.
+                        let back = if was == vk::ImageLayout::UNDEFINED { vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL } else { was };
+                        self.barrier_image(cmd, image, depth_range(), vk::ImageLayout::TRANSFER_SRC_OPTIMAL, back);
+                        self.textures.get_mut(depth.0).layout = back;
                     }
                     Cmd::Mark => {
                         if marks < MAX_MARKS - 1 {
