@@ -957,10 +957,15 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     out.pos = vec3<f32>(o.xyz * 16) + local;
     out.normal = corner.normal;
     out.ao = mix(0.85, 0.95, clamp(corner.normal.y, 0.0, 1.0));
+    // A crown's sides go dark toward its bottom, where the canopy shades itself (`fs_lod` takes it
+    // as the crown's own shade, `CROWN_UNDER`).
+    if lod_crown(w0) && dir != 2u && dir != 3u {
+        out.ao = mix(CROWN_UNDER, 1.0, CORNERS[dir * 4u + c].y);
+    }
     // Not traced: it is past the blocks the client keeps. Its tint kind, so far water is drawn as
     // water (and far leaves as leaves).
     let kind = lod_tint(w0);
-    out.kind = vec4(kind, 1u, 0u, 0u);
+    out.kind = vec4(kind, 1u, 0u, select(0u, 1u, lod_crown(w0)));
     var tint = vec3(1.0);
     if kind != 0u {
         tint = unpack_rgb(biomes[corner.biome * g.extra.z + kind - 1u]);
@@ -968,6 +973,35 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     out.tint = tint;
     out.color = pow(tint, vec3(2.2));
     return out;
+}
+
+// How dark a far crown's side gets at its bottom (`vs_lod`).
+const CROWN_UNDER: f32 = 0.5;
+// Far canopy (Ronald, 11-05: "in distant horizons is still 100x better"; the Look session's gap
+// sheet: Bliss + Distant Horizons' far forest reads as clumped crowns, lit tops and dark gaps, ours
+// as even green fields): a crown's top is laid with crowns about `CROWN_CELL` blocks across, each a
+// dome lit by the sun on its side and dark in the gaps between, where the far boxes are too coarse to
+// draw single trees. x: how much of a dome is there (1 its top, 0 a gap), yz: which way it slopes.
+const CROWN_CELL: f32 = 5.0;
+fn crown_clumps(xz: vec2<f32>) -> vec3<f32> {
+    let q = xz / CROWN_CELL;
+    let base = vec2<i32>(floor(q));
+    var best = 9.0;
+    var to = vec2(0.0);
+    for (var j = -1; j <= 1; j++) {
+        for (var i = -1; i <= 1; i++) {
+            let cell = base + vec2(i, j);
+            let at = vec2<f32>(cell) + 0.15 + 0.7 * vec2(hash3(vec3(cell.x, 7, cell.y)), hash3(vec3(cell.x, 13, cell.y)));
+            let d = q - at;
+            let l = dot(d, d);
+            if l < best {
+                best = l;
+                to = d;
+            }
+        }
+    }
+    let r = sqrt(best);
+    return vec3(1.0 - smoothstep(0.15, 0.8, r), to / max(r, 1e-4) * smoothstep(0.05, 0.6, r));
 }
 
 // Whether real cubes show this distant tile pixel's column (`Lod::mask`): then they stand there,
@@ -1043,10 +1077,27 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
         let w = water(in, avg, false);
         return vec4(w.rgb, SOLID_ALPHA);
     }
+    // A crown's face: its own shade toward its bottom (`vs_lod`) at any distance, and on its top the
+    // clumped crowns (`crown_clumps`), faded in where the far boxes stand for more than a tree and out
+    // where a crown is under a couple of pixels (its domes would only shimmer).
+    var lit_in = in;
+    if in.kind.w != 0u {
+        lit_in.ao = 0.95;
+        albedo = vec4(albedo.rgb * in.ao, albedo.a);
+        if in.normal.y > 0.5 {
+            let fw = length(fwidth(in.pos.xz)) / CROWN_CELL;
+            let amount = smoothstep(150.0, 260.0, in.dist) * (1.0 - smoothstep(0.3, 0.9, fw));
+            if amount > 0.0 {
+                let k = crown_clumps(in.pos.xz);
+                albedo = vec4(albedo.rgb * mix(1.0, mix(0.5, 1.08, k.x), amount), albedo.a);
+                lit_in.normal = normalize(vec3(k.y * amount, 1.0, k.z * amount));
+            }
+        }
+    }
     // From about 500 blocks out, where cells are 8 blocks and more (`lod::SLOPE_LEVEL`), a box's
     // walls lean halfway up as the slopes they stand for (`far_soft`, far look 2). Lit as upright
     // walls they got no sun at midday and a far snow range read stone-grey under thin white lines
     // (Far view, 11-05; the smooth tiles' facets had leaned toward the sun). Nearer, the 2-4 block
     // steps are steps and keep their shade: leaned there too, the land within 500 lost its relief.
-    return vec4(shade_soft(in, albedo, far_soft(in) * smoothstep(450.0, 800.0, in.dist)).rgb, SOLID_ALPHA);
+    return vec4(shade_soft(lit_in, albedo, far_soft(in) * smoothstep(450.0, 800.0, in.dist)).rgb, SOLID_ALPHA);
 }

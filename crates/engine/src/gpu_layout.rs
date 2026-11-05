@@ -79,6 +79,9 @@ shared! {
         CELL_MASK = 63,
         CELL_J_SHIFT = 6,
         LEVEL_SHIFT = 12,
+        /// chiacraft: word 0's top bit: the face is a tree crown's (`client::lod`), for packs that
+        /// shade far canopies apart from the ground.
+        CROWN_SHIFT = 31,
     }
     /// Tint kinds of faces and quads (0 none); mods' kinds follow the engine's.
     tint {
@@ -549,6 +552,7 @@ fn records() -> String {
         "}\n",
         "fn lod_dir(w0: u32) -> u32 {\n    return (w0 >> LOD_FACE_DIR_SHIFT) & FACE_DIR_MASK;\n}\n",
         "fn lod_tint(w0: u32) -> u32 {\n    return (w0 >> LOD_FACE_TINT_SHIFT) & TINT_MASK;\n}\n",
+        "fn lod_crown(w0: u32) -> bool {\n    return (w0 >> LOD_FACE_CROWN_SHIFT) != 0u;\n}\n",
     ));
     s
 }

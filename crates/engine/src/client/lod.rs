@@ -272,6 +272,13 @@ fn quad(dir: u32, x: i32, y: i32, z: i32, size: (i32, i32, i32), tex: u32, tint:
     crate::gpu_layout::lod_record(dir, [x, y, z], [size.0, size.1, size.2], tex, tint, biome)
 }
 
+/// chiacraft: marks a record as a tree crown's face (`lod_face::CROWN_SHIFT`): packs shade far
+/// canopies as crowns, lit on top and dark in the gaps and under them.
+fn crowned(mut r: [u32; 4]) -> [u32; 4] {
+    r[0] |= 1 << crate::gpu_layout::lod_face::CROWN_SHIFT;
+    r
+}
+
 /// The texture (its average color) and tint kind a distant face of `state` in direction `dir`
 /// is drawn in. A box model's faces are its boxes' own (its block's textures may be unset, and
 /// came out as the missing texture's magenta): its largest box's. A plant's is its picture.
@@ -493,7 +500,7 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                 }
                 if shows {
                     let (tex, tint) = face_of(c.leaves, dir as usize);
-                    out.push(quad(dir, i * s, y, j * s, ((end - i) * s, 1, s), tex, tint, biome));
+                    out.push(crowned(quad(dir, i * s, y, j * s, ((end - i) * s, 1, s), tex, tint, biome)));
                 }
                 (lo, hi) = (lo.min(c.bottom), hi.max(c.top + 1));
                 i = end;
@@ -513,7 +520,7 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                     if inside { (at(i + di, j + dj).0, crown_at(i + di, j + dj).map(|n| (n.bottom, n.top))) } else { (y, None) };
                 let (tex, tint) = face_of(c.leaves, dir);
                 for (a, b) in open_spans(c.bottom, c.top, ny, filled) {
-                    out.push(quad(dir as u32, i * s, a, j * s, (s, b + 1 - a, s), tex, tint, biome));
+                    out.push(crowned(quad(dir as u32, i * s, a, j * s, (s, b + 1 - a, s), tex, tint, biome)));
                 }
             }
             // Its trunk, from the ground to the crown, in the tile.
