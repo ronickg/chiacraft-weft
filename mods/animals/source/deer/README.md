@@ -46,6 +46,11 @@ lie (legs folded, chewing the cud).
   the build trait for horns (`Ho`) scales; in the gene files its range is nearly 1, so the trait's
   bottom draws them to nothing. A doe's sex shifts it all the way down, a buck's sits near the
   middle (antlers of varying size), and a young one's is lower still (spikes).
+- **Antlers as cut-out planes** (the skill's rule 7, Ronald 11-05): one quad an antler facing
+  sideways, turned out with the beam and leaning out, the beam and three tines drawn a texel thick
+  in its texture (`ANTLER_ART`); they were rods under a texel thick. The nose is painted on the
+  muzzle (rule 4), and the chest is flush with the hips at the sides and 2.25 texels higher at the
+  withers (rule 3).
 - **Fawns are spotted**: the gene files' `young` pattern, fading as they grow.
 - **The neck** rises at 55 degrees from low in the chest, long enough (with the front legs
   straddled a little) that the mouth reaches the grass with all four hooves on the ground.
