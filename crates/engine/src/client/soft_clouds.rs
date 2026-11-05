@@ -25,7 +25,10 @@ const CELL: usize = SIDE + 2;
 const ATLAS: usize = CELL * 8;
 
 fn hash(x: i32, y: i32, z: i32, seed: u32) -> u32 {
-    let mut h = (x as u32).wrapping_mul(73856093) ^ (y as u32).wrapping_mul(19349663) ^ (z as u32).wrapping_mul(83492791) ^ seed.wrapping_mul(2654435761);
+    let mut h = (x as u32).wrapping_mul(73856093)
+        ^ (y as u32).wrapping_mul(19349663)
+        ^ (z as u32).wrapping_mul(83492791)
+        ^ seed.wrapping_mul(2654435761);
     h = (h ^ (h >> 16)).wrapping_mul(0x45d9f3b);
     h = (h ^ (h >> 16)).wrapping_mul(0x45d9f3b);
     h ^ (h >> 16)
@@ -45,9 +48,18 @@ fn perlin(p: [f32; 3], period: i32, seed: u32) -> f32 {
         let h = hash((i[0] + dx).rem_euclid(period), (i[1] + dy).rem_euclid(period), (i[2] + dz).rem_euclid(period), seed);
         // One of the twelve edge directions of a cube.
         const G: [[f32; 3]; 12] = [
-            [1.0, 1.0, 0.0], [-1.0, 1.0, 0.0], [1.0, -1.0, 0.0], [-1.0, -1.0, 0.0],
-            [1.0, 0.0, 1.0], [-1.0, 0.0, 1.0], [1.0, 0.0, -1.0], [-1.0, 0.0, -1.0],
-            [0.0, 1.0, 1.0], [0.0, -1.0, 1.0], [0.0, 1.0, -1.0], [0.0, -1.0, -1.0],
+            [1.0, 1.0, 0.0],
+            [-1.0, 1.0, 0.0],
+            [1.0, -1.0, 0.0],
+            [-1.0, -1.0, 0.0],
+            [1.0, 0.0, 1.0],
+            [-1.0, 0.0, 1.0],
+            [1.0, 0.0, -1.0],
+            [-1.0, 0.0, -1.0],
+            [0.0, 1.0, 1.0],
+            [0.0, -1.0, 1.0],
+            [0.0, 1.0, -1.0],
+            [0.0, -1.0, -1.0],
         ];
         let g = G[(h % 12) as usize];
         g[0] * (f[0] - dx as f32) + g[1] * (f[1] - dy as f32) + g[2] * (f[2] - dz as f32)
@@ -123,7 +135,9 @@ pub fn noise_atlas() -> Vec<u8> {
     }
     for (o, v) in out.iter_mut().zip(raw.iter().enumerate()) {
         let c = v.0 % 4;
-        *o = ((v.1 - lo[c]) / (hi[c] - lo[c]).max(1e-6) * 255.0).round().clamp(0.0, 255.0) as u8;
+        *o = ((v.1 - lo[c]) / (hi[c] - lo[c]).max(1e-6) * 255.0)
+            .round()
+            .clamp(0.0, 255.0) as u8;
     }
     // The billows (r) equalized: each value by its rank, so a cover of 0.5 lets half of them
     // through. Stretched alone they still sat mostly low, and a clear day showed none (11-05).
@@ -308,11 +322,13 @@ impl SoftClouds {
             list.bind(bind::sky::SCENE, scene);
             list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: clouds });
         };
-        self.passes.push(Cmd::BeginPass { color: Some((Target::Texture(t.trace), Some([0.0, 0.0, 0.0, 1.0]))), depth: None });
+        self.passes
+            .push(Cmd::BeginPass { color: Some((Target::Texture(t.trace), Some([0.0, 0.0, 0.0, 1.0]))), depth: None });
         draw(&mut self.passes, trace_pipe);
         self.passes.push(Cmd::EndPass);
         // The resolve reads the trace by the index in the clouds entry (`trace_index`).
-        self.passes.push(Cmd::BeginPass { color: Some((Target::Texture(t.history[now]), None)), depth: None });
+        self.passes
+            .push(Cmd::BeginPass { color: Some((Target::Texture(t.history[now]), None)), depth: None });
         draw(&mut self.passes, resolve_pipe);
         self.passes.push(Cmd::EndPass);
         self.frame += 1;

@@ -8,13 +8,13 @@ use rustc_hash::FxHashMap;
 use weft_abi::sky_kind;
 use weft_render::*;
 
+use super::soft_clouds::SoftClouds;
 use super::world_render::Camera;
 use crate::assets::{Assets, decode_png};
 use crate::content::{DimensionDef, content};
 use crate::gpu_layout::{GpuSky, bind, sky as kind};
 use crate::registry::SkyDef;
 use crate::shaders::{Hook, Slots};
-use super::soft_clouds::SoftClouds;
 
 pub const HOOK: Hook = Hook {
     kind: "sky",
@@ -393,7 +393,8 @@ impl Sky {
         // world's gaps showed the clear colour, a band of navy streaks where the near sea floor
         // ended, the world playtester's under-water shots).
         if in_liquid {
-            self.soft.prepare(gpu, false, frame.width, frame.height, glam::Mat4::IDENTITY, cam.pos, glam::DVec2::ZERO);
+            self.soft
+                .prepare(gpu, false, frame.width, frame.height, glam::Mat4::IDENTITY, cam.pos, glam::DVec2::ZERO);
             self.list.clear();
             let aspect = frame.width as f32 / frame.height.max(1) as f32;
             let (o, px, py) = screen_rays(cam, aspect);
@@ -471,7 +472,8 @@ impl Sky {
                 // picture's cells stand (`offset`: what is added to a place to find it in them).
                 let offset = glam::DVec2::new(time * s.drift as f64 - self.cloud_drift.x, -self.cloud_drift.y);
                 let view_proj = cam.proj(aspect) * cam.view();
-                self.soft.prepare(gpu, self.soft_wanted && self.soft_possible, frame.width, frame.height, view_proj, cam.pos, offset);
+                self.soft
+                    .prepare(gpu, self.soft_wanted && self.soft_possible, frame.width, frame.height, view_proj, cam.pos, offset);
                 let trace = self
                     .soft
                     .trace_index()
@@ -589,7 +591,9 @@ impl Sky {
         }
         match clouds {
             Some(first_instance) => self.soft.record(buf, scene, first_instance),
-            None => self.soft.prepare(gpu, false, frame.width, frame.height, glam::Mat4::IDENTITY, cam.pos, glam::DVec2::ZERO),
+            None => self
+                .soft
+                .prepare(gpu, false, frame.width, frame.height, glam::Mat4::IDENTITY, cam.pos, glam::DVec2::ZERO),
         }
         if let (Some(first_instance), Some(pipe)) = (clouds, self.clouds_pipe) {
             list.pipeline(pipe);
