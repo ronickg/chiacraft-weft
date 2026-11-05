@@ -1503,9 +1503,9 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     let y = luma(t);
     // In the HDR world 0.8 of it (its curve keeps more colour; at 1.2 the noon land measured 131
     // of saturation against Bliss's 75: the gap sheets, 11-05).
-    // In the HDR world it follows the sun: as made with the sun low (the morning read greyer than
-    // Bliss's, 48 against 72 at 08:00), 0.68 of it at noon (100 against 75).
-    let sat = 1.2 * look_opt(OPT_SATURATION, 1.0) * select(1.0, mix(1.0, 0.68, smoothstep(0.45, 0.85, scene.sun.y)), scene.frame.x > 0.5);
+    // In the HDR world it follows the sun: as made with the sun under about 17° (dawn's gold), 0.6 of
+    // it from about 48° (the match checkpoints: 08:00 100 and noon 89 against Bliss's 72 and 75).
+    let sat = 1.2 * look_opt(OPT_SATURATION, 1.0) * select(1.0, mix(1.0, 0.6, smoothstep(0.3, 0.75, scene.sun.y)), scene.frame.x > 0.5);
     t = max(mix(vec3(y), t, mix(1.0, sat, day)), vec3(0.0));
     // A cool floor so the night is never pure black; by day black stays black.
     t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034) * (1.0 - day);
