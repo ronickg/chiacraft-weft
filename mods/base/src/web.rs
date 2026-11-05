@@ -310,7 +310,7 @@ fn web(ui: &mut Ui, s: &SkillWeb, points: u32, v: &View) {
             continue;
         }
         let st = if n.id == perks::START { State::Taken } else { state(s, n, points) };
-        let class: &'static str = Box::leak(format!("perk_{kind}_{}", st.suffix()).into_boxed_str());
+        let class = node_class(kind, st);
         let (tip, args) = tooltip(n, st, s);
         let args: Vec<Arg> = args.iter().map(|a| a.as_arg()).collect();
         let id = n.id;
@@ -330,6 +330,25 @@ fn web(ui: &mut Ui, s: &SkillWeb, points: u32, v: &View) {
             },
             |_| {},
         );
+    }
+}
+
+/// A node's class: its kind and state (`perk_<kind>_<state>`, the textures in `gui/`).
+fn node_class(kind: &str, st: State) -> &'static str {
+    match (kind, st.suffix()) {
+        ("start", _) => "perk_start_taken",
+        ("small", "taken") => "perk_small_taken",
+        ("small", "open") => "perk_small_open",
+        ("small", "far") => "perk_small_far",
+        ("small", _) => "perk_small_locked",
+        ("notable", "taken") => "perk_notable_taken",
+        ("notable", "open") => "perk_notable_open",
+        ("notable", "far") => "perk_notable_far",
+        ("notable", _) => "perk_notable_locked",
+        (_, "taken") => "perk_keystone_taken",
+        (_, "open") => "perk_keystone_open",
+        (_, "far") => "perk_keystone_far",
+        _ => "perk_keystone_locked",
     }
 }
 

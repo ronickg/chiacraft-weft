@@ -422,17 +422,17 @@ fn effects(r: &mut Registry) {
 // ------------------------------------------------------------------ commands
 
 fn commands(r: &mut Registry) {
-    // Sets a skill's level (for testing), or tells them all.
-    r.command("skill", "[skill:word] [level:int]", |cmd| {
+    // Sets a skill's level (for testing; 3.99 is just under 4), or tells them all.
+    r.command("skill", "[skill:word] [level:float]", |cmd| {
         let w = cmd.world();
         let player = cmd.player();
-        if let (Some(id), Some(level)) = (cmd.text("skill").map(str::to_string), cmd.int("level")) {
+        if let (Some(id), Some(level)) = (cmd.text("skill").map(str::to_string), cmd.float("level")) {
             let Some(sk) = Skill::of_id(&id) else {
                 cmd.reply("command.base.skill.unknown", &[Arg::Text(&id)]);
                 return;
             };
             if let Some(s) = w.component_mut(player, &SKILL_WEB) {
-                s.em[sk.index()] = skills::em_to(level.clamp(0, skills::MAX as i64) as f32);
+                s.em[sk.index()] = skills::em_to(level.clamp(0.0, skills::MAX as f64) as f32);
             }
         }
         let Some(s) = w.component(player, &SKILL_WEB) else { return };
