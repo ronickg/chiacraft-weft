@@ -217,6 +217,11 @@ pub fn held(w: &World, id: u64) -> Option<Act> {
     w.component(id, &HELD).and_then(|h| Act::of(h[STATE]))
 }
 
+/// Whether a clip played once (`act`, `play`) is still on for `id`.
+pub fn busy(w: &World, id: u64) -> bool {
+    w.component(id, &HELD).is_some_and(|h| w.game_time() < h[BUSY])
+}
+
 /// `id` holds state `a` (a gait too) this tick: call it each tick the behaviour wants it (once in
 /// `GRACE` ticks at least); it ends by itself once no longer asked for. Sent only when it changes.
 pub fn hold(w: &World, id: u64, a: Act) {
