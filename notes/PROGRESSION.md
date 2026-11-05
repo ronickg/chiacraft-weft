@@ -17,7 +17,7 @@ material ladder) and `notes/ANIMALS.md`.
 | Lore | The star-born ancients (below) |
 | End | A final boss in the furthest dimension, then open play |
 | Length | 100+ hours from stone to the stars ("let's make the sort of the time it takes 100+ hours") |
-| Classes | Skyrim-style: skills rise by doing, skill-ups give perk points for any tree; crafting, taming and life skills have trees too |
+| Classes | Skyrim-style skills that rise by doing, and perk points on one Path of Exile-style web: a centre start, a region per skill group, notables and keystones; crafting, taming and life skills included |
 | Bosses | Each biome its own: a giant native creature, summoned at an altar, tameable after (a young one or an egg), harder forms each age |
 | Boss loot | Random, with bad-luck help; summon again to try for a missing piece |
 | Tames | Work and farming, power before machines, mounts, in automation; and later better saddles, magic bonds, cyber and star beasts, tames linked to automation |
@@ -80,7 +80,20 @@ customizability". The model is Skyrim's:
 - **Skill-ups feed your level.** Each level gives a perk point to spend in any tree. Points are scarce, so a player specialises; a rare item resets them.
 - **Yours only.** Skills, perks and age are always the player's own, even in a tribe.
 
-The trees, grouped:
+**One web, like Path of Exile's passive tree** (Ronald, 11-06: "one thing in the center, and then
+you sort of expands out in the different branches ... you can kind of be a jack of all trades, but
+not really. But you can also then get very specific"):
+- Every perk sits on one big web. You start in the centre and spend points on nodes next to ones you have, growing outward.
+- Each group of skills below has its own region of the web, so going deep in one means not reaching the far end of another.
+- **Small nodes** give small bonuses (+2% melee damage, faster taming).
+- **Notables** are the key ones worth walking to (a tame shares your buffs, spells chain to a second target, forged items roll an extra property).
+- **Keystones** at the edges change how you play, with a cost. For example: your tames fight twice as hard but you can't wear heavy armour; or spells cost health instead of mana.
+- **Skill levels gate depth.** A region's deeper nodes need that skill's level, which rises by doing (Skyrim). So you can only go deep where you actually play, but your points decide which way.
+- **Bridges between regions** reward hybrids (between Beasts and Magic: rune collars; between Crafting and Engineering: machine-forged gear). A jack of all trades is possible but thin; a specialist goes far.
+- **Respec** with a rare item, a few nodes at a time.
+- **Room to grow:** new ages and content add nodes at the web's rim or new branches off existing notables, so old builds keep working.
+
+The regions, grouped:
 
 | Group | Trees |
 |---|---|
