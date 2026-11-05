@@ -126,6 +126,23 @@ fn main() {
         println!("  nearest waystone to a waystone: {lo:.0} min, {mid:.0} median, {hi:.0} max");
     }
     println!("  farthest ground from a line: {far:.0} blocks, at ({}, {}); the rod feels {:.0}", far_at.0, far_at.1, ley::LINE_REACH);
+    // The waystones nearest the middle, to aim a look: where, the lines meeting, biome and ground.
+    let mut near: Vec<&ley::Node> = stones.clone();
+    near.sort_by_key(|n| (n.x - cx).pow(2) + (n.z - cz).pow(2));
+    for n in near.iter().take(12) {
+        let h = l::height(&f, n.x * 16, n.z * 16) >> 4;
+        println!("  waystone at {} {} ({} lines): {}, ground {h}", n.x, n.z, n.lines, biome_at(n.x, n.z));
+    }
+    // The lines out of the nearest one: where to stand on a line, and off it.
+    if let Some(n) = near.first() {
+        for li in lines
+            .iter()
+            .filter(|li| li.from == [n.x, n.z] || li.to == [n.x, n.z])
+        {
+            let mid = [(li.from[0] + li.to[0]) / 2, (li.from[1] + li.to[1]) / 2];
+            println!("  its line {:?} -> {:?}, flow {:.2}, middle {} {}", li.from, li.to, li.flow, mid[0], mid[1]);
+        }
+    }
     for (b, k, w) in by {
         println!("  {b:16} nodes {k:4}  waystones {w:4}");
     }
