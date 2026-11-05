@@ -343,8 +343,9 @@ their numbers. Our own rules stay: 32 texels a block, the designed eyes, cute on
 3. **Front-heavy, in clean steps**: chest wider and taller than the hips (Naturalist bear 17
    against 15, rhino 24x29 against 20x25), stepped in evenly on both sides, every step whole and
    two texels or more at 32 (see "No thin lines").
-4. **Skull plus a narrower muzzle box**, 40-70% of the skull's width, out 8-12 texels at 32; the
-   nose painted on it or a thin strip, never a pad a texel proud.
+4. **Skull plus a narrower muzzle box**, 40-70% of the skull's width, as long as the species'
+   muzzle (a bear's 4-6 px at 16 is 8-12 texels at 32; a wolf's is longer for its head, a cat's
+   shorter); the nose painted on it or a thin strip, never a pad a texel proud.
 5. **A long neck is its own column** (camel, deer, giraffe), the head set on top.
 6. **Coats, manes and moss: one shell per area**, a little bigger than the body (ours: half a unit
    or more out, no inflate in our exporter), its hem cut out ragged and the shag painted as
