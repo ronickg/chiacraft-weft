@@ -1444,7 +1444,7 @@ dependencies = [
 
 [[package]]
 name = "chiacraft_bots"
-version = "26.10.4"
+version = "26.11.2"
 dependencies = [
  "chiacraft-packages",
  "glam 0.34.1",
