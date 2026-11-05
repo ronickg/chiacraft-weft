@@ -274,6 +274,7 @@ struct Sensed {
     gain: f32,
     sight: f32,
     other: f32,
+    hear: f32,
     smell_only: bool,
 }
 
@@ -285,7 +286,7 @@ fn sense_one(out: &Senses, facing: [f32; 2], field: f32, off: [f32; 2], d: f32, 
     let hear = perception::gain(d, heard);
     let smell = perception::gain(d, perception::scent_reach(off, out.heading, out.wind));
     let other = hear.max(smell);
-    Sensed { gain: sight.max(other), sight, other, smell_only: hear == 0.0 && sight == 0.0 && smell > 0.0 }
+    Sensed { gain: sight.max(other), sight, other, hear, smell_only: hear == 0.0 && sight == 0.0 && smell > 0.0 }
 }
 
 /// Awareness `a` after `secs` of `s` (nothing sensed: it fades); smell alone alerts it but never
@@ -383,7 +384,7 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
             // Its sight of it in the light there, and only with nothing opaque between.
             let d = dist2(pos, p).sqrt() as f32;
             let sight = if clear(w, eye, their_eye) { perception::gain(d, watch as f32 * lit(w, their_eye)) } else { 0.0 };
-            s = Sensed { gain: sight.max(s.other), sight, ..s };
+            s = Sensed { gain: sight.max(s.other), sight, smell_only: sight == 0.0 && s.hear == 0.0 && s.other > 0.0, ..s };
         }
         if s.gain > 0.0 && best.is_none_or(|b| s.gain > b.0.gain) {
             best = Some((s, t, pos));
@@ -491,7 +492,11 @@ fn players(
         }
     }
     let mut sensed = best.map(|(s, q, pos, their_eye)| {
-        let s = if s.sight > s.other && !clear(w, st.eye(), their_eye) { Sensed { gain: s.other, sight: 0.0, ..s } } else { s };
+        let s = if s.sight > s.other && !clear(w, st.eye(), their_eye) {
+            Sensed { gain: s.other, sight: 0.0, smell_only: s.hear == 0.0 && s.other > 0.0, ..s }
+        } else {
+            s
+        };
         (s, q, pos)
     });
     // A block broken near it by a player, or a fight one started.
