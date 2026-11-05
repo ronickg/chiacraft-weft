@@ -38,14 +38,27 @@ Pictures: `~/Coding/chiacraft-archive/images/android-port/2026-11-05/` (`r4` tit
 `r5` a world with the touch controls, `r6` pause, resume, menu taps and back, `r7`
 `grid_r7_touch.png` inventory, back and pause by touch, `grid_r7.png` the freeze below).
 
-### Found in the second run, fixed, not yet run again
+### Found in the second run, fixed
 
 The first start after the emulator's cold boot: Android stopped and destroyed the activity 2 s
 in, and the game froze with "chiacraft isn't responding". Android's main thread waits in
 onDestroy until the native game ends, and winit 0.30 only logs Destroy. Now the game notices it,
 saves and ends (a new start is a fresh process), a second `android_main` in one process ends
 it too, and the manifest takes every configuration change in place so Android has fewer reasons
-to recreate the activity. Built for both CPUs (APK wip8); needs a run to see it.
+to recreate the activity.
+
+Third run (r8, wip8, 11-05 19:10): a cold boot started cleanly (64 s in a world, no "isn't
+responding"); Home and back kept the same process with a new surface. `am start -R 2` (Android
+finishes the activity and starts it again) made the new activity start in the old process: the
+second-`android_main` guard ended it and Android started a fresh process, which reopened the
+world where it was saved, without a freeze. The onDestroy hook itself hasn't fired in a run yet
+(Android didn't destroy the activity on its own this time). Pictures: `r8/grid_r8.png`.
+
+### The desktop is unchanged
+
+PC looks of dev (0c8189eb) and this branch (930bb728), the vista and the birch forest at 06, 12
+and 18 h with the shader pack: the same pictures (0.1-2.6 % of pixels differ, leaves in the
+wind and the far fill's timing). `desktop/dev_vs_branch.png`.
 
 ### Numbers on the emulator (not a phone)
 
