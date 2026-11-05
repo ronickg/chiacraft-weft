@@ -1194,9 +1194,9 @@ fn grow_column(e: &mut BlockEvent, me: &'static Block) {
 /// px thick in the block's middle with an arm to each side it joins (`n` `s` `e` `w` `u` `d`, set by
 /// worldgen), in the log's bark cropped to the box, as Dynamic Trees draws its branches. Collides
 /// as its boxes; an axe takes it; a stick for it.
-/// The woods Art has drawn young bark for (`branch_<wood>`, `_across`, `_end`); the others wear
-/// their log's until then.
-const BRANCH_BARK: &[&str] = &["oak"];
+/// The woods Art has drawn young bark for (`branch_<wood>`, `_across`, `_end`; all nine, Ronald:
+/// "Approve all"); another wood wears its log's until then.
+const BRANCH_BARK: &[&str] = &["oak", "birch", "acacia", "mesquite", "dogwood", "ipe", "andiroba", "matamata", "brazil_nut"];
 
 /// A thin branch of `wood` (`base:<wood>_branch`, named on its log as `TREE_BRANCH`): a post 4 or 8
 /// px thick in the block's middle with an arm to each side it joins (`n` `s` `e` `w` `u` `d`, set by
