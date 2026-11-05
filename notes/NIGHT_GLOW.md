@@ -1,4 +1,9 @@
-# Fireflies and glowing plants (plan, Plants, 2026-11-05)
+# Fireflies and glowing plants (Plants, 2026-11-05)
+
+Built on `ecology-sync` (from the Weft sync): fireflies (`fireflies.rs`) and the three glowing
+plants (`wild.rs`), each waiting on its PC look. Where it differs from the plan below: foxfire and
+goblin's gold are picked as themselves (no loot table), and all three are placed on the forest
+floor like the mushrooms, not only under crowns.
 
 Ronald's fantasy picks from `reports/Research round 17.md`: recommendation 1 (fireflies) and two or
 three of recommendation 4's glowing plants. To build after the Weft sync, on a branch cut from dev,
