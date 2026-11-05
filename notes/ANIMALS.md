@@ -1229,3 +1229,14 @@ A species' page opens when the player sees one up close (within 8 blocks with no
 - **Bred:** breeding seasons, young (born or hatched), gestation or incubation, litter size, growth time, and lifespan.
 
 Every fact is read from the species' own rows (`animals_core::journal::facts`), so the journal says what the game does. Active hours are a new researched field, `Species::active`: Velociraptor at night and Protoceratops at any hour (from their scleral rings, Schmitz & Motani 2011), reindeer at any hour (van Oort et al. 2005), deer and wolves at dawn and dusk. The deeds are saved with the player (`journal::JOURNAL`). Creative reads every page. The screen is UI's (`journal_screen.rs`, with its inventory tab and the key I), and it reads `journal::entries(view)`. Each fact names its section on the page: the header, the chips, where it lives, or the survival rows.
+
+## Nests for the birds (2026-11-05)
+
+Birds now lay eggs in nests. Before this, their young came out as fledglings after the eggs' time, with no eggs at all (a gestation tune). Each bird builds its nest at its kind of site (`animals_core::nests::SITES`):
+- **Treetops:** the raven, the house sparrow, the great horned owl (which takes old nests in trees), the savanna hawk, and Confuciusornis (estimated).
+- **A high bare ledge, or failing that a treetop:** the golden eagle.
+- **The ground:** the snow bunting (crevices), the snowy owl (a scrape on a mound), the turkey vulture (a cave floor), the herring gull, and Gobipteryx (its eggs were found half buried in sand).
+
+When she lays (`eggs::lay_in_nest`), she looks 12 blocks around her for the highest open leaves or ledge, and uses the ground under her if there's none. A bird's nest is brooded (`life::egg_air_of`): its eggs are held at a sitting parent's 37 °C whatever the air, so a snowy owl's clutch hatches in the tundra. Before, a nest only pulled the air 60% of the way toward 37 °C. The young hatch in the nest.
+
+Not yet: a parent seen sitting on the nest, and egg eaters raiding wild nests.

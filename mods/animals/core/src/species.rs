@@ -1554,9 +1554,7 @@ pub static SPECIES: [Species; 46] = [
             comfort: (-30.0, 32.0),
             cold_blooded: false,
         },
-        // No nests yet (Ronald, 2026-11-03): eggs laid on the ground would never hatch in the
-        // north's cold (`eggs.rs`), so its young come out as fledglings after the eggs' time.
-        tune: Tune { gestation: Some(12_700), ..Tune::NONE },
+        // It lays in a nest it builds (`nests::SITES`), its eggs brooded whatever the cold.
         birth_size: 0.3,
         ..BASE
     },
@@ -1855,8 +1853,7 @@ pub static SPECIES: [Species; 46] = [
     },
     // The small birds (`reports/ecology/Overworld food webs.md`: the songbirds of every land biome, the
     // cat's, the owl's and the hawk's prey): two wild species on one model (`source/small_bird`), on
-    // the ground and in the air (`small_bird.rs`). No nests yet (Ronald, 2026-11-03): as the raven's,
-    // their young come out as fledglings after the eggs' time.
+    // the ground and in the air (`small_bird.rs`). They lay in nests (`nests::SITES`).
     Species {
         model: "small_bird",
         name: "house_sparrow",
@@ -1903,12 +1900,12 @@ pub static SPECIES: [Species; 46] = [
             comfort: (-25.0, 38.0),
             cold_blooded: false,
         },
-        // No nests yet: the young come out as fledglings after the eggs' time. Its life paced as the
+        // It lays in a nest (`nests::SITES`). Its life paced as the
         // mouse's (a small animal's derived span is too short for a line to be bred), growing up a
         // fifth of it; many live close together, at feeders and in hedges (`balance::checks`).
         // Room near raised so a small wild group of its kind lasts on its own (`web/test.mjs`: two pairs
         // left alone at their room neither die out nor flood); the food web's grazing still holds.
-        tune: Tune { gestation: Some(8_665), growth: Some(66_000), lifespan: Some(336_000), crowd: Some(30), ..Tune::NONE },
+        tune: Tune { growth: Some(66_000), lifespan: Some(336_000), crowd: Some(30), ..Tune::NONE },
         birth_size: 0.6,
         ..BASE
     },
@@ -1955,25 +1952,17 @@ pub static SPECIES: [Species; 46] = [
             comfort: (-40.0, 18.0),
             cold_blooded: false,
         },
-        // No nests yet: the young come out as fledglings after the eggs' time; paced as the sparrow,
+        // It lays in a nest (`nests::SITES`); paced as the sparrow,
         // a second brood in a long summer, flocks close together (`balance::checks`).
         // Room near raised so a small wild group of its kind lasts on its own (`web/test.mjs`: two pairs
         // left alone at their room neither die out nor flood); the food web's grazing still holds.
-        tune: Tune {
-            gestation: Some(8_935),
-            growth: Some(66_000),
-            lifespan: Some(336_000),
-            recovery: Some(60_000),
-            crowd: Some(30),
-            ..Tune::NONE
-        },
+        tune: Tune { growth: Some(66_000), lifespan: Some(336_000), recovery: Some(60_000), crowd: Some(30), ..Tune::NONE },
         birth_size: 0.6,
         ..BASE
     },
     // The owls (`reports/ecology/Overworld food webs.md`: the night's hunter of every land biome, the
     // rodent's and the hare's): two wild species on one model (`source/owl`), on the ground and in
-    // the air (`owl.rs`). No nests yet (Ronald, 2026-11-03): as the raven's, their young come out as
-    // fledglings after the eggs' time.
+    // the air (`owl.rs`). They lay in nests (`nests::SITES`).
     Species {
         model: "owl",
         name: "great_horned_owl",
@@ -2035,7 +2024,6 @@ pub static SPECIES: [Species; 46] = [
             comfort: (-35.0, 38.0),
             cold_blooded: false,
         },
-        tune: Tune { gestation: Some(18_505), ..Tune::NONE },
         birth_size: 0.3,
         ..BASE
     },
@@ -2085,7 +2073,6 @@ pub static SPECIES: [Species; 46] = [
             comfort: (-50.0, 16.0),
             cold_blooded: false,
         },
-        tune: Tune { gestation: Some(18_083), ..Tune::NONE },
         birth_size: 0.3,
         ..BASE
     },
@@ -2093,8 +2080,7 @@ pub static SPECIES: [Species; 46] = [
     // the hare's, the marmot's, the fawn's and the small dog's): the golden eagle of the north's and
     // the dry country's open land, and the savanna hawk of the llanos and the Pantanal, where there
     // are no golden eagles: two wild species on one model (`source/eagle`), the hawk drawn smaller
-    // by its size genes; on the ground and in the air (`eagle.rs`). No nests yet (Ronald,
-    // 2026-11-03): their young come out as fledglings after the eggs' time.
+    // by its size genes; on the ground and in the air (`eagle.rs`). They lay in nests (`nests::SITES`).
     Species {
         model: "eagle",
         name: "golden_eagle",
@@ -2153,10 +2139,10 @@ pub static SPECIES: [Species; 46] = [
             comfort: (-40.0, 38.0),
             cold_blooded: false,
         },
-        // No nests yet: the young come out as fledglings after the eggs' time. A young eagle flies in
+        // Its young hatch in a nest (`nests::SITES`). A young eagle flies in
         // its first summer and looks grown in a year; it waits years to breed, which no line of
         // breeding in the game could wait for (`balance::checks`: a fourth generation in 40 days).
-        tune: Tune { gestation: Some(22_568), growth: Some(200_000), ..Tune::NONE },
+        tune: Tune { growth: Some(200_000), ..Tune::NONE },
         birth_size: 0.3,
         ..BASE
     },
@@ -2202,17 +2188,17 @@ pub static SPECIES: [Species; 46] = [
             comfort: (5.0, 42.0),
             cold_blooded: false,
         },
-        // No nests yet: fledglings after the eggs' time. One young a year: her rest set shorter so
+        // Its young hatch in a nest (`nests::SITES`). One young a year: her rest set shorter so
         // the wild replaces its dead (`balance::checks`: six young in a life).
-        tune: Tune { gestation: Some(20_975), recovery: Some(60_000), ..Tune::NONE },
+        tune: Tune { recovery: Some(60_000), ..Tune::NONE },
         birth_size: 0.3,
         ..BASE
     },
     // The turkey vulture (`reports/ecology/Overworld food webs.md`: something for the dead in the warm
     // biomes, the raven's counterpart): a wild bird on its own model (`source/vulture`), on the
     // ground and in the air (`vulture.rs`), finding the dead by smell from the air. It hunts nothing;
-    // carcasses as food in the world come with the web's third tier. No nests yet (Ronald,
-    // 2026-11-03): its young come out as fledglings after the eggs' time.
+    // carcasses as food in the world come with the web's third tier. It lays on a cave's floor
+    // (`nests::SITES`).
     Species {
         model: "vulture",
         name: "turkey_vulture",
@@ -2266,18 +2252,17 @@ pub static SPECIES: [Species; 46] = [
             comfort: (-12.0, 42.0),
             cold_blooded: false,
         },
-        // No nests yet: fledglings after the eggs' time. A young vulture is grown in its first year
+        // Its young hatch in a nest (`nests::SITES`). A young vulture is grown in its first year
         // and breeds at three, which no line in the game could wait for (`balance::checks`).
         // Roosts of dozens, but spread over a big range by day: room near as a herd's at most.
         // Her rest after a brood set shorter, so a roost of a few lasts on its own (`web/test.mjs`).
-        tune: Tune { gestation: Some(21_377), growth: Some(110_000), recovery: Some(80_000), crowd: Some(24), ..Tune::NONE },
+        tune: Tune { growth: Some(110_000), recovery: Some(80_000), crowd: Some(24), ..Tune::NONE },
         birth_size: 0.3,
         ..BASE
     },
     // The herring gull (`reports/ecology/Overworld food webs.md`: the coast's hunter and its eater of
     // the dead): a wild bird on its own model (`source/gull`), on the ground and in the air
-    // (`gull.rs`). No nests yet (Ronald, 2026-11-03): its young come out as fledglings after the
-    // eggs' time.
+    // (`gull.rs`). It nests on the ground (`nests::SITES`).
     Species {
         model: "gull",
         name: "herring_gull",
@@ -2326,10 +2311,10 @@ pub static SPECIES: [Species; 46] = [
             comfort: (-15.0, 34.0),
             cold_blooded: false,
         },
-        // No nests yet: fledglings after the eggs' time. A young gull flies in five or six weeks and
+        // Its young hatch in a nest (`nests::SITES`). A young gull flies in five or six weeks and
         // is grown in a year; it waits four years to breed, which no line in the game could wait for
         // (`balance::checks`).
-        tune: Tune { gestation: Some(16_796), growth: Some(110_000), crowd: Some(24), ..Tune::NONE },
+        tune: Tune { growth: Some(110_000), crowd: Some(24), ..Tune::NONE },
         birth_size: 0.3,
         ..BASE
     },
@@ -3119,9 +3104,9 @@ pub static SPECIES: [Species; 46] = [
             comfort: (0.0, 34.0),
             cold_blooded: false,
         },
-        // No nests yet: fledglings after the eggs' time, as the other birds (`birds.rs`), grown in
+        // Its young hatch in a nest (`nests::SITES`), as the other birds', grown in
         // a few weeks of the game's, and a room that lets a flock last (`web/test.mjs`).
-        tune: Tune { gestation: Some(16_796), growth: Some(110_000), crowd: Some(24), ..Tune::NONE },
+        tune: Tune { growth: Some(110_000), crowd: Some(24), ..Tune::NONE },
         birth_size: 0.3,
         ..BASE
     },
@@ -3170,9 +3155,9 @@ pub static SPECIES: [Species; 46] = [
             comfort: (0.0, 40.0),
             cold_blooded: false,
         },
-        // No nests yet: fledglings after the eggs' time, as the other birds (`birds.rs`), grown in
+        // Its young hatch in a nest (`nests::SITES`), as the other birds', grown in
         // a few weeks of the game's, and a room that lets a flock last (`web/test.mjs`).
-        tune: Tune { gestation: Some(16_796), growth: Some(150_000), crowd: Some(24), ..Tune::NONE },
+        tune: Tune { growth: Some(150_000), crowd: Some(24), ..Tune::NONE },
         birth_size: 0.3,
         ..BASE
     },
