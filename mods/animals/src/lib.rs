@@ -72,6 +72,7 @@ mod riding;
 mod sauropod;
 mod scars;
 mod screen;
+mod senses;
 mod signatures;
 mod small_bird;
 mod species;
@@ -156,6 +157,7 @@ fn init(r: &mut Registry) {
     forage::init(r);
     drink::init(r);
     hunt::init(r);
+    senses::init(r);
     screen::init(r);
     taming::init(r);
     commands::init(r);

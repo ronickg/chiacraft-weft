@@ -32,6 +32,10 @@ use crate::species::{self, SPECIES, Species};
 static FORAGE: Component<[f64; 4]> = Component::named("animal_forage");
 /// The dropped item it is going to eat (0: a block, or nothing; not saved).
 static ITEM: Component<u64> = Component::named("animal_forage_item");
+/// The last place it found food growing (x, y, z, and 1 where there is one): a hungry animal
+/// looks round there first, where more of it likely grows (`reports/Creature AI.md`, step 1).
+/// Not saved.
+static PATCH: Component<[i32; 4]> = Component::named("animal_forage_patch");
 static GRAZED_GRASS: Block = Block::named("base:grazed_grass");
 static DUNG: Item = Item::named("base:dung");
 static DUNG_PAT: Block = Block::named("base:dung_pat");
@@ -53,9 +57,11 @@ const NOTHING: f64 = 300.0;
 pub fn init(r: &mut Registry) {
     r.entity_component(&FORAGE, [0.0; 4], 0);
     r.entity_component(&ITEM, 0u64, 0);
+    r.entity_component(&PATCH, [0i32; 4], 0);
     for s in &SPECIES {
         r.attach(s.kind, &FORAGE);
         r.attach(s.kind, &ITEM);
+        r.attach(s.kind, &PATCH);
     }
     // A place holds as many as it feeds (`notes/ECOLOGY.md`, part 7): plant eaters come as often
     // as their food grows there now, so fewer in a drought or a winter.
@@ -169,24 +175,46 @@ fn season(w: &World) -> Option<usize> {
     crate::breeding::season_bit(w).map(|bit| bit.trailing_zeros() as usize)
 }
 
-/// The nearest food of its diet within `LOOK` blocks it can reach from the ground; the ground's
-/// own roots, insects and lichen only when nothing richer is in sight (`Source::fallback`).
-fn nearest(w: &World, s: &Species, pos: [f64; 3]) -> Option<[i32; 3]> {
+/// Blocks round the patch it last found food in that it looks first, and how far it goes back to
+/// one.
+const PATCH_LOOK: i32 = 3;
+const RECALL: i32 = 2 * LOOK;
+
+/// Food of its diet: round the patch it last found some in, if that is within `RECALL` blocks and
+/// still has some, else the nearest within `LOOK` blocks; remembered as its patch.
+fn find_food(w: &World, id: u64, s: &Species, pos: [f64; 3]) -> Option<[i32; 3]> {
     let p = pos.map(|v| v.floor() as i32);
+    let patch = w
+        .component(id, &PATCH)
+        .filter(|k| k[3] != 0 && (k[0] - p[0]).pow(2) + (k[2] - p[2]).pow(2) <= RECALL * RECALL);
+    let found = patch
+        .and_then(|k| nearest(w, s, [k[0], k[1], k[2]], PATCH_LOOK, p, false))
+        .or_else(|| nearest(w, s, p, LOOK, p, true))?;
+    if let Some(c) = w.component_mut(id, &PATCH) {
+        *c = [found[0], found[1], found[2], 1];
+    }
+    Some(found)
+}
+
+/// The nearest food of its diet to `p` within `r` blocks of `center` it can reach from the
+/// ground; the ground's own roots, insects and lichen only when nothing richer is in sight
+/// (`Source::fallback`), and only with `ground`.
+fn nearest(w: &World, s: &Species, center: [i32; 3], r: i32, p: [i32; 3], ground_too: bool) -> Option<[i32; 3]> {
     let now = season(w);
     let mut best: Option<([i32; 3], i32)> = None;
     let mut ground: Option<([i32; 3], i32)> = None;
-    for dx in -LOOK..=LOOK {
-        for dz in -LOOK..=LOOK {
+    for dx in -r..=r {
+        for dz in -r..=r {
             for dy in -2..=LOOK_UP {
-                let at = [p[0] + dx, p[1] + dy, p[2] + dz];
-                let d = dx * dx + dz * dz + dy * dy * 4;
+                let at = [center[0] + dx, center[1] + dy, center[2] + dz];
+                let (ox, oy, oz) = (at[0] - p[0], at[1] - p[1], at[2] - p[2]);
+                let d = ox * ox + oz * oz + oy * oy * 4;
                 if best.is_some_and(|(_, b)| d >= b) {
                     continue;
                 }
                 match food(s, w.block(at), now) {
                     Some(src) if !src.fallback() => best = Some((at, d)),
-                    Some(_) if ground.is_none_or(|(_, b)| d < b) => ground = Some((at, d)),
+                    Some(_) if ground_too && ground.is_none_or(|(_, b)| d < b) => ground = Some((at, d)),
                     _ => {}
                 }
             }
@@ -280,8 +308,9 @@ pub fn forage(w: &World, id: u64, st: &EntityState) -> bool {
     // Only an animal that gets hungry, and whose food the world grows or drops.
     let grows = s.eats.iter().any(|&(c, _)| vitals::forage::grows(c));
     let drops = s.eats.iter().any(|&(c, _)| vitals::forage::dropped_kind(c));
-    let hungry = (s.hungry_in_the_wild() || animal::tamed(w, id)) && (grows || drops);
-    if !hungry || full >= FULL || (f[3] == 0.0 && full >= HUNGRY) {
+    // The cheap reasons first: most animals most of the time aren't hungry.
+    let fed = full >= FULL || (f[3] == 0.0 && full >= HUNGRY);
+    if fed || !((s.hungry_in_the_wild() || animal::tamed(w, id)) && (grows || drops)) {
         if f[3] != 0.0 {
             w.component_mut(id, &FORAGE).map(|f| *f = [0.0; 4]);
             w.component_mut(id, &ITEM).map(|i| *i = 0);
@@ -361,7 +390,10 @@ pub fn forage(w: &World, id: u64, st: &EntityState) -> bool {
             .map(|c| *c = [p[0], p[1], p[2], now + WALK]);
         return true;
     }
-    match grows.then(|| nearest(w, s, st.pos.to_array())).flatten() {
+    match grows
+        .then(|| find_food(w, id, s, st.pos.to_array()))
+        .flatten()
+    {
         Some(p) => {
             w.navigate(id, [p[0] as f64 + 0.5, p[1] as f64, p[2] as f64 + 0.5], 1.0);
             f = [p[0] as f64, p[1] as f64, p[2] as f64, now + WALK];

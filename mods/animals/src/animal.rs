@@ -160,13 +160,20 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
         }
         crate::coats::upkeep(w, id, index, a, st.pos.to_array());
         crate::breeding::upkeep(w, id, index, a);
-        if old_age(w, id, index, a) {
+        // What changes slowly, once in `SLOW` ticks (staggered; every time it ticks while resting):
+        // its age, size and stats. Each read its genes, and they were most of a crowd's upkeep.
+        let slow = new || due(w, id, SLOW);
+        // A slow look while up stands for the `SLOW` calls it used to be (`/animal speed` ages it by
+        // each).
+        let calls = if new || w.tick_elapsed(id) > 1 { 1 } else { SLOW };
+        if slow && old_age(w, id, index, a, calls) {
             return false;
         }
         let a = *a;
+        crate::senses::refresh(w, id, index, st.kind);
         // Its size, from its genes and sex, and how far it has grown (the engine forgets it on
         // loading: set it again).
-        if let Some(g) = crate::coats::size_of(w, id) {
+        if slow && let Some(g) = crate::coats::size_of(w, id) {
             let size = g * crate::breeding::growth(w, id, index);
             if w.component(id, &SCALED).is_some_and(|s| s != size) {
                 w.set_scale(id, size);
@@ -190,14 +197,25 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
                 }
             }
         }
-        let (health, speed) = factors(w, id, &a);
-        if w.component(id, &APPLIED)
-            .is_some_and(|p| p != [health, speed])
-        {
-            apply(w, id, st, health, speed, if new { f32::MAX } else { 0.0 });
+        if slow {
+            let (health, speed) = factors(w, id, &a);
+            if w.component(id, &APPLIED)
+                .is_some_and(|p| p != [health, speed])
+            {
+                apply(w, id, st, health, speed, if new { f32::MAX } else { 0.0 });
+            }
         }
         false
     }
+}
+
+/// Ticks between `upkeep`'s looks at what changes slowly.
+const SLOW: u64 = 20;
+
+/// Whether `id`'s turn of every `every` ticks came since it last ticked (each tick while it is
+/// up, every time while it rests and ticks seldom), staggered by its id.
+pub fn due(w: &World, id: u64, every: u64) -> bool {
+    (w.game_time() + id) % every < (w.tick_elapsed(id) as u64).max(1)
 }
 
 /// A new one's wild level, sex, age and food (`roll`, `arrive`).
@@ -333,7 +351,7 @@ fn born_wild(w: &World, index: usize) -> u64 {
 /// Its age (`notes/ANIMALS.md`, "Old age"): one from before animals aged gets one; a grown one
 /// past most of its life is an elder (greying, past breeding); at the end of its own lifespan
 /// (its species', give or take a fifth) it dies. True if it died.
-fn old_age(w: &World, id: u64, index: usize, a: &mut Animal) -> bool {
+fn old_age(w: &World, id: u64, index: usize, a: &mut Animal, calls: u64) -> bool {
     let s = &SPECIES[index];
     if a.born == 0 {
         let growing = w
@@ -344,7 +362,7 @@ fn old_age(w: &World, id: u64, index: usize, a: &mut Animal) -> bool {
     // Sped up for testing (`/animal speed`): older by the extra ticks too.
     let n = crate::breeding::speed() as u64;
     if n > 1 {
-        a.born = a.born.saturating_sub(n - 1).max(1);
+        a.born = a.born.saturating_sub((n - 1) * calls).max(1);
     }
     let Some(seed) = w.component(id, &crate::coats::GENOME).map(|g| g.seed) else { return false };
     let (age, span) = (life::age(w.game_time(), a.born), life::lifespan(s, seed));

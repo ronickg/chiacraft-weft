@@ -2352,6 +2352,9 @@ impl Dim {
         }
         let mut kinds: Vec<(u64, u32)> = by_kind.keys().copied().collect();
         kinds.sort();
+        // Nothing moves them while mods run but mods' own teleports: their queries look by
+        // column (`Entities::index_cells`) until physics.
+        self.entities.index_cells(true);
         for (frame, kind) in kinds {
             let ids = &by_kind[&(frame, kind)];
             for &(owner, cb) in &c.game.entities[kind as usize].on_tick {
@@ -2378,6 +2381,7 @@ impl Dim {
             self.call(owner, cb, |w| abi::WorldTickArgs { world: w });
         }
         self.fire_timers(c);
+        self.entities.index_cells(false);
         self.navigation(c);
         self.steer_mounts(c);
 
