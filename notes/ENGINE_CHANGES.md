@@ -23,6 +23,7 @@ for now is bug fixes only, written and opened by him.
 | Vulkan: order upload copies that write the same bytes (0b06e383) | Overlapping writes in the wrong order | #84 closed; upstream re-implemented it (1049ba95). Take theirs |
 | Vulkan: GPU-only memory spills to system memory when full (a3606d48, f88e5a7c) | Two games on one GPU panicked with "Out of memory" | #97 closed for now; clean branch ready for Ronald |
 | Far terrain: a scatter that forces all its blocks takes its commonest block (414e4e88) | Boulders drew as purple missing-texture blocks in the distance | #96 closed for now; clean branch ready |
+| Vulkan: `drawIndirectCount` optional (`Backend::indirect_count`, `Cmd::FillBuffer`): without it the table's count draws draw all their records, zeroed before the culling writes them; `--no-indirect-count` forces it | Since Weft's GPU terrain culling (c376cf9c) the game wouldn't start on any Mac: "Apple M3 Max lacks what the game needs: drawIndirectCount" (MoltenVK has none) | Candidate 6: clean branch for Ronald |
 | HUD: crosshair only in first person (6a394c0d) | It sat on the player's back in third person | #98 closed for now; clean branch ready |
 | `/rule` reads values the way the rule takes them (a2f4c81c) | `false` was refused, `2` and `999` clamped silently | Clean branch ready, never opened |
 | Box-model blocks' far faces use their boxes' textures (e1f48a48) | Magenta in distant terrain | Maybe |
