@@ -1,0 +1,69 @@
+[
+ {
+  "kind": "block",
+  "type": "workstation face",
+  "name": "tanning_frame_side",
+  "like": "/Users/ronald/Coding/chiacraft-weft/mods/base/assets/textures/item/stick.png",
+  "what": "the side of a tanning frame: two upright pale stick-wood poles (like the attached stick, warm light brown with dark grain) joined by a crossbar at the top and bottom, a raw hide stretched between them, pale dull grey-tan (#a08a72 to #c4b096) with soft creases, laced to the poles with thin dark rawhide cord in small zigzag stitches all round its edge. The game shows only the middle columns 4-27 of this texture (the frame is 12 of 16 wide): keep the frame inside them, its two poles at columns 4-7 and 24-27; columns 0-3 and 28-31 just continue the pattern. Every cell filled, no border, light from the top left, flat face-on view (a block face, not a scene).",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "kind": "block",
+  "type": "workstation face",
+  "name": "tanning_frame_top",
+  "like": "/Users/ronald/Coding/chiacraft-weft/mods/base/assets/textures/item/stick.png",
+  "what": "the top of a tanning frame seen from above: a horizontal stick-wood crossbar (warm light brown, dark grain, like the attached stick) running across the middle, the ends of the two poles as round cut log ends at its left and right, and the thin upper edge of the pale grey-tan laced hide (#a08a72 to #c4b096) just below the bar; dark ground-brown gaps (#3a2a20) around them. The game shows only the middle columns 4-27 of this texture (the frame is 12 of 16 wide): keep the frame inside them, its two poles at columns 4-7 and 24-27; columns 0-3 and 28-31 just continue the pattern. Every cell filled, no border, light from the top left, flat face-on view (a block face, not a scene).",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "kind": "block",
+  "type": "planks / bricks / built stone",
+  "name": "tanning_pit_side",
+  "like": "/Users/ronald/Coding/chiacraft-weft/mods/base/assets/textures/block/planks_oak.png",
+  "what": "the side of a tanning vat sunk in the ground: vertical oak planks like the attached planks (the same warm walnut-to-honey wood and plank width), bound by two dark iron-grey hoops, the wood darker and wet-stained toward the top rim where tannin liquor has soaked it. The game shows only the LOWER three quarters of this side texture (rows 8-31; the block is 12 of 16 tall): keep everything that matters in rows 8-31, the top edge of the block at row 8, and let rows 0-7 simply continue the same pattern. Every cell filled, no border, light from the top left, flat face-on view (a block face, not a scene).",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "kind": "block",
+  "type": "liquid / animated",
+  "name": "tanning_pit_top",
+  "like": "/Users/ronald/Coding/chiacraft-weft/mods/base/assets/textures/block/planks_oak.png",
+  "what": "the top of a tanning vat seen from above: a 3 px rim of oak planks round all four edges (like the attached planks), and inside it dark murky tannin liquor, deep brown-red (#3e2416 to #6a3e24), with a few floating curls of oak bark and faint pale ripples; one frame only. Every cell filled, no border, light from the top left, flat face-on view (a block face, not a scene).",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "name": "charcoal_clamp_side",
+  "like": "/Users/ronald/Coding/chiacraft-weft/mods/base/assets/textures/block/dirt.png",
+  "what": "the side of a charcoal clamp: a mound of packed earth like the attached dirt (the same brown clods and colours) with patches of turf on its upper part, and two or three round ends of stacked logs peeking out near the bottom, charred dark at their cut ends with a faint orange glow deep in one crack. The game shows only the LOWER three quarters of this side texture (rows 8-31; the block is 12 of 16 tall): keep everything that matters in rows 8-31, the top edge of the block at row 8, and let rows 0-7 simply continue the same pattern. Every cell filled, no border, light from the top left, flat face-on view (a block face, not a scene).",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "name": "charcoal_clamp_top",
+  "like": "/Users/ronald/Coding/chiacraft-weft/mods/base/assets/textures/block/dirt.png",
+  "what": "the top of a charcoal clamp seen from above: packed earth like the attached dirt with ragged patches of turf (muted green grass tufts), a small dark vent hole near the middle ringed with grey ash and soot; seamless on all four edges. Every cell filled, no border, light from the top left, flat face-on view (a block face, not a scene).",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "kind": "item",
+  "name": "hide",
+  "what": "a raw animal hide, hair still on: a flat irregular pelt shape with four short leg flaps, pale dull grey-tan hair (#9a826a to #c0aa8e) with soft brown streaks, the pale fleshy edge showing at one corner; duller and paler than tanned buckskin, lying flat, centred with 3-5 px of padding",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "kind": "item",
+  "name": "sole_leather",
+  "what": "a thick stiff slab of bark-tanned sole leather: a rectangular folded-over hide edge, heavy and rigid, dark brown (#3a2414 to #6a4428) with a slightly glossy top face and a lighter cut edge showing its thickness, clearly darker and stiffer than soft buckskin; three-quarter top view, centred with 3-5 px of padding",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "kind": "item",
+  "name": "oak_bark",
+  "like": "/Users/ronald/Coding/chiacraft-weft/mods/base/assets/textures/block/log_oak.png",
+  "what": "two curled strips of oak bark peeled from a log, lying crossed: the rough outer side in the same grey-brown ridged bark as the attached oak log (the same colours and deep grooves), the smooth inner side pale tan where a strip curls over; centred with 3-5 px of padding",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ }
+]

@@ -1,0 +1,65 @@
+[
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "name": "termite_clay_side",
+  "what": "the side of a pale clay termite mound, like the baked-earth domes of African savanna termites: a smooth hard crust of pale grey-buff clay (#a89880 to #d4c4a8), fine hairline cracks, softly rounded swellings, small dark vent holes (#4a3a2c) scattered unevenly, each with a slightly raised rim; the surface rough and built up by hand, like a living mound, not stone bricks; tileable top to bottom too, so two stacked read as one mound. Seamless left to right, every cell filled, no border, light from the top left, flat face-on view of one block face.",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "name": "termite_clay_top",
+  "what": "the top of a pale clay termite mound, like the baked-earth domes of African savanna termites: a smooth hard crust of pale grey-buff clay (#a89880 to #d4c4a8), fine hairline cracks, softly rounded swellings, seen from above: lighter and smoother than its sides, sun-baked, with one or two dark vent holes (each with a raised rim) off centre; seamless on all four edges. Seamless left to right, every cell filled, no border, light from the top left, flat face-on view of one block face.",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "name": "termite_clay_cap",
+  "what": "the side of a pale clay termite mound, like the baked-earth domes of African savanna termites: a smooth hard crust of pale grey-buff clay (#a89880 to #d4c4a8), fine hairline cracks, softly rounded swellings, small dark vent holes (#4a3a2c) scattered unevenly, each with a slightly raised rim. This is the UPPER block of a two-block mound: its bottom edge must continue the lower block's side seamlessly, and toward the top the surface gathers into a rounded crown: the ridges and lumps converge and grow knobbier, a few small turrets or vent chimneys along the top edge. Seamless left to right, every cell filled, no border, light from the top left, flat face-on view of one block face.",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "name": "termite_laterite_side",
+  "what": "the side of a red laterite termite mound, like the knobbly red-earth mounds of Australian and African termites: rough built-up rust-red earth (#8a3e22 to #c86a3e) made of rounded pellets and lumps 2-3 px across, deep red-brown shadows between them, small dark vent holes (#3a1a10) tucked between the lumps; the surface rough and built up by hand, like a living mound, not stone bricks; tileable top to bottom too, so two stacked read as one mound. Seamless left to right, every cell filled, no border, light from the top left, flat face-on view of one block face.",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "name": "termite_laterite_top",
+  "what": "the top of a red laterite termite mound, like the knobbly red-earth mounds of Australian and African termites: rough built-up rust-red earth (#8a3e22 to #c86a3e) made of rounded pellets and lumps 2-3 px across, deep red-brown shadows between them, seen from above: lighter and smoother than its sides, sun-baked, with one or two dark vent holes (each with a raised rim) off centre; seamless on all four edges. Seamless left to right, every cell filled, no border, light from the top left, flat face-on view of one block face.",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "name": "termite_laterite_cap",
+  "what": "the side of a red laterite termite mound, like the knobbly red-earth mounds of Australian and African termites: rough built-up rust-red earth (#8a3e22 to #c86a3e) made of rounded pellets and lumps 2-3 px across, deep red-brown shadows between them, small dark vent holes (#3a1a10) tucked between the lumps. This is the UPPER block of a two-block mound: its bottom edge must continue the lower block's side seamlessly, and toward the top the surface gathers into a rounded crown: the ridges and lumps converge and grow knobbier, a few small turrets or vent chimneys along the top edge. Seamless left to right, every cell filled, no border, light from the top left, flat face-on view of one block face.",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "name": "termite_cathedral_side",
+  "what": "the side of a cathedral termite mound, like the tall fluted spires of northern Australia: ochre-brown hard earth (#94683e to #c8985e) shaped into deep vertical flutes and buttresses, ridges 4-6 px wide running straight up the block with dark grooves between them, a granular surface, a few small dark vent holes (#3e2a1a) in the grooves; the surface rough and built up by hand, like a living mound, not stone bricks; tileable top to bottom too, so two stacked read as one mound. Seamless left to right, every cell filled, no border, light from the top left, flat face-on view of one block face.",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "name": "termite_cathedral_top",
+  "what": "the top of a cathedral termite mound, like the tall fluted spires of northern Australia: ochre-brown hard earth (#94683e to #c8985e) shaped into deep vertical flutes and buttresses, ridges 4-6 px wide running straight up the block with dark grooves between them, a granular surface, seen from above: lighter and smoother than its sides, sun-baked, with one or two dark vent holes (each with a raised rim) off centre; seamless on all four edges. Seamless left to right, every cell filled, no border, light from the top left, flat face-on view of one block face.",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "name": "termite_cathedral_cap",
+  "what": "the side of a cathedral termite mound, like the tall fluted spires of northern Australia: ochre-brown hard earth (#94683e to #c8985e) shaped into deep vertical flutes and buttresses, ridges 4-6 px wide running straight up the block with dark grooves between them, a granular surface, a few small dark vent holes (#3e2a1a) in the grooves. This is the UPPER block of a two-block mound: its bottom edge must continue the lower block's side seamlessly, and toward the top the surface gathers into a rounded crown: the ridges and lumps converge and grow knobbier, a few small turrets or vent chimneys along the top edge. Seamless left to right, every cell filled, no border, light from the top left, flat face-on view of one block face.",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ }
+]
