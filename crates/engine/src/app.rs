@@ -344,6 +344,9 @@ pub(crate) struct Running {
     bench_line: String,
     /// The on-screen controls of a touch screen (`touch::enabled`).
     touch: crate::touch::Touch,
+    /// A world to start once the loading screen has been on the screen this many frames
+    /// (`begin_world`).
+    pending_world: Option<(WorldMeta, u32)>,
 }
 
 struct App {
@@ -644,6 +647,7 @@ impl App {
             bench_last: [0.0; 5],
             bench_line: String::new(),
             touch: crate::touch::Touch::default(),
+            pending_world: None,
         };
         if let Some(world) = &self.opts.world {
             let saves_dir = r.settings.saves_dir();
@@ -651,7 +655,7 @@ impl App {
                 .into_iter()
                 .find(|w| &w.name == world)
                 .unwrap_or_else(|| saves::create(&saves_dir, world, self.opts.seed.unwrap_or(1)));
-            r.start_world(meta);
+            r.begin_world(meta);
         } else {
             r.open(screens::engine("core:title"));
             if let Some(name) = &self.opts.screen {
@@ -1053,6 +1057,19 @@ impl Running {
         let _ = self.window.set_cursor_position(middle);
     }
 
+    /// Starts a world after the loading screen has been drawn: starting builds every pipeline and
+    /// waits for the world, the frame thread busy all the while, and that frame stays on the
+    /// screen meanwhile instead of black or a frozen menu. Scripted runs start at once, as before.
+    fn begin_world(&mut self, meta: WorldMeta) {
+        if self.settings.read_only {
+            self.start_world(meta);
+            return;
+        }
+        self.screens.clear();
+        self.open(Box::new(screens::Loading));
+        self.pending_world = Some((meta, 0));
+    }
+
     fn start_world(&mut self, mut meta: WorldMeta) {
         log::info!("opening world '{}' (seed {})", meta.name, meta.seed);
         if meta.format != saves::SAVE_FORMAT {
@@ -1143,6 +1160,11 @@ impl Running {
                 self.hud.invalidate();
                 self.quads_dirty = true;
                 self.set_capture(true);
+                // The world's pipelines are built: kept now, as Android ends an app without the
+                // exit that saves them (a phone compiled the shader pack's for 38 s every start).
+                if cfg!(target_os = "android") {
+                    save_pipeline_cache(&*self.gpu);
+                }
             }
             Err(e) => {
                 log::error!("{e}");
@@ -1319,12 +1341,12 @@ impl Running {
                     let mut missing = meta.missing_mods(content());
                     missing.extend(modloader::for_world(&meta).1);
                     if missing.is_empty() {
-                        self.start_world(meta);
+                        self.begin_world(meta);
                     } else {
                         self.open(Box::new(saves::MissingMods { world: meta, missing }));
                     }
                 }
-                Request::StartWorldAnyway(meta) => self.start_world(meta),
+                Request::StartWorldAnyway(meta) => self.begin_world(meta),
                 Request::LeaveWorld => self.leave_world(),
                 Request::Host => {
                     match &self.game {
@@ -2206,6 +2228,8 @@ impl ApplicationHandler for App {
         if let Some(server) = r.game.as_ref().and_then(|g| g.server.as_ref()) {
             server.save_now();
         }
+        // Android ends a background app without the exit that saves it otherwise.
+        save_pipeline_cache(&*r.gpu);
         r.gpu.surface_lost();
     }
 
@@ -2349,6 +2373,14 @@ struct UiCallbacks {
 /// One frame. Returns true when the app should quit.
 fn frame(r: &mut Running, opts: &Options) -> bool {
     r.retired = None;
+    // The loading screen has been shown (two frames, so one was presented): now the slow start.
+    if let Some((meta, shown)) = r.pending_world.take() {
+        if shown >= 2 {
+            r.start_world(meta);
+        } else {
+            r.pending_world = Some((meta, shown + 1));
+        }
+    }
     // The fps cap: what is left of this frame's share of a second, slept away.
     let cap = r.settings.fps_cap();
     if cap > 0 {

@@ -1263,7 +1263,30 @@ impl VulkanBackend {
                             (color_range(t.desc.mips), vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
                         };
                         let image = t.image;
-                        self.barrier_image(cmd, image, range, vk::ImageLayout::UNDEFINED, new);
+                        // Cleared to zeros, not left as the memory was: a desktop driver's new
+                        // memory happened to be zeros, a phone's (the Pixel 10's PowerVR) held
+                        // leftovers and NaNs, which screen effects reading a target before it was
+                        // first written (histories, half-size targets) showed as black blocks
+                        // with coloured specks.
+                        self.barrier_image(cmd, image, range, vk::ImageLayout::UNDEFINED, vk::ImageLayout::TRANSFER_DST_OPTIMAL);
+                        if depth {
+                            self.device.cmd_clear_depth_stencil_image(
+                                cmd,
+                                image,
+                                vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                                &vk::ClearDepthStencilValue { depth: 0.0, stencil: 0 },
+                                &[range],
+                            );
+                        } else {
+                            self.device.cmd_clear_color_image(
+                                cmd,
+                                image,
+                                vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                                &vk::ClearColorValue { float32: [0.0; 4] },
+                                &[range],
+                            );
+                        }
+                        self.barrier_image(cmd, image, range, vk::ImageLayout::TRANSFER_DST_OPTIMAL, new);
                         self.textures.get_mut(id).layout = new;
                     }
                 }
@@ -1271,6 +1294,55 @@ impl VulkanBackend {
             self.memory_barrier(cmd);
         }
     }
+}
+
+/// **(Weft bug, naga 30)** naga marks a texture loaded from the bindless array with a
+/// non-uniform index `NonUniform`, but not the `OpSampledImage` made from it, which is the operand
+/// the sample reads and which Vulkan requires marked (VUID-RuntimeSpirv-NonUniform-06274). NVIDIA
+/// samples right without it; the Pixel 10's PowerVR sampled one texture for a whole group of
+/// pixels where two textures met (black blocks with coloured specks at plants' edges and water).
+/// So each `OpSampledImage` of a `NonUniform` image gets the decoration too.
+fn non_uniform_sampled_images(words: Vec<u32>) -> Vec<u32> {
+    const OP_DECORATE: u32 = 71;
+    const OP_SAMPLED_IMAGE: u32 = 86;
+    const NON_UNIFORM: u32 = 5300;
+    if words.len() < 5 {
+        return words;
+    }
+    // Instructions after the five-word header: (where it starts, opcode, length).
+    let mut at = 5;
+    let mut ops = Vec::new();
+    while at < words.len() {
+        let (len, op) = ((words[at] >> 16) as usize, words[at] & 0xffff);
+        if len == 0 || at + len > words.len() {
+            return words;
+        }
+        ops.push((at, op, len));
+        at += len;
+    }
+    let mut marked: std::collections::HashSet<u32> = std::collections::HashSet::new();
+    let mut last_decorate = None;
+    for &(at, op, len) in &ops {
+        if op == OP_DECORATE {
+            last_decorate = Some(at + len);
+            if len >= 3 && words[at + 2] == NON_UNIFORM {
+                marked.insert(words[at + 1]);
+            }
+        }
+    }
+    let add: Vec<u32> = ops
+        .iter()
+        .filter(|&&(at, op, len)| op == OP_SAMPLED_IMAGE && len >= 5 && marked.contains(&words[at + 3]) && !marked.contains(&words[at + 2]))
+        .map(|&(at, ..)| words[at + 2])
+        .collect();
+    let Some(insert) = last_decorate.filter(|_| !add.is_empty()) else { return words };
+    let mut out = Vec::with_capacity(words.len() + add.len() * 3);
+    out.extend_from_slice(&words[..insert]);
+    for id in add {
+        out.extend_from_slice(&[(3 << 16) | OP_DECORATE, id, NON_UNIFORM]);
+    }
+    out.extend_from_slice(&words[insert..]);
+    out
 }
 
 fn color_range(mips: u32) -> vk::ImageSubresourceRange {
@@ -1377,6 +1449,7 @@ impl VulkanBackend {
             Some(&naga::back::spv::PipelineOptions { shader_stage: stage, entry_point: entry.to_string() }),
         )
         .map_err(|e| Error(format!("SPIR-V for {entry}: {e}")))?;
+        let words = non_uniform_sampled_images(words);
         unsafe {
             self.device
                 .create_shader_module(&vk::ShaderModuleCreateInfo::default().code(&words), None)
@@ -1581,7 +1654,10 @@ impl Backend for VulkanBackend {
         // Depth is also sampled: screen effects read how far each pixel is (it stays bindless,
         // read in SHADER_READ_ONLY_OPTIMAL between the passes that draw into it).
         let usage = if depth {
-            vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT | vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_SRC
+            vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT
+                | vk::ImageUsageFlags::SAMPLED
+                | vk::ImageUsageFlags::TRANSFER_SRC
+                | vk::ImageUsageFlags::TRANSFER_DST
         } else {
             let mut u = vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST;
             if desc.render_target {
@@ -2360,6 +2436,44 @@ impl Drop for VulkanBackend {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A texture from the bindless array by a per-pixel index, sampled in a helper function: the
+    /// `OpSampledImage` gets `NonUniform` like the image it is made from (naga 30 leaves it off).
+    #[test]
+    fn sampled_images_of_non_uniform_textures_are_marked() {
+        let src = r#"enable wgpu_binding_array;
+@group(0) @binding(0) var textures: binding_array<texture_2d<f32>>;
+@group(0) @binding(1) var samp: sampler;
+struct VOut { @builtin(position) pos: vec4<f32>, @location(0) @interpolate(flat) layer: u32, @location(1) uv: vec2<f32> };
+fn sample(in: VOut) -> vec4<f32> { return textureSample(textures[in.layer], samp, in.uv); }
+@fragment fn fs(in: VOut) -> @location(0) vec4<f32> { return sample(in); }
+"#;
+        let module = naga::front::wgsl::parse_str(src).unwrap();
+        let info = naga::valid::Validator::new(naga::valid::ValidationFlags::all(), naga::valid::Capabilities::all())
+            .validate(&module)
+            .unwrap();
+        let words = naga::back::spv::write_vec(&module, &info, &Default::default(), None).unwrap();
+        let fixed = non_uniform_sampled_images(words.clone());
+        assert_eq!(fixed.len(), words.len() + 3, "one decoration added");
+        // The added decoration names the OpSampledImage's result.
+        let mut at = 5;
+        let mut sampled = None;
+        while at < fixed.len() {
+            let (len, op) = ((fixed[at] >> 16) as usize, fixed[at] & 0xffff);
+            if op == 86 {
+                sampled = Some(fixed[at + 2]);
+            }
+            at += len;
+        }
+        let sampled = sampled.unwrap();
+        assert!(
+            fixed
+                .windows(3)
+                .any(|w| w == [(3 << 16) | 71, sampled, 5300])
+        );
+        // Again changes nothing.
+        assert_eq!(non_uniform_sampled_images(fixed.clone()), fixed);
+    }
 
     fn memory(heaps: &[vk::MemoryHeapFlags], types: &[(vk::MemoryPropertyFlags, u32)]) -> vk::PhysicalDeviceMemoryProperties {
         let mut mem = vk::PhysicalDeviceMemoryProperties {

@@ -25,7 +25,7 @@
             android:screenOrientation="sensorLandscape"
             android:resizeableActivity="false"
             android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|density|screenSize|smallestScreenSize|layoutDirection|colorMode|fontWeightAdjustment|grammaticalGender"
-            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen">
+            android:theme="@style/Game">
             <meta-data android:name="android.app.lib_name" android:value="chiacraft" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

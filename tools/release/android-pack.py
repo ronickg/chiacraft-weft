@@ -7,7 +7,8 @@
                               engine's assets in assets/core and every mod not marked
                               `dist = false` packed into run/mods/<mod>.zip, its assets only
 <stage>/apk-assets/game.stamp <stamp>: the game unpacks game.zip again when it changes
-<stage>/res/mipmap-*/ic_launcher.png   the launcher icon (the engine's icon.png)
+<stage>/res/                  tools/release/android/res (the theme, the splash picture) and
+                              mipmap-*/ic_launcher.png, the launcher icon (the engine's icon.png)
 
 The mods' libraries don't go in their zips: the APK carries them per CPU in lib/<abi>/ beside
 libchiacraft.so, and the game looks there (crates/android, `paths::set_library_dir`), so one
@@ -62,10 +63,12 @@ def main() -> None:
             print(f"  mod {mod.name}: {packed.stat().st_size // 1024} KB")
     (assets / "game.stamp").write_text(stamp + "\n")
     print(f"game.zip: {n} files, {(assets / 'game.zip').stat().st_size // (1024 * 1024)} MB")
+    # The theme and the splash picture (tools/release/android/res), then the launcher icon.
+    shutil.copytree(root / "tools" / "release" / "android" / "res", stage / "res")
     icon = root / "crates" / "engine" / "assets" / "icon.png"
     for density in ["mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"]:
         d = stage / "res" / f"mipmap-{density}"
-        d.mkdir(parents=True)
+        d.mkdir(parents=True, exist_ok=True)
         shutil.copy2(icon, d / "ic_launcher.png")
     # The names of the mods to build, for android.sh.
     (stage / "mods.txt").write_text("".join(f"{m.name}\n" for m in dist_mods(root)))

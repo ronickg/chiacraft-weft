@@ -326,6 +326,15 @@ impl SoftClouds {
             .push(Cmd::BeginPass { color: Some((Target::Texture(t.trace), Some([0.0, 0.0, 0.0, 1.0]))), depth: None });
         draw(&mut self.passes, trace_pipe);
         self.passes.push(Cmd::EndPass);
+        // A history starting anew is cleared before the resolve reads it: new GPU memory is not
+        // zeros on every GPU (the Pixel 10's PowerVR gave leftovers and NaNs, which a weight of 0
+        // still lets through: black clouds with coloured specks, for good).
+        if self.age == 0 {
+            let before = 1 - now;
+            self.passes
+                .push(Cmd::BeginPass { color: Some((Target::Texture(t.history[before]), Some([0.0; 4]))), depth: None });
+            self.passes.push(Cmd::EndPass);
+        }
         // The resolve reads the trace by the index in the clouds entry (`trace_index`).
         self.passes
             .push(Cmd::BeginPass { color: Some((Target::Texture(t.history[now]), None)), depth: None });

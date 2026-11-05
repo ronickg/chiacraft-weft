@@ -56,16 +56,14 @@ printf '%s\n' "$*" > "$out/args.txt"
 started=$(date +%s)
 "$adb" shell am start -W -n "$pkg/android.app.NativeActivity" > "$out/start.log" 2>&1
 
-declare -A taps keys swipes
-for t in ${TAPS:-}; do taps[${t#*@}]+="${t%@*} "; done
-for w in ${SWIPES:-}; do swipes[${w#*@}]+="${w%@*} "; done
-for k in ${KEYS:-}; do keys[${k#*@}]+="${k%@*} "; done
+# "what@second" lists (taps, swipes, keys); plain loops, so macOS's bash 3 runs it too.
+at() { for e in $1; do [ "${e##*@}" = "$2" ] && echo "${e%@*}"; done; true; }
 every="${SHOT_EVERY:-10}"
 for s in $(seq 1 "$secs"); do
 	sleep 1
-	for xy in ${taps[$s]:-}; do "$adb" shell input tap "${xy%,*}" "${xy#*,}"; done
-	for k in ${keys[$s]:-}; do "$adb" shell input keyevent "$k"; done
-	for w in ${swipes[$s]:-}; do "$adb" shell input swipe ${w//,/ } & done
+	for xy in $(at "${TAPS:-}" "$s"); do "$adb" shell input tap "${xy%,*}" "${xy#*,}"; done
+	for k in $(at "${KEYS:-}" "$s"); do "$adb" shell input keyevent "$k"; done
+	for w in $(at "${SWIPES:-}" "$s"); do "$adb" shell input swipe $(echo "$w" | tr , ' ') & done
 	if [ $((s % every)) = 0 ]; then
 		"$adb" exec-out screencap -p > "$out/shot_$(printf %03d "$s").png"
 	fi
