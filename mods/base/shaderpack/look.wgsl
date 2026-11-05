@@ -180,12 +180,16 @@ fn palette() -> Palette {
     // not muddy green. Clear skies only: rain keeps its greys.
     let tale = clamp(fantasy_opt(OPT_STORYBOOK), 0.0, 1.0) * (1.0 - r);
     if tale > 0.0 {
-        let blue_hour = smoothstep(0.03, -0.03, e) * smoothstep(-0.2, -0.08, e);
+        // Blue hour: the sun just under the horizon, to about 14° below (it fell short of the
+        // 18:57 check at -0.2..-0.08).
+        let blue_hour = smoothstep(0.04, -0.02, e) * smoothstep(-0.32, -0.16, e);
         // (`golden()` by hand: `palette` has a local of that name.)
         let gold_hour = (1.0 - smoothstep(0.08, 0.35, e)) * smoothstep(-0.06, 0.03, e);
         let hour = max(gold_hour, blue_hour);
-        p.ambient = mix(p.ambient, vec3(luma(p.ambient)) * vec3(0.92, 0.82, 1.18), tale * hour * 0.8);
-        p.zenith = mix(p.zenith, vec3(luma(p.zenith)) * vec3(0.85, 0.62, 1.45), tale * blue_hour * 0.7);
+        // At 0.92 0.82 1.18 the lavender hardly showed at a sheet's size (the storybook check, 11-05).
+        p.ambient = mix(p.ambient, vec3(luma(p.ambient)) * vec3(0.95, 0.72, 1.4) * 1.15, tale * hour * 0.9);
+        p.horizon = mix(p.horizon, vec3(luma(p.horizon)) * vec3(1.08, 0.8, 1.15), tale * hour * 0.45);
+        p.zenith = mix(p.zenith, vec3(luma(p.zenith)) * vec3(0.8, 0.55, 1.6), tale * blue_hour * 0.8);
         let moonlit = smoothstep(-0.14, -0.3, e);
         p.sun = mix(p.sun, vec3(luma(p.sun)) * vec3(0.78, 0.9, 1.16), tale * moonlit);
         p.ambient = mix(p.ambient, vec3(luma(p.ambient)) * vec3(0.82, 0.92, 1.12), tale * moonlit * 0.6);
