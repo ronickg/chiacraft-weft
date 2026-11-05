@@ -47,9 +47,13 @@ pub const SHOWN_SIGHT: f64 = 72.0;
 /// How fast the motes drawn on a line flow along it (blocks a second).
 pub const FLOW_SPEED: f32 = 1.6;
 /// Motes drawn a second on the lines in view, at most (the client's budget), and a mote's life
-/// (seconds). Every line shown is drawn alike: faint, flowing.
-pub const MOTES_A_SECOND: f32 = 90.0;
-pub const MOTE_LIFE: (f32, f32) = (1.6, 2.6);
+/// (seconds). Every line shown is drawn alike: faint, flowing. `MOTES_PER_BLOCK` a second for
+/// each block of line in reach (the first look, 0.9, showed a few specks, not a line).
+pub const MOTES_A_SECOND: f32 = 260.0;
+pub const MOTE_LIFE: (f32, f32) = (2.0, 3.2);
+pub const MOTES_PER_BLOCK: f32 = 3.0;
+/// How high over the ground the motes ride (blocks over its top block): over tall grass.
+pub const MOTE_RISE: (f64, f64) = (0.8, 1.8);
 
 /// The rod's reading as words: under `STILL` it hangs still, then faint, a pull, strong; within
 /// `ON_LINE` blocks of a line's middle it's on it, within `AT_NODE` of a node at the node.

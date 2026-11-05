@@ -65,10 +65,10 @@ pub fn register(r: &mut Registry) {
     r.particle(&MOTE)
         .textures(&["core:glint_0", "core:glint_1", "core:glint_2", "core:glint_3"])
         .life(ley::MOTE_LIFE.0, ley::MOTE_LIFE.1)
-        .size(0.09, 0.16)
+        .size(0.16, 0.28)
         .gravity(0.0)
         .drag(1.0)
-        .color(0xB8F0FF, 0x7C8CFF)
+        .color(0xD0FAFF, 0x8C9CFF)
         .fullbright()
         .translucent()
         .shrinking();
@@ -490,7 +490,7 @@ fn motes(c: &Client, s: &mut Rod, seed: u64, me: [f64; 3], shown: f64, dt: f32) 
         return;
     }
     // As many born a second as the stretches' length asks, to the budget.
-    let rate = ((total * 0.9) as f32).min(ley::MOTES_A_SECOND);
+    let rate = (total as f32 * ley::MOTES_PER_BLOCK).min(ley::MOTES_A_SECOND);
     s.owed = (s.owed + rate * dt).min(ley::MOTES_A_SECOND);
     if s.ground.len() > 8192 {
         s.ground.clear();
@@ -513,10 +513,10 @@ fn motes(c: &Client, s: &mut Rod, seed: u64, me: [f64; 3], shown: f64, dt: f32) 
             .unwrap_or(&parts[0]);
         let t = t0 + (t1 - t0) * s.unit();
         let [ux, uz] = l.dir();
-        let side = (s.unit() - 0.5) * 1.2;
+        let side = (s.unit() - 0.5) * 0.8;
         let (px, pz) = (l.from[0] as f64 + 0.5 + ux * t - uz * side, l.from[1] as f64 + 0.5 + uz * t + ux * side);
         let Some(top) = ground_at(c, s, px.floor() as i32, pz.floor() as i32, me[1]) else { continue };
-        let y = top as f64 + 1.0 + 0.15 + s.unit() * 0.9;
+        let y = top as f64 + 1.0 + ley::MOTE_RISE.0 + s.unit() * (ley::MOTE_RISE.1 - ley::MOTE_RISE.0);
         let speed = ley::FLOW_SPEED as f64 * (0.7 + 0.6 * l.flow as f64);
         let v = [ux * speed, (s.unit() - 0.5) * 0.15, uz * speed];
         drop(c.spawn_particles(&MOTE, [px, y, pz]).velocity(v));
