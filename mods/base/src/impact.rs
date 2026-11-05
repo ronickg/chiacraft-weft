@@ -53,6 +53,8 @@ struct Carve {
     core_state: u32,
     rim_spots: Vec<(i32, i32)>,
     rim_state: u32,
+    /// Called on each core block once placed (First hours' `meteors::hot`: heat 3, cooling).
+    hot: Option<fn(&World, [i32; 3])>,
 }
 
 /// What a crater holds: the core's block (full name) and how many, and the meteorites in the
@@ -62,6 +64,9 @@ pub struct Loot {
     pub core: &'static str,
     pub core_count: i32,
     pub rim_count: i32,
+    /// Called on each core block once it is placed: First hours' `meteors::hot` sets it hot and
+    /// cooling. None leaves the block as placed.
+    pub hot: Option<fn(&World, [i32; 3])>,
 }
 
 impl Loot {
@@ -73,6 +78,7 @@ impl Loot {
             core: "base:meteorite",
             core_count: (pick(seed >> 8, n::IMPACT_CORE) as f64 * share.max(1.0)).round() as i32,
             rim_count: pick(seed >> 24, n::IMPACT_RIM_METEORITES),
+            hot: None,
         }
     }
 }
@@ -171,6 +177,7 @@ pub fn start_with(w: &World, x: i32, z: i32, radius: i32, ticks: u32, loot: Opti
         core_state,
         rim_spots,
         rim_state,
+        hot: loot.hot,
     });
     Some(count)
 }
@@ -289,6 +296,9 @@ fn column(w: &World, c: &Carve, dx: i32, dz: i32, gone: &mut Vec<[i32; 3]>) -> O
                     set([x, y, z], rubble(hash(y, 5)));
                 }
                 set([x, floor - below, z], c.core_state);
+                if let Some(hot) = c.hot {
+                    hot(w, [x, floor - below, z]);
+                }
             }
         }
     } else if u < n::IMPACT_RIM_OUT {
