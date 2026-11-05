@@ -1749,6 +1749,13 @@ impl Dim {
             .get(source)
             .filter(|_| !recovering && !def.has(df::NO_KNOCKBACK))
             .map(|s| s.pos);
+        // What of the knock it shrugs off (`attribute::KNOCKBACK_RESISTANCE`: big creatures).
+        let resist = if knock.is_some() {
+            self.attribute(c, id, super::extend::KNOCKBACK_RESISTANCE, false)
+                .clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
         // A death mods may refuse (a totem): it lives on with one health.
         let dying = self
             .entities
@@ -1773,8 +1780,9 @@ impl Dim {
                 .unwrap_or(DVec3::X);
             if e.player {
                 knocked = Some(away.as_vec3().to_array());
-            } else {
-                e.vel = crate::physics::knock(e.vel * crate::world::TICK, away, e.on_ground) * crate::world::TPS as f64;
+            } else if resist < 1.0 {
+                let knocked = crate::physics::knock(e.vel * crate::world::TICK, away, e.on_ground) * crate::world::TPS as f64;
+                e.vel = e.vel + (knocked - e.vel) * (1.0 - resist);
             }
         }
         let (health, player, pos, kind, on_fire, height) = (e.health, e.player, e.pos, e.kind, e.fire > 0, e.height(c));

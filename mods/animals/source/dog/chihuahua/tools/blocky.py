@@ -1230,13 +1230,26 @@ def pose_stalk(t, L):
     """Creeping low, head level and forward, tail low and still (1.1 s a cycle, in place of the walk)."""
     p = t / 1.1
     q = vd.legs_gait(p, (0.0, 0.5, 0.75, 0.25), 14, 26, L)
+    # The legs bent the way a step lifts them, the paws kept flat: each pair about 1.3 units shorter
+    # (bent the other way the gait moonwalked: the lift straightened the knee). Its height is set
+    # from its feet in the build (`ground.grounded`).
     for leg in ("FL", "FR", "BL", "BR"):
-        f = leg[0] == "F"
-        q[f"leg_{leg}_upper"] = (q[f"leg_{leg}_upper"][0] + (22 if f else -18), 0, 0)
-        q[f"leg_{leg}_lower"] = (q[f"leg_{leg}_lower"][0] + (-30 if f else 28), 0, 0)
-        q[f"leg_{leg}_paw"] = (q[f"leg_{leg}_paw"][0] + (8 if f else -10), 0, 0)
-    q.update({"root": (0, -1.5, 0), "neck": (14, 0, 0), "head": (-12, 0, 0), "ear_L": (-20, 0, 0), "ear_R": (-20, 0, 0)})
+        bend = (-30, 70, -40) if leg[0] == "F" else (40, -70, 30)
+        for part, b in zip(("upper", "lower", "paw"), bend):
+            q[f"leg_{leg}_{part}"] = (q[f"leg_{leg}_{part}"][0] + b, 0, 0)
+    q.update({"root": (0, 0, 0), "neck": (14, 0, 0), "head": (-12, 0, 0), "ear_L": (-20, 0, 0), "ear_R": (-20, 0, 0)})
     return wag(q, L, 0, 0, (30, 0, 0))
+
+
+def pose_approach(t, L):
+    """Curious, coming to look: slow short steps, the head low and stretched forward, sniffing, the
+    ears up and forward, the tail level with a slow wag (1.2 s a cycle, in place of the walk). Its
+    height is set from its feet in the build (`ground.grounded`)."""
+    p = t / 1.2
+    q = vd.legs_gait(p, (0.0, 0.5, 0.75, 0.25), 16, 26, L)
+    q.update({"root": (0, 0, 0), "neck": (12, 0, 0), "head": (-8 + 2 * math.sin(TAU * p * 4), 0, 0), "ear_L": (-12, 0, 0),
+              "ear_R": (-12, 0, 0)})
+    return wag(q, L, 10, TAU * p * 2, (10, 0, 0))
 
 
 def pose_alarm(t, L):
@@ -1312,10 +1325,10 @@ def pose_death(t, L):
 
 
 CLIP_LENGTHS = {"stare": 2.0, "sniff": 2.0, "drink": 1.0, "look": 2.6, "scratch": 1.8, "stretch": 2.2, "sleep": 5.0, "stalk": 1.1,
-                "alarm": 1.0, "howl": 3.0, "play": 1.4, "groom": 2.4, "nuzzle": 2.0, "flinch": 0.4, "death": 1.2}
+                "alarm": 1.0, "howl": 3.0, "play": 1.4, "groom": 2.4, "nuzzle": 2.0, "flinch": 0.4, "death": 1.2, "approach": 1.2}
 CLIP_MOUTHS = set(CLIP_LENGTHS)
-LOOPS = {"stare": True, "drink": True, "sleep": True, "stalk": True, "death": "hold_on_last_frame"}
-BLENDS = {"flinch": (0.05, 0.2), "death": (0.1, 0.0), "stalk": (0.3, 0.3), "sleep": (0.6, 0.6)}
+LOOPS = {"stare": True, "drink": True, "sleep": True, "stalk": True, "approach": True, "death": "hold_on_last_frame"}
+BLENDS = {"flinch": (0.05, 0.2), "death": (0.1, 0.0), "stalk": (0.3, 0.3), "approach": (0.3, 0.3), "sleep": (0.6, 0.6)}
 
 
 def behaviour_mouth(name, p):

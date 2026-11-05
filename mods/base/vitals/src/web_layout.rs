@@ -29,10 +29,13 @@ pub enum Style {
     Clusters,
     /// Curving branches that fork and rejoin, notables at the bends.
     Branches,
+    /// Ronald's pick (11-05, "A, with clearer islands"): the clusters, each region an island of
+    /// its own with empty space round it, a small start hub of gates, bridges across the gaps.
+    Islands,
 }
 
 /// The style the game uses.
-pub const STYLE: Style = Style::Clusters;
+pub const STYLE: Style = Style::Islands;
 
 /// How much room each region gets round the web (`skills::SKILLS` order): the skills with most to
 /// do today, and Taming (a whole group, Beasts, in one region), get the widest; Trading, with
@@ -177,6 +180,9 @@ fn relax(blobs: &mut [Blob], gap: f32, inner: f32) {
 pub fn lay(style: Style, nodes: &mut Vec<Node>, links: &mut Vec<(u16, u16)>, arcs: &mut Arcs) {
     if style == Style::Wheel {
         return;
+    }
+    if style == Style::Islands {
+        return islands(nodes, links, arcs);
     }
     let wedges = wedges();
     let branches = style == Style::Branches;
@@ -539,4 +545,229 @@ fn spline(p: &[(f32, f32); 4], t: f32) -> (f32, f32) {
         0.5 * (2.0 * b + (-a + c) * u + (2.0 * a - 5.0 * b + 4.0 * c - d) * u * u + (-a + 3.0 * b - 3.0 * c + d) * u * u * u)
     };
     (f(p0.0, p1.0, p2.0, p3.0), f(p0.1, p1.1, p2.1, p3.1))
+}
+
+/// An island's size for a region's room: an oval, long outwards (`along`, 150 to 190 GUI px from
+/// its middle) and narrower across (`across`, 80 to 105), and its rings' radius (30 to 36:
+/// readable at the screen's opening zoom).
+fn island_size(room: f32) -> (f32, f32, f32) {
+    let t = ((room - 0.7) / 0.7).clamp(0.0, 1.0);
+    (150.0 + 40.0 * t, 80.0 + 25.0 * t, 30.0 + 6.0 * t)
+}
+/// GUI px of empty space between islands, and how far out the hub's gates sit.
+const ISLAND_GAP: f32 = 46.0;
+const GATE_R: f32 = 70.0;
+
+/// The islands: each region's nodes inside its own oval, the ovals in one ring round the start
+/// hub (so every island faces the hub and its keystone the rim, and nothing stands between a
+/// road and its island), empty space between them, bridges and the centre sockets in the gaps.
+fn islands(nodes: &mut Vec<Node>, links: &mut Vec<(u16, u16)>, arcs: &mut Arcs) {
+    // The ring: each island's share of the way round is its width and a gap.
+    let sizes: Vec<(f32, f32, f32)> = ROOM.iter().map(|&r| island_size(r)).collect();
+    let round: f32 = sizes.iter().map(|s| 2.0 * s.1 + ISLAND_GAP).sum();
+    let ring_r = round / TAU;
+    let mut discs: Vec<Blob> = Vec::new();
+    let mut at_angle = -(2.0 * sizes[0].1 + ISLAND_GAP) / 2.0 / ring_r;
+    for (i, &(along, across, _)) in sizes.iter().enumerate() {
+        let span = (2.0 * across + ISLAND_GAP) / ring_r;
+        let mid = at_angle + span / 2.0;
+        at_angle += span;
+        // Out a little more or less each (uneven), the middle of the oval past the ring.
+        let d = ring_r + along * 0.55 + 28.0 * sym(4000 + i as u32, 1);
+        discs.push(Blob { c: (d * mid.sin(), -d * mid.cos()), r: across, pinned: false });
+    }
+    let mut pos: HashMap<u16, (f32, f32)> = HashMap::new();
+    pos.insert(START, (0.0, 0.0));
+    for (i, r) in REGIONS.iter().enumerate() {
+        let seed = 7000 + i as u32 * 7919;
+        let s = r.skill;
+        let p = |at: u16| id(s, at);
+        let room = ROOM[i];
+        let c = discs[i].c;
+        let (along, across, rr) = sizes[i];
+        // The island's frame: `a` out from the start, `b` across (clockwise), both in its radii.
+        let l = c.0.hypot(c.1).max(1.0);
+        let (ax, ay) = (c.0 / l, c.1 / l);
+        let (bx, by) = (-ay, ax);
+        let at = |a: f32, b: f32| (c.0 + ax * a * along + bx * b * across, c.1 + ay * a * along + by * b * across);
+        let j = |k: u32| 0.06 * sym(seed, k);
+        // Travel nodes, as the other styles make them (lane A, B, B, A).
+        let mut extra_ids = Vec::new();
+        for e in 0..extras(room) {
+            let eid = p(EXTRA_FROM + e as u16);
+            let fam = if e == 0 || e == 3 { r.a } else { r.b };
+            let ring = if e >= 2 { 6.5 } else { 3.5 };
+            nodes.push(Node {
+                id: eid,
+                kind: Kind::Small,
+                region: Some(s),
+                bridge: None,
+                ring,
+                x: 0.0,
+                y: 0.0,
+                gives: vec![(fam, 1.0)],
+                special: None,
+                key: format!("family.{}", fam.id()),
+                needs: crate::perks::gate(ring),
+                socket: None,
+            });
+            extra_ids.push(eid);
+        }
+        let ex = |k: usize| -> Vec<u16> { extra_ids.get(k).copied().into_iter().collect() };
+        let entry = at(-0.9, j(1));
+        pos.insert(p(0), entry);
+        let a1 = at(-0.45 + j(2), -0.5 + j(3));
+        let b1 = at(-0.2 + j(4), 0.52 + j(5));
+        let mid = at(0.06 + j(6), j(7));
+        let a2 = at(0.34 + j(8), -0.48 + j(9));
+        let b2 = at(0.56 + j(10), 0.46 + j(11));
+        let meet = at(0.84 + j(12), 0.12 * sym(seed, 13));
+        place_ring(&mut pos, links, arcs, (a1, rr), [p(3), p(5), p(7)], (entry, a2, mid), &ex(0), 0.1 * sym(seed, 14));
+        place_ring(&mut pos, links, arcs, (b1, rr - 2.0), [p(4), p(6), p(8)], (entry, b2, mid), &ex(1), 0.1 * sym(seed, 15));
+        pos.insert(p(1), mid_bent(entry, pos[&p(3)], 0.12 * sym(seed, 16)));
+        pos.insert(p(2), mid_bent(entry, pos[&p(4)], 0.12 * sym(seed, 17)));
+        pos.insert(p(9), mid);
+        pos.insert(p(crate::perks::REGION_SOCKET), at(0.2 + j(18), 0.02));
+        // The outer rings: two template nodes each (10 and 12, 11 and 13), an extra the far way.
+        for (centre, rad, from, to, (n_in, n_out), extra) in
+            [(a2, rr - 4.0, pos[&p(7)], meet, (p(10), p(12)), ex(2)), (b2, rr - 4.0, pos[&p(8)], meet, (p(11), p(13)), ex(3))]
+        {
+            let a_in = angle_to(centre, from);
+            let a_out = a_in
+                + (angle_to(centre, to) - a_in)
+                    .rem_euclid(TAU)
+                    .clamp(TAU / 3.0, TAU * 2.0 / 3.0);
+            pos.insert(n_in, on_ring(centre, rad, a_in));
+            pos.insert(n_out, on_ring(centre, rad, a_out));
+            arcs.insert(key(n_in, n_out), centre);
+            for &e in &extra {
+                pos.insert(e, on_ring(centre, rad, a_out + (TAU - (a_out - a_in)) / 2.0));
+                links.push((n_in, e));
+                links.push((e, n_out));
+                arcs.insert(key(n_in, e), centre);
+                arcs.insert(key(e, n_out), centre);
+            }
+        }
+        pos.insert(p(14), meet);
+        // The keystone just past the island's outer edge, off to one side.
+        let k = at(1.06 + 0.06 * rnd(seed, 19), (0.15 + 0.3 * rnd(seed, 20)) * if rnd(seed, 21) < 0.5 { -1.0 } else { 1.0 });
+        pos.insert(p(15), k);
+        arcs.insert(key(p(14), p(15)), bulge(meet, k, 0.2 * sym(seed, 22)));
+    }
+    // Bridges across the gap to the next island; the centre sockets between two islands' lanes.
+    for (i, r) in REGIONS.iter().enumerate() {
+        let next = REGIONS[(i + 1) % COUNT].skill;
+        let (a, b) = (pos[&id(r.skill, 8)], pos[&id(next, 7)]);
+        let m = mid_bent(a, b, 0.0);
+        let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+        let l = dx.hypot(dy).max(1.0);
+        // Out from the web's middle, across the bridge.
+        let o = {
+            let q = m.0.hypot(m.1).max(1.0);
+            (m.0 / q, m.1 / q)
+        };
+        let _ = l;
+        pos.insert(id(r.skill, crate::perks::BRIDGE_SMALL), m);
+        let notable = add(m, (o.0 * 28.0, o.1 * 28.0));
+        pos.insert(id(r.skill, crate::perks::BRIDGE_NOTABLE), notable);
+        pos.insert(id(r.skill, crate::perks::BRIDGE_SOCKET), add(notable, (o.0 * 26.0, o.1 * 26.0)));
+    }
+    // The junctions: inside the ring, facing the middle of their islands.
+    // (entries sit about 60 px inside the ring: the junctions well inside them)
+    let inner = ring_r - 150.0;
+    for (j, run) in crate::perks::junctions().iter().enumerate() {
+        let (mut sx, mut sy) = (0.0, 0.0);
+        for &i in run {
+            let c = discs[i].c;
+            let l = c.0.hypot(c.1).max(1.0);
+            sx += c.0 / l;
+            sy += c.1 / l;
+        }
+        let l = sx.hypot(sy).max(1e-3);
+        pos.insert(crate::perks::JUNCTION_FROM + j as u16, (sx / l * inner, sy / l * inner));
+    }
+    // The hub: each gate towards its regions (the middle of their islands' directions).
+    for (g, &(group, _)) in crate::perks::GATES_OF.iter().enumerate() {
+        let (mut sx, mut sy) = (0.0, 0.0);
+        for (i, r) in REGIONS.iter().enumerate() {
+            if r.skill.group() == group {
+                let c = discs[i].c;
+                let l = c.0.hypot(c.1).max(1.0);
+                sx += c.0 / l;
+                sy += c.1 / l;
+            }
+        }
+        let l = sx.hypot(sy).max(1e-3);
+        let _ = g;
+        pos.insert(crate::perks::gate_id(group), (sx / l * GATE_R, sy / l * GATE_R));
+    }
+    for n in nodes.iter() {
+        if n.region.is_none() && n.socket.is_some() {
+            let near: Vec<(f32, f32)> = links
+                .iter()
+                .filter_map(|&(a, b)| if b == n.id { pos.get(&a).copied() } else { None })
+                .collect();
+            if near.len() == 2 {
+                pos.insert(n.id, mid_bent(near[0], near[1], 0.0));
+            }
+        }
+    }
+    // A gate's road out to an island's entry: straight if nothing is in the way, else an arc
+    // through the gap between the islands it would cross (the outer islands sit behind two inner
+    // ones).
+    for &(a, b) in links.iter() {
+        let road = (crate::perks::GATE_FROM..crate::perks::JUNCTION_FROM + 8).contains(&a);
+        if !road {
+            continue;
+        }
+        let (Some(&pa), Some(&pb)) = (pos.get(&a), pos.get(&b)) else { continue };
+        let Some(own) = REGIONS.iter().position(|r| id(r.skill, 0) == b) else { continue };
+        let blocked: Vec<usize> = (0..COUNT)
+            .filter(|&k| k != own && crosses(pa, pb, discs[k]))
+            .collect();
+        if blocked.is_empty() {
+            continue;
+        }
+        // The gap: between the blocking island and its nearer neighbour on the road's side.
+        let k = blocked[0];
+        let side = |q: usize| {
+            let c = discs[q].c;
+            (pb.0 - pa.0) * (c.1 - pa.1) - (pb.1 - pa.1) * (c.0 - pa.0)
+        };
+        let other = if side(k) > 0.0 { (k + COUNT - 1) % COUNT } else { (k + 1) % COUNT };
+        let (d1, d2) = (discs[k], discs[other]);
+        let (dx, dy) = (d2.c.0 - d1.c.0, d2.c.1 - d1.c.1);
+        let l = dx.hypot(dy).max(1.0);
+        // The middle of the empty space between the two discs' edges.
+        let t = (d1.r + (l - d1.r - d2.r) / 2.0) / l;
+        let gap = (d1.c.0 + dx * t, d1.c.1 + dy * t);
+        if let Some(c) = circle(pa, gap, pb) {
+            arcs.insert(key(a, b), c);
+        }
+    }
+    nudge(nodes, &mut pos, arcs);
+    for n in nodes.iter_mut() {
+        if let Some(&(x, y)) = pos.get(&n.id) {
+            (n.x, n.y) = (x, y);
+        }
+    }
+}
+
+/// Whether the segment from a to b passes through a disc.
+fn crosses(a: (f32, f32), b: (f32, f32), d: Blob) -> bool {
+    let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+    let len2 = (dx * dx + dy * dy).max(1e-3);
+    let t = (((d.c.0 - a.0) * dx + (d.c.1 - a.1) * dy) / len2).clamp(0.0, 1.0);
+    let (x, y) = (a.0 + dx * t, a.1 + dy * t);
+    (x - d.c.0).hypot(y - d.c.1) < d.r && t > 0.02 && t < 0.98
+}
+
+/// The centre of the circle through three points (none if they're in a line).
+fn circle(a: (f32, f32), b: (f32, f32), c: (f32, f32)) -> Option<(f32, f32)> {
+    let d = 2.0 * (a.0 * (b.1 - c.1) + b.0 * (c.1 - a.1) + c.0 * (a.1 - b.1));
+    if d.abs() < 1e-3 {
+        return None;
+    }
+    let (a2, b2, c2) = (a.0 * a.0 + a.1 * a.1, b.0 * b.0 + b.1 * b.1, c.0 * c.0 + c.1 * c.1);
+    Some(((a2 * (b.1 - c.1) + b2 * (c.1 - a.1) + c2 * (a.1 - b.1)) / d, (a2 * (c.0 - b.0) + b2 * (a.0 - c.0) + c2 * (b.0 - a.0)) / d))
 }

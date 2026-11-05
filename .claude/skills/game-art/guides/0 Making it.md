@@ -31,7 +31,7 @@ item lab, the UI kit and the model skill learned (2026-10 to 11), so every guide
   texture: from it we take colors, coat patterns and faces, never the skin itself.
 - **Block textures are 32 × 32** (Ronald's choice, 2026-11-03, after the style guide test), like
   the items. The whole block set, redone at 32 from the block master prompt, is in the game
-  (the `block-textures` skill, `notes/blocks/`, merged 2026-11-03).
+  (`guides/2 Blocks/Full set.md`, `notes/blocks/`, merged 2026-11-03; it was the `block-textures` skill until 11-05).
 - **One pixel size everywhere: 32 a block.** Box models are being rebuilt at 32 texels a block to
   match (Ronald, 2026-11-04, "Yes, rebuild at 32"; the session "Animal models rebuilt at 32 texels
   a block"); very small creatures still paint finer so their faces fit.
