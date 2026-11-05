@@ -702,6 +702,21 @@ gpu_struct! {
         /// Where the player is: x how closed a forest's canopy is (0 open sky to 1 a rainforest's;
         /// a mod's air, `air_flags::CANOPY_SHIFT`), for packs' light under the leaves; yzw unused.
         pub canopy: [f32; 4],
+        /// Soft clouds (`core:soft_clouds`, with a pack whose sky has `fs_cloud_trace` and
+        /// `fs_cloud_resolve`; chiacraft): x the bindless index + 1 of this frame's clouds, traced
+        /// at a quarter of the pixels each way and blended over frames, which `fs_clouds` draws
+        /// from (0: off, the blocky clouds); y the index + 1 of last frame's, the history
+        /// `fs_cloud_resolve` blends into; z the bindless index of the noise volume
+        /// (`soft_clouds::noise_atlas`: 64 slices of 64², eight to a row, each in a 66² cell with
+        /// a wrapped border, so a linear sample within a cell tiles); w how many frames the history
+        /// holds (0: none yet, take this frame's alone).
+        pub soft_clouds: [f32; 4],
+        /// Last frame's `view_proj` (camera relative then), for reprojecting the clouds.
+        pub prev_view_proj: [[f32; 4]; 4],
+        /// xyz: where last frame's camera stands from this one's, less how far the wind carried
+        /// the clouds since (blocks): a cloud at camera-relative `p` now stood at `p + xyz` from
+        /// last frame's camera. w: the frame's number (for the trace's jitter).
+        pub cloud_moved: [f32; 4],
     }
 }
 

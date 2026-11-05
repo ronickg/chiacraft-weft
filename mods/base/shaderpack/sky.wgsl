@@ -204,10 +204,269 @@ fn cloud_density(s: Sky, cellp: vec2<f32>, h: f32, dims: vec2<f32>) -> f32 {
     return shaped;
 }
 
+// ---- soft clouds (`core:soft_clouds`; the engine's `client/soft_clouds.rs`) ----
+// Ronald, 11-05: "Both, a setting" (blocky by default), then "Soft clouds first", storms first.
+// Traced at a quarter of the pixels each way (`fs_cloud_trace`), blended over frames
+// (`fs_cloud_resolve`), drawn by `fs_clouds`. The method after Horizon Zero Dawn's (Schneider 2015)
+// and Photon's: masses from a slow coverage field, billows remapped into it, detail that only wears
+// their edges, a light march that doubles each step, scattering in octaves. Our own code: Photon's
+// licence allows learning from it, not reuse (the Researcher's notes, side-session-notes
+// soft-clouds-photon-bliss.md).
+
+// The soft layer over its underside (blocks): fair-weather cumulus, and a storm's deck with towers.
+const SOFT_THICK: f32 = 120.0;
+const SOFT_STORM_THICK: f32 = 190.0;
+// How far a look is followed (blocks): beyond, the clouds fade into the sky.
+const SOFT_REACH: f32 = 4000.0;
+
+// One slice `z` (0..63) of the noise volume at `xy` (texels, 0..64).
+fn soft_slice(z: u32, xy: vec2<f32>) -> vec4<f32> {
+    let cell = vec2<f32>(f32(z % 8u), f32(z / 8u)) * 66.0 + vec2(1.0);
+    return textureSampleLevel(textures[u32(scene.soft_clouds.z)], linear_clamp, (cell + xy) / 528.0, 0.0);
+}
+
+// The noise volume at `p` (tiles: it repeats every 1 each way), between two slices.
+fn soft_noise(p: vec3<f32>) -> vec4<f32> {
+    let t = fract(p) * 64.0;
+    let zf = t.z - 0.5 + 64.0;
+    let z0 = u32(floor(zf)) % 64u;
+    return mix(soft_slice(z0, t.xy), soft_slice((z0 + 1u) % 64u, t.xy), fract(zf));
+}
+
+// Where camera-relative `rel` is in the clouds' own frame (blocks, x and z): the picture's cells,
+// which the wind carries, wrap every 4096 cells, so every tile here divides 49152 blocks.
+fn soft_at(s: Sky, rel: vec3<f32>) -> vec2<f32> {
+    return (s.uv.xy + rel.xz / s.extra.x + s.uv.zw) * s.extra.x;
+}
+
+// How much of the sky the clouds cover here, 0..1: fair weather a third, rain most, a storm all
+// but its breaks; varying over a few thousand blocks (Photon's slow field, Bliss's large noise).
+fn soft_cover(s: Sky, at: vec2<f32>) -> f32 {
+    let wet = max(s.axes[0].x, s.axes[0].z);
+    let field = soft_slice(9u, fract(at / 6144.0) * 64.0).r * 0.65 + soft_slice(27u, fract(at / 1536.0) * 64.0).r * 0.35;
+    // At 0.38 a clear day's were thin wisps with no body (the first soft run, 11-05).
+    // Storms at 0.92 closed into one even deck once the billows were equalized: 0.8 keeps breaks.
+    return clamp(mix(0.5, 0.8, wet) + (field - 0.5) * mix(0.8, 0.5, wet), 0.0, 1.0);
+}
+
+// The cloud's density at `at` (its frame, blocks) and `a` (0 at the layer's underside, 1 at its
+// top), 0..1; `fine`: the eroding detail too (the light march leaves it out).
+fn soft_density(s: Sky, at: vec2<f32>, a: f32, cover: f32, fine: bool) -> f32 {
+    if a < 0.0 || a > 1.0 {
+        return 0.0;
+    }
+    let storm = s.axes[0].z;
+    let t = scene.params.w;
+    // Billows about three hundred blocks across (at half that a clear day's were small wisps
+    // beside Photon's cumulus, the soft-clouds sheet, 11-05), leaning a little with height, mixed
+    // with the slow field so masses group.
+    let billow = soft_noise(vec3(at.x / 1536.0 + a * 0.04, a * 0.3 + t * 0.0003, at.y / 1536.0)).r;
+    let mass = soft_slice(41u, fract(at / 3072.0) * 64.0).r;
+    // A smaller billow on them, so the puffs are cauliflowers, not smooth marshmallows (11-05).
+    let small = soft_noise(vec3(at.x / 384.0 + 0.37, a * 0.8 + t * 0.001, at.y / 384.0)).r;
+    let shape = billow * 0.55 + mass * 0.25 + small * 0.2;
+    // Photon's remap: the billows the cover lets through, shaped from the bottom up.
+    var d = clamp((shape - (1.0 - cover)) / max(cover, 0.05) * 1.6, 0.0, 1.0);
+    // An egg: a flat-ish base, rounded tops; a storm's deck fills more of its height.
+    d *= smoothstep(0.0, 0.08, a);
+    d -= smoothstep(mix(0.35, 0.55, storm), 1.0, a) * mix(0.45, 0.4, storm);
+    if fine && d > 0.0 {
+        // Detail wears only the edges (Photon: by 1 - density), so the cores stay solid.
+        let w = soft_noise(vec3(at.x / 128.0, a * 1.4 + t * 0.002, at.y / 128.0));
+        let cells = w.g * 0.625 + w.b * 0.25 + w.a * 0.125;
+        d -= (1.0 - cells) * 0.5 * (1.0 - d) * mix(0.6, 1.0, a);
+    }
+    return clamp(d, 0.0, 1.0);
+}
+
+// The soft clouds along `dir` from the camera, up to `far` (blocks): rgb the light they send toward
+// the eye (linear), a how much of what is behind still shows.
+fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
+    let storm = s.axes[0].z;
+    let thick = mix(SOFT_THICK, SOFT_STORM_THICK, storm);
+    let low = s.extra.z;
+    let high = low + thick;
+    var near = 0.0;
+    var far = min(far_in, SOFT_REACH);
+    if abs(dir.y) > 1e-5 {
+        let a = low / dir.y;
+        let b = high / dir.y;
+        near = max(near, min(a, b));
+        far = min(far, max(a, b));
+    } else if low > 0.0 || high < 0.0 {
+        return vec4(0.0, 0.0, 0.0, 1.0);
+    }
+    if near >= far {
+        return vec4(0.0, 0.0, 0.0, 1.0);
+    }
+    // Photon's: more steps toward the horizon, where a look crosses more of the layer.
+    let steps = i32(mix(36.0, 18.0, abs(dir.y)));
+    let step = (far - near) / f32(steps);
+    let p = palette();
+    let l = light_dir();
+    let mu = dot(dir, l);
+    // Two lobes, forward (the silver lining toward the sun) and a little back.
+    let phase = min(0.75 * cloud_hg(mu, 0.75) + 0.25 * cloud_hg(mu, -0.2), 0.6) * 12.566;
+    let sun = p.sun * light_strength() * (1.0 - s.axes[0].y * 0.55);
+    // Rain darkens the clouds' albedo and keeps their shapes (Photon: ×0.66); a storm's more.
+    let albedo = mix(1.0, 0.66, s.axes[0].x) * mix(1.0, 0.6, storm);
+    var through = 1.0;
+    var light = vec3(0.0);
+    for (var i = 0; i < steps; i++) {
+        let t = near + (f32(i) + dither) * step;
+        let rel = dir * t;
+        let at = soft_at(s, rel);
+        let a = (rel.y - low) / thick;
+        let cover = soft_cover(s, at);
+        let d = soft_density(s, at, a, cover, true);
+        if d <= 0.0 {
+            continue;
+        }
+        // Extinction per block: a dense core is gone in a few blocks.
+        let sigma = d * 0.55;
+        // Toward the light, five taps each twice as far as the last (3 to 48 blocks).
+        var od = 0.0;
+        var reach = 3.0;
+        var last = 0.0;
+        for (var j = 0; j < 5; j++) {
+            let q = rel + l * reach;
+            let qa = (q.y - low) / thick;
+            od += soft_density(s, soft_at(s, q), qa, cover, false) * 0.55 * (reach - last);
+            last = reach;
+            reach *= 2.0;
+        }
+        // Scattering in octaves: each lets more light through, less of it, rounder.
+        var direct = 0.0;
+        var k = 1.0;
+        var e = 1.0;
+        for (var o = 0; o < 3; o++) {
+            direct += k * exp(-od * e) * mix(1.0, phase, pow(0.6, f32(o)));
+            k *= 0.5;
+            e *= 0.4;
+        }
+        // Dark edges facing away from the sun (powder), fading out looking toward it.
+        let powder = mix(1.0 - exp(-sigma * 14.0), 1.0, 0.5 * (mu * 0.5 + 0.5) * (mu * 0.5 + 0.5) + 0.3);
+        // The sky's light from above, brighter on the tops; under a storm the bellies darker.
+        // Grey-blue shaded bases, bright tops: evenly lit, a clear day's read as flat white cut-outs.
+        let ambient = mix(p.horizon * 0.3 + p.ambient * 0.25, p.ambient * 1.2 + p.horizon * 0.2, smoothstep(0.0, 0.8, a)) * mix(1.0, 0.55, s.axes[0].y * (1.0 - a));
+        let c = (sun * direct * powder * 0.9 + ambient) * albedo;
+        let kept = exp(-sigma * step);
+        light += through * (1.0 - kept) * c;
+        through *= kept;
+        if through < 0.03 {
+            through = 0.0;
+            break;
+        }
+    }
+    return vec4(light, through);
+}
+
+// The trace: one look per quarter-target pixel, at a sub-pixel that moves each frame (16 places),
+// dithered along the look; it stops at the world (its depth's copy).
+@fragment
+fn fs_cloud_trace(in: CloudOut) -> @location(0) vec4<f32> {
+    let s = sky[in.index];
+    let n = u32(scene.cloud_moved.w);
+    let px = vec2(dpdx(in.at.x), dpdy(in.at.y));
+    // A Bayer order through the 4 × 4 pixels this one stands for.
+    let bayer = array<u32, 16>(0u, 8u, 2u, 10u, 12u, 4u, 14u, 6u, 3u, 11u, 1u, 9u, 15u, 7u, 13u, 5u);
+    let b = bayer[n % 16u];
+    let sub = (vec2(f32(b % 4u), f32(b / 4u)) + 0.5) / 4.0 - 0.5;
+    let at = vec3(in.at.xy + sub * px, 1.0);
+    let dir = normalize(mat(sky[0]) * at);
+    var far = SOFT_REACH;
+    if scene.behind.z > 0.5 {
+        let size = vec2<f32>(textureDimensions(textures[u32(scene.behind.y)]));
+        let uv = vec2(at.x * 0.5 + 0.5, 0.5 - at.y * 0.5);
+        let d = textureLoad(textures[u32(scene.behind.y)], vec2<i32>(clamp(uv * size, vec2(0.0), size - 1.0)), 0).r;
+        if d > 0.0 {
+            let w = scene.inv_view_proj * vec4(at.x, at.y, d, 1.0);
+            far = length(w.xyz / w.w);
+        }
+    }
+    let h = hash(u32(in.clip.x) * 1973u + u32(in.clip.y) * 9277u);
+    let dither = fract(unit(h) + f32(n) * 0.618034);
+    if !open_sky() || in_liquid() {
+        return vec4(0.0, 0.0, 0.0, 1.0);
+    }
+    return soft_march(s, dir, far, dither);
+}
+
+// How far the clouds seen along `dir` stand, for reprojecting them: the layer's lower third, or
+// far off where a look misses it.
+fn soft_distance(s: Sky, dir: vec3<f32>) -> f32 {
+    let mid = s.extra.z + mix(SOFT_THICK, SOFT_STORM_THICK, s.axes[0].z) * 0.3;
+    let t = mid / dir.y;
+    return select(SOFT_REACH, clamp(t, 30.0, SOFT_REACH), t > 0.0 && abs(dir.y) > 1e-4);
+}
+
+// The resolve: this frame's trace blended into last frame's clouds where they stood then
+// (reprojected: the camera's move and the wind's), held to what this frame's neighbourhood allows.
+@fragment
+fn fs_cloud_resolve(in: CloudOut) -> @location(0) vec4<f32> {
+    let s = sky[in.index];
+    let trace = u32(s.axes[1].x - 1.0);
+    let at = vec2<i32>(in.clip.xy);
+    let size = vec2<i32>(textureDimensions(textures[trace]));
+    let now = textureLoad(textures[trace], at, 0);
+    if scene.soft_clouds.w < 0.5 || scene.soft_clouds.y < 0.5 {
+        return now;
+    }
+    let dir = normalize(mat(sky[0]) * in.at);
+    let then = scene.prev_view_proj * vec4(dir * soft_distance(s, dir) + scene.cloud_moved.xyz, 1.0);
+    if then.w <= 0.0 {
+        return now;
+    }
+    let ndc = then.xy / then.w;
+    let uv = vec2(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5);
+    if any(uv < vec2(0.0)) || any(uv > vec2(1.0)) {
+        return now;
+    }
+    var history = textureSampleLevel(textures[u32(scene.soft_clouds.y - 1.0)], linear_clamp, uv, 0.0);
+    // Held within this frame's 3 × 3, widened: the trace is noisy, the clamp only stops smears.
+    var lo = now;
+    var hi = now;
+    for (var y = -1; y <= 1; y++) {
+        for (var x = -1; x <= 1; x++) {
+            let c = textureLoad(textures[trace], clamp(at + vec2(x, y), vec2(0), size - 1), 0);
+            lo = min(lo, c);
+            hi = max(hi, c);
+        }
+    }
+    let pad = (hi - lo) * 0.5 + vec4(0.02);
+    history = clamp(history, lo - pad, hi + pad);
+    // Up to nine parts history: each pixel was traced once in 16 frames at its own sub-pixel.
+    let w = min(1.0 - 1.0 / (scene.soft_clouds.w + 1.0), 0.9);
+    return mix(now, history, w);
+}
+
+// The full picture from the resolved clouds (`fs_clouds` with soft clouds on).
+fn soft_pixel(in: CloudOut, s: Sky, dir: vec3<f32>) -> CloudPixel {
+    let size = vec2<f32>(textureDimensions(textures[u32(scene.behind.x)]));
+    let c = textureSampleLevel(textures[u32(scene.soft_clouds.x - 1.0)], linear_clamp, in.clip.xy / size, 0.0);
+    let alpha_cloud = 1.0 - c.a;
+    if alpha_cloud < 0.004 {
+        discard;
+    }
+    let seen = soft_distance(s, dir);
+    let rel = dir * seen;
+    var color = c.rgb / alpha_cloud;
+    // Toward the far end they hand over to the sky.
+    let dist = length(rel.xz) / SOFT_REACH;
+    color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) + 1e-3, dir.z))), smoothstep(0.45, 1.0, dist));
+    color = display(fog_through(rainbow_on(color, dir), dir * 220.0, 1.0));
+    let alpha = alpha_cloud * (1.0 - smoothstep(0.85, 1.0, dist));
+    let clip = scene.view_proj * vec4(rel, 1.0);
+    return CloudPixel(vec4(color * alpha, alpha), clip.z / clip.w);
+}
+
 @fragment
 fn fs_clouds(in: CloudOut) -> CloudPixel {
     let s = sky[in.index];
     let dir = normalize(mat(sky[0]) * in.at);
+    if scene.soft_clouds.x > 0.5 {
+        return soft_pixel(in, s, dir);
+    }
     let size = s.extra.x;
     let low = s.extra.z;
     let thick = max(s.extra.y, CLOUD_THICKNESS);

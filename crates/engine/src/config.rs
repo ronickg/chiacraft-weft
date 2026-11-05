@@ -643,6 +643,9 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::number("core:first_person_model", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         ConfigDef::number("core:show_avatars", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         ConfigDef::number("core:occlusion_culling", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
+        // Soft volumetric clouds traced at a quarter of the pixels and blended over frames, for a
+        // pack that draws them (chiacraft's); off, the pack's own (blocky) clouds.
+        ConfigDef::number("core:soft_clouds", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:allow_avatars", ck::BOOL, 1.0, 0.0, 1.0, 0.0) },
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:keep_inventory", ck::BOOL, 0.0, 0.0, 1.0, 0.0) },
     ];
