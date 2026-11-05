@@ -2426,7 +2426,15 @@ pub async fn crafting_table_tags(t: T) -> R {
     let made = t
         .until("sticks in the result", Duration::from_secs(5), |t| t.c().menu_slot(9).item == stick)
         .await;
-    t.check(made.is_ok(), "two planks in a column give no sticks (tag ingredient #planks)");
+    let c = t.c();
+    t.check(
+        made.is_ok(),
+        format!(
+            "two planks in a column give no sticks (tag ingredient #planks): cursor {:?}, grid {:?}",
+            c.cursor_stack(),
+            (0..9).map(|i| c.menu_slot(i)).collect::<Vec<_>>()
+        ),
+    );
     t.c().screen_close();
     t.no_screen().await
 }

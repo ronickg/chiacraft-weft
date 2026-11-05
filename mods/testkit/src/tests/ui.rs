@@ -250,7 +250,11 @@ pub async fn inventory_crafting(t: T) -> R {
         .await?;
     t.click_ui("slot:0", 1);
     t.until("planks in the result", Duration::from_secs(5), |t| t.c().menu_slot(4).item == planks)
-        .await?;
+        .await
+        .map_err(|e| {
+            let c = t.c();
+            format!("{e} (cursor {:?}, grid {:?} {:?} {:?} {:?}, result {:?})", c.cursor_stack(), c.menu_slot(0), c.menu_slot(1), c.menu_slot(2), c.menu_slot(3), c.menu_slot(4))
+        })?;
     t.check_eq(t.c().menu_slot(4).count, 4, "planks from one log");
     t.click_ui(&t.hotbar(0), 0);
     t.until("cursor empty", Duration::from_secs(5), |t| t.c().cursor_stack().is_empty())
