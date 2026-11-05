@@ -1373,7 +1373,9 @@ def animations():
     names = [n for n, _, _ in skeleton(L)]
     for name, (fn, dur) in ANIMS.items():
         frames = []
-        loops = LOOPS.get(name, True)
+        # The standing clips loop; an action plays once unless `LOOPS` holds it (a clip with
+        # "loop": true never ends, whatever `action_play` asks).
+        loops = LOOPS.get(name, name in vd.ANIMS)
         for t in frame_times(name, dur):
             # A loop's last frame is its first; a clip played once ends where it ends.
             tt = t % dur if t < dur else (0.0 if loops is True else dur)
@@ -1383,7 +1385,7 @@ def animations():
             frames.append({"t": round(t, 4), "rot": {b: list(pose.get(b, (0, 0, 0))) for b in names if b != "root"},
                            "root": list(pose.get("root", (0, 0, 0)))})
         out[name] = {"length": dur, "frames": frames}
-        if name in CLIP_LENGTHS:
+        if name not in vd.ANIMS:
             out[name].update(loop=loops, blend=BLENDS.get(name, (0.25, 0.3)))
     return out
 
