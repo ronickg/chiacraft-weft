@@ -809,10 +809,11 @@ pub fn register(r: &mut Registry) {
     r.block(&DUNG_PAT)
         .sound_group("mud")
         .textures("dung_pat_top", "dung_pat_side", "dung_pat_top")
+        // A plant first: `.plant()` makes the model a cross, so the pat's box comes after it.
+        .plant()
         .model_box([2.0, 0.0, 2.0], [14.0, 1.5, 14.0])
         // Its top's corners are clear (Art's tile), so the grass shows round the pat.
         .cutout()
-        .plant()
         .needs_below("#plant_soil")
         .no_item()
         .grows(crate::growth::step_secs("base:dung_pat", 1, 1200.0), 0)
