@@ -24,6 +24,13 @@ pub const IMPACT_SCORCH: f64 = 2.0;
 /// largest, where a creeper's blast does 113 at once.
 pub const IMPACT_CARVE_TICKS: u32 = 20;
 
+/// A column not loaded yet when its turn comes (a cube still loading) is tried again every
+/// second for this long (ticks: 30 s), then left.
+pub const IMPACT_WAIT_TICKS: u64 = 600;
+
+/// Over a raised rim, leaves this many blocks up go (a shrub the rubble rose under).
+pub const IMPACT_RIM_CLEAR: i32 = 4;
+
 /// Blocks over the ground the bowl clears at most (a tree standing in it goes with it).
 pub const IMPACT_CLEAR_UP: i32 = 40;
 
