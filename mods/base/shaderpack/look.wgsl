@@ -301,6 +301,13 @@ fn blood_tint() -> vec3<f32> {
     return mix(vec3(1.0), mix(vec3(1.0, 0.45, 0.2), vec3(0.75, 0.06, 0.02), smoothstep(0.5, 1.0, b)), smoothstep(0.0, 0.35, b));
 }
 
+// How far over the blocky clouds' height the soft layer's underside stands (blocks), less as rain
+// comes (a storm's deck hangs low): cumulus three hundred blocks across at the blocky clouds'
+// height, 150 blocks over a forest floor, filled every gap in the canopy with one flat grey base,
+// looking up from under the trees (Tester 2's looks4, 11-05); higher, they stand in the sky as
+// clouds with blue between them, as Bliss's do.
+const SOFT_LIFT: f32 = 220.0;
+
 // ---- lightning (`scene.lightning`, the engine's flash where the player is) ----
 // Ronald, 11-05: "add lightning flashes" (Tester 2's four storm shots showed none: the engine's
 // flash only lifted the daylight for 0.15 s, which the pack's light never read). A flash is two to
@@ -363,8 +370,11 @@ fn lightning_bolt(dir: vec3<f32>) -> vec3<f32> {
     if f <= 0.0 || fract(r * 91.7) < 0.33 {
         return vec3(0.0);
     }
-    let far = mix(400.0, 2500.0, fract(r * 47.3));
-    let top = atan2(max(scene.clouds.z, 40.0), far);
+    // Nearer than before (400-2500) and from the deck's underside, the soft one 220 higher, so the
+    // bolt stands tall in view: it was a short squiggle at the horizon (PC shbo_bolts).
+    let far = mix(250.0, 1200.0, fract(r * 47.3));
+    let base = scene.clouds.z + select(0.0, SOFT_LIFT * (1.0 - 0.7 * max(min(rain_amount() * 0.75 + scene.weather.w * 0.25, 1.0), scene.weather.w)), scene.soft_clouds.x > 0.5);
+    let top = atan2(max(base, 40.0), far);
     let bottom = atan2(-max(scene.eye.y - SEA_LEVEL, 2.0), far);
     let el = asin(clamp(dir.y, -1.0, 1.0));
     let u = (el - bottom) / max(top - bottom, 1e-3);
