@@ -1,6 +1,6 @@
 ---
 name: game-art
-description: Generate any art for the game from Ronald's style guides — item icons, block textures (cubes, plants, ores, crops, liquids, glass, workstations), animal and monster looks, UI parts, effects, sky — with ChatGPT through the Codex command line, then check it, cut it to exact pixels, show it on a page and put it in the game. Use whenever Ronald says "generate/make/draw/redo <anything visual>", asks for new or redone icons, textures, sprites, UI parts or an icon set, wants to see how art looks in the inventory or the world, sends generated images to put in the game, or wants a style guide changed. Box models themselves (creatures, props) are built by blocky-model; this skill gives them their colors.
+description: Generate any art for the game from Ronald's style guides — item icons, block textures (cubes, plants, ores, crops, liquids, glass, workstations), animal and monster looks, UI parts, effects, sky — with ChatGPT through the Codex command line, then check it, cut it to exact pixels, show it on a page and put it in the game. Also the game's whole 32 px block set and its batches (notes/blocks: new trees, plants, crops and bushes with their stages, "the block prompt", a block that looks off next to the others, blocks seen in a test world). Use whenever Ronald says "generate/make/draw/redo <anything visual>", asks for new or redone icons, textures, sprites, UI parts or an icon set, wants to see how art looks in the inventory or the world, sends generated images to put in the game, or wants a style guide changed. Box models themselves (creatures, props) are built by blocky-model; this skill gives them their colors.
 ---
 
 # Game art: generate anything from the style guides
@@ -21,7 +21,7 @@ patching a prompt in a script: every script reads the guides.
 |---|---|
 | `guides/0 Making it.md` | read first: which guide for what, facts about our game, how to prompt, check, cut and show |
 | `guides/1 Items/` | item icons, 32 × 32: master prompt (section A), material sheet (B), the reference image per kind of item, recipes for tricky objects (D) |
-| `guides/2 Blocks/` | block textures: how Minecraft-style textures work, the master prompt with one type line per texture kind, ramps, the full-pack checklist |
+| `guides/2 Blocks/` | block textures (and `Full set.md`: the whole 32 px set's pipeline in `notes/blocks/`, batches, cutting, the style key, the test world): how Minecraft-style textures work, the master prompt with one type line per texture kind, ramps, the full-pack checklist |
 | `guides/3 Model Blocks/` | blocks with their own shape (torch, lantern, door) |
 | `guides/4 Animals/` | animal looks; Part 4: our animals are box models, what carries over |
 | `guides/5 Monsters and Characters/` | as animals |
@@ -87,7 +87,7 @@ red-brown line, a seam), not whether it is the thing asked for.
 | Kind | Made by | Into the game |
 |---|---|---|
 | Item icon | `art.py item` | `install item NAME --mod base|animals` (32 × 32, `mods/<mod>/assets/textures/item/`); a new item also needs its item definition and a lang key |
-| Block face | `art.py block` | `install block NAME` (32 × 32, decided 2026-11-03; the game's whole 32 px set and its batches are the `block-textures` skill's, `notes/blocks/`) |
+| Block face | `art.py block` | `install block NAME` (32 × 32, decided 2026-11-03; the game's whole 32 px set and its batches: `guides/2 Blocks/Full set.md`, `notes/blocks/`) |
 | Animal, monster | `art.py animal` (a concept sprite) | its colors, coat and face go to the box model (`blocky-model`: coat data, `house.MATERIALS`); never a sprite in the game |
 | UI part | the UI kit flow below | `mods/base/source/ui/` cutters, `install.py` |
 | Effect, sky | the guide's prompt by hand with `codex exec` | as the guide says |

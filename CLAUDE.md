@@ -18,7 +18,7 @@ game), `animals`, `portals`, `packages`, `testkit`.
   plants, grazers, hunters, rot, soil), with its numbers from real places: `notes/ECOLOGY.md`. The numbers: `mods/base/vitals/SHEET.md`,
   `mods/animals/SPECIES.md` (both generated).
 - **The look**: `notes/STYLE.md`, the `game-art` skill (all generated art: items, blocks, animal
-  looks, UI, from the style guides in its `guides/`), `block-textures` (the 32 px block set and
+  looks, UI, from the style guides in its `guides/`), `game-art`'s `guides/2 Blocks/Full set.md` (the 32 px block set and
   its batches) and `blocky-model` (box models).
 - **Names and invented words**: `mods/base/lore/lexicon.toml` is the one source (the ancients' Old
   Eskenai, its drifts, Elvish, Dwarvish), `notes/NAMES.md` its generated sheet. Never make a name

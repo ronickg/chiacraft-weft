@@ -326,6 +326,43 @@ Animation
   solve it to its targets like a gait's foot. Ears flat, a hiss, the head following the strike
   sell it. Run `boxcheck` on them too: a raised limb sweeps through the body's planes.
 
+## What the best ones do
+
+Ronald, 11-05, shown them on `model_refs_sheet.png`: "Yes, all 11". From the
+best-regarded animal mods that fit vanilla's look (Naturalist, Alex's Mobs, Friends & Foes,
+Critters and Companions, Ecologics, Untamed Wilds) and Mojang's own camel, sniffer, armadillo,
+frog and axolotl. Images and what each teaches: `references.md`; measurements:
+`~/Coding/chiacraft-archive/references/models/FINDINGS.md`. They work at 16 px a block, so double
+their numbers. Our own rules stay: 32 texels a block, the designed eyes, cute only on heads.
+
+1. **One density, bigger sheets**: none of them changes its pixel for a big animal; the sheet
+   grows (the sniffer 192, Alex's elephant 256). Ours: 32 everywhere.
+2. **4-6 masses read first**: chest, hips, neck, head, muzzle, legs. 10-15 boxes carry the body
+   (vanilla camel 11, Alex's grizzly 15); the rest is face, joints and fringe, and detail goes in
+   the paint.
+3. **Front-heavy, in clean steps**: chest wider and taller than the hips (Naturalist bear 17
+   against 15, rhino 24x29 against 20x25), stepped in evenly on both sides, every step whole and
+   two texels or more at 32 (see "No thin lines").
+4. **Skull plus a narrower muzzle box**, 40-70% of the skull's width, as long as the species'
+   muzzle (a bear's 4-6 px at 16 is 8-12 texels at 32; a wolf's is longer for its head, a cat's
+   shorter); the nose painted on it or a thin strip, never a pad a texel proud.
+5. **A long neck is its own column** (camel, deer, giraffe), the head set on top.
+6. **Coats, manes and moss: one shell per area**, a little bigger than the body (ours: half a unit
+   or more out, no inflate in our exporter), its hem cut out ragged and the shag painted as
+   streaks: the sniffer's moss, the armadillo's shell, the lion's mane. Not a pile of pads and
+   tufts: every pad edge is a chance for a thin line.
+7. **Thin parts are cut-out planes or thin cores** (antlers, fins, gills, whiskers, crests),
+   never boxes a texel thick.
+8. **Legs: one box with a painted dark hoof or paw band**; knee and hock boxes only where the bend
+   shows (big animals: Ronald asked for Drenkaun's).
+9. **Paint**: pale belly and throat; patterns running straight across box seams (the giraffe's
+   patches, the armadillo's bands); the strongest contrast only at eyes, nose and hooves.
+10. **Eyes**: ours stay the designed Hytale eyes; theirs agree on the structure (a pupil, a
+    highlight, a ring or white). Prey with eyes on the sides, hunters in front; expressions by
+    swapping lids or faces, not by animating pixels.
+11. **Idle**: a 3-8 s loop, the body nearly still, tail and ears moving a little, one event a
+    loop (an ear flick, a sniff), the head following what it looks at (the camel's 4 s idle).
+
 ## Workflow
 
 0. **Research the animal first** (web search and fetch), before laying out a single box, and
@@ -339,6 +376,8 @@ Animation
      for its boxes (what the fewest boxes that still read as the animal are). Hytale's creatures
      (screenshots, its blog, mods that show unused models): head size, eyes, which areas are white
      or recolorable. Vintage Story too when it has the animal.
+     The animal mods in `references.md` (Naturalist, Alex's Mobs...) when they have it: how a
+     modder fitted it to vanilla's look.
    - **What makes it recognizable**: ear shape, muzzle, markings (a tabby's M and stripes), eye
      color and pupil shape, tail carriage, typical poses (a cat sits upright with its tail around
      its paws, lies as a loaf).
