@@ -167,6 +167,9 @@ struct State {
     mini_zoom: usize,
     mini_painted: Option<(Instant, (i32, i32), i32)>,
     mini_shown: bool,
+    /// When M last closed the map: the same press reaches the world's binding once the screen is
+    /// gone, and must not open it again (PC look wm_look1).
+    closed_by_key: Option<Instant>,
 }
 
 static STATE: Mutex<State> = Mutex::new(State {
@@ -184,6 +187,7 @@ static STATE: Mutex<State> = Mutex::new(State {
     mini_zoom: n::MINI_ZOOM_START,
     mini_painted: None,
     mini_shown: false,
+    closed_by_key: None,
 });
 
 fn change(c: &ClientView, f: impl FnOnce(&mut State)) {
@@ -193,7 +197,16 @@ fn change(c: &ClientView, f: impl FnOnce(&mut State)) {
 
 pub fn register(r: &mut Registry) {
     r.key(&OPEN_KEY, "M").on_press_client(|c| {
-        STATE.lock().unwrap().from = None;
+        {
+            let mut s = STATE.lock().unwrap();
+            if s.closed_by_key
+                .take()
+                .is_some_and(|t| t.elapsed().as_secs_f32() < 0.3)
+            {
+                return;
+            }
+            s.from = None;
+        }
         open(c);
     });
     r.client_packet(&ATLAS, |c, bytes| {
@@ -248,7 +261,10 @@ pub fn register(r: &mut Registry) {
             "KeyZ" | "Minus" => change(c, |s| s.zoom = (s.zoom + 1).min(n::ZOOMS.len() - 1)),
             "KeyX" | "Equal" => change(c, |s| s.zoom = s.zoom.saturating_sub(1)),
             "KeyC" | "Home" => change(c, |s| s.pan = (0, 0)),
-            "KeyM" => c.client().screen_close(),
+            "KeyM" => {
+                STATE.lock().unwrap().closed_by_key = Some(Instant::now());
+                c.client().screen_close();
+            }
             _ => {}
         }
     });
