@@ -196,6 +196,14 @@ impl Client {
                 self.player.speed_mul = self.attributes[a::MOVEMENT_SPEED as usize] as f64;
                 self.player.jump_mul = self.attributes[a::JUMP_STRENGTH as usize] as f64;
                 self.player.can_sprint = self.attributes[a::CAN_SPRINT as usize] >= 1.0;
+                // Blocks a second to blocks a tick.
+                let at = |i: u32| self.attributes[i as usize] as f64 / crate::world::TPS as f64;
+                self.player.climb = at(a::CLIMB_SPEED);
+                self.player.glide = crate::physics::Glide {
+                    speed: at(a::GLIDE_SPEED),
+                    sink: at(a::GLIDE_SINK),
+                    wind: glam::DVec3::new(at(a::WIND_X), at(a::LIFT), at(a::WIND_Z)),
+                };
             }
             ToClient::BreakRefused { frame, pos } => {
                 self.refused_break = Some((frame, pos));

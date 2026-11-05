@@ -717,6 +717,7 @@ pub static LOOT_ROLLS: Component<u32> = Component::named(abi::comp::LOOT_ROLLS);
 pub static HARDNESS: Component<f32> = Component::named(abi::comp::HARDNESS);
 pub static FRICTION: Component<f32> = Component::named(abi::comp::FRICTION);
 pub static DRAG: Component<f32> = Component::named(abi::comp::DRAG);
+pub static GRIP: Component<f32> = Component::named(abi::comp::GRIP);
 pub static LIGHT: Component<[u8; 3]> = Component::named(abi::comp::LIGHT);
 pub static TINT: Component<TintRef> = Component::named(abi::comp::TINT);
 pub static TINT_FACES: Component<u8> = Component::named(abi::comp::TINT_FACES);
