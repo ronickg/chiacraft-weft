@@ -176,6 +176,23 @@ a trading post to a city with a spaceport.
 - You drop everything at the spot and run back for it, as in Ark or Valheim.
 - A world setting can soften it.
 
+### From the survival research (Ronald's picks, 11-06)
+
+`reports/Survival systems gap analysis.md` found the body, food, climate, season and animal
+systems already deeper than most survival games. The gaps are outside the body. Ronald picked:
+
+| Area | Systems |
+|---|---|
+| Exploring and travel | Glider, grapple and stamina climbing (the glider's range follows the day's wind); a map that fills where you walk, with waystones (ancient ley nodes you wake); learning by study (examining things fills the journal and opens recipes; the first finder names a species); puzzle ruins and pocket worlds that reset on a timer |
+| Danger | Raids drawn by progress (a boss kill, a new age, loud industry; never while offline, a world setting turns them off); seasonal giants and weather disasters with a forecast; darkness and dread (rises in the dark and deep, falls by fire, tames and ley nodes; never damage); light injuries and illness (off by default) |
+| Working the land | Fishing, nets and traps; hunting by wind and noise (prey smell you downwind, tracks lead to herds); power before steam (waterwheels, windmills, treadwheels) |
+| Building and people | A base heart (claim, tribe ranks, the raid target; upkeep only as a server option); boats, then carts and rails; settlers and traders with contracts |
+
+Not picked this round: timed trips for tames (tames still work, from the earlier answers). Skipped
+by the research: server wipes, full-loot PvP and offline raids, base decay by default, structural
+integrity, body-part injuries, damaging sanity monsters, a fishing minigame bar, underwater bases
+for now, tower defence as a mode.
+
 ## How it stays balanced when things are added
 
 Five rules, kept in code and checked by tests, so a new item, boss or branch can't quietly
