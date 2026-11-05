@@ -27,20 +27,20 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | pacu | *Piaractus mesopotamicus* | uncommon | small | 0.37 m | 4 kg | herd | omnivore | wild | eggs, hatch 0.06 d | 8.65 d | 57.5 d | 2-8 | 26 |
 | red_fox | *Vulpes vulpes* | common | small | 0.38 m | 5.5 kg | pack | carnivore | wild | 1.08 d | 3.5 d | 19.2 d | 2-7 | 24 |
 | arctic_fox | *Vulpes lagopus* | common | small | 0.38 m | 3.5 kg | pack | carnivore | wild | 1.08 d | 3.5 d | 19.2 d | 3-10 | 24 |
-| raven | *Corvus corax* | uncommon | small | 0.34 m | 1.2 kg | solitary | carnivore | wild | 0.53 d | 6.51 d | 46 d | 2-6 | 17 |
+| raven | *Corvus corax* | uncommon | small | 0.34 m | 1.2 kg | solitary | carnivore | wild | eggs, hatch 0.53 d | 6.51 d | 46 d | 2-6 | 17 |
 | protoceratops | *Protoceratops andrewsi* | common | medium | 0.6 m | 83 kg | herd | herbivore | wild | eggs, hatch 1.54 d | 6 d | 53.7 d | 3-8 | 20 |
 | kryptobaatar | *Kryptobaatar dashzevegi* | common | small | 0.05 m | 0.04 kg | solitary | omnivore | wild | 0.53 d | 3 d | 16 d | 1-5 | 30 |
 | priscagama | *Priscagama gobiensis* | common | small | 0.04 m | 0.03 kg | solitary | carnivore | wild | eggs, hatch 1.21 d | 4.01 d | 23 d | 2-6 | 24 |
 | reindeer | *Rangifer tarandus* | common | large | 1.05 m | 120 kg | herd | herbivore | wild | 3.31 d | 4.58 d | 46 d | 1 | 20 |
 | coyote | *Canis latrans* | common | medium | 0.61 m | 13 kg | pack | carnivore | wild | 1.25 d | 3.5 d | 23 d | 2-8 | 22 |
-| house_sparrow | *Passer domesticus* | common | small | 0.1 m | 0.03 kg | herd | omnivore | wild | 0.36 d | 2.75 d | 14 d | 2-6 | 30 |
-| snow_bunting | *Plectrophenax nivalis* | common | small | 0.1 m | 0.035 kg | herd | omnivore | wild | 0.37 d | 2.75 d | 14 d | 2-7 | 30 |
-| great_horned_owl | *Bubo virginianus* | uncommon | small | 0.45 m | 1.4 kg | solitary | carnivore | wild | 0.77 d | 6.51 d | 49.8 d | 1-3 | 16 |
-| snowy_owl | *Bubo scandiacus* | uncommon | small | 0.45 m | 2 kg | solitary | carnivore | wild | 0.75 d | 6.51 d | 38.3 d | 2-8 | 15 |
-| golden_eagle | *Aquila chrysaetos* | uncommon | medium | 0.6 m | 4.5 kg | solitary | carnivore | wild | 0.94 d | 8.33 d | 76.7 d | 1-3 | 13 |
-| savanna_hawk | *Buteogallus meridionalis* | common | small | 0.6 m | 0.85 kg | solitary | carnivore | wild | 0.87 d | 6.51 d | 46 d | 1 | 18 |
-| turkey_vulture | *Cathartes aura* | common | small | 0.5 m | 1.4 kg | herd | carnivore | wild | 0.89 d | 4.58 d | 61.3 d | 1-3 | 24 |
-| herring_gull | *Larus argentatus* | common | small | 0.45 m | 1 kg | herd | carnivore | wild | 0.7 d | 4.58 d | 46 d | 1-4 | 24 |
+| house_sparrow | *Passer domesticus* | common | small | 0.1 m | 0.03 kg | herd | omnivore | wild | eggs, hatch 0.36 d | 2.75 d | 14 d | 2-6 | 30 |
+| snow_bunting | *Plectrophenax nivalis* | common | small | 0.1 m | 0.035 kg | herd | omnivore | wild | eggs, hatch 0.37 d | 2.75 d | 14 d | 2-7 | 30 |
+| great_horned_owl | *Bubo virginianus* | uncommon | small | 0.45 m | 1.4 kg | solitary | carnivore | wild | eggs, hatch 0.77 d | 6.51 d | 49.8 d | 1-3 | 16 |
+| snowy_owl | *Bubo scandiacus* | uncommon | small | 0.45 m | 2 kg | solitary | carnivore | wild | eggs, hatch 0.75 d | 6.51 d | 38.3 d | 2-8 | 15 |
+| golden_eagle | *Aquila chrysaetos* | uncommon | medium | 0.6 m | 4.5 kg | solitary | carnivore | wild | eggs, hatch 0.94 d | 8.33 d | 76.7 d | 1-3 | 13 |
+| savanna_hawk | *Buteogallus meridionalis* | common | small | 0.6 m | 0.85 kg | solitary | carnivore | wild | eggs, hatch 0.87 d | 6.51 d | 46 d | 1 | 18 |
+| turkey_vulture | *Cathartes aura* | common | small | 0.5 m | 1.4 kg | herd | carnivore | wild | eggs, hatch 0.89 d | 4.58 d | 61.3 d | 1-3 | 24 |
+| herring_gull | *Larus argentatus* | common | small | 0.45 m | 1 kg | herd | carnivore | wild | eggs, hatch 0.7 d | 4.58 d | 46 d | 1-4 | 24 |
 | yacare_caiman | *Caiman yacare* | common | large | 2.2 m | 35 kg | herd | carnivore | wild | eggs, hatch 1.4 d | 6.25 d | 75 d | 4-8 | 26 |
 | spectacled_caiman | *Caiman crocodilus* | common | large | 2.2 m | 25 kg | herd | carnivore | wild | eggs, hatch 1.4 d | 6.25 d | 75 d | 4-8 | 26 |
 | grey_wolf | *Canis lupus* | uncommon | medium | 0.8 m | 42 kg | pack | carnivore | passive | 1.25 d | 6.07 d | 46 d | 2-8 | 16 |
@@ -53,8 +53,8 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | iguanodont | *Iguanacolossus fortis* | common | large | 2.2 m | 4000 kg | herd | herbivore | wild | eggs, hatch 1.9 d | 6 d | 115 d | 1-3 | 12 |
 | crocodyliform | *Neosuchia indet.* | uncommon | large | 2.2 m | 150 kg | solitary | carnivore | wild | eggs, hatch 1.5 d | 6.25 d | 75 d | 4-8 | 20 |
 | citipati | *Citipati osmolskae* | common | medium | 0.9 m | 90 kg | solitary | herbivore | wild | eggs, hatch 1.36 d | 6 d | 57.5 d | 2-6 | 18 |
-| confuciusornis | *Confuciusornis sanctus* | common | small | 0.3 m | 0.5 kg | herd | omnivore | wild | 0.7 d | 4.58 d | 38.3 d | 1-4 | 24 |
-| gobipteryx | *Gobipteryx minuta* | uncommon | small | 0.3 m | 0.3 kg | herd | omnivore | wild | 0.7 d | 6.25 d | 38.3 d | 1-4 | 24 |
+| confuciusornis | *Confuciusornis sanctus* | common | small | 0.3 m | 0.5 kg | herd | omnivore | wild | eggs, hatch 0.41 d | 4.58 d | 38.3 d | 1-4 | 24 |
+| gobipteryx | *Gobipteryx minuta* | uncommon | small | 0.3 m | 0.3 kg | herd | omnivore | wild | eggs, hatch 0.41 d | 6.25 d | 38.3 d | 1-4 | 24 |
 | cedarosaurus | *Cedarosaurus weiskopfae* | uncommon | large | 4.1 m | 10000 kg | herd | herbivore | wild | eggs, hatch 2.03 d | 6.67 d | 153.3 d | 1-2 | 10 |
 
 ## Stats at level 1
@@ -1231,7 +1231,8 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | Life | real | in the game |
 |---|---|---|
 | mass | 1.2 kg | |
-| carries her young | 0 d | 0.53 d **set** |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 20 d | 0.53 d |
 | litter or clutch | 4.5 on average | 2-6 |
 | between litters | 1 y | rests 5.07 d |
 | breeds in | spring | out of it, only a tame well cared for |
@@ -1240,11 +1241,11 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | lives | 12 y | 46 d, give or take a fifth; an elder from 80% of it |
 | lives in | solitary | room for 17 within 48 blocks |
 
-**Balance** (uncommon): a generation 7.6 d; a line four deep in 23 d (8 h of play); 7.1 young per mother in 10 days, 22 in her life.
+**Balance** (uncommon): a generation 7.3 d; a line four deep in 22 d (7 h of play); 7.5 young per mother in 10 days, 23 in her life.
 
-- ✓ fourth generation: 22.7 days (want 20-40 days (uncommon))
+- ✓ fourth generation: 21.9 days (want 20-40 days (uncommon))
 - ✓ grown most of its life: grows 6.5 of 46 days (want under a fifth)
-- ✓ young in a life: 21.6 (want 6-40)
+- ✓ young in a life: 22.8 (want 6-40)
 - ✓ litter: 2-6 (want 1-12, fewest first)
 - ✓ room near: 17 (want 3-30)
 
@@ -1598,7 +1599,8 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | Life | real | in the game |
 |---|---|---|
 | mass | 0.03 kg | |
-| carries her young | 0 d | 0.36 d **set** |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 12 d | 0.36 d |
 | litter or clutch | 4.5 on average | 2-6 |
 | between litters | 100 d | rests 1.39 d |
 | breeds in | spring and summer, most in spring | out of it, only a tame well cared for |
@@ -1607,11 +1609,11 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | lives | 3 y | 14 d **set**, give or take a fifth; an elder from 80% of it |
 | lives in | herd | room for 30 **set** within 48 blocks |
 
-**Balance** (common): a generation 3.5 d; a line four deep in 10 d (3 h of play); 22.8 young per mother in 10 days, 19 in her life.
+**Balance** (common): a generation 3.4 d; a line four deep in 10 d (3 h of play); 24.4 young per mother in 10 days, 21 in her life.
 
-- ✓ fourth generation: 10.4 days (want 10-25 days (common))
+- ✓ fourth generation: 10.1 days (want 10-25 days (common))
 - ✓ grown most of its life: grows 2.8 of 14 days (want under a fifth)
-- ✓ young in a life: 19.3 (want 6-40)
+- ✓ young in a life: 20.6 (want 6-40)
 - ✓ litter: 2-6 (want 1-12, fewest first)
 - ✓ room near: 30 (want 3-30)
 
@@ -1659,7 +1661,8 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | Life | real | in the game |
 |---|---|---|
 | mass | 0.035 kg | |
-| carries her young | 0 d | 0.37 d **set** |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 12 d | 0.37 d |
 | litter or clutch | 5 on average | 2-7 |
 | between litters | 1 y | rests 2.5 d **set** |
 | breeds in | summer | out of it, only a tame well cared for |
@@ -1668,11 +1671,11 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | lives | 3 y | 14 d **set**, give or take a fifth; an elder from 80% of it |
 | lives in | herd | room for 30 **set** within 48 blocks |
 
-**Balance** (common): a generation 3.5 d; a line four deep in 10 d (3 h of play); 15.7 young per mother in 10 days, 13 in her life.
+**Balance** (common): a generation 3.4 d; a line four deep in 10 d (3 h of play); 16.4 young per mother in 10 days, 14 in her life.
 
-- ✓ fourth generation: 10.5 days (want 10-25 days (common))
+- ✓ fourth generation: 10.1 days (want 10-25 days (common))
 - ✓ grown most of its life: grows 2.8 of 14 days (want under a fifth)
-- ✓ young in a life: 13.2 (want 6-40)
+- ✓ young in a life: 13.8 (want 6-40)
 - ✓ litter: 2-7 (want 1-12, fewest first)
 - ✓ room near: 30 (want 3-30)
 
@@ -1726,7 +1729,8 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | Life | real | in the game |
 |---|---|---|
 | mass | 1.4 kg | |
-| carries her young | 0 d | 0.77 d **set** |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 33 d | 0.77 d |
 | litter or clutch | 2 on average | 1-3 |
 | between litters | 1 y | rests 5.07 d |
 | breeds in | winter | out of it, only a tame well cared for |
@@ -1735,11 +1739,11 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | lives | 13 y | 49.8 d, give or take a fifth; an elder from 80% of it |
 | lives in | solitary | room for 16 within 48 blocks |
 
-**Balance** (uncommon): a generation 8.1 d; a line four deep in 24 d (8 h of play); 3.4 young per mother in 10 days, 11 in her life.
+**Balance** (uncommon): a generation 7.5 d; a line four deep in 23 d (8 h of play); 3.8 young per mother in 10 days, 13 in her life.
 
-- ✓ fourth generation: 24.2 days (want 20-40 days (uncommon))
+- ✓ fourth generation: 22.6 days (want 20-40 days (uncommon))
 - ✓ grown most of its life: grows 6.5 of 50 days (want under a fifth)
-- ✓ young in a life: 11.4 (want 6-40)
+- ✓ young in a life: 12.5 (want 6-40)
 - ✓ litter: 1-3 (want 1-12, fewest first)
 - ✓ room near: 16 (want 3-30)
 
@@ -1787,7 +1791,8 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | Life | real | in the game |
 |---|---|---|
 | mass | 2 kg | |
-| carries her young | 0 d | 0.75 d **set** |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 32 d | 0.75 d |
 | litter or clutch | 6 on average | 2-8 |
 | between litters | 1 y | rests 5.07 d |
 | breeds in | spring | out of it, only a tame well cared for |
@@ -1796,11 +1801,11 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | lives | 10 y | 38.3 d, give or take a fifth; an elder from 80% of it |
 | lives in | solitary | room for 15 within 48 blocks |
 
-**Balance** (uncommon): a generation 8 d; a line four deep in 24 d (8 h of play); 8.6 young per mother in 10 days, 21 in her life.
+**Balance** (uncommon): a generation 7.5 d; a line four deep in 23 d (8 h of play); 9.4 young per mother in 10 days, 23 in her life.
 
-- ✓ fourth generation: 24.1 days (want 20-40 days (uncommon))
+- ✓ fourth generation: 22.6 days (want 20-40 days (uncommon))
 - ✓ grown most of its life: grows 6.5 of 38 days (want under a fifth)
-- ✓ young in a life: 20.7 (want 6-40)
+- ✓ young in a life: 22.7 (want 6-40)
 - ✓ litter: 2-8 (want 1-12, fewest first)
 - ✓ room near: 15 (want 3-30)
 
@@ -1853,7 +1858,8 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | Life | real | in the game |
 |---|---|---|
 | mass | 4.5 kg | |
-| carries her young | 0 d | 0.94 d **set** |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 43 d | 0.94 d |
 | litter or clutch | 2 on average | 1-3 |
 | between litters | 1 y | rests 5.07 d |
 | breeds in | spring | out of it, only a tame well cared for |
@@ -1862,11 +1868,11 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | lives | 20 y | 76.7 d, give or take a fifth; an elder from 80% of it |
 | lives in | solitary | room for 13 within 48 blocks |
 
-**Balance** (uncommon): a generation 10.2 d; a line four deep in 31 d (10 h of play); 3.3 young per mother in 10 days, 18 in her life.
+**Balance** (uncommon): a generation 9.5 d; a line four deep in 29 d (10 h of play); 3.8 young per mother in 10 days, 20 in her life.
 
-- ✓ fourth generation: 30.6 days (want 20-40 days (uncommon))
+- ✓ fourth generation: 28.6 days (want 20-40 days (uncommon))
 - ✓ grown most of its life: grows 8.3 of 77 days (want under a fifth)
-- ✓ young in a life: 17.6 (want 6-40)
+- ✓ young in a life: 19.9 (want 6-40)
 - ✓ litter: 1-3 (want 1-12, fewest first)
 - ✓ room near: 13 (want 3-30)
 
@@ -1913,7 +1919,8 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | Life | real | in the game |
 |---|---|---|
 | mass | 0.85 kg | |
-| carries her young | 0 d | 0.87 d **set** |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 39 d | 0.87 d |
 | litter or clutch | 1 on average | 1 |
 | between litters | 1 y | rests 2.5 d **set** |
 | breeds in | winter | out of it, only a tame well cared for |
@@ -1922,11 +1929,11 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | lives | 12 y | 46 d, give or take a fifth; an elder from 80% of it |
 | lives in | solitary | room for 18 within 48 blocks |
 
-**Balance** (common): a generation 8.3 d; a line four deep in 25 d (8 h of play); 3 young per mother in 10 days, 9 in her life.
+**Balance** (common): a generation 7.6 d; a line four deep in 23 d (8 h of play); 3.6 young per mother in 10 days, 11 in her life.
 
-- ✓ fourth generation: 24.8 days (want 10-25 days (common))
+- ✓ fourth generation: 22.9 days (want 10-25 days (common))
 - ✓ grown most of its life: grows 6.5 of 46 days (want under a fifth)
-- ✓ young in a life: 9.0 (want 6-40)
+- ✓ young in a life: 11.0 (want 6-40)
 - ✓ litter: 1-1 (want 1-12, fewest first)
 - ✓ room near: 18 (want 3-30)
 
@@ -1978,7 +1985,8 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | Life | real | in the game |
 |---|---|---|
 | mass | 1.4 kg | |
-| carries her young | 0 d | 0.89 d **set** |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 40 d | 0.89 d |
 | litter or clutch | 2 on average | 1-3 |
 | between litters | 1 y | rests 3.33 d **set** |
 | breeds in | spring | out of it, only a tame well cared for |
@@ -1987,11 +1995,11 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | lives | 16 y | 61.3 d, give or take a fifth; an elder from 80% of it |
 | lives in | herd | room for 24 **set** within 48 blocks |
 
-**Balance** (common): a generation 6.4 d; a line four deep in 19 d (6 h of play); 4.7 young per mother in 10 days, 21 in her life.
+**Balance** (common): a generation 5.7 d; a line four deep in 17 d (6 h of play); 5.6 young per mother in 10 days, 25 in her life.
 
-- ✓ fourth generation: 19.1 days (want 10-25 days (common))
+- ✓ fourth generation: 17.2 days (want 10-25 days (common))
 - ✓ grown most of its life: grows 4.6 of 61 days (want under a fifth)
-- ✓ young in a life: 21.1 (want 6-40)
+- ✓ young in a life: 24.8 (want 6-40)
 - ✓ litter: 1-3 (want 1-12, fewest first)
 - ✓ room near: 24 (want 3-30)
 
@@ -2039,7 +2047,8 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | Life | real | in the game |
 |---|---|---|
 | mass | 1 kg | |
-| carries her young | 0 d | 0.7 d **set** |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 29 d | 0.7 d |
 | litter or clutch | 3 on average | 1-4 |
 | between litters | 1 y | rests 5.07 d |
 | breeds in | spring | out of it, only a tame well cared for |
@@ -2048,11 +2057,11 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | lives | 12 y | 46 d, give or take a fifth; an elder from 80% of it |
 | lives in | herd | room for 24 **set** within 48 blocks |
 
-**Balance** (common): a generation 6 d; a line four deep in 18 d (6 h of play); 4.3 young per mother in 10 days, 14 in her life.
+**Balance** (common): a generation 5.5 d; a line four deep in 17 d (6 h of play); 4.7 young per mother in 10 days, 15 in her life.
 
-- ✓ fourth generation: 17.9 days (want 10-25 days (common))
+- ✓ fourth generation: 16.6 days (want 10-25 days (common))
 - ✓ grown most of its life: grows 4.6 of 46 days (want under a fifth)
-- ✓ young in a life: 13.9 (want 6-40)
+- ✓ young in a life: 15.1 (want 6-40)
 - ✓ litter: 1-4 (want 1-12, fewest first)
 - ✓ room near: 24 (want 3-30)
 
@@ -2835,7 +2844,8 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | Life | real | in the game |
 |---|---|---|
 | mass | 0.5 kg | |
-| carries her young | 0 d | 0.7 d **set** |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 14 d | 0.41 d |
 | litter or clutch | 3 on average | 1-4 |
 | between litters | 1 y | rests 5.07 d |
 | breeds in | the wet season | out of it, only a tame well cared for |
@@ -2844,11 +2854,11 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | lives | 10 y | 38.3 d, give or take a fifth; an elder from 80% of it |
 | lives in | herd | room for 24 **set** within 48 blocks |
 
-**Balance** (common): a generation 5.7 d; a line four deep in 17 d (6 h of play); 4.3 young per mother in 10 days, 11 in her life.
+**Balance** (common): a generation 5.2 d; a line four deep in 16 d (5 h of play); 4.7 young per mother in 10 days, 12 in her life.
 
-- ✓ fourth generation: 17.1 days (want 10-25 days (common))
+- ✓ fourth generation: 15.7 days (want 10-25 days (common))
 - ✓ grown most of its life: grows 4.6 of 38 days (want under a fifth)
-- ✓ young in a life: 11.3 (want 6-40)
+- ✓ young in a life: 12.2 (want 6-40)
 - ✓ litter: 1-4 (want 1-12, fewest first)
 - ✓ room near: 24 (want 3-30)
 
@@ -2895,7 +2905,8 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn 
 | Life | real | in the game |
 |---|---|---|
 | mass | 0.3 kg | |
-| carries her young | 0 d | 0.7 d **set** |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 14 d | 0.41 d |
 | litter or clutch | 3 on average | 1-4 |
 | between litters | 1 y | rests 5.07 d |
 | breeds in | the wet season | out of it, only a tame well cared for |
@@ -2904,11 +2915,11 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn 
 | lives | 10 y | 38.3 d, give or take a fifth; an elder from 80% of it |
 | lives in | herd | room for 24 **set** within 48 blocks |
 
-**Balance** (uncommon): a generation 7.4 d; a line four deep in 22 d (7 h of play); 4.3 young per mother in 10 days, 11 in her life.
+**Balance** (uncommon): a generation 6.9 d; a line four deep in 21 d (7 h of play); 4.7 young per mother in 10 days, 11 in her life.
 
-- ✓ fourth generation: 22.1 days (want 20-40 days (uncommon))
+- ✓ fourth generation: 20.7 days (want 20-40 days (uncommon))
 - ✓ grown most of its life: grows 6.2 of 38 days (want under a fifth)
-- ✓ young in a life: 10.6 (want 6-40)
+- ✓ young in a life: 11.5 (want 6-40)
 - ✓ litter: 1-4 (want 1-12, fewest first)
 - ✓ room near: 24 (want 3-30)
 

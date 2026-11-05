@@ -472,7 +472,11 @@ fn deliver(w: &World, id: u64, index: usize, b: &Breeding) {
             clutch.push(y);
         }
     }
-    crate::eggs::lay(w, st.pos.to_array(), &clutch, owner);
+    if animals_core::nests::site(s.name).is_some() {
+        crate::eggs::lay_in_nest(w, index, id, st.pos.to_array(), &clutch, owner);
+    } else {
+        crate::eggs::lay(w, st.pos.to_array(), &clutch, owner);
+    }
     hearts(w, id, 9);
     let what = if s.gestation() > 0 { "young born" } else { "eggs laid" };
     weft_sdk::info!("animal {id}: {n} {what}");

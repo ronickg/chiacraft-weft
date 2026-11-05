@@ -1217,3 +1217,14 @@ Plants' herd run (`herd_sav_wi`: six capybaras at 10% food in a winter savanna) 
 - **The others were alive:** the census and entity lines count only within 48 blocks. The testkit's full entity list still held all five at 13 minutes, foraging farther out at 74-85% strength.
 
 Herd scripts should spawn on the ground and count a wider ring, or list every entity.
+
+## Nests for the birds (2026-11-05)
+
+Birds now lay eggs in nests. Before this, their young came out as fledglings after the eggs' time, with no eggs at all (a gestation tune). Each bird builds its nest at its kind of site (`animals_core::nests::SITES`):
+- **Treetops:** the raven, the house sparrow, the great horned owl (which takes old nests in trees), the savanna hawk, and Confuciusornis (estimated).
+- **A high bare ledge, or failing that a treetop:** the golden eagle.
+- **The ground:** the snow bunting (crevices), the snowy owl (a scrape on a mound), the turkey vulture (a cave floor), the herring gull, and Gobipteryx (its eggs were found half buried in sand).
+
+When she lays (`eggs::lay_in_nest`), she looks 12 blocks around her for the highest open leaves or ledge, and uses the ground under her if there's none. A bird's nest is brooded (`life::egg_air_of`): its eggs are held at a sitting parent's 37 °C whatever the air, so a snowy owl's clutch hatches in the tundra. Before, a nest only pulled the air 60% of the way toward 37 °C. The young hatch in the nest.
+
+Not yet: a parent seen sitting on the nest, and egg eaters raiding wild nests.

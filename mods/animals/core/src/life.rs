@@ -228,6 +228,12 @@ pub fn egg_air(air: f32, nest: bool) -> f32 {
     if nest { air + (BROODING - air) * NEST_HOLDS } else { air }
 }
 
+/// The air at an egg in `air`: in a brooded nest (a bird's, `nests::site`) a sitting parent's
+/// whatever the air, else as `egg_air`.
+pub fn egg_air_of(air: f32, nest: bool, brooded: bool) -> f32 {
+    if nest && brooded { BROODING } else { egg_air(air, nest) }
+}
+
 /// Whether an egg develops in that air (`egg_air`).
 pub fn develops(egg_air: f32) -> bool {
     (EGG_AIR.0..=EGG_AIR.1).contains(&egg_air)

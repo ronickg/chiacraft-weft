@@ -10,6 +10,10 @@
 //! ones of its kind near by go for the thief; placed again (on a nest, or anywhere), it hatches
 //! into a young that is the placer's: taming by raising. A tamed mother lays into a nest within
 //! eight blocks if there is one.
+//!
+//! Birds (`animals_core::nests`) build their nest at their kind of site when they lay
+//! (`lay_in_nest`): on a treetop's leaves, a high bare ledge, or the ground, and brood it: in a
+//! bird's nest the eggs are held at a parent's warmth whatever the air, as a sitting bird does.
 
 use std::sync::OnceLock;
 
@@ -54,6 +58,7 @@ pub static EGG_ENTITY: EntityKind = EntityKind::named("egg");
 pub static NEST: EntityKind = EntityKind::named("nest");
 static NEST_ITEM: Item = Item::named("nest");
 static AIR: Block = Block::named("core:air");
+static LEAVES: Tag = Tag::named("base:leaves");
 static TOOLS: CreativeTab = CreativeTab::named("base:tools");
 static CRAFTING: RecipeKind = RecipeKind::named("base:crafting");
 /// Each laying species' egg item, by its row in `SPECIES` (made once).
@@ -285,6 +290,86 @@ pub fn lay(w: &World, at: [f64; 3], young: &[Young], owner: Option<[u8; 64]>) {
     }
 }
 
+/// Mother `mother` of bird species `index` lays `young` (`breeding::deliver`): a nest built at her
+/// kind of site near `at` (`nests::Site`; the ground under her where there's none, or where one
+/// is built already), the clutch laid in it.
+pub fn lay_in_nest(w: &World, index: usize, mother: u64, at: [f64; 3], young: &[Young], owner: Option<[u8; 64]>) {
+    let s = &SPECIES[index];
+    let site = animals_core::nests::site(s.name);
+    let ground = ground_under(w, at);
+    let spot = site
+        .and_then(|k| nest_site(w, k, at, ground))
+        .unwrap_or(ground);
+    if nest_near(w, spot, 1.0).is_none() {
+        let nest = w.spawn(&NEST, spot);
+        if nest_size(index) > 1.0 {
+            w.set_scale(nest, nest_size(index));
+        }
+    }
+    lay(w, spot, young, owner);
+    let at = spot.map(|v| v.floor() as i32);
+    weft_sdk::info!("{} {mother} nested at {at:?} ({site:?}): {} eggs", s.kind_name(), young.len());
+}
+
+/// Where a nest of `site` goes near `at` (`ground` under it): the highest open treetop leaves,
+/// or for a cliff nester the highest bare ledge `CLIFF_ABOVE` over the ground (else a treetop);
+/// `None` for the ground or when nothing is near.
+fn nest_site(w: &World, site: animals_core::nests::Site, at: [f64; 3], ground: [f64; 3]) -> Option<[f64; 3]> {
+    use animals_core::nests::{CLIFF_ABOVE, LOOK, LOOK_DOWN, LOOK_UP, Site};
+    let feet = at.map(|v| v.floor() as i32);
+    let floor = ground[1] as i32;
+    let (mut tree, mut cliff): (Option<[i32; 3]>, Option<[i32; 3]>) = (None, None);
+    // The higher, and of two as high the nearer.
+    let better = |old: Option<[i32; 3]>, new: [i32; 3]| {
+        let d = |p: [i32; 3]| (p[0] - feet[0]).pow(2) + (p[2] - feet[2]).pow(2);
+        old.is_none_or(|o| new[1] > o[1] || (new[1] == o[1] && d(new) < d(o)))
+    };
+    for dx in -LOOK..=LOOK {
+        for dz in -LOOK..=LOOK {
+            let (x, z) = (feet[0] + dx, feet[2] + dz);
+            // The column's top within reach: the first block down from above.
+            let Some(y) = (feet[1] - LOOK_DOWN..=feet[1] + LOOK_UP)
+                .rev()
+                .find(|&y| w.block([x, y, z]) != AIR.id())
+            else {
+                continue;
+            };
+            if w.block([x, y + 1, z]) != AIR.id() || w.block([x, y + 2, z]) != AIR.id() {
+                continue;
+            }
+            let b = w.block([x, y, z]);
+            let top = [x, y + 1, z];
+            if LEAVES.on_block(b) {
+                if better(tree, top) {
+                    tree = Some(top);
+                }
+            } else if site == Site::Cliff
+                && y + 1 >= floor + CLIFF_ABOVE
+                && weft_sdk::block_info(b).is_some_and(|i| i.solid())
+                && better(cliff, top)
+            {
+                cliff = Some(top);
+            }
+        }
+    }
+    let pick = match site {
+        Site::Ground => None,
+        Site::Tree => tree,
+        Site::Cliff => cliff.or(tree),
+    }?;
+    Some([pick[0] as f64 + 0.5, pick[1] as f64, pick[2] as f64 + 0.5])
+}
+
+/// The ground under `at`: down through the air to the first block (at most 64 down).
+fn ground_under(w: &World, at: [f64; 3]) -> [f64; 3] {
+    let p = at.map(|v| v.floor() as i32);
+    let y = (p[1] - 64..=p[1])
+        .rev()
+        .find(|&y| w.block([p[0], y - 1, p[2]]) != AIR.id())
+        .unwrap_or(p[1]);
+    [p[0] as f64 + 0.5, y as f64, p[2] as f64 + 0.5]
+}
+
 /// An egg put down at `at`: resting on the ground (`egg_rest`), leaning (its model leans forward)
 /// with its top toward the nest's middle, or any way outside a nest.
 fn spawn_egg(w: &World, at: [f64; 3], egg: &Egg, owner: Option<[u8; 64]>) -> u64 {
@@ -392,7 +477,9 @@ fn incubate(w: &World, id: u64, st: &EntityState) -> bool {
     let nest = in_nest(w, st.pos.to_array());
     // The air itself: wind chill is what a body loses, and an egg never falls below the air (B5).
     let air = base_api::air_at(w, st.pos.to_array(), 0.3, st.in_liquid != 0, vitals::temperature::FIRE_REACH, |_| {}).still;
-    let step = match life::develops(life::egg_air(air, nest)) {
+    // A bird's nest is brooded: held at a sitting parent's warmth.
+    let brooded = animals_core::nests::site(SPECIES[index].name).is_some();
+    let step = match life::develops(life::egg_air_of(air, nest, brooded)) {
         false => 0,
         true if nest => 40,
         true => 20,

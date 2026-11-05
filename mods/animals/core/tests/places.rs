@@ -89,7 +89,9 @@ fn eggs_hatch_where_and_when_they_are_laid() {
         for season in (0..4).filter(|i| when >> i & 1 != 0) {
             for &(biome, _) in s.habitats {
                 let Some(c) = climate::of(biome) else { continue };
-                let cold = share(c, 1 << season, |a| !life::develops(life::egg_air(a, true)));
+                // A bird's nest is brooded (`nests`): its eggs develop whatever the air.
+                let brooded = animals_core::nests::site(s.name).is_some();
+                let cold = share(c, 1 << season, |a| !life::develops(life::egg_air_of(a, true, brooded)));
                 if cold > 0.5 {
                     problems.push(format!(
                         "{}: eggs in a nest in {biome} develop only {:.0}% of the day in season {season} (its breeding season, biology.rs): life::EGG_AIR {:?} against the biome's climate",

@@ -4,8 +4,8 @@
 //! the ground a bird walks or hops about, foraging, and a hunter or a scavenger takes what it can
 //! (`hunt::hunt`); a walker or a hunter near, or just now and then, it takes off (`fly`): up a few
 //! blocks, a stretch through the air with its wings open (its flying model, a look of its own),
-//! and down again somewhere else. No nests yet (Ronald, 2026-11-03): their young come out as
-//! fledglings (`Tune::gestation` in their rows).
+//! and down again somewhere else. They lay in nests at their kind of site (`eggs::lay_in_nest`,
+//! `animals_core::nests`), and their young hatch there.
 
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
