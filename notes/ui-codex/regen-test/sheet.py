@@ -200,10 +200,11 @@ for g, G in GROUPS.items():
     blocks = g == "blocks"
     nr = len(RUNS)
     cell = 336 if blocks or g == "guides3" else 230
-    W = 170 + (nr + 1) * cell + (0 if blocks else 230) + 200 + 540
+    has_third = g in ("armour", "tools")
+    W = 170 + (nr + 1 + has_third) * cell + 180 + 560
     rowh = (200 if blocks or g == "guides3" else 144) + 40 + (30 if nr > 2 else 0)
     X = [24] + [170 + i * cell for i in range(nr + 2)]
-    gen_x = X[nr + 2] if blocks else X[nr + 2] + 0
+    gen_x = X[nr + 2] + (cell if has_third else 0)
     note_x = None
     H = 500 + len(G["rows"]) * rowh + (5 * 90 + 60 if "set_row" in G else 0)
     im = Image.new("RGBA", (W, H), BG + (255,))
@@ -235,8 +236,6 @@ for g, G in GROUPS.items():
         heads.append("11-04 / on the tool" if g == "tools" else ("approved 11-04" if g == "armour" else ""))
     for cx, t in zip(X, heads):
         d.text((cx, y), t, font=bold, fill=GOLD)
-    gen_x = X[nr + 2] if blocks or g == "guides3" else X[nr + 2]
-    gen_x = gen_x if blocks or g == "guides3" else X[nr + 1] + cell
     d.text((gen_x, y), "as generated", font=bold, fill=GOLD)
     note_x = gen_x + 170
     d.text((note_x, y), "what changed", font=bold, fill=GOLD)
