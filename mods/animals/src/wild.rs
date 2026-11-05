@@ -36,6 +36,8 @@ value! {
         pub rest: u32,
         /// Whether the resting look is on.
         pub resting: bool,
+        /// Ticks rested so far.
+        pub rested: u32,
     }
 }
 
@@ -125,14 +127,26 @@ fn settle(w: &World, id: u64, st: &EntityState, look: &str) -> bool {
     }
     let resting = c.rest > 0;
     if resting {
-        c.rest = c.rest.saturating_sub(w.tick_elapsed(id) as _);
+        let e = w.tick_elapsed(id);
+        c.rest = c.rest.saturating_sub(e as _);
+        c.rested = c.rested.saturating_add(e);
     }
+    let rested = c.rested;
     if c.resting != resting {
         c.resting = resting;
+        c.rested = 0;
         w.set_appearance(id, resting.then(|| format!("animals:{look}")).as_deref());
+        if !resting {
+            // Rested enough: up, and a stretch.
+            crate::anim::clear(w, id);
+            crate::anim::act(w, id, crate::anim::Act::Stretch);
+        }
     }
     if resting && w.navigating(id) {
         w.navigate(id, st.pos, 0.0);
+    }
+    if resting && animals_core::routines::asleep(crate::routines::activity_of(w, id), rested) {
+        crate::anim::hold(w, id, crate::anim::Act::Sleep);
     }
     resting
 }
@@ -151,5 +165,7 @@ pub fn wake(w: &World, id: u64) {
         c.rest = 0;
         c.resting = false;
         w.set_appearance(id, None);
+        // Up at once (scared, hurt): no stretch, and not asleep standing.
+        crate::anim::clear(w, id);
     }
 }

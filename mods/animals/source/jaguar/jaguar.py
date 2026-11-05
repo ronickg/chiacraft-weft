@@ -676,8 +676,19 @@ def pose_bite(t):
 
 BLINKS = {"idle": [1.2], "sit": [1.8], "lie": [1.0, 3.0], "roar": [0.4]}
 BLINK = 0.09
+# The behaviour clips (`mods/animals/src/anim.rs`), the canids' (`../_clips/canid.py`) on a cat's
+# body: the same rig, and an ambusher's stalk is the one the creature AI calls (`hunt::chase`).
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_clips"))
+import canid  # noqa: E402
+
+# A cat's body: its chest and hips poke at any sideways turn of the spine, its thick neck out of
+# its chest past 85 degrees down, and its tail root out of the hips raised far (ground.pokes).
+canid.bind(sys.modules[__name__], scratch=0.4, neck=0.7, bend=0.7, lift=0.7, wag=0.6, twist=0, neck_max=85)
+
 ANIMS = {"idle": (pose_idle, 3.0), "walk": (pose_walk, 0.9), "run": (pose_run, 0.5), "sit": (pose_sit, 3.0),
          "lie": (pose_lie, 4.0), "roar": (pose_roar, 1.6), "swipe": (pose_swipe, 0.6), "bite": (pose_bite, 0.5)}
+ANIMS.update(canid.anims())
+LOOPS, BLENDS = canid.LOOPS, canid.BLENDS
 
 
 def eyelids(name, t):
@@ -686,7 +697,7 @@ def eyelids(name, t):
 
 
 def frame_times(name, dur):
-    n = 24 if name in ("roar", "swipe", "bite") else (12 if dur < 1 else 16)
+    n = 24 if name in ("roar", "swipe", "bite") else canid.FRAMES.get(name, 12 if dur < 1 else 16 if name in ("idle", "walk", "run", "sit", "lie") else 24)
     ts = {round(dur * k / n, 4) for k in range(n + 1)}
     for b in BLINKS.get(name, []):
         ts |= {round(b + d, 4) for d in (-BLINK, -BLINK / 2, 0, BLINK / 2, BLINK)}
@@ -697,13 +708,16 @@ def animations(bone_names):
     out = {}
     for name, (fn, dur) in ANIMS.items():
         frames = []
+        loops = LOOPS.get(name, name in ("idle", "walk", "run", "sit", "lie"))
         for t in frame_times(name, dur):
-            tt = t % dur if t < dur else 0.0
+            # A loop's last frame is its first; a clip played once ends where it ends.
+            tt = t % dur if t < dur else (0.0 if loops is True else dur)
             pose = fn(tt)
-            pose.update(eyelids(name, tt))
+            if name not in canid.SHUT:
+                pose.update(eyelids(name, tt))
             frames.append({"t": round(t, 4), "rot": {b: [round(float(v), 4) for v in pose.get(b, (0, 0, 0))] for b in bone_names if b != "root"},
                            "root": [round(float(v), 4) for v in pose.get("root", (0, 0, 0))]})
-        out[name] = {"length": dur, "frames": frames}
+        out[name] = {"length": dur, "frames": frames, "loop": loops, "blend": BLENDS.get(name, (0.25, 0.3))}
     return out
 
 
@@ -781,6 +795,8 @@ def fit_poses(spec):
     best = fit(grid, lambda P: lie_cost(dict(L, **P, lie_drop=0)))[1]
     P = dict(L, **best, lie_drop=0)
     L.update(best, lie_drop=round(min(v for k, v in low(pose_lie, P).items() if k != "tail"), 2))
+    # Head down to the ground (sniffing, drinking) and the death fall (`canid.fit`).
+    canid.fit(spec, dict(GROUPS, head=lambda n: n in ("skull", "muzzle", "jaw", "nose")))
     L["sit_tail"] = rest_tail(spec, pose_sit, "sit")
     L["lie_tail"] = rest_tail(spec, pose_lie, "lie")
     for key, fn in (("sit", pose_sit), ("lie", pose_lie)):
