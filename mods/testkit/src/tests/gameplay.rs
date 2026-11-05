@@ -1177,9 +1177,11 @@ pub async fn block_shapes(t: T) -> R {
     t.check(t.block(cell).await?.contains("type=double"), format!("the second one joins it: {}", t.block(cell).await?));
     t.check_eq(t.slot("me", 0).await?.1, before - 1, "and is used up");
 
-    // Breaking it gives back both.
-    t.op(&format!("break {}", at(cell))).await?;
+    // Breaking it gives back both. Standing under it first: what a player breaks drops at their
+    // feet (chiacraft's `drop_mined`), Weft's at the block; either way it lands here.
     t.c().teleport(centre(cell, 0.5, -1.0, 0.5));
+    t.secs(0.3).await?;
+    t.op(&format!("break {}", at(cell))).await?;
     t.secs(1.5).await?;
     t.check_eq(t.slot("me", 0).await?.1, before + 1, "both come back");
     t.c().teleport(centre(f, 0.0, 0.0, 0.0));
@@ -1258,9 +1260,11 @@ pub async fn block_shapes(t: T) -> R {
     t.c().teleport(centre(mix, 0.5, 0.0, 2.4));
     t.secs(0.3).await?;
     // Each part by what it asks of the tool, as it would on its own: sandstone wants a pickaxe.
+    // Standing right beside it, where it drops either way, as above.
+    t.c().teleport(centre(mix, 0.5, 0.0, 1.3));
+    t.secs(0.3).await?;
     t.op(&format!("break {} base:iron_pickaxe", at(mix)))
         .await?;
-    t.c().teleport(centre(mix, 0.5, 0.0, 0.5));
     t.secs(1.5).await?;
     t.check_eq(t.slot("me", 2).await?.1, 8, "it gives back the one");
     let inv = t.op("inv me").await?;

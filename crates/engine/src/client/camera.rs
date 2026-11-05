@@ -175,8 +175,13 @@ impl Client {
                 self.want_camera(next);
             }
         }
+        // Not while F3 is held: F3 + a key is a debug combination (F3+F6 the debug options, with
+        // the free camera on F6 here).
+        let f3 = input
+            .binding_of("core:debug")
+            .is_some_and(|b| input.held_key(b.chord.key));
         for (i, m) in c.game.cameras.iter().enumerate() {
-            if m.key.as_deref().is_some_and(|k| input.pressed_raw(k)) {
+            if !f3 && m.key.as_deref().is_some_and(|k| input.pressed_raw(k)) {
                 let i = i as u32;
                 if self.cameras.mode == i {
                     let back = self.cameras.own;

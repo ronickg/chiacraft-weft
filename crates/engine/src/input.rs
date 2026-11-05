@@ -43,8 +43,9 @@ pub const ENGINE_KEYS: &[(&str, &str)] = &[
     ("core:debug", "F3"),
     ("core:screenshot", "F2"),
     ("core:perspective", "F5"),
-    // Away from the keys a hand rests on.
-    ("core:freecam", "KeyP"),
+    // Away from the keys a hand rests on, next to F5's cameras (chiacraft: P is the base game's
+    // Stats screen).
+    ("core:freecam", "F6"),
     ("core:fullscreen", "F11"),
     ("core:player_list", "Tab"),
     // In a screen with a search field (the creative inventory, the recipe viewer).

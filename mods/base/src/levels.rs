@@ -467,6 +467,7 @@ fn client(r: &mut Registry) {
             });
         });
     });
+    // On P: Weft's free camera, on P there, is on F6 here (`core:freecam`, Ronald 11-04).
     r.key(&OPEN, "P").on_press_client(|c| {
         c.screen_open(&SCREEN);
     });

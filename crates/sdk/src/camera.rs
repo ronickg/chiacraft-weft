@@ -21,7 +21,7 @@ pub mod cameras {
     pub static FIRST_PERSON: CameraMode = CameraMode::named("core:first_person");
     pub static BEHIND: CameraMode = CameraMode::named("core:behind");
     pub static FRONT: CameraMode = CameraMode::named("core:front");
-    /// Detached, a small box that bumps into blocks; `core:freecam` (P), in a game mode that
+    /// Detached, a small box that bumps into blocks; `core:freecam` (F6), in a game mode that
     /// flies unless a mod says otherwise (`actions::CAMERA`).
     pub static FREE: CameraMode = CameraMode::named("core:free");
 }
