@@ -103,6 +103,31 @@ The regions, grouped:
 | Beasts | Taming and riding (Ronald: "also taming too") |
 | Proposed by Planner | Mining and prospecting, Engineering (machines and automation), Exploring and cartography, Trading, Survival (fishing, tracking, weather) |
 
+**Built 11-05** (branch claude/perk-web-a4441b): the 16 skills rising by doing, priced in effort
+minutes with tier against skill (`vitals::skills`); one web of 288 nodes, a region per skill from
+one template, bridges, keystones, depth gated by skill, refunds with the Unlearning Stone
+(`vitals::perks`, checked and written to `mods/base/vitals/WEB_SHEET.md`); the effects that touch
+today's systems through chains and attributes, and the K screen (`mods/base/src/skills.rs`,
+`web.rs`). The magic schools, Engineering and Trading are data until spells, machines and traders
+come.
+
+**Sockets and found stones** (Ronald, 11-05: "It would be cool if you can then insert items which
+generate boosts and you find those items in the world, relics or whatever. It's a bit like how Path
+of Exile 2 has that, where you have certain slots where you can insert them"). Built 11-05:
+- **Socket nodes** on the web, taken like any node for 3 points: four near the centre (between
+  region pairs), one deep in every region, one past every second bridge. At one or two points the
+  dominance check found sockets in every build.
+- **Stones**, the ancients' work (Old Eskenai names): Maunduk, the mind-stone (1-3 rolled boosts,
+  3 units at the Stone Age to 5 at the Age of Stars, by item level = tier × 10 + depth); Aruduk,
+  the flow-stone (amplifies or turns the small nodes taken near its socket, like Path of Exile's
+  radius jewels); relics with their own effect (Remaru, the Flow-Watcher: ley sight; Emakaun, the
+  Life-Keeper: health for the nodes near it).
+- **Found, never made:** ruins, boss loot, ley nodes, rare animals, fallen stars, each with its odds
+  (`vitals::sockets::SOURCES`); pallasite drops them today. A drop table adds one with
+  `base_api::skills::drop_stone(w, StoneSource::Boss, tier, pos)`.
+- **Swapped freely:** the checks assume the best stone for the job in every socket taken.
+- Numbers and odds: `mods/base/vitals/WEB_SHEET.md`, "Sockets and stones".
+
 Crafting perks follow Smithing's shape: perks unlock working the next tier's materials, better
 grades and rolls, repairs, salvage, and later merging and upgrading items (see "Gear that keeps
 getting better").

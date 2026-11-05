@@ -348,6 +348,9 @@ pub fn feed(w: &World, id: u64, player: u64) -> bool {
     // Near a capybara it takes to you a quarter faster.
     let calm = if crate::signatures::calm(w, st.pos.to_array()) { 1.25 } else { 1.0 };
     let gain = food.liking.taming() * if wanted { 1.25 } else { 1.0 } * calm / needed;
+    // The tamer's web (taming speed) through the base game's chain.
+    let q = abi::Query { entity: id, other: player, ..query() };
+    let gain = w.chain_compute(&base_api::skills::TAMING_SPEED, gain as f64, &q) as f32;
     let wait = WAIT_TICKS.0 + w.random_below(WAIT_TICKS.1 - WAIT_TICKS.0);
     set(w, id, |t| {
         t.progress = (t.progress + gain).min(1.0);
@@ -403,6 +406,13 @@ pub fn tame(w: &World, id: u64, player: u64, effectiveness: f32) {
         weft_sdk::info!("animal {id} tamed at {:.0}%: {bonus} bonus levels, now level {}", effectiveness * 100.0, a.level());
         let level = a.level();
         crate::xp::tamed(w, player, level);
+        // Taming rises by doing (`vitals::skills::gain::tame`): the size class's taming time, its
+        // work level by the animal's level (a level-200 one about 34 item levels over a level-0).
+        if let Some(s) = a.species() {
+            let minutes = vitals::skills::gain::TAME_MINUTES[s.size as usize];
+            let work = vitals::skills::for_level(5.0 + level as f32 * 34.0 / 200.0);
+            base_api::skills::give_skill(w, player, base_api::skills::Skill::Taming, vitals::skills::gain::tame(minutes), work);
+        }
         crate::journal::note_animal(w, player, id, animals_core::journal::TAMED);
         // The first time this player tames one: how to give it orders (a line under the
         // crosshair, `base_api::hint`), then Survival's "A Friend" advancement

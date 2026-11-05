@@ -180,9 +180,9 @@ fn hit(w: &World, player: u64, v: u32) {
     w.play_sound(&STRIKE, at, 1.0);
     if k.removed & head.away() == head.away() {
         w.set_block(pos, 0);
-        let left = w
-            .inventory(player)
-            .insert(knapped_head(w, player, head.shape, true, Some(unit(w))));
+        let made = knapped_head(w, player, head.shape, true, Some(unit(w)));
+        crate::skills::made(w, player, &made, 1);
+        let left = w.inventory(player).insert(made);
         if !left.is_empty() {
             w.spawn_item(at, left);
         }

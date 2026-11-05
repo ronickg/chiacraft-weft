@@ -155,6 +155,8 @@ const RECIPES_LIST: &[Recipe] = &[
     c("base:fire_bed", 1.0, &[("base:plant_fibre", 1.0), ("#stick", 3.0)], Hand),
     c("base:bow_drill", 1.0, &[("#stick", 2.0), ("#string", 1.0)], Hand),
     c("base:hand_drill", 1.0, &[("#stick", 2.0)], Hand),
+    // the ley lines (ley.rs): the magic path's first step
+    c("base:dowsing_rod", 1.0, &[("#stick", 2.0), ("#string", 1.0), ("base:tektite", 1.0)], Hand),
     c("base:campfire_laid", 1.0, &[("#stick", 2.0), ("#logs", 2.0)], Hand),
     c("base:tanning_frame", 1.0, &[("#stick", 4.0), ("#string", 4.0)], Table),
     c("base:tanning_pit", 1.0, &[("#planks", 7.0)], Table),
@@ -235,6 +237,7 @@ const RECIPES_LIST: &[Recipe] = &[
     b("base:starheart", 1.0, &[("base:star_steel_ore", 1.0)], PICK_IRON, 3600.0),
     c("base:peridot", 2.0, &[("base:pallasite", 1.0)], Hand),
     c("base:star_lantern", 1.0, &[("base:iron_ingot", 2.0), ("base:starheart", 1.0)], Table),
+    c("base:unlearning_stone", 1.0, &[("base:peridot", 1.0), ("base:tektite", 2.0)], Table),
     Recipe { out: "base:star_steel_ingot", n: 1.0, ins: &[("base:star_steel_lump", 1.0)], at: Furnace, secs: 20.0 },
     Recipe { out: "base:water_bucket", n: 1.0, ins: &[("base:bucket", 1.0)], at: Fill, secs: 10.0 },
     Recipe { out: "base:lava_bucket", n: 1.0, ins: &[("base:bucket", 1.0)], at: Fill, secs: 30.0 },
@@ -288,6 +291,8 @@ const RECIPES_LIST: &[Recipe] = &[
     c("base:wool_cloak", 1.0, &[("base:wool", 3.0), ("#string", 1.0)], Table),
     c("base:fur_robe", 1.0, &[("base:fur", 5.0), ("#string", 1.0)], Table),
     c("base:rain_cape", 1.0, &[("base:leather", 5.0), ("#string", 1.0)], Table),
+    // glider.rs
+    c("base:glider", 1.0, &[("base:leather", 3.0), ("#stick", 4.0), ("#string", 1.0)], Table),
     // the animals mod (knockout.rs, screen.rs, gateway.rs, riding.rs, taming.rs, eggs.rs)
     c("animals:club", 1.0, &[("#logs", 1.0), ("base:stick", 1.0)], Hand),
     c("animals:sedative", 2.0, &[("base:spider_eye", 1.0), ("base:sugar", 1.0), ("base:wheat_seeds", 1.0)], Hand),
@@ -415,8 +420,9 @@ pub const KEYS: &[Key] = &[Key {
     routes: &[
         (Path::Tech, &["base:pickaxe", "base:furnace"]),
         (Path::Beasts, &["animals:club", "animals:tranquilizer_dart", "animals:nest"]),
+        (Path::Magic, &["base:dowsing_rod"]),
     ],
-    missing: &["magic route: a dowsing rod (sensing ley lines)", "a biome boss's part", "knowledge: a ruin's blueprint or lore page"],
+    missing: &["a biome boss's part", "knowledge: a ruin's blueprint or lore page"],
 }];
 
 // ------------------------------------------------------------------ the graph, solved

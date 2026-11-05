@@ -272,7 +272,7 @@ pub fn register(r: &mut Registry) {
     r.player_menu(&INVENTORY);
 }
 
-fn armor_applies(cause: u32) -> bool {
+pub fn armor_applies(cause: u32) -> bool {
     DamageCause::flags_of(cause) & damage_flags::BYPASSES_ARMOR == 0
 }
 
@@ -310,6 +310,7 @@ fn consume_grid(m: &MenuCtx) {
         }
     }
     base_api::give_xp(&m.world(), m.player(), vitals::levels::xp::craft(used));
+    crate::skills::made(&m.world(), m.player(), &made, used);
 }
 
 /// What the air bar shows: whole bubbles like vanilla's, hidden with a full breath.

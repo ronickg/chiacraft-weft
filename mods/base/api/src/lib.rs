@@ -11,6 +11,7 @@ pub mod branchy;
 pub mod colonize;
 pub mod grow;
 pub mod land;
+pub mod skills;
 pub mod tree_recipes;
 pub mod trees;
 
@@ -657,6 +658,13 @@ pub fn hint(w: &World, player: u64, key: &str, args: &[i64]) {
     w.send(player, &HINT_TEXT, &text);
 }
 
+/// Ley sight (`notes/PROGRESSION.md`, "Round 6"): how clearly a player sees the ley lines without
+/// a dowsing rod, 0 (not at all) to 1, on the player and sent to its owner. Base registers and
+/// attaches it and draws the lines while it is over 0 (as faint as the rod's at 1, out to
+/// `vitals::ley::SHOWN_SIGHT`); the magic path's perk (the perk web) sets it. The network itself
+/// is `vitals::ley`: `ley::strength(w.seed(), x, z)` is what magic, mana and machines draw on.
+pub static LEY_SIGHT: Component<f32> = Component::named("base:ley_sight");
+
 /// Things a player has done that other mods know of and the base game's advancements read
 /// (`advancements.rs`, the "Surviving" group): a bit each (`milestones`), kept through death.
 pub static MILESTONES: Component<u32> = Component::named("base:milestones");
@@ -712,6 +720,10 @@ pub fn has_room(w: &World, player: u64, item: u32) -> bool {
 /// Burn time in ticks.
 pub static FUEL: Component<u32> = Component::named("fuel");
 pub static ARMOR: Component<Armor> = Component::named("armor");
+/// A weapon's or tool's item level (`vitals::curve`: tier × 10 + depth, its working material's):
+/// on today's tools as their item's, on a tool built from parts as its stack's. Against a big
+/// creature it counts at most its size's cap over the creature (`vitals::combat::Band::cap`).
+pub static ITEM_LEVEL: Component<f32> = Component::named("base:item_level");
 /// How readily fire takes it.
 pub static FLAMMABLE: Component<u32> = Component::named("flammable");
 

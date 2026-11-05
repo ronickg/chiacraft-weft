@@ -478,6 +478,9 @@ fn craft(w: &World, player: u64, station: Station, r: &Recipe, count: u32) -> u3
             }
         }
         base_api::give_xp(w, player, vitals::levels::xp::craft(needs.len() as u32));
+        if let Some((o, _)) = r.outputs().into_iter().next() {
+            crate::skills::made(w, player, &o, needs.len() as u32);
+        }
         made += 1;
     }
     if let Some((out, _)) = r.outputs().into_iter().next() {

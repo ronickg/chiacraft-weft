@@ -291,7 +291,17 @@ fn bite(w: &World, id: u64, st: &EntityState) {
         Liking::Favorite => FAVORITE_BITE,
         Liking::Kibble => 0.0,
     };
-    let progress = (t.progress + food.liking.taming() / needed).min(1.0);
+    // Tamed by whoever is nearest (the tamer, as a rule), whose web (taming speed) speeds it
+    // through the base game's chain.
+    let tamer = w
+        .players()
+        .into_iter()
+        .filter_map(|p| Some((p, w.entity(p)?)))
+        .min_by(|a, b| dist2(a.1.pos, st.pos).total_cmp(&dist2(b.1.pos, st.pos)))
+        .map(|(p, _)| p);
+    let q = abi::Query { entity: id, other: tamer.unwrap_or(0), ..query() };
+    let gain = w.chain_compute(&base_api::skills::TAMING_SPEED, (food.liking.taming() / needed) as f64, &q) as f32;
+    let progress = (t.progress + gain).min(1.0);
     let effectiveness = (t.effectiveness - cost).max(0.0);
     if let Some(t) = w.component_mut(id, &TAMING) {
         t.progress = progress;
@@ -304,13 +314,6 @@ fn bite(w: &World, id: u64, st: &EntityState) {
     });
     animal::feed(w, id, food.food);
     if progress >= 1.0 {
-        // Tamed by whoever is nearest (the tamer, as a rule).
-        let tamer = w
-            .players()
-            .into_iter()
-            .filter_map(|p| Some((p, w.entity(p)?)))
-            .min_by(|a, b| dist2(a.1.pos, st.pos).total_cmp(&dist2(b.1.pos, st.pos)))
-            .map(|(p, _)| p);
         spill(w, id, st);
         set(w, id, |k| {
             k.out = 0;
