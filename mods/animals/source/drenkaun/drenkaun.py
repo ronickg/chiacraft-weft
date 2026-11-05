@@ -205,17 +205,17 @@ def elements():
     # The mane: long pale hair down the throat, a box with locks hanging below it.
     n0 = NECK0
     E.append(el("mane", "neck", (-4.7, n0[1] + 3, n0[2] + 4.0), (4.7, n0[1] + 24, n0[2] + 8.6), rot=NECK_ROT, origin=tuple(n0)))
-    E.append(el("fringe_mane", "neck", (0, n0[1] + 3.5, n0[2] + 6.0), (0, n0[1] + 24.5, n0[2] + 14.0), quad="east", rot=NECK_ROT,
+    E.append(el("fringe_mane", "neck", (0, n0[1] + 3.5, n0[2] + 6.0), (0, n0[1] + 24.5, n0[2] + 23.0), quad="east", rot=NECK_ROT,
                 origin=tuple(n0), cut="mane"))
     # The moss cape over the withers and shoulders, hanging down the sides in locks, and the bark
     # plates on its back; the crown of bark on its head between the antlers (`Part` crown).
-    E.append(el("moss_cape", "spine_1", (-12.2, 50.0, -4.0), (12.2, 61.2, 27.0)))
+    E.append(el("moss_cape", "spine_1", (-12.2, 49.0, -4.0), (12.2, 61.2, 31.0)))
     for s_, q in ((1, "east"), (-1, "west")):
-        E.append(el(f"fringe_moss_{q}", "spine_1", (s_ * 12.7, 40.0, -3.0), (s_ * 12.7, 60.6, 26.5), quad=q, cut="moss"))
+        E.append(el(f"fringe_moss_{q}", "spine_1", (s_ * 12.7, 34.0, -3.0), (s_ * 12.7, 60.6, 30.5), quad=q, cut="moss"))
         # A bark plate on each shoulder, lying on the cape's side and top, tilted out (concept A's
         # armour of bark).
-        E.append(el(f"bark_shoulder_{q}", "spine_1", (s_ * 8.0 - 4.6, 54.5, 2.0), (s_ * 8.0 + 4.6, 60.0, 20.0), rot=(0, 0, -s_ * 32),
-                    origin=(s_ * 8.0, 57.0, 11.0)))
+        E.append(el(f"bark_shoulder_{q}", "spine_1", (s_ * 11.0 - 6.0, 54.0, 0.0), (s_ * 11.0 + 6.0, 57.6, 24.0), rot=(0, 0, -s_ * 58),
+                    origin=(s_ * 11.0, 55.8, 12.0)))
     E.append(el("bark_back", "spine_0", (-8.2, 55.6, -34.0), (8.2, 60.4, -10.0), rot=(-4, 0, 0), origin=(0, 57.0, -22.0)))
     E.append(el("crown", "head", (-4.4, 71.4, 33.0), (4.4, 74.4, 43.0)))
     E.append(el("tail", "tail", (-2.6, 45.5, -42.8), (2.6, 54.5, -39.75), rot=(12, 0, 0), origin=tuple(TAIL0)))
@@ -321,9 +321,10 @@ def area(e, face, p, uu, vv, h):
             a[:] = PALE
     elif name.startswith("bark") or name == "crown":
         a[:] = BARK
-        if face == "up":  # grooves along it, a texel a few apart
-            a = np.where((np.floor(z * K * TX / 3.0) % 3) == 0, DARK, BARK)
-            a = np.where((np.floor((x + z) * K * TX / 5.0) % 7) == 0, MOSS, a)  # a little moss on it
+        if face in ("up", "east", "west"):  # grooves along its length, a few texels apart, broken now and then
+            o = np.array(e["origin"]) / K if e["origin"] else np.zeros(3)
+            across = np.hypot(x - o[0], y - o[1])
+            a = np.where(((np.floor(across * K * TX / 3.0) % 3) == 0) & ((np.floor(z * K * TX / 7.0) % 5) != 0), DARK, BARK)
     elif name == "skull":
         if face == "up":
             a[:] = BACK
@@ -376,10 +377,10 @@ def cut_mask(e, p):
     """Cut-out outlines: the ear's short oval, the mane's locks (in the neck's own frame)."""
     if e["cut"] == "moss":  # locks hanging down the cape's sides, longest over the shoulder
         y, z = p[..., 1] / K, p[..., 2] / K
-        u = np.clip((z + 3.0) / 29.5, 0, 1)
+        u = np.clip((z + 3.0) / 33.5, 0, 1)
         period = max(2.0, 3 / (TX * K))
         lock = np.abs(((z / period) % 1.0) - 0.5) * 2
-        tip = 52.0 - 9.0 * np.sin(math.pi * u) ** 0.8 + 2.4 * lock
+        tip = 47.0 - 11.0 * np.sin(math.pi * u) ** 0.8 + 3.0 * lock  # shaggy, longest over the shoulder
         return y >= tip
     if e["cut"] == "ear":
         x, y = p[..., 0] / K, p[..., 1] / K
@@ -393,7 +394,7 @@ def cut_mask(e, p):
     u = np.clip((along - 3.5) / 21.0, 0, 1)
     period = max(2.5, 3 / (TX * K))  # a lock every 3 texels or more (finer ones alias at 32)
     lock = np.abs(((along / period) % 1.0) - 0.5) * 2  # points every few texels
-    tip = 9.8 + 7.0 * np.sin(math.pi * u) ** 0.7 - max(1.6, 1 / (TX * K)) * lock  # notches a texel deep
+    tip = 12.0 + 10.0 * np.sin(math.pi * u) ** 0.7 - max(1.6, 1 / (TX * K)) * lock  # notches a texel deep
     return depth <= tip
 
 
