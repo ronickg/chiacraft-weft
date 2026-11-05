@@ -189,7 +189,9 @@ def flat_spike(name, bone, side, x_body, y, zc, out, length, droop):
 
 def elements():
     E = [el("hips", "spine_0", (-54, 28, -46), (54, 76, 22)),  # the widest: a very broad, flat rump
-         el("shield", "spine_0", (-51, 75, -44), (51, 80.5, 16)),  # the sacral shield over the hips
+         # the sacral shield over the hips, reaching just past their sides and back (at 51 and -44 their top
+         # showed round it as a band a texel and a half wide; linecheck)
+         el("shield", "spine_0", (-54.55, 75, -46.55), (54.55, 80.5, 16)),
          el("ribs_0", "spine_0", (-58.5, 38, -40), (58.5, 64, 14)),  # the flanks bulging out: a barrel, not a crate
          el("belly_0", "spine_0", (-46, 22, -38), (46, 32, 18)),  # the belly bulging down between the legs
          el("chest", "spine_1", (-50, 31, 16), (50, 66, 74)),
