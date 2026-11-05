@@ -7,7 +7,7 @@ use weft_sdk::*;
 
 static FOOD_TAB: CreativeTab = CreativeTab::named("base:food");
 /// What's left of a dead animal that gives no meat (`animals_core::meat::CARCASS`): carrion for
-/// the scavengers, no food for a player (its icon is rotten flesh's until Art draws one).
+/// the scavengers, no food for a player (its own icon: a torn hide with ribs, Art 11-05).
 static CARCASS: Item = Item::named("carcass");
 
 /// Hunger and saturation, raw and cooked: venison as beef, hare as chicken, fish as the cod.
