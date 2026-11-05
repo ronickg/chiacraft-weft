@@ -176,6 +176,32 @@ a trading post to a city with a spaceport.
 - You drop everything at the spot and run back for it, as in Ark or Valheim.
 - A world setting can soften it.
 
+### Peoples (Ronald's answers, 11-06)
+
+Ronald: "I really love the fantasy stuff, like the Lord of the Rings with elves and dwarves ...
+some dwarven kingdom in like the mountains, or elves would be in a specific biome".
+- **Who:** dwarves in the mountain ranges (kingdoms carved into the rock, master smiths and miners, deep halls and forges), elves in the old forests (the sequoia groves or the tropical canopy; keepers of ley magic, archers and beast-tamers), humans as the main folk in the open lands (the settlers and traders, growing with the ages), and more peoples later, each in its own biome (desert nomads, swamp folk, sea raiders, northern giants).
+- **Lore:** heirs of the ancients. Each people inherited one part of the star-born ancients' legacy: dwarves their craft and star steel, elves their ley magic, humans their spread. Their old feuds and lost knowledge are what the player uncovers.
+- **Dealing with them:** reputation per people (trading, helping and contracts raise it, and higher standing opens their smiths, spells, mounts and lands). They teach their crafts (dwarves smithing secrets and blueprints, elves magic and taming), which ties them into the skill web and the ages. They can turn hostile: guards and ambushes, and raids can come from them.
+- **In the world:** living towns and kingdoms with NPCs going about their day, traders, smiths and quest givers. A big build.
+- **Names:** each people gets its own naming language, derived from the ancients' tongue, as Tolkien's peoples' languages differ (`reports/Naming and invented words.md`, running).
+
+### Endless gear: the research's proposal
+
+From `reports/Progression systems.md` (Path of Exile 2, Skyrim, Ark, Terraria, Vintage Story,
+Valheim, GregTech and the automation packs, Thaumcraft and Botania). It builds on
+`notes/CRAFTING.md`'s parts and ten grades, and keeps its rule of no rerolls to buy:
+- **Item level:** tier × 10, plus a depth of 0-9 from where the material or drop came from (a ley vein, a boss form, a dimension's depth). It caps which properties can roll.
+- **Marks:** properties (affixes) with item-level tiers, added only with found crafting materials, each material with one job: ley shards, star dust, pallasite tears and others, from ley nodes, ruins and meteorites.
+- **Certainty costs more:** a boss's essence guarantees a property from its biome's family.
+- **Merging:** the ancients' fusing anvil pools two items' properties into one, with risk. A relic's potential (1-4) caps how much transfers.
+- **Rebasing:** a favourite item can be carried up a tier at about the cost of a new one, so nothing is ever retired.
+- **A repeatable endgame:** star charts open pocket worlds through the gates at depths 1-16. Deeper charts drop deeper charts and higher item levels, and the Exploring and cartography region of the web plays Path of Exile's Atlas tree.
+- **Boss forms:** one per age, and each higher form gives everything the lower ones do plus more. A boss's drop is a key or tool that opens the next material.
+- **Power-creep controls:** each tier is about 1.6× the last. Grade plus marks add at most +60%, so a perfect tier-N item roughly equals a plain tier-N+1. Skill experience comes from an item's tier against your skill, not from how many you make. Enemies scale by place and age, never by your level. A crafting simulation in the sheet flags any source that's too generous.
+- **Bad-luck help:** certain by a set kill count.
+- **Death in a dimension:** costs the expedition, not your gear, softening "drop everything" there.
+
 ### From the survival research (Ronald's picks, 11-06)
 
 `reports/Survival systems gap analysis.md` found the body, food, climate, season and animal
