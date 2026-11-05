@@ -14,8 +14,9 @@
 //! - **Its loot** includes the Bronze Age key's part, `summit_stone`; its kid is tamed with a
 //!   mountain offering.
 //!
-//! Its look is a placeholder (the reindeer's model scaled up) until its own model (`source/borkon`,
-//! blocky-model) is approved; its clips are asked for by name like Drenkaun's.
+//! Its model and clips are `source/borkon` (blocky-model, concept A: an ibex titan, Ronald 11-05
+//! "A: ibex"): `rise`, a `<attack>_tell` and `<attack>` for each attack, `stunned` and `down`,
+//! played by name.
 
 use animals_core::bosses::Attack;
 use weft_sdk::*;
@@ -66,10 +67,11 @@ pub static DEF: Def = Def {
     young_name: "borkon_kid",
     young_scale: 0.24,
     tame_with: &OFFERING,
-    // A placeholder until its own model (`source/borkon`): the reindeer's, drawn big.
-    model: "reindeer",
-    texture: "reindeer/reindeer",
-    scale: 3.6,
+    // Its model (`source/borkon`, built with the blocky-model skill on concept A: about 3.3 m at
+    // the shoulder, its horns' arc 5.8 m up), drawn at its own size.
+    model: "borkon",
+    texture: "borkon/borkon",
+    scale: 1.0,
     speed: 2.4,
     dust: &GRAVEL,
     bits: &GRANITE,
