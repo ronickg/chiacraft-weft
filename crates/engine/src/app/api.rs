@@ -688,7 +688,9 @@ pub unsafe extern "C" fn client_screen_text(
     }
 }
 
-/// chiacraft: `client_screen_text` wrapped to `width` GUI pixels, its lines centered.
+/// chiacraft: `client_screen_text` wrapped to `width` GUI pixels, its lines centered; a negative
+/// `width` draws it on the HUD's plate (`hud_plate`), wrapped to its size (a hint: the playtest's
+/// "thin small line mid-screen").
 #[allow(clippy::too_many_arguments)]
 pub unsafe extern "C" fn client_screen_text_wrapped(
     c: *mut abi::ClientCtx,
@@ -704,7 +706,7 @@ pub unsafe extern "C" fn client_screen_text_wrapped(
         let Some(r) = run(c) else { return };
         let text = crate::ui::text::Msg::new(key.as_str(), crate::client::modui::args(args));
         r.mod_screen_text
-            .push((x, y, text, color, if size > 0.0 { size } else { 1.0 }, width.max(0.0)));
+            .push((x, y, text, color, if size > 0.0 { size } else { 1.0 }, width));
     }
 }
 

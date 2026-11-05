@@ -19,6 +19,7 @@ pub mod difficulty;
 pub mod effects;
 pub mod events;
 pub mod felling;
+pub mod fireflies;
 pub mod first;
 pub mod foliage;
 pub mod food;

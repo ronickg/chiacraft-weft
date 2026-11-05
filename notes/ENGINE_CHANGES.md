@@ -23,6 +23,7 @@ for now is bug fixes only, written and opened by him.
 | Vulkan: order upload copies that write the same bytes (0b06e383) | Overlapping writes in the wrong order | #84 closed; upstream re-implemented it (1049ba95). Take theirs |
 | Vulkan: GPU-only memory spills to system memory when full (a3606d48, f88e5a7c) | Two games on one GPU panicked with "Out of memory" | #97 closed for now; clean branch ready for Ronald |
 | Far terrain: a scatter that forces all its blocks takes its commonest block (414e4e88) | Boulders drew as purple missing-texture blocks in the distance | #96 closed for now; clean branch ready |
+| Vulkan: `drawIndirectCount` optional (`Backend::indirect_count`, `Cmd::FillBuffer`): without it the table's count draws draw all their records, zeroed before the culling writes them; `--no-indirect-count` forces it | Since Weft's GPU terrain culling (c376cf9c) the game wouldn't start on any Mac: "Apple M3 Max lacks what the game needs: drawIndirectCount" (MoltenVK has none) | Candidate 6: clean branch for Ronald |
 | HUD: crosshair only in first person (6a394c0d) | It sat on the player's back in third person | #98 closed for now; clean branch ready |
 | `/rule` reads values the way the rule takes them (a2f4c81c) | `false` was refused, `2` and `999` clamped silently | Clean branch ready, never opened |
 | Box-model blocks' far faces use their boxes' textures (e1f48a48) | Magenta in distant terrain | Maybe |
@@ -45,6 +46,7 @@ Weft's shader packs could only replace shaders. Our pack needed data the engine 
 - **Clouds follow the weather and the wind** (5a42062b, 1bae91a3), **biome tints a mod can change while running** (34432291, used for seasons and rain). *Why:* the living-world systems (seasons, rain by place) have to show.
 - **Canopy light** (e40f323e, on look-canopy): a biome's air flags carry how closed its canopy is (`weft_abi::air_flags::CANOPY_SHIFT`, bits 16-23, 0-255). The client eases it over 10 s into a new `Scene.canopy` field, the same path the aurora takes. *Why:* the tropical forest's shade and sunflecks under closed crowns.
 - **Soft clouds** (Lighting, branch `soft-clouds` from the sync tip, 11-05): `client/soft_clouds.rs`, a setting `core:soft_clouds` (off: the pack's blocky clouds). When the pack's `sky.wgsl` has `fs_cloud_trace` and `fs_cloud_resolve`, the engine traces them into a quarter-size target each frame after the world is copied (`app.rs`, after `copy_behind`), blends that into one of two histories, and the sky's `fs_clouds` draws from it. Three new `Scene` fields: `soft_clouds` (the history's, last frame's and the noise volume's indices, the history's age), `prev_view_proj`, `cloud_moved` (camera move less the clouds' drift, frame number); a 64³ tiling noise volume made once on the CPU (`noise_atlas`); old targets are destroyed only after the frames that used them (a resize must not hang the GPU). *Why:* Ronald, 11-05, "Both, a setting" and "Soft clouds first": Bliss/Photon soft clouds at a sixteenth of the pixels (Research round 15, rec. 7).
+- **Screen effects at half size** (Lighting, branch `half-res`, 11-05): a second post hook, `post_low` (`shaders/post_low/<name>.wgsl`, `fn low(p: PostPixel) -> vec4<f32>`): an effect's half-size part, drawn before the effects into its own Rgba16Float image a quarter the pixels, which the effect of the same name reads (`Pass.low`, `PostPixel.low`, `post_low_upsampled`: the four nearest texels weighted by depth). *Why:* Research round 16 #7, #5 and #1b: volumetric light, shafts and the mist march need far fewer pixels than the screen's; the Mac pays 5× the PC per pixel.
 - **Performance:** render scale (519dbf32, 14a00a37), a pipeline cache on disk (b1867503), a bounded, depth-only shadow pass (409d70ed), screen effects in one pass (716acfd8, ce011d36), the water's grid only when changed (bdb745ef), small frame-thread steps in place (ac4995f3), the frame thread culling its own draws (c31f6d34), skin painters off the frame thread (1041e730). *Why:* Ronald's Mac lagged at 3456x2234; these took it from about 96-124 fps to 128-154 fps uncapped.
 - **Diagnostics:** GPU time per pass in benches (ee147880), slow frames name their step (2394267c), where "submit" goes each second (9ab54ee5, bf07e118), the size the world draws at (ce993538), PACING lines (dcde2415). *Why:* to find the lag and the hitches.
 - **Breaking cracks at 32 px** (Art, claude/art-cracks 3fa5964f, merged 0800ffb5): `crates/engine/assets/textures/block/destroy_0-9.png` redrawn 32x32 in place (grown by `notes/blocks/destroy.py`), same names, so `core:block/destroy_N` is unchanged. The pack darkens the face with them (`entity.wgsl` `fs_overlay`). *Why:* the 16 px near-black cracks stamped a chunky black maze on our 32 px blocks (Ronald: "glitchy").
@@ -84,6 +86,8 @@ Weft's shader packs could only replace shaders. Our pack needed data the engine 
 - **Chat fits small windows; no crosshair over a screen** (claude/audit-rest, merged a0fc9a41; `hud.rs`, `game_screens.rs`). *Why:* at 760x600 the chat covered the Inventory/Recipes/Stats buttons (B9c), and the crosshair stood over the sleeping screen.
 - **Block outline thin and faint** (look-outline ba37dc6d, merged 9a5398eb): `client/entity_render.rs` draws the selection outline's 12 edge boxes see-through (alpha `OUTLINE_DARK` 0.4) in the overlay pass, each sized to `OUTLINE_PX` 1.25 screen pixels from its distance, the camera's fov and the frame height, instead of solid black boxes 0.012 blocks thick. *Why:* Ronald: "thin and faint like vanilla"; the old frame was about 3 px solid black.
 - **Mods' screen text can wrap** (claude/hint-wrap; `app.rs`, `app/api.rs`, sdk `Client::screen_text_wrapped`): a screen label may carry a width it wraps to, its lines centred; zero keeps one line. *Why:* the base game's long hint ("Press [E]: logs make planks…") ran over the HUD's top-left column in a narrow window (760x600).
+- **…and sit on the HUD's plate** (claude/hint-plate; `app.rs`, `app/api.rs`, sdk `Client::screen_text_plated`): a negative wrap width draws the label inside a `hud_plate` panel (no new host function). *Why:* the first hint read as "a thin small line mid-screen" (World playtest round 13).
+- **A UI preview of an entity kind alone** (claude/journal-ui; `client/modui.rs`, `client/entity_render.rs`, `app.rs`, sdk `Ui::kind_model`): a 3D preview node may name an entity kind (`kind:<name>`), drawn with its kind's own texture (loaded for it, as none may be in the world) and no entity behind it, turning with the mouse like the player's figure. *Why:* the Field Journal's page shows each animal turning, also ones not in the world (Ronald, 11-05: "Yes, turning 3D").
 
 ## 6. Sound
 
@@ -105,6 +109,13 @@ These are the biggest changes. They live mostly in our crates, but each needed h
 
 - **Settings set for a run hold for the whole run** (2fa0beff), **and in the worlds it opens** (b091ac8b), **`--config` and `--no-shadows`** (ee147880). *Why:* scripted PC looks and benches need fixed settings.
 - **The network path in the log** (0a11b0ee): `net: path to <id> relay|direct|mixed <kind>` on every join, portal arrival and player coming in, and again on each change. **A relay-only test setting** (`core:net_relay_only`, on no screen): the endpoint gets no IP transport, so every connection goes through n0's relay. *Why:* Ronald asked whether joins really cross the network, and every two-machine check ran on one home network.
+
+- **Load-test hooks for many players** (Research round 18, branch `claude/jovial-einstein-158b8f`):
+  - `net/p2p.rs`: `ALPN`, `PROTOCOL`, `MAX_FRAME`, `MAX_HELLO`, `MAX_OFFER`, `write_frame` and `read_frame_max` are made public;
+  - `diag::take_net` reads the traffic counters without a frame report;
+  - `weft --server --stats [secs]` logs a stats line: ticks per second, tick avg/p50/p99/max and phases, players, cubes, entities, traffic by message kind each way (with `--log net=debug`), and memory, threads and CPU by thread name from `/proc` (`dedicated.rs`, `Shared::stats` and `tick_samples` in `server/mod.rs`).
+
+  *Why:* our bot client (`crates/bots`, `weft-bots`) joins over the real protocol by the hundred, and the server had no tick timing without a game window. Off unless asked for. *Upstream?* Maybe the stats line.
 
 ## 9. Removed
 
@@ -139,4 +150,4 @@ These are the biggest changes. They live mostly in our crates, but each needed h
 
 ## Our own crates (additions, not core changes)
 
-`sandbox` (wasmtime mod host), `packages` (data packages), `account`, `bridge`.
+`sandbox` (wasmtime mod host), `packages` (data packages), `account`, `bridge`, `bots` (`weft-bots`, headless load-test players).

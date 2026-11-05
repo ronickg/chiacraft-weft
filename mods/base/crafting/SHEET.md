@@ -25,6 +25,7 @@ Points: material up to 40, work up to 40 (from memory up to 30, a machine 22), s
 |---|---|---|---|---|---|---|---|---|---|---|
 | flint | working | 2.6 | 1.8 | 100 | 75 | 3 | 1 | - | - | keen |
 | chert | working | 2.6 | 1.8 | 100 | 70 | 3 | 1 | - | - | common |
+| tektite | working | 2.4 | 1.8 | 100 | 50 | 3.2 | 1.5 | - | - | razor |
 | obsidian | working | 2.4 | 1.8 | 100 | 40 | 3.2 | 1.5 | - | - | razor |
 | bone | working, holding | 1.9 | 1.5 | 50 | 90 | 2.5 | 0.5 | uses +5%, speed +0% | - | tough |
 | antler | working, holding | 1.9 | 1.5 | 50 | 90 | 2.5 | 0.5 | uses +8%, speed +0% | - | tough |
@@ -35,6 +36,7 @@ Points: material up to 40, work up to 40 (from memory up to 30, a machine 22), s
 | wrought_iron | working, fitting | 7.7 | 1 | 220 | 275 | 7 | 2 | - | 260 uses | weldable |
 | meteoric_iron | working, fitting | 7.9 | 1 | 200 | 240 | 6.5 | 2 | - | 220 uses | - |
 | steel | working, fitting | 7.85 | 1 | 300 | 500 | 8 | 3 | - | 400 uses | tempered |
+| star_steel | working, fitting | 7.9 | 1 | 350 | 650 | 8.5 | 3.2 | - | 500 uses | patterned |
 | gold | fitting | 19.3 | 1 | 0 | 30 | 6 | 0 | - | 40 uses | - |
 | oak | working, holding | 0.75 | 1.6 | 0 | 60 | 2 | 0 | uses +10%, speed -3% | - | tough |
 | mesquite | working, holding | 0.88 | 1.6 | 0 | 70 | 2 | 0 | uses +15%, speed -5% | - | tough |
@@ -44,7 +46,7 @@ Points: material up to 40, work up to 40 (from memory up to 30, a machine 22), s
 | osage_orange (provisional) | working, holding | 0.86 | 1.6 | 0 | 65 | 2 | 0 | uses +8%, speed +0% | - | - |
 | spruce | working, holding | 0.45 | 1.6 | 0 | 45 | 2 | 0 | uses -5%, speed +5% | - | light |
 | branch | holding | 0.6 | 1.6 | 0 | 40 | 2 | 0 | uses -10%, speed +0% | - | - |
-| plant_cordage | fitting | 1.3 | 1 | 0 | 0 | 0 | 0 | - | 30 uses | cheap |
+| plant_cordage | fitting | 1.3 | 1 | 0 | 0 | 0 | 0 | - | 50 uses | cheap |
 | sinew | fitting | 1.3 | 1 | 0 | 0 | 0 | 0 | - | 60 uses | shrinks_tight |
 | rawhide | fitting, holding | 1.2 | 1 | 0 | 0 | 0 | 0 | uses +0%, speed +0% | 80 uses | shrinks_tight |
 | birch_tar | fitting | 1 | 1 | 0 | 0 | 0 | 0 | - | 70 uses | glued |
@@ -65,6 +67,7 @@ Provisional rows stand in for today's tools until Content plan's flint and chert
 | recastable | Recast | Always |
 | weldable | Weld | Always |
 | tempered | Wear(0.7) | Always |
+| patterned | RepairCost(0.5) | Always |
 | light | Speed(1.05) | Always |
 | shrinks_tight | Wear(0.5) | Dry |
 | glued | Wear(1.0) | Wet |
