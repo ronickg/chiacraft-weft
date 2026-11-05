@@ -3611,11 +3611,12 @@ fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, 
                 p.rope_len = p.rope_len.max(reach).min(rope.length);
             }
             let taut = !w.on_wall && physics::rope_hold(c, block, bodies, &mut p.pos, &mut p.vel, hw, height, hold, rope.anchor, p.rope_len);
-            // Swinging on a taut rope keeps its way: little of the air's drag (0.91 a step,
-            // which stops a pendulum in a swing).
+            // Swinging on a taut rope keeps its way: little of the air's drag (0.91 a step
+            // across and 0.98 up and down, which stop a pendulum in a swing).
             if taut && !w.on_ground {
                 p.vel.x *= ROPE_DRAG / 0.91;
                 p.vel.z *= ROPE_DRAG / 0.91;
+                p.vel.y *= ROPE_DRAG / 0.98;
             }
             p.on_rope = !w.on_ground && (taut || p.pos.distance(rope.anchor) <= p.rope_len + hold + 0.5);
         }

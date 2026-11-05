@@ -275,9 +275,10 @@ fn draw(c: &Client) {
         // The hands: from one's own eyes low and to the right of the view; on a body over the
         // head while hanging, else at the shoulder.
         let hands = if id == me && first {
+            // Ahead of the eyes, low and to the right, so the cord's cubes don't fill the view.
             let (s, co) = (st.yaw as f64).sin_cos();
-            let right = Vec3::new(co, 0.0, -s);
-            st.camera_pos.offset(right.x * 0.3, -0.35, right.z * 0.3)
+            let (right, ahead) = (Vec3::new(co, 0.0, -s), Vec3::new(-s, 0.0, -co));
+            st.camera_pos.offset(right.x * 0.35 + ahead.x * 0.7, -0.45, right.z * 0.35 + ahead.z * 0.7)
         } else {
             let pos = if id == me { st.shown } else { e.pos };
             pos.offset(0.0, if e.pose == HANG.id() { HANDS } else { 1.4 }, 0.0)

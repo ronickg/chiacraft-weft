@@ -61,7 +61,13 @@ pub fn register(r: &mut Registry) {
         }
         // The wing shows only on whoever glides.
         let glide = GLIDE.id();
-        for id in c.entities() {
+        let mut ids = c.entities();
+        // One's own player too (not among the entities a client knows).
+        let me = c.state().player;
+        if !ids.contains(&me) {
+            ids.push(me);
+        }
+        for id in ids {
             if c.entity(id).is_some_and(|e| e.pose != glide) {
                 c.bone_scale(id, WING_BONE, [0.0; 3]);
             }
