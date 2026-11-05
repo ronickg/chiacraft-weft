@@ -225,6 +225,12 @@ pub const RULES: &[Rule] = &[
     // ---- the first tools and fire (vitals::first)
     r(&["base:rock", "base:flint", "base:tektite", "base:stick", "base:plant_fibre", "base:sharp_flake"], 0, Shared, Material, Made),
     r(&["base:bow_drill", "base:hand_drill", "base:fire_bed", "base:campfire_laid"], 0, Shared, Station, Made),
+    // the ley lines (ley.rs, `vitals::ley`): the magic path's first step, and the ancients' stone
+    n(&["base:dowsing_rod"], 0, Magic, Tool, Made, "senses the ley lines: the Stone Age's magic route"),
+    n(&["base:ley_stone"], 0, Magic, Building, World(PICK, 3.0), "the ancients' carved stone round the waystones, some 600 blocks apart"),
+    n(&["base:waystone"], 0, Magic, Technical, Not, "a sleeping waystone on a great ley crossing: not carried off, woken later"),
+    // glider.rs: leather on a frame of sticks (`vitals::glide::HIDE`).
+    r(&["base:glider"], 0, Tech, Tool, Made),
     // ---- tools, weapons and armour: all built from parts (Ronald, 11-05)
     n(
         &["base:axe", "base:pickaxe", "base:shovel", "base:hoe", "base:knife", "base:spear", "base:sword", "base:bow"],
@@ -340,6 +346,14 @@ pub const RULES: &[Rule] = &[
     r(&["base:starheart", "base:peridot"], 2, Magic, Sky, Made),
     n(&["base:star_lantern"], 2, Magic, Light, Made, "a starheart in iron"),
     n(&["base:unlearning_stone"], 2, Magic, Material, Made, "a peridot ground with tektites: gives back perk web nodes (vitals::perks)"),
+    n(
+        &["base:maunduk", "base:aruduk", "base:remaru", "base:emakaun"],
+        2,
+        Magic,
+        Material,
+        Drop(60.0),
+        "stones for the web's sockets (vitals::sockets), found, never made: in pallasite today; bosses, ley nodes, ruins and rare animals add theirs (an earlier tier then)",
+    ),
     r(&["base:diamond", "base:diamond_block"], 3, Tech, Material, Made),
     // ---- smelting's things (the furnace: the Stone Age's last build, the Bronze Age's first station)
     n(&["base:furnace"], 0, Tech, Station, Made, "the Stone Age key's infrastructure: what it makes is the Bronze Age's"),

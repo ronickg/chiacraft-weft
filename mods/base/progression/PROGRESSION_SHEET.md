@@ -24,9 +24,9 @@ Power grows Ã—1.6 an age: `g(L) = 1.6^(L/10)` over area and item level L (tier Ã
 
 | tier | age | hours | EM | g at start | reference: hit / health / armour | things tagged | made | kit EM | of budget | everything once |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 526 | 143 | 49 | 34 % | 198 EM |
+| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 530 | 145 | 49 | 34 % | 211 EM |
 | 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 26 | 15 | 76 | 26 % | 53 EM |
-| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 22 | 20 | 50 | 13 % | 242 EM |
+| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 26 | 20 | 50 | 13 % | 242 EM |
 | 3 | Age of Steam | 18 | 1080 | 4.10 | 31.1 / 104 / 130 | 25 | 22 | 94 | 22 % | 263 EM |
 | 4 | Age of Lightning | 20 | 1200 | 6.55 | 49.7 / 166 / 207 | 0 | 0 | 0 | 0 % | 0 EM |
 | 5 | Age of the Future | 18 | 1080 | 10.49 | 79.6 / 265 / 332 | 0 | 0 | 0 | 0 % | 0 EM |
@@ -249,7 +249,7 @@ Moving to the next age takes a key, one thing from each gate (materials and tool
 
 | age | tech | magic | beasts | not built yet |
 |---|---|---|---|---|
-| Stone Age | base:pickaxe, base:furnace | - | animals:club, animals:tranquilizer_dart, animals:nest | magic route: a dowsing rod (sensing ley lines); a biome boss's part; knowledge: a ruin's blueprint or lore page |
+| Stone Age | base:pickaxe, base:furnace | base:dowsing_rod | animals:club, animals:tranquilizer_dart, animals:nest | a biome boss's part; knowledge: a ruin's blueprint or lore page |
 | Bronze Age | - | - | - | all of it |
 | Iron Age | - | - | - | all of it |
 | Age of Steam | - | - | - | all of it |
@@ -261,19 +261,22 @@ Moving to the next age takes a key, one thing from each gate (materials and tool
 
 Every named item and block, by its tag (`content::RULES`). EM is the cheapest way to have one; "-" not had as an item.
 
-### Stone Age (526)
+### Stone Age (530)
 
-**tech** (82)
+**tech** (83)
 
-- tool: arrow (2.0), axe (0.48), bow (0.48), hoe (0.70), knife (0.43), pickaxe (0.48), shovel (0.48), spear (0.70), sword (0.70)
+- tool: arrow (2.0), axe (0.48), bow (0.48), glider (7.8), hoe (0.70), knife (0.43), pickaxe (0.48), shovel (0.48), spear (0.70), sword (0.70)
 - armour: boots (0.70), chestplate (0.70), helmet (0.70), leggings (0.70)
 - station: furnace (1.2)
 - part: part_bar_guard (0.22), part_barbed_point (0.22), part_bearded_axe_head (0.22), part_boot_shell (0.22), part_bowstring (0.22), part_chest_shell (0.22), part_felling_axe_head (0.22), part_grip (0.22), part_haft (0.22), part_helmet_shell (0.22), part_hoe_blade (0.22), part_knife_blade (0.22), part_lashing (0.22), part_leaf_point (0.22), part_leg_shell (0.22), part_lining (0.22), part_long_blade (0.22), part_long_haft (0.22), part_pick_head (0.22), part_round_pommel (0.22), part_self_stave (0.22), part_shaft (0.22), part_short_blade (0.22), part_short_stave (0.22), part_shovel_blade (0.22), part_straight_blade (0.22), part_straps (0.22)
 - technical: diamond_axe (-), diamond_boots (-), diamond_chestplate (-), diamond_helmet (-), diamond_hoe (-), diamond_leggings (-), diamond_pickaxe (-), diamond_shovel (-), diamond_sword (-), gold_axe (-), gold_boots (-), gold_chestplate (-), gold_helmet (-), gold_hoe (-), gold_leggings (-), gold_pickaxe (-), gold_shovel (-), gold_sword (-), iron_axe (-), iron_boots (-), iron_chestplate (-), iron_helmet (-), iron_hoe (-), iron_leggings (-), iron_pickaxe (-), iron_shovel (-), iron_sword (-), leather_boots (-), leather_chestplate (-), leather_helmet (-), leather_leggings (-), stone_axe (-), stone_hoe (-), stone_pickaxe (-), stone_shovel (-), stone_sword (-), wood_axe (-), wood_hoe (-), wood_pickaxe (-), wood_shovel (-), wood_sword (-)
 
-**magic** (1)
+**magic** (4)
 
+- tool: dowsing_rod (5.2)
+- building: ley_stone (3.0)
 - sky: eclipse_ash (40)
+- technical: waystone (-)
 
 **beasts** (34)
 
@@ -305,6 +308,9 @@ Notes:
 - animals:gateway, animals:termite_mound_upper: the Cretaceous gateway is built of amber blocks; a mound's top
 - portals:portal, packages:unknown: a linked world's door; a missing package's stand-in
 - base:eclipse_ash: falls in an eclipse
+- base:dowsing_rod: senses the ley lines: the Stone Age's magic route
+- base:ley_stone: the ancients' carved stone round the waystones, some 600 blocks apart
+- base:waystone: a sleeping waystone on a great ley crossing: not carried off, woken later
 - base:axe, base:pickaxe, base:shovel, base:hoe, base:knife, base:spear, base:sword, base:bow: built from parts: its parts' materials set its real age (`MATERIALS`)
 - base:helmet, base:chestplate, base:leggings, base:boots: built from a shell, fastening and lining: its shell sets its real age; a leather-look shell (leather, rawhide, bone)
 - base:part_*: a part's material sets its real age (`MATERIALS`)
@@ -335,7 +341,7 @@ Notes:
 - base:meteoric_iron: hammered cold, iron-grade before a player can smelt (Research round 17)
 - base:raw_gold, base:gold_ingot, base:gold_block: cast and soft: the Bronze Age's (Ronald, 11-07: "move them to fit")
 
-### Iron Age (22)
+### Iron Age (26)
 
 **tech** (14)
 
@@ -343,9 +349,9 @@ Notes:
 - material: bucket (3.5), iron_block (11), iron_ingot (1.2), lava_bucket (4.1), raw_iron (1.0), star_steel_ingot (12), star_steel_lump (12), water_bucket (3.7)
 - armour: boots_mail (2.8), chestplate_mail (4.0), helmet_mail (2.8), leggings_mail (4.0)
 
-**magic** (4)
+**magic** (8)
 
-- material: unlearning_stone (20)
+- material: aruduk (60), emakaun (60), maunduk (60), remaru (60), unlearning_stone (20)
 - light: star_lantern (62)
 - sky: peridot (10), starheart (60)
 
@@ -363,6 +369,7 @@ Notes:
 - base:helmet_mail, base:chestplate_mail, base:leggings_mail, base:boots_mail: the same armour with an iron or steel shell, an item of its own only for its worn look (`parts::ARMOUR_LOOKS`)
 - base:star_lantern: a starheart in iron
 - base:unlearning_stone: a peridot ground with tektites: gives back perk web nodes (vitals::perks)
+- base:maunduk, base:aruduk, base:remaru, base:emakaun: stones for the web's sockets (vitals::sockets), found, never made: in pallasite today; bosses, ley nodes, ruins and rare animals add theirs (an earlier tier then)
 - base:salt, base:salted_meat: salt is boiled from a water bucket (iron)
 - animals:wyvern_saddle: a dragon-sized saddle has an iron frame
 

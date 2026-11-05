@@ -28,6 +28,8 @@ pub enum Node {
     Notable,
     /// Changes how you play, with a cost (your tames fight twice as hard, but no heavy armour).
     Keystone,
+    /// An empty socket for a found stone (`crate::sockets`): nothing by itself.
+    Socket,
 }
 
 impl Node {
@@ -36,7 +38,7 @@ impl Node {
         match self {
             Node::Small => (1.0, 1.0),
             Node::Notable => (3.0, 4.0),
-            Node::Keystone => (0.0, 0.0),
+            Node::Keystone | Node::Socket => (0.0, 0.0),
         }
     }
 }

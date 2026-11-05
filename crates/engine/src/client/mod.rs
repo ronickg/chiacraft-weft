@@ -89,6 +89,13 @@ pub struct LocalPlayer {
     /// Walking speed and jump multipliers from the server (attributes).
     pub speed_mul: f64,
     pub jump_mul: f64,
+    /// Blocks a second it climbs walls (`attribute::CLIMB_SPEED`) and its glider's air
+    /// (`GLIDE_SPEED` over 0 glides), from the server, per tick.
+    pub climb: f64,
+    pub glide: physics::Glide,
+    /// Held on to a wall at the last step, gliding at the last step: the poses for them.
+    pub on_wall: bool,
+    pub gliding: bool,
 }
 
 pub struct ClientEntity {
@@ -878,6 +885,10 @@ impl Client {
                 climbing: false,
                 speed_mul: 1.0,
                 jump_mul: 1.0,
+                climb: 0.0,
+                glide: physics::Glide::default(),
+                on_wall: false,
+                gliding: false,
             },
             joined: false,
             blocks_preloaded: false,
@@ -3432,6 +3443,8 @@ fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, 
         (!input_too || ((d.key.is_empty() || input.held(&d.key)) && (!on(w::SPRINTING) || sprint)))
             && (!on(w::NOT_FLYING) || !(p.flying || p.noclip))
             && (!on(w::SWIM_LIQUID) || in_swim_liquid)
+            && (!on(w::CLIMBING) || p.on_wall)
+            && (!on(w::GLIDING) || p.gliding)
     };
     let want = match p.forced {
         Some((held, _)) => held,
@@ -3518,6 +3531,26 @@ fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, 
         return;
     }
 
+    // Gliding: the air carries it, it steers by its look; holding back brakes, sneaking dives.
+    p.gliding = p.glide.speed > 0.0 && !p.on_ground && !p.in_liquid && !p.on_wall && p.riding.is_none();
+    if p.gliding {
+        let brake = if fwd_in < 0.0 { 1.0 } else { 0.0 };
+        let dive = if sneak { 1.0 } else { 0.0 };
+        physics::glide(&mut p.vel, forward, &p.glide, brake, dive);
+        let r = physics::move_box_with(c, block, bodies, 0, p.pos, hw, height, p.vel, 0.0);
+        p.pos = r.pos;
+        for i in 0..3 {
+            if r.hit[i] {
+                p.vel[i] = 0.0;
+            }
+        }
+        p.on_ground = r.on_ground;
+        p.landed |= p.on_ground;
+        let here = physics::around(c, block, p.pos, height);
+        (p.in_liquid, p.climbing) = (here.in_liquid, here.climbing);
+        return;
+    }
+
     // Walking is the same step mobs take; the player only brings its input.
     p.jump_cooldown = p.jump_cooldown.saturating_sub(1);
     if !jump {
@@ -3533,6 +3566,7 @@ fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, 
         careful: sneak,
         sprint: swimming,
         swim_look: swimming.then(|| (p.pitch as f64).sin()),
+        climb: p.climb,
     };
     let frame = physics::Frame { half_width: hw, height, step: physics::STEP_UP, gravity: g };
     let w = physics::walk(c, block, bodies, 0, &mut p.pos, &mut p.vel, p.on_ground, &ctl, &frame);
@@ -3540,6 +3574,7 @@ fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, 
         p.jump_cooldown = 10;
         p.jumped = true;
     }
+    p.on_wall = w.on_wall;
     let here = physics::around(c, block, p.pos, height);
     (p.in_liquid, p.climbing) = (here.in_liquid, here.climbing);
     if w.on_ground {

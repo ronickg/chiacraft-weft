@@ -22,6 +22,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::OnceLock;
 
 use crate::skills::{self, COUNT, SKILLS, Skill};
+use crate::sockets::{self, Flow, Kind as StoneKind, RADIUS, Stone, Unique};
 use crate::web::{FAMILIES, Family, KEYSTONE_UNITS, Node as Kind, family_signed, units_to_ceiling};
 
 /// Node ids a region has room for (one `u64` of a saved build each).
@@ -76,6 +77,8 @@ pub struct Node {
     pub key: String,
     /// The skill level it needs, in its region's skill (and a bridge's second skill).
     pub needs: u32,
+    /// A socket's saved index (`SOCKETS`), stable like ids.
+    pub socket: Option<u8>,
 }
 
 impl Node {
@@ -441,6 +444,7 @@ fn build() -> Web {
         special: None,
         key: "start".into(),
         needs: 0,
+        socket: None,
     }];
     let mut links = Vec::new();
     for (i, r) in REGIONS.iter().enumerate() {
@@ -467,6 +471,7 @@ fn build() -> Web {
                 special,
                 key,
                 needs: gate(t.ring),
+                socket: None,
             });
             if t.from.is_empty() {
                 links.push((START, id(r.skill, t.at)));
@@ -490,6 +495,7 @@ fn build() -> Web {
             special: None,
             key: format!("family.{}", r.bridge.gives[0].0.id()),
             needs: gate(BRIDGE_RINGS.0),
+            socket: None,
         });
         nodes.push(Node {
             id: notable,
@@ -502,10 +508,29 @@ fn build() -> Web {
             special: r.bridge.special,
             key: r.bridge.key.to_string(),
             needs: gate(BRIDGE_RINGS.1),
+            socket: None,
         });
         links.push((id(r.skill, 8), small));
         links.push((id(next, 7), small));
         links.push((small, notable));
+        // Its socket, deep in the region between the lanes (from the link across at 4.6).
+        let deep = id(r.skill, REGION_SOCKET);
+        nodes.push(socket_node(deep, Some(r.skill), None, REGION_SOCKET_RING, mid, 4 + i as u8));
+        links.push((id(r.skill, 9), deep));
+        // Every second bridge has one past its notable.
+        if i % 2 == 0 {
+            let by = id(r.skill, BRIDGE_SOCKET);
+            nodes.push(socket_node(by, Some(r.skill), Some(next), BRIDGE_SOCKET_RING, edge, 20 + (i / 2) as u8));
+            links.push((notable, by));
+        }
+    }
+    // Four near the centre, between region pairs a quarter round apart, from both entries.
+    for (j, &r) in CENTRE_SOCKETS.iter().enumerate() {
+        let sid = 1 + j as u16;
+        let angle = region_angle(r) + std::f32::consts::PI / COUNT as f32;
+        nodes.push(socket_node(sid, None, None, CENTRE_SOCKET_RING, angle, j as u8));
+        links.push((id(REGIONS[r].skill, 2), sid));
+        links.push((id(REGIONS[(r + 1) % COUNT].skill, 1), sid));
     }
     let index = nodes.iter().enumerate().map(|(i, n)| (n.id, i)).collect();
     let mut near: HashMap<u16, Vec<u16>> = HashMap::new();
@@ -514,6 +539,34 @@ fn build() -> Web {
         near.entry(b).or_default().push(a);
     }
     Web { nodes, links, index, near }
+}
+
+/// Where the sockets are: deep in each region (its place 20, ring 5.6), past every second
+/// bridge's notable (place 42, ring 7.3), and four near the centre (ids 1-4, ring 2.6) between
+/// the regions after these, reached from either side's ring-2 lane node.
+pub const REGION_SOCKET: u16 = 20;
+pub const BRIDGE_SOCKET: u16 = 42;
+const REGION_SOCKET_RING: f32 = 5.6;
+const BRIDGE_SOCKET_RING: f32 = 7.3;
+const CENTRE_SOCKET_RING: f32 = 2.6;
+const CENTRE_SOCKETS: [usize; 4] = [1, 5, 9, 13];
+/// Sockets a saved build holds stones for (28 used; the rest room for more at the rim).
+pub const SOCKETS: usize = 48;
+
+fn socket_node(id: u16, region: Option<Skill>, bridge: Option<Skill>, ring: f32, angle: f32, socket: u8) -> Node {
+    Node {
+        id,
+        kind: Kind::Socket,
+        region,
+        bridge,
+        ring,
+        angle,
+        gives: Vec::new(),
+        special: None,
+        key: "socket".into(),
+        needs: if region.is_some() { gate(ring) } else { 0 },
+        socket: Some(socket),
+    }
 }
 
 /// The web, built once.
@@ -551,6 +604,24 @@ pub fn count(taken: &Taken) -> u32 {
         .count() as u32
 }
 
+/// Points a node costs: one, a socket `SOCKET_POINTS`.
+pub fn cost(n: &Node) -> u32 {
+    if n.kind == Kind::Socket { SOCKET_POINTS } else { 1 }
+}
+/// Points a socket costs (a stone is worth more than a node: the dominance check found a socket
+/// at one point in every build).
+pub const SOCKET_POINTS: u32 = 3;
+
+/// Points spent on a build.
+pub fn spent(taken: &Taken) -> u32 {
+    web()
+        .nodes
+        .iter()
+        .filter(|n| n.id != START && has(taken, n.id))
+        .map(cost)
+        .sum()
+}
+
 /// Whether a special is in the build.
 pub fn has_special(taken: &Taken, s: Special) -> bool {
     web()
@@ -570,6 +641,80 @@ pub fn units(taken: &Taken) -> [f32; FAMILIES.len()] {
         }
     }
     u
+}
+
+/// The stones in a build's sockets, by socket index (`Node::socket`).
+pub type Stones = [Option<Stone>; SOCKETS];
+
+fn near(a: (f32, f32), b: (f32, f32)) -> bool {
+    (a.0 - b.0).hypot(a.1 - b.1) <= RADIUS
+}
+
+/// Units a build gives each family with the stones in its sockets taken: a mind-stone's rolls, a
+/// flow-stone's work on the small nodes taken in its reach, a relic's own.
+pub fn units_with(taken: &Taken, stones: &Stones) -> [f32; FAMILIES.len()] {
+    let web = web();
+    let mut u = units(taken);
+    for n in &web.nodes {
+        let Some(i) = n.socket else { continue };
+        let Some(st) = stones.get(i as usize).copied().flatten() else { continue };
+        if !has(taken, n.id) {
+            continue;
+        }
+        for &(f, x) in st.rolls.iter().flatten() {
+            u[f.index()] += x;
+        }
+        let here = n.pos();
+        let reach = || {
+            web.nodes
+                .iter()
+                .filter(move |m| m.id != START && m.id != n.id && has(taken, m.id) && near(m.pos(), here))
+        };
+        match (st.kind, st.flow) {
+            (_, Some(Flow::Amplify(x))) => {
+                for m in reach().filter(|m| m.kind == Kind::Small) {
+                    for &(f, g) in &m.gives {
+                        u[f.index()] += g * x;
+                    }
+                }
+            }
+            (_, Some(Flow::Turn(to))) => {
+                for m in reach().filter(|m| m.kind == Kind::Small) {
+                    for &(f, g) in &m.gives {
+                        u[f.index()] -= g;
+                        u[to.index()] += g;
+                    }
+                }
+            }
+            (StoneKind::Unique(Unique::Remaru), _) => u[Family::ManaCost.index()] += sockets::REMARU_UNITS,
+            (StoneKind::Unique(Unique::Emakaun), _) => {
+                u[Family::Health.index()] += reach().count() as f32 * sockets::LIFEKEEP_PER_NODE;
+            }
+            _ => {}
+        }
+    }
+    u
+}
+
+/// `times` with the stones counted.
+pub fn times_with(taken: &Taken, stones: &Stones, f: Family) -> f32 {
+    family_signed(units_with(taken, stones)[f.index()])
+}
+
+/// `has_special` with the relics counted (Remaru gives ley sight).
+pub fn has_special_with(taken: &Taken, stones: &Stones, s: Special) -> bool {
+    has_special(taken, s)
+        || (s == Special::LeySight
+            && web().nodes.iter().any(|n| {
+                n.socket.is_some_and(|i| {
+                    has(taken, n.id)
+                        && stones
+                            .get(i as usize)
+                            .copied()
+                            .flatten()
+                            .is_some_and(|st| st.kind == StoneKind::Unique(Unique::Remaru))
+                })
+            }))
 }
 
 /// What a build multiplies a family by (capped at one age, a keystone's cost down to the floor).
@@ -599,7 +744,7 @@ pub fn can_take(taken: &Taken, id: u16, levels: &[u32; COUNT], points: u32) -> R
     if !n.open_at(levels) {
         return Err(Refusal::Skill);
     }
-    if points == 0 {
+    if points < cost(n) {
         return Err(Refusal::NoPoints);
     }
     Ok(())
@@ -703,7 +848,7 @@ pub fn problems() -> Vec<String> {
             }
             _ => {}
         }
-        if n.gives.is_empty() {
+        if n.gives.is_empty() && n.kind != Kind::Socket {
             out.push(format!("{} gives nothing", n.key));
         }
     }
@@ -722,6 +867,8 @@ pub fn problems() -> Vec<String> {
                 .filter(|g| g.0 == f)
                 .map(|g| g.1)
                 .sum();
+            // Every socket of the region holding the best stone for this family.
+            let fu = fu + region_sockets(s) as f32 * sockets::best_units();
             if fu > units_to_ceiling() + 1e-4 {
                 out.push(format!("region {} gives {fu} units of {}", s.id(), f.name()));
             }
@@ -761,11 +908,44 @@ pub const CHECK_SKILL: u32 = 45;
 /// A build's score on a job: the log of what its families multiply, weighted (so ×1.2 in one and
 /// ×1.2 in another is worth as much as ×1.44 in one).
 pub fn score(taken: &Taken, job: &Job) -> f32 {
-    let u = units(taken);
-    job.weights
+    let mut u = units(taken);
+    let worth = |u: &[f32; FAMILIES.len()]| -> f32 {
+        job.weights
+            .iter()
+            .map(|&(f, w)| w * family_signed(u[f.index()]).ln())
+            .sum()
+    };
+    // Each socket taken holds the best stone for the job: a top-level mind-stone in whichever
+    // family gains it most (stones swap freely, so a build always has its best).
+    let sockets = web()
+        .nodes
         .iter()
-        .map(|&(f, w)| w * family_signed(u[f.index()]).ln())
-        .sum()
+        .filter(|n| n.socket.is_some() && has(taken, n.id))
+        .count();
+    for _ in 0..sockets {
+        let best = job
+            .weights
+            .iter()
+            .map(|&(f, _)| {
+                let mut t = u;
+                t[f.index()] += sockets::best_units();
+                (worth(&t), f)
+            })
+            .max_by(|a, b| a.0.total_cmp(&b.0));
+        if let Some((_, f)) = best {
+            u[f.index()] += sockets::best_units();
+        }
+    }
+    worth(&u)
+}
+
+/// Sockets in a region (its own and its bridge's).
+pub fn region_sockets(skill: Skill) -> usize {
+    web()
+        .nodes
+        .iter()
+        .filter(|n| n.region == Some(skill) && n.socket.is_some())
+        .count()
 }
 
 /// The dominance check's result.
@@ -790,14 +970,14 @@ pub fn climb(job: &Job, points: u32, skill: u32) -> Taken {
         // Paths of up to three new nodes out from the build.
         let mut paths: Vec<Vec<u16>> = Vec::new();
         for n in &web.nodes {
-            if can_take(&taken, n.id, &levels, 1).is_ok() {
+            if can_take(&taken, n.id, &levels, SOCKET_POINTS).is_ok() {
                 paths.push(vec![n.id]);
             }
         }
         for _ in 1..3 {
             let mut more = Vec::new();
             for p in &paths {
-                if p.len() as u32 >= left {
+                if path_cost(p) >= left {
                     continue;
                 }
                 let mut t = taken;
@@ -816,14 +996,14 @@ pub fn climb(job: &Job, points: u32, skill: u32) -> Taken {
             paths.extend(more);
         }
         for p in paths {
-            if p.len() as u32 > left {
+            if path_cost(&p) > left {
                 continue;
             }
             let mut t = taken;
             for &i in &p {
                 set(&mut t, i, true);
             }
-            let per = (score(&t, job) - base) / p.len() as f32;
+            let per = (score(&t, job) - base) / path_cost(&p) as f32;
             if best.as_ref().is_none_or(|b| per > b.0 + 1e-6) {
                 best = Some((per, p));
             }
@@ -833,12 +1013,16 @@ pub fn climb(job: &Job, points: u32, skill: u32) -> Taken {
         if per <= 1e-6 {
             break;
         }
+        left -= path_cost(&p);
         for i in p {
             set(&mut taken, i, true);
-            left -= 1;
         }
     }
     taken
+}
+
+fn path_cost(p: &[u16]) -> u32 {
+    p.iter().map(|&i| web().node(i).map_or(1, cost)).sum()
 }
 
 /// Runs the build dominance check.

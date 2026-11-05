@@ -55,7 +55,7 @@ At full rate means work at or above one's skill: Stone Age work at skill 7 teach
 
 ## The web
 
-288 nodes (192 small, 80 notables, 16 keystones) in 16 regions around a free start, 336 links. A small node gives 2 % to its family, a notable 3-4 times that, a keystone 40 % to one family for as much off another. A family tops out at ×1.6 (one age), a keystone's cost at ×0.6. A rare item refunds 3 nodes, each one the rest don't hang from.
+316 nodes (192 small, 80 notables, 16 keystones, 28 sockets) in 16 regions around a free start, 368 links. A small node gives 2 % to its family, a notable 3-4 times that, a keystone 40 % to one family for as much off another. A family tops out at ×1.6 (one age), a keystone's cost at ×0.6. A rare item refunds 3 nodes, each one the rest don't hang from.
 
 Skill level each ring needs (rings 9-12 are room for later ages at the rim):
 
@@ -111,6 +111,31 @@ A region's budget is 30 units (one age in its speciality); keystones count as no
 | smelting speed | 22 | later |
 | machine speed | 39 | later |
 
+### Sockets and stones
+
+Ronald, 11-05: "insert items which generate boosts and you find those items in the world, relics or whatever". A socket costs 3 points (at one, the dominance check found sockets in every build); four sit near the centre (ring 2.6), one deep in every region (5.6) and one past every second bridge (7.3). Stones are found, never made, and swap freely, so the checks assume the best stone for the job in every socket taken: a top-level mind-stone, 5 units in one family.
+
+| Stone | What it does |
+|---|---|
+| maunduk | 1-3 boosts to families, its band split among them, each rolled 60-100 % of its share in half units |
+| aruduk | the small nodes taken within 48 px of its socket: +25-50 % of their units (two in three), or turned to one family |
+| remaru | ley sight, and +2 units of mana cost |
+| emakaun | +0.5 units of health for every node taken in its reach |
+
+A mind-stone's band by the age it's found in (units at the age's middle):
+
+| Stone Age | Bronze Age | Iron Age | Age of Steam | Age of Lightning | Age of the Future | Age of Stars |
+|---|---|---|---|---|---|---|
+| 3.1 | 3.4 | 3.7 | 4.0 | 4.3 | 4.6 | 4.9 |
+
+| Found at | Mind | Flow | Unique | Depth | Chance each time |
+|---|---|---|---|---|---|
+| ruin | 60 % | 30 % | 10 % | 6 | 50 % |
+| boss | 50 % | 35 % | 15 % | 7 | 100 % |
+| ley_node | 40 % | 50 % | 10 % | 5 | 25 % |
+| rare_animal | 85 % | 15 % | 0 % | 4 | 20 % |
+| meteorite | 70 % | 25 % | 5 % | 8 | 12 % |
+
 ## Checks
 
 Every node reachable from the start without passing a deeper gate, every price and region budget kept, no dominant build: no problems.
@@ -121,24 +146,24 @@ Each job's build is hill-climbed with 60 points at skill 45 everywhere, then sco
 
 | Build (points spent) | fighter | archer | tamer | miner | smith | farmer and cook | mage | explorer |
 |---|---|---|---|---|---|---|---|---|
-| fighter (60) | ×2.62 | ×1.27 | ×1.02 | ×1.09 | ×1.04 | ×1.00 | ×1.22 | ×1.12 |
-| archer (55) | ×1.43 | ×2.14 | ×1.00 | ×1.04 | ×1.00 | ×1.04 | ×1.22 | ×1.70 |
-| tamer (35) | ×1.03 | ×1.00 | ×2.05 | ×1.02 | ×1.00 | ×1.00 | ×1.00 | ×1.01 |
-| miner (51) | ×1.22 | ×1.01 | ×1.05 | ×2.05 | ×1.02 | ×1.07 | ×1.00 | ×1.41 |
-| smith (43) | ×1.04 | ×1.00 | ×1.00 | ×1.04 | ×2.19 | ×1.00 | ×1.02 | ×1.00 |
-| farmer and cook (28) | ×1.00 | ×1.00 | ×1.00 | ×1.00 | ×1.00 | ×1.95 | ×1.03 | ×1.10 |
-| mage (45) | ×1.32 | ×1.15 | ×1.00 | ×1.00 | ×1.00 | ×1.00 | ×2.31 | ×1.00 |
-| explorer (60) | ×1.27 | ×1.38 | ×1.04 | ×1.29 | ×1.00 | ×1.18 | ×1.00 | ×2.58 |
+| fighter (44) | ×2.88 | ×2.07 | ×1.85 | ×1.94 | ×1.80 | ×1.85 | ×2.10 | ×1.98 |
+| archer (44) | ×2.02 | ×2.44 | ×1.62 | ×1.60 | ×1.60 | ×1.62 | ×1.79 | ×1.96 |
+| tamer (46) | ×1.86 | ×1.74 | ×2.82 | ×1.72 | ×1.69 | ×1.74 | ×1.81 | ×1.72 |
+| miner (44) | ×1.94 | ×1.81 | ×1.92 | ×2.39 | ×1.82 | ×1.87 | ×1.91 | ×1.96 |
+| smith (43) | ×1.56 | ×1.50 | ×1.51 | ×1.54 | ×2.44 | ×1.51 | ×1.55 | ×1.50 |
+| farmer and cook (41) | ×1.73 | ×1.72 | ×1.74 | ×1.69 | ×1.69 | ×2.85 | ×1.84 | ×1.87 |
+| mage (41) | ×1.96 | ×1.81 | ×1.62 | ×1.63 | ×1.60 | ×1.62 | ×2.68 | ×1.60 |
+| explorer (44) | ×2.01 | ×2.18 | ×1.85 | ×2.04 | ×1.78 | ×1.92 | ×1.85 | ×2.83 |
 
 Most picked nodes:
 
 | Node | Builds |
 |---|---|
-| melee family.melee_damage (ring 1) | 3 of 8 |
-| melee family.stamina (ring 2) | 3 of 8 |
-| melee family.stamina (ring 3) | 3 of 8 |
-| melee melee.second_wind (ring 4) | 3 of 8 |
-| melee family.stamina (ring 5) | 3 of 8 |
-| melee family.stamina (ring 6) | 3 of 8 |
-| melee melee.battle_rhythm (ring 7) | 3 of 8 |
-| defence family.defence (ring 1) | 3 of 8 |
+|  socket (ring 2.6) | 6 of 8 |
+|  socket (ring 2.6) | 6 of 8 |
+|  socket (ring 2.6) | 6 of 8 |
+|  socket (ring 2.6) | 5 of 8 |
+| archery family.ranged_damage (ring 1) | 5 of 8 |
+| archery family.move_speed (ring 2) | 5 of 8 |
+| survival family.health (ring 2) | 5 of 8 |
+| mining family.mine_speed (ring 1) | 4 of 8 |

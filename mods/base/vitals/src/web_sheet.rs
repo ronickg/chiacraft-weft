@@ -88,10 +88,11 @@ pub fn markdown() -> String {
     };
     let _ = writeln!(
         w,
-        "{nodes} nodes ({} small, {} notables, {} keystones) in {} regions around a free start, {} links. A small node gives {:.0} % to its family, a notable 3-4 times that, a keystone {:.0} % to one family for as much off another. A family tops out at ×{:.1} (one age), a keystone's cost at ×{:.1}. A rare item refunds {} nodes, each one the rest don't hang from.\n",
+        "{nodes} nodes ({} small, {} notables, {} keystones, {} sockets) in {} regions around a free start, {} links. A small node gives {:.0} % to its family, a notable 3-4 times that, a keystone {:.0} % to one family for as much off another. A family tops out at ×{:.1} (one age), a keystone's cost at ×{:.1}. A rare item refunds {} nodes, each one the rest don't hang from.\n",
         count(Kind::Small),
         count(Kind::Notable),
         count(Kind::Keystone),
+        count(Kind::Socket),
         REGIONS.len(),
         web.links.len(),
         web::UNIT * 100.0,
@@ -179,6 +180,8 @@ pub fn markdown() -> String {
         let _ = writeln!(w, "| {} | {u:.0} | {} |", f.name(), if f.in_game() { "yes" } else { "later" });
     }
 
+    sockets_section(w);
+
     let _ = writeln!(w, "\n## Checks\n");
     let p = perks::problems();
     if p.is_empty() {
@@ -220,4 +223,66 @@ pub fn markdown() -> String {
         let _ = writeln!(w, "| {} {} (ring {}) | {c} of {} |", n.region.map_or("", |r| r.id()), n.key, n.ring, d.builds.len());
     }
     s
+}
+
+fn sockets_section(w: &mut String) {
+    use crate::sockets::{self, KINDS, SOURCES};
+    let _ = writeln!(
+        w,
+        "\n### Sockets and stones\n\nRonald, 11-05: \"insert items which generate boosts and you find those items in the world, relics or whatever\". A socket costs {} points (at one, the dominance check found sockets in every build); four sit near the centre (ring 2.6), one deep in every region (5.6) and one past every second bridge (7.3). Stones are found, never made, and swap freely, so the checks assume the best stone for the job in every socket taken: a top-level mind-stone, {:.0} units in one family.\n",
+        perks::SOCKET_POINTS,
+        sockets::best_units()
+    );
+    let _ = writeln!(w, "| Stone | What it does |");
+    let _ = writeln!(w, "|---|---|");
+    for k in KINDS {
+        let what = match k {
+            sockets::Kind::Mind => {
+                "1-3 boosts to families, its band split among them, each rolled 60-100 % of its share in half units".to_string()
+            }
+            sockets::Kind::Flow => format!(
+                "the small nodes taken within {:.0} px of its socket: +{:.0}-{:.0} % of their units (two in three), or turned to one family",
+                sockets::RADIUS,
+                sockets::AMPLIFY_MIN * 100.0,
+                sockets::AMPLIFY_MAX * 100.0
+            ),
+            sockets::Kind::Unique(sockets::Unique::Remaru) => format!("ley sight, and +{:.0} units of mana cost", sockets::REMARU_UNITS),
+            sockets::Kind::Unique(sockets::Unique::Emakaun) => {
+                format!("+{} units of health for every node taken in its reach", sockets::LIFEKEEP_PER_NODE)
+            }
+        };
+        let _ = writeln!(w, "| {} | {what} |", k.id());
+    }
+    let _ = writeln!(w, "\nA mind-stone's band by the age it's found in (units at the age's middle):\n");
+    let _ = writeln!(
+        w,
+        "| {} |",
+        AGES.iter()
+            .map(|a| a.name())
+            .collect::<Vec<_>>()
+            .join(" | ")
+    );
+    let _ = writeln!(w, "|{}", "---|".repeat(AGES.len()));
+    let _ = writeln!(
+        w,
+        "| {} |\n",
+        AGES.iter()
+            .map(|a| format!("{:.1}", sockets::band(a.reference())))
+            .collect::<Vec<_>>()
+            .join(" | ")
+    );
+    let _ = writeln!(w, "| Found at | Mind | Flow | Unique | Depth | Chance each time |");
+    let _ = writeln!(w, "|---|---|---|---|---|---|");
+    for f in SOURCES {
+        let _ = writeln!(
+            w,
+            "| {} | {:.0} % | {:.0} % | {:.0} % | {} | {:.0} % |",
+            f.source.id(),
+            f.odds[0] * 100.0,
+            f.odds[1] * 100.0,
+            f.odds[2] * 100.0,
+            f.depth,
+            f.chance * 100.0
+        );
+    }
 }

@@ -32,6 +32,7 @@ pub const BUILTIN: &[(&str, &str)] = &[
     (abi::comp::HARDNESS, "f32"),
     (abi::comp::FRICTION, "f32"),
     (abi::comp::DRAG, "f32"),
+    (abi::comp::GRIP, "f32"),
     (abi::comp::LIGHT, "[u8;3]"),
     (abi::comp::TINT, "tint"),
     (abi::comp::TINT_FACES, "u8"),

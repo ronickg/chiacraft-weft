@@ -9,6 +9,7 @@
 use base_api::skills::{
     COOK_EXTRA, Family, HARVEST_EXTRA, HUNGER_PACE, MAX_HEALTH, MAX_STAMINA, SKILL_WEB, Skill, SkillWeb, TAMING_SPEED, give_skill, times,
 };
+use base_api::skills::{STONE, StoneKind, StoneSource, stone_stack};
 use base_api::{VITALS, give_xp};
 use vitals::curve::{Age, age_of, item_level};
 use vitals::perks::{self, Refusal};
@@ -18,6 +19,12 @@ use weft_sdk::*;
 /// A node taken from the web screen, by id; one refunded.
 pub static TAKE: Channel<u32> = Channel::named("web_take");
 pub static REFUND: Channel<u32> = Channel::named("web_refund");
+/// A stone put in a taken socket from an inventory slot (the socket node's id × 65536 + the
+/// slot), and one taken out (the node's id).
+pub static SOCKET: Channel<u32> = Channel::named("web_socket");
+pub static UNSOCKET: Channel<u32> = Channel::named("web_unsocket");
+/// The stones' items (`vitals::sockets::KINDS`): mind-stone, flow-stone and the relics.
+pub static STONES: [Item; 4] = [Item::named("maunduk"), Item::named("aruduk"), Item::named("remaru"), Item::named("emakaun")];
 /// The rare item that refunds a few nodes (`perks::REFUNDS_PER_ITEM`).
 pub static UNLEARNING_STONE: Item = Item::named("unlearning_stone");
 /// The attribute modifiers the web sets.
@@ -39,6 +46,27 @@ pub fn register(r: &mut Registry) {
     effects(r);
     r.packet(&TAKE, |p, id| take(&p.world(), p.player(), id as u16));
     r.packet(&REFUND, |p, id| refund(&p.world(), p.player(), id as u16));
+    r.packet(&SOCKET, |p, v| socket(&p.world(), p.player(), (v >> 16) as u16, v & 0xffff));
+    r.packet(&UNSOCKET, |p, id| {
+        unsocket(&p.world(), p.player(), id as u16);
+    });
+    r.stack_component(&STONE, 0);
+    for item in &STONES {
+        r.item(item)
+            .max_stack(1)
+            .tag("web_stones")
+            .tab(&crate::tabs::INGREDIENTS);
+    }
+    // Fallen stars: a pallasite broken may hold a stone (`vitals::sockets::SOURCES`).
+    r.on(&actions::BREAK_BLOCK, |b| {
+        let w = b.world();
+        for e in b.iter() {
+            if crate::stars::PALLASITE.is(e.state) && !w.outside_survival(e.player) {
+                let p = e.pos.to_array();
+                base_api::skills::drop_stone(&w, StoneSource::Meteorite, 2, [p[0] as f64 + 0.5, p[1] as f64 + 0.5, p[2] as f64 + 0.5]);
+            }
+        }
+    });
     r.item(&UNLEARNING_STONE)
         .max_stack(16)
         .on_use(|u| {
@@ -68,7 +96,7 @@ pub fn points(w: &World, player: u64) -> u32 {
         .map_or(1, |v| vitals::levels::level_of(v.xp).0);
     let taken = w
         .component(player, &SKILL_WEB)
-        .map_or(0, |s| perks::count(&s.taken));
+        .map_or(0, |s| perks::spent(&s.taken));
     points_of(level, taken)
 }
 
@@ -109,7 +137,60 @@ fn refund(w: &World, player: u64, id: u16) {
     }
     perks::set(&mut s.taken, id, false);
     s.refunds -= 1;
+    // A socket's stone comes back.
+    unsocket(w, player, id);
     refresh(w, player);
+}
+
+/// The socket index of a node, if it's a socket.
+fn socket_index(id: u16) -> Option<usize> {
+    perks::web()
+        .node(id)
+        .and_then(|n| n.socket)
+        .map(|i| i as usize)
+}
+
+/// Puts the stone in inventory `slot` into the taken socket `id` (one already there comes back).
+fn socket(w: &World, player: u64, id: u16, slot: u32) {
+    let Some(i) = socket_index(id) else { return };
+    let inv = w.inventory(player);
+    if slot >= inv.len() {
+        return;
+    }
+    let stack = inv.get(slot);
+    let Some(data) = STONE.on_stack_own(&stack) else { return };
+    if !w
+        .component(player, &SKILL_WEB)
+        .is_some_and(|s| perks::has(&s.taken, id))
+    {
+        return;
+    }
+    inv.set(slot, StackData::shrink(stack, 1));
+    unsocket(w, player, id);
+    if let Some(s) = w.component_mut(player, &SKILL_WEB) {
+        s.stones[i] = data;
+    }
+    weft_sdk::info!("player {player} socketed a stone (kind {}) in node {id}", data.kind);
+    refresh(w, player);
+}
+
+/// Takes the stone out of socket `id` into the inventory (or at the feet): free, any time.
+fn unsocket(w: &World, player: u64, id: u16) -> bool {
+    let Some(i) = socket_index(id) else { return false };
+    let Some(s) = w.component_mut(player, &SKILL_WEB) else { return false };
+    let data = std::mem::take(&mut s.stones[i]);
+    let Some(kind) = StoneKind::of_code(data.kind) else { return false };
+    let Some(item) = Item::lookup(&format!("base:{}", kind.id())) else { return false };
+    let left = w
+        .inventory(player)
+        .insert(ItemStack::new(item, 1).with(&STONE, data));
+    if !left.is_empty()
+        && let Some(st) = w.entity(player)
+    {
+        w.spawn_item(st.pos, left);
+    }
+    refresh(w, player);
+    true
 }
 
 // ------------------------------------------------------------------ the second's work
@@ -445,11 +526,53 @@ fn commands(r: &mut Registry) {
     })
     .permission(permission::GAME_MASTER);
     // Takes a node by id (for testing: the screen's click), or refunds it.
-    r.command("perk", "<action:word(take,refund)> <node:int>", |cmd| {
+    // Gives a rolled stone (for testing): its kind and item level (the Iron Age's middle without).
+    r.command("stone", "<kind:word(maunduk,aruduk,remaru,emakaun)> [level:int]", |cmd| {
+        let w = cmd.world();
+        let Some(kind) = cmd
+            .text("kind")
+            .and_then(|k| vitals::sockets::KINDS.into_iter().find(|s| s.id() == k))
+        else {
+            return;
+        };
+        let level = cmd.int("level").map_or(Age::Iron.reference(), |l| l as f32);
+        let stack = stone_stack(&w, kind, level);
+        let data = STONE.on_stack_own(&stack).unwrap_or_default();
+        let left = w.inventory(cmd.player()).insert(stack);
+        if !left.is_empty() {
+            return;
+        }
+        cmd.reply("command.base.stone", &[Arg::Text(kind.id()), Arg::Int(data.level as i64)]);
+    })
+    .permission(permission::GAME_MASTER);
+    // Puts a stone from an inventory slot in a socket, or takes one out (for testing: the screen's clicks).
+    r.command("socket", "<node:int> [slot:int]", |cmd| {
+        let w = cmd.world();
+        let id = cmd.int("node").unwrap_or(0).clamp(0, u16::MAX as i64) as u16;
+        match cmd.int("slot") {
+            Some(slot) => socket(&w, cmd.player(), id, slot.max(0) as u32),
+            None => {
+                unsocket(&w, cmd.player(), id);
+            }
+        }
+    })
+    .permission(permission::GAME_MASTER);
+    // Takes or refunds a node by id (for testing: the screen's clicks), or shows what the web and
+    // its stones multiply each family the game reads by.
+    r.command("perk", "<action:word(take,refund,show)> [node:int]", |cmd| {
         let w = cmd.world();
         let id = cmd.int("node").unwrap_or(0).clamp(0, u16::MAX as i64) as u16;
         match cmd.text("action") {
             Some("refund") => refund(&w, cmd.player(), id),
+            Some("show") => {
+                let line = vitals::web::FAMILIES
+                    .iter()
+                    .filter(|f| f.in_game())
+                    .map(|&f| format!("{} x{:.3}", f.id(), times(&w, cmd.player(), f)))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                cmd.reply("command.base.perk_show", &[Arg::Text(&line)]);
+            }
             _ => take(&w, cmd.player(), id),
         }
     })
