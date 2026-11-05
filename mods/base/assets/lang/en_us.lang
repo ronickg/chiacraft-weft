@@ -693,6 +693,8 @@ advancement.base.preserved = Put By
 advancement.base.preserved.desc = Preserve food for later
 advancement.base.tame = A Friend
 advancement.base.tame.desc = Tame an animal
+advancement.base.red_night = Red Night
+advancement.base.red_night.desc = See a blood moon through to its end without dying
 
 # Where things come from (tooltips)
 menu.base.campfire = Campfire
@@ -1091,6 +1093,10 @@ hint.base.lash = Lash the head to a stick with two string in your inventory's gr
 hint.base.tree = An axe fells a tree: chop its lowest log, and cut the trunk where it lies. The nearest tree stands at x {0}, z {1}.
 hint.base.tree_far = An axe fells a tree: chop its lowest log, and cut the trunk where it lies. No tree grows near here: look for a wood.
 hint.base.knapping_book = Knapping from memory: {0} s a head. Keep the flint in your bag.
+hint.base.blood_moon = The full moon will rise dark red tonight. Monsters walk boldly under it: stay by your fire.
+hint.base.blood_moon_gentle = The full moon will rise dark red tonight: an eclipse, worth staying up for.
+hint.base.meteor_shower = The sky is restless tonight: stars will fall after midnight.
+hint.base.aurora_storm = The north is glowing tonight.
 knapping.base.title = Knapping
 knapping.base.how = Strike away the flint outside the head's outline. A strike inside it breaks the nodule.
 knapping.base.keep_tip = Part of the head: a strike here breaks the nodule

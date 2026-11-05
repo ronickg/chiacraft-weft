@@ -224,6 +224,8 @@ fn watch(w: &World) {
                 let light = vitals::calendar::daylight_hours((v.date - 1) as f32, base_api::calendars::swing(v.calendar));
                 12.0 + light / 2.0
             });
+        // Tonight's sky event, foretold before sunset (`events.rs`).
+        crate::events::dusk(w, id, hour, sunset);
         if (sunset - DUSK_BEFORE..sunset).contains(&hour) && !seen(w, id, NIGHT) {
             let day = (w.day_time() / 24000) as u32;
             if let Some(shown) = w.component_mut(id, &NIGHT_SHOWN)

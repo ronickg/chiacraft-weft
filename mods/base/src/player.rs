@@ -27,8 +27,14 @@ fn armor_of(w: &World, entity: u64) -> (u32, f32) {
 pub fn register(r: &mut Registry) {
     // Third person sways and jolts as first person does (chiacraft's feel; Weft's own behind and
     // front cameras are still).
-    drop(r.camera(&cameras::BEHIND).with(weft_sdk::abi::camera_flags::EFFECTS));
-    drop(r.camera(&cameras::FRONT).with(weft_sdk::abi::camera_flags::EFFECTS));
+    drop(
+        r.camera(&cameras::BEHIND)
+            .with(weft_sdk::abi::camera_flags::EFFECTS),
+    );
+    drop(
+        r.camera(&cameras::FRONT)
+            .with(weft_sdk::abi::camera_flags::EFFECTS),
+    );
     r.player_inventory()
         .group("hotbar", Slots::row(9).hotbar())
         .group("main", Slots::grid(9, 3));

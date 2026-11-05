@@ -12,6 +12,7 @@ mod crafts;
 mod crops;
 mod death;
 mod discovery;
+mod events;
 mod fall;
 mod farming;
 mod felled;
@@ -109,6 +110,7 @@ fn init(r: &mut Registry) {
     first::register(r);
     knapping::register(r);
     firebed::register(r);
+    events::register(r);
     sounds::register(r);
     mobs::register(r);
     worldgen::register(r);

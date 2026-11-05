@@ -22,7 +22,11 @@ value! {
 pub static KNOWN: Component<Known> = Component::named("base:known_items");
 
 pub fn register(r: &mut Registry) {
-    r.entity_component(&KNOWN, Known { bits: [0; WORDS] }, component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP_ON_RESPAWN);
+    r.entity_component(
+        &KNOWN,
+        Known { bits: [0; WORDS] },
+        component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP_ON_RESPAWN,
+    );
     r.attach(&PLAYER, &KNOWN);
     r.world_tick(|w| {
         if w.game_time() % EVERY != 0 {
