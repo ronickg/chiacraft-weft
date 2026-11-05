@@ -804,18 +804,19 @@ fn base_ground(h: &Here) -> i32 {
 /// The ground's height (Q4) with the rivers: what the engine makes of `features`.
 pub fn height(f: &Fields, x: i32, z: i32) -> i32 {
     let ground = with_tarns(f, x, z);
-    ground + stream_cut(f, x, z, ground)
+    ground + stream_cut(f, x, z, || ground)
 }
 
 /// The ground (Q4) with the tarns, before their streams.
 fn with_tarns(f: &Fields, x: i32, z: i32) -> i32 {
     let ground = before_tarns(f, x, z);
-    ground + tarns::cut(f, x, z, ground, &|x, z| before_tarns(f, x * 16, z * 16) >> 4)
+    ground + tarns::cut(f, x, z, &|| ground, &|x, z| before_tarns(f, x * 16, z * 16) >> 4)
 }
 
-/// What a tarn's stream takes off ground `ground` (Q4) at (`x`, `z`) (Q4): down to its bed.
-fn stream_cut(f: &Fields, x: i32, z: i32, ground: i32) -> i32 {
-    stream_bed(f, x >> 4, z >> 4).map_or(0, |bed| (q4(bed as f64) + 8 - ground).min(0))
+/// What a tarn's stream takes off ground `ground` (Q4, asked only where a stream runs) at (`x`,
+/// `z`) (Q4): down to its bed.
+fn stream_cut(f: &Fields, x: i32, z: i32, ground: impl FnOnce() -> i32) -> i32 {
+    stream_bed(f, x >> 4, z >> 4).map_or(0, |bed| (q4(bed as f64) + 8 - ground()).min(0))
 }
 
 /// The bed (blocks) of a tarn's stream at column (`x`, `z`) (blocks), if one runs there: still
@@ -827,7 +828,7 @@ pub fn stream_bed(f: &Fields, x: i32, z: i32) -> Option<i32> {
 /// What the tarns' streams take off the ground (Q4, zero or less) at (`x`, `z`) (Q4), as the
 /// engine adds it.
 pub fn tarn_streams(f: &Fields, x: i32, z: i32) -> i32 {
-    stream_cut(f, x, z, with_tarns(f, x, z))
+    stream_cut(f, x, z, || with_tarns(f, x, z))
 }
 
 /// The stream of the tarn in the cell holding (`x`, `z`) (blocks): its columns from the outlet
@@ -845,7 +846,7 @@ fn before_tarns(f: &Fields, x: i32, z: i32) -> i32 {
 
 /// What the tarns take off the ground (Q4, zero or less) at (`x`, `z`) (Q4), as the engine adds it.
 pub fn tarns(f: &Fields, x: i32, z: i32) -> i32 {
-    tarns::cut(f, x, z, before_tarns(f, x, z), &|x, z| before_tarns(f, x * 16, z * 16) >> 4)
+    tarns::cut(f, x, z, &|| before_tarns(f, x, z), &|x, z| before_tarns(f, x * 16, z * 16) >> 4)
 }
 
 /// The water's level (y of its top block) of the tarn column (`x`, `z`) (blocks) is in, if any:
