@@ -36,6 +36,7 @@ mod levels;
 mod ley;
 mod look;
 mod machines;
+mod metals;
 mod meteors;
 mod mobs;
 mod parts;
@@ -124,6 +125,7 @@ fn init(r: &mut Registry) {
     recipes::register(r);
     book::register(r);
     discovery::register(r);
+    metals::register(r);
     parts::register(r);
     gems::register(r);
     first::register(r);

@@ -143,7 +143,8 @@ pub(crate) fn mass(w: &World, id: u64) -> Option<f32> {
 }
 
 /// A goal for wild hunters: hungry, it goes after the nearest prey it can take; it takes the turn
-/// while it chases (a knock-out kind fights through its anger, `knockout::behave`).
+/// while it chases (a knock-out kind fights through its anger, `knockout::behave`, after stalking
+/// first if it ambushes: `stalks_first`).
 pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
     let t = crate::prof::stamp();
     let r = hunt_(w, id, st);
@@ -178,6 +179,9 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
         let give_up = ((if pack { 2 * GIVE_UP } else { GIVE_UP }) as f32 * (1.0 + animals_core::roles::FIERCE_CHASE * fierce)) as u64;
         if alive && now < h[1] + give_up {
             if knockout {
+                if stalks_first(w, id, st, s, h[0], pack, now) {
+                    return true;
+                }
                 // Its anger does the chasing; kept up while the chase lasts.
                 if w.component(id, &crate::knockout::KNOCKOUT)
                     .is_some_and(|k| k.angry == 0 && k.out == 0)
@@ -240,10 +244,28 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
     h = [t, now, now + LOOK_EVERY, (pack >= species::PACK) as u64];
     w.component_mut(id, &HUNT).map(|c| *c = h);
     if knockout {
+        if stalks_first(w, id, st, s, t, pack >= species::PACK, now) {
+            return true;
+        }
         crate::knockout::anger(w, id, t);
         return false;
     }
     crate::commands::fight(w, id, st, t);
+    true
+}
+
+/// A knock-out kind that ambushes (a jaguar) stalks to its burst range as any ambusher does
+/// (`chase`); its anger takes over as it breaks cover with the pounce. False once it has broken
+/// cover (or isn't an ambusher alone): its anger does the rest.
+fn stalks_first(w: &World, id: u64, st: &EntityState, s: &Species, prey: u64, pack: bool, now: u64) -> bool {
+    if pack || !animals_core::roles::ambushes(s.family.name) || w.component(id, &CHARGING).unwrap_or(0) != 0 {
+        return false;
+    }
+    let (aim, speed) = chase(w, id, st, s, prey, pack, now);
+    if w.component(id, &CHARGING).unwrap_or(0) != 0 {
+        return false;
+    }
+    crate::commands::fight_aiming(w, id, st, prey, speed, aim);
     true
 }
 
@@ -306,7 +328,7 @@ pub fn wary(w: &World, id: u64, st: &EntityState) -> bool {
         weft_sdk::debug!("animal {id} runs from {} (awareness {:.2}) to {to:?}", seen.threat, seen.aware);
         w.navigate(id, to, 1.6);
         // The alarm as it bolts: a snort, the tail flagged, a bark (whatever its kind's is).
-        crate::anim::act(w, id, crate::anim::Act::Alarm);
+        crate::wild::alarm(w, id);
         w.component_mut(id, &WARY).map(|u| *u = now + RUN);
         crate::senses::ran(w, id, false);
         return true;

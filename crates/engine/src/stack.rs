@@ -122,6 +122,14 @@ pub fn name(stack: &ItemStack) -> Option<String> {
     value(stack.data, c.ids.name?).map(|b| String::from_utf8_lossy(b).into_owned())
 }
 
+/// How a worn stack is drawn on its wearer (`abi::comp::WORN_LOOK`), if it has its own.
+pub fn worn_look(stack: &ItemStack) -> Option<&'static str> {
+    let c = crate::content::try_content()?;
+    value(stack.data, c.ids.worn_look?)
+        .and_then(|b| std::str::from_utf8(b).ok())
+        .filter(|l| !l.is_empty())
+}
+
 /// The layers the stack is drawn from (`abi::comp::LOOK`), if it has its own look.
 pub fn look(stack: &ItemStack) -> Option<&'static str> {
     let c = crate::content::try_content()?;

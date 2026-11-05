@@ -46,6 +46,12 @@ if __name__ == "__main__":
         back = {f: v for f, v in gait(spec, anim, FEET).items() if v is not None and v <= 0}
         assert not back, f"{anim} goes backwards: {back}"
     made = export(spec, os.path.join(OUT, "texture.png"), ASSETS, "mouse", SCALE, "mouse/mouse", pose_files=POSES)
+    # No thin lines (Ronald, 11-05): no strip of a box under two texels showing beside another, checked
+    # on the model as the game has it (`linecheck.py` on the exported geo).
+    from linecheck import density_of, lines, load  # noqa: E402
+    boxes, tex = load(os.path.join(ASSETS, "models", "mouse.geo.json"), os.path.join(ASSETS, "textures", "entity", "mouse", "mouse.png"))
+    thin = [h for h in lines(boxes, tex, density_of(boxes), allow=()) if h["kind"] == "line"]
+    assert not thin, f"thin lines: {[(h['box'], h['face'], h['cover'], h['width']) for h in thin]}"
     # Its coat layers, for coats painted from genes in the game (`core/src/coats.rs`).
     shutil.copytree(os.path.join(OUT, "layers"), os.path.join(HERE, "..", "..", "genetics", "layers", "mouse"), dirs_exist_ok=True)
     print("wrote", made, "into", os.path.normpath(ASSETS))

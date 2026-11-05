@@ -111,11 +111,28 @@ def materials(kind):
     return [material("shell", shell), material("shell", deep), material("shell", mark)]
 
 
+# No thin lines (Ronald, 11-05): no strip of a box under two texels showing beside another, checked
+# on the spec and on the model as the game has it. Meant (the planner's ruling, 11-05): the egg's
+# round taper, each layer a unit narrower than the next stepping in toward both ends, so the middle
+# layers' sides (1 to 5) show a band of under a texel above or below their neighbours, and their
+# tops a ring; reshaping them to flush or two texels would square the egg off. The tips (0, 6) stay
+# checked.
+TAPER = [f"egg{k}" for k in range(1, 6)]
+
+
+def no_thin_lines(boxes, tex, allow):
+    from linecheck import density_of, lines  # noqa: E402
+    thin = [h for h in lines(boxes, tex, density_of(boxes), allow=allow) if h["kind"] == "line"]
+    assert not thin, f"thin lines: {[(h['box'], h['face'], h['cover'], h['width']) for h in thin]}"
+
+
 def build(kind, out):
     os.makedirs(out, exist_ok=True)
     E = elements()
     down = lambda e, face, p: np.clip((HEIGHT - p[..., 1]) / HEIGHT, 0, 1)  # lit as one piece
     sheet, uv = paint(E, lambda e, f, p, uu, vv, h: area(p, kind), materials(kind), ground=False, width=32, down=down, tx=TX)
+    from linecheck import boxes_from_spec  # noqa: E402
+    no_thin_lines(boxes_from_spec(entity_spec(E, uv, sheet, "egg")), sheet, TAPER)
     return E, sheet, uv
 
 
@@ -135,4 +152,7 @@ if __name__ == "__main__":
     subprocess.run([sys.executable, os.path.join(SKILL, "boxcheck.py"), os.path.join(OUT, "spec.json")], check=True)
     if "--variants" not in sys.argv:
         made = export(spec, os.path.join(OUT, "texture.png"), ASSETS, "egg", SCALE, "egg/egg", pose_files={"": {}})
+        from linecheck import load  # noqa: E402
+        no_thin_lines(*load(os.path.join(ASSETS, "models", "egg.geo.json"), os.path.join(ASSETS, "textures", "entity", "egg", "egg.png")),
+                      [f"{n}_tilt#0" for n in TAPER])  # the exported cubes: <bone>#<n>
         print("wrote", made, "(", CHOSEN, ")")

@@ -151,6 +151,15 @@ fn settle(w: &World, id: u64, st: &EntityState, look: &str) -> bool {
     resting
 }
 
+/// The alarm as it bolts (`hunt::wary`, `taming::behave`), unless it is still in its resting look:
+/// those looks are other kinds with no alarm clip, and the look comes off later than a clip goes
+/// out (the PC log: "no clip for action alarm on animals:deer_lie"). Up at once instead.
+pub fn alarm(w: &World, id: u64) {
+    if !w.component(id, &STATE).is_some_and(|c| c.resting) {
+        crate::anim::act(w, id, crate::anim::Act::Alarm);
+    }
+}
+
 /// Up and running from a hunter (`hunt::wary`): out of its rest.
 fn woken(w: &World, id: u64) -> bool {
     wake(w, id);

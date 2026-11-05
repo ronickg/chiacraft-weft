@@ -36,6 +36,17 @@ if __name__ == "__main__":
     from ground import gait, joints  # noqa: E402
     loose = joints(spec)  # every joint inside both parts it joins, or they come apart when it turns
     assert not loose, f"loose joints: {loose}"
+    # No thin lines (Ronald, 11-05): no strip of a box under two texels showing beside another
+    # (linecheck; flush, or two texels clear).
+    # Meant: the cat is small at 32 a block, so an upper leg's face is 2 by 2 texels and any of it the
+    # chest or hips cover leaves the rest under two (the legs' tops showing 1-1.25 texels under the
+    # body at their joints); the white throat a texel under the skull.
+    from linecheck import boxes_from_spec, lines  # noqa: E402
+    from PIL import Image  # noqa: E402
+    import numpy as np  # noqa: E402
+    thin = [h for h in lines(boxes_from_spec(spec), np.array(Image.open(os.path.join(OUT, "texture.png")).convert("RGBA")),
+                             allow=("leg_FL_upper", "leg_FR_upper", "thigh_*", "neck.south")) if h["kind"] == "line"]
+    assert not thin, f"thin lines: {[(h['box'], h['face'], h['cover'], h['width']) for h in thin]}"
     for anim in ("walk", "run"):  # a foot in the air must swing forward, or it moonwalks
         back = {f: v for f, v in gait(spec, anim, ["leg_FL_paw", "leg_FR_paw", "leg_BL_paw", "leg_BR_paw"]).items() if v is not None and v <= 0}
         assert not back, f"{anim} goes backwards: {back}"

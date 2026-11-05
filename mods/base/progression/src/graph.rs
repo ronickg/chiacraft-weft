@@ -205,6 +205,19 @@ const RECIPES_LIST: &[Recipe] = &[
     c("base:coal", 9.0, &[("base:coal_block", 1.0)], Hand),
     s("base:iron_ingot", &[("base:raw_iron", 1.0)], Furnace),
     s("base:gold_ingot", &[("base:raw_gold", 1.0)], Furnace),
+    // Copper, tin, bronze and steel (`metals.rs`, `vitals::crafts`).
+    s("base:copper_ingot", &[("base:raw_copper", 1.0)], Furnace),
+    s("base:tin_ingot", &[("base:raw_tin", 1.0)], Furnace),
+    Recipe {
+        out: "base:bronze_ingot",
+        n: 1.0,
+        ins: &[("base:copper_ingot", 1.0), ("base:tin_ingot", 1.0)],
+        at: Station("base:crucible"),
+        secs: 30.0,
+    },
+    Recipe { out: "base:steel_ingot", n: 1.0, ins: &[("base:iron_ingot", 1.0), ("base:coal", 1.0)], at: Station("base:forge"), secs: 48.0 },
+    c("base:crucible", 1.0, &[("base:bricks", 7.0), ("base:coal", 1.0)], Table),
+    c("base:forge", 1.0, &[("base:iron_ingot", 3.0), ("base:bricks", 5.0), ("base:furnace", 1.0)], Table),
     s("base:cooked_beef", &[("base:beef", 1.0)], Fire),
     s("base:cooked_porkchop", &[("base:porkchop", 1.0)], Fire),
     s("base:cooked_chicken", &[("base:chicken", 1.0)], Fire),
@@ -216,6 +229,9 @@ const RECIPES_LIST: &[Recipe] = &[
     // ores and the sky (blocks.rs, meteors.rs, stars.rs)
     b("base:coal", 1.0, &[("base:coal_ore", 1.0)], PICK, 30.0),
     b("base:raw_iron", 1.0, &[("base:iron_ore", 1.0)], PICK_STONE, 60.0),
+    // Copper is common where it is; tin about thirty times rarer: a long search.
+    b("base:raw_copper", 1.0, &[("base:copper_ore", 1.0)], PICK_STONE, 90.0),
+    b("base:raw_tin", 1.0, &[("base:tin_ore", 1.0)], PICK_STONE, 300.0),
     b("base:raw_gold", 1.0, &[("base:gold_ore", 1.0)], PICK_STONE, 180.0),
     b("base:diamond", 1.0, &[("base:diamond_ore", 1.0)], PICK_STEEL, 600.0),
     b("base:redstone", 4.0, &[("base:redstone_ore", 1.0)], PICK_IRON, 120.0),
@@ -356,6 +372,9 @@ pub const GROUPS: &[(&str, &[&str])] = &[
             "base:meteoric_iron",
             "base:star_steel_ingot",
             "base:gold_ingot",
+            "base:copper_ingot",
+            "base:bronze_ingot",
+            "base:steel_ingot",
             "base:diamond",
             "base:wool",
             "base:cloth",
@@ -371,7 +390,10 @@ pub const GROUPS: &[(&str, &[&str])] = &[
 pub const TOOLS: &[(&str, &str, u32)] = &[
     ("base:axe", "axe", 100),
     ("base:pickaxe", "pickaxe", 100),
+    ("base:copper_ingot", "pickaxe", 170),
+    ("base:bronze_ingot", "pickaxe", 210),
     ("base:iron_ingot", "pickaxe", 280),
+    ("base:steel_ingot", "pickaxe", 320),
     ("base:meteoric_iron", "pickaxe", 230),
     ("base:star_steel_ingot", "pickaxe", 340),
     ("base:diamond", "pickaxe", 400),
@@ -384,7 +406,10 @@ pub const TOOLS: &[(&str, &str, u32)] = &[
 pub const TOOL_HEADS: &[(&str, &str)] = &[
     ("base:axe", "flint"),
     ("base:pickaxe", "flint"),
+    ("base:copper_ingot", "copper"),
+    ("base:bronze_ingot", "bronze"),
     ("base:iron_ingot", "wrought_iron"),
+    ("base:steel_ingot", "steel"),
     ("base:meteoric_iron", "meteoric_iron"),
     ("base:star_steel_ingot", "star_steel"),
     ("base:diamond", "diamond"),
@@ -742,6 +767,9 @@ pub const KITS: &[(Age, &[(&str, f32)])] = &[
             ("base:gold_ingot", 4.0),
             ("animals:borkon_altar", 1.0),
             ("animals:mountain_offering", 2.0),
+            // A bronze pick and axe head and a sword blade (3, 3, 2) from the crucible.
+            ("base:crucible", 1.0),
+            ("base:bronze_ingot", 8.0),
         ],
     ),
     (
@@ -758,6 +786,9 @@ pub const KITS: &[(Age, &[(&str, f32)])] = &[
             ("base:boots_mail", 1.0),
             ("base:iron_ingot", 8.0),
             ("base:wool", 4.0),
+            // A steel blade at the forge.
+            ("base:forge", 1.0),
+            ("base:steel_ingot", 2.0),
             ("base:bucket", 2.0),
             ("animals:spyglass", 1.0),
             ("animals:wyvern_saddle", 1.0),
