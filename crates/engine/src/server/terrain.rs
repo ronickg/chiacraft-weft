@@ -758,6 +758,19 @@ pub fn build(
     t
 }
 
+thread_local! {
+    static ONE_COLUMN: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Runs `f` with this thread's `Terrain::surface_block` working out only the column asked for
+/// (distant terrain's faces: far cells, each in a cube column of its own).
+pub fn one_column<R>(f: impl FnOnce() -> R) -> R {
+    let was = ONE_COLUMN.replace(true);
+    let r = f();
+    ONE_COLUMN.set(was);
+    r
+}
+
 impl Terrain {
     fn new(
         stone: u32,
@@ -893,17 +906,21 @@ impl Terrain {
         if self.surface_carved(seed, x, z) {
             return 0;
         }
-        // Its own column unless its cube's are known: working out all 256 of the cube (every
-        // feature, mods' included) for one cost 1-2 ms, and distant terrain asks this (through the
-        // dimension's faces) for steep cells far apart, where no cube is.
-        let (col, rule) = match self.cache.peek(seed, x.div_euclid(16), z.div_euclid(16)) {
-            Some(c) => {
-                let i = (z.rem_euclid(16) * 16 + x.rem_euclid(16)) as usize;
-                (c.cols[i], c.rules[i])
-            }
-            None => self.compute(seed, x, z),
-        };
-        self.surface_of(rule, col.height)
+        let i = (z.rem_euclid(16) * 16 + x.rem_euclid(16)) as usize;
+        let (cx, cz) = (x.div_euclid(16), z.div_euclid(16));
+        // Distant terrain asks this (through the dimension's faces) for steep cells far apart,
+        // where no cube is: there its own column only, as all 256 of the cube (every feature, mods'
+        // included) cost 1-2 ms a call. Near, the cube's columns are worked out once for the many
+        // scattered things that ask in it.
+        if ONE_COLUMN.get() {
+            let (col, rule) = match self.cache.peek(seed, cx, cz) {
+                Some(c) => (c.cols[i], c.rules[i]),
+                None => self.compute(seed, x, z),
+            };
+            return self.surface_of(rule, col.height);
+        }
+        let cols = self.columns(seed, cx, cz);
+        self.surface_of(cols.rules[i], cols.cols[i].height)
     }
 
     /// Smoothed surface height (Q4) at local column (x, z) from the cube's corner grid.

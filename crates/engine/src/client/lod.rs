@@ -186,11 +186,12 @@ fn take_columns(job: &LodJob, words: &mut [u32]) {
     }
 }
 
-/// What a steep face shows (`Faces::block`, the dimension's mod), timed for `diag`.
+/// What a steep face shows (`Faces::block`, the dimension's mod), its surface lookups one column
+/// each (`terrain::one_column`), timed for `diag`.
 #[allow(clippy::too_many_arguments)]
 fn face_block(f: crate::server::terrain::Faces, seed: u64, dim: u32, pos: [i32; 3], height: i32, biome: u32, fall: i32, block: u32) -> u32 {
     let start = std::time::Instant::now();
-    let b = f.block(seed, dim, pos, height, biome, fall, block);
+    let b = crate::server::terrain::one_column(|| f.block(seed, dim, pos, height, biome, fall, block));
     crate::diag::LOD_FACES.add(1);
     crate::diag::LOD_FACES_NS.add(start.elapsed().as_nanos() as u64);
     b
