@@ -27,10 +27,6 @@ pub static SNOW: Block = Block::named("snow");
 pub static ICE: Block = Block::named("ice");
 pub static LAKE_ICE: Block = Block::named("lake_ice");
 pub static OBSIDIAN: Block = Block::named("obsidian");
-/// A stone from the sky (Research round 17): buried under old craters (`base_api::land::crater_meteorites`),
-/// fallen in showers and big impacts. Its fusion-crust texture and meteoric-iron drop come later
-/// (Art, crafting); obsidian's look until then.
-pub static METEORITE: Block = Block::named("meteorite");
 pub static COAL_ORE: Block = Block::named("coal_ore");
 pub static IRON_ORE: Block = Block::named("iron_ore");
 pub static GOLD_ORE: Block = Block::named("gold_ore");
@@ -641,14 +637,6 @@ pub fn register(r: &mut Registry) {
         .hardness(50.0)
         .mineable("pickaxe")
         .needs_tool_level(tool_tier::DIAMOND)
-        .tab(&crate::tabs::NATURAL);
-    r.block(&METEORITE)
-        .texture("obsidian")
-        .sound_group("stone")
-        .hardness(3.0)
-        .mineable("pickaxe")
-        .needs_tool_level(tool_tier::STONE)
-        .tag("meteorites")
         .tab(&crate::tabs::NATURAL);
     r.block(&COAL_ORE)
         .sound_group("stone")
