@@ -783,3 +783,27 @@ journal.animals.join_21 = {0}{1}{2}{3}{4}{5}{6}{7}{8}{9}{10}{11}{12}{13}{14}{15}
 journal.animals.join_22 = {0}{1}{2}{3}{4}{5}{6}{7}{8}{9}{10}{11}{12}{13}{14}{15}{16}{17}{18}{19}{20}{21}
 journal.animals.join_23 = {0}{1}{2}{3}{4}{5}{6}{7}{8}{9}{10}{11}{12}{13}{14}{15}{16}{17}{18}{19}{20}{21}{22}
 journal.animals.join_24 = {0}{1}{2}{3}{4}{5}{6}{7}{8}{9}{10}{11}{12}{13}{14}{15}{16}{17}{18}{19}{20}{21}{22}{23}
+
+# Дренкаун, Страж Леса (drenkaun.rs)
+entity.animals.drenkaun = Дренкаун
+entity.animals.drenkaun.title = Дренкаун, Страж Леса
+entity.animals.drenkaun_calf = Детёныш Дренкауна
+block.animals.drenkaun_altar = Алтарь Стража Леса
+block.animals.drenkaun_altar.tooltip = Поставьте его среди старых деревьев и используйте с лесным подношением: Дренкаун, Страж Леса, поднимется на бой.
+item.animals.forest_offering = Лесное подношение
+item.animals.forest_offering.tooltip = Дары старого леса: жёлудь, красный гриб, ягоды и мох. На Алтаре Стража Леса оно призывает Дренкауна; его детёныша оно приручает.
+item.animals.warden_heartseed = Семя-сердце Стража
+item.animals.warden_heartseed.tooltip = Живое семя в сердце Дренкауна. Ключу Каменного века нужна часть босса биома: это — от леса.
+item.animals.warden_antler = Рог Стража
+item.animals.warden_antler.tooltip = Отросток рогов Дренкауна, твёрдый, как старый дуб. Отбит в бою или остался после него.
+item.animals.warden_bark = Кора Стража
+item.animals.warden_bark.tooltip = Кора с мшистой короны Дренкауна.
+title.animals.drenkaun = Дренкаун
+subtitle.animals.drenkaun = Страж Леса
+subtitle.animals.drenkaun.left_antler = Его левый рог сломан!
+subtitle.animals.drenkaun.right_antler = Его правый рог сломан!
+subtitle.animals.drenkaun.crown = Его корона из коры раскололась!
+hint.animals.drenkaun.offering = Алтарю нужно лесное подношение.
+hint.animals.drenkaun.trees = Дренкаун отвечает только среди старых деревьев: брёвен вокруг алтаря {0}, нужно {1}.
+hint.animals.drenkaun.awake = Дренкаун уже пробудился неподалёку.
+hint.animals.drenkaun_calf.tamed = Детёныш привязался к вам и идёт следом.

@@ -306,6 +306,9 @@ const RECIPES_LIST: &[Recipe] = &[
         secs: 3.0,
     },
     c("animals:nest", 1.0, &[("base:stick", 4.0), ("base:wheat", 1.0)], Table),
+    // drenkaun.rs: the old forest's boss
+    c("animals:forest_offering", 1.0, &[("base:acorn", 1.0), ("base:mushroom_red", 1.0), ("base:berries", 1.0), ("base:moss_block", 1.0)], Hand),
+    c("animals:drenkaun_altar", 1.0, &[("base:mossy_cobblestone", 7.0), ("base:flint", 1.0), ("#logs", 2.0)], Table),
     s("animals:cooked_venison", &[("animals:venison", 1.0)], Fire),
     s("animals:cooked_hare", &[("animals:hare", 1.0)], Fire),
     s("animals:cooked_trout", &[("animals:trout", 1.0)], Fire),
@@ -413,10 +416,10 @@ pub struct Key {
 pub const KEYS: &[Key] = &[Key {
     age: Age::Stone,
     routes: &[
-        (Path::Tech, &["base:pickaxe", "base:furnace"]),
-        (Path::Beasts, &["animals:club", "animals:tranquilizer_dart", "animals:nest"]),
+        (Path::Tech, &["base:pickaxe", "base:furnace", "animals:warden_heartseed"]),
+        (Path::Beasts, &["animals:club", "animals:tranquilizer_dart", "animals:nest", "animals:warden_heartseed"]),
     ],
-    missing: &["magic route: a dowsing rod (sensing ley lines)", "a biome boss's part", "knowledge: a ruin's blueprint or lore page"],
+    missing: &["magic route: a dowsing rod (sensing ley lines)", "knowledge: a ruin's blueprint or lore page"],
 }];
 
 // ------------------------------------------------------------------ the graph, solved
@@ -710,6 +713,8 @@ pub const KITS: &[(Age, &[(&str, f32)])] = &[
             ("animals:tranquilizer_dart", 8.0),
             ("animals:kibble", 8.0),
             ("animals:nest", 1.0),
+            ("animals:drenkaun_altar", 1.0),
+            ("animals:forest_offering", 2.0),
         ],
     ),
     (

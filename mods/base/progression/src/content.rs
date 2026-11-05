@@ -497,6 +497,20 @@ pub const RULES: &[Rule] = &[
         Beast,
         Made,
     ),
+    // ---- the biome bosses (animals_core::bosses, drenkaun.rs): the altar and its offering made,
+    // the boss's parts from the fight (a fight about 5 minutes, the offering's gathering and the
+    // altar's, over the kills its bad-luck help needs)
+    n(&["animals:drenkaun_altar"], 0, Shared, Station, Made, "a biome boss's altar: the player picks when to fight (round 6)"),
+    n(&["animals:forest_offering"], 0, Shared, Material, Made, "the old forest's offering: calls Drenkaun, tames its calf"),
+    n(
+        &["animals:warden_heartseed"],
+        0,
+        Shared,
+        Part,
+        Drop(45.0),
+        "Drenkaun's loot, certain by the third kill: the Stone Age key's boss part",
+    ),
+    n(&["animals:warden_antler", "animals:warden_bark"], 0, Shared, Material, Drop(15.0), "Drenkaun's part breaks and loot"),
     n(&["animals:kibble"], 0, Beasts, Beast, Made, "an egg, food, grain and fibre (no iron bucket; Ronald, 11-07: \"move them to fit\")"),
     n(&["animals:wyvern_saddle"], 2, Beasts, Beast, Made, "a dragon-sized saddle has an iron frame"),
     r(&["animals:spyglass"], 2, Shared, Tool, Made),

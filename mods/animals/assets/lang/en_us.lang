@@ -784,3 +784,27 @@ journal.animals.join_21 = {0}{1}{2}{3}{4}{5}{6}{7}{8}{9}{10}{11}{12}{13}{14}{15}
 journal.animals.join_22 = {0}{1}{2}{3}{4}{5}{6}{7}{8}{9}{10}{11}{12}{13}{14}{15}{16}{17}{18}{19}{20}{21}
 journal.animals.join_23 = {0}{1}{2}{3}{4}{5}{6}{7}{8}{9}{10}{11}{12}{13}{14}{15}{16}{17}{18}{19}{20}{21}{22}
 journal.animals.join_24 = {0}{1}{2}{3}{4}{5}{6}{7}{8}{9}{10}{11}{12}{13}{14}{15}{16}{17}{18}{19}{20}{21}{22}{23}
+
+# Drenkaun, the Wood-Warden: the old forests' boss (drenkaun.rs)
+entity.animals.drenkaun = Drenkaun
+entity.animals.drenkaun.title = Drenkaun, the Wood-Warden
+entity.animals.drenkaun_calf = Drenkaun's Calf
+block.animals.drenkaun_altar = Wood-Warden's Altar
+block.animals.drenkaun_altar.tooltip = Set it among old trees and use it with a forest offering: Drenkaun, the Wood-Warden, rises to fight.
+item.animals.forest_offering = Forest Offering
+item.animals.forest_offering.tooltip = What an old wood gives: an acorn, a red mushroom, berries and moss. Offered at the Wood-Warden's Altar, it calls Drenkaun; offered to its calf, it tames it.
+item.animals.warden_heartseed = Warden's Heartseed
+item.animals.warden_heartseed.tooltip = The living seed at Drenkaun's heart. The Stone Age's key needs a biome boss's part: this is the forest's.
+item.animals.warden_antler = Warden's Antler
+item.animals.warden_antler.tooltip = A tine of Drenkaun's antlers, hard as old oak. Broken off in the fight, or left after it.
+item.animals.warden_bark = Warden's Bark
+item.animals.warden_bark.tooltip = Bark from Drenkaun's mossy crown.
+title.animals.drenkaun = Drenkaun
+subtitle.animals.drenkaun = the Wood-Warden
+subtitle.animals.drenkaun.left_antler = Its left antler breaks!
+subtitle.animals.drenkaun.right_antler = Its right antler breaks!
+subtitle.animals.drenkaun.crown = Its crown of bark splits!
+hint.animals.drenkaun.offering = The altar wants a forest offering.
+hint.animals.drenkaun.trees = Drenkaun answers only among old trees: {0} logs round the altar, {1} wanted.
+hint.animals.drenkaun.awake = Drenkaun is already awake near here.
+hint.animals.drenkaun_calf.tamed = The calf takes to you and follows.

@@ -437,6 +437,7 @@ form = "Drenkaun"
 gloss = "tree-keeper"
 what = "the forest's guardian"
 epithet = "the Wood-Warden"
+lang_key = "entity.animals.drenkaun"
 
 [name.nokaun]
 kind = "boss"
