@@ -66,6 +66,16 @@ const OPT_SPARKLE: u32 = 21u;
 const OPT_CURVE: u32 = 22u;
 const OPT_BLOOM: u32 = 23u;
 const OPT_AUTO_EXPOSURE: u32 = 24u;
+// Gap tests (Planner's breakdown against Bliss, 11-05), read raw: the sky's light in the shade
+// (`base:look_sky_light`, 1 as made), and grass and leaves darker and less yellow
+// (`base:look_foliage_test`, 0 as made to 1: 30% darker).
+const OPT_SKY_LIGHT: u32 = 25u;
+const OPT_FOLIAGE_TEST: u32 = 26u;
+
+// The colour a grass or leaf tint is multiplied by for the foliage test: 1 as made.
+fn foliage_test() -> vec3<f32> {
+    return mix(vec3(1.0), vec3(0.62, 0.72, 0.66), clamp(fantasy_opt(OPT_FOLIAGE_TEST), 0.0, 1.0));
+}
 
 fn fantasy_opt(i: u32) -> f32 {
     return scene.options[i / 4u][i % 4u];
@@ -126,6 +136,14 @@ fn blend(a: Palette, b: Palette, t: f32) -> Palette {
 // here it was some 150 instructions in up to ten places of every pixel, and the Mac's world pass
 // spilled registers (Tester's trace, 11-05).
 fn palette() -> Palette {
+    var p = palette_read();
+    // The sky's light test (`base:look_sky_light`): its light in the shade scaled, the sun's kept.
+    let k = fantasy_opt(OPT_SKY_LIGHT);
+    p.ambient *= select(1.0, k, k > 0.0);
+    return p;
+}
+
+fn palette_read() -> Palette {
     if scene.frame_look.x > 0.5 {
         let t = textures[u32(scene.frame_look.x) - 1u];
         return Palette(
@@ -550,7 +568,9 @@ fn shadow_at(rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
         return near;
     }
     // Past 250 blocks (the far land's tiles start about 180 out), the far map's cheap filter.
-    let far = shadow_in(scene.shadow_far_view_proj, scene.shadow_far, 400.0, 1200.0, rel, n, length(rel) > 250.0);
+    // Its reach from its texels (`core:shadow_far`: 400 as made, more at ultra), its depth three times that.
+    let far_reach = max(scene.shadow_far.w * scene.shadow_far.y * 0.5, 1.0);
+    let far = shadow_in(scene.shadow_far_view_proj, scene.shadow_far, far_reach, far_reach * 3.0, rel, n, length(rel) > 250.0);
     let trust = max(near.y, far.y);
     if trust <= 0.0 {
         return vec2(1.0, 0.0);

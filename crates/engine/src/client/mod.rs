@@ -552,6 +552,8 @@ pub struct Client {
     shadow_far_age: u32,
     /// The maps' size in texels (`core:shadow_size`), as they were made.
     shadow_size: u32,
+    /// The far shadow map's reach to each side (blocks, `core:shadow_far`; 400 as made).
+    shadow_far_reach: f32,
     pub target: Option<Hit>,
     pub target_entity: Option<u64>,
     pub selected: usize,
@@ -941,6 +943,7 @@ impl Client {
             shadow_far_anchored: glam::Mat4::IDENTITY,
             shadow_far_age: 0,
             shadow_size: 2048,
+            shadow_far_reach: FAR_REACH,
             target: None,
             target_entity: None,
             selected: 0,
@@ -2821,7 +2824,7 @@ impl Client {
             shadow_far_view_proj: self.shadow_far.0.to_cols_array_2d(),
             shadow_far: match self.shadow_far_map {
                 Some(_) if self.shadow_far.1 => {
-                    [self.shadow_far_index as f32, self.shadow_size as f32, 1.0, 2.0 * FAR_REACH / self.shadow_size as f32]
+                    [self.shadow_far_index as f32, self.shadow_size as f32, 1.0, 2.0 * self.shadow_far_reach / self.shadow_size as f32]
                 }
                 _ => [0.0; 4],
             },
@@ -3039,6 +3042,12 @@ impl Client {
             self.shadow_far_map = Some(t);
             self.shadow_far_drawn = None;
         }
+        // The far map's reach (`core:shadow_far`, 400 as made; ultra to 2400): drawn again when it changes.
+        let reach = (shadow_setting("core:shadow_far", FAR_REACH as f64) as f32).clamp(200.0, 2400.0);
+        if reach != self.shadow_far_reach {
+            self.shadow_far_reach = reach;
+            self.shadow_far_drawn = None;
+        }
         let cam = self.render_camera();
         self.shadow = (light_box(dir, cam.pos, SHADOW_REACH, SHADOW_DEPTH, size), true);
         // The far map about a place in the world, not the camera: built about the camera, its box
@@ -3047,7 +3056,7 @@ impl Client {
         // Mac). Snapped to `FAR_ANCHOR` blocks, it stays put until the player crosses into
         // another cell; seen from the camera it is the same box, moved by camera less anchor.
         let anchor = ((cam.pos / FAR_ANCHOR).floor() + 0.5) * FAR_ANCHOR;
-        let anchored = light_box(dir, anchor, FAR_REACH, FAR_DEPTH, size);
+        let anchored = light_box(dir, anchor, reach, reach * FAR_DEPTH / FAR_REACH, size);
         self.shadow_far_anchored = anchored;
         let from_cam = glam::Mat4::from_translation((cam.pos - anchor).as_vec3());
         self.shadow_far = (anchored * from_cam, level >= 2);
