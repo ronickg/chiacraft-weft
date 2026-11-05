@@ -85,29 +85,6 @@ const fn b(out: &'static str, n: f32, from: &'static [(&'static str, f32)], need
     Recipe { out, n, ins: from, at: Break(needs), secs }
 }
 
-macro_rules! tools {
-    ($m:literal, $x:literal) => {
-        [
-            c(concat!("base:", $m, "_pickaxe"), 1.0, &[($x, 3.0), ("#stick", 2.0)], Table),
-            c(concat!("base:", $m, "_axe"), 1.0, &[($x, 3.0), ("#stick", 2.0)], Table),
-            c(concat!("base:", $m, "_shovel"), 1.0, &[($x, 1.0), ("#stick", 2.0)], Table),
-            c(concat!("base:", $m, "_hoe"), 1.0, &[($x, 2.0), ("#stick", 2.0)], Table),
-            c(concat!("base:", $m, "_sword"), 1.0, &[($x, 2.0), ("#stick", 1.0)], Table),
-        ]
-    };
-}
-
-macro_rules! armour {
-    ($m:literal, $x:literal) => {
-        [
-            c(concat!("base:", $m, "_helmet"), 1.0, &[($x, 5.0)], Table),
-            c(concat!("base:", $m, "_chestplate"), 1.0, &[($x, 8.0)], Table),
-            c(concat!("base:", $m, "_leggings"), 1.0, &[($x, 7.0)], Table),
-            c(concat!("base:", $m, "_boots"), 1.0, &[($x, 4.0)], Table),
-        ]
-    };
-}
-
 macro_rules! clothes {
     ($m:literal, $x:literal) => {
         [
@@ -119,19 +96,6 @@ macro_rules! clothes {
     };
 }
 
-const MC_TOOLS: [[Recipe; 5]; 5] = [
-    tools!("wood", "#planks"),
-    tools!("stone", "#cobblestone"),
-    tools!("iron", "base:iron_ingot"),
-    tools!("gold", "base:gold_ingot"),
-    tools!("diamond", "base:diamond"),
-];
-const MC_ARMOUR: [[Recipe; 4]; 4] = [
-    armour!("leather", "base:sole_leather"),
-    armour!("iron", "base:iron_ingot"),
-    armour!("gold", "base:gold_ingot"),
-    armour!("diamond", "base:diamond"),
-];
 const CLOTHES: [[Recipe; 4]; 4] =
     [clothes!("fur", "base:fur"), clothes!("hide", "base:hide"), clothes!("wool", "base:wool"), clothes!("linen", "base:cloth")];
 
@@ -175,6 +139,24 @@ const RECIPES_LIST: &[Recipe] = &[
     c("base:spear", 1.0, &[("base:part_leaf_point", 1.0), ("base:part_shaft", 1.0), ("base:part_lashing", 1.0)], Table),
     c("base:sword", 1.0, &[("base:part_straight_blade", 1.0), ("base:part_grip", 1.0), ("base:part_bar_guard", 1.0)], Table),
     c("base:bow", 1.0, &[("base:part_self_stave", 1.0), ("base:part_bowstring", 1.0)], Table),
+    c("base:axe", 1.0, &[("base:part_felling_axe_head", 1.0), ("base:part_haft", 1.0), ("base:part_lashing", 1.0)], Table),
+    c("base:pickaxe", 1.0, &[("base:part_pick_head", 1.0), ("base:part_haft", 1.0), ("base:part_lashing", 1.0)], Table),
+    c("base:shovel", 1.0, &[("base:part_shovel_blade", 1.0), ("base:part_haft", 1.0), ("base:part_lashing", 1.0)], Table),
+    c("base:knife", 1.0, &[("base:part_knife_blade", 1.0), ("base:part_grip", 1.0), ("base:part_lashing", 1.0)], Table),
+    // Armour: a shell, straps and a lining; a look family's item takes its shell's material
+    // (`parts::ARMOUR_LOOKS`: an iron or steel shell is worn as mail, a diamond one as gems).
+    c("base:helmet", 1.0, &[("base:part_helmet_shell", 1.0), ("base:part_straps", 1.0), ("base:part_lining", 1.0)], Table),
+    c("base:chestplate", 1.0, &[("base:part_chest_shell", 1.0), ("base:part_straps", 1.0), ("base:part_lining", 1.0)], Table),
+    c("base:leggings", 1.0, &[("base:part_leg_shell", 1.0), ("base:part_straps", 1.0), ("base:part_lining", 1.0)], Table),
+    c("base:boots", 1.0, &[("base:part_boot_shell", 1.0), ("base:part_straps", 1.0), ("base:part_lining", 1.0)], Table),
+    c("base:helmet_mail", 1.0, &[("base:iron_ingot", 2.0), ("base:part_straps", 1.0), ("base:part_lining", 1.0)], Table),
+    c("base:chestplate_mail", 1.0, &[("base:iron_ingot", 3.0), ("base:part_straps", 1.0), ("base:part_lining", 1.0)], Table),
+    c("base:leggings_mail", 1.0, &[("base:iron_ingot", 3.0), ("base:part_straps", 1.0), ("base:part_lining", 1.0)], Table),
+    c("base:boots_mail", 1.0, &[("base:iron_ingot", 2.0), ("base:part_straps", 1.0), ("base:part_lining", 1.0)], Table),
+    c("base:helmet_gem", 1.0, &[("base:diamond", 2.0), ("base:part_straps", 1.0), ("base:part_lining", 1.0)], Table),
+    c("base:chestplate_gem", 1.0, &[("base:diamond", 3.0), ("base:part_straps", 1.0), ("base:part_lining", 1.0)], Table),
+    c("base:leggings_gem", 1.0, &[("base:diamond", 3.0), ("base:part_straps", 1.0), ("base:part_lining", 1.0)], Table),
+    c("base:boots_gem", 1.0, &[("base:diamond", 2.0), ("base:part_straps", 1.0), ("base:part_lining", 1.0)], Table),
     // recipes.rs
     c("base:*_planks", 4.0, &[("#logs", 1.0)], Hand),
     c("base:stick", 4.0, &[("#planks", 2.0)], Hand),
@@ -315,13 +297,7 @@ const RECIPES_LIST: &[Recipe] = &[
 
 /// Every recipe.
 pub fn recipes() -> Vec<&'static Recipe> {
-    MC_TOOLS
-        .iter()
-        .flatten()
-        .chain(MC_ARMOUR.iter().flatten())
-        .chain(CLOTHES.iter().flatten())
-        .chain(RECIPES_LIST)
-        .collect()
+    CLOTHES.iter().flatten().chain(RECIPES_LIST).collect()
 }
 
 /// The `#groups` recipes take: any one of their members.
@@ -359,35 +335,38 @@ pub const GROUPS: &[(&str, &[&str])] = &[
             "base:star_steel_ingot",
             "base:gold_ingot",
             "base:diamond",
+            "base:wool",
+            "base:cloth",
+            "base:fur",
         ],
     ),
 ];
 
-/// What can break what: a tool item, its kind and the level it harvests (today's tools by their
-/// material, `items.rs`; the tools built from parts at flint's, the best their parts make today).
+/// What can break what: a tool item, its kind and the level it harvests. Every tool is built from
+/// parts, so a kind's item stands for its cheapest (a flint head, harvest 100); a better head's
+/// material stands for the tool it makes (`vitals::gear::harvest` by its level: wrought iron 280,
+/// star steel 340, diamond 400; a check keeps these equal to the curve's).
 pub const TOOLS: &[(&str, &str, u32)] = &[
-    ("base:wood_axe", "axe", 0),
-    ("base:stone_axe", "axe", 100),
-    ("base:iron_axe", "axe", 200),
-    ("base:gold_axe", "axe", 0),
-    ("base:diamond_axe", "axe", 400),
     ("base:axe", "axe", 100),
-    ("base:wood_pickaxe", "pickaxe", 0),
-    ("base:stone_pickaxe", "pickaxe", 100),
-    ("base:iron_pickaxe", "pickaxe", 200),
-    ("base:gold_pickaxe", "pickaxe", 0),
-    ("base:diamond_pickaxe", "pickaxe", 400),
-    // A pickaxe built with a star-steel head (harvest 350) has no item of its own: its ingot
-    // stands for it.
-    ("base:star_steel_ingot", "pickaxe", 350),
     ("base:pickaxe", "pickaxe", 100),
-    ("base:wood_shovel", "shovel", 0),
-    ("base:stone_shovel", "shovel", 100),
-    ("base:iron_shovel", "shovel", 200),
-    ("base:diamond_shovel", "shovel", 400),
+    ("base:iron_ingot", "pickaxe", 280),
+    ("base:meteoric_iron", "pickaxe", 230),
+    ("base:star_steel_ingot", "pickaxe", 340),
+    ("base:diamond", "pickaxe", 400),
     ("base:shovel", "shovel", 100),
     ("base:sharp_flake", "cutter", 0),
     ("base:knife", "cutter", 0),
+];
+
+/// The material each stand-in in `TOOLS` is a head of.
+pub const TOOL_HEADS: &[(&str, &str)] = &[
+    ("base:axe", "flint"),
+    ("base:pickaxe", "flint"),
+    ("base:iron_ingot", "wrought_iron"),
+    ("base:meteoric_iron", "meteoric_iron"),
+    ("base:star_steel_ingot", "star_steel"),
+    ("base:diamond", "diamond"),
+    ("base:shovel", "flint"),
 ];
 
 /// The tools that meet `needs`.
@@ -727,13 +706,17 @@ pub const KITS: &[(Age, &[(&str, f32)])] = &[
     (
         Age::Iron,
         &[
-            ("base:iron_pickaxe", 1.0),
-            ("base:iron_axe", 1.0),
-            ("base:iron_sword", 1.0),
-            ("base:iron_helmet", 1.0),
-            ("base:iron_chestplate", 1.0),
-            ("base:iron_leggings", 1.0),
-            ("base:iron_boots", 1.0),
+            // An iron pick, axe and sword and a mail set, built from parts: their iron (3 for a
+            // pick or axe head, 2 for a blade, the shells 2, 3, 3, 2) and wool linings.
+            ("base:pickaxe", 1.0),
+            ("base:axe", 1.0),
+            ("base:sword", 1.0),
+            ("base:helmet_mail", 1.0),
+            ("base:chestplate_mail", 1.0),
+            ("base:leggings_mail", 1.0),
+            ("base:boots_mail", 1.0),
+            ("base:iron_ingot", 8.0),
+            ("base:wool", 4.0),
             ("base:bucket", 2.0),
             ("animals:spyglass", 1.0),
             ("animals:wyvern_saddle", 1.0),
@@ -742,8 +725,8 @@ pub const KITS: &[(Age, &[(&str, f32)])] = &[
     (
         Age::Steam,
         &[
-            ("base:diamond_pickaxe", 1.0),
-            ("base:diamond_sword", 1.0),
+            // A diamond pick head and sword blade on the Iron Age's hafts and hilts.
+            ("base:diamond", 5.0),
             ("base:piston", 4.0),
             ("base:observer", 2.0),
             ("base:repeater", 4.0),
@@ -863,6 +846,18 @@ pub fn literal_outputs(text: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tool_stand_ins_harvest_as_their_heads() {
+        for &(item, kind, level) in TOOLS.iter().filter(|t| t.1 != "cutter") {
+            let (_, head) = TOOL_HEADS
+                .iter()
+                .find(|h| h.0 == item)
+                .unwrap_or_else(|| panic!("{item}"));
+            let m = crafting::materials::material(head).unwrap();
+            assert_eq!(level, m.harvest(), "{item} as a {kind}");
+        }
+    }
 
     #[test]
     fn literal_outputs_are_found() {

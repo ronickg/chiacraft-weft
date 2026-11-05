@@ -1,7 +1,8 @@
 # Crafting
 
 Status: decided 2026-11-04. Slice 1 is built and waiting for a game run; the rest follows the
-slices at the end.
+slices at the end. Since 11-05 every tool, weapon and piece of armour comes only from parts
+("Parts only", below).
 
 **Ronald's decision:** "Yes, 1A 2A 3A 4B". So:
 - the grid with a book that fills it
@@ -153,6 +154,62 @@ with a socket. An iron head is forged with an eye and held by a wedge.
     numbers: insulation in clo, how much it keeps when wet, blunt padding.
   - So the same mail coat takes a fur lining for a taiga winter and a linen one for the desert.
 
+### Parts only (11-05)
+
+Ronald, 11-05: "I actually don't want to have like diamond sword or something, because it doesn't
+really make sense. I want ... more modular approach where you build a sort of different pieces, but
+like only, let's say, the blade can be of diamond and the hilt, but not like the handle out of
+diamond ... I kind of wanted to be a bit more realistic, but not completely". So:
+
+- **No whole tools or armour.** `wood_pickaxe` ... `diamond_sword` and the leather, iron, gold
+  and diamond armour have no recipe, no creative tab and no place in any list. Every tool and
+  weapon is a kind item (`base:axe`, `base:sword` ...) assembled from parts; armour is a helmet,
+  chestplate, leggings or boots assembled from a shell, a fastening and a lining.
+- **Old saves:** the engine drops an item name it doesn't know, so the old items stay registered
+  (`mods/base/src/whole.rs`) and each turns into its closest part-built one on sight: a player's
+  whole inventory when they join and every second, a chest's when it's opened. Same kind, Sound
+  (grade 4), wear carried over:
+
+  | Old | Becomes |
+  |---|---|
+  | iron tools | wrought-iron head, oak haft, wrought-iron wedge |
+  | iron sword | wrought-iron blade, guard and pommel, leather grip |
+  | diamond tools | diamond head, oak haft, wrought-iron wedge |
+  | diamond sword | diamond blade, wrought-iron guard and pommel, oak grip |
+  | stone tools | ground-stone head, oak haft, cordage lashing |
+  | wooden shovel, hoe | oak blade, oak haft, cordage |
+  | wooden axe, pick; wooden and stone swords | flint head; a flint blade set in oak (a macuahuitl) |
+  | gold tools, sword | copper head or blade, gold fittings, guard and pommel |
+  | leather, iron, diamond armour | a leather, wrought-iron or diamond-scale shell, leather straps (wrought-iron rivets for diamond), linen or wool lining |
+  | gold armour | bronze scales, gold rivets, linen lining |
+
+- **`/gear <kind> <materials...> [grade=N] [slot=N]`** builds one for checks and scripts (game
+  masters): the working part's material first, then its slots' in order, the usual ones for the
+  rest (an oak haft, a leather grip on a bow, cordage on stone and wrought iron on metal, leather
+  straps and a wool lining on armour).
+- **Worn armour** shows today's four worn sets until its parts have region textures: a leather
+  look (leather, rawhide, bone shells), a grey one (`_mail`: the irons and steels), a yellow one
+  (`_scale`: copper and bronze), diamond's (`_gem`). They're items of their own only for their worn
+  texture (`parts::ARMOUR_LOOKS`); assembly picks the item by its shell.
+
+### What each material can be
+
+Checked once against the real things (`crafting::materials::Works` and `fits`):
+
+| Material | Working part (head, blade, point, shell) | Holding (haft, grip, shaft) | Fitting | Guard, pommel | Lining |
+|---|---|---|---|---|---|
+| Flint, chert, obsidian, tektite | every edge and head; a sword only as a macuahuitl's inset blade; no armour | - | - | - | - |
+| Ground stone | axe, pick, shovel and hoe heads; nothing that cuts | - | - | - | - |
+| Bone, antler | antler picks, scapula shovels, hoes, axes, knives, points; bone-slat armour; no sword | yes | - | yes | - |
+| Woods | a wooden spade, a hoe, a fire-hardened point, a bow stave (springy woods only); no axe, pick, sword or armour | yes | - | yes | - |
+| Copper, bronze, the irons, steel, star steel | everything but a bow; scales, mail, plate | - | rivets, wedges, collars | yes | - |
+| Diamond | every edge and head; armour of scales sewn on a backing (the one fantasy kept) | no | no | no | - |
+| Gold | never (soft, heavy) | - | rivets, collars, inlay | yes | - |
+| Leather, rawhide | armour shells only (cuir bouilli, rawhide lamellar) | a grip wrap only, no haft | lacing, lashings, straps | - | leather as a hide lining |
+| Cordage, sinew | - | - | lashings, lacing | - | - |
+| Birch tar | - | - | glue on a head; no armour | - | - |
+| Linen, wool, fur | - | - | - | - | yes |
+
 ### Making parts
 
 The first time you make a part shape, you make it by hand. After that it's in your book.
@@ -191,6 +248,19 @@ One rule, shown in the tooltip, so nothing is hidden:
 - **The working part sets the numbers** (head, blade, point, stave, shell): what it harvests, its
   speed or damage or protection, and its own wear. The material and the shape set them; the grade
   multiplies them.
+  - **From the curve** (11-05, `vitals::gear`): its material's item level `L` (tier × 10 + depth)
+    sets a Sound part's uses, `53 × g(L)^1.5` (flint 75, wrought iron 270, diamond 630), its mining
+    speed, `2.5 × g(L)^0.75` (flint 3.0, wrought iron 5.6, diamond 8.6), its harvest level,
+    `100 + 10 × (L − 5)` (flint 100, bronze 210, wrought iron 280, steel 320, diamond 400), and a
+    weapon's damage and swings by its kind (`gear::weapon`). Each material may tweak uses or speed
+    by ×0.75-1.25 with its reason (`materials.rs`).
+  - **The item level travels on the stack** (`base:item_level`), so the over-tier caps and rate
+    floors (`animals::armour`) read a part-built weapon's.
+  - **Armour:** a shell's piece is its slot's share of a same-age set from the curve
+    (`gear::armour`: armour points and the health it adds), × the shell's grade; it lasts the
+    shell's uses × the slot's share (a coat the most), and the fastening wears first. Warmth is the
+    shell's insulation by the set it looks like plus the lining's clothing at half a piece
+    (`vitals::clothing::LINING_SHARE`).
 - **The holding part multiplies them** (haft, grip, shaft): a material and shape bonus, such as
   +10% durability for oak, or +5% speed for birch.
   - It sums with the other holding parts like Tinkers' handles: total = working part ×
@@ -690,6 +760,11 @@ are rows.
    5. **Signed history through portals**, with Phase 4's world DIDs.
 11. **Slow crafts** as machines (the tanning frame first), then **smithing and casting** with
    Content's copper, bronze and iron.
+12. **Parts only** (built 11-05, waiting for PC looks): the whole tools and armour gone, old
+    saves converted (`whole.rs`), armour from shell, fastening and lining, the roles checked
+    against the real things, the numbers from the curve, `/gear`. Not yet: part art for armour
+    (it wears today's four sets), copper, bronze and steel in the world (their parts exist, nothing
+    to make them from).
 
 ## Who does what
 

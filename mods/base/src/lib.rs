@@ -50,6 +50,7 @@ mod video;
 mod weather;
 mod weather_sound;
 mod web;
+mod whole;
 mod wild;
 mod window;
 mod worldgen;
@@ -91,8 +92,8 @@ fn init(r: &mut Registry) {
         (&tabs::COLORED, &Item::named("red_stained_glass")),
         (&tabs::NATURAL, &Item::named("grass")),
         (&tabs::FUNCTIONAL, &Item::named("crafting_table")),
-        (&tabs::TOOLS, &Item::named("iron_pickaxe")),
-        (&tabs::COMBAT, &Item::named("iron_sword")),
+        (&tabs::TOOLS, &Item::named("pickaxe")),
+        (&tabs::COMBAT, &Item::named("sword")),
         (&tabs::FOOD, &Item::named("apple")),
         (&tabs::INGREDIENTS, &items::IRON_INGOT),
         (&tabs::REDSTONE, &Item::named("redstone")),
@@ -117,6 +118,7 @@ fn init(r: &mut Registry) {
     book::register(r);
     discovery::register(r);
     parts::register(r);
+    whole::register(r);
     first::register(r);
     knapping::register(r);
     firebed::register(r);

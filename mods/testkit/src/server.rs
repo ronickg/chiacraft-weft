@@ -83,7 +83,7 @@ pub fn register(r: &mut Registry) {
         .no_item();
     r.entity_component(&MARK, 0, component_flags::SYNC_WATCHERS);
     // A suit to swim in lava with (`swimming`).
-    r.set_text_on(Target::Name("base:diamond_chestplate"), &SWIMS_IN, "#lava");
+    r.set_text_on(Target::Name("base:chestplate_gem"), &SWIMS_IN, "#lava");
     r.attach(&PIG, &MARK);
     r.storage(&STASH, 54);
     r.attach_storage(&PLAYER, &STASH);
@@ -675,7 +675,7 @@ const OPS: &[(&str, &str, Run)] = &[
         // `n` dropped stacks of a few kinds (blocks and sprites) in a grid north of the
         // player, 1.1 apart so they do not merge.
         let n: u32 = int(cmd, "n")?;
-        let kinds: Vec<u32> = ["base:dirt", "base:coal", "base:iron_pickaxe", "base:dandelion", "base:stick", "base:torch"]
+        let kinds: Vec<u32> = ["base:dirt", "base:coal", "base:pickaxe", "base:dandelion", "base:stick", "base:torch"]
             .iter()
             .filter_map(|k| Item::lookup(k))
             .collect();

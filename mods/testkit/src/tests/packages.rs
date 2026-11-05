@@ -65,7 +65,7 @@ pub async fn packages(t: T) -> R {
     t.no_screen().await?;
 
     // Mined with a pickaxe it drops itself (the default), which is picked up.
-    t.op("put me 1 diamond_pickaxe 1").await?;
+    t.cmd("/gear pickaxe diamond slot=1").await?;
     t.c().select_slot(1);
     t.look_at(block);
     t.frames(2).await?;

@@ -24,10 +24,10 @@ Power grows Ã—1.6 an age: `g(L) = 1.6^(L/10)` over area and item level L (tier Ã
 
 | tier | age | hours | EM | g at start | reference: hit / health / armour | things tagged | made | kit EM | of budget | everything once |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 489 | 147 | 49 | 34 % | 252 EM |
-| 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 31 | 24 | 76 | 26 % | 164 EM |
-| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 27 | 25 | 62 | 16 % | 270 EM |
-| 3 | Age of Steam | 18 | 1080 | 4.10 | 31.1 / 104 / 130 | 30 | 27 | 94 | 22 % | 512 EM |
+| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 526 | 143 | 49 | 34 % | 198 EM |
+| 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 26 | 15 | 76 | 26 % | 53 EM |
+| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 22 | 20 | 50 | 13 % | 242 EM |
+| 3 | Age of Steam | 18 | 1080 | 4.10 | 31.1 / 104 / 130 | 25 | 22 | 94 | 22 % | 263 EM |
 | 4 | Age of Lightning | 20 | 1200 | 6.55 | 49.7 / 166 / 207 | 0 | 0 | 0 | 0 % | 0 EM |
 | 5 | Age of the Future | 18 | 1080 | 10.49 | 79.6 / 265 / 332 | 0 | 0 | 0 | 0 % | 0 EM |
 | 6 | Age of Stars | 16 | 960 | 16.78 | 127.3 / 424 / 531 | 0 | 0 | 0 | 0 % | 0 EM |
@@ -207,7 +207,7 @@ One hit's damage (engine points) by material:
 | osage_orange | Stone Age | 1 | 3.9 | 6.3 | 5.2 | 2.2 | 2.6 | 2.5 | 0.9 | 26 / 21 |
 | bone | Stone Age | 3 | 4.3 | 6.9 | 5.8 | 2.4 | 2.9 | 2.8 | 1.0 | 29 / 23 |
 | antler | Stone Age | 3 | 4.3 | 6.9 | 5.8 | 2.4 | 2.9 | 2.8 | 1.0 | 29 / 23 |
-| chert | Stone Age | 4 | 4.5 | 7.2 | 6.0 | 2.5 | 3.0 | 2.9 | 1.1 | 30 / 24 |
+| chert | Stone Age | 5 | 4.7 | 7.6 | 6.3 | 2.7 | 3.2 | 3.0 | 1.1 | 32 / 25 |
 | flint | Stone Age | 5 | 4.7 | 7.6 | 6.3 | 2.7 | 3.2 | 3.0 | 1.1 | 32 / 25 |
 | stone | Stone Age | 5 | 4.7 | 7.6 | 6.3 | 2.7 | 3.2 | 3.0 | 1.1 | 32 / 25 |
 | tektite | Stone Age | 6 | 5.0 | 8.0 | 6.6 | 2.8 | 3.3 | 3.2 | 1.2 | 33 / 27 |
@@ -217,6 +217,9 @@ One hit's damage (engine points) by material:
 | rawhide | Stone Age | 3 | 4.3 | 6.9 | 5.8 | 2.4 | 2.9 | 2.8 | 1.0 | 29 / 23 |
 | birch_tar | Stone Age | 4 | 4.5 | 7.2 | 6.0 | 2.5 | 3.0 | 2.9 | 1.1 | 30 / 24 |
 | leather | Stone Age | 5 | 4.7 | 7.6 | 6.3 | 2.7 | 3.2 | 3.0 | 1.1 | 32 / 25 |
+| linen | Stone Age | 3 | 4.3 | 6.9 | 5.8 | 2.4 | 2.9 | 2.8 | 1.0 | 29 / 23 |
+| wool | Stone Age | 3 | 4.3 | 6.9 | 5.8 | 2.4 | 2.9 | 2.8 | 1.0 | 29 / 23 |
+| fur | Stone Age | 4 | 4.5 | 7.2 | 6.0 | 2.5 | 3.0 | 2.9 | 1.1 | 30 / 24 |
 | copper | Bronze Age | 12 | 6.6 | 10.5 | 8.8 | 3.7 | 4.4 | 4.2 | 1.6 | 44 / 35 |
 | gold | Bronze Age | 13 | 6.9 | 11.1 | 9.2 | 3.9 | 4.6 | 4.4 | 1.7 | 46 / 37 |
 | bronze | Bronze Age | 16 | 8.0 | 12.7 | 10.6 | 4.5 | 5.3 | 5.1 | 1.9 | 53 / 42 |
@@ -258,14 +261,15 @@ Moving to the next age takes a key, one thing from each gate (materials and tool
 
 Every named item and block, by its tag (`content::RULES`). EM is the cheapest way to have one; "-" not had as an item.
 
-### Stone Age (489)
+### Stone Age (526)
 
-**tech** (45)
+**tech** (82)
 
-- tool: arrow (2.0), axe (0.48), bow (0.48), hoe (0.70), knife (0.43), pickaxe (0.48), shovel (0.48), spear (0.70), stone_axe (0.60), stone_hoe (0.45), stone_pickaxe (0.60), stone_shovel (0.30), stone_sword (0.40), sword (0.70), wood_axe (0.41), wood_hoe (0.33), wood_pickaxe (0.41), wood_shovel (0.24), wood_sword (0.28)
-- armour: leather_boots (9.1), leather_chestplate (18), leather_helmet (11), leather_leggings (16)
+- tool: arrow (2.0), axe (0.48), bow (0.48), hoe (0.70), knife (0.43), pickaxe (0.48), shovel (0.48), spear (0.70), sword (0.70)
+- armour: boots (0.70), chestplate (0.70), helmet (0.70), leggings (0.70)
 - station: furnace (1.2)
-- part: part_bar_guard (0.22), part_barbed_point (0.22), part_bearded_axe_head (0.22), part_bowstring (0.22), part_felling_axe_head (0.22), part_grip (0.22), part_haft (0.22), part_hoe_blade (0.22), part_knife_blade (0.22), part_lashing (0.22), part_leaf_point (0.22), part_long_blade (0.22), part_long_haft (0.22), part_pick_head (0.22), part_round_pommel (0.22), part_self_stave (0.22), part_shaft (0.22), part_short_blade (0.22), part_short_stave (0.22), part_shovel_blade (0.22), part_straight_blade (0.22)
+- part: part_bar_guard (0.22), part_barbed_point (0.22), part_bearded_axe_head (0.22), part_boot_shell (0.22), part_bowstring (0.22), part_chest_shell (0.22), part_felling_axe_head (0.22), part_grip (0.22), part_haft (0.22), part_helmet_shell (0.22), part_hoe_blade (0.22), part_knife_blade (0.22), part_lashing (0.22), part_leaf_point (0.22), part_leg_shell (0.22), part_lining (0.22), part_long_blade (0.22), part_long_haft (0.22), part_pick_head (0.22), part_round_pommel (0.22), part_self_stave (0.22), part_shaft (0.22), part_short_blade (0.22), part_short_stave (0.22), part_shovel_blade (0.22), part_straight_blade (0.22), part_straps (0.22)
+- technical: diamond_axe (-), diamond_boots (-), diamond_chestplate (-), diamond_helmet (-), diamond_hoe (-), diamond_leggings (-), diamond_pickaxe (-), diamond_shovel (-), diamond_sword (-), gold_axe (-), gold_boots (-), gold_chestplate (-), gold_helmet (-), gold_hoe (-), gold_leggings (-), gold_pickaxe (-), gold_shovel (-), gold_sword (-), iron_axe (-), iron_boots (-), iron_chestplate (-), iron_helmet (-), iron_hoe (-), iron_leggings (-), iron_pickaxe (-), iron_shovel (-), iron_sword (-), leather_boots (-), leather_chestplate (-), leather_helmet (-), leather_leggings (-), stone_axe (-), stone_hoe (-), stone_pickaxe (-), stone_shovel (-), stone_sword (-), wood_axe (-), wood_hoe (-), wood_pickaxe (-), wood_shovel (-), wood_sword (-)
 
 **magic** (1)
 
@@ -302,20 +306,21 @@ Notes:
 - portals:portal, packages:unknown: a linked world's door; a missing package's stand-in
 - base:eclipse_ash: falls in an eclipse
 - base:axe, base:pickaxe, base:shovel, base:hoe, base:knife, base:spear, base:sword, base:bow: built from parts: its parts' materials set its real age (`MATERIALS`)
+- base:helmet, base:chestplate, base:leggings, base:boots: built from a shell, fastening and lining: its shell sets its real age; a leather-look shell (leather, rawhide, bone)
 - base:part_*: a part's material sets its real age (`MATERIALS`)
+- base:wood_pickaxe, base:wood_axe, base:wood_shovel, base:wood_hoe, base:wood_sword, base:stone_pickaxe, base:stone_axe, base:stone_shovel, base:stone_hoe, base:stone_sword, base:iron_pickaxe, base:iron_axe, base:iron_shovel, base:iron_hoe, base:iron_sword, base:gold_pickaxe, base:gold_axe, base:gold_shovel, base:gold_hoe, base:gold_sword, base:diamond_pickaxe, base:diamond_axe, base:diamond_shovel, base:diamond_hoe, base:diamond_sword, base:leather_helmet, base:leather_chestplate, base:leather_leggings, base:leather_boots, base:iron_helmet, base:iron_chestplate, base:iron_leggings, base:iron_boots, base:gold_helmet, base:gold_chestplate, base:gold_leggings, base:gold_boots, base:diamond_helmet, base:diamond_chestplate, base:diamond_leggings, base:diamond_boots: the old whole tools and armour: kept only so old saves load, each turned into its closest part-built one on sight (`whole.rs`)
 - base:arrow: dropped by skeletons; no recipe yet
 - base:furnace: the Stone Age key's infrastructure: what it makes is the Bronze Age's
 - base:cooking_pot, base:stew: a clay pot (Ronald, 11-07: "move them to fit")
 - animals:kibble: an egg, food, grain and fibre (no iron bucket; Ronald, 11-07: "move them to fit")
 
-### Bronze Age (31)
+### Bronze Age (26)
 
-**tech** (30)
+**tech** (25)
 
 - ground: gold_ore (-), granite_gold_ore (-), granite_iron_ore (-), iron_ore (-), meteorite (-), red_sandstone_iron_ore (-)
 - material: gold_block (29), gold_ingot (3.2), meteoric_iron (10), raw_gold (3.0)
-- tool: gold_axe (9.7), gold_hoe (6.5), gold_pickaxe (9.7), gold_shovel (3.3), gold_sword (6.4)
-- armour: gold_boots (13), gold_chestplate (25), gold_helmet (16), gold_leggings (22)
+- armour: boots_scale (-), chestplate_scale (-), helmet_scale (-), leggings_scale (-)
 - building: blue_stained_glass (0.47), bricks (0.27), glass (0.27), green_stained_glass (0.52), red_stained_glass (0.42), stone (0.32), stone_bricks (0.33)
 - light: blue_lamp (1.4), glowstone (1.2), green_lamp (1.4), red_lamp (1.3)
 
@@ -326,17 +331,17 @@ Notes:
 Notes:
 - base:iron_ore, base:granite_iron_ore, base:red_sandstone_iron_ore, base:meteorite, base:gold_ore, base:granite_gold_ore: breaks into raw iron, meteoric iron or raw gold (a stone pickaxe)
 - base:pallasite: a stony-iron meteorite's olivine, found where one fell
+- base:helmet_scale, base:chestplate_scale, base:leggings_scale, base:boots_scale: a bronze or copper shell's worn look: no copper or bronze in the game yet, only old gold armour converted
 - base:meteoric_iron: hammered cold, iron-grade before a player can smelt (Research round 17)
 - base:raw_gold, base:gold_ingot, base:gold_block: cast and soft: the Bronze Age's (Ronald, 11-07: "move them to fit")
 
-### Iron Age (27)
+### Iron Age (22)
 
-**tech** (19)
+**tech** (14)
 
 - ground: redstone_ore (-), star_steel_ore (-)
 - material: bucket (3.5), iron_block (11), iron_ingot (1.2), lava_bucket (4.1), raw_iron (1.0), star_steel_ingot (12), star_steel_lump (12), water_bucket (3.7)
-- tool: iron_axe (3.6), iron_hoe (2.5), iron_pickaxe (3.6), iron_shovel (1.3), iron_sword (2.4)
-- armour: iron_boots (4.7), iron_chestplate (9.4), iron_helmet (5.9), iron_leggings (8.2)
+- armour: boots_mail (2.8), chestplate_mail (4.0), helmet_mail (2.8), leggings_mail (4.0)
 
 **magic** (4)
 
@@ -355,19 +360,19 @@ Notes:
 
 Notes:
 - base:redstone_ore, base:star_steel_ore: breaks into its ore (an iron pickaxe)
+- base:helmet_mail, base:chestplate_mail, base:leggings_mail, base:boots_mail: the same armour with an iron or steel shell, an item of its own only for its worn look (`parts::ARMOUR_LOOKS`)
 - base:star_lantern: a starheart in iron
 - base:unlearning_stone: a peridot ground with tektites: gives back perk web nodes (vitals::perks)
 - base:salt, base:salted_meat: salt is boiled from a water bucket (iron)
 - animals:wyvern_saddle: a dragon-sized saddle has an iron frame
 
-### Age of Steam (30)
+### Age of Steam (25)
 
-**tech** (29)
+**tech** (24)
 
 - ground: diamond_ore (-)
 - material: diamond (10), diamond_block (90)
-- tool: diamond_axe (30), diamond_hoe (20), diamond_pickaxe (30), diamond_shovel (10), diamond_sword (20)
-- armour: diamond_boots (40), diamond_chestplate (80), diamond_helmet (50), diamond_leggings (70)
+- armour: boots_gem (20), chestplate_gem (30), helmet_gem (20), leggings_gem (30)
 - machine: anchor (9.9), comparator (3.3), copper_lamp (-), dispenser (1.6), floater (10), golden_lamp (13), lever (0.25), observer (3.1), piston (2.6), redstone (0.50), redstone_block (4.6), redstone_lamp (3.2), redstone_torch (0.60), repeater (2.7), slime_block (1.0), sticky_piston (3.7), stone_button (0.37)
 
 **shared** (1)
@@ -378,7 +383,7 @@ Notes:
 - base:diamond_ore: breaks into a diamond (a steel pickaxe: harvest 300)
 - base:copper_lamp: no recipe yet (no copper in the game)
 - base:obsidian: a steel pickaxe or better (harvest 300)
-- base:diamond_pickaxe, base:diamond_axe, base:diamond_shovel, base:diamond_hoe, base:diamond_sword: diamond is a tier above steel (`crafting::materials`)
+- base:helmet_gem, base:chestplate_gem, base:leggings_gem, base:boots_gem: a diamond-scale shell's worn look
 - base:redstone, base:redstone_block, base:redstone_torch, base:repeater, base:comparator, base:lever, base:stone_button, base:redstone_lamp, base:piston, base:sticky_piston, base:slime_block, base:observer, base:dispenser, base:floater, base:anchor, base:golden_lamp: redstone ore needs an iron pickaxe; machines are the Age of Steam's
 
 ## Tool parts' materials
@@ -415,4 +420,7 @@ Each `crafting::MATERIALS` row's age, and what a part of it is made from in the 
 | rawhide | Stone Age | - |
 | birch_tar | Stone Age | - |
 | leather | Stone Age | base:sole_leather |
+| linen | Stone Age | base:cloth |
+| wool | Stone Age | base:wool |
+| fur | Stone Age | base:fur |
 

@@ -160,7 +160,7 @@ pub fn art_name(material: &str) -> &str {
 /// anchor less the handle's socket. Nothing for a material with no anchor yet.
 pub fn shift(kind: &str, material: &str) -> [i32; 2] {
     let Some(l) = look(kind) else { return [0, 0] };
-    let art = art_name(material);
+    let art = drawn(kind, material);
     match l.anchors.iter().find(|(m, _)| *m == art) {
         Some((_, a)) => [(a[0] - l.socket[0]).round() as i32, (a[1] - l.socket[1]).round() as i32],
         None => [0, 0],
@@ -171,7 +171,30 @@ pub fn shift(kind: &str, material: &str) -> [i32; 2] {
 /// and a felling one each have their own): painted, `base:parts/<kind>/<shape>/<art name>`, used
 /// as it is; or a shade map, `base:parts/<kind>/<shape>`, painted with ramps.
 pub fn painted(kind: &str, shape: &str, material: &str) -> String {
-    format!("base:parts/{kind}/{shape}/{}", art_name(material))
+    format!("base:parts/{kind}/{shape}/{}", drawn(kind, material))
+}
+
+/// The drawing a working part of `material` uses on `kind`: its own where it's drawn (the kind's
+/// anchors list the drawn ones), else the nearest drawn one until its art comes (meteoric iron as
+/// iron, star steel as steel, chert, obsidian and tektite as flint, bone and antler, and flint on a
+/// sword, as stone).
+pub fn drawn<'a>(kind: &str, material: &'a str) -> &'a str {
+    let Some(l) = look(kind) else { return art_name(material) };
+    let has = |a: &str| l.anchors.is_empty() || l.anchors.iter().any(|(m, _)| *m == a);
+    let mut art = art_name(material);
+    for _ in 0..3 {
+        if has(art) {
+            return art;
+        }
+        art = match art {
+            "meteoric_iron" => "iron",
+            "star_steel" => "steel",
+            "chert" | "obsidian" | "tektite" => "flint",
+            "flint" | "bone" | "antler" => "stone",
+            _ => "iron",
+        };
+    }
+    art
 }
 
 pub fn map(kind: &str, shape: &str) -> String {
@@ -217,5 +240,9 @@ mod tests {
             }
         }
         assert_eq!(painted("axe", "felling_axe_head", "oak"), "base:parts/axe/felling_axe_head/wood");
+        // Until their art comes, undrawn heads use the nearest drawn one.
+        assert_eq!(painted("pickaxe", "pick_head", "meteoric_iron"), "base:parts/pickaxe/pick_head/iron");
+        assert_eq!(painted("sword", "straight_blade", "flint"), "base:parts/sword/straight_blade/stone");
+        assert_eq!(painted("axe", "felling_axe_head", "obsidian"), "base:parts/axe/felling_axe_head/flint");
     }
 }
