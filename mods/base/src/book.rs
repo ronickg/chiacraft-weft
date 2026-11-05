@@ -881,9 +881,12 @@ fn picked_recipe(ui: &mut Ui, station: Station, r: &Recipe, have: &[(u32, u32)])
                     .send(&CRAFT, &[index as u64, n as u64, station as u64]);
             });
         }
-        ui.button_args("crafting.book.craft_all", &[Arg::Int(can as i64)], S::default().h(14.0).pad(3.0).disabled(can == 0), move |c| {
+        // Max makes one of what doesn't stack (a tool, a drill): Max on the hand drill ate four
+        // sticks for two drills (the world playtester, round 13). Craft 5 still makes more.
+        let all = if weft_sdk::max_stack(out.item) <= 1 { can.min(1) } else { can };
+        ui.button_args("crafting.book.craft_all", &[Arg::Int(all as i64)], S::default().h(14.0).pad(3.0).disabled(all == 0), move |c| {
             c.client()
-                .send(&CRAFT, &[index as u64, can as u64, station as u64]);
+                .send(&CRAFT, &[index as u64, all as u64, station as u64]);
         });
     });
 }
