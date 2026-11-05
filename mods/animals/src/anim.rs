@@ -21,9 +21,20 @@
 //! Cheap: the state is kept on the animal (`HELD`, not saved) and only a change is sent; idle life
 //! looks once a second and plays a clip every 15 to 40 seconds.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use weft_sdk::*;
 
 use crate::species::SPECIES;
+
+/// `/anim log`: every change of state and every clip played once goes to the log (for checks).
+static LOG: AtomicBool = AtomicBool::new(false);
+
+fn log(id: u64, what: &str, clip: &str) {
+    if LOG.load(Ordering::Relaxed) {
+        weft_sdk::info!("anim: {id} {what} {clip}");
+    }
+}
 
 /// An animation state, by its clip's name.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -188,7 +199,7 @@ pub fn init(r: &mut Registry) {
     for s in &SPECIES {
         r.attach(s.kind, &HELD);
     }
-    r.command("anim", "<clip:word> [mode:word(hold,once,clear)]", command)
+    r.command("anim", "<clip:word> [mode:word(hold,once,clear,loop)]", command)
         .permission(permission::GAME_MASTER);
     // A flinch when hit, unless the blow kills it (the engine plays `death`).
     r.on(&actions::HURT, |b| {
@@ -226,6 +237,7 @@ pub fn hold_for(w: &World, id: u64, a: Act, ticks: u64) {
         return;
     }
     end(w, id, h[STATE]);
+    log(id, "holds", a.clip());
     let state = if !a.gait().is_empty() {
         for from in a.gait() {
             w.action_override(id, from, a.clip());
@@ -249,6 +261,7 @@ pub fn clear(w: &World, id: u64) {
     let Some(h) = w.component(id, &HELD) else { return };
     if h[STATE] != 0 {
         end(w, id, h[STATE]);
+        log(id, "holds", "nothing");
         edit(w, id, |c| c[STATE] = 0);
     }
 }
@@ -262,6 +275,7 @@ pub fn act(w: &World, id: u64, a: Act) {
 /// roar), as `act`.
 pub fn play(w: &World, id: u64, clip: &str, secs: f32) {
     let Some(h) = w.component(id, &HELD) else { return };
+    log(id, "plays", clip);
     w.action_play(id, clip, false);
     let busy = w.game_time() + (secs * 20.0).ceil() as u64;
     edit(w, id, |c| {
@@ -340,10 +354,17 @@ fn idle_life(w: &World, id: u64, h: [u64; 4]) {
 /// Ticks `/anim <clip> hold` pins a state for: ten minutes, for looks.
 const PINNED: u64 = 20 * 600;
 
-/// `/anim <clip> [hold|once|clear]` (for checks and looks): the nearest animal within 16 blocks
-/// holds a state (pinned for ten minutes) or plays a clip once (`death` too, without dying).
+/// `/anim <clip> [hold|once|clear|loop]` (for checks and looks): the nearest animal within 16
+/// blocks holds a state (pinned for ten minutes), plays a clip once (`death` too, without dying),
+/// or plays any clip looping where it stands (`loop`: a gait seen in place, ticks frozen). `/anim
+/// log` logs every animal's changes of state from then on.
 fn command(cmd: &mut ServerCommand) {
     let (w, player) = (cmd.world(), cmd.player());
+    if cmd.text("clip") == Some("log") {
+        LOG.store(true, Ordering::Relaxed);
+        cmd.reply("command.animals.line", &[Arg::Text("anim: logging")]);
+        return;
+    }
     let Some(p) = w.entity(player) else { return };
     let d2 = |id: u64| {
         w.entity(id)
@@ -360,7 +381,11 @@ fn command(cmd: &mut ServerCommand) {
     let clip = cmd.text("clip").unwrap_or_default().to_string();
     let mode = cmd.text("mode").unwrap_or("once").to_string();
     match (Act::named(&clip), mode.as_str()) {
-        (_, "clear") => clear(&w, id),
+        (_, "clear") => {
+            clear(&w, id);
+            w.action_stop(id);
+        }
+        (_, "loop") => w.action_play(id, &clip, true),
         (Some(a), "hold") => hold_for(&w, id, a, PINNED),
         (Some(a), _) => act(&w, id, a),
         (None, "hold") => w.action_play(id, &clip, true),
