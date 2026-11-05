@@ -167,7 +167,7 @@ def elements():
          el("rump", "spine_0", (-4.0, 6.5, -17.5), (4.0, 16, -15.5)),
          # The back slopes down to the shoulders; its front 0.4 short of the skull's back (at 4.5 a texel of neck
          # showed between them; linecheck).
-         el("chest", "spine_1", (-4.5, 5.5, -8), (4.5, 16.9, 6.6)),
+         el("chest", "spine_1", (-4.5, 6.0, -8), (4.5, 16.9, 6.6)),  # bottom 6.0 (was 5.5): with the front paws a texel tall the forearm still shows two texels (linecheck)
          el("neck", "neck", (-3, 13.4, 0.5), (3, 16.4, 11)),  # inside the skull's height where it enters
          el("skull", "head", *SKULL),
          # Blunt, the split lip; out 4.2 from the skull's front, over two texels (at 17.5, out 2.5, its sides and top
@@ -205,7 +205,7 @@ def elements():
             # and 0.5 in front (flush: it was 1.5 out in front, 0.4-0.6 elsewhere), its top 1.45 (1.6 before: the
             # forearm's side showed 1.75 texels above it).
             E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x - 2, 1.2, z - 2), (x + 2, 7.0, z + 2)))
-            E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 2.35, 0, z - 2.35), (x + 2.35, 1.45, z + 2.5)))
+            E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 2.35, 0, z - 2.35), (x + 2.35, 2.0, z + 2.5)))  # a texel tall (Planner, 11-05: at 1.45, 0.72 texel, linecheck listed it thin)
         else:
             x, z = BACK_X * s, BACK_Z
             xi, xo = sorted((x - 2.0 * s, x + 2.4 * s))  # the haunch, bulging out (its inside clear of the front legs)

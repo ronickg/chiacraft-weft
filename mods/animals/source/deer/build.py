@@ -55,6 +55,28 @@ if __name__ == "__main__":
         spec["animations"][clip] = grounded(spec, spec["animations"][clip], FEET, bounds)
         low = min(feet_low(spec, spec["animations"][clip], FEET))
         assert abs(low) < 0.3, f"{clip}'s feet at {low:.2f}, not on the ground"
+    # The standing clips keep a hoof on the ground in every frame (rearing on the hind ones; the pronk
+    # leaves it and lands); none sinks.
+    for clip in ("stare", "graze", "drink", "sniff", "look", "scratch", "stretch", "alarm", "rear", "groom", "nuzzle", "flinch", "watch"):
+        low = feet_low(spec, spec["animations"][clip], FEET)
+        assert min(low) > -0.3 and max(low) < 0.3, f"{clip}'s feet from {min(low):.2f} to {max(low):.2f}, not on the ground"
+    spec["animations"]["play"] = grounded(spec, spec["animations"]["play"], FEET, True)  # the pronk lands on the ground
+    assert abs(min(feet_low(spec, spec["animations"]["play"], FEET))) < 0.3, "the pronk lands in the ground"
+    # Dying, it rolls onto its side: mid-roll its legs swing out below where it ends up lying (11 units
+    # into the ground), so each frame rests on its lowest point (the fitted drop in `deer.py` is only
+    # the last frame's).
+    everything = [e["name"] for e in spec["elements"]]
+    spec["animations"]["death"] = grounded(spec, spec["animations"]["death"], everything)
+    low = feet_low(spec, spec["animations"]["death"], everything)
+    assert min(low) > -0.3 and max(low) < 0.3, f"dying, its lowest point from {min(low):.2f} to {max(low):.2f}"
+    # No thin lines (Ronald, 11-05): no strip of a box under two texels showing beside another
+    # (linecheck; flush, or two texels clear).
+    from linecheck import boxes_from_spec, lines  # noqa: E402
+    from PIL import Image  # noqa: E402
+    import numpy as np  # noqa: E402
+    thin = [h for h in lines(boxes_from_spec(spec), np.array(Image.open(os.path.join(OUT, "texture.png")).convert("RGBA")))
+            if h["kind"] == "line"]
+    assert not thin, f"thin lines: {[(h['box'], h['face'], h['cover'], h['width']) for h in thin]}"
     made = export(spec, os.path.join(OUT, "texture.png"), ASSETS, "deer", SCALE, "deer/deer", pose_files=POSES)
     # Its coat layers, for coats painted from genes in the game (`core/src/coats.rs`).
     shutil.copytree(os.path.join(OUT, "layers"), os.path.join(HERE, "..", "..", "genetics", "layers", "deer"), dirs_exist_ok=True)
