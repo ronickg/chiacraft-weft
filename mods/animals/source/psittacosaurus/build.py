@@ -26,8 +26,13 @@ from house import SCALE  # noqa: E402  the house density: 64 texels a block
 
 # Which animations go in which file: the engine plays `idle`, `walk` and `run` by itself; lying
 # down is a look of its own.
-POSES = {"": {"idle": "idle", "walk": "walk", "run": "run"},
-         "_lie": {"idle": "lie", "walk": "walk"}}
+# The behaviour clips (`mods/animals/src/anim.rs`) go in the standing file too, by their own names
+# (no rear or charge: it is under the size that stands its ground).
+CLIPS = ["stare", "graze", "drink", "sniff", "look", "scratch", "stretch", "sleep", "alarm", "play", "groom", "nuzzle", "flinch",
+         "death", "watch", "approach"]
+# Asleep it lies in its look (`wild.rs` settle): the sleep clip goes in the lying file too.
+POSES = {"": {"idle": "idle", "walk": "walk", "run": "run", **{c: c for c in CLIPS}},
+         "_lie": {"idle": "lie", "walk": "walk", "sleep": "sleep"}}
 FEET = ["toes_L", "toes_R"]
 AXIS = ["neck", "skull", "chest", "hips", "tail_"]
 
@@ -35,7 +40,7 @@ if __name__ == "__main__":
     subprocess.run([sys.executable, os.path.join(HERE, "psittacosaurus.py")], check=True)
     subprocess.run([sys.executable, os.path.join(SKILL, "boxcheck.py"), os.path.join(OUT, "spec.json")], check=True)
     from to_bedrock import export  # noqa: E402
-    from ground import gait, joints, pokes  # noqa: E402
+    from ground import feet_low, gait, grounded, joints, pokes  # noqa: E402
     from linecheck import boxes_from_spec, lines  # noqa: E402
 
     spec = json.load(open(os.path.join(OUT, "spec.json")))
@@ -49,9 +54,17 @@ if __name__ == "__main__":
     assert not thin, f"thin lines: {[(h['box'], h['face'], h['cover'], h['width']) for h in thin]}"
     poking = pokes(spec, AXIS)  # no neck corner through the head or chest
     assert not poking, f"poking through: {sorted(poking)}"
-    for anim in ("walk", "run"):  # a foot in the air must swing forward, or it moonwalks
+    for anim in ("walk", "run", "approach"):  # a foot in the air must swing forward, or it moonwalks
         back = {f: v for f, v in gait(spec, anim, FEET).items() if v is not None and v <= 0}
         assert not back, f"{anim} goes backwards: {back}"
+    # The approach, written as angles, stands on its feet: the root's height from the feet, frame by
+    # frame, and checked: no foot sinks into the ground or floats over it.
+    spec["animations"]["approach"] = grounded(spec, spec["animations"]["approach"], FEET)
+    low = feet_low(spec, spec["animations"]["approach"], FEET)
+    assert max(abs(v) for v in low) < 0.3, f"approach's feet at {min(low):.2f}..{max(low):.2f}, not on the ground"
+    # A clip played once must not loop (the engine loops a clip whose file says so, whatever the game asks).
+    looping = [c for c in CLIPS if spec["animations"][c].get("loop") is True]
+    assert sorted(looping) == ["approach", "drink", "graze", "sleep", "stare", "watch"], f"looping: {looping}"
     made = export(spec, os.path.join(OUT, "texture.png"), ASSETS, "psittacosaurus", SCALE, "psittacosaurus/psittacosaurus", pose_files=POSES)
     # Its coat layers, for coats painted from genes in the game (`core/src/coats.rs`).
     shutil.copytree(os.path.join(OUT, "layers"), os.path.join(HERE, "..", "..", "genetics", "layers", "psittacosaurus"), dirs_exist_ok=True)

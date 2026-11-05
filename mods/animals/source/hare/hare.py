@@ -134,7 +134,9 @@ def eye_box(side):
 
 
 LEGS = ("FL", "FR", "BL", "BR")
-FRONT_Z, BACK_Z, FRONT_X, BACK_X = 2.2, -10.5, 2.5, 4.0
+# The front legs 2.85 out (2.5 before): the forearms two texels across (rule 7, Ronald 11-05) then end 0.35
+# past the chest's side, not in its plane (boxcheck), and the paws keep 1.0 apart.
+FRONT_Z, BACK_Z, FRONT_X, BACK_X = 2.2, -10.5, 2.85, 4.0
 HIP_Y, KNEE_Y, ANKLE_Y = 11.0, 3.5, -5.7  # straight down at rest: thigh 7.5, shin 9.2
 EAR = [(19.0, 23.0, 1.7), (23.0, 27.0, 1.5), (27.0, 29.0, 1.1), (29.0, 30.0, 0.5)]  # y0, y1, half width
 EAR_Z, EAR_X = (9.2, 10.4), 1.9
@@ -165,7 +167,7 @@ def elements():
          el("rump", "spine_0", (-4.0, 6.5, -17.5), (4.0, 16, -15.5)),
          # The back slopes down to the shoulders; its front 0.4 short of the skull's back (at 4.5 a texel of neck
          # showed between them; linecheck).
-         el("chest", "spine_1", (-4.5, 5.5, -8), (4.5, 16.9, 6.6)),
+         el("chest", "spine_1", (-4.5, 6.0, -8), (4.5, 16.9, 6.6)),  # bottom 6.0 (was 5.5): with the front paws a texel tall the forearm still shows two texels (linecheck)
          el("neck", "neck", (-3, 13.4, 0.5), (3, 16.4, 11)),  # inside the skull's height where it enters
          el("skull", "head", *SKULL),
          # Blunt, the split lip; out 4.2 from the skull's front, over two texels (at 17.5, out 2.5, its sides and top
@@ -194,9 +196,16 @@ def elements():
         if leg[0] == "F":
             x, z = FRONT_X * s, FRONT_Z
             # The shoulder's bottom half a unit below the chest's (at 4.6, 0.9 below, it read as a rim; linecheck).
-            E.append(el(f"leg_{leg}_upper", f"leg_{leg}_upper", (x - 1.5, 5.0, z - 1.6), (x + 1.5, 12, z + 1.6)))
-            E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x - 1, 1.2, z - 1.1), (x + 1, 5.4, z + 1.1)))
-            E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 1.4, 0, z - 1.7), (x + 1.4, 1.6, z + 2.6)))
+            # Its outside 0.4 in from the chest's (boxcheck), now the leg sits 2.85 out; inside the forearm below.
+            xa, xb = sorted((x - 1.5 * s, x + 1.25 * s))
+            E.append(el(f"leg_{leg}_upper", f"leg_{leg}_upper", (xa, 5.0, z - 1.6), (xb, 12, z + 1.6)))
+            # Rule 7 (Ronald, 11-05: no boxes a texel thick): the forearm two texels square (it was 2 by 2.2 units, a
+            # texel across), up into the chest (to 7.0, its face three texels tall) so it shows two of them above the
+            # paw (no thin line) and hides the upper leg's stub; the paw 0.35 out from it round the sides and back
+            # and 0.5 in front (flush: it was 1.5 out in front, 0.4-0.6 elsewhere), its top 1.45 (1.6 before: the
+            # forearm's side showed 1.75 texels above it).
+            E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x - 2, 1.2, z - 2), (x + 2, 7.0, z + 2)))
+            E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 2.35, 0, z - 2.35), (x + 2.35, 2.0, z + 2.5)))  # a texel tall (Planner, 11-05: at 1.45, 0.72 texel, linecheck listed it thin)
         else:
             x, z = BACK_X * s, BACK_Z
             xi, xo = sorted((x - 2.0 * s, x + 2.4 * s))  # the haunch, bulging out (its inside clear of the front legs)

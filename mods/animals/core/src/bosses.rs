@@ -100,50 +100,99 @@ const fn loot(item: &'static str, count: (u32, u32), chance: f32, certain_by: u3
     Loot { item, count, chance, certain_by, from: Age::Stone }
 }
 
-pub static BOSSES: [Boss; 1] = [Boss {
-    name: "drenkaun",
-    role: Role::Apex,
-    home: "forests",
-    tweaks: &[(Stat::Health, Tweak::new(0.8, "a boss is fought in windows: its tells, knockdowns and the misses add the time back"))],
-    // Only the Stone form is playable; the later ones wait for their ages' offerings.
-    forms: &[
-        form(Age::Stone, Some("animals:forest_offering"), 5),
-        form(Age::Bronze, None, 5),
-        form(Age::Iron, None, 5),
-        form(Age::Steam, None, 5),
-    ],
-    attacks: &[
-        // Its form's hit downs a same-age player in about one (a titan's band), so each attack
-        // takes a share: two charges or three sweeps down them (round 1: "can still down you in
-        // two hits").
-        // Head down, antlers forward, a straight run that tramples what is in its path; it is
-        // stunned if it runs into a trunk or a wall (the window to punish it).
-        Attack { name: "charge", hit: 0.75, reach: 1.5, windup: 1.2, cooldown: 9.0, knockback: 14.0 },
-        // A sideways sweep of the antlers in front of it.
-        Attack { name: "sweep", hit: 0.5, reach: 4.5, windup: 0.8, cooldown: 3.5, knockback: 9.0 },
-        // It rears and stamps: a ring round it, for whoever stands under or behind it.
-        Attack { name: "stomp", hit: 0.4, reach: 3.5, windup: 0.9, cooldown: 7.0, knockback: 7.0 },
-        // Roots burst up under a player it can see far off and hold them (slowed) a while.
-        Attack { name: "roots", hit: 0.25, reach: 24.0, windup: 1.4, cooldown: 12.0, knockback: 2.0 },
-    ],
-    parts: &[
-        Part { name: "left_antler", at: 0.10, drop: "animals:warden_antler", count: 1, weakens: Some("sweep") },
-        Part { name: "right_antler", at: 0.20, drop: "animals:warden_antler", count: 1, weakens: Some("charge") },
-        Part { name: "crown", at: 0.30, drop: "animals:warden_bark", count: 2, weakens: Some("roots") },
-    ],
-    loot: &[
-        // The Stone Age key's boss part.
-        loot("animals:warden_heartseed", (1, 1), 0.35, 3),
-        loot("animals:warden_antler", (1, 2), 0.6, 2),
-        loot("animals:warden_bark", (2, 4), 1.0, 0),
-        loot("base:leather", (6, 10), 1.0, 0),
-        loot("base:bone", (4, 8), 1.0, 0),
-    ],
-    young: loot("animals:drenkaun_calf", (1, 1), 0.3, 4),
-    knockdown: 0.08,
-    down_secs: 4.0,
-    fierce_at: 0.5,
-}];
+pub static BOSSES: [Boss; 2] = [
+    Boss {
+        name: "drenkaun",
+        role: Role::Apex,
+        home: "forests",
+        tweaks: &[(Stat::Health, Tweak::new(0.8, "a boss is fought in windows: its tells, knockdowns and the misses add the time back"))],
+        // Only the Stone form is playable; the later ones wait for their ages' offerings.
+        forms: &[
+            form(Age::Stone, Some("animals:forest_offering"), 5),
+            form(Age::Bronze, None, 5),
+            form(Age::Iron, None, 5),
+            form(Age::Steam, None, 5),
+        ],
+        attacks: &[
+            // Its form's hit downs a same-age player in about one (a titan's band), so each attack
+            // takes a share: two charges or three sweeps down them (round 1: "can still down you in
+            // two hits").
+            // Head down, antlers forward, a straight run that tramples what is in its path; it is
+            // stunned if it runs into a trunk or a wall (the window to punish it).
+            Attack { name: "charge", hit: 0.75, reach: 1.5, windup: 1.2, cooldown: 9.0, knockback: 14.0 },
+            // A sideways sweep of the antlers in front of it.
+            Attack { name: "sweep", hit: 0.5, reach: 4.5, windup: 0.8, cooldown: 3.5, knockback: 9.0 },
+            // It rears and stamps: a ring round it, for whoever stands under or behind it.
+            Attack { name: "stomp", hit: 0.4, reach: 3.5, windup: 0.9, cooldown: 7.0, knockback: 7.0 },
+            // Roots burst up under a player it can see far off and hold them (slowed) a while.
+            Attack { name: "roots", hit: 0.25, reach: 24.0, windup: 1.4, cooldown: 12.0, knockback: 2.0 },
+        ],
+        parts: &[
+            Part { name: "left_antler", at: 0.10, drop: "animals:warden_antler", count: 1, weakens: Some("sweep") },
+            Part { name: "right_antler", at: 0.20, drop: "animals:warden_antler", count: 1, weakens: Some("charge") },
+            Part { name: "crown", at: 0.30, drop: "animals:warden_bark", count: 2, weakens: Some("roots") },
+        ],
+        loot: &[
+            // The Stone Age key's boss part.
+            loot("animals:warden_heartseed", (1, 1), 0.35, 3),
+            loot("animals:warden_antler", (1, 2), 0.6, 2),
+            loot("animals:warden_bark", (2, 4), 1.0, 0),
+            loot("base:leather", (6, 10), 1.0, 0),
+            loot("base:bone", (4, 8), 1.0, 0),
+        ],
+        young: loot("animals:drenkaun_calf", (1, 1), 0.3, 4),
+        knockdown: 0.08,
+        down_secs: 4.0,
+        fierce_at: 0.5,
+    },
+    // Borkon, the Height-Keeper (round 6): the mountains' giant horned beast in the high passes, at a
+    // stone altar near the dwarven halls. The Bronze Age's boss (Ronald, 11-05: "Yes, build Borkon";
+    // Drenkaun serves the Stone Age key, so Borkon's part goes in the Bronze Age's: its first form is
+    // the Bronze Age's, a titan at its middle, and the dwarves' gold calls it).
+    Boss {
+        name: "borkon",
+        role: Role::Apex,
+        home: "mountains",
+        tweaks: &[(Stat::Health, Tweak::new(0.8, "a boss is fought in windows: its tells, knockdowns and the misses add the time back"))],
+        forms: &[
+            form(Age::Bronze, Some("animals:mountain_offering"), 5),
+            form(Age::Iron, None, 5),
+            form(Age::Steam, None, 5),
+            form(Age::Lightning, None, 5),
+        ],
+        attacks: &[
+            // Head down, a run that rams with the horns and flings what it hits up and back; into a
+            // rock face it is stunned.
+            Attack { name: "charge", hit: 0.75, reach: 1.5, windup: 1.4, cooldown: 9.0, knockback: 12.0 },
+            // A toss of the horns for whoever is close in front: thrown high.
+            Attack { name: "toss", hit: 0.55, reach: 3.5, windup: 0.9, cooldown: 4.5, knockback: 10.0 },
+            // It rears and stamps the mountain: rocks fall where a player far off stands (three where
+            // it is fierce).
+            Attack { name: "rockfall", hit: 0.35, reach: 26.0, windup: 1.6, cooldown: 11.0, knockback: 2.0 },
+            // It leaps where its target is, up onto a ledge or down from one, and lands with a quake
+            // round it: the high passes are its ground.
+            Attack { name: "leap", hit: 0.5, reach: 22.0, windup: 1.0, cooldown: 12.0, knockback: 8.0 },
+        ],
+        parts: &[
+            Part { name: "left_horn", at: 0.10, drop: "animals:borkon_horn", count: 1, weakens: Some("toss") },
+            Part { name: "right_horn", at: 0.20, drop: "animals:borkon_horn", count: 1, weakens: Some("charge") },
+            Part { name: "fleece", at: 0.30, drop: "animals:height_fleece", count: 2, weakens: Some("leap") },
+        ],
+        loot: &[
+            // The Bronze Age key's boss part.
+            loot("animals:summit_stone", (1, 1), 0.35, 3),
+            loot("animals:borkon_horn", (1, 2), 0.6, 2),
+            loot("animals:height_fleece", (2, 4), 1.0, 0),
+            loot("base:wool", (6, 10), 1.0, 0),
+            loot("base:raw_gold", (2, 4), 1.0, 0),
+            loot("base:bone", (4, 8), 1.0, 0),
+        ],
+        young: loot("animals:borkon_kid", (1, 1), 0.3, 4),
+        knockdown: 0.08,
+        down_secs: 4.0,
+        fierce_at: 0.5,
+    },
+];
 
 /// A boss by name.
 pub fn boss(name: &str) -> Option<&'static Boss> {
@@ -250,15 +299,38 @@ mod tests {
     }
 
     #[test]
-    fn bad_luck_help_is_certain_by_its_count() {
-        let b = boss("drenkaun").unwrap();
-        for l in b.loot.iter().chain([&b.young]) {
-            if l.certain_by > 0 {
-                assert_eq!(l.chance_after(l.certain_by - 1), 1.0, "{}", l.item);
-                assert!(l.chance_after(0) < 1.0 || l.chance >= 1.0);
+    fn every_boss_fights_in_its_first_age_band() {
+        for b in &BOSSES {
+            let f = &b.forms[0];
+            let fight = b.reference_fight(f);
+            assert!((120.0..=300.0).contains(&fight.ttk), "{}: {fight:?}", b.name);
+            for age in [Age::Steam, Age::Stars] {
+                assert!(b.fight_with(f, age).ttk >= 120.0, "{} vs {age:?}", b.name);
             }
-            assert_eq!(l.count_at(0.0), l.count.0);
-            assert_eq!(l.count_at(1.0), l.count.1);
+            assert!(f.offering.is_some(), "{}'s first form is called by an offering", b.name);
+            assert!(b.attacks.len() <= 4 && b.loot.len() < 8, "{}: the game keeps 4 cooldowns and 7 loot lines", b.name);
+            assert!(
+                b.parts
+                    .iter()
+                    .all(|p| p.at < STAGGER_SHARE && p.weakens.is_none_or(|a| b.attack(a).is_some())),
+                "{}",
+                b.name
+            );
+        }
+        assert_eq!(boss("borkon").unwrap().forms[0].age, Age::Bronze);
+    }
+
+    #[test]
+    fn bad_luck_help_is_certain_by_its_count() {
+        for b in &BOSSES {
+            for l in b.loot.iter().chain([&b.young]) {
+                if l.certain_by > 0 {
+                    assert_eq!(l.chance_after(l.certain_by - 1), 1.0, "{}", l.item);
+                    assert!(l.chance_after(0) < 1.0 || l.chance >= 1.0);
+                }
+                assert_eq!(l.count_at(0.0), l.count.0);
+                assert_eq!(l.count_at(1.0), l.count.1);
+            }
         }
     }
 
