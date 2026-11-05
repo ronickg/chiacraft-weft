@@ -1,6 +1,7 @@
 pub mod camera;
 pub mod ctm;
 pub mod entity_render;
+pub mod frame_look;
 pub mod gizmo;
 pub mod lod;
 pub mod looks;
@@ -10,7 +11,6 @@ pub mod modui;
 pub mod particles;
 mod receive;
 pub mod sky;
-pub mod frame_look;
 pub mod soft_clouds;
 pub mod stack_look;
 pub mod terrain;
