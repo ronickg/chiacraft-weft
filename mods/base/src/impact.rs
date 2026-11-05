@@ -36,9 +36,15 @@ struct Carve {
     columns: Vec<(i32, i32)>,
     /// Block edits a tick.
     budget: usize,
-    /// Edits made so far, columns skipped (not loaded or water).
+    /// Edits made so far, columns skipped (water, or never loaded).
     edits: usize,
     skipped: usize,
+    /// Columns not loaded yet when their turn came (a cube still loading after the player moved:
+    /// impact_look1 left a 16 by 16 pillar standing in a bowl), tried again every second until
+    /// `deadline` (game time).
+    later: Vec<(i32, i32)>,
+    deadline: u64,
+    retry: u64,
     /// The core: (dx, dz, blocks under the bowl's lining) and its block; the rim's meteorites:
     /// (dx, dz) and theirs. No block (`u32::MAX`), none placed.
     core: Vec<(i32, i32, i32)>,
@@ -118,7 +124,7 @@ pub fn start(w: &World, x: i32, z: i32, radius: i32, ticks: u32) -> Option<usize
 /// `start` with what the crater holds (`loot`; None for `Loot::meteorites` alone).
 pub fn start_with(w: &World, x: i32, z: i32, radius: i32, ticks: u32, loot: Option<Loot>) -> Option<usize> {
     let guess = base_api::land::height(&base_api::land::fields(w.seed()), x * 16, z * 16) >> 4;
-    let y = ground(w, x, z, guess)?;
+    let Ground::At(y) = ground(w, x, z, guess) else { return None };
     let seed = w.seed_at([x, y, z]);
     let rim = n::IMPACT_RIM.0 + (seed % (n::IMPACT_RIM.1 - n::IMPACT_RIM.0 + 1) as u64) as i32;
     let out = (radius as f64 * n::IMPACT_SCORCH.max(n::IMPACT_TEKTITE_REACH.1)).ceil() as i32;
@@ -185,6 +191,9 @@ pub fn start_with(w: &World, x: i32, z: i32, radius: i32, ticks: u32, loot: Opti
         budget,
         edits: 0,
         skipped: 0,
+        later: Vec::new(),
+        deadline: w.game_time() + n::IMPACT_WAIT_TICKS,
+        retry: 0,
         core,
         core_state,
         rim_spots,
@@ -213,25 +222,40 @@ fn surface(u: f64, radius: i32, rim: i32) -> i32 {
     h.round() as i32
 }
 
+/// What a column's ground search found.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Ground {
+    /// The top of the ground (blocks).
+    At(i32),
+    /// Water lies on it (or no ground within reach).
+    Water,
+    /// Not loaded (yet).
+    Unloaded,
+}
+
 /// The top of the ground at (`x`, `z`) near `guess`: the highest full block that isn't a tree.
-/// None where it isn't loaded, or water lies on it. A cube of air over the ground may not be
-/// loaded at all (impact_carve1: every strike 160 blocks out came back without ground), so what
-/// isn't loaded counts as air until the ground is found.
-fn ground(w: &World, x: i32, z: i32, guess: i32) -> Option<i32> {
+/// A cube of air over the ground may not be loaded at all (impact_carve1: every strike 160
+/// blocks out came back without ground), so what isn't loaded counts as air until the ground is
+/// found; with no ground found and some of it not loaded, it isn't loaded yet.
+fn ground(w: &World, x: i32, z: i32, guess: i32) -> Ground {
+    let mut unloaded = false;
     for y in (guess - 24..=guess + 24).rev() {
-        let Some(s) = w.block_loaded([x, y, z]) else { continue };
+        let Some(s) = w.block_loaded([x, y, z]) else {
+            unloaded = true;
+            continue;
+        };
         if s == 0 {
             continue;
         }
         let flags = state_flags(s);
         if flags & abi::block_flags::LIQUID != 0 {
-            return None;
+            return Ground::Water;
         }
         if flags & abi::block_flags::OPAQUE != 0 && !LOGS.on_block(s) && !LEAVES.on_block(s) {
-            return Some(y);
+            return Ground::At(y);
         }
     }
-    None
+    if unloaded { Ground::Unloaded } else { Ground::Water }
 }
 
 fn tick(w: &World) {
@@ -250,13 +274,27 @@ fn tick(w: &World) {
         while edits < c.budget {
             let Some((dx, dz)) = c.columns.pop() else { break };
             match column(w, c, dx, dz, &mut gone) {
-                Some(e) => edits += e,
-                None => c.skipped += 1,
+                Ok(e) => edits += e,
+                Err(Ground::Unloaded) => c.later.push((dx, dz)),
+                Err(_) => c.skipped += 1,
             }
         }
         c.edits += edits;
         if !gone.is_empty() {
             crate::leaf_decay::logs_gone(w, gone.into_iter());
+        }
+        if c.columns.is_empty() && !c.later.is_empty() {
+            let now = w.game_time();
+            if now < c.deadline {
+                // Again in a second, nearest the middle first as before.
+                if now >= c.retry {
+                    c.columns = std::mem::take(&mut c.later);
+                    c.columns.reverse();
+                    c.retry = now + 20;
+                }
+                return true;
+            }
+            c.skipped += std::mem::take(&mut c.later).len();
         }
         if c.columns.is_empty() {
             weft_sdk::info!(
@@ -275,14 +313,17 @@ fn tick(w: &World) {
     });
 }
 
-/// Carves one column; the blocks it changed, or None where it was left (not loaded, water).
-fn column(w: &World, c: &Carve, dx: i32, dz: i32, gone: &mut Vec<[i32; 3]>) -> Option<usize> {
+/// Carves one column; the blocks it changed, or why it was left (not loaded yet, water).
+fn column(w: &World, c: &Carve, dx: i32, dz: i32, gone: &mut Vec<[i32; 3]>) -> Result<usize, Ground> {
     let [cx, cy, cz] = c.at;
     let (x, z) = (cx + dx, cz + dz);
     // Searched round the land's own height there: on a hillside the middle's is too far off
     // (impact_carve2: 1,095 of a crater's columns skipped).
     let guess = base_api::land::height(&base_api::land::fields(c.seed_world), x * 16, z * 16) >> 4;
-    let g = ground(w, x, z, guess)?;
+    let g = match ground(w, x, z, guess) {
+        Ground::At(g) => g,
+        other => return Err(other),
+    };
     let d = ((dx * dx + dz * dz) as f64).sqrt();
     let u = d / c.radius as f64;
     let hash = |y: i32, k: i64| weft_sdk::noise::hash(c.seed, x as i64, y as i64 * 7 + k, z as i64);
@@ -334,6 +375,13 @@ fn column(w: &World, c: &Carve, dx: i32, dz: i32, gone: &mut Vec<[i32; 3]>) -> O
         if top > g {
             set([x, top, z], COARSE_DIRT.id());
             clear_plant(w, [x, top + 1, z], &mut set);
+            // A shrub the rubble rose under is buried, not left floating over it.
+            for y in top + 1..=top + n::IMPACT_RIM_CLEAR {
+                let s = w.block([x, y, z]);
+                if LEAVES.on_block(s) && !LOGS.on_block(s) {
+                    set([x, y, z], 0);
+                }
+            }
         } else {
             scorch(w, [x, g, z], &mut set);
         }
@@ -354,7 +402,7 @@ fn column(w: &World, c: &Carve, dx: i32, dz: i32, gone: &mut Vec<[i32; 3]>) -> O
             shard(w, [x, g + 1, z], &mut set);
         }
     }
-    Some(edits)
+    Ok(edits)
 }
 
 /// A tektite shard at `p`, on solid ground, where nothing but a small plant stands.
