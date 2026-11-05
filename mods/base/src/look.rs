@@ -56,9 +56,10 @@ pub fn register(r: &mut Registry) {
     // shafts through the crown gaps are.
     r.config(&LOOK_CANOPY).float(1.0, 0.2, 2.0);
     r.config(&LOOK_SHAFTS).float(1.0, 0.2, 3.0);
-    // The HDR world's picture: 0 Lottes's curve (the look as made), 1 Hejl's, 2 AgX; bloom 0 none to 3;
+    // The HDR world's picture: 0 Lottes's curve (the look as made), 1 Hejl's (the default, Ronald's
+    // pick of 11-05: "Hejl 2015"), 2 AgX; bloom 0 none to 3;
     // the exposure following the view, 0 fixed to 2.
-    r.config(&LOOK_CURVE).float(0.0, 0.0, 2.0);
+    r.config(&LOOK_CURVE).float(1.0, 0.0, 2.0);
     r.config(&LOOK_BLOOM).float(1.0, 0.0, 3.0);
     r.config(&LOOK_AUTO_EXPOSURE).float(1.0, 0.0, 2.0);
 }

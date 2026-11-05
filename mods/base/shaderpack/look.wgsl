@@ -1249,10 +1249,12 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     let day = smoothstep(-0.05, 0.15, scene.sun.y) * select(1.0, 0.0, in_liquid());
     let night_t = hejl(max(c, vec3(0.0)) * exposure(), 3.0);
     var day_t = min(lottes(max(c, vec3(0.0)) * 1.3 * look_opt(OPT_EXPOSURE, 1.0)), vec3(1.0));
-    // Or Hejl's 2015 curve by day (`base:look_curve` 1; Ronald's Bliss setting): a real toe, so
+    // Or Hejl's 2015 curve by day (`base:look_curve` 1, the HDR world's default: Ronald's pick of
+    // 11-05, "Hejl 2015", as in his Bliss settings): a real toe, so
     // the shade goes deep and the mids keep their colour, a long shoulder to white at 3.5.
     // Or AgX (`base:look_curve` 2): Blender's and Bliss's current default.
-    let curve = fantasy_opt(OPT_CURVE);
+    // Only in the HDR world: without it the look stays as made (Lottes's), whatever the setting.
+    let curve = select(0.0, fantasy_opt(OPT_CURVE), scene.frame.x > 0.5);
     if curve > 1.5 {
         day_t = agx(max(c, vec3(0.0)) * 0.55 * exposure() * look_opt(OPT_EXPOSURE, 1.0));
     } else if curve > 0.5 {
