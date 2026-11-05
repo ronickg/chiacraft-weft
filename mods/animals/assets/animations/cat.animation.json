@@ -986,7 +986,7 @@
    }
   },
   "animation.cat.meow": {
-   "loop": true,
+   "loop": false,
    "animation_length": 1.6,
    "bones": {
     "ear_R": {
@@ -1352,10 +1352,14 @@
       "1.6": [-0.0, 0.0, -0.0]
      }
     }
-   }
+   },
+   "override_previous_animation": true,
+   "blend_weight": 1,
+   "blend_in": 0.25,
+   "blend_out": 0.3
   },
   "animation.cat.swipe": {
-   "loop": true,
+   "loop": false,
    "animation_length": 0.6,
    "bones": {
     "head": {
@@ -1619,10 +1623,14 @@
       "0.6": [-0.09, -1.345, 7.6523]
      }
     }
-   }
+   },
+   "override_previous_animation": true,
+   "blend_weight": 1,
+   "blend_in": 0.25,
+   "blend_out": 0.3
   },
   "animation.cat.bite": {
-   "loop": true,
+   "loop": false,
    "animation_length": 0.5,
    "bones": {
     "head": {
@@ -1828,7 +1836,11 @@
       "0.5": [-0.09, -1.345, 7.6523]
      }
     }
-   }
+   },
+   "override_previous_animation": true,
+   "blend_weight": 1,
+   "blend_in": 0.25,
+   "blend_out": 0.3
   }
  }
 }
