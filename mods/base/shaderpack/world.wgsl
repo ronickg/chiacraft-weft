@@ -734,11 +734,29 @@ fn with_overlay(in: VOut, albedo: vec4<f32>, nuv: vec2<f32>, du: vec2<f32>, dv: 
     return vec4(mix(albedo.rgb, ov.rgb * pow(in.tint, vec3(2.2)), ov.a), albedo.a);
 }
 
+// EXPERIMENT (far-look, bit 4): with distance a block's texture gives way to its average colour
+// (its smallest mip), from 64 to 192 blocks, as Distant Horizons' far blocks are one colour and
+// Voxy's mips converge on it: per-texel grain on far grass, sand and leaves goes.
+fn far_flat(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
+    if (far_look() & 4u) == 0u {
+        return albedo;
+    }
+    let f = smoothstep(64.0, 192.0, in.dist);
+    if f <= 0.0 {
+        return albedo;
+    }
+    var avg = textureSampleLevel(textures[in.layer], linear_mipped, vec2(0.5), 16.0);
+    if in.blend > 0.0 {
+        avg = mix(avg, textureSampleLevel(textures[in.layer2], linear_mipped, vec2(0.5), 16.0), in.blend);
+    }
+    return vec4(mix(albedo.rgb, avg.rgb, f), albedo.a);
+}
+
 fn opaque(in: VOut) -> vec4<f32> {
     let du = dpdx(in.uv);
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
-    let albedo = with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv);
+    let albedo = far_flat(in, with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv));
     return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
 }
 
@@ -772,9 +790,12 @@ fn fs_cutout(in: VOut) -> @location(0) vec4<f32> {
     let du = dpdx(in.uv);
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
-    let albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
+    var albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
     if albedo.a <= 0.1 {
         discard;
+    }
+    if in.kind.z == 0u {
+        albedo = far_flat(in, albedo);
     }
     return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
 }
