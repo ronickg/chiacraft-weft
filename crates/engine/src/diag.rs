@@ -57,6 +57,17 @@ pub static LOD_HEIGHTS_NS: Counter = Counter::new();
 pub static LOD_MESHED: Counter = Counter::new();
 pub static LOD_MESH_NS: Counter = Counter::new();
 pub static LOD_AGE_NS: Counter = Counter::new();
+/// Box tiles meshed and their quads by kind: ground tops, walls, crowns' tops and undersides,
+/// crowns' sides and trunks.
+static LOD_BOX: [Counter; 5] = [const { Counter::new() }; 5];
+
+/// A box tile's quads by kind (`lod::mesh`).
+pub fn lod_box_quads(q: [usize; 4]) {
+    LOD_BOX[0].add(1);
+    for (c, n) in LOD_BOX[1..].iter().zip(q) {
+        c.add(n as u64);
+    }
+}
 /// Calls to the dimension's steep faces (`Faces::block`) while meshing tiles, and their time.
 pub static LOD_FACES: Counter = Counter::new();
 pub static LOD_FACES_NS: Counter = Counter::new();
@@ -431,6 +442,19 @@ impl Reporter {
             let (made, off, age) = (LOD_MADE.take(), LOD_CALLED_OFF.take(), LOD_AGE_NS.take());
             let (heights, heights_ns, meshed, mesh_ns) = (LOD_HEIGHTS.take(), LOD_HEIGHTS_NS.take(), LOD_MESHED.take(), LOD_MESH_NS.take());
             let (faces, faces_ns) = (LOD_FACES.take(), LOD_FACES_NS.take());
+            let boxq: Vec<u64> = LOD_BOX.iter().map(Counter::take).collect();
+            if boxq[0] > 0 {
+                let per = |n: u64| n / boxq[0];
+                log::debug!(
+                    target: "load",
+                    "distant terrain box tiles per {secs:.1} s: {}, quads each: {} tops, {} walls, {} crown tops and undersides, {} crown sides and trunks",
+                    boxq[0],
+                    per(boxq[1]),
+                    per(boxq[2]),
+                    per(boxq[3]),
+                    per(boxq[4])
+                );
+            }
             let missing = LOD_MISSING.load(Ordering::Relaxed);
             if made + off > 0 || missing > 0 {
                 log::debug!(
