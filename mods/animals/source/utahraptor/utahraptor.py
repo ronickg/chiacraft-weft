@@ -1158,9 +1158,10 @@ PLANTED = {"scratch": ["toe3_L", "toe4_L"], "stretch": ["toe3_L", "toe4_L"]}  # 
 def ground_clips(spec):
     """Each standing clip's height from its feet, frame by frame (`ground.grounded`): crouches,
     leans and steps stand on the ground; the pounce's leap added over it; the fall each frame on its
-    lowest point. Asleep it lies as it rests. The strikes and the run set the same way, the run
-    keeping its bounce: the hips' pitch carries the legs, and the bite and run sank their feet 0.8
-    and 1.8 units, the screech and kick lifted them 0.3."""
+    lowest point. Asleep it lies as it rests. The strikes, the walk and the run set the same way, the
+    run keeping its bounce: the hips' pitch carries the legs, and the bite and run sank their feet
+    0.8 and 1.8 units, the screech and kick lifted them 0.3; the walk floated 2.7 at mid-stride (both
+    legs swung apart, the root bobbing up), now each frame on its planted foot."""
     from ground import grounded
     A = spec["animations"]
     everything = [e["name"] for e in spec["elements"]]
@@ -1173,10 +1174,10 @@ def ground_clips(spec):
                 f["root"][1] = round(f["root"][1] + pounce_rise(f["t"]), 4)
         for f in A[name]["frames"]:
             f["root"] = [round(float(v), 4) for v in f["root"]]
-    for name in ("screech", "bite", "kick"):
+    for name in ("walk", "screech", "bite", "kick"):
         A[name] = grounded(spec, A[name], FEET)
     A["run"] = grounded(spec, A["run"], FEET, bounds=True)
-    for name in ("screech", "bite", "kick", "run"):
+    for name in ("walk", "screech", "bite", "kick", "run"):
         for f in A[name]["frames"]:
             f["root"] = [round(float(v), 4) for v in f["root"]]
 

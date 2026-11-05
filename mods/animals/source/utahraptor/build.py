@@ -86,10 +86,10 @@ if __name__ == "__main__":
             assert min(feet_low(spec, a, ["shag_L", "shag_R"])) > -3.5, "the thigh feathers sink deeper asleep than resting"
             continue
         low = feet_low(spec, a, FEET)
-        # (The walk's and run's own bounce leaves the ground, the walk's 2.7 at mid-stride with both legs
-        # swung: only their sinking is checked.)
+        # (The run's own bounce leaves the ground: only its sinking is checked. The walk stands on its
+        # planted foot in every frame.)
         down = [v for f, v in zip(a["frames"], low) if not (clip == "pounce" and LEAP[0] < f["t"] < LEAP[1])
-                and clip not in ("walk", "run")] or [0.0]
+                and clip != "run"] or [0.0]
         assert min(low) > -0.3 and max(down) < 0.3, f"{clip}'s feet from {min(low):.2f} to {max(down):.2f}, not on the ground"
         assert min(feet_low(spec, a, everything)) > -0.3, f"{clip} goes into the ground"
     assert max(feet_low(spec, A["pounce"], FEET)) > 3, "the pounce doesn't leave the ground"
