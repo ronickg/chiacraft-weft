@@ -247,20 +247,29 @@ pub fn wary(w: &World, id: u64, st: &EntityState) -> bool {
     if !(now + id).is_multiple_of(crate::senses::EVERY) || animal::tamed(w, id) {
         return false;
     }
+    // What it has noticed of hunters (`senses`: seen, heard, smelled, a fight near): half aware
+    // it stops and stares that way, aware it runs, over ground it can run on.
     let seen = crate::senses::sense(w, id, st, |sight| watch(w, sight));
-    if seen.threat == 0 {
-        return false;
+    let h = seen.threat_pos.map(f64::from);
+    if seen.aware >= animals_core::perception::NOTICED && (seen.threat != 0 || h != [0.0; 3]) {
+        let to = crate::senses::escape(w, st, h, 10.0);
+        weft_sdk::debug!("animal {id} runs from {} (awareness {:.2}) to {to:?}", seen.threat, seen.aware);
+        w.navigate(id, to, 1.6);
+        w.component_mut(id, &WARY).map(|u| *u = now + RUN);
+        return true;
     }
-    let h = seen.threat_pos;
-    let (x, z) = (st.pos.x - h[0] as f64, st.pos.z - h[2] as f64);
-    let n = (x * x + z * z).sqrt().max(0.01);
-    w.navigate(id, [st.pos.x + x / n * 10.0, st.pos.y, st.pos.z + z / n * 10.0], 1.6);
-    w.component_mut(id, &WARY).map(|u| *u = now + RUN);
-    true
+    if seen.aware >= animals_core::perception::STARE && seen.threat != 0 {
+        crate::senses::stare(w, id, st, seen.threat_pos);
+        // Held till its next look.
+        w.component_mut(id, &WARY)
+            .map(|u| *u = now + crate::senses::EVERY);
+        return true;
+    }
+    false
 }
 
 /// Blocks it watches for hunters: `WATCH` by the weather's `sight`, half again in a blood moon.
-fn watch(w: &World, sight: f32) -> f64 {
+pub(crate) fn watch(w: &World, sight: f32) -> f64 {
     let blood = animals_core::sky::totality(w.seed(), w.day_time());
     WATCH * sight as f64 * if blood { animals_core::sky::BLOOD_MOON_WATCH as f64 } else { 1.0 }
 }

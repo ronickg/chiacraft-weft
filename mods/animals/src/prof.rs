@@ -99,7 +99,7 @@ fn report(w: &World) -> String {
 pub fn init(r: &mut Registry) {
     // The rows in the same order every run.
     row("upkeep");
-    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite)>", |cmd| {
+    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses)> [value:float]", |cmd| {
         let w = cmd.world();
         let text = match cmd.text("what").unwrap_or("") {
             "on" => {
@@ -108,6 +108,44 @@ pub fn init(r: &mut Registry) {
                 "animal goal timer on".to_string()
             }
             "dump" => report(&w),
+            "wind" => {
+                // The wind's way the animals smell by (degrees clockwise from north; none: the
+                // weather's own), for a test.
+                let v = cmd.float("value").map_or(f32::NAN, |v| v as f32);
+                crate::senses::WIND_TEST.store(v.to_bits(), Relaxed);
+                format!("animals' wind toward {v}")
+            }
+            "senses" => {
+                // What the animals nearest the player have noticed: awareness of hunters and of
+                // players, by whom.
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let mut near: Vec<(f64, u64)> = w
+                    .entities_near(me.pos, 48.0, None)
+                    .into_iter()
+                    .filter_map(|id| Some((crate::dist2(w.entity(id)?.pos, me.pos), id)))
+                    .filter(|&(_, id)| w.component(id, &crate::senses::SENSES).is_some())
+                    .collect();
+                near.sort_by(|a, b| a.0.total_cmp(&b.0));
+                let rows: Vec<String> = near
+                    .iter()
+                    .take(8)
+                    .filter_map(|&(d2, id)| {
+                        let s = w.component(id, &crate::senses::SENSES)?;
+                        let kind = name_of(abi::entry_kind::ENTITY, w.entity(id)?.kind);
+                        Some(format!(
+                            "{id} {kind} at {:.1}: player {} fright {:.2}, hunter {} aware {:.2}, wind {:.0} {:.1} m/s",
+                            d2.sqrt(),
+                            s.player,
+                            s.fright,
+                            s.threat,
+                            s.aware,
+                            s.heading,
+                            s.wind
+                        ))
+                    })
+                    .collect();
+                format!("ANIMAL_SENSES {}", rows.join(" | "))
+            }
             "bite" => {
                 // The hunter nearest the player bites the animal nearest it (`taming::hurt` with
                 // the hunter as the source: the bitten one runs from it).

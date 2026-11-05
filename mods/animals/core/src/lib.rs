@@ -16,6 +16,7 @@ pub mod life;
 pub mod meat;
 pub mod needs;
 pub mod nests;
+pub mod perception;
 pub mod sheet;
 pub mod sky;
 pub mod species;
