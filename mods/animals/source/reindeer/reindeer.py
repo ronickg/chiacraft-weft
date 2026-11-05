@@ -159,43 +159,50 @@ ANTLER0 = (3.6, 71.4, 36.5)  # where the left antler's burr sits on the skull
 # turned out with the beam's sweep and leaning out as the beam did.
 # The beam and the palm two texels thick (Ronald, 11-05: one texel read wiry, a thin outline loop from
 # the side), the points and tines one or two.
+# Open the C (Ronald, 11-05: "Open the C"): from the side the beam swept back and forward again into
+# nearly a ring, the bez tine running forward across its middle. Now the beam rises two texels higher
+# at the back before it turns forward, the palm's top reaches two texels further forward, and the bez
+# tine is a short point rising off the beam (two texels past it, was a rod four past), so the C's mouth
+# is open in front: 11 texel rows clear between the palm and the shovel (was 10, the bez tine across).
 ANTLER_ART = {
-    "L": ["....#..#..#...",  # rows top down, columns back to front, in texels; B the burr (its lower row in the skull)
-          "....#..#..#...",
-          "...#########..",  # the palm
-          "..##########..",
-          ".####.........",
+    "L": [".....#..#..#..",  # rows top down, columns back to front, in texels; B the burr (its lower row in the skull)
+          ".....#..#..#..",
+          "....##########",  # the palm, its front tip turned up
+          "...##########.",
+          "..####........",
           ".###..........",
           "###...........",
           "##............",
           "##............",
           "##............",
+          "##............",
           "###...........",
-          ".###..........",
-          ".#######......",  # the bez tine, forward off the beam
-          "..###.........",
-          "...###....##..",  # the shovel over the face
-          "....###...##..",
-          ".....######...",  # the beam's root and the brow tine
+          ".###..#.......",  # the bez tine's tip, rising
+          "..#####.......",  # the bez tine, short, off the beam
+          "...###........",
+          "....###...##..",  # the shovel over the face
+          ".....###..##..",
+          "......######..",  # the beam's root and the brow tine
           ".......BB.##..",
           ".......BB....."],
-    "R": ["....#..#..#...",
-          "....#..#..#...",
-          "...#########..",
-          "..##########..",
-          ".####.........",
+    "R": [".....#..#..#..",
+          ".....#..#..#..",
+          "....##########",
+          "...##########.",
+          "..####........",
           ".###..........",
           "###...........",
           "##............",
           "##............",
           "##............",
+          "##............",
           "###...........",
-          ".###..........",
-          ".#######......",
-          "..###.........",
+          ".###..#.......",
+          "..#####.......",
           "...###........",
           "....###.......",
-          ".....#####....",  # the plain brow point
+          ".....###......",
+          "......#####...",  # the plain brow point
           ".......BB.....",
           ".......BB....."]}
 ANTLER_T = 2.0 / K  # a texel, in the deer's space
