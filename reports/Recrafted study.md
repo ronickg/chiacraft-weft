@@ -11,6 +11,7 @@ The detailed notes, module by module, are in [`recrafted-study/`](recrafted-stud
 - [weather, water and surfaces](recrafted-study/A_weather_water_surfaces.md)
 - [light, shadows, post and the Polytone wiring](recrafted-study/B_light_shadow_post_polytone.md)
 - [particles, foliage and sounds](recrafted-study/C_particles_foliage_sounds.md)
+- [ImmersiveVFX](recrafted-study/D_immersivevfx.md), added on Ronald's word (11-05, through Planner): "This mod also looks pretty interesting ... interesting things here as well that we can learn from, or even add features". It is ImmersiveVFX 1.5.1 by Shinyflvres (NeoForge, MC 26.3, All Rights Reserved), CurseForge file 9451348. Section [ImmersiveVFX](#immersivevfx) below.
 
 **What was seen in game:** Minecraft 26.2 with Fabric, Sodium, Polytone and Recrafted on the PC (instance `mc-recrafted`). Shots are in [In the game](#in-the-game) below.
 
@@ -93,6 +94,32 @@ These are worth keeping in mind when we copy an idea: his drivers are thinner th
 - **Weather by place** (`climate`, `weather.rs`): his is vanilla's one rain switch. Our rain spells follow each biome's real place, thunder too, with blizzards and dust storms (`air::blizzard`, `air::dust`) and fog by kind and hour.
 - **Snow that lies and melts** over days (`air::Place::snow_lying`), and water that freezes and thaws by °C.
 
+## ImmersiveVFX
+
+ImmersiveVFX is the other way to do it:
+- **Bedrock data.** Oreville's "Realistic Biomes" add-on for Bedrock (441 particle files, Molang controllers) runs inside a Java port of Bedrock's particle and Molang runtime.
+- **Vanilla's shaders swapped in place.** The terrain, entity, block and particle shaders are replaced by its own forward versions. There is no deferred pipeline and no extra full-screen passes beyond a few cheap ones, which is where its "2-3x Iris+Complementary" speed comes from.
+
+Where it does the same as Recrafted, differently:
+
+| | Recrafted | ImmersiveVFX | ours |
+|---|---|---|---|
+| **Weather** | vanilla's rain level, plus a per-column snow line by temperature | vanilla's clock **turned by biome**: rain becomes sand wind in desert, mesa and savanna, snow in cold biomes; thunder becomes a sandstorm or a blizzard | real spells by place and season, blizzards and dust storms from wind and humidity (richer than both) |
+| **Fog** | analytic height fog in post, biome visibility field | a hand-tuned table per biome (~42 profiles) × 10 phases of the day (771 colours), very short in storms: rain 48 blocks, thunder 32, blizzard 38, sandstorm 96 | fog by place, kind and hour, marched through the shadow map |
+| **Rain** | analytic drops in post, tile-binned | camera-parented streak particles (750/s from a 20-block disc 40 up), impacts when a drop leaves air | shader strips per column |
+| **Sand and dust** | sand relief on the ground, no storm | sand specks, 5-53-block gust streaks, a fast sand curtain from 40 blocks upwind, fog tinted sand | dust storms as fog (`air::dust`), **no particles** |
+| **Leaves** | emitters on every leaf block, flutter and tumble, litter that stays | savanna storms shed leaves from leaf blocks found in a 70x20x70 box; leaves land on water | none |
+| **Shadows** | a 1056² sun camera snapped to 1/16 block, Poisson PCF, leaf transmission | one cached map re-drawn only on chunk change or a sun step, cross-faded over 1.5 s; **each pixel's position snapped to its texel's centre before the lookup, so shadow edges step in the blocks' own pixels** | engine cascades redrawn per frame (far one on change) |
+| **Water** | wave spectrum, wake simulation, heightmap reflections | shore foam from an 8-neighbour mask with a travelling front in 16-px steps; Voronoi caustics snapped to the texel grid; SSR | noise waves, foam by shore distance, caustics, SSR |
+
+What it has that Recrafted doesn't:
+- **Smooth block placement:** a placed block springs in (squash and tilt, 0.42 s, ~4 Hz); a row placed together ripples. The real block stays hidden until its mesh is built, so there is no pop.
+- **Burning blocks:** glowing crack veins crawl over them (a heat field: charcoal, red, orange, yellow).
+- **Fire light:** a quarter-res screen pass over up to 32 fires, with a closed-form halo.
+- **Auroras on half of clear cold nights**, and meteor showers elsewhere.
+- **A cave probe:** 40 rays, 2 a tick, that tells outdoor from cave ambience.
+- **Ambient motes per biome:** pollen by day, fireflies at night, spores on mushroom islands.
+
 ## The plan, ranked
 
 Ranked by how much realism each adds for what it costs, with the leaves first because they are what Ronald asked about. "Engine" means `crates/` (a `notes/ENGINE_CHANGES.md` line each); "pack" means `mods/base/shaderpack`.
@@ -120,7 +147,7 @@ Ranked by how much realism each adds for what it costs, with the leaves first be
 - **Adds:**
   - petals blowing off flowers in bloom, and kicked up as you walk through them (`vitals::wild::BLOOMS`);
   - spindrift streaming across snow in a blizzard (`SNOWING` + wind > `air::BLIZZARD.0`);
-  - sand and dust streaming low over deserts in a dust storm (`air_flags::DUST`; this is where we beat him, he has none);
+  - sand and dust streaming low over deserts in a dust storm (`air_flags::DUST`; Recrafted has none). ImmersiveVFX shows the shape that works: fine specks round the player; a few long, thin gust streaks (5-50 blocks) along the wind; and now and then a fast curtain of sand, spawned 40 blocks upwind, that crosses the view in a few seconds. Ours would come from our real dust storms (dry places, wind 7-11 m/s) instead of "rain in a desert". In savannas the same storm sheds leaves from nearby trees, which item 1 covers;
   - pollen motes in spring sun;
   - drips from leaves for a while after rain.
 - **Cost:** cheap, once 1 exists.
@@ -188,14 +215,42 @@ Ranked by how much realism each adds for what it costs, with the leaves first be
 - **Cost:** moderate (the footprint map).
 - **Owner:** relief to the Shader session; footprints to a later engine session.
 
-### 9. Water wakes
+### 9. Placed blocks spring in (ImmersiveVFX)
+
+- **Adds:** building feels alive. A placed block pops in with a squash and a small tilt for less than half a second, and a row placed together ripples along.
+- **Build:** engine client.
+  - Keep the real block hidden until its section's mesh is rebuilt.
+  - Meanwhile draw a moving copy (the falling-block or structure path the engine already has, `finish()` in `world.wgsl`) on a damped spring: about 0.4 s at about 4 Hz, squash and tilt from the face it was placed on.
+  - Hand over with no pop.
+- **Cost:** cheap.
+- **Driven by:** placement only.
+- **Owner:** an engine client piece; small, its own session or a UI/feel session. A feel choice for Ronald first: it's playful, and a survival game may want it subtle.
+
+### 10. Shadow edges in the blocks' own pixels (ImmersiveVFX)
+
+- **Adds:** shadow edges that step in exact 1/16-block pixels, matching the texture grid: the pixel-art look of the rest of the world, instead of soft or diagonal-aliased edges.
+- **Build:** in the pack's `sun_shadow` and `shadow_in`, move the pixel's world position to the centre of its texture texel (from screen derivatives) before the shadow lookup. This needs a near cascade at 16 texels a block or close to it.
+- **Cost:** cheap (a few ALU), plus whatever shadow resolution it needs.
+- **Owner:** the Shader session; **a look choice for Ronald** (a pixel-art edge versus our soft 3x3 or 4x4 edge), shown side by side.
+
+### 11. Shore foam that runs along the shore (ImmersiveVFX)
+
+- **Adds:** foam that laps in and out in pixel steps along a beach, instead of a fixed wobbling line.
+- **Build:** our `world.wgsl` foam already uses `shore_distance` on the pixel grid. Make the foam front a wave that travels along the shore and in and out with time, stepped in 1/16 block, with sparse dots on the retreating side. Caustics can be snapped to the same texel grid.
+- **Cost:** cheap.
+- **Owner:** the Shader session.
+
+### 12. Water wakes
 
 - **Adds:** rings and V-wakes behind swimmers, boats and animals wading.
 - **Build:** a 256-512² wave-equation grid round the camera on the GPU, stamped by entities in water, added to `wave_normal`.
 - **Cost:** moderate.
 - **Owner:** later. The Shader session or a water session.
 
-### 10. Smaller things worth a line each
+### 13. Smaller things worth a line each
+
+- **Burning blocks glow** with crawling crack veins (charcoal to orange to yellow), and fires light the air round them in a cheap screen pass (ImmersiveVFX). This is for when fire spreads in our game (pack plus engine; later).
+- **A cave probe for ambience:** 40 rays round the player, 2 a tick, giving how open, how stony and how big the space is (ImmersiveVFX). It would feed cave or outdoor sound beds. Our `weather_sound` already samples cover in rings for the muffling, so extend that rather than add another (sound owner).
 
 - **Held light fades** when you swap items, an exponential approach in the engine's `hand_light` (cheap; engine).
 - **Lightning bolts drawn** at the strike, procedural and stepped like our pixel style, not an atlas (Shader session; it just added the flashes).
@@ -206,10 +261,17 @@ Ranked by how much realism each adds for what it costs, with the leaves first be
 **Not worth taking:**
 - his voxeliser, coloured flood fill, TAA and atlas plumbing, which work around Minecraft; we have RGB light and our own frame;
 - his single-scatter sky, since Ronald's look is Bliss's vivid palette;
-- his fixed wind.
+- his fixed wind;
+- ImmersiveVFX's Bedrock/Molang runtime and its trick of probing blocks with invisible particles, since a world query does the same;
+- its hand-made fog table per biome and hour (771 colours), since ours comes from the place's weather;
+- its camera-emitter rain, since our strips plus the Shader session's streaks already cover rain;
+- its aurora, since we have ours (`sky.wgsl`, by latitude, `air::AURORA`).
 
 ## In the game
 
-Minecraft 26.2 (Fabric 0.20.1, Fabric API 0.161.0, Sodium 0.9.2, Polytone 26.2-6.8.5, Recrafted 0.2.1 at its defaults, every feature on) in Prism instance `mc-recrafted` on the PC. World seed 1, made headless by Mojang's 26.2 server. Scenes by `~/Coding/chiacraft-archive/tester-tools/recrafted/scenes.py` through the comparison session's `run_pack.sh`, in two 15-minute queue holds. Seed 1 on 26.2 has no desert, badlands or warm ocean within `/locate`'s reach, so the beach stands in for sand.
+- **Recrafted:** Minecraft 26.2 (Fabric 0.20.1, Fabric API 0.161.0, Sodium 0.9.2, Polytone 26.2-6.8.5, Recrafted 0.2.1 at its defaults, every feature on) in Prism instance `mc-recrafted` on the PC. Part a (forests, petals, rain, snow) uses world `recrafted1` (seed 1). Part b (desert, fog, water, ice, night light) uses world `recrafted2` (seed 2), because seed 1 has no desert, badlands or warm ocean within `/locate`'s reach.
+- **ImmersiveVFX:** Minecraft 26.3 with NeoForge 26.3.0.101 and ImmersiveVFX 1.5.1 at its defaults, in instance `mc-ivfx`, world `ivfx2` (seed 2).
+- **How the worlds and shots were made:** each world was made headless by Mojang's own server for its version, its biomes found with `/locate`. Scenes come from `~/Coding/chiacraft-archive/tester-tools/recrafted/scenes.py` through the comparison session's `run_pack.sh`, each in a 15-minute queue hold.
+- **Ours:** dev 958111da through the PC queue (look `rc_ours1`, `ours_scenes.txt`): an autumn birch forest in wind and storm, a desert dust storm, a lake at noon and in rain, a snowy taiga in winter.
 
 (Shots and the side-by-side sheets follow when the runs are done.)
