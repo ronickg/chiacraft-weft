@@ -112,12 +112,10 @@ fn tick(w: &World) {
         if (biome as usize) < v.visited.len() * 32 && v.visited[biome as usize / 32] & 1 << (biome % 32) == 0 {
             v.visited[biome as usize / 32] |= 1 << (biome % 32);
             found += xp::DISCOVER;
-            crate::skills::discovered(w, id, false);
         }
         if dim < 32 && v.dimensions & 1 << dim == 0 {
             v.dimensions |= 1 << dim;
             found += xp::DISCOVER * 10;
-            crate::skills::discovered(w, id, true);
         }
         // The world one starts in, and its first biome, are no discovery.
         if v.level == 0 {
@@ -125,6 +123,8 @@ fn tick(w: &World) {
         }
         if found > 0 && !creative {
             give_xp(w, id, found);
+            // Exploring rises by the same finds (a dimension's are ten a biome's).
+            crate::skills::discovered(w, id, found >= xp::DISCOVER * 10);
         }
         let Some(v) = w.component_mut(id, &VITALS) else { continue };
         let level = levels::level_of(v.xp).0;
