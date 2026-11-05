@@ -297,9 +297,8 @@ pub fn lay_in_nest(w: &World, index: usize, mother: u64, at: [f64; 3], young: &[
     let s = &SPECIES[index];
     let site = animals_core::nests::site(s.name);
     let ground = ground_under(w, at);
-    let spot = site
-        .and_then(|k| nest_site(w, k, at, ground))
-        .unwrap_or(ground);
+    let found = site.and_then(|k| nest_site(w, k, at, ground));
+    let spot = found.unwrap_or(ground);
     if nest_near(w, spot, 1.0).is_none() {
         let nest = w.spawn(&NEST, spot);
         if nest_size(index) > 1.0 {
@@ -308,7 +307,12 @@ pub fn lay_in_nest(w: &World, index: usize, mother: u64, at: [f64; 3], young: &[
     }
     lay(w, spot, young, owner);
     let at = spot.map(|v| v.floor() as i32);
-    weft_sdk::info!("{} {mother} nested at {at:?} ({site:?}): {} eggs", s.kind_name(), young.len());
+    let place = match (site, found) {
+        (Some(animals_core::nests::Site::Ground), _) => "on the ground",
+        (_, Some(p)) if p[1] > ground[1] => "up high",
+        _ => "on the ground, no site near",
+    };
+    weft_sdk::info!("{} {mother} nested at {at:?} {place} ({site:?}, ground {}): {} eggs", s.kind_name(), ground[1], young.len());
 }
 
 /// Where a nest of `site` goes near `at` (`ground` under it): the highest open treetop leaves,
@@ -316,7 +320,8 @@ pub fn lay_in_nest(w: &World, index: usize, mother: u64, at: [f64; 3], young: &[
 /// `None` for the ground or when nothing is near.
 fn nest_site(w: &World, site: animals_core::nests::Site, at: [f64; 3], ground: [f64; 3]) -> Option<[f64; 3]> {
     use animals_core::nests::{CLIFF_ABOVE, LOOK, LOOK_DOWN, LOOK_UP, Site};
-    let feet = at.map(|v| v.floor() as i32);
+    // Round the ground under her: in the air, her own height says nothing of the trees'.
+    let feet = [at[0].floor() as i32, ground[1] as i32, at[2].floor() as i32];
     let floor = ground[1] as i32;
     let (mut tree, mut cliff): (Option<[i32; 3]>, Option<[i32; 3]>) = (None, None);
     // The higher, and of two as high the nearer.
