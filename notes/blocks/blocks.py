@@ -12,6 +12,10 @@ a texture the game already has is replaced where it is. `name@mod` overrides the
 entry, `name@-` keeps the tile out of the game. The kinds (`KINDS`) add the master prompt's type
 line and say how the square is cut: tiled and seam-healed, one whole picture, see-through on
 magenta, greyed for the game's biome tint.
+
+Every image also gets the block guide's reference sheet for its kinds (Ronald's guides 2, 11-05),
+after our key, with the family's "Make it yours" notes in the prompt (`SHEETS`; the game-art skill's
+`art.py` finds the sheet and the notes). `BLOCK_NO_REF=1` leaves them out (the old way).
 """
 import os
 import subprocess
@@ -50,6 +54,25 @@ KINDS = {
     "cutout": ("Fills the square as described, with flat solid magenta wherever it is open or see-through.", False, True, False),
     "flat": ("Seen from straight above, lying flat, centred, not touching the edges, on the magenta background, with a soft 1-px edge darker than the inside.", False, True, False),
 }
+# The block guide's reference sheet for each kind ("Reference images to attach"); a kind with none
+# (a whole face, a flat thing) gets no sheet.
+SHEETS = {"cube": "01", "grass": "02", "grass_side": "02", "log": "04", "end": "04", "built": "05", "framed": "06",
+          "leaves": "07", "fleaves": "07", "plant": "08", "tplant": "09", "crop": "10", "cutout": "18"}
+sys.path.insert(0, os.path.join(ROOT, ".claude", "skills", "game-art", "scripts"))
+
+
+def guide_sheets(entries):
+    """The guide's sheets for an image's kinds (at most two, most common first) and their family notes."""
+    if os.environ.get("BLOCK_NO_REF"):
+        return [], ""
+    import art
+    nums = [SHEETS[e["kind"]] for e in entries if e and e["kind"] in SHEETS]
+    nums = sorted(set(nums), key=lambda n: -nums.count(n))[:2]
+    paths = [art.ref_path("block", n) for n in nums]
+    notes = "\n".join(f for f in (art.family("block", [p]) for p in paths) if f)
+    return paths, notes
+
+
 # Biome tints in the game, for previews only (`mods/base/src/tints.rs` picks the real ones).
 GRASS, FOLIAGE = np.array([0x7F, 0xB0, 0x48]), np.array([0x6F, 0x9A, 0x3C])
 
@@ -122,10 +145,18 @@ def gen(rows):
             return f"{image}: exists"
         parts = [f"{e['what']}. {KINDS[e['kind']][0]}" if e else "Leave this square flat solid magenta." for e in entries]
         prompt = style.replace("NAME", image)
+        sheets, notes = guide_sheets(entries)
+        extra = [x for p in sheets for x in ("-i", p)]
+        if sheets:
+            prompt = prompt.replace("Match their pixel size, shading and colour.", "Match their pixel size, shading and colour. "
+                                    f"The last {'image is' if len(sheets) == 1 else f'{len(sheets)} images are'} the style "
+                                    "guide's reference sheet for these kinds of block, from another game's texture pack: take how "
+                                    "such textures are built there (scale, how the pieces read, how they tile), never their "
+                                    "designs; my own textures decide the look. Make it ours, as the guide says:\n" + notes, 1)
         for key, text in zip(("TL", "TR", "BL", "BR"), parts):
             prompt = prompt.replace(key, text, 1)
         with open(os.path.join(GEN, f"run_{image}.log"), "w") as log:
-            subprocess.run([CODEX, "exec", "--skip-git-repo-check", "--sandbox", "workspace-write", "--ephemeral", *refs,
+            subprocess.run([CODEX, "exec", "--skip-git-repo-check", "--sandbox", "workspace-write", "--ephemeral", *refs, *extra,
                             "-o", f"last_{image}.txt", prompt], cwd=GEN, stdin=subprocess.DEVNULL, stdout=log, stderr=log)
         return f"{image}: {'ok' if os.path.exists(os.path.join(GEN, image + '.png')) else 'FAILED, see gen/run_' + image + '.log'}"
 
