@@ -148,8 +148,12 @@ def run_name(g, k, n):
     return f"{'rt' if k == 1 else 'n2'}_{n}"
 
 
+def run_dir(g, k):
+    return run2 if g == "blocks" or k == 2 else run1  # both block runs were made in run 2's batch
+
+
 def run_icon(g, k, n):
-    return icon(os.path.join(run1 if k == 1 else run2, run_name(g, k, n) + "_px.png"))
+    return icon(os.path.join(run_dir(g, k), run_name(g, k, n) + "_px.png"))
 
 
 def text(d, xy, s, f, fill, width):
@@ -162,7 +166,7 @@ def text(d, xy, s, f, fill, width):
 
 
 def tries(g, k, n):
-    chk = os.path.join(run1 if k == 1 else run2, run_name(g, k, n) + "_checks.json")
+    chk = os.path.join(run_dir(g, k), run_name(g, k, n) + "_checks.json")
     if not os.path.exists(chk):
         return ""
     t = json.load(open(chk))["tries"]
@@ -222,7 +226,7 @@ for g, G in GROUPS.items():
         if third:
             im.alpha_composite(pair(cur_icon(third)), (X[4], y))
         for k, oy in ((1, 0), (2, 70)):
-            gen = os.path.join(run1 if k == 1 else run2, run_name(g, k, n) + ".png")
+            gen = os.path.join(run_dir(g, k), run_name(g, k, n) + ".png")
             if os.path.exists(gen):
                 im.alpha_composite(Image.open(gen).convert("RGBA").resize((64, 64), Image.LANCZOS), (gen_x, y + oy))
             d.text((gen_x + 70, y + oy + 24), tries(g, k, n).replace(" tr", "\ntr", 1), font=small, fill=MUTED)
