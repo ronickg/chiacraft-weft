@@ -1751,7 +1751,8 @@ pub fn freeze(
     let mut interceptors: Vec<(ModId, String, Callback)> = Vec::new();
     let mut modifiers: Vec<(ModId, String, u32, Callback)> = Vec::new();
     let mut attributes: Vec<(String, f64, f64, f64)> = vec![
-        (abi::attribute::MAX_HEALTH.into(), 20.0, 1.0, 1024.0),
+        // Up to 100000 (chiacraft): later ages' bosses have thousands (`notes/ENGINE_CHANGES.md`).
+        (abi::attribute::MAX_HEALTH.into(), 20.0, 1.0, 100_000.0),
         (abi::attribute::MOVEMENT_SPEED.into(), 1.0, 0.0, 16.0),
         (abi::attribute::VISIBILITY.into(), 1.0, 0.0, 16.0),
         (abi::attribute::JUMP_STRENGTH.into(), 1.0, 0.0, 16.0),
