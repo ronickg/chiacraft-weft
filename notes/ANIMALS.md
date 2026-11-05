@@ -1217,3 +1217,15 @@ Plants' herd run (`herd_sav_wi`: six capybaras at 10% food in a winter savanna) 
 - **The others were alive:** the census and entity lines count only within 48 blocks. The testkit's full entity list still held all five at 13 minutes, foraging farther out at 74-85% strength.
 
 Herd scripts should spawn on the ground and count a wider ring, or list every entity.
+
+## The field journal (2026-11-05)
+
+Ronald asked for "a dossier" on every animal. He picked a picture with basics and survival facts, unlocked by discovery, in an inventory tab.
+
+A species' page opens when the player sees one up close (within 8 blocks with no opaque block between), looks at it through the spyglass, or opens its screen. The client then gets a toast message. What the player does with it then fills in more:
+- **Seen:** Latin name, family, weight, biomes, active hours, diet and foods, temper, and group size.
+- **Hunted:** its drops (meat and hide).
+- **Tamed or ridden:** how it's tamed and with what foods, whether it can be ridden, and how fast.
+- **Bred:** breeding seasons, young (born or hatched), gestation or incubation, litter size, growth time, and lifespan.
+
+Every fact is read from the species' own rows (`animals_core::journal::facts`), so the journal says what the game does. Active hours are a new researched field, `Species::active`: Velociraptor at night and Protoceratops at any hour (from their scleral rings, Schmitz & Motani 2011), reindeer at any hour (van Oort et al. 2005), deer and wolves at dawn and dusk. The deeds are saved with the player (`journal::JOURNAL`). Creative reads every page. The screen is UI's (`journal_screen.rs`, with its inventory tab and the key I), and it reads `journal::entries(view)`. Each fact names its section on the page: the header, the chips, where it lives, or the survival rows.

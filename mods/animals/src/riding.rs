@@ -199,6 +199,7 @@ pub fn interact(w: &World, id: u64, player: u64) -> bool {
         return true;
     }
     if w.mount(player, id) {
+        crate::journal::note_animal(w, player, id, animals_core::journal::TAMED);
         if let Some(r) = w.component_mut(id, &RIDDEN) {
             *r = 1;
         }
