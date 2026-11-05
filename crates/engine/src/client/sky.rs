@@ -8,6 +8,7 @@ use rustc_hash::FxHashMap;
 use weft_abi::sky_kind;
 use weft_render::*;
 
+use super::froxels::Froxels;
 use super::frame_look::FrameLook;
 use super::soft_clouds::SoftClouds;
 use super::world_render::Camera;
@@ -133,6 +134,11 @@ pub struct Sky {
     pub cloud_shade: [[f32; 4]; 2],
     /// Soft clouds (chiacraft, `core:soft_clouds`): their targets, history and passes.
     pub soft: SoftClouds,
+    /// The mist's volume (`client::froxels`): wanted (`core:froxels`) and of use this frame (mist
+    /// in the air, the eye out of liquids); the client and app set both before `draw`.
+    pub froxels: Froxels,
+    pub froxels_wanted: bool,
+    pub froxels_possible: bool,
     /// What the pack's look works out once a frame (`client::frame_look`).
     pub frame_look: FrameLook,
     /// Soft clouds wanted (the setting) and possible this frame (the world copied, whose depth the
@@ -192,6 +198,9 @@ impl Sky {
             cloud_drift: glam::DVec2::ZERO,
             cloud_shade: [[0.0; 4]; 2],
             soft: SoftClouds::default(),
+            froxels: Froxels::default(),
+            froxels_wanted: true,
+            froxels_possible: false,
             frame_look: FrameLook::default(),
             soft_wanted: false,
             soft_possible: false,
@@ -251,6 +260,7 @@ impl Sky {
         match made {
             Ok((pipe, clouds, slots, shader)) => {
                 self.soft.set_shader(gpu, &shader);
+                self.froxels.set_shader(gpu, &shader);
                 self.frame_look.set_shader(gpu, &shader);
                 if let Some(old) = self.pipe.replace(pipe) {
                     gpu.destroy_pipeline(old);
@@ -327,6 +337,7 @@ impl Sky {
     pub fn destroy(&mut self, gpu: &mut dyn Backend) {
         self.drop_pictures(gpu);
         self.soft.destroy(gpu);
+        self.froxels.destroy(gpu);
         self.frame_look.destroy(gpu);
         for p in [self.pipe.take(), self.clouds_pipe.take()]
             .into_iter()
@@ -595,6 +606,8 @@ impl Sky {
         for (vertices, first_instance) in draws {
             list.push(Cmd::Draw { vertices, instances: 1, first_vertex: 0, first_instance });
         }
+        let froxels = self.froxels_wanted && self.froxels_possible;
+        self.froxels.frame(gpu, froxels, frame.width, frame.height, buf, scene);
         self.frame_look.frame(gpu, buf, scene);
         match clouds {
             Some(first_instance) => self.soft.record(buf, scene, first_instance),

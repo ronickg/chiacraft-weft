@@ -670,6 +670,8 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // The HDR world's bloom (chiacraft): 0 none, 1 a pyramid of 4 levels, 2 of 6 (wider glow);
         // live. Without the HDR world the pack's own bloom effect glows as before.
         ConfigDef::number("core:bloom", ck::INT, 2.0, 0.0, 2.0, 1.0),
+        // The mist as a volume read by every surface (`client::froxels`); off, each walks it.
+        ConfigDef::number("core:froxels", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:allow_avatars", ck::BOOL, 1.0, 0.0, 1.0, 0.0) },
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:keep_inventory", ck::BOOL, 0.0, 0.0, 1.0, 0.0) },
     ];

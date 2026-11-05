@@ -270,6 +270,11 @@ impl Settings {
         number("core:hdr_world") != 0.0
     }
 
+    /// The mist as a volume for packs that have one (`client::froxels`), live.
+    pub fn froxels(&self) -> bool {
+        number("core:froxels") != 0.0
+    }
+
     /// Soft clouds for packs that draw them (`client::soft_clouds`).
     pub fn soft_clouds(&self) -> bool {
         number("core:soft_clouds") != 0.0
