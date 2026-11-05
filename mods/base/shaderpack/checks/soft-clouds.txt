@@ -8,6 +8,8 @@ idle
 chat /rule core:mob_spawning 0
 chat /tk mode spectator
 chat /weather clear 99999
+set_config core:vsync 0
+set_config core:fps_cap 0
 chat /tp 149.5 120 -166.5
 loaded
 idle
@@ -22,6 +24,12 @@ shot sc_1b_clear_up.png
 look 0 20
 wait 1
 bench 4 soft_clear
+set_config core:soft_clouds 0
+wait 1
+bench 4 blocky_clear
+set_config core:soft_clouds 1
+wait 2
+bench 4 soft_clear2
 chat /time set 11300
 look 90 8
 wait 3
@@ -57,6 +65,12 @@ shot sc_5c_storm_up.png
 look 90 12
 wait 1
 bench 4 soft_storm
+set_config core:soft_clouds 0
+wait 1
+bench 4 blocky_storm
+set_config core:soft_clouds 1
+wait 2
+bench 4 soft_storm2
 chat /weather clear 99999
 chat /time set 6000
 chat /tp 149.5 120 -166.5

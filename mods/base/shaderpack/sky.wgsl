@@ -244,7 +244,8 @@ fn soft_at(s: Sky, rel: vec3<f32>) -> vec2<f32> {
 fn soft_cover(s: Sky, at: vec2<f32>) -> f32 {
     let wet = max(s.axes[0].x, s.axes[0].z);
     let field = soft_slice(9u, fract(at / 6144.0) * 64.0).r * 0.65 + soft_slice(27u, fract(at / 1536.0) * 64.0).r * 0.35;
-    return clamp(mix(0.38, 0.92, wet) + (field - 0.5) * mix(0.9, 0.5, wet), 0.0, 1.0);
+    // At 0.38 a clear day's were thin wisps with no body (the first soft run, 11-05).
+    return clamp(mix(0.52, 0.92, wet) + (field - 0.5) * mix(0.8, 0.5, wet), 0.0, 1.0);
 }
 
 // The cloud's density at `at` (its frame, blocks) and `a` (0 at the layer's underside, 1 at its
@@ -266,7 +267,7 @@ fn soft_density(s: Sky, at: vec2<f32>, a: f32, cover: f32, fine: bool) -> f32 {
         // Detail wears only the edges (Photon: by 1 - density), so the cores stay solid.
         let w = soft_noise(vec3(at.x / 192.0, a * 1.4 + t * 0.002, at.y / 192.0));
         let cells = w.g * 0.625 + w.b * 0.25 + w.a * 0.125;
-        d -= (1.0 - cells) * 0.45 * (1.0 - d) * mix(0.6, 1.0, a);
+        d -= (1.0 - cells) * 0.3 * (1.0 - d) * mix(0.5, 1.0, a);
     }
     return clamp(d, 0.0, 1.0);
 }
@@ -339,7 +340,8 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
         // Dark edges facing away from the sun (powder), fading out looking toward it.
         let powder = mix(1.0 - exp(-sigma * 14.0), 1.0, 0.5 * (mu * 0.5 + 0.5) * (mu * 0.5 + 0.5) + 0.3);
         // The sky's light from above, brighter on the tops; under a storm the bellies darker.
-        let ambient = mix(p.horizon * 0.55 + p.ambient * 0.35, p.ambient * 1.3 + p.horizon * 0.2, a) * mix(1.0, 0.55, s.axes[0].y * (1.0 - a));
+        // Grey-blue shaded bases, bright tops: evenly lit, a clear day's read as flat white cut-outs.
+        let ambient = mix(p.horizon * 0.3 + p.ambient * 0.25, p.ambient * 1.2 + p.horizon * 0.2, smoothstep(0.0, 0.8, a)) * mix(1.0, 0.55, s.axes[0].y * (1.0 - a));
         let c = (sun * direct * powder * 0.9 + ambient) * albedo;
         let kept = exp(-sigma * step);
         light += through * (1.0 - kept) * c;
