@@ -23,6 +23,8 @@ pub static SLIME_BLOCK: Block = Block::named("slime_block");
 pub static ANCHOR: Block = Block::named("anchor");
 pub static FLOATER: Block = Block::named("floater");
 pub static GOLDEN_LAMP: Block = Block::named("golden_lamp");
+// Ours beside upstream's golden lamp (Ronald, 11-05: "Keep both"); no recipe until copper ore and ingots come.
+pub static COPPER_LAMP: Block = Block::named("copper_lamp");
 
 const BUTTON_TICKS: u32 = 20;
 
@@ -320,6 +322,26 @@ pub fn register(r: &mut Registry) {
                 .light_opacity(15)
                 .light(if power { 15 } else { 0 })
         })
+        .on_signal(|e| {
+            if e.rising() {
+                let (w, p) = (e.world(), e.pos());
+                let lit = w.prop(p, "lit") == Some("true");
+                w.prop_set(p, "lit", if lit { "false" } else { "true" });
+            }
+        })
+        .signal_read(|w, p| if w.prop(p, "lit") == Some("true") { 15 } else { 0 })
+        .sound_group("stone")
+        .hardness(3.0)
+        .mineable("pickaxe")
+        .tab(&crate::tabs::REDSTONE);
+
+    // Our copper lamp, the golden lamp's twin in copper: each new pulse flips it. Creative only for now: its
+    // recipe waits for copper ore and ingots (notes/overview/pieces.json).
+    r.block(&COPPER_LAMP)
+        .signal_sink()
+        .prop("power", ["off", "on"])
+        .prop("lit", ["false", "true"])
+        .states(|p, s| if p.is("lit", "true") { s.texture("copper_lamp_lit").light(15) } else { s.texture("copper_lamp") })
         .on_signal(|e| {
             if e.rising() {
                 let (w, p) = (e.world(), e.pos());

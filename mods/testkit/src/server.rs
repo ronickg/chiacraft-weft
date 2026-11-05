@@ -279,22 +279,22 @@ type Run = fn(&World, &Command, u64, [i32; 3]) -> Result<String, String>;
 
 /// Opens menu `which` on the player's stash, filled with item/count pairs (`stash`; `vmenu` is its old name).
 fn open_stash(w: &World, cmd: &Command, player: u64) -> Result<String, String> {
-        let name = word(cmd, "which")?;
-        let m = Menu::lookup(name).ok_or_else(|| format!("no menu {name}"))?;
-        let inv = w.inventory(STASH.of(player));
-        // Pairs of item and count, the rest emptied.
-        let words: Vec<&str> = cmd.text("items").unwrap_or("").split_whitespace().collect();
-        for i in 0..inv.len() {
-            let stack = match words.chunks(2).nth(i as usize) {
-                Some([n, c]) => ItemStack::new(item(n)?, c.parse().map_err(|_| format!("bad count {c}"))?),
-                _ => ItemStack::EMPTY,
-            };
-            inv.set(i, stack);
-        }
-        if !w.open_menu(player, m, STASH.of(player)) {
-            return Err(format!("cannot open {name} on the stash"));
-        }
-        Ok(inv.len().to_string())
+    let name = word(cmd, "which")?;
+    let m = Menu::lookup(name).ok_or_else(|| format!("no menu {name}"))?;
+    let inv = w.inventory(STASH.of(player));
+    // Pairs of item and count, the rest emptied.
+    let words: Vec<&str> = cmd.text("items").unwrap_or("").split_whitespace().collect();
+    for i in 0..inv.len() {
+        let stack = match words.chunks(2).nth(i as usize) {
+            Some([n, c]) => ItemStack::new(item(n)?, c.parse().map_err(|_| format!("bad count {c}"))?),
+            _ => ItemStack::EMPTY,
+        };
+        inv.set(i, stack);
+    }
+    if !w.open_menu(player, m, STASH.of(player)) {
+        return Err(format!("cannot open {name} on the stash"));
+    }
+    Ok(inv.len().to_string())
 }
 
 /// The operations tests run on the server, as one command (`/tk set ~ ~ ~2 stone`): the engine
@@ -657,9 +657,7 @@ const OPS: &[(&str, &str, Run)] = &[
         let yaw = (cmd.float("yaw").ok_or("missing yaw")? as f32).to_radians();
         let mut n = 0;
         for id in w.entities_near([me[0] as f64 + 0.5, me[1] as f64, me[2] as f64 + 0.5], r, None) {
-            if id != player
-                && w.entity(id).is_some()
-            {
+            if id != player && w.entity(id).is_some() {
                 w.entity_edit(id).yaw(yaw);
                 n += 1;
             }

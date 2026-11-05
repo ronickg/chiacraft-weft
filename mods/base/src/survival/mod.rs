@@ -57,7 +57,11 @@ pub fn register(r: &mut Registry) {
             Verdict::Abstain
         }
     });
-    r.entity_component(&VITALS, Vitals::new(MAX_AIR), component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP_ON_RESPAWN);
+    r.entity_component(
+        &VITALS,
+        Vitals::new(MAX_AIR),
+        component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP_ON_RESPAWN,
+    );
     r.attach(&PLAYER, &VITALS);
     r.world_tick(tick);
     food::register(r);
