@@ -571,7 +571,7 @@ async fn play(
         }
         if !view_done {
             let settled = last_cube.unwrap_or(welcomed);
-            if settled.elapsed() > Duration::from_secs(3) || welcomed.elapsed() > Duration::from_secs(120) {
+            if settled.elapsed() > Duration::from_secs(3) || welcomed.elapsed() > Duration::from_secs(60) {
                 view_done = true;
                 stats.view_s.lock().push((settled - welcomed).as_secs_f64());
             }
@@ -590,7 +590,11 @@ async fn play(
             turn_in = 60 + (r() * 100.0) as u32;
         }
         turn_in -= 1;
-        pos += DVec3::new(heading.cos(), 0.0, heading.sin()) * (4.3 / 20.0);
+        // It stands where it arrived until its view has come (a player loading in), so the view
+        // time is the first view's, not the stream of cubes a walk brings.
+        if view_done {
+            pos += DVec3::new(heading.cos(), 0.0, heading.sin()) * (4.3 / 20.0);
+        }
         let yaw = (-(heading.cos()).atan2(-(heading.sin()))) as f32;
         msgs.push(ToServer::Move {
             pos,
