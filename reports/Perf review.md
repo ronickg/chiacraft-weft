@@ -68,9 +68,9 @@ The client update's parts, added up over the run (the sum of per-second averages
 | take terrain / end batch | 16 | 40 ms |
 | uploads near the player | 7 | 28 ms |
 
-- **solid cells** is the biggest CPU part while loading and in flight. It averages up to 15.5 ms a frame in the second after a teleport. Its loop looks at about 8k cells and rebuilds 32 cubes a frame, which reading the code says should be well under 1 ms. A finer split is on `spans/solid-split` 2214dd4e, to be run on the PC. Owner: Upstream, then Lighting (the pack's `solid_at` is what needs it).
-- **Uploads** have worst frames of 30 ms inside the budget, because one item can take that long. That matches #13: a texture loaded lazily inside `upload`.
-- **tints**, the biome tint blends, reach 38 ms worst. That is finding 7 in `client-update.md`.
+- **Correction (LOADCPU on the PC):** "solid cells" is not CPU work. 95 % of it is the cube bits' `write_buffer`, and the bits themselves take 0.02 ms. The Vulkan backend's first write of a frame waits for that frame slot's fence (`ensure_slot_ready`). The client update writes first, so it carries the frame's GPU wait and can't overlap the GPU. That is why the Mac's flight frames looked CPU-bound (gpu wait 0, cpu update 12 ms). The tints' and uploads' worst frames are likely the same wait.
+- **Fix:** `fix/early-writes` 3727f9a0. Writes made before the slot is ready stay on the CPU and are staged right after its wait, in order. `WEFT_EARLY_WAIT=1` brings back the old behaviour for comparison. Expected: the update overlaps the GPU, gaining up to its real CPU time a frame on the Mac while loading and in flight. To measure on the Mac.
+- `fix/texture-loads-once` and `fix/tints-once` showed no gain on the PC (within noise; the colours are fine). Their Mac evidence was that wait in disguise, so they stay unmerged until a Mac run with early-writes shows they matter.
 - MoltenVK's own log says encoding a command buffer averages 1.63 ms (max 14.6), and its pipeline compiles 0.62 ms (74 of them).
 - The 400-600 ms screenshot frames are gone, now that the PNG is encoded on its own thread.
 
