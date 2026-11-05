@@ -184,7 +184,7 @@ some dwarven kingdom in like the mountains, or elves would be in a specific biom
 - **Lore:** heirs of the ancients. Each people inherited one part of the star-born ancients' legacy: dwarves their craft and star steel, elves their ley magic, humans their spread. Their old feuds and lost knowledge are what the player uncovers.
 - **Dealing with them:** reputation per people (trading, helping and contracts raise it, and higher standing opens their smiths, spells, mounts and lands). They teach their crafts (dwarves smithing secrets and blueprints, elves magic and taming), which ties them into the skill web and the ages. They can turn hostile: guards and ambushes.
 - **In the world:** living towns and kingdoms with NPCs going about their day, traders, smiths and quest givers. A big build.
-- **Names:** each people gets its own naming language, derived from the ancients' tongue, as Tolkien's peoples' languages differ (`reports/Naming and invented words.md`, running).
+- **Names:** each people gets its own naming language, as Tolkien's do (`reports/Naming and invented words.md`). The ancients speak Old Eskenai (Ronald: "Yes, use Eskenai"). Elves speak a soft daughter of it, and can live in several forests ("we can add more ones for them"). Dwarves have their own tongue, and wear English bynames with true names learned through reputation ("Yes, bynames + true names"). Guardians' names end in -kaun or -gom (Borkon, the Height-Keeper). The naming tool comes first ("Now"), so names never get made up freehand.
 
 ### Endless gear: the research's proposal
 
