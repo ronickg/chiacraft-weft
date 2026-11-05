@@ -365,6 +365,30 @@ pub fn fight(player: Player, size: Size, level: f32, them: Stats) -> Fight {
     Fight { ttk, raw, hits: p.health() / taken.max(1e-6), counted }
 }
 
+/// The share of a hit an over-tier weapon keeps against a creature of `size` at `level`: its item
+/// level counts at most the size's cap above the creature (grade and marks still multiply what's
+/// counted). 1 for small creatures and for gear within the cap.
+pub fn cap_share(size: Size, item_level: f32, level: f32) -> f32 {
+    match size.band().cap {
+        Some(cap) if item_level > level + cap => g(level + cap) / g(item_level),
+        _ => 1.0,
+    }
+}
+
+/// The rate floor as a bucket: a big creature may lose at most `max_health / floor` a second, from
+/// everything together, with one second's worth held in hand (`FLOOR_HELD`). What it can take now
+/// out of `budget` (refilled over `secs` since the last hit), the budget left, and what spilled
+/// over (for stagger and part breaks).
+pub const FLOOR_HELD: f32 = 1.0;
+
+pub fn floor_take(size: Size, max_health: f32, budget: f32, secs: f32, hit: f32) -> (f32, f32, f32) {
+    let Some(floor) = size.band().floor else { return (hit, budget, 0.0) };
+    let rate = max_health / floor;
+    let have = (budget + rate * secs.max(0.0)).min(rate * FLOOR_HELD);
+    let took = hit.min(have);
+    (took, have - took, hit - took)
+}
+
 /// A same-age reference player of `age` against a creature of `size` and `role` at `level`.
 pub fn reference_fight(age: Age, size: Size, role: Role, level: f32) -> Fight {
     fight(Player::of(age), size, level, derive(size, role, level))
@@ -413,6 +437,22 @@ mod tests {
             let f = fight(star, size, lv, derive(size, Role::Grazer, lv));
             assert!(f.ttk >= size.band().floor.unwrap(), "{size:?}: {f:?}");
         }
+    }
+
+    #[test]
+    fn the_floor_holds_whatever_the_hits() {
+        // A large creature of 100 health: at most 10 a second, a second's worth at once.
+        let (mut budget, mut dealt) = (10.0, 0.0);
+        for _ in 0..100 {
+            let (took, left, over) = floor_take(Size::Large, 100.0, budget, 0.1, 50.0);
+            assert!((took + over - 50.0).abs() < 1e-4);
+            budget = left;
+            dealt += took;
+        }
+        assert!(dealt <= 10.0 * 10.0 + 10.0 + 1e-3, "{dealt}");
+        assert_eq!(floor_take(Size::Small, 5.0, 0.0, 0.0, 9.0), (9.0, 0.0, 0.0));
+        assert!((cap_share(Size::Large, 45.0, 5.0) - g(25.0) / g(45.0)).abs() < 1e-6);
+        assert_eq!(cap_share(Size::Small, 60.0, 0.0), 1.0);
     }
 
     #[test]
