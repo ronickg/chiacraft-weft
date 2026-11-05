@@ -505,7 +505,9 @@ pub(crate) fn open_ground(w: &World, x: i32, y: i32, z: i32) -> Option<BlockPos>
     const LOOK: i32 = 48;
     for gy in (y - LOOK..=y + LOOK).rev() {
         let p = BlockPos::new(x, gy, z);
-        let state = w.block_loaded(p)?;
+        // Air cubes high over the land may not be loaded at all: passed over, not the end of
+        // the look (PC run fh_impact5: 96 of 96 tries stopped above the ground).
+        let Some(state) = w.block_loaded(p) else { continue };
         if state == 0 || LEAVES.on_block(state) {
             continue;
         }
