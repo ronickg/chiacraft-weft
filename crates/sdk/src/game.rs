@@ -1903,7 +1903,12 @@ impl Registry {
     /// painted again when the value changes. For looks that follow from a few bytes, such as an
     /// animal's genes: they travel instead of pictures. `f` may also scale the entity's bones
     /// (`Skin::scale_bone`): its build, drawn in every look of it.
-    pub fn entity_skin<T: Value>(&mut self, kind: &EntityKind, comp: &'static Component<T>, f: impl Fn(&T, &mut Skin) + Send + Sync + 'static) {
+    pub fn entity_skin<T: Value>(
+        &mut self,
+        kind: &EntityKind,
+        comp: &'static Component<T>,
+        f: impl Fn(&T, &mut Skin) + Send + Sync + 'static,
+    ) {
         let cb = callback(move |a: &mut abi::SkinArgs| {
             if a.data.len != size_of::<T>() || a.rgba.is_null() {
                 return;

@@ -1264,10 +1264,8 @@ impl Server {
             .send(ToClient::Edits { dim: to, specs: dims[to as usize].edits.iter().map(|e| e.spec(c)).collect(), all: true });
         p.conn
             .send(ToClient::Time { dim: to, time: dims[to as usize].day_time(), rate: dims[to as usize].day_rate as f32 });
-        p.conn.send(ToClient::Weather {
-            id: dims[to as usize].weather as u32,
-            only: dims[to as usize].rain_here().map(|o| o.to_vec()),
-        });
+        p.conn
+            .send(ToClient::Weather { id: dims[to as usize].weather as u32, only: dims[to as usize].rain_here().map(|o| o.to_vec()) });
         p.conn
             .send(ToClient::Air { air: dims[to as usize].air.0.clone(), heading: dims[to as usize].air.1 });
         if to == c.void_dim && from != to as usize {

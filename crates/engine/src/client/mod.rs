@@ -3068,9 +3068,7 @@ impl Client {
     }
 
     pub fn fog_color(&self) -> [f32; 4] {
-        self.fog_linear()
-            .extend(self.rain())
-            .to_array()
+        self.fog_linear().extend(self.rain()).to_array()
     }
 }
 
@@ -3188,7 +3186,6 @@ fn advance_swing(swing: &mut Option<f32>, dt: f32) {
 fn angle_diff(a: f32, b: f32) -> f32 {
     (a - b + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI
 }
-
 
 /// One 20 Hz tick of player movement with vanilla's numbers (blocks per tick): acceleration
 /// scaled by ground slipperiness, 0.91 air drag, 0.98 vertical drag, 0.08 gravity, 0.42 jump,

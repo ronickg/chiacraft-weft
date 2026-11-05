@@ -370,7 +370,10 @@ fn find(kind: u32, name: &str) -> Option<u32> {
 
 impl ClientGame for PlayerGame {
     fn me(&mut self) -> Option<([f64; 3], f32, f32)> {
-        self.c.view().player_state().map(|e| ([e.pos.x, e.pos.y, e.pos.z], e.health, e.max_health))
+        self.c
+            .view()
+            .player_state()
+            .map(|e| ([e.pos.x, e.pos.y, e.pos.z], e.health, e.max_health))
     }
     fn day_time(&mut self) -> u64 {
         self.c.view().day_time()

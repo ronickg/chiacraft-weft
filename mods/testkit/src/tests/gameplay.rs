@@ -2103,7 +2103,12 @@ pub async fn swimming_no_bob(t: T) -> R {
     t.secs(1.0).await?;
     for _ in 0..120 {
         t.frames(1).await?;
-        if let Some(me) = t.c().view().player_state().filter(|m| m.pose == abi::pose::SWIM) {
+        if let Some(me) = t
+            .c()
+            .view()
+            .player_state()
+            .filter(|m| m.pose == abi::pose::SWIM)
+        {
             samples += 1;
             touching += (me.on_ground != 0) as u32;
             swum = swum.max(t.state().bob);
@@ -2276,7 +2281,8 @@ pub async fn dedicated_server(t: T) -> R {
     let mut server = start()?;
     t.until("the server hosting", Duration::from_secs(30), hosting)
         .await?;
-    t.c().world_join(&hosting_address(&dir).ok_or("no address")?);
+    t.c()
+        .world_join(&hosting_address(&dir).ok_or("no address")?);
     t.until("joined by address", Duration::from_secs(30), |t| t.flag(client::client_flags::JOINED))
         .await?;
     t.loaded().await?;
@@ -2312,7 +2318,8 @@ pub async fn dedicated_server(t: T) -> R {
     let _server = start()?;
     t.until("the server hosting again", Duration::from_secs(30), hosting)
         .await?;
-    t.c().world_join(&hosting_address(&dir).ok_or("no address")?);
+    t.c()
+        .world_join(&hosting_address(&dir).ok_or("no address")?);
     t.screen("core:message").await?;
     t.check(!t.flag(client::client_flags::IN_WORLD), "not on the whitelist, not in");
     t.c().screen_close();
@@ -2422,7 +2429,14 @@ pub async fn crafting_table_tags(t: T) -> R {
     t.click_ui(&hot, 0);
     t.until("planks on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().item == planks)
         .await
-        .map_err(|e| format!("{e} (clicked {hot}; cursor {:?}, slot 0 {:?}, hotbar slot 0 {:?})", t.c().cursor_stack(), t.c().menu_slot(0), t.c().inventory_slot(0)))?;
+        .map_err(|e| {
+            format!(
+                "{e} (clicked {hot}; cursor {:?}, slot 0 {:?}, hotbar slot 0 {:?})",
+                t.c().cursor_stack(),
+                t.c().menu_slot(0),
+                t.c().inventory_slot(0)
+            )
+        })?;
     t.click_ui("slot:0", 1);
     t.frames(3).await?;
     t.click_ui("slot:3", 1);
@@ -2468,7 +2482,16 @@ pub async fn creative_middle_click(t: T) -> R {
     t.click_ui(&t.hotbar(0), 2);
     t.until("a whole stack on the cursor", Duration::from_secs(2), |t| t.c().cursor_stack().count == 64)
         .await
-        .map_err(|e| format!("{e} (mode {}, screen {}, clicked {}; cursor {:?}, hotbar slot 0 {:?})", t.state().mode, t.c().screen(), t.hotbar(0), t.c().cursor_stack(), t.c().inventory_slot(0)))?;
+        .map_err(|e| {
+            format!(
+                "{e} (mode {}, screen {}, clicked {}; cursor {:?}, hotbar slot 0 {:?})",
+                t.state().mode,
+                t.c().screen(),
+                t.hotbar(0),
+                t.c().cursor_stack(),
+                t.c().inventory_slot(0)
+            )
+        })?;
     t.check_eq(t.c().inventory_slot(0).count, 3, "and the slot keeps what it had");
     t.c().screen_close();
     t.no_screen().await?;
