@@ -167,16 +167,16 @@ What takes days in real life takes its time on the growing pace (`vitals::crafts
 
 An axe at a tree's foot fells it in one chop that takes logs^0.75 times one log's (`vitals::felling`), with the axe's own speed on top. Each tier of axe takes trees up to a size for their wood; past it a tree still falls, 8 times slower, and gives nothing. A tree that loses its foot, or a log of its trunk, by any means falls (none stands in the air); bare hands and other tools chop the foot as slowly as an axe past its tier, and as fruitlessly: the first axe is made by hand off the ground (`first`). Never more than 60 min. Felled, a tree within its tier lies on the ground in pieces of 4 logs, each cut as long as felling a tree of its logs takes; the axe wears by logs^0.75 for a felling or a piece. A tree falls as itself: a 1 s creak, then 2.5 s for one 10 high (2-5 s, by the square root of its height), its leaves breaking off past 20° until 70% have, the rest bursting on the ground; on the way leaves and branches in its path break, and a trunk it strikes falls too if the falling tree has 2x its logs, or else it catches there and settles as blocks; a creature it hits takes 2 + a tenth of its logs, up to 20. Seconds for a typical axe of each tier (a log is hardness 2), * past its tier:
 
-| tier | harvest | takes up to | speed | oak (43) | birch (9) | araucaria (64) | young sequoia (165) | sequoia (1015) |
+| tier | harvest | takes up to | speed | oak (16) | birch (20) | araucaria (61) | young sequoia (165) | sequoia (1015) |
 |---|---|---|---|---|---|---|---|---|
-| bare hands, other tools | - | nothing | 1 | 7 min * | 2 min * | 9 min * | 18 min * | 60 min * |
-| wood, gold | 0 | 56 logs | 2 | 25 s | 8 s | 5 min * | 9 min * | 36 min * |
-| bone, antler | 50 | 72 logs | 2.5 | 20 s | 6 s | 27 s | 7 min * | 29 min * |
-| flint, chert, obsidian, stone | 100 | 96 logs | 2.91 | 17 s | 5 s | 23 s | 6 min * | 25 min * |
-| copper | 150 | 192 logs | 4.85 | 10 s | 3 s | 14 s | 28 s | 15 min * |
-| bronze, iron, wrought iron | 200 | 512 logs | 6.79 | 7 s | 2 s | 10 s | 20 s | 11 min * |
-| steel, diamond (old) | 300 | 1536 logs | 7.76 | 6 s | 2 s | 9 s | 18 s | 70 s |
-| diamond | 400 | 4096 logs | 8 | 6 s | 2 s | 8 s | 17 s | 67 s |
+| bare hands, other tools | - | nothing | 1 | 3 min * | 4 min * | 9 min * | 18 min * | 60 min * |
+| wood, gold | 0 | 56 logs | 2 | 12 s | 14 s | 4 min * | 9 min * | 36 min * |
+| bone, antler | 50 | 72 logs | 2.5 | 10 s | 11 s | 26 s | 7 min * | 29 min * |
+| flint, chert, obsidian, stone | 100 | 96 logs | 2.91 | 8 s | 10 s | 23 s | 6 min * | 25 min * |
+| copper | 150 | 192 logs | 4.85 | 5 s | 6 s | 14 s | 28 s | 15 min * |
+| bronze, iron, wrought iron | 200 | 512 logs | 6.79 | 4 s | 4 s | 10 s | 20 s | 11 min * |
+| steel, diamond (old) | 300 | 1536 logs | 7.76 | 3 s | 4 s | 8 s | 18 s | 70 s |
+| diamond | 400 | 4096 logs | 8 | 3 s | 4 s | 8 s | 17 s | 67 s |
 
 ## Effects
 

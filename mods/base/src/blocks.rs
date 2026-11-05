@@ -714,6 +714,10 @@ pub fn register(r: &mut Registry) {
     leaves(r, &ACACIA_LEAVES, "leaves_acacia", "sapling", None);
     woods(r);
     grove(r);
+    // The broadleaf trees' thin wood as branch blocks (Ronald, 11-05: "All broadleaf trees").
+    for wood in base_api::trees::BRANCH_WOODS {
+        branch(r, wood);
+    }
     // Lianas: woody climbers hanging from the tropical forest's crowns, a rope one can climb;
     // cut, their stems are cordage now and then (`vitals::clothing`).
     r.block(&LIANA)
@@ -1230,6 +1234,94 @@ fn grow_column(e: &mut BlockEvent, me: &'static Block) {
     if height < 3 {
         w.set_block(above, me.id());
     }
+}
+
+/// A thin branch of `wood` (the branch-block study, `base_api::trees::TREE_BRANCH`): a post 4 or 8
+/// px thick in the block's middle with an arm to each side it joins (`n` `s` `e` `w` `u` `d`, set by
+/// worldgen), in the log's bark cropped to the box, as Dynamic Trees draws its branches. Collides
+/// as its boxes; an axe takes it; a stick for it.
+/// The woods Art has drawn young bark for (`branch_<wood>`, `_across`, `_end`; all nine, Ronald:
+/// "Approve all"); another wood wears its log's until then.
+const BRANCH_BARK: &[&str] = &["oak", "birch", "acacia", "mesquite", "dogwood", "ipe", "andiroba", "matamata", "brazil_nut"];
+
+/// A thin branch of `wood` (`base:<wood>_branch`, named on its log as `TREE_BRANCH`): a post 4 or 8
+/// px thick in the block's middle with an arm to each side it joins (`n` `s` `e` `w` `u` `d`, set by
+/// worldgen), in Art's young bark (`branch_<wood>`: grain up; `_across`: along a level arm; `_end`:
+/// its rings), the log's own until Art has drawn it. Faces an arm covers aren't drawn. Collides as
+/// its boxes; an axe takes it; a stick for it, as Dynamic Trees gives sticks for thin wood.
+fn branch(r: &mut Registry, wood: &str) {
+    let name = format!("{wood}_branch");
+    let art = BRANCH_BARK.contains(&wood);
+    let bark = if art { format!("branch_{wood}") } else { format!("log_{wood}") };
+    let across = if art { format!("branch_{wood}_across") } else { bark.clone() };
+    let end = if art { format!("branch_{wood}_end") } else { format!("log_{wood}_top") };
+    r.set_text_on(Target::Name(&format!("base:{wood}_log")), &crate::worldgen::TREE_BRANCH, &format!("base:{name}"));
+    let sides = ["n", "s", "e", "w", "u", "d"];
+    let mut b = r
+        .block(Block::generated(name))
+        .sound_group("wood")
+        .hardness(0.8)
+        .mineable("axe")
+        .tag("logs")
+        .tag("branches")
+        .tag(&format!("logs/{wood}"))
+        .set(&FLAMMABLE, 5)
+        .set(&FUEL, 100)
+        .prop("size", ["4", "8"]);
+    for side in sides {
+        b = b.prop(side, ["0", "1"]);
+    }
+    b.states(move |p, s| {
+        let h = if p.get("size") == "4" { 2.0 } else { 4.0 };
+        let (lo, hi) = (8.0 - h, 8.0 + h);
+        let on = |side: &str| p.get(side) == "1";
+        // A box's faces in -X, +X, -Y, +Y, -Z, +Z order, the bark cropped to the box's own extent,
+        // its grain along the box (`along`: 0 x, 1 y, 2 z), the rings across it; `hide` the faces
+        // an arm or the post covers (they'd only add to what the GPU draws: the bench's +8%).
+        let faces = |a: [f32; 3], c: [f32; 3], along: usize, hide: [bool; 6]| -> [(&str, [f32; 4]); 6] {
+            let zy = [a[2], 16.0 - c[1], c[2], 16.0 - a[1]];
+            let xz = [a[0], a[2], c[0], c[2]];
+            let xy = [a[0], 16.0 - c[1], c[0], 16.0 - a[1]];
+            let (x, y, z): (&str, &str, &str) = match along {
+                0 => (&end, &across, &across),
+                2 => (&across, &bark, &end),
+                _ => (&bark, &end, &bark),
+            };
+            let f = [(x, zy), (x, zy), (y, xz), (y, xz), (z, xy), (z, xy)];
+            std::array::from_fn(|i| if hide[i] { (f[i].0, abi::UV_NO_FACE) } else { f[i] })
+        };
+        let along = if on("u") || on("d") || !(on("e") || on("w") || on("n") || on("s")) {
+            1
+        } else if on("e") || on("w") {
+            0
+        } else {
+            2
+        };
+        // The post: no face where an arm leaves it (the arm's end covers it exactly).
+        let core = [on("w"), on("e"), on("d"), on("u"), on("n"), on("s")];
+        let mut s = s.model_box_faces([lo, lo, lo], [hi, hi, hi], faces([lo, lo, lo], [hi, hi, hi], along, core));
+        for (side, i) in [("w", 0), ("e", 1), ("d", 2), ("u", 3), ("n", 4), ("s", 5)] {
+            if !on(side) {
+                continue;
+            }
+            let (a, c, along) = match side {
+                "n" => ([lo, lo, 0.0], [hi, hi, lo], 2),
+                "s" => ([lo, lo, hi], [hi, hi, 16.0], 2),
+                "w" => ([0.0, lo, lo], [lo, hi, hi], 0),
+                "e" => ([hi, lo, lo], [16.0, hi, hi], 0),
+                "d" => ([lo, 0.0, lo], [hi, lo, hi], 1),
+                _ => ([lo, hi, lo], [hi, 16.0, hi], 1),
+            };
+            // An arm's end at the post is hidden; its end at the block's face stays (a thinner
+            // neighbour's arm would leave a hole round it).
+            let mut hide = [false; 6];
+            hide[i ^ 1] = true;
+            s = s.model_box_faces(a, c, faces(a, c, along, hide));
+        }
+        s
+    })
+    .drops("stick", 1)
+    .tab(&crate::tabs::NATURAL);
 }
 
 /// Whether a dung pat lies within `vitals::soil::PAT_REACH` blocks of `pos` (a block up or down).

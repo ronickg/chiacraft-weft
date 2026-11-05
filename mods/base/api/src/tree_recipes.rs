@@ -151,44 +151,55 @@ pub const RECIPES: &[Recipe] = &[
         frond_spread: 26.0,
         ..Recipe::BASE
     },
-    // An araucaria: a tall straight bare trunk (2 x 2 at its foot), whorls of four near the top
-    // held flat and turning up at their tips, tufts only at the tips: flat layered plates.
+    // An araucaria (the Cretaceous's; a monkey puzzle's look): a tall straight trunk, 2 x 2 to its
+    // first whorl, whorls of five held out level with their tips turned up, in tiers with the trunk
+    // bare between, its stiff leaves in flat pads along them: a tiered candelabra, not a ball.
     Recipe {
         log: "animals:araucaria_log",
         height: 14.0,
         width: 1.6,
-        width_loss: 0.08,
-        drift: 1.5,
-        droop: -0.12,
-        branch_start: 0.62,
-        branch_every: 2.2,
-        branch_count: 4,
-        branch_angle: 86.0,
-        branch_width: 0.22,
+        width_loss: 0.07,
+        drift: 1.0,
+        // Its whorls' tips turn up (the monkey puzzle's candelabra), in tiers with gaps between.
+        droop: -0.3,
+        branch_start: 0.5,
+        branch_every: 2.4,
+        branch_count: 5,
+        branch_angle: 84.0,
+        branch_width: 0.32,
         branch_len: 0.42,
         orders: 1,
-        taper: 0.6,
-        leaf_r: 2.1,
-        leaf_ry: 0.8,
+        taper: 0.3,
+        branch_var: 0.4,
+        // Its stiff leaves in flat pads along the branches (`twig`), the trunk bare between the
+        // tiers, not one ball of a crown.
+        leaf_along: false,
+        leaf_r: 1.7,
+        leaf_ry: 0.6,
         ragged: 0.3,
+        twig: 0.22,
         ..Recipe::BASE
     },
-    // A ginkgo: a straight leader, short limbs held out nearly flat, sparse small clusters: a
-    // narrow, open, uneven crown (an oak's is broad and full).
+    // A ginkgo: a straight leader, a few long limbs rising then spreading, its fan leaves in
+    // clusters on short shoots all along them: an open, uneven crown (not pom-poms on sticks).
     Recipe {
         log: "animals:ginkgo_log",
-        height: 10.0,
+        height: 11.0,
         width_loss: 0.07,
         drift: 4.0,
-        branch_start: 0.3,
-        branch_every: 1.3,
-        branch_angle: 72.0,
-        branch_width: 0.32,
-        orders: 1,
-        taper: 0.5,
-        leaf_r: 1.4,
-        leaf_ry: 1.1,
-        ragged: 0.55,
+        // A few long limbs rising steeply, then spreading (an old ginkgo's irregular crown), their
+        // leaves in clusters on short shoots all along them, not pom-poms at their tips.
+        branch_start: 0.28,
+        branch_every: 1.1,
+        branch_angle: 60.0,
+        branch_width: 0.45,
+        orders: 2,
+        branch_len: 0.5,
+        taper: 0.45,
+        leaf_along: true,
+        leaf_r: 1.1,
+        leaf_ry: 1.0,
+        ragged: 0.6,
         ..Recipe::BASE
     },
     // A swamp cypress (Taxodium): a buttressed 2 x 2 foot, a tall trunk, level branches with
@@ -557,6 +568,9 @@ pub fn understory(r: &Recipe) -> Recipe {
 /// (`understory`). The cone and column trees and the palms keep `branchy`.
 pub const COLONIZED: &[crate::colonize::Colonize] = &[
     crate::colonize::OAK,
+    // The birch with its trunk forced to its top (Ronald, 11-05: "Try birch with its trunk forced
+    // to the top"), its fine twigs branch blocks.
+    crate::colonize::BIRCH,
     crate::colonize::ACACIA,
     crate::colonize::IPE,
     crate::colonize::ANDIROBA,
@@ -581,6 +595,102 @@ pub fn grown(log: &str, seed: u64) -> Option<Vec<(i32, i32, i32, crate::branchy:
         );
     }
     of(log).map(|r| crate::branchy::blocks(r, seed))
+}
+
+/// A tree's form, rolled per tree in the wild (`trees::shaped`): most stand as their recipe grows
+/// them; some are big and old, some crooked, some twins forking low into two stems, so a wood of
+/// one species isn't clones (the tree-look audit; Planner's slice 4).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Variant {
+    Standing,
+    Big,
+    Crooked,
+    Twin,
+}
+
+impl Variant {
+    pub const ALL: [Variant; 4] = [Variant::Standing, Variant::Big, Variant::Crooked, Variant::Twin];
+}
+
+/// `r` grown as `v`: big and old taller and thicker, crooked leaning and wandering, a twin's trunk
+/// forking low into two leaders (as an acacia's into its stems).
+pub fn varied(r: &Recipe, v: Variant) -> Recipe {
+    match v {
+        Variant::Standing => *r,
+        // (A trunk already 2 x 2 only grows taller: wider, an araucaria's passed a stone axe.)
+        Variant::Big if r.width >= 1.5 => Recipe { height: r.height * 1.1, ..*r },
+        Variant::Big => Recipe { height: r.height * 1.15, width: r.width * 1.1, ..*r },
+        // (A conifer grows straight to its tip, and a giant's limbs reach its scatter's edge: crooked
+        // they'd lean past it. The wild roll never makes a cone tree crooked either.)
+        Variant::Crooked if r.leaf_along || r.reach > 0 => *r,
+        Variant::Crooked => Recipe { lean: r.lean + 7.0, drift: r.drift * 1.6 + 2.0, rise: r.rise * 0.8, ..*r },
+        // (A palm, a conifer or a small tree of leafy sprays, the dogwood's, keeps one stem.)
+        Variant::Twin if r.fronds > 0 || r.leaf_along || r.twig > 0.0 => *r,
+        Variant::Twin => Recipe { fork: true, branch_count: 2, branch_start: 0.22, branch_angle: 24.0, branch_width: 0.95, ..*r },
+    }
+}
+
+/// `c` grown as `v`: big and old taller, wider and thicker (within its reach), crooked its crown
+/// well off its foot so the trunk bends to it, a twin's trunk forking into two stems.
+pub fn varied_colonized(c: &crate::colonize::Colonize, v: Variant) -> crate::colonize::Colonize {
+    // A giant's trunk is its recipe's (`trunk_from`): it keeps its form.
+    if c.trunk_from.is_some() {
+        return *c;
+    }
+    let (reach, _) = c.limits();
+    match v {
+        Variant::Standing => *c,
+        Variant::Big => crate::colonize::Colonize {
+            trunk: c.trunk * 1.12,
+            crown_h: c.crown_h * 1.15,
+            crown_r: (c.crown_r * 1.12).min(reach as f32 - c.leaf_r * 0.6),
+            min_trunk: c.min_trunk * 1.25,
+            ..*c
+        },
+        Variant::Crooked => crate::colonize::Colonize { lean: 0.3, ..*c },
+        Variant::Twin if c.fork > 0 => *c,
+        Variant::Twin => crate::colonize::Colonize { fork: 2, ..*c },
+    }
+}
+
+/// A tree's block with its wood's width (0 for leaves): `colonize::blocks`, `grown_widths`.
+pub type WideBlock = (i32, i32, i32, crate::branchy::Part, f32);
+
+/// A grown tree of `log` with each wood block's width (`colonize::blocks`, `branchy::wood_widths`).
+pub fn grown_widths(log: &str, seed: u64) -> Option<Vec<WideBlock>> {
+    if let Some(c) = colonized(log) {
+        return Some(crate::colonize::blocks(c, seed));
+    }
+    let r = of(log)?;
+    let w: std::collections::HashMap<_, _> = crate::branchy::wood_widths(r, seed)
+        .into_iter()
+        .map(|(x, y, z, w)| ((x, y, z), w))
+        .collect();
+    Some(
+        crate::branchy::blocks(r, seed)
+            .into_iter()
+            .map(|(x, y, z, p)| (x, y, z, p, w.get(&(x, y, z)).copied().unwrap_or(1.0)))
+            .collect(),
+    )
+}
+
+/// A tree's wood as felling counts it (`felling.rs`): a log one, a branch block (a broadleaf
+/// tree's wood under `trees::BRANCH_UNDER` wide) a quarter, rounded up.
+pub fn felling_wood(log: &str, blocks: &[WideBlock]) -> usize {
+    let wood = log
+        .split(':')
+        .next_back()
+        .unwrap_or("")
+        .trim_end_matches("_log");
+    let branchy = crate::trees::BRANCH_WOODS.contains(&wood);
+    let logs = blocks
+        .iter()
+        .filter(|b| matches!(b.3, crate::branchy::Part::Log { .. }));
+    let branches = logs
+        .clone()
+        .filter(|b| branchy && b.4 < crate::trees::BRANCH_UNDER)
+        .count();
+    logs.count() - branches + branches.div_ceil(4)
 }
 
 /// The recipe a sapling of this log grows by: its young one's, if it has one, else its own.
