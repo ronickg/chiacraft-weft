@@ -407,7 +407,9 @@ fn stands_ground(w: &World, id: u64, st: &EntityState, threat: u64) -> bool {
             // the start: the PC look's deer stared first and never reared) and every few seconds
             // after (not over a rear still on), staring it down.
             let now = w.game_time();
-            let began = w.component(id, &STOOD).is_none_or(|t| now > t + 3 * crate::senses::EVERY);
+            let began = w
+                .component(id, &STOOD)
+                .is_none_or(|t| now > t + 3 * crate::senses::EVERY);
             let again = !anim::busy(w, id) && ((now + id) / crate::senses::EVERY).is_multiple_of(REAR_EVERY);
             if began || again {
                 anim::act(w, id, Act::Rear);

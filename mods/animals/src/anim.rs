@@ -219,7 +219,8 @@ pub fn held(w: &World, id: u64) -> Option<Act> {
 
 /// Whether a clip played once (`act`, `play`) is still on for `id`.
 pub fn busy(w: &World, id: u64) -> bool {
-    w.component(id, &HELD).is_some_and(|h| w.game_time() < h[BUSY])
+    w.component(id, &HELD)
+        .is_some_and(|h| w.game_time() < h[BUSY])
 }
 
 /// `id` holds state `a` (a gait too) this tick: call it each tick the behaviour wants it (once in
