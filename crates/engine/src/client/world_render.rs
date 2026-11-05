@@ -1654,7 +1654,27 @@ impl WorldRenderer {
         let groups = self.table.groups();
         let capped = !gpu.indirect_count() && cap_draws();
         let mut issued = (0u64, 0u64);
+        // Everything opaque that never discards first, then all that may (cutout, the fade band,
+        // distant terrain): a discarding fragment can't hide what is drawn after it, so Apple's
+        // hidden-surface removal stopped there, and other GPUs' early depth lost the occluders.
+        // The table's groups are layer first, so its opaque ones lead; the CPU's plain opaque runs
+        // (meshes with something translucent too) came after the table's cutout before (perf
+        // review: the Mac's world pass is 77 % fragment work). `WEFT_OLD_ORDER=1` to compare.
+        let plain = |r: &(u8, u8, u32, u32, u32)| r.1 == 0 && r.0 < 2;
+        let firsts = if old_order() {
+            0
+        } else {
+            self.runs[..self.translucent]
+                .iter()
+                .take_while(|r| plain(r))
+                .count()
+        };
+        let mut cpu_opaque_drawn = old_order();
         for &(kind, layer, page, id, base, max) in &groups {
+            if layer > 0 && !cpu_opaque_drawn {
+                self.emit(list, 0..firsts);
+                cpu_opaque_drawn = true;
+            }
             let (pipe, buf) = self.pipe_of(kind, layer, page);
             self.bind_run(list, pipe, buf, self.table.out.as_ref().map_or(obuf, |o| o.origins));
             let Some(o) = self.table.out.as_ref() else { continue };
@@ -1670,7 +1690,10 @@ impl WorldRenderer {
             });
         }
         self.table.log_draws(gpu.indirect_count(), capped, issued);
-        self.emit(list, 0..self.translucent);
+        if !cpu_opaque_drawn {
+            self.emit(list, 0..firsts);
+        }
+        self.emit(list, firsts..self.translucent);
     }
 
     /// The translucent part of the last `draw`, after everything that may stand behind it.
@@ -2193,6 +2216,13 @@ impl Occlusion {
         }
         self.last = self.now.take();
     }
+}
+
+/// `WEFT_OLD_ORDER=1`: the world pass in the order before opaque-first (the table's groups, then
+/// the CPU's runs), to compare.
+fn old_order() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("WEFT_OLD_ORDER").is_some())
 }
 
 /// Levels a dispatch of `occlusion.wgsl`'s `down` makes: a 32 x 32 tile halved down to 1.
