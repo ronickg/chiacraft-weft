@@ -191,6 +191,7 @@ pub fn init(r: &mut Registry) {
     // The forest's offerings: what an old wood gives.
     r.shapeless(&CRAFTING, "forest_offering", 1, &["base:acorn", "base:mushroom_red", "base:berries", "base:moss_block"], 0);
     r.block(&ALTAR)
+        .textures("drenkaun_altar_top", "drenkaun_altar_side", "base:mossy_cobblestone")
         .sound_group("base:block.stone")
         .hardness(3.0)
         .mineable("pickaxe")
