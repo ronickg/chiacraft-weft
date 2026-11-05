@@ -251,12 +251,12 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
     if pass_.bloom != 0u {
         let glow = bloom_tap(pass_.bloom - 1u, uv);
         let air = clamp(max(rain_amount(), scene.weather.z), 0.0, 1.0);
-        col = mix(col, glow, BLOOM_MIX * (1.0 + air));
+        col = mix(col, glow, clamp(BLOOM_MIX * (1.0 + air) * fantasy_opt(OPT_BLOOM), 0.0, 0.6));
     }
     if pass_.exposure != 0u {
         let e = textureLoad(textures[pass_.exposure - 1u], vec2(0, 0), 0).g;
         if e == e && e > 0.0 {
-            col *= auto_exposure(e);
+            col *= pow(auto_exposure(e), fantasy_opt(OPT_AUTO_EXPOSURE));
         }
     }
     return col;

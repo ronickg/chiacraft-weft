@@ -55,6 +55,11 @@ const OPT_MOON_SIZE: u32 = 18u;
 const OPT_GLOW: u32 = 19u;
 const OPT_BIOME_AIR: u32 = 20u;
 const OPT_SPARKLE: u32 = 21u;
+// The HDR world's picture (`base:look_curve`, `look_bloom`, `look_auto_exposure`), read raw: 0 is
+// Lottes's curve, no bloom, a fixed exposure.
+const OPT_CURVE: u32 = 22u;
+const OPT_BLOOM: u32 = 23u;
+const OPT_AUTO_EXPOSURE: u32 = 24u;
 
 fn fantasy_opt(i: u32) -> f32 {
     return scene.options[i / 4u][i % 4u];
@@ -1214,7 +1219,12 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     // dark by design), blended as the sun comes up.
     let day = smoothstep(-0.05, 0.15, scene.sun.y) * select(1.0, 0.0, in_liquid());
     let night_t = hejl(max(c, vec3(0.0)) * exposure(), 3.0);
-    let day_t = min(lottes(max(c, vec3(0.0)) * 1.3 * look_opt(OPT_EXPOSURE, 1.0)), vec3(1.0));
+    var day_t = min(lottes(max(c, vec3(0.0)) * 1.3 * look_opt(OPT_EXPOSURE, 1.0)), vec3(1.0));
+    // Or Hejl's 2015 curve by day (`base:look_curve` 1; Ronald's Bliss setting): a real toe, so
+    // the shade goes deep and the mids keep their colour, a long shoulder to white at 3.5.
+    if fantasy_opt(OPT_CURVE) > 0.5 {
+        day_t = hejl(max(c, vec3(0.0)) * exposure() * look_opt(OPT_EXPOSURE, 1.0), 3.5);
+    }
     var t = mix(night_t, day_t, day);
     // Only true darks go cool (most daylit ground is mid-tone and keeps its color).
     let lights = smoothstep(0.02, 0.22, luma(t));
