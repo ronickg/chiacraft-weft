@@ -612,14 +612,25 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
         // the Researcher's weather findings, 11-05); the bellies still darken (`dark`).
         let albedo = max(s.color.rgb / max(dimmed, vec3(0.005)), vec3(0.55, 0.58, 0.64) * scene.weather.w);
         color = albedo * light / alpha_cloud;
-        color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) + 1e-3, dir.z))), smoothstep(0.3, 1.0, dist));
+        color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) + 1e-3, dir.z))), smoothstep(mix(0.3, 0.15, wet), mix(1.0, 0.85, wet), dist));
         // The rainbow stands in the falling rain under the clouds, in front of them: drawn in the sky
         // alone, the shower's clouds hid it (the after-rain check from under the clouds, 11-05).
+        // Rain's mist between the eye and the cloud, as over the land (`rain_depth`), toward the
+        // colour the land's mist takes: from the vista, 14 blocks under a storm's deck, all of it in
+        // view was near and dark over land kilometres off and fully misted, and the two met in a hard
+        // line at the horizon (fading by the deck's reach alone could not close it).
+        let misted = 1.0 - exp(-rain_depth(length(rel)));
+        color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z))), misted);
+        // A lightning flash glows inside the deck; its bolt hangs under the deck, in front of it.
+        color += lightning_in_clouds(dir) * albedo + lightning_bolt(dir);
         color = display(fog_through(rainbow_on(color, dir), dir * 220.0, 1.0));
     } else {
         color = mix(s.color.rgb * light / alpha_cloud, scene.fog_color.rgb, smoothstep(0.5, 1.0, dist));
     }
-    let alpha = s.color.a * alpha_cloud * (1.0 - smoothstep(0.8, 1.0, dist));
+    // In rain the deck thins out over the second half of its reach into the low sky, whose colour
+    // the land's mist takes too: faded only in its last fifth, a storm's deck ended in a hard
+    // straight line at the horizon (Tester 2's rain and thunder shots, 11-05).
+    let alpha = s.color.a * alpha_cloud * (1.0 - smoothstep(mix(0.8, 0.4, wet), 1.0, dist));
     let clip = scene.view_proj * vec4(rel, 1.0);
     return CloudPixel(vec4(color * alpha, alpha), clip.z / clip.w);
 }
@@ -862,7 +873,7 @@ fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
         return vec4(scene.fog_color.rgb, 1.0);
     }
     if open_sky() && !in_liquid() {
-        var c = sky_color(dir) + milky_way(dir) + aurora(dir) + meteors(dir) + shooting_stars(dir) + fireball(dir);
+        var c = sky_color(dir) + milky_way(dir) + aurora(dir) + meteors(dir) + shooting_stars(dir) + fireball(dir) + lightning_bolt(dir);
         // The rainbow in the rain, in front of the high cirrus.
         c = rainbow_on(cirrus(c, dir), dir);
         if dir.y < 0.0 {
@@ -942,6 +953,44 @@ fn dome_uv(l: vec3<f32>, s: Sky) -> vec2<f32> {
     return (cell + face * 0.5 + 0.5) / vec2(3.0, 2.0);
 }
 
+// The moon as a round disc lit by the sun (Bliss's moon is a sphere too), its markings from the
+// full moon of the base game's picture, softened: the phase is where the sun stands, so it matches
+// the night's light (the moon lags the day by its phase, `mods/base/src/lib.rs`). `local` is the
+// pixel's direction in the body's frame (x toward it). By day a pale, see-through disc, as the real
+// moon on a blue sky, only its lit part; at night the dark part keeps a faint earthshine. rgb is
+// linear light before `display`, a how much of the pixel it covers.
+fn moon_body(s: Sky, local: vec3<f32>) -> vec4<f32> {
+    // The quad's half size as `vs` draws it (`base:moon_size`).
+    var half = s.extra.x;
+    half *= clamp(select(fantasy_opt(OPT_MOON_SIZE), 1.0, fantasy_opt(OPT_MOON_SIZE) <= 0.0), 1.0, 2.0);
+    // Where in the quad, -1..1 along its up and its right; the picture's moon fills its middle half.
+    let q = local.yz / max(local.x * half, 1e-5);
+    let d = q / 0.5;
+    let r2 = dot(d, d);
+    let cover = 1.0 - smoothstep(0.94, 1.0, sqrt(r2));
+    if cover <= 0.0 {
+        return vec4(0.0);
+    }
+    // The sphere's face toward the eye, in the world, and how the sun lights it.
+    let n = mat(s) * vec3(-sqrt(max(1.0 - r2, 0.0)), d.x, d.y);
+    let lit = smoothstep(-0.04, 0.14, dot(n, scene.sun.xyz));
+    // The full moon's picture (frame 0, top left) where this pixel lies: u along the quad's right,
+    // v down its up, as `vs` lays the picture out.
+    var albedo = vec3(0.85, 0.87, 0.9);
+    if s.ids.x != 0xffffffffu {
+        let c = vec2(q.y * 0.5 + 0.5, 0.5 - q.x * 0.5);
+        let at = c * (s.uv.zw - s.uv.xy);
+        albedo = textureSampleLevel(textures[s.ids.x], linear_clamp, at, 0.0).rgb;
+    }
+    // A little darker toward the rim (the real moon barely darkens; a hint reads as round).
+    let rim = mix(0.78, 1.0, sqrt(max(1.0 - r2, 0.0)));
+    let day = smoothstep(-0.05, 0.15, scene.sun.y);
+    let shine = albedo * s.color.rgb * rim * (lit + 0.05 * (1.0 - day));
+    // By day only the lit part shows, pale: a third of its night light over the blue.
+    let a = cover * mix(1.0, lit, day);
+    return vec4(shine * mix(1.0, 0.32, day), a);
+}
+
 @fragment
 fn fs(in: VOut) -> @location(0) vec4<f32> {
     let s = sky[in.index];
@@ -991,8 +1040,19 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         // The sun shines through the tone curve; the moon keeps its markings.
         var shape = 1.0;
         var tint_after = vec3(1.0);
-        // (Within about 25° of the sun: the moon lags the day now and can stand on its side of the sky.)
-        if s.ids.y == SKY_BODY && dot(dir, scene.sun.xyz) > 0.9 {
+        // Which body this is, by where the body itself stands (`axes[0]` points at it), not by how
+        // near the pixel is to the sun: tested per pixel, a moon within 25° of the sun took the sun's
+        // branch, and every other moon kept vanilla's square picture, which by day went white
+        // through the curve as a big white square or, low down, a skewed one (Tester 2's
+        // "square sun", 11-05: the moon of summer day 5, up by day).
+        let is_sun = s.ids.y == SKY_BODY && dot(s.axes[0].xyz, scene.sun.xyz) > 0.9995;
+        let is_moon = s.ids.y == SKY_BODY && !is_sun && dot(s.axes[0].xyz, scene.moon.xyz) > 0.9995;
+        if is_moon {
+            let m = moon_body(s, local);
+            rgb = m.rgb;
+            a = m.a * s.color.a;
+        }
+        if is_sun {
             // The sun as a round disc with a soft glow (Bliss's), not the picture's square: that
             // square, about 20° across with a pale border, went white through the curve, washed
             // out the golden hour (and the water's path with it), and turned into a diamond on the
@@ -1007,11 +1067,14 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
             shape = smoothstep(0.0, 0.004, disc + halo);
         }
         // A blood moon: copper, then a deep red disc, dimmer in totality.
-        if s.ids.y == SKY_BODY && dot(dir, scene.moon.xyz) > 0.9 && blood_moon() > 0.0 {
+        if is_moon && blood_moon() > 0.0 {
             // Tinted after the curve as well: the moon's bright picture went white through it, and a
             // copper moon showed only a faint pink (the sky-events check, 11-05).
             rgb *= blood_tint() * mix(1.0, 0.45, smoothstep(0.5, 1.0, blood_moon()));
             tint_after = blood_tint();
+        }
+        if is_moon {
+            shape = smoothstep(0.0, 0.004, a);
         }
         a *= 1.0 - rain_amount() * 0.9;
         // `display` lifts black a little: outside the sun's shape nothing may be added.

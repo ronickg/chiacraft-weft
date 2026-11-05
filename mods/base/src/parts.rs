@@ -9,11 +9,13 @@
 //!   taking it uses them. A tool in the "apart" slot comes back apart into its parts: lashings
 //!   and glue are cut and lost, wedges and rivets come back.
 //!
-//! Until the look hook (`notes/CRAFTING.md`, "The engine hook for looks"), every part and kind
-//! shows its plain icon.
+//! - **Armour** the same way: a shell, a fastening and a lining make a helmet, chestplate,
+//!   leggings or boots (`ARMOUR_LOOKS` for how it's worn).
+//! - **`/gear`** builds one (or one part) for checks and scripts.
 
-use crafting::combine::{Part, ToolStats, combine};
-use crafting::materials::Making;
+use crafting::combine::{ArmourStats, Life, Part, ToolStats, armour, combine};
+use crafting::kinds::Use;
+use crafting::materials::fits;
 use crafting::{KINDS, Kind, MATERIALS, Role, SHAPES, code, grades, kind_of, material_of, shape_of};
 use weft_sdk::*;
 
@@ -38,7 +40,13 @@ value! {
         pub grade: u32,
     }
 }
+value! {
+    /// A built armour piece's numbers from its parts (`crafting::combine::armour`): armour points
+    /// and the health it adds over the base, engine points (`player::armor_of`).
+    pub struct ArmourOf { pub armour: f32, pub health: f32 }
+}
 pub static PART: Component<PartOf> = Component::named("base:part");
+pub static ARMOUR_OF: Component<ArmourOf> = Component::named("base:armour_of");
 pub static PARTS: Component<Parts> = Component::named("base:parts");
 /// The material a part recipe makes its part of (a recipe value).
 pub static PART_MATERIAL: Component<u32> = Component::named("base:part_material");
@@ -67,6 +75,10 @@ const SOURCES: &[(&str, &str)] = &[
     ("diamond", "#gems/diamond"),
     ("plant_cordage", "#string"),
     ("leather", "#materials/leather"),
+    // Linings, as clothes are sewn (`clothing.rs`).
+    ("linen", "#cloth"),
+    ("wool", "wool"),
+    ("fur", "#pelts"),
 ];
 
 /// A holding part of wood is split from a log of it.
@@ -78,7 +90,8 @@ fn holding_source(material: &str) -> Option<String> {
 fn units(shape: &str) -> u32 {
     match shape {
         "felling_axe_head" | "bearded_axe_head" | "pick_head" => 3,
-        "hoe_blade" | "straight_blade" | "long_blade" | "long_haft" | "shaft" | "self_stave" => 2,
+        "chest_shell" | "leg_shell" => 3,
+        "hoe_blade" | "straight_blade" | "long_blade" | "long_haft" | "shaft" | "self_stave" | "helmet_shell" | "boot_shell" => 2,
         _ => 1,
     }
 }
@@ -114,6 +127,13 @@ pub fn register(r: &mut Registry) {
     .permission(permission::EVERYONE);
     r.stack_component(&PART, 0);
     r.stack_component(&PARTS, 0);
+    r.stack_component(&ARMOUR_OF, 0);
+    // A built item's own item level and warmth, over its kind item's (the caps read the level:
+    // `animals::armour`; Survival the warmth).
+    r.stack_component(&base_api::ITEM_LEVEL, 0);
+    r.stack_component(&base_api::WARMTH, 0);
+    // A built piece's armour in the tooltip's and the HUD's points (`ARMOUR_PER_POINT`).
+    r.stack_component(&crate::items::ARMOR, 0);
     r.recipe_kind(&PART_RECIPES).inputs(3, 1).outputs(1, 1);
     let mut made: Vec<&str> = Vec::new();
     for s in SHAPES {
@@ -125,7 +145,10 @@ pub fn register(r: &mut Registry) {
             .max_stack(16)
             .tab(&crate::tabs::INGREDIENTS);
     }
-    for k in KINDS {
+    for k in KINDS.iter().filter(|k| k.use_ == Use::Guard) {
+        register_armour(r, k);
+    }
+    for k in KINDS.iter().filter(|k| k.use_ != Use::Guard) {
         let tool = match k.id {
             "axe" | "pickaxe" | "shovel" | "hoe" | "sword" => Some(k.id),
             _ => None,
@@ -143,10 +166,57 @@ pub fn register(r: &mut Registry) {
             Some(t) => b.tool(t),
             None => b,
         };
-        if k.id == "hoe" {
+        // Vanilla: weapons wear by one per hit, tools (made for blocks) by two.
+        let b = b.set(&WEAR_PER_HIT, if matches!(k.id, "sword" | "spear" | "knife") { 1 } else { 2 });
+        if k.id == "sword" {
+            b.sweeps().no_creative_break();
+        } else if k.id == "hoe" {
             b.on_use(crate::farming::till);
         }
     }
+    r.command("gear", "<kind:word> [materials:text]", |cmd| {
+        let (w, player) = (cmd.world(), cmd.player());
+        let Some(kind) = cmd.text("kind").map(str::to_string) else { return };
+        let materials: Vec<String> = cmd
+            .text("materials")
+            .unwrap_or("")
+            .split_whitespace()
+            .map(str::to_string)
+            .collect();
+        let grade = materials
+            .iter()
+            .find_map(|m| m.strip_prefix("grade=").and_then(|g| g.parse().ok()))
+            .unwrap_or(4u8);
+        // `slot=N` puts it in that inventory slot (36-39 are armour's), replacing what's there.
+        let slot = materials
+            .iter()
+            .find_map(|m| m.strip_prefix("slot=").and_then(|g| g.parse::<u32>().ok()));
+        let names: Vec<&str> = materials
+            .iter()
+            .filter(|m| !m.contains('='))
+            .map(String::as_str)
+            .collect();
+        let day = (w.day_time() / vitals::calendar::DAY_TICKS) as u32;
+        // `/gear part <shape> <material>`: one part, to assemble by hand.
+        let made = if kind == "part" {
+            names
+                .first()
+                .zip(names.get(1))
+                .map_or(ItemStack::EMPTY, |(shape, m)| part_of(shape, m, grade, day))
+        } else {
+            made_of(&kind, &names, grade, day)
+        };
+        if made.is_empty() {
+            cmd.reply("command.base.gear.cant", &[Arg::Text(&kind)]);
+            return;
+        }
+        match slot {
+            Some(i) if i < w.inventory(player).len() => w.inventory(player).set(i, made),
+            _ => give(&w, player, made),
+        }
+        cmd.reply("command.base.gear.made", &[Arg::Item(made.item)]);
+    })
+    .permission(permission::GAME_MASTER);
     // One recipe per shape and material that can be it, carrying the material.
     let mut shapes: Vec<&crafting::Shape> = Vec::new();
     for s in SHAPES {
@@ -162,15 +232,9 @@ pub fn register(r: &mut Registry) {
             .map(|x| x.role)
             .unwrap_or(Role::Extra);
         for m in MATERIALS {
-            // A guard or pommel is cast, forged or carved: not cordage or leather.
-            let can = match role {
-                Role::Extra => {
-                    m.roles.contains(&Role::Working) || m.roles.contains(&Role::Fitting) && !matches!(m.making, Making::Hands | Making::Sew)
-                }
-                r => m.roles.contains(&r),
-            };
+            // What the real thing could be made of (`crafting::materials::fits`).
             let Some(&(_, from)) = SOURCES.iter().find(|(id, _)| *id == m.id) else { continue };
-            if !can {
+            if !fits(m, s.kind, s.slot, role) {
                 continue;
             }
             // Hafts, grips, shafts and bow staves are split from a log.
@@ -214,7 +278,16 @@ pub fn finish(w: &World, player: u64, r: &Recipe, out: ItemStack, u: f32) -> Ite
         s.xp[craft] = s.xp[craft].saturating_add(crafting::skills::xp_for(grade));
     }
     let made_day = (w.day_time() / vitals::calendar::DAY_TICKS) as u32;
-    out.with(&PART, PartOf { material, grade: grade as u32, worn: 0, made_day, repairs: 0 })
+    let out = out.with(&PART, PartOf { material, grade: grade as u32, worn: 0, made_day, repairs: 0 });
+    drawn_part(out, m.id)
+}
+
+/// A loose part drawn in its material where its shape has a map (`crafting::looks::part_look`).
+fn drawn_part(stack: ItemStack, material: &str) -> ItemStack {
+    match shape_id(stack.item).and_then(|s| crafting::looks::part_look(s, material)) {
+        Some(look) => with_look(stack, Some(look.as_str())),
+        None => stack,
+    }
 }
 
 /// The skill a part recipe uses, as (its name's key, the local player's level), for the book.
@@ -276,9 +349,14 @@ fn build(stacks: &[ItemStack]) -> Option<(&'static Kind, Vec<(Part, PartOf)>)> {
     Some((kind, out))
 }
 
-/// The tool `parts` make, with its numbers on the stack. Its wear so far is its most worn part's
-/// share (each part keeps its own).
-fn tool_stack(kind: &Kind, parts: &[(Part, PartOf)], stats: &ToolStats) -> ItemStack {
+/// Each wearing part's life in `kind` built from `parts`: a tool's or a piece of armour's.
+fn lives(kind: &Kind, parts: &[Part]) -> Option<Vec<Life>> {
+    if kind.use_ == Use::Guard { armour(kind.id, parts).ok().map(|a| a.life) } else { combine(kind.id, parts).ok().map(|t| t.life) }
+}
+
+/// The parts as the item carries them, and the item's wear so far: the largest share any wearing
+/// part has used (each part keeps its own).
+fn parts_of(kind: &Kind, parts: &[(Part, PartOf)], life: &[Life]) -> (Parts, f32) {
     let mut p = Parts {
         kind: code(kind.id),
         n: parts.len() as u32,
@@ -291,11 +369,7 @@ fn tool_stack(kind: &Kind, parts: &[(Part, PartOf)], stats: &ToolStats) -> ItemS
         repairs: [0; 4],
         grade: 0,
     };
-    let working = kind
-        .slots
-        .iter()
-        .find(|s| s.role == Role::Working)
-        .map(|s| s.name);
+    let working = kind.working();
     for (i, (part, of)) in parts.iter().enumerate().take(4) {
         p.slots[i] = code(part.slot);
         p.shapes[i] = code(part.shape);
@@ -304,26 +378,29 @@ fn tool_stack(kind: &Kind, parts: &[(Part, PartOf)], stats: &ToolStats) -> ItemS
         p.worn[i] = of.worn;
         p.made_days[i] = of.made_day;
         p.repairs[i] = of.repairs;
-        if Some(part.slot) == working {
+        if part.slot == working {
             p.grade = part.grade as u32;
         }
     }
-    let uses = stats.weakest().map_or(1.0, |l| l.uses).max(1.0) as u32;
-    // Wear so far: the largest share any wearing part has used.
     let used = parts
         .iter()
         .filter_map(|(part, worn)| {
-            stats
-                .life
-                .iter()
+            life.iter()
                 .find(|l| l.slot == part.slot)
                 .map(|l| worn.worn as f32 / l.uses.max(1.0))
         })
         .fold(0.0f32, f32::max);
+    (p, used)
+}
+
+/// The tool `parts` make, with its numbers on the stack.
+fn tool_stack(kind: &Kind, parts: &[(Part, PartOf)], stats: &ToolStats) -> ItemStack {
+    let (p, used) = parts_of(kind, parts, &stats.life);
+    let uses = stats.weakest().map_or(1.0, |l| l.uses).max(1.0) as u32;
     // Its working part's material's item level (`vitals::gear`): what an over-tier cap reads.
     let level = parts
         .iter()
-        .find(|(part, _)| Some(part.slot) == working)
+        .find(|(part, _)| part.slot == kind.working())
         .and_then(|(part, _)| vitals::gear::material(part.material))
         .map_or(0.0, |m| m.level());
     let stack = ItemStack::new(Item::generated(kind.id.to_string()).id(), 1)
@@ -339,6 +416,110 @@ fn tool_stack(kind: &Kind, parts: &[(Part, PartOf)], stats: &ToolStats) -> ItemS
     let stack = with_look(stack, (!look.is_empty()).then_some(look.as_str()));
     let worn = (used * uses as f32) as u32;
     if worn > 0 { stack.with(&DAMAGE, worn) } else { stack }
+}
+
+/// How armour looks when worn, by its shell, until it has textures by part (`notes/CRAFTING.md`,
+/// "How parts look": region maps per part): today's four worn sets. Its item is `<kind>` for a
+/// leather look, else `<kind>_<look>`; the look families are items only so the worn texture can be
+/// theirs, and none is made or found but by assembling.
+pub const ARMOUR_LOOKS: [(&str, &str); 4] = [("leather", ""), ("iron", "_mail"), ("gold", "_scale"), ("diamond", "_gem")];
+
+/// The worn set a shell of `material` looks like: bronze and copper the yellow one, the irons and
+/// steels the grey one, diamond its own, hides and bone the leather one.
+pub fn armour_look(material: &str) -> &'static str {
+    match material {
+        "copper" | "bronze" => "gold",
+        "wrought_iron" | "meteoric_iron" | "steel" | "star_steel" => "iron",
+        "diamond" => "diamond",
+        _ => "leather",
+    }
+}
+
+/// The item a piece of armour of kind `kind` with a shell of `material` is.
+pub fn armour_item(kind: &str, material: &str) -> String {
+    let look = armour_look(material);
+    let suffix = ARMOUR_LOOKS
+        .iter()
+        .find(|(l, _)| *l == look)
+        .map_or("", |l| l.1);
+    format!("{kind}{suffix}")
+}
+
+/// An armour kind's items, one per look family: worn on its slot, worn out it stays (a part is
+/// repaired or replaced).
+fn register_armour(r: &mut Registry, k: &Kind) {
+    let Some(slot) = k.armour_slot() else { return };
+    // Leggings are the inner layer, drawn closer to the body.
+    let (inflate, layer) = if slot == 2 { (0.5, 2) } else { (1.0, 1) };
+    for (look, suffix) in ARMOUR_LOOKS {
+        let b = r
+            .item(Item::generated(format!("{}{suffix}", k.id)))
+            // Drawn as today's piece of the set it looks like, until part art for armour (the
+            // game-art sheet waiting on Ronald).
+            .texture(&format!("{look}_{}", k.id))
+            .durability(1)
+            .keeps_broken()
+            .set(&crate::items::ARMOR, crate::items::Armor { points: 0, toughness: 0.0 })
+            .tag(crate::items::ARMOR_SLOTS[slot])
+            .wearable(crate::player::EQUIPMENT[slot], inflate, &format!("armor/{look}_{layer}"));
+        // Only the leather-look item shows in creative; the others are what assembly makes.
+        if suffix.is_empty() {
+            drop(b.tab(&crate::tabs::COMBAT));
+        }
+    }
+}
+
+/// A piece of armour's warmth from its parts: its shell's own insulation by the set it looks like,
+/// and its lining's as Survival's clothing (`vitals::clothing::Worn::lining`).
+pub fn armour_worn(worn: &mut vitals::clothing::Worn, a_shell: &str, lining: &str, slot: usize) {
+    worn.armor(armour_look(a_shell), slot);
+    let cloth = if lining == "leather" { "hide" } else { lining };
+    if let Some(m) = vitals::clothing::find(cloth) {
+        worn.lining(m, slot);
+    }
+}
+
+/// The armour `parts` make, with its numbers on the stack.
+fn armour_stack(kind: &Kind, parts: &[(Part, PartOf)], a: &ArmourStats) -> ItemStack {
+    let (p, used) = parts_of(kind, parts, &a.life);
+    let uses = a.weakest().map_or(1.0, |l| l.uses).max(1.0) as u32;
+    let mut worn = vitals::clothing::Worn::default();
+    armour_worn(&mut worn, a.shell, a.lining, a.slot);
+    let warmth = base_api::Warmth {
+        cold: worn.cold.round().max(0.0) as u32,
+        heat: worn.heat.round() as i32,
+        wet: if worn.cold > 0.0 { (worn.cold_wet / worn.cold * 100.0).round() as u32 } else { 0 },
+        wind: (worn.windproof * 100.0).round() as u32,
+    };
+    let stack = ItemStack::new(Item::generated(armour_item(kind.id, a.shell)).id(), 1)
+        .with(&PARTS, p)
+        .with(&DURABILITY, uses)
+        .with(&ARMOUR_OF, ArmourOf { armour: a.armour, health: a.health })
+        .with(&crate::items::ARMOR, crate::items::Armor { points: (a.armour / ARMOUR_PER_POINT).round() as u32, toughness: 0.0 })
+        .with(&base_api::ITEM_LEVEL, a.level)
+        .with(&base_api::WARMTH, warmth);
+    // Its icon is its shell's, in the shell's material (the worn look is its item's set).
+    let shell = parts
+        .iter()
+        .find(|(p, _)| p.slot == "shell")
+        .map(|(p, _)| p.shape);
+    let stack = match shell.and_then(|s| crafting::looks::part_look(s, a.shell)) {
+        Some(look) => with_look(stack, Some(look.as_str())),
+        None => stack,
+    };
+    let worn = (used * uses as f32) as u32;
+    if worn > 0 { stack.with(&DAMAGE, worn) } else { stack }
+}
+
+/// Armour points (`vitals::combat`) per point shown in the tooltip and the HUD (20 fill its row):
+/// a Sound Iron Age set (`vitals::gear`, about 74 for wrought iron) shows about 15.
+pub const ARMOUR_PER_POINT: f32 = 5.0;
+
+/// Whether a stack is worn out (a kept-broken tool or armour piece: its damage reached its
+/// durability).
+pub fn broken(stack: &ItemStack) -> bool {
+    let max = DURABILITY.on_stack(stack).unwrap_or(0);
+    max > 0 && damage_of(stack) >= max
 }
 
 /// How a tool of `kind` built from `parts` is drawn (`crafting::looks`, the engine's `core:look`):
@@ -380,10 +561,101 @@ pub fn look_text(kind: &str, parts: &[Part]) -> String {
 /// What the assembly slots make, for the output slot (empty when nothing).
 pub fn assembled(stacks: &[ItemStack]) -> ItemStack {
     let Some((kind, parts)) = build(stacks) else { return ItemStack::EMPTY };
+    built(kind, &parts)
+}
+
+/// `kind` from `parts`, with its numbers on the stack; empty if they don't make one.
+fn built(kind: &Kind, parts: &[(Part, PartOf)]) -> ItemStack {
     let plain: Vec<Part> = parts.iter().map(|p| p.0).collect();
-    match combine(kind.id, &plain) {
-        Ok(stats) => tool_stack(kind, &parts, &stats),
-        Err(_) => ItemStack::EMPTY,
+    if kind.use_ == Use::Guard {
+        return armour(kind.id, &plain).map_or(ItemStack::EMPTY, |a| armour_stack(kind, parts, &a));
+    }
+    combine(kind.id, &plain).map_or(ItemStack::EMPTY, |stats| tool_stack(kind, parts, &stats))
+}
+
+/// What a part of `kind`'s slot `slot` usually is when nothing names it (`/gear`):
+/// an oak haft or grip, a leather wrap, a wrought-iron wedge, leather straps, a wool lining.
+fn usual(kind: &Kind, role: Role, working: &str) -> &'static str {
+    let metal = material_of(code(working))
+        .is_some_and(|m| m.works == crafting::materials::Works::Metal || m.works == crafting::materials::Works::Gem);
+    match role {
+        Role::Holding if kind.id == "bow" => "leather",
+        Role::Holding => "oak",
+        Role::Fitting if kind.use_ == Use::Guard => "leather",
+        Role::Fitting if kind.id == "bow" => "sinew",
+        Role::Fitting if metal => "wrought_iron",
+        Role::Fitting => "plant_cordage",
+        Role::Extra if metal => "wrought_iron",
+        Role::Extra => "oak",
+        Role::Lining => "wool",
+        Role::Working => "flint",
+    }
+}
+
+/// `kind_id` built of `materials` (its slots' in order, the usual ones for those left out), every
+/// part of grade `grade` and made on `day`: for `/gear` and scripts. Empty if they
+/// don't make one.
+pub fn made_of(kind_id: &str, materials: &[&str], grade: u8, day: u32) -> ItemStack {
+    let Some(kind) = crafting::kinds::kind(kind_id) else { return ItemStack::EMPTY };
+    let working = materials.first().copied().unwrap_or("flint");
+    let mut parts = Vec::new();
+    for (i, slot) in kind.slots.iter().enumerate() {
+        let name = materials
+            .get(i)
+            .copied()
+            .unwrap_or_else(|| usual(kind, slot.role, working));
+        let Some(m) = crafting::materials::material(name) else { return ItemStack::EMPTY };
+        let Some(shape) = crafting::kinds::shapes_for(kind.id, slot.name).next() else { return ItemStack::EMPTY };
+        let part = Part { slot: slot.name, shape: shape.id, material: m.id, grade: grade.clamp(1, 10) };
+        parts.push((part, PartOf { material: code(m.id), grade: part.grade as u32, worn: 0, made_day: day, repairs: 0 }));
+    }
+    built(kind, &parts)
+}
+
+/// A part item of shape `shape` and material `material`, of grade `grade`, made on `day`; empty
+/// if that material can't be that part.
+pub fn part_of(shape: &str, material: &str, grade: u8, day: u32) -> ItemStack {
+    let Some(m) = crafting::materials::material(material) else { return ItemStack::EMPTY };
+    let can = SHAPES.iter().filter(|s| s.id == shape).any(|s| {
+        crafting::kinds::kind(s.kind)
+            .and_then(|k| k.slots.iter().find(|x| x.name == s.slot))
+            .is_some_and(|x| fits(m, s.kind, s.slot, x.role))
+    });
+    if !can {
+        return ItemStack::EMPTY;
+    }
+    let part = ItemStack::new(part_item(shape).id(), 1)
+        .with(&PART, PartOf { material: code(m.id), grade: grade.clamp(1, 10) as u32, worn: 0, made_day: day, repairs: 0 });
+    drawn_part(part, m.id)
+}
+
+/// Puts `stack` where it goes: armour on its slot if that's free, else the selected hotbar slot,
+/// else the bag; dropped at the feet if all are full.
+pub fn give(w: &World, player: u64, stack: ItemStack) {
+    let inv = w.inventory(player);
+    if let Some(slot) = crate::items::ARMOR_SLOTS
+        .iter()
+        .position(|t| item_has_tag(stack.item, t))
+        && let Some(worn) = inv.find_group(EQUIPMENT_GROUP)
+        && worn.get(slot as u32).is_empty()
+    {
+        worn.set(slot as u32, stack);
+        return;
+    }
+    let hotbar = inv.group("hotbar");
+    let at = w.selected_slot(player);
+    if hotbar.get(at).is_empty() {
+        hotbar.set(at, stack);
+        return;
+    }
+    for i in 0..inv.len() {
+        if inv.get(i).is_empty() {
+            inv.set(i, stack);
+            return;
+        }
+    }
+    if let Some(e) = w.entity(player) {
+        w.spawn_item(e.pos, stack);
     }
 }
 
@@ -409,14 +681,14 @@ fn apart_into(stack: &ItemStack, cut: bool) -> Vec<ItemStack> {
             })
         })
         .collect();
-    let stats = combine(kind.id, &plain).ok();
+    let life = lives(kind, &plain).unwrap_or_default();
     let max = DURABILITY.on_stack_own(stack).unwrap_or(1).max(1) as f32;
     let share = damage_of(stack) as f32 / max;
     let mut out = Vec::new();
     for (i, part) in plain.iter().enumerate() {
-        let life = stats
-            .as_ref()
-            .and_then(|s| s.life.iter().find(|l| l.slot == part.slot))
+        let life = life
+            .iter()
+            .find(|l| l.slot == part.slot)
             .map_or(0.0, |l| l.uses);
         let role = kind
             .slots
@@ -427,12 +699,13 @@ fn apart_into(stack: &ItemStack, cut: bool) -> Vec<ItemStack> {
             continue;
         }
         let worn = (p.worn[i] as f32).max(share * life) as u32;
-        out.push(
+        out.push(drawn_part(
             ItemStack::new(part_item(part.shape).id(), 1).with(
                 &PART,
                 PartOf { material: p.materials[i], grade: p.grades[i], worn, made_day: p.made_days[i], repairs: p.repairs[i] },
             ),
-        );
+            part.material,
+        ));
     }
     out
 }

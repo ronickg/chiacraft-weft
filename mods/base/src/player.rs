@@ -17,26 +17,22 @@ static HUD_ATTACK: HudElement = HudElement::named("attack_indicator");
 pub const EQUIPMENT: [&EquipmentSlot; 4] = [&HEAD, &base_api::CHEST, &LEGS, &FEET];
 
 /// Armor and the health it adds (engine points) of what `entity` wears, from the curve by each
-/// piece's material and slot (`vitals::gear::armour`): a piece is named `<material>_<piece>`.
+/// piece's shell and slot (`vitals::gear::armour`), carried by each piece built from parts
+/// (`parts::ARMOUR_OF`). A worn-out piece stops nothing.
 pub fn armor_of(w: &World, entity: u64) -> (f32, f32) {
     let Some(worn) = w.inventory(entity).find_group(EQUIPMENT_GROUP) else { return (0.0, 0.0) };
     (0..worn.len())
         .filter_map(|i| {
-            let item = worn.get(i).item;
-            ARMOR.on_item(item)?;
-            piece_armour(item_name(item))
+            let s = worn.get(i);
+            ARMOR.on_item(s.item)?;
+            if crate::parts::broken(&s) {
+                return None;
+            }
+            crate::parts::ARMOUR_OF
+                .on_stack_own(&s)
+                .map(|a| (a.armour, a.health))
         })
         .fold((0.0, 0.0), |t, a| (t.0 + a.0, t.1 + a.1))
-}
-
-/// An armour piece's armour and health, by its name.
-fn piece_armour(name: &str) -> Option<(f32, f32)> {
-    let name = name.rsplit(':').next().unwrap_or(name);
-    let (material, piece) = name.rsplit_once('_')?;
-    let slot = ["helmet", "chestplate", "leggings", "boots"]
-        .iter()
-        .position(|p| *p == piece)?;
-    vitals::gear::armour_of(slot, material)
 }
 
 /// How much bigger held items are in the player's own first-person hand than Weft draws them
@@ -121,11 +117,12 @@ pub fn register(r: &mut Registry) {
     // them (creative).
     r.hud_element(&HUD_ARMOR, hud_anchor::TOP_LEFT, 6, |ui| {
         ui.icons("armor", 10, |c| {
-            // From what the client knows of its own inventory, like the server's damage chain.
+            // From what the client knows of its own inventory, like the server's damage chain: a
+            // built piece's own points (`parts::ARMOUR_PER_POINT`).
             let points: u32 = c
                 .inventory_group(EQUIPMENT_GROUP)
                 .iter()
-                .filter_map(|s| ARMOR.on_item(s.item))
+                .filter_map(|s| ARMOR.on_stack(s))
                 .map(|a| a.points)
                 .sum();
             if points > 0 && !c.outside_survival() { points as f32 } else { -1.0 }

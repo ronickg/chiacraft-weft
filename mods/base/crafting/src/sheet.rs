@@ -33,7 +33,7 @@ pub fn markdown() -> String {
     let _ = writeln!(w, "## Materials\n");
     let _ = writeln!(
         w,
-        "| Material | Roles | g/cm³ | Bulk | Harvest | Uses | Speed | Damage | As a haft | As a fitting | Trait |\n|---|---|---|---|---|---|---|---|---|---|---|"
+        "| Material | Roles | Works as | Level | g/cm³ | Bulk | Harvest | Uses | Speed | As a haft | As a fitting | Trait |\n|---|---|---|---|---|---|---|---|---|---|---|---|"
     );
     for m in MATERIALS {
         let roles: Vec<&str> = m
@@ -44,6 +44,7 @@ pub fn markdown() -> String {
                 Role::Holding => "holding",
                 Role::Fitting => "fitting",
                 Role::Extra => "extra",
+                Role::Lining => "lining",
             })
             .collect();
         let haft = if m.roles.contains(&Role::Holding) {
@@ -54,15 +55,16 @@ pub fn markdown() -> String {
         let fit = if m.fitting_uses > 0.0 { format!("{:.0} uses", m.fitting_uses) } else { "-".into() };
         let _ = writeln!(
             w,
-            "| {} | {} | {} | {} | {} | {:.0} | {} | {} | {} | {} | {} |",
+            "| {} | {} | {:?} | {:.0} | {} | {} | {} | {} | {} | {} | {} | {} |",
             if crate::materials::PROVISIONAL.contains(&m.id) { format!("{} (provisional)", m.id) } else { m.id.to_string() },
             roles.join(", "),
+            m.works,
+            m.level(),
             m.density,
             m.bulk,
-            m.harvest,
-            m.uses,
-            m.speed,
-            m.damage,
+            if m.works == crate::materials::Works::None { "-".to_string() } else { m.harvest().to_string() },
+            if m.works == crate::materials::Works::None { "-".to_string() } else { format!("{:.0}", m.uses()) },
+            if m.works == crate::materials::Works::None { "-".to_string() } else { format!("{:.1}", m.speed()) },
             haft,
             fit,
             if m.trait_id.is_empty() { "-" } else { m.trait_id }
@@ -71,7 +73,13 @@ pub fn markdown() -> String {
 
     let _ = writeln!(
         w,
-        "\nProvisional rows stand in for today's tools until Content plan's flint and chert. Diamond is a tier above steel, and the ladder stays open at the top: a new tier is a row.\n"
+        "\nHarvest, uses and speed are a working part's at Sound, from its material's level on the curve (`vitals::gear`: uses {} × g^{}, speed {} × g^{}, harvest {} at level 5 and {} a level), with each row's hand tweak (×0.75-1.25, reasons in `materials.rs`). Provisional rows stand in until their materials grow in the world. Diamond is a tier above steel, and the ladder stays open at the top: a new tier is a row.\n",
+        vitals::gear::REF_USES,
+        vitals::gear::USES_POWER,
+        vitals::gear::REF_MINE,
+        vitals::gear::MINE_POWER,
+        vitals::gear::REF_HARVEST,
+        vitals::gear::HARVEST_PER_LEVEL
     );
     let _ = writeln!(w, "## Traits\n");
     let _ = writeln!(w, "| Trait | Effect | When |\n|---|---|---|");
@@ -92,6 +100,24 @@ pub fn markdown() -> String {
                 w,
                 "  - {} `{}`: {} cm³, stat ×{}, speed ×{}, damage ×{}, reach {:+}",
                 s.slot, s.id, s.volume, s.stat, s.speed, s.damage, s.reach
+            );
+        }
+    }
+
+    let _ = writeln!(w, "\n## Example armour (a chestplate, leather straps, wool lining, Sound parts)\n");
+    let _ = writeln!(w, "| Shell | Level | Armour | Health | kg | Lasts (blows) | Gives out first |\n|---|---|---|---|---|---|---|");
+    for shell in ["leather", "bone", "copper", "bronze", "wrought_iron", "steel", "diamond"] {
+        let parts = [
+            Part { slot: "shell", shape: "chest_shell", material: shell, grade: 4 },
+            Part { slot: "fastening", shape: "straps", material: "leather", grade: 4 },
+            Part { slot: "lining", shape: "lining", material: "wool", grade: 4 },
+        ];
+        if let Ok(a) = crate::combine::armour("chestplate", &parts) {
+            let weak = a.weakest().unwrap();
+            let _ = writeln!(
+                w,
+                "| {shell} | {:.0} | {:.1} | {:.1} | {:.1} | {:.0} | {} |",
+                a.level, a.armour, a.health, a.mass_kg, weak.uses, weak.slot
             );
         }
     }

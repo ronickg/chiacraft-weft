@@ -17,12 +17,12 @@ chat /tk mode survival
 chat /tk attr_mod me core:max_health testkit:hp 0 300 0
 chat /tk attr_mod me core:entity_reach testkit:reach 0 2 0
 chat /tk put me 0 animals:forest_offering 8
-chat /tk put me 1 base:stone_sword 1
-chat /tk put me 2 base:diamond_sword 1
-chat /tk put me 36 base:leather_helmet 1
-chat /tk put me 37 base:leather_chestplate 1
-chat /tk put me 38 base:leather_leggings 1
-chat /tk put me 39 base:leather_boots 1
+chat /gear sword flint slot=1
+chat /gear sword diamond slot=2
+chat /gear helmet leather slot=36
+chat /gear chestplate leather slot=37
+chat /gear leggings leather slot=38
+chat /gear boots leather slot=39
 chat /tk heal
 # Drenkaun's health line and its calf's taming (drenkaun_hud.txt)
 chat /tk fill -4 200 -4 -4 204 -4 base:oak_log
