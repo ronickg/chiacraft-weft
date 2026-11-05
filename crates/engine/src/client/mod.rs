@@ -96,6 +96,13 @@ pub struct LocalPlayer {
     /// Held on to a wall at the last step, gliding at the last step: the poses for them.
     pub on_wall: bool,
     pub gliding: bool,
+    /// The rope it hangs on (`attribute::ROPE_LENGTH`), how much of it is let out now (pulled in
+    /// with jump, let out with sneak), the anchor that length is for, and hanging off the ground on
+    /// it at the last step.
+    pub rope: Option<physics::Rope>,
+    pub rope_len: f64,
+    pub rope_for: Option<DVec3>,
+    pub on_rope: bool,
 }
 
 pub struct ClientEntity {
@@ -111,6 +118,9 @@ pub struct ClientEntity {
     pub health: f32,
     pub hurt: f32,
     pub worn: Vec<u32>,
+    /// What it wears drawn by its own looks (`abi::comp::WORN_LOOK`), in `worn`'s order; empty
+    /// for an item's own texture.
+    pub worn_looks: Vec<String>,
     /// A player's item in hand, 0 for none, and that stack's own look (`abi::comp::LOOK`).
     pub held: u32,
     pub held_look: Option<String>,
@@ -344,6 +354,7 @@ impl ClientEntity {
             health: f32::NAN,
             hurt: 0.0,
             worn: Vec::new(),
+            worn_looks: Vec::new(),
             held: 0,
             off_held: 0,
             using: None,
@@ -667,6 +678,8 @@ pub struct Client {
     aurora: f32,
     /// How closed the canopy is where the player is (a mod's air, `air_flags::CANOPY_SHIFT`).
     canopy: f32,
+    /// How wet the ground is where the player is, 0..1 (`weather_effects`, `Scene::canopy.y`).
+    wet: f32,
     /// What happens in the sky (`weft_abi::sky_event`, chiacraft), how strongly, and when it began
     /// (`shaders::time`).
     sky_event: (u32, f32, f32),
@@ -682,6 +695,9 @@ pub struct Client {
     lightning: f32,
     /// Lightning flashes seen so far: mods hear a new one as thunder.
     lightnings: u32,
+    /// The last flash for packs (`Scene::lightning`): seconds since it began (real time, so tests'
+    /// pinned shader clock still shows it), and a random number of its own (where it strikes).
+    lightning_seen: (f32, f32),
     /// Holding the use button on an item that takes time: ticks left, ticks in all.
     using: Option<(f32, f32)>,
     /// Who else is mining what, and how far along.
@@ -889,6 +905,10 @@ impl Client {
                 glide: physics::Glide::default(),
                 on_wall: false,
                 gliding: false,
+                rope: None,
+                rope_len: 0.0,
+                rope_for: None,
+                on_rope: false,
             },
             joined: false,
             blocks_preloaded: false,
@@ -997,6 +1017,7 @@ impl Client {
             dust: 0.0,
             aurora: 0.0,
             canopy: 0.0,
+            wet: 0.0,
             sky_event: (0, 0.0, 0.0),
             sky_landing: None,
             weather_id: 0,
@@ -1004,6 +1025,7 @@ impl Client {
             gloom: 0.0,
             lightning: 0.0,
             lightnings: 0,
+            lightning_seen: (1.0e4, 0.0),
             using: None,
             others_mining: Vec::new(),
             told_mining: None,
@@ -2299,7 +2321,8 @@ impl Client {
     /// Copies an engine field component into the entity (or the own player) that shows it.
     fn engine_field(&mut self, id: u64, comp: u32, bytes: &[u8]) {
         let c = content();
-        let [health, burning, worn, shape, held, off_held, using, swaps, looping, effect, forced, riding, held_look] = c.game.field_comps;
+        let [health, burning, worn, shape, held, off_held, using, swaps, looping, effect, forced, riding, held_look, worn_looks] =
+            c.game.field_comps;
         let now = self.world.time;
         let f: Vec<f32> = words(bytes).map(f32::from_le_bytes).collect();
         let shaped = || {
@@ -2328,6 +2351,11 @@ impl Client {
             e.burning = bytes.first().is_some_and(|&b| b != 0);
         } else if comp == worn {
             e.worn = words(bytes).map(u32::from_le_bytes).collect();
+        } else if comp == worn_looks {
+            e.worn_looks = String::from_utf8_lossy(bytes)
+                .split('\n')
+                .map(str::to_string)
+                .collect();
         } else if comp == held {
             e.held = words(bytes).next().map_or(0, u32::from_le_bytes);
         } else if comp == held_look {
@@ -2378,6 +2406,19 @@ impl Client {
                 .0
                 .unwrap_or(c.game.entities[c.game.player_kind as usize].size());
         }
+    }
+
+    /// The worn looks of what the local player wears (`abi::comp::WORN_LOOK`), in `worn`'s order.
+    pub fn worn_looks(&self) -> Vec<String> {
+        let c = content();
+        let w = &c.game.player_layout.worn;
+        self.inventory
+            .get(w.start as usize..w.end as usize)
+            .unwrap_or_default()
+            .iter()
+            .filter(|s| !s.is_empty() && c.worn(s.item).is_some())
+            .map(|s| crate::stack::worn_look(s).unwrap_or("").to_string())
+            .collect()
     }
 
     /// Items the local player wears.
@@ -2520,6 +2561,15 @@ impl Client {
             .inventory
             .get(w.start as usize..w.end as usize)
             .map_or(Vec::new(), |s| s.iter().filter(|s| !s.is_empty()).map(|s| s.item).collect());
+        let worn_looks: Vec<String> = self
+            .inventory
+            .get(w.start as usize..w.end as usize)
+            .map_or(Vec::new(), |s| {
+                s.iter()
+                    .filter(|s| !s.is_empty())
+                    .map(|s| crate::stack::worn_look(s).unwrap_or("").to_string())
+                    .collect()
+            });
         let (pos, held, off_held) = (self.smooth_pos(), self.shown_held().item, self.off_held().item);
         let using = self
             .using
@@ -2529,6 +2579,7 @@ impl Client {
         me.held_look = held_look;
         (me.pos, me.target, me.yaw, me.target_yaw, me.pitch) = (pos, pos, self.player.yaw, self.player.yaw, self.player.pitch);
         (me.worn, me.held, me.off_held, me.using) = (worn, held, off_held, using);
+        me.worn_looks = worn_looks;
         (me.arm_swing, me.swing_off, me.pose, me.walked) = (self.hand_swing, self.hand_swing_off, self.player.pose, me.walk);
         me.sprinting = self.player.sprinting && self.player.on_ground;
         me.age = self.start.elapsed().as_secs_f32();
@@ -2619,6 +2670,7 @@ impl Client {
         go(&mut l.cloud_dark, sky(none.cloud_dark, to.cloud_dark), step);
         go(&mut l.darkness, sky(none.darkness, to.darkness), step);
         self.lightning = (self.lightning - dt).max(0.0);
+        self.lightning_seen.0 = (self.lightning_seen.0 + dt).min(1.0e4);
         // The air where the player is: fog rolls in over a few seconds (the weather itself changes
         // it slowly), the wind turns in seconds.
         let (fog, speed, cover, flags) = self.world.air_at(self.player.pos.floor().as_ivec3());
@@ -2631,12 +2683,24 @@ impl Client {
         self.aurora += (aurora - self.aurora).clamp(-dt / 20.0, dt / 20.0);
         let canopy = ((flags >> weft_abi::air_flags::CANOPY_SHIFT) & 255) as f32 / 255.0;
         self.canopy += (canopy - self.canopy).clamp(-dt / 10.0, dt / 10.0);
+        // The ground wets as the rain comes (in about twenty seconds) and dries after it at the
+        // pace the air there gives (a mod's `DRYING_SHIFT`; 0, about two minutes): it stayed wet
+        // only as long as the rain fell, gone 25 s after (Tester 2's after-rain shots, 11-05).
+        let falling = if self.snowing > 0.5 { 0.0 } else { self.look.falls };
+        if falling > self.wet {
+            self.wet = (self.wet + dt / 20.0).min(falling);
+        } else {
+            let drying = (flags >> weft_abi::air_flags::DRYING_SHIFT) & 255;
+            let secs = if drying == 0 { 120.0 } else { 3600.0 * (30.0f32 / 3600.0).powf((drying - 1) as f32 / 254.0) };
+            self.wet = (self.wet - dt / secs).max(falling);
+        }
         let heading = self.world.air.1.to_radians();
         let wind = Vec2::new(heading.sin(), -heading.cos()) * speed;
         self.wind += (wind - self.wind) * (1.0 - (-dt / 4.0).exp());
         if here && self.gloom > 0.9 && weather.lightning() && self.chance() < dt / 12.0 {
             self.lightning = 0.15;
             self.lightnings = self.lightnings.wrapping_add(1);
+            self.lightning_seen = (0.0, self.chance());
         }
         if let Some(sound) = weather
             .sound
@@ -2732,11 +2796,12 @@ impl Client {
             options: pack_options(),
             hand: hand.0,
             hand_light: hand.1,
-            canopy: [self.canopy, 0.0, 0.0, 0.0],
+            canopy: [self.canopy, self.wet, 0.0, 0.0],
             // Filled in once the sky has readied them (`render`).
             soft_clouds: [0.0; 4],
             // Filled in once the sky has readied it (`render`).
             frame_look: [0.0; 4],
+            lightning: [self.lightning_seen.0, self.lightning_seen.1, self.thunder(), 0.0],
             prev_view_proj: [[0.0; 4]; 4],
             cloud_moved: [0.0; 4],
             // On the real clock (`shaders::clock`): tests pin the shaders' time, and a fireball's
@@ -3393,6 +3458,11 @@ fn swims_in(c: &crate::content::Content, kind: u32, worn: &[u32]) -> Vec<bool> {
         .collect()
 }
 
+/// Where on a player a rope holds it: its hands over its head, as a share of its height.
+const ROPE_HOLD: f64 = 1.05;
+/// The air's drag a step on a body swinging on a taut rope (0.91 off it).
+const ROPE_DRAG: f64 = 0.995;
+
 fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, gravity: f64, bodies: &[physics::Body]) {
     let c = content();
     // Held facing one way it stays put: in a bed.
@@ -3445,6 +3515,7 @@ fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, 
             && (!on(w::SWIM_LIQUID) || in_swim_liquid)
             && (!on(w::CLIMBING) || p.on_wall)
             && (!on(w::GLIDING) || p.gliding)
+            && (!on(w::ROPE) || p.on_rope)
     };
     let want = match p.forced {
         Some((held, _)) => held,
@@ -3532,7 +3603,7 @@ fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, 
     }
 
     // Gliding: the air carries it, it steers by its look; holding back brakes, sneaking dives.
-    p.gliding = p.glide.speed > 0.0 && !p.on_ground && !p.in_liquid && !p.on_wall && p.riding.is_none();
+    p.gliding = p.glide.speed > 0.0 && !p.on_ground && !p.in_liquid && !p.on_wall && p.riding.is_none() && p.rope.is_none();
     if p.gliding {
         let brake = if fwd_in < 0.0 { 1.0 } else { 0.0 };
         let dive = if sneak { 1.0 } else { 0.0 };
@@ -3575,6 +3646,37 @@ fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, 
         p.jumped = true;
     }
     p.on_wall = w.on_wall;
+    // On a rope: jump pulls it in, sneak lets it out, and the hands stay within it.
+    p.on_rope = false;
+    match p.rope {
+        Some(rope) => {
+            if p.rope_for != Some(rope.anchor) {
+                (p.rope_for, p.rope_len) = (Some(rope.anchor), rope.length);
+            }
+            if jump {
+                p.rope_len = (p.rope_len - rope.reel).max(physics::ROPE_MIN);
+            } else if sneak {
+                p.rope_len = (p.rope_len + rope.reel * 0.7).min(rope.length);
+            }
+            let hold = height * ROPE_HOLD;
+            // Hands on a wall: the rope runs slack behind as it climbs, past the anchor too.
+            if w.on_wall {
+                let reach = (p.pos + DVec3::Y * hold).distance(rope.anchor);
+                p.rope_len = p.rope_len.max(reach).min(rope.length);
+            }
+            let taut =
+                !w.on_wall && physics::rope_hold(c, block, bodies, &mut p.pos, &mut p.vel, hw, height, hold, rope.anchor, p.rope_len);
+            // Swinging on a taut rope keeps its way: little of the air's drag (0.91 a step
+            // across and 0.98 up and down, which stop a pendulum in a swing).
+            if taut && !w.on_ground {
+                p.vel.x *= ROPE_DRAG / 0.91;
+                p.vel.z *= ROPE_DRAG / 0.91;
+                p.vel.y *= ROPE_DRAG / 0.98;
+            }
+            p.on_rope = !w.on_ground && (taut || p.pos.distance(rope.anchor) <= p.rope_len + hold + 0.5);
+        }
+        None => p.rope_for = None,
+    }
     let here = physics::around(c, block, p.pos, height);
     (p.in_liquid, p.climbing) = (here.in_liquid, here.climbing);
     if w.on_ground {

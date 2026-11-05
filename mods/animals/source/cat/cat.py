@@ -86,12 +86,12 @@ EYES.update({
                         halo="none", iris="Gg"),
 })
 EYE_STYLE = os.environ.get("CAT_EYES", "cat_px_lit")
-EYE_Y, EYE_X = 29.5, 5.0  # eye centers on the face: at 6 texels across, 2-texel eyes at its edges, 2 between
+EYE_Y, EYE_X = 29.2, 5.0  # (29.2: on the taller face, in the same rows) eye centers on the face: at 6 texels across, 2-texel eyes at its edges, 2 between
 LID_Z = 24.4  # the eyelids' hinge line, in front of the face (z = 24)
 
 # ------------------------------------------------------------------ the model
 
-SKULL = ((-8, 20.5, 11), (8, 33.5, 24))
+SKULL = ((-8, 19.6, 11), (8, 33.5, 24))  # its bottom flush with the two-texel jaw's (at 20.5 the jaw's back showed a strip under it; linecheck)
 TAIL = [(20, 7.0, 4.2), (42, 7.0, 3.4), (72, 6.0, 2.6), (100, 5.0, 1.8)]  # pitch up (deg), length, width (0.4 a side thinner each: swaying, neighbors never share a plane)
 TAIL0 = np.array([0.0, 18.0, -16.5])  # its top below the hips' top, even lifted running
 
@@ -137,7 +137,7 @@ def eye_box(cx):
 
 def bones():
     B = [("root", None, (0, 0, 0)), ("spine_0", "root", (0, 16, -12)), ("spine_1", "spine_0", (0, 16, -2)),
-         ("neck", "spine_1", (0, 20, 11)), ("head", "neck", (0, 24, 14)), ("jaw", "head", (0, 23.5, 21.5))]
+         ("neck", "spine_1", (0, 20, 11)), ("head", "neck", (0, 24, 14)), ("jaw", "head", (0, 23.5, 24.2))]  # the hinge at the jaw's back, on the face
     for s, n in ((1, "L"), (-1, "R")):
         x0, x1, top, _ = eye_box(s * EYE_X)
         B += [(f"ear_{n}", "head", (s * 5.5, 33, 17)), (f"eyelid_{n}", "head", ((x0 + x1) / 2, top, LID_Z))]
@@ -159,10 +159,15 @@ def elements():
          el("chest", "spine_1", (-6, 11.5, -2.5), (6, 22, 12)),
          el("neck", "neck", (-4, 17, 9), (4, 25, 15)),
          el("skull", "head", *SKULL),
-         el("muzzle", "head", (-3.5, 24, 23.5), (3.5, 28, 27)),
-         el("mouth", "head", (-2.5, 22.5, 21.5), (2.5, 24.5, 24.8)),
-         el("jaw", "jaw", (-3, 21.5, 21), (3, 24, 25.5)),
-         el("nose", "head", (-1.5, 26.5, 27), (1.5, 28, 27.6))]
+         # Two texels narrower than the skull each side (at 3.5 the cheeks beside it were 1.7 texels; linecheck).
+         # Two texels tall and two out from the skull (rule 7, and flush or two clear: at 4 tall it was a
+         # box a texel thick, at 27 a texel proud), as a block-game cat's nose stands out; the nose
+         # painted on its front (rule 4: the box it was, a pad half a texel proud, drew a rim).
+         el("muzzle", "head", (-2.6, 23.6, 22.5), (2.6, 28, 29.9)),
+         el("mouth", "head", (-1.7, 22.6, 24.2), (1.7, 24.0, 29.0)),  # inside the muzzle and jaw: seen when it opens
+         # Two texels tall (rule 7), from inside the head (its side three texels long, two showing) to half a unit short of the muzzle's tip,
+         # a little narrower than it.
+         el("jaw", "jaw", (-2.2, 19.2, 22.2), (2.2, 23.6, 29.4))]
     # Ears: steps narrowing to a point (solid), plus one cut-out panel through the middle for a
     # smooth triangle with a few tufts; turned out a little and leaning out.
     steps = [(33, 35.5, 4), (35.5, 37.5, 3), (37.5, 39.5, 1.8), (39.5, 41, 0.8)]  # y0, y1, half width (a third of the head)
@@ -180,17 +185,30 @@ def elements():
         p = pts[k]
         E.append(el(f"tail_{k}", f"tail_{k}", (p[0] - w / 2, p[1] - w / 2, p[2] - length), (p[0] + w / 2, p[1] + w / 2, p[2] + 0.4),
                     rot=(pitch, 0, 0), origin=tuple(p)))
+    # Legs two texels thick or more (rule 7: at 4 a lower leg was a texel), the paw a white band a
+    # little round it (rule 8), each part's sides (inner, outer: from the middle) half a unit or more
+    # from the next one's and from those it meets in a pose (boxcheck): a turning joint keeps its
+    # sides in their planes.
     for leg in ("FL", "FR", "BL", "BR"):
         s = 1 if leg[1] == "L" else -1
-        x = 4.5 * s
+        side = lambda i, o: sorted((s * i, s * o))  # noqa: E731
         if leg[0] == "F":
             z = 10.25
-            E.append(el(f"leg_{leg}_upper", f"leg_{leg}_upper", (x - 2.5, 8, z - 2.5), (x + 2.5, 15, z + 2.5)))  # wider than the lower leg
+            (x0, x1) = side(2.0, 7.0)
+            E.append(el(f"leg_{leg}_upper", f"leg_{leg}_upper", (x0, 8, z - 2.5), (x1, 15, z + 2.5)))
+            (x0, x1) = side(1.5, 7.5)
+            E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x0, 2.5, z - 3.0), (x1, 8, z + 3.0)))
+            (x0, x1) = side(2.0, 7.0)
+            E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x0, 0, z - 2.5), (x1, 2.5, z + 3.5)))
         else:
             z = -12.5
-            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (x - 3, 7.5, z - 4), (x + 3, 18, z + 4)))  # holds the knee (y = 8)
-        E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x - 2, 2.5, z - 2), (x + 2, 8, z + 2)))
-        E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 3.5, 0, z - 2.5), (x + 3.5, 2.5, z + 3.5)))
+            # Its outer side flush with the hips' (at x + 3 it stood 0.7 texels out beside them; linecheck).
+            (x0, x1) = side(1.5, 6.0)
+            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (x0, 8, z - 4), (x1, 18, z + 4)))  # down to the knee (y = 8), on the lower leg's top
+            (x0, x1) = side(0.95, 6.75)
+            E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x0, 2.5, z - 2.9), (x1, 8, z + 2.9)))
+            (x0, x1) = side(1.95, 7.25)  # off the thigh's and hips' sides, which it meets sitting
+            E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x0, 0, z - 3.4), (x1, 2.5, z + 3.5)))
     return E
 
 
@@ -265,8 +283,10 @@ def area(e, face, p, uu, vv):
             a = np.where(z > 15, WHITE, a)
     elif name in ("muzzle", "jaw"):
         a[:] = WHITE
-    elif name == "nose":
-        a[:] = NOSE
+        if name == "muzzle" and face == "south":  # the nose, painted where its box was (rule 4)
+            a = np.where((np.abs(x) <= 1.55) & (y >= 26.5), NOSE, a)
+        elif name == "muzzle" and face == "up":  # and over the front texel of the top
+            a = np.where((np.abs(x) <= 1.55) & (z >= 27.5), NOSE, a)
     elif name == "mouth":
         a[:] = DARK
     elif name.startswith("ear_core"):
@@ -326,7 +346,7 @@ def layer_props(e, face, p, a):
         white = np.full(y.shape, 0.95)
     elif n.startswith(("leg_", "thigh_")):
         white = 0.45 + 0.4 * low
-    elif n in ("muzzle", "jaw", "nose"):
+    elif n in ("muzzle", "jaw"):
         white = np.full(y.shape, 0.9)
     elif n in ("chest", "hips", "neck"):
         white = 0.75 * low + 0.2 * (face == "down") + 0.1 * (face == "south") * (n == "chest")
@@ -336,7 +356,7 @@ def layer_props(e, face, p, a):
         white = 0.4 * low
     white = np.maximum(white * 0.85, np.where(a == WHITE, 0.9, 0))
     ext = np.zeros(y.shape)
-    if n.startswith(("ear_", "muzzle", "nose", "jaw")) or n.endswith("_paw"):
+    if n.startswith(("ear_", "muzzle", "jaw")) or n.endswith("_paw"):
         ext[:] = 1.0
     elif n == "skull":
         ext[:] = 0.75 if face == "south" else 0.35
@@ -344,7 +364,7 @@ def layer_props(e, face, p, a):
         ext = 0.5 + 0.4 * low
     elif n.startswith("tail_"):
         ext[:] = {"tail_0": 0.3, "tail_1": 0.55, "tail_2": 0.8}.get(n, 1.0)
-    pattern = np.full(y.shape, 0.2 if n in ("muzzle", "jaw", "nose") or n.endswith("_paw") else 1.0)
+    pattern = np.full(y.shape, 0.2 if n in ("muzzle", "jaw") or n.endswith("_paw") else 1.0)
     return {"white": white, "extremity": ext, "pattern": pattern}
 
 
@@ -406,8 +426,10 @@ def paint_face(e, face, boxes):
 # ------------------------------------------------------------------ animation
 
 LEGS = ("FL", "FR", "BL", "BR")
+FEET = [f"leg_{leg}_paw" for leg in LEGS]
 L = {"sit_angle": 45, "sit_hip": -80, "sit_knee": 140, "sit_lean": -6, "sit_drop": 6,
-     "lie_front": 95, "lie_hip": -80, "lie_knee": 150, "lie_drop": 8}
+     "lie_front": 95, "lie_hip": -80, "lie_knee": 150, "lie_drop": 8,
+     "hd_drop": 3, "hd_pitch": 10, "hd_neck": 50, "hd_head": 20, "sleep_neck": 20, "sleep_head": 10}  # head down and asleep: fitted
 
 
 def tail_swing(k, angle, base=(0, 0, 0)):
@@ -548,6 +570,403 @@ BLINKS = {"idle": [1.2], "sit": [1.8], "lie": [1.0, 3.0], "meow": [0.4]}
 BLINK = 0.09
 ANIMS = {"idle": (pose_idle, 3.0), "walk": (pose_walk, 0.9), "run": (pose_run, 0.5), "sit": (pose_sit, 3.0),
          "lie": (pose_lie, 4.0), "meow": (pose_meow, 1.6), "swipe": (pose_swipe, 0.6), "bite": (pose_bite, 0.5)}
+OWN = tuple(ANIMS)  # the cat's own clips, exported as they were (no loop or blend of their own)
+
+# ------------------------------------------------------------------ behaviour clips
+
+# The clips the game asks for by name (`mods/animals/src/anim.rs`, `notes/ANIMALS.md` "Animations"):
+# the canids' module (`../_clips/canid.py`) bound with a cat's scales as the jaguar's is, for what a
+# cat does as a dog does (look, nuzzle, the stalk's and approach's steps, the death fall); the
+# cat's own poses for the rest (the hiss's arch, the pounce, the bow, a hind foot to the ear, the
+# paw licked and the face washed, the pat and hop, asleep curled). The standing ones keep their
+# paws planted (`plant`: two bones a leg), so the body can arch, bow or crouch over them.
+sys.path.insert(0, os.path.join(HERE, "..", "_clips"))
+import canid  # noqa: E402
+
+canid.bind(sys.modules[__name__], scratch=0.4, neck=0.7, bend=0.7, lift=0.7, wag=0.6, twist=0, neck_max=85)
+RIG = [{"name": n, "parent": p, "pivot": [float(v) for v in pv]} for n, p, pv in bones()]
+PIV = {b["name"]: np.array(b["pivot"], float) for b in RIG}
+PARENT = {b["name"]: b["parent"] for b in RIG}
+
+
+def world_of(q):
+    from ground import world
+    return world(RIG, q)
+
+
+def point(W, bone, p):
+    """Where model point `p` (at rest, on `bone`) is in pose W (`world_of`)."""
+    R, t = W[bone]
+    return R @ (np.asarray(p, float) - PIV[bone]) + t
+
+
+def reach(q, leg, target, paw=0.0, W=None):
+    """Sets `leg`'s upper, lower and paw (about x) so its paw's pivot is at `target` (world) and the
+    paw at `paw` degrees in the world (0: flat on the ground), the joint bent the leg's way (a
+    foreleg's back, a hind leg's forward); a target out of reach is reached toward. Two bones in
+    the plane of the leg's parent; the upper's own y and z kept."""
+    up, lo, pw = (f"leg_{leg}_{k}" for k in ("upper", "lower", "paw"))
+    par = PARENT[up]
+    R, t = (W or world_of(q))[par]
+    d = R.T @ (np.asarray(target, float) - point({par: (R, t)}, par, PIV[up]))
+    l1, l2 = PIV[up][1] - PIV[lo][1], PIV[lo][1] - PIV[pw][1]
+    dz, dy = d[2], d[1]
+    r = max(math.hypot(dz, dy), 1e-6)
+    rr = min(max(r, abs(l1 - l2) + 1e-3), l1 + l2 - 1e-6)
+    al = math.acos((l1 * l1 + rr * rr - l2 * l2) / (2 * l1 * rr))
+    a1 = math.atan2(-dz, -dy) + (al if leg[0] == "F" else -al)  # a leg at x = a points (0, -cos a, -sin a)
+    kz, ky = -l1 * math.sin(a1), -l1 * math.cos(a1)
+    a12 = math.atan2(-(dz * rr / r - kz), -(dy * rr / r - ky))
+    phi = math.atan2(R[2][1], R[1][1])  # the parent's pitch
+    _, uy, uz = q.get(up, (0, 0, 0))
+    q.update({up: (math.degrees(a1), uy, uz), lo: (math.degrees(a12 - a1), 0, 0), pw: (paw - math.degrees(phi + a12), 0, 0)})
+    # Folded deep, the paw comes up beside the upper leg in its side planes (they flicker): it turns
+    # its toes out a little, as a crouching cat's do, still flat.
+    fold = min(1.0, max(0.0, (abs(math.degrees(a12 - a1)) - 40) / 40))
+    if fold > 0 and not uy and not uz:
+        from ground import rot
+        Rl = R @ rot(math.degrees(a1), 0, 0) @ rot(math.degrees(a12 - a1), 0, 0)
+        M = Rl.T @ rot(0, (6 if leg[1] == "L" else -6) * fold, 0) @ rot(paw, 0, 0)
+        q[pw] = (math.degrees(math.atan2(M[2][1], M[2][2])), math.degrees(math.asin(-M[2][0])), math.degrees(math.atan2(M[1][0], M[0][0])))
+    return q
+
+
+LEG_BOXES = {leg: [e for e in elements() if e["bone"] in (f"leg_{leg}_upper", f"leg_{leg}_lower")] for leg in LEGS}
+
+
+def plant(q, legs=LEGS, at=None, tilt=None):
+    """The paws of `legs` flat on the ground where they stand at rest, or moved by at[leg] = (dz, dy)
+    and tipped by tilt[leg] degrees; a leg folded so low that its knee or shin would go into the
+    ground lifts its paw instead."""
+    from ground import corners
+    W = world_of(q)
+    for leg in legs:
+        dz, dy = (at or {}).get(leg, (0, 0))
+        for _ in range(4):
+            reach(q, leg, PIV[f"leg_{leg}_paw"] + np.array([0, dy, dz]), paw=(tilt or {}).get(leg, 0.0), W=W)
+            Wl = world_of(q)
+            low = min(float(((corners(e) - PIV[e["bone"]]) @ Wl[e["bone"]][0].T + Wl[e["bone"]][1])[:, 1].min()) for e in LEG_BOXES[leg])
+            if low >= 0.0:
+                break
+            dy += 0.02 - low
+    return q
+
+
+def still(t, dur, breaths=1):
+    """Standing still and breathing, nothing else, looping in `dur`: what a clip builds on."""
+    p = t / dur
+    br = S(TAU * p * breaths)
+    q = {"root": (0, 0.1 * br, 0), "spine_1": (0.5 * br, 0, 0)}
+    q.update(tail_sway(p, 1, 2))
+    return q
+
+
+def tail_line(pitches, sway=0.0):
+    """The tail's segments at these pitches up from level (the body's frame); `sway` degrees side to
+    side, growing to the tip."""
+    out, before = {}, 0.0
+    for k in range(len(TAIL)):
+        r = pitches[k] - TAIL[k][0]
+        out[f"tail_{k}"] = tail_swing(k, sway * (k / 3), (r - before, 0, 0))
+        before = r
+    return out
+
+
+def mix(a, b, k):
+    """Pose `a` turned `k` of the way to pose `b`."""
+    out = {}
+    for n in set(a) | set(b):
+        va, vb = np.array(a.get(n, (0, 0, 0)), float), np.array(b.get(n, (0, 0, 0)), float)
+        out[n] = tuple(va + (vb - va) * k)
+    return out
+
+
+def ears(x, out=0.0):
+    """Both ears tipped forward by `x` (back, negative) and flattened out sideways by `out`."""
+    return {"ear_L": (x, 0, -out), "ear_R": (x, 0, out)}
+
+
+def ease(p, ps, vs):
+    return float(np.interp(p, ps, vs))
+
+
+REST_TAIL = [k[0] for k in TAIL]
+LOW_TAIL = [-4, -8, -6, 6]  # held low and straight back, the tip curled up a little
+UP_TAIL = [48, 80, 100, 120]  # carried up, the tip hooked over: a friendly, curious cat
+# The neck and head turn within what the cat's boxes take (`ground.pokes`: a corner of the neck
+# coming out of the chest's or skull's face at a slant): the neck pitched -25 to 20, turned 15 (25
+# with the head up, pitched -15 or more), rolled 10; the head on it pitched -10 to 15, turned 5, rolled
+# 10. Looking further, it turns its ears; reaching down, it tips its body.
+
+
+def head_down(d=1.0, P=None):
+    """Head down to the ground by `d` (1: the nose just over it, fitted in `fit_clips`): the body
+    lowered and tipped forward over bent forelegs (`plant` bends them), the neck and head down."""
+    P = L if P is None else P
+    return {"root": (0, -P["hd_drop"] * d, 0), "spine_0": (P["hd_pitch"] * d, 0, 0), "neck": (P["hd_neck"] * d, 0, 0),
+            "head": (P["hd_head"] * d, 0, 0)}
+
+
+def pose_stare(t):
+    """Half aware of something: frozen, the head up and pointed at it, ears pricked forward, the tail
+    low and still but for its tip; only the breath moves (2 s, held)."""
+    q = still(t, 2.0)
+    q.update({"neck": (-10, 0, 0), "head": (-4, 0, 0), **ears(8)})
+    q.update(tail_line(LOW_TAIL))
+    q["tail_3"] = tail_swing(3, 14 * S(TAU * t / 2.0), q["tail_3"])
+    return plant(q)
+
+
+def pose_watch(t):
+    """On watch: the head high, turning slowly to look round one way and the other, the ears with
+    it, the tail low (4 s, held)."""
+    p = t / 4.0
+    yaw = ease(p, [0, .15, .4, .55, .8, 1], [0, 38, 38, -38, -38, 0])
+    q = still(t, 4.0, 2)
+    q.update({"neck": (-20, 0.62 * yaw, 0), "head": (-6, 0.1 * yaw, 0), "ear_L": (6, 0.5 * yaw, 0), "ear_R": (6, 0.5 * yaw, 0)})
+    q.update(tail_line(LOW_TAIL, 6 * S(TAU * p * 2)))
+    return plant(q)
+
+
+def pose_drink(t):
+    """Crouched at the water, the head down, lapping (1 s, held)."""
+    p = t / 1.0
+    q = still(t, 1.0)
+    q.update(head_down())
+    q["head"] = (q["head"][0] + 2 * S(TAU * p * 3), 0, 0)
+    q["jaw"] = (8 * max(0.0, S(TAU * p * 3)), 0, 0)
+    q.update(ears(-6))
+    q.update(tail_line(LOW_TAIL, 4 * S(TAU * p)))
+    return plant(q)
+
+
+def pose_sniff(t):
+    """Nose to the ground, sniffing along a little, and up again (2.5 s, once)."""
+    p = t / 2.5
+    d = ease(p, [0, .2, .8, 1], [0, 1, 1, 0])
+    q = still(t, 2.5)
+    q.update(head_down(d=d))
+    q["neck"] = (q["neck"][0], 8 * d * S(TAU * p), 0)
+    q["head"] = (q["head"][0], 3 * d * S(TAU * p), 0)
+    q.update({"jaw": (2 * d * max(0.0, S(TAU * p * 8)), 0, 0), **ears(8 * d)})
+    return plant(q)
+
+
+def pose_look(t):
+    """Looking round: the head up and turning one way, holding, the other way, back, the ears
+    turned further (the canids' look, its turns within the cat's neck; 3 s, once)."""
+    p = t / 3.0
+    yaw = ease(p, [0, .15, .4, .55, .8, 1], [0, 40, 40, -40, -40, 0])
+    up = ease(p, [0, .1, .9, 1], [0, 1, 1, 0])
+    q = still(t, 3.0)
+    q.update({"neck": (-18 * up, 0.6 * yaw, 0), "head": (-3 * up, 0.1 * yaw, 0), "ear_L": (4, 0.6 * yaw, 0), "ear_R": (4, 0.6 * yaw, 0)})
+    return plant(q)
+
+
+def pose_nuzzle(t):
+    """Nuzzling a young one: the body tipped forward and down, the head low, a gentle push and a
+    lick, the tail swaying soft (the canids' nuzzle, low by the body rather than the neck; 2 s, once)."""
+    p = t / 2.0
+    d = ease(p, [0, .2, .85, 1], [0, 1, 1, 0])
+    push = max(0.0, S(TAU * p * 2))
+    q = still(t, 2.0)
+    q.update({"root": (0, -1.5 * d, 0), "spine_0": (8 * d, 0, 0), "neck": (14 * d, 0, 0), "head": (8 * d - 8 * push * d, 0, 0),
+              "jaw": (6 * d * push, 0, 0), **ears(10 * d)})
+    q.update(tail_sway(p, 3, 6))
+    q["tail_0"] = tail_swing(0, 0)
+    return plant(q)
+
+
+def pose_alarm(t):
+    """The hiss: the back arched high over stiff legs, the head low, ears flat out, the mouth open
+    hissing twice, the tail straight up (1.2 s, once)."""
+    p = t / 1.2
+    up = ease(p, [0, .15, .8, 1], [0, 1, 1, 0])
+    hiss = ease(p, [0, .15, .25, .45, .55, .75, 1], [0, 0, 1, .7, 1, .3, 0])
+    q = still(t, 1.2)
+    q.update({"root": (0, -0.3 * up, 0), "spine_0": (-22 * up, 0, 0), "spine_1": (40 * up, 0, 0), "neck": (-8 * up, 0, 0),
+              "head": (-10 * up, 0, 0), "jaw": (24 * hiss, 0, 0), **ears(-24 * up, 34 * up)})
+    q.update(tail_line([r + (w - r) * up for r, w in zip(REST_TAIL, [48, 78, 92, 98])], 3 * S(TAU * p * 3) * up))
+    return plant(q)
+
+
+def pose_flinch(t):
+    """Hit: a jerk down and away, the head ducking, ears flat, eyes squeezed, the tail tucked, and
+    back (0.45 s, once)."""
+    p = t / 0.45
+    d = ease(p, [0, .15, .45, 1], [0, 1, .8, 0])
+    q = still(t, 0.45)
+    q.update({"root": (0, -1.6 * d, 0), "spine_1": (4 * d, 0, 0), "neck": (14 * d, 0, 0), "head": (10 * d, 0, 0),
+              **ears(-20 * d, 30 * d), "eyelid_L": (-80 * d, 0, 0), "eyelid_R": (-80 * d, 0, 0)})
+    q.update(tail_line([r + (w - r) * d for r, w in zip(REST_TAIL, [-20, -30, -20, 0])]))
+    return plant(q)
+
+
+def pose_stalk(t):
+    """Stalking (the canids' crouched creep, 1.6 s a cycle, in place of the walk): the tail low and
+    straight back, its tip twitching; set on its feet by the build (`ground.grounded`)."""
+    q = canid.pose_stalk(t * 1.2 / 1.6)
+    q.update(ears(6))
+    q.update(tail_line(LOW_TAIL))
+    q["tail_3"] = tail_swing(3, 16 * S(TAU * t / 1.6 * 2), q["tail_3"])
+    return q
+
+
+def pose_approach(t):
+    """Curious, coming to look (the canids' head-low walk, 1.4 s a cycle, in place of the walk): the
+    tail carried up with its tip hooked over, swaying a little."""
+    q = canid.pose_approach(t)
+    q.update(ears(8))
+    q.update(tail_line(UP_TAIL, 6 * S(TAU * t / 1.4)))
+    return q
+
+
+def pose_death(t):
+    """Dying (the canids' fall onto the side, 1.2 s, holds); each frame set on its lowest point by
+    the build."""
+    return canid.pose_death(t, dict(L, death_drop=0))
+
+
+def pose_stretch(t):
+    """The bow on getting up: the forelegs slid out along the ground, the chest down, the rump up,
+    a yawn; then one hind leg stretched out behind (2.5 s, once)."""
+    p = t / 2.5
+    bow = ease(p, [0, .15, .45, .55, 1], [0, 1, 1, 0, 0])
+    back = ease(p, [0, .5, .62, .85, 1], [0, 0, 1, 1, 0])
+    yawn = ease(p, [0, .15, .22, .38, .45, 1], [0, 0, 1, 1, 0, 0])
+    q = still(t, 2.5)
+    q.update({"root": (0, -1.5 * back, 0), "spine_0": (20 * bow + 4 * back, 0, 0), "neck": (-24 * bow - 6 * back, 0, 0),
+              "head": (-8 * bow, 0, 0), "jaw": (26 * yawn, 0, 0), **ears(-10 * bow, 14 * yawn),
+              "eyelid_L": (-90 * yawn, 0, 0), "eyelid_R": (-90 * yawn, 0, 0)})
+    q.update(tail_line([r + (w - r) * bow for r, w in zip(REST_TAIL, UP_TAIL)], 8 * S(TAU * p * 2) * bow))
+    return plant(q, at={"FL": (10.5 * bow, 0), "FR": (10.5 * bow, 0), "BL": (-5.5 * back, 0)})
+
+
+def pose_pounce(t):
+    """The pounce, a leap: crouched low, the hind paws treading, the tail tip twitching; then a
+    spring up and forward, forelegs reaching, claws out, mouth open, hind legs stretched out behind;
+    a landing on the forepaws first, and up (1 s, once). It leaves the ground from 0.55 to 0.78 s;
+    the game moves it forward."""
+    p = t / 1.0
+    crouch = ease(p, [0, .2, .45, .52, .58, .78, .86, 1], [0, 1, 1, .3, 0, 0, .6, 0])
+    air = ease(p, [0, .5, .58, .74, .8, 1], [0, 0, 1, 1, 0, 0])
+    rise = ease(p, [0, .5, .56, .66, .76, .8, 1], [0, 0, 1.5, 4.5, 1.5, 0, 0])
+    q = still(t, 1.0)
+    q.update({"root": (0, -4.0 * crouch, 0), "spine_0": (-10 * air + 6 * ease(p, [0, .76, .82, .9, 1], [0, 0, 1, 0, 0]), 0, 0),
+              "neck": (10 * crouch - 4 * air, 0, 0), "head": (-10 * crouch, 0, 0), "jaw": (24 * air, 0, 0),
+              **ears(8 * crouch - 16 * air)})
+    q.update(tail_line([r + (w - r) * max(crouch, air) for r, w in zip(REST_TAIL, LOW_TAIL)]))
+    q["tail_3"] = tail_swing(3, 20 * S(TAU * p * 6) * crouch, q["tail_3"])
+    env = ease(p, [0, .2, .42, .46, 1], [0, 1, 1, 0, 0])
+    plant(q, at={"BL": (0, 0.8 * max(0.0, S(TAU * p * 8)) * env), "BR": (0, 0.8 * max(0.0, -S(TAU * p * 8)) * env)})
+    if air > 0:
+        fly = {}
+        for leg in ("FL", "FR"):
+            fly.update({f"leg_{leg}_upper": (-70, 0, 0), f"leg_{leg}_lower": (18, 0, 0), f"leg_{leg}_paw": (-30, 0, 0)})
+        for leg in ("BL", "BR"):
+            fly.update({f"leg_{leg}_upper": (55, 0, 0), f"leg_{leg}_lower": (20, 0, 0), f"leg_{leg}_paw": (25, 0, 0)})
+        q.update({k: tuple(np.array(q[k]) + (np.array(v) - np.array(q[k])) * air) for k, v in fly.items()})
+    q["root"] = (0, q["root"][1] + rise, 0)
+    return q
+
+
+def pose_play(t):
+    """Play: crouched at the front, a forepaw patting the ground twice, then a hop up at the front
+    and down; the tail up and swishing (1.6 s, once). The hind paws stay down."""
+    p = t / 1.6
+    low = ease(p, [0, .1, .72, .8, .92, 1], [0, 1, 1, 0, 0, 0])
+    pat = sum(max(0.0, S(math.pi * (p - a) / .3)) for a in (.1, .4) if a < p < a + .3)
+    hop = S(math.pi * (p - .74) / .22) if .74 < p < .96 else 0.0
+    q = still(t, 1.6)
+    q.update({"root": (0, -1.2 * low, 0), "spine_0": (8 * low - 16 * hop, 0, 0), "neck": (-8 * low + 6 * hop, 0, 8 * low),
+              "head": (-4 * low, 0, 10 * low), "jaw": (6 * hop, 0, 0), **ears(10 * low)})
+    q.update(tail_line([r + (w - r) * max(low, hop) for r, w in zip(REST_TAIL, UP_TAIL)], 10 * S(TAU * p * 3)))
+    return plant(q, at={"FL": (2.0 * hop, 4.0 * hop), "FR": (3.0 * low + 2.0 * hop, 5.0 * pat + 4.0 * hop)},
+                 tilt={"FL": -20 * hop, "FR": -40 * pat - 20 * hop})
+
+
+GROOM_LICK = (0.5, 21.0, 27.0)  # on the head at rest: just under the front of the jaw
+GROOM_WASH = [(4.5, 29.0, 25.5), (3.5, 23.5, 27.5)]  # over the left eye, then down to the muzzle
+
+
+def pose_groom(t):
+    """Grooming: a forepaw raised to the mouth and licked, the head bobbing over it, then the face
+    washed: the head turned into the paw and rubbed down over it, from the eye to the muzzle, twice
+    (the paw reaches toward the face as far as the leg goes; 2.5 s, once)."""
+    p = t / 2.5
+    d = ease(p, [0, .12, .88, 1], [0, 1, 1, 0])
+    wash = ease(p, [0, .46, .54, 1], [0, 0, 1, 1])
+    stroke = 0.5 - 0.5 * math.cos(TAU * max(0.0, p - .54) / .17) if .54 < p < .88 else 0.0
+    lick = max(0.0, S(TAU * p * 6)) * (1 - wash) * d
+    q = still(t, 2.5)
+    rub = (2 * stroke - 1) * wash  # the head's rub over the paw: up, then down
+    q.update({"root": (0, -1.5 * d, 0), "spine_0": (6 * d, 0, 0), "neck": ((12 + 3 * lick) * d, 10 * wash, 0),
+              "head": ((10 + 4 * lick) * d - 6 * rub, 4 * wash, 9 * wash), "jaw": (14 * lick, 0, 0), **ears(-6 * d - 10 * wash)})
+    W = world_of(q)
+    plant(q, legs=("FR", "BL", "BR"))
+    a, b = (np.array(v) for v in GROOM_WASH)
+    on_head = np.array(GROOM_LICK) * (1 - wash) + (a + (b - a) * stroke) * wash
+    target = point(W, "head", on_head) + np.array([0, 2.5, -2.0])  # the paw's pivot is its top back, the pad under it
+    rest = PIV["leg_FL_paw"]
+    reach(q, "FL", rest + (target - rest) * d, paw=-70 * d - 20 * wash * d, W=W)
+    up, ly, lz = q["leg_FL_upper"]
+    q["leg_FL_upper"] = (up, ly, lz - 10 * d)
+    return q
+
+
+SIT_TAIL = [28, 30, 40, 70]  # sitting, the tail laid back along the ground, its tip up (the body tipped up 25 degrees)
+
+
+def pose_scratch(t):
+    """Scratching: it sits, a hind foot comes up and forward toward the ear and scratches fast, the
+    head turned and tipped over to it, eyes half shut, and it stands (2 s, once). At the cat's build
+    (a big head, short legs) the foot reaches up by the shoulder, as high as a sitting cat's leg
+    goes: an optimizer over the neck, head and leg found the ear 13 units out of its reach, and
+    nearer only with the head thrown back. Each frame set on its feet by the build."""
+    p = t / 2.0
+    s = ease(p, [0, .2, .85, 1], [0, 1, 1, 0])
+    lift = ease(p, [0, .22, .3, .75, .83, 1], [0, 0, 1, 1, 0, 0])
+    sc = S(TAU * p * 10) * lift
+    q = mix(still(t, 2.0), {k: v for k, v in pose_sit(0.0).items() if not k.startswith("tail_")}, s)
+    q.update(tail_line([r + (w - r) * s for r, w in zip(REST_TAIL, SIT_TAIL)]))
+    for b, add in (("neck", (-10, -14, -6)), ("head", (2, -4, -9)), ("leg_BR_upper", (-57 + 6 * sc, -10, -28)),
+                   ("ear_R", (-10, 0, 20)), ("ear_L", (0, 0, -6))):
+        q[b] = tuple(np.array(q.get(b, (0, 0, 0))) + np.array(add) * lift)
+    q["leg_BR_lower"] = (q["leg_BR_lower"][0] + (11 + 14 * sc - q["leg_BR_lower"][0]) * lift, 0, 0)
+    q["leg_BR_paw"] = (q["leg_BR_paw"][0] + (-30 - q["leg_BR_paw"][0]) * lift, 0, 0)
+    q["jaw"] = (4 * lift, 0, 0)
+    q.update({"eyelid_L": (-60 * lift, 0, 0), "eyelid_R": (-60 * lift, 0, 0)})  # eyes half shut: it feels good
+    return plant(q, legs=("FL", "FR"), at={"FL": (-1.1 * s, 0), "FR": (-1.1 * s, 0)})
+
+
+def pose_sleep(t, P=None):
+    """Asleep, curled in the lying pose: the head turned round and laid down by the tail on its
+    right side, eyes shut, ears relaxed, a slow breath; the tail's tip twitching now and then
+    (6 s, held). The head's tilt fitted to rest on the ground (`fit_poses`)."""
+    P = L if P is None else P
+    q = pose_lie(t * 4.0 / 6.0, P)
+    br = S(TAU * t / 6.0 * 2)
+    q.update({"root": (0, -P["lie_drop"] + 0.12 * br, 0), "spine_1": (0.8 * br, 0, 0), "neck": (P["sleep_neck"], -8, 0),
+              "head": (P["sleep_head"], -4, -8), "ear_L": (-8, 0, -12), "ear_R": (-8, 0, 12),
+              "eyelid_L": (-90, 0, 0), "eyelid_R": (-90, 0, 0)})
+    return q
+
+
+CLIPS = {"stare": (pose_stare, 2.0), "watch": (pose_watch, 4.0), "drink": (pose_drink, 1.0), "sleep": (pose_sleep, 6.0),
+         "stalk": (pose_stalk, 1.6), "approach": (pose_approach, 1.4), "alarm": (pose_alarm, 1.2), "pounce": (pose_pounce, 1.0),
+         "sniff": (pose_sniff, 2.5), "look": (pose_look, 3.0), "scratch": (pose_scratch, 2.0), "stretch": (pose_stretch, 2.5),
+         "play": (pose_play, 1.6), "groom": (pose_groom, 2.5), "nuzzle": (pose_nuzzle, 2.0), "flinch": (pose_flinch, 0.45),
+         "death": (pose_death, 1.2)}
+ANIMS.update(CLIPS)
+# The held ones and the gaits loop; a clip played once must not (the engine loops a clip whose file
+# says so, whatever the game asks); the death holds its last frame.
+LOOPS = {"stare": True, "watch": True, "drink": True, "sleep": True, "stalk": True, "approach": True, "death": "hold_on_last_frame"}
+BLENDS = {**canid.BLENDS, "watch": (0.4, 0.4), "pounce": (0.1, 0.2)}
+BLINKS.update({"stare": [1.4], "watch": [1.1, 3.3], "look": [1.5], "drink": [0.5], "sniff": [2.2], "nuzzle": [1.0], "approach": [0.9],
+               "play": [1.3]})
+SHUT = ("sleep", "death", "flinch", "scratch", "stretch")  # their own lids: shut, squeezed, half shut, a yawn's
+FRAMES = {"watch": 40, "sleep": 36, "stalk": 32, "approach": 28, "flinch": 12, "scratch": 60, "groom": 50, "play": 32, "stretch": 30,
+          "pounce": 30}
 
 
 def eyelids(name, t):
@@ -556,7 +975,10 @@ def eyelids(name, t):
 
 
 def frame_times(name, dur):
-    n = 24 if name in ("meow", "swipe", "bite") else (12 if dur < 1 else 16)
+    if name in OWN:
+        n = 24 if name in ("meow", "swipe", "bite") else (12 if dur < 1 else 16)
+    else:
+        n = FRAMES.get(name, 24)
     ts = {round(dur * k / n, 4) for k in range(n + 1)}
     for b in BLINKS.get(name, []):
         ts |= {round(b + d, 4) for d in (-BLINK, -BLINK / 2, 0, BLINK / 2, BLINK)}
@@ -567,13 +989,30 @@ def animations(bone_names):
     out = {}
     for name, (fn, dur) in ANIMS.items():
         frames = []
+        loops = LOOPS.get(name, False)
         for t in frame_times(name, dur):
-            tt = t % dur if t < dur else 0.0
+            if name in OWN:
+                tt = t % dur if t < dur else 0.0
+            else:  # a loop's last frame is its first; a clip played once ends where it ends
+                tt = t % dur if t < dur else (0.0 if loops is True else dur)
             pose = fn(tt)
-            pose.update(eyelids(name, tt))
+            if name not in SHUT:
+                pose.update(eyelids(name, tt))
             frames.append({"t": round(t, 4), "rot": {b: [round(float(v), 4) for v in pose.get(b, (0, 0, 0))] for b in bone_names if b != "root"},
                            "root": [round(float(v), 4) for v in pose.get("root", (0, 0, 0))]})
         out[name] = {"length": dur, "frames": frames}
+        if name not in OWN:
+            out[name].update(loop=loops, blend=BLENDS.get(name, (0.25, 0.3)))
+    # A clip goes over what plays below only on the bones it writes, and the exporter leaves out a bone
+    # that stays at 0: kept at a hundredth of a degree, so the idle's (or lying's) head turn, ears and
+    # tail don't show through a clip that holds them still. The eyelids are left to the idle's blinks.
+    for name in CLIPS:
+        below = ("idle", "lie") if name == "sleep" else ("idle",)
+        moved = {b for a in below for f in out[a]["frames"] for b, r in f["rot"].items() if any(abs(v) > 1e-6 for v in r)}
+        for b in moved - {"eyelid_L", "eyelid_R"}:
+            if all(not any(abs(v) > 1e-6 for v in f["rot"][b]) for f in out[name]["frames"]):
+                for f in out[name]["frames"]:
+                    f["rot"][b] = [0.01, 0.0, 0.0]
     return out
 
 
@@ -650,6 +1089,31 @@ def fit_poses(spec):
     L.update(best, lie_drop=round(min(low(pose_lie, P).values()), 2))
     L["sit_tail"], L["sit_tail_err"] = fit_tail(spec, pose_sit, "sit", L)
     L["lie_tail"], L["lie_tail_err"] = fit_tail(spec, pose_lie, "lie", L)
+    fit_clips(spec)
+
+
+def fit_clips(spec):
+    """The behaviour clips' reaches to the ground. Head down (sniffing, drinking): the nose half a
+    unit over the ground, the body lowered and tipped onto bent forelegs (a cat drinks crouched),
+    the neck and head bent within what the boxes take (`UP_TAIL`'s note). Asleep: the head laid down
+    toward the tail, as low as the neck goes."""
+    nose = {"nose": lambda n: n in ("muzzle", "jaw", "skull"), **{f: (lambda f: lambda n: n == f)(f) for f in FEET}}
+
+    def hd_cost(P):
+        g = lowest(spec, plant(head_down(P=dict(L, **P))), nose)  # a paw lifted: a foreleg folded too low
+        return (g["nose"] - 0.8) ** 2 + 20 * max(g[f] for f in FEET) ** 2 + 0.0002 * (P["hd_neck"] ** 2 + P["hd_head"] ** 2) + 0.0005 * P["hd_pitch"] ** 2 + 0.01 * P["hd_drop"] ** 2
+    best = fit({"hd_drop": [2, 3, 4, 5, 6, 7], "hd_pitch": [10, 15, 20, 25, 30, 35], "hd_neck": [0, 5, 10, 15], "hd_head": [0, 5, 10, 15]},
+               hd_cost)[1]
+    L.update(best)
+    print("head down, nose over the ground:", round(float(lowest(spec, plant(head_down()), nose)["nose"]), 2), best)
+    head = {"head": lambda n: n in ("skull", "muzzle", "jaw") or n.startswith("ear_core")}
+
+    def sleep_cost(P):
+        g = lowest(spec, pose_sleep(0.0, dict(L, **P)), head)
+        return (g["head"] - 0.2) ** 2 + 0.0005 * (P["sleep_neck"] ** 2 + P["sleep_head"] ** 2)
+    best = fit({"sleep_neck": list(range(-10, 16, 5)), "sleep_head": list(range(-10, 16, 5))}, sleep_cost)[1]
+    L.update(best)
+    print("asleep, the head over the ground:", round(float(lowest(spec, pose_sleep(0.0), head)["head"]), 2), best)
 
 
 # ------------------------------------------------------------------ build
@@ -676,6 +1140,11 @@ def build():
             "bones": [{"name": n, "parent": p, "pivot": [float(v) for v in pv]} for n, p, pv in B], "elements": E}
     fit_poses(spec)
     spec["animations"] = animations([n for n, _, _ in B])
+    # Set on the ground frame by frame: the gaits written as angles and the scratch's sitting down on
+    # their feet; the death on its lowest point, as its legs swing out below where it ends up lying.
+    from ground import grounded
+    for clip, on in (("stalk", FEET), ("approach", FEET), ("scratch", FEET), ("death", [e["name"] for e in E])):
+        spec["animations"][clip] = grounded(spec, spec["animations"][clip], on)
     spec["fitted"] = {k: v for k, v in L.items()}
     return spec, sheet
 

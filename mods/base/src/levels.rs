@@ -84,8 +84,12 @@ pub fn register(r: &mut Registry) {
     // Gives XP (for testing), or tells it.
     r.command("xp", "[amount:int]", |cmd| {
         let w = cmd.world();
-        if let Some(n) = cmd.int("amount") {
-            give_xp(&w, cmd.player(), n.max(0) as u64);
+        // Straight in, in any game mode: `give_xp` gives nothing outside survival (right for play),
+        // which left test scripts in spectator at level 1 with no perk points (Ley lines' look, 11-05).
+        if let Some(n) = cmd.int("amount")
+            && let Some(v) = w.component_mut(cmd.player(), &VITALS)
+        {
+            v.xp += n.max(0) as u64;
         }
         let Some(v) = w.component(cmd.player(), &VITALS) else { return };
         let (level, into) = levels::level_of(v.xp);

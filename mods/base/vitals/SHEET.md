@@ -162,6 +162,8 @@ What takes days in real life takes its time on the growing pace (`vitals::crafts
 | tanning_frame | #hides | - | base:leather | 3 | 2.8 min | 1 |
 | tanning_pit | #hides | #bark_tannin | base:sole_leather | 365 | 4.0 game days | 8 |
 | charcoal_clamp | #logs | - | base:coal | 7 | 5.0 min | 16 |
+| crucible | #ingots/copper | #ingots/tin | base:bronze_ingot | 0.25 | 0.5 min | 4 |
+| forge | #ingots/iron | #gems/coal | base:steel_ingot | 0.5 | 0.8 min | 4 |
 
 ## Felling
 
@@ -219,6 +221,10 @@ Any wall, pushing into it in the air: 1.5 blocks a second at grip 1, 6 stamina a
 | `base:glider` | 8 | 1.8 | 4.4 | 178 | 244 | 111 | 607 |
 
 The wind carries a glider at 0.75 of the surface wind. Rising air: thermals up to 1.6 blocks a second at 14:00 over bare ground (half over grass) in 0.3 of 40-block cells, none in rain; wind up a slope lifts by its rise over 8 blocks downwind, x0.8; at most 3 together.
+
+| grappling hook | reach | pulled in | let out | throws | stamina on the rope |
+|---|---|---|---|---|---|
+| `base:grappling_hook` | 22 | 3 a second | 2.1 a second | 236 | climbing's: 6 a second pulling, 2.1 hanging |
 
 ## Climates
 

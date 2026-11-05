@@ -1,9 +1,6 @@
----
-name: block-textures
-description: Block textures for the game (cubes, logs, leaves, plants, crops, saplings, bushes, workstation faces) at 32 px in one hand-painted pixel style, generated with Codex from Ronald's block master prompt, cut into game tiles, checked on a preview sheet and in a test world, and put into the mods. Use when Ronald asks for new or redone block textures, a new tree, plant, crop or bush and its stages, "the block prompt", a block that looks off next to the others, or wants to see how blocks look in the game.
----
+# The full block set: 32 px, Ronald's master prompt
 
-# Block textures: 32 px, Ronald's master prompt
+Folded in from the old `block-textures` skill (Ronald, 11-05: "put it into the one skill"). Use this for the game's whole 32 px block set, a new tree, plant, crop or bush and its stages, "the block prompt", a block that looks off next to the others, or seeing blocks in the game. A single block face can also go through `art.py block` (SKILL.md).
 
 Everything lives in `notes/blocks/`: `style.txt` (the master prompt), `blocks.py` (generate, cut,
 preview, install), `batches/*.tsv` (what to make), `approved.txt` (the style key), `tiles/` (the
@@ -17,10 +14,13 @@ deep shade of the block's own colour (never black), restrained highlights, top-l
 
 ## Rules
 
-- **Never attach other games' or resource packs' art** to a generation, and keep "Minecraft"
-  out of the prompt. Ronald's guide comes with reference sheets cut from a resource pack
-  (Dokucraft Light); they are not attached. The style key is our own approved tiles
-  (`approved.txt`, built into a sheet on every run) plus `notes/texture-test/palette.png`.
+- **Our key first, the guide's sheet after it, made ours** (Ronald's guides 2, 11-05, replacing
+  "never attach other packs' art"). The style key is our own approved tiles (`approved.txt`, built
+  into a sheet on every run) plus `notes/texture-test/palette.png`; the guide's reference sheet for
+  the type (`Block Prompt References/`, cut from a resource pack, never committed) comes after it,
+  with the family's "Make it yours" line, so the model copies no design. `art.py block` and
+  `blocks.py` batches both do this (`blocks.py`'s `SHEETS`: up to two sheets for an image's kinds;
+  `BLOCK_NO_REF=1` for the old way). Keep "Minecraft" out of the prompt.
 - **Every request gets the style key**, and every result is looked at before it is cut: the
   image model sometimes stops following the prompt.
 - **One resolution**: every block texture is 32 px. Don't mix in 16 or 64 px textures.

@@ -139,7 +139,9 @@ L = {
     "leg_top": 14, "knee": 8, "ankle": 3,
     # Sit and lie, fit with tools/ground.py so the paws and body rest on the ground.
     "sit_angle": 19, "sit_hip": -70, "sit_knee": 144, "sit_drop": 7.5, "sit_back": 0,
-    "lie_front": -74, "lie_hip": -86, "lie_knee": 160, "lie_drop": 8.4, "lie_neck": 70, "lie_head": -58,
+    # lie_hip -98 and lie_knee 156 (were -86, 160): refit for the thighs pulled in for linecheck,
+    # whose backs, under them lying, had risen a unit off the ground.
+    "lie_front": -74, "lie_hip": -98, "lie_knee": 156, "lie_drop": 8.4, "lie_neck": 70, "lie_head": -58,
 }
 FACES = {"north": (2, -1), "south": (2, 1), "west": (0, -1), "east": (0, 1), "down": (1, -1), "up": (1, 1)}
 
@@ -157,12 +159,17 @@ def el(name, bone, lo, hi, quad=None, cut=False, rot=None, origin=None, view=Non
 def elements():
     E = []
     # Body: the front half on spine_1, the back half on spine_0.
-    E.append(el("chest", "spine_1", (-8, 12, -1), (8, 26, 13)))
+    E.append(el("chest", "spine_1", (-8, 12, -1), (8, 27.5, 13)))  # top half a unit under the skull (was 26: the neck showed as a band between them); linecheck
     E.append(el("hips", "spine_0", (-7.5, 13, -19), (7.5, 24.6, -1)))  # a bit inside the chest: the two bend apart
-    E.append(el("britches", "spine_0", (-7, 14, -22), (7, 24, -19)))
+    # Within 0.4 of the hips' sides and top and half a unit under their bottom (was 14 wide from y 14
+    # to 24: their back showed round it as a rim); linecheck
+    E.append(el("britches", "spine_0", (-7.1, 12.5, -22), (7.1, 24.2, -19)))
     E.append(el("neck", "neck", (-7.5, 22, 1), (7.5, 31, 11)))
     # The bib: a solid block and a quad in front of it cut to the sheet's locks.
-    E.append(el("bib", "spine_1", (-10, 14, 11), (10, 29, 16)))  # short: the locks' V hangs below it
+    # short: the locks' V hangs below it. Half a unit out from the chest's sides and bottom (was 20
+    # wide from y 14: the chest showed under it and its back as a rim beside the chest), and deep
+    # enough (from z 8.5, was 11) that its sides are two texels, not a strip under the skull; linecheck
+    E.append(el("bib", "spine_1", (-8.5, 12.5, 8.5), (8.5, 29, 16)))
     E.append(el("bib_locks", "spine_1", (-12, 4, 16.5), (12, 30, 16.5), quad="south", cut=True))
     # Belly fringe along both sides, cut from the side views.
     for side, face in ((1, "east"), (-1, "west")):
@@ -175,7 +182,7 @@ def elements():
     # Muzzle: the upper part on the head, the lower jaw on its own bone (hinged at the back) so
     # the mouth opens; a dark box inside is the mouth you see when it does; the tongue on its
     # own bone pivots at the lip so it can hang out over the jaw.
-    E.append(el("muzzle", "head", (-5, 30, 16), (5, 35, 25)))
+    E.append(el("muzzle", "head", (-5, 30, 20), (5, 35, 25)))  # from the skull's front (was 16, inside it: its top showed as a strip in front of the skull); linecheck
     E.append(el("mouth", "head", (-3.5, 28.5, 18), (3.5, 31, 21.3)))
     E.append(el("jaw", "jaw", (-4, 27, 17.5), (4, 30, 22.5)))  # shorter than the muzzle: the tongue bends out of sight
     # The tongue: a base lying in the mouth on the jaw, then two parts that bend over the lip's
@@ -213,7 +220,12 @@ def elements():
         E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (lx - 2.5, 3, lz - 2.5), (lx + 2.5, 8, lz + 2.5)))  # thinner than the upper leg: folded, their sides never share a plane
         E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (lx - 4, 0, lz - 3.5), (lx + 4, 3, lz + 4.5)))  # 8 wide: three toes
         if not front:
-            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (lx - 3.5, 10, lz - 5), (lx + 3.5, 21, lz + 5)))
+            # Half a unit out from the hips' side, within 0.4 of their top and bottom (under half a
+            # sample, so the check reads it flush), inside their back (was 2 units out, from y 10 to 21
+            # and z -20: the hips showed above it as a band and it a rim round them); linecheck
+            side = 1 if leg[1] == "L" else -1
+            x0, x1 = sorted((lx - side * 3.5, side * 8.0))
+            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (x0, 12.6, lz - 3.5), (x1, 24.2, lz + 5)))
     return E
 
 
@@ -1230,13 +1242,26 @@ def pose_stalk(t, L):
     """Creeping low, head level and forward, tail low and still (1.1 s a cycle, in place of the walk)."""
     p = t / 1.1
     q = vd.legs_gait(p, (0.0, 0.5, 0.75, 0.25), 14, 26, L)
+    # The legs bent the way a step lifts them, the paws kept flat: each pair about 1.3 units shorter
+    # (bent the other way the gait moonwalked: the lift straightened the knee). Its height is set
+    # from its feet in the build (`ground.grounded`).
     for leg in ("FL", "FR", "BL", "BR"):
-        f = leg[0] == "F"
-        q[f"leg_{leg}_upper"] = (q[f"leg_{leg}_upper"][0] + (22 if f else -18), 0, 0)
-        q[f"leg_{leg}_lower"] = (q[f"leg_{leg}_lower"][0] + (-30 if f else 28), 0, 0)
-        q[f"leg_{leg}_paw"] = (q[f"leg_{leg}_paw"][0] + (8 if f else -10), 0, 0)
-    q.update({"root": (0, -1.5, 0), "neck": (14, 0, 0), "head": (-12, 0, 0), "ear_L": (-20, 0, 0), "ear_R": (-20, 0, 0)})
+        bend = (-30, 70, -40) if leg[0] == "F" else (40, -70, 30)
+        for part, b in zip(("upper", "lower", "paw"), bend):
+            q[f"leg_{leg}_{part}"] = (q[f"leg_{leg}_{part}"][0] + b, 0, 0)
+    q.update({"root": (0, 0, 0), "neck": (14, 0, 0), "head": (-12, 0, 0), "ear_L": (-20, 0, 0), "ear_R": (-20, 0, 0)})
     return wag(q, L, 0, 0, (30, 0, 0))
+
+
+def pose_approach(t, L):
+    """Curious, coming to look: slow short steps, the head low and stretched forward, sniffing, the
+    ears up and forward, the tail level with a slow wag (1.2 s a cycle, in place of the walk). Its
+    height is set from its feet in the build (`ground.grounded`)."""
+    p = t / 1.2
+    q = vd.legs_gait(p, (0.0, 0.5, 0.75, 0.25), 16, 26, L)
+    q.update({"root": (0, 0, 0), "neck": (12, 0, 0), "head": (-8 + 2 * math.sin(TAU * p * 4), 0, 0), "ear_L": (-12, 0, 0),
+              "ear_R": (-12, 0, 0)})
+    return wag(q, L, 10, TAU * p * 2, (10, 0, 0))
 
 
 def pose_alarm(t, L):
@@ -1312,10 +1337,10 @@ def pose_death(t, L):
 
 
 CLIP_LENGTHS = {"stare": 2.0, "sniff": 2.0, "drink": 1.0, "look": 2.6, "scratch": 1.8, "stretch": 2.2, "sleep": 5.0, "stalk": 1.1,
-                "alarm": 1.0, "howl": 3.0, "play": 1.4, "groom": 2.4, "nuzzle": 2.0, "flinch": 0.4, "death": 1.2}
+                "alarm": 1.0, "howl": 3.0, "play": 1.4, "groom": 2.4, "nuzzle": 2.0, "flinch": 0.4, "death": 1.2, "approach": 1.2}
 CLIP_MOUTHS = set(CLIP_LENGTHS)
-LOOPS = {"stare": True, "drink": True, "sleep": True, "stalk": True, "death": "hold_on_last_frame"}
-BLENDS = {"flinch": (0.05, 0.2), "death": (0.1, 0.0), "stalk": (0.3, 0.3), "sleep": (0.6, 0.6)}
+LOOPS = {"stare": True, "drink": True, "sleep": True, "stalk": True, "approach": True, "death": "hold_on_last_frame"}
+BLENDS = {"flinch": (0.05, 0.2), "death": (0.1, 0.0), "stalk": (0.3, 0.3), "approach": (0.3, 0.3), "sleep": (0.6, 0.6)}
 
 
 def behaviour_mouth(name, p):

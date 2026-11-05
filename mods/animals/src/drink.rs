@@ -189,6 +189,8 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
             dx * dx + dz * dz <= 2.25 && (p[1] - st.pos.y).abs() <= 1.5
         });
     if there {
+        // Head down at the water, lapping, while it drinks.
+        crate::anim::hold(w, id, crate::anim::Act::Drink);
         if now < d[3] {
             return true; // swallowing
         }

@@ -160,7 +160,7 @@ pub fn art_name(material: &str) -> &str {
 /// anchor less the handle's socket. Nothing for a material with no anchor yet.
 pub fn shift(kind: &str, material: &str) -> [i32; 2] {
     let Some(l) = look(kind) else { return [0, 0] };
-    let art = art_name(material);
+    let art = drawn(kind, material);
     match l.anchors.iter().find(|(m, _)| *m == art) {
         Some((_, a)) => [(a[0] - l.socket[0]).round() as i32, (a[1] - l.socket[1]).round() as i32],
         None => [0, 0],
@@ -171,7 +171,30 @@ pub fn shift(kind: &str, material: &str) -> [i32; 2] {
 /// and a felling one each have their own): painted, `base:parts/<kind>/<shape>/<art name>`, used
 /// as it is; or a shade map, `base:parts/<kind>/<shape>`, painted with ramps.
 pub fn painted(kind: &str, shape: &str, material: &str) -> String {
-    format!("base:parts/{kind}/{shape}/{}", art_name(material))
+    format!("base:parts/{kind}/{shape}/{}", drawn(kind, material))
+}
+
+/// The drawing a working part of `material` uses on `kind`: its own where it's drawn (the kind's
+/// anchors list the drawn ones), else the nearest drawn one until its art comes (meteoric iron as
+/// iron, star steel as steel, chert, obsidian and tektite as flint, bone and antler, and flint on a
+/// sword, as stone).
+pub fn drawn<'a>(kind: &str, material: &'a str) -> &'a str {
+    let Some(l) = look(kind) else { return art_name(material) };
+    let has = |a: &str| l.anchors.is_empty() || l.anchors.iter().any(|(m, _)| *m == a);
+    let mut art = art_name(material);
+    for _ in 0..3 {
+        if has(art) {
+            return art;
+        }
+        art = match art {
+            "meteoric_iron" => "iron",
+            "star_steel" => "steel",
+            "chert" | "obsidian" | "tektite" => "flint",
+            "flint" | "bone" | "antler" => "stone",
+            _ => "iron",
+        };
+    }
+    art
 }
 
 pub fn map(kind: &str, shape: &str) -> String {
@@ -180,6 +203,125 @@ pub fn map(kind: &str, shape: &str) -> String {
 
 pub fn ramp(material: &str) -> String {
     format!("base:ramps/{material}")
+}
+
+/// Where gems sit on each kind's 32 px icon, the centre of its first, second and third socket
+/// (measured on the iron heads, the hilt's guard and pommel, and the armour shells' icons).
+pub const GEM_SPOTS: &[(&str, [[i32; 2]; 3])] = &[
+    ("axe", [[19, 9], [22, 6], [16, 12]]),
+    ("pickaxe", [[18, 9], [22, 6], [14, 12]]),
+    ("shovel", [[23, 8], [25, 5], [21, 11]]),
+    ("hoe", [[18, 9], [21, 6], [15, 12]]),
+    ("sword", [[9, 22], [4, 27], [12, 19]]),
+    // Kinds drawn by their plain icon until their parts have art: the knife's bolster, the
+    // spear's socket under its point, the bow's grip.
+    ("knife", [[12, 20], [8, 24], [16, 16]]),
+    ("spear", [[22, 11], [19, 14], [16, 17]]),
+    ("bow", [[7, 12], [5, 16], [10, 8]]),
+    ("helmet", [[16, 13], [12, 16], [20, 16]]),
+    ("chestplate", [[15, 13], [10, 10], [20, 10]]),
+    ("leggings", [[12, 8], [19, 8], [15, 4]]),
+    ("boots", [[11, 10], [20, 10], [15, 6]]),
+];
+
+/// How a shell is built, and so drawn (Ronald, 11-05: "Fix all as recommended"): hardened leather
+/// and rawhide as the approved leather set, bone and antler as a lamellar of laced slats, diamond as
+/// the approved diamond set's quilted scales, the metals as plate (the approved iron set).
+pub fn shell_family(material: &str) -> &'static str {
+    match material {
+        "leather" | "rawhide" => "leather",
+        "bone" | "antler" => "bone",
+        "diamond" => "diamond",
+        _ => "plate",
+    }
+}
+
+/// The shell materials, each with its own worn set (`base:entity/armor/worn/<material>_<1|2>`):
+/// Ronald, 11-05: "A for all", each painted through game-art from that material's part icons, the
+/// leather and steel ones from the approved try, diamond its approved quilted set.
+pub const WORN_SETS: [&str; 11] =
+    ["leather", "rawhide", "bone", "antler", "copper", "bronze", "wrought_iron", "meteoric_iron", "steel", "star_steel", "diamond"];
+
+/// Worn armour drawn from its parts (`abi::comp::WORN_LOOK`): its shell's material's worn set, the
+/// layer in the wearer's skin layout (leggings the inner layer, 2; the rest the outer, 1), its gems
+/// set at their spots. A shell without a set of its own (a new material) wears steel's until it
+/// has one. Under a helmet and a chestplate's pauldrons, where the painting rounds their corners
+/// off, an under-layer of the fastening's (Ronald, 11-05: "Fix it", no skin showing there): a mail
+/// coif and sleeves for a metal fastening (always in steel's dark steps), padding for leather, sinew
+/// and cord in the fastening's own.
+pub fn worn_look(slot: usize, shell: &str, fastening: &str, gems: &[&str]) -> String {
+    let layer = if slot == 2 { 2 } else { 1 };
+    let set = if WORN_SETS.contains(&shell) { shell } else { "steel" };
+    let under = if slot <= 1 {
+        let metal = fastening == "gold" || crate::materials::material(fastening).is_some_and(|m| m.works == crate::materials::Works::Metal);
+        // Mail is always iron-dark, whatever metal fastens the piece (Ronald, 11-05: "Always
+        // iron-dark"; copper or gold mail read loud under the plates).
+        if metal {
+            format!("base:entity/armor/parts/under_mail_1@{};", ramp("steel"))
+        } else {
+            format!("base:entity/armor/parts/under_padded_1@{};", ramp(fastening))
+        }
+    } else {
+        String::new()
+    };
+    let mut look = format!("{under}base:entity/armor/worn/{set}_{layer}");
+    for (i, g) in gems.iter().enumerate() {
+        if let Some(spot) = WORN_GEM_SPOTS.get(slot).and_then(|s| s.get(i)) {
+            let (x, y) = (spot[0] - GEM_SIZE / 2, spot[1] - GEM_SIZE / 2);
+            look += &format!(";base:entity/armor/parts/gem_set@{}+{x},{y}", ramp(&format!("gem_{g}")));
+        }
+    }
+    look
+}
+
+/// Where gems sit on worn armour, the centre of each socket's in the 128 x 64 skin layout, head to
+/// feet. A helmet shows one, on the brow (Ronald, 11-05: not a row of studs across the visor; its
+/// other sockets count but aren't drawn); across the chest; on the thigh's front, then its outer
+/// and inner sides; on the boot's front, then its sides (a leg's front is 8 wide, too narrow for
+/// three).
+pub const WORN_GEM_SPOTS: [&[[i32; 2]]; 4] =
+    [&[[24, 19]], &[[48, 46], [43, 46], [53, 46]], &[[12, 46], [4, 46], [20, 46]], &[[12, 60], [4, 60], [20, 60]]];
+
+/// The gem drawing's size: a shade map with the gem in its top-left corner
+/// (`base:parts/gem/set`), moved to its socket's spot.
+pub const GEM_SIZE: i32 = 5;
+
+/// The look layer of a gem `gem` (`crafting::gems::GEMS`) in socket `i` of an item of `kind`:
+/// the gem's map painted with its ramp (`base:ramps/gem_<gem>`) at the socket's spot; none for a
+/// kind without spots (drawn by its plain icon).
+pub fn gem_look(kind: &str, i: usize, gem: &str) -> Option<String> {
+    let spot = GEM_SPOTS.iter().find(|(k, _)| *k == kind)?.1.get(i)?;
+    let (x, y) = (spot[0] - GEM_SIZE / 2, spot[1] - GEM_SIZE / 2);
+    Some(format!("base:parts/gem/set@{}+{x},{y}", ramp(&format!("gem_{gem}"))))
+}
+
+/// Part shapes drawn from one shade map painted with their material's ramp, as a loose part and
+/// (a shell) as the built piece (`base:parts/armour/<shape>`, made from the approved icons): armour's
+/// shells, straps (their buckles a second region: the straps' own metal, else wrought iron) and
+/// linings. Ronald, 11-05: a shell's icon shows its material.
+pub const PART_MAPS: [&str; 6] = ["helmet_shell", "chest_shell", "leg_shell", "boot_shell", "straps", "lining"];
+
+/// The look of a part of `shape` made of `material` (the engine's `core:look`), if it's drawn
+/// from a map.
+pub fn part_look(shape: &str, material: &str) -> Option<String> {
+    if !PART_MAPS.contains(&shape) {
+        return None;
+    }
+    let metal = crate::materials::material(material).is_some_and(|m| m.works == crate::materials::Works::Metal || m.id == "gold");
+    let buckle = if shape != "straps" {
+        String::new()
+    } else if metal {
+        format!(",{}", ramp(material))
+    } else {
+        format!(",{}", ramp("wrought_iron"))
+    };
+    // A shell is drawn as its family is built: a leather cap, bone slats.
+    let drawn = match (shell_family(material), shape) {
+        ("leather", "helmet_shell") => "cap_shell".to_string(),
+        ("bone", s) if s.ends_with("_shell") => format!("bone_{s}"),
+        _ => shape.to_string(),
+    };
+    Some(format!("base:parts/armour/{drawn}@{}{buckle}", ramp(material)))
 }
 
 #[cfg(test)]
@@ -217,5 +359,47 @@ mod tests {
             }
         }
         assert_eq!(painted("axe", "felling_axe_head", "oak"), "base:parts/axe/felling_axe_head/wood");
+        // Until their art comes, undrawn heads use the nearest drawn one.
+        assert_eq!(painted("pickaxe", "pick_head", "meteoric_iron"), "base:parts/pickaxe/pick_head/iron");
+        assert_eq!(painted("sword", "straight_blade", "flint"), "base:parts/sword/straight_blade/stone");
+        assert_eq!(painted("axe", "felling_axe_head", "obsidian"), "base:parts/axe/felling_axe_head/flint");
+        assert_eq!(part_look("chest_shell", "bronze").unwrap(), "base:parts/armour/chest_shell@base:ramps/bronze");
+        assert_eq!(part_look("straps", "leather").unwrap(), "base:parts/armour/straps@base:ramps/leather,base:ramps/wrought_iron");
+        assert!(part_look("haft", "oak").is_none());
+        assert_eq!(part_look("helmet_shell", "leather").unwrap(), "base:parts/armour/cap_shell@base:ramps/leather");
+        assert_eq!(part_look("leg_shell", "bone").unwrap(), "base:parts/armour/bone_leg_shell@base:ramps/bone");
+        assert_eq!(worn_look(2, "diamond", "wrought_iron", &[]), "base:entity/armor/worn/diamond_2");
+        assert_eq!(
+            worn_look(0, "unobtainium", "leather", &[]),
+            "base:entity/armor/parts/under_padded_1@base:ramps/leather;base:entity/armor/worn/steel_1"
+        );
+        // A helmet shows one gem however many it holds.
+        assert_eq!(
+            worn_look(0, "steel", "steel", &["amber", "diamond", "peridot"])
+                .matches("gem_set")
+                .count(),
+            1
+        );
+        assert_eq!(gem_look("sword", 0, "diamond").unwrap(), "base:parts/gem/set@base:ramps/gem_diamond+7,20");
+        assert!(gem_look("axe", 3, "diamond").is_none() && gem_look("sword", 3, "diamond").is_none());
+        assert_eq!(
+            worn_look(1, "bronze", "gold", &["amber"]),
+            "base:entity/armor/parts/under_mail_1@base:ramps/steel;base:entity/armor/worn/bronze_1;base:entity/armor/parts/gem_set@base:ramps/gem_amber+46,44"
+        );
+    }
+
+    #[test]
+    fn every_shell_material_has_a_worn_set() {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../assets/textures/entity/armor/worn");
+        for m in crate::materials::MATERIALS {
+            if crate::materials::fits(m, "chestplate", "shell", crate::kinds::Role::Working) {
+                assert!(WORN_SETS.contains(&m.id), "{}: a shell with no worn set", m.id);
+            }
+        }
+        for m in WORN_SETS {
+            for layer in [1, 2] {
+                assert!(std::path::Path::new(&format!("{dir}/{m}_{layer}.png")).exists(), "{m}_{layer}.png");
+            }
+        }
     }
 }

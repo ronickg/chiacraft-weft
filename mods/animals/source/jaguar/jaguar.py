@@ -148,6 +148,9 @@ LID_Z = 0.0  # the eyelids' hinge line, just in front of the placed face (set be
 # ------------------------------------------------------------------ the model
 
 SKULL = ((-8, 20.5, 11), (8, 33.5, 24))
+# Where the nose is painted on the muzzle (the cat's units): the old box's front, and a texel (1.48
+# units here) back from the muzzle's tip on its top.
+NOSE_X, NOSE_Y, NOSE_Z = 1.5, 26.5, 26.7
 HEAD_BONES.add("head")
 LID_Z = float(warp(HEAD_PIVOT + (np.array(SKULL[1]) - HEAD_PIVOT) * HS)[2]) + 0.15
 # The shortest tail of the big cats, thick, carried low and turning up at the tip: pitch (up),
@@ -241,13 +244,14 @@ def bones():
 
 def elements():
     E = [el("hips", "spine_0", (-5.9, 11, -21), (5.9, 21, 3)),  # a longer back than a cat's, deep in the chest
-         el("chest", "spine_1", (-6.6, 11.5, -2.5), (6.6, 22, 12)),  # deep and broad
+         # Its bottom flush with the hips' (at 11.5 the hips' side showed a strip half a texel tall under it; linecheck).
+         el("chest", "spine_1", (-6.6, 11.2, -2.5), (6.6, 22, 12)),  # deep and broad
          el("neck", "neck", (-3.6, 17.5, 9), (3.6, 25, 15)),  # slimmer than the head it enters
          el("skull", "head", *SKULL),
-         el("muzzle", "head", (-4.2, 24, 23.5), (4.2, 28, 27)),  # broad
+         # Broad; out over two texels from the skull (at 27, 1.7: a rim; linecheck), to the nose's tip (painted on).
+         el("muzzle", "head", (-4.2, 24, 23.5), (4.2, 28, 28.1)),
          el("mouth", "head", (-2.5, 22.5, 21.5), (2.5, 24.5, 24.8)),
-         el("jaw", "jaw", (-3, 21.5, 21), (3, 24, 25.5)),
-         el("nose", "head", (-1.5, 26.5, 27), (1.5, 28, 27.6))]
+         el("jaw", "jaw", (-3, 21.5, 21), (3, 24, 27.75))]  # out two texels from the skull (at 25.5, one texel: a rim; linecheck), flush under the muzzle's tip
     # Ears: steps narrowing to a point (solid), plus one cut-out panel through the middle for a
     # smooth triangle with a few tufts; turned out a little and leaning out.
     steps = [(33, 35, 3.6), (35, 36.6, 2.9), (36.6, 37.8, 1.8)]  # y0, y1, half width: small and round
@@ -268,10 +272,14 @@ def elements():
         x = 4.6 * s
         if leg[0] == "F":
             z = 10.25
-            E.append(el(f"leg_{leg}_upper", f"leg_{leg}_upper", (x - 2.9, 8, z - 2.9), (x + 2.9, 15, z + 2.9)))  # stocky
+            # Its outer side and front flush with the chest's (at x + 2.9 it stood a texel out beside it,
+            # at z + 2.9 1.3 texels ahead of it; linecheck): as deep, a little further back.
+            xi, xo = sorted((x - 2.9 * s, x + 2.2 * s))
+            E.append(el(f"leg_{leg}_upper", f"leg_{leg}_upper", (xi, 8, z - 3.85), (xo, 15, z + 1.95)))  # stocky
         else:
             z = -15.5
-            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (x - 3.3, 7.5, z - 4.4), (x + 3.3, 18, z + 4.4)))  # holds the knee (y = 8)
+            # Its back two texels short of the rump's (at z - 4.4 a band 1.2 texels wide showed behind it; linecheck).
+            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (x - 3.3, 7.5, z - 3.7), (x + 3.3, 18, z + 4.4)))  # holds the knee (y = 8)
         E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x - 2.3, 2.5, z - 2.3), (x + 2.3, 8, z + 2.3)))
         E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 3.7, 0, z - 2.7), (x + 3.7, 2.5, z + 3.9)))  # big paws
     for e in E:  # the cat's units into the model's
@@ -402,8 +410,12 @@ def area(e, face, p, uu, vv, along=None):
         a[:] = WHITE
         if name == "muzzle" and face in ("east", "west") and x.shape[1] >= 4:
             a = marks(a, rosettes(z, y, 1.8, True), y > 26.5)  # the whisker spots (a muzzle side is 2 texels at 32: none)
-    elif name == "nose":
-        a[:] = NOSE
+        # The nose, painted (rule 4: the box it was, a pad a texel proud, drew a rim): on the front
+        # where the box was, and the front texel of the top.
+        if name == "muzzle" and face == "south":
+            a = np.where((np.abs(x) <= NOSE_X + 0.05) & (y >= NOSE_Y), NOSE, a)
+        elif name == "muzzle" and face == "up":
+            a = np.where((np.abs(x) <= NOSE_X + 0.05) & (z >= NOSE_Z), NOSE, a)
     elif name == "mouth":
         a[:] = DARK
     elif name.startswith("ear_core"):
@@ -471,7 +483,7 @@ def layer_props(e, face, p, a):
     else:
         white = np.full(y.shape, 0.2)
     white = np.maximum(white * 0.85, np.where(a == WHITE, 0.9, 0))
-    pattern = np.full(y.shape, 0.15 if n in ("muzzle", "jaw", "nose", "mouth") or n.startswith("ear_") else
+    pattern = np.full(y.shape, 0.15 if n in ("muzzle", "jaw", "mouth") or n.startswith("ear_") else
                       (0.5 if n == "skull" else 1.0))
     return {"white": white, "pattern": pattern}
 
@@ -676,8 +688,19 @@ def pose_bite(t):
 
 BLINKS = {"idle": [1.2], "sit": [1.8], "lie": [1.0, 3.0], "roar": [0.4]}
 BLINK = 0.09
+# The behaviour clips (`mods/animals/src/anim.rs`), the canids' (`../_clips/canid.py`) on a cat's
+# body: the same rig, and an ambusher's stalk is the one the creature AI calls (`hunt::chase`).
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_clips"))
+import canid  # noqa: E402
+
+# A cat's body: its chest and hips poke at any sideways turn of the spine, its thick neck out of
+# its chest past 85 degrees down, and its tail root out of the hips raised far (ground.pokes).
+canid.bind(sys.modules[__name__], scratch=0.4, neck=0.7, bend=0.7, lift=0.7, wag=0.6, twist=0, neck_max=85)
+
 ANIMS = {"idle": (pose_idle, 3.0), "walk": (pose_walk, 0.9), "run": (pose_run, 0.5), "sit": (pose_sit, 3.0),
          "lie": (pose_lie, 4.0), "roar": (pose_roar, 1.6), "swipe": (pose_swipe, 0.6), "bite": (pose_bite, 0.5)}
+ANIMS.update(canid.anims())
+LOOPS, BLENDS = canid.LOOPS, canid.BLENDS
 
 
 def eyelids(name, t):
@@ -686,7 +709,7 @@ def eyelids(name, t):
 
 
 def frame_times(name, dur):
-    n = 24 if name in ("roar", "swipe", "bite") else (12 if dur < 1 else 16)
+    n = 24 if name in ("roar", "swipe", "bite") else canid.FRAMES.get(name, 12 if dur < 1 else 16 if name in ("idle", "walk", "run", "sit", "lie") else 24)
     ts = {round(dur * k / n, 4) for k in range(n + 1)}
     for b in BLINKS.get(name, []):
         ts |= {round(b + d, 4) for d in (-BLINK, -BLINK / 2, 0, BLINK / 2, BLINK)}
@@ -697,13 +720,16 @@ def animations(bone_names):
     out = {}
     for name, (fn, dur) in ANIMS.items():
         frames = []
+        loops = LOOPS.get(name, name in ("idle", "walk", "run", "sit", "lie"))
         for t in frame_times(name, dur):
-            tt = t % dur if t < dur else 0.0
+            # A loop's last frame is its first; a clip played once ends where it ends.
+            tt = t % dur if t < dur else (0.0 if loops is True else dur)
             pose = fn(tt)
-            pose.update(eyelids(name, tt))
+            if name not in canid.SHUT:
+                pose.update(eyelids(name, tt))
             frames.append({"t": round(t, 4), "rot": {b: [round(float(v), 4) for v in pose.get(b, (0, 0, 0))] for b in bone_names if b != "root"},
                            "root": [round(float(v), 4) for v in pose.get("root", (0, 0, 0))]})
-        out[name] = {"length": dur, "frames": frames}
+        out[name] = {"length": dur, "frames": frames, "loop": loops, "blend": BLENDS.get(name, (0.25, 0.3))}
     return out
 
 
@@ -781,6 +807,8 @@ def fit_poses(spec):
     best = fit(grid, lambda P: lie_cost(dict(L, **P, lie_drop=0)))[1]
     P = dict(L, **best, lie_drop=0)
     L.update(best, lie_drop=round(min(v for k, v in low(pose_lie, P).items() if k != "tail"), 2))
+    # Head down to the ground (sniffing, drinking) and the death fall (`canid.fit`).
+    canid.fit(spec, dict(GROUPS, head=lambda n: n in ("skull", "muzzle", "jaw")))
     L["sit_tail"] = rest_tail(spec, pose_sit, "sit")
     L["lie_tail"] = rest_tail(spec, pose_lie, "lie")
     for key, fn in (("sit", pose_sit), ("lie", pose_lie)):

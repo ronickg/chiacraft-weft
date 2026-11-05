@@ -428,6 +428,7 @@ form = "Borkon"
 gloss = "mountain-keeper"
 what = "the mountains' guardian"
 epithet = "the Height-Keeper"
+lang_key = "entity.animals.borkon"
 
 [name.drenkaun]
 kind = "boss"
@@ -437,6 +438,7 @@ form = "Drenkaun"
 gloss = "tree-keeper"
 what = "the forest's guardian"
 epithet = "the Wood-Warden"
+lang_key = "entity.animals.drenkaun"
 
 [name.nokaun]
 kind = "boss"

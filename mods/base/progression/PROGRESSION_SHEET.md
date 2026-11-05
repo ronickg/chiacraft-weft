@@ -17,6 +17,7 @@ Written from `mods/base/progression` (`cargo run -p progression --bin sheet > mo
 | every species inside its bands at every level, floors hold | passes |
 | tames capped by their saddle and ceiling | passes |
 | tweaks inside ×0.75-×1.25 with a reason | passes |
+| grade and gems at most +60% over a plain item | passes |
 
 ## The ages
 
@@ -24,10 +25,10 @@ Power grows ×1.6 an age: `g(L) = 1.6^(L/10)` over area and item level L (tier �
 
 | tier | age | hours | EM | g at start | reference: hit / health / armour | things tagged | made | kit EM | of budget | everything once |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 493 | 149 | 49 | 34 % | 265 EM |
-| 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 31 | 24 | 76 | 26 % | 164 EM |
-| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 31 | 25 | 62 | 16 % | 270 EM |
-| 3 | Age of Steam | 18 | 1080 | 4.10 | 31.1 / 104 / 130 | 30 | 27 | 94 | 22 % | 512 EM |
+| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 496 | 149 | 52 | 36 % | 221 EM |
+| 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 39 | 23 | 150 | 52 % | 84 EM |
+| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 30 | 24 | 60 | 16 % | 264 EM |
+| 3 | Age of Steam | 18 | 1080 | 4.10 | 31.1 / 104 / 130 | 26 | 23 | 94 | 22 % | 273 EM |
 | 4 | Age of Lightning | 20 | 1200 | 6.55 | 49.7 / 166 / 207 | 0 | 0 | 0 | 0 % | 0 EM |
 | 5 | Age of the Future | 18 | 1080 | 10.49 | 79.6 / 265 / 332 | 0 | 0 | 0 | 0 % | 0 EM |
 | 6 | Age of Stars | 16 | 960 | 16.78 | 127.3 / 424 / 531 | 0 | 0 | 0 | 0 % | 0 EM |
@@ -207,7 +208,7 @@ One hit's damage (engine points) by material:
 | osage_orange | Stone Age | 1 | 3.9 | 6.3 | 5.2 | 2.2 | 2.6 | 2.5 | 0.9 | 26 / 21 |
 | bone | Stone Age | 3 | 4.3 | 6.9 | 5.8 | 2.4 | 2.9 | 2.8 | 1.0 | 29 / 23 |
 | antler | Stone Age | 3 | 4.3 | 6.9 | 5.8 | 2.4 | 2.9 | 2.8 | 1.0 | 29 / 23 |
-| chert | Stone Age | 4 | 4.5 | 7.2 | 6.0 | 2.5 | 3.0 | 2.9 | 1.1 | 30 / 24 |
+| chert | Stone Age | 5 | 4.7 | 7.6 | 6.3 | 2.7 | 3.2 | 3.0 | 1.1 | 32 / 25 |
 | flint | Stone Age | 5 | 4.7 | 7.6 | 6.3 | 2.7 | 3.2 | 3.0 | 1.1 | 32 / 25 |
 | stone | Stone Age | 5 | 4.7 | 7.6 | 6.3 | 2.7 | 3.2 | 3.0 | 1.1 | 32 / 25 |
 | tektite | Stone Age | 6 | 5.0 | 8.0 | 6.6 | 2.8 | 3.3 | 3.2 | 1.2 | 33 / 27 |
@@ -217,6 +218,9 @@ One hit's damage (engine points) by material:
 | rawhide | Stone Age | 3 | 4.3 | 6.9 | 5.8 | 2.4 | 2.9 | 2.8 | 1.0 | 29 / 23 |
 | birch_tar | Stone Age | 4 | 4.5 | 7.2 | 6.0 | 2.5 | 3.0 | 2.9 | 1.1 | 30 / 24 |
 | leather | Stone Age | 5 | 4.7 | 7.6 | 6.3 | 2.7 | 3.2 | 3.0 | 1.1 | 32 / 25 |
+| linen | Stone Age | 3 | 4.3 | 6.9 | 5.8 | 2.4 | 2.9 | 2.8 | 1.0 | 29 / 23 |
+| wool | Stone Age | 3 | 4.3 | 6.9 | 5.8 | 2.4 | 2.9 | 2.8 | 1.0 | 29 / 23 |
+| fur | Stone Age | 4 | 4.5 | 7.2 | 6.0 | 2.5 | 3.0 | 2.9 | 1.1 | 30 / 24 |
 | copper | Bronze Age | 12 | 6.6 | 10.5 | 8.8 | 3.7 | 4.4 | 4.2 | 1.6 | 44 / 35 |
 | gold | Bronze Age | 13 | 6.9 | 11.1 | 9.2 | 3.9 | 4.6 | 4.4 | 1.7 | 46 / 37 |
 | bronze | Bronze Age | 16 | 8.0 | 12.7 | 10.6 | 4.5 | 5.3 | 5.1 | 1.9 | 53 / 42 |
@@ -226,6 +230,8 @@ One hit's damage (engine points) by material:
 | steel | Iron Age | 27 | 13.3 | 21.3 | 17.8 | 7.5 | 8.9 | 8.5 | 3.2 | 89 / 71 |
 | star_steel | Iron Age | 29 | 14.7 | 23.4 | 19.5 | 8.2 | 9.8 | 9.4 | 3.5 | 98 / 78 |
 | diamond | Age of Steam | 35 | 19.4 | 31.1 | 25.9 | 10.9 | 13.0 | 12.4 | 4.7 | 130 / 104 |
+| peridot | Iron Age | 28 | 14.0 | 22.4 | 18.6 | 7.8 | 9.3 | 8.9 | 3.4 | 93 / 75 |
+| amber | Stone Age | 4 | 4.5 | 7.2 | 6.0 | 2.5 | 3.0 | 2.9 | 1.1 | 30 / 24 |
 
 ## Tames by saddle
 
@@ -235,6 +241,26 @@ A saddle (and barding) of an age carries a tame up to that age's reference level
 |---|---|---|---|---|---|---|---|---|
 | utahraptor | 103 / 10 (top 165 / 16) | 131 / 12 (top 209 / 20) | 209 / 20 (top 334 / 31) | 334 / 31 (top 535 / 50) | 535 / 50 (top 856 / 80) | 856 / 80 (top 1370 / 129) | 1370 / 129 (top 2192 / 206) | 2192 / 206 (top 3507 / 330) |
 | wyvern | 456 / 15 (top 730 / 24) | 577 / 19 (top 923 / 30) | 923 / 30 (top 1478 / 48) | 1478 / 48 (top 2364 / 77) | 2364 / 77 (top 3783 / 124) | 3783 / 124 (top 6052 / 198) | 6052 / 198 (top 9683 / 317) | 9683 / 317 (top 15494 / 507) |
+
+## Biome bosses
+
+Each boss is a titan at its form's age (`animals_core::bosses`): its numbers from the curve like any creature's, a fight of 2-5 minutes for a same-age player, the cap and the floor against over-tier gear. Seconds to kill and its hits to down the player (grade 4), by the player's age. Forms with no offering are data for later ages.
+
+| boss | form | offering | level | health | armour | hit | Stone | Bronze | Iron | Steam | Stars |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| drenkaun | Stone Age | animals:forest_offering | 5 | 912 | 31.0 | 28.3 | 218 s / 1.1 | 156 s / 1.5 | 156 s / 1.5 | 156 s / 1.5 | 156 s / 1.5 |
+| drenkaun | Bronze Age | - | 15 | 1459 | 49.7 | 45.3 | 444 s / 0.6 | 218 s / 1.1 | 156 s / 1.5 | 156 s / 1.5 | 156 s / 1.5 |
+| drenkaun | Iron Age | - | 25 | 2334 | 79.5 | 72.4 | 952 s / 0.4 | 444 s / 0.6 | 218 s / 1.1 | 156 s / 1.5 | 156 s / 1.5 |
+| drenkaun | Age of Steam | - | 35 | 3734 | 127.2 | 115.9 | 2141 s / 0.2 | 952 s / 0.4 | 444 s / 0.6 | 218 s / 1.1 | 156 s / 1.5 |
+
+drenkaun: a titan apex; attacks charge (×0.75 hit, 1.2 s tell), sweep (×0.50 hit, 0.8 s tell), stomp (×0.40 hit, 0.9 s tell), roots (×0.25 hit, 1.4 s tell); parts left_antler at 10 %, right_antler at 20 %, crown at 30 %; knocked down by 8 % of its health in stagger; loot animals:warden_heartseed 35 % (certain by kill 3), animals:warden_antler 60 % (certain by kill 2), animals:warden_bark 100 %, leather 100 %, bone 100 %; its young animals:drenkaun_calf (30 %, certain by kill 4).
+
+| borkon | Bronze Age | animals:mountain_offering | 15 | 1459 | 49.7 | 45.3 | 444 s / 0.6 | 218 s / 1.1 | 156 s / 1.5 | 156 s / 1.5 | 156 s / 1.5 |
+| borkon | Iron Age | - | 25 | 2334 | 79.5 | 72.4 | 952 s / 0.4 | 444 s / 0.6 | 218 s / 1.1 | 156 s / 1.5 | 156 s / 1.5 |
+| borkon | Age of Steam | - | 35 | 3734 | 127.2 | 115.9 | 2141 s / 0.2 | 952 s / 0.4 | 444 s / 0.6 | 218 s / 1.1 | 156 s / 1.5 |
+| borkon | Age of Lightning | - | 45 | 5975 | 203.5 | 185.4 | 3936 s / 0.1 | 2141 s / 0.2 | 952 s / 0.4 | 444 s / 0.6 | 156 s / 1.5 |
+
+borkon: a titan apex; attacks charge (×0.75 hit, 1.4 s tell), toss (×0.55 hit, 0.9 s tell), rockfall (×0.35 hit, 1.6 s tell), leap (×0.50 hit, 1.0 s tell); parts left_horn at 10 %, right_horn at 20 %, fleece at 30 %; knocked down by 8 % of its health in stagger; loot animals:summit_stone 35 % (certain by kill 3), animals:borkon_horn 60 % (certain by kill 2), animals:height_fleece 100 %, wool 100 %, raw_gold 100 %, bone 100 %; its young animals:borkon_kid (30 %, certain by kill 4).
 
 ## The perk web's prices
 
@@ -246,8 +272,8 @@ Moving to the next age takes a key, one thing from each gate (materials and tool
 
 | age | tech | magic | beasts | not built yet |
 |---|---|---|---|---|
-| Stone Age | base:pickaxe, base:furnace | base:dowsing_rod | animals:club, animals:tranquilizer_dart, animals:nest | a biome boss's part; knowledge: a ruin's blueprint or lore page |
-| Bronze Age | - | - | - | all of it |
+| Stone Age | base:pickaxe, base:furnace, animals:warden_heartseed | base:dowsing_rod, animals:warden_heartseed | animals:club, animals:tranquilizer_dart, animals:nest, animals:warden_heartseed | knowledge: a ruin's blueprint or lore page |
+| Bronze Age | animals:summit_stone | animals:summit_stone | animals:summit_stone | materials and tools: the Bronze Age's own; knowledge: a ruin's blueprint or lore page; infrastructure: a working setup from the Bronze Age |
 | Iron Age | - | - | - | all of it |
 | Age of Steam | - | - | - | all of it |
 | Age of Lightning | - | - | - | all of it |
@@ -258,14 +284,15 @@ Moving to the next age takes a key, one thing from each gate (materials and tool
 
 Every named item and block, by its tag (`content::RULES`). EM is the cheapest way to have one; "-" not had as an item.
 
-### Stone Age (493)
+### Stone Age (496)
 
-**tech** (46)
+**tech** (44)
 
-- tool: arrow (2.0), axe (0.48), bow (0.48), glider (7.8), hoe (0.70), knife (0.43), pickaxe (0.48), shovel (0.48), spear (0.70), stone_axe (0.60), stone_hoe (0.45), stone_pickaxe (0.60), stone_shovel (0.30), stone_sword (0.40), sword (0.70), wood_axe (0.41), wood_hoe (0.33), wood_pickaxe (0.41), wood_shovel (0.24), wood_sword (0.28)
-- armour: leather_boots (9.1), leather_chestplate (18), leather_helmet (11), leather_leggings (16)
+- material: gem_amber (2.0), gem_tektite (5.1)
+- tool: arrow (2.0), axe (0.48), bow (0.48), glider (7.8), hoe (0.70), knife (0.43), pickaxe (0.48), shovel (0.48), spear (0.70), sword (0.70)
+- armour: boots (0.70), chestplate (0.70), helmet (0.70), leggings (0.70)
 - station: furnace (1.2)
-- part: part_bar_guard (0.22), part_barbed_point (0.22), part_bearded_axe_head (0.22), part_bowstring (0.22), part_felling_axe_head (0.22), part_grip (0.22), part_haft (0.22), part_hoe_blade (0.22), part_knife_blade (0.22), part_lashing (0.22), part_leaf_point (0.22), part_long_blade (0.22), part_long_haft (0.22), part_pick_head (0.22), part_round_pommel (0.22), part_self_stave (0.22), part_shaft (0.22), part_short_blade (0.22), part_short_stave (0.22), part_shovel_blade (0.22), part_straight_blade (0.22)
+- part: part_bar_guard (0.22), part_barbed_point (0.22), part_bearded_axe_head (0.22), part_boot_shell (0.22), part_bowstring (0.22), part_chest_shell (0.22), part_felling_axe_head (0.22), part_grip (0.22), part_haft (0.22), part_helmet_shell (0.22), part_hoe_blade (0.22), part_knife_blade (0.22), part_lashing (0.22), part_leaf_point (0.22), part_leg_shell (0.22), part_lining (0.22), part_long_blade (0.22), part_long_haft (0.22), part_pick_head (0.22), part_round_pommel (0.22), part_self_stave (0.22), part_shaft (0.22), part_short_blade (0.22), part_short_stave (0.22), part_shovel_blade (0.22), part_straight_blade (0.22), part_straps (0.22)
 
 **magic** (4)
 
@@ -280,18 +307,19 @@ Every named item and block, by its tag (`content::RULES`). EM is the cheapest wa
 - beast: animals:amber (2.0), animals:amber_block (8.1), animals:brown_trout_egg (4.0), animals:carcass (4.0), animals:cedarosaurus_egg (4.0), animals:citipati_egg (4.0), animals:club (0.40), animals:confuciusornis_egg (4.0), animals:crocodyliform_egg (4.0), animals:gastonia_egg (4.0), animals:gobipteryx_egg (4.0), animals:iguanodont_egg (4.0), animals:kibble (0.62), animals:lungfish_egg (4.0), animals:lycoptera_egg (4.0), animals:nest (0.45), animals:pacu_egg (4.0), animals:pinacosaurus_egg (4.0), animals:priscagama_egg (4.0), animals:protoceratops_egg (4.0), animals:psittacosaurus_egg (4.0), animals:raptor_egg (4.0), animals:sedative (1.2), animals:spectacled_caiman_egg (4.0), animals:tranquilizer_dart (1.0), animals:utahraptor_egg (4.0), animals:utahraptor_saddle (7.7), animals:velociraptor_osmolskae_egg (4.0), animals:wyvern_egg (4.0), animals:yacare_caiman_egg (4.0)
 - technical: animals:gateway (-), animals:termite_mound_upper (-)
 
-**shared** (409)
+**shared** (414)
 
 - ground: animals:red_sand (0.10), animals:red_sandstone (0.15), banded_clay (0.15), banded_clay_coal_ore (-), brain_coral_block (0.15), clay (0.10), coal_ore (-), coarse_dirt (0.10), cobblestone (0.15), coral_rubble (0.15), cream_sandstone (0.15), deep_leaf_litter (0.10), dirt (0.10), fallen_branch (-), glacier_ice (0.15), granite (0.15), grass (0.10), gravel (0.10), ice (0.15), impact_glass (0.10), lake_ice (0.15), leaf_litter (0.10), limestone (0.15), loose_flint (-), loose_rock (-), loose_tektite (-), moss_block (0.10), mossy_cobblestone (0.15), ochre_sandstone (0.15), podzol (0.10), porites_coral_block (0.15), red_sandstone (0.15), sand (0.10), sandstone (0.15), slate (0.15), snow (0.10), snow_layer (0.10), snowy_grass (0.10), staghorn_coral_block (0.15), suevite (0.15), weathered_limestone (0.15)
 - wood: animals:araucaria_leaves (0.10), animals:araucaria_log (0.30), animals:araucaria_sapling (0.10), animals:ginkgo_leaves (0.10), animals:ginkgo_log (0.30), animals:ginkgo_sapling (0.10), animals:rotten_log (0.30), animals:scale_conifer_leaves (0.10), animals:scale_conifer_log (0.30), animals:scale_conifer_sapling (0.10), animals:swamp_cypress_leaves (0.10), animals:swamp_cypress_log (0.30), animals:swamp_cypress_sapling (0.10), animals:tempskya_leaves (0.10), animals:tempskya_log (0.30), acacia_branch (0.20), acacia_leaves (0.10), acacia_log (0.30), acacia_planks (0.09), acuri_palm_leaves (0.10), acuri_palm_log (0.30), acuri_palm_planks (0.09), acuri_palm_sapling (0.10), andiroba_branch (0.20), andiroba_leaves (0.10), andiroba_log (0.30), andiroba_planks (0.09), andiroba_sapling (0.10), birch_branch (0.20), birch_leaves (0.10), birch_log (0.30), birch_planks (0.09), brazil_nut_branch (0.20), brazil_nut_buttress (0.30), brazil_nut_leaves (0.10), brazil_nut_log (0.30), brazil_nut_planks (0.09), brazil_nut_sapling (0.10), cacao_leaves (0.10), cacao_log (0.30), cacao_planks (0.09), cacao_sapling (0.10), creosote_leaves (0.10), dogwood_branch (0.20), dogwood_leaves (0.10), dogwood_log (0.30), ipe_branch (0.20), ipe_leaves (0.10), ipe_log (0.30), ipe_planks (0.09), ipe_sapling (0.10), juniper_leaves (0.10), matamata_branch (0.20), matamata_leaves (0.10), matamata_log (0.30), matamata_planks (0.09), matamata_sapling (0.10), mesquite_branch (0.20), mesquite_leaves (0.10), mesquite_log (0.30), mesquite_planks (0.09), mesquite_sapling (0.10), moriche_palm_leaves (0.10), moriche_palm_log (0.30), moriche_palm_planks (0.09), moriche_palm_sapling (0.10), mossy_sequoia_log (0.30), oak_branch (0.20), oak_leaves (0.10), oak_log (0.30), oak_planks (0.09), sapling (0.10), sequoia_leaves (0.10), sequoia_log (0.30), sequoia_planks (0.09), sequoia_sapling (0.10), spruce_leaves (0.10), spruce_log (0.30), spruce_planks (0.09), stripped_acacia_log (0.30), stripped_acuri_palm_log (0.30), stripped_andiroba_log (0.30), stripped_birch_log (0.30), stripped_brazil_nut_log (0.30), stripped_cacao_log (0.30), stripped_dogwood_log (0.30), stripped_ipe_log (0.30), stripped_matamata_log (0.30), stripped_mesquite_log (0.30), stripped_moriche_palm_log (0.30), stripped_oak_log (0.30), stripped_sequoia_log (0.30), stripped_spruce_log (0.30), willow_leaves (0.10)
 - plant: animals:cycad (0.10), animals:fern (0.10), animals:flowering_shrub (0.10), animals:horsetail (0.10), animals:water_lily (0.10), alligator_flag (0.10), alpenrose (0.10), alpine_aster (0.10), arctic_coltsfoot (0.10), arctic_poppy (0.10), banana (0.10), beach_plum_bush (0.10), bellflower (0.10), berry_bush (0.10), black_eyed_susan (0.10), blazing_star (0.10), bracket_fungus (0.10), bramble_bush (0.10), brittlebush (0.10), bromeliad (0.10), bunchberry (0.10), butterfly_milkweed (0.10), cattail (0.10), chanterelle (0.10), cloudberry_bush (0.10), clover (0.10), cottongrass (0.10), crowberry_bush (0.10), dandelion (0.10), dead_bush (0.10), desert_marigold (0.10), dune_grass (0.10), dung_pat (0.10), dwarf_birch (0.10), edelweiss (0.10), elkhorn_coral (0.10), fern (0.10), finger_coral (0.10), fireweed (0.10), foxfire (0.10), foxglove (0.10), gentian (0.10), globeflower (0.10), globemallow (0.10), glow_mycena (0.10), goblins_gold (0.10), gold_poppy (0.10), hazel_bush (0.10), heliconia (0.10), honey_fungus (0.10), horned_poppy (0.10), hottentot_fig (0.10), huckleberry_bush (0.10), labrador_tea (0.10), leadplant (0.10), lesser_celandine (0.10), liana (0.10), lily_of_the_valley (0.10), lily_pad (0.10), lingonberry_bush (0.10), lousewort (0.10), lungwort (0.10), lupine (0.10), may_lily (0.10), morning_glory (0.10), ocotillo (0.10), pencil_flower (0.10), philodendron (0.10), porcini (0.10), prickly_pear (0.10), prickly_rose (0.10), purple_coneflower (0.10), pygmy_buttercup (0.10), reed (0.10), reindeer_lichen (0.10), rose (0.10), saxifrage (0.10), sea_daffodil (0.10), sea_fan (0.10), sea_holly (0.10), sea_rocket (0.10), sea_rod (0.10), seagrass (0.10), sedge (0.10), senna (0.10), sensitive_plant (0.10), staghorn_coral (0.10), sweet_woodruff (0.10), sword_fern (0.10), tall_grass (0.10), tall_grass_double (0.10), turtle_grass (0.10), twinflower (0.10), water_hyacinth (0.10), water_primrose (0.10), wild_sunflower (0.10), wood_anemone (0.10), wood_cranesbill (0.10)
 - crop: barley (0.20), barley_seeds (0.20), bean_seeds (0.20), beans (0.20), beetroot (0.20), beetroots (0.20), cactus (0.20), carrot (0.20), carrots (0.20), cassava (0.20), chia (0.20), chia_seeds (0.20), corn (0.20), maize (0.20), maize_seeds (0.20), melon (0.20), millet (0.20), millet_seeds (0.20), potato (0.20), potatoes (0.20), pumpkin (0.20), rice (0.20), rice_seeds (0.20), rye (0.20), rye_seeds (0.20), sorghum (0.20), sorghum_seeds (0.20), sugar_cane (0.20), tepary_beans (0.20), wheat (0.20), wheat_seeds (0.20), wild_rice (0.20)
 - food: animals:araucaria_cone (0.20), animals:cooked_hare (3.2), animals:cooked_pacu (3.2), animals:cooked_trout (3.2), animals:cooked_venison (3.2), animals:cycad_seed (0.20), animals:ginkgo_seed (0.20), animals:hare (3.0), animals:pacu (3.0), animals:trout (3.0), animals:venison (3.0), acorn (0.20), acuri_nut (0.20), andiroba_seed (0.20), apple (0.20), apple_pie (2.7), baked_potato (0.37), bananas (0.20), beach_plums (0.20), beef (3.0), berries (0.20), brazil_nut (0.20), bread (0.65), cacao_beans (0.25), cacao_pod (0.20), cattail_root (0.20), chicken (3.0), cloudberries (0.20), cooked_beef (3.2), cooked_chicken (3.2), cooked_egg (2.2), cooked_mutton (3.2), cooked_porkchop (3.2), cooked_rice (0.37), cooked_wild_rice (0.37), crowberries (0.20), dried_apple (0.25), dried_berries (0.25), dried_meat (3.0), hazelnut (0.20), huckleberries (0.20), ipe_seed (0.20), kelp (0.20), lingonberries (0.20), matamata_fruit (0.20), melon_seeds (0.03), melon_slice (0.01), mesquite_pod (0.20), moriche_fruit (0.20), mushroom_brown (0.20), mushroom_red (0.20), mutton (3.0), pine_nut (0.20), porkchop (3.0), prickly_pear_fruit (0.20), pumpkin_seeds (0.03), pumpkin_slice (0.01), raspberries (0.20), roasted_cacao (0.42), roasted_corn (0.37), rose_hip (0.20), sequoia_cone (0.20), smoked_meat (3.2), sunflower_seeds (0.20)
-- material: bandage (0.14), bone (2.0), book (3.2), bowl (0.08), cloth (0.30), coal (0.33), coal_block (3.0), compost (0.45), dung (2.0), egg (2.0), feather (2.0), flint (0.20), fur (2.0), gunpowder (2.0), hide (2.0), leather (2.5), oak_bark (0.08), paper (0.22), plant_fibre (0.02), rock (0.10), rotten_flesh (2.0), sharp_flake (0.25), sole_leather (2.2), spider_eye (2.0), stick (0.05), string (0.08), sugar (0.25), tektite (5.0)
+- material: animals:forest_offering (0.75), animals:warden_antler (15), animals:warden_bark (15), bandage (0.14), bone (2.0), book (3.2), bowl (0.08), cloth (0.30), coal (0.33), coal_block (3.0), compost (0.45), dung (2.0), egg (2.0), feather (2.0), flint (0.20), fur (2.0), gunpowder (2.0), hide (2.0), leather (2.5), oak_bark (0.08), paper (0.22), plant_fibre (0.02), rock (0.10), rotten_flesh (2.0), sharp_flake (0.25), sole_leather (2.2), spider_eye (2.0), stick (0.05), string (0.08), sugar (0.25), tektite (5.0)
 - clothing: fur_boots (4.1), fur_coat (8.2), fur_hat (4.1), fur_robe (10), fur_trousers (6.2), hide_boots (4.1), hide_coat (8.2), hide_hat (4.1), hide_trousers (6.2), linen_boots (0.73), linen_coat (1.4), linen_hat (0.73), linen_trousers (1.1), rain_cape (13), wool_boots (0.90), wool_cloak (1.3), wool_coat (1.8), wool_hat (0.90), wool_trousers (1.4)
-- station: bow_drill (0.23), campfire_laid (0.75), charcoal_clamp (1.1), compost_bin (0.66), cooking_pot (0.75), drying_rack (0.30), fire_bed (0.22), hand_drill (0.15), stew (3.4), tanning_frame (0.58), tanning_pit (0.66)
+- station: animals:drenkaun_altar (1.9), bow_drill (0.23), campfire_laid (0.75), charcoal_clamp (1.1), compost_bin (0.66), cooking_pot (0.75), drying_rack (0.30), fire_bed (0.22), hand_drill (0.15), stew (3.4), tanning_frame (0.58), tanning_pit (0.66)
 - building: bed (1.5), bookshelf (10), chest (0.75), crafting_table (0.40), hay_bale (1.9), ladder (0.13), wool (0.38)
 - light: torch (0.11)
+- part: animals:warden_heartseed (45)
 - technical: campfire (-), farmland (-), grazed_grass (-), lava (-), maize_top (-), melon_stem (-), millet_top (-), paddy_rice (-), pumpkin_stem (-), sorghum_top (-), tombstone (-), water (-), packages:unknown (-), portals:portal (-)
 
 Notes:
@@ -308,20 +336,26 @@ Notes:
 - base:ley_stone: the ancients' carved stone round the waystones, some 600 blocks apart
 - base:waystone: a sleeping waystone on a great ley crossing: not carried off, woken later
 - base:axe, base:pickaxe, base:shovel, base:hoe, base:knife, base:spear, base:sword, base:bow: built from parts: its parts' materials set its real age (`MATERIALS`)
+- base:helmet, base:chestplate, base:leggings, base:boots: built from a shell, fastening and lining: its shell sets its real age; a leather-look shell (leather, rawhide, bone)
 - base:part_*: a part's material sets its real age (`MATERIALS`)
+- base:gem_tektite, base:gem_amber: cut gems: a boost in a tool's, weapon's or armour's socket
 - base:arrow: dropped by skeletons; no recipe yet
 - base:furnace: the Stone Age key's infrastructure: what it makes is the Bronze Age's
 - base:cooking_pot, base:stew: a clay pot (Ronald, 11-07: "move them to fit")
+- animals:drenkaun_altar: a biome boss's altar: the player picks when to fight (round 6)
+- animals:forest_offering: the old forest's offering: calls Drenkaun, tames its calf
+- animals:warden_heartseed: Drenkaun's loot, certain by the third kill: the Stone Age key's boss part
+- animals:warden_antler, animals:warden_bark: Drenkaun's part breaks and loot
 - animals:kibble: an egg, food, grain and fibre (no iron bucket; Ronald, 11-07: "move them to fit")
 
-### Bronze Age (31)
+### Bronze Age (39)
 
-**tech** (30)
+**tech** (33)
 
-- ground: gold_ore (-), granite_gold_ore (-), granite_iron_ore (-), iron_ore (-), meteorite (-), red_sandstone_iron_ore (-)
-- material: gold_block (29), gold_ingot (3.2), meteoric_iron (10), raw_gold (3.0)
-- tool: gold_axe (9.7), gold_hoe (6.5), gold_pickaxe (9.7), gold_shovel (3.3), gold_sword (6.4)
-- armour: gold_boots (13), gold_chestplate (25), gold_helmet (16), gold_leggings (22)
+- ground: copper_ore (-), gold_ore (-), granite_gold_ore (-), granite_iron_ore (-), iron_ore (-), meteorite (-), red_sandstone_iron_ore (-), tin_ore (-)
+- material: bronze_ingot (7.3), copper_ingot (1.7), gold_block (29), gold_ingot (3.2), meteoric_iron (10), raw_copper (1.5), raw_gold (3.0), raw_tin (5.0), tin_ingot (5.2)
+- armour: boots_scale (-), chestplate_scale (-), helmet_scale (-), leggings_scale (-)
+- station: crucible (2.2)
 - building: blue_stained_glass (0.47), bricks (0.27), glass (0.27), green_stained_glass (0.52), red_stained_glass (0.42), stone (0.32), stone_bricks (0.33)
 - light: blue_lamp (1.4), glowstone (1.2), green_lamp (1.4), red_lamp (1.3)
 
@@ -329,20 +363,33 @@ Notes:
 
 - sky: pallasite (20)
 
+**shared** (5)
+
+- material: animals:borkon_horn (20), animals:height_fleece (20), animals:mountain_offering (3.8)
+- station: animals:borkon_altar (5.1)
+- part: animals:summit_stone (60)
+
 Notes:
+- base:copper_ore, base:tin_ore: breaks into raw copper or raw tin (a stone pickaxe): copper in cold, dry and beach land, tin on beaches and in mountains (`metals.rs`)
 - base:iron_ore, base:granite_iron_ore, base:red_sandstone_iron_ore, base:meteorite, base:gold_ore, base:granite_gold_ore: breaks into raw iron, meteoric iron or raw gold (a stone pickaxe)
 - base:pallasite: a stony-iron meteorite's olivine, found where one fell
+- base:helmet_scale, base:chestplate_scale, base:leggings_scale, base:boots_scale: a bronze or copper shell's worn look: no copper or bronze in the game yet (only `/gear`)
 - base:meteoric_iron: hammered cold, iron-grade before a player can smelt (Research round 17)
 - base:raw_gold, base:gold_ingot, base:gold_block: cast and soft: the Bronze Age's (Ronald, 11-07: "move them to fit")
+- animals:borkon_altar: the Height-Keeper's altar: stone bricks and gold (the Bronze Age's)
+- animals:mountain_offering: the heights' offering, with a gold ingot: calls Borkon, tames its kid
+- animals:summit_stone: Borkon's loot, certain by the third kill: the Bronze Age key's boss part
+- animals:borkon_horn, animals:height_fleece: Borkon's part breaks and loot
 
-### Iron Age (31)
+### Iron Age (30)
 
-**tech** (19)
+**tech** (18)
 
 - ground: redstone_ore (-), star_steel_ore (-)
-- material: bucket (3.5), iron_block (11), iron_ingot (1.2), lava_bucket (4.1), raw_iron (1.0), star_steel_ingot (12), star_steel_lump (12), water_bucket (3.7)
-- tool: iron_axe (3.6), iron_hoe (2.5), iron_pickaxe (3.6), iron_shovel (1.3), iron_sword (2.4)
-- armour: iron_boots (4.7), iron_chestplate (9.4), iron_helmet (5.9), iron_leggings (8.2)
+- material: bucket (3.5), gem_peridot (10), iron_block (11), iron_ingot (1.2), lava_bucket (4.1), raw_iron (1.0), star_steel_ingot (12), star_steel_lump (12), steel_ingot (2.3), water_bucket (3.7)
+- tool: grappling_hook (3.8)
+- armour: boots_mail (2.8), chestplate_mail (4.0), helmet_mail (2.8), leggings_mail (4.0)
+- station: forge (6.1)
 
 **magic** (8)
 
@@ -361,20 +408,20 @@ Notes:
 
 Notes:
 - base:redstone_ore, base:star_steel_ore: breaks into its ore (an iron pickaxe)
+- base:helmet_mail, base:chestplate_mail, base:leggings_mail, base:boots_mail: the same armour with an iron or steel shell, an item of its own only for its worn look (`parts::ARMOUR_LOOKS`)
 - base:star_lantern: a starheart in iron
 - base:unlearning_stone: a peridot ground with tektites: gives back perk web nodes (vitals::perks)
 - base:maunduk, base:aruduk, base:remaru, base:emakaun: stones for the web's sockets (vitals::sockets), found, never made: in pallasite today; bosses, ley nodes, ruins and rare animals add theirs (an earlier tier then)
 - base:salt, base:salted_meat: salt is boiled from a water bucket (iron)
 - animals:wyvern_saddle: a dragon-sized saddle has an iron frame
 
-### Age of Steam (30)
+### Age of Steam (26)
 
-**tech** (29)
+**tech** (25)
 
 - ground: diamond_ore (-)
-- material: diamond (10), diamond_block (90)
-- tool: diamond_axe (30), diamond_hoe (20), diamond_pickaxe (30), diamond_shovel (10), diamond_sword (20)
-- armour: diamond_boots (40), diamond_chestplate (80), diamond_helmet (50), diamond_leggings (70)
+- material: diamond (10), diamond_block (90), gem_diamond (10)
+- armour: boots_gem (20), chestplate_gem (30), helmet_gem (20), leggings_gem (30)
 - machine: anchor (9.9), comparator (3.3), copper_lamp (-), dispenser (1.6), floater (10), golden_lamp (13), lever (0.25), observer (3.1), piston (2.6), redstone (0.50), redstone_block (4.6), redstone_lamp (3.2), redstone_torch (0.60), repeater (2.7), slime_block (1.0), sticky_piston (3.7), stone_button (0.37)
 
 **shared** (1)
@@ -385,7 +432,7 @@ Notes:
 - base:diamond_ore: breaks into a diamond (a steel pickaxe: harvest 300)
 - base:copper_lamp: no recipe yet (no copper in the game)
 - base:obsidian: a steel pickaxe or better (harvest 300)
-- base:diamond_pickaxe, base:diamond_axe, base:diamond_shovel, base:diamond_hoe, base:diamond_sword: diamond is a tier above steel (`crafting::materials`)
+- base:helmet_gem, base:chestplate_gem, base:leggings_gem, base:boots_gem: a diamond-scale shell's worn look
 - base:redstone, base:redstone_block, base:redstone_torch, base:repeater, base:comparator, base:lever, base:stone_button, base:redstone_lamp, base:piston, base:sticky_piston, base:slime_block, base:observer, base:dispenser, base:floater, base:anchor, base:golden_lamp: redstone ore needs an iron pickaxe; machines are the Age of Steam's
 
 ## Tool parts' materials
@@ -402,11 +449,11 @@ Each `crafting::MATERIALS` row's age, and what a part of it is made from in the 
 | antler | Stone Age | - |
 | stone | Stone Age | base:cobblestone |
 | diamond | Age of Steam | base:diamond |
-| copper | Bronze Age | - |
-| bronze | Bronze Age | - |
+| copper | Bronze Age | base:copper_ingot |
+| bronze | Bronze Age | base:bronze_ingot |
 | wrought_iron | Iron Age | base:iron_ingot |
 | meteoric_iron | Bronze Age | base:meteoric_iron |
-| steel | Iron Age | - |
+| steel | Iron Age | base:steel_ingot |
 | star_steel | Iron Age | base:star_steel_ingot |
 | gold | Bronze Age | base:gold_ingot |
 | oak | Stone Age | base:oak_planks |
@@ -422,4 +469,7 @@ Each `crafting::MATERIALS` row's age, and what a part of it is made from in the 
 | rawhide | Stone Age | - |
 | birch_tar | Stone Age | - |
 | leather | Stone Age | base:sole_leather |
+| linen | Stone Age | base:cloth |
+| wool | Stone Age | base:wool |
+| fur | Stone Age | base:fur |
 

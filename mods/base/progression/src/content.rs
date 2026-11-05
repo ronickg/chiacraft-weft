@@ -136,6 +136,14 @@ pub const RULES: &[Rule] = &[
     ),
     n(&["base:coal_ore", "base:banded_clay_coal_ore"], 0, Shared, Ground, Not, "breaks into coal"),
     n(
+        &["base:copper_ore", "base:tin_ore"],
+        1,
+        Tech,
+        Ground,
+        Not,
+        "breaks into raw copper or raw tin (a stone pickaxe): copper in cold, dry and beach land, tin on beaches and in mountains (`metals.rs`)",
+    ),
+    n(
         &[
             "base:iron_ore",
             "base:granite_iron_ore",
@@ -229,7 +237,9 @@ pub const RULES: &[Rule] = &[
     n(&["base:dowsing_rod"], 0, Magic, Tool, Made, "senses the ley lines: the Stone Age's magic route"),
     n(&["base:ley_stone"], 0, Magic, Building, World(PICK, 3.0), "the ancients' carved stone round the waystones, some 600 blocks apart"),
     n(&["base:waystone"], 0, Magic, Technical, Not, "a sleeping waystone on a great ley crossing: not carried off, woken later"),
-    // ---- tools, weapons and armour: today's by material, and the ones built from parts
+    // glider.rs: leather on a frame of sticks (`vitals::glide::HIDE`).
+    r(&["base:glider"], 0, Tech, Tool, Made),
+    // ---- tools, weapons and armour: all built from parts (Ronald, 11-05)
     n(
         &["base:axe", "base:pickaxe", "base:shovel", "base:hoe", "base:knife", "base:spear", "base:sword", "base:bow"],
         0,
@@ -238,44 +248,53 @@ pub const RULES: &[Rule] = &[
         Made,
         "built from parts: its parts' materials set its real age (`MATERIALS`)",
     ),
-    n(&["base:part_*"], 0, Tech, Part, Made, "a part's material sets its real age (`MATERIALS`)"),
-    r(
-        &[
-            "base:wood_pickaxe",
-            "base:wood_axe",
-            "base:wood_shovel",
-            "base:wood_hoe",
-            "base:wood_sword",
-            "base:stone_pickaxe",
-            "base:stone_axe",
-            "base:stone_shovel",
-            "base:stone_hoe",
-            "base:stone_sword",
-        ],
+    n(
+        &["base:helmet", "base:chestplate", "base:leggings", "base:boots"],
         0,
         Tech,
-        Tool,
+        Armour,
         Made,
+        "built from a shell, fastening and lining: its shell sets its real age; a leather-look shell (leather, rawhide, bone)",
     ),
-    r(&["base:leather_helmet", "base:leather_chestplate", "base:leather_leggings", "base:leather_boots"], 0, Tech, Armour, Made),
-    // glider.rs: leather on a frame of sticks (`vitals::glide::HIDE`).
-    r(&["base:glider"], 0, Tech, Tool, Made),
-    r(&["base:iron_pickaxe", "base:iron_axe", "base:iron_shovel", "base:iron_hoe", "base:iron_sword"], 2, Tech, Tool, Made),
-    r(&["base:iron_helmet", "base:iron_chestplate", "base:iron_leggings", "base:iron_boots"], 2, Tech, Armour, Made),
-    r(&["base:gold_pickaxe", "base:gold_axe", "base:gold_shovel", "base:gold_hoe", "base:gold_sword"], 1, Tech, Tool, Made),
-    r(&["base:gold_helmet", "base:gold_chestplate", "base:gold_leggings", "base:gold_boots"], 1, Tech, Armour, Made),
+    // grapple.rs: wrought-iron flukes on a string cord (`vitals::grapple::IRON`).
+    r(&["base:grappling_hook"], 2, Tech, Tool, Made),
     n(
-        &["base:diamond_pickaxe", "base:diamond_axe", "base:diamond_shovel", "base:diamond_hoe", "base:diamond_sword"],
+        &["base:helmet_mail", "base:chestplate_mail", "base:leggings_mail", "base:boots_mail"],
+        2,
+        Tech,
+        Armour,
+        Made,
+        "the same armour with an iron or steel shell, an item of its own only for its worn look (`parts::ARMOUR_LOOKS`)",
+    ),
+    n(
+        &["base:helmet_scale", "base:chestplate_scale", "base:leggings_scale", "base:boots_scale"],
+        1,
+        Tech,
+        Armour,
+        Not,
+        "a bronze or copper shell's worn look: no copper or bronze in the game yet (only `/gear`)",
+    ),
+    n(
+        &["base:helmet_gem", "base:chestplate_gem", "base:leggings_gem", "base:boots_gem"],
         3,
         Tech,
-        Tool,
+        Armour,
         Made,
-        "diamond is a tier above steel (`crafting::materials`)",
+        "a diamond-scale shell's worn look",
     ),
-    r(&["base:diamond_helmet", "base:diamond_chestplate", "base:diamond_leggings", "base:diamond_boots"], 3, Tech, Armour, Made),
+    n(&["base:part_*"], 0, Tech, Part, Made, "a part's material sets its real age (`MATERIALS`)"),
+    // Gems for gear sockets (`crafting::gems`), cut from their found stones, of their stone's age.
+    n(&["base:gem_tektite", "base:gem_amber"], 0, Tech, Material, Made, "cut gems: a boost in a tool's, weapon's or armour's socket"),
+    r(&["base:gem_peridot"], 2, Tech, Material, Made),
+    r(&["base:gem_diamond"], 3, Tech, Material, Made),
     n(&["base:arrow"], 0, Tech, Tool, Drop(2.0), "dropped by skeletons; no recipe yet"),
     // ---- metals and gems
     r(&["base:coal", "base:coal_block"], 0, Shared, Material, Made),
+    // Copper, tin and bronze (`metals.rs`): the Bronze Age's; steel the Iron Age's.
+    r(&["base:raw_copper", "base:copper_ingot", "base:raw_tin", "base:tin_ingot", "base:bronze_ingot"], 1, Tech, Material, Made),
+    r(&["base:crucible"], 1, Tech, Station, Made),
+    r(&["base:steel_ingot"], 2, Tech, Material, Made),
+    r(&["base:forge"], 2, Tech, Station, Made),
     n(&["base:meteoric_iron"], 1, Tech, Material, Made, "hammered cold, iron-grade before a player can smelt (Research round 17)"),
     r(
         &["base:raw_iron", "base:iron_ingot", "base:iron_block", "base:bucket", "base:water_bucket", "base:lava_bucket"],
@@ -512,6 +531,26 @@ pub const RULES: &[Rule] = &[
         Beast,
         Made,
     ),
+    // ---- the biome bosses (animals_core::bosses, drenkaun.rs): the altar and its offering made,
+    // the boss's parts from the fight (a fight about 5 minutes, the offering's gathering and the
+    // altar's, over the kills its bad-luck help needs)
+    n(&["animals:drenkaun_altar"], 0, Shared, Station, Made, "a biome boss's altar: the player picks when to fight (round 6)"),
+    n(&["animals:forest_offering"], 0, Shared, Material, Made, "the old forest's offering: calls Drenkaun, tames its calf"),
+    n(
+        &["animals:warden_heartseed"],
+        0,
+        Shared,
+        Part,
+        Drop(45.0),
+        "Drenkaun's loot, certain by the third kill: the Stone Age key's boss part",
+    ),
+    n(&["animals:warden_antler", "animals:warden_bark"], 0, Shared, Material, Drop(15.0), "Drenkaun's part breaks and loot"),
+    // Borkon (borkon.rs): the Bronze Age's boss, its altar of granite, stone bricks and gold, its
+    // offering with the dwarves' gold; a Bronze fight about 4 minutes
+    n(&["animals:borkon_altar"], 1, Shared, Station, Made, "the Height-Keeper's altar: stone bricks and gold (the Bronze Age's)"),
+    n(&["animals:mountain_offering"], 1, Shared, Material, Made, "the heights' offering, with a gold ingot: calls Borkon, tames its kid"),
+    n(&["animals:summit_stone"], 1, Shared, Part, Drop(60.0), "Borkon's loot, certain by the third kill: the Bronze Age key's boss part"),
+    n(&["animals:borkon_horn", "animals:height_fleece"], 1, Shared, Material, Drop(20.0), "Borkon's part breaks and loot"),
     n(&["animals:kibble"], 0, Beasts, Beast, Made, "an egg, food, grain and fibre (no iron bucket; Ronald, 11-07: \"move them to fit\")"),
     n(&["animals:wyvern_saddle"], 2, Beasts, Beast, Made, "a dragon-sized saddle has an iron frame"),
     r(&["animals:spyglass"], 2, Shared, Tool, Made),
@@ -719,11 +758,11 @@ pub const MATERIALS: &[MaterialTag] = &[
     mt("antler", ""),
     mt("stone", "base:cobblestone"),
     mt("diamond", "base:diamond"),
-    mt("copper", ""),
-    mt("bronze", ""),
+    mt("copper", "base:copper_ingot"),
+    mt("bronze", "base:bronze_ingot"),
     mt("wrought_iron", "base:iron_ingot"),
     mt("meteoric_iron", "base:meteoric_iron"),
-    mt("steel", ""),
+    mt("steel", "base:steel_ingot"),
     mt("star_steel", "base:star_steel_ingot"),
     mt("gold", "base:gold_ingot"),
     mt("oak", "base:oak_planks"),
@@ -739,6 +778,9 @@ pub const MATERIALS: &[MaterialTag] = &[
     mt("rawhide", ""),
     mt("birch_tar", ""),
     mt("leather", "base:sole_leather"),
+    mt("linen", "base:cloth"),
+    mt("wool", "base:wool"),
+    mt("fur", "base:fur"),
 ];
 
 pub fn material(id: &str) -> Option<&'static MaterialTag> {

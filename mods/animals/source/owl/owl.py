@@ -146,6 +146,10 @@ CFG = dict(
     tilt=-50,
     neck_share=0.0,
     neck_hidden=True,  # the head sits on the shoulders: the neck is a hidden link
+    # Its back inside the head (behind 6.44 a strip under two texels showed between the head and the back;
+    # linecheck), 0.36 units in, clear of flicker; its joint with the chest (z 6.6) within the joints' tolerance.
+    # Its front two texels before the chest's (8.4): at 10.4 the throat under the head read as a strip; linecheck.
+    neck_box=(12.4, 18.2, 6.8, 10.65),
     eyes=dict(kind="front", pattern="owl", x=EYE_PX_X, y=EYE_Y, lash=(52, 34, 26)),
     materials=MATERIALS,
     feather=(BROWN, DARK, BUFF, RUFOUS, WHITE),

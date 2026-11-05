@@ -83,7 +83,7 @@ pub fn register(r: &mut Registry) {
         .no_item();
     r.entity_component(&MARK, 0, component_flags::SYNC_WATCHERS);
     // A suit to swim in lava with (`swimming`).
-    r.set_text_on(Target::Name("base:diamond_chestplate"), &SWIMS_IN, "#lava");
+    r.set_text_on(Target::Name("base:chestplate_gem"), &SWIMS_IN, "#lava");
     r.attach(&PIG, &MARK);
     r.storage(&STASH, 54);
     r.attach_storage(&PLAYER, &STASH);
@@ -304,6 +304,19 @@ fn open_stash(w: &World, cmd: &Command, player: u64) -> Result<String, String> {
 static PROTECTED: std::sync::Mutex<Option<[i32; 3]>> = std::sync::Mutex::new(None);
 
 const OPS: &[(&str, &str, Run)] = &[
+    // The registry as JSON for the crew gallery's catalogue (`notes/crew/gallery/catalogue`):
+    // every item, block, entity and biome with what the game knows of it. Written into the
+    // `--shot-dir` when there is one.
+    ("dump", "<file:word>", |_, cmd, _, _| {
+        let file = word(cmd, "file")?;
+        let path = match launch_option("shot-dir") {
+            Some(d) => format!("{d}/{file}"),
+            None => file.to_string(),
+        };
+        let text = dump_registry();
+        std::fs::write(&path, &text).map_err(|e| format!("{path}: {e}"))?;
+        Ok(format!("{path} {}", text.len()))
+    }),
     // Items into the player's inventory (the crew's scripts set up with it).
     ("give", "<item:item> [count:int]", |w, cmd, player, _| {
         let count: u32 = int(cmd, "count").unwrap_or(1);
@@ -675,7 +688,7 @@ const OPS: &[(&str, &str, Run)] = &[
         // `n` dropped stacks of a few kinds (blocks and sprites) in a grid north of the
         // player, 1.1 apart so they do not merge.
         let n: u32 = int(cmd, "n")?;
-        let kinds: Vec<u32> = ["base:dirt", "base:coal", "base:iron_pickaxe", "base:dandelion", "base:stick", "base:torch"]
+        let kinds: Vec<u32> = ["base:dirt", "base:coal", "base:pickaxe", "base:dandelion", "base:stick", "base:torch"]
             .iter()
             .filter_map(|k| Item::lookup(k))
             .collect();
@@ -1025,7 +1038,8 @@ const OPS: &[(&str, &str, Run)] = &[
         w.attribute_remove_modifier(owner(w, cmd)?, Attribute::generated(word(cmd, "attribute")?.to_string()), word(cmd, "mod")?);
         Ok(String::new())
     }),
-    ("loot", "<table:word> <n:int> [ctx:text]", |w, cmd, _, _| {
+    // `held` as the tool: the stack in the player's selected hotbar slot (a tool built from parts).
+    ("loot", "<table:word> <n:int> [ctx:text]", |w, cmd, player, _| {
         let table = LootTable::generated(word(cmd, "table")?.to_string());
         let n: u32 = int(cmd, "n")?;
         let mut ctx = LootCtx::default();
@@ -1035,7 +1049,7 @@ const OPS: &[(&str, &str, Run)] = &[
                 "player" => ctx.by_player = true,
                 // Mined by the tool, from the block the table is named after.
                 "mined" => ctx.mined = Block::lookup(table.name()).ok_or("not a block's table")?,
-                tool => ctx.tool = ItemStack::new(item(tool)?, 1),
+                tool => ctx.tool = tool_stack(w, player, tool)?,
             }
         }
         let mut totals: std::collections::BTreeMap<String, u32> = Default::default();
@@ -1050,10 +1064,11 @@ const OPS: &[(&str, &str, Run)] = &[
             .collect::<Vec<_>>()
             .join(" "))
     }),
-    ("break", "<pos:pos> [tool:item]", |w, cmd, player, _| {
-        let tool = cmd
-            .id("tool")
-            .map_or(ItemStack::EMPTY, |t| ItemStack::new(t, 1));
+    ("break", "<pos:pos> [tool:word]", |w, cmd, player, _| {
+        let tool = match cmd.text("tool") {
+            Some(t) => tool_stack(w, player, t)?,
+            None => ItemStack::EMPTY,
+        };
         Ok((w.break_block(pos(cmd, "pos")?, tool, player, true) as u32).to_string())
     }),
     // A melee hit's damage with what `item` makes of the player having fallen `fall` blocks.
@@ -1140,3 +1155,182 @@ const OPS: &[(&str, &str, Run)] = &[
         Ok(out.join(" "))
     }),
 ];
+
+/// A tool for `break` and `loot`: `held` is the stack in `player`'s selected hotbar slot (a tool
+/// built from parts, `/gear`), anything else an item by name.
+fn tool_stack(w: &World, player: u64, name: &str) -> Result<ItemStack, String> {
+    if name == "held" {
+        return Ok(w
+            .inventory(player)
+            .group("hotbar")
+            .get(w.selected_slot(player)));
+    }
+    Ok(ItemStack::new(item(name)?, 1))
+}
+
+/// A JSON string.
+fn js(s: &str) -> String {
+    let mut o = String::with_capacity(s.len() + 2);
+    o.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => o.push_str("\\\""),
+            '\\' => o.push_str("\\\\"),
+            c if (c as u32) < 0x20 => o.push_str(&format!("\\u{:04x}", c as u32)),
+            c => o.push(c),
+        }
+    }
+    o.push('"');
+    o
+}
+
+/// The components and tags an entry carries, by name (`tab/base:tools`, `crops/wheat`, `food`).
+fn comps_json(kind: u32, id: u32) -> String {
+    let names: Vec<String> = components_of(kind, id).iter().map(|(n, _)| js(n)).collect();
+    format!("[{}]", names.join(","))
+}
+
+/// Every item, block, entity kind and biome (`/tk dump`).
+fn dump_registry() -> String {
+    let mut items = Vec::new();
+    for id in 0..entry_count(ek::ITEM) {
+        let Some(i) = item_info(id) else { continue };
+        items.push(format!(
+            "{{\"id\":{},\"owner\":{},\"max_stack\":{},\"durability\":{},\"attack\":{},\"block\":{},\"worn\":{},\"handheld\":{},\"comps\":{}}}",
+            js(i.name),
+            js(i.owner),
+            i.max_stack,
+            i.durability,
+            i.attack,
+            i.block.map_or("null".to_string(), |b| js(block_name(b))),
+            js(i.worn),
+            i.handheld,
+            comps_json(ek::ITEM, id)
+        ));
+    }
+    let mut blocks = Vec::new();
+    let mut state = 0;
+    while let Some(b) = block_info(state) {
+        let tex: Vec<String> = b.textures.iter().map(|t| js(t)).collect();
+        blocks.push(format!(
+            "{{\"id\":{},\"owner\":{},\"states\":{},\"model\":{},\"layer\":{},\"light\":[{},{},{}],\"hardness\":{},\"solid\":{},\"textures\":[{}],\"item\":{},\"comps\":{}}}",
+            js(b.name),
+            js(b.owner),
+            b.states,
+            js(&format!("{:?}", b.model)),
+            js(&format!("{:?}", b.layer)),
+            b.light[0],
+            b.light[1],
+            b.light[2],
+            b.hardness,
+            b.solid(),
+            tex.join(","),
+            b.item.map_or("null".to_string(), |i| js(item_name(i))),
+            comps_json(ek::BLOCK, b.first_state)
+        ));
+        state = b.first_state + b.states.max(1);
+    }
+    let named = |kind: u32| -> Vec<String> {
+        (0..entry_count(kind))
+            .map(|id| format!("{{\"id\":{},\"comps\":{}}}", js(name_of(kind, id)), comps_json(kind, id)))
+            .collect()
+    };
+    format!(
+        "{{\"items\":[\n{}\n],\"blocks\":[\n{}\n],\"entities\":[\n{}\n],\"biomes\":[\n{}\n],\"menus\":[\n{}\n],\"recipes\":[\n{}\n]}}\n",
+        items.join(",\n"),
+        blocks.join(",\n"),
+        named(ek::ENTITY).join(",\n"),
+        named(ek::BIOME).join(",\n"),
+        named(ek::MENU).join(",\n"),
+        recipes_json().join(",\n")
+    )
+    .trim_end()
+    .trim_end_matches('}')
+    .to_string()
+        + &format!(",\"skills\":[\n{}\n],\"web\":{}}}\n", skills_json().join(",\n"), web_json())
+}
+
+/// The skills (`vitals::skills`): id, name, group, path, what raises them.
+fn skills_json() -> Vec<String> {
+    vitals::skills::SKILLS
+        .iter()
+        .map(|s| {
+            format!(
+                "{{\"id\":{},\"name\":{},\"group\":{},\"path\":{},\"by\":{}}}",
+                js(s.id()),
+                js(s.name()),
+                js(s.group().name()),
+                js(&format!("{:?}", s.path())),
+                js(s.by())
+            )
+        })
+        .collect()
+}
+
+/// The perk web (`vitals::perks::web`): every node where it's drawn, with what it gives, and the
+/// links.
+fn web_json() -> String {
+    let w = vitals::perks::web();
+    let nodes: Vec<String> = w
+        .nodes
+        .iter()
+        .map(|n| {
+            let gives: Vec<String> = n.gives.iter().map(|(f, u)| format!("[{},{u}]", js(f.name()))).collect();
+            format!(
+                "{{\"id\":{},\"kind\":{},\"region\":{},\"bridge\":{},\"ring\":{},\"x\":{},\"y\":{},\"gives\":[{}],\"special\":{},\"key\":{},\"needs\":{},\"socket\":{}}}",
+                n.id,
+                js(&format!("{:?}", n.kind)),
+                n.region.map_or("null".into(), |s| js(s.id())),
+                n.bridge.map_or("null".into(), |s| js(s.id())),
+                n.ring,
+                n.x,
+                n.y,
+                gives.join(","),
+                n.special.map_or("null".into(), |s| js(s.id())),
+                js(&n.key),
+                n.needs,
+                n.socket.map_or("null".into(), |s| s.to_string())
+            )
+        })
+        .collect();
+    let links: Vec<String> = w.links.iter().map(|(a, b)| format!("[{a},{b}]")).collect();
+    format!("{{\"nodes\":[\n{}\n],\"links\":[{}]}}", nodes.join(",\n"), links.join(","))
+}
+
+/// The recipe kinds the mods register (`base_api`, `parts.rs`).
+static DUMP_KINDS: [RecipeKind; 3] =
+    [RecipeKind::named("base:crafting"), RecipeKind::named("base:smelting"), RecipeKind::named("base:parts")];
+
+/// Every recipe of the mods' kinds: its grid (0 x 0 shapeless), cells or ingredients (kind,
+/// count, the item shown), outputs with their chances and its time in ticks.
+fn recipes_json() -> Vec<String> {
+    let mut out = Vec::new();
+    for kind in &DUMP_KINDS {
+        for r in recipes(kind) {
+            let (w, h) = r.shape().unwrap_or((0, 0));
+            let ins: Vec<String> = r
+                .inputs()
+                .iter()
+                .map(|i| {
+                    let shown = if i.shown == 0 { String::new() } else { item_name(i.shown).to_string() };
+                    format!("[{},{},{}]", i.kind, i.count, js(&shown))
+                })
+                .collect();
+            let outs: Vec<String> = r
+                .outputs()
+                .iter()
+                .map(|(s, chance)| format!("[{},{},{}]", js(item_name(s.item)), s.count, chance))
+                .collect();
+            out.push(format!(
+                "{{\"kind\":{},\"index\":{},\"time\":{},\"hidden\":{},\"w\":{w},\"h\":{h},\"in\":[{}],\"out\":[{}]}}",
+                js(r.kind()),
+                r.index(),
+                r.time(),
+                r.hidden(),
+                ins.join(","),
+                outs.join(",")
+            ));
+        }
+    }
+    out
+}

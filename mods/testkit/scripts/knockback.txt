@@ -1,0 +1,228 @@
+# Knockback resistance check (branch claude/knockback-resistance): each animal hit in a 7x7 pen, its
+# position logged after every hit; then Drenkaun (spawned) hit 20 times in the open (it used to be flung 20 blocks).
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /time set 6000
+chat /tk attr_mod me core:entity_reach testkit:reach 0 3 0
+chat /tk attr_mod me core:max_health testkit:hp 0 300 0
+chat /tk mode spectator
+chat /tp 0.5 206 -0.5
+wait 2
+loaded
+chat /tk fill -8 196 -6 8 199 10 stone
+chat /tk fill -3 197 0 3 199 6 core:air
+chat /tk fill -1 200 -2 1 202 -2 stone
+chat /tk fill -1 200 -1 -1 202 -1 stone
+chat /tk fill 1 200 -1 1 202 -1 stone
+chat /tk fill 0 202 -1 0 202 -1 stone
+chat /tp 0.5 200 -0.5
+wait 1
+loaded
+chat /tk mode survival
+chat /tp 0.5 200 -0.5
+chat /gear sword flint slot=0
+key 1
+chat /tk heal
+chat /tk spawn animals:grey_wolf 0 197 1
+wait 1
+chat /animal level 0
+wait 0.5
+where K0_grey_wolf_start
+entities 10
+shot kb_K0_grey_wolf.png
+chat /tp 0.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.3
+entities 10
+wait 1.2
+chat /tp 0.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.3
+entities 10
+wait 1.2
+chat /tp 0.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.3
+entities 10
+wait 1.2
+chat /tp 0.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.3
+entities 10
+wait 1.2
+where K0_grey_wolf_end
+chat /tk mode spectator
+chat /tp 20.5 206 -0.5
+wait 2
+loaded
+chat /tk fill 12 196 -6 28 199 10 stone
+chat /tk fill 17 197 0 23 199 6 core:air
+chat /tk fill 19 200 -2 21 202 -2 stone
+chat /tk fill 19 200 -1 19 202 -1 stone
+chat /tk fill 21 200 -1 21 202 -1 stone
+chat /tk fill 20 202 -1 20 202 -1 stone
+chat /tp 20.5 200 -0.5
+wait 1
+loaded
+chat /tk mode survival
+chat /tp 20.5 200 -0.5
+chat /gear sword flint slot=0
+key 1
+chat /tk heal
+chat /tk spawn animals:utahraptor 20 197 1
+wait 1
+chat /animal level 0
+wait 0.5
+where K1_utahraptor_start
+entities 10
+shot kb_K1_utahraptor.png
+chat /tp 20.5 200 -0.5
+look 180 -55
+press core:attack
+wait 0.3
+entities 10
+wait 1.2
+chat /tp 20.5 200 -0.5
+look 180 -55
+press core:attack
+wait 0.3
+entities 10
+wait 1.2
+chat /tp 20.5 200 -0.5
+look 180 -55
+press core:attack
+wait 0.3
+entities 10
+wait 1.2
+chat /tp 20.5 200 -0.5
+look 180 -55
+press core:attack
+wait 0.3
+entities 10
+wait 1.2
+where K1_utahraptor_end
+chat /tk mode spectator
+chat /tp 40.5 206 -0.5
+wait 2
+loaded
+chat /tk fill 32 196 -6 48 199 10 stone
+chat /tk fill 37 197 0 43 199 6 core:air
+chat /tk fill 39 200 -2 41 202 -2 stone
+chat /tk fill 39 200 -1 39 202 -1 stone
+chat /tk fill 41 200 -1 41 202 -1 stone
+chat /tk fill 40 202 -1 40 202 -1 stone
+chat /tp 40.5 200 -0.5
+wait 1
+loaded
+chat /tk mode survival
+chat /tp 40.5 200 -0.5
+chat /gear sword flint slot=0
+key 1
+chat /tk heal
+chat /tk spawn animals:iguanodont 40 197 1
+wait 1
+chat /animal level 0
+wait 0.5
+where K2_iguanodont_start
+entities 10
+shot kb_K2_iguanodont.png
+chat /tp 40.5 200 -0.5
+look 180 -55
+press core:attack
+wait 0.3
+entities 10
+wait 1.2
+chat /tp 40.5 200 -0.5
+look 180 -55
+press core:attack
+wait 0.3
+entities 10
+wait 1.2
+chat /tp 40.5 200 -0.5
+look 180 -55
+press core:attack
+wait 0.3
+entities 10
+wait 1.2
+chat /tp 40.5 200 -0.5
+look 180 -55
+press core:attack
+wait 0.3
+entities 10
+wait 1.2
+where K2_iguanodont_end
+chat /tk mode spectator
+chat /tp 100.5 206 0.5
+wait 2
+loaded
+chat /tk fill 80 198 -20 120 198 20 stone
+chat /tk fill 80 199 -20 120 199 20 base:grass
+chat /tk fill 80 200 -20 120 212 20 core:air
+chat /tk fill 100 200 0 100 200 0 animals:drenkaun_altar
+chat /tk fill 96 200 -4 96 204 -4 base:oak_log
+chat /tk fill 104 200 -4 104 204 -4 base:oak_log
+chat /tk fill 96 200 4 96 204 4 base:oak_log
+chat /tk fill 104 200 4 104 204 4 base:oak_log
+chat /tp 100.5 200 2.5
+wait 1
+loaded
+chat /tk mode survival
+chat /tp 100.5 200 2.5
+chat /gear sword diamond slot=2
+chat /tk spawn animals:drenkaun 100 200 -6
+wait 4
+key 3
+where D_start
+chat /drenkaun state
+entities 30
+chat /drenkaun hurt 60
+wait 0.55
+chat /drenkaun hurt 60
+wait 0.55
+chat /drenkaun hurt 60
+wait 0.55
+chat /drenkaun hurt 60
+wait 0.55
+chat /drenkaun hurt 60
+wait 0.55
+chat /drenkaun hurt 60
+wait 0.55
+chat /drenkaun hurt 60
+wait 0.55
+chat /drenkaun hurt 60
+wait 0.55
+chat /drenkaun hurt 60
+wait 0.55
+chat /drenkaun hurt 60
+wait 0.55
+chat /drenkaun hurt 60
+wait 0.55
+chat /drenkaun hurt 60
+wait 0.55
+chat /drenkaun hurt 60
+wait 0.55
+chat /drenkaun hurt 60
+wait 0.55
+chat /drenkaun hurt 60
+wait 0.55
+chat /drenkaun hurt 60
+wait 0.55
+chat /drenkaun hurt 60
+wait 0.55
+chat /drenkaun hurt 60
+wait 0.55
+chat /drenkaun hurt 60
+wait 0.55
+chat /drenkaun hurt 60
+wait 0.55
+entities 30
+chat /drenkaun state
+where D_end
+look 0 10
+shot kb_drenkaun.png
+quit

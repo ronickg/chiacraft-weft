@@ -700,7 +700,9 @@ gpu_struct! {
         /// when what is held gives none. It falls off like block light, a level a block.
         pub hand_light: [f32; 4],
         /// Where the player is: x how closed a forest's canopy is (0 open sky to 1 a rainforest's;
-        /// a mod's air, `air_flags::CANOPY_SHIFT`), for packs' light under the leaves; yzw unused.
+        /// a mod's air, `air_flags::CANOPY_SHIFT`), for packs' light under the leaves; y how wet
+        /// the ground is, 0..1: it follows what falls up and dries over minutes after (a mod's air
+        /// says how fast, `air_flags::DRYING_SHIFT`); zw unused.
         pub canopy: [f32; 4],
         /// Soft clouds (`core:soft_clouds`, with a pack whose sky has `fs_cloud_trace` and
         /// `fs_cloud_resolve`; chiacraft): x the bindless index + 1 of this frame's clouds, traced
@@ -728,6 +730,12 @@ gpu_struct! {
         /// has `fs_frame_look`; chiacraft): x the bindless index + 1 of its row of texels (0:
         /// none this frame, each shader works them out itself), yzw unused.
         pub frame_look: [f32; 4],
+        /// The last lightning flash where the player is (a weather with `lightning`, chiacraft):
+        /// x seconds since it began (1e4 when none yet; real time, not the shaders' clock, which
+        /// tests pin), y a random number 0..1 of its own (for where it strikes), z how hard it
+        /// thunders now (as `weather.w`), w unused. The engine's own flash only brightens the
+        /// daylight for 0.15 s; packs draw the bolt and the flicker from this.
+        pub lightning: [f32; 4],
     }
 }
 

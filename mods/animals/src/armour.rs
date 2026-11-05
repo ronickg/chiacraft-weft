@@ -35,18 +35,9 @@ pub fn init(r: &mut Registry) {
         let size = danger::size(s);
         let level = danger::danger(s.name).map_or(0.0, |d| d.area_level(a.level().min(danger::LEVELS.1)));
         let raw = m.value as f32;
-        let mut hit = raw;
         let by_player = q.cause == damage_cause::ATTACK && w.players_iter().any(|p| p == q.other);
         // 1. A player's weapon, capped by the animal's size.
-        if by_player {
-            let held = w
-                .inventory(q.other)
-                .group("hotbar")
-                .get(w.selected_slot(q.other));
-            if let Some(lv) = base_api::ITEM_LEVEL.on_stack(&held) {
-                hit *= vitals::combat::cap_share(size, lv, level);
-            }
-        }
+        let mut hit = raw * player_cap(&w, q.other, q.cause, size, level);
         let capped = hit;
         // 2. Armour.
         if DamageCause::flags_of(q.cause) & damage_flags::BYPASSES_ARMOR == 0 {
@@ -56,29 +47,14 @@ pub fn init(r: &mut Registry) {
         if q.cause != damage_cause::VOID
             && let Some(st) = w.entity(q.entity)
         {
-            let now = w.game_time();
-            let [budget, last, stagger] = w
-                .component(q.entity, &FLOOR)
-                .unwrap_or([f64::NAN, 0.0, 0.0]);
-            // A fresh one holds a second's worth.
-            let budget = if budget.is_nan() {
-                vitals::combat::floor_rate(size, st.max_health).unwrap_or(st.max_health) * vitals::combat::FLOOR_HELD
-            } else {
-                budget as f32
-            };
-            let secs = now.saturating_sub(last as u64) as f32 / vitals::TICKS as f32;
-            let (took, left, over) = vitals::combat::floor_take(size, st.max_health, budget, secs, hit);
-            if size.band().floor.is_some() {
-                w.set_component(q.entity, &FLOOR, [left as f64, now as f64, stagger + over as f64]);
-            }
+            let (took, _, stagger) = floor(&w, q.entity, size, st.max_health, hit);
             // One line per player hit, for the fight checks (`scripts/floors.txt`): what each step
             // left of it, and the health it leaves.
             if by_player {
                 weft_sdk::info!(
-                    "floor: {} {} ({size:?}, level {level:.0}) hit {raw:.2}, capped {capped:.2}, armour {hit:.2}, took {took:.2}, stagger {:.1}, health {:.1}/{:.1}",
+                    "floor: {} {} ({size:?}, level {level:.0}) hit {raw:.2}, capped {capped:.2}, armour {hit:.2}, took {took:.2}, stagger {stagger:.1}, health {:.1}/{:.1}",
                     s.name,
                     q.entity,
-                    stagger + over as f64,
                     (st.health - took).max(0.0),
                     st.max_health,
                 );
@@ -87,4 +63,40 @@ pub fn init(r: &mut Registry) {
         }
         m.value = hit as f64;
     });
+}
+
+/// The share of a hit by `attacker` (with `cause`) a creature of `size` at area level `level`
+/// lets count: a player's held weapon at most its size's cap in item levels over it
+/// (`vitals::combat::cap_share`), everything else whole.
+pub fn player_cap(w: &World, attacker: u64, cause: u32, size: vitals::combat::Size, level: f32) -> f32 {
+    if cause != damage_cause::ATTACK || !w.players_iter().any(|p| p == attacker) {
+        return 1.0;
+    }
+    let held = w
+        .inventory(attacker)
+        .group("hotbar")
+        .get(w.selected_slot(attacker));
+    base_api::ITEM_LEVEL
+        .on_stack(&held)
+        .map_or(1.0, |lv| vitals::combat::cap_share(size, lv, level))
+}
+
+/// The rate floor on `entity` (it carries `FLOOR`): of `hit`, what it takes now, what spilled
+/// over, and all its stagger so far (`vitals::combat::floor_take`, refilled since its last hit).
+pub fn floor(w: &World, entity: u64, size: vitals::combat::Size, max_health: f32, hit: f32) -> (f32, f32, f64) {
+    let now = w.game_time();
+    let [budget, last, stagger] = w.component(entity, &FLOOR).unwrap_or([f64::NAN, 0.0, 0.0]);
+    // A fresh one holds a second's worth.
+    let budget = if budget.is_nan() {
+        vitals::combat::floor_rate(size, max_health).unwrap_or(max_health) * vitals::combat::FLOOR_HELD
+    } else {
+        budget as f32
+    };
+    let secs = now.saturating_sub(last as u64) as f32 / vitals::TICKS as f32;
+    let (took, left, over) = vitals::combat::floor_take(size, max_health, budget, secs, hit);
+    let stagger = stagger + over as f64;
+    if size.band().floor.is_some() {
+        w.set_component(entity, &FLOOR, [left as f64, now as f64, stagger]);
+    }
+    (took, over, stagger)
 }

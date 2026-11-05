@@ -110,7 +110,8 @@ FRONT_Z, BACK_Z, FRONT_X, BACK_X = 0.0, -2.2, 0.6, 1.1
 # Half widths across the body (x), chosen so no two faces that can meet in a pose share a plane:
 # the hips, the chest, the haunch inside and out of its leg's line, the hind shin and foot, the
 # front leg and paw.
-G = {"hips": 2.3, "chest": 1.65, "thigh_in": 0.8, "thigh_out": 1.55, "shin": 0.2, "foot": 0.85, "fleg": 0.15, "fpaw": 0.55,
+# The chest 1.9 across (1.65 left a 0.75 ring of its front round the neck; linecheck).
+G = {"hips": 2.3, "chest": 1.9, "thigh_in": 0.8, "thigh_out": 1.55, "shin": 0.2, "foot": 0.85, "fleg": 0.15, "fpaw": 0.55,
      "foot_len": 1.0, "belly": 1.2, "hind": 1.5}
 TAIL = [(-8, 3.0, 1.04), (-4, 4.0, 0.6)]  # pitch (deg, down), length, width (thinner to the tip)
 TAIL0 = np.array([0.0, 1.9, -3.4])
@@ -152,9 +153,11 @@ def elements():
     E = [el("hips", "spine_0", (-G["hips"], G["belly"], -3.5), (G["hips"], 3.5, -0.9)),  # pear-shaped: wide behind
          el("rump", "spine_0", (-0.85, 1.6, -3.9), (0.85, 3.0, -3.1)),
          el("chest", "spine_1", (-G["chest"], 1.55, -1.5), (G["chest"], 3.1, 1.2)),
-         el("neck", "spine_1", (-0.9, 2.15, -0.5), (0.9, 3.5, 3.2)),  # short, deep in the head: it turns on it
+         # Short, deep in the head: it turns on it; its bottom half a unit over the chest's (0.6 read as a rim; linecheck).
+         el("neck", "spine_1", (-0.9, 2.05, -0.5), (0.9, 3.5, 3.2)),
          el("skull", "head", *SKULL),
-         el("muzzle", "head", (-0.75, 2.0, 4.3), (0.75, 3.25, 5.4))]  # the blunt, broad snout
+         # The blunt, broad snout, out two texels from the skull (at 5.4, 1.4 texels, its sides and top read as a rim; linecheck).
+         el("muzzle", "head", (-0.75, 2.0, 4.3), (0.75, 3.25, 5.75))]
     for s, n in ((1, "L"), (-1, "R")):
         cx = EAR_X * s
         # Big round ears: two thin steps and a cut-out panel through the middle for the outline,
