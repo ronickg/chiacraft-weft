@@ -432,6 +432,14 @@ fn held_light(rel: vec3<f32>, n: vec3<f32>) -> vec3<f32> {
 
 // Light arriving at a surface with normal `n`. `light` is the world's (sky, red, green, blue, 0..1),
 // `shadow` 1 where the sun reaches it, `ao` the corner shading, `rel` where it is from the camera.
+// How much of block light shows where the sky's light is `sky` (0..1): all of it at night and
+// under cover, a quarter in the open by day. Vanilla takes the brighter of the two, not their sum:
+// summed, a lamp's level 15 at noon washed the stone about it out to a pale, glassy blue (First
+// hours' Starheart lantern, 11-05).
+fn block_by_day(sky: f32) -> f32 {
+    return 1.0 - 0.75 * smoothstep(0.5, 1.0, sky) * smoothstep(0.3, 0.8, scene.params.z);
+}
+
 fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let p = palette();
     // The sky's light falls off steeply under cover (Bliss's lightmap, (L^15 x 2 + L^2.5) / 3: 1 in the
@@ -465,7 +473,7 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>
     let open = smoothstep(mix(0.5, 0.25, c_open), mix(0.95, 0.55, c_open), light.x);
     c += p.sun * light_strength() * sun_facing(n) * shadow * open * mix(0.75, 1.0, ao);
     // A held torch's light where it is brighter than the placed lights there (no doubling).
-    c += block_light(max(light.yzw, held_light(rel, n)), pos) * mix(0.5, 1.0, ao);
+    c += block_light(max(light.yzw, held_light(rel, n)), pos) * mix(0.5, 1.0, ao) * block_by_day(light.x);
     // A floor so caves are never quite black: the dimension's own and the Brightness setting.
     let floor_light = max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y));
     c += vec3(floor_light) * vec3(0.85, 0.9, 1.0) * ao;
@@ -478,7 +486,7 @@ fn light_round(light: vec4<f32>, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let sky = brightness_curve(light.x);
     var c = p.ambient * sky * 0.85;
     c += p.sun * light_strength() * 0.5 * smoothstep(0.5, 0.95, light.x);
-    c += block_light(max(light.yzw, held_light(rel, vec3(0.0))), pos);
+    c += block_light(max(light.yzw, held_light(rel, vec3(0.0))), pos) * block_by_day(light.x);
     c += vec3(max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y)));
     return c;
 }
