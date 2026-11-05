@@ -745,6 +745,14 @@ and cactus.**
     owls, prey of six hunters).
   - **Grazing** (Plants' 25-50%, `web::grazing`) stays counted at the grazers' full stocked
     crowds, the worst case: hunters only take the herds' increase.
+  - **Seen on the PC** (aw_hunters, aw_hunters2): a taiga wolf has room for 1 and a second is
+    turned away; three jaguars on the stocked savanna live under their room with no want
+    deaths, and the capybara herd breeds on through a sprinted game day. Not seen there: a kill
+    (the jaguars came young or stayed fed, and the spot's hills buried some spawns).
+  - **Later** (paused for the performance push, 11-05): a look that shows kills over game days
+    (grown, hungry jaguars on flat open ground); kill pacing against real hunters' (a big cat
+    every 4-7 days; ours hunt about every 1.3 game days at full hunger); a heavy savanna grazer
+    (Plants' grazing plan); hunting players (a decision).
 
 
 - **What a hunter takes:** each species' own prey-size range, from its research. Hunters under
