@@ -243,17 +243,13 @@ pub fn register(r: &mut Registry) {
         ui.column(S::column().size(ring, ring), |ui| {
             let inset = (ring - px) / 2.0;
             ui.column(S::column().size(px, px).at(inset, inset), |ui| ui.image(MINI_IMAGE, px, px));
-            ui.progress_bind("minimap", S::default().size(ring, ring).at(0.0, 0.0), move |c| {
-                if shown(c) { 1.0 } else { -1.0 }
-            });
+            ui.progress_bind("minimap", S::default().size(ring, ring).at(0.0, 0.0), move |c| if shown(c) { 1.0 } else { -1.0 });
             // The plates' corners (`minimap_ring.py`: centres 65 UI px, half a GUI px each, out).
             let (mid, far) = ((ring - plate) / 2.0, ring - plate);
             for (key, x, y) in [("north", mid, 0.0), ("east", far, mid), ("south", mid, far), ("west", 0.0, mid)] {
                 let key = format!("map.base.{key}");
                 ui.column(S::column().size(plate, plate).at(x, y).center(), move |ui| {
-                    ui.text_bind_styled(S::default().no_wrap(), move |c, out| {
-                        if shown(c) { out.set(&key, &[]) } else { out.text("") }
-                    });
+                    ui.text_bind_styled(S::default().no_wrap(), move |c, out| if shown(c) { out.set(&key, &[]) } else { out.text("") });
                 });
             }
         });
