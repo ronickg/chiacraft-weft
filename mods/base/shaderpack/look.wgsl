@@ -330,6 +330,25 @@ fn lightning_toward() -> vec2<f32> {
     return vec2(sin(a), -cos(a));
 }
 
+// In the HDR world the strike lights the land and the air round where it hits (a bolt's flash is
+// thousands of times the night; the whole-sky flash is the deck's): camera-relative `rel`, a cold
+// white falling off over about 180 blocks from the strike, at the place `lightning_bolt` draws it.
+// None for a strike inside the clouds, or without the HDR world (`palette`'s even flash alone).
+fn lightning_glow_at(rel: vec3<f32>) -> vec3<f32> {
+    let r = scene.lightning.y;
+    if scene.frame.x < 0.5 || fract(r * 91.7) < 0.33 {
+        return vec3(0.0);
+    }
+    let f = lightning_flash();
+    if f <= 0.0 {
+        return vec3(0.0);
+    }
+    let at = lightning_toward() * mix(400.0, 2500.0, fract(r * 47.3));
+    let d = length(rel.xz - at);
+    let near = 180.0 * 180.0 / (180.0 * 180.0 + d * d);
+    return vec3(0.75, 0.8, 1.0) * f * 3.0 * near;
+}
+
 // The bolt in the sky along `dir` (linear light): a jagged line from the deck's underside down to
 // the ground where it struck, a few hundred to two and a half thousand blocks off, with one branch;
 // none for a strike inside the clouds.
@@ -729,6 +748,8 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>
     let c_open = min(canopy(), 1.0);
     let open = smoothstep(mix(0.5, 0.25, c_open), mix(0.95, 0.55, c_open), light.x);
     c += p.sun * light_strength() * sun_facing(n) * shadow * open * mix(0.75, 1.0, ao);
+    // The ground round a lightning strike, lit by it (the HDR world).
+    c += lightning_glow_at(rel) * sky * hemi * ao;
     // A held torch's light where it is brighter than the placed lights there (no doubling).
     c += block_light(max(light.yzw, held_light(rel, n)), pos) * mix(0.5, 1.0, ao) * block_by_day(light.x);
     // A floor so caves are never quite black: the dimension's own and the Brightness setting.
@@ -1059,7 +1080,7 @@ fn froxel_cell(dir: vec3<f32>, at: f32, floor: f32) -> vec4<f32> {
     if scene.frame.z > 0.5 && scene.frame.z < 6.0 {
         lit = lit * 0.5 + (sun_reaches(dir * (at - span * 0.4)) + sun_reaches(dir * (at - span * 0.1)) + sun_reaches(dir * (at + span * 0.4))) / 6.0;
     }
-    return vec4(mix(shaded_sky, light.sky, lit) + light.sun * lit, d);
+    return vec4(mix(shaded_sky, light.sky, lit) + light.sun * lit + lightning_glow_at(dir * at) * 0.6, d);
 }
 
 // How much snow lies on a surface with normal `n` at `pos` (world) with `sky` light: on what
