@@ -452,3 +452,195 @@ Each step gets a PC run through Tester 2's queue: a world with `/tk time` set to
 - Terraria's meteorites fall at about 2 % a night, with ore and Meteor Heads at the site: [Meteorite](https://terraria.wiki.gg/wiki/Meteorites).
 - Vintage Story's meteoric iron comes from crash sites, needs a tier-4 pick, and outperforms iron: [Meteoric iron](https://wiki.vintagestory.at/Meteoric_iron).
 - Tutankhamun's blade is meteoric iron at about 10.8-12.8 % nickel: [Eos](https://eos.org/articles/pharaohs-iron-dagger-made-from-a-meteorite-study-confirms).
+
+---
+
+# Addendum 2: big impacts and rare star materials (2026-11-05)
+
+Ronald (via Planner): "what also would be super cool is if we had like meteorites which could come down from ... the space ... and then like land onto Earth, which is like sort of random. I'm not exactly sure where it would happen, but it can then bring like some new like resources onto the world which are like super rare."
+
+This extends Addendum 1, the sky-events design Ronald approved ("Yes, as designed", dev `52ee42ba`; First hours leads the build after the sync). Addendum 1's small fallen stars from the showers stay as they are. A **big impact** is a separate, rarer event:
+- a crater is carved live;
+- a core of rare material is left behind;
+- the whole world sees it.
+
+**What was read:**
+- the engine's block edits (`World::fill_sphere` / `fill_sphere_keeping`: creepers already carve with them, `mobs.rs` `blast`), `get_loaded`, `players`;
+- base's tombstone pointer (`base_api::GRAVE`, the hotbar line "Tombstone: 42 m, ahead to the left"), `base_api::hint`;
+- the worldgen craters (`base_api::land` `CRATER_*`, radius 20-30 every 640-block square);
+- crafting's material ladder (`mods/base/crafting/SHEET.md`; `notes/CRAFTING.md`: "the ladder stays open at the top", diamond 400 above steel 300);
+- `notes/PLAN.md` (rule 2, freedom for owners; linked worlds and inventory carry-over).
+
+## How real meteorites anchor this
+
+- **Most falls are stone, few are iron.** About 5 % of meteorites are irons (a commonly cited figure). Stony-irons are about 2 % of known meteorites, and of those the **pallasites** (gem olivine, *peridot*, set in nickel-iron) number under a hundred known, only four of them seen to fall ([Wikipedia](https://en.wikipedia.org/wiki/Pallasite)).
+- **Iron meteorites are nickel-iron:**
+  - kamacite holds about 5-12 % Ni, taenite about 12-45 %;
+  - cut and etched, octahedrites show the **Widmanstätten pattern** of their interlocking plates ([Wikipedia](https://en.wikipedia.org/wiki/Widmanst%C3%A4tten_pattern), [AMNH](https://www.amnh.org/exhibitions/permanent/meteorites/building-planets/iron-crystals)).
+  - Vintage Story's meteoric iron is worked into tools better than iron ([VS wiki](https://wiki.vintagestory.at/Meteoric_iron)).
+- **Tektites** are not from space. They are the ground melted and thrown out by the impact: **moldavite**, green glass from the Ries crater in Germany about 14.7-15 million years ago, scattered in a fan about 75° wide ([Wikipedia](https://en.wikipedia.org/wiki/Moldavite)).
+- **Big falls are seen by day.** The 1947 Sikhote-Alin iron shower fell in daylight with a smoke trail that hung for hours (from memory, not checked this round).
+
+## 1. The event
+
+**How rare** (`vitals::events`):
+- `BIG_IMPACTS_PER_YEAR` = 3 per world. A year is 56 days, so that is about one every 19 game days, or one per 6 hours of play.
+- They never come closer than `BIG_IMPACT_GAP` 10 days apart, and never before `BIG_IMPACT_FROM_DAY` 21: the end of the first season, when a player has a base to come back to.
+- They are picked by the same seeded schedule as Addendum 1 (`tonight(seed, day)`), but **at any hour**, since big falls come by day too. They take priority over every other event that day.
+
+**Where:**
+- **Far wilds, but in loaded land.** The site is picked among loaded columns between `IMPACT_FROM_PLAYERS` 160 blocks from every player and their view edge, using `get_loaded`, so no unloaded or ungenerated land is touched.
+- **On land with open sky:** dry, flat enough (the same tests worldgen craters use), not in water or a river.
+- **Never near builds.** Never within `IMPACT_FROM_BUILDS` 256 blocks of any player-placed block, campfire, bed or tombstone, and never within 256 of the world spawn.
+  - The base mod keeps a coarse map of built columns: a bitset per 16×16, set on `BLOCK_PLACED` by players and saved with the world.
+- **If there's no site** (a player boxed in by builds, or only sea in reach), it falls in the sea: you see the streak, a white plume and a boom. No crater and no loot this time, and the next one is not delayed.
+
+**How you notice:**
+1. **Before** (T−20 s): the sky brightens toward its side, the low rumble starts, and animals go wary (Animals).
+2. **The streak** (T−6 s to 0): a bright head with a long trail across the whole sky, seen from anywhere in the world.
+   - By night it's a fireball brighter than the moon.
+   - By day it's a white-hot spark with a **smoke trail that hangs for minutes** (Sikhote-Alin's).
+   - Lighting draws it from the event value plus the impact's position (below).
+3. **Impact:**
+   - a white flash lights the horizon in that direction, and a dust ring rises;
+   - **the boom** comes after the distance's delay (`weather_sound::thunder_delay`, 343 m/s, so 3 s a kilometre);
+   - near (under 500 blocks) the ground shakes: a short camera shake.
+4. **After:**
+   - the crater's hot core glows (light 12 fading to 0 over `IMPACT_HOT` 2 game hours);
+   - a **smoke column** rises for 10 real minutes, seen over the land;
+   - at night an orange glow sits on the horizon above it.
+5. **Pointer (the compass hint):**
+   - at impact every player gets a line: **"A star has fallen, far to the north-east."** It names the 8-point direction from that player and a band: near under 500 blocks, far under 1.5 km, very far past that;
+   - then the tombstone pointer's hotbar line reads **"Fallen star: 1,240 m, ahead to the left"** for one game day, or until the player is within 16 blocks;
+   - a setting (`base:fx_sky_events`) can hide the pointer for those who'd rather search by the smoke.
+6. **Rumour:** at the next dawn, a player who hasn't reached it gets a hint: *"The fallen star still smokes to the north-east."*
+
+**Does the crater form live? Yes, at a modest size.** Worldgen's craters are radius 20-30, ancient and filled with buried meteorites (Addendum 1). A live impact carves a **fresh crater of radius `IMPACT_RADIUS` 7-12** (cost below), spread over `IMPACT_CARVE_TICKS` 20 ticks:
+1. The bowl: `fill_sphere_keeping` a sphere sunk to `IMPACT_DEPTH` 0.6 radius, keeping liquids and unbreakables.
+2. The rim: a ring raised 2-4 blocks of the local ground and broken stone (suevite, the impact breccia).
+3. Melt and ejecta:
+   - the bowl's lining (1 block) turns to **impact glass**;
+   - sand or gravel within 1.2-2.5 radii turns partly to tektite pieces, in a fan downrange of the streak's heading (moldavite's 75° strewn field);
+   - trees inside 2 radii are knocked flat, as fallen logs, using felling's `felled` pieces;
+   - grass turns to scorched dirt, with no fire spread.
+4. The core: at the bottom, under 1-2 blocks of broken stone, the meteorite mass (below), hot.
+
+## 2. What it brings: four materials found only from the sky
+
+| material | what it is (real) | found | for | place on the ladder |
+|---|---|---|---|---|
+| **Meteoric iron** (exists, Addendum 1) | iron-nickel, worked cold (Inuit, Cape York) | shower falls 1-3; worldgen craters 4-15; a big impact's ejecta 6-12 lumps round the rim | iron-grade heads before smelting | early, between bronze and wrought iron |
+| **Star steel** (Widmanstätten nickel-iron, an octahedrite) | the big impact's iron core: kamacite and taenite plates that show the pattern when etched | the core: `STAR_STEEL_CORE` 8-16 lumps per big impact, so 2-4 tools' worth | tools, weapons, armour: a **new tier between steel (300) and diamond (400)**: harvest 350, uses 650, speed 8.5, damage 3.2, trait `patterned` (the etched look on the tool, no rust, repairs at half cost); fittings 500 uses | late: needs the forge (iron age) to work it, so a reason to travel when you can use it; armour pieces take 6-8 lumps |
+| **Peridot** (from a **pallasite**) | olivine gems in nickel-iron; under 100 known pallasites | a quarter of big impacts are pallasites (`PALLASITE_CHANCE` 0.25): 3-8 peridot plus a few **pallasite** blocks (green crystals in metal, translucent) | inlays on tools and armour (`CRAFTING.md`'s inlays: looks and trade value), jewellery, a stunning decor block | any age; rare goods for trade between linked worlds (`PLAN.md` carry-over) |
+| **Tektite glass** (moldavite) | the ground melted and thrown out by the impact | 12-30 pieces in the strewn fan round each big crater, plus the bowl's impact-glass lining | a working material like obsidian: knife and arrow heads, harvest 100, uses 50, speed 3.2, trait `razor`; green glass panes and blocks; a lens (spyglass, later) | early-mid: no tools needed to pick up, a sharp edge for a newcomer who reaches a crater |
+| **Starheart** (the fantasy one) | none: a fragment of the core that never cools, faintly blue-white | 1 in 3 big impacts (`STARHEART_CHANCE` 0.33), one piece at the very centre | a light that needs no fuel: **star lantern** (light 12, no warmth, never goes out, cold to touch); a beacon block that shows on the far land at night; held, it lights like a torch (the pack's `hand_light`, a cool tint) | rare reward, not power: light only, so it doesn't break survival's fire and warmth loop (a campfire still warms and keeps monsters off; a star lantern only lights) |
+
+Why these fit the game:
+- **Three grounded, one fantasy.**
+  - The Starheart is round 17's fantasy feel: dim, rare and useful as light, never a weapon.
+  - Star steel gives the open ladder its first rung above steel from a story, not a deeper ore.
+  - Peridot and tektite give decoration and trade, which linked worlds will want.
+- **Each impact rewards a different stage.** A newcomer can take tektite edges and meteoric iron from the rim. A late player digs out the star steel core.
+
+## 3. Multiplayer
+
+- **Everyone in the dimension sees it:** the streak and flash for all, the boom by each player's distance, and the direction line from each player's own position.
+- **Who gets it:** whoever reaches it. There are no claims, which keeps owners free (`PLAN.md` rule 2). To keep a server from racing to a single prize:
+  - the loot is many pieces: lumps round the rim, glass in the fan, the core in a dozen lumps;
+  - the core scales with players online within 2 km: ×1 alone, +40 % per extra player, up to ×2.2 (`IMPACT_SHARE`).
+- **The world owner chooses** with a world rule, `base:sky_impacts`:
+  - 0 off;
+  - 1 looks only: the streak and boom, the sea plume, no crater;
+  - 2 on: the default.
+- **Multiplayer announcement:** the direction line goes to every player in the dimension. There is no chat spam: one line each, plus the pointer.
+- **Achievements:** "Starfall" (meteoric iron) exists in Addendum 1. "Heart of a Star" (find a Starheart) could be one of the achievements anchored on chain (`PLAN.md`: achievements on Chia), since it is rare and earned.
+
+## 4. Risks
+
+- **Griefing and builds.** Never within 256 blocks of anything a player built or of the world spawn. Never in unloaded land. A player can't call one down: it is the world's schedule. With `base:sky_impacts` an owner can turn it off.
+- **Players hurt:** none. The site is at least 160 blocks from everyone, so the blast damage (`blast`'s rule, radius ×2) reaches no one. A player who walks into the hot bowl takes campfire-like burns until it cools.
+- **Performance of a live carve.** A radius-12 bowl removes about 4,300 blocks (a cap of a sphere) and sets about 600 more (rim, lining, glass, core). That touches about 9-16 engine sections (16³).
+  - Spread over 20 ticks, that is about 250 edits a tick. Creepers already do 113-block spheres in one tick.
+  - Remeshing and light run on the engine's usual queues.
+  - Risks: a hitch on the Mac if the crater falls in view; a light-update spike.
+  - Mitigations:
+    - carve only while the server's tick is under 35 ms, otherwise wait a second;
+    - keep the radius at 12 or less;
+    - bench it first on Tester 2's queue: frame time during a scripted impact at 200 blocks, PC and Mac.
+- **Save size.** The built-columns bitset is 1 bit per 256 m², a few KB for a big world.
+- **Too much loot over time.** 3 a year at 8-16 star steel lumps gives about 2-4 tools a year per world, plus diamond's ladder above. It is checked against crafting's needs, as Addendum 1's meteoric iron is.
+
+## Numbers for `vitals::events` (beside Addendum 1's)
+
+| number | value | note |
+|---|---|---|
+| `BIG_IMPACTS_PER_YEAR` | 3 | per world; a daily chance of 3/56 with the gap below |
+| `BIG_IMPACT_GAP` | 10 days | |
+| `BIG_IMPACT_FROM_DAY` | 21 | after the first season |
+| `IMPACT_FROM_PLAYERS` | 160 blocks | out to the view edge, loaded only |
+| `IMPACT_FROM_BUILDS` | 256 blocks | and the world spawn |
+| `IMPACT_RADIUS` | 7-12 | live crater; worldgen's ancient ones stay 20-30 |
+| `IMPACT_DEPTH`, `IMPACT_RIM` | 0.6 radius; 2-4 blocks | |
+| `IMPACT_CARVE_TICKS` | 20 | and only while a tick is under 35 ms |
+| `IMPACT_HOT` | 2 game hours | light 12 fading; smoke 10 real minutes |
+| `IMPACT_WARN` | 20 s | brightening and rumble before the streak |
+| `RIM_METEORIC_IRON` | 6-12 lumps | |
+| `STAR_STEEL_CORE` | 8-16 lumps | ×`IMPACT_SHARE` (1 + 0.4 per extra player within 2 km, at most 2.2) |
+| `PALLASITE_CHANCE` | 0.25 | 3-8 peridot, 2-4 pallasite blocks |
+| `TEKTITE_PIECES` | 12-30 | in a 75° fan, 1.2-2.5 radii out |
+| `STARHEART_CHANCE` | 0.33 | one piece |
+| `POINTER_DAYS` | 1 | the hotbar line, or until within 16 blocks |
+
+**Crafting rows** go in `mods/base/crafting` (`materials.rs`): `star_steel`, `tektite` and `peridot` (fitting, inlay). `meteoric_iron` comes from Addendum 1.
+
+**Checks:**
+- the schedule over 100 simulated years: 2-4 a year, gaps kept, none before day 21;
+- star steel per year under a full tool and armour set;
+- the impact site test: never within 256 of a placed block, in a game test with a built column.
+
+## Rows for `notes/SYSTEMS.md`
+
+| System | Code | Numbers | Reads | Read by |
+|---|---|---|---|---|
+| Big impacts | `vitals::events` (schedule), `mods/base/src/events.rs` (site, streak flag, live carve, the pointer and dusk/dawn lines), the built-columns map (`BLOCK_PLACED`, saved) | the table above; the world rule `base:sky_impacts` | the calendar, the world's seed, players' places and what is loaded, built columns, the land's flatness and water (`base_api::land` tests), the server's tick time | the world (a crater, glass, ejecta, felled trees), crafting (star steel, peridot, tektite, meteoric iron), the pack (streak, flash, smoke, glow: event value and position), weather sound (the boom), animals (wariness), hints and the pointer, advancements |
+| Star materials | `mods/base/crafting` (`star_steel`, `tektite`, `peridot`), `blocks.rs` (`base:meteorite`, `base:pallasite`, impact glass, tektite glass, star lantern, Starheart) | material rows; `STAR_STEEL_CORE`, `PALLASITE_CHANCE`, `TEKTITE_PIECES`, `STARHEART_CHANCE` | big impacts, Addendum 1's falls and craters | tools and armour above steel, inlays and trade, light without fuel (`hand_light` when held) |
+
+**Check line** for "When you change something": *A star material or impact numbers*: crafting's ladder (star steel stays below diamond), the yearly yield check, and the build-distance test.
+
+## Owners
+
+| piece | owner | engine? |
+|---|---|---|
+| Schedule, site picking, built-columns map, pointer and lines, world rule | **First hours** (with Addendum 1's `events.rs`) | no |
+| The live carve (bowl, rim, glass fan, felled trees, core placement) | **Worldgen** (it owns the crater shapes and land tests) | no (`fill_sphere_keeping`, `set`) |
+| Star steel, tektite, peridot rows; star lantern and inlays | **Survival** or crafting's owner | no |
+| Streak by day and night, flash, smoke column, horizon glow, hot core, Starheart's cool light, pallasite and glass looks | **Lighting** | **small**: the impact's position in the scene (a vec4 beside round 17's air-flag bits), so the pack can draw the streak and glow toward it |
+| Textures: meteorite crust, suevite, impact and tektite glass, pallasite block, star steel ingot (the etched pattern), peridot, Starheart, star lantern | **Art** | no |
+| Animals' wariness before an impact; the camera shake if wanted | **Animals**; **UI** or the engine for the shake | shake: maybe |
+| The boom (a deeper, longer thunder) | First hours, with `weather_sound` | no |
+
+**Order:** after Addendum 1's events land (First hours, after the sync):
+1. the schedule and site picking with the sea plume only;
+2. the live carve and loot, benched;
+3. the looks;
+4. the materials in crafting.
+
+## Summary for Ronald
+
+Big impacts are rare, world-wide events, separate from the yearly showers:
+- **How often:** about 3 a game year (about one per 6 hours of play), never in the first season.
+- **What you see and hear:** a streak across the whole sky, a fireball by night or a smoking trail by day, a flash on the horizon, and a boom that arrives seconds later by distance.
+- **Where:** they land in the far wilds of loaded land, at least 160 blocks from everyone and 256 from anything built.
+- **The crater** is carved live (radius 7-12), with glass, broken rock and flattened trees round it. It smokes and glows for hours.
+- **Finding it:** every player gets "A star has fallen, far to the north-east" and a pointer like the tombstone's.
+
+They bring four materials found only there:
+
+| material | real or fantasy | what it gives |
+|---|---|---|
+| star steel | real (nickel-iron with the Widmanstätten pattern) | a new tool and armour tier between steel and diamond |
+| peridot | real (from rare pallasites) | gems for inlays, decoration and trade |
+| tektite glass | real (like moldavite) | sharp early blades and green glass |
+| the Starheart | fantasy, 1 in 3 impacts | a fragment that never cools: a lantern that never goes out |
+
+On a server whoever gets there first takes it, but the loot is many pieces and grows with the players nearby. The world owner can turn impacts off or to looks only.
