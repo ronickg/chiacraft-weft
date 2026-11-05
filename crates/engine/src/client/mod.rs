@@ -2814,6 +2814,7 @@ impl Client {
                     .to_array(),
                 None => [0.0, 0.0, 0.0, -1e6],
             },
+            frame: [crate::post::hdr() as u32 as f32, crate::post::bloom() as u32 as f32, 0.0, 0.0],
             shadow_view_proj: self.shadow.0.to_cols_array_2d(),
             shadow_far_view_proj: self.shadow_far.0.to_cols_array_2d(),
             shadow_far: match self.shadow_far_map {

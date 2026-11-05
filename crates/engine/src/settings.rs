@@ -256,6 +256,20 @@ impl Settings {
         number("core:post_low") != 0.0
     }
 
+    /// Levels of the HDR world's bloom pyramid (`core:bloom`: 0 none, 1 four, 2 six), live.
+    pub fn bloom_levels(&self) -> u32 {
+        match number("core:bloom") as i32 {
+            i32::MIN..=0 => 0,
+            1 => 4,
+            _ => 6,
+        }
+    }
+
+    /// The HDR world (`post::world_format`), read once at start.
+    pub fn hdr_world(&self) -> bool {
+        number("core:hdr_world") != 0.0
+    }
+
     /// Soft clouds for packs that draw them (`client::soft_clouds`).
     pub fn soft_clouds(&self) -> bool {
         number("core:soft_clouds") != 0.0

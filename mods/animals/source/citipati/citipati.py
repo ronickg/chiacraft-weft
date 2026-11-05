@@ -29,7 +29,7 @@ sys.path.insert(0, SKILL)
 from layers import Recorder, bounds as layer_bounds  # noqa: E402
 from paint import EYES, eye_corner, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
 from rig import euler, fit, qmul, quat, swing  # noqa: E402
-from ground import lowest  # noqa: E402
+from ground import grounded, lowest  # noqa: E402
 from house import TX  # noqa: E402
 
 # TX: texels a unit, 0.5 (32 a block). The eye's face, the skull's side, is 7 by 6 texels at 32 (the
@@ -438,8 +438,10 @@ def paint_face(e, face, boxes):
 
 # The stance: on its long hind legs, the knees forward and the ankles back as a bird's, the toes flat
 # (the angles sum to 0). Pecking: tipped forward at the hips, the neck and head down to the ground.
-L = {"thigh": -28, "shin": 54, "foot": -42, "drop": 0.0, "peck_lean": 15, "peck_n0": 40, "peck_n1": 60, "peck_head": 30,
-     "rest_thigh": -70, "rest_shin": 140, "rest_foot": -100, "rest_drop": 0.0, "rest_pitch": 0.0, "wing_roll": 40.0, "wing_pitch": 0.0, "run_lift": 0.0}
+L = {"thigh": -28, "shin": 54, "foot": -42, "drop": 0.0,
+     "rest_thigh": -70, "rest_shin": 140, "rest_foot": -100, "rest_drop": 0.0, "rest_pitch": 0.0, "wing_roll": 40.0, "wing_pitch": 0.0, "run_lift": 0.0,
+     "graze_lean": 20, "graze_n0": 40, "graze_n1": 20, "graze_head": 10,
+     "sleep_n0": 40, "sleep_yaw": 120, "sleep_n1": -60, "sleep_yaw1": -15, "sleep_head": 15, "sleep_yaw2": 90}
 
 
 def legs(base_t, base_s, base_f, swing_l=0.0, swing_r=0.0, lift_l=0.0, lift_r=0.0, lean=0.0):
@@ -478,16 +480,6 @@ def stand(lean=0.0):
     return q
 
 
-def peck_pose(g, P=L):
-    """Tipped forward at the hips, the neck and head down to the ground, by `g` (0..1)."""
-    q = stand(P["peck_lean"] * g)
-    q["neck_0"] = (P["peck_n0"] * g, 0, 0)
-    q["neck_1"] = (P["peck_n1"] * g, 0, 0)
-    q["head"] = (P["peck_head"] * g, 0, 0)
-    q["tail_0"] = (-0.8 * P["peck_lean"] * g, 0, 0)  # the tail kept about level
-    return q
-
-
 def keys(t, pts):
     """Piecewise-linear keys [(t, v)]: holds where two keys share a value, snaps where they're close."""
     ts, vs = zip(*pts)
@@ -501,14 +493,14 @@ def pose_idle(t):
     # down for 3.2 s with quick jabs at the ground, up and looking about, down again
     g = keys(t, [(0, 1), (3.2, 1), (3.7, 0), (7.3, 0), (7.8, 1), (8, 1)])
     jab = max(0.0, S(TAU * t * 1.25)) ** 3 if t < 3.2 else 0.0
-    q = peck_pose(g * (0.86 + 0.14 * jab))
+    q = head_down(g * (0.86 + 0.14 * jab))  # the beak's tip to the ground at each jab
     yaw = keys(t, [(0, 0), (3.9, 0), (3.98, 30), (4.9, 30), (4.98, -24), (5.9, -24), (5.98, 12), (6.8, 12), (6.88, 0), (8, 0)])
     roll = keys(t, [(0, 0), (3.9, 0), (3.98, 10), (4.9, 10), (4.98, -6), (5.9, -6), (5.98, 0), (8, 0)])
     q["head"] = (q["head"][0] + keys(t, [(0, 0), (5.98, 0), (6.06, -8), (6.8, -8), (6.88, 0), (8, 0)]), yaw, roll)
     q["neck_1"] = (q["neck_1"][0], 0.3 * yaw, 0)
     q["root"] = (0, q["root"][1] + 0.12 * (1 + br), 0)  # breathing, the toes never below the ground
     q["spine_1"] = (0.6 * br, 0, 0)
-    q.update(tail_sway(t / 8.0, 2, 4, lift=-0.8 * L["peck_lean"] * g, fan=-4))
+    q.update(tail_sway(t / 8.0, 2, 4, lift=-0.8 * L["graze_lean"] * g, fan=-4))
     q["jaw"] = (6 * jab if t < 3.2 else 0, 0, 0)
     return q
 
@@ -575,11 +567,333 @@ def pose_lie(t, P=L):
     return q
 
 
-BLINKS = {"idle": [4.4, 6.3], "lie": [1.2, 4.0]}
+# ------------------------------------------------------------------ behaviour clips (`anim.rs`)
+# Each a whole-body pose over what plays below on the bones it moves (`to_bedrock.as_action`): held
+# states and the gaits loop, the rest play once. A mother (90 kg, over `roles::GUARDS_KG`) stands her
+# ground for her young: rear (a display), then stare, then charge. No stalk or pounce: not a hunter.
+
+
+def still(t, period=4.0, lean=0.0, tail=1.5):
+    """Standing and breathing, tipped at the hips by `lean` (the legs keep their place), the tail held
+    against it and swaying a little: what a clip builds on."""
+    br = S(TAU * t / period * 2)
+    q = stand(lean)
+    q["root"] = (0, q["root"][1] + 0.12 * (1 + br), 0)  # the toes never below the ground
+    q["spine_1"] = (0.6 * br, 0, 0)
+    q.update(tail_sway(t / period, 1, tail, lift=-0.8 * lean, fan=-4))
+    return q
+
+
+def upright(q, lean, n0, n1, head=None, yaw=0.0, roll=0.0):
+    """The neck raised over a body tipped by `lean`: neck_0 and neck_1 pitched by n0, n1 (negative is
+    back), the head kept level unless `head` is given; `yaw` turned mostly at the head, a bird's way."""
+    h = -(lean + n0 + n1) if head is None else head
+    # (turned at neck_1 by a quarter at most: past 15 degrees there its corners poke out of neck_0)
+    q.update({"neck_0": (n0, 0, 0), "neck_1": (n1, 0.25 * yaw, 0), "head": (h, 0.75 * yaw, roll)})
+    return q
+
+
+def spread(q, out, up=0.0, fold=0.0, open_=0.0, sides=("L", "R")):
+    """The wings spread from the flanks by `out` degrees (yawed out from the shoulder; 75: straight out
+    to the side, the feather panels turned to face forward), raised by `up`, the forearm and hand
+    opened on by `open_` (or folded back in by `fold`)."""
+    for n, s in (("L", 1), ("R", -1)):
+        if n not in sides:
+            continue
+        q[f"arm_{n}"] = euler(qmul(quat(0, 0, s * up), quat(0, -s * out, 0)))
+        q[f"forearm_{n}"] = (0, s * (fold - open_), 0)
+        q[f"hand_{n}"] = (0, s * (fold - 0.6 * open_), 0)
+    return q
+
+
+def head_down(g, P=L):
+    """Tipped forward at the hips, the neck and head down by `g` (1: the beak's tip half a unit over the
+    ground, the lowest of the head, fitted; the legs straight under it), the tail kept about level."""
+    lean = P["graze_lean"] * g
+    q = stand(lean)
+    # the hips' joints, two units under the spine's pivot, rise as it tips: the body let down to keep the toes on the ground
+    q["root"] = (0, q["root"][1] - 2.0 * (1 - math.cos(math.radians(lean))), 0)
+    q["neck_0"] = (P["graze_n0"] * g, 0, 0)
+    q["neck_1"] = (P["graze_n1"] * g, 0, 0)
+    q["head"] = (P["graze_head"] * g, 0, 0)
+    return q
+
+
+def peck_still(g, t, period, P=L):
+    """The beak toward the ground by `g` (`head_down`), breathing, the tail kept level."""
+    br = S(TAU * t / period * 2)
+    q = head_down(g, P)
+    q["root"] = (0, q["root"][1] + 0.12 * (1 + br), 0)
+    q["spine_1"] = (0.6 * br, 0, 0)
+    q.update(tail_sway(t / period, 1, 2, lift=-0.8 * P["graze_lean"] * g, fan=-4))
+    return q
+
+
+def pose_stare(t):
+    """Half aware: frozen tall, the head high and level, locked on, only the breath moving (2 s, held)."""
+    q = still(t, 2.0, lean=-4, tail=0.6)
+    return upright(q, -4, -12, 6)
+
+
+def pose_graze(t):
+    """Pecking at the ground (seeds, insects, fallen fruit): quick jabs, the beak snapping at each, the
+    head working side to side (2.4 s, held)."""
+    p = t / 2.4
+    jab = max(0.0, S(TAU * p * 3)) ** 3
+    q = peck_still(0.84 + 0.16 * jab, t, 2.4)
+    q["neck_1"] = (q["neck_1"][0], 8 * S(TAU * p), 0)
+    q["head"] = (q["head"][0], 6 * S(TAU * p), 0)
+    q["jaw"] = (7 * max(0.0, S(TAU * p * 3 - 0.9)), 0, 0)
+    return q
+
+
+def pose_drink(t):
+    """Drinking a bird's way: the beak dipped into the water, then raised and tipped up to let it run
+    down (2 s, held)."""
+    p = t / 2.0
+    d = keys(p, [(0, 1), (0.3, 1), (0.45, 0.35), (0.85, 0.35), (1, 1)])
+    up = keys(p, [(0, 0), (0.35, 0), (0.5, 1), (0.8, 1), (0.95, 0), (1, 0)])
+    q = peck_still(d, t, 2.0)
+    q["head"] = (q["head"][0] - 26 * up, 0, 0)
+    q["neck_1"] = (q["neck_1"][0] - 10 * up, 0, 0)
+    q["jaw"] = (4 * max(0.0, S(TAU * p * 4)) * (1 - up), 0, 0)
+    return q
+
+
+def pose_sniff(t):
+    """Down to the ground, a few pecks and a look along it side to side, and up (2.2 s, once)."""
+    p = t / 2.2
+    d = keys(p, [(0, 0), (0.25, 1), (0.75, 1), (1, 0)])
+    jab = max(0.0, S(TAU * p * 4)) ** 2
+    q = peck_still(d * (0.88 + 0.12 * jab), t, 2.2)
+    q["neck_1"] = (q["neck_1"][0], 14 * d * S(TAU * p * 1.5), 0)
+    q["head"] = (q["head"][0], 10 * d * S(TAU * p * 1.5), 8 * d * S(TAU * p * 1.5))
+    q["jaw"] = (5 * d * jab, 0, 0)
+    return q
+
+
+LOOK = [(0, 0), (0.1, 0), (0.13, 42), (0.38, 42), (0.41, -38), (0.66, -38), (0.69, 14), (0.84, 14), (0.87, 0), (1, 0)]
+TILT = [(0, 0), (0.1, 0), (0.13, 12), (0.38, 12), (0.41, -8), (0.66, -8), (0.69, 0), (1, 0)]
+
+
+def pose_look(t):
+    """Looking round a bird's way: up, then the head snapped to one side and held, cocked, snapped to
+    the other, back (2.6 s, once)."""
+    p = t / 2.6
+    up = keys(p, [(0, 0), (0.1, 1), (0.9, 1), (1, 0)])
+    q = still(t, 2.6, lean=-3 * up)
+    return upright(q, -3 * up, -10 * up, 4 * up, yaw=keys(p, LOOK), roll=keys(p, TILT))
+
+
+WATCH = [(0, 0), (0.12, 0), (0.14, 34), (0.36, 34), (0.38, 12), (0.5, 12), (0.52, -30), (0.76, -30), (0.78, -8), (0.88, -8),
+         (0.9, 0), (1, 0)]
+
+
+def pose_watch(t):
+    """A sentinel: standing tall, the head high, turning in a bird's jerks (snapped round and held) one
+    way and the other (4 s, held)."""
+    p = t / 4.0
+    q = still(t, 4.0, lean=-7, tail=1.0)
+    return upright(q, -7, -16, 6, yaw=keys(p, WATCH), roll=0.2 * keys(p, WATCH))
+
+
+def preen(t, dur, side, reach):
+    """The beak working through one wing's feathers, the wing lifted out from the flank to meet it;
+    `reach` how far along the wing the head runs (a quick nibble or a long grooming)."""
+    p = t / dur
+    d = keys(p, [(0, 0), (0.18, 1), (0.85, 1), (1, 0)])
+    n = "L" if side > 0 else "R"
+    along = d * reach * S(TAU * p * 1.5) if reach else 0.0
+    q = still(t, dur / 2)
+    # (turned at neck_0, pitched forward with it: turned 70 or more, or less pitched, its corners poke out of
+    # the chest; neck_1 bent forward, not turned)
+    q.update({"spine_1": (0, side * 6 * d, 0), "neck_0": (40 * d, side * 60 * d, 0), "neck_1": (30 * d + 6 * along, 0, 0),
+              "head": (-10 * d, side * 40 * d + side * 8 * along, side * 10 * d)})
+    q["jaw"] = (8 * d * max(0.0, S(TAU * p * 7)), 0, 0)
+    spread(q, 26 * d, up=10 * d, open_=8 * d, sides=(n,))
+    return q
+
+
+def pose_scratch(t):
+    """An itch: a quick nibble in the left wing's feathers, the wing lifted (1.8 s, once)."""
+    return preen(t, 1.8, 1, 0.0)
+
+
+def pose_groom(t):
+    """Preening: the right wing held out, the beak run along its feathers (2.6 s, once)."""
+    return preen(t, 2.6, -1, 1.0)
+
+
+def pose_stretch(t):
+    """Waking up: both wings spread and raised, the neck long and up, a yawn; then a bird's wing-and-leg
+    stretch, the left wing and leg pushed out behind together (2.4 s, once)."""
+    p = t / 2.4
+    a = keys(p, [(0, 0), (0.18, 1), (0.45, 1), (0.55, 0), (1, 0)])
+    b = keys(p, [(0, 0), (0.5, 0), (0.65, 1), (0.88, 1), (1, 0)])
+    q = still(t, 2.4)
+    upright(q, 0, -14 * a, 4 * a, head=-6 * a)
+    q["jaw"] = (22 * a * keys(p, [(0, 0), (0.15, 0), (0.25, 1), (0.4, 1), (0.48, 0), (1, 0)]), 0, 0)
+    spread(q, 60 * a, up=24 * a, open_=20 * a)
+    if b > 0:
+        q["arm_L"] = euler(qmul(quat(0, 0, -6 * b), quat(14 * b, -20 * b, 0)))
+        q["forearm_L"] = (0, -10 * b, 0)
+        q["hand_L"] = (0, -6 * b, 0)
+    q.update(legs(L["thigh"], L["shin"], L["foot"], swing_l=34 * b, lift_l=-14 * b))
+    q["tail_0"] = (q["tail_0"][0] + 10 * b, q["tail_0"][1], 0)
+    return q
+
+
+def pose_alarm(t):
+    """Startled: drawn up tall, the neck pulled back, a hiss with the beak open, the wings flared out
+    from the flanks, the tail raised (1.2 s, once)."""
+    p = t / 1.2
+    up = keys(p, [(0, 0), (0.1, 1), (0.75, 1), (1, 0)])
+    hiss = keys(p, [(0, 0), (0.12, 0), (0.2, 1), (0.6, 1), (0.7, 0), (1, 0)])
+    q = still(t, 1.2, lean=-8 * up, tail=1.0)
+    upright(q, -8 * up, -14 * up, -2 * up, head=14 * up)
+    q["jaw"] = (24 * hiss, 0, 0)
+    spread(q, 24 * up, up=26 * up, open_=10 * up)
+    q["tail_0"] = (q["tail_0"][0] + 12 * up, q["tail_0"][1], 0)
+    q["tail_3"] = (q["tail_3"][0] + 14 * up, q["tail_3"][1], 0)
+    return q
+
+
+def pose_rear(t):
+    """A mother's threat display, as the stand begins: drawn up to her full height, the wings spread
+    wide to the sides with their feathers opened toward the threat, the crest held high, the tail raised
+    and its fan tipped up behind, a hiss; the feet planted (its height set from them frame by frame,
+    `ground_clips`) (1.4 s, once)."""
+    p = t / 1.4
+    r = keys(p, [(0, 0), (0.22, 1), (0.78, 1), (1, 0)])
+    hiss = keys(p, [(0, 0), (0.2, 0), (0.28, 1), (0.62, 1), (0.7, 0), (1, 0)])
+    sway = r * S(TAU * min(1.0, max(0.0, (p - 0.22) / 0.56)))
+    q = still(t, 1.4, lean=-12 * r, tail=0.6)
+    upright(q, -12 * r, -14 * r, 2 * r, head=8 * r, yaw=6 * sway)
+    q["jaw"] = (26 * hiss, 0, 0)
+    spread(q, 72 * r, up=22 * r + 4 * sway, open_=26 * r)
+    q["tail_0"] = (q["tail_0"][0] + 24 * r, q["tail_0"][1], 0)
+    q["tail_3"] = (q["tail_3"][0] + 12 * r, q["tail_3"][1], 0)  # (more, and its corners poke out of tail_2)
+    return q
+
+
+def pose_play(t):
+    """A young one's play: two little hops off both feet, the wings flapped out, the head tossed
+    (1.4 s, once; it takes off from and lands on the ground, `ground_clips`)."""
+    p = t / 1.4
+    hop = max(0.0, S(TAU * p * 2))
+    q = still(t, 1.4, lean=4 * hop)
+    q["root"] = (0, q["root"][1] + 7.0 * hop, 0)
+    q.update(legs(L["thigh"], L["shin"], L["foot"], -8 * hop, -8 * hop, 26 * hop, 26 * hop, lean=4 * hop))
+    upright(q, 4 * hop, -6 * hop, 0, head=4 * hop + 8 * S(TAU * p), yaw=18 * S(TAU * p), roll=10 * S(TAU * p))
+    spread(q, 40 * hop, up=30 * hop, open_=10 * hop)
+    q.update(tail_sway(p, 2, 5, lift=-3 * hop, fan=6 * hop))
+    return q
+
+
+def pose_nuzzle(t):
+    """A brooding parent's nudge: the beak lowered to a chick's height, two gentle pushes, a nibble
+    (2 s, once)."""
+    p = t / 2.0
+    d = keys(p, [(0, 0), (0.2, 1), (0.85, 1), (1, 0)])
+    push = max(0.0, S(TAU * p * 2)) * d
+    q = peck_still(0.6 * d, t, 2.0)
+    q["neck_1"] = (q["neck_1"][0] + 8 * push, 0, 0)
+    q["head"] = (q["head"][0] - 10 * push, 0, 6 * d * S(TAU * p))
+    q["jaw"] = (5 * d * max(0.0, S(TAU * p * 4)), 0, 0)
+    return q
+
+
+def pose_flinch(t):
+    """Hit: a jerk aside, the neck pulled down and back, the head ducked and turned away, the wings
+    clapped to the flanks, the tail clamped (0.45 s, once)."""
+    p = t / 0.45
+    d = keys(p, [(0, 0), (0.15, 1), (0.45, 0.8), (1, 0)])
+    q = still(t, 0.45, tail=0.0)
+    q.update({"spine_1": (0, 5 * d, 0), "neck_0": (14 * d, -8 * d, 0), "neck_1": (8 * d, 0, 0), "head": (-12 * d, -14 * d, 0),
+              "jaw": (8 * d, 0, 0)})
+    q.update(wings(out=-2 * d, lift=-4 * d))
+    q["tail_0"] = (q["tail_0"][0] - 8 * d, 0, 0)
+    return q
+
+
+def pose_approach(t):
+    """Curious, coming to look: slow careful steps, the neck stretched forward and low, the beak level,
+    the head cocked one way and the other (1.6 s a cycle, in place of the walk; its height set from its
+    feet, `ground_clips`)."""
+    p = t / 1.6
+    a = TAU * p
+    lean = 8
+    q = stand(lean)
+    q.update(legs(L["thigh"] - 4, L["shin"] + 8, L["foot"] - 4, -18 * S(a), 18 * S(a), 24 * max(0.0, S(a + math.pi / 2)),
+                  24 * max(0.0, S(a - math.pi / 2)), lean=lean))
+    bob = keys(p % 0.5, [(0, 0), (0.15, 1), (0.42, 1), (0.5, 0)])
+    upright(q, lean, 26 + 4 * bob, 12, roll=10 * S(a))
+    q["spine_1"] = (0, 2 * S(a), 0)
+    q.update(tail_sway(p, 1, 4, lift=-0.8 * lean, fan=-4))
+    return q
+
+
+def pose_charge(t):
+    """Charging a hunter: the run driven hard, the neck stretched straight out ahead and the head low
+    and forward, the beak open, the wings a little out (0.6 s a cycle, in place of the walk and the run;
+    `ground_clips` sets its height from its feet, keeping the bounce)."""
+    p = t / 0.6
+    a = TAU * p
+    q = pose_run(t)
+    upright(q, 12, 30, 38, head=-70 + 3 * S(2 * a))  # (at -77 the neck's top lies in the eyelids' plane: they flicker)
+    q["jaw"] = (10, 0, 0)
+    q.update(wings(out=16 + 4 * S(2 * a), lift=-10))
+    return q
+
+
+def pose_sleep(t, P=L):
+    """Asleep on the nest: the brooding pose, the head turned back over the shoulder and laid on the
+    back, the beak tucked in, eyes shut, a slow breath (6 s, held)."""
+    q = pose_lie(0.0, P)
+    br = S(TAU * t / 6.0 * 2)
+    q.update({"root": (0, -P["rest_drop"] + 0.1 * (1 + br), 0), "spine_1": (0.8 * br, 0, 0),
+              "neck_0": (P["sleep_n0"], P["sleep_yaw"], 0), "neck_1": (P["sleep_n1"], P["sleep_yaw1"], 0),
+              "head": (P["sleep_head"], P["sleep_yaw2"], 0), "jaw": (0.01, 0, 0)})
+    q.update({"eyelid_L": (0, 0, 90), "eyelid_R": (0, 0, -90)})
+    return q
+
+
+def pose_death(t):
+    """Dying: the legs give, it topples onto its side, the neck and tail fall slack, the wings loose,
+    the eyes shut; it stays (1.4 s, holds; each frame on its lowest point, `ground_clips`)."""
+    p = t / 1.4
+    fall = keys(p, [(0, 0), (0.35, 0.35), (0.7, 1), (1, 1)])
+    q = stand()
+    q["root"] = (0, -L["drop"] - 40 * fall, 0)
+    q.update({"spine_0": (0, 0, 84 * fall), "neck_0": (30 * fall, 0, -20 * fall), "neck_1": (30 * fall, 0, -10 * fall),
+              "head": (10 * fall, 0, -10 * fall), "jaw": (12 * fall, 0, 0)})
+    q.update(legs(L["thigh"] + 24 * fall, L["shin"] - 30 * fall, L["foot"] + 6 * fall))
+    q.update(wings(out=8 * fall))
+    q.update({f"tail_{k}": (0, 0, (-6 if k == 0 else -3) * fall) for k in range(len(TAIL))})
+    q.update({"eyelid_L": (0, 0, 90 * fall), "eyelid_R": (0, 0, -90 * fall)})
+    return q
+
+
+BLINKS = {"idle": [4.4, 6.3], "lie": [1.2, 4.0], "stare": [1.3], "graze": [1.1], "look": [1.7], "watch": [1.0, 3.3],
+          "drink": [1.3], "approach": [0.9]}
 BLINK = 0.09
-ANIMS = {"idle": (pose_idle, 8.0), "walk": (pose_walk, 1.0), "run": (pose_run, 0.6), "lie": (pose_lie, 6.0)}
-SNAPS = {"idle": [3.9, 3.98, 4.9, 4.98, 5.9, 5.98, 6.06, 6.8, 6.88], "lie": [1.9, 1.98, 3.2, 3.28, 4.6, 4.68],
-         "walk": [0.15, 0.42, 0.5, 0.65, 0.92]}
+ANIMS = {"idle": (pose_idle, 8.0), "walk": (pose_walk, 1.0), "run": (pose_run, 0.6), "lie": (pose_lie, 6.0),
+         "stare": (pose_stare, 2.0), "graze": (pose_graze, 2.4), "drink": (pose_drink, 2.0), "sniff": (pose_sniff, 2.2),
+         "look": (pose_look, 2.6), "scratch": (pose_scratch, 1.8), "groom": (pose_groom, 2.6), "stretch": (pose_stretch, 2.4),
+         "sleep": (pose_sleep, 6.0), "alarm": (pose_alarm, 1.2), "rear": (pose_rear, 1.4), "play": (pose_play, 1.4),
+         "nuzzle": (pose_nuzzle, 2.0), "flinch": (pose_flinch, 0.45), "death": (pose_death, 1.4), "watch": (pose_watch, 4.0),
+         "approach": (pose_approach, 1.6), "charge": (pose_charge, 0.6)}
+# The idle's: the jabs' peaks (the beak at the ground), then the head snaps.
+SNAPS = {"idle": [0.2, 1.0, 1.8, 2.6, 3.9, 3.98, 4.9, 4.98, 5.9, 5.98, 6.06, 6.8, 6.88], "lie": [1.9, 1.98, 3.2, 3.28, 4.6, 4.68],
+         "walk": [0.15, 0.42, 0.5, 0.65, 0.92], "look": [2.6 * k for k, _ in LOOK[1:-1]], "watch": [4.0 * k for k, _ in WATCH[1:-1]],
+         "approach": [1.6 * (h + k) for h in (0, 0.5) for k in (0.15, 0.42)]}
+# The held ones and the gaits loop; a clip played once must not (the engine loops a clip whose file
+# says so, whatever the game asks); the death holds its last frame.
+LOOPS = {"stare": True, "graze": True, "drink": True, "sleep": True, "watch": True, "approach": True, "charge": True,
+         "death": "hold_on_last_frame"}
+BLENDS = {"flinch": (0.05, 0.2), "death": (0.1, 0.0), "sleep": (0.6, 0.6), "graze": (0.4, 0.4), "watch": (0.4, 0.4),
+          "approach": (0.3, 0.3), "charge": (0.2, 0.3)}
+STANDING = ("idle", "walk", "run", "lie")
 
 
 def eyelids(name, t):
@@ -588,7 +902,8 @@ def eyelids(name, t):
 
 
 def frame_times(name, dur):
-    n = {"idle": 96, "lie": 60, "walk": 20, "run": 16}.get(name, 16)
+    n = {"idle": 96, "lie": 60, "walk": 20, "run": 16, "sleep": 36, "flinch": 12, "watch": 48, "approach": 24, "charge": 16,
+         "look": 40}.get(name, 16 if name in STANDING else 24)
     ts = {round(dur * k / n, 4) for k in range(n + 1)} | {round(s, 4) for s in SNAPS.get(name, [])}
     for b in BLINKS.get(name, []):
         ts |= {round(b + d, 4) for d in (-BLINK, -BLINK / 2, 0, BLINK / 2, BLINK)}
@@ -599,13 +914,29 @@ def animations(bone_names):
     out = {}
     for name, (fn, dur) in ANIMS.items():
         frames = []
+        loops = LOOPS.get(name, name in STANDING)
         for t in frame_times(name, dur):
-            tt = t % dur if t < dur else 0.0
+            # A loop's last frame is its first; a clip played once ends where it ends.
+            tt = t % dur if t < dur else (0.0 if loops is True else dur)
             pose = fn(tt)
-            pose.update(eyelids(name, tt))
+            if name not in ("sleep", "death"):  # those keep their eyes shut
+                pose.update(eyelids(name, tt))
             frames.append({"t": round(t, 4), "rot": {b: [round(float(v), 4) for v in pose.get(b, (0, 0, 0))] for b in bone_names if b != "root"},
                            "root": [round(float(v), 4) for v in pose.get("root", (0, 0, 0))]})
         out[name] = {"length": dur, "frames": frames}
+        if name not in STANDING:
+            out[name].update(loop=loops, blend=BLENDS.get(name, (0.25, 0.3)))
+    # A clip goes over what plays below only on the bones it writes, and the exporter leaves out a bone
+    # that stays at 0: kept at a hundredth of a degree, so the idle's pecking lean, neck and tail don't
+    # show through a clip that holds them straight. The eyelids are left to the idle's blinks.
+    moved = {b for a in ("idle", "lie") for f in out[a]["frames"] for b, r in f["rot"].items() if any(abs(v) > 1e-6 for v in r)}
+    for name, anim in out.items():
+        if name in STANDING:
+            continue
+        for b in moved - {"eyelid_L", "eyelid_R"}:
+            if all(not any(abs(v) > 1e-6 for v in f["rot"][b]) for f in anim["frames"]):
+                for f in anim["frames"]:
+                    f["rot"][b] = [0.01, 0.0, 0.0]
     return out
 
 
@@ -625,17 +956,6 @@ def fit_poses(spec):
     L["drop"] = round(float(g["toes"]), 2)
     # the run's bob: its lowest toe just on the ground
     L["run_lift"] = round(-min(float(lowest(spec, pose_run(t), GROUPS)["toes"]) for t in np.linspace(0, 0.6, 25)), 2)
-
-    def peck_cost(P):
-        g = lowest(spec, peck_pose(1.0, dict(L, **P)), GROUPS)
-        floor = g["toes"]
-        return (g["beak"] - floor - 0.5) ** 2 + 0.001 * (P["peck_n0"] ** 2 + P["peck_n1"] ** 2 + P["peck_head"] ** 2) \
-            + 0.004 * P["peck_lean"] ** 2 + 40 * min(0.0, g["wings"] - floor - 1) ** 2 + 40 * min(0.0, g["fan"] - floor) ** 2 \
-            + 40 * min(0.0, g["head"] - floor - 1) ** 2 \
-            + 0.004 * (P["peck_lean"] + P["peck_n0"] + P["peck_n1"] + P["peck_head"] - 80) ** 2  # the beak points down
-    best = fit({"peck_lean": list(range(0, 26, 5)), "peck_n0": list(range(10, 71, 5)), "peck_n1": list(range(0, 91, 10)),
-                "peck_head": list(range(-10, 71, 10))}, peck_cost)[1]
-    L.update(best)
 
     def rest_cost(P):
         g = lowest(spec, pose_lie(0.0, P), GROUPS)
@@ -658,6 +978,39 @@ def fit_poses(spec):
         return (g["wings"] - 0.4) ** 2 + 50 * min(0.0, g["arms"] - 1.0) ** 2 - 0.01 * Q["wing_roll"]
     best_w = fit({"wing_roll": list(range(20, 71, 2)), "wing_pitch": list(range(-30, 11, 2))}, wing_cost)[1]
     L.update(best, rest_drop=P["rest_drop"], **best_w)
+
+    # Pecking (the idle's, graze, drink, sniff): the beak's tip to the ground, lower than the rest of the
+    # head, the legs straight, nothing else near the ground.
+    head = {"tip": lambda n: n in ("beak", "jaw"), "head": lambda n: n in ("skull", "snout") or n.startswith("crest")}
+
+    def graze_cost(Q):
+        g = lowest(spec, head_down(1.0, dict(L, **Q)), {**GROUPS, **head})
+        floor = g["toes"]
+        return (g["tip"] - floor - 0.5) ** 2 + 40 * min(0.0, g["head"] - g["tip"] - 1.5) ** 2 \
+            + 40 * min(0.0, g["wings"] - floor - 1) ** 2 + 40 * min(0.0, g["fan"] - floor) ** 2 \
+            + 0.001 * (Q["graze_n0"] ** 2 + Q["graze_n1"] ** 2 + Q["graze_head"] ** 2) + 0.004 * Q["graze_lean"] ** 2
+    best_g = fit({"graze_lean": list(range(0, 51, 5)), "graze_n0": list(range(0, 121, 10)), "graze_n1": list(range(-30, 61, 10)),
+                  "graze_head": list(range(-40, 21, 5))}, graze_cost)[1]
+    L.update(best_g)
+    g = lowest(spec, head_down(1.0), {**GROUPS, **head})
+    print("pecking: the beak's tip", round(float(g["tip"] - g["toes"]), 2), "over the ground, the head",
+          round(float(g["head"] - g["toes"]), 2), best_g)
+
+
+FEET = ["toes_L", "toes_R"]
+
+
+def ground_clips(spec):
+    """The clips written as angles, stood on the ground: the approach's height from its feet frame by
+    frame, the charge's and the play's once over the clip (keeping their bounce and hops); rearing on
+    its planted feet, frame by frame; dying, each frame of the fall on its lowest point (mid-fall a leg
+    swings out below where it ends up lying)."""
+    A = spec["animations"]
+    A["approach"] = grounded(spec, A["approach"], FEET)
+    A["charge"] = grounded(spec, A["charge"], FEET, True)
+    A["play"] = grounded(spec, A["play"], FEET, True)
+    A["rear"] = grounded(spec, A["rear"], FEET)
+    A["death"] = grounded(spec, A["death"], [e["name"] for e in spec["elements"]])
 
 
 # ------------------------------------------------------------------ build
@@ -684,6 +1037,7 @@ def build():
             "bones": [{"name": n, "parent": p, "pivot": [float(v) for v in pv]} for n, p, pv in B], "elements": E}
     fit_poses(spec)
     spec["animations"] = animations([n for n, _, _ in B])
+    ground_clips(spec)
     spec["fitted"] = dict(L)
     return spec, sheet
 
