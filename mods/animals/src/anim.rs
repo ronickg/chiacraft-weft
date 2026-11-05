@@ -386,7 +386,12 @@ fn command(cmd: &mut ServerCommand) {
             w.action_stop(id);
         }
         (_, "loop") => w.action_play(id, &clip, true),
-        (Some(a), "hold") => hold_for(&w, id, a, PINNED),
+        (Some(a), "hold") => {
+            // At once, even under a clip played once: with ticks frozen (`/tick freeze`, for
+            // looks) the game's clock stops and that clip would never end for it.
+            edit(&w, id, |c| c[BUSY] = 0);
+            hold_for(&w, id, a, PINNED);
+        }
         (Some(a), _) => act(&w, id, a),
         (None, "hold") => w.action_play(id, &clip, true),
         (None, _) => play_named(&w, id, &clip),
