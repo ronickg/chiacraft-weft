@@ -40,3 +40,7 @@ portal
 mailbox_front
 mailbox_side
 mailbox_top
+ley_stone_side
+ley_stone_top
+waystone_side
+waystone_top
