@@ -989,7 +989,9 @@ fn fog_light(dir: vec3<f32>) -> FogLight {
     if scene.frame.x > 0.5 {
         sky_part *= 0.55;
     }
-    let sun_part = p.sun * mix(vec3(1.0), MIST_GOLD * 0.65, warm) * light_strength() * phase;
+    // In the HDR world the sunlit mist a deeper gold (Bliss's dawn mist, saturation 181 against our 99).
+    let gold = select(MIST_GOLD * 0.65, vec3(1.0, 0.58, 0.2) * 0.7, scene.frame.x > 0.5);
+    let sun_part = p.sun * mix(vec3(1.0), gold, warm) * light_strength() * phase;
     let k = 0.75 * tint * look_opt(OPT_FOG, 1.0);
     let leaf_part = p.sun * mix(vec3(1.0), MIST_GOLD, warm) * light_strength() * 0.06 * LEAF_LIGHT;
     return FogLight(sky_part * k, sun_part * k, leaf_part * k);
@@ -1483,7 +1485,8 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     // The HDR world's white balance by day (`base:look_white`): warmer, less blue (our land read
     // much bluer than Bliss's at every hour, red less blue -37 against -10 at noon: the gap sheet).
     if scene.frame.x > 0.5 {
-        let w = fantasy_opt(OPT_WHITE) * day;
+        // Warmer still at golden hour (Bliss's dawn land: warmth +106 against our +47).
+        let w = fantasy_opt(OPT_WHITE) * day * (1.0 + 0.8 * golden());
         t *= vec3(1.0 + 0.08 * w, 1.0, 1.0 - 0.14 * w);
     }
     // Only true darks go cool (most daylit ground is mid-tone and keeps its color).
@@ -1499,7 +1502,9 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     let y = luma(t);
     // In the HDR world 0.8 of it (its curve keeps more colour; at 1.2 the noon land measured 131
     // of saturation against Bliss's 75: the gap sheets, 11-05).
-    let sat = 1.2 * look_opt(OPT_SATURATION, 1.0) * select(1.0, 0.8, scene.frame.x > 0.5);
+    // In the HDR world it follows the sun: as made with the sun low (the morning read greyer than
+    // Bliss's, 48 against 72 at 08:00), 0.68 of it at noon (100 against 75).
+    let sat = 1.2 * look_opt(OPT_SATURATION, 1.0) * select(1.0, mix(1.0, 0.68, smoothstep(0.45, 0.85, scene.sun.y)), scene.frame.x > 0.5);
     t = max(mix(vec3(y), t, mix(1.0, sat, day)), vec3(0.0));
     // A cool floor so the night is never pure black; by day black stays black.
     t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034) * (1.0 - day);
