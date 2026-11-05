@@ -774,7 +774,7 @@ pub fn register(r: &mut Registry) {
         .tint(&tints::GRASS)
         .no_item();
     r.loot(&TALL_GRASS)
-        .pool(Pool::new().when(Cond::Chance(0.125)).item("wheat_seeds"))
+        .pool(Pool::new().when(Cond::Chance(vitals::crops::WHEAT_SEED_CHANCE)).item("wheat_seeds"))
         // Fibre for string and linen (`clothing.rs`).
         .pool(
             Pool::new()
@@ -1098,7 +1098,7 @@ pub fn register(r: &mut Registry) {
         }
     }
     r.loot(&TALL_GRASS_DOUBLE)
-        .pool(Pool::new().when(Cond::Chance(0.125)).item("wheat_seeds"))
+        .pool(Pool::new().when(Cond::Chance(vitals::crops::WHEAT_SEED_CHANCE)).item("wheat_seeds"))
         .pool(
             Pool::new()
                 .when(Cond::Chance(vitals::clothing::FIBRE_CHANCE))

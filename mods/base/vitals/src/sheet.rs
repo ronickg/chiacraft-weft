@@ -426,9 +426,10 @@ fn plant_table(w: &mut String) {
 fn crop_table(w: &mut String) {
     let _ = writeln!(
         w,
-        "## Crops\n\nWhat each crop is sown from and gives ripe (`vitals::crops`; how it grows is its plants row): picked unripe it gives back what sowed it, ripe its harvest and, with a seed of its own, up to {} more seed. Its ripe harvest tires or feeds the farmland under it. Broken tall grass in the biomes listed gives one of their crops' seed a time in {:.0}.\n\n| crop | sown from | ripe gives | stages | soil | wild seed in |\n|---|---|---|---|---|---|",
+        "## Crops\n\nWhat each crop is sown from and gives ripe (`vitals::crops`; how it grows is its plants row): picked unripe it gives back what sowed it, ripe its harvest and, with a seed of its own, up to {} more seed. Its ripe harvest tires or feeds the farmland under it. Broken tall grass in the biomes listed gives one of their crops' seed a time in {:.0}, and anywhere a wheat seed a time in {:.0}.\n\n| crop | sown from | ripe gives | stages | soil | wild seed in |\n|---|---|---|---|---|---|",
         crate::crops::EXTRA_SEEDS,
-        1.0 / crate::crops::WILD_SEED_CHANCE
+        1.0 / crate::crops::WILD_SEED_CHANCE,
+        1.0 / crate::crops::WHEAT_SEED_CHANCE
     );
     for c in &crate::crops::CROPS {
         let wild = if c.wild.is_empty() { "tall grass anywhere".to_string() } else { c.wild.join(", ") };

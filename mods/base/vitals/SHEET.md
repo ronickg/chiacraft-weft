@@ -323,7 +323,7 @@ What each growing plant needs (`vitals::plants`, from `reports/ecology/Plants an
 
 ## Crops
 
-What each crop is sown from and gives ripe (`vitals::crops`; how it grows is its plants row): picked unripe it gives back what sowed it, ripe its harvest and, with a seed of its own, up to 3 more seed. Its ripe harvest tires or feeds the farmland under it. Broken tall grass in the biomes listed gives one of their crops' seed a time in 16.
+What each crop is sown from and gives ripe (`vitals::crops`; how it grows is its plants row): picked unripe it gives back what sowed it, ripe its harvest and, with a seed of its own, up to 3 more seed. Its ripe harvest tires or feeds the farmland under it. Broken tall grass in the biomes listed gives one of their crops' seed a time in 32, and anywhere a wheat seed a time in 32.
 
 | crop | sown from | ripe gives | stages | soil | wild seed in |
 |---|---|---|---|---|---|
