@@ -65,6 +65,13 @@ if __name__ == "__main__":
     for clip in ("approach", "charge"):
         low = {f: min(feet_low(spec, A[clip], [f])) for f in FEET}
         assert all(abs(v) < 0.3 for v in low.values()), f"{clip}'s feet reach {low}, not the ground"
+    # The walk and the run stand on a planted foot in every keyframe (`sauropod.ground_clips`), nothing below the ground.
+    everything = [e["name"] for e in spec["elements"]]
+    for clip in ("walk", "run"):
+        low = feet_low(spec, A[clip], FEET)
+        assert min(low) > -0.3 and max(low) < 0.3, f"{clip}'s planted foot from {min(low):.2f} to {max(low):.2f}, not on the ground"
+        low = min(feet_low(spec, A[clip], everything))
+        assert low > -0.3, f"{clip}: {low:.2f} into the ground"
     # The standing clips keep a foot on the ground in every keyframe, none sunk into it.
     for clip in STANDING_CLIPS:
         low = feet_low(spec, A[clip], FEET)
@@ -77,7 +84,6 @@ if __name__ == "__main__":
     tail = feet_low(spec, A["rear"], [f"tail_{k}" for k in range(5)])
     assert min(tail) > -0.3 and min(tail) < 1.0, f"rearing, the tail's lowest {min(tail):.2f}: not on the ground"
     # Dying, it rolls onto its side: each frame rests on its lowest point.
-    everything = [e["name"] for e in spec["elements"]]
     low = feet_low(spec, A["death"], everything)
     assert min(low) > -0.3 and max(low) < 0.3, f"dying, its lowest point from {min(low):.2f} to {max(low):.2f}"
     # Nothing goes below the ground in any clip (nor the idle and the lie): not the long neck's head

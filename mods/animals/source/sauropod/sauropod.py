@@ -1106,10 +1106,14 @@ def fit_clips(spec):
 
 
 def ground_clips(spec):
-    """The clips written as angles, stood on the ground: the approach's height from its feet frame
-    by frame, the charge's once over the loop (its bounce kept); rearing on its hind feet, frame by
+    """The clips written as angles, stood on the ground: the walk's, run's and approach's height from
+    their feet frame by frame, the charge's once over the loop (its bounce kept); rearing on its hind feet, frame by
     frame; dying, each frame of the fall on its lowest point; the scratch's sway on its feet."""
     A = spec["animations"]
+    # The walk and the run (an amble on the walk's footfalls, always a foot down) stood on the planted
+    # foot frame by frame, their steps kept: written as angles, their hind feet sank 0.9-1.1 (fixed 11-05).
+    A["walk"] = grounded(spec, A["walk"], FEET)
+    A["run"] = grounded(spec, A["run"], FEET)
     A["approach"] = grounded(spec, A["approach"], FEET)
     A["charge"] = grounded(spec, A["charge"], FEET, True)
     A["scratch"] = grounded(spec, A["scratch"], FEET)
