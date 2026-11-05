@@ -490,7 +490,9 @@ pub async fn second_hand(t: T) -> R {
             .and_then(|n| n.parse().ok())
             .unwrap_or(0))
     };
-    const OFF: u32 = 40;
+    // The other hand is the last inventory slot: past the hotbar and main (36), the four armor, four clothes and
+    // the cloak (9 worn): 45. Weft's own layout, without our clothes, has it at 40.
+    const OFF: u32 = 45;
     let id = |name: &str| Item::lookup(name).unwrap_or(u32::MAX);
     let ground = add(f, [2, -1, 0]);
     let above = add(ground, [0, 1, 0]);
@@ -1597,7 +1599,8 @@ pub async fn every_food_has_nutrition(t: T) -> R {
     let missing: Vec<&str> = (0..u16::MAX as u32)
         .filter(|&id| base_api::FOOD.on_item(id).is_some())
         .map(item_name)
-        .filter(|name| !name.is_empty() && vitals::food::find(name).is_none())
+        // The test mod's own foods (Weft's `testmod:apple`) are no part of the game's food table.
+        .filter(|name| !name.is_empty() && !name.starts_with("testmod:") && vitals::food::find(name).is_none())
         .collect();
     t.check(missing.is_empty(), format!("food without a row in vitals::food::FOODS (it can't be eaten): {missing:?}"));
     Ok(())

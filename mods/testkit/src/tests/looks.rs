@@ -190,8 +190,9 @@ pub async fn broken_shader_pack(t: T) -> R {
     let world = include_str!("../../../../crates/engine/assets/shaders/world.wgsl");
     let ending = "    return vec4(mix(lit.rgb, scene.fog_color.rgb, fog), lit.a);";
     t.check(world.contains(ending), "the world shader still ends its shading like this");
-    // Packs are copies of it, from whenever they were made.
-    t.check(world.contains("tex_info[name * 2u]"), "the texture table still reads as packs read it");
+    // Packs are copies of it, from whenever they were made: four words a texture since Weft
+    // 26.11.2 (chiacraft's pack world.wgsl reads it so too).
+    t.check(world.contains("tex_info[name * 4u]"), "the texture table still reads as packs read it");
     let sepia = world.replace(
         ending,
         "    let y = dot(mix(lit.rgb, scene.fog_color.rgb, fog), vec3(0.3, 0.59, 0.11));
