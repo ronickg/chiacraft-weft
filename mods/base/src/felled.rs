@@ -14,6 +14,8 @@ use weft_sdk::*;
 
 static AXES: Tag = Tag::named("tools/axe");
 static LOGS: Tag = Tag::named("logs");
+/// Thin branch blocks (`blocks::branch`): a felled tree's land as sticks, not lying.
+static BRANCHES: Tag = Tag::named("branches");
 static LEAVES: Tag = Tag::named("leaves");
 
 /// The piece a felled log belongs to (`a` or `b`), none for a standing or placed log.
@@ -137,6 +139,17 @@ pub fn lay(w: &World, foot: [i32; 3], logs: &[[i32; 3]], states: &[u32], d: [i32
         let Some((at, h)) = spot else { continue };
         let at = [at[0], at[1] - drop[h], at[2]];
         if !taken.insert(at) || !gives_way(w.block(at)) {
+            continue;
+        }
+        // A branch lands as sticks where it falls (Dynamic Trees gives sticks for its thin wood):
+        // an 8 px one a stick, a 4 px one every other; turned, its arms would point the old way.
+        if BRANCHES.on_block(state) {
+            let thick = state_prop(state, "size") == Some("8");
+            if thick || (at[0] + at[1] + at[2]).rem_euclid(2) == 0 {
+                if let Some(stick) = Item::lookup("base:stick") {
+                    w.spawn_item([at[0] as f64 + 0.5, at[1] as f64 + 0.5, at[2] as f64 + 0.5], ItemStack::new(stick, 1));
+                }
+            }
             continue;
         }
         let piece = if (h / vitals::felling::PIECE) % 2 == 0 { "a" } else { "b" };

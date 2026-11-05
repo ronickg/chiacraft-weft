@@ -190,7 +190,7 @@ pub fn tree_blocks(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
     let giant_young = crate::tree_recipes::YOUNG.iter().any(|y| y.log == name);
     if let Some(c) = crate::tree_recipes::colonized(name).filter(|_| !giant_young) {
         if let Some(branch) = TREE_BRANCH.on_block(log).map(|b| b.0) {
-            put_with_branches(&crate::colonize::blocks(c, t.seed), log, t.leaves, branch, t.x, t.y, t.z, &mut put);
+            put_with_branches(&crate::colonize::blocks(c, t.seed), None, log, t.leaves, branch, t.x, t.y, t.z, &mut put);
             put(t.x, t.y - 1, t.z, DIRT.id(), true);
             return;
         }
@@ -336,6 +336,11 @@ pub fn giant_tree_blocks(log: u32, x: i32, y: i32, z: i32, h: u64, mut put: impl
     // A colonized giant (the Brazil nut): its trunk from its recipe, its crown by colonization.
     if let Some(c) = crate::tree_recipes::colonized(name) {
         let bark = state_with(log, "axis", "bark");
+        if let Some(branch) = TREE_BRANCH.on_block(log).map(|b| b.0) {
+            put_with_branches(&crate::colonize::blocks(c, h), Some(bark.unwrap_or(log)), log, leaves, branch, x, y, z, &mut put);
+            put(x, y - 1, z, DIRT.id(), true);
+            return;
+        }
         for (dx, dy, dz, part, _) in crate::colonize::blocks(c, h) {
             let (x, y, z) = (x + dx, y + dy, z + dz);
             match part {
@@ -458,7 +463,7 @@ fn grow_with_branches(
         .into_iter()
         .map(|(x, y, z, p)| (x, y, z, p, widths.get(&(x, y, z)).copied().unwrap_or(1.0)))
         .collect();
-    put_with_branches(&b, log, leaves, branch, x, y, z, put);
+    put_with_branches(&b, None, log, leaves, branch, x, y, z, put);
 }
 
 /// A tree's blocks with each wood block's width (`colonize::blocks`, `branchy::wood_widths`), its
@@ -466,6 +471,7 @@ fn grow_with_branches(
 #[allow(clippy::too_many_arguments)]
 fn put_with_branches(
     b: &[(i32, i32, i32, branchy::Part, f32)],
+    upright: Option<u32>,
     log: u32,
     leaves: u32,
     branch: u32,
@@ -485,7 +491,11 @@ fn put_with_branches(
             branchy::Part::Log { axis } => {
                 if w >= BRANCH_UNDER {
                     let along = ["x", "y", "z"][axis as usize];
-                    put(x + dx, y + dy, z + dz, state_with(log, "axis", along).unwrap_or(log), true);
+                    let state = match upright {
+                        Some(u) if axis == 1 => u,
+                        _ => state_with(log, "axis", along).unwrap_or(log),
+                    };
+                    put(x + dx, y + dy, z + dz, state, true);
                     continue;
                 }
                 let mut s = state_with(branch, "size", if w < BRANCH_THIN { "4" } else { "8" }).unwrap_or(branch);
