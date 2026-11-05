@@ -15,6 +15,7 @@ What it reports, at rest:
   `FLUSH`, the half unit `boxcheck` asks for between faces) and at
   least 2 long, in a colour unlike the box that covers the rest (a fur box's top showing beside a
   moss pad, a body box's edge between two tufts). These are the thin lines.
+  A strip whose texels are cut out (a shell's open hem) shows nothing and is skipped.
 - `seam`: the same strip in nearly the same colour as its cover: a small step, read as a crease.
   Fine on a joint (an upper leg's rim round the lower), worth a look on a flat back.
 - `thin`: a whole face under one texel wide that nothing covers (a box thinner than a texel seen
@@ -51,7 +52,8 @@ FRAMES = {"south": ("lo0 hi1 hi2", (1, 0, 0), (0, -1, 0)), "north": ("hi0 hi1 lo
           "up": ("lo0 hi1 lo2", (1, 0, 0), (0, 0, 1)), "down": ("lo0 lo1 hi2", (1, 0, 0), (0, 0, -1))}
 SPT = 4  # samples a texel along each side
 MAX_W, MIN_LEN = 2.0, 2.0  # a line: under 2 texels wide and at least 2 long
-FLUSH = 0.6  # units: a strip this narrow is the half-unit step boxcheck asks for between faces, read as flush
+FLUSH = 0.6  # layout units (1/64 block): a strip this narrow is the half-unit step boxcheck asks for, read as flush
+GEO_UNIT = 4.0  # layout units in an exported model's pixel (16 a block, as house.SCALE exports them)
 CONTRAST = 34.0  # mean RGB distance from the cover's colour that turns a seam into a line
 
 
@@ -82,7 +84,7 @@ def boxes_from_spec(spec):
         c = R @ (o - E @ o - p0) + t
         faces = {f: r for f, r in (e.get("faces") or {}).items() if r is not None}
         out.append(dict(name=e["name"], bone=e["bone"], lo=np.array(e["lo"], float), hi=np.array(e["hi"], float),
-                        A=A, c=c, quad=e.get("quad"), faces=faces, up=chain(spec["bones"], e["bone"]), pivots=piv))
+                        A=A, c=c, quad=e.get("quad"), faces=faces, up=chain(spec["bones"], e["bone"]), pivots=piv, unit=1.0))
     return out
 
 
@@ -138,7 +140,8 @@ def boxes_from_geo(geo):
             else:
                 A2, c2 = A, c
             faces = {}
-            for gf, uv in (cube.get("uv") or {}).items():
+            per_face = cube.get("uv") if isinstance(cube.get("uv"), dict) else {}  # box UV (a list): no per-face rectangles
+            for gf, uv in per_face.items():
                 if not isinstance(uv, dict):
                     continue
                 u, v = uv["uv"]
@@ -150,7 +153,7 @@ def boxes_from_geo(geo):
                 ax = thin[0]
                 quad = next((f for f, (a_, _) in FACES.items() if a_ == ax and f in faces), None) or "up"
             out.append(dict(name=f"{b['name']}#{k}", bone=b["name"], lo=lo, hi=hi, A=A2, c=c2, quad=quad, faces=faces,
-                            up=chain(g["bones"], b["name"]), pivots=pivots))
+                            up=chain(g["bones"], b["name"]), pivots=pivots, unit=GEO_UNIT))
     return out
 
 
@@ -205,7 +208,7 @@ def face_colours(b, face, tex, nu, nv, w, h):
     vi = np.clip((np.arange(nv) * h) // nv, 0, h - 1) + v0
     ui = np.clip(ui, 0, tex.shape[1] - 1)
     vi = np.clip(vi, 0, tex.shape[0] - 1)
-    return tex[vi[:, None], ui[None, :], :3].astype(float)
+    return tex[vi[:, None], ui[None, :], :4].astype(float)
 
 
 def mean_face_colour(b, face, tex):
@@ -331,12 +334,14 @@ def lines(boxes, tex=None, density=0.5, allow=()):
             lab, k = ndimage.label(thin)
             if k == 0:
                 continue
-            across = np.minimum(runs(vis) * tu, runs(vis.T).T * tv)  # how wide what shows is, at each sample
+            ru, rv = runs(vis), runs(vis.T).T
+            across = np.minimum(ru * tu, rv * tv)  # how wide what shows is, at each sample, in the face's texels
+            across_u = np.minimum(ru * du_len / nu, rv * dv_len / nv)  # the same in the model's units
             cols = None
             for comp in range(1, k + 1):
                 m = lab == comp
                 width = float(np.median(across[m]))  # the strip's width, in texels
-                units = width / max(min(w / max(du_len, 1e-9), h / max(dv_len, 1e-9)), 1e-9)
+                units = float(np.median(across_u[m])) * b.get("unit", 1.0)  # and in layout units (1/64 block)
                 if width >= 0.95 * MAX_W or units < FLUSH:  # a wedge where a tilted box crosses, or flush
                     continue
                 area = m.sum() * tu * tv
@@ -361,8 +366,11 @@ def lines(boxes, tex=None, density=0.5, allow=()):
                     if len(near) > 400:
                         near = near[:: len(near) // 400 + 1]
                     cc = colour_beside(cover, near, tex)
+                    if cols is not None and (cols[m][:, 3] > 0).mean() < 0.2:
+                        continue  # cut out: the strip's texels are see-through (a shell's open hem)
                     if cols is not None and cc is not None:
-                        contrast = round(float(np.linalg.norm(cols[m].mean(0) - cc)), 1)
+                        shown = cols[m][cols[m][:, 3] > 0]
+                        contrast = round(float(np.linalg.norm(shown[:, :3].mean(0) - cc)), 1)
                 kind = "line" if contrast is None or contrast >= CONTRAST else "seam"
                 if joint_rim(b, cover, n):
                     kind = "seam"  # the end of a part round the next one in its chain (a hoof's rim)

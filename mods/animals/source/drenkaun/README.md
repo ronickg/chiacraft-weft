@@ -30,9 +30,12 @@ clips) and `textures/entity/drenkaun/drenkaun.png` into `../../assets`. Its body
   to bone-pale tips, moss dripping from the beam, leaves at the tines' roots; each antler its own
   bone (`antler_L`, `antler_R`: the `left_antler` and `right_antler` breaks).
 - The moss mane: down the front of the neck and chest in locks of uneven length, tufts along the
-  neck's crest, then over the shoulders and along the back in tufts each narrower than the last,
-  thinning to the hips and stopping short of the rump; locks down the shoulders, shorter toward
-  the back. No bark plates (Ronald, round 4: "Drop the plates").
+  neck's crest; over the shoulders and back as one shell (the blocky-model skill's rule 6, like
+  Mojang's sniffer; Ronald, 11-05: "Shell, longer to the hips"), its hem cut out in ragged locks,
+  longest over the shoulders, and a lower shell over the hips carrying it down the back, its
+  locks shorter and its back edge in tongues, ending before the haunches and the rump.
+  `DRENKAUN_MOSS=tufts` builds round 5's pads and tufts instead. No bark plates (Ronald, round 4:
+  "Drop the plates").
 - Eyes: the skill's `hytale_amber` drawn round at 12 by 10 (`EYES["warden_amber"]`, Ronald: "A
   amber", "eyes a bit bigger"), on the head's sides, mirrored so the catchlights face forward,
   with blinking lids; a narrow muzzle tapering to a dark nose, the nostrils soft slits low on it.

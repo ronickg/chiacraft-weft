@@ -118,7 +118,7 @@ which is the world's and the same for every player.
   - the PC looks.
 - **Art:**
   - the firefly particle;
-  - `foxfire`, `glow_mycena` (and `goblins_gold`) with `_e` masks, via `block-textures`.
+  - `foxfire`, `glow_mycena` (and `goblins_gold`) with `_e` masks, via game-art's block pipeline (`guides/2 Blocks/Full set.md`).
 - **Lighting:**
   - the particle shader's blinking;
   - the `base:fx_glow` row and its night scaling of emission;
