@@ -2154,43 +2154,60 @@ impl Occlusion {
             self.last = None;
             return;
         };
-        let (texels, levels) = {
-            let (mut s, mut texels, mut levels) = (size, 0u64, 0);
-            loop {
-                texels += s[0] as u64 * s[1] as u64;
-                levels += 1;
-                if s[0] <= 1 && s[1] <= 1 {
-                    break (texels, levels);
-                }
-                s = s.map(|v| v.div_ceil(2));
-            }
-        };
+        // The levels under the depth (level 0, the depth texture, is read where it is: copying it,
+        // 31 MB at 3456 x 2234, and a dispatch behind a full barrier per level were a dozen Metal
+        // encoders a frame on the Mac; perf review #14).
+        let (texels, levels) = pyramid(size);
         let buffer = match self.depths.filter(|d| d.1 == size) {
             Some(d) => d.0,
             None => {
                 if let Some((old, ..)) = self.depths.take() {
                     gpu.destroy_buffer(old);
                 }
-                let b = gpu.create_buffer(texels * 4, usage::STORAGE, "depth levels");
+                let b = gpu.create_buffer(texels.max(1) * 4, usage::STORAGE, "depth levels");
                 self.depths = Some((b, size, levels));
                 b
             }
         };
-        list.push(Cmd::CopyDepthToBuffer { depth, buffer });
         list.push(Cmd::Barrier);
         list.pipeline(down);
         list.bind(crate::gpu_layout::bind::occlusion::DEPTHS, buffer);
-        let (mut s, mut src) = (size, 0u32);
-        for _ in 1..levels {
-            let dst = src + s[0] * s[1];
-            list.push_constants(&crate::gpu_layout::OcclusionArgs { size: s, src, dst, count: 0, pad: 0 });
-            s = s.map(|v| v.div_ceil(2));
-            list.push(Cmd::Dispatch { x: s[0].div_ceil(32), y: s[1].div_ceil(32), z: 1 });
+        // Each dispatch makes up to `PER_DISPATCH` levels from the last one made (the depth for the
+        // first), a 32 x 32 tile halving in workgroup memory.
+        let (mut s, mut src, mut from_texture, mut made) = (size, 0u32, true, 1u32);
+        while made < levels {
+            let count = PER_DISPATCH.min(levels - made);
+            let d = s.map(|v| v.div_ceil(2));
+            let dst = if from_texture { 0 } else { src + s[0] * s[1] };
+            let pad = if from_texture { gpu.texture_index(depth) + 1 } else { 0 };
+            list.push_constants(&crate::gpu_layout::OcclusionArgs { size: s, src, dst, count, pad });
+            list.push(Cmd::Dispatch { x: d[0].div_ceil(32), y: d[1].div_ceil(32), z: 1 });
             list.push(Cmd::Barrier);
-            src = dst;
+            // The last level this one made, and where it is.
+            let (mut at, mut ls) = (dst, d);
+            for _ in 1..count {
+                at += ls[0] * ls[1];
+                ls = ls.map(|v| v.div_ceil(2));
+            }
+            (s, src, from_texture, made) = (ls, at, false, made + count);
         }
         self.last = self.now.take();
     }
+}
+
+/// Levels a dispatch of `occlusion.wgsl`'s `down` makes: a 32 x 32 tile halved down to 1.
+const PER_DISPATCH: u32 = 6;
+
+/// The depth pyramid of a depth of `size`: the texels of levels 1 and on (what `depths` holds), and
+/// how many levels there are with level 0 (down to 1 x 1).
+fn pyramid(size: [u32; 2]) -> (u64, u32) {
+    let (mut s, mut texels, mut levels) = (size, 0u64, 1u32);
+    while s[0] > 1 || s[1] > 1 {
+        s = s.map(|v| v.div_ceil(2));
+        texels += s[0] as u64 * s[1] as u64;
+        levels += 1;
+    }
+    (texels, levels)
 }
 
 /// Left, right, bottom, top planes; the reverse-Z infinite projection has no useful far plane.
@@ -2220,6 +2237,17 @@ mod indirect_count_tests {
             assert_eq!(at % 256, 0, "{n} buckets");
             assert!(at >= n * 8, "{n} buckets: it would overlap them");
         }
+    }
+
+    #[test]
+    fn the_pyramid_has_every_level_but_the_depth() {
+        // 4 x 4: levels 2 x 2 and 1 x 1 kept, three levels with the depth.
+        assert_eq!(pyramid([4, 4]), (5, 3));
+        assert_eq!(pyramid([1, 1]), (0, 1));
+        // Odd sizes round up, as the shader's (s + 1) / 2.
+        assert_eq!(pyramid([5, 3]), (3 * 2 + 2 + 1, 4));
+        let (_, levels) = pyramid([3456, 2234]);
+        assert_eq!(levels, 13);
     }
 
     #[test]
