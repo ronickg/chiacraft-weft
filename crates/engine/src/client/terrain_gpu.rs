@@ -576,7 +576,7 @@ impl GpuTerrain {
                     drop(back);
                     crate::server::dim::warm_scatters(content(), made[0].0.dim, made[0].0.seed, x, z);
                     for (job, words) in made {
-                        crate::background().spawn(move || finish(job, unpack(&words)));
+                        crate::client_terrain().spawn(move || finish(job, unpack(&words)));
                     }
                 });
             }
@@ -595,7 +595,7 @@ impl GpuTerrain {
             let Some((words, custom)) = describe(content(), key.0, key.1) else {
                 // The terrain thread asked for a dimension the GPU cannot make: done by the CPU.
                 for job in self.queue.drain(..) {
-                    crate::background().spawn(move || cpu(job));
+                    crate::client_terrain().spawn(move || cpu(job));
                 }
                 return;
             };

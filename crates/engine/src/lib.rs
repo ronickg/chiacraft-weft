@@ -84,6 +84,26 @@ pub fn background() -> &'static rayon::ThreadPool {
     })
 }
 
+/// The client's own terrain: finishing the cubes the GPU made, the CPU's where it can't, and the
+/// mods' features under them. Apart from `background`, where it waited in one queue behind the
+/// integrated server's generation (a saturated pool while loading: finishing a cube took 0.3 to
+/// 11 ms, perf review). `WEFT_SHARED_TERRAIN_POOL=1` puts it back on `background`, to compare.
+pub fn client_terrain() -> &'static rayon::ThreadPool {
+    static POOL: std::sync::OnceLock<rayon::ThreadPool> = std::sync::OnceLock::new();
+    static SHARED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    if *SHARED.get_or_init(|| std::env::var_os("WEFT_SHARED_TERRAIN_POOL").is_some()) {
+        return background();
+    }
+    POOL.get_or_init(|| {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(workers())
+            .thread_name(|i| format!("client terrain {i}"))
+            .start_handler(|_| lower_priority())
+            .build()
+            .expect("client terrain pool")
+    })
+}
+
 /// Meshing: queued by the thousand while loading, so apart from the global pool, where the
 /// frame's culling waited behind it.
 pub fn meshing() -> &'static rayon::ThreadPool {
