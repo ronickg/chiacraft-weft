@@ -21,6 +21,7 @@ mod first;
 mod growth;
 mod hints;
 mod hud;
+mod impact;
 mod items;
 mod knapping;
 mod land;
@@ -126,6 +127,7 @@ fn init(r: &mut Registry) {
     death::register(r);
     beds::register(r);
     hud::register(r);
+    impact::register(r);
     redstone::register(r);
     look::register(r);
     shaderpack::register(r);

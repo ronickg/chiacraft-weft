@@ -1102,3 +1102,5 @@ item.base.hand_drill.tooltip = Two sticks, spun between the palms. Hold it on a 
 block.base.campfire_laid = Laid Campfire
 block.base.campfire_laid.tooltip = Two logs and two sticks, not lit yet. Hold a bow drill or hand drill on it for an ember.
 command.base.knap.no_room = No room for a nodule here: stand on open ground.
+command.base.impact.started = A meteorite falls: a crater of radius {0} at {1} {2}, {3} columns over {4} ticks
+command.base.impact.no_ground = No loaded land to strike at {0} {1}
