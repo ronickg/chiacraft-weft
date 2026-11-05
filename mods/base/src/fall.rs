@@ -372,7 +372,19 @@ fn hurt(w: &World, f: &mut Fall, deg: f32) {
     let harm = n::hurt(f.logs.len() as u32);
     for p in f.logs.iter().step_by(step) {
         let at = turn(center(*p), f.pivot, f.axis, deg);
-        for id in crate::felled::in_box(w, at, n::HURT_REACH) {
+        // Coming down, a trunk cut above its foot (its pivot the stump's top) still drops a block
+        // as it lands (`felled::lay`): a creature under a block tall (a capybara) is in its way
+        // there, not where it turns (the felling round: a 6-log tree's fall passed over two).
+        let low = [at[0], at[1] - 1.0, at[2]];
+        let ids = crate::felled::in_box(w, at, n::HURT_REACH)
+            .into_iter()
+            .chain(
+                (deg > 60.0)
+                    .then(|| crate::felled::in_box(w, low, n::HURT_REACH))
+                    .into_iter()
+                    .flatten(),
+            );
+        for id in ids {
             if id != f.body && f.hurt.insert(id) {
                 w.damage(id, harm, 0, damage_cause::CRUSH);
             }

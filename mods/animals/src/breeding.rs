@@ -215,7 +215,11 @@ pub fn upkeep(w: &World, id: u64, index: usize, a: &mut Animal) {
             .entity(id)
             .map_or(s.crowd(), |st| crate::species::crowd_at(w, s, st.block_pos()));
         let roll = w.random_below(1_000_000) as f64 / 1_000_000.0;
-        if roll < life::want_chance(days, near, crowd, a.stage) {
+        // A group that came to an empty place lives (`life::room_for` lets it in), though a room
+        // under its group size (a hunter where its prey feed one, `needs::hunter_room`) keeps it
+        // from breeding up: it dies of want only past its biggest group.
+        let room = crowd.max(s.bio.social.group().1);
+        if roll < life::want_chance(days, near, room, a.stage) {
             weft_sdk::info!("wild {} {id} died of want ({near:.1} of its kind near, room for {crowd})", s.name);
             w.damage(id, 1e9, 0, damage_cause::STARVE);
             return;
@@ -356,17 +360,7 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             return false;
         }
         let female = |o: u64| w.component(o, &ANIMAL).map(|a| a.female);
-        let Some(mine) = w.component(id, &ANIMAL).and_then(|a| a.species()) else { return false };
-        let mate = w.entities_near(st.pos, 24.0, None).into_iter().find(|&o| {
-            o != id
-                && female(o) != female(id)
-                && w.component(o, &ANIMAL)
-                    .and_then(|a| a.species())
-                    .is_some_and(|s| species::same_species(s, mine))
-                && w.component(o, &BREEDING)
-                    .is_some_and(|m| m.love > 0 && m.growing == 0)
-        });
-        let Some(mate) = mate else { return false };
+        let Some(mate) = mate_near(w, id, st) else { return false };
         let Some(ms) = w.entity(mate) else { return false };
         let d2 = (ms.pos.x - st.pos.x).powi(2) + (ms.pos.z - st.pos.z).powi(2);
         if d2 > 1.5 * 1.5 {
@@ -385,9 +379,30 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
     }
 }
 
+/// A mate for `id`, in love itself: one of the other sex of its species within 24 blocks, grown
+/// and in love too.
+pub fn mate_near(w: &World, id: u64, st: &EntityState) -> Option<u64> {
+    if w.component(id, &BREEDING)
+        .is_none_or(|b| b.love == 0 || b.growing > 0)
+    {
+        return None;
+    }
+    let female = |o: u64| w.component(o, &ANIMAL).map(|a| a.female);
+    let mine = w.component(id, &ANIMAL).and_then(|a| a.species())?;
+    w.entities_near(st.pos, 24.0, None).into_iter().find(|&o| {
+        o != id
+            && female(o) != female(id)
+            && w.component(o, &ANIMAL)
+                .and_then(|a| a.species())
+                .is_some_and(|s| species::same_species(s, mine))
+            && w.component(o, &BREEDING)
+                .is_some_and(|m| m.love > 0 && m.growing == 0)
+    })
+}
+
 /// Mother `id` and father `mate` have mated: she carries his young (or will lay his eggs); both
 /// rest.
-fn mated(w: &World, id: u64, mate: u64, index: usize) {
+pub fn mated(w: &World, id: u64, mate: u64, index: usize) {
     let s = &SPECIES[index];
     let (Some(genes), Some(wild)) = (w.component(mate, &GENOME), w.component(mate, &ANIMAL).map(|a| a.wild)) else {
         return;
@@ -466,15 +481,26 @@ fn deliver(w: &World, id: u64, index: usize, b: &Breeding) {
         };
         let angle = k as f64 / n as f64 * std::f64::consts::TAU;
         let at = [st.pos.x + angle.cos() * 0.6, st.pos.y, st.pos.z + angle.sin() * 0.6];
-        if s.gestation() > 0 {
+        // A fish's eggs lie in the water for their time (`life::carrying`), then the fry come.
+        if s.gestation() > 0 || s.in_water() {
             born(w, at, &y, owner);
         } else {
             clutch.push(y);
         }
     }
-    crate::eggs::lay(w, st.pos.to_array(), &clutch, owner);
+    if animals_core::nests::site(s.name).is_some() {
+        crate::eggs::lay_in_nest(w, index, id, st.pos.to_array(), &clutch, owner);
+    } else {
+        crate::eggs::lay(w, st.pos.to_array(), &clutch, owner);
+    }
     hearts(w, id, 9);
-    let what = if s.gestation() > 0 { "young born" } else { "eggs laid" };
+    let what = if s.gestation() > 0 {
+        "young born"
+    } else if s.in_water() {
+        "fry hatched"
+    } else {
+        "eggs laid"
+    };
     weft_sdk::info!("animal {id}: {n} {what}");
 }
 

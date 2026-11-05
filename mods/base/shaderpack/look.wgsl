@@ -46,6 +46,19 @@ const OPT_NIGHT_LIGHT: u32 = 10u;
 const OPT_NIGHT_MOON: u32 = 11u;
 const OPT_CANOPY: u32 = 12u;
 const OPT_SHAFTS: u32 = 13u;
+// The Fantasy group (round 17; `mods/base/src/video.rs`, rows UI made): read raw with `fantasy_opt`,
+// as their 0 is off, where `look_opt` takes 0 for a setting not found.
+const OPT_STORYBOOK: u32 = 15u;
+const OPT_NIGHT_SKY: u32 = 16u;
+const OPT_SHOOTING_STARS: u32 = 17u;
+const OPT_MOON_SIZE: u32 = 18u;
+const OPT_GLOW: u32 = 19u;
+const OPT_BIOME_AIR: u32 = 20u;
+const OPT_SPARKLE: u32 = 21u;
+
+fn fantasy_opt(i: u32) -> f32 {
+    return scene.options[i / 4u][i % 4u];
+}
 
 fn look_opt(i: u32, missing: f32) -> f32 {
     let v = scene.options[i / 4u][i % 4u];
@@ -161,6 +174,26 @@ fn palette() -> Palette {
     p.sun = p.sun * (1.0 - r * 0.9);
     // At night rain and its clouds darken the sky's light too (by day overcast only greys it).
     p.ambient *= mix(1.0, 1.0 - 0.6 * r, smoothstep(-0.14, -0.3, e));
+    // A storybook hour (round 17, rec. 2; `base:look_storybook`, 0 to 1): at golden hour and blue
+    // hour the shade goes lavender (Solas's 205 184 236) while the sun stays orange, the blue
+    // hour's zenith violet; at night the moon's light silver-blue (a 15000 K blackbody, Bliss's),
+    // not muddy green. Clear skies only: rain keeps its greys.
+    let tale = clamp(fantasy_opt(OPT_STORYBOOK), 0.0, 1.0) * (1.0 - r);
+    if tale > 0.0 {
+        // Blue hour: the sun just under the horizon, to about 14° below (it fell short of the
+        // 18:57 check at -0.2..-0.08).
+        let blue_hour = smoothstep(0.04, -0.02, e) * smoothstep(-0.32, -0.16, e);
+        // (`golden()` by hand: `palette` has a local of that name.)
+        let gold_hour = (1.0 - smoothstep(0.08, 0.35, e)) * smoothstep(-0.06, 0.03, e);
+        let hour = max(gold_hour, blue_hour);
+        // At 0.92 0.82 1.18 the lavender hardly showed at a sheet's size (the storybook check, 11-05).
+        p.ambient = mix(p.ambient, vec3(luma(p.ambient)) * vec3(0.95, 0.72, 1.4) * 1.15, tale * hour * 0.9);
+        p.horizon = mix(p.horizon, vec3(luma(p.horizon)) * vec3(1.08, 0.8, 1.15), tale * hour * 0.45);
+        p.zenith = mix(p.zenith, vec3(luma(p.zenith)) * vec3(0.8, 0.55, 1.6), tale * blue_hour * 0.8);
+        let moonlit = smoothstep(-0.14, -0.3, e);
+        p.sun = mix(p.sun, vec3(luma(p.sun)) * vec3(0.78, 0.9, 1.16), tale * moonlit);
+        p.ambient = mix(p.ambient, vec3(luma(p.ambient)) * vec3(0.82, 0.92, 1.12), tale * moonlit * 0.6);
+    }
     return p;
 }
 
@@ -185,11 +218,33 @@ fn light_dir() -> vec3<f32> {
 
 // How much of the palette's direct light there is: it fades out as the sun sets and the moon comes
 // up a little after.
+// ---- sky events (`scene.sky_event`: a blood moon, meteors, a fireball, an aurora storm) ----
+// Round 17, rec. 6, with gameplay (Ronald, "Gameplay too"): the base mod's schedule says when
+// (`vitals::events`), the pack draws them; none when `base:fx_sky_events` is off (nothing is sent).
+
+// How strong the sky event of `kind` (`weft_abi::sky_event`) is now, 0 when another or none.
+fn sky_event(kind: f32) -> f32 {
+    return select(0.0, clamp(scene.sky_event.y, 0.0, 1.0), abs(scene.sky_event.x - kind) < 0.5);
+}
+
+// The blood moon, 0..1: under 0.5 its copper dusk, 1 totality.
+fn blood_moon() -> f32 {
+    return sky_event(1.0);
+}
+
+// The moon's colour on a blood moon night: copper as it reddens, a deep red in totality.
+fn blood_tint() -> vec3<f32> {
+    let b = blood_moon();
+    return mix(vec3(1.0), mix(vec3(1.0, 0.45, 0.2), vec3(0.75, 0.06, 0.02), smoothstep(0.5, 1.0, b)), smoothstep(0.0, 0.35, b));
+}
+
 fn light_strength() -> f32 {
     let e = scene.sun.y;
     // At night the moon's light: its phase times how high it stands (`scene.moon.w`), none when it
     // is down or new.
-    return select(smoothstep(0.06, 0.2, -e) * scene.moon.w, smoothstep(-0.04, 0.05, e), e > -0.06);
+    // In a blood moon's totality the night is as dark as a new moon's (round 17's design).
+    let moon = scene.moon.w * mix(1.0, 0.12, smoothstep(0.5, 1.0, blood_moon()));
+    return select(smoothstep(0.06, 0.2, -e) * moon, smoothstep(-0.04, 0.05, e), e > -0.06);
 }
 
 // ---- the sky ----
@@ -222,7 +277,8 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     // The glow about the moon where it stands, as bright as its light (`scene.moon.w`): on a new
     // moon there is none, and a glow alone read as a dark-blue ring (the world playtester's nights).
     let moon = pow(max(dot(dir, scene.moon.xyz), 0.0), 24.0) * smoothstep(-0.05, -0.25, scene.sun.y) * scene.moon.w;
-    c += vec3(0.05, 0.07, 0.12) * moon;
+    // On a blood moon its glow goes copper, then red.
+    c += vec3(0.05, 0.07, 0.12) * mix(vec3(1.0), blood_tint() * vec3(2.0, 1.4, 1.0), smoothstep(0.0, 0.4, blood_moon())) * moon;
     if dir.y < 0.0 {
         // Below the horizon it darkens a little toward the ground the haze stands on.
         c = mix(c, p.horizon * 0.6 + p.ambient * 0.2, smoothstep(0.0, 0.4, -dir.y));
@@ -238,7 +294,11 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
 // then guesses as it would without one).
 // One cascade of the sun's shadows: its matrix `m`, `info` (bindless index, size, 1 when it holds
 // this frame's, the blocks a texel covers), its round reach and depth (blocks).
-fn shadow_in(m: mat4x4<f32>, info: vec4<f32>, round: f32, depth: f32, rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
+// `cheap`: four texels filtered (a 2x2 of the map, weighed by where the point lies among them)
+// instead of the 4x4 and its nine taps, for the far land, where a far-map texel is blocks wide and
+// the cracks the 4x4 closes don't show (Distant terrain's probe: the far cascade's 16 loads were
+// 0.21 ms of the far land at 3456).
+fn shadow_in(m: mat4x4<f32>, info: vec4<f32>, round: f32, depth: f32, rel: vec3<f32>, n: vec3<f32>, cheap: bool) -> vec2<f32> {
     if info.z < 0.5 {
         return vec2(1.0, 0.0);
     }
@@ -264,6 +324,19 @@ fn shadow_in(m: mat4x4<f32>, info: vec4<f32>, round: f32, depth: f32, rel: vec3<
     // depth: no floating shadows at the foot of things.
     let slope = min(sqrt(max(1.0 - ndl * ndl, 0.0)) / max(ndl, 0.05), 4.0);
     let bias = (0.03 + texel * 0.5 * slope) / depth;
+    let low = smoothstep(0.02, 0.06, light_dir().y);
+    if cheap {
+        let p = vec2(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5) * f32(size) - 0.5;
+        let base = vec2<i32>(floor(p));
+        let f = fract(p);
+        var lit4 = vec4(0.0);
+        for (var k = 0; k < 4; k++) {
+            let t = clamp(base + vec2(k % 2, k / 2), vec2(0), vec2(size - 1));
+            lit4[k] = select(0.0, 1.0, textureLoad(textures[index], t, 0).r <= ndc.z + bias);
+        }
+        let lit = mix(mix(lit4.x, lit4.y, f.x), mix(lit4.z, lit4.w, f.x), f.y);
+        return vec2(lit, (1.0 - smoothstep(0.85, 0.97, reach)) * low);
+    }
     // A 4x4 of the map about the point; each of the 3x3 taps takes the nearest to the light of its
     // texel and the ones right and below. That closes the one-texel cracks between neighbouring
     // meshes, through which sunlight would draw thin dotted lines across a shadow.
@@ -286,7 +359,6 @@ fn shadow_in(m: mat4x4<f32>, info: vec4<f32>, round: f32, depth: f32, rel: vec3<
     lit /= 9.0;
     // Near its edge it hands over to the caller's guess, and so it does as the light nears the
     // horizon (long smeared shadows, then the swap from the sun to the moon).
-    let low = smoothstep(0.02, 0.06, light_dir().y);
     return vec2(lit, (1.0 - smoothstep(0.85, 0.97, reach)) * low);
 }
 
@@ -294,11 +366,12 @@ fn shadow_in(m: mat4x4<f32>, info: vec4<f32>, round: f32, depth: f32, rel: vec3<
 // about the player, fine) where it holds, the far one's (400 blocks, coarser) beyond, handing over
 // smoothly; x 1 lit to 0 in shadow, y how far to trust it.
 fn shadow_at(rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
-    let near = shadow_in(scene.shadow_view_proj, scene.shadow, 80.0, 400.0, rel, n);
+    let near = shadow_in(scene.shadow_view_proj, scene.shadow, 80.0, 400.0, rel, n, false);
     if near.y >= 0.999 {
         return near;
     }
-    let far = shadow_in(scene.shadow_far_view_proj, scene.shadow_far, 400.0, 1200.0, rel, n);
+    // Past 250 blocks (the far land's tiles start about 180 out), the far map's cheap filter.
+    let far = shadow_in(scene.shadow_far_view_proj, scene.shadow_far, 400.0, 1200.0, rel, n, length(rel) > 250.0);
     let trust = max(near.y, far.y);
     if trust <= 0.0 {
         return vec2(1.0, 0.0);
@@ -432,6 +505,16 @@ fn held_light(rel: vec3<f32>, n: vec3<f32>) -> vec3<f32> {
 
 // Light arriving at a surface with normal `n`. `light` is the world's (sky, red, green, blue, 0..1),
 // `shadow` 1 where the sun reaches it, `ao` the corner shading, `rel` where it is from the camera.
+// How much of block light shows where the sky's light is `sky` (0..1): all of it at night and
+// under cover, a quarter in the open by day. Vanilla takes the brighter of the two, not their sum:
+// summed, a lamp's level 15 at noon washed the stone about it out to a pale, glassy blue (First
+// hours' Starheart lantern, 11-05).
+fn block_by_day(sky: f32) -> f32 {
+    // By the sun's height, not the daylight value: that stays above zero at night, and a torch
+    // at midnight lost some of its warmth.
+    return 1.0 - 0.75 * smoothstep(0.5, 1.0, sky) * smoothstep(0.0, 0.25, scene.sun.y);
+}
+
 fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let p = palette();
     // The sky's light falls off steeply under cover (Bliss's lightmap, (L^15 x 2 + L^2.5) / 3: 1 in the
@@ -465,7 +548,7 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>
     let open = smoothstep(mix(0.5, 0.25, c_open), mix(0.95, 0.55, c_open), light.x);
     c += p.sun * light_strength() * sun_facing(n) * shadow * open * mix(0.75, 1.0, ao);
     // A held torch's light where it is brighter than the placed lights there (no doubling).
-    c += block_light(max(light.yzw, held_light(rel, n)), pos) * mix(0.5, 1.0, ao);
+    c += block_light(max(light.yzw, held_light(rel, n)), pos) * mix(0.5, 1.0, ao) * block_by_day(light.x);
     // A floor so caves are never quite black: the dimension's own and the Brightness setting.
     let floor_light = max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y));
     c += vec3(floor_light) * vec3(0.85, 0.9, 1.0) * ao;
@@ -478,7 +561,7 @@ fn light_round(light: vec4<f32>, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let sky = brightness_curve(light.x);
     var c = p.ambient * sky * 0.85;
     c += p.sun * light_strength() * 0.5 * smoothstep(0.5, 0.95, light.x);
-    c += block_light(max(light.yzw, held_light(rel, vec3(0.0))), pos);
+    c += block_light(max(light.yzw, held_light(rel, vec3(0.0))), pos) * block_by_day(light.x);
     c += vec3(max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y)));
     return c;
 }
@@ -823,7 +906,7 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // In rain everything takes a little grey-blue wash, near too.
     let pale = mix(mix(c, vec3(luma(c)), clamp(veil.b * 0.6, 0.0, 0.3)), vec3(luma(c)) * vec3(0.92, 0.97, 1.05), rain * 0.08);
     let seen = mix(pale, lit, veil);
-    return mix(seen, lit, edge) + held_in_fog(rel, fog_here(sky));
+    return mix(seen, lit, edge) + held_in_fog(rel, sky);
 }
 
 // ---- light in the fog: torches (Research round 15, 6: Valheim's warm firelight in the mist) ----
@@ -843,11 +926,15 @@ fn fog_here(sky: f32) -> f32 {
 // the integral of 1 / (h^2 + (t - t0)^2) over the look, h how far the look passes the light. The
 // flame is no point: h is never under about 0.7. Looking where the torch is held the glow is
 // strongest; looking back, half as much.
-fn held_in_fog(rel: vec3<f32>, sigma: f32) -> vec3<f32> {
+// `sky` the sky light where it is seen (`fog_here`'s), asked only when a light is held: as an
+// argument the mist at the eye (two noises) was worked out for every pixel of the world, light or
+// none (Distant terrain's probe: 0.13 ms of the far land's 1.5 at 3456).
+fn held_in_fog(rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let l = scene.hand_light.rgb;
     if max(max(l.x, l.y), l.z) <= 0.0 {
         return vec3(0.0);
     }
+    let sigma = fog_here(sky);
     let len = length(rel);
     let dist = min(len, 48.0);
     let dir = rel / max(len, 1e-4);
@@ -866,11 +953,12 @@ fn held_in_fog(rel: vec3<f32>, sigma: f32) -> vec3<f32> {
 // Placed lights in the fog: the air just before a lit surface glows with the light there (`b`, its
 // block light levels), as deep as a few blocks of fog. Cheaper than walking the light: it stops at
 // the silhouettes, which the bloom softens.
-fn placed_in_fog(b: vec3<f32>, rel: vec3<f32>, pos: vec3<f32>, sigma: f32) -> vec3<f32> {
+// `sky` as `held_in_fog`'s, asked only where there is block light.
+fn placed_in_fog(b: vec3<f32>, rel: vec3<f32>, pos: vec3<f32>, sky: f32) -> vec3<f32> {
     if max(max(b.x, b.y), b.z) <= 0.0 {
         return vec3(0.0);
     }
-    return block_light(b, pos) * min(sigma, 0.04) * min(length(rel), 4.0) * 0.6;
+    return block_light(b, pos) * min(fog_here(sky), 0.04) * min(length(rel), 4.0) * 0.6;
 }
 
 // ---- to the screen ----
@@ -956,5 +1044,14 @@ fn display(c: vec3<f32>) -> vec3<f32> {
     t = max(mix(vec3(y), t, mix(1.0, 1.2 * look_opt(OPT_SATURATION, 1.0), day)), vec3(0.0));
     // A cool floor so the night is never pure black; by day black stays black.
     t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034) * (1.0 - day);
+    // A storybook night (`base:look_storybook`): dim colours slide toward a blue-grey, as the eye's
+    // rods take over (Purkinje; Photon's, 0.05 × its setting), firelight kept: warm pixels, whose
+    // red outweighs their blue, keep their colour.
+    let dim_px = 1.0 - smoothstep(0.02, 0.16, luma(t));
+    let warm = smoothstep(-0.02, 0.06, t.r - t.b);
+    let rods = clamp(fantasy_opt(OPT_STORYBOOK), 0.0, 1.0) * (1.0 - day) * dim_px * (1.0 - warm) * 0.45;
+    t = mix(t, vec3(luma(t)) * vec3(0.84, 0.95, 1.18), rods);
+    // A blood moon's faint red cast over the night.
+    t *= mix(vec3(1.0), vec3(1.1, 0.88, 0.86), blood_moon() * 0.6 * (1.0 - day));
     return clamp(t, vec3(0.0), vec3(1.0));
 }

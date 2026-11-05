@@ -526,6 +526,15 @@ impl App {
         crate::shaders::pin_time(self.opts.automated && !recording());
         let depth = make_depth(&mut *gpu, size.width, size.height);
         let gpu_name = gpu.device_name().to_string();
+        // What the GPU is, for mods (`core:gpu_*`): as found, whatever a file says.
+        for (name, v) in [("core:gpu_class", gpu.device_class() as f64), ("core:gpu_memory_mb", gpu.device_memory_mb() as f64)] {
+            if let Some(id) = crate::config::by_name(name) {
+                crate::config::put(id, v);
+            }
+        }
+        if let Some(id) = crate::config::by_name("core:gpu_name") {
+            crate::config::put_text(id, &gpu_name);
+        }
         let mut r = Running {
             gpu,
             window,
@@ -2231,6 +2240,7 @@ impl ApplicationHandler for App {
     }
 
     fn exiting(&mut self, _el: &ActiveEventLoop) {
+        finish_screenshots();
         if let Some(mut r) = self.run.take() {
             r.gpu.wait_idle();
             r.leave_world_silent();
@@ -2557,6 +2567,7 @@ fn update_game(r: &mut Running, dt: f64, frame_start: Instant) {
         g.client.entity_render.show_avatars = r.settings.show_avatars();
         g.client.render.occlusion.on = r.settings.occlusion_culling();
         g.client.sky.soft_wanted = r.settings.soft_clouds();
+        r.post.use_low = r.settings.post_low();
         let t = Instant::now();
         if world_input {
             g.client.update(&mut *r.gpu, &r.textures, &mut r.input, dt);
@@ -3085,6 +3096,9 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
             world.append(&mut g.client.sky.soft.passes);
             world.push(Cmd::BeginPass { color: Some((world_target, None)), depth: Some((r.depth.0, None)) });
             world.append(&mut g.client.late_out);
+            // The "translucent" part ends here: the copy, the sky, clouds, water, particles and the
+            // hand (the client leaves this mark to the app when the world is copied).
+            world.push(Cmd::Mark);
         }
     }
     r.list.push(Cmd::Mark);
@@ -3178,25 +3192,47 @@ fn save_screenshot(r: &mut Running) {
         if let Some(dir) = path.parent() {
             let _ = std::fs::create_dir_all(dir);
         }
-        match crate::assets::encode_png(&path, cap.width, cap.height, &cap.rgba) {
-            Ok(()) => {
-                log::info!("screenshot saved to {}", path.display());
-                if let Some(g) = r.game.as_mut().filter(|_| own) {
-                    let open = |p: &std::path::Path, label: &str| {
-                        Arg::Msg(Msg::template(&format!("{{link:open:{}}}{{lang:{label}}}{{/link}}", p.display())))
-                    };
-                    let folder = path.parent().unwrap_or(&path);
-                    g.client.chat_line(Msg::new(
-                        "chat.screenshot",
-                        vec![open(&path, "chat.screenshot.picture"), open(folder, "chat.screenshot.folder")],
-                    ));
-                }
+        // Encoded on a thread: a PNG at 3456 x 2234 took 0.4-0.6 s of the frame (perf review).
+        // The chat line can say where it goes now; quitting waits for it (`finish_screenshots`).
+        if let Some(g) = r.game.as_mut().filter(|_| own) {
+            let open = |p: &std::path::Path, label: &str| {
+                Arg::Msg(Msg::template(&format!("{{link:open:{}}}{{lang:{label}}}{{/link}}", p.display())))
+            };
+            let folder = path.parent().unwrap_or(&path);
+            g.client.chat_line(Msg::new(
+                "chat.screenshot",
+                vec![open(&path, "chat.screenshot.picture"), open(folder, "chat.screenshot.folder")],
+            ));
+        }
+        let rgba = match r.shot_image.take() {
+            Some(id) => {
+                api::store_image(id, cap.width, cap.height, cap.rgba.clone());
+                cap.rgba
             }
-            Err(e) => log::error!("screenshot: {e}"),
+            None => cap.rgba,
+        };
+        let (w, h) = (cap.width, cap.height);
+        let job = std::thread::Builder::new()
+            .name("screenshot".into())
+            .spawn(move || match crate::assets::encode_png(&path, w, h, &rgba) {
+                Ok(()) => log::info!("screenshot saved to {}", path.display()),
+                Err(e) => log::error!("screenshot: {e}"),
+            });
+        match job {
+            Ok(j) => SHOTS.lock().unwrap_or_else(|e| e.into_inner()).push(j),
+            Err(e) => log::error!("screenshot: no thread to save it: {e}"),
         }
-        if let Some(id) = r.shot_image.take() {
-            api::store_image(id, cap.width, cap.height, cap.rgba);
-        }
+    }
+}
+
+/// Screenshots still being encoded and written.
+static SHOTS: std::sync::Mutex<Vec<std::thread::JoinHandle<()>>> = std::sync::Mutex::new(Vec::new());
+
+/// Waits for the screenshots still being written (before the game quits).
+fn finish_screenshots() {
+    let jobs = std::mem::take(&mut *SHOTS.lock().unwrap_or_else(|e| e.into_inner()));
+    for j in jobs {
+        let _ = j.join();
     }
 }
 

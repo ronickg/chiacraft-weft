@@ -86,6 +86,8 @@ pub struct Colonize {
     /// The trunk goes on to the crown's top as a leader the branches grow from (a birch's), not
     /// only to the crown's foot (an oak's, which divides into its limbs).
     pub leader: bool,
+    /// How far the crown leans off the foot, a share of its radius (the trunk bends toward it).
+    pub lean: f32,
     /// Stems the trunk divides into at its top before the crown grows (an acacia's 3 or 4 fanning
     /// out like a vase); 0 none.
     pub fork: u32,
@@ -126,6 +128,7 @@ pub const OAK: Colonize = Colonize {
     leaf_along: false,
     twig: 0.32,
     leader: false,
+    lean: 0.08,
     fork: 0,
     reach: 0,
     max_height: 0,
@@ -152,6 +155,7 @@ pub const SPRUCE: Colonize = Colonize {
     leaf_along: true,
     twig: 0.3,
     leader: false,
+    lean: 0.08,
     fork: 0,
     reach: 0,
     max_height: 0,
@@ -172,12 +176,13 @@ pub const BIRCH: Colonize = Colonize {
     tropism: -0.05,
     twig_r: 0.08,
     min_trunk: 0.9,
-    leaf_r: 1.3,
-    leaf_ry: 1.3,
-    ragged: 0.5,
+    leaf_r: 1.5,
+    leaf_ry: 1.4,
+    ragged: 0.35,
     leaf_along: true,
-    twig: 0.16,
+    twig: 0.22,
     leader: true,
+    lean: 0.08,
     fork: 0,
     reach: 0,
     max_height: 0,
@@ -206,6 +211,7 @@ pub const ACACIA: Colonize = Colonize {
     leaf_along: false,
     twig: 0.32,
     leader: false,
+    lean: 0.08,
     fork: 3,
     reach: 0,
     max_height: 0,
@@ -235,6 +241,7 @@ pub const DOGWOOD: Colonize = Colonize {
     leaf_along: false,
     twig: 0.3,
     leader: false,
+    lean: 0.08,
     fork: 0,
     reach: 0,
     max_height: 0,
@@ -264,6 +271,7 @@ pub const IPE: Colonize = Colonize {
     leaf_along: false,
     twig: 0.32,
     leader: false,
+    lean: 0.08,
     fork: 0,
     reach: 8,
     max_height: 42,
@@ -292,6 +300,7 @@ pub const ANDIROBA: Colonize = Colonize {
     leaf_along: false,
     twig: 0.32,
     leader: false,
+    lean: 0.08,
     fork: 0,
     reach: 8,
     max_height: 40,
@@ -320,6 +329,7 @@ pub const MATAMATA: Colonize = Colonize {
     leaf_along: false,
     twig: 0.32,
     leader: false,
+    lean: 0.08,
     fork: 0,
     reach: 8,
     max_height: 38,
@@ -350,6 +360,7 @@ pub const BRAZIL_NUT: Colonize = Colonize {
     leaf_along: false,
     twig: 0.34,
     leader: false,
+    lean: 0.08,
     fork: 0,
     reach: 12,
     max_height: 80,
@@ -406,7 +417,7 @@ fn skeleton(c: &Colonize, seed: u64, foot: V, trunk_len: Option<f32>) -> (Vec<No
     let size = 1.0 + c.size_var * rng.s();
     let (trunk, ch, cr) = (trunk_len.unwrap_or(c.trunk * size), c.crown_h * size, c.crown_r * size);
     // The crown leans a little off the foot, as a tree's does toward its light.
-    let lean = [rng.s() * cr * 0.08, 0.0, rng.s() * cr * 0.08];
+    let lean = [rng.s() * cr * c.lean, 0.0, rng.s() * cr * c.lean];
     let base = add(foot, add(lean, [0.0, trunk, 0.0]));
     // The points, uniform in the crown (rejection from its box).
     let mut pts: Vec<V> = Vec::with_capacity(c.points as usize);
@@ -736,7 +747,11 @@ mod tests {
     /// reach and height, under a shape's 4,096 blocks; the same tree from the same seed.
     #[test]
     fn colonized_trees_keep_the_rules() {
-        for c in ALL {
+        let forms: Vec<Colonize> = ALL
+            .iter()
+            .flat_map(|c| crate::tree_recipes::Variant::ALL.map(|v| crate::tree_recipes::varied_colonized(c, v)))
+            .collect();
+        for c in &forms {
             for seed in 0..20 {
                 let t = blocks(c, seed);
                 let name = c.log;

@@ -39,6 +39,8 @@ pub struct Post {
     low_pipe: Option<PipelineId>,
     low_slots: Slots,
     low_targets: Vec<(String, TextureId, u32, (u32, u32))>,
+    /// Whether the half-size parts run (`core:post_low`); off, the effects do their full work.
+    pub use_low: bool,
     /// Effects on, in the order they were turned on: (name, strength).
     pub active: Vec<(String, f32)>,
     /// Two images the size of the screen (scene and the one after each pass), with their
@@ -64,6 +66,7 @@ impl Post {
             low_pipe: None,
             low_slots: Slots::default(),
             low_targets: Vec::new(),
+            use_low: true,
             active: Vec::new(),
             targets: None,
             params: Vec::new(),
@@ -286,7 +289,7 @@ impl Post {
         let mut passes = passes;
         // The half-size parts first: each into its effect's own image, which that effect reads.
         let mut lows: Vec<TextureId> = Vec::new();
-        if self.low_pipe.is_some() {
+        if self.low_pipe.is_some() && self.use_low {
             let (w, h) = (frame.width.div_ceil(2).max(1), frame.height.div_ceil(2).max(1));
             for (i, (name, _)) in active[..n].iter().enumerate() {
                 let slot = self.low_slots.slot(name);
@@ -318,7 +321,7 @@ impl Post {
         }
         let low_entries: Vec<Pass> = active[..n]
             .iter()
-            .filter(|(name, _)| self.low_pipe.is_some() && self.low_slots.slot(name) != 0)
+            .filter(|(name, _)| self.low_pipe.is_some() && self.use_low && self.low_slots.slot(name) != 0)
             .map(|(name, strength)| Pass {
                 scene: idx[0],
                 slot: self.low_slots.slot(name),
@@ -331,22 +334,24 @@ impl Post {
                 spare: 0,
             })
             .collect();
-        // Merged (`packs::merge_effects`): one pass runs them all, the first's `pad` their count.
-        let mut n = if n > 1 && crate::packs::merge_effects() {
+        // Merged (`packs::merge_effects`): one pass runs them all, the first's `pad` their count,
+        // reading the entries after it. `draws`: the entry each pass starts from.
+        let mut draws: Vec<u32> = if n > 1 && crate::packs::merge_effects() {
             passes[0].pad = n as u32;
-            1
+            vec![0]
         } else {
-            n
+            (0..n as u32).collect()
         };
         // With the world drawn smaller than the screen, the effects stay at the world's size and a
         // plain pass (slot 0) scales the last one's image up. As the last pass, an effect drew
         // straight onto the screen and ran per screen pixel: with the effects merged into one, all
         // of them, 2.25 times the work at a 0.67 render scale (the Mac's effects after a flight over
-        // water took 6-7.8 ms, Planner 11-04).
-        if scaled && !self.active.is_empty() && n < MAX_PASSES {
-            passes.truncate(n);
-            passes.push(Pass { scene: idx[n % 2], slot: 0, strength: 1.0, pad: 0, low: 0, ..passes[0] });
-            n += 1;
+        // water took 6-7.8 ms, Planner 11-04). Its entry goes after all the effects': in the place
+        // of the second (Perf 7), the merged pass read it and the half-size parts' entries as its
+        // other effects, so under a render scale (the Mac) only the first effect ran as itself.
+        if scaled && !self.active.is_empty() && passes.len() < MAX_PASSES {
+            passes.push(Pass { scene: idx[draws.len() % 2], slot: 0, strength: 1.0, pad: 0, low: 0, ..passes[0] });
+            draws.push((passes.len() - 1) as u32);
         }
         let buf = self.params[frame.slot];
         // The main passes, then the half-size parts' entries after them (`lows` holds their index).
@@ -368,13 +373,14 @@ impl Post {
                 list.push(Cmd::EndPass);
             }
         }
-        for i in 0..n {
+        let n = draws.len();
+        for (i, entry) in draws.into_iter().enumerate() {
             let target = if i + 1 == n { Target::Surface } else { Target::Texture(tex[(i + 1) % 2]) };
             list.push(Cmd::BeginPass { color: Some((target, Some([0.0; 4]))), depth: None });
             list.pipeline(pipe);
             list.bind(crate::gpu_layout::bind::post::PASSES, buf);
             list.bind(crate::gpu_layout::bind::post::SCENE, scene);
-            list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: i as u32 });
+            list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: entry });
             if i + 1 < n {
                 list.push(Cmd::EndPass);
             }

@@ -25,6 +25,8 @@ static BOOM: Sound = Sound::named("weather.thunder_far");
 type Landings = (u64, Vec<f32>);
 static TONIGHT: Mutex<Option<HashMap<u64, Landings>>> = Mutex::new(None);
 
+/// Meteorites on their way: (dimension, the tick they land, where).
+static COMING: Mutex<Vec<(u32, u64, BlockPos)>> = Mutex::new(Vec::new());
 /// Landings come from this hour, for this many hours (to 05:00).
 const FROM_HOUR: f32 = 23.0;
 const HOURS: f32 = 6.0;
@@ -93,6 +95,22 @@ fn tick(w: &World) {
     if !w.game_time().is_multiple_of(ROUND_TICKS) || w.dimension() != crate::OVERWORLD.id() {
         return;
     }
+    // The streaks that have come down.
+    let (dim, now) = (w.dimension(), w.game_time());
+    let landed: Vec<BlockPos> = {
+        let mut coming = COMING.lock().unwrap();
+        let due: Vec<BlockPos> = coming
+            .iter()
+            .filter(|c| c.0 == dim && c.1 <= now)
+            .map(|c| c.2)
+            .collect();
+        coming.retain(|c| c.0 != dim || c.1 > now);
+        due
+    };
+    for top in landed {
+        let n = land(w, top);
+        weft_sdk::info!("meteors: a fallen star landed at {top:?}, {n} meteorites");
+    }
     let landings = match crate::events::tonight(w) {
         Some(Event::Meteors { peak: true }) => ev::METEOR_LANDINGS[0],
         Some(Event::Meteors { peak: false }) => ev::METEOR_LANDINGS[1],
@@ -146,8 +164,11 @@ fn land_near(w: &World, player: u64) {
         if crate::events::near_built(w, top, ev::METEOR_CLEAR) || crate::mobs::campfire_near(w, top.center()).is_some() {
             continue;
         }
-        let n = land(w, top);
-        weft_sdk::info!("meteors: a fallen star at {top:?} for {player}, {n} meteorites");
+        // Its streak first; it lands `LANDING_LEAD_SECS` later (`tick`), where the streak ends.
+        crate::events::streak(w, top.center(), ev::LANDING_LEAD_SECS);
+        let due = w.game_time() + (ev::LANDING_LEAD_SECS * vitals::TICKS as f32) as u64;
+        COMING.lock().unwrap().push((w.dimension(), due, top));
+        weft_sdk::info!("meteors: a fallen star coming down at {top:?} for {player}");
         return;
     }
 }

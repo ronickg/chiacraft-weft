@@ -167,16 +167,16 @@ What takes days in real life takes its time on the growing pace (`vitals::crafts
 
 An axe at a tree's foot fells it in one chop that takes logs^0.75 times one log's (`vitals::felling`), with the axe's own speed on top. Each tier of axe takes trees up to a size for their wood; past it a tree still falls, 8 times slower, and gives nothing. A tree that loses its foot, or a log of its trunk, by any means falls (none stands in the air); bare hands and other tools chop the foot as slowly as an axe past its tier, and as fruitlessly: the first axe is made by hand off the ground (`first`). Never more than 60 min. Felled, a tree within its tier lies on the ground in pieces of 4 logs, each cut as long as felling a tree of its logs takes; the axe wears by logs^0.75 for a felling or a piece. A tree falls as itself: a 1 s creak, then 2.5 s for one 10 high (2-5 s, by the square root of its height), its leaves breaking off past 20° until 70% have, the rest bursting on the ground; on the way leaves and branches in its path break, and a trunk it strikes falls too if the falling tree has 2x its logs, or else it catches there and settles as blocks; a creature it hits takes 2 + a tenth of its logs, up to 20. Seconds for a typical axe of each tier (a log is hardness 2), * past its tier:
 
-| tier | harvest | takes up to | speed | oak (43) | birch (9) | araucaria (64) | young sequoia (165) | sequoia (1015) |
+| tier | harvest | takes up to | speed | oak (16) | birch (20) | araucaria (61) | young sequoia (165) | sequoia (1015) |
 |---|---|---|---|---|---|---|---|---|
-| bare hands, other tools | - | nothing | 1 | 7 min * | 2 min * | 9 min * | 18 min * | 60 min * |
-| wood, gold | 0 | 56 logs | 2 | 25 s | 8 s | 5 min * | 9 min * | 36 min * |
-| bone, antler | 50 | 72 logs | 2.5 | 20 s | 6 s | 27 s | 7 min * | 29 min * |
-| flint, chert, obsidian, stone | 100 | 96 logs | 2.91 | 17 s | 5 s | 23 s | 6 min * | 25 min * |
-| copper | 150 | 192 logs | 4.85 | 10 s | 3 s | 14 s | 28 s | 15 min * |
-| bronze, iron, wrought iron | 200 | 512 logs | 6.79 | 7 s | 2 s | 10 s | 20 s | 11 min * |
-| steel, diamond (old) | 300 | 1536 logs | 7.76 | 6 s | 2 s | 9 s | 18 s | 70 s |
-| diamond | 400 | 4096 logs | 8 | 6 s | 2 s | 8 s | 17 s | 67 s |
+| bare hands, other tools | - | nothing | 1 | 3 min * | 4 min * | 9 min * | 18 min * | 60 min * |
+| wood, gold | 0 | 56 logs | 2 | 12 s | 14 s | 4 min * | 9 min * | 36 min * |
+| bone, antler | 50 | 72 logs | 2.5 | 10 s | 11 s | 26 s | 7 min * | 29 min * |
+| flint, chert, obsidian, stone | 100 | 96 logs | 2.91 | 8 s | 10 s | 23 s | 6 min * | 25 min * |
+| copper | 150 | 192 logs | 4.85 | 5 s | 6 s | 14 s | 28 s | 15 min * |
+| bronze, iron, wrought iron | 200 | 512 logs | 6.79 | 4 s | 4 s | 10 s | 20 s | 11 min * |
+| steel, diamond (old) | 300 | 1536 logs | 7.76 | 3 s | 4 s | 8 s | 18 s | 70 s |
+| diamond | 400 | 4096 logs | 8 | 3 s | 4 s | 8 s | 17 s | 67 s |
 
 ## Effects
 
@@ -397,7 +397,7 @@ What foraging animals eat of the world's blocks (`vitals::forage`), how much a m
 
 | block | kind | food | eaten | grows back as |
 |---|---|---|---|---|
-| base:tall_grass | grass | 10 | becomes base:grazed_grass | base:grazed_grass |
+| base:tall_grass | grass | 2 | becomes base:grazed_grass | base:grazed_grass |
 | base:berry_bush (age 3) | fruit | 8 | back to age 1 | base:berry_bush |
 | base:oak_leaves | leaves | 4 | stays | always there in base:forest, base:plains, base:swamp (spring, summer, autumn), worth 40% of fresh growth |
 | base:birch_leaves | leaves | 4 | stays | always there in base:forest, base:birch_forest (spring, summer, autumn), worth 40% of fresh growth |
@@ -492,6 +492,7 @@ On the ground, animals eat dropped food of their diet one item a mouthful: every
 | base:matamata_fruit | seeds | 20 |
 | animals:araucaria_cone | seeds | 50 |
 | animals:ginkgo_seed | fruit | 10 |
+| animals:carcass | carrion | 500 |
 
 ## Soil and compost
 
@@ -506,7 +507,7 @@ Farmland's fertility (`vitals::soil`): how fast crops grow at each level, what w
 
 A ripe harvest of base:wheat, base:barley, base:rye, base:carrots, base:potatoes, base:beetroots, base:maize, base:paddy_rice, base:sorghum, base:millet, base:cassava, base:pumpkin_stem, base:melon_stem takes a level, of base:beans, base:tepary_beans gives one back; base:compost +2, base:dung +1; a season unplanted (about 14 game days, at grass's rate) gives one back. A compost bin fills in 7 steps: spoiled food 2, base:dung 2, base:rotten_flesh 2, base:oak_leaves 1, base:birch_leaves 1, base:spruce_leaves 1, base:acacia_leaves 1, base:sapling 1, base:wheat_seeds 1, base:wheat 1; full, it rots into compost in about 23 minutes.
 
-Dung pats: a grazer drops one every 20 mouthfuls where it stands on the ground, never within 2 blocks of another; it rots by warmth and soil water into a tuft of fresh grass (at most 3 game days, frozen or dry), and while it lies grazed grass within 2 blocks grows back x2. How long one lies, in game minutes (a game day is 20):
+Dung pats: a grazer drops one every 100 mouthfuls where it stands on the ground, never within 2 blocks of another; it rots by warmth and soil water into a tuft of fresh grass (at most 3 game days, frozen or dry), and while it lies grazed grass within 2 blocks grows back x2. How long one lies, in game minutes (a game day is 20):
 
 | biome | spring | summer | autumn | winter |
 |---|---|---|---|---|

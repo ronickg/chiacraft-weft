@@ -107,6 +107,36 @@ pub const EQUINOX_DAYS: u32 = 4;
 /// The equinoxes' days of the season (spring = season 0, autumn = 2).
 pub const EQUINOX_DAY: u32 = 7;
 
+// ---------------------------------------------------------------- the sky's looks (Lighting)
+
+/// What a night's event shows, `abi::sky_event` by `sky_look`: a shower's side nights at the
+/// side's share of the peak's streaks, from `SHOWER_FROM_HOUR` to dawn; an aurora storm from
+/// `AURORA_FROM_HOUR`. A streak is announced this many seconds before its landing (a meteorite,
+/// a big impact), and the sky shows a fireball for `FIREBALL_SECS` after it.
+pub const SHOWER_FROM_HOUR: f32 = 23.0;
+pub const AURORA_FROM_HOUR: f32 = 21.0;
+pub const NIGHT_UNTIL_HOUR: f32 = 5.0;
+pub const LANDING_LEAD_SECS: f32 = 3.0;
+pub const IMPACT_LEAD_SECS: f32 = 6.0;
+pub const FIREBALL_SECS: f32 = 60.0;
+
+/// Tonight's event as the sky shows it at `hour`: its kind (`abi::sky_event`'s numbers, 0 none) and
+/// strength 0 to 1.
+pub fn sky_look(event: Option<Event>, hour: f32) -> (u32, f32) {
+    let night_from = |from: f32| hour >= from || hour < NIGHT_UNTIL_HOUR;
+    match event {
+        Some(Event::BloodMoon) => match blood_moon_strength(hour) {
+            s if s > 0.0 => (1, s),
+            _ => (0, 0.0),
+        },
+        Some(Event::Meteors { peak }) if night_from(SHOWER_FROM_HOUR) => {
+            (2, if peak { 1.0 } else { SHOWER_SIDE_STREAKS / SHOWER_PEAK_STREAKS })
+        }
+        Some(Event::AuroraStorm) if night_from(AURORA_FROM_HOUR) => (4, 1.0),
+        _ => (0, 0.0),
+    }
+}
+
 // ---------------------------------------------------------------- the dusk line
 
 /// Each announced event is foretold this many hours before sunset (the night hint's slot).
@@ -426,6 +456,18 @@ mod tests {
             assert!(lo < hi && hi < sim * 16, "sim {sim}: meteors {lo}-{hi}");
         }
         assert_eq!(impact_reach(32), (IMPACT_FROM_PLAYERS, IMPACT_REACH));
+    }
+
+    #[test]
+    fn the_sky_shows_tonight() {
+        assert_eq!(sky_look(Some(Event::BloodMoon), 22.5), (1, 1.0));
+        assert_eq!(sky_look(Some(Event::BloodMoon), 12.0), (0, 0.0));
+        assert_eq!(sky_look(Some(Event::Meteors { peak: true }), 0.5), (2, 1.0));
+        assert_eq!(sky_look(Some(Event::Meteors { peak: true }), 21.0), (0, 0.0));
+        assert!((sky_look(Some(Event::Meteors { peak: false }), 23.5).1 - 0.3).abs() < 1e-6);
+        assert_eq!(sky_look(Some(Event::AuroraStorm), 22.0), (4, 1.0));
+        assert_eq!(sky_look(Some(Event::Fireball), 23.0), (0, 0.0));
+        assert_eq!(sky_look(None, 23.0), (0, 0.0));
     }
 
     #[test]

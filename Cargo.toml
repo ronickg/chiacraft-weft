@@ -55,3 +55,12 @@ opt-level = 3
 
 [profile.release]
 debug = "line-tables-only"
+
+# What players get (the release builds of CI): thin LTO and one codegen unit. On the PC, far
+# terrain made its tiles 17 % (heights) and 10 % (meshing) faster than `release`; frames the same
+# (GPU-bound); fat LTO only 3 % more. It builds about 6x slower, so the crew's runs keep `release`
+# (perf review, 11-05). `cargo build --profile dist`, output in target/dist.
+[profile.dist]
+inherits = "release"
+lto = "thin"
+codegen-units = 1

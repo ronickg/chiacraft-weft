@@ -941,6 +941,8 @@ impl Server {
                     }
                 }
                 DimEvent::SetAir { dim, air, heading } => self.dims[dim as usize].set_air(air, heading),
+                DimEvent::SetSkyEvent { dim, kind, strength } => self.dims[dim as usize].set_sky_event(kind, strength),
+                DimEvent::SkyLanding { dim, pos, seconds } => self.dims[dim as usize].landings.push((pos, seconds)),
                 DimEvent::SetTints { dim, tints } => self.dims[dim as usize].set_tints(tints),
                 DimEvent::SetRain { dim, biomes, weather } => {
                     // Only where weather comes at all.
@@ -1287,6 +1289,8 @@ impl Server {
             .send(ToClient::Weather { id: dims[to as usize].weather as u32, only: dims[to as usize].rain_here().map(|o| o.to_vec()) });
         p.conn
             .send(ToClient::Air { air: dims[to as usize].air.0.clone(), heading: dims[to as usize].air.1 });
+        let (kind, strength) = dims[to as usize].sky_event;
+        p.conn.send(ToClient::SkyEvent { kind, strength });
         if to == c.void_dim && from != to as usize {
             p.conn
                 .send(ToClient::Show(crate::net::Shown::chat(void_note(c))));

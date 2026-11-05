@@ -57,6 +57,17 @@ pub static LOD_HEIGHTS_NS: Counter = Counter::new();
 pub static LOD_MESHED: Counter = Counter::new();
 pub static LOD_MESH_NS: Counter = Counter::new();
 pub static LOD_AGE_NS: Counter = Counter::new();
+/// Box tiles meshed and their quads by kind: ground tops, walls, crowns' tops and undersides,
+/// crowns' sides and trunks.
+static LOD_BOX: [Counter; 5] = [const { Counter::new() }; 5];
+
+/// A box tile's quads by kind (`lod::mesh`).
+pub fn lod_box_quads(q: [usize; 4]) {
+    LOD_BOX[0].add(1);
+    for (c, n) in LOD_BOX[1..].iter().zip(q) {
+        c.add(n as u64);
+    }
+}
 /// Calls to the dimension's steep faces (`Faces::block`) while meshing tiles, and their time.
 pub static LOD_FACES: Counter = Counter::new();
 pub static LOD_FACES_NS: Counter = Counter::new();
@@ -390,6 +401,7 @@ impl Reporter {
                 format!(" | server {:.2} ms: {}", sh.tick_us.load(Ordering::Relaxed) as f64 / 1000.0, phases.join(", "))
             });
             log::debug!(target: "frame", "{:.0} fps, frame avg {:.2} max {:.2} ms | cpu {} | gpu {}{server}", self.frames as f64 / secs, self.frame_sum / n, self.frame_max, cpu.join(", "), gpu.join(", "));
+            log_parts(n);
         }
         if on(Channel::Net, Level::Debug) {
             for (dir, name) in [(0, "to clients"), (1, "to server")] {
@@ -430,6 +442,19 @@ impl Reporter {
             let (made, off, age) = (LOD_MADE.take(), LOD_CALLED_OFF.take(), LOD_AGE_NS.take());
             let (heights, heights_ns, meshed, mesh_ns) = (LOD_HEIGHTS.take(), LOD_HEIGHTS_NS.take(), LOD_MESHED.take(), LOD_MESH_NS.take());
             let (faces, faces_ns) = (LOD_FACES.take(), LOD_FACES_NS.take());
+            let boxq: Vec<u64> = LOD_BOX.iter().map(Counter::take).collect();
+            if boxq[0] > 0 {
+                let per = |n: u64| n / boxq[0];
+                log::debug!(
+                    target: "load",
+                    "distant terrain box tiles per {secs:.1} s: {}, quads each: {} tops, {} walls, {} crown tops and undersides, {} crown sides and trunks",
+                    boxq[0],
+                    per(boxq[1]),
+                    per(boxq[2]),
+                    per(boxq[3]),
+                    per(boxq[4])
+                );
+            }
             let missing = LOD_MISSING.load(Ordering::Relaxed);
             if made + off > 0 || missing > 0 {
                 log::debug!(
@@ -649,6 +674,60 @@ thread_local! {
 
 /// A frame record's step a frame times until it is dropped (`span`); only on the frame thread.
 pub struct Span(&'static str, Instant);
+
+thread_local! {
+    /// The parts of this thread's per-frame work (`part`): (name, ms summed, most in one frame,
+    /// this frame's so far), logged once a second as `update split` (`--log frame=debug`).
+    static PARTS: std::cell::RefCell<Vec<(&'static str, f64, f32, f32)>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Times a part of the frame's update until dropped, summed over a second (`log_parts`). Costs an
+/// `Instant::now` pair; nothing else until the frame channel is on.
+pub struct Part(&'static str, Instant);
+
+pub fn part(name: &'static str) -> Part {
+    Part(name, Instant::now())
+}
+
+impl Drop for Part {
+    fn drop(&mut self) {
+        let ms = self.1.elapsed().as_secs_f32() * 1000.0;
+        PARTS.with(|p| {
+            let mut p = p.borrow_mut();
+            match p.iter_mut().find(|e| e.0 == self.0) {
+                Some(e) => e.3 += ms,
+                None => p.push((self.0, 0.0, 0.0, ms)),
+            }
+        });
+    }
+}
+
+/// Ends a frame for `part`: each part's time this frame goes into its sum and maximum.
+pub fn end_parts() {
+    PARTS.with(|p| {
+        for e in p.borrow_mut().iter_mut() {
+            (e.1, e.2, e.3) = (e.1 + e.3 as f64, e.2.max(e.3), 0.0);
+        }
+    });
+}
+
+/// The parts' average and maximum per frame over `frames` frames, slowest first, and starts again.
+fn log_parts(frames: f64) {
+    let parts = PARTS.with(|p| std::mem::take(&mut *p.borrow_mut()));
+    if parts.is_empty() {
+        return;
+    }
+    let mut parts: Vec<_> = parts
+        .into_iter()
+        .map(|e| (e.0, e.1 / frames.max(1.0), e.2))
+        .collect();
+    parts.sort_by(|a, b| b.1.total_cmp(&a.1));
+    let line: Vec<String> = parts
+        .iter()
+        .map(|(k, avg, max)| format!("{k} {avg:.2} (max {max:.1})"))
+        .collect();
+    log::debug!(target: "frame", "update split ms a frame: {}", line.join(", "));
+}
 
 /// Times a step of recording the frame: a frame whose record took long logs its steps
 /// (`slow_record`). Nested ones ("render/world") are listed too, before the step they are in.

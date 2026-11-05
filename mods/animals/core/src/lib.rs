@@ -15,6 +15,7 @@ pub mod journal;
 pub mod life;
 pub mod meat;
 pub mod needs;
+pub mod nests;
 pub mod sheet;
 pub mod sky;
 pub mod species;

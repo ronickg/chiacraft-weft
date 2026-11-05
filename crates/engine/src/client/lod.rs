@@ -378,6 +378,7 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
             i = end;
         }
     }
+    let n_tops = out.len();
     for j in 0..CELLS {
         for i in 0..CELLS {
             let (y, _, biome, under) = at(i, j);
@@ -425,6 +426,7 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
             }
         }
     }
+    let n_walls = out.len() - n_tops;
     let side = CELLS * s;
     // Crowns: tops and undersides in runs along x, as the ground's tops.
     for (dir, face_y) in [(3u32, true), (2, false)] {
@@ -459,6 +461,7 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
             }
         }
     }
+    let n_flat = out.len() - n_tops - n_walls;
     for j in 0..CELLS {
         for i in 0..CELLS {
             let Some(c) = crown_at(i, j) else { continue };
@@ -488,6 +491,7 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
             }
         }
     }
+    crate::diag::lod_box_quads([n_tops, n_walls, n_flat, out.len() - n_tops - n_walls - n_flat]);
     (out, (lo, hi))
 }
 
@@ -578,6 +582,9 @@ pub struct Lod {
     /// Indices of the dimension's features whose heights run mods' code (`terrain_gpu`);
     /// `None`: no distant terrain here.
     custom: Option<Arc<Vec<usize>>>,
+    /// Tiles whose features' heights are being worked out (`request` keeps it under
+    /// `heights_in_flight`).
+    heights: Arc<std::sync::atomic::AtomicUsize>,
     ready: FxHashSet<TileKey>,
     /// Asked for, and their jobs' flags (cleared to call them off).
     pending: FxHashMap<TileKey, Arc<AtomicBool>>,
@@ -617,6 +624,7 @@ impl Lod {
             dim: u32::MAX,
             seed: 0,
             custom: None,
+            heights: Arc::default(),
             ready: FxHashSet::default(),
             pending: FxHashMap::default(),
             cached: FxHashSet::default(),
@@ -722,6 +730,10 @@ impl Lod {
         if (dim, seed) != (self.dim, self.seed) {
             (self.dim, self.seed) = (dim, seed);
             self.custom = super::terrain_gpu::describe(c, dim, seed).map(|(_, custom)| Arc::new(custom));
+            // Its description runs mods' shapes for a while: started now, ahead of the tiles.
+            if self.custom.is_some() {
+                let _ = super::terrain_gpu::lod_desc(dim, seed);
+            }
         }
         // Tiles stand in for cubes not shown yet; the inner half of the view is shown long
         // before the edge, where flying outruns the cubes.
@@ -1010,8 +1022,15 @@ impl Lod {
             }
         }
         order.sort_by(|a, b| a.0.total_cmp(&b.0).then(b.1.level.cmp(&a.1.level)));
+        let busy = self.heights.load(Ordering::Relaxed);
+        let mut started = 0;
         for (_, key) in order {
             if self.pending.len() >= IN_FLIGHT {
+                break;
+            }
+            // A few tiles' heights at a time: meshes and the description share the pool's queue,
+            // and behind 256 heights jobs the first tiles came 3 s after a join.
+            if !custom.is_empty() && busy + started >= heights_in_flight() {
                 break;
             }
             let again = self.stale.remove(&key);
@@ -1027,8 +1046,18 @@ impl Lod {
                 continue;
             }
             let custom = custom.clone();
+            started += 1;
+            let heights = self.heights.clone();
+            heights.fetch_add(1, Ordering::Relaxed);
             // Mods' features run their code: on LOD's own threads.
             pool().spawn(move || {
+                struct Done(Arc<std::sync::atomic::AtomicUsize>);
+                impl Drop for Done {
+                    fn drop(&mut self) {
+                        self.0.fetch_sub(1, Ordering::Relaxed);
+                    }
+                }
+                let _done = Done(heights);
                 if !live.load(Ordering::Relaxed) {
                     return;
                 }
@@ -1041,6 +1070,14 @@ impl Lod {
         }
         self.stale.retain(|k| self.ready.contains(k));
     }
+}
+
+/// Tiles' heights worked out at once at most: eight per LOD thread, about a fifth of a second of
+/// them ahead of a made tile's meshing. Three per thread starved a fast flight (PC, 11-05: 100
+/// tiles a second, 340 missing, against 120-300 and 250 with no cap); 256 kept the first tiles
+/// back 1.5 s.
+fn heights_in_flight() -> usize {
+    pool().current_num_threads() * 8
 }
 
 /// Heights of the mod features `custom` at the tile's columns, for its job.

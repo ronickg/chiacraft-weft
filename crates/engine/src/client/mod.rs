@@ -657,6 +657,11 @@ pub struct Client {
     aurora: f32,
     /// How closed the canopy is where the player is (a mod's air, `air_flags::CANOPY_SHIFT`).
     canopy: f32,
+    /// What happens in the sky (`weft_abi::sky_event`, chiacraft), how strongly, and when it began
+    /// (`shaders::time`).
+    sky_event: (u32, f32, f32),
+    /// What is falling from the sky: where it lands, and when (`shaders::time`).
+    sky_landing: Option<(DVec3, f32)>,
     /// The weather's look as it is by now, going over to the weather's own (`weather_effects`).
     look: weft_abi::WeatherLook,
     frame_dt: f32,
@@ -974,6 +979,8 @@ impl Client {
             dust: 0.0,
             aurora: 0.0,
             canopy: 0.0,
+            sky_event: (0, 0.0, 0.0),
+            sky_landing: None,
             weather_id: 0,
             look: Default::default(),
             lightning: 0.0,
@@ -1092,7 +1099,10 @@ impl Client {
         input.mute_moves = m.has(weft_abi::camera_flags::DETACHED);
         input.mute_hands = m.has(weft_abi::camera_flags::NO_INTERACT);
         let input = &*input;
+        crate::diag::end_parts();
+        let p = crate::diag::part("messages and terrain");
         self.take_messages(dt);
+        drop(p);
         self.read_look(input);
         self.read_controls(input);
         self.fly_speed(input);
@@ -1110,14 +1120,20 @@ impl Client {
         if input.pressed("core:inventory") && input.captured {
             self.conn.send(ToServer::OpenInventory);
         }
+        let p = crate::diag::part("physics, camera, act");
         self.step_physics(input, dt);
         self.update_camera(input, dt as f32);
         let look = self.aim(input);
         self.act(input, dt, look);
         self.send_move(dt);
+        drop(p);
+        let p = crate::diag::part("entities");
         self.animate_entities(dt);
+        drop(p);
         self.chip_block(dt);
+        let p = crate::diag::part("particles");
         self.particles.update(dt as f32);
+        drop(p);
         self.creature_sounds(dt as f32, moved);
         self.me.hurt = (self.me.hurt - dt as f32).max(0.0);
         self.dead_for = self.dead.then(|| self.dead_for.unwrap_or(0.0) + dt as f32);
@@ -1796,12 +1812,14 @@ impl Client {
         if std::mem::take(&mut self.world.tints_changed) {
             self.render.set_biome_table(gpu, self.world.biome_tints());
         }
+        let p = crate::diag::part("tints");
         for (col, tints) in self
             .world
             .take_tints(glam::IVec2::new(center.x, center.z), reach)
         {
             self.render.upload_tints(gpu, col, &tints);
         }
+        drop(p);
         if self.joined && self.terrain_view != (center, self.view_radius) {
             self.terrain_view = (center, self.view_radius);
             let _ = self
@@ -1811,18 +1829,25 @@ impl Client {
         }
         // Enough jobs that meshing keeps up at 50 frames per second too (results are taken once
         // a frame), not only at hundreds.
+        let p = crate::diag::part("schedule meshing");
         self.world
             .schedule_meshing(center, crate::meshing().current_num_threads() * 512);
+        drop(p);
+        let p = crate::diag::part("solid cells");
         self.render.update_solid(gpu, &self.world, center);
+        drop(p);
         self.world.set_eye(center.y);
         // Uploads too, oldest first; the rest wait for the next frame (dropped if their cube
         // changed or left meanwhile). Edits and what is around the player go right away.
+        let p = crate::diag::part("uploads near (no budget)");
         let (now, later) = self.world.take_meshes(center);
         for r in now {
             self.render.upload(gpu, textures, (0, r.pos), &r.mesh);
             self.world.mark_shown(r.pos);
         }
         self.meshes.extend(later);
+        drop(p);
+        let _p = crate::diag::part("uploads (budget)");
         let start = Instant::now();
         while start.elapsed() < self.budget {
             let Some(r) = self.meshes.pop_front() else { break };
@@ -2629,6 +2654,16 @@ impl Client {
             soft_clouds: [0.0; 4],
             prev_view_proj: [[0.0; 4]; 4],
             cloud_moved: [0.0; 4],
+            // On the real clock (`shaders::clock`): tests pin the shaders' time, and a fireball's
+            // countdown and a shower's streaks stood still in their shots.
+            sky_event: [self.sky_event.0 as f32, self.sky_event.1, crate::shaders::clock() - self.sky_event.2, 0.0],
+            sky_landing: match self.sky_landing {
+                Some((at, when)) => (at - cam.pos)
+                    .as_vec3()
+                    .extend(when - crate::shaders::clock())
+                    .to_array(),
+                None => [0.0, 0.0, 0.0, -1e6],
+            },
             shadow_view_proj: self.shadow.0.to_cols_array_2d(),
             shadow_far_view_proj: self.shadow_far.0.to_cols_array_2d(),
             shadow_far: match self.shadow_far_map {
@@ -3090,7 +3125,12 @@ impl Client {
             list.append(&mut hand_late);
         }
         (self.late, self.hand_late) = (late, hand_late);
-        list.push(weft_render::Cmd::Mark);
+        // The end of the "translucent" part; with the copy, the app marks it after what it draws
+        // after the copy, so the sky, clouds and water are not counted as screen effects (Research
+        // round 16, M1).
+        if self.behind[2] <= 0.5 {
+            list.push(weft_render::Cmd::Mark);
+        }
     }
 
     /// Linear rgb, and in w how hard it rains (0..1) for shader packs.

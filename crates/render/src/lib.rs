@@ -329,6 +329,15 @@ pub trait Backend: Send {
     fn device_name(&self) -> &str {
         ""
     }
+    /// What kind of GPU it is: 0 not known, 1 integrated, 2 discrete, 3 another (virtual, CPU).
+    /// The base game picks its first quality preset by it (Research round 19, 7).
+    fn device_class(&self) -> u32 {
+        0
+    }
+    /// Its own memory (the largest device-local heap), MB; 0 not known.
+    fn device_memory_mb(&self) -> u64 {
+        0
+    }
     fn frames_in_flight(&self) -> usize;
     /// Whether the `*IndirectCount` draws take their count from the GPU (Vulkan 1.2's
     /// `drawIndirectCount`). Without it (MoltenVK) they draw all `max` records.

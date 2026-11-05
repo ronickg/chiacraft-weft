@@ -55,6 +55,8 @@ pub static SKY_IMPACTS: Config<u32> = Config::named("sky_impacts");
 static STAR_MARK: HudElement = HudElement::named("fallen_star");
 /// The day the last big impact fell in each dimension, so it falls once.
 static FELL: Mutex<Vec<(u32, u64)>> = Mutex::new(Vec::new());
+/// Till when each dimension's sky shows a fireball (game ticks).
+static FIREBALL_UNTIL: Mutex<Vec<(u32, u64)>> = Mutex::new(Vec::new());
 /// The day each dimension's impact was last said to be waiting (logged once).
 static WAITED: Mutex<Vec<(u32, u64)>> = Mutex::new(Vec::new());
 /// The 8 directions' keys, north first and clockwise (`vitals::events::compass`).
@@ -165,6 +167,7 @@ fn tick(w: &World) {
     pointers(w);
     let event = tonight(w);
     sky_watchers(w, event);
+    show_sky(w, event);
     let strength = if event == Some(Event::BloodMoon) { ev::blood_moon_strength(ev::hour_of(w.day_time())) } else { 0.0 };
     watch(w, strength);
     let dim = w.dimension();
@@ -298,6 +301,30 @@ fn walk_off(w: &World) {
     });
 }
 
+/// The sky's look for Lighting's pack (`set_sky_event`): a fireball for `FIREBALL_SECS` after any
+/// landing, else tonight's event by the hour (`vitals::events::sky_look`).
+fn show_sky(w: &World, event: Option<Event>) {
+    let now = w.game_time();
+    let fireball = FIREBALL_UNTIL
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|&(d, until)| d == w.dimension() && now < until);
+    let (kind, strength) = if fireball { (abi::sky_event::FIREBALL, 1.0) } else { ev::sky_look(event, ev::hour_of(w.day_time())) };
+    w.set_sky_event(kind, strength);
+}
+
+/// Something falls to `pos` in `secs` (a meteorite, a big impact): its streak in every player's sky,
+/// and the fireball look for a minute.
+pub(crate) fn streak(w: &World, pos: Vec3, secs: f32) {
+    w.sky_landing(pos.to_array(), secs);
+    let until = w.game_time() + ((secs + ev::FIREBALL_SECS) * vitals::TICKS as f32) as u64;
+    let dim = w.dimension();
+    let mut f = FIREBALL_UNTIL.lock().unwrap();
+    f.retain(|&(d, _)| d != dim);
+    f.push((dim, until));
+}
+
 /// Players out under the open sky in the dark of a shower's peak (from 23:00) or an aurora storm
 /// (from full dark, 21:00) to 05:00: Wish Upon and Sky on Fire.
 fn sky_watchers(w: &World, event: Option<Event>) {
@@ -413,9 +440,18 @@ fn impacts(w: &World) {
         }
     );
     let Some(site) = site else {
+        // Into the sea: the streak far off over the water, no crater.
+        let far = w
+            .players()
+            .into_iter()
+            .filter_map(|p| w.entity(p))
+            .next()
+            .map_or(Vec3::new(0.0, 63.0, 0.0), |e| e.pos + Vec3::new(0.0, 0.0, -1000.0));
+        streak(w, far, ev::IMPACT_LEAD_SECS);
         tell_all(w, None);
         return;
     };
+    streak(w, site.center(), ev::IMPACT_LEAD_SECS);
     tell_all(w, Some(site));
     if rule == 2 {
         carve(w, site);
