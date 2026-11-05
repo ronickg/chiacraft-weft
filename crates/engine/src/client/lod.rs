@@ -32,9 +32,16 @@ const SIDE: i32 = crate::gpu_layout::terrain::lod::SIDE as i32;
 const WORDS: usize = crate::gpu_layout::terrain::lod::WORDS as usize;
 pub const LOD_WORDS_PER_TILE: usize = SAMPLES * WORDS;
 pub const MAX_LEVEL: u32 = 5;
-/// From this level on tiles are smooth ground, morphing into the next level with distance: at
-/// 8-block cells and more (from about 1000 blocks away), boxes only drew stairs.
-pub const SMOOTH_LEVEL: u32 = 3;
+/// From this level on tiles are smooth ground, morphing into the next level with distance
+/// (`mesh_smooth`). chiacraft: past `MAX_LEVEL`, so every level is boxes. Far land keeps the block
+/// steps the near land has, as Distant Horizons' does: the smooth facets from about 500 blocks out
+/// read as another game, faceted snow peaks and curtains along far shores (Ronald, 11-05, after the
+/// Distant Horizons + Bliss comparison: "I want to be better").
+pub const SMOOTH_LEVEL: u32 = MAX_LEVEL + 1;
+/// From this level on (8-block cells, about 500 blocks out) a crown is drawn down to the ground, a
+/// forest's canopy as one block over the land as from afar it is: a trunk a cell's eighth wide or
+/// less is under a pixel there, and without it the crown hung in the air.
+const CANOPY_LEVEL: u32 = 3;
 /// A tile splits into the level below while nearer than this many of its widths: a cell stays
 /// about the same size on screen (a 32-block cell at 4096 blocks).
 const SPLIT: f64 = 4.0;
@@ -306,7 +313,10 @@ const BANDS: i32 = 8;
 pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (Vec<[u32; 4]>, (i32, i32)) {
     let s = 1 << key.level;
     let at = |i: i32, j: i32| ground(words, i, j);
-    let crown_at = |i: i32, j: i32| crown(words, i, j);
+    let canopy = key.level >= CANOPY_LEVEL;
+    let crown_at = |i: i32, j: i32| {
+        crown(words, i, j).map(|c| if canopy { Crown { bottom: c.bottom.min(at(i, j).0 + 1), trunk: None, ..c } } else { c })
+    };
     let looks = super::looks::current();
     let face_of = |state: u32, dir: usize| face_of(c, &looks, state, dir);
     let terrain = c.dims.get(dim as usize).and_then(|d| d.terrain.as_ref());
@@ -390,6 +400,12 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                 // where this one's sample says: the wall goes on down below it (a skirt), or
                 // the sky shows through the crack.
                 if !(0..CELLS).contains(&(i + di)) || !(0..CELLS).contains(&(j + dj)) {
+                    // Not under water beside water, which lies at the sea's height at every level:
+                    // there is no crack to close, and a sheet of water hung down the tile's edge
+                    // showed as a curtain along far shores (Far view, 11-05).
+                    if under == top && ny >= y {
+                        continue;
+                    }
                     ny = ny.min(y - 1) - 2 * s;
                 }
                 if ny >= y {
