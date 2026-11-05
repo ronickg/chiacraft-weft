@@ -592,14 +592,17 @@ impl WorldRenderer {
             })
             .map_err(|e| e.0)
         };
+        // `WEFT_NO_ALPHA_TEST=1`: cutout (leaves, plants) drawn as opaque, no discard, to measure
+        // what alpha testing costs (a Mac row; leaves then show as solid boxes).
+        let cutout = if std::env::var_os("WEFT_NO_ALPHA_TEST").is_some() { "fs_opaque" } else { "fs_cutout" };
         let faces = [
             make("faces opaque", "vs_face", "fs_opaque", depth_write, Blend::None, true)?,
-            make("faces cutout", "vs_face", "fs_cutout", depth_write, Blend::None, true)?,
+            make("faces cutout", "vs_face", cutout, depth_write, Blend::None, true)?,
             make("faces translucent", "vs_face", "fs_translucent", depth_read, Blend::Alpha, true)?,
         ];
         let quads = [
             make("quads opaque", "vs_quad", "fs_opaque", depth_write, Blend::None, true)?,
-            make("quads cutout", "vs_quad", "fs_cutout", depth_write, Blend::None, true)?,
+            make("quads cutout", "vs_quad", cutout, depth_write, Blend::None, true)?,
             make("quads translucent", "vs_quad", "fs_translucent", depth_read, Blend::Alpha, true)?,
         ];
         let lod = make("distant terrain", "vs_lod", "fs_lod", depth_write, Blend::None, true)?;
