@@ -881,17 +881,23 @@ def fit_poses(spec):
     L.update(best)
     L["lift"] = round(-float(lowest(spec, crouch(), GROUPS)["front paws"]), 2)
 
+    # The floor is every part's lowest, not only the feet's and the body's: fitted on those alone, the
+    # folded haunches went 2.2 into the ground (hip -50, knee 135, arch 5).
+    every = {"all": lambda n: True}
+
     def lie_cost(P):
         q = pose_lie(0.0, dict(L, **P, lie_drop=0))
         g = lowest(spec, q, GROUPS)
-        f = min(g["back paws"], g["front paws"], g["body"])
+        f = lowest(spec, q, every)["all"]
         # The belly just off the ground (its faces never in the feet's plane), the feet on it.
-        return (g["body"] - f - 0.6) ** 2 + 0.5 * (g["back paws"] - f) ** 2 + 0.5 * (g["front paws"] - f) ** 2
-    grid = {"lie_hip": list(range(-90, -44, 5)), "lie_knee": list(range(100, 166, 5)), "lie_front": list(range(40, 101, 10))}
+        # The forearms (at lie_front - 70) never level with the belly (at lie_arch): their undersides flicker.
+        flat = 1.0 if abs(P["lie_front"] - 70 - P["lie_arch"]) < 2 else 0.0
+        return (g["body"] - f - 0.6) ** 2 + 0.5 * (g["back paws"] - f) ** 2 + 0.5 * (g["front paws"] - f) ** 2 + flat
+    grid = {"lie_hip": list(range(-130, -29, 5)), "lie_knee": list(range(90, 181, 5)), "lie_front": list(range(40, 101, 5)),
+            "lie_arch": [-5, 0, 5, 10, 15]}
     best = fit(grid, lie_cost)[1]
     q = pose_lie(0.0, dict(L, **best, lie_drop=0))
-    g = lowest(spec, q, GROUPS)
-    L.update(best, lie_drop=round(float(min(g["back paws"], g["front paws"], g["body"])), 2))
+    L.update(best, lie_drop=round(float(lowest(spec, q, every)["all"]), 2))
 
     def graze_cost(P):
         q = add(crouch(), {"neck": (P["graze_neck"], 0, 0), "head": (P["graze_head"], 0, 0)})

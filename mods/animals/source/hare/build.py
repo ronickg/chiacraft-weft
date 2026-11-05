@@ -68,6 +68,10 @@ if __name__ == "__main__":
     everything = [e["name"] for e in spec["elements"]]
     low = feet_low(spec, spec["animations"]["death"], everything)
     assert min(low) > -0.3 and max(low) < 0.3, f"dying, its lowest point from {min(low):.2f} to {max(low):.2f}"
+    # Lying and asleep, nothing goes into the ground (the haunches once sank 2.2).
+    for clip in ("lie", "sleep"):
+        low = feet_low(spec, spec["animations"][clip], everything)
+        assert min(low) > -0.3, f"{clip}: a part {min(low):.2f} into the ground"
     # A clip played once must not loop (the engine loops a clip whose file says so, whatever the game asks).
     looping = [c for c in CLIPS if spec["animations"][c].get("loop") is True]
     assert sorted(looping) == ["approach", "drink", "graze", "sleep", "stare", "watch"], f"looping: {looping}"
