@@ -832,31 +832,8 @@ fn faded(in: VOut) -> bool {
         return false;
     }
     let f = clamp((length(in.rel.xz) - (end - FADE_BAND)) / FADE_BAND, 0.0, 1.0);
-    // What stands higher than distant terrain draws in its column stays: where the tiles' land is
-    // lower (a hill's top between their samples, a pillar, an arch, a build), its dropped pixels let
-    // the land behind show through, a translucent slab (Far view, 11-05; the engine's
-    // `lod::column_tops`).
-    if f <= 0.0 || in.pos.y > fade_top(in.pos.xz) + 2.0 {
-        return false;
-    }
     let p = floor(in.clip.xy);
     return fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y)) < f;
-}
-
-// The highest distant terrain draws in the cube column at `xz` (world), from after the mask's bits
-// in `lod_mask` (two to a word); far below everything where no tile is shown (no fade there).
-fn fade_top(xz: vec2<f32>) -> f32 {
-    let half = i32(g.extra.w & 0xFFFFFFu);
-    let col = vec2<i32>(floor(xz / 16.0));
-    let d = col - g.cam_cube.xz;
-    if abs(d.x) > half || abs(d.y) > half {
-        return 1e9;
-    }
-    let w = 2 * half + 1;
-    let i = u32(((col.y % w) + w) % w * w + ((col.x % w) + w) % w);
-    let word = lod_mask[(u32(w * w) + 31u) / 32u + i / 2u];
-    let t = (word >> ((i % 2u) * 16u)) & 0xFFFFu;
-    return f32(bitcast<i32>(t << 16u) >> 16u);
 }
 
 // The cubes near where they end (the engine draws only those meshes with these, so the rest keep

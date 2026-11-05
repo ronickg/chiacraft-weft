@@ -149,8 +149,6 @@ pub struct LodMesh {
     pub skip: u32,
     pub y: (i32, i32),
     pub asked: std::time::Instant,
-    /// chiacraft: per cube column of the tile, the highest it draws (`column_tops`).
-    pub tops: Vec<i16>,
 }
 
 /// What came back for `job`, meshed on a worker.
@@ -166,7 +164,6 @@ pub fn made(job: LodJob, mut words: Vec<u32>) {
         if !job.columns.is_empty() {
             take_columns(&job, &mut words);
         }
-        let tops = column_tops(job.key, &words);
         let (quads, skip, y) = if job.key.smooth() {
             mesh_smooth(content(), job.dim, job.seed, job.key, &words)
         } else {
@@ -177,7 +174,7 @@ pub fn made(job: LodJob, mut words: Vec<u32>) {
         crate::diag::LOD_MESH_NS.add(start.elapsed().as_nanos() as u64);
         let _ = job
             .done
-            .send(LodMesh { dim: job.dim, seed: job.seed, key: job.key, quads, skip, y, asked: job.asked, tops });
+            .send(LodMesh { dim: job.dim, seed: job.seed, key: job.key, quads, skip, y, asked: job.asked });
     });
 }
 
@@ -197,37 +194,6 @@ fn take_columns(job: &LodJob, words: &mut [u32]) {
             words[w + 3] = 0;
         }
     }
-}
-
-/// chiacraft: per cube column of the tile (16 blocks; `size / 16` a side, rows along x), the
-/// highest its cells draw there: ground or a crown's top. Where the cubes fade into the tiles
-/// (`faded` in the pack's `world.wgsl`), only their pixels up to it fade: where the tiles' land is
-/// lower (a hill's top between two samples, a mesa's pillar, an arch, a build), dithered away the
-/// cubes let the land behind show through, a translucent slab (Far view, 11-05).
-pub fn column_tops(key: TileKey, words: &[u32]) -> Vec<i16> {
-    let s = 1 << key.level;
-    let n = (key.size() / 16).max(1);
-    let mut out = vec![i16::MIN; (n * n) as usize];
-    for j in 0..CELLS {
-        for i in 0..CELLS {
-            let mut top = ground(words, i, j).0;
-            if let Some(c) = crown(words, i, j) {
-                top = top.max(c.top);
-            }
-            let top = top.clamp(i16::MIN as i32 + 1, i16::MAX as i32) as i16;
-            // The columns the cell lies in (a cell of 32 blocks spans two, sixty-four cells share
-            // one at the finest level).
-            let (x0, x1) = ((i * s) / 16, (i * s + s - 1) / 16);
-            let (z0, z1) = ((j * s) / 16, (j * s + s - 1) / 16);
-            for z in z0..=z1 {
-                for x in x0..=x1 {
-                    let t = &mut out[(z * n + x) as usize];
-                    *t = (*t).max(top);
-                }
-            }
-        }
-    }
-    out
 }
 
 /// What a steep face shows (`Faces::block`, the dimension's mod), its surface lookups one column
@@ -676,14 +642,6 @@ pub struct Lod {
     half: i32,
     center: IVec2,
     mask_changed: bool,
-    /// chiacraft: made tiles' `column_tops`, and per mask column the shown tiles' (after the mask's
-    /// bits in its buffer, two to a word; `i16::MIN` where none is shown: no fade there).
-    tops: FxHashMap<TileKey, Vec<i16>>,
-    fade_tops: Vec<i16>,
-    /// The shown tiles (`WorldRenderer::terrain_epoch`) and the window `fade_tops` were made for,
-    /// and whether a tile's tops came or went since.
-    tops_for: (u64, IVec2, i32),
-    tops_dirty: bool,
     /// What the server said of columns of `columns_dim`.
     columns: Arc<Columns>,
     columns_dim: u32,
@@ -717,10 +675,6 @@ impl Lod {
             half: 0,
             center: IVec2::ZERO,
             mask_changed: false,
-            tops: FxHashMap::default(),
-            fade_tops: Vec::new(),
-            tops_for: (u64::MAX, IVec2::ZERO, 0),
-            tops_dirty: true,
             columns: Arc::default(),
             columns_dim: u32::MAX,
             stale: FxHashSet::default(),
@@ -797,14 +751,12 @@ impl Lod {
     ) {
         let c = content();
         let dim = world.dim;
-        self.update_mask(render, world, seed, cam, view);
+        self.update_mask(gpu, render, world, seed, cam, view);
         let reach = Self::distance();
         if (dim, seed) != (self.dim, self.seed) || reach == 0 {
             for key in self.ready.drain() {
                 render.remove_lod(key);
             }
-            self.tops.clear();
-            self.tops_dirty = true;
             for (_, live) in self.pending.drain() {
                 live.store(false, Ordering::Relaxed);
             }
@@ -839,15 +791,12 @@ impl Lod {
             }
             render.upload_lod(gpu, textures, m.key, &m.quads, m.skip, m.y);
             self.ready.insert(m.key);
-            self.tops.insert(m.key, m.tops);
-            self.tops_dirty = true;
             crate::diag::LOD_MADE.add(1);
             crate::diag::LOD_AGE_NS.add(m.asked.elapsed().as_nanos() as u64);
         }
         if reach == 0 || self.custom.is_none() {
             render.lod_draw.clear();
             render.lod_fade = 0;
-            self.upload_mask(gpu, render);
             return;
         }
         let p = glam::DVec2::new(cam.x, cam.z);
@@ -919,7 +868,6 @@ impl Lod {
         }
         render.lod_draw.clear();
         render.lod_draw.extend(shown);
-        self.upload_mask(gpu, render);
         // Tiles no longer wanted wait in the cache, the oldest freed past `CACHE`.
         for &key in &self.ready {
             if !keep.contains(&key) && self.cached.insert(key) {
@@ -931,8 +879,6 @@ impl Lod {
             let Some(key) = self.dropped.pop_front() else { break };
             if self.cached.remove(&key) {
                 self.ready.remove(&key);
-                self.tops.remove(&key);
-                self.tops_dirty = true;
                 render.remove_lod(key);
             }
         }
@@ -997,6 +943,7 @@ impl Lod {
     /// coming into the window when the camera moved to another column.
     fn update_mask(
         &mut self,
+        gpu: &mut dyn weft_render::Backend,
         render: &mut super::world_render::WorldRenderer,
         world: &mut super::world::ClientWorld,
         seed: u64,
@@ -1045,48 +992,9 @@ impl Lod {
             }
         }
         render.lod_half = half as u32;
-    }
-
-    /// Sends the mask and, after it, the shown tiles' tops per mask column (`column_tops`), when
-    /// either changed.
-    fn upload_mask(&mut self, gpu: &mut dyn weft_render::Backend, render: &mut super::world_render::WorldRenderer) {
-        if self.mask.is_empty() {
-            return;
-        }
-        let w = 2 * self.half + 1;
-        let window = (render.terrain_epoch, self.center, self.half);
-        let tops_changed = self.tops_dirty || self.tops_for != window;
-        if tops_changed {
-            self.tops_dirty = false;
-            self.fade_tops.clear();
-            self.fade_tops.resize((w * w) as usize, i16::MIN);
-            // Coarse tiles first, finer ones over them (a stand-in parent and its made children).
-            let mut keys: Vec<TileKey> = render.lod_draw.clone();
-            keys.sort_by_key(|k| std::cmp::Reverse(k.level));
-            let (lo, hi) = (self.center - IVec2::splat(self.half), self.center + IVec2::splat(self.half));
-            for key in keys {
-                let Some(tops) = self.tops.get(&key) else { continue };
-                let n = (key.size() / 16).max(1);
-                let o = key.origin().div_euclid(IVec2::splat(16));
-                let (a, b) = (o.max(lo), (o + IVec2::splat(n - 1)).min(hi));
-                for z in a.y..=b.y {
-                    for x in a.x..=b.x {
-                        let slot = (z.rem_euclid(w) * w + x.rem_euclid(w)) as usize;
-                        self.fade_tops[slot] = tops[((z - o.y) * n + (x - o.x)) as usize];
-                    }
-                }
-            }
-            self.tops_for = window;
-        }
-        if self.mask_changed || tops_changed {
+        if self.mask_changed {
             self.mask_changed = false;
-            let mut words = self.mask.clone();
-            words.extend(
-                self.fade_tops
-                    .chunks(2)
-                    .map(|p| (p[0] as u16 as u32) | ((*p.get(1).unwrap_or(&i16::MIN) as u16 as u32) << 16)),
-            );
-            render.set_lod_mask(gpu, &words);
+            render.set_lod_mask(gpu, &self.mask);
         }
     }
 
