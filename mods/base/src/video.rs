@@ -335,7 +335,8 @@ fn apply_fantasy(f: usize) {
 }
 
 /// What quality preset `q` allows of the rows that cost (Research round 17's table): Low few
-/// fireflies, no motes, a subtle night sky, no sparkle, no bloom, blocky clouds; Medium soft bloom. With
+/// fireflies, no motes, a subtle night sky, no sparkle, no bloom; Medium soft bloom. Soft clouds
+/// cost no more than blocky (Lighting, on the PC and the Mac), so they follow the master alone. With
 /// `bloom_up`, High and Ultra take the master's bloom (a quality preset just chosen).
 fn fantasy_caps(q: usize, bloom_up: bool) {
     if q == 0 {
@@ -344,8 +345,6 @@ fn fantasy_caps(q: usize, bloom_up: bool) {
         FX_NIGHT_SKY.set(FX_NIGHT_SKY.get().min(1));
         FX_SPARKLE.set(0);
         FX_BLOOM.set(0);
-        // Blocky on Low until the Mac's numbers are in (Lighting: on the PC within 0.1 ms).
-        SOFT_CLOUDS.set(false);
     } else if q == 1 {
         FX_BLOOM.set(FX_BLOOM.get().min(1));
     } else if bloom_up && q <= 3 {
