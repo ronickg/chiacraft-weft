@@ -125,37 +125,55 @@ pub fn amplify(level: f32) -> f32 {
 }
 
 /// Rolls a stone of `kind` at item `level` from `rand`, a source of numbers in 0..1. A mind-stone
-/// takes 1-3 boosts (one most often), splits its band among them and rolls each between
-/// `ROLL_FLOOR` and all of its share, in half units; a flow-stone amplifies (two in three) or
+/// takes 1-3 boosts (`roll_among` the web's families); a flow-stone amplifies (two in three) or
 /// turns small nodes to one family.
 pub fn roll(kind: Kind, level: f32, mut rand: impl FnMut() -> f32) -> Stone {
     let level = level.clamp(0.0, MAX_LEVEL);
     let mut stone = Stone { kind, level: level.round() as u8, rolls: [None; 3], flow: None };
     let pick = |u: f32| FAMILIES[((u * FAMILIES.len() as f32) as usize).min(FAMILIES.len() - 1)];
     match kind {
-        Kind::Mind => {
-            let n = match rand() {
-                u if u < 0.6 => 1,
-                u if u < 0.9 => 2,
-                _ => 3,
-            };
-            let share = band(level) / n as f32;
-            for i in 0..n {
-                let mut f = pick(rand());
-                // No family twice: the next one round.
-                while stone.rolls.iter().flatten().any(|r| r.0 == f) {
-                    f = FAMILIES[(f.index() + 1) % FAMILIES.len()];
-                }
-                let units = (share * (ROLL_FLOOR + (1.0 - ROLL_FLOOR) * rand()) * 2.0).round() / 2.0;
-                stone.rolls[i] = Some((f, units.max(0.5)));
-            }
-        }
+        Kind::Mind => stone.rolls = roll_among(&FAMILIES, level, &mut rand),
         Kind::Flow => {
             stone.flow = Some(if rand() < 2.0 / 3.0 { Flow::Amplify(amplify(level)) } else { Flow::Turn(pick(rand())) });
         }
         Kind::Unique(_) => {}
     }
     stone
+}
+
+/// What gems for gear can boost (`crafting`'s gem sockets, Ronald 11-05: "pieces and items should
+/// also get like gem slots"): only what a tool, weapon or piece of armour carries itself.
+pub const GEAR_FAMILIES: [Family; 6] =
+    [Family::MeleeDamage, Family::RangedDamage, Family::Defence, Family::Health, Family::MineSpeed, Family::GatherSpeed];
+
+/// A mind-stone's boosts, picked from `families` (a gem's from `GEAR_FAMILIES`): 1-3 of them (one
+/// most often), the band at `level` split among them, each rolled between `ROLL_FLOOR` and all of
+/// its share, in half units; no family twice.
+pub fn roll_among(families: &[Family], level: f32, mut rand: impl FnMut() -> f32) -> [Option<(Family, f32)>; 3] {
+    let mut rolls: [Option<(Family, f32)>; 3] = [None; 3];
+    if families.is_empty() {
+        return rolls;
+    }
+    let level = level.clamp(0.0, MAX_LEVEL);
+    let pick = |u: f32| families[((u * families.len() as f32) as usize).min(families.len() - 1)];
+    let n = match rand() {
+        u if u < 0.6 => 1,
+        u if u < 0.9 => 2,
+        _ => 3,
+    }
+    .min(families.len());
+    let share = band(level) / n as f32;
+    for i in 0..n {
+        let mut f = pick(rand());
+        // No family twice: the next one round.
+        while rolls.iter().flatten().any(|r| r.0 == f) {
+            let at = families.iter().position(|x| *x == f).unwrap_or(0);
+            f = families[(at + 1) % families.len()];
+        }
+        let units = (share * (ROLL_FLOOR + (1.0 - ROLL_FLOOR) * rand()) * 2.0).round() / 2.0;
+        rolls[i] = Some((f, units.max(0.5)));
+    }
+    rolls
 }
 
 /// The best stone a socket can hold for a family: a mind-stone at the top level, one perfect roll.
@@ -262,6 +280,23 @@ mod tests {
         }
         for k in KINDS {
             assert_eq!(Kind::of_code(k.code()), Some(k));
+        }
+    }
+
+    #[test]
+    fn gems_roll_gear_families() {
+        let mut seed = 7u64;
+        let mut rand = move || {
+            seed = seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (seed >> 40) as f32 / (1u64 << 24) as f32
+        };
+        for _ in 0..300 {
+            let r = roll_among(&GEAR_FAMILIES, 30.0, &mut rand);
+            assert!(r.iter().flatten().all(|(f, _)| GEAR_FAMILIES.contains(f)));
+            let total: f32 = r.iter().flatten().map(|x| x.1).sum();
+            assert!(total <= band(30.0) + 0.5 && total >= 0.5);
         }
     }
 }

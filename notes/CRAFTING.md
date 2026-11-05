@@ -352,6 +352,37 @@ trait can depend on the part it's in. Proposed:
     the whetstone (+keenness, which needs re-honing as it wears), armour "fitted" to its wearer.
   - Each part has its own few steps, capped.
 
+### Gem sockets (11-05)
+
+Ronald, 11-05: "pieces and items should also get like gem slots because that will make it even
+cooler". The modifier slots above become real gem sockets (`crafting::gems`, `mods/base/src/gems.rs`):
+- **How many:** the working part's grade's slots (0 up to Plain, 1 from Sound, 2 from Superior,
+  3 at Masterwork and Legendary), at most what its material can hold: a gem glued into knapped
+  stone, bone or wood 1, sewn onto leather or set into diamond 2, a metal setting 3. The tooltip
+  shows "Gems: n of m sockets".
+- **Gems** are cut at a crafting table (the book's Parts tab) from found stones: diamond, peridot
+  (a pallasite's), tektite, amber (the animals mod's, tagged `gem_stones/amber`); a new gem is a
+  row and a `gem_stones/<id>` tag. Each rolls 1-3 boosts with Perk web's roll
+  (`vitals::sockets::roll_among` over `GEAR_FAMILIES`: melee, ranged, defence, health, mining,
+  gathering) inside its stone's item level's band, 3-5 units (+6-10%) in all. A gem keeps its roll
+  in the web's `StoneData`, on its own component (`base:gem`): never a web stone.
+- **Boosts count only where they fit:** melee damage on a blade, a spear or a tool's hit, ranged on
+  a bow, defence and health on armour, mining on a pick or shovel, gathering on an axe or hoe. So
+  which gem goes where is a choice.
+- **The ceiling:** grade and gems together at most x1.6 a plain item (`curve::GRADE_CEILING`,
+  PROGRESSION.md "Endless gear": "grade plus marks add at most +60%"); a progression check holds it
+  for every kind and grade with the best rolls.
+- **Setting and taking out** at the table's assembly row: a built item and gems make the item with
+  them set (if it has the sockets free); the item alone there makes it bare, and its gems come back
+  to the bag. Taking an item apart gives its gems back too. **The cost:** a cheap gem (item level
+  under 20: tektite, amber) cracks one time in four coming out; diamond and peridot never do.
+  Repairs keep the gems set.
+- **The look:** each gem shows on the icon and in hand at its socket's spot (`looks::GEM_SPOTS`:
+  on an axe's or pick's head, a sword's guard and pommel, an armour shell's chest), a 5 px setting
+  (`base:parts/gem/set`) painted with the gem's ramp, made from its cut icon. Kinds without layered
+  art (knife, spear, bow) don't show their gems yet.
+- **For scripts:** `/gear gem <id> [slot=N]` gives a cut gem.
+
 ### Wear and repair, per part
 
 - **Each part wears by what it does.** The head wears on every use, a haft rarely, a fitting with

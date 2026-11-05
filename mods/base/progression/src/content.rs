@@ -275,6 +275,10 @@ pub const RULES: &[Rule] = &[
         "a diamond-scale shell's worn look",
     ),
     n(&["base:part_*"], 0, Tech, Part, Made, "a part's material sets its real age (`MATERIALS`)"),
+    // Gems for gear sockets (`crafting::gems`), cut from their found stones, of their stone's age.
+    n(&["base:gem_tektite", "base:gem_amber"], 0, Tech, Material, Made, "cut gems: a boost in a tool's, weapon's or armour's socket"),
+    r(&["base:gem_peridot"], 2, Tech, Material, Made),
+    r(&["base:gem_diamond"], 3, Tech, Material, Made),
     n(&["base:arrow"], 0, Tech, Tool, Drop(2.0), "dropped by skeletons; no recipe yet"),
     // ---- metals and gems
     r(&["base:coal", "base:coal_block"], 0, Shared, Material, Made),

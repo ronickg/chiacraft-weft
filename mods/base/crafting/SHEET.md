@@ -134,6 +134,17 @@ Harvest, uses and speed are a working part's at Sound, from its material's level
   - fastening `straps`: 10 cm³, stat ×1, speed ×1, damage ×1, reach +0
   - lining `lining`: 500 cm³, stat ×1, speed ×1, damage ×1, reach +0
 
+## Gems
+
+Sockets: the working part's grade's modifier slots, at most its material's (knapped stone, ground stone, bone, wood 1; leather and diamond 2; metal 3). A gem rolls 1-3 boosts among [MeleeDamage, RangedDamage, Defence, Health, MineSpeed, GatherSpeed] with the web's roll (`vitals::sockets::roll_among`), 3.0-5.0 units in all (a unit is +2%), by its stone's item level. A boost counts only where it fits the item; grade and gems together at most x1.6 a plain item. A gem under item level 20 cracks one time in 4 coming out.
+
+| Gem | Cut from | Item level | Units in all | Cracks |
+|---|---|---|---|---|
+| diamond | base:diamond | 35 | 4.0 | no |
+| peridot | base:peridot | 28 | 3.8 | no |
+| tektite | base:tektite | 6 | 3.2 | 1 in 4 |
+| amber | animals:amber | 4 | 3.1 | 1 in 4 |
+
 ## Example armour (a chestplate, leather straps, wool lining, Sound parts)
 
 | Shell | Level | Armour | Health | kg | Lasts (blows) | Gives out first |

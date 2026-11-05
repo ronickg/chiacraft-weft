@@ -1138,6 +1138,17 @@ material.base.wool = Шерсть
 material.base.fur = Мех
 command.base.gear.made = Собрано: {0}
 command.base.gear.cant = Эти детали не собираются в {0}: сначала назовите материал рабочей детали, затем остальные по порядку слотов (материал, который не может быть этой деталью, ничего не даёт)
+tagged.base.gem = {#c6a383}Уровень предмета {value.level}{/}{if:value.f0==0}\n{#9ad7ff}+{value.p0} % урон в ближнем бою{/}{/if}{if:value.f0==1}\n{#9ad7ff}+{value.p0} % урон издалека{/}{/if}{if:value.f0==3}\n{#9ad7ff}+{value.p0} % защита{/}{/if}{if:value.f0==4}\n{#9ad7ff}+{value.p0} % здоровье{/}{/if}{if:value.f0==8}\n{#9ad7ff}+{value.p0} % скорость сбора{/}{/if}{if:value.f0==9}\n{#9ad7ff}+{value.p0} % скорость добычи{/}{/if}{if:value.f1==0}\n{#9ad7ff}+{value.p1} % урон в ближнем бою{/}{/if}{if:value.f1==1}\n{#9ad7ff}+{value.p1} % урон издалека{/}{/if}{if:value.f1==3}\n{#9ad7ff}+{value.p1} % защита{/}{/if}{if:value.f1==4}\n{#9ad7ff}+{value.p1} % здоровье{/}{/if}{if:value.f1==8}\n{#9ad7ff}+{value.p1} % скорость сбора{/}{/if}{if:value.f1==9}\n{#9ad7ff}+{value.p1} % скорость добычи{/}{/if}{if:value.f2==0}\n{#9ad7ff}+{value.p2} % урон в ближнем бою{/}{/if}{if:value.f2==1}\n{#9ad7ff}+{value.p2} % урон издалека{/}{/if}{if:value.f2==3}\n{#9ad7ff}+{value.p2} % защита{/}{/if}{if:value.f2==4}\n{#9ad7ff}+{value.p2} % здоровье{/}{/if}{if:value.f2==8}\n{#9ad7ff}+{value.p2} % скорость сбора{/}{/if}{if:value.f2==9}\n{#9ad7ff}+{value.p2} % скорость добычи{/}{/if}
+tagged.base.gems = {if:value.sockets>0}{#9ad7ff}Камни: {value.n} из {value.sockets} гнёзд{/}{/if}
+item.base.gem_diamond = Огранённый алмаз
+item.base.gem_peridot = Огранённый перидот
+item.base.gem_tektite = Огранённый тектит
+item.base.gem_amber = Янтарный кабошон
+gem.base.diamond = Алмаз
+gem.base.peridot = Перидот
+gem.base.tektite = Тектит
+gem.base.amber = Янтарь
+gem.base.cracked = Камень треснул при извлечении: {0}
 command.base.skills.line = {0}: уровень {1} (опыт {2})
 grade.base.crude = Грубое
 grade.base.rough = Неровное

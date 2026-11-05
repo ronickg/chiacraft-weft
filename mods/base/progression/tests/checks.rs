@@ -11,7 +11,7 @@ fn check(name: &str) {
 
 #[test]
 fn every_check_runs() {
-    assert_eq!(progression::checks().len(), 11);
+    assert_eq!(progression::checks().len(), 12);
 }
 
 #[test]
@@ -67,4 +67,9 @@ fn tames() {
 #[test]
 fn tweaks() {
     check("tweaks inside ×0.75-×1.25 with a reason");
+}
+
+#[test]
+fn gem_ceiling() {
+    check("grade and gems at most +60% over a plain item");
 }
