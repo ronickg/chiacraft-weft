@@ -929,6 +929,10 @@ video.base.sky_events = Небесные события
 video.base.sky_events.what = Звездопады, кровавые луны, полярные бури; «только вид» — без их действия в игре
 video.base.sparkle = Блеск
 video.base.sparkle.what = Блики на снегу, песке и воде
+video.base.clouds = Облака
+video.base.clouds.what = Облака блоками или мягкие, клубящиеся
+video.base.value.blocky = Блоками
+video.base.value.clouds_soft = Мягкие
 
 # Ремёсла, которые ждут (crafts.rs, vitals::crafts)
 block.base.tanning_frame = Рама для выделки

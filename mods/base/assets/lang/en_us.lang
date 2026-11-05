@@ -928,6 +928,10 @@ video.base.sky_events = Sky events
 video.base.sky_events.what = Meteor showers, blood moons, aurora storms; "looks only" leaves out what they do in the game
 video.base.sparkle = Sparkle
 video.base.sparkle.what = Glints on snow, sand and water
+video.base.clouds = Clouds
+video.base.clouds.what = Blocky clouds, or soft ones that billow
+video.base.value.blocky = Blocky
+video.base.value.clouds_soft = Soft
 
 # Crafts that wait (crafts.rs, vitals::crafts)
 block.base.tanning_frame = Tanning Frame

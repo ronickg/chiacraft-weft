@@ -233,6 +233,9 @@ pub static FX_BIOME_AIR: Config<f32> = Config::named("fx_biome_air");
 /// 0 off, 1 looks only (no gameplay), 2 on.
 pub static FX_SKY_EVENTS: Config<i32> = Config::named("fx_sky_events");
 pub static FX_SPARKLE: Config<i32> = Config::named("fx_sparkle");
+/// The sky's clouds: blocky (off) or soft volumetric ones (Lighting's; Ronald: "Both, a setting",
+/// blocky by default). The engine's, at once, no restart.
+static SOFT_CLOUDS: Config<bool> = Config::named("core:soft_clouds");
 
 const FANTASY_NAMES: [&str; 3] = ["off", "subtle", "storybook"];
 
@@ -240,7 +243,7 @@ fn percent(v: f64) -> (String, i64) {
     ("percent".into(), (v * 100.0).round() as i64)
 }
 
-const FANTASY_ROWS: [Row; 10] = [
+const FANTASY_ROWS: [Row; 11] = [
     Row {
         key: "fireflies",
         values: &[0.0, 1.0, 2.0],
@@ -293,16 +296,23 @@ const FANTASY_ROWS: [Row; 10] = [
         shown: |v| word(["off", "looks_only", "on"][(v as usize).min(2)]),
     },
     Row { key: "sparkle", values: &[0.0, 1.0], get: || FX_SPARKLE.get() as f64, set: |v| FX_SPARKLE.set(v as i32), shown: off_on },
+    Row {
+        key: "clouds",
+        values: &[0.0, 1.0],
+        get: || SOFT_CLOUDS.get() as u8 as f64,
+        set: |v| SOFT_CLOUDS.set(v > 0.0),
+        shown: |v| word(if v > 0.0 { "clouds_soft" } else { "blocky" }),
+    },
 ];
 
 /// What the master sets, Off, Subtle and Storybook, per row (in `FANTASY_ROWS` order); NaN leaves
 /// a row as it is: sky events carry gameplay (Ronald: "Gameplay too"), so a look's master
 /// doesn't take them away. Then bloom: soft, soft, dreamy.
-const FANTASY_PRESETS: [[f64; 10]; 3] = [
-    // fireflies motes storybook night shooting moon glow  air  events    sparkle
-    [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, f64::NAN, 0.0],
-    [1.0, 1.0, 0.4, 1.0, 1.0, 1.0, 1.0, 0.6, f64::NAN, 1.0],
-    [2.0, 1.0, 1.0, 2.0, 1.0, 1.5, 1.5, 1.0, f64::NAN, 1.0],
+const FANTASY_PRESETS: [[f64; 11]; 3] = [
+    // fireflies motes storybook night shooting moon glow  air  events    sparkle clouds
+    [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, f64::NAN, 0.0, 0.0],
+    [1.0, 1.0, 0.4, 1.0, 1.0, 1.0, 1.0, 0.6, f64::NAN, 1.0, 0.0],
+    [2.0, 1.0, 1.0, 2.0, 1.0, 1.5, 1.5, 1.0, f64::NAN, 1.0, 1.0],
 ];
 const FANTASY_BLOOM: [i32; 3] = [1, 1, 2];
 
@@ -325,7 +335,7 @@ fn apply_fantasy(f: usize) {
 }
 
 /// What quality preset `q` allows of the rows that cost (Research round 17's table): Low few
-/// fireflies, no motes, a subtle night sky, no sparkle, no bloom; Medium soft bloom. With
+/// fireflies, no motes, a subtle night sky, no sparkle, no bloom, blocky clouds; Medium soft bloom. With
 /// `bloom_up`, High and Ultra take the master's bloom (a quality preset just chosen).
 fn fantasy_caps(q: usize, bloom_up: bool) {
     if q == 0 {
@@ -334,6 +344,8 @@ fn fantasy_caps(q: usize, bloom_up: bool) {
         FX_NIGHT_SKY.set(FX_NIGHT_SKY.get().min(1));
         FX_SPARKLE.set(0);
         FX_BLOOM.set(0);
+        // Blocky on Low until the Mac's numbers are in (Lighting: on the PC within 0.1 ms).
+        SOFT_CLOUDS.set(false);
     } else if q == 1 {
         FX_BLOOM.set(FX_BLOOM.get().min(1));
     } else if bloom_up && q <= 3 {
