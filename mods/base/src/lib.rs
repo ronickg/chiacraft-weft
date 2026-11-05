@@ -21,7 +21,9 @@ mod felling;
 mod firebed;
 mod fireflies;
 mod first;
+mod gems;
 mod glider;
+mod grapple;
 mod growth;
 mod hints;
 mod hud;
@@ -94,8 +96,8 @@ fn init(r: &mut Registry) {
         (&tabs::COLORED, &Item::named("red_stained_glass")),
         (&tabs::NATURAL, &Item::named("grass")),
         (&tabs::FUNCTIONAL, &Item::named("crafting_table")),
-        (&tabs::TOOLS, &Item::named("iron_pickaxe")),
-        (&tabs::COMBAT, &Item::named("iron_sword")),
+        (&tabs::TOOLS, &Item::named("pickaxe")),
+        (&tabs::COMBAT, &Item::named("sword")),
         (&tabs::FOOD, &Item::named("apple")),
         (&tabs::INGREDIENTS, &items::IRON_INGOT),
         (&tabs::REDSTONE, &Item::named("redstone")),
@@ -111,6 +113,7 @@ fn init(r: &mut Registry) {
     survival::register(r);
     climbing::register(r);
     glider::register(r);
+    grapple::register(r);
     levels::register(r);
     skills::register(r);
     web::register(r);
@@ -122,6 +125,7 @@ fn init(r: &mut Registry) {
     book::register(r);
     discovery::register(r);
     parts::register(r);
+    gems::register(r);
     first::register(r);
     knapping::register(r);
     firebed::register(r);

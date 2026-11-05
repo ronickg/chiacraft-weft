@@ -951,6 +951,9 @@ impl EntityRenderer {
         }
         // Its own pictures one over the other, as its icon shows them.
         let img = match crate::stack::layers(stack) {
+            // Chiacraft's look: its layers composed as its icon is.
+            Some(spec) if crate::stack::is_look(spec) => super::stack_look::compose(spec, |n| crate::assets::read_image(assets, n))
+                .map(|(size, rgba)| crate::assets::Image { width: size, height: size, rgba }),
             Some(spec) => {
                 let parts: Vec<(String, u32)> = crate::stack::parse_layers(spec)
                     .into_iter()
@@ -1955,7 +1958,7 @@ impl EntityRenderer {
             };
             let held_how = Play { looping: true, aim: true, hand: true, ..how };
             // Hands on a wall or a glider's bar: the pose's clip has the arms, not what is held.
-            let hands_busy = pose.when & (weft_abi::pose_when::CLIMBING | weft_abi::pose_when::GLIDING) != 0;
+            let hands_busy = pose.when & (weft_abi::pose_when::CLIMBING | weft_abi::pose_when::GLIDING | weft_abi::pose_when::ROPE) != 0;
             if hands_busy {
                 // Nothing of the hands: the item rides along on the raised arm.
             } else if e.held != 0 {

@@ -182,6 +182,7 @@ Two files don't match the rest of the set and should not be used as reference: `
 - Seeds, grains and small berries need contrast and size: a few big clear grains or berries with a light top-left and a dark outline, never a pale washed-out heap or a tiny dark speck. Grain ears (barley, rye) are full and golden with clear bearded ears, not wispy.
 - Beans are clearly beans (kidney-shaped, glossy, with a speckle or a pale eye), never a pink lump that reads as meat; small round berries (crowberries) are glossy and big enough to see one by one.
 - Things tied to creatures show a little of their real size against each other, in a gentle range (Ronald, 11-04): the longest side runs from about 16 px of the 32 (60%, tiny things: an earthworm, a grub, a chicken's egg nearer 70%) to about 26 px (100%: a nest, a raptor egg, a saddle for the biggest mount), centred, never so small it can't be read. A saddle matches its mount; a spawn egg is scaled a little by its animal (a chicken's small, a cow's full). Very thin creatures (an earthworm, a snake) get a little more than their real scale, about 20 px, so they stay readable at 1x.
+- Bone, antler and horn are bone-pale to their tips (warm cream, #e0d6bc to #ece4d0), never pink or red at the points (Ronald, 11-05, Drenkaun's antler: "tips bone-pale"). A seed reads as a seed (a teardrop with a pale base scar and a sprout), never round and ribbed like a fruit.
 
 How to prompt, check and cut it: `0 Making it.md`.
 

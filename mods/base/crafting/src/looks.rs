@@ -160,7 +160,7 @@ pub fn art_name(material: &str) -> &str {
 /// anchor less the handle's socket. Nothing for a material with no anchor yet.
 pub fn shift(kind: &str, material: &str) -> [i32; 2] {
     let Some(l) = look(kind) else { return [0, 0] };
-    let art = art_name(material);
+    let art = drawn(kind, material);
     match l.anchors.iter().find(|(m, _)| *m == art) {
         Some((_, a)) => [(a[0] - l.socket[0]).round() as i32, (a[1] - l.socket[1]).round() as i32],
         None => [0, 0],
@@ -171,7 +171,30 @@ pub fn shift(kind: &str, material: &str) -> [i32; 2] {
 /// and a felling one each have their own): painted, `base:parts/<kind>/<shape>/<art name>`, used
 /// as it is; or a shade map, `base:parts/<kind>/<shape>`, painted with ramps.
 pub fn painted(kind: &str, shape: &str, material: &str) -> String {
-    format!("base:parts/{kind}/{shape}/{}", art_name(material))
+    format!("base:parts/{kind}/{shape}/{}", drawn(kind, material))
+}
+
+/// The drawing a working part of `material` uses on `kind`: its own where it's drawn (the kind's
+/// anchors list the drawn ones), else the nearest drawn one until its art comes (meteoric iron as
+/// iron, star steel as steel, chert, obsidian and tektite as flint, bone and antler, and flint on a
+/// sword, as stone).
+pub fn drawn<'a>(kind: &str, material: &'a str) -> &'a str {
+    let Some(l) = look(kind) else { return art_name(material) };
+    let has = |a: &str| l.anchors.is_empty() || l.anchors.iter().any(|(m, _)| *m == a);
+    let mut art = art_name(material);
+    for _ in 0..3 {
+        if has(art) {
+            return art;
+        }
+        art = match art {
+            "meteoric_iron" => "iron",
+            "star_steel" => "steel",
+            "chert" | "obsidian" | "tektite" => "flint",
+            "flint" | "bone" | "antler" => "stone",
+            _ => "iron",
+        };
+    }
+    art
 }
 
 pub fn map(kind: &str, shape: &str) -> String {
@@ -180,6 +203,56 @@ pub fn map(kind: &str, shape: &str) -> String {
 
 pub fn ramp(material: &str) -> String {
     format!("base:ramps/{material}")
+}
+
+/// Where gems sit on each kind's 32 px icon, the centre of its first, second and third socket
+/// (measured on the iron heads, the hilt's guard and pommel, and the armour shells' icons).
+pub const GEM_SPOTS: &[(&str, [[i32; 2]; 3])] = &[
+    ("axe", [[19, 9], [22, 6], [16, 12]]),
+    ("pickaxe", [[18, 9], [22, 6], [14, 12]]),
+    ("shovel", [[23, 8], [25, 5], [21, 11]]),
+    ("hoe", [[18, 9], [21, 6], [15, 12]]),
+    ("sword", [[9, 22], [4, 27], [12, 19]]),
+    ("helmet", [[16, 13], [12, 16], [20, 16]]),
+    ("chestplate", [[15, 13], [10, 10], [20, 10]]),
+    ("leggings", [[12, 8], [19, 8], [15, 4]]),
+    ("boots", [[11, 10], [20, 10], [15, 6]]),
+];
+
+/// The gem drawing's size: a shade map with the gem in its top-left corner
+/// (`base:parts/gem/set`), moved to its socket's spot.
+pub const GEM_SIZE: i32 = 5;
+
+/// The look layer of a gem `gem` (`crafting::gems::GEMS`) in socket `i` of an item of `kind`:
+/// the gem's map painted with its ramp (`base:ramps/gem_<gem>`) at the socket's spot; none for a
+/// kind without spots (drawn by its plain icon).
+pub fn gem_look(kind: &str, i: usize, gem: &str) -> Option<String> {
+    let spot = GEM_SPOTS.iter().find(|(k, _)| *k == kind)?.1.get(i)?;
+    let (x, y) = (spot[0] - GEM_SIZE / 2, spot[1] - GEM_SIZE / 2);
+    Some(format!("base:parts/gem/set@{}+{x},{y}", ramp(&format!("gem_{gem}"))))
+}
+
+/// Part shapes drawn from one shade map painted with their material's ramp, as a loose part and
+/// (a shell) as the built piece (`base:parts/armour/<shape>`, made from the approved icons): armour's
+/// shells, straps (their buckles a second region: the straps' own metal, else wrought iron) and
+/// linings. Ronald, 11-05: a shell's icon shows its material.
+pub const PART_MAPS: [&str; 6] = ["helmet_shell", "chest_shell", "leg_shell", "boot_shell", "straps", "lining"];
+
+/// The look of a part of `shape` made of `material` (the engine's `core:look`), if it's drawn
+/// from a map.
+pub fn part_look(shape: &str, material: &str) -> Option<String> {
+    if !PART_MAPS.contains(&shape) {
+        return None;
+    }
+    let metal = crate::materials::material(material).is_some_and(|m| m.works == crate::materials::Works::Metal || m.id == "gold");
+    let buckle = if shape != "straps" {
+        String::new()
+    } else if metal {
+        format!(",{}", ramp(material))
+    } else {
+        format!(",{}", ramp("wrought_iron"))
+    };
+    Some(format!("base:parts/armour/{shape}@{}{buckle}", ramp(material)))
 }
 
 #[cfg(test)]
@@ -217,5 +290,14 @@ mod tests {
             }
         }
         assert_eq!(painted("axe", "felling_axe_head", "oak"), "base:parts/axe/felling_axe_head/wood");
+        // Until their art comes, undrawn heads use the nearest drawn one.
+        assert_eq!(painted("pickaxe", "pick_head", "meteoric_iron"), "base:parts/pickaxe/pick_head/iron");
+        assert_eq!(painted("sword", "straight_blade", "flint"), "base:parts/sword/straight_blade/stone");
+        assert_eq!(painted("axe", "felling_axe_head", "obsidian"), "base:parts/axe/felling_axe_head/flint");
+        assert_eq!(part_look("chest_shell", "bronze").unwrap(), "base:parts/armour/chest_shell@base:ramps/bronze");
+        assert_eq!(part_look("straps", "leather").unwrap(), "base:parts/armour/straps@base:ramps/leather,base:ramps/wrought_iron");
+        assert!(part_look("haft", "oak").is_none());
+        assert_eq!(gem_look("sword", 0, "diamond").unwrap(), "base:parts/gem/set@base:ramps/gem_diamond+7,20");
+        assert!(gem_look("knife", 0, "diamond").is_none() && gem_look("sword", 3, "diamond").is_none());
     }
 }

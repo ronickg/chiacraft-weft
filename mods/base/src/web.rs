@@ -30,7 +30,7 @@ const SOCKET: f32 = 12.0;
 const PICK_ICON: f32 = 16.0;
 /// A link's dots: their size and the gap between them (GUI pixels).
 const DOT: f32 = 1.0;
-const DOT_STEP: f32 = 5.0;
+const DOT_STEP: f32 = 3.0;
 /// The zoom steps; the screen opens at `ZOOM_START`. Zoom spreads the web; the nodes keep their
 /// size (the UI guide's one pixel grid: art only at whole multiples), doubled at the closest step.
 const ZOOMS: [f32; 5] = [0.55, 0.75, 1.0, 1.4, 2.0];
@@ -39,10 +39,10 @@ const ZOOM_START: usize = 0;
 const ZOOM_DOUBLE: f32 = 2.0;
 /// GUI pixels a pan key moves the view, at zoom 1.
 const PAN_STEP: f32 = 40.0;
-/// The sidebar's width, and a skill row's: clear of the list's scrollbar (6 GUI px) with 3 UI px of
-/// air (the UI guide: nothing clipped).
+/// The sidebar's width, and a skill row's: the list is the sidebar's width and its scrollbar draws
+/// over its right edge, so a row stops short of it with air to spare (the levels were under it).
 const SIDE_W: f32 = 118.0;
-const ROW_W: f32 = SIDE_W - 10.0;
+const ROW_W: f32 = SIDE_W - 16.0;
 
 #[derive(Clone, Copy)]
 struct View {
@@ -212,7 +212,7 @@ fn sidebar(ui: &mut Ui, s: &SkillWeb, points: u32, refund: bool) {
                 |c| change(c, |v| v.refund = !v.refund),
             );
         }
-        ui.column(S::column().gap(1.0).scroll().h(VIEW_H - 4.0), |ui| {
+        ui.column(S::column().gap(1.0).scroll().w(SIDE_W).h(VIEW_H - 4.0), |ui| {
             for (i, sk) in SKILLS.iter().enumerate() {
                 let (level, into) = skills::level_of(s.em[i]);
                 let name = format!("web.base.skill.{}", sk.id());
@@ -314,11 +314,34 @@ fn web(ui: &mut Ui, s: &SkillWeb, points: u32, v: &View) {
         }
         let lit = perks::has(&s.taken, a) && perks::has(&s.taken, b);
         let class = if lit { "perk_link_taken" } else { "perk_link" };
-        let len = (pb.0 - pa.0).hypot(pb.1 - pa.1);
-        let steps = (len / (DOT_STEP * times)).floor().max(1.0) as u32;
-        for k in 1..steps {
-            let t = k as f32 / steps as f32;
-            let p = ((pa.0 + (pb.0 - pa.0) * t).round(), (pa.1 + (pb.1 - pa.1) * t).round());
+        // Along the link's arc where it curves (a ring, a branch: `web_layout`), else straight.
+        let points: Vec<(f32, f32)> = match web.arcs.get(&vitals::web_layout::key(a, b)) {
+            Some(&c) => {
+                let c = place(v, c);
+                let r = (pa.0 - c.0).hypot(pa.1 - c.1);
+                let a0 = (pa.1 - c.1).atan2(pa.0 - c.0);
+                let a1 = (pb.1 - c.1).atan2(pb.0 - c.0);
+                let da = (a1 - a0 + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI;
+                let steps = ((da.abs() * r) / (DOT_STEP * times)).floor().max(1.0) as u32;
+                (1..steps)
+                    .map(|k| {
+                        let t = a0 + da * k as f32 / steps as f32;
+                        ((c.0 + r * t.cos()).round(), (c.1 + r * t.sin()).round())
+                    })
+                    .collect()
+            }
+            None => {
+                let len = (pb.0 - pa.0).hypot(pb.1 - pa.1);
+                let steps = (len / (DOT_STEP * times)).floor().max(1.0) as u32;
+                (1..steps)
+                    .map(|k| {
+                        let t = k as f32 / steps as f32;
+                        ((pa.0 + (pb.0 - pa.0) * t).round(), (pa.1 + (pb.1 - pa.1) * t).round())
+                    })
+                    .collect()
+            }
+        };
+        for p in points {
             if inside(p, dot) {
                 ui.panel(class, S::column().size(dot, dot).at_pivot(p.0, p.1, [0.5, 0.5]), |_| {});
             }

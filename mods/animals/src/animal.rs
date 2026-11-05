@@ -437,6 +437,12 @@ pub fn set_level(w: &World, id: u64, level: u32) {
 fn apply(w: &World, id: u64, st: &EntityState, health: f32, speed: f32, heal: f32) {
     w.attribute_add_modifier(id, &attribute::MAX_HEALTH, "animals:stats", attr_op::MULTIPLY_BASE, health as f64 - 1.0, 0);
     w.attribute_add_modifier(id, &attribute::MOVEMENT_SPEED, "animals:stats", attr_op::MULTIPLY_BASE, speed as f64 - 1.0, 0);
+    // Big creatures stand their ground: knockback resistance by size class (`vitals::combat`'s
+    // bands: medium 0.3, large 0.7, huge and titan 1).
+    if let Some(s) = w.component(id, &ANIMAL).and_then(|a| a.species()) {
+        let resist = animals_core::danger::size(s).band().knockback;
+        w.attribute_add_modifier(id, &attribute::KNOCKBACK_RESISTANCE, "animals:size", attr_op::ADD, resist as f64, 0);
+    }
     if let Some(p) = w.component_mut(id, &APPLIED) {
         *p = [health, speed];
     }

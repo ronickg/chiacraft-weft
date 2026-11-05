@@ -1767,6 +1767,12 @@ pub fn freeze(
         (abi::attribute::WIND_X.into(), 0.0, -256.0, 256.0),
         (abi::attribute::WIND_Z.into(), 0.0, -256.0, 256.0),
         (abi::attribute::LIFT.into(), 0.0, -64.0, 64.0),
+        (abi::attribute::ROPE_LENGTH.into(), 0.0, 0.0, 1024.0),
+        (abi::attribute::ROPE_X.into(), 0.0, -1.0e8, 1.0e8),
+        (abi::attribute::ROPE_Y.into(), 0.0, -1.0e8, 1.0e8),
+        (abi::attribute::ROPE_Z.into(), 0.0, -1.0e8, 1.0e8),
+        (abi::attribute::ROPE_REEL.into(), 0.0, 0.0, 64.0),
+        (abi::attribute::KNOCKBACK_RESISTANCE.into(), 0.0, 0.0, 1.0),
     ];
     let mut particles: Vec<RawParticle> = engine_particles();
     let mut sky: Vec<RawSky> = Vec::new();

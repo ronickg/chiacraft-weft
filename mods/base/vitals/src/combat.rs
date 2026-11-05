@@ -180,7 +180,8 @@ pub struct Band {
     /// second from all sources together (players, tames, fire, traps). Damage over the floor fills
     /// its stagger (knockdowns and part breaks), not its death.
     pub floor: Option<f32>,
-    /// Knockback resistance (1: none).
+    /// Knockback resistance: the share of a hit's knockback it shrugs off (0: all of it moves it,
+    /// 1: none; the engine's `core:knockback_resistance`).
     pub knockback: f32,
 }
 

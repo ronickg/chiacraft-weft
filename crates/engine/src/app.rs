@@ -2085,7 +2085,7 @@ impl Running {
                         }
                         redraw = true;
                     }
-                    Kind::Progress { bind, value, .. } | Kind::Icons { bind, value, .. } => {
+                    Kind::Progress { bind, value, .. } | Kind::Icons { bind, value, .. } | Kind::BoundImage { bind, value, .. } => {
                         let v = bind(&ctx);
                         if (v - *value).abs() > 1e-4 {
                             *value = v;

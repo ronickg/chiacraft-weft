@@ -1097,6 +1097,51 @@ pub fn glide(vel: &mut DVec3, forward: DVec3, g: &Glide, brake: f64, dive: f64) 
     *vel = DVec3::new(air.x + wind.x, fall, air.z + wind.z);
 }
 
+/// A rope it hangs on (`attribute::ROPE_LENGTH` and the rest): where it is made fast, how long
+/// it may be let out (blocks) and how fast it is pulled in or let out (blocks a tick).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Rope {
+    pub anchor: DVec3,
+    pub length: f64,
+    pub reel: f64,
+}
+
+/// The shortest a rope is pulled in to, blocks.
+pub const ROPE_MIN: f64 = 1.2;
+
+/// Keeps a body's `hold` point (its hands, `hold` above its feet) within `length` of the rope's
+/// anchor after a tick's move: moved back along the rope as far as blocks allow, and what took it
+/// outward taken off its velocity. Gravity on the rope is the swing. True if the rope is taut.
+#[allow(clippy::too_many_arguments)]
+pub fn rope_hold(
+    c: &Content,
+    block: &impl Cells,
+    bodies: &[Body<'_>],
+    pos: &mut DVec3,
+    vel: &mut DVec3,
+    half_width: f64,
+    height: f64,
+    hold: f64,
+    anchor: DVec3,
+    length: f64,
+) -> bool {
+    let hands = *pos + DVec3::Y * hold;
+    let d = hands - anchor;
+    let dist = d.length();
+    if dist <= length || dist < 1e-6 {
+        return false;
+    }
+    let n = d / dist;
+    let back = anchor + n * length - hands;
+    let r = move_box_with(c, block, bodies, 0, *pos, half_width, height, back, 0.0);
+    *pos = r.pos;
+    let out = vel.dot(n);
+    if out > 0.0 {
+        *vel -= n * out;
+    }
+    true
+}
+
 /// The push two overlapping soft bodies give each other per tick (vanilla's
 /// applyEntityCollision), for an offset `d` from the other one: along the larger axis, 0.05.
 pub fn nudge(d: DVec3) -> DVec3 {
