@@ -85,8 +85,11 @@ pub fn markdown() -> String {
     let _ = writeln!(w);
 
     // Stats side by side.
-    let _ = writeln!(w, "## Stats at level 1\n");
-    let _ = writeln!(w, "Damage and speed are each kind's own (1 = 100%).\n");
+    let _ = writeln!(w, "## Stats at level 0\n");
+    let _ = writeln!(
+        w,
+        "Health and damage (one hit, engine points) come from each species' size, role, mass and tweaks on the curve (`danger`, `PROGRESSION_SHEET.md`); speed is each kind's own (1 = 100%).\n"
+    );
     let _ = write!(w, "| Species |");
     for n in STAT_NAMES {
         let _ = write!(w, " {n} |");
@@ -95,8 +98,9 @@ pub fn markdown() -> String {
     let _ = writeln!(w, "|---|{}---|", "---|".repeat(STATS));
     for s in &SPECIES {
         let _ = write!(w, "| {} |", name(s));
-        for v in s.base {
-            let _ = write!(w, " {v} |");
+        for i in 0..STATS {
+            let v = s.base_stat(i);
+            let _ = if v >= 10.0 || v == v.round() { write!(w, " {v:.0} |") } else { write!(w, " {v:.1} |") };
         }
         let _ = writeln!(w, " {} |", s.hunger);
     }
@@ -408,7 +412,7 @@ fn species(w: &mut String, s: &Species) {
             .join(", ");
         let _ = writeln!(w, "| its food grows at home (spring/summer/autumn/winter) | {homes} |");
     }
-    let _ = writeln!(w, "| feedings to tame at level 1 | {} (2.5x at level 150) |", s.feedings);
+    let _ = writeln!(w, "| feedings to tame at level 0 | {} (3x at level 200) |", s.feedings);
     let _ = writeln!(
         w,
         "| scared by a walking player within | {} |",

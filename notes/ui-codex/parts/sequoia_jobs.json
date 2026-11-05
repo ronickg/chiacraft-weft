@@ -1,0 +1,49 @@
+[
+ {
+  "kind": "block",
+  "type": "log side / log top",
+  "name": "log_sequoia",
+  "what": "the bark of a giant sequoia trunk: thick soft fibrous bark in warm red-brown and cinnamon (#7a3a22 to #c06a42), split by DEEP vertical furrows (#3a1810) into long rounded stringy ridges 4-7 px wide that run straight up and down, fine vertical fibres along each ridge, a few paler weathered strands (#d08a5e); tileable top to bottom AND left to right, because a huge trunk is many blocks wide. Seamless on all four edges, every cell filled, no border, light from the top left, flat face-on view of one block face.",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "kind": "block",
+  "type": "log side / log top",
+  "name": "log_sequoia_top",
+  "like": "/Users/ronald/Coding/chiacraft-weft/mods/base/assets/textures/block/log_oak_top.png",
+  "what": "the cut end of a giant sequoia log, laid out like the attached log top (bark round the edge, rings inside): very DENSE fine growth rings, 1 px apart, in warm red-brown heartwood (#9a4a2a to #d48e5c) round a darker centre, a 3-4 px band of thick fibrous red-brown bark (#6e3420) round all four edges with deep notches. Seamless on all four edges, every cell filled, no border, light from the top left, flat face-on view of one block face.",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "kind": "block",
+  "type": "leaves",
+  "name": "leaves_sequoia",
+  "cutout": true,
+  "like": "/Users/ronald/Coding/chiacraft-weft/mods/base/assets/textures/block/leaves_spruce.png",
+  "what": "giant sequoia foliage: dense sprays of short scale-like needles, small overlapping 2-3 px scales along drooping sprigs, blue-green (#3e6a5a to #86ae9c) with paler tips; the same density and leaf gaps as the attached leaves (whose grey is just the game's tint base), gaps of flat solid magenta covering 10-15% of the tile, tileable.",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "kind": "block",
+  "type": "planks / bricks / built stone",
+  "name": "planks_sequoia",
+  "like": "/Users/ronald/Coding/chiacraft-weft/mods/base/assets/textures/block/planks_oak.png",
+  "what": "sequoia (redwood) planks: 4 horizontal boards laid out like the attached planks (the same board width, joints and bevel), in a warm red-brown redwood (#8a3a24 to #cc7450), clearly redder than oak or spruce, fine straight grain with a few tight knots. Seamless on all four edges, every cell filled, no border, light from the top left, flat face-on view of one block face.",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "kind": "block",
+  "type": "flower / sapling / mushroom (cross)",
+  "name": "sapling_sequoia",
+  "cutout": true,
+  "like": "/Users/ronald/Coding/chiacraft-weft/mods/base/assets/textures/block/sapling_oak.png",
+  "what": "a young giant sequoia sapling, placed like the attached sapling (standing upright, centred, its base on the bottom edge): a small narrow cone-shaped spire about 22 px tall of blue-green scale-needle sprays (#3e6a5a to #86ae9c), drooping slightly, on a thin red-brown stem (#7a3a22) at the base; on flat solid magenta.",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "kind": "item",
+  "name": "sequoia_cone",
+  "what": "a giant sequoia cone: a small egg-shaped woody cone, about 2 to 3 times as long as wide, made of tight diamond-shaped scales each with a little dimple, red-brown (#6e3a22 to #b8724a) with faint olive-green edges, a short stalk at one end; lying slightly diagonal, centred with 6-8 px of padding (it is small)",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ }
+]

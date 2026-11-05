@@ -9,8 +9,9 @@
 //!   base through size class and role; a level-200 one is about 5× a level-0 one of its kind.
 //! - Tames go into later ages on saddles and gear, capped like gear.
 //!
-//! Nothing in the game reads these yet (11-07): the species table keeps today's `base` stats, and
-//! `PROGRESSION_SHEET.md` shows them next to these, so the gaps are Ronald's next decision.
+//! The game reads them (11-07, Ronald: "Yes, all of them"): each kind registers `body`'s health
+//! and hit, its wild points step by `LEVEL_STEP`, and its armour is a step of the damage chain
+//! (`mods/animals/src/armour.rs`).
 
 use vitals::combat::{self, Player, Role, Size, Stats};
 use vitals::curve::{Age, GRADE_CEILING, Tweak, levels_for};
@@ -22,19 +23,43 @@ pub const LEVELS: (u32, u32) = (0, 200);
 /// A top level's strength against a level-0 one of the same species.
 pub const TOP_TIMES: f32 = 5.0;
 
+/// How much stronger one at `level` is than a level-0 one of its kind: straight up to
+/// `TOP_TIMES` at the top, as the game's wild points add (each a share of the base, `LEVEL_STEP`).
+pub fn level_times(level: u32) -> f32 {
+    1.0 + (TOP_TIMES - 1.0) * level.min(LEVELS.1) as f32 / LEVELS.1 as f32
+}
+
+/// What a wild point in health or damage adds, as a share of the base: a level's points fall on
+/// the nine stats alike, so a level-200 one has about 22 in each, and `TOP_TIMES` its base.
+pub const LEVEL_STEP: f32 = (TOP_TIMES - 1.0) * crate::species::STATS as f32 / LEVELS.1 as f32;
+
 /// Area levels a creature's level adds over its age's start: 0 at level 0, about 34 (three and a
-/// half ages) at 200, so a level-200 one is `TOP_TIMES` a level-0 one.
+/// half ages) at 200.
 pub fn level_shift(level: u32) -> f32 {
-    levels_for(TOP_TIMES) * level.min(LEVELS.1) as f32 / LEVELS.1 as f32
+    levels_for(level_times(level))
 }
 
 /// The creature level at which a species of `home` meets an age's start (a Stone Age species
-/// reaches the Bronze Age's band at level 59, the Iron Age's at 117, Steam's at 176).
+/// reaches the Bronze Age's band at level 30, the Iron Age's at 79, Steam's at 155).
 pub fn level_reaching(home: Age, age: Age) -> Option<u32> {
-    let need = age.start() - home.start();
-    let per = levels_for(TOP_TIMES) / LEVELS.1 as f32;
-    let lv = (need / per).ceil();
-    (need >= 0.0 && lv <= LEVELS.1 as f32).then_some(lv as u32)
+    (LEVELS.0..=LEVELS.1).find(|&lv| home.start() + level_shift(lv) >= age.start() - 1e-4)
+}
+
+/// Inside the small class (everything under 10 kg), health and bite go with mass: a fox at its
+/// middle, a mouse a fifth (Ronald, 11-07: "a fox beats a mouse"). As the cube root of mass (a
+/// body's length), kept between `SMALL_TIMES` so the class's band holds.
+pub const SMALL_MASS: f32 = 5.0;
+pub const SMALL_TIMES: (f32, f32) = (0.2, 1.3);
+
+/// A small one's share of its class's numbers, by its mass (1 for the other classes).
+pub fn mass_times(s: &Species) -> f32 {
+    if size(s) == Size::Small {
+        (s.bio.mass / SMALL_MASS)
+            .cbrt()
+            .clamp(SMALL_TIMES.0, SMALL_TIMES.1)
+    } else {
+        1.0
+    }
 }
 
 /// Which derived stat a tweak moves.
@@ -163,15 +188,17 @@ impl Danger {
 pub fn stats(s: &Species, level: u32) -> Option<Stats> {
     let d = danger(s.name)?;
     let mut st = combat::derive(size(s), d.role, d.area_level(level));
-    st.health *= d.tweak(Stat::Health);
+    let m = mass_times(s);
+    st.health *= d.tweak(Stat::Health) * m;
     st.armour *= d.tweak(Stat::Armour);
-    st.hit *= d.tweak(Stat::Hit);
+    st.hit *= d.tweak(Stat::Hit) * m;
     Some(st)
 }
 
-/// What the species table gives it today at level 1: health and damage (`Species::base`).
-pub fn today(s: &Species) -> (f32, f32) {
-    (s.base[HEALTH], s.base[DAMAGE])
+/// A level-0 one's numbers, what the game registers its kind with (its level's points multiply
+/// them, `LEVEL_STEP`); a species with no row keeps its table's.
+pub fn body(s: &Species) -> Stats {
+    stats(s, 0).unwrap_or(Stats { health: s.base[HEALTH], armour: 0.0, hit: s.base[DAMAGE], interval: 1.0 })
 }
 
 // ------------------------------------------------------------------ tames
@@ -194,10 +221,11 @@ pub fn tame(s: &Species, level: u32, saddle: Option<Age>, bonus: f32) -> Option<
     let own = d.area_level(level);
     let at = saddle.map_or(own, |a| own.max(a.reference()));
     let times = bonus.clamp(1.0, TAME_CEILING);
+    let m = mass_times(s);
     let mut st = combat::derive(size(s), d.role, at);
-    st.health *= d.tweak(Stat::Health) * times;
+    st.health *= d.tweak(Stat::Health) * times * m;
     st.armour *= d.tweak(Stat::Armour) * times;
-    st.hit *= d.tweak(Stat::Hit) * times;
+    st.hit *= d.tweak(Stat::Hit) * times * m;
     Some(st)
 }
 
@@ -242,8 +270,17 @@ mod tests {
         let s = SPECIES.iter().find(|s| s.name == "grey_wolf").unwrap();
         let (lo, hi) = (stats(s, 0).unwrap(), stats(s, 200).unwrap());
         assert!((hi.health / lo.health - TOP_TIMES).abs() < 1e-3);
-        assert_eq!(level_reaching(Age::Stone, Age::Bronze), Some(59));
+        assert!((level_times(100) - 3.0).abs() < 1e-5);
+        assert!((LEVEL_STEP - 0.18).abs() < 1e-5);
+        assert_eq!(level_reaching(Age::Stone, Age::Bronze), Some(30));
         assert_eq!(level_reaching(Age::Stone, Age::Lightning), None);
+    }
+
+    #[test]
+    fn a_fox_beats_a_mouse() {
+        let of = |n: &str| SPECIES.iter().find(|s| s.name == n).unwrap();
+        let (fox, mouse) = (body(of("red_fox")), body(of("wood_mouse")));
+        assert!(fox.health > 3.0 * mouse.health && fox.hit > 3.0 * mouse.hit);
     }
 
     #[test]

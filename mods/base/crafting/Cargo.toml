@@ -6,3 +6,5 @@ license = "MIT"
 description = "Items built from parts (notes/CRAFTING.md): materials, kinds, part shapes, the ten grades, traits and how a tool's numbers come from its parts"
 
 [dependencies]
+# Damage by the material's age, from the one curve (`vitals::gear`).
+vitals.workspace = true

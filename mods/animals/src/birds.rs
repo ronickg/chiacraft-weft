@@ -27,13 +27,13 @@ pub struct Wings {
     /// Its box in the air, width and height in blocks (on the ground its model's:
     /// `animals_core::bodies`).
     pub fly_size: (f32, f32),
-    pub health: f32,
     /// Its speed on the ground, and in the air as a multiple of it.
     pub speed: f32,
     pub air: f32,
     pub wander: f32,
-    /// What its bite or talons do (0: it never fights).
-    pub damage: f32,
+    /// Whether its bite or talons hurt; how much, and its health, come from its species
+    /// (`animals_core::danger::body`).
+    pub bites: bool,
     /// How high it climbs (blocks above where it took off, and a random share as much again), how
     /// far it flies (blocks, and as much again at random) and the ticks a flight may last.
     pub height: f64,
@@ -85,9 +85,9 @@ pub fn register(r: &mut Registry, kinds: &[&'static EntityKind], wings: &'static
         let index = crate::species::of(kind);
         r.entity(kind)
             .size(bw, bh)
-            .max_health(wings.health)
+            .max_health(crate::animal::health(index))
             .walk_speed(wings.speed)
-            .attack_damage(wings.damage)
+            .attack_damage(if wings.bites { crate::animal::hit(index) } else { 0.0 })
             .passive()
             .model_file(wings.model)
             .animations(wings.model)

@@ -84,7 +84,7 @@ const RECALL: f64 = 2.0 * LOOK as f64;
 
 /// The nearest place to `pos` where it can stand on dry ground beside open water: at a place it
 /// drank from before within `RECALL` blocks if that is still a shore, else within `LOOK` blocks.
-fn find_water(w: &World, id: u64, pos: [f64; 3]) -> Option<[f64; 3]> {
+fn find_water(w: &World, id: u64, pos: [f64; 3], driven: bool) -> Option<[f64; 3]> {
     let mut known = w.component(id, &WATERS).unwrap_or_default();
     let near = |k: &[f32; 4]| k[3] != 0.0 && (k[0] as f64 - pos[0]).powi(2) + (k[2] as f64 - pos[2]).powi(2) <= RECALL * RECALL;
     let mut order: Vec<&[f32; 4]> = known.iter().filter(|k| near(k)).collect();
@@ -95,6 +95,11 @@ fn find_water(w: &World, id: u64, pos: [f64; 3]) -> Option<[f64; 3]> {
         .into_iter()
         .find_map(|k| nearest_water(w, [k[0], k[1], k[2]].map(|v| v.floor() as i32), AGAIN, pos));
     let found = again.or_else(|| nearest_water(w, pos.map(|v| v.floor() as i32), LOOK, pos))?;
+    // A waterhole where its kind was killed it keeps off unless thirst drives it (`memory`).
+    if !driven && crate::memory::fear_at(w, found) >= animals_core::memory::AVOID {
+        weft_sdk::debug!("animal {id} keeps off feared water at {found:?}");
+        return None;
+    }
     let f = [found[0] as f32, found[1] as f32, found[2] as f32, 1.0];
     if known[0][..3] != f[..3] {
         known = [f, known[0]];
@@ -163,7 +168,13 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
     let Some(mut d) = w.component(id, &DRINK) else { return false };
     let water = 1.0 - a.thirst;
     // The cheap reasons first: most animals most of the time aren't thirsty.
-    let calm = water >= SLAKED || (d[3] == 0.0 && water >= THIRSTY);
+    // A plant eater goes to water at dawn and dusk (`routines::DRINKS_AT`): herds at the river.
+    let thirsty = if s.forages_wild() && animals_core::routines::drinking_hour(crate::routines::hour(w)) {
+        animals_core::routines::DRINKS_AT.max(THIRSTY)
+    } else {
+        THIRSTY
+    };
+    let calm = water >= SLAKED || (d[3] == 0.0 && water >= thirsty);
     if calm || !((s.hungry_in_the_wild() || animal::tamed(w, id)) && lasts(w, id, &a).is_some()) {
         if d[3] != 0.0 {
             w.component_mut(id, &DRINK).map(|d| *d = [0.0; 4]);
@@ -197,7 +208,8 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
         // Walking to it; or no water near, foraging and wandering on.
         return spot.is_some();
     }
-    match find_water(w, id, st.pos.to_array()) {
+    let driven = needs::thirst_score(water, true) >= animals_core::memory::DRIVEN;
+    match find_water(w, id, st.pos.to_array(), driven) {
         Some(p) => {
             weft_sdk::debug!("{} {id} is thirsty (water {:.0}%): to water at {p:?}", s.name, water * 100.0);
             w.navigate(id, p, 1.0);

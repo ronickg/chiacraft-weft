@@ -25,6 +25,7 @@ declare_mod!(deps: ["base"], init: init);
 pub mod anim;
 mod animal;
 mod ankylosaur;
+mod armour;
 mod birds;
 mod breath;
 mod breeding;
@@ -61,6 +62,7 @@ mod knockout;
 mod kryptobaatar;
 mod lizard;
 mod meat;
+mod memory;
 mod mouse;
 mod owl;
 mod prof;
@@ -71,6 +73,7 @@ mod raven;
 mod reindeer;
 mod rest;
 mod riding;
+mod routines;
 mod sauropod;
 mod scars;
 mod screen;
@@ -111,6 +114,7 @@ fn data_dir() -> String {
 fn init(r: &mut Registry) {
     // The goal timer first: its first row ("upkeep") is the one that logs.
     prof::init(r);
+    armour::init(r);
     dog::init(r);
     for p in species::problems() {
         weft_sdk::error!("{p}");
@@ -161,6 +165,7 @@ fn init(r: &mut Registry) {
     hunt::init(r);
     anim::init(r);
     senses::init(r);
+    memory::init(r);
     choose::init(r);
     screen::init(r);
     taming::init(r);

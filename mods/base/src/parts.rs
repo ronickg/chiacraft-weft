@@ -136,6 +136,8 @@ pub fn register(r: &mut Registry) {
             .durability(1)
             // Worn out, it stays: a part is repaired or replaced, not the tool lost.
             .keeps_broken()
+            // Its kind's swings a second (`vitals::gear`).
+            .attack_speed(vitals::gear::spread(k.id).map_or(1.0, |s| s.speed))
             .tab(if matches!(k.id, "sword" | "spear" | "knife" | "bow") { &crate::tabs::COMBAT } else { &crate::tabs::TOOLS });
         let b = match tool {
             Some(t) => b.tool(t),

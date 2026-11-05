@@ -57,58 +57,58 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | gobipteryx | *Gobipteryx minuta* | uncommon | small | 0.3 m | 0.3 kg | herd | omnivore | wild | eggs, hatch 0.41 d | 6.25 d | 38.3 d | 1-4 | 24 |
 | cedarosaurus | *Cedarosaurus weiskopfae* | uncommon | large | 4.1 m | 10000 kg | herd | herbivore | wild | eggs, hatch 2.03 d | 6.67 d | 153.3 d | 1-2 | 10 |
 
-## Stats at level 1
+## Stats at level 0
 
-Damage and speed are each kind's own (1 = 100%).
+Health and damage (one hit, engine points) come from each species' size, role, mass and tweaks on the curve (`danger`, `PROGRESSION_SHEET.md`); speed is each kind's own (1 = 100%).
 
 | Species | health | stamina | food | damage | speed | weight | oxygen | torpor | fortitude | hunger (s a point) |
 |---|---|---|---|---|---|---|---|---|---|---|
-| dog (chihuahua) | 8 | 100 | 80 | 2 | 1 | 40 | 100 | 60 | 10 | 30 |
-| cat | 6 | 80 | 60 | 1 | 1 | 30 | 80 | 40 | 10 | 40 |
-| capybara | 12 | 150 | 200 | 1 | 1 | 150 | 400 | 150 | 20 | 25 |
-| raptor | 14 | 150 | 150 | 4 | 1 | 140 | 150 | 200 | 15 | 20 |
-| utahraptor | 60 | 300 | 400 | 10 | 1 | 400 | 200 | 700 | 30 | 12 |
-| osmolskae | 14 | 150 | 150 | 4 | 1 | 140 | 150 | 200 | 15 | 20 |
-| wyvern | 400 | 800 | 2000 | 30 | 1 | 1200 | 400 | 3000 | 80 | 5 |
-| hare | 5 | 120 | 40 | 0.5 | 1 | 15 | 60 | 20 | 5 | 30 |
-| mountain_hare | 5 | 120 | 40 | 0.5 | 1 | 13 | 60 | 20 | 5 | 30 |
-| wood_mouse | 2 | 60 | 15 | 0.2 | 1 | 2 | 30 | 5 | 2 | 30 |
-| field_vole | 2 | 60 | 15 | 0.2 | 1 | 3 | 30 | 5 | 2 | 30 |
-| white_tailed_deer | 30 | 200 | 120 | 2 | 1 | 70 | 80 | 60 | 15 | 15 |
-| red_deer | 45 | 250 | 180 | 3 | 1 | 120 | 80 | 90 | 20 | 15 |
-| brown_trout | 3 | 60 | 20 | 0.3 | 1 | 5 | 400 | 10 | 3 | 30 |
-| pacu | 6 | 80 | 40 | 0.5 | 1 | 20 | 400 | 15 | 4 | 25 |
-| red_fox | 10 | 120 | 60 | 2 | 1 | 30 | 80 | 40 | 10 | 30 |
-| arctic_fox | 8 | 120 | 60 | 1.6 | 1 | 22 | 80 | 35 | 12 | 30 |
-| raven | 6 | 120 | 40 | 1 | 1 | 10 | 60 | 20 | 5 | 30 |
-| protoceratops | 35 | 200 | 120 | 2 | 1 | 90 | 80 | 70 | 18 | 15 |
-| kryptobaatar | 2 | 60 | 15 | 0.2 | 1 | 2 | 30 | 5 | 2 | 30 |
-| priscagama | 2 | 60 | 12 | 0.2 | 1 | 2 | 40 | 5 | 2 | 40 |
-| reindeer | 40 | 260 | 160 | 3 | 1 | 110 | 80 | 80 | 25 | 15 |
-| coyote | 18 | 150 | 80 | 3.5 | 1 | 45 | 80 | 60 | 12 | 30 |
-| house_sparrow | 2 | 60 | 15 | 0.2 | 1 | 1 | 40 | 5 | 2 | 20 |
-| snow_bunting | 2 | 60 | 15 | 0.2 | 1 | 1.2 | 40 | 5 | 3 | 20 |
-| great_horned_owl | 8 | 100 | 40 | 2.5 | 1 | 14 | 60 | 20 | 6 | 30 |
-| snowy_owl | 10 | 110 | 45 | 3 | 1 | 20 | 60 | 24 | 8 | 30 |
-| golden_eagle | 16 | 150 | 60 | 4 | 1 | 30 | 60 | 40 | 10 | 30 |
-| savanna_hawk | 8 | 110 | 40 | 2 | 1 | 10 | 60 | 20 | 6 | 30 |
-| turkey_vulture | 10 | 140 | 50 | 1 | 1 | 14 | 60 | 24 | 10 | 40 |
-| herring_gull | 8 | 130 | 40 | 1.5 | 1 | 10 | 70 | 20 | 8 | 30 |
-| yacare_caiman | 30 | 160 | 120 | 5 | 1 | 80 | 300 | 60 | 30 | 60 |
-| spectacled_caiman | 26 | 150 | 100 | 4.5 | 1 | 60 | 300 | 50 | 26 | 60 |
-| grey_wolf | 30 | 220 | 120 | 6 | 1 | 60 | 80 | 90 | 20 | 40 |
-| jaguar | 45 | 260 | 200 | 9 | 1 | 120 | 160 | 300 | 25 | 20 |
-| lungfish | 8 | 90 | 40 | 0.6 | 1 | 12 | 600 | 20 | 6 | 30 |
-| lycoptera | 1 | 40 | 8 | 0.1 | 1 | 1 | 300 | 4 | 1 | 30 |
-| psittacosaurus | 22 | 160 | 80 | 1.5 | 1.1 | 45 | 70 | 45 | 14 | 15 |
-| gastonia | 120 | 300 | 400 | 6 | 0.8 | 600 | 200 | 400 | 60 | 12 |
-| pinacosaurus | 120 | 300 | 400 | 6 | 0.8 | 600 | 200 | 400 | 60 | 12 |
-| iguanodont | 150 | 400 | 600 | 8 | 1 | 800 | 250 | 500 | 50 | 12 |
-| crocodyliform | 45 | 180 | 160 | 7 | 1 | 120 | 400 | 90 | 40 | 60 |
-| citipati | 40 | 220 | 120 | 3 | 1.2 | 80 | 90 | 80 | 20 | 15 |
-| confuciusornis | 6 | 120 | 30 | 1 | 1 | 6 | 60 | 15 | 6 | 30 |
-| gobipteryx | 6 | 120 | 30 | 1 | 1 | 6 | 60 | 15 | 6 | 30 |
-| cedarosaurus | 300 | 600 | 1200 | 10 | 0.8 | 2000 | 400 | 1200 | 80 | 10 |
+| dog (chihuahua) | 4.3 | 100 | 80 | 2.3 | 1 | 40 | 100 | 60 | 10 | 30 |
+| cat | 5.2 | 80 | 60 | 2.8 | 1 | 30 | 80 | 40 | 10 | 40 |
+| capybara | 19 | 150 | 200 | 2.5 | 1 | 150 | 400 | 150 | 20 | 25 |
+| raptor | 21 | 150 | 150 | 6 | 1 | 140 | 150 | 200 | 15 | 20 |
+| utahraptor | 103 | 300 | 400 | 9.7 | 1 | 400 | 200 | 700 | 30 | 12 |
+| osmolskae | 21 | 150 | 150 | 6 | 1 | 140 | 150 | 200 | 15 | 20 |
+| wyvern | 456 | 800 | 2000 | 15 | 1 | 1200 | 400 | 3000 | 80 | 5 |
+| hare | 3.8 | 120 | 40 | 1.1 | 1 | 15 | 60 | 20 | 5 | 30 |
+| mountain_hare | 3.5 | 120 | 40 | 1.0 | 1 | 13 | 60 | 20 | 5 | 30 |
+| wood_mouse | 0.8 | 60 | 15 | 0.2 | 1 | 2 | 30 | 5 | 2 | 30 |
+| field_vole | 0.8 | 60 | 15 | 0.2 | 1 | 3 | 30 | 5 | 2 | 30 |
+| white_tailed_deer | 19 | 200 | 120 | 2.5 | 1 | 70 | 80 | 60 | 15 | 15 |
+| red_deer | 94 | 250 | 180 | 4.0 | 1 | 120 | 80 | 90 | 20 | 15 |
+| brown_trout | 1.9 | 60 | 20 | 0.6 | 1 | 5 | 400 | 10 | 3 | 30 |
+| pacu | 3.9 | 80 | 40 | 1.1 | 1 | 20 | 400 | 15 | 4 | 25 |
+| red_fox | 5.6 | 120 | 60 | 3.0 | 1 | 30 | 80 | 40 | 10 | 30 |
+| arctic_fox | 4.8 | 120 | 60 | 2.6 | 1 | 22 | 80 | 35 | 12 | 30 |
+| raven | 2.6 | 120 | 40 | 0.8 | 1 | 10 | 60 | 20 | 5 | 30 |
+| protoceratops | 27 | 200 | 120 | 4 | 1 | 90 | 80 | 70 | 18 | 15 |
+| kryptobaatar | 0.8 | 60 | 15 | 0.2 | 1 | 2 | 30 | 5 | 2 | 30 |
+| priscagama | 0.8 | 60 | 12 | 0.2 | 1 | 2 | 40 | 5 | 2 | 40 |
+| reindeer | 27 | 260 | 160 | 4 | 1 | 110 | 80 | 80 | 25 | 15 |
+| coyote | 24 | 150 | 80 | 6 | 1 | 45 | 80 | 60 | 12 | 30 |
+| house_sparrow | 0.8 | 60 | 15 | 0.2 | 1 | 1 | 40 | 5 | 2 | 20 |
+| snow_bunting | 0.8 | 60 | 15 | 0.2 | 1 | 1.2 | 40 | 5 | 3 | 20 |
+| great_horned_owl | 3.5 | 100 | 40 | 1.9 | 1 | 14 | 60 | 20 | 6 | 30 |
+| snowy_owl | 4.0 | 110 | 45 | 2.2 | 1 | 20 | 60 | 24 | 8 | 30 |
+| golden_eagle | 5.2 | 150 | 60 | 2.8 | 1 | 30 | 60 | 40 | 10 | 30 |
+| savanna_hawk | 3.0 | 110 | 40 | 1.6 | 1 | 10 | 60 | 20 | 6 | 30 |
+| turkey_vulture | 2.7 | 140 | 50 | 0.8 | 1 | 14 | 60 | 24 | 10 | 40 |
+| herring_gull | 2.5 | 130 | 40 | 0.7 | 1 | 10 | 70 | 20 | 8 | 30 |
+| yacare_caiman | 24 | 160 | 120 | 6 | 1 | 80 | 300 | 60 | 30 | 60 |
+| spectacled_caiman | 24 | 150 | 100 | 6 | 1 | 60 | 300 | 50 | 26 | 60 |
+| grey_wolf | 24 | 220 | 120 | 6 | 1 | 60 | 80 | 90 | 20 | 40 |
+| jaguar | 35 | 260 | 200 | 6.5 | 1 | 120 | 160 | 300 | 25 | 20 |
+| lungfish | 3.5 | 90 | 40 | 1.0 | 1 | 12 | 600 | 20 | 6 | 30 |
+| lycoptera | 0.8 | 40 | 8 | 0.2 | 1 | 1 | 300 | 4 | 1 | 30 |
+| psittacosaurus | 27 | 160 | 80 | 4 | 1.1 | 45 | 70 | 45 | 14 | 15 |
+| gastonia | 135 | 300 | 400 | 5.7 | 0.8 | 600 | 200 | 400 | 60 | 12 |
+| pinacosaurus | 135 | 300 | 400 | 5.7 | 0.8 | 600 | 200 | 400 | 60 | 12 |
+| iguanodont | 351 | 400 | 600 | 9.2 | 1 | 800 | 250 | 500 | 50 | 12 |
+| crocodyliform | 122 | 180 | 160 | 9.7 | 1 | 120 | 400 | 90 | 40 | 60 |
+| citipati | 27 | 220 | 120 | 4 | 1.2 | 80 | 90 | 80 | 20 | 15 |
+| confuciusornis | 1.9 | 120 | 30 | 0.6 | 1 | 6 | 60 | 15 | 6 | 30 |
+| gobipteryx | 1.6 | 120 | 30 | 0.5 | 1 | 6 | 60 | 15 | 6 | 30 |
+| cedarosaurus | 351 | 600 | 1200 | 11 | 0.8 | 2000 | 400 | 1200 | 80 | 10 |
 
 ## The food web
 
@@ -193,7 +193,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | a meal that fills it | 0.25 kg; its biggest prey at home fills it in one kill |
 | room by its prey | plains 11, savanna 11, desert 9, forest 11, birch_forest 8 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.226 L a day; a drink lasts 17 min, thirsty after 8 |
-| feedings to tame at level 1 | 4 (2.5x at level 150) |
+| feedings to tame at level 0 | 4 (3x at level 200) |
 | scared by a walking player within | 3 blocks (twice that running) |
 | eats (food points) | `base:beef` 10; `base:porkchop` 10; `base:chicken` 8; `base:mutton` 8; `base:cooked_beef` 20, favorite; `base:cooked_porkchop` 20, favorite; `base:cooked_chicken` 16, favorite; `base:cooked_mutton` 16, favorite; `base:bone` 5, favorite; `animals:kibble` 30, kibble |
 
@@ -258,7 +258,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | a meal that fills it | 0.45 kg; its biggest prey at home fills it in one kill |
 | room by its prey | plains 5, forest 5, birch_forest 4, savanna 5, desert 4, taiga 4 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 50% of its 0.383 L a day; a drink lasts 35 min, thirsty after 18 |
-| feedings to tame at level 1 | 5 (2.5x at level 150) |
+| feedings to tame at level 0 | 5 (3x at level 200) |
 | scared by a walking player within | 6 blocks (twice that running) |
 | eats (food points) | `base:beef` 8; `base:mutton` 8; `base:egg` 6; `base:cooked_beef` 14; `base:cooked_mutton` 14; `base:chicken` 10, favorite; `base:cooked_chicken` 16, favorite; `animals:kibble` 30, kibble |
 
@@ -318,7 +318,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | a meal that fills it | 5 kg |
 | drinks | 100% of its 3.347 L a day; a drink lasts 22 min, thirsty after 11 |
 | its food grows at home (spring/summer/autumn/winter) | swamp 40/100/96/40%, savanna 43/100/100/40% |
-| feedings to tame at level 1 | 3 (2.5x at level 150) |
+| feedings to tame at level 0 | 3 (3x at level 200) |
 | scared by a walking player within | nothing |
 | eats (food points) | `base:wheat` 10; `base:wheat_seeds` 3; `base:bread` 15; `base:hay_bale` 90; `base:apple` 15, favorite; `base:sugar_cane` 12, favorite; `base:berries` 8, favorite; `animals:kibble` 30, kibble |
 
@@ -380,7 +380,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | a meal that fills it | 1.5 kg; its biggest prey at home fills it in one kill |
 | room by its prey | red_dunes 10, scrubland 10 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 50% of its 1.133 L a day; a drink lasts 40 min, thirsty after 20 |
-| feedings to tame at level 1 | 10 (2.5x at level 150) |
+| feedings to tame at level 0 | 10 (3x at level 200) |
 | scared by a walking player within | 8 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:mutton` 10; `base:porkchop` 12; `base:beef` 15, favorite; `animals:kibble` 30, kibble |
 
@@ -443,7 +443,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.4% of spawn 
 | a meal that fills it | 30 kg; its biggest prey at home fills it in one kill |
 | room by its prey | floodplain 5, scrubland 7, fern_forest 2 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 80% of its 16.79 L a day; a drink lasts 34 min, thirsty after 17 |
-| feedings to tame at level 1 | 18 (2.5x at level 150) |
+| feedings to tame at level 0 | 18 (3x at level 200) |
 | scared by a walking player within | 10 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:porkchop` 15; `base:beef` 20, favorite; `base:mutton` 15, favorite; `animals:kibble` 30, kibble |
 
@@ -504,7 +504,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | a meal that fills it | 1.5 kg; its biggest prey at home fills it in one kill |
 | room by its prey | red_dunes 10 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 50% of its 1.133 L a day; a drink lasts 40 min, thirsty after 20 |
-| feedings to tame at level 1 | 10 (2.5x at level 150) |
+| feedings to tame at level 0 | 10 (3x at level 200) |
 | scared by a walking player within | 8 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:mutton` 10; `base:porkchop` 12; `base:beef` 15, favorite; `animals:kibble` 30, kibble |
 
@@ -568,7 +568,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.06% of spa
 | a meal that fills it | 500 kg; its biggest prey at home fills it in one kill |
 | room by its prey | crags 1, fern_forest 3, red_dunes 5, scrubland 8 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 211.207 L a day; a drink lasts 36 min, thirsty after 18 |
-| feedings to tame at level 1 | 45 (2.5x at level 150) |
+| feedings to tame at level 0 | 45 (3x at level 200) |
 | scared by a walking player within | nothing |
 | eats (food points) | `base:chicken` 10; `base:porkchop` 15; `base:beef` 20; `base:mutton` 20, favorite; `base:cooked_mutton` 30, favorite; `animals:kibble` 30, kibble |
 
@@ -631,7 +631,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | a meal that fills it | 0.38 kg |
 | drinks | 30% of its 0.329 L a day; a drink lasts 58 min, thirsty after 29 |
 | its food grows at home (spring/summer/autumn/winter) | plains 40/86/46/40%, desert 55/78/55/40%, forest 40/73/41/40%, savanna 43/100/100/40%, beach 62/68/82/48% |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 12 blocks (twice that running) |
 | eats (food points) | `base:wheat` 8; `base:wheat_seeds` 2; `base:apple` 10, favorite; `base:berries` 6, favorite |
 
@@ -694,7 +694,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | a meal that fills it | 0.3 kg |
 | drinks | 30% of its 0.266 L a day; a drink lasts 56 min, thirsty after 28 |
 | its food grows at home (spring/summer/autumn/winter) | taiga 40/93/40/40%, birch_forest 40/62/40/40%, snowy_plains 40/62/40/40%, mountains 60/95/76/40%, sequoia_grove 40/40/40/40% |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 12 blocks (twice that running) |
 | eats (food points) | `base:crowberries` 4; `base:lingonberries` 6, favorite |
 
@@ -757,7 +757,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | a meal that fills it | 0.002 kg |
 | drinks | 20% of its 0.003 L a day; a drink lasts 52 min, thirsty after 26 |
 | its food grows at home (spring/summer/autumn/winter) | plains 40/86/46/40%, forest 40/73/41/40%, desert 55/78/55/40%, savanna 43/100/100/40%, beach 62/68/82/48% |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 6 blocks (twice that running) |
 | eats (food points) | `base:wheat_seeds` 4; `base:wheat` 6; `base:berries` 4, favorite |
 
@@ -821,7 +821,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | a meal that fills it | 0.004 kg |
 | drinks | 10% of its 0.005 L a day; a drink lasts 108 min, thirsty after 54 |
 | its food grows at home (spring/summer/autumn/winter) | taiga 40/65/40/40%, birch_forest 40/62/40/40%, snowy_plains 40/50/40/40%, mountains 40/70/40/40%, swamp 40/100/96/40%, sequoia_grove 40/40/40/40% |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 5 blocks (twice that running) |
 | eats (food points) | `base:wheat` 6; `base:wheat_seeds` 3; `base:sunflower_seeds` 6, favorite |
 
@@ -884,7 +884,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | a meal that fills it | 7 kg |
 | drinks | 70% of its 4.531 L a day; a drink lasts 33 min, thirsty after 17 |
 | its food grows at home (spring/summer/autumn/winter) | plains 40/86/46/40%, savanna 43/100/100/40%, desert 55/78/55/40%, forest 40/73/41/40%, swamp 40/100/96/40% |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 16 blocks (twice that running) |
 | eats (food points) | `base:wheat` 8; `base:apple` 12, favorite; `base:berries` 6, favorite |
 
@@ -946,7 +946,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn 
 | a meal that fills it | 16 kg |
 | drinks | 80% of its 9.535 L a day; a drink lasts 31 min, thirsty after 16 |
 | its food grows at home (spring/summer/autumn/winter) | forest 40/73/41/40%, birch_forest 40/62/40/40%, mountains 40/78/74/40%, sequoia_grove 40/40/40/40% |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 20 blocks (twice that running) |
 | eats (food points) | `base:wheat` 10; `base:apple` 12, favorite |
 
@@ -1009,7 +1009,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | eats | insects 65%, fish 30%, carrion 5% |
 | a meal that fills it | 0.05 kg |
 | drinks | never: it lives in the water |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 6 blocks (twice that running) |
 | eats (food points) |  |
 
@@ -1069,7 +1069,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn 
 | eats | fruit 30%, seeds 15%, insects 35%, fish 20% |
 | a meal that fills it | 0.4 kg |
 | drinks | never: it lives in the water |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 5 blocks (twice that running) |
 | eats (food points) |  |
 
@@ -1136,7 +1136,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | a meal that fills it | 0.55 kg; its biggest prey at home fills it in one kill |
 | room by its prey | forest 14, birch_forest 10, taiga 10, mountains 9, plains 23, desert 17, beach 11, sequoia_grove 5 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 50% of its 0.459 L a day; a drink lasts 36 min, thirsty after 18 |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 10 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:beef` 10; `base:berries` 6, favorite |
 
@@ -1197,7 +1197,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | a meal that fills it | 0.35 kg; its biggest prey at home fills it in one kill |
 | room by its prey | snowy_plains 15, taiga 8 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 30% of its 0.306 L a day; a drink lasts 57 min, thirsty after 29 |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 10 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:beef` 10; `base:berries` 6, favorite |
 
@@ -1266,7 +1266,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | a meal that fills it | 0.12 kg; its biggest prey at home in 3.4 kills |
 | room by its prey | taiga 5, mountains 3, forest 16, birch_forest 14, snowy_plains 17, desert 13, plains 17, beach 12, sequoia_grove 2 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 70% of its 0.117 L a day; a drink lasts 22 min, thirsty after 11 |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 14 blocks (twice that running) |
 | eats (food points) | `base:beef` 10; `base:wheat_seeds` 2; `base:rotten_flesh` 8, favorite |
 
@@ -1327,7 +1327,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | a meal that fills it | 8.3 kg |
 | drinks | 40% of its 5.282 L a day; a drink lasts 59 min, thirsty after 29 |
 | its food grows at home (spring/summer/autumn/winter) | red_dunes 40/40/40/40%, scrubland 40/40/40/40% |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 12 blocks (twice that running) |
 | eats (food points) | `animals:fern` 8; `base:wheat` 8; `animals:cycad_seed` 10, favorite |
 
@@ -1386,7 +1386,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | eats | insects 60%, seeds 25%, fruit 10%, roots 5% |
 | a meal that fills it | 0.004 kg |
 | drinks | 10% of its 0.005 L a day; a drink lasts 110 min, thirsty after 55 |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 6 blocks (twice that running) |
 | eats (food points) | `base:wheat_seeds` 4; `base:wheat` 6; `base:berries` 4, favorite |
 
@@ -1446,7 +1446,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | eats | insects 90%, leaves 10% |
 | a meal that fills it | 0.003 kg |
 | drinks | 10% of its 0.001 L a day; a drink lasts 534 min, thirsty after 267 |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 5 blocks (twice that running) |
 | eats (food points) | `base:spider_eye` 4, favorite |
 
@@ -1507,7 +1507,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | a meal that fills it | 12 kg |
 | drinks | 100% of its 7.36 L a day; a drink lasts 24 min, thirsty after 12 |
 | its food grows at home (spring/summer/autumn/winter) | snowy_plains 40/62/40/40%, taiga 40/80/40/40%, mountains 60/95/76/40% |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 18 blocks (twice that running) |
 | eats (food points) | `base:mushroom_brown` 8 |
 
@@ -1571,7 +1571,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | a meal that fills it | 1.3 kg; its biggest prey at home fills it in one kill |
 | room by its prey | plains 13, desert 9, forest 7, mountains 5, sequoia_grove 2 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.996 L a day; a drink lasts 20 min, thirsty after 10 |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 14 blocks (twice that running) |
 | eats (food points) | `base:beef` 12; `base:chicken` 10, favorite; `base:berries` 4 |
 
@@ -1635,7 +1635,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | a meal that fills it | 0.003 kg |
 | drinks | 100% of its 0.004 L a day; a drink lasts 11 min, thirsty after 5 |
 | its food grows at home (spring/summer/autumn/winter) | plains 40/86/45/40%, desert 55/78/55/40%, beach 40/68/82/40%, forest 40/73/40/40%, swamp 40/100/96/40% |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 8 blocks (twice that running) |
 | eats (food points) | `base:wheat_seeds` 2; `base:berries` 3, favorite |
 
@@ -1697,7 +1697,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | a meal that fills it | 0.004 kg |
 | drinks | 100% of its 0.005 L a day; a drink lasts 11 min, thirsty after 5 |
 | its food grows at home (spring/summer/autumn/winter) | snowy_plains 40/50/40/40%, mountains 40/78/74/40%, taiga 40/93/40/40% |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 8 blocks (twice that running) |
 | eats (food points) | `base:wheat_seeds` 2; `base:berries` 3, favorite |
 
@@ -1766,7 +1766,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | a meal that fills it | 0.14 kg; its biggest prey at home fills it in one kill |
 | room by its prey | forest 2, birch_forest 1, taiga 3, plains 3, mountains 2, desert 2, swamp 3, savanna 3, sequoia_grove 1 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.134 L a day; a drink lasts 16 min, thirsty after 8 |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 14 blocks (twice that running) |
 | eats (food points) | `base:beef` 10; `base:chicken` 10, favorite |
 
@@ -1829,7 +1829,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | a meal that fills it | 0.2 kg; its biggest prey at home fills it in one kill |
 | room by its prey | snowy_plains 1, taiga 3, mountains 2 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.185 L a day; a drink lasts 16 min, thirsty after 8 |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 16 blocks (twice that running) |
 | eats (food points) | `base:beef` 10; `base:chicken` 10, favorite |
 
@@ -1897,7 +1897,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | a meal that fills it | 0.45 kg; its biggest prey at home fills it in one kill |
 | room by its prey | mountains 11, plains 13, desert 9, taiga 8, snowy_plains 13, forest 11, birch_forest 10, sequoia_grove 7 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.383 L a day; a drink lasts 18 min, thirsty after 9 |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 24 blocks (twice that running) |
 | eats (food points) | `base:beef` 12; `base:chicken` 10, favorite; `base:rotten_flesh` 4 |
 
@@ -1959,7 +1959,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | a meal that fills it | 0.085 kg; its biggest prey at home in 2.4 kills |
 | room by its prey | savanna 8, swamp 4 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.086 L a day; a drink lasts 15 min, thirsty after 7 |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 16 blocks (twice that running) |
 | eats (food points) | `base:beef` 8; `base:chicken` 8, favorite |
 
@@ -2024,7 +2024,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | eats | carrion 95%, fruit 5% |
 | a meal that fills it | 0.14 kg |
 | drinks | 100% of its 0.134 L a day; a drink lasts 16 min, thirsty after 8 |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 16 blocks (twice that running) |
 | eats (food points) | `base:rotten_flesh` 10, favorite |
 
@@ -2088,7 +2088,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | a meal that fills it | 0.1 kg; its biggest prey at home in 2.9 kills |
 | room by its prey | beach 5, plains 14, swamp 5 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.099 L a day; a drink lasts 15 min, thirsty after 8 |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 10 blocks (twice that running) |
 | eats (food points) | `base:beef` 8; `base:bread` 6, favorite; `base:rotten_flesh` 6 |
 
@@ -2150,7 +2150,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | a meal that fills it | 3.5 kg; its biggest prey at home fills it in one kill |
 | room by its prey | swamp 17, savanna 26 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.486 L a day; a drink lasts 108 min, thirsty after 54 |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 8 blocks (twice that running) |
 | eats (food points) | `base:beef` 14; `base:chicken` 12, favorite; `base:porkchop` 12 |
 
@@ -2212,7 +2212,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | a meal that fills it | 2.5 kg; its biggest prey at home fills it in one kill |
 | room by its prey | savanna 26, swamp 20 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.359 L a day; a drink lasts 105 min, thirsty after 52 |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 8 blocks (twice that running) |
 | eats (food points) | `base:beef` 14; `base:chicken` 12, favorite; `base:porkchop` 12 |
 
@@ -2278,7 +2278,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.8% of spawn 
 | a meal that fills it | 4.2 kg; its biggest prey at home fills it in one kill |
 | room by its prey | taiga 1, forest 1, birch_forest 8, mountains 1, snowy_plains 2, plains 4, sequoia_grove 3 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 2.861 L a day; a drink lasts 22 min, thirsty after 11 |
-| feedings to tame at level 1 | 10 (2.5x at level 150) |
+| feedings to tame at level 0 | 10 (3x at level 200) |
 | scared by a walking player within | 20 blocks (twice that running) |
 | eats (food points) | `base:beef` 10; `base:porkchop` 10; `base:chicken` 6; `base:cooked_beef` 14; `base:cooked_mutton` 14; `base:mutton` 12, favorite; `animals:kibble` 30, kibble |
 
@@ -2340,7 +2340,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | a meal that fills it | 8.5 kg; its biggest prey at home fills it in one kill |
 | room by its prey | swamp 5, savanna 10, desert 1 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 5.397 L a day; a drink lasts 24 min, thirsty after 12 |
-| feedings to tame at level 1 | 14 (2.5x at level 150) |
+| feedings to tame at level 0 | 14 (3x at level 200) |
 | scared by a walking player within | 12 blocks (twice that running) |
 | eats (food points) | `base:chicken` 8; `base:porkchop` 14; `base:beef` 18, favorite; `base:mutton` 14; `animals:kibble` 30, kibble |
 
@@ -2399,7 +2399,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | eats | insects 50%, water plants 20%, fish 30% |
 | a meal that fills it | 0.3 kg |
 | drinks | never: it lives in the water |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 6 blocks (twice that running) |
 | eats (food points) |  |
 
@@ -2458,7 +2458,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | eats | insects 100% |
 | a meal that fills it | 0.002 kg |
 | drinks | never: it lives in the water |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 6 blocks (twice that running) |
 | eats (food points) |  |
 
@@ -2520,7 +2520,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | a meal that fills it | 2.5 kg |
 | drinks | 100% of its 1.794 L a day; a drink lasts 21 min, thirsty after 10 |
 | its food grows at home (spring/summer/autumn/winter) | fern_forest 40/40/40/40%, floodplain 40/40/40/40%, scrubland 40/40/40/40% |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 12 blocks (twice that running) |
 | eats (food points) | `animals:fern` 8; `animals:ginkgo_seed` 8; `base:berries` 10, favorite |
 
@@ -2582,7 +2582,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | a meal that fills it | 190 kg |
 | drinks | 100% of its 88.412 L a day; a drink lasts 32 min, thirsty after 16 |
 | its food grows at home (spring/summer/autumn/winter) | floodplain 40/40/40/40%, scrubland 40/40/40/40%, fern_forest 40/40/40/40% |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 8 blocks (twice that running) |
 | eats (food points) | `animals:fern` 10; `animals:cycad_seed` 12, favorite |
 
@@ -2644,7 +2644,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | a meal that fills it | 190 kg |
 | drinks | 100% of its 88.412 L a day; a drink lasts 32 min, thirsty after 16 |
 | its food grows at home (spring/summer/autumn/winter) | scrubland 40/40/40/40%, red_dunes 40/40/40/40%, crags 40/40/40/40% |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 8 blocks (twice that running) |
 | eats (food points) | `animals:fern` 10; `base:berries` 12, favorite |
 
@@ -2705,7 +2705,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | a meal that fills it | 400 kg |
 | drinks | 100% of its 172.778 L a day; a drink lasts 35 min, thirsty after 17 |
 | its food grows at home (spring/summer/autumn/winter) | floodplain 40/40/40/40%, fern_forest 40/40/40/40% |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 10 blocks (twice that running) |
 | eats (food points) | `animals:fern` 10; `animals:cycad_seed` 14, favorite |
 
@@ -2767,7 +2767,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | a meal that fills it | 15 kg; its biggest prey at home fills it in one kill |
 | room by its prey | floodplain 7, fern_forest 20 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 1.799 L a day; a drink lasts 125 min, thirsty after 63 |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 6 blocks (twice that running) |
 | eats (food points) | `animals:trout` 10; `animals:venison` 14, favorite |
 
@@ -2830,7 +2830,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | room by its prey | red_dunes 1, scrubland 1 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 5.681 L a day; a drink lasts 24 min, thirsty after 12 |
 | its food grows at home (spring/summer/autumn/winter) | red_dunes 40/40/40/40%, scrubland 40/40/40/40% |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 12 blocks (twice that running) |
 | eats (food points) | `animals:cycad_seed` 8; `base:berries` 10, favorite; `base:wheat_seeds` 3 |
 
@@ -2890,7 +2890,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | eats | fish 40%, seeds 40%, insects 20% |
 | a meal that fills it | 0.05 kg |
 | drinks | 100% of its 0.053 L a day; a drink lasts 14 min, thirsty after 7 |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 10 blocks (twice that running) |
 | eats (food points) | `animals:cycad_seed` 4; `base:wheat_seeds` 3, favorite |
 
@@ -2952,7 +2952,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn 
 | a meal that fills it | 0.03 kg |
 | drinks | 100% of its 0.033 L a day; a drink lasts 13 min, thirsty after 7 |
 | its food grows at home (spring/summer/autumn/winter) | crags 40/40/40/40%, scrubland 40/40/40/40%, red_dunes 40/40/40/40% |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 10 blocks (twice that running) |
 | eats (food points) | `animals:cycad_seed` 4; `base:wheat_seeds` 3, favorite |
 
@@ -3013,7 +3013,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn 
 | a meal that fills it | 1000 kg |
 | drinks | 100% of its 394.126 L a day; a drink lasts 38 min, thirsty after 19 |
 | its food grows at home (spring/summer/autumn/winter) | floodplain 40/40/40/40%, fern_forest 40/40/40/40% |
-| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 6 blocks (twice that running) |
 | eats (food points) | `animals:fern` 10; `animals:araucaria_cone` 16, favorite |
 
@@ -3030,7 +3030,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn 
 
 | Levels | health / stamina / food / damage / speed / weight / oxygen / torpor / fortitude |
 |---|---|
-| a wild point adds (share of the base) | 0.2 / 0.1 / 0.1 / 0.05 / 0.01 / 0.02 / 0.1 / 0.06 / 0.05 |
+| a wild point adds (share of the base) | 0.18 / 0.1 / 0.1 / 0.18 / 0.01 / 0.02 / 0.1 / 0.06 / 0.05 |
 | a tamed point adds | 0.1 / 0.1 / 0.1 / 0.04 / 0.015 / 0.04 / 0.1 / 0 / 0.05 |
 
 | Pacing: real days to game days (`biology.rs`) | |

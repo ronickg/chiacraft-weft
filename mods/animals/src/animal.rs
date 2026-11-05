@@ -12,8 +12,9 @@ use animals_core::life;
 pub use animals_core::species::{ADULT, BABY};
 pub const STAGE_NAMES: [&str; 5] = ["baby", "juvenile", "adolescent", "adult", "elder"];
 
-/// Wild levels: most low, a few high (proposed in the design; a world setting later).
-pub const MAX_WILD_LEVEL: u32 = 150;
+/// Wild levels, 0 to 200 everywhere, most low and a few high (Ronald, 11-06: "0-200 acrso the
+/// board"; a level-200 one is five times a level-0 one, `animals_core::danger`).
+pub const MAX_WILD_LEVEL: u32 = animals_core::danger::LEVELS.1;
 /// Tamed points an animal can get by leveling (proposed; a world setting later).
 pub const MAX_TAMED_POINTS: u32 = 75;
 
@@ -59,10 +60,9 @@ impl Animal {
     pub fn species(&self) -> Option<&'static species::Species> {
         SPECIES.get((self.species as usize).checked_sub(1)?)
     }
-    /// 1, plus a level for every point.
+    /// A level for every point (0 to 200 in the wild, more with tamed points).
     pub fn level(&self) -> u32 {
-        1 + self
-            .wild
+        self.wild
             .iter()
             .chain(&self.tamed)
             .map(|&p| p as u32)
@@ -71,19 +71,39 @@ impl Animal {
     pub fn tamed_points(&self) -> u32 {
         self.tamed.iter().map(|&p| p as u32).sum()
     }
-    /// Stat `i`'s value: `base * (1 + wild * wild_step) * (1 + tamed * tamed_step) * (1 + bonus)`,
-    /// the bonus from imprinting (up to 20%) and bond (up to 5%).
+    /// Stat `i`'s value: `base * (1 + wild * wild_step) * tamed`, where `tamed` is
+    /// `(1 + tamed points * tamed_step) * (1 + bonus)`, the bonus from imprinting (up to 20%) and
+    /// bond (up to 5%), all of it capped at `danger::TAME_CEILING` (×1.6, as gear's grade and
+    /// marks). The base's health and damage come from its species' danger (`Species::base_stat`).
     pub fn stat(&self, i: usize) -> f32 {
         let Some(s) = self.species() else { return 0.0 };
-        let bonus = self.imprint as f32 / 100.0 * 0.2 + self.bond as f32 / 100.0 * 0.05;
+        let bonus = self.imprint as f32 / 100.0 * animals_core::danger::IMPRINT + self.bond as f32 / 100.0 * animals_core::danger::BOND;
         // The body's stats go with its age: growing up, its prime, old (`life::vigor`).
         let age = if BODILY.contains(&i) && self.vigor > 0 { self.vigor as f32 / 100.0 } else { 1.0 };
-        s.base[i] * (1.0 + self.wild[i] as f32 * s.wild_step[i]) * (1.0 + self.tamed[i] as f32 * s.tamed_step[i]) * (1.0 + bonus) * age
+        let tamed = ((1.0 + self.tamed[i] as f32 * s.tamed_step[i]) * (1.0 + bonus)).min(animals_core::danger::TAME_CEILING);
+        s.base_stat(i) * (1.0 + self.wild[i] as f32 * s.wild_step[i]) * tamed * age
     }
     /// The stat as a multiple of the species' base.
     pub fn factor(&self, i: usize) -> f32 {
-        self.species().map_or(1.0, |s| self.stat(i) / s.base[i])
+        self.species()
+            .map_or(1.0, |s| self.stat(i) / s.base_stat(i).max(1e-6))
     }
+}
+
+/// A level-0 one's health (engine points), what its kind registers (`animals_core::danger::body`).
+pub fn health(index: usize) -> f32 {
+    animals_core::danger::body(&SPECIES[index]).health
+}
+
+/// A level-0 one's bite, one hit.
+pub fn hit(index: usize) -> f32 {
+    animals_core::danger::body(&SPECIES[index]).hit
+}
+
+/// Its armour: its species' at level 0, times its health's level (`armour.rs`).
+pub fn armour(a: &Animal) -> f32 {
+    a.species()
+        .map_or(0.0, |s| animals_core::danger::body(s).armour * a.factor(species::HEALTH))
 }
 
 /// The stats that go with its age: health, stamina, damage, speed and what it carries.
@@ -250,13 +270,13 @@ pub fn ensure_rolled(w: &World, id: u64) -> bool {
 /// stat, a sex, an adult, fed.
 fn roll(w: &World, index: usize) -> Animal {
     let level = match w.random_below(100) {
-        0..60 => 1 + w.random_below(30),
-        60..90 => 31 + w.random_below(60),
-        _ => 91 + w.random_below(MAX_WILD_LEVEL - 90),
+        0..60 => w.random_below(40),
+        60..90 => 40 + w.random_below(80),
+        _ => 120 + w.random_below(MAX_WILD_LEVEL - 119),
     };
     let mut a = Animal { species: index as u8 + 1, female: w.random_below(2) as u8, stage: ADULT, ..Animal::default() };
     a.born = born_wild(w, index);
-    for _ in 1..level {
+    for _ in 0..level {
         a.wild[w.random_below(STATS as u32) as usize] += 1;
     }
     a.food = a.stat(species::FOOD).round() as u16;

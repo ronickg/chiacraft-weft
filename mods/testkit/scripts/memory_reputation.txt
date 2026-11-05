@@ -1,0 +1,45 @@
+# Memory (reports/Creature AI.md, part 3, step 5). Flat pad, creative, still air, mobs off.
+# 1. Before: three red deer 18 blocks east; the player walks at them. Read "bolts from player ...
+#    blocks off" (red deer shy 20: about 9 blocks).
+# 2. The player kills three (/animalprof kill): "killed by player ...: its kind here fears him
+#    more", and ANIMAL_FEAR (the ground's fear where they fell, red deer's reputation of him).
+# 3. After: three new red deer 18 blocks east of where he stands; he walks at them again. They
+#    notice him much farther off ("bolts ... blocks off" larger than in 1).
+# 4. A starving red fox 20 blocks west with no prey near goes to where the deer fell ("goes to a
+#    kill site").
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode creative
+chat /tk time 6000
+chat /air 0 0 0
+chat /tk fill ~-34 ~-1 ~-34 ~34 ~-1 ~34 base:grass
+chat /tk fill ~-34 ~ ~-34 ~34 ~3 ~34 core:air
+wait 2
+chat /tk spawn animals:red_deer ~18 ~ ~0
+chat /tk spawn animals:red_deer ~18 ~ ~2
+chat /tk spawn animals:red_deer ~18 ~ ~-2
+wait 4
+look 270 0
+hold core:forward 3
+wait 2
+chat /animalprof kill
+chat /animalprof kill
+chat /animalprof kill
+wait 1
+chat /animalprof fear
+wait 1
+chat /tk spawn animals:red_deer ~18 ~ ~0
+chat /tk spawn animals:red_deer ~18 ~ ~2
+chat /tk spawn animals:red_deer ~18 ~ ~-2
+wait 4
+look 270 0
+hold core:forward 3
+wait 2
+chat /animalprof senses
+chat /tk spawn animals:red_fox ~-20 ~ ~0
+wait 1
+chat /animalprof starve
+wait 8
+chat /animalprof fear
+quit

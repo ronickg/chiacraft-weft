@@ -119,9 +119,9 @@ Provisional rows stand in for today's tools until Content plan's flint and chert
 
 | Head | Fitting | Chops | Damage | kg | Lasts (uses) | Gives out first |
 |---|---|---|---|---|---|---|
-| flint | sinew | 2.91 | 6.0 | 1.05 | 60 | fitting |
-| obsidian | birch_tar | 3.10 | 8.1 | 0.99 | 22 | head |
-| copper | copper | 4.85 | 6.5 | 1.73 | 120 | fitting |
-| bronze | bronze | 6.79 | 7.0 | 1.70 | 220 | fitting |
-| wrought_iron | wrought_iron | 6.79 | 7.0 | 1.53 | 260 | fitting |
-| steel | steel | 7.76 | 8.0 | 1.55 | 571 | fitting |
+| flint | sinew | 2.91 | 7.6 | 1.05 | 60 | fitting |
+| obsidian | birch_tar | 3.10 | 9.9 | 0.99 | 22 | head |
+| copper | copper | 4.85 | 10.5 | 1.73 | 120 | fitting |
+| bronze | bronze | 6.79 | 12.7 | 1.70 | 220 | fitting |
+| wrought_iron | wrought_iron | 6.79 | 17.7 | 1.53 | 260 | fitting |
+| steel | steel | 7.76 | 21.3 | 1.55 | 571 | fitting |

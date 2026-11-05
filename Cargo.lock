@@ -1870,6 +1870,9 @@ dependencies = [
 [[package]]
 name = "crafting"
 version = "0.1.0"
+dependencies = [
+ "vitals",
+]
 
 [[package]]
 name = "cranelift-assembler-x64"

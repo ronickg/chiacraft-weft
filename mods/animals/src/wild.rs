@@ -17,16 +17,15 @@ pub struct Body {
     /// Its model and animation files (`<model>.geo.json`, `<model>.animation.json`), and texture.
     pub model: &'static str,
     pub texture: &'static str,
-    /// Its health (its box is its model's: `animals_core::bodies`).
-    pub health: f32,
     /// Its full speed (fleeing), and the share of it it wanders at.
     pub speed: f32,
     pub wander: f32,
     /// Its resting pose: the look kind's name (`<model>_<pose>`, its own animation file) and its
     /// box.
     pub rest: (&'static str, (f32, f32)),
-    /// What its bite does (a hunter's; 0: it never fights).
-    pub damage: f32,
+    /// Whether it bites (a hunter's); how hard, and its health, come from its species' size, role
+    /// and level (`animals_core::danger::body`; its box is its model's, `animals_core::bodies`).
+    pub bites: bool,
 }
 
 value! {
@@ -62,9 +61,9 @@ pub fn register(r: &mut Registry, kinds: &[&'static EntityKind], body: &'static 
         let index = crate::species::of(kind);
         r.entity(kind)
             .size(bw, bh)
-            .max_health(body.health)
+            .max_health(crate::animal::health(index))
             .walk_speed(body.speed)
-            .attack_damage(body.damage)
+            .attack_damage(if body.bites { crate::animal::hit(index) } else { 0.0 })
             .passive()
             .model_file(body.model)
             .animations(body.model)
@@ -92,6 +91,8 @@ pub fn register(r: &mut Registry, kinds: &[&'static EntityKind], body: &'static 
                                 Need::Rest,
                                 Stops { goal: move |w: &World, id: u64, st: &EntityState| settle(w, id, st, look), stop: wake },
                             )
+                            .with(Need::Watch, crate::senses::watch_goal)
+                            .with(Need::Investigate, crate::senses::investigate)
                             .with(Need::Comfort, crate::comfort::seek)
                             .with(Need::Drink, crate::drink::drink)
                             .with(Need::Eat, crate::forage::eat)
@@ -118,7 +119,8 @@ fn startle(w: &World, id: u64, _: &EntityState) -> bool {
 /// Every tick: now and then rest for a while, showing the resting look.
 fn settle(w: &World, id: u64, st: &EntityState, look: &str) -> bool {
     let Some(c) = w.component_mut(id, &STATE) else { return false };
-    if c.rest == 0 && !w.navigating(id) && !crate::forage::busy(w, id) && w.random_below(400) == 0 {
+    let chance = crate::routines::rest_chance(400, crate::routines::activity_of(w, id));
+    if c.rest == 0 && !w.navigating(id) && !crate::forage::busy(w, id) && w.random_below(chance) == 0 {
         c.rest = 600 + w.random_below(1800);
     }
     let resting = c.rest > 0;

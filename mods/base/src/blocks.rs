@@ -678,11 +678,12 @@ pub fn register(r: &mut Registry) {
         .tag("ores")
         .tag("ores/iron")
         .tab(&crate::tabs::NATURAL);
+    // Gold is the Bronze Age's (cast, soft; Ronald, 11-07: "move them to fit"): a stone pickaxe.
     r.block(&GOLD_ORE)
         .sound_group("stone")
         .hardness(3.0)
         .mineable("pickaxe")
-        .needs_tool_level(tool_tier::IRON)
+        .needs_tool_level(tool_tier::STONE)
         .drops("raw_gold", 1)
         .tag("ores")
         .tag("ores/gold")
@@ -693,7 +694,7 @@ pub fn register(r: &mut Registry) {
         (&BANDED_CLAY_COAL_ORE, "banded_clay_coal_ore", "coal", 0, "coal"),
         (&RED_SANDSTONE_IRON_ORE, "red_sandstone_iron_ore", "raw_iron", tool_tier::STONE, "iron"),
         (&GRANITE_IRON_ORE, "granite_iron_ore", "raw_iron", tool_tier::STONE, "iron"),
-        (&GRANITE_GOLD_ORE, "granite_gold_ore", "raw_gold", tool_tier::IRON, "gold"),
+        (&GRANITE_GOLD_ORE, "granite_gold_ore", "raw_gold", tool_tier::STONE, "gold"),
     ] {
         r.block(block)
             .sound_group("stone")
@@ -706,11 +707,13 @@ pub fn register(r: &mut Registry) {
             .tag(&format!("ores/{kind}"))
             .tab(&crate::tabs::NATURAL);
     }
+    // Diamond is a tier above steel (`notes/CRAFTING.md`): a steel pick or better (300; star
+    // steel's 350, diamond's own 400).
     r.block(&DIAMOND_ORE)
         .sound_group("stone")
         .hardness(3.0)
         .mineable("pickaxe")
-        .needs_tool_level(tool_tier::IRON)
+        .needs_tool_level(tool_tier::DIAMOND)
         .drops("diamond", 1)
         .tag("ores")
         .tag("ores/diamond")
@@ -1027,7 +1030,7 @@ pub fn register(r: &mut Registry) {
         .sound_group("stone")
         .hardness(3.0)
         .mineable("pickaxe")
-        .needs_tool_level(tool_tier::IRON)
+        .needs_tool_level(tool_tier::STONE)
         .tag("ore_blocks/gold")
         .tab(&crate::tabs::BUILDING);
     r.block(&DIAMOND_BLOCK)
