@@ -52,7 +52,11 @@ pub fn register(r: &mut Registry) {
     );
     r.attach(&PLAYER, &ROPE);
     let hook = grapple::IRON;
-    r.item(&HOOK).max_stack(1).durability(hook.durability()).tab(&crate::tabs::TOOLS).on_use(throw);
+    r.item(&HOOK)
+        .max_stack(1)
+        .durability(hook.durability())
+        .tab(&crate::tabs::TOOLS)
+        .on_use(throw);
     // Three iron flukes on a shank, a cord of string.
     r.shaped(&base_api::CRAFTING, "grappling_hook", 1, &["I I", "SIS", " S "], &[('I', "base:iron_ingot"), ('S', "#string")]);
     r.pose(&HANG)
@@ -119,7 +123,12 @@ fn throw(u: &mut ItemUse) -> bool {
             let n = FACES[h.face.min(5) as usize];
             // On a wall's side within `OVER` of its top it catches over the edge, as a grapnel does.
             let top = (n[1] == 0.0)
-                .then(|| (0..=OVER).map(|k| h.pos.offset(0, k, 0)).take_while(|p| holds(w.block(*p))).last())
+                .then(|| {
+                    (0..=OVER)
+                        .map(|k| h.pos.offset(0, k, 0))
+                        .take_while(|p| holds(w.block(*p)))
+                        .last()
+                })
                 .flatten()
                 .filter(|p| !holds(w.block(p.offset(0, 1, 0))));
             let (at, n) = match top {
@@ -138,7 +147,8 @@ fn throw(u: &mut ItemUse) -> bool {
                 anchor.z
             );
             state(|s| {
-                s.lines.insert(id, Line { block: h.pos, anchor, length, reel: hook.reel, last: st.pos });
+                s.lines
+                    .insert(id, Line { block: h.pos, anchor, length, reel: hook.reel, last: st.pos });
             });
             say(&w, id, anchor, length, hook.reel);
             if let Some(r) = w.component_mut(id, &ROPE) {
@@ -178,13 +188,7 @@ fn release(w: &World, id: u64, st: Option<&EntityState>, why: &str) {
         r.on = 0;
     }
     let at = st.map_or(line.last, |s| s.pos);
-    weft_sdk::info!(
-        "grapple: {id} {why} at {:.1} {:.1} {:.1}, {:.1} under the anchor",
-        at.x,
-        at.y,
-        at.z,
-        line.anchor.y - at.y
-    );
+    weft_sdk::info!("grapple: {id} {why} at {:.1} {:.1} {:.1}, {:.1} under the anchor", at.x, at.y, at.z, line.anchor.y - at.y);
 }
 
 const DT: f32 = 1.0 / 20.0;
@@ -206,7 +210,11 @@ fn tick(w: &World) {
             release(w, id, Some(&st), "lost its hold (the block is gone)");
             continue;
         }
-        if (st.pos.offset(0.0, HANDS, 0.0) - anchor).length_squared().sqrt() > length + SNAPS {
+        if (st.pos.offset(0.0, HANDS, 0.0) - anchor)
+            .length_squared()
+            .sqrt()
+            > length + SNAPS
+        {
             release(w, id, Some(&st), "was pulled off the rope");
             continue;
         }
@@ -278,7 +286,8 @@ fn draw(c: &Client) {
             // Ahead of the eyes, low and to the right, so the cord's cubes don't fill the view.
             let (s, co) = (st.yaw as f64).sin_cos();
             let (right, ahead) = (Vec3::new(co, 0.0, -s), Vec3::new(-s, 0.0, -co));
-            st.camera_pos.offset(right.x * 0.35 + ahead.x * 0.7, -0.45, right.z * 0.35 + ahead.z * 0.7)
+            st.camera_pos
+                .offset(right.x * 0.35 + ahead.x * 0.7, -0.45, right.z * 0.35 + ahead.z * 0.7)
         } else {
             let pos = if id == me { st.shown } else { e.pos };
             pos.offset(0.0, if e.pose == HANG.id() { HANDS } else { 1.4 }, 0.0)
