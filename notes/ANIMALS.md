@@ -1305,7 +1305,7 @@ The builds check every keyframe: no flicker, no loose joints, nothing poking alo
 **Done, first group:**
 - **Wolf:** the howl moved out of its 8-second idle (every wolf howled every 8 s) into its own clip, which the blood moon plays.
 - **Deer.**
-- **Dog and chihuahua** (one model): exported as animations only (`build.py --anims-only`), because Upstream is looking into the chihuahua's texture and its skin and UVs had to stay unchanged.
+- **Dog and chihuahua** (one model): first exported as animations only, while Upstream looked into the chihuahua's texture (not a bug: the 32-texel rebuild had made the face small, and Ronald chose "Keep 32"). Since 11-05 it builds in full again (`build.py`).
 - **Raptor.**
 
 **Hooks** are Creature AI's to call, in its behaviour code: stare, graze, drink, sleep, stalk, alarm, the strikes, the social clips.
@@ -1320,12 +1320,10 @@ Not yet: the other species, and young ones' play at their own scale (the pup mod
 
 The exporter now plays an action once unless its animation says it loops (`to_bedrock`). Every hunter's strike had been exported looping, so a fox, coyote, cat, jaguar, caiman, Utahraptor or wyvern kept biting after one bite; all of them are rebuilt (animations only).
 
-Found for Creature AI: the jaguar is a knock-out kind, and `hunt_` hands knock-out kinds to their anger before `chase()`, so the ambush path (stalk, then the pounce on breaking cover) is reached only by the caimans. The jaguar's stalk plays only through `/anim`.
+The jaguar is a knock-out kind, and `hunt_` used to hand knock-out kinds to their anger before `chase()`, so only the caimans reached the ambush path. Now a knock-out kind that ambushes stalks first (`hunt::stalks_first`) and its anger takes over as it pounces (PC look an2_jaguar_amb2: stalk 7 s, breaks cover at 9 blocks, pounce). The alarm skips an animal still in its resting look (`wild::alarm`: those looks have no alarm clip).
 
 Checked on the PC (11-05): the deer's watch, sleep, stretch, idle life, stare, alarm, graze and drink under the AI; a stand that rears and charges (two of three looks; the third deer was timid and bolted); the wolves' strikes playing once, flinches on hits. Fixed from the looks:
 - a held state that waited under a clip played once came back only through `tick`; with ticks frozen it stayed under (a fox's stare under a sniff). `hold` now puts it back when the clip has ended, and `/anim <clip> hold` clears what plays first;
 - a deer that stared before it stood never reared (the stand's start is now its own mark), and the periodic rear could cut the first one.
-
-Seen once in a log: an alarm played on a deer still in its lying look (`deer_lie` has no alarm clip), so the bolt from lying shows no alarm. Harmless; the engine skips it.
 
 Not yet: the other species' sets; the social clips' calls (a mother nuzzling her young, grooming, young ones' play at their own scale).

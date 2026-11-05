@@ -40,7 +40,15 @@ if __name__ == "__main__":
 
     ground = json.load(open(os.path.join(OUT, "spec.json")))
     fly = json.load(open(os.path.join(OUT, "spec_fly.json")))
+    from linecheck import boxes_from_spec, lines  # noqa: E402
+    import numpy as np  # noqa: E402
+    from PIL import Image  # noqa: E402
+
+    tex = np.array(Image.open(os.path.join(OUT, "texture.png")).convert("RGBA"))
     for spec in (ground, fly):
+        # No thin lines (Ronald, 11-05): no strip of a box under two texels showing beside another.
+        thin = [h for h in lines(boxes_from_spec(spec), tex) if h["kind"] == "line"]
+        assert not thin, f"{spec['name']}: thin lines: {[(h['box'], h['face'], h['cover'], h['width']) for h in thin]}"
         loose = joints(spec)  # every joint inside both parts it joins, or they come apart when it turns
         assert not loose, f"{spec['name']}: loose joints: {loose}"
         poking = pokes(spec, AXIS)  # no neck corner through the head or the back

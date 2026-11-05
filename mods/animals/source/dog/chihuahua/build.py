@@ -35,6 +35,15 @@ if __name__ == "__main__":
     from ground import feet_low, gait, grounded, joints  # noqa: E402
     loose = joints(spec)  # every joint inside both parts it joins, or they come apart when it turns
     assert not loose, f"loose joints: {loose}"
+    # No thin lines (Ronald, 11-05): every box on or in another flush with it or two texels clear.
+    # Allowed: the nose, a one-texel pad on a muzzle front of 2 x 1 texels, so the white round it
+    # can be neither painted nor covered without losing the nose.
+    import numpy as np  # noqa: E402
+    from PIL import Image  # noqa: E402
+    from linecheck import boxes_from_spec, lines  # noqa: E402
+    thin = [h for h in lines(boxes_from_spec(spec), np.array(Image.open(os.path.join(OUT, "texture.png")).convert("RGBA")),
+                             allow=("muzzle.south",)) if h["kind"] == "line"]
+    assert not thin, f"thin lines: {[(h['box'], h['face'], h['cover'], h['width']) for h in thin]}"
     FEET = ["leg_FL_paw", "leg_FR_paw", "leg_BL_paw", "leg_BR_paw"]
     for anim in ("walk", "run", "stalk", "approach"):  # a foot in the air must swing forward, or it moonwalks
         back = {f: v for f, v in gait(spec, anim, FEET).items() if v is not None and v <= 0}
@@ -45,6 +54,10 @@ if __name__ == "__main__":
         spec["animations"][clip] = grounded(spec, spec["animations"][clip], FEET)
         low = min(feet_low(spec, spec["animations"][clip], FEET))
         assert abs(low) < 0.3, f"{clip}'s feet at {low:.2f}, not on the ground"
+    # Lying, the back legs and paws rest on the ground (tools/ground.py fits lie_hip and lie_knee).
+    for part in (["thigh_BL", "thigh_BR"], ["leg_BL_paw", "leg_BR_paw"]):
+        low = feet_low(spec, spec["animations"]["lie"], part)
+        assert all(abs(y) < 0.3 for y in low), f"lying, {part} at {min(low):.2f}..{max(low):.2f}, not on the ground"
     from to_bedrock import POSE_FILES  # noqa: E402
     # Its bite and the behaviour clips (`mods/animals/src/anim.rs`), for code to play.
     sys.path.insert(0, os.path.join(HERE, "tools"))

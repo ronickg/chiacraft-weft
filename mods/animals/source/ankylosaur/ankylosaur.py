@@ -174,9 +174,13 @@ def bones():
 def spike_box(name, bone, base, rot, w0, len0, w1, len1):
     """A tall spike as two boxes tapering to a point, tilted out and back from its base on the body."""
     x, y, z = base
+    # The tip at the base's back and outer edge, half a unit in, so the base's top shows only in
+    # front and inside, over two texels (centred, a one-texel ring round the tip read as a rim; linecheck).
+    xo = x + math.copysign(w0 / 2 - 0.5, x)
+    tx0, tx1 = sorted((xo, xo - math.copysign(w1, x)))
+    tz0 = z - w0 / 2 + 0.5
     return [el(f"{name}_base", bone, (x - w0 / 2, y - 4, z - w0 / 2), (x + w0 / 2, y + len0, z + w0 / 2), rot=rot, origin=base),
-            el(f"{name}_tip", bone, (x - w1 / 2, y + len0 - 2, z - w1 / 2), (x + w1 / 2, y + len0 + len1, z + w1 / 2), rot=rot,
-               origin=base)]
+            el(f"{name}_tip", bone, (tx0, y + len0 - 2, tz0), (tx1, y + len0 + len1, tz0 + w1), rot=rot, origin=base)]
 
 
 def flat_spike(name, bone, side, x_body, y, zc, out, length, droop):
@@ -191,20 +195,25 @@ def elements():
     E = [el("hips", "spine_0", (-54, 28, -46), (54, 76, 22)),  # the widest: a very broad, flat rump
          # the sacral shield over the hips, reaching just past their sides and back (at 51 and -44 their top
          # showed round it as a band a texel and a half wide; linecheck)
-         el("shield", "spine_0", (-54.55, 75, -46.55), (54.55, 80.5, 16)),
+         # its bottom half a unit over the tail's top (at 75 a band a unit high showed between them; linecheck)
+         el("shield", "spine_0", (-54.55, 74.5, -46.55), (54.55, 80.5, 16)),
          el("ribs_0", "spine_0", (-58.5, 38, -40), (58.5, 64, 14)),  # the flanks bulging out: a barrel, not a crate
          el("belly_0", "spine_0", (-46, 22, -38), (46, 32, 18)),  # the belly bulging down between the legs
          el("chest", "spine_1", (-50, 31, 16), (50, 66, 74)),
          el("backplate", "spine_1", (-42, 64, 18), (42, 70.5, 70)),  # the arched back over the ribs
-         el("belly_1", "spine_1", (-40, 25, 20), (40, 34, 64)),
-         el("ribs_1", "spine_1", (-53.2, 39, 22), (53.2, 60, 68)),
+         # Its bottom two texels under the hips' and over the front legs' tops (at 25, 1.5 texels of its back showed under the hips; linecheck).
+         el("belly_1", "spine_1", (-40, 24, 20), (40, 34, 64)),
+         # Out two texels from the chest's sides (at 53.2, 1.6 texels, its front read as a rim; linecheck).
+         el("ribs_1", "spine_1", (-54.5, 39, 22), (54.5, 60, 68)),
          # The neck: a box from inside the chest out along its slope to the head's joint, deep in
          # the skull, so they share a point and never come apart (`ground.pokes`).
          el("neck", "neck", NECK_BASE + np.array([-NECK_HW, -NECK_HH, -1.5]), NECK_BASE + np.array([NECK_HW, NECK_HH, NECK_LEN + 0.5]),
             rot=(-NECK_ANGLE, 0, 0), origin=tuple(NECK_BASE))]
     # Two bony collars (half rings of keeled plates) over the neck, tilted with it.
-    for k, (z0, z1) in enumerate(((6.0, 13.0), (15.5, 22.5))):
-        E.append(el(f"collar_{k}", "neck", NECK_BASE + np.array([-17.5 + k, -2.0, z0]), NECK_BASE + np.array([17.5 - k, 12.5 - 0.5 * k, z1]),
+    # Over two texels out from the neck (at 3.5 and 3 units their edges read as rims), the neck between them,
+    # and between the second and the skull, over two texels (they were 1.25; linecheck).
+    for k, (z0, z1) in enumerate(((4.5, 10.5), (15.0, 20.5))):
+        E.append(el(f"collar_{k}", "neck", NECK_BASE + np.array([-19.0 + 0.5 * k, -2.0, z0]), NECK_BASE + np.array([19.0 - 0.5 * k, 14.0 - 0.5 * k, z1]),
                     rot=(-NECK_ANGLE, 0, 0), origin=tuple(NECK_BASE)))
     E += [el("skull", "head", *SKULL),
           el("snout", "head", (-12, 42, 120), (12, 57, 132)),  # narrowing to the beak: a triangle from above
@@ -213,9 +222,13 @@ def elements():
           el("jaw", "jaw", (-11.5, 36, 98), (11.5, 43.5, 128))]  # shorter than the upper beak
     for s, n in ((1, "L"), (-1, "R")):
         x0, x1 = sorted((s * 16.5, s * 25.0))
-        E.append(el(f"horn_{n}", "head", (x0, 52.5, 94.6), (x1, 60.5, 101.5)))  # the squamosal horn, at the skull's back corner
-        x0, x1 = sorted((s * 17.0, s * 22.0))
-        E.append(el(f"cheek_{n}", "head", (x0, 43.5, 100.5), (x1, 49.5, 106)))  # the jugal horn, under and behind the eye
+        # the squamosal horn, at the skull's back corner: up to half a unit over its top (2.5 under it, the skull's
+        # side showed above it as a line; linecheck)
+        E.append(el(f"horn_{n}", "head", (x0, 55.5, 94.5), (x1, 63.5, 101.5)))
+        x0, x1 = sorted((s * 17.0, s * 23.5))
+        # the jugal horn, under and behind the eye: out and up over two texels (3 out and 3.5 over the skull's
+        # bottom, its sides and the skull under it read as rims; linecheck)
+        E.append(el(f"cheek_{n}", "head", (x0, 44.5, 100.5), (x1, 50.5, 106)))
         za, zb, top, bottom = eye_box(s)
         h = top - bottom
         lx0, lx1 = (LID_X - h, LID_X) if s > 0 else (-LID_X, -LID_X + h)
@@ -224,13 +237,13 @@ def elements():
     for k, (length, hw, cy, hh) in enumerate(TAIL):
         z = pts[k][2]
         E.append(el(f"tail_{k}", f"tail_{k}", (-hw, cy - hh, z - length), (hw, cy + hh, z + DEEP)))
-    E.append(el("club", "tail_3", (-11, 49.5, -178), (11, 60, -164)))  # a small club (Pinacosaurus's), low and wide
+    E.append(el("club", "tail_3", (-12, 49.5, -178), (12, 60, -164)))  # out over two texels from the tail (at 11, 1.75; linecheck)  # a small club (Pinacosaurus's), low and wide
     # The shoulder spikes: the biggest, rising out, up and back; then flat ones along the flanks,
     # smaller toward the hips; flat triangles in pairs down the tail.
     for s, n in ((1, "L"), (-1, "R")):
-        E += spike_box(f"spike_{n}0", "spine_1", (s * 44.0, 63.0, 64.0), (-30, 0, -s * 46), 9, 14, 5, 12)
-        E += spike_box(f"spike_{n}1", "spine_1", (s * 48.0, 59.0, 47.0), (-38, 0, -s * 58), 9, 15, 5, 13)
-        for k, (bone, xb, y, zc, out, length) in enumerate((("spine_1", 53.2, 51, 30, 30, 22), ("spine_0", 58.5, 52, 6, 27, 20),
+        E += spike_box(f"spike_{n}0", "spine_1", (s * 44.0, 65.0, 64.0), (-30, 0, -s * 46), 9, 14, 4, 12)  # up 2 (at 63 the chest showed 1.25 texels between it and the ribs), a tip of 4 (linecheck)
+        E += spike_box(f"spike_{n}1", "spine_1", (s * 48.0, 59.0, 47.0), (-38, 0, -s * 58), 9, 15, 4, 13)
+        for k, (bone, xb, y, zc, out, length) in enumerate((("spine_1", 54.5, 51, 30, 30, 22), ("spine_0", 58.5, 52, 6, 27, 20),
                                                            ("spine_0", 58.5, 52, -16, 23, 18), ("spine_0", 58.5, 52, -34, 18, 14))):
             E.append(flat_spike(f"flank_{n}{k}", bone, s, xb, y, zc, out, length, 36))
         for k, (length, hw, cy, hh) in enumerate(TAIL):
