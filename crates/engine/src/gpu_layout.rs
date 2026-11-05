@@ -740,7 +740,8 @@ gpu_struct! {
         /// the picture finished in the effects' last pass, so a pack's surfaces leave its tone
         /// curve to that pass); 0 into the screen or a preview. y 1 when the last frame drew the
         /// HDR world's bloom pyramid (`post::bloom`), which the last pass adds, so a pack's own
-        /// bloom effect leaves its glow out. zw unused.
+        /// bloom effect leaves its glow out. z the pixels a mist volume cell covers each way
+        /// (`client::froxels`: 8, or 4 at ultra), for a pack that spends more on finer cells. w unused.
         pub frame: [f32; 4],
         /// The mist's volume (`client::froxels`, `core:froxels`, with a pack whose sky has
         /// `fs_froxel_light` and `fs_froxel_sum`; chiacraft): x the bindless index + 1 of the sums

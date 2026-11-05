@@ -827,7 +827,9 @@ fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
     // and tree tops stand out of it and the beams have clear air to cross. (One even veil read as
     // milk over the whole view: the mist sheet, 11-05.)
     if scene.frame.x > 0.5 {
-        let b = smoothstep(0.25, 0.75, banks);
+        // As the sun climbs the banks lift and dissolve into a thin even haze (they burned off as
+        // grey smudges on the forest by 08:00, the checkpoint sheet).
+        let b = mix(smoothstep(0.25, 0.75, banks), 0.3, smoothstep(0.15, 0.45, scene.sun.y));
         return f * open * burn * (low * (mix(0.02, 0.7, s) + mix(2.6, 0.6, s) * b) + 0.012 * high) * 0.11;
     }
     return f * open * burn * (low * (mix(0.05, 0.7, s) + mix(1.7, 0.6, s) * banks) + 0.06 * high) * 0.11;
@@ -1035,7 +1037,11 @@ fn froxel_cell(dir: vec3<f32>, at: f32, floor: f32) -> vec4<f32> {
     // between `at`'s neighbours' ends), so a shaft narrower than a cell is part-lit, not all or none.
     let k = froxel_slice(at);
     let span = froxel_end(k) - froxel_end(k - 1.0);
-    let lit = (sun_reaches(dir * (at - span * 0.25)) + sun_reaches(dir * at) + sun_reaches(dir * (at + span * 0.25))) / 3.0;
+    var lit = (sun_reaches(dir * (at - span * 0.25)) + sun_reaches(dir * at) + sun_reaches(dir * (at + span * 0.25))) / 3.0;
+    // Ultra (`core:froxels` 2, finer cells: `scene.frame.z` 4): six taps, the beams' edges finer.
+    if scene.frame.z > 0.5 && scene.frame.z < 6.0 {
+        lit = lit * 0.5 + (sun_reaches(dir * (at - span * 0.4)) + sun_reaches(dir * (at - span * 0.1)) + sun_reaches(dir * (at + span * 0.4))) / 6.0;
+    }
     return vec4(mix(shaded_sky, light.sky, lit) + light.sun * lit, d);
 }
 
