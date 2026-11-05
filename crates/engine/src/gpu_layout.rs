@@ -1021,6 +1021,10 @@ gpu_struct! {
         /// Bindless index of the world's depth (reverse Z: 0 is the far plane, the sky).
         pub depth: u32,
         pub pad: u32,
+        /// Bindless index + 1 of this effect's own image at half the size each way, which its
+        /// `shaders/post_low/<name>.wgsl` drew before the effects (0: none; chiacraft).
+        pub low: u32,
+        pub spare: u32,
     }
 }
 
