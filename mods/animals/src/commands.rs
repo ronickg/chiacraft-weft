@@ -482,6 +482,12 @@ pub fn fight(w: &World, id: u64, st: &EntityState, t: u64) {
 
 /// `fight` at `speed` times its kind's speed while it closes in (a pack runs its prey down).
 pub fn fight_at(w: &World, id: u64, st: &EntityState, t: u64, speed: f32) {
+    fight_aiming(w, id, st, t, speed, None);
+}
+
+/// `fight_at`, running at `aim` instead of straight at it while it isn't within reach (a pack's
+/// flank, where the prey will be).
+pub fn fight_aiming(w: &World, id: u64, st: &EntityState, t: u64, speed: f32, aim: Option<[f64; 3]>) {
     let Some(e) = w.entity(t) else { return };
     let species = w.component(id, &ANIMAL).and_then(|a| a.species());
     // At least a lunge: the path ends a block and a half short of a target that stands still.
@@ -496,7 +502,10 @@ pub fn fight_at(w: &World, id: u64, st: &EntityState, t: u64, speed: f32) {
         }
     }
     if (w.game_time() + id) % 5 == 0 || !w.navigating(id) {
-        w.navigate(id, e.pos, speed);
+        let to = aim
+            .filter(|_| flat >= reach * reach * 4.0)
+            .map_or(e.pos, Vec3::from);
+        w.navigate(id, to, speed);
     }
 }
 

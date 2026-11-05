@@ -114,7 +114,7 @@ fn report(w: &World) -> String {
 pub fn init(r: &mut Registry) {
     // The rows in the same order every run.
     row("upkeep");
-    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses)> [value:float]", |cmd| {
+    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water)> [value:float]", |cmd| {
         let w = cmd.world();
         let text = match cmd.text("what").unwrap_or("") {
             "on" => {
@@ -123,6 +123,57 @@ pub fn init(r: &mut Registry) {
                 "animal goal timer on".to_string()
             }
             "dump" => report(&w),
+            "water" => {
+                // Every wild animal within 96 blocks has this share of its water.
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let v = cmd.float("value").unwrap_or(0.5) as f32;
+                let mut n = 0;
+                for id in w.entities_near(me.pos, 96.0, None) {
+                    if let Some(a) = w.component_mut(id, &crate::animal::ANIMAL)
+                        && a.species != 0
+                    {
+                        a.thirst = (1.0 - v).clamp(0.0, 1.0);
+                        n += 1;
+                    }
+                }
+                format!("{n} animals at {:.0}% water", v * 100.0)
+            }
+            "kill" => {
+                // The player kills the wild animal nearest him (a hunter's kill: fear there, and
+                // its kind's reputation of him falls).
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let near = w
+                    .entities_near(me.pos, 48.0, None)
+                    .into_iter()
+                    .filter(|&id| {
+                        w.component(id, &crate::animal::ANIMAL)
+                            .is_some_and(|a| a.species != 0)
+                            && !crate::animal::tamed(&w, id)
+                    })
+                    .filter_map(|id| Some((crate::dist2(w.entity(id)?.pos, me.pos), id)))
+                    .min_by(|a, b| a.0.total_cmp(&b.0));
+                let Some((_, id)) = near else { return };
+                w.damage(id, 1e6, cmd.player(), damage_cause::ATTACK);
+                format!("KILL {id}")
+            }
+            "fear" => {
+                // The fear of the ground where the player stands, and red deer's (and hares')
+                // reputation of him there.
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let p = me.pos.to_array();
+                let rep = |name: &str| {
+                    crate::species::SPECIES
+                        .iter()
+                        .position(|s| s.name == name)
+                        .map_or(0.0, |i| crate::memory::reputation(&w, i, p, cmd.player()))
+                };
+                format!(
+                    "ANIMAL_FEAR here {:.2}, red_deer reputation {:.2}, hare {:.2}",
+                    crate::memory::fear_at(&w, p),
+                    rep("red_deer"),
+                    rep("hare")
+                )
+            }
             "wind" => {
                 // The wind's way the animals smell by (degrees clockwise from north; none: the
                 // weather's own), for a test.
@@ -148,14 +199,23 @@ pub fn init(r: &mut Registry) {
                         let s = w.component(id, &crate::senses::SENSES)?;
                         let kind = name_of(abi::entry_kind::ENTITY, w.entity(id)?.kind);
                         Some(format!(
-                            "{id} {kind} at {:.1}: player {} fright {:.2}, hunter {} aware {:.2}, wind {:.0} {:.1} m/s",
+                            "{id} {kind} at {:.1}: player {} fright {:.2}, hunter {} aware {:.2}, kin {}{}, wind {:.0} {:.1} m/s, persona {}, about {:.2} doing {}",
                             d2.sqrt(),
                             s.player,
                             s.fright,
                             s.threat,
                             s.aware,
+                            s.kin,
+                            if s.sentinel != 0 { " sentinel" } else { "" },
                             s.heading,
-                            s.wind
+                            s.wind,
+                            w.component(id, &crate::senses::FACTS)
+                                .map(|f| f.persona().map(|v| format!("{v:.2}")).join("/"))
+                                .unwrap_or_default(),
+                            crate::routines::activity_of(&w, id),
+                            ["-", "love", "rest", "hold", "comfort", "drink", "eat", "wander", "watch", "investigate"]
+                                .get(crate::choose::doing(&w, id) as usize)
+                                .unwrap_or(&"?")
                         ))
                     })
                     .collect();

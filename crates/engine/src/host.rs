@@ -591,6 +591,9 @@ pub fn mod_totals(m: ModId) -> (u64, u64) {
     (s.nanos.load(Ordering::Relaxed), s.calls.load(Ordering::Relaxed))
 }
 
+/// A server mod call taking this long of its own (50 ms, a whole tick) is logged.
+const SLOW_CALL_NS: u64 = 50_000_000;
+
 /// Calls a mod callback. Time is charged to `owner`; a failing callback is logged with the mod's
 /// name and the engine carries on.
 pub fn invoke<A>(owner: ModId, cb: Callback, args: &mut A) -> bool {
@@ -609,6 +612,19 @@ pub fn invoke<A>(owner: ModId, cb: Callback, args: &mut A) -> bool {
     if crate::diag::on_server() {
         s.nanos.fetch_add(own, Ordering::Relaxed);
         s.calls.fetch_add(1, Ordering::Relaxed);
+        // A hitch players feel: say whose, and what kind of call (its own time, without the
+        // calls it made).
+        if own >= SLOW_CALL_NS {
+            let name = try_content().map_or("?".to_string(), |c| c.mod_name(owner).to_string());
+            log::warn!(
+                "slow mod call: {name} took {:.0} ms of its own in a {} call",
+                own as f64 / 1e6,
+                std::any::type_name::<A>()
+                    .rsplit("::")
+                    .next()
+                    .unwrap_or("?")
+            );
+        }
     }
     if r != 0 {
         let n = s.faults.fetch_add(1, Ordering::Relaxed);

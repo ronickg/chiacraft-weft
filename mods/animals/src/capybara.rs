@@ -55,6 +55,7 @@ pub fn init(r: &mut Registry) {
                         .with(Need::Love, crate::breeding::behave(index))
                         .with(Need::Rest, Stops { goal: crate::rest::settle, stop: crate::rest::stop })
                         .with(Need::Hold, crate::commands::hold)
+                        .with(Need::Watch, crate::senses::watch_goal)
                         .with(Need::Comfort, crate::comfort::seek)
                         .with(Need::Drink, crate::drink::drink)
                         .with(Need::Eat, crate::forage::eat)

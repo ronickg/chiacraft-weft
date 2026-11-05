@@ -14,6 +14,8 @@
 use weft_sdk::*;
 
 use animals_core::perception::{self, NOTICED};
+use animals_core::roles;
+use animals_core::routines;
 
 use crate::animal::ANIMAL;
 use crate::dist2;
@@ -31,6 +33,10 @@ value! {
         pub tamed: u8,
         /// Whether it is an egg (food for egg eaters, a hunter to nobody).
         pub egg: u8,
+        /// Whether it is still growing (a pack's hunters pick the young, `roles::prey_score`).
+        pub young: u8,
+        /// Its personality (`coats::personality`: temperament, curiosity, fierceness), 0..255.
+        pub persona: [u8; 3],
         /// Its mass now, kg (by its genes and growth, `hunt::mass`).
         pub mass: f32,
         /// When it was worked out (0: not yet).
@@ -39,6 +45,10 @@ value! {
 }
 
 impl Facts {
+    /// Temperament (calm 0 to skittish 1), curiosity and fierceness.
+    pub fn persona(&self) -> [f32; 3] {
+        self.persona.map(|v| v as f32 / 255.0)
+    }
     pub fn species(&self) -> Option<&'static Species> {
         SPECIES.get((self.species as usize).checked_sub(1)?)
     }
@@ -72,6 +82,10 @@ value! {
         /// How far it sees through the weather (`base_api::sight`), the wind's way (degrees from
         /// north) and strength (m/s) where it is, and since when.
         pub sight: f32,
+        /// Whether it stands watch for its herd now (`roles::SENTINEL`), and when it last heard
+        /// an alarm call (it doesn't call one back).
+        pub sentinel: u8,
+        pub alarm_at: u64,
         pub heading: f32,
         pub wind: f32,
         pub sight_at: u64,
@@ -158,6 +172,10 @@ pub fn refresh(w: &World, id: u64, index: usize, kind: u32) {
         species: index as u8 + 1,
         tamed: crate::animal::tamed(w, id) as u8,
         egg: 0,
+        young: crate::breeding::young(w, id) as u8,
+        persona: w
+            .component(id, &crate::coats::GENOME)
+            .map_or([128; 3], |g| animals_core::coats::personality(&g).map(|v| (v * 255.0) as u8)),
         mass: crate::hunt::mass(w, id).unwrap_or(SPECIES[index].bio.mass),
         at: now.max(1),
     };
@@ -182,7 +200,8 @@ pub fn facts(w: &World, id: u64) -> Option<Facts> {
         .unwrap_or(0);
     let mass = crate::hunt::mass(w, id)?;
     let tamed = crate::animal::tamed(w, id) || crate::hunt::owned_egg(w, id);
-    Some(Facts { kind: e.kind, species, tamed: tamed as u8, egg: egg.is_some() as u8, mass, at: 0 })
+    let young = crate::breeding::young(w, id) as u8;
+    Some(Facts { kind: e.kind, species, tamed: tamed as u8, egg: egg.is_some() as u8, young, persona: [128; 3], mass, at: 0 })
 }
 
 /// What it saw at its last look round, looking again first when that was `EVERY` ticks ago (on
@@ -192,6 +211,11 @@ pub fn sense(w: &World, id: u64, st: &EntityState, watch: impl Fn(f32) -> f64) -
     let now = w.game_time();
     let mut s = w.component(id, &SENSES).unwrap_or_default();
     if s.at != 0 && (now < s.at + EVERY || !(now + id).is_multiple_of(EVERY)) && now < s.at + 4 * EVERY {
+        return s;
+    }
+    // Less detail where no player would see a mistake (`routines::Detail`).
+    let detail = detail(w, st);
+    if s.at != 0 && now < s.at + detail.every() && now < s.at + 4 * detail.every() {
         return s;
     }
     let t = crate::prof::stamp();
@@ -210,9 +234,9 @@ pub fn sense(w: &World, id: u64, st: &EntityState, watch: impl Fn(f32) -> f64) -
     crate::prof::slow(t, || format!("sight and wind of {id}"));
     let watch = watch(s.sight);
     // Seconds since it last looked (its awareness builds and fades by them), a second at most.
-    let secs = if s.at == 0 { 0.5 } else { (now.saturating_sub(s.at) as f32 / 20.0).min(1.0) };
+    let secs = if s.at == 0 { 0.5 } else { (now.saturating_sub(s.at) as f32 / 20.0).min(4.0) };
     let t = crate::prof::stamp();
-    look(w, id, st, &mut s, watch, secs);
+    look(w, id, st, &mut s, watch, secs, detail == routines::Detail::Full);
     crate::prof::slow(t, || format!("look round of {id} (sight {:.2}, wind {:.1})", s.sight, s.wind));
     s.at = now.max(1);
     if let Some(c) = w.component_mut(id, &SENSES) {
@@ -236,6 +260,8 @@ const HUNTERS_WITHIN: f64 = 12.0;
 /// Blocks a second a walker or a hunter covers sprinting, and walking at all.
 const RUNNING: f32 = 0.2;
 const MOVING: f32 = 0.01;
+/// Blocks a tick under which a walking hunter is stalking (as quiet as a sneak).
+const STALKING: f32 = 0.12;
 
 /// How well it sees at `pos` in the light there, 0 to 1 of its range (`perception::DARK_SEEN` in
 /// the dark).
@@ -307,7 +333,7 @@ fn aware_after(a: f32, s: Option<Sensed>, secs: f32) -> f32 {
 /// heard on the move, smelled downwind) and players the same way, its awareness of each building
 /// up or fading; its kin within `KIN` (`HUDDLE_LOOK` for a herd in a blood moon); and a hungry
 /// hunter's nearest prey within `hunt::LOOK`.
-fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs: f32) {
+fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs: f32, full: bool) {
     let Some(me) = w
         .component(id, &FACTS)
         .filter(|f| f.at != 0)
@@ -320,7 +346,7 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
     let blood = animals_core::sky::totality(w.seed(), w.day_time());
     let kin_r = match social {
         animals_core::biology::Social::Herd if blood => animals_core::sky::HUDDLE_LOOK as f64,
-        animals_core::biology::Social::Herd => 0.0,
+        animals_core::biology::Social::Herd => KIN,
         _ if mine.pack_prey().is_some() => KIN,
         _ => 0.0,
     };
@@ -332,6 +358,10 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
     let eye = st.eye();
     let facing = weft_sdk::yaw_dir(st.yaw);
     let field = if mine.hunts() { perception::HUNTER_FIELD } else { perception::PREY_FIELD };
+    // A herd's sentinel notices sooner and farther (`roles::SENTINEL`).
+    let eyes = if out.sentinel != 0 { roles::SENTINEL } else { 1.0 };
+    // A skittish one notices sooner, a calm one later.
+    let eyes = eyes * (1.0 + roles::SKITTISH * roles::lean(me.persona()[0]));
     let (mut kin, mut mid) = (1u16, [p.x, p.y, p.z]);
     let mut prey: Vec<(u64, f32, f64)> = Vec::new();
     // The hunters it senses, best first after the loop.
@@ -364,19 +394,24 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
             let d = d2.sqrt() as f32;
             let off = [(e.pos.x - p.x) as f32, (e.pos.z - p.z) as f32];
             // The light there is read only for the hunters it notices most (below).
-            let seen = if d <= watch as f32 { watch as f32 } else { 0.0 };
+            let seen = if d <= watch as f32 * eyes { watch as f32 * eyes } else { 0.0 };
+            // A hunter stalking slowly is as quiet as a sneak.
             let heard = match e.moved {
                 m if m > RUNNING => perception::SPRINT_HEARD,
-                m if m > MOVING => perception::WALK_HEARD,
+                m if m > STALKING => perception::WALK_HEARD,
+                m if m > MOVING => perception::SNEAK_HEARD,
                 _ => 0.0,
             };
-            let s = sense_one(out, facing, field, off, d, seen, heard);
+            let mut s = sense_one(out, facing, field, off, d, seen, heard);
+            (s.gain, s.sight, s.other, s.hear) = (s.gain * eyes, s.sight * eyes, s.other * eyes, s.hear * eyes);
             if s.gain > 0.0 {
                 hunters.push((s, t, e.pos, e.eye()));
             }
         }
         if food && d2 <= prey_r * prey_r && e.health > 0.0 {
-            prey.push((t, f.mass, d2));
+            // The young and the hurt count as nearer: hunters pick the weak.
+            let share = if e.max_health > 0.0 { e.health / e.max_health } else { 1.0 };
+            prey.push((t, f.mass, roles::prey_score(d2, f.young != 0, share)));
         }
     }
     // The most noticeable hunter, its sight only if nothing opaque is between (one or two rays a
@@ -387,7 +422,14 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
         if s.sight > s.other {
             // Its sight of it in the light there, and only with nothing opaque between.
             let d = dist2(pos, p).sqrt() as f32;
-            let sight = if clear(w, eye, their_eye) { perception::gain(d, watch as f32 * lit(w, their_eye)) } else { 0.0 };
+            // Coarse, it takes no line of sight and no light (`routines::Detail`).
+            let sight = if !full {
+                perception::gain(d, watch as f32)
+            } else if clear(w, eye, their_eye) {
+                perception::gain(d, watch as f32 * lit(w, their_eye))
+            } else {
+                0.0
+            };
             s = Sensed { gain: sight.max(s.other), sight, smell_only: sight == 0.0 && s.hear == 0.0 && s.other > 0.0, ..s };
         }
         if s.gain > 0.0 && best.is_none_or(|b| s.gain > b.0.gain) {
@@ -437,10 +479,16 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
         _ => {}
     }
     if wild && mine.shy > 0.0 {
-        players(w, id, st, out, mine, facing, field, secs, player_noise);
+        players(w, id, st, out, mine, facing, field, secs, player_noise, full);
     }
     out.kin = kin;
     out.kin_mid = mid.map(|v| (v / kin as f64) as f32);
+    // One adult of a herd at a time stands watch, the watch going round (by id and time).
+    let herd = social == animals_core::biology::Social::Herd;
+    out.sentinel = (herd && kin >= roles::SENTINEL_HERD && me.young == 0 && {
+        let turn = now / roles::SENTINEL_TURN;
+        (id ^ turn.wrapping_mul(0x9E37_79B9)).wrapping_mul(0x2545_F491_4F6C_DD1D) >> 40 & 0xFFFF < (0x10000 / kin as u64)
+    }) as u8;
     let best = prey
         .into_iter()
         .filter(|&(_, kg, _)| mine.takes_with(me.mass, kg, kin as u32))
@@ -458,11 +506,12 @@ fn players(
     id: u64,
     st: &EntityState,
     out: &mut Senses,
-    mine: &Species,
+    mine: &'static Species,
     facing: [f32; 2],
     field: f32,
     secs: f32,
     noise: Option<(f32, u64)>,
+    full: bool,
 ) {
     let p = st.pos;
     let far = perception::SPRINT_HEARD.max(perception::SCENT) as f64;
@@ -481,7 +530,9 @@ fn players(
         let seen = if !moving {
             0.0
         } else {
-            shy * if sprint { 2.0 } else { 1.0 } * if sneak { perception::SNEAK_SEEN } else { 1.0 } * lit(w, e.eye())
+            shy * if sprint { 2.0 } else { 1.0 }
+                * if sneak { perception::SNEAK_SEEN } else { 1.0 }
+                * if full { lit(w, e.eye()) } else { 1.0 }
         };
         let heard = match (moving, sprint, sneak) {
             (false, ..) => 0.0,
@@ -490,13 +541,17 @@ fn players(
             _ => perception::WALK_HEARD,
         };
         let off = [(e.pos.x - p.x) as f32, (e.pos.z - p.z) as f32];
-        let s = sense_one(out, facing, field, off, d, seen, heard);
+        // What it and its kind here remember of him (`memory`): one who hurt them is noticed
+        // sooner and farther off, one who fed them later and nearer.
+        let (sooner, farther) = crate::memory::wary_of(w, id, mine.index(), p.to_array(), q);
+        let mut s = sense_one(out, facing, field, off, d, seen * farther, heard * farther.min(1.5));
+        (s.gain, s.sight, s.other, s.hear) = (s.gain * sooner, s.sight * sooner, s.other * sooner, s.hear * sooner);
         if s.gain > 0.0 && best.is_none_or(|b| s.gain > b.0.gain) {
             best = Some((s, q, e.pos, e.eye()));
         }
     }
     let mut sensed = best.map(|(s, q, pos, their_eye)| {
-        let s = if s.sight > s.other && !clear(w, st.eye(), their_eye) {
+        let s = if full && s.sight > s.other && !clear(w, st.eye(), their_eye) {
             Sensed { gain: s.other, sight: 0.0, smell_only: s.hear == 0.0 && s.other > 0.0, ..s }
         } else {
             s
@@ -524,8 +579,19 @@ fn players(
 /// Where to run from `from`: `dist` blocks away along the way most nearly straight away from it
 /// that has ground to stand on half way and at the end (no drop of more than 3, no water), trying
 /// ways turned up to 110° off; straight away when none has.
-pub fn escape(w: &World, st: &EntityState, from: [f64; 3], dist: f64) -> [f64; 3] {
-    let (x, z) = (st.pos.x - from[0], st.pos.z - from[2]);
+pub fn escape(w: &World, st: &EntityState, from: [f64; 3], dist: f64, herd: Option<[f64; 3]>) -> [f64; 3] {
+    let (mut x, mut z) = (st.pos.x - from[0], st.pos.z - from[2]);
+    // A herd animal runs toward its herd's middle too, unless that is toward the hunter: the others
+    // between it and the danger (`roles::SELFISH`).
+    if let Some(mid) = herd {
+        let n = (x * x + z * z).sqrt().max(0.01);
+        let (mx, mz) = (mid[0] - st.pos.x, mid[2] - st.pos.z);
+        let m = (mx * mx + mz * mz).sqrt();
+        if m > 2.0 && (mx * x + mz * z) / (m * n) > -0.3 {
+            let k = roles::SELFISH as f64;
+            (x, z) = (x / n + k * mx / m, z / n + k * mz / m);
+        }
+    }
     let away = if x * x + z * z > 0.01 { z.atan2(x) } else { w.random_below(628) as f64 / 100.0 };
     let straight = [st.pos.x + away.cos() * dist, st.pos.y, st.pos.z + away.sin() * dist];
     for turn in [0.0f64, 35.0, -35.0, 70.0, -70.0, 110.0, -110.0] {
@@ -573,4 +639,146 @@ pub fn ran(w: &World, id: u64, player: bool) {
         let a = if player { &mut s.fright } else { &mut s.aware };
         *a = a.min(perception::ALERT);
     }
+}
+
+/// Its herd's middle from its last look, if it is a herd's and has kin near (`escape`'s selfish
+/// herd).
+pub fn herd_mid(w: &World, id: u64) -> Option<[f64; 3]> {
+    let s = w.component(id, &SENSES)?;
+    let herd = w
+        .component(id, &FACTS)
+        .and_then(|f| f.species())
+        .is_some_and(|sp| sp.bio.social == animals_core::biology::Social::Herd);
+    (herd && s.kin >= 2).then(|| s.kin_mid.map(f64::from))
+}
+
+/// It runs from `threat` at `pos`: it calls, and its wild kin within `roles::ALARM` blocks know at
+/// once (unless it ran on a call itself). How many heard.
+pub fn alarm(w: &World, id: u64, st: &EntityState, threat: u64, pos: [f32; 3]) -> u32 {
+    let now = w.game_time();
+    if w.component(id, &SENSES)
+        .is_some_and(|s| s.alarm_at != 0 && now < s.alarm_at + roles::ALARM_QUIET)
+    {
+        return 0;
+    }
+    let Some(kind) = SPECIES
+        .iter()
+        .find(|s| s.kind.id() == st.kind)
+        .map(|s| s.kind)
+    else {
+        return 0;
+    };
+    if !SPECIES
+        .iter()
+        .any(|s| s.kind.id() == st.kind && s.bio.social != animals_core::biology::Social::Solitary)
+    {
+        return 0;
+    }
+    let mut heard = 0;
+    for o in w.entities_near(st.pos, roles::ALARM, Some(kind)) {
+        if o == id || crate::animal::tamed(w, o) {
+            continue;
+        }
+        if let Some(s) = w.component_mut(o, &SENSES) {
+            s.aware = s.aware.max(NOTICED);
+            s.threat = threat;
+            s.threat_pos = pos;
+            s.alarm_at = now.max(1);
+            heard += 1;
+        }
+    }
+    heard
+}
+
+/// A goal in the needs band (`Need::Watch`): a herd's sentinel stands with its head up, turning to
+/// look round now and then; it takes the turn while it is on watch.
+pub fn watch_goal(w: &World, id: u64, st: &EntityState) -> bool {
+    if w.component(id, &SENSES).is_none_or(|s| s.sentinel == 0) {
+        return false;
+    }
+    if w.navigating(id) {
+        w.navigate(id, st.pos, 0.0);
+    }
+    if (w.game_time() + id).is_multiple_of(40) {
+        let turn = (w.random_below(240) as f32 - 120.0).to_radians();
+        w.entity_edit(id).yaw(st.yaw + turn);
+    }
+    true
+}
+
+/// A goal in the needs band (`Need::Investigate`): a curious one (`roles::CURIOUS`) that is calm
+/// comes to look at a player standing still within `LOOKS_FROM` times its shy distance, to
+/// `COMES_TO` of it (nearer the more curious), and stands looking at him; it takes the turn while
+/// it does. Once he moves, its senses take over (`taming::behave`).
+pub fn investigate(w: &World, id: u64, st: &EntityState) -> bool {
+    use crate::choose::Need;
+    let now = w.game_time();
+    let at_it = crate::choose::doing(w, id) == Need::Investigate as u8;
+    if !(now + id).is_multiple_of(20) {
+        return at_it;
+    }
+    let Some(me) = w
+        .component(id, &FACTS)
+        .filter(|f| f.at != 0 && f.tamed == 0)
+    else {
+        return false;
+    };
+    let Some(mine) = me.species() else { return false };
+    let [_, curious, _] = me.persona();
+    if curious < roles::CURIOUS
+        || mine.shy <= 0.0
+        || w.component(id, &SENSES)
+            .is_some_and(|s| s.fright >= perception::STARE)
+    {
+        return false;
+    }
+    let shy = mine.shy * crate::taming::shyness(w, id);
+    let facing = weft_sdk::yaw_dir(st.yaw);
+    let field = if mine.hunts() { perception::HUNTER_FIELD } else { perception::PREY_FIELD };
+    let near = w
+        .players_iter()
+        .filter(|&q| w.game_mode(q) != weft_sdk::abi::game_mode::SPECTATOR)
+        .filter_map(|q| Some((q, w.entity(q)?)))
+        .filter(|(_, e)| e.moved <= MOVING)
+        .map(|(q, e)| (q, dist2(e.pos, st.pos).sqrt() as f32, e))
+        .filter(|(_, d, e)| {
+            *d <= shy * roles::LOOKS_FROM
+                && perception::in_view(facing, [(e.pos.x - st.pos.x) as f32, (e.pos.z - st.pos.z) as f32], field)
+                && clear(w, st.eye(), e.eye())
+        })
+        .min_by(|a, b| a.1.total_cmp(&b.1));
+    let Some((q, d, e)) = near else { return false };
+    let to = shy * roles::COMES_TO * (1.5 - curious);
+    if d > to + 1.0 {
+        if !at_it {
+            weft_sdk::info!("{} {id} comes to look at player {q} ({d:.1} blocks off, curiosity {curious:.2})", mine.name);
+        }
+        let k = ((d - to) / d) as f64;
+        w.navigate(id, [st.pos.x + (e.pos.x - st.pos.x) * k, e.pos.y, st.pos.z + (e.pos.z - st.pos.z) * k], 0.6);
+    } else {
+        stare(w, id, st, [e.pos.x as f32, e.pos.y as f32, e.pos.z as f32]);
+    }
+    true
+}
+
+/// How much detail `st`'s senses get now (`routines::Detail`): by the nearest player, and whether
+/// it is in a player's view.
+pub fn detail(w: &World, st: &EntityState) -> routines::Detail {
+    use animals_core::routines::{COARSE_WITHIN, Detail, FULL_WITHIN, SEEN_WITHIN, VIEW};
+    let mut best = Detail::Far;
+    for q in w.players_iter() {
+        let Some(p) = w.entity(q) else { continue };
+        let d2 = dist2(p.pos, st.pos);
+        if d2 <= FULL_WITHIN * FULL_WITHIN {
+            return Detail::Full;
+        }
+        let off = [(st.pos.x - p.pos.x) as f32, (st.pos.z - p.pos.z) as f32];
+        if d2 <= SEEN_WITHIN * SEEN_WITHIN && perception::in_view(weft_sdk::yaw_dir(p.yaw), off, VIEW) {
+            return Detail::Full;
+        }
+        if d2 <= COARSE_WITHIN * COARSE_WITHIN {
+            best = Detail::Coarse;
+        }
+    }
+    best
 }
