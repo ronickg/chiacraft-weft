@@ -17,6 +17,8 @@ impl Screen for FinderScreen {
     fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
         use super::finder;
         let f = finder::snapshot();
+        // Open: read again every minute while it stays open (a new listing shows by itself).
+        finder::watch();
         if f.phase.0.is_empty() {
             finder::refresh(cx.settings);
         }
@@ -32,6 +34,15 @@ impl Screen for FinderScreen {
                     if f.left_out > 0 {
                         label(ui, cx, "finder.left_out", &[Arg::Int(f.left_out as i64)], "dim");
                     }
+                    // Honest about the wait: a listing shows once the chain has it.
+                    label(ui, cx, "finder.new_listings", &[], "dim");
+                });
+            }
+            // This game's own listings still on their way to the chain.
+            for name in &f.pending {
+                ui.panel("panel", Style::default().pad(6.0).gap(2.0).w(400.0), |ui| {
+                    label(ui, cx, "finder.name", &[Arg::Text(name.clone())], "default");
+                    label(ui, cx, "finder.pending", &[], "dim");
                 });
             }
             let mut worlds = f.worlds.clone();

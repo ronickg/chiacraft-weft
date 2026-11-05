@@ -149,9 +149,12 @@ pub fn list(settings: &crate::settings::Settings, dir: PathBuf) {
             return Err("the wallet isn't synced with the chain".into());
         }
         let keys = wallet_keys(network)?;
+        let fee = settings.listing_fee();
+        let pushed = std::time::Instant::now();
+        let pushed_at = reader.status().peak.unwrap_or(0);
         let (push, coin) = push_while_full(|| {
             reader
-                .list_world(&keys, owner, &world, world_did, deposit, 0, std::time::Duration::from_secs(60))
+                .list_world(&keys, owner, &world, world_did, deposit, fee, std::time::Duration::from_secs(60))
                 .map_err(|e| e.to_string())
         })?;
         if matches!(push, chiacraft_wallet::chain::PushOutcome::Rejected { .. }) {
@@ -166,25 +169,37 @@ pub fn list(settings: &crate::settings::Settings, dir: PathBuf) {
         };
         save(&dir, &listed)?;
         HOST_NOW.store(true, std::sync::atomic::Ordering::Relaxed);
-        log::info!("listing world {} with a deposit of {} TXCH (coin {})", did.did(), txch(deposit), coin.coin_id());
+        log::info!(
+            "listing world {} with a deposit of {} TXCH and a fee of {} TXCH (coin {}), at height {pushed_at}",
+            did.did(),
+            txch(deposit),
+            txch(fee),
+            coin.coin_id()
+        );
         // On chain once the finders see it.
         let until = std::time::Instant::now() + std::time::Duration::from_secs(900);
-        loop {
+        let created = loop {
             let seen = reader
                 .listings(deposit, 1000, std::time::Duration::from_secs(30))
-                .map(|l| l.iter().any(|x| x.coin == coin))
-                .unwrap_or(false);
-            if seen {
-                break;
+                .ok()
+                .and_then(|l| l.iter().find(|x| x.coin == coin).map(|x| x.created));
+            if let Some(h) = seen {
+                break h;
             }
             if std::time::Instant::now() > until {
                 return Err("the listing isn't on the chain after 15 minutes".into());
             }
-            std::thread::sleep(std::time::Duration::from_secs(10));
-        }
+            std::thread::sleep(std::time::Duration::from_secs(5));
+        };
         listed.confirmed = true;
         save(&dir, &listed)?;
-        log::info!("world {} is listed", did.did());
+        // Where the time went: blocks until it was taken in, then seen.
+        log::info!(
+            "world {} is listed: in block {created}, {} blocks after the push, seen {:.0} s after it",
+            did.did(),
+            created.saturating_sub(pushed_at),
+            pushed.elapsed().as_secs_f32()
+        );
         set("listing.listed", &[txch(deposit)]);
         Ok(())
     });
