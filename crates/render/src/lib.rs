@@ -344,6 +344,11 @@ pub trait Backend: Send {
     fn indirect_count(&self) -> bool {
         true
     }
+    /// Without `indirect_count`, whether count draws may draw only about as many records as the
+    /// GPU wrote last time (the engine's cap, for Metal's sake) rather than all of them.
+    fn cap_draws(&self) -> bool {
+        true
+    }
     fn surface_size(&self) -> (u32, u32);
     /// The window's surface is going away (Android sends the app to the background): drop it and
     /// its swapchain, keeping everything else. No frames until `surface_restored`.

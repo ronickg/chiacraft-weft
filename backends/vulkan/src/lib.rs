@@ -144,6 +144,8 @@ pub struct VulkanBackend {
     /// Android with `VK_EXT_image_compression_control`: render targets are made uncompressed
     /// (`create_texture`). See `compression_off`.
     no_compression: bool,
+    /// `Backend::cap_draws`: not on Imagination's driver.
+    cap_draws: bool,
     allocator: ManuallyDrop<Allocator>,
     /// The memory types outside the GPU's own heaps (system memory), where a GPU-only allocation goes
     /// when the GPU's memory is full (`allocate`). None on a GPU that shares the system's memory.
@@ -456,7 +458,12 @@ impl VulkanBackend {
             }
             // Optional: without it the count draws draw all their records (MoltenVK has none).
             // `WEFT_NO_INDIRECT_COUNT=1` does without it on any GPU, to check that path.
-            let indirect_count = has12.draw_indirect_count != vk::FALSE && std::env::var_os("WEFT_NO_INDIRECT_COUNT").is_none();
+            // Imagination's driver (the Pixel 10's PowerVR) lost some count draws: in tile-shaped
+            // patches the terrain was missing (seen through water: holes in the sea floor). There
+            // every record is drawn instead, uncapped (`cap_draws`).
+            let imagination = driver.driver_id == vk::DriverId::IMAGINATION_PROPRIETARY;
+            let indirect_count =
+                has12.draw_indirect_count != vk::FALSE && std::env::var_os("WEFT_NO_INDIRECT_COUNT").is_none() && !imagination;
             if !indirect_count {
                 log::info!("{device_name}: no drawIndirectCount, indirect count draws draw every record");
             }
@@ -502,11 +509,14 @@ impl VulkanBackend {
             }
             // Android: render targets without the GPU's framebuffer compression (`compression_off`).
             let mut compression = vk::PhysicalDeviceImageCompressionControlFeaturesEXT::default();
-            let no_compression = cfg!(target_os = "android") && has_ext(ext::image_compression_control::NAME) && {
-                let mut f = vk::PhysicalDeviceFeatures2::default().push_next(&mut compression);
-                instance.get_physical_device_features2(pdev, &mut f);
-                compression.image_compression_control != vk::FALSE
-            };
+            let no_compression = cfg!(target_os = "android")
+                && std::env::var_os("WEFT_KEEP_COMPRESSION").is_none()
+                && has_ext(ext::image_compression_control::NAME)
+                && {
+                    let mut f = vk::PhysicalDeviceFeatures2::default().push_next(&mut compression);
+                    instance.get_physical_device_features2(pdev, &mut f);
+                    compression.image_compression_control != vk::FALSE
+                };
             if no_compression {
                 dev_exts.push(ext::image_compression_control::NAME.as_ptr());
                 log::info!("{device_name}: render targets without framebuffer compression");
@@ -706,6 +716,7 @@ impl VulkanBackend {
                 swapchain_fn,
                 push_fn,
                 no_compression,
+                cap_draws: !imagination,
                 allocator: ManuallyDrop::new(allocator),
                 spill,
                 swapchain: None,
@@ -1661,6 +1672,10 @@ impl Backend for VulkanBackend {
 
     fn indirect_count(&self) -> bool {
         self.indirect_count
+    }
+
+    fn cap_draws(&self) -> bool {
+        self.cap_draws
     }
 
     fn surface_size(&self) -> (u32, u32) {

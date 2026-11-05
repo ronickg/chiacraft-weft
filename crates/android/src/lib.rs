@@ -12,7 +12,8 @@
 //!
 //! Launch options, for checks: one per line or space separated, in `<files>/args.txt` or the
 //! app's external folder (`/sdcard/Android/data/<package>/files/args.txt`, which `adb push`
-//! reaches), as on a desktop's command line (`--world droid1 --log frame=debug`).
+//! reaches), as on a desktop's command line (`--world droid1 --log frame=debug`), and
+//! `--env NAME=value` for the engine's environment switches.
 #![cfg(target_os = "android")]
 
 use std::io::{BufRead, Read};
@@ -79,6 +80,14 @@ fn android_main(app: AndroidApp) {
             "--gpu-debug" => opts.gpu_debug = true,
             "--verbose" => verbose = true,
             "--log" => log_spec = value(),
+            // An environment variable for this run (`--env WEFT_ALL_BARRIERS=1`), as a desktop's
+            // shell would set it: the engine's switches for comparing ways of drawing.
+            "--env" => {
+                if let Some((k, v)) = value().split_once('=') {
+                    // SAFETY: before any other thread starts that reads the environment.
+                    unsafe { std::env::set_var(k, v) };
+                }
+            }
             other => {
                 if let Some(name) = other.strip_prefix("--") {
                     let v = if it.peek().is_some_and(|n| !n.starts_with("--")) { it.next().unwrap_or_default() } else { "1".into() };
