@@ -229,6 +229,11 @@ fn reflect_result(p: PostPixel) -> vec4<f32> {
     return vec4(mirrored * amount, amount);
 }
 
+// Where this half-size pixel is not water, `a` is -1, so the full-size pass knows it holds nothing
+// to lay over the water there (`reflect_upsampled`); 0 is water that mirrors nothing.
 fn low(p: PostPixel) -> vec4<f32> {
+    if p.color.a < 0.02 {
+        return vec4(0.0, 0.0, 0.0, -1.0);
+    }
     return reflect_result(p);
 }
