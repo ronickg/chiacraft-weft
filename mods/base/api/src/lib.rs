@@ -210,7 +210,7 @@ pub fn air_at(w: &World, pos: [f64; 3], height: f32, in_water: bool, reach: i32,
     for dx in -reach..=reach {
         for dy in -reach..=reach {
             for dz in -reach..=reach {
-                let state = w.get([feet[0] + dx, feet[1] + dy, feet[2] + dz]);
+                let state = w.block([feet[0] + dx, feet[1] + dy, feet[2] + dz]);
                 each(state);
                 let h = heat_of(state);
                 if h > 0.0 {
@@ -374,7 +374,7 @@ pub fn ground_at(w: &World, pos: [i32; 3]) -> Ground {
     let by_water = (-WATER_REACH..=WATER_REACH).any(|dx| {
         (-WATER_REACH..=WATER_REACH).any(|dz| {
             (-1..=0).any(|dy| {
-                block_name(w.get([pos[0] + dx, pos[1] + dy, pos[2] + dz]))
+                block_name(w.block([pos[0] + dx, pos[1] + dy, pos[2] + dz]))
                     .split('[')
                     .next()
                     == Some("base:water")
@@ -484,9 +484,9 @@ value! {
 pub static ADVANCEMENTS: Component<Advancements> = Component::named("base:advancements");
 
 value! {
-    /// Where a player respawns: the foot of the bed they last used and its dimension, when `set`
-    /// is 1. Kept through death.
-    pub struct BedSpawn { pub bed: [i32; 3], pub dim: u32, pub set: u32 }
+    /// Where a player respawns: the foot of the bed they last used and its dimension
+    /// (`dimension_key`), when `set` is 1. Kept through death.
+    pub struct BedSpawn { pub bed: [i32; 3], pub set: u32, pub dim_key: u64 }
 }
 pub static BED_SPAWN: Component<BedSpawn> = Component::named("base:bed_spawn");
 
@@ -540,11 +540,11 @@ pub mod freshness {
 /// and whether it's still hot.
 pub fn food_age(stack: &ItemStack, now: u64) -> (f32, bool) {
     let secs = (now / 20) as u32;
-    if let Some(hot) = HOT.stack_only(stack) {
+    if let Some(hot) = HOT.on_stack_own(stack) {
         let age = secs.saturating_sub(hot) as f32;
         return (age, age < vitals::food::HOT_FOR);
     }
-    let made = MADE.stack_only(stack).unwrap_or(0);
+    let made = MADE.on_stack_own(stack).unwrap_or(0);
     if made == 0 {
         return (0.0, false);
     }
@@ -581,7 +581,7 @@ pub fn eat(u: &mut ItemUse) -> bool {
     } else if roll < vitals::food::poisoning_chance(f, fresh) * (1.0 - resist) {
         v.sick = v.sick.max(vitals::food::SICK_SECS);
     }
-    u.set_stack(stack.shrink(1));
+    u.set_stack(consume_one(stack));
     true
 }
 
@@ -590,7 +590,7 @@ pub fn eat(u: &mut ItemUse) -> bool {
 /// top; hot, it warms. The bowl is left. Refused when it doesn't all fit.
 pub fn eat_meal(u: &mut ItemUse) -> bool {
     let stack = u.stack();
-    let foods = vitals::meals::ingredients(MEAL.stack_only(&stack).unwrap_or(0));
+    let foods = vitals::meals::ingredients(MEAL.on_stack_own(&stack).unwrap_or(0));
     if foods.is_empty() {
         return false;
     }
@@ -610,7 +610,7 @@ pub fn eat_meal(u: &mut ItemUse) -> bool {
     if roll < vitals::meals::poisoning_chance(&foods, fresh) * (1.0 - resist) {
         v.sick = v.sick.max(vitals::food::SICK_SECS);
     }
-    u.set_stack(weft_sdk::use_one(stack));
+    u.set_stack(weft_sdk::consume_one(stack));
     true
 }
 
@@ -632,7 +632,7 @@ pub fn sedate(w: &World, player: u64, amount: f32) {
 }
 
 fn with_body(w: &World, player: u64, f: impl FnOnce(&mut Vitals, f32)) {
-    if w.creative(player) {
+    if w.outside_survival(player) {
         return;
     }
     let Some(v) = w.component_mut(player, &VITALS) else { return };
@@ -683,7 +683,7 @@ pub static GRAVE: Component<Grave> = Component::named("base:grave");
 /// Gives `player` XP for what they did (`vitals::levels::xp`): other mods call it for theirs
 /// (taming, raising young, hatching eggs). Rested raises it; nothing in creative.
 pub fn give_xp(w: &World, player: u64, amount: u64) {
-    if amount == 0 || w.creative(player) {
+    if amount == 0 || w.outside_survival(player) {
         return;
     }
     let Some(v) = w.component_mut(player, &VITALS) else { return };
@@ -693,7 +693,7 @@ pub fn give_xp(w: &World, player: u64, amount: u64) {
 
 /// Whether there's room in `player`'s stomach for all of a stew.
 pub fn has_room_for_meal(w: &World, player: u64, stack: &ItemStack) -> bool {
-    let foods = vitals::meals::ingredients(MEAL.stack_only(stack).unwrap_or(0));
+    let foods = vitals::meals::ingredients(MEAL.on_stack_own(stack).unwrap_or(0));
     w.component(player, &VITALS)
         .is_some_and(|v| v.stomach().room(v.capacity()) + 1e-4 >= vitals::meals::units(&foods))
 }
@@ -734,7 +734,7 @@ pub static OVERWORLD: Dimension = Dimension::named("base:overworld");
 pub static FLATLANDS: Dimension = Dimension::named("base:flatlands");
 
 /// What is in the sky of the game's dimensions. Any of them can be changed or taken out by a mod:
-/// `r.sky_body(&OVERWORLD, &MOON).size(40.0)`, `r.remove_sky(&OVERWORLD, &STARS)`.
+/// `r.sky_body(&OVERWORLD, &MOON).size(40.0)`, `r.sky_remove(&OVERWORLD, &STARS)`.
 pub static SUN: SkyObject = SkyObject::named("base:sun");
 pub static MOON: SkyObject = SkyObject::named("base:moon");
 pub static STARS: SkyObject = SkyObject::named("base:stars");

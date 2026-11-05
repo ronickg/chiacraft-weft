@@ -167,7 +167,7 @@ fn init(r: &mut Registry) {
         if !pools.is_empty() {
             pools
                 .into_iter()
-                .fold(r.loot(&Entity::named(s.name)), |l, p| l.pool(p));
+                .fold(r.loot(&EntityKind::named(s.name)), |l, p| l.pool(p));
         }
     }
     coats::init(r);
@@ -189,8 +189,9 @@ fn init(r: &mut Registry) {
 }
 
 /// The squared distance between two points (blocks²).
-pub(crate) fn dist2(a: [f64; 3], b: [f64; 3]) -> f64 {
-    (a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)
+pub(crate) fn dist2(a: impl Into<Vec3>, b: impl Into<Vec3>) -> f64 {
+    let (a, b) = (a.into(), b.into());
+    (a.x - b.x).powi(2) + (a.y - b.y).powi(2) + (a.z - b.z).powi(2)
 }
 
 /// Knocked out: lying down (the raptors, the wyvern and the jaguar as they rest, `rest.rs`).
@@ -203,4 +204,17 @@ fn sleep(w: &World, id: u64, _index: usize) {
 fn wake(w: &World, id: u64, _index: usize) {
     rest::wake(w, id);
     wild::wake(w, id);
+}
+
+/// An entity kind's model from `models/<name>.geo.json` (Bedrock geometry, as Blockbench exports
+/// it), as Weft's `model_file` did before it went: the kind's `MODEL` text component.
+trait ModelFile {
+    fn model_file(self, name: &str) -> Self;
+}
+
+impl ModelFile for EntityBuilder<'_> {
+    fn model_file(self, name: &str) -> Self {
+        let full = if name.contains(':') { name.to_string() } else { format!("{}:{name}", weft_sdk::mod_id()) };
+        self.set_text(&weft_sdk::MODEL, &full)
+    }
 }

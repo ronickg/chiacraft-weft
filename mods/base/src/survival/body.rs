@@ -22,10 +22,13 @@ const BANDAGE_HEALS: f32 = 10.0;
 static HEALS: Component<u8> = Component::named("base:heals");
 
 pub fn register(r: &mut Registry) {
+    for (cause, key) in [(&FREEZE, "death.freeze"), (&HEAT, "death.heat"), (&POISON, "death.poison"), (&BLEED, "death.bleed")] {
+        r.damage_cause(cause).bypasses_armor().death_message(key);
+    }
     // A heavy blow on a player opens a wound that bleeds.
-    r.on(&ENTITY_HURT, |b| {
+    r.on(&actions::HURT, |b| {
         let w = b.world();
-        for e in b.iter().filter(|e| e.cause == damage::ATTACK) {
+        for e in b.iter().filter(|e| e.cause == damage_cause::ATTACK) {
             // A blow that killed leaves nothing to bleed: it would carry over the respawn (the
             // death handler clears bleeding, and this event can come after it).
             if w.entity(e.entity).is_none_or(|st| st.health <= 0.0) {
@@ -76,19 +79,25 @@ fn bandage(u: &mut ItemUse) -> bool {
     }
     v.bleed = 0.0;
     st.health = (st.health + BANDAGE_HEALS / HEALTH_SCALE).min(max);
-    w.set_entity(player, &st);
-    if !w.creative(player) {
+    w.entity_edit(player).health(st.health);
+    if !w.outside_survival(player) {
         u.set_stack(u.stack().shrink(1));
     }
     true
 }
 
+// The vitals' own causes of death: none of them armor softens.
+pub static FREEZE: DamageCause = DamageCause::named("freeze");
+pub static HEAT: DamageCause = DamageCause::named("heat");
+pub static POISON: DamageCause = DamageCause::named("poison");
+pub static BLEED: DamageCause = DamageCause::named("bleed");
+
 /// What a death from an effect's loss of health is put down to.
 pub fn cause_of(e: Effect) -> u32 {
     match e {
-        Effect::Heatstroke => damage::HEAT,
-        Effect::Poisoned => damage::POISON,
-        Effect::Bleeding => damage::BLEED,
-        _ => damage::FREEZE,
+        Effect::Heatstroke => HEAT.id(),
+        Effect::Poisoned => POISON.id(),
+        Effect::Bleeding => BLEED.id(),
+        _ => FREEZE.id(),
     }
 }

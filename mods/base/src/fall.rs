@@ -155,7 +155,8 @@ pub fn start(
 ) -> bool {
     let mut cells: Vec<[i32; 3]> = logs.clone();
     cells.extend(leaves.iter().map(|l| l.0));
-    let body = w.lift(foot, &cells);
+    let cells: Vec<BlockPos> = cells.into_iter().map(BlockPos::from).collect();
+    let body = w.body_from_blocks(foot, &cells);
     if body == 0 {
         return false;
     }
@@ -171,7 +172,7 @@ pub fn start(
     // Shed from the end: the highest last in the list.
     leaves.sort_by_key(|l| l.0[1]);
     let leaves_at_start = leaves.len();
-    let now = w.time();
+    let now = w.game_time();
     w.body_turn(body, pivot, quat(axis, n::CREAK_DEGREES), n::CREAK_TICKS);
     STARTING.lock().unwrap().push(Fall {
         dim: w.dimension(),
@@ -216,7 +217,7 @@ pub fn register(r: &mut Registry) {
         .pitch(0.85, 1.05)
         .range(64.0);
     r.world_tick(|w| {
-        let (dim, now) = (w.dimension(), w.time());
+        let (dim, now) = (w.dimension(), w.game_time());
         let mut falling = FALLING.lock().unwrap();
         falling.append(&mut STARTING.lock().unwrap());
         if falling.is_empty() {
@@ -265,7 +266,9 @@ fn step(w: &World, f: &mut Fall, now: u64) -> bool {
         let Some((p, state)) = f.leaves.pop() else { break };
         shed += 1;
         let local = [p[0] - f.foot[0], p[1] - f.foot[1], p[2] - f.foot[2]];
-        w.set_structure_block(f.body, local, 0);
+        if let Some(b) = w.on_body(f.body) {
+            b.set_block(local, 0);
+        }
         leaf_off(w, f, p, state, deg, speed);
     }
     // Up to the ground (not the bounce): a log moves up to half a block a tick near the end, so
@@ -274,14 +277,14 @@ fn step(w: &World, f: &mut Fall, now: u64) -> bool {
         hurt(w, f, deg);
         f.thudded_ground = deg >= 90.0;
     }
-    if deg > n::KNOCK_FROM {
-        if let Some(holder) = knock(w, f, deg) {
-            // It leans back a little onto what caught it and rests there.
-            let rest = (deg - n::HANG_BACK).max(n::KNOCK_FROM);
-            w.body_turn(f.body, f.pivot, quat(f.axis, rest), n::HANG_SETTLE_TICKS / 2);
-            f.hung = Some((rest, now, holder));
-            return true;
-        }
+    if deg > n::KNOCK_FROM
+        && let Some(holder) = knock(w, f, deg)
+    {
+        // It leans back a little onto what caught it and rests there.
+        let rest = (deg - n::HANG_BACK).max(n::KNOCK_FROM);
+        w.body_turn(f.body, f.pivot, quat(f.axis, rest), n::HANG_SETTLE_TICKS / 2);
+        f.hung = Some((rest, now, holder));
+        return true;
     }
     if t < end {
         return true;
@@ -292,7 +295,7 @@ fn step(w: &World, f: &mut Fall, now: u64) -> bool {
             leaf_off(w, f, p, state, 90.0, 0.0);
         }
     }
-    w.remove(f.body);
+    w.despawn(f.body);
     if f.lays {
         crate::felled::lay(w, f.foot, &f.logs, &f.states, f.d);
     } else {
@@ -326,7 +329,7 @@ fn knock(w: &World, f: &mut Fall, deg: f32) -> Option<[i32; 3]> {
         }
     }
     for cell in hit {
-        let state = w.get(cell);
+        let state = w.block(cell);
         if state == 0 || crate::felled::piece_of(state).is_some() {
             continue;
         }
@@ -339,19 +342,19 @@ fn knock(w: &World, f: &mut Fall, deg: f32) -> Option<[i32; 3]> {
         }
         // Down its column to where it stands: on the ground (a trunk) or on air (a branch).
         let mut foot = cell;
-        while LOGS.on_block(w.get([foot[0], foot[1] - 1, foot[2]])) {
+        while LOGS.on_block(w.block([foot[0], foot[1] - 1, foot[2]])) {
             foot[1] -= 1;
         }
-        if w.get([foot[0], foot[1] - 1, foot[2]]) == 0 {
+        if w.block([foot[0], foot[1] - 1, foot[2]]) == 0 {
             w.break_block(cell, ItemStack::EMPTY, 0, true);
             continue;
         }
-        let Some(logs) = crate::felling::tree_on(w, foot, w.get(foot)) else { continue };
+        let Some(logs) = crate::felling::tree_on(w, foot, w.block(foot)) else { continue };
         // Too big to knock down: it catches there.
         if f.logs.len() < logs.len() * n::KNOCK_FELLS {
             return Some(cell);
         }
-        let states: Vec<u32> = logs.iter().map(|&p| w.get(p)).collect();
+        let states: Vec<u32> = logs.iter().map(|&p| w.block(p)).collect();
         let leaves = crate::felling::crown(w, &logs);
         if start(w, foot, logs.clone(), states, leaves, f.d, f.lays) {
             crate::leaf_decay::logs_gone(w, logs.iter().copied());
@@ -369,7 +372,7 @@ fn hurt(w: &World, f: &mut Fall, deg: f32) {
         let at = turn(center(*p), f.pivot, f.axis, deg);
         for id in crate::felled::in_box(w, at, n::HURT_REACH) {
             if id != f.body && f.hurt.insert(id) {
-                w.damage(id, harm, 0, abi::damage::CRUSH);
+                w.damage(id, harm, 0, damage_cause::CRUSH);
             }
         }
     }
@@ -380,7 +383,7 @@ fn hurt(w: &World, f: &mut Fall, deg: f32) {
 /// trunk of blocks, corners joined), wherever there is room. It is then a tree like any other,
 /// chopped at its lowest log; and `holder` going brings it down (`release`).
 fn settle(w: &World, f: &Fall, deg: f32, holder: [i32; 3]) {
-    w.remove(f.body);
+    w.despawn(f.body);
     // Upright under 45 degrees, lying along the fall past it.
     let axis = if deg < 45.0 {
         "y"
@@ -390,12 +393,12 @@ fn settle(w: &World, f: &Fall, deg: f32, holder: [i32; 3]) {
         "z"
     };
     let mut base: Option<[i32; 3]> = None;
-    let mut put = |p: [i32; 3], state: u32| {
+    let put = |p: [i32; 3], state: u32| {
         let cell = turn(center(p), f.pivot, f.axis, deg).map(|v| v.floor() as i32);
-        let here = w.get(cell);
+        let here = w.block(cell);
         let room = here == 0 || crate::leaf_decay::decays(w, cell) || HARDNESS.on_block(here).is_some_and(|h| h <= 0.0);
         if room && !crate::felled::occupied(w, cell) {
-            w.set(cell, state);
+            w.set_block(cell, state);
             Some(cell)
         } else {
             None
@@ -403,10 +406,10 @@ fn settle(w: &World, f: &Fall, deg: f32, holder: [i32; 3]) {
     };
     for (&p, &state) in f.logs.iter().zip(&f.states) {
         let state = state_with(state, "axis", axis).unwrap_or(state);
-        if let Some(cell) = put(p, state) {
-            if base.is_none_or(|b| cell[1] < b[1]) {
-                base = Some(cell);
-            }
+        if let Some(cell) = put(p, state)
+            && base.is_none_or(|b| cell[1] < b[1])
+        {
+            base = Some(cell);
         }
     }
     for &(p, state) in &f.leaves {
@@ -436,10 +439,10 @@ pub fn release(w: &World, gone: &[[i32; 3]]) {
         freed
     };
     for h in freed {
-        let state = w.get(h.base);
+        let state = w.block(h.base);
         let Some(mut logs) = crate::felling::loose(w, h.base, state) else { continue };
         logs.push(h.base);
-        let states: Vec<u32> = logs.iter().map(|&p| w.get(p)).collect();
+        let states: Vec<u32> = logs.iter().map(|&p| w.block(p)).collect();
         let leaves = crate::felling::crown(w, &logs);
         if start(w, h.base, logs.clone(), states, leaves, h.d, h.lays) {
             crate::leaf_decay::logs_gone(w, logs.iter().copied());

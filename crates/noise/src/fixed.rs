@@ -153,7 +153,7 @@ pub fn ramp(v: i32, from: i32, to: i32) -> i32 {
         return if v >= to { ONE } else { 0 };
     }
     // Parameters are within +-2^18 (`q12` clamps), so this stays in 32 bits.
-    ((v - from).clamp(-(1 << 18), 1 << 18) * ONE / (to - from)).clamp(0, ONE)
+    ((v.wrapping_sub(from)).clamp(-(1 << 18), 1 << 18) * ONE / (to - from)).clamp(0, ONE)
 }
 
 /// To Q12 (and Q4 below), rounded, for parameters given as decimals; out of range (an open
@@ -281,4 +281,35 @@ pub mod shape {
         }
         total
     }
+}
+
+/// Where `weft_abi::expr::SITE` looks: the square of the distance from (`x`, `z`) (Q4) to the
+/// nearest point of the grid cells around, in units of that point's radius (Q12). A cell of
+/// `spacing` (Q4) holds one point at a seeded spot with chance `chance` (Q12), and its radius is
+/// `radius` (Q4) times 0.5 to 1.5. 8192 where none is within reach.
+pub fn site(seed: u32, x: i32, z: i32, spacing: i32, chance: i32, radius: i32) -> i32 {
+    let sp = spacing.clamp(16, 512 * 16);
+    let (cx, cz) = (div_floor(x, sp).0, div_floor(z, sp).0);
+    let (bx, bz) = (x >> 4, z >> 4);
+    let mut nearest = 2 * ONE;
+    for dz in -1..=1 {
+        for dx in -1..=1 {
+            let h = hash(seed, cx + dx, 0, cz + dz);
+            let h2 = fmix(h);
+            if (h & 4095) as i32 > chance {
+                continue;
+            }
+            // In blocks from here on: squares of Q4 distances overflow 32 bits.
+            let r = ((radius.clamp(16, 512 * 16) * (2048 + ((h >> 12) & 4095) as i32)) >> 12) >> 4;
+            let r2 = (r * r).max(1);
+            let px = ((cx + dx) * sp + (((h2 & 4095) as i32 * sp) >> 12)) >> 4;
+            let pz = ((cz + dz) * sp + ((((h2 >> 12) & 4095) as i32 * sp) >> 12)) >> 4;
+            let d2 = (bx - px) * (bx - px) + (bz - pz) * (bz - pz);
+            if d2 >= r2 * 2 {
+                continue;
+            }
+            nearest = nearest.min(((d2 as u32 * 4096) / r2 as u32) as i32);
+        }
+    }
+    nearest
 }

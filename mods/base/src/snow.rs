@@ -24,8 +24,13 @@ pub fn register(r: &mut Registry) {
             let n: f32 = p.get("layers").parse().unwrap_or(1.0);
             let s = s.model_box([0.0, 0.0, 0.0], [16.0, 2.0 * n, 16.0]);
             // As in vanilla: one layer is walked through and built over, more hold a foot an
-            // eighth lower than they look.
-            if n <= 1.0 { s.not_solid().replaceable() } else { s.collision([0.0, 0.0, 0.0], [16.0, 2.0 * (n - 1.0), 16.0]) }
+            // eighth lower than they look (outlined as they look).
+            if n <= 1.0 {
+                s.not_solid().replaceable()
+            } else {
+                s.hitbox([0.0, 0.0, 0.0], [16.0, 2.0 * (n - 1.0), 16.0])
+                    .outline([0.0, 0.0, 0.0], [16.0, 2.0 * n, 16.0])
+            }
         })
         .texture("snow")
         .sound_group("snow")
@@ -33,15 +38,15 @@ pub fn register(r: &mut Registry) {
         .mineable("shovel")
         .drops_nothing()
         .no_item()
-        .growth(air::SNOW_MELT_SECS, 0)
+        .grows(air::SNOW_MELT_SECS, 0)
         .on_grow(|e| {
             let w = e.world();
-            let pos = e.pos();
+            let pos = e.pos().to_array();
             let Some(snow) = cover_at(&w, pos) else { return };
             let have = layers(e.state());
             let want = air::snow_layers(snow);
             if want < have && melts(&w, pos) {
-                w.set(pos, with_layers(have - 1));
+                w.set_block(pos, with_layers(have - 1));
             }
         });
     r.world_tick(tick);
@@ -58,9 +63,9 @@ fn freezes(w: &World, pos: [i32; 3]) -> bool {
 /// look's last skins, over a river's one-deep edges, never thawed while it asked for water under).
 pub fn ice_step(e: &mut BlockEvent) {
     let w = e.world();
-    let pos = e.pos();
+    let pos = e.pos().to_array();
     if melts(&w, pos) {
-        w.set(pos, WATER.id());
+        w.set_block(pos, WATER.id());
     }
 }
 
@@ -98,7 +103,7 @@ fn tick(w: &World) {
     }
     for player in w.players() {
         let Some(st) = w.entity(player) else { continue };
-        let [px, py, pz] = st.pos.map(|v| v.floor() as i32);
+        let [px, py, pz] = st.pos.block().to_array();
         let side = 2 * air::SNOW_REACH as u32 + 1;
         for _ in 0..air::SNOW_SAMPLES {
             let x = px - air::SNOW_REACH + w.random_below(side) as i32;
@@ -114,7 +119,7 @@ fn column(w: &World, x: i32, y: i32, z: i32) {
     let mut top = None;
     for dy in (-air::SNOW_SCAN..=air::SNOW_SCAN / 2).rev() {
         let pos = [x, y + dy, z];
-        match w.get_loaded(pos) {
+        match w.block_loaded(pos) {
             None => return,
             Some(0) => continue,
             Some(state) => {
@@ -128,12 +133,12 @@ fn column(w: &World, x: i32, y: i32, z: i32) {
     // Open still water freezes in the cold; a skin of ice on water thaws in the warmth.
     if state == WATER.id() {
         if w.sky_light(above) >= 15 && freezes(w, pos) {
-            w.set(pos, LAKE_ICE.id());
+            w.set_block(pos, LAKE_ICE.id());
         }
         return;
     }
     if LAKE_ICE.is(state) && melts(w, pos) {
-        w.set(pos, WATER.id());
+        w.set_block(pos, WATER.id());
         return;
     }
     let Some(snow) = cover_at(w, above) else { return };
@@ -141,9 +146,9 @@ fn column(w: &World, x: i32, y: i32, z: i32) {
     if SNOW_LAYER.is(state) {
         let have = layers(state);
         if want > have {
-            w.set(pos, with_layers(have + 1));
+            w.set_block(pos, with_layers(have + 1));
         } else if want < have && melts(w, pos) {
-            w.set(pos, with_layers(have - 1));
+            w.set_block(pos, with_layers(have - 1));
         }
         return;
     }
@@ -157,15 +162,15 @@ fn column(w: &World, x: i32, y: i32, z: i32) {
     if ground(state) {
         // Open sky over it: snow falls there.
         if w.sky_light(above) >= 15 {
-            w.set(above, with_layers(1));
+            w.set_block(above, with_layers(1));
         }
     } else if want >= air::SNOW_BURIES
         && flags & abi::block_flags::REPLACEABLE != 0
         && flags & abi::block_flags::LIQUID == 0
         && w.sky_light(pos) >= 15
-        && w.get_loaded([x, pos[1] - 1, z]).is_some_and(ground)
+        && w.block_loaded([x, pos[1] - 1, z]).is_some_and(ground)
     {
         // Grass and small plants under a deep enough cover are buried.
-        w.set(pos, with_layers(1));
+        w.set_block(pos, with_layers(1));
     }
 }

@@ -79,11 +79,10 @@ struct Frame {
 }
 
 fn texture_frame(name: u32) -> Frame {
-    let base = tex_info[name * 2u];
-    let info = tex_info[name * 2u + 1u];
-    // The sizes start after two words per texture; `frames[0]` holds the count (`arrayLength`
-    // is wrong on some drivers, see `GameTextures::world_tables`).
-    let size = f32(tex_info[frames[0] * 2u + name]);
+    let base = tex_info[name * 4u];
+    let info = tex_info[name * 4u + 1u];
+    // A size of 0 would make every derivative NaN, and the sampler the smallest mip.
+    let size = f32(max(tex_info[name * 4u + 2u], 1u));
     if info == 0u {
         return Frame(base, base, 0.0, size);
     }
@@ -162,7 +161,7 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     var out: VOut;
     out.clip = scene.view_proj * pos;
     out.dist = length(pos.xyz);
-    out.uv = UVS[c];
+    out.uv = UVS[(c + ((w0 >> FACE_TURN_SHIFT) & FACE_TURN_MASK)) % 4u];
     let tex_id = w1 & FACE_TEX_MASK;
     let fr = texture_frame(tex_id);
     out.size = fr.size;

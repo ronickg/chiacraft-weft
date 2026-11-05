@@ -25,28 +25,34 @@ fn armor_of(w: &World, entity: u64) -> (u32, f32) {
 }
 
 pub fn register(r: &mut Registry) {
+    // Third person sways and jolts as first person does (chiacraft's feel; Weft's own behind and
+    // front cameras are still).
+    drop(r.camera(&cameras::BEHIND).with(weft_sdk::abi::camera_flags::EFFECTS));
+    drop(r.camera(&cameras::FRONT).with(weft_sdk::abi::camera_flags::EFFECTS));
     r.player_inventory()
         .group("hotbar", Slots::row(9).hotbar())
         .group("main", Slots::grid(9, 3));
-    for (slot, parts, piece) in [
-        (&HEAD, worn_parts::HEAD, "helmet"),
-        (&base_api::CHEST, worn_parts::BODY | worn_parts::ARMS, "chestplate"),
-        (&LEGS, worn_parts::BODY | worn_parts::LEGS, "leggings"),
-        (&FEET, worn_parts::LEGS, "boots"),
+    for (slot, covers, piece) in [
+        (&HEAD, worn::HEAD, "helmet"),
+        (&base_api::CHEST, worn::CHEST, "chestplate"),
+        (&LEGS, worn::LEGS, "leggings"),
+        (&FEET, worn::FEET, "boots"),
     ] {
-        r.equipment_slot(slot, parts, &format!("slot_{piece}"));
+        r.equipment_slot(slot, covers, &format!("slot_{piece}"));
     }
     // Clothes under the armor (`vitals::clothing`): warmth, no protection.
     for (slot, parts, piece) in [
-        (&base_api::HAT, worn_parts::HEAD, "hat"),
-        (&base_api::COAT, worn_parts::BODY | worn_parts::ARMS, "coat"),
-        (&base_api::TROUSERS, worn_parts::BODY | worn_parts::LEGS, "trousers"),
-        (&base_api::SHOES, worn_parts::LEGS, "shoes"),
+        (&base_api::HAT, worn::HEAD, "hat"),
+        (&base_api::COAT, worn::CHEST, "coat"),
+        (&base_api::TROUSERS, worn::LEGS, "trousers"),
+        (&base_api::SHOES, worn::FEET, "shoes"),
         // And a cloak over everything (CONTENT decision 3: nine slots).
-        (&base_api::CLOAK, worn_parts::BODY | worn_parts::ARMS, "cloak"),
+        (&base_api::CLOAK, worn::CHEST, "cloak"),
     ] {
         r.equipment_slot(slot, parts, &format!("slot_{piece}"));
     }
+    // Upstream's off-hand: a second item to hold (a shield, a torch).
+    r.equipment_slot(&OFF_HAND, &[], "slot_offhand");
     // Armor is a step of the damage chain (modern's CombatRules: big hits go through more of it,
     // unless it is tough), and wears when the hit actually lands, a quarter of the damage per
     // piece (at least 1) like vanilla.
@@ -60,7 +66,7 @@ pub fn register(r: &mut Registry) {
         let through = m.value / (2.0 + toughness as f64 / 4.0);
         m.value *= 1.0 - (points - through).clamp(points * 0.2, 20.0) / 25.0;
     });
-    r.on(&ENTITY_HURT, |b| {
+    r.on(&actions::HURT, |b| {
         let w = b.world();
         for h in b.iter().filter(|h| armor_applies(h.cause)) {
             let Some(worn) = w.inventory(h.entity).find_group(EQUIPMENT_GROUP) else { continue };
@@ -68,9 +74,7 @@ pub fn register(r: &mut Registry) {
             for slot in 0..worn.len() {
                 let s = worn.get(slot);
                 if ARMOR.on_item(s.item).is_some() {
-                    let durability = DURABILITY.on_item(s.item).unwrap_or(0);
-                    let damage = s.damage() + wear;
-                    worn.set(slot, if durability > 0 && damage >= durability { ItemStack::EMPTY } else { s.with_damage(damage) });
+                    worn.set(slot, s.add_wear(wear));
                 }
             }
         }
@@ -83,7 +87,7 @@ pub fn register(r: &mut Registry) {
         let slot = w.selected_slot(cmd.player());
         let s = hotbar.get(slot);
         if !s.is_empty() {
-            hotbar.set(slot, with_name(s, cmd.text("name")));
+            hotbar.set(slot, stack_with_name(s, cmd.text("name")));
         }
     })
     .permission(permission::EVERYONE);
@@ -98,18 +102,18 @@ pub fn register(r: &mut Registry) {
                 .filter_map(|s| ARMOR.on_item(s.item))
                 .map(|a| a.points)
                 .sum();
-            if points > 0 && !c.creative() { points as f32 } else { -1.0 }
-        })
+            if points > 0 && !c.outside_survival() { points as f32 } else { -1.0 }
+        });
     });
     r.hud_element(&HUD_AIR, hud_anchor::TOP_LEFT, 7, |ui| {
         ui.icons("air", 10, |c| {
-            if c.creative() {
+            if c.outside_survival() {
                 -1.0
             } else {
                 c.component(&base_api::VITALS)
                     .map_or(-1.0, |v| air_bubbles(v.air))
             }
-        })
+        });
     });
 
     // While a swing charges.
@@ -132,23 +136,23 @@ pub fn register(r: &mut Registry) {
         .screen(|ui| {
             let tabs: [crate::window::Tab; 2] = [
                 ("window.base.tab.stats", |c| {
-                    c.client().open_screen(&crate::levels::SCREEN);
+                    c.client().screen_open(&crate::levels::SCREEN);
                 }),
                 ("window.base.tab.advancements", |c| {
-                    c.client().open_screen(&crate::advancements::SCREEN);
+                    c.client().screen_open(&crate::advancements::SCREEN);
                 }),
             ];
             // The recipe book beside it, hand recipes only (`book.rs`).
             ui.row(S::row().gap(4.0), |ui| {
-                crate::window::window(ui, S::col().pad(7.0).gap(5.0), &tabs, |ui| {
+                crate::window::window(ui, S::column().pad(7.0).gap(5.0), &tabs, |ui| {
                     ui.row(S::row().gap(1.0), |ui| {
                         // Armor, and the clothes worn under it beside, the cloak under them.
-                        ui.column(S::col(), |ui| {
+                        ui.column(S::column(), |ui| {
                             for slot in EQUIPMENT.iter() {
                                 ui.group(slot.name());
                             }
                         });
-                        ui.column(S::col(), |ui| {
+                        ui.column(S::column(), |ui| {
                             for slot in base_api::CLOTHES.iter() {
                                 ui.group(slot.name());
                             }
@@ -156,13 +160,16 @@ pub fn register(r: &mut Registry) {
                         });
                         ui.player_model(51.0, 72.0);
                         ui.spacer();
-                        ui.column(S::col().gap(2.0), |ui| {
+                        ui.column(S::column().gap(2.0).stretch(), |ui| {
                             ui.text_styled(S::default().no_wrap(), "window.base.crafting", &[]);
                             ui.row(S::row().gap(4.0), |ui| {
                                 ui.group("grid");
                                 ui.recipe_arrow();
                                 ui.group("result");
                             });
+                            // Upstream's off-hand slot, under the grid.
+                            ui.spacer();
+                            ui.group(OFF_HAND.name());
                         });
                     });
                     ui.player_inventory(false);
@@ -170,7 +177,7 @@ pub fn register(r: &mut Registry) {
                 // Not in creative: its item picker takes the left side and has every item, and the
                 // picker, the inventory and the book side by side were wider than a 1280 x 720
                 // screen at GUI scale 2 (both ends cut off, the label check, 11-04).
-                if !ui.client().creative() {
+                if !ui.view().creative() {
                     crate::book::book(ui, crate::book::Station::Hands);
                 }
             });
@@ -197,7 +204,7 @@ pub fn register(r: &mut Registry) {
         .screen(|ui| {
             // The recipe book beside it: every recipe, from the bag and the chests near the table.
             ui.row(S::row().gap(4.0), |ui| {
-                crate::window::window(ui, S::col().pad(7.0).gap(4.0).stretch(), &[], |ui| {
+                crate::window::window(ui, S::column().pad(7.0).gap(4.0).stretch(), &[], |ui| {
                     ui.row(S::row().gap(8.0), |ui| {
                         ui.spacer();
                         ui.group("grid");
@@ -215,14 +222,14 @@ pub fn register(r: &mut Registry) {
 }
 
 fn armor_applies(cause: u32) -> bool {
-    cause & damage::BYPASSES_ARMOR == 0
+    DamageCause::flags_of(cause) & damage_flags::BYPASSES_ARMOR == 0
 }
 
 /// The `result` slot shows what the `grid` makes.
 fn craft_result(m: &MenuCtx) {
     let grid = m.group("grid");
     let cells: Vec<ItemStack> = (0..grid.len()).map(|i| grid.get(i)).collect();
-    let made = recipe_match(&crate::recipes::CRAFTING, &cells, grid.cols(), grid.rows());
+    let made = recipe_grid_output(&crate::recipes::CRAFTING, &cells, grid.cols(), grid.rows());
     // Food made of food is as far along as its stalest part, and nothing comes of spoiled food.
     let made = crate::survival::crafted(&cells, made, m.world().day_time());
     // An axe lashed by hand takes its parts from the grid (`first.rs`).
@@ -239,7 +246,7 @@ fn consume_grid(m: &MenuCtx) {
     }
     let grid = m.group("grid");
     let cells: Vec<ItemStack> = (0..grid.len()).map(|i| grid.get(i)).collect();
-    let made = recipe_match(&crate::recipes::CRAFTING, &cells, grid.cols(), grid.rows());
+    let made = recipe_grid_output(&crate::recipes::CRAFTING, &cells, grid.cols(), grid.rows());
     if !made.is_empty() {
         crate::advancements::crafted(&m.world(), m.player(), made.item);
     }
@@ -247,7 +254,7 @@ fn consume_grid(m: &MenuCtx) {
     for i in 0..grid.len() {
         let s = grid.get(i);
         if !s.is_empty() {
-            grid.set(i, use_one(s));
+            grid.set(i, consume_one(s));
             used += 1;
         }
     }

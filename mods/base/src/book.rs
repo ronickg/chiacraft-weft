@@ -128,7 +128,7 @@ pub fn register(r: &mut Registry) {
             c.send(&POOL_ASK, &[station as u64]);
         }
         let open = BOOK.lock().map_or(u32::MAX, |b| b.asked);
-        let window = c.menu().map_or(u32::MAX, |m| m[1]);
+        let window = c.menu().map_or(u32::MAX, |m| m.window);
         if open == u32::MAX || window != open {
             return;
         }
@@ -302,14 +302,14 @@ struct Source {
 
 /// The crafting table nearest `player` within `TABLE_REACH`, if any.
 fn table_near(w: &World, player: u64) -> Option<[i32; 3]> {
-    let p = w.entity(player)?.pos.map(|v| v.floor() as i32);
+    let p = block_pos_of(w.entity(player)?.pos).to_array();
     let mut best: Option<([i32; 3], i32)> = None;
     for dx in -TABLE_REACH..=TABLE_REACH {
         for dy in -TABLE_REACH..=TABLE_REACH {
             for dz in -TABLE_REACH..=TABLE_REACH {
                 let at = [p[0] + dx, p[1] + dy, p[2] + dz];
                 let d = dx * dx + dy * dy + dz * dz;
-                if TABLES.on_block(w.get(at)) && best.is_none_or(|b| d < b.1) {
+                if TABLES.on_block(w.block(at)) && best.is_none_or(|b| d < b.1) {
                     best = Some((at, d));
                 }
             }
@@ -326,7 +326,7 @@ fn chests_near(w: &World, table: [i32; 3]) -> Vec<u64> {
         for dy in -r..=r {
             for dz in -r..=r {
                 let at = [table[0] + dx, table[1] + dy, table[2] + dz];
-                if CHESTS.on_block(w.get(at)) {
+                if CHESTS.on_block(w.block(at)) {
                     let e = w.block_entity(at);
                     if e != 0 {
                         out.push(e);
@@ -384,7 +384,7 @@ fn craft(w: &World, player: u64, station: Station, r: &Recipe, count: u32) -> u3
     if needs.is_empty() {
         return 0;
     }
-    let pos = w.entity(player).map_or([0.0; 3], |e| e.pos);
+    let pos = w.entity(player).map_or([0.0; 3], |e| e.pos.into());
     let mut made = 0;
     let mut from_chests = 0;
     while made < count {
@@ -420,7 +420,7 @@ fn craft(w: &World, player: u64, station: Station, r: &Recipe, count: u32) -> u3
             let inv = w.inventory(src[i].owner);
             let mut s = inv.get(src[i].slot);
             for _ in 0..n {
-                s = use_one(s);
+                s = consume_one(s);
             }
             inv.set(src[i].slot, s);
         }
@@ -467,7 +467,7 @@ fn roll(player: u64, n: u32) -> f32 {
 
 /// What the player has to craft with here: the bag, and at a table the chests' totals.
 fn have(ui: &Ui, station: Station, pool: &[(u32, u32)]) -> Vec<(u32, u32)> {
-    let v = ui.client();
+    let v = ui.view();
     let mut stacks = v.inventory_group(BAG_GROUPS[0]);
     stacks.extend(v.inventory_group(BAG_GROUPS[1]));
     let mut out = totals(stacks);
@@ -491,8 +491,8 @@ fn edit(f: impl FnOnce(&mut Book)) {
 /// The book: tabs, a page of recipes (what you can make first), the picked one's ingredients
 /// and the Craft buttons.
 pub fn book(ui: &mut Ui, station: Station) {
-    let client = ui.client().client();
-    let window = client.menu().map_or(0, |m| m[1]);
+    let client = ui.view().client();
+    let window = client.menu().map_or(0, |m| m.window);
     let (tab, page, picked, pool) = {
         let Ok(mut b) = BOOK.lock() else { return };
         if b.asked != window {
@@ -514,8 +514,8 @@ pub fn book(ui: &mut Ui, station: Station) {
     };
     let have = have(ui, station, &pool);
     // What the player has ever held (`discovery.rs`), and what they hold now; creative knows all.
-    let creative = ui.client().creative();
-    let mut touched = if creative { Vec::new() } else { crate::discovery::held_items(&ui.client()) };
+    let creative = ui.view().creative();
+    let mut touched = if creative { Vec::new() } else { crate::discovery::held_items(&ui.view()) };
     for &(item, _) in &have {
         if !touched.contains(&item) {
             touched.push(item);
@@ -578,8 +578,8 @@ pub fn book(ui: &mut Ui, station: Station) {
     let pages = list.len().div_ceil(PER_PAGE).max(1);
     let page = page.min(pages - 1);
 
-    ui.panel("panel", S::col().pad(7.0).gap(3.0), |ui| {
-        ui.text_styled(S::col().class("title"), "crafting.book.title", &[]);
+    ui.panel("panel", S::column().pad(7.0).gap(3.0), |ui| {
+        ui.text_styled(S::column().class("title"), "crafting.book.title", &[]);
         // The picked recipe's name, at the top (Ronald's first-day test: the book was icons only).
         if let Some((out, _)) = picked
             .and_then(recipe_of)
@@ -627,11 +627,11 @@ pub fn book(ui: &mut Ui, station: Station) {
             });
         }
         // Slots touch: their dark groove is the gap (UI guide).
-        ui.column(S::col(), |ui| {
+        ui.column(S::column(), |ui| {
             let start = page * PER_PAGE;
             let on_page = &list[start.min(list.len())..(start + PER_PAGE).min(list.len())];
             if on_page.is_empty() {
-                ui.text_styled(S::col().class("dim"), "crafting.book.empty", &[]);
+                ui.text_styled(S::column().class("dim"), "crafting.book.empty", &[]);
             }
             for row in on_page.chunks(COLS) {
                 ui.row(S::row(), |ui| {
@@ -643,7 +643,7 @@ pub fn book(ui: &mut Ui, station: Station) {
                                     &[Arg::Int(got as i64), Arg::Int(all as i64), Arg::Name(&name_of(missing))],
                                 ),
                                 |_| {},
-                                |ui| ui.text_styled(S::col().class("dim"), "crafting.book.unknown", &[]),
+                                |ui| ui.text_styled(S::column().class("dim"), "crafting.book.unknown", &[]),
                             );
                             continue;
                         }
@@ -722,7 +722,7 @@ fn picked_recipe(ui: &mut Ui, station: Station, r: &Recipe, have: &[(u32, u32)])
     if let Some(key) = crate::parts::material_key(r) {
         ui.text_args("crafting.parts.of", &[Arg::Key(key)]);
     }
-    if let Some((skill, level)) = crate::parts::skill_of(&ui.client(), r) {
+    if let Some((skill, level)) = crate::parts::skill_of(&ui.view(), r) {
         ui.text_args("crafting.parts.skill", &[Arg::Key(skill), Arg::Int(level as i64)]);
     }
     // Each distinct ingredient once, with the total it takes.
@@ -773,7 +773,7 @@ fn picked_recipe(ui: &mut Ui, station: Station, r: &Recipe, have: &[(u32, u32)])
         });
     }
     if station == Station::Hands && !fits_hands(r) {
-        ui.text_styled(S::col().class("dim"), "crafting.book.needs_table", &[]);
+        ui.text_styled(S::column().class("dim"), "crafting.book.needs_table", &[]);
         return;
     }
     ui.row(S::row().gap(2.0), |ui| {

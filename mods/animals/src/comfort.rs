@@ -15,6 +15,10 @@ use weft_sdk::*;
 use crate::animal::{self, ANIMAL, Animal};
 use crate::species::{self, SPECIES};
 
+// Base's own causes of death (`survival/body.rs`), by name: armor doesn't soften them.
+static FREEZE: DamageCause = DamageCause::named("base:freeze");
+static HEAT: DamageCause = DamageCause::named("base:heat");
+
 value! {
     #[derive(Default)]
     /// How its body is (once a second), sent to whoever has its screen open.
@@ -96,11 +100,11 @@ fn comfort(a: &Animal) -> Option<Comfort> {
 pub fn upkeep(w: &World, id: u64, a: &Animal, st: &EntityState, secs: f32) -> f32 {
     let Some(s) = a.species() else { return 1.0 };
     let Some(body) = comfort(a) else { return 1.0 };
-    let air = base_api::air_at(w, st.pos, st.size[1], st.in_liquid != 0, REACH, |_| {}).celsius;
+    let air = base_api::air_at(w, st.pos.to_array(), st.size.height, st.in_liquid != 0, REACH, |_| {}).celsius;
     let index = (a.species - 1) as usize;
     let size = crate::coats::size_of(w, id).map_or(1.0, |g| g / crate::coats::mean_size(index) * crate::breeding::growth(w, id, index));
     let mass = s.bio.mass * size.powi(3);
-    let old = w.component(id, &BODY).copied().unwrap_or_default();
+    let old = w.component(id, &BODY).unwrap_or_default();
     let (core, feeling, warmth) = if s.bio.cold_blooded {
         let mid = (s.bio.comfort.0 + s.bio.comfort.1) / 2.0;
         (air, Feeling::Comfortable, temperature::ectotherm_speed(air, mid))
@@ -129,7 +133,7 @@ pub fn upkeep(w: &World, id: u64, a: &Animal, st: &EntityState, secs: f32) -> f3
         let max = st.max_health;
         let loss = (e.modifiers().health_loss * max * d.harm * secs).min((st.health - max * TAME_FLOOR).max(0.0));
         if loss > 0.0 {
-            let cause = if e == Effect::Freezing { damage::FREEZE } else { damage::HEAT };
+            let cause = if e == Effect::Freezing { &FREEZE } else { &HEAT };
             w.damage(id, loss, 0, cause);
         }
     }
@@ -151,9 +155,9 @@ pub fn speed(w: &World, id: u64) -> f32 {
 /// A goal: cold or hot (not just chilly or warm), it goes to a better place near by (in the
 /// shade, into water, by a fire, under a roof) and rests there; it takes the turn while it does.
 pub fn seek(w: &World, id: u64, st: &EntityState) -> bool {
-    let Some(b) = w.component(id, &BODY).copied() else { return false };
+    let Some(b) = w.component(id, &BODY) else { return false };
     let uneasy = matches!(FEELINGS.get(b.feel as usize), Some(Feeling::Cold | Feeling::Freezing | Feeling::Hot | Feeling::Heatstroke));
-    let Some(seek) = w.component(id, &SEEK).copied() else { return false };
+    let Some(seek) = w.component(id, &SEEK) else { return false };
     if !uneasy {
         if seek[3] > 0.0 {
             w.navigate(id, st.pos, 0.0);
@@ -163,12 +167,12 @@ pub fn seek(w: &World, id: u64, st: &EntityState) -> bool {
         }
         return false;
     }
-    let now = w.time() as f64;
+    let now = w.game_time() as f64;
     // On its way, or resting where it went, until it looks again.
     if now < seek[3] {
         return true;
     }
-    let Some(a) = w.component(id, &ANIMAL).copied() else { return false };
+    let Some(a) = w.component(id, &ANIMAL) else { return false };
     let Some(body) = comfort(&a) else { return false };
     let (lo, hi) = body.comfort_range();
     let off = |t: f32| (lo - t).max(t - hi).max(0.0);
@@ -178,11 +182,11 @@ pub fn seek(w: &World, id: u64, st: &EntityState) -> bool {
         .map(|_| {
             let angle = w.random_below(3600) as f64 / 3600.0 * std::f64::consts::TAU;
             let dist = 2.0 + w.random_below(1000) as f64 / 1000.0 * (LOOK - 2.0);
-            ((st.pos[0] + angle.cos() * dist).floor() as i32, (st.pos[2] + angle.sin() * dist).floor() as i32)
+            ((st.pos.x + angle.cos() * dist).floor() as i32, (st.pos.z + angle.sin() * dist).floor() as i32)
         })
         .collect();
     if b.air < lo
-        && let Some(fire) = nearest_fire(w, st.pos)
+        && let Some(fire) = nearest_fire(w, st.pos.to_array())
     {
         for (dx, dz) in [(2, 0), (-2, 0), (0, 2), (0, -2), (2, 2), (-2, 2), (2, -2), (-2, -2)] {
             tries.push((fire[0] + dx, fire[2] + dz));
@@ -190,15 +194,15 @@ pub fn seek(w: &World, id: u64, st: &EntityState) -> bool {
     }
     let mut best: Option<([f64; 3], f32)> = None;
     for (x, z) in tries {
-        let Some(y) = ground(w, x, st.pos[1].floor() as i32, z) else { continue };
+        let Some(y) = ground(w, x, st.pos.y.floor() as i32, z) else { continue };
         let at = [x as f64 + 0.5, y as f64, z as f64 + 0.5];
         let wet = w.in_liquid([at[0], at[1] + 0.3, at[2]]);
-        let t = off(base_api::air_at(w, at, st.size[1], wet, REACH, |_| {}).celsius);
+        let t = off(base_api::air_at(w, at, st.size.height, wet, REACH, |_| {}).celsius);
         if t + BETTER <= here && best.is_none_or(|(_, b)| t < b) {
             best = Some((at, t));
         }
     }
-    let target = best.map_or(st.pos, |(p, _)| p);
+    let target = best.map_or(st.pos.to_array(), |(p, _)| p);
     if let Some((p, t)) = best {
         weft_sdk::debug!("animal {id} seeks comfort at {p:?}: {t:.1} °C off its comfort, {here:.1} here");
         w.navigate(id, target, 1.0);
@@ -220,7 +224,7 @@ fn nearest_fire(w: &World, pos: [f64; 3]) -> Option<[i32; 3]> {
             for dz in -r..=r {
                 let d = dx * dx + dy * dy + dz * dz;
                 let at = [p[0] + dx, p[1] + dy, p[2] + dz];
-                if best.is_none_or(|(_, b)| d < b) && base_api::heat_of(w.get(at)) > 0.0 {
+                if best.is_none_or(|(_, b)| d < b) && base_api::heat_of(w.block(at)) > 0.0 {
                     best = Some((at, d));
                 }
             }
@@ -233,9 +237,9 @@ fn nearest_fire(w: &World, pos: [f64; 3]) -> Option<[i32; 3]> {
 /// air or water.
 pub(crate) fn ground(w: &World, x: i32, y: i32, z: i32) -> Option<i32> {
     (y - 4..=y + 3).rev().find(|&y| {
-        let feet = w.get([x, y, z]);
-        let below = w.get([x, y - 1, z]);
+        let feet = w.block([x, y, z]);
+        let below = w.block([x, y - 1, z]);
         let solid = below != 0 && !w.in_liquid([x as f64 + 0.5, y as f64 - 0.5, z as f64 + 0.5]);
-        (feet == 0 || WATER.in_cell(feet)) && solid && w.get([x, y + 1, z]) == 0
+        (feet == 0 || WATER.at(w, [x, y, z])) && solid && w.block([x, y + 1, z]) == 0
     })
 }

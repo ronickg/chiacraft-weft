@@ -92,9 +92,11 @@ struct Frame {
 }
 
 fn texture_frame(name: u32) -> Frame {
-    let base = tex_info[name * 2u];
-    let info = tex_info[name * 2u + 1u];
-    let size = f32(tex_info[frames[0] * 2u + name]);
+    // Four words a texture (Weft 26.11.2): base, frames, size; a size of 0 would make every
+    // derivative NaN, and the sampler the smallest mip.
+    let base = tex_info[name * 4u];
+    let info = tex_info[name * 4u + 1u];
+    let size = f32(max(tex_info[name * 4u + 2u], 1u));
     if info == 0u {
         return Frame(base, base, 0.0, size);
     }
@@ -214,7 +216,8 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     out.clip = scene.view_proj * pos;
     out.dist = length(pos.xyz);
     out.rel = pos.xyz;
-    out.uv = UVS[c];
+    // A face's texture turned in quarters (Weft 26.11.2's block faces with a rotation).
+    out.uv = UVS[(c + ((w0 >> FACE_TURN_SHIFT) & FACE_TURN_MASK)) % 4u];
     let tex_id = w1 & FACE_TEX_MASK;
     let fr = texture_frame(tex_id);
     out.size = fr.size;

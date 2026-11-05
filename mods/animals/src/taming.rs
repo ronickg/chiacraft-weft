@@ -99,15 +99,19 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
         if !(s.taming == Method::Passive || wild) || animal::tamed(w, id) {
             return false;
         }
-        let Some(t) = w.component(id, &TAMING).copied() else { return false };
+        let Some(t) = w.component(id, &TAMING) else { return false };
         if t.scared > 0 {
             set(w, id, |t| t.scared = t.scared.saturating_sub(w.tick_elapsed(id)));
-            if (w.time() + id) % 20 == 0 || !w.navigating(id) {
+            if (w.game_time() + id) % 20 == 0 || !w.navigating(id) {
                 flee(w, id, st);
             }
             return true;
         }
-        if (w.time() + id) % 10 == 0 && s.shy > 0.0 && frightened(w, st, s.shy * shyness(w, id)) && !crate::signatures::calm(w, st.pos) {
+        if (w.game_time() + id) % 10 == 0
+            && s.shy > 0.0
+            && frightened(w, st, s.shy * shyness(w, id))
+            && !crate::signatures::calm(w, st.pos.to_array())
+        {
             scare(w, id);
             return true;
         }
@@ -125,11 +129,11 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             let bubble = BUBBLES
                 .get()
                 .and_then(|b| b.iter().find(|(item, _)| Some(*item) == food));
-            if (w.time() + id) % 20 == 0
+            if (w.game_time() + id) % 20 == 0
                 && let Some((_, p)) = bubble
             {
                 drop(
-                    w.spawn_particles(p, [st.pos[0], st.pos[1] + st.size[1] as f64 + 0.45, st.pos[2]])
+                    w.spawn_particles(p, [st.pos.x, st.pos.y + st.size.height as f64 + 0.45, st.pos.z])
                         .count(1)
                         .spread(0.0),
                 );
@@ -143,7 +147,7 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             set(w, id, |t| t.wait = t.wait.saturating_sub(w.tick_elapsed(id)));
             return false;
         }
-        if (w.time() + id) % 20 == 0 && near_player(w, st).is_some() {
+        if (w.game_time() + id) % 20 == 0 && near_player(w, st).is_some() {
             // Its favorite half the time, else anything it eats (kibble it never asks for:
             // that it always takes).
             let pick: Vec<usize> = (0..s.foods.len())
@@ -190,7 +194,7 @@ fn dist2(a: &EntityState, b: &EntityState) -> f64 {
 /// lets a walker come to 0.6 of it, a skittish one (1) runs at 1.4 times it.
 fn shyness(w: &World, id: u64) -> f32 {
     w.component(id, &crate::coats::GENOME)
-        .map_or(1.0, |g| 0.6 + 0.8 * crate::coats::temperament(g))
+        .map_or(1.0, |g| 0.6 + 0.8 * crate::coats::temperament(&g))
 }
 
 /// A player walking upright within `shy` blocks, or running within twice that.
@@ -226,14 +230,14 @@ fn flee(w: &World, id: u64, st: &EntityState) {
         .into_iter()
         .filter_map(|p| w.entity(p))
         .min_by(|a, b| dist2(a, st).total_cmp(&dist2(b, st)))
-        .map(|p| (st.pos[0] - p.pos[0], st.pos[2] - p.pos[2]))
+        .map(|p| (st.pos.x - p.pos.x, st.pos.z - p.pos.z))
         .filter(|&(x, z)| x * x + z * z > 0.01);
     let (x, z) = away.unwrap_or_else(|| {
         let a = w.random_below(628) as f64 / 100.0;
         (a.cos(), a.sin())
     });
     let n = (x * x + z * z).sqrt().max(0.01);
-    w.navigate(id, [st.pos[0] + x / n * 8.0, st.pos[1], st.pos[2] + z / n * 8.0], 1.6);
+    w.navigate(id, [st.pos.x + x / n * 8.0, st.pos.y, st.pos.z + z / n * 8.0], 1.6);
 }
 
 /// It was hurt: a taming under way loses effectiveness, and it runs off.
@@ -256,8 +260,8 @@ pub fn hurt(w: &World, id: u64) {
 /// A player right clicks a wild animal with `held`: food it eats goes toward taming it. True if
 /// the click was used.
 pub fn feed(w: &World, id: u64, player: u64) -> bool {
-    let Some(a) = w.component(id, &ANIMAL).copied() else { return false };
-    let (Some(s), Some(t)) = (a.species(), w.component(id, &TAMING).copied()) else { return false };
+    let Some(a) = w.component(id, &ANIMAL) else { return false };
+    let (Some(s), Some(t)) = (a.species(), w.component(id, &TAMING)) else { return false };
     if s.taming != Method::Passive || animal::tamed(w, id) || t.scared > 0 {
         return false;
     }
@@ -282,7 +286,7 @@ pub fn feed(w: &World, id: u64, player: u64) -> bool {
     let wanted = t.want as usize == index + 1;
     let needed = s.feedings * (1.0 + a.level() as f32 / 100.0);
     // Near a capybara it takes to you a quarter faster.
-    let calm = if crate::signatures::calm(w, st.pos) { 1.25 } else { 1.0 };
+    let calm = if crate::signatures::calm(w, st.pos.to_array()) { 1.25 } else { 1.0 };
     let gain = food.liking.taming() * if wanted { 1.25 } else { 1.0 } * calm / needed;
     let wait = WAIT_TICKS.0 + w.random_below(WAIT_TICKS.1 - WAIT_TICKS.0);
     set(w, id, |t| {
@@ -291,7 +295,7 @@ pub fn feed(w: &World, id: u64, player: u64) -> bool {
         t.asking = 0;
         t.wait = wait;
     });
-    hearts(w, st.pos, 2);
+    hearts(w, st.pos.to_array(), 2);
     if t.progress + gain >= 1.0 {
         tame(w, id, player, t.effectiveness);
     }
@@ -302,7 +306,7 @@ pub fn feed(w: &World, id: u64, player: u64) -> bool {
 fn mistake(w: &World, id: u64, st: &EntityState, scares: bool) {
     set(w, id, |t| t.effectiveness = (t.effectiveness - MISTAKE).max(0.0));
     drop(
-        w.spawn_particles(&POOF, [st.pos[0], st.pos[1] + 0.5, st.pos[2]])
+        w.spawn_particles(&POOF, [st.pos.x, st.pos.y + 0.5, st.pos.z])
             .count(4)
             .spread(0.2),
     );
@@ -354,7 +358,7 @@ pub fn tame(w: &World, id: u64, player: u64, effectiveness: f32) {
     crate::commands::tamed(w, id);
     crate::dog::on_tamed(w, id);
     if let Some(st) = w.entity(id) {
-        hearts(w, st.pos, 7);
+        hearts(w, st.pos.to_array(), 7);
     }
 }
 
@@ -369,7 +373,7 @@ fn hearts(w: &World, at: [f64; 3], count: u32) {
 
 /// One of the held item used up (unless in creative).
 pub fn take_one(w: &World, player: u64) {
-    if w.creative(player) {
+    if w.outside_survival(player) {
         return;
     }
     let inv = w.inventory(player);

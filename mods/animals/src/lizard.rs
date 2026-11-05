@@ -7,7 +7,7 @@ use weft_sdk::*;
 
 use crate::wild::{self, Body};
 
-pub(crate) static PRISCAGAMA: Entity = Entity::named("priscagama");
+pub(crate) static PRISCAGAMA: EntityKind = EntityKind::named("priscagama");
 
 static BODY: Body = Body {
     model: "lizard",

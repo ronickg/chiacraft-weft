@@ -30,7 +30,7 @@ fn biomes() -> &'static [(u32, Climate)] {
 
 fn tick(w: &World) {
     // A second at a time, and only on a new quarter day (or a time set by hand).
-    if w.time() % 20 != 0 || SEASONS.on_dimension(w.dimension()).unwrap_or(0) != calendars::FOUR {
+    if w.game_time() % 20 != 0 || SEASONS.on_dimension(w.dimension()).unwrap_or(0) != calendars::FOUR {
         return;
     }
     let time = w.day_time();

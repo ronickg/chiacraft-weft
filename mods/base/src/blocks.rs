@@ -132,8 +132,8 @@ fn axis_placement(p: &Place, props: &mut Props) {
     props.set(
         "axis",
         match p.face() {
-            0 | 1 => "x",
-            4 | 5 => "z",
+            Dir::West | Dir::East => "x",
+            Dir::North | Dir::South => "z",
             _ => "y",
         },
     );
@@ -169,9 +169,14 @@ fn log(r: &mut Registry, handle: &'static Block, wood: &str, leaves: &str, shape
         .prop("felled", ["no", "a", "b"])
         .states(move |p, s| match p.get("axis") {
             "y" => s.textures(&top, &side, &top),
-            "x" => s.faces([&top, &top, &side, &side, &side, &side]),
+            // The bark runs along the log.
+            "x" => s
+                .faces([&top, &top, &side, &side, &side, &side])
+                .face_turns([0, 0, 1, 1, 1, 1]),
             "bark" => s.texture(&side),
-            _ => s.faces([&side, &side, &side, &side, &top, &top]),
+            _ => s
+                .faces([&side, &side, &side, &side, &top, &top])
+                .face_turns([1, 1, 0, 0, 0, 0]),
         })
         .placement(axis_placement)
         .tab(&crate::tabs::NATURAL);
@@ -225,13 +230,13 @@ fn woods(r: &mut Registry) {
             .texture(&format!("sapling_{wood}"))
             .plant()
             .needs_below("#sapling_soil")
-            .growth(crate::growth::step_secs(plant, 1, 470.0), 9)
-            .on_grow(move |e| crate::growth::grow(e, plant, false, |e| worldgen::grow_tree(e.world(), e.pos(), log_block.id())))
+            .grows(crate::growth::step_secs(plant, 1, 470.0), 9)
+            .on_grow(move |e| crate::growth::grow(e, plant, false, |e| worldgen::grow_tree(e.world(), e.pos().to_array(), log_block.id())))
             .tab(&crate::tabs::NATURAL);
         // A fruit that's a food is registered with the foods (`items.rs`), which plants it too.
         if vitals::food::find(&format!("base:{fruit}")).is_none() {
             r.item(Item::generated(fruit.into()))
-                .placed_block(sapling_block)
+                .places(sapling_block)
                 .tab(&crate::tabs::NATURAL);
         }
     }
@@ -264,9 +269,9 @@ fn grove(r: &mut Registry) {
         .hardness(0.2)
         .cutout()
         .cull_same()
-        .opacity(1)
+        .light_opacity(1)
         .tag("leaves")
-        .redstone_blocker()
+        .signal_blocker()
         .mineable("shears")
         .tab(&crate::tabs::NATURAL);
     r.loot(&DOGWOOD_LEAVES)
@@ -327,7 +332,7 @@ fn leaves(r: &mut Registry, handle: &'static Block, tex: &str, sapling: &str, fr
         // Faces between two leaves of one tree kind aren't drawn (each was drawn twice): a crown
         // keeps its outer shell and its holes (Researcher's performance report, item 9).
         .cull_same()
-        .opacity(1);
+        .light_opacity(1);
     // Its tint by how it turns in autumn (`vitals::wild::LEAVES`), but for leaves drawn in their
     // own colours (the tropical canopy's, `vitals::wild::OWN_COLOURS`).
     let b = if vitals::wild::OWN_COLOURS.contains(&handle.name()) {
@@ -336,7 +341,7 @@ fn leaves(r: &mut Registry, handle: &'static Block, tex: &str, sapling: &str, fr
         b.tint(base_api::trees::leaf_tint(vitals::wild::turn(handle.name())))
     };
     b.tag("leaves")
-        .redstone_blocker()
+        .signal_blocker()
         .mineable("shears")
         .tab(&crate::tabs::NATURAL);
     // Vanilla: a sapling one time in 20, oak leaves an apple one time in 200.
@@ -365,9 +370,9 @@ fn bloom<'a>(b: BlockBuilder<'a>, leaves: &str, open: &'static str, shut: &'stat
     let Some(seasons) = vitals::wild::blooms(leaves) else { return b };
     b.prop("bloom", 0..=1)
         .states(move |p, s| s.texture(if p.get("bloom") == "1" { open } else { shut }))
-        .growth(BLOOM_SECS, 0)
+        .grows(BLOOM_SECS, 0)
         .on_grow(move |e| {
-            let open = vitals::wild::in_bloom(seasons, base_api::ground_at(&e.world(), e.pos()).season);
+            let open = vitals::wild::in_bloom(seasons, base_api::ground_at(&e.world(), e.pos().to_array()).season);
             let want = if open { "1" } else { "0" };
             if state_prop(e.state(), "bloom") == Some(want) {
                 return;
@@ -377,15 +382,15 @@ fn bloom<'a>(b: BlockBuilder<'a>, leaves: &str, open: &'static str, shut: &'stat
             // hour after a season turned, and the world round them never settled (the tropical
             // forest's stall, found on the PC).
             let w = e.world();
-            let [x, y, z] = e.pos();
+            let [x, y, z] = e.pos().to_array();
             let kind = block_name(e.state()).split('[').next().unwrap_or("");
             for dy in -BLOOM_REACH..=BLOOM_REACH {
                 for dz in -BLOOM_REACH..=BLOOM_REACH {
                     for dx in -BLOOM_REACH..=BLOOM_REACH {
                         let p = [x + dx, y + dy, z + dz];
-                        let st = w.get(p);
+                        let st = w.block(p);
                         if block_name(st).split('[').next() == Some(kind) && state_prop(st, "bloom") != Some(want) {
-                            w.set_prop(p, "bloom", want);
+                            w.prop_set(p, "bloom", want);
                         }
                     }
                 }
@@ -431,6 +436,8 @@ fn plant(r: &mut Registry, handle: &'static Block, tex: &str) {
         .sound_group("grass")
         .texture(tex)
         .plant()
+        .replaceable()
+        .hitbox([5.0, 0.0, 5.0], [11.0, 10.0, 11.0])
         .needs_below("#plant_soil")
         .tab(&crate::tabs::NATURAL);
 }
@@ -440,11 +447,29 @@ pub fn register(r: &mut Registry) {
     // The leaves' tint kinds besides foliage (`base_api::trees`), as green as foliage by default.
     r.tint_kind(&base_api::trees::EVERGREEN, vitals::foliage::muted(vitals::foliage::LEAVES));
     r.tint_kind(&base_api::trees::YELLOW_LEAVES, vitals::foliage::muted(vitals::foliage::LEAVES));
+    // Any block of any mod tagged so comes in these too.
+    r.tag(
+        "has_shapes",
+        &[
+            "base:stone",
+            "base:cobblestone",
+            "base:mossy_cobblestone",
+            "base:sandstone",
+            "base:bricks",
+            "base:stone_bricks",
+            "base:oak_planks",
+            "base:birch_planks",
+            "base:spruce_planks",
+        ],
+    );
+    r.stairs("#has_shapes").tab(&crate::tabs::BUILDING);
+    r.slabs("#has_shapes").tab(&crate::tabs::BUILDING);
+    r.vertical_slabs("#has_shapes").tab(&crate::tabs::BUILDING);
     r.block(&STONE)
         .sound_group("stone")
         .hardness(1.5)
         .mineable("pickaxe")
-        .needs_tool(0)
+        .needs_tool_level(0)
         .drops("cobblestone", 1)
         .tag("stone")
         .tag("smooth_stone")
@@ -454,7 +479,7 @@ pub fn register(r: &mut Registry) {
         .sound_group("stone")
         .hardness(2.0)
         .mineable("pickaxe")
-        .needs_tool(0)
+        .needs_tool_level(0)
         .tag("stone")
         .tag("cobblestone")
         .tag("materials/stone")
@@ -463,7 +488,7 @@ pub fn register(r: &mut Registry) {
         .sound_group("stone")
         .hardness(2.0)
         .mineable("pickaxe")
-        .needs_tool(0)
+        .needs_tool_level(0)
         .tab(&crate::tabs::BUILDING);
     r.block(&DIRT)
         .sound_group("gravel")
@@ -481,7 +506,7 @@ pub fn register(r: &mut Registry) {
         .tag("dirt")
         // Vanilla's pace: a minute or so under a block, many minutes to cover bare dirt.
         .spreads("#grass_spreads_to", 765.0, 9)
-        .smothered("dirt", 68.0)
+        .smothered_into("dirt", 68.0)
         .tab(&crate::tabs::NATURAL);
     r.block(&SNOWY_GRASS)
         .sound_group("grass")
@@ -515,7 +540,7 @@ pub fn register(r: &mut Registry) {
         .textures("sandstone_top", "sandstone_side", "sandstone_bottom")
         .hardness(0.8)
         .mineable("pickaxe")
-        .needs_tool(0)
+        .needs_tool_level(0)
         .tab(&crate::tabs::BUILDING);
     for (block, textures) in [
         (&GRANITE, None),
@@ -533,7 +558,7 @@ pub fn register(r: &mut Registry) {
             .sound_group("stone")
             .hardness(1.2)
             .mineable("pickaxe")
-            .needs_tool(0);
+            .needs_tool_level(0);
         match textures {
             Some((top, side, bottom)) => b.textures(top, side, bottom),
             None => b,
@@ -547,17 +572,17 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::NATURAL);
     // Blue lamps and glass are made with it.
     r.block(&ICE)
-        .redstone_blocker()
+        .signal_blocker()
         .sound_group("glass")
         .tag("ice")
         .tag("dyes/blue")
         .hardness(0.5)
         .translucent()
-        .opacity(2)
+        .light_opacity(2)
         .friction(0.98)
         .mineable("pickaxe")
         // Itself with a pickaxe (Research round 3, U1: it's the only blue dye).
-        .needs_tool(0)
+        .needs_tool_level(0)
         .tab(&crate::tabs::NATURAL);
     // Water's skin of ice in the cold (`snow.rs`, `vitals::air::freeze_chance`), drawn as ice: it
     // thaws back to water in the warmth, also away from players (`snow::ice_step`). Broken, it's
@@ -567,12 +592,12 @@ pub fn register(r: &mut Registry) {
         .texture("ice")
         .hardness(0.5)
         .translucent()
-        .opacity(2)
+        .light_opacity(2)
         .friction(0.98)
         .mineable("pickaxe")
         .drops_nothing()
         .no_item()
-        .growth(vitals::air::ICE_THAW_SECS, 0)
+        .grows(vitals::air::ICE_THAW_SECS, 0)
         .on_grow(crate::snow::ice_step);
     // Packed by its own weight: opaque, slippery like ice, mined with a pickaxe.
     r.block(&GLACIER_ICE)
@@ -581,7 +606,7 @@ pub fn register(r: &mut Registry) {
         .hardness(0.5)
         .friction(0.98)
         .mineable("pickaxe")
-        .needs_tool(0)
+        .needs_tool_level(0)
         .tab(&crate::tabs::NATURAL);
     // Coral: stony, mined with a pickaxe, dropping itself.
     for (block, texture) in [
@@ -594,7 +619,7 @@ pub fn register(r: &mut Registry) {
             .texture(texture)
             .hardness(1.0)
             .mineable("pickaxe")
-            .needs_tool(0)
+            .needs_tool_level(0)
             .tag("coral")
             .tab(&crate::tabs::NATURAL);
     }
@@ -611,13 +636,13 @@ pub fn register(r: &mut Registry) {
         .sound_group("stone")
         .hardness(50.0)
         .mineable("pickaxe")
-        .needs_tool(tool_tier::DIAMOND)
+        .needs_tool_level(tool_tier::DIAMOND)
         .tab(&crate::tabs::NATURAL);
     r.block(&COAL_ORE)
         .sound_group("stone")
         .hardness(3.0)
         .mineable("pickaxe")
-        .needs_tool(0)
+        .needs_tool_level(0)
         .drops("coal", 1)
         .tag("ores")
         .tag("ores/coal")
@@ -626,7 +651,7 @@ pub fn register(r: &mut Registry) {
         .sound_group("stone")
         .hardness(3.0)
         .mineable("pickaxe")
-        .needs_tool(tool_tier::STONE)
+        .needs_tool_level(tool_tier::STONE)
         .drops("raw_iron", 1)
         .tag("ores")
         .tag("ores/iron")
@@ -635,7 +660,7 @@ pub fn register(r: &mut Registry) {
         .sound_group("stone")
         .hardness(3.0)
         .mineable("pickaxe")
-        .needs_tool(tool_tier::IRON)
+        .needs_tool_level(tool_tier::IRON)
         .drops("raw_gold", 1)
         .tag("ores")
         .tag("ores/gold")
@@ -653,7 +678,7 @@ pub fn register(r: &mut Registry) {
             .texture(texture)
             .hardness(3.0)
             .mineable("pickaxe")
-            .needs_tool(tier)
+            .needs_tool_level(tier)
             .drops(drop, 1)
             .tag("ores")
             .tag(&format!("ores/{kind}"))
@@ -663,7 +688,7 @@ pub fn register(r: &mut Registry) {
         .sound_group("stone")
         .hardness(3.0)
         .mineable("pickaxe")
-        .needs_tool(tool_tier::IRON)
+        .needs_tool_level(tool_tier::IRON)
         .drops("diamond", 1)
         .tag("ores")
         .tag("ores/diamond")
@@ -711,11 +736,16 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::NATURAL);
 
     // Vanilla numbers: water steps every 5 ticks and reaches 7 blocks, lava every 30 and 3.
+    // Players swim in water; what they wear may add more (`SWIMS_IN` on an item).
+    r.set_text_on(Target::Entity("core:player"), &SWIMS_IN, "#water");
     r.liquid(&WATER)
         .tint(&tints::WATER)
         .translucent()
         .renewable(2)
         .fog(0x050533, 96.0)
+        .set_text(&DRIP, abi::particle::DRIP)
+        .set_text(&SPLASH, abi::particle::SPLASH)
+        .set_text(&BUBBLE, abi::particle::BUBBLE)
         .tag("water")
         .bucket(Item::generated("water_bucket".into()), &crate::items::BUCKET, &crate::tabs::TOOLS);
     r.liquid(&LAVA)
@@ -725,21 +755,20 @@ pub fn register(r: &mut Registry) {
         .drop_off(2)
         .slope_find(2)
         .temperature(1300)
-        .not_swimmable()
         .fog(0x991A00, 1.0)
         .no_overlay()
         .tag("lava")
-        .tag("hot")
         .bucket(Item::generated("lava_bucket".into()), &crate::items::BUCKET, &crate::tabs::TOOLS);
     r.liquid_reaction("#hot", "#water")
-        .source_block("obsidian")
-        .flowing_block("cobblestone")
-        .turns_below_into("stone");
+        .source_turns_into("obsidian")
+        .flowing_turns_into("cobblestone")
+        .below_turns_into("stone");
 
     r.block(&TALL_GRASS)
         .sound_group("grass")
         .texture("tallgrass")
         .plant()
+        .replaceable()
         .needs_below("#plant_soil")
         .tint(&tints::GRASS)
         .no_item();
@@ -759,10 +788,10 @@ pub fn register(r: &mut Registry) {
         .needs_below("#plant_soil")
         .tint(&tints::GRASS)
         .no_item()
-        .growth(crate::growth::step_secs("base:grazed_grass", 1, 600.0), 9)
+        .grows(crate::growth::step_secs("base:grazed_grass", 1, 600.0), 9)
         .on_grow(|e| {
             crate::growth::grow(e, "base:grazed_grass", false, |e| {
-                e.world().set(e.pos(), TALL_GRASS.id());
+                e.world().set_block(e.pos(), TALL_GRASS.id());
             })
         });
     plant(r, &DANDELION, "flower_dandelion");
@@ -776,25 +805,26 @@ pub fn register(r: &mut Registry) {
         .texture("sapling_oak")
         .plant()
         .needs_below("#plant_soil")
-        .growth(crate::growth::step_secs("base:sapling", 1, 470.0), 9)
-        .on_grow(|e| crate::growth::grow(e, "base:sapling", false, |e| worldgen::grow_tree(e.world(), e.pos(), OAK_LOG.id())))
+        .grows(crate::growth::step_secs("base:sapling", 1, 470.0), 9)
+        .on_grow(|e| crate::growth::grow(e, "base:sapling", false, |e| worldgen::grow_tree(e.world(), e.pos().to_array(), OAK_LOG.id())))
         .tab(&crate::tabs::NATURAL);
     r.block(&SUGAR_CANE)
         .sound_group("grass")
         .texture("reeds")
         .plant()
         .needs_below("#sugar_cane_soil")
-        .needs_near_support("#water")
-        .growth(crate::growth::step_secs("base:sugar_cane", 1, 270.0), 0)
+        .needs_near("#water")
+        .grows(crate::growth::step_secs("base:sugar_cane", 1, 270.0), 0)
         .on_grow(|e| crate::growth::grow(e, "base:sugar_cane", false, |e| grow_column(e, &SUGAR_CANE)))
         .tab(&crate::tabs::NATURAL);
     r.block(&CACTUS)
         .sound_group("cloth")
         .textures("cactus_top", "cactus_side", "cactus_top")
         .model_box([1.0, 0.0, 1.0], [15.0, 16.0, 15.0])
+        .hitbox([1.0, 0.0, 1.0], [15.0, 16.0, 15.0])
         .hardness(0.4)
         .needs_below("#cactus_soil")
-        .growth(crate::growth::step_secs("base:cactus", 1, 270.0), 0)
+        .grows(crate::growth::step_secs("base:cactus", 1, 270.0), 0)
         .on_grow(|e| crate::growth::grow(e, "base:cactus", false, |e| grow_column(e, &CACTUS)))
         .tab(&crate::tabs::NATURAL);
     r.block(&WHEAT)
@@ -805,7 +835,7 @@ pub fn register(r: &mut Registry) {
         .needs_below("#crop_soil")
         .no_item()
         // By warmth and rain (`growth.rs`): seven stages over its real 110 days' pace.
-        .growth(crate::growth::step_secs("base:wheat", 7, 205.0), 9)
+        .grows(crate::growth::step_secs("base:wheat", 7, 205.0), 9)
         .on_grow(|e| crate::growth::grow(e, "base:wheat", false, |e| crate::growth::next_age(e, 7)));
     // Modern's: unripe gives its seed back, ripe gives the wheat and up to 3 more seeds.
     r.loot(&WHEAT)
@@ -828,17 +858,16 @@ pub fn register(r: &mut Registry) {
             };
             s.textures(&top, "dirt", "dirt")
         })
-        .growth(vitals::soil::FALLOW_SECS, 0)
+        .grows(vitals::soil::FALLOW_SECS, 0)
         .on_grow(crate::farming::fallow)
         .model_box([0.0, 0.0, 0.0], [16.0, 15.0, 16.0])
-        .flags(0, 0)
         .hardness(0.6)
         .mineable("shovel")
         .drops("dirt", 1)
         .tab(&crate::tabs::NATURAL);
 
     r.block(&GLASS)
-        .redstone_blocker()
+        .signal_blocker()
         .sound_group("glass")
         .tag("glass")
         .cutout()
@@ -848,12 +877,12 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::BUILDING);
     for (name, col) in [("red", [0u8, 12, 12]), ("green", [12, 0, 12]), ("blue", [12, 12, 0])] {
         r.block(Block::generated(format!("{name}_stained_glass")))
-            .redstone_blocker()
+            .signal_blocker()
             .sound_group("glass")
             .tag(&format!("stained_glass/{name}"))
             .texture(&format!("glass_{name}"))
             .translucent()
-            .filter(col[0], col[1], col[2])
+            .light_filter(col[0], col[1], col[2])
             .hardness(0.3)
             .tab(&crate::tabs::COLORED);
     }
@@ -871,7 +900,7 @@ pub fn register(r: &mut Registry) {
         .faces([
             "crafting_table_side",
             "crafting_table_side",
-            "planks_oak",
+            "crafting_table_bottom",
             "crafting_table_top",
             "crafting_table_front",
             "crafting_table_front",
@@ -897,13 +926,10 @@ pub fn register(r: &mut Registry) {
         .facing(Facings::HORIZONTAL, Toward::Face)
         .states(|p, s| {
             let d = p.facing();
-            let (min, max) = match d {
-                Dir::South => ([0.0, 0.0, 0.0], [16.0, 16.0, 1.0]),
-                Dir::North => ([0.0, 0.0, 15.0], [16.0, 16.0, 16.0]),
-                Dir::East => ([0.0, 0.0, 0.0], [1.0, 16.0, 16.0]),
-                _ => ([15.0, 0.0, 0.0], [16.0, 16.0, 16.0]),
-            };
-            s.model_box(min, max).needs(d.opposite().face(), "")
+            // Against the wall to the north when it faces south.
+            s.oriented(weft_sdk::signal::Orientation::new(Dir::Down, d.opposite()))
+                .model_box([0.0, 0.0, 0.0], [16.0, 16.0, 1.0])
+                .needs(d.opposite(), "")
         })
         .climbable()
         .not_solid()
@@ -916,44 +942,45 @@ pub fn register(r: &mut Registry) {
         .hardness(0.3)
         .tab(&crate::tabs::NATURAL);
     r.block(&BRICKS)
+        .faces(["bricks_side_1", "bricks_side_4", "bricks_bottom", "bricks_top", "bricks_side_3", "bricks_side_2"])
         .sound_group("stone")
         .hardness(2.0)
         .mineable("pickaxe")
-        .needs_tool(0)
+        .needs_tool_level(0)
         .tab(&crate::tabs::BUILDING);
     r.block(&STONE_BRICKS)
         .sound_group("stone")
-        .texture("stonebrick")
+        .faces(["stonebrick_side_1", "stonebrick_side_4", "stonebrick_bottom", "stonebrick_top", "stonebrick_side_3", "stonebrick_side_2"])
         .hardness(1.5)
         .mineable("pickaxe")
-        .needs_tool(0)
+        .needs_tool_level(0)
         .tab(&crate::tabs::BUILDING);
     r.block(&IRON_BLOCK)
         .sound_group("stone")
         .hardness(5.0)
         .mineable("pickaxe")
-        .needs_tool(tool_tier::STONE)
+        .needs_tool_level(tool_tier::STONE)
         .tag("ore_blocks/iron")
         .tab(&crate::tabs::BUILDING);
     r.block(&GOLD_BLOCK)
         .sound_group("stone")
         .hardness(3.0)
         .mineable("pickaxe")
-        .needs_tool(tool_tier::IRON)
+        .needs_tool_level(tool_tier::IRON)
         .tag("ore_blocks/gold")
         .tab(&crate::tabs::BUILDING);
     r.block(&DIAMOND_BLOCK)
         .sound_group("stone")
         .hardness(5.0)
         .mineable("pickaxe")
-        .needs_tool(tool_tier::IRON)
+        .needs_tool_level(tool_tier::IRON)
         .tag("ore_blocks/diamond")
         .tab(&crate::tabs::BUILDING);
     r.block(&COAL_BLOCK)
         .sound_group("stone")
         .hardness(5.0)
         .mineable("pickaxe")
-        .needs_tool(0)
+        .needs_tool_level(0)
         .tag("ore_blocks/coal")
         .set(&FUEL, 16000)
         .tab(&crate::tabs::BUILDING);
@@ -992,9 +1019,9 @@ pub fn register(r: &mut Registry) {
             .hardness(0.2)
             .cutout()
             .cull_same()
-            .opacity(1)
+            .light_opacity(1)
             .tag("leaves")
-            .redstone_blocker()
+            .signal_blocker()
             .mineable("shears")
             .tab(&crate::tabs::NATURAL);
         r.loot(b)
@@ -1100,7 +1127,7 @@ pub fn register(r: &mut Registry) {
         })
         .hardness(0.6)
         .mineable("axe")
-        .growth(vitals::soil::compost_secs(), 0)
+        .grows(vitals::soil::compost_secs(), 0)
         .on_grow(crate::farming::rot)
         .on_use(crate::farming::bin)
         .tab(&crate::tabs::FUNCTIONAL);
@@ -1140,39 +1167,21 @@ pub fn register(r: &mut Registry) {
     r.tag("animal_spawn", &["grass"]);
 }
 
-/// Torches stand on the floor or hang on a wall, facing away from it.
-pub const TORCH_FACINGS: Facings = Facings::only(&[Dir::Up, Dir::North, Dir::East, Dir::South, Dir::West]);
-
-/// A torch facing `d`: on the floor (`Up`), hanging (`Down`), or leaning out from the wall behind
-/// it, by vanilla's numbers.
-pub fn torch_state<'a>(d: Dir, s: State<'a>, texture: &str) -> State<'a> {
-    let side = (texture, [7.0, 6.0, 9.0, 16.0]);
-    let faces = [side, side, (texture, [7.0, 13.0, 9.0, 15.0]), (texture, [7.0, 6.0, 9.0, 8.0]), side, side];
-    let s = s.texture(texture).needs(d.opposite().face(), "");
-    if d.horizontal() {
-        let frame = weft_sdk::signal::Frame::leaning(d.opposite());
-        s.framed_box_with(frame, [-1.0, 3.5, 7.0], [1.0, 13.5, 9.0], faces, [0; 6], Some(([0.0, 3.5, 8.0], Dir::South, -22.5)))
-            .framed_selection(frame, [0.0, 3.0, 5.5], [5.0, 13.0, 10.5])
-    } else {
-        let frame = weft_sdk::signal::Frame::new(d.opposite(), Dir::North);
-        s.framed_box(frame, [7.0, 0.0, 7.0], [9.0, 10.0, 9.0], faces)
-            .framed_selection(frame, [6.0, 0.0, 6.0], [10.0, 10.0, 10.0])
-    }
-}
+pub use weft_sdk::shapes::{TORCH_FACINGS, stick_faces, torch_state};
 
 /// Sugar cane and cacti grow a block on top, up to three high.
 fn grow_column(e: &mut BlockEvent, me: &'static Block) {
     let w = e.world();
     let p = e.pos();
-    let above = [p[0], p[1] + 1, p[2]];
-    if w.get(above) != 0 {
+    let above = [p.x, p.y + 1, p.z];
+    if w.block(above) != 0 {
         return;
     }
     let mut height = 1;
-    while height < 3 && me.is(w.get([p[0], p[1] - height, p[2]])) {
+    while height < 3 && me.is(w.block([p.x, p.y - height, p.z])) {
         height += 1;
     }
     if height < 3 {
-        w.set(above, me.id());
+        w.set_block(above, me.id());
     }
 }

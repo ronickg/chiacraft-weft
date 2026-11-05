@@ -6,6 +6,7 @@ mod beds;
 mod blocks;
 mod book;
 mod clothing;
+mod commands;
 mod cooking;
 mod crafts;
 mod crops;
@@ -90,6 +91,7 @@ fn init(r: &mut Registry) {
         r.creative_tab(tab, icon);
     }
     blocks::register(r);
+    commands::register(r);
     wild::register(r);
     crops::register(r);
     items::register(r);
@@ -136,28 +138,28 @@ fn init(r: &mut Registry) {
     r.dimension(&OVERWORLD)
         .player_spawn()
         // A fair first place: level plains, temperate, by water and woods (`base_api::land::spawn`).
-        .spawn(fair_spawn)
+        .spawn_point(|seed| fair_spawn(seed).into())
         .sky_above(16)
         .day_length(24000)
         .seasons(vitals::calendar::YEAR_DAYS, base_api::calendars::FOUR_SWING)
         .set(&base_api::SEASONS, base_api::calendars::FOUR)
-        .weather();
+        .weathers(&[&weathers::RAIN, &weathers::THUNDER]);
     // Second dimension on purpose: nothing in the engine may assume there is only one world.
     r.dimension(&FLATLANDS)
         .generator(worldgen::flat)
         .bare()
-        .spawn(|_| [0, 3, 0])
-        .height(-2, 8)
+        .spawn_point(|_| [0, 3, 0].into())
+        .height_cubes(-2, 8)
         .sky_above(1)
         .fixed_time(6000)
         .gravity(20.0)
-        .sky(0xb0c8ff, 0xe0e8ff);
+        .sky_color(0xb0c8ff, 0xe0e8ff);
     for dim in [&OVERWORLD, &FLATLANDS] {
         r.sky_stars(dim, &STARS).count(1500);
         r.sky_clouds(dim, &CLOUDS).texture("clouds");
         r.sky_body(dim, &SUN)
             .texture("sun")
-            .additive()
+            .blend_add()
             .size(33.0)
             .glow(0xFFE633)
             // Its path leaned 35° to the south (Bliss's and Complementary's sun paths lean about
@@ -173,7 +175,7 @@ fn init(r: &mut Registry) {
         // lights the night, no moon is dark).
         r.sky_body(dim, &MOON)
             .texture("moon_phases")
-            .additive()
+            .blend_add()
             .frames(4, 2)
             .size(23.0)
             .orbit(vitals::calendar::DAY_TICKS as f32 * 8.0 / 7.0)

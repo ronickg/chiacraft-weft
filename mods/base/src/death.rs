@@ -31,8 +31,8 @@ struct Death {
 static LAST: Mutex<Option<Death>> = Mutex::new(None);
 
 pub fn register(r: &mut Registry) {
-    r.entity_component(&GRACE, 0.0, component_flags::SAVE | component_flags::KEEP | component_flags::SYNC_OWNER);
-    r.entity_component(&DROPPED, 0, component_flags::KEEP);
+    r.entity_component(&GRACE, 0.0, component_flags::SAVE | component_flags::KEEP_ON_RESPAWN | component_flags::SYNC_OWNER);
+    r.entity_component(&DROPPED, 0, component_flags::KEEP_ON_RESPAWN);
     r.attach(&PLAYER, &DROPPED);
     r.attach(&PLAYER, &GRACE);
     // Back from the dead: monsters leave one be until the tombstone is reached.
@@ -47,10 +47,10 @@ pub fn register(r: &mut Registry) {
     });
     // No creature hurts one in grace (monsters, their arrows, wild hunters); falls, fire and the
     // cold still do.
-    r.intercept(&question::HURT, |q| {
+    r.intercept(&actions::HURT, |q| {
         let w = q.world();
         let source = q.query().other;
-        let in_grace = w.component(q.entity(), &GRACE).is_some_and(|g| *g > 0.0);
+        let in_grace = w.component(q.entity(), &GRACE).is_some_and(|g| g > 0.0);
         if in_grace && source != 0 && source != q.entity() && !w.players().contains(&source) { Verdict::Deny } else { Verdict::Abstain }
     });
     r.world_tick(watch);
@@ -59,15 +59,16 @@ pub fn register(r: &mut Registry) {
 
 /// Whether `player` is in grace now (monsters don't go after them, `mobs.rs`).
 pub fn in_grace(w: &World, player: u64) -> bool {
-    w.component(player, &GRACE).is_some_and(|g| *g > 0.0)
+    w.component(player, &GRACE).is_some_and(|g| g > 0.0)
 }
 
 /// Tells the one who died what killed them and where their things are (after the tombstone is
 /// placed, `levels.rs`).
 pub fn tell(w: &World, d: &abi::Death) {
-    use abi::damage as dm;
-    let killer = (d.killer != 0 && d.killer != d.entity)
-        .then(|| w.entity(d.killer))
+    use abi::damage_cause as dm;
+    use crate::survival::body::{BLEED, FREEZE, HEAT, POISON};
+    let killer = (d.source != 0 && d.source != d.entity)
+        .then(|| w.entity(d.source))
         .flatten()
         .map(|e| format!("entity.{}", name_of(abi::entry_kind::ENTITY, e.kind).replace(':', ".")));
     let cause = match (d.cause, &killer) {
@@ -81,13 +82,13 @@ pub fn tell(w: &World, d: &abi::Death) {
         (dm::CRUSH, _) => "crush",
         (dm::EXPLOSION, _) => "explosion",
         (dm::SUFFOCATE, _) => "suffocate",
-        (dm::FREEZE, _) => "freeze",
-        (dm::HEAT, _) => "heat",
-        (dm::POISON, _) => "poison",
-        (dm::BLEED, _) => "bleed",
+        (c, _) if c == FREEZE.id() => "freeze",
+        (c, _) if c == HEAT.id() => "heat",
+        (c, _) if c == POISON.id() => "poison",
+        (c, _) if c == BLEED.id() => "bleed",
         _ => "generic",
     };
-    let dropped = w.component(d.entity, &DROPPED).is_some_and(|x| *x != 0);
+    let dropped = w.component(d.entity, &DROPPED).is_some_and(|x| x != 0);
     let grave = w
         .component(d.entity, &GRAVE)
         .filter(|g| g.set != 0)
@@ -99,7 +100,7 @@ pub fn tell(w: &World, d: &abi::Death) {
 /// Once a second: the grace runs down; reaching the tombstone (or its being gone) ends the marker
 /// and leaves the grace `GRACE_AT_GRAVE` seconds at most.
 fn watch(w: &World) {
-    if w.time() % 20 != 3 {
+    if w.game_time() % 20 != 3 {
         return;
     }
     for id in w.players() {
@@ -121,9 +122,9 @@ fn watch(w: &World) {
         };
         let at = [g.x, g.y, g.z];
         let d2 = (0..3)
-            .map(|i| (st.pos[i] - (at[i] as f64 + 0.5)).powi(2))
+            .map(|i| (<[f64; 3]>::from(st.pos)[i] - (at[i] as f64 + 0.5)).powi(2))
             .sum::<f64>();
-        let gone = !crate::levels::TOMBSTONE.is(w.get(at));
+        let gone = !crate::levels::TOMBSTONE.is(w.block(at));
         if d2 <= GRAVE_REACHED * GRAVE_REACHED || gone {
             if let Some(g) = w.component_mut(id, &GRAVE) {
                 g.set = 0;
@@ -163,17 +164,17 @@ fn client(r: &mut Registry) {
     r.screen(&screens::DEATH, |ui| {
         // The UI redo: a dark red-brown vignette (`death`), and in its middle a window with the
         // title, what happened, where the tombstone is, and the two ways on.
-        ui.panel("death", S::col().center().stretch(), |ui| {
+        ui.panel("death", S::column().center().stretch(), |ui| {
             ui.panel(
                 "panel",
-                S::col()
+                S::column()
                     .pad(10.0)
                     .gap(6.0)
                     .w(240.0)
                     .self_align(abi::ui_align::CENTER),
                 |ui| {
                     ui.text_styled(
-                        S::col()
+                        S::column()
                             .class("title")
                             .scale(2.0)
                             .no_wrap()
@@ -181,7 +182,7 @@ fn client(r: &mut Registry) {
                         "death.title",
                         &[],
                     );
-                    ui.text_bind_styled(S::col().self_align(abi::ui_align::CENTER), |_, out| {
+                    ui.text_bind_styled(S::column().self_align(abi::ui_align::CENTER), |_, out| {
                         let last = LAST.lock().unwrap();
                         match last.as_ref() {
                             Some(d) if !d.killer.is_empty() => out.set(&d.cause, &[Arg::Key(&d.killer)]),
@@ -189,8 +190,8 @@ fn client(r: &mut Registry) {
                             None => out.set("death.base.cause.generic", &[]),
                         }
                     });
-                    ui.panel("well", S::col().pad(5.0).stretch(), |ui| {
-                        ui.text_bind_styled(S::col().max_w(216.0), |_, out| {
+                    ui.panel("well", S::column().pad(5.0).stretch(), |ui| {
+                        ui.text_bind_styled(S::column().max_w(216.0), |_, out| {
                             let (grave, dropped) = LAST
                                 .lock()
                                 .unwrap()
@@ -206,8 +207,8 @@ fn client(r: &mut Registry) {
                         });
                     });
                     ui.row(S::row().gap(6.0).self_align(abi::ui_align::CENTER), |ui| {
-                        ui.button("death.respawn", S::col().min_w(110.0), |c| c.client().respawn());
-                        ui.button("menu.save_quit", S::col().class("button_secondary").min_w(110.0), |c| c.client().leave_world());
+                        ui.button("death.respawn", S::column().min_w(110.0), |c| c.client().respawn());
+                        ui.button("menu.save_quit", S::column().class("button_secondary").min_w(110.0), |c| c.client().world_leave());
                     });
                 },
             );
@@ -218,15 +219,15 @@ fn client(r: &mut Registry) {
     // Over the hotbar after respawning: the way to the tombstone, and the grace left.
     r.hud_element(&GRAVE_MARK, hud_anchor::ABOVE_HOTBAR, 2, |ui| {
         ui.text_bind(|c, out| {
-            let (Some(g), Some(me)) = (c.component(&GRAVE).filter(|g| g.set != 0), c.me()) else {
+            let (Some(g), Some(me)) = (c.component(&GRAVE).filter(|g| g.set != 0), c.player_state()) else {
                 out.text("");
                 return;
             };
-            if c.creative() || me.health <= 0.0 {
+            if c.outside_survival() || me.health <= 0.0 {
                 out.text("");
                 return;
             }
-            let (dx, dz) = (g.x as f64 + 0.5 - me.pos[0], g.z as f64 + 0.5 - me.pos[2]);
+            let (dx, dz) = (g.x as f64 + 0.5 - me.pos.x, g.z as f64 + 0.5 - me.pos.z);
             let dist = (dx * dx + dz * dz).sqrt().round() as i64;
             let to = (-dx).atan2(-dz) as f32;
             let way = format!("hud.base.way.{}", way(to, me.yaw));

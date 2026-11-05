@@ -9,6 +9,8 @@ use std::sync::Mutex;
 
 use weft_sdk::*;
 
+use crate::ModelFile;
+
 value! {
     #[derive(Default)]
     /// What a resting creature is doing (not saved: it just settles down again).
@@ -37,7 +39,7 @@ pub struct Settle {
 
 /// Each kind's way of settling, and its poses' looks (`animals:<kind>`, first sitting or lying,
 /// then lying), filled at registration.
-static KINDS: Mutex<Vec<(&'static Entity, Settle, &'static [String])>> = Mutex::new(Vec::new());
+static KINDS: Mutex<Vec<(&'static EntityKind, Settle, &'static [String])>> = Mutex::new(Vec::new());
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&REST, Resting::default(), 0);
@@ -47,7 +49,7 @@ pub fn init(r: &mut Registry) {
 /// geometry with `texture`, `size` blocks wide and tall; the kind attaches its resting state.
 pub fn register(
     r: &mut Registry,
-    kind: &'static Entity,
+    kind: &'static EntityKind,
     settle: Settle,
     model: &str,
     texture: &str,
@@ -56,7 +58,7 @@ pub fn register(
 ) {
     for (suffix, look) in poses {
         drop(
-            r.entity(Entity::generated(look.to_string()))
+            r.entity(EntityKind::generated(look.to_string()))
                 .size(size.0, size.1)
                 .passive()
                 .model_file(model)
@@ -119,7 +121,7 @@ fn show(w: &World, id: u64, c: &mut Resting, pose: u32, looks: &[String]) {
     if c.look != pose + 1 {
         c.look = pose + 1;
         let look = pose.checked_sub(1).and_then(|i| looks.get(i as usize));
-        w.set_look(id, look.map(String::as_str));
+        w.set_appearance(id, look.map(String::as_str));
     }
 }
 
@@ -130,7 +132,7 @@ pub fn wake(w: &World, id: u64) {
     {
         c.rest = 0;
         c.look = 1;
-        w.set_look(id, None);
+        w.set_appearance(id, None);
     }
 }
 

@@ -71,10 +71,10 @@ const THERMOMETER: (f32, f32) = (64.0, 5.0);
 const COLDEST: f32 = 31.0;
 const HOTTEST: f32 = 43.0;
 
-/// The player's vitals, none in creative or while dead (the bars hide: a dead player's are
+/// The player's vitals, none in creative or spectator or while dead (the bars hide: a dead player's are
 /// placeholders, health "0 / -1" over the death screen).
 fn vitals_of(c: &ClientView) -> Option<Vitals> {
-    if c.creative() || c.me().is_none_or(|m| m.health <= 0.0) {
+    if c.outside_survival() || c.player_state().is_none_or(|m| m.health <= 0.0) {
         return None;
     }
     c.component(&VITALS)
@@ -130,7 +130,7 @@ fn foods_held(v: &base_api::Vitals) -> Vec<(&'static vitals::food::Food, u32, f3
 /// tile.
 fn food_tile(ui: &mut Ui, k: usize) {
     let held = move |c: &ClientView| vitals_of(c).and_then(|v| foods_held(&v).get(k).copied());
-    ui.column(S::col().gap(1.0), move |ui| {
+    ui.column(S::column().gap(1.0), move |ui| {
         ui.row(S::row().size(FOOD_TILE.0, FOOD_TILE.1), move |ui| {
             ui.progress_bind("hud_food", S::default().size(FOOD_TILE.0, FOOD_TILE.1).at(0.0, 0.0), move |c| {
                 if held(c).is_some() { 1.0 } else { -1.0 }
@@ -181,11 +181,11 @@ pub fn register(r: &mut Registry) {
     // units. The level, the XP and the points to place are above the hotbar (`HUD_LEVEL`; Ronald,
     // 11-04: "1: above the hotbar").
     r.hud_element(&HUD_HEALTH, hud_anchor::TOP_LEFT, 0, |ui| {
-        ui.column(S::col().gap(1.0), |ui| {
+        ui.column(S::column().gap(1.0), |ui| {
             // The numbers inside the bar's right end, as on Ronald's sheet.
             ui.row(S::row().size(BAR.0, BAR.1), |ui| {
                 ui.progress_bind("hud_health", S::default().size(BAR.0, BAR.1), |c| {
-                    let (Some(v), Some(me)) = (vitals_of(c), c.me()) else { return -1.0 };
+                    let (Some(v), Some(me)) = (vitals_of(c), c.player_state()) else { return -1.0 };
                     bar_fill(me.health * HEALTH_SCALE / v.max_health.max(1.0), BAR_RIM)
                 });
                 ui.text_bind_styled(
@@ -193,7 +193,7 @@ pub fn register(r: &mut Registry) {
                         .no_wrap()
                         .at_pivot(BAR.0 - BAR_TEXT_INSET, BAR.1 / 2.0, [1.0, 0.5]),
                     |c, t| {
-                        let (Some(v), Some(me)) = (vitals_of(c), c.me()) else { return t.text("") };
+                        let (Some(v), Some(me)) = (vitals_of(c), c.player_state()) else { return t.text("") };
                         t.set(
                             "hud.base.bar_value",
                             &[Arg::Int((me.health * HEALTH_SCALE).round() as i64), Arg::Int(v.max_health.round() as i64)],
@@ -266,7 +266,7 @@ pub fn register(r: &mut Registry) {
     });
     // What's in the stomach: each food with the minutes it has left, and how full of each nutrient.
     r.hud_element(&HUD_STOMACH, hud_anchor::TOP_LEFT, 3, |ui| {
-        ui.column(S::col().gap(1.0), |ui| {
+        ui.column(S::column().gap(1.0), |ui| {
             // A tile per food as on Ronald's sheet ("Yes, tiles", 11-04): its picture, the minutes
             // until the last of it is digested, how many portions if more than one, and under it a
             // bar of how much of that portion is left. The places are fixed, so the HUD doesn't
@@ -356,7 +356,7 @@ pub fn register(r: &mut Registry) {
     // the sun rises earlier in summer, by the calendar), and
     // the day of the season ("Spring 3"; "Wet season 3" in the Cretaceous).
     r.hud_element(&HUD_CLOCK, hud_anchor::TOP_RIGHT, 0, |ui| {
-        ui.panel("tooltip", S::col().pad(3.0).gap(1.0).center(), |ui| {
+        ui.panel("tooltip", S::column().pad(3.0).gap(1.0).center(), |ui| {
             ui.text_bind_styled(S::default().no_wrap(), |c, t| {
                 let ticks = c.day_time() % 24000;
                 let minutes = (ticks * 60 / 1000 + 6 * 60) % (24 * 60);
@@ -388,13 +388,13 @@ pub fn register(r: &mut Registry) {
     // x and z, as on a map.
     r.hud_element(&HUD_POSITION, hud_anchor::TOP_RIGHT, 1, |ui| {
         ui.text_bind_styled(S::default().no_wrap(), |c, t| {
-            let Some(me) = c.me() else { return };
-            t.set("hud.base.position", &[Arg::Int(me.pos[0].floor() as i64), Arg::Int(me.pos[2].floor() as i64)]);
+            let Some(me) = c.player_state() else { return };
+            t.set("hud.base.position", &[Arg::Int(me.pos.x.floor() as i64), Arg::Int(me.pos.z.floor() as i64)]);
         });
     });
     // A framed picture per screen, its key beside it.
     r.hud_element(&HUD_SHORTCUTS, hud_anchor::TOP_LEFT, 10, |ui| {
-        ui.column(S::col().gap(2.0), |ui| {
+        ui.column(S::column().gap(2.0), |ui| {
             for name in SHORTCUTS {
                 ui.row(S::row().gap(3.0).center(), |ui| {
                     ui.panel("hotbar", S::row().size(18.0, 18.0).center(), |ui| {

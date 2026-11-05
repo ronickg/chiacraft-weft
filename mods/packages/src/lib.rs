@@ -56,7 +56,7 @@ fn show_line(c: &Client, text: String) {
         lines.push_back(text);
     }
     // The lock is let go first: the command may run right here, and it takes the lock.
-    c.chat("/packages_say");
+    c.say("/packages_say");
 }
 
 // ------------------------------------------------------------------ the engine's bridge
@@ -86,7 +86,7 @@ pub unsafe extern "C" fn chiacraft_register_package(host: *const Host, me: ModId
         Ok(p) => p,
         Err(errors) => {
             for e in errors {
-                unsafe { ((*host).reg_error)(reg, Str::new(&e)) };
+                unsafe { ((*host).reg_mistake)(reg, Str::new(&e)) };
             }
             return 0;
         }
@@ -95,7 +95,7 @@ pub unsafe extern "C" fn chiacraft_register_package(host: *const Host, me: ModId
     *CURRENT.lock().unwrap() = Some(pkg);
     let r = unsafe { weft_sdk::__init(host, me, reg, id, register_current) };
     if let Some(e) = CODE_ERROR.lock().unwrap().take() {
-        unsafe { ((*host).reg_error)(reg, Str::new(&e)) };
+        unsafe { ((*host).reg_mistake)(reg, Str::new(&e)) };
     }
     r
 }
@@ -178,7 +178,7 @@ fn block(r: &mut Registry, id: &str, d: &BlockDef, code: Option<&std::sync::Arc<
         b = b.mineable(m);
     }
     if let Some(l) = d.tool_level {
-        b = b.needs_tool(l);
+        b = b.needs_tool_level(l);
     }
     match &d.drops {
         Some(Drops::Name(n)) if n == "nothing" => b = b.drops_nothing(),
@@ -242,7 +242,7 @@ fn item(r: &mut Registry, id: &str, d: &ItemDef, code: Option<&std::sync::Arc<sa
         i = i.attack_damage(a);
     }
     if let Some(b) = &d.places {
-        i = i.placed_block(Block::generated(b.clone()));
+        i = i.places(&Block::generated(b.clone()));
     }
     if let Some(t) = &d.tab {
         i = i.tab(CreativeTab::generated(t.clone()));

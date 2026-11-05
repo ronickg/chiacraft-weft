@@ -36,7 +36,7 @@ pub static KNOCKOUT: Component<Knockout> = Component::named("knockout");
 pub static CLUB: Item = Item::named("club");
 pub static SEDATIVE: Item = Item::named("sedative");
 pub static DART: Item = Item::named("tranquilizer_dart");
-static DART_SHOT: Entity = Entity::named("dart");
+static DART_SHOT: EntityKind = EntityKind::named("dart");
 static SHOOTER: Component<u64> = Component::named("dart_shooter");
 static SLEEP: Particle = Particle::named("sleep");
 static TOOLS: CreativeTab = CreativeTab::named("base:tools");
@@ -74,7 +74,7 @@ pub fn init(r: &mut Registry) {
     r.item(&DART).tab(&COMBAT).on_use(|u| {
         let (w, player) = (u.world(), u.player());
         throw_dart(&w, player);
-        if !w.creative(player) {
+        if !w.outside_survival(player) {
             u.set_stack(StackData::shrink(u.stack(), 1));
         }
         true
@@ -87,9 +87,12 @@ pub fn init(r: &mut Registry) {
         .no_egg()
         .size(0.3, 0.3)
         .unpushable()
-        .health(1.0)
-        .speed(0.0)
-        .model(Model::from(vec![Part::new("body", [0.0, 1.0, 0.0]).cube([-0.5, -0.5, -4.0], [1.0, 1.0, 8.0], [0.0, 0.0])]).uv(32, 32))
+        .max_health(1.0)
+        .walk_speed(0.0)
+        .model(
+            Model::from(vec![ModelPart::new("body", [0.0, 1.0, 0.0]).cuboid([-0.5, -0.5, -4.0], [1.0, 1.0, 8.0], [0.0, 0.0])])
+                .uv_size(32, 32),
+        )
         .texture("dart")
         .attach(&SHOOTER)
         .always_active()
@@ -101,7 +104,7 @@ pub fn init(r: &mut Registry) {
         .gravity(-0.25)
         .drag(0.92)
         .fullbright();
-    r.on(&ENTITY_HURT, |b| {
+    r.on(&actions::HURT, |b| {
         let w = b.world();
         for h in b.iter() {
             hurt(&w, h);
@@ -144,14 +147,14 @@ pub fn add_torpor(w: &World, id: u64, amount: f32) {
     });
     if fell {
         weft_sdk::info!("animal {id} knocked out");
-        w.navigate(id, w.entity(id).map_or([0.0; 3], |e| e.pos), 0.0);
+        w.navigate(id, w.entity(id).map_or([0.0; 3], |e| e.pos.to_array()), 0.0);
     }
 }
 
 /// Every hurt: a hit by a player raises torpor (a club or bare hands); one on an unconscious
 /// animal costs effectiveness; an awake wild one turns on whoever hurt it.
 fn hurt(w: &World, h: &abi::Hurt) {
-    let Some(k) = w.component(h.entity, &KNOCKOUT).copied() else { return };
+    let Some(k) = w.component(h.entity, &KNOCKOUT) else { return };
     if animal::tamed(w, h.entity) || h.source == 0 {
         return;
     }
@@ -189,7 +192,7 @@ pub fn anger(w: &World, id: u64, at: u64) {
 /// torpor, waking when it's gone); angry it attacks; awake its torpor wears off.
 pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send + Sync + 'static {
     move |w, id, st| {
-        let Some(k) = w.component(id, &KNOCKOUT).copied() else { return false };
+        let Some(k) = w.component(id, &KNOCKOUT) else { return false };
         let max = max_torpor(w, id);
         // Ticks since it last ticked (a resting one, no player near, ticks now and then).
         let e = w.tick_elapsed(id);
@@ -214,9 +217,9 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
         if w.navigating(id) {
             w.navigate(id, st.pos, 0.0);
         }
-        if (w.time() + id) % 30 == 0 {
+        if (w.game_time() + id) % 30 == 0 {
             drop(
-                w.spawn_particles(&SLEEP, [st.pos[0], st.pos[1] + st.size[1] as f64 + 0.2, st.pos[2]])
+                w.spawn_particles(&SLEEP, [st.pos.x, st.pos.y + st.size.height as f64 + 0.2, st.pos.z])
                     .count(1)
                     .spread(0.1),
             );
@@ -266,9 +269,9 @@ fn wake_up(w: &World, id: u64, index: usize, st: &EntityState) {
 
 /// The food left in its mouth falls out.
 fn spill(w: &World, id: u64, st: &EntityState) {
-    let Some(k) = w.component(id, &KNOCKOUT).copied() else { return };
+    let Some(k) = w.component(id, &KNOCKOUT) else { return };
     if k.count > 0 {
-        w.spawn_item([st.pos[0], st.pos[1] + 0.3, st.pos[2]], ItemStack::new(k.food, k.count));
+        w.spawn_item([st.pos.x, st.pos.y + 0.3, st.pos.z], ItemStack::new(k.food, k.count));
     }
     set(w, id, |k| {
         k.food = 0;
@@ -278,9 +281,9 @@ fn spill(w: &World, id: u64, st: &EntityState) {
 
 /// A bite of the food in its mouth: toward taming it, less with poorer food.
 fn bite(w: &World, id: u64, st: &EntityState) {
-    let Some(a) = w.component(id, &ANIMAL).copied() else { return };
-    let Some(k) = w.component(id, &KNOCKOUT).copied() else { return };
-    let (Some(s), Some(t)) = (a.species(), w.component(id, &TAMING).copied()) else { return };
+    let Some(a) = w.component(id, &ANIMAL) else { return };
+    let Some(k) = w.component(id, &KNOCKOUT) else { return };
+    let (Some(s), Some(t)) = (a.species(), w.component(id, &TAMING)) else { return };
     let Some((_, food)) = s.food(k.food) else { return };
     let needed = s.feedings * (1.0 + a.level() as f32 / 100.0);
     let cost = match food.liking {
@@ -322,7 +325,7 @@ fn bite(w: &World, id: u64, st: &EntityState) {
 /// A player right clicks an unconscious animal: a sedative keeps it under; food it eats goes in
 /// its mouth (the held stack, if its mouth is empty or holds the same). True if it was used.
 pub fn feed(w: &World, id: u64, player: u64) -> bool {
-    let Some(k) = w.component(id, &KNOCKOUT).copied().filter(|k| k.out != 0) else { return false };
+    let Some(k) = w.component(id, &KNOCKOUT).filter(|k| k.out != 0) else { return false };
     let inv = w.inventory(player);
     let slot = w.selected_slot(player);
     let held = inv.get(slot);
@@ -340,7 +343,7 @@ pub fn feed(w: &World, id: u64, player: u64) -> bool {
         k.food = held.item;
         k.count += held.count;
     });
-    if !w.creative(player) {
+    if !w.outside_survival(player) {
         inv.set(slot, ItemStack::EMPTY);
     }
     true
@@ -359,32 +362,32 @@ fn throw_dart(w: &World, player: u64) {
     let (sy, cy) = (p.yaw as f64).sin_cos();
     let (sp, cp) = (p.pitch as f64).sin_cos();
     let dir = [-sy * cp, sp, -cy * cp];
-    let eye = [p.pos[0] + dir[0] * 0.6, p.pos[1] + p.size[2] as f64 - 0.1 + dir[1] * 0.6, p.pos[2] + dir[2] * 0.6];
+    let eye = [p.pos.x + dir[0] * 0.6, p.pos.y + p.size.eye as f64 - 0.1 + dir[1] * 0.6, p.pos.z + dir[2] * 0.6];
     let dart = w.spawn(&DART_SHOT, eye);
     if let Some(s) = w.component_mut(dart, &SHOOTER) {
         *s = player;
     }
-    if let Some(mut s) = w.entity(dart) {
-        s.vel = dir.map(|d| d * DART_SPEED);
-        s.yaw = p.yaw;
-        w.set_entity(dart, &s);
+    if w.entity(dart).is_some() {
+        w.entity_edit(dart)
+            .velocity(dir.map(|d| d * DART_SPEED))
+            .yaw(p.yaw);
     }
 }
 
 /// A dart in flight: hitting something it stings (a little damage) and sedates; gone when it
 /// hits or lands.
 fn dart_flies(w: &World, id: u64, st: &EntityState) -> bool {
-    let shooter = w.component(id, &SHOOTER).copied().unwrap_or(0);
+    let shooter = w.component(id, &SHOOTER).unwrap_or(0);
     let hit = w
-        .near_bodies(st.pos, 0.8)
+        .targets_near(st.pos, 0.8, None)
         .into_iter()
         .find(|&e| e != id && e != shooter && w.entity(e).is_some_and(|s| s.kind != st.kind));
     if let Some(target) = hit {
-        w.damage(target, 1.0, shooter, damage::ATTACK);
+        w.damage(target, 1.0, shooter, damage_cause::ATTACK);
         add_torpor(w, target, DART_TORPOR);
-        w.remove(id);
+        w.despawn(id);
     } else if st.flags & entity_flags::BLOCKED != 0 || st.on_ground != 0 || st.age > 100 {
-        w.remove(id);
+        w.despawn(id);
     }
     true
 }

@@ -22,18 +22,18 @@ pub fn weigh(w: &World, id: u64, v: &mut Vitals, stats: &[f32; STATS]) {
 /// rejoin drops it.
 pub fn speed(w: &World, id: u64, v: &mut Vitals, stats: &[f32; STATS], mods: &Modifiers) {
     let speed = if v.out != 0 { 0.0 } else { stats[Stat::Speed.index()] * mods.speed };
-    if (v.speed - speed).abs() > 0.001 || w.time() % 100 == 0 {
+    if (v.speed - speed).abs() > 0.001 || w.game_time() % 100 == 0 {
         v.speed = speed;
-        w.add_modifier(id, &attribute::MOVEMENT_SPEED, "base:vitals", attr_op::MUL_TOTAL, (speed - 1.0) as f64, 0);
-        w.add_modifier(id, &attribute::JUMP_STRENGTH, "base:vitals", attr_op::MUL_TOTAL, if v.out != 0 { -1.0 } else { 0.0 }, 0);
+        w.attribute_add_modifier(id, &attribute::MOVEMENT_SPEED, "base:vitals", attr_op::MULTIPLY_TOTAL, (speed - 1.0) as f64, 0);
+        w.attribute_add_modifier(id, &attribute::JUMP_STRENGTH, "base:vitals", attr_op::MULTIPLY_TOTAL, if v.out != 0 { -1.0 } else { 0.0 }, 0);
     }
 }
 
 /// In creative: the body's speed as the engine's.
 pub fn reset_speed(w: &World, id: u64, v: &mut Vitals) {
     if v.speed != 1.0 {
-        w.remove_modifier(id, &attribute::MOVEMENT_SPEED, "base:vitals");
-        w.remove_modifier(id, &attribute::JUMP_STRENGTH, "base:vitals");
+        w.attribute_remove_modifier(id, &attribute::MOVEMENT_SPEED, "base:vitals");
+        w.attribute_remove_modifier(id, &attribute::JUMP_STRENGTH, "base:vitals");
         v.speed = 1.0;
     }
 }
@@ -41,7 +41,7 @@ pub fn reset_speed(w: &World, id: u64, v: &mut Vitals) {
 /// Kilograms one carries, everything in the inventory and worn (`weight`).
 fn carried(w: &World, player: u64) -> f32 {
     let inv = w.inventory(player);
-    (0..inv.size())
+    (0..inv.len())
         .map(|i| inv.get(i))
         .filter(|s| !s.is_empty())
         .map(|s| weight(item_name(s.item)) * s.count as f32)

@@ -1,8 +1,9 @@
 //! Distant terrain beyond the view: made on the GPU straight from the dimension's terrain at a
-//! coarser step (`shaders/terrain.wgsl`'s `lod`), never from cubes, so it reaches as far as wanted
-//! for a few kilobytes a tile. A tile is 32x32 cells of 2^level blocks; each cell is the column
-//! at its middle: its top block, the one under it, its biome, and tree canopies over it (no
-//! caves or edits).
+//! coarser step (`shaders/terrain.wgsl`'s `lod`), so it reaches as far as wanted for a few
+//! kilobytes a tile. A tile is 32x32 cells of 2^level blocks; each cell is the column at its
+//! middle: its top block, the one under it, its biome, and tree crowns over it. Where saved
+//! cubes made a column's top other than the terrain's (a town, a crater), the server says so
+//! (`server::lod_tops`) and that column is taken instead.
 //! Tiles are picked by distance, nearer ones split into the four of the level below; one is
 //! shown once made, its parent or children standing in until then. Where a column of real cubes
 //! shows its ground the tiles' pixels are dropped (`fs_lod`, `Lod::mask`), so they fill in for
@@ -15,6 +16,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use glam::{DVec3, IVec2};
 use rustc_hash::{FxHashMap, FxHashSet};
+
+/// Columns whose top isn't the terrain's: height, top block, the one under it.
+pub type Columns = FxHashMap<IVec2, (i32, u32, u32)>;
 
 use crate::content::{Content, content};
 use crate::gpu_layout::face;
@@ -95,6 +99,8 @@ pub struct LodJob {
     pub done: Sender<LodMesh>,
     /// Cleared when the tile is no longer wanted: the work left is skipped.
     pub live: Arc<AtomicBool>,
+    /// What the server said of columns, taken over the terrain's where the tile samples them.
+    pub columns: Arc<Columns>,
 }
 
 impl LodJob {
@@ -129,13 +135,16 @@ pub struct LodMesh {
 }
 
 /// What came back for `job`, meshed on a worker.
-pub fn made(job: LodJob, words: Vec<u32>) {
+pub fn made(job: LodJob, mut words: Vec<u32>) {
     if !job.live() {
         return;
     }
     pool().spawn(move || {
         if !job.live() {
             return;
+        }
+        if !job.columns.is_empty() {
+            take_columns(&job, &mut words);
         }
         let (quads, skip, y) = if job.key.smooth() {
             mesh_smooth(content(), job.dim, job.seed, job.key, &words)
@@ -147,6 +156,24 @@ pub fn made(job: LodJob, words: Vec<u32>) {
             .done
             .send(LodMesh { dim: job.dim, seed: job.seed, key: job.key, quads, skip, y });
     });
+}
+
+/// Saved columns over the terrain's where the tile samples them (at the cells' middles, or a
+/// smooth tile's corners): their ground, and no crown (whatever stands there now is in them).
+fn take_columns(job: &LodJob, words: &mut [u32]) {
+    let (s, o) = (1 << job.key.level, job.key.origin());
+    let mid = if job.key.smooth() { 0 } else { s / 2 };
+    for k in 0..SAMPLES {
+        let (i, j) = ((k as i32 % SIDE) - 1, (k as i32 / SIDE) - 1);
+        let col = o + IVec2::new(i * s + mid, j * s + mid);
+        if let Some(&(y, top, under)) = job.columns.get(&col) {
+            let w = k * WORDS;
+            words[w] = (y as u32 & 0xFFFF) | (top << 16);
+            words[w + 1] = (words[w + 1] & 0xFFFF) | (under << 16);
+            words[w + 2] = 0;
+            words[w + 3] = 0;
+        }
+    }
 }
 
 /// Sample (i, j)'s ground (from -1 to 32): its height, top block, biome and the block under.
@@ -219,16 +246,17 @@ fn quad(dir: u32, x: i32, y: i32, z: i32, size: (i32, i32, i32), tex: u32, tint:
 /// came out as the missing texture's magenta): its largest box's. A plant's is its picture.
 fn face_of(c: &Content, looks: &super::looks::Looks, state: u32, dir: usize) -> (u32, u32) {
     let info = &c.states[state as usize];
-    let tint = if info.tint_faces & (1 << dir) != 0 { info.tint as u32 } else { 0 };
+    // No overlays out there.
+    let tint = if crate::content::face_paint(info, dir, false).base_tinted { info.tint as u32 } else { 0 };
     let drawn = looks.drawn(state, info);
     let volume = |b: &crate::content::ModelBox| (0..3).map(|a| (b.max[a] - b.min[a]).abs()).product::<f32>();
     let tex = match drawn.model {
-        weft_abi::Model::Boxes => drawn
+        weft_abi::BlockModel::Boxes => drawn
             .boxes
             .iter()
             .max_by(|a, b| volume(a).total_cmp(&volume(b)))
             .map_or(drawn.textures[dir], |b| b.textures[dir]),
-        weft_abi::Model::Cross | weft_abi::Model::Wire => drawn.textures[0],
+        weft_abi::BlockModel::Cross | weft_abi::BlockModel::Wire => drawn.textures[0],
         _ => drawn.textures[dir],
     };
     (tex & face::TEX_MASK, tint)
@@ -547,6 +575,11 @@ pub struct Lod {
     half: i32,
     center: IVec2,
     mask_changed: bool,
+    /// What the server said of columns of `columns_dim`.
+    columns: Arc<Columns>,
+    columns_dim: u32,
+    /// Made tiles to make again for columns that changed, shown as they are till then.
+    stale: FxHashSet<TileKey>,
 }
 
 /// Columns the mask reaches past the view radius (cubes are kept that far).
@@ -572,7 +605,50 @@ impl Lod {
             half: 0,
             center: IVec2::ZERO,
             mask_changed: false,
+            columns: Arc::default(),
+            columns_dim: u32::MAX,
+            stale: FxHashSet::default(),
         }
+    }
+
+    /// `ToClient::LodColumns`: tiles with those columns are made again.
+    pub fn set_columns(&mut self, dim: u32, all: bool, cols: &[(i32, i32, i32, u32, u32)]) {
+        if all || dim != self.columns_dim {
+            self.columns = Arc::default();
+            self.columns_dim = dim;
+            self.stale.extend(self.ready.iter().copied());
+        }
+        let map = Arc::make_mut(&mut self.columns);
+        for &(x, z, y, top, under) in cols {
+            let p = IVec2::new(x, z);
+            if top == u32::MAX {
+                map.remove(&p);
+            } else {
+                map.insert(p, (y, top, under));
+            }
+            if !all {
+                // Every level's tile with it, and the ones beside that sample it for their walls.
+                for level in 0..=MAX_LEVEL {
+                    let size = CELLS << level;
+                    for dz in -1..=1 {
+                        for dx in -1..=1 {
+                            let key = TileKey {
+                                level,
+                                x: (x + dx * (size / CELLS)).div_euclid(size),
+                                z: (z + dz * (size / CELLS)).div_euclid(size),
+                            };
+                            if self.ready.contains(&key) {
+                                self.stale.insert(key);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn columns_len(&self) -> usize {
+        self.columns.len()
     }
 
     /// Tiles asked for and not back yet.
@@ -847,22 +923,24 @@ impl Lod {
         self.split = split;
     }
 
-    /// Asks for the nearest wanted tiles not made yet.
+    /// Asks for the nearest wanted tiles not made yet, or made before columns changed.
     fn request(&mut self) {
         let c = content();
         let custom = self.custom.clone().unwrap();
+        let columns = if self.columns_dim == self.dim { self.columns.clone() } else { Arc::default() };
         for &key in &self.wanted {
             if self.pending.len() >= IN_FLIGHT {
                 break;
             }
-            if self.ready.contains(&key) || self.pending.contains_key(&key) {
+            let again = self.stale.remove(&key);
+            if (self.ready.contains(&key) && !again) || self.pending.contains_key(&key) {
                 continue;
             }
             let live = Arc::new(AtomicBool::new(true));
             self.pending.insert(key, live.clone());
-            let (dim, seed, done, jobs) = (self.dim, self.seed, self.done.0.clone(), self.jobs.clone());
+            let (dim, seed, done, jobs, columns) = (self.dim, self.seed, self.done.0.clone(), self.jobs.clone(), columns.clone());
             if custom.is_empty() {
-                let _ = jobs.send(LodJob { dim, seed, key, custom: Vec::new(), done, live });
+                let _ = jobs.send(LodJob { dim, seed, key, custom: Vec::new(), done, live, columns });
                 continue;
             }
             let custom = custom.clone();
@@ -872,9 +950,10 @@ impl Lod {
                     return;
                 }
                 let heights = custom_heights(c, dim, seed, key, &custom);
-                let _ = jobs.send(LodJob { dim, seed, key, custom: heights, done, live });
+                let _ = jobs.send(LodJob { dim, seed, key, custom: heights, done, live, columns });
             });
         }
+        self.stale.retain(|k| self.ready.contains(k));
     }
 }
 

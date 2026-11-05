@@ -104,9 +104,9 @@ pub fn init(r: &mut Registry) {
     }
     // Counted for `/animal census`: deaths other than of old age (counted in `animal::old_age`).
     // (By its kind: its components are gone by the time the event comes.)
-    r.on(&ENTITY_DIED, |b| {
+    r.on(&actions::DIE, |b| {
         for d in b.iter() {
-            if d.cause != damage::VOID
+            if d.cause != damage_cause::VOID
                 && let Some(i) = SPECIES.iter().position(|s| s.kind.id() == d.kind)
             {
                 count(&DIED, i);
@@ -157,7 +157,7 @@ pub fn upkeep(w: &World, id: u64, index: usize, a: &mut Animal) {
     b.rest = b.rest.saturating_sub(n);
     b.growing = b.growing.saturating_sub(n);
     a.stage = life::stage(s, b.growing, a.stage);
-    if b.love > 0 && (w.time() + id) % 20 == 0 {
+    if b.love > 0 && (w.game_time() + id) % 20 == 0 {
         hearts(w, id, 1);
     }
     if b.carrying > 0 {
@@ -171,13 +171,13 @@ pub fn upkeep(w: &World, id: u64, index: usize, a: &mut Animal) {
     // Checked as often in game time at any speed (`/animal speed`), or a sped-up herd falls in
     // love all at once.
     let every = (WILD_LOVE_EVERY / speed() as u64).max(1);
-    if (w.time() + id) % every < e as u64 && !crate::animal::tamed(w, id) {
+    if (w.game_time() + id) % every < e as u64 && !crate::animal::tamed(w, id) {
         let days = (every * speed() as u64) as f64 / life::DAY as f64;
         let (kin, near) = kin_near(w, id, index, a);
         let roll = w.random_below(1_000_000) as f64 / 1_000_000.0;
         if roll < life::want_chance(days, near, s.crowd(), a.stage) {
             weft_sdk::info!("wild {} {id} died of want ({near:.1} of its kind near, room for {})", s.name, s.crowd());
-            w.damage(id, 1e9, 0, damage::STARVE);
+            w.damage(id, 1e9, 0, damage_cause::STARVE);
             return;
         }
         wild_love(w, id, index, a, &b, &kin, near, days);
@@ -189,7 +189,7 @@ pub fn upkeep(w: &World, id: u64, index: usize, a: &mut Animal) {
 fn kin_near(w: &World, id: u64, index: usize, a: &Animal) -> (Vec<u64>, f64) {
     let Some(st) = w.entity(id) else { return (Vec::new(), 0.0) };
     let kin: Vec<u64> = w
-        .near(st.pos, life::CROWD_RADIUS, Some(SPECIES[index].kind))
+        .entities_near(st.pos, life::CROWD_RADIUS, Some(SPECIES[index].kind))
         .into_iter()
         .filter(|&o| {
             w.component(o, &ANIMAL)
@@ -228,9 +228,9 @@ fn wild_love(w: &World, id: u64, index: usize, a: &Animal, b: &Breeding, kin: &[
         o != id
             && !crate::animal::tamed(w, o)
             && w.entity(o)
-                .is_some_and(|m| (m.pos[0] - st.pos[0]).powi(2) + (m.pos[2] - st.pos[2]).powi(2) < 24.0 * 24.0)
+                .is_some_and(|m| (m.pos.x - st.pos.x).powi(2) + (m.pos.z - st.pos.z).powi(2) < 24.0 * 24.0)
             && match (w.component(o, &ANIMAL), w.component(o, &BREEDING)) {
-                (Some(oa), Some(ob)) => oa.female != a.female && ready(oa, ob),
+                (Some(oa), Some(ob)) => oa.female != a.female && ready(&oa, &ob),
                 _ => false,
             }
     });
@@ -271,7 +271,7 @@ pub fn young(w: &World, id: u64) -> bool {
 fn hearts(w: &World, id: u64, count: u32) {
     let Some(st) = w.entity(id) else { return };
     drop(
-        w.spawn_particles(&HEART, [st.pos[0], st.pos[1] + st.size[1] as f64 + 0.1, st.pos[2]])
+        w.spawn_particles(&HEART, [st.pos.x, st.pos.y + st.size.height as f64 + 0.1, st.pos.z])
             .count(count)
             .spread(0.3)
             .velocity([0.0, 0.6, 0.0]),
@@ -285,7 +285,7 @@ fn hearts(w: &World, id: u64, count: u32) {
 /// breeding season, or out of it if well cared for (`OUT_OF_SEASON_BOND`, `OUT_OF_SEASON_FOOD`); a
 /// young one grows a tenth of what it has left. True if it took the food.
 pub fn fed(w: &World, id: u64, player: u64) -> bool {
-    let Some(a) = w.component(id, &ANIMAL).copied() else { return false };
+    let Some(a) = w.component(id, &ANIMAL) else { return false };
     let in_season = a
         .species()
         .is_none_or(|s| s.bio.season_love(season_bit(w)) > 0.0);
@@ -308,7 +308,7 @@ pub fn fed(w: &World, id: u64, player: u64) -> bool {
 /// species and the other sex, grown) and, meeting, they mate; a young one keeps near its mother.
 pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send + Sync + 'static {
     move |w, id, st| {
-        let Some(b) = w.component(id, &BREEDING).copied() else { return false };
+        let Some(b) = w.component(id, &BREEDING) else { return false };
         if b.growing > 0 {
             return follow_mother(w, id, index, st, &b);
         }
@@ -317,7 +317,7 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
         }
         let female = |o: u64| w.component(o, &ANIMAL).map(|a| a.female);
         let Some(mine) = w.component(id, &ANIMAL).and_then(|a| a.species()) else { return false };
-        let mate = w.near(st.pos, 24.0, None).into_iter().find(|&o| {
+        let mate = w.entities_near(st.pos, 24.0, None).into_iter().find(|&o| {
             o != id
                 && female(o) != female(id)
                 && w.component(o, &ANIMAL)
@@ -328,7 +328,7 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
         });
         let Some(mate) = mate else { return false };
         let Some(ms) = w.entity(mate) else { return false };
-        let d2 = (ms.pos[0] - st.pos[0]).powi(2) + (ms.pos[2] - st.pos[2]).powi(2);
+        let d2 = (ms.pos.x - st.pos.x).powi(2) + (ms.pos.z - st.pos.z).powi(2);
         if d2 > 1.5 * 1.5 {
             if crate::animal::tamed(w, id) && crate::commands::command(w, id) == crate::commands::STAY {
                 return false;
@@ -349,7 +349,7 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
 /// rest.
 fn mated(w: &World, id: u64, mate: u64, index: usize) {
     let s = &SPECIES[index];
-    let (Some(genes), Some(wild)) = (w.component(mate, &GENOME).copied(), w.component(mate, &ANIMAL).map(|a| a.wild)) else {
+    let (Some(genes), Some(wild)) = (w.component(mate, &GENOME), w.component(mate, &ANIMAL).map(|a| a.wild)) else {
         return;
     };
     if let Some(b) = w.component_mut(id, &BREEDING) {
@@ -372,11 +372,11 @@ fn follow_mother(w: &World, id: u64, index: usize, st: &EntityState, b: &Breedin
         return false;
     }
     let Some(m) = w.entity(b.mother).filter(|_| b.mother != 0) else { return false };
-    let d2 = (m.pos[0] - st.pos[0]).powi(2) + (m.pos[2] - st.pos[2]).powi(2);
+    let d2 = (m.pos.x - st.pos.x).powi(2) + (m.pos.z - st.pos.z).powi(2);
     if d2 < 3.0 * 3.0 || d2 > 32.0 * 32.0 {
         return false;
     }
-    if (w.time() + id) % 10 == 0 || !w.navigating(id) {
+    if (w.game_time() + id) % 10 == 0 || !w.navigating(id) {
         crate::wake(w, id, index);
         w.navigate(id, m.pos, 1.2);
     }
@@ -402,14 +402,14 @@ pub struct Young {
 fn deliver(w: &World, id: u64, index: usize, b: &Breeding) {
     let s = &SPECIES[index];
     let (Some(mother), Some(father), Some(st), Some(a)) =
-        (w.component(id, &GENOME).copied(), unpack(&b.mate_genes, &b.mate_more), w.entity(id), w.component(id, &ANIMAL).copied())
+        (w.component(id, &GENOME), unpack(&b.mate_genes, &b.mate_more), w.entity(id), w.component(id, &ANIMAL))
     else {
         return;
     };
     let mut r = coats::world_rng(w);
     let n = life::litter(s, w.random_below(u32::MAX));
     let father_gen = w.component(b.mate, &BREEDING).map_or(0, |f| f.generation);
-    let owner = w.component(id, &OWNER).copied().filter(|o| o[0] != 0);
+    let owner = w.component(id, &OWNER).filter(|o| o[0] != 0);
     let mut clutch = Vec::new();
     for k in 0..n {
         let Some(genome) = coats::breed(&mother, &father, &mut r) else { continue };
@@ -425,14 +425,14 @@ fn deliver(w: &World, id: u64, index: usize, b: &Breeding) {
             wild,
         };
         let angle = k as f64 / n as f64 * std::f64::consts::TAU;
-        let at = [st.pos[0] + angle.cos() * 0.6, st.pos[1], st.pos[2] + angle.sin() * 0.6];
+        let at = [st.pos.x + angle.cos() * 0.6, st.pos.y, st.pos.z + angle.sin() * 0.6];
         if s.gestation() > 0 {
             born(w, at, &y, owner);
         } else {
             clutch.push(y);
         }
     }
-    crate::eggs::lay(w, st.pos, &clutch, owner);
+    crate::eggs::lay(w, st.pos.to_array(), &clutch, owner);
     hearts(w, id, 9);
     let what = if s.gestation() > 0 { "young born" } else { "eggs laid" };
     weft_sdk::info!("animal {id}: {n} {what}");
@@ -455,7 +455,7 @@ pub fn born(w: &World, at: [f64; 3], y: &Young, owner: Option<[u8; 64]>) -> u64 
             species: y.index as u8 + 1,
             female: y.genome.female,
             stage: animal::BABY,
-            born: life::birth(w.time(), 0),
+            born: life::birth(w.game_time(), 0),
             bond: if owner.is_some() { 25 } else { 0 },
             wild: y.wild,
             ..Animal::default()
@@ -491,7 +491,7 @@ pub fn born(w: &World, at: [f64; 3], y: &Young, owner: Option<[u8; 64]>) -> u64 
 /// bonded enough, wanders and falls in love.
 pub fn love_near(w: &World, player: u64) {
     let Some(p) = w.entity(player) else { return };
-    for id in w.near(p.pos, 12.0, None) {
+    for id in w.entities_near(p.pos, 12.0, None) {
         if w.component(id, &BREEDING).is_none_or(|b| b.growing > 0) {
             continue;
         }
@@ -512,11 +512,11 @@ pub fn love_near(w: &World, player: u64) {
 /// second, every egg hatches, every young one grows up.
 pub fn hurry_near(w: &World, player: u64) {
     let Some(p) = w.entity(player) else { return };
-    for id in w.near(p.pos, 16.0, None) {
+    for id in w.entities_near(p.pos, 16.0, None) {
         if let Some(b) = w.component_mut(id, &BREEDING) {
             b.carrying = b.carrying.min(20);
             b.growing = b.growing.min(20);
         }
     }
-    crate::eggs::hurry(w, p.pos);
+    crate::eggs::hurry(w, p.pos.to_array());
 }

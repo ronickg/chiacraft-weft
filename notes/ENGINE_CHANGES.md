@@ -67,6 +67,7 @@ Weft's shader packs could only replace shaders. Our pack needed data the engine 
 - **A time-of-day rate per dimension, sent to clients** (1e138839, protocol 11 to 12). *Why:* Ronald's slow first day, starting at 10:00.
 - **A moving structure can lean** (416f25cf, protocol 12 to 13): `World::body_turn(entity, pivot, rot, ticks)` gives a body a pose, a pivot and a rotation the clients ease to (`ToClient::BodyLean`); `world.wgsl` (the engine's and the base pack's) turns its vertices and the pack its normals (`offsets` is three vec4 a structure: offset and light, rotation, pivot); a leaning body is only drawn: the server's physics and picking and the client's collision and raycast skip it. *Why:* Ronald, 11-05: trees "fall down sideways and like the leaves to sort of start breaking while it's falling": the tree's own blocks, lifted (`World::lift`), lean over the stump and shed leaves as they go (`mods/base/src/fall.rs`). Ronald chose this over a box-model tree ("Yes, the real tree falls").
 - **A leaning structure casts its shadow** (70f1b361): the sun's shadow pass draws leaning structures (`WorldRenderer::draw_shadow` takes them with their pose; its offsets as `draw`'s), turned like their blocks. *Why:* a falling tree threw no shadow (Planner's follow-up, 11-05; Lighting agreed the pack needs nothing, its shadow vertex goes through `finish()`). Other moving structures still cast none.
+- **The free camera on F6** (`input.rs`, `core:freecam`; Weft has P). *Why:* P is the base game's Stats screen, and the two on one key opened Stats instead of the camera (Ronald, 11-04: freecam to F6, P stays Stats). Camera keys don't fire while F3 is held (`client/camera.rs`), so F3+F6 only opens the debug options.
 - **A world never takes a nameless player** (dc1d8b7b); **a headless server has its own identity** (432889c9). *Why:* bugs found in multiplayer checks.
 
 ## 5. UI the engine had to allow
@@ -108,7 +109,28 @@ These are the biggest changes. They live mostly in our crates, but each needed h
 
 ## What this means for syncing with upstream
 
-- Upstream (VortexSo4/Weft master 10fdced5) is 173 commits ahead of our base. The next sync will conflict where we both changed the same code: Vulkan uploads (take upstream's versions), item stacks and icons (upstream now has "stack values over item values" and layered item icons, close to ours), and anything in `server/dim.rs`, `config.rs` and the UI.
+- **Synced with Weft v26.11.2** (upstream `2db18c23`) on `sync/weft-26.11.2`, merge `e9c8405c`
+  (plan: `notes/crew/upstream/sync-plan.md`, Ronald's calls 1-6). Upstream's engine is the base;
+  what stays ours on top of it:
+  - **Terrain:** CPU callback features beside upstream's expression features
+    (`FeatureDesc.custom`, `Feature::custom`, `FeatureArgs.continent_scale`), `FACES` (16),
+    `CONTINENT_SCALE` (17), scatter `thin` as an expression mask; the GPU cube path takes the CPU
+    features' heights (`gpu_custom`, `custom_cache`).
+  - **Distant terrain:** our smooth tiles, wall bands and faces, with upstream's saved columns.
+  - **Weather:** upstream's weather ids, with our rain by biome on them (`set_rain(biomes,
+    weather)`, `weather_in`, `ToClient::Weather { id, only }`), air, tints and the `/weather`
+    override; packs' rain/thunder inputs come from the weather's look.
+  - **Kept as before:** sun and moon shadows (`mesh_draws` with all layers for the shadow passes,
+    `table_only` meshes cast too), painted skins, bone builds, mob shadows, day rate, drops at the
+    feet, felling's leaning bodies (`body_turn`), probation and the chiacraft layers, protocol 14.
+  - **Taken from upstream instead of ours:** waterlogging (cell parts; our `holds_liquid` is
+    gone), riding (seats, steering), camera modes (`camera_flags` for the crosshair, the hand and
+    one's own shadow), the Vulkan upload fixes, mining on the server (our broken-tool rule is in
+    `mining_rate`, keep-broken in `stack::worn`).
+  - **Fixed in upstream's code (PR candidates):** `sdk/ai.rs` mob moods cleared when another
+    world opens (they were process-wide by entity id and tick, so a zombie's anger landed on the
+    next world's spider: `neutral_mobs`); particles' spawn on a cell not arrived yet; first person
+    cutting worn layers by bone mask; a ridden flyer's flight counted as a fall (MountMove `flies`).
 - The bug fixes in section 1 are the natural PRs. Upstream already has its own versions of #83 and #84. The clean branches for #96 to #98 and `/rule` are in `notes/crew/upstream/for-ronald.md`.
 - Everything else is ours to keep in the fork unless Ronald decides to offer it.
 

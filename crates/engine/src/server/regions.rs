@@ -28,13 +28,15 @@ pub struct DimSet {
     day_rest: f64,
     /// `/time` moved the sky: players hear at once, not at the next second.
     pub day_moved: bool,
-    pub raining: bool,
-    pub thunder: bool,
+    /// The weather now (`registry::WeatherDef`).
+    pub weather: u16,
     /// When the weather changes by itself.
     pub weather_until: u64,
     /// The biomes a mod rains in (`set_rain`): from then on the weather is the mod's, not the
     /// dimension's own timing.
     pub rain_in: Option<Arc<Vec<u32>>>,
+    /// The weather the mod set with `rain_in`.
+    pub mod_weather: u16,
     /// Until when a `/weather` command rains (or doesn't) everywhere, over the mod's.
     pub manual_until: u64,
     /// Changed: players hear at once.
@@ -72,10 +74,10 @@ impl DimSet {
             day_rate: 1.0,
             day_rest: 0.0,
             day_moved: false,
-            raining: false,
-            thunder: false,
+            weather: 0,
             weather_until: 0,
             rain_in: None,
+            mod_weather: 0,
             manual_until: 0,
             weather_moved: false,
             air: Arc::default(),
@@ -95,8 +97,7 @@ impl DimSet {
         d.set_rng(weft_noise::hash(self.seed ^ self.time, section.x as i64, section.y as i64, section.z as i64));
         d.time = self.time;
         d.day_offset = self.day_offset;
-        d.raining = self.raining;
-        d.thunder = self.thunder;
+        d.weather = self.weather;
         d.rain_in = self.rain_here();
         d.air = self.air.clone();
         self.regions.push(d);
@@ -323,9 +324,9 @@ impl DimSet {
         let def = &c.dims[self.id as usize];
         let mut pos = def.spawn_at;
         if let Some(cb) = def.spawn {
-            let mut args = abi::SpawnArgs { seed: self.seed, pos };
+            let mut args = abi::SpawnArgs { seed: self.seed, pos: pos.into() };
             host::invoke(def.owner, cb, &mut args);
-            pos = args.pos;
+            pos = args.pos.to_array();
         } else if let Some(p) = search_spawn(c, def, self.seed) {
             pos = p;
         }
@@ -337,7 +338,7 @@ impl DimSet {
     pub fn area_fill(&mut self, c: &'static Content, mut fill: super::area::AreaFill, fresh: &[IVec3]) {
         let start = std::time::Instant::now();
         fill.id = self.edits.last().map_or(1, |e| e.id + 1);
-        Arc::make_mut(&mut self.edits).push(fill);
+        Arc::make_mut(&mut self.edits).push(fill.clone());
         // Regions first (making one may merge others), then who gets what.
         for &cp in fresh {
             self.region_for(c, section_of_cube(cp));
@@ -357,8 +358,8 @@ impl DimSet {
             total.light_ms += s.light_ms;
         }
         log::info!(
-            "area fill r {:.0}: {} cubes changed ({} whole), {:.0} ms applying, {} relit in {:.0} ms, {} edge updates queued, {:.0} ms in all",
-            fill.radius,
+            "area fill {}: {} cubes changed ({} whole), {:.0} ms applying, {} relit in {:.0} ms, {} edge updates queued, {:.0} ms in all",
+            fill.id,
             total.cubes,
             total.whole,
             total.apply_ms,
@@ -412,20 +413,17 @@ impl DimSet {
     }
 
     /// The time of day's own clock.
-    pub fn set_weather(&mut self, raining: bool, thunder: bool, ticks: u64) {
-        (self.raining, self.thunder) = (raining, raining && thunder);
+    pub fn set_weather(&mut self, weather: u16, ticks: u64) {
+        self.weather = weather;
         self.weather_until = self.time + ticks;
         self.weather_moved = true;
         let only = self.rain_here();
         for r in &mut self.regions {
-            r.raining = raining;
-            r.thunder = self.thunder;
+            r.weather = self.weather;
             r.rain_in = only.clone();
         }
     }
 
-    /// Where it rains when it rains: the mod's biomes, or everywhere (no mod saying, or a
-    /// `/weather` command's time).
     /// The air in its biomes from now on (`air`); players hear only of a change.
     pub fn set_air(&mut self, mut air: Vec<(u32, f32, f32, f32, u32)>, heading: f32) {
         air.sort_unstable_by_key(|a| a.0);
@@ -451,50 +449,78 @@ impl DimSet {
         self.tints_moved = true;
     }
 
+    /// Where the weather falls: the mod's biomes, or everywhere (no mod saying, or a `/weather`
+    /// command's time).
     pub fn rain_here(&self) -> Option<Arc<Vec<u32>>> {
         if self.time < self.manual_until { None } else { self.rain_in.clone() }
     }
 
     /// `/weather`: everywhere for `ticks`, whatever a mod says, then the mod's again.
-    pub fn set_manual_weather(&mut self, raining: bool, thunder: bool, ticks: u64) {
+    pub fn set_manual_weather(&mut self, weather: u16, ticks: u64) {
         self.manual_until = self.time + ticks;
-        self.set_weather(raining, thunder, ticks);
+        self.set_weather(weather, ticks);
     }
 
-    /// Rain from now on only in `biomes` (none: dry), thunder with it: a mod's weather by place
-    /// and season (`set_rain`). Players hear only of a change.
-    pub fn set_rain(&mut self, mut biomes: Vec<u32>, thunder: bool) {
+    /// Weather `weather` from now on only in `biomes` (none, or weather 0: clear everywhere): a
+    /// mod's weather by place and season (`set_rain`). Players hear only of a change.
+    pub fn set_rain(&mut self, mut biomes: Vec<u32>, weather: u16) {
         biomes.sort_unstable();
         biomes.dedup();
-        if self.rain_in.as_deref() == Some(&biomes) && self.thunder == (thunder && !biomes.is_empty()) {
+        let weather = if biomes.is_empty() { 0 } else { weather };
+        if self.rain_in.as_deref() == Some(&biomes) && self.mod_weather == weather {
             return;
         }
-        let raining = !biomes.is_empty();
         self.rain_in = Some(Arc::new(biomes));
+        self.mod_weather = weather;
         if self.time >= self.manual_until {
-            self.set_weather(raining, thunder, u32::MAX as u64);
+            self.set_weather(weather, u32::MAX as u64);
+        } else {
+            let only = self.rain_here();
+            for r in &mut self.regions {
+                r.rain_in = only.clone();
+            }
         }
     }
 
-    /// Vanilla's timing: clear for 10 minutes to 2.5 hours, rain for 10 to 20 minutes, a third of
-    /// it with thunder.
-    pub fn tick_weather(&mut self) {
-        if let Some(only) = self.rain_in.clone() {
-            // A mod's weather: back to it when a `/weather` command's time is up.
+    /// After clear weather one of the others by their weights, after any other clear again, each
+    /// for as long as its `duration` says; under a mod's weather (`set_rain`) the mod's, back to
+    /// it when a `/weather` command's time is up.
+    pub fn tick_weather(&mut self, c: &Content) {
+        let tick = abi::WeatherTick { dim: self.id, weather: self.weather as u32 };
+        if let Some(r) = self.regions.first_mut() {
+            r.emit_engine(c, abi::event::WEATHER_TICK, &tick);
+        }
+        if self.rain_in.is_some() {
             if self.manual_until != 0 && self.time >= self.manual_until {
                 self.manual_until = 0;
-                self.set_weather(!only.is_empty(), self.thunder, u32::MAX as u64);
+                self.set_weather(self.mod_weather, u32::MAX as u64);
             }
             return;
         }
         if self.time < self.weather_until {
             return;
         }
+        let all = &c.game.weathers;
         let r = weft_noise::hash(self.seed ^ 0x5745_4154, self.time as i64, 0, 0);
         let first = self.weather_until == 0;
-        let raining = !first && !self.raining;
-        let ticks = if raining { 12000 + r % 12000 } else { 12000 + r % 168000 };
-        self.set_weather(raining, raining && r >> 32 & 3 == 0, ticks);
+        let here = &c.dims[self.id as usize].weathers;
+        let total: u64 = here.iter().map(|&w| all[w as usize].weight as u64).sum();
+        let next = if first || self.weather != 0 || total == 0 {
+            0
+        } else {
+            let mut pick = (r >> 32) % total;
+            here.iter()
+                .copied()
+                .find(|&w| {
+                    let weight = all[w as usize].weight as u64;
+                    let hit = pick < weight;
+                    pick = pick.saturating_sub(weight);
+                    hit
+                })
+                .unwrap_or(0) as usize
+        };
+        let [lo, hi] = all[next].duration;
+        self.set_weather(next as u16, lo + r % (hi - lo + 1));
     }
 
     pub fn day_time(&self) -> u64 {

@@ -47,14 +47,14 @@ pub fn init(r: &mut Registry) {
 /// The size `id`'s genes draw (`size`): read once for the genes it has, then kept.
 pub fn size_of(w: &World, id: u64) -> Option<f32> {
     let g = w.component(id, &GENOME)?;
-    let print = fingerprint(g);
-    if let Some(&[bits, p]) = w.component(id, &SIZE)
+    let print = fingerprint(&g);
+    if let Some([bits, p]) = w.component(id, &SIZE)
         && bits != 0
         && p == print
     {
         return Some(f32::from_bits(bits));
     }
-    let size = size(g);
+    let size = size(&g);
     if let Some(c) = w.component_mut(id, &SIZE) {
         *c = [size.to_bits(), print];
     }
