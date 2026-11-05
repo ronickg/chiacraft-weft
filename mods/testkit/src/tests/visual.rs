@@ -82,11 +82,11 @@ pub async fn held_items(t: T) -> R {
     }
     t.c().set_look(0.0, -10.0);
     let looks: [(&str, fn([u8; 3]) -> bool, f32); 5] = [
-        ("pickaxe", probe::brown, 0.01),
-        ("sword", probe::cyan, 0.01),
-        ("block", probe::light, 0.01),
-        ("flower", probe::red, 0.007),
-        ("torch", probe::dark, 0.01),
+        ("pickaxe", probe::brown, 0.03),
+        ("sword", probe::cyan, 0.03),
+        ("block", probe::light, 0.03),
+        ("flower", probe::red, 0.02),
+        ("torch", probe::dark, 0.03),
     ];
     for (i, (name, color, min)) in looks.into_iter().enumerate() {
         t.c().select_slot(i as u32);
@@ -95,9 +95,7 @@ pub async fn held_items(t: T) -> R {
         // The hand lowers and comes back up on a switch.
         t.secs(0.6).await?;
         let shot = t.shot(name).await?;
-        // Weft holds it on the posed arm (its hold clips), smaller and further in than a corner
-        // sprite: about x 0.60-0.85, y 0.45-1.0 (Animals, SYNC7 shots).
-        let v = shot.share(0.58, 0.45, 0.90, 1.0, color);
+        let v = shot.share(0.78, 0.55, 1.0, 0.95, color);
         t.probe(&format!("{name} colors in the hand"), v, v > min);
     }
     Ok(())
