@@ -116,7 +116,7 @@ def hd(lo, hi):
 SKULL = hd((-14.0, -18.0, -16.0), (14.0, 16.0, 16.0))
 DOME = hd((-10.0, 2.0, 0.0), (10.0, 28.0, 23.0))
 SNOUT = hd((-12.75, -13.0, 14.0), (12.75, 4.5, 44.0))
-JAW_BOX = hd((-9.5, -21.0, -10.0), (9.5, -11.0, 40.0))
+JAW_BOX = hd((-9.5, -22.5, -10.0), (9.5, -11.0, 40.0))  # its bottom over two texels under the skull's (at -21, 1.5; linecheck)
 MOUTH_BOX = hd((-8.0, -15.5, -4.0), (8.0, -12.5, 38.0))
 JAW = (0.0, HY - 15.0, HZ - 8.0)
 EYE_Z, EYE_Y = HZ + 5.0, HY + 8.0  # high on the side, behind the dome
@@ -216,7 +216,7 @@ def elements():
          # The barrel: the gut slung low between the legs, the deep ribcage in front, the back a
          # slab sloping up from the hips to the shoulders, and the shoulder girdle's muscle widening
          # the top in front.
-         el("belly", "spine_1", (-62, 104, 20), (62, 204, 160)),
+         el("belly", "spine_1", (-61, 104, 20), (61, 204, 160)),  # 4.5 inside the chest's sides (at 62, 1.75 texels of its back showed beside it; linecheck)
          el("chest", "spine_1", (-65.5, 138, 138), (65.5, 258, 234)),
          el("back", "spine_1", (-52, 176, 4), (52, 222, 212), rot=(-14, 0, 0), origin=(0, 200, 40)),
          el("shoulders", "spine_1", (-70, 204, 166), (70, 262.5, 218))]

@@ -179,7 +179,9 @@ def elements():
     E = [el("hips", "spine_0", (-32, 92, -42), (32, 164, 34)),  # highest over the hips
          el("belly", "spine_0", (-34, 72, -20), (34, 122, 40)),  # the big gut slung between the legs
          el("chest", "spine_1", (-37, 76, 28), (37, 152, 122)),  # deep, the back sloping down to the shoulders
-         el("shoulders", "spine_1", (-39.5, 96, 84), (39.5, 147, 124)),  # the shoulder girdle and its muscle
+         # the shoulder girdle and its muscle: forward over two texels from the chest's front, its sides half a
+         # unit out from the chest's (2.5 out and 2 forward, they read as rims; linecheck)
+         el("shoulders", "spine_1", (-37.5, 96, 84), (37.5, 147, 126.5)),
          el("neck", "neck", NECK_BASE + np.array([-NECK_HW, -NECK_HH, -6.0]), NECK_BASE + np.array([NECK_HW, NECK_HH, NECK_LEN + 2.0]),
             rot=(-NECK_ANGLE, 0, 0), origin=tuple(NECK_BASE)),
          # Its root, deeper and wider, ending short of the head: the neck thick where it leaves the chest.
@@ -187,11 +189,14 @@ def elements():
             rot=(-NECK_ANGLE, 0, 0), origin=tuple(NECK_BASE)),
          el("skull", "head", *SKULL),
          el("nasal", "head", (-6, 162, 198), (6, 167, 230)),  # the ridge down the face
-         el("snout", "head", (-10, 137, 200), (10, 163, 236)),
+         el("snout", "head", (-11.5, 137, 200), (11.5, 163, 236)),  # half a unit short of the skull's sides (at 10, a rim; linecheck)
          el("beak", "head", (-7.5, 134, 234), (7.5, 148, 243)),  # the toothless upper beak
-         el("mouth", "head", (-8, 138.5, 168), (8, 141.5, 234)),
-         el("jaw", "jaw", (-9, 126, 164), (9, 144, 224)),  # deep, under the cheeks
-         el("predentary", "jaw", (-6.5, 130, 222), (6.5, 139, 235))]  # the lower beak, behind the upper's tip
+         el("mouth", "head", (-7, 138.5, 168), (7, 141.5, 234)),  # a unit inside the lower beak's sides (boxcheck)
+         el("jaw", "jaw", (-8.5, 126, 164), (8.5, 144, 224)),  # deep, under the cheeks; half a unit past the lower beak
+         # the lower beak, behind the upper's tip: half a unit past the upper beak's sides and inside the jaw's,
+         # down to the jaw's bottom (narrower and higher, the jaw's front and its own showed round them as
+         # rims; linecheck)
+         el("predentary", "jaw", (-8.0, 126.5, 222), (8.0, 139, 235))]
     for s, n in ((1, "L"), (-1, "R")):
         za, zb, top, bottom = eye_box(s)
         h = top - bottom
@@ -207,16 +212,20 @@ def elements():
         s = 1 if leg[1] == "L" else -1
         if leg[0] == "F":
             x, z = FRONT_X * s, FRONT_Z
-            E.append(el(f"leg_{leg}_upper", f"leg_{leg}_upper", (x - 11, 64, z - 12), (x + 11, 118, z + 11)))
+            # its front half a unit short of the chest's (at z + 11 the chest showed before it a unit wide; linecheck)
+            E.append(el(f"leg_{leg}_upper", f"leg_{leg}_upper", (x - 11, 64, z - 12), (x + 11, 118, z + 11.6)))
             E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x - 8.5, 20, z - 9), (x + 8.5, 70, z + 8.5)))
             # The hand: the three middle fingers bound into a hoof, the thumb a spike on the inside.
             E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 10, 0, z - 10.0), (x + 10, 23, z + 11.5)))
             xi = x - s * 10.0  # the hand's inner side
             ta, tb = sorted((xi + s * 1.0, xi - s * 4.5))
-            E.append(el(f"thumb_{leg}", f"leg_{leg}_paw", (ta, 11, z + 2.0), (tb, 19, z + 8.0)))
+            # two texels short of the hand's front (at z + 8, 1.75; linecheck)
+            E.append(el(f"thumb_{leg}", f"leg_{leg}_paw", (ta, 11, z + 2.0), (tb, 19, z + 7.0)))
         else:
             x, z = BACK_X * s, BACK_Z
-            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (x - 15, 74, z - 21), (x + 15, 140, z + 19)))  # the big drumstick
+            # the big drumstick, down to half a unit over the belly's bottom (at 74 the belly's sides showed under
+            # it a texel high; linecheck)
+            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (x - 15, 72.5, z - 21), (x + 15, 140, z + 19)))
             E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x - 11, 26, z - 14), (x + 11, 80, z + 10)))
             E.append(el(f"meta_{leg}", f"leg_{leg}_paw", (x - 10, 6, z - 12), (x + 10, 30, z + 8.5)))
             E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 12.6, 0, z - 13), (x + 12.6, 9, z + 24)))  # three hoofed toes

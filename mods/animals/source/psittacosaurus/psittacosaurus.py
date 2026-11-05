@@ -136,14 +136,19 @@ def eye_box(side):
     return za, zb, y1 - v0 * sv, y1 - (v0 + ph) * sv
 
 
+# The arm's middle: its outside half a unit past the chest's side (at 8.4 it stood out of it by
+# a texel, a rim; linecheck), so it comes out from under the chest.
+ARM_X = 6.4
+
+
 def bones():
     B = [("root", None, (0, 0, 0)), ("spine_0", "root", (0, 33, 0)), ("spine_1", "spine_0", (0, 33, 5)),
          ("neck", "spine_1", tuple(NECK_BASE)), ("head", "neck", tuple(neck_end())), ("jaw", "head", (0, 38.5, 29.0))]
     for s, n in ((1, "L"), (-1, "R")):
         za, zb, top, _ = eye_box(s)
         B += [(f"eyelid_{n}", "head", (s * LID_X, top, (za + zb) / 2)),
-              (f"arm_{n}", "spine_1", (s * 8.0, 29.5, 17.0)), (f"forearm_{n}", f"arm_{n}", (s * 8.4, 22.5, 17.0)),
-              (f"hand_{n}", f"forearm_{n}", (s * 8.4, 16.5, 17.5))]
+              (f"arm_{n}", "spine_1", (s * 8.0, 29.5, 17.0)), (f"forearm_{n}", f"arm_{n}", (s * ARM_X, 22.5, 17.0)),
+              (f"hand_{n}", f"forearm_{n}", (s * ARM_X, 16.5, 17.5))]
     pts = tail_points()
     B += [(f"tail_{k}", "spine_0" if k == 0 else f"tail_{k - 1}", tuple(pts[k])) for k in range(len(TAIL))]
     for s, n in ((1, "L"), (-1, "R")):
@@ -154,17 +159,24 @@ def bones():
 
 
 def elements():
-    E = [el("hips", "spine_0", (-6.5, 27, -10), (6.5, 39, 6)),  # highest over the hips
+    # highest over the hips; out over the thighs' tops (at 6.5 the thighs' backs showed beside them as
+    # rims a texel wide; linecheck), 0.3 past the chest's sides and 0.7 past the thighs', so no face meets
+    # another in any pose (boxcheck)
+    E = [el("hips", "spine_0", (-8.3, 27, -10), (8.3, 39, 6)),
          el("chest", "spine_1", (-8, 25, 4), (8, 36.0, 22)),  # a barrel of a body, slung under the back
          # The neck: a box from inside the chest out along the neck's angle to the head's joint,
          # inside the skull, so they share a point and never come apart (`ground.pokes`).
          el("neck", "neck", NECK_BASE + np.array([-3.0, -3.0, -1.5]), NECK_BASE + np.array([3.0, 3.0, NECK_LEN + 0.5]),
             rot=(-NECK_ANGLE, 0, 0), origin=tuple(NECK_BASE)),
          el("skull", "head", *SKULL),
-         el("snout", "head", (-3.6, 38.5, 35.5), (3.6, 45.5, 40.0)),  # the upper beak's base
-         el("beak", "head", (-2.2, 36.4, 39.4), (2.2, 42.4, 42.2)),  # its hooked tip, a parrot's
+         # the upper beak's base, out over two texels from the skull (at 40, 1.8; linecheck)
+         el("snout", "head", (-3.6, 38.5, 35.5), (3.6, 45.5, 41.0)),
+         # its hooked tip, a parrot's: out over two texels from the snout (at 2.2 units its sides read as a rim; linecheck)
+         el("beak", "head", (-2.2, 36.4, 40.4), (2.2, 42.4, 45.5)),
          el("mouth", "head", (-3.0, 37.6, 30), (3.0, 39.0, 38.8)),
-         el("jaw", "jaw", (-4.2, 34.0, 27.5), (4.2, 38.6, 39.5))]  # deep, ending in the lower beak
+         # deep, ending in the lower beak; down and out over two texels from the skull (at 34 and 39.5 it showed
+         # under and before it by 1.8 texels, a rim; linecheck)
+         el("jaw", "jaw", (-4.2, 31.5, 27.5), (4.2, 38.6, 40.5))]
     for s, n in ((1, "L"), (-1, "R")):
         x0, x1 = sorted((s * 5.0, s * 8.0))
         E.append(el(f"horn_{n.lower()}", "head", (x0, 36.5, 29.0), (x1, 38.6, 31.0)))  # the cheek horn, sticking out
@@ -172,14 +184,17 @@ def elements():
         h = top - bottom
         lx0, lx1 = (LID_X - h, LID_X) if s > 0 else (-LID_X, -LID_X + h)
         E.append(el(f"eyelid_{n}", f"eyelid_{n}", (lx0, top, za), (lx1, top, zb), quad="down"))
-        ax = 8.4 * s  # the shoulder (x = 8) inside both the chest and the arm
-        E.append(el(f"arm_{n}", f"arm_{n}", (ax - 1.6, 22, 15.5), (ax + 1.6, 31, 18.5)))
-        E.append(el(f"forearm_{n}", f"forearm_{n}", (ax - 1.0, 16, 16.1), (ax + 1.0, 23.5, 17.9)))
-        E.append(el(f"hand_{n}", f"hand_{n}", (ax - 1.6, 13, 15.4), (ax + 1.6, 16.5, 20.0)))  # a grasping hand, off the ground
+        ax = ARM_X * s  # the shoulder (x = 8) inside both the chest and the arm
+        # down over two texels under the chest (at 22, 1.5; linecheck)
+        # The arm, forearm and hand each half a unit round the one below: the forearm 3 units a side, two
+        # texels (at 2, one texel, its whole face was a line beside the arm; linecheck).
+        E.append(el(f"arm_{n}", f"arm_{n}", (ax - 2.1, 20.5, 15.0), (ax + 2.1, 31, 19.0)))
+        E.append(el(f"forearm_{n}", f"forearm_{n}", (ax - 1.5, 16, 15.5), (ax + 1.5, 23.5, 18.5)))
+        E.append(el(f"hand_{n}", f"hand_{n}", (ax - 2.0, 13, 15.0), (ax + 2.0, 16.5, 20.0)))  # a grasping hand, off the ground
     pts = tail_points()
     for k, (length, w) in enumerate(TAIL):
         p = pts[k]
-        hh = w * 0.95
+        hh = max(w * 0.95, 3.2)  # the tip at least 2 texels high (at 2.85 its sides were a 1-texel line; linecheck)
         E.append(el(f"tail_{k}", f"tail_{k}", (-w / 2, p[1] - hh / 2, p[2] - length), (w / 2, p[1] + hh / 2, p[2] + 0.5)))
     # The bristles: a fringe of long quills standing up along the top of the tail's base (the
     # Senckenberg specimen's, up to 16 cm), one cut-out panel on each of the first two segments.
@@ -191,7 +206,10 @@ def elements():
                     quad="east", cut="bristles"))
     for s, n in ((1, "L"), (-1, "R")):
         x = 5.0 * s
-        E.append(el(f"thigh_{n}", f"leg_{n}_thigh", (x - 3.4, 20, -5), (x + 3.4, 34, 5.5)))  # the big drumstick
+        # the big drumstick, its top inside the hips (at x + 3.4 its back showed beside them a texel wide;
+        # linecheck), 0.4 inside the chest's side and 0.5 outside the shin's
+        xi, xo = sorted((x - 3.4 * s, x + 2.6 * s))
+        E.append(el(f"thigh_{n}", f"leg_{n}_thigh", (xi, 20, -5), (xo, 34, 5.5)))
         E.append(el(f"shin_{n}", f"leg_{n}_shin", (x - 2.1, 10, -2.6), (x + 2.1, 22, 1.8)))
         E.append(el(f"foot_{n}", f"leg_{n}_foot", (x - 1.6, 2, -2.2), (x + 1.6, 11, 1.2)))
         E.append(el(f"toes_{n}", f"leg_{n}_toes", (x - 2.8, 0, -1.6), (x + 2.8, 2.4, 6.0)))
