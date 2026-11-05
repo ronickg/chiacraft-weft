@@ -42,6 +42,9 @@ pub const SMOOTH_LEVEL: u32 = MAX_LEVEL + 1;
 /// forest's canopy as one block over the land as from afar it is: a trunk a cell's eighth wide or
 /// less is under a pixel there, and without it the crown hung in the air.
 const CANOPY_LEVEL: u32 = 3;
+/// From this level on (8-block cells) a cell's walls are drawn as the slope it stands for: its top
+/// block (bare rock where the dimension's faces say), steepness its mean drop per block.
+const SLOPE_LEVEL: u32 = 3;
 /// A tile splits into the level below while nearer than this many of its widths: a cell stays
 /// about the same size on screen (a 32-block cell at 4096 blocks).
 const SPLIT: f64 = 4.0;
@@ -314,6 +317,7 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
     let s = 1 << key.level;
     let at = |i: i32, j: i32| ground(words, i, j);
     let canopy = key.level >= CANOPY_LEVEL;
+    let slope = key.level >= SLOPE_LEVEL;
     let crown_at = |i: i32, j: i32| {
         crown(words, i, j).map(|c| if canopy { Crown { bottom: c.bottom.min(at(i, j).0 + 1), trunk: None, ..c } } else { c })
     };
@@ -340,7 +344,10 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                 .map(|&(di, dj)| at(i + di, j + dj).0)
                 .min()
                 .unwrap_or(y);
-            let fall = fall(y - low, s);
+            // chiacraft: from 8-block cells (`SLOPE_LEVEL`) the mean drop per block: a cell that wide
+            // stands for a slope, and the stepped fall's half again (`fall`) made whole mountainsides
+            // cliffs, far snow ranges bare rock.
+            let fall = if slope { (y - low).max(0) / s } else { fall(y - low, s) };
             if fall < f.fall {
                 continue;
             }
@@ -353,7 +360,16 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
             let mut bands: Vec<(i32, u32)> = Vec::new();
             let mut wy = y - 1;
             while wy > bottom && step > 0 {
-                let before = if y - wy <= FILLER { under } else { stone };
+                // A coarse cell's wall is the slope's face, not a cut through the ground: its top
+                // block, bare where the face says (far snow ranges were stone walls under thin
+                // white lines).
+                let before = if slope {
+                    top
+                } else if y - wy <= FILLER {
+                    under
+                } else {
+                    stone
+                };
                 let block = shown(wy, before);
                 let lo = (wy - step + 1).max(bottom + 1);
                 match bands.last_mut() {
@@ -414,7 +430,14 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                 // The top block's own color down the step, a cell's height at most: a gentle slope's
                 // steps read as its grass from afar, not as rows of dirt dashes (bare faces keep
                 // their bands under a block of it).
-                let band = if walls[k].is_some() { 1 } else { s.min(y - ny) };
+                // (A coarse cell's whole wall: it stands for a slope of its top.)
+                let band = if walls[k].is_some() {
+                    1
+                } else if slope {
+                    y - ny
+                } else {
+                    s.min(y - ny)
+                };
                 let (tex, tint) = face_of(top, 3);
                 out.push(quad(dir as u32, i * s, y + 1 - band, j * s, (s, band, s), tex, tint, biome));
                 lo = lo.min(ny + 1);
