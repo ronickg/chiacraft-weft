@@ -435,7 +435,9 @@ fn shade_soft(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
             let sat = (c.g - c.b) / max(c.g, 1e-4);
             // (In linear light: the lime's sRGB 120 167 3 is red/green 0.72 on the screen, about 0.5
             // here, which a window of 0.5-0.72 missed: PC sh6.)
-            let k = smoothstep(0.25, 0.7, luma(c)) * smoothstep(0.55, 0.85, sat) * smoothstep(0.25, 0.45, c.r / c.g) * low;
+            // (Not only the bright: the 18:00 leaf is mid-bright, luma about 0.3 before the curve, and
+            // lime by its colour alone; from 0.25 it hardly counted, 3 % of the frame left, PC sh6b.)
+            let k = smoothstep(0.06, 0.22, luma(c)) * smoothstep(0.55, 0.85, sat) * smoothstep(0.25, 0.45, c.r / c.g) * low;
             lit = vec4(mix(c, vec3(luma(c)) * vec3(0.92, 1.05, 0.88), k * 0.35) * (1.0 - 0.18 * k), lit.a);
         }
     } else {
