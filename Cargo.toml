@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/*", "backends/*", "mods/*", "mods/base/api", "mods/base/vitals", "mods/base/crafting", "mods/animals/core", "mods/animals/web"]
+members = ["crates/*", "backends/*", "mods/*", "mods/base/api", "mods/base/vitals", "mods/base/crafting", "mods/base/progression", "mods/animals/core", "mods/animals/web"]
 # Bare `cargo build`/`cargo run` build the game and its mods, and `cargo run` starts the game (the
 # wallet's live test tool is a second binary); use `--workspace` or `-p` for everything else.
 default-members = ["crates/app", "mods/*"]

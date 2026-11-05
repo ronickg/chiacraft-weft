@@ -5705,6 +5705,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "progression"
+version = "0.1.0"
+dependencies = [
+ "animals_core",
+ "crafting",
+ "vitals",
+]
+
+[[package]]
 name = "pulley-interpreter"
 version = "36.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
