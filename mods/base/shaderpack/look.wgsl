@@ -844,7 +844,9 @@ fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
         // As the sun climbs the banks lift and dissolve into a thin even haze (they burned off as
         // grey smudges on the forest by 08:00, the checkpoint sheet).
         let b = mix(smoothstep(0.25, 0.75, banks), 0.3, smoothstep(0.15, 0.45, scene.sun.y));
-        return f * open * burn * (low * (mix(0.02, 0.7, s) + mix(2.6, 0.6, s) * b) + 0.012 * high) * 0.11;
+        // Lying in the valleys only, the dawn mist's amount read thin (the mist-height sheet): the
+        // low layer two and a half times as dense there, none higher up.
+        return f * open * burn * (low * (mix(0.05, 0.7, s) + mix(6.5, 0.6, s) * b) + 0.012 * high) * 0.11;
     }
     return f * open * burn * (low * (mix(0.05, 0.7, s) + mix(1.7, 0.6, s) * banks) + 0.06 * high) * 0.11;
 }
