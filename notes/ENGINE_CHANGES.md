@@ -106,6 +106,13 @@ These are the biggest changes. They live mostly in our crates, but each needed h
 - **Settings set for a run hold for the whole run** (2fa0beff), **and in the worlds it opens** (b091ac8b), **`--config` and `--no-shadows`** (ee147880). *Why:* scripted PC looks and benches need fixed settings.
 - **The network path in the log** (0a11b0ee): `net: path to <id> relay|direct|mixed <kind>` on every join, portal arrival and player coming in, and again on each change. **A relay-only test setting** (`core:net_relay_only`, on no screen): the endpoint gets no IP transport, so every connection goes through n0's relay. *Why:* Ronald asked whether joins really cross the network, and every two-machine check ran on one home network.
 
+- **Load-test hooks for many players** (Research round 18, branch `claude/jovial-einstein-158b8f`):
+  - `net/p2p.rs`: `ALPN`, `PROTOCOL`, `MAX_FRAME`, `MAX_HELLO`, `MAX_OFFER`, `write_frame` and `read_frame_max` are made public;
+  - `diag::take_net` reads the traffic counters without a frame report;
+  - `weft --server --stats [secs]` logs a stats line: ticks per second, tick avg/p50/p99/max and phases, players, cubes, entities, traffic by message kind each way (with `--log net=debug`), and memory, threads and CPU by thread name from `/proc` (`dedicated.rs`, `Shared::stats` and `tick_samples` in `server/mod.rs`).
+
+  *Why:* our bot client (`crates/bots`, `weft-bots`) joins over the real protocol by the hundred, and the server had no tick timing without a game window. Off unless asked for. *Upstream?* Maybe the stats line.
+
 ## 9. Removed
 
 - **The texture pack built from a player's Minecraft copy** (159b507c). *Why:* Mojang's assets must not ship or be generated from; Weft's AI_POLICY also forbids "generated look-alikes".
@@ -139,4 +146,4 @@ These are the biggest changes. They live mostly in our crates, but each needed h
 
 ## Our own crates (additions, not core changes)
 
-`sandbox` (wasmtime mod host), `packages` (data packages), `account`, `bridge`.
+`sandbox` (wasmtime mod host), `packages` (data packages), `account`, `bridge`, `bots` (`weft-bots`, headless load-test players).
