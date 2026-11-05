@@ -3079,6 +3079,8 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         g.client
             .render(&mut *r.gpu, &mut world, &mut r.list, world_info, &r.textures);
         drop(s);
+        // What the pack's look works out once a frame, before anything that reads it.
+        r.list.append(&mut g.client.sky.frame_look.passes);
         // The shadow map once the models are posed, ahead of the world's pass that samples it.
         let s = crate::diag::span("shadows");
         g.client

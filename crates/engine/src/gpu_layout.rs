@@ -724,6 +724,10 @@ gpu_struct! {
         /// What falls from the sky (a mod's `sky_landing`): xyz where it lands (camera relative),
         /// w seconds until it does (negative after; -1e6 when nothing falls).
         pub sky_landing: [f32; 4],
+        /// What the pack's look works out once a frame (`client::frame_look`, a pack whose sky
+        /// has `fs_frame_look`; chiacraft): x the bindless index + 1 of its row of texels (0:
+        /// none this frame, each shader works them out itself), yzw unused.
+        pub frame_look: [f32; 4],
     }
 }
 
