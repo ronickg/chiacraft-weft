@@ -337,6 +337,17 @@ impl Client {
         if effects {
             let bob = self.bobbed(cam).bob;
             cam.bob = (bob.0, bob.1 + pose.roll, bob.2);
+            // The sway and an action's camera kick move the eye in view space, past what the body's
+            // box keeps clear: an action that dips the head (landing, crouching on an edge) put the
+            // eye inside the block in front or below, and the world showed from inside, black
+            // (Ronald, 11-06). As far as a box of the camera's size gets from the eye, no further.
+            let moved = eye_offset(&cam);
+            let to = cam.pos + moved;
+            let cells = super::world::SeenCells { world: &self.world, air_if_missing: false };
+            let k = physics::sweep(c, &cells, cam.pos, to, HALF);
+            if k < 1.0 {
+                cam.bob.0 *= k as f32;
+            }
         }
         let cams = &mut self.cameras;
         if let Some((from, t, secs, easing)) = &mut cams.blend {
@@ -356,5 +367,36 @@ impl Client {
             }
         }
         cams.shown = cam;
+    }
+}
+
+/// Where the view-space offset of `cam`'s sway (`Camera::bob`) puts the eye, from `cam.pos`, in
+/// the world: the view moves the world by the offset, so the eye goes the other way.
+fn eye_offset(cam: &Camera) -> DVec3 {
+    let (offset, roll, pitch) = cam.bob;
+    let rot = glam::Mat4::from_rotation_z(roll)
+        * glam::Mat4::from_rotation_x(pitch)
+        * glam::camera::rh::view::look_to_mat4(glam::Vec3::ZERO, cam.forward(), glam::Vec3::Y);
+    -rot.inverse().transform_vector3(offset).as_dvec3()
+}
+
+#[cfg(test)]
+mod eye_tests {
+    use super::*;
+
+    fn cam(yaw: f32, pitch: f32, offset: glam::Vec3) -> Camera {
+        Camera { pos: DVec3::ZERO, yaw, pitch, fov: 70.0, bob: (offset, 0.05, -0.03) }
+    }
+
+    /// The offset turned into the world agrees with the view matrix: the point the eye moves to
+    /// is where the view puts the origin of view space.
+    #[test]
+    fn the_eye_offset_matches_the_view() {
+        for (yaw, pitch) in [(0.0, 0.0), (1.0, -0.4), (-2.5, 1.2), (3.0, -1.5)] {
+            let c = cam(yaw, pitch, glam::Vec3::new(0.05, -0.12, 0.3));
+            let at = eye_offset(&c).as_vec3();
+            let seen = c.view().transform_point3(at);
+            assert!(seen.length() < 1e-4, "{yaw} {pitch}: the eye at {at} is {seen} in view space");
+        }
     }
 }
