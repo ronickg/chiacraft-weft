@@ -708,7 +708,7 @@ pub fn register(r: &mut Registry) {
     woods(r);
     grove(r);
     // The broadleaf trees' thin wood as branch blocks (Ronald, 11-05: "All broadleaf trees").
-    for wood in BRANCH_WOODS {
+    for wood in base_api::trees::BRANCH_WOODS {
         branch(r, wood);
     }
     // Lianas: woody climbers hanging from the tropical forest's crowns, a rope one can climb;
@@ -1194,10 +1194,6 @@ fn grow_column(e: &mut BlockEvent, me: &'static Block) {
 /// px thick in the block's middle with an arm to each side it joins (`n` `s` `e` `w` `u` `d`, set by
 /// worldgen), in the log's bark cropped to the box, as Dynamic Trees draws its branches. Collides
 /// as its boxes; an axe takes it; a stick for it.
-/// The woods whose trees grow their thin wood as branch blocks (`base_api::trees::TREE_BRANCH`):
-/// the broadleaf trees (Ronald, 11-05: "All broadleaf trees"); needles and fronds hide a conifer's
-/// or a palm's wood, which keep their logs.
-pub const BRANCH_WOODS: &[&str] = &["oak", "birch", "acacia", "mesquite", "dogwood", "ipe", "andiroba", "matamata", "brazil_nut"];
 /// The woods Art has drawn young bark for (`branch_<wood>`, `_across`, `_end`); the others wear
 /// their log's until then.
 const BRANCH_BARK: &[&str] = &["oak"];

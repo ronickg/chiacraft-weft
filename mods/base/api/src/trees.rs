@@ -18,6 +18,11 @@ pub static TREE_BRANCH: Component<BlockRef> = Component::named("tree_branch");
 /// Wood under this wide is a branch block: under `BRANCH_THIN` a 4 px one, else 8 px.
 pub const BRANCH_UNDER: f32 = 0.75;
 pub const BRANCH_THIN: f32 = 0.4;
+/// The woods whose trees grow their thin wood as branch blocks (`base:<wood>_branch`, named on
+/// the log as `TREE_BRANCH`): the broadleaf trees (Ronald, 11-05: "All broadleaf trees"); needles
+/// and fronds hide a conifer's or a palm's wood, which keep their logs. Felling counts a branch
+/// block a quarter of a log (`tree_recipes::felling_wood`).
+pub const BRANCH_WOODS: &[&str] = &["oak", "birch", "acacia", "mesquite", "dogwood", "ipe", "andiroba", "matamata", "brazil_nut"];
 /// Logs with this tag grow into cones (spruces), the others round (oaks, birches).
 pub static CONE_TREE: Tag = Tag::named("cone_tree");
 /// A tall bare trunk under one wide, flat crown (the acacia).

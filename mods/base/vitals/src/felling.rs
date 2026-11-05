@@ -89,12 +89,13 @@ pub const LONGEST_SECS: f32 = 3600.0;
 /// Axe tiers by harvest level (`abi::tool_tier`, the crafting materials' `harvest`): the most
 /// logs a tree may have for an axe of that level to fell it for its wood. The highest row at or
 /// under the axe's level counts. Sized on the species (`cargo run -p base_api --example
-/// tree_logs`, 11-05, after the trees by space colonization): the ordinary trees grow 4 to 87
-/// logs (a stone axe takes them all); a wooden one the first day's common trees, the medians of
-/// the oak (43), birch (9) and spruce (21) and most oaks (Planner, 11-05: raised from 40 when the
-/// colonized oak's median passed it); bone a little more (most araucarias); a young sequoia 76 to
-/// 231 and the tropical canopy trees up to 181 (copper), the Brazil nut up to 432 (bronze), a
-/// grown sequoia 444 to 1421 (steel).
+/// tree_logs`, 11-05, the trees by space colonization, a broadleaf tree's branch blocks a
+/// quarter of a log each): the ordinary trees grow 2 to 92 logs (a stone axe takes them all); a
+/// wooden one the first day's common trees, the medians of the oak (16), birch (20) and spruce
+/// (21) and most oaks (Planner, 11-05: 56, raised from 40 when the colonized oak's median, 43
+/// before branch blocks, passed it); bone a little more (the biggest oaks and acacias); a young
+/// sequoia 76 to 231 and the tropical canopy trees up to 174 (copper), the Brazil nut up to 379
+/// (bronze), a grown sequoia 444 to 1421 (steel).
 pub const TIERS: &[Tier] = &[
     Tier { harvest: 0, name: "wood, gold", logs: 56, speed: 2.0 },
     Tier { harvest: 50, name: "bone, antler", logs: 72, speed: 2.5 },
@@ -118,7 +119,7 @@ pub struct Tier {
 
 /// Trees the sheet times (logs, from `tree_logs`): a median oak, birch and araucaria, a young
 /// sequoia and a grown one.
-pub const SHEET_TREES: &[(&str, u32)] = &[("oak", 43), ("birch", 9), ("araucaria", 64), ("young sequoia", 165), ("sequoia", 1015)];
+pub const SHEET_TREES: &[(&str, u32)] = &[("oak", 16), ("birch", 20), ("araucaria", 61), ("young sequoia", 165), ("sequoia", 1015)];
 
 /// The tier of an axe of `harvest` level.
 pub fn tier(harvest: u32) -> &'static Tier {
@@ -201,9 +202,10 @@ mod tests {
         // More logs, more chops; a tree past the tier is slower still and gives nothing.
         assert!(felling(30, 100).chops > felling(6, 100).chops);
         assert!(felling(30, 100).fruitful);
-        // The first day's trees (`tree_logs`, 11-05): a wooden axe fells the median oak (43 logs)
-        // for its wood, the first stone axe (flint, harvest 100) the biggest (87).
-        assert!(felling(43, 0).fruitful && felling(87, 100).fruitful);
+        // The first day's trees (`tree_logs`, 11-05, branch blocks a quarter): a wooden axe fells
+        // the median oak (16) and birch (20) for their wood, a bone one the biggest oak (66), the
+        // first stone axe (flint, harvest 100) the biggest ordinary tree (an araucaria's 92).
+        assert!(felling(20, 0).fruitful && felling(66, 50).fruitful && felling(92, 100).fruitful);
         let giant = felling(1350, 100);
         assert!(!giant.fruitful && giant.chops > felling(1350, 300).chops);
         assert!(felling(1350, 300).fruitful, "steel fells a sequoia for its wood");
