@@ -140,10 +140,11 @@ fn blend(a: Palette, b: Palette, t: f32) -> Palette {
 fn palette() -> Palette {
     var p = palette_read();
     // The sky's light test (`base:look_sky_light`): its light in the shade scaled, the sun's kept.
-    // In the HDR world 0.6 of it as made (the gap sheets: our shade never went dark against
-    // Bliss's; agreed with Shader, 11-05, so today's approved look keeps its keys).
+    // In the HDR world 0.45 of it as made (the gap sheets: our shade never went dark against
+    // Bliss's, the near forest at 08:00 luma 93 against 58; agreed with Shader, 11-05, so today's
+    // approved look keeps its keys).
     let k = fantasy_opt(OPT_SKY_LIGHT);
-    p.ambient *= select(1.0, k, k > 0.0) * select(1.0, 0.6, scene.frame.x > 0.5);
+    p.ambient *= select(1.0, k, k > 0.0) * select(1.0, 0.45, scene.frame.x > 0.5);
     return p;
 }
 
