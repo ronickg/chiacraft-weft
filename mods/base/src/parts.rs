@@ -541,7 +541,7 @@ fn armour_stack(kind: &Kind, parts: &[(Part, PartOf)], a: &ArmourStats, gems: &[
     // Worn, it's drawn from its parts too (the engine's `core:worn_look`); its item's set stays
     // for anything that can't compose it.
     let gem_ids: Vec<&str> = set.iter().map(|g| g.gem.id).collect();
-    let stack = with_worn_look(stack, Some(crafting::looks::worn_look(a.slot, a.shell, &gem_ids).as_str()));
+    let stack = with_worn_look(stack, Some(crafting::looks::worn_look(a.slot, a.shell, a.fastening, &gem_ids).as_str()));
     // Its icon is its shell's, in the shell's material.
     let shell = parts
         .iter()

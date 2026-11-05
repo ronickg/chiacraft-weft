@@ -47,3 +47,10 @@ each of the tail's first two segments, a quill every other texel; a dark-brown e
 3 by 2 texels; wild, in herds; animations idle (tipped forward at the hips to crop ferns, the tail
 held level, then up to look about), walk, run (leaning forward), lie (like a bird: the legs folded
 under, belly and tail down).
+
+Behaviour clips (2026-11-05, `mods/animals/src/anim.rs`): held and looping stare, graze, drink,
+sleep (curled in the lie pose, also in the lying file), watch; the approach gait (looping, its
+height set from its feet, `ground.grounded`); once alarm, sniff, look, scratch, groom, stretch,
+play, nuzzle, flinch; the death fall onto its side (holds). No rear or charge: it is under the size
+that stands its ground. Graze, drink, sniff and nuzzle use the fitted cropping pose (the beak half
+a unit over the ground, the legs straight); sleep's head and the death's drop are fitted too.

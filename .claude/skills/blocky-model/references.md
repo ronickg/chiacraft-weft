@@ -9,6 +9,8 @@ block: double their numbers for our 32.
 
 Paths below are under `~/Coding/chiacraft-archive/references/models/`.
 
+Comparing our cut-out planes (antlers, crests, fins) with these: `scripts/render.py` draws a plane's back lined up in 3D, as the game does (fixed 11-05; before, a lopsided plane drew reversed from behind, and the reindeer's antler read as a ring in shots that the game drew right). Shots of a plane from behind made before that fix are wrong.
+
 ## Mojang (minecraft.wiki renders and textures; `vanilla/geo/` the bedrock-samples geometry)
 - `vanilla/vanilla_sniffer_render.png`, `vanilla_sniffer_texture.png`: the moss coat as ONE shell a little bigger than the body, its hem cut out ragged, shag painted as streaks (not tufts).
 - `vanilla/vanilla_camel_render.png`, `vanilla_camel_texture.png`: the hump flush on the back, 3 px in each side; a neck column; a muzzle box; soft light painted per face on a 128 sheet.

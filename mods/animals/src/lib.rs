@@ -27,6 +27,8 @@ mod animal;
 mod ankylosaur;
 mod armour;
 mod birds;
+mod borkon;
+mod boss;
 mod breath;
 mod breeding;
 mod caiman;
@@ -142,7 +144,9 @@ fn init(r: &mut Registry) {
     citipati::init(r);
     early_bird::init(r);
     sauropod::init(r);
+    boss::init(r);
     drenkaun::init(r);
+    borkon::init(r);
     kryptobaatar::init(r);
     lizard::init(r);
     reindeer::init(r);
