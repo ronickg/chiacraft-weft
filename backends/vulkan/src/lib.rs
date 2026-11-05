@@ -1025,11 +1025,33 @@ impl VulkanBackend {
     }
 
     unsafe fn memory_barrier(&self, cmd: vk::CommandBuffer) {
+        // The host's reads (readbacks, mapped counts) are made visible once, at the end of the
+        // frame (`host_barrier`): a host stage here made MoltenVK go over every buffer and image
+        // at each of a frame's barriers. `WEFT_HOST_BARRIER_EACH=1` puts it back, to compare.
+        let (host_stage, host_read) = if host_barrier_each() {
+            (vk::PipelineStageFlags2::HOST, vk::AccessFlags2::HOST_READ)
+        } else {
+            (vk::PipelineStageFlags2::NONE, vk::AccessFlags2::NONE)
+        };
         let b = [vk::MemoryBarrier2::default()
             .src_stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS)
             .src_access_mask(vk::AccessFlags2::MEMORY_WRITE)
-            .dst_stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS | vk::PipelineStageFlags2::HOST)
-            .dst_access_mask(vk::AccessFlags2::MEMORY_READ | vk::AccessFlags2::MEMORY_WRITE | vk::AccessFlags2::HOST_READ)];
+            .dst_stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS | host_stage)
+            .dst_access_mask(vk::AccessFlags2::MEMORY_READ | vk::AccessFlags2::MEMORY_WRITE | host_read)];
+        unsafe {
+            self.device
+                .cmd_pipeline_barrier2(cmd, &vk::DependencyInfo::default().memory_barriers(&b))
+        };
+    }
+
+    /// Everything the frame's commands wrote, visible to the host once the frame's fence has
+    /// signalled: what the CPU reads back (captures, depth, counts).
+    unsafe fn host_barrier(&self, cmd: vk::CommandBuffer) {
+        let b = [vk::MemoryBarrier2::default()
+            .src_stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS)
+            .src_access_mask(vk::AccessFlags2::MEMORY_WRITE)
+            .dst_stage_mask(vk::PipelineStageFlags2::HOST)
+            .dst_access_mask(vk::AccessFlags2::HOST_READ)];
         unsafe {
             self.device
                 .cmd_pipeline_barrier2(cmd, &vk::DependencyInfo::default().memory_barriers(&b))
@@ -1916,15 +1938,12 @@ impl Backend for VulkanBackend {
                     }
                     Cmd::CopyDepthToBuffer { depth, buffer } => {
                         let t = self.textures.get(depth.0);
-                        let (image, width, height) = (t.image, t.desc.width, t.desc.height);
+                        // From the layout it is in (`EndPass` leaves a sampled depth target
+                        // shader-readable), and back to it: assuming the attachment layout was
+                        // wrong, and left the effects sampling it in the attachment layout.
+                        let (image, width, height, was) = (t.image, t.desc.width, t.desc.height, t.layout);
                         let raw = self.buffers.get(buffer.0).raw;
-                        self.barrier_image(
-                            cmd,
-                            image,
-                            depth_range(),
-                            vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL,
-                            vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-                        );
+                        self.barrier_image(cmd, image, depth_range(), was, vk::ImageLayout::TRANSFER_SRC_OPTIMAL);
                         let region = vk::BufferImageCopy::default()
                             .image_subresource(vk::ImageSubresourceLayers {
                                 aspect_mask: vk::ImageAspectFlags::DEPTH,
@@ -1935,13 +1954,10 @@ impl Backend for VulkanBackend {
                             .image_extent(vk::Extent3D { width, height, depth: 1 });
                         self.device
                             .cmd_copy_image_to_buffer(cmd, image, vk::ImageLayout::TRANSFER_SRC_OPTIMAL, raw, &[region]);
-                        self.barrier_image(
-                            cmd,
-                            image,
-                            depth_range(),
-                            vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-                            vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL,
-                        );
+                        // An image never used yet goes back to being a depth attachment.
+                        let back = if was == vk::ImageLayout::UNDEFINED { vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL } else { was };
+                        self.barrier_image(cmd, image, depth_range(), vk::ImageLayout::TRANSFER_SRC_OPTIMAL, back);
+                        self.textures.get_mut(depth.0).layout = back;
                     }
                     Cmd::Mark => {
                         if marks < MAX_MARKS - 1 {
@@ -1987,6 +2003,9 @@ impl Backend for VulkanBackend {
             self.device
                 .cmd_write_timestamp2(cmd, vk::PipelineStageFlags2::ALL_COMMANDS, self.queries, first_query + marks);
             self.frames[self.slot].marks = marks + 1;
+            if !host_barrier_each() {
+                self.host_barrier(cmd);
+            }
             self.device.end_command_buffer(cmd).ok();
 
             let frame = &mut self.frames[self.slot];
@@ -2190,4 +2209,11 @@ mod tests {
         let unified = memory(&[vk::MemoryHeapFlags::DEVICE_LOCAL], &[(P::DEVICE_LOCAL, 0), (P::DEVICE_LOCAL | host, 0)]);
         assert_eq!(spill_types(&unified), 0);
     }
+}
+
+/// `WEFT_HOST_BARRIER_EACH=1`: every `Cmd::Barrier` also makes writes visible to the host, as
+/// before (`--host-barrier-each`), to compare with one host barrier at the end of the frame.
+fn host_barrier_each() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("WEFT_HOST_BARRIER_EACH").is_some())
 }

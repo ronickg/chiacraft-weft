@@ -68,6 +68,7 @@ pub mod salt {
     pub const FALLS: u64 = 0xFA11;
     pub const SINKS: u64 = 0x4A9;
     pub const CRATERS: u64 = 0xC4A7;
+    pub const CRATER_METEORITES: u64 = 0xC4A8;
     pub const TARNS: u64 = 0x7A27;
     pub const STREAMS: u64 = 0x57EA;
     pub const FACE_COAL: u64 = 0x0C0A;
@@ -449,6 +450,15 @@ pub const CRATER_DEPTH: f64 = 0.65;
 pub const CRATER_RIM: (i32, i32) = (5, 8);
 pub const CRATER_RIM_OUT: f64 = 1.8;
 
+/// Old craters keep what fell (Research round 17, addendum 1, approved by Ronald 11-06): this
+/// share of them holds `CRATER_METEORITES` meteorite blocks, `CRATER_METEORITE_DEPTH` blocks
+/// under the floor, within `CRATER_METEORITE_SPREAD` radii of the middle, for a daytime player
+/// to dig for.
+pub const CRATER_METEORITE_CHANCE: f64 = 1.0 / 3.0;
+pub const CRATER_METEORITES: (i32, i32) = (2, 5);
+pub const CRATER_METEORITE_DEPTH: (i32, i32) = (2, 6);
+pub const CRATER_METEORITE_SPREAD: f64 = 0.2;
+
 /// Cirque tarns (Planner, 11-04: mountain lakes, water above the sea's level): one per `TARN_CELL`
 /// square at most, kept with `TARN_CHANCE`, in a hollow of the mountains (their biome's strength)
 /// from `TARN_BAND.0` to `TARN_BAND.1` blocks under the snow line (under the glaciers), found in
@@ -732,18 +742,9 @@ pub fn features() -> Vec<Feature> {
         preset::mountains(MOUNTAINS.0, MOUNTAINS.1)
             .mask(MOUNTAINS_RISE.mask())
             .named("mountain_rise"),
-        Feature::custom(mesa).named("mesas"),
-        Feature::custom(canyons).named("canyons"),
-        Feature::custom(karst).named("karst"),
-        Feature::custom(reefs).named("reefs"),
-        Feature::custom(lakes).named("lakes"),
-        Feature::custom(rivers).named("rivers"),
-        // Last: a crater is measured from its ground, the rivers' cut included (none reach one).
-        Feature::custom(craters).named("craters"),
-        // After the craters: a tarn is measured from the ground they leave (none meet).
-        Feature::custom(tarns).named("tarns"),
-        // After the tarns: their streams' channels, down from them.
-        Feature::custom(tarn_streams).named("tarn_streams"),
+        // Mesas, canyons, karst, reefs, lakes, rivers, craters, tarns and their streams: one
+        // callback, so a column's ground under them is worked out once (`customs`).
+        Feature::custom(customs).named("land"),
     ]
 }
 
@@ -775,14 +776,48 @@ pub fn land_height(f: &Fields, x: i32, z: i32) -> i32 {
 }
 
 fn land_height_at(h: &Here) -> i32 {
-    let ground = ground_at(h);
+    land_on(h, base_ground(h))
+}
+
+/// `land_height_at` over ground `base` (`base_ground`).
+fn land_on(h: &Here, base: i32) -> i32 {
+    let ground = ground_on(h, base);
     ground + lakes_on(h, ground)
 }
 
 /// The ground before the lakes and the rivers.
 fn ground_at(h: &Here) -> i32 {
-    let base = base_ground(h);
+    ground_on(h, base_ground(h))
+}
+
+/// `ground_at` over ground `base` (`base_ground`).
+fn ground_on(h: &Here, base: i32) -> i32 {
     base + canyons::cut(h, base) + karst::add(h, base) + karst::sink(h, || base) + reefs::add(h, base)
+}
+
+/// What the custom features add at (`x`, `z`) (Q4), summed: the mesas, canyons, karst, reefs,
+/// lakes, rivers, craters, tarns and their streams, each as its own function gives it, with the
+/// ground under them (`base_ground`, `land_height`, the ground before the tarns) worked out once
+/// and only where one asks. Distant terrain asks this at every sample of every far tile: as nine
+/// callbacks they took the ground over again each (12 ms a tile, Terrain 11-05).
+pub fn customs(f: &Fields, x: i32, z: i32) -> i32 {
+    use std::cell::OnceCell;
+    let h = Here::new(f, x, z);
+    let (base, land, before) = (OnceCell::new(), OnceCell::new(), OnceCell::new());
+    let base = || *base.get_or_init(|| base_ground(&h));
+    let land = || *land.get_or_init(|| land_on(&h, base()));
+    let mesa = mesa_at(&h);
+    let canyons = if !canyons::near(&h) { 0 } else { canyons::cut(&h, base()) };
+    let karst = if KARST_AREA.at(&h) == 0 { 0 } else { karst::add(&h, base()) } + karst::sink(&h, base);
+    let reefs = if reefs::warm(&h) < q12(0.5) { 0 } else { reefs::add(&h, base()) };
+    let lakes = lakes_on(&h, i32::MIN);
+    let rivers = rivers_on(&h, &land);
+    let craters = craters::add(&h, || land() + rivers);
+    // The ground before the tarns: the land, the rivers' cut and the craters'.
+    let before = || *before.get_or_init(|| land() + rivers + craters);
+    let tarns = tarns::cut(f, x, z, &before, &|x, z| before_tarns(f, x * 16, z * 16) >> 4);
+    let streams = stream_cut(f, x, z, || before() + tarns);
+    mesa + canyons + karst + reefs + lakes + rivers + craters + tarns + streams
 }
 
 /// The ground before the karst towers (which stand on it, or rise out of the water over it).
@@ -804,18 +839,19 @@ fn base_ground(h: &Here) -> i32 {
 /// The ground's height (Q4) with the rivers: what the engine makes of `features`.
 pub fn height(f: &Fields, x: i32, z: i32) -> i32 {
     let ground = with_tarns(f, x, z);
-    ground + stream_cut(f, x, z, ground)
+    ground + stream_cut(f, x, z, || ground)
 }
 
 /// The ground (Q4) with the tarns, before their streams.
 fn with_tarns(f: &Fields, x: i32, z: i32) -> i32 {
     let ground = before_tarns(f, x, z);
-    ground + tarns::cut(f, x, z, ground, &|x, z| before_tarns(f, x * 16, z * 16) >> 4)
+    ground + tarns::cut(f, x, z, &|| ground, &|x, z| before_tarns(f, x * 16, z * 16) >> 4)
 }
 
-/// What a tarn's stream takes off ground `ground` (Q4) at (`x`, `z`) (Q4): down to its bed.
-fn stream_cut(f: &Fields, x: i32, z: i32, ground: i32) -> i32 {
-    stream_bed(f, x >> 4, z >> 4).map_or(0, |bed| (q4(bed as f64) + 8 - ground).min(0))
+/// What a tarn's stream takes off ground `ground` (Q4, asked only where a stream runs) at (`x`,
+/// `z`) (Q4): down to its bed.
+fn stream_cut(f: &Fields, x: i32, z: i32, ground: impl FnOnce() -> i32) -> i32 {
+    stream_bed(f, x >> 4, z >> 4).map_or(0, |bed| (q4(bed as f64) + 8 - ground()).min(0))
 }
 
 /// The bed (blocks) of a tarn's stream at column (`x`, `z`) (blocks), if one runs there: still
@@ -827,7 +863,7 @@ pub fn stream_bed(f: &Fields, x: i32, z: i32) -> Option<i32> {
 /// What the tarns' streams take off the ground (Q4, zero or less) at (`x`, `z`) (Q4), as the
 /// engine adds it.
 pub fn tarn_streams(f: &Fields, x: i32, z: i32) -> i32 {
-    stream_cut(f, x, z, with_tarns(f, x, z))
+    stream_cut(f, x, z, || with_tarns(f, x, z))
 }
 
 /// The stream of the tarn in the cell holding (`x`, `z`) (blocks): its columns from the outlet
@@ -845,7 +881,7 @@ fn before_tarns(f: &Fields, x: i32, z: i32) -> i32 {
 
 /// What the tarns take off the ground (Q4, zero or less) at (`x`, `z`) (Q4), as the engine adds it.
 pub fn tarns(f: &Fields, x: i32, z: i32) -> i32 {
-    tarns::cut(f, x, z, before_tarns(f, x, z), &|x, z| before_tarns(f, x * 16, z * 16) >> 4)
+    tarns::cut(f, x, z, &|| before_tarns(f, x, z), &|x, z| before_tarns(f, x * 16, z * 16) >> 4)
 }
 
 /// The water's level (y of its top block) of the tarn column (`x`, `z`) (blocks) is in, if any:
@@ -1065,15 +1101,21 @@ fn lake_cut(h: &Here, lake: Lake, ground: &mut i32) -> i32 {
 /// What the rivers take off the ground (Q4, zero or less) at (`x`, `z`) (Q4): the deepest cut
 /// of the river stretches near (`net`), so tributaries join their river.
 pub fn rivers(f: &Fields, x: i32, z: i32) -> i32 {
+    let here = Here::new(f, x, z);
+    rivers_on(&here, &|| land_height_at(&here))
+}
+
+/// `rivers` at `here`, the land under them (`land_height`) from `land`, asked only near a river.
+fn rivers_on(here: &Here, land: &dyn Fn() -> i32) -> i32 {
+    let (f, x, z) = (here.f, here.x, here.z);
     let (bx, bz) = (x >> 4, z >> 4);
     let region = net::region_at(f, bx, bz);
     let mut segs = region.near(bx, bz).peekable();
     if segs.peek().is_none() {
         return 0;
     }
-    let here = Here::new(f, x, z);
     let p = net::meander(f, x, z);
-    let mountains = net::mountains(&here);
+    let mountains = net::mountains(here);
     if mountains == 0 {
         return 0;
     }
@@ -1087,7 +1129,7 @@ pub fn rivers(f: &Fields, x: i32, z: i32) -> i32 {
             continue;
         }
         if h0 == i32::MIN {
-            h0 = land_height_at(&here);
+            h0 = land();
         }
         let rise = (h0 - sea) >> 4;
         if rise < 0 {
@@ -1182,6 +1224,12 @@ pub fn reef_rubble(f: &Fields, x: i32, z: i32) -> bool {
 /// What the meteor craters add at (`x`, `z`) (Q4), as the engine adds it.
 pub fn craters(f: &Fields, x: i32, z: i32) -> i32 {
     craters::add(&Here::new(f, x, z), || land_height(f, x, z) + rivers(f, x, z))
+}
+
+/// The meteorites buried under the old craters' floors (blocks) within `r` blocks of (`x`, `z`)
+/// (blocks): `CRATER_METEORITES` of them under 1 crater in 3.
+pub fn crater_meteorites(f: &Fields, x: i32, z: i32, r: i32) -> Vec<[i32; 3]> {
+    craters::meteorites(f, x, z, r)
 }
 
 /// The meteor craters (middle x, z and radius, blocks) within `r` blocks of (`x`, `z`) (blocks).
@@ -2060,6 +2108,37 @@ mod tests {
             }
         }
         assert!(frayed > 0 && frayed < 4_000, "{frayed} frayed columns of 40 000");
+    }
+
+    #[test]
+    fn some_old_craters_hide_meteorites_under_their_floors() {
+        let f = fields(42);
+        let sites = craters_near(&f, 0, 0, 8000);
+        let mut holding = 0;
+        for &(x, z, r) in &sites {
+            let found = crater_meteorites(&f, x, z, 0);
+            let spread = (r as f64 * CRATER_METEORITE_SPREAD) as i32 + 1;
+            let mine: Vec<_> = found
+                .iter()
+                .filter(|m| (m[0] - x).abs() <= spread && (m[2] - z).abs() <= spread)
+                .collect();
+            if !mine.is_empty() {
+                holding += 1;
+                assert!(
+                    (CRATER_METEORITES.0..=CRATER_METEORITES.1).contains(&(mine.len() as i32)),
+                    "crater at {x} {z}: {} meteorites",
+                    mine.len()
+                );
+            }
+            for m in mine {
+                let below = (height(&f, m[0] * 16, m[2] * 16) >> 4) - m[1];
+                assert!(
+                    (CRATER_METEORITE_DEPTH.0..=CRATER_METEORITE_DEPTH.1).contains(&below),
+                    "meteorite at {m:?}: {below} under the floor"
+                );
+            }
+        }
+        assert!(holding > 0 && holding < sites.len(), "{holding} of {} craters hold meteorites", sites.len());
     }
 
     #[test]

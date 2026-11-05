@@ -1,3 +1,8 @@
+// Screen-space reflections on water, marched per pixel (chiacraft's shader pack turns them on).
+// fx-half marched them at half the size each way, but at a glancing look the far water packs many
+// screen rows into each half-size row and the mirrored far shore landed on the wrong rows as lines
+// (the golden lake shot; gone with reflections off, not with contact or bloom), and marching the
+// level band per pixel still left them lower down. Per pixel again until a better upsample.
 // Water reflections (chiacraft's shader pack turns them on, `mods/base/src/shaderpack.rs`): where
 // water lies (the world image's alpha, which the pack leaves at 0 for solid things, and the water's
 // surface in the depth, `translucent_depth`), the reflected ray is walked across the screen until
@@ -100,14 +105,16 @@ fn reflect_reach(pos: vec3<f32>) -> f32 {
     return 1.0 - smoothstep(end - 72.0, end - 24.0, max(abs(pos.x), abs(pos.z)));
 }
 
-fn apply(p: PostPixel) -> vec4<f32> {
+// What the water mirrors at this pixel, premultiplied by how much (rgb), and how much (a): 0 where
+// it mirrors nothing. Premultiplied, a shore's half-size texels average to less mirror, not to black.
+fn reflect_result(p: PostPixel) -> vec4<f32> {
     let water = p.color.a;
     // Not water, the eye in a liquid, or nothing drawn.
     if water < 0.02 || abs(scene.params.x - 0.6 * scene.params.y) > 0.5 {
-        return p.color;
+        return vec4(0.0);
     }
     if post_depth(p, p.uv) <= 0.0 {
-        return p.color;
+        return vec4(0.0);
     }
     let pos = post_position(p, p.uv);
     // The surface's slope from its neighbours' depth: only what lies flat, below the eye.
@@ -119,7 +126,7 @@ fn apply(p: PostPixel) -> vec4<f32> {
         n = -n;
     }
     if n.y < 0.9 || pos.y > -0.3 {
-        return p.color;
+        return vec4(0.0);
     }
     let v = normalize(pos);
     n = reflect_swell(pos.xz + scene.eye.xz, scene.params.w, length(pos), -v.y);
@@ -134,7 +141,7 @@ fn apply(p: PostPixel) -> vec4<f32> {
     let cheap = p.strength < 0.75;
     let mask = smoothstep(0.02, 0.3, water) * select(min(p.strength, 1.0), 1.0, cheap) * reflect_reach(pos);
     if mask <= 0.0 {
-        return p.color;
+        return vec4(0.0);
     }
     // Walk out along it, the steps growing, from a random start against banding. Past something
     // thin without a clean hit it keeps going; a hit is narrowed down between the last two steps.
@@ -178,7 +185,7 @@ fn apply(p: PostPixel) -> vec4<f32> {
         // the sun), so the water is not a flat painted blue.
         let far = reflect_project(r * 4096.0);
         if far.w < 0.0 || far.x < 0.0 || far.x > 1.0 || far.y < 0.0 || far.y > 1.0 {
-            return p.color;
+            return vec4(0.0);
         }
         // Where something is drawn at that spot (land at the horizon, a trunk), look a little
         // higher up the screen for the sky, and give it less the further up it was: switching
@@ -194,13 +201,13 @@ fn apply(p: PostPixel) -> vec4<f32> {
             found = at.y > 0.0 && post_depth(p, at) <= 0.0;
         }
         if !found {
-            return p.color;
+            return vec4(0.0);
         }
         let sky = textureSampleLevel(textures[p.scene], linear_clamp, at, 0.0).rgb;
         let edge = smoothstep(0.0, 0.1, min(min(at.x, 1.0 - at.x), min(at.y, 1.0 - at.y)));
         // The pack's own sky is already in the water at this share; this only replaces it.
         let amount = clamp(fresnel, 0.0, 0.97) * mask * edge * (1.0 - reach);
-        return vec4(mix(p.color.rgb, sky, amount), p.color.a);
+        return vec4(sky * amount, amount);
     }
     // Blurred more the farther the ray went before it hit (a reflection in rippled water softens
     // with distance): the hit and four samples about it. One sharp sample turned dark tree crowns
@@ -223,5 +230,10 @@ fn apply(p: PostPixel) -> vec4<f32> {
     // That extra fades looking steeply down, where the water shows its body more than what it mirrors.
     let steep = smoothstep(0.5, 0.9, dot(-v, n));
     let amount = clamp(fresnel + 0.15 * (1.0 - steep), 0.0, 0.97) * mask * edge * near;
-    return vec4(mix(p.color.rgb, mirrored, amount), p.color.a);
+    return vec4(mirrored * amount, amount);
+}
+
+fn apply(p: PostPixel) -> vec4<f32> {
+    let r = reflect_result(p);
+    return vec4(p.color.rgb * (1.0 - r.a) + r.rgb, p.color.a);
 }

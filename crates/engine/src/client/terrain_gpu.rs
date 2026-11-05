@@ -360,6 +360,27 @@ struct Slot {
 
 type LodDesc = ((u32, u64), Arc<std::sync::OnceLock<Option<(Vec<i32>, usize)>>>);
 
+/// Distant terrain's description of (`dim`, `seed`) and its count of features made on the CPU,
+/// worked out once on LOD's threads (it runs mods' shapes) by whoever asks first: `Lod` asks when
+/// the dimension changes, so it is done by the time the first tile's job is in, not started then
+/// behind every tile's heights. Inside: `None` while not done, then `None` when the GPU can't
+/// make it.
+pub fn lod_desc(dim: u32, seed: u64) -> LodDesc {
+    static LAST: std::sync::Mutex<Option<LodDesc>> = std::sync::Mutex::new(None);
+    let mut last = LAST.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(d) = last.as_ref().filter(|d| d.0 == (dim, seed)) {
+        return d.clone();
+    }
+    let cell = Arc::new(std::sync::OnceLock::new());
+    let out = cell.clone();
+    super::lod::pool().spawn(move || {
+        let _ = out.set(describe_lod(content(), dim, seed).map(|(w, custom)| (w, custom.len())));
+    });
+    let d = ((dim, seed), cell);
+    *last = Some(d.clone());
+    d
+}
+
 /// A frame slot's output buffer as workers read it, straight from where the GPU wrote it.
 struct Readback(*const u32, usize);
 
@@ -483,12 +504,7 @@ impl GpuTerrain {
         let Some(first) = self.lod_queue.front() else { return };
         let key = (first.dim, first.seed);
         if self.lod_desc.as_ref().is_none_or(|d| d.0 != key) {
-            let cell = Arc::new(std::sync::OnceLock::new());
-            let out = cell.clone();
-            super::lod::pool().spawn(move || {
-                let _ = out.set(describe_lod(content(), key.0, key.1).map(|(w, custom)| (w, custom.len())));
-            });
-            self.lod_desc = Some((key, cell));
+            self.lod_desc = Some(lod_desc(key.0, key.1));
         }
         let cell = self.lod_desc.as_ref().unwrap().1.clone();
         let Some(made) = cell.get() else { return };
