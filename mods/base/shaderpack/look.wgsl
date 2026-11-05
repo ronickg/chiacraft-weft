@@ -196,7 +196,9 @@ fn palette_made() -> Palette {
     p.ambient *= mix(1.0, 1.0 - 0.6 * r, smoothstep(-0.14, -0.3, e));
     // A lightning flash lights the land and the sky, a cold white, for its strokes.
     let flash = lightning_flash();
-    p.ambient += vec3(0.5, 0.55, 0.7) * flash;
+    // At night half as much: at the day's strength a near strike lit the night's land brighter than
+    // a storm's noon (PC run sh2_thunder_burst, frame luma 119 against 112).
+    p.ambient += vec3(0.5, 0.55, 0.7) * flash * mix(1.0, 0.5, smoothstep(-0.05, -0.25, e));
     p.zenith += vec3(0.22, 0.24, 0.32) * flash;
     p.horizon += vec3(0.3, 0.32, 0.42) * flash;
     // A storybook hour (round 17, rec. 2; `base:look_storybook`, 0 to 1): at golden hour and blue
