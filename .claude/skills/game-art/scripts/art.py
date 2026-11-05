@@ -40,6 +40,12 @@ from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GUIDES = os.path.join(HERE, "..", "guides")
+# ART_RAW=guides-3 (Ronald, 11-05: "the version 3, but without how edited skill ... the raw version"):
+# his guide set exactly as sent (archived in chiacraft-archive/references/style-guides), with its own
+# reference sheets and none of ours: no style key of approved art, no lessons, no lines we added.
+RAW = os.environ.get("ART_RAW", "")
+if RAW:
+    GUIDES = os.path.expanduser(f"~/Coding/chiacraft-archive/references/style-guides/{RAW}")
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", "..", ".."))
 UI_DIR = os.path.join(ROOT, "mods", "base", "source", "ui")
 CODEX = "/Applications/Codex.app/Contents/Resources/codex-cli/bin/codex"
@@ -281,9 +287,10 @@ def grid_image(w, h):
     return path
 
 
+ORD = ["First", "Second", "Third"]
 SHEET_TEXT = ("{n}, the style guide's reference sheet for this kind of {label}, from another game's texture pack: "
               "take how such things are built there (view, proportions, how the parts and materials read), never "
-              "their designs; our style key decides the look. Make it ours, as the guide says:\n{fam}")
+              "their designs; {who} decides the look. Make it ours, as the guide says:\n{fam}")
 
 
 def build(a):
@@ -292,17 +299,19 @@ def build(a):
     fam = family(a.kind, sheets)
     bg = ("solid flat #00FFFF cyan" if a.green == "cyan" else
           "solid flat #00FF00 green" if a.green else "solid flat #FF00FF magenta")
-    key = key_path(a.kind) if a.kind != "ui" else None
+    key = key_path(a.kind) if a.kind != "ui" and not RAW else None
     if getattr(a, "key", ""):  # another style key of ours (approved art), e.g. the plants sheet for flowers
         key = a.key
     if a.kind == "item":
         w, h = 32, 32
         t = (f"Make one item icon for my block game.\n\n{style('item')}\n\n{GRID.format(w=w, h=h, W=1024, H=1024, c=32)} "
              f"The item sits inside the 32 x 32 grid; everything outside it is {bg} (it will be cut out). Use about "
-             "16-32 colors.\n\nAttached: first, approved items of my game, the style key: take their size, outline, "
-             "light and level of detail, not their designs. "
-             + (SHEET_TEXT.format(n="Second", label="item", fam=fam or "(the shapes are free)") + "\n\n" if sheets else "")
-             + ("Third" if sheets else "Second") + ", the game's UI: its colors and the dark brown slot "
+             "16-32 colors.\n\nAttached: "
+             + ("first, approved items of my game, the style key: take their size, outline, light and level of detail, "
+                "not their designs. " if key else "")
+             + (SHEET_TEXT.format(n="Second" if key else "first", label="item", fam=fam or "(the shapes are free)", who="the style above" if RAW else "our style key")
+                + "\n\n" if sheets else "")
+             + ORD[bool(key) + bool(sheets)] + ", the game's UI: its colors and the dark brown slot "
              f"(#352015) the icon must read on.\n\nThe item: {a.what}.\n\n")
         refs, full = [key, *sheets, UI_REF], False
     elif a.kind == "block":
@@ -312,10 +321,12 @@ def build(a):
                 "seamlessly." if full else
                 f"Where there is nothing (gaps, around the plant) the image is {bg}, which stands for transparent.")
         t = (f"Make one block texture for my block game.\n\n{style('block')}\n\n{type_line('block', a.type)}\n\n"
-             f"{GRID.format(w=w, h=h, W=1024, H=1024, c=32)} {fill}\n\nAttached: first, approved block textures of my "
-             "game, the style key: take their look, not their designs. "
-             + (SHEET_TEXT.format(n="Second", label="block", fam=fam or "(the shapes are free)") + "\n\n" if sheets else "")
-             + ("Third" if sheets else "Second") + ", the game's UI, for its colors.\n\n"
+             f"{GRID.format(w=w, h=h, W=1024, H=1024, c=32)} {fill}\n\nAttached: "
+             + ("first, approved block textures of my game, the style key: take their look, not their designs. "
+                if key else "")
+             + (SHEET_TEXT.format(n="Second" if key else "first", label="block", fam=fam or "(the shapes are free)", who="the style above" if RAW else "our style key")
+                + "\n\n" if sheets else "")
+             + ORD[bool(key) + bool(sheets)] + ", the game's UI, for its colors.\n\n"
              f"The block: {a.what}.\n\n")
         refs = [key, *sheets, UI_REF]
     elif a.kind == "animal":
@@ -363,9 +374,9 @@ def build(a):
     if sheets and a.kind not in ("item", "block"):
         refs = [refs[0], *sheets] + list(refs[1:])
         t = t.replace("\n\nThe ", "\n\nAlso attached, right after the style key: "
-                      + SHEET_TEXT.format(n="the guide's sheet", label=LABEL[a.kind], fam=fam or "(the shapes are free)")
+                      + SHEET_TEXT.format(n="the guide's sheet", label=LABEL[a.kind], fam=fam or "(the shapes are free)", who="the style above" if RAW else "our style key")
                       .replace("the guide's sheet, ", "") + "\n\nThe ", 1)
-    if not key:  # no style key of ours for this kind yet: say so rather than describe a missing image
+    if not key and not RAW:  # no style key of ours for this kind yet: say so rather than describe a missing image
         t = t.replace(", the style key:", " (none attached yet, so follow the words):")
     extra = [r for r in (getattr(a, "like", "") or "").split(",") if r]
     if extra:  # our own drawings to match in shape (never another game's or pack's art)
