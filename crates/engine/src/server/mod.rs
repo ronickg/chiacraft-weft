@@ -189,6 +189,10 @@ pub struct Shared {
     pub views: parking_lot::RwLock<Vec<(u32, View)>>,
     /// Achievements mods granted this tick (chiacraft, `achievements`): the server signs them.
     pub grants: parking_lot::Mutex<Vec<crate::chiacraft::achievements::Grant>>,
+    /// `weft --server --stats` (a load test, `crates/bots`): every tick's time and its phases in
+    /// microseconds, kept until the stats line takes them (`dedicated::stats`).
+    pub stats: AtomicBool,
+    pub tick_samples: parking_lot::Mutex<Vec<(u32, [u32; 6])>>,
 }
 
 pub const PHASES: [&str; 6] = ["insert", "messages", "regions", "request", "sync", "rest"];
@@ -778,6 +782,10 @@ impl Server {
         let us = start.elapsed().as_micros() as u64;
         self.shared.tick_us.store(us, Ordering::Relaxed);
         self.shared.tick_max_us.fetch_max(us, Ordering::Relaxed);
+        if self.shared.stats.load(Ordering::Relaxed) {
+            let phases = std::array::from_fn(|i| self.shared.phase_us[i].load(Ordering::Relaxed) as u32);
+            self.shared.tick_samples.lock().push((us as u32, phases));
+        }
     }
 
     /// Whatever a player's or mod's action changed takes effect at once, wherever it reached:

@@ -15,7 +15,8 @@ use super::codec;
 use super::{ClientConn, Conn, ServerConn, ToClient, ToServer};
 use crate::settings::Settings;
 
-const ALPN: &[u8] = b"weft/1";
+/// Joining a world (public for load-test clients, `crates/bots`).
+pub const ALPN: &[u8] = b"weft/1";
 /// A world's status, for lists of worlds (chiacraft): answered without joining.
 const STATUS_ALPN: &[u8] = b"chiacraft/status/1";
 /// Link requests and answers between owners' account endpoints (chiacraft, `links`).
@@ -36,8 +37,8 @@ const BANS_ALPN: &[u8] = b"chiacraft/bans/1";
 /// world sends its issuer's revocation list (`ToClient::Revocations`; chiacraft, phase 4). 12: a
 /// time-of-day rate per dimension (`ToClient::Time`). 13: a moving structure leans
 /// (`ToClient::BodyLean`; chiacraft, falling trees).
-const PROTOCOL: u32 = 13;
-const MAX_FRAME: usize = 64 << 20;
+pub const PROTOCOL: u32 = 13;
+pub const MAX_FRAME: usize = 64 << 20;
 
 /// A data package the host's world plays with: id, version, hash (hex), size in bytes, its
 /// signature envelope (empty if unsigned), and the mod API its sandboxed code
@@ -53,8 +54,8 @@ const MAX_MANIFEST: u64 = 1 << 20;
 /// Limits on joining (chiacraft): the hello and the ready are small; a player has this long to
 /// download the world's packages and load them; the host serves this many players' downloads at
 /// once, this many requests of each at once.
-const MAX_HELLO: usize = 2 << 10;
-const MAX_OFFER: usize = 1 << 20;
+pub const MAX_HELLO: usize = 2 << 10;
+pub const MAX_OFFER: usize = 1 << 20;
 const CONFIGURE_TIME: Duration = Duration::from_secs(15 * 60);
 const MAX_CONFIGURING: usize = 8;
 const PEER_STREAMS: usize = 4;
@@ -234,7 +235,7 @@ fn throwaway_key() -> iroh::SecretKey {
     iroh::SecretKey::from_bytes(&bytes)
 }
 
-async fn write_frame(send: &mut iroh::endpoint::SendStream, data: &[u8]) -> Result<(), String> {
+pub async fn write_frame(send: &mut iroh::endpoint::SendStream, data: &[u8]) -> Result<(), String> {
     let packed = if data.len() > 256 { lz4_flex::compress_prepend_size(data) } else { data.to_vec() };
     let flag = (data.len() > 256) as u32;
     let header = (packed.len() as u32) << 1 | flag;
@@ -250,7 +251,7 @@ async fn read_frame(recv: &mut iroh::endpoint::RecvStream) -> Result<Vec<u8>, St
 
 /// A frame of at most `max` bytes, unpacked: the size a packed frame claims is checked before
 /// anything is allocated for it (chiacraft: a few bytes could otherwise claim gigabytes).
-async fn read_frame_max(recv: &mut iroh::endpoint::RecvStream, max: usize) -> Result<Vec<u8>, String> {
+pub async fn read_frame_max(recv: &mut iroh::endpoint::RecvStream, max: usize) -> Result<Vec<u8>, String> {
     let mut h = [0u8; 4];
     recv.read_exact(&mut h).await.map_err(|e| e.to_string())?;
     let header = u32::from_le_bytes(h);

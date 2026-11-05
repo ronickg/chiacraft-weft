@@ -1443,6 +1443,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "chiacraft_bots"
+version = "26.10.4"
+dependencies = [
+ "chiacraft-packages",
+ "glam 0.34.1",
+ "iroh",
+ "log",
+ "parking_lot 0.13.0",
+ "tokio",
+ "weft_engine",
+]
+
+[[package]]
 name = "chialisp"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

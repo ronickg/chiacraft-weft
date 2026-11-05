@@ -65,6 +65,22 @@ pub fn net_message(to_server: bool, kind: usize, count: u64, bytes: usize) {
     }
 }
 
+/// The traffic counted since the last call (with the `net` channel at debug), one way: by message
+/// kind, how many and how many bytes encoded (before compression). For a headless server's stats
+/// line (`dedicated::stats`), where no frame report reads them.
+pub fn take_net(to_server: bool) -> Vec<(&'static str, u64, u64)> {
+    use crate::net::Message;
+    let kinds = if to_server { crate::net::ToServer::KINDS } else { crate::net::ToClient::KINDS };
+    NET[to_server as usize]
+        .iter()
+        .enumerate()
+        .filter_map(|(k, c)| {
+            let (count, bytes) = (c.0.swap(0, Ordering::Relaxed), c.1.swap(0, Ordering::Relaxed));
+            (count + bytes > 0).then(|| (kinds.get(k).copied().unwrap_or("?"), count, bytes))
+        })
+        .collect()
+}
+
 // ---------------------------------------------------------------- allocations
 
 static COUNT_ALLOCS: AtomicBool = AtomicBool::new(false);
