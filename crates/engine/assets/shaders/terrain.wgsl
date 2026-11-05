@@ -623,6 +623,12 @@ var<workgroup> lod_ground: array<u32, LOD_SAMPLES>;
 var<workgroup> canopy: array<atomic<u32>, LOD_SAMPLES>;
 var<workgroup> cover: array<atomic<u32>, LOD_SAMPLES>;
 var<workgroup> trunk: array<atomic<u32>, LOD_SAMPLES>;
+// chiacraft: the lowest any crown over the sample reaches down to (its bottom, or the ground's top
+// under it), plus `LOD_FLOOR_BIAS`: a forest's crown is drawn from the highest top down to it, so the
+// low canopy under an emergent's crown stays (Far view, 11-05: with only the highest crown a
+// rainforest's emergents stood as bare trunks on open ground, far off a forest of pillars).
+var<workgroup> crown_floor: array<atomic<u32>, LOD_SAMPLES>;
+const LOD_FLOOR_BIAS: i32 = 32768;
 
 // The ground height of sample (`i`, `j`), clamped to the tile's samples.
 fn lod_height(i: i32, j: i32) -> i32 {
@@ -719,6 +725,7 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
         atomicStore(&canopy[k], 0u);
         atomicStore(&cover[k], 0u);
         atomicStore(&trunk[k], 0u);
+        atomicStore(&crown_floor[k], 0xFFFFFFFFu);
     }
     // The samples' tops in `outp` are read back below.
     storageBarrier();
@@ -848,6 +855,7 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
                     let q = u32(j) * LOD_SIDE + u32(i);
                     atomicAdd(&cover[q], u32(wx * wz));
                     atomicMax(&canopy[q], packed);
+                    atomicMin(&crown_floor[q], u32(ct - depth + LOD_FLOOR_BIAS));
                 }
             }
             // Its trunk, in the cell it stands in (its place there in 2 bits: box tiles' cells are 4
@@ -872,8 +880,10 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
             let ground = max(bitcast<i32>(lod_ground[k] << 16u) >> 16u, sea);
             let top = ground + i32(p >> 23u);
             let tr = atomicLoad(&trunk[k]);
+            let low = i32(atomicLoad(&crown_floor[k])) - LOD_FLOOR_BIAS;
+            let depth = u32(clamp(top - low, 0, 127));
             outp[o + 2u] = (u32(top) & LOD_OUT_HALF_MASK) | ((p & 65535u) << LOD_OUT_HALF_SHIFT);
-            outp[o + 3u] = ((p >> 16u) & 127u) | (((tr >> 16u) & 255u) << LOD_OUT_TRUNK_DZ_SHIFT) | ((tr & 65535u) << LOD_OUT_HALF_SHIFT);
+            outp[o + 3u] = depth | (((tr >> 16u) & 255u) << LOD_OUT_TRUNK_DZ_SHIFT) | ((tr & 65535u) << LOD_OUT_HALF_SHIFT);
         }
     }
 }
