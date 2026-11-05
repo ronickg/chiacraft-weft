@@ -15,6 +15,7 @@ Merge e9c8405c on sync/weft-26.11.2. Things the merge dropped or left for an own
 - Upstream bug (a PR candidate): first person cut only bone roles (draw_own_hand, the body in view), not bone_mask: worn layers drawn by bone name kept every bone, so a shirt's torso and sleeves drew at the camera. Fixed in the sync (bones_with, Animals).
 - Upstream candidate: a steered flying mount's flight counted as a fall on the server (mount_moved's track_fall didn't know it flew); MountMove now carries flies.
 - Upstream bug (a PR candidate): sdk/ai.rs kept mob moods (anger, fear) in a process-wide static by entity id and game tick, never cleared when another world opened: a fresh world's spider took the last world's zombie's anger at the player (neutral_mobs after zombie_chases; players opening a second world too). Fixed in the sync: cleared when the seed changes or the clock goes back.
+- For Ronald (visible, with call 6 and "Keep Weft's pose"): held items now sit in the posed hand (Weft's hold clips and held_transform), smaller and further in (about x 0.60-0.85 of the screen), not big in the bottom-right corner as on dev. Every item draws (Animals: ~/Coding/chiacraft-archive/images/animals-worker/2026-11-05/held_dev_sync.jpg). held_items' window moved to match. Dev's corner look back would mean porting dev's camera-relative transform into place_carried for one's own hand.
 
 ## Test fails that are not the sync (SYNC8, Tester)
 
