@@ -278,7 +278,16 @@ pub fn finish(w: &World, player: u64, r: &Recipe, out: ItemStack, u: f32) -> Ite
         s.xp[craft] = s.xp[craft].saturating_add(crafting::skills::xp_for(grade));
     }
     let made_day = (w.day_time() / vitals::calendar::DAY_TICKS) as u32;
-    out.with(&PART, PartOf { material, grade: grade as u32, worn: 0, made_day, repairs: 0 })
+    let out = out.with(&PART, PartOf { material, grade: grade as u32, worn: 0, made_day, repairs: 0 });
+    drawn_part(out, m.id)
+}
+
+/// A loose part drawn in its material where its shape has a map (`crafting::looks::part_look`).
+fn drawn_part(stack: ItemStack, material: &str) -> ItemStack {
+    match shape_id(stack.item).and_then(|s| crafting::looks::part_look(s, material)) {
+        Some(look) => with_look(stack, Some(look.as_str())),
+        None => stack,
+    }
 }
 
 /// The skill a part recipe uses, as (its name's key, the local player's level), for the book.
@@ -489,6 +498,15 @@ fn armour_stack(kind: &Kind, parts: &[(Part, PartOf)], a: &ArmourStats) -> ItemS
         .with(&crate::items::ARMOR, crate::items::Armor { points: (a.armour / ARMOUR_PER_POINT).round() as u32, toughness: 0.0 })
         .with(&base_api::ITEM_LEVEL, a.level)
         .with(&base_api::WARMTH, warmth);
+    // Its icon is its shell's, in the shell's material (the worn look is its item's set).
+    let shell = parts
+        .iter()
+        .find(|(p, _)| p.slot == "shell")
+        .map(|(p, _)| p.shape);
+    let stack = match shell.and_then(|s| crafting::looks::part_look(s, a.shell)) {
+        Some(look) => with_look(stack, Some(look.as_str())),
+        None => stack,
+    };
     let worn = (used * uses as f32) as u32;
     if worn > 0 { stack.with(&DAMAGE, worn) } else { stack }
 }
@@ -606,8 +624,9 @@ pub fn part_of(shape: &str, material: &str, grade: u8, day: u32) -> ItemStack {
     if !can {
         return ItemStack::EMPTY;
     }
-    ItemStack::new(part_item(shape).id(), 1)
-        .with(&PART, PartOf { material: code(m.id), grade: grade.clamp(1, 10) as u32, worn: 0, made_day: day, repairs: 0 })
+    let part = ItemStack::new(part_item(shape).id(), 1)
+        .with(&PART, PartOf { material: code(m.id), grade: grade.clamp(1, 10) as u32, worn: 0, made_day: day, repairs: 0 });
+    drawn_part(part, m.id)
 }
 
 /// Puts `stack` where it goes: armour on its slot if that's free, else the selected hotbar slot,
@@ -680,12 +699,13 @@ fn apart_into(stack: &ItemStack, cut: bool) -> Vec<ItemStack> {
             continue;
         }
         let worn = (p.worn[i] as f32).max(share * life) as u32;
-        out.push(
+        out.push(drawn_part(
             ItemStack::new(part_item(part.shape).id(), 1).with(
                 &PART,
                 PartOf { material: p.materials[i], grade: p.grades[i], worn, made_day: p.made_days[i], repairs: p.repairs[i] },
             ),
-        );
+            part.material,
+        ));
     }
     out
 }

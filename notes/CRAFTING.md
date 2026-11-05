@@ -535,8 +535,13 @@ How it was built:
 - **SDK:** `with_look`, `stack_look`.
 - **Base:** writes a tool's look when it's assembled (`parts::look_text`). Placeholder axe layers
   stand in for Chiacraft's.
-- **Not yet:** looks in rich-text item icons (they have only an item id), and a look on loose
-  part items.
+- **Armour's parts** (11-05, Ronald's yes to the six icons: "Install all six"): a shell, straps
+  and a lining are drawn from one shade map each (`base:parts/armour/<shape>`, made from the
+  approved icons) painted with their material's ramp, as a loose part and, a shell, as the built
+  piece's icon (`crafting::looks::part_look`): a bronze chestplate is bronze, a bone one bone. New
+  ramps from approved art: diamond, wool, linen, fur. The worn piece still shows its look set.
+- **Not yet:** looks in rich-text item icons (they have only an item id), and looks on loose tool
+  parts (they show their plain icon).
 
 ### Fewer pieces in the picture
 
