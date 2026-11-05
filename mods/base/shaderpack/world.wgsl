@@ -978,6 +978,30 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     return out;
 }
 
+// Far water (distant terrain's): deep, a dark mirror of the sky with the sun's path on it, as Photon's
+// and Bliss's far seas are (Planner, 11-05: "its far water is a flat dark mirror reflecting the sky").
+// Through `water()` it took the near water's shallow depth and bottom, and read pale and milky.
+fn far_water(in: VOut) -> vec3<f32> {
+    let v = -normalize(in.rel);
+    let n = wave_normal(in.pos, in.dist, v.y);
+    let ndv = max(dot(n, v), 0.02);
+    // Schlick's: nearly all mirror at the slants far water is seen at.
+    let fresnel = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
+    let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, cloud_shadow(in.rel), 1.0, in.pos, in.rel);
+    let deep = vec3(0.014, 0.045, 0.045) * lit;
+    let r = reflect(-v, n);
+    let refl = sky_color(normalize(vec3(r.x, max(r.y, 0.02), r.z)));
+    let l = light_dir();
+    let hv = normalize(l + v + vec3(0.0, 1e-4, 0.0));
+    let nh = max(dot(n, hv), 0.0);
+    let a2 = 0.0025;
+    let dd = nh * nh * (a2 - 1.0) + 1.0;
+    let spec = a2 / (3.14159 * dd * dd) * fresnel * 0.25;
+    let glint = palette().sun * light_strength() * min(spec, mix(30.0, 1.5, golden())) * smoothstep(0.0, 0.1, l.y + 0.05) * cloud_shadow(in.rel);
+    let c = refl * fresnel + deep * (1.0 - fresnel) + glint;
+    return display(haze_lit(c, in.rel, in.light.x));
+}
+
 // How dark a far crown's side gets at its bottom (`vs_lod`).
 const CROWN_UNDER: f32 = 0.5;
 // Far canopy (Ronald, 11-05: "in distant horizons is still 100x better"; the Look session's gap
@@ -1077,8 +1101,7 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
     // the mask): looking out to sea, their march over every far-water pixel cost too much
     // (reports/performance.md).
     if in.kind.x == TINT_WATER {
-        let w = water(in, avg, false);
-        return vec4(w.rgb, SOLID_ALPHA);
+        return vec4(far_water(in), SOLID_ALPHA);
     }
     // A crown's face: its own shade toward its bottom (`vs_lod`) at any distance, and on its top the
     // clumped crowns (`crown_clumps`), faded in where the far boxes stand for more than a tree and out
