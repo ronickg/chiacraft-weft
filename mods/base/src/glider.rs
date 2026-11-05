@@ -51,6 +51,8 @@ pub fn register(r: &mut Registry) {
     // Jump pressed in the world: the server decides whether it opens or closes anything.
     let was = std::sync::atomic::AtomicBool::new(false);
     r.client_frame(move |c| {
+        // The camera for the frame overlay: a HUD binding sees no client state.
+        FIRST_PERSON.store(c.state().camera == cameras::FIRST_PERSON.camera_id(), std::sync::atomic::Ordering::Relaxed);
         let now = c.key_held(&client::keys::JUMP) && c.screen().is_empty();
         if now && !was.swap(true, std::sync::atomic::Ordering::Relaxed) {
             c.send(&TOGGLE, &());
@@ -72,7 +74,7 @@ pub fn register(r: &mut Registry) {
         ui.image_bind("base:gui/glider_frame", S::default().h(FRAME_H), |c| {
             static SHOWN: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
             let gliding = c.player_state().is_some_and(|me| me.pose == GLIDE.id() && me.health > 0.0);
-            let first = c.client().state().camera == cameras::FIRST_PERSON.camera_id();
+            let first = FIRST_PERSON.load(std::sync::atomic::Ordering::Relaxed);
             let was = f32::from_bits(SHOWN.load(std::sync::atomic::Ordering::Relaxed));
             let now = if gliding && first { (was + FRAME_FADE).min(1.0) } else { (was - FRAME_FADE).max(0.0) };
             SHOWN.store(now.to_bits(), std::sync::atomic::Ordering::Relaxed);
@@ -82,6 +84,9 @@ pub fn register(r: &mut Registry) {
 }
 
 static HUD_FRAME: HudElement = HudElement::named("glider_frame");
+
+/// Seen from one's own eyes this frame (the frame hook says, for the overlay's binding).
+static FIRST_PERSON: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
 
 /// The frame overlay's height in GUI pixels (its picture is 640 x 120, a texel a GUI pixel at
 /// 1280 x 720 and GUI scale 2), and how much it fades in or out a frame.
