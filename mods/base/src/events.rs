@@ -424,7 +424,7 @@ fn site(w: &World) -> Option<BlockPos> {
 }
 
 /// The ground's top in column (`x`, `z`) near `y`: loaded, open to the sky, not water.
-fn open_ground(w: &World, x: i32, y: i32, z: i32) -> Option<BlockPos> {
+pub(crate) fn open_ground(w: &World, x: i32, y: i32, z: i32) -> Option<BlockPos> {
     const LOOK: i32 = 48;
     for gy in (y - LOOK..=y + LOOK).rev() {
         let p = BlockPos::new(x, gy, z);
@@ -442,6 +442,21 @@ fn open_ground(w: &World, x: i32, y: i32, z: i32) -> Option<BlockPos> {
         return (w.sky_light(p.above()) >= 15).then_some(p);
     }
     None
+}
+
+/// Whether `pos` is within `clear` blocks of a cell an online player built in.
+pub(crate) fn near_built(w: &World, pos: BlockPos, clear: i32) -> bool {
+    let half = ev::BUILT_CELL as f64 / 2.0;
+    let reach = clear as f64 + half * 1.5;
+    w.players().into_iter().any(|p| {
+        w.component(p, &BUILT).is_some_and(|b| {
+            (0..b.len as usize).any(|i| {
+                let (cx, cz) =
+                    (b.cells[2 * i] as f64 * ev::BUILT_CELL as f64 + half, b.cells[2 * i + 1] as f64 * ev::BUILT_CELL as f64 + half);
+                (cx - pos.x as f64).powi(2) + (cz - pos.z as f64).powi(2) < reach * reach
+            })
+        })
+    })
 }
 
 /// Every player in the dimension hears which way it fell (and how far, in bands), and on land

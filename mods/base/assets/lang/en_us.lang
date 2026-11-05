@@ -1079,6 +1079,7 @@ grade.base.legendary = Legendary
 
 # The first hours (first.rs, notes/FIRST_HOURS.md)
 block.base.loose_rock = Loose Rock
+block.base.meteorite = Meteorite
 block.base.loose_flint = Flint Nodule
 block.base.fallen_branch = Fallen Branch
 item.base.rock = Rock

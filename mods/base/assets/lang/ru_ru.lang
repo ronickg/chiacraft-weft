@@ -1080,6 +1080,7 @@ grade.base.legendary = Легендарное
 
 # The first hours (first.rs, notes/FIRST_HOURS.md)
 block.base.loose_rock = Лежащая галька
+block.base.meteorite = Метеорит
 block.base.loose_flint = Желвак кремня
 block.base.fallen_branch = Упавшая ветка
 item.base.rock = Галька
