@@ -68,17 +68,18 @@ pub async fn held_items(t: T) -> R {
     static HANDHELD: Tag = Tag::named("handheld");
     let handheld = |name: &str| Item::lookup(name).is_some_and(|i| HANDHELD.on_item(i));
     t.check(
-        handheld("base:diamond_sword") && handheld("base:wood_pickaxe") && handheld("base:stick") && handheld("testmod:steel_pickaxe"),
+        handheld("base:sword") && handheld("base:pickaxe") && handheld("base:stick") && handheld("testmod:steel_pickaxe"),
         "tools and the stick are held like tools",
     );
     t.check(!handheld("base:apple") && !handheld("base:stone"), "the rest are not");
     t.flat().await?;
     // (wool: the 32 px glass is mostly see-through in a brown frame, too little of it light)
-    for (i, name) in ["wood_pickaxe", "diamond_sword", "wool", "rose", "torch"]
-        .iter()
-        .enumerate()
-    {
-        t.op(&format!("put me {i} {name} 1")).await?;
+    // A flint pickaxe on an oak haft and a diamond-bladed sword, built from parts (their looks
+    // drawn from the parts' layers), then three plain items.
+    t.cmd("/gear pickaxe flint slot=0").await?;
+    t.cmd("/gear sword diamond slot=1").await?;
+    for (i, name) in ["wool", "rose", "torch"].iter().enumerate() {
+        t.op(&format!("put me {} {name} 1", i + 2)).await?;
     }
     t.c().set_look(0.0, -10.0);
     let looks: [(&str, fn([u8; 3]) -> bool, f32); 5] = [
@@ -109,9 +110,9 @@ pub async fn tooltips(t: T) -> R {
     t.flat().await?;
     t.op("put me 0 furnace 1").await?;
     t.op("put me 1 coal 5").await?;
-    t.op("put me 2 diamond_sword 1").await?;
+    t.cmd("/gear sword diamond slot=2").await?;
     t.op("put me 3 bread 1").await?;
-    t.op("put me 4 diamond_chestplate 1").await?;
+    t.cmd("/gear chestplate diamond slot=4").await?;
     t.press("core:inventory");
     t.screen("core:menu").await?;
     t.c().input_cursor(0.02, 0.02);
@@ -522,7 +523,7 @@ pub async fn ladder_placement(t: T) -> R {
 /// Third person shows the player's model from behind and from the front.
 pub async fn third_person(t: T) -> R {
     t.flat().await?;
-    t.op("put me 0 iron_sword 1").await?;
+    t.cmd("/gear sword wrought_iron slot=0").await?;
     t.c().select_slot(0);
     t.press("core:perspective");
     t.c().set_look(30.0, -15.0);

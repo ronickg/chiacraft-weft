@@ -10,7 +10,7 @@
 //! round it.
 
 use crate::combat::{REF_ARMOUR, REF_HEALTH, REF_HIT, REF_RATE, Type};
-use crate::curve::{LEVELS_PER_AGE, g};
+use crate::curve::{LEVELS_PER_AGE, REFERENCE_DEPTH, g};
 
 /// A material's age and depth (its item level is tier × 10 + depth; depth 5 is the age's
 /// reference). Tool parts' materials (`crafting::MATERIALS`) and today's tool and armour sets.
@@ -47,7 +47,8 @@ pub const MATERIALS: &[MaterialLevel] = &[
     ml("osage_orange", 0, 1),
     ml("bone", 0, 3),
     ml("antler", 0, 3),
-    ml("chert", 0, 4),
+    // Chert is flint's equal (its trait is the difference: repairs at half the stone).
+    ml("chert", 0, 5),
     ml("flint", 0, 5),
     ml("stone", 0, 5),
     ml("tektite", 0, 6),
@@ -57,6 +58,10 @@ pub const MATERIALS: &[MaterialLevel] = &[
     ml("rawhide", 0, 3),
     ml("birch_tar", 0, 4),
     ml("leather", 0, 5),
+    // Armour linings (`crafting`: a lining is Survival's clothing in numbers).
+    ml("linen", 0, 3),
+    ml("wool", 0, 3),
+    ml("fur", 0, 4),
     ml("copper", 1, 2),
     ml("gold", 1, 3),
     ml("bronze", 1, 6),
@@ -66,6 +71,10 @@ pub const MATERIALS: &[MaterialLevel] = &[
     ml("steel", 2, 7),
     ml("star_steel", 2, 9),
     ml("diamond", 3, 5),
+    // Gems only (`crafting::gems`): a pallasite's peridot (the fallen stars, cut like iron-age
+    // star steel), the animals mod's amber (fossil resin, Stone Age).
+    ml("peridot", 2, 8),
+    ml("amber", 0, 4),
 ];
 
 pub fn material(id: &str) -> Option<&'static MaterialLevel> {
@@ -117,6 +126,38 @@ pub fn weapon_of(kind: &str, of: &str) -> Option<(f32, f32)> {
     weapon(kind, material(of)?.level())
 }
 
+/// What a tool's working part does by its material's level (`notes/CRAFTING.md`, "How stats
+/// combine": the working part sets the numbers). Power `g(L)` splits two ways: uses grow as
+/// `g^USES_POWER` (a better tool is also less upkeep), mining speed as `g^MINE_POWER` (the rest of
+/// its power is the harder ground it opens, `harvest`). At Sound (grade 4), before shape, haft and
+/// trait: flint about 75 uses at 3.0, wrought iron about 270 at 5.6, diamond about 630 at 8.6.
+pub const REF_USES: f32 = 53.0;
+pub const USES_POWER: f32 = 1.5;
+pub const REF_MINE: f32 = 2.5;
+pub const MINE_POWER: f32 = 0.75;
+/// What a working part at the Stone Age's reference (flint, level 5) harvests: stone and iron ore
+/// (`abi::tool_tier::STONE`); each level more opens ten (bronze 210 takes diamond ore, iron's 200;
+/// steel 320 obsidian, diamond's 300; diamond itself 400, above steel).
+pub const REF_HARVEST: f32 = 100.0;
+pub const HARVEST_PER_LEVEL: f32 = 10.0;
+
+/// Uses of a Sound working part at item level `level`.
+pub fn tool_uses(level: f32) -> f32 {
+    REF_USES * g(level).powf(USES_POWER)
+}
+
+/// Mining (chopping, digging) speed of a working part at `level`.
+pub fn mining_speed(level: f32) -> f32 {
+    REF_MINE * g(level).powf(MINE_POWER)
+}
+
+/// The harvest level (`abi::tool_tier`, a hundred an old tier) of a working part at `level`, in
+/// steps of ten.
+pub fn harvest(level: f32) -> u32 {
+    let h = REF_HARVEST + HARVEST_PER_LEVEL * (level - REFERENCE_DEPTH);
+    ((h / 10.0).round() * 10.0).max(0.0) as u32
+}
+
 /// Armour slots, head to feet, and each one's share of a full set.
 pub const SLOT_SHARE: [f32; 4] = [0.15, 0.4, 0.3, 0.15];
 
@@ -161,5 +202,19 @@ mod tests {
             assert!(spread(k).is_some(), "{k}");
         }
         assert!(weapon_of("sword", "diamond").unwrap().0 > weapon_of("sword", "iron").unwrap().0);
+    }
+
+    #[test]
+    fn tools_by_level() {
+        let flint = material("flint").unwrap().level();
+        assert_eq!(harvest(flint), crate::gear::REF_HARVEST as u32);
+        // The old gates: bronze takes what iron did (200), steel what diamond did (300), diamond
+        // stays above steel; wood and bone stay under stone's 100.
+        assert!(harvest(material("bronze").unwrap().level()) >= 200);
+        assert!(harvest(material("steel").unwrap().level()) >= 300);
+        assert!(harvest(material("diamond").unwrap().level()) > harvest(material("steel").unwrap().level()));
+        assert!(harvest(material("bone").unwrap().level()) < 100 && harvest(material("oak").unwrap().level()) < 100);
+        assert!((tool_uses(flint) - 75.0).abs() < 2.0 && (mining_speed(flint) - 3.0).abs() < 0.05);
+        assert!(tool_uses(35.0) > tool_uses(25.0) && mining_speed(35.0) > mining_speed(25.0));
     }
 }

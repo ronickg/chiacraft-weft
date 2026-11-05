@@ -170,3 +170,28 @@ pub fn tweak_text(species: &str) -> String {
 pub fn stat_name(s: Stat) -> &'static str {
     s.name()
 }
+
+/// Gear's grade and its gems together stay under the curve's ceiling (`curve::GRADE_CEILING`,
+/// `notes/PROGRESSION.md` "Endless gear": "grade plus marks add at most +60%"): every kind at
+/// every grade, its sockets full of the best gem roll there is (a whole band on each stat it takes).
+pub fn gem_ceiling() -> Vec<String> {
+    let mut out = Vec::new();
+    for k in crafting::KINDS {
+        for g in crafting::GRADES {
+            let best = vitals::sockets::best_units() * 3.0;
+            let boosts: Vec<(vitals::web::Family, f32)> = vitals::sockets::GEAR_FAMILIES
+                .iter()
+                .map(|f| (*f, best))
+                .collect();
+            for (i, m) in crafting::gems::multipliers(k, g.n, &boosts)
+                .iter()
+                .enumerate()
+            {
+                if g.mult * m > vitals::curve::GRADE_CEILING + 1e-4 {
+                    out.push(format!("{} at grade {}: stat {i} x{:.2}", k.id, g.n, g.mult * m));
+                }
+            }
+        }
+    }
+    out
+}

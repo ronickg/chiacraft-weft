@@ -227,6 +227,7 @@ Valheim, GregTech and the automation packs, Thaumcraft and Botania). It builds o
 `notes/CRAFTING.md`'s parts and ten grades, and keeps its rule of no rerolls to buy:
 - **Item level:** tier × 10, plus a depth of 0-9 from where the material or drop came from (a ley vein, a boss form, a dimension's depth). It caps which properties can roll.
 - **Marks:** properties (affixes) with item-level tiers, added only with found crafting materials, each material with one job: ley shards, star dust, pallasite tears and others, from ley nodes, ruins and meteorites.
+- **Gem sockets** (built 11-05, Ronald: "pieces and items should also get like gem slots because that will make it even cooler"): the first marks. A part's grade gives its item sockets; gems cut from found stones roll gear boosts with the web's stone roll at their stone's item level; grade and gems stay under +60% (the check "grade and gems at most +60% over a plain item"). `notes/CRAFTING.md`, "Gem sockets".
 - **Merging:** the ancients' fusing anvil pools two items' properties into one, with risk. A relic's potential (1-4) caps how much transfers.
 - **A repeatable endgame:** star charts open pocket worlds through the gates at depths 1-16. Deeper charts drop deeper charts and higher item levels, and the Exploring and cartography region of the web plays Path of Exile's Atlas tree.
 - **Boss forms:** one per age, and each higher form gives everything the lower ones do plus more. A boss's drop is a key or tool that opens the next material.

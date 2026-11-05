@@ -88,8 +88,8 @@ chat /tk put me 40 base:fur_hat
 chat /tk put me 41 base:fur_coat
 chat /tk put me 42 base:fur_trousers
 chat /tk put me 43 base:fur_boots
-chat /tk put me 37 base:iron_chestplate
-chat /tk put me 38 base:leather_leggings
+chat /gear chestplate wrought_iron slot=37
+chat /gear leggings leather slot=38
 wait 1
 press core:perspective
 wait 1

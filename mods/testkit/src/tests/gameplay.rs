@@ -88,16 +88,18 @@ pub async fn sprint_and_sneak_modes(t: T) -> R {
 /// Breaking blocks with and without the right tool: drops, pick up, tool wear.
 pub async fn mining_and_wear(t: T) -> R {
     t.flat().await?;
-    t.op("put me 0 stone_pickaxe 1").await?;
+    // A pickaxe built from parts (`/gear`): a ground-stone head on a birch haft.
+    t.cmd("/gear pickaxe stone birch slot=0").await?;
     t.c().select_slot(0);
     let f = t.feet();
     let stone = add(f, [2, 0, 0]);
     t.set(stone, "stone").await?;
     t.look_at(stone);
     t.frames(2).await?;
-    // A stone pickaxe takes 0.56 s; letting go right after keeps the block behind intact.
-    t.hold("core:attack", 0.8);
-    t.secs(1.2).await?;
+    // A stone-headed pickaxe (speed about 3.1 from the curve) takes about 0.72 s; letting go
+    // right after keeps the block behind intact.
+    t.hold("core:attack", 1.0);
+    t.secs(1.4).await?;
     t.check_eq(t.block(stone).await?, "core:air".into(), "stone mined");
     t.check_eq(t.slot("me", 0).await?.2, 1, "pickaxe wear");
     t.c()
@@ -126,7 +128,7 @@ pub async fn mining_and_wear(t: T) -> R {
     // A break an interceptor refuses puts the block back on the client too.
     let gold = add(f, [-2, 0, 0]);
     t.set(gold, "gold_block").await?;
-    t.op("put me 1 diamond_pickaxe 1").await?;
+    t.cmd("/gear pickaxe diamond slot=1").await?;
     t.c().select_slot(1);
     t.cmd("/rule testkit:protect_gold 1").await?;
     t.look_at(gold);
@@ -142,8 +144,10 @@ pub async fn mining_and_wear(t: T) -> R {
 /// Shift-click puts armor into its slots; hits wear it.
 pub async fn armor(t: T) -> R {
     t.flat().await?;
-    for (slot, name) in [(0, "iron_helmet"), (1, "diamond_chestplate"), (2, "gold_leggings"), (3, "leather_boots")] {
-        t.op(&format!("put me {slot} {name} 1")).await?;
+    // Built from parts: a wrought-iron helmet, a diamond-scale coat, bronze leggings with gold
+    // rivets, leather boots.
+    for (slot, gear) in [(0, "helmet wrought_iron"), (1, "chestplate diamond"), (2, "leggings bronze gold"), (3, "boots leather")] {
+        t.cmd(&format!("/gear {gear} slot={slot}")).await?;
     }
     t.press("core:inventory");
     t.screen("core:menu").await?;
@@ -1050,7 +1054,7 @@ pub async fn drop_and_pickup(t: T) -> R {
 pub async fn creative_and_invulnerable(t: T) -> R {
     t.flat().await?;
     t.op("mode creative").await?;
-    t.op("put me 0 stone_pickaxe 1").await?;
+    t.cmd("/gear pickaxe stone slot=0").await?;
     t.c().select_slot(0);
     let f = t.feet();
     let stone = add(f, [2, 0, 0]);
@@ -1263,7 +1267,7 @@ pub async fn block_shapes(t: T) -> R {
     // Standing right beside it, where it drops either way, as above.
     t.c().teleport(centre(mix, 0.5, 0.0, 1.3));
     t.secs(0.3).await?;
-    t.op(&format!("break {} base:iron_pickaxe", at(mix)))
+    t.op(&format!("break {} testmod:steel_pickaxe", at(mix)))
         .await?;
     t.secs(1.5).await?;
     t.check_eq(t.slot("me", 2).await?.1, 8, "it gives back the one");
@@ -1728,7 +1732,11 @@ pub async fn own_names(t: T) -> R {
     t.check(t.c().ui_rect("text:Loot Box").is_some(), "the chest window shows its own name");
     t.c().screen_close();
     t.no_screen().await?;
-    t.op(&format!("break {} wood_axe", at(chest))).await?;
+    // Broken with a flint axe built from parts, held.
+    t.cmd("/gear axe flint slot=8").await?;
+    t.c().select_slot(8);
+    t.frames(2).await?;
+    t.op(&format!("break {} held", at(chest))).await?;
     t.c()
         .teleport([chest[0] as f64 + 0.5, chest[1] as f64, chest[2] as f64 + 0.5]);
     let back = t
@@ -1871,12 +1879,13 @@ pub async fn swimming(t: T) -> R {
     let (wade, _) = sprint_speed(t.clone(), 0.0).await?;
     t.note(format!("sprinting in lava: {wade:.2} blocks/s"));
     t.check(wade < 1.8, format!("no swimming in lava: {wade:.2} blocks/s"));
-    t.op("put me 37 base:diamond_chestplate").await?;
+    // A diamond-scale chestplate (the test mod lets it swim in lava).
+    t.cmd("/gear chestplate diamond slot=37").await?;
     t.secs(0.2).await?;
     let (suit, _) = sprint_speed(t.clone(), 0.0).await?;
     t.note(format!("with the suit: {suit:.2} blocks/s"));
     t.check(suit > wade * 1.3, format!("the suit swims in lava: {wade:.2} -> {suit:.2}"));
-    t.op("put me 37 base:diamond_chestplate 0").await?;
+    t.op("put me 37 base:chestplate_gem 0").await?;
     pool("air").await?;
     Ok(())
 }
@@ -1885,10 +1894,10 @@ pub async fn swimming(t: T) -> R {
 /// stronger hit during the target's recovery still adds the difference.
 pub async fn attack_charge(t: T) -> R {
     t.flat().await?;
-    // A wood sword, its hit from the curve (`vitals::gear`): small enough that the cow lives
-    // through both hits.
-    let sword = vitals::gear::weapon_of("sword", "wood").map_or(4.0, |w| w.0);
-    t.op("put me 0 wood_sword 1").await?;
+    // A flint-bladed sword built from parts, its hit from the curve (`vitals::gear`): small
+    // enough that the cow (10) lives through both hits.
+    let sword = vitals::gear::weapon_of("sword", "flint").map_or(4.0, |w| w.0);
+    t.cmd("/gear sword flint slot=0").await?;
     t.c().select_slot(0);
     let f = t.feet();
     let spot = add(f, [0, 0, -2]);
@@ -1926,7 +1935,7 @@ pub async fn attack_charge(t: T) -> R {
     t.secs(0.15).await?;
     let full = before - health(t.clone(), id.clone()).await?;
     t.note(format!("charged: {full:.2}"));
-    t.check((sword - 0.5..sword + 0.5).contains(&full), format!("a charged wood sword does {sword:.2}: {full:.2}"));
+    t.check((sword - 0.5..sword + 0.5).contains(&full), format!("a charged flint sword does {sword:.2}: {full:.2}"));
     Ok(())
 }
 
@@ -1953,8 +1962,8 @@ pub async fn permissions(t: T) -> R {
 pub async fn creative_sword(t: T) -> R {
     t.flat().await?;
     t.op("mode creative").await?;
-    t.op("put me 0 iron_sword 1").await?;
-    t.op("put me 1 iron_pickaxe 1").await?;
+    t.cmd("/gear sword wrought_iron slot=0").await?;
+    t.cmd("/gear pickaxe wrought_iron slot=1").await?;
     t.c().select_slot(0);
     let b = add(t.feet(), [2, 0, 0]);
     t.set(b, "stone").await?;

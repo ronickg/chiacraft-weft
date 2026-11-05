@@ -689,6 +689,9 @@ pub struct Client {
     lightning: f32,
     /// Lightning flashes seen so far: mods hear a new one as thunder.
     lightnings: u32,
+    /// The last flash for packs (`Scene::lightning`): seconds since it began (real time, so tests'
+    /// pinned shader clock still shows it), and a random number of its own (where it strikes).
+    lightning_seen: (f32, f32),
     /// Holding the use button on an item that takes time: ticks left, ticks in all.
     using: Option<(f32, f32)>,
     /// Who else is mining what, and how far along.
@@ -1015,6 +1018,7 @@ impl Client {
             gloom: 0.0,
             lightning: 0.0,
             lightnings: 0,
+            lightning_seen: (1.0e4, 0.0),
             using: None,
             others_mining: Vec::new(),
             told_mining: None,
@@ -2630,6 +2634,7 @@ impl Client {
         go(&mut l.cloud_dark, sky(none.cloud_dark, to.cloud_dark), step);
         go(&mut l.darkness, sky(none.darkness, to.darkness), step);
         self.lightning = (self.lightning - dt).max(0.0);
+        self.lightning_seen.0 = (self.lightning_seen.0 + dt).min(1.0e4);
         // The air where the player is: fog rolls in over a few seconds (the weather itself changes
         // it slowly), the wind turns in seconds.
         let (fog, speed, cover, flags) = self.world.air_at(self.player.pos.floor().as_ivec3());
@@ -2648,6 +2653,7 @@ impl Client {
         if here && self.gloom > 0.9 && weather.lightning() && self.chance() < dt / 12.0 {
             self.lightning = 0.15;
             self.lightnings = self.lightnings.wrapping_add(1);
+            self.lightning_seen = (0.0, self.chance());
         }
         if let Some(sound) = weather
             .sound
@@ -2748,6 +2754,7 @@ impl Client {
             soft_clouds: [0.0; 4],
             // Filled in once the sky has readied it (`render`).
             frame_look: [0.0; 4],
+            lightning: [self.lightning_seen.0, self.lightning_seen.1, self.thunder(), 0.0],
             prev_view_proj: [[0.0; 4]; 4],
             cloud_moved: [0.0; 4],
             // On the real clock (`shaders::clock`): tests pin the shaders' time, and a fireball's

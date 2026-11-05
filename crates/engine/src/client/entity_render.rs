@@ -951,6 +951,9 @@ impl EntityRenderer {
         }
         // Its own pictures one over the other, as its icon shows them.
         let img = match crate::stack::layers(stack) {
+            // Chiacraft's look: its layers composed as its icon is.
+            Some(spec) if crate::stack::is_look(spec) => super::stack_look::compose(spec, |n| crate::assets::read_image(assets, n))
+                .map(|(size, rgba)| crate::assets::Image { width: size, height: size, rgba }),
             Some(spec) => {
                 let parts: Vec<(String, u32)> = crate::stack::parse_layers(spec)
                     .into_iter()

@@ -28,6 +28,7 @@ pub fn markdown() -> String {
     species_matrix(&mut w);
     weapons(&mut w);
     tames(&mut w);
+    bosses(&mut w);
     web_prices(&mut w);
     keys(&mut w);
     tags(&mut w, &g);
@@ -291,6 +292,62 @@ fn tames(w: &mut String) {
         w.push('\n');
     }
     w.push('\n');
+}
+
+fn bosses(w: &mut String) {
+    use animals_core::bosses::{BOSSES, SIZE};
+    w.push_str("## Biome bosses\n\nEach boss is a titan at its form's age (`animals_core::bosses`): its numbers from the curve like any creature's, a fight of 2-5 minutes for a same-age player, the cap and the floor against over-tier gear. Seconds to kill and its hits to down the player (grade 4), by the player's age. Forms with no offering are data for later ages.\n\n| boss | form | offering | level | health | armour | hit | Stone | Bronze | Iron | Steam | Stars |\n|---|---|---|---|---|---|---|---|---|---|---|---|\n");
+    for b in &BOSSES {
+        for f in b.forms {
+            let st = b.stats(f);
+            let _ = write!(
+                w,
+                "| {} | {} | {} | {:.0} | {:.0} | {:.1} | {:.1} |",
+                b.name,
+                f.age.name(),
+                f.offering.unwrap_or("-"),
+                b.level(f),
+                st.health,
+                st.armour,
+                st.hit
+            );
+            for age in [Age::Stone, Age::Bronze, Age::Iron, Age::Steam, Age::Stars] {
+                let fight = b.fight_with(f, age);
+                let _ = write!(w, " {:.0} s / {:.1} |", fight.ttk, fight.hits);
+            }
+            w.push('\n');
+        }
+        let _ = writeln!(
+            w,
+            "\n{}: a {} {}; attacks {}; parts {}; knocked down by {:.0} % of its health in stagger; loot {}; its young {} ({:.0} %, certain by kill {}).\n",
+            b.name,
+            SIZE.name(),
+            b.role.name(),
+            b.attacks
+                .iter()
+                .map(|a| format!("{} (×{:.2} hit, {:.1} s tell)", a.name, a.hit, a.windup))
+                .collect::<Vec<_>>()
+                .join(", "),
+            b.parts
+                .iter()
+                .map(|p| format!("{} at {:.0} %", p.name, p.at * 100.0))
+                .collect::<Vec<_>>()
+                .join(", "),
+            b.knockdown * 100.0,
+            b.loot
+                .iter()
+                .map(|l| if l.certain_by > 0 {
+                    format!("{} {:.0} % (certain by kill {})", short(l.item), l.chance * 100.0, l.certain_by)
+                } else {
+                    format!("{} {:.0} %", short(l.item), l.chance * 100.0)
+                })
+                .collect::<Vec<_>>()
+                .join(", "),
+            short(b.young.item),
+            b.young.chance * 100.0,
+            b.young.certain_by
+        );
+    }
 }
 
 fn web_prices(w: &mut String) {

@@ -201,6 +201,21 @@ pub fn body(s: &Species) -> Stats {
     stats(s, 0).unwrap_or(Stats { health: s.base[HEALTH], armour: 0.0, hit: s.base[DAMAGE], interval: 1.0 })
 }
 
+// ------------------------------------------------------------------ bosses
+
+/// The biome bosses (`crate::bosses`): titans whatever their mass, at their form's age.
+pub fn boss_size() -> Size {
+    crate::bosses::SIZE
+}
+
+/// A boss's form at `age` (its last past its last): its area level and numbers, derived like
+/// every creature's and tweaked within the range.
+pub fn boss(name: &str, age: Age) -> Option<(f32, Stats)> {
+    let b = crate::bosses::boss(name)?;
+    let f = b.form(age);
+    Some((b.level(f), b.stats(f)))
+}
+
 // ------------------------------------------------------------------ tames
 
 /// A tame's own bonuses together (tamed points, imprint, bond, Ark's mutations among them) add at

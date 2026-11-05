@@ -709,7 +709,14 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
         let under = water_under(in, n, v, scatter, shadow);
         let foam_all = max(foam, (1.0 - smoothstep(0.05, 0.3 + 0.1 * wobble, under.w)) * 0.6);
         let surface = refl * fresnel + glint + (lit * 0.9 + vec3(0.03)) * foam_all;
-        let below = under.rgb * (1.0 - fresnel) * (1.0 - foam_all);
+        var below = under.rgb * (1.0 - fresnel) * (1.0 - foam_all);
+        // The bottom seen through the water lies under the same air as the surface: veiled by it too
+        // (on the screen's colours, near enough), or a pond's pale floor stayed a saturated blue
+        // under rain's mist when everything round it had gone grey (Tester 2's rain shots, 11-05).
+        if open_sky() {
+            let d = length(in.rel);
+            below *= (vec3(1.0) - haze_veil(in.rel, d)) * (1.0 - smoothstep(scene.params.y * 0.84, scene.params.y, d));
+        }
         return vec4(below + display(haze_lit(surface, in.rel, in.light.x)), 1.0);
     }
     let lost = (1.0 - fresnel) * through;
