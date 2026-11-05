@@ -425,7 +425,12 @@ fn impacts(w: &World) {
 /// The world's simulation distance in cubes: what is loaded round each player.
 pub(crate) fn simulation() -> i32 {
     static SIMULATION: Config<u32> = Config::named("core:simulation_distance");
-    SIMULATION.get() as i32
+    // The engine's default (8) when the setting reads nothing (PC run fh_impact8 tried 16-40 blocks
+    // out, a reach from 0).
+    match SIMULATION.get() as i32 {
+        n if n >= 2 => n,
+        _ => ev::SIMULATION_DEFAULT,
+    }
 }
 
 /// Where a big impact lands: loaded land between `vitals::events::impact_reach` from a
@@ -499,7 +504,12 @@ fn site(w: &World) -> Result<BlockPos, String> {
         }
         uneven += 1;
     }
-    Err(format!("{near} near players, builds or spawn, {ground} not open dry loaded ground, {uneven} not level"))
+    Err(format!(
+        "{near} near players, builds or spawn, {ground} not open dry loaded ground, {uneven} not level; reach {lo}-{hi} at simulation {}",
+        simulation(),
+        lo = ev::impact_reach(simulation()).0,
+        hi = ev::impact_reach(simulation()).1
+    ))
 }
 
 /// The land's height at block (`x`, `z`), as worldgen shapes it (before caves and plants).

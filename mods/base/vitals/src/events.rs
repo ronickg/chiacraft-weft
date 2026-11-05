@@ -136,6 +136,8 @@ pub const IMPACT_FROM_BUILDS: i32 = 256;
 /// distance `IMPACT_FROM_PLAYERS` or `IMPACT_INSIDE` inside the reach, whichever is less (88-112 at
 /// 8: a crater's blast, 2 radii, still reaches no one).
 pub const LOADED_MARGIN: i32 = 4;
+/// The engine's simulation distance when the world's setting can't be read (its default).
+pub const SIMULATION_DEFAULT: i32 = 8;
 pub const IMPACT_INSIDE: i32 = 24;
 
 /// An impact's (least, most) distance from a player with `simulation` cubes loaded round them.
