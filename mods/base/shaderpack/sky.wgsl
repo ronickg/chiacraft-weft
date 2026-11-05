@@ -479,14 +479,12 @@ fn soft_pixel(in: CloudOut, s: Sky, dir: vec3<f32>) -> CloudPixel {
     // Toward the far end they hand over to the sky.
     let dist = length(rel.xz) / SOFT_REACH;
     color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) + 1e-3, dir.z))), smoothstep(0.45, 1.0, dist));
-    // Rain's mist between the eye and the cloud, as over the land (`rain_depth`; the blocky clouds
-    // have it too): without it the soft deck met the misted land in a hard line at the horizon
-    // again once soft clouds were the default (PC shf2_rain).
-    // By its distance along the ground: the rain falls under the deck, and a deck overhead seen
-        // through its whole distance was misted pale, a storm's dark sky with it (PC shf3).
-        // Two fifths of the land's: at its full thickness a storm's deck a few hundred blocks off went
-        // pale grey, its dark sky lost (PC shf4); the far deck, thousands off, still fades fully.
-        let misted = 1.0 - exp(-rain_depth(length(rel.xz)) * 0.4);
+    // Rain's mist on the soft deck only low over the horizon, by how low it stands, not by its
+    // distance: misted by distance, even at two fifths, a storm's near deck went pale slate and its
+    // dark sky was lost (PC shf4, shf5; lifted, without mist it stayed dark, shfB). Low down it
+    // meets the misted land in the same colour, so no hard line (which came back once soft clouds
+    // were the default, PC shf2_rain).
+    let misted = rain_amount() * (1.0 - smoothstep(0.02, 0.22, dir.y));
     color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z))), misted);
     color = display(fog_through(rainbow_on(color, dir), dir * 220.0, 1.0));
     let alpha = alpha_cloud * (1.0 - smoothstep(0.85, 1.0, dist));
@@ -648,11 +646,7 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
         // colour the land's mist takes: from the vista, 14 blocks under a storm's deck, all of it in
         // view was near and dark over land kilometres off and fully misted, and the two met in a hard
         // line at the horizon (fading by the deck's reach alone could not close it).
-        // By its distance along the ground: the rain falls under the deck, and a deck overhead seen
-        // through its whole distance was misted pale, a storm's dark sky with it (PC shf3).
-        // Two fifths of the land's: at its full thickness a storm's deck a few hundred blocks off went
-        // pale grey, its dark sky lost (PC shf4); the far deck, thousands off, still fades fully.
-        let misted = 1.0 - exp(-rain_depth(length(rel.xz)) * 0.4);
+        let misted = 1.0 - exp(-rain_depth(length(rel)));
         color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z))), misted);
         // A lightning flash glows inside the deck; its bolt hangs under the deck, in front of it.
         color += lightning_in_clouds(dir) * albedo + lightning_bolt(dir);
