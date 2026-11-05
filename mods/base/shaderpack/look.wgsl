@@ -162,13 +162,17 @@ fn palette_made() -> Palette {
     // still blue, so the day runs gold, warm, clear at noon, warm, gold. Golden hour ended 16° up
     // (sun.y 0.28), and on the leaned path of a long summer day the sun is over that from 05:00 to
     // 19:00: those hours all looked alike (Tester 2's hours sheet, 11-05). Now gold to about 20° up,
-    // warm to about 46°, clear above that (about 08:00 to 16:00 in summer).
-    let warm = key(vec3(0.13, 0.27, 0.66), vec3(0.62, 0.58, 0.56), vec3(1.0, 0.76, 0.50), vec3(1.0, 0.80, 0.60) * 1.85 * look_opt(OPT_SUN, 1.0), mix(fill_hue, vec3(0.95, 0.95, 1.1), 0.4) * 0.3 * look_opt(OPT_FILL, 1.0));
+    // warm to about 51°, clear above that (about 08:00 to 16:00 in summer).
+    // (Its warmth on the land, a gold sun, the horizon still a light blue: with a cream horizon,
+    // 0.62 0.58 0.56, and a paler gold sun, 05:00 and 19:00 went a pale cream haze and 06:00-07:00
+    // barely changed, PC run sh3.)
+    // (Variant B: a deeper gold sun, the horizon and the shade a little warm too.)
+    let warm = key(vec3(0.13, 0.27, 0.66), vec3(0.54, 0.53, 0.62), vec3(1.0, 0.68, 0.38), vec3(1.0, 0.68, 0.38) * 2.0 * look_opt(OPT_SUN, 1.0), mix(fill_hue, vec3(1.0, 0.9, 0.85), 0.25) * 0.3 * look_opt(OPT_FILL, 1.0));
     var p: Palette;
-    if e > 0.34 {
-        p = blend(warm, day, smoothstep(0.34, 0.72, e));
+    if e > 0.4 {
+        p = blend(warm, day, smoothstep(0.4, 0.78, e));
     } else if e > 0.08 {
-        p = blend(golden, warm, smoothstep(0.08, 0.34, e));
+        p = blend(golden, warm, smoothstep(0.08, 0.34, min(e, 0.34)));
     } else if e > -0.02 {
         p = blend(sunset, golden, smoothstep(-0.02, 0.08, e));
     } else if e > -0.14 {
@@ -237,7 +241,7 @@ fn palette_made() -> Palette {
 fn golden() -> f32 {
     let e = scene.sun.y;
     // To about 26° up (it was 20°): the golden hours run longer at both ends.
-    return (1.0 - smoothstep(0.1, 0.45, e)) * smoothstep(-0.06, 0.03, e);
+    return (1.0 - smoothstep(0.1, 0.55, e)) * smoothstep(-0.06, 0.03, e);
 }
 
 // The moon's light by its phase: 1 full, 0 new (`scene.eye.w`, the engine's).
