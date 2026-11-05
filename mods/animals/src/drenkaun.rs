@@ -81,6 +81,10 @@ const ROOT_TICKS: u64 = 60;
 const ROOT_SLOW: f64 = -0.75;
 const ROOT_RADIUS: f64 = 2.0;
 const TICKS: f32 = vitals::TICKS as f32;
+/// Faster than this sideways (blocks a second) and not charging, it was knocked back.
+const KNOCKED: f64 = 4.5;
+/// How near its edge it comes to a player before it stops and turns to them.
+const CLOSE: f64 = 1.5;
 
 const RISING: u32 = 0;
 const CHASE: u32 = 1;
@@ -126,6 +130,8 @@ static SCALED: Component<u32> = Component::named("warden_scaled");
 static LUCK: Component<[u8; 16]> = Component::named("boss_luck");
 /// A calf's owner's player key (zeros while wild).
 static CALF_OWNER: Component<[u8; 64]> = Component::named("calf_owner");
+/// Each one's last fight state (not saved).
+static LAST: Mutex<Option<HashMap<u64, Warden>>> = Mutex::new(None);
 /// Who each charge has already hit (not saved).
 static TRAMPLED: Mutex<Option<HashMap<u64, Vec<u64>>>> = Mutex::new(None);
 
@@ -315,11 +321,18 @@ fn fight(w: &World, id: u64, st: &EntityState) -> bool {
                 weft_sdk::info!("drenkaun {id}: no one to fight, back into the wood");
                 burst(w, st.pos.to_array(), OAK_LEAVES.id(), 40, 2.0);
                 w.despawn(id);
+                LAST.lock().unwrap().get_or_insert_with(HashMap::new).remove(&id);
                 return true;
             }
         }
     }
     let fierce = st.health < st.max_health * b.fierce_at;
+    // A titan stands its ground: the engine knocks back whatever is hit (PC look boss_drenkaun1:
+    // twenty hits flung it 20 blocks off its arena), so outside its own charge that is undone.
+    let charging = c.state == ACT && b.attacks[c.attack as usize % b.attacks.len()].name == "charge";
+    if !charging && st.vel.x * st.vel.x + st.vel.z * st.vel.z > KNOCKED * KNOCKED {
+        drop(w.entity_edit(id).velocity([0.0, st.vel.y.min(0.0), 0.0]));
+    }
     match c.state {
         RISING => {
             stand(w, id, st);
@@ -356,6 +369,12 @@ fn fight(w: &World, id: u64, st: &EntityState) -> bool {
                     w.navigate(id, st.pos, 0.0);
                     w.action_play(id, &format!("{}_tell", a.name), false);
                     go(&mut c, WINDUP);
+                }
+                // Close enough: it stops and turns to them rather than walk into them (PC look
+                // boss_drenkaun1: it stood on the player's spot and every swing missed).
+                None if dist - half < CLOSE => {
+                    stand(w, id, st);
+                    face(w, id, [(to[0] / dist.max(0.1)) as f32, (to[1] / dist.max(0.1)) as f32]);
                 }
                 None => {
                     w.navigate(id, t.pos, 1.0);
@@ -426,7 +445,14 @@ fn fight(w: &World, id: u64, st: &EntityState) -> bool {
         _ => go(&mut c, CHASE),
     }
     w.set_component(id, &WARDEN, c);
+    remember(id, c);
     true
+}
+
+/// Its last state, for when it has died (its components are gone by then: boss_drenkaun1's death
+/// lines read a fresh one's).
+fn remember(id: u64, c: Warden) {
+    LAST.lock().unwrap().get_or_insert_with(HashMap::new).insert(id, c);
 }
 
 fn go(c: &mut Warden, state: u32) {
@@ -687,6 +713,7 @@ fn hurt(w: &World, id: u64, other: u64, cause: u32, raw: f32) -> f32 {
         weft_sdk::info!("drenkaun {id}: knocked down");
     }
     w.set_component(id, &WARDEN, c);
+    remember(id, c);
     took
 }
 
@@ -701,7 +728,8 @@ fn item_id(name: &str) -> Option<u32> {
 /// help, and its calf may stay behind.
 fn died(w: &World, id: u64, pos: [f64; 3]) {
     let b = boss();
-    let c = w.component(id, &WARDEN).unwrap_or_default();
+    let last = LAST.lock().unwrap().get_or_insert_with(HashMap::new).remove(&id);
+    let c = last.or_else(|| w.component(id, &WARDEN)).unwrap_or_default();
     let f = form_of(&c);
     let index = bosses::BOSSES
         .iter()
