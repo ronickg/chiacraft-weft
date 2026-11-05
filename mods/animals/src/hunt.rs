@@ -243,6 +243,10 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
     true
 }
 
+/// While it stands its ground and doesn't charge, it rears once in this many of its looks
+/// (`senses::EVERY` ticks each): every 4 seconds.
+const REAR_EVERY: u64 = 8;
+
 /// Its kind's speed a pack chases at (one alone: 1.4, `commands::fight`): a wolf 5.5 blocks a
 /// second, at this nearly 10, past a fleeing deer's 8.
 const PACK_SPEED: f32 = 1.75;
@@ -395,8 +399,10 @@ fn stands_ground(w: &World, id: u64, st: &EntityState, threat: u64) -> bool {
         if d2 <= roles::CHARGE * roles::CHARGE * 4.0 {
             anim::hold(w, id, Act::Charge);
         } else {
-            // It rears as it turns to face it, then stands staring it down.
-            if !matches!(anim::held(w, id), Some(Act::Stare | Act::Charge)) {
+            // It rears as it turns to face it and every few seconds after (a threat: in the PC
+            // look a deer already staring never reared on the first test alone), staring it down.
+            let held = anim::held(w, id);
+            if held != Some(Act::Stare) || (w.game_time() + id) / crate::senses::EVERY % REAR_EVERY == 0 {
                 anim::act(w, id, Act::Rear);
             }
             anim::hold(w, id, Act::Stare);
