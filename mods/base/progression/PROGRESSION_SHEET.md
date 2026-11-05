@@ -24,7 +24,7 @@ Power grows Ã—1.6 an age: `g(L) = 1.6^(L/10)` over area and item level L (tier Ã
 
 | tier | age | hours | EM | g at start | reference: hit / health / armour | things tagged | made | kit EM | of budget | everything once |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 489 | 147 | 49 | 34 % | 252 EM |
+| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 490 | 148 | 49 | 34 % | 260 EM |
 | 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 31 | 24 | 76 | 26 % | 164 EM |
 | 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 31 | 25 | 62 | 16 % | 270 EM |
 | 3 | Age of Steam | 18 | 1080 | 4.10 | 31.1 / 104 / 130 | 30 | 27 | 94 | 22 % | 512 EM |
@@ -258,11 +258,11 @@ Moving to the next age takes a key, one thing from each gate (materials and tool
 
 Every named item and block, by its tag (`content::RULES`). EM is the cheapest way to have one; "-" not had as an item.
 
-### Stone Age (489)
+### Stone Age (490)
 
-**tech** (45)
+**tech** (46)
 
-- tool: arrow (2.0), axe (0.48), bow (0.48), hoe (0.70), knife (0.43), pickaxe (0.48), shovel (0.48), spear (0.70), stone_axe (0.60), stone_hoe (0.45), stone_pickaxe (0.60), stone_shovel (0.30), stone_sword (0.40), sword (0.70), wood_axe (0.41), wood_hoe (0.33), wood_pickaxe (0.41), wood_shovel (0.24), wood_sword (0.28)
+- tool: arrow (2.0), axe (0.48), bow (0.48), glider (7.8), hoe (0.70), knife (0.43), pickaxe (0.48), shovel (0.48), spear (0.70), stone_axe (0.60), stone_hoe (0.45), stone_pickaxe (0.60), stone_shovel (0.30), stone_sword (0.40), sword (0.70), wood_axe (0.41), wood_hoe (0.33), wood_pickaxe (0.41), wood_shovel (0.24), wood_sword (0.28)
 - armour: leather_boots (9.1), leather_chestplate (18), leather_helmet (11), leather_leggings (16)
 - station: furnace (1.2)
 - part: part_bar_guard (0.22), part_barbed_point (0.22), part_bearded_axe_head (0.22), part_bowstring (0.22), part_felling_axe_head (0.22), part_grip (0.22), part_haft (0.22), part_hoe_blade (0.22), part_knife_blade (0.22), part_lashing (0.22), part_leaf_point (0.22), part_long_blade (0.22), part_long_haft (0.22), part_pick_head (0.22), part_round_pommel (0.22), part_self_stave (0.22), part_shaft (0.22), part_short_blade (0.22), part_short_stave (0.22), part_shovel_blade (0.22), part_straight_blade (0.22)

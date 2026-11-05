@@ -154,6 +154,7 @@ pub fn register(r: &mut Registry) {
         // `.tool(kind)` tags it `tools/<kind>`; `<kind>s/<material>` picks its recipe.
         let tool = |r: &mut Registry, kind: &str| {
             let (damage, speed) = vitals::gear::weapon_of(kind, m.name).unwrap_or((1.0, 1.0));
+            let level = vitals::gear::material(m.name).map_or(0.0, |x| x.level());
             let b = r
                 .item(Item::generated(format!("{}_{kind}", m.name)))
                 .tool(kind)
@@ -162,6 +163,7 @@ pub fn register(r: &mut Registry) {
                 .durability(m.durability)
                 .attack_damage(damage)
                 .attack_speed(speed)
+                .set(&base_api::ITEM_LEVEL, level)
                 .tag(&format!("{kind}s/{}", m.name))
                 // Vanilla: weapons wear by one per hit, tools (made for blocks) by two.
                 .set(&WEAR_PER_HIT, if kind == "sword" { 1 } else { 2 })

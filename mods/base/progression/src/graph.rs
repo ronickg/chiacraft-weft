@@ -289,6 +289,8 @@ const RECIPES_LIST: &[Recipe] = &[
     c("base:wool_cloak", 1.0, &[("base:wool", 3.0), ("#string", 1.0)], Table),
     c("base:fur_robe", 1.0, &[("base:fur", 5.0), ("#string", 1.0)], Table),
     c("base:rain_cape", 1.0, &[("base:leather", 5.0), ("#string", 1.0)], Table),
+    // glider.rs
+    c("base:glider", 1.0, &[("base:leather", 3.0), ("#stick", 4.0), ("#string", 1.0)], Table),
     // the animals mod (knockout.rs, screen.rs, gateway.rs, riding.rs, taming.rs, eggs.rs)
     c("animals:club", 1.0, &[("#logs", 1.0), ("base:stick", 1.0)], Hand),
     c("animals:sedative", 2.0, &[("base:spider_eye", 1.0), ("base:sugar", 1.0), ("base:wheat_seeds", 1.0)], Hand),

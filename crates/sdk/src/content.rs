@@ -1528,6 +1528,11 @@ macro_rules! state_setters {
             self.each(|s| s.set(&c::DRAG, d));
             self
         }
+        /// How well a climber holds on to its sides (1; 0 can't be climbed).
+        pub fn grip(mut self, g: f32) -> Self {
+            self.each(|s| s.set(&c::GRIP, g));
+            self
+        }
         /// How many times its loot is rolled when it breaks: 2 for two slabs in one block.
         pub fn loot_rolls(mut self, n: u32) -> Self {
             self.each(|s| s.set(&c::LOOT_ROLLS, n));
