@@ -241,6 +241,8 @@ pub const ROOF_REACH: i32 = 24;
 pub const TREE_LOOK: i32 = 48;
 /// ... and this many up or down: a foot on a ledge far above isn't one to walk to.
 pub const TREE_UP: i32 = 8;
+/// ... and a tree of at least this many logs (a shrub's log or a stump doesn't count).
+pub const TREE_LOGS: usize = 3;
 
 /// Seconds to an ember, on average, with a drill: its holds until one takes.
 pub fn ember_secs(d: Drill) -> f32 {

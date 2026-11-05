@@ -130,6 +130,28 @@ pub const BIG_IMPACT_FROM_DAY: u64 = 21;
 pub const IMPACT_FROM_PLAYERS: i32 = 160;
 pub const IMPACT_REACH: i32 = 200;
 pub const IMPACT_FROM_BUILDS: i32 = 256;
+/// The land loaded round a player ends at the world's simulation distance (`core:simulation_distance`,
+/// 8 cubes = 128 blocks by default): a site 160-200 out is never loaded (PC run fh_impact6: 96 of 96
+/// tries). So the reach is the loaded edge less the crater's width and `LOADED_MARGIN`, and the least
+/// distance `IMPACT_FROM_PLAYERS` or `IMPACT_INSIDE` inside the reach, whichever is less (88-112 at
+/// 8: a crater's blast, 2 radii, still reaches no one).
+pub const LOADED_MARGIN: i32 = 4;
+/// The engine's simulation distance when the world's setting can't be read (its default).
+pub const SIMULATION_DEFAULT: i32 = 8;
+pub const IMPACT_INSIDE: i32 = 24;
+
+/// An impact's (least, most) distance from a player with `simulation` cubes loaded round them.
+pub fn impact_reach(simulation: i32) -> (i32, i32) {
+    let reach = (simulation * 16 - IMPACT_SITE_RADIUS - LOADED_MARGIN).min(IMPACT_REACH);
+    (IMPACT_FROM_PLAYERS.min(reach - IMPACT_INSIDE), reach)
+}
+
+/// A meteor's (least, most) distance from its player, loaded land only.
+pub fn meteor_reach(simulation: i32) -> (i32, i32) {
+    let most = (simulation * 16 - LOADED_MARGIN).min(METEOR_REACH.1);
+    (METEOR_REACH.0.min(most - IMPACT_INSIDE), most)
+}
+
 /// The built-columns map: cells this many blocks across, and the most a player remembers.
 pub const BUILT_CELL: i32 = 64;
 pub const BUILT_CELLS: usize = 32;
@@ -167,6 +189,30 @@ pub fn impact_on(seed: u64, day: u64) -> Option<f32> {
     let days = BIG_IMPACT_SLOT_DAYS - BIG_IMPACT_GAP + 1;
     let at = (mix(r) >> 44) % days;
     ((day - BIG_IMPACT_FROM_DAY) % BIG_IMPACT_SLOT_DAYS == at).then(|| 24.0 * unit(mix(mix(r))))
+}
+
+/// A big impact's star materials (Addendum 2 §2): star steel lumps a core block gives (about 8-16
+/// a core of 3-6 blocks), the furnace's ticks for an ingot, the peridot a pallasite block crafts
+/// into (2-4 blocks: 4-8, the design's 3-8), and how often a core holds a Starheart and pallasite.
+pub const STAR_STEEL_PER_BLOCK: (u32, u32) = (2, 3);
+pub const STAR_STEEL_SMELT_TICKS: u32 = 400;
+pub const PERIDOT_PER_PALLASITE: u32 = 2;
+pub const STARHEART_CHANCE: f32 = 0.33;
+pub const PALLASITE_CHANCE: f32 = 0.25;
+pub const PALLASITE_BLOCKS: (u32, u32) = (2, 4);
+/// Tektite a loose shard block gives (the strewn field's 12-30 pieces in some 8-15 blocks).
+pub const TEKTITE_PER_SHARDS: (u32, u32) = (1, 2);
+
+/// What a core of the impact `seed` holds: a Starheart, and how many pallasite blocks.
+pub fn core_kind(seed: u64) -> (bool, u32) {
+    let r = mix(seed ^ 0x5354_4152_4845_4152);
+    let heart = unit(r) < STARHEART_CHANCE;
+    let pallasite = if unit(mix(r)) < PALLASITE_CHANCE {
+        PALLASITE_BLOCKS.0 + (mix(mix(r)) >> 44) as u32 % (PALLASITE_BLOCKS.1 - PALLASITE_BLOCKS.0 + 1)
+    } else {
+        0
+    };
+    (heart, pallasite)
 }
 
 /// The core's share with `others` more players within reach.
@@ -353,6 +399,33 @@ mod tests {
                 assert!((0.0..24.0).contains(&hour));
             }
         }
+    }
+
+    #[test]
+    fn cores_hold_hearts_and_pallasite_now_and_then() {
+        let cores: Vec<(bool, u32)> = (0..10_000u64)
+            .map(|s| core_kind(s.wrapping_mul(0x9E37_79B9)))
+            .collect();
+        let hearts = cores.iter().filter(|c| c.0).count() as f32 / cores.len() as f32;
+        let pallasites = cores.iter().filter(|c| c.1 > 0).count() as f32 / cores.len() as f32;
+        assert!((hearts - STARHEART_CHANCE).abs() < 0.03, "{hearts}");
+        assert!((pallasites - PALLASITE_CHANCE).abs() < 0.03, "{pallasites}");
+        assert!(
+            cores
+                .iter()
+                .all(|c| c.1 == 0 || (PALLASITE_BLOCKS.0..=PALLASITE_BLOCKS.1).contains(&c.1))
+        );
+    }
+
+    #[test]
+    fn sites_lie_in_loaded_land() {
+        for sim in [4, 8, 12, 32] {
+            let (lo, hi) = impact_reach(sim);
+            assert!(lo < hi && hi + IMPACT_SITE_RADIUS < sim * 16 && lo >= IMPACT_SITE_RADIUS * 2, "sim {sim}: {lo}-{hi}");
+            let (lo, hi) = meteor_reach(sim);
+            assert!(lo < hi && hi < sim * 16, "sim {sim}: meteors {lo}-{hi}");
+        }
+        assert_eq!(impact_reach(32), (IMPACT_FROM_PLAYERS, IMPACT_REACH));
     }
 
     #[test]

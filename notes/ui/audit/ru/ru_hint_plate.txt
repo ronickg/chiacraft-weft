@@ -1,0 +1,13 @@
+# The same in Russian (--config core:language=ru_ru).
+# Hints on the HUD's plate (World playtest round 13: the 20 s ground hint read as "a thin small line
+# mid-screen"): the first hint at 20 s in survival, and the night hint at dusk.
+loaded
+idle
+chat /tk mode survival
+chat /tk time 6000
+wait 22
+shot ru_hp_01_ground_hint.png
+chat /tk time 10500
+wait 8
+shot ru_hp_02_night_hint.png
+quit

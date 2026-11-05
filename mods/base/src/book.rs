@@ -78,6 +78,9 @@ struct Book {
     /// (Ronald's first-day test: the first slot stopped being what was just made); set when the
     /// book opens or its tab changes.
     order: Vec<u32>,
+    /// The items held when the book last opened: a makeable recipe using one gained since goes
+    /// first (World playtest round 13: after knapping a head, the axe wasn't the first slot).
+    held_before: Vec<u32>,
     pool: Vec<(u32, u32)>,
     /// The menu window the pool was asked for.
     asked: u32,
@@ -109,8 +112,16 @@ static QUEUED: Mutex<Vec<Queued>> = Mutex::new(Vec::new());
 static WORKING: Sound = Sound::named("block.stone.hit");
 static DONE: Sound = Sound::named("block.stone.break");
 
-static BOOK: Mutex<Book> =
-    Mutex::new(Book { tab: 0, page: 0, picked: None, order: Vec::new(), pool: Vec::new(), asked: u32::MAX, ask: None });
+static BOOK: Mutex<Book> = Mutex::new(Book {
+    tab: 0,
+    page: 0,
+    picked: None,
+    order: Vec::new(),
+    held_before: Vec::new(),
+    pool: Vec::new(),
+    asked: u32::MAX,
+    ask: None,
+});
 
 pub fn register(r: &mut Registry) {
     r.tag("chests", &["chest"]);
@@ -646,12 +657,31 @@ pub fn book(ui: &mut Ui, station: Station) {
             }
         })
         .collect();
-    // What you can make first, then what you know, then what needs a table, then the near misses;
-    // otherwise as registered. Sorted when the book opens or its tab changes, then kept in that
-    // order while it is open (what becomes makeable or known later goes at the end).
+    // What you can make first, of it first what takes something gained since the book last
+    // opened, then what you know, then what needs a table, then the near misses; otherwise as
+    // registered. Sorted when the book opens or its tab changes, then kept in that order while it
+    // is open (what becomes makeable or known later goes at the end).
     let order = BOOK.lock().map(|b| b.order.clone()).unwrap_or_default();
     if order.is_empty() {
-        list.sort_by_key(|(r, n, near)| ((*n == 0) as u8, table_only(station, r) as u8, near.is_some() as u8));
+        let before = BOOK
+            .lock()
+            .map(|b| b.held_before.clone())
+            .unwrap_or_default();
+        let gained: Vec<u32> = have
+            .iter()
+            .map(|&(i, _)| i)
+            .filter(|i| !before.contains(i))
+            .collect();
+        let new = |r: &Recipe| {
+            !before.is_empty()
+                && r.inputs()
+                    .iter()
+                    .enumerate()
+                    .any(|(n, _)| gained.iter().any(|&i| r.accepts(n as u32, i)))
+        };
+        list.sort_by_key(|(r, n, near)| ((*n == 0) as u8, !(*n > 0 && new(r)) as u8, table_only(station, r) as u8, near.is_some() as u8));
+        let held: Vec<u32> = have.iter().map(|&(i, _)| i).collect();
+        edit(|b| b.held_before = held);
         let ids: Vec<u32> = list.iter().map(|(r, _, _)| id_of(r)).collect();
         edit(|b| b.order = ids);
     } else {
@@ -881,9 +911,12 @@ fn picked_recipe(ui: &mut Ui, station: Station, r: &Recipe, have: &[(u32, u32)])
                     .send(&CRAFT, &[index as u64, n as u64, station as u64]);
             });
         }
-        ui.button_args("crafting.book.craft_all", &[Arg::Int(can as i64)], S::default().h(14.0).pad(3.0).disabled(can == 0), move |c| {
+        // Max makes one of what doesn't stack (a tool, a drill): Max on the hand drill ate four
+        // sticks for two drills (the world playtester, round 13). Craft 5 still makes more.
+        let all = if weft_sdk::max_stack(out.item) <= 1 { can.min(1) } else { can };
+        ui.button_args("crafting.book.craft_all", &[Arg::Int(all as i64)], S::default().h(14.0).pad(3.0).disabled(all == 0), move |c| {
             c.client()
-                .send(&CRAFT, &[index as u64, can as u64, station as u64]);
+                .send(&CRAFT, &[index as u64, all as u64, station as u64]);
         });
     });
 }

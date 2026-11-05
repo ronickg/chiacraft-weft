@@ -157,7 +157,7 @@ pub fn register(r: &mut Registry) {
             ];
             // The recipe book beside it, hand recipes only (`book.rs`).
             ui.row(S::row().gap(4.0), |ui| {
-                crate::window::window(ui, S::column().pad(7.0).gap(5.0), &tabs, |ui| {
+                crate::window::family_window(ui, S::column().pad(7.0).gap(5.0), None, &tabs, |ui| {
                     ui.row(S::row().gap(1.0), |ui| {
                         // Armor, and the clothes worn under it beside, the cloak under them.
                         ui.column(S::column(), |ui| {

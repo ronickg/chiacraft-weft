@@ -61,6 +61,8 @@ pub const TRAITS: &[Trait] = &[
     t("recastable", "trait.base.recastable", Effect::Recast, When::Always),
     t("weldable", "trait.base.weldable", Effect::Weld, When::Always),
     t("tempered", "trait.base.tempered", Effect::Wear(0.7), When::Always),
+    // Star steel's etched plates: no rust, and repairs at half the material.
+    t("patterned", "trait.base.patterned", Effect::RepairCost(0.5), When::Always),
     t("light", "trait.base.light", Effect::Speed(1.05), When::Always),
     t("shrinks_tight", "trait.base.shrinks_tight", Effect::Wear(0.5), When::Dry),
     t("glued", "trait.base.glued", Effect::Wear(1.0), When::Wet),
