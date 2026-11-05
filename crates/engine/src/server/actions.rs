@@ -226,6 +226,7 @@ impl Server {
                 self.players[pi].identity = identity;
                 // A DID claimed (chiacraft): checked on chain in the background. When the
                 // world's rules ask for a DID, the join waits for the answer (a few seconds).
+                self.players[pi].did_proof = did.clone();
                 let did_pending = self.check_did(pi, &key, &did) && self.gate.rules.needs_did();
                 // An achievement the rules ask for: the joining game shows its credentials for it.
                 let ask = self

@@ -143,6 +143,13 @@ pub struct Player {
     /// days, and a join waiting for that check (name, key, since).
     did: Option<String>,
     did_days: Option<u32>,
+    /// The DID they claimed couldn't be checked (no chain peer answered): not counted as theirs;
+    /// asked again now and then while they are here (`did_recheck`: when next, tries left), with
+    /// the proof they gave (`did_proof`). `did_note`: what to tell them about it when they join.
+    did_unchecked: bool,
+    did_proof: String,
+    did_recheck: Option<(Instant, u32)>,
+    did_note: Option<crate::ui::text::Msg>,
     waiting: Option<(String, String, Instant)>,
     /// The join waits for the DID check, and for the achievements the rules asked about.
     did_pending: bool,
@@ -668,6 +675,10 @@ impl Server {
                 told: None,
                 did: None,
                 did_days: None,
+                did_unchecked: false,
+                did_proof: String::new(),
+                did_recheck: None,
+                did_note: None,
                 waiting: None,
                 did_pending: false,
                 proofs_pending: false,
