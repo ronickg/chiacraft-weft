@@ -174,13 +174,17 @@ pub fn upkeep(w: &World, id: u64, index: usize, a: &mut Animal) {
     if (w.game_time() + id) % every < e as u64 && !crate::animal::tamed(w, id) {
         let days = (every * speed() as u64) as f64 / life::DAY as f64;
         let (kin, near) = kin_near(w, id, index, a);
+        // Its room where it is: a plant eater's as heavily as its biome is stocked.
+        let crowd = w
+            .entity(id)
+            .map_or(s.crowd(), |st| crate::species::crowd_at(w, s, st.block_pos()));
         let roll = w.random_below(1_000_000) as f64 / 1_000_000.0;
-        if roll < life::want_chance(days, near, s.crowd(), a.stage) {
-            weft_sdk::info!("wild {} {id} died of want ({near:.1} of its kind near, room for {})", s.name, s.crowd());
+        if roll < life::want_chance(days, near, crowd, a.stage) {
+            weft_sdk::info!("wild {} {id} died of want ({near:.1} of its kind near, room for {crowd})", s.name);
             w.damage(id, 1e9, 0, damage_cause::STARVE);
             return;
         }
-        wild_love(w, id, index, a, &b, &kin, near, days);
+        wild_love(w, id, index, a, &b, &kin, near, crowd, days);
     }
 }
 
@@ -212,7 +216,7 @@ const WILD_LOVE_EVERY: u64 = 200;
 /// going as old age takes them, and stop when it's crowded. They then meet and mate as tames in
 /// love do (`behave`).
 #[allow(clippy::too_many_arguments)]
-fn wild_love(w: &World, id: u64, index: usize, a: &Animal, b: &Breeding, kin: &[u64], near: f64, days: f64) {
+fn wild_love(w: &World, id: u64, index: usize, a: &Animal, b: &Breeding, kin: &[u64], near: f64, crowd: u32, days: f64) {
     let ready = |a: &Animal, b: &Breeding| life::can_breed(a.stage) && b.growing == 0 && b.love == 0 && b.rest == 0 && b.carrying == 0;
     if !ready(a, b) {
         return;
@@ -221,7 +225,7 @@ fn wild_love(w: &World, id: u64, index: usize, a: &Animal, b: &Breeding, kin: &[
     let Some(st) = w.entity(id) else { return };
     // Only in its breeding season, twice as readily in its peak.
     let roll = w.random_below(1_000_000) as f64 / 1_000_000.0;
-    if roll >= life::love_chance(days, near, s.crowd()) * s.bio.season_love(season_bit(w)) {
+    if roll >= life::love_chance(days, near, crowd) * s.bio.season_love(season_bit(w)) {
         return;
     }
     let mate = kin.iter().copied().find(|&o| {

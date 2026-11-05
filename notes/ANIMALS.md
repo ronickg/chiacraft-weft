@@ -948,6 +948,18 @@ body's whole footprint (`notes/ENGINE_CHANGES.md`, section 1). The sauropod's bo
 blocks (`bodies::LOW`): its neck reaches 8.6, above any reach from the ground, and a box that tall
 found no room under the fern forest's crowns.
 
+**Stocking by biome** (2026-11-05, with Plants; Ronald picked real grazing levels: herds eat 25-50%
+of what their grass grows back). A biome holds plant eaters as real grazer densities go: open
+grassland heavily, deep forest and the giant groves lightly (`STOCKING`: savanna 2.5, plains 1.4,
+forest 1, swamp 0.9, birch forest 0.55, taiga 0.35, mountains 0.26, sequoia grove 0.09; the
+Cretaceous 1). A plant eater's crowd there is its crowd times that, never under a pair
+(`Species::crowd_in`), and everything that weighs the crowd reads it at the animal's own biome:
+natural spawning's room, wild breeding, dying of want, the food webs' grazing. So a stocked
+savanna holds 40 capybaras where it held 16, and they don't starve back down. With Plants' grass
+feeding as real grass does (a tuft feeds 2, not 10), every grazed biome lands about a third. The
+savanna is held at 2.5 (3.5 would match the rest) until it has a heavy grazer, which eats as much
+with fewer animals.
+
 **Far animals keep time** (2026-11-05). With the engine's activation ranges an animal no player
 is within 48 blocks of rests, ticking only every `core:inactive_entity_interval` ticks (20). Its
 countdowns run down by the ticks elapsed (`World::tick_elapsed`: breeding, gifts, anger, taming's
