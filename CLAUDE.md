@@ -20,6 +20,10 @@ game), `animals`, `portals`, `packages`, `testkit`.
 - **The look**: `notes/STYLE.md`, the `game-art` skill (all generated art: items, blocks, animal
   looks, UI, from the style guides in its `guides/`), `block-textures` (the 32 px block set and
   its batches) and `blocky-model` (box models).
+- **Names and invented words**: `mods/base/lore/lexicon.toml` is the one source (the ancients' Old
+  Eskenai, its drifts, Elvish, Dwarvish), `notes/NAMES.md` its generated sheet. Never make a name
+  up freehand: `python3 tools/names/names.py gen --people <p>` offers roots, `derive <word> --steps`
+  shows each tongue's form, `check` must pass. Why: `reports/Naming and invented words.md`.
 
 ## The engine's docs (Weft)
 

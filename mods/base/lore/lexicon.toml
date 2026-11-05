@@ -1,0 +1,885 @@
+# The lexicon: every invented word in chiacraft, and the rules that make them.
+#
+# One source of truth. No invented word goes into the game, the lang files or the notes without an
+# entry here, built from roots by the rules below. `tools/names/names.py` reads this file:
+#
+#   python3 tools/names/names.py gen --people elvish -n 40    candidates; a person picks
+#   python3 tools/names/names.py derive eskenai --steps       every drift, every rule that fired
+#   python3 tools/names/names.py check                        fails on any break (runs on CI)
+#   python3 tools/names/names.py sheet > notes/NAMES.md       the generated sheet
+#
+# Why it is built this way, with sources: reports/Naming and invented words.md (sections 6-15).
+# The roots and names are Ronald's first draft (11-06: "Yes, use Eskenai").
+#
+# The family tree:
+#   Old Eskenai (dead, carved on altars, relics, gates) -> three drifts, applied in order:
+#     soft  -> Elvish, and forest ruins
+#     frost -> the dwarves' loans, and mountain and cold ruins
+#     worn  -> humans and traders, coasts, plains, swamps, deserts; the latest era
+#   Dwarvish is a tongue of its own, unrelated, with loans from Old Eskenai through the frost drift.
+
+# What a name can be, in the order the sheet lists them.
+kinds = ["people", "realm", "place", "dimension", "ruin", "boss", "person", "title", "relic", "rune", "spell", "weapon", "material", "word"]
+
+# Sounds written with two letters that the tool reads as one sound, per tongue. A drift's rules can
+# write any of them (`ch`, `sh`, `ng`, `ei`); `sk`, `st` and `sp` are always two sounds.
+[sounds]
+old = ["ai", "au"]
+elvish = ["ai", "au", "ei"]
+dwarvish_loan = ["ai", "au", "ch"]
+worn = ["ai", "au", "sh", "ng"]
+dwarvish = ["kv", "ch"]
+rules = ["ai", "au", "ei", "ch", "sh", "ng", "kv"]
+
+# SCA² categories, one capital letter each, used in the drift rules.
+[categories]
+V = ["a", "e", "i", "o", "u", "ai", "au", "ei"] # any vowel, diphthongs included
+P = ["a", "e", "i", "o", "u"]                   # plain vowels
+C = ["p", "t", "k", "b", "d", "g", "m", "n", "s", "h", "f", "r", "w", "y", "l", "v", "ch", "sh", "ng", "kv"]
+F = ["e", "i", "ei"]                            # front vowels
+G = ["k", "g"]
+
+# ---------------------------------------------------------------------------------------------
+# Peoples: each one's sounds, syllables and stress. `gen` draws from the weights; `check` holds
+# every shown form to its people's rules.
+#   from   = the tongue whose roots it uses ("old" for the drifts)
+#   drift  = the drift that turns an Old word into this people's form
+#   joins  = how roots join: "eskenai" (section 7) or "dwarvish" (just stacked, doubles merged)
+#   stress = "first" syllable, or "last" root
+#   onsets = clusters besides one consonant; initial_onsets only at a word's start
+#   codas  = what may close a syllable inside a word; final_codas at the word's end
+#   final_vowel = a word may end in a vowel
+# ---------------------------------------------------------------------------------------------
+
+[people.old]
+title = "Old Eskenai"
+about = "The ancients' tongue, carved on altars, relics, runes and gates. Dead, so it never changes."
+from = "old"
+joins = "eskenai"
+stress = "first"
+# Weights from section 7: k t s r n common, m d b g middling, h p f w y rare.
+vowels = { a = 26, e = 20, i = 18, o = 14, u = 12, ai = 5, au = 5 }
+consonants = { k = 10, t = 10, s = 10, r = 10, n = 10, m = 5, d = 5, b = 5, g = 5, h = 2, p = 2, f = 2, w = 2, y = 2 }
+onsets = ["pr", "tr", "kr", "br", "dr", "gr"]
+initial_onsets = ["sk", "st"]
+# p closes a syllable only inside a word (kep + esk = Kepesk); a word never ends in it.
+codas = ["m", "n", "r", "s", "t", "k", "p"]
+final_codas = ["m", "n", "r", "s", "t", "k", "sk", "st"]
+final_vowel = true
+# How roots are drawn by `gen`: syllables per root (the 35 roots: 30 of one, 5 of two), and the
+# chance (in %) that a syllable has an onset, that the onset is a cluster, and that it has a coda.
+gen = { syllables = { 1 = 85, 2 = 15 }, onset = 85, cluster = 12, coda = 55, final_cluster = 6 }
+
+[people.elvish]
+title = "Elvish"
+about = "Old Eskenai worn smooth by thousands of years of song: open, flowing, often ending in a vowel or -n, with b d g and l between vowels and ei common. The ancients' pupils, so their words are the easiest to trace back."
+from = "old"
+drift = "soft"
+joins = "eskenai"
+stress = "first"
+vowels = ["a", "e", "i", "o", "u", "ai", "au", "ei"]
+consonants = ["p", "t", "k", "b", "d", "g", "m", "n", "s", "h", "f", "r", "w", "y", "l"]
+onsets = ["pr", "tr", "kr", "br", "dr", "gr"]
+initial_onsets = []
+codas = ["m", "n", "r", "s", "t", "k", "p", "l"]
+final_codas = ["n"]
+final_vowel = true
+
+# The elves' homes (Ronald, 11-06: "well we can add more ones for them"). Each home names its
+# realm and its dialect. A dialect is a drift: "soft", or one that extends it with rules of its
+# own, written like this and named in a home's `drift`:
+#   [drift.soft_<home>]
+#   title = "..."
+#   extends = "soft"
+#   rules = [ { sca = "...", says = "..." } ]
+# A name from that home gives `home = "<key>"` and is derived through the home's drift.
+[people.elvish.homes.aludren]
+realm = "aludren"
+where = "Old-growth or birch forest with ley nodes, where the ley lines run strongest (the report's pick; could move to the giant groves once they exist)."
+drift = "soft"
+
+[people.dwarvish_loan]
+title = "Dwarvish loans and mountain names (frost)"
+about = "The ancients' words as the dwarves borrowed them from the mountain halls, and the names of mountain and cold ruins."
+from = "old"
+drift = "frost"
+joins = "eskenai"
+stress = "first"
+vowels = ["a", "e", "i", "o", "u", "ai", "au"]
+consonants = ["p", "t", "k", "b", "d", "g", "m", "n", "s", "h", "f", "r", "w", "y", "ch"]
+onsets = ["pr", "tr", "kr", "br", "dr", "gr"]
+initial_onsets = ["sk", "st"]
+codas = ["m", "n", "r", "s", "t", "k", "p"]
+final_codas = ["m", "n", "r", "s", "t", "k", "p", "sk", "st"]
+final_vowel = true
+
+[people.worn]
+title = "Worn speech (humans, traders)"
+about = "Plain English with the old words worn down: every trader calls a ruin a dokan. Also the coasts', plains', swamps' and deserts' ruins, until a desert or sea people of their own is added."
+from = "old"
+drift = "worn"
+joins = "eskenai"
+stress = "first"
+vowels = ["a", "e", "i", "o", "u", "ai", "au"]
+consonants = ["p", "t", "k", "b", "d", "g", "m", "n", "s", "h", "f", "r", "w", "y", "sh", "ng"]
+onsets = ["pr", "tr", "kr", "br", "dr", "gr"]
+initial_onsets = ["sk", "st"]
+codas = ["m", "n", "r", "s", "t", "k", "p", "ng"]
+final_codas = ["m", "n", "r", "s", "t", "k", "st", "sh"]
+final_vowel = true
+
+[people.dwarvish]
+title = "Dwarvish"
+about = "Their own tongue, not descended from the ancients'. Short, closed, stressed at the end, with lots of b d g r and kv: the sound of hammering, and of words said in a hall of stone. Head first ('hold-mountain'), plural -ok."
+from = "dwarvish"
+joins = "dwarvish"
+stress = "last"
+# No native i, no diphthongs; adds v and kv; no w, y, f. These weights are a first tuning.
+vowels = { u = 30, o = 30, a = 25, e = 15 }
+consonants = { r = 10, b = 8, d = 8, g = 8, k = 6, n = 6, v = 5, m = 5, s = 5, t = 5, kv = 4, p = 2, h = 2 }
+onsets = ["br", "dr", "gr", "kr", "pr", "tr"]
+initial_onsets = ["sk", "st"] # only in loans (skir)
+codas = ["p", "t", "k", "b", "d", "g", "m", "n", "s", "r", "v", "rn", "rk", "rd", "nd", "nk", "mb", "st", "sk"]
+final_codas = ["p", "t", "k", "b", "d", "g", "m", "n", "s", "r", "v", "rn", "rk", "rd", "nd", "nk", "mb", "st", "sk"]
+final_vowel = true
+# Sounds only loans have: a careful player can tell a loan from a native word, as with French
+# words in English. `gen` never draws them and native roots may not use them.
+loan_only = ["i", "ch"]
+gen = { syllables = { 1 = 100 }, onset = 85, cluster = 22, coda = 95, final_cluster = 55 }
+
+# Bynames and true names (Ronald, 11-06: "Yes, bynames + true names"). Outside their holds a dwarf
+# goes by a plain English byname, which is what players mostly meet. The true name, in Dwarvish,
+# is learned as the player's standing with the hold grows (reputation, notes/PROGRESSION.md).
+# Every dwarvish person needs a `byname`; bynames follow the English rules (no grand mash-ups).
+[people.dwarvish.naming]
+shown = "byname"
+true_name = "learned through standing with the hold"
+byname_examples = ["Old Oath", "Ironhand"]
+
+# Which tongue names a ruin follows who lives near it.
+[regions]
+forest = "elvish"
+mountain = "dwarvish_loan"
+cold = "dwarvish_loan"
+coast = "worn"
+plains = "worn"
+swamp = "worn"
+desert = "worn"
+
+# ---------------------------------------------------------------------------------------------
+# Old Eskenai's roots (section 8). Roots were checked against English, Russian, French and German
+# for funny, rude or loaded meanings; dropped first picks are in [bad_words]. Add a root only when
+# no root fits (style rule 6), from `gen`, with its meaning.
+# ---------------------------------------------------------------------------------------------
+[root]
+esk = { means = "star" }
+kep = { means = "fall, come down" }
+nai = { means = "be born, begin" }
+rai = { means = "light, shine" }
+nau = { means = "night, dark" }
+dau = { means = "fire, burn" }
+skir = { means = "ice, cold" }
+omu = { means = "water, sea" }
+hes = { means = "sky, air" }
+bor = { means = "mountain, height" }
+nu = { means = "deep, below" }
+duk = { means = "stone" }
+tem = { means = "iron, metal" }
+tauk = { means = "gate, a way through" }
+aru = { means = "line, flow (ley)" }
+kaun = { means = "keep, guard" }
+gom = { means = "beast, creature" }
+dren = { means = "tree, wood" }
+has = { means = "dry, sand" }
+pok = { means = "rot, mire" }
+pem = { means = "world" }
+maun = { means = "mind, knowing" }
+sen = { means = "word, mark, rune" }
+ta = { means = "make, build" }
+ris = { means = "break, ruin" }
+eka = { means = "old, first" }
+gai = { means = "great" }
+pai = { means = "seed, egg, young" }
+rem = { means = "watch, see" }
+wom = { means = "voice, call" }
+ber = { means = "go, cross" }
+taru = { means = "sleep, wait" }
+kru = { means = "bone" }
+ema = { means = "life, blood" }
+tun = { means = "hollow, cave" }
+
+# Endings, written with a leading hyphen in a build.
+[ending]
+ar = { means = "one who", example = "kaunar, keeper" }
+an = { means = "place of", example = "dukan, stone place (a ruin)" }
+ek = { means = "a made thing", example = "senek, an inscription" }
+o = { means = "done", example = "kepo, fallen" }
+
+# How Old roots join (section 7), checked by `check`:
+#   1. the modifier comes first and the head last;
+#   2. if three consonants would meet, or two of the same, put e between;
+#   3. if two vowels meet, the first plain vowel drops; a diphthong's second half becomes w or y.
+[[join_example]]
+build = ["hes", "dau"]
+form = "hesdau"
+[[join_example]]
+build = ["esk", "nai"]
+form = "eskenai"
+[[join_example]]
+build = ["esk", "tem"]
+form = "esketem"
+[[join_example]]
+build = ["aru", "ema"]
+form = "arema"
+[[join_example]]
+build = ["dau", "aru"]
+form = "dawaru"
+
+# ---------------------------------------------------------------------------------------------
+# The drifts (section 9), each applied in order, in SCA² syntax: target/replacement/environment,
+# with an optional /exception. `_` is the sound changed, `#` a word's edge, a capital a category,
+# `(X)` something that may be there. Commas pair targets with replacements; an empty target
+# inserts, an empty replacement deletes. A hard case can be checked in Lexurgy or SCA² as written.
+# ---------------------------------------------------------------------------------------------
+[drift.soft]
+title = "Soft"
+used_for = "Elvish, and the forest ruins"
+rules = [
+  { sca = "sp,st,sk/s,s,s/#_", says = "s plus p, t or k at the start loses the stop: skir → sir" },
+  { sca = "/a/C_#/n_#", says = "a word ending in a consonant other than n takes -a: duk → duka" },
+  { sca = "p,t,k/b,d,g/V_V", says = "p t k become b d g between vowels: duka → duga" },
+  { sca = "r/l/V_V", says = "r becomes l between vowels: aru → alu" },
+  { sca = "ai/ei/_", says = "ai becomes ei: nai → nei" },
+]
+
+[drift.frost]
+title = "Frost"
+used_for = "the dwarves' loans, and mountain and cold ruins"
+rules = [
+  { sca = "P//V(C)(C)(C)_#", says = "in words of two or more syllables, a final single vowel drops: aru → ar" },
+  { sca = "au,ai/o,e/_", says = "au becomes o, ai becomes e: kaun → kon, tauk → tok" },
+  { sca = "k/ch/_F/s_", says = "k becomes ch (as in church) before i or e, but not after s: kepesk → chepesk" },
+  { sca = "b,d,g/p,t,k/_#", says = "b d g become p t k at the end of a word" },
+]
+
+[drift.worn]
+title = "Worn"
+used_for = "humans and traders, coasts, plains, swamps, deserts; the latest era"
+rules = [
+  { sca = "h//#_", says = "h at the start of a word drops: has → as" },
+  { sca = "P//#(C)(C)VC_CV", says = "in words of three or more syllables, a vowel in the second syllable between single consonants drops: ekaru → ekru" },
+  { sca = "u/o/_", says = "u becomes o (but au stays): duk → dok, nu → no" },
+  { sca = "n/ng/_G", says = "n becomes ng before k or g" },
+  { sca = "sk/sh/_#", says = "a final sk becomes sh: kepesk → kepesh" },
+]
+
+# The same word in all four forms (section 9's table), checked by `check`.
+[[drift_example]]
+build = ["esk", "nai"]
+means = "star-born (the ancients)"
+old = "Eskenai"
+soft = "Eskenei"
+frost = "Eskene"
+worn = "Eskenai"
+[[drift_example]]
+build = ["esk", "tem"]
+means = "star-iron (star steel)"
+old = "Esketem"
+soft = "Eskedema"
+frost = "Esketem"
+worn = "Esketem"
+[[drift_example]]
+build = ["kep", "esk"]
+means = "fall-star (a meteorite)"
+old = "Kepesk"
+soft = "Kebeska"
+frost = "Chepesk"
+worn = "Kepesh"
+[[drift_example]]
+build = ["kaun", "-ar"]
+means = "keeper"
+old = "kaunar"
+soft = "kaunala"
+frost = "konar"
+worn = "kaunar"
+[[drift_example]]
+build = ["hes", "dau"]
+means = "sky-fire (lightning)"
+old = "Hesdau"
+soft = "Hesdau"
+frost = "Hesdo"
+worn = "Esdau"
+[[drift_example]]
+build = ["duk", "-an"]
+means = "stone place (a ruin)"
+old = "dukan"
+soft = "dugan"
+frost = "dukan"
+worn = "dokan"
+
+# ---------------------------------------------------------------------------------------------
+# Dwarvish roots (section 12): native ones, and loans from Old Eskenai through the frost drift
+# (`loan` is the Old build; `check` re-derives the loan's form, its key).
+# ---------------------------------------------------------------------------------------------
+[dwarvish_root]
+gund = { means = "hold, hall" }
+kvor = { means = "lord, king" }
+brum = { means = "hammer" }
+vork = { means = "axe" }
+vend = { means = "oath" }
+umb = { means = "deep, under" }
+sund = { means = "gold" }
+grod = { means = "forge" }
+dund = { means = "kin" }
+brok = { means = "old" }
+bor = { means = "mountain", loan = ["bor"] }
+esk = { means = "star", loan = ["esk"] }
+tem = { means = "iron", loan = ["tem"] }
+duk = { means = "stone", loan = ["duk"] }
+tok = { means = "gate", loan = ["tauk"] }
+kon = { means = "keep", loan = ["kaun"] }
+chepesk = { means = "meteorite iron (fall-star)", loan = ["kep", "esk"] }
+eskene = { means = "the ancients (star-born)", loan = ["esk", "nai"] }
+
+[dwarvish_ending]
+ok = { means = "plural", example = "dundok, the kins" }
+
+# ---------------------------------------------------------------------------------------------
+# The names. Each one:
+#   kind     boss, ruin, relic, rune, spell, dimension, people, realm, place, weapon, material,
+#            person, title, word
+#   people   which tongue gives the shown form (a [people] key)
+#   build    roots and -endings, joined by that people's rules (" " is a word break)
+#   form     what the game shows; `check` re-derives it from the build
+#   gloss    the meaning, for translators and the journal
+#   what     what it is in the game
+#   epithet  a boss's English title (translated): "Borkon, the Height-Keeper"
+#   english  the English shown beside it (translated): "Maunsen (Mind-Rune)"
+#   byname   a dwarf's English byname, what players meet first
+#   home     an elvish home, whose dialect derives it
+#   irregular = "why"   a deliberate exception to the derivation
+#   lang_key the game's key, once it is in the lang files (`check` then wants it in en, ru, fr;
+#            the epithet under <key>.title). None yet: names go in after Ronald picks them.
+# ---------------------------------------------------------------------------------------------
+
+# The ancients' world (section 10).
+[name.eskenai]
+kind = "people"
+people = "old"
+build = ["esk", "nai"]
+form = "Eskenai"
+gloss = "star-born"
+what = "the ancients"
+english = "the Ancients"
+
+[name.esketem]
+kind = "material"
+people = "old"
+build = ["esk", "tem"]
+form = "Esketem"
+gloss = "star-iron"
+what = "star steel's lore name"
+english = "Star Steel"
+
+[name.kepesk]
+kind = "relic"
+people = "old"
+build = ["kep", "esk"]
+form = "Kepesk"
+gloss = "fall-star"
+what = "a meteorite heart; traders say Kepesh"
+
+[name.eskan]
+kind = "dimension"
+people = "old"
+build = ["esk", "-an"]
+form = "Eskan"
+gloss = "star-place"
+what = "the furthest dimension, the ancients' home, where Old Eskenai is still spoken"
+
+[name.nopem]
+kind = "dimension"
+people = "dwarvish_loan"
+build = ["nau", "pem"]
+form = "Nopem"
+gloss = "night-world"
+what = "a night dimension"
+
+[name.ekaskir]
+kind = "boss"
+people = "dwarvish_loan"
+build = ["eka", "skir"]
+form = "Ekaskir"
+gloss = "old ice"
+what = "the tundra's guardian"
+epithet = "the Old Ice"
+
+[name.borkon]
+kind = "boss"
+people = "dwarvish_loan"
+build = ["bor", "kaun"]
+form = "Borkon"
+gloss = "mountain-keeper"
+what = "the mountains' guardian"
+epithet = "the Height-Keeper"
+
+[name.drenkaun]
+kind = "boss"
+people = "elvish"
+build = ["dren", "kaun"]
+form = "Drenkaun"
+gloss = "tree-keeper"
+what = "the forest's guardian"
+epithet = "the Wood-Warden"
+
+[name.nokaun]
+kind = "boss"
+people = "worn"
+build = ["nu", "kaun"]
+form = "Nokaun"
+gloss = "deep-keeper"
+what = "the ocean's guardian"
+epithet = "Keeper of the Deep"
+
+[name.askaun]
+kind = "boss"
+people = "worn"
+build = ["has", "kaun"]
+form = "Askaun"
+gloss = "dry-keeper"
+what = "the desert's guardian"
+epithet = "the Sand Keeper"
+
+[name.pokgom]
+kind = "boss"
+people = "worn"
+build = ["pok", "gom"]
+form = "Pokgom"
+gloss = "rot-beast"
+what = "the swamp's guardian"
+epithet = "the Mire Beast"
+
+[name.nogom]
+kind = "boss"
+people = "dwarvish_loan"
+build = ["nau", "gom"]
+form = "Nogom"
+gloss = "night-beast"
+what = "a deep-cave guardian"
+
+[name.dokan]
+kind = "word"
+people = "worn"
+build = ["duk", "-an"]
+form = "dokan"
+gloss = "stone place"
+what = "what everyone calls a ruin"
+
+[name.drenduga]
+kind = "ruin"
+people = "elvish"
+build = ["dren", "duk"]
+form = "Drenduga"
+gloss = "wood-stone"
+what = "a forest ruin"
+
+[name.ristok]
+kind = "ruin"
+people = "dwarvish_loan"
+build = ["ris", "tauk"]
+form = "Ristok"
+gloss = "broken gate"
+what = "a mountain ruin with a dead gate"
+
+[name.eskerem]
+kind = "ruin"
+people = "old"
+build = ["esk", "rem"]
+form = "Eskerem"
+gloss = "star-watch"
+what = "a star-watching ruin on a peak"
+
+[name.maunsen]
+kind = "relic"
+people = "old"
+build = ["maun", "sen"]
+form = "Maunsen"
+gloss = "mind-rune"
+what = "a tablet that teaches runes"
+english = "Mind-Rune"
+
+[name.dau]
+kind = "rune"
+people = "old"
+build = ["dau"]
+form = "Dau"
+gloss = "fire"
+what = "one of the first four runes"
+
+[name.skir]
+kind = "rune"
+people = "old"
+build = ["skir"]
+form = "Skir"
+gloss = "ice"
+what = "one of the first four runes"
+
+[name.aru]
+kind = "rune"
+people = "old"
+build = ["aru"]
+form = "Aru"
+gloss = "flow"
+what = "one of the first four runes"
+
+[name.tauk]
+kind = "rune"
+people = "old"
+build = ["tauk"]
+form = "Tauk"
+gloss = "gate"
+what = "one of the first four runes"
+
+[name.hesdau]
+kind = "spell"
+people = "old"
+build = ["hes", "dau"]
+form = "Hesdau"
+gloss = "sky-fire"
+what = "the lightning spell's name on its tome; Hesdo to dwarves, Esdau to traders"
+english = "Lightning"
+
+[name.arema]
+kind = "place"
+people = "old"
+build = ["aru", "ema"]
+form = "Arema"
+gloss = "flow-life"
+what = "a ley spring"
+
+# The elves (section 11).
+[name.alunei]
+kind = "people"
+people = "elvish"
+home = "aludren"
+build = ["aru", "nai"]
+form = "Alunei"
+gloss = "born of the flow (ley)"
+what = "the elves' own name"
+english = "Elves"
+
+[name.aludren]
+kind = "realm"
+people = "elvish"
+home = "aludren"
+build = ["aru", "dren"]
+form = "Aludren"
+gloss = "wood of the flow"
+what = "an elven forest realm (the first home)"
+
+[name.taleska]
+kind = "place"
+people = "elvish"
+home = "aludren"
+build = ["taru", "esk"]
+form = "Taleska"
+gloss = "waiting for the stars"
+what = "Aludren's city"
+
+[name.reiwoma]
+kind = "person"
+people = "elvish"
+home = "aludren"
+build = ["rai", "wom"]
+form = "Reiwoma"
+gloss = "light-voice"
+what = "the eldest, a seer"
+
+[name.emalei]
+kind = "person"
+people = "elvish"
+home = "aludren"
+build = ["ema", "rai"]
+form = "Emalei"
+gloss = "life-light"
+what = "the warden-queen"
+
+[name.hesalu]
+kind = "weapon"
+people = "elvish"
+build = ["hes", "aru"]
+form = "Hesalu"
+gloss = "sky-thread"
+what = "an elven bow"
+
+[name.naulisa]
+kind = "weapon"
+people = "elvish"
+build = ["nau", "ris"]
+form = "Naulisa"
+gloss = "night-breaker"
+what = "an elven sword"
+
+[name.peidren]
+kind = "place"
+people = "elvish"
+home = "aludren"
+build = ["pai", "dren"]
+form = "Peidren"
+gloss = "seed-wood"
+what = "a sacred grove"
+
+[name.alema]
+kind = "place"
+people = "elvish"
+home = "aludren"
+build = ["aru", "ema"]
+form = "Alema"
+gloss = "flow-life"
+what = "a ley spring in the realm"
+
+[name.dugema]
+kind = "people"
+people = "elvish"
+build = ["duk", "ema"]
+form = "Dugema"
+gloss = "stone-blood"
+what = "the elves' word for the dwarves"
+
+[name.eskenei]
+kind = "people"
+people = "elvish"
+build = ["esk", "nai"]
+form = "Eskenei"
+gloss = "star-born"
+what = "the elves' word for the ancients"
+
+# The dwarves (section 12).
+[name.dundok]
+kind = "people"
+people = "dwarvish"
+build = ["dund", "-ok"]
+form = "Dundok"
+gloss = "the kins"
+what = "the dwarves' own name"
+english = "Dwarves"
+
+[name.gundbor]
+kind = "realm"
+people = "dwarvish"
+build = ["gund", "bor"]
+form = "Gundbor"
+gloss = "hold of the mountain"
+what = "the mountain kingdom"
+
+[name.grodsund]
+kind = "place"
+people = "dwarvish"
+build = ["grod", "sund"]
+form = "Grodsund"
+gloss = "forge of gold"
+what = "Gundbor's city"
+
+[name.kvor_vendbrok]
+kind = "person"
+people = "dwarvish"
+build = ["kvor", " ", "vend", "brok"]
+form = "Kvor Vendbrok"
+gloss = "lord; oath-old"
+what = "the king"
+byname = "Old Oath"
+
+[name.dundbrok]
+kind = "title"
+people = "dwarvish"
+build = ["dund", "brok"]
+form = "Dundbrok"
+gloss = "kin-old"
+what = "the title of the eldest"
+
+[name.brumesk]
+kind = "weapon"
+people = "dwarvish"
+build = ["brum", "esk"]
+form = "Brumesk"
+gloss = "hammer of the star"
+what = "a star-steel hammer"
+
+[name.vorktem]
+kind = "weapon"
+people = "dwarvish"
+build = ["vork", "tem"]
+form = "Vorktem"
+gloss = "axe of iron"
+what = "a dwarven axe"
+
+[name.tokumb]
+kind = "place"
+people = "dwarvish"
+build = ["tok", "umb"]
+form = "Tokumb"
+gloss = "gate of the deep"
+what = "the great gate"
+
+[name.umbsund]
+kind = "place"
+people = "dwarvish"
+build = ["umb", "sund"]
+form = "Umbsund"
+gloss = "deep of gold"
+what = "a deep gold mine"
+
+[name.venduk]
+kind = "place"
+people = "dwarvish"
+build = ["vend", "duk"]
+form = "Venduk"
+gloss = "oath stone"
+what = "the oath-stone (vend + duk: dd becomes d)"
+
+[name.chepesk]
+kind = "material"
+people = "dwarvish"
+build = ["chepesk"]
+form = "Chepesk"
+gloss = "fall-star"
+what = "the dwarves' word for meteorite iron"
+
+[name.eskene]
+kind = "people"
+people = "dwarvish"
+build = ["eskene"]
+form = "Eskene"
+gloss = "star-born"
+what = "the dwarves' word for the ancients"
+
+# ---------------------------------------------------------------------------------------------
+# Against the generic (section 4 and the style guide, section 14). Each pattern is a regular
+# expression on the lower-case form. `people` and `kinds` narrow where it applies; `on` is "form"
+# (default) or "english" (bynames, epithets and other English names).
+# ---------------------------------------------------------------------------------------------
+[[banned]]
+re = "[xzqj]"
+why = "x, z, q and j used to look exotic (Xyrthos, Zyrael)"
+[[banned]]
+re = "th"
+why = "th: stock fantasy, and Tolkien's"
+[[banned]]
+re = "ae"
+why = "ae: stock fantasy (Aeth-, Ael-)"
+[[banned]]
+re = "y(?![aeiou])"
+why = "y as a vowel"
+[[banned]]
+re = "([a-z])\\1"
+why = "doubled letters"
+[[banned]]
+re = "['\\-\\u00c0-\\u024f]"
+why = "apostrophes, hyphens and accents (an epithet is set off with a comma)"
+[[banned]]
+re = "(ia|ion|oth|wyn|ryn)$"
+why = "stock endings -ia, -ion, -oth, -wyn, -ryn"
+[[banned]]
+re = "^(aeth|ael|vael)"
+why = "stock openings Aeth-, Ael-, Vael-"
+[[banned]]
+re = "^(elara|lyra|kael|kaelen|thorne|eldoria|voss|silas)$"
+why = "the names language models keep producing"
+[[banned]]
+re = "(iel|wen|dor|ion|las|ndil)$"
+people = ["elvish"]
+why = "reads as Tolkien or generic elf: -iel, -wen, -dor, -ion, -las, -ndil"
+[[banned]]
+re = "^(gal|cel|mith)"
+people = ["elvish"]
+why = "reads as Tolkien: gal-, cel-, mith-"
+[[banned]]
+re = "^el"
+people = ["elvish"]
+kinds = ["person"]
+why = "El- at the start of an elf's personal name"
+[[banned]]
+re = "^kh|(dum|dûm|zul)$"
+people = ["dwarvish", "dwarvish_loan"]
+why = "Tolkien's Khuzdul: Kh-, Khaz-, -dûm, -zul"
+[[banned]]
+re = "^(durin|thorin|balin|dvalin|dwalin|dain|nain|thrain|thror|oin|gloin|ori|nori|dori|fili|kili|bifur|bofur|bombur|fundin)$"
+people = ["dwarvish", "dwarvish_loan"]
+why = "the Norse dwarf list (and Tolkien's)"
+[[banned]]
+re = "^(storm|shadow|blood|ember)|(forge|fall|heim|gard)$"
+on = "english"
+why = "grand English mash-ups: an English name must be concrete and local (Bywater, not Stormwatch)"
+[[banned]]
+re = "\\b(the )?(eternal|unbroken)\\b"
+on = "english"
+why = "grand titles"
+
+# Words that make a name funny, rude or loaded in a language players read, written in our
+# letters (Russian by the Cyrillic table below). Three letters or fewer match a whole word; longer
+# ones match anywhere in it. The check is for real collisions, not for every short word.
+[bad_words]
+# Dropped first picks for roots (section 8): sau and gau (German "sow", and the Nazi-era Gau),
+# ham, nosk (Russian носки "socks"), wai (Maori "water").
+en = ["ham", "ass", "arse", "anus", "butt", "poo", "poop", "puke", "turd", "fart", "shit", "piss", "fuck", "cunt", "cock", "dick", "twat", "wank", "slut", "whore", "crap", "bum", "boob", "knob", "rape", "nazi", "isis", "kkk", "fag", "gook", "kike", "coon", "paki", "spic", "nig", "dung", "snot", "pee", "wee", "tit"]
+ru = ["nosk", "hui", "huy", "her", "suka", "suchka", "govno", "gavno", "srat", "sran", "derm", "mudak", "durak", "kaka", "pisa", "siska", "trah", "hren", "bla", "blad", "ebat", "eban", "yob", "manda", "pidor", "pider", "perd", "loh", "debil", "padla", "kozel", "sopl", "zad", "pup"]
+fr = ["merde", "putain", "pute", "con", "conne", "cul", "bite", "chier", "pet", "salaud", "salope", "nique", "foutre", "couille", "bordel", "enkule", "caca", "pipi", "crotte", "pisse", "zob"]
+de = ["sau", "gau", "scheis", "sheis", "arsch", "kacke", "fotze", "pisse", "mist", "furz", "titte", "dreck", "fick", "hure", "depp", "doof", "heil", "nazi"]
+mi = ["wai"]
+
+# Russian writes invented names by one fixed table (section 14); French and English keep them as
+# written. Longer keys are read first. `e_initial` is e at a word's start. The table's first rows
+# are the report's; the plain letters after them are the obvious ones.
+[cyrillic]
+ai = "ай"
+au = "ау"
+ei = "эй"
+ch = "ч"
+sh = "ш"
+ng = "нг"
+kv = "кв"
+sk = "ск"
+a = "а"
+e = "е"
+e_initial = "э"
+i = "и"
+o = "о"
+u = "у"
+k = "к"
+g = "г"
+h = "х"
+w = "в"
+y = "й"
+p = "п"
+t = "т"
+b = "б"
+d = "д"
+m = "м"
+n = "н"
+s = "с"
+r = "р"
+f = "ф"
+l = "л"
+v = "в"
+
+# Where `check` looks for lang keys, and which languages every key needs.
+[lang]
+dirs = ["crates/engine/assets/lang", "mods/base/assets/lang", "mods/animals/assets/lang", "mods/portals/assets/lang", "mods/packages/assets/lang"]
+files = ["en_us", "ru_ru", "fr_fr"]
+
+# `gen`: a candidate is too close to a word already in the lexicon when one edit turns one into
+# the other (for words of four letters or more), or when it has the same consonants with other
+# vowels (for any length): the existing short roots (nu, nau; has, hes) stay as they are. A root
+# has at least `min_sounds` sounds and one consonant.
+[gen]
+min_distance = 2
+min_sounds = 2
+
+# Everyday words in a language players read: `gen` never offers them, since an invented root that
+# is a plain word reads as that word (get, mud, run). Roots already chosen may be one (bor is
+# Russian for a pine wood, ta French for "your"); `check` doesn't hold them to this list.
+[plain_words]
+en = ["a", "i", "am", "an", "as", "at", "be", "by", "do", "go", "he", "if", "in", "is", "it", "me", "my", "no", "of", "on", "or", "so", "to", "up", "us", "we", "ad", "ah", "oh", "ok", "bad", "bag", "ban", "bar", "bat", "bed", "bet", "bid", "big", "bin", "bit", "bog", "bot", "bow", "bud", "bug", "bun", "bus", "but", "buy", "can", "cap", "dad", "dam", "den", "dew", "did", "dig", "dim", "dip", "doe", "dog", "dot", "dub", "due", "dug", "ear", "eat", "egg", "ego", "end", "era", "eve", "fan", "far", "fat", "fed", "fee", "fen", "few", "fig", "fin", "fir", "fit", "fog", "for", "fun", "fur", "gag", "gap", "gas", "gem", "get", "god", "got", "gum", "gun", "gut", "had", "hat", "hen", "her", "hid", "him", "hip", "his", "hit", "hog", "hop", "hot", "how", "hub", "hug", "hum", "hut", "ink", "inn", "its", "keg", "kid", "kin", "kit", "mad", "man", "map", "mat", "may", "men", "met", "mob", "mom", "mop", "mud", "mug", "mum", "nag", "nap", "net", "new", "nib", "nod", "nor", "not", "now", "nub", "nun", "nut", "oak", "oar", "odd", "off", "oft", "oil", "old", "one", "our", "out", "owe", "own", "pad", "pan", "par", "pat", "paw", "pay", "peg", "pen", "pet", "pie", "pig", "pin", "pit", "pod", "pop", "pot", "pro", "pub", "pun", "put", "rag", "ram", "ran", "rap", "rat", "raw", "red", "rib", "rid", "rig", "rim", "rip", "rob", "rod", "rot", "row", "rub", "rug", "rum", "run", "rut", "sad", "sag", "sap", "sat", "saw", "say", "sea", "see", "set", "sew", "she", "sin", "sip", "sir", "sit", "ski", "sob", "son", "sow", "spa", "sub", "sum", "sun", "tab", "tag", "tan", "tap", "tar", "tea", "ten", "tie", "tin", "tip", "toe", "ton", "too", "top", "tow", "tub", "tug", "two", "urn", "use", "van", "vat", "vet", "war", "was", "way", "web", "wed", "wet", "who", "wig", "win", "wit", "woe", "won", "bank", "band", "bend", "bent", "best", "bird", "bond", "bone", "bonk", "born", "boss", "bust", "dark", "dent", "desk", "dirt", "disk", "dome", "done", "dose", "dumb", "dump", "dune", "dusk", "dust", "gift", "gold", "gone", "good", "grim", "grin", "grip", "gust", "hand", "hard", "harm", "hint", "honk", "horn", "hunt", "hurt", "kind", "king", "mask", "mint", "mist", "most", "must", "nest", "next", "none", "norm", "nose", "pink", "pond", "post", "punk", "rank", "rest", "ring", "risk", "rose", "rust", "sand", "send", "sink", "soft", "song", "sort", "sung", "sunk", "tank", "task", "tent", "term", "test", "tusk", "wind", "word", "work", "worm", "west"]
+fr = ["le", "la", "de", "du", "un", "une", "et", "est", "en", "te", "tu", "mon", "ton", "sa", "ma", "mes", "tes", "ses", "nos", "vos", "sur", "pas", "par", "bon", "mal", "bas", "mot", "mort", "nord", "sud", "rue", "roi", "dur", "mur", "nez", "pot", "rat", "sac", "sol", "ver", "vin", "dos", "os", "or", "mer", "fer", "fin", "gare", "mode", "note", "port", "robe", "rose", "sel"]
+de = ["der", "die", "das", "und", "ist", "ein", "mit", "auf", "aus", "bei", "um", "rot", "gut", "tot", "ort", "mut", "berg", "burg", "hund", "mund", "bund", "wort", "rind", "bett", "dorf", "gast", "rast", "see", "tor", "rat", "not"]
+ru = ["da", "net", "ona", "dom", "kot", "nos", "sok", "sup", "dub", "kum", "mat", "med", "mir", "mor", "rak", "rog", "ruka", "sad", "sam", "son", "sor", "sto", "ton", "tur", "um", "us", "gora", "voda", "nebo", "sneg", "most", "brat", "drug", "gost", "dar", "dno", "vor", "bog"]
