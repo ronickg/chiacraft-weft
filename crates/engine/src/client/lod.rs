@@ -351,10 +351,13 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                 .map(|&(di, dj)| at(i + di, j + dj).0)
                 .min()
                 .unwrap_or(y);
-            // chiacraft: from 8-block cells (`SLOPE_LEVEL`) the mean drop per block: a cell that wide
-            // stands for a slope, and the stepped fall's half again (`fall`) made whole mountainsides
-            // cliffs, far snow ranges bare rock.
-            let fall = if slope { (y - low).max(0) / s } else { fall(y - low, s) };
+            // chiacraft: the mean drop per block (from 8-block cells, `SLOPE_LEVEL`, rounded down;
+            // finer, up), not the stepped fall's half again (`fall`): with it a slope the cubes keep
+            // in sand, snow or grass went bare rock in distant terrain, whole far snow ranges at
+            // coarse cells, and at the seam where the cubes end a pale sand or snow face met the
+            // same slope drawn as striped rock, the "glass slabs" (Far view, 11-05).
+            let drop = (y - low).max(0);
+            let fall = if slope { drop / s } else { (drop + s - 1) / s };
             if fall < f.fall {
                 continue;
             }
