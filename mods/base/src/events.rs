@@ -568,7 +568,9 @@ fn pointers(w: &World) {
 
 /// The crater and what lies in it: Terrain's live carve (`impact::start`, on its branch, not in
 /// dev yet). Until it lands an impact on land is the looks only, as `sky_impacts` 1 has it.
-fn carve(_w: &World, site: BlockPos) {
+fn carve(w: &World, site: BlockPos) {
+    // What the core will hold, decided by the site (`stars::core_block` places it with the carve).
+    crate::stars::core_begins(w, w.seed_at(site));
     weft_sdk::info!("events: the crater at {site:?} waits for Terrain's impact::start");
 }
 

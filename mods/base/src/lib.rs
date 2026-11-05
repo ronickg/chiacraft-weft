@@ -39,6 +39,7 @@ mod seasons;
 mod shaderpack;
 mod snow;
 mod sounds;
+mod stars;
 mod survival;
 mod video;
 mod weather;
@@ -113,6 +114,7 @@ fn init(r: &mut Registry) {
     firebed::register(r);
     events::register(r);
     meteors::register(r);
+    stars::register(r);
     sounds::register(r);
     mobs::register(r);
     worldgen::register(r);

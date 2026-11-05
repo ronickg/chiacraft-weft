@@ -52,8 +52,12 @@ pub fn register(r: &mut Registry) {
         .on_scheduled(cool)
         .tag("meteorites")
         .tab(&crate::tabs::NATURAL);
-    r.loot(&METEORITE)
-        .pool(Pool::new().items("meteoric_iron", ev::METEORITE_DROPS.0, ev::METEORITE_DROPS.1));
+    // Only mined with its tool (a hand-written table needs `Harvested` to say so).
+    r.loot(&METEORITE).pool(
+        Pool::new()
+            .when(Cond::Harvested)
+            .items("meteoric_iron", ev::METEORITE_DROPS.0, ev::METEORITE_DROPS.1),
+    );
     r.item(&METEORIC_IRON)
         .tag("meteoric_iron")
         .tab(&crate::tabs::INGREDIENTS);

@@ -169,6 +169,28 @@ pub fn impact_on(seed: u64, day: u64) -> Option<f32> {
     ((day - BIG_IMPACT_FROM_DAY) % BIG_IMPACT_SLOT_DAYS == at).then(|| 24.0 * unit(mix(mix(r))))
 }
 
+/// A big impact's star materials (Addendum 2 §2): star steel lumps a core block gives (about 8-16
+/// a core of 3-6 blocks), the furnace's ticks for an ingot, the peridot a pallasite block crafts
+/// into (2-4 blocks: 4-8, the design's 3-8), and how often a core holds a Starheart and pallasite.
+pub const STAR_STEEL_PER_BLOCK: (u32, u32) = (2, 3);
+pub const STAR_STEEL_SMELT_TICKS: u32 = 400;
+pub const PERIDOT_PER_PALLASITE: u32 = 2;
+pub const STARHEART_CHANCE: f32 = 0.33;
+pub const PALLASITE_CHANCE: f32 = 0.25;
+pub const PALLASITE_BLOCKS: (u32, u32) = (2, 4);
+
+/// What a core of the impact `seed` holds: a Starheart, and how many pallasite blocks.
+pub fn core_kind(seed: u64) -> (bool, u32) {
+    let r = mix(seed ^ 0x5354_4152_4845_4152);
+    let heart = unit(r) < STARHEART_CHANCE;
+    let pallasite = if unit(mix(r)) < PALLASITE_CHANCE {
+        PALLASITE_BLOCKS.0 + (mix(mix(r)) >> 44) as u32 % (PALLASITE_BLOCKS.1 - PALLASITE_BLOCKS.0 + 1)
+    } else {
+        0
+    };
+    (heart, pallasite)
+}
+
 /// The core's share with `others` more players within reach.
 pub fn impact_share(others: u32) -> f32 {
     (1.0 + IMPACT_SHARE.0 * others as f32).min(IMPACT_SHARE.1)
@@ -353,6 +375,22 @@ mod tests {
                 assert!((0.0..24.0).contains(&hour));
             }
         }
+    }
+
+    #[test]
+    fn cores_hold_hearts_and_pallasite_now_and_then() {
+        let cores: Vec<(bool, u32)> = (0..10_000u64)
+            .map(|s| core_kind(s.wrapping_mul(0x9E37_79B9)))
+            .collect();
+        let hearts = cores.iter().filter(|c| c.0).count() as f32 / cores.len() as f32;
+        let pallasites = cores.iter().filter(|c| c.1 > 0).count() as f32 / cores.len() as f32;
+        assert!((hearts - STARHEART_CHANCE).abs() < 0.03, "{hearts}");
+        assert!((pallasites - PALLASITE_CHANCE).abs() < 0.03, "{pallasites}");
+        assert!(
+            cores
+                .iter()
+                .all(|c| c.1 == 0 || (PALLASITE_BLOCKS.0..=PALLASITE_BLOCKS.1).contains(&c.1))
+        );
     }
 
     #[test]
