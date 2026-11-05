@@ -389,8 +389,7 @@ fn shade(in: VOut, albedo_in: vec4<f32>) -> vec4<f32> {
     return shade_soft(in, albedo_in, far_soft(in));
 }
 
-// `shade` with the cubes' shading softened by `soft` (distant terrain passes 0: its mountains keep
-// their relief).
+// `shade` with the cubes' shading softened by `soft` (distant terrain's boxes too, `fs_lod`).
 fn shade_soft(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     let ao = mix(in.ao, 1.0, soft);
     let n = normalize(mix(normalize(in.normal), vec3(0.0, 1.0, 0.0), soft * 0.5));
@@ -1009,5 +1008,9 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
         let w = water(in, avg, false);
         return vec4(w.rgb, SOLID_ALPHA);
     }
-    return vec4(shade_soft(in, albedo, 0.0).rgb, SOLID_ALPHA);
+    // Shaded as the near cubes are at that distance (`far_soft`, far look 2): a box's walls lean
+    // halfway up, as the slopes they stand for. Lit as upright walls, the far boxes' faces got no sun
+    // at midday and a snow range read stone-grey under thin white lines (Far view, 11-05; the smooth
+    // tiles' facets had leaned toward the sun).
+    return vec4(shade_soft(in, albedo, far_soft(in)).rgb, SOLID_ALPHA);
 }
