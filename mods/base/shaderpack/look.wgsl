@@ -46,6 +46,19 @@ const OPT_NIGHT_LIGHT: u32 = 10u;
 const OPT_NIGHT_MOON: u32 = 11u;
 const OPT_CANOPY: u32 = 12u;
 const OPT_SHAFTS: u32 = 13u;
+// The Fantasy group (round 17; `mods/base/src/video.rs`, rows UI made): read raw with `fantasy_opt`,
+// as their 0 is off, where `look_opt` takes 0 for a setting not found.
+const OPT_STORYBOOK: u32 = 15u;
+const OPT_NIGHT_SKY: u32 = 16u;
+const OPT_SHOOTING_STARS: u32 = 17u;
+const OPT_MOON_SIZE: u32 = 18u;
+const OPT_GLOW: u32 = 19u;
+const OPT_BIOME_AIR: u32 = 20u;
+const OPT_SPARKLE: u32 = 21u;
+
+fn fantasy_opt(i: u32) -> f32 {
+    return scene.options[i / 4u][i % 4u];
+}
 
 fn look_opt(i: u32, missing: f32) -> f32 {
     let v = scene.options[i / 4u][i % 4u];
@@ -161,6 +174,26 @@ fn palette() -> Palette {
     p.sun = p.sun * (1.0 - r * 0.9);
     // At night rain and its clouds darken the sky's light too (by day overcast only greys it).
     p.ambient *= mix(1.0, 1.0 - 0.6 * r, smoothstep(-0.14, -0.3, e));
+    // A storybook hour (round 17, rec. 2; `base:look_storybook`, 0 to 1): at golden hour and blue
+    // hour the shade goes lavender (Solas's 205 184 236) while the sun stays orange, the blue
+    // hour's zenith violet; at night the moon's light silver-blue (a 15000 K blackbody, Bliss's),
+    // not muddy green. Clear skies only: rain keeps its greys.
+    let tale = clamp(fantasy_opt(OPT_STORYBOOK), 0.0, 1.0) * (1.0 - r);
+    if tale > 0.0 {
+        // Blue hour: the sun just under the horizon, to about 14° below (it fell short of the
+        // 18:57 check at -0.2..-0.08).
+        let blue_hour = smoothstep(0.04, -0.02, e) * smoothstep(-0.32, -0.16, e);
+        // (`golden()` by hand: `palette` has a local of that name.)
+        let gold_hour = (1.0 - smoothstep(0.08, 0.35, e)) * smoothstep(-0.06, 0.03, e);
+        let hour = max(gold_hour, blue_hour);
+        // At 0.92 0.82 1.18 the lavender hardly showed at a sheet's size (the storybook check, 11-05).
+        p.ambient = mix(p.ambient, vec3(luma(p.ambient)) * vec3(0.95, 0.72, 1.4) * 1.15, tale * hour * 0.9);
+        p.horizon = mix(p.horizon, vec3(luma(p.horizon)) * vec3(1.08, 0.8, 1.15), tale * hour * 0.45);
+        p.zenith = mix(p.zenith, vec3(luma(p.zenith)) * vec3(0.8, 0.55, 1.6), tale * blue_hour * 0.8);
+        let moonlit = smoothstep(-0.14, -0.3, e);
+        p.sun = mix(p.sun, vec3(luma(p.sun)) * vec3(0.78, 0.9, 1.16), tale * moonlit);
+        p.ambient = mix(p.ambient, vec3(luma(p.ambient)) * vec3(0.82, 0.92, 1.12), tale * moonlit * 0.6);
+    }
     return p;
 }
 
@@ -989,6 +1022,13 @@ fn display(c: vec3<f32>) -> vec3<f32> {
     t = max(mix(vec3(y), t, mix(1.0, 1.2 * look_opt(OPT_SATURATION, 1.0), day)), vec3(0.0));
     // A cool floor so the night is never pure black; by day black stays black.
     t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034) * (1.0 - day);
+    // A storybook night (`base:look_storybook`): dim colours slide toward a blue-grey, as the eye's
+    // rods take over (Purkinje; Photon's, 0.05 × its setting), firelight kept: warm pixels, whose
+    // red outweighs their blue, keep their colour.
+    let dim_px = 1.0 - smoothstep(0.02, 0.16, luma(t));
+    let warm = smoothstep(-0.02, 0.06, t.r - t.b);
+    let rods = clamp(fantasy_opt(OPT_STORYBOOK), 0.0, 1.0) * (1.0 - day) * dim_px * (1.0 - warm) * 0.45;
+    t = mix(t, vec3(luma(t)) * vec3(0.84, 0.95, 1.18), rods);
     // A blood moon's faint red cast over the night.
     t *= mix(vec3(1.0), vec3(1.1, 0.88, 0.86), blood_moon() * 0.6 * (1.0 - day));
     return clamp(t, vec3(0.0), vec3(1.0));
