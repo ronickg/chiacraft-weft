@@ -488,14 +488,18 @@ def chew(t, rate=2.5, amp=7.0):
     return {"jaw": (amp * max(0.0, S(TAU * t * rate)), 0, 0)}
 
 
-def graze_pose(g, P=L):
+def graze_pose(g, P=L, even=False):
     """Neck and head down toward the grass by `g` (0..1); the front legs straddled forward a
-    little to lower the shoulders, the hooves kept flat on the ground."""
-    sp = P["graze_splay"] * g
+    little to lower the shoulders, the hooves kept flat on the ground. `even`: the legs straddled
+    by the square root of `g`, so on the way down the hooves stay on the ground (the shoulders drop
+    with the lean, the straddle lifts them with its angle squared: straddled by `g`, part-way down
+    the front hooves sank half a unit; the idle keeps the plain way)."""
+    k = math.sqrt(g) if even else g
+    sp = P["graze_splay"] * k
     q = {"spine_1": (P["graze_lean"] * g, 0, 0), "neck": (P["graze_neck"] * g, 0, 0), "head": (P["graze_head"] * g, 0, 0)}
     for leg in ("FL", "FR"):
-        q[f"leg_{leg}_upper"] = (-sp - P["graze_lean"] * g, 0, 0)
-        q[f"leg_{leg}_paw"] = (sp, 0, 0)
+        q[f"leg_{leg}_upper"] = (-sp - P["graze_lean"] * k, 0, 0)
+        q[f"leg_{leg}_paw"] = (sp + P["graze_lean"] * (k - g), 0, 0)  # flat: the lean, the leg and the hoof's turns sum to nothing
     return q
 
 
@@ -593,7 +597,7 @@ def pose_sniff(t):
     p = t / 2.2
     d = float(np.interp(p, [0, .25, .75, 1], [0, 1, 1, 0]))
     q = still(t)
-    q.update(graze_pose(d))
+    q.update(graze_pose(d, even=True))
     q["head"] = (q["head"][0], 8 * d * S(TAU * p * 2), 0)
     return q
 
@@ -623,7 +627,7 @@ def pose_stretch(t):
     a = float(np.interp(p, [0, .2, .5, .6, 1], [0, 1, 1, 0, 0]))
     b = float(np.interp(p, [0, .55, .7, .9, 1], [0, 0, 1, 1, 0]))
     q = still(t)
-    q.update({"spine_1": (6 * a, 0, 0), "neck": (20 * a, 0, 0), "head": (-16 * a, 0, 0), "ear_L": (0, 0, -20 * a), "ear_R": (0, 0, 20 * a),
+    q.update({"neck": (24 * a, 0, 0), "head": (-16 * a, 0, 0), "ear_L": (0, 0, -20 * a), "ear_R": (0, 0, 20 * a),
               "leg_BL_upper": (30 * b, 0, 0), "leg_BL_lower": (-10 * b, 0, 0), "leg_BL_paw": (-20 * b, 0, 0)})
     q.update(chew(t, 0.5, 14 * a))  # a yawn
     return q
@@ -645,7 +649,7 @@ def pose_alarm(t):
     up = float(np.interp(p, [0, .1, .8, 1], [0, 1, 1, 0]))
     stamp = float(np.interp(p, [0, .25, .32, .4, .5, .57, .65, 1], [0, 0, 1, 0, 0, 1, 0, 0]))
     q = still(t)
-    q.update({"spine_1": (-3 * up, 0, 0), "neck": (-20 * up, 0, 0), "head": (8 * up, 0, 0), "ear_L": (-10 * up, 0, -18 * up),
+    q.update({"neck": (-22 * up, 0, 0), "head": (8 * up, 0, 0), "ear_L": (-10 * up, 0, -18 * up),
               "ear_R": (-10 * up, 0, 18 * up), "tail": (-70 * up, 0, 0),
               "leg_FR_upper": (-24 * stamp, 0, 0), "leg_FR_lower": (40 * stamp, 0, 0), "leg_FR_paw": (-16 * stamp, 0, 0)})
     q.update(chew(t, 4.0, 6.0 * up))  # a snort
@@ -699,7 +703,7 @@ def pose_nuzzle(t):
     d = float(np.interp(p, [0, .2, .85, 1], [0, 1, 1, 0]))
     push = max(0.0, S(TAU * p * 2))
     q = still(t)
-    q.update(graze_pose(0.55 * d))
+    q.update(graze_pose(0.55 * d, even=True))
     q["head"] = (q["head"][0] - 8 * push, 0, 0)
     q.update(chew(t, 2.0, 4.0 * d))
     q.update({"ear_L": (10 * d, 0, 0), "ear_R": (10 * d, 0, 0)})
@@ -711,8 +715,9 @@ def pose_flinch(t):
     p = t / 0.45
     d = float(np.interp(p, [0, .15, .45, 1], [0, 1, 0.8, 0]))
     q = still(t)
-    q.update({"root": (0, -1.5 * d, 0), "spine_1": (4 * d, 0, 2 * d), "neck": (16 * d, 0, 0), "head": (10 * d, 0, 0),
-              "ear_L": (24 * d, 0, 0), "ear_R": (24 * d, 0, 0), "tail": (10 * d, 0, 0)})
+    q.update({"spine_1": (0, 0, 2 * d), "neck": (18 * d, 0, 0), "head": (10 * d, 0, 0),
+              "ear_L": (24 * d, 0, 0), "ear_R": (24 * d, 0, 0), "tail": (10 * d, 0, 0),
+              "leg_FL_upper": (0, 0, -2 * d), "leg_FR_upper": (0, 0, -2 * d)})
     return q
 
 
@@ -722,7 +727,7 @@ def pose_watch(t):
     p = t / 4.0
     yaw = 32 * S(TAU * p)
     q = still(t, 4.0)
-    q.update({"spine_1": (-2, 0, 0), "neck": (-18, 0.6 * yaw, 0), "head": (6, 0.4 * yaw, 0),
+    q.update({"neck": (-20, 0.6 * yaw, 0), "head": (6, 0.4 * yaw, 0),
               "ear_L": (-8, 0, -14 - 0.3 * yaw), "ear_R": (-8, 0, 14 - 0.3 * yaw), "tail": (-6, 0, 0)})
     q.update(chew(t, 2.0, 3.0 * max(0.0, S(TAU * p * 2))))
     return q
@@ -733,7 +738,7 @@ def pose_approach(t):
     forward to sniff, the ears cupped ahead (1.8 s a cycle, in place of the walk)."""
     p = t / 1.8
     q = gait(p, (0.0, 0.5, 0.75, 0.25), 14, 34)
-    q.update({"root": (0, 0.4 * abs(S(TAU * p * 2)), 0), "spine_1": (3, 0, 0), "neck": (22, 0, 0), "head": (-14 + 3 * S(TAU * p * 2), 0, 0),
+    q.update({"root": (0, 0.4 * abs(S(TAU * p * 2)), 0), "neck": (25, 0, 0), "head": (-14 + 3 * S(TAU * p * 2), 0, 0),
               "ear_L": (-10, 0, -10), "ear_R": (-10, 0, 10), "tail": (-4, 0, 0)})
     return q
 
@@ -744,8 +749,8 @@ def pose_charge(t):
     p = t / 0.5
     q = gait(p, (0.0, 0.1, 0.5, 0.6), 30, 58)
     c = S(TAU * p)
-    q.update({"root": (0, 2.0 * max(0.0, S(TAU * p + 0.6)), 0), "spine_0": (-4 * c, 0, 0), "spine_1": (5 + 5 * c, 0, 0),
-              "neck": (30, 0, 0), "head": (22, 0, 0), "ear_L": (30, 0, 14), "ear_R": (30, 0, -14), "tail": (6, 0, 0)})
+    q.update({"root": (0, 2.0 * max(0.0, S(TAU * p + 0.6)), 0), "spine_0": (-4 * c, 0, 0), "spine_1": (5 * c, 0, 0),
+              "neck": (34, 0, 0), "head": (22, 0, 0), "ear_L": (30, 0, 14), "ear_R": (30, 0, -14), "tail": (6, 0, 0)})
     return q
 
 

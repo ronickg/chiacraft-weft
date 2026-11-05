@@ -256,7 +256,11 @@ fn soft_cover(s: Sky, at: vec2<f32>) -> f32 {
     let field = soft_slice(9u, fract(at / 6144.0) * 64.0).r * 0.65 + soft_slice(27u, fract(at / 1536.0) * 64.0).r * 0.35;
     // At 0.38 a clear day's were thin wisps with no body (the first soft run, 11-05).
     // Storms at 0.92 closed into one even deck once the billows were equalized: 0.8 keeps breaks.
-    return clamp(mix(0.5, 0.8, wet) + (field - 0.5) * mix(0.8, 0.5, wet), 0.0, 1.0);
+    // Clear weather from about 0.36 to 0.57 (0.46 +- 0.35 of the field's spread): with 0.5 +- 0.8,
+    // where the slow field peaks (over 0.6) the billows all passed and a clear day stood under a
+    // flat grey deck that never moved off, a birch forest's sky through its gaps grey at every
+    // hour (Tester 2's looks4, 11-05, once soft clouds were the default).
+    return clamp(mix(0.46, 0.8, wet) + (field - 0.5) * mix(0.35, 0.5, wet), 0.0, 1.0);
 }
 
 // The cloud's density at `at` (its frame, blocks) and `a` (0 at the layer's underside, 1 at its
@@ -291,10 +295,21 @@ fn soft_density(s: Sky, at: vec2<f32>, a: f32, cover: f32, fine: bool) -> f32 {
 
 // The soft clouds along `dir` from the camera, up to `far` (blocks): rgb the light they send toward
 // the eye (linear), a how much of what is behind still shows.
+// How far over the blocky clouds' height the soft layer's underside stands (blocks), less as rain
+// comes (a storm's deck hangs low): cumulus three hundred blocks across at the blocky clouds'
+// height, 150 blocks over a forest floor, filled every gap in the canopy with one flat grey base,
+// looking up from under the trees (Tester 2's looks4, 11-05); higher, they stand in the sky as
+// clouds with blue between them, as Bliss's do.
+const SOFT_LIFT: f32 = 220.0;
+
+fn soft_low(s: Sky) -> f32 {
+    return s.extra.z + SOFT_LIFT * (1.0 - 0.7 * max(s.axes[0].x, s.axes[0].z));
+}
+
 fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
     let storm = s.axes[0].z;
     let thick = mix(SOFT_THICK, SOFT_STORM_THICK, storm);
-    let low = s.extra.z;
+    let low = soft_low(s);
     let high = low + thick;
     var near = 0.0;
     var far = min(far_in, SOFT_REACH);
@@ -405,7 +420,7 @@ fn fs_cloud_trace(in: CloudOut) -> @location(0) vec4<f32> {
 // How far the clouds seen along `dir` stand, for reprojecting them: the layer's lower third, or
 // far off where a look misses it.
 fn soft_distance(s: Sky, dir: vec3<f32>) -> f32 {
-    let mid = s.extra.z + mix(SOFT_THICK, SOFT_STORM_THICK, s.axes[0].z) * 0.3;
+    let mid = soft_low(s) + mix(SOFT_THICK, SOFT_STORM_THICK, s.axes[0].z) * 0.3;
     let t = mid / dir.y;
     return select(SOFT_REACH, clamp(t, 30.0, SOFT_REACH), t > 0.0 && abs(dir.y) > 1e-4);
 }
@@ -464,6 +479,13 @@ fn soft_pixel(in: CloudOut, s: Sky, dir: vec3<f32>) -> CloudPixel {
     // Toward the far end they hand over to the sky.
     let dist = length(rel.xz) / SOFT_REACH;
     color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) + 1e-3, dir.z))), smoothstep(0.45, 1.0, dist));
+    // Rain's mist on the soft deck only low over the horizon, by how low it stands, not by its
+    // distance: misted by distance, even at two fifths, a storm's near deck went pale slate and its
+    // dark sky was lost (PC shf4, shf5; lifted, without mist it stayed dark, shfB). Low down it
+    // meets the misted land in the same colour, so no hard line (which came back once soft clouds
+    // were the default, PC shf2_rain).
+    let misted = rain_amount() * (1.0 - smoothstep(0.02, 0.22, dir.y));
+    color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z))), misted);
     color = display(fog_through(rainbow_on(color, dir), dir * 220.0, 1.0));
     let alpha = alpha_cloud * (1.0 - smoothstep(0.85, 1.0, dist));
     let clip = scene.view_proj * vec4(rel, 1.0);

@@ -363,8 +363,21 @@ fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32>
     var light = paint * light_on(n, in.light, shadow, ao, in.pos, in.rel);
     // Leaves and plants let some sun through when it is behind them.
     if in.kind.x == TINT_FOLIAGE || in.kind.z != 0u {
+        // A low morning or evening sun full on a crown's side: light about as strong as on the tops
+        // at noon, but on the light birch green seen from below it went through the curve as a
+        // lime flash at 06:00-07:00 and 17:00-18:00 (Tester 2's forest hours, 11-05). Its brightest
+        // part is held back while the sun is under about 45° (none at noon or at golden hour's
+        // dim light), so leaves stay vivid at other hours.
         let back = max(-dot(normalize(in.rel), light_dir()), 0.0);
         light += paint * palette().sun * light_strength() * pow(back, 3.0) * 0.35 * shadow * smoothstep(0.5, 0.95, in.light.x);
+        let low = 1.0 - smoothstep(0.5, 0.72, scene.sun.y);
+        let lum = luma(light / max(paint, vec3(0.05)));
+        light *= 1.0 / (1.0 + 0.9 * max(lum - 1.0, 0.0) * low);
+        // And some colour out of the sunlit part: held back alone it kept a near-pure yellow-green
+        // (sRGB 135 170 7, a gold morning sun has little blue), 3 % of the frame at 06:00 where it
+        // was 6 % (PC run sh3); from a lower light up, a leaf by the eye at 18:00 stayed lime (sh3b).
+        let hot = smoothstep(0.6, 1.3, lum) * low;
+        light = mix(light, vec3(luma(light)) * vec3(0.9, 1.06, 0.86), hot * 0.2);
     }
     return light;
 }
@@ -412,15 +425,37 @@ fn shade_soft(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     var lit: vec4<f32>;
     if in.slot == 0u {
         lit = vec4(albedo.rgb * light, albedo.a);
+        // A low sun full on a bright, saturated yellow-green (the birch's untinted leaves, whose
+        // own picture is that green, so `surface_light` never sees them as leaves): some of its
+        // colour and brightness held back while the sun is under about 45°. A leaf by the eye at
+        // 18:00 stayed lime, 3.5 % of the frame (PC sh3c). By colour, as no flag marks them.
+        let low = 1.0 - smoothstep(0.5, 0.72, scene.sun.y);
+        let c = lit.rgb;
+        if low > 0.0 && c.g > c.r && c.r > c.b {
+            let sat = (c.g - c.b) / max(c.g, 1e-4);
+            // (In linear light: the lime's sRGB 120 167 3 is red/green 0.72 on the screen, about 0.5
+            // here, which a window of 0.5-0.72 missed: PC sh6.)
+            // (Not only the bright: the 18:00 leaf is mid-bright, luma about 0.3 before the curve, and
+            // lime by its colour alone; from 0.25 it hardly counted, 3 % of the frame left, PC sh6b.)
+            let k = smoothstep(0.06, 0.22, luma(c)) * smoothstep(0.55, 0.85, sat) * smoothstep(0.25, 0.45, c.r / c.g) * low;
+            lit = vec4(mix(c, vec3(luma(c)) * vec3(0.92, 1.05, 0.88), k * 0.175) * (1.0 - 0.18 * k), lit.a);
+        }
     } else {
         lit = block_shade(in.slot, BlockPixel(in.uv, albedo, light, in.pos, scene.params.w));
     }
-    // Out in the rain, the ground goes dark and wet, with a little of the sky on it (not plants).
-    let wet = rain_amount() * smoothstep(0.85, 1.0, in.light.x) * smoothstep(0.3, 0.9, n.y) * select(1.0, 0.0, in.kind.z != 0u || in.kind.x == TINT_FOLIAGE);
+    // Out under the sky, the ground goes dark and wet, with a little of the sky on it, and stays so
+    // after the rain until it dries (`ground_wet`: it followed the rain alone and was gone 25 s
+    // after it stopped, Tester 2's after-rain shots, 11-05). Leaves and plants wet too, less: a
+    // little darker, a faint sheen.
+    let open_top = smoothstep(0.85, 1.0, in.light.x);
+    let leafy = in.kind.z != 0u || in.kind.x == TINT_FOLIAGE;
+    let wet = ground_wet() * open_top * select(smoothstep(0.3, 0.9, n.y), 0.45, leafy);
     if wet > 0.0 {
         let v = -normalize(in.rel);
-        let sheen = pow(1.0 - max(dot(n, v), 0.0), 5.0) * 0.12;
-        lit = vec4(lit.rgb * mix(1.0, 0.7, wet) + sky_color(reflect(-v, n)) * sheen * wet, lit.a);
+        // (Darker and glossier than in the rain alone: after it, in the sun, 0.7 and a 0.12 sheen
+        // read only 2-4 % darker than dry ground, PC shw_wet.)
+        let sheen = (0.04 + pow(1.0 - max(dot(n, v), 0.0), 4.0) * 0.3) * select(1.0, 0.35, leafy);
+        lit = vec4(lit.rgb * mix(1.0, select(0.58, 0.8, leafy), wet) + sky_color(reflect(-v, n)) * sheen * wet, lit.a);
     }
     // The air before it glows with the placed lights' light (the held one is in `haze_lit`).
     let glow = placed_in_fog(in.light.yzw, in.rel, in.pos, in.light.x);
