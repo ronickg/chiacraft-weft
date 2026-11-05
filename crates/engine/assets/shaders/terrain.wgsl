@@ -628,6 +628,10 @@ var<workgroup> trunk: array<atomic<u32>, LOD_SAMPLES>;
 // low canopy under an emergent's crown stays (Far view, 11-05: with only the highest crown a
 // rainforest's emergents stood as bare trunks on open ground, far off a forest of pillars).
 var<workgroup> crown_floor: array<atomic<u32>, LOD_SAMPLES>;
+// chiacraft: the crowns' tops over the sample's ground, summed weighed by how much of it each covers
+// (over `cover`, their mean): the crown's top. The highest alone stood a rainforest's few emergents
+// up as towers over every sample they reached (Far view, 11-05); far off a forest is its canopy.
+var<workgroup> crown_tops: array<atomic<u32>, LOD_SAMPLES>;
 const LOD_FLOOR_BIAS: i32 = 32768;
 
 // The ground height of sample (`i`, `j`), clamped to the tile's samples.
@@ -726,6 +730,7 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
         atomicStore(&cover[k], 0u);
         atomicStore(&trunk[k], 0u);
         atomicStore(&crown_floor[k], 0xFFFFFFFFu);
+        atomicStore(&crown_tops[k], 0u);
     }
     // The samples' tops in `outp` are read back below.
     storageBarrier();
@@ -856,6 +861,7 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
                     atomicAdd(&cover[q], u32(wx * wz));
                     atomicMax(&canopy[q], packed);
                     atomicMin(&crown_floor[q], u32(ct - depth + LOD_FLOOR_BIAS));
+                    atomicAdd(&crown_tops[q], u32(min(above, 511) * wx * wz));
                 }
             }
             // Its trunk, in the cell it stands in (its place there in 2 bits: box tiles' cells are 4
@@ -872,16 +878,17 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
     }
     workgroupBarrier();
     // A sample has a crown where crowns cover a third of it (a forest from afar, single trees up
-    // close), the highest one's.
+    // close): the highest one's leaves, chiacraft: its top their mean (`crown_tops`), down to the
+    // lowest of them (`crown_floor`).
     for (var k = t; k < LOD_SAMPLES; k += 256u) {
         let p = atomicLoad(&canopy[k]);
         if (p != 0u && atomicLoad(&cover[k]) * 3u >= u32(s * s)) {
             let o = (tile * LOD_SAMPLES + k) * LOD_WORDS;
             let ground = max(bitcast<i32>(lod_ground[k] << 16u) >> 16u, sea);
-            let top = ground + i32(p >> 23u);
+            let top = ground + i32((atomicLoad(&crown_tops[k]) + atomicLoad(&cover[k]) / 2u) / max(atomicLoad(&cover[k]), 1u));
             let tr = atomicLoad(&trunk[k]);
             let low = i32(atomicLoad(&crown_floor[k])) - LOD_FLOOR_BIAS;
-            let depth = u32(clamp(top - low, 0, 127));
+            let depth = u32(clamp(top - low, 1, 127));
             outp[o + 2u] = (u32(top) & LOD_OUT_HALF_MASK) | ((p & 65535u) << LOD_OUT_HALF_SHIFT);
             outp[o + 3u] = depth | (((tr >> 16u) & 255u) << LOD_OUT_TRUNK_DZ_SHIFT) | ((tr & 65535u) << LOD_OUT_HALF_SHIFT);
         }
