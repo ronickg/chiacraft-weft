@@ -382,7 +382,7 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
 
 @fragment
 fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
-    let half = i32(g.extra.w);
+    let half = i32(g.extra.w & 0xFFFFFFu);
     let col = vec2<i32>(floor(in.pos.xz / 16.0));
     let d = col - g.cam_cube.xz;
     if abs(d.x) <= half && abs(d.y) <= half {

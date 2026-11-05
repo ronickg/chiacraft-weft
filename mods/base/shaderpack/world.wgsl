@@ -326,9 +326,16 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
 // shadows that move with the sun), the sky light alone beyond it, and never deep under cover. This
 // file must not name the engine's block lookup: its name anywhere in it makes the engine upload
 // the blocks around the camera every frame.
+const PLANT_SHADOW_LIFT: f32 = 0.7;
+
 fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
     let sky = smoothstep(0.75, 1.0, in.light.x);
-    let mapped = shadow_at(in.rel, n);
+    // A plant's blade asks the map from most of a block toward the sun: the blades round it, as
+    // thin as a few of the map's texels, shaded each other in fine crossing stripes, pale and
+    // banded tall grass up close at 3456 px (Ronald's Mac, 11-06; gone with shadows off). Trees,
+    // walls and the player still shade it; the ground under it keeps the grass's shade.
+    let lift = select(0.0, PLANT_SHADOW_LIFT, in.kind.z != 0u);
+    let mapped = shadow_at(in.rel + light_dir() * lift, n);
     // Under a forest's canopy the map's gaps let the sun through where the leaves cut the sky light
     // (`light_on`'s sunflecks).
     let c = min(canopy(), 1.0);
@@ -351,9 +358,9 @@ fn fs_shadow(in: VOut) {
 // ---- shading ----
 
 // `paint` the tint the light takes (a biome's grass and leaf colour, `in.color`; white under snow).
-fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>) -> vec3<f32> {
+fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32> {
     let shadow = sun_shadow(in, n);
-    var light = paint * light_on(n, in.light, shadow, in.ao, in.pos, in.rel);
+    var light = paint * light_on(n, in.light, shadow, ao, in.pos, in.rel);
     // Leaves and plants let some sun through when it is behind them.
     if in.kind.x == TINT_FOLIAGE || in.kind.z != 0u {
         let back = max(-dot(normalize(in.rel), light_dir()), 0.0);
@@ -362,8 +369,31 @@ fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>) -> vec3<f32> {
     return light;
 }
 
+// The far ground's look (`core:far_look`, all on by default; Ronald, 11-06, after Voxy and Distant
+// Horizons): 1 small plants thin out, 2 the cubes' block-scale shading softens, 4 textures give way
+// to their average colour, all with distance.
+fn far_look() -> u32 {
+    return g.extra.w >> 24u;
+}
+
+// How far a cube's shading has softened (far look 2): from 48 to 160 blocks its corner shade goes
+// and its faces' normals lean halfway up, so one-block steps don't each draw a dark line.
+fn far_soft(in: VOut) -> f32 {
+    if (far_look() & 2u) == 0u {
+        return 0.0;
+    }
+    return smoothstep(48.0, 160.0, in.dist);
+}
+
 fn shade(in: VOut, albedo_in: vec4<f32>) -> vec4<f32> {
-    let n = normalize(in.normal);
+    return shade_soft(in, albedo_in, far_soft(in));
+}
+
+// `shade` with the cubes' shading softened by `soft` (distant terrain passes 0: its mountains keep
+// their relief).
+fn shade_soft(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
+    let ao = mix(in.ao, 1.0, soft);
+    let n = normalize(mix(normalize(in.normal), vec3(0.0, 1.0, 0.0), soft * 0.5));
     var albedo = albedo_in;
     // Snow lying on the tops of blocks and leaves (not on plants, which it buries). The biome's
     // tint goes onto the light (`in.color`), so the snow takes it off there too: tinted with the
@@ -374,7 +404,7 @@ fn shade(in: VOut, albedo_in: vec4<f32>) -> vec4<f32> {
         snow = snow_on(n, in.pos, in.light.x);
         albedo = vec4(mix(albedo.rgb, vec3(0.86, 0.9, 0.95), snow), albedo.a);
     }
-    var light = surface_light(in, n, mix(in.color, vec3(1.0), snow));
+    var light = surface_light(in, n, mix(in.color, vec3(1.0), snow), ao);
     if in.glow != 0xffffffffu {
         let e = textureSampleLevel(textures[in.glow], nearest_clamp, in.uv, 0.0).r;
         light = max(light, select(pow(in.tint, vec3(2.2)), vec3(1.0), in.overlay != 0u) * e * 1.7);
@@ -716,11 +746,29 @@ fn with_overlay(in: VOut, albedo: vec4<f32>, nuv: vec2<f32>, du: vec2<f32>, dv: 
     return vec4(mix(albedo.rgb, ov.rgb * pow(in.tint, vec3(2.2)), ov.a), albedo.a);
 }
 
+// Far look 4: from 64 to 192 blocks a block's texture gives way to its average colour (its
+// smallest mip), as Distant Horizons' far blocks are one colour and Voxy's mips converge on it, so
+// far grass, sand and leaves aren't grainy.
+fn far_flat(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
+    if (far_look() & 4u) == 0u {
+        return albedo;
+    }
+    let f = smoothstep(64.0, 192.0, in.dist);
+    if f <= 0.0 {
+        return albedo;
+    }
+    var avg = textureSampleLevel(textures[in.layer], linear_mipped, vec2(0.5), 16.0);
+    if in.blend > 0.0 {
+        avg = mix(avg, textureSampleLevel(textures[in.layer2], linear_mipped, vec2(0.5), 16.0), in.blend);
+    }
+    return vec4(mix(albedo.rgb, avg.rgb, f), albedo.a);
+}
+
 fn opaque(in: VOut) -> vec4<f32> {
     let du = dpdx(in.uv);
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
-    let albedo = with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv);
+    let albedo = far_flat(in, with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv));
     return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
 }
 
@@ -742,12 +790,24 @@ fn fs_opaque(in: VOut) -> @location(0) vec4<f32> {
 
 @fragment
 fn fs_cutout(in: VOut) -> @location(0) vec4<f32> {
+    // Far look 1: small plants thin out from 40 to 96 blocks, so far ground isn't speckled with
+    // flowers and tufts a pixel or two across.
+    if (far_look() & 1u) != 0u && in.kind.z != 0u {
+        let f = smoothstep(40.0, 96.0, in.dist);
+        let p = floor(in.clip.xy);
+        if fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y)) < f {
+            discard;
+        }
+    }
     let du = dpdx(in.uv);
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
-    let albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
+    var albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
     if albedo.a <= 0.1 {
         discard;
+    }
+    if in.kind.z == 0u {
+        albedo = far_flat(in, albedo);
     }
     return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
 }
@@ -872,7 +932,7 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
 // Whether real cubes show this distant tile pixel's column (`Lod::mask`): then they stand there,
 // and the tile is left out.
 fn lod_hidden(in: VOut) -> bool {
-    let half = i32(g.extra.w);
+    let half = i32(g.extra.w & 0xFFFFFFu);
     let col = vec2<i32>(floor(in.pos.xz / 16.0));
     let d = col - g.cam_cube.xz;
     if abs(d.x) <= half && abs(d.y) <= half {
@@ -942,5 +1002,5 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
         let w = water(in, avg, false);
         return vec4(w.rgb, SOLID_ALPHA);
     }
-    return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
+    return vec4(shade_soft(in, albedo, 0.0).rgb, SOLID_ALPHA);
 }
