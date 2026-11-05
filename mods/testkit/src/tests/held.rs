@@ -1,16 +1,43 @@
-//! Blocks standing in water (`holds_liquid`), with testmod's waterweed (always in water) and sea
-//! slab (`waterlogged=true` its wet twin): placing, breaking, buckets, pistons, swimming and how
-//! the water around them is drawn. The engine's own checks are its unit tests (`liquid.rs`).
+//! Blocks standing in water (`.holds_liquid()`, Weft's waterlogging), with testmod's waterweed and
+//! sea slab: the water is a part of the cell beside the block (`/tk parts`), so "wet" is the block
+//! and a water source in one cell. Placing, breaking, buckets, pistons, swimming and how the water
+//! around them is drawn. The engine's own checks are its unit tests (`liquid.rs`).
 
 use weft_sdk::*;
 
-use super::{add, probe};
+use super::{add, at, probe};
 use crate::runner::{R, Shot, T};
 
 const WEED: &str = "testmod:waterweed";
-const WET: &str = "testmod:sea_slab[waterlogged=true]";
-const DRY: &str = "testmod:sea_slab[waterlogged=false]";
+const SLAB: &str = "testmod:sea_slab";
 const SOURCE: &str = "base:water[level=0]";
+
+/// The names of what is in a cell (`/tk parts`), sorted: `[SLAB, SOURCE]` is a wet slab.
+async fn parts(t: &T, p: [i32; 3]) -> Result<Vec<String>, String> {
+    let mut v: Vec<String> = t
+        .op(&format!("parts {}", at(p)))
+        .await?
+        .split_whitespace()
+        .map(String::from)
+        .collect();
+    v.sort();
+    Ok(v)
+}
+
+/// What a cell holds, as a sorted list to compare with.
+fn cell(names: &[&str]) -> Vec<String> {
+    let mut v: Vec<String> = names.iter().map(|n| n.to_string()).collect();
+    v.sort();
+    v
+}
+
+/// Water in the cell with `thing` standing in it (what placing it into water, or a bucket, makes).
+async fn in_water(t: &T, p: [i32; 3], thing: &str) -> R {
+    t.set(p, "water").await?;
+    let added = t.op(&format!("addpart {} {thing}", at(p))).await?;
+    t.check_eq(added, "1".to_string(), "the block joins the water's cell");
+    Ok(())
+}
 
 /// A pool dug into the flat ground in front of the player: x 1..=3, z -3..=-1, `deep` blocks.
 async fn pool(t: &T, deep: i32) -> Result<[i32; 3], String> {
@@ -47,16 +74,16 @@ pub async fn held_water_place(t: T) -> R {
     t.frames(3).await?;
     t.press("core:use");
     t.secs(0.4).await?;
-    t.check_eq(t.block(cell).await?, WET.to_string(), "a slab placed into water stands in it");
+    t.check_eq(parts(&t, cell).await?, self::cell(&[SLAB, SOURCE]), "a slab placed into water stands in it, the water kept");
     t.look_at(add(f, [-2, -1, 0]));
     t.frames(3).await?;
     t.secs(0.3).await?;
     t.press("core:use");
     t.secs(0.4).await?;
-    t.check_eq(t.block(add(f, [-2, 0, 0])).await?, DRY.to_string(), "a slab placed on land is dry");
-    t.set(cell, "air").await?;
+    t.check_eq(parts(&t, add(f, [-2, 0, 0])).await?, self::cell(&[SLAB]), "a slab placed on land is dry");
+    t.op(&format!("rmpart {} {SLAB}", at(cell))).await?;
     t.secs(0.3).await?;
-    t.check_eq(t.block(cell).await?, SOURCE.to_string(), "the slab's water left");
+    t.check_eq(parts(&t, cell).await?, self::cell(&[SOURCE]), "the slab taken out, its water stays");
 
     t.c().select_slot(1);
     t.secs(0.3).await?;
@@ -64,7 +91,7 @@ pub async fn held_water_place(t: T) -> R {
     t.frames(3).await?;
     t.press("core:use");
     t.secs(0.4).await?;
-    t.check_eq(t.block(cell).await?, WEED.to_string(), "the weed placed into water");
+    t.check(parts(&t, cell).await?.contains(&WEED.to_string()), "the weed placed into water");
     t.look_at(add(f, [-3, -1, 1]));
     t.frames(3).await?;
     t.secs(0.3).await?;
@@ -77,32 +104,32 @@ pub async fn held_water_place(t: T) -> R {
     Ok(())
 }
 
-/// Breaking (mining, a command) leaves the water; a bucket drains a slab and fills it again, and
-/// takes nothing from the weed.
+/// Breaking (mining, a command) leaves the water; a bucket drains a slab and fills it again (what
+/// it does to the weed's water is noted).
 pub async fn held_water_break(t: T) -> R {
     let f = pool(&t, 2).await?;
     let (weed, slab, other) = (add(f, [1, -1, -2]), add(f, [2, -1, -1]), add(f, [3, -1, -2]));
-    t.set(weed, WEED).await?;
-    t.set(slab, WET).await?;
-    t.set(other, WEED).await?;
+    in_water(&t, weed, WEED).await?;
+    in_water(&t, slab, SLAB).await?;
+    in_water(&t, other, WEED).await?;
     t.secs(0.5).await?;
     t.look_at(weed);
     t.frames(3).await?;
     t.press("core:attack");
     t.secs(0.5).await?;
-    t.check_eq(t.block(weed).await?, SOURCE.to_string(), "the mined weed leaves its water");
+    t.check_eq(parts(&t, weed).await?, cell(&[SOURCE]), "the mined weed leaves its water");
     t.look_at(slab);
     t.frames(3).await?;
     t.hold("core:attack", 1.5);
     t.secs(1.8).await?;
-    t.check_eq(t.block(slab).await?, SOURCE.to_string(), "the mined slab leaves its water");
-    t.set(other, "air").await?;
+    t.check_eq(parts(&t, slab).await?, cell(&[SOURCE]), "the mined slab leaves its water");
+    t.op(&format!("rmpart {} {WEED}", at(other))).await?;
     t.secs(0.3).await?;
-    t.check_eq(t.block(other).await?, SOURCE.to_string(), "set to air by a command, the water stays");
+    t.check_eq(parts(&t, other).await?, cell(&[SOURCE]), "the weed taken out by a command, the water stays");
 
     // Buckets.
-    t.set(slab, WET).await?;
-    t.set(weed, WEED).await?;
+    in_water(&t, slab, SLAB).await?;
+    in_water(&t, weed, WEED).await?;
     t.op("put me 0 bucket 1").await?;
     t.c().select_slot(0);
     t.secs(0.3).await?;
@@ -111,19 +138,23 @@ pub async fn held_water_break(t: T) -> R {
     t.press("core:use");
     t.secs(0.4).await?;
     t.check_eq(t.slot("me", 0).await?.0, "base:water_bucket".to_string(), "water taken from the slab");
-    t.check_eq(t.block(slab).await?, DRY.to_string(), "the slab drained");
+    t.check_eq(parts(&t, slab).await?, cell(&[SLAB]), "the slab drained");
     t.secs(0.3).await?;
     t.press("core:use");
     t.secs(0.4).await?;
     t.check_eq(t.slot("me", 0).await?.0, "base:bucket".to_string(), "poured back");
-    t.check_eq(t.block(slab).await?, WET.to_string(), "the slab filled again");
+    t.check_eq(parts(&t, slab).await?, cell(&[SLAB, SOURCE]), "the slab filled again");
     t.secs(0.3).await?;
     t.look_at(weed);
     t.frames(3).await?;
     t.press("core:use");
     t.secs(0.4).await?;
-    t.check_eq(t.slot("me", 0).await?.0, "base:bucket".to_string(), "nothing taken from the weed");
-    t.check_eq(t.block(weed).await?, WEED.to_string(), "the weed still there");
+    // Weft's bucket takes any water source it looks at, and the test mod's weed holds the water
+    // the same way a slab does, so what this does with the weed's water is noted, not asserted
+    // (kelp's water not coming out is vanilla's, not Weft's, rule).
+    let after = t.slot("me", 0).await?.0;
+    t.note(format!("bucket on the weed: {after}; its cell holds {:?}", parts(&t, weed).await?));
+    t.check(parts(&t, weed).await?.contains(&WEED.to_string()), "the weed still there");
     Ok(())
 }
 
@@ -134,30 +165,30 @@ pub async fn held_water_piston(t: T) -> R {
     t.flat().await?;
     let f = t.feet();
     let lever = |on: bool| format!("base:lever[attach=down,front=north,power={}]", if on { "on" } else { "off" });
-    for (z, piston, thing) in [(-4, "base:sticky_piston[facing=east]", WET), (-8, "base:piston[facing=east]", WEED)] {
+    for (z, piston, thing) in [(-4, "base:sticky_piston[facing=east]", SLAB), (-8, "base:piston[facing=east]", WEED)] {
         // A channel one deep, x 4..=8, flooded; the piston at its west end, a lever beside it.
         t.fill(add(f, [4, -1, z]), add(f, [8, -1, z]), "water")
             .await?;
         t.set(add(f, [2, -1, z]), &lever(false)).await?;
         t.set(add(f, [3, -1, z]), piston).await?;
-        t.set(add(f, [4, -1, z]), thing).await?;
+        in_water(&t, add(f, [4, -1, z]), thing).await?;
     }
     t.secs(1.0).await?;
     for z in [-4, -8] {
         t.set(add(f, [2, -1, z]), &lever(true)).await?;
     }
     t.secs(1.0).await?;
-    t.check_eq(t.block(add(f, [5, -1, -4])).await?, WET.to_string(), "pushed into water, the slab stands in it");
+    t.check_eq(parts(&t, add(f, [5, -1, -4])).await?, cell(&[SLAB, SOURCE]), "pushed into water, the slab stands in it");
     t.check(t.block(add(f, [4, -1, -4])).await?.contains("piston_head"), "the head out");
-    let weed_gone = t.block(add(f, [5, -1, -8])).await?;
-    t.check(!weed_gone.contains("waterweed"), format!("the weed broke, not moved: {weed_gone}"));
+    let weed_gone = parts(&t, add(f, [5, -1, -8])).await?;
+    t.check(!weed_gone.contains(&WEED.to_string()), format!("the weed broke, not moved: {weed_gone:?}"));
     for z in [-4, -8] {
         t.set(add(f, [2, -1, z]), &lever(false)).await?;
     }
     t.secs(1.5).await?;
-    t.check_eq(t.block(add(f, [4, -1, -4])).await?, DRY.to_string(), "pulled back out of the water's way, dry");
-    t.check_eq(t.block(add(f, [5, -1, -4])).await?, SOURCE.to_string(), "the water stayed where it stood");
-    t.check_eq(t.block(add(f, [5, -1, -8])).await?, SOURCE.to_string(), "the weed's channel still full");
+    t.check_eq(parts(&t, add(f, [4, -1, -4])).await?, cell(&[SLAB]), "pulled back out of the water's way, dry");
+    t.check_eq(parts(&t, add(f, [5, -1, -4])).await?, cell(&[SOURCE]), "the water stayed where it stood");
+    t.check_eq(parts(&t, add(f, [5, -1, -8])).await?, cell(&[SOURCE]), "the weed's channel still full");
     let near = t.count_near("core:item", 12.0).await?;
     t.check(near >= 1, format!("the broken weed dropped: {near} items"));
     Ok(())
@@ -174,7 +205,8 @@ pub async fn held_water_swim(t: T) -> R {
     }
     t.flat().await?;
     let f = t.feet();
-    t.fill(add(f, [-8, -4, -40]), add(f, [8, -1, 8]), WEED)
+    t.fill(add(f, [-8, -4, -40]), add(f, [8, -1, 8]), "water").await?;
+    t.op(&format!("fillpart {} {} {WEED}", at(add(f, [-8, -4, -40])), at(add(f, [8, -1, 8]))))
         .await?;
     t.secs(0.5).await?;
     let p = add(f, [0, -2, -3]);
@@ -224,9 +256,9 @@ pub async fn held_water_mesh(t: T) -> R {
     let f = t.feet();
     t.fill(add(f, [-4, -3, -10]), add(f, [4, -1, -4]), "water")
         .await?;
-    t.fill(add(f, [-1, -3, -10]), add(f, [1, -1, -4]), WEED)
+    t.op(&format!("fillpart {} {} {WEED}", at(add(f, [-1, -3, -10])), at(add(f, [1, -1, -4]))))
         .await?;
-    t.fill(add(f, [2, -3, -10]), add(f, [4, -3, -4]), WET)
+    t.op(&format!("fillpart {} {} {SLAB}", at(add(f, [2, -3, -10])), at(add(f, [4, -3, -4]))))
         .await?;
     t.secs(1.0).await?;
     t.c().set_look(0.0, -45.0);

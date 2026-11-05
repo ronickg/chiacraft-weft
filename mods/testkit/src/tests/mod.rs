@@ -126,7 +126,6 @@ pub fn all() -> Vec<TestDef> {
         extend::events_batched,
         extend::vetoes_and_timers,
         extend::block_properties,
-        // SYNC: port to upstream waterlogging
         held::held_water_place,
         held::held_water_break,
         held::held_water_piston,

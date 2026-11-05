@@ -472,6 +472,26 @@ const OPS: &[(&str, &str, Run)] = &[
             .join(" "))
     }),
     ("addpart", "<pos:pos> <block:block>", |w, cmd, _, _| Ok((w.part_add(pos(cmd, "pos")?, id(cmd, "block")?) as u32).to_string())),
+    ("rmpart", "<pos:pos> <block:block>", |w, cmd, _, _| Ok((w.part_remove(pos(cmd, "pos")?, id(cmd, "block")?) as u32).to_string())),
+    // `addpart` over a box: how many cells took it (a pool of weed or slabs in water).
+    ("fillpart", "<from:pos> <to:pos> <block:block>", |w, cmd, _, _| {
+        let (p, q) = (pos(cmd, "from")?, pos(cmd, "to")?);
+        let s = id(cmd, "block")?;
+        let (lo, hi) = ([p[0].min(q[0]), p[1].min(q[1]), p[2].min(q[2])], [p[0].max(q[0]), p[1].max(q[1]), p[2].max(q[2])]);
+        let volume = (0..3).map(|i| (hi[i] - lo[i] + 1) as i64).product::<i64>();
+        if volume > 1 << 18 {
+            return Err(format!("fillpart of {volume} cells is too big"));
+        }
+        let mut added = 0;
+        for y in lo[1]..=hi[1] {
+            for z in lo[2]..=hi[2] {
+                for x in lo[0]..=hi[0] {
+                    added += w.part_add([x, y, z], s) as u32;
+                }
+            }
+        }
+        Ok(added.to_string())
+    }),
     ("crater", "<r:int>", |w, cmd, _, me| {
         // Every loaded block within `r` of the player turned to air, one `w.set` each, the
         // way a mod would do it today: changed, already air, not loaded, milliseconds.
