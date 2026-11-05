@@ -416,7 +416,9 @@ mod tests {
     /// on a misty morning, and never thicker than `DAWN_MIST`.
     #[test]
     fn dawn_mist_by_air_and_hour() {
-        let misty = (0..64).find(|&d| dawn_mist(1.0, 6.0, 6.0, 0.0, false, 7, d) > 0.0).expect("a misty morning in 64 days");
+        let misty = (0..64)
+            .find(|&d| dawn_mist(1.0, 6.0, 6.0, 0.0, false, 7, d) > 0.0)
+            .expect("a misty morning in 64 days");
         let m = dawn_mist(1.0, 6.0, 6.0, 0.0, false, 7, misty);
         assert!(m > 0.6 * DAWN_MIST && m <= DAWN_MIST, "{m}");
         assert_eq!(dawn_mist(0.3, 6.0, 6.0, 0.0, false, 7, misty), 0.0);
