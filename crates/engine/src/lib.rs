@@ -120,9 +120,24 @@ pub fn lower_priority() {
 const PRIORITY_BELOW_NORMAL: i32 = -1;
 pub(crate) const PRIORITY_ABOVE_NORMAL: i32 = 1;
 
-/// The calling thread's scheduling priority (Windows values; Linux maps them onto nice;
-/// elsewhere nothing).
+/// The calling thread's scheduling priority (Windows values; Linux maps them onto nice; macOS only
+/// with `WEFT_BULK_QOS=utility`).
 pub(crate) fn set_priority(_priority: i32) {
+    // macOS: nothing is set unless `WEFT_BULK_QOS=utility`, which runs bulk work as "utility" and
+    // the frame's own as "user interactive", for an A/B on a Mac: utility may move far terrain
+    // onto the efficiency cores and slow its fill (Planner, 11-05: not shipped until measured).
+    #[cfg(target_os = "macos")]
+    if std::env::var("WEFT_BULK_QOS").as_deref() == Ok("utility") {
+        use libc::qos_class_t::{QOS_CLASS_DEFAULT, QOS_CLASS_USER_INTERACTIVE, QOS_CLASS_UTILITY};
+        let class = match _priority {
+            p if p > 0 => QOS_CLASS_USER_INTERACTIVE,
+            p if p < 0 => QOS_CLASS_UTILITY,
+            _ => QOS_CLASS_DEFAULT,
+        };
+        unsafe {
+            libc::pthread_set_qos_class_self_np(class, 0);
+        }
+    }
     #[cfg(windows)]
     {
         unsafe extern "system" {
@@ -135,9 +150,15 @@ pub(crate) fn set_priority(_priority: i32) {
     }
     // Windows: +1 above normal, -1 below. Linux nice: lower is higher, so they flip. Raising
     // the priority needs a privilege and quietly does nothing without it.
+    // Below normal is nice 10 (nice 1 hardly yielded to the frame with every core loading;
+    // `WEFT_BULK_NICE=<n>` to compare).
     #[cfg(target_os = "linux")]
     {
-        let nice = -_priority.clamp(-1, 1);
+        let below: i32 = std::env::var("WEFT_BULK_NICE")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(10);
+        let nice = if _priority < 0 { below } else { -_priority.clamp(0, 1) };
         let tid = unsafe { libc::syscall(libc::SYS_gettid) } as libc::id_t;
         unsafe {
             libc::setpriority(libc::PRIO_PROCESS, tid, nice);
