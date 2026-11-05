@@ -35,15 +35,15 @@ K = 4.0  # the deer's layout drawn this much bigger: the withers 3.75 m up, 6.9 
 
 # ------------------------------------------------------------------ materials and eyes
 
-FUR, BACK, BELLY, DARK, EARIN, MOUTH, ANTLER, HOOF, TAILTOP, LEG, PALE, BONE, MOSS, MOSSDK, BARK, BARKDK, BARKLT = range(17)
+FUR, BACK, BELLY, DARK, EARIN, MOUTH, ANTLER, HOOF, TAILTOP, LEG, PALE, BONE, MOSS, MOSSDK, BARK, BARKDK, BARKLT, MUZZLE, NOSE = range(19)
 # From concept A: a warm mid-brown coat (FUR), darker along the spine (BACK), a cream-tan belly,
 # throat and muzzle (BELLY, PALE), dark brown legs (LEG), dark hooves, a cream tail; antlers of
 # bark-brown (ANTLER) to bone-pale tips (BONE); a yellow-green moss cape and mane (MOSS, its shade
 # MOSSDK); grey-brown bark plates (BARK).
 BASE = [(150, 88, 46), (104, 60, 32), (224, 190, 136), (48, 34, 26), (190, 140, 110), (84, 42, 44), (140, 92, 54),
         (56, 40, 32), (226, 196, 146), (86, 52, 30), (210, 164, 108), (232, 218, 186), (156, 158, 46), (102, 108, 30),
-        (122, 92, 66), (84, 62, 44), (152, 120, 88)]
-SHADOW = [0.02, 0.02, 0.06, 0.95, 0.97, 0.95, 0.04, 0.74, 0.06, 0.02, 0.06, 0.06, 0.12, 0.12, 0.05, 0.04, 0.06]
+        (122, 92, 66), (84, 62, 44), (152, 120, 88), (166, 118, 74), (84, 60, 46)]
+SHADOW = [0.02, 0.02, 0.06, 0.95, 0.97, 0.95, 0.04, 0.74, 0.06, 0.02, 0.06, 0.06, 0.12, 0.12, 0.05, 0.04, 0.06, 0.03, 0.03]
 TONES = [tones(c, h) for c, h in zip(BASE, SHADOW)]
 COAT = (FUR, BACK, BELLY, LEG, PALE, MOSS, MOSSDK)
 
@@ -246,10 +246,12 @@ def elements():
          el("shoulders", "spine_1", (-12.8, 44.0, 4.0), (12.8, 64.2, 26.5)),
          el("belly", "spine_0", (-9.2, 31.6, -31.0), (9.2, 38.0, -5.0)),
          el("skull", "head", *SKULL0),
-         el("muzzle", "head", hs((-5.4, 59.6, 45.5)), hs((5.4, 67.6, 55.0))),  # broad and blunt
-         el("nose", "head", hs((-4.6, 60.4, 54.5)), hs((4.6, 66.6, 57.4))),  # furred to the lip
-         el("mouth", "head", hs((-3.5, 58.9, 44.5)), hs((3.5, 60.9, 53.6))),
-         el("jaw", "jaw", hs((-4.0, 57.6, 44.0)), hs((4.0, 60.4, 54.0)))]  # shorter than the muzzle
+         # A stag's muzzle, narrow and tapering to a dark nose (Ronald, round 4: the big flat pale
+         # box read as a cow's).
+         el("muzzle", "head", hs((-4.4, 59.8, 45.5)), hs((4.4, 66.6, 53.0))),
+         el("nose", "head", hs((-3.4, 60.4, 52.5)), hs((3.4, 65.2, 56.6))),
+         el("mouth", "head", hs((-2.7, 59.0, 44.5)), hs((2.7, 60.6, 52.0))),
+         el("jaw", "jaw", hs((-3.1, 57.9, 44.0)), hs((3.1, 60.3, 52.4)))]  # shorter than the muzzle
     neck, _ = rod("neck", "neck", tuple(NECK0), NECK_ROT, NECK_LEN, NECK_W, back=6.0)  # slimmer than the head
     E.append(neck)
     n0 = NECK0
@@ -271,23 +273,14 @@ def elements():
     E.append(el("moss_chest", "spine_1", (-10.4, 34.0, 30.6), (10.4, 58.0, 34.9)))
     E.append(el("fringe_chest", "spine_1", (-11.4, 18.0, 35.4), (11.4, 58.0, 35.4), quad="south", cut="chest"))
     for s_, q in ((1, "east"), (-1, "west")):
-        E.append(el(f"fringe_moss_{q}", "spine_1", (s_ * 14.8, 30.0, 14.0), (s_ * 14.8, 64.6, 30.5), quad=q, cut="moss"))
-    # Bark shingles (Ronald, round 3: "the sort of scales or plates ... is pretty bad"; concept A:
-    # a few big overlapping bark shingles over the shoulders and back, brown-grey with moss on
-    # their edges, lying flat to the body). Three a side, from behind the moss to mid-back, none
-    # on the rump: each a plate over the back's top edge, tilted a little down to the side, and a
-    # plate down the side under it; each one over the front of the next, like shingles, the
-    # later ones following the back down toward the hips.
-    for s_, q in ((1, "e"), (-1, "w")):
-        for j, (bone_, top, z0, z1, pitch) in enumerate((("spine_1", 62.5, 2.0, 19.0, 0.0), ("spine_1", 62.0, -11.0, 5.0, -10.0),
-                                                       ("spine_0", 55.4, -25.0, -8.5, -6.0))):
-            zc, t = (z0 + z1) / 2, 0.35 * j
-            E.append(el(f"bark_top{j}_{q}", bone_, (min(s_ * 0.7, s_ * 12.8), top - 0.6 - t, z0), (max(s_ * 0.7, s_ * 12.8), top + 1.3 + t, z1),
-                        rot=(pitch, 0, -s_ * (9 + 1.5 * j)), origin=(s_ * 0.7, top, zc)))
-            E.append(el(f"bark_side{j}_{q}", bone_, (min(s_ * 11.9, s_ * 13.5) - 0.1 * j, top - 8.5 + 0.8 * j, z0 + 1.2),
-                        (max(s_ * 11.9, s_ * 13.5) + 0.1 * j, top - 1.0, z1 - 0.8), rot=(pitch, 0, -s_ * (5 + j)),
-                        origin=(s_ * 12.7, top - 1.5, zc)))
-    E.append(el("crown", "head", hs((-4.4, 71.4, 33.0)), hs((4.4, 74.4, 43.0))))
+        E.append(el(f"fringe_moss_{q}", "spine_1", (s_ * 14.8, 30.0, -6.0), (s_ * 14.8, 64.6, 30.5), quad=q, cut="moss"))
+    # No bark plates (Ronald, round 4: "Drop the plates"): the moss mane carries on over the
+    # shoulders and along the back in uneven tufts, each narrower and lower than the one before,
+    # thinning toward the hips and stopping short of the rump (concept A).
+    for j, (bone_, x, y0, y1, z0, z1) in enumerate((("spine_1", 12.0, 61.0, 66.2, 8.5, 20.2), ("spine_1", 10.2, 60.6, 65.1, -1.5, 9.2),
+                                                     ("spine_1", 8.0, 59.9, 63.9, -9.5, -0.8), ("spine_0", 6.4, 53.6, 57.6, -18.0, -8.6),
+                                                     ("spine_0", 4.4, 53.9, 56.5, -26.0, -17.4))):
+        E.append(el(f"moss_back{j}", bone_, (-x, y0, z0), (x, y1, z1)))
     E.append(el("tail", "tail", (-2.6, 45.5, -42.8), (2.6, 54.5, -39.75), rot=(12, 0, 0), origin=tuple(TAIL0)))
     for s, n in ((1, "L"), (-1, "R")):
         cx = EAR_X * s
@@ -390,7 +383,7 @@ def area(e, face, p, uu, vv, h):
                 a = np.where(y > 36.0, FUR, BELLY)  # behind the moss mane's locks
             if name == "hips" and face == "north":
                 a = np.where((np.abs(x) < 6.0) & (y > 40), BELLY, a)  # the pale rump round the tail
-    elif name in ("mane", "fringe_mane", "moss_chest", "fringe_chest") or name.startswith(("fringe_moss", "moss_crest", "moss_tuft")):
+    elif name in ("mane", "fringe_mane", "moss_chest", "fringe_chest") or name.startswith(("fringe_moss", "moss_crest", "moss_tuft", "moss_back")):
         a[:] = MOSS
         if e["quad"]:
             if not e["rot"]:
@@ -434,17 +427,19 @@ def area(e, face, p, uu, vv, h):
         elif face == "down":
             a[:] = PALE
         elif side:
-            a = np.where(z > hs((0, 0, 42.5))[2], PALE, FUR)
+            a = np.where(z > hs((0, 0, 44.0))[2], MUZZLE, FUR)
         elif face == "north":
             a[:] = FUR
     elif name == "muzzle":
-        a[:] = PALE
+        a[:] = MUZZLE
         if face == "up":
             a[:] = FUR
+        elif face == "down":
+            a[:] = PALE
     elif name == "nose":
-        a[:] = PALE  # the cream muzzle to the lip; the nostrils are slits (`paint_face`)
-        if face == "up":
-            a[:] = FUR
+        a[:] = NOSE  # dark to the lip; the nostrils are soft slits (`paint_face`)
+        if face == "down":
+            a[:] = MUZZLE
     elif name == "jaw":
         a[:] = MOUTH if face == "up" else PALE
     elif name == "mouth":
@@ -488,14 +483,15 @@ def cut_mask(e, p):
         lock = np.abs(((x / period) % 1.0) - 0.5) * 2
         tip = 22.0 + 7.0 * (np.abs(x) / 11.4) ** 1.5 + 9.0 * rnd + 2.0 * lock
         return y >= tip
-    if e["cut"] == "moss":  # locks hanging down the shoulders' fronts, uneven
+    if e["cut"] == "moss":  # locks hanging down the shoulders, uneven, shorter toward the back
         y, z = p[..., 1] / K, p[..., 2] / K
         u = np.clip((z - 14.0) / 16.5, 0, 1)
+        back = np.clip((14.0 - z) / 20.0, 0, 1)  # 0 at the shoulder, 1 at mid-back
         period = max(2.0, 3 / (TX * K))
         lock = np.abs(((z / period) % 1.0) - 0.5) * 2
         idx = np.floor(z / period)
         rnd = (np.sin(idx * 12.9898 + e["lo"][0]) * 43758.5453) % 1.0  # each lock its own length: uneven tufts
-        tip = 46.0 - 12.0 * np.sin(math.pi * u) ** 0.8 + 3.0 * lock + 7.0 * rnd  # shaggy, longest over the shoulder
+        tip = 46.0 - 12.0 * np.sin(math.pi * u) ** 0.8 + 3.0 * lock + 7.0 * rnd + 14.0 * back ** 0.8  # shaggy, longest over the shoulder
         return y >= tip
     if e["cut"] == "ear":
         x, y = p[..., 0] / K, p[..., 1] / K
@@ -550,7 +546,7 @@ def paint_face(e, face, boxes):
         # Nostrils as short soft slits low on the nose, the lip a line below them: never two dark
         # marks high on the face, which read as a second pair of eyes (the skill's face rule).
         r = max(1, int(h * 0.62))
-        soft = (150, 112, 82)
+        soft = (52, 36, 28)
         if w >= 10:
             for c0 in (int(w * 0.18), int(w * 0.70)):
                 img[r, c0:c0 + max(2, w // 8), :3] = soft

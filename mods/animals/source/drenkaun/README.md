@@ -29,9 +29,15 @@ clips) and `textures/entity/drenkaun/drenkaun.png` into `../../assets`. Its body
 - Antlers like oak boughs, wide like a lyre: four beam lengths and five tines a side, bark-brown
   to bone-pale tips, moss dripping from the beam, leaves at the tines' roots; each antler its own
   bone (`antler_L`, `antler_R`: the `left_antler` and `right_antler` breaks).
-- A moss cape over the withers with locks hanging down its sides (cut-out quads), the moss mane
-  under the neck, bark plates on each shoulder and the back, a bark crown between the antlers.
-- Amber eyes, 4 by 3 texels (`EYES["warden"]`), with blinking lids.
+- The moss mane: down the front of the neck and chest in locks of uneven length, tufts along the
+  neck's crest, then over the shoulders and along the back in tufts each narrower than the last,
+  thinning to the hips and stopping short of the rump; locks down the shoulders, shorter toward
+  the back. No bark plates (Ronald, round 4: "Drop the plates").
+- Eyes: the skill's `hytale_amber` drawn round at 12 by 10 (`EYES["warden_amber"]`, Ronald: "A
+  amber", "eyes a bit bigger"), on the head's sides, mirrored so the catchlights face forward,
+  with blinking lids; a narrow muzzle tapering to a dark nose, the nostrils soft slits low on it.
+- Standing on bent legs: the knees and hocks bend, fitted so all four hooves stand level
+  (`STANCE`, `stance_drop`); the withers stand higher than the hips.
 - Carriage: the neck raised and the head level in every standing clip (`HEAD_UP`).
 
 ## The real animals it is built on
