@@ -289,6 +289,47 @@ pub struct Entities {
     /// What changes players whose clients run them (their movement, look, flight, hand), so
     /// they get told.
     pub told: Vec<(u64, Told)>,
+    /// Where they are by column, for `within` while mods run.
+    cells: Cells,
+}
+
+/// Entities by 16-block column, so `within` looks only near the shape instead of at every
+/// entity in the region (mob AI asks it for every mob, which grew with the square of a crowd).
+/// Only while `Dim::tick_entities` runs mods (`index_cells`): physics moves entities after, so in
+/// between a position changes only where a mod puts an entity (`moved_to`) or one arrives
+/// (`insert`), which are added as they happen. A change of the list's order starts it over.
+#[derive(Default)]
+struct Cells {
+    on: bool,
+    built: bool,
+    /// List indices by column (an entity put somewhere else may be in two; `within` checks
+    /// where each is now).
+    map: FxHashMap<(i32, i32), Vec<u32>>,
+    /// How far past a shape to look for any part of a box: the widest and tallest box, and
+    /// `SLACK`.
+    reach: f64,
+}
+
+/// Blocks a column is wide.
+const CELL: f64 = 16.0;
+/// Below this many entities a scan of them all is as quick.
+const CELLS_FROM: usize = 64;
+/// The most columns a query looks at before it scans the list instead (a huge shape).
+const MAX_CELLS: i64 = 1024;
+/// Blocks past a shape a query also looks (and past the widest box, `Cells::reach`): for small
+/// moves the columns don't hear of (a rider set down beside its mount).
+const SLACK: f64 = 2.0;
+
+fn column(p: DVec3) -> (i32, i32) {
+    ((p.x / CELL).floor() as i32, (p.z / CELL).floor() as i32)
+}
+
+impl Cells {
+    fn add(&mut self, c: &Content, i: usize, e: &Entity) {
+        let d = e.dims(c);
+        self.reach = self.reach.max(d.half_width.max(d.height) + SLACK);
+        self.map.entry(column(e.pos)).or_default().push(i as u32);
+    }
 }
 
 /// Velocities in blocks per tick, like the client's own.
@@ -369,7 +410,38 @@ impl Entities {
             self.anchors.insert((e.block_frame(), a), id);
         }
         self.index.insert(id, self.list.len());
+        if self.cells.built {
+            self.cells.add(c, self.list.len(), &e);
+        }
         self.list.push(e);
+    }
+
+    /// Whether `within` uses the columns: on while mods run (`Dim::tick_entities`), built again
+    /// at their first query.
+    pub fn index_cells(&mut self, on: bool) {
+        self.cells.on = on;
+        self.cells.built = false;
+        self.cells.map.clear();
+    }
+
+    /// `id` was put somewhere (a teleport, set down from its mount): the columns know where.
+    pub fn moved_to(&mut self, c: &Content, id: u64) {
+        if let (true, Some(&i)) = (self.cells.built, self.index.get(&id)) {
+            let e = &self.list[i];
+            self.cells.add(c, i, e);
+        }
+    }
+
+    fn build_cells(&mut self, c: &Content) {
+        let cells = &mut self.cells;
+        cells.map.clear();
+        cells.reach = SLACK;
+        for (i, e) in self.list.iter().enumerate() {
+            if !e.removed {
+                cells.add(c, i, e);
+            }
+        }
+        cells.built = true;
     }
 
     /// A new life for an entity that stays, what its kind attaches starts
@@ -416,6 +488,9 @@ impl Entities {
         e.anchor = Some(at);
         e.frame = (frame != 0).then_some(frame);
         e.pos = pos;
+        if self.cells.built {
+            self.moved_to(crate::content::content(), id);
+        }
         if let Some(was) = was.filter(|was| self.anchors.get(was) == Some(&id)) {
             self.anchors.remove(&was);
         }
@@ -461,6 +536,7 @@ impl Entities {
             .map(|e| e.id)
             .collect();
         self.list.retain(|e| !e.removed);
+        self.cells.built = false;
         self.index = self
             .list
             .iter()
@@ -502,6 +578,7 @@ impl Entities {
     pub fn take(&mut self, id: u64) -> Option<(Entity, Option<Vec<ItemStack>>, Vec<(u32, Box<[u8]>)>)> {
         let i = *self.index.get(&id)?;
         let e = self.list.remove(i);
+        self.cells.built = false;
         self.index = self
             .list
             .iter()
@@ -524,6 +601,7 @@ impl Entities {
 
     /// Canonical tick order after regions merge.
     pub fn sort_by_id(&mut self) {
+        self.cells.built = false;
         self.list.sort_by_key(|e| e.id);
         self.index = self
             .list
@@ -594,11 +672,23 @@ impl Entities {
     /// Within `radius`, of `kind` (`u32::MAX`: any), `abi::near` saying what else.
     /// In `shape` (in the frame `place` turns world positions into), of `kind` (`u32::MAX`:
     /// any), `abi::entity_filter` saying what else.
-    pub fn within(&self, c: &Content, place: &crate::physics::Transform, shape: &crate::shape::Shape, kind: u32, flags: u32) -> Vec<u64> {
+    pub fn within(
+        &mut self,
+        c: &Content,
+        place: &crate::physics::Transform,
+        shape: &crate::shape::Shape,
+        kind: u32,
+        flags: u32,
+    ) -> Vec<u64> {
         use weft_abi::entity_filter as f;
         let (targets, touching) = (flags & f::TARGETS != 0, flags & f::TOUCHING != 0);
-        self.list
-            .iter()
+        let near = self.near_cells(c, place, shape, touching);
+        let list = &self.list;
+        let candidates: Box<dyn Iterator<Item = &Entity>> = match &near {
+            Some(near) => Box::new(near.iter().map(|&i| &list[i as usize])),
+            None => Box::new(list.iter()),
+        };
+        candidates
             .filter(|e| !e.removed && (kind == u32::MAX || e.kind == kind))
             .filter(|e| !targets || (e.is_body() && e.alive()))
             .filter(|e| {
@@ -612,6 +702,42 @@ impl Entities {
             })
             .map(|e| e.id)
             .collect()
+    }
+
+    /// The list indices in the columns `shape` touches, and round it `Cells::reach` for whole
+    /// boxes (`touching`) or `SLACK` for feet, in list order as a scan would give them; `None`:
+    /// scan them all (the columns are off, the region small or the shape huge).
+    fn near_cells(
+        &mut self,
+        c: &Content,
+        place: &crate::physics::Transform,
+        shape: &crate::shape::Shape,
+        touching: bool,
+    ) -> Option<Vec<u32>> {
+        if !self.cells.on || self.list.len() < CELLS_FROM {
+            return None;
+        }
+        if !self.cells.built {
+            self.build_cells(c);
+        }
+        let (lo, hi) = shape.bounds();
+        let reach = DVec3::splat(if touching { self.cells.reach } else { SLACK });
+        let (lo, hi) = (column(place.to_world(lo) - reach), column(place.to_world(hi) + reach));
+        let span = (hi.0 as i64 - lo.0 as i64 + 1) * (hi.1 as i64 - lo.1 as i64 + 1);
+        if !(1..=MAX_CELLS).contains(&span) {
+            return None;
+        }
+        let mut near = Vec::new();
+        for x in lo.0..=hi.0 {
+            for z in lo.1..=hi.1 {
+                if let Some(v) = self.cells.map.get(&(x, z)) {
+                    near.extend_from_slice(v);
+                }
+            }
+        }
+        near.sort_unstable();
+        near.dedup();
+        Some(near)
     }
 }
 

@@ -129,7 +129,7 @@ pub fn init(r: &mut Registry) {
             false
         })
         .on_hurt(|w, h| {
-            taming::hurt(w, h.entity);
+            taming::hurt(w, h.entity, h.source);
             if let Some(d) = w.component_mut(h.entity, &DOG)
                 && d.tamed == 0
             {

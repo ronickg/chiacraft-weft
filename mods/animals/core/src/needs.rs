@@ -193,3 +193,66 @@ pub fn drink_lasts(s: &Species, kg: f32) -> Option<f32> {
     let drunk = litres_a_day(s, kg) * drinks(s);
     (drunk > 0.0).then(|| SPARE * kg / drunk * DRINK_DAY_SECS)
 }
+
+// ------------------------------------------------------------------ choosing between needs
+
+// What an animal does when nothing is after it (`reports/Creature AI.md`, part 3, step 3): each
+// need scores itself 0 to 1 from how pressing it is, and the most pressing that has something to
+// do goes first (`mods/animals/src/choose.rs`), not a fixed order. So a starving deer gets up to
+// eat, and one parched leaves its mate to drink. Hunger and thirst grow as the square of how far
+// past their start they are (Dave Mark's quadratic response curve): mild hunger waits for a rest
+// to end, real hunger doesn't.
+
+/// What a need scores when it is barely pressing (hunger just under `HUNGRY`, thirst just under
+/// `THIRSTY`) and when it is all there is (empty, parched).
+pub const EAT_FLOOR: f32 = 0.3;
+pub const DRINK_FLOOR: f32 = 0.35;
+/// A mate in its season, and a rest: what a hungry or thirsty one sets aside only once the need
+/// presses (the square past about 0.25 and 0.36 of the way to empty).
+pub const LOVE: f32 = 0.5;
+pub const REST: f32 = 0.45;
+/// The air: cold or hot, and freezing or in a heatstroke.
+pub const UNEASY: f32 = 0.4;
+pub const SUFFERING: f32 = 0.85;
+/// Wandering, last of all.
+pub const WANDER: f32 = 0.01;
+/// What it is doing already counts this much more (Blumberg's hysteresis: it doesn't flicker
+/// between two needs near the same).
+pub const KEEP_AT: f32 = 1.2;
+
+/// How pressing hunger is at `fed` (its share of its food): 0 when fed (`HUNGRY` or more and not
+/// eating already), `EAT_FLOOR` just under, 1 empty.
+pub fn hunger_score(fed: f32, eating: bool) -> f32 {
+    need_score(fed, HUNGRY, EAT_FLOOR, eating)
+}
+
+/// How pressing thirst is at `water` (its share of its water): as hunger, from `THIRSTY`.
+pub fn thirst_score(water: f32, drinking: bool) -> f32 {
+    need_score(water, THIRSTY, DRINK_FLOOR, drinking)
+}
+
+fn need_score(have: f32, start: f32, floor: f32, at_it: bool) -> f32 {
+    if have >= start && !at_it {
+        return 0.0;
+    }
+    let past = ((start - have) / start).clamp(0.0, 1.0);
+    floor + (1.0 - floor) * past * past
+}
+
+#[cfg(test)]
+mod choosing {
+    use super::*;
+
+    #[test]
+    fn real_hunger_beats_a_rest_and_real_thirst_beats_love() {
+        // Mild hunger waits for its rest; a starving one gets up (the rest held at `KEEP_AT`).
+        assert!(hunger_score(0.5, false) < REST * KEEP_AT);
+        assert!(hunger_score(0.1, false) > REST * KEEP_AT);
+        // Thirst leaves a mate only once it presses.
+        assert!(thirst_score(0.45, false) < LOVE);
+        assert!(thirst_score(0.15, false) > LOVE);
+        // Fed and watered, neither asks for the turn; a meal under way keeps going.
+        assert_eq!(hunger_score(0.8, false), 0.0);
+        assert!(hunger_score(0.8, true) > 0.0);
+    }
+}

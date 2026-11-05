@@ -30,7 +30,7 @@ static WARY: Component<u64> = Component::named("animal_wary");
 
 /// Blocks a hunter looks for prey and prey watches for hunters, in clear air: fog, a blizzard or
 /// a dust storm close both in (`base_api::sight`).
-const LOOK: f64 = 16.0;
+pub(crate) const LOOK: f64 = 16.0;
 const WATCH: f64 = 10.0;
 /// It hunts under this share of its food, until this full (as foraging, `needs`).
 use animals_core::needs::{FULL, HUNGRY};
@@ -92,7 +92,7 @@ pub fn prey_lush(w: &World, s: &Species, pos: [i32; 3]) -> Option<f32> {
 const EGG_KG: f32 = 0.2;
 
 /// The species `index` an egg `id` holds, if it is one.
-fn egg_of(w: &World, id: u64) -> Option<usize> {
+pub(crate) fn egg_of(w: &World, id: u64) -> Option<usize> {
     let e = w.component(id, &crate::eggs::EGG)?;
     (e.species as usize)
         .checked_sub(1)
@@ -100,7 +100,7 @@ fn egg_of(w: &World, id: u64) -> Option<usize> {
 }
 
 /// A player's egg (its nest's, or one laid by a tame): the wild's egg eaters leave those alone.
-fn owned_egg(w: &World, id: u64) -> bool {
+pub(crate) fn owned_egg(w: &World, id: u64) -> bool {
     egg_of(w, id).is_some() && w.component(id, &animal::OWNER).is_some_and(|o| o[0] != 0)
 }
 
@@ -132,23 +132,6 @@ pub(crate) fn mass(w: &World, id: u64) -> Option<f32> {
         Some(crate::coats::size_of(w, id)? / crate::coats::mean_size(index) * crate::breeding::growth(w, id, index))
     });
     kind_mass(e.kind, size)
-}
-
-/// The family of `id`, if it's one of the species: by its animal record, or by its kind before it
-/// has one (one spawned this tick, which a packmate otherwise took for prey).
-fn family(w: &World, id: u64) -> Option<&'static str> {
-    w.component(id, &ANIMAL)
-        .and_then(|a| a.species())
-        .map(|s| s.family.name)
-        .or_else(|| {
-            let kind = w.entity(id)?.kind;
-            SPECIES
-                .iter()
-                .find(|s| s.kind.id() == kind)
-                .map(|s| s.family.name)
-        })
-        // An egg is its species' family's: a hunter leaves its own kind's eggs.
-        .or_else(|| egg_of(w, id).map(|i| SPECIES[i].family.name))
 }
 
 /// A goal for wild hunters: hungry, it goes after the nearest prey it can take; it takes the turn
@@ -201,16 +184,17 @@ pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
         return false;
     }
     let own = mass(w, id).unwrap_or(s.bio.mass);
-    // A pack's kind with others of it near hunts together: bigger prey (`Species::takes_with`).
-    let pack = if s.pack_prey().is_some() { pack_near(w, id, st) } else { 1 };
-    let prey = w
-        .targets_near(st.pos, LOOK * base_api::sight(w, st.pos.to_array()) as f64, None)
-        .into_iter()
-        .filter(|&t| t != id && family(w, t) != Some(s.family.name) && !owned_egg(w, t))
-        .filter_map(|t| Some((t, w.entity(t)?, mass(w, t)?)))
-        .filter(|(_, e, kg)| e.health > 0.0 && s.takes_with(own, *kg, pack))
-        .min_by(|a, b| dist2(a.1.pos, st.pos).total_cmp(&dist2(b.1.pos, st.pos)));
-    let Some((t, _, kg)) = prey else {
+    // Its prey and its pack from its last look round (`senses`): a pack's kind with others of it
+    // near hunts together, bigger prey (`Species::takes_with`).
+    let seen = crate::senses::sense(w, id, st, |sight| watch(w, sight));
+    let pack = if s.pack_prey().is_some() { seen.kin as u32 } else { 1 };
+    let prey = (seen.prey != 0)
+        .then_some((seen.prey, seen.prey_kg))
+        .filter(|&(t, _)| {
+            w.entity(t)
+                .is_some_and(|e| e.health > 0.0 && dist2(e.pos, st.pos) < (LOOK * 1.5).powi(2))
+        });
+    let Some((t, kg)) = prey else {
         w.component_mut(id, &HUNT).map(|c| *c = h);
         return false;
     };
@@ -232,17 +216,8 @@ pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
 /// second, at this nearly 10, past a fleeing deer's 8.
 const PACK_SPEED: f32 = 1.75;
 
-/// Blocks within which a pack's kind hunt together.
-const PACK_RANGE: f64 = 16.0;
-
-/// How many wild ones of `id`'s kind are near it, itself among them.
-fn pack_near(w: &World, id: u64, st: &EntityState) -> u32 {
-    let kind = w.entity(id).map(|e| e.kind);
-    w.entities_near(st.pos, PACK_RANGE, None)
-        .into_iter()
-        .filter(|&o| o == id || (w.entity(o).map(|e| e.kind) == kind && !animal::tamed(w, o)))
-        .count() as u32
-}
+/// Blocks within which a pack's kind hunt together (and count each other, `senses::KIN`).
+const PACK_RANGE: f64 = crate::senses::KIN;
 
 /// Big prey only a pack takes: the others of the pack near that aren't hunting already go after it
 /// too, so it isn't one wolf against a red deer.
@@ -263,43 +238,38 @@ fn rally(w: &World, id: u64, st: &EntityState, target: u64, now: u64) {
 
 /// A goal for wild animals: a hunter near that could take it, and it runs the other way.
 pub fn wary(w: &World, id: u64, st: &EntityState) -> bool {
-    if animal::tamed(w, id) {
-        return false;
-    }
     let now = w.game_time();
+    // Running already; else it looks round once in `senses::EVERY` ticks (a tame never does: it
+    // trusts its owner to keep it safe).
     if w.component(id, &WARY).is_some_and(|until| now < until) {
         return true;
     }
-    if (now + id) % 10 != 0 {
+    if !(now + id).is_multiple_of(crate::senses::EVERY) || animal::tamed(w, id) {
         return false;
     }
-    let Some(me) = mass(w, id) else { return false };
-    let mine = family(w, id);
-    let blood = animals_core::sky::totality(w.seed(), w.day_time());
-    let watch = WATCH * base_api::sight(w, st.pos.to_array()) as f64 * if blood { animals_core::sky::BLOOD_MOON_WATCH as f64 } else { 1.0 };
-    let hunter = w
-        .targets_near(st.pos, watch, None)
-        .into_iter()
-        .filter(|&t| t != id && family(w, t) != mine && !animal::tamed(w, t))
-        .filter_map(|t| {
-            let s = w.component(t, &ANIMAL)?.species()?;
-            let e = w.entity(t)?;
-            s.takes_at_most(mass(w, t)?, me).then_some(e) // a pack's kind with its pack's reach
-        })
-        .min_by(|a, b| dist2(a.pos, st.pos).total_cmp(&dist2(b.pos, st.pos)));
-    let Some(h) = hunter else { return false };
-    let (x, z) = (st.pos.x - h.pos.x, st.pos.z - h.pos.z);
+    let seen = crate::senses::sense(w, id, st, |sight| watch(w, sight));
+    if seen.threat == 0 {
+        return false;
+    }
+    let h = seen.threat_pos;
+    let (x, z) = (st.pos.x - h[0] as f64, st.pos.z - h[2] as f64);
     let n = (x * x + z * z).sqrt().max(0.01);
     w.navigate(id, [st.pos.x + x / n * 10.0, st.pos.y, st.pos.z + z / n * 10.0], 1.6);
     w.component_mut(id, &WARY).map(|u| *u = now + RUN);
     true
 }
 
+/// Blocks it watches for hunters: `WATCH` by the weather's `sight`, half again in a blood moon.
+fn watch(w: &World, sight: f32) -> f64 {
+    let blood = animals_core::sky::totality(w.seed(), w.day_time());
+    WATCH * sight as f64 * if blood { animals_core::sky::BLOOD_MOON_WATCH as f64 } else { 1.0 }
+}
+
 /// A goal for wild herd animals on the ground (not birds: a flock's `wary` takes off): in a blood
 /// moon's totality, one more than `HUDDLE` from the middle of its herd near walks back to it (held,
 /// as a flight from a hunter, for `HUDDLE_WALK` ticks).
 pub fn huddle(w: &World, id: u64, st: &EntityState) -> bool {
-    use animals_core::sky::{HUDDLE, HUDDLE_LOOK};
+    use animals_core::sky::HUDDLE;
     let now = w.game_time();
     if !(now + id).is_multiple_of(20) || animal::tamed(w, id) || !animals_core::sky::totality(w.seed(), w.day_time()) {
         return false;
@@ -311,20 +281,15 @@ pub fn huddle(w: &World, id: u64, st: &EntityState) -> bool {
     if !herd {
         return false;
     }
-    let kind = w.entity(id).map(|e| e.kind);
-    let (mut sum, mut n) = ([0.0f64; 3], 0.0);
-    for o in w.entities_near(st.pos, HUDDLE_LOOK as f64, None) {
-        if o == id || animal::tamed(w, o) {
-            continue;
-        }
-        let Some(e) = w.entity(o).filter(|e| Some(e.kind) == kind) else { continue };
-        sum = [sum[0] + e.pos.x, sum[1] + e.pos.y, sum[2] + e.pos.z];
-        n += 1.0;
-    }
-    if n == 0.0 {
+    // Its herd within `HUDDLE_LOOK` from its last look round (`senses`: a herd's counts its kin
+    // that far in a blood moon), itself taken out of the middle.
+    let seen = crate::senses::sense(w, id, st, |sight| watch(w, sight));
+    let n = seen.kin as f64 - 1.0;
+    if n <= 0.0 {
         return false;
     }
-    let mid = [sum[0] / n, sum[1] / n, sum[2] / n];
+    let p = [st.pos.x, st.pos.y, st.pos.z];
+    let mid: [f64; 3] = std::array::from_fn(|i| (seen.kin_mid[i] as f64 * seen.kin as f64 - p[i]) / n);
     if dist2(mid, st.pos) <= (HUDDLE * HUDDLE) as f64 {
         return false;
     }

@@ -17,6 +17,10 @@ use crate::species::SPECIES;
 /// Where it stands to drink (x, y, z; NaN: no water near), and when it looks again or takes its
 /// next gulp (0: not drinking). Not saved.
 static DRINK: Component<[f64; 4]> = Component::named("animal_drink");
+/// The last two places it drank from (x, y, z, and 1 where there is one), the newest first: a
+/// thirsty animal goes back to one near before it looks over all the blocks round it again
+/// (`reports/Creature AI.md`, step 1). Not saved.
+static WATERS: Component<[[f32; 4]; 2]> = Component::named("animal_waters");
 
 /// Blocks it looks round for water, and down and up.
 const LOOK: i32 = 16;
@@ -31,8 +35,10 @@ const WADING: f32 = 0.05;
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&DRINK, [0.0; 4], 0);
+    r.entity_component(&WATERS, [[0.0f32; 4]; 2], 0);
     for s in &SPECIES {
         r.attach(s.kind, &DRINK);
+        r.attach(s.kind, &WATERS);
     }
 }
 
@@ -72,16 +78,49 @@ fn open_water(w: &World, pos: [i32; 3]) -> bool {
     crate::comfort::WATER.at(w, pos) && w.block([pos[0], pos[1] + 1, pos[2]]) == 0
 }
 
-/// The nearest place within `LOOK` blocks where it can stand on dry ground beside open water.
-fn nearest_water(w: &World, pos: [f64; 3]) -> Option<[f64; 3]> {
-    let p = pos.map(|v| v.floor() as i32);
+/// Blocks round a remembered place it looks for its shore again, and how far it goes back to one.
+const AGAIN: i32 = 2;
+const RECALL: f64 = 2.0 * LOOK as f64;
+
+/// The nearest place to `pos` where it can stand on dry ground beside open water: at a place it
+/// drank from before within `RECALL` blocks if that is still a shore, else within `LOOK` blocks.
+fn find_water(w: &World, id: u64, pos: [f64; 3]) -> Option<[f64; 3]> {
+    let mut known = w.component(id, &WATERS).unwrap_or_default();
+    let near = |k: &[f32; 4]| k[3] != 0.0 && (k[0] as f64 - pos[0]).powi(2) + (k[2] as f64 - pos[2]).powi(2) <= RECALL * RECALL;
+    let mut order: Vec<&[f32; 4]> = known.iter().filter(|k| near(k)).collect();
+    order.sort_by(|a, b| {
+        crate::dist2([a[0], a[1], a[2]].map(f64::from), pos).total_cmp(&crate::dist2([b[0], b[1], b[2]].map(f64::from), pos))
+    });
+    let again = order
+        .into_iter()
+        .find_map(|k| nearest_water(w, [k[0], k[1], k[2]].map(|v| v.floor() as i32), AGAIN, pos));
+    let found = again.or_else(|| nearest_water(w, pos.map(|v| v.floor() as i32), LOOK, pos))?;
+    let f = [found[0] as f32, found[1] as f32, found[2] as f32, 1.0];
+    if known[0][..3] != f[..3] {
+        known = [f, known[0]];
+        if let Some(c) = w.component_mut(id, &WATERS) {
+            *c = known;
+        }
+    }
+    Some(found)
+}
+
+/// The nearest place to `pos` within `r` blocks of `p` where it can stand on dry ground beside
+/// open water.
+fn nearest_water(w: &World, p: [i32; 3], r: i32, pos: [f64; 3]) -> Option<[f64; 3]> {
     let mut best: Option<([f64; 3], f64)> = None;
-    for dx in -LOOK..=LOOK {
-        for dz in -LOOK..=LOOK {
+    for dx in -r..=r {
+        for dz in -r..=r {
             for dy in -LOOK_DOWN..=LOOK_UP {
                 let at = [p[0] + dx, p[1] + dy, p[2] + dz];
-                let d = (dx * dx + dz * dz + dy * dy * 4) as f64;
-                if best.as_ref().is_some_and(|&(_, b)| d >= b) || !open_water(w, at) {
+                let d =
+                    (at[0] as f64 + 0.5 - pos[0]).powi(2) + (at[2] as f64 + 0.5 - pos[2]).powi(2) + (at[1] as f64 - pos[1]).powi(2) * 4.0;
+                // Its shore is within a block of it: no nearer than this less a block and a half.
+                if best
+                    .as_ref()
+                    .is_some_and(|&(_, b)| d.sqrt() - 1.5 >= b.sqrt())
+                    || !open_water(w, at)
+                {
                     continue;
                 }
                 // A shore beside it: dry ground at its surface or a block above.
@@ -123,8 +162,9 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
     let Some(s) = a.species() else { return false };
     let Some(mut d) = w.component(id, &DRINK) else { return false };
     let water = 1.0 - a.thirst;
-    let gets_thirsty = (s.hungry_in_the_wild() || animal::tamed(w, id)) && lasts(w, id, &a).is_some();
-    if !gets_thirsty || water >= SLAKED || (d[3] == 0.0 && water >= THIRSTY) {
+    // The cheap reasons first: most animals most of the time aren't thirsty.
+    let calm = water >= SLAKED || (d[3] == 0.0 && water >= THIRSTY);
+    if calm || !((s.hungry_in_the_wild() || animal::tamed(w, id)) && lasts(w, id, &a).is_some()) {
         if d[3] != 0.0 {
             w.component_mut(id, &DRINK).map(|d| *d = [0.0; 4]);
         }
@@ -157,7 +197,7 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
         // Walking to it; or no water near, foraging and wandering on.
         return spot.is_some();
     }
-    match nearest_water(w, st.pos.to_array()) {
+    match find_water(w, id, st.pos.to_array()) {
         Some(p) => {
             weft_sdk::debug!("{} {id} is thirsty (water {:.0}%): to water at {p:?}", s.name, water * 100.0);
             w.navigate(id, p, 1.0);

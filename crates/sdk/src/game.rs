@@ -314,9 +314,12 @@ impl World {
     }
     /// The value of `c` on any holder: an entity, a block's entity, a stack in a slot.
     pub fn component<T: Value>(&self, h: impl Into<Holder>, c: &Component<T>) -> Option<T> {
-        let mut buf = vec![0u8; size_of::<T>()];
-        let n = unsafe { (host().component_get)(self.raw(), &h.into(), c.id(), buf.as_mut_ptr(), buf.len() as u32) };
-        (n as usize == buf.len()).then(|| unsafe { std::ptr::read_unaligned(buf.as_ptr() as *const T) })
+        // Read straight into the value: mob AI reads several a mob a tick, and a heap buffer each
+        // time was most of what they cost.
+        let mut out = std::mem::MaybeUninit::<T>::uninit();
+        let len = size_of::<T>();
+        let n = unsafe { (host().component_get)(self.raw(), &h.into(), c.id(), out.as_mut_ptr() as *mut u8, len as u32) };
+        (n as usize == len).then(|| unsafe { out.assume_init() })
     }
     /// Sets `c` on any holder. An entity has it only if its kind attaches it; a stack takes any.
     pub fn set_component<T: Value>(&self, h: impl Into<Holder>, c: &Component<T>, v: T) -> bool {

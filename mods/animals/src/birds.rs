@@ -11,6 +11,8 @@ use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
 use crate::ModelFile;
+use crate::choose::{Band, Need, WithBand};
+use crate::prof::Timed;
 
 use crate::dist2;
 
@@ -98,17 +100,24 @@ pub fn register(r: &mut Registry, kinds: &[&'static EntityKind], wings: &'static
             })
             .goals(
                 Goals::new()
-                    .then(crate::animal::upkeep(index))
-                    .then(move |w: &World, id: u64, st: &EntityState| fly(w, id, st, wings))
-                    .then(crate::taming::behave(index))
-                    .then(move |w: &World, id: u64, st: &EntityState| crate::hunt::wary(w, id, st) && take_off(w, id, st, wings))
-                    .then(crate::hunt::hunt)
-                    .then(crate::breeding::behave(index))
-                    .then(crate::comfort::seek)
-                    .then(crate::forage::forage)
-                    .then(ai::wander(wings.wander, 8.0)),
+                    .timed("upkeep", crate::animal::upkeep(index))
+                    .timed("fly", move |w: &World, id: u64, st: &EntityState| fly(w, id, st, wings))
+                    .timed("taming", crate::taming::behave(index))
+                    .timed("wary", move |w: &World, id: u64, st: &EntityState| crate::hunt::wary(w, id, st) && take_off(w, id, st, wings))
+                    .timed("hunt", crate::hunt::hunt)
+                    // What it does when nothing is after it, the most pressing first
+                    // (`choose.rs`).
+                    .band(
+                        "needs",
+                        Band::new()
+                            .with(Need::Love, crate::breeding::behave(index))
+                            .with(Need::Comfort, crate::comfort::seek)
+                            .with(Need::Drink, crate::drink::drink)
+                            .with(Need::Eat, crate::forage::eat)
+                            .with(Need::Wander, ai::wander(wings.wander, 8.0)),
+                    ),
             )
-            .on_hurt(|w, h| crate::taming::hurt(w, h.entity));
+            .on_hurt(|w, h| crate::taming::hurt(w, h.entity, h.source));
     }
 }
 

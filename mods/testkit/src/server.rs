@@ -715,6 +715,35 @@ const OPS: &[(&str, &str, Run)] = &[
         }
         Ok(format!("{n} mobs"))
     }),
+    ("ring", "<kind:word> <n:int> <near:float> <far:float>", |w, cmd, _, me| {
+        // `n` mobs at random in the ring `near`..`far` blocks round the player, each on the
+        // ground of its column (the first block that isn't air under 24 above the player), the
+        // same places every run (the creature-crowd bench, `reports/Creature AI.md` step 0).
+        let n: u32 = int(cmd, "n")?;
+        let kind = EntityKind::lookup(word(cmd, "kind")?).ok_or("no such entity")?;
+        let (near, far) = (cmd.float("near").ok_or("missing near")?, cmd.float("far").ok_or("missing far")?);
+        let mut seed = (n as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ kind as u64 ^ (far.to_bits() >> 20);
+        let mut next = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            (seed >> 11) as f64 / (1u64 << 53) as f64
+        };
+        let mut placed = 0;
+        for _ in 0..n {
+            let (a, r) = (next() * std::f64::consts::TAU, (near * near + next() * (far * far - near * near)).sqrt());
+            let (x, z) = (me[0] + (a.cos() * r) as i32, me[2] + (a.sin() * r) as i32);
+            let Some(y) = (me[1] - 40..me[1] + 24)
+                .rev()
+                .find(|&y| w.block([x, y, z]) != 0)
+            else {
+                continue;
+            };
+            w.spawn(kind, [x as f64 + 0.5, (y + 1) as f64, z as f64 + 0.5]);
+            placed += 1;
+        }
+        Ok(format!("{placed} mobs"))
+    }),
     ("swap", "<id:int> <from:word> [to:word]", |w, cmd, _, _| {
         match cmd.text("to") {
             Some(to) => w.action_override(int(cmd, "id")?, word(cmd, "from")?, to),
