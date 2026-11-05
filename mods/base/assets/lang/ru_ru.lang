@@ -82,6 +82,7 @@ block.base.water = Вода
 block.base.lava = Лава
 block.base.tall_grass = Трава
 block.base.grazed_grass = Объеденная трава
+block.base.dung_pat = Лепёшка навоза
 block.base.compost_bin = Компостный ящик
 item.base.compost = Компост
 item.base.dung = Навоз

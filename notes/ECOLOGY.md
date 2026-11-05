@@ -794,14 +794,23 @@ and cactus.**
 ### 8. Death, dung and rot
 
 **Built in part (2026-11-03).**
-- **Dung:** grazers leave dung about every sixth mouthful (`forage.rs`).
+- **Dung pats** (2026-11-05, `vitals::soil`, `base:dung_pat`): a grazer drops a pat where it
+  stands on the soil every 20 mouthfuls (`MOUTHFULS_A_PAT`), never within 2 blocks of another
+  (off the soil, the dung as an item). A pat rots by the plant rule, 45 real days at 20-30 °C
+  and wet (dung beetles, fungi): about 16-25 minutes in a warm wet season, longer dry or cold,
+  never past 3 game days (`PAT_MOST_DAYS`, frost and hooves), and leaves a tuft of fresh grass.
+  While it lies, grazed grass within 2 blocks grows back twice as fast. Broken, it gives the dung
+  (compost, farmland). A block is far bigger than a real pat, so they are rarer than droppings:
+  at most 0.8% of a herd's ground at once in any biome (`animals_core::web`, the "carpeted in
+  dung" check; the species sheet's grazing column), as in a grazed pasture.
 - **The compost bin** (`base:compost_bin`, crafted from planks) takes spoiled food of any kind,
   dung, rotten flesh, leaves, saplings, wheat and seeds (`vitals::soil::COMPOSTS`). Full, it
   rots into compost in about 23 minutes, the weeks hot compost takes, at the growing pace.
 - **Carcasses:** a kill's drops stay where it fell.
 - **Seen in the game:** the bin filling, its top turning to dirt.
 - **Not yet:**
-  - food and carcasses on the ground rotting away;
+  - food and carcasses on the ground rotting away: the engine clears every item after 5
+    minutes (`ITEM_LIFETIME`), so this needs a per-item lifetime in the engine first (Upstream);
   - scavengers eat food and carrion off the ground (part 5), but our species leave no carcass yet;
   - the generated art for dung, compost and the bin (placeholders now, `notes/STYLE.md`).
 

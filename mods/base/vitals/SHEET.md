@@ -284,6 +284,7 @@ What each growing plant needs (`vitals::plants`, from `reports/ecology/Plants an
 | base:cactus | saguaro | 10, 25-40, 50 | Dry | -7 °C | - | the game's | plains (su), forest (su), birch_forest (su), taiga (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au wi), tropical_forest (sp su au wi), sequoia_grove (su), ocean (sp su au), coral_reef (sp su au wi), lagoon (sp su au wi), beach (sp su au), red_dunes (su), scrubland (su), floodplain (sp su au), fern_forest (su), crags (su) |
 | base:sapling | oak | 5, 18-28, 38 | Moderate | hardy | - | the game's | plains (su au), forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), mountains (su), ocean (sp su au wi), coral_reef (su au), lagoon (su au), beach (au), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au) |
 | base:grazed_grass | prairie grass | 5, 15-30, 40 | Moderate | hardy | 18 | 7 | plains (su au), forest (su au), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), mountains (su), ocean (sp su au wi), coral_reef (su au), lagoon (su au), beach (au wi), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au) |
+| base:dung_pat | a cow pat (dung beetles, fungi) | 5, 20-30, 42 | Moderate | hardy | 45 | 14 | plains (su au), forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), mountains (su), ocean (sp su au wi), coral_reef (su au), lagoon (su au), beach (au), scrubland (su), floodplain (su au), fern_forest (su), crags (su au) |
 | base:sedge | sedges | -1, 8-22, 32 | Moderate | hardy | 18 | 7 | plains (sp su au), forest (sp su au), birch_forest (su au), taiga (su), snowy_plains (su), savanna (au), tropical_forest (au), mountains (su au), ocean (sp su au wi), coral_reef (au), lagoon (au), beach (au wi), floodplain (au), fern_forest (su au), crags (su au wi) |
 | base:cottongrass | cottongrass (Eriophorum) | -2, 6-16, 25 | Moderate | hardy | 18 | 7 | plains (sp au), forest (sp su au wi), birch_forest (su au), taiga (su), snowy_plains (su), mountains (sp su au), sequoia_grove (wi), ocean (sp au wi), beach (au wi), fern_forest (su au), crags (au wi) |
 | base:reindeer_lichen | reindeer lichen (Cladonia) | 0, 5-15, 25 | Dry | hardy | 3650 | 301 | plains (sp au), forest (sp su au), birch_forest (sp su au), taiga (su au), snowy_plains (su), mountains (sp su au), sequoia_grove (sp su au wi), ocean (sp au wi), beach (sp au wi), red_dunes (sp au wi), scrubland (sp au wi), floodplain (au wi), fern_forest (sp su au), crags (sp au wi) |
@@ -498,6 +499,26 @@ Farmland's fertility (`vitals::soil`): how fast crops grow at each level, what w
 | 0 | 20% |
 
 A ripe harvest of base:wheat, base:barley, base:rye, base:carrots, base:potatoes, base:beetroots, base:maize, base:paddy_rice, base:sorghum, base:millet, base:cassava, base:pumpkin_stem, base:melon_stem takes a level, of base:beans, base:tepary_beans gives one back; base:compost +2, base:dung +1; a season unplanted (about 14 game days, at grass's rate) gives one back. A compost bin fills in 7 steps: spoiled food 2, base:dung 2, base:rotten_flesh 2, base:oak_leaves 1, base:birch_leaves 1, base:spruce_leaves 1, base:acacia_leaves 1, base:sapling 1, base:wheat_seeds 1, base:wheat 1; full, it rots into compost in about 23 minutes.
+
+Dung pats: a grazer drops one every 20 mouthfuls where it stands on the ground, never within 2 blocks of another; it rots by warmth and soil water into a tuft of fresh grass (at most 3 game days, frozen or dry), and while it lies grazed grass within 2 blocks grows back x2. How long one lies, in game minutes (a game day is 20):
+
+| biome | spring | summer | autumn | winter |
+|---|---|---|---|---|
+| base:plains | 47 | 22 | 28 | 60 |
+| base:forest | 48 | 20 | 32 | 60 |
+| base:birch_forest | 58 | 22 | 37 | 60 |
+| base:taiga | 60 | 24 | 51 | 60 |
+| base:savanna | 25 | 16 | 17 | 36 |
+| base:swamp | 48 | 20 | 24 | 60 |
+| base:tropical_forest | 35 | 18 | 17 | 24 |
+| base:mountains | 58 | 24 | 41 | 60 |
+| base:sequoia_grove | 52 | 35 | 60 | 60 |
+| base:coral_reef | 45 | 21 | 20 | 31 |
+| base:lagoon | 45 | 21 | 20 | 31 |
+| animals:scrubland | 49 | 25 | 51 | 60 |
+| animals:floodplain | 47 | 20 | 20 | 60 |
+| animals:fern_forest | 53 | 19 | 30 | 60 |
+| animals:crags | 47 | 19 | 23 | 48 |
 
 ## Difficulty (the `base:difficulty` rule)
 

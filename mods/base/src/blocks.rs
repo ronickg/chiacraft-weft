@@ -60,6 +60,7 @@ pub static WATER: Block = Block::named("water");
 pub static LAVA: Block = Block::named("lava");
 pub static TALL_GRASS: Block = Block::named("tall_grass");
 pub static GRAZED_GRASS: Block = Block::named("grazed_grass");
+pub static DUNG_PAT: Block = Block::named("dung_pat");
 pub static DANDELION: Block = Block::named("dandelion");
 pub static ROSE: Block = Block::named("rose");
 pub static SAPLING: Block = Block::named("sapling");
@@ -790,10 +791,40 @@ pub fn register(r: &mut Registry) {
         .no_item()
         .grows(crate::growth::step_secs("base:grazed_grass", 1, 600.0), 9)
         .on_grow(|e| {
-            crate::growth::grow(e, "base:grazed_grass", false, |e| {
-                e.world().set_block(e.pos(), TALL_GRASS.id());
-            })
+            // Beside a dung pat it grows back `PAT_GROWTH` times as fast: as many tries a step.
+            let tries = if pat_near(&e.world(), e.pos().to_array()) { vitals::soil::PAT_GROWTH } else { 1 };
+            for _ in 0..tries {
+                match base_api::grow::step(e, "base:grazed_grass", false) {
+                    base_api::grow::Step::Grow => {
+                        e.world().set_block(e.pos(), TALL_GRASS.id());
+                        return;
+                    }
+                    base_api::grow::Step::Frost => return,
+                    base_api::grow::Step::Rest => {}
+                }
+            }
         });
+    // A grazer's dung pat (`vitals::soil`, `mods/animals/src/forage.rs`): it rots by warmth and
+    // rain into a tuft of fresh grass; broken, it gives the dung.
+    r.block(&DUNG_PAT)
+        .sound_group("mud")
+        .textures("dung_pat_top", "dung_pat_side", "dung_pat_top")
+        .model_box([2.0, 0.0, 2.0], [14.0, 1.5, 14.0])
+        // Its top's corners are clear (Art's tile), so the grass shows round the pat.
+        .cutout()
+        .plant()
+        .needs_below("#plant_soil")
+        .no_item()
+        .grows(crate::growth::step_secs("base:dung_pat", 1, 1200.0), 0)
+        .on_grow(|e| {
+            // Rotted, or broken up at last (`vitals::soil::PAT_MOST_DAYS`): a tuft of fresh grass.
+            let rots = matches!(base_api::grow::step(e, "base:dung_pat", false), base_api::grow::Step::Grow)
+                || ((e.world().random() >> 11) as f32 / (1u64 << 53) as f32) < vitals::soil::pat_break_chance();
+            if rots {
+                e.world().set_block(e.pos(), TALL_GRASS.id());
+            }
+        });
+    r.loot(&DUNG_PAT).pool(Pool::new().item("dung"));
     plant(r, &DANDELION, "flower_dandelion");
     plant(r, &ROSE, "flower_rose");
     // A wild rose gives itself and, a time in four, its hips.
@@ -1184,4 +1215,10 @@ fn grow_column(e: &mut BlockEvent, me: &'static Block) {
     if height < 3 {
         w.set_block(above, me.id());
     }
+}
+
+/// Whether a dung pat lies within `vitals::soil::PAT_REACH` blocks of `pos` (a block up or down).
+pub fn pat_near(w: &World, [x, y, z]: [i32; 3]) -> bool {
+    let r = vitals::soil::PAT_REACH;
+    (-1..=1).any(|dy| (-r..=r).any(|dz| (-r..=r).any(|dx| DUNG_PAT.is(w.block([x + dx, y + dy, z + dz])))))
 }

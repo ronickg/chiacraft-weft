@@ -131,6 +131,7 @@ block.base.water = Water
 block.base.lava = Lava
 block.base.tall_grass = Grass
 block.base.grazed_grass = Grazed Grass
+block.base.dung_pat = Dung Pat
 block.base.compost_bin = Compost Bin
 item.base.compost = Compost
 item.base.dung = Dung
