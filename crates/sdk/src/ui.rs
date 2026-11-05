@@ -614,6 +614,15 @@ impl Ui {
         self.leaf(n)
     }
 
+    /// Entity kind `kind` (`animals:grey_wolf`) as its model shows with no entity behind it (its
+    /// kind's own texture, no painted coat), turning with the mouse like the others: an entry in a
+    /// field guide. One 3D preview shows per screen.
+    pub fn kind_model(&mut self, kind: &str, w: f32, h: f32) {
+        let mut n = node(k::PLAYER_MODEL, S::default().size(w, h));
+        n.text = Str::new(&format!("kind:{kind}"));
+        self.leaf(n)
+    }
+
     pub fn spacer(&mut self) {
         self.leaf(node(k::SPACER, S::default().grow()))
     }
