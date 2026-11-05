@@ -6,16 +6,21 @@ impl Client {
     pub(super) fn receive(&mut self) {
         // World messages go to the terrain thread, all of a frame together.
         let mut fwd = Vec::new();
+        let p = crate::diag::part("messages");
         while let Some(msg) = self.conn.recv() {
             self.receive_message(msg, &mut fwd);
         }
+        drop(p);
         if !fwd.is_empty() {
             let _ = self.terrain.tx.send(terrain::In::Many(fwd));
         }
+        let p = crate::diag::part("take terrain");
         self.take_terrain();
+        drop(p);
         if self.conn.is_closed() && self.disconnected.is_none() {
             self.disconnected = Some("connection lost".into());
         }
+        let _p = crate::diag::part("removed cubes");
         for pos in std::mem::take(&mut self.world.removed) {
             self.render.remove((0, pos));
         }
@@ -439,6 +444,7 @@ impl Client {
                     break;
                 }
             }
+            let _p = crate::diag::part("end batch (no budget)");
             self.world.end_batch();
         }
     }
