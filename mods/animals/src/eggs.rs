@@ -59,6 +59,7 @@ pub static NEST: EntityKind = EntityKind::named("nest");
 static NEST_ITEM: Item = Item::named("nest");
 static AIR: Block = Block::named("core:air");
 static LEAVES: Tag = Tag::named("base:leaves");
+static LOGS: Tag = Tag::named("base:logs");
 static TOOLS: CreativeTab = CreativeTab::named("base:tools");
 static CRAFTING: RecipeKind = RecipeKind::named("base:crafting");
 /// Each laying species' egg item, by its row in `SPECIES` (made once).
@@ -357,8 +358,11 @@ fn nest_site(w: &World, site: animals_core::nests::Site, at: [f64; 3], ground: [
             if taken(top) {
                 continue;
             }
-            if LEAVES.on_block(b) {
-                if better(tree, top) {
+            // A crown: leaves, or a trunk's tip above them (our spruces end in a log: aw_nests3's
+            // ravens found no leaves on top and nested on the ground), high over the ground.
+            let crown = LEAVES.on_block(b) || LOGS.on_block(b);
+            if crown {
+                if y + 1 >= floor + CLIFF_ABOVE && better(tree, top) {
                     tree = Some(top);
                 }
             } else if site == Site::Cliff
