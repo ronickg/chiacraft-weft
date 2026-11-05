@@ -156,6 +156,39 @@ fn parse_gui(src: &str, pixels: [f32; 2]) -> Slicing {
     }
 }
 
+/// GUI images mods paint at runtime (`Host::client_image_set`), by name (`dyn:` first): their
+/// size, pixels and a count bumped on every set, so the renderer uploads only what changed.
+struct Dynamic {
+    w: u32,
+    h: u32,
+    rgba: Vec<u8>,
+    version: u64,
+}
+
+static DYNAMIC: std::sync::Mutex<Option<FxHashMap<String, Dynamic>>> = std::sync::Mutex::new(None);
+/// What a runtime GUI image's name starts with.
+pub const DYN: &str = "dyn:";
+/// The largest side of a runtime GUI image.
+pub const DYN_MAX: u32 = 2048;
+
+/// Sets runtime GUI image `name` (`DYN` first); false if refused.
+pub fn set_dynamic(name: &str, w: u32, h: u32, rgba: &[u8]) -> bool {
+    if !name.starts_with(DYN) || w == 0 || h == 0 || w > DYN_MAX || h > DYN_MAX || rgba.len() < (w * h * 4) as usize {
+        return false;
+    }
+    let mut all = DYNAMIC.lock().unwrap_or_else(|e| e.into_inner());
+    let all = all.get_or_insert_with(FxHashMap::default);
+    let e = all
+        .entry(name.to_string())
+        .or_insert(Dynamic { w, h, rgba: Vec::new(), version: 0 });
+    e.w = w;
+    e.h = h;
+    e.rgba.clear();
+    e.rgba.extend_from_slice(&rgba[..(w * h * 4) as usize]);
+    e.version += 1;
+    true
+}
+
 pub struct UiRenderer {
     pipeline: PipelineId,
     pub font: Font,
@@ -171,6 +204,8 @@ pub struct UiRenderer {
     /// Bare textures already warned about (`check_bare`).
     warned_bare: std::collections::HashSet<String>,
     owned: Vec<TextureId>,
+    /// Runtime GUI images on the GPU: texture, the version uploaded, size.
+    dynamic: FxHashMap<String, (TextureId, u64, u32, u32)>,
     buffers: Vec<(BufferId, u32)>,
     screen: Vec<BufferId>,
     pub quads: Vec<Quad>,
@@ -233,6 +268,7 @@ impl UiRenderer {
             outset: FxHashMap::default(),
             warned_bare: Default::default(),
             owned: Vec::new(),
+            dynamic: FxHashMap::default(),
             buffers: Vec::new(),
             screen,
             quads: Vec::new(),
@@ -373,6 +409,9 @@ impl UiRenderer {
 
     /// Bindless index and size of a GUI texture, loaded the first time it is used.
     pub fn texture(&mut self, gpu: &mut dyn Backend, assets: &Assets, name: &str) -> Option<(u32, u32, u32)> {
+        if name.starts_with(DYN) {
+            return self.dynamic_texture(gpu, name);
+        }
         if let Some(t) = self.textures.get(name) {
             return *t;
         }
@@ -428,6 +467,38 @@ impl UiRenderer {
         }
         self.textures.insert(name.to_string(), loaded);
         loaded
+    }
+
+    /// A runtime GUI image (`set_dynamic`) on the GPU: uploaded when its version moved, made anew
+    /// when its size changed.
+    fn dynamic_texture(&mut self, gpu: &mut dyn Backend, name: &str) -> Option<(u32, u32, u32)> {
+        let all = DYNAMIC.lock().unwrap_or_else(|e| e.into_inner());
+        let d = all.as_ref()?.get(name)?;
+        let have = self.dynamic.get(name).copied();
+        match have {
+            Some((t, v, w, h)) if w == d.w && h == d.h => {
+                if v != d.version {
+                    gpu.write_texture(t, 0, &d.rgba);
+                    self.dynamic.insert(name.to_string(), (t, d.version, w, h));
+                }
+                Some((gpu.texture_index(t), w, h))
+            }
+            _ => {
+                if let Some((old, ..)) = have {
+                    self.owned.retain(|&o| o != old);
+                    gpu.destroy_texture(old);
+                }
+                let t = gpu.create_texture(
+                    &TextureDesc { width: d.w, height: d.h, mips: 1, format: Format::Rgba8Srgb, render_target: false },
+                    name,
+                );
+                gpu.write_texture(t, 0, &d.rgba);
+                self.owned.push(t);
+                self.dynamic
+                    .insert(name.to_string(), (t, d.version, d.w, d.h));
+                Some((gpu.texture_index(t), d.w, d.h))
+            }
+        }
     }
 
     /// Whether GUI texture `name` declares a nine-slice in its `.gui`.

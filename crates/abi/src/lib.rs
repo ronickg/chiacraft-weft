@@ -3195,6 +3195,10 @@ pub struct Host {
     pub client_clip_length: unsafe extern "C" fn(c: *mut ClientCtx, entity: u64, name: Str) -> f32,
     /// The item in `entity`'s `hand`; 0 for none.
     pub client_held_item: unsafe extern "C" fn(c: *mut ClientCtx, entity: u64, hand: u32) -> u32,
+    /// Sets GUI image `name` (it must start with `dyn:`) to `w` x `h` RGBA pixels (`len` bytes, 4
+    /// a pixel): the UI's `image` parts of that name draw it from the next frame, uploaded again
+    /// only when it is set again. 0 if refused (no `dyn:`, a size of 0 or over 2048, `len` short).
+    pub client_image_set: unsafe extern "C" fn(c: *mut ClientCtx, name: Str, w: u32, h: u32, rgba: *const u8, len: usize) -> u32,
     /// Where a bone of what `entity` is or has on was, the last frame. 0 if there is none.
     pub client_bone_position: unsafe extern "C" fn(c: *mut ClientCtx, entity: u64, bone: Str, out: *mut Vec3) -> u32,
     /// The engine's own cosmetics for this entity, what a kind without a tick gets.

@@ -40,9 +40,12 @@ static TWITCH: Sound = Sound::named("ley.twitch");
 static SEED: Component<[u32; 3]> = Component::named("ley_seed");
 
 pub fn register(r: &mut Registry) {
+    // Held on use at a sleeping waystone it wakes it (`waystones.rs`).
     r.item(&DOWSING_ROD)
         .max_stack(1)
         .handheld()
+        .use_ticks(vitals::waystones::WAKE_TICKS)
+        .on_use(crate::waystones::rod_used)
         .tag("dowsing_rods")
         .tab(&crate::tabs::TOOLS);
     // A forked branch lashed with cordage, a tektite (star glass, the ancients' own) at its tip.
@@ -59,6 +62,7 @@ pub fn register(r: &mut Registry) {
     r.block(&WAYSTONE)
         .sound_group("stone")
         .unbreakable()
+        .on_use(crate::waystones::stone_used)
         .textures("waystone_top", "waystone_side", "ley_stone_top")
         .tag("waystones")
         .tab(&crate::tabs::BUILDING);
@@ -152,6 +156,23 @@ fn hand_seed(w: &World) {
             *v = sight;
         }
     }
+}
+
+/// The world's seed on the client while its player is in the overworld (the lines and the map are
+/// the overworld's), from the server (`SEED`).
+pub(crate) fn seed_here(view: &ClientView) -> Option<u64> {
+    view.component(&SEED)
+        .filter(|s| s[2] != 0)
+        .map(|[lo, hi, _]| lo as u64 | (hi as u64) << 32)
+}
+
+/// Whether the local player sees the ley lines now: the rod in a hand, or ley sight.
+pub(crate) fn sees_lines(c: &Client) -> bool {
+    let view = c.view();
+    let me = view.player();
+    let rod = DOWSING_ROD.id();
+    let holding = rod != u32::MAX && (c.held_item(me, Hand::Main) == rod || c.held_item(me, Hand::Off) == rod);
+    holding || view.component(&base_api::LEY_SIGHT).unwrap_or(0.0) > 0.0
 }
 
 // ------------------------------------------------------------------ the waystones
@@ -311,11 +332,10 @@ fn waystones(g: &mut Gen) {
     }
 }
 
-/// A ley node's heart opened: what waking a sleeping waystone does (`notes/PROGRESSION.md`, "From
-/// the survival research": waystones, ancient ley nodes you wake), not built yet. Waking calls this
-/// with the age it happens in; the perk web's socket stone may drop at the stone
-/// (`StoneSource::LeyNode`: a quarter of the time, depth 5). True when one dropped.
-#[allow(dead_code)]
+/// A ley node's heart opened: what waking a sleeping waystone does (`waystones.rs`, `notes/
+/// PROGRESSION.md` "From the survival research": waystones, ancient ley nodes you wake), with the
+/// age it happens in; the perk web's socket stone may drop at the stone (`StoneSource::LeyNode`: a
+/// quarter of the time, depth 5). True when one dropped.
 pub(crate) fn heart_opened(w: &World, node: &Node, tier: u8, top: i32) -> bool {
     let at = [node.x as f64 + 0.5, top as f64 + 1.2, node.z as f64 + 0.5];
     base_api::skills::drop_stone(w, base_api::skills::StoneSource::LeyNode, tier, at)
