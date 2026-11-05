@@ -683,8 +683,9 @@ fn aurora(dir: vec3<f32>) -> vec3<f32> {
 }
 
 // Shooting stars on a meteor shower's night (a sky event): pixel-snapped streaks, as many as the
-// shower's strength (1 at its peak), each a fraction of a second. In four layers of slots of 1.2 s,
-// each slot holds one streak or none, from a hash of the slot alone.
+// shower's strength (1 at its peak), each a fraction of a second. In twelve layers of slots of
+// 1.2 s, each slot holds one streak or none, from a hash of the slot alone: at four the whole sky
+// held about one at a time, and a view rarely caught it (the sky-events check, 11-05).
 fn meteors(dir: vec3<f32>) -> vec3<f32> {
     let shower = sky_event(2.0);
     let dark = smoothstep(-0.1, -0.25, scene.sun.y) * (1.0 - rain_amount());
@@ -694,12 +695,12 @@ fn meteors(dir: vec3<f32>) -> vec3<f32> {
     let d = normalize(floor(dir * 220.0) / 220.0);
     let t = scene.params.w;
     var c = vec3(0.0);
-    for (var layer = 0u; layer < 4u; layer++) {
-        let at = t / 1.2 + f32(layer) * 0.31;
+    for (var layer = 0u; layer < 12u; layer++) {
+        let at = t / 1.2 + f32(layer) * 0.0833;
         let slot = u32(floor(at));
         let h = hash(slot * 4u + layer + 7u);
         // About two a second at the peak, a few a minute on a side night.
-        if unit(h) > mix(0.05, 0.6, shower) {
+        if unit(h) > mix(0.04, 0.8, shower) {
             continue;
         }
         let f = fract(at) / 0.45;
@@ -712,12 +713,12 @@ fn meteors(dir: vec3<f32>) -> vec3<f32> {
         let start = vec3(cos(az) * cos(el), sin(el), sin(az) * cos(el));
         let side = normalize(cross(start, vec3(0.0, 1.0, 0.0)) + vec3(0.0, 1e-4, 0.0));
         let fall = normalize(side * (unit(h * 5u + 3u) * 2.0 - 1.0) - vec3(0.0, 0.6, 0.0) * start.y);
-        let head = normalize(start + fall * 0.22 * f);
+        let head = normalize(start + fall * 0.3 * f);
         // Distance to the streak between where it began and its head.
         let ab = head - start;
         let k = clamp(dot(d - start, ab) / max(dot(ab, ab), 1e-6), 0.0, 1.0);
         let off = length(d - (start + ab * k));
-        let line = 1.0 - smoothstep(0.0025, 0.005, off);
+        let line = 1.0 - smoothstep(0.003, 0.006, off);
         // Brightest at the head, fading along the trail and as it burns out.
         let fade = k * k * (1.0 - smoothstep(0.7, 1.0, f));
         c += vec3(0.95, 0.97, 1.0) * line * fade * 0.9;
