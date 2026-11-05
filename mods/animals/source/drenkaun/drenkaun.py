@@ -35,31 +35,43 @@ K = 4.0  # the deer's layout drawn this much bigger: the withers 3.75 m up, 6.9 
 
 # ------------------------------------------------------------------ materials and eyes
 
-FUR, BACK, BELLY, DARK, EARIN, MOUTH, ANTLER, HOOF, TAILTOP, LEG, PALE, BONE, MOSS, MOSSDK, BARK = range(15)
+FUR, BACK, BELLY, DARK, EARIN, MOUTH, ANTLER, HOOF, TAILTOP, LEG, PALE, BONE, MOSS, MOSSDK, BARK, BARKDK, BARKLT = range(17)
 # From concept A: a warm mid-brown coat (FUR), darker along the spine (BACK), a cream-tan belly,
 # throat and muzzle (BELLY, PALE), dark brown legs (LEG), dark hooves, a cream tail; antlers of
 # bark-brown (ANTLER) to bone-pale tips (BONE); a yellow-green moss cape and mane (MOSS, its shade
 # MOSSDK); grey-brown bark plates (BARK).
 BASE = [(150, 88, 46), (104, 60, 32), (224, 190, 136), (48, 34, 26), (190, 140, 110), (84, 42, 44), (140, 92, 54),
         (56, 40, 32), (226, 196, 146), (86, 52, 30), (210, 164, 108), (232, 218, 186), (156, 158, 46), (102, 108, 30),
-        (132, 114, 94)]
-SHADOW = [0.02, 0.02, 0.06, 0.95, 0.97, 0.95, 0.04, 0.74, 0.06, 0.02, 0.06, 0.06, 0.12, 0.12, 0.74]
+        (108, 82, 58), (64, 46, 32), (146, 118, 86)]
+SHADOW = [0.02, 0.02, 0.06, 0.95, 0.97, 0.95, 0.04, 0.74, 0.06, 0.02, 0.06, 0.06, 0.12, 0.12, 0.05, 0.04, 0.06]
 TONES = [tones(c, h) for c, h in zip(BASE, SHADOW)]
 COAT = (FUR, BACK, BELLY, LEG, PALE, MOSS, MOSSDK)
 
 # Amber eyes on the sides of the head: at K = 4 the head's side is 28 texels by 24, so a 4 by 3
 # design: a dark rim, an amber iris glowing low, a near-black pupil, a catchlight up and forward.
 EYES.update({
-    "warden": dict(pattern=["OHPO", "OPPO", "OIIO"], colors={"O": (54, 34, 22), "P": (22, 14, 10), "H": (240, 236, 220),
-                                                            "I": (222, 150, 52)}, halo="none", iris="I"),
-    "warden_m": dict(pattern=["OPHO", "OPPO", "OIIO"], colors={"O": (54, 34, 22), "P": (22, 14, 10), "H": (240, 236, 220),
-                                                              "I": (222, 150, 52)}, halo="none", iris="I"),
+    # 5 by 4 at the bigger head, a bright amber ring that reads from the side (Ronald: "the amber
+    # eye readable from the side").
+    "warden": dict(pattern=[".OOO.", "OIHIO", "OIPIO", ".OIO."], colors={"O": (54, 30, 18), "P": (22, 14, 10), "H": (248, 240, 214),
+                                                                        "I": (240, 168, 56)}, halo="none", iris="I"),
+    "warden_m": dict(pattern=[".OOO.", "OIHIO", "OIPIO", ".OIO."], colors={"O": (54, 30, 18), "P": (22, 14, 10), "H": (248, 240, 214),
+                                                                          "I": (240, 168, 56)}, halo="none", iris="I"),
 })
 EYE_STYLE = "warden"
 
-# In the deer's space (scaled by K when the model is built).
-SKULL0 = ((-7.0, 60.0, 32.0), (7.0, 72.0, 46.0))
-EYE_Z0, EYE_Y0 = 40.5, 67.6
+# In the deer's space (scaled by K when the model is built). The head is drawn `HS` times its
+# reindeer size about its pivot (Ronald, 11-05: "the head is small: scale it up a little").
+HEAD = np.array([0.0, 66.0, 38.0])
+HS = 1.22
+
+
+def hs(p):
+    """A point of the head, drawn `HS` times bigger about the head's pivot."""
+    return tuple(HEAD + (np.array(p, float) - HEAD) * HS)
+
+
+SKULL0 = (hs((-7.0, 60.0, 32.0)), hs((7.0, 72.0, 46.0)))
+EYE_Z0, EYE_Y0 = hs((0, 67.6, 40.5))[2], hs((0, 67.6, 40.5))[1]
 SKULL = tuple(tuple(v * K for v in c) for c in SKULL0)
 EYE_Z, EYE_Y = EYE_Z0 * K, EYE_Y0 * K
 LID_X = SKULL[1][0] + 0.4  # the eyelids' hinge plane, just outside the head's side (scaled)
@@ -126,13 +138,13 @@ def eye_box(side):
 LEGS = ("FL", "FR", "BL", "BR")
 FRONT_X, FRONT_Z, BACK_X, BACK_Z = 6.4, 21.0, 6.2, -30.0
 # The neck carried forward and low (45 degrees), the head held out in front: a reindeer's way.
-HEAD, NECK_PITCH, NECK_LEN, NECK_W = np.array([0.0, 66.0, 38.0]), -45.0, 30.0, 10.4
+NECK_PITCH, NECK_LEN, NECK_W = -45.0, 30.0, 13.0  # a thick neck (Ronald: "a thicker neck rising to the head")
 NECK0 = HEAD - (NECK_LEN - 2.5) * np.array([0, math.sin(math.radians(-NECK_PITCH)), math.cos(math.radians(-NECK_PITCH))])
 NECK_ROT = (NECK_PITCH + 90, 0, 0)
 EAR = [(70.5, 72.5, 1.8), (72.5, 76.5, 2.6), (76.5, 78.5, 1.7)]  # y0, y1, half width: short and round
 EAR_X, EAR_Z = 5.4, (34.0, 35.6)
 TAIL0 = np.array([0.0, 53.5, -40.0])  # on the rump's back face: a flap hinged on the surface
-ANTLER0 = (3.6, 71.4, 36.5)  # where the left antler's burr sits on the skull
+ANTLER0 = hs((3.6, 71.4, 36.5))  # where the left antler's burr sits on the skull
 
 
 def antler(side):
@@ -147,23 +159,30 @@ def antler(side):
     start = (s * x0, y0, z0)
     E = [el(f"burr_{k}", bone, (s * x0 - 1.4, y0 - 1.0, z0 - 1.6), (s * x0 + 1.4, y0 + 2.6, z0 + 1.6))]
     # Wide like a lyre (concept A): out and back, then up, the tips curving in a little.
-    beam0, p1 = rod(f"beam0_{k}", bone, (start[0], y0 + 2.0, z0), (-20, 0, -s * 76), 14.0, 3.0)
-    beam1, p2 = rod(f"beam1_{k}", bone, tuple(p1), (-12, 0, -s * 58), 13.0, 2.6)
-    beam2, p3 = rod(f"beam2_{k}", bone, tuple(p2), (2, 0, -s * 34), 12.0, 2.2)
-    beam3, p4 = rod(f"beam3_{k}", bone, tuple(p3), (16, 0, -s * 8), 9.0, 1.8)
+    beam0, p1 = rod(f"beam0_{k}", bone, (start[0], y0 + 2.0, z0), (-20, 0, -s * 76), 17.0, 3.4)
+    beam1, p2 = rod(f"beam1_{k}", bone, tuple(p1), (-12, 0, -s * 58), 16.0, 3.0)
+    beam2, p3 = rod(f"beam2_{k}", bone, tuple(p2), (2, 0, -s * 34), 15.0, 2.6)
+    beam3, p4 = rod(f"beam3_{k}", bone, tuple(p3), (16, 0, -s * 8), 11.0, 2.1)
     E += [beam0, beam1, beam2, beam3]
-    tines = [("brow", np.array(start) + np.array([s * 0.6, 3.0, 0.8]), (70, 0, -s * 22), 10.0, 1.8),
-             ("bez", p1 + (p2 - p1) * 0.1, (48, 0, -s * 18), 10.0, 1.7),
-             ("trez", p1 + (p2 - p1) * 0.75, (34, 0, -s * 10), 11.0, 1.6),
-             ("royal", p2 + (p3 - p2) * 0.6, (28, 0, s * 10), 9.0, 1.5),
-             ("fork", p3 + (p4 - p3) * 0.5, (-12, 0, -s * 30), 8.0, 1.4)]
+    # Branchy as concept A: seven tines a side, the upper ones forking off the beam's outer side.
+    tines = [("brow", np.array(start) + np.array([s * 0.6, 3.0, 0.8]), (70, 0, -s * 22), 12.0, 2.1),
+             ("bez", p1 + (p2 - p1) * 0.1, (48, 0, -s * 18), 12.0, 2.0),
+             ("trez", p1 + (p2 - p1) * 0.75, (34, 0, -s * 10), 13.0, 1.9),
+             ("royal", p2 + (p3 - p2) * 0.45, (28, 0, s * 10), 11.0, 1.8),
+             ("sur", p2 + (p3 - p2) * 0.9, (-4, 0, -s * 52), 9.0, 1.7),
+             ("crown", p3 + (p4 - p3) * 0.55, (8, 0, s * 22), 9.0, 1.6),
+             ("fork", p3 + (p4 - p3) * 0.5, (-12, 0, -s * 40), 9.5, 1.6)]
     for name, at, rot, length, w in tines:
         t, _ = rod(f"tine_{name}_{k}", bone, tuple(at), rot, length, w)
         E.append(t)
     # Moss hanging from the beam, in drips of different lengths, and leaves at the tines' roots.
-    for j, (q, f, ln, u) in enumerate(((p1, p2, 7.0, 0.35), (p2, p3, 5.0, 0.65), (p1, p2, 4.0, 0.2))):
+    # Strands of moss hanging from the beams and tines, of different lengths (concept A).
+    drips = ((p1, p2, 11.0, 0.3, 1.2), (p2, p3, 8.0, 0.6, 1.0), (p1, p2, 6.0, 0.8, 0.9), (p0 := np.array(start), p1, 7.0, 0.7, 1.1),
+             (p3, p4, 6.5, 0.3, 0.9), (p2, p3, 4.5, 0.2, 0.8))
+    for j, (q, f, ln, u, w) in enumerate(drips):
         at = q + (f - q) * u
-        E.append(el(f"moss_drip{j}_{k}", bone, (at[0] - 0.7, at[1] - ln, at[2] - 0.7), (at[0] + 0.7, at[1] - 0.4, at[2] + 0.7)))
+        E.append(el(f"moss_drip{j}_{k}", bone, (at[0] - w / 2, at[1] - ln, at[2] - w / 2 + 0.13 * j),
+                    (at[0] + w / 2, at[1] - 0.6, at[2] + w / 2 + 0.13 * j)))
     for j, (name, at, rot, length, w) in enumerate(tines[1:4]):
         E.append(el(f"leaf{j}_{k}", bone, (at[0] - 1.6, at[1] + 0.2, at[2] - 1.05), (at[0] + 1.6, at[1] + 0.9, at[2] + 1.55)))
     return E
@@ -171,10 +190,10 @@ def antler(side):
 
 def bones():
     B = [("root", None, (0, 0, 0)), ("spine_0", "root", (0, 48, -22)), ("spine_1", "spine_0", (0, 46, -7)),
-         ("neck", "spine_1", tuple(NECK0)), ("head", "neck", tuple(HEAD)), ("jaw", "head", (0, 60.1, 45.0)),
+         ("neck", "spine_1", tuple(NECK0)), ("head", "neck", tuple(HEAD)), ("jaw", "head", hs((0, 60.1, 45.0))),
          ("tail", "spine_0", tuple(TAIL0))]
     for s, n in ((1, "L"), (-1, "R")):
-        B += [(f"ear_{n}", "head", (s * EAR_X, 71.0, sum(EAR_Z) / 2)), (f"antler_{n}", "head", (s * ANTLER0[0], ANTLER0[1], ANTLER0[2]))]
+        B += [(f"ear_{n}", "head", hs((s * EAR_X, 71.0, sum(EAR_Z) / 2))), (f"antler_{n}", "head", (s * ANTLER0[0], ANTLER0[1], ANTLER0[2]))]
     for leg in LEGS:
         s = 1 if leg[1] == "L" else -1
         if leg[0] == "F":
@@ -195,52 +214,79 @@ def bones():
 def elements():
     E = [el("hips", "spine_0", (-10.6, 35, -40), (10.6, 57.5, 0)),  # reaching deep into the chest, below the withers
          el("chest", "spine_1", (-11.4, 30, -8), (11.4, 60, 30)),  # deep and broad
+         # Ronald: "a deeper chest and shoulders ... and a lower belly line at the back".
+         el("brisket", "spine_1", (-9.6, 25.5, 12.0), (9.6, 34.0, 32.5)),
+         el("shoulders", "spine_1", (-12.8, 43.0, 4.0), (12.8, 58.6, 26.5)),
+         el("belly", "spine_0", (-9.2, 31.6, -31.0), (9.2, 38.0, -5.0)),
          el("skull", "head", *SKULL0),
-         el("muzzle", "head", (-5.4, 59.6, 45.5), (5.4, 67.6, 55.0)),  # broad and blunt
-         el("nose", "head", (-4.6, 60.4, 54.5), (4.6, 66.6, 57.4)),  # furred to the lip
-         el("mouth", "head", (-3.5, 58.9, 44.5), (3.5, 60.9, 53.6)),
-         el("jaw", "jaw", (-4.0, 57.6, 44.0), (4.0, 60.4, 54.0))]  # shorter than the muzzle
+         el("muzzle", "head", hs((-5.4, 59.6, 45.5)), hs((5.4, 67.6, 55.0))),  # broad and blunt
+         el("nose", "head", hs((-4.6, 60.4, 54.5)), hs((4.6, 66.6, 57.4))),  # furred to the lip
+         el("mouth", "head", hs((-3.5, 58.9, 44.5)), hs((3.5, 60.9, 53.6))),
+         el("jaw", "jaw", hs((-4.0, 57.6, 44.0)), hs((4.0, 60.4, 54.0)))]  # shorter than the muzzle
     neck, _ = rod("neck", "neck", tuple(NECK0), NECK_ROT, NECK_LEN, NECK_W, back=6.0)  # slimmer than the head
     E.append(neck)
-    # The mane: long pale hair down the throat, a box with locks hanging below it.
     n0 = NECK0
-    E.append(el("mane", "neck", (-4.7, n0[1] + 3, n0[2] + 4.0), (4.7, n0[1] + 24, n0[2] + 8.6), rot=NECK_ROT, origin=tuple(n0)))
-    E.append(el("fringe_mane", "neck", (0, n0[1] + 3.5, n0[2] + 6.0), (0, n0[1] + 24.5, n0[2] + 23.0), quad="east", rot=NECK_ROT,
+    hw = NECK_W / 2
+    # The moss mane (Ronald: "a mane that drapes over the neck and shoulders in uneven tufts"):
+    # under the throat a long beard of locks; along the neck's crest tufts of different sizes; over
+    # the withers and shoulders more tufts, their locks hanging down the sides unevenly.
+    E.append(el("mane", "neck", (-5.6, n0[1] + 3, n0[2] + hw - 1.5), (5.6, n0[1] + 24, n0[2] + hw + 3.1), rot=NECK_ROT, origin=tuple(n0)))
+    E.append(el("fringe_mane", "neck", (0, n0[1] + 3.5, n0[2] + hw), (0, n0[1] + 24.5, n0[2] + hw + 15.0), quad="east", rot=NECK_ROT,
                 origin=tuple(n0), cut="mane"))
-    # The moss cape over the withers and shoulders, hanging down the sides in locks, and the bark
-    # plates on its back; the crown of bark on its head between the antlers (`Part` crown).
-    E.append(el("moss_cape", "spine_1", (-12.2, 49.0, -4.0), (12.2, 61.2, 31.0)))
+    for j, (t, ln, w, d) in enumerate(((2.0, 8.0, 1.6, 3.2), (8.5, 7.0, 2.3, 2.6), (14.5, 8.5, 1.3, 3.6), (21.5, 6.5, 1.1, 2.4))):
+        E.append(el(f"moss_crest{j}", "neck", (-hw - w, n0[1] + t, n0[2] - hw - d), (hw + w, n0[1] + t + ln, n0[2] - hw + 2.0 + 0.2 * j),
+                    rot=NECK_ROT, origin=tuple(n0)))
+    for j, (x, y0, y1, z0, z1) in enumerate(((13.6, 51.0, 61.6, 17.5, 30.7), (14.3, 47.5, 60.4, 7.0, 19.0), (13.2, 52.5, 62.4, -3.5, 8.0))):
+        E.append(el(f"moss_tuft{j}", "spine_1", (-x, y0, z0), (x, y1, z1)))
     for s_, q in ((1, "east"), (-1, "west")):
-        E.append(el(f"fringe_moss_{q}", "spine_1", (s_ * 12.7, 34.0, -3.0), (s_ * 12.7, 60.6, 30.5), quad=q, cut="moss"))
-        # A bark plate on each shoulder, lying on the cape's side and top, tilted out (concept A's
-        # armour of bark).
-        E.append(el(f"bark_shoulder_{q}", "spine_1", (s_ * 11.0 - 6.0, 54.0, 0.0), (s_ * 11.0 + 6.0, 57.6, 24.0), rot=(0, 0, -s_ * 58),
-                    origin=(s_ * 11.0, 55.8, 12.0)))
-    E.append(el("bark_back", "spine_0", (-8.2, 55.6, -34.0), (8.2, 60.4, -10.0), rot=(-4, 0, 0), origin=(0, 57.0, -22.0)))
-    E.append(el("crown", "head", (-4.4, 71.4, 33.0), (4.4, 74.4, 43.0)))
+        E.append(el(f"fringe_moss_{q}", "spine_1", (s_ * 14.8, 30.0, -3.0), (s_ * 14.8, 60.0, 30.5), quad=q, cut="moss"))
+    # Bark scales (Ronald: "overlapping brown-grey bark scales along the back and flanks"): a
+    # row down the back from behind the moss to the rump, each lifted at its back edge over the
+    # next like shingles, and three down each flank.
+    for j in range(5):
+        z0 = -2.0 - 8.0 * j
+        w = 7.6 - 0.5 * (j % 2) - 0.3 * j
+        bone_ = "spine_1" if z0 > -8 else "spine_0"
+        top = 60.4 if bone_ == "spine_1" else 57.9
+        E.append(el(f"bark_back{j}", bone_, (-w, top - 2.4 - 0.35 * j, z0 - 10.5), (w, top + 0.9 + 0.12 * j, z0), rot=(-11 - 2.5 * j, 0, 0),
+                    origin=(0, top, z0)))
+    for s_, q in ((1, "e"), (-1, "w")):
+        for j, (z0, y0) in enumerate(((-12.0, 46.5), (-21.5, 47.5), (-31.0, 46.0))):
+            x0 = s_ * (10.6 + 0.4 * j)
+            th = 1.3 + 0.3 * j
+            E.append(el(f"bark_flank{j}_{q}", "spine_0", (x0 - th, y0 - 5.0, z0 - 6.0 - 0.15 * j), (x0 + th, y0 + 5.0, z0 + 4.0),
+                        rot=(0, 0, s_ * (16 + 3 * j)), origin=(x0, y0 + 5.0, z0)))
+    E.append(el("crown", "head", hs((-4.4, 71.4, 33.0)), hs((4.4, 74.4, 43.0))))
     E.append(el("tail", "tail", (-2.6, 45.5, -42.8), (2.6, 54.5, -39.75), rot=(12, 0, 0), origin=tuple(TAIL0)))
     for s, n in ((1, "L"), (-1, "R")):
         cx = EAR_X * s
         rot, origin = (-14, 0, -s * 45), (cx, 71.0, sum(EAR_Z) / 2)
-        for k, (y0, y1, hw) in enumerate(EAR):
-            E.append(el(f"ear_core_{n.lower()}{k}", f"ear_{n}", (cx - hw, y0, EAR_Z[0]), (cx + hw, y1, EAR_Z[1]), rot=rot, origin=origin))
+        ears = [el(f"ear_core_{n.lower()}{k}", f"ear_{n}", (cx - hw_, y0, EAR_Z[0]), (cx + hw_, y1, EAR_Z[1]), rot=rot, origin=origin)
+                for k, (y0, y1, hw_) in enumerate(EAR)]
         zc = sum(EAR_Z) / 2
-        E.append(el(f"fringe_ear_{n.lower()}", f"ear_{n}", (cx - 3.1, 70, zc), (cx + 3.1, 79.6, zc), quad="south", rot=rot,
-                    origin=origin, cut="ear"))
+        ears.append(el(f"fringe_ear_{n.lower()}", f"ear_{n}", (cx - 3.1, 70, zc), (cx + 3.1, 79.6, zc), quad="south", rot=rot,
+                       origin=origin, cut="ear"))
+        for e in ears:  # the ears go with the bigger head
+            e["lo"], e["hi"], e["origin"] = list(hs(e["lo"])), list(hs(e["hi"])), list(hs(e["origin"]))
+        E += ears
         E += antler(n)
+    # Legs (Ronald: "thicker, with knees and hocks, taper to the hooves"): each a thick upper part,
+    # a knee or hock where it bends, a slimmer shank, a broad dark hoof.
     for leg in LEGS:
         s = 1 if leg[1] == "L" else -1
         if leg[0] == "F":
             x, z = FRONT_X * s, FRONT_Z
-            E.append(el(f"leg_{leg}_upper", f"leg_{leg}_upper", (x - 3.6, 20, z - 3.6), (x + 3.6, 42, z + 3.8)))
-            E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x - 2.4, 4.5, z - 2.4), (x + 2.4, 22, z + 2.4)))
-            E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 3.2, 0, z - 3.0), (x + 3.2, 5.6, z + 3.8)))  # the broad hoof
+            E.append(el(f"leg_{leg}_upper", f"leg_{leg}_upper", (x - 4.4, 18.5, z - 4.4), (x + 4.4, 44.6, z + 4.6)))
+            E.append(el(f"knee_{leg}", f"leg_{leg}_lower", (x - 3.7, 17.0, z - 3.6), (x + 3.7, 23.5, z + 3.9)))
+            E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x - 3.0, 4.6, z - 3.0), (x + 3.0, 20.0, z + 3.0)))
+            E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 3.4, 0, z - 3.3), (x + 3.4, 5.4, z + 3.9)))  # the broad hoof
         else:
             x, z = BACK_X * s, BACK_Z
-            xi, xo = sorted((x - 3.8 * s, x + 3.8 * s))  # the ham
-            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (xi, 28, z - 6.5), (xo, 55.5, z + 6)))
-            E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x - 2.5, 5.5, z - 2.5), (x + 2.5, 30, z + 2.5)))
-            E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 3.3, 0, z - 3.1), (x + 3.3, 6.2, z + 3.9)))
+            xi, xo = sorted((x - 4.6 * s, x + 4.6 * s))  # the ham
+            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (xi, 27.5, z - 7.0), (xo, 55.5, z + 6.5)))
+            E.append(el(f"hock_{leg}", f"leg_{leg}_lower", (x - 3.5, 24.5, z - 3.4), (x + 3.5, 31.5, z + 3.6)))
+            E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x - 2.9, 5.4, z - 2.9), (x + 2.9, 26.0, z + 2.9)))
+            E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 3.4, 0, z - 3.2), (x + 3.4, 6.0, z + 3.8)))
     for e in E:  # the deer's space, drawn K times bigger
         e["lo"] = [v * K for v in e["lo"]]
         e["hi"] = [v * K for v in e["hi"]]
@@ -294,7 +340,15 @@ def area(e, face, p, uu, vv, h):
     a = np.full(x.shape, FUR)
     side = face in ("east", "west")
     t = vv / max(h, 1)
-    if name in ("hips", "chest"):
+    if name in ("brisket", "shoulders", "belly"):
+        a[:] = FUR
+        if face == "down":
+            a[:] = BELLY
+        elif name == "belly" and face != "up":
+            a = np.where(y < 34.5, BELLY, FUR)
+        elif name == "brisket" and face == "south":
+            a = np.where(y < 29.0, BELLY, FUR)
+    elif name in ("hips", "chest"):
         if face == "up":
             a[:] = BACK
         elif face == "down":
@@ -305,14 +359,16 @@ def area(e, face, p, uu, vv, h):
                 a = np.where(y > 36.0, FUR, BELLY)  # behind the moss mane's locks
             if name == "hips" and face == "north":
                 a = np.where((np.abs(x) < 6.0) & (y > 40), BELLY, a)  # the pale rump round the tail
-    elif name in ("moss_cape", "mane", "fringe_mane") or name.startswith("fringe_moss"):
+    elif name in ("mane", "fringe_mane") or name.startswith(("fringe_moss", "moss_crest", "moss_tuft")):
         a[:] = MOSS
         if e["quad"]:
-            o = e["lo"][1] / K if not e["rot"] else None
-            if o is not None:
-                a = np.where(y < 46.0, MOSSDK, MOSS)  # the locks darker toward their tips
+            if not e["rot"]:
+                a = np.where(y < 44.0, MOSSDK, MOSS)  # the locks darker toward their tips
         elif face == "down":
             a[:] = MOSSDK
+        elif face != "up":  # tufts: darker below, in uneven tongues
+            tongue = 0.35 + 0.25 * np.sin(uu * 1.7 + len(name)) + 0.15 * np.sin(uu * 0.6)
+            a = np.where(t > 1 - tongue * 0.6, MOSSDK, MOSS)
     elif name == "neck":
         a[:] = FUR
         if face in ("north", "up"):
@@ -320,18 +376,28 @@ def area(e, face, p, uu, vv, h):
         elif face == "south" or face == "down":
             a[:] = PALE
     elif name.startswith("bark") or name == "crown":
+        # Brown-grey bark (Ronald: "with texture, no flat grey panels"): deep grooves along the
+        # scale broken into plates, a lighter worn edge round it, a fleck of moss now and then.
         a[:] = BARK
-        if face in ("up", "east", "west"):  # grooves along its length, a few texels apart, broken now and then
-            o = np.array(e["origin"]) / K if e["origin"] else np.zeros(3)
-            across = np.hypot(x - o[0], y - o[1])
-            a = np.where(((np.floor(across * K * TX / 3.0) % 3) == 0) & ((np.floor(z * K * TX / 7.0) % 5) != 0), DARK, BARK)
+        seed = sum(map(ord, name))
+        if e["quad"] is None:
+            # Streaks of bark down the scale, each its own length (no frame, no grid: Ronald's
+            # "grey signs with stripes").
+            col = uu.astype(int)
+            r1 = (np.sin(col * 12.9898 + seed) * 43758.5453) % 1.0
+            r2 = (np.sin(col * 78.233 + seed * 3) * 12345.678) % 1.0
+            streak = (r1 < 0.32) & (vv > r2 * vv.max() * 0.5)
+            a = np.where(streak, BARKDK, BARK)
+            a = np.where((r1 > 0.86) & (vv < vv.max() * 0.7), BARKLT, a)
+            if face == "up":
+                a = np.where(((uu.astype(int) * 7 + vv.astype(int) * 13 + seed) % 29) == 0, MOSS, a)
     elif name == "skull":
         if face == "up":
             a[:] = BACK
         elif face == "down":
             a[:] = PALE
         elif side:
-            a = np.where(z > 42.5, PALE, FUR)
+            a = np.where(z > hs((0, 0, 42.5))[2], PALE, FUR)
         elif face == "north":
             a[:] = FUR
     elif name == "muzzle":
@@ -351,7 +417,7 @@ def area(e, face, p, uu, vv, h):
     elif name.startswith(("burr_", "beam", "tine_")):
         a[:] = ANTLER
         if name.startswith("tine_") or name.startswith("beam3"):
-            a = np.where(local_y(e, p * K) > 0.55, BONE, ANTLER)
+            a = np.where(local_y(e, p * K) > 0.72, BONE, ANTLER)
     elif name == "tail":
         a[:] = TAILTOP
     elif name.startswith("ear_core"):
@@ -359,6 +425,8 @@ def area(e, face, p, uu, vv, h):
         if face == "south":
             cx = e["origin"][0] / K
             a = np.where(np.abs(x - cx) < 1.7, EARIN, np.where(np.abs(x - cx) < 2.3, FUR, DARK))
+    elif name.startswith(("knee_", "hock_")):
+        a[:] = LEG
     elif name.startswith("thigh_"):
         a[:] = FUR
         if face == "up":
@@ -380,7 +448,9 @@ def cut_mask(e, p):
         u = np.clip((z + 3.0) / 33.5, 0, 1)
         period = max(2.0, 3 / (TX * K))
         lock = np.abs(((z / period) % 1.0) - 0.5) * 2
-        tip = 47.0 - 11.0 * np.sin(math.pi * u) ** 0.8 + 3.0 * lock  # shaggy, longest over the shoulder
+        idx = np.floor(z / period)
+        rnd = (np.sin(idx * 12.9898 + e["lo"][0]) * 43758.5453) % 1.0  # each lock its own length: uneven tufts
+        tip = 46.0 - 12.0 * np.sin(math.pi * u) ** 0.8 + 3.0 * lock + 7.0 * rnd  # shaggy, longest over the shoulder
         return y >= tip
     if e["cut"] == "ear":
         x, y = p[..., 0] / K, p[..., 1] / K
@@ -564,8 +634,8 @@ def pose_charge_tell(t):
     p = t / 1.2
     d = ease(p, 0.0, 0.3)
     scrape = S(TAU * p * 2) if p < 0.9 else 0.0
-    return stand({"neck": (HEAD_UP[0][0] + 50 * d, 0, 0), "head": (HEAD_UP[1][0] + 18 * d, 0, 0), "spine_1": (4 * d, 0, 0),
-                  "leg_FR_upper": (-25 * max(0.0, scrape), 0, 0), "leg_FR_lower": (30 * max(0.0, scrape), 0, 0),
+    return stand({"neck": (HEAD_UP[0][0] + 45 * d, 0, 0), "head": (HEAD_UP[1][0] + 21 * d, 0, 0), "spine_1": (4 * d, 0, 0),
+                  "leg_FR_upper": (-23 * max(0.0, scrape), 0, 0), "leg_FR_lower": (30 * max(0.0, scrape), 0, 0),
                   "tail": (-30 * d, 0, 0)})
 
 
@@ -700,8 +770,8 @@ def animations(bone_names):
 # ------------------------------------------------------------------ fitting poses to the ground
 
 GROUPS = {"front paws": lambda n: n in ("leg_FL_paw", "leg_FR_paw"), "back paws": lambda n: n in ("leg_BL_paw", "leg_BR_paw"),
-          "body": lambda n: n in ("hips", "chest"), "muzzle": lambda n: n in ("nose", "jaw"),
-          "legs": lambda n: n.startswith(("leg_", "thigh_")), "antlers": lambda n: n.startswith(ANTLER_PARTS),
+          "body": lambda n: n in ("hips", "chest", "brisket", "belly"), "muzzle": lambda n: n in ("nose", "jaw"),
+          "legs": lambda n: n.startswith(("leg_", "thigh_", "knee_", "hock_")), "antlers": lambda n: n.startswith(ANTLER_PARTS),
           "mane": lambda n: n in ("mane", "fringe_mane")}
 
 

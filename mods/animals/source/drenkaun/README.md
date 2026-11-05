@@ -15,12 +15,17 @@ colors (Ronald, 11-05: "A: lighter, leaner elk"; the concept in
 flicker (at rest and in every clip), joints, pokes and gait, and exports
 `models/drenkaun.geo.json`, `animations/drenkaun.animation.json` (idle, walk, run and the fight's
 clips) and `textures/entity/drenkaun/drenkaun.png` into `../../assets`. Its body box is
-`animals_core::bodies` ("drenkaun", 4.2 by 5.0). No coat genes: one of its kind.
+`animals_core::bodies` ("drenkaun", 4.8 by 5.4). No coat genes: one of its kind.
 
 ## How it's made
 
 - The reindeer's layout in the deer's units, drawn `K = 4` times bigger: the withers 3.75 m up,
-  6.4 blocks nose to tail, its antlers 4.7 blocks across and 6.5 up.
+  6.6 blocks nose to tail, its antlers 5.9 blocks across and 7 up.
+- Ronald's round on the first model (11-05, "Closer to A first"): legs thicker with knees and
+  hocks, a brisket, shoulders and a lower belly at the back, a thicker neck, the head 1.22 times
+  bigger (`HS`) with a 5 by 4 amber eye, the moss as a mane of uneven tufts (crest tufts, shoulder
+  tufts, locks of random lengths) with strands from the antlers, the bark as overlapping streaked
+  scales down the back and flanks, the antlers bigger with seven tines a side.
 - Antlers like oak boughs, wide like a lyre: four beam lengths and five tines a side, bark-brown
   to bone-pale tips, moss dripping from the beam, leaves at the tines' roots; each antler its own
   bone (`antler_L`, `antler_R`: the `left_antler` and `right_antler` breaks).
