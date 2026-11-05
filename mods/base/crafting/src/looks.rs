@@ -213,6 +213,11 @@ pub const GEM_SPOTS: &[(&str, [[i32; 2]; 3])] = &[
     ("shovel", [[23, 8], [25, 5], [21, 11]]),
     ("hoe", [[18, 9], [21, 6], [15, 12]]),
     ("sword", [[9, 22], [4, 27], [12, 19]]),
+    // Kinds drawn by their plain icon until their parts have art: the knife's bolster, the
+    // spear's socket under its point, the bow's grip.
+    ("knife", [[12, 20], [8, 24], [16, 16]]),
+    ("spear", [[22, 11], [19, 14], [16, 17]]),
+    ("bow", [[7, 12], [5, 16], [10, 8]]),
     ("helmet", [[16, 13], [12, 16], [20, 16]]),
     ("chestplate", [[15, 13], [10, 10], [20, 10]]),
     ("leggings", [[12, 8], [19, 8], [15, 4]]),
@@ -319,7 +324,7 @@ mod tests {
         assert_eq!(part_look("straps", "leather").unwrap(), "base:parts/armour/straps@base:ramps/leather,base:ramps/wrought_iron");
         assert!(part_look("haft", "oak").is_none());
         assert_eq!(gem_look("sword", 0, "diamond").unwrap(), "base:parts/gem/set@base:ramps/gem_diamond+7,20");
-        assert!(gem_look("knife", 0, "diamond").is_none() && gem_look("sword", 3, "diamond").is_none());
+        assert!(gem_look("axe", 3, "diamond").is_none() && gem_look("sword", 3, "diamond").is_none());
         assert_eq!(
             worn_look(1, "bronze", "gold", "wool", &["amber"]),
             "base:entity/armor/parts/plates_1@base:ramps/bronze,base:ramps/gold,base:ramps/wool;base:entity/armor/parts/gem_set@base:ramps/gem_amber+46,44"

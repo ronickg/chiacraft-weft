@@ -443,8 +443,13 @@ fn tool_stack(kind: &Kind, parts: &[(Part, PartOf)], stats: &ToolStats, gems: &[
     // Drawn from its parts (the engine's `core:look`), its gems set on it.
     let plain: Vec<Part> = parts.iter().map(|p| p.0).collect();
     let look = look_text(kind.id, &plain);
-    // Gems over a drawn tool only (a kind with no layers shows its plain icon).
-    let look = if look.is_empty() { look } else { look + &gem_layers(kind.id, &set) };
+    // Its gems over it; a kind with no layered art yet (a knife, a spear) is its plain icon under
+    // them, or with none set its plain icon alone.
+    let look = match (look.is_empty(), set.is_empty()) {
+        (false, _) => look + &gem_layers(kind.id, &set),
+        (true, false) => format!("base:item/{}", kind.id) + &gem_layers(kind.id, &set),
+        (true, true) => look,
+    };
     let stack = with_look(stack, (!look.is_empty()).then_some(look.as_str()));
     let worn = (used * uses as f32) as u32;
     if worn > 0 { stack.with(&DAMAGE, worn) } else { stack }

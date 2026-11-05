@@ -382,8 +382,8 @@ cooler". The modifier slots above become real gem sockets (`crafting::gems`, `mo
   Repairs keep the gems set.
 - **The look:** each gem shows on the icon and in hand at its socket's spot (`looks::GEM_SPOTS`:
   on an axe's or pick's head, a sword's guard and pommel, an armour shell's chest), a 5 px setting
-  (`base:parts/gem/set`) painted with the gem's ramp, made from its cut icon. Kinds without layered
-  art (knife, spear, bow) don't show their gems yet.
+  (`base:parts/gem/set`) painted with the gem's ramp, made from its cut icon. A knife and a spear,
+  with no part art yet, show their gems over their plain icon; the bow on its grip.
 - **For scripts:** `/gear gem <id> [slot=N]` gives a cut gem.
 
 ### Wear and repair, per part
