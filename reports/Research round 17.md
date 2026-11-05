@@ -252,3 +252,395 @@ Rows that only the base mod reads (fireflies, motes, moon size, sky events) need
   - Spring to Life fireflies: https://www.nintendolife.com/news/2025/03/minecrafts-latest-update-is-now-live-here-are-the-patch-notes
 - **Sky: Children of the Light:** https://80.lv/articles/how-to-design-emotional-game-environments-for-sky-children-of-the-light/
 - **Stardew:** https://stardewvalleywiki.com/Green_Rain
+
+---
+
+# Addendum: sky events with gameplay (2026-11-05)
+
+Ronald chose "Gameplay too" for sky events. The master setting defaults to Subtle and the moon stays at 1× (Planner, relayed). This addendum designs:
+- **the blood moon**: more and bolder monsters;
+- **meteor showers**: fallen stars to find, with meteoric iron;
+- **aurora storms**: kept as looks only.
+
+It also says where their numbers live, the rows they add to `notes/SYSTEMS.md`, and the owners.
+
+**What was read:**
+- `notes/SYSTEMS.md`, `notes/SURVIVAL.md` (steps 11, 14 and 15: the fair first night, "Campfire keeps you safe", dying and the way back) and `notes/PLAN.md`;
+- `mods/base/src/mobs.rs` (the four monsters, their spawn rules, `keep_from_fire`);
+- the engine's natural spawner (`crates/engine/src/server/dim.rs:1700-1790`: every 40 ticks, 4 tries per player 20-45 blocks out, light 0-6, category caps within 64 blocks; `core:hostile` cap 8 (`registry.rs:1378`); the `question::NATURAL_SPAWN` veto);
+- `vitals::{calendar, difficulty, levels}`, the crafting materials (`mods/base/crafting/SHEET.md`), the craters in `base_api::land` (`CRATER_*`), and the moon (`lib.rs`: 8 phases, full on day 0 mod 8).
+
+## The rules this keeps
+
+These come from `notes/SURVIVAL.md` and round 17's restraint rules:
+- **"Campfire keeps you safe"** holds on every night, blood moon included. Event monsters spawn only at light 6 or less and stay out of a campfire's ring (`keep_from_fire`). A blood moon is a night to sit by the fire, not a night that breaks the promise.
+- **No death spiral.** The respawn grace (`GRACE_SECS` 180) and the tombstone run hold. Gentle's first three nights stay free of monsters (`grace_nights`).
+- **Rare and announced.** Each event is foretold at the night hint's hour, two game hours before sunset (the same slot as `hints.rs` `night`). The sky shows it from dusk.
+- **Real-world anchors**, as in the rest of the game:
+  - a blood moon is a total lunar eclipse, which happens only at a full moon;
+  - meteor showers come on fixed dates each year, as the Perseids and Geminids do;
+  - meteoric iron is iron-nickel that people worked cold before smelting (Inuit blades from the Cape York meteorite; Tutankhamun's dagger, about 11 % nickel);
+  - aurora storms come most near the equinoxes.
+- **One event a night at most,** and the same on every machine: a hash of the world's seed and the day, as rain's `climate::spell` is.
+
+## 1. The blood moon (a total eclipse of the full moon)
+
+**When:**
+- **Only on a full moon** (day mod 8 = 0).
+- **Frequency:** `BLOOD_MOON_CHANCE` = 1 in 3 full moons. That is about 2-3 a year (a year is 56 days, 7 full moons), about once every 24 days, or 8 real hours of play. For comparison, Terraria's is 1 in 9 nights, which would be every 3 hours of play: too often for a survival game with long builds.
+- **Not before** `BLOOD_MOON_FROM_DAY` 16 (the second full moon after a new world's start on day 7), and never in gentle's grace nights.
+- **Totality:** from `BLOOD_MOON_HOURS` (22.0, 2.0). The moon reddens over the hour before and clears over the hour after, so the event runs 21:00-03:00.
+
+**Announcement and look:**
+- **Two game hours before sunset:** "The full moon will rise dark red tonight. Monsters walk boldly under it: stay by your fire." (`hint.base.blood_moon`, en and ru)
+- **At dusk** the moon rises copper. In totality it is a deep red disc, and the night is as dark as a new moon's: the moon's light goes, a red cast stays.
+- **Pack side:** the sky event value (air-flag bits 24-31, round 17 rec. 5) drives the pack's moon colour, the night light and a faint red grade (`base:fx_sky_events` = looks).
+
+**Gameplay** (`base:fx_sky_events` = on and difficulty above gentle; on gentle the look only):
+- **More monsters.** A second category, `base:blood_moon`, with its own cap `BLOOD_MOON_CAP` 6, on top of the hostile 8, so up to 14 within 64 blocks.
+  - Its spawn rules are registered like the normal ones: light 0-6, the same biomes.
+  - The base mod's `NATURAL_SPAWN` interceptor turns them down outside totality. That needs no engine change; the engine already asks.
+  - The weights favour pack hunters and keep griefing low:
+
+    | monster | weight |
+    |---|---|
+    | zombie | 3 |
+    | spider | 3 |
+    | skeleton | 2 |
+    | creeper | 1 (fewer craters in bases) |
+
+- **Bolder monsters:**
+  - event monsters spawn with +20 % max health (`BLOOD_MOON_HEALTH` 1.2) and +10 % speed (`BLOOD_MOON_SPEED` 1.1), as attribute modifiers;
+  - their sight reach for players is ×1.5 (`hostile(reach)` × `BLOOD_MOON_REACH`);
+  - **no extra damage**: the danger is numbers and pace, not one-hit deaths.
+- **Red eyes:** an emissive eye mask (`_e`) on each monster model, shown while the event flag is set (art and the entity shader).
+- **Dawn:** at 03:00 the leftover event monsters walk away from players and despawn once out of sight (or at 40 blocks). Daylight ends them for good.
+- **Harsh:** cap 8 and health ×1.35. **Gentle:** looks only. Both go in `vitals::difficulty` (`blood_moon_cap`, `blood_moon_health`).
+
+**Rewards:**
+- XP ×1.5 for kills in totality (`BLOOD_MOON_XP`, through `levels::xp::kill`).
+- An advancement, **"Red Night"**: see a blood moon through to 03:00 without dying.
+- A rare drop worth having: 1 in 8 event monsters drops one **"eclipse ash"**, a dye or ingredient for a red-black cloak dye (`clothing`). It's cosmetic, so it never becomes a grind.
+
+**Animals (Animals mod):** herds bunch closer and run sooner during totality (`hunt::wary` × 1.5). Wolves howl once at totality (the voices system).
+
+## 2. Meteor showers and fallen stars
+
+**When** (`METEOR_SHOWERS`, by calendar date, every year):
+
+| shower | dates (real equivalent) | peak night |
+|---|---|---|
+| summer | summer days 9-11 (the Perseids, mid-August) | day 10 |
+| winter | winter days 2-4 (the Geminids, mid-December) | day 3 |
+
+- **Peak night:** shooting stars ×20 (Solas-like streaks) from 23:00 to dawn.
+- **Each side of the peak:** shooting stars ×6.
+- **A lone fireball:** `FIREBALL_CHANCE` = 1 clear night in 20 brings a single bright fireball that lands.
+- Rain and cloud hide the streaks but not the landings: you hear the boom.
+
+**Announcement:**
+- **Peak:** "The sky is restless tonight: stars will fall after midnight." (`hint.base.meteor_shower`)
+- **A lone fireball** has no warning; that is the point of it.
+
+**What falls: a meteorite.**
+- **Landings** (`METEOR_LANDINGS`):
+  - 1-2 per player on the peak night, 0-1 on a side night, 1 for a fireball;
+  - each lands 48-160 blocks from the player (`METEOR_REACH`), under the open sky (sky light 15), on land;
+  - never in water (over water it splashes and sinks, lost);
+  - never within 24 blocks of a player-placed block or a campfire (no griefing, `METEOR_CLEAR`).
+- **What the player sees and hears:** a streak across the sky toward the impact point (pack, from the event value plus the landing's place), then a boom heard after the distance's delay (`weather_sound::thunder_delay`).
+- **On the ground:**
+  - a scorched pit 3-5 blocks across: grass turns to coarse dirt, nothing set alight;
+  - 1-3 `base:meteorite` blocks with a black fusion crust, glowing hot: light 9 fading to 0 over `METEORITE_COOLS` = 1 game hour;
+  - smoke for 5 real minutes, a column to walk toward;
+  - touching it hot burns, like a campfire.
+- **Old impacts:** worldgen's craters (`CRATER_*`, one per 640-block square) hold buried meteorites. 1 crater in 3 has 2-5 `base:meteorite` blocks 2-6 under its floor (`CRATER_METEORITES`). So a daytime player can dig for it too: the Vintage Story idea, with no event needed.
+
+**What it gives: meteoric iron.**
+- A `base:meteorite` block mines at stone hardness with a flint-tier pick or better (`harvest` 100). It drops 1-3 `meteoric_iron` lumps (`METEORITE_DROPS`), plus stone.
+- **Meteoric iron** is a new crafting material row in `mods/base/crafting` (`materials.rs`):
+  - roles: working and fitting;
+  - 7.9 g/cm³, harvest 200, uses 240, speed 6.5, damage 2;
+  - trait `cold_worked`.
+- It is **hammered cold** at a stone anvil or a hammer station, **with no furnace or bloomery**, as the Inuit worked Cape York's iron.
+- **Its place in the progression:** a lucky early step to iron-tier cutting edges (a knife, an axe or a spear head) before the player can smelt. It comes in small amounts:
+  - a shower night gives about 2-6 lumps a player;
+  - a crater gives 4-15.
+  - A head takes 2 lumps, so 1-3 heads a night: enough to matter, not enough to skip copper and bronze for armour, tools in bulk, or anything that needs ingots.
+- It sits between bronze and wrought iron, below steel (VS's meteoric iron sits above iron, but there it needs an iron pick; ours rewards the night walk instead).
+- **Risk and reward:** the stars fall at night, when monsters are out. Going to a smoke column after midnight is a choice, made safer with a torch and a campfire near the impact.
+
+**Advancements:**
+- **"Starfall"**: pick up meteoric iron.
+- **"Wish Upon"**: be outside under a shower's peak.
+
+## 3. Aurora storms: looks only
+
+**When:**
+- `AURORA_STORM_CHANCE` = 1 clear night in 30, about 2 a year.
+- ×2 within 4 days of either equinox (spring day 7, autumn day 7), the Russell-McPherron effect that makes real geomagnetic storms likeliest then.
+- Never on a blood moon or a meteor peak.
+
+**Look:**
+- The aurora reaches south of its usual biomes: full in the north as now, 0.6 in the birch forest and temperate plains, 0.2 further south. It is brighter, picks a rarer palette (red-violet, round 17 rec. 3), and lights the snow a little.
+- Dusk line: "The north is glowing tonight."
+
+**Gameplay: none.** It is a reward for being outside, not a hazard. Two events with gameplay are enough to learn.
+- The only hook is an advancement, **"Sky on Fire"**: see an aurora storm.
+- A later idea, if Ronald wants one: compasses, if we add them, swing on such nights, as real ones do in a geomagnetic storm.
+
+## Where the numbers live
+
+**A new module, `mods/base/vitals/src/events.rs`.** It belongs beside `calendar` and `difficulty`, since events are calendar dates, moon phases and a difficulty's share. It holds:
+- every constant above:
+  - `BLOOD_MOON_CHANCE`, `BLOOD_MOON_FROM_DAY`, `BLOOD_MOON_HOURS`;
+  - `BLOOD_MOON_CAP`, `BLOOD_MOON_HEALTH`, `BLOOD_MOON_SPEED`, `BLOOD_MOON_REACH`, `BLOOD_MOON_XP`;
+  - `METEOR_SHOWERS`, `FIREBALL_CHANCE`, `METEOR_LANDINGS`, `METEOR_REACH`, `METEOR_CLEAR`;
+  - `METEORITE_COOLS`, `METEORITE_DROPS`;
+  - `AURORA_STORM_CHANCE`, `EQUINOX_BOOST`;
+- one function, `tonight(seed, day) -> Option<Event>`. It is deterministic like `climate::spell` and applies the priorities: blood moon, then a shower's peak, then an aurora storm, then a fireball.
+
+Per-difficulty values go in `vitals::difficulty` (`blood_moon_cap`, `blood_moon_health`, `blood_moon_gameplay`).
+
+**Checks** in `vitals::balance` (or a test in `events.rs`):
+- over 100 simulated years:
+  - blood moons 2-3 a year, only on full moons, none before day 16;
+  - 2 showers a year on their dates;
+  - aurora storms 1-3 a year;
+  - never two events a night;
+- the cap and multipliers keep a player in arrival clothes by a campfire unharmed (the same check as step 14's);
+- the meteoric iron a night gives is under the iron a crafted tool set needs (the check against crafting's early needs, as with the faces' ores).
+
+**Other places:**
+- `CRATER_METEORITES` goes in `base_api::land` beside the other crater numbers.
+- The material row goes in `mods/base/crafting` (`materials.rs`).
+- After the numbers change, regenerate the sheets (`vitals --bin sheet`, `crafting --bin sheet`).
+
+## Rows for `notes/SYSTEMS.md`
+
+| System | Code | Numbers | Reads | Read by |
+|---|---|---|---|---|
+| Sky events | `vitals::events`, `mods/base/src/events.rs` (dusk lines, the event flag, landings) | `events.rs` constants; `difficulty` (`blood_moon_*`) | the calendar (date, hour), the moon's phase (day mod 8), the world's seed, difficulty and gentle's grace nights, the rain where the player stands (streaks hidden), the biomes' aurora shares | monsters (blood moon spawning and strength), the pack (air-flag bits 24-31: moon colour, night light, streaks, aurora reach), hints (the dusk lines), advancements, weather sound (the impact boom), animals (wariness, howls) |
+| Monsters on a blood moon | `mods/base/src/mobs.rs` (the `base:blood_moon` category and its rules, the `NATURAL_SPAWN` veto outside totality, the modifiers, the dawn walk-off) | `BLOOD_MOON_CAP`, `_HEALTH`, `_SPEED`, `_REACH`, weights | sky events, light (0-6), campfires (`keep_from_fire`), the respawn grace | players' nights, XP (`BLOOD_MOON_XP`), eclipse ash drops |
+| Meteorites, meteoric iron | `mods/base/src/events.rs` (landings), `blocks.rs` (`base:meteorite`, hot and cooling), `base_api::land` craters (`CRATER_METEORITES`), `mods/base/crafting` (`meteoric_iron`) | `METEOR_*`, `METEORITE_*`, `CRATER_METEORITES`, the material row | sky events, open sky and players' builds (where it may land), worldgen's craters | crafting (iron-tier heads before smelting), advancements, the smoke and glow (pack and particles) |
+
+Also update the **"When you change something, check"** list with one line: *A sky event or its numbers*: `vitals::events`' checks (frequency, no two a night), the first-night check by a campfire, and crafting's early iron.
+
+## Owners
+
+| piece | owner | needs the engine? |
+|---|---|---|
+| `vitals::events` (the schedule, numbers, checks) and `events.rs` (dusk lines, the event flag, landings, the meteorite block) | a base worker: **First hours** (it owns hints, the first nights and the campfire rule), or a new "Sky events" worker | no (`NATURAL_SPAWN` and categories exist); the flag to the pack needs round 17's small engine change (air-flag bits into `scene`) |
+| Blood-moon monsters (category, modifiers, dawn walk-off) | **First hours** (`mobs.rs` is base's; Planner's note named Animals, but the four monsters live in base) | no |
+| Animals' wariness and howls on a blood moon | **Animals** | no |
+| Meteoric iron (material row, cold working, heads) | **Survival** or whoever owns crafting (`mods/base/crafting`) | no |
+| Crater meteorites | **Worldgen** | no |
+| Looks: moon colour and darkness, red cast, streaks and the landing trail, hot glow, aurora storm reach and palette | **Lighting** | the same air-flag change |
+| Art: meteorite block (crust, hot glow `_e`), meteoric iron lump, eclipse ash, monster eye masks | **Art** (the `game-art` and `block-textures` skills) | no |
+| Strings (dusk lines, advancements, items), en and ru | each owner with its piece | no |
+
+**Order:**
+1. `vitals::events` with its checks and the dusk lines, using today's look (the existing aurora plus the shooting stars).
+2. The blood moon (base monsters, then Lighting's look).
+3. Meteor landings, the meteorite block and meteoric iron, then crater meteorites.
+4. The aurora storm look, alongside Lighting's rec. 3.
+
+Each step gets a PC run through Tester 2's queue: a world with `/tk time` set to a blood moon or shower night, with spawning on.
+
+**Sources for this addendum:**
+- Terraria's blood moon is 1 in 9 nights, never at a new moon, and decided at dusk: [Blood Moon](https://terraria.wiki.gg/wiki/Blood_Moon).
+- Terraria's meteorites fall at about 2 % a night, with ore and Meteor Heads at the site: [Meteorite](https://terraria.wiki.gg/wiki/Meteorites).
+- Vintage Story's meteoric iron comes from crash sites, needs a tier-4 pick, and outperforms iron: [Meteoric iron](https://wiki.vintagestory.at/Meteoric_iron).
+- Tutankhamun's blade is meteoric iron at about 10.8-12.8 % nickel: [Eos](https://eos.org/articles/pharaohs-iron-dagger-made-from-a-meteorite-study-confirms).
+
+---
+
+# Addendum 2: big impacts and rare star materials (2026-11-05)
+
+Ronald (via Planner): "what also would be super cool is if we had like meteorites which could come down from ... the space ... and then like land onto Earth, which is like sort of random. I'm not exactly sure where it would happen, but it can then bring like some new like resources onto the world which are like super rare."
+
+This extends Addendum 1, the sky-events design Ronald approved ("Yes, as designed", dev `52ee42ba`; First hours leads the build after the sync). Addendum 1's small fallen stars from the showers stay as they are. A **big impact** is a separate, rarer event:
+- a crater is carved live;
+- a core of rare material is left behind;
+- the whole world sees it.
+
+**What was read:**
+- the engine's block edits (`World::fill_sphere` / `fill_sphere_keeping`: creepers already carve with them, `mobs.rs` `blast`), `get_loaded`, `players`;
+- base's tombstone pointer (`base_api::GRAVE`, the hotbar line "Tombstone: 42 m, ahead to the left"), `base_api::hint`;
+- the worldgen craters (`base_api::land` `CRATER_*`, radius 20-30 every 640-block square);
+- crafting's material ladder (`mods/base/crafting/SHEET.md`; `notes/CRAFTING.md`: "the ladder stays open at the top", diamond 400 above steel 300);
+- `notes/PLAN.md` (rule 2, freedom for owners; linked worlds and inventory carry-over).
+
+## How real meteorites anchor this
+
+- **Most falls are stone, few are iron.** About 5 % of meteorites are irons (a commonly cited figure). Stony-irons are about 2 % of known meteorites, and of those the **pallasites** (gem olivine, *peridot*, set in nickel-iron) number under a hundred known, only four of them seen to fall ([Wikipedia](https://en.wikipedia.org/wiki/Pallasite)).
+- **Iron meteorites are nickel-iron:**
+  - kamacite holds about 5-12 % Ni, taenite about 12-45 %;
+  - cut and etched, octahedrites show the **Widmanstätten pattern** of their interlocking plates ([Wikipedia](https://en.wikipedia.org/wiki/Widmanst%C3%A4tten_pattern), [AMNH](https://www.amnh.org/exhibitions/permanent/meteorites/building-planets/iron-crystals)).
+  - Vintage Story's meteoric iron is worked into tools better than iron ([VS wiki](https://wiki.vintagestory.at/Meteoric_iron)).
+- **Tektites** are not from space. They are the ground melted and thrown out by the impact: **moldavite**, green glass from the Ries crater in Germany about 14.7-15 million years ago, scattered in a fan about 75° wide ([Wikipedia](https://en.wikipedia.org/wiki/Moldavite)).
+- **Big falls are seen by day.** The 1947 Sikhote-Alin iron shower fell in daylight with a smoke trail that hung for hours (from memory, not checked this round).
+
+## 1. The event
+
+**How rare** (`vitals::events`):
+- `BIG_IMPACTS_PER_YEAR` = 3 per world. A year is 56 days, so that is about one every 19 game days, or one per 6 hours of play.
+- They never come closer than `BIG_IMPACT_GAP` 10 days apart, and never before `BIG_IMPACT_FROM_DAY` 21: the end of the first season, when a player has a base to come back to.
+- They are picked by the same seeded schedule as Addendum 1 (`tonight(seed, day)`), but **at any hour**, since big falls come by day too. They take priority over every other event that day.
+
+**Where:**
+- **Far wilds, but in loaded land.** The site is picked among loaded columns between `IMPACT_FROM_PLAYERS` 160 blocks from every player and their view edge, using `get_loaded`, so no unloaded or ungenerated land is touched.
+- **On land with open sky:** dry, flat enough (the same tests worldgen craters use), not in water or a river.
+- **Never near builds.** Never within `IMPACT_FROM_BUILDS` 256 blocks of any player-placed block, campfire, bed or tombstone, and never within 256 of the world spawn.
+  - The base mod keeps a coarse map of built columns: a bitset per 16×16, set on `BLOCK_PLACED` by players and saved with the world.
+- **If there's no site** (a player boxed in by builds, or only sea in reach), it falls in the sea: you see the streak, a white plume and a boom. No crater and no loot this time, and the next one is not delayed.
+
+**How you notice:**
+1. **Before** (T−20 s): the sky brightens toward its side, the low rumble starts, and animals go wary (Animals).
+2. **The streak** (T−6 s to 0): a bright head with a long trail across the whole sky, seen from anywhere in the world.
+   - By night it's a fireball brighter than the moon.
+   - By day it's a white-hot spark with a **smoke trail that hangs for minutes** (Sikhote-Alin's).
+   - Lighting draws it from the event value plus the impact's position (below).
+3. **Impact:**
+   - a white flash lights the horizon in that direction, and a dust ring rises;
+   - **the boom** comes after the distance's delay (`weather_sound::thunder_delay`, 343 m/s, so 3 s a kilometre);
+   - near (under 500 blocks) the ground shakes: a short camera shake.
+4. **After:**
+   - the crater's hot core glows (light 12 fading to 0 over `IMPACT_HOT` 2 game hours);
+   - a **smoke column** rises for 10 real minutes, seen over the land;
+   - at night an orange glow sits on the horizon above it.
+5. **Pointer (the compass hint):**
+   - at impact every player gets a line: **"A star has fallen, far to the north-east."** It names the 8-point direction from that player and a band: near under 500 blocks, far under 1.5 km, very far past that;
+   - then the tombstone pointer's hotbar line reads **"Fallen star: 1,240 m, ahead to the left"** for one game day, or until the player is within 16 blocks;
+   - a setting (`base:fx_sky_events`) can hide the pointer for those who'd rather search by the smoke.
+6. **Rumour:** at the next dawn, a player who hasn't reached it gets a hint: *"The fallen star still smokes to the north-east."*
+
+**Does the crater form live? Yes, at a modest size.** Worldgen's craters are radius 20-30, ancient and filled with buried meteorites (Addendum 1). A live impact carves a **fresh crater of radius `IMPACT_RADIUS` 7-12** (cost below), spread over `IMPACT_CARVE_TICKS` 20 ticks:
+1. The bowl: `fill_sphere_keeping` a sphere sunk to `IMPACT_DEPTH` 0.6 radius, keeping liquids and unbreakables.
+2. The rim: a ring raised 2-4 blocks of the local ground and broken stone (suevite, the impact breccia).
+3. Melt and ejecta:
+   - the bowl's lining (1 block) turns to **impact glass**;
+   - sand or gravel within 1.2-2.5 radii turns partly to tektite pieces, in a fan downrange of the streak's heading (moldavite's 75° strewn field);
+   - trees inside 2 radii are knocked flat, as fallen logs, using felling's `felled` pieces;
+   - grass turns to scorched dirt, with no fire spread.
+4. The core: at the bottom, under 1-2 blocks of broken stone, the meteorite mass (below), hot.
+
+## 2. What it brings: four materials found only from the sky
+
+| material | what it is (real) | found | for | place on the ladder |
+|---|---|---|---|---|
+| **Meteoric iron** (exists, Addendum 1) | iron-nickel, worked cold (Inuit, Cape York) | shower falls 1-3; worldgen craters 4-15; a big impact's ejecta 6-12 lumps round the rim | iron-grade heads before smelting | early, between bronze and wrought iron |
+| **Star steel** (Widmanstätten nickel-iron, an octahedrite) | the big impact's iron core: kamacite and taenite plates that show the pattern when etched | the core: `STAR_STEEL_CORE` 8-16 lumps per big impact, so 2-4 tools' worth | tools, weapons, armour: a **new tier between steel (300) and diamond (400)**: harvest 350, uses 650, speed 8.5, damage 3.2, trait `patterned` (the etched look on the tool, no rust, repairs at half cost); fittings 500 uses | late: needs the forge (iron age) to work it, so a reason to travel when you can use it; armour pieces take 6-8 lumps |
+| **Peridot** (from a **pallasite**) | olivine gems in nickel-iron; under 100 known pallasites | a quarter of big impacts are pallasites (`PALLASITE_CHANCE` 0.25): 3-8 peridot plus a few **pallasite** blocks (green crystals in metal, translucent) | inlays on tools and armour (`CRAFTING.md`'s inlays: looks and trade value), jewellery, a stunning decor block | any age; rare goods for trade between linked worlds (`PLAN.md` carry-over) |
+| **Tektite glass** (moldavite) | the ground melted and thrown out by the impact | 12-30 pieces in the strewn fan round each big crater, plus the bowl's impact-glass lining | a working material like obsidian: knife and arrow heads, harvest 100, uses 50, speed 3.2, trait `razor`; green glass panes and blocks; a lens (spyglass, later) | early-mid: no tools needed to pick up, a sharp edge for a newcomer who reaches a crater |
+| **Starheart** (the fantasy one) | none: a fragment of the core that never cools, faintly blue-white | 1 in 3 big impacts (`STARHEART_CHANCE` 0.33), one piece at the very centre | a light that needs no fuel: **star lantern** (light 12, no warmth, never goes out, cold to touch); a beacon block that shows on the far land at night; held, it lights like a torch (the pack's `hand_light`, a cool tint) | rare reward, not power: light only, so it doesn't break survival's fire and warmth loop (a campfire still warms and keeps monsters off; a star lantern only lights) |
+
+Why these fit the game:
+- **Three grounded, one fantasy.**
+  - The Starheart is round 17's fantasy feel: dim, rare and useful as light, never a weapon.
+  - Star steel gives the open ladder its first rung above steel from a story, not a deeper ore.
+  - Peridot and tektite give decoration and trade, which linked worlds will want.
+- **Each impact rewards a different stage.** A newcomer can take tektite edges and meteoric iron from the rim. A late player digs out the star steel core.
+
+## 3. Multiplayer
+
+- **Everyone in the dimension sees it:** the streak and flash for all, the boom by each player's distance, and the direction line from each player's own position.
+- **Who gets it:** whoever reaches it. There are no claims, which keeps owners free (`PLAN.md` rule 2). To keep a server from racing to a single prize:
+  - the loot is many pieces: lumps round the rim, glass in the fan, the core in a dozen lumps;
+  - the core scales with players online within 2 km: ×1 alone, +40 % per extra player, up to ×2.2 (`IMPACT_SHARE`).
+- **The world owner chooses** with a world rule, `base:sky_impacts`:
+  - 0 off;
+  - 1 looks only: the streak and boom, the sea plume, no crater;
+  - 2 on: the default.
+- **Multiplayer announcement:** the direction line goes to every player in the dimension. There is no chat spam: one line each, plus the pointer.
+- **Achievements:** "Starfall" (meteoric iron) exists in Addendum 1. "Heart of a Star" (find a Starheart) could be one of the achievements anchored on chain (`PLAN.md`: achievements on Chia), since it is rare and earned.
+
+## 4. Risks
+
+- **Griefing and builds.** Never within 256 blocks of anything a player built or of the world spawn. Never in unloaded land. A player can't call one down: it is the world's schedule. With `base:sky_impacts` an owner can turn it off.
+- **Players hurt:** none. The site is at least 160 blocks from everyone, so the blast damage (`blast`'s rule, radius ×2) reaches no one. A player who walks into the hot bowl takes campfire-like burns until it cools.
+- **Performance of a live carve.** A radius-12 bowl removes about 4,300 blocks (a cap of a sphere) and sets about 600 more (rim, lining, glass, core). That touches about 9-16 engine sections (16³).
+  - Spread over 20 ticks, that is about 250 edits a tick. Creepers already do 113-block spheres in one tick.
+  - Remeshing and light run on the engine's usual queues.
+  - Risks: a hitch on the Mac if the crater falls in view; a light-update spike.
+  - Mitigations:
+    - carve only while the server's tick is under 35 ms, otherwise wait a second;
+    - keep the radius at 12 or less;
+    - bench it first on Tester 2's queue: frame time during a scripted impact at 200 blocks, PC and Mac.
+- **Save size.** The built-columns bitset is 1 bit per 256 m², a few KB for a big world.
+- **Too much loot over time.** 3 a year at 8-16 star steel lumps gives about 2-4 tools a year per world, plus diamond's ladder above. It is checked against crafting's needs, as Addendum 1's meteoric iron is.
+
+## Numbers for `vitals::events` (beside Addendum 1's)
+
+| number | value | note |
+|---|---|---|
+| `BIG_IMPACTS_PER_YEAR` | 3 | per world; a daily chance of 3/56 with the gap below |
+| `BIG_IMPACT_GAP` | 10 days | |
+| `BIG_IMPACT_FROM_DAY` | 21 | after the first season |
+| `IMPACT_FROM_PLAYERS` | 160 blocks | out to the view edge, loaded only |
+| `IMPACT_FROM_BUILDS` | 256 blocks | and the world spawn |
+| `IMPACT_RADIUS` | 7-12 | live crater; worldgen's ancient ones stay 20-30 |
+| `IMPACT_DEPTH`, `IMPACT_RIM` | 0.6 radius; 2-4 blocks | |
+| `IMPACT_CARVE_TICKS` | 20 | and only while a tick is under 35 ms |
+| `IMPACT_HOT` | 2 game hours | light 12 fading; smoke 10 real minutes |
+| `IMPACT_WARN` | 20 s | brightening and rumble before the streak |
+| `RIM_METEORIC_IRON` | 6-12 lumps | |
+| `STAR_STEEL_CORE` | 8-16 lumps | ×`IMPACT_SHARE` (1 + 0.4 per extra player within 2 km, at most 2.2) |
+| `PALLASITE_CHANCE` | 0.25 | 3-8 peridot, 2-4 pallasite blocks |
+| `TEKTITE_PIECES` | 12-30 | in a 75° fan, 1.2-2.5 radii out |
+| `STARHEART_CHANCE` | 0.33 | one piece |
+| `POINTER_DAYS` | 1 | the hotbar line, or until within 16 blocks |
+
+**Crafting rows** go in `mods/base/crafting` (`materials.rs`): `star_steel`, `tektite` and `peridot` (fitting, inlay). `meteoric_iron` comes from Addendum 1.
+
+**Checks:**
+- the schedule over 100 simulated years: 2-4 a year, gaps kept, none before day 21;
+- star steel per year under a full tool and armour set;
+- the impact site test: never within 256 of a placed block, in a game test with a built column.
+
+## Rows for `notes/SYSTEMS.md`
+
+| System | Code | Numbers | Reads | Read by |
+|---|---|---|---|---|
+| Big impacts | `vitals::events` (schedule), `mods/base/src/events.rs` (site, streak flag, live carve, the pointer and dusk/dawn lines), the built-columns map (`BLOCK_PLACED`, saved) | the table above; the world rule `base:sky_impacts` | the calendar, the world's seed, players' places and what is loaded, built columns, the land's flatness and water (`base_api::land` tests), the server's tick time | the world (a crater, glass, ejecta, felled trees), crafting (star steel, peridot, tektite, meteoric iron), the pack (streak, flash, smoke, glow: event value and position), weather sound (the boom), animals (wariness), hints and the pointer, advancements |
+| Star materials | `mods/base/crafting` (`star_steel`, `tektite`, `peridot`), `blocks.rs` (`base:meteorite`, `base:pallasite`, impact glass, tektite glass, star lantern, Starheart) | material rows; `STAR_STEEL_CORE`, `PALLASITE_CHANCE`, `TEKTITE_PIECES`, `STARHEART_CHANCE` | big impacts, Addendum 1's falls and craters | tools and armour above steel, inlays and trade, light without fuel (`hand_light` when held) |
+
+**Check line** for "When you change something": *A star material or impact numbers*: crafting's ladder (star steel stays below diamond), the yearly yield check, and the build-distance test.
+
+## Owners
+
+| piece | owner | engine? |
+|---|---|---|
+| Schedule, site picking, built-columns map, pointer and lines, world rule | **First hours** (with Addendum 1's `events.rs`) | no |
+| The live carve (bowl, rim, glass fan, felled trees, core placement) | **Worldgen** (it owns the crater shapes and land tests) | no (`fill_sphere_keeping`, `set`) |
+| Star steel, tektite, peridot rows; star lantern and inlays | **Survival** or crafting's owner | no |
+| Streak by day and night, flash, smoke column, horizon glow, hot core, Starheart's cool light, pallasite and glass looks | **Lighting** | **small**: the impact's position in the scene (a vec4 beside round 17's air-flag bits), so the pack can draw the streak and glow toward it |
+| Textures: meteorite crust, suevite, impact and tektite glass, pallasite block, star steel ingot (the etched pattern), peridot, Starheart, star lantern | **Art** | no |
+| Animals' wariness before an impact; the camera shake if wanted | **Animals**; **UI** or the engine for the shake | shake: maybe |
+| The boom (a deeper, longer thunder) | First hours, with `weather_sound` | no |
+
+**Order:** after Addendum 1's events land (First hours, after the sync):
+1. the schedule and site picking with the sea plume only;
+2. the live carve and loot, benched;
+3. the looks;
+4. the materials in crafting.
+
+## Summary for Ronald
+
+Big impacts are rare, world-wide events, separate from the yearly showers:
+- **How often:** about 3 a game year (about one per 6 hours of play), never in the first season.
+- **What you see and hear:** a streak across the whole sky, a fireball by night or a smoking trail by day, a flash on the horizon, and a boom that arrives seconds later by distance.
+- **Where:** they land in the far wilds of loaded land, at least 160 blocks from everyone and 256 from anything built.
+- **The crater** is carved live (radius 7-12), with glass, broken rock and flattened trees round it. It smokes and glows for hours.
+- **Finding it:** every player gets "A star has fallen, far to the north-east" and a pointer like the tombstone's.
+
+They bring four materials found only there:
+
+| material | real or fantasy | what it gives |
+|---|---|---|
+| star steel | real (nickel-iron with the Widmanstätten pattern) | a new tool and armour tier between steel and diamond |
+| peridot | real (from rare pallasites) | gems for inlays, decoration and trade |
+| tektite glass | real (like moldavite) | sharp early blades and green glass |
+| the Starheart | fantasy, 1 in 3 impacts | a fragment that never cools: a lantern that never goes out |
+
+On a server whoever gets there first takes it, but the loot is many pieces and grows with the players nearby. The world owner can turn impacts off or to looks only.

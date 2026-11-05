@@ -286,7 +286,9 @@ def install(rows):
                     a = np.asarray(Image.open(os.path.join(home, n + ".png")).convert("RGB")).astype(int)
                     fire = (a[..., 0] > 190) & (a[..., 1] > 90) & (a[..., 0] - a[..., 2] > 90)
                     m = np.where(fire, 255, 0).astype(np.uint8)
-                    Image.fromarray(np.dstack([m, m, m, np.full_like(m, 255)]), "RGBA").save(os.path.join(home, n + "_e.png"))
+                    # a mask with no fire in its face (ore flecks, glowing plants: emissive.py) is kept as it is
+                    if fire.any():
+                        Image.fromarray(np.dstack([m, m, m, np.full_like(m, 255)]), "RGBA").save(os.path.join(home, n + "_e.png"))
                 done.append(n)
     print(f"{len(done)} textures in the game: {' '.join(done)}")
 
