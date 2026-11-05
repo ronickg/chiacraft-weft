@@ -47,6 +47,9 @@ pub static TERRAIN_FINISHED: Counter = Counter::new();
 pub static TERRAIN_FINISH_NS: Counter = Counter::new();
 pub static TERRAIN_JOINED: Counter = Counter::new();
 pub static TERRAIN_BUSY_NS: Counter = Counter::new();
+/// Near cubes' meshes handed to the GPU on the frame thread (`WorldRenderer::upload`), and the time.
+pub static UPLOADS: Counter = Counter::new();
+pub static UPLOAD_NS: Counter = Counter::new();
 /// Distant terrain: tiles made (shown or cached) and asked for then called off.
 pub static LOD_MADE: Counter = Counter::new();
 pub static LOD_CALLED_OFF: Counter = Counter::new();
@@ -431,12 +434,14 @@ impl Reporter {
         if on(Channel::Load, Level::Debug) {
             let (gpu, fin, fin_ns, joined, busy) =
                 (TERRAIN_GPU.take(), TERRAIN_FINISHED.take(), TERRAIN_FINISH_NS.take(), TERRAIN_JOINED.take(), TERRAIN_BUSY_NS.take());
-            if gpu + fin + joined > 0 {
+            let (uploads, upload_ns) = (UPLOADS.take(), UPLOAD_NS.take());
+            if gpu + fin + joined + uploads > 0 {
                 log::debug!(
                     target: "load",
-                    "terrain per {secs:.1} s: {gpu} from the GPU, {fin} finished ({:.0} us each on a worker), {joined} put in, terrain thread busy {:.0}%",
+                    "terrain per {secs:.1} s: {gpu} from the GPU, {fin} finished ({:.0} us each on a worker), {joined} put in, terrain thread busy {:.0}%; {uploads} meshes uploaded ({:.1} us each on the frame thread)",
                     fin_ns as f64 / fin.max(1) as f64 / 1000.0,
-                    busy as f64 / secs / 1e7
+                    busy as f64 / secs / 1e7,
+                    upload_ns as f64 / uploads.max(1) as f64 / 1000.0
                 );
             }
             let (made, off, age) = (LOD_MADE.take(), LOD_CALLED_OFF.take(), LOD_AGE_NS.take());
