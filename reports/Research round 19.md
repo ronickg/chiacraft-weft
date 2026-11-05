@@ -31,7 +31,51 @@ Researcher, 2026-11-05, for Planner, Lighting and Distant terrain. Ronald asked:
    - **Mist and light in the air marched in a froxel volume, accumulated over frames** (Frostbite 2015, AC4 2014): about 45× fewer samples than our per-pixel march.
    - **Clouds refreshed a sixteenth at a time** (Nubis; Toft et al. measured 40×, against a much worse baseline than ours).
 4. **Apple's own rules give smaller sure wins:** draw opaque before anything that discards, don't split the world pass for the water copy, and specialise the merged effects shader (Apple measured 4.6× on an uber-shader, on other content).
-5. **Far terrain:** no source gives 10× for graph-based rivers and lakes like ours on the GPU. A world-scale cache of the features per region would do it more cheaply: our 11 µs per column against Génevaux's about 1 µs points to redundant work. Then evaluate columns on the GPU from that cache. Expect about 3–10× on fill-in time, not on frames.
+5. **For every platform**, not only the Mac, the same changes lead, in this order:
+   1. the temporal upscaler (largest on integrated GPUs, which are fill-bound);
+   2. the froxel mist;
+   3. specialised effect shaders;
+   4. temporal clouds;
+   5. opaque-first drawing;
+   6. the far-feature cache;
+   7. quality chosen by the GPU at first start.
+
+   Platform-only wins (the Mac's draw count, vendor upscalers, mesh shaders and VRS on desktop) are listed apart ("Ranked for every platform").
+6. **Far terrain:** no source gives 10× for graph-based rivers and lakes like ours on the GPU. A world-scale cache of the features per region would do it more cheaply: our 11 µs per column against Génevaux's about 1 µs points to redundant work. Then evaluate columns on the GPU from that cache. Expect about 3–10× on fill-in time, not on frames.
+
+## Ranked for every platform
+
+Ronald (relayed by Planner): "optimisation doesn't need to be mac specific, but sure u can try platform specific ones too". So first the changes that help on every GPU, then the ones that help only on some. The "#" column points to the detailed row in the next section (sources, files, risk). Effort is in agent hours.
+
+**Platforms:**
+- **Desktop:** discrete NVIDIA, AMD, Intel Arc, Windows and Linux.
+- **Low-end:** integrated GPUs (Intel, AMD APUs, Steam Deck) and older discrete cards. They are fill-rate and bandwidth bound first.
+- **Mac:** Apple GPUs through MoltenVK, tile-based.
+
+Already in Weft since the sync: GPU frustum and Hi-Z occlusion culling of the cubes (`world_render.rs:1612-1660`, `occlusion.wgsl`), so occlusion is not ranked here.
+
+| rank | change | desktop | low-end and integrated | Mac | effort | # |
+|---|---|---|---|---|---|---|
+| 1 | **Our own temporal upscaler (TAAU)** at render scale 0.5 | large at 1440p and 4K (the PC runs at scale 1 today: 75% fewer pixels shaded); small at 1080p | **the largest win**: these GPUs are fill-bound, so frame time falls nearly with the pixels | about −4 to −6 ms (from 0.67 to 0.5) | 16–24 | 2 |
+| 2 | **Mist and the light in the air in a froxel volume** with temporal accumulation (first step: mist at half size with history) | mist cost +3.4 ms on the RTX 5090 at 3456 (round 16) → about 0.5 | mist is unplayable today on these: the biggest single effect cut | +5–7.6 ms → about 1 | 8–12, then 24–40 | 3 |
+| 3 | **Specialise the merged effects shader** (a pipeline per set of active effects) | occupancy is set by the worst branch's registers on NVIDIA and AMD, so likely more than on M3 (Dynamic Caching softens it there) | as desktop | 0.5–2 ms (Apple measured 4.6× on Blender content) | 4–8 | 5 |
+| 4 | **Clouds refreshed a quarter to a sixteenth of the pixels a frame** (needs rank 1's history) | small but free once history exists | real: clouds cover much of the screen by day | 0.5–1.5 ms | 8–16 | 7 |
+| 5 | **Opaque first, discard only where needed** (the fade band's discard only in the band, cutout leaves after opaque, no `frag_depth` on clouds) | discard and shader depth writes turn off early depth testing for those draws on immediate-mode GPUs too: a smaller win than on tile GPUs | real for iGPUs (overdraw costs bandwidth they lack); large on tile-based mobile-class GPUs | possibly large (HSR) | 4–8 | 4 |
+| 6 | **Far features cached per region**, then columns on the GPU | far view in seconds instead of 5–6 s (PC) | the biggest gain on 4–8-core CPUs, where far terrain takes longest | 11 s → about 2–4 s | 8–16, then 40–80 | 9 |
+| 7 | **Quality chosen by the GPU at first start**: render scale, effect levels and shadow map size by device type and VRAM (integrated → 0.5 scale, effects Low, shadows 1024) | none | the largest cheap win: players never see the unplayable defaults | a little (the auto 0.67 already) | 4–6 | new |
+| 8 | **8-byte faces** (from 16) | half the face bandwidth and memory; small in frame time | more: bandwidth is what iGPUs lack | as desktop | 12–20 | 10 |
+| 9 | **The water copy without splitting the world pass** | saves a full-screen copy of colour and depth (bandwidth) | a measurable share on iGPUs | 0.4–1 ms (tile memory) | 8–12 | 6 |
+| 10 | **A sky-view LUT** and aerial-perspective volume | small | small to medium (the per-pixel sky and haze math) | 0.2–0.5 ms | 8–12 | 8 |
+
+**Platform-specific wins**, kept apart so the top 10 isn't one platform's:
+
+| change | where it helps | why only there | gain | effort |
+|---|---|---|---|---|
+| **Issue only the drawn count when the driver has no `drawIndirectCount`** (#1 below) | the Mac (MoltenVK); any driver without the feature | elsewhere the GPU takes the count itself | possibly most of the Mac's 7.6 ms world pass (measure first) | 4–8 |
+| **Vendor upscalers behind the same inputs as rank 1:** FSR 2/3 (open source, any Vulkan GPU, Performance mode shades 25% of pixels at 0.6–2.3 ms), DLSS (NVIDIA RTX only), XeSS | desktop and low-end (FSR runs on all; DLSS on RTX) | MetalFX is not reachable through MoltenVK; FSR on MoltenVK is unconfirmed | better quality at 0.5 than our own TAAU; same jitter, velocity and history | 8–16 after rank 1 |
+| **Mesh shaders** (`VK_EXT_mesh_shader`) for near cubes and LOD tiles | desktop (NVIDIA Turing+, AMD RDNA2+, Intel Arc) | not in MoltenVK (PR #2842 open); measured slower than draws on Apple M1 | Meshelium (Minecraft): 1.5× at 12 chunks, 5.3× at 64, when draw-bound (developer's figures) | 40–80 |
+| **Variable-rate shading** (`VK_KHR_fragment_shading_rate`) at half or quarter rate for the sky, far terrain and fog | desktop (Turing+, RDNA2+, Arc) | MoltenVK has no mapping (issue #1710) | no number found in these sources: unconfirmed | 12–20 |
+| **Tile-memory pass structure:** memoryless or transient attachments, exact barrier stage masks instead of ALL_COMMANDS at every pass start | the Mac and other tile GPUs | immediate-mode GPUs keep attachments in memory anyway | small but sure (Apple gives no number) | 4–8 |
 
 ## Ranked: gain for the effort, weighted toward the Mac's GPU time
 
