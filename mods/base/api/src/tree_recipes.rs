@@ -617,7 +617,9 @@ impl Variant {
 pub fn varied(r: &Recipe, v: Variant) -> Recipe {
     match v {
         Variant::Standing => *r,
-        Variant::Big => Recipe { height: r.height * 1.2, width: r.width * 1.15, ..*r },
+        // (A trunk already 2 x 2 only grows taller: wider, an araucaria's passed a stone axe.)
+        Variant::Big if r.width >= 1.5 => Recipe { height: r.height * 1.1, ..*r },
+        Variant::Big => Recipe { height: r.height * 1.15, width: r.width * 1.1, ..*r },
         // (A conifer grows straight to its tip, and a giant's limbs reach its scatter's edge: crooked
         // they'd lean past it. The wild roll never makes a cone tree crooked either.)
         Variant::Crooked if r.leaf_along || r.reach > 0 => *r,
