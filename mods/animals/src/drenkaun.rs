@@ -601,7 +601,7 @@ fn trample(w: &World, id: u64, st: &EntityState, hit: f32, reach: f64, knockback
     let mut guard = TRAMPLED.lock().unwrap();
     let done = guard.get_or_insert_with(HashMap::new).entry(id).or_default();
     for e in w.entities_near(front, half + reach, None) {
-        if e == id || done.contains(&e) || w.component(e, &WARDEN).is_some() {
+        if e == id || done.contains(&e) || spared(w, e) {
             continue;
         }
         let Some(s) = w.entity(e) else { continue };
@@ -660,13 +660,19 @@ fn strike(w: &World, id: u64, st: &EntityState, c: &Warden, a: &bosses::Attack, 
         }
     }
     for (e, push) in hits {
-        if w.component(e, &WARDEN).is_some() {
+        if spared(w, e) {
             continue;
         }
         w.damage(e, hit, id, damage_cause::ATTACK);
         w.push(e, push);
         weft_sdk::info!("drenkaun {id}: {} hits {e} for {hit:.1}", a.name);
     }
+}
+
+/// What its attacks never hit: another Drenkaun, and its calves (PC look boss_drenkaun_hud1: a
+/// second one trampled the first one's calf).
+fn spared(w: &World, e: u64) -> bool {
+    w.component(e, &WARDEN).is_some() || w.entity(e).is_some_and(|s| s.kind == CALF.id())
 }
 
 fn burst(w: &World, at: [f64; 3], state: u32, count: u32, spread: f64) {

@@ -63,17 +63,17 @@ wait 1
 shot drenkaun_hud_02_down.png
 chat /drenkaun kill
 wait 2
-chat /tk spawn animals:drenkaun_calf 0 200 -1
+chat /tk spawn animals:drenkaun_calf 10 200 10
 wait 1
-chat /tp 0.5 200 1.5
+chat /tp 10.5 200 12.5
 key 1
-look 0 -35
+look 0 -30
 wait 0.5
 press core:use
 wait 1
 shot drenkaun_hud_03_calf.png
 wait 1
-chat /tp -6.5 200 6.5
+chat /tp 16.5 200 16.5
 wait 4
 entities 20
 shot drenkaun_hud_04_follows.png
