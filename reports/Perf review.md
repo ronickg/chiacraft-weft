@@ -63,6 +63,7 @@ Gain per effort, all platforms. "Mac", "PC" and "weak" mean the M3 Max, the RTX 
 - Together: 0.684 → 0.579 ms, −15 %. The Mac gains are to measure, with both in its next build.
 - The `dist` profile: far tiles' heights −17 %, mesh −10 %.
 - `fix/surface-once` (#5): far-tile mesh 1.43 → 0.46 ms (−68 %), tile rate +20 %, first tiles asked→made 1217 → 603 ms; far shots the same.
+- `fix/preload-block-textures` (#9): 568 block textures in 4-6 ms at the join; textures loaded during play 228 → 81 at the join, 40 → 19 after a teleport; budgeted uploads' worst frame at the join 27.9 → 3.3 ms.
 
 ## What the update split showed on the Mac (Tester, 179 s run, dev 9ae94af9)
 
