@@ -516,12 +516,18 @@ fn tick(w: &World) {
                 due.push((p, t));
             } else {
                 if now.is_multiple_of(5) {
-                    drop(
-                        w.spawn_particles(&FLARE, [st.pos.x, st.pos.y + 1.0, st.pos.z])
-                            .count(6)
-                            .spread_box([0.6, 1.0, 0.6])
-                            .velocity([0.0, 0.8, 0.0]),
-                    );
+                    // A ring round the feet, rising, clear of the eyes (sparks at the chest filled
+                    // the camera: PC look wm_look3).
+                    let a = (now / 5) as f64 * 2.4;
+                    for k in 0..3 {
+                        let b = a + k as f64 * std::f64::consts::TAU / 3.0;
+                        drop(
+                            w.spawn_particles(&FLARE, [st.pos.x + b.cos() * 1.4, st.pos.y + 0.2, st.pos.z + b.sin() * 1.4])
+                                .count(2)
+                                .spread(0.15)
+                                .velocity([0.0, 0.9, 0.0]),
+                        );
+                    }
                 }
                 keep.push((p, t));
             }
