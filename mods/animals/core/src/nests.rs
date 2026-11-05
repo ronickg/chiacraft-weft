@@ -52,6 +52,9 @@ pub const LOOK_UP: i32 = 20;
 pub const LOOK_DOWN: i32 = 8;
 /// A ledge counts as a cliff from this many blocks above the ground under the mother.
 pub const CLIFF_ABOVE: i32 = 4;
+/// Blocks a new nest keeps from another (each pair its own; three eagles shared one ledge in
+/// aw_nests2).
+pub const APART: f64 = 4.0;
 
 #[cfg(test)]
 mod tests {

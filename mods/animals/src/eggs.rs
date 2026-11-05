@@ -319,10 +319,20 @@ pub fn lay_in_nest(w: &World, index: usize, mother: u64, at: [f64; 3], young: &[
 /// or for a cliff nester the highest bare ledge `CLIFF_ABOVE` over the ground (else a treetop);
 /// `None` for the ground or when nothing is near.
 fn nest_site(w: &World, site: animals_core::nests::Site, at: [f64; 3], ground: [f64; 3]) -> Option<[f64; 3]> {
-    use animals_core::nests::{CLIFF_ABOVE, LOOK, LOOK_DOWN, LOOK_UP, Site};
+    use animals_core::nests::{APART, CLIFF_ABOVE, LOOK, LOOK_DOWN, LOOK_UP, Site};
     // Round the ground under her: in the air, her own height says nothing of the trees'.
     let feet = [at[0].floor() as i32, ground[1] as i32, at[2].floor() as i32];
     let floor = ground[1] as i32;
+    // Nests already built near: a site this close to one is taken.
+    let built: Vec<[f64; 3]> = w
+        .entities_near(ground, LOOK as f64 + APART + LOOK_UP as f64, Some(&NEST))
+        .into_iter()
+        .filter_map(|n| Some(w.entity(n)?.pos.to_array()))
+        .collect();
+    let taken = |p: [i32; 3]| {
+        let c = [p[0] as f64 + 0.5, p[1] as f64, p[2] as f64 + 0.5];
+        built.iter().any(|b| crate::dist2(*b, c) < APART * APART)
+    };
     let (mut tree, mut cliff): (Option<[i32; 3]>, Option<[i32; 3]>) = (None, None);
     // The higher, and of two as high the nearer.
     let better = |old: Option<[i32; 3]>, new: [i32; 3]| {
@@ -344,6 +354,9 @@ fn nest_site(w: &World, site: animals_core::nests::Site, at: [f64; 3], ground: [
             }
             let b = w.block([x, y, z]);
             let top = [x, y + 1, z];
+            if taken(top) {
+                continue;
+            }
             if LEAVES.on_block(b) {
                 if better(tree, top) {
                     tree = Some(top);
