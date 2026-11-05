@@ -74,7 +74,7 @@ pub static TALL_GRASS_SHARE: Component<f32> = Component::named("tall_grass_share
 pub static BIG_LEAVES: Component<f32> = Component::named("big_leaves");
 pub static BIG_LEAF_KINDS: Component<BlockList> = Component::named("big_leaf_kinds");
 // The trees' vocabulary and shapes are `base_api::trees`, so any mod's saplings grow them.
-pub use base_api::trees::{TREE_LEAVES, grow_tree};
+pub use base_api::trees::{TREE_BRANCH, TREE_LEAVES, grow_tree};
 use base_api::trees::{tree_blocks, wild_tree_at};
 static FROZEN: Tag = Tag::named("frozen");
 static DRY: Tag = Tag::named("dry");

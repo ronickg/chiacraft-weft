@@ -11,6 +11,13 @@ use weft_sdk::*;
 
 /// On a log, the leaves of the tree it grows into.
 pub static TREE_LEAVES: Component<BlockRef> = Component::named("tree_leaves");
+/// On a log, its thin branch block (the study, Ronald 11-05: "branches ... a bit like a fence"):
+/// a tree grown from branches puts its wood under `BRANCH_UNDER` wide as this, a post 4 or 8 px
+/// thick (`size`) with an arm to each wood neighbour (`n` `s` `e` `w` `u` `d`).
+pub static TREE_BRANCH: Component<BlockRef> = Component::named("tree_branch");
+/// Wood under this wide is a branch block: under `BRANCH_THIN` a 4 px one, else 8 px.
+pub const BRANCH_UNDER: f32 = 0.75;
+pub const BRANCH_THIN: f32 = 0.4;
 /// Logs with this tag grow into cones (spruces), the others round (oaks, birches).
 pub static CONE_TREE: Tag = Tag::named("cone_tree");
 /// A tall bare trunk under one wide, flat crown (the acacia).
@@ -182,6 +189,11 @@ pub fn tree_blocks(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
     // giant scatter's.)
     let giant_young = crate::tree_recipes::YOUNG.iter().any(|y| y.log == name);
     if let Some(c) = crate::tree_recipes::colonized(name).filter(|_| !giant_young) {
+        if let Some(branch) = TREE_BRANCH.on_block(log).map(|b| b.0) {
+            put_with_branches(&crate::colonize::blocks(c, t.seed), log, t.leaves, branch, t.x, t.y, t.z, &mut put);
+            put(t.x, t.y - 1, t.z, DIRT.id(), true);
+            return;
+        }
         for (dx, dy, dz, part, _) in crate::colonize::blocks(c, t.seed) {
             let (x, y, z) = (t.x + dx, t.y + dy, t.z + dz);
             match part {
@@ -196,6 +208,11 @@ pub fn tree_blocks(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
         return;
     }
     let recipe = crate::tree_recipes::sapling_of(name);
+    if let (Some(recipe), Some(branch)) = (recipe, TREE_BRANCH.on_block(log).map(|b| b.0)) {
+        grow_with_branches(recipe, log, t.leaves, branch, t.x, t.y, t.z, t.seed, &mut put);
+        put(t.x, t.y - 1, t.z, DIRT.id(), true);
+        return;
+    }
     if let Some(recipe) = recipe {
         branchy::grow(recipe, t.x, t.y, t.z, t.seed, |x, y, z, part| match part {
             branchy::Part::Log { axis } => {
@@ -417,4 +434,70 @@ pub fn grow_tree(w: World, p: [i32; 3], log: u32) {
             w.set_block([x, y, z], s);
         }
     });
+}
+
+/// A tree grown from `recipe` whose thin wood is `branch` blocks (`TREE_BRANCH`), each joined to
+/// its wood neighbours; the rest logs along their limbs and leaves.
+#[allow(clippy::too_many_arguments)]
+fn grow_with_branches(
+    recipe: &branchy::Recipe,
+    log: u32,
+    leaves: u32,
+    branch: u32,
+    x: i32,
+    y: i32,
+    z: i32,
+    seed: u64,
+    put: &mut impl FnMut(i32, i32, i32, u32, bool),
+) {
+    let widths: std::collections::HashMap<_, _> = branchy::wood_widths(recipe, seed)
+        .into_iter()
+        .map(|(x, y, z, w)| ((x, y, z), w))
+        .collect();
+    let b: Vec<_> = branchy::blocks(recipe, seed)
+        .into_iter()
+        .map(|(x, y, z, p)| (x, y, z, p, widths.get(&(x, y, z)).copied().unwrap_or(1.0)))
+        .collect();
+    put_with_branches(&b, log, leaves, branch, x, y, z, put);
+}
+
+/// A tree's blocks with each wood block's width (`colonize::blocks`, `branchy::wood_widths`), its
+/// thin wood as `branch` blocks joined to their wood neighbours, the rest logs and leaves.
+#[allow(clippy::too_many_arguments)]
+fn put_with_branches(
+    b: &[(i32, i32, i32, branchy::Part, f32)],
+    log: u32,
+    leaves: u32,
+    branch: u32,
+    x: i32,
+    y: i32,
+    z: i32,
+    put: &mut impl FnMut(i32, i32, i32, u32, bool),
+) {
+    let wood: std::collections::HashSet<_> = b
+        .iter()
+        .filter(|e| matches!(e.3, branchy::Part::Log { .. }))
+        .map(|e| (e.0, e.1, e.2))
+        .collect();
+    for &(dx, dy, dz, part, w) in b {
+        match part {
+            branchy::Part::Leaves => put(x + dx, y + dy, z + dz, leaves, false),
+            branchy::Part::Log { axis } => {
+                if w >= BRANCH_UNDER {
+                    let along = ["x", "y", "z"][axis as usize];
+                    put(x + dx, y + dy, z + dz, state_with(log, "axis", along).unwrap_or(log), true);
+                    continue;
+                }
+                let mut s = state_with(branch, "size", if w < BRANCH_THIN { "4" } else { "8" }).unwrap_or(branch);
+                for (name, (ox, oy, oz)) in
+                    [("n", (0, 0, -1)), ("s", (0, 0, 1)), ("e", (1, 0, 0)), ("w", (-1, 0, 0)), ("u", (0, 1, 0)), ("d", (0, -1, 0))]
+                {
+                    if wood.contains(&(dx + ox, dy + oy, dz + oz)) {
+                        s = state_with(s, name, "1").unwrap_or(s);
+                    }
+                }
+                put(x + dx, y + dy, z + dz, s, true);
+            }
+        }
+    }
 }
