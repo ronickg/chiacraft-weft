@@ -607,6 +607,10 @@ pub mod comp {
     /// Entity kinds and worn items: the liquids sprinting swims in (`str`, names and `#tags`
     /// apart by spaces); a worn item's add to its wearer's.
     pub const SWIMS_IN: &str = "swims_in";
+    /// Entity kinds (`f32`): how much bigger than they'd be held items are drawn in its own
+    /// first-person hand, about where they're held (1, or none: as held; a game whose items read
+    /// small in the view turns it up).
+    pub const FIRST_PERSON_HELD_SCALE: &str = "first_person_held_scale";
 }
 
 /// Harvest levels (`tool_level` of a tool, `harvest_level` of a block) of the vanilla tiers.
