@@ -36,7 +36,7 @@ ui.panel("panel", S::column().pad(7.0).gap(4.0), |ui| {
 | `input(value, max, s, on_change)` | a one-line text field; the closure gets the text after every edit |
 | `slider(s, value, on_change)` | a slider at `value` (0..1, read every frame); the closure gets where it is dragged |
 | `item(id, count, s)` | an item's icon with its count |
-| `image(texture, w, h)` | a GUI texture such as `base:gui/arrow_bg` |
+| `image(texture, w, h)` | a GUI texture such as `base:gui/arrow_bg`, or a picture the mod paints at runtime: `c.set_image("dyn:mymod:map", w, h, &rgba)` sets one (a name starting `dyn:`, up to 2048 a side), and `image("dyn:mymod:map", ..)` draws it, uploaded again only when it is set again (base's map) |
 | `spacer()` | an empty part that grows, to push others apart or center them |
 | `group(name)`, `group_slot(name, i)` | a menu's slots, see [menus](#menus) |
 | `player_model(w, h)` | the player with what they wear, the figure in the inventory |

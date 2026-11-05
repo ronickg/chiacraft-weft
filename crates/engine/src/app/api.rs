@@ -739,6 +739,18 @@ pub unsafe extern "C" fn client_particle_burst(c: *mut abi::ClientCtx, burst: *c
     }
 }
 
+/// `Host::client_image_set`: a mod's picture for the GUI (`ui::render::set_dynamic`).
+pub unsafe extern "C" fn client_image_set(_c: *mut abi::ClientCtx, name: Str, w: u32, h: u32, rgba: *const u8, len: usize) -> u32 {
+    unsafe {
+        let name = name.as_str();
+        let need = w as usize * h as usize * 4;
+        if rgba.is_null() || len < need {
+            return 0;
+        }
+        crate::ui::render::set_dynamic(name, w, h, std::slice::from_raw_parts(rgba, need)) as u32
+    }
+}
+
 pub unsafe extern "C" fn client_pose_bone(
     c: *mut abi::ClientCtx,
     entity: u64,
