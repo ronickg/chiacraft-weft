@@ -581,6 +581,7 @@ hud.base.resting = {#c2ac88}Отдых у огня: {0} с{/}
 hud.base.comfort = {#c2ac88}Комфорт {0}{/}
 hud.element.base.temperature = Температура
 hud.element.base.climb_stamina = Выносливость при лазании
+hud.element.base.glider_frame = Планер над головой
 hud.base.outside = {#c6a383}воздух{/} {0}°C
 hud.base.feels.freezing = {img:base:temp_freezing 12x12}
 hud.base.feels.cold = {img:base:temp_cold 12x12}

@@ -344,6 +344,7 @@ hud.base.resting = {#c2ac88}Resting by the fire: {0}s{/}
 hud.base.comfort = {#c2ac88}Comfort {0}{/}
 hud.element.base.temperature = Temperature
 hud.element.base.climb_stamina = Climbing stamina
+hud.element.base.glider_frame = Glider overhead
 hud.base.outside = {#c6a383}air{/} {0}°C
 hud.base.feels.freezing = {img:base:temp_freezing 12x12}
 hud.base.feels.cold = {img:base:temp_cold 12x12}

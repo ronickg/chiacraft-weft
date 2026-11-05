@@ -66,7 +66,27 @@ pub fn register(r: &mut Registry) {
         }
     });
     r.world_tick(tick);
+    // From one's own eyes: the frame overhead across the top of the view (`source/glider/frame_view.py`,
+    // drawn from the wing's model), while gliding in the first person, fading in and out.
+    r.hud_element(&HUD_FRAME, hud_anchor::TOP, 0, |ui| {
+        ui.image_bind("base:gui/glider_frame", S::default().h(FRAME_H), |c| {
+            static SHOWN: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+            let gliding = c.player_state().is_some_and(|me| me.pose == GLIDE.id() && me.health > 0.0);
+            let first = c.client().state().camera == cameras::FIRST_PERSON.camera_id();
+            let was = f32::from_bits(SHOWN.load(std::sync::atomic::Ordering::Relaxed));
+            let now = if gliding && first { (was + FRAME_FADE).min(1.0) } else { (was - FRAME_FADE).max(0.0) };
+            SHOWN.store(now.to_bits(), std::sync::atomic::Ordering::Relaxed);
+            if now > 0.0 { now } else { -1.0 }
+        });
+    });
 }
+
+static HUD_FRAME: HudElement = HudElement::named("glider_frame");
+
+/// The frame overlay's height in GUI pixels (its picture is 640 x 120, a texel a GUI pixel at
+/// 1280 x 720 and GUI scale 2), and how much it fades in or out a frame.
+const FRAME_H: f32 = 120.0;
+const FRAME_FADE: f32 = 0.08;
 
 /// One flight: where and when it began (for the log), ticks aloft toward the next wear.
 struct Flight {

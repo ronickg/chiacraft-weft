@@ -5599,6 +5599,9 @@ pub struct CommandArgs {
 
 /// Places for HUD elements. `HOTBAR_LEFT`/`HOTBAR_RIGHT` stack upwards above the hotbar's halves.
 pub mod hud_anchor {
+    /// Across the top of the screen, the whole width, under the rest of the HUD: an overlay (the
+    /// frame of a glider overhead).
+    pub const TOP: &str = "top";
     pub const TOP_LEFT: &str = "top_left";
     pub const TOP_RIGHT: &str = "top_right";
     pub const BOTTOM_LEFT: &str = "bottom_left";

@@ -1191,6 +1191,13 @@ impl UiRenderer {
                     self.image(r, idx, [0.0, 0.0, 1.0, 1.0], *color);
                 }
             }
+            Kind::BoundImage { value, .. } if *value <= 0.0 => {}
+            Kind::BoundImage { texture, value, .. } => {
+                if let Some((idx, _, _)) = self.texture(gpu, assets, texture) {
+                    let alpha = (value.min(1.0) * 255.0).round() as u32;
+                    self.image(r, idx, [0.0, 0.0, 1.0, 1.0], 0xFFFF_FF00 | alpha);
+                }
+            }
             Kind::Item { last, .. } => {
                 if last.0 != 0 {
                     let clip = n
