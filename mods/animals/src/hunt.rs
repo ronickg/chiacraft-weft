@@ -329,6 +329,7 @@ pub fn huddle(w: &World, id: u64, st: &EntityState) -> bool {
         return false;
     }
     w.navigate(id, mid, 1.2);
+    weft_sdk::info!("animal {id} huddles back to its herd ({:.1} blocks out)", dist2(mid, st.pos).sqrt());
     if let Some(u) = w.component_mut(id, &WARY) {
         *u = now + HUDDLE_WALK;
     }
