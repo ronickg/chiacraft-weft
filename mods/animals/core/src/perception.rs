@@ -16,6 +16,9 @@ pub const HUNTER_FIELD: f32 = 200.0;
 /// Awareness at which it acts (runs), and at which it stops to stare.
 pub const NOTICED: f32 = 1.0;
 pub const STARE: f32 = 0.4;
+/// Its awareness once it has run: alert, staring if it still senses the danger, bolting again
+/// only if it is noticed again (it ran from deer 30 blocks off while its awareness faded).
+pub const ALERT: f32 = 0.6;
 /// Awareness a second at the edge of its senses and close by (it rises faster the nearer: as
 /// `1 - d / range`, plus this floor so a walker at the edge still gets noticed in time).
 pub const CLOSE_PER_SEC: f32 = 2.5;
@@ -26,7 +29,7 @@ pub const FADES_PER_SEC: f32 = 0.2;
 /// How far it sees a walker or a hunter in the open by day, as a share of its watch (the mod's
 /// `hunt::WATCH`, or a species' shy distance): crouching shrinks what it sees of one, and so does
 /// the dark (a light of 0 sees this share at most).
-pub const SNEAK_SEEN: f32 = 0.5;
+pub const SNEAK_SEEN: f32 = 0.3;
 pub const DARK_SEEN: f32 = 0.45;
 
 /// Blocks a sound carries: a sprint, a walk, a sneak (quiet, not silent), a block broken, a

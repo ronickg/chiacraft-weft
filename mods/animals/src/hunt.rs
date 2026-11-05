@@ -256,6 +256,7 @@ pub fn wary(w: &World, id: u64, st: &EntityState) -> bool {
         weft_sdk::debug!("animal {id} runs from {} (awareness {:.2}) to {to:?}", seen.threat, seen.aware);
         w.navigate(id, to, 1.6);
         w.component_mut(id, &WARY).map(|u| *u = now + RUN);
+        crate::senses::ran(w, id, false);
         return true;
     }
     if seen.aware >= animals_core::perception::STARE && seen.threat != 0 {

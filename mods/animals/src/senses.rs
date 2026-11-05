@@ -549,3 +549,12 @@ pub fn stare(w: &World, id: u64, st: &EntityState, at: [f32; 3]) {
         w.entity_edit(id).yaw((-x).atan2(-z) as f32);
     }
 }
+
+/// It has run from the danger (`player`: from a player): its awareness of it falls to
+/// `perception::ALERT`, so it runs again only once it notices again.
+pub fn ran(w: &World, id: u64, player: bool) {
+    if let Some(s) = w.component_mut(id, &SENSES) {
+        let a = if player { &mut s.fright } else { &mut s.aware };
+        *a = a.min(perception::ALERT);
+    }
+}

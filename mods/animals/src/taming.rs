@@ -130,6 +130,7 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
                         seen.fright
                     );
                     scare(w, id, 0);
+                    crate::senses::ran(w, id, true);
                     return true;
                 }
                 if seen.fright >= animals_core::perception::STARE {
