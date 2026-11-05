@@ -14,10 +14,13 @@ deep shade of the block's own colour (never black), restrained highlights, top-l
 
 ## Rules
 
-- **Never attach other games' or resource packs' art** to a generation, and keep "Minecraft"
-  out of the prompt. Ronald's guide comes with reference sheets cut from a resource pack
-  (Dokucraft Light); they are not attached. The style key is our own approved tiles
-  (`approved.txt`, built into a sheet on every run) plus `notes/texture-test/palette.png`.
+- **Our key first, the guide's sheet after it, made ours** (Ronald's guides 2, 11-05, replacing
+  "never attach other packs' art"). The style key is our own approved tiles (`approved.txt`, built
+  into a sheet on every run) plus `notes/texture-test/palette.png`; the guide's reference sheet for
+  the type (`Block Prompt References/`, cut from a resource pack, never committed) comes after it,
+  with the family's "Make it yours" line, so the model copies no design. `art.py block` and
+  `blocks.py` batches both do this (`blocks.py`'s `SHEETS`: up to two sheets for an image's kinds;
+  `BLOCK_NO_REF=1` for the old way). Keep "Minecraft" out of the prompt.
 - **Every request gets the style key**, and every result is looked at before it is cut: the
   image model sometimes stops following the prompt.
 - **One resolution**: every block texture is 32 px. Don't mix in 16 or 64 px textures.
