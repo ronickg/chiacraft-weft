@@ -10,6 +10,7 @@ pub mod modui;
 pub mod particles;
 mod receive;
 pub mod sky;
+pub mod froxels;
 pub mod soft_clouds;
 pub mod stack_look;
 pub mod terrain;
@@ -2652,6 +2653,8 @@ impl Client {
             canopy: [self.canopy, 0.0, 0.0, 0.0],
             // Filled in once the sky has readied them (`render`).
             soft_clouds: [0.0; 4],
+            // Filled in once the sky has readied it (`render`).
+            froxels: [0.0; 4],
             prev_view_proj: [[0.0; 4]; 4],
             cloud_moved: [0.0; 4],
             // On the real clock (`shaders::clock`): tests pin the shaders' time, and a fireball's
@@ -3037,6 +3040,8 @@ impl Client {
         let s = crate::diag::span("render/sky");
         // Soft clouds trace against the copy of the world (`behind`), made after this.
         self.sky.soft_possible = self.behind[2] > 0.5;
+        // The mist's volume, when there is mist and the eye is out of liquids (`fog_through`).
+        self.sky.froxels_possible = self.fog >= 0.005 && self.eye_liquid().is_none();
         self.sky.draw(
             gpu,
             &mut late,
@@ -3055,6 +3060,7 @@ impl Client {
         drop(s);
         // The sky readied this frame's soft clouds: their fields in the scene.
         (scene.soft_clouds, scene.prev_view_proj, scene.cloud_moved) = self.sky.soft.scene;
+        scene.froxels = self.sky.froxels.scene;
         gpu.mapped(scene_buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
         self.render.draw_translucent(&mut late);
         let alive = !self.dead && !self.mode.has(weft_abi::game_mode_flags::NO_INTERACT);

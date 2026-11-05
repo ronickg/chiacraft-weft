@@ -724,6 +724,11 @@ gpu_struct! {
         /// What falls from the sky (a mod's `sky_landing`): xyz where it lands (camera relative),
         /// w seconds until it does (negative after; -1e6 when nothing falls).
         pub sky_landing: [f32; 4],
+        /// The mist's volume (`client::froxels`, `core:froxels`, with a pack whose sky has
+        /// `fs_froxel_light` and `fs_froxel_sum`; chiacraft): x the bindless index + 1 of the sums
+        /// from the eye (0: none this frame), y the index of each cell's own, zw the cells across
+        /// the view; 32 slices deep, eight to a row of the image.
+        pub froxels: [f32; 4],
     }
 }
 

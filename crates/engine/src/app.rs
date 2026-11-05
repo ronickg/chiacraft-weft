@@ -2566,6 +2566,7 @@ fn update_game(r: &mut Running, dt: f64, frame_start: Instant) {
         g.client.entity_render.show_avatars = r.settings.show_avatars();
         g.client.render.occlusion.on = r.settings.occlusion_culling();
         g.client.sky.soft_wanted = r.settings.soft_clouds();
+        g.client.sky.froxels_wanted = r.settings.froxels();
         let t = Instant::now();
         if world_input {
             g.client.update(&mut *r.gpu, &r.textures, &mut r.input, dt);
@@ -3081,6 +3082,8 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         let s = crate::diag::span("shadows");
         g.client
             .render_shadows(&mut *r.gpu, &mut r.list, world_info);
+        // The mist's volume, which reads the shadow maps, before the world that reads it.
+        r.list.append(&mut g.client.sky.froxels.passes);
         drop(s);
         // The opaque world copied, then what is seen through it drawn over it, reading the copy.
         if g.client.behind[2] > 0.5 {

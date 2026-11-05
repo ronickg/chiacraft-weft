@@ -708,6 +708,9 @@ fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     if scene.weather.z < 0.005 || in_liquid() || !open_sky() || sky <= 0.0 {
         return c;
     }
+    if scene.froxels.x > 0.5 {
+        return froxel_fog(c, rel, sky);
+    }
     // The whole view: walked only to 220 blocks, the fog lying on the land ended 220 blocks out, a
     // flat pale disc seen from high up (the world playtester, y 250 over snow, 11-04).
     let dist = min(length(rel), 1500.0);
@@ -752,6 +755,67 @@ fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
         last = at;
     }
     return c * through + gained;
+}
+
+// The mist as a volume (`client::froxels`, `core:froxels`): the view cut into cells an eighth of
+// the pixels each way and 32 slices deep, out to 1500 blocks, closer together near the eye. The
+// sky fills it before the world is drawn (`fs_froxel_light`: each cell's own mist and light, as
+// `fog_through` walks them; `fs_froxel_sum`: all of it from the eye to each cell's far end), and
+// every surface reads it in two filtered taps instead of walking the mist in 8 steps: the mist,
+// with its shadow taps, was among the Mac's dearest parts (Research rounds 15 and 19).
+const FROXEL_SLICES: f32 = 32.0;
+const FROXEL_FAR: f32 = 1500.0;
+const FROXEL_CURVE: f32 = 6.0;
+
+// Where slice `k` ends, blocks from the eye (the first under a block, the last at 1500).
+fn froxel_end(k: f32) -> f32 {
+    return FROXEL_FAR * (exp(FROXEL_CURVE * (k + 1.0) / FROXEL_SLICES) - 1.0) / (exp(FROXEL_CURVE) - 1.0);
+}
+
+// The slices from the eye to `d` blocks: k + 1 at the end of slice k.
+fn froxel_slice(d: f32) -> f32 {
+    return FROXEL_SLICES * log(1.0 + d * (exp(FROXEL_CURVE) - 1.0) / FROXEL_FAR) / FROXEL_CURVE;
+}
+
+// The sums from the eye to the end of slice `k` at screen `uv`: rgb the light gathered, a how much
+// gets through (none before the first: nothing, all).
+fn froxel_at(uv: vec2<f32>, k: i32) -> vec4<f32> {
+    if k < 0 {
+        return vec4(0.0, 0.0, 0.0, 1.0);
+    }
+    let grid = scene.froxels.zw;
+    let cell = clamp(uv * grid, vec2(0.5), grid - 0.5);
+    let tile = vec2(f32(k % 8), f32(k / 8));
+    let at = (tile * grid + cell) / (grid * vec2(8.0, FROXEL_SLICES / 8.0));
+    return textureSampleLevel(textures[u32(scene.froxels.x) - 1u], linear_clamp, at, 0.0);
+}
+
+// `fog_through` from the volume. `sky` thins the mist on the way as it did each step there: what
+// gets through to the power `sky`, and the light gathered by as much.
+fn froxel_fog(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
+    let clip = scene.view_proj * vec4(rel, 1.0);
+    let uv = clamp(vec2(clip.x, -clip.y) / max(clip.w, 1e-4) * 0.5 + 0.5, vec2(0.0), vec2(1.0));
+    let f = froxel_slice(min(length(rel), FROXEL_FAR));
+    let k = i32(floor(f));
+    let v = mix(froxel_at(uv, k - 1), froxel_at(uv, min(k, i32(FROXEL_SLICES) - 1)), fract(f));
+    let through = pow(max(v.a, 1e-6), sky);
+    return c * through + v.rgb * (1.0 - through) / max(1.0 - v.a, 1e-4);
+}
+
+// One cell's own mist and light for the volume (`fs_froxel_light`): toward `dir`, `at` blocks out,
+// with the mist's floor `floor` (`fog_floor` of what lies behind it): rgb the light the mist sends
+// toward the eye there (as `fog_through` lights each step: the sky's, and the sun's where it
+// reaches), a its density (per block).
+fn froxel_cell(dir: vec3<f32>, at: f32, floor: f32) -> vec4<f32> {
+    let light = fog_light(dir);
+    let leafy = min(canopy(), 1.0);
+    let shaded_sky = light.sky * mix(vec3(1.0), LEAF_LIGHT * 0.2, leafy * 0.85) + light.leaf * leafy;
+    let d = fog_density(scene.eye.xyz + dir * at, floor);
+    if d <= 0.0 {
+        return vec4(0.0);
+    }
+    let lit = sun_reaches(dir * at);
+    return vec4(mix(shaded_sky, light.sky, lit) + light.sun * lit, d);
 }
 
 // How much snow lies on a surface with normal `n` at `pos` (world) with `sky` light: on what

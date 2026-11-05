@@ -1019,3 +1019,54 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
     }
     return vec4(rgb * a, select(a, 0.0, s.ids.w != 0u));
 }
+
+// The mist's volume (`client::froxels`, `look.wgsl`'s `froxel_fog`), filled before the world is
+// drawn: its image holds the 32 slices eight to a row, each the cells across the view.
+// The cell this pixel of the image is: x and y across the view, z the slice.
+fn froxel_cell_of(px: vec2<f32>) -> vec3<i32> {
+    let grid = vec2<i32>(scene.froxels.zw);
+    let p = vec2<i32>(px);
+    let tile = p / grid;
+    return vec3(p - tile * grid, tile.x + tile.y * 8);
+}
+
+// The cells' own mist and light: toward the cell's middle, halfway through its slice. The mist's
+// floor is that of what lay behind the cell last frame (the world's copy for water, `behind`):
+// `fog_through` takes it from the surface it ends at.
+@fragment
+fn fs_froxel_light(in: CloudOut) -> @location(0) vec4<f32> {
+    let c = froxel_cell_of(in.clip.xy);
+    let uv = (vec2<f32>(c.xy) + 0.5) / scene.froxels.zw;
+    let ndc = vec2(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
+    let far = scene.inv_view_proj * vec4(ndc, 1e-6, 1.0);
+    let dir = normalize(far.xyz / far.w);
+    var end = dir * 220.0;
+    if scene.behind.z > 0.5 {
+        let depth = textures[u32(scene.behind.y)];
+        let d = textureLoad(depth, vec2<i32>(uv * vec2<f32>(textureDimensions(depth))), 0).r;
+        if d > 0.0 {
+            let w = scene.inv_view_proj * vec4(ndc, d, 1.0);
+            end = w.xyz / w.w;
+        }
+    }
+    let k = f32(c.z);
+    return froxel_cell(dir, 0.5 * (froxel_end(k - 1.0) + froxel_end(k)), fog_floor(end));
+}
+
+// The sums from the eye to each cell's far end, slice by slice as `fog_through` walks its steps:
+// rgb the light gathered, a how much gets through.
+@fragment
+fn fs_froxel_sum(in: CloudOut) -> @location(0) vec4<f32> {
+    let c = froxel_cell_of(in.clip.xy);
+    let grid = vec2<i32>(scene.froxels.zw);
+    let cells = textures[u32(scene.froxels.y)];
+    var through = 1.0;
+    var gained = vec3(0.0);
+    for (var j = 0; j <= c.z; j++) {
+        let v = textureLoad(cells, c.xy + vec2(j % 8, j / 8) * grid, 0);
+        let kept = exp(-v.a * (froxel_end(f32(j)) - froxel_end(f32(j) - 1.0)));
+        gained += through * (1.0 - kept) * v.rgb;
+        through *= kept;
+    }
+    return vec4(gained, through);
+}
