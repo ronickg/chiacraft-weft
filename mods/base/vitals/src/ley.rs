@@ -54,6 +54,8 @@ pub const MOTE_LIFE: (f32, f32) = (2.0, 3.2);
 pub const MOTES_PER_BLOCK: f32 = 3.0;
 /// How high over the ground the motes ride (blocks over its top block): over tall grass.
 pub const MOTE_RISE: (f64, f64) = (0.8, 1.8);
+/// No mote nearer the player than this (blocks, across the ground): one by the eyes fills the screen.
+pub const MOTE_CLEAR: f64 = 4.0;
 
 /// The rod's reading as words: under `STILL` it hangs still, then faint, a pull, strong; within
 /// `ON_LINE` blocks of a line's middle it's on it, within `AT_NODE` of a node at the node.

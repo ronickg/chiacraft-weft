@@ -524,6 +524,11 @@ fn motes(c: &Client, s: &mut Rod, seed: u64, me: [f64; 3], shown: f64, dt: f32) 
         let [ux, uz] = l.dir();
         let side = (s.unit() - 0.5) * 0.8;
         let (px, pz) = (l.from[0] as f64 + 0.5 + ux * t - uz * side, l.from[1] as f64 + 0.5 + uz * t + ux * side);
+        // None by the eyes: the line under the player's feet put one in the camera's face (PC look
+        // ley_look2), a cross filling a fifth of the screen.
+        if (px - x).hypot(pz - z) < ley::MOTE_CLEAR {
+            continue;
+        }
         let Some(top) = ground_at(c, s, px.floor() as i32, pz.floor() as i32, me[1]) else { continue };
         let y = top as f64 + 1.0 + ley::MOTE_RISE.0 + s.unit() * (ley::MOTE_RISE.1 - ley::MOTE_RISE.0);
         let speed = ley::FLOW_SPEED as f64 * (0.7 + 0.6 * l.flow as f64);
