@@ -256,7 +256,11 @@ fn soft_cover(s: Sky, at: vec2<f32>) -> f32 {
     let field = soft_slice(9u, fract(at / 6144.0) * 64.0).r * 0.65 + soft_slice(27u, fract(at / 1536.0) * 64.0).r * 0.35;
     // At 0.38 a clear day's were thin wisps with no body (the first soft run, 11-05).
     // Storms at 0.92 closed into one even deck once the billows were equalized: 0.8 keeps breaks.
-    return clamp(mix(0.5, 0.8, wet) + (field - 0.5) * mix(0.8, 0.5, wet), 0.0, 1.0);
+    // Clear weather from about 0.36 to 0.57 (0.46 +- 0.35 of the field's spread): with 0.5 +- 0.8,
+    // where the slow field peaks (over 0.6) the billows all passed and a clear day stood under a
+    // flat grey deck that never moved off, a birch forest's sky through its gaps grey at every
+    // hour (Tester 2's looks4, 11-05, once soft clouds were the default).
+    return clamp(mix(0.46, 0.8, wet) + (field - 0.5) * mix(0.35, 0.5, wet), 0.0, 1.0);
 }
 
 // The cloud's density at `at` (its frame, blocks) and `a` (0 at the layer's underside, 1 at its
