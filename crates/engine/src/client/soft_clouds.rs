@@ -88,6 +88,7 @@ fn worley(p: [f32; 3], cells: i32, seed: u32) -> f32 {
 /// eight to a row, each in a 66² cell with a one-texel wrapped border.
 pub fn noise_atlas() -> Vec<u8> {
     let mut out = vec![0u8; ATLAS * ATLAS * 4];
+    let mut raw = vec![0f32; ATLAS * ATLAS * 4];
     let s = SIDE as f32;
     for z in 0..SIDE {
         let (cx, cy) = ((z % 8) * CELL, (z / 8) * CELL);
@@ -106,12 +107,23 @@ pub fn noise_atlas() -> Vec<u8> {
                 // Perlin remapped by the cells: billows with rounded tops.
                 let billow = ((base - (1.0 - cells)) / (1.0 - (1.0 - cells)).max(1e-3)).clamp(0.0, 1.0) * 0.5 + base * 0.5;
                 let o = ((cy + y) * ATLAS + cx + x) * 4;
-                out[o] = (billow * 255.0) as u8;
-                out[o + 1] = (w4 * 255.0) as u8;
-                out[o + 2] = (w8 * 255.0) as u8;
-                out[o + 3] = (w16 * 255.0) as u8;
+                raw[o..o + 4].copy_from_slice(&[billow, w4, w8, w16]);
             }
         }
+    }
+    // Each channel stretched to the whole 0..1: as made, the billows spanned about 0.1-0.6, and
+    // a clear day's cover let almost none of them through (the first soft-cloud runs, 11-05).
+    let mut lo = [f32::MAX; 4];
+    let mut hi = [f32::MIN; 4];
+    for px in raw.as_chunks::<4>().0 {
+        for c in 0..4 {
+            lo[c] = lo[c].min(px[c]);
+            hi[c] = hi[c].max(px[c]);
+        }
+    }
+    for (o, v) in out.iter_mut().zip(raw.iter().enumerate()) {
+        let c = v.0 % 4;
+        *o = ((v.1 - lo[c]) / (hi[c] - lo[c]).max(1e-6) * 255.0).round().clamp(0.0, 255.0) as u8;
     }
     out
 }
