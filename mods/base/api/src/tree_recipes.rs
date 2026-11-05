@@ -597,6 +597,60 @@ pub fn grown(log: &str, seed: u64) -> Option<Vec<(i32, i32, i32, crate::branchy:
     of(log).map(|r| crate::branchy::blocks(r, seed))
 }
 
+/// A tree's form, rolled per tree in the wild (`trees::shaped`): most stand as their recipe grows
+/// them; some are big and old, some crooked, some twins forking low into two stems, so a wood of
+/// one species isn't clones (the tree-look audit; Planner's slice 4).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Variant {
+    Standing,
+    Big,
+    Crooked,
+    Twin,
+}
+
+impl Variant {
+    pub const ALL: [Variant; 4] = [Variant::Standing, Variant::Big, Variant::Crooked, Variant::Twin];
+}
+
+/// `r` grown as `v`: big and old taller and thicker, crooked leaning and wandering, a twin's trunk
+/// forking low into two leaders (as an acacia's into its stems).
+pub fn varied(r: &Recipe, v: Variant) -> Recipe {
+    match v {
+        Variant::Standing => *r,
+        Variant::Big => Recipe { height: r.height * 1.2, width: r.width * 1.15, ..*r },
+        // (A conifer grows straight to its tip, and a giant's limbs reach its scatter's edge: crooked
+        // they'd lean past it. The wild roll never makes a cone tree crooked either.)
+        Variant::Crooked if r.leaf_along || r.reach > 0 => *r,
+        Variant::Crooked => Recipe { lean: r.lean + 7.0, drift: r.drift * 1.6 + 2.0, rise: r.rise * 0.8, ..*r },
+        // (A palm, a conifer or a small tree of leafy sprays, the dogwood's, keeps one stem.)
+        Variant::Twin if r.fronds > 0 || r.leaf_along || r.twig > 0.0 => *r,
+        Variant::Twin => Recipe { fork: true, branch_count: 2, branch_start: 0.22, branch_angle: 24.0, branch_width: 0.95, ..*r },
+    }
+}
+
+/// `c` grown as `v`: big and old taller, wider and thicker (within its reach), crooked its crown
+/// well off its foot so the trunk bends to it, a twin's trunk forking into two stems.
+pub fn varied_colonized(c: &crate::colonize::Colonize, v: Variant) -> crate::colonize::Colonize {
+    // A giant's trunk is its recipe's (`trunk_from`): it keeps its form.
+    if c.trunk_from.is_some() {
+        return *c;
+    }
+    let (reach, _) = c.limits();
+    match v {
+        Variant::Standing => *c,
+        Variant::Big => crate::colonize::Colonize {
+            trunk: c.trunk * 1.12,
+            crown_h: c.crown_h * 1.15,
+            crown_r: (c.crown_r * 1.12).min(reach as f32 - c.leaf_r * 0.6),
+            min_trunk: c.min_trunk * 1.25,
+            ..*c
+        },
+        Variant::Crooked => crate::colonize::Colonize { lean: 0.3, ..*c },
+        Variant::Twin if c.fork > 0 => *c,
+        Variant::Twin => crate::colonize::Colonize { fork: 2, ..*c },
+    }
+}
+
 /// A grown tree of `log` with each wood block's width (`colonize::blocks`, `branchy::wood_widths`).
 pub fn grown_widths(log: &str, seed: u64) -> Option<Vec<(i32, i32, i32, crate::branchy::Part, f32)>> {
     if let Some(c) = colonized(log) {

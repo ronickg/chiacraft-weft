@@ -193,7 +193,18 @@ pub fn tree_blocks(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
     // (A giant's species in a tree's site grows its young recipe, below: the grown giant is the
     // giant scatter's.)
     let giant_young = crate::tree_recipes::YOUNG.iter().any(|y| y.log == name);
-    if let Some(c) = crate::tree_recipes::colonized(name).filter(|_| !giant_young) {
+    // Its form (rolled in `shaped`): big and old, crooked or a twin, or as its recipe grows.
+    let variant = match t.form {
+        Form::Big => crate::tree_recipes::Variant::Big,
+        Form::Crooked => crate::tree_recipes::Variant::Crooked,
+        Form::Twin => crate::tree_recipes::Variant::Twin,
+        _ => crate::tree_recipes::Variant::Standing,
+    };
+    if let Some(c) = crate::tree_recipes::colonized(name)
+        .filter(|_| !giant_young)
+        .map(|c| crate::tree_recipes::varied_colonized(c, variant))
+    {
+        let c = &c;
         if let Some(branch) = TREE_BRANCH.on_block(log).map(|b| b.0) {
             put_with_branches(&crate::colonize::blocks(c, t.seed), None, log, t.leaves, branch, t.x, t.y, t.z, &mut put);
             put(t.x, t.y - 1, t.z, DIRT.id(), true);
@@ -212,7 +223,8 @@ pub fn tree_blocks(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
         put(t.x, t.y - 1, t.z, DIRT.id(), true);
         return;
     }
-    let recipe = crate::tree_recipes::sapling_of(name);
+    let recipe = crate::tree_recipes::sapling_of(name).map(|r| crate::tree_recipes::varied(r, variant));
+    let recipe = recipe.as_ref();
     if let (Some(recipe), Some(branch)) = (recipe, TREE_BRANCH.on_block(log).map(|b| b.0)) {
         grow_with_branches(recipe, log, t.leaves, branch, t.x, t.y, t.z, t.seed, &mut put);
         put(t.x, t.y - 1, t.z, DIRT.id(), true);
