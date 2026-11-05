@@ -79,7 +79,9 @@ pub fn register(r: &mut Registry) {
     r.hud_element(&HUD_FRAME, hud_anchor::TOP, 0, |ui| {
         ui.image_bind("base:gui/glider_frame", S::default().h(FRAME_H), |c| {
             static SHOWN: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
-            let gliding = c.player_state().is_some_and(|me| me.pose == GLIDE.id() && me.health > 0.0);
+            let gliding = c
+                .player_state()
+                .is_some_and(|me| me.pose == GLIDE.id() && me.health > 0.0);
             let first = FIRST_PERSON.load(std::sync::atomic::Ordering::Relaxed);
             let was = f32::from_bits(SHOWN.load(std::sync::atomic::Ordering::Relaxed));
             let now = if gliding && first { (was + FRAME_FADE).min(1.0) } else { (was - FRAME_FADE).max(0.0) };
@@ -135,7 +137,13 @@ fn toggle(w: &World, id: u64) {
         close(w, id, &st, "closed");
         return;
     }
-    if st.on_ground != 0 || st.in_liquid != 0 || st.flying != 0 || st.health <= 0.0 || st.fall_distance < OPENS_AFTER || crate::grapple::attached(id) {
+    if st.on_ground != 0
+        || st.in_liquid != 0
+        || st.flying != 0
+        || st.health <= 0.0
+        || st.fall_distance < OPENS_AFTER
+        || crate::grapple::attached(id)
+    {
         return;
     }
     let Some((_, wing)) = carried(w, id) else { return };

@@ -3610,7 +3610,8 @@ fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, 
                 let reach = (p.pos + DVec3::Y * hold).distance(rope.anchor);
                 p.rope_len = p.rope_len.max(reach).min(rope.length);
             }
-            let taut = !w.on_wall && physics::rope_hold(c, block, bodies, &mut p.pos, &mut p.vel, hw, height, hold, rope.anchor, p.rope_len);
+            let taut =
+                !w.on_wall && physics::rope_hold(c, block, bodies, &mut p.pos, &mut p.vel, hw, height, hold, rope.anchor, p.rope_len);
             // Swinging on a taut rope keeps its way: little of the air's drag (0.91 a step
             // across and 0.98 up and down, which stop a pendulum in a swing).
             if taut && !w.on_ground {
