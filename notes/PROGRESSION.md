@@ -182,7 +182,7 @@ Ronald: "I really love the fantasy stuff, like the Lord of the Rings with elves 
 some dwarven kingdom in like the mountains, or elves would be in a specific biome".
 - **Who:** dwarves in the mountain ranges (kingdoms carved into the rock, master smiths and miners, deep halls and forges), elves in the old forests (the sequoia groves or the tropical canopy; keepers of ley magic, archers and beast-tamers), humans as the main folk in the open lands (the settlers and traders, growing with the ages), and more peoples later, each in its own biome (desert nomads, swamp folk, sea raiders, northern giants).
 - **Lore:** heirs of the ancients. Each people inherited one part of the star-born ancients' legacy: dwarves their craft and star steel, elves their ley magic, humans their spread. Their old feuds and lost knowledge are what the player uncovers.
-- **Dealing with them:** reputation per people (trading, helping and contracts raise it, and higher standing opens their smiths, spells, mounts and lands). They teach their crafts (dwarves smithing secrets and blueprints, elves magic and taming), which ties them into the skill web and the ages. They can turn hostile: guards and ambushes, and raids can come from them.
+- **Dealing with them:** reputation per people (trading, helping and contracts raise it, and higher standing opens their smiths, spells, mounts and lands). They teach their crafts (dwarves smithing secrets and blueprints, elves magic and taming), which ties them into the skill web and the ages. They can turn hostile: guards and ambushes.
 - **In the world:** living towns and kingdoms with NPCs going about their day, traders, smiths and quest givers. A big build.
 - **Names:** each people gets its own naming language, derived from the ancients' tongue, as Tolkien's peoples' languages differ (`reports/Naming and invented words.md`, running).
 
@@ -210,11 +210,11 @@ systems already deeper than most survival games. The gaps are outside the body. 
 | Area | Systems |
 |---|---|
 | Exploring and travel | Glider, grapple and stamina climbing (the glider's range follows the day's wind); a map that fills where you walk, with waystones (ancient ley nodes you wake); learning by study (examining things fills the journal and opens recipes; the first finder names a species); puzzle ruins and pocket worlds that reset on a timer |
-| Danger | Raids drawn by progress (a boss kill, a new age, loud industry; never while offline, a world setting turns them off); seasonal giants and weather disasters with a forecast; darkness and dread (rises in the dark and deep, falls by fire, tames and ley nodes; never damage); light injuries and illness (off by default) |
+| Danger | Seasonal giants and weather disasters with a forecast; darkness and dread (rises in the dark and deep, falls by fire, tames and ley nodes; never damage); light injuries and illness (off by default) |
 | Working the land | Fishing, nets and traps; hunting by wind and noise (prey smell you downwind, tracks lead to herds); power before steam (waterwheels, windmills, treadwheels) |
-| Building and people | A base heart (claim, tribe ranks, the raid target; upkeep only as a server option); boats, then carts and rails; settlers and traders with contracts |
+| Building and people | A base heart (claim and tribe ranks; upkeep only as a server option); boats, then carts and rails; settlers and traders with contracts |
 
-Not picked this round: timed trips for tames (tames still work, from the earlier answers). Skipped
+Later (Ronald, 11-06: "keep out sort of those RAID runs for now. That's maybe something later down the line"): raids drawn by progress, so the base heart is a claim and ranks, not yet a raid target. Not picked this round: timed trips for tames (tames still work, from the earlier answers). Skipped
 by the research: server wipes, full-loot PvP and offline raids, base decay by default, structural
 integrity, body-part injuries, damaging sanity monsters, a fishing minigame bar, underwater bases
 for now, tower defence as a mode.
