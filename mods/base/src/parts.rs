@@ -197,7 +197,16 @@ pub fn register(r: &mut Registry) {
             .filter(|m| !m.contains('='))
             .map(String::as_str)
             .collect();
-        let made = made_of(&kind, &names, grade, (w.day_time() / vitals::calendar::DAY_TICKS) as u32);
+        let day = (w.day_time() / vitals::calendar::DAY_TICKS) as u32;
+        // `/gear part <shape> <material>`: one part, to assemble by hand.
+        let made = if kind == "part" {
+            names
+                .first()
+                .zip(names.get(1))
+                .map_or(ItemStack::EMPTY, |(shape, m)| part_of(shape, m, grade, day))
+        } else {
+            made_of(&kind, &names, grade, day)
+        };
         if made.is_empty() {
             cmd.reply("command.base.gear.cant", &[Arg::Text(&kind)]);
             return;
@@ -584,6 +593,22 @@ pub fn made_of(kind_id: &str, materials: &[&str], grade: u8, day: u32) -> ItemSt
         parts.push((part, PartOf { material: code(m.id), grade: part.grade as u32, worn: 0, made_day: day, repairs: 0 }));
     }
     built(kind, &parts)
+}
+
+/// A part item of shape `shape` and material `material`, of grade `grade`, made on `day`; empty
+/// if that material can't be that part.
+pub fn part_of(shape: &str, material: &str, grade: u8, day: u32) -> ItemStack {
+    let Some(m) = crafting::materials::material(material) else { return ItemStack::EMPTY };
+    let can = SHAPES.iter().filter(|s| s.id == shape).any(|s| {
+        crafting::kinds::kind(s.kind)
+            .and_then(|k| k.slots.iter().find(|x| x.name == s.slot))
+            .is_some_and(|x| fits(m, s.kind, s.slot, x.role))
+    });
+    if !can {
+        return ItemStack::EMPTY;
+    }
+    ItemStack::new(part_item(shape).id(), 1)
+        .with(&PART, PartOf { material: code(m.id), grade: grade.clamp(1, 10) as u32, worn: 0, made_day: day, repairs: 0 })
 }
 
 /// Puts `stack` where it goes: armour on its slot if that's free, else the selected hotbar slot,

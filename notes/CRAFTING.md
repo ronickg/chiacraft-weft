@@ -186,7 +186,8 @@ diamond ... I kind of wanted to be a bit more realistic, but not completely". So
 - **`/gear <kind> <materials...> [grade=N] [slot=N]`** builds one for checks and scripts (game
   masters): the working part's material first, then its slots' in order, the usual ones for the
   rest (an oak haft, a leather grip on a bow, cordage on stone and wrought iron on metal, leather
-  straps and a wool lining on armour).
+  straps and a wool lining on armour). `/gear part <shape> <material>` gives one part, to assemble
+  by hand at the table.
 - **Worn armour** shows today's four worn sets until its parts have region textures: a leather
   look (leather, rawhide, bone shells), a grey one (`_mail`: the irons and steels), a yellow one
   (`_scale`: copper and bronze), diamond's (`_gem`). They're items of their own only for their worn
