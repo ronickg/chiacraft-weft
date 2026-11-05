@@ -342,12 +342,25 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
     let l = light_dir();
     let mu = dot(dir, l);
     // Two lobes, forward (the silver lining toward the sun) and a little back.
-    let phase = min(0.75 * cloud_hg(mu, 0.75) + 0.25 * cloud_hg(mu, -0.2), 0.6) * 12.566;
+    var phase = min(0.75 * cloud_hg(mu, 0.75) + 0.25 * cloud_hg(mu, -0.2), 0.6) * 12.566;
+    // In the HDR world the forward peak is kept (about 21 times the light across the sun, where 7.5
+    // was the cap for the screen's range): a bright silver lining round clouds before the sun, the
+    // curve and the bloom taking it, as Bliss's clouds have.
+    if scene.frame.x > 0.5 {
+        phase = (0.75 * cloud_hg(mu, 0.75) + 0.25 * cloud_hg(mu, -0.2)) * 12.566;
+    }
     // With the sun low the light reaching the clouds is deeper orange and a little dimmer, so their
     // lit sides glow orange against darker bellies (Bliss's sunsets); at its full strength it went
     // white through the curve and the clouds stayed white at sunrise and sunset (the Bliss
     // comparison, 11-05).
-    let sun = p.sun * light_strength() * (1.0 - s.axes[0].y * 0.55) * cloud_sun_tint();
+    // Clouds hundreds of blocks up still see the sun a little after it has set on the ground (and
+    // before it rises): in the HDR world they keep its light down to about 4° under the horizon, so
+    // the dawn's clouds are lit gold from below while the land is still in shade (Bliss's 06:00).
+    var strength = light_strength();
+    if scene.frame.x > 0.5 && scene.sun.y > -0.1 {
+        strength = max(strength, smoothstep(-0.08, 0.03, scene.sun.y));
+    }
+    let sun = p.sun * strength * (1.0 - s.axes[0].y * 0.55) * cloud_sun_tint();
     // Rain darkens the clouds' albedo and keeps their shapes (Photon: ×0.66); a storm's more.
     let albedo = mix(1.0, 0.66, s.axes[0].x) * mix(1.0, 0.6, storm);
     var through = 1.0;
