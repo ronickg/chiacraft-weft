@@ -117,7 +117,7 @@ pub fn drying_byte(secs: f32) -> u32 {
 /// pick, 11-05: no mist at 05:00-06:00 in a clear summer, Tester 2's mist shots, where `/air`'s
 /// forced mist looked right): the ground cools through the night and the damp air above it
 /// condenses in the last hours before sunrise, lying in valleys and over water (the shader pack
-/// lays any fog low); the sun burns it off two to three hours after it rises. Dry air (humidity
+/// lays it below sea level + 8); the sun burns it off within two hours after it rises. Dry air (humidity
 /// under `DAWN_MIST_DAMP.0`) none, the dampest `DAWN_MIST` thick. Only on some mornings: each
 /// day's, the same on every machine. `sunrise` the hour the sun rises that day.
 // (0.1: at 0.42 a damp morning over the birch forest went a golden white-out, at 0.2 it still hid
@@ -135,7 +135,9 @@ pub fn dawn_mist(humidity: f32, sunrise: f32, hour: f32, wind: f32, raining: boo
         return 0.0;
     }
     let ramp = |from: f32, to: f32| ((hour - from) / (to - from)).clamp(0.0, 1.0);
-    let hours = ramp(sunrise - 3.0, sunrise - 0.5) * (1.0 - ramp(sunrise + 1.5, sunrise + 3.5));
+    // From two and a half hours before sunrise, burnt off within two after it (it lasted three and
+    // a half, a white sea at the vista to 08:00 at the equinox: the Look session's checkpoint).
+    let hours = ramp(sunrise - 2.5, sunrise - 0.5) * (1.0 - ramp(sunrise + 0.5, sunrise + 2.0));
     let blown = ((wind - CLEARS.0) / (CLEARS.1 - CLEARS.0)).clamp(0.0, 1.0);
     DAWN_MIST * damp * hours * (1.0 - blown)
 }
