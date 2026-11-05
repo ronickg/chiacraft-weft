@@ -105,7 +105,17 @@ pub fn terrain(r: &mut Registry) {
         // Distant terrain runs no decorations: it asks this what its steep faces show.
         .faces(l::SNOW_FALL, |f| {
             let [x, _, z] = f.pos();
-            let rocks = l::rock_set(&l::fields(f.seed()), x * 16, z * 16, f.height(), SAND.is(f.surface_block()));
+            // A steep cell is asked once for its top and once per wall band down, the same column
+            // each time: its rocks (the climate, the areas, the surface) are worked out once.
+            let key = (f.seed(), x, z, f.height());
+            let rocks = FACE_ROCKS.with(|c| match c.get() {
+                Some((k, rocks)) if k == key => rocks,
+                _ => {
+                    let rocks = l::rock_set(&l::fields(f.seed()), x * 16, z * 16, f.height(), SAND.is(f.surface_block()));
+                    c.set(Some((key, rocks)));
+                    rocks
+                }
+            });
             if let Some(rock) = bare(f.seed(), f.pos(), f.block(), f.fall(), f.biome(), rocks) {
                 f.set(rock);
             }
@@ -120,6 +130,14 @@ pub fn terrain(r: &mut Registry) {
     r.decoration(coral).dimension(&crate::OVERWORLD);
     r.decoration(landmarks).dimension(&crate::OVERWORLD);
     r.decoration(tropical_water).dimension(&crate::OVERWORLD);
+}
+
+/// A steep column (seed, x, z, height) and its rocks.
+type FaceRocks = Option<((u64, i32, i32, i32), l::RockSet)>;
+
+thread_local! {
+    /// The last steep column's rocks (`faces`).
+    static FACE_ROCKS: std::cell::Cell<FaceRocks> = const { std::cell::Cell::new(None) };
 }
 
 static WET: Tag = Tag::named("wet");

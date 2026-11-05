@@ -127,15 +127,15 @@ pub(super) fn at(f: &Fields, x: i32, z: i32, ground: &dyn Fn(i32, i32) -> i32) -
 }
 
 /// What a tarn takes off the ground (Q4, zero or less) at (`x`, `z`) (Q4), the ground there
-/// before it being `base` (Q4): down to its bowl's bed.
-pub(super) fn cut(f: &Fields, x: i32, z: i32, base: i32, ground: &dyn Fn(i32, i32) -> i32) -> i32 {
+/// before it being `base` (Q4; asked only inside a tarn's bowl): down to its bowl's bed.
+pub(super) fn cut(f: &Fields, x: i32, z: i32, base: &dyn Fn() -> i32, ground: &dyn Fn(i32, i32) -> i32) -> i32 {
     let (bx, bz) = (x >> 4, z >> 4);
     let Some(t) = at(f, bx, bz, ground) else { return 0 };
     let (ex, ez) = ((x - t.x * 16) as i64, (z - t.z * 16) as i64);
     let d = ((ex * ex + ez * ez) as u64).isqrt() as i32;
     let Some(bed) = t.bed(d) else { return 0 };
     // The bed's top block at `bed`: the ground's sum somewhere in that block.
-    (q4(bed as f64) + 8 - base).min(0)
+    (q4(bed as f64) + 8 - base()).min(0)
 }
 
 /// The tarns (middle x, z, radius, level) within `r` blocks of (`x`, `z`) (blocks).
