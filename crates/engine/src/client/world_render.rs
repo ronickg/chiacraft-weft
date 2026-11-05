@@ -1674,7 +1674,12 @@ impl WorldRenderer {
             self.table.cull(gpu, early, frame.slot, pipe, vbuf, depths);
         }
         let groups = self.table.groups();
-        let capped = !gpu.indirect_count() && cap_draws();
+        // The counts are two frames old: after a big turn or move since, they may be far too few,
+        // so that frame draws every record (as without the cap).
+        let now = (cam.forward(), cam.pos);
+        let turned = self.table.looks[1].is_some_and(|(f, p)| f.dot(now.0) < 0.985 || p.distance(now.1) > 4.0);
+        self.table.looks = [Some(now), self.table.looks[0]];
+        let capped = !gpu.indirect_count() && cap_draws() && !turned;
         let mut issued = (0u64, 0u64);
         // Everything opaque that never discards first, then all that may (cutout, the fade band,
         // distant terrain): a discarding fragment can't hide what is drawn after it, so Apple's
@@ -1700,7 +1705,13 @@ impl WorldRenderer {
             let (pipe, buf) = self.pipe_of(kind, layer, page);
             self.bind_run(list, pipe, buf, self.table.out.as_ref().map_or(obuf, |o| o.origins));
             let Some(o) = self.table.out.as_ref() else { continue };
-            let seen = self.table.seen.get(id as usize).copied().flatten();
+            let seen = self
+                .table
+                .seen
+                .get(id as usize)
+                .copied()
+                .flatten()
+                .map(|n| n.max(self.table.peak.get(id as usize).copied().unwrap_or(0)));
             let draws = if capped { capped_draws(seen, max) } else { max };
             issued = (issued.0 + draws as u64, issued.1 + max as u64);
             list.push(Cmd::DrawIndexedIndirectCount {
@@ -1790,6 +1801,14 @@ struct CubeTable {
     /// culling wrote the last time this frame slot ran, read back before it is reset; `None`
     /// while unknown (a slot's buffer just made). A draw then issues about that many, not all.
     seen: Vec<Option<u32>>,
+    /// Per bucket the most `seen` has been lately, falling by 1/64 a frame (about a second to
+    /// halve): a count drawn from two frames back was too few after staring into the ground and
+    /// looking up, and cubes went missing for a frame or two, the world black behind them (Ronald,
+    /// 11-06).
+    peak: Vec<u32>,
+    /// The camera's look and place the last two frames: a big change since the counts were made
+    /// draws every record that frame.
+    looks: [Option<(Vec3, DVec3)>; 2],
     /// What the last frame issued and the culling had written: (draws issued, all records,
     /// written), for the once-a-second log line.
     issued: (u64, u64, u64, u32),
@@ -1874,6 +1893,8 @@ impl CubeTable {
             views: Vec::new(),
             out: None,
             seen: Vec::new(),
+            peak: Vec::new(),
+            looks: [None; 2],
             issued: (0, 0, 0, 0),
             logged: None,
         }
@@ -2025,8 +2046,10 @@ impl CubeTable {
             // buffer made just now holds nothing yet.
             let same = before == Some(buckets);
             self.seen.resize(self.per_bucket.len(), None);
-            for (id, seen) in self.seen.iter_mut().enumerate() {
+            self.peak.resize(self.per_bucket.len(), 0);
+            for (id, (seen, peak)) in self.seen.iter_mut().zip(self.peak.iter_mut()).enumerate() {
                 *seen = same.then(|| words[id * 2]);
+                *peak = (*peak - *peak / 64).max(seen.unwrap_or(0));
             }
             let mut base = 0;
             for (id, &n) in self.per_bucket.iter().enumerate() {
