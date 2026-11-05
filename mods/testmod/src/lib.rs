@@ -274,22 +274,19 @@ fn init(r: &mut Registry) {
     r.shaped(&CRAFTING, "cable", 8, &["iii"], &[('i', "#ingots/iron")]);
 
     r.block(&REGOLITH).hardness(0.5).mineable("shovel");
-    // Standing in water: a weed that only lives in it (it stacks, held up by nothing, so tests
-    // can fill a pool with it), and a slab whose `waterlogged=true` state is its wet twin
-    // (placed into water it fills, a bucket drains it).
+    // Standing in water (Weft's waterlogging: `.holds_liquid()`, the water a part of the cell): a
+    // weed that only lives in it (it stacks, held up by nothing, so tests can fill a pool with
+    // it), and a slab that keeps the water it is placed into (a bucket fills or drains it).
     r.block(&WATERWEED)
         .plant()
         .texture("base:cottongrass")
         .holds_liquid();
     r.block(&SEA_SLAB)
-        .prop("waterlogged", ["false", "true"])
         .texture("base:planks_birch")
         .model_box([0.0, 0.0, 0.0], [16.0, 8.0, 16.0])
         .hardness(0.5)
         .mineable("axe")
-        // SYNC: port to upstream waterlogging (holds_liquid is a flag now, the liquid an extra part;
-        // a `waterlogged` prop may not be needed any more).
-        .states(|p, s| if p.is("waterlogged", "true") { s.holds_liquid() } else { s });
+        .holds_liquid();
     // Only the common `sand` tag: cactus and sugar cane accept it without knowing it.
     r.block(&RED_SAND)
         .hardness(0.5)
