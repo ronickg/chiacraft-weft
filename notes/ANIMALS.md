@@ -1251,3 +1251,15 @@ Fish now breed in their seasons; before, only the spawner made more. The seasons
 A fish in love swims to a mate of its kind within 24 blocks (`fish::court`, steering its swim; walking pathfinding doesn't work in water). When they meet, the female spawns.
 
 No egg entity is used. An egg only develops in 25-40 °C air, which suits a nest, not a trout stream. Instead the female carries her eggs' time (`life::carrying`), then her fry come out beside her. Lycoptera's eggs' time is paced up to 0.46 d so a line still takes ten days to four generations. The spawner still tops up what breeding doesn't fill.
+
+## Carcasses for the vulture (2026-11-05)
+
+The turkey vulture never ate before. A wild animal gets hungry only if it's a plant eater or a hunter with prey at home, and a vulture (95% carrion) is neither. Rotten flesh was left alone too, as poisonous. Now a scavenger (`Species::scavenges`: carrion is half its diet or more) works like this:
+- **Hunger:** it gets hungry in the wild.
+- **Smell:** hungry, it smells carrion within 64 blocks, even under a forest canopy, as turkey vultures do (Houston 1986), flies there (`birds::scent`), lands and eats.
+- **Food:** carcass pieces, a kill's meat (carrion to it), and rotten flesh, which a vulture's stomach acid makes safe.
+- **Survival:** it fasts instead of starving and gets its water from its food, so a world with patchy carrion doesn't wipe it out.
+
+Every one of our species of a kilogram or more that gives no meat leaves carcass pieces when it dies (`animals_core::meat::carcass`). Each piece is half a kilogram of carrion, and it leaves as many as its meat would be portions. For example, a wolf leaves fur plus 2-3 pieces. The carcass's icon is rotten flesh's until Art draws one.
+
+Items on the ground vanish after five minutes, so a vulture must arrive in time. Carcasses don't rot on the ground yet.

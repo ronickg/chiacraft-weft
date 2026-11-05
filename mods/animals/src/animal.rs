@@ -184,7 +184,10 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             let rate = crate::comfort::upkeep(w, id, &a, st, secs);
             if tamed(w, id) || a.species().is_some_and(|s| s.hungry_in_the_wild()) {
                 hunger(w, id, &a, rate, secs);
-                crate::drink::thirst(w, id, &a, st, rate, secs);
+                // A wild scavenger's water is in what it eats.
+                if tamed(w, id) || a.species().is_some_and(|s| !s.scavenges()) {
+                    crate::drink::thirst(w, id, &a, st, rate, secs);
+                }
             }
         }
         let (health, speed) = factors(w, id, &a);
@@ -398,7 +401,8 @@ fn hunger(w: &World, id: u64, a: &Animal, rate: f32, secs: f32) {
     // A wild one with nothing left starves to death in a game day (a tame suffers, never dies:
     // its condition falls instead).
     if a.food == 0 && !tamed(w, id) {
-        if let Some(st) = w.entity(id) {
+        // A scavenger fasts instead (`needs::STARVES_SECS`).
+        if let Some(st) = w.entity(id).filter(|_| !s.scavenges()) {
             w.damage(id, st.max_health / STARVES_SECS * secs, 0, damage_cause::STARVE);
         }
         return;

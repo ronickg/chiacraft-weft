@@ -389,7 +389,18 @@ impl Species {
     /// Whether a wild one gets hungry: a plant eater, or a hunter with prey where it lives (a
     /// hunter with none waits for its prey to come to the world).
     pub fn hungry_in_the_wild(&self) -> bool {
-        self.forages_wild() || self.prey_at_home().next().is_some()
+        self.forages_wild() || self.prey_at_home().next().is_some() || self.scavenges()
+    }
+    /// Whether it lives on the dead: half its diet or more carrion (the vulture). It gets hungry in
+    /// the wild, smells carrion from afar (`needs::SCENT`), takes a carcass's meat as carrion and
+    /// rotten flesh without harm, and never starves in the wild (`needs::STARVES_SECS`).
+    pub fn scavenges(&self) -> bool {
+        self.eats
+            .iter()
+            .filter(|(c, _)| *c == Carrion)
+            .map(|(_, s)| s)
+            .sum::<f32>()
+            >= 0.5
     }
     /// Ticks a mother carries her young (an in-game day is 24 000); 0: it lays eggs.
     pub fn gestation(&self) -> u32 {

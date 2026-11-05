@@ -6,6 +6,9 @@
 use weft_sdk::*;
 
 static FOOD_TAB: CreativeTab = CreativeTab::named("base:food");
+/// What's left of a dead animal that gives no meat (`animals_core::meat::CARCASS`): carrion for
+/// the scavengers, no food for a player (its icon is rotten flesh's until Art draws one).
+static CARCASS: Item = Item::named("carcass");
 
 /// Hunger and saturation, raw and cooked: venison as beef, hare as chicken, fish as the cod.
 fn filling(meat: &str) -> [(u32, f32); 2] {
@@ -17,6 +20,7 @@ fn filling(meat: &str) -> [(u32, f32); 2] {
 }
 
 pub fn init(r: &mut Registry) {
+    r.item(&CARCASS).tab(&FOOD_TAB);
     for &meat in animals_core::meat::MEATS {
         let [raw, cooked] = filling(meat);
         for (name, (hunger, saturation), tag) in
