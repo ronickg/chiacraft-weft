@@ -807,12 +807,14 @@ def pose_approach(t):
 def pose_charge(t):
     """Charging a wolf: a hard run with the head down and the antlers out in front, the ears
     pinned back, the tail clamped (0.55 s a cycle, in place of the walk and the run). The neck less
-    down than the deer's: it is carried low already, and the muzzle stays clear of the ground."""
+    down than the deer's: it is carried low already, and the muzzle stays clear of the ground. The
+    spine only rocks with the gallop, no lean (a lean dropped the shoulders, and grounded on the
+    forefeet the hind hooves never came down)."""
     p = t / 0.55
     q = gait(p, (0.0, 0.1, 0.5, 0.6), 28, 56)
     c = S(TAU * p)
-    q.update({"root": (0, 2.0 * max(0.0, S(TAU * p + 0.6)), 0), "spine_0": (-4 * c, 0, 0), "spine_1": (4 + 4 * c, 0, 0),
-              "neck": (20, 0, 0), "head": (16, 0, 0), "ear_L": (30, 0, 14), "ear_R": (30, 0, -14),
+    q.update({"root": (0, 2.0 * max(0.0, S(TAU * p + 0.6)), 0), "spine_0": (-4 * c, 0, 0), "spine_1": (4 * c, 0, 0),
+              "neck": (24, 0, 0), "head": (16, 0, 0), "ear_L": (30, 0, 14), "ear_R": (30, 0, -14),
               "tail": (6, 0, 0)})
     return q
 
