@@ -1815,12 +1815,10 @@ impl Client {
         }
         self.blocks_preloaded = true;
         let t = Instant::now();
-        let mut ids: Vec<u32> = content().states.iter().flat_map(|s| s.textures).collect();
-        ids.sort_unstable();
-        ids.dedup();
-        let n = ids.len();
-        textures.ensure_blocks(gpu, ids);
-        log::info!(target: "load", "block textures preloaded: {n} in {:.0} ms", t.elapsed().as_secs_f64() * 1000.0);
+        // All of them, not only the blocks': items, entities, particles, the GUI and connected
+        // tiles otherwise loaded inside a mesh upload when first shown (about 80 at a join).
+        let n = textures.load_all(gpu);
+        log::info!(target: "load", "textures preloaded: {n} in {:.0} ms", t.elapsed().as_secs_f64() * 1000.0);
     }
 
     fn upload_meshes(&mut self, gpu: &mut dyn Backend, textures: &GameTextures) {
