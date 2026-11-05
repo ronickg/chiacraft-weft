@@ -316,8 +316,9 @@ pub fn lay_in_nest(w: &World, index: usize, mother: u64, at: [f64; 3], young: &[
     weft_sdk::info!("{} {mother} nested at {at:?} {place} ({site:?}, ground {}): {} eggs", s.kind_name(), ground[1], young.len());
 }
 
-/// Where a nest of `site` goes near `at` (`ground` under it): the highest open treetop leaves,
-/// or for a cliff nester the highest bare ledge `CLIFF_ABOVE` over the ground (else a treetop);
+/// Where a nest of `site` goes near `at` (`ground` under it, the search's middle): the highest
+/// open treetop (leaves or a trunk's tip) `CLIFF_ABOVE` over the ground, or for a cliff nester
+/// the highest bare ledge as high (else a treetop);
 /// `None` for the ground or when nothing is near.
 fn nest_site(w: &World, site: animals_core::nests::Site, at: [f64; 3], ground: [f64; 3]) -> Option<[f64; 3]> {
     use animals_core::nests::{APART, CLIFF_ABOVE, LOOK, LOOK_DOWN, LOOK_UP, Site};
