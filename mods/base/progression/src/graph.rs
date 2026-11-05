@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 use vitals::curve::{AGES, Age, Em, Path, ROUTES};
 
-use crate::content::{self, AXE, CUTTER, Get, Needs, PICK, PICK_IRON, PICK_STONE};
+use crate::content::{self, AXE, CUTTER, Get, Needs, PICK, PICK_IRON, PICK_STEEL, PICK_STONE};
 
 /// Where a recipe is made.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -227,8 +227,8 @@ const RECIPES_LIST: &[Recipe] = &[
     // ores and the sky (blocks.rs, meteors.rs, stars.rs)
     b("base:coal", 1.0, &[("base:coal_ore", 1.0)], PICK, 30.0),
     b("base:raw_iron", 1.0, &[("base:iron_ore", 1.0)], PICK_STONE, 60.0),
-    b("base:raw_gold", 1.0, &[("base:gold_ore", 1.0)], PICK_IRON, 180.0),
-    b("base:diamond", 1.0, &[("base:diamond_ore", 1.0)], PICK_IRON, 600.0),
+    b("base:raw_gold", 1.0, &[("base:gold_ore", 1.0)], PICK_STONE, 180.0),
+    b("base:diamond", 1.0, &[("base:diamond_ore", 1.0)], PICK_STEEL, 600.0),
     b("base:redstone", 4.0, &[("base:redstone_ore", 1.0)], PICK_IRON, 120.0),
     b("base:meteoric_iron", 2.0, &[("base:meteorite", 1.0)], PICK_STONE, 1200.0),
     b("base:star_steel_lump", 2.5, &[("base:star_steel_ore", 1.0)], PICK_IRON, 1800.0),
@@ -259,7 +259,7 @@ const RECIPES_LIST: &[Recipe] = &[
     c("base:bowl", 4.0, &[("#planks", 3.0)], Table),
     s("base:salt", &[("base:water_bucket", 1.0)], Furnace),
     c("base:salted_meat", 1.0, &[("#raw_meat", 1.0), ("base:salt", 1.0)], Hand),
-    c("base:cooking_pot", 1.0, &[("base:iron_ingot", 7.0)], Table),
+    c("base:cooking_pot", 1.0, &[("base:clay", 7.0)], Table),
     c("base:drying_rack", 1.0, &[("#stick", 5.0)], Table),
     Recipe {
         out: "base:stew",
@@ -298,7 +298,13 @@ const RECIPES_LIST: &[Recipe] = &[
     b("animals:amber", 1.0, &[("animals:amber_ore", 1.0)], PICK_STONE, 120.0),
     c("animals:utahraptor_saddle", 1.0, &[("base:leather", 3.0), ("base:string", 2.0)], Table),
     c("animals:wyvern_saddle", 1.0, &[("base:leather", 5.0), ("base:iron_ingot", 1.0), ("base:string", 2.0)], Table),
-    c("animals:kibble", 4.0, &[("base:egg", 1.0), ("#kibble_filling", 1.0), ("base:wheat", 1.0), ("base:water_bucket", 1.0)], Hand),
+    Recipe {
+        out: "animals:kibble",
+        n: 4.0,
+        ins: &[("base:egg", 1.0), ("#kibble_filling", 1.0), ("base:wheat", 1.0), ("base:plant_fibre", 1.0)],
+        at: Station("base:cooking_pot"),
+        secs: 10.0,
+    },
     c("animals:nest", 1.0, &[("base:stick", 4.0), ("base:wheat", 1.0)], Table),
     s("animals:cooked_venison", &[("animals:venison", 1.0)], Fire),
     s("animals:cooked_hare", &[("animals:hare", 1.0)], Fire),
@@ -363,18 +369,21 @@ pub const TOOLS: &[(&str, &str, u32)] = &[
     ("base:stone_axe", "axe", 100),
     ("base:iron_axe", "axe", 200),
     ("base:gold_axe", "axe", 0),
-    ("base:diamond_axe", "axe", 300),
+    ("base:diamond_axe", "axe", 400),
     ("base:axe", "axe", 100),
     ("base:wood_pickaxe", "pickaxe", 0),
     ("base:stone_pickaxe", "pickaxe", 100),
     ("base:iron_pickaxe", "pickaxe", 200),
     ("base:gold_pickaxe", "pickaxe", 0),
-    ("base:diamond_pickaxe", "pickaxe", 300),
+    ("base:diamond_pickaxe", "pickaxe", 400),
+    // A pickaxe built with a star-steel head (harvest 350) has no item of its own: its ingot
+    // stands for it.
+    ("base:star_steel_ingot", "pickaxe", 350),
     ("base:pickaxe", "pickaxe", 100),
     ("base:wood_shovel", "shovel", 0),
     ("base:stone_shovel", "shovel", 100),
     ("base:iron_shovel", "shovel", 200),
-    ("base:diamond_shovel", "shovel", 300),
+    ("base:diamond_shovel", "shovel", 400),
     ("base:shovel", "shovel", 100),
     ("base:sharp_flake", "cutter", 0),
     ("base:knife", "cutter", 0),
@@ -645,9 +654,12 @@ pub fn materials(g: &Solved) -> Vec<String> {
     for m in crafting::MATERIALS {
         match content::material(m.id) {
             None => out.push(format!("material {} has no tag (add it to `content::MATERIALS`)", m.id)),
+            Some(t) if t.tier().is_none() => out.push(format!("material {} has no age in `vitals::gear::MATERIALS`", m.id)),
             Some(t) if !t.from.is_empty() => match content::tier(t.from) {
                 None => out.push(format!("material {} is made from {}, which has no tag", m.id, t.from)),
-                Some(x) if x > t.tier => out.push(format!("material {} (tier {}) is made from {} (tier {x})", m.id, t.tier, t.from)),
+                Some(x) if x > t.tier().unwrap_or(0) => {
+                    out.push(format!("material {} (tier {}) is made from {} (tier {x})", m.id, t.tier().unwrap_or(0), t.from))
+                }
                 _ if !g.reachable(t.from) => out.push(format!("material {}'s {} can't be reached", m.id, t.from)),
                 _ => {}
             },
@@ -688,6 +700,7 @@ pub const KITS: &[(Age, &[(&str, f32)])] = &[
             ("base:torch", 16.0),
             ("base:tanning_frame", 1.0),
             ("base:drying_rack", 1.0),
+            ("base:cooking_pot", 1.0),
             ("base:hide_hat", 1.0),
             ("base:hide_coat", 1.0),
             ("base:hide_trousers", 1.0),
@@ -695,12 +708,20 @@ pub const KITS: &[(Age, &[(&str, f32)])] = &[
             ("base:furnace", 1.0),
             ("animals:club", 1.0),
             ("animals:tranquilizer_dart", 8.0),
+            ("animals:kibble", 8.0),
             ("animals:nest", 1.0),
         ],
     ),
     (
         Age::Bronze,
-        &[("base:glass", 8.0), ("base:stone_bricks", 32.0), ("base:bricks", 32.0), ("base:glowstone", 2.0), ("base:meteoric_iron", 4.0)],
+        &[
+            ("base:glass", 8.0),
+            ("base:stone_bricks", 32.0),
+            ("base:bricks", 32.0),
+            ("base:glowstone", 2.0),
+            ("base:meteoric_iron", 4.0),
+            ("base:gold_ingot", 4.0),
+        ],
     ),
     (
         Age::Iron,
@@ -713,9 +734,8 @@ pub const KITS: &[(Age, &[(&str, f32)])] = &[
             ("base:iron_leggings", 1.0),
             ("base:iron_boots", 1.0),
             ("base:bucket", 2.0),
-            ("base:cooking_pot", 1.0),
             ("animals:spyglass", 1.0),
-            ("animals:kibble", 8.0),
+            ("animals:wyvern_saddle", 1.0),
         ],
     ),
     (

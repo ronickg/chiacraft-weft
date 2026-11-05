@@ -220,7 +220,8 @@ pub struct Species {
     /// Velociraptor up to six times its own (the Fighting Dinosaurs).
     pub prey: (f32, f32),
     pub taming: Taming,
-    /// Each stat's value at level 1 (damage and speed as the kind's own: 100%).
+    /// Each stat's value at level 0 (speed as the kind's own: 100%). Health and damage are 0 here:
+    /// they come from the species' size, role and tweaks (`danger`); read them with `base_stat`.
     pub base: [f32; STATS],
     /// What a point adds, as a share of the base: a wild point, a tamed point.
     pub wild_step: [f32; STATS],
@@ -277,6 +278,16 @@ pub struct Species {
 }
 
 impl Species {
+    /// Stat `i` at level 0: health and damage (a hit, engine points) from its danger (size class,
+    /// role, mass and tweaks, `danger::body`), the rest from its row.
+    pub fn base_stat(&self, i: usize) -> f32 {
+        match i {
+            HEALTH => crate::danger::body(self).health,
+            DAMAGE => crate::danger::body(self).hit,
+            _ => self.base[i],
+        }
+    }
+
     /// The share of its food that is plants.
     pub fn plant_share(&self) -> f32 {
         self.eats
@@ -491,7 +502,9 @@ pub fn stocking(biome: &str) -> f32 {
 }
 
 /// ARK's shape: health grows fastest, speed slowest, torpor only from wild points.
-pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
+/// Health and damage step by `danger::LEVEL_STEP`, so a level-200 one is five times a level-0 one
+/// (Ronald, 11-06).
+pub const WILD_STEP: [f32; STATS] = [crate::danger::LEVEL_STEP, 0.1, 0.1, crate::danger::LEVEL_STEP, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
 /// What most rows share, written once (`..BASE` ends every row; Research round 5, item 4): a wild
@@ -563,7 +576,7 @@ pub static SPECIES: [Species; 46] = [
         prey: (0.008, 0.8),
         taming: Taming::Passive,
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [8.0, 100.0, 80.0, 2.0, 1.0, 40.0, 100.0, 60.0, 10.0],
+        base: [0.0, 100.0, 80.0, 0.0, 1.0, 40.0, 100.0, 60.0, 10.0],
         hunger: 30.0,
         foods: &[
             eats("base:beef", 10),
@@ -622,7 +635,7 @@ pub static SPECIES: [Species; 46] = [
         eats: &[(Meat, 0.8), (Insects, 0.1), (Carrion, 0.05), (Fish, 0.05)],
         prey: (0.005, 0.4),
         taming: Taming::Passive,
-        base: [6.0, 80.0, 60.0, 1.0, 1.0, 30.0, 80.0, 40.0, 10.0],
+        base: [0.0, 80.0, 60.0, 0.0, 1.0, 30.0, 80.0, 40.0, 10.0],
         hunger: 40.0,
         // No fish in the game yet: birds and eggs are what it likes best.
         foods: &[
@@ -690,7 +703,7 @@ pub static SPECIES: [Species; 46] = [
         eats: &[(Grass, 0.7), (WaterPlants, 0.2), (Seeds, 0.05), (Fruit, 0.05)],
         taming: Taming::Passive,
         // It holds its breath for five minutes.
-        base: [12.0, 150.0, 200.0, 1.0, 1.0, 150.0, 400.0, 150.0, 20.0],
+        base: [0.0, 150.0, 200.0, 0.0, 1.0, 150.0, 400.0, 150.0, 20.0],
         hunger: 25.0,
         foods: &[
             eats("base:wheat", 10),
@@ -749,7 +762,7 @@ pub static SPECIES: [Species; 46] = [
         eats: &[(Meat, 0.7), (Carrion, 0.25), (Insects, 0.05)],
         prey: (0.002, 6.0),
         taming: Taming::Knockout,
-        base: [14.0, 150.0, 150.0, 4.0, 1.0, 140.0, 150.0, 200.0, 15.0],
+        base: [0.0, 150.0, 150.0, 0.0, 1.0, 140.0, 150.0, 200.0, 15.0],
         hunger: 20.0,
         foods: &[eats("base:chicken", 10), eats("base:mutton", 10), eats("base:porkchop", 12), favorite("base:beef", 15), KIBBLE],
         feedings: 10.0,
@@ -798,7 +811,7 @@ pub static SPECIES: [Species; 46] = [
         eats: &[(Meat, 0.8), (Carrion, 0.15), (Fish, 0.05)],
         prey: (0.01, 3.0),
         taming: Taming::Knockout,
-        base: [60.0, 300.0, 400.0, 10.0, 1.0, 400.0, 200.0, 700.0, 30.0],
+        base: [0.0, 300.0, 400.0, 0.0, 1.0, 400.0, 200.0, 700.0, 30.0],
         hunger: 12.0,
         foods: &[eats("base:chicken", 10), eats("base:porkchop", 15), favorite("base:beef", 20), favorite("base:mutton", 15), KIBBLE],
         feedings: 18.0,
@@ -850,7 +863,7 @@ pub static SPECIES: [Species; 46] = [
         eats: &[(Meat, 0.7), (Carrion, 0.25), (Insects, 0.05)],
         prey: (0.002, 6.0),
         taming: Taming::Knockout,
-        base: [14.0, 150.0, 150.0, 4.0, 1.0, 140.0, 150.0, 200.0, 15.0],
+        base: [0.0, 150.0, 150.0, 0.0, 1.0, 140.0, 150.0, 200.0, 15.0],
         hunger: 20.0,
         foods: &[eats("base:chicken", 10), eats("base:mutton", 10), eats("base:porkchop", 12), favorite("base:beef", 15), KIBBLE],
         feedings: 10.0,
@@ -899,7 +912,7 @@ pub static SPECIES: [Species; 46] = [
         prey: (0.001, 0.6),
         taming: Taming::Knockout,
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [400.0, 800.0, 2000.0, 30.0, 1.0, 1200.0, 400.0, 3000.0, 80.0],
+        base: [0.0, 800.0, 2000.0, 0.0, 1.0, 1200.0, 400.0, 3000.0, 80.0],
         hunger: 5.0,
         foods: &[
             eats("base:chicken", 10),
@@ -968,7 +981,7 @@ pub static SPECIES: [Species; 46] = [
         // Grasses most of the year, herbs and crops, twigs and bark in winter.
         eats: &[(Grass, 0.55), (Leaves, 0.25), (Roots, 0.1), (Seeds, 0.05), (Fruit, 0.05)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [5.0, 120.0, 40.0, 0.5, 1.0, 15.0, 60.0, 20.0, 5.0],
+        base: [0.0, 120.0, 40.0, 0.0, 1.0, 15.0, 60.0, 20.0, 5.0],
         hunger: 30.0,
         foods: &[eats("base:wheat", 8), eats("base:wheat_seeds", 2), favorite("base:apple", 10), favorite("base:berries", 6)],
         // It sits tight in its form, then bolts when a walker comes within about 12 m.
@@ -1020,7 +1033,7 @@ pub static SPECIES: [Species; 46] = [
         size: Size::Small,
         // Grasses and herbs in summer; in winter birch, willow and heather twigs and bark.
         eats: &[(Grass, 0.4), (Leaves, 0.5), (Fruit, 0.05), (Lichen, 0.05)],
-        base: [5.0, 120.0, 40.0, 0.5, 1.0, 13.0, 60.0, 20.0, 5.0],
+        base: [0.0, 120.0, 40.0, 0.0, 1.0, 13.0, 60.0, 20.0, 5.0],
         hunger: 30.0,
         foods: &[eats("base:crowberries", 4), favorite("base:lingonberries", 6)],
         shy: 12.0,
@@ -1081,7 +1094,7 @@ pub static SPECIES: [Species; 46] = [
         // roots later.
         eats: &[(Seeds, 0.45), (Insects, 0.2), (Fruit, 0.15), (Grass, 0.1), (Fungi, 0.05), (Roots, 0.05)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [2.0, 60.0, 15.0, 0.2, 1.0, 2.0, 30.0, 5.0, 2.0],
+        base: [0.0, 60.0, 15.0, 0.0, 1.0, 2.0, 30.0, 5.0, 2.0],
         hunger: 30.0,
         foods: &[eats("base:wheat_seeds", 4), eats("base:wheat", 6), favorite("base:berries", 4)],
         shy: 6.0,
@@ -1138,7 +1151,7 @@ pub static SPECIES: [Species; 46] = [
         // Grasses and herbs, root tubers and moss; bark in winter; a few insect larvae.
         eats: &[(Grass, 0.6), (Leaves, 0.15), (Roots, 0.15), (Seeds, 0.05), (Insects, 0.05)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [2.0, 60.0, 15.0, 0.2, 1.0, 3.0, 30.0, 5.0, 2.0],
+        base: [0.0, 60.0, 15.0, 0.0, 1.0, 3.0, 30.0, 5.0, 2.0],
         hunger: 30.0,
         foods: &[eats("base:wheat", 6), eats("base:wheat_seeds", 3), favorite("base:sunflower_seeds", 6)],
         shy: 5.0,
@@ -1204,7 +1217,7 @@ pub static SPECIES: [Species; 46] = [
         // A browser: leaves, twigs and buds first, grass and herbs, acorns and other mast, fruit, fungi.
         eats: &[(Leaves, 0.5), (Grass, 0.2), (Fruit, 0.15), (Seeds, 0.1), (Fungi, 0.05)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [30.0, 200.0, 120.0, 2.0, 1.0, 70.0, 80.0, 60.0, 15.0],
+        base: [0.0, 200.0, 120.0, 0.0, 1.0, 70.0, 80.0, 60.0, 15.0],
         hunger: 15.0,
         foods: &[eats("base:wheat", 8), favorite("base:apple", 12), favorite("base:berries", 6)],
         shy: 16.0,
@@ -1251,7 +1264,7 @@ pub static SPECIES: [Species; 46] = [
         size: Size::Large,
         // A mixed feeder: grasses and sedges, browse of trees and shrubs, heather, mast and fruit.
         eats: &[(Grass, 0.5), (Leaves, 0.4), (Fruit, 0.05), (Seeds, 0.05)],
-        base: [45.0, 250.0, 180.0, 3.0, 1.0, 120.0, 80.0, 90.0, 20.0],
+        base: [0.0, 250.0, 180.0, 0.0, 1.0, 120.0, 80.0, 90.0, 20.0],
         hunger: 15.0,
         foods: &[eats("base:wheat", 10), favorite("base:apple", 12)],
         shy: 20.0,
@@ -1310,7 +1323,7 @@ pub static SPECIES: [Species; 46] = [
         // Insects (larvae and those fallen on the water), crustaceans and snails, small fish.
         eats: &[(Insects, 0.65), (Fish, 0.3), (Carrion, 0.05)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [3.0, 60.0, 20.0, 0.3, 1.0, 5.0, 400.0, 10.0, 3.0],
+        base: [0.0, 60.0, 20.0, 0.0, 1.0, 5.0, 400.0, 10.0, 3.0],
         hunger: 30.0,
         foods: &[],
         shy: 6.0,
@@ -1361,7 +1374,7 @@ pub static SPECIES: [Species; 46] = [
         // and small fish the rest of the year.
         // (Under half plants: it doesn't forage on land, `Species::forages_wild`.)
         eats: &[(Fruit, 0.3), (Seeds, 0.15), (Insects, 0.35), (Fish, 0.2)],
-        base: [6.0, 80.0, 40.0, 0.5, 1.0, 20.0, 400.0, 15.0, 4.0],
+        base: [0.0, 80.0, 40.0, 0.0, 1.0, 20.0, 400.0, 15.0, 4.0],
         hunger: 25.0,
         foods: &[],
         shy: 5.0,
@@ -1413,7 +1426,7 @@ pub static SPECIES: [Species; 46] = [
         // Voles and mice from about 20 g to hares near its own size (most under a fifth of it).
         prey: (0.004, 0.8),
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [10.0, 120.0, 60.0, 2.0, 1.0, 30.0, 80.0, 40.0, 10.0],
+        base: [0.0, 120.0, 60.0, 0.0, 1.0, 30.0, 80.0, 40.0, 10.0],
         hunger: 30.0,
         foods: &[eats("base:chicken", 10), eats("base:beef", 10), favorite("base:berries", 6)],
         shy: 10.0,
@@ -1479,7 +1492,7 @@ pub static SPECIES: [Species; 46] = [
         eats: &[(Meat, 0.55), (Carrion, 0.25), (Fruit, 0.1), (Insects, 0.05), (Fish, 0.05)],
         // Lemmings to an Arctic hare about its own size.
         prey: (0.004, 1.0),
-        base: [8.0, 120.0, 60.0, 1.6, 1.0, 22.0, 80.0, 35.0, 12.0],
+        base: [0.0, 120.0, 60.0, 0.0, 1.0, 22.0, 80.0, 35.0, 12.0],
         hunger: 30.0,
         foods: &[eats("base:chicken", 10), eats("base:beef", 10), favorite("base:berries", 6)],
         shy: 10.0,
@@ -1535,7 +1548,7 @@ pub static SPECIES: [Species; 46] = [
         // Mice and voles to a nestling or a young hare, a tenth of its own mass.
         prey: (0.01, 0.1),
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [6.0, 120.0, 40.0, 1.0, 1.0, 10.0, 60.0, 20.0, 5.0],
+        base: [0.0, 120.0, 40.0, 0.0, 1.0, 10.0, 60.0, 20.0, 5.0],
         hunger: 30.0,
         foods: &[eats("base:beef", 10), eats("base:wheat_seeds", 2), favorite("base:rotten_flesh", 8)],
         shy: 14.0,
@@ -1601,7 +1614,7 @@ pub static SPECIES: [Species; 46] = [
         // 2009): ferns, cycads and shrubs, their roots and seeds.
         eats: &[(Leaves, 0.75), (Roots, 0.15), (Seeds, 0.1)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [35.0, 200.0, 120.0, 2.0, 1.0, 90.0, 80.0, 70.0, 18.0],
+        base: [0.0, 200.0, 120.0, 0.0, 1.0, 90.0, 80.0, 70.0, 18.0],
         hunger: 15.0,
         foods: &[eats("animals:fern", 8), eats("base:wheat", 8), favorite("animals:cycad_seed", 10)],
         shy: 12.0,
@@ -1661,7 +1674,7 @@ pub static SPECIES: [Species; 46] = [
         // fruit and roots.
         eats: &[(Insects, 0.6), (Seeds, 0.25), (Fruit, 0.1), (Roots, 0.05)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [2.0, 60.0, 15.0, 0.2, 1.0, 2.0, 30.0, 5.0, 2.0],
+        base: [0.0, 60.0, 15.0, 0.0, 1.0, 2.0, 30.0, 5.0, 2.0],
         hunger: 30.0,
         foods: &[eats("base:wheat_seeds", 4), eats("base:wheat", 6), favorite("base:berries", 4)],
         shy: 6.0,
@@ -1715,7 +1728,7 @@ pub static SPECIES: [Species; 46] = [
         // Insects first (as agamas), a few leaves and flowers.
         eats: &[(Insects, 0.9), (Leaves, 0.1)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [2.0, 60.0, 12.0, 0.2, 1.0, 2.0, 40.0, 5.0, 2.0],
+        base: [0.0, 60.0, 12.0, 0.0, 1.0, 2.0, 40.0, 5.0, 2.0],
         hunger: 40.0,
         foods: &[favorite("base:spider_eye", 4)],
         shy: 5.0,
@@ -1767,7 +1780,7 @@ pub static SPECIES: [Species; 46] = [
         // leaves in summer, mushrooms in autumn.
         eats: &[(Lichen, 0.4), (Grass, 0.35), (Leaves, 0.2), (Fungi, 0.05)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [40.0, 260.0, 160.0, 3.0, 1.0, 110.0, 80.0, 80.0, 25.0],
+        base: [0.0, 260.0, 160.0, 0.0, 1.0, 110.0, 80.0, 80.0, 25.0],
         hunger: 15.0,
         foods: &[eats("base:mushroom_brown", 8)],
         shy: 18.0,
@@ -1836,7 +1849,7 @@ pub static SPECIES: [Species; 46] = [
         // deer).
         prey: (0.001, 0.4),
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [18.0, 150.0, 80.0, 3.5, 1.0, 45.0, 80.0, 60.0, 12.0],
+        base: [0.0, 150.0, 80.0, 0.0, 1.0, 45.0, 80.0, 60.0, 12.0],
         hunger: 30.0,
         foods: &[eats("base:beef", 12), favorite("base:chicken", 10), eats("base:berries", 4)],
         shy: 14.0,
@@ -1891,7 +1904,7 @@ pub static SPECIES: [Species; 46] = [
         // Seeds and grain first, insects (most of what the nestlings get), buds and berries.
         eats: &[(Seeds, 0.6), (Insects, 0.3), (Fruit, 0.1)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [2.0, 60.0, 15.0, 0.2, 1.0, 1.0, 40.0, 5.0, 2.0],
+        base: [0.0, 60.0, 15.0, 0.0, 1.0, 1.0, 40.0, 5.0, 2.0],
         hunger: 20.0,
         foods: &[eats("base:wheat_seeds", 2), favorite("base:berries", 3)],
         shy: 8.0,
@@ -1946,7 +1959,7 @@ pub static SPECIES: [Species; 46] = [
         // Seeds of grasses and sedges, their shoots and willow buds, insects in the Arctic summer
         // (what the young are raised on).
         eats: &[(Seeds, 0.4), (Insects, 0.3), (Grass, 0.15), (Leaves, 0.1), (Fruit, 0.05)],
-        base: [2.0, 60.0, 15.0, 0.2, 1.0, 1.2, 40.0, 5.0, 3.0],
+        base: [0.0, 60.0, 15.0, 0.0, 1.0, 1.2, 40.0, 5.0, 3.0],
         hunger: 20.0,
         foods: &[eats("base:wheat_seeds", 2), favorite("base:berries", 3)],
         shy: 8.0,
@@ -2004,7 +2017,7 @@ pub static SPECIES: [Species; 46] = [
         // A deer mouse of 20 g to a hare or a skunk near twice its own mass.
         prey: (0.005, 1.8),
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [8.0, 100.0, 40.0, 2.5, 1.0, 14.0, 60.0, 20.0, 6.0],
+        base: [0.0, 100.0, 40.0, 0.0, 1.0, 14.0, 60.0, 20.0, 6.0],
         hunger: 30.0,
         foods: &[eats("base:beef", 10), favorite("base:chicken", 10)],
         shy: 14.0,
@@ -2065,7 +2078,7 @@ pub static SPECIES: [Species; 46] = [
         eats: &[(Meat, 1.0)],
         // A lemming of 50 g to a hare about its own mass.
         prey: (0.005, 1.2),
-        base: [10.0, 110.0, 45.0, 3.0, 1.0, 20.0, 60.0, 24.0, 8.0],
+        base: [0.0, 110.0, 45.0, 0.0, 1.0, 20.0, 60.0, 24.0, 8.0],
         hunger: 30.0,
         foods: &[eats("base:beef", 10), favorite("base:chicken", 10)],
         shy: 16.0,
@@ -2121,7 +2134,7 @@ pub static SPECIES: [Species; 46] = [
         // A vole to a fawn or a fox, up to about one and a half times its own mass.
         prey: (0.01, 1.5),
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [16.0, 150.0, 60.0, 4.0, 1.0, 30.0, 60.0, 40.0, 10.0],
+        base: [0.0, 150.0, 60.0, 0.0, 1.0, 30.0, 60.0, 40.0, 10.0],
         hunger: 30.0,
         foods: &[eats("base:beef", 12), favorite("base:chicken", 10), eats("base:rotten_flesh", 4)],
         shy: 24.0,
@@ -2183,7 +2196,7 @@ pub static SPECIES: [Species; 46] = [
         // Rodents, lizards, snakes, frogs and crabs, big insects; following fires and the plough.
         eats: &[(Meat, 0.7), (Insects, 0.2), (Fish, 0.1)],
         prey: (0.005, 0.6),
-        base: [8.0, 110.0, 40.0, 2.0, 1.0, 10.0, 60.0, 20.0, 6.0],
+        base: [0.0, 110.0, 40.0, 0.0, 1.0, 10.0, 60.0, 20.0, 6.0],
         hunger: 30.0,
         foods: &[eats("base:beef", 8), favorite("base:chicken", 8)],
         shy: 16.0,
@@ -2237,7 +2250,7 @@ pub static SPECIES: [Species; 46] = [
         // left out: it hunts nothing here).
         eats: &[(Carrion, 0.95), (Fruit, 0.05)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [10.0, 140.0, 50.0, 1.0, 1.0, 14.0, 60.0, 24.0, 10.0],
+        base: [0.0, 140.0, 50.0, 0.0, 1.0, 14.0, 60.0, 24.0, 10.0],
         hunger: 40.0,
         foods: &[favorite("base:rotten_flesh", 10)],
         shy: 16.0,
@@ -2302,7 +2315,7 @@ pub static SPECIES: [Species; 46] = [
         // Small fish and mice to a young rabbit or a duckling, under a third of its mass.
         prey: (0.005, 0.3),
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [8.0, 130.0, 40.0, 1.5, 1.0, 10.0, 70.0, 20.0, 8.0],
+        base: [0.0, 130.0, 40.0, 0.0, 1.0, 10.0, 70.0, 20.0, 8.0],
         hunger: 30.0,
         foods: &[eats("base:beef", 8), favorite("base:bread", 6), eats("base:rotten_flesh", 6)],
         shy: 10.0,
@@ -2365,7 +2378,7 @@ pub static SPECIES: [Species; 46] = [
         // A snail or a minnow to a capybara near its own mass.
         prey: (0.005, 1.0),
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [30.0, 160.0, 120.0, 5.0, 1.0, 80.0, 300.0, 60.0, 30.0],
+        base: [0.0, 160.0, 120.0, 0.0, 1.0, 80.0, 300.0, 60.0, 30.0],
         hunger: 60.0,
         foods: &[eats("base:beef", 14), favorite("base:chicken", 12), eats("base:porkchop", 12)],
         shy: 8.0,
@@ -2434,7 +2447,7 @@ pub static SPECIES: [Species; 46] = [
         // A snail or a minnow to a capybara near its own mass.
         prey: (0.005, 1.0),
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [26.0, 150.0, 100.0, 4.5, 1.0, 60.0, 300.0, 50.0, 26.0],
+        base: [0.0, 150.0, 100.0, 0.0, 1.0, 60.0, 300.0, 50.0, 26.0],
         hunger: 60.0,
         foods: &[eats("base:beef", 14), favorite("base:chicken", 12), eats("base:porkchop", 12)],
         shy: 8.0,
@@ -2509,7 +2522,7 @@ pub static SPECIES: [Species; 46] = [
         prey: (0.02, 3.0),
         taming: Taming::Passive,
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [30.0, 220.0, 120.0, 6.0, 1.0, 60.0, 80.0, 90.0, 20.0],
+        base: [0.0, 220.0, 120.0, 0.0, 1.0, 60.0, 80.0, 90.0, 20.0],
         hunger: 40.0,
         foods: &[
             eats("base:beef", 10),
@@ -2590,7 +2603,7 @@ pub static SPECIES: [Species; 46] = [
         prey: (0.01, 1.5),
         taming: Taming::Knockout,
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [45.0, 260.0, 200.0, 9.0, 1.0, 120.0, 160.0, 300.0, 25.0],
+        base: [0.0, 260.0, 200.0, 0.0, 1.0, 120.0, 160.0, 300.0, 25.0],
         hunger: 20.0,
         foods: &[eats("base:chicken", 8), eats("base:porkchop", 14), favorite("base:beef", 18), eats("base:mutton", 14), KIBBLE],
         feedings: 14.0,
@@ -2657,7 +2670,7 @@ pub static SPECIES: [Species; 46] = [
         // Snails, insect larvae and crayfish, water plants, small fish.
         eats: &[(Insects, 0.5), (WaterPlants, 0.2), (Fish, 0.3)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [8.0, 90.0, 40.0, 0.6, 1.0, 12.0, 600.0, 20.0, 6.0],
+        base: [0.0, 90.0, 40.0, 0.0, 1.0, 12.0, 600.0, 20.0, 6.0],
         hunger: 30.0,
         foods: &[],
         shy: 6.0,
@@ -2704,7 +2717,7 @@ pub static SPECIES: [Species; 46] = [
         // Insect larvae and plankton.
         eats: &[(Insects, 1.0)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [1.0, 40.0, 8.0, 0.1, 1.0, 1.0, 300.0, 4.0, 1.0],
+        base: [0.0, 40.0, 8.0, 0.0, 1.0, 1.0, 300.0, 4.0, 1.0],
         hunger: 30.0,
         foods: &[],
         shy: 6.0,
@@ -2759,7 +2772,7 @@ pub static SPECIES: [Species; 46] = [
         // fronds first, seeds and nuts, some fruit.
         eats: &[(Leaves, 0.6), (Seeds, 0.3), (Fruit, 0.1)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [22.0, 160.0, 80.0, 1.5, 1.1, 45.0, 70.0, 45.0, 14.0],
+        base: [0.0, 160.0, 80.0, 0.0, 1.1, 45.0, 70.0, 45.0, 14.0],
         hunger: 15.0,
         foods: &[eats("animals:fern", 8), eats("animals:ginkgo_seed", 8), favorite("base:berries", 10)],
         shy: 12.0,
@@ -2814,7 +2827,7 @@ pub static SPECIES: [Species; 46] = [
         // Low plants: ferns, horsetails, cycads' fronds, a little fruit and seed.
         eats: &[(Leaves, 0.9), (Fruit, 0.05), (Seeds, 0.05)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [120.0, 300.0, 400.0, 6.0, 0.8, 600.0, 200.0, 400.0, 60.0],
+        base: [0.0, 300.0, 400.0, 0.0, 0.8, 600.0, 200.0, 400.0, 60.0],
         hunger: 12.0,
         foods: &[eats("animals:fern", 10), favorite("animals:cycad_seed", 12)],
         shy: 8.0,
@@ -2869,7 +2882,7 @@ pub static SPECIES: [Species; 46] = [
         // Low plants, perhaps pulpy fruit, roots and a few insects (speculative).
         eats: &[(Leaves, 0.8), (Fruit, 0.1), (Roots, 0.05), (Insects, 0.05)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [120.0, 300.0, 400.0, 6.0, 0.8, 600.0, 200.0, 400.0, 60.0],
+        base: [0.0, 300.0, 400.0, 0.0, 0.8, 600.0, 200.0, 400.0, 60.0],
         hunger: 12.0,
         foods: &[eats("animals:fern", 10), favorite("base:berries", 12)],
         shy: 8.0,
@@ -2925,7 +2938,7 @@ pub static SPECIES: [Species; 46] = [
         // Browse up to about 4 m: ferns, horsetails, conifers and cycads; a few seeds and fruit.
         eats: &[(Leaves, 0.85), (Seeds, 0.1), (Fruit, 0.05)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [150.0, 400.0, 600.0, 8.0, 1.0, 800.0, 250.0, 500.0, 50.0],
+        base: [0.0, 400.0, 600.0, 0.0, 1.0, 800.0, 250.0, 500.0, 50.0],
         hunger: 12.0,
         foods: &[eats("animals:fern", 10), favorite("animals:cycad_seed", 14)],
         shy: 10.0,
@@ -2982,7 +2995,7 @@ pub static SPECIES: [Species; 46] = [
         // A fish or a bird at the water (as crocodiles take them) to a young dinosaur near its own mass.
         prey: (0.003, 1.0),
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [45.0, 180.0, 160.0, 7.0, 1.0, 120.0, 400.0, 90.0, 40.0],
+        base: [0.0, 180.0, 160.0, 0.0, 1.0, 120.0, 400.0, 90.0, 40.0],
         hunger: 60.0,
         foods: &[eats("animals:trout", 10), favorite("animals:venison", 14)],
         shy: 6.0,
@@ -3048,7 +3061,7 @@ pub static SPECIES: [Species; 46] = [
         // A lizard (50 g) to a Kryptobaatar or a hatchling.
         prey: (0.0004, 0.05),
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [40.0, 220.0, 120.0, 3.0, 1.2, 80.0, 90.0, 80.0, 20.0],
+        base: [0.0, 220.0, 120.0, 0.0, 1.2, 80.0, 90.0, 80.0, 20.0],
         hunger: 15.0,
         foods: &[eats("animals:cycad_seed", 8), favorite("base:berries", 10), eats("base:wheat_seeds", 3)],
         shy: 12.0,
@@ -3102,7 +3115,7 @@ pub static SPECIES: [Species; 46] = [
         // takes none (its fish are what lies on the shore).
         prey: (0.0, 0.0),
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [6.0, 120.0, 30.0, 1.0, 1.0, 6.0, 60.0, 15.0, 6.0],
+        base: [0.0, 120.0, 30.0, 0.0, 1.0, 6.0, 60.0, 15.0, 6.0],
         hunger: 30.0,
         foods: &[eats("animals:cycad_seed", 4), favorite("base:wheat_seeds", 3)],
         shy: 10.0,
@@ -3153,7 +3166,7 @@ pub static SPECIES: [Species; 46] = [
         eats: &[(Insects, 0.5), (Seeds, 0.4), (Leaves, 0.1)],
         prey: (0.0, 0.0),
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [6.0, 120.0, 30.0, 1.0, 1.0, 6.0, 60.0, 15.0, 6.0],
+        base: [0.0, 120.0, 30.0, 0.0, 1.0, 6.0, 60.0, 15.0, 6.0],
         hunger: 30.0,
         foods: &[eats("animals:cycad_seed", 4), favorite("base:wheat_seeds", 3)],
         shy: 10.0,
@@ -3207,7 +3220,7 @@ pub static SPECIES: [Species; 46] = [
         // High browse: conifers (Araucaria), horsetails, ferns; a few seeds and cones.
         eats: &[(Leaves, 0.95), (Seeds, 0.05)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [300.0, 600.0, 1200.0, 10.0, 0.8, 2000.0, 400.0, 1200.0, 80.0],
+        base: [0.0, 600.0, 1200.0, 0.0, 0.8, 2000.0, 400.0, 1200.0, 80.0],
         hunger: 10.0,
         foods: &[eats("animals:fern", 10), favorite("animals:araucaria_cone", 16)],
         shy: 6.0,
