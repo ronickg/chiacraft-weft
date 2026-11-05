@@ -291,6 +291,7 @@ species.animals.lycoptera = ликоптера
 family.animals.lycopteridae = семейство ликоптерид
 item.animals.venison = Сырая оленина
 item.animals.cooked_venison = Жареная оленина
+item.animals.carcass = Туша
 item.animals.hare = Сырая зайчатина
 item.animals.cooked_hare = Жареная зайчатина
 item.animals.trout = Сырая форель

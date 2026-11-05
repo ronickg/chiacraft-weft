@@ -485,6 +485,7 @@ On the ground, animals eat dropped food of their diet one item a mouthful: every
 | base:matamata_fruit | seeds | 20 |
 | animals:araucaria_cone | seeds | 50 |
 | animals:ginkgo_seed | fruit | 10 |
+| animals:carcass | carrion | 500 |
 
 ## Soil and compost
 

@@ -163,7 +163,13 @@ fn init(r: &mut Registry) {
             .iter()
             .find(|h| h.0 == s.name)
             .map(|&(_, item, lo, hi)| Pool::new().items(item, lo, hi));
-        let pools: Vec<Pool> = hide.into_iter().chain(meat::pool(s.name)).collect();
+        // One that gives no meat leaves carcass pieces for the scavengers.
+        let carcass = animals_core::meat::carcass(s.name).map(|(lo, hi)| Pool::new().items(animals_core::meat::CARCASS, lo, hi));
+        let pools: Vec<Pool> = hide
+            .into_iter()
+            .chain(meat::pool(s.name))
+            .chain(carcass)
+            .collect();
         if !pools.is_empty() {
             pools
                 .into_iter()

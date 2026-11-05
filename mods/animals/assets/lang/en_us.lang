@@ -291,6 +291,7 @@ species.animals.lycoptera = Lycoptera
 family.animals.lycopteridae = Lycoptera family
 item.animals.venison = Raw Venison
 item.animals.cooked_venison = Cooked Venison
+item.animals.carcass = Carcass
 item.animals.hare = Raw Hare
 item.animals.cooked_hare = Cooked Hare
 item.animals.trout = Raw Trout

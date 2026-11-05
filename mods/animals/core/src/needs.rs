@@ -34,7 +34,13 @@ pub fn fills(own: f32, kg: f32) -> f32 {
 pub const ARRIVES_FED: f32 = 0.3;
 
 /// Seconds a wild one lives on an empty stomach at full health before it starves (a game day).
+/// A scavenger (`Species::scavenges`) never starves in the wild: a turkey vulture fasts two
+/// weeks, and the world's carrion is too patchy to hold its life to a game day.
 pub const STARVES_SECS: f32 = 1200.0;
+
+/// Blocks a hungry scavenger smells carrion from, from the air or the ground (a turkey vulture
+/// finds a carcass hidden under a forest's canopy by its smell, Houston 1986); it flies there.
+pub const SCENT: f64 = 64.0;
 
 /// The prey of `hunter` that live in `biome`: species of other families it takes alone, by their
 /// grown masses (farm animals aren't here: they don't come and go with the seasons).

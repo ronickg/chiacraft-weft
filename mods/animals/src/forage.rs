@@ -205,7 +205,10 @@ fn edible(w: &World, s: &animals_core::species::Species, id: u64) -> Option<f32>
     let food = vitals::food::FOODS.iter().find(|f| f.name == name);
     // A poisonous one (a fly agaric, a spider's eye) it leaves where it lies, and salted meat,
     // too salty for an animal; dried and smoked meat a meat eater takes as it raids a camp (C6).
-    if food.is_some_and(|f| f.poison > 0.0) || name == "base:salted_meat" {
+    // A scavenger's stomach takes rotten flesh (a vulture's acid kills what's in it).
+    if food.is_some_and(|f| f.poison > 0.0 && !(s.scavenges() && f.category == vitals::food::Category::Carrion))
+        || name == "base:salted_meat"
+    {
         return None;
     }
     let spoiled = food.is_some_and(|f| {
@@ -213,6 +216,8 @@ fn edible(w: &World, s: &animals_core::species::Species, id: u64) -> Option<f32>
         vitals::food::freshness(f, age, base_api::difficulty().keep) == vitals::food::Freshness::Spoiled
     });
     let (c, grams) = vitals::forage::dropped(name, spoiled)?;
+    // To a scavenger a kill's meat lying there is carrion.
+    let c = if s.scavenges() && c == vitals::food::Category::Meat { vitals::food::Category::Carrion } else { c };
     // Kibble is every species' (`taming.rs`), though the food table files it as meat (C6); a
     // carcass gone off is the insects' as well, its beetles and grubs an insect eater's (the
     // Djadokhta's bones are bored by them), a share of it.
@@ -255,6 +260,9 @@ fn eat_item(w: &World, id: u64, a: &animal::Animal, item: u64, grams: f32) {
         name_of(abi::entry_kind::ITEM, stack.item),
         a.food.saturating_add(points).min(max as u16)
     );
+    if a.species().is_some_and(|s| s.scavenges()) {
+        weft_sdk::info!("scavenger {id} eats {} ({grams} g)", name_of(abi::entry_kind::ITEM, stack.item));
+    }
 }
 
 /// A goal: thirsty, it drinks first (`drink::drink`); hungry, it goes to the nearest food of its

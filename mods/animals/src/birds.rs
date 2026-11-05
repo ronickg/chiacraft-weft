@@ -130,7 +130,11 @@ fn take_off(w: &World, id: u64, st: &EntityState, wings: &Wings) -> bool {
         _ => random(w) * std::f64::consts::TAU,
     };
     let r = wings.reach * (1.0 + random(w));
-    let to = [st.pos.x + a.cos() * r, st.pos.y, st.pos.z + a.sin() * r];
+    lift(w, id, st, wings, [st.pos.x + a.cos() * r, st.pos.y, st.pos.z + a.sin() * r])
+}
+
+/// Up into the air, flying to `to`.
+fn lift(w: &World, id: u64, st: &EntityState, wings: &Wings, to: [f64; 3]) -> bool {
     set(
         w,
         id,
@@ -154,7 +158,12 @@ fn take_off(w: &World, id: u64, st: &EntityState, wings: &Wings) -> bool {
 /// height, then come down and land.
 fn fly(w: &World, id: u64, st: &EntityState, wings: &Wings) -> bool {
     let Some(mut f) = w.component(id, &STATE) else { return false };
+    let smelled = scent(w, id, st);
     if !f.flying {
+        if let Some(at) = smelled {
+            weft_sdk::info!("bird {id} smells carrion {:.0} blocks off", dist2(at, st.pos).sqrt());
+            return lift(w, id, st, wings, at);
+        }
         let scared = w.component(id, &TAMING).is_some_and(|t| t.scared > 0);
         if scared || (!w.navigating(id) && !crate::forage::busy(w, id) && w.random_below(wings.restless) == 0) {
             return take_off(w, id, st, wings);
@@ -169,6 +178,9 @@ fn fly(w: &World, id: u64, st: &EntityState, wings: &Wings) -> bool {
         set(w, id, Flight::default());
         w.set_appearance(id, None);
         return false;
+    }
+    if let Some(at) = smelled.filter(|_| !f.landing) {
+        f.to = at.map(|v| v as f32);
     }
     f.left = f.left.saturating_sub(w.tick_elapsed(id));
     let (dx, dz) = (f.to[0] as f64 - st.pos.x, f.to[2] as f64 - st.pos.z);
@@ -190,6 +202,22 @@ fn fly(w: &World, id: u64, st: &EntityState, wings: &Wings) -> bool {
     w.fly(id, dir, if f.landing { wings.air * 0.5 } else { wings.air });
     set(w, id, f);
     true
+}
+
+/// A hungry scavenger (`Species::scavenges`) smells carrion within `needs::SCENT` beyond its
+/// foraging reach (inside it, it walks there, `forage.rs`): where it lies. Looked for every two
+/// seconds.
+fn scent(w: &World, id: u64, st: &EntityState) -> Option<[f64; 3]> {
+    if !(w.game_time() + id).is_multiple_of(40) || crate::animal::tamed(w, id) {
+        return None;
+    }
+    let a = w.component(id, &crate::animal::ANIMAL)?;
+    let s = a.species()?;
+    if !s.scavenges() || a.food as f32 >= a.stat(crate::species::FOOD) * animals_core::needs::HUNGRY {
+        return None;
+    }
+    let (_, at) = crate::forage::ground_food(w, s, st.pos.to_array(), animals_core::needs::SCENT)?;
+    (dist2(at, st.pos) > crate::forage::ITEM_LOOK * crate::forage::ITEM_LOOK).then_some(at)
 }
 
 fn set(w: &World, id: u64, f: Flight) {

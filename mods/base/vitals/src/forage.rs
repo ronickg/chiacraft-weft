@@ -251,7 +251,7 @@ pub const SOURCES: [Source; 76] = [
 /// Food on the ground (`notes/ECOLOGY.md`, parts 5 and 8): items animals eat that aren't a
 /// player's food (`food::FOODS` has those, each with its kind and weight): grain and seeds, as
 /// they fall from a field or a hand. By name, kind and grams.
-pub const DROPPED: [(&str, Category, f32); 14] = [
+pub const DROPPED: [(&str, Category, f32); 15] = [
     // A handful of seed, and an ear's grain.
     ("base:wheat_seeds", Category::Seeds, 10.0),
     ("base:wheat", Category::Seeds, 50.0),
@@ -275,6 +275,9 @@ pub const DROPPED: [(&str, Category, f32); 14] = [
     ("base:matamata_fruit", Category::Seeds, 20.0),
     ("animals:araucaria_cone", Category::Seeds, 50.0),
     ("animals:ginkgo_seed", Category::Fruit, 10.0),
+    // What's left of a dead animal that gives no meat of its own (`animals_core::meat::CARCASS`):
+    // a scavenger's, half a kilogram a piece.
+    ("animals:carcass", Category::Carrion, 500.0),
 ];
 
 /// What a dropped item `name` is to animals: its kind of food and grams (a food's portion,

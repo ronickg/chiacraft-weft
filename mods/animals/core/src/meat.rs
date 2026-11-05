@@ -34,6 +34,18 @@ pub fn portions(mass: f32) -> (u32, u32) {
     (c.floor().max(1.0) as u32, c.ceil().max(1.0) as u32)
 }
 
+/// What a dead animal leaves when it gives no meat of its own (`MEAT`): carcass pieces
+/// (`animals:carcass`, half a kilogram of carrion each, a scavenger's), as many as its meat would
+/// be portions; one under a kilogram leaves none (the beetles have it).
+pub const CARCASS: &str = "animals:carcass";
+pub const CARCASS_FROM_KG: f32 = 1.0;
+
+/// Carcass pieces a grown one of species `name` leaves, fewest to most (`None`: none).
+pub fn carcass(name: &str) -> Option<(u32, u32)> {
+    let s = SPECIES.iter().find(|s| s.name == name)?;
+    (!MEAT.iter().any(|(n, _)| *n == name) && s.bio.mass >= CARCASS_FROM_KG).then(|| portions(s.bio.mass))
+}
+
 /// Each species that gives meat, its meat, and how many portions.
 pub fn drops() -> impl Iterator<Item = (&'static str, &'static str, u32, u32)> {
     MEAT.iter().filter_map(|&(name, meat)| {
@@ -46,6 +58,23 @@ pub fn drops() -> impl Iterator<Item = (&'static str, &'static str, u32, u32)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn carcasses_feed_the_scavengers() {
+        // One that gives meat leaves its meat; a big one without, carcass pieces; a mouse, none.
+        assert_eq!(carcass("red_deer"), None);
+        assert!(carcass("grey_wolf").is_some_and(|(lo, hi)| lo >= 1 && hi >= lo));
+        assert_eq!(carcass("wood_mouse"), None);
+        // The vulture lives on them, and only carrion eaters are scavengers.
+        let scavengers: Vec<&str> = SPECIES
+            .iter()
+            .filter(|s| s.scavenges())
+            .map(|s| s.name)
+            .collect();
+        assert_eq!(scavengers, ["turkey_vulture"]);
+        // The pieces are carrion on the ground (`vitals::forage::DROPPED`).
+        assert_eq!(vitals::forage::dropped(CARCASS, false).map(|d| d.0), Some(vitals::food::Category::Carrion));
+    }
 
     #[test]
     fn every_meat_is_a_species_and_a_food() {
