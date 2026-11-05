@@ -1008,9 +1008,10 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
         let w = water(in, avg, false);
         return vec4(w.rgb, SOLID_ALPHA);
     }
-    // Shaded as the near cubes are at that distance (`far_soft`, far look 2): a box's walls lean
-    // halfway up, as the slopes they stand for. Lit as upright walls, the far boxes' faces got no sun
-    // at midday and a snow range read stone-grey under thin white lines (Far view, 11-05; the smooth
-    // tiles' facets had leaned toward the sun).
-    return vec4(shade_soft(in, albedo, far_soft(in)).rgb, SOLID_ALPHA);
+    // From about 500 blocks out, where cells are 8 blocks and more (`lod::SLOPE_LEVEL`), a box's
+    // walls lean halfway up as the slopes they stand for (`far_soft`, far look 2). Lit as upright
+    // walls they got no sun at midday and a far snow range read stone-grey under thin white lines
+    // (Far view, 11-05; the smooth tiles' facets had leaned toward the sun). Nearer, the 2-4 block
+    // steps are steps and keep their shade: leaned there too, the land within 500 lost its relief.
+    return vec4(shade_soft(in, albedo, far_soft(in) * smoothstep(450.0, 800.0, in.dist)).rgb, SOLID_ALPHA);
 }
