@@ -27,8 +27,10 @@ const WING_BONE: &str = "glider";
 /// Blocks fallen before jump opens it: a jump off the ground doesn't.
 const OPENS_AFTER: f32 = 0.75;
 
-/// The modifiers' id on the engine's attributes.
+/// The modifiers' id on the engine's attributes. They last `HOLD` ticks unless said again (every
+/// `glide::AIR_EVERY`), so a flight its region no longer sees (the player left) ends by itself.
 const MOD: &str = "base:glider";
+const HOLD: u64 = 40;
 
 pub fn register(r: &mut Registry) {
     let wing = glide::HIDE;
@@ -65,6 +67,8 @@ pub fn register(r: &mut Registry) {
 
 /// One flight: where and when it began (for the log), ticks aloft toward the next wear.
 struct Flight {
+    speed: f32,
+    sink: f32,
     from: Vec3,
     began: u64,
     aloft: u32,
@@ -110,9 +114,7 @@ fn toggle(w: &World, id: u64) {
         wind.0,
         wind.1
     );
-    w.attribute_add_modifier(id, &attribute::GLIDE_SPEED, MOD, attr_op::ADD, wing.speed as f64, 0);
-    w.attribute_add_modifier(id, &attribute::GLIDE_SINK, MOD, attr_op::ADD, wing.sink as f64, 0);
-    flights(|f| f.insert(id, Flight { from: st.pos, began: w.game_time(), aloft: 0, wind }));
+    flights(|f| f.insert(id, Flight { speed: wing.speed, sink: wing.sink, from: st.pos, began: w.game_time(), aloft: 0, wind }));
     air(w, id, &st);
 }
 
@@ -142,10 +144,8 @@ fn close(w: &World, id: u64, st: &EntityState, why: &str) {
 fn tick(w: &World) {
     let open: Vec<u64> = flights(|f| f.keys().copied().collect());
     for id in open {
-        let Some(st) = w.entity(id) else {
-            flights(|f| f.remove(&id));
-            continue;
-        };
+        // In another region (each ticks this), or gone: its modifiers run out by themselves.
+        let Some(st) = w.entity(id) else { continue };
         if st.on_ground != 0 || st.in_liquid != 0 || st.flying != 0 || st.health <= 0.0 {
             close(w, id, &st, if st.on_ground != 0 { "landed" } else { "stopped" });
             continue;
@@ -176,18 +176,27 @@ fn tick(w: &World) {
 fn air(w: &World, id: u64, st: &EntityState) {
     let at = block_pos_of(st.pos);
     let (speed, heading) = crate::weather::wind_at(w, at);
-    flights(|f| {
-        if let Some(f) = f.get_mut(&id) {
+    let Some((wing_speed, sink)) = flights(|f| {
+        f.get_mut(&id).map(|f| {
             f.wind = (speed, heading);
-        }
-    });
+            (f.speed, f.sink)
+        })
+    }) else {
+        return;
+    };
     let blow = speed * glide::WIND_SHARE;
     let (s, c) = heading.to_radians().sin_cos();
     let (wx, wz) = (blow * s, -blow * c);
     let lift = rising(w, st.pos, (s, -c), blow).min(glide::LIFT_MAX);
-    w.attribute_add_modifier(id, &attribute::WIND_X, MOD, attr_op::ADD, wx as f64, 0);
-    w.attribute_add_modifier(id, &attribute::WIND_Z, MOD, attr_op::ADD, wz as f64, 0);
-    w.attribute_add_modifier(id, &attribute::LIFT, MOD, attr_op::ADD, lift as f64, 0);
+    for (a, v) in [
+        (&attribute::GLIDE_SPEED, wing_speed),
+        (&attribute::GLIDE_SINK, sink),
+        (&attribute::WIND_X, wx),
+        (&attribute::WIND_Z, wz),
+        (&attribute::LIFT, lift),
+    ] {
+        w.attribute_add_modifier(id, a, MOD, attr_op::ADD, v as f64, HOLD);
+    }
 }
 
 /// The ground under a point: its height and kind, or `None` past `reach`.
