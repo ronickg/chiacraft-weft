@@ -231,6 +231,13 @@ pub const DRILLS: [Drill; 2] = [BOW_DRILL, HAND_DRILL];
 /// Blocks over a fire bed that keep the rain off it.
 pub const ROOF_REACH: i32 = 24;
 
+/// The first axe's hint names the nearest tree foot (a log on ground) within this many blocks
+/// across (playtest, 11-05: on seeds 1 and 42 no trunk was in reach of spawn in a minute, and
+/// nothing said where one was) ...
+pub const TREE_LOOK: i32 = 48;
+/// ... and this many up or down: a foot on a ledge far above isn't one to walk to.
+pub const TREE_UP: i32 = 8;
+
 /// Seconds to an ember, on average, with a drill: its holds until one takes.
 pub fn ember_secs(d: Drill) -> f32 {
     d.secs / d.chance
