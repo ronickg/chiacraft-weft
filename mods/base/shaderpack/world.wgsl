@@ -425,6 +425,17 @@ fn shade_soft(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     var lit: vec4<f32>;
     if in.slot == 0u {
         lit = vec4(albedo.rgb * light, albedo.a);
+        // A low sun full on a bright, saturated yellow-green (the birch's untinted leaves, whose
+        // own picture is that green, so `surface_light` never sees them as leaves): some of its
+        // colour and brightness held back while the sun is under about 45°. A leaf by the eye at
+        // 18:00 stayed lime, 3.5 % of the frame (PC sh3c). By colour, as no flag marks them.
+        let low = 1.0 - smoothstep(0.5, 0.72, scene.sun.y);
+        let c = lit.rgb;
+        if low > 0.0 && c.g > c.r && c.r > c.b {
+            let sat = (c.g - c.b) / max(c.g, 1e-4);
+            let k = smoothstep(0.3, 0.75, luma(c)) * smoothstep(0.55, 0.85, sat) * smoothstep(0.5, 0.72, c.r / c.g) * low;
+            lit = vec4(mix(c, vec3(luma(c)) * vec3(0.92, 1.05, 0.88), k * 0.35) * (1.0 - 0.18 * k), lit.a);
+        }
     } else {
         lit = block_shade(in.slot, BlockPixel(in.uv, albedo, light, in.pos, scene.params.w));
     }
