@@ -1263,3 +1263,35 @@ The turkey vulture never ate before. A wild animal gets hungry only if it's a pl
 Every one of our species of a kilogram or more that gives no meat leaves carcass pieces when it dies (`animals_core::meat::carcass`). Each piece is half a kilogram of carrion, and it leaves as many as its meat would be portions. For example, a wolf leaves fur plus 2-3 pieces. The carcass's icon is rotten flesh's until Art draws one.
 
 Items on the ground vanish after five minutes, so a vulture must arrive in time. Carcasses don't rot on the ground yet.
+
+## Animations: idle life, moods, fights and hunts, social (2026-11-05)
+
+Ronald picked all four sets: idle life, needs and moods, fights and hunts, social.
+
+**The system** (`mods/animals/src/anim.rs`): the behaviour asks for a state by name, and the engine plays the species' clip of that name. A species without the clip carries on as before.
+- **Held** (`anim::hold`, until another or `clear`): stare, graze, drink, sleep, and stalk, which replaces the walk with a crouched creep. Held states loop.
+- **Once** (`anim::act`): alarm, pounce, bite, rear, howl, play, groom, nuzzle, stretch.
+- **By itself:**
+  - a flinch when hit (its own HURT handler);
+  - idle life every 15-40 s while it stands with nothing held (`anim::idle_life`): look round, sniff the ground, a scratch;
+  - breathing and ear and tail flicks, in every idle clip;
+  - the death fall, the engine's `death` clip, which holds its last frame.
+- **Cheap:** the held state sits on the animal (`HELD`, not saved), and only a change goes over the network.
+- **Testing:** `/anim <clip> [hold|once|clear]` plays a clip on the nearest animal, for checks and looks.
+
+**Clips** are written per species in its `source/<model>` build as pose functions, exported by `to_bedrock`. Every clip other than idle, walk and run goes *over* what plays below, on the bones it moves (`override_previous_animation`), easing in and out (`as_action`; a clip's own `blend` and `loop` win). Added on top instead, a whole pose stacked on the idle's own moves. The poses that reach the ground are fitted with forward kinematics:
+- head down to sniff, drink or graze, with the legs bent as little as it takes;
+- the death fall onto the side;
+- rearing, which keeps the hind hooves down.
+
+The builds check every keyframe: no flicker, no loose joints, nothing poking along the axis. The chihuahua's existing clips already poke up to 1.5 units; its new ones stay within that.
+
+**Done, first group:**
+- **Wolf:** the howl moved out of its 8-second idle (every wolf howled every 8 s) into its own clip, which the blood moon plays.
+- **Deer.**
+- **Dog and chihuahua** (one model): exported as animations only (`build.py --anims-only`), because Upstream is looking into the chihuahua's texture and its skin and UVs had to stay unchanged.
+- **Raptor.**
+
+**Hooks** are Creature AI's to call, in its behaviour code: stare, graze, drink, sleep, stalk, alarm, the strikes, the social clips.
+
+Not yet: the other species, and young ones' play at their own scale (the pup models share the clips).
