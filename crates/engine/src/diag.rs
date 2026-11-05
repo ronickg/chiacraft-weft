@@ -546,6 +546,38 @@ pub fn size(bytes: u64) -> String {
 
 thread_local! {
     static CURRENT_MOD: Cell<u32> = const { Cell::new(u32::MAX) };
+    /// Whether this thread is the server's (its own or its pool's): mod time here is the
+    /// server's, the rest (drawing, the client's hooks) is not counted per tick.
+    static SERVER: Cell<bool> = const { Cell::new(false) };
+    /// Nanoseconds the mod calls made inside the one running took, so it isn't charged them too.
+    static INNER_NS: Cell<u64> = const { Cell::new(0) };
+}
+
+/// This thread is the server's (`host::invoke` charges mod time here to `mod_totals`).
+pub fn mark_server_thread() {
+    SERVER.with(|s| s.set(true));
+}
+
+/// Whether this thread is the server's.
+#[inline]
+pub fn on_server() -> bool {
+    SERVER.with(|s| s.get())
+}
+
+/// A mod call starts: what its caller's inner calls took so far, to give back at the end.
+#[inline]
+pub fn inner_start() -> u64 {
+    INNER_NS.with(|c| c.replace(0))
+}
+
+/// A mod call that took `ns` ends: its own time (less the calls it made), and the caller's inner
+/// time now (`saved` and this call).
+#[inline]
+pub fn inner_end(saved: u64, ns: u64) -> u64 {
+    INNER_NS.with(|c| {
+        let inner = c.replace(saved + ns);
+        ns.saturating_sub(inner)
+    })
 }
 
 /// Marks this thread as running `m`'s code; returns what to restore afterwards.

@@ -10,6 +10,9 @@
 //!
 //! A tame told to stay (`Need::Hold`) holds against whatever would move it (the air, water, food):
 //! it scores just above the most pressing of those.
+//!
+//! Every animal with a goal list runs its needs through a band: the simple creatures (`wild.rs`),
+//! the birds, the wolf, cat, dog, both raptors, the jaguar, the capybara and the wyvern.
 
 use weft_sdk::ai::{Goal, Goals};
 use weft_sdk::*;

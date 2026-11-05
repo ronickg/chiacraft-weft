@@ -153,7 +153,7 @@ pub fn busy(w: &World, id: u64) -> bool {
             .is_some_and(|d| d[3] != 0.0 && !d[0].is_nan())
 }
 
-/// A goal (run first by the forage goal, `forage::forage`): thirsty, it goes to the nearest water
+/// A goal (in the needs band, `choose.rs`, weighed against hunger): thirsty, it goes to the nearest water
 /// it can stand beside and drinks a gulp at a time until slaked; it takes the turn while it does.
 /// Standing in water it drinks where it is. With no water near it lets foraging and wandering
 /// take it elsewhere.
