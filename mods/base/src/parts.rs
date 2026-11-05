@@ -86,7 +86,11 @@ fn cut_when_apart(material: &str) -> bool {
 }
 
 pub fn register(r: &mut Registry) {
-    r.entity_component(&SKILLS, Skills { xp: [0; 6] }, component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP_ON_RESPAWN);
+    r.entity_component(
+        &SKILLS,
+        Skills { xp: [0; 6] },
+        component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP_ON_RESPAWN,
+    );
     r.attach(&PLAYER, &SKILLS);
     // What the held part or tool is made of and has been through, and the player's crafts.
     r.command("inspect", "", |cmd| {

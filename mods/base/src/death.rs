@@ -65,8 +65,8 @@ pub fn in_grace(w: &World, player: u64) -> bool {
 /// Tells the one who died what killed them and where their things are (after the tombstone is
 /// placed, `levels.rs`).
 pub fn tell(w: &World, d: &abi::Death) {
-    use abi::damage_cause as dm;
     use crate::survival::body::{BLEED, FREEZE, HEAT, POISON};
+    use abi::damage_cause as dm;
     let killer = (d.source != 0 && d.source != d.entity)
         .then(|| w.entity(d.source))
         .flatten()

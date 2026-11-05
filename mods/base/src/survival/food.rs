@@ -179,8 +179,9 @@ pub fn age_inventory(w: &World, id: u64, merge: bool) {
 /// it cools.
 pub fn merge_food(stacks: &mut [ItemStack]) {
     let alike = |s: &ItemStack| ItemStack { count: 1, ..s.without(&MADE) };
-    let mergeable =
-        |s: &ItemStack| !s.is_empty() && FRESHNESS.on_item(s.item).is_some() && HOT.on_stack_own(s).is_none() && MEAL.on_stack_own(s).is_none();
+    let mergeable = |s: &ItemStack| {
+        !s.is_empty() && FRESHNESS.on_item(s.item).is_some() && HOT.on_stack_own(s).is_none() && MEAL.on_stack_own(s).is_none()
+    };
     for i in 0..stacks.len() {
         if !mergeable(&stacks[i]) {
             continue;

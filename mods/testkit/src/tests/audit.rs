@@ -252,8 +252,7 @@ pub async fn changes_in_one_tick(t: T) -> R {
     let (torch, flower) = (add(f, [3, 0, 3]), add(f, [5, 0, 3]));
     t.c()
         .say(&format!("/tk set {} base:mossy_cobblestone", at(torch)));
-    t.c()
-        .say(&format!("/tk set {} base:dandelion", at(flower)));
+    t.c().say(&format!("/tk set {} base:dandelion", at(flower)));
     t.secs(1.0).await?;
     t.check_eq(t.block(flower).await?, "base:dandelion".to_string(), "the server has the flower");
     t.check(

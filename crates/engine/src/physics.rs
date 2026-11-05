@@ -774,7 +774,6 @@ pub fn liquid_at(c: &Content, block: &impl Cells, p: DVec3) -> Option<u16> {
     (p.y - at.y as f64 <= surface).then_some(liquid)
 }
 
-
 /// How a walker moves itself this tick, in blocks per tick like vanilla.
 #[derive(Clone, Copy, Default)]
 pub struct Control {

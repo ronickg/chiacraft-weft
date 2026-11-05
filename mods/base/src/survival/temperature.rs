@@ -83,7 +83,8 @@ pub fn register(r: &mut Registry) {
 /// comfort around (`camp::comfort_of`), found in the same search for fires.
 pub fn feel(w: &World, id: u64, st: &EntityState, v: &mut Vitals, s: &stomach::Stomach, fortitude: f32, fat: f32) -> (Air, u32) {
     let mut comfort = 0u32;
-    let here = base_api::air_at(w, st.pos.into(), st.size.eye, st.in_liquid != 0, HEAT_REACH, |state| comfort |= super::camp::comfort_of(state));
+    let here =
+        base_api::air_at(w, st.pos.into(), st.size.eye, st.in_liquid != 0, HEAT_REACH, |state| comfort |= super::camp::comfort_of(state));
     (v.date, v.calendar) = (here.day, here.calendar);
     let worn = worn(w, id);
     // A rain cape keeps the rain off; water still soaks.

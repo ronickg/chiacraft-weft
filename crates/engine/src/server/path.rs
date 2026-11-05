@@ -218,7 +218,15 @@ mod tests {
             hitbox: Vec::new(),
             outline: Vec::new(),
             liquid_walls: 0,
-            signal: RawSignal { kind: abi::SignalDesc::DEFAULT.kind, attach: 6, front: 6, delay: 0, flags: 0, inputs: 0, head: String::new() },
+            signal: RawSignal {
+                kind: abi::SignalDesc::DEFAULT.kind,
+                attach: 6,
+                front: 6,
+                delay: 0,
+                flags: 0,
+                inputs: 0,
+                head: String::new(),
+            },
             components: Vec::new(),
         };
         r.blocks.push(RawBlock {
