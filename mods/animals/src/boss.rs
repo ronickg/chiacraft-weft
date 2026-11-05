@@ -238,7 +238,12 @@ pub fn init(r: &mut Registry) {
 }
 
 /// Registers a boss's kinds: itself (its fight `goal`, which calls `fight`) and its young.
-pub fn register(r: &mut Registry, def: &'static Def, goal: fn(&World, u64, &EntityState) -> bool, young_goal: fn(&World, u64, &EntityState) -> bool) {
+pub fn register(
+    r: &mut Registry,
+    def: &'static Def,
+    goal: fn(&World, u64, &EntityState) -> bool,
+    young_goal: fn(&World, u64, &EntityState) -> bool,
+) {
     let b = data(def);
     let base = b.stats(&b.forms[0]);
     let (bw, bh) = animals_core::bodies::of(def.model);
@@ -309,7 +314,14 @@ pub fn rise(def: &'static Def, w: &World, player: u64, at: [i32; 3], form: &Form
     }
     let b = data(def);
     let max = b.stats(form).health;
-    w.attribute_add_modifier(id, &attribute::MAX_HEALTH, "animals:form", attr_op::MULTIPLY_BASE, (max / b.stats(&b.forms[0]).health) as f64 - 1.0, 0);
+    w.attribute_add_modifier(
+        id,
+        &attribute::MAX_HEALTH,
+        "animals:form",
+        attr_op::MULTIPLY_BASE,
+        (max / b.stats(&b.forms[0]).health) as f64 - 1.0,
+        0,
+    );
     w.entity_edit(id).health(max);
     w.set_component(id, &WARDEN, Warden { form: form.age.tier() as u32, state: RISING, target: player, altar: at, ..Warden::default() });
     w.action_play(id, "rise", false);
@@ -351,7 +363,14 @@ pub fn fight(def: &'static Def, w: &World, id: u64, st: &EntityState) -> bool {
         }
         w.set_component(id, &SCALED, 1);
         // A titan stands its ground (`core:knockback_resistance`).
-        w.attribute_add_modifier(id, &attribute::KNOCKBACK_RESISTANCE, "animals:size", attr_op::ADD, bosses::SIZE.band().knockback as f64, 0);
+        w.attribute_add_modifier(
+            id,
+            &attribute::KNOCKBACK_RESISTANCE,
+            "animals:size",
+            attr_op::ADD,
+            bosses::SIZE.band().knockback as f64,
+            0,
+        );
     }
     for cd in c.cooldown.iter_mut() {
         *cd = cd.saturating_sub(e);
@@ -564,7 +583,18 @@ pub fn dist2(a: [f64; 3], b: [f64; 3]) -> f64 {
 /// it takes the hit and is thrown (`toss` up as much as the knockback across), once a charge; into
 /// a trunk or a wall it is stunned.
 #[allow(clippy::too_many_arguments)]
-pub fn charge(def: &Def, w: &World, id: u64, st: &EntityState, c: &Warden, a: &Attack, s: Strike, speed: f32, ticks: u32, toss: f64) -> Step {
+pub fn charge(
+    def: &Def,
+    w: &World,
+    id: u64,
+    st: &EntityState,
+    c: &Warden,
+    a: &Attack,
+    s: Strike,
+    speed: f32,
+    ticks: u32,
+    toss: f64,
+) -> Step {
     w.walk(id, c.dir, speed, false);
     face(w, id, c.dir);
     let half = st.size.width as f64 / 2.0;
@@ -622,7 +652,9 @@ pub fn land(def: &Def, w: &World, id: u64, a: &Attack, hit: f32, hits: Vec<(u64,
 /// What a boss's attacks never hit: a boss, and every boss's young (PC look boss_drenkaun_hud1: a
 /// second Drenkaun trampled the first one's calf).
 pub fn spared(w: &World, e: u64) -> bool {
-    w.component(e, &WARDEN).is_some() || w.entity(e).is_some_and(|s| defs().iter().any(|d| d.young.id() == s.kind))
+    w.component(e, &WARDEN).is_some()
+        || w.entity(e)
+            .is_some_and(|s| defs().iter().any(|d| d.young.id() == s.kind))
 }
 
 pub fn burst(w: &World, at: [f64; 3], state: u32, count: u32, spread: f64) {

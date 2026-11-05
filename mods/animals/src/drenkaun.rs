@@ -225,7 +225,14 @@ fn strike(w: &World, id: u64, st: &EntityState, c: &Warden, a: &Attack, hit: f32
                 for e in w.entities_near(at, ROOT_RADIUS, None) {
                     if e != id && !hits.iter().any(|(h, _)| *h == e) && !boss::spared(w, e) {
                         hits.push((e, [0.0, k, 0.0]));
-                        w.attribute_add_modifier(e, &attribute::MOVEMENT_SPEED, "animals:warden_roots", attr_op::MULTIPLY_BASE, ROOT_SLOW, ROOT_TICKS);
+                        w.attribute_add_modifier(
+                            e,
+                            &attribute::MOVEMENT_SPEED,
+                            "animals:warden_roots",
+                            attr_op::MULTIPLY_BASE,
+                            ROOT_SLOW,
+                            ROOT_TICKS,
+                        );
                     }
                 }
             }
