@@ -22,6 +22,7 @@ mod firebed;
 mod fireflies;
 mod first;
 mod glider;
+mod grapple;
 mod growth;
 mod hints;
 mod hud;
@@ -111,6 +112,7 @@ fn init(r: &mut Registry) {
     survival::register(r);
     climbing::register(r);
     glider::register(r);
+    grapple::register(r);
     levels::register(r);
     skills::register(r);
     web::register(r);

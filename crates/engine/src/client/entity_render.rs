@@ -1955,7 +1955,7 @@ impl EntityRenderer {
             };
             let held_how = Play { looping: true, aim: true, hand: true, ..how };
             // Hands on a wall or a glider's bar: the pose's clip has the arms, not what is held.
-            let hands_busy = pose.when & (weft_abi::pose_when::CLIMBING | weft_abi::pose_when::GLIDING) != 0;
+            let hands_busy = pose.when & (weft_abi::pose_when::CLIMBING | weft_abi::pose_when::GLIDING | weft_abi::pose_when::ROPE) != 0;
             if hands_busy {
                 // Nothing of the hands: the item rides along on the raised arm.
             } else if e.held != 0 {

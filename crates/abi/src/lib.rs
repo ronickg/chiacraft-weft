@@ -2125,6 +2125,8 @@ pub mod pose_when {
     pub const CLIMBING: u32 = 8;
     /// Gliding (`attribute::GLIDE_SPEED`) in the air.
     pub const GLIDING: u32 = 16;
+    /// Hanging on a rope (`attribute::ROPE_LENGTH`), off the ground.
+    pub const ROPE: u32 = 32;
 }
 
 /// A pose (`Host::reg_pose`). Of the poses whose conditions hold the one with the highest
@@ -4583,6 +4585,14 @@ pub mod attribute {
     pub const WIND_Z: &str = "core:wind_z";
     /// Rising air under it, blocks a second (a thermal, a ridge's updraft).
     pub const LIFT: &str = "core:lift";
+    /// Over 0: it hangs on a rope from (`ROPE_X`, `ROPE_Y`, `ROPE_Z`) at most this many blocks
+    /// long, its hands kept within it (a grappling hook). Jump pulls it in and sneak lets it out
+    /// at `ROPE_REEL` blocks a second (0: neither); swinging is gravity on the rope.
+    pub const ROPE_LENGTH: &str = "core:rope_length";
+    pub const ROPE_X: &str = "core:rope_x";
+    pub const ROPE_Y: &str = "core:rope_y";
+    pub const ROPE_Z: &str = "core:rope_z";
+    pub const ROPE_REEL: &str = "core:rope_reel";
 }
 
 /// How an attribute modifier applies, like vanilla: ADD amounts sum onto the base, then times
@@ -5599,6 +5609,9 @@ pub struct CommandArgs {
 
 /// Places for HUD elements. `HOTBAR_LEFT`/`HOTBAR_RIGHT` stack upwards above the hotbar's halves.
 pub mod hud_anchor {
+    /// Across the top of the screen, the whole width, under the rest of the HUD: an overlay (the
+    /// frame of a glider overhead).
+    pub const TOP: &str = "top";
     pub const TOP_LEFT: &str = "top_left";
     pub const TOP_RIGHT: &str = "top_right";
     pub const BOTTOM_LEFT: &str = "bottom_left";

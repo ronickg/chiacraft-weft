@@ -96,6 +96,13 @@ pub struct LocalPlayer {
     /// Held on to a wall at the last step, gliding at the last step: the poses for them.
     pub on_wall: bool,
     pub gliding: bool,
+    /// The rope it hangs on (`attribute::ROPE_LENGTH`), how much of it is let out now (pulled in
+    /// with jump, let out with sneak), the anchor that length is for, and hanging off the ground on
+    /// it at the last step.
+    pub rope: Option<physics::Rope>,
+    pub rope_len: f64,
+    pub rope_for: Option<DVec3>,
+    pub on_rope: bool,
 }
 
 pub struct ClientEntity {
@@ -889,6 +896,10 @@ impl Client {
                 glide: physics::Glide::default(),
                 on_wall: false,
                 gliding: false,
+                rope: None,
+                rope_len: 0.0,
+                rope_for: None,
+                on_rope: false,
             },
             joined: false,
             blocks_preloaded: false,
@@ -3393,6 +3404,11 @@ fn swims_in(c: &crate::content::Content, kind: u32, worn: &[u32]) -> Vec<bool> {
         .collect()
 }
 
+/// Where on a player a rope holds it: its hands over its head, as a share of its height.
+const ROPE_HOLD: f64 = 1.05;
+/// The air's drag a step on a body swinging on a taut rope (0.91 off it).
+const ROPE_DRAG: f64 = 0.995;
+
 fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, gravity: f64, bodies: &[physics::Body]) {
     let c = content();
     // Held facing one way it stays put: in a bed.
@@ -3445,6 +3461,7 @@ fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, 
             && (!on(w::SWIM_LIQUID) || in_swim_liquid)
             && (!on(w::CLIMBING) || p.on_wall)
             && (!on(w::GLIDING) || p.gliding)
+            && (!on(w::ROPE) || p.on_rope)
     };
     let want = match p.forced {
         Some((held, _)) => held,
@@ -3532,7 +3549,7 @@ fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, 
     }
 
     // Gliding: the air carries it, it steers by its look; holding back brakes, sneaking dives.
-    p.gliding = p.glide.speed > 0.0 && !p.on_ground && !p.in_liquid && !p.on_wall && p.riding.is_none();
+    p.gliding = p.glide.speed > 0.0 && !p.on_ground && !p.in_liquid && !p.on_wall && p.riding.is_none() && p.rope.is_none();
     if p.gliding {
         let brake = if fwd_in < 0.0 { 1.0 } else { 0.0 };
         let dive = if sneak { 1.0 } else { 0.0 };
@@ -3575,6 +3592,36 @@ fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, 
         p.jumped = true;
     }
     p.on_wall = w.on_wall;
+    // On a rope: jump pulls it in, sneak lets it out, and the hands stay within it.
+    p.on_rope = false;
+    match p.rope {
+        Some(rope) => {
+            if p.rope_for != Some(rope.anchor) {
+                (p.rope_for, p.rope_len) = (Some(rope.anchor), rope.length);
+            }
+            if jump {
+                p.rope_len = (p.rope_len - rope.reel).max(physics::ROPE_MIN);
+            } else if sneak {
+                p.rope_len = (p.rope_len + rope.reel * 0.7).min(rope.length);
+            }
+            let hold = height * ROPE_HOLD;
+            // Hands on a wall: the rope runs slack behind as it climbs, past the anchor too.
+            if w.on_wall {
+                let reach = (p.pos + DVec3::Y * hold).distance(rope.anchor);
+                p.rope_len = p.rope_len.max(reach).min(rope.length);
+            }
+            let taut = !w.on_wall && physics::rope_hold(c, block, bodies, &mut p.pos, &mut p.vel, hw, height, hold, rope.anchor, p.rope_len);
+            // Swinging on a taut rope keeps its way: little of the air's drag (0.91 a step
+            // across and 0.98 up and down, which stop a pendulum in a swing).
+            if taut && !w.on_ground {
+                p.vel.x *= ROPE_DRAG / 0.91;
+                p.vel.z *= ROPE_DRAG / 0.91;
+                p.vel.y *= ROPE_DRAG / 0.98;
+            }
+            p.on_rope = !w.on_ground && (taut || p.pos.distance(rope.anchor) <= p.rope_len + hold + 0.5);
+        }
+        None => p.rope_for = None,
+    }
     let here = physics::around(c, block, p.pos, height);
     (p.in_liquid, p.climbing) = (here.in_liquid, here.climbing);
     if w.on_ground {

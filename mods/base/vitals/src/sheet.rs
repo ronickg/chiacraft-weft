@@ -279,6 +279,7 @@ fn clothes(w: &mut String) {
 
 fn climbing_gliding(w: &mut String) {
     use crate::{climb, glide};
+    // The grappling hook's row follows the glider's.
     let _ = writeln!(
         w,
         "## Climbing and gliding\n\nAny wall, pushing into it in the air: {} blocks a second at grip 1, {} stamina a second climbing and {:.1} hanging still (sneaking; sneaking into it climbs down). Grip: rough rock and logs {}, dressed stone and planks {}, loose ground {}, ice and glass {}. Run out and the hands let go until {} is back.\n\n| on the climber | pace | stamina |\n|---|---|---|",
@@ -324,6 +325,21 @@ fn climbing_gliding(w: &mut String) {
         glide::RIDGE_SHARE,
         glide::LIFT_MAX
     );
+    let _ = writeln!(w, "| grappling hook | reach | pulled in | let out | throws | stamina on the rope |\n|---|---|---|---|---|---|");
+    for h in crate::grapple::HOOKS {
+        let _ = writeln!(
+            w,
+            "| `{}` | {} | {} a second | {:.1} a second | {} | climbing's: {} a second pulling, {:.1} hanging |",
+            h.name,
+            h.reach,
+            h.reel,
+            h.reel * crate::grapple::LET_OUT_SHARE,
+            h.durability(),
+            crate::stamina::CLIMB,
+            climb::cost(false, climb::FREE)
+        );
+    }
+    let _ = writeln!(w);
 }
 
 fn effects_table(w: &mut String) {

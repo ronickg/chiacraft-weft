@@ -467,6 +467,10 @@ pub unsafe extern "C" fn ui_open(u: *mut abi::UiCtx, node: *const abi::UiNode) {
                     style,
                 )
             }
+            uk::IMAGE if n.bind.is_some() => {
+                let bind = float_bind(owner, n.bind);
+                b.ui.open(Kind::BoundImage { texture: n.text.as_str().to_string(), bind, value: 0.0 }, style)
+            }
             uk::IMAGE => {
                 b.ui.open(Kind::Image { texture: n.text.as_str().to_string(), color: 0xFFFFFFFF }, style)
             }
