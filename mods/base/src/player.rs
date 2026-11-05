@@ -24,11 +24,18 @@ fn armor_of(w: &World, entity: u64) -> (u32, f32) {
         .fold((0, 0.0), |t, a| (t.0 + a.points, t.1 + a.toughness))
 }
 
+/// How much bigger held items are in the player's own first-person hand than Weft draws them
+/// (`comp::FIRST_PERSON_HELD_SCALE`).
+const FIRST_PERSON_ITEMS: f32 = 1.8;
+
 pub fn register(r: &mut Registry) {
     // Third person sways and jolts as first person does (chiacraft's feel; Weft's own behind and
     // front cameras are still).
     drop(r.camera(&cameras::BEHIND).with(weft_sdk::abi::camera_flags::EFFECTS));
     drop(r.camera(&cameras::FRONT).with(weft_sdk::abi::camera_flags::EFFECTS));
+    // Held items about as big in the view as they were before the Weft sync (Ronald: "our items
+    // a bit bigger"): Weft holds them in the posed hand, smaller than our old corner.
+    r.set_on(Target::Entity("core:player"), &FIRST_PERSON_HELD_SCALE, FIRST_PERSON_ITEMS);
     r.player_inventory()
         .group("hotbar", Slots::row(9).hotbar())
         .group("main", Slots::grid(9, 3));
