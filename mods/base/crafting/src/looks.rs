@@ -245,11 +245,19 @@ pub const WORN_SETS: [&str; 11] =
 /// Worn armour drawn from its parts (`abi::comp::WORN_LOOK`): its shell's material's worn set, the
 /// layer in the wearer's skin layout (leggings the inner layer, 2; the rest the outer, 1), its gems
 /// set at their spots. A shell without a set of its own (a new material) wears steel's until it
-/// has one.
-pub fn worn_look(slot: usize, shell: &str, gems: &[&str]) -> String {
+/// has one. Under a helmet and a chestplate's pauldrons, where the painting rounds their corners
+/// off, an under-layer of the fastening's (Ronald, 11-05: "Fix it", no skin showing there): a mail
+/// coif and sleeves for a metal fastening, padding for leather, sinew and cord, in its dark steps.
+pub fn worn_look(slot: usize, shell: &str, fastening: &str, gems: &[&str]) -> String {
     let layer = if slot == 2 { 2 } else { 1 };
     let set = if WORN_SETS.contains(&shell) { shell } else { "steel" };
-    let mut look = format!("base:entity/armor/worn/{set}_{layer}");
+    let under = if slot <= 1 {
+        let metal = fastening == "gold" || crate::materials::material(fastening).is_some_and(|m| m.works == crate::materials::Works::Metal);
+        format!("base:entity/armor/parts/under_{}_1@{};", if metal { "mail" } else { "padded" }, ramp(fastening))
+    } else {
+        String::new()
+    };
+    let mut look = format!("{under}base:entity/armor/worn/{set}_{layer}");
     for (i, g) in gems.iter().enumerate() {
         if let Some(spot) = WORN_GEM_SPOTS.get(slot).and_then(|s| s.get(i)) {
             let (x, y) = (spot[0] - GEM_SIZE / 2, spot[1] - GEM_SIZE / 2);
@@ -353,20 +361,23 @@ mod tests {
         assert!(part_look("haft", "oak").is_none());
         assert_eq!(part_look("helmet_shell", "leather").unwrap(), "base:parts/armour/cap_shell@base:ramps/leather");
         assert_eq!(part_look("leg_shell", "bone").unwrap(), "base:parts/armour/bone_leg_shell@base:ramps/bone");
-        assert_eq!(worn_look(2, "diamond", &[]), "base:entity/armor/worn/diamond_2");
-        assert_eq!(worn_look(0, "unobtainium", &[]), "base:entity/armor/worn/steel_1");
+        assert_eq!(worn_look(2, "diamond", "wrought_iron", &[]), "base:entity/armor/worn/diamond_2");
+        assert_eq!(
+            worn_look(0, "unobtainium", "leather", &[]),
+            "base:entity/armor/parts/under_padded_1@base:ramps/leather;base:entity/armor/worn/steel_1"
+        );
         // A helmet shows one gem however many it holds.
         assert_eq!(
-            worn_look(0, "steel", &["amber", "diamond", "peridot"])
-                .matches(';')
+            worn_look(0, "steel", "steel", &["amber", "diamond", "peridot"])
+                .matches("gem_set")
                 .count(),
             1
         );
         assert_eq!(gem_look("sword", 0, "diamond").unwrap(), "base:parts/gem/set@base:ramps/gem_diamond+7,20");
         assert!(gem_look("axe", 3, "diamond").is_none() && gem_look("sword", 3, "diamond").is_none());
         assert_eq!(
-            worn_look(1, "bronze", &["amber"]),
-            "base:entity/armor/worn/bronze_1;base:entity/armor/parts/gem_set@base:ramps/gem_amber+46,44"
+            worn_look(1, "bronze", "gold", &["amber"]),
+            "base:entity/armor/parts/under_mail_1@base:ramps/gold;base:entity/armor/worn/bronze_1;base:entity/armor/parts/gem_set@base:ramps/gem_amber+46,44"
         );
     }
 
