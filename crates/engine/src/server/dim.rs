@@ -2229,7 +2229,8 @@ impl Dim {
                 }
                 let n = rule.group[0] + (self.rng.next() % (rule.group[1] - rule.group[0] + 1) as u64) as u32;
                 // A mod may turn it down (`question::NATURAL_SPAWN`: no food there for them).
-                let mut q = abi::Query { pos: abi::BlockPos { x, y, z }, other: rule.entity as u64, amount: n as f64, ..abi::Query::DEFAULT };
+                let mut q =
+                    abi::Query { pos: abi::BlockPos { x, y, z }, other: rule.entity as u64, amount: n as f64, ..abi::Query::DEFAULT };
                 if !self.ask(c, abi::question::NATURAL_SPAWN, &mut q) {
                     continue;
                 }

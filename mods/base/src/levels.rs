@@ -62,7 +62,9 @@ pub fn register(r: &mut Registry) {
         for d in b.iter() {
             if d.source != 0 && d.source != d.entity && w.players().contains(&d.source) {
                 let danger = if w.players().contains(&d.entity) { 3.0 } else { 1.5 };
-                give_xp(&w, d.source, xp::kill(1, danger));
+                // A blood moon's kills in totality are worth more (`vitals::events`).
+                let blood = if crate::events::blood_totality(&w) { vitals::events::BLOOD_MOON_XP } else { 1.0 };
+                give_xp(&w, d.source, (xp::kill(1, danger) as f32 * blood).round() as u64);
             }
             if w.players().contains(&d.entity) {
                 tombstone(&w, d.entity, d.pos.into());

@@ -234,6 +234,11 @@ fn knows(w: &World, player: u64, item: u32) -> bool {
             .is_some_and(|k| crate::discovery::held(&k, item_name(item)))
 }
 
+/// Seconds the book takes to make `item` from memory: a knapped head's, else none (made at once).
+pub fn book_secs(item: u32) -> Option<f32> {
+    knapped_of(item).map(|_| f::HEAD_FROM_BOOK_SECS)
+}
+
 /// The knapped head a recipe's output is, if it is one.
 fn knapped_of(item: u32) -> Option<&'static f::Knapped> {
     f::knapped(item_name(item).strip_prefix("base:part_")?)
@@ -265,7 +270,8 @@ pub fn finish(w: &World, player: u64, cells: &[ItemStack], made: ItemStack, roll
         return made;
     }
     if let Some(k) = knapped_of(made.item) {
-        if !knows(w, player, made.item) {
+        // From memory, a head is the book's, in its time (`book_secs`); the grid shows none.
+        if roll.is_none() || !knows(w, player, made.item) {
             return ItemStack::EMPTY;
         }
         return crate::knapping::knapped_head(w, player, k.shape, false, roll);

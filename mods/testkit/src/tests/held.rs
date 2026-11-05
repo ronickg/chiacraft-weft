@@ -212,7 +212,8 @@ pub async fn held_water_swim(t: T) -> R {
     }
     t.flat().await?;
     let f = t.feet();
-    t.fill(add(f, [-8, -4, -40]), add(f, [8, -1, 8]), "water").await?;
+    t.fill(add(f, [-8, -4, -40]), add(f, [8, -1, 8]), "water")
+        .await?;
     t.op(&format!("fillpart {} {} {WEED}", at(add(f, [-8, -4, -40])), at(add(f, [8, -1, 8]))))
         .await?;
     t.secs(0.5).await?;
@@ -241,7 +242,11 @@ pub async fn held_water_swim(t: T) -> R {
     let mut swum = 0;
     for _ in 0..120 {
         t.frames(1).await?;
-        swum += t.c().view().player_state().is_some_and(|m| m.pose == abi::pose::SWIM) as u32;
+        swum += t
+            .c()
+            .view()
+            .player_state()
+            .is_some_and(|m| m.pose == abi::pose::SWIM) as u32;
     }
     t.check(swum > 20, format!("swam through the weed for {swum} frames"));
     t.secs(4.0).await?;

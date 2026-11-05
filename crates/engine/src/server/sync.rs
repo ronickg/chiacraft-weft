@@ -272,7 +272,8 @@ fn send_clock(p: &mut Player, dim: &DimSet, tick: u64, rate: u32) {
         p.conn.send(ToClient::TickRate(rate));
     }
     if dim.weather_moved || p.first_sync {
-        p.conn.send(ToClient::Weather { id: dim.weather as u32, only: dim.rain_here().map(|o| o.to_vec()) });
+        p.conn
+            .send(ToClient::Weather { id: dim.weather as u32, only: dim.rain_here().map(|o| o.to_vec()) });
     }
     if dim.air_moved || p.first_sync {
         p.conn

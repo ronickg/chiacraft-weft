@@ -478,7 +478,7 @@ static CAMPFIRES: Tag = Tag::named("campfires");
 static FIRES_SEEN: std::sync::Mutex<Option<std::collections::HashMap<u64, (u64, Option<BlockPos>)>>> = std::sync::Mutex::new(None);
 
 /// The campfire within the ring of `pos`, if any.
-fn campfire_near(w: &World, pos: Vec3) -> Option<BlockPos> {
+pub(crate) fn campfire_near(w: &World, pos: Vec3) -> Option<BlockPos> {
     let p = block_pos_of(pos);
     for dy in -FIRE_RING_UP..=FIRE_RING_UP {
         for dz in -FIRE_RING..=FIRE_RING {
@@ -544,8 +544,15 @@ fn hostile(goals: ai::Goals) -> ai::Goals {
         .then(ai::watch_player(8.0))
         .then(keep_from_fire())
         .then(ai::melee())
+        .then(blood_chase())
         .then(ai::chase_target(35.0, 1.0))
         .then(ai::wander(0.6, 10.0))
+}
+
+/// A blood moon's monster sees players further (`vitals::events::BLOOD_MOON_REACH`).
+fn blood_chase() -> impl ai::Goal {
+    let chase = ai::chase_target(35.0 * vitals::events::BLOOD_MOON_REACH as f64, 1.0);
+    move |w: &World, id: u64, st: &EntityState| crate::events::is_blood(id) && ai::Goal::run(&chase, w, id, st)
 }
 
 /// A spider's peace: out in daylight.

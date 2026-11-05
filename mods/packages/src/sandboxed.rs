@@ -418,7 +418,8 @@ pub fn on_block<'a>(mut b: BlockBuilder<'a>, runs: &Arc<Runs>, id: &str) -> Bloc
         match h {
             Hook::BlockUse(name) if name == id => {
                 b = b.on_use(move |u| {
-                    let (w, ev) = (u.world(), BlockUseEvent { player: u.player(), pos: t3(u.pos()), state: u.state(), face: u.face().face() });
+                    let (w, ev) =
+                        (u.world(), BlockUseEvent { player: u.player(), pos: t3(u.pos()), state: u.state(), face: u.face().face() });
                     rs.with(|inst| inst.block_use(|| Box::new(WorldGame::of(w, &rs)), cb, ev))
                         .unwrap_or(false)
                 });
