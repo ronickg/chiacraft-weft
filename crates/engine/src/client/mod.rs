@@ -481,6 +481,8 @@ pub struct Client {
     pub entity_render: EntityRenderer,
     pub player: LocalPlayer,
     pub joined: bool,
+    /// Every block's textures were loaded once after joining (`preload_block_textures`).
+    blocks_preloaded: bool,
     pub player_id: u64,
     /// The local player as an entity: what the server says of it (health, actions, look) and
     /// what its own animation works out, brought up to date each frame (`sync_me`).
@@ -874,6 +876,7 @@ impl Client {
                 jump_mul: 1.0,
             },
             joined: false,
+            blocks_preloaded: false,
             player_id: 0,
             sprint_stopped: false,
             me: ClientEntity::new(content().game.player_kind, DVec3::ZERO, 0.0, 0.0, ItemStack::EMPTY),
@@ -1802,7 +1805,26 @@ impl Client {
         }
     }
 
+    /// Every block state's textures, loaded once while the world comes in after joining: a mesh
+    /// loading its own mid-play decoded with the frame waiting (15-35 ms frames in a new biome,
+    /// budgeted uploads overrunning to 30 ms; perf review #9). About 0.2 ms a texture, decoded in
+    /// parallel. A pack's own looks still load when first drawn.
+    fn preload_block_textures(&mut self, gpu: &mut dyn Backend, textures: &GameTextures) {
+        if self.blocks_preloaded || !self.joined {
+            return;
+        }
+        self.blocks_preloaded = true;
+        let t = Instant::now();
+        let mut ids: Vec<u32> = content().states.iter().flat_map(|s| s.textures).collect();
+        ids.sort_unstable();
+        ids.dedup();
+        let n = ids.len();
+        textures.ensure_blocks(gpu, ids);
+        log::info!(target: "load", "block textures preloaded: {n} in {:.0} ms", t.elapsed().as_secs_f64() * 1000.0);
+    }
+
     fn upload_meshes(&mut self, gpu: &mut dyn Backend, textures: &GameTextures) {
+        self.preload_block_textures(gpu, textures);
         let center: IVec3 = (self.player.pos.floor().as_ivec3()) >> 4;
         // Wide enough for every column the server keeps sent (view radius + 2).
         let reach = self.view_radius + 3;
