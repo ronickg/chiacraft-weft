@@ -30,6 +30,8 @@ struct Carve {
     radius: i32,
     rim: i32,
     seed: u64,
+    /// The world's seed, for the land's heights.
+    seed_world: u64,
     /// (dx, dz) still to carve, farthest first (taken from the back).
     columns: Vec<(i32, i32)>,
     /// Block edits a tick.
@@ -175,6 +177,7 @@ pub fn start_with(w: &World, x: i32, z: i32, radius: i32, ticks: u32, loot: Opti
         radius,
         rim,
         seed,
+        seed_world: w.seed(),
         columns,
         budget,
         edits: 0,
@@ -267,7 +270,10 @@ fn tick(w: &World) {
 fn column(w: &World, c: &Carve, dx: i32, dz: i32, gone: &mut Vec<[i32; 3]>) -> Option<usize> {
     let [cx, cy, cz] = c.at;
     let (x, z) = (cx + dx, cz + dz);
-    let g = ground(w, x, z, cy)?;
+    // Searched round the land's own height there: on a hillside the middle's is too far off
+    // (impact_carve2: 1,095 of a crater's columns skipped).
+    let guess = base_api::land::height(&base_api::land::fields(c.seed_world), x * 16, z * 16) >> 4;
+    let g = ground(w, x, z, guess)?;
     let d = ((dx * dx + dz * dz) as f64).sqrt();
     let u = d / c.radius as f64;
     let hash = |y: i32, k: i64| weft_sdk::noise::hash(c.seed, x as i64, y as i64 * 7 + k, z as i64);
