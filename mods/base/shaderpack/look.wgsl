@@ -1132,8 +1132,19 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // glass, the land behind seen through it. Rain and the weather's fog veil as before (the Shader
     // session's), and the handover where the terrain ends is still the sky's.
     let wet = clamp(max(rain, scene.weather.z), 0.0, 1.0);
-    let v = mix(min(veil, vec3(0.8)), veil, wet);
-    let toward = lit * mix(0.9, 1.0, wet);
+    var v = mix(min(veil, vec3(0.8)), veil, wet);
+    var toward = lit * mix(0.9, 1.0, wet);
+    // With the sun under about 40° the clear air's haze takes the low sun's colour, warm and even
+    // across the channels, not the sky's blue: Bliss's 08:00 far land is warm (red minus blue +27),
+    // ours was blue-grey (-15) at the same brightness (the Look session's measure on the forest
+    // vista, 11-05). The HDR path only (`scene.frame.x`), so today's look stays as it is.
+    let low_sun = (1.0 - smoothstep(0.3, 0.65, scene.sun.y)) * smoothstep(-0.02, 0.06, scene.sun.y) * (1.0 - wet)
+        * select(0.0, 1.0, scene.frame.x > 0.5);
+    if low_sun > 0.0 {
+        let sun_tint = p.sun / max(luma(p.sun), 1e-3);
+        toward = mix(toward, luma(toward) * sun_tint, 0.4 * low_sun);
+        v = mix(v, vec3((v.r + v.g + v.b) / 3.0), 0.5 * low_sun);
+    }
     let mixed = mix(pale, toward, v);
     let own = mix(pale, toward, v * mix(0.7, 1.0, wet));
     let seen = max(vec3(luma(mixed)) + own - vec3(luma(own)), vec3(0.0));
