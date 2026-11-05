@@ -239,6 +239,13 @@ break the path.
 World settings can scale costs, boss strength and death's harshness for a faster or slower world,
 on top of the same curves.
 
+**The goal** (Ronald, 11-06: "easy to add more content, and it sort of balances it decently well.
+Of course, we will need to be able to tweak certain stuff ... if that system's built out good, then
+it's already, I think, a huge win"):
+- **Declare, then derive.** A new creature, item, perk, spell or boss only declares a few things: tier, size class, role, path, rarity. Its numbers come from the curves.
+- **Bounded tweaks.** Hand tweaks are bounded multipliers on the derived values, each with a reason, and the checks still run on the result.
+- **Every system, not only combat:** skills, bosses, loot, magic, tames, automation and exploration, all priced in one shared currency of value. Its method is in `reports/Balance model.md` (running).
+
 ## What's next
 
 1. **Research:** how Ark, Vintage Story, Terraria, Skyrim, GregTech or All the Mods, Thaumcraft or Botania, and Valheim structure their progression and keep it balanced. What to take, what to avoid.
