@@ -53,6 +53,7 @@ mod hare;
 mod hunt;
 mod iguanodont;
 mod jaguar;
+pub mod journal;
 mod knockout;
 mod kryptobaatar;
 mod lizard;
@@ -143,6 +144,7 @@ fn init(r: &mut Registry) {
     wolf::init(r);
     jaguar::init(r);
     voices::init(r);
+    journal::init(r);
     breath::init(r);
     animal::init(r);
     comfort::init(r);

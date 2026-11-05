@@ -473,6 +473,7 @@ pub fn born(w: &World, at: [f64; 3], y: &Young, owner: Option<[u8; 64]>) -> u64 
             *own = o;
         }
         crate::xp::raised(w, &o);
+        crate::journal::note_owner(w, &o, id, animals_core::journal::BRED);
         crate::commands::tamed(w, id);
         crate::commands::set_command(w, id, crate::commands::WANDER, None);
         crate::dog::on_tamed(w, id);
