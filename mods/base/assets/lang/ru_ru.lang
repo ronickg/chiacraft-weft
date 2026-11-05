@@ -983,6 +983,11 @@ crafting.book.lacks = {0}: нужно ещё {1} × {2}
 crafting.book.parts = Детали
 crafting.parts.assemble = Собрать
 crafting.parts.apart = Разобрать
+crafting.parts.slot.head = Насадка, наконечник или клинок
+crafting.parts.slot.haft = Рукоять, древко или черен
+crafting.parts.slot.fitting = Обмотка или крепление
+crafting.parts.slot.more = Ещё одна деталь
+crafting.parts.slot.apart = Инструмент, чтобы разобрать
 
 # Предметы из деталей (parts.rs)
 item.base.part_felling_axe_head = Топор лесоруба (насадка)

@@ -982,6 +982,11 @@ crafting.book.lacks = {0}: needs {1} more {2}
 crafting.book.parts = Parts
 crafting.parts.assemble = Build
 crafting.parts.apart = Apart
+crafting.parts.slot.head = A head, point or blade
+crafting.parts.slot.haft = A haft, shaft or grip
+crafting.parts.slot.fitting = A binding or fitting
+crafting.parts.slot.more = Another part
+crafting.parts.slot.apart = A tool to take apart
 
 # Items built from parts (parts.rs)
 item.base.part_felling_axe_head = Felling Axe Head
