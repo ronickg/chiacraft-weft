@@ -944,7 +944,9 @@ vanilla's boxes. A long animal's head and tail still stick out of its box (one b
 a 9-block body). The bigger boxes need wider gaps to walk through, and the engine's path search
 led every walker one cell wide, so the big animals jammed between trunks (PC run aw_walk:
 cedarosaurs 0-6 blocks in 5 minutes against 5-14 with the old boxes); it now needs room across a
-body's whole footprint (`notes/ENGINE_CHANGES.md`, section 1). The sauropod's box stops at 5.5
+body's whole footprint (`notes/ENGINE_CHANGES.md`, section 1). The sauropod keeps to the open
+floodplain (its fern forest share 0.5 to 0.2, Planner's pick of option (a), 11-05): at 4.5 wide
+it stood still among the trunks. The sauropod's box stops at 5.5
 blocks (`bodies::LOW`): its neck reaches 8.6, above any reach from the ground, and a box that tall
 found no room under the fern forest's crowns.
 
