@@ -3088,10 +3088,10 @@ const FAR_REACH: f32 = 400.0;
 const FAR_DEPTH: f32 = 1200.0;
 
 /// The values of the settings the shader pack reads (`Scene::options`).
-fn pack_options() -> [[f32; 4]; 4] {
-    let mut out = [[0.0; 4]; 4];
+fn pack_options() -> [[f32; 4]; 8] {
+    let mut out = [[0.0; 4]; 8];
     let names = &content().game.config_names;
-    for (i, name) in crate::packs::pack_options().iter().enumerate().take(16) {
+    for (i, name) in crate::packs::pack_options().iter().enumerate().take(32) {
         if let Some(&id) = names.get(name.as_str()) {
             out[i / 4][i % 4] = crate::config::get(id) as f32;
         }
