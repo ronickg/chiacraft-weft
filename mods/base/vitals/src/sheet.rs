@@ -26,6 +26,7 @@ pub fn markdown() -> String {
     waiting(&mut w);
     felling_table(&mut w);
     effects_table(&mut w);
+    climbing_gliding(&mut w);
     climates(&mut w);
     plant_table(&mut w);
     crop_table(&mut w);
@@ -274,6 +275,55 @@ fn clothes(w: &mut String) {
         );
     }
     let _ = writeln!(w);
+}
+
+fn climbing_gliding(w: &mut String) {
+    use crate::{climb, glide};
+    let _ = writeln!(
+        w,
+        "## Climbing and gliding\n\nAny wall, pushing into it in the air: {} blocks a second at grip 1, {} stamina a second climbing and {:.1} hanging still (sneaking; sneaking into it climbs down). Grip: rough rock and logs {}, dressed stone and planks {}, loose ground {}, ice and glass {}. Run out and the hands let go until {} is back.\n\n| on the climber | pace | stamina |\n|---|---|---|",
+        climb::SPEED,
+        crate::stamina::CLIMB,
+        climb::cost(false, climb::FREE),
+        climb::GRIP_ROUGH,
+        climb::GRIP_SMOOTH,
+        climb::GRIP_LOOSE,
+        climb::GRIP_NONE,
+        climb::AGAIN
+    );
+    for (e, b) in climb::BURDENS {
+        let _ = writeln!(w, "| {} | x{} | x{} |", e.name(), b.pace, b.cost);
+    }
+    let _ = writeln!(
+        w,
+        "\n| glider | airspeed | sink | glide ratio | from 40 up: still air | 4 m/s behind | 4 m/s against | seconds aloft |\n|---|---|---|---|---|---|---|---|"
+    );
+    for g in glide::WINGS {
+        let wind = 4.0 * glide::WIND_SHARE;
+        let _ = writeln!(
+            w,
+            "| `{}` | {} | {} | {:.1} | {:.0} | {:.0} | {:.0} | {} |",
+            g.name,
+            g.speed,
+            g.sink,
+            g.ratio(),
+            g.range(40.0, 0.0),
+            g.range(40.0, wind),
+            g.range(40.0, -wind),
+            g.durability()
+        );
+    }
+    let _ = writeln!(
+        w,
+        "\nThe wind carries a glider at {} of the surface wind. Rising air: thermals up to {} blocks a second at 14:00 over bare ground (half over grass) in {} of {}-block cells, none in rain; wind up a slope lifts by its rise over {} blocks downwind, x{}; at most {} together.\n",
+        glide::WIND_SHARE,
+        glide::THERMAL,
+        glide::THERMAL_SHARE,
+        glide::THERMAL_CELL,
+        glide::RIDGE_LOOK,
+        glide::RIDGE_SHARE,
+        glide::LIFT_MAX
+    );
 }
 
 fn effects_table(w: &mut String) {

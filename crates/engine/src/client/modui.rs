@@ -638,6 +638,7 @@ pub unsafe extern "C" fn client_entity(c: *mut abi::ClientCtx, id: u64, out: *mu
                     pos: e.pos.to_array().into(),
                     yaw: e.yaw,
                     pitch: e.pitch,
+                    pose: e.pose.0 as u32,
                     moved: e.swing,
                     health: e.health,
                     // The kind's own value: clients do not see attribute modifiers of others.

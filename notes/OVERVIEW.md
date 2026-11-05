@@ -4,7 +4,7 @@ Written by `notes/overview/build.py` from `notes/overview/pieces.json`; edit tha
 
 **The goal.** Players open their own worlds, find other people's without any central service, link them with portals and walk between them; missing mods download on the way; identity and achievements live on Chia. The game in those worlds: survival in the Valheim spirit with real temperatures and seasons, and animals to tame, breed and raise, from real facts.
 
-■ built and seen working: 78 · ◧ partly built: 47 · □ not built yet: 10 · ◌ planned for later: 6
+■ built and seen working: 79 · ◧ partly built: 48 · □ not built yet: 10 · ◌ planned for later: 7
 
 ## Core next
 
@@ -112,14 +112,17 @@ Code: `crates/engine/src/dedicated.rs`. Docs: `notes/PLAN.md`.
 
 ## Survival
 
-One body for players and animals: food sets how much of your stats you reach, temperature from a real climate, seasons, levels. 11 of 13 parts built.
+One body for players and animals: food sets how much of your stats you reach, temperature from a real climate, seasons, levels. 12 of 16 parts built.
 
 | | Part | Notes |
 |---|---|---|
 | ■ | Stats and levels | Nine stats, a point a level, XP from everything. Code: `mods/base/vitals/src/stats.rs`, `mods/base/vitals/src/levels.rs`, `mods/base/src/levels.rs`. |
 | ■ | Stomach and food | Real nutrients, well fed from three foods, water as a nutrient. Code: `mods/base/vitals/src/food.rs`, `mods/base/vitals/src/stomach.rs`, `mods/base/src/survival/food.rs`. |
 | ■ | Health | Max health from the stomach, healing from protein and greens. Code: `mods/base/src/survival/health.rs`. |
-| ■ | Stamina | Climbing's cost waits for ladders. Code: `mods/base/vitals/src/stamina.rs`, `mods/base/src/survival/stamina.rs`. |
+| ■ | Stamina | Sprinting, jumping, swimming, swings, blocks broken and climbing walls (Stamina climbing) pay from it. Code: `mods/base/vitals/src/stamina.rs`, `mods/base/src/survival/stamina.rs`. |
+| ■ | Stamina climbing | Any wall, pushing into it in the air (the engine's core:climb_speed times the block's grip, the CLIMBING pose): rough rock and logs faster, dressed stone and planks slower, loose ground crumbly, ice and glass not at all; sneaking hangs, sneaking into it climbs down, a wall ending under the knees is climbed over. Stamina by the second, dearer and slower carrying a load, wet or cold; out of stamina the hands let go until 15 is back. A stamina bar under the crosshair on a wall. Seen in the game (PC, 11-05, gc_climb1, gc_multi3): granite at 1.8 blocks a second and over the top, stone with a hang and a climb down, stone bricks at half speed, ice not at all, the hands letting go 11 blocks up a pillar when stamina ran out; another player sees the climbing pose. Code: `mods/base/vitals/src/climb.rs`, `mods/base/src/climbing.rs`, `crates/engine/src/physics.rs`. |
+| ◧ | Glider | The leather glider (Stone Age, 7.8 EM): opens with jump once falling, closes with jump, on landing or in water; 8 blocks a second, sinking 1.8 (4.4 to 1); the day's wind from the weather carries it (further downwind), thermals over sun-warmed ground by day and wind up slopes lift it; a second's wear a second aloft (607). Each flight logged with its distance along the wind. Seen in the game (PC, 11-05, gc_glide4, gc_multi3): with 6 m/s of wind 1160 blocks downwind (7.2 to 1) against 201 into it (2.0 to 1), 4.0 to 1 in still air, closing and opening again in the air; another player sees the wing over whoever glides. Its icon and the wing model wait on Ronald's yes (preview branch glider-art-preview). Not yet: the first-person view of the frame (the HUD has no full-width top anchor). Code: `mods/base/vitals/src/glide.rs`, `mods/base/src/glider.rs`. |
+| ◌ | Grapple | An Iron Age rope swing (reports/Survival systems gap analysis.md, 4), after climbing and the glider are seen in the game. |
 | ■ | Breath | Air under water; the oxygen stat doesn't lengthen it yet. Code: `mods/base/src/survival/breath.rs`. |
 | ■ | Body temperature | Climate, season, hour, height, weather, fires, armor. Code: `mods/base/vitals/src/temperature.rs`, `mods/base/vitals/src/climate.rs`, `mods/base/src/survival/temperature.rs`. |
 | ■ | Clothing | Fur, wool, hide and linen clothes in four slots of their own under armor, no armor value; warmth at the content plan's research numbers (12 °C a clo walking), a share kept wet and of the wind stopped by material (vitals clothing.rs). Pelts and hides from wild animals (animals_core hides.rs), plant fibre from tall grass. Seen in the game 11-04: fur under an iron chestplate comes to 31.6 °C and stops 80% of the wind. Not yet seen: pelts dropping, fibre. Icons, the pot's, rack's and campfire's faces and the slot outlines by game-art (11-04, Ronald's yes); the worn layers are being painted (Animal models session). More sets and a cloak slot wait for the content plan. Code: `mods/base/vitals/src/clothing.rs`, `mods/base/src/clothing.rs`, `mods/base/src/survival/temperature.rs`. |
