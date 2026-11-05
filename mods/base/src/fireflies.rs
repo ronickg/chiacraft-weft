@@ -100,7 +100,7 @@ fn count(w: &World) {
         // In place, as survival keeps its vitals.
         let Some(here) = w.component_mut(player, &HERE) else { continue };
         if *here != n.share {
-            weft_sdk::debug!(
+            weft_sdk::info!(
                 "fireflies: player {player} in {}: air {:.1}, mean {:.1}, soil {:.2}, rain {}, {:.2} h, sunset {:.2}: share {:.2}",
                 n.biome,
                 n.air,
@@ -160,7 +160,7 @@ fn frame(c: &Client) {
         .is_none_or(|l| now.duration_since(l).as_secs_f32() >= 5.0)
         && (me.is_none() || share.is_none())
     {
-        weft_sdk::debug!("fireflies: no player state ({}) or share ({:?}) on the client", me.is_some(), share);
+        weft_sdk::info!("fireflies: no player state ({}) or share ({:?}) on the client", me.is_some(), share);
         s.logged = Some(now);
     }
     let (Some(me), Some(share)) = (me, share) else { return };
@@ -174,7 +174,7 @@ fn frame(c: &Client) {
     if s.logged
         .is_none_or(|l| now.duration_since(l).as_secs_f32() >= 5.0)
     {
-        weft_sdk::debug!(
+        weft_sdk::info!(
             "fireflies: share {share:.2}, want {want:.0}, clusters {}, sent {}, spots turned down (no ground, not air, no light, sky or torch, crowded) {:?}",
             s.clusters.len(),
             s.sent,
