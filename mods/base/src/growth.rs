@@ -32,6 +32,12 @@ pub fn register(r: &mut Registry) {
         let list: Vec<String> = found.iter().map(|(n, c)| format!("{n} {c}")).collect();
         cmd.reply("command.base.litter", &[Arg::Int(r as i64), Arg::Text(&list.join(", "))]);
     });
+    // DIAGNOSTIC (to remove): every block broken by no player, to find the fibre round a herd.
+    r.on(&actions::BREAK_BLOCK, |b| {
+        for e in b.iter().filter(|e| e.player == 0) {
+            weft_sdk::info!("broken by no player: {} at {:?}", block_name(e.state), e.pos.to_array());
+        }
+    });
     r.command("growth", "", |cmd| {
         let w = cmd.world();
         let Some(st) = w.entity(cmd.player()) else { return };
