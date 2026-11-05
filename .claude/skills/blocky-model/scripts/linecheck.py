@@ -15,6 +15,7 @@ What it reports, at rest:
   `FLUSH`, the half unit `boxcheck` asks for between faces) and at
   least 2 long, in a colour unlike the box that covers the rest (a fur box's top showing beside a
   moss pad, a body box's edge between two tufts). These are the thin lines.
+  A strip whose texels are cut out (a shell's open hem) shows nothing and is skipped.
 - `seam`: the same strip in nearly the same colour as its cover: a small step, read as a crease.
   Fine on a joint (an upper leg's rim round the lower), worth a look on a flat back.
 - `thin`: a whole face under one texel wide that nothing covers (a box thinner than a texel seen
@@ -138,7 +139,8 @@ def boxes_from_geo(geo):
             else:
                 A2, c2 = A, c
             faces = {}
-            for gf, uv in (cube.get("uv") or {}).items():
+            per_face = cube.get("uv") if isinstance(cube.get("uv"), dict) else {}  # box UV (a list): no per-face rectangles
+            for gf, uv in per_face.items():
                 if not isinstance(uv, dict):
                     continue
                 u, v = uv["uv"]
@@ -205,7 +207,7 @@ def face_colours(b, face, tex, nu, nv, w, h):
     vi = np.clip((np.arange(nv) * h) // nv, 0, h - 1) + v0
     ui = np.clip(ui, 0, tex.shape[1] - 1)
     vi = np.clip(vi, 0, tex.shape[0] - 1)
-    return tex[vi[:, None], ui[None, :], :3].astype(float)
+    return tex[vi[:, None], ui[None, :], :4].astype(float)
 
 
 def mean_face_colour(b, face, tex):
@@ -361,8 +363,11 @@ def lines(boxes, tex=None, density=0.5, allow=()):
                     if len(near) > 400:
                         near = near[:: len(near) // 400 + 1]
                     cc = colour_beside(cover, near, tex)
+                    if cols is not None and (cols[m][:, 3] > 0).mean() < 0.2:
+                        continue  # cut out: the strip's texels are see-through (a shell's open hem)
                     if cols is not None and cc is not None:
-                        contrast = round(float(np.linalg.norm(cols[m].mean(0) - cc)), 1)
+                        shown = cols[m][cols[m][:, 3] > 0]
+                        contrast = round(float(np.linalg.norm(shown[:, :3].mean(0) - cc)), 1)
                 kind = "line" if contrast is None or contrast >= CONTRAST else "seam"
                 if joint_rim(b, cover, n):
                     kind = "seam"  # the end of a part round the next one in its chain (a hoof's rim)

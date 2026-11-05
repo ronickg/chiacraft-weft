@@ -87,6 +87,13 @@ EYE_STYLE = os.environ.get("DRENKAUN_EYES", "warden_amber")
 # In the deer's space (scaled by K when the model is built). The head is drawn `HS` times its
 # reindeer size about its pivot (Ronald, 11-05: "the head is small: scale it up a little").
 HEAD = np.array([0.0, 66.0, 38.0])
+# The moss over the shoulders and back (Ronald, 11-05, shown both: "Shell, longer to the hips"):
+# the skill's rule 6, one shell a little bigger than the shoulders, its hem cut out ragged, as
+# Mojang's sniffer wears its moss, and a lower, shorter one over the hips carrying it down the back,
+# thinning to a ragged end before the haunches (concept A: none on the rump). "tufts" is round 5's.
+MOSS_STYLE = os.environ.get("DRENKAUN_MOSS", "shell")
+SHELL = (-13.3, 42.0, -9.0), (13.3, 65.0, 30.6)  # 2 units out from the shoulders on every side
+SHELL_HIPS = (-11.1, 47.0, -22.5), (11.1, 55.6, -8.0)  # 2 units out from the hips, short of the thighs
 HS = 1.22
 
 
@@ -243,7 +250,8 @@ def elements():
          el("chest", "spine_1", (-11.4, 30, -8), (11.4, 62.5, 30)),  # deep and broad, the withers high
          # Ronald: "a deeper chest and shoulders ... and a lower belly line at the back".
          el("brisket", "spine_1", (-9.6, 25.5, 12.0), (9.6, 34.0, 32.5)),
-         el("shoulders", "spine_1", (-12.8, 44.0, 4.0), (12.8, 64.2, 26.5)),
+         # Under the shell the shoulders reach back over the chest, so the shell hugs one box.
+         el("shoulders", "spine_1", (-12.8, 44.0, -8.5 if MOSS_STYLE == "shell" else 4.0), (12.8, 64.2, 26.5)),
          el("belly", "spine_0", (-9.2, 31.6, -31.0), (9.2, 38.0, -5.0)),
          el("skull", "head", *SKULL0),
          # A stag's muzzle, narrow and tapering to a dark nose (Ronald, round 4: the big flat pale
@@ -276,10 +284,14 @@ def elements():
     # The tuft over the withers two texels wider than the shoulders (0.8 left a strip of their front
     # beside it); the chest's mat reaching back into the chest, over the brisket's top (it left a
     # texel and a half of the brisket showing between them).
-    E.append(el("moss_tuft0", "spine_1", (-13.9, 54.0, 19.5), (13.9, 65.4, 30.7)))
+    if MOSS_STYLE == "shell":
+        E.append(el("moss_shell", "spine_1", *SHELL, cut="shell"))
+        E.append(el("moss_shell_hips", "spine_0", *SHELL_HIPS, cut="shell_hips"))
+    else:
+        E.append(el("moss_tuft0", "spine_1", (-13.9, 54.0, 19.5), (13.9, 65.4, 30.7)))
     E.append(el("moss_chest", "spine_1", (-10.4, 34.0, 29.6), (10.4, 58.0, 34.9)))
     E.append(el("fringe_chest", "spine_1", (-11.4, 18.0, 35.4), (11.4, 58.0, 35.4), quad="south", cut="chest"))
-    for s_, q in ((1, "east"), (-1, "west")):
+    for s_, q in ((1, "east"), (-1, "west")) if MOSS_STYLE != "shell" else ():
         E.append(el(f"fringe_moss_{q}", "spine_1", (s_ * 14.8, 30.0, -6.0), (s_ * 14.8, 64.6, 30.5), quad=q, cut="moss"))
     # No bark plates (Ronald, round 4: "Drop the plates"): the moss mane carries on over the
     # shoulders and along the back in uneven tufts, each narrower and lower than the one before,
@@ -289,7 +301,7 @@ def elements():
     # clearly narrower than the back they lie on.
     for j, (bone_, x, y0, y1, z0, z1) in enumerate((("spine_1", 12.93, 61.0, 66.2, 8.5, 20.2), ("spine_1", 10.2, 60.6, 65.4, -1.5, 9.2),
                                                      ("spine_1", 8.0, 59.9, 63.9, -9.5, -0.8), ("spine_0", 6.4, 53.6, 57.6, -18.0, -8.6),
-                                                     ("spine_0", 4.4, 53.9, 56.5, -26.0, -17.4))):
+                                                     ("spine_0", 4.4, 53.9, 56.5, -26.0, -17.4)) if MOSS_STYLE != "shell" else ()):
         E.append(el(f"moss_back{j}", bone_, (-x, y0, z0), (x, y1, z1)))
     E.append(el("tail", "tail", (-2.6, 45.5, -42.8), (2.6, 54.5, -39.75), rot=(12, 0, 0), origin=tuple(TAIL0)))
     for s, n in ((1, "L"), (-1, "R")):
@@ -395,7 +407,7 @@ def area(e, face, p, uu, vv, h):
                 a = np.where(y > 36.0, FUR, BELLY)  # behind the moss mane's locks
             if name == "hips" and face == "north":
                 a = np.where((np.abs(x) < 6.0) & (y > 40), BELLY, a)  # the pale rump round the tail
-    elif name in ("mane", "fringe_mane", "moss_chest", "fringe_chest") or name.startswith(("fringe_moss", "moss_crest", "moss_tuft", "moss_back")):
+    elif name in ("mane", "fringe_mane", "moss_chest", "fringe_chest") or name.startswith(("fringe_moss", "moss_crest", "moss_tuft", "moss_back", "moss_shell")):
         a[:] = MOSS
         if e["quad"]:
             if not e["rot"]:
@@ -495,6 +507,36 @@ def cut_mask(e, p):
         lock = np.abs(((x / period) % 1.0) - 0.5) * 2
         tip = 22.0 + 7.0 * (np.abs(x) / 11.4) ** 1.5 + 9.0 * rnd + 2.0 * lock
         return y >= tip
+    if e["cut"] == "shell":  # the shell's hem: ragged locks, longest over the shoulders' front
+        x, y, z = p[..., 0] / K, p[..., 1] / K, p[..., 2] / K
+        (x0, y0, z0), (x1, y1, z1) = SHELL
+        period = max(2.0, 3 / (TX * K))
+        on_side = np.abs(np.abs(x) - x1) < 0.05
+        on_back = np.abs(z - z0) < 0.05
+        on_down = np.abs(y - y0) < 0.05
+        along = np.where(on_side, z, x)  # the locks run along the hem
+        lock = np.abs(((along / period) % 1.0) - 0.5) * 2
+        rnd = (np.sin(np.floor(along / period) * 12.9898 + 7.0 * on_back + 3.0 * np.sign(x)) * 43758.5453) % 1.0
+        u = np.clip((z - z0) / (z1 - z0), 0, 1)  # 0 at the back, 1 at the front
+        tip_side = 57.0 - 11.0 * u ** 0.7 + 2.0 * lock + 3.5 * rnd
+        tip_back = 57.5 + 2.0 * lock + 3.0 * rnd
+        keep = np.where(on_side, y >= tip_side, np.where(on_back, y >= tip_back, True))
+        return keep & ~on_down
+    if e["cut"] == "shell_hips":  # the hips' shell: short ragged locks, its back edge in tongues
+        x, y, z = p[..., 0] / K, p[..., 1] / K, p[..., 2] / K
+        (x0, y0, z0), (x1, y1, z1) = SHELL_HIPS
+        period = max(2.0, 3 / (TX * K))
+        on_side = np.abs(np.abs(x) - x1) < 0.05
+        on_top = np.abs(y - y1) < 0.05
+        on_open = (np.abs(z - z0) < 0.05) | (np.abs(y - y0) < 0.05)  # its back end and underside
+        along = np.where(on_side, z, x)
+        lock = np.abs(((along / period) % 1.0) - 0.5) * 2
+        rnd = (np.sin(np.floor(along / period) * 78.233 + 5.0 * on_top + 3.0 * np.sign(x)) * 43758.5453) % 1.0
+        u = np.clip((z - z0) / (z1 - z0), 0, 1)  # 0 at the back, 1 at the front
+        tip_side = 50.0 - 3.0 * u + 2.0 * lock + 2.5 * rnd + 2.5 * (1 - u) ** 2  # longer toward the shoulders
+        back = z0 + 1.0 + 4.5 * rnd + 2.0 * lock  # tongues reaching back over the hips
+        keep = np.where(on_side, y >= tip_side, np.where(on_top, z >= back, True))
+        return keep & ~on_open
     if e["cut"] == "moss":  # locks hanging down the shoulders, uneven, shorter toward the back
         y, z = p[..., 1] / K, p[..., 2] / K
         u = np.clip((z - 14.0) / 16.5, 0, 1)
@@ -888,7 +930,8 @@ def fit_poses(spec):
 def build():
     B = bones()
     E = elements()
-    boxes = [(e["name"], np.array(e["lo"]), np.array(e["hi"])) for e in E if not e["quad"] and not e["rot"]]
+    # A shell with a cut-out hem casts no occlusion: what shows through its hem is lit as open fur.
+    boxes = [(e["name"], np.array(e["lo"]), np.array(e["hi"])) for e in E if not e["quad"] and not e["rot"] and not str(e["cut"]).startswith("shell")]
     tiles = []
     for i, e in enumerate(E):
         for f in ([e["quad"]] if e["quad"] else list(FACES)):
