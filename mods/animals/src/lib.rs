@@ -60,6 +60,7 @@ mod knockout;
 mod kryptobaatar;
 mod lizard;
 mod meat;
+mod memory;
 mod mouse;
 mod owl;
 mod prof;
@@ -159,6 +160,7 @@ fn init(r: &mut Registry) {
     drink::init(r);
     hunt::init(r);
     senses::init(r);
+    memory::init(r);
     choose::init(r);
     screen::init(r);
     taming::init(r);

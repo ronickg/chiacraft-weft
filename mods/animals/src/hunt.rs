@@ -203,6 +203,14 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
         });
     let Some((t, kg)) = prey else {
         w.component_mut(id, &HUNT).map(|c| *c = h);
+        // No prey in sight: it goes where kills were (`memory::haunt`), where prey come and die.
+        if let Some(site) = crate::memory::haunt(w, st.pos.to_array())
+            && dist2(site, st.pos) > 16.0
+            && !w.navigating(id)
+        {
+            weft_sdk::info!("{} {id} goes to a kill site at {:.0} {:.0}", s.name, site[0], site[2]);
+            w.navigate(id, site, 1.0);
+        }
         return false;
     };
     weft_sdk::info!("{} {id} hunts {} ({kg:.1} kg, a pack of {pack})", s.name, t);

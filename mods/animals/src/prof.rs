@@ -114,7 +114,7 @@ fn report(w: &World) -> String {
 pub fn init(r: &mut Registry) {
     // The rows in the same order every run.
     row("upkeep");
-    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses)> [value:float]", |cmd| {
+    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear)> [value:float]", |cmd| {
         let w = cmd.world();
         let text = match cmd.text("what").unwrap_or("") {
             "on" => {
@@ -123,6 +123,42 @@ pub fn init(r: &mut Registry) {
                 "animal goal timer on".to_string()
             }
             "dump" => report(&w),
+            "kill" => {
+                // The player kills the wild animal nearest him (a hunter's kill: fear there, and
+                // its kind's reputation of him falls).
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let near = w
+                    .entities_near(me.pos, 48.0, None)
+                    .into_iter()
+                    .filter(|&id| {
+                        w.component(id, &crate::animal::ANIMAL)
+                            .is_some_and(|a| a.species != 0)
+                            && !crate::animal::tamed(&w, id)
+                    })
+                    .filter_map(|id| Some((crate::dist2(w.entity(id)?.pos, me.pos), id)))
+                    .min_by(|a, b| a.0.total_cmp(&b.0));
+                let Some((_, id)) = near else { return };
+                w.damage(id, 1e6, cmd.player(), damage_cause::ATTACK);
+                format!("KILL {id}")
+            }
+            "fear" => {
+                // The fear of the ground where the player stands, and red deer's (and hares')
+                // reputation of him there.
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let p = me.pos.to_array();
+                let rep = |name: &str| {
+                    crate::species::SPECIES
+                        .iter()
+                        .position(|s| s.name == name)
+                        .map_or(0.0, |i| crate::memory::reputation(&w, i, p, cmd.player()))
+                };
+                format!(
+                    "ANIMAL_FEAR here {:.2}, red_deer reputation {:.2}, hare {:.2}",
+                    crate::memory::fear_at(&w, p),
+                    rep("red_deer"),
+                    rep("hare")
+                )
+            }
             "wind" => {
                 // The wind's way the animals smell by (degrees clockwise from north; none: the
                 // weather's own), for a test.

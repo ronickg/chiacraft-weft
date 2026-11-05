@@ -15,6 +15,7 @@ pub mod hides;
 pub mod journal;
 pub mod life;
 pub mod meat;
+pub mod memory;
 pub mod needs;
 pub mod nests;
 pub mod perception;

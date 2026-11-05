@@ -458,7 +458,7 @@ fn players(
     id: u64,
     st: &EntityState,
     out: &mut Senses,
-    mine: &Species,
+    mine: &'static Species,
     facing: [f32; 2],
     field: f32,
     secs: f32,
@@ -490,7 +490,11 @@ fn players(
             _ => perception::WALK_HEARD,
         };
         let off = [(e.pos.x - p.x) as f32, (e.pos.z - p.z) as f32];
-        let s = sense_one(out, facing, field, off, d, seen, heard);
+        // What it and its kind here remember of him (`memory`): one who hurt them is noticed
+        // sooner and farther off, one who fed them later and nearer.
+        let (sooner, farther) = crate::memory::wary_of(w, id, mine.index(), p.to_array(), q);
+        let mut s = sense_one(out, facing, field, off, d, seen * farther, heard * farther.min(1.5));
+        (s.gain, s.sight, s.other, s.hear) = (s.gain * sooner, s.sight * sooner, s.other * sooner, s.hear * sooner);
         if s.gain > 0.0 && best.is_none_or(|b| s.gain > b.0.gain) {
             best = Some((s, q, e.pos, e.eye()));
         }

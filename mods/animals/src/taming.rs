@@ -333,6 +333,7 @@ pub fn feed(w: &World, id: u64, player: u64) -> bool {
     };
     take_one(w, player);
     animal::feed(w, id, food.food);
+    crate::memory::fed(w, id, player);
     if t.asking == 0 {
         // Fed when it wasn't asking: it eats, warily.
         mistake(w, id, &st, w.random_below(3) == 0);
