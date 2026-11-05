@@ -39,10 +39,10 @@ const ZOOM_START: usize = 0;
 const ZOOM_DOUBLE: f32 = 2.0;
 /// GUI pixels a pan key moves the view, at zoom 1.
 const PAN_STEP: f32 = 40.0;
-/// The sidebar's width, and a skill row's: clear of the list's scrollbar (6 GUI px) with 3 UI px of
-/// air (the UI guide: nothing clipped).
+/// The sidebar's width, and a skill row's: the list is the sidebar's width and its scrollbar draws
+/// over its right edge, so a row stops short of it with air to spare (the levels were under it).
 const SIDE_W: f32 = 118.0;
-const ROW_W: f32 = SIDE_W - 10.0;
+const ROW_W: f32 = SIDE_W - 16.0;
 
 #[derive(Clone, Copy)]
 struct View {
@@ -212,7 +212,7 @@ fn sidebar(ui: &mut Ui, s: &SkillWeb, points: u32, refund: bool) {
                 |c| change(c, |v| v.refund = !v.refund),
             );
         }
-        ui.column(S::column().gap(1.0).scroll().h(VIEW_H - 4.0), |ui| {
+        ui.column(S::column().gap(1.0).scroll().w(SIDE_W).h(VIEW_H - 4.0), |ui| {
             for (i, sk) in SKILLS.iter().enumerate() {
                 let (level, into) = skills::level_of(s.em[i]);
                 let name = format!("web.base.skill.{}", sk.id());
