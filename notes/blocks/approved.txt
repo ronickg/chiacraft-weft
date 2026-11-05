@@ -44,3 +44,7 @@ ley_stone_side
 ley_stone_top
 waystone_side
 waystone_top
+crucible_top
+crucible_side
+forge_top
+forge_side
