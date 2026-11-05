@@ -328,7 +328,7 @@ Animation
 
 ## What the best ones do
 
-PROPOSED (11-05, shown to Ronald on `model_refs_sheet.png`; final on his yes). From the
+Ronald, 11-05, shown them on `model_refs_sheet.png`: "Yes, all 11". From the
 best-regarded animal mods that fit vanilla's look (Naturalist, Alex's Mobs, Friends & Foes,
 Critters and Companions, Ecologics, Untamed Wilds) and Mojang's own camel, sniffer, armadillo,
 frog and axolotl. Images and what each teaches: `references.md`; measurements:
