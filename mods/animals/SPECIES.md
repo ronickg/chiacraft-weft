@@ -2940,7 +2940,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn 
 | Where it lives | how common there |
 |---|---|
 | `animals:floodplain` | commonest |
-| `animals:fern_forest` | 50% |
+| `animals:fern_forest` | 20% |
 
 Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn attempts that pick it where commonest (uncommon).
 

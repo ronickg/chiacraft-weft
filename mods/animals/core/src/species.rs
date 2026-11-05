@@ -3076,7 +3076,10 @@ pub static SPECIES: [Species; 46] = [
         // At the shoulder (the back slopes down to the hips).
         height: (4.1, "shoulder"),
         // The floodplain first; the fern forest (as Dongbeititan) less often.
-        habitats: &[("animals:floodplain", 1.0), ("animals:fern_forest", 0.5)],
+        // The open floodplain, seldom among the fern forest's trunks: at 4.5 blocks wide its body
+        // finds few clearings between them and stood still there (PC runs aw_walk_path, 11-05;
+        // Ronald: "keep to open floodplain").
+        habitats: &[("animals:floodplain", 1.0), ("animals:fern_forest", 0.2)],
         bio: Biology {
             // About 10 t (est.).
             mass: 10000.0,
