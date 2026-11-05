@@ -826,6 +826,12 @@ struct FogLight {
     leaf: vec3<f32>,
 }
 
+// Henyey-Greenstein's phase for asymmetry `g` at the cosine `mu` from the light, 1 where it scatters
+// alike every way.
+fn hg_phase(mu: f32, g: f32) -> f32 {
+    return (1.0 - g * g) / pow(max(1.0 + g * g - 2.0 * g * mu, 1e-4), 1.5);
+}
+
 fn fog_light(dir: vec3<f32>) -> FogLight {
     let p = palette();
     let mu = dot(dir, light_dir());
@@ -834,7 +840,14 @@ fn fog_light(dir: vec3<f32>) -> FogLight {
     // The sun's glow in the fog capped: uncapped it was over twice the sunlight looking toward a high
     // sun, and noon fog by a river or on snow went a milky white-out (the world playtester's shots,
     // frame luma 0.76, saturation 0.06). Valheim's daytime fog reads grey and soft.
-    let phase = min(hg * 1.6, 0.9) + 0.3;
+    var phase = min(hg * 1.6, 0.9) + 0.3;
+    // In the HDR world the curve rolls the brights off, so the glow toward the sun can be what
+    // droplets really do: strongly forward (two Henyey-Greenstein lobes, g 0.8 and 0.1, as Bliss's
+    // mist: about 30x toward the sun what it is across it), so a low sun through mist is a bright
+    // gold haze with beams, and the mist away from it stays dim and lets the land through.
+    if scene.frame.x > 0.5 {
+        phase = (0.7 * hg_phase(mu, 0.8) + 0.3 * hg_phase(mu, 0.1)) * 0.45;
+    }
     // Droplets are white, snow whiter, dust the color of sand.
     let tint = mix(mix(vec3(0.9), vec3(1.0, 1.0, 1.03), scene.ground.y), vec3(0.95, 0.68, 0.42), scene.ground.z);
     // At dawn and dusk the mist is lit gold toward the low sun and dims away from it (the
@@ -993,7 +1006,11 @@ fn froxel_cell(dir: vec3<f32>, at: f32, floor: f32) -> vec4<f32> {
     if d <= 0.0 {
         return vec4(0.0);
     }
-    let lit = sun_reaches(dir * at);
+    // Three taps of the shadow map through the cell's depth (a quarter, a half and three quarters
+    // between `at`'s neighbours' ends), so a shaft narrower than a cell is part-lit, not all or none.
+    let k = froxel_slice(at);
+    let span = froxel_end(k) - froxel_end(k - 1.0);
+    let lit = (sun_reaches(dir * (at - span * 0.25)) + sun_reaches(dir * at) + sun_reaches(dir * (at + span * 0.25))) / 3.0;
     return vec4(mix(shaded_sky, light.sky, lit) + light.sun * lit, d);
 }
 

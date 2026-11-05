@@ -245,13 +245,34 @@ fn auto_exposure(mean: f32) -> f32 {
 // and fog, where the air itself scatters.
 const BLOOM_MIX: f32 = 0.1;
 
+// How much of the view at `uv` the mist covers (0 none to 1), from the mist volume (`froxels`) at
+// the world's depth there; 0 without the volume.
+fn mist_over(uv: vec2<f32>, pass_: Pass) -> f32 {
+    if scene.froxels.x < 0.5 {
+        return 0.0;
+    }
+    let size = vec2<i32>(pass_.size);
+    let at = clamp(vec2<i32>(uv * pass_.size), vec2(0), size - vec2(1));
+    let d = max(textureLoad(textures[pass_.depth], at, 0).r, 1e-7);
+    let w = scene.inv_view_proj * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, d, 1.0);
+    let dist = min(length(w.xyz / w.w), FROXEL_FAR);
+    let f = froxel_slice(dist);
+    let k = i32(floor(f));
+    let v = mix(froxel_at(uv, k - 1), froxel_at(uv, min(k, i32(FROXEL_SLICES) - 1)), fract(f));
+    return clamp(1.0 - v.a, 0.0, 1.0);
+}
+
 // The HDR world's light before the tone curve: the bloom mixed in and the exposure applied.
 fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
     var col = max(c, vec3(0.0));
     if pass_.bloom != 0u {
         let glow = bloom_tap(pass_.bloom - 1u, uv);
         let air = clamp(max(rain_amount(), scene.weather.z), 0.0, 1.0);
-        col = mix(col, glow, clamp(BLOOM_MIX * (1.0 + air) * fantasy_opt(OPT_BLOOM), 0.0, 0.6));
+        // Bloomy fog (Bliss's): where mist covers the view (the mist volume's own opacity there,
+        // `froxels`), it takes much more of the glow, so thick mist reads as soft light rather than
+        // a grey wall, and its banks' noise melts.
+        let fog = mist_over(uv, pass_);
+        col = mix(col, glow, clamp((BLOOM_MIX * (1.0 + air) + fog * 0.6) * fantasy_opt(OPT_BLOOM), 0.0, 0.8));
     }
     if pass_.exposure != 0u {
         let e = textureLoad(textures[pass_.exposure - 1u], vec2(0, 0), 0).g;
