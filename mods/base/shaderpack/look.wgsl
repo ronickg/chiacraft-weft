@@ -71,6 +71,8 @@ const OPT_AUTO_EXPOSURE: u32 = 24u;
 // (`base:look_foliage_test`, 0 as made to 1: 30% darker).
 const OPT_SKY_LIGHT: u32 = 25u;
 const OPT_FOLIAGE_TEST: u32 = 26u;
+// The HDR world's white balance after the curve (`base:look_white`, 0 neutral as made, + warmer).
+const OPT_WHITE: u32 = 27u;
 
 // The colour a grass or leaf tint is multiplied by for the foliage test: 1 as made.
 fn foliage_test() -> vec3<f32> {
@@ -1465,6 +1467,12 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
         day_t = hejl(max(c, vec3(0.0)) * exposure() * look_opt(OPT_EXPOSURE, 1.0), 3.5);
     }
     var t = mix(night_t, day_t, day);
+    // The HDR world's white balance by day (`base:look_white`): warmer, less blue (our land read
+    // much bluer than Bliss's at every hour, red less blue -37 against -10 at noon: the gap sheet).
+    if scene.frame.x > 0.5 {
+        let w = fantasy_opt(OPT_WHITE) * day;
+        t *= vec3(1.0 + 0.08 * w, 1.0, 1.0 - 0.14 * w);
+    }
     // Only true darks go cool (most daylit ground is mid-tone and keeps its color).
     let lights = smoothstep(0.02, 0.22, luma(t));
     let shade = mix(vec3(0.975, 0.99, 1.03), vec3(0.92, 0.96, 1.10), golden());

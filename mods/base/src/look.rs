@@ -29,12 +29,14 @@ pub static LOOK_AUTO_EXPOSURE: Config<f32> = Config::named("look_auto_exposure")
 /// darker and less yellow (0 as made to 1: 30% darker). Tests, not looks: as made by default.
 pub static LOOK_SKY_LIGHT: Config<f32> = Config::named("look_sky_light");
 pub static LOOK_FOLIAGE_TEST: Config<f32> = Config::named("look_foliage_test");
+/// The HDR world's white balance by day: 0 neutral (as made), + warmer and less blue.
+pub static LOOK_WHITE: Config<f32> = Config::named("look_white");
 
 /// The pack's `options` line: the settings in the order `look.wgsl` reads them.
 pub const OPTIONS: &str = "base:look_exposure, base:look_sun, base:look_sun_warmth, base:look_fill, base:look_fill_cool, \
 base:look_contrast, base:look_saturation, base:look_shade, base:look_haze, base:look_fog, base:night_light, base:night_moon, \
 base:look_canopy, base:look_shafts, core:view_distance, base:look_storybook, base:fx_night_sky, base:fx_shooting_stars, \
-base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle, base:look_curve, base:look_bloom, base:look_auto_exposure, base:look_sky_light, base:look_foliage_test";
+base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle, base:look_curve, base:look_bloom, base:look_auto_exposure, base:look_sky_light, base:look_foliage_test, base:look_white";
 
 pub fn register(r: &mut Registry) {
     // By day: how bright the picture is taken, the sun's strength and warmth (-1 whiter, +1 toward
@@ -68,4 +70,5 @@ pub fn register(r: &mut Registry) {
     r.config(&LOOK_AUTO_EXPOSURE).float(1.0, 0.0, 2.0);
     r.config(&LOOK_SKY_LIGHT).float(1.0, 0.2, 1.5);
     r.config(&LOOK_FOLIAGE_TEST).float(0.0, 0.0, 1.0);
+    r.config(&LOOK_WHITE).float(0.0, -1.0, 2.0);
 }
