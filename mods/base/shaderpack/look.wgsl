@@ -811,6 +811,14 @@ fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
     // The sun thins the banks by day to a third (mornings and evenings keep them); a storm's
     // blowing snow or dust it leaves.
     let burn = mix(1.0, mix(0.35, 1.0, s), smoothstep(0.25, 0.65, scene.sun.y));
+    // In the HDR world the mist lies in banks, as Bliss's does: the low layer is mostly banks with
+    // clear lanes between them (their edges sharper), a fifth of the thin haze up high, so ridges
+    // and tree tops stand out of it and the beams have clear air to cross. (One even veil read as
+    // milk over the whole view: the mist sheet, 11-05.)
+    if scene.frame.x > 0.5 {
+        let b = smoothstep(0.25, 0.75, banks);
+        return f * open * burn * (low * (mix(0.02, 0.7, s) + mix(2.6, 0.6, s) * b) + 0.012 * high) * 0.11;
+    }
     return f * open * burn * (low * (mix(0.05, 0.7, s) + mix(1.7, 0.6, s) * banks) + 0.06 * high) * 0.11;
 }
 
@@ -859,7 +867,13 @@ fn fog_light(dir: vec3<f32>) -> FogLight {
     // Dimmer too: thick mist lit at the sun's full strength toward it clipped to white, and white
     // shows no colour (the dawn check's 07:30 mist, luma p50 170, saturation 0.03).
     let warm = 1.0 - smoothstep(0.1, 0.65, scene.sun.y);
-    let sky_part = (p.ambient * 1.25 + p.horizon * 0.2) * mix(1.0, 0.5, warm);
+    var sky_part = (p.ambient * 1.25 + p.horizon * 0.2) * mix(1.0, 0.5, warm);
+    // In the HDR world the sun's forward glow carries the mist's light toward it, and away from it
+    // the mist is dim, the sky's light alone (Bliss's mist across the sun is a blue-grey that lets
+    // the land through, not a bright veil).
+    if scene.frame.x > 0.5 {
+        sky_part *= 0.55;
+    }
     let sun_part = p.sun * mix(vec3(1.0), MIST_GOLD * 0.65, warm) * light_strength() * phase;
     let k = 0.75 * tint * look_opt(OPT_FOG, 1.0);
     let leaf_part = p.sun * mix(vec3(1.0), MIST_GOLD, warm) * light_strength() * 0.06 * LEAF_LIGHT;
