@@ -19,7 +19,7 @@
 //! `RIVER_SINK_RADIUS`), cut like the basins' lakes (`lake_cut`).
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, LazyLock, Mutex, OnceLock};
 
 use weft_sdk::noise::fixed::{self, Fields, ONE, div_floor, q4, q12, ramp, shape};
 
@@ -112,15 +112,24 @@ impl Region {
         let mut height = vec![0i32; n];
         let mut rain = vec![0i32; n];
         let sea = q4(SEA as f64);
-        for j in 0..side {
-            for i in 0..side {
-                let p = node_pos(f.seed, i0 + i, j0 + j);
-                let here = Here::new(f, p[0] * 16, p[1] * 16);
-                let k = at(i, j);
-                pos[k] = p;
-                height[k] = route_height(&here);
-                let dry = q12(RIVER_RAIN.2);
-                rain[k] = dry + (((ONE - dry) * ramp(here.humidity(), q12(RIVER_RAIN.0), q12(RIVER_RAIN.1))) >> 12);
+        // The nodes from the tiles every region shares (`tile_at`): a region's grid reaches 40
+        // nodes past its own 32 each way, so its neighbours sample most of the same ones.
+        let (t0, t1) = (div_floor(i0, TILE).0, div_floor(i0 + side - 1, TILE).0);
+        let (u0, u1) = (div_floor(j0, TILE).0, div_floor(j0 + side - 1, TILE).0);
+        for tj in u0..=u1 {
+            for ti in t0..=t1 {
+                let tile = tile_at(f, ti, tj);
+                for b in 0..TILE {
+                    for a in 0..TILE {
+                        let (i, j) = (ti * TILE + a - i0, tj * TILE + b - j0);
+                        if (0..side).contains(&i) && (0..side).contains(&j) {
+                            let (k, t) = (at(i, j), (b * TILE + a) as usize);
+                            pos[k] = tile.pos[t];
+                            height[k] = tile.height[t];
+                            rain[k] = tile.rain[t];
+                        }
+                    }
+                }
             }
         }
         // Steepest descent, then pits spill over their lowest neighbour that doesn't drain back.
@@ -316,28 +325,86 @@ impl Region {
 }
 
 type Key = (u64, i32, i32);
-/// A region being worked out or done: the first thread to ask builds it, the rest wait for it.
-type Slot = Arc<OnceLock<Arc<Region>>>;
+/// Something being worked out or done: the first thread to ask builds it, the rest wait for it.
+type Slot<V> = Arc<OnceLock<Arc<V>>>;
 
-/// The regions every thread shares (`region_at`), each with when it was last asked for. Past
-/// `KEEP` the least recently asked quarter goes (it was every region more than 3 from the last
-/// asker: distant terrain asks regions kilometres apart while the cubes ask near ones, so they
-/// were built over and over, 11-16 ms of every far tile's heights).
-struct Regions {
-    map: HashMap<Key, (Slot, u64)>,
+/// Things every thread shares, each with when it was last asked for. Past `keep` the least
+/// recently asked quarter goes, never the one being asked for.
+struct Shared<V> {
+    map: HashMap<Key, (Slot<V>, u64)>,
     clock: u64,
 }
 
-/// Regions kept for every thread: some 30 cover distant terrain's reach, a few the cubes.
+impl<V> Shared<V> {
+    fn new() -> Self {
+        Shared { map: HashMap::new(), clock: 0 }
+    }
+
+    fn slot(&mut self, key: Key, keep: usize) -> Slot<V> {
+        self.clock += 1;
+        let now = self.clock;
+        if self.map.len() > keep {
+            let mut ages: Vec<u64> = self.map.values().map(|v| v.1).collect();
+            let (_, &mut cut, _) = ages.select_nth_unstable(keep / 4);
+            self.map.retain(|k, v| *k == key || v.1 > cut);
+        }
+        let e = self.map.entry(key).or_insert_with(|| (Slot::default(), now));
+        e.1 = now;
+        e.0.clone()
+    }
+}
+
+/// Nodes sampled for the routing (`route_height` and the rain), `TILE` by `TILE` to a tile.
+struct Tile {
+    pos: Vec<[i32; 2]>,
+    height: Vec<i32>,
+    rain: Vec<i32>,
+}
+
+/// Nodes to a tile's side: small, so a lone region samples few it doesn't need (a 130-node
+/// grid takes 17 by 17 tiles, 136 for 130), large enough that a region asks only some 300.
+const TILE: i32 = 8;
+
+impl Tile {
+    fn build(f: &Fields, ti: i32, tj: i32) -> Tile {
+        let n = (TILE * TILE) as usize;
+        let mut t = Tile { pos: Vec::with_capacity(n), height: Vec::with_capacity(n), rain: Vec::with_capacity(n) };
+        let dry = q12(RIVER_RAIN.2);
+        for b in 0..TILE {
+            for a in 0..TILE {
+                let p = node_pos(f.seed, ti * TILE + a, tj * TILE + b);
+                let here = Here::new(f, p[0] * 16, p[1] * 16);
+                t.pos.push(p);
+                t.height.push(route_height(&here));
+                t.rain.push(dry + (((ONE - dry) * ramp(here.humidity(), q12(RIVER_RAIN.0), q12(RIVER_RAIN.1))) >> 12));
+            }
+        }
+        t
+    }
+}
+
+/// Regions kept for every thread (`region_at`): some 30 cover distant terrain's reach, a few
+/// the cubes. Least recently asked go first (it was every region more than 3 from the last
+/// asker).
 const KEEP: usize = 160;
+/// Tiles kept: a region's grid takes some 300, and a cluster of regions shares most of theirs.
+const KEEP_TILES: usize = 6000;
 /// Regions each thread keeps at hand, most recently asked first: a column's features ask the
 /// same one or its neighbours over and over, without taking the lock.
 const AT_HAND: usize = 8;
 
-static REGIONS: OnceLock<Mutex<Regions>> = OnceLock::new();
+static REGIONS: LazyLock<Mutex<Shared<Region>>> = LazyLock::new(|| Mutex::new(Shared::new()));
+static TILES: LazyLock<Mutex<Shared<Tile>>> = LazyLock::new(|| Mutex::new(Shared::new()));
 
 thread_local! {
     static AT: std::cell::RefCell<Vec<(Key, Arc<Region>)>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Tile (`ti`, `tj`) of the routing's nodes, sampled once for every region and thread.
+fn tile_at(f: &Fields, ti: i32, tj: i32) -> Arc<Tile> {
+    let key = (f.seed, ti, tj);
+    let slot = TILES.lock().unwrap_or_else(|e| e.into_inner()).slot(key, KEEP_TILES);
+    slot.get_or_init(|| Arc::new(Tile::build(f, ti, tj))).clone()
 }
 
 /// The region holding block (`bx`, `bz`), worked out once for every thread.
@@ -354,22 +421,7 @@ pub(super) fn region_at(f: &Fields, bx: i32, bz: i32) -> Arc<Region> {
     }) {
         return hit;
     }
-    let slot = {
-        let mut regions = REGIONS
-            .get_or_init(|| Mutex::new(Regions { map: HashMap::new(), clock: 0 }))
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
-        regions.clock += 1;
-        let now = regions.clock;
-        if regions.map.len() > KEEP {
-            let mut ages: Vec<u64> = regions.map.values().map(|v| v.1).collect();
-            let (_, &mut cut, _) = ages.select_nth_unstable(KEEP / 4);
-            regions.map.retain(|k, v| *k == key || v.1 > cut);
-        }
-        let e = regions.map.entry(key).or_insert_with(|| (Slot::default(), now));
-        e.1 = now;
-        e.0.clone()
-    };
+    let slot = REGIONS.lock().unwrap_or_else(|e| e.into_inner()).slot(key, KEEP);
     let region = slot
         .get_or_init(|| Arc::new(Region::build(f, key.1, key.2)))
         .clone();
