@@ -61,6 +61,11 @@ const OPT_MOON_SIZE: u32 = 18u;
 const OPT_GLOW: u32 = 19u;
 const OPT_BIOME_AIR: u32 = 20u;
 const OPT_SPARKLE: u32 = 21u;
+// The HDR world's picture (`base:look_curve`, `look_bloom`, `look_auto_exposure`), read raw: 0 is
+// Lottes's curve (1 Hejl's, 2 AgX), no bloom, a fixed exposure.
+const OPT_CURVE: u32 = 22u;
+const OPT_BLOOM: u32 = 23u;
+const OPT_AUTO_EXPOSURE: u32 = 24u;
 
 fn fantasy_opt(i: u32) -> f32 {
     return scene.options[i / 4u][i % 4u];
@@ -157,8 +162,14 @@ fn palette_made() -> Palette {
     let fill_hue = select(mix(vec3(0.85, 0.95, 1.2), vec3(1.0, 1.0, 1.0), -cool), mix(vec3(0.85, 0.95, 1.2), vec3(0.7, 0.92, 1.45), cool), cool >= 0.0);
     let day = key(vec3(0.137, 0.289, 0.612), vec3(0.378, 0.538, 0.797), vec3(1.0, 0.92, 0.78), sun_hue * 1.92 * look_opt(OPT_SUN, 1.0), fill_hue * 0.3 * look_opt(OPT_FILL, 1.0));
     // Golden hour is orange, not white: a warm horizon, an orange glow and sun.
-    let golden = key(vec3(0.11, 0.25, 0.78), vec3(0.92, 0.62, 0.42), vec3(1.0, 0.58, 0.26), vec3(1.55, 0.80, 0.38), vec3(0.22, 0.24, 0.38));
-    let sunset = key(vec3(0.08, 0.10, 0.38), vec3(1.05, 0.46, 0.34), vec3(1.0, 0.50, 0.26), vec3(1.50, 0.76, 0.38), vec3(0.27, 0.22, 0.36));
+    // Golder sunrises and sunsets with the sun just up (0-12°): horizons and glow toward gold-yellow,
+    // less red-violet (the Look session's Bliss checkpoint, 11-05: ours read pink-lavender at
+    // 05:00-07:00 where Bliss's are gold). The pinks and violets stay for the dusk, under the horizon.
+    // (Before: golden horizon 0.92 0.62 0.42, glow 1.0 0.58 0.26; sunset horizon 1.05 0.46 0.34,
+    // glow 1.0 0.50 0.26, ambient 0.27 0.22 0.36.)
+    // (A first pass, sunset horizon 1.05 0.58 0.30, hardly showed on the forest vista: PC shv_gold.)
+    let golden = key(vec3(0.11, 0.25, 0.78), vec3(1.0, 0.78, 0.38), vec3(1.0, 0.70, 0.24), vec3(1.55, 0.88, 0.36), vec3(0.26, 0.25, 0.30));
+    let sunset = key(vec3(0.08, 0.10, 0.38), vec3(1.08, 0.66, 0.26), vec3(1.0, 0.64, 0.20), vec3(1.50, 0.82, 0.34), vec3(0.30, 0.25, 0.27));
     let dusk = key(vec3(0.045, 0.05, 0.16), vec3(0.30, 0.15, 0.27), vec3(0.45, 0.20, 0.25), vec3(0.0, 0.0, 0.0), vec3(0.10, 0.09, 0.17));
     // Night is dark and blue, a little lighter than vanilla's, so lanterns carry the scene.
     // Night is dark and blue, so firelight's orange stands out against it. (A blue-teal shade, as
@@ -400,7 +411,9 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     let mu = dot(dir, scene.sun.xyz);
     let low = 1.0 - smoothstep(0.0, 0.2, abs(scene.sun.y));
     // Away from the sun the sunset sky goes rose and violet.
-    let away = (0.5 - 0.5 * mu) * (1.0 - h) * low;
+    // Most of it once the sun is down (the blue hour); with the sun up a little only (it tinted the
+    // whole sunrise sky lavender).
+    let away = (0.5 - 0.5 * mu) * (1.0 - h) * low * mix(0.35, 1.0, smoothstep(0.03, -0.05, scene.sun.y));
     c = mix(c, c * vec3(0.97, 0.80, 1.06) + vec3(0.03, 0.0, 0.03), away * 0.4);
     // Toward it, a warmer band low on the horizon.
     let toward = pow(max(mu, 0.0), 2.0) * pow(1.0 - h, 3.0) * low;
@@ -794,7 +807,12 @@ fn storm() -> f32 {
 fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
     let f = scene.weather.z;
     let s = storm();
-    let h = p.y - floor;
+    // The mist (not a storm's dust or snow) lies below a height of its own, `MIST_TOP` over the
+    // sea (`vitals::air`), as Bliss's does: rivers, lakes and valleys fill, and ridges and forests higher up stand
+    // out of it. Lying on whatever ground was under it, it blanketed the hills too, and from the
+    // forest vista 210 up the dawn mist was a pink-white sea from 04:00 to 08:00 (the Look
+    // session's checkpoint, 11-05; the same rule as its HDR path, 5124c25f).
+    let h = p.y - mix(min(floor, SEA_LEVEL + MIST_TOP), floor, s);
     // In a forest the morning mist rises into the crowns (a rainforest's lies on its canopy at
     // dawn, 25-35 blocks up).
     let low = exp(-max(h - 3.0, 0.0) / mix(7.0 + 12.0 * min(canopy(), 1.0), 40.0, s));
@@ -852,7 +870,11 @@ fn fog_light(dir: vec3<f32>) -> FogLight {
     // Dimmer too: thick mist lit at the sun's full strength toward it clipped to white, and white
     // shows no colour (the dawn check's 07:30 mist, luma p50 170, saturation 0.03).
     let warm = 1.0 - smoothstep(0.1, 0.65, scene.sun.y);
-    let sky_part = (p.ambient * 1.25 + p.horizon * 0.2) * mix(1.0, 0.5, warm);
+    // With the sun up and low, the sky's light in the mist goes gold too (sunlight scattered all
+    // round in it): lit by the sky's cool fill, a dawn mist read pale pink-white where Bliss's is
+    // gold (the Look session's checkpoint, 11-05). None before sunrise: the blue hour keeps its blue.
+    let sunlit_low = warm * smoothstep(-0.02, 0.06, scene.sun.y) * (1.0 - rain_amount());
+    let sky_part = mix(p.ambient * 1.25 + p.horizon * 0.2, vec3(luma(p.ambient * 1.25 + p.horizon * 0.2)) * vec3(1.25, 1.0, 0.62), sunlit_low * 0.7) * mix(1.0, 0.5, warm);
     let sun_part = p.sun * mix(vec3(1.0), MIST_GOLD * 0.65, warm) * light_strength() * phase;
     let k = 0.75 * tint * look_opt(OPT_FOG, 1.0);
     let leaf_part = p.sun * mix(vec3(1.0), MIST_GOLD, warm) * light_strength() * 0.06 * LEAF_LIGHT;
@@ -1028,7 +1050,9 @@ fn haze_veil(rel: vec3<f32>, dist: f32) -> vec3<f32> {
     // blue, about a fifth of the way to the sky's colour at 1000 blocks). Grey haze (Mie) comes
     // with the conditions: rain, the weather's fog, a forest's damp air, and a little always.
     let k = look_opt(OPT_HAZE, 1.6) * mix(0.45, 1.0, thin);
-    let rayleigh = vec3(0.35, 0.6, 1.0) * 2.6e-4 * k;
+    // A third thicker than it was (Far view, 11-05: Bliss's far land is about two thirds sky-blue
+    // at 2000 blocks, ours was under 0.6): far land reads as far, the near stays as clear.
+    let rayleigh = vec3(0.35, 0.6, 1.0) * 3.4e-4 * k;
     let mie = (0.4e-4 + 2.0e-4 * scene.weather.z + 0.8e-4 * min(canopy(), 1.0)) * k;
     let far = dist * smoothstep(90.0, 450.0, dist);
     // Rain's own mist starts at the eye (Ronald, 11-05: "when raining shouldn't it be more
@@ -1065,7 +1089,14 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // Straight down there is no level direction left: never a zero vector (its normalize is NaN,
     // and the Mac's fast math has no safety net).
     let air = vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z);
-    let color = sky_color(normalize(air));
+    let horizon = sky_color(normalize(air));
+    // Aerial perspective: the air's own blue, the sky's a little above the horizon (about 6°, a
+    // third of the way to the zenith's colour), not the horizon's pale band: veiled toward that, far
+    // land went milky white and lost its contrast, where Bliss's goes a deep sky blue (Far view, the
+    // Distant Horizons comparison, 11-05). It hands over to the horizon's colour where the terrain
+    // ends, so the last ridges still meet the sky without a line, standing a little bluer than it.
+    let blue = sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 0.1, dir.z)));
+    let color = mix(blue, horizon, smoothstep(end * 0.55, end, dist));
     let rain = rain_amount();
     // Thinner looking up at what is high, so hills stand out against a hazy valley (`haze_veil`).
     let veil = haze_veil(rel, dist);
@@ -1090,8 +1121,22 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // Far ridges still lose a little colour (as before, but only where the veil has begun), then
     // the veil per channel (its blue thicker than its red), then the handover at the end.
     // In rain everything takes a little grey-blue wash, near too.
-    let pale = mix(mix(c, vec3(luma(c)), clamp(veil.b * 0.6, 0.0, 0.3)), vec3(luma(c)) * vec3(0.92, 0.97, 1.05), rain * 0.08);
-    let seen = mix(pale, lit, veil);
+    // (Clear air takes less of its colour: a fifth of the veil, a tenth at most, as far biome colours
+    // under Bliss stay saturated, a snowfield white and a forest green; rain's grey as before.)
+    let grey = mix(clamp(veil.b * 0.2, 0.0, 0.1), clamp(veil.b * 0.6, 0.0, 0.3), max(rain, scene.weather.z));
+    let pale = mix(mix(c, vec3(luma(c)), grey), vec3(luma(c)) * vec3(0.92, 0.97, 1.05), rain * 0.08);
+    // Haze keeps the land's colour (Ronald, 11-05, on the glass slabs: "Haze keeps land colour"):
+    // in clear air the veil stops at four fifths, the land veils toward a tenth under the sky's
+    // brightness, and its hue and saturation take only seven tenths of the veil (its brightness all
+    // of it). Veiled all the way to the sky's own colour, pale bare rock 400-500 blocks off read as
+    // glass, the land behind seen through it. Rain and the weather's fog veil as before (the Shader
+    // session's), and the handover where the terrain ends is still the sky's.
+    let wet = clamp(max(rain, scene.weather.z), 0.0, 1.0);
+    let v = mix(min(veil, vec3(0.8)), veil, wet);
+    let toward = lit * mix(0.9, 1.0, wet);
+    let mixed = mix(pale, toward, v);
+    let own = mix(pale, toward, v * mix(0.7, 1.0, wet));
+    let seen = max(vec3(luma(mixed)) + own - vec3(luma(own)), vec3(0.0));
     return mix(seen, lit, edge) + held_in_fog(rel, sky);
 }
 
@@ -1189,6 +1234,35 @@ fn hejl(c: vec3<f32>, white: f32) -> vec3<f32> {
     return pow(max(f.rgb / f.w, vec3(0.0)), vec3(2.2));
 }
 
+// AgX, Troy Sobotka's display transform, in Benjamin Wrensch's minimal fit (MIT License,
+// Copyright (c) 2024 Missing Deadlines (Benjamin Wrensch), iolite-engine.com): the light into a
+// log space between -12.47 and +4.03 stops round mid-grey, through a polynomial S curve, back out of
+// its inset primaries. Brights roll off toward white in their own hue instead of clipping.
+fn agx_curve(x: vec3<f32>) -> vec3<f32> {
+    let x2 = x * x;
+    let x4 = x2 * x2;
+    return 15.5 * x4 * x2 - 40.14 * x4 * x + 31.96 * x4 - 6.868 * x2 * x + 0.4298 * x2 + 0.1191 * x - vec3(0.00232);
+}
+
+// Linear light in, display-linear out (as `lottes`), for the sRGB screen.
+fn agx(c: vec3<f32>) -> vec3<f32> {
+    let inset = mat3x3<f32>(
+        vec3(0.842479062253094, 0.0423282422610123, 0.0423756549057051),
+        vec3(0.0784335999999992, 0.878468636469772, 0.0784336),
+        vec3(0.0792237451477643, 0.0791661274605434, 0.879142973793104),
+    );
+    let outset = mat3x3<f32>(
+        vec3(1.19687900512017, -0.0528968517574562, -0.0529716355144438),
+        vec3(-0.0980208811401368, 1.15190312990417, -0.0980434501171241),
+        vec3(-0.0990297440797205, -0.0989611768448433, 1.15107367264116),
+    );
+    let min_ev = -12.47393;
+    let max_ev = 4.026069;
+    let v = clamp(log2(max(inset * c, vec3(1e-10))), vec3(min_ev), vec3(max_ev));
+    let shaped = agx_curve((v - min_ev) / (max_ev - min_ev));
+    return pow(clamp(outset * shaped, vec3(0.0), vec3(1.0)), vec3(2.2));
+}
+
 // How bright the picture is taken: the filmic curve deepens the mid-tones, so by day it is opened
 // up to keep them where they were, and more as night falls and under water, the eye adjusting.
 fn exposure() -> f32 {
@@ -1206,7 +1280,18 @@ fn exposure() -> f32 {
     return mix(day, 4.0, smoothstep(0.0, -0.2, scene.sun.y));
 }
 
+// What a surface writes: into the HDR world (`scene.frame.x`, the engine's `core:hdr_world`) its light
+// as it is, linear and past 1, which the screen effects work on and the effects' last pass then
+// finishes (`finish_picture`, in this pack's post.wgsl); into the screen, finished here as always.
 fn display(c: vec3<f32>) -> vec3<f32> {
+    if scene.frame.x > 0.5 {
+        return max(c, vec3(0.0));
+    }
+    return finish_picture(c);
+}
+
+// The picture finished: exposure, the tone curve and the grade, from linear light to the screen.
+fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     // By day Timothy Lottes's curve (his published formula, GDC 2016; Complementary's settings:
     // contrast 1.05, mid-grey 0.25 in and out, peak 8) at exposure 1.3: black stays black (no toe
     // lift, which raised the black point and halved saturation: Colour 4-7) and the darks keep their
@@ -1214,7 +1299,18 @@ fn display(c: vec3<f32>) -> vec3<f32> {
     // dark by design), blended as the sun comes up.
     let day = smoothstep(-0.05, 0.15, scene.sun.y) * select(1.0, 0.0, in_liquid());
     let night_t = hejl(max(c, vec3(0.0)) * exposure(), 3.0);
-    let day_t = min(lottes(max(c, vec3(0.0)) * 1.3 * look_opt(OPT_EXPOSURE, 1.0)), vec3(1.0));
+    var day_t = min(lottes(max(c, vec3(0.0)) * 1.3 * look_opt(OPT_EXPOSURE, 1.0)), vec3(1.0));
+    // Or Hejl's 2015 curve by day (`base:look_curve` 1, the HDR world's default: Ronald's pick of
+    // 11-05, "Hejl 2015", as in his Bliss settings): a real toe, so
+    // the shade goes deep and the mids keep their colour, a long shoulder to white at 3.5.
+    // Or AgX (`base:look_curve` 2): Blender's and Bliss's current default.
+    // Only in the HDR world: without it the look stays as made (Lottes's), whatever the setting.
+    let curve = select(0.0, fantasy_opt(OPT_CURVE), scene.frame.x > 0.5);
+    if curve > 1.5 {
+        day_t = agx(max(c, vec3(0.0)) * 0.55 * exposure() * look_opt(OPT_EXPOSURE, 1.0));
+    } else if curve > 0.5 {
+        day_t = hejl(max(c, vec3(0.0)) * exposure() * look_opt(OPT_EXPOSURE, 1.0), 3.5);
+    }
     var t = mix(night_t, day_t, day);
     // Only true darks go cool (most daylit ground is mid-tone and keeps its color).
     let lights = smoothstep(0.02, 0.22, luma(t));

@@ -20,12 +20,17 @@ pub static NIGHT_LIGHT: Config<f32> = Config::named("night_light");
 pub static NIGHT_MOON: Config<f32> = Config::named("night_moon");
 pub static LOOK_CANOPY: Config<f32> = Config::named("look_canopy");
 pub static LOOK_SHAFTS: Config<f32> = Config::named("look_shafts");
+/// The HDR world's picture (`core:hdr_world`): the tone curve by day (0 Lottes's, 1 Hejl's 2015, as
+/// Ronald's Bliss settings, 2 AgX), how strong the bloom is, and how much the exposure follows the view.
+pub static LOOK_CURVE: Config<f32> = Config::named("look_curve");
+pub static LOOK_BLOOM: Config<f32> = Config::named("look_bloom");
+pub static LOOK_AUTO_EXPOSURE: Config<f32> = Config::named("look_auto_exposure");
 
 /// The pack's `options` line: the settings in the order `look.wgsl` reads them.
 pub const OPTIONS: &str = "base:look_exposure, base:look_sun, base:look_sun_warmth, base:look_fill, base:look_fill_cool, \
 base:look_contrast, base:look_saturation, base:look_shade, base:look_haze, base:look_fog, base:night_light, base:night_moon, \
 base:look_canopy, base:look_shafts, core:view_distance, base:look_storybook, base:fx_night_sky, base:fx_shooting_stars, \
-base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle";
+base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle, base:look_curve, base:look_bloom, base:look_auto_exposure";
 
 pub fn register(r: &mut Registry) {
     // By day: how bright the picture is taken, the sun's strength and warmth (-1 whiter, +1 toward
@@ -51,4 +56,10 @@ pub fn register(r: &mut Registry) {
     // shafts through the crown gaps are.
     r.config(&LOOK_CANOPY).float(1.0, 0.2, 2.0);
     r.config(&LOOK_SHAFTS).float(1.0, 0.2, 3.0);
+    // The HDR world's picture: 0 Lottes's curve (the look as made), 1 Hejl's (the default, Ronald's
+    // pick of 11-05: "Hejl 2015"), 2 AgX; bloom 0 none to 3;
+    // the exposure following the view, 0 fixed to 2.
+    r.config(&LOOK_CURVE).float(1.0, 0.0, 2.0);
+    r.config(&LOOK_BLOOM).float(1.0, 0.0, 3.0);
+    r.config(&LOOK_AUTO_EXPOSURE).float(1.0, 0.0, 2.0);
 }
