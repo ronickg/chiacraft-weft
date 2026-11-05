@@ -62,6 +62,7 @@ Gain per effort, all platforms. "Mac", "PC" and "weak" mean the M3 Max, the RTX 
 - `fix/barrier-masks` (render #5, b2d9b08c): image barriers on the stages their layouts use, and the acquire at colour output. 0.612 → 0.579 ms (−5.4 %), GPU 0.574 → 0.540. Sync validation: no hazards seen. `WEFT_ALL_BARRIERS=1` compares.
 - Together: 0.684 → 0.579 ms, −15 %. The Mac gains are to measure, with both in its next build.
 - The `dist` profile: far tiles' heights −17 %, mesh −10 %.
+- `fix/surface-once` (#5): far-tile mesh 1.43 → 0.46 ms (−68 %), tile rate +20 %, first tiles asked→made 1217 → 603 ms; far shots the same.
 
 ## What the update split showed on the Mac (Tester, 179 s run, dev 9ae94af9)
 
