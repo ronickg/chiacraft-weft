@@ -140,8 +140,10 @@ fn blend(a: Palette, b: Palette, t: f32) -> Palette {
 fn palette() -> Palette {
     var p = palette_read();
     // The sky's light test (`base:look_sky_light`): its light in the shade scaled, the sun's kept.
+    // In the HDR world 0.6 of it as made (the gap sheets: our shade never went dark against
+    // Bliss's; agreed with Shader, 11-05, so today's approved look keeps its keys).
     let k = fantasy_opt(OPT_SKY_LIGHT);
-    p.ambient *= select(1.0, k, k > 0.0);
+    p.ambient *= select(1.0, k, k > 0.0) * select(1.0, 0.6, scene.frame.x > 0.5);
     return p;
 }
 
@@ -1495,7 +1497,10 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     t = mix(vec3(dim), t, keep);
     // By day 1.2 of saturation after the curve (Colour 9; 1.07, Complementary's, read pale here).
     let y = luma(t);
-    t = max(mix(vec3(y), t, mix(1.0, 1.2 * look_opt(OPT_SATURATION, 1.0), day)), vec3(0.0));
+    // In the HDR world 0.8 of it (its curve keeps more colour; at 1.2 the noon land measured 131
+    // of saturation against Bliss's 75: the gap sheets, 11-05).
+    let sat = 1.2 * look_opt(OPT_SATURATION, 1.0) * select(1.0, 0.8, scene.frame.x > 0.5);
+    t = max(mix(vec3(y), t, mix(1.0, sat, day)), vec3(0.0));
     // A cool floor so the night is never pure black; by day black stays black.
     t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034) * (1.0 - day);
     // A storybook night (`base:look_storybook`): dim colours slide toward a blue-grey, as the eye's

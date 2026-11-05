@@ -29,7 +29,8 @@ pub static LOOK_AUTO_EXPOSURE: Config<f32> = Config::named("look_auto_exposure")
 /// darker and less yellow (0 as made to 1: 30% darker). Tests, not looks: as made by default.
 pub static LOOK_SKY_LIGHT: Config<f32> = Config::named("look_sky_light");
 pub static LOOK_FOLIAGE_TEST: Config<f32> = Config::named("look_foliage_test");
-/// The HDR world's white balance by day: 0 neutral (as made), + warmer and less blue.
+/// The HDR world's white balance by day: 0 neutral, + warmer and less blue (1.6 by default: the gap
+/// sheets, our land bluer than Bliss's at every hour).
 pub static LOOK_WHITE: Config<f32> = Config::named("look_white");
 
 /// The pack's `options` line: the settings in the order `look.wgsl` reads them.
@@ -70,5 +71,5 @@ pub fn register(r: &mut Registry) {
     r.config(&LOOK_AUTO_EXPOSURE).float(1.0, 0.0, 2.0);
     r.config(&LOOK_SKY_LIGHT).float(1.0, 0.2, 1.5);
     r.config(&LOOK_FOLIAGE_TEST).float(0.0, 0.0, 1.0);
-    r.config(&LOOK_WHITE).float(0.0, -1.0, 2.0);
+    r.config(&LOOK_WHITE).float(1.6, -1.0, 2.5);
 }
