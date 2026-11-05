@@ -66,6 +66,28 @@ pub const BURST: f64 = 9.0;
 pub const STALK: f32 = 0.45;
 pub const BURST_TICKS: u64 = 200;
 
+/// Personality (`coats::personality`: temperament, curiosity, fierceness, each 0..1, 0.5 middling).
+/// A fierce hunter starts hunting up to `FIERCE_HUNGER` sooner (of its food) and keeps at a chase
+/// up to `FIERCE_CHASE` times as long (a timid one that much less); a fierce plant eater stands its
+/// ground from `FIERCE_STAND` of `STANDS_KG`; a skittish one notices hunters up to `SKITTISH`
+/// times as fast (a calm one that much slower).
+pub const FIERCE_HUNGER: f32 = 0.15;
+pub const FIERCE_CHASE: f32 = 0.5;
+pub const FIERCE_STAND: f32 = 0.6;
+pub const SKITTISH: f32 = 0.4;
+/// A curious one (curiosity past `CURIOUS`) comes to look at a player standing within `LOOKS_FROM`
+/// times its shy distance, to `COMES_TO` of it, while it is calm; what that scores in the needs
+/// band, at full curiosity.
+pub const CURIOUS: f32 = 0.6;
+pub const LOOKS_FROM: f32 = 1.5;
+pub const COMES_TO: f32 = 0.5;
+pub const INVESTIGATE: f32 = 0.4;
+
+/// `v` (0..1, 0.5 middling) as -1..1.
+pub fn lean(v: f32) -> f32 {
+    (v - 0.5) * 2.0
+}
+
 pub fn ambushes(family: &str) -> bool {
     AMBUSHERS.contains(&family)
 }

@@ -93,6 +93,7 @@ pub fn register(r: &mut Registry, kinds: &[&'static EntityKind], body: &'static 
                                 Stops { goal: move |w: &World, id: u64, st: &EntityState| settle(w, id, st, look), stop: wake },
                             )
                             .with(Need::Watch, crate::senses::watch_goal)
+                            .with(Need::Investigate, crate::senses::investigate)
                             .with(Need::Comfort, crate::comfort::seek)
                             .with(Need::Drink, crate::drink::drink)
                             .with(Need::Eat, crate::forage::eat)

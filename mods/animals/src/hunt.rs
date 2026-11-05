@@ -152,7 +152,10 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
     let Some(s) = a.species().filter(|s| s.hunts()) else { return false };
     let Some(mut h) = w.component(id, &HUNT) else { return false };
     let full = a.food as f32 / a.stat(species::FOOD).max(1.0);
-    if animal::tamed(w, id) || full >= FULL || (h[0] == 0 && full >= HUNGRY) {
+    // A fierce one hunts sooner (`roles::FIERCE_HUNGER`), a timid one later.
+    let fierce = crate::senses::facts(w, id).map_or(0.0, |f| animals_core::roles::lean(f.persona()[2]));
+    let hungry = (HUNGRY + animals_core::roles::FIERCE_HUNGER * fierce).min(FULL - 0.05);
+    if animal::tamed(w, id) || full >= FULL || (h[0] == 0 && full >= hungry) {
         if h[0] != 0 {
             w.component_mut(id, &HUNT).map(|h| *h = [0; 4]);
         }
@@ -167,7 +170,9 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
         // A pack runs its prey down: they take turns at the front, faster than one alone could
         // keep up, and keep at it twice as long (a wolf pack's chase of an elk lasts minutes).
         let pack = h[3] == 1;
-        if alive && now < h[1] + if pack { 2 * GIVE_UP } else { GIVE_UP } {
+        // A fierce one keeps at it longer (`roles::FIERCE_CHASE`).
+        let give_up = ((if pack { 2 * GIVE_UP } else { GIVE_UP }) as f32 * (1.0 + animals_core::roles::FIERCE_CHASE * fierce)) as u64;
+        if alive && now < h[1] + give_up {
             if knockout {
                 // Its anger does the chasing; kept up while the chase lasts.
                 if w.component(id, &crate::knockout::KNOCKOUT)
@@ -354,7 +359,9 @@ fn stands_ground(w: &World, id: u64, st: &EntityState, threat: u64) -> bool {
         return false;
     }
     let Some(t) = w.entity(threat) else { return false };
-    let big_alone = me.mass >= roles::STANDS_KG && {
+    // A fierce one stands from a smaller size (`roles::FIERCE_STAND`).
+    let stands_kg = roles::STANDS_KG * (1.0 - (1.0 - roles::FIERCE_STAND) * roles::lean(me.persona()[2]).max(0.0));
+    let big_alone = me.mass >= stands_kg && {
         // Lone: no other of its kind near it.
         w.targets_near(t.pos, roles::LONE, None)
             .into_iter()

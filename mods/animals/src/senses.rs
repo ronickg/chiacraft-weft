@@ -34,6 +34,8 @@ value! {
         pub egg: u8,
         /// Whether it is still growing (a pack's hunters pick the young, `roles::prey_score`).
         pub young: u8,
+        /// Its personality (`coats::personality`: temperament, curiosity, fierceness), 0..255.
+        pub persona: [u8; 3],
         /// Its mass now, kg (by its genes and growth, `hunt::mass`).
         pub mass: f32,
         /// When it was worked out (0: not yet).
@@ -42,6 +44,10 @@ value! {
 }
 
 impl Facts {
+    /// Temperament (calm 0 to skittish 1), curiosity and fierceness.
+    pub fn persona(&self) -> [f32; 3] {
+        self.persona.map(|v| v as f32 / 255.0)
+    }
     pub fn species(&self) -> Option<&'static Species> {
         SPECIES.get((self.species as usize).checked_sub(1)?)
     }
@@ -166,6 +172,9 @@ pub fn refresh(w: &World, id: u64, index: usize, kind: u32) {
         tamed: crate::animal::tamed(w, id) as u8,
         egg: 0,
         young: crate::breeding::young(w, id) as u8,
+        persona: w
+            .component(id, &crate::coats::GENOME)
+            .map_or([128; 3], |g| animals_core::coats::personality(&g).map(|v| (v * 255.0) as u8)),
         mass: crate::hunt::mass(w, id).unwrap_or(SPECIES[index].bio.mass),
         at: now.max(1),
     };
@@ -191,7 +200,7 @@ pub fn facts(w: &World, id: u64) -> Option<Facts> {
     let mass = crate::hunt::mass(w, id)?;
     let tamed = crate::animal::tamed(w, id) || crate::hunt::owned_egg(w, id);
     let young = crate::breeding::young(w, id) as u8;
-    Some(Facts { kind: e.kind, species, tamed: tamed as u8, egg: egg.is_some() as u8, young, mass, at: 0 })
+    Some(Facts { kind: e.kind, species, tamed: tamed as u8, egg: egg.is_some() as u8, young, persona: [128; 3], mass, at: 0 })
 }
 
 /// What it saw at its last look round, looking again first when that was `EVERY` ticks ago (on
@@ -345,6 +354,8 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
     let field = if mine.hunts() { perception::HUNTER_FIELD } else { perception::PREY_FIELD };
     // A herd's sentinel notices sooner and farther (`roles::SENTINEL`).
     let eyes = if out.sentinel != 0 { roles::SENTINEL } else { 1.0 };
+    // A skittish one notices sooner, a calm one later.
+    let eyes = eyes * (1.0 + roles::SKITTISH * roles::lean(me.persona()[0]));
     let (mut kin, mut mid) = (1u16, [p.x, p.y, p.z]);
     let mut prey: Vec<(u64, f32, f64)> = Vec::new();
     // The hunters it senses, best first after the loop.
@@ -675,6 +686,61 @@ pub fn watch_goal(w: &World, id: u64, st: &EntityState) -> bool {
     if (w.game_time() + id).is_multiple_of(40) {
         let turn = (w.random_below(240) as f32 - 120.0).to_radians();
         w.entity_edit(id).yaw(st.yaw + turn);
+    }
+    true
+}
+
+/// A goal in the needs band (`Need::Investigate`): a curious one (`roles::CURIOUS`) that is calm
+/// comes to look at a player standing still within `LOOKS_FROM` times its shy distance, to
+/// `COMES_TO` of it (nearer the more curious), and stands looking at him; it takes the turn while
+/// it does. Once he moves, its senses take over (`taming::behave`).
+pub fn investigate(w: &World, id: u64, st: &EntityState) -> bool {
+    use crate::choose::Need;
+    let now = w.game_time();
+    let at_it = crate::choose::doing(w, id) == Need::Investigate as u8;
+    if !(now + id).is_multiple_of(20) {
+        return at_it;
+    }
+    let Some(me) = w
+        .component(id, &FACTS)
+        .filter(|f| f.at != 0 && f.tamed == 0)
+    else {
+        return false;
+    };
+    let Some(mine) = me.species() else { return false };
+    let [_, curious, _] = me.persona();
+    if curious < roles::CURIOUS
+        || mine.shy <= 0.0
+        || w.component(id, &SENSES)
+            .is_some_and(|s| s.fright >= perception::STARE)
+    {
+        return false;
+    }
+    let shy = mine.shy * crate::taming::shyness(w, id);
+    let facing = weft_sdk::yaw_dir(st.yaw);
+    let field = if mine.hunts() { perception::HUNTER_FIELD } else { perception::PREY_FIELD };
+    let near = w
+        .players_iter()
+        .filter(|&q| w.game_mode(q) != weft_sdk::abi::game_mode::SPECTATOR)
+        .filter_map(|q| Some((q, w.entity(q)?)))
+        .filter(|(_, e)| e.moved <= MOVING)
+        .map(|(q, e)| (q, dist2(e.pos, st.pos).sqrt() as f32, e))
+        .filter(|(_, d, e)| {
+            *d <= shy * roles::LOOKS_FROM
+                && perception::in_view(facing, [(e.pos.x - st.pos.x) as f32, (e.pos.z - st.pos.z) as f32], field)
+                && clear(w, st.eye(), e.eye())
+        })
+        .min_by(|a, b| a.1.total_cmp(&b.1));
+    let Some((q, d, e)) = near else { return false };
+    let to = shy * roles::COMES_TO * (1.5 - curious);
+    if d > to + 1.0 {
+        if !at_it {
+            weft_sdk::info!("{} {id} comes to look at player {q} ({d:.1} blocks off, curiosity {curious:.2})", mine.name);
+        }
+        let k = ((d - to) / d) as f64;
+        w.navigate(id, [st.pos.x + (e.pos.x - st.pos.x) * k, e.pos.y, st.pos.z + (e.pos.z - st.pos.z) * k], 0.6);
+    } else {
+        stare(w, id, st, [e.pos.x as f32, e.pos.y as f32, e.pos.z as f32]);
     }
     true
 }

@@ -184,7 +184,7 @@ pub fn init(r: &mut Registry) {
                         let s = w.component(id, &crate::senses::SENSES)?;
                         let kind = name_of(abi::entry_kind::ENTITY, w.entity(id)?.kind);
                         Some(format!(
-                            "{id} {kind} at {:.1}: player {} fright {:.2}, hunter {} aware {:.2}, kin {}{}, wind {:.0} {:.1} m/s",
+                            "{id} {kind} at {:.1}: player {} fright {:.2}, hunter {} aware {:.2}, kin {}{}, wind {:.0} {:.1} m/s, persona {}",
                             d2.sqrt(),
                             s.player,
                             s.fright,
@@ -193,7 +193,10 @@ pub fn init(r: &mut Registry) {
                             s.kin,
                             if s.sentinel != 0 { " sentinel" } else { "" },
                             s.heading,
-                            s.wind
+                            s.wind,
+                            w.component(id, &crate::senses::FACTS)
+                                .map(|f| f.persona().map(|v| format!("{v:.2}")).join("/"))
+                                .unwrap_or_default()
                         ))
                     })
                     .collect();

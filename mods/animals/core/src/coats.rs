@@ -56,8 +56,9 @@ pub const NONE: u8 = 255;
 pub const OWN: usize = 16;
 /// Every slot: a species' own and the core.
 pub const SLOTS: usize = 33;
-/// The genome's layout now: 1 the core traits, 2 temperament.
-pub const VERSION: u8 = 2;
+/// The genome's layout now: 1 the core traits, 2 temperament, 3 curiosity and fierceness (two own
+/// loci at the end of every gene file: an older genome has them empty, and `upgrade` draws them).
+pub const VERSION: u8 = 3;
 
 /// Scar kinds (`Genome::scars`): three raked lines of claws, a ring of tooth marks, a blade's
 /// long line, a burn, torn wing skin.
@@ -1801,13 +1802,25 @@ pub fn genes_of(genome: &Genome) -> Vec<GeneLine> {
 /// Its temperament as it shows (`Tp`), 0 calm to 1 skittish: how near a walker may come before it
 /// runs (`taming.rs`). 0.5 for a genome without one.
 pub fn temperament(genome: &Genome) -> f32 {
+    trait_of(genome, "Tp")
+}
+
+/// Its personality as it shows, each 0..1 (0.5 for a genome without the trait yet): temperament
+/// (`Tp`, calm to skittish), curiosity (`Cu`, aloof to curious) and fierceness (`Fi`, timid to
+/// fierce), all heritable in part. The mod's senses, needs and hunting weigh them
+/// (`mods/animals/src/senses.rs`).
+pub fn personality(genome: &Genome) -> [f32; 3] {
+    ["Tp", "Cu", "Fi"].map(|id| trait_of(genome, id))
+}
+
+fn trait_of(genome: &Genome, id: &str) -> f32 {
     let Some(s) = (genome.species as usize)
         .checked_sub(1)
         .and_then(|i| SPECIES.get(i))
     else {
         return 0.5;
     };
-    gene_file(s.name).map_or(0.5, |g| Read { g, genome }.qv("Tp"))
+    gene_file(s.name).map_or(0.5, |g| Read { g, genome }.qv(id))
 }
 
 /// Its size genes (`Sz`), 0..1: small to big for its kind (what it passes on).

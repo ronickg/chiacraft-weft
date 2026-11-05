@@ -36,10 +36,17 @@ pub enum Need {
     Wander,
     /// A herd's sentinel standing watch (`senses::watch_goal`).
     Watch,
+    /// A curious one coming to look at a player standing still (`senses::investigate`).
+    Investigate,
 }
 
 /// The need whose goal took the turn last tick (0: none; not saved).
 static DOING: Component<u8> = Component::named("animal_doing");
+
+/// What `id` did last tick of its needs (`Need as u8`, 0: none).
+pub fn doing(w: &World, id: u64) -> u8 {
+    w.component(id, &DOING).unwrap_or(0)
+}
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&DOING, 0u8, 0);
@@ -65,8 +72,8 @@ impl Band {
 }
 
 /// How pressing each need is for `id` now, by need (index `Need as usize`).
-fn scores(w: &World, id: u64, doing: u8) -> [f32; 9] {
-    let mut s = [0.0f32; 9];
+fn scores(w: &World, id: u64, doing: u8) -> [f32; 10] {
+    let mut s = [0.0f32; 10];
     let at = |n: Need| doing == n as u8;
     if let Some(a) = w.component(id, &ANIMAL) {
         let fed = a.food as f32 / a.stat(crate::species::FOOD).max(1.0);
@@ -85,6 +92,7 @@ fn scores(w: &World, id: u64, doing: u8) -> [f32; 9] {
     s[Need::Rest as usize] = REST;
     s[Need::Wander as usize] = WANDER;
     s[Need::Watch as usize] = animals_core::roles::WATCH;
+    s[Need::Investigate as usize] = animals_core::roles::INVESTIGATE;
     // Staying put outranks what would move it, and nothing else.
     s[Need::Hold as usize] = s[Need::Comfort as usize]
         .max(s[Need::Drink as usize])
@@ -101,7 +109,7 @@ impl Goal for Band {
         let doing = w.component(id, &DOING).unwrap_or(0);
         let s = scores(w, id, doing);
         // Most pressing first; a tie keeps the list's order.
-        let mut order: [usize; 9] = std::array::from_fn(|i| i);
+        let mut order: [usize; 10] = std::array::from_fn(|i| i);
         let order = &mut order[..self.goals.len()];
         order.sort_by(|&a, &b| s[self.goals[b].0 as usize].total_cmp(&s[self.goals[a].0 as usize]));
         let mut took = 0u8;
