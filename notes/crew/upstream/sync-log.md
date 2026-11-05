@@ -14,3 +14,8 @@ Merge e9c8405c on sync/weft-26.11.2. Things the merge dropped or left for an own
 - Upstream bug (a PR candidate for Ronald): client/particles.rs spawn indexed c.states with world.block() of a cell whose cube hadn't arrived (u32::MAX): a panic right after a teleport (SYNC4, world::crater). Fixed in the sync with .get().
 - Upstream bug (a PR candidate): first person cut only bone roles (draw_own_hand, the body in view), not bone_mask: worn layers drawn by bone name kept every bone, so a shirt's torso and sleeves drew at the camera. Fixed in the sync (bones_with, Animals).
 - Upstream candidate: a steered flying mount's flight counted as a fall on the server (mount_moved's track_fall didn't know it flew); MountMove now carries flies.
+
+## Test fails that are not the sync (SYNC8, Tester)
+
+- distant_terrain_from_above: 618 tiles shown, 198 still pending at y 1024 after 20 s: slow, not missing. Distant terrain's priority work; the test's 20 s limit may need raising after it.
+- inventory_crafting (planks from one log in the hand grid) and crafting_table_tags (two planks in a column give sticks): both fail on dev b5815f09 too. Our first hours give planks through the book, not the hand grid; First hours and Plants to say what the grid should give, then Tester rewrites the tests.
