@@ -194,8 +194,12 @@ Every name with its build, meaning and how to say it. For names from Old roots, 
 
 | name | what | build | means | tongue | say | ru | Soft · Frost · Worn | notes |
 |---|---|---|---|---|---|---|---|---|
+| **Aruduk** | a stone for the web's sockets: works on the small nodes around it | aru + duk | flow-stone | Old Eskenai | A-ru-duk | Арудук | Aluduga · Aruduk · Ardok | English: Flow-Stone |
+| **Emakaun** | a unique relic for the web's sockets: health for the nodes around it | ema + kaun | life-keeper | Old Eskenai | E-ma-kaun | Эмакаун | Emagaun · Emakon · Emkaun | English: the Life-Keeper |
 | **Kepesk** | a meteorite heart; traders say Kepesh | kep + esk | fall-star | Old Eskenai | KE-pesk | Кепеск | Kebeska · Chepesk · Kepesh |  |
+| **Maunduk** | a stone for the web's sockets: rolled boosts to families | maun + duk | mind-stone | Old Eskenai | MAUN-duk | Маундук | Maunduga · Monduk · Maundok | English: Mind-Stone |
 | **Maunsen** | a tablet that teaches runes | maun + sen | mind-rune | Old Eskenai | MAUN-sen | Маунсен | Maunsen · Monsen · Maunsen | English: Mind-Rune |
+| **Remaru** | a unique relic for the web's sockets: ley sight | rem + aru | flow-watcher | Old Eskenai | RE-ma-ru | Ремару | Remalu · Remar · Remro | English: the Flow-Watcher |
 
 ### rune
 

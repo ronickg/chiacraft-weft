@@ -311,6 +311,16 @@ fn waystones(g: &mut Gen) {
     }
 }
 
+/// A ley node's heart opened: what waking a sleeping waystone does (`notes/PROGRESSION.md`, "From
+/// the survival research": waystones, ancient ley nodes you wake), not built yet. Waking calls this
+/// with the age it happens in; the perk web's socket stone may drop at the stone
+/// (`StoneSource::LeyNode`: a quarter of the time, depth 5). True when one dropped.
+#[allow(dead_code)]
+pub(crate) fn heart_opened(w: &World, node: &Node, tier: u8, top: i32) -> bool {
+    let at = [node.x as f64 + 0.5, top as f64 + 1.2, node.z as f64 + 0.5];
+    base_api::skills::drop_stone(w, base_api::skills::StoneSource::LeyNode, tier, at)
+}
+
 // ------------------------------------------------------------------ the rod and the lines, client
 
 /// What the client keeps between frames.
