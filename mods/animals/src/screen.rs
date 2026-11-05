@@ -44,7 +44,7 @@ pub fn init(r: &mut Registry) {
     r.menu(&FAMILY_MENU).screen(family_screen);
     r.packet(&PAGE, |p, [id, page]| {
         let (w, player) = (p.world(), p.player());
-        if !animal::ensure_rolled(&w, id) || !(crate::commands::can_command(&w, id, player) || w.creative(player)) {
+        if !animal::ensure_rolled(&w, id) || !(crate::commands::can_command(&w, id, player) || w.outside_survival(player)) {
             return;
         }
         let menu = [&ANIMAL_MENU, &GENES_MENU, &FAMILY_MENU][(page as usize).min(2)];
@@ -69,7 +69,7 @@ pub fn open(w: &World, player: u64, id: u64) -> bool {
     if w.component(id, &ANIMAL).is_none() || !animal::ensure_rolled(w, id) {
         return false;
     }
-    let full = crate::commands::can_command(w, id, player) || w.creative(player);
+    let full = crate::commands::can_command(w, id, player) || w.outside_survival(player);
     let spyglass = w.inventory(player).get(w.selected_slot(player)).item == SPYGLASS.id();
     w.open_menu(
         player,
@@ -92,7 +92,7 @@ pub fn interact(w: &World, id: u64, player: u64) -> bool {
     let sneaking = w
         .entity(player)
         .is_some_and(|p| p.pose == abi::pose::CROUCH);
-    if held == SPYGLASS.id() || (sneaking && (crate::commands::can_command(w, id, player) || w.creative(player))) {
+    if held == SPYGLASS.id() || (sneaking && (crate::commands::can_command(w, id, player) || w.outside_survival(player))) {
         return open(w, player, id);
     }
     false
@@ -107,22 +107,22 @@ pub fn looked_at(w: &World, player: u64, range: f64) -> Option<u64> {
 /// the way.
 pub fn looked_at_any(w: &World, player: u64, range: f64, pick: impl Fn(u64) -> bool) -> Option<u64> {
     let st = w.entity(player)?;
-    let eye = [st.pos[0], st.pos[1] + st.size[2] as f64, st.pos[2]];
+    let eye = [st.pos.x, st.pos.y + st.size.eye as f64, st.pos.z];
     let (sy, cy) = (st.yaw as f64).sin_cos();
     let (sp, cp) = (st.pitch as f64).sin_cos();
     let dir = [-sy * cp, sp, -cy * cp];
-    let wall = w.look_at(player, range, false).map_or(range, |hit| {
-        let c = hit.pos.map(|v| v as f64 + 0.5);
+    let wall = w.target_block(player, range, false).map_or(range, |hit| {
+        let c = hit.pos.to_array().map(|v| v as f64 + 0.5);
         ((c[0] - eye[0]).powi(2) + (c[1] - eye[1]).powi(2) + (c[2] - eye[2]).powi(2)).sqrt()
     });
-    w.near(eye, range, None)
+    w.entities_near(eye, range, None)
         .into_iter()
         .filter(|&id| id != player && pick(id))
         .filter_map(|id| {
             let e = w.entity(id)?;
-            let (hw, h) = (e.size[0] as f64 / 2.0 + 0.1, e.size[1] as f64 + 0.1);
-            let lo = [e.pos[0] - hw, e.pos[1] - 0.1, e.pos[2] - hw];
-            let hi = [e.pos[0] + hw, e.pos[1] + h, e.pos[2] + hw];
+            let (hw, h) = (e.size.width as f64 / 2.0 + 0.1, e.size.height as f64 + 0.1);
+            let lo = [e.pos.x - hw, e.pos.y - 0.1, e.pos.z - hw];
+            let hi = [e.pos.x + hw, e.pos.y + h, e.pos.z + hw];
             Some((id, ray_box(eye, dir, lo, hi)?))
         })
         .filter(|&(_, t)| t <= wall)
@@ -504,7 +504,7 @@ fn window_page(ui: &mut Ui, page: usize, s: S, body: impl FnOnce(&mut Ui)) {
 fn framed(ui: &mut Ui, page: Option<usize>, s: S, body: impl FnOnce(&mut Ui)) {
     // The tabs stand on the frame: the column's gap tucks their bottom 3 UI px under its top
     // line, an even 12 rows of face round a label's capitals (kit 2, as in base's window.rs).
-    ui.column(S::col().stretch().gap(-1.5), |ui| {
+    ui.column(S::column().stretch().gap(-1.5), |ui| {
         ui.row(S::row().gap(2.0), |ui| {
             ui.row(S::row().w(6.0), |_| {});
             let Some(page) = page else {
@@ -539,7 +539,7 @@ fn framed_close(ui: &mut Ui) {
             .size(7.0, 7.0)
             .pad(0.5)
             .tooltip("window.base.close_tip"),
-        |c| c.client().close_screen(),
+        |c| c.client().screen_close(),
     );
     ui.row(S::row().w(4.0), |_| {});
 }
@@ -630,7 +630,7 @@ const STAT_ROW_W: f32 =
 fn animal_screen(ui: &mut Ui) {
     window_page(ui, 0, S::row().pad(OVERVIEW_PAD).gap(OVERVIEW_GAP), |ui| {
         // Left: the level on a badge, the name, life, how it feels, and the facts.
-        ui.column(S::col().gap(3.0).w(LEFT_W), |ui| {
+        ui.column(S::column().gap(3.0).w(LEFT_W), |ui| {
             // The animal itself, turning with the mouse, its level on a badge in the corner.
             ui.panel("portrait", S::row().size(LEFT_W, 70.0), |ui| {
                 ui.entity_model(LEFT_W - 2.0, 68.0);
@@ -642,7 +642,7 @@ fn animal_screen(ui: &mut Ui) {
                 });
             });
             ui.row(S::row().gap(4.0).center(), |ui| {
-                ui.column(S::col().gap(1.0), |ui| {
+                ui.column(S::column().gap(1.0), |ui| {
                     title(ui, false);
                     ui.text_bind_styled(S::default().class("dim").no_wrap(), |c, t| {
                         let Some(a) = c.menu_component(&ANIMAL) else { return };
@@ -653,7 +653,7 @@ fn animal_screen(ui: &mut Ui) {
             });
             // Its coat, what its kind does and its temperament, as chips, one under another (a row
             // can't wrap, and "Hunts in packs" alone nearly fills the column).
-            ui.column(S::col().gap(2.0).max_w(LEFT_W), |ui| {
+            ui.column(S::column().gap(2.0).max_w(LEFT_W), |ui| {
                 ui.panel("chip", S::row().pad(2.0), |ui| {
                     ui.text_bind_styled(S::default().max_w(LEFT_W - 14.0), |c, t| {
                         let Some(look) = c
@@ -761,7 +761,7 @@ fn animal_screen(ui: &mut Ui) {
             });
         });
         // Middle: the nine stats as bars, coloured by their wild points, with the points.
-        ui.column(S::col().gap(2.0), |ui| {
+        ui.column(S::column().gap(2.0), |ui| {
             ui.row(S::row().gap(4.0).center(), |ui| {
                 ui.text_styled(S::default().class("title").no_wrap(), "screen.animals.stats", &[]);
                 ui.panel("chip_points", S::row().pad(2.0), |ui| {
@@ -893,7 +893,7 @@ fn animal_screen(ui: &mut Ui) {
             ui.text_styled(S::default().class("dim").max_w(STAT_ROW_W), "screen.animals.quality_legend", &[]);
         });
         // Right: its coat and what its kind does, then its orders.
-        ui.column(S::col().gap(3.0).w(100.0), |ui| {
+        ui.column(S::column().gap(3.0).w(100.0), |ui| {
             ui.text_styled(S::default().class("title").no_wrap(), "screen.animals.orders_title", &[]);
             ui.text_bind_styled(S::default().max_w(100.0), |c, t| {
                 let (Some(a), Some(o)) = (c.menu_component(&ANIMAL), c.menu_component(&ORDERS)) else { return };
@@ -945,9 +945,9 @@ fn animal_screen(ui: &mut Ui) {
 
 /// The Genes page: its coat and kind as chips, every gene on a line of its own, then its kind.
 fn genes_screen(ui: &mut Ui) {
-    window_page(ui, 1, S::col().pad(8.0).gap(4.0).w(230.0), |ui| {
+    window_page(ui, 1, S::column().pad(8.0).gap(4.0).w(230.0), |ui| {
         ui.text_styled(S::default().class("title").no_wrap(), "screen.animals.coat_title", &[]);
-        ui.column(S::col().gap(2.0).max_w(214.0), |ui| {
+        ui.column(S::column().gap(2.0).max_w(214.0), |ui| {
             ui.panel("chip", S::row().pad(2.0), |ui| {
                 ui.text_bind_styled(S::default().max_w(94.0), |c, t| {
                     let Some(look) = c
@@ -983,26 +983,35 @@ fn genes_screen(ui: &mut Ui) {
         });
         ui.text_styled(S::default().class("title").no_wrap(), "screen.animals.genes_title", &[]);
         // Its genes, one line each: its kind's own first, then the core traits.
-        ui.panel("well", S::col().pad(3.0).gap(1.0).w(214.0).h(GENES_PAGE_H).scroll(), |ui| {
-            for i in 0..GENE_LINES {
-                ui.text_bind_styled(S::default().max_w(206.0), move |c, t| {
-                    let Some(g) = c.menu_component(&crate::coats::GENOME) else { return t.text("") };
-                    let Some(l) = animals_core::coats::genes_of(&g).into_iter().nth(i) else { return t.text("") };
-                    // Its name in the player's language (`gene.<name>`; the gene files name it in
-                    // English); the alleles as they are written.
-                    let name = gene_key(&l.name);
-                    match l.value {
-                        Some(v) => t.set("screen.animals.gene_value", &[Arg::Key(&name), Arg::Int((v * 100.0).round() as i64)]),
-                        None => {
-                            let pair = l.alleles.join("/");
-                            t.set("screen.animals.gene_alleles", &[Arg::Key(&name), Arg::Text(&l.shows), Arg::Text(&pair)]);
+        ui.panel(
+            "well",
+            S::column()
+                .pad(3.0)
+                .gap(1.0)
+                .w(214.0)
+                .h(GENES_PAGE_H)
+                .scroll(),
+            |ui| {
+                for i in 0..GENE_LINES {
+                    ui.text_bind_styled(S::default().max_w(206.0), move |c, t| {
+                        let Some(g) = c.menu_component(&crate::coats::GENOME) else { return t.text("") };
+                        let Some(l) = animals_core::coats::genes_of(&g).into_iter().nth(i) else { return t.text("") };
+                        // Its name in the player's language (`gene.<name>`; the gene files name it in
+                        // English); the alleles as they are written.
+                        let name = gene_key(&l.name);
+                        match l.value {
+                            Some(v) => t.set("screen.animals.gene_value", &[Arg::Key(&name), Arg::Int((v * 100.0).round() as i64)]),
+                            None => {
+                                let pair = l.alleles.join("/");
+                                t.set("screen.animals.gene_alleles", &[Arg::Key(&name), Arg::Text(&l.shows), Arg::Text(&pair)]);
+                            }
                         }
-                    }
-                });
-            }
-        });
+                    });
+                }
+            },
+        );
         ui.text_styled(S::default().class("title").no_wrap(), "screen.animals.kind_title", &[]);
-        ui.column(S::col().gap(1.0).max_w(214.0), |ui| {
+        ui.column(S::column().gap(1.0).max_w(214.0), |ui| {
             taxon_line(ui);
             height_line(ui);
             signature_line(ui);
@@ -1012,9 +1021,9 @@ fn genes_screen(ui: &mut Ui) {
 
 /// The Family page: who it is, how old, when its kind breeds and how it stands now, its parents.
 fn family_screen(ui: &mut Ui) {
-    window_page(ui, 2, S::col().pad(8.0).gap(4.0).w(230.0), |ui| {
+    window_page(ui, 2, S::column().pad(8.0).gap(4.0).w(230.0), |ui| {
         title(ui, false);
-        ui.column(S::col().gap(2.0).max_w(214.0), |ui| {
+        ui.column(S::column().gap(2.0).max_w(214.0), |ui| {
             about_line(ui);
             age_line(ui);
             ui.text_styled(S::default().class("title").no_wrap(), "screen.animals.breeding_title", &[]);
@@ -1036,7 +1045,7 @@ fn order_button_w(ui: &mut Ui, key: &str, order: u64, w: f32) {
 }
 
 fn scout_screen(ui: &mut Ui) {
-    window(ui, S::col().pad(8.0).gap(3.0).min_w(180.0), |ui| {
+    window(ui, S::column().pad(8.0).gap(3.0).min_w(180.0), |ui| {
         heading(ui);
         ui.text_bind(|c, t| {
             let Some(s) = c.menu_component(&ANIMAL).and_then(|a| a.species()) else { return };
@@ -1113,11 +1122,8 @@ fn scout_screen(ui: &mut Ui) {
 /// The animal nearest `player` within `range`.
 fn nearest(w: &World, player: u64, range: f64) -> Option<u64> {
     let p = w.entity(player)?.pos;
-    let d2 = |id: u64| {
-        w.entity(id)
-            .map_or(f64::MAX, |e| (0..3).map(|i| (e.pos[i] - p[i]).powi(2)).sum())
-    };
-    w.near(p, range, None)
+    let d2 = |id: u64| w.entity(id).map_or(f64::MAX, |e| crate::dist2(e.pos, p));
+    w.entities_near(p, range, None)
         .into_iter()
         .filter(|&id| id != player && w.component(id, &ANIMAL).is_some())
         .min_by(|&a, &b| d2(a).total_cmp(&d2(b)))
@@ -1159,7 +1165,7 @@ fn command(cmd: &mut ServerCommand) {
         Some("habitats") => {
             let Some(p) = w.entity(player) else { return };
             let radius = cmd.int("count").unwrap_or(2048).clamp(64, 16_384) as i32;
-            for line in crate::habitats::survey(&w, [p.pos[0] as i32, p.pos[2] as i32], radius) {
+            for line in crate::habitats::survey(&w, [p.pos.x as i32, p.pos.z as i32], radius) {
                 weft_sdk::info!("habitats: {line}");
                 cmd.reply("command.animals.line", &[Arg::Text(&line)]);
             }
@@ -1176,16 +1182,17 @@ fn command(cmd: &mut ServerCommand) {
             else {
                 return;
             };
-            let at = p.pos.map(|v| v.floor() as i32);
+            let at = p.pos.to_array().map(|v| v.floor() as i32);
             let coming = cmd
                 .int("count")
                 .map_or(s.bio.social.group().1, |n| n.max(1) as u32);
             let near = crate::forage::kind_near(&w, s, at);
-            let comes = animals_core::life::room_for(near, coming, s.crowd());
+            let crowd = crate::species::crowd_at(&w, s, at);
+            let comes = animals_core::life::room_for(near, coming, crowd);
             let line = format!(
                 "room: {} at {at:?}: {near:.1} near, room for {}: a group of {coming} {}",
                 s.name,
-                s.crowd(),
+                crowd,
                 if comes { "would come" } else { "is turned away" }
             );
             weft_sdk::info!("{line}");
@@ -1205,7 +1212,7 @@ fn command(cmd: &mut ServerCommand) {
             let days = cmd.int("count").unwrap_or(30).clamp(1, 10_000) as u64;
             let Some(p) = w.entity(player) else { return };
             let mut n = 0;
-            for id in w.near(p.pos, 256.0, None) {
+            for id in w.entities_near(p.pos, 256.0, None) {
                 if let Some(a) = w.component_mut(id, &ANIMAL).filter(|a| a.seen != 0) {
                     a.seen = a.seen.saturating_sub(days * animals_core::life::DAY).max(1);
                     a.born = a.born.saturating_sub(days * animals_core::life::DAY).max(1);
@@ -1301,11 +1308,11 @@ fn command(cmd: &mut ServerCommand) {
             }
         }
         "here" => {
-            if let (Some(p), Some(mut e)) = (w.entity(player), w.entity(id)) {
+            if let (Some(p), Some(_)) = (w.entity(player), w.entity(id)) {
                 let (sy, cy) = (p.yaw as f64).sin_cos();
-                e.pos = [p.pos[0] - sy * 2.0, p.pos[1], p.pos[2] - cy * 2.0];
-                w.set_entity(id, &e);
-                w.navigate(id, e.pos, 0.0);
+                let to = [p.pos.x - sy * 2.0, p.pos.y, p.pos.z - cy * 2.0];
+                w.entity_edit(id).pos(to);
+                w.navigate(id, to, 0.0);
             }
         }
         _ => {
@@ -1321,7 +1328,7 @@ fn census(w: &World, player: u64, radius: f64) -> Vec<String> {
     use std::sync::atomic::Ordering::Relaxed;
     let Some(p) = w.entity(player) else { return Vec::new() };
     let mut lines = Vec::new();
-    let near = w.near(p.pos, radius, None);
+    let near = w.entities_near(p.pos, radius, None);
     for (i, s) in species::SPECIES.iter().enumerate() {
         let mut n = [0u32; 5];
         let (mut expecting, mut love, mut vigor, mut tame) = (0, 0, 0.0, 0);
@@ -1371,14 +1378,14 @@ const PLATE: (f32, f32) = (150.0, 46.0);
 /// The nearest animal within reach that the player is taming (fed at least once, not tame yet)
 /// or has knocked out, with its taming and knock-out (synced to whoever sees it).
 fn being_tamed(c: &ClientView) -> Option<(u64, crate::taming::Taming, Option<crate::knockout::Knockout>)> {
-    let me = c.me()?;
+    let me = c.player_state()?;
     let client = c.client();
     client
         .entities()
         .into_iter()
         .filter_map(|id| {
             let e = client.entity(id)?;
-            let d2: f64 = (0..3).map(|k| (e.pos[k] - me.pos[k]).powi(2)).sum();
+            let d2: f64 = crate::dist2(e.pos, me.pos);
             if d2 > TAMING_RANGE * TAMING_RANGE {
                 return None;
             }
@@ -1407,7 +1414,7 @@ fn taming_hud(r: &mut Registry) {
             ui.progress_bind("hud_plate", S::default().size(PLATE.0, PLATE.1).at(0.0, 0.0), |c| {
                 if being_tamed(c).is_some() { 1.0 } else { -1.0 }
             });
-            ui.column(S::col().gap(1.0).at(5.0, 3.0), |ui| {
+            ui.column(S::column().gap(1.0).at(5.0, 3.0), |ui| {
                 ui.text_bind_styled(S::default().class("title").no_wrap(), |c, t| {
                     let Some(s) = being_tamed(c).and_then(|(id, _, _)| species_of(c, id)) else { return t.text("") };
                     t.set("hud.animals.taming.who", &[Arg::Key(&format!("entity.animals.{}", s.kind_name()))]);

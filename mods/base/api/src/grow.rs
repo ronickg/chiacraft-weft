@@ -33,7 +33,7 @@ pub fn step_secs(block: &str, steps: u32, game: f32) -> f32 {
 
 /// Farmland's fertility at `pos` (`None`: not farmland): `vitals::soil::MAX` less its `worn`.
 pub fn fertility(w: &World, pos: [i32; 3]) -> Option<u8> {
-    let state = w.get(pos);
+    let state = w.block(pos);
     if !FARMLAND.is(state) {
         return None;
     }
@@ -67,20 +67,20 @@ fn chance(e: &BlockEvent, block: &str, last: bool) -> Step {
     let p = plant(block);
     let w = e.world();
     if p.frost > plants::HARDY {
-        let at = e.pos().map(|v| v as f64 + 0.5);
+        let at = e.pos().to_array().map(|v| v as f64 + 0.5);
         // The still air: wind chill is what a body loses, a plant does not fall below the air (Research round 3, B5).
         let air = crate::air_at(&w, [at[0], at[1] - 0.5, at[2]], 0.5, false, 3, |_| {}).still;
         if plants::frosted(p, air) {
             return Step::Frost;
         }
     }
-    let ground = crate::ground_at(&w, e.pos());
+    let ground = crate::ground_at(&w, e.pos().to_array());
     if last && !plants::ripens_in(p, ground.season) {
         return Step::Rest;
     }
     let rate = plants::rate(p, ground.mean_air, if p.water == plants::Water::Wet { 1.0 } else { ground.soil });
     // On farmland, as fast as its fertility lets (`vitals::soil`).
-    let pos = e.pos();
+    let pos = e.pos().to_array();
     let rate = rate * fertility(&w, [pos[0], pos[1] - 1, pos[2]]).map_or(1.0, vitals::soil::growth);
     if (w.random() >> 11) as f32 / (1u64 << 53) as f32 >= rate { Step::Rest } else { Step::Grow }
 }

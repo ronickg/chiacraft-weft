@@ -117,7 +117,7 @@ pub fn init(r: &mut Registry) {
 
 /// Its rider pressed the key: the wyvern they ride breathes where they look.
 fn ridden(w: &World, player: u64) {
-    let Some((id, _)) = w.mount_of(player) else { return };
+    let Some((id, _)) = w.vehicle(player) else { return };
     if w.component(id, &BREATH).is_some() {
         start(w, id, 0);
     }
@@ -133,10 +133,12 @@ pub fn start(w: &World, id: u64, target: u64) -> bool {
         return false;
     }
     *b = Breath { t: 1, cooldown: COOLDOWN, flying: flying as u32, target };
-    let kind = w.component(id, &GENOME).map_or("fire", coats::breath);
+    let kind = w
+        .component(id, &GENOME)
+        .map_or("fire", |g| coats::breath(&g));
     weft_sdk::info!("wyvern {id} breathes {kind}");
     if !flying {
-        w.play_animation(id, "breathe", false);
+        w.action_play(id, "breathe", false);
     }
     true
 }
@@ -156,12 +158,12 @@ pub fn behave(w: &World, id: u64, st: &EntityState) -> bool {
         b.t = 0;
         return false;
     }
-    let rider = w.rider_of(id);
+    let rider = crate::riding::rider_of(w, id);
     // Where it breathes: where its rider looks, at its target, or ahead.
     let (yaw, pitch) = match (rider.and_then(|r| w.entity(r)), w.entity(breath.target)) {
         (Some(r), _) => (r.yaw, r.pitch),
         (None, Some(t)) => {
-            let d = [t.pos[0] - st.pos[0], t.pos[1] + t.size[1] as f64 * 0.5 - st.pos[1] - 3.0, t.pos[2] - st.pos[2]];
+            let d = [t.pos.x - st.pos.x, t.pos.y + t.size.height as f64 * 0.5 - st.pos.y - 3.0, t.pos.z - st.pos.z];
             let flat = (d[0] * d[0] + d[2] * d[2]).sqrt();
             ((-d[0]).atan2(-d[2]) as f32, d[1].atan2(flat) as f32)
         }
@@ -169,23 +171,23 @@ pub fn behave(w: &World, id: u64, st: &EntityState) -> bool {
     };
     if breath.flying == 0 {
         // Rearing on the ground it turns to face where it will breathe, and stands.
-        let mut s = *st;
-        s.yaw = yaw;
-        w.set_entity(id, &s);
+        w.entity_edit(id).yaw(yaw);
         if w.navigating(id) {
             w.navigate(id, st.pos, 0.0);
         }
     }
     if breath.t >= from {
-        let kind = w.component(id, &GENOME).map_or("fire", coats::breath);
+        let kind = w
+            .component(id, &GENOME)
+            .map_or("fire", |g| coats::breath(&g));
         let size = coats::size_of(w, id).unwrap_or(1.0) as f64;
         let (ahead, up) = if breath.flying != 0 { MOUTH_AIR } else { MOUTH_GROUND };
         let (sy, cy) = (st.yaw as f64).sin_cos();
-        let mouth = [st.pos[0] - sy * ahead * size, st.pos[1] + up * size, st.pos[2] - cy * ahead * size];
+        let mouth = [st.pos.x - sy * ahead * size, st.pos.y + up * size, st.pos.z - cy * ahead * size];
         let (s2, c2) = (yaw as f64).sin_cos();
         let (sp, cp) = (pitch as f64).sin_cos();
         let dir = [-s2 * cp, sp, -c2 * cp];
-        stream(w, id, rider, kind, mouth, dir, st.vel, breath.t);
+        stream(w, id, rider, kind, mouth, dir, st.vel.to_array(), breath.t);
     }
     breath.flying == 0
 }
@@ -224,8 +226,8 @@ fn stream(w: &World, id: u64, rider: Option<u64>, kind: &str, mouth: [f64; 3], d
     match kind {
         "frost" => {
             for &(e, _) in &hit {
-                w.damage(e, 2.5, source, damage::GENERIC);
-                w.add_modifier(e, &attribute::MOVEMENT_SPEED, "animals:frost", attr_op::MUL_BASE, -0.6, 80);
+                w.damage(e, 2.5, source, damage_cause::GENERIC);
+                w.attribute_add_modifier(e, &attribute::MOVEMENT_SPEED, "animals:frost", attr_op::MULTIPLY_BASE, -0.6, 80);
                 w.ignite(e, 0);
             }
         }
@@ -233,20 +235,20 @@ fn stream(w: &World, id: u64, rider: Option<u64>, kind: &str, mouth: [f64; 3], d
             if t % 10 == 0
                 && let Some((first, p)) = target_in_cone(w, id, rider, mouth, dir)
             {
-                w.damage(first, 9.0, source, damage::GENERIC);
+                w.damage(first, 9.0, source, damage_cause::GENERIC);
                 w.ignite(first, 40);
                 // It arcs on to the two nearest beside it.
                 let mut from = p;
                 for other in w
-                    .near(p, 6.0, None)
+                    .entities_near(p, 6.0, None)
                     .into_iter()
                     .filter(|&o| o != first && o != id && Some(o) != rider)
                     .take(2)
                 {
                     if let Some(o) = w.entity(other) {
-                        let at = [o.pos[0], o.pos[1] + o.size[1] as f64 * 0.5, o.pos[2]];
+                        let at = [o.pos.x, o.pos.y + o.size.height as f64 * 0.5, o.pos.z];
                         bolt(w, from, at, t + 1);
-                        w.damage(other, 5.0, source, damage::GENERIC);
+                        w.damage(other, 5.0, source, damage_cause::GENERIC);
                         from = at;
                     }
                 }
@@ -256,7 +258,7 @@ fn stream(w: &World, id: u64, rider: Option<u64>, kind: &str, mouth: [f64; 3], d
             let mut poison = POISON.lock().unwrap();
             let poison = poison.get_or_insert_with(HashMap::new);
             for &(e, _) in &hit {
-                w.damage(e, 2.0, source, damage::GENERIC);
+                w.damage(e, 2.0, source, damage_cause::GENERIC);
                 // A player is poisoned by their body (base's survival: longer, less with
                 // fortitude, a death put down to the poison); an animal here.
                 if w.players().contains(&e) {
@@ -268,7 +270,7 @@ fn stream(w: &World, id: u64, rider: Option<u64>, kind: &str, mouth: [f64; 3], d
         }
         _ => {
             for &(e, _) in &hit {
-                w.damage(e, 3.5, source, damage::FIRE);
+                w.damage(e, 3.5, source, damage_cause::FIRE);
                 w.ignite(e, 120);
             }
         }
@@ -281,17 +283,17 @@ fn stream(w: &World, id: u64, rider: Option<u64>, kind: &str, mouth: [f64; 3], d
 /// Everything the stream reaches (not the wyvern, nor its rider): ids and where they are hit.
 fn in_cone(w: &World, id: u64, rider: Option<u64>, mouth: [f64; 3], dir: [f64; 3]) -> Vec<(u64, [f64; 3])> {
     let mid = [mouth[0] + dir[0] * RANGE / 2.0, mouth[1] + dir[1] * RANGE / 2.0, mouth[2] + dir[2] * RANGE / 2.0];
-    w.near(mid, RANGE / 2.0 + 2.0, None)
+    w.entities_near(mid, RANGE / 2.0 + 2.0, None)
         .into_iter()
         .filter(|&e| e != id && Some(e) != rider)
         .filter_map(|e| {
             let s = w.entity(e)?;
-            let p = [s.pos[0], s.pos[1] + s.size[1] as f64 * 0.5, s.pos[2]];
+            let p = [s.pos.x, s.pos.y + s.size.height as f64 * 0.5, s.pos.z];
             let d = [p[0] - mouth[0], p[1] - mouth[1], p[2] - mouth[2]];
             let len = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt();
             let along = (d[0] * dir[0] + d[1] * dir[1] + d[2] * dir[2]) / len.max(1e-6);
             // Wide things count when their box is in it, not only their middle.
-            let slack = (s.size[0] as f64 / 2.0 / len.max(1.0)).min(0.3);
+            let slack = (s.size.width as f64 / 2.0 / len.max(1.0)).min(0.3);
             (len <= RANGE && along >= CONE - slack).then_some((e, p))
         })
         .collect()
@@ -321,7 +323,7 @@ fn ground_hit(w: &World, mouth: [f64; 3], dir: [f64; 3]) -> Option<[i32; 3]> {
     let mut d = 0.0;
     while d < RANGE {
         let p = [mouth[0] + dir[0] * d, mouth[1] + dir[1] * d, mouth[2] + dir[2] * d].map(|v| v.floor() as i32);
-        if w.get(p) != AIR.id() {
+        if w.block(p) != AIR.id() {
             return Some(p);
         }
         d += 0.5;
@@ -338,7 +340,7 @@ fn scorch(w: &World, kind: &str, at: [i32; 3]) {
                     continue;
                 }
                 let p = [at[0] + dx, at[1] + dy, at[2] + dz];
-                let b = w.get(p);
+                let b = w.block(p);
                 let plant = [TALL_GRASS.id(), DANDELION.id(), ROSE.id()].contains(&b);
                 let leaves = LEAVES.iter().any(|l| l.id() == b);
                 let to = match kind {
@@ -352,7 +354,7 @@ fn scorch(w: &World, kind: &str, at: [i32; 3]) {
                     _ => None,
                 };
                 if let Some(s) = to {
-                    w.set(p, s);
+                    w.set_block(p, s);
                 }
             }
         }
@@ -369,10 +371,10 @@ fn poison_tick(w: &World) {
             return *left > 0; // gone, or in another dimension: its time runs out all the same
         }
         if *left % 20 == 0 {
-            w.damage(victim, 1.5, *source, damage::GENERIC);
+            w.damage(victim, 1.5, *source, damage_cause::GENERIC);
             if let Some(s) = w.entity(victim) {
                 drop(
-                    w.spawn_particles(&VENOM, [s.pos[0], s.pos[1] + s.size[1] as f64 * 0.7, s.pos[2]])
+                    w.spawn_particles(&VENOM, [s.pos.x, s.pos.y + s.size.height as f64 * 0.7, s.pos.z])
                         .count(3)
                         .spread(0.3),
                 );

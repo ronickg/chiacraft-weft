@@ -15,8 +15,10 @@ use vitals::effects::Effect;
 use weft_sdk::*;
 
 /// The hints, by their bit in `SEEN`: `hint.base.<name>` in the lang files.
-const HINTS: [&str; 14] =
-    ["logs", "table", "night", "cold", "freezing", "wet", "empty", "raw_meat", "grave", "hot", "rest", "knap", "flake", "lash"];
+const HINTS: [&str; 16] = [
+    "logs", "table", "night", "cold", "freezing", "wet", "empty", "raw_meat", "grave", "hot", "rest", "knap", "flake", "lash", "tree",
+    "tree_far",
+];
 const LOGS: u32 = 0;
 const TABLE: u32 = 1;
 const NIGHT: u32 = 2;
@@ -32,6 +34,9 @@ const REST: u32 = 10;
 const KNAP: u32 = 11;
 const FLAKE: u32 = 12;
 const LASH: u32 = 13;
+/// The first axe: where the nearest tree foot is (`TREE_FAR` when none is near; one seen bit).
+const TREE: u32 = 14;
+const TREE_FAR: u32 = 15;
 
 /// Seconds played before the first hint, that bare hands can't fell a tree (`first.rs`).
 const LOGS_AFTER: u64 = 20;
@@ -51,6 +56,7 @@ value! {
 static HINT: Channel<Hint> = Channel::named("hint");
 
 static LOG_TAG: Tag = Tag::named("logs");
+static AXES_TAG: Tag = Tag::named("tools/axe");
 static TABLE_TAG: Tag = Tag::named("crafting_tables");
 static FURNACE_TAG: Tag = Tag::named("furnaces");
 static RAW_MEAT_TAG: Tag = Tag::named("raw_meat");
@@ -65,7 +71,7 @@ const DUSK_BEFORE: f32 = 2.0;
 
 pub fn register(r: &mut Registry) {
     r.config(&SHOW).bool(true);
-    r.entity_component(&SEEN, 0, component_flags::SAVE | component_flags::KEEP);
+    r.entity_component(&SEEN, 0, component_flags::SAVE | component_flags::KEEP_ON_RESPAWN);
     r.attach(&PLAYER, &SEEN);
     r.entity_component(&WAS_FREEZING, 0, 0);
     r.attach(&PLAYER, &WAS_FREEZING);
@@ -74,7 +80,7 @@ pub fn register(r: &mut Registry) {
     r.world_tick(watch);
     // A campfire built: the night hint has done its work (Ronald, 11-04: "Campfire keeps you
     // safe"; its light keeps monsters from spawning near it).
-    r.on(&BLOCK_PLACED, |b| {
+    r.on(&actions::PLACE_BLOCK, |b| {
         let w = b.world();
         for c in b.iter() {
             if CAMPFIRE_TAG.on_block(c.state) {
@@ -114,16 +120,53 @@ fn once(w: &World, player: u64, hint: u32) {
     }
 }
 
+/// The nearest tree foot to `from` (a log standing on something that isn't a log or air), ring by
+/// ring out to `vitals::first::TREE_LOOK`, the nearest in height first within a ring.
+fn nearest_tree(w: &World, from: BlockPos) -> Option<BlockPos> {
+    use vitals::first::{TREE_LOOK, TREE_UP};
+    let foot = |p: BlockPos| {
+        LOG_TAG.on_block(w.block(p)) && {
+            let below = w.block(p.below());
+            below != 0 && !LOG_TAG.on_block(below)
+        }
+    };
+    for r in 0..=TREE_LOOK {
+        let mut best: Option<(i32, BlockPos)> = None;
+        for dz in -r..=r {
+            for dx in -r..=r {
+                if dx.abs().max(dz.abs()) != r {
+                    continue;
+                }
+                for dy in 0..=TREE_UP {
+                    if best.is_some_and(|(b, _)| b <= dy) {
+                        break;
+                    }
+                    for y in [dy, -dy] {
+                        let p = from.offset(dx, y, dz);
+                        if foot(p) {
+                            best = Some((dy, p));
+                        }
+                    }
+                }
+            }
+        }
+        if let Some((_, p)) = best {
+            return Some(p);
+        }
+    }
+    None
+}
+
 /// Each player's state, once a second.
 fn watch(w: &World) {
     let hour = ((w.day_time() % 24000) as f32 / 1000.0 + 6.0) % 24.0;
     for id in w.players() {
         let Some(st) = w.entity(id) else { continue };
-        if st.age % 20 != 7 || w.creative(id) {
+        if st.age % 20 != 7 || w.outside_survival(id) {
             continue;
         }
         let inv = w.inventory(id);
-        let items: Vec<u32> = (0..inv.size())
+        let items: Vec<u32> = (0..inv.len())
             .map(|i| inv.get(i))
             .filter(|s| !s.is_empty())
             .map(|s| s.item)
@@ -159,6 +202,19 @@ fn watch(w: &World) {
         if head && !logs {
             once(w, id, LASH);
         }
+        if !logs && !seen(w, id, TREE) && has(&AXES_TAG) {
+            mark(w, id, TREE);
+            let hint = match nearest_tree(w, st.pos.block()) {
+                Some(p) => Hint { hint: TREE, a: p.x, b: p.z },
+                None => Hint { hint: TREE_FAR, a: 0, b: 0 },
+            };
+            weft_sdk::info!(
+                "hints: first axe for {id} at {:?}: tree {}",
+                st.pos.block(),
+                if hint.hint == TREE { format!("at x {} z {}", hint.a, hint.b) } else { "none near".into() }
+            );
+            w.send(id, &HINT, &hint);
+        }
         // Each evening at dusk until a campfire is built, by the season's sunset (as the HUD clock
         // and beds have it; integration review: fixed at 16-18 it came after dark in winter).
         let sunset = w
@@ -168,6 +224,8 @@ fn watch(w: &World) {
                 let light = vitals::calendar::daylight_hours((v.date - 1) as f32, base_api::calendars::swing(v.calendar));
                 12.0 + light / 2.0
             });
+        // Tonight's sky event, foretold before sunset (`events.rs`).
+        crate::events::dusk(w, id, hour, sunset);
         if (sunset - DUSK_BEFORE..sunset).contains(&hour) && !seen(w, id, NIGHT) {
             let day = (w.day_time() / 24000) as u32;
             if let Some(shown) = w.component_mut(id, &NIGHT_SHOWN)

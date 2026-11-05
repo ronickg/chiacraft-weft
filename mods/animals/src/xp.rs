@@ -34,20 +34,20 @@ pub fn init(r: &mut Registry) {
         let mut struck = STRUCK.lock().unwrap();
         struck
             .get_or_insert_with(HashMap::new)
-            .insert(q.entity, (q.other, a.level(), i, w.time()));
+            .insert(q.entity, (q.other, a.level(), i, w.game_time()));
     });
-    r.on(&ENTITY_DIED, |b| {
+    r.on(&actions::DIE, |b| {
         let w = b.world();
         let mut struck = STRUCK.lock().unwrap();
         let struck = struck.get_or_insert_with(HashMap::new);
         for d in b.iter() {
             if let Some((player, level, i, _)) = struck.remove(&d.entity)
-                && player == d.killer
+                && player == d.source
             {
                 give_xp(&w, player, xp::kill(level, danger(i)));
             }
         }
-        let now = w.time();
+        let now = w.game_time();
         struck.retain(|_, s| now.saturating_sub(s.3) < REMEMBER);
     });
 }

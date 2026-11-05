@@ -118,7 +118,7 @@ impl Screen for MenuScreen {
         ui.root_style(Style::default().stretch());
         let creative = cx
             .client
-            .is_some_and(|cl| cl.mode == crate::world::GameMode::Creative)
+            .is_some_and(|cl| cl.mode.has(weft_abi::game_mode_flags::CREATIVE_INVENTORY))
             && c.game.player_menu == Some(self.kind);
         ui.panel("overlay", Style::default().grow().center(), |ui| {
             ui.container(Style::row().gap(4.0).align(crate::ui::Align::Start), |ui| {
@@ -198,7 +198,7 @@ pub fn chat_lines(
     let said: Vec<_> = client
         .chat
         .iter()
-        .filter(|(_, at)| open || now.duration_since(*at).as_secs() < 10)
+        .filter(|(s, at)| open || s.alpha(now.duration_since(*at).as_secs_f32()) > 0.0)
         .collect();
     // Over the game, only what fits; a line is about this tall.
     let room = if open { usize::MAX } else { (look.closed_height.min(room.unwrap_or(f32::MAX)) / 11.0).max(1.0) as usize };
@@ -228,8 +228,10 @@ pub fn chat_lines(
         shown.self_align(crate::ui::Align::Start)
     };
     let lines = ui.container(style, |ui| {
-        for (line, _) in said.iter().rev().take(room).rev() {
-            ui.text(line.spans(lang, Some(input)), "chat");
+        for (line, at) in said.iter().rev().take(room).rev() {
+            // Open it is the history, what is over included.
+            let alpha = if open { 1.0 } else { line.alpha(now.duration_since(*at).as_secs_f32()) };
+            crate::hud::shown_text(ui, line, alpha, lang, Some(input));
         }
     });
     ui.set_id(lines, "chat_lines");
@@ -388,9 +390,13 @@ impl Screen for Chat {
             ctx.requests.push(Request::Rebuild);
         };
         match key {
+            // Shift+Tab goes back through the list.
             Key::Code(KeyCode::Tab) if n > 0 => {
+                let back = ctx.input.mods() & crate::input::SHIFT != 0;
                 if st.stem.is_some() {
-                    st.selected = (st.selected + 1) % n;
+                    st.selected = if back { (st.selected + n - 1) % n } else { (st.selected + 1) % n };
+                } else if back {
+                    st.selected = n - 1;
                 }
                 take(&mut st, ctx);
                 true
@@ -780,27 +786,6 @@ pub fn recipe_slot(
         Ingredient::Empty => {
             ui.add(Kind::Container { class: Some("recipe_slot".into()) }, size);
             return;
-        }
-        Ingredient::Fluid(name) => {
-            // The liquid's own top texture, tinted like its item would be (water is gray).
-            let state = c
-                .liquids
-                .iter()
-                .find(|l| &l.name == name)
-                .and_then(|l| c.states.get(l.first_state as usize));
-            let texture = state
-                .and_then(|s| c.textures.get(s.textures[2] as usize))
-                .cloned()
-                .unwrap_or_default();
-            let color =
-                state.map_or(0xFFFFFFFF, |s| if s.tint != 0 { (crate::content::item_tint(s.tint) << 8) | 0xFF } else { 0xFFFFFFFF });
-            let b = ui.button("recipe_slot", size, Rc::new(|_: &mut Ctx| {}), |ui| {
-                ui.add(Kind::Image { texture, color }, Style::default().size(16.0, 16.0));
-            });
-            tip = text::Name::Liquid(name.clone()).spans(lang, None);
-            tip.push(text::Span::text("\n", None));
-            tip.extend(fmt("recipes.fluid_amount", &[text::Arg::Int(count as i64)]));
-            b
         }
         Ingredient::Item(_) | Ingredient::Tag(_) | Ingredient::Any(_) => {
             let items: Vec<u32> = match ing {

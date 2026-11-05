@@ -261,7 +261,7 @@ pub fn grazing(biome: &str) -> Option<Grazing> {
     let regrown = blocks * mouthful * rate * vitals::DAY_SECS / secs;
     let eaten = grazers
         .iter()
-        .map(|&(s, share)| s.crowd() as f32 * share * vitals::DAY_SECS / s.hunger.max(1.0))
+        .map(|&(s, share)| s.crowd_in(biome) as f32 * share * vitals::DAY_SECS / s.hunger.max(1.0))
         .sum();
     Some(Grazing { season, regrown, eaten })
 }

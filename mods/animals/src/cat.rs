@@ -6,7 +6,9 @@
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
-pub(crate) static CAT: Entity = Entity::named("cat");
+use crate::ModelFile;
+
+pub(crate) static CAT: EntityKind = EntityKind::named("cat");
 const TEXTURE: &str = "cat/cat";
 
 pub fn init(r: &mut Registry) {
@@ -23,8 +25,8 @@ pub fn init(r: &mut Registry) {
     );
     r.entity(&CAT)
         .size(animals_core::bodies::of("cat").0, animals_core::bodies::of("cat").1)
-        .health(6.0)
-        .speed(3.0)
+        .max_health(6.0)
+        .walk_speed(3.0)
         .attack_damage(1.0)
         .passive()
         .model_file("cat")
@@ -35,6 +37,7 @@ pub fn init(r: &mut Registry) {
             if !crate::screen::interact(&w, id, player) && !crate::taming::feed(&w, id, player) {
                 crate::commands::interact(&w, id, player);
             }
+            false
         })
         .goals(
             Goals::new()

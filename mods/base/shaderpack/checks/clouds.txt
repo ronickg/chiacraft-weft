@@ -1,49 +1,57 @@
+# Clouds lit as volumes, still blocky (Research round 15, rec. 2; Ronald: "both, a setting"): at
+# noon looking up and across, toward a low sun (the silver lining and backlit glow) and away from
+# it, at sunset, and a thunderstorm's deck with its towers and darker bellies; plus a bench at noon.
+# Seed 1, --view 12, 1280x720, --shader-pack chiacraft, a fresh world. Spectator at y 120 over the
+# spawn. Yaw 0 faces -z, 90 -x (west), 270 +x (east).
 loaded
 idle
-chat /tk mode creative
-chat /weather clear
-# Plains (Tester 2's spot): open sky for the clouds, grass for the seasons.
-chat /gamemode spectator
-chat /tp -450 145 535
-wait 8
-chat /gamemode creative
-wait 3
+chat /rule core:mob_spawning 0
+chat /tk mode spectator
+chat /weather clear 99999
 chat /time set 6000
-# Clouds drift with the wind: a light easterly, then a strong southerly; two shots 4 s apart each.
-chat /air 0 2 90 mist
+chat /air 0 0
+chat /tp 149.5 120 -166.5
+loaded
+wait 20
 look 0 25
 wait 3
-shot 01_light_wind_a.png
-wait 4
-shot 02_light_wind_b.png
-chat /air 0 12 180 mist
-wait 3
-shot 03_strong_wind_a.png
-wait 4
-shot 04_strong_wind_b.png
-# Rain coming: more cover and dark undersides; then a storm's deck.
-chat /air 0 5 90 mist
-chat /weather rain
-wait 8
-look 0 20
-shot 05_rain.png
-chat /weather thunder
-wait 8
-shot 06_storm.png
-chat /weather clear
-wait 8
-shot 07_cleared.png
-# The grass through the year (a new world starts on spring's 8th): looking down at it.
-look 0 -40
+shot clouds_1_noon_n.png
+look 180 10
 wait 2
-shot 08_grass_spring.png
-chat /time set 342000
+shot clouds_1b_noon_s.png
+wait 1
+bench 4 clouds_noon
+chat /time set 11300
+wait 4
+look 90 8
 wait 3
-shot 09_grass_summer.png
-chat /time set 438000
+shot clouds_2_evening_tosun.png
+look 270 8
+wait 2
+shot clouds_2b_evening_away.png
+chat /time set 12100
+wait 4
+look 90 6
 wait 3
-shot 10_grass_autumn.png
-chat /time set 246000
+shot clouds_3_sunset.png
+chat /time set 6000
+chat /weather thunder 99999
+wait 15
+look 0 15
 wait 3
-shot 11_grass_winter.png
+shot clouds_4_storm_n.png
+look 0 40
+wait 2
+shot clouds_4b_storm_up.png
+look 0 15
+wait 1
+bench 4 clouds_storm
+chat /tp 149.5 75 -166.5
+wait 6
+look 0 5
+wait 3
+shot clouds_5_storm_ground.png
+look 180 20
+wait 2
+shot clouds_5b_storm_ground_s.png
 quit

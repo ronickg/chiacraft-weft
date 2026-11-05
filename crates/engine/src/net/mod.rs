@@ -156,6 +156,98 @@ macro_rules! messages {
     };
 }
 
+/// How much of a player's own model is sent, all its files together.
+pub const AVATAR_BYTES: usize = 512 * 1024;
+
+wire_struct! {
+    /// Text for the screen, however it ends up looking (`abi::ShowDesc`). Times below zero or a
+    /// scale of 0 are for the client to fill in (`settled`). `from`: what the chat's visibility
+    /// setting goes by.
+    #[derive(Clone, Debug)]
+    pub struct Shown {
+        pub place: u32,
+        pub msg: crate::ui::text::Msg,
+        pub id: String,
+        pub times: [f32; 3],
+        pub scale: f32,
+        pub at: Option<[f32; 2]>,
+        pub color: Option<u32>,
+        pub from: u8,
+    }
+}
+
+impl Shown {
+    pub const SYSTEM: u8 = 0;
+    pub const PLAYER: u8 = 1;
+    /// The answer to a command of whoever gets it.
+    pub const REPLY: u8 = 2;
+
+    pub fn new(place: u32, msg: crate::ui::text::Msg) -> Shown {
+        Shown { place, msg, id: String::new(), times: [-1.0; 3], scale: 0.0, at: None, color: None, from: Shown::SYSTEM }
+    }
+
+    /// A chat line.
+    pub fn chat(msg: crate::ui::text::Msg) -> Shown {
+        Shown::new(weft_abi::show_place::CHAT, msg)
+    }
+
+    /// What its place is (`hud::places`).
+    pub fn look(&self) -> &'static crate::hud::Place {
+        let all = crate::hud::places();
+        all.get(self.place as usize).unwrap_or(&all[0])
+    }
+
+    /// With what was left open as its place has it.
+    pub fn settled(mut self) -> Shown {
+        let look = self.look();
+        if self.times[1] < 0.0 {
+            self.times = look.times;
+        }
+        if self.scale <= 0.0 {
+            self.scale = look.scale;
+        }
+        self.at = self.at.or(look.own_at);
+        self
+    }
+
+    /// Asks for what its place and id show to go away.
+    pub fn clears(&self) -> bool {
+        self.msg.key.is_empty() && self.msg.args.is_empty()
+    }
+
+    /// How opaque it is `age` seconds in, 0 once over.
+    pub fn alpha(&self, age: f32) -> f32 {
+        let [fade_in, stay, fade_out] = self.times;
+        if age < fade_in {
+            age / fade_in
+        } else if age < fade_in + stay {
+            1.0
+        } else if age < fade_in + stay + fade_out {
+            (fade_in + stay + fade_out - age) / fade_out
+        } else {
+            0.0
+        }
+    }
+}
+
+wire_struct! {
+    /// A player's own model: its files, which the server passes on unread.
+    #[derive(Clone, Debug, Default)]
+    pub struct AvatarData {
+        pub geo: Vec<u8>,
+        pub animations: Vec<u8>,
+        pub bones: Vec<u8>,
+        pub png: Vec<u8>,
+        pub glow: Vec<u8>,
+    }
+}
+
+impl AvatarData {
+    pub fn size(&self) -> usize {
+        self.geo.len() + self.animations.len() + self.bones.len() + self.png.len() + self.glow.len()
+    }
+}
+
 wire_struct! {
     #[derive(Clone, Debug)]
     pub struct EntityView {
@@ -169,8 +261,9 @@ wire_struct! {
 }
 
 wire_struct! {
-    /// A debug shape for a gizmo group (`client::gizmo`): `kind` 0 is a line from `a` to `b`, 1 a box
-    /// between corners `a` and `b`, 2 `text` at `a`. Shown for `ticks` server ticks.
+    /// A debug shape for a gizmo group (`client::gizmo`): `kind` a `gizmo_kind` from `a` to `b`, or
+    /// `GizmoShape::TEXT`, `text` at `a` `size` times as big as menu text. Shown for `ticks`
+    /// server ticks.
     #[derive(Clone, Debug, PartialEq)]
     pub struct GizmoShape {
         pub group: String,
@@ -179,13 +272,34 @@ wire_struct! {
         pub b: DVec3,
         pub color: u32,
         pub ticks: u32,
+        pub size: f32,
         pub text: crate::ui::text::Msg,
     }
 }
 
+impl GizmoShape {
+    /// Not a `gizmo_kind`: a label.
+    pub const TEXT: u8 = u8::MAX;
+
+    pub fn shape(group: &str, kind: u8, a: DVec3, b: DVec3, color: u32, ticks: u32) -> GizmoShape {
+        GizmoShape { group: group.into(), kind, a, b, color, ticks, size: 0.0, text: crate::ui::text::Msg::default() }
+    }
+
+    pub fn text(group: &str, at: DVec3, size: f32, color: u32, ticks: u32, text: crate::ui::text::Msg) -> GizmoShape {
+        GizmoShape { group: group.into(), kind: GizmoShape::TEXT, a: at, b: at, color, ticks, size, text }
+    }
+}
+
+/// Someone's mining as others see it: who, the cell, which of what is in it, how far along (0..1).
+pub type Crack = (u64, IVec3, u32, f32);
+
 /// An entity's move: id, position, yaw, pitch, crouching, and its frame: the solid body it
 /// stands on (0: the world), which clients draw it relative to.
-pub type Move = (u64, DVec3, f32, f32, crate::world::Pose, u64);
+/// An entity, where it is, its look, pose, whether it sprints, and the body it stands on.
+pub type Move = (u64, DVec3, f32, f32, crate::world::Pose, bool, u64);
+
+/// The longest message a connection takes.
+pub const MAX_MESSAGE: usize = 64 << 20;
 
 messages! {
     #[derive(Clone)]
@@ -202,8 +316,15 @@ messages! {
         /// Area edits of the dimension (`AreaFill::spec`): `all` replaces what the client has,
         /// otherwise they come after it. Clients make them on what they generate.
         Edits { dim: u32, specs: Vec<String>, all: bool },
+        /// Columns of dimension `dim` whose top isn't the terrain's, for distant terrain: (x, z,
+        /// height, top, under), `top` `u32::MAX` for one that is again; `all`: every one there is.
+        LodColumns { dim: u32, all: bool, cols: Vec<(i32, i32, i32, u32, u32)> },
         /// Of the world, or of body `frame`.
-        Blocks { dim: u32, frame: u64, changes: Vec<(IVec3, u32)> },
+        /// `extras`: what else is in cells, after `changes` (which take it away).
+        Blocks { dim: u32, frame: u64, changes: Vec<(IVec3, u32)>, extras: Vec<(IVec3, Vec<u32>)> },
+        /// What moving bodies' lights give cells of the world besides what is there, for a client
+        /// to work out light as the server would: (cell, its light), none taking it away.
+        BodyGlow { dim: u32, cells: Vec<(IVec3, [u8; 3])> },
         /// The world's light on body `frame`, by its cubes.
         BodyLight { frame: u64, lights: Vec<(IVec3, u32)> },
         /// Power of pieces of wire: (cell, face, level), of the world or of body `frame`.
@@ -222,7 +343,7 @@ messages! {
         /// Items picked up: (item entity, who took it). They fly to the taker before going.
         Taken(Vec<(u64, u64)>),
         /// A use (right click) did something: the arm swings, and dips if the held item was used.
-        Swing { used_item: bool },
+        Swing { used_item: bool, off_hand: bool },
         GameMode(crate::world::GameMode),
         /// Everyone online, sent when someone joins or leaves.
         Players(Vec<String>),
@@ -230,19 +351,31 @@ messages! {
         Inventory(Vec<(u32, ItemStack)>),
         /// Own synced components: (component id, bytes).
         Components(Vec<(u32, Vec<u8>)>),
-        /// Hit by something at this horizontal direction from the player.
-        /// Velocity change in blocks per tick, after halving the velocity when the flag says so
-        /// (knockback, a mod's push).
-        Push(([f32; 3], bool)),
+        /// A hit knocks the player back, `away` being flat and of length 1 (`physics::knock`).
+        Knock { away: [f32; 3] },
+        /// Velocity change in blocks per tick (a mod's push, a sprinting hit).
+        Velocity { add: [f32; 3] },
+        /// A mod set the player's velocity, in blocks per tick.
+        SetVelocity([f32; 3]),
+        /// A mod turned the player: yaw and pitch in radians.
+        Look([f32; 2]),
+        /// A mod made the player fly or stop.
+        Flying(bool),
+        /// A mod put this hotbar slot in the player's hand.
+        Selected(u32),
+        /// Ticks a second the server runs at.
+        TickRate(u32),
         /// The player's walking speed and jump multipliers.
         /// The player's attributes that changed, by id.
         Attributes(Vec<(u32, f32)>),
-        /// Mining that block is not allowed (`question::BREAK_BLOCK`).
+        /// Mining that block is not allowed (`action::BREAK_BLOCK`).
         BreakRefused { frame: u64, pos: IVec3 },
         /// Holding the use button started on an item that takes this many ticks, or it ended.
-        Using(Option<u32>),
-        /// `only`: the biomes it rains in (a mod's weather by place); `None`: everywhere.
-        Weather { raining: bool, thunder: bool, only: Option<Vec<u32>> },
+        /// Ticks it takes, and whether in the other hand.
+        Using(Option<(u32, bool)>),
+        /// The dimension's weather now (`registry::WeatherDef` by id); `only`: the biomes it falls
+        /// in (a mod's weather by place, chiacraft); `None`: everywhere.
+        Weather { id: u32, only: Option<Vec<u32>> },
         /// The air in the dimension's biomes (a mod's, `set_air`): (biome, fog 0..1, wind m/s,
         /// snow lying 0..1, `air_flags`), and where the wind blows to, degrees clockwise from
         /// north (-z).
@@ -250,16 +383,18 @@ messages! {
         /// Every biome's tint colors (a mod's, `set_biome_tints`): biome by biome, one 0xRRGGBB
         /// per tint kind; empty for the content's.
         Tints { tints: Vec<u32> },
-        /// A white flash on an entity.
-        Flash(u64),
         /// Someone else's arm swings: a hit, a use, mining.
-        EntitySwing(u64),
-        /// Who is mining what, and how far along (0..1), besides this player.
-        Cracks(Vec<(u64, IVec3, f32)>),
+        /// Who, and whether with the other hand.
+        EntitySwing { id: u64, off: bool },
+        /// Who is mining what, besides this player.
+        Cracks(Vec<Crack>),
         /// The player's `permission` level, for what its client offers.
         Permission(u32),
         /// A sprinting hit landed, which ends the sprint.
         StopSprint,
+        /// Camera mode `mode` (`u32::MAX`: the player's own again), `locked` till told; the
+        /// change over `transition` seconds (NaN: the mode's).
+        Camera { mode: u32, locked: bool, transition: f32, easing: u32 },
         /// `block`: the state it was opened on (0: none), `name`: what it belongs to is called.
         OpenMenu { kind: u32, window: u32, slots: u32, owner: u64, block: u32, name: String },
         MenuSlots(Vec<(u32, ItemStack)>),
@@ -267,7 +402,7 @@ messages! {
         CloseMenu,
         Died,
         /// Formatted by the client in its own language.
-        Chat(crate::ui::text::Msg),
+        Show(Shown),
         /// The answer to `ToServer::Command` `id`, for whoever ran it rather than the chat.
         CommandReply { id: u32, lines: Vec<crate::ui::text::Msg> },
         Disconnect(String),
@@ -282,7 +417,7 @@ messages! {
         /// Sound events: (event, position, volume, pitch or 0).
         Sounds(Vec<(u32, DVec3, f32, f32)>),
         /// Keyframe animations started on entities: (entity, name, looping); empty name = none.
-        Animate(Vec<(u64, String, bool)>),
+        PlayAction(Vec<(u64, String, bool)>),
         /// A player's own skin (PNG), for their entity.
         Skin { entity: u64, png: Vec<u8> },
         /// Not let in, or sent away, with the reason in the player's own language (chiacraft:
@@ -305,6 +440,10 @@ messages! {
         /// in `ticks`. The identity stands it up again. A leaning body is only drawn: nothing
         /// collides with it or picks it.
         BodyLean { frame: u64, pivot: [f32; 3], rot: [f32; 4], ticks: u32 },
+        /// A player's own model, for their entity.
+        Avatar { entity: u64, avatar: AvatarData },
+        /// That player left: what they brought can go.
+        PlayerGone { entity: u64 },
     }
 }
 
@@ -319,24 +458,37 @@ messages! {
         /// still holds the DID (chiacraft, phase 4).
         Join { name: String, key: String, account: String, did: String },
         /// `frame`: the body it rides and its position relative to that body as the client shows it
-        /// (the client shows bodies behind the server; only the relative position agrees), or the
-        /// mount it sits on and its seat. `keys`: the movement keys held (`abi::held_keys`).
-        Move { pos: DVec3, yaw: f32, pitch: f32, on_ground: bool, pose: crate::world::Pose, sprint: bool, flying: bool, frame: Option<(u64, DVec3)>, keys: u8 },
-        /// Started mining this block (`frame` like `Break`'s).
-        StartBreak { pos: IVec3, frame: u64 },
+        /// (the client shows bodies behind the server; only the relative position agrees).
+        /// `jumped`: it jumped since the last one.
+        Move { pos: DVec3, yaw: f32, pitch: f32, on_ground: bool, pose: crate::world::Pose, sprint: bool, flying: bool, jumped: bool, frame: Option<(u64, DVec3)> },
+        /// Where the mount the player steers went this tick (its client moves it).
+        /// `flies`: its steering flies it this tick (no fall to count).
+        MountMove { pos: DVec3, yaw: f32, vel: DVec3, on_ground: bool, flies: bool },
+        /// Off what the player rides (`core:dismount`).
+        Dismount,
+        /// May it turn on camera mode `mode` (`camera_flags::ASK`)? Answered with `Camera`.
+        Camera(u32),
+        /// Started mining this block (`frame` and `part` like `Break`'s).
+        StartBreak { pos: IVec3, part: u32, frame: u64 },
         /// Stopped mining without finishing.
         StopBreak,
         /// Let go of the use button before the item took effect.
         StopUsing,
+        /// The main hand's item goes to the other hand and back.
+        SwapHands,
         /// `frame`: the structure (entity) the block is part of, its position in the structure's
         /// coordinates; 0 for the world. `face`: of its selection that was hit.
-        Break { pos: IVec3, face: u8, frame: u64 },
+        /// `part`: which of what is in the cell.
+        Break { pos: IVec3, part: u32, face: u8, frame: u64 },
         /// Right click on a block: the block reacts first (chests), otherwise the held item is used or
         /// placed against the clicked face. `frame` like `Break`'s; `look` in world space.
-        Use { pos: IVec3, face: u8, look: [f32; 3], sneak: bool, frame: u64 },
+        /// `hit`: where on the block, from its corner.
+        Use { pos: IVec3, part: u32, face: u8, look: [f32; 3], hit: [f32; 3], sneak: bool, frame: u64 },
         UseItem { target: Option<(IVec3, u8)> },
         Select(u32),
         Attack(u64),
+        /// A swing that spends its charge, whatever it hit, sent after any `Attack` of that swing.
+        Swing,
         Interact(u64),
         OpenInventory,
         Click { slot: u32, button: u8, shift: bool },
@@ -360,6 +512,8 @@ messages! {
         Packet { channel: u32, data: Vec<u8> },
         /// The player's skin (PNG, 64 x 64 or 64 x 32).
         Skin(Vec<u8>),
+        /// The player's own model.
+        Avatar(AvatarData),
         /// The client's view distance in cubes: what the server announces edited cubes in.
         View(u32),
         /// The player's credentials for the achievement the world asked about

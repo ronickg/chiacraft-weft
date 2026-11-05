@@ -601,21 +601,21 @@ async fn play(
             yaw,
             pitch: 0.0,
             on_ground: true,
-            pose: weft_engine::world::Pose::Stand,
+            pose: weft_engine::world::Pose::STAND,
             sprint: false,
             flying: true,
+            jumped: false,
             frame: None,
-            keys: 1,
         });
         // Now and then: dig the block under it (start, then finish a second later).
         match mining {
             Some((at, done)) if ticks >= done => {
-                msgs.push(ToServer::Break { pos: at, face: 1, frame: 0 });
+                msgs.push(ToServer::Break { pos: at, part: 0, face: 1, frame: 0 });
                 mining = None;
             }
             None if r() < 1.0 / (30.0 * 20.0) => {
                 let at = (pos - DVec3::new(0.0, 1.0, 0.0)).floor().as_ivec3();
-                msgs.push(ToServer::StartBreak { pos: at, frame: 0 });
+                msgs.push(ToServer::StartBreak { pos: at, part: 0, frame: 0 });
                 mining = Some((at, ticks + 20));
             }
             _ => {}

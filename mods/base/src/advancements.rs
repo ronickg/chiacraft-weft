@@ -71,10 +71,11 @@ static STRING: Tag = Tag::named("string");
 static CLOTHES: Tag = Tag::named("clothes");
 static STEWS: Tag = Tag::named("stew");
 static PRESERVED: Tag = Tag::named("preserved");
+static METEORIC_IRON: Tag = Tag::named("meteoric_iron");
 
 /// In the order they usually come. The index is the bit in `Advancements::done`, so new ones go
 /// at the end (at most 64).
-static ALL: [Advancement; 27] = [
+static ALL: [Advancement; 29] = [
     Advancement { id: "timber", icon: Item::named("oak_log"), group: 0, rule: Rule::Break(&LOGS) },
     Advancement { id: "workbench", icon: Item::named("crafting_table"), group: 0, rule: Rule::Have(&CRAFTING_TABLES) },
     Advancement { id: "first_pickaxe", icon: Item::named("wood_pickaxe"), group: 0, rule: Rule::Have(&PICKAXES) },
@@ -103,6 +104,10 @@ static ALL: [Advancement; 27] = [
     Advancement { id: "stew", icon: Item::named("stew"), group: 4, rule: Rule::Have(&STEWS) },
     Advancement { id: "preserved", icon: Item::named("dried_meat"), group: 4, rule: Rule::Have(&PRESERVED) },
     Advancement { id: "tame", icon: Item::named("bone"), group: 4, rule: Rule::Milestone(base_api::milestones::TAME) },
+    // A blood moon seen through without dying (sky events, `events.rs`).
+    Advancement { id: "red_night", icon: Item::named("campfire"), group: 4, rule: Rule::Milestone(base_api::milestones::RED_NIGHT) },
+    // A fallen star's iron in hand (sky events, `meteors.rs`).
+    Advancement { id: "starfall", icon: Item::named("meteoric_iron"), group: 3, rule: Rule::Have(&METEORIC_IRON) },
 ];
 
 /// Server to the player who made it: the index into `ALL`.
@@ -126,7 +131,7 @@ pub fn register(r: &mut Registry) {
     r.entity_component(
         &ADVANCEMENTS,
         Advancements { done: 0 },
-        component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP,
+        component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP_ON_RESPAWN,
     );
     r.attach(&PLAYER, &ADVANCEMENTS);
     r.sound(&CHIME)
@@ -134,25 +139,25 @@ pub fn register(r: &mut Registry) {
         .category(&sound_categories::UI);
 
     r.world_tick(check_players);
-    r.on(&BLOCK_BROKEN, |b| {
+    r.on(&actions::BREAK_BLOCK, |b| {
         let w = b.world();
         for c in b.iter() {
             grant_where(&w, c.player, |rule| matches!(rule, Rule::Break(t) if t.on_block(c.state)));
         }
     });
-    r.on(&BLOCK_PLACED, |b| {
+    r.on(&actions::PLACE_BLOCK, |b| {
         let w = b.world();
         for c in b.iter() {
             placed(&w, c.player, c.state);
         }
     });
-    r.on(&ENTITY_DIED, |b| {
+    r.on(&actions::DIE, |b| {
         let w = b.world();
         for d in b.iter() {
-            grant_where(&w, d.killer, |rule| matches!(rule, Rule::Kill(t) if t.on_entity(d.kind)));
+            grant_where(&w, d.source, |rule| matches!(rule, Rule::Kill(t) if t.on_entity(d.kind)));
         }
     });
-    r.on(&ITEM_USED, |b| {
+    r.on(&actions::USE_ITEM, |b| {
         let w = b.world();
         for u in b.iter() {
             let hot = base_api::food_age(&u.stack, w.day_time()).1;
@@ -183,11 +188,11 @@ pub fn register(r: &mut Registry) {
 fn check_players(w: &World) {
     for id in w.players() {
         let Some(st) = w.entity(id) else { continue };
-        if st.age % 20 != 0 || w.creative(id) {
+        if st.age % 20 != 0 || w.outside_survival(id) {
             continue;
         }
         let inv = w.inventory(id);
-        let items: Vec<u32> = (0..inv.size())
+        let items: Vec<u32> = (0..inv.len())
             .map(|i| inv.get(i))
             .filter(|s| !s.is_empty())
             .map(|s| s.item)
@@ -197,9 +202,9 @@ fn check_players(w: &World) {
                 .filter(|&i| ARMOR.on_item(g.get(i).item).is_some())
                 .count() as u32
         });
-        let y = st.pos[1];
+        let y = st.pos.y;
         let effects = w.component(id, &base_api::VITALS).map_or(0, |v| v.effects);
-        let milestones = w.component(id, &base_api::MILESTONES).copied().unwrap_or(0);
+        let milestones = w.component(id, &base_api::MILESTONES).unwrap_or(0);
         grant_where(w, id, |rule| match *rule {
             Rule::Effect(e) => effects & (1 << e.index()) != 0,
             Rule::Milestone(m) => milestones & m != 0,
@@ -220,7 +225,7 @@ pub fn crafted(w: &World, player: u64, item: u32) {
 /// Grants every advancement whose rule `met` says so to `player`, if it is a player in survival
 /// that doesn't have it yet, and tells their client.
 fn grant_where(w: &World, player: u64, met: impl Fn(&Rule) -> bool) {
-    if player == 0 || w.creative(player) {
+    if player == 0 || w.outside_survival(player) {
         return;
     }
     let Some(a) = w.component_mut(player, &ADVANCEMENTS) else { return };
@@ -285,7 +290,7 @@ fn client(r: &mut Registry) {
         let (gw, gh) = (st.window[0] as f32 / scale, st.window[1] as f32 / scale);
         let left = gw - (TOAST_W + TOAST_MARGIN) * ease;
         let text = |x: f32, y: f32, key: &str, args: &[Arg], color: u32, size: f32| {
-            c.screen_text((left + x) / gw, (TOAST_TOP + y) / gh, key, args, color, size)
+            c.draw_screen_text((left + x) / gw, (TOAST_TOP + y) / gh, key, args, color, size)
         };
         text(TOAST_W / 2.0, 0.0, "advancements.base.toast_box", &[], 0xffffffff, 1.0);
         // An icon in text is as tall as a line: twice the size fills the slot.
@@ -299,24 +304,24 @@ fn client(r: &mut Registry) {
     // Every group a chain of tiles, gold framed once made, with the details in their tooltips.
     // Built when the screen opens, from what the player has made by then.
     r.screen(&SCREEN, |ui| {
-        let done = ui.client().component(&ADVANCEMENTS).map_or(0, |a| a.done);
+        let done = ui.view().component(&ADVANCEMENTS).map_or(0, |a| a.done);
         let tabs: [crate::window::Tab; 1] = [("window.base.tab.stats", |c| {
-            c.client().open_screen(&crate::levels::SCREEN);
+            c.client().screen_open(&crate::levels::SCREEN);
         })];
-        crate::window::window_titled(ui, S::col().pad(8.0).gap(6.0), "advancements.base.title", &tabs, |ui| {
+        crate::window::window_titled(ui, S::column().pad(8.0).gap(6.0), "advancements.base.title", &tabs, |ui| {
             ui.row(S::row().gap(8.0), |ui| {
                 ui.spacer();
-                ui.text_bind_styled(S::col().class("dim").no_wrap(), |v, out| {
+                ui.text_bind_styled(S::column().class("dim").no_wrap(), |v, out| {
                     let done = v
                         .component(&ADVANCEMENTS)
                         .map_or(0, |a| a.done.count_ones());
                     out.set("advancements.base.progress", &[Arg::Int(done as i64), Arg::Int(ALL.len() as i64)]);
                 });
             });
-            ui.panel("well", S::col().pad(6.0).gap(6.0), |ui| {
+            ui.panel("well", S::column().pad(6.0).gap(6.0), |ui| {
                 for (g, group) in GROUPS.iter().enumerate() {
                     ui.row(S::row(), |ui| {
-                        ui.text_styled(S::col().w(90.0).no_wrap(), &format!("advancements.base.group.{group}"), &[]);
+                        ui.text_styled(S::column().w(90.0).no_wrap(), &format!("advancements.base.group.{group}"), &[]);
                         for (n, (i, adv)) in ALL
                             .iter()
                             .enumerate()
@@ -342,14 +347,14 @@ fn client(r: &mut Registry) {
             });
         });
     });
-    r.key(&OPEN, "L").on_press(|c| {
-        c.open_screen(&SCREEN);
+    r.key(&OPEN, "L").on_press_client(|c| {
+        c.screen_open(&SCREEN);
     });
     // The pause menu stretches its mods' parts across the screen; sized and centered like its own
     // buttons (200 wide) instead.
     r.screen_part(&screens::PAUSE, "buttons", 0, |ui| {
-        ui.button("advancements.base.button", S::col().min_w(200.0).self_align(abi::ui_align::CENTER), |c| {
-            c.client().open_screen(&SCREEN);
+        ui.button("advancements.base.button", S::column().min_w(200.0).self_align(abi::ui_align::CENTER), |c| {
+            c.client().screen_open(&SCREEN);
         });
     });
 }

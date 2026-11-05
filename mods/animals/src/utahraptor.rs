@@ -9,10 +9,10 @@
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
-pub(crate) static UTAHRAPTOR: Entity = Entity::named("utahraptor");
-const TEXTURE: &str = "utahraptor/utahraptor";
+use crate::ModelFile;
 
-/// What it hunts.
+pub(crate) static UTAHRAPTOR: EntityKind = EntityKind::named("utahraptor");
+const TEXTURE: &str = "utahraptor/utahraptor";
 
 pub fn init(r: &mut Registry) {
     let index = crate::species::of(&UTAHRAPTOR);
@@ -26,10 +26,10 @@ pub fn init(r: &mut Registry) {
         animals_core::bodies::of("utahraptor"),
         &[("_rest", "utahraptor_rest")],
     );
-    r.entity(&UTAHRAPTOR)
+    crate::riding::rideable(r.entity(&UTAHRAPTOR), index)
         .size(animals_core::bodies::of("utahraptor").0, animals_core::bodies::of("utahraptor").1)
-        .health(60.0)
-        .speed(3.6)
+        .max_health(60.0)
+        .walk_speed(3.6)
         .attack_damage(10.0)
         .passive()
         .model_file("utahraptor")
@@ -43,6 +43,7 @@ pub fn init(r: &mut Registry) {
             {
                 crate::commands::interact(&w, id, player);
             }
+            false
         })
         .goals(
             Goals::new()

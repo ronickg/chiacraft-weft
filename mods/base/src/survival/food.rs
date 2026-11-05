@@ -38,9 +38,9 @@ pub fn register(r: &mut Registry) {
     r.stack_component(&FRESHNESS, 0);
     // No room in the stomach: it doesn't start eating (the other way round it would only find out
     // at the end).
-    r.intercept(&question::USE_ITEM, |q| {
+    r.intercept(&actions::USE_ITEM, |q| {
         let w = q.world();
-        if w.creative(q.entity()) {
+        if w.outside_survival(q.entity()) {
             return Verdict::Abstain;
         }
         let player = q.entity();
@@ -56,7 +56,7 @@ pub fn register(r: &mut Registry) {
             if held.item != q.item() {
                 return Verdict::Abstain;
             }
-            (meals::ingredients(MEAL.stack_only(&held).unwrap_or(0)).len(), base_api::has_room_for_meal(&w, player, &held))
+            (meals::ingredients(MEAL.on_stack_own(&held).unwrap_or(0)).len(), base_api::has_room_for_meal(&w, player, &held))
         } else {
             return Verdict::Abstain;
         };
@@ -70,7 +70,7 @@ pub fn register(r: &mut Registry) {
         } else {
             return Verdict::Abstain;
         };
-        let now = w.time();
+        let now = w.game_time();
         let mut told = TOLD.lock().unwrap();
         let last = told
             .get_or_insert_with(HashMap::new)
@@ -93,11 +93,11 @@ pub fn register(r: &mut Registry) {
         }
         let alpha = ((REFUSED_SECS - t) / REFUSED_FADE).clamp(0.0, 1.0);
         let key = format!("food.base.refused.{}", REFUSALS[why as usize % REFUSALS.len()]);
-        c.screen_text(0.5, REFUSED_Y, &key, &[], 0xffffff00 | (alpha * 255.0) as u32, 1.0);
+        c.draw_screen_text(0.5, REFUSED_Y, &key, &[], 0xffffff00 | (alpha * 255.0) as u32, 1.0);
     });
     // Opening a chest (or any block's inventory) brings its food's freshness up to date: it has
     // aged all along from its stamp, the stamp just says so now.
-    r.intercept(&question::USE_BLOCK, |q| {
+    r.intercept(&actions::USE_BLOCK, |q| {
         let w = q.world();
         let be = w.block_entity(q.pos());
         if be != 0 {
@@ -154,7 +154,7 @@ pub fn age(w: &World, player: u64) {
 pub fn age_inventory(w: &World, id: u64, merge: bool) {
     let inv = w.inventory(id);
     let now = w.day_time();
-    let size = inv.size();
+    let size = inv.len();
     let before: Vec<ItemStack> = (0..size).map(|i| inv.get(i)).collect();
     let mut after = before.clone();
     for stack in after.iter_mut() {
@@ -179,8 +179,9 @@ pub fn age_inventory(w: &World, id: u64, merge: bool) {
 /// it cools.
 pub fn merge_food(stacks: &mut [ItemStack]) {
     let alike = |s: &ItemStack| ItemStack { count: 1, ..s.without(&MADE) };
-    let mergeable =
-        |s: &ItemStack| !s.is_empty() && FRESHNESS.on_item(s.item).is_some() && HOT.stack_only(s).is_none() && MEAL.stack_only(s).is_none();
+    let mergeable = |s: &ItemStack| {
+        !s.is_empty() && FRESHNESS.on_item(s.item).is_some() && HOT.on_stack_own(s).is_none() && MEAL.on_stack_own(s).is_none()
+    };
     for i in 0..stacks.len() {
         if !mergeable(&stacks[i]) {
             continue;
@@ -195,7 +196,7 @@ pub fn merge_food(stacks: &mut [ItemStack]) {
                 continue;
             }
             let n = room.min(s.count);
-            let made = match (MADE.stack_only(&t), MADE.stack_only(&s)) {
+            let made = match (MADE.on_stack_own(&t), MADE.on_stack_own(&s)) {
                 (Some(a), Some(b)) if a > 0 && b > 0 => a.min(b),
                 (Some(a), _) if a > 0 => a,
                 (_, Some(b)) => b,
@@ -214,7 +215,7 @@ pub fn merge_food(stacks: &mut [ItemStack]) {
 /// A food stack stamped and its freshness moved on, at day time `now`.
 fn aged(stack: ItemStack, now: u64) -> ItemStack {
     let today = (now / calendar::DAY_TICKS) as u32 + 1;
-    let keeps = if let Some(packed) = MEAL.stack_only(&stack) {
+    let keeps = if let Some(packed) = MEAL.on_stack_own(&stack) {
         meals::keeps(&meals::ingredients(packed))
     } else if let Some(f) = food::find(item_name(stack.item)).map(|f| &food::FOODS[f]) {
         f.keeps
@@ -224,11 +225,11 @@ fn aged(stack: ItemStack, now: u64) -> ItemStack {
     let mut new = stack;
     // Stamped with today when first seen; hot only where it was cooked (the furnace, the campfire,
     // the pot stamp it), not here: crafted bread came out hot (integration review).
-    if MADE.stack_only(&stack).unwrap_or(0) == 0 {
+    if MADE.on_stack_own(&stack).unwrap_or(0) == 0 {
         new = new.with(&MADE, today);
     }
     let (age, hot) = base_api::food_age(&new, now);
-    if HOT.stack_only(&new).is_some() && !hot {
+    if HOT.on_stack_own(&new).is_some() && !hot {
         new = new.without(&HOT);
     }
     let state = if hot {
@@ -240,7 +241,7 @@ fn aged(stack: ItemStack, now: u64) -> ItemStack {
             food::Freshness::Spoiled => freshness::SPOILED,
         }
     };
-    if FRESHNESS.stack_only(&new) != Some(state) {
+    if FRESHNESS.on_stack_own(&new) != Some(state) {
         new = new.with(&FRESHNESS, state);
     }
     new
@@ -248,7 +249,7 @@ fn aged(stack: ItemStack, now: u64) -> ItemStack {
 
 /// Game days a food stack keeps fresh, then stale (a stew by its ingredients), if it is a food.
 fn keeps_of(stack: &ItemStack) -> Option<(f32, f32)> {
-    if let Some(packed) = MEAL.stack_only(stack) {
+    if let Some(packed) = MEAL.on_stack_own(stack) {
         return Some(meals::keeps(&meals::ingredients(packed)));
     }
     food::find(item_name(stack.item)).map(|f| food::FOODS[f].keeps)

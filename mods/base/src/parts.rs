@@ -60,6 +60,7 @@ const SOURCES: &[(&str, &str)] = &[
     ("stone", "#cobblestone"),
     ("bone", "bone"),
     ("wrought_iron", "#ingots/iron"),
+    ("meteoric_iron", "#meteoric_iron"),
     ("gold", "#ingots/gold"),
     ("diamond", "#gems/diamond"),
     ("plant_cordage", "#string"),
@@ -86,7 +87,11 @@ fn cut_when_apart(material: &str) -> bool {
 }
 
 pub fn register(r: &mut Registry) {
-    r.entity_component(&SKILLS, Skills { xp: [0; 6] }, component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP);
+    r.entity_component(
+        &SKILLS,
+        Skills { xp: [0; 6] },
+        component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP_ON_RESPAWN,
+    );
     r.attach(&PLAYER, &SKILLS);
     // What the held part or tool is made of and has been through, and the player's crafts.
     r.command("inspect", "", |cmd| {
@@ -235,7 +240,7 @@ fn build(stacks: &[ItemStack]) -> Option<(&'static Kind, Vec<(Part, PartOf)>)> {
     let parts: Vec<(&'static str, PartOf)> = stacks
         .iter()
         .filter(|s| !s.is_empty())
-        .map(|s| Some((shape_id(s.item)?, PART.stack_only(s)?)))
+        .map(|s| Some((shape_id(s.item)?, PART.on_stack_own(s)?)))
         .collect::<Option<_>>()?;
     // The working part names the kind: the only one whose shape is a working slot of a kind.
     let kind = KINDS.iter().find(|k| {
@@ -379,7 +384,7 @@ pub fn apart(stack: &ItemStack) -> Vec<ItemStack> {
 
 /// As `apart`; with `cut` false every part comes back (for a repair that puts it back together).
 fn apart_into(stack: &ItemStack, cut: bool) -> Vec<ItemStack> {
-    let Some(p) = PARTS.stack_only(stack) else { return Vec::new() };
+    let Some(p) = PARTS.on_stack_own(stack) else { return Vec::new() };
     let Some(kind) = kind_of(p.kind) else { return Vec::new() };
     // The item's wear since it was put together goes to each part by its wear rate.
     let plain: Vec<Part> = (0..p.n.min(4) as usize)
@@ -394,7 +399,7 @@ fn apart_into(stack: &ItemStack, cut: bool) -> Vec<ItemStack> {
         })
         .collect();
     let stats = combine(kind.id, &plain).ok();
-    let max = DURABILITY.stack_only(stack).unwrap_or(1).max(1) as f32;
+    let max = DURABILITY.on_stack_own(stack).unwrap_or(1).max(1) as f32;
     let share = damage_of(stack) as f32 / max;
     let mut out = Vec::new();
     for (i, part) in plain.iter().enumerate() {
@@ -423,7 +428,7 @@ fn apart_into(stack: &ItemStack, cut: bool) -> Vec<ItemStack> {
 
 /// Uses a stack has worn (the engine's damage on it).
 fn damage_of(stack: &ItemStack) -> u32 {
-    DAMAGE.stack_only(stack).unwrap_or(0)
+    DAMAGE.on_stack_own(stack).unwrap_or(0)
 }
 
 // ---------------------------------------------------------------- repair
@@ -454,7 +459,7 @@ fn role_of_item(item: u32) -> Option<Role> {
 
 /// A worn part with one unit of its material: the part with `repair_share` of its life back.
 fn repair_part(part: &ItemStack, with: &ItemStack) -> Option<ItemStack> {
-    let p = PART.stack_only(part)?;
+    let p = PART.on_stack_own(part)?;
     let m = material_of(p.material)?;
     if p.worn == 0 || !is_source(m.id, with.item) {
         return None;
@@ -467,13 +472,13 @@ fn repair_part(part: &ItemStack, with: &ItemStack) -> Option<ItemStack> {
 /// A tool with one unit of a material: its most worn part of that material repaired, the tool
 /// put back together.
 fn repair_tool(tool: &ItemStack, with: &ItemStack) -> Option<ItemStack> {
-    PARTS.stack_only(tool)?;
+    PARTS.on_stack_own(tool)?;
     let mut parts = apart_into(tool, false);
     let worst = parts
         .iter()
         .enumerate()
         .filter_map(|(i, s)| {
-            let p = PART.stack_only(s)?;
+            let p = PART.on_stack_own(s)?;
             let m = material_of(p.material)?;
             let life = crafting::combine::life_of(role_of_item(s.item)?, m.id, p.grade as u8).max(1.0);
             (p.worn > 0 && is_source(m.id, with.item)).then_some((i, p.worn as f32 / life))
@@ -504,22 +509,18 @@ fn repaired(stacks: &[ItemStack]) -> ItemStack {
 /// "assembled" shows what the assembly slots make: a tool from parts, or a repair (a worn part
 /// or tool and one unit of its material).
 pub fn on_change(m: &MenuCtx) {
-    let (asm, apart_slot, out) = (m.group("assembly"), m.group("apart"), m.group("assembled"));
-    if asm.is_empty() {
+    let (apart_slot, out) = (m.group("apart"), m.group("assembled"));
+    if m.group(ASSEMBLY[0]).is_empty() {
         return;
     }
     let held = apart_slot.get(0);
-    if !held.is_empty() && PARTS.stack_only(&held).is_some() && (0..asm.len()).all(|i| asm.get(i).is_empty()) {
-        for (i, part) in apart(&held)
-            .into_iter()
-            .enumerate()
-            .take(asm.len() as usize)
-        {
-            asm.set(i as u32, part);
+    if !held.is_empty() && PARTS.on_stack_own(&held).is_some() && (0..ASSEMBLY.len()).all(|i| asm_get(m, i).is_empty()) {
+        for (i, part) in apart(&held).into_iter().enumerate().take(ASSEMBLY.len()) {
+            asm_set(m, i, part);
         }
         apart_slot.set(0, ItemStack::EMPTY);
     }
-    let stacks: Vec<ItemStack> = (0..asm.len()).map(|i| asm.get(i)).collect();
+    let stacks: Vec<ItemStack> = (0..ASSEMBLY.len()).map(|i| asm_get(m, i)).collect();
     // A tool from its parts, else a repair: a worn part or tool and a unit of its material.
     let built = assembled(&stacks);
     out.set(0, if built.is_empty() { repaired(&stacks) } else { built });
@@ -531,26 +532,41 @@ pub fn on_take(m: &MenuCtx) -> bool {
     if m.group("assembled").index_of(m.slot()).is_none() {
         return false;
     }
-    let asm = m.group("assembly");
-    for i in 0..asm.len() {
-        let s = asm.get(i);
+    for i in 0..ASSEMBLY.len() {
+        let s = asm_get(m, i);
         if !s.is_empty() {
-            asm.set(i, if s.count > 1 { ItemStack { count: s.count - 1, ..s } } else { ItemStack::EMPTY });
+            asm_set(m, i, if s.count > 1 { ItemStack { count: s.count - 1, ..s } } else { ItemStack::EMPTY });
         }
     }
     true
+}
+
+/// The table's four assembly slots, a group each so each shows its own ghost while empty (a
+/// head, a haft, a fitting, the UI redo; parts go in any order).
+pub const ASSEMBLY: [&str; 4] = ["assembly_head", "assembly_haft", "assembly_fitting", "assembly_more"];
+
+fn asm_get(m: &MenuCtx, i: usize) -> ItemStack {
+    m.group(ASSEMBLY[i]).get(0)
+}
+
+fn asm_set(m: &MenuCtx, i: usize, s: ItemStack) {
+    m.group(ASSEMBLY[i]).set(0, s);
 }
 
 /// The table's parts row: four assembly slots, what they make, and the slot that takes a tool
 /// apart.
 pub fn ui(ui: &mut Ui) {
     ui.row(S::row().gap(4.0), |ui| {
-        ui.text_styled(S::col().class("dim"), "crafting.parts.assemble", &[]);
-        ui.group("assembly");
+        ui.text_styled(S::column().class("dim"), "crafting.parts.assemble", &[]);
+        ui.row(S::row(), |ui| {
+            for g in ASSEMBLY {
+                ui.group(g);
+            }
+        });
         ui.recipe_arrow();
         ui.group("assembled");
         ui.spacer();
-        ui.text_styled(S::col().class("dim"), "crafting.parts.apart", &[]);
+        ui.text_styled(S::column().class("dim"), "crafting.parts.apart", &[]);
         ui.group("apart");
     });
 }
@@ -565,7 +581,7 @@ fn inspect(w: &World, player: u64, mut reply: impl FnMut(&str, &[Arg])) {
         .group("hotbar")
         .get(w.selected_slot(player));
     let grade_key = |g: u32| grades::grade(g.clamp(1, 10) as u8).key;
-    if let Some(p) = PART.stack_only(&held) {
+    if let Some(p) = PART.on_stack_own(&held) {
         let m = material_of(p.material).map_or("", |m| m.key);
         reply(
             "command.base.inspect.part",
@@ -578,7 +594,7 @@ fn inspect(w: &World, player: u64, mut reply: impl FnMut(&str, &[Arg])) {
                 Arg::Int(p.worn as i64),
             ],
         );
-    } else if let Some(t) = PARTS.stack_only(&held) {
+    } else if let Some(t) = PARTS.on_stack_own(&held) {
         reply("command.base.inspect.tool", &[Arg::Item(held.item), Arg::Key(grade_key(t.grade)), Arg::Int(t.n as i64)]);
         let kind = kind_of(t.kind);
         for i in 0..t.n.min(4) as usize {

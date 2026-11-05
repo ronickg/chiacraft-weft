@@ -97,7 +97,7 @@ pub fn merge_effects() -> bool {
 /// The `pack.cfg` the options were read from, when it was written, and the names in it.
 type OptionsRead = Option<(PathBuf, Option<std::time::SystemTime>, Vec<String>)>;
 
-/// The settings the chosen pack reads (`options = a, b, ...` in its `pack.cfg`, at most 16):
+/// The settings the chosen pack reads (`options = a, b, ...` in its `pack.cfg`, at most 32):
 /// their values reach every pack shader as `scene.options` (`Client::scene`), in that order, so a
 /// pack's look can be tuned in the game's settings and swept with `--config` without editing
 /// shaders. Read again when the file changes.
@@ -123,7 +123,7 @@ pub fn pack_options() -> Vec<String> {
                 .collect::<Vec<_>>()
         })
         .filter(|n| !n.is_empty())
-        .take(16)
+        .take(32)
         .collect();
     *CACHE.write().unwrap() = Some((dir, stamp, names.clone()));
     names
@@ -208,6 +208,11 @@ pub fn compose(
 
 pub(crate) fn open_folder(dir: &Path) {
     let _ = std::fs::create_dir_all(dir);
+    open_path(dir);
+}
+
+/// Opens a file or folder the way the system does (Explorer, Finder, xdg-open).
+pub(crate) fn open_path(path: &Path) {
     let opener = if cfg!(windows) {
         "explorer"
     } else if cfg!(target_os = "macos") {
@@ -215,8 +220,8 @@ pub(crate) fn open_folder(dir: &Path) {
     } else {
         "xdg-open"
     };
-    if let Err(e) = std::process::Command::new(opener).arg(dir).spawn() {
-        log::warn!("opening {}: {e}", dir.display());
+    if let Err(e) = std::process::Command::new(opener).arg(path).spawn() {
+        log::warn!("opening {}: {e}", path.display());
     }
 }
 

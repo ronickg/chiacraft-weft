@@ -49,7 +49,7 @@ fn lasts(w: &World, id: u64, a: &Animal) -> Option<f32> {
 /// loses health (dead in `PARCHED_SECS` at full health).
 pub fn thirst(w: &World, id: u64, a: &Animal, st: &EntityState, rate: f32, secs: f32) {
     let Some(lasts) = lasts(w, id, a) else { return };
-    let eye = [st.pos[0], st.pos[1] + st.size[2] as f64, st.pos[2]].map(|v| v.floor() as i32);
+    let eye = [st.pos.x, st.pos.y + st.size.eye as f64, st.pos.z].map(|v| v.floor() as i32);
     let rained = w.sky_light(eye) >= 15 && w.raining_at(eye);
     let mut t = a.thirst + rate / lasts * secs;
     if rained {
@@ -63,13 +63,13 @@ pub fn thirst(w: &World, id: u64, a: &Animal, st: &EntityState, rate: f32, secs:
         a.thirst = t;
     }
     if t >= 1.0 && !animal::tamed(w, id) {
-        w.damage(id, st.max_health / PARCHED_SECS * secs, 0, damage::STARVE);
+        w.damage(id, st.max_health / PARCHED_SECS * secs, 0, damage_cause::STARVE);
     }
 }
 
 /// Whether the block at `pos` is open water to drink from: its surface, air above it.
 fn open_water(w: &World, pos: [i32; 3]) -> bool {
-    crate::comfort::WATER.in_cell(w.get(pos)) && w.get([pos[0], pos[1] + 1, pos[2]]) == 0
+    crate::comfort::WATER.at(w, pos) && w.block([pos[0], pos[1] + 1, pos[2]]) == 0
 }
 
 /// The nearest place within `LOOK` blocks where it can stand on dry ground beside open water.
@@ -88,7 +88,7 @@ fn nearest_water(w: &World, pos: [f64; 3]) -> Option<[f64; 3]> {
                 for (sx, sz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
                     let (x, z) = (at[0] + sx, at[2] + sz);
                     let Some(y) = crate::comfort::ground(w, x, at[1] + 1, z) else { continue };
-                    if (y - (at[1] + 1)).abs() > 1 || crate::comfort::WATER.in_cell(w.get([x, y, z])) {
+                    if (y - (at[1] + 1)).abs() > 1 || crate::comfort::WATER.at(w, [x, y, z]) {
                         continue;
                     }
                     let spot = [x as f64 + 0.5, y as f64, z as f64 + 0.5];
@@ -119,9 +119,9 @@ pub fn busy(w: &World, id: u64) -> bool {
 /// Standing in water it drinks where it is. With no water near it lets foraging and wandering
 /// take it elsewhere.
 pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
-    let Some(a) = w.component(id, &ANIMAL).copied() else { return false };
+    let Some(a) = w.component(id, &ANIMAL) else { return false };
     let Some(s) = a.species() else { return false };
-    let Some(mut d) = w.component(id, &DRINK).copied() else { return false };
+    let Some(mut d) = w.component(id, &DRINK) else { return false };
     let water = 1.0 - a.thirst;
     let gets_thirsty = (s.hungry_in_the_wild() || animal::tamed(w, id)) && lasts(w, id, &a).is_some();
     if !gets_thirsty || water >= SLAKED || (d[3] == 0.0 && water >= THIRSTY) {
@@ -130,12 +130,12 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
         }
         return false;
     }
-    let now = w.time() as f64;
+    let now = w.game_time() as f64;
     let spot = (!d[0].is_nan() && d[3] != 0.0).then(|| [d[0], d[1], d[2]]);
     let there = st.in_liquid != 0
         || spot.is_some_and(|p| {
-            let (dx, dz) = (p[0] - st.pos[0], p[2] - st.pos[2]);
-            dx * dx + dz * dz <= 2.25 && (p[1] - st.pos[1]).abs() <= 1.5
+            let (dx, dz) = (p[0] - st.pos.x, p[2] - st.pos.z);
+            dx * dx + dz * dz <= 2.25 && (p[1] - st.pos.y).abs() <= 1.5
         });
     if there {
         if now < d[3] {
@@ -148,7 +148,7 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
             w.navigate(id, st.pos, 0.0);
         }
         weft_sdk::debug!("{} {id} drinks: water {:.0}%", s.name, (water + GULP).min(1.0) * 100.0);
-        let p = spot.unwrap_or(st.pos);
+        let p = spot.unwrap_or(st.pos.to_array());
         d = [p[0], p[1], p[2], now + GULP_TICKS as f64];
         w.component_mut(id, &DRINK).map(|c| *c = d);
         return true;
@@ -157,7 +157,7 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
         // Walking to it; or no water near, foraging and wandering on.
         return spot.is_some();
     }
-    match nearest_water(w, st.pos) {
+    match nearest_water(w, st.pos.to_array()) {
         Some(p) => {
             weft_sdk::debug!("{} {id} is thirsty (water {:.0}%): to water at {p:?}", s.name, water * 100.0);
             w.navigate(id, p, 1.0);

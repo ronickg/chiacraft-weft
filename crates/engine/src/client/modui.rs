@@ -318,7 +318,12 @@ pub unsafe extern "C" fn ui_open(u: *mut abi::UiCtx, node: *const abi::UiNode) {
                 let layout = &c.game.player_layout;
                 let def = b.menu.and_then(|k| c.game.menus.get(k as usize));
                 let id = b.ui.open(Kind::Container { class: None }, style);
-                for e in &layout.equipment {
+                // The other hand has its own place in a screen (`ui.group`).
+                for e in layout
+                    .equipment
+                    .iter()
+                    .filter(|e| e.name != weft_abi::OFF_HAND_SLOT)
+                {
                     if let Some((g, first, _)) = def.and_then(|d| d.group(layout, &e.name)) {
                         let s = b.ui.add(
                             Kind::Custom { tag: TAG_SLOT, data: first as u64 },
@@ -405,7 +410,7 @@ pub unsafe extern "C" fn ui_open(u: *mut abi::UiCtx, node: *const abi::UiNode) {
                 }
                 id
             }
-            uk::PARTS => {
+            uk::SCREEN_PARTS => {
                 let id = b.ui.open(Kind::Container { class: None }, style);
                 let (screen, area) = (class.clone(), n.text.as_str().to_string());
                 parts(b.ui, lang, input, b.client, &screen, &area);
@@ -444,8 +449,20 @@ pub unsafe extern "C" fn ui_open(u: *mut abi::UiCtx, node: *const abi::UiNode) {
                         count: n.count,
                         bind,
                         value: -1.0,
-                        dir: if n.data == 1 { weft_abi::ui_dir::LEFT } else { n.dir },
-                        shake: n.data == 2,
+                        dir: n.dir,
+                        shake: if n.data == 0 { None } else { Some(f32::from_bits(n.data)) },
+                        effects: n
+                            .effects
+                            .as_slice()
+                            .iter()
+                            .map(|e| crate::ui::IconEffect {
+                                kind: e.kind,
+                                bind: e.bind.func.is_some().then(|| float_bind(owner, e.bind)),
+                                amount: e.amount,
+                                value: 0.0,
+                            })
+                            .collect(),
+                        change: None,
                     },
                     style,
                 )
@@ -454,7 +471,7 @@ pub unsafe extern "C" fn ui_open(u: *mut abi::UiCtx, node: *const abi::UiNode) {
                 b.ui.open(Kind::Image { texture: n.text.as_str().to_string(), color: 0xFFFFFFFF }, style)
             }
             // The player (data 0), or with the text "menu" the menu's own entity (data 1).
-            uk::ENTITY => {
+            uk::PLAYER_MODEL => {
                 b.ui.open(Kind::Custom { tag: TAG_ENTITY, data: (n.text.as_str() == "menu") as u64 }, style)
             }
             uk::SPACER => {
@@ -527,8 +544,8 @@ pub unsafe extern "C" fn client_day_time(c: *mut abi::ClientCtx) -> u64 {
     unsafe { view(c).map_or(0, |cl| cl.world.time) }
 }
 
-pub unsafe extern "C" fn client_raining(c: *mut abi::ClientCtx) -> u32 {
-    unsafe { view(c).is_some_and(|cl| cl.weather.0 && cl.world.rains_at(cl.player.pos.floor().as_ivec3())) as u32 }
+pub unsafe extern "C" fn client_weather(c: *mut abi::ClientCtx) -> u32 {
+    unsafe { view(c).map_or(0, |cl| cl.weather_id as u32) }
 }
 
 pub unsafe extern "C" fn client_permission(c: *mut abi::ClientCtx) -> u32 {
@@ -587,21 +604,18 @@ pub unsafe extern "C" fn client_entity(c: *mut abi::ClientCtx, id: u64, out: *mu
         if id == cl.player_id || id == 0 {
             let state = abi::EntityState {
                 kind: content.game.player_kind,
-                pos: cl.player.pos.to_array(),
-                vel: cl.player.vel.to_array(),
+                pos: cl.player.pos.to_array().into(),
+                vel: cl.player.vel.to_array().into(),
                 yaw: cl.player.yaw,
                 pitch: cl.player.pitch,
                 on_ground: cl.player.on_ground as u32,
                 in_liquid: cl.player.in_liquid as u32,
                 sprinting: cl.player.sprinting as u32,
-                pose: cl.player.pose as u32,
+                pose: cl.player.pose.0 as u32,
                 flying: cl.player.flying as u32,
-                health: cl.health,
+                health: cl.health(),
                 max_health: cl.max_health,
-                size: {
-                    let (hw, h, eye) = cl.player.dims();
-                    [hw as f32 * 2.0, h as f32, eye as f32]
-                },
+                size: cl.player.dims().size(),
                 ..Default::default()
             };
             *out = state;
@@ -611,7 +625,7 @@ pub unsafe extern "C" fn client_entity(c: *mut abi::ClientCtx, id: u64, out: *mu
             Some(e) => {
                 let state = abi::EntityState {
                     kind: e.kind,
-                    pos: e.pos.to_array(),
+                    pos: e.pos.to_array().into(),
                     yaw: e.yaw,
                     pitch: e.pitch,
                     moved: e.swing,
@@ -627,10 +641,7 @@ pub unsafe extern "C" fn client_entity(c: *mut abi::ClientCtx, id: u64, out: *mu
                             })
                             .unwrap_or(attr.default) as f32
                     },
-                    size: {
-                        let (hw, h, eye) = e.dims();
-                        [hw as f32 * 2.0, h as f32, eye as f32]
-                    },
+                    size: e.dims().size(),
                     ..Default::default()
                 };
                 *out = state;
@@ -641,6 +652,6 @@ pub unsafe extern "C" fn client_entity(c: *mut abi::ClientCtx, id: u64, out: *mu
     }
 }
 
-pub unsafe extern "C" fn client_creative(c: *mut abi::ClientCtx) -> u32 {
-    unsafe { view(c).is_some_and(|cl| cl.mode.invulnerable()) as u32 }
+pub unsafe extern "C" fn client_game_mode(c: *mut abi::ClientCtx) -> u32 {
+    unsafe { view(c).map_or(0, |cl| cl.mode.0 as u32) }
 }

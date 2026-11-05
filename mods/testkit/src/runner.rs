@@ -13,6 +13,15 @@ use std::time::{Duration, Instant};
 use weft_sdk::client::{self, ClientState, client_flags as cf};
 use weft_sdk::*;
 
+/// The key of an action tests and scripts name as text, one handle per name.
+fn key_named(action: &str) -> &'static Key {
+    static KEYS: std::sync::Mutex<Option<HashMap<String, &'static Key>>> = std::sync::Mutex::new(None);
+    let mut keys = KEYS.lock().unwrap();
+    keys.get_or_insert_with(HashMap::new)
+        .entry(action.to_string())
+        .or_insert_with(|| Key::generated(action.to_string()))
+}
+
 pub type R = Result<(), String>;
 pub type BoxTest = Pin<Box<dyn Future<Output = R>>>;
 
@@ -150,16 +159,15 @@ impl T {
     /// of the local player in first person; `None` behind the camera.
     pub fn on_screen(&self, p: [f64; 3]) -> Option<(f32, f32)> {
         let s = self.state();
-        let eye_y = self.c().entity(0).map_or(1.62, |e| e.size[2] as f64);
-        let eye = [s.shown[0], s.shown[1] + eye_y, s.shown[2]];
+        let eye_y = self.c().entity(0).map_or(1.62, |e| e.size.eye as f64);
+        let eye = [s.shown.x, s.shown.y + eye_y, s.shown.z];
+        let fwd = look_dir(s.yaw, s.pitch);
         let (sy, cy) = (s.yaw as f64).sin_cos();
-        let (sp, cp) = (s.pitch as f64).sin_cos();
-        let fwd = [-sy * cp, sp, -cy * cp];
         let right = [cy, 0.0, -sy];
-        let up = [right[1] * fwd[2] - right[2] * fwd[1], right[2] * fwd[0] - right[0] * fwd[2], right[0] * fwd[1] - right[1] * fwd[0]];
+        let up = [right[1] * fwd.z - right[2] * fwd.y, right[2] * fwd.x - right[0] * fwd.z, right[0] * fwd.y - right[1] * fwd.x];
         let d = [p[0] - eye[0], p[1] - eye[1], p[2] - eye[2]];
         let dot = |a: [f64; 3]| a[0] * d[0] + a[1] * d[1] + a[2] * d[2];
-        let z = dot(fwd);
+        let z = dot(fwd.to_array());
         if z <= 0.05 {
             return None;
         }
@@ -222,8 +230,8 @@ impl T {
         let mut last = [f64::NAN; 3];
         self.until("standing still", DEFAULT_TIMEOUT, move |t| {
             let s = t.state();
-            let moved = (0..3).any(|i| (s.pos[i] - last[i]).abs() > 1e-6 || s.pos[i].is_nan());
-            last = s.pos;
+            let moved = (s.pos - last.into()).length_squared() > 1e-12 || s.pos.to_array().iter().any(|v| v.is_nan());
+            last = s.pos.to_array();
             still = if moved || !t.flag(cf::ON_GROUND) { 0 } else { still + 1 };
             still >= 20
         })
@@ -239,7 +247,7 @@ impl T {
     /// A fresh world `test-<name>` with `seed`, waiting until it is loaded.
     pub async fn world(&self, seed: u64) -> R {
         let name = format!("test-{}", self.name());
-        self.c().new_world(&name, seed);
+        self.c().world_create(&name, seed);
         self.until("joined", Duration::from_secs(60), |t| t.flag(cf::JOINED))
             .await?;
         // Mobs only where a test puts them, so pictures repeat.
@@ -252,7 +260,7 @@ impl T {
         let before = self.c().chat_line(0);
         let marker = self.0.borrow().state.frame;
         let sent = Instant::now();
-        self.c().chat(line);
+        self.c().say(line);
         let mut seen = String::new();
         // A reply the same as the line before (time frozen) or none at all (`/rename`) shows as no
         // change: then 600 frames or 5 s, whichever first, count as answered. Frames alone never
@@ -329,14 +337,13 @@ impl T {
 
     /// Player's block position as the client has it.
     pub fn feet(&self) -> [i32; 3] {
-        let p = self.state().pos;
-        [p[0].floor() as i32, p[1].floor() as i32, p[2].floor() as i32]
+        block_pos_of(self.state().pos).to_array()
     }
 
     // ------------------------------------------------ input
 
     pub fn press(&self, action: &str) {
-        if !self.c().press(action, 0.0) {
+        if !self.c().input_action(key_named(action), 0.0) {
             self.fail(format!("no action {action}"));
         }
     }
@@ -351,7 +358,7 @@ impl T {
     }
 
     pub fn hold(&self, action: &str, secs: f32) {
-        if !self.c().press(action, secs) {
+        if !self.c().input_action(key_named(action), secs) {
             self.fail(format!("no action {action}"));
         }
     }
@@ -361,7 +368,7 @@ impl T {
         for q in queries {
             match self.c().ui_rect(q) {
                 None => self.fail(format!("no UI element {q} on {}", self.0.borrow().screen)),
-                Some([x, y, w, h]) => {
+                Some(Rect { x, y, w, h }) => {
                     self.check(
                         x >= 0.0 && y >= 0.0 && x + w <= 1.001 && y + h <= 1.001,
                         format!("{q} sticks out of the window ({x:.3} {y:.3} {w:.3} {h:.3})"),
@@ -389,16 +396,37 @@ impl T {
 
     /// The UI query of hotbar slot `i` in the open menu: a menu's last nine slots are the hotbar
     /// (the player's inventory comes last), so its number follows whatever the menu has before
-    /// it (the inventory's clothing slots moved it from 36 to 40).
+    /// it (the inventory's clothing slots moved it from 36 to 40), except the other hand's slot, numbered after it.
     pub fn hotbar(&self, i: u32) -> String {
-        let last = (0..512u32)
-            .rev()
-            .find(|n| self.c().ui_rect(&format!("slot:{n}")).is_some());
+        let rect = |n: u32| self.c().ui_rect(&format!("slot:{n}"));
+        let mut last = (0..512u32).rev().find(|&n| rect(n).is_some());
+        // Weft numbers the other hand's slot last, past the hotbar: when the highest slot isn't
+        // in the row of the one before it, it is that, and the hotbar ends one earlier.
+        if let Some(l) = last.filter(|&l| l > 9) {
+            if let (Some(a), Some(b)) = (rect(l), rect(l - 1)) {
+                if (a.y - b.y).abs() > 0.001 {
+                    last = Some(l - 1);
+                }
+            }
+        }
         format!("slot:{}", last.map_or(36 + i, |l| l.saturating_sub(8) + i))
     }
 
+    /// Clicks a UI element after the cursor has rested on it for two frames. `click_ui` moves the
+    /// cursor and presses in one frame, which may land on what the cursor was over before: with a
+    /// stack held, a right click meant for a grid cell then goes back onto the slot it was taken from.
+    pub async fn click_settled(&self, query: &str, button: u32) -> R {
+        let Some(Rect { x, y, w, h }) = self.c().ui_rect(query) else {
+            return Err(format!("no UI element {query} on {}", self.0.borrow().screen));
+        };
+        self.c().input_cursor(x + w / 2.0, y + h / 2.0);
+        self.frames(2).await?;
+        self.c().input_click(button, 0.0);
+        Ok(())
+    }
+
     pub fn click_ui(&self, query: &str, button: u32) -> bool {
-        let ok = self.c().click_ui(query, button);
+        let ok = self.c().ui_click(query, button);
         if !ok {
             self.fail(format!("no UI element {query} on {}", self.0.borrow().screen));
         }
@@ -418,11 +446,11 @@ impl T {
         let id = self.c().screenshot(&path);
         let mut shot = None;
         self.until(&format!("screenshot {name}"), Duration::from_secs(10), |_| {
-            shot = client::image(id).map(|(w, h, p)| Shot { w, h, px: p.to_vec() });
+            shot = client::image_pixels(id).map(|(w, h, p)| Shot { w, h, px: p.to_vec() });
             shot.is_some()
         })
         .await?;
-        client::image_free(id);
+        client::image_unload(id);
         Ok(shot.unwrap())
     }
 
@@ -739,7 +767,7 @@ pub fn frame(c: &Client) {
         }
         let (t, fut, began) = run.current.as_mut().unwrap();
         // Held, not pressed: a key the test taps itself is pressed only within its own frame.
-        if c.held(&PROBE) {
+        if c.key_held(&PROBE) {
             PROBES.with(|p| p.set(p.get() + 1));
         }
         {
@@ -768,12 +796,12 @@ pub fn frame(c: &Client) {
             drop(i);
             run.done.push(out);
             run.current = None;
-            c.release_all();
+            c.input_release_all();
             if c.state().flags & cf::DEBUG != 0 {
-                c.key("F3", 0.0);
+                c.input_key("F3", 0.0);
             }
             if c.state().flags & cf::IN_WORLD != 0 {
-                c.leave_world();
+                c.world_leave();
             }
         }
     });

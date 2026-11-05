@@ -588,7 +588,7 @@ dependencies = [
 
 [[package]]
 name = "base"
-version = "26.10.4"
+version = "26.11.2"
 dependencies = [
  "base_api",
  "crafting",
@@ -622,7 +622,7 @@ checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 
 [[package]]
 name = "base_api"
-version = "26.10.4"
+version = "26.11.2"
 dependencies = [
  "vitals",
  "weft_sdk",
@@ -1338,7 +1338,7 @@ dependencies = [
 
 [[package]]
 name = "chiacraft-bridge"
-version = "26.10.4"
+version = "26.11.2"
 dependencies = [
  "weft_abi",
 ]
@@ -7161,7 +7161,7 @@ dependencies = [
 
 [[package]]
 name = "testkit"
-version = "26.10.4"
+version = "26.11.2"
 dependencies = [
  "base_api",
  "png",
@@ -7171,7 +7171,7 @@ dependencies = [
 
 [[package]]
 name = "testmod"
-version = "26.10.4"
+version = "26.11.2"
 dependencies = [
  "base_api",
  "weft_sdk",
@@ -8394,7 +8394,7 @@ dependencies = [
 
 [[package]]
 name = "weft"
-version = "26.10.4"
+version = "26.11.2"
 dependencies = [
  "log",
  "weft_engine",
@@ -8405,11 +8405,11 @@ dependencies = [
 
 [[package]]
 name = "weft_abi"
-version = "26.10.4"
+version = "26.11.2"
 
 [[package]]
 name = "weft_engine"
-version = "26.10.4"
+version = "26.11.2"
 dependencies = [
  "arboard",
  "bytemuck",
@@ -8444,11 +8444,11 @@ dependencies = [
 
 [[package]]
 name = "weft_noise"
-version = "26.10.4"
+version = "26.11.2"
 
 [[package]]
 name = "weft_render"
-version = "26.10.4"
+version = "26.11.2"
 dependencies = [
  "bytemuck",
  "naga",
@@ -8458,7 +8458,7 @@ dependencies = [
 
 [[package]]
 name = "weft_sdk"
-version = "26.10.4"
+version = "26.11.2"
 dependencies = [
  "weft_abi",
  "weft_noise",
@@ -8466,7 +8466,7 @@ dependencies = [
 
 [[package]]
 name = "weft_vulkan"
-version = "26.10.4"
+version = "26.11.2"
 dependencies = [
  "ash",
  "ash-window",

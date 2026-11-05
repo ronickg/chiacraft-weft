@@ -8,8 +8,8 @@ use weft_sdk::*;
 
 use crate::birds::{self, Wings};
 
-pub(crate) static HOUSE_SPARROW: Entity = Entity::named("house_sparrow");
-pub(crate) static SNOW_BUNTING: Entity = Entity::named("snow_bunting");
+pub(crate) static HOUSE_SPARROW: EntityKind = EntityKind::named("house_sparrow");
+pub(crate) static SNOW_BUNTING: EntityKind = EntityKind::named("snow_bunting");
 
 static WINGS: Wings = Wings {
     model: "small_bird",

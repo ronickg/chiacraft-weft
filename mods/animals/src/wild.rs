@@ -8,6 +8,8 @@
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
+use crate::ModelFile;
+
 /// One simple creature's body, for every species on its model.
 pub struct Body {
     /// Its model and animation files (`<model>.geo.json`, `<model>.animation.json`), and texture.
@@ -43,10 +45,10 @@ pub fn init(r: &mut Registry) {
 }
 
 /// Registers `kinds` (each an entity and its row in `species::SPECIES`) on one `body`.
-pub fn register(r: &mut Registry, kinds: &[&'static Entity], body: &'static Body) {
+pub fn register(r: &mut Registry, kinds: &[&'static EntityKind], body: &'static Body) {
     let (look, (w, h)) = body.rest;
     drop(
-        r.entity(Entity::generated(look.to_string()))
+        r.entity(EntityKind::generated(look.to_string()))
             .size(w, h)
             .passive()
             .model_file(body.model)
@@ -58,8 +60,8 @@ pub fn register(r: &mut Registry, kinds: &[&'static Entity], body: &'static Body
         let index = crate::species::of(kind);
         r.entity(kind)
             .size(bw, bh)
-            .health(body.health)
-            .speed(body.speed)
+            .max_health(body.health)
+            .walk_speed(body.speed)
             .attack_damage(body.damage)
             .passive()
             .model_file(body.model)
@@ -69,6 +71,7 @@ pub fn register(r: &mut Registry, kinds: &[&'static Entity], body: &'static Body
             .on_interact(|e| {
                 let (w, id, player) = (e.world(), e.entity(), e.other());
                 crate::screen::interact(&w, id, player);
+                false
             })
             .goals(
                 Goals::new()
@@ -76,6 +79,7 @@ pub fn register(r: &mut Registry, kinds: &[&'static Entity], body: &'static Body
                     .then(startle)
                     .then(crate::taming::behave(index))
                     .then(|w: &World, id: u64, st: &EntityState| crate::hunt::wary(w, id, st) && woken(w, id))
+                    .then(|w: &World, id: u64, st: &EntityState| crate::hunt::huddle(w, id, st) && woken(w, id))
                     .then(|w: &World, id: u64, st: &EntityState| crate::hunt::hunt(w, id, st) && woken(w, id))
                     .then(crate::breeding::behave(index))
                     .then(move |w: &World, id: u64, st: &EntityState| settle(w, id, st, look))
@@ -112,7 +116,7 @@ fn settle(w: &World, id: u64, st: &EntityState, look: &str) -> bool {
     }
     if c.resting != resting {
         c.resting = resting;
-        w.set_look(id, resting.then(|| format!("animals:{look}")).as_deref());
+        w.set_appearance(id, resting.then(|| format!("animals:{look}")).as_deref());
     }
     if resting && w.navigating(id) {
         w.navigate(id, st.pos, 0.0);
@@ -133,6 +137,6 @@ pub fn wake(w: &World, id: u64) {
     {
         c.rest = 0;
         c.resting = false;
-        w.set_look(id, None);
+        w.set_appearance(id, None);
     }
 }

@@ -5,11 +5,10 @@ use std::cmp::Reverse;
 use std::collections::{BinaryHeap, VecDeque};
 use std::sync::Arc;
 
-use glam::{DVec3, IVec3};
+use glam::IVec3;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::content::{AIR, Content};
-use crate::physics::Transform;
 use crate::world::{Cube, cube_of, local_index};
 
 #[derive(Default)]
@@ -28,6 +27,10 @@ pub struct Space {
     pub(super) neighbor_queue: VecDeque<(IVec3, IVec3)>,
     /// Block changes this tick, sent as deltas.
     pub changes: Vec<(IVec3, u32)>,
+    /// The part of a cell whose callback is running, what the mod's `get` and `set` mean there.
+    pub(super) acting: Option<(IVec3, u32)>,
+    /// Cells whose other blocks changed this tick, with what they have now.
+    pub extra_changes: Vec<(IVec3, Vec<u32>)>,
     /// Cubes whose light changed this tick, sent whole.
     pub resend: Vec<(IVec3, Arc<Cube>)>,
     pub(super) light_dirty: FxHashSet<IVec3>,
@@ -51,6 +54,8 @@ pub struct Space {
     /// Light from bodies going through here: the cells they light from, each body's and in all.
     pub(super) body_lights: FxHashMap<u64, Vec<(IVec3, [u8; 3])>>,
     pub(super) body_light: FxHashMap<IVec3, [u8; 3]>,
+    /// Cells of that which changed, for clients.
+    pub(super) body_light_changes: Vec<(IVec3, [u8; 3])>,
     /// The world's light where a body's blocks are, by its cubes, and whether that is news.
     pub world_light: FxHashMap<IVec3, u32>,
     pub(super) world_light_changed: bool,
@@ -77,6 +82,53 @@ pub struct Space {
 impl crate::physics::Blocks for Space {
     fn block(&self, p: IVec3) -> u32 {
         self.get(p).unwrap_or(AIR)
+    }
+    fn bounds(&self) -> Option<(IVec3, IVec3)> {
+        self.bounds
+    }
+    fn extras(&self, p: IVec3) -> &[u32] {
+        self.extras(p)
+    }
+}
+
+/// The cubes of a world as physics reads them, on any thread while they stay put.
+#[derive(Clone, Copy)]
+pub struct CubeCells<'a>(pub &'a FxHashMap<IVec3, Arc<Cube>>);
+
+impl crate::physics::Cells for CubeCells<'_> {
+    fn main(&self, p: IVec3) -> Option<u32> {
+        self.0.get(&cube_of(p)).map(|cube| cube.get(local_index(p)))
+    }
+    fn extras(&self, p: IVec3) -> &[u32] {
+        self.0
+            .get(&cube_of(p))
+            .map_or(&[], |cube| cube.extras(local_index(p)))
+    }
+    #[inline]
+    fn cell(&self, p: IVec3) -> Option<(u32, &[u32])> {
+        let (cube, i) = (self.0.get(&cube_of(p))?, local_index(p));
+        Some((cube.get(i), cube.extras(i)))
+    }
+}
+
+/// A body's blocks to walk on: everything outside them is air, nothing unloaded.
+pub struct DeckCells<'a>(pub &'a Space);
+
+impl crate::physics::Cells for DeckCells<'_> {
+    fn main(&self, p: IVec3) -> Option<u32> {
+        Some(self.0.get(p).unwrap_or(AIR))
+    }
+    fn extras(&self, p: IVec3) -> &[u32] {
+        Space::extras(self.0, p)
+    }
+}
+
+impl crate::physics::Cells for Space {
+    fn main(&self, p: IVec3) -> Option<u32> {
+        self.get(p)
+    }
+    fn extras(&self, p: IVec3) -> &[u32] {
+        Space::extras(self, p)
     }
 }
 
@@ -127,6 +179,20 @@ impl Space {
         self.cubes
             .get(&cube_of(p))
             .map(|cube| cube.get(local_index(p)))
+    }
+
+    /// What else is in the cell at `p`.
+    pub fn extras(&self, p: IVec3) -> &[u32] {
+        self.cubes
+            .get(&cube_of(p))
+            .map_or(&[], |cube| cube.extras(local_index(p)))
+    }
+
+    /// Puts what else is in a cell of a structure without block updates (building it).
+    pub(super) fn put_extras(&mut self, p: IVec3, extras: Vec<u32>) {
+        if let Some(cube) = self.cubes.get_mut(&cube_of(p)) {
+            Arc::make_mut(cube).set_extras(local_index(p), extras);
+        }
     }
 
     /// Writes a block of a structure without block updates (building it, loading it).
@@ -183,12 +249,6 @@ impl Space {
                 self.resend.push((cp, Arc::new(cube.clone())));
             }
         }
-    }
-
-    /// Box around a structure's blocks in the world, for its entity at `pos`.
-    pub fn structure_box(&self, pos: DVec3) -> Option<crate::physics::Aabb> {
-        let (lo, hi) = self.bounds?;
-        Some(Transform::of(pos).box_to_world(crate::physics::Aabb { min: lo.as_dvec3(), max: (hi + IVec3::ONE).as_dvec3() }))
     }
 
     /// The blocks of a structure for saving: (position, state name), air left out.

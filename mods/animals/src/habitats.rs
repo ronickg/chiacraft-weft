@@ -36,12 +36,12 @@ pub fn init(r: &mut Registry) {
                 continue; // fish come by their own spawner, into water (`fish.rs`)
             }
             let (few, most) = s.bio.social.group();
-            r.spawn(s.kind)
+            r.natural_spawn(s.kind)
                 .dimension(world(s))
                 .biome(&format!("#{}", tag(biome)))
                 .ground(&format!("#{GROUND}"))
                 .light(7, 15)
-                .group(few, most)
+                .pack_size(few, most)
                 .chance(s.spawn_chance(biome));
         }
     }

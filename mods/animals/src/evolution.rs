@@ -325,11 +325,11 @@ static TICKS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0
 
 pub fn init(r: &mut Registry) {
     // A wild animal that dies (hunted, killed by another, starved...) is gone from its pool.
-    r.on(&ENTITY_DIED, |b| {
+    r.on(&actions::DIE, |b| {
         let w = b.world();
         for d in b.iter() {
             if !crate::animal::tamed(&w, d.entity) {
-                count_at(&w, d.entity, d.pos, -1.0);
+                count_at(&w, d.entity, d.pos.to_array(), -1.0);
             }
         }
     });
@@ -428,20 +428,20 @@ fn step(p: &mut Pools, k: &str, index: usize, cell: (i64, i64), h: Habitat, r: &
 /// hunting the white ones makes white rarer there, and released tames spread their coats.
 pub fn count(w: &World, id: u64, sign: f32) {
     if let Some(st) = w.entity(id) {
-        count_at(w, id, st.pos, sign);
+        count_at(w, id, st.pos.to_array(), sign);
     }
 }
 
 /// `count` for animal `id` at `pos` (one that just died is nowhere any more).
 fn count_at(w: &World, id: u64, pos: [f64; 3], sign: f32) {
-    let Some(g) = w.component(id, &coats::GENOME).copied() else { return };
+    let Some(g) = w.component(id, &coats::GENOME) else { return };
     let Some(index) = (g.species as usize)
         .checked_sub(1)
         .filter(|&i| i < SPECIES.len())
     else {
         return;
     };
-    let (cell, h, day) = (cell_of(pos), habitat_at(w, pos), w.time() / GENERATION);
+    let (cell, h, day) = (cell_of(pos), habitat_at(w, pos), w.game_time() / GENERATION);
     let mut r = coats::world_rng(w);
     with_pools(|p| {
         evolved(p, index, cell, h, day, &mut r)?;
@@ -455,7 +455,7 @@ fn count_at(w: &World, id: u64, pos: [f64; 3], sign: f32) {
 /// The pool a wild animal of species `index` spawning at `pos` is drawn from: its kind's there,
 /// as it has evolved by today.
 pub fn pool_at(w: &World, index: usize, pos: [f64; 3]) -> Option<Pool> {
-    let (cell, h, day) = (cell_of(pos), habitat_at(w, pos), w.time() / GENERATION);
+    let (cell, h, day) = (cell_of(pos), habitat_at(w, pos), w.game_time() / GENERATION);
     with_pools(|p| evolved(p, index, cell, h, day, &mut coats::world_rng(w)))
 }
 
@@ -464,7 +464,8 @@ pub fn pool_at(w: &World, index: usize, pos: [f64; 3]) -> Option<Pool> {
 /// species, saying how common each variant is now.
 pub fn evolve_here(w: &World, player: u64, count: u32, habitat: Option<Habitat>) -> Vec<String> {
     let Some(p) = w.entity(player) else { return Vec::new() };
-    let (cell, h, day) = (cell_of(p.pos), habitat.unwrap_or_else(|| habitat_at(w, p.pos)), w.time() / GENERATION);
+    let (cell, h, day) =
+        (cell_of(p.pos.to_array()), habitat.unwrap_or_else(|| habitat_at(w, p.pos.to_array())), w.game_time() / GENERATION);
     let mut r = coats::world_rng(w);
     with_pools(|pools| {
         (0..SPECIES.len())

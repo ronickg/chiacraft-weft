@@ -92,6 +92,23 @@ type Entry = (Recipe, u32, Option<(u32, u32, u32)>);
 /// The bag as the open book last saw it (`client_frame` above).
 static BAG_SIG: Mutex<u64> = Mutex::new(0);
 
+/// Crafts that take time (`first::book_secs`: a knapped head from memory), one at a time per
+/// player: each made when its time comes, from what the bag (or the chests) holds then, so nothing
+/// is taken before and a craft whose inputs went makes nothing and ends the line.
+struct Queued {
+    player: u64,
+    dim: u32,
+    station: Station,
+    recipe: u32,
+    left: u32,
+    /// The world time (ticks) the next one is made, and each one's ticks.
+    at: u64,
+    each: u64,
+}
+static QUEUED: Mutex<Vec<Queued>> = Mutex::new(Vec::new());
+static WORKING: Sound = Sound::named("block.stone.hit");
+static DONE: Sound = Sound::named("block.stone.break");
+
 static BOOK: Mutex<Book> =
     Mutex::new(Book { tab: 0, page: 0, picked: None, order: Vec::new(), pool: Vec::new(), asked: u32::MAX, ask: None });
 
@@ -102,10 +119,17 @@ pub fn register(r: &mut Registry) {
         let player = p.player();
         let station = Station::from(v[2]);
         if let Some(recipe) = recipe_of(v[0] as u32) {
-            craft(&w, player, station, &recipe, (v[1] as u32).clamp(1, MAX_BATCH));
+            let count = (v[1] as u32).clamp(1, MAX_BATCH);
+            match timed(&recipe) {
+                Some(secs) => queue(&w, player, station, &recipe, count, secs),
+                None => {
+                    craft(&w, player, station, &recipe, count);
+                }
+            }
         }
         p.reply(&POOL, &encode(&chest_totals(&w, player, station)));
     });
+    r.world_tick(work_queued);
     r.packet(&POOL_ASK, |p, v| {
         let w = p.world();
         let station = Station::from(v[0]);
@@ -128,7 +152,7 @@ pub fn register(r: &mut Registry) {
             c.send(&POOL_ASK, &[station as u64]);
         }
         let open = BOOK.lock().map_or(u32::MAX, |b| b.asked);
-        let window = c.menu().map_or(u32::MAX, |m| m[1]);
+        let window = c.menu().map_or(u32::MAX, |m| m.window);
         if open == u32::MAX || window != open {
             return;
         }
@@ -302,14 +326,14 @@ struct Source {
 
 /// The crafting table nearest `player` within `TABLE_REACH`, if any.
 fn table_near(w: &World, player: u64) -> Option<[i32; 3]> {
-    let p = w.entity(player)?.pos.map(|v| v.floor() as i32);
+    let p = block_pos_of(w.entity(player)?.pos).to_array();
     let mut best: Option<([i32; 3], i32)> = None;
     for dx in -TABLE_REACH..=TABLE_REACH {
         for dy in -TABLE_REACH..=TABLE_REACH {
             for dz in -TABLE_REACH..=TABLE_REACH {
                 let at = [p[0] + dx, p[1] + dy, p[2] + dz];
                 let d = dx * dx + dy * dy + dz * dz;
-                if TABLES.on_block(w.get(at)) && best.is_none_or(|b| d < b.1) {
+                if TABLES.on_block(w.block(at)) && best.is_none_or(|b| d < b.1) {
                     best = Some((at, d));
                 }
             }
@@ -326,7 +350,7 @@ fn chests_near(w: &World, table: [i32; 3]) -> Vec<u64> {
         for dy in -r..=r {
             for dz in -r..=r {
                 let at = [table[0] + dx, table[1] + dy, table[2] + dz];
-                if CHESTS.on_block(w.get(at)) {
+                if CHESTS.on_block(w.block(at)) {
                     let e = w.block_entity(at);
                     if e != 0 {
                         out.push(e);
@@ -384,7 +408,7 @@ fn craft(w: &World, player: u64, station: Station, r: &Recipe, count: u32) -> u3
     if needs.is_empty() {
         return 0;
     }
-    let pos = w.entity(player).map_or([0.0; 3], |e| e.pos);
+    let pos = w.entity(player).map_or([0.0; 3], |e| e.pos.into());
     let mut made = 0;
     let mut from_chests = 0;
     while made < count {
@@ -420,7 +444,7 @@ fn craft(w: &World, player: u64, station: Station, r: &Recipe, count: u32) -> u3
             let inv = w.inventory(src[i].owner);
             let mut s = inv.get(src[i].slot);
             for _ in 0..n {
-                s = use_one(s);
+                s = consume_one(s);
             }
             inv.set(src[i].slot, s);
         }
@@ -454,6 +478,80 @@ fn craft(w: &World, player: u64, station: Station, r: &Recipe, count: u32) -> u3
     made
 }
 
+/// Seconds `r` takes a craft from the book, if it takes any.
+fn timed(r: &Recipe) -> Option<f32> {
+    let (out, _) = r.outputs().into_iter().next()?;
+    crate::first::book_secs(out.item)
+}
+
+/// `count` of `r` asked for at `station`: added to the player's line (one more of the same recipe
+/// joins it; another replaces it), the first made in `secs`.
+fn queue(w: &World, player: u64, station: Station, r: &Recipe, count: u32, secs: f32) {
+    if station == Station::Hands && !fits_hands(r) || crate::first::locked_for(w, player, r) {
+        return;
+    }
+    let each = (secs * vitals::TICKS as f32).round().max(1.0) as u64;
+    let (recipe, now, dim) = (id_of(r), w.game_time(), w.dimension());
+    let started = {
+        let mut q = QUEUED.lock().unwrap();
+        match q.iter_mut().find(|e| e.player == player) {
+            Some(e) if e.recipe == recipe && e.station == station => {
+                e.left = (e.left + count).min(MAX_BATCH);
+                false
+            }
+            _ => {
+                q.retain(|e| e.player != player);
+                q.push(Queued { player, dim, station, recipe, left: count, at: now + each, each });
+                true
+            }
+        }
+    };
+    weft_sdk::info!(
+        "crafting: queued {count} x {} at {station:?} from the book, {secs} s each",
+        r.outputs().first().map_or("?", |o| item_name(o.0.item))
+    );
+    // Said once when a line starts; more of the same joins it quietly (a fast clicker queued four
+    // of the same hint, PC run fh_bookhead1).
+    if started {
+        base_api::hint(w, player, "hint.base.knapping_book", &[secs.round() as i64]);
+        if let Some(e) = w.entity(player) {
+            w.play_sound(&WORKING, e.pos, 0.7);
+        }
+    }
+}
+
+/// The lines of this world's players: a knock every second while one works, and each craft
+/// made when its time comes.
+fn work_queued(w: &World) {
+    let (now, dim) = (w.game_time(), w.dimension());
+    let mut due = Vec::new();
+    {
+        let mut q = QUEUED.lock().unwrap();
+        q.retain(|e| e.dim != dim || w.entity(e.player).is_some());
+        for e in q.iter_mut().filter(|e| e.dim == dim) {
+            if now >= e.at {
+                due.push((e.player, e.station, e.recipe));
+                e.left -= 1;
+                e.at = now + e.each;
+            } else if (e.at - now) % vitals::TICKS as u64 == 0
+                && let Some(p) = w.entity(e.player)
+            {
+                w.play_sound(&WORKING, p.pos, 0.5);
+            }
+        }
+        q.retain(|e| e.left > 0);
+    }
+    for (player, station, recipe) in due {
+        let made = recipe_of(recipe).map_or(0, |r| craft(w, player, station, &r, 1));
+        if made == 0 {
+            // Its inputs went (used, dropped, the table left behind): the line ends.
+            QUEUED.lock().unwrap().retain(|e| e.player != player);
+        } else if let Some(p) = w.entity(player) {
+            w.play_sound(&DONE, p.pos, 0.9);
+        }
+    }
+}
+
 /// A roll in 0..1 for a chance result, different for each craft.
 fn roll(player: u64, n: u32) -> f32 {
     let mut x = player ^ (n as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ 0xD1B5_4A32_D192_ED03;
@@ -467,7 +565,7 @@ fn roll(player: u64, n: u32) -> f32 {
 
 /// What the player has to craft with here: the bag, and at a table the chests' totals.
 fn have(ui: &Ui, station: Station, pool: &[(u32, u32)]) -> Vec<(u32, u32)> {
-    let v = ui.client();
+    let v = ui.view();
     let mut stacks = v.inventory_group(BAG_GROUPS[0]);
     stacks.extend(v.inventory_group(BAG_GROUPS[1]));
     let mut out = totals(stacks);
@@ -491,8 +589,8 @@ fn edit(f: impl FnOnce(&mut Book)) {
 /// The book: tabs, a page of recipes (what you can make first), the picked one's ingredients
 /// and the Craft buttons.
 pub fn book(ui: &mut Ui, station: Station) {
-    let client = ui.client().client();
-    let window = client.menu().map_or(0, |m| m[1]);
+    let client = ui.view().client();
+    let window = client.menu().map_or(0, |m| m.window);
     let (tab, page, picked, pool) = {
         let Ok(mut b) = BOOK.lock() else { return };
         if b.asked != window {
@@ -514,8 +612,8 @@ pub fn book(ui: &mut Ui, station: Station) {
     };
     let have = have(ui, station, &pool);
     // What the player has ever held (`discovery.rs`), and what they hold now; creative knows all.
-    let creative = ui.client().creative();
-    let mut touched = if creative { Vec::new() } else { crate::discovery::held_items(&ui.client()) };
+    let creative = ui.view().creative();
+    let mut touched = if creative { Vec::new() } else { crate::discovery::held_items(&ui.view()) };
     for &(item, _) in &have {
         if !touched.contains(&item) {
             touched.push(item);
@@ -578,8 +676,8 @@ pub fn book(ui: &mut Ui, station: Station) {
     let pages = list.len().div_ceil(PER_PAGE).max(1);
     let page = page.min(pages - 1);
 
-    ui.panel("panel", S::col().pad(7.0).gap(3.0), |ui| {
-        ui.text_styled(S::col().class("title"), "crafting.book.title", &[]);
+    ui.panel("panel", S::column().pad(7.0).gap(3.0), |ui| {
+        ui.text_styled(S::column().class("title"), "crafting.book.title", &[]);
         // The picked recipe's name, at the top (Ronald's first-day test: the book was icons only).
         if let Some((out, _)) = picked
             .and_then(recipe_of)
@@ -627,11 +725,11 @@ pub fn book(ui: &mut Ui, station: Station) {
             });
         }
         // Slots touch: their dark groove is the gap (UI guide).
-        ui.column(S::col(), |ui| {
+        ui.column(S::column(), |ui| {
             let start = page * PER_PAGE;
             let on_page = &list[start.min(list.len())..(start + PER_PAGE).min(list.len())];
             if on_page.is_empty() {
-                ui.text_styled(S::col().class("dim"), "crafting.book.empty", &[]);
+                ui.text_styled(S::column().class("dim"), "crafting.book.empty", &[]);
             }
             for row in on_page.chunks(COLS) {
                 ui.row(S::row(), |ui| {
@@ -643,7 +741,7 @@ pub fn book(ui: &mut Ui, station: Station) {
                                     &[Arg::Int(got as i64), Arg::Int(all as i64), Arg::Name(&name_of(missing))],
                                 ),
                                 |_| {},
-                                |ui| ui.text_styled(S::col().class("dim"), "crafting.book.unknown", &[]),
+                                |ui| ui.text_styled(S::column().class("dim"), "crafting.book.unknown", &[]),
                             );
                             continue;
                         }
@@ -722,7 +820,7 @@ fn picked_recipe(ui: &mut Ui, station: Station, r: &Recipe, have: &[(u32, u32)])
     if let Some(key) = crate::parts::material_key(r) {
         ui.text_args("crafting.parts.of", &[Arg::Key(key)]);
     }
-    if let Some((skill, level)) = crate::parts::skill_of(&ui.client(), r) {
+    if let Some((skill, level)) = crate::parts::skill_of(&ui.view(), r) {
         ui.text_args("crafting.parts.skill", &[Arg::Key(skill), Arg::Int(level as i64)]);
     }
     // Each distinct ingredient once, with the total it takes.
@@ -773,7 +871,7 @@ fn picked_recipe(ui: &mut Ui, station: Station, r: &Recipe, have: &[(u32, u32)])
         });
     }
     if station == Station::Hands && !fits_hands(r) {
-        ui.text_styled(S::col().class("dim"), "crafting.book.needs_table", &[]);
+        ui.text_styled(S::column().class("dim"), "crafting.book.needs_table", &[]);
         return;
     }
     ui.row(S::row().gap(2.0), |ui| {

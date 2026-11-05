@@ -43,11 +43,11 @@ pub fn register(r: &mut Registry) {
         let b = match p.ground {
             Ground::Soil => b.needs_below("#plant_soil"),
             Ground::Sand => b.needs_below("#sand"),
-            Ground::Shore => b.needs_below("#shore_soil").needs_near_support("#water"),
+            Ground::Shore => b.needs_below("#shore_soil").needs_near("#water"),
             Ground::Water => b.needs_below("#water"),
             Ground::Bed => b
                 .needs_below(if p.form == Form::Column { "#kelp_soil" } else { "#water_bed" })
-                .holds_liquid(&crate::blocks::WATER),
+                .holds_liquid(),
         };
         let full = p.block;
         // Spreading plants come up in the shade too (mushrooms), and the bed's under water that
@@ -59,13 +59,13 @@ pub fn register(r: &mut Registry) {
                 .prop("age", 0..=1)
                 .states(move |p, s| s.texture(&if p.get("age") == "0" { format!("{name}_grazed") } else { name.to_string() }))
                 .no_item()
-                .growth(growth::step_secs(full, 1, 600.0), light)
+                .grows(growth::step_secs(full, 1, 600.0), light)
                 .on_grow(move |e| growth::grow(e, full, false, |e| growth::next_age(e, 1))),
             Form::Bush => b
                 .prop("age", 0..=3)
                 .states(move |p, s| s.texture(&format!("{name}_stage_{}", p.get("age"))))
                 .no_item()
-                .growth(growth::step_secs(full, 3, 300.0), light)
+                .grows(growth::step_secs(full, 3, 300.0), light)
                 .on_grow(move |e| {
                     let last = growth::age(e) == 2;
                     growth::grow(e, full, last, |e| growth::next_age(e, 3))
@@ -74,12 +74,12 @@ pub fn register(r: &mut Registry) {
                 .prop("age", 0..=1)
                 .states(move |p, s| s.texture(&if p.get("age") == "1" { format!("{name}_ripe") } else { name.to_string() }))
                 .no_item()
-                .growth(growth::step_secs(full, 1, 300.0), light)
+                .grows(growth::step_secs(full, 1, 300.0), light)
                 .on_grow(move |e| growth::grow(e, full, true, |e| growth::next_age(e, 1))),
             Form::Spreads => {
                 let b = b
                     .texture(name)
-                    .growth(growth::step_secs(full, 1, 300.0), light)
+                    .grows(growth::step_secs(full, 1, 300.0), light)
                     .on_grow(move |e| growth::grow(e, full, true, |e| spread(e, full)));
                 if p.gives.is_some() { b.no_item() } else { b.tab(&crate::tabs::NATURAL) }
             }
@@ -101,13 +101,12 @@ pub fn register(r: &mut Registry) {
                 .states(move |p, s| s.texture(&if p.get("top") == "true" { format!("{name}_top") } else { name.to_string() }))
                 .on_neighbor(move |e| {
                     let w = e.world();
-                    let [x, y, z] = e.pos();
-                    let top = if block.is(w.get([x, y + 1, z])) { "false" } else { "true" };
-                    if let Some(s) = state_with(e.state(), "top", top).filter(|&s| s != e.state()) {
-                        w.set(e.pos(), s);
+                    let top = if block.is(w.block(e.pos().above())) { "false" } else { "true" };
+                    if state_prop(e.state(), "top") != Some(top) {
+                        w.prop_set(e.pos(), "top", top);
                     }
                 })
-                .growth(growth::step_secs(full, 1, 270.0), light)
+                .grows(growth::step_secs(full, 1, 270.0), light)
                 .on_grow(move |e| growth::grow(e, full, false, grow_up))
                 // Picked, it gives a handful of kelp, the food (`items.rs` registers its item).
                 .no_item(),
@@ -146,6 +145,13 @@ pub fn register(r: &mut Registry) {
         }
     }
     flowers(r);
+    // A plant of the bed (eelgrass, kelp) is set only into water, where it goes in with the water
+    // (`.holds_liquid()`), as the world grows it; never on dry ground.
+    r.intercept(&actions::PLACE_BLOCK, |a| {
+        let name = block_name(a.state()).split('[').next().unwrap_or("");
+        let bed = wild::of(name).is_some_and(|p| p.ground == Ground::Bed);
+        if bed && !WATER.at(&a.world(), a.pos()) { Verdict::Deny } else { Verdict::Abstain }
+    });
 }
 
 /// Each biome's wild flowers (`vitals::wild::FLOWERS`): plants that stand and give themselves,
@@ -161,13 +167,13 @@ fn flowers(r: &mut Registry) {
             .needs_below(if f.ground == Ground::Sand { "#sand" } else { "#plant_soil" })
             .prop("bloom", 0..=1)
             .states(move |p, s| s.texture(&if p.get("bloom") == "1" { name.to_string() } else { format!("{name}_green") }))
-            .growth(BLOOM_SECS, 0)
+            .grows(BLOOM_SECS, 0)
             .on_grow(move |e| {
-                let season = base_api::ground_at(&e.world(), e.pos()).season;
+                let season = base_api::ground_at(&e.world(), e.pos().to_array()).season;
                 let open = season.is_none_or(|s| blooms >> s & 1 != 0);
                 let want = if open { "1" } else { "0" };
                 if state_prop(e.state(), "bloom") != Some(want) {
-                    e.world().set_prop(e.pos(), "bloom", want);
+                    e.world().prop_set(e.pos(), "bloom", want);
                 }
             })
             .tab(&crate::tabs::NATURAL);
@@ -246,28 +252,29 @@ pub fn upper_of(s: u32, roll: f32) -> Option<u32> {
 }
 
 /// A column's growth step (kelp): one more on top while it is still a block below the surface.
+/// It goes into the water source there as a part of its cell (`.holds_liquid()`), which keeps the
+/// water; `set_block` would put it in place of the water.
 fn grow_up(e: &mut BlockEvent) {
     let w = e.world();
-    let [x, y, z] = e.pos();
-    let (above, over) = ([x, y + 1, z], [x, y + 2, z]);
-    // A water source, the first of its states.
-    let still = |p| w.get(p) == crate::blocks::WATER.id();
-    if still(above) && still(over) {
-        w.set(above, e.state());
+    let above = e.pos().above();
+    // A water source, the first of its states, and nothing else in the cell.
+    let still = |p: BlockPos| w.parts(p) == [crate::blocks::WATER.id()];
+    if still(above) && still(above.above()) {
+        w.part_add(above, e.state());
     }
 }
 
 /// A spreading plant's growth step: a new one nearby on its ground, unless `CROWD` are there.
 fn spread(e: &mut BlockEvent, block: &str) {
     let w = e.world();
-    let [x, y, z] = e.pos();
+    let [x, y, z] = e.pos().to_array();
     let me = e.state();
     let r = wild::REACH;
     let mut near = 0;
     for dz in -r..=r {
         for dy in -1..=1 {
             for dx in -r..=r {
-                if w.get([x + dx, y + dy, z + dz]) == me {
+                if w.block([x + dx, y + dy, z + dz]) == me {
                     near += 1;
                 }
             }
@@ -279,14 +286,14 @@ fn spread(e: &mut BlockEvent, block: &str) {
     let roll = w.random();
     let span = (2 * r + 1) as u64;
     let at = [x + (roll % span) as i32 - r, y + ((roll >> 8) % 3) as i32 - 1, z + ((roll >> 16) % span) as i32 - r];
-    let below = w.get([at[0], at[1] - 1, at[2]]);
+    let below = [at[0], at[1] - 1, at[2]];
     let ground = wild::of(block).map(|p| p.ground);
     let fits = match ground {
-        Some(Ground::Water) => WATER.in_cell(below),
-        _ => PLANT_SOIL.on_block(below),
+        Some(Ground::Water) => WATER.at(&w, below),
+        _ => PLANT_SOIL.on_block(w.block(below)),
     };
-    if w.get(at) == 0 && fits {
-        w.set(at, me);
+    if w.block(at) == 0 && fits {
+        w.set_block(at, me);
     }
 }
 
@@ -296,10 +303,10 @@ pub fn frost(e: &mut BlockEvent, block: &str) {
     let w = e.world();
     match wild::of(block).map(|p| p.form) {
         Some(Form::Bush) if growth::age(e) > 1 => {
-            w.set_prop(e.pos(), "age", "1");
+            w.prop_set(e.pos(), "age", "1");
         }
         Some(Form::Ripens | Form::Spreads) => {
-            w.set(e.pos(), 0);
+            w.set_block(e.pos(), 0);
         }
         _ => {}
     }

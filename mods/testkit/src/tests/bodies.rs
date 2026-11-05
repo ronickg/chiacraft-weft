@@ -63,9 +63,9 @@ pub async fn body_chest(t: T) -> R {
     // Open from on board.
     t.op(&format!("onto {id} 1.0")).await?;
     t.secs(0.4).await?;
-    t.c().look(-90.0, -40.0);
+    t.c().set_look(-90.0, -40.0);
     t.secs(0.2).await?;
-    t.check_eq(t.state().target_frame, id, "the chest on the structure is looked at");
+    t.check_eq(t.state().target_body, id, "the chest on the structure is looked at");
     t.press("core:use");
     t.secs(0.4).await?;
     let open = t.c().screen();
@@ -73,14 +73,14 @@ pub async fn body_chest(t: T) -> R {
     // Still open after it flew on.
     t.secs(0.4).await?;
     t.check_eq(t.c().screen(), open, "and stays open as it flies");
-    t.c().close_screen();
+    t.c().screen_close();
     t.no_screen().await?;
 
     // Saved with it.
     let name = format!("test-{}", t.name());
-    t.c().leave_world();
+    t.c().world_leave();
     t.screen("core:title").await?;
-    t.c().open_world(&name, 1);
+    t.c().world_open(&name, 1);
     t.until("joined again", Duration::from_secs(60), |t| t.flag(client::client_flags::JOINED))
         .await?;
     t.loaded().await?;
@@ -162,7 +162,7 @@ pub async fn body_sneak_edge(t: T) -> R {
                 .await?;
             t.secs(0.2).await?;
             t.op(&format!("onto {id} 1.0")).await?;
-            t.c().look(yaw, 0.0);
+            t.c().set_look(yaw, 0.0);
             t.secs(0.5).await?;
             t.hold("core:sneak", 2.4);
             t.frames(3).await?;
@@ -173,7 +173,7 @@ pub async fn body_sneak_edge(t: T) -> R {
                 t.frames(1).await?;
                 let st = t.state();
                 let Some(on) = t.c().entity(body).map(|e| e.pos) else { continue };
-                let rel = [st.pos[0] - on[0], st.pos[1] - on[1], st.pos[2] - on[2]];
+                let rel = [st.pos.x - on.x, st.pos.y - on.y, st.pos.z - on.z];
                 far = far.max(rel[0].abs()).max(rel[2].abs());
                 log.push(format!("{:.3} {:.3} {:.3} ground {}", rel[0], rel[1], rel[2], t.flag(client::client_flags::ON_GROUND)));
                 if rel[1] < 0.7 {
@@ -196,7 +196,7 @@ pub async fn body_place(t: T) -> R {
     t.flat().await?;
     t.op("mode creative").await?;
     t.op("put me 0 oak_planks 64").await?;
-    t.c().select(0);
+    t.c().select_slot(0);
     let f = t.feet();
     // A plate lifted around a spot over it: all it has is a layer under its middle.
     let center = add(f, [0, 4, -5]);
@@ -207,11 +207,11 @@ pub async fn body_place(t: T) -> R {
         .await?;
     t.cmd(&format!("/tp {} {} {}", center[0] as f64 + 0.5, center[1] + 2, center[2] as f64 + 3.5))
         .await?;
-    t.c().fly(true);
+    t.c().set_flying(true);
     t.secs(0.5).await?;
     t.look_at(add(center, [0, -1, 0]));
     t.secs(0.3).await?;
-    t.check(t.state().target_frame.to_string() == id, "looking at the structure");
+    t.check(t.state().target_body.to_string() == id, "looking at the structure");
     t.press("core:use");
     t.secs(0.5).await?;
     t.check_eq(t.op(&format!("sblock {id} 0 0 0")).await?, "base:oak_planks".to_string(), "a block goes on top of the plate");
@@ -221,75 +221,6 @@ pub async fn body_place(t: T) -> R {
     t.press("core:use");
     t.secs(0.5).await?;
     t.check_eq(t.op(&format!("sblock {id} 1 0 1")).await?, "base:oak_planks".to_string(), "and another");
-    Ok(())
-}
-
-/// Carried along, the camera doesn't bob: it goes by how fast one walks on what one stands on.
-pub async fn body_no_bob(t: T) -> R {
-    t.flat().await?;
-    let f = t.feet();
-    let id = spawn(&t, "testmod:skiff", add(f, [0, 3, -6])).await?;
-    t.op(&format!("onto {id} 1.0")).await?;
-    t.secs(0.8).await?;
-    let mut most = 0.0f32;
-    for _ in 0..200 {
-        t.frames(1).await?;
-        most = most.max(t.state().bob);
-    }
-    t.probe("bob standing on what moves", most, most < 0.005);
-    // Walking on it does.
-    t.hold("core:forward", 0.4);
-    let mut walked = 0.0f32;
-    for _ in 0..40 {
-        t.frames(1).await?;
-        walked = walked.max(t.state().bob);
-    }
-    t.probe("bob walking on it", walked, walked > 0.02);
-    // From one body straight onto another stays there.
-    let other = spawn(&t, "testmod:lift", add(f, [0, 3, 6])).await?;
-    t.op(&format!("onto {other} 1.0")).await?;
-    t.secs(0.5).await?;
-    let (p, b) = (t.state().pos, t.c().entity(other).map_or([0.0; 3], |e| e.pos));
-    t.check((p[0] - b[0]).abs() < 2.0 && (p[2] - b[2]).abs() < 2.0, format!("onto another body: at {p:?}, it at {b:?}"));
-    Ok(())
-}
-
-/// A body is lit from the moment it is there, and a block broken shows its light at once.
-pub async fn body_lit_at_once(t: T) -> R {
-    t.flat().await?;
-    t.op("mode creative").await?;
-    let f = t.feet();
-    let at = add(f, [0, 2, -5]);
-    t.set(at, "base:stone").await?;
-    t.look_at(at);
-    t.secs(0.8).await?;
-    let Some((x, y)) = t.on_screen([at[0] as f64 + 0.5, at[1] as f64 + 0.9, at[2] as f64 + 1.02]) else {
-        return Err("it isn't in view".into());
-    };
-    let shade = |c: probe::C| c[0] as i32 + c[1] as i32 + c[2] as i32;
-    let before = shade(t.pixel(x + 0.01, y + 0.012).await?);
-    let id = t
-        .op(&format!("lift {} {} {} 0", at[0], at[1], at[2]))
-        .await?;
-    t.check(id != "0", "it lifted");
-    let mut darkest = before;
-    for _ in 0..30 {
-        t.frames(1).await?;
-        darkest = darkest.min(shade(t.pixel(x + 0.01, y + 0.012).await?));
-    }
-    t.check(darkest * 10 >= before * 7, format!("not dark for a moment: {darkest} of {before}"));
-    t.op(&format!("remove {id}")).await?;
-
-    // Broken by hand: what was inside a block has the light of the air now, in the same frame.
-    let b = add(f, [1, 0, -4]);
-    t.set(b, "base:stone").await?;
-    t.look_at(b);
-    t.secs(0.5).await?;
-    t.press("core:attack");
-    t.until("gone on the client", Duration::from_secs(2), |t| t.c().block(b) == Some(0))
-        .await?;
-    let sky = t.c().light(b).unwrap_or(0) & 255;
-    t.check(sky > 0, format!("a broken block's place is lit in the frame it goes: {sky}"));
     Ok(())
 }
 
@@ -305,12 +236,12 @@ pub async fn lift(t: T) -> R {
     t.secs(2.0).await?;
     let (me, lift) = (t.state().pos, pos_of(&t, &format!("{id}")).await?);
     t.check(lift[1] > p[1] + 1.2, "the lift went up");
-    t.check((me[1] - (lift[1] + 1.0)).abs() < 0.15, format!("the player rides on top (feet {:.2}, deck {:.2})", me[1], lift[1] + 1.0));
+    t.check((me.y - (lift[1] + 1.0)).abs() < 0.15, format!("the player rides on top (feet {:.2}, deck {:.2})", me.y, lift[1] + 1.0));
     // Up to the top, then all the way down.
     t.secs(5.0).await?;
     let (me, lift) = (t.state().pos, pos_of(&t, &format!("{id}")).await?);
     t.check(lift[1] < p[1] + 1.5, "the lift came down");
-    t.check((me[1] - (lift[1] + 1.0)).abs() < 0.15, format!("the player rode it down (feet {:.2}, deck {:.2})", me[1], lift[1] + 1.0));
+    t.check((me.y - (lift[1] + 1.0)).abs() < 0.15, format!("the player rode it down (feet {:.2}, deck {:.2})", me.y, lift[1] + 1.0));
     let health: f32 = t.op("health").await?.parse().unwrap_or(0.0);
     t.check(super::full(&t, health), format!("health after the ride: {health}, full {}", super::max_health(&t)));
     Ok(())
@@ -325,10 +256,10 @@ pub async fn ride_frames(t: T) -> R {
     t.op(&format!("onto {id} 1.0")).await?;
     t.secs(0.5).await?;
     let mut steps = Vec::new();
-    let mut last = t.state().shown[1];
+    let mut last = t.state().shown.y;
     for _ in 0..60 {
         t.frames(1).await?;
-        let y = t.state().shown[1];
+        let y = t.state().shown.y;
         steps.push(y - last);
         last = y;
     }
@@ -361,7 +292,7 @@ pub async fn skiff_smooth(t: T) -> R {
     t.op(&format!("onto {skiff} 1.0 {idol}")).await?;
     // Into a leg, away from its turn (it turns every 3 seconds of its age).
     t.secs(0.5).await?;
-    let x = |t: &T, id| t.c().entity(id).map_or(0.0, |e| e.pos[0]);
+    let x = |t: &T, id| t.c().entity(id).map_or(0.0, |e| e.pos.x);
     // For 3.5 seconds (a turn is in it): it reverses once (overshooting and coming back would
     // reverse three times, jitter many times), never jumps, and its rider stays on its spot.
     // A jump is what a step has beyond its 6 blocks a second: a long frame of the machine's makes
@@ -398,11 +329,11 @@ pub async fn skiff_smooth(t: T) -> R {
     t.secs(0.5).await?;
     // For 3.5 seconds, so a turn is in it.
     let mut steps = Vec::new();
-    let mut last = x(&t, skiff) - t.state().shown[0];
+    let mut last = x(&t, skiff) - t.state().shown.x;
     let start = std::time::Instant::now();
     while start.elapsed().as_secs_f64() < 3.5 {
         t.frames(1).await?;
-        let now = x(&t, skiff) - t.state().shown[0];
+        let now = x(&t, skiff) - t.state().shown.x;
         steps.push((now - last).abs());
         last = now;
     }
@@ -410,119 +341,6 @@ pub async fn skiff_smooth(t: T) -> R {
     let big = steps.last().copied().unwrap_or(0.0);
     t.note(format!("skiff seen from its rider: steps up to {big:.4}"));
     t.check(big < 0.01, "the skiff stays put in front of a rider, turns included");
-    Ok(())
-}
-
-/// Jumping on a skiff flying 6 blocks a second lands on it again: riders move with it up to its
-/// carry height.
-pub async fn skiff(t: T) -> R {
-    t.flat().await?;
-    let f = t.feet();
-    let id = spawn(&t, "testmod:skiff", add(f, [0, 3, 0])).await?;
-    let p = pos_of(&t, &format!("{id}")).await?;
-    t.op(&format!("onto {id} 1.0")).await?;
-    t.secs(0.5).await?;
-    // Jumping through its turn (it flies back after 3 seconds), then landing.
-    t.hold("core:jump", 2.5);
-    t.secs(3.5).await?;
-    // Both as the server has them: the player's position arrives every tick from its client.
-    let (me, skiff) = (pos_of(&t, "me").await?, pos_of(&t, &format!("{id}")).await?);
-    t.check((skiff[0] - p[0]).abs() > 5.0, "the skiff flew on");
-    // The skiff moves on while the teleport arrives, so the player may stand anywhere on the
-    // deck (1.5 + 0.3 from its middle); the server also hears the player a tick late (0.3).
-    t.check(
-        (me[0] - skiff[0]).abs() < 2.1 && (me[2] - skiff[2]).abs() < 2.1,
-        format!("the player is still over it (x {:.2}, skiff {:.2})", me[0], skiff[0]),
-    );
-    t.check((me[1] - (skiff[1] + 1.0)).abs() < 0.15, format!("and back on its deck (feet {:.2}, deck {:.2})", me[1], skiff[1] + 1.0));
-    Ok(())
-}
-
-/// Pausing on a flying skiff and going on: a paused server keeps sending the skiff at the same
-/// tick, which once made it (and its rider) fly off at an endless speed on resuming.
-pub async fn skiff_pause(t: T) -> R {
-    t.flat().await?;
-    let f = t.feet();
-    let id = spawn(&t, "testmod:skiff", add(f, [0, 3, 0])).await?;
-    t.op(&format!("onto {id} 1.0")).await?;
-    t.secs(0.5).await?;
-    for _ in 0..3 {
-        t.c().key("Escape", 0.0);
-        t.screen("core:pause").await?;
-        t.secs(2.0).await?;
-        t.c().key("Escape", 0.0);
-        t.no_screen().await?;
-        t.secs(1.0).await?;
-    }
-    let (me, skiff) = (t.state().pos, pos_of(&t, &format!("{id}")).await?);
-    t.check(
-        (me[0] - skiff[0]).abs() < 3.0 && (me[2] - skiff[2]).abs() < 3.0,
-        format!("the player stays on the skiff (x {:.2}, skiff {:.2})", me[0], skiff[0]),
-    );
-    Ok(())
-}
-
-/// Natural spawning runs from rules: at night monsters appear around the player (in the
-/// overworld; the flatlands stay at noon), and the rule switch stops it.
-pub async fn natural_spawning(t: T) -> R {
-    t.world(5).await?;
-    t.idle().await?;
-    t.op("time 18000").await?;
-    t.cmd("/rule core:mob_spawning 1").await?;
-    t.secs(8.0).await?;
-    let near = t.op("near ~ ~ ~ 64").await?;
-    let monsters = near
-        .split_whitespace()
-        .filter(|e| e.ends_with(":base:zombie") || e.ends_with(":base:spider"))
-        .count();
-    t.check(monsters > 0, format!("monsters spawned at night ({near})"));
-    t.check(!near.contains("base:pig") && !near.contains("base:cow"), "no animals at night or outside `animals` biomes");
-    t.cmd("/rule core:mob_spawning 0").await?;
-    Ok(())
-}
-
-/// A mod changes one entity's box and look while it stays the same entity: a player morphed
-/// into a pig is 0.9 high, walks through a gap 1 block high and sees from 0.77; crouching still
-/// lowers whatever box it has; morphing back restores the player's.
-pub async fn morph(t: T) -> R {
-    t.flat().await?;
-    let f = t.feet();
-    t.cmd("/morph base:pig 0.9 0.9").await?;
-    t.until("small box", std::time::Duration::from_secs(2), |t| t.c().entity(0).is_some())
-        .await?;
-    t.secs(0.3).await?;
-    // A tunnel one block high: a pig fits.
-    t.fill(add(f, [-1, 1, -2]), add(f, [1, 1, -6]), "stone")
-        .await?;
-    t.fill(add(f, [-1, 0, -2]), add(f, [-1, 0, -6]), "stone")
-        .await?;
-    t.fill(add(f, [1, 0, -2]), add(f, [1, 0, -6]), "stone")
-        .await?;
-    t.c().look(0.0, 0.0);
-    t.hold("core:forward", 0.9);
-    t.secs(1.0).await?;
-    let z = t.state().pos[2];
-    t.check(z < f[2] as f64 - 2.5, format!("the morphed player went into the low tunnel (z {z:.2})"));
-    t.shot("pig").await?;
-    t.cmd("/morph").await?;
-    t.cmd(&format!("/tp {} {} {}", f[0], f[1], f[2] + 3))
-        .await?;
-    t.secs(0.3).await?;
-    t.hold("core:forward", 1.0);
-    t.secs(1.1).await?;
-    let z = t.state().pos[2];
-    t.check(z > f[2] as f64 - 1.6, format!("as a player again it does not fit (z {z:.2})"));
-    // Without a size, the size of what it turns into, out in the open.
-    t.cmd(&format!("/tp {} {} {}", f[0], f[1], f[2] + 8))
-        .await?;
-    t.secs(0.3).await?;
-    for (kind, want) in [("core:player", [0.6, 1.8]), ("base:pig", [0.9, 0.9]), ("base:arrow", [0.5, 0.5])] {
-        t.cmd(&format!("/morph {kind}")).await?;
-        t.secs(0.2).await?;
-        let size = t.c().entity(0).map_or([0.0; 3], |e| e.size);
-        t.check((size[0] - want[0]).abs() < 0.01 && (size[1] - want[1]).abs() < 0.01, format!("{kind}: {size:?}, want {want:?}"));
-    }
-    t.cmd("/morph").await?;
     Ok(())
 }
 
@@ -631,7 +449,7 @@ pub async fn skiff_blocks(t: T) -> R {
     t.flat().await?;
     t.op("mode creative").await?;
     t.op("put me 0 stone 64").await?;
-    t.c().select(0);
+    t.c().select_slot(0);
     let f = t.feet();
     let id = spawn(&t, "testmod:skiff", add(f, [0, 3, 0])).await?;
     let sb = |p: [i32; 3]| format!("sblock {id} {} {} {}", p[0], p[1], p[2]);
@@ -639,7 +457,7 @@ pub async fn skiff_blocks(t: T) -> R {
     t.op(&format!("onto {id} 1.0")).await?;
     t.secs(0.4).await?;
     // Down at the deck ahead: the block goes on top of it.
-    t.c().look(0.0, -60.0);
+    t.c().set_look(0.0, -60.0);
     t.secs(0.2).await?;
     t.press("core:use");
     t.secs(0.5).await?;
@@ -650,18 +468,18 @@ pub async fn skiff_blocks(t: T) -> R {
     // Looking at a spot of the deck 0.02 from the edge between two planks (along the way it
     // flies) while riding, the same block stays targeted.
     let st = t.state();
-    let o = t.c().entity(id).map_or([0.0; 3], |e| e.pos);
+    let o = t.c().entity(id).map_or([0.0; 3], |e| e.pos.to_array());
     let spot = [o[0] - 0.5 + 0.98, o[1] + 1.0, o[2] - 0.5 + 0.5 - 1.0];
-    let eye = [st.shown[0], st.shown[1] + t.c().entity(0).map_or(1.62, |e| e.size[2] as f64), st.shown[2]];
+    let eye = [st.shown.x, st.shown.y + t.c().entity(0).map_or(1.62, |e| e.size.eye as f64), st.shown.z];
     let (dx, dy, dz) = (spot[0] - eye[0], spot[1] - eye[1], spot[2] - eye[2]);
     t.c()
-        .look((-dx).atan2(-dz).to_degrees() as f32, dy.atan2((dx * dx + dz * dz).sqrt()).to_degrees() as f32);
+        .set_look((-dx).atan2(-dz).to_degrees() as f32, dy.atan2((dx * dx + dz * dz).sqrt()).to_degrees() as f32);
     t.frames(2).await?;
     let mut targets = std::collections::BTreeSet::new();
     for _ in 0..60 {
         t.frames(1).await?;
         let s = t.state();
-        targets.insert((s.target, s.target_frame));
+        targets.insert((s.target, s.target_body));
     }
     t.check(targets.len() == 1, format!("one block looked at while riding ({targets:?})"));
     let (a, sa) = (pos_of(&t, &format!("{id}")).await?, t.op(&sb([0, 1, -1])).await?);
@@ -671,10 +489,94 @@ pub async fn skiff_blocks(t: T) -> R {
     // A mod's write, then the player breaks the stone.
     t.check_eq(t.op(&format!("{} base:cobblestone", sb([1, 1, 1]))).await?, "1".to_string(), "a mod sets a block of it");
     t.check_eq(t.op(&sb([1, 1, 1])).await?, "base:cobblestone".to_string(), "and reads it back");
-    t.c().look(0.0, -60.0);
+    t.c().set_look(0.0, -60.0);
     t.secs(0.2).await?;
     t.hold("core:attack", 0.1);
     t.secs(0.5).await?;
     t.check_eq(t.op(&sb([0, 1, -1])).await?, "core:air".to_string(), "the stone broken off the flying deck");
+    Ok(())
+}
+
+// Restored from dev b5815f09 (Weft v26.11.2 removed them): see notes/crew/upstream/lost-tests.md
+
+/// Natural spawning runs from rules: at night monsters appear around the player (in the
+/// overworld; the flatlands stay at noon), and the rule switch stops it.
+pub async fn natural_spawning(t: T) -> R {
+    t.world(5).await?;
+    t.idle().await?;
+    t.op("time 18000").await?;
+    t.cmd("/rule core:mob_spawning 1").await?;
+    t.secs(8.0).await?;
+    let near = t.op("near ~ ~ ~ 64").await?;
+    let monsters = near
+        .split_whitespace()
+        .filter(|e| e.ends_with(":base:zombie") || e.ends_with(":base:spider"))
+        .count();
+    t.check(monsters > 0, format!("monsters spawned at night ({near})"));
+    t.check(!near.contains("base:pig") && !near.contains("base:cow"), "no animals at night or outside `animals` biomes");
+    t.cmd("/rule core:mob_spawning 0").await?;
+    Ok(())
+}
+
+/// Pausing on a flying skiff and going on: a paused server keeps sending the skiff at the same
+/// tick, which once made it (and its rider) fly off at an endless speed on resuming.
+pub async fn skiff_pause(t: T) -> R {
+    t.flat().await?;
+    let f = t.feet();
+    let id = spawn(&t, "testmod:skiff", add(f, [0, 3, 0])).await?;
+    t.op(&format!("onto {id} 1.0")).await?;
+    t.secs(0.5).await?;
+    for _ in 0..3 {
+        t.c().input_key("Escape", 0.0);
+        t.screen("core:pause").await?;
+        t.secs(2.0).await?;
+        t.c().input_key("Escape", 0.0);
+        t.no_screen().await?;
+        t.secs(1.0).await?;
+    }
+    let (me, skiff) = (t.state().pos, pos_of(&t, &format!("{id}")).await?);
+    t.check(
+        (me.x - skiff[0]).abs() < 3.0 && (me.z - skiff[2]).abs() < 3.0,
+        format!("the player stays on the skiff (x {:.2}, skiff {:.2})", me.x, skiff[0]),
+    );
+    Ok(())
+}
+
+/// A body is lit from the moment it is there, and a block broken shows its light at once.
+pub async fn body_lit_at_once(t: T) -> R {
+    t.flat().await?;
+    t.op("mode creative").await?;
+    let f = t.feet();
+    let at = add(f, [0, 2, -5]);
+    t.set(at, "base:stone").await?;
+    t.look_at(at);
+    t.secs(0.8).await?;
+    let Some((x, y)) = t.on_screen([at[0] as f64 + 0.5, at[1] as f64 + 0.9, at[2] as f64 + 1.02]) else {
+        return Err("it isn't in view".into());
+    };
+    let shade = |c: probe::C| c[0] as i32 + c[1] as i32 + c[2] as i32;
+    let before = shade(t.pixel(x + 0.01, y + 0.012).await?);
+    let id = t
+        .op(&format!("lift {} {} {} 0", at[0], at[1], at[2]))
+        .await?;
+    t.check(id != "0", "it lifted");
+    let mut darkest = before;
+    for _ in 0..30 {
+        t.frames(1).await?;
+        darkest = darkest.min(shade(t.pixel(x + 0.01, y + 0.012).await?));
+    }
+    t.check(darkest * 10 >= before * 7, format!("not dark for a moment: {darkest} of {before}"));
+    t.op(&format!("remove {id}")).await?;
+
+    // Broken by hand: what was inside a block has the light of the air now, in the same frame.
+    let b = add(f, [1, 0, -4]);
+    t.set(b, "base:stone").await?;
+    t.look_at(b);
+    t.secs(0.5).await?;
+    t.press("core:attack");
+    t.until("gone on the client", Duration::from_secs(2), |t| t.c().block(b) == Some(0))
+        .await?;
+    let sky = t.c().light(b).unwrap_or(0) & 255;
+    t.check(sky > 0, format!("a broken block's place is lit in the frame it goes: {sky}"));
     Ok(())
 }

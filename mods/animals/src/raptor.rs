@@ -10,16 +10,16 @@
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
-pub(crate) static RAPTOR: Entity = Entity::named("raptor");
-pub(crate) static OSMOLSKAE: Entity = Entity::named("velociraptor_osmolskae");
+use crate::ModelFile;
+
+pub(crate) static RAPTOR: EntityKind = EntityKind::named("raptor");
+pub(crate) static OSMOLSKAE: EntityKind = EntityKind::named("velociraptor_osmolskae");
 /// Each species: its kind and its texture.
-static KINDS: [(&Entity, &str); 2] = [(&RAPTOR, "raptor/raptor"), (&OSMOLSKAE, "raptor/osmolskae")];
+static KINDS: [(&EntityKind, &str); 2] = [(&RAPTOR, "raptor/raptor"), (&OSMOLSKAE, "raptor/osmolskae")];
 
 /// How near a pack keeps together: helping, hunting, fighting better.
 const PACK_RANGE: f64 = 8.0;
 const AID_RANGE: f64 = 16.0;
-/// What a pack hunts.
-
 pub fn init(r: &mut Registry) {
     // Tamed raptors fight better together: a tenth more damage for each other tame raptor of
     // its species within 8 blocks, up to three.
@@ -30,7 +30,7 @@ pub fn init(r: &mut Registry) {
         }
         let Some(st) = w.entity(id) else { return };
         let pack = w
-            .near(st.pos, PACK_RANGE, kind_of(&w, id))
+            .entities_near(st.pos, PACK_RANGE, kind_of(&w, id))
             .into_iter()
             .filter(|&o| o != id && is_tame_raptor(&w, o))
             .count()
@@ -44,13 +44,13 @@ pub fn init(r: &mut Registry) {
 
 /// One species: the kind, and its resting pose (a look) drawn in place of it lying down
 /// (`rest.rs`).
-fn register(r: &mut Registry, kind: &'static Entity, index: usize, texture: &str) {
+fn register(r: &mut Registry, kind: &'static EntityKind, index: usize, texture: &str) {
     let settle = crate::rest::Settle { chance: 300, ticks: (400, 1200), lie_after: 0 };
     crate::rest::register(r, kind, settle, "raptor", texture, (0.6, 0.9), &[("_rest", &rest_look(kind))]);
-    r.entity(kind)
+    crate::riding::rideable(r.entity(kind), index)
         .size(animals_core::bodies::of("raptor").0, animals_core::bodies::of("raptor").1)
-        .health(14.0)
-        .speed(4.0)
+        .max_health(14.0)
+        .walk_speed(4.0)
         .attack_damage(4.0)
         .passive()
         .model_file("raptor")
@@ -64,6 +64,7 @@ fn register(r: &mut Registry, kind: &'static Entity, index: usize, texture: &str
             {
                 crate::commands::interact(&w, id, player);
             }
+            false
         })
         .goals(
             Goals::new()
@@ -88,12 +89,12 @@ fn register(r: &mut Registry, kind: &'static Entity, index: usize, texture: &str
 }
 
 /// A species' resting look (`raptor_rest`, `velociraptor_osmolskae_rest`).
-fn rest_look(kind: &Entity) -> String {
+fn rest_look(kind: &EntityKind) -> String {
     format!("{}_rest", kind.path())
 }
 
 /// The kind of raptor `id` is.
-fn kind_of(w: &World, id: u64) -> Option<&'static Entity> {
+fn kind_of(w: &World, id: u64) -> Option<&'static EntityKind> {
     let k = w.entity(id)?.kind;
     KINDS.iter().map(|(e, _)| *e).find(|e| e.id() == k)
 }
@@ -114,7 +115,7 @@ pub fn aid(w: &World, id: u64, at: u64) {
         return;
     }
     let Some(st) = w.entity(id) else { return };
-    for other in w.near(st.pos, AID_RANGE, None) {
+    for other in w.entities_near(st.pos, AID_RANGE, None) {
         if other == id || crate::animal::tamed(w, other) || w.entity(other).is_none_or(|e| e.kind != st.kind) {
             continue;
         }

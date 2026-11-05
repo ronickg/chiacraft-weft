@@ -7,7 +7,9 @@
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
-pub(crate) static CAPYBARA: Entity = Entity::named("capybara");
+use crate::ModelFile;
+
+pub(crate) static CAPYBARA: EntityKind = EntityKind::named("capybara");
 const TEXTURE: &str = "capybara/capybara";
 
 pub fn init(r: &mut Registry) {
@@ -24,8 +26,8 @@ pub fn init(r: &mut Registry) {
     );
     r.entity(&CAPYBARA)
         .size(animals_core::bodies::of("capybara").0, animals_core::bodies::of("capybara").1)
-        .health(12.0)
-        .speed(2.5)
+        .max_health(12.0)
+        .walk_speed(2.5)
         .passive()
         .model_file("capybara")
         .animations("capybara")
@@ -35,12 +37,14 @@ pub fn init(r: &mut Registry) {
             if !crate::screen::interact(&w, id, player) && !crate::taming::feed(&w, id, player) {
                 crate::commands::interact(&w, id, player);
             }
+            false
         })
         .goals(
             Goals::new()
                 .then(crate::animal::upkeep(index))
                 .then(crate::taming::behave(index))
                 .then(crate::hunt::wary)
+                .then(crate::hunt::huddle)
                 .then(crate::signatures::calm_aura)
                 .then(crate::commands::act(index))
                 .then(crate::breeding::behave(index))
