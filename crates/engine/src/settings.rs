@@ -275,6 +275,11 @@ impl Settings {
         number("core:froxels") != 0.0
     }
 
+    /// Pixels a mist volume cell covers each way: 8 (`core:froxels` 1), 4 (2, ultra).
+    pub fn froxel_cell(&self) -> u32 {
+        if number("core:froxels") >= 2.0 { 4 } else { 8 }
+    }
+
     /// Soft clouds for packs that draw them (`client::soft_clouds`).
     pub fn soft_clouds(&self) -> bool {
         number("core:soft_clouds") != 0.0

@@ -2572,6 +2572,7 @@ fn update_game(r: &mut Running, dt: f64, frame_start: Instant) {
         r.post.use_low = r.settings.post_low();
         r.post.bloom_levels = r.settings.bloom_levels();
         g.client.sky.froxels_wanted = r.settings.froxels();
+        g.client.sky.froxels.cell = r.settings.froxel_cell();
         let t = Instant::now();
         if world_input {
             g.client.update(&mut *r.gpu, &r.textures, &mut r.input, dt);

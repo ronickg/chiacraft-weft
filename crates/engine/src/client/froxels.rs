@@ -17,9 +17,11 @@ use crate::gpu_layout::bind;
 pub const SLICES: u32 = 32;
 const ROW: u32 = 8;
 
-/// The cells across the view for a world `w` × `h` pixels: an eighth each way.
-fn grid(w: u32, h: u32) -> (u32, u32) {
-    (w.div_ceil(8).max(1), h.div_ceil(8).max(1))
+/// The cells across the view for a world `w` × `h` pixels: one per `cell` pixels each way (8, or
+/// 4 at `core:froxels` 2, ultra).
+fn grid(w: u32, h: u32, cell: u32) -> (u32, u32) {
+    let cell = cell.max(1);
+    (w.div_ceil(cell).max(1), h.div_ceil(cell).max(1))
 }
 
 struct Targets {
@@ -38,6 +40,8 @@ pub struct Froxels {
     /// What the scene gets this frame (`Scene::froxels`): x the sums' bindless index + 1 (0: none,
     /// the surfaces walk the mist themselves), y the cells' own image's index, zw the cells across.
     pub scene: [f32; 4],
+    /// Pixels a cell covers each way (`core:froxels`: 8, or 4 for ultra; 0 reads as 8).
+    pub cell: u32,
     /// The two passes, for the app to run once the shadow maps are drawn and before the world.
     pub passes: CommandList,
 }
@@ -101,7 +105,7 @@ impl Froxels {
             self.scene = [0.0; 4];
             return;
         };
-        let cells = grid(w, h);
+        let cells = grid(w, h, if self.cell == 0 { 8 } else { self.cell });
         if self.targets.as_ref().is_none_or(|t| t.grid != cells) {
             if let Some(old) = self.targets.take() {
                 // The GPU frees them once no frame in flight still draws with them.
