@@ -445,6 +445,12 @@ fn plant(r: &mut Registry, handle: &'static Block, tex: &str) {
 
 /// Sand and gravel: with nothing under them they fall as an entity and land as a block.
 pub fn register(r: &mut Registry) {
+    // First: soil is any dirt. The engine sets a tag by tag in the order the calls come, reading
+    // the tag as it is then, so `plant_soil` must hold the dirt before `tall_grass_soil` and
+    // `big_leaf_soil` read it below. When it came after, double tall grass, bananas and
+    // philodendrons on grass had no soil and broke at the first block update beside them (the
+    // plant fibre round the grazing herds, 11-05).
+    r.tag("plant_soil", &["#dirt"]);
     // The leaves' tint kinds besides foliage (`base_api::trees`), as green as foliage by default.
     r.tint_kind(&base_api::trees::EVERGREEN, vitals::foliage::muted(vitals::foliage::LEAVES));
     r.tint_kind(&base_api::trees::YELLOW_LEAVES, vitals::foliage::muted(vitals::foliage::LEAVES));
@@ -1187,7 +1193,7 @@ pub fn register(r: &mut Registry) {
 
     // What may grow or stand where, from the common `dirt` and `sand` tags like modern vanilla:
     // a mod's sand tagged `sand` gets cactus and sugar cane, in the world and from players.
-    r.tag("plant_soil", &["#dirt"]);
+    // (`plant_soil` from `#dirt` is set at the top of `register`.)
     r.tag("sugar_cane", &["sugar_cane"]);
     r.tag("hay_bale", &["hay_bale"]);
     r.tag("dyes/red", &["rose"]);
