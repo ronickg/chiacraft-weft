@@ -26,8 +26,9 @@ from PIL import Image  # noqa: E402
 import bird  # noqa: E402
 
 # On the ground the engine plays `idle`, `walk` and `run` by itself; flying is a look of its own
-# (`<model>_fly`, put on by `birds.rs`), its wings beating whatever it does.
-GROUND = {"": {"idle": "idle", "walk": "walk", "run": "run"}}
+# (`<model>_fly`, put on by `birds.rs`), its wings beating whatever it does. The behaviour clips
+# (`mods/animals/src/anim.rs`, `bird.CLIPS`) go in the standing file, by their own names.
+GROUND = {"": {"idle": "idle", "walk": "walk", "run": "run", **{c: c for c in bird.CLIPS}}}
 FLY = {"": {"idle": "flap", "walk": "flap", "run": "flap"}}
 FEET = ["toes_l", "toes_r"]
 
@@ -68,6 +69,10 @@ def export(model):
     for anim in ("walk", "run"):  # a foot in the air must swing forward, or it moonwalks
         back = {f: v for f, v in gait(ground, anim, FEET).items() if v is not None and v <= 0}
         assert not back, f"{anim} goes backwards: {back}"
+    # The behaviour clips: held ones and the approach loop, the rest once; the feet on the ground (on one
+    # foot, or taking off and landing), nothing in it, the fall on its lowest point, the approach going
+    # forward, the eyes shut asleep and dead, no wing or foot swung into the body.
+    bird.check_clips(ground, bird.config(mod.CFG))
     texture = os.path.join(out, "texture.png")
     made = to_bedrock(ground, texture, ASSETS, model, SCALE, f"{model}/{model}", pose_files=GROUND)
     made += to_bedrock(fly, texture, ASSETS, f"{model}_fly", SCALE, f"{model}/{model}", pose_files=FLY)
