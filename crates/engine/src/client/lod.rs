@@ -111,17 +111,19 @@ impl LodJob {
     }
 }
 
-/// LOD's own threads, apart from the pool that finishes the near cubes: half the cores (3 to 8),
-/// at normal priority. At 3 low-priority threads its mods' heights and meshing waited on the
-/// cubes' terrain (about 20 tiles a second for the 800 of a view, the coarse boxes standing for
-/// half a minute); Distant Horizons gives its LOD half the cores at the highest priority.
+/// LOD's own threads, apart from the pool that finishes the near cubes: a third of the cores (3 to
+/// 6), at that pool's low priority, so they share the CPU with it by count. At 3 threads its
+/// meshing waited on base's steep faces (fixed in `Terrain::surface_block`); at half the cores and
+/// normal priority (Distant Horizons gives its LOD that) the near cubes took 7 s to come in after
+/// a teleport instead of 1.5 (PC, 11-05), worse than the far boxes it cleared.
 pub fn pool() -> &'static rayon::ThreadPool {
     static POOL: std::sync::OnceLock<rayon::ThreadPool> = std::sync::OnceLock::new();
     POOL.get_or_init(|| {
         let cores = std::thread::available_parallelism().map_or(4, |n| n.get());
         rayon::ThreadPoolBuilder::new()
-            .num_threads((cores / 2).clamp(3, 8))
+            .num_threads((cores / 3).clamp(3, 6))
             .thread_name(|i| format!("distant terrain {i}"))
+            .start_handler(|_| crate::lower_priority())
             .build()
             .expect("distant terrain pool")
     })
