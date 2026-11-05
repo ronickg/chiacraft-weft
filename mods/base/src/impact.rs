@@ -17,6 +17,18 @@ use crate::blocks::{COBBLESTONE, DIRT, GRASS, GRAVEL, OBSIDIAN, SNOWY_GRASS};
 static COARSE_DIRT: Block = Block::named("coarse_dirt");
 /// First hours' block (the sky events); a crater holds none until it is there.
 static METEORITE: Block = Block::named("base:meteorite");
+/// Melt lining the bowl and broken impact rock (Art's, claude/art-sky); obsidian and gravel
+/// until they are registered.
+static IMPACT_GLASS: Block = Block::named("base:impact_glass");
+static SUEVITE: Block = Block::named("base:suevite");
+
+/// `b`'s state, or `or`'s while `b` isn't registered.
+fn or_else(b: &Block, or: &Block) -> u32 {
+    match b.id() {
+        u32::MAX => or.id(),
+        id => id,
+    }
+}
 static LOGS: Tag = Tag::named("logs");
 static LEAVES: Tag = Tag::named("leaves");
 
@@ -267,8 +279,8 @@ fn column(w: &World, c: &Carve, dx: i32, dz: i32, gone: &mut Vec<[i32; 3]>) -> O
         for y in g + 1..floor {
             set([x, y, z], rubble(hash(y, 1)));
         }
-        // Lined with melt (impact glass, for now obsidian), broken rock under it.
-        set([x, floor, z], OBSIDIAN.id());
+        // Lined with melt, broken rock under it.
+        set([x, floor, z], or_else(&IMPACT_GLASS, &OBSIDIAN));
         set([x, floor - 1, z], rubble(hash(floor - 1, 2)));
         // The core, under a block or two of broken rock.
         if c.core_state != u32::MAX {
@@ -305,11 +317,11 @@ fn column(w: &World, c: &Carve, dx: i32, dz: i32, gone: &mut Vec<[i32; 3]>) -> O
     Some(edits)
 }
 
-/// Thrown-out rock: gravel, cobblestone or dirt, by `IMPACT_RUBBLE`.
+/// Thrown-out rock: suevite (gravel until it exists), cobblestone or dirt, by `IMPACT_RUBBLE`.
 fn rubble(h: u64) -> u32 {
     let (gravel, cobble) = n::IMPACT_RUBBLE;
     match (h % 100) as u32 {
-        r if r < gravel => GRAVEL.id(),
+        r if r < gravel => or_else(&SUEVITE, &GRAVEL),
         r if r < gravel + cobble => COBBLESTONE.id(),
         _ => DIRT.id(),
     }

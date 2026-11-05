@@ -27,7 +27,8 @@ pub const IMPACT_CARVE_TICKS: u32 = 20;
 /// Blocks over the ground the bowl clears at most (a tree standing in it goes with it).
 pub const IMPACT_CLEAR_UP: i32 = 40;
 
-/// Shares of the rim's thrown-out rock (out of 100): gravel, then cobblestone; the rest dirt.
+/// Shares of the rim's thrown-out rock (out of 100): suevite (impact breccia; gravel until it
+/// exists), then cobblestone; the rest dirt.
 pub const IMPACT_RUBBLE: (u32, u32) = (45, 40);
 
 /// Meteorites in the core at the bowl's bottom, under a block or two of broken rock (before
