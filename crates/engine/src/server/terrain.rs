@@ -763,12 +763,17 @@ thread_local! {
 }
 
 /// Runs `f` with this thread's `Terrain::surface_block` working out only the column asked for
-/// (distant terrain's faces: far cells, each in a cube column of its own).
+/// (distant terrain's faces: far cells, each in a cube column of its own). The flag is put back
+/// on the way out, a panic included, so a pool thread doing near work after can't keep it.
 pub fn one_column<R>(f: impl FnOnce() -> R) -> R {
-    let was = ONE_COLUMN.replace(true);
-    let r = f();
-    ONE_COLUMN.set(was);
-    r
+    struct Restore(bool);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            ONE_COLUMN.set(self.0);
+        }
+    }
+    let _restore = Restore(ONE_COLUMN.replace(true));
+    f()
 }
 
 impl Terrain {
