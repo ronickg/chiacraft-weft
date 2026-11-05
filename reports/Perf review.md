@@ -56,6 +56,13 @@ Gain per effort, all platforms. "Mac", "PC" and "weak" mean the M3 Max, the RTX 
 - **Client update:** mesh upload copies, tint blends ×9, the server rescanning its backlog per cube, `ColumnCache` waits, per-cell rescans near the camera, the storage lock held across disk reads.
 - **Far terrain:** `host::invoke` overhead; cave interpolation twice per node; site caches per thread; river regions built 16×; the Mac's 4 LOD threads.
 
+## Measured gains so far (PC flight bench, 1280x720)
+
+- `fix/hiz-chain` (#14): 0.684 → 0.613 ms a frame (−10 %).
+- `fix/barrier-masks` (render #5, b2d9b08c): image barriers on the stages their layouts use, and the acquire at colour output. 0.612 → 0.579 ms (−5.4 %), GPU 0.574 → 0.540. Sync validation: no hazards seen. `WEFT_ALL_BARRIERS=1` compares.
+- Together: 0.684 → 0.579 ms, −15 %. The Mac gains are to measure, with both in its next build.
+- The `dist` profile: far tiles' heights −17 %, mesh −10 %.
+
 ## What the update split showed on the Mac (Tester, 179 s run, dev 9ae94af9)
 
 The client update's parts, added up over the run (the sum of per-second averages, in ms a frame), with each part's worst frame:
