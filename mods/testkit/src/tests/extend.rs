@@ -20,7 +20,8 @@ pub async fn events_batched(t: T) -> R {
     for i in 0..3 {
         let p = add(f, [3, 0, i]);
         t.set(p, "stone").await?;
-        t.op(&format!("break {} testmod:steel_pickaxe", at(p))).await?;
+        t.op(&format!("break {} testmod:steel_pickaxe", at(p)))
+            .await?;
     }
     t.op("put me 0 dirt 4").await?;
     t.c().select_slot(0);
