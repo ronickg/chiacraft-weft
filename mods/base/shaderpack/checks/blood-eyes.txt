@@ -1,0 +1,30 @@
+# Blood-moon eyes (Art's masks, the green channel): a zombie, a skeleton, a creeper and a spider in
+# a row at night on a grass floor high in the open (x 40 y 200), faces seen from the front at eye
+# height, with the blood moon in totality and then without. Seed 1, --view 12, 1280x720,
+# --shader-pack chiacraft, a fresh world, mobs off. Mobs spawn facing +z; the camera looks -z.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /weather clear 99999
+chat /tk mode creative
+chat /time set 18000
+chat /tp 40 205 52
+loaded
+idle
+wait 6
+chat /tk fill 30 199 36 50 199 60 grass
+chat /tk spawn base:zombie 37 200 45
+chat /tk spawn base:skeleton 39 200 45
+chat /tk spawn base:creeper 41 200 45
+chat /tk spawn base:spider 43.5 200 45
+wait 1
+chat /tick freeze
+chat /tp 40 199.4 49.5
+look 0 2
+chat /tk sky_event 1 1
+wait 3
+shot be_1_blood.png
+chat /tk sky_event 0 0
+wait 2
+shot be_2_normal.png
+quit
