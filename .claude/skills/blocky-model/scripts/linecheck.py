@@ -52,7 +52,8 @@ FRAMES = {"south": ("lo0 hi1 hi2", (1, 0, 0), (0, -1, 0)), "north": ("hi0 hi1 lo
           "up": ("lo0 hi1 lo2", (1, 0, 0), (0, 0, 1)), "down": ("lo0 lo1 hi2", (1, 0, 0), (0, 0, -1))}
 SPT = 4  # samples a texel along each side
 MAX_W, MIN_LEN = 2.0, 2.0  # a line: under 2 texels wide and at least 2 long
-FLUSH = 0.6  # units: a strip this narrow is the half-unit step boxcheck asks for between faces, read as flush
+FLUSH = 0.6  # layout units (1/64 block): a strip this narrow is the half-unit step boxcheck asks for, read as flush
+GEO_UNIT = 4.0  # layout units in an exported model's pixel (16 a block, as house.SCALE exports them)
 CONTRAST = 34.0  # mean RGB distance from the cover's colour that turns a seam into a line
 
 
@@ -83,7 +84,7 @@ def boxes_from_spec(spec):
         c = R @ (o - E @ o - p0) + t
         faces = {f: r for f, r in (e.get("faces") or {}).items() if r is not None}
         out.append(dict(name=e["name"], bone=e["bone"], lo=np.array(e["lo"], float), hi=np.array(e["hi"], float),
-                        A=A, c=c, quad=e.get("quad"), faces=faces, up=chain(spec["bones"], e["bone"]), pivots=piv))
+                        A=A, c=c, quad=e.get("quad"), faces=faces, up=chain(spec["bones"], e["bone"]), pivots=piv, unit=1.0))
     return out
 
 
@@ -152,7 +153,7 @@ def boxes_from_geo(geo):
                 ax = thin[0]
                 quad = next((f for f, (a_, _) in FACES.items() if a_ == ax and f in faces), None) or "up"
             out.append(dict(name=f"{b['name']}#{k}", bone=b["name"], lo=lo, hi=hi, A=A2, c=c2, quad=quad, faces=faces,
-                            up=chain(g["bones"], b["name"]), pivots=pivots))
+                            up=chain(g["bones"], b["name"]), pivots=pivots, unit=GEO_UNIT))
     return out
 
 
@@ -333,12 +334,14 @@ def lines(boxes, tex=None, density=0.5, allow=()):
             lab, k = ndimage.label(thin)
             if k == 0:
                 continue
-            across = np.minimum(runs(vis) * tu, runs(vis.T).T * tv)  # how wide what shows is, at each sample
+            ru, rv = runs(vis), runs(vis.T).T
+            across = np.minimum(ru * tu, rv * tv)  # how wide what shows is, at each sample, in the face's texels
+            across_u = np.minimum(ru * du_len / nu, rv * dv_len / nv)  # the same in the model's units
             cols = None
             for comp in range(1, k + 1):
                 m = lab == comp
                 width = float(np.median(across[m]))  # the strip's width, in texels
-                units = width / max(min(w / max(du_len, 1e-9), h / max(dv_len, 1e-9)), 1e-9)
+                units = float(np.median(across_u[m])) * b.get("unit", 1.0)  # and in layout units (1/64 block)
                 if width >= 0.95 * MAX_W or units < FLUSH:  # a wedge where a tilted box crosses, or flush
                     continue
                 area = m.sum() * tu * tv
