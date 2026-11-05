@@ -58,6 +58,7 @@ block.base.porites_coral_block = Блок коралла поритес
 block.base.coral_rubble = Коралловый щебень
 block.base.glacier_ice = Ледниковый лёд
 block.base.obsidian = Обсидиан
+block.base.meteorite = Метеорит
 block.base.coal_ore = Угольная руда
 block.base.iron_ore = Железная руда
 block.base.gold_ore = Золотая руда
