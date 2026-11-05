@@ -60,6 +60,7 @@ const SOURCES: &[(&str, &str)] = &[
     ("stone", "#cobblestone"),
     ("bone", "bone"),
     ("wrought_iron", "#ingots/iron"),
+    ("meteoric_iron", "#meteoric_iron"),
     ("gold", "#ingots/gold"),
     ("diamond", "#gems/diamond"),
     ("plant_cordage", "#string"),
