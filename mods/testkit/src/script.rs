@@ -92,6 +92,7 @@ const COMMANDS: &[&str] = &[
     "set_config",
     "shot",
     "bench",
+    "bench_bg",
     "host",
     "join",
     "open",
