@@ -794,6 +794,11 @@ fn died(w: &World, id: u64, pos: [f64; 3]) {
             luck[y] = luck[y].saturating_add(1);
         }
         w.set_component(p, &LUCK, luck);
+        // A socket stone for the perk web (`vitals::sockets`, a boss's find: one a kill, rolled at
+        // its form's age).
+        if base_api::skills::drop_stone(w, base_api::skills::StoneSource::Boss, f.age.tier(), [pos[0], pos[1] + 1.0, pos[2]]) {
+            got.push("a socket stone".into());
+        }
         weft_sdk::info!("drenkaun {id}: loot for player {p}: {}", got.join(", "));
     }
     if calf {
