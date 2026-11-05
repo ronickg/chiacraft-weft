@@ -20,6 +20,8 @@ static NAMES: std::sync::Mutex<Vec<&'static str>> = std::sync::Mutex::new(Vec::n
 static NANOS: [AtomicU64; ROWS] = [const { AtomicU64::new(0) }; ROWS];
 static CALLS: [AtomicU64; ROWS] = [const { AtomicU64::new(0) }; ROWS];
 static TOOK: [AtomicU64; ROWS] = [const { AtomicU64::new(0) }; ROWS];
+/// The longest single run, nanoseconds (a spike: one search, one burst).
+static MAX: [AtomicU64; ROWS] = [const { AtomicU64::new(0) }; ROWS];
 /// The tick the rows started at.
 static SINCE: AtomicU64 = AtomicU64::new(0);
 
@@ -44,7 +46,9 @@ impl<G: Goal> Goal for Time<G> {
         }
         let t = Instant::now();
         let took = self.goal.run(w, id, st);
-        NANOS[self.row].fetch_add(t.elapsed().as_nanos() as u64, Relaxed);
+        let ns = t.elapsed().as_nanos() as u64;
+        NANOS[self.row].fetch_add(ns, Relaxed);
+        MAX[self.row].fetch_max(ns, Relaxed);
         CALLS[self.row].fetch_add(1, Relaxed);
         TOOK[self.row].fetch_add(took as u64, Relaxed);
         took
@@ -73,13 +77,21 @@ fn report(w: &World) -> String {
     let mut total = 0.0;
     let mut rows = Vec::new();
     for (i, name) in names.iter().enumerate().take(ROWS) {
-        let (ns, calls, took) = (NANOS[i].swap(0, Relaxed), CALLS[i].swap(0, Relaxed), TOOK[i].swap(0, Relaxed));
+        let (ns, calls, took, max) =
+            (NANOS[i].swap(0, Relaxed), CALLS[i].swap(0, Relaxed), TOOK[i].swap(0, Relaxed), MAX[i].swap(0, Relaxed));
         if calls == 0 {
             continue;
         }
         let us = ns as f64 / 1000.0;
         total += us;
-        rows.push(format!("{name} {:.1}us/t {:.2}us/call {}/{}", us / ticks, us / calls as f64, took, calls));
+        rows.push(format!(
+            "{name} {:.1}us/t {:.2}us/call {}/{} max {:.0}us",
+            us / ticks,
+            us / calls as f64,
+            took,
+            calls,
+            max as f64 / 1000.0
+        ));
     }
     format!("ANIMAL_GOALS {:.0} ticks | total {:.1} us/tick | {}", ticks, total / ticks, rows.join(" | "))
 }

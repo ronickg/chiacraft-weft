@@ -298,9 +298,12 @@ fn eat_item(w: &World, id: u64, a: &animal::Animal, item: u64, grams: f32) {
 /// (wandering) take it elsewhere.
 pub fn forage(w: &World, id: u64, st: &EntityState) -> bool {
     // Thirst first: water is the more urgent (`drink.rs`).
-    if crate::drink::drink(w, id, st) {
-        return true;
-    }
+    crate::drink::drink(w, id, st) || eat(w, id, st)
+}
+
+/// `forage` without drinking first: for the animals that weigh thirst against hunger
+/// (`choose.rs`).
+pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
     let Some(a) = w.component(id, &ANIMAL) else { return false };
     let Some(s) = a.species() else { return false };
     let Some(mut f) = w.component(id, &FORAGE) else { return false };

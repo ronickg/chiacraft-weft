@@ -107,7 +107,9 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
         if t.scared > 0 {
             set(w, id, |t| t.scared = t.scared.saturating_sub(w.tick_elapsed(id)));
             if t.scared <= w.tick_elapsed(id) {
-                w.component_mut(id, &FROM).map(|f| *f = 0);
+                if let Some(f) = w.component_mut(id, &FROM) {
+                    *f = 0;
+                }
             } else if (w.game_time() + id) % 20 == 0 || !w.navigating(id) {
                 flee(w, id, st);
             }

@@ -30,6 +30,7 @@ mod breeding;
 mod caiman;
 mod capybara;
 mod cat;
+mod choose;
 mod citipati;
 mod coats;
 mod comfort;
@@ -158,6 +159,7 @@ fn init(r: &mut Registry) {
     drink::init(r);
     hunt::init(r);
     senses::init(r);
+    choose::init(r);
     screen::init(r);
     taming::init(r);
     commands::init(r);

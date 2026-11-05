@@ -11,6 +11,7 @@ use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
 use crate::ModelFile;
+use crate::choose::{Band, Need, WithBand};
 use crate::prof::Timed;
 
 use crate::dist2;
@@ -104,10 +105,17 @@ pub fn register(r: &mut Registry, kinds: &[&'static EntityKind], wings: &'static
                     .timed("taming", crate::taming::behave(index))
                     .timed("wary", move |w: &World, id: u64, st: &EntityState| crate::hunt::wary(w, id, st) && take_off(w, id, st, wings))
                     .timed("hunt", crate::hunt::hunt)
-                    .timed("breeding", crate::breeding::behave(index))
-                    .timed("comfort", crate::comfort::seek)
-                    .timed("forage", crate::forage::forage)
-                    .timed("wander", ai::wander(wings.wander, 8.0)),
+                    // What it does when nothing is after it, the most pressing first
+                    // (`choose.rs`).
+                    .band(
+                        "needs",
+                        Band::new()
+                            .with(Need::Love, crate::breeding::behave(index))
+                            .with(Need::Comfort, crate::comfort::seek)
+                            .with(Need::Drink, crate::drink::drink)
+                            .with(Need::Eat, crate::forage::eat)
+                            .with(Need::Wander, ai::wander(wings.wander, 8.0)),
+                    ),
             )
             .on_hurt(|w, h| crate::taming::hurt(w, h.entity, h.source));
     }

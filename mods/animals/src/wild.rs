@@ -9,6 +9,7 @@ use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
 use crate::ModelFile;
+use crate::choose::{Band, Need, Stops, WithBand};
 use crate::prof::Timed;
 
 /// One simple creature's body, for every species on its model.
@@ -82,11 +83,20 @@ pub fn register(r: &mut Registry, kinds: &[&'static EntityKind], body: &'static 
                     .timed("wary", |w: &World, id: u64, st: &EntityState| crate::hunt::wary(w, id, st) && woken(w, id))
                     .timed("huddle", |w: &World, id: u64, st: &EntityState| crate::hunt::huddle(w, id, st) && woken(w, id))
                     .timed("hunt", |w: &World, id: u64, st: &EntityState| crate::hunt::hunt(w, id, st) && woken(w, id))
-                    .timed("breeding", crate::breeding::behave(index))
-                    .timed("settle", move |w: &World, id: u64, st: &EntityState| settle(w, id, st, look))
-                    .timed("comfort", crate::comfort::seek)
-                    .timed("forage", crate::forage::forage)
-                    .timed("wander", ai::wander(body.wander, 8.0)),
+                    // What it does when nothing is after it, the most pressing first (`choose.rs`).
+                    .band(
+                        "needs",
+                        Band::new()
+                            .with(Need::Love, crate::breeding::behave(index))
+                            .with(
+                                Need::Rest,
+                                Stops { goal: move |w: &World, id: u64, st: &EntityState| settle(w, id, st, look), stop: wake },
+                            )
+                            .with(Need::Comfort, crate::comfort::seek)
+                            .with(Need::Drink, crate::drink::drink)
+                            .with(Need::Eat, crate::forage::eat)
+                            .with(Need::Wander, ai::wander(body.wander, 8.0)),
+                    ),
             )
             .on_hurt(|w, h| {
                 crate::taming::hurt(w, h.entity, h.source);

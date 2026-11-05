@@ -10,6 +10,7 @@ use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
 use crate::ModelFile;
+use crate::choose::{Band, Need, Stops, WithBand};
 use crate::prof::Timed;
 
 pub(crate) static WOLF: EntityKind = EntityKind::named("grey_wolf");
@@ -51,12 +52,19 @@ pub fn init(r: &mut Registry) {
                 .timed("wary", crate::hunt::wary)
                 .timed("hunt", crate::hunt::hunt)
                 .timed("commands", crate::commands::act(index))
-                .timed("breeding", crate::breeding::behave(index))
-                .timed("settle", crate::rest::settle)
-                .timed("hold", crate::commands::hold)
-                .timed("comfort", crate::comfort::seek)
-                .timed("forage", crate::forage::forage)
-                .timed("wander", ai::wander(0.4, 10.0)),
+                // What it does when nothing is after it or ordered, the most pressing first
+                // (`choose.rs`).
+                .band(
+                    "needs",
+                    Band::new()
+                        .with(Need::Love, crate::breeding::behave(index))
+                        .with(Need::Rest, Stops { goal: crate::rest::settle, stop: crate::rest::stop })
+                        .with(Need::Hold, crate::commands::hold)
+                        .with(Need::Comfort, crate::comfort::seek)
+                        .with(Need::Drink, crate::drink::drink)
+                        .with(Need::Eat, crate::forage::eat)
+                        .with(Need::Wander, ai::wander(0.4, 10.0)),
+                ),
         )
         .on_hurt(|w, h| {
             crate::taming::hurt(w, h.entity, h.source);
