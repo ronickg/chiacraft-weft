@@ -343,10 +343,13 @@ async fn commands(t: &T) -> R {
 async fn damage_chain(t: &T) -> R {
     let bare = t.op("damage 8 0").await?;
     t.check((value(&bare) - 8.0).abs() < 1e-6, format!("no armor: {bare}"));
-    // Iron chestplate: 6 points, 4% each.
+    // Iron chestplate: its armour from the curve (`vitals::gear`), cutting a hit by
+    // armour / (armour + 5 × hit) (`vitals::combat`).
+    let plate = vitals::gear::armour_of(1, "iron").map_or(0.0, |a| a.0);
+    let want = 8.0 * (1.0 - vitals::combat::armour_cut(plate, 8.0)) as f64;
     t.op("put me 37 iron_chestplate 1").await?;
     let armored = t.op("damage 8 0").await?;
-    t.check((value(&armored) - 7.36).abs() < 1e-4, format!("iron chestplate: {armored}"));
+    t.check((value(&armored) - want).abs() < 1e-3, format!("iron chestplate: {armored}, not {want:.3}"));
     let fall = t
         .op(&format!("damage 8 {}", abi::damage_cause::FALL))
         .await?;
@@ -354,7 +357,7 @@ async fn damage_chain(t: &T) -> R {
     t.cmd("/rule testkit:half_damage 1").await?;
     let both = t.op("damage 8 0").await?;
     t.cmd("/rule testkit:half_damage 0").await?;
-    t.check((value(&both) - 3.68).abs() < 1e-4, format!("armor then halved: {both}"));
+    t.check((value(&both) - want / 2.0).abs() < 1e-3, format!("armor then halved: {both}"));
     t.check(both.contains("base at stage 200") && both.contains("testkit at stage 300"), format!("explanation names both steps: {both}"));
     Ok(())
 }

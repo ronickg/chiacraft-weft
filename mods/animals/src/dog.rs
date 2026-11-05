@@ -115,9 +115,9 @@ pub fn init(r: &mut Registry) {
     }
     r.entity(&CHIHUAHUA)
         .size(animals_core::bodies::of("chihuahua").0, animals_core::bodies::of("chihuahua").1)
-        .max_health(8.0)
+        .max_health(crate::animal::health(species::of(&CHIHUAHUA)))
         .walk_speed(2.8)
-        .attack_damage(2.0)
+        .attack_damage(crate::animal::hit(species::of(&CHIHUAHUA)))
         .passive()
         .model_file("chihuahua")
         .animations("chihuahua")

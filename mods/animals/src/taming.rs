@@ -66,7 +66,9 @@ pub fn init(r: &mut Registry) {
     r.tag("kibble_meat", &["base:beef", "base:porkchop", "base:chicken", "base:mutton"]);
     r.tag("kibble_plant", &["base:apple", "base:sugar_cane"]);
     for filling in ["#kibble_meat", "#kibble_plant"] {
-        r.shapeless(&CRAFTING, "kibble", 4, &["base:egg", filling, "base:wheat", "base:water_bucket"], 0);
+        // Fibre for the binding, not a water bucket: an iron bucket put kibble in the Iron Age, and
+        // taming starts in the Stone Age (Ronald, 11-07: "move them to fit").
+        r.shapeless(&CRAFTING, "kibble", 4, &["base:egg", filling, "base:wheat", "base:plant_fibre"], 0);
     }
     // A bubble with each food in it, shown above an animal asking for it.
     let mut bubbles: Vec<(&'static str, &'static Particle)> = Vec::new();

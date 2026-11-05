@@ -12,11 +12,10 @@ pub(crate) static KRYPTOBAATAR: EntityKind = EntityKind::named("kryptobaatar");
 static BODY: Body = Body {
     model: "kryptobaatar",
     texture: "kryptobaatar/kryptobaatar",
-    health: 2.0,
     // Scurrying, darting off at about 3 m/s (est., as a mouse's).
     speed: 3.0,
     wander: 0.35,
-    damage: 0.0,
+    bites: false,
     rest: ("kryptobaatar_sit", (0.15, 0.2)),
 };
 

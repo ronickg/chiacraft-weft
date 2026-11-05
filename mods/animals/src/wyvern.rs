@@ -35,9 +35,9 @@ pub fn init(r: &mut Registry) {
     );
     crate::riding::rideable(r.entity(&WYVERN), index)
         .size(animals_core::bodies::of("wyvern").0, animals_core::bodies::of("wyvern").1)
-        .max_health(400.0)
+        .max_health(crate::animal::health(index))
         .walk_speed(5.0)
-        .attack_damage(30.0)
+        .attack_damage(crate::animal::hit(index))
         .attack_speed(0.8)
         .passive()
         .model_file("wyvern")

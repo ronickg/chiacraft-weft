@@ -1885,7 +1885,10 @@ pub async fn swimming(t: T) -> R {
 /// stronger hit during the target's recovery still adds the difference.
 pub async fn attack_charge(t: T) -> R {
     t.flat().await?;
-    t.op("put me 0 iron_sword 1").await?;
+    // A wood sword, its hit from the curve (`vitals::gear`): small enough that the cow lives
+    // through both hits.
+    let sword = vitals::gear::weapon_of("sword", "wood").map_or(4.0, |w| w.0);
+    t.op("put me 0 wood_sword 1").await?;
     t.c().select_slot(0);
     let f = t.feet();
     let spot = add(f, [0, 0, -2]);
@@ -1916,14 +1919,14 @@ pub async fn attack_charge(t: T) -> R {
     t.secs(0.15).await?;
     let weak = before - health(t.clone(), id.clone()).await?;
     t.note(format!("uncharged: {weak:.2}"));
-    t.check((0.1..2.5).contains(&weak), format!("a hit with no charge does little: {weak:.2} of 6"));
+    t.check((0.1..sword * 0.6).contains(&weak), format!("a hit with no charge does little: {weak:.2} of {sword:.2}"));
     t.secs(1.5).await?;
     let before = health(t.clone(), id.clone()).await?;
     t.press("core:attack");
     t.secs(0.15).await?;
     let full = before - health(t.clone(), id.clone()).await?;
     t.note(format!("charged: {full:.2}"));
-    t.check((5.5..6.5).contains(&full), format!("a charged iron sword does 6: {full:.2}"));
+    t.check((sword - 0.5..sword + 0.5).contains(&full), format!("a charged wood sword does {sword:.2}: {full:.2}"));
     Ok(())
 }
 
