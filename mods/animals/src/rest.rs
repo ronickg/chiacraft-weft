@@ -94,7 +94,8 @@ fn kind_of(w: &World, id: u64) -> Option<(Settle, &'static [String])> {
 pub fn settle(w: &World, id: u64, st: &EntityState) -> bool {
     let Some((how, looks)) = kind_of(w, id) else { return false };
     let Some(c) = w.component_mut(id, &REST) else { return false };
-    if c.rest == 0 && !w.navigating(id) && !crate::forage::busy(w, id) && w.random_below(how.chance) == 0 {
+    let chance = crate::routines::rest_chance(how.chance, crate::routines::activity_of(w, id));
+    if c.rest == 0 && !w.navigating(id) && !crate::forage::busy(w, id) && w.random_below(chance) == 0 {
         c.rest = how.ticks.0 + w.random_below(how.ticks.1);
         c.rested = 0;
     }

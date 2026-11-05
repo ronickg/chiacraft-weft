@@ -182,7 +182,7 @@ const RECALL: i32 = 2 * LOOK;
 
 /// Food of its diet: round the patch it last found some in, if that is within `RECALL` blocks and
 /// still has some, else the nearest within `LOOK` blocks; remembered as its patch.
-fn find_food(w: &World, id: u64, s: &Species, pos: [f64; 3]) -> Option<[i32; 3]> {
+fn find_food(w: &World, id: u64, s: &Species, pos: [f64; 3], driven: bool) -> Option<[i32; 3]> {
     let p = pos.map(|v| v.floor() as i32);
     let patch = w
         .component(id, &PATCH)
@@ -190,6 +190,12 @@ fn find_food(w: &World, id: u64, s: &Species, pos: [f64; 3]) -> Option<[i32; 3]>
     let found = patch
         .and_then(|k| nearest(w, s, [k[0], k[1], k[2]], PATCH_LOOK, p, false))
         .or_else(|| nearest(w, s, p, LOOK, p, true))?;
+    // Ground that frightened its kind (a kill there, `memory`) it keeps off unless hunger drives it.
+    let at = [found[0] as f64 + 0.5, found[1] as f64, found[2] as f64 + 0.5];
+    if !driven && crate::memory::fear_at(w, at) >= animals_core::memory::AVOID {
+        weft_sdk::debug!("animal {id} keeps off feared ground to eat at {found:?}");
+        return None;
+    }
     if let Some(c) = w.component_mut(id, &PATCH) {
         *c = [found[0], found[1], found[2], 1];
     }
@@ -388,7 +394,7 @@ pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
         return true;
     }
     match grows
-        .then(|| find_food(w, id, s, st.pos.to_array()))
+        .then(|| find_food(w, id, s, st.pos.to_array(), animals_core::needs::hunger_score(full, true) >= animals_core::memory::DRIVEN))
         .flatten()
     {
         Some(p) => {
