@@ -1,7 +1,8 @@
 # Fireflies and glowing plants (Plants, 2026-11-05)
 
-Built on `ecology-sync` (from the Weft sync): fireflies (`fireflies.rs`) and the three glowing
-plants (`wild.rs`), each waiting on its PC look. Where it differs from the plan below: foxfire and
+Built on `ecology-sync` (from the Weft sync) and seen on the PC: fireflies (`fireflies.rs`; `/fireflies`
+says how many fly where you stand and why; none round a spectator, whom the world doesn't count
+among its players) and the three glowing plants (`wild.rs`). Where it differs from the plan below: foxfire and
 goblin's gold are picked as themselves (no loot table), and all three are placed on the forest
 floor like the mushrooms, not only under crowns.
 
