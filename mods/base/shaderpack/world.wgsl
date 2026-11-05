@@ -363,6 +363,14 @@ fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32>
     var light = paint * light_on(n, in.light, shadow, ao, in.pos, in.rel);
     // Leaves and plants let some sun through when it is behind them.
     if in.kind.x == TINT_FOLIAGE || in.kind.z != 0u {
+        // A low morning or evening sun full on a crown's side: light about as strong as on the tops
+        // at noon, but on the light birch green seen from below it went through the curve as a
+        // lime flash at 06:00-07:00 and 17:00-18:00 (Tester 2's forest hours, 11-05). Its brightest
+        // part is held back while the sun is under about 45° (none at noon or at golden hour's
+        // dim light), so leaves stay vivid at other hours.
+        let low = 1.0 - smoothstep(0.5, 0.72, scene.sun.y);
+        let over = max(luma(light / max(paint, vec3(0.05))) - 1.2, 0.0);
+        light *= 1.0 / (1.0 + 0.7 * over * low);
         let back = max(-dot(normalize(in.rel), light_dir()), 0.0);
         light += paint * palette().sun * light_strength() * pow(back, 3.0) * 0.35 * shadow * smoothstep(0.5, 0.95, in.light.x);
     }
