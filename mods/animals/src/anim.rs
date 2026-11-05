@@ -230,8 +230,15 @@ pub fn hold_for(w: &World, id: u64, a: Act, ticks: u64) {
     let now = w.game_time();
     let until = now + ticks;
     if h[STATE] & CODE == a.code() {
-        // Written only now and then: the grace covers the ticks between.
-        if until > h[ASKED] + 4 {
+        if h[STATE] & APPLIED == 0 && now >= h[BUSY] {
+            // Waiting under a clip played once that has ended: back on now (`tick` would too).
+            w.action_play(id, a.clip(), true);
+            edit(w, id, |c| {
+                c[STATE] |= APPLIED;
+                c[ASKED] = c[ASKED].max(until);
+            });
+        } else if until > h[ASKED] + 4 {
+            // Written only now and then: the grace covers the ticks between.
             edit(w, id, |c| c[ASKED] = until);
         }
         return;
