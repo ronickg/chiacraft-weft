@@ -120,8 +120,9 @@ pub fn drying_byte(secs: f32) -> u32 {
 /// lays any fog low); the sun burns it off two to three hours after it rises. Dry air (humidity
 /// under `DAWN_MIST_DAMP.0`) none, the dampest `DAWN_MIST` thick. Only on some mornings: each
 /// day's, the same on every machine. `sunrise` the hour the sun rises that day.
-// (0.2: at 0.42 a damp morning over the birch forest went a golden white-out, PC shm_mist.)
-pub const DAWN_MIST: f32 = 0.2;
+// (0.1: at 0.42 a damp morning over the birch forest went a golden white-out, at 0.2 it still hid
+// most of the land from 30 blocks up, PC shm_mist, shm_mist2.)
+pub const DAWN_MIST: f32 = 0.1;
 pub const DAWN_MIST_DAMP: (f32, f32) = (0.45, 0.8);
 pub const DAWN_MIST_DAYS: f32 = 0.6;
 
