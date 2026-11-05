@@ -2632,6 +2632,15 @@ impl Client {
         self.look.falls.clamp(0.0, 1.0)
     }
 
+    /// How far the rain's sky has come where the player is, 0..1, for packs (chiacraft's
+    /// `scene.fog_color.w`: its sky's gray, its clouds, the far rain's mist): ahead of what falls,
+    /// so the sky darkens before the drops (`weather_effects`), never behind it.
+    fn sky_rain(&self) -> f32 {
+        let weather = &content().game.weathers[self.weather_id as usize];
+        let full = if weather.falls() { weather.look.falls } else { 0.0 };
+        (self.gloom * full).max(self.look.falls).clamp(0.0, 1.0)
+    }
+
     /// How stormy it is, 0..1: thunder's clouds go 0.95 dark (`scene.weather.w` for packs).
     fn thunder(&self) -> f32 {
         (self.look.cloud_dark / 0.95).clamp(0.0, 1.0)
@@ -3188,7 +3197,7 @@ impl Client {
     }
 
     pub fn fog_color(&self) -> [f32; 4] {
-        self.fog_linear().extend(self.rain()).to_array()
+        self.fog_linear().extend(self.sky_rain()).to_array()
     }
 }
 
