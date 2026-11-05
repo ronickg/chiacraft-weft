@@ -4,8 +4,9 @@
 //! clear of what players built and of campfires. Each leaves a scorched pit 3-5 across with 1-3
 //! `base:meteorite` blocks in it, glowing hot (light 9) and cooling over a game hour, and a boom.
 //!
-//! The meteorite drops itself until meteoric iron (its lumps, a crafting material) comes with
-//! Art's lump and ramp; Terrain's old craters hide it too (`land.rs`), and big impacts' cores will.
+//! Mined, a meteorite gives 1-3 lumps of meteoric iron (`METEORITE_DROPS`), iron-nickel worked
+//! cold into iron-grade heads before a player can smelt (crafting's `meteoric_iron`). Terrain's
+//! old craters hide meteorites too (`land.rs`), and big impacts' cores will.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -16,6 +17,7 @@ use weft_sdk::*;
 use crate::blocks::{DIRT, GRASS, SNOWY_GRASS};
 
 pub static METEORITE: Block = Block::named("meteorite");
+pub static METEORIC_IRON: Item = Item::named("meteoric_iron");
 static COARSE_DIRT: Block = Block::named("coarse_dirt");
 static BOOM: Sound = Sound::named("weather.thunder_far");
 
@@ -33,24 +35,28 @@ const ROUND_TICKS: u64 = 40;
 const TRIES: u32 = 24;
 
 pub fn register(r: &mut Registry) {
-    // Obsidian's look until Art's crust (and its hot `_e` glow).
+    // Art's crust, and while it cools its hot look, orange in the cracks (`meteorite_hot_e` glows).
     r.block(&METEORITE)
         .prop("heat", 0..=HEAT)
         .sound_group("stone")
-        .texture("obsidian")
+        .texture("meteorite")
         .hardness(1.5)
         .mineable("pickaxe")
         .needs_tool_level(tool_tier::STONE)
         .states(|p, s| match p.get("heat") {
-            "3" => s.light(9),
-            "2" => s.light(6),
-            "1" => s.light(3),
+            "3" => s.texture("meteorite_hot").light(9),
+            "2" => s.texture("meteorite_hot").light(6),
+            "1" => s.texture("meteorite_hot").light(3),
             _ => s,
         })
         .on_scheduled(cool)
         .tag("meteorites")
         .tab(&crate::tabs::NATURAL);
-    r.loot(&METEORITE).pool(Pool::new().item("meteorite"));
+    r.loot(&METEORITE)
+        .pool(Pool::new().items("meteoric_iron", ev::METEORITE_DROPS.0, ev::METEORITE_DROPS.1));
+    r.item(&METEORIC_IRON)
+        .tag("meteoric_iron")
+        .tab(&crate::tabs::INGREDIENTS);
     r.world_tick(tick);
 }
 

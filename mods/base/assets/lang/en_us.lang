@@ -696,6 +696,8 @@ advancement.base.tame = A Friend
 advancement.base.tame.desc = Tame an animal
 advancement.base.red_night = Red Night
 advancement.base.red_night.desc = See a blood moon through to its end without dying
+advancement.base.starfall = Starfall
+advancement.base.starfall.desc = Hold iron from a fallen star
 
 # Where things come from (tooltips)
 menu.base.campfire = Campfire
@@ -1028,6 +1030,7 @@ material.base.diamond = Diamond
 material.base.copper = Copper
 material.base.bronze = Bronze
 material.base.wrought_iron = Wrought Iron
+material.base.meteoric_iron = Meteoric Iron
 material.base.steel = Steel
 material.base.gold = Gold
 material.base.oak = Oak
@@ -1089,6 +1092,10 @@ block.base.loose_flint = Flint Nodule
 block.base.fallen_branch = Fallen Branch
 item.base.rock = Rock
 item.base.rock.tooltip = Lies loose on the ground. A hammerstone: use it on flint lying on the ground to strike off a sharp flake.
+item.base.meteoric_iron = Meteoric Iron
+item.base.meteoric_iron.tooltip = Iron-nickel from a fallen star. Hammered cold into iron-grade heads before you can smelt.
+item.base.eclipse_ash = Eclipse Ash
+item.base.eclipse_ash.tooltip = Left where a blood moon's monster fell. A red-black dye.
 item.base.flint = Flint Nodule
 item.base.flint.tooltip = Lies loose on the ground, most on gravel and slopes. Put it down and strike it with a rock for flakes, or sneak while striking to knap a head.
 item.base.sharp_flake = Sharp Flake

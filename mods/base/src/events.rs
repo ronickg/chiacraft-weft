@@ -45,6 +45,9 @@ weft_sdk::value! {
     /// The fallen star a player is pointed to, until the game day `until` or until they reach it.
     pub struct Star { pub x: i32, pub z: i32, pub until: u64, pub set: u32 }
 }
+/// One in `ECLIPSE_ASH_ONE_IN` blood-moon monsters leaves a pinch of it (a dye for a red-black
+/// cloak; cosmetic, so never a grind).
+pub static ECLIPSE_ASH: Item = Item::named("eclipse_ash");
 pub static BUILT: Component<Built> = Component::named("built_cells");
 pub static STAR: Component<Star> = Component::named("fallen_star");
 /// Big impacts: off, the looks only (the streak, the boom, a plume in the sea; no crater), or on.
@@ -93,12 +96,19 @@ pub fn register(r: &mut Registry) {
         });
     });
     r.world_tick(tick);
-    // Dying ends a player's watch of the blood moon.
+    r.item(&ECLIPSE_ASH)
+        .tag("dyes")
+        .tab(&crate::tabs::INGREDIENTS);
+    // Dying ends a player's watch of the blood moon; a blood-moon monster's death may leave ash.
     r.on(&actions::DIE, |b| {
+        let w = b.world();
         let mut watching = WATCHING.lock().unwrap();
         let watching = watching.get_or_insert_with(HashMap::new);
         for d in b.iter() {
             watching.remove(&d.entity);
+            if is_blood(d.entity) && w.random_below(ev::ECLIPSE_ASH_ONE_IN) == 0 {
+                w.spawn_item(d.pos, ItemStack::new(ECLIPSE_ASH.id(), 1));
+            }
         }
     });
 }

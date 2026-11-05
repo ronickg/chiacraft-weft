@@ -696,6 +696,8 @@ advancement.base.tame = Друг
 advancement.base.tame.desc = Приручите животное
 advancement.base.red_night = Красная ночь
 advancement.base.red_night.desc = Переживите кровавую луну до конца, ни разу не погибнув
+advancement.base.starfall = Звездопад
+advancement.base.starfall.desc = Держите в руках железо упавшей звезды
 
 # Откуда что берётся (подсказки к предметам)
 menu.base.campfire = Костёр
@@ -1029,6 +1031,7 @@ material.base.diamond = Алмаз
 material.base.copper = Медь
 material.base.bronze = Бронза
 material.base.wrought_iron = Кричное железо
+material.base.meteoric_iron = Метеоритное железо
 material.base.steel = Сталь
 material.base.gold = Золото
 material.base.oak = Дуб
@@ -1090,6 +1093,10 @@ block.base.loose_flint = Желвак кремня
 block.base.fallen_branch = Упавшая ветка
 item.base.rock = Галька
 item.base.rock.tooltip = Лежит на земле. Отбойник: ударьте им по кремню на земле, чтобы отбить острый отщеп.
+item.base.meteoric_iron = Метеоритное железо
+item.base.meteoric_iron.tooltip = Железо с никелем из упавшей звезды. Его куют холодным в насадки не хуже железных ещё до плавки.
+item.base.eclipse_ash = Пепел затмения
+item.base.eclipse_ash.tooltip = Остаётся там, где пало чудовище кровавой луны. Красно-чёрная краска.
 item.base.flint = Желвак кремня
 item.base.flint.tooltip = Лежит на земле, чаще на гравии и склонах. Положите его и бейте галькой — отщепы, а крадучись — оббивка насадки.
 item.base.sharp_flake = Острый отщеп

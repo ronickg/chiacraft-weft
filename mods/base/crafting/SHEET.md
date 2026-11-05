@@ -33,6 +33,7 @@ Points: material up to 40, work up to 40 (from memory up to 30, a machine 22), s
 | copper | working, fitting | 8.96 | 1 | 150 | 150 | 5 | 1.5 | - | 120 uses | soft |
 | bronze | working, fitting | 8.8 | 1 | 200 | 250 | 7 | 2 | - | 220 uses | recastable |
 | wrought_iron | working, fitting | 7.7 | 1 | 220 | 275 | 7 | 2 | - | 260 uses | weldable |
+| meteoric_iron | working, fitting | 7.9 | 1 | 200 | 240 | 6.5 | 2 | - | 220 uses | - |
 | steel | working, fitting | 7.85 | 1 | 300 | 500 | 8 | 3 | - | 400 uses | tempered |
 | gold | fitting | 19.3 | 1 | 0 | 30 | 6 | 0 | - | 40 uses | - |
 | oak | working, holding | 0.75 | 1.6 | 0 | 60 | 2 | 0 | uses +10%, speed -3% | - | tough |
