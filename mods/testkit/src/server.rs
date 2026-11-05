@@ -304,6 +304,19 @@ fn open_stash(w: &World, cmd: &Command, player: u64) -> Result<String, String> {
 static PROTECTED: std::sync::Mutex<Option<[i32; 3]>> = std::sync::Mutex::new(None);
 
 const OPS: &[(&str, &str, Run)] = &[
+    // The registry as JSON for the crew gallery's catalogue (`notes/crew/gallery/catalogue`):
+    // every item, block, entity and biome with what the game knows of it. Written into the
+    // `--shot-dir` when there is one.
+    ("dump", "<file:word>", |_, cmd, _, _| {
+        let file = word(cmd, "file")?;
+        let path = match launch_option("shot-dir") {
+            Some(d) => format!("{d}/{file}"),
+            None => file.to_string(),
+        };
+        let text = dump_registry();
+        std::fs::write(&path, &text).map_err(|e| format!("{path}: {e}"))?;
+        Ok(format!("{path} {}", text.len()))
+    }),
     // Items into the player's inventory (the crew's scripts set up with it).
     ("give", "<item:item> [count:int]", |w, cmd, player, _| {
         let count: u32 = int(cmd, "count").unwrap_or(1);
@@ -1153,4 +1166,80 @@ fn tool_stack(w: &World, player: u64, name: &str) -> Result<ItemStack, String> {
             .get(w.selected_slot(player)));
     }
     Ok(ItemStack::new(item(name)?, 1))
+}
+
+/// A JSON string.
+fn js(s: &str) -> String {
+    let mut o = String::with_capacity(s.len() + 2);
+    o.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => o.push_str("\\\""),
+            '\\' => o.push_str("\\\\"),
+            c if (c as u32) < 0x20 => o.push_str(&format!("\\u{:04x}", c as u32)),
+            c => o.push(c),
+        }
+    }
+    o.push('"');
+    o
+}
+
+/// The components and tags an entry carries, by name (`tab/base:tools`, `crops/wheat`, `food`).
+fn comps_json(kind: u32, id: u32) -> String {
+    let names: Vec<String> = components_of(kind, id).iter().map(|(n, _)| js(n)).collect();
+    format!("[{}]", names.join(","))
+}
+
+/// Every item, block, entity kind and biome (`/tk dump`).
+fn dump_registry() -> String {
+    let mut items = Vec::new();
+    for id in 0..entry_count(ek::ITEM) {
+        let Some(i) = item_info(id) else { continue };
+        items.push(format!(
+            "{{\"id\":{},\"owner\":{},\"max_stack\":{},\"durability\":{},\"attack\":{},\"block\":{},\"worn\":{},\"handheld\":{},\"comps\":{}}}",
+            js(i.name),
+            js(i.owner),
+            i.max_stack,
+            i.durability,
+            i.attack,
+            i.block.map_or("null".to_string(), |b| js(block_name(b))),
+            js(i.worn),
+            i.handheld,
+            comps_json(ek::ITEM, id)
+        ));
+    }
+    let mut blocks = Vec::new();
+    let mut state = 0;
+    while let Some(b) = block_info(state) {
+        let tex: Vec<String> = b.textures.iter().map(|t| js(t)).collect();
+        blocks.push(format!(
+            "{{\"id\":{},\"owner\":{},\"states\":{},\"model\":{},\"layer\":{},\"light\":[{},{},{}],\"hardness\":{},\"solid\":{},\"textures\":[{}],\"item\":{},\"comps\":{}}}",
+            js(b.name),
+            js(b.owner),
+            b.states,
+            js(&format!("{:?}", b.model)),
+            js(&format!("{:?}", b.layer)),
+            b.light[0],
+            b.light[1],
+            b.light[2],
+            b.hardness,
+            b.solid(),
+            tex.join(","),
+            b.item.map_or("null".to_string(), |i| js(item_name(i))),
+            comps_json(ek::BLOCK, b.first_state)
+        ));
+        state = b.first_state + b.states.max(1);
+    }
+    let named = |kind: u32| -> Vec<String> {
+        (0..entry_count(kind))
+            .map(|id| format!("{{\"id\":{},\"comps\":{}}}", js(name_of(kind, id)), comps_json(kind, id)))
+            .collect()
+    };
+    format!(
+        "{{\"items\":[\n{}\n],\"blocks\":[\n{}\n],\"entities\":[\n{}\n],\"biomes\":[\n{}\n]}}\n",
+        items.join(",\n"),
+        blocks.join(",\n"),
+        named(ek::ENTITY).join(",\n"),
+        named(ek::BIOME).join(",\n")
+    )
 }
