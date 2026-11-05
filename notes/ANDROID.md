@@ -103,8 +103,9 @@ All engine changes are in `notes/ENGINE_CHANGES.md` (8b). The ones that came out
    events directly.
 5. **Sound**: cpal's AAudio backend builds and the game's audio starts (all 215 sound events
    found); not listened to yet (the emulator ran with `-no-audio`).
-6. **Lifecycle**: an app killed in the background loses unsaved play (the world saves on its
-   timer; save on `suspended` too). Rotation is locked to landscape.
+6. **Lifecycle**: going to the background saves the world and players at once (an app killed
+   there loses nothing since); not yet seen in a run that Android actually kills. Rotation is
+   locked to landscape.
 7. **Packaging for friends**: a release signing key (not the debug key), version codes, maybe
    an AAB for a store later. Size now ~50 MB per CPU.
 
@@ -113,5 +114,5 @@ All engine changes are in `notes/ENGINE_CHANGES.md` (8b). The ones that came out
 1. Run on one real phone Ronald has (adb over USB), fix what its GPU lacks.
 2. Mobile preset and a frame-time pass on that phone (`--log frame=debug`).
 3. Touch UI round two with the UI worker's art: proper buttons, drag stacks, text input.
-4. Save on suspend; sound check; controllers.
+4. Sound check; controllers.
 5. A signed APK for friends (`tools/release/android.sh` with a release key).

@@ -2196,6 +2196,9 @@ impl ApplicationHandler for App {
             r.open(screens::engine("core:pause"));
         }
         r.set_capture(false);
+        if let Some(server) = r.game.as_ref().and_then(|g| g.server.as_ref()) {
+            server.save_now();
+        }
         r.gpu.surface_lost();
     }
 

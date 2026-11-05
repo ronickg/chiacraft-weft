@@ -278,10 +278,10 @@ impl VulkanBackend {
                 .map_err(err("window handle"))?
                 .as_raw();
 
-            let mut exts: Vec<*const i8> = ash_window::enumerate_required_extensions(display)
+            let mut exts: Vec<*const std::ffi::c_char> = ash_window::enumerate_required_extensions(display)
                 .map_err(err("surface extensions"))?
                 .to_vec();
-            let mut layers: Vec<*const i8> = Vec::new();
+            let mut layers: Vec<*const std::ffi::c_char> = Vec::new();
             let validation = c"VK_LAYER_KHRONOS_validation";
             let debug = desc.debug
                 && entry
