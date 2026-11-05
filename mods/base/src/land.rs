@@ -98,6 +98,13 @@ pub fn terrain(r: &mut Registry) {
         if biome == "swamp" {
             rule = rule.height(..=SEA + 12).continent(0.1..);
         }
+        // Old growth in its patches of the temperate wet land, up to its height
+        // (`base_api::land::OLD_GROWTH_AREA`).
+        if biome == "old_growth_forest" {
+            rule = rule
+                .height(..=SEA + l::OLD_GROWTH_TOP)
+                .field(l::OLD_GROWTH_FIELD, l::OLD_GROWTH_FROM..);
+        }
         t = t.biome(rule);
     }
     t.cave_biome("deep_caves", 24, 96.0, 0.25)

@@ -78,7 +78,7 @@ impl Climate {
 // Wind and fog (`air`): each place's seasonal mean wind at 10 m and its days with fog, from airport
 // records, the weather services and the Cretaceous places' modern stand-ins
 // (`reports/ecology/Wind and fog.md`, with which are estimates).
-pub const BIOMES: [Climate; 21] = [
+pub const BIOMES: [Climate; 22] = [
     // The overworld (`mods/base/src/worldgen.rs`).
     c("base:plains", "Manhattan, Kansas (Konza Prairie)", 12.8, 0.42, 14.2, [0.27, 0.27, 0.2, 0.14]).air(
         [3.8, 3.0, 3.0, 3.1],
@@ -88,6 +88,17 @@ pub const BIOMES: [Climate; 21] = [
     c("base:forest", "Kassel, Germany", 9.3, 0.77, 8.7, [0.34, 0.34, 0.37, 0.41]).air(
         [2.5, 2.0, 2.4, 3.0],
         [5.8, 4.9, 16.1, 11.3],
+        Fog::Dawn,
+    ),
+    // Old-growth forest (Ronald, 11-05: the Bliss shots' forest): Białowieża's strict reserve, the
+    // lowland oak-hornbeam and mixed old growth, cooler and more continental than Kassel's. Its
+    // numbers are Białystok's 1991-2020 normals, 60 km off on the same plain: 7.7 °C, January
+    // -2.9, July 18.4, about 106 days of rain a year, a little more in summer. Humidity fitted to
+    // its 8.9 °C day range; wind and fog are estimates for the sheltered forest (no station
+    // record): a light wind, dawn fog in autumn and winter along the river valleys.
+    c("base:old_growth_forest", "Białowieża Forest, Poland", 7.7, 0.7, 10.7, [0.28, 0.3, 0.29, 0.29]).air(
+        [2.8, 2.2, 2.4, 2.9],
+        [6.0, 5.0, 16.0, 14.0],
         Fog::Dawn,
     ),
     c("base:birch_forest", "Moscow", 6.3, 0.8, 12.9, [0.29, 0.3, 0.32, 0.47]).air([1.5, 1.1, 1.4, 1.6], [1.5, 2.3, 3.0, 1.6], Fog::Dawn),

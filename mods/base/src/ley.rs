@@ -203,7 +203,7 @@ impl Style {
             "mountains" | "snowy_plains" | "taiga" => Style::Cairn,
             "swamp" | "tropical_forest" => Style::Sunken,
             "ocean" | "coral_reef" | "lagoon" => Style::Seabed,
-            "forest" | "birch_forest" | "sequoia_grove" => Style::Menhir { mossy: true },
+            "forest" | "birch_forest" | "sequoia_grove" | "old_growth_forest" => Style::Menhir { mossy: true },
             _ => Style::Menhir { mossy: false },
         }
     }

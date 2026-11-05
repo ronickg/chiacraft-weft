@@ -598,8 +598,10 @@ pub const AURORA: [(&str, f32); 3] = [("base:taiga", 1.0), ("base:snowy_plains",
 /// a temperate broadleaf wood in leaf 3-10 %, a conifer or birch wood more, and an open grove or a
 /// swamp's scattered trees more again (Lighting's estimates from those shares). Biomes not listed
 /// have open sky.
-pub const CANOPY: [(&str, f32); 6] = [
+pub const CANOPY: [(&str, f32); 7] = [
     ("base:tropical_forest", 1.0),
+    // Białowieża's old oaks and hornbeams in leaf: a closed temperate canopy, 2-5 % of the sun.
+    ("base:old_growth_forest", 0.75),
     ("base:sequoia_grove", 0.6),
     ("base:forest", 0.5),
     ("base:taiga", 0.4),

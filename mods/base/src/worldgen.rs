@@ -91,6 +91,9 @@ pub static SWAMP: Biome = Biome::named("swamp");
 pub static TROPICAL_FOREST: Biome = Biome::named("tropical_forest");
 pub static MOUNTAINS: Biome = Biome::named("mountains");
 pub static SEQUOIA_GROVE: Biome = Biome::named("sequoia_grove");
+/// Old-growth forest (`base_api::land::OLD_GROWTH_AREA`): the closed canopy of old oaks in
+/// Bliss's comparison shots, rivers and lakes through it.
+pub static OLD_GROWTH_FOREST: Biome = Biome::named("old_growth_forest");
 pub static OCEAN: Biome = Biome::named("ocean");
 /// Warm shallow seas (`base_api::land::REEF_*`): the lagoon along the shore, the reef farther out.
 pub static LAGOON: Biome = Biome::named("lagoon");
@@ -307,6 +310,28 @@ pub fn register(r: &mut Registry) {
         .set_text(&GIANT_KINDS, "base:sequoia_log")
         // Lupine in its sunny gaps and meadows.
         .set_text(&FLOWERS, "base:lupine");
+    // Old-growth forest (Ronald, 11-05: "a biome looking similar to the one shown in bliss ... with
+    // all those trees"): Białowieża's strict reserve, oaks over two centuries old with a few
+    // birches, the canopy closed over rolling hills to the horizon, rivers and lakes through it
+    // with sandy beds. Twice the forest's trees: a site in nearly every 5 x 5 cell and more in the
+    // stands, so the crowns touch (each its own, from branches) and only the deepest clearings
+    // open; young trees and blossoming dogwoods in them (`vitals::layers`). Its own patches of the
+    // temperate wet land, not a climate range (`land.rs`).
+    r.biome(&OLD_GROWTH_FOREST)
+        .tint(water, WATER_TINT)
+        .set(&CLIMATE, base_api::climate("base:old_growth_forest"))
+        .set(&BOULDERS, 0.06)
+        .surface("grass", "dirt", 4)
+        .tint(grass, muted(0x6aa84a))
+        .tint(foliage, muted(0x4a9a2a))
+        .tint(&base_api::trees::EVERGREEN, muted(0x4a9a2a))
+        .tint(&base_api::trees::YELLOW_LEAVES, muted(0x5aa232))
+        .tag("forest")
+        .tag("animals")
+        .set(&TREES, 0.95)
+        .set(&STAND_TREES, 0.3)
+        .set(&GRASS_COVER, vitals::forage::grass_cover("base:old_growth_forest").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
+        .set_text(&TREE_KINDS, "base:oak_log:8 base:birch_log:1");
     r.biome(&OCEAN)
         .tint(grass, muted(ENGINE_GRASS))
         .tint(foliage, muted(ENGINE_FOLIAGE))

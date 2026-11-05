@@ -68,6 +68,7 @@ const ALL_YEAR: u8 = 15;
 const TURF: &[&str] = &[
     "base:plains",
     "base:forest",
+    "base:old_growth_forest",
     "base:birch_forest",
     "base:savanna",
     "base:swamp",
@@ -79,11 +80,11 @@ const TURF: &[&str] = &[
     "animals:crags",
 ];
 /// Where oaks grow (the plains' and swamp's few trees are oaks, the forest's mostly).
-const OAKS: &[&str] = &["base:forest", "base:plains", "base:swamp"];
+const OAKS: &[&str] = &["base:forest", "base:old_growth_forest", "base:plains", "base:swamp"];
 const MESQUITE: &[&str] = &["base:desert", "base:savanna"];
 const ARAUCARIAS: &[&str] = &["animals:scrubland", "animals:floodplain", "animals:fern_forest", "animals:crags"];
 const SCALE_CONIFERS: &[&str] = &["animals:red_dunes", "animals:scrubland", "animals:crags"];
-const BIRCHES: &[&str] = &["base:forest", "base:birch_forest"];
+const BIRCHES: &[&str] = &["base:forest", "base:old_growth_forest", "base:birch_forest"];
 
 pub const SOURCES: [Source; 76] = [
     // A tuft of tall grass feeds 2 (it fed 10): a grazer crops five tufts for what it used to eat
@@ -92,7 +93,7 @@ pub const SOURCES: [Source; 76] = [
     s("base:tall_grass", None, Category::Grass, 2, Eaten::Becomes("base:grazed_grass"), Some("base:grazed_grass")),
     wild("base:berry_bush", 3, Category::Fruit, 8, Eaten::Age(1), wild::FORESTS),
     browse("base:oak_leaves", Category::Leaves, 4, OAKS, GREEN),
-    browse("base:birch_leaves", Category::Leaves, 4, &["base:forest", "base:birch_forest"], GREEN),
+    browse("base:birch_leaves", Category::Leaves, 4, BIRCHES, GREEN),
     // Evergreen: a winter's browse (and the tundra's few trees).
     browse(
         "base:spruce_leaves",
@@ -113,6 +114,7 @@ pub const SOURCES: [Source; 76] = [
         &[
             "base:plains",
             "base:forest",
+            "base:old_growth_forest",
             "base:birch_forest",
             "base:taiga",
             "base:savanna",
@@ -316,9 +318,11 @@ pub fn of(block: &str, age: Option<u8>, eats: impl Fn(Category) -> bool, season:
 /// `cretaceous.rs` read it): the grass that grazers eat and that grows back. A biome not listed
 /// gets the world's default (`GRASS_COVER_ELSE`) wherever its ground takes plants; frozen ground
 /// and sand take none (`grass_grows`).
-pub const GRASS_COVER: [(&str, f32); 13] = [
+pub const GRASS_COVER: [(&str, f32); 14] = [
     ("base:plains", 0.25),
     ("base:forest", 0.12),
+    // Under the closed canopy, grass only in the clearings and along the water.
+    ("base:old_growth_forest", 0.05),
     ("base:birch_forest", 0.12),
     ("base:taiga", 0.08),
     ("base:savanna", 0.35),

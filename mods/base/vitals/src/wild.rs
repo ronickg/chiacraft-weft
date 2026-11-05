@@ -86,7 +86,7 @@ const fn f(block: &'static str, found: &'static [&'static str], ground: Ground, 
     Flower { block, found, ground, blooms }
 }
 const PLAINS: &[&str] = &["base:plains"];
-const FOREST: &[&str] = &["base:forest"];
+const FOREST: &[&str] = &["base:forest", "base:old_growth_forest"];
 const BIRCH: &[&str] = &["base:birch_forest"];
 const TAIGA: &[&str] = &["base:taiga"];
 const SNOWY: &[&str] = &["base:snowy_plains"];
@@ -307,15 +307,23 @@ pub const BOREAL: &[&str] = &["base:taiga", "base:birch_forest", "base:mountains
 pub const SEDGE_LANDS: &[&str] = &["base:snowy_plains", "base:taiga", "base:swamp"];
 pub const MEADOWS: &[&str] = &["base:plains", "base:forest", "base:birch_forest", "base:mountains"];
 pub const WOODS: &[&str] = &["base:forest", "base:birch_forest", "base:plains"];
-pub const BRAMBLES: &[&str] = &["base:forest", "base:birch_forest", "base:plains", "base:taiga", "base:mountains"];
-pub const FOREST_FLOOR: &[&str] = &["base:forest", "base:birch_forest", "base:taiga", "base:mountains"];
-pub const AGARICS: &[&str] = &["base:forest", "base:birch_forest", "base:taiga"];
+pub const BRAMBLES: &[&str] =
+    &["base:forest", "base:old_growth_forest", "base:birch_forest", "base:plains", "base:taiga", "base:mountains"];
+pub const FOREST_FLOOR: &[&str] = &["base:forest", "base:old_growth_forest", "base:birch_forest", "base:taiga", "base:mountains"];
+pub const AGARICS: &[&str] = &["base:forest", "base:old_growth_forest", "base:birch_forest", "base:taiga"];
 /// Where the berry bush (blueberries) grows: the forests' floor.
-pub const FORESTS: &[&str] = &["base:forest", "base:birch_forest", "base:taiga"];
+pub const FORESTS: &[&str] = &["base:forest", "base:old_growth_forest", "base:birch_forest", "base:taiga"];
 pub const WETLANDS: &[&str] = &["base:swamp", "base:savanna"];
 /// Foxfire: the damp forests, where wood rots on the floor.
-pub const FOXFIRE_WOODS: &[&str] =
-    &["base:forest", "base:birch_forest", "base:taiga", "base:swamp", "base:tropical_forest", "base:sequoia_grove"];
+pub const FOXFIRE_WOODS: &[&str] = &[
+    "base:forest",
+    "base:old_growth_forest",
+    "base:birch_forest",
+    "base:taiga",
+    "base:swamp",
+    "base:tropical_forest",
+    "base:sequoia_grove",
+];
 /// Glow mycena: the warm wet forests.
 pub const MYCENA_WOODS: &[&str] = &["base:tropical_forest", "base:swamp"];
 pub const MARSHES: &[&str] = &["base:swamp", "base:plains", "base:forest", "base:taiga", "base:savanna"];
@@ -329,10 +337,11 @@ pub const PONDS: &[&str] = &["animals:floodplain", "animals:red_dunes"];
 /// Still fresh water in the temperate and boreal lands: white water lilies' (Nymphaea alba, and
 /// N. tetragona into the taiga).
 /// Water lilies on still water; the llanos' and the Pantanal's lagoons have theirs too.
-pub const LAKES: &[&str] = &["base:plains", "base:forest", "base:birch_forest", "base:swamp", "base:taiga", "base:savanna"];
+pub const LAKES: &[&str] =
+    &["base:plains", "base:forest", "base:old_growth_forest", "base:birch_forest", "base:swamp", "base:taiga", "base:savanna"];
 /// Common reed (Phragmites australis) rings the temperate and boreal lakes; the swamp's and the
 /// llanos' shores are mostly the cattails' and the wild rice's, with a few reeds (`COVER_IN`).
-pub const REEDBEDS: &[&str] = &["base:plains", "base:forest", "base:birch_forest", "base:taiga", "base:swamp"];
+pub const REEDBEDS: &[&str] = &["base:plains", "base:forest", "base:old_growth_forest", "base:birch_forest", "base:taiga", "base:swamp"];
 /// Sheltered sea floor: eelgrass meadows (Zostera) off the beaches.
 pub const SEA_MEADOWS: &[&str] = &["base:ocean", "base:beach"];
 /// Kelp forests: the open sea's rocky and sandy floor.
