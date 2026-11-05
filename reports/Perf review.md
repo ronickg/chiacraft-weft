@@ -64,6 +64,8 @@ Gain per effort, all platforms. "Mac", "PC" and "weak" mean the M3 Max, the RTX 
 - The `dist` profile: far tiles' heights −17 %, mesh −10 %.
 - `fix/surface-once` (#5): far-tile mesh 1.43 → 0.46 ms (−68 %), tile rate +20 %, first tiles asked→made 1217 → 603 ms; far shots the same.
 - `fix/preload-block-textures` (#9): 568 block textures in 4-6 ms at the join; textures loaded during play 228 → 81 at the join, 40 → 19 after a teleport; budgeted uploads' worst frame at the join 27.9 → 3.3 ms.
+- `fix/preload-all-textures`: every texture at the join (1177 in 7 ms): zero texture loads in play after it; VRAM the same.
+- Tried, no gain (unmerged): `fix/upload-copies` (client #6): an upload costs 2.4-2.9 µs on both, not the 30-100 µs estimated; `fix/client-terrain-lane` (#10); `fix/texture-loads-once` and `fix/tints-once` (their Mac evidence was the GPU wait that early-writes removed); `fix/host-barrier-once` (reverted).
 
 ## What the update split showed on the Mac (Tester, 179 s run, dev 9ae94af9)
 
