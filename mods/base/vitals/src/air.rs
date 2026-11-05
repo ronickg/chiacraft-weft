@@ -120,7 +120,8 @@ pub fn drying_byte(secs: f32) -> u32 {
 /// lays any fog low); the sun burns it off two to three hours after it rises. Dry air (humidity
 /// under `DAWN_MIST_DAMP.0`) none, the dampest `DAWN_MIST` thick. Only on some mornings: each
 /// day's, the same on every machine. `sunrise` the hour the sun rises that day.
-pub const DAWN_MIST: f32 = 0.42;
+// (0.2: at 0.42 a damp morning over the birch forest went a golden white-out, PC shm_mist.)
+pub const DAWN_MIST: f32 = 0.2;
 pub const DAWN_MIST_DAMP: (f32, f32) = (0.45, 0.8);
 pub const DAWN_MIST_DAYS: f32 = 0.6;
 
@@ -416,12 +417,12 @@ mod tests {
     fn dawn_mist_by_air_and_hour() {
         let misty = (0..64).find(|&d| dawn_mist(1.0, 6.0, 6.0, 0.0, false, 7, d) > 0.0).expect("a misty morning in 64 days");
         let m = dawn_mist(1.0, 6.0, 6.0, 0.0, false, 7, misty);
-        assert!(m > 0.3 && m <= DAWN_MIST, "{m}");
+        assert!(m > 0.6 * DAWN_MIST && m <= DAWN_MIST, "{m}");
         assert_eq!(dawn_mist(0.3, 6.0, 6.0, 0.0, false, 7, misty), 0.0);
         assert_eq!(dawn_mist(1.0, 6.0, 6.0, 0.0, true, 7, misty), 0.0);
         assert_eq!(dawn_mist(1.0, 6.0, 6.0, CLEARS.1, false, 7, misty), 0.0);
         assert_eq!(dawn_mist(1.0, 6.0, 12.0, 0.0, false, 7, misty), 0.0);
-        assert!(dawn_mist(1.0, 4.0, 4.0, 0.0, false, 7, misty) > 0.3, "it follows the season's sunrise");
+        assert!(dawn_mist(1.0, 4.0, 4.0, 0.0, false, 7, misty) > 0.6 * DAWN_MIST, "it follows the season's sunrise");
     }
 
     /// Every biome the per-biome shares name (aurorae, canopies) has a climate row, so a renamed
