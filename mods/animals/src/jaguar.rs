@@ -28,9 +28,9 @@ pub fn init(r: &mut Registry) {
     );
     r.entity(&JAGUAR)
         .size(animals_core::bodies::of("jaguar").0, animals_core::bodies::of("jaguar").1)
-        .max_health(45.0)
+        .max_health(crate::animal::health(index))
         .walk_speed(5.0)
-        .attack_damage(9.0)
+        .attack_damage(crate::animal::hit(index))
         .passive()
         .model_file("jaguar")
         .animations("jaguar")

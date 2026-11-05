@@ -12,11 +12,10 @@ pub(crate) static PSITTACOSAURUS: EntityKind = EntityKind::named("psittacosaurus
 static BODY: Body = Body {
     model: "psittacosaurus",
     texture: "psittacosaurus/psittacosaurus",
-    health: 22.0,
     // A quick runner on its hind legs, about 5 m/s at its fastest (est., from its long shins).
     speed: 5.0,
     wander: 0.3,
-    damage: 0.0,
+    bites: false,
     rest: ("psittacosaurus_lie", (0.6, 0.45)),
 };
 

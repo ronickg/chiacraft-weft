@@ -153,6 +153,9 @@ fn tick(w: &World) {
         let capacity = v.capacity();
         let full = s.fullness(capacity);
         let (max_health, max_stamina) = stomach::max_health_stamina(stats[0], stats[1], &s, capacity);
+        // Armour lifts it with the ages (`vitals::gear::armour`: a full same-age set takes it to the
+        // age's reference, about 25 engine points in the Stone Age's middle, 65 in the Iron Age's).
+        let max_health = max_health + crate::player::armor_of(w, id).1 * base_api::HEALTH_SCALE;
         // The place, a second at a time.
         if pulse {
             let fat = full[vitals::food::FAT];

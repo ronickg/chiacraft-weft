@@ -16,12 +16,27 @@ static HUD_ATTACK: HudElement = HudElement::named("attack_indicator");
 /// Head to feet.
 pub const EQUIPMENT: [&EquipmentSlot; 4] = [&HEAD, &base_api::CHEST, &LEGS, &FEET];
 
-/// Armor points and toughness of what `entity` wears.
-fn armor_of(w: &World, entity: u64) -> (u32, f32) {
-    let Some(worn) = w.inventory(entity).find_group(EQUIPMENT_GROUP) else { return (0, 0.0) };
+/// Armor and the health it adds (engine points) of what `entity` wears, from the curve by each
+/// piece's material and slot (`vitals::gear::armour`): a piece is named `<material>_<piece>`.
+pub fn armor_of(w: &World, entity: u64) -> (f32, f32) {
+    let Some(worn) = w.inventory(entity).find_group(EQUIPMENT_GROUP) else { return (0.0, 0.0) };
     (0..worn.len())
-        .filter_map(|i| ARMOR.on_item(worn.get(i).item))
-        .fold((0, 0.0), |t, a| (t.0 + a.points, t.1 + a.toughness))
+        .filter_map(|i| {
+            let item = worn.get(i).item;
+            ARMOR.on_item(item)?;
+            piece_armour(item_name(item))
+        })
+        .fold((0.0, 0.0), |t, a| (t.0 + a.0, t.1 + a.1))
+}
+
+/// An armour piece's armour and health, by its name.
+fn piece_armour(name: &str) -> Option<(f32, f32)> {
+    let name = name.rsplit(':').next().unwrap_or(name);
+    let (material, piece) = name.rsplit_once('_')?;
+    let slot = ["helmet", "chestplate", "leggings", "boots"]
+        .iter()
+        .position(|p| *p == piece)?;
+    vitals::gear::armour_of(slot, material)
 }
 
 /// How much bigger held items are in the player's own first-person hand than Weft draws them
@@ -66,18 +81,16 @@ pub fn register(r: &mut Registry) {
     }
     // Upstream's off-hand: a second item to hold (a shield, a torch).
     r.equipment_slot(&OFF_HAND, &[], "slot_offhand");
-    // Armor is a step of the damage chain (modern's CombatRules: big hits go through more of it,
-    // unless it is tough), and wears when the hit actually lands, a quarter of the damage per
-    // piece (at least 1) like vanilla.
+    // Armor is a step of the damage chain (`vitals::combat`: armour / (armour + 5 × hit), at most
+    // 80 %: big hits go through more of it), and wears when the hit actually lands, a quarter of
+    // the damage per piece (at least 1) like vanilla.
     r.modify(&chain::DAMAGE, stage::MULTIPLY, |m| {
         let q = *m.query();
         if !armor_applies(q.cause) {
             return;
         }
-        let (points, toughness) = armor_of(&m.world(), q.entity);
-        let points = points as f64;
-        let through = m.value / (2.0 + toughness as f64 / 4.0);
-        m.value *= 1.0 - (points - through).clamp(points * 0.2, 20.0) / 25.0;
+        let (armour, _) = armor_of(&m.world(), q.entity);
+        m.value *= 1.0 - vitals::combat::armour_cut(armour, m.value as f32) as f64;
     });
     r.on(&actions::HURT, |b| {
         let w = b.world();

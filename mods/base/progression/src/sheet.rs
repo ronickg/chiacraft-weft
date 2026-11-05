@@ -170,31 +170,33 @@ fn over_tier(w: &mut String) {
 fn gaps(w: &mut String) {
     let _ = writeln!(
         w,
-        "## Species: today against the curve\n\nEvery wild animal rolls a level of {}-{} anywhere, and a level-{} one is {}× a level-0 one of its species (Ronald, 11-06). Its size class comes from its mass, its role and tweaks from `animals_core::danger`. Today is the species table's level-1 `base` (health, and damage as `SPECIES.md` gives it); the curve is a level-0 one of the Stone Age. A Stone Age species reaches the Bronze Age's band at level {}, the Iron Age's at {}, Steam's at {}.\n",
+        "## Species\n\nEvery wild animal rolls a level of {}-{} anywhere, and a level-{} one is {}× a level-0 one of its species (Ronald, 11-06): a wild point in health or damage adds {:.2} of the base. Its size class comes from its mass (small ones scale inside their class by the cube root of mass against {} kg, ×{}-×{}: a fox beats a mouse), its role and tweaks from `animals_core::danger`. The game registers each kind with these level-0 numbers (11-07). A Stone Age species reaches the Bronze Age's band at level {}, the Iron Age's at {}, Steam's at {}.\n",
         danger::LEVELS.0,
         danger::LEVELS.1,
         danger::LEVELS.1,
         danger::TOP_TIMES,
+        danger::LEVEL_STEP,
+        danger::SMALL_MASS,
+        danger::SMALL_TIMES.0,
+        danger::SMALL_TIMES.1,
         danger::level_reaching(Age::Stone, Age::Bronze).unwrap_or(0),
         danger::level_reaching(Age::Stone, Age::Iron).unwrap_or(0),
         danger::level_reaching(Age::Stone, Age::Steam).unwrap_or(0),
     );
-    w.push_str("| species | kg | size | role | today health | curve health (level 0) | ×  | today damage | curve hit (level 0) | curve health at 100 / 200 | tweaks |\n|---|---|---|---|---|---|---|---|---|---|---|\n");
+    w.push_str("| species | kg | size | role | mass × | health / armour / hit (level 0) | health at 100 / 200 | tweaks |\n|---|---|---|---|---|---|---|---|\n");
     for s in SPECIES.iter() {
         let Some(d) = danger::danger(s.name) else { continue };
         let (Some(st), Some(mid), Some(top)) = (danger::stats(s, 0), danger::stats(s, 100), danger::stats(s, 200)) else { continue };
-        let (health, dmg) = danger::today(s);
         let _ = writeln!(
             w,
-            "| {} | {} | {} | {} | {} | {:.0} | {:.1} | {} | {:.1} | {:.0} / {:.0} | {} |",
+            "| {} | {} | {} | {} | {:.2} | {:.1} / {:.1} / {:.1} | {:.0} / {:.0} | {} |",
             s.name,
             s.bio.mass,
             danger::size(s).name(),
             d.role.name(),
-            health,
+            danger::mass_times(s),
             st.health,
-            st.health / health.max(0.01),
-            dmg,
+            st.armour,
             st.hit,
             mid.health,
             top.health,
@@ -229,26 +231,30 @@ fn species_matrix(w: &mut String) {
     w.push('\n');
 }
 
-/// Today's weapons (`mods/base/src/items.rs`, the modern game's numbers): damage a hit, swings a
-/// second, and their tier's tag. Quoted for the gap; the game keeps its own until they're derived.
-const TODAY_WEAPONS: [(&str, u8, f32, f32); 9] = [
-    ("base:wood_sword", 0, 4.0, 1.6),
-    ("base:stone_sword", 0, 5.0, 1.6),
-    ("base:iron_sword", 2, 6.0, 1.6),
-    ("base:gold_sword", 2, 4.0, 1.6),
-    ("base:diamond_sword", 3, 7.0, 1.6),
-    ("base:stone_axe", 0, 9.0, 0.8),
-    ("base:iron_axe", 2, 9.0, 0.9),
-    ("base:diamond_axe", 3, 9.0, 1.0),
-    ("base:wood_axe", 0, 7.0, 0.8),
-];
-
 fn weapons(w: &mut String) {
-    w.push_str("## Today's weapons against the reference\n\nDamage a second of today's swords and axes (`items.rs`) against the reference hit a second of their age (6 × g(L) at one hit a second).\n\n| weapon | tier | damage × swings | a second | reference | × |\n|---|---|---|---|---|---|\n");
-    for (id, tier, dmg, speed) in TODAY_WEAPONS {
-        let r = Player::of(Age::of_tier(tier)).hit() * combat::REF_RATE;
-        let dps = dmg * speed;
-        let _ = writeln!(w, "| {id} | {tier} | {dmg} × {speed} | {dps:.1} | {r:.1} | {:.2} |", dps / r);
+    w.push_str("## Weapons, tools and armour\n\nFrom the curve (`vitals::gear`, Ronald, 11-07: \"Yes, from the curves\"): a kind swings at its speed and deals its share of the reference's damage a second at its material's item level (tier × 10 + depth). A sword of the age is the reference. A full armour set of an age gives the reference's armour and lifts health to the reference's (20 engine points at its base).\n\n| kind | swings a second | share |\n|---|---|---|\n");
+    for sp in vitals::gear::SPREADS {
+        let _ = writeln!(w, "| {} | {} | {} |", sp.kind, sp.speed, sp.share);
+    }
+    w.push_str("\nOne hit's damage (engine points) by material:\n\n| material | age | level |");
+    let kinds = ["sword", "axe", "spear", "knife", "pickaxe", "shovel", "hoe"];
+    for k in kinds {
+        let _ = write!(w, " {k} |");
+    }
+    w.push_str(" full armour set: armour / health |\n|---|---|---|");
+    for _ in kinds {
+        w.push_str("---|");
+    }
+    w.push_str("---|\n");
+    for m in vitals::gear::MATERIALS {
+        let _ = write!(w, "| {} | {} | {:.0} |", m.id, Age::of_tier(m.tier).name(), m.level());
+        for k in kinds {
+            let _ = write!(w, " {:.1} |", vitals::gear::weapon(k, m.level()).map_or(0.0, |x| x.0));
+        }
+        let (a, v) = (0..4)
+            .map(|slot| vitals::gear::armour(slot, m.level()))
+            .fold((0.0, 0.0), |t, x| (t.0 + x.0, t.1 + x.1));
+        let _ = writeln!(w, " {a:.0} / {:.0} |", combat::REF_HEALTH + v);
     }
     w.push('\n');
 }
@@ -406,7 +412,13 @@ fn materials(w: &mut String) {
     for m in crafting::MATERIALS {
         match content::material(m.id) {
             Some(t) => {
-                let _ = writeln!(w, "| {} | {} | {} |", m.id, Age::of_tier(t.tier).name(), if t.from.is_empty() { "-" } else { t.from });
+                let _ = writeln!(
+                    w,
+                    "| {} | {} | {} |",
+                    m.id,
+                    t.tier().map_or("untagged", |x| Age::of_tier(x).name()),
+                    if t.from.is_empty() { "-" } else { t.from }
+                );
             }
             None => {
                 let _ = writeln!(w, "| {} | untagged | - |", m.id);

@@ -100,8 +100,9 @@ much it can eat before starving), **damage**, **speed**, **carry weight**, **oxy
 (underwater), **torpor** (how much it takes to knock out; only goes down, never placed by
 players) and **fortitude** (heat, cold, poison resistance).
 
-**Wild levels.** A wild animal spawns with a level, 1 to 150 (proposed, a world setting; ARK's
-difficulty), most of them low: proposed weights 1-30 common, 31-90 uncommon, 91-150 rare. Each
+**Wild levels.** A wild animal spawns with a level, 0 to 200 everywhere (Ronald, 11-06: "0-200
+acrso the board"; a level-200 one is about five times a level-0 one of its species), most of them
+low: 0-39 common (60%), 40-119 uncommon (30%), 120-200 rare (10%). Each
 level is one **wild point** placed on a random stat (never torpor alone). Its stats are known
 from its level and its points, so two level-100 raptors differ: one with 30 points in speed is a
 different animal from one with 30 in health.
@@ -112,8 +113,13 @@ different animal from one with 30 in health.
 value = base * (1 + wild_points * wild_step) * (1 + tamed_points * tamed_step) * (1 + bonus)
 ```
 
-`wild_step` and `tamed_step` are per species and stat (about 0.2 health, 0.05 damage, 0.01
-speed); `bonus` is the imprint bonus (up to +20%) plus the bond bonus (up to +5%).
+`base`'s health, damage and armour come from the species' size class (by mass), role and tweaks
+on the progression curve (`animals_core::danger`, `PROGRESSION_SHEET.md`; Ronald, 11-07: "Yes, all
+of them"); small ones scale by mass inside their class (a fox beats a mouse). `wild_step` is
+0.18 for health and damage (`danger::LEVEL_STEP`: a level's points fall on the nine stats alike,
+so 200 levels make five times the base), 0.01 speed; `tamed_step` per species and stat; `bonus` is
+the imprint bonus (up to +20%) plus the bond bonus (up to +5%), and tamed points and bonus
+together stop at ×1.6 (`danger::TAME_CEILING`, as gear's grade and marks).
 
 **Taming bonus.** A tame gains `floor(level * effectiveness / 2)` bonus levels, placed like wild
 points. A clean tame of a level-100 animal becomes level 150.
@@ -342,7 +348,7 @@ ride and breed it.
 | Setting | Default |
 |---|---|
 | Tame cap per player or tribe | None |
-| Wild level range | 1-150 |
+| Wild level range | 0-200 |
 | Taming speed, breeding interval, growth speed | 1x |
 | Tames from other worlds through portals | Owner's choice per world or link (proposed default: off) |
 | Highest level of a visiting tame | No limit |
@@ -526,7 +532,7 @@ Sources: [canid immobilization](https://pmc.ncbi.nlm.nih.gov/articles/PMC3141559
   0.01/0.015...), hunger rate.
 - `animal.rs`: the `animal` component (saved; sent to whoever has its screen open): species,
   sex, life stage, bond, imprint, command, wild and tamed points per stat, unspent points, food,
-  XP. A new animal rolls its level (60% 1-30, 30% 31-90, 10% 91-150) and places a point per level
+  XP. A new animal rolls its level (60% 0-39, 30% 40-119, 10% 120-200) and places a point per level
   on a random stat. Health and speed are attribute modifiers (`animals:stats`, applied again
   after loading); damage is a step of `chain::ATTACK_DAMAGE`; the rest are kept and shown. Tames
   use food at their species' rate (meat feeds a chihuahua); nothing happens at 0 yet. The owner

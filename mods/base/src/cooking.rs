@@ -78,7 +78,9 @@ pub fn register(r: &mut Registry) {
     // Sea water boiled dry; the bucket comes back (`consume_one` in the furnace).
     r.shapeless(&SMELTING, "salt", 1, &["water_bucket"], preserve::SALT_TICKS);
     r.shapeless(&CRAFTING, "salted_meat", 1, &["#raw_meat", "#salt"], 0);
-    r.shaped(&CRAFTING, "cooking_pot", 1, &["i i", "i i", "iii"], &[('i', "#ingots/iron")]);
+    // A clay pot (the Stone Age's, Ronald, 11-07: "move them to fit"; it hardens on its first
+    // fire), not iron.
+    r.shaped(&CRAFTING, "cooking_pot", 1, &["c c", "c c", "ccc"], &[('c', "#clay")]);
     r.shaped(&CRAFTING, "drying_rack", 1, &["sss", "s s"], &[('s', "#stick")]);
     // In the inventory's own grid: a fire comes before a crafting table (Research round 4).
     // Laid unlit, and lit with a drill like a fire bed (`firebed.rs`; Planner, 11-05, from Ronald's

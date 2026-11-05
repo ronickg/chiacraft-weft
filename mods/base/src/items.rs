@@ -18,15 +18,17 @@ struct Material {
     level: u32,
     speed: f32,
     durability: u32,
-    damage: f32,
 }
 
+/// Today's tool sets: harvest level, mining speed and uses. Their damage and swings come from the
+/// curve by their material's age (`vitals::gear`); a material the parts know harvests at its
+/// level there (diamond above steel, `notes/CRAFTING.md`).
 const MATERIALS: [Material; 5] = [
-    Material { name: "wood", level: tool_tier::WOOD, speed: 2.0, durability: 59, damage: 0.0 },
-    Material { name: "stone", level: tool_tier::STONE, speed: 4.0, durability: 131, damage: 1.0 },
-    Material { name: "iron", level: tool_tier::IRON, speed: 6.0, durability: 250, damage: 2.0 },
-    Material { name: "gold", level: tool_tier::WOOD, speed: 12.0, durability: 32, damage: 0.0 },
-    Material { name: "diamond", level: tool_tier::DIAMOND, speed: 8.0, durability: 1561, damage: 3.0 },
+    Material { name: "wood", level: tool_tier::WOOD, speed: 2.0, durability: 59 },
+    Material { name: "stone", level: tool_tier::STONE, speed: 4.0, durability: 131 },
+    Material { name: "iron", level: tool_tier::IRON, speed: 6.0, durability: 250 },
+    Material { name: "gold", level: tool_tier::WOOD, speed: 12.0, durability: 32 },
+    Material { name: "diamond", level: tool_tier::DIAMOND, speed: 8.0, durability: 1561 },
 ];
 
 pub fn register(r: &mut Registry) {
@@ -150,11 +152,12 @@ pub fn register(r: &mut Registry) {
 
     for m in &MATERIALS {
         // `.tool(kind)` tags it `tools/<kind>`; `<kind>s/<material>` picks its recipe.
-        let tool = |r: &mut Registry, kind: &str, damage: f32, speed: f32| {
+        let tool = |r: &mut Registry, kind: &str| {
+            let (damage, speed) = vitals::gear::weapon_of(kind, m.name).unwrap_or((1.0, 1.0));
             let b = r
                 .item(Item::generated(format!("{}_{kind}", m.name)))
                 .tool(kind)
-                .tool_level(m.level)
+                .tool_level(crafting::materials::material(m.name).map_or(m.level, |x| x.harvest))
                 .mining_speed(m.speed)
                 .durability(m.durability)
                 .attack_damage(damage)
@@ -170,19 +173,9 @@ pub fn register(r: &mut Registry) {
                 b.on_use(crate::farming::till);
             }
         };
-        tool(r, "pickaxe", 2.0 + m.damage, 1.2);
-        tool(r, "shovel", 2.5 + m.damage, 1.0);
-        tool(r, "sword", 4.0 + m.damage, 1.6);
-        // Modern's: slow and strong axes, hoes barely hit but swing fast with the material.
-        let (axe_damage, axe_speed, hoe_speed) = match m.name {
-            "wood" => (7.0, 0.8, 1.0),
-            "stone" => (9.0, 0.8, 2.0),
-            "iron" => (9.0, 0.9, 3.0),
-            "diamond" => (9.0, 1.0, 4.0),
-            _ => (7.0, 1.0, 1.0),
-        };
-        tool(r, "axe", axe_damage, axe_speed);
-        tool(r, "hoe", 1.0, hoe_speed);
+        for kind in ["pickaxe", "shovel", "sword", "axe", "hoe"] {
+            tool(r, kind);
+        }
     }
 
     // Points per piece, head to feet, as in modern.

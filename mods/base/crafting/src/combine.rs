@@ -169,9 +169,14 @@ pub fn combine(kind_id: &str, parts: &[Part]) -> Result<ToolStats, Missing> {
         .map(|t| if let Effect::Damage(f) = t.effect { f } else { 1.0 })
         .product();
     // A blade's or point's main stat is its damage: the grade goes there, a tool's goes to speed.
-    // A bow's power is its stave's spring.
+    // A bow's power is its stave's spring. The rest hit as their kind does at their working part's
+    // age (`vitals::gear`, from the curve; Ronald, 11-07).
     let weapon = matches!(k.use_, Use::Cut | Use::Thrust | Use::Shoot);
-    let base_damage = if k.use_ == Use::Shoot { k.damage * crate::materials::spring(m.id) } else { k.damage + m.damage };
+    let base_damage = if k.use_ == Use::Shoot {
+        k.damage * crate::materials::spring(m.id)
+    } else {
+        vitals::gear::weapon_of(k.id, m.id).map_or(k.damage + m.damage, |(hit, _)| hit)
+    };
     let stat = m.speed * s.stat * stat_mul * if weapon { 1.0 } else { g.mult } * (1.0 + hold_speed) * hold_mul_speed * s.speed;
     let damage = base_damage * s.damage * dmg_mul * if weapon { g.mult } else { 1.0 } * hold_mul_damage;
     let head = Life { slot: p.slot, uses: m.uses * g.mult * (1.0 + hold_uses) / always_wear(&own) };

@@ -13,12 +13,11 @@ static WINGS: Wings = Wings {
     model: "vulture",
     texture: "vulture/vulture",
     fly_size: (1.1, 0.35),
-    health: 10.0,
     // It walks little; it soars at about 12 m/s.
     speed: 1.5,
     air: 5.5,
     wander: 0.2,
-    damage: 0.0,
+    bites: false,
     height: 12.0,
     reach: 32.0,
     flight: 800,

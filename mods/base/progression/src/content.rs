@@ -101,6 +101,7 @@ pub const AXE: Needs = Needs::Tool("axe", 0);
 pub const PICK: Needs = Needs::Tool("pickaxe", 0);
 pub const PICK_STONE: Needs = Needs::Tool("pickaxe", 100);
 pub const PICK_IRON: Needs = Needs::Tool("pickaxe", 200);
+pub const PICK_STEEL: Needs = Needs::Tool("pickaxe", 300);
 pub const PICK_DIAMOND: Needs = Needs::Tool("pickaxe", 300);
 pub const CUTTER: Needs = Needs::Tool("cutter", 0);
 
@@ -135,21 +136,22 @@ pub const RULES: &[Rule] = &[
     ),
     n(&["base:coal_ore", "base:banded_clay_coal_ore"], 0, Shared, Ground, Not, "breaks into coal"),
     n(
-        &["base:iron_ore", "base:granite_iron_ore", "base:red_sandstone_iron_ore", "base:meteorite"],
+        &[
+            "base:iron_ore",
+            "base:granite_iron_ore",
+            "base:red_sandstone_iron_ore",
+            "base:meteorite",
+            "base:gold_ore",
+            "base:granite_gold_ore",
+        ],
         1,
         Tech,
         Ground,
         Not,
-        "breaks into raw iron or meteoric iron (a stone pickaxe)",
+        "breaks into raw iron, meteoric iron or raw gold (a stone pickaxe)",
     ),
-    n(
-        &["base:gold_ore", "base:granite_gold_ore", "base:diamond_ore", "base:redstone_ore", "base:star_steel_ore"],
-        2,
-        Tech,
-        Ground,
-        Not,
-        "breaks into its ore (an iron pickaxe)",
-    ),
+    n(&["base:redstone_ore", "base:star_steel_ore"], 2, Tech, Ground, Not, "breaks into its ore (an iron pickaxe)"),
+    n(&["base:diamond_ore"], 3, Tech, Ground, Not, "breaks into a diamond (a steel pickaxe: harvest 300)"),
     n(&["animals:amber_ore"], 0, Beasts, Ground, Not, "breaks into amber"),
     n(
         &["animals:gateway", "animals:termite_mound_upper"],
@@ -211,7 +213,7 @@ pub const RULES: &[Rule] = &[
         Ground,
         World(PICK, 0.15),
     ),
-    n(&["base:obsidian"], 3, Shared, Ground, World(PICK_DIAMOND, 1.0), "a diamond pickaxe"),
+    n(&["base:obsidian"], 3, Shared, Ground, World(PICK_DIAMOND, 1.0), "a steel pickaxe or better (harvest 300)"),
     n(&["base:pallasite"], 1, Magic, Sky, World(PICK_STONE, 20.0), "a stony-iron meteorite's olivine, found where one fell"),
     n(&["base:eclipse_ash"], 0, Magic, Sky, World(Hand, 40.0), "falls in an eclipse"),
     // ---- wood
@@ -252,40 +254,10 @@ pub const RULES: &[Rule] = &[
         Made,
     ),
     r(&["base:leather_helmet", "base:leather_chestplate", "base:leather_leggings", "base:leather_boots"], 0, Tech, Armour, Made),
-    r(
-        &[
-            "base:iron_pickaxe",
-            "base:iron_axe",
-            "base:iron_shovel",
-            "base:iron_hoe",
-            "base:iron_sword",
-            "base:gold_pickaxe",
-            "base:gold_axe",
-            "base:gold_shovel",
-            "base:gold_hoe",
-            "base:gold_sword",
-        ],
-        2,
-        Tech,
-        Tool,
-        Made,
-    ),
-    r(
-        &[
-            "base:iron_helmet",
-            "base:iron_chestplate",
-            "base:iron_leggings",
-            "base:iron_boots",
-            "base:gold_helmet",
-            "base:gold_chestplate",
-            "base:gold_leggings",
-            "base:gold_boots",
-        ],
-        2,
-        Tech,
-        Armour,
-        Made,
-    ),
+    r(&["base:iron_pickaxe", "base:iron_axe", "base:iron_shovel", "base:iron_hoe", "base:iron_sword"], 2, Tech, Tool, Made),
+    r(&["base:iron_helmet", "base:iron_chestplate", "base:iron_leggings", "base:iron_boots"], 2, Tech, Armour, Made),
+    r(&["base:gold_pickaxe", "base:gold_axe", "base:gold_shovel", "base:gold_hoe", "base:gold_sword"], 1, Tech, Tool, Made),
+    r(&["base:gold_helmet", "base:gold_chestplate", "base:gold_leggings", "base:gold_boots"], 1, Tech, Armour, Made),
     n(
         &["base:diamond_pickaxe", "base:diamond_axe", "base:diamond_shovel", "base:diamond_hoe", "base:diamond_sword"],
         3,
@@ -308,11 +280,11 @@ pub const RULES: &[Rule] = &[
     ),
     n(
         &["base:raw_gold", "base:gold_ingot", "base:gold_block"],
-        2,
+        1,
         Tech,
         Material,
         Made,
-        "gold ore needs an iron pickaxe today; the plan casts gold in the Bronze Age",
+        "cast and soft: the Bronze Age's (Ronald, 11-07: \"move them to fit\")",
     ),
     r(&["base:star_steel_lump", "base:star_steel_ingot"], 2, Tech, Material, Made),
     r(&["base:starheart", "base:peridot"], 2, Magic, Sky, Made),
@@ -358,14 +330,8 @@ pub const RULES: &[Rule] = &[
     ),
     r(&["base:torch"], 0, Shared, Light, Made),
     r(&["base:tanning_frame", "base:tanning_pit", "base:charcoal_clamp", "base:drying_rack", "base:compost_bin"], 0, Shared, Station, Made),
-    n(
-        &["base:cooking_pot", "base:stew", "base:salt", "base:salted_meat"],
-        2,
-        Shared,
-        Station,
-        Made,
-        "the pot is iron; salt is boiled from a water bucket",
-    ),
+    n(&["base:cooking_pot", "base:stew"], 0, Shared, Station, Made, "a clay pot (Ronald, 11-07: \"move them to fit\")"),
+    n(&["base:salt", "base:salted_meat"], 2, Shared, Food, Made, "salt is boiled from a water bucket (iron)"),
     // ---- materials of hunting, farming and sewing
     r(
         &[
@@ -531,7 +497,7 @@ pub const RULES: &[Rule] = &[
         Beast,
         Made,
     ),
-    n(&["animals:kibble"], 2, Beasts, Beast, Made, "takes a water bucket (iron)"),
+    n(&["animals:kibble"], 0, Beasts, Beast, Made, "an egg, food, grain and fibre (no iron bucket; Ronald, 11-07: \"move them to fit\")"),
     n(&["animals:wyvern_saddle"], 2, Beasts, Beast, Made, "a dragon-sized saddle has an iron frame"),
     r(&["animals:spyglass"], 2, Shared, Tool, Made),
     r(&["animals:rotten_log", "animals:termite_mound"], 0, Beasts, Ground, World(AXE, 0.3)),
@@ -708,53 +674,56 @@ pub fn tier(id: &str) -> Option<u8> {
 
 // ------------------------------------------------------------------ tool parts' materials
 
-/// A crafting material's age and path, and the item a part of it is made from (`parts.rs`'s
-/// `SOURCES`; `""` where there is none in the game yet).
+/// A crafting material's path and the item a part of it is made from (`parts.rs`'s `SOURCES`;
+/// `""` where there is none in the game yet). Its age is `vitals::gear::MATERIALS`'.
 #[derive(Clone, Copy, Debug)]
 pub struct MaterialTag {
     pub id: &'static str,
-    pub tier: u8,
     pub path: Path,
     pub from: &'static str,
 }
 
-const fn mt(id: &'static str, tier: u8, from: &'static str) -> MaterialTag {
-    MaterialTag { id, tier, path: Tech, from }
+impl MaterialTag {
+    /// Its tier, from `vitals::gear` (none: no age there).
+    pub fn tier(&self) -> Option<u8> {
+        vitals::gear::material(self.id).map(|m| m.tier)
+    }
 }
 
-/// Every row of `crafting::MATERIALS` (a check fails on one without a tag). Stone and bone, wood
-/// and cordage are the Stone Age's; copper and bronze the Bronze Age's, meteoric iron its lucky
-/// early step; wrought iron, steel and star steel the Iron Age's; diamond above steel. Gold is the
-/// Iron Age's while its ore needs an iron pickaxe.
+const fn mt(id: &'static str, from: &'static str) -> MaterialTag {
+    MaterialTag { id, path: Tech, from }
+}
+
+/// Every row of `crafting::MATERIALS` (a check fails on one without a tag).
 pub const MATERIALS: &[MaterialTag] = &[
-    mt("flint", 0, "base:flint"),
-    mt("chert", 0, ""),
-    mt("tektite", 0, "base:tektite"),
-    mt("obsidian", 0, ""),
-    mt("bone", 0, "base:bone"),
-    mt("antler", 0, ""),
-    mt("stone", 0, "base:cobblestone"),
-    mt("diamond", 3, "base:diamond"),
-    mt("copper", 1, ""),
-    mt("bronze", 1, ""),
-    mt("wrought_iron", 2, "base:iron_ingot"),
-    mt("meteoric_iron", 1, "base:meteoric_iron"),
-    mt("steel", 2, ""),
-    mt("star_steel", 2, "base:star_steel_ingot"),
-    mt("gold", 2, "base:gold_ingot"),
-    mt("oak", 0, "base:oak_planks"),
-    mt("mesquite", 0, "base:mesquite_planks"),
-    mt("birch", 0, "base:birch_planks"),
-    mt("yew", 0, ""),
-    mt("elm", 0, ""),
-    mt("osage_orange", 0, ""),
-    mt("spruce", 0, "base:spruce_planks"),
-    mt("branch", 0, "base:stick"),
-    mt("plant_cordage", 0, "base:string"),
-    mt("sinew", 0, ""),
-    mt("rawhide", 0, ""),
-    mt("birch_tar", 0, ""),
-    mt("leather", 0, "base:sole_leather"),
+    mt("flint", "base:flint"),
+    mt("chert", ""),
+    mt("tektite", "base:tektite"),
+    mt("obsidian", ""),
+    mt("bone", "base:bone"),
+    mt("antler", ""),
+    mt("stone", "base:cobblestone"),
+    mt("diamond", "base:diamond"),
+    mt("copper", ""),
+    mt("bronze", ""),
+    mt("wrought_iron", "base:iron_ingot"),
+    mt("meteoric_iron", "base:meteoric_iron"),
+    mt("steel", ""),
+    mt("star_steel", "base:star_steel_ingot"),
+    mt("gold", "base:gold_ingot"),
+    mt("oak", "base:oak_planks"),
+    mt("mesquite", "base:mesquite_planks"),
+    mt("birch", "base:birch_planks"),
+    mt("yew", ""),
+    mt("elm", ""),
+    mt("osage_orange", ""),
+    mt("spruce", "base:spruce_planks"),
+    mt("branch", "base:stick"),
+    mt("plant_cordage", "base:string"),
+    mt("sinew", ""),
+    mt("rawhide", ""),
+    mt("birch_tar", ""),
+    mt("leather", "base:sole_leather"),
 ];
 
 pub fn material(id: &str) -> Option<&'static MaterialTag> {
