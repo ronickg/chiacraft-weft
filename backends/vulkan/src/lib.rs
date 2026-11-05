@@ -102,6 +102,12 @@ struct Frame {
     marks: u32,
 }
 
+/// Where a write kept on the CPU before the slot was ready goes (`VulkanBackend::early`).
+enum Early {
+    Buffer { dst: u32, offset: u64 },
+    Texture { dst: u32, mip: u32 },
+}
+
 enum Upload {
     Buffer { src: (u32, u64), dst: u32, offset: u64, size: u64 },
     Texture { src: (u32, u64), dst: u32, mip: u32 },
@@ -144,6 +150,12 @@ pub struct VulkanBackend {
     textures: Slab<Texture>,
     pipelines: Slab<Pipeline>,
     uploads: Vec<Upload>,
+    /// Writes made before this frame slot's fence was waited on, kept on the CPU and staged right
+    /// after that wait, in order (`ensure_slot_ready`). Staging them waited for the GPU at the
+    /// first write of a frame, in the middle of the game's update, which then could not overlap
+    /// the GPU's work (perf review: it showed as 3-15 ms of "solid cells" on the Mac).
+    /// `WEFT_EARLY_WAIT=1` waits at the first write again, to compare.
+    early: Vec<(Early, Vec<u8>)>,
     global_layout: vk::DescriptorSetLayout,
     global_pool: vk::DescriptorPool,
     global_set: vk::DescriptorSet,
@@ -673,6 +685,7 @@ impl VulkanBackend {
                 textures: Slab::new(),
                 pipelines: Slab::new(),
                 uploads: Vec::new(),
+                early: Vec::new(),
                 global_layout,
                 global_pool,
                 global_set,
@@ -904,6 +917,14 @@ impl VulkanBackend {
         frame.waited = true;
         frame.staging.current = 0;
         frame.staging.used = 0;
+        for (to, data) in std::mem::take(&mut self.early) {
+            let src = self.stage(&data);
+            self.uploads.push(match to {
+                Early::Buffer { dst, offset } => Upload::Buffer { src, dst, offset, size: data.len() as u64 },
+                Early::Texture { dst, mip } => Upload::Texture { src, dst, mip },
+            });
+        }
+        let frame = &mut self.frames[self.slot];
         if frame.marks > 1 {
             let mut ts = vec![0u64; frame.marks as usize];
             let first = self.slot as u32 * MAX_MARKS;
@@ -1381,6 +1402,11 @@ impl Backend for VulkanBackend {
             return;
         }
         debug_assert!(offset + data.len() as u64 <= self.buffers.get(buffer.0).size);
+        if !self.frames[self.slot].waited && !early_wait() {
+            self.early
+                .push((Early::Buffer { dst: buffer.0, offset }, data.to_vec()));
+            return;
+        }
         let src = self.stage(data);
         self.uploads
             .push(Upload::Buffer { src, dst: buffer.0, offset, size: data.len() as u64 });
@@ -1392,6 +1418,8 @@ impl Backend for VulkanBackend {
             // before the uploads run (a reload makes many) would take them, past its end.
             self.uploads
                 .retain(|u| !matches!(u, Upload::Buffer { dst, .. } if *dst == buffer.0));
+            self.early
+                .retain(|e| !matches!(e.0, Early::Buffer { dst, .. } if dst == buffer.0));
             self.defer(Deferred::Buffer(b.raw, b.alloc));
         }
     }
@@ -1479,6 +1507,11 @@ impl Backend for VulkanBackend {
     }
 
     fn write_texture(&mut self, texture: TextureId, mip: u32, data: &[u8]) {
+        if !self.frames[self.slot].waited && !early_wait() {
+            self.early
+                .push((Early::Texture { dst: texture.0, mip }, data.to_vec()));
+            return;
+        }
         let src = self.stage(data);
         self.uploads
             .push(Upload::Texture { src, dst: texture.0, mip });
@@ -1497,6 +1530,8 @@ impl Backend for VulkanBackend {
                 Upload::InitTexture(id) => *id != texture.0,
                 Upload::Buffer { .. } => true,
             });
+            self.early
+                .retain(|e| !matches!(e.0, Early::Texture { dst, .. } if dst == texture.0));
             self.defer(Deferred::Texture(t.image, t.view, t.alloc, t.index));
         }
     }
@@ -2184,4 +2219,11 @@ mod tests {
         let unified = memory(&[vk::MemoryHeapFlags::DEVICE_LOCAL], &[(P::DEVICE_LOCAL, 0), (P::DEVICE_LOCAL | host, 0)]);
         assert_eq!(spill_types(&unified), 0);
     }
+}
+
+/// `WEFT_EARLY_WAIT=1`: a write before the frame slot is ready waits for the GPU there and then,
+/// as before (to compare with keeping it on the CPU until the slot is waited on).
+fn early_wait() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("WEFT_EARLY_WAIT").is_some())
 }
