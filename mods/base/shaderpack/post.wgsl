@@ -137,7 +137,7 @@ fn fs_copy_behind(in: VOut) -> BehindOut {
 fn bloom_tap(tex: u32, uv: vec2<f32>) -> vec3<f32> {
     let c = textureSampleLevel(textures[tex], linear_clamp, uv, 0.0).rgb;
     let ok = all(c == c) && all(c < vec3(1e6));
-    return select(vec3(0.0), min(max(c, vec3(0.0)), vec3(48.0)), ok);
+    return select(vec3(0.0), min(max(c, vec3(0.0)), vec3(256.0)), ok);
 }
 
 // Four taps' average, weighed down where it is bright (Karis's average): on the first level only,
@@ -180,8 +180,9 @@ fn fs_bloom_down(in: VOut) -> @location(0) vec4<f32> {
 }
 
 // How much of the wider levels each level keeps on the way up: 1 weighs each level about as Bliss
-// does its seven (1, 1/2, 1/3 ... of a normalised blur).
-const BLOOM_SPREAD: f32 = 1.0;
+// does its seven (1, 1/2, 1/3 ... of a normalised blur); 1.3 a little wider, for the glare round a
+// low sun.
+const BLOOM_SPREAD: f32 = 1.3;
 
 // One level up: this level (`scene`) and the wider one over it (`low` - 1), filtered by a 3x3 tent.
 @fragment

@@ -411,6 +411,15 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     let toward = pow(max(mu, 0.0), 2.0) * pow(1.0 - h, 3.0) * low;
     c += vec3(0.55, 0.22, 0.05) * toward;
     c += sun_glow(dir, p);
+    // In the HDR world the air round the sun glows as bright as it really is (Mie scattering's
+    // forward peak, a wide lobe and a tight one in the sun's own colour, strongest low), which the
+    // curve rolls off and the bloom spreads: Bliss's low sun stands in a great gold glare. The
+    // haze over the land toward the sun takes it too (it reads this colour).
+    if scene.frame.x > 0.5 {
+        let m = max(mu, 0.0);
+        let mie = (pow(m, 8.0) * 0.45 + pow(m, 64.0) * 2.2) * (0.35 + 0.65 * low) * (1.0 - rain_amount());
+        c += p.sun * mie * 0.5;
+    }
     // The glow about the moon where it stands, as bright as its light (`scene.moon.w`): on a new
     // moon there is none, and a glow alone read as a dark-blue ring (the world playtester's nights).
     let moon = pow(max(dot(dir, scene.moon.xyz), 0.0), 24.0) * smoothstep(-0.05, -0.25, scene.sun.y) * scene.moon.w;
