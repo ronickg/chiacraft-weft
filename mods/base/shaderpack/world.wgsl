@@ -972,6 +972,9 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     }
     out.tint = tint;
     out.color = pow(tint, vec3(2.2));
+    // Shut in by the land round it (`lod_occ`, 0 to 3): valley floors and the ground between crowns
+    // get less of the sky and the low sun, down to 0.58 (Far view, 11-05: far land evenly lit).
+    out.color *= 1.0 - 0.14 * f32(lod_occ(w0));
     return out;
 }
 
