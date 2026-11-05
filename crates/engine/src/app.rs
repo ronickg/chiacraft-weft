@@ -513,6 +513,8 @@ impl App {
         let look = Look::new(&assets, &mod_ids(), &lang);
         let textures = GameTextures::new(&mut *gpu, content(), &assets);
         let ui = UiRenderer::new(&mut *gpu, &assets)?;
+        // The HDR world's format, before any pipeline drawing into the world is made.
+        crate::post::set_hdr(settings.hdr_world());
         let post = crate::post::Post::new(&mut *gpu, &assets);
         let mut input = Input::default();
         for (action, key) in &content().game.keys {
@@ -2568,6 +2570,7 @@ fn update_game(r: &mut Running, dt: f64, frame_start: Instant) {
         g.client.render.occlusion.on = r.settings.occlusion_culling();
         g.client.sky.soft_wanted = r.settings.soft_clouds();
         r.post.use_low = r.settings.post_low();
+        r.post.bloom_levels = r.settings.bloom_levels();
         let t = Instant::now();
         if world_input {
             g.client.update(&mut *r.gpu, &r.textures, &mut r.input, dt);
@@ -3034,7 +3037,8 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
     // Screen effects need the world in an image they can read, and so does a world drawn smaller
     // than the screen (`render_scale`), which their last pass scales up.
     let scaled = (world_info.width, world_info.height) != (info.width, info.height);
-    let post = (r.post.on() || scaled) && r.game.is_some();
+    // The HDR world always ends in the effects' last pass, which finishes the picture.
+    let post = (r.post.on() || scaled || crate::post::hdr()) && r.game.is_some();
     let world_target = if post {
         Target::Texture(
             r.post

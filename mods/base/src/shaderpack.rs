@@ -23,13 +23,14 @@ fn shared_numbers() -> String {
     format!("// From vitals::air (mods/base/src/shaderpack.rs).\nconst MIST_TOP: f32 = {:.1};\n", vitals::air::MIST_TOP)
 }
 
-const FILES: [(&str, &str); 6] = [
+const FILES: [(&str, &str); 7] = [
     ("world.wgsl", include_str!("../shaderpack/world.wgsl")),
     ("sky.wgsl", include_str!("../shaderpack/sky.wgsl")),
     ("model.wgsl", include_str!("../shaderpack/model.wgsl")),
     ("entity.wgsl", include_str!("../shaderpack/entity.wgsl")),
     ("particle.wgsl", include_str!("../shaderpack/particle.wgsl")),
     ("weather.wgsl", include_str!("../shaderpack/weather.wgsl")),
+    ("post.wgsl", include_str!("../shaderpack/post.wgsl")),
 ];
 
 // Water writes depth, so the reflections effect finds its surface.

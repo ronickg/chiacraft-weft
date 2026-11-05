@@ -373,7 +373,7 @@ impl EntityRenderer {
                 shader: &s,
                 vertex,
                 fragment: Some("fs"),
-                color: Some(Format::Surface),
+                color: Some(crate::post::world_format()),
                 depth: Some(DepthState { write: true, compare: Compare::GreaterEqual }),
                 blend: Blend::None,
                 cull_back: true,
@@ -392,7 +392,7 @@ impl EntityRenderer {
                 shader: &s,
                 vertex: "vs",
                 fragment: Some("fs"),
-                color: Some(Format::Surface),
+                color: Some(crate::post::world_format()),
                 depth: Some(DepthState { write: true, compare: Compare::GreaterEqual }),
                 blend: Blend::None,
                 cull_back: true,
@@ -405,7 +405,7 @@ impl EntityRenderer {
                 shader: &s,
                 vertex: "vs",
                 fragment: Some("fs_overlay"),
-                color: Some(Format::Surface),
+                color: Some(crate::post::world_format()),
                 depth: Some(DepthState { write: false, compare: Compare::GreaterEqual }),
                 blend: Blend::Alpha,
                 cull_back: true,
@@ -467,9 +467,9 @@ impl EntityRenderer {
             })
             .map_err(|e| e.0)
         };
-        let (world, preview) = (make("models", "vs", Format::Surface)?, make("entity preview", "vs", Format::Rgba8Srgb)?);
+        let (world, preview) = (make("models", "vs", crate::post::world_format())?, make("entity preview", "vs", Format::Rgba8Srgb)?);
         // A shader pack's older copy of the file has no `vs_hand`.
-        let hand = make("model hand", "vs_hand", Format::Surface).or_else(|_| make("model hand", "vs", Format::Surface))?;
+        let hand = make("model hand", "vs_hand", crate::post::world_format()).or_else(|_| make("model hand", "vs", crate::post::world_format()))?;
         // Depth only, both sides (a model's thin parts are open boxes), its see-through texels left out.
         let shadow = crate::packs::sun_shadows()
             .then(|| {
