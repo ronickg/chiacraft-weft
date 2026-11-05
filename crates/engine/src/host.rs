@@ -584,7 +584,8 @@ pub fn stats(m: ModId) -> &'static ModStats {
     &STATS[(m.0 as usize).min(MAX_MODS - 1)]
 }
 
-/// Callback nanoseconds and calls of a mod since start; readers diff two looks.
+/// Server-side callback nanoseconds (its own, not counting the mod calls inside) and calls of a
+/// mod since start; readers diff two looks.
 pub fn mod_totals(m: ModId) -> (u64, u64) {
     let s = stats(m);
     (s.nanos.load(Ordering::Relaxed), s.calls.load(Ordering::Relaxed))
@@ -595,13 +596,20 @@ pub fn mod_totals(m: ModId) -> (u64, u64) {
 pub fn invoke<A>(owner: ModId, cb: Callback, args: &mut A) -> bool {
     let Some(f) = cb.func else { return true };
     let start = Instant::now();
+    let saved = crate::diag::inner_start();
     let prev = crate::diag::enter_mod(owner);
     let r = unsafe { f(cb.data, args as *mut A as *mut c_void) };
     crate::diag::leave_mod(prev);
+    // Its own time: less what other calls it made took (they are charged to their own mods).
+    let own = crate::diag::inner_end(saved, start.elapsed().as_nanos() as u64);
     let s = stats(owner);
-    s.nanos
-        .fetch_add(start.elapsed().as_nanos() as u64, Ordering::Relaxed);
-    s.calls.fetch_add(1, Ordering::Relaxed);
+    // Only the server's calls count toward a mod's time per tick (`mod_totals`): the client's
+    // (drawing an animal's look every frame) ran at the frame rate and were counted as if each
+    // were a server tick's.
+    if crate::diag::on_server() {
+        s.nanos.fetch_add(own, Ordering::Relaxed);
+        s.calls.fetch_add(1, Ordering::Relaxed);
+    }
     if r != 0 {
         let n = s.faults.fetch_add(1, Ordering::Relaxed);
         if n < 10 {
