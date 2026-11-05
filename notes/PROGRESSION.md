@@ -262,6 +262,17 @@ of band.
 - **Damage:** armour / (armour + 5 × hit), capped at 80%, with penetration, damage types, weak points and part breaks.
 - **Today's big animals are too soft for these bands.** At the stone age the utahraptor should be about 171 health (it's 60), and a stone sword kills a cedarosaurus in under 40 s. They get re-derived when the curves land.
 
+### Round 6 (Ronald, 11-07)
+
+- **Age names:** plain English: Stone Age, Bronze Age, Iron Age, Age of Steam, Age of Lightning, Age of the Future, Age of Stars.
+- **The first biome bosses**, all four:
+  - Borkon, the Height-Keeper: mountains, a giant horned beast in the high passes, at a stone altar near the dwarven halls;
+  - Drenkaun, the Wood-Warden: old forests, a huge antlered guardian near the elves' woods;
+  - Askaun, the Sand Keeper: desert, a burrowing sand wyrm;
+  - Nokaun, Keeper of the Deep: ocean, a great sea creature fought from boats or the shore.
+- **Ley lines:** seen with the right tools. Invisible at first; a dowsing rod, then ley sight from magic, shows them as faint flowing lines, so finding them is part of exploring.
+- **Tribe ranks:** custom. The owner makes ranks and picks what each can do, like Rust or Ark clans.
+
 ## What's next
 
 1. **Research:** how Ark, Vintage Story, Terraria, Skyrim, GregTech or All the Mods, Thaumcraft or Botania, and Valheim structure their progression and keep it balanced. What to take, what to avoid.
