@@ -1244,8 +1244,13 @@ impl WorldRenderer {
             return;
         }
         self.terrain_epoch += 1;
-        // The textures it shows are loaded before it is drawn.
-        let mut used: Vec<u32> = mesh
+        let began = std::time::Instant::now();
+        // The textures it shows are loaded before it is drawn: a handful of distinct ones over
+        // thousands of records, neighbours mostly the same (collecting one a record and sorting
+        // them was a good part of an upload, perf review client #6).
+        let mut used: Vec<u32> = Vec::with_capacity(16);
+        let mut last = u32::MAX;
+        let ids = mesh
             .faces
             .iter()
             .flatten()
@@ -1255,10 +1260,13 @@ impl WorldRenderer {
                     .iter()
                     .flatten()
                     .map(|q| q[4] & crate::gpu_layout::face::TEX_MASK),
-            )
-            .collect();
-        used.sort_unstable();
-        used.dedup();
+            );
+        for id in ids {
+            if id != last && !used.contains(&id) {
+                used.push(id);
+            }
+            last = id;
+        }
         textures.ensure_blocks(gpu, used);
         let face_counts = mesh.faces.each_ref().map(|v| {
             let mut n = [0u32; 6];
@@ -1272,14 +1280,23 @@ impl WorldRenderer {
         let total_q: u32 = quad_counts.iter().sum();
         let faces = (total_f > 0).then(|| {
             let a = self.faces.alloc(gpu, total_f);
-            let data: Vec<[u32; 4]> = mesh.faces.concat();
-            gpu.write_buffer(self.faces.pages[a.page as usize].0, a.offset as u64 * 16, bytemuck::cast_slice(&data));
+            // Each layer in its place, one after the other: no joined copy first (staging copies anyway).
+            let page = self.faces.pages[a.page as usize].0;
+            let mut at = a.offset as u64;
+            for layer in &mesh.faces {
+                gpu.write_buffer(page, at * 16, bytemuck::cast_slice(layer));
+                at += layer.len() as u64;
+            }
             a
         });
         let quads = (total_q > 0).then(|| {
             let a = self.quads.alloc(gpu, total_q);
-            let data: Vec<[u32; 8]> = mesh.quads.concat();
-            gpu.write_buffer(self.quads.pages[a.page as usize].0, a.offset as u64 * 32, bytemuck::cast_slice(&data));
+            let page = self.quads.pages[a.page as usize].0;
+            let mut at = a.offset as u64;
+            for layer in &mesh.quads {
+                gpu.write_buffer(page, at * 32, bytemuck::cast_slice(layer));
+                at += layer.len() as u64;
+            }
             if !mesh.quads[2].is_empty() {
                 self.sorted.insert(
                     key,
@@ -1301,6 +1318,8 @@ impl WorldRenderer {
             [u32::MAX; 4]
         };
         let mesh = GpuMesh { slots, faces, face_counts, quads, quad_counts };
+        crate::diag::UPLOADS.add(1);
+        crate::diag::UPLOAD_NS.add(began.elapsed().as_nanos() as u64);
         if key.0 == 0 && face_counts[2].iter().sum::<u32>() + quad_counts[2] == 0 {
             self.table_only.insert(key, mesh);
             return;
