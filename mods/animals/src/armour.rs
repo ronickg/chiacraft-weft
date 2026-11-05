@@ -88,7 +88,12 @@ pub fn floor(w: &World, entity: u64, size: vitals::combat::Size, max_health: f32
     let [budget, last, stagger] = w
         .component(entity, &FLOOR)
         .unwrap_or([f64::NAN, 0.0, 0.0]);
-    let budget = if budget.is_nan() { max_health / size.band().floor.unwrap_or(1.0) } else { budget as f32 };
+    // A fresh one holds a second's worth.
+    let budget = if budget.is_nan() {
+        vitals::combat::floor_rate(size, max_health).unwrap_or(max_health) * vitals::combat::FLOOR_HELD
+    } else {
+        budget as f32
+    };
     let secs = now.saturating_sub(last as u64) as f32 / vitals::TICKS as f32;
     let (took, left, over) = vitals::combat::floor_take(size, max_health, budget, secs, hit);
     let stagger = stagger + over as f64;
