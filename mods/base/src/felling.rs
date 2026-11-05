@@ -197,6 +197,9 @@ pub fn register(r: &mut Registry) {
                 for &p in &logs {
                     w.break_block(p, tool, e.player, false);
                 }
+                // What stood in its way is hit as by a fall (`felled::crush`).
+                let hit = crate::felled::crush(&w, pos, &logs, d);
+                weft_sdk::info!("felling: {} logs at {pos:?} not lifted, taken down in place, {hit} hit in its line", logs.len());
                 if lays {
                     crate::felled::lay(&w, pos, &logs, &states, d);
                 }

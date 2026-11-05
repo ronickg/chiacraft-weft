@@ -203,6 +203,31 @@ pub fn piece(w: &World, from: [i32; 3], state: u32, max: usize) -> Vec<[i32; 3]>
     out
 }
 
+/// A tree that couldn't be lifted to fall (`fall::start` found no body: a small tree's, the felling
+/// round on b5815f09) is taken down where it stands; the creatures in the line its trunk lies along
+/// take the hit a falling trunk gives them (`vitals::felling::hurt`, once each), as they would
+/// have from the fall. Before, they took none (a 6-log tree's fall missed two capybaras), or were
+/// buried in it (4cdcdc3f).
+pub fn crush(w: &World, foot: [i32; 3], logs: &[[i32; 3]], d: [i32; 2]) -> usize {
+    let harm = vitals::felling::hurt(logs.len() as u32);
+    let mut hit = HashSet::new();
+    for (at, _) in line(foot, logs, d) {
+        let mid = [at[0] as f64 + 0.5, at[1] as f64 + 0.5, at[2] as f64 + 0.5];
+        for id in in_box(w, mid, vitals::felling::HURT_REACH) {
+            if hit.insert(id) {
+                w.damage(id, harm, 0, damage_cause::CRUSH);
+            }
+        }
+    }
+    hit.len()
+}
+
+/// The cells a felled trunk lies across, the ones up to one under the ground included (a slice
+/// drops to the ground as it lands: `lay`).
+fn line(foot: [i32; 3], logs: &[[i32; 3]], d: [i32; 2]) -> Vec<([i32; 3], i32)> {
+    turned(foot, logs, d).into_iter().flatten().collect()
+}
+
 /// An axe on a felled log (`state`, at `pos`, still there as mining starts): the piece it cuts,
 /// counting itself.
 pub fn piece_logs(w: &World, pos: [i32; 3], state: u32, item: u32) -> Option<usize> {
@@ -215,6 +240,27 @@ pub const MAX_PIECE: usize = 512;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A small tree that falls without a body still hits what is in its way: a 6-log trunk falling
+    /// toward -z lies across the cells 1 to 6 out, so creatures 3.5 and 5.5 out (the capybaras of
+    /// the felling round) are in its line.
+    #[test]
+    fn a_small_tree_lies_across_what_is_in_its_way() {
+        let trunk: Vec<[i32; 3]> = (1..=6).map(|y| [0, y, 0]).collect();
+        let cells: Vec<[i32; 3]> = line([0, 0, 0], &trunk, [0, -1])
+            .into_iter()
+            .map(|c| c.0)
+            .collect();
+        for out in [3.5f64, 5.5] {
+            let z = -out;
+            assert!(
+                cells
+                    .iter()
+                    .any(|c| c[1] == 0 && (c[2] as f64 + 0.5 - z).abs() <= 0.5 + vitals::felling::HURT_REACH),
+                "nothing lies {out} out: {cells:?}"
+            );
+        }
+    }
 
     #[test]
     fn a_tree_turns_a_quarter_over_its_far_edge() {
