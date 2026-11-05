@@ -578,6 +578,9 @@ pub struct Lod {
     /// Indices of the dimension's features whose heights run mods' code (`terrain_gpu`);
     /// `None`: no distant terrain here.
     custom: Option<Arc<Vec<usize>>>,
+    /// Tiles whose features' heights are being worked out (`request` keeps it under
+    /// `heights_in_flight`).
+    heights: Arc<std::sync::atomic::AtomicUsize>,
     ready: FxHashSet<TileKey>,
     /// Asked for, and their jobs' flags (cleared to call them off).
     pending: FxHashMap<TileKey, Arc<AtomicBool>>,
@@ -617,6 +620,7 @@ impl Lod {
             dim: u32::MAX,
             seed: 0,
             custom: None,
+            heights: Arc::default(),
             ready: FxHashSet::default(),
             pending: FxHashMap::default(),
             cached: FxHashSet::default(),
@@ -722,6 +726,10 @@ impl Lod {
         if (dim, seed) != (self.dim, self.seed) {
             (self.dim, self.seed) = (dim, seed);
             self.custom = super::terrain_gpu::describe(c, dim, seed).map(|(_, custom)| Arc::new(custom));
+            // Its description runs mods' shapes for a while: started now, ahead of the tiles.
+            if self.custom.is_some() {
+                let _ = super::terrain_gpu::lod_desc(dim, seed);
+            }
         }
         // Tiles stand in for cubes not shown yet; the inner half of the view is shown long
         // before the edge, where flying outruns the cubes.
@@ -1010,8 +1018,15 @@ impl Lod {
             }
         }
         order.sort_by(|a, b| a.0.total_cmp(&b.0).then(b.1.level.cmp(&a.1.level)));
+        let busy = self.heights.load(Ordering::Relaxed);
+        let mut started = 0;
         for (_, key) in order {
             if self.pending.len() >= IN_FLIGHT {
+                break;
+            }
+            // A few tiles' heights at a time: meshes and the description share the pool's queue,
+            // and behind 256 heights jobs the first tiles came 3 s after a join.
+            if !custom.is_empty() && busy + started >= heights_in_flight() {
                 break;
             }
             let again = self.stale.remove(&key);
@@ -1027,8 +1042,18 @@ impl Lod {
                 continue;
             }
             let custom = custom.clone();
+            started += 1;
+            let heights = self.heights.clone();
+            heights.fetch_add(1, Ordering::Relaxed);
             // Mods' features run their code: on LOD's own threads.
             pool().spawn(move || {
+                struct Done(Arc<std::sync::atomic::AtomicUsize>);
+                impl Drop for Done {
+                    fn drop(&mut self) {
+                        self.0.fetch_sub(1, Ordering::Relaxed);
+                    }
+                }
+                let _done = Done(heights);
                 if !live.load(Ordering::Relaxed) {
                     return;
                 }
@@ -1041,6 +1066,11 @@ impl Lod {
         }
         self.stale.retain(|k| self.ready.contains(k));
     }
+}
+
+/// Tiles' heights worked out at once at most: three per LOD thread keeps them all busy.
+fn heights_in_flight() -> usize {
+    pool().current_num_threads() * 3
 }
 
 /// Heights of the mod features `custom` at the tile's columns, for its job.
