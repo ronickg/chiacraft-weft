@@ -415,6 +415,21 @@ fn factors(w: &World, id: u64, a: &Animal) -> (f32, f32) {
     (a.factor(species::HEALTH) * crate::comfort::condition(a), a.factor(species::SPEED) * crate::comfort::speed(w, id))
 }
 
+/// Sets a wild one's level to `level` (its points spread evenly over the stats), at full health:
+/// for checks that need a known animal (`/animal level`, `scripts/floors.txt`).
+pub fn set_level(w: &World, id: u64, level: u32) {
+    let Some(st) = w.entity(id) else { return };
+    let Some(a) = w.component_mut(id, &ANIMAL) else { return };
+    let level = level.min(MAX_WILD_LEVEL);
+    a.wild = [0; STATS];
+    for i in 0..level as usize {
+        a.wild[i % STATS] += 1;
+    }
+    let a = *a;
+    let (health, speed) = factors(w, id, &a);
+    apply(w, id, &st, health, speed, f32::MAX);
+}
+
 /// Max health and speed as the stats say; `heal` adds that much health on top (a new animal
 /// starts full).
 fn apply(w: &World, id: u64, st: &EntityState, health: f32, speed: f32, heal: f32) {

@@ -33,10 +33,12 @@ pub mod impact;
 pub mod layers;
 pub mod levels;
 pub mod meals;
+pub mod perks;
 pub mod plants;
 pub mod preserve;
 pub mod sheet;
 pub mod shelter;
+pub mod skills;
 pub mod soil;
 pub mod stamina;
 pub mod stats;
@@ -44,6 +46,7 @@ pub mod stomach;
 pub mod temperature;
 pub mod weather_sound;
 pub mod web;
+pub mod web_sheet;
 pub mod wild;
 
 /// Ticks a second, as the game's.

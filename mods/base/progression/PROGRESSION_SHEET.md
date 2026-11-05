@@ -26,7 +26,7 @@ Power grows ×1.6 an age: `g(L) = 1.6^(L/10)` over area and item level L (tier �
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 490 | 148 | 49 | 34 % | 260 EM |
 | 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 31 | 24 | 76 | 26 % | 164 EM |
-| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 26 | 24 | 62 | 16 % | 250 EM |
+| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 27 | 25 | 62 | 16 % | 270 EM |
 | 3 | Age of Steam | 18 | 1080 | 4.10 | 31.1 / 104 / 130 | 30 | 27 | 94 | 22 % | 512 EM |
 | 4 | Age of Lightning | 20 | 1200 | 6.55 | 49.7 / 166 / 207 | 0 | 0 | 0 | 0 % | 0 EM |
 | 5 | Age of the Future | 18 | 1080 | 10.49 | 79.6 / 265 / 332 | 0 | 0 | 0 | 0 % | 0 EM |
@@ -238,7 +238,7 @@ A saddle (and barding) of an age carries a tame up to that age's reference level
 
 ## The perk web's prices
 
-A unit is +2 % to one family; a small node gives 1, a notable 3-4, a keystone nets 0. Inside a family bonuses add, between families they multiply. A family tops out at ×1.6 (30 units: one age); everything together (gear, web, a tame's bond, food) at ×2.5 (two ages). Families: melee damage, ranged damage, spell damage, defence, health, tame damage, taming speed, craft grade, gathering speed, mining speed, move speed, mana cost. No node exists yet.
+A unit is +2 % to one family; a small node gives 1, a notable 3-4, a keystone nets 0. Inside a family bonuses add, between families they multiply. A family tops out at ×1.6 (30 units: one age); everything together (gear, web, a tame's bond, food) at ×2.5 (two ages). Families: melee damage, ranged damage, spell damage, defence, health, tame damage, taming speed, craft grade, gathering speed, mining speed, move speed, mana cost, stamina, slower hunger, cooking, harvest, riding speed, trade, smelting speed, machine speed. The nodes, skills and their checks: `mods/base/vitals/WEB_SHEET.md`.
 
 ## Age keys by path
 
@@ -329,7 +329,7 @@ Notes:
 - base:meteoric_iron: hammered cold, iron-grade before a player can smelt (Research round 17)
 - base:raw_gold, base:gold_ingot, base:gold_block: cast and soft: the Bronze Age's (Ronald, 11-07: "move them to fit")
 
-### Iron Age (26)
+### Iron Age (27)
 
 **tech** (19)
 
@@ -338,8 +338,9 @@ Notes:
 - tool: iron_axe (3.6), iron_hoe (2.5), iron_pickaxe (3.6), iron_shovel (1.3), iron_sword (2.4)
 - armour: iron_boots (4.7), iron_chestplate (9.4), iron_helmet (5.9), iron_leggings (8.2)
 
-**magic** (3)
+**magic** (4)
 
+- material: unlearning_stone (20)
 - light: star_lantern (62)
 - sky: peridot (10), starheart (60)
 
@@ -355,6 +356,7 @@ Notes:
 Notes:
 - base:redstone_ore, base:star_steel_ore: breaks into its ore (an iron pickaxe)
 - base:star_lantern: a starheart in iron
+- base:unlearning_stone: a peridot ground with tektites: gives back perk web nodes (vitals::perks)
 - base:salt, base:salted_meat: salt is boiled from a water bucket (iron)
 - animals:wyvern_saddle: a dragon-sized saddle has an iron frame
 

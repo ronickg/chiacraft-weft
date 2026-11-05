@@ -320,12 +320,19 @@ fn tool_stack(kind: &Kind, parts: &[(Part, PartOf)], stats: &ToolStats) -> ItemS
                 .map(|l| worn.worn as f32 / l.uses.max(1.0))
         })
         .fold(0.0f32, f32::max);
+    // Its working part's material's item level (`vitals::gear`): what an over-tier cap reads.
+    let level = parts
+        .iter()
+        .find(|(part, _)| Some(part.slot) == working)
+        .and_then(|(part, _)| vitals::gear::material(part.material))
+        .map_or(0.0, |m| m.level());
     let stack = ItemStack::new(Item::generated(kind.id.to_string()).id(), 1)
         .with(&PARTS, p)
         .with(&DURABILITY, uses)
         .with(&MINING_SPEED, stats.stat)
         .with(&TOOL_LEVEL, stats.harvest)
-        .with(&ATTACK_DAMAGE, stats.damage);
+        .with(&ATTACK_DAMAGE, stats.damage)
+        .with(&base_api::ITEM_LEVEL, level);
     // Drawn from its parts (the engine's `core:look`).
     let plain: Vec<Part> = parts.iter().map(|p| p.0).collect();
     let look = look_text(kind.id, &plain);
@@ -536,6 +543,10 @@ pub fn on_take(m: &MenuCtx) -> bool {
     if m.group("assembled").index_of(m.slot()).is_none() {
         return false;
     }
+    // Smithing for the maker, by the tool its parts make (the result slot is already taken).
+    let stacks: Vec<ItemStack> = (0..ASSEMBLY.len()).map(|i| asm_get(m, i)).collect();
+    let parts = stacks.iter().filter(|s| !s.is_empty()).count() as u32;
+    crate::skills::made(&m.world(), m.player(), &assembled(&stacks), parts);
     for i in 0..ASSEMBLY.len() {
         let s = asm_get(m, i);
         if !s.is_empty() {

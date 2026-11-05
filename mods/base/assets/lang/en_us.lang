@@ -1235,3 +1235,218 @@ block.base.campfire_laid.tooltip = Two logs and two sticks, not lit yet. Hold a 
 command.base.knap.no_room = No room for a nodule here: stand on open ground.
 command.base.impact.started = A meteorite falls: a crater of radius {0} at {1} {2}, {3} columns over {4} ticks
 command.base.impact.no_ground = No loaded land to strike at {0} {1}
+
+# Skills and the perk web (skills.rs, web.rs; vitals::skills, vitals::perks)
+key.base.web = Skills
+web.base.title = Skills
+web.base.tab = Skills
+web.base.keys = {#c6a383}WASD{/} pan · {#c6a383}Z X{/} zoom · {#c6a383}C{/} centre
+web.base.zoom_out = -
+web.base.zoom_out_tip = Zoom out (Z)
+web.base.zoom_in = +
+web.base.zoom_in_tip = Zoom in (X)
+web.base.centre = Centre
+web.base.centre_tip = Back to the start (C)
+web.base.points = {0} perk points
+web.base.refund_on = Unlearning: {0} left
+web.base.refund_off = Unlearn ({0} left)
+web.base.refund_tip = Click a taken node to give it back. Only ones the rest don't hang from.
+web.base.skill_tip = {color:title}{0}{/}
+    {color:dim}Rises by {1}. Click to see its region.{/}
+web.base.level = {0}
+web.base.by.later = nothing yet: it comes with spells, machines or traders
+web.base.state.taken = {#7fdc6a}Taken{/}
+web.base.state.open = {#ffbe45}Click to take (1 point){/}
+web.base.state.waiting = {#c6a383}No perk point left: the next level gives one{/}
+web.base.state.far = {#6b6f86}Take a node next to it first{/}
+web.base.state.locked = {#e8907a}Your skill is too low{/}
+web.base.tip.start = {color:title}The start{/}
+    {color:dim}Everyone begins here. Grow out to the skills you use.{/}
+web.base.tip.1 = {color:title}{0}{/}
+    {1} {2}
+    {3}
+web.base.tip.2 = {color:title}{0}{/}
+    {1} {2}
+    {3} {4}
+    {5}
+web.base.tip.1n = {color:title}{0}{/}
+    {1} {2}
+    {color:dim}Needs {3} {4} (yours: {5}){/}
+    {6}
+web.base.tip.2n = {color:title}{0}{/}
+    {1} {2}
+    {3} {4}
+    {color:dim}Needs {5} {6} (yours: {7}){/}
+    {8}
+web.base.tip.1b = {color:title}{0}{/}
+    {1} {2}
+    {color:dim}Needs {3} and {4} {5} (yours: {6}){/}
+    {7}
+web.base.tip.2b = {color:title}{0}{/}
+    {1} {2}
+    {3} {4}
+    {color:dim}Needs {5} and {6} {7} (yours: {8}){/}
+    {9}
+web.base.tip.1s = {color:title}{0}{/}
+    {1} {2}
+    {3}
+    {4}
+web.base.tip.1sn = {color:title}{0}{/}
+    {1} {2}
+    {3}
+    {color:dim}Needs {4} {5} (yours: {6}){/}
+    {7}
+web.base.unlearn = You can unlearn {0} nodes: open the skills ({key:base:web})
+web.base.no_points = No perk point left: the next level gives one
+web.base.too_low = Your skill is too low for that node
+web.base.not_next = Take a node next to it first
+web.base.no_refunds = Use an unlearning stone first
+web.base.holds_others = Other nodes hang from that one
+web.base.skill_up = {0} rose to {1}
+command.base.skill = {0}; {1} perk points, {2} refunds
+command.base.skill.unknown = No skill called {0}
+item.base.unlearning_stone = Unlearning Stone
+item.base.unlearning_stone.tooltip = Use it to give back up to 3 nodes of the skill web.
+perk.base.special.ley_sight = {#9ad7ff}Shows ley lines without a dowsing rod{/}
+web.base.skill.melee = Melee
+web.base.by.melee = hitting creatures up close
+web.base.skill.archery = Archery and throwing
+web.base.by.archery = hitting from afar
+web.base.skill.defence = Defence
+web.base.by.defence = taking hits from creatures
+web.base.skill.smithing = Smithing and tinkering
+web.base.by.smithing = making tools, weapons, armour and parts; smelting
+web.base.skill.engineering = Engineering
+web.base.skill.mining = Mining and prospecting
+web.base.by.mining = breaking stone and ore
+web.base.skill.building = Building and farming
+web.base.by.building = placing blocks; sowing and harvesting crops
+web.base.skill.alchemy = Alchemy and cooking
+web.base.by.alchemy = cooking at a fire or pot
+web.base.skill.runecraft = Runecraft and enchanting
+web.base.skill.destruction = Destruction
+web.base.skill.restoration = Restoration
+web.base.skill.conjuring = Conjuring and wards
+web.base.skill.taming = Taming and riding
+web.base.by.taming = taming and riding animals
+web.base.skill.survival = Survival
+web.base.by.survival = chopping trees; making everyday things
+web.base.skill.exploring = Exploring and cartography
+web.base.by.exploring = finding new biomes and dimensions
+web.base.skill.trading = Trading
+perk.base.family.melee_damage = melee damage
+perk.base.family.ranged_damage = ranged damage
+perk.base.family.spell_damage = spell damage
+perk.base.family.defence = defence
+perk.base.family.health = health
+perk.base.family.tame_damage = tame damage
+perk.base.family.taming_speed = taming speed
+perk.base.family.craft_grade = craft grade
+perk.base.family.gather_speed = gathering speed
+perk.base.family.mine_speed = mining speed
+perk.base.family.move_speed = move speed
+perk.base.family.mana_cost = mana cost
+perk.base.family.stamina = stamina
+perk.base.family.hunger = slower hunger
+perk.base.family.cooking = cooking
+perk.base.family.harvest = harvest
+perk.base.family.ride_speed = riding speed
+perk.base.family.trade = trade
+perk.base.family.smelting = smelting speed
+perk.base.family.machine_speed = machine speed
+perk.base.melee.heavy_blows = Heavy Blows
+perk.base.melee.second_wind = Second Wind
+perk.base.melee.executioner = Executioner
+perk.base.melee.battle_rhythm = Battle Rhythm
+perk.base.melee.berserker = Berserker
+perk.base.bridge.weapon_master = Weapon Master
+perk.base.archery.steady_aim = Steady Aim
+perk.base.archery.light_feet = Light Feet
+perk.base.archery.piercing_shot = Piercing Shot
+perk.base.archery.skirmisher = Skirmisher
+perk.base.archery.glass_arrow = Glass Arrow
+perk.base.bridge.shield_archer = Shield Archer
+perk.base.defence.thick_hide = Thick Hide
+perk.base.defence.hardy = Hardy
+perk.base.defence.shield_wall = Shield Wall
+perk.base.defence.unbroken = Unbroken
+perk.base.defence.iron_wall = Iron Wall
+perk.base.bridge.armourer = Armourer
+perk.base.smithing.keen_eye = Keen Eye
+perk.base.smithing.bellows = Bellows
+perk.base.smithing.masters_touch = Master's Touch
+perk.base.smithing.hot_forge = Hot Forge
+perk.base.smithing.forge_bound = Forge-Bound
+perk.base.bridge.machine_forged = Machine-Forged
+perk.base.engineering.gearwright = Gearwright
+perk.base.engineering.steady_fire = Steady Fire
+perk.base.engineering.clockwork = Clockwork
+perk.base.engineering.pressure = Pressure
+perk.base.engineering.overclock = Overclock
+perk.base.bridge.steam_drill = Steam Drill
+perk.base.mining.stonecutter = Stonecutter
+perk.base.mining.strong_back = Strong Back
+perk.base.mining.vein_sense = Vein Sense
+perk.base.mining.tireless = Tireless
+perk.base.mining.tunnel_rat = Tunnel Rat
+perk.base.bridge.quarry_master = Quarry Master
+perk.base.building.green_thumb = Green Thumb
+perk.base.building.quick_hands = Quick Hands
+perk.base.building.bountiful = Bountiful
+perk.base.building.builders_eye = Builder's Eye
+perk.base.building.homesteader = Homesteader
+perk.base.bridge.kitchen_garden = Kitchen Garden
+perk.base.alchemy.hearty_meals = Hearty Meals
+perk.base.alchemy.iron_stomach = Iron Stomach
+perk.base.alchemy.fine_cook = Fine Cook
+perk.base.alchemy.lean_living = Lean Living
+perk.base.alchemy.feaster = Feaster
+perk.base.bridge.infuser = Infuser
+perk.base.runecraft.ley_sight = Ley Sight
+perk.base.runecraft.rune_carver = Rune Carver
+perk.base.runecraft.deep_runes = Deep Runes
+perk.base.runecraft.glyph_weaver = Glyph Weaver
+perk.base.runecraft.rune_bound = Rune-Bound
+perk.base.bridge.charged_runes = Charged Runes
+perk.base.destruction.kindling = Kindling
+perk.base.destruction.focus = Focus
+perk.base.destruction.storm_call = Storm Call
+perk.base.destruction.overflow = Overflow
+perk.base.destruction.ley_burn = Ley Burn
+perk.base.bridge.balance = Balance
+perk.base.restoration.mending = Mending
+perk.base.restoration.calm_mind = Calm Mind
+perk.base.restoration.renewal = Renewal
+perk.base.restoration.wellspring = Wellspring
+perk.base.restoration.lifeblood = Lifeblood
+perk.base.bridge.warding_light = Warding Light
+perk.base.conjuring.bound_spirit = Bound Spirit
+perk.base.conjuring.ward = Ward
+perk.base.conjuring.greater_summons = Greater Summons
+perk.base.conjuring.bastion = Bastion
+perk.base.conjuring.warden = Warden
+perk.base.bridge.rune_collars = Rune Collars
+perk.base.taming.gentle_hand = Gentle Hand
+perk.base.taming.saddle_sense = Saddle Sense
+perk.base.taming.pack_leader = Pack Leader
+perk.base.taming.swift_mount = Swift Mount
+perk.base.taming.beastmaster = Beastmaster
+perk.base.bridge.tracker = Tracker
+perk.base.survival.woodsman = Woodsman
+perk.base.survival.weathered = Weathered
+perk.base.survival.forager = Forager
+perk.base.survival.hard_to_kill = Hard to Kill
+perk.base.survival.wild_born = Wild Born
+perk.base.bridge.pathfinder = Pathfinder
+perk.base.exploring.long_stride = Long Stride
+perk.base.exploring.wayfarer = Wayfarer
+perk.base.exploring.pathless = Pathless
+perk.base.exploring.far_walker = Far Walker
+perk.base.exploring.wanderer = Wanderer
+perk.base.bridge.caravan = Caravan
+perk.base.trading.haggler = Haggler
+perk.base.trading.pack_train = Pack Train
+perk.base.trading.merchant_prince = Merchant Prince
+perk.base.trading.caravaneer = Caravaneer
+perk.base.trading.silver_tongue = Silver Tongue
+perk.base.bridge.sellsword = Sellsword
