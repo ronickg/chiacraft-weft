@@ -22,7 +22,10 @@ ASSETS = os.path.join(HERE, "..", "..", "assets")
 SCALE = 0.3  # model pixels per unit: about half a block at the hip, 1.7 long (a real Velociraptor: 0.5 m, 1.8-2 m)
 # Which animations go in which file: the engine plays `idle` and `walk` by itself, a pose's
 # file holds it in `idle`; `run` and `meow` are there for code to play.
-POSES = {"": {"idle": "idle", "walk": "walk", "run": "run", "screech": "screech", "bite": "bite", "kick": "kick"},
+# The behaviour clips (`mods/animals/src/anim.rs`) go in the standing file too, by their own names.
+CLIPS = ["screech", "bite", "kick", "stare", "sniff", "drink", "look", "scratch", "groom", "stretch", "sleep", "stalk", "alarm", "pounce",
+         "play", "nuzzle", "flinch", "death"]
+POSES = {"": {"idle": "idle", "walk": "walk", "run": "run", **{c: c for c in CLIPS}},
          "_rest": {"idle": "rest", "walk": "walk"}}
 
 if __name__ == "__main__":
