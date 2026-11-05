@@ -39,8 +39,10 @@ const ZOOM_START: usize = 0;
 const ZOOM_DOUBLE: f32 = 2.0;
 /// GUI pixels a pan key moves the view, at zoom 1.
 const PAN_STEP: f32 = 40.0;
-/// The sidebar's width.
+/// The sidebar's width, and a skill row's: clear of the list's scrollbar (6 GUI px) with 3 UI px of
+/// air (the UI guide: nothing clipped).
 const SIDE_W: f32 = 118.0;
+const ROW_W: f32 = SIDE_W - 10.0;
 
 #[derive(Clone, Copy)]
 struct View {
@@ -224,17 +226,17 @@ fn sidebar(ui: &mut Ui, s: &SkillWeb, points: u32, refund: bool) {
                         .class("list_row")
                         .pad(2.0)
                         .gap(1.0)
-                        .w(SIDE_W - 6.0)
+                        .w(ROW_W)
                         .tooltip_args("web.base.skill_tip", &[Arg::Key(&name), Arg::Key(&by)]),
                     move |c| change(c, |v| v.centre = region),
                     |ui| {
                         // The name left, the level right-aligned in its column.
-                        ui.row(S::row().gap(2.0).w(SIDE_W - 10.0), |ui| {
+                        ui.row(S::row().gap(2.0).w(ROW_W - 4.0), |ui| {
                             ui.text_styled(S::default().no_wrap(), &name, &[]);
                             ui.spacer();
                             ui.text_styled(S::default().no_wrap().mono(), "web.base.level", &[Arg::Int(level as i64)]);
                         });
-                        ui.progress_bind("stat_xp", S::default().size(SIDE_W - 10.0, 2.0), move |_| into);
+                        ui.progress_bind("stat_xp", S::default().size(ROW_W - 4.0, 2.0), move |_| into);
                     },
                 );
             }

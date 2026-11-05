@@ -151,7 +151,8 @@ def main():
             im.save(f"{out}/{name}.png")
             with open(f"{out}/{name}.gui", "w") as f:
                 f.write("scaling = stretch\nsize = 12 12\n")
-    for name, col in [("perk_link", k.BRONZE_D), ("perk_link_taken", k.GLOW)]:
+    # A link is 1 GUI px: the lit wood reads on the well, the dark one vanished (PC look, 11-05).
+    for name, col in [("perk_link", k.BRONZE_L), ("perk_link_taken", k.GLOW)]:
         link(col).save(f"{out}/{name}.png")
         with open(f"{out}/{name}.gui", "w") as f:
             f.write("scaling = stretch\nsize = 1 1\n")
