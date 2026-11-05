@@ -14,11 +14,10 @@ static BODY: Body = Body {
     model: "sauropod",
     texture: "sauropod/sauropod",
     // The body's box (its neck reaches far above it; a box to the head would stand on everything).
-    health: 300.0,
     // A slow amble at most (est.).
     speed: 4.0,
     wander: 0.2,
-    damage: 0.0,
+    bites: false,
     rest: ("sauropod_lie", (2.4, 2.6)),
 };
 

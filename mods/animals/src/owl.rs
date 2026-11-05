@@ -15,12 +15,11 @@ static WINGS: Wings = Wings {
     model: "owl",
     texture: "owl/owl",
     fly_size: (0.6, 0.35),
-    health: 8.0,
     // It walks little; it flies at about 10 m/s.
     speed: 1.5,
     air: 5.0,
     wander: 0.2,
-    damage: 2.5,
+    bites: true,
     height: 4.0,
     reach: 14.0,
     flight: 400,

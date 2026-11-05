@@ -18,11 +18,10 @@ pub(crate) static CROCODYLIFORM: EntityKind = EntityKind::named("crocodyliform")
 static BODY: Body = Body {
     model: "caiman",
     texture: "caiman/caiman",
-    health: 30.0,
     // A slow walk on land, a short rush at prey.
     speed: 3.0,
     wander: 0.15,
-    damage: 5.0,
+    bites: true,
     rest: ("caiman_bask", (0.9, 0.3)),
 };
 

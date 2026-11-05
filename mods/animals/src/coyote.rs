@@ -14,11 +14,10 @@ pub(crate) static COYOTE: EntityKind = EntityKind::named("coyote");
 static BODY: Body = Body {
     model: "coyote",
     texture: "coyote/coyote",
-    health: 18.0,
     // Trotting far, running at up to 65 km/h.
     speed: 5.0,
     wander: 0.3,
-    damage: 3.0,
+    bites: true,
     rest: ("coyote_lie", (0.55, 0.45)),
 };
 

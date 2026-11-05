@@ -14,11 +14,10 @@ pub(crate) static RED_DEER: EntityKind = EntityKind::named("red_deer");
 static BODY: Body = Body {
     model: "deer",
     texture: "deer/deer",
-    health: 30.0,
     // Ambling while it feeds, bounding off at up to 60 km/h.
     speed: 5.0,
     wander: 0.25,
-    damage: 0.0,
+    bites: false,
     rest: ("deer_lie", (0.9, 0.7)),
 };
 

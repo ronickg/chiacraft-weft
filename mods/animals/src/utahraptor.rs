@@ -29,9 +29,9 @@ pub fn init(r: &mut Registry) {
     );
     crate::riding::rideable(r.entity(&UTAHRAPTOR), index)
         .size(animals_core::bodies::of("utahraptor").0, animals_core::bodies::of("utahraptor").1)
-        .max_health(60.0)
+        .max_health(crate::animal::health(index))
         .walk_speed(3.6)
-        .attack_damage(10.0)
+        .attack_damage(crate::animal::hit(index))
         .passive()
         .model_file("utahraptor")
         .animations("utahraptor")

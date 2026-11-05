@@ -17,16 +17,15 @@ pub struct Body {
     /// Its model and animation files (`<model>.geo.json`, `<model>.animation.json`), and texture.
     pub model: &'static str,
     pub texture: &'static str,
-    /// Its health (its box is its model's: `animals_core::bodies`).
-    pub health: f32,
     /// Its full speed (fleeing), and the share of it it wanders at.
     pub speed: f32,
     pub wander: f32,
     /// Its resting pose: the look kind's name (`<model>_<pose>`, its own animation file) and its
     /// box.
     pub rest: (&'static str, (f32, f32)),
-    /// What its bite does (a hunter's; 0: it never fights).
-    pub damage: f32,
+    /// Whether it bites (a hunter's); how hard, and its health, come from its species' size, role
+    /// and level (`animals_core::danger::body`; its box is its model's, `animals_core::bodies`).
+    pub bites: bool,
 }
 
 value! {
@@ -62,9 +61,9 @@ pub fn register(r: &mut Registry, kinds: &[&'static EntityKind], body: &'static 
         let index = crate::species::of(kind);
         r.entity(kind)
             .size(bw, bh)
-            .max_health(body.health)
+            .max_health(crate::animal::health(index))
             .walk_speed(body.speed)
-            .attack_damage(body.damage)
+            .attack_damage(if body.bites { crate::animal::hit(index) } else { 0.0 })
             .passive()
             .model_file(body.model)
             .animations(body.model)

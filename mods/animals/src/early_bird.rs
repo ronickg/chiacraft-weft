@@ -15,12 +15,11 @@ static WINGS: Wings = Wings {
     model: "early_bird",
     texture: "early_bird/early_bird",
     fly_size: (0.7, 0.25),
-    health: 6.0,
     // No record: a crow-sized bird's walk and flight (est.).
     speed: 2.0,
     air: 4.5,
     wander: 0.35,
-    damage: 1.0,
+    bites: true,
     height: 5.0,
     reach: 14.0,
     flight: 300,

@@ -50,9 +50,9 @@ fn register(r: &mut Registry, kind: &'static EntityKind, index: usize, texture: 
     crate::rest::register(r, kind, settle, "raptor", texture, (0.6, 0.9), &[("_rest", &rest_look(kind))]);
     crate::riding::rideable(r.entity(kind), index)
         .size(animals_core::bodies::of("raptor").0, animals_core::bodies::of("raptor").1)
-        .max_health(14.0)
+        .max_health(crate::animal::health(index))
         .walk_speed(4.0)
-        .attack_damage(4.0)
+        .attack_damage(crate::animal::hit(index))
         .passive()
         .model_file("raptor")
         .animations("raptor")

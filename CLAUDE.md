@@ -44,7 +44,8 @@ in our crates and mods.
   touches gameplay, and a check that ties it to what it touches.
 - After changing numbers, regenerate the sheets (tests fail while they're stale):
   - `cargo run -p vitals --bin sheet > mods/base/vitals/SHEET.md`
-  - `mods/animals/web/build.sh && node mods/animals/web/sheet.mjs`
+  - `mods/animals/web/build.sh && node mods/animals/web/sheet.mjs` (or, with no WASM build,
+    `cargo run -p animals_core --bin sheet > mods/animals/SPECIES.md`: the same page)
   - `cargo run -p progression --bin sheet > mods/base/progression/PROGRESSION_SHEET.md` (ages,
     curves, the combat matrix, every item's age and path; also after adding an item, block,
     recipe or species: the checks fail until it's tagged in `mods/base/progression`)
