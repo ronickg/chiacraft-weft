@@ -1,9 +1,6 @@
----
-name: block-textures
-description: Block textures for the game (cubes, logs, leaves, plants, crops, saplings, bushes, workstation faces) at 32 px in one hand-painted pixel style, generated with Codex from Ronald's block master prompt, cut into game tiles, checked on a preview sheet and in a test world, and put into the mods. Use when Ronald asks for new or redone block textures, a new tree, plant, crop or bush and its stages, "the block prompt", a block that looks off next to the others, or wants to see how blocks look in the game.
----
+# The full block set: 32 px, Ronald's master prompt
 
-# Block textures: 32 px, Ronald's master prompt
+Folded in from the old `block-textures` skill (Ronald, 11-05: "put it into the one skill"). Use this for the game's whole 32 px block set, a new tree, plant, crop or bush and its stages, "the block prompt", a block that looks off next to the others, or seeing blocks in the game. A single block face can also go through `art.py block` (SKILL.md).
 
 Everything lives in `notes/blocks/`: `style.txt` (the master prompt), `blocks.py` (generate, cut,
 preview, install), `batches/*.tsv` (what to make), `approved.txt` (the style key), `tiles/` (the
