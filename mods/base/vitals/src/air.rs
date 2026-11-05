@@ -88,6 +88,58 @@ pub fn fog(days: [f32; 4], kind: Fog, season: Option<usize>, key: u64, day: u64,
     thick * fog_hours(kind, hour) * (1.0 - blown)
 }
 
+/// How long wet ground takes to dry once the rain stops, in seconds of play (`DRYING`, as the
+/// engine counts it): seven minutes in mild damp calm air (15 °C, humidity 0.6), twice as fast
+/// for every ten degrees warmer, slower in damp air, faster in a wind; from half a minute (hot,
+/// dry, windy) to an hour (frozen or close to it). Ronald's pick, 11-05: the ground and leaves
+/// stay wet after rain and dry over minutes by the air's warmth and wind.
+pub const DRYING: (f32, f32) = (30.0, 3600.0);
+
+pub fn drying_secs(celsius: f32, humidity: f32, wind: f32) -> f32 {
+    if celsius <= 0.5 {
+        return DRYING.1;
+    }
+    let warmth = 2.0f32.powf(-(celsius - 15.0) / 10.0);
+    let damp = (0.5 + humidity.clamp(0.0, 1.0)) / 1.1;
+    let breeze = 1.0 + wind.max(0.0) / 4.0;
+    // (Seven minutes: at three, a summer forest's ground was dry again within a minute, PC shw2.)
+    (420.0 * warmth * damp / breeze).clamp(DRYING.0, DRYING.1)
+}
+
+/// `drying_secs` as the engine's byte (`air_flags::DRYING_SHIFT`): 1 an hour to 255 half a minute,
+/// spaced evenly in the logarithm.
+pub fn drying_byte(secs: f32) -> u32 {
+    let t = (secs.clamp(DRYING.0, DRYING.1) / DRYING.1).ln() / (DRYING.0 / DRYING.1).ln();
+    1 + (t * 254.0).round() as u32
+}
+
+/// A light mist on calm, clear mornings that are not fog days, by the air's humidity (Ronald's
+/// pick, 11-05: no mist at 05:00-06:00 in a clear summer, Tester 2's mist shots, where `/air`'s
+/// forced mist looked right): the ground cools through the night and the damp air above it
+/// condenses in the last hours before sunrise, lying in valleys and over water (the shader pack
+/// lays any fog low); the sun burns it off two to three hours after it rises. Dry air (humidity
+/// under `DAWN_MIST_DAMP.0`) none, the dampest `DAWN_MIST` thick. Only on some mornings: each
+/// day's, the same on every machine. `sunrise` the hour the sun rises that day.
+// (0.1: at 0.42 a damp morning over the birch forest went a golden white-out, at 0.2 it still hid
+// most of the land from 30 blocks up, PC shm_mist, shm_mist2.)
+pub const DAWN_MIST: f32 = 0.1;
+pub const DAWN_MIST_DAMP: (f32, f32) = (0.45, 0.8);
+pub const DAWN_MIST_DAYS: f32 = 0.6;
+
+pub fn dawn_mist(humidity: f32, sunrise: f32, hour: f32, wind: f32, raining: bool, key: u64, day: u64) -> f32 {
+    if raining {
+        return 0.0;
+    }
+    let damp = ((humidity - DAWN_MIST_DAMP.0) / (DAWN_MIST_DAMP.1 - DAWN_MIST_DAMP.0)).clamp(0.0, 1.0);
+    if damp <= 0.0 || unit(mix(key ^ day.wrapping_mul(0x8CB9_2BA7_2F3D_8DD7) ^ 0x4D49_5354)) >= DAWN_MIST_DAYS {
+        return 0.0;
+    }
+    let ramp = |from: f32, to: f32| ((hour - from) / (to - from)).clamp(0.0, 1.0);
+    let hours = ramp(sunrise - 3.0, sunrise - 0.5) * (1.0 - ramp(sunrise + 1.5, sunrise + 3.5));
+    let blown = ((wind - CLEARS.0) / (CLEARS.1 - CLEARS.0)).clamp(0.0, 1.0);
+    DAWN_MIST * damp * hours * (1.0 - blown)
+}
+
 // ---- snow, blizzards and dust ----
 
 /// Below this air (°C, out in the open, the rain's cooling counted) what falls is snow.
@@ -347,6 +399,34 @@ fn unit(r: u64) -> f32 {
 mod tests {
     use super::*;
     use crate::climate::BIOMES;
+
+    /// Drying: faster warm, dry and windy, an hour when it freezes; the byte runs 1 (an hour) to 255
+    /// (half a minute) as the engine reads it.
+    #[test]
+    fn drying_by_warmth_damp_and_wind() {
+        let mild = drying_secs(15.0, 0.6, 0.0);
+        assert!((mild - 420.0).abs() < 1.0, "{mild}");
+        assert!(drying_secs(30.0, 0.6, 0.0) < mild && drying_secs(15.0, 0.9, 0.0) > mild && drying_secs(15.0, 0.6, 8.0) < mild);
+        assert_eq!(drying_secs(-5.0, 0.6, 0.0), DRYING.1);
+        assert_eq!(drying_byte(DRYING.1), 1);
+        assert_eq!(drying_byte(DRYING.0), 255);
+    }
+
+    /// Dawn mist: none in dry air, in rain, in a wind or at noon; some at sunrise in damp calm air
+    /// on a misty morning, and never thicker than `DAWN_MIST`.
+    #[test]
+    fn dawn_mist_by_air_and_hour() {
+        let misty = (0..64)
+            .find(|&d| dawn_mist(1.0, 6.0, 6.0, 0.0, false, 7, d) > 0.0)
+            .expect("a misty morning in 64 days");
+        let m = dawn_mist(1.0, 6.0, 6.0, 0.0, false, 7, misty);
+        assert!(m > 0.6 * DAWN_MIST && m <= DAWN_MIST, "{m}");
+        assert_eq!(dawn_mist(0.3, 6.0, 6.0, 0.0, false, 7, misty), 0.0);
+        assert_eq!(dawn_mist(1.0, 6.0, 6.0, 0.0, true, 7, misty), 0.0);
+        assert_eq!(dawn_mist(1.0, 6.0, 6.0, CLEARS.1, false, 7, misty), 0.0);
+        assert_eq!(dawn_mist(1.0, 6.0, 12.0, 0.0, false, 7, misty), 0.0);
+        assert!(dawn_mist(1.0, 4.0, 4.0, 0.0, false, 7, misty) > 0.6 * DAWN_MIST, "it follows the season's sunrise");
+    }
 
     /// Every biome the per-biome shares name (aurorae, canopies) has a climate row, so a renamed
     /// biome can't silently lose its aurora or its light under the leaves.
