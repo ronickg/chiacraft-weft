@@ -50,6 +50,21 @@ pub static TERRAIN_BUSY_NS: Counter = Counter::new();
 /// Distant terrain: tiles made (shown or cached) and asked for then called off.
 pub static LOD_MADE: Counter = Counter::new();
 pub static LOD_CALLED_OFF: Counter = Counter::new();
+/// Distant terrain's work per tile: the CPU-made features' heights (tiles, time), the meshing
+/// (tiles, time) and, for each tile made, the time from asking for it to having it.
+pub static LOD_HEIGHTS: Counter = Counter::new();
+pub static LOD_HEIGHTS_NS: Counter = Counter::new();
+pub static LOD_MESHED: Counter = Counter::new();
+pub static LOD_MESH_NS: Counter = Counter::new();
+pub static LOD_AGE_NS: Counter = Counter::new();
+/// Calls to the dimension's steep faces (`Faces::block`) while meshing tiles, and their time.
+pub static LOD_FACES: Counter = Counter::new();
+pub static LOD_FACES_NS: Counter = Counter::new();
+/// Distant terrain now: tiles wanted, wanted but not made (a coarser tile or nothing shows
+/// there), and asked for.
+pub static LOD_WANTED: AtomicU64 = AtomicU64::new(0);
+pub static LOD_MISSING: AtomicU64 = AtomicU64::new(0);
+pub static LOD_PENDING: AtomicU64 = AtomicU64::new(0);
 
 /// Messages and bytes per message kind: `[0]` to clients, `[1]` to the server.
 static NET: [[(AtomicU64, AtomicU64); 64]; 2] = [const { [const { (AtomicU64::new(0), AtomicU64::new(0)) }; 64] }; 2];
@@ -63,6 +78,22 @@ pub fn net_message(to_server: bool, kind: usize, count: u64, bytes: usize) {
         c.0.fetch_add(count, Ordering::Relaxed);
         c.1.fetch_add(bytes as u64, Ordering::Relaxed);
     }
+}
+
+/// The traffic counted since the last call (with the `net` channel at debug), one way: by message
+/// kind, how many and how many bytes encoded (before compression). For a headless server's stats
+/// line (`dedicated::stats`), where no frame report reads them.
+pub fn take_net(to_server: bool) -> Vec<(&'static str, u64, u64)> {
+    use crate::net::Message;
+    let kinds = if to_server { crate::net::ToServer::KINDS } else { crate::net::ToClient::KINDS };
+    NET[to_server as usize]
+        .iter()
+        .enumerate()
+        .filter_map(|(k, c)| {
+            let (count, bytes) = (c.0.swap(0, Ordering::Relaxed), c.1.swap(0, Ordering::Relaxed));
+            (count + bytes > 0).then(|| (kinds.get(k).copied().unwrap_or("?"), count, bytes))
+        })
+        .collect()
 }
 
 // ---------------------------------------------------------------- allocations
@@ -396,9 +427,22 @@ impl Reporter {
                     busy as f64 / secs / 1e7
                 );
             }
-            let (made, off) = (LOD_MADE.take(), LOD_CALLED_OFF.take());
-            if made + off > 0 {
-                log::debug!(target: "load", "distant terrain per {secs:.1} s: {made} tiles made, {off} called off");
+            let (made, off, age) = (LOD_MADE.take(), LOD_CALLED_OFF.take(), LOD_AGE_NS.take());
+            let (heights, heights_ns, meshed, mesh_ns) = (LOD_HEIGHTS.take(), LOD_HEIGHTS_NS.take(), LOD_MESHED.take(), LOD_MESH_NS.take());
+            let (faces, faces_ns) = (LOD_FACES.take(), LOD_FACES_NS.take());
+            let missing = LOD_MISSING.load(Ordering::Relaxed);
+            if made + off > 0 || missing > 0 {
+                log::debug!(
+                    target: "load",
+                    "distant terrain per {secs:.1} s: {made} tiles made ({:.0} ms from asked to made), {off} called off, {} wanted, {missing} not made yet, {} asked; heights {:.0} us, mesh {:.0} us each, of which {:.0} us in {:.0} face calls",
+                    age as f64 / made.max(1) as f64 / 1e6,
+                    LOD_WANTED.load(Ordering::Relaxed),
+                    LOD_PENDING.load(Ordering::Relaxed),
+                    heights_ns as f64 / heights.max(1) as f64 / 1000.0,
+                    mesh_ns as f64 / meshed.max(1) as f64 / 1000.0,
+                    faces_ns as f64 / meshed.max(1) as f64 / 1000.0,
+                    faces as f64 / meshed.max(1) as f64,
+                );
             }
         }
         if on(Channel::Mesh, Level::Debug) {

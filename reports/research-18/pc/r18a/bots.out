@@ -1,0 +1,421 @@
+[90m    0.050[0m [32mINFO [0m [90m[modloader][0m unpacked mod animals
+[90m    0.124[0m [32mINFO [0m [90m[modloader][0m unpacked mod base
+[90m    0.240[0m [32mINFO [0m [90m[modloader][0m unpacked mod packages
+[90m    0.252[0m [32mINFO [0m [90m[modloader][0m unpacked mod portals
+[90m    0.288[0m [32mINFO [0m [90m[modloader][0m unpacked mod testkit
+[90m    0.316[0m [32mINFO [0m [90m[modloader][0m 5 mods registered in 316.2 ms
+[90m    0.326[0m [32mINFO [0m [90m[components][0m base overrides sound on base:dirt (was set by its registration)
+[90m    0.326[0m [32mINFO [0m [90m[components][0m base overrides sound on base:dirt (was set by its registration)
+[90m    0.326[0m [32mINFO [0m [90m[components][0m base overrides sound on base:clay (was set by its registration)
+[90m    0.326[0m [32mINFO [0m [90m[components][0m base overrides sound on base:clay (was set by its registration)
+[90m    0.326[0m [32mINFO [0m [90m[components][0m base overrides sound on base:farmland (was set by its registration)
+[90m    0.326[0m [32mINFO [0m [90m[components][0m base overrides sound on base:farmland (was set by its registration)
+[90m    0.326[0m [32mINFO [0m [90m[components][0m base overrides sound on base:farmland (was set by its registration)
+[90m    0.326[0m [32mINFO [0m [90m[components][0m base overrides sound on base:farmland (was set by its registration)
+[90m    0.326[0m [32mINFO [0m [90m[components][0m base overrides sound on base:farmland (was set by its registration)
+[90m    0.326[0m [32mINFO [0m [90m[components][0m base overrides sound on base:podzol (was set by its registration)
+[90m    0.326[0m [32mINFO [0m [90m[components][0m base overrides sound on base:podzol (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:charcoal_clamp (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:charcoal_clamp (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:snow (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:snow (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:snowy_grass (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:snowy_grass (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:ice (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:ice (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:iron_block (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:iron_block (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:gold_block (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:gold_block (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:copper_lamp (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:copper_lamp (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:copper_lamp (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:copper_lamp (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:copper_lamp (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on animals:araucaria_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on animals:ginkgo_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on animals:scale_conifer_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on animals:swamp_cypress_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on animals:tempskya_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:acacia_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:acacia_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:acacia_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:acacia_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:acuri_palm_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:acuri_palm_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:andiroba_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:andiroba_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:birch_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:birch_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:brazil_nut_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:brazil_nut_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:cacao_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:cacao_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:creosote_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:creosote_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:dogwood_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:dogwood_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:dogwood_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:dogwood_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:ipe_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:ipe_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:ipe_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:ipe_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:juniper_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:matamata_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:matamata_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:mesquite_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:mesquite_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:mesquite_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:mesquite_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:moriche_palm_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:moriche_palm_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:oak_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:oak_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:sequoia_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:sequoia_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:spruce_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:spruce_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:willow_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:willow_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on animals:araucaria_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on animals:ginkgo_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on animals:scale_conifer_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on animals:swamp_cypress_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on animals:tempskya_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:acacia_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:acuri_palm_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:andiroba_leaves (was set by its registration)
+[90m    0.327[0m [32mINFO [0m [90m[components][0m base overrides sound on base:birch_leaves (was set by its registration)
+[90m    0.328[0m [32mINFO [0m [90m[components][0m base overrides sound on base:brazil_nut_leaves (was set by its registration)
+[90m    0.328[0m [32mINFO [0m [90m[components][0m base overrides sound on base:cacao_leaves (was set by its registration)
+[90m    0.328[0m [32mINFO [0m [90m[components][0m base overrides sound on base:creosote_leaves (was set by its registration)
+[90m    0.328[0m [32mINFO [0m [90m[components][0m base overrides sound on base:dogwood_leaves (was set by its registration)
+[90m    0.328[0m [32mINFO [0m [90m[components][0m base overrides sound on base:ipe_leaves (was set by its registration)
+[90m    0.328[0m [32mINFO [0m [90m[components][0m base overrides sound on base:juniper_leaves (was set by its registration)
+[90m    0.328[0m [32mINFO [0m [90m[components][0m base overrides sound on base:matamata_leaves (was set by its registration)
+[90m    0.328[0m [32mINFO [0m [90m[components][0m base overrides sound on base:mesquite_leaves (was set by its registration)
+[90m    0.328[0m [32mINFO [0m [90m[components][0m base overrides sound on base:moriche_palm_leaves (was set by its registration)
+[90m    0.328[0m [32mINFO [0m [90m[components][0m base overrides sound on base:oak_leaves (was set by its registration)
+[90m    0.328[0m [32mINFO [0m [90m[components][0m base overrides sound on base:sequoia_leaves (was set by its registration)
+[90m    0.328[0m [32mINFO [0m [90m[components][0m base overrides sound on base:spruce_leaves (was set by its registration)
+[90m    0.328[0m [32mINFO [0m [90m[components][0m base overrides sound on base:willow_leaves (was set by its registration)
+[90m    0.328[0m [32mINFO [0m [90m[content][0m testkit replaces the engine's command /regions
+[90m    0.331[0m [32mINFO [0m [90m[content][0m block sounds: 7 blocks have none: packages:unknown, testkit:and_gate, testkit:blue_wire, testkit:drill, testkit:varied_box, testkit:varied_cube, testkit:varied_plant
+[90m    0.331[0m [32mINFO [0m [90m[modloader][0m content: 5 mods and packages, 323 blocks (3285 states), 603 items, 5 dimensions in 15.1 ms
+[90m    0.331[0m [32mINFO [0m [90m[modloader][0m loaded mod base 26.10.4 (load position 0)
+[90m    0.332[0m [32mINFO [0m [90m[modloader][0m loaded mod animals 0.1.0 (load position 1)
+[90m    0.332[0m [32mINFO [0m [90m[modloader][0m loaded mod packages 0.1.0 (load position 2)
+[90m    0.332[0m [32mINFO [0m [90m[modloader][0m loaded mod portals 0.1.0 (load position 3)
+[90m    0.332[0m [32mINFO [0m [90m[modloader][0m loaded mod testkit 26.10.4 (load position 4)
+[90m    0.332[0m [32mINFO [0m [90m[bots][0m bots join botworld at 4 address(es), native hash 50887bc97dc6a492
+[90m    0.332[0m [32mINFO [0m [90m[bots][0m bots step: 10 bots (t 0 s)
+[90m    0.335[0m [32mINFO [0m [90m[bots][0m bot 0: the world plays with 0 package(s); content hash f0994ed23727fefd
+[90m    5.333[0m [32mINFO [0m [90m[bots][0m bots stats t 5 s: live 10, joining 0, joined 10 | in 7530 frames/s 26377.8 KB/s (2637.78 KB/s a bot) (Cube 6911/s 26213.5 KB/s, Moves 180/s 75.9 KB/s, Components 182/s 73.4 KB/s, EntityComponents 149/s 6.9 KB/s, Air 6/s 1.7 KB/s, Inventory 2/s 1.4 KB/s) | out 186 frames/s 7.6 KB/s | wire so far rx 1.7 MB tx 0.1 MB | join s p50 0.03 p99 0.12 (n 10) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 21.0 p99 25.8 max 25.8 (n 8) | failed [] | disconnects []
+[90m   10.334[0m [32mINFO [0m [90m[bots][0m bots stats t 10 s: live 10, joining 0, joined 10 | in 386 frames/s 607.6 KB/s (60.76 KB/s a bot) (Cube 151/s 553.4 KB/s, Components 84/s 31.7 KB/s, Moves 61/s 17.8 KB/s, EntityComponents 69/s 3.3 KB/s, Air 2/s 0.8 KB/s, Spawn 2/s 0.2 KB/s) | out 201 frames/s 8.4 KB/s | wire so far rx 17.1 MB tx 0.6 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 4.05 p99 4.35 (n 4) | ping ms p50 0.0 p99 0.0 max 0.0 (n 0) | failed [] | disconnects []
+[90m   15.335[0m [32mINFO [0m [90m[bots][0m bots stats t 15 s: live 10, joining 0, joined 10 | in 1264 frames/s 3181.0 KB/s (318.10 KB/s a bot) (Cube 699/s 3058.2 KB/s, Components 182/s 68.7 KB/s, Moves 173/s 46.0 KB/s, EntityComponents 151/s 5.7 KB/s, Air 2/s 0.8 KB/s, Attributes 20/s 0.3 KB/s) | out 202 frames/s 8.4 KB/s | wire so far rx 18.3 MB tx 0.9 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 30.6 p99 586.1 max 586.1 (n 10) | failed [] | disconnects []
+[90m   20.336[0m [32mINFO [0m [90m[bots][0m bots stats t 20 s: live 10, joining 0, joined 10 | in 706 frames/s 430.9 KB/s (43.09 KB/s a bot) (Cube 77/s 273.0 KB/s, Components 200/s 75.5 KB/s, Moves 200/s 73.1 KB/s, EntityComponents 167/s 6.3 KB/s, Air 4/s 1.7 KB/s, Attributes 22/s 0.4 KB/s) | out 201 frames/s 8.4 KB/s | wire so far rx 20.3 MB tx 1.0 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 36.4 p99 36.4 max 36.4 (n 1) | failed [] | disconnects []
+[90m   25.337[0m [32mINFO [0m [90m[bots][0m bots stats t 25 s: live 10, joining 0, joined 10 | in 1003 frames/s 1476.5 KB/s (147.65 KB/s a bot) (Cube 358/s 1305.6 KB/s, Moves 200/s 85.7 KB/s, Components 200/s 75.5 KB/s, EntityComponents 167/s 6.3 KB/s, Air 4/s 1.7 KB/s, Attributes 22/s 0.4 KB/s) | out 203 frames/s 8.5 KB/s | wire so far rx 21.1 MB tx 1.1 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 28.0 p99 33.8 max 33.8 (n 9) | failed [] | disconnects []
+[90m   30.338[0m [32mINFO [0m [90m[bots][0m bots stats t 30 s: live 10, joining 0, joined 10 | in 1073 frames/s 2072.4 KB/s (207.24 KB/s a bot) (Cube 454/s 1917.1 KB/s, Components 200/s 75.5 KB/s, Moves 195/s 70.3 KB/s, EntityComponents 167/s 6.4 KB/s, Air 4/s 1.7 KB/s, Attributes 22/s 0.4 KB/s) | out 200 frames/s 8.4 KB/s | wire so far rx 22.5 MB tx 1.2 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 36.4 p99 36.4 max 36.4 (n 1) | failed [] | disconnects []
+[90m   35.339[0m [32mINFO [0m [90m[bots][0m bots stats t 35 s: live 10, joining 0, joined 10 | in 820 frames/s 967.1 KB/s (96.71 KB/s a bot) (Cube 198/s 813.0 KB/s, Components 200/s 75.5 KB/s, Moves 190/s 69.0 KB/s, EntityComponents 163/s 6.2 KB/s, Air 4/s 1.7 KB/s, Blocks 10/s 0.4 KB/s) | out 202 frames/s 8.4 KB/s | wire so far rx 23.9 MB tx 1.3 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 27.87 p99 27.87 (n 2) | ping ms p50 27.3 p99 34.3 max 34.3 (n 9) | failed [] | disconnects []
+[90m   40.340[0m [32mINFO [0m [90m[bots][0m bots stats t 40 s: live 10, joining 0, joined 10 | in 778 frames/s 757.0 KB/s (75.70 KB/s a bot) (Cube 135/s 601.4 KB/s, Components 200/s 75.5 KB/s, Moves 193/s 70.0 KB/s, EntityComponents 167/s 6.5 KB/s, Air 4/s 1.7 KB/s, Attributes 22/s 0.4 KB/s) | out 202 frames/s 8.4 KB/s | wire so far rx 25.0 MB tx 1.5 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 36.4 p99 36.4 max 36.4 (n 1) | failed [] | disconnects []
+[90m   45.341[0m [32mINFO [0m [90m[bots][0m bots stats t 45 s: live 10, joining 0, joined 10 | in 806 frames/s 858.7 KB/s (85.87 KB/s a bot) (Cube 180/s 698.9 KB/s, Components 200/s 75.5 KB/s, Moves 200/s 75.3 KB/s, EntityComponents 165/s 6.1 KB/s, Air 4/s 1.7 KB/s, Attributes 22/s 0.4 KB/s) | out 202 frames/s 8.4 KB/s | wire so far rx 25.9 MB tx 1.6 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 27.2 p99 34.4 max 34.4 (n 9) | failed [] | disconnects []
+[90m   50.342[0m [32mINFO [0m [90m[bots][0m bots stats t 50 s: live 10, joining 0, joined 10 | in 843 frames/s 1132.0 KB/s (113.20 KB/s a bot) (Cube 227/s 987.1 KB/s, Components 200/s 75.5 KB/s, Moves 197/s 60.5 KB/s, EntityComponents 165/s 6.2 KB/s, Air 4/s 1.7 KB/s, Attributes 22/s 0.4 KB/s) | out 201 frames/s 8.4 KB/s | wire so far rx 26.9 MB tx 1.7 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 36.4 p99 36.4 max 36.4 (n 1) | failed [] | disconnects []
+[90m   55.343[0m [32mINFO [0m [90m[bots][0m bots stats t 55 s: live 10, joining 0, joined 10 | in 788 frames/s 743.0 KB/s (74.30 KB/s a bot) (Cube 120/s 596.3 KB/s, Components 200/s 75.5 KB/s, Moves 200/s 61.1 KB/s, EntityComponents 165/s 6.2 KB/s, Air 4/s 1.7 KB/s, Blocks 8/s 0.5 KB/s) | out 204 frames/s 8.5 KB/s | wire so far rx 28.1 MB tx 1.8 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 27.2 p99 34.3 max 34.3 (n 9) | failed [] | disconnects []
+[90m   60.344[0m [32mINFO [0m [90m[bots][0m bots stats t 60 s: live 10, joining 0, joined 10 | in 662 frames/s 378.5 KB/s (37.85 KB/s a bot) (Cube 52/s 228.0 KB/s, Components 200/s 75.5 KB/s, Moves 194/s 66.2 KB/s, EntityComponents 165/s 6.1 KB/s, Air 4/s 1.7 KB/s, Attributes 22/s 0.4 KB/s) | out 201 frames/s 8.4 KB/s | wire so far rx 29.0 MB tx 1.9 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 54.86 p99 55.16 (n 3) | ping ms p50 36.4 p99 36.4 max 36.4 (n 1) | failed [] | disconnects []
+[90m   61.345[0m [32mINFO [0m [90m[bots][0m bots step: 50 bots (t 61 s)
+[90m   65.345[0m [32mINFO [0m [90m[bots][0m bots stats t 65 s: live 50, joining 0, joined 50 | in 30013 frames/s 109700.1 KB/s (2194.00 KB/s a bot) (Cube 27421/s 108549.2 KB/s, Moves 512/s 708.2 KB/s, Components 524/s 212.0 KB/s, EntityComponents 515/s 90.5 KB/s, Players 244/s 74.5 KB/s, Spawn 244/s 29.7 KB/s) | out 544 frames/s 22.3 KB/s | wire so far rx 29.6 MB tx 2.0 MB | join s p50 0.03 p99 0.05 (n 40) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 17.9 p99 48.8 max 48.8 (n 33) | failed [] | disconnects []
+[90m   70.346[0m [32mINFO [0m [90m[bots][0m bots stats t 70 s: live 50, joining 0, joined 50 | in 6541 frames/s 12831.3 KB/s (256.63 KB/s a bot) (Cube 2939/s 10393.9 KB/s, Moves 1000/s 1894.7 KB/s, Components 1000/s 380.9 KB/s, EntityComponents 1000/s 137.7 KB/s, Air 20/s 8.5 KB/s, Cracks 79/s 3.4 KB/s) | out 1006 frames/s 42.1 KB/s | wire so far rx 107.0 MB tx 4.4 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 37.8 p99 47.5 max 47.5 (n 17) | failed [] | disconnects []
+[90m   75.347[0m [32mINFO [0m [90m[bots][0m bots stats t 75 s: live 50, joining 0, joined 50 | in 5921 frames/s 8898.8 KB/s (177.98 KB/s a bot) (Cube 1852/s 6847.8 KB/s, Moves 1000/s 1459.8 KB/s, Components 1000/s 377.6 KB/s, EntityComponents 1000/s 169.7 KB/s, Cracks 197/s 15.3 KB/s, Air 20/s 8.5 KB/s) | out 1012 frames/s 42.3 KB/s | wire so far rx 120.6 MB tx 6.2 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 18.9 p99 49.7 max 49.7 (n 33) | failed [] | disconnects []
+[90m   80.348[0m [32mINFO [0m [90m[bots][0m bots stats t 80 s: live 50, joining 0, joined 50 | in 4230 frames/s 4282.6 KB/s (85.65 KB/s a bot) (Cube 462/s 2092.5 KB/s, Moves 1000/s 1613.0 KB/s, Components 1000/s 377.7 KB/s, EntityComponents 1000/s 171.1 KB/s, Air 20/s 8.5 KB/s, Cracks 147/s 8.3 KB/s) | out 1006 frames/s 42.1 KB/s | wire so far rx 129.6 MB tx 6.8 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 37.9 p99 47.6 max 47.6 (n 17) | failed [] | disconnects []
+[90m   85.349[0m [32mINFO [0m [90m[bots][0m bots stats t 85 s: live 50, joining 0, joined 50 | in 4860 frames/s 6765.2 KB/s (135.30 KB/s a bot) (Cube 1162/s 4235.9 KB/s, Moves 996/s 1954.5 KB/s, Components 1000/s 377.6 KB/s, EntityComponents 1000/s 171.9 KB/s, Air 20/s 8.5 KB/s, Cracks 108/s 4.1 KB/s) | out 1009 frames/s 42.2 KB/s | wire so far rx 139.3 MB tx 7.3 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 19.1 p99 49.8 max 49.8 (n 33) | failed [] | disconnects []
+[90m   90.350[0m [32mINFO [0m [90m[bots][0m bots stats t 90 s: live 50, joining 0, joined 50 | in 5792 frames/s 9393.5 KB/s (187.87 KB/s a bot) (Cube 1947/s 6984.9 KB/s, Moves 996/s 1830.3 KB/s, Components 1000/s 377.6 KB/s, EntityComponents 1000/s 170.3 KB/s, Cracks 167/s 8.7 KB/s, Air 20/s 8.5 KB/s) | out 1007 frames/s 42.1 KB/s | wire so far rx 151.3 MB tx 7.9 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 38.1 p99 46.9 max 46.9 (n 17) | failed [] | disconnects []
+[90m   95.352[0m [32mINFO [0m [90m[bots][0m bots stats t 95 s: live 50, joining 0, joined 50 | in 5314 frames/s 7339.7 KB/s (146.79 KB/s a bot) (Cube 1356/s 5173.2 KB/s, Moves 1000/s 1582.3 KB/s, Components 1000/s 377.6 KB/s, EntityComponents 1000/s 170.9 KB/s, Cracks 187/s 13.6 KB/s, Air 20/s 8.5 KB/s) | out 1011 frames/s 42.2 KB/s | wire so far rx 162.4 MB tx 8.5 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 18.1 p99 49.2 max 49.2 (n 33) | failed [] | disconnects []
+[90m  100.353[0m [32mINFO [0m [90m[bots][0m bots stats t 100 s: live 50, joining 0, joined 50 | in 4372 frames/s 4839.0 KB/s (96.78 KB/s a bot) (Cube 703/s 2572.3 KB/s, Moves 1000/s 1693.0 KB/s, Components 1000/s 377.6 KB/s, EntityComponents 1000/s 171.4 KB/s, Air 20/s 8.5 KB/s, Cracks 118/s 5.8 KB/s) | out 1007 frames/s 42.1 KB/s | wire so far rx 172.1 MB tx 9.1 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 37.8 p99 46.6 max 46.6 (n 17) | failed [] | disconnects []
+[90m  105.354[0m [32mINFO [0m [90m[bots][0m bots stats t 105 s: live 50, joining 0, joined 50 | in 4738 frames/s 4996.6 KB/s (99.93 KB/s a bot) (Cube 702/s 2561.9 KB/s, Moves 1000/s 1848.9 KB/s, Components 1000/s 377.6 KB/s, EntityComponents 1000/s 171.8 KB/s, Cracks 187/s 10.5 KB/s, Air 20/s 8.5 KB/s) | out 1011 frames/s 42.2 KB/s | wire so far rx 181.3 MB tx 9.7 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 17.9 p99 49.3 max 49.3 (n 33) | failed [] | disconnects []
+[90m  110.355[0m [32mINFO [0m [90m[bots][0m bots stats t 110 s: live 50, joining 0, joined 50 | in 4324 frames/s 4417.4 KB/s (88.35 KB/s a bot) (Cube 609/s 2172.1 KB/s, Moves 1000/s 1673.0 KB/s, Components 1000/s 377.6 KB/s, EntityComponents 1000/s 170.1 KB/s, Air 20/s 8.5 KB/s, Cracks 127/s 4.7 KB/s) | out 1006 frames/s 42.1 KB/s | wire so far rx 190.4 MB tx 10.3 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 38.4 p99 47.2 max 47.2 (n 17) | failed [] | disconnects []
+[90m  115.357[0m [32mINFO [0m [90m[bots][0m bots stats t 115 s: live 50, joining 0, joined 50 | in 4361 frames/s 4355.9 KB/s (87.12 KB/s a bot) (Cube 587/s 2148.9 KB/s, Moves 1000/s 1630.1 KB/s, Components 1000/s 377.6 KB/s, EntityComponents 1000/s 170.4 KB/s, Air 20/s 8.5 KB/s, Cracks 147/s 8.3 KB/s) | out 1010 frames/s 42.2 KB/s | wire so far rx 198.8 MB tx 10.9 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 18.5 p99 37.5 max 37.5 (n 33) | failed [] | disconnects []
+[90m  120.358[0m [32mINFO [0m [90m[bots][0m bots stats t 120 s: live 50, joining 0, joined 50 | in 4139 frames/s 3805.1 KB/s (76.10 KB/s a bot) (Moves 1000/s 1752.1 KB/s, Cube 388/s 1476.7 KB/s, Components 1000/s 377.6 KB/s, EntityComponents 1000/s 171.7 KB/s, Air 20/s 8.5 KB/s, Cracks 128/s 6.8 KB/s) | out 1006 frames/s 42.1 KB/s | wire so far rx 207.3 MB tx 11.5 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 37.0 p99 39.3 max 39.3 (n 17) | failed [] | disconnects []
+[90m  125.359[0m [32mINFO [0m [90m[bots][0m bots stats t 125 s: live 50, joining 0, joined 50 | in 4094 frames/s 3777.6 KB/s (75.55 KB/s a bot) (Moves 1000/s 1756.5 KB/s, Cube 352/s 1447.2 KB/s, Components 1000/s 377.6 KB/s, EntityComponents 1000/s 170.8 KB/s, Air 20/s 8.5 KB/s, Cracks 128/s 5.4 KB/s) | out 1010 frames/s 42.2 KB/s | wire so far rx 216.0 MB tx 12.0 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 119.47 p99 119.47 (n 1) | ping ms p50 17.9 p99 37.4 max 37.4 (n 33) | failed [] | disconnects []
+[90m  125.389[0m [32mINFO [0m [90m[bots][0m bots step: 100 bots (t 125 s)
+[90m  130.360[0m [32mINFO [0m [90m[bots][0m bots stats t 130 s: live 100, joining 0, joined 99 | in 42642 frames/s 145084.0 KB/s (1450.84 KB/s a bot) (Cube 34705/s 138959.9 KB/s, Moves 1486/s 4338.3 KB/s, Components 1496/s 585.0 KB/s, EntityComponents 1496/s 510.7 KB/s, Players 735/s 501.0 KB/s, Spawn 738/s 95.8 KB/s) | out 1523 frames/s 63.3 KB/s | wire so far rx 227.9 MB tx 12.7 MB | join s p50 0.03 p99 0.05 (n 49) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 25.2 p99 38.7 max 38.7 (n 34) | failed [] | disconnects []
+[90m  135.361[0m [32mINFO [0m [90m[bots][0m bots stats t 135 s: live 100, joining 0, joined 100 | in 12579 frames/s 25024.7 KB/s (250.25 KB/s a bot) (Cube 4423/s 16222.3 KB/s, Moves 1999/s 7270.6 KB/s, Components 2000/s 756.7 KB/s, EntityComponents 2000/s 676.7 KB/s, Cracks 358/s 28.5 KB/s, Players 20/s 17.6 KB/s) | out 2018 frames/s 84.4 KB/s | wire so far rx 344.1 MB tx 16.2 MB | join s p50 0.03 p99 0.03 (n 1) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 22.2 p99 47.7 max 47.9 (n 66) | failed [] | disconnects []
+[90m  140.362[0m [32mINFO [0m [90m[bots][0m bots stats t 140 s: live 100, joining 0, joined 100 | in 11852 frames/s 16832.4 KB/s (168.32 KB/s a bot) (Cube 2438/s 9047.3 KB/s, Moves 2000/s 6205.4 KB/s, Components 2000/s 755.3 KB/s, EntityComponents 2000/s 670.1 KB/s, Cracks 733/s 87.6 KB/s, EntitySwing 1718/s 21.8 KB/s) | out 2016 frames/s 84.4 KB/s | wire so far rx 377.8 MB tx 18.9 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 25.0 p99 39.2 max 39.2 (n 34) | failed [] | disconnects []
+[90m  145.363[0m [32mINFO [0m [90m[bots][0m bots stats t 145 s: live 100, joining 0, joined 100 | in 9563 frames/s 11870.4 KB/s (118.70 KB/s a bot) (Moves 1999/s 6491.9 KB/s, Cube 1011/s 3855.1 KB/s, Components 1999/s 755.2 KB/s, EntityComponents 1999/s 670.1 KB/s, Cracks 533/s 40.2 KB/s, Air 40/s 16.9 KB/s) | out 2019 frames/s 84.4 KB/s | wire so far rx 405.0 MB tx 20.1 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 22.9 p99 48.5 max 50.0 (n 66) | failed [] | disconnects []
+[90m  150.364[0m [32mINFO [0m [90m[bots][0m bots stats t 150 s: live 100, joining 0, joined 100 | in 10008 frames/s 14607.3 KB/s (146.07 KB/s a bot) (Moves 2000/s 7247.4 KB/s, Cube 1621/s 5842.2 KB/s, Components 2000/s 755.3 KB/s, EntityComponents 2000/s 672.1 KB/s, Cracks 515/s 37.7 KB/s, Air 40/s 16.9 KB/s) | out 2012 frames/s 84.3 KB/s | wire so far rx 433.8 MB tx 21.4 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 24.9 p99 39.0 max 39.0 (n 34) | failed [] | disconnects []
+[90m  155.365[0m [32mINFO [0m [90m[bots][0m bots stats t 155 s: live 100, joining 0, joined 100 | in 11213 frames/s 17117.5 KB/s (171.18 KB/s a bot) (Cube 2435/s 8267.7 KB/s, Moves 2000/s 7314.6 KB/s, Components 2000/s 755.3 KB/s, EntityComponents 2000/s 671.1 KB/s, Cracks 555/s 49.5 KB/s, Air 40/s 16.9 KB/s) | out 2020 frames/s 84.4 KB/s | wire so far rx 465.0 MB tx 22.6 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 22.2 p99 48.4 max 48.4 (n 66) | failed [] | disconnects []
+[90m  160.366[0m [32mINFO [0m [90m[bots][0m bots stats t 160 s: live 100, joining 0, joined 100 | in 10494 frames/s 15453.9 KB/s (154.54 KB/s a bot) (Cube 2037/s 7031.1 KB/s, Moves 2000/s 6899.0 KB/s, Components 2000/s 755.3 KB/s, EntityComponents 2000/s 673.0 KB/s, Cracks 456/s 39.9 KB/s, Air 40/s 16.9 KB/s) | out 2012 frames/s 84.3 KB/s | wire so far rx 496.1 MB tx 23.9 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 25.2 p99 39.1 max 39.1 (n 34) | failed [] | disconnects []
+[90m  165.367[0m [32mINFO [0m [90m[bots][0m bots stats t 165 s: live 100, joining 0, joined 100 | in 10012 frames/s 12824.6 KB/s (128.25 KB/s a bot) (Moves 2000/s 6693.9 KB/s, Cube 1261/s 4593.3 KB/s, Components 2000/s 755.3 KB/s, EntityComponents 2000/s 671.5 KB/s, Cracks 595/s 53.6 KB/s, Air 40/s 16.9 KB/s) | out 2021 frames/s 84.5 KB/s | wire so far rx 525.0 MB tx 25.1 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 22.0 p99 48.4 max 48.6 (n 66) | failed [] | disconnects []
+[90m  170.368[0m [32mINFO [0m [90m[bots][0m bots stats t 170 s: live 100, joining 0, joined 100 | in 9426 frames/s 12301.7 KB/s (123.02 KB/s a bot) (Moves 2000/s 7102.0 KB/s, Cube 850/s 3675.5 KB/s, Components 2000/s 755.3 KB/s, EntityComponents 2000/s 671.0 KB/s, Cracks 535/s 42.5 KB/s, Air 40/s 16.9 KB/s) | out 2013 frames/s 84.3 KB/s | wire so far rx 553.1 MB tx 26.4 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 25.5 p99 39.5 max 39.5 (n 34) | failed [] | disconnects []
+[90m  175.369[0m [32mINFO [0m [90m[bots][0m bots stats t 175 s: live 100, joining 0, joined 100 | in 8698 frames/s 11872.7 KB/s (118.73 KB/s a bot) (Moves 2000/s 7301.9 KB/s, Cube 797/s 3075.3 KB/s, Components 2000/s 755.3 KB/s, EntityComponents 2000/s 672.8 KB/s, Cracks 356/s 22.0 KB/s, Air 40/s 16.9 KB/s) | out 2017 frames/s 84.4 KB/s | wire so far rx 582.5 MB tx 27.6 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 23.4 p99 48.5 max 50.0 (n 66) | failed [] | disconnects []
+[90m  180.370[0m [32mINFO [0m [90m[bots][0m bots stats t 180 s: live 100, joining 0, joined 100 | in 8970 frames/s 11601.8 KB/s (116.02 KB/s a bot) (Moves 2000/s 6673.2 KB/s, Cube 859/s 3422.0 KB/s, Components 2000/s 755.3 KB/s, EntityComponents 2000/s 671.9 KB/s, Cracks 456/s 30.7 KB/s, Air 40/s 16.9 KB/s) | out 2012 frames/s 84.3 KB/s | wire so far rx 610.8 MB tx 28.9 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 25.2 p99 38.9 max 38.9 (n 34) | failed [] | disconnects []
+[90m  185.371[0m [32mINFO [0m [90m[bots][0m bots stats t 185 s: live 100, joining 0, joined 100 | in 8863 frames/s 10416.4 KB/s (104.16 KB/s a bot) (Moves 1999/s 6772.3 KB/s, Cube 542/s 2134.2 KB/s, Components 1999/s 755.2 KB/s, EntityComponents 1999/s 671.5 KB/s, Cracks 455/s 32.1 KB/s, Air 40/s 16.9 KB/s) | out 2018 frames/s 84.4 KB/s | wire so far rx 636.8 MB tx 30.1 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 119.86 p99 120.01 (n 40) | ping ms p50 23.0 p99 48.3 max 49.8 (n 66) | failed [] | disconnects []
+[90m  190.372[0m [32mINFO [0m [90m[bots][0m bots stats t 190 s: live 100, joining 0, joined 100 | in 9040 frames/s 10634.5 KB/s (106.35 KB/s a bot) (Moves 2000/s 7276.4 KB/s, Cube 476/s 1825.7 KB/s, Components 2000/s 755.3 KB/s, EntityComponents 2000/s 673.0 KB/s, Cracks 535/s 49.8 KB/s, Air 40/s 16.9 KB/s) | out 2013 frames/s 84.3 KB/s | wire so far rx 663.9 MB tx 31.3 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 24.9 p99 38.1 max 38.1 (n 34) | failed [] | disconnects []
+[90m  190.442[0m [32mINFO [0m [90m[bots][0m bots step: 250 bots (t 190 s)
+[90m  195.373[0m [32mINFO [0m [90m[bots][0m bots stats t 195 s: live 149, joining 0, joined 149 | in 49913 frames/s 157834.9 KB/s (1059.29 KB/s a bot) (Cube 34877/s 142179.3 KB/s, Moves 2474/s 11678.5 KB/s, Players 1225/s 1393.3 KB/s, EntityComponents 2484/s 1222.7 KB/s, Components 2484/s 956.2 KB/s, Spawn 1257/s 155.2 KB/s) | out 2525 frames/s 105.1 KB/s | wire so far rx 696.2 MB tx 32.6 MB | join s p50 0.03 p99 0.05 (n 49) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 24.8 p99 49.6 max 50.0 (n 66) | failed [] | disconnects []
+[90m  200.374[0m [32mINFO [0m [90m[bots][0m bots stats t 200 s: live 199, joining 0, joined 198 | in 60090 frames/s 183990.0 KB/s (924.57 KB/s a bot) (Cube 38659/s 155133.7 KB/s, Moves 3464/s 22074.0 KB/s, Players 1705/s 2748.1 KB/s, EntityComponents 3474/s 2142.6 KB/s, Components 3474/s 1335.3 KB/s, Spawn 1709/s 210.8 KB/s) | out 3517 frames/s 146.8 KB/s | wire so far rx 854.0 MB tx 36.9 MB | join s p50 0.03 p99 0.06 (n 49) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 24.0 p99 49.5 max 49.7 (n 67) | failed [] | disconnects []
+[90m  205.376[0m [32mINFO [0m [90m[bots][0m bots stats t 205 s: live 248, joining 0, joined 248 | in 69684 frames/s 206602.5 KB/s (833.07 KB/s a bot) (Cube 40334/s 161972.8 KB/s, Moves 4453/s 34056.9 KB/s, Players 2234/s 4676.5 KB/s, EntityComponents 4463/s 3325.3 KB/s, Components 4463/s 1705.1 KB/s, Cracks 1989/s 281.9 KB/s) | out 4522 frames/s 188.7 KB/s | wire so far rx 1058.6 MB tx 43.5 MB | join s p50 0.03 p99 0.05 (n 50) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 20.6 p99 48.5 max 49.4 (n 131) | failed [] | disconnects []
+[90m  210.377[0m [32mINFO [0m [90m[bots][0m bots stats t 210 s: live 250, joining 0, joined 250 | in 37398 frames/s 75885.6 KB/s (303.54 KB/s a bot) (Moves 4998/s 41517.4 KB/s, Cube 7623/s 27734.7 KB/s, EntityComponents 4998/s 3647.9 KB/s, Components 4998/s 1892.0 KB/s, Cracks 2842/s 575.3 KB/s, Players 100/s 233.3 KB/s) | out 5041 frames/s 210.9 KB/s | wire so far rx 1308.3 MB tx 50.6 MB | join s p50 0.02 p99 0.02 (n 2) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 25.5 p99 49.0 max 50.0 (n 117) | failed [] | disconnects []
+[90m  215.378[0m [32mINFO [0m [90m[bots][0m bots stats t 215 s: live 250, joining 0, joined 250 | in 30844 frames/s 64041.0 KB/s (256.16 KB/s a bot) (Moves 4999/s 41898.2 KB/s, Cube 4458/s 16051.8 KB/s, EntityComponents 4999/s 3630.6 KB/s, Components 4999/s 1888.2 KB/s, Cracks 2193/s 346.7 KB/s, EntitySwing 6211/s 78.9 KB/s) | out 5040 frames/s 210.8 KB/s | wire so far rx 1465.5 MB tx 55.5 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 20.5 p99 49.7 max 50.0 (n 133) | failed [] | disconnects []
+[90m  220.379[0m [32mINFO [0m [90m[bots][0m bots stats t 220 s: live 250, joining 0, joined 250 | in 32489 frames/s 71674.7 KB/s (286.70 KB/s a bot) (Moves 5011/s 44386.0 KB/s, Cube 5192/s 21068.7 KB/s, EntityComponents 5011/s 3671.0 KB/s, Components 5011/s 1892.6 KB/s, Cracks 2405/s 421.9 KB/s, EntitySwing 6869/s 87.2 KB/s) | out 5038 frames/s 210.8 KB/s | wire so far rx 1623.2 MB tx 58.9 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 25.4 p99 48.9 max 48.9 (n 117) | failed [] | disconnects []
+[90m  225.380[0m [32mINFO [0m [90m[bots][0m bots stats t 225 s: live 250, joining 0, joined 250 | in 35946 frames/s 71252.2 KB/s (285.01 KB/s a bot) (Moves 5003/s 44488.2 KB/s, Cube 5739/s 20330.2 KB/s, EntityComponents 5003/s 3640.7 KB/s, Components 5003/s 1889.7 KB/s, Cracks 2879/s 631.1 KB/s, EntitySwing 8899/s 113.0 KB/s) | out 5045 frames/s 211.0 KB/s | wire so far rx 1788.8 MB tx 62.4 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 20.3 p99 48.2 max 49.6 (n 133) | failed [] | disconnects []
+[90m  230.381[0m [32mINFO [0m [90m[bots][0m bots stats t 230 s: live 250, joining 0, joined 250 | in 35336 frames/s 67004.3 KB/s (268.02 KB/s a bot) (Moves 5004/s 42202.9 KB/s, Cube 5285/s 18382.9 KB/s, EntityComponents 5004/s 3633.8 KB/s, Components 5004/s 1889.9 KB/s, Cracks 2763/s 631.4 KB/s, EntitySwing 9152/s 116.2 KB/s) | out 5006 frames/s 209.4 KB/s | wire so far rx 1948.3 MB tx 65.9 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 29.4 p99 50.0 max 63.1 (n 116) | failed [] | disconnects []
+[90m  235.382[0m [32mINFO [0m [90m[bots][0m bots stats t 235 s: live 250, joining 0, joined 250 | in 36547 frames/s 61828.7 KB/s (247.31 KB/s a bot) (Moves 5011/s 42288.2 KB/s, Cube 3756/s 12777.6 KB/s, EntityComponents 5011/s 3644.9 KB/s, Components 5011/s 1892.9 KB/s, Cracks 3450/s 922.8 KB/s, EntitySwing 10595/s 134.5 KB/s) | out 5047 frames/s 211.0 KB/s | wire so far rx 2103.8 MB tx 69.5 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 30.3 p99 36.5 max 36.5 (n 133) | failed [] | disconnects []
+[90m  240.383[0m [32mINFO [0m [90m[bots][0m bots stats t 240 s: live 250, joining 0, joined 250 | in 31373 frames/s 60203.3 KB/s (240.81 KB/s a bot) (Moves 5009/s 44203.2 KB/s, Cube 2703/s 9716.5 KB/s, EntityComponents 5009/s 3648.7 KB/s, Components 5009/s 1891.9 KB/s, Cracks 2561/s 486.6 KB/s, EntitySwing 7658/s 97.2 KB/s) | out 5039 frames/s 210.8 KB/s | wire so far rx 2259.0 MB tx 73.1 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 30.6 p99 43.7 max 43.7 (n 117) | failed [] | disconnects []
+[90m  245.384[0m [32mINFO [0m [90m[bots][0m bots stats t 245 s: live 250, joining 0, joined 250 | in 31627 frames/s 61172.6 KB/s (244.69 KB/s a bot) (Moves 5000/s 45316.2 KB/s, Cube 2405/s 9500.3 KB/s, EntityComponents 5000/s 3635.0 KB/s, Components 5000/s 1888.4 KB/s, Cracks 2785/s 578.4 KB/s, EntitySwing 8212/s 104.3 KB/s) | out 5044 frames/s 210.9 KB/s | wire so far rx 2418.3 MB tx 76.6 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 30.3 p99 36.4 max 36.6 (n 133) | failed [] | disconnects []
+[90m  250.386[0m [32mINFO [0m [90m[bots][0m bots stats t 250 s: live 250, joining 0, joined 250 | in 30992 frames/s 58764.0 KB/s (235.06 KB/s a bot) (Moves 5005/s 43262.0 KB/s, Cube 2416/s 9187.8 KB/s, EntityComponents 5005/s 3639.1 KB/s, Components 5005/s 1890.5 KB/s, Cracks 2600/s 543.2 KB/s, EntitySwing 8213/s 104.3 KB/s) | out 5040 frames/s 210.9 KB/s | wire so far rx 2576.0 MB tx 80.1 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 119.93 p99 120.01 (n 49) | ping ms p50 30.6 p99 43.7 max 43.7 (n 117) | failed [] | disconnects []
+[90m  255.387[0m [32mINFO [0m [90m[bots][0m bots stats t 255 s: live 250, joining 0, joined 250 | in 30224 frames/s 56270.2 KB/s (225.08 KB/s a bot) (Moves 4999/s 42120.2 KB/s, Cube 2198/s 7908.4 KB/s, EntityComponents 4999/s 3632.7 KB/s, Components 4999/s 1888.1 KB/s, Cracks 2593/s 483.3 KB/s, EntitySwing 7460/s 94.7 KB/s) | out 5042 frames/s 210.9 KB/s | wire so far rx 2727.1 MB tx 83.6 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 119.91 p99 119.91 (n 1) | ping ms p50 30.3 p99 36.5 max 36.6 (n 133) | failed [] | disconnects []
+[90m  260.388[0m [32mINFO [0m [90m[bots][0m bots stats t 260 s: live 250, joining 0, joined 250 | in 29964 frames/s 57418.6 KB/s (229.67 KB/s a bot) (Moves 4999/s 43471.0 KB/s, Cube 1742/s 7684.1 KB/s, EntityComponents 4999/s 3631.2 KB/s, Components 4999/s 1888.3 KB/s, Cracks 2839/s 505.8 KB/s, EntitySwing 7011/s 89.0 KB/s) | out 5038 frames/s 210.8 KB/s | wire so far rx 2878.6 MB tx 87.2 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 30.5 p99 43.7 max 43.7 (n 117) | failed [] | disconnects []
+[90m  265.389[0m [32mINFO [0m [90m[bots][0m bots stats t 265 s: live 250, joining 0, joined 250 | in 31675 frames/s 57741.0 KB/s (230.96 KB/s a bot) (Moves 4998/s 45159.9 KB/s, Cube 1541/s 6126.9 KB/s, EntityComponents 4998/s 3641.2 KB/s, Components 4998/s 1887.9 KB/s, Cracks 3090/s 658.5 KB/s, EntitySwing 8606/s 109.3 KB/s) | out 5044 frames/s 210.9 KB/s | wire so far rx 3036.7 MB tx 90.7 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 30.2 p99 36.6 max 36.7 (n 133) | failed [] | disconnects []
+[90m  265.601[0m [32mINFO [0m [90m[bots][0m bots: last step held; done
+[90m  265.601[0m [32mINFO [0m [90m[bots][0m bots stats t 265 s: live 250, joining 0, joined 250 | in 1123 frames/s 2222.9 KB/s (8.89 KB/s a bot) (Moves 200/s 1782.0 KB/s, Cube 48/s 207.1 KB/s, EntityComponents 200/s 143.0 KB/s, Components 200/s 75.5 KB/s, Cracks 50/s 8.6 KB/s, EntitySwing 349/s 4.4 KB/s) | out 243 frames/s 10.2 KB/s | wire so far rx 3043.7 MB tx 90.9 MB | join s p50 0.00 p99 0.00 (n 0) | view s p50 0.00 p99 0.00 (n 0) | ping ms p50 30.5 p99 35.5 max 35.5 (n 5) | failed [] | disconnects []
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.602[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.603[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.604[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.605[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.606[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.606[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.606[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.606[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.606[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.606[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.606[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.606[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.606[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.606[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.606[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.606[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.606[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.606[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.606[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.606[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.606[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.607[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.607[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.607[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.607[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.607[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.607[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.607[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.607[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.607[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.607[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.607[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.607[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.607[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.607[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.607[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.607[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.607[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.607[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.608[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.608[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.608[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.608[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.608[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.608[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.608[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.608[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.608[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.608[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.608[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.608[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.608[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.608[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.608[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.608[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.609[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.609[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.609[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.609[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.609[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.609[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.609[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.609[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.609[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.609[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.609[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.609[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.609[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.609[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.609[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.610[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.610[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.610[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.610[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.610[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.610[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.610[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.610[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.610[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.
+[90m  265.610[0m [1;31mERROR[0m [90m[iroh::socket][0m Endpoint dropped without calling `Endpoint::close`. Aborting ungracefully.

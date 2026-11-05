@@ -42,6 +42,28 @@ pub enum Size {
     Large,
 }
 
+/// When in the day an animal is about.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum Active {
+    Day,
+    Night,
+    /// Dawn and dusk (crepuscular).
+    Twilight,
+    /// Any hour (cathemeral).
+    AnyTime,
+}
+
+impl Active {
+    pub fn name(self) -> &'static str {
+        match self {
+            Active::Day => "day",
+            Active::Night => "night",
+            Active::Twilight => "twilight",
+            Active::AnyTime => "any_time",
+        }
+    }
+}
+
 /// What kind of eater it is, from its diet's plant share (`Species::diet`).
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Diet {
@@ -182,6 +204,9 @@ pub struct Species {
     pub name: &'static str,
     /// Its scientific name: genus and species ("Canis familiaris").
     pub binomial: &'static str,
+    /// When in the day it is about (the field journal's active hours; from research, `Est.` where
+    /// only its relatives' are known). Day unless its row says.
+    pub active: Active,
     pub family: &'static Family,
     pub subfamily: &'static str,
     /// The breed, for domestic species that have them (the gene file's breed).
@@ -393,6 +418,17 @@ impl Species {
     pub fn crowd(&self) -> u32 {
         self.tune.crowd.unwrap_or_else(|| self.bio.crowd())
     }
+    /// Its crowd in `biome`: a plant eater's (`forages_wild`) as heavily as the biome is stocked
+    /// (`STOCKING`), others' as they are; never under two, a pair. What natural spawning, wild
+    /// breeding, dying of want and the food webs' grazing all weigh (`life::room_for`,
+    /// `love_chance`, `want_chance`, `web::grazing`), so a stocked place holds its grazers and
+    /// doesn't starve them back down.
+    pub fn crowd_in(&self, biome: &str) -> u32 {
+        if !self.forages_wild() {
+            return self.crowd();
+        }
+        ((self.crowd() as f32 * stocking(biome)).round() as u32).max(2)
+    }
     /// Young born or hatched at once (`breeding.rs`), fewest and most.
     pub fn litter(&self) -> (u32, u32) {
         self.tune.litter.unwrap_or_else(|| self.bio.litter())
@@ -402,6 +438,32 @@ impl Species {
 /// What a Cretaceous biome's spawn rules average (`Species::spawn_chance`): about the
 /// overworld's plains, whose own animals and base's farm animals (5%) come to this.
 pub const CRETACEOUS_FLOW: f32 = 0.025;
+
+/// How heavily each biome is stocked with plant eaters, against their crowd (`Species::crowd_in`;
+/// 1 where unlisted, the Cretaceous's too): open grassland heavily, deep forest and the giant
+/// groves lightly, as real grazer densities go. With grass feeding as real grass does (Plants'
+/// tufts, `vitals::forage`), every grazed biome's herds eat about a third of what its grass
+/// grows back, as real herds take 25-50% (`notes/ECOLOGY.md`; Plants' and Animals' grazing plan,
+/// 2026-11-05). The savanna is held at 2.5 (3.5 would land it with the rest) until it has a heavy
+/// grazer, which eats as much with fewer animals.
+pub const STOCKING: &[(&str, f32)] = &[
+    ("base:savanna", 2.5),
+    ("base:plains", 1.4),
+    ("base:forest", 1.0),
+    ("base:swamp", 0.9),
+    ("base:birch_forest", 0.55),
+    ("base:taiga", 0.35),
+    ("base:mountains", 0.26),
+    ("base:sequoia_grove", 0.09),
+];
+
+/// How heavily `biome` is stocked with plant eaters (`STOCKING`, 1 unlisted).
+pub fn stocking(biome: &str) -> f32 {
+    STOCKING
+        .iter()
+        .find(|(b, _)| *b == biome)
+        .map_or(1.0, |&(_, s)| s)
+}
 
 /// ARK's shape: health grows fastest, speed slowest, torpor only from wild points.
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
@@ -415,6 +477,7 @@ const BASE: Species = Species {
     model: "",
     name: "",
     binomial: "",
+    active: Active::Day,
     family: &NO_FAMILY,
     subfamily: "",
     breed: None,
@@ -525,6 +588,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "cat",
         name: "cat",
+        // Active: crepuscular, as its wildcat ancestor.
+        active: Active::Twilight,
         binomial: "Felis catus",
         family: &FELIDAE,
         subfamily: "Felinae",
@@ -591,6 +656,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "capybara",
         name: "capybara",
+        // Active: grazes at dawn and dusk, rests in the day's heat.
+        active: Active::Twilight,
         binomial: "Hydrochoerus hydrochaeris",
         family: &CAVIIDAE,
         subfamily: "Hydrochoerinae",
@@ -648,6 +715,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "raptor",
         name: "raptor",
+        // Active: Velociraptor: nocturnal by its scleral ring (Schmitz & Motani 2011, Science).
+        active: Active::Night,
         binomial: "Velociraptor mongoliensis",
         family: &DROMAEOSAURIDAE,
         subfamily: "Velociraptorinae",
@@ -695,6 +764,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "utahraptor",
         name: "utahraptor",
+        // Active: Est.: a dromaeosaurid, as Velociraptor (Schmitz & Motani 2011).
+        active: Active::Night,
         binomial: "Utahraptor ostrommaysi",
         family: &DROMAEOSAURIDAE,
         subfamily: "Dromaeosaurinae",
@@ -745,6 +816,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "raptor",
         name: "osmolskae",
+        // Active: Est.: Velociraptor, as V. mongoliensis (Schmitz & Motani 2011).
+        active: Active::Night,
         binomial: "Velociraptor osmolskae",
         family: &DROMAEOSAURIDAE,
         subfamily: "Velociraptorinae",
@@ -791,6 +864,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "wyvern",
         name: "wyvern",
+        // Active: a fantasy one: hunts at dusk.
+        active: Active::Twilight,
         binomial: "Wyverna montana",
         family: &WYVERNIDAE,
         subfamily: "Wyverninae",
@@ -859,6 +934,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "hare",
         name: "hare",
+        // Active: crepuscular and nocturnal.
+        active: Active::Twilight,
         binomial: "Lepus europaeus",
         family: &LEPORIDAE,
         subfamily: "Leporinae",
@@ -910,6 +987,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "hare",
         name: "mountain_hare",
+        // Active: crepuscular and nocturnal.
+        active: Active::Twilight,
         binomial: "Lepus timidus",
         family: &LEPORIDAE,
         subfamily: "Leporinae",
@@ -967,6 +1046,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "mouse",
         name: "wood_mouse",
+        // Active: nocturnal (Apodemus sylvaticus).
+        active: Active::Night,
         binomial: "Apodemus sylvaticus",
         family: &MURIDAE,
         subfamily: "Murinae",
@@ -1023,6 +1104,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "vole",
         name: "field_vole",
+        // Active: active round the clock in short bouts.
+        active: Active::AnyTime,
         binomial: "Microtus agrestis",
         family: &CRICETIDAE,
         subfamily: "Arvicolinae",
@@ -1087,6 +1170,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "deer",
         name: "white_tailed_deer",
+        // Active: crepuscular.
+        active: Active::Twilight,
         binomial: "Odocoileus virginianus",
         family: &CERVIDAE,
         subfamily: "Capreolinae",
@@ -1133,6 +1218,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "deer",
         name: "red_deer",
+        // Active: crepuscular.
+        active: Active::Twilight,
         binomial: "Cervus elaphus",
         family: &CERVIDAE,
         subfamily: "Cervinae",
@@ -1189,6 +1276,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "fish",
         name: "brown_trout",
+        // Active: feeds most at dusk and dawn.
+        active: Active::Twilight,
         binomial: "Salmo trutta",
         family: &SALMONIDAE,
         subfamily: "Salmoninae",
@@ -1285,6 +1374,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "fox",
         name: "red_fox",
+        // Active: crepuscular and nocturnal.
+        active: Active::Twilight,
         binomial: "Vulpes vulpes",
         family: &CANIDAE,
         subfamily: "Caninae",
@@ -1350,6 +1441,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "fox",
         name: "arctic_fox",
+        // Active: active at any hour, by the season's light.
+        active: Active::AnyTime,
         binomial: "Vulpes lagopus",
         family: &CANIDAE,
         subfamily: "Caninae",
@@ -1473,6 +1566,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "protoceratops",
         name: "protoceratops",
+        // Active: cathemeral by its scleral ring (Schmitz & Motani 2011).
+        active: Active::AnyTime,
         binomial: "Protoceratops andrewsi",
         family: &PROTOCERATOPSIDAE,
         subfamily: "Protoceratopsinae",
@@ -1531,6 +1626,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "kryptobaatar",
         name: "kryptobaatar",
+        // Active: Est.: small multituberculates, as most small Mesozoic mammals, nocturnal.
+        active: Active::Night,
         binomial: "Kryptobaatar dashzevegi",
         family: &DJADOCHTATHERIIDAE,
         subfamily: "Djadochtatheriinae",
@@ -1635,6 +1732,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "reindeer",
         name: "reindeer",
+        // Active: no daily rhythm in the polar summer and winter (van Oort et al. 2005, Nature).
+        active: Active::AnyTime,
         binomial: "Rangifer tarandus",
         family: &CERVIDAE,
         subfamily: "Capreolinae",
@@ -1700,6 +1799,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "coyote",
         name: "coyote",
+        // Active: crepuscular.
+        active: Active::Twilight,
         binomial: "Canis latrans",
         family: &CANIDAE,
         subfamily: "Caninae",
@@ -1876,6 +1977,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "owl",
         name: "great_horned_owl",
+        // Active: nocturnal, hunting from dusk.
+        active: Active::Night,
         binomial: "Bubo virginianus",
         family: &STRIGIDAE,
         subfamily: "Striginae",
@@ -2238,6 +2341,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "caiman",
         name: "yacare_caiman",
+        // Active: hunts mostly at night, basks by day.
+        active: Active::Night,
         binomial: "Caiman yacare",
         family: &ALLIGATORIDAE,
         subfamily: "Caimaninae",
@@ -2305,6 +2410,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "caiman",
         name: "spectacled_caiman",
+        // Active: hunts mostly at night, basks by day.
+        active: Active::Night,
         binomial: "Caiman crocodilus",
         family: &ALLIGATORIDAE,
         subfamily: "Caimaninae",
@@ -2376,6 +2483,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "wolf",
         name: "grey_wolf",
+        // Active: crepuscular, travelling and hunting at dawn and dusk.
+        active: Active::Twilight,
         binomial: "Canis lupus",
         family: &CANIDAE,
         subfamily: "Caninae",
@@ -2456,6 +2565,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "jaguar",
         name: "jaguar",
+        // Active: crepuscular and nocturnal.
+        active: Active::Twilight,
         binomial: "Panthera onca",
         family: &FELIDAE,
         subfamily: "Pantherinae",
@@ -2525,6 +2636,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "fish",
         name: "lungfish",
+        // Active: Est.: lungfishes forage mostly at night.
+        active: Active::Night,
         binomial: "Ceratodus kempae",
         family: &CERATODONTIDAE,
         subfamily: "",
@@ -2620,6 +2733,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "psittacosaurus",
         name: "psittacosaurus",
+        // Active: Est.: as the small ornithischians (Schmitz & Motani 2011).
+        active: Active::AnyTime,
         binomial: "Psittacosaurus lujiatunensis",
         family: &PSITTACOSAURIDAE,
         subfamily: "",
@@ -2674,6 +2789,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "ankylosaur",
         name: "gastonia",
+        // Active: Est.: big plant eaters were cathemeral (Schmitz & Motani 2011).
+        active: Active::AnyTime,
         binomial: "Gastonia burgei",
         family: &POLACANTHIDAE,
         subfamily: "",
@@ -2727,6 +2844,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "ankylosaur",
         name: "pinacosaurus",
+        // Active: Est.: big plant eaters were cathemeral (Schmitz & Motani 2011).
+        active: Active::AnyTime,
         binomial: "Pinacosaurus grangeri",
         family: &ANKYLOSAURIDAE,
         subfamily: "",
@@ -2781,6 +2900,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "iguanodont",
         name: "iguanodont",
+        // Active: Est.: big plant eaters were cathemeral (Schmitz & Motani 2011).
+        active: Active::AnyTime,
         binomial: "Iguanacolossus fortis",
         family: &STYRACOSTERNA,
         subfamily: "",
@@ -2834,6 +2955,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "caiman",
         name: "crocodyliform",
+        // Active: Est.: as the living crocodilians.
+        active: Active::Night,
         binomial: "Neosuchia indet.",
         family: &NEOSUCHIA,
         subfamily: "",
@@ -2897,6 +3020,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "citipati",
         name: "citipati",
+        // Active: Est.: oviraptorosaurs, as other cathemeral theropods.
+        active: Active::AnyTime,
         binomial: "Citipati osmolskae",
         family: &OVIRAPTORIDAE,
         subfamily: "Citipatiinae",
@@ -3057,6 +3182,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "sauropod",
         name: "cedarosaurus",
+        // Active: Est.: sauropodomorphs were cathemeral (Schmitz & Motani 2011).
+        active: Active::AnyTime,
         binomial: "Cedarosaurus weiskopfae",
         family: &BRACHIOSAURIDAE,
         subfamily: "",
@@ -3076,7 +3203,10 @@ pub static SPECIES: [Species; 46] = [
         // At the shoulder (the back slopes down to the hips).
         height: (4.1, "shoulder"),
         // The floodplain first; the fern forest (as Dongbeititan) less often.
-        habitats: &[("animals:floodplain", 1.0), ("animals:fern_forest", 0.5)],
+        // The open floodplain, seldom among the fern forest's trunks: at 4.5 blocks wide its body
+        // finds few clearings between them and stood still there (PC runs aw_walk_path, 11-05;
+        // Ronald: "keep to open floodplain").
+        habitats: &[("animals:floodplain", 1.0), ("animals:fern_forest", 0.2)],
         bio: Biology {
             // About 10 t (est.).
             mass: 10000.0,

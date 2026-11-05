@@ -71,10 +71,11 @@ static STRING: Tag = Tag::named("string");
 static CLOTHES: Tag = Tag::named("clothes");
 static STEWS: Tag = Tag::named("stew");
 static PRESERVED: Tag = Tag::named("preserved");
+static METEORIC_IRON: Tag = Tag::named("meteoric_iron");
 
 /// In the order they usually come. The index is the bit in `Advancements::done`, so new ones go
 /// at the end (at most 64).
-static ALL: [Advancement; 27] = [
+static ALL: [Advancement; 29] = [
     Advancement { id: "timber", icon: Item::named("oak_log"), group: 0, rule: Rule::Break(&LOGS) },
     Advancement { id: "workbench", icon: Item::named("crafting_table"), group: 0, rule: Rule::Have(&CRAFTING_TABLES) },
     Advancement { id: "first_pickaxe", icon: Item::named("wood_pickaxe"), group: 0, rule: Rule::Have(&PICKAXES) },
@@ -103,6 +104,10 @@ static ALL: [Advancement; 27] = [
     Advancement { id: "stew", icon: Item::named("stew"), group: 4, rule: Rule::Have(&STEWS) },
     Advancement { id: "preserved", icon: Item::named("dried_meat"), group: 4, rule: Rule::Have(&PRESERVED) },
     Advancement { id: "tame", icon: Item::named("bone"), group: 4, rule: Rule::Milestone(base_api::milestones::TAME) },
+    // A blood moon seen through without dying (sky events, `events.rs`).
+    Advancement { id: "red_night", icon: Item::named("campfire"), group: 4, rule: Rule::Milestone(base_api::milestones::RED_NIGHT) },
+    // A fallen star's iron in hand (sky events, `meteors.rs`).
+    Advancement { id: "starfall", icon: Item::named("meteoric_iron"), group: 3, rule: Rule::Have(&METEORIC_IRON) },
 ];
 
 /// Server to the player who made it: the index into `ALL`.
@@ -303,7 +308,7 @@ fn client(r: &mut Registry) {
         let tabs: [crate::window::Tab; 1] = [("window.base.tab.stats", |c| {
             c.client().screen_open(&crate::levels::SCREEN);
         })];
-        crate::window::window_titled(ui, S::column().pad(8.0).gap(6.0), "advancements.base.title", &tabs, |ui| {
+        crate::window::family_window(ui, S::column().pad(8.0).gap(6.0), Some("advancements.base.title"), &tabs, |ui| {
             ui.row(S::row().gap(8.0), |ui| {
                 ui.spacer();
                 ui.text_bind_styled(S::column().class("dim").no_wrap(), |v, out| {

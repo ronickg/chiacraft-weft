@@ -173,6 +173,8 @@ pub enum Cmd {
         count: u32,
     },
     /// Up to `max` [`DrawIndexedArgs`] records, how many a shader wrote at `count_offset`.
+    /// Without [`Backend::indirect_count`] all `max` are drawn, so records past the count must
+    /// draw nothing (zeroed with [`Cmd::FillBuffer`] before the shader writes them).
     DrawIndexedIndirectCount {
         buffer: BufferId,
         offset: u64,
@@ -194,6 +196,14 @@ pub enum Cmd {
     },
     /// Makes shader writes visible to later commands. Only needed between compute and its consumers.
     Barrier,
+    /// Sets `size` bytes of `buffer` from `offset` to the 32-bit `value`, on the GPU. Outside a
+    /// pass; offset and size multiples of 4. Ordered with later commands by a [`Cmd::Barrier`].
+    FillBuffer {
+        buffer: BufferId,
+        offset: u64,
+        size: u64,
+        value: u32,
+    },
     /// Copies a depth texture to the start of a buffer, 32-bit floats row by row. Outside a pass.
     CopyDepthToBuffer {
         depth: TextureId,
@@ -320,6 +330,11 @@ pub trait Backend: Send {
         ""
     }
     fn frames_in_flight(&self) -> usize;
+    /// Whether the `*IndirectCount` draws take their count from the GPU (Vulkan 1.2's
+    /// `drawIndirectCount`). Without it (MoltenVK) they draw all `max` records.
+    fn indirect_count(&self) -> bool {
+        true
+    }
     fn surface_size(&self) -> (u32, u32);
     fn resize(&mut self, width: u32, height: u32);
     fn set_vsync(&mut self, vsync: bool);

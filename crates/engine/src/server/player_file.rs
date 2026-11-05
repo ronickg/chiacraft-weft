@@ -133,7 +133,10 @@ impl Server {
             let left = self.players[pi].probation_left(&probation);
             self.players[pi]
                 .conn
-                .send(ToClient::Show(crate::net::Shown::chat(Msg::new("admission.probation_on", vec![Arg::Int(left.div_ceil(60) as i64)]))));
+                .send(ToClient::Show(crate::net::Shown::chat(Msg::new(
+                    "admission.probation_on",
+                    vec![Arg::Int(left.div_ceil(60) as i64)],
+                ))));
         }
         let p = &mut self.players[pi];
         let line = Msg::new("multiplayer.joined", vec![Arg::Text(p.name.clone())]);

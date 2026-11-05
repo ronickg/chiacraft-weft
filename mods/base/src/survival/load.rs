@@ -25,7 +25,14 @@ pub fn speed(w: &World, id: u64, v: &mut Vitals, stats: &[f32; STATS], mods: &Mo
     if (v.speed - speed).abs() > 0.001 || w.game_time() % 100 == 0 {
         v.speed = speed;
         w.attribute_add_modifier(id, &attribute::MOVEMENT_SPEED, "base:vitals", attr_op::MULTIPLY_TOTAL, (speed - 1.0) as f64, 0);
-        w.attribute_add_modifier(id, &attribute::JUMP_STRENGTH, "base:vitals", attr_op::MULTIPLY_TOTAL, if v.out != 0 { -1.0 } else { 0.0 }, 0);
+        w.attribute_add_modifier(
+            id,
+            &attribute::JUMP_STRENGTH,
+            "base:vitals",
+            attr_op::MULTIPLY_TOTAL,
+            if v.out != 0 { -1.0 } else { 0.0 },
+            0,
+        );
     }
 }
 

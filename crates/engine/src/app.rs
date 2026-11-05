@@ -317,7 +317,8 @@ pub(crate) struct Running {
     ui_cached: Vec<crate::ui::render::Quad>,
     ui_animated: Vec<crate::ui::render::Animated>,
     /// Where UI asked for the player model, physical pixels.
-    /// Where 3D previews go, and whose: the player (0) or the open menu's own entity (1).
+    /// Where 3D previews go, and whose: the player (0), the open menu's own entity (1), or an
+    /// entity kind alone (2 + its index).
     previews: Vec<([f32; 4], u64)>,
     /// Texture holding the rendered inventory figure, drawn by the UI.
     preview_tex: Option<u32>,
@@ -2555,6 +2556,7 @@ fn update_game(r: &mut Running, dt: f64, frame_start: Instant) {
         g.client.first_person_model = r.settings.first_person_model();
         g.client.entity_render.show_avatars = r.settings.show_avatars();
         g.client.render.occlusion.on = r.settings.occlusion_culling();
+        g.client.sky.soft_wanted = r.settings.soft_clouds();
         let t = Instant::now();
         if world_input {
             g.client.update(&mut *r.gpu, &r.textures, &mut r.input, dt);
@@ -2886,14 +2888,23 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
         let mut o = crate::ui::Ui::new();
         o.text_unit = text_unit;
         for (x, y, text, color, size, wrap) in labels {
+            // A negative width: on the HUD's plate, wrapped to the width.
+            let plate = wrap < 0.0;
+            let wrap = wrap.abs();
             let mut spans = text.spans(&r.lang, Some(&r.input));
             if wrap > 0.0 {
                 for s in &mut spans {
                     s.align = crate::ui::text::align::CENTER;
                 }
             }
+            let at = crate::ui::Style::default().at(x, y, [0.5, 0.0]);
+            if plate {
+                o.open(crate::ui::Kind::Container { class: Some("hud_plate".into()) }, at.pad(4.0));
+            }
             let id = o.text(spans, "label");
-            o.nodes[id].style = crate::ui::Style::default().at(x, y, [0.5, 0.0]);
+            if !plate {
+                o.nodes[id].style = at;
+            }
             if wrap > 0.0 {
                 o.nodes[id].style.max_w = wrap;
             }
@@ -2904,6 +2915,9 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
                 t.center = wrap > 0.0;
                 t.color = Some(color);
                 t.scale = size;
+            }
+            if plate {
+                o.close();
             }
         }
         o.layout(Vec2::new(sw as f32 / scale, sh as f32 / scale), &r.ui.font);
@@ -2969,10 +2983,19 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         if let Some(&([x, y, w, h], whose)) = r.previews.first() {
             let worn = g.client.worn();
             let look = r.input.cursor - Vec2::new(x, y);
-            let subject = (whose == 1)
-                .then(|| g.client.menu.as_ref().map(|m| m.owner))
-                .flatten()
-                .and_then(|id| g.client.entities.get(&id).map(|e| (id, e.kind)));
+            // The menu's own entity, or a kind alone (no entity: its own texture, nothing painted).
+            let subject = match whose {
+                1 => g
+                    .client
+                    .menu
+                    .as_ref()
+                    .map(|m| m.owner)
+                    .and_then(|id| g.client.entities.get(&id).map(|e| (id, e.kind))),
+                k if k >= 2 => Some((u64::MAX, (k - 2) as u32)),
+                _ => None,
+            };
+            // A kind alone: its skin loads with the others (none of it may be in the world).
+            g.client.entity_render.preview_kind = (whose >= 2).then(|| (whose - 2) as u32);
             let s = crate::diag::span("preview");
             let tex = g.client.entity_render.draw_preview(
                 &mut *r.gpu,
@@ -3058,6 +3081,8 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
                 r.post
                     .copy_behind(&mut *r.gpu, &mut world, world_info, scene, depth);
             }
+            // Soft clouds traced against that copy, before the sky draws them (chiacraft).
+            world.append(&mut g.client.sky.soft.passes);
             world.push(Cmd::BeginPass { color: Some((world_target, None)), depth: Some((r.depth.0, None)) });
             world.append(&mut g.client.late_out);
         }

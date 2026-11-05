@@ -279,7 +279,7 @@ pub fn grazing(biome: &str) -> Option<Grazing> {
     let regrown = blocks * mouthful * rate * vitals::DAY_SECS / secs;
     let eaten: f32 = grazers
         .iter()
-        .map(|&(s, share)| s.crowd() as f32 * share * vitals::DAY_SECS / s.hunger.max(1.0))
+        .map(|&(s, share)| s.crowd_in(biome) as f32 * share * vitals::DAY_SECS / s.hunger.max(1.0))
         .sum();
     // Dung pats (`vitals::soil`): a pat every few mouthfuls, each lying as long as it takes to rot
     // or break up that season; the most of the crowd's ground they cover at once, in any season.

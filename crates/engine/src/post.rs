@@ -18,9 +18,27 @@ pub const HOOK: Hook = Hook {
     fallback: "return p.color;",
 };
 
+/// An effect's half-size part (chiacraft): `shaders/post_low/<name>.wgsl`, `fn low(p: PostPixel) ->
+/// vec4<f32>`, drawn before the effects into an image of its own a quarter the pixels, which the
+/// effect of the same name reads (`p.low`, `post_low_upsampled`).
+pub const HOOK_LOW: Hook = Hook {
+    kind: "post_low",
+    entry: "low",
+    dispatch: "post_low",
+    params: "p: PostPixel",
+    args: "p",
+    ret: "vec4<f32>",
+    fallback: "return vec4(0.0);",
+};
+
 pub struct Post {
     pipeline: Option<PipelineId>,
     slots: Slots,
+    /// The half-size parts' pipeline and slots (`HOOK_LOW`), and each effect's image for it:
+    /// (name, texture, bindless index, size).
+    low_pipe: Option<PipelineId>,
+    low_slots: Slots,
+    low_targets: Vec<(String, TextureId, u32, (u32, u32))>,
     /// Effects on, in the order they were turned on: (name, strength).
     pub active: Vec<(String, f32)>,
     /// Two images the size of the screen (scene and the one after each pass), with their
@@ -43,6 +61,9 @@ impl Post {
         let mut p = Post {
             pipeline: None,
             slots: Slots::default(),
+            low_pipe: None,
+            low_slots: Slots::default(),
+            low_targets: Vec::new(),
             active: Vec::new(),
             targets: None,
             params: Vec::new(),
@@ -57,9 +78,29 @@ impl Post {
 
     pub fn reload(&mut self, gpu: &mut dyn Backend, assets: &Assets) {
         let snippets = crate::shaders::snippets(assets, &HOOK);
-        let made = crate::packs::compose(assets, "post.wgsl", &[(&HOOK, &snippets)])
+        let low_snippets = crate::shaders::snippets(assets, &HOOK_LOW);
+        let made = crate::packs::compose(assets, "post.wgsl", &[(&HOOK, &snippets), (&HOOK_LOW, &low_snippets)])
             .map_err(|e| e.0)
             .and_then(|(s, mut slots)| {
+                // The half-size parts' pipeline (`fs_low`), when there are any.
+                let low_slots = slots.pop().unwrap_or_default();
+                let low = (!low_slots.names.is_empty())
+                    .then(|| {
+                        gpu.create_pipeline(&PipelineDesc {
+                            label: "post low",
+                            shader: &s,
+                            vertex: "vs",
+                            fragment: Some("fs_low"),
+                            color: Some(Format::Rgba16Float),
+                            depth: None,
+                            blend: Blend::None,
+                            cull_back: false,
+                            topology: Topology::Triangles,
+                        })
+                        .map_err(|e| log::warn!("post: no half-size parts: {}", e.0))
+                        .ok()
+                    })
+                    .flatten();
                 let p = gpu
                     .create_pipeline(&PipelineDesc {
                         label: "post",
@@ -88,10 +129,14 @@ impl Post {
                     })
                     .map_err(|e| log::warn!("post: no copy of the world for water: {}", e.0))
                     .ok();
-                Ok((p, copy, slots.pop().unwrap_or_default()))
+                Ok((p, copy, slots.pop().unwrap_or_default(), low, low_slots))
             });
         match made {
-            Ok((p, copy, slots)) => {
+            Ok((p, copy, slots, low, low_slots)) => {
+                if let Some(old) = std::mem::replace(&mut self.low_pipe, low) {
+                    gpu.destroy_pipeline(old);
+                }
+                self.low_slots = low_slots;
                 if let Some(old) = self.pipeline.replace(p) {
                     gpu.destroy_pipeline(old);
                 }
@@ -177,6 +222,8 @@ impl Post {
             size: [frame.width as f32, frame.height as f32],
             depth,
             pad: 0,
+            low: 0,
+            spare: 0,
         };
         let buf = self.copy_params[frame.slot];
         gpu.mapped(buf)[..size_of::<Pass>()].copy_from_slice(bytemuck::bytes_of(&pass));
@@ -232,9 +279,58 @@ impl Post {
                 size: [frame.width as f32, frame.height as f32],
                 depth,
                 pad: 0,
+                low: 0,
+                spare: 0,
             })
             .collect();
         let mut passes = passes;
+        // The half-size parts first: each into its effect's own image, which that effect reads.
+        let mut lows: Vec<TextureId> = Vec::new();
+        if self.low_pipe.is_some() {
+            let (w, h) = (frame.width.div_ceil(2).max(1), frame.height.div_ceil(2).max(1));
+            for (i, (name, _)) in active[..n].iter().enumerate() {
+                let slot = self.low_slots.slot(name);
+                if slot == 0 {
+                    continue;
+                }
+                let at = match self.low_targets.iter().position(|t| t.0 == *name) {
+                    Some(at) => at,
+                    None => {
+                        self.low_targets
+                            .push((name.clone(), TextureId(u32::MAX), 0, (0, 0)));
+                        self.low_targets.len() - 1
+                    }
+                };
+                if self.low_targets[at].3 != (w, h) {
+                    // The GPU frees the old image once no frame in flight still draws with it.
+                    if self.low_targets[at].1 != TextureId(u32::MAX) {
+                        gpu.destroy_texture(self.low_targets[at].1);
+                    }
+                    let t = gpu.create_texture(
+                        &TextureDesc { width: w, height: h, mips: 1, format: Format::Rgba16Float, render_target: true },
+                        "post low",
+                    );
+                    self.low_targets[at] = (name.clone(), t, gpu.texture_index(t), (w, h));
+                }
+                passes[i].low = self.low_targets[at].2 + 1;
+                lows.push(self.low_targets[at].1);
+            }
+        }
+        let low_entries: Vec<Pass> = active[..n]
+            .iter()
+            .filter(|(name, _)| self.low_pipe.is_some() && self.low_slots.slot(name) != 0)
+            .map(|(name, strength)| Pass {
+                scene: idx[0],
+                slot: self.low_slots.slot(name),
+                strength: *strength,
+                time,
+                size: [frame.width as f32, frame.height as f32],
+                depth,
+                pad: 0,
+                low: 0,
+                spare: 0,
+            })
+            .collect();
         // Merged (`packs::merge_effects`): one pass runs them all, the first's `pad` their count.
         let mut n = if n > 1 && crate::packs::merge_effects() {
             passes[0].pad = n as u32;
@@ -249,11 +345,29 @@ impl Post {
         // water took 6-7.8 ms, Planner 11-04).
         if scaled && !self.active.is_empty() && n < MAX_PASSES {
             passes.truncate(n);
-            passes.push(Pass { scene: idx[n % 2], slot: 0, strength: 1.0, pad: 0, ..passes[0] });
+            passes.push(Pass { scene: idx[n % 2], slot: 0, strength: 1.0, pad: 0, low: 0, ..passes[0] });
             n += 1;
         }
         let buf = self.params[frame.slot];
+        // The main passes, then the half-size parts' entries after them (`lows` holds their index).
+        let first_low = passes.len();
+        passes.extend(low_entries);
+        passes.truncate(MAX_PASSES);
         gpu.mapped(buf)[..passes.len() * size_of::<Pass>()].copy_from_slice(bytemuck::cast_slice(&passes));
+        if let Some(low_pipe) = self.low_pipe {
+            for (k, target) in lows.iter().enumerate() {
+                let entry = first_low + k;
+                if entry >= passes.len() {
+                    break;
+                }
+                list.push(Cmd::BeginPass { color: Some((Target::Texture(*target), Some([0.0; 4]))), depth: None });
+                list.pipeline(low_pipe);
+                list.bind(crate::gpu_layout::bind::post::PASSES, buf);
+                list.bind(crate::gpu_layout::bind::post::SCENE, scene);
+                list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: entry as u32 });
+                list.push(Cmd::EndPass);
+            }
+        }
         for i in 0..n {
             let target = if i + 1 == n { Target::Surface } else { Target::Texture(tex[(i + 1) % 2]) };
             list.push(Cmd::BeginPass { color: Some((target, Some([0.0; 4]))), depth: None });

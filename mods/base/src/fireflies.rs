@@ -1,7 +1,8 @@
 //! Fireflies on warm nights (`notes/NIGHT_GLOW.md`, Research round 17's recommendation 1; the
 //! numbers in `vitals::fireflies`). The server works out every few seconds how many fly round each
 //! player, as a share of the full count (the client knows neither biome, air nor soil), and puts it
-//! on the player. The client keeps that share of `base:fx_fireflies`' count alive as particles, in
+//! on the player. The client keeps that share of `base:fx_fireflies`' count (0 off, 1 few, 2 many;
+//! a row of the Fantasy screen, `video.rs`) alive as particles, in
 //! clusters over the ground near the player, away from torches and under open sky. They give no
 //! light; the pack's particle shader makes them blink (Lighting).
 
@@ -13,13 +14,10 @@ use weft_sdk::*;
 
 /// Art's firefly: a speck of yellow-green light, three frames.
 pub static FIREFLY: Particle = Particle::named("firefly");
-/// Fireflies: 0 off, 1 few, 2 many (`vitals::fireflies::COUNTS`).
-pub static FX_FIREFLIES: Config<i32> = Config::named("fx_fireflies");
 /// The share of the full count that fly round this player now (0 to 1), the server's.
 static HERE: Component<f32> = Component::named("fireflies");
 
 pub fn register(r: &mut Registry) {
-    r.config(&FX_FIREFLIES).int(1, 0, 2);
     r.entity_component(&HERE, 0.0, component_flags::SYNC_OWNER);
     r.attach(&PLAYER, &HERE);
     r.particle(&FIREFLY)
@@ -155,7 +153,7 @@ fn frame(c: &Client) {
         .map_or(0.0, |l| now.duration_since(l).as_secs_f32())
         .min(0.25);
     s.last = Some(now);
-    let setting = FX_FIREFLIES.get().clamp(0, 2) as usize;
+    let setting = crate::video::FX_FIREFLIES.get().clamp(0, 2) as usize;
     let view = c.view();
     let (me, share) = (view.player_state(), view.component(&HERE));
     if s.logged

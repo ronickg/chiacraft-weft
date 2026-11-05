@@ -115,3 +115,9 @@ pub fn problems() -> Vec<String> {
 pub fn anyone_eats(item: u32) -> bool {
     SPECIES.iter().any(|s| s.food(item).is_some())
 }
+
+/// Species `s`'s crowd where `pos` is: as heavily as its biome is stocked
+/// (`animals_core::species::Species::crowd_in`).
+pub fn crowd_at(w: &weft_sdk::World, s: &Species, pos: impl Into<weft_sdk::BlockPos>) -> u32 {
+    s.crowd_in(weft_sdk::name_of(weft_sdk::abi::entry_kind::BIOME, w.biome(pos)))
+}

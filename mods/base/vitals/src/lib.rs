@@ -17,6 +17,7 @@ pub mod crafts;
 pub mod crops;
 pub mod difficulty;
 pub mod effects;
+pub mod events;
 pub mod felling;
 pub mod fireflies;
 pub mod first;

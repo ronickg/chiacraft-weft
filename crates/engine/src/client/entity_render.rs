@@ -160,6 +160,9 @@ struct Sprite {
 pub struct EntityRenderer {
     /// What the head's move in an action does to the camera: offset in view space, roll, pitch.
     pub camera_kick: (Vec3, f32, f32),
+    /// An entity kind a UI preview shows alone (`Ui::kind_model`): its skin is loaded although
+    /// none of it is in the world (the Field Journal's picture was empty).
+    pub preview_kind: Option<u32>,
     pipeline: PipelineId,
     overlay: PipelineId,
     /// Model pipelines for the screen and for the inventory figure's image.
@@ -340,6 +343,7 @@ impl EntityRenderer {
             preview,
             preview_pipe,
             preview_target: None,
+            preview_kind: None,
             skins: FxHashMap::default(),
             player_skins: FxHashMap::default(),
             skin_pending: Vec::new(),
@@ -762,6 +766,12 @@ impl EntityRenderer {
         self.seen_kinds = seen;
         self.seen_items = seen_items;
         self.load(gpu, assets, &c.game.entities[c.game.player_kind as usize].texture);
+        if let Some(k) = self
+            .preview_kind
+            .filter(|&k| (k as usize) < c.game.entities.len())
+        {
+            self.load(gpu, assets, &c.game.entities[k as usize].texture);
+        }
         for &i in worn {
             if let Some((_, t)) = c.worn(i) {
                 self.load(gpu, assets, t);
@@ -2155,7 +2165,9 @@ impl EntityRenderer {
                     if model.is_none() {
                         if let Some(m) = self.item_model(textures, &stack) {
                             let display = self.models.displays.get(&item).copied();
-                            let inst = item_instance(held_transform(arm, item, off, display), m.0, 0.0, lit);
+                            // In its own first-person hand, as much bigger as its kind says.
+                            let grow = if own { first_person_held_scale(posed[holder].kind) } else { 1.0 };
+                            let inst = item_instance(held_transform(arm, item, off, display, grow), m.0, 0.0, lit);
                             if own {
                                 hand_items.push((inst, m.1));
                             } else {
@@ -2418,7 +2430,20 @@ fn shows_block(item: u32) -> bool {
 /// Where an item goes in the hand of a model, from its arm at the shoulder (pixels): vanilla's
 /// ItemInHandLayer, then the item model's third person display transform. Vanilla's model space is
 /// ours turned around z, and it measures from a shoulder one pixel closer to the body.
-fn held_transform(arm: Mat4, item: u32, off: bool, display: Option<Display>) -> Mat4 {
+/// How much bigger than held items are drawn in kind `kind`'s own first-person hand
+/// (`comp::FIRST_PERSON_HELD_SCALE`, 1 without it).
+fn first_person_held_scale(kind: u32) -> f32 {
+    let c = content();
+    c.components
+        .id(weft_abi::comp::FIRST_PERSON_HELD_SCALE)
+        .and_then(|id| c.components.get::<f32>(crate::components::ENTITY, kind, id))
+        .filter(|s| s.is_finite() && *s > 0.0)
+        .unwrap_or(1.0)
+}
+
+/// An item held by `arm`: its model file's display (or the defaults), `grow` times as big about
+/// where it's held.
+fn held_transform(arm: Mat4, item: u32, off: bool, display: Option<Display>, grow: f32) -> Mat4 {
     use std::f32::consts::{FRAC_PI_2, PI};
     let deg = |d: f32| d.to_radians();
     let hand = arm
@@ -2451,7 +2476,7 @@ fn held_transform(arm: Mat4, item: u32, off: bool, display: Option<Display>) -> 
         * Mat4::from_rotation_x(deg(rx))
         * Mat4::from_rotation_y(deg(ry * side))
         * Mat4::from_rotation_z(deg(rz * side))
-        * Mat4::from_scale(Vec3::from_array(d.scale))
+        * Mat4::from_scale(Vec3::from_array(d.scale) * grow)
         // Seen from behind, a flat item is its mirror image, without turning its faces inside out.
         * Mat4::from_rotation_y(if off { PI } else { 0.0 })
         * Mat4::from_translation(Vec3::splat(-0.5))

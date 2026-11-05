@@ -95,7 +95,7 @@ const fn m(
 }
 
 /// Densities: flint and chert 2.6, obsidian 2.4, bone and antler 1.9, copper 8.96, bronze 8.8,
-/// wrought iron 7.7, steel 7.85, gold 19.3; seasoned oak 0.75, birch 0.65, spruce 0.45, mesquite
+/// wrought iron 7.7, meteoric iron 7.9 (iron with 5-12 % nickel), steel 7.85, gold 19.3; seasoned oak 0.75, birch 0.65, spruce 0.45, mesquite
 /// 0.88. Working-part numbers from Content's ladder (`notes/CONTENT.md`, "The ladder").
 pub const MATERIALS: &[Material] = &[
     // Stone and bone (tier 1).
@@ -112,6 +112,10 @@ pub const MATERIALS: &[Material] = &[
     m("copper", "material.base.copper", &[W, F], 8.96, 1.0, 150, 150.0, 5.0, 1.5, (0.0, 0.0), 120.0, "soft", Making::Forge),
     m("bronze", "material.base.bronze", &[W, F], 8.8, 1.0, 200, 250.0, 7.0, 2.0, (0.0, 0.0), 220.0, "recastable", Making::Cast),
     m("wrought_iron", "material.base.wrought_iron", &[W, F], 7.7, 1.0, 220, 275.0, 7.0, 2.0, (0.0, 0.0), 260.0, "weldable", Making::Forge),
+    // Meteoric iron (sky events, Research round 17's addendum): iron-nickel from fallen stars,
+    // hammered cold as the Inuit worked Cape York's, so iron-grade heads before a player can smelt;
+    // a lucky early step between bronze and wrought iron, found a few lumps at a time.
+    m("meteoric_iron", "material.base.meteoric_iron", &[W, F], 7.9, 1.0, 200, 240.0, 6.5, 2.0, (0.0, 0.0), 220.0, "", Making::Forge),
     m("steel", "material.base.steel", &[W, F], 7.85, 1.0, 300, 500.0, 8.0, 3.0, (0.0, 0.0), 400.0, "tempered", Making::Forge),
     m("gold", "material.base.gold", &[F], 19.3, 1.0, 0, 30.0, 6.0, 0.0, (0.0, 0.0), 40.0, "", Making::Cast),
     // Wood, for hafts, shafts and grips (and wooden heads: a club, a digging stick).
