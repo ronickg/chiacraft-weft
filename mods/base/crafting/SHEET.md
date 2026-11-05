@@ -46,7 +46,7 @@ Points: material up to 40, work up to 40 (from memory up to 30, a machine 22), s
 | osage_orange (provisional) | working, holding | 0.86 | 1.6 | 0 | 65 | 2 | 0 | uses +8%, speed +0% | - | - |
 | spruce | working, holding | 0.45 | 1.6 | 0 | 45 | 2 | 0 | uses -5%, speed +5% | - | light |
 | branch | holding | 0.6 | 1.6 | 0 | 40 | 2 | 0 | uses -10%, speed +0% | - | - |
-| plant_cordage | fitting | 1.3 | 1 | 0 | 0 | 0 | 0 | - | 30 uses | cheap |
+| plant_cordage | fitting | 1.3 | 1 | 0 | 0 | 0 | 0 | - | 50 uses | cheap |
 | sinew | fitting | 1.3 | 1 | 0 | 0 | 0 | 0 | - | 60 uses | shrinks_tight |
 | rawhide | fitting, holding | 1.2 | 1 | 0 | 0 | 0 | 0 | uses +0%, speed +0% | 80 uses | shrinks_tight |
 | birch_tar | fitting | 1 | 1 | 0 | 0 | 0 | 0 | - | 70 uses | glued |

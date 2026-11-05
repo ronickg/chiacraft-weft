@@ -138,7 +138,10 @@ pub const MATERIALS: &[Material] = &[
     // Green or dead wood off the ground, weaker than a haft split from a log.
     m("branch", "material.base.branch", &[H], 0.6, 1.6, 0, 40.0, 2.0, 0.0, (-0.10, 0.0), 0.0, "", Making::Carve),
     // Fittings: what holds a head on.
-    m("plant_cordage", "material.base.plant_cordage", &[F], 1.3, 1.0, 0, 0.0, 0.0, 0.0, (0.0, 0.0), 30.0, "cheap", Making::Hands),
+    // Cordage lashing 50 (was 30): a hand-lashed first axe (Plain, x0.9: 45) fells a 60-log oak
+    // (21) and cuts its pieces (15) before it gives (PC run fh_natural4 broke at the fell); sinew
+    // and rawhide still last longer.
+    m("plant_cordage", "material.base.plant_cordage", &[F], 1.3, 1.0, 0, 0.0, 0.0, 0.0, (0.0, 0.0), 50.0, "cheap", Making::Hands),
     m("sinew", "material.base.sinew", &[F], 1.3, 1.0, 0, 0.0, 0.0, 0.0, (0.0, 0.0), 60.0, "shrinks_tight", Making::Hands),
     m("rawhide", "material.base.rawhide", &[F, H], 1.2, 1.0, 0, 0.0, 0.0, 0.0, (0.0, 0.0), 80.0, "shrinks_tight", Making::Hands),
     m("birch_tar", "material.base.birch_tar", &[F], 1.0, 1.0, 0, 0.0, 0.0, 0.0, (0.0, 0.0), 70.0, "glued", Making::Hands),
