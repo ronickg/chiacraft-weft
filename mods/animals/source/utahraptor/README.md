@@ -73,3 +73,13 @@ head jerks), walk, run, rest, screech.
 - **Neck into the head**: the neck (6.4 thick, 12 long) is slimmer than the skull and ends deep
   in it, so no corner of it pokes out of the head when the head turns and tilts; `build.py`
   asserts `ground.pokes` is empty along the body's axis.
+- **Behaviour clips** (for `src/anim.rs`): the Velociraptor's hunter set, heavier and slower:
+  stare, watch (drawn up tall), drink, sleep (in the resting look, the head tucked; in the resting
+  file too), stalk and approach (gaits), alarm (a hiss, the feathered arms flared), pounce (a leap,
+  the sickle claws swung out in front), sniff, look, scratch (the right foot up to the neck, its
+  reach fitted), stretch, play, groom (preening the right arm), nuzzle, flinch, death (onto its
+  side). No rear or charge: it hunts. Leans pitch the hips with the legs taken back off them (the
+  chest bent pokes the hips through it); every standing clip's height is set from its feet frame by
+  frame, the fall's from its lowest point. The resting arms are tucked up (hanging, the wing
+  feathers went 7.3 into the ground); the shaggy thigh feathers still go 3.2 in when it lies (they
+  hang from the hips).
