@@ -46,6 +46,11 @@ pub fn register(r: &mut Registry) {
                 Arg::Int((n.soil * 100.0).round() as i64),
                 Arg::Float(n.hour as f64, 1),
                 Arg::Float(n.sunset as f64, 1),
+                // What the server last put on you (`count`): the client's share.
+                Arg::Int(
+                    w.component(Holder::entity(cmd.player()), &HERE)
+                        .map_or(-1, |v| (v * 100.0).round() as i64),
+                ),
             ],
         );
     });
@@ -146,7 +151,15 @@ fn frame(c: &Client) {
     s.last = Some(now);
     let setting = FX_FIREFLIES.get().clamp(0, 2) as usize;
     let view = c.view();
-    let (Some(me), Some(share)) = (view.player_state(), view.component(&HERE)) else { return };
+    let (me, share) = (view.player_state(), view.component(&HERE));
+    if s.logged
+        .is_none_or(|l| now.duration_since(l).as_secs_f32() >= 5.0)
+        && (me.is_none() || share.is_none())
+    {
+        weft_sdk::info!("fireflies: no player state ({}) or share ({:?}) on the client", me.is_some(), share);
+        s.logged = Some(now);
+    }
+    let (Some(me), Some(share)) = (me, share) else { return };
     let want = ff::COUNTS[setting] as f32 * share;
     if want < 0.5 {
         s.clusters.clear();
