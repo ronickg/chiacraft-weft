@@ -734,6 +734,10 @@ gpu_struct! {
         /// thunders now (as `weather.w`), w unused. The engine's own flash only brightens the
         /// daylight for 0.15 s; packs draw the bolt and the flicker from this.
         pub lightning: [f32; 4],
+        /// How this frame is drawn: x 1 when into the HDR world (`post::hdr`: linear light past 1,
+        /// the picture finished in the effects' last pass, so a pack's surfaces leave its tone
+        /// curve to that pass); 0 into the screen or a preview. yzw unused.
+        pub frame: [f32; 4],
     }
 }
 

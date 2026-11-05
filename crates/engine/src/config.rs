@@ -664,6 +664,9 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::number("core:soft_clouds", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         // Screen effects' half-size parts (`post_low`); off, every effect at full size, as before.
         ConfigDef::number("core:post_low", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
+        // The world drawn in 16-bit float (linear light past 1) with the screen effects after it and
+        // the picture finished in one last pass (chiacraft, the HDR world); read at start.
+        ConfigDef::number("core:hdr_world", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:allow_avatars", ck::BOOL, 1.0, 0.0, 1.0, 0.0) },
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:keep_inventory", ck::BOOL, 0.0, 0.0, 1.0, 0.0) },
     ];

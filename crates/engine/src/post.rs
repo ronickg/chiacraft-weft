@@ -31,8 +31,29 @@ pub const HOOK_LOW: Hook = Hook {
     fallback: "return vec4(0.0);",
 };
 
+static HDR: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// The HDR world (chiacraft, `core:hdr_world`): set once at start, before any pipeline is made, as
+/// every pipeline drawing into the world must have its image's format.
+pub fn set_hdr(on: bool) {
+    HDR.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Whether the world is drawn in 16-bit float, the screen effects after it and the picture finished
+/// in the last pass (`Pass::spare` 1 there, for a pack's tone curve).
+pub fn hdr() -> bool {
+    HDR.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// The format of the image the world is drawn into: the screen's, or 16-bit float.
+pub fn world_format() -> Format {
+    if hdr() { Format::Rgba16Float } else { Format::Surface }
+}
+
 pub struct Post {
     pipeline: Option<PipelineId>,
+    /// With the HDR world: the same shader drawing the last pass onto the screen (its format).
+    final_pipe: Option<PipelineId>,
     slots: Slots,
     /// The half-size parts' pipeline and slots (`HOOK_LOW`), and each effect's image for it:
     /// (name, texture, bindless index, size).
@@ -62,6 +83,7 @@ impl Post {
     pub fn new(gpu: &mut dyn Backend, assets: &Assets) -> Post {
         let mut p = Post {
             pipeline: None,
+            final_pipe: None,
             slots: Slots::default(),
             low_pipe: None,
             low_slots: Slots::default(),
@@ -110,7 +132,7 @@ impl Post {
                         shader: &s,
                         vertex: "vs",
                         fragment: Some("fs"),
-                        color: Some(Format::Surface),
+                        color: Some(world_format()),
                         depth: None,
                         blend: Blend::None,
                         cull_back: false,
@@ -124,7 +146,7 @@ impl Post {
                         shader: &s,
                         vertex: "vs",
                         fragment: Some("fs_copy_behind"),
-                        color: Some(Format::Surface),
+                        color: Some(world_format()),
                         depth: Some(DepthState { write: true, compare: Compare::Always }),
                         blend: Blend::None,
                         cull_back: false,
@@ -132,10 +154,32 @@ impl Post {
                     })
                     .map_err(|e| log::warn!("post: no copy of the world for water: {}", e.0))
                     .ok();
-                Ok((p, copy, slots.pop().unwrap_or_default(), low, low_slots))
+                // The last pass onto the screen, from the HDR world.
+                let last = if hdr() {
+                    Some(
+                        gpu.create_pipeline(&PipelineDesc {
+                            label: "post last",
+                            shader: &s,
+                            vertex: "vs",
+                            fragment: Some("fs"),
+                            color: Some(Format::Surface),
+                            depth: None,
+                            blend: Blend::None,
+                            cull_back: false,
+                            topology: Topology::Triangles,
+                        })
+                        .map_err(|e| e.0)?,
+                    )
+                } else {
+                    None
+                };
+                Ok((p, copy, slots.pop().unwrap_or_default(), low, low_slots, last))
             });
         match made {
-            Ok((p, copy, slots, low, low_slots)) => {
+            Ok((p, copy, slots, low, low_slots, last)) => {
+                if let Some(old) = std::mem::replace(&mut self.final_pipe, last) {
+                    gpu.destroy_pipeline(old);
+                }
                 if let Some(old) = std::mem::replace(&mut self.low_pipe, low) {
                     gpu.destroy_pipeline(old);
                 }
@@ -179,7 +223,7 @@ impl Post {
             if let Some((old, ..)) = self.targets.take() {
                 old.into_iter().for_each(|t| gpu.destroy_texture(t));
             }
-            let desc = TextureDesc { width: w.max(1), height: h.max(1), mips: 1, format: Format::Surface, render_target: true };
+            let desc = TextureDesc { width: w.max(1), height: h.max(1), mips: 1, format: world_format(), render_target: true };
             let t = [gpu.create_texture(&desc, "post a"), gpu.create_texture(&desc, "post b")];
             self.targets = Some((t, t.map(|t| gpu.texture_index(t)), (w, h)));
         }
@@ -196,7 +240,7 @@ impl Post {
             }
             let (w, h) = (w.max(1), h.max(1));
             let color = gpu.create_texture(
-                &TextureDesc { width: w, height: h, mips: 1, format: Format::Surface, render_target: true },
+                &TextureDesc { width: w, height: h, mips: 1, format: world_format(), render_target: true },
                 "behind color",
             );
             let depth = gpu.create_texture(
@@ -355,6 +399,10 @@ impl Post {
         }
         let buf = self.params[frame.slot];
         // The main passes, then the half-size parts' entries after them (`lows` holds their index).
+        // The last pass finishes the picture in the HDR world (a pack's tone curve, `spare` 1).
+        if hdr() && n > 0 {
+            passes[n - 1].spare = 1;
+        }
         let first_low = passes.len();
         passes.extend(low_entries);
         passes.truncate(MAX_PASSES);
@@ -377,7 +425,8 @@ impl Post {
         for (i, entry) in draws.into_iter().enumerate() {
             let target = if i + 1 == n { Target::Surface } else { Target::Texture(tex[(i + 1) % 2]) };
             list.push(Cmd::BeginPass { color: Some((target, Some([0.0; 4]))), depth: None });
-            list.pipeline(pipe);
+            // Onto the screen from the HDR world: the pipeline of the screen's format.
+            list.pipeline(if i + 1 == n { self.final_pipe.unwrap_or(pipe) } else { pipe });
             list.bind(crate::gpu_layout::bind::post::PASSES, buf);
             list.bind(crate::gpu_layout::bind::post::SCENE, scene);
             list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: entry });
