@@ -657,6 +657,13 @@ pub fn hint(w: &World, player: u64, key: &str, args: &[i64]) {
     w.send(player, &HINT_TEXT, &text);
 }
 
+/// Ley sight (`notes/PROGRESSION.md`, "Round 6"): how clearly a player sees the ley lines without
+/// a dowsing rod, 0 (not at all) to 1, on the player and sent to its owner. Base registers and
+/// attaches it and draws the lines while it is over 0 (as faint as the rod's at 1, out to
+/// `vitals::ley::SHOWN_SIGHT`); the magic path's perk (the perk web) sets it. The network itself
+/// is `vitals::ley`: `ley::strength(w.seed(), x, z)` is what magic, mana and machines draw on.
+pub static LEY_SIGHT: Component<f32> = Component::named("base:ley_sight");
+
 /// Things a player has done that other mods know of and the base game's advancements read
 /// (`advancements.rs`, the "Surviving" group): a bit each (`milestones`), kept through death.
 pub static MILESTONES: Component<u32> = Component::named("base:milestones");

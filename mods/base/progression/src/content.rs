@@ -225,6 +225,10 @@ pub const RULES: &[Rule] = &[
     // ---- the first tools and fire (vitals::first)
     r(&["base:rock", "base:flint", "base:tektite", "base:stick", "base:plant_fibre", "base:sharp_flake"], 0, Shared, Material, Made),
     r(&["base:bow_drill", "base:hand_drill", "base:fire_bed", "base:campfire_laid"], 0, Shared, Station, Made),
+    // the ley lines (ley.rs, `vitals::ley`): the magic path's first step, and the ancients' stone
+    n(&["base:dowsing_rod"], 0, Magic, Tool, Made, "senses the ley lines: the Stone Age's magic route"),
+    n(&["base:ley_stone"], 0, Magic, Building, World(PICK, 3.0), "the ancients' carved stone round the waystones, some 600 blocks apart"),
+    n(&["base:waystone"], 0, Magic, Technical, Not, "a sleeping waystone on a great ley crossing: not carried off, woken later"),
     // ---- tools, weapons and armour: today's by material, and the ones built from parts
     n(
         &["base:axe", "base:pickaxe", "base:shovel", "base:hoe", "base:knife", "base:spear", "base:sword", "base:bow"],

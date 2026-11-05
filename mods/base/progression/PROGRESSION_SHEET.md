@@ -24,7 +24,7 @@ Power grows Ã—1.6 an age: `g(L) = 1.6^(L/10)` over area and item level L (tier Ã
 
 | tier | age | hours | EM | g at start | reference: hit / health / armour | things tagged | made | kit EM | of budget | everything once |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 489 | 147 | 49 | 34 % | 252 EM |
+| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 492 | 148 | 49 | 34 % | 257 EM |
 | 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 31 | 24 | 76 | 26 % | 164 EM |
 | 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 26 | 24 | 62 | 16 % | 250 EM |
 | 3 | Age of Steam | 18 | 1080 | 4.10 | 31.1 / 104 / 130 | 30 | 27 | 94 | 22 % | 512 EM |
@@ -246,7 +246,7 @@ Moving to the next age takes a key, one thing from each gate (materials and tool
 
 | age | tech | magic | beasts | not built yet |
 |---|---|---|---|---|
-| Stone Age | base:pickaxe, base:furnace | - | animals:club, animals:tranquilizer_dart, animals:nest | magic route: a dowsing rod (sensing ley lines); a biome boss's part; knowledge: a ruin's blueprint or lore page |
+| Stone Age | base:pickaxe, base:furnace | base:dowsing_rod | animals:club, animals:tranquilizer_dart, animals:nest | a biome boss's part; knowledge: a ruin's blueprint or lore page |
 | Bronze Age | - | - | - | all of it |
 | Iron Age | - | - | - | all of it |
 | Age of Steam | - | - | - | all of it |
@@ -258,7 +258,7 @@ Moving to the next age takes a key, one thing from each gate (materials and tool
 
 Every named item and block, by its tag (`content::RULES`). EM is the cheapest way to have one; "-" not had as an item.
 
-### Stone Age (489)
+### Stone Age (492)
 
 **tech** (45)
 
@@ -267,9 +267,12 @@ Every named item and block, by its tag (`content::RULES`). EM is the cheapest wa
 - station: furnace (1.2)
 - part: part_bar_guard (0.22), part_barbed_point (0.22), part_bearded_axe_head (0.22), part_bowstring (0.22), part_felling_axe_head (0.22), part_grip (0.22), part_haft (0.22), part_hoe_blade (0.22), part_knife_blade (0.22), part_lashing (0.22), part_leaf_point (0.22), part_long_blade (0.22), part_long_haft (0.22), part_pick_head (0.22), part_round_pommel (0.22), part_self_stave (0.22), part_shaft (0.22), part_short_blade (0.22), part_short_stave (0.22), part_shovel_blade (0.22), part_straight_blade (0.22)
 
-**magic** (1)
+**magic** (4)
 
+- tool: dowsing_rod (5.2)
+- building: ley_stone (3.0)
 - sky: eclipse_ash (40)
+- technical: waystone (-)
 
 **beasts** (34)
 
@@ -301,6 +304,9 @@ Notes:
 - animals:gateway, animals:termite_mound_upper: the Cretaceous gateway is built of amber blocks; a mound's top
 - portals:portal, packages:unknown: a linked world's door; a missing package's stand-in
 - base:eclipse_ash: falls in an eclipse
+- base:dowsing_rod: senses the ley lines: the Stone Age's magic route
+- base:ley_stone: the ancients' carved stone round the waystones, some 600 blocks apart
+- base:waystone: a sleeping waystone on a great ley crossing: not carried off, woken later
 - base:axe, base:pickaxe, base:shovel, base:hoe, base:knife, base:spear, base:sword, base:bow: built from parts: its parts' materials set its real age (`MATERIALS`)
 - base:part_*: a part's material sets its real age (`MATERIALS`)
 - base:arrow: dropped by skeletons; no recipe yet
