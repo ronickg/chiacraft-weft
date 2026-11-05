@@ -46,9 +46,19 @@ The game itself makes this folder (`weft --dist`); `tools/release/package.sh` ru
 the result and archives it. The same script runs anywhere the game builds:
 
 ```
-cargo build --release
+CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_RELEASE_STRIP=debuginfo cargo build --release
 tools/release/package.sh linux-x64      # dist/chiacraft-<commit>-linux-x64.tar.gz
 ```
+
+**No debug info.** The workflow builds with those two settings, so the archives carry no debug
+info. Our own `cargo build --release` keeps line tables (`debug = "line-tables-only"` in
+`Cargo.toml`), so the crew's backtraces name file and line. Only the workflow drops them. The
+first run without stripping (11-05) gave Linux 129 MB, Windows 43 MB and macOS 48 MB. Most of
+the Linux size was debug info inside the `.so` files, about 80 MB of it in the packages mod.
+Windows keeps its debug info in `.pdb` files, which the game folder never contained, and macOS
+leaves it in the object files. Those two only lose a small debug map. `strip = "debuginfo"`
+keeps the symbol names, so a player's crash backtrace still names the functions, without line
+numbers.
 
 What each runner needs to build: Linux `libasound2-dev pkg-config` (ALSA for sound); Windows
 NASM (for the wallet's TLS library, aws-lc-sys) and MSVC, which the runner has; macOS nothing

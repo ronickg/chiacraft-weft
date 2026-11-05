@@ -132,7 +132,14 @@ jobs:
           echo "MOLTENVK_LICENSE=$RUNNER_TEMP/MoltenVK/LICENSE" >> "$GITHUB_ENV"
 
       # The workspace's default members: the game (crates/app) and every mod in mods/.
+      # Players' copies carry no debug info. The release profile keeps line tables, for the
+      # crew's own builds' backtraces, and on Linux they stay inside the libraries: 129 MB of the
+      # first Linux artifact against 43 (Windows, in .pdb files) and 48 (macOS, left in the
+      # object files). `debuginfo` keeps the symbol names, so a backtrace still names functions.
       - name: Build
+        env:
+          CARGO_PROFILE_RELEASE_DEBUG: "0"
+          CARGO_PROFILE_RELEASE_STRIP: debuginfo
         run: cargo build --release
 
       - name: Package
