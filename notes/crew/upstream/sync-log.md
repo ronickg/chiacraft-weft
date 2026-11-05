@@ -14,6 +14,7 @@ Merge e9c8405c on sync/weft-26.11.2. Things the merge dropped or left for an own
 - Upstream bug (a PR candidate for Ronald): client/particles.rs spawn indexed c.states with world.block() of a cell whose cube hadn't arrived (u32::MAX): a panic right after a teleport (SYNC4, world::crater). Fixed in the sync with .get().
 - Upstream bug (a PR candidate): first person cut only bone roles (draw_own_hand, the body in view), not bone_mask: worn layers drawn by bone name kept every bone, so a shirt's torso and sleeves drew at the camera. Fixed in the sync (bones_with, Animals).
 - Upstream candidate: a steered flying mount's flight counted as a fall on the server (mount_moved's track_fall didn't know it flew); MountMove now carries flies.
+- Upstream bug (a PR candidate): sdk/ai.rs kept mob moods (anger, fear) in a process-wide static by entity id and game tick, never cleared when another world opened: a fresh world's spider took the last world's zombie's anger at the player (neutral_mobs after zombie_chases; players opening a second world too). Fixed in the sync: cleared when the seed changes or the clock goes back.
 
 ## Test fails that are not the sync (SYNC8, Tester)
 

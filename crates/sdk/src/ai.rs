@@ -25,13 +25,30 @@ struct Moods {
     fear: Vec<(u64, u64)>,
 }
 
-static MOODS: Mutex<Option<HashMap<u64, Moods>>> = Mutex::new(None);
+/// Every mob's moods, with the world they belong to: its seed and the last tick they were read.
+struct AllMoods {
+    seed: u64,
+    last: u64,
+    mobs: HashMap<u64, Moods>,
+}
+
+static MOODS: Mutex<Option<AllMoods>> = Mutex::new(None);
 
 /// `f` on mob `id`'s moods, what has run out already dropped.
 fn moods<T>(w: &World, id: u64, f: impl FnOnce(&mut Moods) -> T) -> T {
     let now = w.game_time();
+    let seed = w.seed();
     let mut all = MOODS.lock().unwrap();
-    let all = all.get_or_insert_with(HashMap::new);
+    let all = all.get_or_insert_with(|| AllMoods { seed, last: now, mobs: HashMap::new() });
+    // Another world opened in the same game (another seed, or its clock behind the last one's):
+    // its entity ids and ticks start over, so the old world's moods would land on whoever has
+    // those ids now (a spider angry at the player for a zombie's grudge).
+    if all.seed != seed || now < all.last {
+        all.mobs.clear();
+        all.seed = seed;
+    }
+    all.last = now;
+    let all = &mut all.mobs;
     // Now and then everything run out, so mobs gone leave nothing behind.
     if now % 200 == 0 && all.len() > 64 {
         all.retain(|_, m| m.anger.iter().chain(&m.fear).any(|e| e.1 > now));

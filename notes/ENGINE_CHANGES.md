@@ -126,6 +126,10 @@ These are the biggest changes. They live mostly in our crates, but each needed h
     gone), riding (seats, steering), camera modes (`camera_flags` for the crosshair, the hand and
     one's own shadow), the Vulkan upload fixes, mining on the server (our broken-tool rule is in
     `mining_rate`, keep-broken in `stack::worn`).
+  - **Fixed in upstream's code (PR candidates):** `sdk/ai.rs` mob moods cleared when another
+    world opens (they were process-wide by entity id and tick, so a zombie's anger landed on the
+    next world's spider: `neutral_mobs`); particles' spawn on a cell not arrived yet; first person
+    cutting worn layers by bone mask; a ridden flyer's flight counted as a fall (MountMove `flies`).
 - The bug fixes in section 1 are the natural PRs. Upstream already has its own versions of #83 and #84. The clean branches for #96 to #98 and `/rule` are in `notes/crew/upstream/for-ronald.md`.
 - Everything else is ours to keep in the fork unless Ronald decides to offer it.
 
