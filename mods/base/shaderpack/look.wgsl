@@ -308,21 +308,26 @@ fn blood_tint() -> vec3<f32> {
 // lights the land and the deck, and two strikes in three show their bolt in the sky, the rest a
 // glow inside the clouds. Where and how far is the flash's own random number.
 
-fn lightning_stroke(t: f32, at: f32, k: f32) -> f32 {
-    return select(0.0, k * exp(-(t - at) / 0.055), t >= at);
+fn lightning_stroke(t: f32, at: f32, k: f32, fade: f32) -> f32 {
+    return select(0.0, k * exp(-(t - at) / fade), t >= at);
+}
+
+// The strokes of the flash, each fading over `fade` seconds.
+fn lightning_strokes(fade: f32) -> f32 {
+    let t = scene.lightning.x;
+    if t > 1.2 || scene.lightning.z < 0.05 {
+        return 0.0;
+    }
+    let r = scene.lightning.y;
+    var f = lightning_stroke(t, 0.0, 1.0, fade) + lightning_stroke(t, 0.06 + 0.06 * fract(r * 7.3), 0.75, fade);
+    f += select(0.0, lightning_stroke(t, 0.2 + 0.1 * fract(r * 13.7), 0.6, fade), fract(r * 3.1) > 0.3);
+    f += select(0.0, lightning_stroke(t, 0.42 + 0.15 * fract(r * 29.1), 0.45, fade), fract(r * 5.7) > 0.55);
+    return f * lightning_near() * smoothstep(0.05, 0.4, scene.lightning.z);
 }
 
 // How bright the flash is now, 0 (none) to about 1.5 at a stroke, times how near it struck.
 fn lightning_flash() -> f32 {
-    let t = scene.lightning.x;
-    if t > 1.0 || scene.lightning.z < 0.05 {
-        return 0.0;
-    }
-    let r = scene.lightning.y;
-    var f = lightning_stroke(t, 0.0, 1.0) + lightning_stroke(t, 0.06 + 0.06 * fract(r * 7.3), 0.75);
-    f += select(0.0, lightning_stroke(t, 0.2 + 0.1 * fract(r * 13.7), 0.6), fract(r * 3.1) > 0.3);
-    f += select(0.0, lightning_stroke(t, 0.42 + 0.15 * fract(r * 29.1), 0.45), fract(r * 5.7) > 0.55);
-    return f * lightning_near() * smoothstep(0.05, 0.4, scene.lightning.z);
+    return lightning_strokes(0.055);
 }
 
 // How near the strike is, 1 close to 0.35 far.
@@ -330,9 +335,20 @@ fn lightning_near() -> f32 {
     return mix(1.0, 0.35, fract(scene.lightning.y * 47.3));
 }
 
-// Toward the strike along the horizon (a unit vector, x and z).
+// Toward the strike along the horizon (a unit vector, x and z). Two strikes in three come down
+// within about 40° of where the camera looks (`scene.inv_view_proj`'s middle ray): anywhere round
+// the compass, a quarter of them were in view and a burst of 400 shots caught flashes but no bolt
+// (Tester 2's looks3, 11-05). The rest anywhere, so storms still flash all round.
 fn lightning_toward() -> vec2<f32> {
-    let a = scene.lightning.y * 6.2831853;
+    let r = scene.lightning.y;
+    var a = r * 6.2831853;
+    if fract(r * 61.3) < 0.67 {
+        let near = scene.inv_view_proj * vec4(0.0, 0.0, 1.0, 1.0);
+        let far = scene.inv_view_proj * vec4(0.0, 0.0, 0.1, 1.0);
+        let fwd = far.xyz / far.w - near.xyz / near.w;
+        let look = atan2(fwd.x, -fwd.z);
+        a = select(a, look + (fract(r * 23.1) - 0.5) * 1.4, abs(fwd.x) + abs(fwd.z) > 1e-4);
+    }
     return vec2(sin(a), -cos(a));
 }
 
@@ -340,7 +356,9 @@ fn lightning_toward() -> vec2<f32> {
 // the ground where it struck, a few hundred to two and a half thousand blocks off, with one branch;
 // none for a strike inside the clouds.
 fn lightning_bolt(dir: vec3<f32>) -> vec3<f32> {
-    let f = lightning_flash();
+    // The channel glows on a little after each stroke's flash (0.12 s against 0.055), as a real
+    // bolt's afterimage does: it showed for a frame or two only.
+    let f = lightning_strokes(0.12);
     let r = scene.lightning.y;
     if f <= 0.0 || fract(r * 91.7) < 0.33 {
         return vec3(0.0);
