@@ -10,6 +10,7 @@ pub mod modui;
 pub mod particles;
 mod receive;
 pub mod sky;
+pub mod frame_look;
 pub mod soft_clouds;
 pub mod stack_look;
 pub mod terrain;
@@ -2672,6 +2673,8 @@ impl Client {
             canopy: [self.canopy, 0.0, 0.0, 0.0],
             // Filled in once the sky has readied them (`render`).
             soft_clouds: [0.0; 4],
+            // Filled in once the sky has readied it (`render`).
+            frame_look: [0.0; 4],
             prev_view_proj: [[0.0; 4]; 4],
             cloud_moved: [0.0; 4],
             // On the real clock (`shaders::clock`): tests pin the shaders' time, and a fireball's
@@ -3075,6 +3078,7 @@ impl Client {
         drop(s);
         // The sky readied this frame's soft clouds: their fields in the scene.
         (scene.soft_clouds, scene.prev_view_proj, scene.cloud_moved) = self.sky.soft.scene;
+        scene.frame_look = self.sky.frame_look.scene;
         gpu.mapped(scene_buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
         self.render.draw_translucent(&mut late);
         let alive = !self.dead && !self.mode.has(weft_abi::game_mode_flags::NO_INTERACT);

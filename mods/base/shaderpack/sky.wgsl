@@ -1019,3 +1019,19 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
     }
     return vec4(rgb * a, select(a, 0.0, s.ids.w != 0u));
 }
+
+// What the look works out once a frame (`client::frame_look`), drawn before the world: the palette,
+// a member a texel (`look.wgsl`'s `palette`).
+@fragment
+fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
+    let p = palette_made();
+    switch u32(in.clip.x) {
+        case 0u: { return vec4(p.zenith, 1.0); }
+        case 1u: { return vec4(p.horizon, 1.0); }
+        case 2u: { return vec4(p.glow, 1.0); }
+        case 3u: { return vec4(p.sun, 1.0); }
+        case 4u: { return vec4(p.ambient, 1.0); }
+        default: { return vec4(0.0); }
+    }
+}
+

@@ -110,7 +110,25 @@ fn blend(a: Palette, b: Palette, t: f32) -> Palette {
 
 // The palette by how high the sun stands (`scene.sun.y`, about 0.82 at noon on the leaned path): day, golden hour,
 // sunset, dusk and night, blended between.
+// The palette, as the sky worked it out once this frame (`client::frame_look`: five texels, each a
+// member), or worked out here without that (previews, a pack reload's first frame). Worked out
+// here it was some 150 instructions in up to ten places of every pixel, and the Mac's world pass
+// spilled registers (Tester's trace, 11-05).
 fn palette() -> Palette {
+    if scene.frame_look.x > 0.5 {
+        let t = textures[u32(scene.frame_look.x) - 1u];
+        return Palette(
+            textureLoad(t, vec2(0, 0), 0).rgb,
+            textureLoad(t, vec2(1, 0), 0).rgb,
+            textureLoad(t, vec2(2, 0), 0).rgb,
+            textureLoad(t, vec2(3, 0), 0).rgb,
+            textureLoad(t, vec2(4, 0), 0).rgb,
+        );
+    }
+    return palette_made();
+}
+
+fn palette_made() -> Palette {
     let e = scene.sun.y;
     // Day, after Bliss's own colours (reports in the crew notes, bliss-source.md): a muted blue
     // overhead, about sRGB 50 92 148 (it was 6 139 237), going to a light grey-blue at the horizon
@@ -339,22 +357,30 @@ fn shadow_in(m: mat4x4<f32>, info: vec4<f32>, round: f32, depth: f32, rel: vec3<
     }
     // A 4x4 of the map about the point; each of the 3x3 taps takes the nearest to the light of its
     // texel and the ones right and below. That closes the one-texel cracks between neighbouring
-    // meshes, through which sunlight would draw thin dotted lines across a shadow.
-    var map: array<f32, 16>;
-    for (var j = 0; j < 4; j++) {
-        for (var i = 0; i < 4; i++) {
-            let t = clamp(at + vec2(i - 1, j - 1), vec2(0), vec2(size - 1));
-            map[j * 4 + i] = textureLoad(textures[index], t, 0).r;
-        }
-    }
+    // meshes, through which sunlight would draw thin dotted lines across a shadow. Read a row at a
+    // time, each row's neighbouring pairs kept as a vec3: as a 16-float array indexed in loops, the
+    // Mac's compiler kept it in memory (the world pass's register spill, Tester's trace 11-05).
     var lit = 0.0;
-    for (var j = 0; j < 3; j++) {
-        for (var i = 0; i < 3; i++) {
-            let k = j * 4 + i;
-            // Reverse depth: what the light meets first is the larger.
-            let nearest = max(max(map[k], map[k + 1]), max(map[k + 4], map[k + 5]));
-            lit += select(0.0, 1.0, nearest <= ndc.z + bias);
+    var above = vec3(0.0);
+    for (var j = 0; j < 4; j++) {
+        let y = clamp(at.y + j - 1, 0, size - 1);
+        let x0 = clamp(at.x - 1, 0, size - 1);
+        let x1 = clamp(at.x, 0, size - 1);
+        let x2 = clamp(at.x + 1, 0, size - 1);
+        let x3 = clamp(at.x + 2, 0, size - 1);
+        let row = vec4(
+            textureLoad(textures[index], vec2(x0, y), 0).r,
+            textureLoad(textures[index], vec2(x1, y), 0).r,
+            textureLoad(textures[index], vec2(x2, y), 0).r,
+            textureLoad(textures[index], vec2(x3, y), 0).r,
+        );
+        // Reverse depth: what the light meets first is the larger.
+        let pairs = max(row.xyz, row.yzw);
+        if j > 0 {
+            let nearest = max(above, pairs);
+            lit += dot(select(vec3(0.0), vec3(1.0), nearest <= vec3(ndc.z + bias)), vec3(1.0));
         }
+        above = pairs;
     }
     lit /= 9.0;
     // Near its edge it hands over to the caller's guess, and so it does as the light nears the
