@@ -25,12 +25,15 @@ const SMALL: f32 = 8.0;
 const NOTABLE: f32 = 12.0;
 const KEYSTONE: f32 = 16.0;
 const START: f32 = 12.0;
-/// A link's dots: their size and the gap between them, at zoom 1.
-const DOT: f32 = 2.0;
+/// A link's dots: their size and the gap between them (GUI pixels).
+const DOT: f32 = 1.0;
 const DOT_STEP: f32 = 5.0;
-/// The zoom steps; the screen opens at `ZOOM_START`.
-const ZOOMS: [f32; 6] = [0.4, 0.55, 0.75, 1.0, 1.4, 2.0];
-const ZOOM_START: usize = 1;
+/// The zoom steps; the screen opens at `ZOOM_START`. Zoom spreads the web; the nodes keep their
+/// size (the UI guide's one pixel grid: art only at whole multiples), doubled at the closest step.
+const ZOOMS: [f32; 5] = [0.55, 0.75, 1.0, 1.4, 2.0];
+const ZOOM_START: usize = 0;
+/// The zoom from which nodes and links are drawn at twice their size.
+const ZOOM_DOUBLE: f32 = 2.0;
 /// GUI pixels a pan key moves the view, at zoom 1.
 const PAN_STEP: f32 = 40.0;
 /// The sidebar's width.
@@ -199,13 +202,14 @@ fn sidebar(ui: &mut Ui, s: &SkillWeb, points: u32, refund: bool) {
                 ui.button_with(
                     S::column()
                         .class("list_row")
-                        .pad(1.5)
+                        .pad(2.0)
                         .gap(1.0)
                         .w(SIDE_W - 6.0)
                         .tooltip_args("web.base.skill_tip", &[Arg::Key(&name), Arg::Key(&by)]),
                     move |c| change(c, |v| v.centre = region),
                     |ui| {
-                        ui.row(S::row().gap(2.0), |ui| {
+                        // The name left, the level right-aligned in its column.
+                        ui.row(S::row().gap(2.0).w(SIDE_W - 10.0), |ui| {
                             ui.text_styled(S::default().no_wrap(), &name, &[]);
                             ui.spacer();
                             ui.text_styled(S::default().no_wrap().mono(), "web.base.level", &[Arg::Int(level as i64)]);
@@ -218,10 +222,10 @@ fn sidebar(ui: &mut Ui, s: &SkillWeb, points: u32, refund: bool) {
     });
 }
 
-/// Where a web point lands in the well, and how big things are, at this view.
+/// Where a web point lands in the well at this view, on a whole GUI pixel.
 fn place(v: &View, p: (f32, f32)) -> (f32, f32) {
     let z = ZOOMS[v.zoom];
-    ((p.0 - v.centre.0) * z + VIEW_W / 2.0, (p.1 - v.centre.1) * z + VIEW_H / 2.0)
+    (((p.0 - v.centre.0) * z + VIEW_W / 2.0).round(), ((p.1 - v.centre.1) * z + VIEW_H / 2.0).round())
 }
 
 fn inside(p: (f32, f32), margin: f32) -> bool {
@@ -278,7 +282,8 @@ fn web(ui: &mut Ui, s: &SkillWeb, points: u32, v: &View) {
     let web = perks::web();
     let z = ZOOMS[v.zoom];
     // Links first, under the nodes: a row of dots, lit where both ends are taken.
-    let dot = (DOT * z.max(0.75)).round().max(1.0);
+    let times = if z >= ZOOM_DOUBLE { 2.0 } else { 1.0 };
+    let dot = DOT * times;
     for &(a, b) in &web.links {
         let (Some(na), Some(nb)) = (web.node(a), web.node(b)) else { continue };
         let (pa, pb) = (place(v, na.pos()), place(v, nb.pos()));
@@ -288,10 +293,10 @@ fn web(ui: &mut Ui, s: &SkillWeb, points: u32, v: &View) {
         let lit = perks::has(&s.taken, a) && perks::has(&s.taken, b);
         let class = if lit { "perk_link_taken" } else { "perk_link" };
         let len = (pb.0 - pa.0).hypot(pb.1 - pa.1);
-        let steps = (len / (DOT_STEP * z.max(0.6))).floor().max(1.0) as u32;
+        let steps = (len / (DOT_STEP * times)).floor().max(1.0) as u32;
         for k in 1..steps {
             let t = k as f32 / steps as f32;
-            let p = (pa.0 + (pb.0 - pa.0) * t, pa.1 + (pb.1 - pa.1) * t);
+            let p = ((pa.0 + (pb.0 - pa.0) * t).round(), (pa.1 + (pb.1 - pa.1) * t).round());
             if inside(p, dot) {
                 ui.panel(class, S::column().size(dot, dot).at_pivot(p.0, p.1, [0.5, 0.5]), |_| {});
             }
@@ -305,7 +310,7 @@ fn web(ui: &mut Ui, s: &SkillWeb, points: u32, v: &View) {
             Kind::Notable => ("notable", NOTABLE),
             Kind::Keystone => ("keystone", KEYSTONE),
         };
-        let d = (size * z.max(0.6)).round();
+        let d = size * times;
         if !inside(p, d / 2.0) {
             continue;
         }
