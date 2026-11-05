@@ -82,14 +82,9 @@ pub fn register(r: &mut Registry) {
                     .texture(if name == "glow_mycena" { "glow_mycena_small" } else { name })
                     .grows(growth::step_secs(full, 1, 300.0), light)
                     .on_grow(move |e| growth::grow(e, full, true, |e| spread(e, full)));
-                // Foxfire and goblin's gold lie flat, a sixteenth high, like a mat; a slot shows
-                // their own picture.
-                let b = if wild::LIES_FLAT.contains(&full) {
-                    b.model_box([0.0, 0.0, 0.0], [16.0, 1.0, 16.0])
-                        .item_texture(name)
-                } else {
-                    b
-                };
+                // Foxfire and goblin's gold lie flat, a sixteenth high, like a mat (their slot shows
+                // the model until Art draws item pictures).
+                let b = if wild::LIES_FLAT.contains(&full) { b.model_box([0.0, 0.0, 0.0], [16.0, 1.0, 16.0]) } else { b };
                 if p.gives.is_some() { b.no_item() } else { b.tab(&crate::tabs::NATURAL) }
             }
             // A lily pad lies flat on the water.
