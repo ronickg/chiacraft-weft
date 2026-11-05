@@ -1068,9 +1068,12 @@ impl Lod {
     }
 }
 
-/// Tiles' heights worked out at once at most: three per LOD thread keeps them all busy.
+/// Tiles' heights worked out at once at most: eight per LOD thread, about a fifth of a second of
+/// them ahead of a made tile's meshing. Three per thread starved a fast flight (PC, 11-05: 100
+/// tiles a second, 340 missing, against 120-300 and 250 with no cap); 256 kept the first tiles
+/// back 1.5 s.
 fn heights_in_flight() -> usize {
-    pool().current_num_threads() * 3
+    pool().current_num_threads() * 8
 }
 
 /// Heights of the mod features `custom` at the tile's columns, for its job.
