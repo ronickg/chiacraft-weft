@@ -246,6 +246,22 @@ it's already, I think, a huge win"):
 - **Bounded tweaks.** Hand tweaks are bounded multipliers on the derived values, each with a reason, and the checks still run on the result.
 - **Every system, not only combat:** skills, bosses, loot, magic, tames, automation and exploration, all priced in one shared currency of value. Its method is in `reports/Balance model.md` (running).
 
+### The balance model (Ronald's answers, 11-06)
+
+From `reports/Balance model.md`. Everything is priced in one currency, effort minutes. Each
+system gets a budget in it. Numbers come from curves, and checks and sheets catch anything out
+of band.
+- **Fight lengths, as proposed:** for a player geared for the same age, a large dinosaur takes 20-40 s of fighting, a huge one 60-120 s, a titan or boss 2-5 minutes, small ones about 1-5 s.
+- **Floors, as proposed:** over-tier gear counts only up to a ceiling against big creatures. A stone-age titan takes at least 2½ minutes even in star-age gear and can still down you in two hits, a huge one about 50 s, a large one 10 s; small ones die in one hit. Damage over the floor goes into stagger and part breaks.
+- **Creature levels** (Ronald: "animals should prob have 0-200 acrso the board, so its less of different tiers per biomie, but ofc a dragon should be super strong vs othernanim,asls"):
+  - every wild animal rolls a level from 0 to 200 anywhere;
+  - the species sets the base strength through its size class and role, so a dragon stays far above a deer;
+  - a level-200 animal is about 5× a level-0 one of the same species;
+  - this replaces the earlier "a top roll is worth about one age", and the balance model's per-biome area levels apply to places and loot, not to animal levels.
+- **Tames in later ages:** carried up by saddles and gear (a higher-age saddle or armour raises the tame), capped like player gear.
+- **Damage:** armour / (armour + 5 × hit), capped at 80%, with penetration, damage types, weak points and part breaks.
+- **Today's big animals are too soft for these bands.** At the stone age the utahraptor should be about 171 health (it's 60), and a stone sword kills a cedarosaurus in under 40 s. They get re-derived when the curves land.
+
 ## What's next
 
 1. **Research:** how Ark, Vintage Story, Terraria, Skyrim, GregTech or All the Mods, Thaumcraft or Botania, and Valheim structure their progression and keep it balanced. What to take, what to avoid.
