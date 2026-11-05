@@ -87,11 +87,13 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         let pass_ = passes[in.pass_index + k];
         let px = PostPixel(in.uv, color, pass_.strength, pass_.time, pass_.size, first.scene, pass_.depth, pass_.low);
         color = vec4(post_apply(pass_.slot, px).rgb, 1.0);
-    }
-    // The effects' last pass from the HDR world finishes the picture (chiacraft's tone curve and
-    // grade, `finish_picture` in look.wgsl): the surfaces left it in linear light.
-    if first.spare == 1u && scene.frame.x > 0.5 {
-        color = vec4(finish_picture(color.rgb), 1.0);
+        // The HDR world's last effect finishes the picture (chiacraft's tone curve and grade,
+        // `finish_picture` in look.wgsl): the surfaces left it in linear light. Checked on each
+        // entry, as merged (`pad`) the last effect is not the first entry, which alone was read
+        // before, so a merged pass never finished the picture.
+        if pass_.spare == 1u && scene.frame.x > 0.5 {
+            color = vec4(finish_picture(color.rgb), 1.0);
+        }
     }
     return color;
 }
