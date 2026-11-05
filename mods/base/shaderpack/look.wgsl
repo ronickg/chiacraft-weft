@@ -808,7 +808,12 @@ fn storm() -> f32 {
 fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
     let f = scene.weather.z;
     let s = storm();
-    let h = p.y - floor;
+    // In the HDR world the mist (not a storm's dust or snow) lies below a height of its own, a few
+    // blocks over the sea, as Bliss's does: rivers, lakes and valleys fill, and ridges and forests
+    // higher up stand out of it. Lying on whatever ground was under it, it blanketed the hills too
+    // and the forest vista at dawn was a white sea (the checkpoint, 11-05).
+    let floor_at = select(floor, mix(min(floor, SEA_LEVEL + 8.0), floor, s), scene.frame.x > 0.5);
+    let h = p.y - floor_at;
     // In a forest the morning mist rises into the crowns (a rainforest's lies on its canopy at
     // dawn, 25-35 blocks up).
     let low = exp(-max(h - 3.0, 0.0) / mix(7.0 + 12.0 * min(canopy(), 1.0), 40.0, s));
