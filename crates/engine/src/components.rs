@@ -51,6 +51,7 @@ pub const BUILTIN: &[(&str, &str)] = &[
     (abi::comp::SPLASH, "str"),
     (abi::comp::BUBBLE, "str"),
     (abi::comp::SWIMS_IN, "str"),
+    (abi::comp::FIRST_PERSON_HELD_SCALE, "f32"),
     (abi::comp::CONDUCTOR, ""),
     (abi::comp::ENERGY, <abi::Energy as abi::Schema>::SCHEMA),
     (abi::comp::WORN, <abi::Worn as abi::Schema>::SCHEMA),

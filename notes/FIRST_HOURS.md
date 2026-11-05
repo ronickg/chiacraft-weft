@@ -11,8 +11,9 @@ screen's look by UI redo) and seen in PC runs (11-05). The research behind it is
   knaps an axe head (8 squares away), a pick head (13) or a shovel blade (8). A click inside the
   outline breaks the nodule into a flake. No knife blade: a knife is a flake on a stick.
 - After a head of a shape has been held, flint makes it from the book or the grid (1 flint an
-  axe head, 2 side by side a pick head, 2 stacked a shovel blade), from memory. It's instant;
-  a craft time waits for the book's queue.
+  axe head, 2 side by side a pick head, 2 stacked a shovel blade), from memory, in the book only
+  (the grid shows none): 8 s a head (`HEAD_FROM_BOOK_SECS`), queued per player with a knock each
+  second, the flint taken as each head is made (none lost if the bag changes meanwhile).
 - No shaved-haft step: the stick in the hafting recipe is the haft (`branch` wood).
 - The lit bed becomes today's campfire. Today's campfire recipe (two logs, two sticks) lays it
   unlit (`campfire_laid`), lit by the drill too: one rule for fire (Planner, 11-05). Flint and

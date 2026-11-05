@@ -194,7 +194,16 @@ fn camera_sides(lo: Vec3) -> [bool; 6] {
 /// rank, see `camera_sides`). The view's draws of the world start at the translucent layer (2): its
 /// opaque and cutout layers are `CubeTable`'s; a structure's, and the sun-shadow passes, all layers
 /// (0), or terrain would cast no shadows (chiacraft).
-fn mesh_draws(m: &GpuMesh, key: MeshKey, lo: Vec3, k: i32, cam_cube: IVec3, seen: [bool; 6], first_layer: usize, out: &mut Vec<DrawRecord>) -> u64 {
+fn mesh_draws(
+    m: &GpuMesh,
+    key: MeshKey,
+    lo: Vec3,
+    k: i32,
+    cam_cube: IVec3,
+    seen: [bool; 6],
+    first_layer: usize,
+    out: &mut Vec<DrawRecord>,
+) -> u64 {
     let rel = if k == 0 { key.1 - cam_cube } else { key.1 };
     let origin = [rel.x, rel.y, rel.z, k];
     let center = lo + Vec3::splat(8.0);
