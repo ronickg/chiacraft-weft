@@ -492,21 +492,31 @@ fn queue(w: &World, player: u64, station: Station, r: &Recipe, count: u32, secs:
     }
     let each = (secs * vitals::TICKS as f32).round().max(1.0) as u64;
     let (recipe, now, dim) = (id_of(r), w.game_time(), w.dimension());
-    let mut q = QUEUED.lock().unwrap();
-    match q.iter_mut().find(|e| e.player == player) {
-        Some(e) if e.recipe == recipe && e.station == station => e.left = (e.left + count).min(MAX_BATCH),
-        _ => {
-            q.retain(|e| e.player != player);
-            q.push(Queued { player, dim, station, recipe, left: count, at: now + each, each });
+    let started = {
+        let mut q = QUEUED.lock().unwrap();
+        match q.iter_mut().find(|e| e.player == player) {
+            Some(e) if e.recipe == recipe && e.station == station => {
+                e.left = (e.left + count).min(MAX_BATCH);
+                false
+            }
+            _ => {
+                q.retain(|e| e.player != player);
+                q.push(Queued { player, dim, station, recipe, left: count, at: now + each, each });
+                true
+            }
         }
-    }
+    };
     weft_sdk::info!(
         "crafting: queued {count} x {} at {station:?} from the book, {secs} s each",
         r.outputs().first().map_or("?", |o| item_name(o.0.item))
     );
-    base_api::hint(w, player, "hint.base.knapping_book", &[secs.round() as i64]);
-    if let Some(e) = w.entity(player) {
-        w.play_sound(&WORKING, e.pos, 0.7);
+    // Said once when a line starts; more of the same joins it quietly (a fast clicker queued four
+    // of the same hint, PC run fh_bookhead1).
+    if started {
+        base_api::hint(w, player, "hint.base.knapping_book", &[secs.round() as i64]);
+        if let Some(e) = w.entity(player) {
+            w.play_sound(&WORKING, e.pos, 0.7);
+        }
     }
 }
 

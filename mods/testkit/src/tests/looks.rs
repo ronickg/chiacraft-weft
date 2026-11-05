@@ -927,7 +927,9 @@ pub async fn distant_terrain_from_above(t: T) -> R {
         t.c().set_look(0.0, -89.0);
         t.until("distant terrain made", Duration::from_secs(20), |t| t.state().lod_tiles > 50 && t.state().lod_pending == 0)
             .await
-            .map_err(|e| format!("{e} (at y {:.0}: {} tiles shown, {} pending)", t.state().pos.y, t.state().lod_tiles, t.state().lod_pending))?;
+            .map_err(|e| {
+                format!("{e} (at y {:.0}: {} tiles shown, {} pending)", t.state().pos.y, t.state().lod_tiles, t.state().lod_pending)
+            })?;
         t.secs(0.5).await?;
         let shot = t.shot("down").await?;
         // The sky's pale blue; a cloud may be in the way, which is white.

@@ -737,6 +737,7 @@ pub static DRIP: Component<Text> = Component::named(abi::comp::DRIP);
 pub static SPLASH: Component<Text> = Component::named(abi::comp::SPLASH);
 pub static BUBBLE: Component<Text> = Component::named(abi::comp::BUBBLE);
 pub static SWIMS_IN: Component<Text> = Component::named(abi::comp::SWIMS_IN);
+pub static FIRST_PERSON_HELD_SCALE: Component<f32> = Component::named(abi::comp::FIRST_PERSON_HELD_SCALE);
 pub static CONDUCTOR: Tag = Tag::named(abi::comp::CONDUCTOR);
 pub static ENERGY: Component<abi::Energy> = Component::named(abi::comp::ENERGY);
 pub static WORN: Component<abi::Worn> = Component::named(abi::comp::WORN);

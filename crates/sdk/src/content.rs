@@ -3847,7 +3847,6 @@ impl Registry {
     }
 }
 
-
 /// Liquid id of a liquid block state (`None` for other blocks; a cell's other parts: `World::liquid_in_cell`).
 pub fn liquid_of(state: u32) -> Option<u32> {
     let l = unsafe { (host().liquid_of)(state) };

@@ -1,6 +1,7 @@
 //! Sky events in the world (`vitals::events` has the schedule and numbers; reports/Research round
 //! 17.md's addendum, Ronald: "Yes, as designed"): the dusk line foretelling tonight's event, and
-//! the blood moon's monsters.
+//! the blood moon's monsters, and the big impacts (Addendum 2): where one lands, the line telling
+//! each player which way it fell, and the pointer over the hotbar.
 //!
 //! A blood moon's monsters come on top of the hostile ones (`BLOOD_MOON_CAP` within 64 blocks of
 //! each player, `Difficulty::blood_moon_cap`), spawned here every two seconds in totality by the
@@ -35,14 +36,79 @@ const SPAWN_UP: i32 = 16;
 /// Monsters walking off at the end are gone this far from every player.
 const GONE_AT: f64 = 40.0;
 
+weft_sdk::value! {
+    /// The coarse cells (`vitals::events::BUILT_CELL` across) a player placed blocks in, the
+    /// newest `BUILT_CELLS` as (x, z) pairs: a big impact keeps away from them.
+    pub struct Built { pub cells: [i32; 64], pub len: u32, pub next: u32 }
+}
+weft_sdk::value! {
+    /// The fallen star a player is pointed to, until the game day `until` or until they reach it.
+    pub struct Star { pub x: i32, pub z: i32, pub until: u64, pub set: u32 }
+}
+/// One in `ECLIPSE_ASH_ONE_IN` blood-moon monsters leaves a pinch of it (a dye for a red-black
+/// cloak; cosmetic, so never a grind).
+pub static ECLIPSE_ASH: Item = Item::named("eclipse_ash");
+pub static BUILT: Component<Built> = Component::named("built_cells");
+pub static STAR: Component<Star> = Component::named("fallen_star");
+/// Big impacts: off, the looks only (the streak, the boom, a plume in the sea; no crater), or on.
+pub static SKY_IMPACTS: Config<u32> = Config::named("sky_impacts");
+static STAR_MARK: HudElement = HudElement::named("fallen_star");
+/// The day the last big impact fell in each dimension, so it falls once.
+static FELL: Mutex<Vec<(u32, u64)>> = Mutex::new(Vec::new());
+/// The 8 directions' keys, north first and clockwise (`vitals::events::compass`).
+static LEAVES: Tag = Tag::named("leaves");
+const DIRECTIONS: [&str; 8] = ["north", "north_east", "east", "south_east", "south", "south_west", "west", "north_west"];
+
 pub fn register(r: &mut Registry) {
+    r.config(&SKY_IMPACTS)
+        .choice(2, &["off", "looks", "on"])
+        .world();
+    r.entity_component(&BUILT, Built { cells: [0; 64], len: 0, next: 0 }, component_flags::SAVE | component_flags::KEEP_ON_RESPAWN);
+    r.attach(&PLAYER, &BUILT);
+    r.entity_component(
+        &STAR,
+        Star { x: 0, z: 0, until: 0, set: 0 },
+        component_flags::SAVE | component_flags::KEEP_ON_RESPAWN | component_flags::SYNC_OWNER,
+    );
+    r.attach(&PLAYER, &STAR);
+    // Where players build, for big impacts to keep away from.
+    r.on(&actions::PLACE_BLOCK, |b| {
+        let w = b.world();
+        for e in b.iter().filter(|e| e.player != 0) {
+            built_at(&w, e.player, e.pos);
+        }
+    });
+    // Over the hotbar, for a game day or until reached: the way to the fallen star.
+    r.hud_element(&STAR_MARK, hud_anchor::ABOVE_HOTBAR, 3, |ui| {
+        ui.text_bind(|c, out| {
+            let (Some(s), Some(me)) = (c.component(&STAR).filter(|s| s.set != 0), c.player_state()) else {
+                out.text("");
+                return;
+            };
+            if me.health <= 0.0 {
+                out.text("");
+                return;
+            }
+            let (dx, dz) = (s.x as f64 + 0.5 - me.pos.x, s.z as f64 + 0.5 - me.pos.z);
+            let dist = (dx * dx + dz * dz).sqrt().round() as i64;
+            let way = format!("hud.base.way.{}", crate::death::way((-dx).atan2(-dz) as f32, me.yaw));
+            out.set("hud.base.fallen_star", &[Arg::Int(dist), Arg::Key(&way)]);
+        });
+    });
     r.world_tick(tick);
-    // Dying ends a player's watch of the blood moon.
+    r.item(&ECLIPSE_ASH)
+        .tag("dyes")
+        .tab(&crate::tabs::INGREDIENTS);
+    // Dying ends a player's watch of the blood moon; a blood-moon monster's death may leave ash.
     r.on(&actions::DIE, |b| {
+        let w = b.world();
         let mut watching = WATCHING.lock().unwrap();
         let watching = watching.get_or_insert_with(HashMap::new);
         for d in b.iter() {
             watching.remove(&d.entity);
+            if is_blood(d.entity) && w.random_below(ev::ECLIPSE_ASH_ONE_IN) == 0 {
+                w.spawn_item(d.pos, ItemStack::new(ECLIPSE_ASH.id(), 1));
+            }
         }
     });
 }
@@ -91,6 +157,10 @@ fn tick(w: &World) {
     if !now.is_multiple_of(ROUND_TICKS) {
         return;
     }
+    if w.dimension() == crate::OVERWORLD.id() {
+        impacts(w);
+    }
+    pointers(w);
     let event = tonight(w);
     let strength = if event == Some(Event::BloodMoon) { ev::blood_moon_strength(ev::hour_of(w.day_time())) } else { 0.0 };
     watch(w, strength);
@@ -246,6 +316,236 @@ fn watch(w: &World, strength: f32) {
             false
         });
     }
+}
+
+// ---------------------------------------------------------------- big impacts
+
+/// `player` placed a block at `pos`: its cell joins their built cells if new.
+fn built_at(w: &World, player: u64, pos: BlockPos) {
+    let (cx, cz) = (pos.x.div_euclid(ev::BUILT_CELL), pos.z.div_euclid(ev::BUILT_CELL));
+    let Some(b) = w.component_mut(player, &BUILT) else { return };
+    let known = (0..b.len as usize).any(|i| b.cells[2 * i] == cx && b.cells[2 * i + 1] == cz);
+    if !known {
+        let i = b.next as usize % ev::BUILT_CELLS;
+        (b.cells[2 * i], b.cells[2 * i + 1]) = (cx, cz);
+        b.next = ((i + 1) % ev::BUILT_CELLS) as u32;
+        b.len = (b.len + 1).min(ev::BUILT_CELLS as u32);
+    }
+}
+
+/// Today's big impact, once, at its hour (the warning `IMPACT_WARN_SECS` before).
+fn impacts(w: &World) {
+    let rule = SKY_IMPACTS.get();
+    let day = w.day_time() / vitals::calendar::DAY_TICKS;
+    let Some(at) = ev::impact_on(w.seed(), day) else { return };
+    // Through the day from 06:00 (0) to the next 06:00 (1), the impact's hour on the same scale.
+    let now = (w.day_time() % vitals::calendar::DAY_TICKS) as f32 / vitals::calendar::DAY_TICKS as f32;
+    let due = (at - 6.0).rem_euclid(24.0) / 24.0;
+    if rule == 0 || now < due {
+        return;
+    }
+    let dim = w.dimension();
+    if FELL
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|&(d, f)| d == dim && f == day)
+    {
+        return;
+    }
+    // From its hour it falls the first round a site is free, when a player is out in the wilds
+    // (none is near spawn or anyone's base: PC run fh_impact1 stood at spawn and found none), and
+    // into the sea in the day's last minutes if none was.
+    let last = now >= 1.0 - ev::IMPACT_LAST_HOURS / 24.0;
+    let site = match site(w) {
+        Ok(p) => Some(p),
+        Err(why) if last => {
+            weft_sdk::info!("events: no site for day {day}'s impact by its end ({why}): into the sea");
+            None
+        }
+        Err(_) => return,
+    };
+    {
+        let mut fell = FELL.lock().unwrap();
+        fell.retain(|&(d, _)| d != dim);
+        fell.push((dim, day));
+    }
+    weft_sdk::info!(
+        "events: a big impact on day {day} (due {at:.1}h, now {:.1}h): {}",
+        ev::hour_of(w.day_time()),
+        match site {
+            Some(p) => format!("at {p:?}"),
+            None => "into the sea".into(),
+        }
+    );
+    let Some(site) = site else {
+        tell_all(w, None);
+        return;
+    };
+    tell_all(w, Some(site));
+    if rule == 2 {
+        carve(w, site);
+    }
+}
+
+/// Where a big impact lands: loaded land between `IMPACT_FROM_PLAYERS` and `IMPACT_REACH` from a
+/// player, open to the sky, level and dry over the crater's width, and far from every player,
+/// their built cells, beds and tombstones, and the world spawn. None: it falls in the sea.
+fn site(w: &World) -> Result<BlockPos, String> {
+    let players: Vec<(u64, Vec3)> = w
+        .players()
+        .into_iter()
+        .filter_map(|p| w.entity(p).map(|e| (p, e.pos)))
+        .collect();
+    if players.is_empty() {
+        return Err("no players".into());
+    }
+    // What a site keeps away from: (x, z, how far).
+    let mut away: Vec<(f64, f64, f64)> = players
+        .iter()
+        .map(|&(_, p)| (p.x, p.z, ev::IMPACT_FROM_PLAYERS as f64))
+        .collect();
+    let build = ev::IMPACT_FROM_BUILDS as f64;
+    let spawn = crate::fair_spawn(w.seed());
+    away.push((spawn[0] as f64, spawn[2] as f64, build));
+    let half = ev::BUILT_CELL as f64 / 2.0;
+    for &(p, _) in &players {
+        if let Some(b) = w.component(p, &BUILT) {
+            for i in 0..b.len as usize {
+                let (cx, cz) = (b.cells[2 * i] as f64, b.cells[2 * i + 1] as f64);
+                away.push((cx * ev::BUILT_CELL as f64 + half, cz * ev::BUILT_CELL as f64 + half, build + half * 1.5));
+            }
+        }
+        if let Some(bed) = w.component(p, &base_api::BED_SPAWN).filter(|b| b.set != 0) {
+            away.push((bed.bed[0] as f64, bed.bed[2] as f64, build));
+        }
+        if let Some(g) = w.component(p, &base_api::GRAVE).filter(|g| g.set != 0) {
+            away.push((g.x as f64, g.z as f64, build));
+        }
+    }
+    let clear = |x: f64, z: f64| {
+        away.iter()
+            .all(|&(ax, az, r)| (ax - x).powi(2) + (az - z).powi(2) >= r * r)
+    };
+    let radius = ev::IMPACT_SITE_RADIUS;
+    // Why tries failed: near something, no open dry ground there, not level.
+    let (mut near, mut ground, mut uneven) = (0, 0, 0);
+    for _ in 0..ev::IMPACT_SITE_TRIES {
+        let (_, from) = players[w.random_below(players.len() as u32) as usize];
+        let angle = unit(w) as f64 * std::f64::consts::TAU;
+        let reach = ev::IMPACT_FROM_PLAYERS as f64 + (ev::IMPACT_REACH - ev::IMPACT_FROM_PLAYERS) as f64 * unit(w) as f64;
+        let (x, z) = (from.x + angle.cos() * reach, from.z + angle.sin() * reach);
+        if !clear(x, z) {
+            near += 1;
+            continue;
+        }
+        let (x, z) = (x.floor() as i32, z.floor() as i32);
+        let Some(top) = open_ground(w, x, from.y.floor() as i32, z) else {
+            ground += 1;
+            continue;
+        };
+        // Level and dry across the crater: eight points round it within `IMPACT_LEVEL`.
+        let level = (0..8).all(|k| {
+            let a = k as f64 * std::f64::consts::FRAC_PI_4;
+            let (px, pz) = (x + (a.cos() * radius as f64) as i32, z + (a.sin() * radius as f64) as i32);
+            open_ground(w, px, top.y, pz).is_some_and(|p| (p.y - top.y).abs() <= ev::IMPACT_LEVEL)
+        });
+        if level {
+            return Ok(top);
+        }
+        uneven += 1;
+    }
+    Err(format!("{near} near players, builds or spawn, {ground} not open dry loaded ground, {uneven} not level"))
+}
+
+/// The ground's top in column (`x`, `z`) near `y`: loaded, open to the sky, not water.
+pub(crate) fn open_ground(w: &World, x: i32, y: i32, z: i32) -> Option<BlockPos> {
+    const LOOK: i32 = 48;
+    for gy in (y - LOOK..=y + LOOK).rev() {
+        let p = BlockPos::new(x, gy, z);
+        let state = w.block_loaded(p)?;
+        if state == 0 || LEAVES.on_block(state) {
+            continue;
+        }
+        let flags = w.block_flags(p);
+        if flags & abi::block_flags::LIQUID != 0 {
+            return None;
+        }
+        if flags & abi::block_flags::SOLID == 0 {
+            continue;
+        }
+        return (w.sky_light(p.above()) >= 15).then_some(p);
+    }
+    None
+}
+
+/// Whether `pos` is within `clear` blocks of a cell an online player built in.
+pub(crate) fn near_built(w: &World, pos: BlockPos, clear: i32) -> bool {
+    let half = ev::BUILT_CELL as f64 / 2.0;
+    let reach = clear as f64 + half * 1.5;
+    w.players().into_iter().any(|p| {
+        w.component(p, &BUILT).is_some_and(|b| {
+            (0..b.len as usize).any(|i| {
+                let (cx, cz) =
+                    (b.cells[2 * i] as f64 * ev::BUILT_CELL as f64 + half, b.cells[2 * i + 1] as f64 * ev::BUILT_CELL as f64 + half);
+                (cx - pos.x as f64).powi(2) + (cz - pos.z as f64).powi(2) < reach * reach
+            })
+        })
+    })
+}
+
+/// Every player in the dimension hears which way it fell (and how far, in bands), and on land
+/// gets the pointer for a game day.
+fn tell_all(w: &World, site: Option<BlockPos>) {
+    let day = w.day_time() / vitals::calendar::DAY_TICKS;
+    for p in w.players() {
+        let Some(e) = w.entity(p) else { continue };
+        let at = site.map_or(e.pos + Vec3::new(0.0, 0.0, -1000.0), |s| s.center());
+        let (dx, dz) = (at.x - e.pos.x, at.z - e.pos.z);
+        let dist = (dx * dx + dz * dz).sqrt();
+        let band = if dist < ev::IMPACT_BANDS.0 {
+            "near"
+        } else if dist < ev::IMPACT_BANDS.1 {
+            "far"
+        } else {
+            "very_far"
+        };
+        let dir = format!("events.base.dir.{}", DIRECTIONS[ev::compass(dx, dz) as usize]);
+        let band = format!("events.base.band.{band}");
+        match site {
+            Some(s) => {
+                w.hint(p, "hint.base.star_fell", &[Arg::Key(&band), Arg::Key(&dir)]);
+                if let Some(star) = w.component_mut(p, &STAR) {
+                    *star = Star { x: s.x, z: s.z, until: day + ev::POINTER_DAYS, set: 1 };
+                }
+            }
+            None => {
+                w.hint(p, "hint.base.star_sea", &[]);
+            }
+        }
+    }
+}
+
+/// Pointers end after their day, or once their player is within `POINTER_NEAR` of the star.
+fn pointers(w: &World) {
+    let day = w.day_time() / vitals::calendar::DAY_TICKS;
+    for p in w.players() {
+        let Some(e) = w.entity(p) else { continue };
+        let Some(star) = w.component_mut(p, &STAR) else { continue };
+        if star.set == 0 {
+            continue;
+        }
+        let near = (star.x as f64 + 0.5 - e.pos.x).powi(2) + (star.z as f64 + 0.5 - e.pos.z).powi(2) < ev::POINTER_NEAR.powi(2);
+        if near || day >= star.until {
+            star.set = 0;
+        }
+    }
+}
+
+/// The crater and what lies in it: Terrain's live carve (`impact::start`, on its branch, not in
+/// dev yet). Until it lands an impact on land is the looks only, as `sky_impacts` 1 has it.
+fn carve(_w: &World, site: BlockPos) {
+    weft_sdk::info!("events: the crater at {site:?} waits for Terrain's impact::start");
 }
 
 fn unit(w: &World) -> f32 {

@@ -245,25 +245,33 @@ pub async fn inventory_crafting(t: T) -> R {
     // Menu slots: 0-3 grid, 4 result, 5-13 equipment (armor, clothes, cloak), 14-40 main, 41-49 the
     // hotbar (`t.hotbar`, which finds it).
     let (log, planks) = (id("base:oak_log"), id("base:oak_planks"));
-    t.click_ui(&t.hotbar(0), 0);
+    t.click_settled(&t.hotbar(0), 0).await?;
     t.until("logs on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().item == log)
         .await?;
-    t.click_ui("slot:0", 1);
+    t.click_settled("slot:0", 1).await?;
     t.until("planks in the result", Duration::from_secs(5), |t| t.c().menu_slot(4).item == planks)
         .await
         .map_err(|e| {
             let c = t.c();
-            format!("{e} (cursor {:?}, grid {:?} {:?} {:?} {:?}, result {:?})", c.cursor_stack(), c.menu_slot(0), c.menu_slot(1), c.menu_slot(2), c.menu_slot(3), c.menu_slot(4))
+            format!(
+                "{e} (cursor {:?}, grid {:?} {:?} {:?} {:?}, result {:?})",
+                c.cursor_stack(),
+                c.menu_slot(0),
+                c.menu_slot(1),
+                c.menu_slot(2),
+                c.menu_slot(3),
+                c.menu_slot(4)
+            )
         })?;
     t.check_eq(t.c().menu_slot(4).count, 4, "planks from one log");
-    t.click_ui(&t.hotbar(0), 0);
+    t.click_settled(&t.hotbar(0), 0).await?;
     t.until("cursor empty", Duration::from_secs(5), |t| t.c().cursor_stack().is_empty())
         .await?;
     t.shot("grid").await?;
-    t.click_ui("slot:4", 0);
+    t.click_settled("slot:4", 0).await?;
     t.until("planks on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().item == planks)
         .await?;
-    t.click_ui(&t.hotbar(1), 0);
+    t.click_settled(&t.hotbar(1), 0).await?;
     t.until("planks in the hotbar", Duration::from_secs(5), |t| t.c().inventory_slot(1).item == planks)
         .await?;
     t.c().screen_close();
@@ -713,7 +721,11 @@ pub async fn inventory_hotkeys(t: T) -> R {
     t.screen("core:menu").await?;
     // The menu's slot of the player's inventory slot `i` (9..36 the backpack): the backpack comes
     // just before the hotbar, past the grid, the worn slots (clothes among them) and the result.
-    let hot: u32 = t.hotbar(0).trim_start_matches("slot:").parse().map_err(|_| "no hotbar".to_string())?;
+    let hot: u32 = t
+        .hotbar(0)
+        .trim_start_matches("slot:")
+        .parse()
+        .map_err(|_| "no hotbar".to_string())?;
     let menu = |i: u32| hot - 27 + (i - 9);
     let hover = |inv: u32| -> R {
         let slot = menu(inv);
@@ -914,7 +926,10 @@ pub async fn mods_switch(t: T) -> R {
     );
     // The LED is in the mod's row, and clicking it isn't clicking the row.
     let (led, row) = (t.c().ui_rect("id:mod_led:testmod").ok_or("no LED")?, t.c().ui_rect("id:mod:testmod").ok_or("no row")?);
-    t.check(led.x > row.x && led.x + led.w <= row.x + row.w + 0.001, format!("the LED {:?} inside its row {:?}", (led.x, led.y, led.w, led.h), (row.x, row.y, row.w, row.h)));
+    t.check(
+        led.x > row.x && led.x + led.w <= row.x + row.w + 0.001,
+        format!("the LED {:?} inside its row {:?}", (led.x, led.y, led.w, led.h), (row.x, row.y, row.w, row.h)),
+    );
     t.check(t.c().ui_rect("text:Needs").is_none(), "the row isn't selected by it (only testmod needs something)");
     t.shot("switched").await?;
     t.check(t.click_ui("id:mod_led:testmod", 0), "and back");

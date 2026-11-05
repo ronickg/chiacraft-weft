@@ -112,6 +112,74 @@ pub const EQUINOX_DAY: u32 = 7;
 /// Each announced event is foretold this many hours before sunset (the night hint's slot).
 pub const DUSK_LINE_HOURS: f32 = 2.0;
 
+// ---------------------------------------------------------------- big impacts (Addendum 2)
+
+/// A big impact's schedule: the days from `BIG_IMPACT_FROM_DAY` cut in slots of this many, each
+/// with one impact `BIG_IMPACT_SLOT_CHANCE` of the time on one of its first 10 days (the slot
+/// less the gap, plus one), at any hour (big falls come by day too): about 2.65 a world a year
+/// (the design's 3), at least `BIG_IMPACT_GAP` days apart, the same on every machine and with no
+/// look back.
+pub const BIG_IMPACT_SLOT_DAYS: u64 = 19;
+pub const BIG_IMPACT_SLOT_CHANCE: f32 = 0.9;
+pub const BIG_IMPACT_GAP: u64 = 10;
+/// None in the first season: a player has a base to come back to first.
+pub const BIG_IMPACT_FROM_DAY: u64 = 21;
+/// Where one may land: at least this far from every player (no one is hurt), in loaded land out
+/// to `IMPACT_REACH`, and this far from anything built (`BUILT_CELL` cells a player placed a
+/// block in, beds and tombstones) and the world spawn.
+pub const IMPACT_FROM_PLAYERS: i32 = 160;
+pub const IMPACT_REACH: i32 = 200;
+pub const IMPACT_FROM_BUILDS: i32 = 256;
+/// The built-columns map: cells this many blocks across, and the most a player remembers.
+pub const BUILT_CELL: i32 = 64;
+pub const BUILT_CELLS: usize = 32;
+/// From its hour a big impact waits for a round with a free site (a player out in the wilds: none
+/// is near spawn or a base), and with none by the day's last this-many hours falls in the sea.
+pub const IMPACT_LAST_HOURS: f32 = 0.2;
+/// Tries at a site each round.
+pub const IMPACT_SITE_TRIES: u32 = 96;
+/// The widest live crater (Terrain's `vitals::impact::IMPACT_RADIUS`): a site is level and dry
+/// that far round.
+pub const IMPACT_SITE_RADIUS: i32 = 12;
+/// The land at a site: level within this many blocks over the crater's radius, and no water.
+pub const IMPACT_LEVEL: i32 = 4;
+/// The brightening and rumble before the streak, seconds.
+pub const IMPACT_WARN_SECS: f32 = 20.0;
+/// The pointer over the hotbar lasts a game day, or until within this many blocks.
+pub const POINTER_DAYS: u64 = 1;
+pub const POINTER_NEAR: f64 = 16.0;
+/// The direction line's bands: near under the first, far under the second, very far past it.
+pub const IMPACT_BANDS: (f64, f64) = (500.0, 1500.0);
+/// The core's share for players near: 1 alone, `IMPACT_SHARE.0` more for each other player within
+/// `IMPACT_SHARE.2` blocks, up to `IMPACT_SHARE.1`.
+pub const IMPACT_SHARE: (f32, f32, f64) = (0.4, 2.2, 2000.0);
+
+/// The hour a big impact falls on `day` in the world of `seed`, if one does.
+pub fn impact_on(seed: u64, day: u64) -> Option<f32> {
+    if day < BIG_IMPACT_FROM_DAY {
+        return None;
+    }
+    let slot = (day - BIG_IMPACT_FROM_DAY) / BIG_IMPACT_SLOT_DAYS;
+    let r = mix(mix(seed ^ 0x494D_5041_4354_5321) ^ slot);
+    if unit(r) >= BIG_IMPACT_SLOT_CHANCE {
+        return None;
+    }
+    let days = BIG_IMPACT_SLOT_DAYS - BIG_IMPACT_GAP + 1;
+    let at = (mix(r) >> 44) % days;
+    ((day - BIG_IMPACT_FROM_DAY) % BIG_IMPACT_SLOT_DAYS == at).then(|| 24.0 * unit(mix(mix(r))))
+}
+
+/// The core's share with `others` more players within reach.
+pub fn impact_share(others: u32) -> f32 {
+    (1.0 + IMPACT_SHARE.0 * others as f32).min(IMPACT_SHARE.1)
+}
+
+/// The 8-point direction (0 north, clockwise) from (`dx`, `dz`), north being -z.
+pub fn compass(dx: f64, dz: f64) -> u32 {
+    let angle = dx.atan2(-dz).to_degrees().rem_euclid(360.0);
+    ((angle + 22.5) / 45.0) as u32 % 8
+}
+
 /// What the sky does on the night at the end of `day` (days since the world began), in the world
 /// of `seed`. In order of priority: a blood moon, a shower's nights, an aurora storm, a fireball.
 pub fn tonight(seed: u64, day: u64) -> Option<Event> {
@@ -266,6 +334,42 @@ mod tests {
         assert_eq!(hour_of(crate::calendar::DAY_TICKS * 3 + 18000), 0.0);
         // The whole night, 18:00 to 06:00, is the same day's.
         assert!(hour_of(crate::calendar::DAY_TICKS - 1) > 5.9);
+    }
+
+    #[test]
+    fn big_impacts_two_to_four_a_year_kept_apart() {
+        for seed in SEEDS {
+            let days: Vec<u64> = (0..YEARS * YEAR_DAYS as u64)
+                .filter(|&d| impact_on(seed, d).is_some())
+                .collect();
+            let n = days.len() as f32 / YEARS as f32;
+            assert!((2.0..=4.0).contains(&n), "seed {seed}: {n} a year");
+            assert!(days[0] >= BIG_IMPACT_FROM_DAY, "seed {seed}: the first on day {}", days[0]);
+            for pair in days.windows(2) {
+                assert!(pair[1] - pair[0] >= BIG_IMPACT_GAP, "seed {seed}: days {pair:?}");
+            }
+            for d in days {
+                let hour = impact_on(seed, d).unwrap();
+                assert!((0.0..24.0).contains(&hour));
+            }
+        }
+    }
+
+    #[test]
+    fn the_compass_points() {
+        assert_eq!(compass(0.0, -10.0), 0, "north is -z");
+        assert_eq!(compass(10.0, -10.0), 1);
+        assert_eq!(compass(10.0, 0.0), 2);
+        assert_eq!(compass(0.0, 10.0), 4);
+        assert_eq!(compass(-10.0, 0.0), 6);
+        assert_eq!(compass(-10.0, -9.0), 7);
+    }
+
+    #[test]
+    fn the_core_grows_with_players_near_but_not_past_its_cap() {
+        assert_eq!(impact_share(0), 1.0);
+        assert!((impact_share(1) - 1.4).abs() < 1e-6);
+        assert_eq!(impact_share(10), IMPACT_SHARE.1);
     }
 
     #[test]

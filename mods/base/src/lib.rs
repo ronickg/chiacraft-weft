@@ -29,6 +29,7 @@ mod leaf_decay;
 mod levels;
 mod look;
 mod machines;
+mod meteors;
 mod mobs;
 mod parts;
 mod player;
@@ -111,6 +112,7 @@ fn init(r: &mut Registry) {
     knapping::register(r);
     firebed::register(r);
     events::register(r);
+    meteors::register(r);
     sounds::register(r);
     mobs::register(r);
     worldgen::register(r);

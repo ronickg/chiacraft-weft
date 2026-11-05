@@ -102,11 +102,11 @@ def foxfire(sq, seed):
     base = cut(fill(sq, m))
     rng = np.random.default_rng(100 + seed)
     thread = runs(seed)
-    cream = np.array([140.0, 154.0, 134.0])  # dull off-white, faintly green-grey, a little lighter than the wood
+    cream = np.array([128.0, 154.0, 128.0])  # dull off-white leaning green (Plants, 11-05: the glow read white), a little lighter than the wood
     out = base.copy()
     jitter = rng.uniform(-8, 8, (N, N))[..., None]
     out[thread] = (cream + jitter[thread]) * 0.75 + base[thread] * 0.25
-    e = np.where(thread, rng.uniform(0.60, 0.90, (N, N)), 0)
+    e = np.where(thread, rng.uniform(0.33, 0.42, (N, N)), 0)  # faint: Plants' PC look had it the brightest thing at midnight
     return out, e
 
 

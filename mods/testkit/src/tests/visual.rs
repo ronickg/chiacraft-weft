@@ -86,7 +86,8 @@ pub async fn held_items(t: T) -> R {
         ("sword", probe::cyan, 0.03),
         ("block", probe::light, 0.03),
         ("flower", probe::red, 0.02),
-        ("torch", probe::dark, 0.03),
+        // our torch is its flame (dark was the old stick): fire orange
+        ("torch", probe::orange, 0.03),
     ];
     for (i, (name, color, min)) in looks.into_iter().enumerate() {
         t.c().select_slot(i as u32);
@@ -95,7 +96,9 @@ pub async fn held_items(t: T) -> R {
         // The hand lowers and comes back up on a switch.
         t.secs(0.6).await?;
         let shot = t.shot(name).await?;
-        let v = shot.share(0.78, 0.55, 1.0, 0.95, color);
+        // Where Weft's posed hand holds it, our items drawn bigger there
+        // (`comp::FIRST_PERSON_HELD_SCALE` on the player, base's `player.rs`).
+        let v = shot.share(0.58, 0.45, 0.90, 1.0, color);
         t.probe(&format!("{name} colors in the hand"), v, v > min);
     }
     Ok(())
