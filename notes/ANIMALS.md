@@ -1192,7 +1192,7 @@ Ronald: seasons tied in with mating and breeding; each species breeds in its rea
 
 From Research round 17's addendum (Ronald: "Yes, as designed"). The numbers live in `animals_core::sky`. Totality runs 22:00-02:00 (`vitals::events`), and while it lasts:
 - **Prey watch half again as far** for hunters (`hunt::wary`, `BLOOD_MOON_WATCH` 1.5).
-- **Herds bunch up.** A herd animal (`Social::Herd`) more than 4 blocks from the middle of its herd (looking 24 blocks around) walks back to it (`hunt::huddle`).
+- **Herds bunch up.** A herd animal on the ground (`Social::Herd`, from `wild.rs` and the capybara; a flock's wariness takes off, so birds don't) more than 4 blocks from the middle of its herd (looking 24 blocks around) walks back to it (`hunt::huddle`).
 - **Wild grey wolves howl once** in the first half hour of totality, using their ambient call. A pack's howls spread over a few seconds (`voices::howl_at_blood_moon`).
 
 This applies on every difficulty: on gentle the blood moon brings no monsters, but the animals still feel it. Coyotes don't howl at it yet.

@@ -11,7 +11,8 @@
 //!
 //! Prey keep watch (`wary`): a wild animal that sees a hunter able to take it runs off. In fog
 //! both see less far (`base_api::sight`). In a blood moon's totality (`animals_core::sky`) they
-//! watch half again as far, and a herd animal strayed from its herd walks back to its middle.
+//! watch half again as far, and a herd animal strayed from its herd walks back to its middle
+//! (`huddle`).
 
 use weft_sdk::*;
 
@@ -286,7 +287,7 @@ pub fn wary(w: &World, id: u64, st: &EntityState) -> bool {
             s.takes_at_most(mass(w, t)?, me).then_some(e) // a pack's kind with its pack's reach
         })
         .min_by(|a, b| dist2(a.pos, st.pos).total_cmp(&dist2(b.pos, st.pos)));
-    let Some(h) = hunter else { return blood && huddle(w, id, st, now) };
+    let Some(h) = hunter else { return false };
     let (x, z) = (st.pos.x - h.pos.x, st.pos.z - h.pos.z);
     let n = (x * x + z * z).sqrt().max(0.01);
     w.navigate(id, [st.pos.x + x / n * 10.0, st.pos.y, st.pos.z + z / n * 10.0], 1.6);
@@ -294,10 +295,15 @@ pub fn wary(w: &World, id: u64, st: &EntityState) -> bool {
     true
 }
 
-/// In a blood moon's totality: a herd animal more than `HUDDLE` from the middle of its herd near
-/// walks back to it (held, as a flight, for `HUDDLE_WALK` ticks).
-fn huddle(w: &World, id: u64, st: &EntityState, now: u64) -> bool {
+/// A goal for wild herd animals on the ground (not birds: a flock's `wary` takes off): in a blood
+/// moon's totality, one more than `HUDDLE` from the middle of its herd near walks back to it (held,
+/// as a flight from a hunter, for `HUDDLE_WALK` ticks).
+pub fn huddle(w: &World, id: u64, st: &EntityState) -> bool {
     use animals_core::sky::{HUDDLE, HUDDLE_LOOK};
+    let now = w.game_time();
+    if !(now + id).is_multiple_of(20) || animal::tamed(w, id) || !animals_core::sky::totality(w.seed(), w.day_time()) {
+        return false;
+    }
     let herd = w
         .component(id, &ANIMAL)
         .and_then(|a| a.species())
@@ -323,6 +329,8 @@ fn huddle(w: &World, id: u64, st: &EntityState, now: u64) -> bool {
         return false;
     }
     w.navigate(id, mid, 1.2);
-    w.component_mut(id, &WARY).map(|u| *u = now + HUDDLE_WALK);
+    if let Some(u) = w.component_mut(id, &WARY) {
+        *u = now + HUDDLE_WALK;
+    }
     true
 }

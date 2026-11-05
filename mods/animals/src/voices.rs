@@ -59,7 +59,9 @@ pub fn howl_at_blood_moon(w: &World, id: u64, st: &EntityState) -> bool {
     {
         return false;
     }
-    w.component_mut(id, &HOWLED).map(|n| *n = night);
+    if let Some(n) = w.component_mut(id, &HOWLED) {
+        *n = night;
+    }
     w.play_sound(&HOWL, st.pos, 1.0);
     weft_sdk::info!("grey_wolf {id} howls at the blood moon");
     false
