@@ -667,6 +667,9 @@ pub struct Client {
     sky_landing: Option<(DVec3, f32)>,
     /// The weather's look as it is by now, going over to the weather's own (`weather_effects`).
     look: weft_abi::WeatherLook,
+    /// How far the weather's sky has come in where the player is, 0..1 (`weather_effects`): it
+    /// gathers over `GLOOM_SECS` before anything falls.
+    gloom: f32,
     frame_dt: f32,
     /// Seconds left of a lightning's flash.
     lightning: f32,
@@ -987,6 +990,7 @@ impl Client {
             sky_landing: None,
             weather_id: 0,
             look: Default::default(),
+            gloom: 0.0,
             lightning: 0.0,
             lightnings: 0,
             using: None,
@@ -2553,18 +2557,41 @@ impl Client {
     fn weather_effects(&mut self, dt: f32) {
         let weather = &content().game.weathers[self.weather_id as usize];
         // Where the player stands: the weather only in some biomes, when a mod says where
-        // (chiacraft); clear elsewhere.
-        let here = self.world.rains_at(self.player.pos.floor().as_ivec3());
-        let (to, step) = (if here { weather.look } else { weft_abi::WeatherLook::default() }, dt / 5.0);
-        let go = |v: &mut f32, t: f32| *v += (t - *v).clamp(-step, step);
+        // (chiacraft); clear elsewhere. Asked at nine places round the player a stretch apart,
+        // so across a border into rain the sky and the rain come in over a few chunks.
+        let at = self.player.pos.floor().as_ivec3();
+        let mut wet = 0;
+        for dx in -1..=1 {
+            for dz in -1..=1 {
+                if self
+                    .world
+                    .rains_at(at + IVec3::new(dx * WEATHER_REACH, 0, dz * WEATHER_REACH))
+                {
+                    wet += 1;
+                }
+            }
+        }
+        let share = wet as f32 / 9.0;
+        let here = self.world.rains_at(at);
+        // The sky gathers first: clouds and gray over GLOOM_SECS (and clears as slowly); what
+        // falls comes once it is more than half there, over FALLS_SECS, and stops first. Both
+        // went from nothing to all in five seconds, the moment the spell began (Ronald, 11-06:
+        // "it like change in 2 seconds from clear to rain").
+        self.gloom += (share - self.gloom).clamp(-dt / GLOOM_SECS, dt / GLOOM_SECS);
+        let none = weft_abi::WeatherLook::default();
+        let to = weather.look;
+        let sky = |clear: f32, rain: f32| clear + (rain - clear) * self.gloom;
+        let falls_to = if weather.falls() { to.falls * share * smoothstep(0.55, 0.9, self.gloom) } else { 0.0 };
+        let step = dt / 5.0;
+        let go = |v: &mut f32, t: f32, step: f32| *v += (t - *v).clamp(-step, step);
         let l = &mut self.look;
-        go(&mut l.falls, if weather.falls() { to.falls } else { 0.0 });
-        go(&mut l.sky_gray, to.sky_gray);
-        go(&mut l.sky_cover, to.sky_cover);
-        go(&mut l.fog_gray, to.fog_gray);
-        go(&mut l.cloud_gray, to.cloud_gray);
-        go(&mut l.cloud_dark, to.cloud_dark);
-        go(&mut l.darkness, to.darkness);
+        go(&mut l.falls, falls_to, dt / FALLS_SECS);
+        go(&mut l.sky_gray, sky(none.sky_gray, to.sky_gray), step);
+        go(&mut l.sky_cover, sky(none.sky_cover, to.sky_cover), step);
+        go(&mut l.fog_gray, sky(none.fog_gray, to.fog_gray), step);
+        go(&mut l.cloud_gray, sky(none.cloud_gray, to.cloud_gray), step);
+        go(&mut l.cloud_dark, sky(none.cloud_dark, to.cloud_dark), step);
+        go(&mut l.darkness, sky(none.darkness, to.darkness), step);
         self.lightning = (self.lightning - dt).max(0.0);
         // The air where the player is: fog rolls in over a few seconds (the weather itself changes
         // it slowly), the wind turns in seconds.
@@ -2581,7 +2608,7 @@ impl Client {
         let heading = self.world.air.1.to_radians();
         let wind = Vec2::new(heading.sin(), -heading.cos()) * speed;
         self.wind += (wind - self.wind) * (1.0 - (-dt / 4.0).exp());
-        if here && weather.lightning() && self.chance() < dt / 12.0 {
+        if here && self.gloom > 0.9 && weather.lightning() && self.chance() < dt / 12.0 {
             self.lightning = 0.15;
             self.lightnings = self.lightnings.wrapping_add(1);
         }
@@ -2606,6 +2633,15 @@ impl Client {
     /// `scene.fog_color.w` for packs, mods' rain sound).
     fn rain(&self) -> f32 {
         self.look.falls.clamp(0.0, 1.0)
+    }
+
+    /// How far the rain's sky has come where the player is, 0..1, for packs (chiacraft's
+    /// `scene.fog_color.w`: its sky's gray, its clouds, the far rain's mist): ahead of what falls,
+    /// so the sky darkens before the drops (`weather_effects`), never behind it.
+    fn sky_rain(&self) -> f32 {
+        let weather = &content().game.weathers[self.weather_id as usize];
+        let full = if weather.falls() { weather.look.falls } else { 0.0 };
+        (self.gloom * full).max(self.look.falls).clamp(0.0, 1.0)
     }
 
     /// How stormy it is, 0..1: thunder's clouds go 0.95 dark (`scene.weather.w` for packs).
@@ -3164,7 +3200,7 @@ impl Client {
     }
 
     pub fn fog_color(&self) -> [f32; 4] {
-        self.fog_linear().extend(self.rain()).to_array()
+        self.fog_linear().extend(self.sky_rain()).to_array()
     }
 }
 
@@ -3184,6 +3220,18 @@ const FAR_REACH: f32 = 400.0;
 /// The far shadow map's anchor snaps to this many blocks (`prepare_shadows`): its 400 blocks to
 /// each side cover the camera wherever it stands in the cell.
 const FAR_ANCHOR: f64 = 32.0;
+/// Seconds the weather's sky takes to gather (or clear) where the player is, and the rain to come
+/// in once it has (`Client::weather_effects`); and how far apart the places are that it asks for
+/// rain round the player (blocks: three across span about three chunks).
+const GLOOM_SECS: f32 = 90.0;
+const FALLS_SECS: f32 = 25.0;
+const WEATHER_REACH: i32 = 24;
+
+fn smoothstep(a: f32, b: f32, x: f32) -> f32 {
+    let t = ((x - a) / (b - a)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
 /// Frames the far map waits before drawing in terrain that changed (about a sixth of a second).
 const FAR_TERRAIN_WAIT: u32 = 10;
 const FAR_DEPTH: f32 = 1200.0;
