@@ -208,6 +208,21 @@ pub fn gaps() -> Vec<Gap> {
             ));
         }
     }
+    // Pats don't carpet a herd's ground: rotting keeps up with what its grazers drop.
+    for biome in biomes() {
+        if let Some(g) = grazing(biome)
+            && g.pat_cover > PAT_COVER
+        {
+            out.push(gap(
+                format!("{biome}: carpeted in dung"),
+                format!(
+                    "{biome}: its grazers' dung pats cover {:.1}% of their ground at once (at most {:.0}%): vitals::soil's pats (MOUTHFULS_A_PAT, the base:dung_pat plant) against the grazers' crowds and hunger",
+                    g.pat_cover * 100.0,
+                    PAT_COVER * 100.0
+                ),
+            ));
+        }
+    }
     out
 }
 
@@ -220,6 +235,9 @@ pub struct Grazing {
     /// Food a day its grazers eat of it there, as many of each as live together (`crowd`, by how
     /// common it is there) and the grass's share of their diets.
     pub eaten: f32,
+    /// The share of that ground their dung pats cover at once at the most (`vitals::soil`), in
+    /// the season they lie longest.
+    pub pat_cover: f32,
 }
 
 /// The tall grass's balance in a biome's best season for grass (`None`: no grass, or nothing
@@ -259,12 +277,27 @@ pub fn grazing(biome: &str) -> Option<Grazing> {
     let blocks = std::f32::consts::PI * (crate::life::CROWD_RADIUS as f32).powi(2) * cover;
     let mouthful = tuft.food as f32 * (0.4 + 0.6 * rate);
     let regrown = blocks * mouthful * rate * vitals::DAY_SECS / secs;
-    let eaten = grazers
+    let eaten: f32 = grazers
         .iter()
         .map(|&(s, share)| s.crowd_in(biome) as f32 * share * vitals::DAY_SECS / s.hunger.max(1.0))
         .sum();
-    Some(Grazing { season, regrown, eaten })
+    // Dung pats (`vitals::soil`): a pat every few mouthfuls, each lying as long as it takes to rot
+    // or break up that season; the most of the crowd's ground they cover at once, in any season.
+    let season_secs = vitals::calendar::SEASON_DAYS as f32 * vitals::DAY_SECS;
+    let pats = (0..4)
+        .map(|i| {
+            let rate = vitals::plants::season_rate_in(plant, c.celsius, c.seasons, c.rain, i);
+            let mouthfuls = eaten / (tuft.food as f32 * (0.4 + 0.6 * rate));
+            let lies = vitals::soil::pat_season_secs(c.celsius, c.seasons, c.rain, i).min(season_secs);
+            mouthfuls / vitals::soil::MOUTHFULS_A_PAT as f32 * lies / vitals::DAY_SECS
+        })
+        .fold(0.0f32, f32::max);
+    let area = std::f32::consts::PI * (crate::life::CROWD_RADIUS as f32).powi(2);
+    Some(Grazing { season, regrown, eaten, pat_cover: pats / area })
 }
+
+/// The most of a crowd's ground (within `life::CROWD_RADIUS`) its dung pats may cover at once.
+pub const PAT_COVER: f32 = 0.01;
 
 /// The gaps not in `WAITING`, and the `WAITING` entries no longer gaps: what the test asks to be
 /// empty.

@@ -15,6 +15,7 @@ mod discovery;
 mod events;
 mod fall;
 mod farming;
+mod fireflies;
 mod felled;
 mod felling;
 mod firebed;
@@ -122,6 +123,7 @@ fn init(r: &mut Registry) {
     seasons::register(r);
     growth::register(r);
     farming::register(r);
+    fireflies::register(r);
     felling::register(r);
     fall::register(r);
     leaf_decay::register(r);
