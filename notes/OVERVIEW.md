@@ -4,7 +4,7 @@ Written by `notes/overview/build.py` from `notes/overview/pieces.json`; edit tha
 
 **The goal.** Players open their own worlds, find other people's without any central service, link them with portals and walk between them; missing mods download on the way; identity and achievements live on Chia. The game in those worlds: survival in the Valheim spirit with real temperatures and seasons, and animals to tame, breed and raise, from real facts.
 
-■ built and seen working: 73 · ◧ partly built: 37 · □ not built yet: 10 · ◌ planned for later: 6
+■ built and seen working: 73 · ◧ partly built: 38 · □ not built yet: 10 · ◌ planned for later: 6
 
 ## Core next
 
@@ -156,7 +156,7 @@ Code: `mods/animals`, `mods/animals/core`. Docs: `notes/ANIMALS.md`, `mods/anima
 
 ## Living world
 
-The loop: seasons bring heat and rain, rain grows plants, plants feed grazers, grazers feed hunters, and what dies goes back to the soil. Each part reads five shared things (the place, the climate table, the plant table, food categories, the forage goal) instead of rules of its own. 8 of 22 parts built.
+The loop: seasons bring heat and rain, rain grows plants, plants feed grazers, grazers feed hunters, and what dies goes back to the soil. Each part reads five shared things (the place, the climate table, the plant table, food categories, the forage goal) instead of rules of its own. 8 of 23 parts built.
 
 | | Part | Notes |
 |---|---|---|
@@ -182,6 +182,7 @@ The loop: seasons bring heat and rain, rain grows plants, plants feed grazers, g
 | ◌ | Migration and waterholes | Herds move to wetter land in the dry season; waterholes shrink. Docs: `notes/ECOLOGY.md`. |
 | ◌ | The seasons' look | Grass colour by soil water, autumn leaves, winter snow. Docs: `notes/ECOLOGY.md`. |
 | ◌ | Wildfire | Dry grass burns in the dry season and grows back greener. Docs: `notes/ECOLOGY.md`. |
+| ◧ | Sky events | Research round 17's addendum (Ronald: "Yes, as designed"): one event a night at most from the world's seed and the day (vitals::events tonight: a blood moon on 1 in 3 full moons from day 16, about 2.3 a year; the summer and winter meteor showers' peaks and side nights on their dates; aurora storms about 2 a year, twice as often near the equinoxes; a lone fireball about 2 a year), foretold two hours before sunset (hint.base.blood_moon, meteor_shower, aurora_storm; en, ru). The blood moon's monsters (events.rs): their own spawner in totality (22:00-02:00), a cap on top of the hostile 8 (normal 6, harsh 8 with +35% health, gentle the look only), light 6 or less, never in a campfire's ring, through the NATURAL_SPAWN veto; +20% health, +10% speed, a 1.5x reach, no extra damage; kills in totality give 1.5x XP; at the end they walk off and are gone 40 blocks from every player; Red Night for seeing one through without dying. Not yet: the looks (moon colour, red cast, streaks; Lighting, with round 17's event value to the pack), meteor landings and meteoric iron, crater meteorites (Terrain), eclipse ash and the eye masks (Art), animals' wariness and howls (Animals), the big impacts (Addendum 2). Not yet seen in the game. Code: `mods/base/vitals/src/events.rs`, `mods/base/src/events.rs`, `mods/base/src/mobs.rs`. Docs: `reports/Research round 17.md`. |
 
 Code: `mods/base/vitals/src/climate.rs`, `mods/base/api`, `mods/animals/src/comfort.rs`, `mods/animals/src/habitats.rs`. Docs: `notes/ECOLOGY.md`, `notes/ANIMALS.md`, `notes/SYSTEMS.md`.
 
