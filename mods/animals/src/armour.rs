@@ -34,9 +34,11 @@ pub fn init(r: &mut Registry) {
         let Some(s) = a.species() else { return };
         let size = danger::size(s);
         let level = danger::danger(s.name).map_or(0.0, |d| d.area_level(a.level().min(danger::LEVELS.1)));
-        let mut hit = m.value as f32;
+        let raw = m.value as f32;
+        let mut hit = raw;
+        let by_player = q.cause == damage_cause::ATTACK && w.players_iter().any(|p| p == q.other);
         // 1. A player's weapon, capped by the animal's size.
-        if q.cause == damage_cause::ATTACK && w.players_iter().any(|p| p == q.other) {
+        if by_player {
             let held = w
                 .inventory(q.other)
                 .group("hotbar")
@@ -45,6 +47,7 @@ pub fn init(r: &mut Registry) {
                 hit *= vitals::combat::cap_share(size, lv, level);
             }
         }
+        let capped = hit;
         // 2. Armour.
         if DamageCause::flags_of(q.cause) & damage_flags::BYPASSES_ARMOR == 0 {
             hit *= 1.0 - vitals::combat::armour_cut(armour(&a), hit);
@@ -62,6 +65,18 @@ pub fn init(r: &mut Registry) {
             let (took, left, over) = vitals::combat::floor_take(size, st.max_health, budget, secs, hit);
             if size.band().floor.is_some() {
                 w.set_component(q.entity, &FLOOR, [left as f64, now as f64, stagger + over as f64]);
+            }
+            // One line per player hit, for the fight checks (`scripts/floors.txt`): what each step
+            // left of it, and the health it leaves.
+            if by_player {
+                weft_sdk::info!(
+                    "floor: {} {} ({size:?}, level {level:.0}) hit {raw:.2}, capped {capped:.2}, armour {hit:.2}, took {took:.2}, stagger {:.1}, health {:.1}/{:.1}",
+                    s.name,
+                    q.entity,
+                    stagger + over as f64,
+                    (st.health - took).max(0.0),
+                    st.max_health,
+                );
             }
             hit = took;
         }
