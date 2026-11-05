@@ -184,10 +184,14 @@ def write(path, value):
         f.write(text + "\n")
 
 
-def export(spec, texture, out, name, scale, tex_name, pup=None, pup_head=1.3, pose_files=POSE_FILES):
+def export(spec, texture, out, name, scale, tex_name, pup=None, pup_head=1.3, pose_files=POSE_FILES, anims_only=False):
+    """The game's files: each model (`<name>[_pup].geo.json`), its pose files' animations and its
+    texture. `anims_only` writes the animations alone, leaving the models and texture as they are
+    (a new clip on a model whose skin is not to change)."""
     variants = [(name, scale, 1.0)] + ([(f"{name}_pup", scale * pup, pup_head)] if pup else [])
     for model, s, hs in variants:
-        write(os.path.join(out, "models", f"{model}.geo.json"), geometry(spec, f"geometry.{model}", s, hs))
+        if not anims_only:
+            write(os.path.join(out, "models", f"{model}.geo.json"), geometry(spec, f"geometry.{model}", s, hs))
         for suffix, names in pose_files.items():
             idle = spec["animations"].get(names.get("idle"))
             anims = {f"animation.{model}{suffix}.{k}":
@@ -196,6 +200,8 @@ def export(spec, texture, out, name, scale, tex_name, pup=None, pup_head=1.3, po
                      for k, v in names.items() if v in spec["animations"]}
             write(os.path.join(out, "animations", f"{model}{suffix}.animation.json"),
                   {"format_version": "1.8.0", "animations": anims})
+    if anims_only:
+        return [v[0] for v in variants]
     dst = os.path.join(out, "textures", "entity", f"{tex_name}.png")
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     shutil.copyfile(texture, dst)
