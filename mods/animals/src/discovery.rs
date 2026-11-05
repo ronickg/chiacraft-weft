@@ -1,11 +1,14 @@
-//! The field journal (`animals_core::journal`): what each player has done with each species,
-//! saved with them, and the entries a journal screen reads (`entries`).
+//! The field journal's discovery (`animals_core::journal`): what each player has done with each
+//! species, saved with them, and the entries the journal screen (`journal.rs`, UI's) reads
+//! (`entries`).
 //!
 //! A species' entry opens when the player first sees one up close (within
-//! `journal::SEEN_WITHIN`) or looks at one through the spyglass. Killing one, taming one, having
-//! one born to them and riding one each fill in more. Creative reads everything.
+//! `journal::SEEN_WITHIN`, in their line of sight) or looks at one through the spyglass or its
+//! screen; the client then gets `NEW` (the species' journal id) for the toast. Killing one, taming
+//! or riding one, and having one born to them each fill in more. Creative reads everything. The
+//! journal key (I) opens the screen.
 
-use animals_core::journal::{self as core, BRED, ENTRIES, Fact, HUNTED, RIDDEN, SEEN, TAMED};
+use animals_core::journal::{self as core, ALL, ENTRIES, Fact, HUNTED, SEEN};
 use weft_sdk::*;
 
 use crate::animal::ANIMAL;
@@ -17,6 +20,11 @@ value! {
 }
 pub static JOURNAL: Component<Journal> = Component::named("journal");
 static PLAYER: EntityKind = EntityKind::named("core:player");
+/// Server to client: a species' entry opened (its `journal::id`), for the toast.
+pub static NEW: Channel<u32> = Channel::named("journal_new");
+/// The journal screen (`journal.rs`) and its key.
+pub static SCREEN: Screen = Screen::named("journal");
+static KEY: Key = Key::named("journal");
 /// Ticks between looks round each player (two seconds).
 const EVERY: u64 = 40;
 
@@ -34,8 +42,18 @@ pub fn init(r: &mut Registry) {
         }
         for player in w.players() {
             let Some(p) = w.entity(player) else { continue };
+            let eye = [p.pos.x, p.pos.y + EYE, p.pos.z];
             for id in w.entities_near(p.pos, core::SEEN_WITHIN as f64, None) {
-                if let Some(s) = species_of(w, id) {
+                let Some(s) = species_of(w, id) else { continue };
+                if core::deeds(
+                    &w.component(player, &JOURNAL)
+                        .map_or([0; ENTRIES], |j| j.entries),
+                    s.name,
+                ) & SEEN
+                    == 0
+                    && w.entity(id)
+                        .is_some_and(|e| in_sight(w, eye, [e.pos.x, e.pos.y + 0.5, e.pos.z]))
+                {
                     note(w, player, s, SEEN);
                 }
             }
@@ -54,6 +72,25 @@ pub fn init(r: &mut Registry) {
     });
     r.command("journal", "[action:word(list,all,clear)]", command)
         .permission(permission::GAME_MASTER);
+    r.key(&KEY, "I").on_press_client(|c| {
+        c.screen_open(&SCREEN);
+    });
+}
+
+/// A player's eyes above their feet.
+const EYE: f64 = 1.62;
+
+/// Whether no opaque block stands between `eye` and `at` (tall grass, leaves' gaps and glass
+/// don't hide an animal; the ray stops at the first block, so one behind a plant counts as seen).
+fn in_sight(w: &World, eye: [f64; 3], at: [f64; 3]) -> bool {
+    let d = [at[0] - eye[0], at[1] - eye[1], at[2] - eye[2]];
+    let len = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt();
+    if len < 1.0 {
+        return true;
+    }
+    let dir = [d[0] / len, d[1] / len, d[2] / len];
+    w.raycast(eye, dir, len - 0.5, false)
+        .is_none_or(|hit| !weft_sdk::block_info(hit.state).is_some_and(|b| b.opaque()))
 }
 
 /// The species of animal `id`, if it is one.
@@ -64,8 +101,12 @@ fn species_of(w: &World, id: u64) -> Option<&'static Species> {
 /// `player` did `deed` with one of species `s` (seeing it, at least).
 pub fn note(w: &World, player: u64, s: &Species, deed: u8) {
     let Some(j) = w.component_mut(player, &JOURNAL) else { return };
+    let opens = core::deeds(&j.entries, s.name) & SEEN == 0;
     if core::note(&mut j.entries, s.name, deed | SEEN) {
         weft_sdk::info!("journal: player {player} {} {}", deed_name(deed), s.name);
+        if opens {
+            w.send(player, &NEW, &core::id(s.name));
+        }
     }
 }
 
@@ -100,7 +141,8 @@ pub struct Entry {
     pub species: &'static Species,
     /// Its entity kind (`animals:<kind>`): the model the picture draws.
     pub kind: String,
-    /// What the reader has done with it (`SEEN`, `HUNTED`...); 0: not met, a silhouette.
+    /// What the reader has done with it (`SEEN`, `HUNTED`, `TAMED`, `BRED`); 0: not met, a
+    /// silhouette.
     pub deeds: u8,
     /// Its facts, each with whether the reader knows it yet.
     pub facts: Vec<(Fact, bool)>,
@@ -110,7 +152,7 @@ pub struct Entry {
 /// page is full.
 pub fn entries(view: &ClientView) -> Vec<Entry> {
     let saved = view.component(&JOURNAL).map(|j| j.entries);
-    let all = SEEN | HUNTED | TAMED | BRED | RIDDEN;
+    let all = ALL;
     let mut out: Vec<Entry> = SPECIES
         .iter()
         .map(|s| {
@@ -140,7 +182,7 @@ fn command(cmd: &mut ServerCommand) {
     match cmd.text("action") {
         Some("all") => {
             for s in SPECIES.iter() {
-                note(&w, player, s, HUNTED | TAMED | BRED | RIDDEN);
+                note(&w, player, s, ALL);
             }
         }
         Some("clear") => {

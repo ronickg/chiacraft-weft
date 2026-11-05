@@ -343,7 +343,7 @@ pub fn tame(w: &World, id: u64, player: u64, effectiveness: f32) {
         weft_sdk::info!("animal {id} tamed at {:.0}%: {bonus} bonus levels, now level {}", effectiveness * 100.0, a.level());
         let level = a.level();
         crate::xp::tamed(w, player, level);
-        crate::journal::note_animal(w, player, id, animals_core::journal::TAMED);
+        crate::discovery::note_animal(w, player, id, animals_core::journal::TAMED);
         // The first time this player tames one: how to give it orders (a line under the
         // crosshair, `base_api::hint`), then Survival's "A Friend" advancement
         // (`base_api::milestones`), which also marks that they have.

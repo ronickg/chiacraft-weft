@@ -72,7 +72,7 @@ pub fn open(w: &World, player: u64, id: u64) -> bool {
     let full = crate::commands::can_command(w, id, player) || w.outside_survival(player);
     let spyglass = w.inventory(player).get(w.selected_slot(player)).item == SPYGLASS.id();
     // Looked at closely, through the spyglass or at hand: seen.
-    crate::journal::note_animal(w, player, id, animals_core::journal::SEEN);
+    crate::discovery::note_animal(w, player, id, animals_core::journal::SEEN);
     w.open_menu(
         player,
         if full {

@@ -1,22 +1,34 @@
 //! The field journal (Ronald, 2026-11-05: "For every animal, I want a dossier"): what a player
 //! can read of each species, and what they must have done to read it. A species' entry opens when
-//! they first see one up close; hunting, taming, breeding and riding one fill in more. The facts
+//! they first see one up close; hunting, taming (or riding) and breeding one fill in more. The facts
 //! are read here from the species' own rows (`species`, `meat`, `hides`, `bodies`' sizes), never
 //! copied, so the journal says what the game does.
 //!
 //! Each fact is a label (`journal.animals.<name>`) and a value the screen shows as words: keys
 //! to translate, display names, numbers with their unit.
 
-use crate::species::{Category, Diet, Liking, Social, Species, Taming, seasons};
+use crate::species::{Category, Diet, Liking, Size, Social, Species, Taming, seasons};
 
 /// What a player has done with a species, as bits of its journal entry.
 pub const SEEN: u8 = 1;
 pub const HUNTED: u8 = 2;
 pub const TAMED: u8 = 4;
 pub const BRED: u8 = 8;
-pub const RIDDEN: u8 = 16;
-/// Each deed's name (`journal.animals.by.<it>`: "Hunt one to learn this"), by its bit's order.
-pub const DEEDS: [(u8, &str); 5] = [(SEEN, "seen"), (HUNTED, "hunted"), (TAMED, "tamed"), (BRED, "bred"), (RIDDEN, "ridden")];
+/// Every deed.
+pub const ALL: u8 = SEEN | HUNTED | TAMED | BRED;
+/// Each deed's name (`journal.animals.learn.<it>`: "Hunt one to learn what it drops"), by its
+/// bit's order.
+pub const DEEDS: [(u8, &str); 4] = [(SEEN, "seen"), (HUNTED, "hunted"), (TAMED, "tamed"), (BRED, "bred")];
+
+/// Where a fact goes on its page: the header beside the picture (names), its chips (short
+/// words), where it lives, then the survival rows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Section {
+    Header,
+    Chips,
+    Lives,
+    Survival,
+}
 
 /// Blocks within which an animal counts as seen up close (or through the spyglass, any range).
 pub const SEEN_WITHIN: f32 = 8.0;
@@ -47,20 +59,28 @@ pub struct Fact {
     pub value: Value,
     /// The deed that shows it (`SEEN`, `HUNTED`...).
     pub by: u8,
+    pub section: Section,
 }
 
 fn key(s: impl AsRef<str>) -> String {
     format!("journal.animals.{}", s.as_ref())
 }
 
-/// Every fact of species `s`, in the order shown: the basics, then by deed.
+/// Every fact of species `s`, in the order shown: the header, the chips, where it lives, then
+/// the survival rows by deed.
 pub fn facts(s: &Species) -> Vec<Fact> {
+    use Section::*;
     let mut f = Vec::new();
-    let mut add = |name, value, by| f.push(Fact { name, value, by });
+    let mut add = |name, value, by, section| f.push(Fact { name, value, by, section });
     // Seen up close: who it is, where and when it lives, what it eats, how it takes you.
-    add("latin", Value::Text(s.binomial), SEEN);
-    add("family", Value::Key(format!("family.animals.{}", s.family.name.to_lowercase())), SEEN);
-    add("mass", mass(s.bio.mass), SEEN);
+    add("latin", Value::Text(s.binomial), SEEN, Header);
+    add("family", Value::Key(format!("family.animals.{}", s.family.name.to_lowercase())), SEEN, Header);
+    add("size", Value::Key(key(format!("size.{}", size_name(s.size)))), SEEN, Chips);
+    add("mass", mass(s.bio.mass), SEEN, Chips);
+    add("active", Value::Key(key(format!("active.{}", s.active.name()))), SEEN, Chips);
+    add("temper", Value::Key(key(format!("temper.{}", temper(s)))), SEEN, Chips);
+    add("group", group(s), SEEN, Chips);
+    add("diet", Value::Key(key(format!("diet.{}", diet_name(s.diet())))), SEEN, Chips);
     add(
         "biomes",
         Value::Keys(
@@ -70,9 +90,8 @@ pub fn facts(s: &Species) -> Vec<Fact> {
                 .collect(),
         ),
         SEEN,
+        Lives,
     );
-    add("active", Value::Key(key(format!("active.{}", s.active.name()))), SEEN);
-    add("diet", Value::Key(key(format!("diet.{}", diet_name(s.diet())))), SEEN);
     let mut eats: Vec<&(Category, f32)> = s.eats.iter().filter(|(_, share)| *share > 0.0).collect();
     eats.sort_by(|a, b| b.1.total_cmp(&a.1));
     add(
@@ -83,17 +102,16 @@ pub fn facts(s: &Species) -> Vec<Fact> {
                 .collect(),
         ),
         SEEN,
+        Survival,
     );
-    add("temper", Value::Key(key(format!("temper.{}", temper(s)))), SEEN);
-    add("group", group(s), SEEN);
     // Hunted: what its body gives.
-    add("drops", Value::Names(drops(s)), HUNTED);
-    // Tamed: how, with what, and whether it carries you.
-    add("taming", Value::Key(key(format!("taming.{}", taming_name(s.taming)))), TAMED);
+    add("drops", Value::Names(drops(s)), HUNTED, Survival);
+    // Tamed (or ridden): how, with what, and whether and how fast it carries you.
+    add("taming", Value::Key(key(format!("taming.{}", taming_name(s.taming)))), TAMED, Survival);
     if s.taming != Taming::Wild {
         let mut foods: Vec<_> = s.foods.iter().collect();
         foods.sort_by_key(|f| (f.liking != Liking::Favorite, std::cmp::Reverse(f.food)));
-        add("foods", Value::Names(foods.iter().map(|f| format!("item:{}", f.item)).collect()), TAMED);
+        add("foods", Value::Names(foods.iter().map(|f| format!("item:{}", f.item)).collect()), TAMED, Survival);
         let rides = if s.flight > 0.0 {
             "flies"
         } else if s.seat > 0.0 {
@@ -101,26 +119,32 @@ pub fn facts(s: &Species) -> Vec<Fact> {
         } else {
             "no"
         };
-        add("riding", Value::Key(key(format!("riding.{rides}"))), TAMED);
+        add("riding", Value::Key(key(format!("riding.{rides}"))), TAMED, Survival);
+        if s.seat > 0.0 {
+            add("ride_speed", Value::Num(s.flight.max(1.0), 1, "journal.animals.unit.times_walking"), TAMED, Survival);
+        }
     }
     // Bred: its seasons, its young, its life.
-    add("seasons", seasons_value(s.bio.breeds), BRED);
+    add("seasons", seasons_value(s.bio.breeds), BRED, Survival);
     if s.gestation() > 0 {
-        add("young", Value::Key(key("young.born")), BRED);
-        add("gestation", days(s.gestation()), BRED);
+        add("young", Value::Key(key("young.born")), BRED, Survival);
+        add("gestation", days(s.gestation()), BRED, Survival);
     } else {
-        add("young", Value::Key(key("young.eggs")), BRED);
-        add("incubation", days(s.incubation()), BRED);
+        add("young", Value::Key(key("young.eggs")), BRED, Survival);
+        add("incubation", days(s.incubation()), BRED, Survival);
     }
     let (lo, hi) = s.litter();
-    add("litter", Value::Range(lo, hi, "journal.animals.unit.young"), BRED);
-    add("growth", days(s.growth()), BRED);
-    add("lifespan", days(s.lifespan()), BRED);
-    // Ridden: how fast it carries you.
-    if s.seat > 0.0 {
-        add("ride_speed", Value::Num(s.flight.max(1.0), 1, "journal.animals.unit.times_walking"), RIDDEN);
-    }
+    add("litter", Value::Range(lo, hi, "journal.animals.unit.young"), BRED, Survival);
+    add("growth", days(s.growth()), BRED, Survival);
+    add("lifespan", days(s.lifespan()), BRED, Survival);
     f
+}
+
+/// The species whose journal id is `id` (`id`), for a toast.
+pub fn by_id(id: u32) -> Option<&'static Species> {
+    crate::species::SPECIES
+        .iter()
+        .find(|s| self::id(s.name) == id)
 }
 
 /// Whether a player whose deeds with the species are `deeds` may read `fact`. Every fact needs
@@ -145,6 +169,14 @@ fn mass(kg: f32) -> Value {
 fn days(ticks: u32) -> Value {
     let d = ticks as f32 / DAY;
     Value::Num(d, if d < 10.0 { 1 } else { 0 }, "journal.animals.unit.days")
+}
+
+fn size_name(s: Size) -> &'static str {
+    match s {
+        Size::Small => "small",
+        Size::Medium => "medium",
+        Size::Large => "large",
+    }
 }
 
 fn diet_name(d: Diet) -> &'static str {
@@ -249,7 +281,7 @@ pub fn keys() -> Vec<String> {
             }
         }
     }
-    k.extend(DEEDS.iter().map(|(_, d)| key(format!("by.{d}"))));
+    k.extend(DEEDS.iter().map(|(_, d)| key(format!("learn.{d}"))));
     k.sort();
     k.dedup();
     k
@@ -327,6 +359,9 @@ mod tests {
                 assert!(f.iter().any(|x| x.name == name), "{}: no {name}", s.name);
             }
             assert!(f.iter().filter(|x| x.by == SEEN).count() >= 6, "{}: few facts when seen", s.name);
+            // The sections in their page order, so the screen can lay them out as they come.
+            let order: Vec<Section> = f.iter().map(|x| x.section).collect();
+            assert!(order.windows(2).all(|w| w[0] as u8 <= w[1] as u8), "{}: sections out of order", s.name);
         }
         let deer = SPECIES.iter().find(|s| s.name == "red_deer").unwrap();
         let drops = facts(deer).into_iter().find(|x| x.name == "drops").unwrap();
@@ -335,7 +370,7 @@ mod tests {
 
     #[test]
     fn a_fact_needs_its_deed_and_a_sighting() {
-        let f = Fact { name: "drops", value: Value::Text(""), by: HUNTED };
+        let f = Fact { name: "drops", value: Value::Text(""), by: HUNTED, section: Section::Survival };
         assert!(!known(HUNTED, &f), "hunted unseen (a shot from afar) still needs a look");
         assert!(!known(SEEN, &f));
         assert!(known(SEEN | HUNTED, &f));
