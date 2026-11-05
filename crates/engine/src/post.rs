@@ -296,7 +296,8 @@ impl Post {
                 let at = match self.low_targets.iter().position(|t| t.0 == *name) {
                     Some(at) => at,
                     None => {
-                        self.low_targets.push((name.clone(), TextureId(u32::MAX), 0, (0, 0)));
+                        self.low_targets
+                            .push((name.clone(), TextureId(u32::MAX), 0, (0, 0)));
                         self.low_targets.len() - 1
                     }
                 };
