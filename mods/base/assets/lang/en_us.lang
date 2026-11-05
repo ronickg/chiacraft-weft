@@ -698,6 +698,10 @@ advancement.base.red_night = Red Night
 advancement.base.red_night.desc = See a blood moon through to its end without dying
 advancement.base.starfall = Starfall
 advancement.base.starfall.desc = Hold iron from a fallen star
+advancement.base.wish_upon = Wish Upon
+advancement.base.wish_upon.desc = Be out under the open sky on a meteor shower's peak night
+advancement.base.sky_on_fire = Sky on Fire
+advancement.base.sky_on_fire.desc = See an aurora storm from under the open sky
 
 # Where things come from (tooltips)
 menu.base.campfire = Campfire

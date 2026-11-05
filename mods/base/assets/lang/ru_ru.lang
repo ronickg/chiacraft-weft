@@ -698,6 +698,10 @@ advancement.base.red_night = Красная ночь
 advancement.base.red_night.desc = Переживите кровавую луну до конца, ни разу не погибнув
 advancement.base.starfall = Звездопад
 advancement.base.starfall.desc = Держите в руках железо упавшей звезды
+advancement.base.wish_upon = Загадай желание
+advancement.base.wish_upon.desc = Будьте под открытым небом в пик звездопада
+advancement.base.sky_on_fire = Небо в огне
+advancement.base.sky_on_fire.desc = Увидьте полярную бурю под открытым небом
 
 # Откуда что берётся (подсказки к предметам)
 menu.base.campfire = Костёр

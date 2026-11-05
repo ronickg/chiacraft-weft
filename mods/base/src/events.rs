@@ -162,6 +162,7 @@ fn tick(w: &World) {
     }
     pointers(w);
     let event = tonight(w);
+    sky_watchers(w, event);
     let strength = if event == Some(Event::BloodMoon) { ev::blood_moon_strength(ev::hour_of(w.day_time())) } else { 0.0 };
     watch(w, strength);
     let dim = w.dimension();
@@ -285,12 +286,35 @@ fn walk_off(w: &World) {
                 w.navigate(id, e.pos + away * (GONE_AT / len), 1.0);
                 true
             }
-            _ => {
+            nearest => {
+                let far = nearest.map_or(f64::INFINITY, |&p| (p - e.pos).length_squared().sqrt());
+                weft_sdk::info!("events: a blood-moon monster ({id}) walked off, gone {far:.0} blocks from the nearest player");
                 w.despawn(id);
                 false
             }
         }
     });
+}
+
+/// Players out under the open sky in the dark of a shower's peak (from 23:00) or an aurora storm
+/// (from full dark, 21:00) to 05:00: Wish Upon and Sky on Fire.
+fn sky_watchers(w: &World, event: Option<Event>) {
+    let (from, milestone) = match event {
+        Some(Event::Meteors { peak: true }) => (23.0, base_api::milestones::WISH_UPON),
+        Some(Event::AuroraStorm) => (21.0, base_api::milestones::SKY_ON_FIRE),
+        _ => return,
+    };
+    let hour = ev::hour_of(w.day_time());
+    if !(hour >= from || hour < 5.0) {
+        return;
+    }
+    for p in w.players() {
+        let Some(e) = w.entity(p) else { continue };
+        let head = BlockPos::new(e.pos.x.floor() as i32, (e.pos.y + e.size.eye as f64).floor() as i32, e.pos.z.floor() as i32);
+        if w.sky_light(head) >= 15 {
+            base_api::milestone(w, p, milestone);
+        }
+    }
 }
 
 /// "Red Night": players out when a blood moon starts are watched; those still alive when it has
