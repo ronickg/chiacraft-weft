@@ -329,7 +329,9 @@ pub fn init(r: &mut Registry) {
         let w = b.world();
         for d in b.iter() {
             if !crate::animal::tamed(&w, d.entity) {
+                let t = crate::prof::stamp();
                 count_at(&w, d.entity, d.pos.to_array(), -1.0);
+                crate::prof::slow(t, || format!("evolution: a death taken off its pool ({})", d.entity));
             }
         }
     });

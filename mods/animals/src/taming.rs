@@ -104,6 +104,8 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             return false;
         }
         let Some(t) = w.component(id, &TAMING) else { return false };
+        let t0 = crate::prof::stamp();
+        let _slow = Slow(t0, id);
         if t.scared > 0 {
             set(w, id, |t| t.scared = t.scared.saturating_sub(w.tick_elapsed(id)));
             if t.scared <= w.tick_elapsed(id) {
@@ -115,13 +117,29 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             }
             return true;
         }
-        if (w.game_time() + id) % 10 == 0
-            && s.shy > 0.0
-            && frightened(w, st, s.shy * shyness(w, id))
-            && !crate::signatures::calm(w, st.pos.to_array())
-        {
-            scare(w, id, 0);
-            return true;
+        // Its awareness of players (`senses`): it notices one by sight, sound and scent, stops
+        // to stare when half aware, and bolts when it has noticed.
+        if s.shy > 0.0 {
+            let seen = crate::senses::sense(w, id, st, |sight| crate::hunt::watch(w, sight));
+            if seen.player != 0 && !crate::signatures::calm(w, st.pos.to_array()) {
+                if seen.fright >= animals_core::perception::NOTICED {
+                    let p = seen.player_pos.map(f64::from);
+                    weft_sdk::info!(
+                        "{} {id} bolts from player {} {:.1} blocks off (awareness {:.2})",
+                        s.name,
+                        seen.player,
+                        crate::dist2(p, st.pos).sqrt(),
+                        seen.fright
+                    );
+                    scare(w, id, 0);
+                    crate::senses::ran(w, id, true);
+                    return true;
+                }
+                if seen.fright >= animals_core::perception::STARE {
+                    crate::senses::stare(w, id, st, seen.player_pos);
+                    return true;
+                }
+            }
         }
         if wild {
             return false;
@@ -173,6 +191,15 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
     }
 }
 
+/// Logs a slow `behave` as it ends (`prof::slow`).
+struct Slow(Option<std::time::Instant>, u64);
+
+impl Drop for Slow {
+    fn drop(&mut self) {
+        crate::prof::slow(self.0, || format!("taming::behave of {}", self.1));
+    }
+}
+
 /// `id` was let go: taming it starts again.
 pub fn released(w: &World, id: u64) {
     set(w, id, |t| *t = FRESH);
@@ -200,23 +227,9 @@ fn dist2(a: &EntityState, b: &EntityState) -> f64 {
 
 /// How far its temperament (`coats::temperament`) moves its kind's shy distance: a calm one (0)
 /// lets a walker come to 0.6 of it, a skittish one (1) runs at 1.4 times it.
-fn shyness(w: &World, id: u64) -> f32 {
+pub(crate) fn shyness(w: &World, id: u64) -> f32 {
     w.component(id, &crate::coats::GENOME)
         .map_or(1.0, |g| 0.6 + 0.8 * crate::coats::temperament(&g))
-}
-
-/// A player walking upright within `shy` blocks, or running within twice that.
-fn frightened(w: &World, st: &EntityState, shy: f32) -> bool {
-    let shy = shy as f64;
-    w.players()
-        .into_iter()
-        .filter_map(|p| w.entity(p))
-        .any(|p| {
-            let d2 = dist2(&p, st);
-            let sneaking = p.pose == abi::pose::CROUCH;
-            let walking = p.moved > 0.01;
-            (p.sprinting != 0 && d2 < 4.0 * shy * shy) || (!sneaking && walking && d2 < shy * shy)
-        })
 }
 
 /// Scared: stops asking and runs off for a while, from `from` (0: the nearest player).
@@ -262,8 +275,8 @@ fn flee(w: &World, id: u64, st: &EntityState) {
         let a = w.random_below(628) as f64 / 100.0;
         (a.cos(), a.sin())
     });
-    let n = (x * x + z * z).sqrt().max(0.01);
-    let to = [st.pos.x + x / n * 8.0, st.pos.y, st.pos.z + z / n * 8.0];
+    // Away over ground it can run on (no cliff, no water: `senses::escape`).
+    let to = crate::senses::escape(w, st, [st.pos.x - x, st.pos.y, st.pos.z - z], 8.0);
     if let Some(f) = from {
         weft_sdk::info!(
             "animal {id} at {:.1} {:.1} flees from what hurt it at {:.1} {:.1} to {:.1} {:.1}",

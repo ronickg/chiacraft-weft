@@ -419,12 +419,14 @@ pub fn spawn(cfg: ServerConfig, storage: Option<Storage>) -> ServerHandle {
             // The server's parallel work (region ticks, entities) runs on a pool of its own whose
             // threads are the server's, as the server thread is.
             scope.enter();
+            crate::diag::mark_server_thread();
             let pool_scope = scope.clone();
             let pool = rayon::ThreadPoolBuilder::new()
                 .num_threads(crate::workers())
                 .thread_name(|i| format!("server {i}"))
                 .start_handler(move |_| {
                     pool_scope.enter();
+                    crate::diag::mark_server_thread();
                     crate::set_priority(crate::PRIORITY_ABOVE_NORMAL);
                 })
                 .build()
