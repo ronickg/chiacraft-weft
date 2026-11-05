@@ -1543,3 +1543,7 @@ hint.base.waystone.arrived = Вы выходите из лей-линии в {0}
 command.base.waystone.none_near = Здесь нет путевого камня.
 command.base.waystone.goto = к путевому камню у {0} {1} ({2} линий), с юга
 command.base.waystone.list = пробуждённых камней: {0} ({1}); карта: {2} тайлов, {3} байт
+hud.element.base.minimap = Мини-карта
+config.base.minimap = Мини-карта
+config.base.minimap.tooltip = Маленькая карта в правом верхнем углу: где вы прошли, ваши путевые камни и лей-линии, пока в руке лоза. N меняет масштаб
+key.base.minimap_zoom = Масштаб мини-карты

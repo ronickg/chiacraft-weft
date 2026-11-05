@@ -1542,3 +1542,7 @@ hint.base.waystone.arrived = You step out of the ley, {0} blocks on. The trip le
 command.base.waystone.none_near = No waystone here.
 command.base.waystone.goto = to the waystone at {0} {1} ({2} lines), from the south
 command.base.waystone.list = waystones awake: {0} ({1}); map: {2} tiles, {3} bytes
+hud.element.base.minimap = Minimap
+config.base.minimap = Minimap
+config.base.minimap.tooltip = A small map in the top right corner: where you walked, your waystones, and the ley lines while you hold the dowsing rod. N changes its zoom
+key.base.minimap_zoom = Minimap zoom

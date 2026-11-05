@@ -8,6 +8,8 @@
 //! light) a tile at a time on a thread of its own, so the frame never waits; the picture is painted
 //! into a runtime GUI image (`Client::set_image`, "dyn:base:map") a few times a second while open.
 //! Woken waystones nearby give off a slow rise of light, seen only by the players who woke them.
+//! The minimap in the HUD's top right corner draws the same picture small round the player
+//! (`MINIMAP_ON` in the settings, N for its zoom), painted again as the player moves or turns.
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Condvar, Mutex};
@@ -21,6 +23,11 @@ use weft_sdk::*;
 use crate::waystones::{ASK, ATLAS, Atlas, Cell, OPEN, TRAVEL};
 
 pub static SCREEN: Screen = Screen::named("map");
+/// The minimap (the HUD's top right), its setting and its zoom key.
+static MINIMAP: HudElement = HudElement::named("minimap");
+pub static MINIMAP_ON: Config<bool> = Config::named("minimap");
+static MINI_ZOOM: Key = Key::named("minimap_zoom");
+const MINI_IMAGE: &str = "dyn:base:minimap";
 static OPEN_KEY: Key = Key::named("map");
 const IMAGE: &str = "dyn:base:map";
 /// The picture's side in GUI pixels (one image pixel each).
@@ -156,6 +163,10 @@ struct State {
     rng: u64,
     /// Whether the map was open last frame: closing it forgets the travel and the pan.
     was_open: bool,
+    /// The minimap's zoom, when and where (block, facing) it was last painted, and whether it shows.
+    mini_zoom: usize,
+    mini_painted: Option<(Instant, (i32, i32), i32)>,
+    mini_shown: bool,
 }
 
 static STATE: Mutex<State> = Mutex::new(State {
@@ -170,6 +181,9 @@ static STATE: Mutex<State> = Mutex::new(State {
     glowed: None,
     rng: 0x9E37_79B9_7F4A_7C15,
     was_open: false,
+    mini_zoom: n::MINI_ZOOM_START,
+    mini_painted: None,
+    mini_shown: false,
 });
 
 fn change(c: &ClientView, f: impl FnOnce(&mut State)) {
@@ -200,6 +214,23 @@ pub fn register(r: &mut Registry) {
         open(c);
     });
     r.client_frame(frame);
+    r.config(&MINIMAP_ON).bool(true);
+    r.key(&MINI_ZOOM, "N").on_press_client(|_| {
+        let mut s = STATE.lock().unwrap();
+        s.mini_zoom = (s.mini_zoom + 1) % n::MINI_ZOOMS.len();
+        s.mini_painted = None;
+    });
+    // The picture inside the frame; the frame (a bar always full, its fill clear) hides with the
+    // setting, and the picture is cleared then (`minimap`).
+    let (px, fr) = (n::MINI_PX as f32, n::MINI_FRAME);
+    r.hud_element(&MINIMAP, hud_anchor::TOP_RIGHT, 2, move |ui| {
+        ui.column(S::column().size(px + 2.0 * fr, px + 2.0 * fr), |ui| {
+            ui.column(S::column().size(px, px).at(fr, fr), |ui| ui.image(MINI_IMAGE, px, px));
+            ui.progress_bind("minimap", S::default().size(px + 2.0 * fr, px + 2.0 * fr).at(0.0, 0.0), |c| {
+                if MINIMAP_ON.get() && crate::ley::seed_here(c).is_some() { 1.0 } else { -1.0 }
+            });
+        });
+    });
     r.screen(&SCREEN, screen).on_key(|c, key| {
         let z = n::ZOOMS[STATE.lock().unwrap().zoom];
         let step = 32 * z;
@@ -248,7 +279,13 @@ fn frame(c: &Client) {
     {
         let mut s = STATE.lock().unwrap();
         // A new world (or the first frame): ask for the atlas once, for the waystones' glow.
-        let ask_every = if open { ASK_SECS } else { 30.0 };
+        let ask_every = if open {
+            ASK_SECS
+        } else if MINIMAP_ON.get() {
+            5.0
+        } else {
+            30.0
+        };
         if s.seed != seed
             || s.asked
                 .is_none_or(|t| now.duration_since(t).as_secs_f32() >= ask_every)
@@ -267,6 +304,7 @@ fn frame(c: &Client) {
         s.was_open = open;
     }
     glow(c, seed, now);
+    minimap(c, seed, now);
     if !open {
         return;
     }
@@ -316,9 +354,50 @@ fn centre(view: &ClientView, s: &State) -> (i32, i32) {
     (p.0 + s.pan.0, p.1 + s.pan.1)
 }
 
-/// Where block (`x`, `z`) lands in the picture (GUI pixels), at this view.
+/// Where block (`x`, `z`) lands in the map's picture (GUI pixels), at this view.
 fn place(c: (i32, i32), z: i32, x: i32, zz: i32) -> (f32, f32) {
-    ((x - c.0) as f32 / z as f32 + VIEW / 2.0, (zz - c.1) as f32 / z as f32 + VIEW / 2.0)
+    place_in(VIEW, c, z, x, zz)
+}
+
+/// The same in a picture `side` pixels across.
+fn place_in(side: f32, c: (i32, i32), z: i32, x: i32, zz: i32) -> (f32, f32) {
+    ((x - c.0) as f32 / z as f32 + side / 2.0, (zz - c.1) as f32 / z as f32 + side / 2.0)
+}
+
+/// The minimap: painted again when the player moved a pixel's worth or turned, at most every
+/// `MINI_REPAINT_SECS`; cleared once when switched off.
+fn minimap(c: &Client, seed: u64, now: Instant) {
+    let on = MINIMAP_ON.get();
+    let side = n::MINI_PX as usize;
+    let mut s = STATE.lock().unwrap();
+    if !on {
+        if s.mini_shown {
+            s.mini_shown = false;
+            s.mini_painted = None;
+            drop(s);
+            c.set_image(MINI_IMAGE, n::MINI_PX, n::MINI_PX, &vec![0; side * side * 4]);
+        }
+        return;
+    }
+    let Some(me) = c.view().player_state() else { return };
+    let zoom = n::MINI_ZOOMS[s.mini_zoom];
+    let at = (me.pos.x.floor() as i32, me.pos.z.floor() as i32);
+    let facing = (me.yaw.to_degrees() / 15.0).round() as i32;
+    let stale = match s.mini_painted {
+        None => true,
+        Some((t, p, f)) => {
+            now.duration_since(t).as_secs_f32() >= n::MINI_REPAINT_SECS
+                && ((p.0 - at.0).abs() >= zoom || (p.1 - at.1).abs() >= zoom || f != facing || now.duration_since(t).as_secs_f32() >= 2.0)
+        }
+    };
+    if !stale {
+        return;
+    }
+    s.mini_painted = Some((now, at, facing));
+    s.mini_shown = true;
+    drop(s);
+    let img = picture(c, seed, side, at, zoom, false);
+    c.set_image(MINI_IMAGE, n::MINI_PX, n::MINI_PX, &img);
 }
 
 /// Woken waystones within reach give off a slow rise of light, for this player alone.
@@ -364,12 +443,21 @@ fn glow(c: &Client, seed: u64, now: Instant) {
 fn paint(c: &Client) {
     let view = c.view();
     let Some(seed) = crate::ley::seed_here(&view) else { return };
-    let (centre, zoom, atlas_woken, me) = {
+    let (centre, zoom) = {
         let mut s = STATE.lock().unwrap();
         s.painted = Some(Instant::now());
-        (centre(&view, &s), n::ZOOMS[s.zoom], s.atlas.woken.clone(), view.player_state())
+        (centre(&view, &s), n::ZOOMS[s.zoom])
     };
-    let side = n::MAP_PX as usize;
+    let img = picture(c, seed, n::MAP_PX as usize, centre, zoom, true);
+    c.set_image(IMAGE, n::MAP_PX, n::MAP_PX, &img);
+}
+
+/// The chart `side` pixels a side round block `centre` at `zoom` blocks a pixel: the explored land
+/// over parchment, its edge inked if `edge`, the ley lines with the rod or ley sight, the woken
+/// waystones and the player's arrow. RGBA.
+fn picture(c: &Client, seed: u64, side: usize, centre: (i32, i32), zoom: i32, edge: bool) -> Vec<u8> {
+    let view = c.view();
+    let (atlas_woken, me) = (STATE.lock().unwrap().atlas.woken.clone(), view.player_state());
     let mut img = vec![255u8; side * side * 4];
     let half = side as i32 / 2;
     let w = work();
@@ -408,7 +496,7 @@ fn paint(c: &Client) {
         };
         for j in 1..side as i32 - 1 {
             for i in 1..side as i32 - 1 {
-                if seen_at(i, j) && !(seen_at(i - 1, j) && seen_at(i + 1, j) && seen_at(i, j - 1) && seen_at(i, j + 1)) {
+                if edge && seen_at(i, j) && !(seen_at(i - 1, j) && seen_at(i + 1, j) && seen_at(i, j - 1) && seen_at(i, j + 1)) {
                     let o = (j as usize * side + i as usize) * 4;
                     for k in 0..3 {
                         img[o + k] = (img[o + k] as u16 * 3 / 5) as u8;
@@ -420,7 +508,8 @@ fn paint(c: &Client) {
         if crate::ley::sees_lines(c) {
             let reach = half * zoom + ley::CELL;
             for li in ley::lines_near(seed, centre.0, centre.1, reach) {
-                let (a, b) = (place(centre, zoom, li.from[0], li.from[1]), place(centre, zoom, li.to[0], li.to[1]));
+                let (a, b) =
+                    (place_in(side as f32, centre, zoom, li.from[0], li.from[1]), place_in(side as f32, centre, zoom, li.to[0], li.to[1]));
                 let steps = ((b.0 - a.0).abs().max((b.1 - a.1).abs()).ceil() as i32).max(1);
                 for k in 0..=steps {
                     let t = k as f32 / steps as f32;
@@ -438,7 +527,7 @@ fn paint(c: &Client) {
     // Woken waystones: a small diamond each (the markers over it are the buttons).
     for &(i, j) in &atlas_woken {
         let Some(nd) = ley::node(seed, i, j) else { continue };
-        let (px, pz) = place(centre, zoom, nd.x, nd.z);
+        let (px, pz) = place_in(side as f32, centre, zoom, nd.x, nd.z);
         for dz in -3i32..=3 {
             for dx in -3i32..=3 {
                 let (x, y) = (px as i32 + dx, pz as i32 + dz);
@@ -452,7 +541,7 @@ fn paint(c: &Client) {
     }
     // The player: an arrow the way they face.
     if let Some(st) = me {
-        let (px, pz) = place(centre, zoom, st.pos.x.floor() as i32, st.pos.z.floor() as i32);
+        let (px, pz) = place_in(side as f32, centre, zoom, st.pos.x.floor() as i32, st.pos.z.floor() as i32);
         let [fx, fz] = yaw_dir(st.yaw);
         for dz in -5i32..=5 {
             for dx in -5i32..=5 {
@@ -473,7 +562,7 @@ fn paint(c: &Client) {
             }
         }
     }
-    c.set_image(IMAGE, n::MAP_PX, n::MAP_PX, &img);
+    img
 }
 
 /// The blank parchment's grain at a coarse cell.
