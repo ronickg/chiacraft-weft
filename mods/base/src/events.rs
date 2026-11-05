@@ -477,6 +477,7 @@ fn site(w: &World) -> Result<BlockPos, String> {
     let radius = ev::IMPACT_SITE_RADIUS;
     // Why tries failed: near something, no open dry ground there, not level.
     let (mut blocked, mut ground, mut uneven) = (0, 0, 0);
+    let (mut unloaded, mut water, mut shut, mut nothing, mut shut_light) = (0, 0, 0, 0, 0);
     for _ in 0..ev::IMPACT_SITE_TRIES {
         let (_, from) = players[w.random_below(players.len() as u32) as usize];
         let angle = unit(w) as f64 * std::f64::consts::TAU;
@@ -489,9 +490,21 @@ fn site(w: &World) -> Result<BlockPos, String> {
         let (x, z) = (x.floor() as i32, z.floor() as i32);
         // From the land's own height there, not the player's: one flying, up a cliff or in a
         // cave looked 48 blocks round itself and found no ground (PC run fh_impact2).
-        let Some(top) = open_ground(w, x, land_height(&fields, x, z), z) else {
-            ground += 1;
-            continue;
+        let top = match ground_or_why(w, x, land_height(&fields, x, z), z) {
+            Ok(top) => top,
+            Err(why) => {
+                ground += 1;
+                match why {
+                    NoGround::Unloaded => unloaded += 1,
+                    NoGround::Water => water += 1,
+                    NoGround::Shut(light) => {
+                        shut += 1;
+                        shut_light = shut_light.max(light);
+                    }
+                    NoGround::Nothing => nothing += 1,
+                }
+                continue;
+            }
         };
         // Level and dry across the crater: eight points round it within `IMPACT_LEVEL`.
         let level = (0..8).all(|k| {
@@ -505,7 +518,7 @@ fn site(w: &World) -> Result<BlockPos, String> {
         uneven += 1;
     }
     Err(format!(
-        "{blocked} near players, builds or spawn, {ground} not open dry loaded ground, {uneven} not level; reach {lo}-{hi} at simulation {}",
+        "{blocked} near players, builds or spawn, {ground} no open dry loaded ground ({unloaded} unloaded, {water} water, {shut} under cover (sky light up to {shut_light}), {nothing} nothing solid), {uneven} not level; reach {lo}-{hi} at simulation {}",
         simulation(),
         lo = ev::impact_reach(simulation()).0,
         hi = ev::impact_reach(simulation()).1
@@ -519,25 +532,42 @@ pub(crate) fn land_height(f: &weft_sdk::noise::fixed::Fields, x: i32, z: i32) ->
 
 /// The ground's top in column (`x`, `z`) near `y`: loaded, open to the sky, not water.
 pub(crate) fn open_ground(w: &World, x: i32, y: i32, z: i32) -> Option<BlockPos> {
+    ground_or_why(w, x, y, z).ok()
+}
+
+/// Why a column has no open ground: none of it loaded, water on it, the sky shut off (with the
+/// light it found), or nothing solid within the look.
+pub(crate) enum NoGround {
+    Unloaded,
+    Water,
+    Shut(u32),
+    Nothing,
+}
+
+/// `open_ground`, saying why not (the impact's waiting line counts them).
+pub(crate) fn ground_or_why(w: &World, x: i32, y: i32, z: i32) -> Result<BlockPos, NoGround> {
     const LOOK: i32 = 48;
+    let mut loaded = false;
     for gy in (y - LOOK..=y + LOOK).rev() {
         let p = BlockPos::new(x, gy, z);
         // Air cubes high over the land may not be loaded at all: passed over, not the end of
         // the look (PC run fh_impact5: 96 of 96 tries stopped above the ground).
         let Some(state) = w.block_loaded(p) else { continue };
+        loaded = true;
         if state == 0 || LEAVES.on_block(state) {
             continue;
         }
         let flags = w.block_flags(p);
         if flags & abi::block_flags::LIQUID != 0 {
-            return None;
+            return Err(NoGround::Water);
         }
         if flags & abi::block_flags::SOLID == 0 {
             continue;
         }
-        return (w.sky_light(p.above()) >= 15).then_some(p);
+        let sky = w.sky_light(p.above());
+        return if sky >= 15 { Ok(p) } else { Err(NoGround::Shut(sky)) };
     }
-    None
+    Err(if loaded { NoGround::Nothing } else { NoGround::Unloaded })
 }
 
 /// Whether `pos` is within `clear` blocks of a cell an online player built in.
