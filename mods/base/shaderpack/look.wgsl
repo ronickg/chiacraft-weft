@@ -359,6 +359,21 @@ fn lightning_toward() -> vec2<f32> {
     return vec2(sin(a), -cos(a));
 }
 
+// How far off the strike is (blocks).
+fn lightning_far() -> f32 {
+    return mix(250.0, 1200.0, fract(scene.lightning.y * 47.3));
+}
+
+// The bolt in front of land that lies beyond it (`haze_lit`): drawn in the sky alone, the land
+// covered all of it below the horizon and only a short piece showed between the horizon and the
+// deck (PC shbo2_bolts). Nothing while no flash is on.
+fn lightning_bolt_over(dir: vec3<f32>, dist: f32) -> vec3<f32> {
+    if scene.lightning.x > 1.2 || scene.lightning.z < 0.05 || dist < lightning_far() {
+        return vec3(0.0);
+    }
+    return lightning_bolt(dir);
+}
+
 // The bolt in the sky along `dir` (linear light): a jagged line from the deck's underside down to
 // the ground where it struck, a few hundred to two and a half thousand blocks off, with one branch;
 // none for a strike inside the clouds.
@@ -372,7 +387,7 @@ fn lightning_bolt(dir: vec3<f32>) -> vec3<f32> {
     }
     // Nearer than before (400-2500) and from the deck's underside, the soft one 220 higher, so the
     // bolt stands tall in view: it was a short squiggle at the horizon (PC shbo_bolts).
-    let far = mix(250.0, 1200.0, fract(r * 47.3));
+    let far = lightning_far();
     let base = scene.clouds.z + select(0.0, SOFT_LIFT * (1.0 - 0.7 * max(min(rain_amount() * 0.75 + scene.weather.w * 0.25, 1.0), scene.weather.w)), scene.soft_clouds.x > 0.5);
     let top = atan2(max(base, 40.0), far);
     let bottom = atan2(-max(scene.eye.y - SEA_LEVEL, 2.0), far);
@@ -1170,7 +1185,7 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let mixed = mix(pale, toward, v);
     let own = mix(pale, toward, v * mix(0.7, 1.0, wet));
     let seen = max(vec3(luma(mixed)) + own - vec3(luma(own)), vec3(0.0));
-    return mix(seen, lit, edge) + held_in_fog(rel, sky);
+    return mix(seen, lit, edge) + held_in_fog(rel, sky) + lightning_bolt_over(dir, dist);
 }
 
 // ---- light in the fog: torches (Research round 15, 6: Valheim's warm firelight in the mist) ----
