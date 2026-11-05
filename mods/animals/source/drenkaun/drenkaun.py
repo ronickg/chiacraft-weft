@@ -248,8 +248,10 @@ def elements():
          el("skull", "head", *SKULL0),
          # A stag's muzzle, narrow and tapering to a dark nose (Ronald, round 4: the big flat pale
          # box read as a cow's).
-         el("muzzle", "head", hs((-4.4, 59.8, 45.5)), hs((4.4, 66.6, 53.0))),
-         el("nose", "head", hs((-3.4, 60.4, 52.5)), hs((3.4, 65.2, 56.6))),
+         # Their bottoms flush with the skull's, a half unit apart (linecheck: a lower edge a texel
+         # below the next box's read as a thin line under the face).
+         el("muzzle", "head", hs((-4.4, 59.88, 45.5)), hs((4.4, 66.6, 53.0))),
+         el("nose", "head", hs((-3.4, 59.78, 52.5)), hs((3.4, 65.2, 56.6))),
          el("mouth", "head", hs((-2.7, 59.0, 44.5)), hs((2.7, 60.6, 52.0))),
          el("jaw", "jaw", hs((-3.1, 57.9, 44.0)), hs((3.1, 60.3, 52.4)))]  # shorter than the muzzle
     neck, _ = rod("neck", "neck", tuple(NECK0), NECK_ROT, NECK_LEN, NECK_W, back=6.0)  # slimmer than the head
@@ -262,22 +264,30 @@ def elements():
     E.append(el("mane", "neck", (-5.6, n0[1] + 3, n0[2] + hw - 1.5), (5.6, n0[1] + 24, n0[2] + hw + 3.1), rot=NECK_ROT, origin=tuple(n0)))
     E.append(el("fringe_mane", "neck", (0, n0[1] + 3.5, n0[2] + hw), (0, n0[1] + 24.5, n0[2] + hw + 21.0), quad="east", rot=NECK_ROT,
                 origin=tuple(n0), cut="mane"))
-    for j, (t, ln, w, d) in enumerate(((2.0, 8.0, 1.6, 3.2), (8.5, 7.0, 2.3, 2.6), (14.5, 8.5, 1.3, 3.6), (21.5, 6.5, 1.1, 2.4))):
-        E.append(el(f"moss_crest{j}", "neck", (-hw - w, n0[1] + t, n0[2] - hw - d), (hw + w, n0[1] + t + ln, n0[2] - hw + 2.0 + 0.2 * j),
+    for j, (t, ln, w, d) in enumerate(((2.0, 8.0, 1.6, 3.2), (8.5, 7.0, 2.3, 2.6), (14.5, 8.5, 1.3, 3.6), (21.5, 6.5, 1.42, 2.4))):
+        # Each sunk a unit deeper into the neck than the one before: their inner ends two texels apart
+        # (0.2 apart left a half-texel line along each tuft's end; linecheck).
+        E.append(el(f"moss_crest{j}", "neck", (-hw - w, n0[1] + t, n0[2] - hw - d), (hw + w, n0[1] + t + ln, n0[2] - hw + 2.0 + 1.0 * j),
                     rot=NECK_ROT, origin=tuple(n0)))
     # It hangs down the front, as a mane (Ronald, round 2: "the moss hangs down the front of the
     # neck and chest as a mane instead of lying on top like a blanket"): a mat over the chest's
     # front under the throat, locks hanging from it down the brisket, and down the shoulders' fronts
     # only; on top just the tufts where the neck meets the withers.
-    E.append(el("moss_tuft0", "spine_1", (-13.6, 54.0, 19.5), (13.6, 65.4, 30.7)))
-    E.append(el("moss_chest", "spine_1", (-10.4, 34.0, 30.6), (10.4, 58.0, 34.9)))
+    # The tuft over the withers two texels wider than the shoulders (0.8 left a strip of their front
+    # beside it); the chest's mat reaching back into the chest, over the brisket's top (it left a
+    # texel and a half of the brisket showing between them).
+    E.append(el("moss_tuft0", "spine_1", (-13.9, 54.0, 19.5), (13.9, 65.4, 30.7)))
+    E.append(el("moss_chest", "spine_1", (-10.4, 34.0, 29.6), (10.4, 58.0, 34.9)))
     E.append(el("fringe_chest", "spine_1", (-11.4, 18.0, 35.4), (11.4, 58.0, 35.4), quad="south", cut="chest"))
     for s_, q in ((1, "east"), (-1, "west")):
         E.append(el(f"fringe_moss_{q}", "spine_1", (s_ * 14.8, 30.0, -6.0), (s_ * 14.8, 64.6, 30.5), quad=q, cut="moss"))
     # No bark plates (Ronald, round 4: "Drop the plates"): the moss mane carries on over the
     # shoulders and along the back in uneven tufts, each narrower and lower than the one before,
     # thinning toward the hips and stopping short of the rump (concept A).
-    for j, (bone_, x, y0, y1, z0, z1) in enumerate((("spine_1", 12.0, 61.0, 66.2, 8.5, 20.2), ("spine_1", 10.2, 60.6, 65.1, -1.5, 9.2),
+    # The first pad lies over the shoulders' edges (at 12.0 their top showed beside it as a texel and
+    # a half of brown: Ronald, 11-05, "a thin line there, which makes no sense"); the others are
+    # clearly narrower than the back they lie on.
+    for j, (bone_, x, y0, y1, z0, z1) in enumerate((("spine_1", 12.93, 61.0, 66.2, 8.5, 20.2), ("spine_1", 10.2, 60.6, 65.4, -1.5, 9.2),
                                                      ("spine_1", 8.0, 59.9, 63.9, -9.5, -0.8), ("spine_0", 6.4, 53.6, 57.6, -18.0, -8.6),
                                                      ("spine_0", 4.4, 53.9, 56.5, -26.0, -17.4))):
         E.append(el(f"moss_back{j}", bone_, (-x, y0, z0), (x, y1, z1)))
@@ -306,8 +316,10 @@ def elements():
             E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 3.4, 0, z - 3.3), (x + 3.4, 5.4, z + 3.9)))  # the broad hoof
         else:
             x, z = BACK_X * s, BACK_Z
-            xi, xo = sorted((x - 4.6 * s, x + 4.6 * s))  # the ham
-            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (xi, 27.5, z - 7.0), (xo, 55.5, z + 6.5)))
+            # The ham: two texels out from the hips' side, a haunch (4.6 left 0.4 of a texel poking out).
+            xi, xo = sorted((x - 4.6 * s, x + 5.5 * s))
+            # Its top two texels under the hips' back (at 55.5 it stood a texel above it: a lip; linecheck).
+            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (xi, 27.5, z - 7.0), (xo, 54.0, z + 6.5)))
             E.append(el(f"hock_{leg}", f"leg_{leg}_lower", (x - 3.5, 24.5, z - 3.4), (x + 3.5, 31.5, z + 3.6)))
             E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x - 2.9, 5.4, z - 2.9), (x + 2.9, 26.0, z + 2.9)))
             E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 3.4, 0, z - 3.2), (x + 3.4, 6.0, z + 3.8)))

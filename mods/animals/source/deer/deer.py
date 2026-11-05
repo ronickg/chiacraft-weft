@@ -189,7 +189,8 @@ def elements():
          el("chest", "spine_1", (-10.2, 33, -8), (10.2, 60, 28)),
          el("skull", "head", *SKULL),
          el("muzzle", "head", (-4.6, 61.4, 43), (4.6, 69.2, 52.5)),  # tapering to the nose
-         el("nose", "head", (-3.7, 62.6, 52), (3.7, 67.8, 55.4)),
+         # Out over two texels from the muzzle's front (at 55.4, 1.4 texels, its dark sides read as a rim; linecheck).
+         el("nose", "head", (-3.7, 62.6, 52), (3.7, 67.8, 57.2)),
          el("mouth", "head", (-3.0, 61.0, 42.5), (3.0, 62.4, 51.0)),
          el("jaw", "jaw", (-3.4, 59.6, 41.5), (3.4, 62.0, 51.5))]  # shorter than the muzzle
     neck, _ = rod("neck", "neck", tuple(NECK0), (NECK_PITCH + 90, 0, 0), NECK_LEN, 9.6, back=6.0)  # slimmer than the head
@@ -219,7 +220,8 @@ def elements():
         else:
             x, z = BACK_X * s, BACK_Z
             xi, xo = sorted((x - 3.6 * s, x + 4.2 * s))  # the ham
-            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (xi, 30, z - 6.5), (xo, 56.8, z + 6)))
+            # Its back two texels short of the rump's (at z - 6.5 a band 1.75 texels wide showed behind it; linecheck).
+            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (xi, 30, z - 5.9), (xo, 56.8, z + 6)))
             E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x - 2.2, 6, z - 2.2), (x + 2.2, 32, z + 2.2)))
             E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 2.7, 0, z - 2.7), (x + 2.7, 7.2, z + 3.3)))
     return E
