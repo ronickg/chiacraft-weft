@@ -1251,9 +1251,11 @@ web.base.centre_tip = Назад к началу (C)
 web.base.points = Очков умений: {0}
 web.base.refund_on = Забывание: осталось {0}
 web.base.refund_off = Забыть (осталось {0})
-web.base.refund_tip = Нажмите на взятый узел, чтобы вернуть его. Только тот, на котором не держатся другие.
+web.base.refund_tip = Нажмите на взятый узел, чтобы вернуть его.
+    Только тот, на котором не держатся другие.
 web.base.skill_tip = {color:title}{0}{/}
-    {color:dim}Растёт: {1}. Нажмите, чтобы увидеть его область.{/}
+    {color:dim}Растёт: {1}.{/}
+    {color:dim}Нажмите, чтобы увидеть область.{/}
 web.base.level = {0}
 web.base.by.later = пока ничем: придёт с заклинаниями, машинами или торговцами
 web.base.state.taken = {#7fdc6a}Взято{/}
@@ -1262,7 +1264,9 @@ web.base.state.waiting = {#c6a383}Не хватает очков умений: �
 web.base.state.far = {#6b6f86}Сначала возьмите соседний узел{/}
 web.base.state.locked = {#e8907a}Навык слишком низок{/}
 web.base.tip.start = {color:title}Начало{/}
-    {color:dim}Все начинают здесь. Растите к навыкам, которыми пользуетесь.{/}
+    {color:dim}Все начинают здесь.{/}
+    {color:dim}Растите к навыкам,{/}
+    {color:dim}которыми пользуетесь.{/}
 web.base.tip.1 = {color:title}{0}{/}
     {1} {2}
     {3}
@@ -1463,7 +1467,11 @@ item.base.emakaun = Эмакаун, Хранитель жизни
 item.base.emakaun.tooltip = Реликвия древних. В сети навыков ({key:base:web}) каждый взятый рядом узел даёт здоровье.
 tagged.base.stone = {#c6a383}Уровень предмета {value.level}{/}{if:value.f0==0}\n{#9ad7ff}+{value.p0} % урон в ближнем бою{/}{/if}{if:value.f0==1}\n{#9ad7ff}+{value.p0} % урон издалека{/}{/if}{if:value.f0==2}\n{#9ad7ff}+{value.p0} % урон заклинаний{/}{/if}{if:value.f0==3}\n{#9ad7ff}+{value.p0} % защита{/}{/if}{if:value.f0==4}\n{#9ad7ff}+{value.p0} % здоровье{/}{/if}{if:value.f0==5}\n{#9ad7ff}+{value.p0} % урон прирученных{/}{/if}{if:value.f0==6}\n{#9ad7ff}+{value.p0} % скорость приручения{/}{/if}{if:value.f0==7}\n{#9ad7ff}+{value.p0} % качество ремесла{/}{/if}{if:value.f0==8}\n{#9ad7ff}+{value.p0} % скорость сбора{/}{/if}{if:value.f0==9}\n{#9ad7ff}+{value.p0} % скорость добычи{/}{/if}{if:value.f0==10}\n{#9ad7ff}+{value.p0} % скорость движения{/}{/if}{if:value.f0==11}\n{#9ad7ff}+{value.p0} % расход маны{/}{/if}{if:value.f0==12}\n{#9ad7ff}+{value.p0} % выносливость{/}{/if}{if:value.f0==13}\n{#9ad7ff}+{value.p0} % медленный голод{/}{/if}{if:value.f0==14}\n{#9ad7ff}+{value.p0} % готовка{/}{/if}{if:value.f0==15}\n{#9ad7ff}+{value.p0} % урожай{/}{/if}{if:value.f0==16}\n{#9ad7ff}+{value.p0} % скорость езды{/}{/if}{if:value.f0==17}\n{#9ad7ff}+{value.p0} % торговля{/}{/if}{if:value.f0==18}\n{#9ad7ff}+{value.p0} % скорость плавки{/}{/if}{if:value.f0==19}\n{#9ad7ff}+{value.p0} % скорость машин{/}{/if}{if:value.f1==0}\n{#9ad7ff}+{value.p1} % урон в ближнем бою{/}{/if}{if:value.f1==1}\n{#9ad7ff}+{value.p1} % урон издалека{/}{/if}{if:value.f1==2}\n{#9ad7ff}+{value.p1} % урон заклинаний{/}{/if}{if:value.f1==3}\n{#9ad7ff}+{value.p1} % защита{/}{/if}{if:value.f1==4}\n{#9ad7ff}+{value.p1} % здоровье{/}{/if}{if:value.f1==5}\n{#9ad7ff}+{value.p1} % урон прирученных{/}{/if}{if:value.f1==6}\n{#9ad7ff}+{value.p1} % скорость приручения{/}{/if}{if:value.f1==7}\n{#9ad7ff}+{value.p1} % качество ремесла{/}{/if}{if:value.f1==8}\n{#9ad7ff}+{value.p1} % скорость сбора{/}{/if}{if:value.f1==9}\n{#9ad7ff}+{value.p1} % скорость добычи{/}{/if}{if:value.f1==10}\n{#9ad7ff}+{value.p1} % скорость движения{/}{/if}{if:value.f1==11}\n{#9ad7ff}+{value.p1} % расход маны{/}{/if}{if:value.f1==12}\n{#9ad7ff}+{value.p1} % выносливость{/}{/if}{if:value.f1==13}\n{#9ad7ff}+{value.p1} % медленный голод{/}{/if}{if:value.f1==14}\n{#9ad7ff}+{value.p1} % готовка{/}{/if}{if:value.f1==15}\n{#9ad7ff}+{value.p1} % урожай{/}{/if}{if:value.f1==16}\n{#9ad7ff}+{value.p1} % скорость езды{/}{/if}{if:value.f1==17}\n{#9ad7ff}+{value.p1} % торговля{/}{/if}{if:value.f1==18}\n{#9ad7ff}+{value.p1} % скорость плавки{/}{/if}{if:value.f1==19}\n{#9ad7ff}+{value.p1} % скорость машин{/}{/if}{if:value.f2==0}\n{#9ad7ff}+{value.p2} % урон в ближнем бою{/}{/if}{if:value.f2==1}\n{#9ad7ff}+{value.p2} % урон издалека{/}{/if}{if:value.f2==2}\n{#9ad7ff}+{value.p2} % урон заклинаний{/}{/if}{if:value.f2==3}\n{#9ad7ff}+{value.p2} % защита{/}{/if}{if:value.f2==4}\n{#9ad7ff}+{value.p2} % здоровье{/}{/if}{if:value.f2==5}\n{#9ad7ff}+{value.p2} % урон прирученных{/}{/if}{if:value.f2==6}\n{#9ad7ff}+{value.p2} % скорость приручения{/}{/if}{if:value.f2==7}\n{#9ad7ff}+{value.p2} % качество ремесла{/}{/if}{if:value.f2==8}\n{#9ad7ff}+{value.p2} % скорость сбора{/}{/if}{if:value.f2==9}\n{#9ad7ff}+{value.p2} % скорость добычи{/}{/if}{if:value.f2==10}\n{#9ad7ff}+{value.p2} % скорость движения{/}{/if}{if:value.f2==11}\n{#9ad7ff}+{value.p2} % расход маны{/}{/if}{if:value.f2==12}\n{#9ad7ff}+{value.p2} % выносливость{/}{/if}{if:value.f2==13}\n{#9ad7ff}+{value.p2} % медленный голод{/}{/if}{if:value.f2==14}\n{#9ad7ff}+{value.p2} % готовка{/}{/if}{if:value.f2==15}\n{#9ad7ff}+{value.p2} % урожай{/}{/if}{if:value.f2==16}\n{#9ad7ff}+{value.p2} % скорость езды{/}{/if}{if:value.f2==17}\n{#9ad7ff}+{value.p2} % торговля{/}{/if}{if:value.f2==18}\n{#9ad7ff}+{value.p2} % скорость плавки{/}{/if}{if:value.f2==19}\n{#9ad7ff}+{value.p2} % скорость машин{/}{/if}{if:value.flow==1}\n{#9ad7ff}+{value.sp} % к каждому малому узлу рядом с гнездом{/}{/if}{if:value.turn==0}\n{#9ad7ff}Малые узлы рядом с гнездом дают урон в ближнем бою{/}{/if}{if:value.turn==1}\n{#9ad7ff}Малые узлы рядом с гнездом дают урон издалека{/}{/if}{if:value.turn==2}\n{#9ad7ff}Малые узлы рядом с гнездом дают урон заклинаний{/}{/if}{if:value.turn==3}\n{#9ad7ff}Малые узлы рядом с гнездом дают защита{/}{/if}{if:value.turn==4}\n{#9ad7ff}Малые узлы рядом с гнездом дают здоровье{/}{/if}{if:value.turn==5}\n{#9ad7ff}Малые узлы рядом с гнездом дают урон прирученных{/}{/if}{if:value.turn==6}\n{#9ad7ff}Малые узлы рядом с гнездом дают скорость приручения{/}{/if}{if:value.turn==7}\n{#9ad7ff}Малые узлы рядом с гнездом дают качество ремесла{/}{/if}{if:value.turn==8}\n{#9ad7ff}Малые узлы рядом с гнездом дают скорость сбора{/}{/if}{if:value.turn==9}\n{#9ad7ff}Малые узлы рядом с гнездом дают скорость добычи{/}{/if}{if:value.turn==10}\n{#9ad7ff}Малые узлы рядом с гнездом дают скорость движения{/}{/if}{if:value.turn==11}\n{#9ad7ff}Малые узлы рядом с гнездом дают расход маны{/}{/if}{if:value.turn==12}\n{#9ad7ff}Малые узлы рядом с гнездом дают выносливость{/}{/if}{if:value.turn==13}\n{#9ad7ff}Малые узлы рядом с гнездом дают медленный голод{/}{/if}{if:value.turn==14}\n{#9ad7ff}Малые узлы рядом с гнездом дают готовка{/}{/if}{if:value.turn==15}\n{#9ad7ff}Малые узлы рядом с гнездом дают урожай{/}{/if}{if:value.turn==16}\n{#9ad7ff}Малые узлы рядом с гнездом дают скорость езды{/}{/if}{if:value.turn==17}\n{#9ad7ff}Малые узлы рядом с гнездом дают торговля{/}{/if}{if:value.turn==18}\n{#9ad7ff}Малые узлы рядом с гнездом дают скорость плавки{/}{/if}{if:value.turn==19}\n{#9ad7ff}Малые узлы рядом с гнездом дают скорость машин{/}{/if}
 web.base.tip.socket = {color:title}Гнездо{/}
-    {color:dim}Держит камень, найденный в мире: руины, боссы, лей-узлы, редкие звери, упавшие звёзды. Стоит {0} очка; камни вынимаются и вставляются свободно.{/}
+    {color:dim}Держит камень, найденный в мире:{/}
+    {color:dim}руины, боссы, лей-узлы,{/}
+    {color:dim}редкие звери, упавшие звёзды.{/}
+    {color:dim}Стоит {0} очка. Камни вынимаются{/}
+    {color:dim}и вставляются свободно.{/}
     {1}
 web.base.tip.stone0 = {color:title}{0}{/} {color:dim}(уровень предмета {1}){/}
     {color:dim}Нажмите, чтобы вынуть.{/}
@@ -1483,7 +1491,8 @@ web.base.stone.amplify = к каждому малому узлу рядом
 web.base.stone.remaru = {#9ad7ff}Показывает лей-линии без лозы{/}
 web.base.stone.emakaun = здоровья за каждый взятый рядом узел
 web.base.pick = Вставить камень:
-web.base.pick_none = Камней нет: их находят в руинах, у боссов, в лей-узлах, у редких зверей и в упавших звёздах.
+web.base.pick_none = Камней нет: их находят в руинах, у боссов,
+    в лей-узлах, у редких зверей и в упавших звёздах.
 web.base.pick_cancel = Отмена
 command.base.stone = {0}, уровень предмета {1}
 command.base.perk_show = сеть даёт: {0}

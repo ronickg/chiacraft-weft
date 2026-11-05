@@ -55,7 +55,7 @@ At full rate means work at or above one's skill: Stone Age work at skill 7 teach
 
 ## The web
 
-316 nodes (192 small, 80 notables, 16 keystones, 28 sockets) in 16 regions around a free start, 368 links. A small node gives 2 % to its family, a notable 3-4 times that, a keystone 40 % to one family for as much off another. A family tops out at ×1.6 (one age), a keystone's cost at ×0.6. A rare item refunds 3 nodes, each one the rest don't hang from.
+345 nodes (221 small, 80 notables, 16 keystones, 28 sockets) in 16 regions around a free start, 426 links. A small node gives 2 % to its family, a notable 3-4 times that, a keystone 40 % to one family for as much off another. A family tops out at ×1.6 (one age), a keystone's cost at ×0.6. A rare item refunds 3 nodes, each one the rest don't hang from.
 
 Skill level each ring needs (rings 9-12 are room for later ages at the rim):
 
@@ -67,21 +67,21 @@ Skill level each ring needs (rings 9-12 are room for later ages at the rim):
 
 | Region | Left lane | Right lane | Notables (ring 4, ring 7) | Keystone | Units | Bridge to the next |
 |---|---|---|---|---|---|---|
-| Melee | melee damage | stamina | heavy_blows (+3 melee damage); second_wind (+3 stamina); executioner (+4 melee damage); battle_rhythm (+2 stamina, +2 melee damage) | berserker (+20 melee damage, -20 defence) | 30 | weapon_master (+2 melee damage, +2 ranged damage) |
-| Archery and throwing | ranged damage | move speed | steady_aim (+3 ranged damage); light_feet (+3 move speed); piercing_shot (+4 ranged damage); skirmisher (+2 move speed, +2 ranged damage) | glass_arrow (+20 ranged damage, -20 health) | 30 | shield_archer (+2 ranged damage, +2 defence) |
-| Defence | defence | health | thick_hide (+3 defence); hardy (+3 health); shield_wall (+4 defence); unbroken (+4 health) | iron_wall (+20 defence, -20 move speed) | 30 | armourer (+2 defence, +2 craft grade) |
-| Smithing and tinkering | craft grade | smelting speed | keen_eye (+3 craft grade); bellows (+3 smelting speed); masters_touch (+4 craft grade); hot_forge (+4 smelting speed) | forge_bound (+20 craft grade, -20 stamina) | 30 | machine_forged (+2 craft grade, +2 machine speed) |
-| Engineering | machine speed | smelting speed | gearwright (+3 machine speed); steady_fire (+3 smelting speed); clockwork (+4 machine speed); pressure (+4 smelting speed) | overclock (+20 machine speed, -20 craft grade) | 30 | steam_drill (+2 machine speed, +2 mining speed) |
-| Mining and prospecting | mining speed | stamina | stonecutter (+3 mining speed); strong_back (+3 stamina); vein_sense (+4 mining speed); tireless (+4 stamina) | tunnel_rat (+20 mining speed, -20 health) | 30 | quarry_master (+2 mining speed, +2 gathering speed) |
-| Building and farming | harvest | gathering speed | green_thumb (+3 harvest); quick_hands (+3 gathering speed); bountiful (+4 harvest); builders_eye (+4 gathering speed) | homesteader (+20 harvest, -20 move speed) | 30 | kitchen_garden (+2 harvest, +2 cooking) |
-| Alchemy and cooking | cooking | slower hunger | hearty_meals (+3 cooking); iron_stomach (+3 slower hunger); fine_cook (+4 cooking); lean_living (+4 slower hunger) | feaster (+20 cooking, -20 slower hunger) | 30 | infuser (+2 cooking, +2 mana cost) |
-| Runecraft and enchanting | mana cost | craft grade | ley_sight (+3 mana cost, ley_sight); rune_carver (+3 craft grade); deep_runes (+4 mana cost); glyph_weaver (+4 craft grade) | rune_bound (+20 craft grade, -20 mana cost) | 30 | charged_runes (+2 mana cost, +2 spell damage) |
-| Destruction | spell damage | mana cost | kindling (+3 spell damage); focus (+3 mana cost); storm_call (+4 spell damage); overflow (+4 mana cost) | ley_burn (+20 spell damage, -20 mana cost) | 30 | balance (+2 spell damage, +2 health) |
-| Restoration | health | mana cost | mending (+3 health); calm_mind (+3 mana cost); renewal (+4 health); wellspring (+4 mana cost) | lifeblood (+20 mana cost, -20 health) | 30 | warding_light (+2 health, +2 defence) |
-| Conjuring and wards | tame damage | defence | bound_spirit (+3 tame damage); ward (+3 defence); greater_summons (+4 tame damage); bastion (+4 defence) | warden (+20 defence, -20 spell damage) | 30 | rune_collars (+2 tame damage, +2 defence) |
-| Taming and riding | taming speed | riding speed | gentle_hand (+3 taming speed); saddle_sense (+3 riding speed); pack_leader (+4 tame damage); swift_mount (+4 riding speed) | beastmaster (+20 tame damage, -20 melee damage) | 30 | tracker (+2 taming speed, +2 gathering speed) |
-| Survival | gathering speed | health | woodsman (+3 gathering speed); weathered (+3 health); forager (+4 slower hunger); hard_to_kill (+4 health) | wild_born (+20 slower hunger, -20 cooking) | 30 | pathfinder (+2 slower hunger, +2 move speed) |
-| Exploring and cartography | move speed | stamina | long_stride (+3 move speed); wayfarer (+3 stamina); pathless (+4 move speed); far_walker (+4 stamina) | wanderer (+20 move speed, -20 defence) | 30 | caravan (+2 move speed, +2 trade) |
+| Melee | melee damage | stamina | heavy_blows (+3 melee damage); second_wind (+3 stamina); executioner (+4 melee damage); battle_rhythm (+2 stamina, +2 melee damage) | berserker (+20 melee damage, -20 defence) | 33 | weapon_master (+2 melee damage, +2 ranged damage) |
+| Archery and throwing | ranged damage | move speed | steady_aim (+3 ranged damage); light_feet (+3 move speed); piercing_shot (+4 ranged damage); skirmisher (+2 move speed, +2 ranged damage) | glass_arrow (+20 ranged damage, -20 health) | 32 | shield_archer (+2 ranged damage, +2 defence) |
+| Defence | defence | health | thick_hide (+3 defence); hardy (+3 health); shield_wall (+4 defence); unbroken (+4 health) | iron_wall (+20 defence, -20 move speed) | 32 | armourer (+2 defence, +2 craft grade) |
+| Smithing and tinkering | craft grade | smelting speed | keen_eye (+3 craft grade); bellows (+3 smelting speed); masters_touch (+4 craft grade); hot_forge (+4 smelting speed) | forge_bound (+20 craft grade, -20 stamina) | 33 | machine_forged (+2 craft grade, +2 machine speed) |
+| Engineering | machine speed | smelting speed | gearwright (+3 machine speed); steady_fire (+3 smelting speed); clockwork (+4 machine speed); pressure (+4 smelting speed) | overclock (+20 machine speed, -20 craft grade) | 31 | steam_drill (+2 machine speed, +2 mining speed) |
+| Mining and prospecting | mining speed | stamina | stonecutter (+3 mining speed); strong_back (+3 stamina); vein_sense (+4 mining speed); tireless (+4 stamina) | tunnel_rat (+20 mining speed, -20 health) | 32 | quarry_master (+2 mining speed, +2 gathering speed) |
+| Building and farming | harvest | gathering speed | green_thumb (+3 harvest); quick_hands (+3 gathering speed); bountiful (+4 harvest); builders_eye (+4 gathering speed) | homesteader (+20 harvest, -20 move speed) | 32 | kitchen_garden (+2 harvest, +2 cooking) |
+| Alchemy and cooking | cooking | slower hunger | hearty_meals (+3 cooking); iron_stomach (+3 slower hunger); fine_cook (+4 cooking); lean_living (+4 slower hunger) | feaster (+20 cooking, -20 slower hunger) | 32 | infuser (+2 cooking, +2 mana cost) |
+| Runecraft and enchanting | mana cost | craft grade | ley_sight (+3 mana cost, ley_sight); rune_carver (+3 craft grade); deep_runes (+4 mana cost); glyph_weaver (+4 craft grade) | rune_bound (+20 craft grade, -20 mana cost) | 31 | charged_runes (+2 mana cost, +2 spell damage) |
+| Destruction | spell damage | mana cost | kindling (+3 spell damage); focus (+3 mana cost); storm_call (+4 spell damage); overflow (+4 mana cost) | ley_burn (+20 spell damage, -20 mana cost) | 32 | balance (+2 spell damage, +2 health) |
+| Restoration | health | mana cost | mending (+3 health); calm_mind (+3 mana cost); renewal (+4 health); wellspring (+4 mana cost) | lifeblood (+20 mana cost, -20 health) | 31 | warding_light (+2 health, +2 defence) |
+| Conjuring and wards | tame damage | defence | bound_spirit (+3 tame damage); ward (+3 defence); greater_summons (+4 tame damage); bastion (+4 defence) | warden (+20 defence, -20 spell damage) | 31 | rune_collars (+2 tame damage, +2 defence) |
+| Taming and riding | taming speed | riding speed | gentle_hand (+3 taming speed); saddle_sense (+3 riding speed); pack_leader (+4 tame damage); swift_mount (+4 riding speed) | beastmaster (+20 tame damage, -20 melee damage) | 34 | tracker (+2 taming speed, +2 gathering speed) |
+| Survival | gathering speed | health | woodsman (+3 gathering speed); weathered (+3 health); forager (+4 slower hunger); hard_to_kill (+4 health) | wild_born (+20 slower hunger, -20 cooking) | 32 | pathfinder (+2 slower hunger, +2 move speed) |
+| Exploring and cartography | move speed | stamina | long_stride (+3 move speed); wayfarer (+3 stamina); pathless (+4 move speed); far_walker (+4 stamina) | wanderer (+20 move speed, -20 defence) | 31 | caravan (+2 move speed, +2 trade) |
 | Trading | trade | riding speed | haggler (+3 trade); pack_train (+3 riding speed); merchant_prince (+4 trade); caravaneer (+4 riding speed) | silver_tongue (+20 trade, -20 melee damage) | 30 | sellsword (+2 trade, +2 melee damage) |
 
 A region's budget is 30 units (one age in its speciality); keystones count as nothing, their power is their cost.
@@ -90,26 +90,26 @@ A region's budget is 30 units (one age in its speciality); keystones count as no
 
 | Family | Units in the web | In the game |
 |---|---|---|
-| melee damage | 41 | yes |
-| ranged damage | 41 | later |
-| spell damage | 39 | later |
-| defence | 74 | yes |
-| health | 41 | yes |
-| tame damage | 41 | later |
-| taming speed | 13 | yes |
-| craft grade | 70 | later |
-| gathering speed | 25 | later |
-| mining speed | 39 | yes |
-| move speed | 48 | yes |
-| mana cost | 61 | later |
-| stamina | 31 | yes |
-| slower hunger | 38 | yes |
-| cooking | 39 | yes |
-| harvest | 37 | yes |
-| riding speed | 22 | later |
+| melee damage | 42 | yes |
+| ranged damage | 42 | later |
+| spell damage | 40 | later |
+| defence | 75 | yes |
+| health | 44 | yes |
+| tame damage | 42 | later |
+| taming speed | 15 | yes |
+| craft grade | 71 | later |
+| gathering speed | 27 | later |
+| mining speed | 40 | yes |
+| move speed | 50 | yes |
+| mana cost | 63 | later |
+| stamina | 34 | yes |
+| slower hunger | 39 | yes |
+| cooking | 40 | yes |
+| harvest | 38 | yes |
+| riding speed | 24 | later |
 | trade | 39 | later |
-| smelting speed | 22 | later |
-| machine speed | 39 | later |
+| smelting speed | 24 | later |
+| machine speed | 40 | later |
 
 ### Sockets and stones
 
@@ -146,24 +146,24 @@ Each job's build is hill-climbed with 60 points at skill 45 everywhere, then sco
 
 | Build (points spent) | fighter | archer | tamer | miner | smith | farmer and cook | mage | explorer |
 |---|---|---|---|---|---|---|---|---|
-| fighter (44) | ×2.88 | ×2.07 | ×1.85 | ×1.94 | ×1.80 | ×1.85 | ×2.10 | ×1.98 |
-| archer (44) | ×2.02 | ×2.44 | ×1.62 | ×1.60 | ×1.60 | ×1.62 | ×1.79 | ×1.96 |
-| tamer (46) | ×1.86 | ×1.74 | ×2.82 | ×1.72 | ×1.69 | ×1.74 | ×1.81 | ×1.72 |
-| miner (44) | ×1.94 | ×1.81 | ×1.92 | ×2.39 | ×1.82 | ×1.87 | ×1.91 | ×1.96 |
-| smith (43) | ×1.56 | ×1.50 | ×1.51 | ×1.54 | ×2.44 | ×1.51 | ×1.55 | ×1.50 |
-| farmer and cook (41) | ×1.73 | ×1.72 | ×1.74 | ×1.69 | ×1.69 | ×2.85 | ×1.84 | ×1.87 |
-| mage (41) | ×1.96 | ×1.81 | ×1.62 | ×1.63 | ×1.60 | ×1.62 | ×2.68 | ×1.60 |
+| fighter (44) | ×2.88 | ×2.03 | ×1.85 | ×1.94 | ×1.80 | ×1.85 | ×2.11 | ×1.98 |
+| archer (44) | ×1.89 | ×2.44 | ×1.51 | ×1.50 | ×1.50 | ×1.51 | ×1.71 | ×1.87 |
+| tamer (46) | ×1.86 | ×1.74 | ×2.82 | ×1.72 | ×1.69 | ×1.74 | ×1.81 | ×1.71 |
+| miner (44) | ×1.94 | ×1.81 | ×1.92 | ×2.38 | ×1.82 | ×1.87 | ×1.91 | ×1.96 |
+| smith (46) | ×1.68 | ×1.63 | ×1.62 | ×1.65 | ×2.44 | ×1.62 | ×1.62 | ×1.63 |
+| farmer and cook (44) | ×1.73 | ×1.72 | ×1.74 | ×1.69 | ×1.69 | ×2.94 | ×1.84 | ×1.89 |
+| mage (40) | ×1.84 | ×1.69 | ×1.51 | ×1.51 | ×1.50 | ×1.51 | ×2.68 | ×1.50 |
 | explorer (44) | ×2.01 | ×2.18 | ×1.85 | ×2.04 | ×1.78 | ×1.92 | ×1.85 | ×2.83 |
 
 Most picked nodes:
 
 | Node | Builds |
 |---|---|
+|  socket (ring 2.6) | 7 of 8 |
 |  socket (ring 2.6) | 6 of 8 |
 |  socket (ring 2.6) | 6 of 8 |
 |  socket (ring 2.6) | 6 of 8 |
-|  socket (ring 2.6) | 5 of 8 |
-| archery family.ranged_damage (ring 1) | 5 of 8 |
-| archery family.move_speed (ring 2) | 5 of 8 |
-| survival family.health (ring 2) | 5 of 8 |
-| mining family.mine_speed (ring 1) | 4 of 8 |
+| archery family.ranged_damage (ring 1) | 6 of 8 |
+| archery family.move_speed (ring 2) | 6 of 8 |
+| mining family.mine_speed (ring 1) | 5 of 8 |
+| mining family.stamina (ring 2) | 5 of 8 |
