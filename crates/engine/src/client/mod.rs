@@ -118,6 +118,9 @@ pub struct ClientEntity {
     pub health: f32,
     pub hurt: f32,
     pub worn: Vec<u32>,
+    /// What it wears drawn by its own looks (`abi::comp::WORN_LOOK`), in `worn`'s order; empty
+    /// for an item's own texture.
+    pub worn_looks: Vec<String>,
     /// A player's item in hand, 0 for none, and that stack's own look (`abi::comp::LOOK`).
     pub held: u32,
     pub held_look: Option<String>,
@@ -351,6 +354,7 @@ impl ClientEntity {
             health: f32::NAN,
             hurt: 0.0,
             worn: Vec::new(),
+            worn_looks: Vec::new(),
             held: 0,
             off_held: 0,
             using: None,
@@ -2314,7 +2318,8 @@ impl Client {
     /// Copies an engine field component into the entity (or the own player) that shows it.
     fn engine_field(&mut self, id: u64, comp: u32, bytes: &[u8]) {
         let c = content();
-        let [health, burning, worn, shape, held, off_held, using, swaps, looping, effect, forced, riding, held_look] = c.game.field_comps;
+        let [health, burning, worn, shape, held, off_held, using, swaps, looping, effect, forced, riding, held_look, worn_looks] =
+            c.game.field_comps;
         let now = self.world.time;
         let f: Vec<f32> = words(bytes).map(f32::from_le_bytes).collect();
         let shaped = || {
@@ -2343,6 +2348,11 @@ impl Client {
             e.burning = bytes.first().is_some_and(|&b| b != 0);
         } else if comp == worn {
             e.worn = words(bytes).map(u32::from_le_bytes).collect();
+        } else if comp == worn_looks {
+            e.worn_looks = String::from_utf8_lossy(bytes)
+                .split('\n')
+                .map(str::to_string)
+                .collect();
         } else if comp == held {
             e.held = words(bytes).next().map_or(0, u32::from_le_bytes);
         } else if comp == held_look {
@@ -2393,6 +2403,19 @@ impl Client {
                 .0
                 .unwrap_or(c.game.entities[c.game.player_kind as usize].size());
         }
+    }
+
+    /// The worn looks of what the local player wears (`abi::comp::WORN_LOOK`), in `worn`'s order.
+    pub fn worn_looks(&self) -> Vec<String> {
+        let c = content();
+        let w = &c.game.player_layout.worn;
+        self.inventory
+            .get(w.start as usize..w.end as usize)
+            .unwrap_or_default()
+            .iter()
+            .filter(|s| !s.is_empty() && c.worn(s.item).is_some())
+            .map(|s| crate::stack::worn_look(s).unwrap_or("").to_string())
+            .collect()
     }
 
     /// Items the local player wears.
@@ -2535,6 +2558,15 @@ impl Client {
             .inventory
             .get(w.start as usize..w.end as usize)
             .map_or(Vec::new(), |s| s.iter().filter(|s| !s.is_empty()).map(|s| s.item).collect());
+        let worn_looks: Vec<String> = self
+            .inventory
+            .get(w.start as usize..w.end as usize)
+            .map_or(Vec::new(), |s| {
+                s.iter()
+                    .filter(|s| !s.is_empty())
+                    .map(|s| crate::stack::worn_look(s).unwrap_or("").to_string())
+                    .collect()
+            });
         let (pos, held, off_held) = (self.smooth_pos(), self.shown_held().item, self.off_held().item);
         let using = self
             .using
@@ -2544,6 +2576,7 @@ impl Client {
         me.held_look = held_look;
         (me.pos, me.target, me.yaw, me.target_yaw, me.pitch) = (pos, pos, self.player.yaw, self.player.yaw, self.player.pitch);
         (me.worn, me.held, me.off_held, me.using) = (worn, held, off_held, using);
+        me.worn_looks = worn_looks;
         (me.arm_swing, me.swing_off, me.pose, me.walked) = (self.hand_swing, self.hand_swing_off, self.player.pose, me.walk);
         me.sprinting = self.player.sprinting && self.player.on_ground;
         me.age = self.start.elapsed().as_secs_f32();

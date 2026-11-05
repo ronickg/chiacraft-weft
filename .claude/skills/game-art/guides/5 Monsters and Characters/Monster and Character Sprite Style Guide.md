@@ -5,7 +5,7 @@ This guide covers monsters, people (villagers, traders, raiders) and **armour as
 `Monster Prompt References/` holds two images:
 
 - **`01 Monsters and characters.png`** shows humanoid monsters laid out as a **flat front view** (head, body, arms and legs unfolded from the reference's skins), plus creature faces and the faces of villagers and raiders.
-- **`02 Armour worn on the body.png`** shows the six armour sets (leather, chainmail, iron, gold, diamond, netherite) as a flat front view: helmet, chestplate with arms, leggings and boots.
+- **`02 Armour worn on the body.png`** shows every armour set as a flat front view (helmet, chestplate with arms, leggings and boots): leather (dyed brown and undyed grey), chainmail, iron, copper, gold, diamond, netherite, plus the turtle helmet.
 
 These are **not finished sprites**. They are flattened skins, so use them for colour, costume detail and faces, and let the prompt set the pose.
 
@@ -41,10 +41,36 @@ These are **not finished sprites**. They are flattened skins, so use them for co
 | Gold | `#601814 #a52725 #cba64f #ece17e` | Ornate gold plate with red cloth and red gems |
 | Diamond | `#1a363a #5e5243 #52dde8 #d8f9fb` | Cyan crystal plates on a dark leather base |
 | Netherite | `#0f0706 #272321 #4d423c #c99b50` | Near-black plate with gold trim lines |
+| Copper | bright orange copper with green verdigris | Rounded copper plates with green patina trim and straps |
+| Turtle (helmet only) | mossy green | A shell cap with a lighter rim |
 
 - Every set mixes **metal with leather or cloth** underneath: straps, belts and tabards. That makes armour look worn by someone rather than painted on.
 - The helmet frames the face. In the front view, the face stays visible through a visor gap or open front.
 - **Keep it consistent with the armour icons** in the item guide: the same materials, colours and trim, so a chestplate in the inventory and on the body look like the same object.
+
+### How each set looks on a person, piece by piece
+
+This is what `02 Armour worn on the body.png` shows. Use it when you draw armour **on a character**, not as an inventory icon.
+
+| Set | Helmet | Chest and arms | Leggings | Boots |
+|---|---|---|---|---|
+| **Leather** | Soft hood or cap over the top and sides of the head, face fully open | Laced jerkin with a collar, a belt with a buckle and a ragged lower hem; plain leather sleeves | Loose trousers with a jagged, torn hem | Soft boots with folded-over tops |
+| **Chainmail** | Mail coif over the head and sides, open face with a brown leather rim | Ring-pattern mail shirt and sleeves, a **red-brown tabard** down the front with a small emblem, a thin gold line at the collar | Mail leggings with the tabard flap continuing down the middle | Leather boots with mail cuffs |
+| **Iron** | Silver helmet with a **gold crest ridge** over the top, open face framed in leather | Bright plate breastplate with a centre ridge, plate shoulder guards over the arms, brown leather straps and belt | Plate thigh and knee guards over brown leather | Silver plate boots |
+| **Copper** | Copper helmet covering the whole head, with carved panels | Rounded copper plates in horizontal bands, **green patina straps** and trim; no arm plates | A green cloth skirt over copper | Green-strapped boots with copper toes |
+| **Gold** | Gold helmet with a **red cloth plume** and red side flaps | Ornate gold breastplate with a **red gem** in the centre, red-and-gold shoulder guards, gold-and-black belt | Gold scale pattern with **red gems at the knees** | Gold boots |
+| **Diamond** | Cyan crystal helmet over a dark teal under-cap | Layered **cyan chevron plates** over dark leather, cyan shoulder plates | Cyan thigh plates over dark brown leather | Cyan crystal boots |
+| **Netherite** | Fully closed **near-black helmet**, with gold drips at the lower edge | Dark grey plate with **gold chevron trim lines** across the chest and arms | Dark plate with the same gold trim lines | Dark plate boots with gold edges |
+| **Turtle** | A green shell cap only, no other pieces | — | — | — |
+
+How the pieces sit on the body:
+
+- **Helmet:** covers the top, back and sides of the head. Most sets leave the face open with a 1-px rim around it. Only copper and netherite close it, and the netherite helmet still shows a dark slit at eye level.
+- **Chest and arms:** covers the torso and both upper arms. Shoulder guards stick out 1 px beyond the arm outline. Chainmail and leather have full sleeves; plate sets cover the shoulders and leave leather showing below.
+- **Leggings:** start at a **belt line at the waist** and cover the hips and legs down to the shins. The belt overlaps the bottom edge of the chestplate.
+- **Boots:** cover the feet and lower shins and sit **on top of** the leggings, so the leggings' hem disappears into the boot tops.
+- **Layering order** from the body outwards: base clothing, leggings, boots, chest and arms, helmet.
+- **Trim tells the tiers apart:** leather and chain show cloth, iron shows leather straps, gold shows red cloth and gems, diamond shows dark leather between the crystal, and netherite shows gold lines. Keep that trim when you design your own sets, so each tier reads at sprite size.
 
 ---
 
