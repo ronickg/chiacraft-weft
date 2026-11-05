@@ -44,6 +44,15 @@ pub const IMPACT_RIM_METEORITES: (i32, i32) = (2, 4);
 /// there are more than nine.
 pub const IMPACT_CORE_LAYER: i32 = 9;
 
+/// Tektite shards (melt thrown out and cooled in flight, moldavite's strewn field) lying on the
+/// ground in a fan downrange of the streak, fewest and most; addendum 2's 12-30 pieces, at 1-2
+/// tektite a shard.
+pub const IMPACT_TEKTITES: (i32, i32) = (8, 15);
+
+/// The strewn field's spread (degrees, moldavite's 75) and reach (radii from the middle).
+pub const IMPACT_TEKTITE_FAN: f64 = 75.0;
+pub const IMPACT_TEKTITE_REACH: (f64, f64) = (1.2, 2.5);
+
 // The live crater stays small enough to carve in a second, and shallower than wide.
 const _: () = {
     assert!(IMPACT_RADIUS.0 <= IMPACT_RADIUS.1 && IMPACT_RADIUS.1 <= 12);
@@ -53,4 +62,5 @@ const _: () = {
     assert!(IMPACT_RUBBLE.0 + IMPACT_RUBBLE.1 <= 100);
     assert!(IMPACT_CORE.0 <= IMPACT_CORE.1 && IMPACT_CORE.1 <= IMPACT_CORE_LAYER);
     assert!(IMPACT_RIM_METEORITES.0 <= IMPACT_RIM_METEORITES.1);
+    assert!(IMPACT_TEKTITES.0 <= IMPACT_TEKTITES.1 && IMPACT_TEKTITE_REACH.0 < IMPACT_TEKTITE_REACH.1);
 };

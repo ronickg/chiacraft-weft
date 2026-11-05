@@ -17,6 +17,8 @@ use crate::blocks::{COBBLESTONE, DIRT, GRASS, IMPACT_GLASS, SNOWY_GRASS, SUEVITE
 static COARSE_DIRT: Block = Block::named("coarse_dirt");
 /// First hours' block (the sky events); a crater holds none until it is there.
 static METEORITE: Block = Block::named("base:meteorite");
+/// First hours' loose shard, thrown out in a fan; none until it is there.
+static LOOSE_TEKTITE: Block = Block::named("base:loose_tektite");
 static LOGS: Tag = Tag::named("logs");
 static LEAVES: Tag = Tag::named("leaves");
 
@@ -43,6 +45,8 @@ struct Carve {
     rim_state: u32,
     /// Called on each core block once placed (First hours' `meteors::hot`: heat 3, cooling).
     hot: Option<fn(&World, [i32; 3])>,
+    /// The tektite shards' columns (dx, dz).
+    tektites: Vec<(i32, i32)>,
 }
 
 /// What a crater holds: the core's block (full name) and how many, and the meteorites in the
@@ -112,7 +116,7 @@ pub fn start_with(w: &World, x: i32, z: i32, radius: i32, ticks: u32, loot: Opti
     let y = ground(w, x, z, guess)?;
     let seed = w.seed_at([x, y, z]);
     let rim = n::IMPACT_RIM.0 + (seed % (n::IMPACT_RIM.1 - n::IMPACT_RIM.0 + 1) as u64) as i32;
-    let out = (radius as f64 * n::IMPACT_SCORCH).ceil() as i32;
+    let out = (radius as f64 * n::IMPACT_SCORCH.max(n::IMPACT_TEKTITE_REACH.1)).ceil() as i32;
     let mut columns: Vec<(i32, i32)> = (-out..=out)
         .flat_map(|dz| (-out..=out).map(move |dx| (dx, dz)))
         .filter(|&(dx, dz)| dx * dx + dz * dz <= out * out)
@@ -150,6 +154,20 @@ pub fn start_with(w: &World, x: i32, z: i32, radius: i32, ticks: u32, loot: Opti
             rim_spots.push(spot);
         }
     }
+    // Tektite in a fan downrange: a heading from the seed until the streak gives one.
+    let heading = (seed >> 40) as f64 / (1u64 << 24) as f64 * std::f64::consts::TAU;
+    let mut tektites: Vec<(i32, i32)> = Vec::new();
+    let pick = |v: u64, (lo, hi): (i32, i32)| lo + (v % (hi - lo + 1) as u64) as i32;
+    for i in 0..pick(seed >> 4, n::IMPACT_TEKTITES) as i64 {
+        let h = weft_sdk::noise::hash(seed, i, 11, 0);
+        let a = heading + ((h % 1000) as f64 / 1000.0 - 0.5) * n::IMPACT_TEKTITE_FAN.to_radians();
+        let (lo, hi) = n::IMPACT_TEKTITE_REACH;
+        let u = lo + ((h >> 16) % 1000) as f64 / 1000.0 * (hi - lo);
+        let spot = ((a.cos() * u * radius as f64).round() as i32, (a.sin() * u * radius as f64).round() as i32);
+        if !tektites.contains(&spot) {
+            tektites.push(spot);
+        }
+    }
     let (core_state, rim_state) = (state_named(loot.core), METEORITE.id());
     CARVES.lock().unwrap().push(Carve {
         dim: w.dimension(),
@@ -166,6 +184,7 @@ pub fn start_with(w: &World, x: i32, z: i32, radius: i32, ticks: u32, loot: Opti
         rim_spots,
         rim_state,
         hot: loot.hot,
+        tektites,
     });
     Some(count)
 }
@@ -305,14 +324,31 @@ fn column(w: &World, c: &Carve, dx: i32, dz: i32, gone: &mut Vec<[i32; 3]>) -> O
         if c.rim_state != u32::MAX && c.rim_spots.contains(&(dx, dz)) {
             set([x, (top - 1).max(g), z], c.rim_state);
         }
+        if c.tektites.contains(&(dx, dz)) {
+            shard(w, [x, top.max(g) + 1, z], &mut set);
+        }
     } else {
         // Round it: the grass scorched, thinning outward.
         let v = (n::IMPACT_SCORCH - u) / (n::IMPACT_SCORCH - n::IMPACT_RIM_OUT);
-        if (hash(g, 4) % 100) < (v * 100.0) as u64 {
+        if (hash(g, 4) % 100) < (v.max(0.0) * 100.0) as u64 {
             scorch(w, [x, g, z], &mut set);
+        }
+        if c.tektites.contains(&(dx, dz)) {
+            shard(w, [x, g + 1, z], &mut set);
         }
     }
     Some(edits)
+}
+
+/// A tektite shard at `p`, on solid ground, where nothing but a small plant stands.
+fn shard(w: &World, p: [i32; 3], set: &mut impl FnMut([i32; 3], u32)) {
+    let tektite = LOOSE_TEKTITE.id();
+    let [x, y, z] = p;
+    let here = w.block(p);
+    let open = here == 0 || (state_flags(here) & abi::block_flags::REPLACEABLE != 0 && state_flags(here) & abi::block_flags::LIQUID == 0);
+    if tektite != u32::MAX && open && w.block_flags([x, y - 1, z]) & abi::block_flags::SOLID != 0 {
+        set(p, tektite);
+    }
 }
 
 /// Thrown-out rock: suevite, cobblestone or dirt, by `IMPACT_RUBBLE`.
