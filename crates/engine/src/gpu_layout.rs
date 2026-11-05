@@ -743,6 +743,10 @@ gpu_struct! {
         /// bloom effect leaves its glow out. z the pixels a mist volume cell covers each way
         /// (`client::froxels`: 8, or 4 at ultra), for a pack that spends more on finer cells. w unused.
         pub frame: [f32; 4],
+        /// The soft clouds' shadow on the land (`client::cloud_shadow`, with the HDR world; a pack
+        /// whose sky has `fs_cloud_shadow`): x the map's bindless index + 1 (0: none this frame), y
+        /// its texels each way, zw unused.
+        pub cloud_shadow: [f32; 4],
         /// The mist's volume (`client::froxels`, `core:froxels`, with a pack whose sky has
         /// `fs_froxel_light` and `fs_froxel_sum`; chiacraft): x the bindless index + 1 of the sums
         /// from the eye (0: none this frame), y the index of each cell's own, zw the cells across

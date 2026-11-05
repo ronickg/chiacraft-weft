@@ -618,7 +618,36 @@ fn cloud_fuzz(cell: vec2<f32>) -> f32 {
 // slab's middle, where the four nearest cells are blended as the sky draws them, so the shadows
 // are the clouds overhead, drifting with them across near and far land alike (Bliss's moving
 // shade on the hills).
+// The soft clouds' shadow map (`client::cloud_shadow`, the HDR world): this many blocks across,
+// about the camera, on the plane through the cloud layer's middle (its height over the camera in
+// every texel's g), r how much of the sun gets through there.
+const CLOUD_SHADOW_SPAN: f32 = 4096.0;
+
+// The soft clouds' shadow at `rel` from their map, 1 out of it or without it.
+fn soft_cloud_shadow(rel: vec3<f32>) -> f32 {
+    let l = light_dir();
+    if l.y < 0.03 {
+        return 1.0;
+    }
+    let t = textures[u32(scene.cloud_shadow.x) - 1u];
+    let half = i32(scene.cloud_shadow.y) / 2;
+    let mid = textureLoad(t, vec2(half, half), 0).g;
+    let q = rel.xz + l.xz * (mid - rel.y) / l.y;
+    let uv = q / CLOUD_SHADOW_SPAN + 0.5;
+    if any(uv < vec2(0.0)) || any(uv > vec2(1.0)) {
+        return 1.0;
+    }
+    let through = textureSampleLevel(t, linear_clamp, uv, 0.0).r;
+    // Fading in as the light climbs: long low shadows from far clouds would smear across the land.
+    return mix(1.0, through, smoothstep(0.03, 0.15, l.y));
+}
+
 fn cloud_shadow(rel: vec3<f32>) -> f32 {
+    // In the HDR world the soft clouds' own shadow, where their map is (Bliss's cloud masses throw
+    // shadow patches across the land; the blocky picture's matched nothing in the sky).
+    if scene.frame.x > 0.5 && scene.cloud_shadow.x > 0.5 {
+        return soft_cloud_shadow(rel);
+    }
     let c = scene.clouds;
     let l = light_dir();
     if c.x < 0.5 || l.y < 0.03 {
@@ -1096,6 +1125,11 @@ fn froxel_cell(dir: vec3<f32>, at: f32, floor: f32) -> vec4<f32> {
     let k = froxel_slice(at);
     let span = froxel_end(k) - froxel_end(k - 1.0);
     var lit = (sun_reaches(dir * (at - span * 0.25)) + sun_reaches(dir * at) + sun_reaches(dir * (at + span * 0.25))) / 3.0;
+    // The clouds' shadow in the air too (the HDR world): beams of sun through their gaps, the mist
+    // under a cloud dim.
+    if scene.frame.x > 0.5 && scene.cloud_shadow.x > 0.5 {
+        lit *= soft_cloud_shadow(dir * at);
+    }
     // Ultra (`core:froxels` 2, finer cells: `scene.frame.z` 4): six taps, the beams' edges finer.
     if scene.frame.z > 0.5 && scene.frame.z < 6.0 {
         lit = lit * 0.5 + (sun_reaches(dir * (at - span * 0.4)) + sun_reaches(dir * (at - span * 0.1)) + sun_reaches(dir * (at + span * 0.4))) / 6.0;

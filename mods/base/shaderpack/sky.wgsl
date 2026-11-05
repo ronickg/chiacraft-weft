@@ -1208,3 +1208,32 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
     }
 }
 
+
+// The soft clouds' shadow map (`client::cloud_shadow`, with the HDR world), drawn with the clouds'
+// own entry: for each place on the plane through the layer's middle (`CLOUD_SHADOW_SPAN` blocks
+// across about the camera), how much of the sun gets through the layer along the light, six steps
+// through it; g that plane's height over the camera, for the surfaces' lookup.
+@fragment
+fn fs_cloud_shadow(in: CloudOut) -> @location(0) vec4<f32> {
+    let s = sky[in.index];
+    let storm = s.axes[0].z;
+    let thick = mix(SOFT_THICK, SOFT_STORM_THICK, storm);
+    let low = soft_low(s);
+    let mid = low + thick * 0.5;
+    let l = light_dir();
+    if !open_sky() || l.y < 0.03 {
+        return vec4(1.0, mid, 0.0, 1.0);
+    }
+    let q = (in.clip.xy / scene.cloud_shadow.y - 0.5) * CLOUD_SHADOW_SPAN;
+    let cover = soft_cover(s, soft_at(s, vec3(q.x, mid, q.y)));
+    var od = 0.0;
+    for (var k = 0; k < 6; k++) {
+        let h = low + thick * (f32(k) + 0.5) / 6.0;
+        let p = vec3(q.x, h, q.y) + vec3(l.x, 0.0, l.z) * (h - mid) / l.y;
+        od += soft_density(s, soft_at(s, p), (h - low) / thick, cover, false) * 0.55 * (thick / 6.0) / l.y;
+    }
+    // Light scattered on through the cloud keeps a cloud's shadow from going black (thin ones pass
+    // much, thick ones a fifth or so): Beer's law and a slower tail.
+    let through = max(exp(-od), 0.22 * exp(-od * 0.08));
+    return vec4(through, mid, 0.0, 1.0);
+}

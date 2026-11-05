@@ -11,6 +11,7 @@ pub mod modui;
 pub mod particles;
 mod receive;
 pub mod sky;
+pub mod cloud_shadow;
 pub mod froxels;
 pub mod soft_clouds;
 pub mod stack_look;
@@ -2807,6 +2808,7 @@ impl Client {
             frame_look: [0.0; 4],
             lightning: [self.lightning_seen.0, self.lightning_seen.1, self.thunder(), 0.0],
             froxels: [0.0; 4],
+            cloud_shadow: [0.0; 4],
             prev_view_proj: [[0.0; 4]; 4],
             cloud_moved: [0.0; 4],
             // On the real clock (`shaders::clock`): tests pin the shaders' time, and a fireball's
@@ -3221,6 +3223,7 @@ impl Client {
         (scene.soft_clouds, scene.prev_view_proj, scene.cloud_moved) = self.sky.soft.scene;
         scene.frame_look = self.sky.frame_look.scene;
         scene.froxels = self.sky.froxels.scene;
+        scene.cloud_shadow = self.sky.cloud_shadow.scene;
         gpu.mapped(scene_buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
         self.render.draw_translucent(&mut late);
         let alive = !self.dead && !self.mode.has(weft_abi::game_mode_flags::NO_INTERACT);

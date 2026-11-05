@@ -8,6 +8,7 @@ use rustc_hash::FxHashMap;
 use weft_abi::sky_kind;
 use weft_render::*;
 
+use super::cloud_shadow::CloudShadow;
 use super::froxels::Froxels;
 use super::frame_look::FrameLook;
 use super::soft_clouds::SoftClouds;
@@ -139,6 +140,10 @@ pub struct Sky {
     pub froxels: Froxels,
     pub froxels_wanted: bool,
     pub froxels_possible: bool,
+    /// The soft clouds' shadow on the land (`client::cloud_shadow`), wanted (the HDR world and
+    /// `core:cloud_shadows`); the app sets it before `draw`.
+    pub cloud_shadow: CloudShadow,
+    pub cloud_shadow_wanted: bool,
     /// What the pack's look works out once a frame (`client::frame_look`).
     pub frame_look: FrameLook,
     /// Soft clouds wanted (the setting) and possible this frame (the world copied, whose depth the
@@ -201,6 +206,8 @@ impl Sky {
             froxels: Froxels::default(),
             froxels_wanted: true,
             froxels_possible: false,
+            cloud_shadow: CloudShadow::default(),
+            cloud_shadow_wanted: false,
             frame_look: FrameLook::default(),
             soft_wanted: false,
             soft_possible: false,
@@ -261,6 +268,7 @@ impl Sky {
             Ok((pipe, clouds, slots, shader)) => {
                 self.soft.set_shader(gpu, &shader);
                 self.froxels.set_shader(gpu, &shader);
+                self.cloud_shadow.set_shader(gpu, &shader);
                 self.frame_look.set_shader(gpu, &shader);
                 if let Some(old) = self.pipe.replace(pipe) {
                     gpu.destroy_pipeline(old);
@@ -338,6 +346,7 @@ impl Sky {
         self.drop_pictures(gpu);
         self.soft.destroy(gpu);
         self.froxels.destroy(gpu);
+        self.cloud_shadow.destroy(gpu);
         self.frame_look.destroy(gpu);
         for p in [self.pipe.take(), self.clouds_pipe.take()]
             .into_iter()
@@ -608,6 +617,7 @@ impl Sky {
         }
         let froxels = self.froxels_wanted && self.froxels_possible;
         self.froxels.frame(gpu, froxels, frame.width, frame.height, buf, scene);
+        self.cloud_shadow.frame(gpu, self.cloud_shadow_wanted, buf, scene, clouds);
         self.frame_look.frame(gpu, buf, scene);
         match clouds {
             Some(first_instance) => self.soft.record(buf, scene, first_instance),

@@ -2573,6 +2573,7 @@ fn update_game(r: &mut Running, dt: f64, frame_start: Instant) {
         r.post.bloom_levels = r.settings.bloom_levels();
         g.client.sky.froxels_wanted = r.settings.froxels();
         g.client.sky.froxels.cell = r.settings.froxel_cell();
+        g.client.sky.cloud_shadow_wanted = crate::post::hdr() && r.settings.cloud_shadows();
         let t = Instant::now();
         if world_input {
             g.client.update(&mut *r.gpu, &r.textures, &mut r.input, dt);
@@ -3090,6 +3091,8 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         drop(s);
         // What the pack's look works out once a frame, before anything that reads it.
         r.list.append(&mut g.client.sky.frame_look.passes);
+        // The soft clouds' shadow on the land, before the world that reads it.
+        r.list.append(&mut g.client.sky.cloud_shadow.passes);
         // The shadow map once the models are posed, ahead of the world's pass that samples it.
         let s = crate::diag::span("shadows");
         g.client

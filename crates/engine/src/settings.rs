@@ -265,6 +265,11 @@ impl Settings {
         }
     }
 
+    /// The soft clouds' shadow on the land with the HDR world (`client::cloud_shadow`), live.
+    pub fn cloud_shadows(&self) -> bool {
+        number("core:cloud_shadows") != 0.0
+    }
+
     /// The HDR world (`post::world_format`), read once at start.
     pub fn hdr_world(&self) -> bool {
         number("core:hdr_world") != 0.0
