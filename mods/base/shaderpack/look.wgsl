@@ -1103,7 +1103,18 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // under Bliss stay saturated, a snowfield white and a forest green; rain's grey as before.)
     let grey = mix(clamp(veil.b * 0.2, 0.0, 0.1), clamp(veil.b * 0.6, 0.0, 0.3), max(rain, scene.weather.z));
     let pale = mix(mix(c, vec3(luma(c)), grey), vec3(luma(c)) * vec3(0.92, 0.97, 1.05), rain * 0.08);
-    let seen = mix(pale, lit, veil);
+    // Haze keeps the land's colour (Ronald, 11-05, on the glass slabs: "Haze keeps land colour"):
+    // in clear air the veil stops at four fifths, the land veils toward a tenth under the sky's
+    // brightness, and its hue and saturation take only seven tenths of the veil (its brightness all
+    // of it). Veiled all the way to the sky's own colour, pale bare rock 400-500 blocks off read as
+    // glass, the land behind seen through it. Rain and the weather's fog veil as before (the Shader
+    // session's), and the handover where the terrain ends is still the sky's.
+    let wet = clamp(max(rain, scene.weather.z), 0.0, 1.0);
+    let v = mix(min(veil, vec3(0.8)), veil, wet);
+    let toward = lit * mix(0.9, 1.0, wet);
+    let mixed = mix(pale, toward, v);
+    let own = mix(pale, toward, v * mix(0.7, 1.0, wet));
+    let seen = max(vec3(luma(mixed)) + own - vec3(luma(own)), vec3(0.0));
     return mix(seen, lit, edge) + held_in_fog(rel, sky);
 }
 
