@@ -2640,7 +2640,10 @@ impl Client {
             // countdown and a shower's streaks stood still in their shots.
             sky_event: [self.sky_event.0 as f32, self.sky_event.1, crate::shaders::clock() - self.sky_event.2, 0.0],
             sky_landing: match self.sky_landing {
-                Some((at, when)) => (at - cam.pos).as_vec3().extend(when - crate::shaders::clock()).to_array(),
+                Some((at, when)) => (at - cam.pos)
+                    .as_vec3()
+                    .extend(when - crate::shaders::clock())
+                    .to_array(),
                 None => [0.0, 0.0, 0.0, -1e6],
             },
             shadow_view_proj: self.shadow.0.to_cols_array_2d(),
