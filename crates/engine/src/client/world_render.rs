@@ -1359,7 +1359,19 @@ impl WorldRenderer {
             cam_frac: [cam_frac.x, cam_frac.y, cam_frac.z, 0.0],
             ids: [0, 0, (self.biome_table.len() / crate::content::content().tint_kinds.len()) as u32, self.tint_tiles],
             cam_cube: cam_cube.extend(0).to_array(),
-            extra: [self.overlays, fade, crate::content::content().tint_kinds.len() as u32, self.lod_half],
+            extra: [
+                self.overlays,
+                fade,
+                crate::content::content().tint_kinds.len() as u32,
+                self.lod_half
+                    | (crate::content::content()
+                        .game
+                        .config_names
+                        .get("core:far_look")
+                        .map_or(7, |&id| crate::config::get(id) as u32)
+                        & 255)
+                        << 24,
+            ],
         };
         let gbuf = self.globals[frame.slot];
         gpu.mapped(gbuf)[..size_of::<Globals>()].copy_from_slice(bytemuck::bytes_of(&globals));
