@@ -158,9 +158,17 @@ fn palette_made() -> Palette {
     // Night is dark and blue, so firelight's orange stands out against it. (A blue-teal shade, as
     // Valheim's, mixed with the orange of a fire into olive on the ground: Tester 2's campfire.)
     let night = key(vec3(0.006, 0.010, 0.030), vec3(0.025, 0.035, 0.070), vec3(0.10, 0.13, 0.22), vec3(0.17, 0.21, 0.30) * look_opt(OPT_NIGHT_MOON, 1.0), vec3(0.012, 0.017, 0.030) * look_opt(OPT_NIGHT_LIGHT, 1.0));
+    // The morning and the late afternoon between: a gold sun and a warm, cream horizon, the shade
+    // still blue, so the day runs gold, warm, clear at noon, warm, gold. Golden hour ended 16° up
+    // (sun.y 0.28), and on the leaned path of a long summer day the sun is over that from 05:00 to
+    // 19:00: those hours all looked alike (Tester 2's hours sheet, 11-05). Now gold to about 20° up,
+    // warm to about 46°, clear above that (about 08:00 to 16:00 in summer).
+    let warm = key(vec3(0.13, 0.27, 0.66), vec3(0.62, 0.58, 0.56), vec3(1.0, 0.76, 0.50), vec3(1.0, 0.80, 0.60) * 1.85 * look_opt(OPT_SUN, 1.0), mix(fill_hue, vec3(0.95, 0.95, 1.1), 0.4) * 0.3 * look_opt(OPT_FILL, 1.0));
     var p: Palette;
-    if e > 0.08 {
-        p = blend(golden, day, smoothstep(0.08, 0.28, e));
+    if e > 0.34 {
+        p = blend(warm, day, smoothstep(0.34, 0.72, e));
+    } else if e > 0.08 {
+        p = blend(golden, warm, smoothstep(0.08, 0.34, e));
     } else if e > -0.02 {
         p = blend(sunset, golden, smoothstep(-0.02, 0.08, e));
     } else if e > -0.14 {
@@ -228,7 +236,8 @@ fn palette_made() -> Palette {
 // horizon. The grade warms with it, and the glowing sky lights the ground.
 fn golden() -> f32 {
     let e = scene.sun.y;
-    return (1.0 - smoothstep(0.08, 0.35, e)) * smoothstep(-0.06, 0.03, e);
+    // To about 26° up (it was 20°): the golden hours run longer at both ends.
+    return (1.0 - smoothstep(0.1, 0.45, e)) * smoothstep(-0.06, 0.03, e);
 }
 
 // The moon's light by its phase: 1 full, 0 new (`scene.eye.w`, the engine's).
