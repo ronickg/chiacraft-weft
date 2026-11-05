@@ -321,7 +321,14 @@ fn fight(w: &World, id: u64, st: &EntityState) -> bool {
         w.set_component(id, &SCALED, 1);
         // A titan stands its ground: no knockback (`core:knockback_resistance`; before it the
         // goal undid it, PC look boss_drenkaun1: twenty hits had flung it off its arena).
-        w.attribute_add_modifier(id, &attribute::KNOCKBACK_RESISTANCE, "animals:size", attr_op::ADD, bosses::SIZE.band().knockback as f64, 0);
+        w.attribute_add_modifier(
+            id,
+            &attribute::KNOCKBACK_RESISTANCE,
+            "animals:size",
+            attr_op::ADD,
+            bosses::SIZE.band().knockback as f64,
+            0,
+        );
     }
     for cd in c.cooldown.iter_mut() {
         *cd = cd.saturating_sub(e);
