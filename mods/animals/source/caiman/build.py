@@ -57,7 +57,7 @@ if __name__ == "__main__":
     # Every standing clip keeps a foot on the ground in every keyframe, none sinks; nothing of it goes
     # into the ground (the jaw dipped to drink, the chin asleep).
     everything = [e["name"] for e in spec["elements"]]
-    for clip in [c for c in CLIPS if c != "death"]:
+    for clip in [c for c in CLIPS if c != "death"] + ["bite"]:
         low = feet_low(spec, spec["animations"][clip], FEET)
         assert min(low) > -0.3 and max(low) < 0.3, f"{clip}'s feet from {min(low):.2f} to {max(low):.2f}, not on the ground"
         assert min(feet_low(spec, spec["animations"][clip], everything)) > -0.3, f"{clip} goes into the ground"

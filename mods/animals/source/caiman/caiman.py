@@ -407,7 +407,10 @@ def pose_bite(t):
     open_ = float(np.interp(p, [0, .25, .45, .52, 1], [0, 1, 1, 0, 0]))
     lunge = float(np.interp(p, [0, .3, .5, .7, 1], [0, -0.4, 1, 1, 0]))
     q = pose_idle(0)
-    q.update({"jaw": (40 * open_, 0, 0), "head": (-6 * open_, 14 * lunge, 0), "neck": (0, 8 * lunge, 0), "spine_1": (0, 6 * lunge, 0)})
+    # The snout lifts as the jaws gape (neck and head up with the gape), so the lower jaw stays over
+    # the ground: with the head tipped up only 6 it went 13.7 units into it at full gape.
+    q.update({"jaw": (40 * open_, 0, 0), "head": (-22 * open_, 14 * lunge, 0), "neck": (-12 * open_, 8 * lunge, 0),
+              "spine_1": (0, 6 * lunge, 0)})
     for k in range(len(TAIL)):
         q[f"tail_{k}"] = (0, -8 * lunge * (0.5 + 0.3 * k), 0)
     return q
