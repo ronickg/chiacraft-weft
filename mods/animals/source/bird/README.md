@@ -17,7 +17,7 @@ the vulture and the gull. Made with the `blocky-model` skill
   hops), run (hopping), and the flying model's wingbeat, which a big bird holds open in a glide
   part of the cycle. Blinks in idle: side eyelids for side eyes, front lids for an owl's.
 - `export.py <model>` builds `../<model>/<model>.py`'s `CFG`, checks flicker (at rest and in every
-  keyframe), joints, pokes along the body's axis and a forward walk, and exports
+  keyframe), joints, pokes along the body's axis, thin lines (`linecheck`) and a forward walk, and exports
   `models/<model>[_fly].geo.json`, their animations and `textures/entity/<model>/<model>.png`, and
   the coat layers into `../../genetics/layers/<model>`.
 
