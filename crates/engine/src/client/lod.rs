@@ -378,6 +378,7 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
             i = end;
         }
     }
+    let n_tops = out.len();
     for j in 0..CELLS {
         for i in 0..CELLS {
             let (y, _, biome, under) = at(i, j);
@@ -425,6 +426,7 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
             }
         }
     }
+    let n_walls = out.len() - n_tops;
     let side = CELLS * s;
     // Crowns: tops and undersides in runs along x, as the ground's tops.
     for (dir, face_y) in [(3u32, true), (2, false)] {
@@ -459,6 +461,7 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
             }
         }
     }
+    let n_flat = out.len() - n_tops - n_walls;
     for j in 0..CELLS {
         for i in 0..CELLS {
             let Some(c) = crown_at(i, j) else { continue };
@@ -488,6 +491,7 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
             }
         }
     }
+    crate::diag::lod_box_quads([n_tops, n_walls, n_flat, out.len() - n_tops - n_walls - n_flat]);
     (out, (lo, hi))
 }
 

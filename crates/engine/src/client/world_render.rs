@@ -368,6 +368,9 @@ pub struct WorldRenderer {
     table_only: FxHashMap<MeshKey, GpuMesh>,
     table: CubeTable,
     globals: Vec<BufferId>,
+    /// The sun-shadow passes' own (`draw_shadow`, no fade): they are recorded after the world's,
+    /// and writing the world's buffer took its fade end and the rest away for the whole frame.
+    shadow_globals: Vec<BufferId>,
     origins: Vec<(BufferId, u32)>,
     /// Per frame: camera-relative positions of the structures drawn (index 0: none, the world).
     offsets: Vec<(BufferId, u32)>,
@@ -494,6 +497,9 @@ impl WorldRenderer {
         let globals = (0..frames)
             .map(|_| gpu.create_buffer(size_of::<Globals>() as u64, usage::STORAGE | usage::HOST, "globals"))
             .collect();
+        let shadow_globals = (0..frames)
+            .map(|_| gpu.create_buffer(size_of::<Globals>() as u64, usage::STORAGE | usage::HOST, "shadow globals"))
+            .collect();
         Ok(WorldRenderer {
             shadow_pipes,
             lod_shadow_pipe,
@@ -519,6 +525,7 @@ impl WorldRenderer {
             parts: Vec::new(),
             offsets: Vec::new(),
             globals,
+            shadow_globals,
             origins: Vec::new(),
             indirect: Vec::new(),
             occlusion: Occlusion::new(gpu, assets)?,
@@ -735,7 +742,7 @@ impl WorldRenderer {
             cam_cube: cam_cube.extend(0).to_array(),
             extra: [self.overlays, 0, crate::content::content().tint_kinds.len() as u32, self.lod_half],
         };
-        let gbuf = self.globals[frame.slot];
+        let gbuf = self.shadow_globals[frame.slot];
         gpu.mapped(gbuf)[..size_of::<Globals>()].copy_from_slice(bytemuck::bytes_of(&globals));
         // The light's box on all six sides: along the light too, so what lies beyond its depth (the
         // ground far behind, caves deep under) is not drawn into the map for nothing.
@@ -1015,7 +1022,8 @@ impl WorldRenderer {
         for (b, _) in self.faces.pages.drain(..).chain(self.quads.pages.drain(..)) {
             gpu.destroy_buffer(b);
         }
-        for b in self.globals.drain(..).chain([
+        let shadow_globals: Vec<BufferId> = self.shadow_globals.drain(..).collect();
+        for b in self.globals.drain(..).chain(shadow_globals).chain([
             self.biomes,
             self.tex_info,
             self.anim,
