@@ -14,6 +14,7 @@
 //! - **`/gear`** builds one (or one part) for checks and scripts.
 
 use crafting::combine::{ArmourStats, Life, Part, ToolStats, armour, combine};
+use crafting::gems::Stat;
 use crafting::kinds::Use;
 use crafting::materials::fits;
 use crafting::{KINDS, Kind, MATERIALS, Role, SHAPES, code, grades, kind_of, material_of, shape_of};
@@ -198,7 +199,15 @@ pub fn register(r: &mut Registry) {
             .collect();
         let day = (w.day_time() / vitals::calendar::DAY_TICKS) as u32;
         // `/gear part <shape> <material>`: one part, to assemble by hand.
-        let made = if kind == "part" {
+        let made = if kind == "gem" {
+            // `/gear gem <id>`: a freshly cut gem, rolled.
+            names
+                .first()
+                .and_then(|id| crafting::gems::gem(id))
+                .map_or(ItemStack::EMPTY, |g| {
+                    crate::gems::stack_of(&crate::gems::cut(g, || (w.random() >> 40) as f32 / (1u64 << 24) as f32))
+                })
+        } else if kind == "part" {
             names
                 .first()
                 .zip(names.get(1))
@@ -269,6 +278,10 @@ fn points(material: &str, skill: u32) -> grades::Points {
 /// A part recipe's result, made by `player`: its material from the recipe, its grade rolled with
 /// `u` (0..1) by their skill in its craft, which the making then raises.
 pub fn finish(w: &World, player: u64, r: &Recipe, out: ItemStack, u: f32) -> ItemStack {
+    // A gem cut from its stone: rolled now.
+    if let Some(gem) = crate::gems::finish(w, r, out) {
+        return gem;
+    }
     let Some(material) = r.value(&PART_MATERIAL) else { return out };
     let Some(m) = material_of(material) else { return out };
     let craft = crafting::skills::index(m.making);
@@ -394,8 +407,9 @@ fn parts_of(kind: &Kind, parts: &[(Part, PartOf)], life: &[Life]) -> (Parts, f32
 }
 
 /// The tool `parts` make, with its numbers on the stack.
-fn tool_stack(kind: &Kind, parts: &[(Part, PartOf)], stats: &ToolStats) -> ItemStack {
+fn tool_stack(kind: &Kind, parts: &[(Part, PartOf)], stats: &ToolStats, gems: &[crate::gems::Set]) -> ItemStack {
     let (p, used) = parts_of(kind, parts, &stats.life);
+    let (sockets, set, mult) = gems_for(kind, parts, gems);
     let uses = stats.weakest().map_or(1.0, |l| l.uses).max(1.0) as u32;
     // Its working part's material's item level (`vitals::gear`): what an over-tier cap reads.
     let level = parts
@@ -406,13 +420,16 @@ fn tool_stack(kind: &Kind, parts: &[(Part, PartOf)], stats: &ToolStats) -> ItemS
     let stack = ItemStack::new(Item::generated(kind.id.to_string()).id(), 1)
         .with(&PARTS, p)
         .with(&DURABILITY, uses)
-        .with(&MINING_SPEED, stats.stat)
+        .with(&MINING_SPEED, stats.stat * mult[Stat::Speed as usize])
         .with(&TOOL_LEVEL, stats.harvest)
-        .with(&ATTACK_DAMAGE, stats.damage)
-        .with(&base_api::ITEM_LEVEL, level);
-    // Drawn from its parts (the engine's `core:look`).
+        .with(&ATTACK_DAMAGE, stats.damage * mult[Stat::Damage as usize])
+        .with(&base_api::ITEM_LEVEL, level)
+        .with(&crate::gems::GEMS_ON, crate::gems::gems_of(sockets, &set));
+    // Drawn from its parts (the engine's `core:look`), its gems set on it.
     let plain: Vec<Part> = parts.iter().map(|p| p.0).collect();
     let look = look_text(kind.id, &plain);
+    // Gems over a drawn tool only (a kind with no layers shows its plain icon).
+    let look = if look.is_empty() { look } else { look + &gem_layers(kind.id, &set) };
     let stack = with_look(stack, (!look.is_empty()).then_some(look.as_str()));
     let worn = (used * uses as f32) as u32;
     if worn > 0 { stack.with(&DAMAGE, worn) } else { stack }
@@ -480,8 +497,10 @@ pub fn armour_worn(worn: &mut vitals::clothing::Worn, a_shell: &str, lining: &st
 }
 
 /// The armour `parts` make, with its numbers on the stack.
-fn armour_stack(kind: &Kind, parts: &[(Part, PartOf)], a: &ArmourStats) -> ItemStack {
+fn armour_stack(kind: &Kind, parts: &[(Part, PartOf)], a: &ArmourStats, gems: &[crate::gems::Set]) -> ItemStack {
     let (p, used) = parts_of(kind, parts, &a.life);
+    let (sockets, set, mult) = gems_for(kind, parts, gems);
+    let (armour, health) = (a.armour * mult[Stat::Armour as usize], a.health * mult[Stat::Health as usize]);
     let uses = a.weakest().map_or(1.0, |l| l.uses).max(1.0) as u32;
     let mut worn = vitals::clothing::Worn::default();
     armour_worn(&mut worn, a.shell, a.lining, a.slot);
@@ -494,17 +513,18 @@ fn armour_stack(kind: &Kind, parts: &[(Part, PartOf)], a: &ArmourStats) -> ItemS
     let stack = ItemStack::new(Item::generated(armour_item(kind.id, a.shell)).id(), 1)
         .with(&PARTS, p)
         .with(&DURABILITY, uses)
-        .with(&ARMOUR_OF, ArmourOf { armour: a.armour, health: a.health })
-        .with(&crate::items::ARMOR, crate::items::Armor { points: (a.armour / ARMOUR_PER_POINT).round() as u32, toughness: 0.0 })
+        .with(&ARMOUR_OF, ArmourOf { armour, health })
+        .with(&crate::items::ARMOR, crate::items::Armor { points: (armour / ARMOUR_PER_POINT).round() as u32, toughness: 0.0 })
         .with(&base_api::ITEM_LEVEL, a.level)
-        .with(&base_api::WARMTH, warmth);
+        .with(&base_api::WARMTH, warmth)
+        .with(&crate::gems::GEMS_ON, crate::gems::gems_of(sockets, &set));
     // Its icon is its shell's, in the shell's material (the worn look is its item's set).
     let shell = parts
         .iter()
         .find(|(p, _)| p.slot == "shell")
         .map(|(p, _)| p.shape);
     let stack = match shell.and_then(|s| crafting::looks::part_look(s, a.shell)) {
-        Some(look) => with_look(stack, Some(look.as_str())),
+        Some(look) => with_look(stack, Some((look + &gem_layers(kind.id, &set)).as_str())),
         None => stack,
     };
     let worn = (used * uses as f32) as u32;
@@ -566,11 +586,83 @@ pub fn assembled(stacks: &[ItemStack]) -> ItemStack {
 
 /// `kind` from `parts`, with its numbers on the stack; empty if they don't make one.
 fn built(kind: &Kind, parts: &[(Part, PartOf)]) -> ItemStack {
+    built_with(kind, parts, &[])
+}
+
+/// `kind` from `parts` with `gems` set in it (as many as it has sockets).
+fn built_with(kind: &Kind, parts: &[(Part, PartOf)], gems: &[crate::gems::Set]) -> ItemStack {
     let plain: Vec<Part> = parts.iter().map(|p| p.0).collect();
     if kind.use_ == Use::Guard {
-        return armour(kind.id, &plain).map_or(ItemStack::EMPTY, |a| armour_stack(kind, parts, &a));
+        return armour(kind.id, &plain).map_or(ItemStack::EMPTY, |a| armour_stack(kind, parts, &a, gems));
     }
-    combine(kind.id, &plain).map_or(ItemStack::EMPTY, |stats| tool_stack(kind, parts, &stats))
+    combine(kind.id, &plain).map_or(ItemStack::EMPTY, |stats| tool_stack(kind, parts, &stats, gems))
+}
+
+/// An item's sockets (`crafting::gems::sockets`, by its working part), the gems that fit in them,
+/// and what they multiply (`crafting::gems::multipliers`: damage, speed, armour, health).
+fn gems_for(kind: &Kind, parts: &[(Part, PartOf)], gems: &[crate::gems::Set]) -> (u8, Vec<crate::gems::Set>, [f32; 4]) {
+    let Some((work, _)) = parts.iter().find(|(p, _)| p.slot == kind.working()) else { return (0, Vec::new(), [1.0; 4]) };
+    let Some(m) = crafting::materials::material(work.material) else { return (0, Vec::new(), [1.0; 4]) };
+    let sockets = crafting::gems::sockets(m, work.grade);
+    let set: Vec<crate::gems::Set> = gems.iter().take(sockets as usize).copied().collect();
+    let boosts: Vec<(vitals::web::Family, f32)> = set.iter().flat_map(|s| s.boosts()).collect();
+    (sockets, set, crafting::gems::multipliers(kind, work.grade, &boosts))
+}
+
+/// The look layers of `gems` set in an item of `kind` (`crafting::looks::gem_look`), each after a
+/// `;`; empty without gems.
+fn gem_layers(kind: &str, gems: &[crate::gems::Set]) -> String {
+    gems.iter()
+        .enumerate()
+        .filter_map(|(i, g)| crafting::looks::gem_look(kind, i, g.gem.id))
+        .map(|l| format!(";{l}"))
+        .collect()
+}
+
+/// A built item with its gems set again (its parts as they are now, so wear and repairs carry).
+fn rebuilt(item: &ItemStack, gems: &[crate::gems::Set]) -> ItemStack {
+    PARTS.on_stack_own(item).map_or(ItemStack::EMPTY, |_| {
+        let parts = apart_into(item, false);
+        build(&parts).map_or(ItemStack::EMPTY, |(kind, parts)| built_with(kind, &parts, gems))
+    })
+}
+
+/// A built item and gems in the assembly slots: the item with them set, if it has room for all.
+fn socketed(stacks: &[ItemStack]) -> ItemStack {
+    let full: Vec<&ItemStack> = stacks.iter().filter(|s| !s.is_empty()).collect();
+    let items: Vec<&&ItemStack> = full
+        .iter()
+        .filter(|s| PARTS.on_stack_own(s).is_some())
+        .collect();
+    let new: Vec<crate::gems::Set> = full.iter().filter_map(|s| crate::gems::loose(s)).collect();
+    let ([item], false) = (&items[..], new.is_empty()) else { return ItemStack::EMPTY };
+    if items.len() + new.len() != full.len() {
+        return ItemStack::EMPTY;
+    }
+    let mut gems = crate::gems::on(item);
+    if gems.len() + new.len() > sockets_of(item) as usize {
+        return ItemStack::EMPTY;
+    }
+    gems.extend(new);
+    rebuilt(item, &gems)
+}
+
+/// The sockets a built item has, from its working part's material and grade.
+pub fn sockets_of(item: &ItemStack) -> u8 {
+    let Some(p) = PARTS.on_stack_own(item) else { return 0 };
+    let Some(kind) = kind_of(p.kind) else { return 0 };
+    (0..p.n.min(4) as usize)
+        .find(|&i| p.slots[i] == code(kind.working()))
+        .and_then(|i| Some((material_of(p.materials[i])?, p.grades[i] as u8)))
+        .map_or(0, |(m, g)| crafting::gems::sockets(m, g))
+}
+
+/// A built item with gems alone in the assembly slots: it bare (its gems come back on taking it).
+fn unsocketed(stacks: &[ItemStack]) -> Option<(ItemStack, Vec<crate::gems::Set>)> {
+    let full: Vec<&ItemStack> = stacks.iter().filter(|s| !s.is_empty()).collect();
+    let [item] = full[..] else { return None };
+    let gems = crate::gems::on(item);
+    (!gems.is_empty()).then(|| (rebuilt(item, &[]), gems))
 }
 
 /// What a part of `kind`'s slot `slot` usually is when nothing names it (`/gear`):
@@ -770,7 +862,8 @@ fn repair_tool(tool: &ItemStack, with: &ItemStack) -> Option<ItemStack> {
         .max_by(|a, b| a.1.total_cmp(&b.1))?
         .0;
     parts[worst] = repair_part(&parts[worst], with)?;
-    let again = assembled(&parts);
+    // Its gems stay set.
+    let again = build(&parts).map_or(ItemStack::EMPTY, |(kind, p)| built_with(kind, &p, &crate::gems::on(tool)));
     (!again.is_empty()).then_some(again)
 }
 
@@ -802,12 +895,20 @@ pub fn on_change(m: &MenuCtx) {
         for (i, part) in apart(&held).into_iter().enumerate().take(ASSEMBLY.len()) {
             asm_set(m, i, part);
         }
+        // Its gems come back to the bag (a cheap one may crack).
+        crate::gems::give_back(&m.world(), m.player(), &crate::gems::on(&held));
         apart_slot.set(0, ItemStack::EMPTY);
     }
     let stacks: Vec<ItemStack> = (0..ASSEMBLY.len()).map(|i| asm_get(m, i)).collect();
-    // A tool from its parts, else a repair: a worn part or tool and a unit of its material.
+    // A tool from its parts, else a repair (a worn part or tool and a unit of its material), else
+    // gems set in a built item, else a built item's gems taken out.
     let built = assembled(&stacks);
-    out.set(0, if built.is_empty() { repaired(&stacks) } else { built });
+    let made = [built, repaired(&stacks), socketed(&stacks)]
+        .into_iter()
+        .find(|s| !s.is_empty())
+        .or_else(|| unsocketed(&stacks).map(|u| u.0))
+        .unwrap_or(ItemStack::EMPTY);
+    out.set(0, made);
 }
 
 /// Something was taken: true if it was the assembled tool (its parts are used up), so the grid's
@@ -820,6 +921,14 @@ pub fn on_take(m: &MenuCtx) -> bool {
     let stacks: Vec<ItemStack> = (0..ASSEMBLY.len()).map(|i| asm_get(m, i)).collect();
     let parts = stacks.iter().filter(|s| !s.is_empty()).count() as u32;
     crate::skills::made(&m.world(), m.player(), &assembled(&stacks), parts);
+    // Gems taken out of an item come back to the bag.
+    if assembled(&stacks).is_empty()
+        && repaired(&stacks).is_empty()
+        && socketed(&stacks).is_empty()
+        && let Some((_, gems)) = unsocketed(&stacks)
+    {
+        crate::gems::give_back(&m.world(), m.player(), &gems);
+    }
     for i in 0..ASSEMBLY.len() {
         let s = asm_get(m, i);
         if !s.is_empty() {
@@ -899,6 +1008,16 @@ fn inspect(w: &World, player: u64, mut reply: impl FnMut(&str, &[Arg])) {
                     Arg::Int(t.repairs[i] as i64),
                 ],
             );
+        }
+        let gems = crate::gems::on(&held);
+        reply("command.base.inspect.gems", &[Arg::Int(gems.len() as i64), Arg::Int(sockets_of(&held) as i64)]);
+        for g in &gems {
+            let pct: i64 = g
+                .boosts()
+                .iter()
+                .map(|b| (b.1 * vitals::web::UNIT * 100.0).round() as i64)
+                .sum();
+            reply("command.base.inspect.gem", &[Arg::Key(g.gem.key), Arg::Int(g.data.level as i64), Arg::Int(pct)]);
         }
     } else {
         reply("command.base.inspect.plain", &[]);

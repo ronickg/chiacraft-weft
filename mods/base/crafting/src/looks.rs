@@ -205,6 +205,33 @@ pub fn ramp(material: &str) -> String {
     format!("base:ramps/{material}")
 }
 
+/// Where gems sit on each kind's 32 px icon, the centre of its first, second and third socket
+/// (measured on the iron heads, the hilt's guard and pommel, and the armour shells' icons).
+pub const GEM_SPOTS: &[(&str, [[i32; 2]; 3])] = &[
+    ("axe", [[19, 9], [22, 6], [16, 12]]),
+    ("pickaxe", [[18, 9], [22, 6], [14, 12]]),
+    ("shovel", [[23, 8], [25, 5], [21, 11]]),
+    ("hoe", [[18, 9], [21, 6], [15, 12]]),
+    ("sword", [[9, 22], [4, 27], [12, 19]]),
+    ("helmet", [[16, 13], [12, 16], [20, 16]]),
+    ("chestplate", [[15, 13], [10, 10], [20, 10]]),
+    ("leggings", [[12, 8], [19, 8], [15, 4]]),
+    ("boots", [[11, 10], [20, 10], [15, 6]]),
+];
+
+/// The gem drawing's size: a shade map with the gem in its top-left corner
+/// (`base:parts/gem/set`), moved to its socket's spot.
+pub const GEM_SIZE: i32 = 5;
+
+/// The look layer of a gem `gem` (`crafting::gems::GEMS`) in socket `i` of an item of `kind`:
+/// the gem's map painted with its ramp (`base:ramps/gem_<gem>`) at the socket's spot; none for a
+/// kind without spots (drawn by its plain icon).
+pub fn gem_look(kind: &str, i: usize, gem: &str) -> Option<String> {
+    let spot = GEM_SPOTS.iter().find(|(k, _)| *k == kind)?.1.get(i)?;
+    let (x, y) = (spot[0] - GEM_SIZE / 2, spot[1] - GEM_SIZE / 2);
+    Some(format!("base:parts/gem/set@{}+{x},{y}", ramp(&format!("gem_{gem}"))))
+}
+
 /// Part shapes drawn from one shade map painted with their material's ramp, as a loose part and
 /// (a shell) as the built piece (`base:parts/armour/<shape>`, made from the approved icons): armour's
 /// shells, straps (their buckles a second region: the straps' own metal, else wrought iron) and
@@ -270,5 +297,7 @@ mod tests {
         assert_eq!(part_look("chest_shell", "bronze").unwrap(), "base:parts/armour/chest_shell@base:ramps/bronze");
         assert_eq!(part_look("straps", "leather").unwrap(), "base:parts/armour/straps@base:ramps/leather,base:ramps/wrought_iron");
         assert!(part_look("haft", "oak").is_none());
+        assert_eq!(gem_look("sword", 0, "diamond").unwrap(), "base:parts/gem/set@base:ramps/gem_diamond+7,20");
+        assert!(gem_look("knife", 0, "diamond").is_none() && gem_look("sword", 3, "diamond").is_none());
     }
 }

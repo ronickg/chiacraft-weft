@@ -145,6 +145,11 @@ const RECIPES_LIST: &[Recipe] = &[
     c("base:pickaxe", 1.0, &[("base:part_pick_head", 1.0), ("base:part_haft", 1.0), ("base:part_lashing", 1.0)], Table),
     c("base:shovel", 1.0, &[("base:part_shovel_blade", 1.0), ("base:part_haft", 1.0), ("base:part_lashing", 1.0)], Table),
     c("base:knife", 1.0, &[("base:part_knife_blade", 1.0), ("base:part_grip", 1.0), ("base:part_lashing", 1.0)], Table),
+    // Gems cut from their stones (gems.rs).
+    c("base:gem_diamond", 1.0, &[("base:diamond", 1.0)], Table),
+    c("base:gem_peridot", 1.0, &[("base:peridot", 1.0)], Table),
+    c("base:gem_tektite", 1.0, &[("base:tektite", 1.0)], Table),
+    c("base:gem_amber", 1.0, &[("animals:amber", 1.0)], Table),
     // Armour: a shell, straps and a lining; a look family's item takes its shell's material
     // (`parts::ARMOUR_LOOKS`: an iron or steel shell is worn as mail, a diamond one as gems).
     c("base:helmet", 1.0, &[("base:part_helmet_shell", 1.0), ("base:part_straps", 1.0), ("base:part_lining", 1.0)], Table),

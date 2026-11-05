@@ -29,5 +29,6 @@ pub fn checks() -> Vec<(&'static str, Vec<String>)> {
         ("every species inside its bands at every level, floors hold", matrix::species()),
         ("tames capped by their saddle and ceiling", matrix::tames()),
         ("tweaks inside ×0.75-×1.25 with a reason", matrix::tweaks()),
+        ("grade and gems at most +60% over a plain item", matrix::gem_ceiling()),
     ]
 }

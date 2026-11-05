@@ -104,6 +104,31 @@ pub fn markdown() -> String {
         }
     }
 
+    let _ = writeln!(w, "\n## Gems\n");
+    let _ = writeln!(
+        w,
+        "Sockets: the working part's grade's modifier slots, at most its material's (knapped stone, ground stone, bone, wood 1; leather and diamond 2; metal 3). A gem rolls 1-3 boosts among {:?} with the web's roll (`vitals::sockets::roll_among`), {:.1}-{:.1} units in all (a unit is +{:.0}%), by its stone's item level. A boost counts only where it fits the item; grade and gems together at most x{} a plain item. A gem under item level {} cracks one time in {} coming out.\n",
+        vitals::sockets::GEAR_FAMILIES,
+        vitals::sockets::band(0.0),
+        vitals::sockets::band(vitals::curve::MAX_LEVEL),
+        vitals::web::UNIT * 100.0,
+        vitals::curve::GRADE_CEILING,
+        crate::gems::CHEAP_BELOW,
+        crate::gems::CRACK_ONE_IN
+    );
+    let _ = writeln!(w, "| Gem | Cut from | Item level | Units in all | Cracks |\n|---|---|---|---|---|");
+    for g in crate::gems::GEMS {
+        let _ = writeln!(
+            w,
+            "| {} | {} | {:.0} | {:.1} | {} |",
+            g.id,
+            g.from,
+            g.level(),
+            vitals::sockets::band(g.level()),
+            if g.cracks() { "1 in 4" } else { "no" }
+        );
+    }
+
     let _ = writeln!(w, "\n## Example armour (a chestplate, leather straps, wool lining, Sound parts)\n");
     let _ = writeln!(w, "| Shell | Level | Armour | Health | kg | Lasts (blows) | Gives out first |\n|---|---|---|---|---|---|---|");
     for shell in ["leather", "bone", "copper", "bronze", "wrought_iron", "steel", "diamond"] {
