@@ -245,7 +245,8 @@ fn soft_cover(s: Sky, at: vec2<f32>) -> f32 {
     let wet = max(s.axes[0].x, s.axes[0].z);
     let field = soft_slice(9u, fract(at / 6144.0) * 64.0).r * 0.65 + soft_slice(27u, fract(at / 1536.0) * 64.0).r * 0.35;
     // At 0.38 a clear day's were thin wisps with no body (the first soft run, 11-05).
-    return clamp(mix(0.52, 0.92, wet) + (field - 0.5) * mix(0.8, 0.5, wet), 0.0, 1.0);
+    // Storms at 0.92 closed into one even deck once the billows were equalized: 0.8 keeps breaks.
+    return clamp(mix(0.5, 0.8, wet) + (field - 0.5) * mix(0.8, 0.5, wet), 0.0, 1.0);
 }
 
 // The cloud's density at `at` (its frame, blocks) and `a` (0 at the layer's underside, 1 at its
@@ -261,7 +262,9 @@ fn soft_density(s: Sky, at: vec2<f32>, a: f32, cover: f32, fine: bool) -> f32 {
     // with the slow field so masses group.
     let billow = soft_noise(vec3(at.x / 1536.0 + a * 0.04, a * 0.3 + t * 0.0003, at.y / 1536.0)).r;
     let mass = soft_slice(41u, fract(at / 3072.0) * 64.0).r;
-    let shape = billow * 0.7 + mass * 0.3;
+    // A smaller billow on them, so the puffs are cauliflowers, not smooth marshmallows (11-05).
+    let small = soft_noise(vec3(at.x / 384.0 + 0.37, a * 0.8 + t * 0.001, at.y / 384.0)).r;
+    let shape = billow * 0.55 + mass * 0.25 + small * 0.2;
     // Photon's remap: the billows the cover lets through, shaped from the bottom up.
     var d = clamp((shape - (1.0 - cover)) / max(cover, 0.05) * 1.6, 0.0, 1.0);
     // An egg: a flat-ish base, rounded tops; a storm's deck fills more of its height.
@@ -269,9 +272,9 @@ fn soft_density(s: Sky, at: vec2<f32>, a: f32, cover: f32, fine: bool) -> f32 {
     d -= smoothstep(mix(0.35, 0.55, storm), 1.0, a) * mix(0.45, 0.4, storm);
     if fine && d > 0.0 {
         // Detail wears only the edges (Photon: by 1 - density), so the cores stay solid.
-        let w = soft_noise(vec3(at.x / 192.0, a * 1.4 + t * 0.002, at.y / 192.0));
+        let w = soft_noise(vec3(at.x / 128.0, a * 1.4 + t * 0.002, at.y / 128.0));
         let cells = w.g * 0.625 + w.b * 0.25 + w.a * 0.125;
-        d -= (1.0 - cells) * 0.22 * (1.0 - d) * mix(0.5, 1.0, a);
+        d -= (1.0 - cells) * 0.5 * (1.0 - d) * mix(0.6, 1.0, a);
     }
     return clamp(d, 0.0, 1.0);
 }
@@ -320,7 +323,7 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
             continue;
         }
         // Extinction per block: a dense core is gone in a few blocks.
-        let sigma = d * 0.32;
+        let sigma = d * 0.55;
         // Toward the light, five taps each twice as far as the last (3 to 48 blocks).
         var od = 0.0;
         var reach = 3.0;
@@ -328,7 +331,7 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
         for (var j = 0; j < 5; j++) {
             let q = rel + l * reach;
             let qa = (q.y - low) / thick;
-            od += soft_density(s, soft_at(s, q), qa, cover, false) * 0.32 * (reach - last);
+            od += soft_density(s, soft_at(s, q), qa, cover, false) * 0.55 * (reach - last);
             last = reach;
             reach *= 2.0;
         }
