@@ -155,6 +155,8 @@ const RECIPES_LIST: &[Recipe] = &[
     c("base:fire_bed", 1.0, &[("base:plant_fibre", 1.0), ("#stick", 3.0)], Hand),
     c("base:bow_drill", 1.0, &[("#stick", 2.0), ("#string", 1.0)], Hand),
     c("base:hand_drill", 1.0, &[("#stick", 2.0)], Hand),
+    // the ley lines (ley.rs): the magic path's first step
+    c("base:dowsing_rod", 1.0, &[("#stick", 2.0), ("#string", 1.0), ("base:tektite", 1.0)], Hand),
     c("base:campfire_laid", 1.0, &[("#stick", 2.0), ("#logs", 2.0)], Hand),
     c("base:tanning_frame", 1.0, &[("#stick", 4.0), ("#string", 4.0)], Table),
     c("base:tanning_pit", 1.0, &[("#planks", 7.0)], Table),
@@ -418,8 +420,9 @@ pub const KEYS: &[Key] = &[Key {
     routes: &[
         (Path::Tech, &["base:pickaxe", "base:furnace"]),
         (Path::Beasts, &["animals:club", "animals:tranquilizer_dart", "animals:nest"]),
+        (Path::Magic, &["base:dowsing_rod"]),
     ],
-    missing: &["magic route: a dowsing rod (sensing ley lines)", "a biome boss's part", "knowledge: a ruin's blueprint or lore page"],
+    missing: &["a biome boss's part", "knowledge: a ruin's blueprint or lore page"],
 }];
 
 // ------------------------------------------------------------------ the graph, solved

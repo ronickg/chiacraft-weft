@@ -31,6 +31,7 @@ mod knapping;
 mod land;
 mod leaf_decay;
 mod levels;
+mod ley;
 mod look;
 mod machines;
 mod meteors;
@@ -137,6 +138,7 @@ fn init(r: &mut Registry) {
     growth::register(r);
     farming::register(r);
     fireflies::register(r);
+    ley::register(r);
     felling::register(r);
     fall::register(r);
     leaf_decay::register(r);
