@@ -4,7 +4,10 @@
 # chiacraft shader pack inside its library and writes it out on the first start), and on macOS
 # MoltenVK, which stands in for Vulkan there.
 #
-#   cargo build --release
+# It packs the build in target/$PROFILE (default dist, what players get; PROFILE=release packs
+# a crew build).
+#
+#   cargo build --profile dist
 #   tools/release/package.sh <platform> [label]
 #
 # <platform> is linux-x64, windows-x64, macos-arm64 or macos-x64 and ends up in the file name;
@@ -29,14 +32,15 @@ case "$platform" in
 	windows-*) exe=weft.exe ;;
 	*) exe=weft ;;
 esac
-bin="target/release/$exe"
+profile="${PROFILE:-dist}"
+bin="target/$profile/$exe"
 [ -f Cargo.toml ] && [ -d mods/base ] || { echo "run from the repository root" >&2; exit 1; }
-[ -x "$bin" ] || [ -f "$bin" ] || { echo "$bin is missing: cargo build --release first" >&2; exit 1; }
+[ -x "$bin" ] || [ -f "$bin" ] || { echo "$bin is missing: cargo build --profile $profile first" >&2; exit 1; }
 
 rm -rf "$folder"
 mkdir -p "$out_dir"
 # The engine's own packer: the executable, assets/core and every mod not marked `dist = false`
-# (the test kit, testmod), each with its library from target/release.
+# (the test kit, testmod), each with its library from beside the executable (target/$profile).
 "$bin" --dist "$folder"
 
 # What a player's copy needs, checked here rather than on their machine.
@@ -51,7 +55,7 @@ for dir in mods/*/; do
 	if tr -d ' ' < "$dir/Cargo.toml" | grep -qx 'dist=false'; then
 		[ ! -e "$folder/run/mods/$m.zip" ] || fail "development mod $m was packed"
 	else
-		[ -f "$folder/run/mods/$m.zip" ] || fail "mod $m was not packed (is its library missing from target/release?)"
+		[ -f "$folder/run/mods/$m.zip" ] || fail "mod $m was not packed (is its library missing from target/$profile?)"
 	fi
 done
 ls "$folder/run/mods"
