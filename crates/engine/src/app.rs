@@ -2981,6 +2981,8 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
                 k if k >= 2 => Some((u64::MAX, (k - 2) as u32)),
                 _ => None,
             };
+            // A kind alone: its skin loads with the others (none of it may be in the world).
+            g.client.entity_render.preview_kind = (whose >= 2).then(|| (whose - 2) as u32);
             let s = crate::diag::span("preview");
             let tex = g.client.entity_render.draw_preview(
                 &mut *r.gpu,
