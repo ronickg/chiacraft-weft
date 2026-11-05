@@ -175,7 +175,7 @@ chiacraft's pack reads these settings (`mods/base/src/look.rs`; Mod Settings in 
 | `base:night_moon` | 1, 0.3-2 | the moon's light at night |
 | `base:look_canopy` | 1, 0.2-2 | under a forest's canopy (`vitals::air::CANOPY`): how dim and green the shade under the leaves is, and how freely the sunflecks come through |
 | `base:look_shafts` | 1, 0.2-3 | how strong the light shafts through a forest's crown gaps are (most in morning mist) |
-| `base:look_curve` | 0, 0-1 | with the HDR world: the day's tone curve, 0 Lottes's (as made), 1 Hejl's 2015 (a deeper toe, as Ronald's Bliss settings) |
+| `base:look_curve` | 0, 0-2 | with the HDR world: the day's tone curve, 0 Lottes's (as made), 1 Hejl's 2015 (a deeper toe, as Ronald's Bliss settings), 2 AgX (Bliss's current default) |
 | `base:look_bloom` | 1, 0-3 | with the HDR world: how much of the bloom pyramid's glow is mixed in (1: a tenth, more in fog and rain) |
 | `base:look_auto_exposure` | 1, 0-2 | with the HDR world: how much the exposure follows how bright the view is (0 fixed) |
 

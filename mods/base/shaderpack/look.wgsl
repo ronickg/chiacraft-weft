@@ -56,7 +56,7 @@ const OPT_GLOW: u32 = 19u;
 const OPT_BIOME_AIR: u32 = 20u;
 const OPT_SPARKLE: u32 = 21u;
 // The HDR world's picture (`base:look_curve`, `look_bloom`, `look_auto_exposure`), read raw: 0 is
-// Lottes's curve, no bloom, a fixed exposure.
+// Lottes's curve (1 Hejl's, 2 AgX), no bloom, a fixed exposure.
 const OPT_CURVE: u32 = 22u;
 const OPT_BLOOM: u32 = 23u;
 const OPT_AUTO_EXPOSURE: u32 = 24u;
@@ -1183,6 +1183,35 @@ fn hejl(c: vec3<f32>, white: f32) -> vec3<f32> {
     return pow(max(f.rgb / f.w, vec3(0.0)), vec3(2.2));
 }
 
+// AgX, Troy Sobotka's display transform, in Benjamin Wrensch's minimal fit (MIT License,
+// Copyright (c) 2024 Missing Deadlines (Benjamin Wrensch), iolite-engine.com): the light into a
+// log space between -12.47 and +4.03 stops round mid-grey, through a polynomial S curve, back out of
+// its inset primaries. Brights roll off toward white in their own hue instead of clipping.
+fn agx_curve(x: vec3<f32>) -> vec3<f32> {
+    let x2 = x * x;
+    let x4 = x2 * x2;
+    return 15.5 * x4 * x2 - 40.14 * x4 * x + 31.96 * x4 - 6.868 * x2 * x + 0.4298 * x2 + 0.1191 * x - vec3(0.00232);
+}
+
+// Linear light in, display-linear out (as `lottes`), for the sRGB screen.
+fn agx(c: vec3<f32>) -> vec3<f32> {
+    let inset = mat3x3<f32>(
+        vec3(0.842479062253094, 0.0423282422610123, 0.0423756549057051),
+        vec3(0.0784335999999992, 0.878468636469772, 0.0784336),
+        vec3(0.0792237451477643, 0.0791661274605434, 0.879142973793104),
+    );
+    let outset = mat3x3<f32>(
+        vec3(1.19687900512017, -0.0528968517574562, -0.0529716355144438),
+        vec3(-0.0980208811401368, 1.15190312990417, -0.0980434501171241),
+        vec3(-0.0990297440797205, -0.0989611768448433, 1.15107367264116),
+    );
+    let min_ev = -12.47393;
+    let max_ev = 4.026069;
+    let v = clamp(log2(max(inset * c, vec3(1e-10))), vec3(min_ev), vec3(max_ev));
+    let shaped = agx_curve((v - min_ev) / (max_ev - min_ev));
+    return pow(clamp(outset * shaped, vec3(0.0), vec3(1.0)), vec3(2.2));
+}
+
 // How bright the picture is taken: the filmic curve deepens the mid-tones, so by day it is opened
 // up to keep them where they were, and more as night falls and under water, the eye adjusting.
 fn exposure() -> f32 {
@@ -1222,7 +1251,11 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     var day_t = min(lottes(max(c, vec3(0.0)) * 1.3 * look_opt(OPT_EXPOSURE, 1.0)), vec3(1.0));
     // Or Hejl's 2015 curve by day (`base:look_curve` 1; Ronald's Bliss setting): a real toe, so
     // the shade goes deep and the mids keep their colour, a long shoulder to white at 3.5.
-    if fantasy_opt(OPT_CURVE) > 0.5 {
+    // Or AgX (`base:look_curve` 2): Blender's and Bliss's current default.
+    let curve = fantasy_opt(OPT_CURVE);
+    if curve > 1.5 {
+        day_t = agx(max(c, vec3(0.0)) * 0.55 * exposure() * look_opt(OPT_EXPOSURE, 1.0));
+    } else if curve > 0.5 {
         day_t = hejl(max(c, vec3(0.0)) * exposure() * look_opt(OPT_EXPOSURE, 1.0), 3.5);
     }
     var t = mix(night_t, day_t, day);

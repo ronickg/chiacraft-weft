@@ -21,7 +21,7 @@ pub static NIGHT_MOON: Config<f32> = Config::named("night_moon");
 pub static LOOK_CANOPY: Config<f32> = Config::named("look_canopy");
 pub static LOOK_SHAFTS: Config<f32> = Config::named("look_shafts");
 /// The HDR world's picture (`core:hdr_world`): the tone curve by day (0 Lottes's, 1 Hejl's 2015, as
-/// Ronald's Bliss settings), how strong the bloom is, and how much the exposure follows the view.
+/// Ronald's Bliss settings, 2 AgX), how strong the bloom is, and how much the exposure follows the view.
 pub static LOOK_CURVE: Config<f32> = Config::named("look_curve");
 pub static LOOK_BLOOM: Config<f32> = Config::named("look_bloom");
 pub static LOOK_AUTO_EXPOSURE: Config<f32> = Config::named("look_auto_exposure");
@@ -56,9 +56,9 @@ pub fn register(r: &mut Registry) {
     // shafts through the crown gaps are.
     r.config(&LOOK_CANOPY).float(1.0, 0.2, 2.0);
     r.config(&LOOK_SHAFTS).float(1.0, 0.2, 3.0);
-    // The HDR world's picture: 0 Lottes's curve (the look as made), 1 Hejl's; bloom 0 none to 3;
+    // The HDR world's picture: 0 Lottes's curve (the look as made), 1 Hejl's, 2 AgX; bloom 0 none to 3;
     // the exposure following the view, 0 fixed to 2.
-    r.config(&LOOK_CURVE).float(0.0, 0.0, 1.0);
+    r.config(&LOOK_CURVE).float(0.0, 0.0, 2.0);
     r.config(&LOOK_BLOOM).float(1.0, 0.0, 3.0);
     r.config(&LOOK_AUTO_EXPOSURE).float(1.0, 0.0, 2.0);
 }
