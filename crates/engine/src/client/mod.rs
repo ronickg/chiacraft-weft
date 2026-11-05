@@ -3107,7 +3107,12 @@ impl Client {
             list.append(&mut hand_late);
         }
         (self.late, self.hand_late) = (late, hand_late);
-        list.push(weft_render::Cmd::Mark);
+        // The end of the "translucent" part; with the copy, the app marks it after what it draws
+        // after the copy, so the sky, clouds and water are not counted as screen effects (Research
+        // round 16, M1).
+        if self.behind[2] <= 0.5 {
+            list.push(weft_render::Cmd::Mark);
+        }
     }
 
     /// Linear rgb, and in w how hard it rains (0..1) for shader packs.

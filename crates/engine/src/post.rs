@@ -39,6 +39,8 @@ pub struct Post {
     low_pipe: Option<PipelineId>,
     low_slots: Slots,
     low_targets: Vec<(String, TextureId, u32, (u32, u32))>,
+    /// Whether the half-size parts run (`core:post_low`); off, the effects do their full work.
+    pub use_low: bool,
     /// Effects on, in the order they were turned on: (name, strength).
     pub active: Vec<(String, f32)>,
     /// Two images the size of the screen (scene and the one after each pass), with their
@@ -64,6 +66,7 @@ impl Post {
             low_pipe: None,
             low_slots: Slots::default(),
             low_targets: Vec::new(),
+            use_low: true,
             active: Vec::new(),
             targets: None,
             params: Vec::new(),
@@ -286,7 +289,7 @@ impl Post {
         let mut passes = passes;
         // The half-size parts first: each into its effect's own image, which that effect reads.
         let mut lows: Vec<TextureId> = Vec::new();
-        if self.low_pipe.is_some() {
+        if self.low_pipe.is_some() && self.use_low {
             let (w, h) = (frame.width.div_ceil(2).max(1), frame.height.div_ceil(2).max(1));
             for (i, (name, _)) in active[..n].iter().enumerate() {
                 let slot = self.low_slots.slot(name);
@@ -318,7 +321,7 @@ impl Post {
         }
         let low_entries: Vec<Pass> = active[..n]
             .iter()
-            .filter(|(name, _)| self.low_pipe.is_some() && self.low_slots.slot(name) != 0)
+            .filter(|(name, _)| self.low_pipe.is_some() && self.use_low && self.low_slots.slot(name) != 0)
             .map(|(name, strength)| Pass {
                 scene: idx[0],
                 slot: self.low_slots.slot(name),
