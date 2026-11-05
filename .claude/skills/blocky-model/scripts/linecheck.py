@@ -33,7 +33,8 @@ the faces don't share a plane), pulling the poking box in, or letting it show on
 texels or more. Exit 1 if any `line` or `bleed` hit (the rest are listed, never fail).
 
 Build scripts call `lines(boxes_from_spec(spec), texture)` and assert there are no `line` hits
-(`allow` names the strips that are meant: `box`, `box.face` or `prefix*`). Checked at rest: in a
+(`allow` names the strips that are meant: `box`, `box.face` or `prefix*`); for exported models
+the same list lives in `mods/<mod>/source/<model>/linecheck_allow.txt`. Checked at rest: in a
 pose a joint's bend opens and closes such strips anyway.
 """
 
@@ -568,6 +569,19 @@ def shot(boxes, tex, hits, out, kinds=("line", "under")):
     return out
 
 
+def allow_for(geo_path):
+    """The strips a model means, from `mods/<mod>/source/<model>/linecheck_allow.txt` beside its
+    source: one pattern a line (`box`, `box.face` or `prefix*`), `#` starts a reason. For an
+    exported model the box names are its bones' (`egg1_tilt#0`), so prefixes fit best."""
+    mod = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(geo_path))))
+    name = os.path.basename(geo_path).replace(".geo.json", "")
+    for base in (name, name.replace("_pup", "").replace("_fly", "")):
+        f = os.path.join(mod, "source", base, "linecheck_allow.txt")
+        if os.path.exists(f):
+            return tuple(l.split("#")[0].strip() for l in open(f) if l.split("#")[0].strip())
+    return ()
+
+
 def texture_for(geo_path, repo):
     """The texture an exported model uses: textures/entity/<name>/<name>.png or <name>.png."""
     mod = os.path.dirname(os.path.dirname(geo_path))
@@ -596,11 +610,12 @@ if __name__ == "__main__":
         for geo in sorted(glob.glob(os.path.join(repo, "mods", "*", "assets", "models", "*.geo.json"))):
             tex = texture_for(geo, repo)
             boxes, t = load(geo, tex)
-            hits = lines(boxes, t, density_of(boxes)) + bleed(boxes, t)
+            hits = lines(boxes, t, density_of(boxes), allow=allow_for(geo)) + bleed(boxes, t)
             total += len(report(os.path.relpath(geo, repo) + ("" if tex else " (no texture found)"), hits, seams))
         sys.exit(1 if total else 0)
     boxes, tex = load(args[0], args[1] if len(args) > 1 else None)
-    hits = lines(boxes, tex, density_of(boxes)) + bleed(boxes, tex)
+    allow = allow_for(args[0]) if args[0].endswith(".geo.json") else ()
+    hits = lines(boxes, tex, density_of(boxes), allow=allow) + bleed(boxes, tex)
     bad = report(args[0], hits, seams)
     if "--shot" in sys.argv and tex is not None:
         out = sys.argv[sys.argv.index("--shot") + 1]
