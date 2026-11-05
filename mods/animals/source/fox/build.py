@@ -48,16 +48,11 @@ if __name__ == "__main__":
     assert not poking, f"poking through: {sorted(poking)}"
     # No thin lines (Ronald, 11-05): no strip of a box under two texels showing beside another
     # (linecheck; flush, or two texels clear).
-    # Meant: whole parts under two texels across, not strips of a bigger box: the back shanks (one texel)
-    # whose tops enter the thighs, the jaw (one texel) and the muzzle's sides (one texel tall) whose
-    # backs enter the skull, the muzzle's front round the nose (two texels tall). Open: the cheeks
-    # beside the muzzle are one whole texel (a face four wide, the muzzle two); two would need a head
-    # half again as wide (skull.south).
     from linecheck import boxes_from_spec, lines  # noqa: E402
     from PIL import Image  # noqa: E402
     import numpy as np  # noqa: E402
     thin = [h for h in lines(boxes_from_spec(spec), np.array(Image.open(os.path.join(OUT, "texture.png")).convert("RGBA")),
-                             allow=("leg_BL_lower", "leg_BR_lower", "jaw", "muzzle.west", "muzzle.east", "muzzle.south", "skull.south")) if h["kind"] == "line"]
+                             allow=()) if h["kind"] == "line"]
     assert not thin, f"thin lines: {[(h['box'], h['face'], h['cover'], h['width']) for h in thin]}"
     for anim in ("walk", "run", "stalk", "approach"):  # a foot in the air must swing forward, or it moonwalks
         back = {f: v for f, v in gait(spec, anim, FEET).items() if v is not None and v <= 0}

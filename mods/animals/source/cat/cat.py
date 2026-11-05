@@ -86,12 +86,12 @@ EYES.update({
                         halo="none", iris="Gg"),
 })
 EYE_STYLE = os.environ.get("CAT_EYES", "cat_px_lit")
-EYE_Y, EYE_X = 29.5, 5.0  # eye centers on the face: at 6 texels across, 2-texel eyes at its edges, 2 between
+EYE_Y, EYE_X = 29.2, 5.0  # (29.2: on the taller face, in the same rows) eye centers on the face: at 6 texels across, 2-texel eyes at its edges, 2 between
 LID_Z = 24.4  # the eyelids' hinge line, in front of the face (z = 24)
 
 # ------------------------------------------------------------------ the model
 
-SKULL = ((-8, 20.5, 11), (8, 33.5, 24))
+SKULL = ((-8, 19.6, 11), (8, 33.5, 24))  # its bottom flush with the two-texel jaw's (at 20.5 the jaw's back showed a strip under it; linecheck)
 TAIL = [(20, 7.0, 4.2), (42, 7.0, 3.4), (72, 6.0, 2.6), (100, 5.0, 1.8)]  # pitch up (deg), length, width (0.4 a side thinner each: swaying, neighbors never share a plane)
 TAIL0 = np.array([0.0, 18.0, -16.5])  # its top below the hips' top, even lifted running
 
@@ -137,7 +137,7 @@ def eye_box(cx):
 
 def bones():
     B = [("root", None, (0, 0, 0)), ("spine_0", "root", (0, 16, -12)), ("spine_1", "spine_0", (0, 16, -2)),
-         ("neck", "spine_1", (0, 20, 11)), ("head", "neck", (0, 24, 14)), ("jaw", "head", (0, 23.5, 21.5))]
+         ("neck", "spine_1", (0, 20, 11)), ("head", "neck", (0, 24, 14)), ("jaw", "head", (0, 23.5, 24.2))]  # the hinge at the jaw's back, on the face
     for s, n in ((1, "L"), (-1, "R")):
         x0, x1, top, _ = eye_box(s * EYE_X)
         B += [(f"ear_{n}", "head", (s * 5.5, 33, 17)), (f"eyelid_{n}", "head", ((x0 + x1) / 2, top, LID_Z))]
@@ -160,12 +160,14 @@ def elements():
          el("neck", "neck", (-4, 17, 9), (4, 25, 15)),
          el("skull", "head", *SKULL),
          # Two texels narrower than the skull each side (at 3.5 the cheeks beside it were 1.7 texels; linecheck).
-         el("muzzle", "head", (-2.6, 24, 23.5), (2.6, 28, 27)),
-         el("mouth", "head", (-2.0, 22.5, 21.5), (2.0, 24.5, 24.8)),  # half a unit inside the narrower muzzle and jaw
-         # As narrow as the muzzle, for the cheeks' two texels, and its bottom flush with the skull's (at
-         # 21.5 a strip a third of a texel tall showed under it; linecheck).
-         el("jaw", "jaw", (-2.6, 21.0, 21), (2.6, 24, 25.5)),
-         el("nose", "head", (-1.5, 26.5, 27), (1.5, 28, 27.6))]
+         # Two texels tall and two out from the skull (rule 7, and flush or two clear: at 4 tall it was a
+         # box a texel thick, at 27 a texel proud), as a block-game cat's nose stands out; the nose
+         # painted on its front (rule 4: the box it was, a pad half a texel proud, drew a rim).
+         el("muzzle", "head", (-2.6, 23.6, 22.5), (2.6, 28, 29.9)),
+         el("mouth", "head", (-1.7, 22.6, 24.2), (1.7, 24.0, 29.0)),  # inside the muzzle and jaw: seen when it opens
+         # Two texels tall (rule 7), from inside the head (its side three texels long, two showing) to half a unit short of the muzzle's tip,
+         # a little narrower than it.
+         el("jaw", "jaw", (-2.2, 19.2, 22.2), (2.2, 23.6, 29.4))]
     # Ears: steps narrowing to a point (solid), plus one cut-out panel through the middle for a
     # smooth triangle with a few tufts; turned out a little and leaning out.
     steps = [(33, 35.5, 4), (35.5, 37.5, 3), (37.5, 39.5, 1.8), (39.5, 41, 0.8)]  # y0, y1, half width (a third of the head)
@@ -183,19 +185,30 @@ def elements():
         p = pts[k]
         E.append(el(f"tail_{k}", f"tail_{k}", (p[0] - w / 2, p[1] - w / 2, p[2] - length), (p[0] + w / 2, p[1] + w / 2, p[2] + 0.4),
                     rot=(pitch, 0, 0), origin=tuple(p)))
+    # Legs two texels thick or more (rule 7: at 4 a lower leg was a texel), the paw a white band a
+    # little round it (rule 8), each part's sides (inner, outer: from the middle) half a unit or more
+    # from the next one's and from those it meets in a pose (boxcheck): a turning joint keeps its
+    # sides in their planes.
     for leg in ("FL", "FR", "BL", "BR"):
         s = 1 if leg[1] == "L" else -1
-        x = 4.5 * s
+        side = lambda i, o: sorted((s * i, s * o))  # noqa: E731
         if leg[0] == "F":
             z = 10.25
-            E.append(el(f"leg_{leg}_upper", f"leg_{leg}_upper", (x - 2.5, 8, z - 2.5), (x + 2.5, 15, z + 2.5)))  # wider than the lower leg
+            (x0, x1) = side(2.0, 7.0)
+            E.append(el(f"leg_{leg}_upper", f"leg_{leg}_upper", (x0, 8, z - 2.5), (x1, 15, z + 2.5)))
+            (x0, x1) = side(1.5, 7.5)
+            E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x0, 2.5, z - 3.0), (x1, 8, z + 3.0)))
+            (x0, x1) = side(2.0, 7.0)
+            E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x0, 0, z - 2.5), (x1, 2.5, z + 3.5)))
         else:
             z = -12.5
             # Its outer side flush with the hips' (at x + 3 it stood 0.7 texels out beside them; linecheck).
-            xi, xo = sorted((x - 3 * s, x + 1.5 * s))
-            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (xi, 7.5, z - 4), (xo, 18, z + 4)))  # holds the knee (y = 8)
-        E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x - 2, 2.5, z - 2), (x + 2, 8, z + 2)))
-        E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 3.5, 0, z - 2.5), (x + 3.5, 2.5, z + 3.5)))
+            (x0, x1) = side(1.5, 6.0)
+            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (x0, 8, z - 4), (x1, 18, z + 4)))  # down to the knee (y = 8), on the lower leg's top
+            (x0, x1) = side(0.95, 6.75)
+            E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x0, 2.5, z - 2.9), (x1, 8, z + 2.9)))
+            (x0, x1) = side(1.95, 7.25)  # off the thigh's and hips' sides, which it meets sitting
+            E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x0, 0, z - 3.4), (x1, 2.5, z + 3.5)))
     return E
 
 
@@ -270,8 +283,10 @@ def area(e, face, p, uu, vv):
             a = np.where(z > 15, WHITE, a)
     elif name in ("muzzle", "jaw"):
         a[:] = WHITE
-    elif name == "nose":
-        a[:] = NOSE
+        if name == "muzzle" and face == "south":  # the nose, painted where its box was (rule 4)
+            a = np.where((np.abs(x) <= 1.55) & (y >= 26.5), NOSE, a)
+        elif name == "muzzle" and face == "up":  # and over the front texel of the top
+            a = np.where((np.abs(x) <= 1.55) & (z >= 27.5), NOSE, a)
     elif name == "mouth":
         a[:] = DARK
     elif name.startswith("ear_core"):
@@ -331,7 +346,7 @@ def layer_props(e, face, p, a):
         white = np.full(y.shape, 0.95)
     elif n.startswith(("leg_", "thigh_")):
         white = 0.45 + 0.4 * low
-    elif n in ("muzzle", "jaw", "nose"):
+    elif n in ("muzzle", "jaw"):
         white = np.full(y.shape, 0.9)
     elif n in ("chest", "hips", "neck"):
         white = 0.75 * low + 0.2 * (face == "down") + 0.1 * (face == "south") * (n == "chest")
@@ -341,7 +356,7 @@ def layer_props(e, face, p, a):
         white = 0.4 * low
     white = np.maximum(white * 0.85, np.where(a == WHITE, 0.9, 0))
     ext = np.zeros(y.shape)
-    if n.startswith(("ear_", "muzzle", "nose", "jaw")) or n.endswith("_paw"):
+    if n.startswith(("ear_", "muzzle", "jaw")) or n.endswith("_paw"):
         ext[:] = 1.0
     elif n == "skull":
         ext[:] = 0.75 if face == "south" else 0.35
@@ -349,7 +364,7 @@ def layer_props(e, face, p, a):
         ext = 0.5 + 0.4 * low
     elif n.startswith("tail_"):
         ext[:] = {"tail_0": 0.3, "tail_1": 0.55, "tail_2": 0.8}.get(n, 1.0)
-    pattern = np.full(y.shape, 0.2 if n in ("muzzle", "jaw", "nose") or n.endswith("_paw") else 1.0)
+    pattern = np.full(y.shape, 0.2 if n in ("muzzle", "jaw") or n.endswith("_paw") else 1.0)
     return {"white": white, "extremity": ext, "pattern": pattern}
 
 

@@ -148,6 +148,9 @@ LID_Z = 0.0  # the eyelids' hinge line, just in front of the placed face (set be
 # ------------------------------------------------------------------ the model
 
 SKULL = ((-8, 20.5, 11), (8, 33.5, 24))
+# Where the nose is painted on the muzzle (the cat's units): the old box's front, and a texel (1.48
+# units here) back from the muzzle's tip on its top.
+NOSE_X, NOSE_Y, NOSE_Z = 1.5, 26.5, 26.7
 HEAD_BONES.add("head")
 LID_Z = float(warp(HEAD_PIVOT + (np.array(SKULL[1]) - HEAD_PIVOT) * HS)[2]) + 0.15
 # The shortest tail of the big cats, thick, carried low and turning up at the tip: pitch (up),
@@ -245,10 +248,10 @@ def elements():
          el("chest", "spine_1", (-6.6, 11.2, -2.5), (6.6, 22, 12)),  # deep and broad
          el("neck", "neck", (-3.6, 17.5, 9), (3.6, 25, 15)),  # slimmer than the head it enters
          el("skull", "head", *SKULL),
-         el("muzzle", "head", (-4.2, 24, 23.5), (4.2, 28, 27.5)),  # broad; out over two texels from the skull (at 27, 1.7: a rim; linecheck)
+         # Broad; out over two texels from the skull (at 27, 1.7: a rim; linecheck), to the nose's tip (painted on).
+         el("muzzle", "head", (-4.2, 24, 23.5), (4.2, 28, 28.1)),
          el("mouth", "head", (-2.5, 22.5, 21.5), (2.5, 24.5, 24.8)),
-         el("jaw", "jaw", (-3, 21.5, 21), (3, 24, 27.1)),  # out two texels from the skull (at 25.5, one texel: a rim; linecheck)
-         el("nose", "head", (-1.5, 26.5, 27.5), (1.5, 28, 28.1))]  # on the muzzle's front, moved out with it
+         el("jaw", "jaw", (-3, 21.5, 21), (3, 24, 27.75))]  # out two texels from the skull (at 25.5, one texel: a rim; linecheck), flush under the muzzle's tip
     # Ears: steps narrowing to a point (solid), plus one cut-out panel through the middle for a
     # smooth triangle with a few tufts; turned out a little and leaning out.
     steps = [(33, 35, 3.6), (35, 36.6, 2.9), (36.6, 37.8, 1.8)]  # y0, y1, half width: small and round
@@ -407,8 +410,12 @@ def area(e, face, p, uu, vv, along=None):
         a[:] = WHITE
         if name == "muzzle" and face in ("east", "west") and x.shape[1] >= 4:
             a = marks(a, rosettes(z, y, 1.8, True), y > 26.5)  # the whisker spots (a muzzle side is 2 texels at 32: none)
-    elif name == "nose":
-        a[:] = NOSE
+        # The nose, painted (rule 4: the box it was, a pad a texel proud, drew a rim): on the front
+        # where the box was, and the front texel of the top.
+        if name == "muzzle" and face == "south":
+            a = np.where((np.abs(x) <= NOSE_X + 0.05) & (y >= NOSE_Y), NOSE, a)
+        elif name == "muzzle" and face == "up":
+            a = np.where((np.abs(x) <= NOSE_X + 0.05) & (z >= NOSE_Z), NOSE, a)
     elif name == "mouth":
         a[:] = DARK
     elif name.startswith("ear_core"):
@@ -476,7 +483,7 @@ def layer_props(e, face, p, a):
     else:
         white = np.full(y.shape, 0.2)
     white = np.maximum(white * 0.85, np.where(a == WHITE, 0.9, 0))
-    pattern = np.full(y.shape, 0.15 if n in ("muzzle", "jaw", "nose", "mouth") or n.startswith("ear_") else
+    pattern = np.full(y.shape, 0.15 if n in ("muzzle", "jaw", "mouth") or n.startswith("ear_") else
                       (0.5 if n == "skull" else 1.0))
     return {"white": white, "pattern": pattern}
 
@@ -801,7 +808,7 @@ def fit_poses(spec):
     P = dict(L, **best, lie_drop=0)
     L.update(best, lie_drop=round(min(v for k, v in low(pose_lie, P).items() if k != "tail"), 2))
     # Head down to the ground (sniffing, drinking) and the death fall (`canid.fit`).
-    canid.fit(spec, dict(GROUPS, head=lambda n: n in ("skull", "muzzle", "jaw", "nose")))
+    canid.fit(spec, dict(GROUPS, head=lambda n: n in ("skull", "muzzle", "jaw")))
     L["sit_tail"] = rest_tail(spec, pose_sit, "sit")
     L["lie_tail"] = rest_tail(spec, pose_lie, "lie")
     for key, fn in (("sit", pose_sit), ("lie", pose_lie)):

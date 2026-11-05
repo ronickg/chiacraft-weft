@@ -89,6 +89,7 @@ SKULL = tuple(tuple(float(v) for v in warp(c)) for c in SKULL0)
 EYE_X, EYE_Y = 2.93 * K, (29.0 + D) * K  # on the face, above the cheeks (warped): texels 0-1 and 4-5, rows 0-1
 LID_Z = SKULL[1][2] + 0.15  # the eyelids' hinge line, just in front of the face: closed, they sit over the eyes
 LASH = (52, 30, 22)
+NOSE_X, NOSE_Y, NOSE_Z = 1.1, 26.1, 25.6  # where the nose is painted on the muzzle (the fox's space)
 
 
 def skull_grid():
@@ -184,12 +185,15 @@ def bones():
 
 def elements():
     E = [el("hips", "spine_0", (-4.4, 17, -20), (4.4, 27, -3)),
-         el("chest", "spine_1", (-5.0, 15, -6.5), (5.0, 27.5, 11.6)),  # its front off the skull's back (touching it, the wider skull left a strip of it each side; linecheck)
+         # Its front off the skull's back (touching it, the wider skull left a strip of it each side;
+         # linecheck), its sides half a unit (warped) past the haunches', which meet it running (boxcheck).
+         el("chest", "spine_1", (-5.2, 15, -6.5), (5.2, 27.5, 11.6)),
          el("skull", "head", *SKULL0),
-         el("muzzle", "head", (-MUZZLE_X, 25.0, 19.5), (MUZZLE_X, 27.6, 26.0)),  # long and slender
-         el("nose", "head", (-1.1, 26.1, 25.6), (1.1, 27.3, 26.6)),
+         # Long and slender, to the nose's tip (painted on), its bottom on the jaw's top (at 25.0 it covered
+         # the jaw's top, leaving its sides a strip).
+         el("muzzle", "head", (-MUZZLE_X, 25.2, 19.5), (MUZZLE_X, 27.6, 26.6)),
          el("mouth", "head", (-0.65, 24.4, 19.9), (0.65, 25.6, 24.6)),  # half a unit inside the jaw
-         el("jaw", "jaw", (-1.05, 23.4, 18.8), (1.05, 25.2, 25.2))]  # shorter than the muzzle; half a unit inside its sides
+         el("jaw", "jaw", (-1.05, 22.1, 18.8), (1.05, 25.2, 25.2))]  # shorter than the muzzle; two texels tall (rule 7: at 23.4 it was a texel)
     neck, _ = rod("neck", "neck", tuple(NECK0), (NECK_PITCH + 90, 0, 0), NECK_LEN, 5.6, 6.2, back=3.0)
     E.append(neck)
     for s, n in ((1, "L"), (-1, "R")):
@@ -207,18 +211,28 @@ def elements():
                     rot=(pitch, 0, 0), origin=tuple(p)))  # each 0.4 a side thinner
     for leg in LEGS:
         s = 1 if leg[1] == "L" else -1
+        # Legs two texels thick or more (rule 7: at 2.2 a shank was about a texel, a line under the
+        # upper leg), the paw a band under the shank a little round it (rule 8; turning, it keeps off
+        # the shank's sides), the upper leg round the shank. Their sides (inner, outer: from the
+        # middle) half a unit or more (warped) from every side they meet in a pose (front against back
+        # legs running, a shank against the hips lying; boxcheck); the haunch just past the hips' side.
+        side = lambda i, o: sorted((s * i, s * o))  # noqa: E731
         if leg[0] == "F":
-            x, z = FRONT_X * s, FRONT_Z
-            E.append(el(f"leg_{leg}_upper", f"leg_{leg}_upper", (x - 1.6, 9, z - 1.6), (x + 1.6, 18.5, z + 1.7)))
-            E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x - 1.1, 2, z - 1.1), (x + 1.1, 10, z + 1.1)))
-            E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 1.7, 0, z - 1.5), (x + 1.7, 2.6, z + 2.4)))
+            z = FRONT_Z
+            (x0, x1) = side(0.3, 4.0)
+            E.append(el(f"leg_{leg}_upper", f"leg_{leg}_upper", (x0, 9, z - 2.4), (x1, 18.5, z + 2.4)))
+            (x0, x1) = side(0.8, 3.6)
+            E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x0, 2.3, z - 1.9), (x1, 10, z + 1.9)))
+            (x0, x1) = side(0.25, 3.2)
+            E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x0, 0, z - 2.45), (x1, 2.3, z + 2.6)))
         else:
-            x, z = BACK_X * s, BACK_Z
-            # The haunch: its outer side flush with the hips' (at x + 2.6 it stood 0.65 texels out; linecheck).
-            xi, xo = sorted((x - 1.6 * s, x + 1.95 * s))
-            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (xi, 11, z - 3.6), (xo, 25, z + 3.4)))
-            E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x - 1.0, 2, z - 1.2), (x + 1.0, 12, z + 1.2)))
-            E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 1.75, 0, z - 1.6), (x + 1.75, 2.6, z + 2.6)))
+            z = BACK_Z
+            (x0, x1) = side(0.8, 4.8)  # the haunch
+            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (x0, 11, z - 3.6), (x1, 25, z + 3.4)))
+            (x0, x1) = side(1.35, 4.4)
+            E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x0, 2.3, z - 1.95), (x1, 12, z + 1.95)))
+            (x0, x1) = side(1.85, 4.8)
+            E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x0, 0, z - 2.5), (x1, 2.3, z + 2.6)))
     for e in E:  # the fox's space, warped into the coyote's
         e["lo"], e["hi"] = [float(v) for v in warp(e["lo"])], [float(v) for v in warp(e["hi"])]
         if e["origin"]:
@@ -295,8 +309,12 @@ def area(e, face, p, uu, vv, h):
             a[:] = TAWNY
         else:
             a = np.where(y < 26.0, WHITE, TAWNY)
-    elif name == "nose":
-        a[:] = NOSE
+        # The nose, painted (rule 4: the box it was, a pad a texel proud, drew a rim): on the front
+        # and the front edge of the top, where the box was.
+        if face == "south":
+            a = np.where((np.abs(x) <= NOSE_X + 0.05) & (y >= NOSE_Y), NOSE, a)
+        elif face == "up":
+            a = np.where((np.abs(x) <= NOSE_X + 0.05) & (z >= NOSE_Z), NOSE, a)
     elif name in ("mouth",):
         a[:] = MOUTH
     elif name == "jaw":
@@ -397,8 +415,6 @@ def paint_face(e, face, boxes):
     if e["name"] == "muzzle" and face in ("east", "west") and h >= 3:  # the dark line of the mouth (1-2 texels tall at 32:
         # a darkened row is half the muzzle or all of it; the mouth box under it draws the line)
         img[h - 1, :, :3] = (img[h - 1, :, :3] * 0.6).astype(np.uint8)
-    if e["name"] == "nose" and face == "south" and w >= 4:  # nostrils as slits (the nose is 1 texel at 32)
-        img[h // 2, [0, w - 1], :3] = (24, 18, 18)
     if e["name"].endswith("_paw") and face == "south" and w >= 5:  # four toes (a paw is 2 texels at 32)
         for c in range(1, w - 1, 2):
             img[:, c, :3] = (img[:, c, :3] * 0.75).astype(np.uint8)
@@ -573,7 +589,7 @@ def animations(bone_names):
 # ------------------------------------------------------------------ fitting poses to the ground
 
 GROUPS = {"front paws": lambda n: n in ("leg_FL_paw", "leg_FR_paw"), "back paws": lambda n: n in ("leg_BL_paw", "leg_BR_paw"),
-          "body": lambda n: n in ("hips", "chest"), "head": lambda n: n in ("skull", "muzzle", "jaw", "nose"),
+          "body": lambda n: n in ("hips", "chest"), "head": lambda n: n in ("skull", "muzzle", "jaw"),
           "tail": lambda n: n.startswith("tail_")}
 
 
