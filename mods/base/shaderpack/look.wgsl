@@ -20,6 +20,12 @@ fn rain_amount() -> f32 {
     return clamp(scene.fog_color.w, 0.0, 1.0);
 }
 
+// How wet the ground is where the player is, 0..1: it wets as rain falls and dries over minutes
+// after (`scene.canopy.y`, the engine's, at the pace the base mod's air gives).
+fn ground_wet() -> f32 {
+    return clamp(scene.canopy.y, 0.0, 1.0);
+}
+
 fn luma(c: vec3<f32>) -> f32 {
     return dot(c, vec3(0.2126, 0.7152, 0.0722));
 }

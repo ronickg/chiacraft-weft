@@ -415,12 +415,19 @@ fn shade_soft(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     } else {
         lit = block_shade(in.slot, BlockPixel(in.uv, albedo, light, in.pos, scene.params.w));
     }
-    // Out in the rain, the ground goes dark and wet, with a little of the sky on it (not plants).
-    let wet = rain_amount() * smoothstep(0.85, 1.0, in.light.x) * smoothstep(0.3, 0.9, n.y) * select(1.0, 0.0, in.kind.z != 0u || in.kind.x == TINT_FOLIAGE);
+    // Out under the sky, the ground goes dark and wet, with a little of the sky on it, and stays so
+    // after the rain until it dries (`ground_wet`: it followed the rain alone and was gone 25 s
+    // after it stopped, Tester 2's after-rain shots, 11-05). Leaves and plants wet too, less: a
+    // little darker, a faint sheen.
+    let open_top = smoothstep(0.85, 1.0, in.light.x);
+    let leafy = in.kind.z != 0u || in.kind.x == TINT_FOLIAGE;
+    let wet = ground_wet() * open_top * select(smoothstep(0.3, 0.9, n.y), 0.45, leafy);
     if wet > 0.0 {
         let v = -normalize(in.rel);
-        let sheen = pow(1.0 - max(dot(n, v), 0.0), 5.0) * 0.12;
-        lit = vec4(lit.rgb * mix(1.0, 0.7, wet) + sky_color(reflect(-v, n)) * sheen * wet, lit.a);
+        // (Darker and glossier than in the rain alone: after it, in the sun, 0.7 and a 0.12 sheen
+        // read only 2-4 % darker than dry ground, PC shw_wet.)
+        let sheen = (0.04 + pow(1.0 - max(dot(n, v), 0.0), 4.0) * 0.3) * select(1.0, 0.35, leafy);
+        lit = vec4(lit.rgb * mix(1.0, select(0.58, 0.8, leafy), wet) + sky_color(reflect(-v, n)) * sheen * wet, lit.a);
     }
     // The air before it glows with the placed lights' light (the held one is in `haze_lit`).
     let glow = placed_in_fog(in.light.yzw, in.rel, in.pos, in.light.x);

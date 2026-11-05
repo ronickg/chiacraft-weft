@@ -656,6 +656,10 @@ pub mod air_flags {
     /// Bits 16 to 23: how closed a forest's canopy is there, 0 (open sky) to 255 (a rainforest's),
     /// for shader packs' light under the leaves.
     pub const CANOPY_SHIFT: u32 = 16;
+    /// Bits 24 to 31: how fast wet ground dries there once the rain stops, 0 (the engine's own
+    /// pace, about two minutes) or 1 (hardly: cold, damp, still air, about an hour) to 255 (hot,
+    /// dry, windy air, half a minute), for shader packs' wet look (`Scene::canopy.y`).
+    pub const DRYING_SHIFT: u32 = 24;
 }
 
 pub mod block_flags {
