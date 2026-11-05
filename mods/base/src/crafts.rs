@@ -15,6 +15,10 @@ pub static CHARCOAL_CLAMP: Block = Block::named("charcoal_clamp");
 static FRAME_MENU: Menu = Menu::named("tanning_frame");
 static PIT_MENU: Menu = Menu::named("tanning_pit");
 static CLAMP_MENU: Menu = Menu::named("charcoal_clamp");
+pub static CRUCIBLE: Block = Block::named("crucible");
+pub static FORGE: Block = Block::named("forge");
+static CRUCIBLE_MENU: Menu = Menu::named("crucible");
+static FORGE_MENU: Menu = Menu::named("forge");
 /// A raw hide off an animal (tanned at a frame or in a pit), sole leather from the pit, and the
 /// oak bark that tans it.
 pub static HIDE: Item = Item::named("hide");
@@ -55,6 +59,8 @@ pub fn register(r: &mut Registry) {
     r.shaped(&CRAFTING, "tanning_frame", 1, &["sts", "t t", "sts"], &[('s', "#stick"), ('t', "#string")]);
     r.shaped(&CRAFTING, "tanning_pit", 1, &["p p", "p p", "ppp"], &[('p', "#planks")]);
     r.shaped(&CRAFTING, "charcoal_clamp", 1, &["ddd", "dld", "ddd"], &[('d', "dirt"), ('l', "#logs")]);
+    r.shaped(&CRAFTING, "crucible", 1, &["b b", "bcb", "bbb"], &[('b', "bricks"), ('c', "#gems/coal")]);
+    r.shaped(&CRAFTING, "forge", 1, &["iii", "bfb", "bbb"], &[('i', "#ingots/iron"), ('b', "bricks"), ('f', "#furnaces")]);
 
     r.entity_component(&WAITING, Waiting { station: 0, done: 0.0, item: 0 }, component_flags::SAVE | component_flags::SYNC_MENU);
     r.system(&WAITING, tick);
@@ -62,6 +68,10 @@ pub fn register(r: &mut Registry) {
     station(r, Station::TanningFrame, &TANNING_FRAME, &FRAME_MENU, "wood", "axe", [2.0, 0.0, 2.0], [14.0, 16.0, 14.0]);
     station(r, Station::TanningPit, &TANNING_PIT, &PIT_MENU, "wood", "axe", [0.0, 0.0, 0.0], [16.0, 12.0, 16.0]);
     station(r, Station::CharcoalClamp, &CHARCOAL_CLAMP, &CLAMP_MENU, "gravel", "shovel", [0.0, 0.0, 0.0], [16.0, 12.0, 16.0]);
+    // The metal stations (`metals.rs`): a crucible of fired clay in its hearth, a forge of brick
+    // round an iron hearth.
+    station(r, Station::Crucible, &CRUCIBLE, &CRUCIBLE_MENU, "stone", "pickaxe", [1.0, 0.0, 1.0], [15.0, 14.0, 15.0]);
+    station(r, Station::Forge, &FORGE, &FORGE_MENU, "stone", "pickaxe", [0.0, 0.0, 0.0], [16.0, 16.0, 16.0]);
 }
 
 /// An axe used on a log strips it (Planner, 11-05: "Bark comes from stripping a log with an

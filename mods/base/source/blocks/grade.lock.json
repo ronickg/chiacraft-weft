@@ -26,6 +26,10 @@
  "base/brain_coral_block/2.png": "6104d6561288e20d88c85b58411c4ac28ce5462a",
  "base/brain_coral_block/3.png": "a6e852d571f24bb1aa1a18f78eb1876e91a7ea2e",
  "base/coarse_dirt.png": "a760bed54fcaab0cbff27d800451e84105805043",
+ "base/copper_ore.png": "181e5e20b97a3989865a029b0648f92181c5ef2a",
+ "base/copper_ore/1.png": "8aa49caae064000c47e26b6e7015d0d2283ce362",
+ "base/copper_ore/2.png": "d7df5f965a59a2b2cfb396a728d60f908d4f271a",
+ "base/copper_ore/3.png": "3a4cdaca1193d426f731c7c30a6ecb003dce2add",
  "base/coral_rubble.png": "134098dfe01691984e1ed433955fcfaaa5f17f37",
  "base/coral_rubble/1.png": "c666be1e33f7ee7ca3d931be0252d0c10d4df080",
  "base/coral_rubble/2.png": "13f71c063e273cc4d2370daf1e276de44c15a9bd",
@@ -308,5 +312,9 @@
  "base/tall_grass_lower.png": "43641892865500c585c6d4d11442f20a74fb1c34",
  "base/tall_grass_upper.png": "f4618d2b31b80da6d5de104d1a44a2b6a551a78d",
  "base/tallgrass.png": "d91239ee3d6f4224e3edeb39c645e1c7b66ed3d3",
+ "base/tin_ore.png": "9550c8d2b77df0822d899a394ef7c0da4b480faf",
+ "base/tin_ore/1.png": "360e5939427eb0d966a0af24098212b4021a09b1",
+ "base/tin_ore/2.png": "83d30797e1cd6dc14fe7b1e7dc80392f4625f372",
+ "base/tin_ore/3.png": "ea16b061297ac79ed1080bdd47025675a2487ece",
  "base/wool_white.png": "a618cae1385848381dde840b00ef8dc0bdef0841"
 }

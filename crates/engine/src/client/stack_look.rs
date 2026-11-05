@@ -6,7 +6,15 @@
 /// width and pixels by name (a strip's first frame is used, a ramp's first row). `None` when no
 /// layer could be read.
 pub fn compose(look: &str, read: impl Fn(&str) -> Option<(u32, Vec<u8>)>) -> Option<(u32, Vec<u8>)> {
-    let mut out: Option<(u32, Vec<u8>)> = None;
+    compose_rect(look, read)
+        .filter(|(w, h, _)| w == h)
+        .map(|(w, _, px)| (w, px))
+}
+
+/// As `compose`, at any size: (width, height, RGBA), the size of its first layer (a worn look in
+/// the wearer's skin layout, 2:1).
+pub fn compose_rect(look: &str, read: impl Fn(&str) -> Option<(u32, Vec<u8>)>) -> Option<(u32, u32, Vec<u8>)> {
+    let mut out: Option<(u32, u32, Vec<u8>)> = None;
     for layer in look.split(';').map(str::trim).filter(|l| !l.is_empty()) {
         // `+dx,dy` at the end moves the layer that many pixels (a handle meeting its head).
         let (layer, shift) = match layer
@@ -24,22 +32,23 @@ pub fn compose(look: &str, read: impl Fn(&str) -> Option<(u32, Vec<u8>)>) -> Opt
             log::warn!("look {look}: no texture {name}");
             continue;
         };
-        let bytes = (w * w * 4) as usize;
-        if w == 0 || px.len() < bytes {
-            log::warn!("look {look}: {name} is not square");
+        let h = ((px.len() / 4) as u32).checked_div(w).unwrap_or(0);
+        let bytes = (w * h * 4) as usize;
+        if w == 0 || h == 0 {
+            log::warn!("look {look}: {name} is empty");
             continue;
         }
-        let (size, canvas) = out.get_or_insert_with(|| (w, vec![0; bytes]));
+        let (cw, ch, canvas) = out.get_or_insert_with(|| (w, h, vec![0; bytes]));
         // Each look is composed once, so this warns once per look.
-        if *size != w {
-            log::warn!("look {look}: {name} is {w} wide, the first layer {size}");
+        if (*cw, *ch) != (w, h) {
+            log::warn!("look {look}: {name} is {w} x {h}, the first layer {cw} x {ch}");
             continue;
         }
         let px = &px[..bytes];
         // Where pixel `i` of this layer lands on the canvas, if it's on it.
         let at = |i: usize| -> Option<usize> {
             let (x, y) = ((i as u32 % w) as i32 + shift[0], (i as u32 / w) as i32 + shift[1]);
-            ((0..w as i32).contains(&x) && (0..w as i32).contains(&y)).then(|| (y as u32 * w + x as u32) as usize * 4)
+            ((0..w as i32).contains(&x) && (0..h as i32).contains(&y)).then(|| (y as u32 * w + x as u32) as usize * 4)
         };
         let Some(ramps) = ramps else {
             for (i, p) in px.as_chunks::<4>().0.iter().enumerate() {
