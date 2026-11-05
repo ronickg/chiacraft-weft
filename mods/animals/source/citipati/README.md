@@ -62,7 +62,7 @@ down again), walk (with a bird's head bob), run (leaning, the neck out, the wing
 lie (brooding: sat on its folded legs, the breast on the ground, the arms spread out to both sides
 and turned so their feathers fan down to the ground, as in the nesting fossils; fitted with
 `ground.lowest` and `rig.fit`). Behaviour clips (`src/anim.rs`, in the standing file; sleep in the lying one too): stare, graze
-(pecking, the beak's tip fitted to the ground with the legs straight, not the idle's over-tipped head), drink,
+(pecking, the beak's tip fitted to the ground with the legs straight, as in the idle), drink,
 sniff, look and watch (a bird's head snaps), scratch and groom (preening a lifted wing), stretch (wings up,
 then the wing-and-leg stretch), alarm (a hiss, wings flared), rear (a mother's display: tall, wings spread
 wide, tail and fan raised, the feet planted), play (hops), nuzzle, flinch, sleep (brooding, the head turned

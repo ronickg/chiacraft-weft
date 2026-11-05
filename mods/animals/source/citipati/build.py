@@ -86,8 +86,12 @@ if __name__ == "__main__":
     for clip in CLIPS:
         low = min(feet_low(spec, A[clip], everything))
         assert low > -0.3, f"{clip}: a part {low:.2f} into the ground"
-    # Pecking (graze, drink) brings the beak to the ground: its tip, not the crest.
-    for clip in ("graze", "drink"):
+    # Pecking (the idle's jabs, graze, drink) brings the beak to the ground: its tip, not the crest; the
+    # idle stands on its feet and nothing of it goes into the ground.
+    low = feet_low(spec, A["idle"], FEET)
+    assert min(low) > -0.3 and max(low) < 0.3, f"idle's feet from {min(low):.2f} to {max(low):.2f}, not on the ground"
+    assert min(feet_low(spec, A["idle"], everything)) > -0.3, "idle: a part into the ground"
+    for clip in ("idle", "graze", "drink"):
         low = min(feet_low(spec, A[clip], ["beak", "jaw"]))
         head = min(feet_low(spec, A[clip], ["skull", "snout", "crest", "crest_1"]))
         assert 0 <= low < 1.0 and head > low, f"{clip}: the beak {low:.2f} over the ground, the head {head:.2f}"
