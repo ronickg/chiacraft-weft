@@ -42,7 +42,7 @@ FUR, BACK, BELLY, DARK, EARIN, MOUTH, ANTLER, HOOF, TAILTOP, LEG, PALE, BONE, MO
 # MOSSDK); grey-brown bark plates (BARK).
 BASE = [(150, 88, 46), (104, 60, 32), (224, 190, 136), (48, 34, 26), (190, 140, 110), (84, 42, 44), (140, 92, 54),
         (56, 40, 32), (226, 196, 146), (86, 52, 30), (210, 164, 108), (232, 218, 186), (156, 158, 46), (102, 108, 30),
-        (108, 82, 58), (64, 46, 32), (146, 118, 86)]
+        (122, 92, 66), (84, 62, 44), (152, 120, 88)]
 SHADOW = [0.02, 0.02, 0.06, 0.95, 0.97, 0.95, 0.04, 0.74, 0.06, 0.02, 0.06, 0.06, 0.12, 0.12, 0.05, 0.04, 0.06]
 TONES = [tones(c, h) for c, h in zip(BASE, SHADOW)]
 COAT = (FUR, BACK, BELLY, LEG, PALE, MOSS, MOSSDK)
@@ -54,9 +54,35 @@ COAT = (FUR, BACK, BELLY, LEG, PALE, MOSS, MOSSDK)
 # texels by 29, so Hytale's 8-wide eyes sit as on its own creatures. Three to pick from:
 # `hytale_amber` (concept A's amber), `hytale` (the type Ronald picked before), `hytale_cute`.
 EYE_TYPES = ("hytale_amber", "hytale", "hytale_cute")
-for _t in EYE_TYPES:
+
+
+def scaled(design, k):
+    """A design drawn `k` times bigger, texel for texel (nearest)."""
+    pat = design["pattern"]
+    h, w = len(pat), len(pat[0])
+    H, W = round(h * k), round(w * k)
+    return {**design, "pattern": ["".join(pat[min(h - 1, int(r / k))][min(w - 1, int(c / k))] for c in range(W)) for r in range(H)]}
+
+
+# Ronald, 11-05, round 3: "A amber", "eyes a bit bigger": the amber design 1.5 times as big.
+# Drawn round at 12 by 10 rather than stretched (a nearest stretch doubles rows unevenly): the same
+# dark ring, amber iris, near-black pupil and catchlight, its warmer amber low.
+EYES["warden_amber"] = {**EYES["hytale_amber"], "pattern": [
+    "...LLLLLL...",
+    ".LLAAAAAALL.",
+    ".LAAAAAAAAL.",
+    "LAAHHHPPPAAL",
+    "LAAHHPPPPAAL",
+    "LAAPPPPPPAAL",
+    "LAAPPPPPPAAL",
+    ".LAaPPPPaAL.",
+    ".LLaaAAaaLL.",
+    "...LLLLLL...",
+]}
+assert all(len(r) == 12 for r in EYES["warden_amber"]["pattern"])
+for _t in EYE_TYPES + ("warden_amber",):
     EYES[_t + "_m"] = {**EYES[_t], "pattern": [row[::-1] for row in EYES[_t]["pattern"]]}
-EYE_STYLE = os.environ.get("DRENKAUN_EYES", "hytale_amber")
+EYE_STYLE = os.environ.get("DRENKAUN_EYES", "warden_amber")
 
 # In the deer's space (scaled by K when the model is built). The head is drawn `HS` times its
 # reindeer size about its pivot (Ronald, 11-05: "the head is small: scale it up a little").
@@ -246,22 +272,21 @@ def elements():
     E.append(el("fringe_chest", "spine_1", (-11.4, 18.0, 35.4), (11.4, 58.0, 35.4), quad="south", cut="chest"))
     for s_, q in ((1, "east"), (-1, "west")):
         E.append(el(f"fringe_moss_{q}", "spine_1", (s_ * 14.8, 30.0, 14.0), (s_ * 14.8, 64.6, 30.5), quad=q, cut="moss"))
-    # Bark scales (Ronald: "overlapping brown-grey bark scales along the back and flanks"): a
-    # row down the back from behind the moss to the rump, each lifted at its back edge over the
-    # next like shingles, and three down each flank.
-    for j in range(5):
-        z0 = -2.0 - 8.0 * j
-        w = 7.6 - 0.5 * (j % 2) - 0.3 * j
-        bone_ = "spine_1" if z0 > -8 else "spine_0"
-        top = 62.9 if bone_ == "spine_1" else 55.4
-        E.append(el(f"bark_back{j}", bone_, (-w, top - 2.4 - 0.35 * j, z0 - 10.5), (w, top + 0.9 + 0.12 * j, z0), rot=(-11 - 2.5 * j, 0, 0),
-                    origin=(0, top, z0)))
+    # Bark shingles (Ronald, round 3: "the sort of scales or plates ... is pretty bad"; concept A:
+    # a few big overlapping bark shingles over the shoulders and back, brown-grey with moss on
+    # their edges, lying flat to the body). Three a side, from behind the moss to mid-back, none
+    # on the rump: each a plate over the back's top edge, tilted a little down to the side, and a
+    # plate down the side under it; each one over the front of the next, like shingles, the
+    # later ones following the back down toward the hips.
     for s_, q in ((1, "e"), (-1, "w")):
-        for j, (z0, y0) in enumerate(((-12.0, 46.5), (-21.5, 47.5), (-31.0, 46.0))):
-            x0 = s_ * (10.6 + 0.4 * j)
-            th = 1.3 + 0.3 * j
-            E.append(el(f"bark_flank{j}_{q}", "spine_0", (x0 - th, y0 - 5.0, z0 - 6.0 - 0.15 * j), (x0 + th, y0 + 5.0, z0 + 4.0),
-                        rot=(0, 0, s_ * (16 + 3 * j)), origin=(x0, y0 + 5.0, z0)))
+        for j, (bone_, top, z0, z1, pitch) in enumerate((("spine_1", 62.5, 2.0, 19.0, 0.0), ("spine_1", 62.0, -11.0, 5.0, -10.0),
+                                                       ("spine_0", 55.4, -25.0, -8.5, -6.0))):
+            zc, t = (z0 + z1) / 2, 0.35 * j
+            E.append(el(f"bark_top{j}_{q}", bone_, (min(s_ * 0.7, s_ * 12.8), top - 0.6 - t, z0), (max(s_ * 0.7, s_ * 12.8), top + 1.3 + t, z1),
+                        rot=(pitch, 0, -s_ * (9 + 1.5 * j)), origin=(s_ * 0.7, top, zc)))
+            E.append(el(f"bark_side{j}_{q}", bone_, (min(s_ * 11.9, s_ * 13.5) - 0.1 * j, top - 8.5 + 0.8 * j, z0 + 1.2),
+                        (max(s_ * 11.9, s_ * 13.5) + 0.1 * j, top - 1.0, z1 - 0.8), rot=(pitch, 0, -s_ * (5 + j)),
+                        origin=(s_ * 12.7, top - 1.5, zc)))
     E.append(el("crown", "head", hs((-4.4, 71.4, 33.0)), hs((4.4, 74.4, 43.0))))
     E.append(el("tail", "tail", (-2.6, 45.5, -42.8), (2.6, 54.5, -39.75), rot=(12, 0, 0), origin=tuple(TAIL0)))
     for s, n in ((1, "L"), (-1, "R")):
@@ -382,21 +407,27 @@ def area(e, face, p, uu, vv, h):
         elif face == "south" or face == "down":
             a[:] = PALE
     elif name.startswith("bark") or name == "crown":
-        # Brown-grey bark (Ronald: "with texture, no flat grey panels"): deep grooves along the
-        # scale broken into plates, a lighter worn edge round it, a fleck of moss now and then.
+        # Brown-grey bark: long grooves running along the shingle (front to back), each its own
+        # length, lighter worn ridges between; moss creeping along its lower and back edges.
         a[:] = BARK
         seed = sum(map(ord, name))
         if e["quad"] is None:
-            # Streaks of bark down the scale, each its own length (no frame, no grid: Ronald's
-            # "grey signs with stripes").
-            col = uu.astype(int)
+            along_u = face in ("up", "down")  # on the top the grooves run down the face's v; on a side along u
+            col = (uu if along_u else vv).astype(int)
+            run = vv if along_u else uu
+            span = run.max() + 1
             r1 = (np.sin(col * 12.9898 + seed) * 43758.5453) % 1.0
             r2 = (np.sin(col * 78.233 + seed * 3) * 12345.678) % 1.0
-            streak = (r1 < 0.32) & (vv > r2 * vv.max() * 0.5)
-            a = np.where(streak, BARKDK, BARK)
-            a = np.where((r1 > 0.86) & (vv < vv.max() * 0.7), BARKLT, a)
-            if face == "up":
-                a = np.where(((uu.astype(int) * 7 + vv.astype(int) * 13 + seed) % 29) == 0, MOSS, a)
+            groove = (r1 < 0.2) & (np.abs(run - r2 * span) < span * 0.3)
+            a = np.where(groove, BARKDK, np.where(r1 > 0.82, BARKLT, BARK))
+            if face != "down":
+                # Moss along its lower and back edges, in a wavering band two or three texels deep.
+                depth = 2.2 + 1.2 * np.sin(uu * 0.9 + seed) + 0.8 * np.sin(vv * 1.7)
+                if face == "up":
+                    edge = (uu > uu.max() - depth) | (vv > vv.max() - depth * 0.7)
+                else:
+                    edge = (vv > vv.max() - depth) | ((uu < depth * 0.6) & (face == "north"))
+                a = np.where(edge, MOSS, a)
     elif name == "skull":
         if face == "up":
             a[:] = BACK
