@@ -296,7 +296,12 @@ const RECIPES_LIST: &[Recipe] = &[
     },
     c("animals:nest", 1.0, &[("base:stick", 4.0), ("base:wheat", 1.0)], Table),
     // drenkaun.rs: the old forest's boss
-    c("animals:forest_offering", 1.0, &[("base:acorn", 1.0), ("base:mushroom_red", 1.0), ("base:berries", 1.0), ("base:moss_block", 1.0)], Hand),
+    c(
+        "animals:forest_offering",
+        1.0,
+        &[("base:acorn", 1.0), ("base:mushroom_red", 1.0), ("base:berries", 1.0), ("base:moss_block", 1.0)],
+        Hand,
+    ),
     c("animals:drenkaun_altar", 1.0, &[("base:mossy_cobblestone", 7.0), ("base:flint", 1.0), ("#logs", 2.0)], Table),
     s("animals:cooked_venison", &[("animals:venison", 1.0)], Fire),
     s("animals:cooked_hare", &[("animals:hare", 1.0)], Fire),

@@ -104,10 +104,7 @@ pub static BOSSES: [Boss; 1] = [Boss {
     name: "drenkaun",
     role: Role::Apex,
     home: "forests",
-    tweaks: &[(
-        Stat::Health,
-        Tweak::new(0.8, "a boss is fought in windows: its tells, knockdowns and the misses add the time back"),
-    )],
+    tweaks: &[(Stat::Health, Tweak::new(0.8, "a boss is fought in windows: its tells, knockdowns and the misses add the time back"))],
     // Only the Stone form is playable; the later ones wait for their ages' offerings.
     forms: &[
         form(Age::Stone, Some("animals:forest_offering"), 5),

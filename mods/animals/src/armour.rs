@@ -85,9 +85,7 @@ pub fn player_cap(w: &World, attacker: u64, cause: u32, size: vitals::combat::Si
 /// over, and all its stagger so far (`vitals::combat::floor_take`, refilled since its last hit).
 pub fn floor(w: &World, entity: u64, size: vitals::combat::Size, max_health: f32, hit: f32) -> (f32, f32, f64) {
     let now = w.game_time();
-    let [budget, last, stagger] = w
-        .component(entity, &FLOOR)
-        .unwrap_or([f64::NAN, 0.0, 0.0]);
+    let [budget, last, stagger] = w.component(entity, &FLOOR).unwrap_or([f64::NAN, 0.0, 0.0]);
     // A fresh one holds a second's worth.
     let budget = if budget.is_nan() {
         vitals::combat::floor_rate(size, max_health).unwrap_or(max_health) * vitals::combat::FLOOR_HELD

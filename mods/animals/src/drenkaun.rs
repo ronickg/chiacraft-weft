@@ -241,7 +241,10 @@ fn summon(w: &World, player: u64, at: [i32; 3]) -> bool {
         return true;
     }
     let mid = [at[0] as f64 + 0.5, at[1] as f64, at[2] as f64 + 0.5];
-    if !w.entities_near(mid, ONE_AT_A_TIME, Some(&DRENKAUN)).is_empty() {
+    if !w
+        .entities_near(mid, ONE_AT_A_TIME, Some(&DRENKAUN))
+        .is_empty()
+    {
         w.hint(player, "hint.animals.drenkaun.awake", &[]);
         weft_sdk::info!("drenkaun altar {at:?}: one is already awake near");
         return true;
@@ -258,14 +261,23 @@ fn summon(w: &World, player: u64, at: [i32; 3]) -> bool {
         return true;
     }
     let max = boss().stats(form).health;
-    w.attribute_add_modifier(id, &attribute::MAX_HEALTH, "animals:form", attr_op::MULTIPLY_BASE, (max / boss().stats(boss().form(Age::Stone)).health) as f64 - 1.0, 0);
+    w.attribute_add_modifier(
+        id,
+        &attribute::MAX_HEALTH,
+        "animals:form",
+        attr_op::MULTIPLY_BASE,
+        (max / boss().stats(boss().form(Age::Stone)).health) as f64 - 1.0,
+        0,
+    );
     w.entity_edit(id).health(max);
     w.set_component(id, &WARDEN, Warden { form: form.age.tier() as u32, state: RISING, target: player, altar: at, ..Warden::default() });
     w.action_play(id, "rise", false);
     burst(w, spot, DIRT.id(), 40, 1.5);
     for p in w.entities_near(spot, SIGHT, Some(&PLAYER)) {
-        w.title(p, "title.animals.drenkaun", &[]).times(0.5, 3.0, 1.0);
-        w.subtitle(p, "subtitle.animals.drenkaun", &[]).times(0.5, 3.0, 1.0);
+        w.title(p, "title.animals.drenkaun", &[])
+            .times(0.5, 3.0, 1.0);
+        w.subtitle(p, "subtitle.animals.drenkaun", &[])
+            .times(0.5, 3.0, 1.0);
     }
     weft_sdk::info!("drenkaun {id}: summoned at {at:?} ({} form, {max:.0} health, {trees} logs round the altar)", form.age.name());
     true
@@ -328,7 +340,10 @@ fn fight(w: &World, id: u64, st: &EntityState) -> bool {
                 weft_sdk::info!("drenkaun {id}: no one to fight, back into the wood");
                 burst(w, st.pos.to_array(), OAK_LEAVES.id(), 40, 2.0);
                 w.despawn(id);
-                LAST.lock().unwrap().get_or_insert_with(HashMap::new).remove(&id);
+                LAST.lock()
+                    .unwrap()
+                    .get_or_insert_with(HashMap::new)
+                    .remove(&id);
                 return true;
             }
         }
@@ -348,7 +363,13 @@ fn fight(w: &World, id: u64, st: &EntityState) -> bool {
                 p,
                 &BAR,
                 "hud.animals.boss_health",
-                &[Arg::Key("title.animals.drenkaun"), Arg::Int(st.health.ceil() as i64), Arg::Int(st.max_health.ceil() as i64), Arg::Int(pct), Arg::Key(state)],
+                &[
+                    Arg::Key("title.animals.drenkaun"),
+                    Arg::Int(st.health.ceil() as i64),
+                    Arg::Int(st.max_health.ceil() as i64),
+                    Arg::Int(pct),
+                    Arg::Key(state),
+                ],
             ));
         }
     }
@@ -420,7 +441,11 @@ fn fight(w: &World, id: u64, st: &EntityState) -> bool {
             if c.t as f32 >= a.windup * TICKS {
                 w.action_play(id, a.name, false);
                 if a.name == "charge" {
-                    TRAMPLED.lock().unwrap().get_or_insert_with(HashMap::new).insert(id, Vec::new());
+                    TRAMPLED
+                        .lock()
+                        .unwrap()
+                        .get_or_insert_with(HashMap::new)
+                        .insert(id, Vec::new());
                 }
                 go(&mut c, ACT);
             }
@@ -442,7 +467,11 @@ fn fight(w: &World, id: u64, st: &EntityState) -> bool {
                     ];
                     let blocked = c.t > 6 && solid(w, ahead) && solid(w, [ahead[0], ahead[1] + 1, ahead[2]]);
                     if blocked || c.t >= CHARGE_TICKS {
-                        TRAMPLED.lock().unwrap().get_or_insert_with(HashMap::new).remove(&id);
+                        TRAMPLED
+                            .lock()
+                            .unwrap()
+                            .get_or_insert_with(HashMap::new)
+                            .remove(&id);
                         c.cooldown[c.attack as usize] = cd;
                         if blocked {
                             weft_sdk::info!("drenkaun {id}: charged into {:?}, stunned", ahead);
@@ -477,7 +506,10 @@ fn fight(w: &World, id: u64, st: &EntityState) -> bool {
 /// Its last state, for when it has died (its components are gone by then: boss_drenkaun1's death
 /// lines read a fresh one's).
 fn remember(id: u64, c: Warden) {
-    LAST.lock().unwrap().get_or_insert_with(HashMap::new).insert(id, c);
+    LAST.lock()
+        .unwrap()
+        .get_or_insert_with(HashMap::new)
+        .insert(id, c);
 }
 
 fn go(c: &mut Warden, state: u32) {
@@ -564,13 +596,7 @@ fn head(st: &EntityState) -> [f64; 3] {
 /// Where roots will burst: under the target, and in its fierce phase two more on the line to it.
 fn marks(st: &EntityState, t: &EntityState, fierce: bool) -> [f32; 9] {
     let mut m = [0.0; 9];
-    let at = |s: f64| {
-        [
-            (st.pos.x + (t.pos.x - st.pos.x) * s) as f32,
-            t.pos.y as f32,
-            (st.pos.z + (t.pos.z - st.pos.z) * s) as f32,
-        ]
-    };
+    let at = |s: f64| [(st.pos.x + (t.pos.x - st.pos.x) * s) as f32, t.pos.y as f32, (st.pos.z + (t.pos.z - st.pos.z) * s) as f32];
     m[..3].copy_from_slice(&at(1.0));
     if fierce {
         m[3..6].copy_from_slice(&at(0.66));
@@ -599,7 +625,10 @@ fn trample(w: &World, id: u64, st: &EntityState, hit: f32, reach: f64, knockback
     let f = yaw_dir(st.yaw);
     let front = [st.pos.x + f[0] as f64 * half, st.pos.y, st.pos.z + f[1] as f64 * half];
     let mut guard = TRAMPLED.lock().unwrap();
-    let done = guard.get_or_insert_with(HashMap::new).entry(id).or_default();
+    let done = guard
+        .get_or_insert_with(HashMap::new)
+        .entry(id)
+        .or_default();
     for e in w.entities_near(front, half + reach, None) {
         if e == id || done.contains(&e) || spared(w, e) {
             continue;
@@ -653,7 +682,14 @@ fn strike(w: &World, id: u64, st: &EntityState, c: &Warden, a: &bosses::Attack, 
                 for e in w.entities_near(at, ROOT_RADIUS, None) {
                     if e != id && !hits.iter().any(|(h, _)| *h == e) {
                         hits.push((e, [0.0, a.knockback as f64, 0.0]));
-                        w.attribute_add_modifier(e, &attribute::MOVEMENT_SPEED, "animals:warden_roots", attr_op::MULTIPLY_BASE, ROOT_SLOW, ROOT_TICKS);
+                        w.attribute_add_modifier(
+                            e,
+                            &attribute::MOVEMENT_SPEED,
+                            "animals:warden_roots",
+                            attr_op::MULTIPLY_BASE,
+                            ROOT_SLOW,
+                            ROOT_TICKS,
+                        );
                     }
                 }
             }
@@ -730,7 +766,8 @@ fn hurt(w: &World, id: u64, other: u64, cause: u32, raw: f32) -> f32 {
             }
             burst(w, at, OAK_LOG.id(), 30, 1.5);
             for pl in w.entities_near(st.pos, SIGHT, Some(&PLAYER)) {
-                w.subtitle(pl, &format!("subtitle.animals.drenkaun.{}", p.name), &[]).times(0.2, 2.0, 0.5);
+                w.subtitle(pl, &format!("subtitle.animals.drenkaun.{}", p.name), &[])
+                    .times(0.2, 2.0, 0.5);
             }
             weft_sdk::info!("drenkaun {id}: its {} breaks", p.name);
         }
@@ -738,7 +775,11 @@ fn hurt(w: &World, id: u64, other: u64, cause: u32, raw: f32) -> f32 {
     // A knockdown, unless it is already down.
     if c.knock >= b.knockdown * st.max_health && c.state != DOWN {
         c.knock = 0.0;
-        TRAMPLED.lock().unwrap().get_or_insert_with(HashMap::new).remove(&id);
+        TRAMPLED
+            .lock()
+            .unwrap()
+            .get_or_insert_with(HashMap::new)
+            .remove(&id);
         w.action_play(id, "down", true);
         go(&mut c, DOWN);
         weft_sdk::info!("drenkaun {id}: knocked down");
@@ -759,8 +800,14 @@ fn item_id(name: &str) -> Option<u32> {
 /// help, and its calf may stay behind.
 fn died(w: &World, id: u64, pos: [f64; 3]) {
     let b = boss();
-    let last = LAST.lock().unwrap().get_or_insert_with(HashMap::new).remove(&id);
-    let c = last.or_else(|| w.component(id, &WARDEN)).unwrap_or_default();
+    let last = LAST
+        .lock()
+        .unwrap()
+        .get_or_insert_with(HashMap::new)
+        .remove(&id);
+    let c = last
+        .or_else(|| w.component(id, &WARDEN))
+        .unwrap_or_default();
     let f = form_of(&c);
     let index = bosses::BOSSES
         .iter()
@@ -807,7 +854,11 @@ fn died(w: &World, id: u64, pos: [f64; 3]) {
         weft_sdk::info!("drenkaun {id}: its calf {calf} stays behind");
     }
     weft_sdk::info!("drenkaun {id}: died ({} form, stagger {:.0}, parts broken {:03b})", f.age.name(), c.stagger, c.broken);
-    TRAMPLED.lock().unwrap().get_or_insert_with(HashMap::new).remove(&id);
+    TRAMPLED
+        .lock()
+        .unwrap()
+        .get_or_insert_with(HashMap::new)
+        .remove(&id);
 }
 
 fn roll(w: &World) -> f32 {
@@ -832,7 +883,11 @@ fn calf_interact(w: &World, id: u64, player: u64) -> bool {
     w.set_component(id, &CALF_OWNER, k);
     crate::taming::take_one(w, player);
     if let Some(st) = w.entity(id) {
-        drop(w.spawn_particles(&crate::HEART, [st.pos.x, st.pos.y + 1.2, st.pos.z]).count(6).spread(0.5));
+        drop(
+            w.spawn_particles(&crate::HEART, [st.pos.x, st.pos.y + 1.2, st.pos.z])
+                .count(6)
+                .spread(0.5),
+        );
     }
     w.hint(player, "hint.animals.drenkaun_calf.tamed", &[]);
     weft_sdk::info!("drenkaun calf {id}: tamed by player {player}");
@@ -851,7 +906,13 @@ fn calf(w: &World, id: u64, st: &EntityState) -> bool {
     }
     let Some((p, ps)) = w
         .players_iter()
-        .find(|&p| crate::player_key(p).as_bytes().iter().take(64).eq(owner.iter().take_while(|&&b| b != 0)))
+        .find(|&p| {
+            crate::player_key(p)
+                .as_bytes()
+                .iter()
+                .take(64)
+                .eq(owner.iter().take_while(|&&b| b != 0))
+        })
         .and_then(|p| w.entity(p).map(|s| (p, s)))
     else {
         return false;
@@ -885,7 +946,10 @@ fn command(cmd: &mut ServerCommand) {
         .entities_near(me.pos, 64.0, Some(&DRENKAUN))
         .into_iter()
         .min_by(|a, b| {
-            let d = |e: u64| w.entity(e).map_or(f64::MAX, |s| dist2(s.pos.to_array(), me.pos.to_array()));
+            let d = |e: u64| {
+                w.entity(e)
+                    .map_or(f64::MAX, |s| dist2(s.pos.to_array(), me.pos.to_array()))
+            };
             d(*a).total_cmp(&d(*b))
         })
     else {
@@ -906,7 +970,9 @@ fn command(cmd: &mut ServerCommand) {
     let st = w.entity(id);
     let line = format!(
         "drenkaun {id}: state {} t {} health {:.1}/{:.1} stagger {:.1} knock {:.1} broken {:03b} cooldowns {:?}",
-        ["rising", "chase", "windup", "act", "down", "stunned"].get(c.state as usize).unwrap_or(&"?"),
+        ["rising", "chase", "windup", "act", "down", "stunned"]
+            .get(c.state as usize)
+            .unwrap_or(&"?"),
         c.t,
         st.map_or(0.0, |s| s.health),
         st.map_or(0.0, |s| s.max_health),

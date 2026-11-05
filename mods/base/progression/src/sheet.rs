@@ -323,12 +323,24 @@ fn bosses(w: &mut String) {
             b.name,
             SIZE.name(),
             b.role.name(),
-            b.attacks.iter().map(|a| format!("{} (×{:.2} hit, {:.1} s tell)", a.name, a.hit, a.windup)).collect::<Vec<_>>().join(", "),
-            b.parts.iter().map(|p| format!("{} at {:.0} %", p.name, p.at * 100.0)).collect::<Vec<_>>().join(", "),
+            b.attacks
+                .iter()
+                .map(|a| format!("{} (×{:.2} hit, {:.1} s tell)", a.name, a.hit, a.windup))
+                .collect::<Vec<_>>()
+                .join(", "),
+            b.parts
+                .iter()
+                .map(|p| format!("{} at {:.0} %", p.name, p.at * 100.0))
+                .collect::<Vec<_>>()
+                .join(", "),
             b.knockdown * 100.0,
             b.loot
                 .iter()
-                .map(|l| if l.certain_by > 0 { format!("{} {:.0} % (certain by kill {})", short(l.item), l.chance * 100.0, l.certain_by) } else { format!("{} {:.0} %", short(l.item), l.chance * 100.0) })
+                .map(|l| if l.certain_by > 0 {
+                    format!("{} {:.0} % (certain by kill {})", short(l.item), l.chance * 100.0, l.certain_by)
+                } else {
+                    format!("{} {:.0} %", short(l.item), l.chance * 100.0)
+                })
                 .collect::<Vec<_>>()
                 .join(", "),
             short(b.young.item),
