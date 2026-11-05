@@ -230,6 +230,11 @@ impl Settings {
     pub fn listing_deposit(&self) -> u64 {
         number("core:listing_deposit").max(1.0) as u64
     }
+
+    /// The fee a listing pays, in mojos (`core:listing_fee`).
+    pub fn listing_fee(&self) -> u64 {
+        number("core:listing_fee").max(0.0) as u64
+    }
     /// DID sponsors' addresses (iroh endpoint ids), tried in order.
     pub fn sponsors(&self) -> Vec<String> {
         list("core:sponsors")

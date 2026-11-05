@@ -101,7 +101,12 @@ pub const COMMANDS: &[(&str, &str, Handler, u32)] = &[
     ),
     ("revoke", "<who:word> <id:word>", super::admission::revoke, p::ADMIN),
     ("achievementrule", "show | off | <id:word> [from:text]", super::admission::achievementrule, p::ADMIN),
-    ("didrule", "show | required <on:word(on,off)> | age <days:int>", super::admission::didrule, p::ADMIN),
+    (
+        "didrule",
+        "show | required <on:word(on,off)> | age <days:int> | unchecked <as:word(guest,refuse)>",
+        super::admission::didrule,
+        p::ADMIN,
+    ),
     (
         "banlist",
         "list | follow <from:word> [maintainer:word] | unfollow <what:word> | publish [name:text]",

@@ -216,7 +216,9 @@ fn arrival_in(blocks: &[[i32; 3]], solid: &dyn Fn([i32; 3]) -> bool, free: &dyn 
     let middle = [blocks.iter().map(|b| b[0] as f64).sum::<f64>() / n, blocks.iter().map(|b| b[2] as f64).sum::<f64>() / n];
     // Lowest first, then the side with the most open ground ahead (not facing a wall), then the
     // middle of the sheet.
-    let mut best: Option<(([i32; 3], f32), (i32, i32, f64))> = None;
+    // The spot and its facing, and its rank: (height, minus the open ground ahead, off the middle).
+    type Ranked = (([i32; 3], f32), (i32, i32, f64));
+    let mut best: Option<Ranked> = None;
     for b in blocks {
         for d in faces {
             let at = [b[0] + d[0], b[1], b[2] + d[1]];

@@ -22,6 +22,7 @@ impl Server {
             identity: p.identity.clone(),
             did: p.did.clone(),
             did_days: p.did_days,
+            did_unchecked: p.did_unchecked,
             achievements: p.achievements.clone(),
         };
         if let crate::admission::Verdict::Refuse(why) = self.gate.verdict(&who, trusted) {
@@ -158,6 +159,13 @@ impl Server {
                     "admission.probation_on",
                     vec![Arg::Int(left.div_ceil(60) as i64)],
                 ))));
+        }
+        // What came of their DID's check (chiacraft): checked, from the cache, not theirs, or
+        // couldn't be asked: never left unsaid.
+        if let Some(note) = self.players[pi].did_note.take() {
+            self.players[pi]
+                .conn
+                .send(ToClient::Show(crate::net::Shown::chat(note)));
         }
         let p = &mut self.players[pi];
         let line = Msg::new("multiplayer.joined", vec![Arg::Text(p.name.clone())]);
