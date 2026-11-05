@@ -319,38 +319,65 @@ type Key = (u64, i32, i32);
 /// A region being worked out or done: the first thread to ask builds it, the rest wait for it.
 type Slot = Arc<OnceLock<Arc<Region>>>;
 
-static REGIONS: OnceLock<Mutex<HashMap<Key, Slot>>> = OnceLock::new();
+/// The regions every thread shares (`region_at`), each with when it was last asked for. Past
+/// `KEEP` the least recently asked quarter goes (it was every region more than 3 from the last
+/// asker: distant terrain asks regions kilometres apart while the cubes ask near ones, so they
+/// were built over and over, 11-16 ms of every far tile's heights).
+struct Regions {
+    map: HashMap<Key, (Slot, u64)>,
+    clock: u64,
+}
+
+/// Regions kept for every thread: some 30 cover distant terrain's reach, a few the cubes.
+const KEEP: usize = 160;
+/// Regions each thread keeps at hand, most recently asked first: a column's features ask the
+/// same one or its neighbours over and over, without taking the lock.
+const AT_HAND: usize = 8;
+
+static REGIONS: OnceLock<Mutex<Regions>> = OnceLock::new();
 
 thread_local! {
-    static LAST: std::cell::RefCell<Option<(Key, Arc<Region>)>> = const { std::cell::RefCell::new(None) };
+    static AT: std::cell::RefCell<Vec<(Key, Arc<Region>)>> = const { std::cell::RefCell::new(Vec::new()) };
 }
 
 /// The region holding block (`bx`, `bz`), worked out once for every thread.
 pub(super) fn region_at(f: &Fields, bx: i32, bz: i32) -> Arc<Region> {
     let r = RIVER_REGION * RIVER_NODE;
     let key = (f.seed, div_floor(bx, r).0, div_floor(bz, r).0);
-    if let Some(hit) = LAST.with(|l| {
-        l.borrow()
-            .as_ref()
-            .filter(|(k, _)| *k == key)
-            .map(|(_, v)| v.clone())
+    if let Some(hit) = AT.with(|a| {
+        let mut a = a.borrow_mut();
+        let i = a.iter().position(|(k, _)| *k == key)?;
+        let e = a.remove(i);
+        let v = e.1.clone();
+        a.insert(0, e);
+        Some(v)
     }) {
         return hit;
     }
     let slot = {
-        let mut map = REGIONS
-            .get_or_init(|| Mutex::new(HashMap::new()))
+        let mut regions = REGIONS
+            .get_or_init(|| Mutex::new(Regions { map: HashMap::new(), clock: 0 }))
             .lock()
             .unwrap_or_else(|e| e.into_inner());
-        if map.len() > 96 {
-            map.retain(|k, _| k.0 == key.0 && (k.1 - key.1).abs() <= 3 && (k.2 - key.2).abs() <= 3);
+        regions.clock += 1;
+        let now = regions.clock;
+        if regions.map.len() > KEEP {
+            let mut ages: Vec<u64> = regions.map.values().map(|v| v.1).collect();
+            let (_, &mut cut, _) = ages.select_nth_unstable(KEEP / 4);
+            regions.map.retain(|k, v| *k == key || v.1 > cut);
         }
-        map.entry(key).or_default().clone()
+        let e = regions.map.entry(key).or_insert_with(|| (Slot::default(), now));
+        e.1 = now;
+        e.0.clone()
     };
     let region = slot
         .get_or_init(|| Arc::new(Region::build(f, key.1, key.2)))
         .clone();
-    LAST.with(|l| *l.borrow_mut() = Some((key, region.clone())));
+    AT.with(|a| {
+        let mut a = a.borrow_mut();
+        a.insert(0, (key, region.clone()));
+        a.truncate(AT_HAND);
+    });
     region
 }
 
