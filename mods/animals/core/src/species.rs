@@ -2636,7 +2636,9 @@ pub static SPECIES: [Species; 46] = [
         },
         // A small fish of a short life: grown in its first season, and schools that keep to a
         // room a pond holds (the balance checks' growth and room).
-        tune: Tune { growth: Some(70_000), crowd: Some(30), ..Tune::NONE },
+        // Its eggs' time paced up from its derived 0.19 d (a fish carries it, `life::carrying`) so a
+        // line takes the common band's ten days to four generations (`balance::checks`).
+        tune: Tune { growth: Some(70_000), incubation: Some(11_000), crowd: Some(30), ..Tune::NONE },
         birth_size: 0.1,
         ..BASE
     },
