@@ -162,8 +162,9 @@ fn palette_made() -> Palette {
     // 05:00-07:00 where Bliss's are gold). The pinks and violets stay for the dusk, under the horizon.
     // (Before: golden horizon 0.92 0.62 0.42, glow 1.0 0.58 0.26; sunset horizon 1.05 0.46 0.34,
     // glow 1.0 0.50 0.26, ambient 0.27 0.22 0.36.)
-    let golden = key(vec3(0.11, 0.25, 0.78), vec3(0.96, 0.72, 0.40), vec3(1.0, 0.66, 0.26), vec3(1.55, 0.84, 0.38), vec3(0.24, 0.24, 0.34));
-    let sunset = key(vec3(0.08, 0.10, 0.38), vec3(1.05, 0.58, 0.30), vec3(1.0, 0.58, 0.22), vec3(1.50, 0.78, 0.36), vec3(0.28, 0.23, 0.31));
+    // (A first pass, sunset horizon 1.05 0.58 0.30, hardly showed on the forest vista: PC shv_gold.)
+    let golden = key(vec3(0.11, 0.25, 0.78), vec3(1.0, 0.78, 0.38), vec3(1.0, 0.70, 0.24), vec3(1.55, 0.88, 0.36), vec3(0.26, 0.25, 0.30));
+    let sunset = key(vec3(0.08, 0.10, 0.38), vec3(1.08, 0.66, 0.26), vec3(1.0, 0.64, 0.20), vec3(1.50, 0.82, 0.34), vec3(0.30, 0.25, 0.27));
     let dusk = key(vec3(0.045, 0.05, 0.16), vec3(0.30, 0.15, 0.27), vec3(0.45, 0.20, 0.25), vec3(0.0, 0.0, 0.0), vec3(0.10, 0.09, 0.17));
     // Night is dark and blue, a little lighter than vanilla's, so lanterns carry the scene.
     // Night is dark and blue, so firelight's orange stands out against it. (A blue-teal shade, as
@@ -864,7 +865,11 @@ fn fog_light(dir: vec3<f32>) -> FogLight {
     // Dimmer too: thick mist lit at the sun's full strength toward it clipped to white, and white
     // shows no colour (the dawn check's 07:30 mist, luma p50 170, saturation 0.03).
     let warm = 1.0 - smoothstep(0.1, 0.65, scene.sun.y);
-    let sky_part = (p.ambient * 1.25 + p.horizon * 0.2) * mix(1.0, 0.5, warm);
+    // With the sun up and low, the sky's light in the mist goes gold too (sunlight scattered all
+    // round in it): lit by the sky's cool fill, a dawn mist read pale pink-white where Bliss's is
+    // gold (the Look session's checkpoint, 11-05). None before sunrise: the blue hour keeps its blue.
+    let sunlit_low = warm * smoothstep(-0.02, 0.06, scene.sun.y) * (1.0 - rain_amount());
+    let sky_part = mix(p.ambient * 1.25 + p.horizon * 0.2, vec3(luma(p.ambient * 1.25 + p.horizon * 0.2)) * vec3(1.25, 1.0, 0.62), sunlit_low * 0.7) * mix(1.0, 0.5, warm);
     let sun_part = p.sun * mix(vec3(1.0), MIST_GOLD * 0.65, warm) * light_strength() * phase;
     let k = 0.75 * tint * look_opt(OPT_FOG, 1.0);
     let leaf_part = p.sun * mix(vec3(1.0), MIST_GOLD, warm) * light_strength() * 0.06 * LEAF_LIGHT;
