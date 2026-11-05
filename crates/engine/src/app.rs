@@ -317,7 +317,8 @@ pub(crate) struct Running {
     ui_cached: Vec<crate::ui::render::Quad>,
     ui_animated: Vec<crate::ui::render::Animated>,
     /// Where UI asked for the player model, physical pixels.
-    /// Where 3D previews go, and whose: the player (0) or the open menu's own entity (1).
+    /// Where 3D previews go, and whose: the player (0), the open menu's own entity (1), or an
+    /// entity kind alone (2 + its index).
     previews: Vec<([f32; 4], u64)>,
     /// Texture holding the rendered inventory figure, drawn by the UI.
     preview_tex: Option<u32>,
@@ -2969,10 +2970,17 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         if let Some(&([x, y, w, h], whose)) = r.previews.first() {
             let worn = g.client.worn();
             let look = r.input.cursor - Vec2::new(x, y);
-            let subject = (whose == 1)
-                .then(|| g.client.menu.as_ref().map(|m| m.owner))
-                .flatten()
-                .and_then(|id| g.client.entities.get(&id).map(|e| (id, e.kind)));
+            // The menu's own entity, or a kind alone (no entity: its own texture, nothing painted).
+            let subject = match whose {
+                1 => g
+                    .client
+                    .menu
+                    .as_ref()
+                    .map(|m| m.owner)
+                    .and_then(|id| g.client.entities.get(&id).map(|e| (id, e.kind))),
+                k if k >= 2 => Some((u64::MAX, (k - 2) as u32)),
+                _ => None,
+            };
             let s = crate::diag::span("preview");
             let tex = g.client.entity_render.draw_preview(
                 &mut *r.gpu,

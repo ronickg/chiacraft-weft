@@ -1,12 +1,11 @@
 //! The field journal's discovery (`animals_core::journal`): what each player has done with each
-//! species, saved with them, and the entries the journal screen (`journal.rs`, UI's) reads
+//! species, saved with them, and the entries the journal screen (`journal_screen.rs`, UI's) reads
 //! (`entries`).
 //!
 //! A species' entry opens when the player first sees one up close (within
 //! `journal::SEEN_WITHIN`, in their line of sight) or looks at one through the spyglass or its
 //! screen; the client then gets `NEW` (the species' journal id) for the toast. Killing one, taming
-//! or riding one, and having one born to them each fill in more. Creative reads everything. The
-//! journal key (I) opens the screen.
+//! or riding one, and having one born to them each fill in more. Creative reads everything.
 
 use animals_core::journal::{self as core, ALL, ENTRIES, Fact, HUNTED, SEEN};
 use weft_sdk::*;
@@ -22,9 +21,6 @@ pub static JOURNAL: Component<Journal> = Component::named("journal");
 static PLAYER: EntityKind = EntityKind::named("core:player");
 /// Server to client: a species' entry opened (its `journal::id`), for the toast.
 pub static NEW: Channel<u32> = Channel::named("journal_new");
-/// The journal screen (`journal.rs`) and its key.
-pub static SCREEN: Screen = Screen::named("journal");
-static KEY: Key = Key::named("journal");
 /// Ticks between looks round each player (two seconds).
 const EVERY: u64 = 40;
 
@@ -72,9 +68,6 @@ pub fn init(r: &mut Registry) {
     });
     r.command("journal", "[action:word(list,all,clear)]", command)
         .permission(permission::GAME_MASTER);
-    r.key(&KEY, "I").on_press_client(|c| {
-        c.screen_open(&SCREEN);
-    });
 }
 
 /// A player's eyes above their feet.

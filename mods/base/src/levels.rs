@@ -321,7 +321,7 @@ fn client(r: &mut Registry) {
         let tabs: [crate::window::Tab; 1] = [("window.base.tab.advancements", |c| {
             c.client().screen_open(&crate::advancements::SCREEN);
         })];
-        crate::window::window_titled(ui, S::column().pad(8.0).gap(4.0), "window.base.tab.stats", &tabs, |ui| {
+        crate::window::family_window(ui, S::column().pad(8.0).gap(4.0), Some("window.base.tab.stats"), &tabs, |ui| {
             ui.row(S::row().gap(5.0).center(), |ui| {
                 ui.panel("hud_badge", S::row().size(20.0, 24.0).center(), |ui| {
                     ui.text_bind_styled(S::default().no_wrap(), |c, t| {
