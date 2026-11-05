@@ -889,3 +889,46 @@ en = ["a", "i", "am", "an", "as", "at", "be", "by", "do", "go", "he", "if", "in"
 fr = ["le", "la", "de", "du", "un", "une", "et", "est", "en", "te", "tu", "mon", "ton", "sa", "ma", "mes", "tes", "ses", "nos", "vos", "sur", "pas", "par", "bon", "mal", "bas", "mot", "mort", "nord", "sud", "rue", "roi", "dur", "mur", "nez", "pot", "rat", "sac", "sol", "ver", "vin", "dos", "os", "or", "mer", "fer", "fin", "gare", "mode", "note", "port", "robe", "rose", "sel"]
 de = ["der", "die", "das", "und", "ist", "ein", "mit", "auf", "aus", "bei", "um", "rot", "gut", "tot", "ort", "mut", "berg", "burg", "hund", "mund", "bund", "wort", "rind", "bett", "dorf", "gast", "rast", "see", "tor", "rat", "not"]
 ru = ["da", "net", "ona", "dom", "kot", "nos", "sok", "sup", "dub", "kum", "mat", "med", "mir", "mor", "rak", "rog", "ruka", "sad", "sam", "son", "sor", "sto", "ton", "tur", "um", "us", "gora", "voda", "nebo", "sneg", "most", "brat", "drug", "gost", "dar", "dno", "vor", "bog"]
+
+# The perk web's stones and relics (perk-web, 11-05): the ancients' work, found in the world and set
+# in the web's sockets (`vitals::sockets`; Ronald, 11-05: "insert items which generate boosts and
+# you find those items in the world, relics or whatever").
+[name.maunduk]
+kind = "relic"
+people = "old"
+build = ["maun", "duk"]
+form = "Maunduk"
+gloss = "mind-stone"
+what = "a stone for the web's sockets: rolled boosts to families"
+english = "Mind-Stone"
+lang_key = "item.base.maunduk"
+
+[name.aruduk]
+kind = "relic"
+people = "old"
+build = ["aru", "duk"]
+form = "Aruduk"
+gloss = "flow-stone"
+what = "a stone for the web's sockets: works on the small nodes around it"
+english = "Flow-Stone"
+lang_key = "item.base.aruduk"
+
+[name.remaru]
+kind = "relic"
+people = "old"
+build = ["rem", "aru"]
+form = "Remaru"
+gloss = "flow-watcher"
+what = "a unique relic for the web's sockets: ley sight"
+english = "the Flow-Watcher"
+lang_key = "item.base.remaru"
+
+[name.emakaun]
+kind = "relic"
+people = "old"
+build = ["ema", "kaun"]
+form = "Emakaun"
+gloss = "life-keeper"
+what = "a unique relic for the web's sockets: health for the nodes around it"
+english = "the Life-Keeper"
+lang_key = "item.base.emakaun"

@@ -24,9 +24,9 @@ Power grows Ã—1.6 an age: `g(L) = 1.6^(L/10)` over area and item level L (tier Ã
 
 | tier | age | hours | EM | g at start | reference: hit / health / armour | things tagged | made | kit EM | of budget | everything once |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 490 | 148 | 49 | 34 % | 260 EM |
+| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 493 | 149 | 49 | 34 % | 265 EM |
 | 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 31 | 24 | 76 | 26 % | 164 EM |
-| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 28 | 26 | 62 | 16 % | 274 EM |
+| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 32 | 26 | 62 | 16 % | 274 EM |
 | 3 | Age of Steam | 18 | 1080 | 4.10 | 31.1 / 104 / 130 | 30 | 27 | 94 | 22 % | 512 EM |
 | 4 | Age of Lightning | 20 | 1200 | 6.55 | 49.7 / 166 / 207 | 0 | 0 | 0 | 0 % | 0 EM |
 | 5 | Age of the Future | 18 | 1080 | 10.49 | 79.6 / 265 / 332 | 0 | 0 | 0 | 0 % | 0 EM |
@@ -246,7 +246,7 @@ Moving to the next age takes a key, one thing from each gate (materials and tool
 
 | age | tech | magic | beasts | not built yet |
 |---|---|---|---|---|
-| Stone Age | base:pickaxe, base:furnace | - | animals:club, animals:tranquilizer_dart, animals:nest | magic route: a dowsing rod (sensing ley lines); a biome boss's part; knowledge: a ruin's blueprint or lore page |
+| Stone Age | base:pickaxe, base:furnace | base:dowsing_rod | animals:club, animals:tranquilizer_dart, animals:nest | a biome boss's part; knowledge: a ruin's blueprint or lore page |
 | Bronze Age | - | - | - | all of it |
 | Iron Age | - | - | - | all of it |
 | Age of Steam | - | - | - | all of it |
@@ -258,7 +258,7 @@ Moving to the next age takes a key, one thing from each gate (materials and tool
 
 Every named item and block, by its tag (`content::RULES`). EM is the cheapest way to have one; "-" not had as an item.
 
-### Stone Age (490)
+### Stone Age (493)
 
 **tech** (46)
 
@@ -267,9 +267,12 @@ Every named item and block, by its tag (`content::RULES`). EM is the cheapest wa
 - station: furnace (1.2)
 - part: part_bar_guard (0.22), part_barbed_point (0.22), part_bearded_axe_head (0.22), part_bowstring (0.22), part_felling_axe_head (0.22), part_grip (0.22), part_haft (0.22), part_hoe_blade (0.22), part_knife_blade (0.22), part_lashing (0.22), part_leaf_point (0.22), part_long_blade (0.22), part_long_haft (0.22), part_pick_head (0.22), part_round_pommel (0.22), part_self_stave (0.22), part_shaft (0.22), part_short_blade (0.22), part_short_stave (0.22), part_shovel_blade (0.22), part_straight_blade (0.22)
 
-**magic** (1)
+**magic** (4)
 
+- tool: dowsing_rod (5.2)
+- building: ley_stone (3.0)
 - sky: eclipse_ash (40)
+- technical: waystone (-)
 
 **beasts** (34)
 
@@ -301,6 +304,9 @@ Notes:
 - animals:gateway, animals:termite_mound_upper: the Cretaceous gateway is built of amber blocks; a mound's top
 - portals:portal, packages:unknown: a linked world's door; a missing package's stand-in
 - base:eclipse_ash: falls in an eclipse
+- base:dowsing_rod: senses the ley lines: the Stone Age's magic route
+- base:ley_stone: the ancients' carved stone round the waystones, some 600 blocks apart
+- base:waystone: a sleeping waystone on a great ley crossing: not carried off, woken later
 - base:axe, base:pickaxe, base:shovel, base:hoe, base:knife, base:spear, base:sword, base:bow: built from parts: its parts' materials set its real age (`MATERIALS`)
 - base:part_*: a part's material sets its real age (`MATERIALS`)
 - base:arrow: dropped by skeletons; no recipe yet
@@ -329,7 +335,7 @@ Notes:
 - base:meteoric_iron: hammered cold, iron-grade before a player can smelt (Research round 17)
 - base:raw_gold, base:gold_ingot, base:gold_block: cast and soft: the Bronze Age's (Ronald, 11-07: "move them to fit")
 
-### Iron Age (28)
+### Iron Age (32)
 
 **tech** (20)
 
@@ -338,9 +344,9 @@ Notes:
 - tool: grappling_hook (3.8), iron_axe (3.6), iron_hoe (2.5), iron_pickaxe (3.6), iron_shovel (1.3), iron_sword (2.4)
 - armour: iron_boots (4.7), iron_chestplate (9.4), iron_helmet (5.9), iron_leggings (8.2)
 
-**magic** (4)
+**magic** (8)
 
-- material: unlearning_stone (20)
+- material: aruduk (60), emakaun (60), maunduk (60), remaru (60), unlearning_stone (20)
 - light: star_lantern (62)
 - sky: peridot (10), starheart (60)
 
@@ -357,6 +363,7 @@ Notes:
 - base:redstone_ore, base:star_steel_ore: breaks into its ore (an iron pickaxe)
 - base:star_lantern: a starheart in iron
 - base:unlearning_stone: a peridot ground with tektites: gives back perk web nodes (vitals::perks)
+- base:maunduk, base:aruduk, base:remaru, base:emakaun: stones for the web's sockets (vitals::sockets), found, never made: in pallasite today; bosses, ley nodes, ruins and rare animals add theirs (an earlier tier then)
 - base:salt, base:salted_meat: salt is boiled from a water bucket (iron)
 - animals:wyvern_saddle: a dragon-sized saddle has an iron frame
 
