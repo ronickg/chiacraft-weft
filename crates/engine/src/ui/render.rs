@@ -401,6 +401,8 @@ impl UiRenderer {
         }
         self.textures.clear();
         self.strips.clear();
+        // The runtime images went with `owned`: made again from their pixels on next use.
+        self.dynamic.clear();
         // How textures slice comes with them: a pack's `.gui` must not outlive the pack.
         self.slicing.clear();
         self.outset.clear();
