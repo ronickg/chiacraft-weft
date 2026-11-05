@@ -479,6 +479,11 @@ fn soft_pixel(in: CloudOut, s: Sky, dir: vec3<f32>) -> CloudPixel {
     // Toward the far end they hand over to the sky.
     let dist = length(rel.xz) / SOFT_REACH;
     color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) + 1e-3, dir.z))), smoothstep(0.45, 1.0, dist));
+    // Rain's mist between the eye and the cloud, as over the land (`rain_depth`; the blocky clouds
+    // have it too): without it the soft deck met the misted land in a hard line at the horizon
+    // again once soft clouds were the default (PC shf2_rain).
+    let misted = 1.0 - exp(-rain_depth(length(rel)));
+    color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z))), misted);
     color = display(fog_through(rainbow_on(color, dir), dir * 220.0, 1.0));
     let alpha = alpha_cloud * (1.0 - smoothstep(0.85, 1.0, dist));
     let clip = scene.view_proj * vec4(rel, 1.0);
