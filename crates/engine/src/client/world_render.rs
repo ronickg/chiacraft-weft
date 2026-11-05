@@ -1368,7 +1368,7 @@ impl WorldRenderer {
                         .game
                         .config_names
                         .get("core:far_look")
-                        .map_or(0, |&id| crate::config::get(id) as u32)
+                        .map_or(7, |&id| crate::config::get(id) as u32)
                         & 255)
                         << 24,
             ],

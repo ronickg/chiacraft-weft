@@ -570,10 +570,10 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::number("core:view_distance", ck::INT, 12.0, 2.0, 64.0, 1.0),
         // Distant terrain beyond the view (`client::lod`), in cubes; 0 off.
         ConfigDef::number("core:lod_distance", ck::INT, 256.0, 0.0, 2048.0, 16.0),
-        // EXPERIMENT (branch far-look, not for merging as is): far ground's look, bits: 1 small
-        // plants fade out with distance, 2 softer shading with distance, 4 textures to their
-        // average colour with distance.
-        ConfigDef::number("core:far_look", ck::INT, 0.0, 0.0, 255.0, 1.0),
+        // chiacraft: the far ground's look for shader packs (`Globals.extra.w`'s top byte), bits:
+        // 1 small plants thin out, 2 block-scale shading softens, 4 textures give way to their
+        // average colour, all with distance (Ronald, 11-06: all three).
+        ConfigDef::number("core:far_look", ck::INT, 7.0, 0.0, 255.0, 1.0),
         // The 3D world's share of the window's pixels each way (`app::world_frame`), the UI
         // always whole; 0 picks it by the screen (fewer on high-density ones).
         ConfigDef::number("core:render_scale", ck::FLOAT, 0.0, 0.0, 1.0, 0.05),

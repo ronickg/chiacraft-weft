@@ -362,13 +362,15 @@ fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>) -> vec3<f32> {
     return light;
 }
 
-// EXPERIMENT (far-look): `core:far_look`'s bits.
+// The far ground's look (`core:far_look`, all on by default; Ronald, 11-06, after Voxy and Distant
+// Horizons): 1 small plants thin out, 2 the cubes' block-scale shading softens, 4 textures give way
+// to their average colour, all with distance.
 fn far_look() -> u32 {
     return g.extra.w >> 24u;
 }
 
-// EXPERIMENT (far-look, bit 2): with distance, block-scale shading goes: corner shade toward none
-// and the faces' normals lean up, so one-block steps don't each draw a dark line.
+// How far a cube's shading has softened (far look 2): from 48 to 160 blocks its corner shade goes
+// and its faces' normals lean halfway up, so one-block steps don't each draw a dark line.
 fn far_soft(in: VOut) -> f32 {
     if (far_look() & 2u) == 0u {
         return 0.0;
@@ -376,9 +378,14 @@ fn far_soft(in: VOut) -> f32 {
     return smoothstep(48.0, 160.0, in.dist);
 }
 
-fn shade(in_: VOut, albedo_in: vec4<f32>) -> vec4<f32> {
+fn shade(in: VOut, albedo_in: vec4<f32>) -> vec4<f32> {
+    return shade_soft(in, albedo_in, far_soft(in));
+}
+
+// `shade` with the cubes' shading softened by `soft` (distant terrain passes 0: its mountains keep
+// their relief).
+fn shade_soft(in_: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     var in = in_;
-    let soft = far_soft(in);
     in.ao = mix(in.ao, 1.0, soft);
     in.normal = mix(normalize(in.normal), vec3(0.0, 1.0, 0.0), soft * 0.5);
     let n = normalize(in.normal);
@@ -734,9 +741,9 @@ fn with_overlay(in: VOut, albedo: vec4<f32>, nuv: vec2<f32>, du: vec2<f32>, dv: 
     return vec4(mix(albedo.rgb, ov.rgb * pow(in.tint, vec3(2.2)), ov.a), albedo.a);
 }
 
-// EXPERIMENT (far-look, bit 4): with distance a block's texture gives way to its average colour
-// (its smallest mip), from 64 to 192 blocks, as Distant Horizons' far blocks are one colour and
-// Voxy's mips converge on it: per-texel grain on far grass, sand and leaves goes.
+// Far look 4: from 64 to 192 blocks a block's texture gives way to its average colour (its
+// smallest mip), as Distant Horizons' far blocks are one colour and Voxy's mips converge on it, so
+// far grass, sand and leaves aren't grainy.
 fn far_flat(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
     if (far_look() & 4u) == 0u {
         return albedo;
@@ -778,8 +785,8 @@ fn fs_opaque(in: VOut) -> @location(0) vec4<f32> {
 
 @fragment
 fn fs_cutout(in: VOut) -> @location(0) vec4<f32> {
-    // EXPERIMENT (far-look, bit 1): small plants thin out from 40 to 96 blocks, so far ground
-    // isn't speckled with flowers and tufts a pixel or two across.
+    // Far look 1: small plants thin out from 40 to 96 blocks, so far ground isn't speckled with
+    // flowers and tufts a pixel or two across.
     if (far_look() & 1u) != 0u && in.kind.z != 0u {
         let f = smoothstep(40.0, 96.0, in.dist);
         let p = floor(in.clip.xy);
@@ -990,5 +997,5 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
         let w = water(in, avg, false);
         return vec4(w.rgb, SOLID_ALPHA);
     }
-    return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
+    return vec4(shade_soft(in, albedo, 0.0).rgb, SOLID_ALPHA);
 }
