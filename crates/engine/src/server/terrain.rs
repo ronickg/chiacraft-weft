@@ -908,21 +908,24 @@ impl Terrain {
     /// The block generation leaves at the top of column (`x`, `z`), 0 where caves took it: the
     /// ground of a decoration on the lowest layer of a cube is in the cube below.
     pub fn surface_block(&self, seed: u64, x: i32, z: i32) -> u32 {
-        if self.surface_carved(seed, x, z) {
-            return 0;
-        }
         let i = (z.rem_euclid(16) * 16 + x.rem_euclid(16)) as usize;
         let (cx, cz) = (x.div_euclid(16), z.div_euclid(16));
         // Distant terrain asks this (through the dimension's faces) for steep cells far apart,
         // where no cube is: there its own column only, as all 256 of the cube (every feature, mods'
         // included) cost 1-2 ms a call. Near, the cube's columns are worked out once for the many
         // scattered things that ask in it.
+        // Far, the cave test is left out too: it worked out the column and its 4 corners' again,
+        // 6 columns a call (perf review #5), for a cave mouth at the top of a far wall, too small
+        // to see from there.
         if ONE_COLUMN.get() {
             let (col, rule) = match self.cache.peek(seed, cx, cz) {
                 Some(c) => (c.cols[i], c.rules[i]),
                 None => self.compute(seed, x, z),
             };
             return self.surface_of(rule, col.height);
+        }
+        if self.surface_carved(seed, x, z) {
+            return 0;
         }
         let cols = self.columns(seed, cx, cz);
         self.surface_of(cols.rules[i], cols.cols[i].height)
@@ -1329,6 +1332,25 @@ mod tests {
             }
         }
         assert_eq!(checked, 16384);
+    }
+
+    #[test]
+    fn far_surface_block_is_the_column_s_own_before_caves() {
+        // Distant terrain's faces (`one_column`): what the top of the column is, its own column
+        // worked out once, caves left out; the near answer where caves didn't take the surface.
+        let t = terrain(vec![hills(16, 110)], Vec::new(), Some(1), 64.0);
+        let mut same = 0;
+        for i in 0..256 {
+            let (x, z) = (i % 16, i / 16);
+            let near = t.surface_block(3, x, z);
+            let far = one_column(|| t.surface_block(3, x, z));
+            assert_ne!(far, 0, "at {x} {z}: caves never take a far face's top");
+            if near != 0 {
+                assert_eq!(far, near, "at {x} {z}");
+                same += 1;
+            }
+        }
+        assert!(same > 0);
     }
 
     /// The point check decorations use agrees with what generation put there.
