@@ -310,6 +310,54 @@ pub fn grazing(biome: &str) -> Option<Grazing> {
     Some(Grazing { season, regrown, eaten, pat_cover: pats / area })
 }
 
+/// What a biome's hunters take of one of its prey species in a game year (`notes/ECOLOGY.md`,
+/// part 6): each hunter living there, at its crowd near (`Species::crowd_in`) by its habitat
+/// weight, eats the meat share of its food a day (`Species::hunger`), shared among its prey there
+/// by their biomass, each kill filling it by the prey's mass (`needs::fills`). Real predators take
+/// 10-36% of a prey's numbers a year, one hunter species each.
+#[derive(Clone, Debug)]
+pub struct Predation {
+    pub prey: &'static str,
+    /// Its numbers near (its crowd there, by its habitat weight), and the young they have a game
+    /// year (half of them mothers, `balance::report`'s young per mother).
+    pub numbers: f32,
+    pub young: f32,
+    /// Taken a game year, by each hunter.
+    pub taken: Vec<(&'static str, f32)>,
+}
+
+impl Predation {
+    /// Taken a year by all its hunters there.
+    pub fn taken(&self) -> f32 {
+        self.taken.iter().map(|t| t.1).sum()
+    }
+    /// The share of its young a year (`young`) its hunters take: over 1, they eat it out.
+    pub fn share(&self) -> f32 {
+        self.taken() / self.young.max(0.01)
+    }
+}
+
+/// What each of `biome`'s prey loses to its hunters a year (`Predation`), prey that some hunter
+/// there takes only: each hunter at its crowd there (`Species::crowd_in`, its prey's room) by its
+/// habitat weight, taking what `needs::takes_a_year` says one takes.
+pub fn predation(biome: &str) -> Vec<Predation> {
+    let mut out: Vec<Predation> = Vec::new();
+    for h in SPECIES.iter().filter(|h| h.hunts()) {
+        let n = h.crowd_in(biome) as f32 * crate::needs::habitat_weight(h, biome);
+        if n <= 0.0 {
+            continue;
+        }
+        for (p, kills, numbers, young) in crate::needs::takes_a_year(h, biome) {
+            let taken = n * kills;
+            match out.iter_mut().find(|o| o.prey == p.name) {
+                Some(o) => o.taken.push((h.name, taken)),
+                None => out.push(Predation { prey: p.name, numbers, young, taken: vec![(h.name, taken)] }),
+            }
+        }
+    }
+    out
+}
+
 /// The most of a crowd's ground (within `life::CROWD_RADIUS`) its dung pats may cover at once.
 pub const PAT_COVER: f32 = 0.01;
 

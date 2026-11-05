@@ -434,7 +434,21 @@ impl Species {
     /// breeding, dying of want and the food webs' grazing all weigh (`life::room_for`,
     /// `love_chance`, `want_chance`, `web::grazing`), so a stocked place holds its grazers and
     /// doesn't starve them back down.
+    ///
+    /// A hunter's is as many as its prey there can feed (`needs::hunter_room`: a share of their
+    /// young a year), never over its own crowd nor under one: where its prey feed less than a
+    /// pair, one may come (a group still comes to an empty place, `life::room_for`) but its kind
+    /// doesn't breed up there. Its capacity comes with its prey
+    /// (`notes/ECOLOGY.md`, part 7), so wolves don't eat a lightly stocked taiga's reindeer out.
     pub fn crowd_in(&self, biome: &str) -> u32 {
+        let stocked = self.stocked_in(biome);
+        if !self.hunts() {
+            return stocked;
+        }
+        hunter_room_cached(self.name, biome).map_or(stocked, |room| room.clamp(1, stocked))
+    }
+    /// Its crowd in `biome` by the biome's stocking alone (a plant eater's; others' as they are).
+    pub fn stocked_in(&self, biome: &str) -> u32 {
         if !self.forages_wild() {
             return self.crowd();
         }
@@ -3242,4 +3256,21 @@ pub static SPECIES: [Species; 46] = [
 /// two species of one genus are not.
 pub fn same_species(a: &Species, b: &Species) -> bool {
     a.binomial == b.binomial
+}
+
+/// `needs::hunter_room` worked out once a hunter and biome (it reads every prey's balance; spawns
+/// and wild breeding ask it often).
+fn hunter_room_cached(name: &'static str, biome: &str) -> Option<u32> {
+    use std::collections::HashMap;
+    use std::sync::{Mutex, OnceLock};
+    type Rooms = HashMap<(&'static str, String), Option<u32>>;
+    static ROOMS: OnceLock<Mutex<Rooms>> = OnceLock::new();
+    let rooms = ROOMS.get_or_init(|| Mutex::new(HashMap::new()));
+    if let Some(&r) = rooms.lock().ok()?.get(&(name, biome.to_string())) {
+        return r;
+    }
+    let s = SPECIES.iter().find(|s| s.name == name)?;
+    let room = crate::needs::hunter_room(s, biome);
+    rooms.lock().ok()?.insert((name, biome.to_string()), room);
+    room
 }

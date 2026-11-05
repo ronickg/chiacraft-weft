@@ -215,7 +215,11 @@ pub fn upkeep(w: &World, id: u64, index: usize, a: &mut Animal) {
             .entity(id)
             .map_or(s.crowd(), |st| crate::species::crowd_at(w, s, st.block_pos()));
         let roll = w.random_below(1_000_000) as f64 / 1_000_000.0;
-        if roll < life::want_chance(days, near, crowd, a.stage) {
+        // A group that came to an empty place lives (`life::room_for` lets it in), though a room
+        // under its group size (a hunter where its prey feed one, `needs::hunter_room`) keeps it
+        // from breeding up: it dies of want only past its biggest group.
+        let room = crowd.max(s.bio.social.group().1);
+        if roll < life::want_chance(days, near, room, a.stage) {
             weft_sdk::info!("wild {} {id} died of want ({near:.1} of its kind near, room for {crowd})", s.name);
             w.damage(id, 1e9, 0, damage_cause::STARVE);
             return;

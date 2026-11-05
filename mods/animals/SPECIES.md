@@ -191,6 +191,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | eats | meat 40%, carrion 20%, insects 15%, fruit 15%, seeds 10% |
 | hunts | 0.8%-80% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, brown_trout, raven, house_sparrow, great_horned_owl, savanna_hawk, turkey_vulture, herring_gull, base:chicken |
 | a meal that fills it | 0.25 kg; its biggest prey at home fills it in one kill |
+| room by its prey | plains 11, savanna 11, desert 9, forest 11, birch_forest 8 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.226 L a day; a drink lasts 17 min, thirsty after 8 |
 | feedings to tame at level 1 | 4 (2.5x at level 150) |
 | scared by a walking player within | 3 blocks (twice that running) |
@@ -255,6 +256,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | eats | meat 80%, insects 10%, carrion 5%, fish 5% |
 | hunts | 0.5%-40% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, brown_trout, raven, house_sparrow, snow_bunting, great_horned_owl, savanna_hawk, turkey_vulture, herring_gull, base:chicken |
 | a meal that fills it | 0.45 kg; its biggest prey at home fills it in one kill |
+| room by its prey | plains 5, forest 5, birch_forest 4, savanna 5, desert 4, taiga 4 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 50% of its 0.383 L a day; a drink lasts 35 min, thirsty after 18 |
 | feedings to tame at level 1 | 5 (2.5x at level 150) |
 | scared by a walking player within | 6 blocks (twice that running) |
@@ -376,6 +378,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | eats | meat 70%, carrion 25%, insects 5% |
 | hunts | 0.2%-600% of its mass alone (0.03-90 kg); at home: protoceratops, kryptobaatar, psittacosaurus, citipati, gobipteryx |
 | a meal that fills it | 1.5 kg; its biggest prey at home fills it in one kill |
+| room by its prey | red_dunes 10, scrubland 10 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 50% of its 1.133 L a day; a drink lasts 40 min, thirsty after 20 |
 | feedings to tame at level 1 | 10 (2.5x at level 150) |
 | scared by a walking player within | 8 blocks (twice that running) |
@@ -438,6 +441,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.4% of spawn 
 | eats | meat 80%, carrion 15%, fish 5% |
 | hunts | 1.0%-300% of its mass alone (3.00-900 kg); at home: protoceratops, lungfish, psittacosaurus, gastonia, pinacosaurus, iguanodont, crocodyliform, citipati |
 | a meal that fills it | 30 kg; its biggest prey at home fills it in one kill |
+| room by its prey | floodplain 5, scrubland 7, fern_forest 2 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 80% of its 16.79 L a day; a drink lasts 34 min, thirsty after 17 |
 | feedings to tame at level 1 | 18 (2.5x at level 150) |
 | scared by a walking player within | 10 blocks (twice that running) |
@@ -498,6 +502,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | eats | meat 70%, carrion 25%, insects 5% |
 | hunts | 0.2%-600% of its mass alone (0.03-90 kg); at home: protoceratops, kryptobaatar, citipati, gobipteryx |
 | a meal that fills it | 1.5 kg; its biggest prey at home fills it in one kill |
+| room by its prey | red_dunes 10 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 50% of its 1.133 L a day; a drink lasts 40 min, thirsty after 20 |
 | feedings to tame at level 1 | 10 (2.5x at level 150) |
 | scared by a walking player within | 8 blocks (twice that running) |
@@ -561,6 +566,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.06% of spa
 | eats | meat 80%, fish 10%, carrion 10% |
 | hunts | 0.1%-60% of its mass alone (5.00-3000 kg); at home: raptor, utahraptor, osmolskae, protoceratops, psittacosaurus, gastonia, pinacosaurus, crocodyliform, citipati |
 | a meal that fills it | 500 kg; its biggest prey at home fills it in one kill |
+| room by its prey | crags 1, fern_forest 3, red_dunes 5, scrubland 8 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 211.207 L a day; a drink lasts 36 min, thirsty after 18 |
 | feedings to tame at level 1 | 45 (2.5x at level 150) |
 | scared by a walking player within | nothing |
@@ -1128,6 +1134,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | eats | meat 50%, fruit 20%, insects 15%, carrion 15% |
 | hunts | 0.4%-80% of its mass alone (0.02-4 kg); at home: hare, mountain_hare, wood_mouse, field_vole, brown_trout, raven, house_sparrow, snow_bunting, great_horned_owl, snowy_owl, turkey_vulture, herring_gull, base:chicken |
 | a meal that fills it | 0.55 kg; its biggest prey at home fills it in one kill |
+| room by its prey | forest 14, birch_forest 10, taiga 10, mountains 9, plains 23, desert 17, beach 11, sequoia_grove 5 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 50% of its 0.459 L a day; a drink lasts 36 min, thirsty after 18 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 10 blocks (twice that running) |
@@ -1188,6 +1195,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | eats | meat 55%, carrion 25%, fruit 10%, insects 5%, fish 5% |
 | hunts | 0.4%-100% of its mass alone (0.01-4 kg); at home: mountain_hare, field_vole, brown_trout, raven, snow_bunting, great_horned_owl, snowy_owl, base:chicken |
 | a meal that fills it | 0.35 kg; its biggest prey at home fills it in one kill |
+| room by its prey | snowy_plains 15, taiga 8 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 30% of its 0.306 L a day; a drink lasts 57 min, thirsty after 29 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 10 blocks (twice that running) |
@@ -1256,6 +1264,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | eats | carrion 40%, meat 20%, insects 15%, seeds 15%, fruit 10% |
 | hunts | 1.0%-10% of its mass alone (0.01-0 kg); at home: wood_mouse, field_vole, house_sparrow, snow_bunting |
 | a meal that fills it | 0.12 kg; its biggest prey at home in 3.4 kills |
+| room by its prey | taiga 5, mountains 3, forest 16, birch_forest 14, snowy_plains 17, desert 13, plains 17, beach 12, sequoia_grove 2 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 70% of its 0.117 L a day; a drink lasts 22 min, thirsty after 11 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 14 blocks (twice that running) |
@@ -1560,6 +1569,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | eats | meat 60%, fruit 15%, carrion 15%, insects 10% |
 | hunts | 0.1%-40% of its mass alone (0.01-5 kg); at home: cat, hare, mountain_hare, wood_mouse, field_vole, brown_trout, raven, house_sparrow, snow_bunting, great_horned_owl, snowy_owl, golden_eagle, turkey_vulture, herring_gull, base:chicken |
 | a meal that fills it | 1.3 kg; its biggest prey at home fills it in one kill |
+| room by its prey | plains 13, desert 9, forest 7, mountains 5, sequoia_grove 2 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.996 L a day; a drink lasts 20 min, thirsty after 10 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 14 blocks (twice that running) |
@@ -1754,6 +1764,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | eats | meat 90%, insects 5%, fish 5% |
 | hunts | 0.5%-180% of its mass alone (0.01-3 kg); at home: dog, wood_mouse, field_vole, brown_trout, raven, house_sparrow, snow_bunting, savanna_hawk, turkey_vulture, herring_gull, base:chicken |
 | a meal that fills it | 0.14 kg; its biggest prey at home fills it in one kill |
+| room by its prey | forest 2, birch_forest 1, taiga 3, plains 3, mountains 2, desert 2, swamp 3, savanna 3, sequoia_grove 1 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.134 L a day; a drink lasts 16 min, thirsty after 8 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 14 blocks (twice that running) |
@@ -1816,6 +1827,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | eats | meat 100% |
 | hunts | 0.5%-120% of its mass alone (0.01-2 kg); at home: field_vole, brown_trout, raven, snow_bunting, turkey_vulture, base:chicken |
 | a meal that fills it | 0.2 kg; its biggest prey at home fills it in one kill |
+| room by its prey | snowy_plains 1, taiga 3, mountains 2 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.185 L a day; a drink lasts 16 min, thirsty after 8 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 16 blocks (twice that running) |
@@ -1883,6 +1895,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | eats | meat 85%, carrion 15% |
 | hunts | 1.0%-150% of its mass alone (0.04-7 kg); at home: dog, cat, hare, mountain_hare, brown_trout, red_fox, arctic_fox, raven, great_horned_owl, snowy_owl, turkey_vulture, herring_gull, base:chicken |
 | a meal that fills it | 0.45 kg; its biggest prey at home fills it in one kill |
+| room by its prey | mountains 11, plains 13, desert 9, taiga 8, snowy_plains 13, forest 11, birch_forest 10, sequoia_grove 7 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.383 L a day; a drink lasts 18 min, thirsty after 9 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 24 blocks (twice that running) |
@@ -1944,6 +1957,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | eats | meat 70%, insects 20%, fish 10% |
 | hunts | 0.5%-60% of its mass alone (0.00-1 kg); at home: wood_mouse, field_vole, house_sparrow |
 | a meal that fills it | 0.085 kg; its biggest prey at home in 2.4 kills |
+| room by its prey | savanna 8, swamp 4 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.086 L a day; a drink lasts 15 min, thirsty after 7 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 16 blocks (twice that running) |
@@ -2072,6 +2086,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | eats | fish 45%, carrion 25%, meat 10%, insects 10%, seeds 5%, fruit 5% |
 | hunts | 0.5%-30% of its mass alone (0.00-0 kg); at home: wood_mouse, field_vole, house_sparrow |
 | a meal that fills it | 0.1 kg; its biggest prey at home in 2.9 kills |
+| room by its prey | beach 5, plains 14, swamp 5 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.099 L a day; a drink lasts 15 min, thirsty after 8 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 10 blocks (twice that running) |
@@ -2133,6 +2148,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | eats | fish 60%, meat 30%, insects 10% |
 | hunts | 0.5%-100% of its mass alone (0.17-35 kg); at home: dog, cat, hare, pacu, great_horned_owl, savanna_hawk, turkey_vulture, herring_gull, base:chicken |
 | a meal that fills it | 3.5 kg; its biggest prey at home fills it in one kill |
+| room by its prey | swamp 17, savanna 26 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.486 L a day; a drink lasts 108 min, thirsty after 54 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 8 blocks (twice that running) |
@@ -2194,6 +2210,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | eats | fish 60%, meat 30%, insects 10% |
 | hunts | 0.5%-100% of its mass alone (0.12-25 kg); at home: dog, cat, hare, pacu, great_horned_owl, savanna_hawk, turkey_vulture, herring_gull, base:chicken |
 | a meal that fills it | 2.5 kg; its biggest prey at home fills it in one kill |
+| room by its prey | savanna 26, swamp 20 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.359 L a day; a drink lasts 105 min, thirsty after 52 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 8 blocks (twice that running) |
@@ -2259,6 +2276,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.8% of spawn 
 | eats | meat 85%, carrion 15% |
 | hunts | 2.0%-300% of its mass alone (0.84-126 kg); at home: cat, hare, mountain_hare, white_tailed_deer, red_deer, raven, reindeer, great_horned_owl, snowy_owl, golden_eagle, turkey_vulture, herring_gull, base:chicken, base:pig, base:sheep |
 | a meal that fills it | 4.2 kg; its biggest prey at home fills it in one kill |
+| room by its prey | taiga 1, forest 1, birch_forest 8, mountains 1, snowy_plains 2, plains 4, sequoia_grove 3 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 2.861 L a day; a drink lasts 22 min, thirsty after 11 |
 | feedings to tame at level 1 | 10 (2.5x at level 150) |
 | scared by a walking player within | 20 blocks (twice that running) |
@@ -2320,6 +2338,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | eats | meat 85%, fish 15% |
 | hunts | 1.0%-150% of its mass alone (0.85-128 kg); at home: dog, capybara, hare, white_tailed_deer, pacu, red_fox, raven, coyote, great_horned_owl, golden_eagle, savanna_hawk, turkey_vulture, herring_gull, yacare_caiman, spectacled_caiman, base:chicken, base:pig, base:sheep |
 | a meal that fills it | 8.5 kg; its biggest prey at home fills it in one kill |
+| room by its prey | swamp 5, savanna 10, desert 1 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 5.397 L a day; a drink lasts 24 min, thirsty after 12 |
 | feedings to tame at level 1 | 14 (2.5x at level 150) |
 | scared by a walking player within | 12 blocks (twice that running) |
@@ -2746,6 +2765,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | eats | fish 60%, meat 30%, carrion 10% |
 | hunts | 0.3%-100% of its mass alone (0.45-150 kg); at home: lungfish, psittacosaurus, confuciusornis |
 | a meal that fills it | 15 kg; its biggest prey at home fills it in one kill |
+| room by its prey | floodplain 7, fern_forest 20 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 1.799 L a day; a drink lasts 125 min, thirsty after 63 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 6 blocks (twice that running) |
@@ -2807,6 +2827,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | eats | leaves 40%, seeds 25%, fruit 10%, meat 15%, insects 10% |
 | hunts | 0.0%-5% of its mass alone (0.04-4 kg); at home: kryptobaatar, gobipteryx |
 | a meal that fills it | 9 kg |
+| room by its prey | red_dunes 1, scrubland 1 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 5.681 L a day; a drink lasts 24 min, thirsty after 12 |
 | its food grows at home (spring/summer/autumn/winter) | red_dunes 40/40/40/40%, scrubland 40/40/40/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |

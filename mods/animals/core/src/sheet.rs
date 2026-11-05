@@ -356,6 +356,23 @@ fn species(w: &mut String, s: &Species) {
         _ => String::new(),
     };
     let _ = writeln!(w, "| a meal that fills it | {} kg{kills} |", trim((s.bio.mass * needs::MEAL) as f64, 3));
+    // A hunter's room by its prey (`needs::hunter_room`): as many as a share of their young feed.
+    if s.hunts() {
+        let rooms: Vec<String> = s
+            .habitats
+            .iter()
+            .filter(|&&(b, _)| needs::hunter_room(s, b).is_some())
+            .map(|&(b, _)| format!("{} {}", b.split(':').nth(1).unwrap_or(b), s.crowd_in(b)))
+            .collect();
+        if !rooms.is_empty() {
+            let _ = writeln!(
+                w,
+                "| room by its prey | {} (as many as {}% of their young a year feed, at most its crowd) |",
+                rooms.join(", "),
+                trim((needs::HUNT_SHARE * 100.0) as f64, 0)
+            );
+        }
+    }
     // Water (`needs::drink_lasts`): how much it drinks of what it needs, and how long a drink lasts.
     let need = needs::litres_a_day(s, s.bio.mass);
     let drinks = match needs::drink_lasts(s, s.bio.mass) {

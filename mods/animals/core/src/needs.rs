@@ -50,6 +50,62 @@ pub fn prey_in<'a>(hunter: &'a Species, biome: &'a str) -> impl Iterator<Item = 
     })
 }
 
+/// The share of its prey's young a year one hunter species may take where it lives
+/// (`hunter_room`): real predators take 10-36% of a prey's numbers a year, paid by the herd's own
+/// increase; the rest is the herd's, and other hunters'.
+pub const HUNT_SHARE: f32 = 0.3;
+
+/// A species' share of `biome` by its habitat weight (0 where it doesn't live).
+pub fn habitat_weight(s: &Species, biome: &str) -> f32 {
+    s.habitats
+        .iter()
+        .find(|&&(b, _)| b == biome)
+        .map_or(0.0, |&(_, w)| w)
+}
+
+/// What one `hunter` takes of each of its prey in `biome` a game year, and that prey's numbers
+/// near and young a year (at their stocked crowds, `Species::stocked_in`, by habitat weight). It
+/// eats the meat share of its food a day (`Species::hunger`), shared among its prey by their
+/// biomass, each kill filling it by the prey's mass (`fills`). Empty: no prey of its sizes there.
+pub fn takes_a_year(hunter: &Species, biome: &str) -> Vec<(&'static Species, f32, f32, f32)> {
+    let numbers = |s: &Species| s.stocked_in(biome) as f32 * habitat_weight(s, biome);
+    let prey: Vec<&'static Species> = prey_in(hunter, biome)
+        .filter(|p| numbers(p) > 0.0)
+        .collect();
+    let biomass: f32 = prey.iter().map(|p| numbers(p) * p.bio.mass).sum();
+    if biomass <= 0.0 {
+        return Vec::new();
+    }
+    let meat: f32 = hunter
+        .eats
+        .iter()
+        .filter(|(c, _)| matches!(c, crate::species::Category::Meat | crate::species::Category::Fish))
+        .map(|(_, v)| v)
+        .sum();
+    let year = vitals::calendar::YEAR_DAYS as f32;
+    let food_day = vitals::DAY_SECS / hunter.hunger.max(1.0) * meat;
+    let full = hunter.base[crate::species::FOOD].max(1.0);
+    prey.into_iter()
+        .map(|p| {
+            let diet = numbers(p) * p.bio.mass / biomass;
+            let kills = food_day * diet / (fills(hunter.bio.mass, p.bio.mass) * full) * year;
+            let young = numbers(p) * 0.5 * crate::balance::report(p).young_per_ten as f32 / 10.0 * year;
+            (p, kills, numbers(p), young)
+        })
+        .collect()
+}
+
+/// How many of `hunter` its prey in `biome` feed (`HUNT_SHARE` of each prey's young a year);
+/// `None`: no prey of its sizes lives there.
+pub fn hunter_room(hunter: &Species, biome: &str) -> Option<u32> {
+    takes_a_year(hunter, biome)
+        .into_iter()
+        .filter(|&(_, kills, _, _)| kills > 0.0)
+        .map(|(_, kills, _, young)| HUNT_SHARE * young / kills)
+        .reduce(f32::min)
+        .map(|n| n.floor() as u32)
+}
+
 /// How many of its biggest prey at home fill `hunter` (`fills`): one hunt, or several small
 /// ones. `None`: no prey of its sizes lives where it does (it waits for them to come).
 pub fn kills_to_fill(hunter: &Species) -> Option<f32> {

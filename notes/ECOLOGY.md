@@ -730,6 +730,29 @@ and cactus.**
   - **Carcasses of our own species:** a kill's drops are eaten off the ground now (food off the
     ground, part 5), but the wild species drop nothing yet: a carcass item for them is to come.
   - **Not seen:** prey running from a hunter.
+- **Hunters' room by their prey (2026-11-05):** a hunter's crowd in a biome is as many as its
+  prey there can feed (`needs::hunter_room`): one hunter takes the meat share of its food a day,
+  shared among its prey by biomass, a kill filling it by the prey's mass; its room is how many
+  take at most `HUNT_SHARE` (30%) of each prey's young a year, at most its own crowd, at least one.
+  Natural spawning and wild breeding read it through `Species::crowd_in`, so wolves have room for
+  1 in the taiga (its reindeer stocked at 0.35) and 4 on the plains, jaguars 10 of 12 on the
+  stocked savanna. A group that comes to an empty place lives, but doesn't breed up past its
+  room (it dies of want only past its biggest group).
+  - **The check** (`places.rs`, `hunters_never_eat_their_prey_out`; `web::predation`, the
+    `predation` example): in every biome, all its hunters at their room take at most the young
+    their prey have a year. Before the room, wolves took 6.5 times the taiga's reindeer young and
+    Citipati twice the red dunes' Kryptobaatar's; now the most is 92% (the plains' great horned
+    owls, prey of six hunters).
+  - **Grazing** (Plants' 25-50%, `web::grazing`) stays counted at the grazers' full stocked
+    crowds, the worst case: hunters only take the herds' increase.
+  - **Seen on the PC** (aw_hunters, aw_hunters2): a taiga wolf has room for 1 and a second is
+    turned away; three jaguars on the stocked savanna live under their room with no want
+    deaths, and the capybara herd breeds on through a sprinted game day. Not seen there: a kill
+    (the jaguars came young or stayed fed, and the spot's hills buried some spawns).
+  - **Later** (paused for the performance push, 11-05): a look that shows kills over game days
+    (grown, hungry jaguars on flat open ground); kill pacing against real hunters' (a big cat
+    every 4-7 days; ours hunt about every 1.3 game days at full hunger); a heavy savanna grazer
+    (Plants' grazing plan); hunting players (a decision).
 
 
 - **What a hunter takes:** each species' own prey-size range, from its research. Hunters under
@@ -770,7 +793,7 @@ and cactus.**
 - **Not yet:**
   - **Standing water:** capacity ignores it, so a swamp feeds more in its dry season than the
     number says;
-  - **Hunters:** their capacity comes with their prey;
+  - **Hunters:** built 2026-11-05, below (part 6, "Hunters' room by their prey");
   - **Young without mothers:** young aren't spawned with a mother; they come in their groups.
 
 
