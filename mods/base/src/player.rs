@@ -199,10 +199,35 @@ pub fn register(r: &mut Registry) {
     r.menu(&CRAFTING)
         .group("grid", Slots::grid(3, 3))
         .group("result", Slots::single().output().large())
-        // Items built from parts (`parts.rs`).
-        .group("assembly", Slots::row(4))
+        // Items built from parts (`parts.rs`): four slots in a row, each showing while empty what
+        // usually goes there (a head, a haft, a fitting; they take parts in any order), and the
+        // slot that takes a tool apart.
+        .group(
+            crate::parts::ASSEMBLY[0],
+            Slots::single()
+                .background("slot_part_head")
+                .tooltip("crafting.parts.slot.head"),
+        )
+        .group(
+            crate::parts::ASSEMBLY[1],
+            Slots::single()
+                .background("slot_part_haft")
+                .tooltip("crafting.parts.slot.haft"),
+        )
+        .group(
+            crate::parts::ASSEMBLY[2],
+            Slots::single()
+                .background("slot_part_fitting")
+                .tooltip("crafting.parts.slot.fitting"),
+        )
+        .group(crate::parts::ASSEMBLY[3], Slots::single().tooltip("crafting.parts.slot.more"))
         .group("assembled", Slots::single().output())
-        .group("apart", Slots::single())
+        .group(
+            "apart",
+            Slots::single()
+                .background("slot_part_tool")
+                .tooltip("crafting.parts.slot.apart"),
+        )
         .player_inventory()
         .recipes(&crate::recipes::CRAFTING)
         .on_change(|m| {
