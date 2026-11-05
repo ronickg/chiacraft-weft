@@ -56,12 +56,13 @@ Generated here with the Codex command line on Ronald's ChatGPT plan, one run per
   (32-pixel cells on magenta) as the last reference. Without it the model's pixels are uneven and
   come out at no single size; with it they land on the grid. It sometimes returns 1254 × 1254
   instead: the grid is still 32 cells across, so shrink it with nearest neighbour.
-- **Never attach art from other games or texture packs, and keep "Minecraft" out of the prompt.**
-  The reference images in these guides are cut from a resource pack (the blocks from Dokucraft
-  Light): they show what the guides measured, for reading, not for attaching. The style key we
-  attach is our own approved art (`Our key.png` in each guide's folder, made from sets Ronald
-  approved). The style guide test (`notes/ui-codex/guides/`) attached the pack's sheets once, to
-  test the guides as written.
+- **Our key first, then the guide's sheet, made ours; keep "Minecraft" out of the prompt.** The
+  style key is our own approved art (`Our key.png` in each guide's folder, made from sets Ronald
+  approved), attached first. Since guides 2 (Ronald, 11-05) the guide's reference sheet for the
+  kind comes next (its "Reference images to attach" table; whole sets also get their set sheet,
+  13-26 for items), with the family's "How each family looks" notes and its "Make it yours" line in
+  the prompt, so the model takes how things are built and not their designs. The sheets are cut
+  from a resource pack: never commit them, and look at every result for a copied design.
 - **Attach our style key of the same kind and the game's UI sheet**, and say what to take from each ("its size, outline, light and detail, not its exact
   design"). Without a pixel-art reference and the words "pixel art", it paints realistic 3D
   renders. "3D object", "hand-painted", "Hytale" pull it toward realism.

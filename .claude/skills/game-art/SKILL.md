@@ -5,6 +5,14 @@ description: Generate any art for the game from Ronald's style guides — item i
 
 # Game art: generate anything from the style guides
 
+**Changes**
+- 2026-11-05: Ronald's guides 2 are in (`~/Downloads/Game Art Style Guides 2`): every guide gains
+  "How each family looks" with a "Make it yours" line per family, the item guide gains set sheets
+  13-26, and the monster guide armour worn on the body. Our own additions (lessons, our facts, Part 4)
+  are kept. `art.py` now attaches the guide's reference sheet for the kind (items by what is drawn,
+  blocks by type, `--ref` to choose, `--no-ref` for the old way) after our key, and pastes that
+  family's notes into the prompt. Before: no sheet attached, only our key.
+
 One way for every kind of art. Ronald says what he wants ("generate a copper pickaxe", "redo the
 dirt texture", "make the wyvern's look"); Claude works out the kind, picks the guide, the type
 line and the reference image, writes the description, generates, checks, cuts, shows, and installs
@@ -28,11 +36,15 @@ patching a prompt in a script: every script reads the guides.
 | `guides/6 UI/` | UI parts (the kit below follows it) |
 | `guides/7 Effects/`, `guides/8 Sky/` | particles and effects; sun, moon, clouds |
 
-**Never attach other games' or texture packs' art to a generation, and keep "Minecraft" out of the
-prompt** (Ronald's rule; he finds Faithful too clean and wants our own style). The guides'
-reference images are cut from a resource pack: read them, don't attach them. `art.py` attaches
-our own style key, `Our key.png` in the guide's folder (approved sets of ours), and warns when a
-kind has none yet.
+**Attach our key first, then the guide's sheet for the kind, and make it ours** (Ronald's guides 2,
+11-05, replacing "never attach other packs' art"). `art.py` attaches our own style key, `Our key.png`
+in the guide's folder (approved sets of ours; it warns when a kind has none yet), then the guide's
+reference sheet for that kind (`--ref 01,13` by number, or picked from what is drawn or the block
+type), and puts the family's "How each family looks" notes with their "Make it yours" line into the
+prompt: the sheet shows how such things are built, our key decides the look, and no design is copied.
+Keep "Minecraft" out of the prompt (he finds Faithful too clean and wants our own style). The sheets
+are cut from a resource pack, so they stay out of git; a checkout without them reads Ronald's copy
+(`GUIDE_REFS`, default `~/Downloads/Game Art Style Guides 2`).
 
 **Never throw away a generated image** (Ronald, 2026-11-04: "never throw away generated images pls
 so I can also check back"). Every try, every candidate, every review sheet and every old texture an

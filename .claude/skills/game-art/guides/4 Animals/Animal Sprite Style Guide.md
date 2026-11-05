@@ -73,6 +73,26 @@ This is the animal companion to the item and block guides. Your animals will be 
 
 ---
 
+### How the reference builds an animal
+
+These describe the reference's construction in words, not exact designs. Copy them into a prompt when an image alone isn't clear enough.
+
+- **Faces:**
+  - Big, simple features. Eyes are a 2-px block with a white highlight; some animals (cows, cats) have bright coloured irises.
+  - A lighter muzzle or snout patch sits low on the face.
+  - Coat patterns continue across the face.
+- **Coats:**
+  - **Large irregular patches** in 2 colours (cow, mooshroom) or a soft gradient from a darker back to a lighter belly (fox, wolf, pig).
+  - Fur texture is fine pixel noise in 3–4 close shades, never drawn hair by hair.
+- **Bellies and markings:**
+  - Bellies, chests and muzzles are cream or white.
+  - Legs often end in darker "socks" (fox) or keep the body colour.
+- **Tails, manes and ears:** these carry most of the character. Fluffy tails get a lighter tip, and manes are a band of darker, shaggier fur.
+- **Smooth-skinned animals** (pig, axolotl): soft pink or pastel with gentle shading and almost no texture.
+- **Make it yours:** keep the big eyes, the light belly and muzzle, the patch-or-gradient coats and the soft noise texture. Body shapes, markings and species are free.
+
+---
+
 ## Part 2: Sprite rules for your game
 
 ### 5. Canvas, scale and view

@@ -269,6 +269,92 @@ Earthy, aged medieval fantasy: mossy sage stone, dark walnut wood, iron-banded w
 
 ---
 
+## 9. How each family looks
+
+These describe **how the reference builds each kind of block**, not exact designs. Copy the lines into a prompt when an image alone isn't clear enough. Each family ends with **Make it yours**: what to change so the result isn't a copy of the reference.
+
+**Natural ground** (`01`)
+- Stone is large rounded slabs (6–9 per face) separated by dark crevices, like a dry-stone wall seen face on. Each slab is lighter at the top left.
+- Dirt is clumpy: rounded lumps in 3–4 browns with dark gaps, and no single lump stands out.
+- Sand is very pale with soft horizontal wind ripples and a few single white grains. It's the flattest texture in the set.
+- Gravel is light pebbles scattered on dark ground.
+- Cobblestone is rounded stones stacked in rough horizontal rows. Deepslate is dark grey, cut into rectangular tiles.
+- **Make it yours:** keep the scale (6–9 big shapes per face) and seamless tiling. The shapes and colours are free.
+
+**Ores** (`03`)
+- The background is **exactly the stone texture, unchanged**. The ore sits on top of it.
+- The ore is one bold cluster in the centre covering about half the face, with a darker socket shadow around it. Metals are rounded nuggets, gems are crystal shards pointing outwards, and coal is black lumps.
+- This big centred cluster repeats very visibly as a grid when tiled. For a calmer look, ask for 2–3 smaller clusters placed off-centre.
+- **Make it yours:** keep "stone unchanged plus ore on top". Change the cluster size and placement.
+
+**Logs and wood** (`04`, `05`)
+- Bark is vertical, irregular plates with dark cracks between them, and runs top to bottom.
+- The log end is a rounded square with concentric rings and 2–3 radial cracks inside a bark border.
+- Birch is white with short dark horizontal marks. Stripped logs are smooth with pale vertical grain.
+- Planks are 4 horizontal boards with joints that don't line up and a thin dark gap between boards. The grain is subtle.
+- **Make it yours:** bark pattern and board count are free. Keep the vertical bark and the horizontal planks.
+
+**Built stone and bricks** (`05`)
+- Bricks are chunky and uneven, each a slightly different shade, with dark mortar.
+- Stone bricks are large (2 rows per face) with deep mortar lines. Mossy versions have green vines crawling across the joints.
+- Chiseled blocks have a carved ornamental band with a raised border above and below.
+- **Make it yours:** choose your own brick size and carving motif. Keep the deep mortar shadow.
+
+**Framed and precious blocks** (`06`)
+- Smooth stone is 2×2 flat tiles. Sandstone is a soft square with rounded corners and a darker rim, like a pillow.
+- Metal blocks are a **riveted frame around a recessed panel**. The gold block is instead stacked gold bars.
+- Gem blocks are a big cut gem set in a dark frame with metal corner brackets.
+- **Make it yours:** keep "frame plus centre" so the blocks look crafted. Your frame and centre designs can be anything.
+
+**Leaves** (`07`)
+- Overlapping leaf shapes flowing diagonally, with **fully transparent gaps** between them (cutout, not translucent).
+- Most leaves are drawn grey and coloured by biome. Coloured trees (cherry, azalea) draw the blossom in its real colour on top.
+- **Make it yours:** leaf shape and direction are free. Keep the cutout gaps and the grey base.
+
+**Flowers, saplings and mushrooms** (`08`, `09`, `15`)
+- A single plant growing from the bottom centre, on a transparent background. The stem is thin and the flower head sits in the top third.
+- Saplings are a tiny tree with a trunk and a round leaf crown. Mushrooms are small and sit low.
+- Tall plants are split into a top and a bottom half that join seamlessly.
+- **Make it yours:** keep the bottom-centre stem, the transparent background and the readable silhouette.
+
+**Crops** (`10`, `17`)
+- Bushy clumps of leaves fill the lower half to two-thirds of the face. The crop itself (root, fruit) peeks out at the base in the final stage.
+- Each growth stage is the same plant, taller and fuller, ending in a clear "ripe" colour.
+- Pumpkin and melon sides use strong vertical ribs or stripes.
+- **Make it yours:** you can design any plant. Keep "each stage taller and fuller, ripe at the end".
+
+**Workstations** (`11`)
+- Dark wood with iron bands, corner brackets and rivets, with each tool's purpose shown on the front face.
+- The furnace is stone bricks around an arched opening. The lit version fills the opening with bright fire, and nothing else changes.
+- The bookshelf is a wooden frame around two shelves of coloured book spines. The barrel is vertical staves with two iron hoops.
+- **Make it yours:** keep the shared wood-and-iron construction. Change what each front face shows.
+
+**Liquids and light** (`12`)
+- Water is deep blue with faint lighter ripple lines and almost no contrast. Lava is a dark crust broken into cells with glowing red-to-yellow cracks.
+- Light sources glow from the inside: glowstone is bright bulbs, magma is glowing horizontal streaks, a jack o'lantern is a carved face lit from behind.
+- Fire is a flame shape on transparent, with a white-yellow core and a red tip.
+- **Make it yours:** keep "dark material, bright glowing gaps". The patterns are free.
+
+**Glass and colour sets** (`13`)
+- Glass is almost entirely see-through: a thin dark frame with metal corner brackets. When tiled, the corners form a grid of brackets.
+- Wool looks quilted: soft cloth with a darker 1-px inset border, so each block reads as a cushion.
+- Terracotta is flat and matte with fine noise and no pattern.
+- Coloured sets are one texture recoloured 16 times.
+- **Make it yours:** the glass frame style is free. Keep it nearly clear.
+
+**Nether** (`14`)
+- Netherrack is fleshy pink-red lumps. Nylium is a dark red or teal surface with a branching vein network.
+- Wart blocks are bumpy and organic. Nether bricks are small dark purple-brown bricks. Shroomlight is glowing orange bulbs.
+- Everything is warmer and redder than overworld blocks, and glowing blocks are the brightest.
+- **Make it yours:** use one dominant hue per biome and keep the organic shapes.
+
+**Doors, trapdoors and thin blocks** (`16`, `18`)
+- Doors are the wood of their type in an iron frame with hinges and a window. Trapdoors use the same design squashed into one square.
+- Thin blocks (ladders, rails, bars) are drawn only where solid. Everything else is transparent.
+- **Make it yours:** keep the door and trapdoor of one wood type matching. The window shapes and ironwork are free.
+
+---
+
 # Part 3: Making it
 
 ## A) Master prompt for blocks (style)
