@@ -469,7 +469,8 @@ impl EntityRenderer {
         };
         let (world, preview) = (make("models", "vs", crate::post::world_format())?, make("entity preview", "vs", Format::Rgba8Srgb)?);
         // A shader pack's older copy of the file has no `vs_hand`.
-        let hand = make("model hand", "vs_hand", crate::post::world_format()).or_else(|_| make("model hand", "vs", crate::post::world_format()))?;
+        let hand = make("model hand", "vs_hand", crate::post::world_format())
+            .or_else(|_| make("model hand", "vs", crate::post::world_format()))?;
         // Depth only, both sides (a model's thin parts are open boxes), its see-through texels left out.
         let shadow = crate::packs::sun_shadows()
             .then(|| {

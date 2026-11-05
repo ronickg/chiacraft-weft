@@ -229,7 +229,10 @@ impl Post {
                     match (make("bloom down", "fs_bloom_down"), make("bloom up", "fs_bloom_up"), make("exposure", "fs_exposure")) {
                         (Some(d), Some(u), Some(e)) => Some([d, u, e]),
                         (d, u, e) => {
-                            [d, u, e].into_iter().flatten().for_each(|p| gpu.destroy_pipeline(p));
+                            [d, u, e]
+                                .into_iter()
+                                .flatten()
+                                .for_each(|p| gpu.destroy_pipeline(p));
                             None
                         }
                     }
@@ -305,10 +308,8 @@ impl Post {
                 old.into_iter().for_each(|t| gpu.destroy_texture(t));
             }
             let (w, h) = (w.max(1), h.max(1));
-            let color = gpu.create_texture(
-                &TextureDesc { width: w, height: h, mips: 1, format: world_format(), render_target: true },
-                "behind color",
-            );
+            let color = gpu
+                .create_texture(&TextureDesc { width: w, height: h, mips: 1, format: world_format(), render_target: true }, "behind color");
             let depth = gpu.create_texture(
                 &TextureDesc { width: w, height: h, mips: 1, format: Format::Depth32, render_target: true },
                 "behind depth",
@@ -353,11 +354,18 @@ impl Post {
     /// one before, from half the world's size, none under 2 pixels), made again when either changes;
     /// the exposure texels with them.
     fn ensure_pyramid(&mut self, gpu: &mut dyn Backend, w: u32, h: u32, levels: usize) {
-        if self.pyramid.as_ref().is_some_and(|p| p.size == (w, h) && p.levels == levels) {
+        if self
+            .pyramid
+            .as_ref()
+            .is_some_and(|p| p.size == (w, h) && p.levels == levels)
+        {
             return;
         }
         if let Some(old) = self.pyramid.take() {
-            old.down.iter().chain(old.up.iter()).for_each(|t| gpu.destroy_texture(t.0));
+            old.down
+                .iter()
+                .chain(old.up.iter())
+                .for_each(|t| gpu.destroy_texture(t.0));
             old.exposure.iter().for_each(|t| gpu.destroy_texture(t.0));
         }
         let mut make = |size: (u32, u32), label: &str| {
@@ -376,7 +384,10 @@ impl Post {
             }
             size = (size.0.div_ceil(2), size.1.div_ceil(2));
         }
-        let up = down[..down.len() - 1].iter().map(|d| make(d.2, "bloom up")).collect();
+        let up = down[..down.len() - 1]
+            .iter()
+            .map(|d| make(d.2, "bloom up"))
+            .collect();
         let e = [make((1, 1), "exposure a"), make((1, 1), "exposure b")];
         self.pyramid = Some(Pyramid { size: (w, h), down, up, exposure: e.map(|t| (t.0, t.1)), flip: 0, levels, fresh: true });
         self.last_frame = None;
@@ -515,7 +526,9 @@ impl Post {
         if let Some(pipes) = pipes {
             self.ensure_pyramid(gpu, frame.width, frame.height, self.bloom_levels as usize);
             let now = std::time::Instant::now();
-            let dt = self.last_frame.map_or(0.0, |t| (now - t).as_secs_f32().min(0.5));
+            let dt = self
+                .last_frame
+                .map_or(0.0, |t| (now - t).as_secs_f32().min(0.5));
             self.last_frame = Some(now);
             let py = self.pyramid.as_mut().unwrap();
             py.flip ^= 1;
