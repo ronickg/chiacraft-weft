@@ -157,7 +157,8 @@ fn palette_made() -> Palette {
     // Night is dark and blue, a little lighter than vanilla's, so lanterns carry the scene.
     // Night is dark and blue, so firelight's orange stands out against it. (A blue-teal shade, as
     // Valheim's, mixed with the orange of a fire into olive on the ground: Tester 2's campfire.)
-    let night = key(vec3(0.006, 0.010, 0.030), vec3(0.025, 0.035, 0.070), vec3(0.10, 0.13, 0.22), vec3(0.17, 0.21, 0.30) * look_opt(OPT_NIGHT_MOON, 1.0), vec3(0.012, 0.017, 0.030) * look_opt(OPT_NIGHT_LIGHT, 1.0));
+    // (Its horizon a little lighter, so ridges stand against it: 0.025 0.035 0.070 before.)
+    let night = key(vec3(0.006, 0.010, 0.030), vec3(0.032, 0.044, 0.085), vec3(0.10, 0.13, 0.22), vec3(0.17, 0.21, 0.30) * look_opt(OPT_NIGHT_MOON, 1.0), vec3(0.012, 0.017, 0.030) * look_opt(OPT_NIGHT_LIGHT, 1.0));
     // The morning and the late afternoon between: a gold sun and a warm, cream horizon, the shade
     // still blue, so the day runs gold, warm, clear at noon, warm, gold. Golden hour ended 16° up
     // (sun.y 0.28), and on the leaned path of a long summer day the sun is over that from 05:00 to
@@ -189,7 +190,12 @@ fn palette_made() -> Palette {
     // (Night 4, Ronald "a bit lighter": a full moon high 6x, so shapes read and you can walk by it,
     // grass about luma 77 in the grade model; a new moon still a quarter, near black, a torch needed.
     // Its light less blue than it was, 0.17 0.21 0.30: blue 3.4x red turned stone a saturated blue.)
-    p.ambient *= mix(1.0, mix(0.25, 6.0, scene.moon.w), smoothstep(-0.14, -0.3, e));
+    // (Moonlit nights, Ronald's pick of 11-05: with no moon up, a quarter left the land pure black
+    // under the stars from 22:00 to 02:00 at the vista, the night curve's toe swallowing it. 1.6:
+    // the land's shapes, the water and the ridges against the sky faintly there, still far darker
+    // than a full moon's night, with its direct light, and a torch still needed. (At 2.5 the land
+    // read as moonlit, mean luma 26 against 9, the clouds glowing: PC run sh5.)
+    p.ambient *= mix(1.0, mix(1.6, 6.0, scene.moon.w), smoothstep(-0.14, -0.3, e));
     // Overcast: grey and dim, and the sun no more than a brighter part of the sky. A thunderstorm
     // darker again, its sky a moody slate (Bliss's rain: the land darker but in its colours, the
     // sky dark blue-grey). With the sky's light 0.4 of the sun's the land went a bright flat grey
