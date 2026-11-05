@@ -60,7 +60,12 @@ pub fn init(r: &mut Registry) {
             let [budget, last, stagger] = w
                 .component(q.entity, &FLOOR)
                 .unwrap_or([f64::NAN, 0.0, 0.0]);
-            let budget = if budget.is_nan() { st.max_health / size.band().floor.unwrap_or(1.0) } else { budget as f32 };
+            // A fresh one holds a second's worth.
+            let budget = if budget.is_nan() {
+                vitals::combat::floor_rate(size, st.max_health).unwrap_or(st.max_health) * vitals::combat::FLOOR_HELD
+            } else {
+                budget as f32
+            };
             let secs = now.saturating_sub(last as u64) as f32 / vitals::TICKS as f32;
             let (took, left, over) = vitals::combat::floor_take(size, st.max_health, budget, secs, hit);
             if size.band().floor.is_some() {
