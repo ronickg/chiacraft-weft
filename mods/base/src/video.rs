@@ -278,7 +278,15 @@ const FANTASY_ROWS: [Row; 11] = [
         values: &[1.0, 1.5, 2.0],
         get: || MOON_SIZE.get() as f64,
         set: |v| MOON_SIZE.set(v as f32),
-        shown: |v| word(if v >= 1.75 { "moon_2" } else if v >= 1.25 { "moon_15" } else { "moon_1" }),
+        shown: |v| {
+            word(if v >= 1.75 {
+                "moon_2"
+            } else if v >= 1.25 {
+                "moon_15"
+            } else {
+                "moon_1"
+            })
+        },
     },
     Row { key: "glow", values: &[0.0, 0.5, 1.0, 1.25, 1.5], get: || FX_GLOW.get() as f64, set: |v| FX_GLOW.set(v as f32), shown: percent },
     Row {
@@ -507,7 +515,10 @@ pub fn register(r: &mut Registry) {
             ui.row(S::row().gap(3.0), |ui| {
                 ui.row(S::row().w(84.0), |_| {});
                 ui.text_bind_styled(S::default().class("dim").no_wrap(), |_, t| {
-                    let name = FANTASY_NAMES.get(FANTASY.get() as usize).copied().unwrap_or("custom");
+                    let name = FANTASY_NAMES
+                        .get(FANTASY.get() as usize)
+                        .copied()
+                        .unwrap_or("custom");
                     t.set("video.base.now", &[Arg::Key(&format!("video.base.fantasy.{name}"))]);
                 });
             });
