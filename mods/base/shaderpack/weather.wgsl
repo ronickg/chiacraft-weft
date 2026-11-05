@@ -103,6 +103,7 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
     // Drops a pale grey-blue, flakes white; fading out right by the eye.
     let tint = select(vec3(0.78, 0.84, 0.92), vec3(1.0, 1.0, 1.04), snow);
     let near = smoothstep(select(1.5, 1.0, snow), select(6.0, 3.0, snow), length(in.rel));
-    let strength = select(0.6, 0.95, snow);
+    // (Rain at 0.6 drew bright white lines over a storm's dark deck.)
+    let strength = select(0.42, 0.95, snow);
     return vec4(display(haze(tint * light * select(1.0, 1.15, snow), in.rel)), min(cover * in.alpha * strength * near, 1.0));
 }
