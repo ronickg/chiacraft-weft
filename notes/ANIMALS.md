@@ -1295,3 +1295,19 @@ The builds check every keyframe: no flicker, no loose joints, nothing poking alo
 **Hooks** are Creature AI's to call, in its behaviour code: stare, graze, drink, sleep, stalk, alarm, the strikes, the social clips.
 
 Not yet: the other species, and young ones' play at their own scale (the pup models share the clips).
+
+**Paused (2026-11-05, Ronald: stop once the current work is done).** It stands on claude/animal-animations, not merged. The system and four species' clips are built and checked. The wolf's and deer's PC looks were seen; the raptor's and chihuahua's were queued. To pick it up:
+- merge `dev` in, then land `anim.rs` in dev (Creature AI needs the API there before calling it);
+- add the calls Creature AI listed (11-05), once its branch is merged and its files are free:
+  - `senses::stare` → `hold(Stare)`;
+  - forage.rs `eat()` → `hold(Graze)` while chewing, `clear` after;
+  - drink.rs `drink()` → `hold(Drink)`;
+  - wild.rs and rest.rs `settle` → `hold(Sleep)` (on the rest looks too: they swap the look entity);
+  - hunt.rs `chase()` → `hold(Stalk)`, then `clear` and `act(Pounce)` when it breaks cover;
+  - `commands::fight_aiming` → `act(Bite)`;
+  - hunt.rs `stands_ground` → `act(Rear)`;
+  - hunt.rs `wary` and taming.rs `behave` at the bolt → `act(Alarm)`;
+  - `wild::wake` / `rest::wake` → `act(Stretch)`;
+  - `anim::idle_life` from `animal::upkeep`, not the bottom of the goal list;
+- clips Creature AI's plan also wants: a sentinel's head-up look round, a slow head-low approach, and a charge beside the rear;
+- the other species' clip sets.
