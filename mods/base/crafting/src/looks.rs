@@ -260,10 +260,12 @@ pub fn worn_look(slot: usize, shell: &str, gems: &[&str]) -> String {
 }
 
 /// Where gems sit on worn armour, the centre of each socket's in the 128 x 64 skin layout, head to
-/// feet: across the helmet's brow and the chest; on the thigh's front, then its outer and inner
-/// sides; on the boot's front, then its sides (a leg's front is 8 wide, too narrow for three).
-pub const WORN_GEM_SPOTS: [[[i32; 2]; 3]; 4] =
-    [[[24, 19], [20, 19], [28, 19]], [[48, 46], [43, 46], [53, 46]], [[12, 46], [4, 46], [20, 46]], [[12, 60], [4, 60], [20, 60]]];
+/// feet. A helmet shows one, on the brow (Ronald, 11-05: not a row of studs across the visor; its
+/// other sockets count but aren't drawn); across the chest; on the thigh's front, then its outer
+/// and inner sides; on the boot's front, then its sides (a leg's front is 8 wide, too narrow for
+/// three).
+pub const WORN_GEM_SPOTS: [&[[i32; 2]]; 4] =
+    [&[[24, 19]], &[[48, 46], [43, 46], [53, 46]], &[[12, 46], [4, 46], [20, 46]], &[[12, 60], [4, 60], [20, 60]]];
 
 /// The gem drawing's size: a shade map with the gem in its top-left corner
 /// (`base:parts/gem/set`), moved to its socket's spot.
@@ -353,6 +355,8 @@ mod tests {
         assert_eq!(part_look("leg_shell", "bone").unwrap(), "base:parts/armour/bone_leg_shell@base:ramps/bone");
         assert_eq!(worn_look(2, "diamond", &[]), "base:entity/armor/worn/diamond_2");
         assert_eq!(worn_look(0, "unobtainium", &[]), "base:entity/armor/worn/steel_1");
+        // A helmet shows one gem however many it holds.
+        assert_eq!(worn_look(0, "steel", &["amber", "diamond", "peridot"]).matches(';').count(), 1);
         assert_eq!(gem_look("sword", 0, "diamond").unwrap(), "base:parts/gem/set@base:ramps/gem_diamond+7,20");
         assert!(gem_look("axe", 3, "diamond").is_none() && gem_look("sword", 3, "diamond").is_none());
         assert_eq!(
