@@ -6,6 +6,7 @@
 //! light; the pack's particle shader makes them blink (Lighting).
 
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
 use vitals::{calendar, fireflies as ff};
@@ -51,6 +52,11 @@ pub fn register(r: &mut Registry) {
                 Arg::Float(n.hour as f64, 1),
                 Arg::Float(n.sunset as f64, 1),
                 Arg::Int(on_you),
+                Arg::Int(
+                    (w.game_time()
+                        .saturating_sub(LAST_COUNT.load(Ordering::Relaxed))
+                        / 20) as i64,
+                ),
             ],
         );
     });
@@ -84,6 +90,9 @@ impl Here {
     }
 }
 
+/// The game time `count` last went round the players (for `/fireflies`).
+static LAST_COUNT: AtomicU64 = AtomicU64::new(0);
+
 /// Every `REFRESH_SECS`, each player's share (`vitals::fireflies::share`).
 fn count(w: &World) {
     if !w
@@ -92,11 +101,15 @@ fn count(w: &World) {
     {
         return;
     }
+    LAST_COUNT.store(w.game_time(), Ordering::Relaxed);
     for player in w.players() {
         let Some(st) = w.entity(player) else { continue };
         let n = Here::at(w, st.pos);
-        if w.component(Holder::entity(player), &HERE) != Some(n.share) {
-            weft_sdk::info!(
+        // In place, as survival keeps its vitals: `set_component` on the player left it at 0 (the
+        // sync looks: /fireflies said 24% here, 0% on the player).
+        let Some(here) = w.component_mut(player, &HERE) else { continue };
+        if *here != n.share {
+            weft_sdk::debug!(
                 "fireflies: player {player} in {}: air {:.1}, mean {:.1}, soil {:.2}, rain {}, {:.2} h, sunset {:.2}: share {:.2}",
                 n.biome,
                 n.air,
@@ -107,7 +120,7 @@ fn count(w: &World) {
                 n.sunset,
                 n.share
             );
-            w.set_component(Holder::entity(player), &HERE, n.share);
+            *here = n.share;
         }
     }
 }
