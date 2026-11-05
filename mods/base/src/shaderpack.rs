@@ -17,13 +17,14 @@ pub const ID: &str = "chiacraft";
 
 const LOOK: &str = include_str!("../shaderpack/look.wgsl");
 
-const FILES: [(&str, &str); 6] = [
+const FILES: [(&str, &str); 7] = [
     ("world.wgsl", include_str!("../shaderpack/world.wgsl")),
     ("sky.wgsl", include_str!("../shaderpack/sky.wgsl")),
     ("model.wgsl", include_str!("../shaderpack/model.wgsl")),
     ("entity.wgsl", include_str!("../shaderpack/entity.wgsl")),
     ("particle.wgsl", include_str!("../shaderpack/particle.wgsl")),
     ("weather.wgsl", include_str!("../shaderpack/weather.wgsl")),
+    ("post.wgsl", include_str!("../shaderpack/post.wgsl")),
 ];
 
 // Water writes depth, so the reflections effect finds its surface.

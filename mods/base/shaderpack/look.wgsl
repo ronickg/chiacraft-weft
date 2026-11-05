@@ -998,7 +998,18 @@ fn exposure() -> f32 {
     return mix(day, 4.0, smoothstep(0.0, -0.2, scene.sun.y));
 }
 
+// What a surface writes: into the HDR world (`scene.frame.x`, the engine's `core:hdr_world`) its light
+// as it is, linear and past 1, which the screen effects work on and the effects' last pass then
+// finishes (`finish_picture`, in this pack's post.wgsl); into the screen, finished here as always.
 fn display(c: vec3<f32>) -> vec3<f32> {
+    if scene.frame.x > 0.5 {
+        return max(c, vec3(0.0));
+    }
+    return finish_picture(c);
+}
+
+// The picture finished: exposure, the tone curve and the grade, from linear light to the screen.
+fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     // By day Timothy Lottes's curve (his published formula, GDC 2016; Complementary's settings:
     // contrast 1.05, mid-grey 0.25 in and out, peak 8) at exposure 1.3: black stays black (no toe
     // lift, which raised the black point and halved saturation: Colour 4-7) and the darks keep their

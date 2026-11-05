@@ -724,6 +724,10 @@ gpu_struct! {
         /// What falls from the sky (a mod's `sky_landing`): xyz where it lands (camera relative),
         /// w seconds until it does (negative after; -1e6 when nothing falls).
         pub sky_landing: [f32; 4],
+        /// How this frame is drawn: x 1 when into the HDR world (`post::hdr`: linear light past 1,
+        /// the picture finished in the effects' last pass, so a pack's surfaces leave its tone
+        /// curve to that pass); 0 into the screen or a preview. yzw unused.
+        pub frame: [f32; 4],
     }
 }
 
