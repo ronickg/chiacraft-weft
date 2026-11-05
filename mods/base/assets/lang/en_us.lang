@@ -1521,3 +1521,17 @@ ley.base.feel.strong = a strong pull
 ley.base.feel.on_line = on a line
 ley.base.feel.at_node = at a node
 command.base.ley = ley here {0} ({1}); nearest line {2} blocks, at {3} {4}; nearest node {5} {6} ({7} lines), {8} blocks; nearest waystone {9} {10}, {11} blocks
+web.base.tip.pick0 = {color:title}{0}{/} {color:dim}(item level {1}){/}
+    {color:dim}Click to set it in.{/}
+web.base.tip.pick1 = {color:title}{0}{/} {color:dim}(item level {1}){/}
+    {2} {3}
+    {color:dim}Click to set it in.{/}
+web.base.tip.pick2 = {color:title}{0}{/} {color:dim}(item level {1}){/}
+    {2} {3}
+    {4} {5}
+    {color:dim}Click to set it in.{/}
+web.base.tip.pick3 = {color:title}{0}{/} {color:dim}(item level {1}){/}
+    {2} {3}
+    {4} {5}
+    {6} {7}
+    {color:dim}Click to set it in.{/}

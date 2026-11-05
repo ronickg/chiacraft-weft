@@ -457,11 +457,18 @@ fn picker(ui: &mut Ui, c: &ClientView, socket: u16) {
             ui.text_styled(S::default().no_wrap(), "web.base.pick", &[]);
         }
         for (slot, st) in stones {
+            // Its rolls, as a socketed stone's tooltip says them (an item in a button has none).
+            let (tip, args) = STONE
+                .on_stack_own(&st)
+                .and_then(|d| d.stone())
+                .map_or(("web.base.pick".to_string(), Vec::new()), |stone| stone_tooltip(stone, "pick"));
+            let args: Vec<Arg> = args.iter().map(|a| a.as_arg()).collect();
             ui.button_with(
                 S::default()
                     .class("slot")
                     .size(PICK_ICON + 2.0, PICK_ICON + 2.0)
-                    .center(),
+                    .center()
+                    .tooltip_args(&tip, &args),
                 move |c| {
                     c.client()
                         .send(&crate::skills::SOCKET, &((socket as u32) << 16 | slot));
@@ -477,10 +484,16 @@ fn picker(ui: &mut Ui, c: &ClientView, socket: u16) {
 
 /// A socket's tooltip: empty with its state, or its stone and what it does.
 fn socket_tooltip(stone: Option<vitals::sockets::Stone>, st: State) -> (String, Vec<A>) {
-    use vitals::sockets::{Flow, Kind as K};
     let Some(stone) = stone else {
         return ("web.base.tip.socket".into(), vec![A::Int(perks::SOCKET_POINTS as i64), A::Key(st.key().into())]);
     };
+    stone_tooltip(stone, "stone")
+}
+
+/// A stone's tooltip: its name, item level and what it does, one line a boost (`web.base.tip.<kind><n>`:
+/// "stone" in a socket, "pick" in the picker).
+fn stone_tooltip(stone: vitals::sockets::Stone, kind: &str) -> (String, Vec<A>) {
+    use vitals::sockets::{Flow, Kind as K};
     let mut args = vec![A::Key(format!("item.base.{}", stone.kind.id())), A::Int(stone.level as i64)];
     let mut lines = 0;
     for (f, units) in stone.rolls.iter().flatten() {
@@ -506,7 +519,7 @@ fn socket_tooltip(stone: Option<vitals::sockets::Stone>, st: State) -> (String, 
         }
         _ => {}
     }
-    (format!("web.base.tip.stone{lines}"), args)
+    (format!("web.base.tip.{kind}{lines}"), args)
 }
 
 /// An owned tooltip argument.
