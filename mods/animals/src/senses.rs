@@ -89,6 +89,8 @@ struct Noise {
     heard: f32,
     at: u64,
     by: u64,
+    /// Whether a player made it (worked out once, as it is made).
+    player: bool,
 }
 
 /// The last sounds made (blocks broken, fights), across all regions (`perception::NOISE_TICKS`
@@ -98,7 +100,8 @@ const MOST_NOISES: usize = 64;
 
 /// A sound at `pos` that carries `heard` blocks, made by `by`.
 fn noise(w: &World, pos: [f64; 3], heard: f32, by: u64) {
-    let n = Noise { dim: w.dimension(), pos: pos.map(|v| v as f32), heard, at: w.game_time(), by };
+    let player = by != 0 && w.players_iter().any(|q| q == by);
+    let n = Noise { dim: w.dimension(), pos: pos.map(|v| v as f32), heard, at: w.game_time(), by, player };
     let mut v = NOISES.lock().unwrap_or_else(|e| e.into_inner());
     v.retain(|o| n.at < o.at + perception::NOISE_TICKS && n.at >= o.at);
     if v.len() >= MOST_NOISES {
@@ -225,7 +228,7 @@ fn hunting(w: &World, id: u64, s: &Species, tamed: bool) -> bool {
 
 /// Blocks it notices hunters within at most, by any sense (a sprint heard, a scent on the wind):
 /// the look round is one query of the entities this near.
-const HUNTERS_WITHIN: f64 = 16.0;
+const HUNTERS_WITHIN: f64 = 12.0;
 /// Blocks a second a walker or a hunter covers sprinting, and walking at all.
 const RUNNING: f32 = 0.2;
 const MOVING: f32 = 0.01;
@@ -355,7 +358,8 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
         if hunter {
             let d = d2.sqrt() as f32;
             let off = [(e.pos.x - p.x) as f32, (e.pos.z - p.z) as f32];
-            let seen = if d <= watch as f32 { watch as f32 * lit(w, e.eye()) } else { 0.0 };
+            // The light there is read only for the hunters it notices most (below).
+            let seen = if d <= watch as f32 { watch as f32 } else { 0.0 };
             let heard = match e.moved {
                 m if m > RUNNING => perception::SPRINT_HEARD,
                 m if m > MOVING => perception::WALK_HEARD,
@@ -375,8 +379,11 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
     hunters.sort_by(|a, b| b.0.gain.total_cmp(&a.0.gain));
     let mut best: Option<(Sensed, u64, Vec3)> = None;
     for (mut s, t, pos, their_eye) in hunters.into_iter().take(2) {
-        if s.sight > s.other && !clear(w, eye, their_eye) {
-            s = Sensed { gain: s.other, sight: 0.0, smell_only: s.other > 0.0 && s.smell_only, ..s };
+        if s.sight > s.other {
+            // Its sight of it in the light there, and only with nothing opaque between.
+            let d = dist2(pos, p).sqrt() as f32;
+            let sight = if clear(w, eye, their_eye) { perception::gain(d, watch as f32 * lit(w, their_eye)) } else { 0.0 };
+            s = Sensed { gain: sight.max(s.other), sight, ..s };
         }
         if s.gain > 0.0 && best.is_none_or(|b| s.gain > b.0.gain) {
             best = Some((s, t, pos));
@@ -396,7 +403,7 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
         if g <= 0.0 {
             continue;
         }
-        if w.players_iter().any(|q| q == n.by) {
+        if n.player {
             if player_noise.is_none_or(|b| g > b.0) {
                 player_noise = Some((g, n.by));
             }
