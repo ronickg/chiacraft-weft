@@ -145,10 +145,11 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         discard;
     }
     // On a blood moon the monsters' eyes burn red: their glow masks' green channel (Art's
-    // `entity/<skin>_e.png`, red 0 so no glow on other nights), brighter in totality.
+    // `entity/<skin>_e.png`, red 0 so no glow on other nights), brighter in totality; deep red,
+    // which stays red through the night's curve (brighter, it clipped to orange).
     if in.glow != 0xffffffffu && blood_moon() > 0.0 {
         let g = textureSampleLevel(textures[in.glow], nearest_clamp, in.uv, 0.0).g * blood_moon();
-        c = vec4(mix(c.rgb, vec3(2.2, 0.22, 0.06), g), c.a);
+        c = vec4(mix(c.rgb, vec3(1.15, 0.03, 0.01), g), c.a);
     }
     if in.graded != 0u {
         return vec4(display(haze_lit(c.rgb, in.rel, in.sky)), SOLID_ALPHA);

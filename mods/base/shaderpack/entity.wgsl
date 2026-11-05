@@ -205,9 +205,10 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         light = max(light, in.tint * pow(mask.r, 2.2));
         lit = albedo.rgb * light;
         // On a blood moon the monsters' eyes burn red: their glow masks' green channel (Art's
-        // `entity/<skin>_e.png`, red 0 so no glow on other nights), brighter in totality.
+        // `entity/<skin>_e.png`, red 0 so no glow on other nights), brighter in totality. Deep red that stays red through the night's curve (at 2.4 0.2 0.05 it
+        // clipped to orange, the eyes check, 11-05).
         let g = mask.g * blood_moon();
-        lit = mix(lit, vec3(2.4, 0.2, 0.05), g);
+        lit = mix(lit, vec3(1.15, 0.03, 0.01), g);
     } else {
         lit = albedo.rgb * light;
     }
