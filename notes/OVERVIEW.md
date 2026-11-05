@@ -4,7 +4,7 @@ Written by `notes/overview/build.py` from `notes/overview/pieces.json`; edit tha
 
 **The goal.** Players open their own worlds, find other people's without any central service, link them with portals and walk between them; missing mods download on the way; identity and achievements live on Chia. The game in those worlds: survival in the Valheim spirit with real temperatures and seasons, and animals to tame, breed and raise, from real facts.
 
-■ built and seen working: 73 · ◧ partly built: 38 · □ not built yet: 10 · ◌ planned for later: 6
+■ built and seen working: 73 · ◧ partly built: 39 · □ not built yet: 10 · ◌ planned for later: 6
 
 ## Core next
 
@@ -209,11 +209,12 @@ Code: `mods/base/src`, `mods/base/assets`. Docs: `docs/worldgen.md`, `notes/PLAN
 
 ## Look and feel
 
-One warm pixel style: a copper-bronze UI kit, generated icons, box models painted like illustrations. 7 of 16 parts built.
+One warm pixel style: a copper-bronze UI kit, generated icons, box models painted like illustrations. 7 of 17 parts built.
 
 | | Part | Notes |
 |---|---|---|
 | ■ | Style guide |  |
+| ◧ | 3D plants (prototype) | Ronald, 11-05: "let's try model like grass or like sugarcane crops in 3D". A resource pack, plants_3d, that redraws tall grass, sugar cane, wheat, carrots and beans (every stage) as small box models through .ctm model tiles: three random layouts a plant, sugar cane by the vertical method. Base writes it next to the game after the join; Settings > Resource Packs turns it on, --resource-pack plants_3d for a scripted run. 18-105 quads a block against 4 flat. Waiting: Ronald's look at the sheet and the PC look and bench. Code: `mods/base/source/plants3d`, `mods/base/packs/plants_3d`, `mods/base/src/plants3d.rs`. Docs: `docs/ctm.md`. |
 | ■ | UI kit in the game | Code: `mods/base/source/ui`. |
 | ■ | Shader pack light: shadows, reflections, rays | In chiacraft's pack (mods/base/shaderpack, its screen effects in mods/base/assets/shaders/post): sun shadows from a 2048 shadow map 80 blocks around the player, cast by blocks (leaves and plants dappled), mobs and the player's own body (in first person too); water that is dark and clear looking down, shows the bottom in the shallows (turquoise there, deep blue further down, from the client's block map), mirrors the sky and the hills toward the horizon (Fresnel, reflect.wgsl), has crossed swells along the wind, a narrow sun path and foam at the shore (checks/water-look.txt); contact shadows in corners and under overhangs (contact.wgsl); light shafts round a low sun and in fog (shafts.wgsl). The engine gives packs the scene's depth and the shadow map (pack.cfg: translucent_depth, sun_shadows). Checked on an RTX 5090 (and an M3 Max for the pack before shadows) with the testkit scripts in checks/. Not yet: dropped and held items cast none, a comparison sampler for softer edges. Code: `mods/base/shaderpack`, `mods/base/assets/shaders/post`, `crates/engine/src/client/mod.rs`. Docs: `reports/Shadow maps.md`, `reports/Shader pack testing.md`, `mods/base/shaderpack/checks/README.md`. |
 | ◧ | Light under a forest's canopy | How closed each forest's canopy is, per biome (vitals::air::CANOPY: the tropical forest 1, sequoia grove 0.6, forest 0.5, taiga 0.4, birch 0.35, swamp 0.3), reaches the pack as scene.canopy through the biome's air (air_flags::CANOPY_SHIFT). Under the leaves the floor is lit by green sunlight come through them (luma p50 about 25 at noon in Plants' rainforest, inside the 15-60 target), sunflecks through the gaps come at near full sun, mist rises into the crowns, and the fog is lit per step by the shadow map: dark green in the canopy's shade, light shafts where the sun comes through. Knobs look_canopy and look_shafts (look.rs). Checked with checks/canopy-interior.txt on tropical-trees (sheet: chiacraft-archive images/lighting/2026-11-04/canopy_sheet.jpg). Not yet: the shafts read grey-white, not gold at a low sun; thick dawn mist seen from above the crowns is still white; the shafts' step jitter shows as grain. Code: `mods/base/vitals/src/air.rs`, `mods/base/src/weather.rs`, `mods/base/shaderpack/look.wgsl`, `mods/base/assets/shaders/post/volume.wgsl`. Docs: `docs/shaders.md`, `notes/SYSTEMS.md`. |
