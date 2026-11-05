@@ -619,9 +619,15 @@ pub fn escape(w: &World, st: &EntityState, from: [f64; 3], dist: f64, herd: Opti
     straight
 }
 
-/// It has half noticed something at `at`: it stops and turns to look that way (what the player
-/// sees before it bolts).
+/// It has half noticed something at `at`: it stops and turns to look that way, staring (what the
+/// player sees before it bolts).
 pub fn stare(w: &World, id: u64, st: &EntityState, at: [f32; 3]) {
+    face(w, id, st, at);
+    crate::anim::hold(w, id, crate::anim::Act::Stare);
+}
+
+/// It stops and turns to face `at`.
+pub fn face(w: &World, id: u64, st: &EntityState, at: [f32; 3]) {
     if w.navigating(id) {
         w.navigate(id, st.pos, 0.0);
     }
@@ -703,6 +709,7 @@ pub fn watch_goal(w: &World, id: u64, st: &EntityState) -> bool {
         let turn = (w.random_below(240) as f32 - 120.0).to_radians();
         w.entity_edit(id).yaw(st.yaw + turn);
     }
+    crate::anim::hold(w, id, crate::anim::Act::Watch);
     true
 }
 
@@ -755,6 +762,8 @@ pub fn investigate(w: &World, id: u64, st: &EntityState) -> bool {
         }
         let k = ((d - to) / d) as f64;
         w.navigate(id, [st.pos.x + (e.pos.x - st.pos.x) * k, e.pos.y, st.pos.z + (e.pos.z - st.pos.z) * k], 0.6);
+        // Slowly, the head low (held till its next look, in 20 ticks).
+        crate::anim::hold(w, id, crate::anim::Act::Approach);
     } else {
         stare(w, id, st, [e.pos.x as f32, e.pos.y as f32, e.pos.z as f32]);
     }

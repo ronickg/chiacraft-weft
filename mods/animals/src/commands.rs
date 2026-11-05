@@ -498,7 +498,7 @@ pub fn fight_aiming(w: &World, id: u64, st: &EntityState, t: u64, speed: f32, ai
     if flat < reach * reach && (e.pos.y - st.pos.y).abs() < 2.0 + st.size.height as f64 / 2.0 && w.attack(id, t) {
         let attacks = species.map_or(&[][..], |s| s.attacks);
         if !attacks.is_empty() {
-            w.action_play(id, attacks[w.random_below(attacks.len() as u32) as usize], false);
+            crate::anim::play_named(w, id, attacks[w.random_below(attacks.len() as u32) as usize]);
         }
     }
     if (w.game_time() + id) % 5 == 0 || !w.navigating(id) {

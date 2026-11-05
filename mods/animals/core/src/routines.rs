@@ -44,6 +44,16 @@ pub const DRINKS_AT: f32 = 0.8;
 /// Activity under which a hunter rests rather than hunts, unless its food is under this share.
 pub const HUNTS_FROM: f32 = 0.45;
 pub const HUNTS_ANYWAY: f32 = 0.35;
+/// Lying down, it sleeps (eyes shut, head on its paws: `anim::Act::Sleep`) out of its hours (its
+/// activity under this, as a hunter rests rather than hunts), or once it has lain this many ticks
+/// (a minute: of a deer's 30 s to 2 min rests, most end asleep).
+pub const ASLEEP_BELOW: f32 = HUNTS_FROM;
+pub const DOZES_AFTER: u32 = 1200;
+
+/// Whether one lying down `rested` ticks at `activity` is asleep.
+pub fn asleep(activity: f32, rested: u32) -> bool {
+    activity < ASLEEP_BELOW || rested >= DOZES_AFTER
+}
 
 /// Whether `hour` is dawn's or dusk's drinking time.
 pub fn drinking_hour(hour: f32) -> bool {

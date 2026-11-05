@@ -220,6 +220,7 @@ pub const ROPE_X: u32 = 17;
 pub const ROPE_Y: u32 = 18;
 pub const ROPE_Z: u32 = 19;
 pub const ROPE_REEL: u32 = 20;
+pub const KNOCKBACK_RESISTANCE: u32 = 21;
 
 impl Dim {
     fn base_attribute(&self, c: &Content, entity: u64, attr: u32) -> Option<f64> {

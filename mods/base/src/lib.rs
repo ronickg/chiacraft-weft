@@ -21,6 +21,7 @@ mod felling;
 mod firebed;
 mod fireflies;
 mod first;
+mod gems;
 mod glider;
 mod grapple;
 mod growth;
@@ -124,6 +125,7 @@ fn init(r: &mut Registry) {
     book::register(r);
     discovery::register(r);
     parts::register(r);
+    gems::register(r);
     first::register(r);
     knapping::register(r);
     firebed::register(r);

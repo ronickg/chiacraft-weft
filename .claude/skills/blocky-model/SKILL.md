@@ -265,6 +265,15 @@ Animation
   foot, in walk and run; build scripts assert it. Short legs need a clear lift (a big knee
   bend, a small swing) and fine keyframes (20-24 a cycle), or the foot only shuffles and the
   check can't tell forward from back.
+- **Every gait, not just walk and run**: a clip that plays in place of the walk (a crouched
+  stalk, a slow approach, a charge) is checked the same way. A crouch made by adding a knee bend
+  *against* the way the lift bends it straightens the knee as the foot lifts, so the foot is
+  lowest mid-swing and the gait moonwalks (the first stalks did, on four species, 2026-11-05):
+  bend each joint the way a step lifts it, paw kept flat (`upper + lower + paw = 0`), and search
+  the bends with `gait` and `feet_low`. Bending a leg also shortens it less than you guess: set
+  such a clip's height from its feet with `ground.grounded(spec, anim, feet)` (each frame on its
+  lowest foot; `bounds=True` for a run's or charge's bounce) and assert `feet_low` within 0.3 of
+  the ground, as the builds do. A hand-set root drop sank the first stalk 4 units into the ground.
 - **Feet that don't slide** (big creatures, where sliding shows): give each foot a path (on the
   ground moving back at the ground speed, then lifted and swung forward) and solve the limb's
   angles to it every frame (least squares on the model's bones, warm-started from the last frame,
@@ -658,7 +667,9 @@ system numpy and Pillow). Homebrew's own `python3` has no scipy and refuses inst
   `joints(spec)`: joints whose pivot isn't inside both parts (parts that come apart);
   `pokes(spec, parts)`: corners poking out of a neighbor at an angled joint, at rest and in every
   keyframe (`python ground.py spec.json neck skull ...` prints them);
-  `gait(spec, anim, feet)`: whether a walk or run moves forward (positive per foot).
+  `gait(spec, anim, feet)`: whether a walk or run moves forward (positive per foot);
+  `feet_low(spec, anim, feet)`: the feet's lowest y in each frame; `grounded(spec, anim, feet,
+  bounds=False)`: the clip with its root's height set so its feet stand on the ground.
 - `scripts/variants.py model.glb out.json name=tex.png ...` — texture variants padded to the
   GLB's texture size, as data URLs for the viewer.
 - `scripts/layers.py` — per-texel layers for coats painted on the fly (see above).

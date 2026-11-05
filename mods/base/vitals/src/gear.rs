@@ -71,6 +71,10 @@ pub const MATERIALS: &[MaterialLevel] = &[
     ml("steel", 2, 7),
     ml("star_steel", 2, 9),
     ml("diamond", 3, 5),
+    // Gems only (`crafting::gems`): a pallasite's peridot (the fallen stars, cut like iron-age
+    // star steel), the animals mod's amber (fossil resin, Stone Age).
+    ml("peridot", 2, 8),
+    ml("amber", 0, 4),
 ];
 
 pub fn material(id: &str) -> Option<&'static MaterialLevel> {

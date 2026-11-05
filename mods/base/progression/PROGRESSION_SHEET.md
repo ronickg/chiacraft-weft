@@ -17,6 +17,7 @@ Written from `mods/base/progression` (`cargo run -p progression --bin sheet > mo
 | every species inside its bands at every level, floors hold | passes |
 | tames capped by their saddle and ceiling | passes |
 | tweaks inside ×0.75-×1.25 with a reason | passes |
+| grade and gems at most +60% over a plain item | passes |
 
 ## The ages
 
@@ -24,10 +25,10 @@ Power grows ×1.6 an age: `g(L) = 1.6^(L/10)` over area and item level L (tier �
 
 | tier | age | hours | EM | g at start | reference: hit / health / armour | things tagged | made | kit EM | of budget | everything once |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 494 | 147 | 52 | 36 % | 214 EM |
+| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 496 | 149 | 52 | 36 % | 221 EM |
 | 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 26 | 15 | 76 | 26 % | 53 EM |
-| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 27 | 21 | 50 | 13 % | 246 EM |
-| 3 | Age of Steam | 18 | 1080 | 4.10 | 31.1 / 104 / 130 | 25 | 22 | 94 | 22 % | 263 EM |
+| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 28 | 22 | 50 | 13 % | 256 EM |
+| 3 | Age of Steam | 18 | 1080 | 4.10 | 31.1 / 104 / 130 | 26 | 23 | 94 | 22 % | 273 EM |
 | 4 | Age of Lightning | 20 | 1200 | 6.55 | 49.7 / 166 / 207 | 0 | 0 | 0 | 0 % | 0 EM |
 | 5 | Age of the Future | 18 | 1080 | 10.49 | 79.6 / 265 / 332 | 0 | 0 | 0 | 0 % | 0 EM |
 | 6 | Age of Stars | 16 | 960 | 16.78 | 127.3 / 424 / 531 | 0 | 0 | 0 | 0 % | 0 EM |
@@ -229,6 +230,8 @@ One hit's damage (engine points) by material:
 | steel | Iron Age | 27 | 13.3 | 21.3 | 17.8 | 7.5 | 8.9 | 8.5 | 3.2 | 89 / 71 |
 | star_steel | Iron Age | 29 | 14.7 | 23.4 | 19.5 | 8.2 | 9.8 | 9.4 | 3.5 | 98 / 78 |
 | diamond | Age of Steam | 35 | 19.4 | 31.1 | 25.9 | 10.9 | 13.0 | 12.4 | 4.7 | 130 / 104 |
+| peridot | Iron Age | 28 | 14.0 | 22.4 | 18.6 | 7.8 | 9.3 | 8.9 | 3.4 | 93 / 75 |
+| amber | Stone Age | 4 | 4.5 | 7.2 | 6.0 | 2.5 | 3.0 | 2.9 | 1.1 | 30 / 24 |
 
 ## Tames by saddle
 
@@ -274,10 +277,11 @@ Moving to the next age takes a key, one thing from each gate (materials and tool
 
 Every named item and block, by its tag (`content::RULES`). EM is the cheapest way to have one; "-" not had as an item.
 
-### Stone Age (494)
+### Stone Age (496)
 
-**tech** (42)
+**tech** (44)
 
+- material: gem_amber (2.0), gem_tektite (5.1)
 - tool: arrow (2.0), axe (0.48), bow (0.48), glider (7.8), hoe (0.70), knife (0.43), pickaxe (0.48), shovel (0.48), spear (0.70), sword (0.70)
 - armour: boots (0.70), chestplate (0.70), helmet (0.70), leggings (0.70)
 - station: furnace (1.2)
@@ -327,6 +331,7 @@ Notes:
 - base:axe, base:pickaxe, base:shovel, base:hoe, base:knife, base:spear, base:sword, base:bow: built from parts: its parts' materials set its real age (`MATERIALS`)
 - base:helmet, base:chestplate, base:leggings, base:boots: built from a shell, fastening and lining: its shell sets its real age; a leather-look shell (leather, rawhide, bone)
 - base:part_*: a part's material sets its real age (`MATERIALS`)
+- base:gem_tektite, base:gem_amber: cut gems: a boost in a tool's, weapon's or armour's socket
 - base:arrow: dropped by skeletons; no recipe yet
 - base:furnace: the Stone Age key's infrastructure: what it makes is the Bronze Age's
 - base:cooking_pot, base:stew: a clay pot (Ronald, 11-07: "move them to fit")
@@ -357,12 +362,12 @@ Notes:
 - base:meteoric_iron: hammered cold, iron-grade before a player can smelt (Research round 17)
 - base:raw_gold, base:gold_ingot, base:gold_block: cast and soft: the Bronze Age's (Ronald, 11-07: "move them to fit")
 
-### Iron Age (27)
+### Iron Age (28)
 
-**tech** (15)
+**tech** (16)
 
 - ground: redstone_ore (-), star_steel_ore (-)
-- material: bucket (3.5), iron_block (11), iron_ingot (1.2), lava_bucket (4.1), raw_iron (1.0), star_steel_ingot (12), star_steel_lump (12), water_bucket (3.7)
+- material: bucket (3.5), gem_peridot (10), iron_block (11), iron_ingot (1.2), lava_bucket (4.1), raw_iron (1.0), star_steel_ingot (12), star_steel_lump (12), water_bucket (3.7)
 - tool: grappling_hook (3.8)
 - armour: boots_mail (2.8), chestplate_mail (4.0), helmet_mail (2.8), leggings_mail (4.0)
 
@@ -390,12 +395,12 @@ Notes:
 - base:salt, base:salted_meat: salt is boiled from a water bucket (iron)
 - animals:wyvern_saddle: a dragon-sized saddle has an iron frame
 
-### Age of Steam (25)
+### Age of Steam (26)
 
-**tech** (24)
+**tech** (25)
 
 - ground: diamond_ore (-)
-- material: diamond (10), diamond_block (90)
+- material: diamond (10), diamond_block (90), gem_diamond (10)
 - armour: boots_gem (20), chestplate_gem (30), helmet_gem (20), leggings_gem (30)
 - machine: anchor (9.9), comparator (3.3), copper_lamp (-), dispenser (1.6), floater (10), golden_lamp (13), lever (0.25), observer (3.1), piston (2.6), redstone (0.50), redstone_block (4.6), redstone_lamp (3.2), redstone_torch (0.60), repeater (2.7), slime_block (1.0), sticky_piston (3.7), stone_button (0.37)
 

@@ -659,6 +659,39 @@ def pose_flinch(t):
     return q
 
 
+def pose_watch(t):
+    """A herd's sentinel: standing tall, the head high, turning slowly one way and the other, the
+    ears swivelling to each side, a chew now and then (4 s, held)."""
+    p = t / 4.0
+    yaw = 32 * S(TAU * p)
+    q = still(t, 4.0)
+    q.update({"spine_1": (-2, 0, 0), "neck": (-18, 0.6 * yaw, 0), "head": (6, 0.4 * yaw, 0),
+              "ear_L": (-8, 0, -14 - 0.3 * yaw), "ear_R": (-8, 0, 14 - 0.3 * yaw), "tail": (-6, 0, 0)})
+    q.update(chew(t, 2.0, 3.0 * max(0.0, S(TAU * p * 2))))
+    return q
+
+
+def pose_approach(t):
+    """Curious, coming to look: slow careful steps, the neck stretched out low and the nose
+    forward to sniff, the ears cupped ahead (1.8 s a cycle, in place of the walk)."""
+    p = t / 1.8
+    q = gait(p, (0.0, 0.5, 0.75, 0.25), 14, 34)
+    q.update({"root": (0, 0.4 * abs(S(TAU * p * 2)), 0), "spine_1": (3, 0, 0), "neck": (22, 0, 0), "head": (-14 + 3 * S(TAU * p * 2), 0, 0),
+              "ear_L": (-10, 0, -10), "ear_R": (-10, 0, 10), "tail": (-4, 0, 0)})
+    return q
+
+
+def pose_charge(t):
+    """Charging a hunter: a hard run with the head down and the antlers out in front, the ears
+    pinned back, the tail clamped (0.5 s a cycle, in place of the walk and the run)."""
+    p = t / 0.5
+    q = gait(p, (0.0, 0.1, 0.5, 0.6), 30, 58)
+    c = S(TAU * p)
+    q.update({"root": (0, 2.0 * max(0.0, S(TAU * p + 0.6)), 0), "spine_0": (-4 * c, 0, 0), "spine_1": (5 + 5 * c, 0, 0),
+              "neck": (30, 0, 0), "head": (22, 0, 0), "ear_L": (30, 0, 14), "ear_R": (30, 0, -14), "tail": (6, 0, 0)})
+    return q
+
+
 def pose_death(t, P=L):
     """Dying: the legs fold, it rolls onto its side, the head drops; it stays (1.4 s, holds)."""
     p = t / 1.4
@@ -671,15 +704,18 @@ def pose_death(t, P=L):
     return q
 
 
-BLINKS = {"idle": [2.0, 5.9], "lie": [1.5, 4.4], "stare": [1.3], "graze": [1.1], "look": [1.6]}
+BLINKS = {"idle": [2.0, 5.9], "lie": [1.5, 4.4], "stare": [1.3], "graze": [1.1], "look": [1.6], "watch": [1.2, 3.1]}
 BLINK = 0.12
 ANIMS = {"idle": (pose_idle, 8.0), "walk": (pose_walk, 1.4), "run": (pose_run, 0.5), "lie": (pose_lie, 6.0),
          "stare": (pose_stare, 2.0), "graze": (pose_graze, 2.5), "drink": (pose_drink, 1.5), "sniff": (pose_sniff, 2.2),
          "look": (pose_look, 3.0), "scratch": (pose_scratch, 2.0), "stretch": (pose_stretch, 2.4), "sleep": (pose_sleep, 6.0),
          "alarm": (pose_alarm, 1.4), "rear": (pose_rear, 1.4), "play": (pose_play, 1.2), "groom": (pose_groom, 2.5),
-         "nuzzle": (pose_nuzzle, 2.0), "flinch": (pose_flinch, 0.45), "death": (pose_death, 1.4)}
-LOOPS = {"stare": True, "graze": True, "drink": True, "sleep": True, "death": "hold_on_last_frame"}
-BLENDS = {"flinch": (0.05, 0.2), "death": (0.1, 0.0), "sleep": (0.6, 0.6), "graze": (0.4, 0.4)}
+         "nuzzle": (pose_nuzzle, 2.0), "flinch": (pose_flinch, 0.45), "death": (pose_death, 1.4),
+         "watch": (pose_watch, 4.0), "approach": (pose_approach, 1.8), "charge": (pose_charge, 0.5)}
+LOOPS = {"stare": True, "graze": True, "drink": True, "sleep": True, "watch": True, "approach": True, "charge": True,
+         "death": "hold_on_last_frame"}
+BLENDS = {"flinch": (0.05, 0.2), "death": (0.1, 0.0), "sleep": (0.6, 0.6), "graze": (0.4, 0.4), "watch": (0.4, 0.4),
+          "approach": (0.3, 0.3), "charge": (0.15, 0.3)}
 
 
 def eyelids(name, t):
@@ -688,7 +724,7 @@ def eyelids(name, t):
 
 
 def frame_times(name, dur):
-    n = {"idle": 96, "lie": 60, "walk": 24, "run": 20, "sleep": 36, "flinch": 12}.get(name, 24)
+    n = {"idle": 96, "lie": 60, "walk": 24, "run": 20, "sleep": 36, "flinch": 12, "watch": 40, "approach": 24, "charge": 20}.get(name, 24)
     ts = {round(dur * k / n, 4) for k in range(n + 1)}
     for b in BLINKS.get(name, []):
         ts |= {round(b + d, 4) for d in (-BLINK, -BLINK / 2, 0, BLINK / 2, BLINK)}
