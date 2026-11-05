@@ -118,7 +118,9 @@ def build(out_dir):
     os.makedirs(os.path.join(out_dir, "textures"), exist_ok=True)
     to_bedrock.write(os.path.join(out_dir, "models", "glider_wing.geo.json"), geo)
     Image.fromarray(sheet).save(os.path.join(out_dir, "textures", "glider_wing.png"))
-    with open(os.path.join(out_dir, "glider_wing.spec.json"), "w") as f:
+    # The spec for review renders (`render.py`), beside the build, never into the assets.
+    os.makedirs(os.path.join(HERE, "out"), exist_ok=True)
+    with open(os.path.join(HERE, "out", "glider_wing.spec.json"), "w") as f:
         json.dump(spec, f)
     print("texture", sheet.shape[1], "x", sheet.shape[0], "elements", len(E), "coplanar", bad)
     return spec
