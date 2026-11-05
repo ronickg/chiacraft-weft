@@ -46,6 +46,15 @@ if __name__ == "__main__":
     assert not loose, f"loose joints: {loose}"
     poking = pokes(spec, AXIS)  # no neck corner through the head or chest, no brush segment through the one before
     assert not poking, f"poking through: {sorted(poking)}"
+    # No thin lines (Ronald, 11-05): no strip of a box under two texels showing beside another
+    # (linecheck; flush, or two texels clear).
+    # Meant: the muzzle's front round the nose (two texels tall: no room for two clear round it).
+    from linecheck import boxes_from_spec, lines  # noqa: E402
+    from PIL import Image  # noqa: E402
+    import numpy as np  # noqa: E402
+    thin = [h for h in lines(boxes_from_spec(spec), np.array(Image.open(os.path.join(OUT, "texture.png")).convert("RGBA")),
+                             allow=("muzzle.south",)) if h["kind"] == "line"]
+    assert not thin, f"thin lines: {[(h['box'], h['face'], h['cover'], h['width']) for h in thin]}"
     for anim in ("walk", "run", "stalk", "approach"):  # a foot in the air must swing forward, or it moonwalks
         back = {f: v for f, v in gait(spec, anim, FEET).items() if v is not None and v <= 0}
         assert not back, f"{anim} goes backwards: {back}"

@@ -159,9 +159,12 @@ def elements():
          el("chest", "spine_1", (-6, 11.5, -2.5), (6, 22, 12)),
          el("neck", "neck", (-4, 17, 9), (4, 25, 15)),
          el("skull", "head", *SKULL),
-         el("muzzle", "head", (-3.5, 24, 23.5), (3.5, 28, 27)),
-         el("mouth", "head", (-2.5, 22.5, 21.5), (2.5, 24.5, 24.8)),
-         el("jaw", "jaw", (-3, 21.5, 21), (3, 24, 25.5)),
+         # Two texels narrower than the skull each side (at 3.5 the cheeks beside it were 1.7 texels; linecheck).
+         el("muzzle", "head", (-2.6, 24, 23.5), (2.6, 28, 27)),
+         el("mouth", "head", (-2.0, 22.5, 21.5), (2.0, 24.5, 24.8)),  # half a unit inside the narrower muzzle and jaw
+         # As narrow as the muzzle, for the cheeks' two texels, and its bottom flush with the skull's (at
+         # 21.5 a strip a third of a texel tall showed under it; linecheck).
+         el("jaw", "jaw", (-2.6, 21.0, 21), (2.6, 24, 25.5)),
          el("nose", "head", (-1.5, 26.5, 27), (1.5, 28, 27.6))]
     # Ears: steps narrowing to a point (solid), plus one cut-out panel through the middle for a
     # smooth triangle with a few tufts; turned out a little and leaning out.
@@ -188,7 +191,9 @@ def elements():
             E.append(el(f"leg_{leg}_upper", f"leg_{leg}_upper", (x - 2.5, 8, z - 2.5), (x + 2.5, 15, z + 2.5)))  # wider than the lower leg
         else:
             z = -12.5
-            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (x - 3, 7.5, z - 4), (x + 3, 18, z + 4)))  # holds the knee (y = 8)
+            # Its outer side flush with the hips' (at x + 3 it stood 0.7 texels out beside them; linecheck).
+            xi, xo = sorted((x - 3 * s, x + 1.5 * s))
+            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (xi, 7.5, z - 4), (xo, 18, z + 4)))  # holds the knee (y = 8)
         E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x - 2, 2.5, z - 2), (x + 2, 8, z + 2)))
         E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 3.5, 0, z - 2.5), (x + 3.5, 2.5, z + 3.5)))
     return E

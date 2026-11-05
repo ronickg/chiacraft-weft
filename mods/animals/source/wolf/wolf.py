@@ -189,10 +189,13 @@ def elements():
     E = [el("hips", "spine_0", (-4.4, 17, -20), (4.4, 27, -3)),
          el("chest", "spine_1", (-5.0, 15, -6.5), (5.0, 27.5, 12)),
          el("skull", "head", *SKULL0),
-         el("muzzle", "head", (-2.0, 25.0, 19.5), (2.0, 27.6, 26.0)),  # long and slender
-         el("nose", "head", (-1.1, 26.1, 25.6), (1.1, 27.3, 26.6)),
-         el("mouth", "head", (-1.4, 24.4, 19.9), (1.4, 25.6, 24.6)),
-         el("jaw", "jaw", (-1.7, 23.4, 18.8), (1.7, 25.2, 25.2))]  # shorter than the muzzle
+         # Three of the face's seven texels wide, the cheeks beside it two (at 2.0, 1.75: strips; linecheck),
+         # its bottom on the jaw's top (at 25.0 it covered the jaw's top third, leaving its sides and front
+         # a strip 1.75 texels tall).
+         el("muzzle", "head", (-1.7, 25.2, 19.5), (1.7, 27.6, 26.0)),  # long and slender
+         el("nose", "head", (-1.1, 26.1, 25.6), (1.1, 27.3, 26.25)),  # flush on the muzzle's front (at 26.6 its top stood out a strip half a texel deep; linecheck)
+         el("mouth", "head", (-1.1, 24.4, 19.9), (1.1, 25.6, 24.6)),  # half a unit inside the narrower jaw
+         el("jaw", "jaw", (-1.45, 23.4, 18.8), (1.45, 25.2, 25.2))]  # shorter than the muzzle, a little narrower
     neck, _ = rod("neck", "neck", tuple(NECK0), (NECK_PITCH + 90, 0, 0), NECK_LEN, 5.6, 6.2, back=3.0)
     E.append(neck)
     for s, n in ((1, "L"), (-1, "R")):
@@ -217,7 +220,8 @@ def elements():
             E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 1.7, 0, z - 1.5), (x + 1.7, 2.6, z + 2.4)))
         else:
             x, z = BACK_X * s, BACK_Z
-            xi, xo = sorted((x - 1.6 * s, x + 2.6 * s))  # the haunch
+            # The haunch: its outer side flush with the hips' (at x + 2.6 it stood 0.85 texels out; linecheck).
+            xi, xo = sorted((x - 1.6 * s, x + 1.85 * s))
             E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (xi, 11, z - 3.6), (xo, 25, z + 3.4)))
             E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x - 1.0, 2, z - 1.2), (x + 1.0, 12, z + 1.2)))
             E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 1.75, 0, z - 1.6), (x + 1.75, 2.6, z + 2.6)))

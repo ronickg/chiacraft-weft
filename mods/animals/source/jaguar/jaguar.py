@@ -241,13 +241,14 @@ def bones():
 
 def elements():
     E = [el("hips", "spine_0", (-5.9, 11, -21), (5.9, 21, 3)),  # a longer back than a cat's, deep in the chest
-         el("chest", "spine_1", (-6.6, 11.5, -2.5), (6.6, 22, 12)),  # deep and broad
+         # Its bottom flush with the hips' (at 11.5 the hips' side showed a strip half a texel tall under it; linecheck).
+         el("chest", "spine_1", (-6.6, 11.2, -2.5), (6.6, 22, 12)),  # deep and broad
          el("neck", "neck", (-3.6, 17.5, 9), (3.6, 25, 15)),  # slimmer than the head it enters
          el("skull", "head", *SKULL),
-         el("muzzle", "head", (-4.2, 24, 23.5), (4.2, 28, 27)),  # broad
+         el("muzzle", "head", (-4.2, 24, 23.5), (4.2, 28, 27.5)),  # broad; out over two texels from the skull (at 27, 1.7: a rim; linecheck)
          el("mouth", "head", (-2.5, 22.5, 21.5), (2.5, 24.5, 24.8)),
-         el("jaw", "jaw", (-3, 21.5, 21), (3, 24, 25.5)),
-         el("nose", "head", (-1.5, 26.5, 27), (1.5, 28, 27.6))]
+         el("jaw", "jaw", (-3, 21.5, 21), (3, 24, 27.1)),  # out two texels from the skull (at 25.5, one texel: a rim; linecheck)
+         el("nose", "head", (-1.5, 26.5, 27.5), (1.5, 28, 28.1))]  # on the muzzle's front, moved out with it
     # Ears: steps narrowing to a point (solid), plus one cut-out panel through the middle for a
     # smooth triangle with a few tufts; turned out a little and leaning out.
     steps = [(33, 35, 3.6), (35, 36.6, 2.9), (36.6, 37.8, 1.8)]  # y0, y1, half width: small and round
@@ -268,10 +269,14 @@ def elements():
         x = 4.6 * s
         if leg[0] == "F":
             z = 10.25
-            E.append(el(f"leg_{leg}_upper", f"leg_{leg}_upper", (x - 2.9, 8, z - 2.9), (x + 2.9, 15, z + 2.9)))  # stocky
+            # Its outer side and front flush with the chest's (at x + 2.9 it stood a texel out beside it,
+            # at z + 2.9 1.3 texels ahead of it; linecheck): as deep, a little further back.
+            xi, xo = sorted((x - 2.9 * s, x + 2.2 * s))
+            E.append(el(f"leg_{leg}_upper", f"leg_{leg}_upper", (xi, 8, z - 3.85), (xo, 15, z + 1.95)))  # stocky
         else:
             z = -15.5
-            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (x - 3.3, 7.5, z - 4.4), (x + 3.3, 18, z + 4.4)))  # holds the knee (y = 8)
+            # Its back two texels short of the rump's (at z - 4.4 a band 1.2 texels wide showed behind it; linecheck).
+            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (x - 3.3, 7.5, z - 3.7), (x + 3.3, 18, z + 4.4)))  # holds the knee (y = 8)
         E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x - 2.3, 2.5, z - 2.3), (x + 2.3, 8, z + 2.3)))
         E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 3.7, 0, z - 2.7), (x + 3.7, 2.5, z + 3.9)))  # big paws
     for e in E:  # the cat's units into the model's

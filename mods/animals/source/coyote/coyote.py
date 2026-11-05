@@ -81,9 +81,12 @@ EYES.update({
                       halo="none", iris="A", mirror=True),
 })
 EYE_STYLE = os.environ.get("COYOTE_EYES", "coyote_px_lit")
-SKULL0 = ((-4.0, 24.0, 12.0), (4.0, 31.0, 20.0))  # the fox's space
+# The face six texels wide (8.8 the fox's units, not 8: at five the muzzle's cheeks were 1.25 texels,
+# a strip with a sliver of the next texel; linecheck), the muzzle two, the cheeks beside it two.
+SKULL0 = ((-4.4, 24.0, 12.0), (4.4, 31.0, 20.0))  # the fox's space
+MUZZLE_X = 1.45  # the muzzle's half width, the fox's units
 SKULL = tuple(tuple(float(v) for v in warp(c)) for c in SKULL0)
-EYE_X, EYE_Y = 2.4 * K, (29.0 + D) * K  # on the face, above the muzzle (warped): texels 0-1 and 3-4, rows 0-1
+EYE_X, EYE_Y = 2.93 * K, (29.0 + D) * K  # on the face, above the cheeks (warped): texels 0-1 and 4-5, rows 0-1
 LID_Z = SKULL[1][2] + 0.15  # the eyelids' hinge line, just in front of the face: closed, they sit over the eyes
 LASH = (52, 30, 22)
 
@@ -181,12 +184,12 @@ def bones():
 
 def elements():
     E = [el("hips", "spine_0", (-4.4, 17, -20), (4.4, 27, -3)),
-         el("chest", "spine_1", (-5.0, 15, -6.5), (5.0, 27.5, 12)),
+         el("chest", "spine_1", (-5.0, 15, -6.5), (5.0, 27.5, 11.6)),  # its front off the skull's back (touching it, the wider skull left a strip of it each side; linecheck)
          el("skull", "head", *SKULL0),
-         el("muzzle", "head", (-2.0, 25.0, 19.5), (2.0, 27.6, 26.0)),  # long and slender
+         el("muzzle", "head", (-MUZZLE_X, 25.0, 19.5), (MUZZLE_X, 27.6, 26.0)),  # long and slender
          el("nose", "head", (-1.1, 26.1, 25.6), (1.1, 27.3, 26.6)),
-         el("mouth", "head", (-1.4, 24.4, 19.9), (1.4, 25.6, 24.6)),
-         el("jaw", "jaw", (-1.7, 23.4, 18.8), (1.7, 25.2, 25.2))]  # shorter than the muzzle
+         el("mouth", "head", (-0.65, 24.4, 19.9), (0.65, 25.6, 24.6)),  # half a unit inside the jaw
+         el("jaw", "jaw", (-1.05, 23.4, 18.8), (1.05, 25.2, 25.2))]  # shorter than the muzzle; half a unit inside its sides
     neck, _ = rod("neck", "neck", tuple(NECK0), (NECK_PITCH + 90, 0, 0), NECK_LEN, 5.6, 6.2, back=3.0)
     E.append(neck)
     for s, n in ((1, "L"), (-1, "R")):
@@ -211,7 +214,8 @@ def elements():
             E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 1.7, 0, z - 1.5), (x + 1.7, 2.6, z + 2.4)))
         else:
             x, z = BACK_X * s, BACK_Z
-            xi, xo = sorted((x - 1.6 * s, x + 2.6 * s))  # the haunch
+            # The haunch: its outer side flush with the hips' (at x + 2.6 it stood 0.65 texels out; linecheck).
+            xi, xo = sorted((x - 1.6 * s, x + 1.95 * s))
             E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (xi, 11, z - 3.6), (xo, 25, z + 3.4)))
             E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x - 1.0, 2, z - 1.2), (x + 1.0, 12, z + 1.2)))
             E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 1.75, 0, z - 1.6), (x + 1.75, 2.6, z + 2.6)))
@@ -283,7 +287,7 @@ def area(e, face, p, uu, vv, h):
         elif face == "down":
             a[:] = WHITE
         elif face == "south":
-            a = np.where((y < 27.4) & (np.abs(x) > 2.0), WHITE, a)  # the pale cheeks
+            a = np.where((y < 27.4) & (np.abs(x) > MUZZLE_X), WHITE, a)  # the pale cheeks, beside the muzzle
         elif side:
             a = np.where((y < 26.2) & (z > 15.5), WHITE, a)
     elif name == "muzzle":
