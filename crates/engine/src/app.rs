@@ -370,6 +370,11 @@ pub fn run_android(app: winit::platform::android::activity::AndroidApp, factory:
     run_on(event_loop, factory, opts)
 }
 
+/// Android destroyed the activity (seen in winit's log, `log.rs`): the game saves and ends, which
+/// Android's main thread waits for.
+#[cfg(target_os = "android")]
+pub(crate) static ANDROID_DESTROYED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 fn run_on(event_loop: EventLoop<()>, factory: BackendFactory, opts: Options) -> Result<(), String> {
     event_loop.set_control_flow(ControlFlow::Poll);
     let mut app = App { factory, opts, run: None, error: None, suspended: false };
@@ -2307,6 +2312,16 @@ impl ApplicationHandler for App {
     }
 
     fn about_to_wait(&mut self, _el: &ActiveEventLoop) {
+        #[cfg(target_os = "android")]
+        if ANDROID_DESTROYED.load(std::sync::atomic::Ordering::Relaxed) {
+            log::info!("android: the activity was destroyed, saving and ending");
+            if let Some(r) = &mut self.run {
+                r.leave_world_silent();
+                r.close_home();
+            }
+            _el.exit();
+            return;
+        }
         if let Some(r) = &self.run
             && !self.suspended
         {

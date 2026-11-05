@@ -275,6 +275,12 @@ impl log::Log for Logger {
     }
 
     fn log(&self, record: &Record) {
+        // winit 0.30 tells nobody when Android destroys the activity, only its log; and Android's
+        // main thread then waits until the game ends (an "isn't responding" otherwise).
+        #[cfg(target_os = "android")]
+        if record.target().starts_with("winit::platform_impl::android") && record.args().to_string().contains("onDestroy") {
+            crate::app::ANDROID_DESTROYED.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
         if !self.enabled(record.metadata()) {
             return;
         }

@@ -31,6 +31,13 @@ fn vulkan(desc: &BackendDesc) -> Result<Box<dyn Backend>, Error> {
 
 #[unsafe(no_mangle)]
 fn android_main(app: AndroidApp) {
+    // A NativeActivity made again in the same process starts another `android_main`; the engine
+    // is once per process (one event loop, its statics), so a fresh process has to start it.
+    static STARTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    if STARTED.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        eprintln!("chiacraft: android_main again in the same process; ending it for a fresh start");
+        std::process::exit(0);
+    }
     stdio_to_logcat();
     let Some(files) = app.internal_data_path() else {
         eprintln!("chiacraft: the app has no storage");

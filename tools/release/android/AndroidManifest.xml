@@ -16,13 +16,15 @@
         android:extractNativeLibs="true"
         android:appCategory="game"
         android:isGame="true">
+        <!-- configChanges: every change the game takes in place. Android would otherwise destroy
+             and recreate the activity, and the engine is once per process (crates/android). -->
         <activity
             android:name="android.app.NativeActivity"
             android:exported="true"
             android:launchMode="singleTask"
             android:screenOrientation="sensorLandscape"
             android:resizeableActivity="false"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
+            android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|density|screenSize|smallestScreenSize|layoutDirection|colorMode|fontWeightAdjustment|grammaticalGender"
             android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen">
             <meta-data android:name="android.app.lib_name" android:value="chiacraft" />
             <intent-filter>

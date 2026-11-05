@@ -29,8 +29,23 @@ x86_64, the RTX 5090 through the emulator's Vulkan, gfxstream). Not yet on a pho
   its build changes (`<files>/game`); saves, settings and logs in `<files>/run`; mods' libraries
   per CPU in the APK's `lib/` folder (their zips carry only assets).
 
+- **Inventory by touch** (the Inv button; the inventory and recipe panel fit the phone screen
+  at GUI scale 4), back closes it, the pause button opens the pause screen.
+- **Saves on going to the background**: the world's and player's files were written the moment
+  Home was pressed (r7).
+
 Pictures: `~/Coding/chiacraft-archive/images/android-port/2026-11-05/` (`r4` title screen,
-`r5` a world with the touch controls, `r6` pause, resume, menu taps and back).
+`r5` a world with the touch controls, `r6` pause, resume, menu taps and back, `r7`
+`grid_r7_touch.png` inventory, back and pause by touch, `grid_r7.png` the freeze below).
+
+### Found in the second run, fixed, not yet run again
+
+The first start after the emulator's cold boot: Android stopped and destroyed the activity 2 s
+in, and the game froze with "chiacraft isn't responding". Android's main thread waits in
+onDestroy until the native game ends, and winit 0.30 only logs Destroy. Now the game notices it,
+saves and ends (a new start is a fresh process), a second `android_main` in one process ends
+it too, and the manifest takes every configuration change in place so Android has fewer reasons
+to recreate the activity. Built for both CPUs (APK wip8); needs a run to see it.
 
 ### Numbers on the emulator (not a phone)
 

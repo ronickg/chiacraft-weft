@@ -173,6 +173,7 @@ These are the biggest changes. They live mostly in our crates, but each needed h
   - `settings::max_gui_scale`: on a touch screen the auto GUI scale fits 400 x 240 GUI pixels instead of 400 x 320 (a phone sideways, 2400 x 1080, gets 4 instead of 2, which a finger can hit).
   - `paths::set_engine_assets` and `set_library_dir`: where the engine's assets and the mods' libraries are when not beside the executable (on Android the executable is the system's `app_process`; mods' libraries come per CPU from the APK's `lib/`, their zips carry only assets).
   - **(Weft bug)** Vulkan: the instance's extension and layer lists are `*const c_char`, not `*const i8`: `c_char` is unsigned on ARM Linux and Android, where the backend didn't compile.
+  - `log.rs` + `app.rs` `ANDROID_DESTROYED`: winit 0.30 only logs Android's onDestroy ("TODO: forward onDestroy"), and Android's main thread waits in onDestroy until the game ends, so the game saw nothing and froze ("chiacraft isn't responding", PC emulator 11-05). The logger notices that line and the app saves, leaves and ends. Goes when winit forwards it.
   - `diag.rs`: the process's and the machine's memory from `/proc` on Android as on Linux (the frame report's memory).
   - `clipboard.rs`: arboard has no Android, so there the clipboard is the game's own; arboard is a dependency only off Android. winit gets `android-native-activity` on Android.
 
