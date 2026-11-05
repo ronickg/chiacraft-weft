@@ -1187,3 +1187,11 @@ Ronald: seasons tied in with mating and breeding; each species breeds in its rea
 - The animal screen says when its kind breeds and whether it's that season now; SPECIES.md has a
   "breeds in" row.
 - Not yet: the website's simulator (`web/`) breeds without seasons.
+
+## Capybaras in a savanna winter (2026-11-05)
+
+Plants' herd run (`herd_sav_wi`: six capybaras at 10% food in a winter savanna) lost three of them from its counts within ten minutes. `aw_capy_winter` repeated it with every death logged (`breeding.rs`: species, id, cause, place) and found no winter deaths:
+- **One death, from the spawn:** the script places it at y 94 over ground at 72, so it died of the 22-block fall.
+- **The others were alive:** the census and entity lines count only within 48 blocks. The testkit's full entity list still held all five at 13 minutes, foraging farther out at 74-85% strength.
+
+Herd scripts should spawn on the ground and count a wider ring, or list every entity.
