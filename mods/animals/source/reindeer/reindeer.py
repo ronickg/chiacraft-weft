@@ -157,46 +157,50 @@ ANTLER0 = (3.6, 71.4, 36.5)  # where the left antler's burr sits on the skull
 # on the beam; over the face the brow tine, on the left as the flat 'shovel', on the right a plain point
 # (most have one shovel). A texel is 2 units drawn (2 / K in the deer's space). The plane faces sideways,
 # turned out with the beam's sweep and leaning out as the beam did.
+# The beam and the palm two texels thick (Ronald, 11-05: one texel read wiry, a thin outline loop from
+# the side), the points and tines one or two.
 ANTLER_ART = {
-    "L": ["....#.#.#....",  # rows top down, columns back to front, in texels; B the burr (its lower row in the skull)
-          "....#.#.#....",
-          "...######....",
-          "...##........",
-          "..##.........",
-          ".##..........",
-          ".#...........",
-          ".#...........",
-          ".#...........",
-          ".##..........",
-          "..#..........",
-          "..#####......",  # the bez tine, forward off the beam
-          "..##.........",
-          "...##.....##.",  # the shovel over the face
-          "....##....##.",
-          ".....######..",  # the beam's root and the brow tine
-          ".......BB.##.",
-          ".......BB...."],
-    "R": ["....#.#.#....",
-          "....#.#.#....",
-          "...######....",
-          "...##........",
-          "..##.........",
-          ".##..........",
-          ".#...........",
-          ".#...........",
-          ".#...........",
-          ".##..........",
-          "..#..........",
-          "..#####......",
-          "..##.........",
-          "...##........",
-          "....##.......",
-          ".....#####...",  # the plain brow point
-          ".......BB....",
-          ".......BB...."]}
+    "L": ["....#..#..#...",  # rows top down, columns back to front, in texels; B the burr (its lower row in the skull)
+          "....#..#..#...",
+          "...#########..",  # the palm
+          "..##########..",
+          ".####.........",
+          ".###..........",
+          "###...........",
+          "##............",
+          "##............",
+          "##............",
+          "###...........",
+          ".###..........",
+          ".#######......",  # the bez tine, forward off the beam
+          "..###.........",
+          "...###....##..",  # the shovel over the face
+          "....###...##..",
+          ".....######...",  # the beam's root and the brow tine
+          ".......BB.##..",
+          ".......BB....."],
+    "R": ["....#..#..#...",
+          "....#..#..#...",
+          "...#########..",
+          "..##########..",
+          ".####.........",
+          ".###..........",
+          "###...........",
+          "##............",
+          "##............",
+          "##............",
+          "###...........",
+          ".###..........",
+          ".#######......",
+          "..###.........",
+          "...###........",
+          "....###.......",
+          ".....#####....",  # the plain brow point
+          ".......BB.....",
+          ".......BB....."]}
 ANTLER_T = 2.0 / K  # a texel, in the deer's space
 ANTLER_Y0, ANTLER_Z0 = -1.4, -14.3  # the drawing's bottom and back edge from the burr's pivot, in the deer's space
-ANTLER_TURN = (0, 15, -20)  # the left plane's turn (rx, ry, rz) about the pivot; the right's mirrored
+ANTLER_TURN = (0, 19, -20)  # the left plane's turn (rx, ry, rz) about the pivot; the right's mirrored
 
 
 def antler(side):
@@ -409,7 +413,7 @@ def antler_texels(e, p):
     rows, cols = len(art), len(art[0])
     get = lambda rr, cc: art[rr][cc] if 0 <= rr < rows and 0 <= cc < cols else "."  # noqa: E731
     k = np.array([[get(rr, cc) for rr, cc in zip(R_, C_)] for R_, C_ in zip(r, c)])
-    tip = np.array([[get(rr, cc) == "#" and get(rr - 1, cc) == "." and rr <= 2 for rr, cc in zip(R_, C_)] for R_, C_ in zip(r, c)])
+    tip = np.array([[get(rr, cc) == "#" and get(rr - 1, cc) == "." and rr <= 1 for rr, cc in zip(R_, C_)] for R_, C_ in zip(r, c)])
     return k, tip
 
 
@@ -486,10 +490,10 @@ def paint_face(e, face, boxes):
     img = np.dstack([np.clip(np.round(col), 0, 255), np.full((h, w), 255)]).astype(np.uint8)
     if e["cut"]:
         img[..., 3] = np.where(cut_mask(e, p), 255, 0)
-    if e["cut"] == "antler":  # bone; the burr and the points' tips a shade darker
+    if e["cut"] == "antler":  # bone; the burr a shade darker, the points' tips lighter
         k, tip = antler_texels(e, p)
-        dark = (k == "B") | tip
-        img[dark, :3] = (img[dark, :3] * 0.8).astype(np.uint8)
+        img[k == "B", :3] = (img[k == "B", :3] * 0.8).astype(np.uint8)
+        img[tip, :3] = np.clip(img[tip, :3] * 1.15, 0, 255).astype(np.uint8)
     if e["name"] == "skull" and face in ("east", "west"):
         s = 1 if face == "east" else -1
         stamp_eyes(img, [eye_center(s)], eye_style(s))
