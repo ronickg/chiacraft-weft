@@ -306,7 +306,9 @@ def elements():
             el(f"forearm_{n}", tuple(np.array([146, 256, 126]) * S), tuple(np.array([424, 284, 154]) * S), bone=f"forearm_{n}", part="arm"),
             el(f"hand_{n}", tuple(np.array([410, 261, 129]) * S), tuple(np.array([436, 279, 151]) * S), bone=f"hand_{n}", part="arm"),
             el(f"thumb_{n}", tuple(np.array([418, 263, 144]) * S), tuple(np.array([430, 277, 176]) * S), bone=f"thumb_{n}", part="arm"),
-            el(f"thumbclaw_{n}", tuple(np.array([420.5, 264, 174]) * S), tuple(np.array([427.5, 273, 190]) * S), bone=f"thumb_{n}",
+            # Two texels in from the thumb's sides and flush with its bottom (at 420.5-427.5 and 264, 1.25-texel
+            # bands of the thumb's end showed round it; linecheck).
+            el(f"thumbclaw_{n}", tuple(np.array([422, 263.4, 174]) * S), tuple(np.array([426, 273, 190]) * S), bone=f"thumb_{n}",
                part="claw"),
         ]
         for k, ((w, mid, tip), (_, _, (wa, wb))) in enumerate(zip(finger_points(s), FINGERS)):

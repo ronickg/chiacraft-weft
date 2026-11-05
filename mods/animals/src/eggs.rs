@@ -153,8 +153,8 @@ fn item_of(index: usize) -> Option<&'static Item> {
         .map(|(_, it)| *it)
 }
 
-/// Where a nest's eggs stand: on the floor of its dish (the slabs round its middle are 1.5 to
-/// 2.5 units up, `source/nest`), pushed a little into it.
+/// Where a nest's eggs stand: on the floor of its dish (one floor 1.5 units up, `source/nest`),
+/// pushed half a unit into it.
 const NEST_FLOOR: f64 = 1.0 / 64.0;
 /// Where an egg put down at `at` rests: on the ground there, its bottom on the block's top. It
 /// once sank a quarter into the ground as its relatives laid them, but an entity can't stand

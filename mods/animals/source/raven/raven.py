@@ -126,7 +126,9 @@ def bones():
 def elements():
     E = [el("hips", "spine_0", (-3.4, 9.0, -7.2), (3.4, 16.0, 1.4)),
          el("chest", "spine_1", (-4.0, 8.4, -0.4), (4.0, 16.6, 8.4)),
-         el("neck", "neck", (-2.0, 12.4, 5.0), (2.0, 18.2, 10.4)),  # the shaggy throat, deep in the head
+         # The shaggy throat, deep in the head. Its top 2.2 texels over the chest's, where it shows behind the
+         # head (at 18.2, 1.6 texels read as a rim round the neck's root; linecheck).
+         el("neck", "neck", (-2.0, 12.4, 5.0), (2.0, 18.8, 10.4)),
          el("skull", "head", *SKULL),
          el("bill", "head", (-1.0, 16.7, 13.5), (1.0, 19.0, 19.2), rot=(6, 0, 0), origin=(0, 17.8, 13.5)),  # big, a little curved
          el("jaw", "jaw", (-0.8, 15.9, 13.2), (0.8, 16.9, 18.0)),  # shorter than the bill

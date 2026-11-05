@@ -143,7 +143,7 @@ EAR_Z, EAR_X = (9.2, 10.4), 1.9
 def bones():
     B = [("root", None, (0, 0, 0)), ("spine_0", "root", (0, 11, -8)), ("spine_1", "spine_0", (0, 11, -5.2)),
          ("neck", "spine_1", (0, 14.5, 1.5)), ("head", "neck", (0, 14.6, 8)), ("jaw", "head", (0, 13.6, 13.5)),
-         ("nose", "head", (0, 16.4, 17.2)), ("tail", "spine_0", (0, 14, -17))]
+         ("nose", "head", (0, 16.4, 18.9)), ("tail", "spine_0", (0, 14, -17))]
     for s, n in ((1, "L"), (-1, "R")):
         za, zb, top, _ = eye_box(s)
         B += [(f"ear_{n}", "head", (s * EAR_X, 19.6, sum(EAR_Z) / 2)), (f"eyelid_{n}", "head", (s * LID_X, top, (za + zb) / 2))]
@@ -163,13 +163,17 @@ def bones():
 def elements():
     E = [el("hips", "spine_0", (-6.0, 5, -16), (6.0, 17.5, -5)),  # the tall round rump
          el("rump", "spine_0", (-4.0, 6.5, -17.5), (4.0, 16, -15.5)),
-         el("chest", "spine_1", (-4.5, 5.5, -8), (4.5, 16.9, 4.5)),  # the back slopes down to the shoulders
+         # The back slopes down to the shoulders; its front 0.4 short of the skull's back (at 4.5 a texel of neck
+         # showed between them; linecheck).
+         el("chest", "spine_1", (-4.5, 5.5, -8), (4.5, 16.9, 6.6)),
          el("neck", "neck", (-3, 13.4, 0.5), (3, 16.4, 11)),  # inside the skull's height where it enters
          el("skull", "head", *SKULL),
-         el("muzzle", "head", (-2.5, 13.4, 14.5), (2.5, 17.6, 17.5)),  # blunt, the split lip
+         # Blunt, the split lip; out 4.2 from the skull's front, over two texels (at 17.5, out 2.5, its sides and top
+         # read as a rim; linecheck). Its back in to 13.4 so its sides hold 3 texels, not 2 (clear of the mouth's back).
+         # Its bottom half a unit under the skull's, so the jaw can sit half a unit under it (both 0.4 off before; linecheck).
+         el("muzzle", "head", (-2.5, 12.5, 13.4), (2.5, 17.6, 19.2)),
          el("mouth", "head", (-1.5, 13.95, 14), (1.5, 14.4, 16.1)),
-         el("jaw", "jaw", (-2, 12.5, 13), (2, 14, 16.6)),  # shorter than the muzzle
-         el("nose", "nose", (-1, 15.8, 17.1), (1, 17.0, 17.9)),
+         el("jaw", "jaw", (-2, 12.0, 13), (2, 14, 16.6)),  # shorter than the muzzle; half a unit below it (0.9 read as a rim; linecheck)
          el("tail", "tail", (-2, 11.5, -20), (2, 15.5, -14.5), rot=(-25, 0, 0), origin=(0, 14, -17))]  # the scut, held up
     for s, n in ((1, "L"), (-1, "R")):
         cx = EAR_X * s
@@ -189,15 +193,20 @@ def elements():
         s = 1 if leg[1] == "L" else -1
         if leg[0] == "F":
             x, z = FRONT_X * s, FRONT_Z
-            E.append(el(f"leg_{leg}_upper", f"leg_{leg}_upper", (x - 1.5, 4.6, z - 1.6), (x + 1.5, 12, z + 1.6)))
+            # The shoulder's bottom half a unit below the chest's (at 4.6, 0.9 below, it read as a rim; linecheck).
+            E.append(el(f"leg_{leg}_upper", f"leg_{leg}_upper", (x - 1.5, 5.0, z - 1.6), (x + 1.5, 12, z + 1.6)))
             E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x - 1, 1.2, z - 1.1), (x + 1, 5.4, z + 1.1)))
             E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 1.4, 0, z - 1.7), (x + 1.4, 1.6, z + 2.6)))
         else:
             x, z = BACK_X * s, BACK_Z
-            xi, xo = sorted((x - 2.0 * s, x + 2.5 * s))  # the haunch, bulging out (its inside clear of the front legs)
-            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (xi, 3.0, z - 4.2), (xo, 12.6, z + 4.2)))
-            E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x - 1.0, ANKLE_Y - 0.4, z - 1.2), (x + 1.0, KNEE_Y + 0.6, z + 1.2)))
-            E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 1.5, ANKLE_Y - 1.8, z - 1.8), (x + 1.5, ANKLE_Y + 0.3, z + 8.6)))
+            xi, xo = sorted((x - 2.0 * s, x + 2.4 * s))  # the haunch, bulging out (its inside clear of the front legs)
+            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (xi, 1.0, z - 4.2), (xo, 12.6, z + 4.2)))
+            # Rule 7 (Ronald, 11-05: no boxes a texel thick): the shin two texels square (it was 2 by 2.4 units, a
+            # texel), 0.8 out from the knee and 0.4 past the haunch's outside, so its faces keep clear of the hips' and
+            # the front legs' (boxcheck); the foot 0.35 out from it all round (narrower, the shin's edge would show).
+            xa, xb = sorted((x - 1.2 * s, x + 2.8 * s))
+            E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (xa, ANKLE_Y - 0.4, z - 2.0), (xb, KNEE_Y + 0.6, z + 2.0)))
+            E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (xa - 0.35, ANKLE_Y - 1.8, z - 2.35), (xb + 0.35, ANKLE_Y + 0.3, z + 8.6)))
     return E
 
 
@@ -277,6 +286,12 @@ def area(e, face, p, uu, vv, h):  # uu, vv texel centers in texels (h of them do
             a[:] = BELLY
         else:
             a = np.where(y < 15.4, PALE, a)  # pale lips and whisker pads
+        # Rule 4 (Ronald, 11-05: the nose painted on the muzzle, never a pad proud of it): the pink nose where
+        # its box was, on the front and the front edge of the top.
+        if face == "south":
+            a = np.where((np.abs(x) < 1.6) & (y > 15.8), NOSE, a)  # the muzzle's front is two texels wide
+        elif face == "up":
+            a = np.where((np.abs(x) < 1.6) & (z > 18.2), NOSE, a)
     elif name == "jaw":
         a[:] = MOUTH if face == "up" else BELLY
     elif name == "mouth":
@@ -380,8 +395,6 @@ def paint_face(e, face, boxes):
         c = w // 2
         img[2:h - 1, c - 1:c + 1, :3] = (img[2:h - 1, c - 1:c + 1, :3] * 0.78).astype(np.uint8)
         img[h - 1, c - 1:c + 1, :3] = BASE[TEETH]
-    if e["name"] == "nose" and face == "south" and h >= 2:  # nostrils as slits (a nose is 1 texel at 32)
-        img[0, :, :3] = (img[0, :, :3] * 0.7).astype(np.uint8)
     if e["name"].startswith("eyelid"):
         col_idx = 0 if e["name"].endswith("L") else w - 1
         img[:, col_idx, :3] = LASH
