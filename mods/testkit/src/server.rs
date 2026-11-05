@@ -485,7 +485,9 @@ const OPS: &[(&str, &str, Run)] = &[
         for y in (-64..=320).rev() {
             let n = block_name(w.block([x, y, z]));
             if !air(n) {
-                let under: Vec<&str> = (1..=3).map(|d| block_name(w.block([x, y - d, z]))).collect();
+                let under: Vec<&str> = (1..=3)
+                    .map(|d| block_name(w.block([x, y - d, z])))
+                    .collect();
                 let line = format!("{x} {z} {y} {n} {}", under.join(" "));
                 weft_sdk::info!("tk top {line}");
                 return Ok(line);
