@@ -186,6 +186,12 @@ pub fn register(r: &mut Registry) {
                 None => [[1, 0], [-1, 0], [0, 1], [0, -1]][w.random_below(4) as usize],
             };
             let leaves = crown(&w, &logs);
+            weft_sdk::info!(
+                "felling: {} logs from {pos:?} (foot {foot}), fruitful {}, lays {lays}, falls {d:?}, {} leaves",
+                logs.len(),
+                felling.fruitful,
+                leaves.len()
+            );
             if crate::fall::start(&w, pos, logs.clone(), states.clone(), leaves, d, lays) {
                 crate::leaf_decay::logs_gone(&w, logs.iter().copied());
             } else {
@@ -198,7 +204,8 @@ pub fn register(r: &mut Registry) {
                     w.break_block(p, tool, e.player, false);
                 }
                 if lays {
-                    crate::felled::lay(&w, pos, &logs, &states, d);
+                    let laid = crate::felled::lay(&w, pos, &logs, &states, d);
+                    weft_sdk::info!("felling: not lifted, {laid} of {} logs laid", logs.len());
                 }
             }
             // An axe wears by the felling's chops (not past them).
