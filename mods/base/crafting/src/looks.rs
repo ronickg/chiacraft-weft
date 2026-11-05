@@ -236,15 +236,20 @@ pub fn shell_family(material: &str) -> &'static str {
     }
 }
 
-/// Worn armour drawn from its parts (`abi::comp::WORN_LOOK`): its shell family's shade map per worn
-/// layer in the wearer's skin layout (`base:entity/armor/parts/<family>_<1|2>`, made from that
-/// family's approved set: region 0 its shell, 1 its fastening, 2 its lining, each pixel the nearest
-/// step of its source material's ramp), painted with the three parts' ramps; leggings are the inner
-/// layer (2), the rest the outer (1).
-pub fn worn_look(slot: usize, shell: &str, fastening: &str, lining: &str, gems: &[&str]) -> String {
+/// The shell materials, each with its own worn set (`base:entity/armor/worn/<material>_<1|2>`):
+/// Ronald, 11-05: "A for all", each painted through game-art from that material's part icons, the
+/// leather and steel ones from the approved try, diamond its approved quilted set.
+pub const WORN_SETS: [&str; 11] =
+    ["leather", "rawhide", "bone", "antler", "copper", "bronze", "wrought_iron", "meteoric_iron", "steel", "star_steel", "diamond"];
+
+/// Worn armour drawn from its parts (`abi::comp::WORN_LOOK`): its shell's material's worn set, the
+/// layer in the wearer's skin layout (leggings the inner layer, 2; the rest the outer, 1), its gems
+/// set at their spots. A shell without a set of its own (a new material) wears steel's until it
+/// has one.
+pub fn worn_look(slot: usize, shell: &str, gems: &[&str]) -> String {
     let layer = if slot == 2 { 2 } else { 1 };
-    let family = shell_family(shell);
-    let mut look = format!("base:entity/armor/parts/{family}_{layer}@{},{},{}", ramp(shell), ramp(fastening), ramp(lining));
+    let set = if WORN_SETS.contains(&shell) { shell } else { "steel" };
+    let mut look = format!("base:entity/armor/worn/{set}_{layer}");
     for (i, g) in gems.iter().enumerate() {
         if let Some(spot) = WORN_GEM_SPOTS.get(slot).and_then(|s| s.get(i)) {
             let (x, y) = (spot[0] - GEM_SIZE / 2, spot[1] - GEM_SIZE / 2);
@@ -255,9 +260,10 @@ pub fn worn_look(slot: usize, shell: &str, fastening: &str, lining: &str, gems: 
 }
 
 /// Where gems sit on worn armour, the centre of each socket's in the 128 x 64 skin layout, head to
-/// feet: the helmet's brow, the chest, the thigh, the shin.
+/// feet: across the helmet's brow and the chest; on the thigh's front, then its outer and inner
+/// sides; on the boot's front, then its sides (a leg's front is 8 wide, too narrow for three).
 pub const WORN_GEM_SPOTS: [[[i32; 2]; 3]; 4] =
-    [[[24, 19], [20, 19], [28, 19]], [[48, 46], [43, 46], [53, 46]], [[12, 44], [12, 50], [12, 56]], [[12, 58], [10, 54], [14, 54]]];
+    [[[24, 19], [20, 19], [28, 19]], [[48, 46], [43, 46], [53, 46]], [[12, 46], [4, 46], [20, 46]], [[12, 60], [4, 60], [20, 60]]];
 
 /// The gem drawing's size: a shade map with the gem in its top-left corner
 /// (`base:parts/gem/set`), moved to its socket's spot.
@@ -345,12 +351,28 @@ mod tests {
         assert!(part_look("haft", "oak").is_none());
         assert_eq!(part_look("helmet_shell", "leather").unwrap(), "base:parts/armour/cap_shell@base:ramps/leather");
         assert_eq!(part_look("leg_shell", "bone").unwrap(), "base:parts/armour/bone_leg_shell@base:ramps/bone");
-        assert!(worn_look(2, "diamond", "leather", "wool", &[]).starts_with("base:entity/armor/parts/diamond_2@"));
+        assert_eq!(worn_look(2, "diamond", &[]), "base:entity/armor/worn/diamond_2");
+        assert_eq!(worn_look(0, "unobtainium", &[]), "base:entity/armor/worn/steel_1");
         assert_eq!(gem_look("sword", 0, "diamond").unwrap(), "base:parts/gem/set@base:ramps/gem_diamond+7,20");
         assert!(gem_look("axe", 3, "diamond").is_none() && gem_look("sword", 3, "diamond").is_none());
         assert_eq!(
-            worn_look(1, "bronze", "gold", "wool", &["amber"]),
-            "base:entity/armor/parts/plate_1@base:ramps/bronze,base:ramps/gold,base:ramps/wool;base:entity/armor/parts/gem_set@base:ramps/gem_amber+46,44"
+            worn_look(1, "bronze", &["amber"]),
+            "base:entity/armor/worn/bronze_1;base:entity/armor/parts/gem_set@base:ramps/gem_amber+46,44"
         );
+    }
+
+    #[test]
+    fn every_shell_material_has_a_worn_set() {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../assets/textures/entity/armor/worn");
+        for m in crate::materials::MATERIALS {
+            if crate::materials::fits(m, "chestplate", "shell", crate::kinds::Role::Working) {
+                assert!(WORN_SETS.contains(&m.id), "{}: a shell with no worn set", m.id);
+            }
+        }
+        for m in WORN_SETS {
+            for layer in [1, 2] {
+                assert!(std::path::Path::new(&format!("{dir}/{m}_{layer}.png")).exists(), "{m}_{layer}.png");
+            }
+        }
     }
 }

@@ -173,13 +173,17 @@ diamond ... I kind of wanted to be a bit more realistic, but not completely". So
   rest (an oak haft, a leather grip on a bow, cordage on stone and wrought iron on metal, leather
   straps and a wool lining on armour). `/gear part <shape> <material>` gives one part, to assemble
   by hand at the table.
-- **Worn armour is drawn from its parts** (11-05, Ronald: "Worn armour art"): one shade map per
-  worn layer in the skin layout (`base:entity/armor/parts/plates_1`, `_2`, made in code from the
-  approved iron set: its plates are the shell, its trim the fastening, its hem the lining), painted
-  with the three parts' ramps, its gems set at their spots (`looks::worn_look`, `WORN_GEM_SPOTS`),
-  carried on the stack as `core:worn_look` (an engine addition, `notes/ENGINE_CHANGES.md`). The
-  four look families (`parts::ARMOUR_LOOKS`: `_mail`, `_scale`, `_gem`) stay as items, their own
-  worn sets the fallback, and the pieces' icons.
+- **Worn armour is drawn from its parts** (11-05, Ronald: "Worn armour art"; after a try of painted
+  skins against box models, "A for all"): each shell material has its own worn set
+  (`base:entity/armor/worn/<material>_1`, `_2` in the skin layout, `looks::WORN_SETS`), painted
+  through game-art from that material's part icons, so a piece looks like its icon: leather a hood
+  and buttoned jerkin, rawhide the same laced with sinew, bone and antler a corded lamellar, the
+  metals plate with a visored helm (copper, bronze, wrought iron, meteoric iron, steel, star steel,
+  each its own colours), diamond its approved quilted set. The piece's gems sit at their spots
+  (`looks::worn_look`, `WORN_GEM_SPOTS`), carried on the stack as `core:worn_look` (an engine
+  addition, `notes/ENGINE_CHANGES.md`). A new shell material wears steel's set until it has its own
+  (a check names it). The four look families (`parts::ARMOUR_LOOKS`: `_mail`, `_scale`, `_gem`)
+  stay as items, their own worn sets the fallback, and the pieces' icons.
 
 ### What each material can be
 
