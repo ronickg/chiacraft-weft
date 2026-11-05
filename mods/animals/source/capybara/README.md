@@ -49,3 +49,12 @@ down at the grass), walk (slow), run, sit on its haunches, lie flat with the hea
   forward kinematics (`fit_poses`), as are the sit and the lie.
 - **Gait**: short legs need a clear lift (knee 45 walking, 62 running) and a small swing, or
   the foot only shuffles and the gait check can't tell forward from back.
+- **Behaviour clips** (`mods/animals/src/anim.rs`, in the standing file; sleep in the lying one
+  too): stare, graze, drink, sniff, look, scratch (a hind foot), stretch, sleep (lying, chin down),
+  alarm (a bark), rear (a short lift of the forequarters: a mother stands her ground), play,
+  groom (a forefoot), nuzzle, flinch, death (onto its side), watch (sat back a little), approach
+  and charge (a heavy head-low trot). Only the held ones and the gaits loop. The neck is wider than
+  the skull and sits in the chest, so a turn of more than 5 degrees at the neck or 11 at the head
+  pokes a corner through: it looks about with its side eyes, and lowers its head along the clean
+  angles (`down`), a step a key. `build.py` checks the feet (within 0.3 of the ground in every
+  key), the gaits, the loops and the pokes in every clip's key.
