@@ -40,6 +40,7 @@ mod commands;
 mod coyote;
 mod cretaceous;
 mod deer;
+mod drenkaun;
 mod dog;
 mod drink;
 mod eagle;
@@ -141,6 +142,7 @@ fn init(r: &mut Registry) {
     citipati::init(r);
     early_bird::init(r);
     sauropod::init(r);
+    drenkaun::init(r);
     kryptobaatar::init(r);
     lizard::init(r);
     reindeer::init(r);
