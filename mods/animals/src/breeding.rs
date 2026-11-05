@@ -110,9 +110,45 @@ pub fn init(r: &mut Registry) {
                 && let Some(i) = SPECIES.iter().position(|s| s.kind.id() == d.kind)
             {
                 count(&DIED, i);
+                // What took it, for runs that watch a herd (a capybara gone from the list could
+                // have died or wandered off).
+                weft_sdk::info!(
+                    "{} {} died of {} at {:.0} {:.0} {:.0}",
+                    SPECIES[i].name,
+                    d.entity,
+                    cause_name(d.cause),
+                    d.pos.x,
+                    d.pos.y,
+                    d.pos.z
+                );
             }
         }
     });
+}
+
+/// A damage cause's name for the log: a mod's by its registry name, the engine's by its number
+/// (`name_of` knows only mods' causes; aw_capy_winter's fall death read "died of ").
+fn cause_name(cause: u32) -> String {
+    use weft_sdk::abi::damage_cause as c;
+    let name = name_of(abi::entry_kind::DAMAGE_CAUSE, cause);
+    if !name.is_empty() {
+        return name.to_string();
+    }
+    let engine = match cause {
+        c::GENERIC => "generic",
+        c::FALL => "a fall",
+        c::ATTACK => "an attack",
+        c::FIRE => "fire",
+        c::STARVE => "starving",
+        c::DROWN => "drowning",
+        c::VOID => "the void",
+        c::LAVA => "lava",
+        c::CRUSH => "crushing",
+        c::SUFFOCATE => "suffocating",
+        c::EXPLOSION => "an explosion",
+        _ => return format!("cause {cause}"),
+    };
+    engine.to_string()
 }
 
 // ------------------------------------------------------------------ testing: speed and census
