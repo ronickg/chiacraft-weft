@@ -59,7 +59,7 @@ pub fn init(r: &mut Registry) {
         }
     });
     r.shaped(&CRAFTING, "spyglass", 1, &["  g", " i ", "i  "], &[('g', "#glass"), ('i', "#ingots/iron")]);
-    r.command("animal", "[action:word(show,tame,points,wild,here,gift,bite,ko,love,hurry,nest,evolve,fire,frost,lightning,venom,scar,age,speed,census,reset,room,away,habitats,hungry,thirsty)] [count:int] [habitat:word(grassland,forest,taiga,snow,desert,mountains)]", command)
+    r.command("animal", "[action:word(show,tame,points,wild,here,gift,bite,ko,love,hurry,nest,level,evolve,fire,frost,lightning,venom,scar,age,speed,census,reset,room,away,habitats,hungry,thirsty)] [count:int] [habitat:word(grassland,forest,taiga,snow,desert,mountains)]", command)
         .permission(permission::GAME_MASTER);
 }
 
@@ -1289,6 +1289,11 @@ fn command(cmd: &mut ServerCommand) {
             if let Some(a) = w.component_mut(id, &ANIMAL) {
                 a.thirst = 1.0 - share;
             }
+        }
+        "level" => {
+            let level = cmd.int("count").unwrap_or(0).clamp(0, 200) as u32;
+            animal::set_level(&w, id, level);
+            cmd.reply("command.animals.line", &[Arg::Text(&format!("level {level}"))]);
         }
         "age" => {
             let days = cmd.int("count").unwrap_or(10).clamp(0, 100_000) as u64;

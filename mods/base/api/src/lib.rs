@@ -713,6 +713,10 @@ pub fn has_room(w: &World, player: u64, item: u32) -> bool {
 /// Burn time in ticks.
 pub static FUEL: Component<u32> = Component::named("fuel");
 pub static ARMOR: Component<Armor> = Component::named("armor");
+/// A weapon's or tool's item level (`vitals::curve`: tier × 10 + depth, its working material's):
+/// on today's tools as their item's, on a tool built from parts as its stack's. Against a big
+/// creature it counts at most its size's cap over the creature (`vitals::combat::Band::cap`).
+pub static ITEM_LEVEL: Component<f32> = Component::named("base:item_level");
 /// How readily fire takes it.
 pub static FLAMMABLE: Component<u32> = Component::named("flammable");
 
