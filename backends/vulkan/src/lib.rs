@@ -153,6 +153,9 @@ pub struct VulkanBackend {
     capture_requested: bool,
     capture: Option<(vk::Buffer, Allocation, u32, u32, vk::Format)>,
     device_name: String,
+    /// `Backend::device_class` and `device_memory_mb`.
+    device_class: u32,
+    device_memory_mb: u64,
     /// The device takes indirect draws' counts from a buffer (`drawIndirectCount`). MoltenVK
     /// doesn't: then a count draw draws all its records (`Backend::indirect_count`).
     indirect_count: bool,
@@ -359,6 +362,20 @@ impl VulkanBackend {
                 .device_name_as_c_str()
                 .map(|s| s.to_string_lossy().into_owned())
                 .unwrap_or_default();
+            let device_class = match props.device_type {
+                vk::PhysicalDeviceType::INTEGRATED_GPU => 1,
+                vk::PhysicalDeviceType::DISCRETE_GPU => 2,
+                vk::PhysicalDeviceType::VIRTUAL_GPU | vk::PhysicalDeviceType::CPU => 3,
+                _ => 0,
+            };
+            let memory = instance.get_physical_device_memory_properties(pdev);
+            let device_memory_mb = memory.memory_heaps[..memory.memory_heap_count as usize]
+                .iter()
+                .filter(|h| h.flags.contains(vk::MemoryHeapFlags::DEVICE_LOCAL))
+                .map(|h| h.size)
+                .max()
+                .unwrap_or(0)
+                / (1024 * 1024);
             let mut indexing = vk::PhysicalDeviceDescriptorIndexingProperties::default();
             let mut driver = vk::PhysicalDeviceDriverProperties::default();
             let mut props2 = vk::PhysicalDeviceProperties2::default()
@@ -665,6 +682,8 @@ impl VulkanBackend {
                 capture_requested: false,
                 capture: None,
                 device_name,
+                device_class,
+                device_memory_mb,
                 indirect_count,
                 queries,
                 pipeline_cache,
@@ -1285,6 +1304,14 @@ impl Backend for VulkanBackend {
 
     fn device_name(&self) -> &str {
         &self.device_name
+    }
+
+    fn device_class(&self) -> u32 {
+        self.device_class
+    }
+
+    fn device_memory_mb(&self) -> u64 {
+        self.device_memory_mb
     }
 
     fn frames_in_flight(&self) -> usize {

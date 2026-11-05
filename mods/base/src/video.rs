@@ -86,6 +86,61 @@ fn take_waiting(c: &Client) {
 
 pub static SCREEN: Screen = Screen::named("video");
 
+/// The GPU as the engine found it (`core:gpu_*`): its name, its kind (0 not known, 1 integrated,
+/// 2 discrete, 3 another), its own memory in MB.
+static GPU_NAME: TextConfig = TextConfig::named("core:gpu_name");
+static GPU_CLASS: Config<i32> = Config::named("core:gpu_class");
+static GPU_MEMORY: Config<i32> = Config::named("core:gpu_memory_mb");
+/// What the detection chose (Research round 19, 7: "quality chosen by the GPU at first start"):
+/// the preset (-1 none yet), and whether the render scale went to half with it.
+static DETECTED: Config<i32> = Config::named("gpu_preset");
+static DETECTED_HALF: Config<bool> = Config::named("gpu_preset_half");
+
+/// The GPU's kind, or the one a run pretends to have (`--fake-gpu integrated|discrete|other`).
+fn gpu_class() -> i32 {
+    match weft_sdk::client::launch_option("fake-gpu").as_deref() {
+        Some("integrated") => 1,
+        Some("discrete") => 2,
+        Some("other") => 3,
+        _ => GPU_CLASS.get(),
+    }
+}
+
+/// The preset for this machine, and whether the world is drawn at half its pixels: an
+/// integrated GPU (Intel, an AMD APU, the Steam Deck: fill-bound) Medium at half scale (its
+/// effects low, shadows 1024: Research round 19); a discrete one High, Medium with under 3 GB of
+/// its own; Apple's M chips by their class (Pro, Max and Ultra High, the others Medium, the
+/// screen's density choosing the scale as before); a CPU or virtual GPU Low; one not known by
+/// the window, as before (a high-density one draws many more pixels).
+fn detect(window: [u32; 2]) -> (usize, bool) {
+    let name = GPU_NAME.get().to_lowercase();
+    let pixels = window[0] as u64 * window[1] as u64;
+    if name.contains("apple") {
+        let big = ["pro", "max", "ultra"].iter().any(|w| name.contains(w));
+        return (if big { 2 } else { 1 }, false);
+    }
+    match gpu_class() {
+        1 => (1, true),
+        2 if GPU_MEMORY.get() > 0 && GPU_MEMORY.get() < 3000 => (1, false),
+        2 => (2, false),
+        3 => (0, false),
+        _ => (if pixels >= 5_000_000 { 1 } else { 2 }, false),
+    }
+}
+
+/// Chooses the preset from the GPU (`detect`) and says so on the Video screen.
+fn apply_detected(window: [u32; 2]) {
+    let (p, half) = detect(window);
+    weft_sdk::info!("video: {} ({}, {} MB): the {} preset{}", GPU_NAME.get(), gpu_class(), GPU_MEMORY.get(), PRESET_NAMES[p], if half { ", half render scale" } else { "" });
+    apply(p);
+    if half {
+        RENDER_SCALE_NEXT.set(0.5);
+        QUALITY.set(4);
+    }
+    DETECTED.set(p as i32);
+    DETECTED_HALF.set(half);
+}
+
 /// A setting's row: its name (`video.base.<key>`), the values it steps through, and how each is
 /// shown (`video.base.value.<shown>` or a number).
 struct Row {
@@ -449,6 +504,8 @@ pub fn register(r: &mut Registry) {
     r.config(&FX_BIOME_AIR).float(0.6, 0.0, 1.0);
     r.config(&FX_SKY_EVENTS).int(2, 0, 2);
     r.config(&FX_SPARKLE).int(1, 0, 1);
+    r.config(&DETECTED).int(-1, -1, 3);
+    r.config(&DETECTED_HALF).bool(false);
     r.config(&RENDER_SCALE_NEXT).float(-1.0, -1.0, 1.0);
     r.config(&SHADOW_SIZE_NEXT).int(0, 0, 4096);
     r.client_frame(|_| new_defaults());
@@ -457,10 +514,13 @@ pub fn register(r: &mut Registry) {
         if QUALITY.get() >= 0 {
             return;
         }
-        // Scripts, tests and benchmarks keep their own settings (`--config` sets them per run).
-        if ["script", "test", "config"]
-            .iter()
-            .any(|o| weft_sdk::client::launch_option(o).is_some())
+        // Scripts, tests and benchmarks keep their own settings (`--config` sets them per run),
+        // unless one pretends a GPU to check this (`--fake-gpu`).
+        let fake = weft_sdk::client::launch_option("fake-gpu").is_some();
+        if !fake
+            && ["script", "test", "config"]
+                .iter()
+                .any(|o| weft_sdk::client::launch_option(o).is_some())
         {
             return;
         }
@@ -468,10 +528,7 @@ pub fn register(r: &mut Registry) {
         if w == 0 || h == 0 {
             return;
         }
-        let pixels = w as u64 * h as u64;
-        let p = if pixels >= 5_000_000 { 1 } else { 2 };
-        weft_sdk::info!("video: first run, {w}x{h}: the {} preset", PRESET_NAMES[p]);
-        apply(p);
+        apply_detected([w, h]);
     });
     r.client_frame(take_waiting);
     r.screen(&SCREEN, |ui| {
@@ -493,6 +550,23 @@ pub fn register(r: &mut Registry) {
                     let name = PRESET_NAMES.get(q as usize).copied().unwrap_or("custom");
                     t.set("video.base.now", &[Arg::Key(&format!("video.base.preset.{name}"))]);
                 });
+            });
+            // What the GPU is, what it chose, and choosing again (Research round 19, 7).
+            ui.row(S::row().gap(3.0).center(), |ui| {
+                ui.row(S::row().w(84.0), |_| {});
+                ui.text_bind_styled(S::default().class("dim").max_w(260.0), |_, t| {
+                    let name = GPU_NAME.get();
+                    let class = ["unknown", "integrated", "discrete", "other"][gpu_class().clamp(0, 3) as usize];
+                    let shown = if name.is_empty() { "?".to_string() } else { name };
+                    match PRESET_NAMES.get(DETECTED.get() as usize) {
+                        Some(p) => {
+                            let key = if DETECTED_HALF.get() { "video.base.detected.half" } else { "video.base.detected.preset" };
+                            t.set(key, &[Arg::Text(&shown), Arg::Key(&format!("video.base.gpu.{class}")), Arg::Key(&format!("video.base.preset.{p}"))]);
+                        }
+                        None => t.set("video.base.detected.gpu", &[Arg::Text(&shown), Arg::Key(&format!("video.base.gpu.{class}"))]),
+                    }
+                });
+                ui.button("video.base.detect", S::default().h(12.0).pad(2.0), |c| apply_detected(c.client().state().window));
             });
             for i in 0..ROWS.len() {
                 row_ui(ui, &ROWS, i, step);
