@@ -135,6 +135,9 @@ pub const BUILT_CELL: i32 = 64;
 pub const BUILT_CELLS: usize = 32;
 /// Tries at a site before it falls in the sea instead.
 pub const IMPACT_SITE_TRIES: u32 = 96;
+/// The widest live crater (Terrain's `vitals::impact::IMPACT_RADIUS`): a site is level and dry
+/// that far round.
+pub const IMPACT_SITE_RADIUS: i32 = 12;
 /// The land at a site: level within this many blocks over the crater's radius, and no water.
 pub const IMPACT_LEVEL: i32 = 4;
 /// The brightening and rumble before the streak, seconds.

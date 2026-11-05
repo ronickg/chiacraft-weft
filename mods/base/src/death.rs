@@ -139,7 +139,7 @@ fn watch(w: &World) {
 }
 
 /// Eight ways round, from ahead turning left: `hud.base.way.<n>`.
-fn way(yaw_to: f32, yaw: f32) -> usize {
+pub(crate) fn way(yaw_to: f32, yaw: f32) -> usize {
     let tau = std::f32::consts::TAU;
     let rel = (yaw_to - yaw).rem_euclid(tau);
     ((rel / (tau / 8.0)).round() as usize) % 8
