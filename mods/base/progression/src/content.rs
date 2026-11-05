@@ -290,6 +290,14 @@ pub const RULES: &[Rule] = &[
     r(&["base:starheart", "base:peridot"], 2, Magic, Sky, Made),
     n(&["base:star_lantern"], 2, Magic, Light, Made, "a starheart in iron"),
     n(&["base:unlearning_stone"], 2, Magic, Material, Made, "a peridot ground with tektites: gives back perk web nodes (vitals::perks)"),
+    n(
+        &["base:maunduk", "base:aruduk", "base:remaru", "base:emakaun"],
+        2,
+        Magic,
+        Material,
+        Drop(60.0),
+        "stones for the web's sockets (vitals::sockets), found, never made: in pallasite today; bosses, ley nodes, ruins and rare animals add theirs (an earlier tier then)",
+    ),
     r(&["base:diamond", "base:diamond_block"], 3, Tech, Material, Made),
     // ---- smelting's things (the furnace: the Stone Age's last build, the Bronze Age's first station)
     n(&["base:furnace"], 0, Tech, Station, Made, "the Stone Age key's infrastructure: what it makes is the Bronze Age's"),

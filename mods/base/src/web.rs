@@ -8,7 +8,7 @@
 use std::sync::Mutex;
 
 use base_api::VITALS;
-use base_api::skills::{SKILL_WEB, SkillWeb};
+use base_api::skills::{SKILL_WEB, STONE, SkillWeb, StoneKind};
 use vitals::perks::{self, Node as PNode, Refusal};
 use vitals::skills::{self, SKILLS};
 use vitals::web::Node as Kind;
@@ -25,6 +25,9 @@ const SMALL: f32 = 8.0;
 const NOTABLE: f32 = 12.0;
 const KEYSTONE: f32 = 16.0;
 const START: f32 = 12.0;
+const SOCKET: f32 = 12.0;
+/// The stone picker's row under the well: its icons' size (32 px items at 1x).
+const PICK_ICON: f32 = 16.0;
 /// A link's dots: their size and the gap between them (GUI pixels).
 const DOT: f32 = 1.0;
 const DOT_STEP: f32 = 5.0;
@@ -45,11 +48,16 @@ struct View {
     centre: (f32, f32),
     zoom: usize,
     refund: bool,
-    /// What the screen was last built from (taken, levels, points, refunds).
+    /// The taken socket a stone is being chosen for.
+    picking: Option<u16>,
+    /// What the screen was last built from (taken, levels, points, refunds, stones).
     built: u64,
 }
 
-static VIEW: Mutex<View> = Mutex::new(View { centre: (0.0, 0.0), zoom: ZOOM_START, refund: false, built: 0 });
+static VIEW: Mutex<View> = Mutex::new(View { centre: (0.0, 0.0), zoom: ZOOM_START, refund: false, picking: None, built: 0 });
+
+/// Inventory slots a player has (hotbar, the main rows, armour and the off hand), for the picker.
+const INVENTORY_SLOTS: u32 = 46;
 
 fn view() -> View {
     *VIEW.lock().unwrap()
@@ -65,7 +73,7 @@ fn points(c: &ClientView, s: &SkillWeb) -> u32 {
     let level = c
         .component(&VITALS)
         .map_or(1, |v| vitals::levels::level_of(v.xp).0);
-    crate::skills::points_of(level, perks::count(&s.taken))
+    crate::skills::points_of(level, perks::spent(&s.taken))
 }
 
 /// A hash of what the screen shows, so it's rebuilt when it changes.
@@ -77,6 +85,15 @@ fn signature(c: &ClientView) -> u64 {
     s.levels().iter().for_each(|&l| mix(l as u64));
     mix(points(c, &s) as u64);
     mix(s.refunds as u64);
+    s.stones
+        .iter()
+        .for_each(|d| mix(d.kind as u64 ^ (d.level as u64) << 8));
+    // The picker lists the stones carried.
+    (0..INVENTORY_SLOTS).for_each(|i| {
+        mix(STONE
+            .on_stack_own(&c.inventory_slot(i))
+            .map_or(0, |d| d.kind as u64 + 1))
+    });
     h
 }
 
@@ -167,6 +184,9 @@ fn screen(ui: &mut Ui) {
             ui.panel("well", S::column().size(VIEW_W, VIEW_H), |ui| {
                 web(ui, &s, points, &v);
             });
+            if let Some(socket) = v.picking.filter(|&id| perks::has(&s.taken, id)) {
+                picker(ui, &c, socket);
+            }
         });
     });
 }
@@ -270,8 +290,8 @@ fn state(s: &SkillWeb, n: &PNode, points: u32) -> State {
     if perks::has(&s.taken, n.id) {
         return State::Taken;
     }
-    match perks::can_take(&s.taken, n.id, &s.levels(), points.max(1)) {
-        Ok(()) if points == 0 => State::Waiting,
+    match perks::can_take(&s.taken, n.id, &s.levels(), points.max(perks::cost(n))) {
+        Ok(()) if points < perks::cost(n) => State::Waiting,
         Ok(()) => State::Open,
         Err(Refusal::Skill) => State::Locked,
         Err(_) => State::Far,
@@ -309,14 +329,29 @@ fn web(ui: &mut Ui, s: &SkillWeb, points: u32, v: &View) {
             Kind::Small => ("small", SMALL),
             Kind::Notable => ("notable", NOTABLE),
             Kind::Keystone => ("keystone", KEYSTONE),
+            Kind::Socket => ("socket", SOCKET),
         };
         let d = size * times;
         if !inside(p, d / 2.0) {
             continue;
         }
         let st = if n.id == perks::START { State::Taken } else { state(s, n, points) };
-        let class = node_class(kind, st);
-        let (tip, args) = tooltip(n, st, s);
+        let stone = n
+            .socket
+            .and_then(|i| s.stones[i as usize].stone())
+            .filter(|_| st == State::Taken);
+        let class = match stone.map(|t| t.kind) {
+            Some(StoneKind::Mind) => "perk_socket_mind",
+            Some(StoneKind::Flow) => "perk_socket_flow",
+            Some(StoneKind::Unique(_)) => "perk_socket_relic",
+            None => node_class(kind, st),
+        };
+        let (tip, args) = match n.socket {
+            Some(_) => socket_tooltip(stone, st),
+            None => tooltip(n, st, s),
+        };
+        let is_socket = n.socket.is_some();
+        let filled = stone.is_some();
         let args: Vec<Arg> = args.iter().map(|a| a.as_arg()).collect();
         let id = n.id;
         let refund = v.refund;
@@ -331,6 +366,13 @@ fn web(ui: &mut Ui, s: &SkillWeb, points: u32, v: &View) {
                     c.client().send(&crate::skills::REFUND, &(id as u32));
                 } else if st == State::Open {
                     c.client().send(&crate::skills::TAKE, &(id as u32));
+                } else if is_socket && st == State::Taken {
+                    // A full socket gives its stone back; an empty one opens the picker.
+                    if filled {
+                        c.client().send(&crate::skills::UNSOCKET, &(id as u32));
+                    } else {
+                        change(c, |v| v.picking = Some(id));
+                    }
                 }
             },
             |_| {},
@@ -350,11 +392,80 @@ fn node_class(kind: &str, st: State) -> &'static str {
         ("notable", "open") => "perk_notable_open",
         ("notable", "far") => "perk_notable_far",
         ("notable", _) => "perk_notable_locked",
+        ("socket", "taken") => "perk_socket_taken",
+        ("socket", "open") => "perk_socket_open",
+        ("socket", "far") => "perk_socket_far",
+        ("socket", _) => "perk_socket_locked",
         (_, "taken") => "perk_keystone_taken",
         (_, "open") => "perk_keystone_open",
         (_, "far") => "perk_keystone_far",
         _ => "perk_keystone_locked",
     }
+}
+
+/// The stones carried, as a row under the well: a click puts one in the socket being filled.
+fn picker(ui: &mut Ui, c: &ClientView, socket: u16) {
+    let stones: Vec<(u32, ItemStack)> = (0..INVENTORY_SLOTS)
+        .map(|i| (i, c.inventory_slot(i)))
+        .filter(|(_, st)| !st.is_empty() && STONE.on_stack_own(st).is_some())
+        .collect();
+    ui.row(S::row().gap(4.0).center(), |ui| {
+        if stones.is_empty() {
+            ui.text_styled(S::default().class("dim").no_wrap(), "web.base.pick_none", &[]);
+        } else {
+            ui.text_styled(S::default().no_wrap(), "web.base.pick", &[]);
+        }
+        for (slot, st) in stones {
+            ui.button_with(
+                S::default()
+                    .class("slot")
+                    .size(PICK_ICON + 2.0, PICK_ICON + 2.0)
+                    .center(),
+                move |c| {
+                    c.client()
+                        .send(&crate::skills::SOCKET, &((socket as u32) << 16 | slot));
+                    change(c, |v| v.picking = None);
+                },
+                |ui| ui.item(st.item, 1, S::default().size(PICK_ICON, PICK_ICON)),
+            );
+        }
+        ui.spacer();
+        ui.button("web.base.pick_cancel", S::default().h(12.0).pad(2.0), |c| change(c, |v| v.picking = None));
+    });
+}
+
+/// A socket's tooltip: empty with its state, or its stone and what it does.
+fn socket_tooltip(stone: Option<vitals::sockets::Stone>, st: State) -> (String, Vec<A>) {
+    use vitals::sockets::{Flow, Kind as K};
+    let Some(stone) = stone else {
+        return ("web.base.tip.socket".into(), vec![A::Int(perks::SOCKET_POINTS as i64), A::Key(st.key().into())]);
+    };
+    let mut args = vec![A::Key(format!("item.base.{}", stone.kind.id())), A::Int(stone.level as i64)];
+    let mut lines = 0;
+    for (f, units) in stone.rolls.iter().flatten() {
+        args.push(A::Text(format!("{:+} %", (units * vitals::web::UNIT * 100.0).round() as i64)));
+        args.push(A::Key(format!("perk.base.family.{}", f.id())));
+        lines += 1;
+    }
+    match (stone.kind, stone.flow) {
+        (_, Some(Flow::Amplify(x))) => {
+            args.push(A::Text(format!("{:+} %", (x * 100.0).round() as i64)));
+            args.push(A::Key("web.base.stone.amplify".into()));
+            lines += 1;
+        }
+        (_, Some(Flow::Turn(f))) => {
+            args.push(A::Text("→".into()));
+            args.push(A::Key(format!("perk.base.family.{}", f.id())));
+            lines += 1;
+        }
+        (K::Unique(u), _) => {
+            args.push(A::Text(String::new()));
+            args.push(A::Key(format!("web.base.stone.{}", u.id())));
+            lines += 1;
+        }
+        _ => {}
+    }
+    (format!("web.base.tip.stone{lines}"), args)
 }
 
 /// An owned tooltip argument.

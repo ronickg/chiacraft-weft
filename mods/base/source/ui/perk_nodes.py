@@ -18,7 +18,10 @@ from PIL import Image
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", "notes", "ui", "kit2"))
 import kit2 as k  # noqa: E402
 
-KINDS = [("small", 16), ("notable", 24), ("keystone", 32), ("start", 24)]
+KINDS = [("small", 16), ("notable", 24), ("keystone", 32), ("start", 24), ("socket", 24)]
+# A taken socket holding a stone: the stone's colour in the hole (legend: cream a mind-stone,
+# blue a flow-stone, the ley's colour; gold a relic).
+FILLED = {"mind": "cream", "flow": "blue", "relic": "brass"}
 STATES = ["taken", "open", "far", "locked"]
 
 # The ring per state: (light edge, face, shade).
@@ -80,13 +83,13 @@ def stone(a, m, mat):
             a[y, x, :3] = dark
 
 
-def draw(kind, n, state, hover=False, pressed=False):
+def draw(kind, n, state, hover=False, pressed=False, filled=None):
     a = np.zeros((n, n, 4), np.uint8)
     m = octagon(n) if kind == "keystone" else disc(n)
     light, face, shade = (RING_HOVER if hover else RING)[state]
     rim = k.GLOW if hover and state in ("taken", "open") else k.OUTLINE
     k.raised(a, m, light, face, shade, rim=rim, pressed=pressed)
-    ring = {"small": 3, "notable": 4, "keystone": 4, "start": 4}[kind]
+    ring = {"small": 3, "notable": 4, "keystone": 4, "start": 4, "socket": 4}[kind]
     inner = k.shrink(m, ring)
     # The well inside the ring, sunk: its outline dark, its top row in shade.
     k.paint(a, inner, k.WELL_D)
@@ -97,7 +100,13 @@ def draw(kind, n, state, hover=False, pressed=False):
         # A second ring inside the first.
         k.raised(a, inner, light, face, shade, rim=k.OUTLINE)
         centre = np.roll(k.shrink(inner, 3), dy, 0)
-    if kind == "start":
+    if kind == "socket":
+        # An empty socket is a deep hole (darker than a node's well) with a hint of its rim; a
+        # filled one shows its stone.
+        k.paint(a, centre, k.PANEL_DEEP)
+        if filled:
+            stone(a, k.shrink(centre, 1), k.MAT[FILLED[filled]])
+    elif kind == "start":
         stone(a, centre, k.MAT["brass"])
     elif kind in ("notable", "keystone"):
         stone(a, centre, STONE[state])
@@ -134,6 +143,14 @@ def main():
                 im.save(f"{out}/{name}.png")
                 with open(f"{out}/{name}.gui", "w") as f:
                     f.write(f"scaling = stretch\nsize = {n // 2} {n // 2}\n")
+    for fill in FILLED:
+        for suffix, kw in [("", {}), ("_hover", {"hover": True}), ("_pressed", {"pressed": True}), ("_disabled", {})]:
+            name = f"perk_socket_{fill}{suffix}"
+            im = draw("socket", 24, "taken", filled=fill, **kw)
+            made[name] = im
+            im.save(f"{out}/{name}.png")
+            with open(f"{out}/{name}.gui", "w") as f:
+                f.write("scaling = stretch\nsize = 12 12\n")
     for name, col in [("perk_link", k.BRONZE_D), ("perk_link_taken", k.GLOW)]:
         link(col).save(f"{out}/{name}.png")
         with open(f"{out}/{name}.gui", "w") as f:
@@ -145,7 +162,7 @@ def main():
 
 def sheet(made, path):
     """Every node and state at 1x (as at GUI scale 2) and 4x, on the well and the panel."""
-    rows = [(kind, n) for kind, n in KINDS]
+    rows = [(kind, n) for kind, n in KINDS] + [("socket_filled", 24)]
     cols = ["", "_hover", "_pressed"]
     cell = 34
     scale = 4
@@ -156,7 +173,9 @@ def sheet(made, path):
         x = 8
         for state in STATES:
             for suf in cols:
-                name = f"perk_{kind}_{state}{suf}"
+                name = f"perk_{kind}_{state}{suf}" if kind != "socket_filled" else f"perk_socket_{list(FILLED)[min(STATES.index(state), 2)]}{suf}"
+                if kind == "socket_filled" and STATES.index(state) > 2:
+                    continue
                 y = 8 + r * (cell * scale + 8)
                 Image.Image.paste(s, Image.new("RGBA", (cell * scale, cell * scale), (*k.WELL, 255)), (x, y))
                 if name in made:
