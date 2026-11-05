@@ -31,6 +31,7 @@ Ronald, 11-05: no more PRs to Weft. Engine bugs that are Weft's own are marked *
 | **(Weft bug)** First person cuts worn layers by bone as well as by role (58562745; branch fix/first-person-worn-bones) | A worn item naming its bones (a shirt) drew whole at the camera | Not a PR |
 | **(Weft bug)** Riding: `MountMove` says whether the steering flew the mount, which then counts no fall (6617ffe1; branch fix/flying-mount-no-fall) | A flying mount landed hurt | Not a PR |
 | **(Weft bug)** Test: redstone_on_a_structure looks from above the lift wherever it is (f65451fc; branch fix/test-wire-on-a-lift) | After the reload the lift rose above the fixed camera: 4 of 5 fails on Weft master | Not a PR |
+| Diagnostics: `--log frame=debug` adds an `update split` line, the client update's parts timed per frame (average and worst): messages, take terrain, end batch, uploads near and in budget, schedule meshing, solid cells, tints, entities, particles (`diag::part`; branch spans/update-split) | The perf review found 6-8 ms a frame of untimed client work in flight on the Mac | Diagnostics |
 | HUD: crosshair only in first person (6a394c0d) | It sat on the player's back in third person | #98 closed for now; clean branch ready |
 | `/rule` reads values the way the rule takes them (a2f4c81c) | `false` was refused, `2` and `999` clamped silently | Clean branch ready, never opened |
 | Box-model blocks' far faces use their boxes' textures (e1f48a48) | Magenta in distant terrain | Maybe |
