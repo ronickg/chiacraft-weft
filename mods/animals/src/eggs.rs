@@ -365,12 +365,15 @@ fn nest_site(w: &World, site: animals_core::nests::Site, at: [f64; 3], ground: [
     Some([pick[0] as f64 + 0.5, pick[1] as f64, pick[2] as f64 + 0.5])
 }
 
-/// The ground under `at`: down through the air to the first block (at most 64 down).
+/// The ground under `at`: down through the air and treetops to the first other block (at most
+/// 64 down).
 fn ground_under(w: &World, at: [f64; 3]) -> [f64; 3] {
     let p = at.map(|v| v.floor() as i32);
+    // Through the air and any treetops (a bird over a forest).
+    let open = |b: u32| b == AIR.id() || LEAVES.on_block(b);
     let y = (p[1] - 64..=p[1])
         .rev()
-        .find(|&y| w.block([p[0], y - 1, p[2]]) != AIR.id())
+        .find(|&y| !open(w.block([p[0], y - 1, p[2]])) && open(w.block([p[0], y, p[2]])))
         .unwrap_or(p[1]);
     [p[0] as f64 + 0.5, y as f64, p[2] as f64 + 0.5]
 }
