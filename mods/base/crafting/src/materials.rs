@@ -101,6 +101,9 @@ pub const MATERIALS: &[Material] = &[
     // Stone and bone (tier 1).
     m("flint", "material.base.flint", &[W], 2.6, 1.8, 100, 75.0, 3.0, 1.0, (0.0, 0.0), 0.0, "keen", Making::Knap),
     m("chert", "material.base.chert", &[W], 2.6, 1.8, 100, 70.0, 3.0, 1.0, (0.0, 0.0), 0.0, "common", Making::Knap),
+    // Tektite (big impacts): the ground melted and thrown out, moldavite's green glass; obsidian's
+    // edge for a newcomer who reaches a crater.
+    m("tektite", "material.base.tektite", &[W], 2.4, 1.8, 100, 50.0, 3.2, 1.5, (0.0, 0.0), 0.0, "razor", Making::Knap),
     m("obsidian", "material.base.obsidian", &[W], 2.4, 1.8, 100, 40.0, 3.2, 1.5, (0.0, 0.0), 0.0, "razor", Making::Knap),
     m("bone", "material.base.bone", &[W, H], 1.9, 1.5, 50, 90.0, 2.5, 0.5, (0.05, 0.0), 0.0, "tough", Making::Carve),
     m("antler", "material.base.antler", &[W, H], 1.9, 1.5, 50, 90.0, 2.5, 0.5, (0.08, 0.0), 0.0, "tough", Making::Carve),
@@ -117,6 +120,9 @@ pub const MATERIALS: &[Material] = &[
     // a lucky early step between bronze and wrought iron, found a few lumps at a time.
     m("meteoric_iron", "material.base.meteoric_iron", &[W, F], 7.9, 1.0, 200, 240.0, 6.5, 2.0, (0.0, 0.0), 220.0, "", Making::Forge),
     m("steel", "material.base.steel", &[W, F], 7.85, 1.0, 300, 500.0, 8.0, 3.0, (0.0, 0.0), 400.0, "tempered", Making::Forge),
+    // Star steel (big impacts, Research round 17's Addendum 2): the impact's nickel-iron core, its
+    // etched plates the Widmanstätten pattern; a tier between steel and diamond, worked at the forge.
+    m("star_steel", "material.base.star_steel", &[W, F], 7.9, 1.0, 350, 650.0, 8.5, 3.2, (0.0, 0.0), 500.0, "patterned", Making::Forge),
     m("gold", "material.base.gold", &[F], 19.3, 1.0, 0, 30.0, 6.0, 0.0, (0.0, 0.0), 40.0, "", Making::Cast),
     // Wood, for hafts, shafts and grips (and wooden heads: a club, a digging stick).
     m("oak", "material.base.oak", &[W, H], 0.75, 1.6, 0, 60.0, 2.0, 0.0, (0.10, -0.03), 0.0, "tough", Making::Carve),
@@ -132,7 +138,10 @@ pub const MATERIALS: &[Material] = &[
     // Green or dead wood off the ground, weaker than a haft split from a log.
     m("branch", "material.base.branch", &[H], 0.6, 1.6, 0, 40.0, 2.0, 0.0, (-0.10, 0.0), 0.0, "", Making::Carve),
     // Fittings: what holds a head on.
-    m("plant_cordage", "material.base.plant_cordage", &[F], 1.3, 1.0, 0, 0.0, 0.0, 0.0, (0.0, 0.0), 30.0, "cheap", Making::Hands),
+    // Cordage lashing 50 (was 30): a hand-lashed first axe (Plain, x0.9: 45) fells a 60-log oak
+    // (21) and cuts its pieces (15) before it gives (PC run fh_natural4 broke at the fell); sinew
+    // and rawhide still last longer.
+    m("plant_cordage", "material.base.plant_cordage", &[F], 1.3, 1.0, 0, 0.0, 0.0, 0.0, (0.0, 0.0), 50.0, "cheap", Making::Hands),
     m("sinew", "material.base.sinew", &[F], 1.3, 1.0, 0, 0.0, 0.0, 0.0, (0.0, 0.0), 60.0, "shrinks_tight", Making::Hands),
     m("rawhide", "material.base.rawhide", &[F, H], 1.2, 1.0, 0, 0.0, 0.0, 0.0, (0.0, 0.0), 80.0, "shrinks_tight", Making::Hands),
     m("birch_tar", "material.base.birch_tar", &[F], 1.0, 1.0, 0, 0.0, 0.0, 0.0, (0.0, 0.0), 70.0, "glued", Making::Hands),

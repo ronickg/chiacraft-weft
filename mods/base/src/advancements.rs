@@ -75,7 +75,7 @@ static METEORIC_IRON: Tag = Tag::named("meteoric_iron");
 
 /// In the order they usually come. The index is the bit in `Advancements::done`, so new ones go
 /// at the end (at most 64).
-static ALL: [Advancement; 29] = [
+static ALL: [Advancement; 31] = [
     Advancement { id: "timber", icon: Item::named("oak_log"), group: 0, rule: Rule::Break(&LOGS) },
     Advancement { id: "workbench", icon: Item::named("crafting_table"), group: 0, rule: Rule::Have(&CRAFTING_TABLES) },
     Advancement { id: "first_pickaxe", icon: Item::named("wood_pickaxe"), group: 0, rule: Rule::Have(&PICKAXES) },
@@ -108,6 +108,9 @@ static ALL: [Advancement; 29] = [
     Advancement { id: "red_night", icon: Item::named("campfire"), group: 4, rule: Rule::Milestone(base_api::milestones::RED_NIGHT) },
     // A fallen star's iron in hand (sky events, `meteors.rs`).
     Advancement { id: "starfall", icon: Item::named("meteoric_iron"), group: 3, rule: Rule::Have(&METEORIC_IRON) },
+    // Out under the sky on a shower's peak and an aurora storm (sky events, `events.rs`).
+    Advancement { id: "wish_upon", icon: Item::named("meteorite"), group: 3, rule: Rule::Milestone(base_api::milestones::WISH_UPON) },
+    Advancement { id: "sky_on_fire", icon: Item::named("snow"), group: 3, rule: Rule::Milestone(base_api::milestones::SKY_ON_FIRE) },
 ];
 
 /// Server to the player who made it: the index into `ALL`.
