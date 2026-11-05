@@ -72,6 +72,9 @@ fn main() {
             "--no-vsync" => opts.no_vsync = true,
             // Draws as on a GPU without `drawIndirectCount` (MoltenVK), to check that path anywhere.
             // SAFETY: still one thread, before anything reads the environment.
+            // Every barrier makes writes visible to the host, as before (to compare).
+            // SAFETY: still one thread, before anything reads the environment.
+            "--host-barrier-each" => unsafe { std::env::set_var("WEFT_HOST_BARRIER_EACH", "1") },
             "--no-indirect-count" => unsafe { std::env::set_var("WEFT_NO_INDIRECT_COUNT", "1") },
             "--server" => server = true,
             // Engine shaders and assets live from the source tree in a release build too.
