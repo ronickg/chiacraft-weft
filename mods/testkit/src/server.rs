@@ -1244,6 +1244,57 @@ fn dump_registry() -> String {
         named(ek::MENU).join(",\n"),
         recipes_json().join(",\n")
     )
+    .trim_end()
+    .trim_end_matches('}')
+    .to_string()
+        + &format!(",\"skills\":[\n{}\n],\"web\":{}}}\n", skills_json().join(",\n"), web_json())
+}
+
+/// The skills (`vitals::skills`): id, name, group, path, what raises them.
+fn skills_json() -> Vec<String> {
+    vitals::skills::SKILLS
+        .iter()
+        .map(|s| {
+            format!(
+                "{{\"id\":{},\"name\":{},\"group\":{},\"path\":{},\"by\":{}}}",
+                js(s.id()),
+                js(s.name()),
+                js(s.group().name()),
+                js(&format!("{:?}", s.path())),
+                js(s.by())
+            )
+        })
+        .collect()
+}
+
+/// The perk web (`vitals::perks::web`): every node where it's drawn, with what it gives, and the
+/// links.
+fn web_json() -> String {
+    let w = vitals::perks::web();
+    let nodes: Vec<String> = w
+        .nodes
+        .iter()
+        .map(|n| {
+            let gives: Vec<String> = n.gives.iter().map(|(f, u)| format!("[{},{u}]", js(f.name()))).collect();
+            format!(
+                "{{\"id\":{},\"kind\":{},\"region\":{},\"bridge\":{},\"ring\":{},\"x\":{},\"y\":{},\"gives\":[{}],\"special\":{},\"key\":{},\"needs\":{},\"socket\":{}}}",
+                n.id,
+                js(&format!("{:?}", n.kind)),
+                n.region.map_or("null".into(), |s| js(s.id())),
+                n.bridge.map_or("null".into(), |s| js(s.id())),
+                n.ring,
+                n.x,
+                n.y,
+                gives.join(","),
+                n.special.map_or("null".into(), |s| js(s.id())),
+                js(&n.key),
+                n.needs,
+                n.socket.map_or("null".into(), |s| s.to_string())
+            )
+        })
+        .collect();
+    let links: Vec<String> = w.links.iter().map(|(a, b)| format!("[{a},{b}]")).collect();
+    format!("{{\"nodes\":[\n{}\n],\"links\":[{}]}}", nodes.join(",\n"), links.join(","))
 }
 
 /// The recipe kinds the mods register (`base_api`, `parts.rs`).
