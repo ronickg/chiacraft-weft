@@ -83,8 +83,6 @@ const ROOT_TICKS: u64 = 60;
 const ROOT_SLOW: f64 = -0.75;
 const ROOT_RADIUS: f64 = 2.0;
 const TICKS: f32 = vitals::TICKS as f32;
-/// Faster than this sideways (blocks a second) and not charging, it was knocked back.
-const KNOCKED: f64 = 4.5;
 /// How near its edge it comes to a player before it stops and turns to them.
 const CLOSE: f64 = 1.5;
 
@@ -321,6 +319,9 @@ fn fight(w: &World, id: u64, st: &EntityState) -> bool {
     if w.component(id, &SCALED) != Some(1) {
         w.set_scale(id, SCALE);
         w.set_component(id, &SCALED, 1);
+        // A titan stands its ground: no knockback (`core:knockback_resistance`; before it the
+        // goal undid it, PC look boss_drenkaun1: twenty hits had flung it off its arena).
+        w.attribute_add_modifier(id, &attribute::KNOCKBACK_RESISTANCE, "animals:size", attr_op::ADD, bosses::SIZE.band().knockback as f64, 0);
     }
     for cd in c.cooldown.iter_mut() {
         *cd = cd.saturating_sub(e);
@@ -372,12 +373,6 @@ fn fight(w: &World, id: u64, st: &EntityState) -> bool {
                 ],
             ));
         }
-    }
-    // A titan stands its ground: the engine knocks back whatever is hit (PC look boss_drenkaun1:
-    // twenty hits flung it 20 blocks off its arena), so outside its own charge that is undone.
-    let charging = c.state == ACT && b.attacks[c.attack as usize % b.attacks.len()].name == "charge";
-    if !charging && st.vel.x * st.vel.x + st.vel.z * st.vel.z > KNOCKED * KNOCKED {
-        drop(w.entity_edit(id).velocity([0.0, st.vel.y.min(0.0), 0.0]));
     }
     match c.state {
         RISING => {
