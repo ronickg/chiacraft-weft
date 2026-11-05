@@ -202,6 +202,11 @@ impl Client {
                 self.using_off = ticks.is_some_and(|(_, off)| off);
             }
             ToClient::Air { air, heading } => self.world.air = (air, heading),
+            ToClient::SkyEvent { kind, strength } => {
+                let began = if kind == self.sky_event.0 { self.sky_event.2 } else { crate::shaders::clock() };
+                self.sky_event = (kind, strength, began);
+            }
+            ToClient::SkyLanding { pos, seconds } => self.sky_landing = Some((pos, crate::shaders::clock() + seconds)),
             ToClient::Tints { tints } => self.world.set_tints(tints),
             ToClient::Weather { id, only } => {
                 self.weather_id = (id as usize).min(content().game.weathers.len() - 1) as u16;

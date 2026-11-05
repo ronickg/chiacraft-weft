@@ -297,8 +297,10 @@ fn step(w: &World, f: &mut Fall, now: u64) -> bool {
     }
     w.despawn(f.body);
     if f.lays {
-        crate::felled::lay(w, f.foot, &f.logs, &f.states, f.d);
+        let laid = crate::felled::lay(w, f.foot, &f.logs, &f.states, f.d);
+        weft_sdk::info!("fall: down from {:?}, {laid} of {} logs laid", f.foot, f.logs.len());
     } else {
+        weft_sdk::info!("fall: down from {:?}, shattered ({} logs)", f.foot, f.logs.len());
         // Past the axe's tier it shatters where it lands.
         for (p, &state) in f.logs.iter().zip(&f.states).step_by(2) {
             let at = turn(center(*p), f.pivot, f.axis, 90.0);

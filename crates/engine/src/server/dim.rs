@@ -51,6 +51,18 @@ pub enum DimEvent {
         biomes: Vec<u32>,
         weather: u16,
     },
+    /// What happens in its sky from now on (`Host::set_sky_event`).
+    SetSkyEvent {
+        dim: u32,
+        kind: u32,
+        strength: f32,
+    },
+    /// Something lands at `pos` in `seconds` (`Host::sky_landing`).
+    SkyLanding {
+        dim: u32,
+        pos: glam::DVec3,
+        seconds: f32,
+    },
     /// The air in its biomes from now on (`DimSet::set_air`).
     SetAir {
         dim: u32,

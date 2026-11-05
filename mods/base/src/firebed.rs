@@ -44,12 +44,15 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::FUNCTIONAL);
     r.block(&CAMPFIRE_LAID)
         .sound_group("wood")
-        .textures("campfire_top", "campfire_side", "campfire_side")
+        // Art's unlit tiles (11-04): the lit one's logs and stones, no flames; the side is drawn
+        // for this 14 x 5 x 14 box, its logs in the bottom rows.
+        .textures("campfire_laid_top", "campfire_laid_side", "campfire_laid_side")
         .not_solid()
         .hardness(1.0)
         .mineable("axe")
         .needs(Dir::Down, "")
         .model_box([1.0, 0.0, 1.0], [15.0, 5.0, 15.0])
+        .item_texture("campfire_laid")
         .tag("fire_beds")
         .tab(&crate::tabs::FUNCTIONAL);
     let mut bed = vec!["plant_fibre"];

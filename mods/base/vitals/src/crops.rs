@@ -43,9 +43,12 @@ pub struct Crop {
     pub tall: Option<u32>,
 }
 
-/// The chance broken tall grass gives a seed of one of its biome's crops (wheat's own is an
-/// eighth everywhere).
-pub const WILD_SEED_CHANCE: f32 = 1.0 / 16.0;
+/// The chance broken tall grass gives a seed of one of its biome's crops. Rare, so a seed is a
+/// find and cutting grass for fibre doesn't fill the hotbar with seed kinds (the first-hours
+/// playtest after the sync, round 13: 14 cuts gave six kinds of seed).
+pub const WILD_SEED_CHANCE: f32 = 1.0 / 32.0;
+/// The chance broken tall grass gives a wheat seed, anywhere (it was an eighth, vanilla's).
+pub const WHEAT_SEED_CHANCE: f32 = 1.0 / 32.0;
 
 /// Seed a ripe harvest gives beyond the one back, at most, for a crop with a seed of its own.
 pub const EXTRA_SEEDS: u32 = 3;

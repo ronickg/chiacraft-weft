@@ -110,9 +110,45 @@ pub fn init(r: &mut Registry) {
                 && let Some(i) = SPECIES.iter().position(|s| s.kind.id() == d.kind)
             {
                 count(&DIED, i);
+                // What took it, for runs that watch a herd (a capybara gone from the list could
+                // have died or wandered off).
+                weft_sdk::info!(
+                    "{} {} died of {} at {:.0} {:.0} {:.0}",
+                    SPECIES[i].name,
+                    d.entity,
+                    cause_name(d.cause),
+                    d.pos.x,
+                    d.pos.y,
+                    d.pos.z
+                );
             }
         }
     });
+}
+
+/// A damage cause's name for the log: a mod's by its registry name, the engine's by its number
+/// (`name_of` knows only mods' causes; aw_capy_winter's fall death read "died of ").
+fn cause_name(cause: u32) -> String {
+    use weft_sdk::abi::damage_cause as c;
+    let name = name_of(abi::entry_kind::DAMAGE_CAUSE, cause);
+    if !name.is_empty() {
+        return name.to_string();
+    }
+    let engine = match cause {
+        c::GENERIC => "generic",
+        c::FALL => "a fall",
+        c::ATTACK => "an attack",
+        c::FIRE => "fire",
+        c::STARVE => "starving",
+        c::DROWN => "drowning",
+        c::VOID => "the void",
+        c::LAVA => "lava",
+        c::CRUSH => "crushing",
+        c::SUFFOCATE => "suffocating",
+        c::EXPLOSION => "an explosion",
+        _ => return format!("cause {cause}"),
+    };
+    engine.to_string()
 }
 
 // ------------------------------------------------------------------ testing: speed and census
@@ -174,13 +210,21 @@ pub fn upkeep(w: &World, id: u64, index: usize, a: &mut Animal) {
     if (w.game_time() + id) % every < e as u64 && !crate::animal::tamed(w, id) {
         let days = (every * speed() as u64) as f64 / life::DAY as f64;
         let (kin, near) = kin_near(w, id, index, a);
+        // Its room where it is: a plant eater's as heavily as its biome is stocked.
+        let crowd = w
+            .entity(id)
+            .map_or(s.crowd(), |st| crate::species::crowd_at(w, s, st.block_pos()));
         let roll = w.random_below(1_000_000) as f64 / 1_000_000.0;
-        if roll < life::want_chance(days, near, s.crowd(), a.stage) {
-            weft_sdk::info!("wild {} {id} died of want ({near:.1} of its kind near, room for {})", s.name, s.crowd());
+        // A group that came to an empty place lives (`life::room_for` lets it in), though a room
+        // under its group size (a hunter where its prey feed one, `needs::hunter_room`) keeps it
+        // from breeding up: it dies of want only past its biggest group.
+        let room = crowd.max(s.bio.social.group().1);
+        if roll < life::want_chance(days, near, room, a.stage) {
+            weft_sdk::info!("wild {} {id} died of want ({near:.1} of its kind near, room for {crowd})", s.name);
             w.damage(id, 1e9, 0, damage_cause::STARVE);
             return;
         }
-        wild_love(w, id, index, a, &b, &kin, near, days);
+        wild_love(w, id, index, a, &b, &kin, near, crowd, days);
     }
 }
 
@@ -212,7 +256,7 @@ const WILD_LOVE_EVERY: u64 = 200;
 /// going as old age takes them, and stop when it's crowded. They then meet and mate as tames in
 /// love do (`behave`).
 #[allow(clippy::too_many_arguments)]
-fn wild_love(w: &World, id: u64, index: usize, a: &Animal, b: &Breeding, kin: &[u64], near: f64, days: f64) {
+fn wild_love(w: &World, id: u64, index: usize, a: &Animal, b: &Breeding, kin: &[u64], near: f64, crowd: u32, days: f64) {
     let ready = |a: &Animal, b: &Breeding| life::can_breed(a.stage) && b.growing == 0 && b.love == 0 && b.rest == 0 && b.carrying == 0;
     if !ready(a, b) {
         return;
@@ -221,7 +265,7 @@ fn wild_love(w: &World, id: u64, index: usize, a: &Animal, b: &Breeding, kin: &[
     let Some(st) = w.entity(id) else { return };
     // Only in its breeding season, twice as readily in its peak.
     let roll = w.random_below(1_000_000) as f64 / 1_000_000.0;
-    if roll >= life::love_chance(days, near, s.crowd()) * s.bio.season_love(season_bit(w)) {
+    if roll >= life::love_chance(days, near, crowd) * s.bio.season_love(season_bit(w)) {
         return;
     }
     let mate = kin.iter().copied().find(|&o| {
@@ -316,17 +360,7 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             return false;
         }
         let female = |o: u64| w.component(o, &ANIMAL).map(|a| a.female);
-        let Some(mine) = w.component(id, &ANIMAL).and_then(|a| a.species()) else { return false };
-        let mate = w.entities_near(st.pos, 24.0, None).into_iter().find(|&o| {
-            o != id
-                && female(o) != female(id)
-                && w.component(o, &ANIMAL)
-                    .and_then(|a| a.species())
-                    .is_some_and(|s| species::same_species(s, mine))
-                && w.component(o, &BREEDING)
-                    .is_some_and(|m| m.love > 0 && m.growing == 0)
-        });
-        let Some(mate) = mate else { return false };
+        let Some(mate) = mate_near(w, id, st) else { return false };
         let Some(ms) = w.entity(mate) else { return false };
         let d2 = (ms.pos.x - st.pos.x).powi(2) + (ms.pos.z - st.pos.z).powi(2);
         if d2 > 1.5 * 1.5 {
@@ -345,9 +379,30 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
     }
 }
 
+/// A mate for `id`, in love itself: one of the other sex of its species within 24 blocks, grown
+/// and in love too.
+pub fn mate_near(w: &World, id: u64, st: &EntityState) -> Option<u64> {
+    if w.component(id, &BREEDING)
+        .is_none_or(|b| b.love == 0 || b.growing > 0)
+    {
+        return None;
+    }
+    let female = |o: u64| w.component(o, &ANIMAL).map(|a| a.female);
+    let mine = w.component(id, &ANIMAL).and_then(|a| a.species())?;
+    w.entities_near(st.pos, 24.0, None).into_iter().find(|&o| {
+        o != id
+            && female(o) != female(id)
+            && w.component(o, &ANIMAL)
+                .and_then(|a| a.species())
+                .is_some_and(|s| species::same_species(s, mine))
+            && w.component(o, &BREEDING)
+                .is_some_and(|m| m.love > 0 && m.growing == 0)
+    })
+}
+
 /// Mother `id` and father `mate` have mated: she carries his young (or will lay his eggs); both
 /// rest.
-fn mated(w: &World, id: u64, mate: u64, index: usize) {
+pub fn mated(w: &World, id: u64, mate: u64, index: usize) {
     let s = &SPECIES[index];
     let (Some(genes), Some(wild)) = (w.component(mate, &GENOME), w.component(mate, &ANIMAL).map(|a| a.wild)) else {
         return;
@@ -426,15 +481,26 @@ fn deliver(w: &World, id: u64, index: usize, b: &Breeding) {
         };
         let angle = k as f64 / n as f64 * std::f64::consts::TAU;
         let at = [st.pos.x + angle.cos() * 0.6, st.pos.y, st.pos.z + angle.sin() * 0.6];
-        if s.gestation() > 0 {
+        // A fish's eggs lie in the water for their time (`life::carrying`), then the fry come.
+        if s.gestation() > 0 || s.in_water() {
             born(w, at, &y, owner);
         } else {
             clutch.push(y);
         }
     }
-    crate::eggs::lay(w, st.pos.to_array(), &clutch, owner);
+    if animals_core::nests::site(s.name).is_some() {
+        crate::eggs::lay_in_nest(w, index, id, st.pos.to_array(), &clutch, owner);
+    } else {
+        crate::eggs::lay(w, st.pos.to_array(), &clutch, owner);
+    }
     hearts(w, id, 9);
-    let what = if s.gestation() > 0 { "young born" } else { "eggs laid" };
+    let what = if s.gestation() > 0 {
+        "young born"
+    } else if s.in_water() {
+        "fry hatched"
+    } else {
+        "eggs laid"
+    };
     weft_sdk::info!("animal {id}: {n} {what}");
 }
 
@@ -473,6 +539,7 @@ pub fn born(w: &World, at: [f64; 3], y: &Young, owner: Option<[u8; 64]>) -> u64 
             *own = o;
         }
         crate::xp::raised(w, &o);
+        crate::journal::note_owner(w, &o, id, animals_core::journal::BRED);
         crate::commands::tamed(w, id);
         crate::commands::set_command(w, id, crate::commands::WANDER, None);
         crate::dog::on_tamed(w, id);

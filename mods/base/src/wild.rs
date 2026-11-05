@@ -77,10 +77,19 @@ pub fn register(r: &mut Registry) {
                 .grows(growth::step_secs(full, 1, 300.0), light)
                 .on_grow(move |e| growth::grow(e, full, true, |e| growth::next_age(e, 1))),
             Form::Spreads => {
+                // Glow mycena as Art's smaller clump: its caps are 1-3 cm (`notes/NIGHT_GLOW.md`).
                 let b = b
-                    .texture(name)
+                    .texture(if name == "glow_mycena" { "glow_mycena_small" } else { name })
                     .grows(growth::step_secs(full, 1, 300.0), light)
                     .on_grow(move |e| growth::grow(e, full, true, |e| spread(e, full)));
+                // Foxfire and goblin's gold lie flat, a sixteenth high, like a mat; a slot shows
+                // Art's item picture of them.
+                let b = if wild::LIES_FLAT.contains(&full) {
+                    b.model_box([0.0, 0.0, 0.0], [16.0, 1.0, 16.0])
+                        .item_texture(name)
+                } else {
+                    b
+                };
                 if p.gives.is_some() { b.no_item() } else { b.tab(&crate::tabs::NATURAL) }
             }
             // A lily pad lies flat on the water.
@@ -117,6 +126,9 @@ pub fn register(r: &mut Registry) {
                 .model_box([0.0, 0.0, 0.0], [16.0, 1.0, 16.0])
                 .no_item(),
         };
+        // The glowing ones' own dim light (`wild::GLOW`); their `_e` glow is the pack's.
+        let glow = wild::glow(full);
+        let b = if glow > 0 { b.light(glow) } else { b };
         drop(b);
         // Picking gives what plants it again: a bush or a seed head three when ripe and nothing out
         // of season, the others one; a cordage plant fibre besides (`wild::FIBRE`).

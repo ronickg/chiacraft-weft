@@ -60,6 +60,9 @@ const SOURCES: &[(&str, &str)] = &[
     ("stone", "#cobblestone"),
     ("bone", "bone"),
     ("wrought_iron", "#ingots/iron"),
+    ("meteoric_iron", "#meteoric_iron"),
+    ("star_steel", "#ingots/star_steel"),
+    ("tektite", "#tektite"),
     ("gold", "#ingots/gold"),
     ("diamond", "#gems/diamond"),
     ("plant_cordage", "#string"),
@@ -190,7 +193,7 @@ pub static SKILLS: Component<Skills> = Component::named("base:craft_skills");
 /// from memory by the maker's skill in its craft, and a crafting table's.
 fn points(material: &str, skill: u32) -> grades::Points {
     let material = match material {
-        "diamond" | "steel" => 30,
+        "diamond" | "steel" | "star_steel" => 30,
         "flint" | "obsidian" | "wrought_iron" | "bronze" | "oak" | "mesquite" => 24,
         _ => 20,
     };

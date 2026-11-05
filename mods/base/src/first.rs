@@ -123,7 +123,7 @@ pub fn register(r: &mut Registry) {
 
 /// A loose thing's block: its counting props (0 to the most), then small boxes lying on the ground
 /// with `tex` on them, no collision, broken at a touch, on something solid.
-fn loose(r: &mut Registry, b: &'static Block, props: &[(&str, u32)], group: &str, tex: &str, boxes: &[([f32; 3], [f32; 3])]) {
+pub(crate) fn loose(r: &mut Registry, b: &'static Block, props: &[(&str, u32)], group: &str, tex: &str, boxes: &[([f32; 3], [f32; 3])]) {
     let mut bb = r.block(b);
     for &(name, most) in props {
         bb = bb.prop(name, 0..=most);
@@ -234,6 +234,11 @@ fn knows(w: &World, player: u64, item: u32) -> bool {
             .is_some_and(|k| crate::discovery::held(&k, item_name(item)))
 }
 
+/// Seconds the book takes to make `item` from memory: a knapped head's, else none (made at once).
+pub fn book_secs(item: u32) -> Option<f32> {
+    knapped_of(item).map(|_| f::HEAD_FROM_BOOK_SECS)
+}
+
 /// The knapped head a recipe's output is, if it is one.
 fn knapped_of(item: u32) -> Option<&'static f::Knapped> {
     f::knapped(item_name(item).strip_prefix("base:part_")?)
@@ -265,7 +270,8 @@ pub fn finish(w: &World, player: u64, cells: &[ItemStack], made: ItemStack, roll
         return made;
     }
     if let Some(k) = knapped_of(made.item) {
-        if !knows(w, player, made.item) {
+        // From memory, a head is the book's, in its time (`book_secs`); the grid shows none.
+        if roll.is_none() || !knows(w, player, made.item) {
             return ItemStack::EMPTY;
         }
         return crate::knapping::knapped_head(w, player, k.shape, false, roll);

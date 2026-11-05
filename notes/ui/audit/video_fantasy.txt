@@ -1,0 +1,34 @@
+# The Fantasy screen (Research round 17): its tab beside Video and Quality, Subtle by default,
+# then Storybook and Off from the master, a row stepped (the master becomes Custom), and the Low
+# quality preset capping the rows that cost.
+loaded
+idle
+leave
+wait 2
+tap core:title text:Settings
+wait 1.5
+cursor 0.5 0.5
+scroll -40
+wait 1
+tap_once core:settings text:Video and Quality
+wait 1.5
+tap base:video text:Fantasy
+wait 1.5
+shot vf_01_subtle.png
+tap_once base:video_fantasy text:Storybook
+wait 1
+shot vf_02_storybook.png
+tap_once base:video_fantasy text:Off
+wait 1
+shot vf_03_off.png
+tap_once base:video_fantasy text:Subtle
+wait 1
+tap base:video_fantasy text:Video and Quality
+wait 1.5
+tap_once base:video text:Low
+wait 1
+shot vf_04_low_quality.png
+tap base:video text:Fantasy
+wait 1.5
+shot vf_05_after_low.png
+quit

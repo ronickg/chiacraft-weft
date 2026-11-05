@@ -135,12 +135,21 @@ pub fn lay(w: &World, foot: [i32; 3], logs: &[[i32; 3]], states: &[u32], d: [i32
     let along_x = d[0] != 0;
     let mut laid = 0;
     let mut taken = HashSet::new();
-    for (spot, &state) in spots.iter().zip(states) {
-        let Some((at, h)) = spot else { continue };
-        let at = [at[0], at[1] - drop[h], at[2]];
-        if !taken.insert(at) || !gives_way(w.block(at)) {
-            continue;
+    // A log with no place to lie drops as its item where it would have lain, so a fruitful fell
+    // keeps all its wood (PC run fh_natural2: a 60-log oak laid 27 and lost 32, its crown's
+    // branches turning onto the same cells).
+    let as_item = |state: u32, at: [i32; 3]| {
+        let name = name_of(abi::entry_kind::BLOCK, block_of(state));
+        if let Some(item) = Item::lookup(name.split('[').next().unwrap_or("")) {
+            w.spawn_item([at[0] as f64 + 0.5, at[1] as f64 + 0.5, at[2] as f64 + 0.5], ItemStack::new(item, 1));
         }
+    };
+    for (spot, &state) in spots.iter().zip(states) {
+        let Some((at, h)) = spot else {
+            as_item(state, foot);
+            continue;
+        };
+        let at = [at[0], at[1] - drop[h], at[2]];
         // A branch lands as sticks where it falls (Dynamic Trees gives sticks for its thin wood):
         // an 8 px one a stick, a 4 px one every other; turned, its arms would point the old way.
         if BRANCHES.on_block(state) {
@@ -152,21 +161,22 @@ pub fn lay(w: &World, foot: [i32; 3], logs: &[[i32; 3]], states: &[u32], d: [i32
             }
             continue;
         }
+        // Its cell, or the first free one up to `PILE_UP` over it (a crown's logs pile up).
+        let Some(at) = (0..=vitals::felling::PILE_UP)
+            .map(|k| [at[0], at[1] + k, at[2]])
+            .find(|c| !taken.contains(c) && gives_way(w.block(*c)))
+        else {
+            as_item(state, at);
+            continue;
+        };
+        taken.insert(at);
         let piece = if (h / vitals::felling::PIECE) % 2 == 0 { "a" } else { "b" };
         let axis = state_prop(state, "axis").map_or("y", |a| turned_axis(a, along_x));
         let lying = state_with(state, "axis", axis)
             .and_then(|s| state_with(s, "felled", piece))
             .unwrap_or(state);
         if occupied(w, at) {
-            let item = Item::lookup(
-                name_of(abi::entry_kind::BLOCK, block_of(state))
-                    .split('[')
-                    .next()
-                    .unwrap_or(""),
-            );
-            if let Some(item) = item {
-                w.spawn_item([at[0] as f64 + 0.5, at[1] as f64 + 0.5, at[2] as f64 + 0.5], ItemStack::new(item, 1));
-            }
+            as_item(state, at);
             continue;
         }
         if w.block(at) != 0 {

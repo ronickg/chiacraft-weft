@@ -53,6 +53,8 @@ mod hare;
 mod hunt;
 mod iguanodont;
 mod jaguar;
+pub mod journal;
+mod journal_screen;
 mod knockout;
 mod kryptobaatar;
 mod lizard;
@@ -143,6 +145,8 @@ fn init(r: &mut Registry) {
     wolf::init(r);
     jaguar::init(r);
     voices::init(r);
+    journal::init(r);
+    journal_screen::register(r);
     breath::init(r);
     animal::init(r);
     comfort::init(r);
@@ -163,7 +167,13 @@ fn init(r: &mut Registry) {
             .iter()
             .find(|h| h.0 == s.name)
             .map(|&(_, item, lo, hi)| Pool::new().items(item, lo, hi));
-        let pools: Vec<Pool> = hide.into_iter().chain(meat::pool(s.name)).collect();
+        // One that gives no meat leaves carcass pieces for the scavengers.
+        let carcass = animals_core::meat::carcass(s.name).map(|(lo, hi)| Pool::new().items(animals_core::meat::CARCASS, lo, hi));
+        let pools: Vec<Pool> = hide
+            .into_iter()
+            .chain(meat::pool(s.name))
+            .chain(carcass)
+            .collect();
         if !pools.is_empty() {
             pools
                 .into_iter()

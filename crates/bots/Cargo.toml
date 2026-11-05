@@ -1,0 +1,19 @@
+[package]
+name = "chiacraft_bots"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Headless load-test players: many bots in one process join a world over the game's own network protocol (Research round 18)."
+
+[[bin]]
+name = "weft-bots"
+path = "src/main.rs"
+
+[dependencies]
+weft_engine.workspace = true
+iroh.workspace = true
+tokio.workspace = true
+glam.workspace = true
+log.workspace = true
+parking_lot.workspace = true
+chiacraft-packages = { path = "../packages" }

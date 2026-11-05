@@ -1,0 +1,22 @@
+# The book puts first what you can make with something new (World playtest round 13: after knapping
+# a head the axe wasn't the first slot): the book opened with string and a stick, closed, a
+# felling axe head given, opened again: the axe picked first.
+loaded
+idle
+chat /tk mode survival
+chat /tk time 6000
+wait 2
+chat /tk give base:string 4
+chat /tk give base:stick 4
+wait 1
+press core:inventory
+wait 1.5
+shot bn_01_before.png
+key Escape
+wait 1
+chat /tk give base:part_felling_axe_head 1
+wait 1
+press core:inventory
+wait 1.5
+shot bn_02_axe_first.png
+quit

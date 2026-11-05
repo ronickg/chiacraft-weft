@@ -60,6 +60,7 @@ pub static WATER: Block = Block::named("water");
 pub static LAVA: Block = Block::named("lava");
 pub static TALL_GRASS: Block = Block::named("tall_grass");
 pub static GRAZED_GRASS: Block = Block::named("grazed_grass");
+pub static DUNG_PAT: Block = Block::named("dung_pat");
 pub static DANDELION: Block = Block::named("dandelion");
 pub static ROSE: Block = Block::named("rose");
 pub static SAPLING: Block = Block::named("sapling");
@@ -444,6 +445,12 @@ fn plant(r: &mut Registry, handle: &'static Block, tex: &str) {
 
 /// Sand and gravel: with nothing under them they fall as an entity and land as a block.
 pub fn register(r: &mut Registry) {
+    // First: soil is any dirt. The engine sets a tag by tag in the order the calls come, reading
+    // the tag as it is then, so `plant_soil` must hold the dirt before `tall_grass_soil` and
+    // `big_leaf_soil` read it below. When it came after, double tall grass, bananas and
+    // philodendrons on grass had no soil and broke at the first block update beside them (the
+    // plant fibre round the grazing herds, 11-05).
+    r.tag("plant_soil", &["#dirt"]);
     // The leaves' tint kinds besides foliage (`base_api::trees`), as green as foliage by default.
     r.tint_kind(&base_api::trees::EVERGREEN, vitals::foliage::muted(vitals::foliage::LEAVES));
     r.tint_kind(&base_api::trees::YELLOW_LEAVES, vitals::foliage::muted(vitals::foliage::LEAVES));
@@ -777,7 +784,11 @@ pub fn register(r: &mut Registry) {
         .tint(&tints::GRASS)
         .no_item();
     r.loot(&TALL_GRASS)
-        .pool(Pool::new().when(Cond::Chance(0.125)).item("wheat_seeds"))
+        .pool(
+            Pool::new()
+                .when(Cond::Chance(vitals::crops::WHEAT_SEED_CHANCE))
+                .item("wheat_seeds"),
+        )
         // Fibre for string and linen (`clothing.rs`).
         .pool(
             Pool::new()
@@ -794,10 +805,41 @@ pub fn register(r: &mut Registry) {
         .no_item()
         .grows(crate::growth::step_secs("base:grazed_grass", 1, 600.0), 9)
         .on_grow(|e| {
-            crate::growth::grow(e, "base:grazed_grass", false, |e| {
-                e.world().set_block(e.pos(), TALL_GRASS.id());
-            })
+            // Beside a dung pat it grows back `PAT_GROWTH` times as fast: as many tries a step.
+            let tries = if pat_near(&e.world(), e.pos().to_array()) { vitals::soil::PAT_GROWTH } else { 1 };
+            for _ in 0..tries {
+                match base_api::grow::step(e, "base:grazed_grass", false) {
+                    base_api::grow::Step::Grow => {
+                        e.world().set_block(e.pos(), TALL_GRASS.id());
+                        return;
+                    }
+                    base_api::grow::Step::Frost => return,
+                    base_api::grow::Step::Rest => {}
+                }
+            }
         });
+    // A grazer's dung pat (`vitals::soil`, `mods/animals/src/forage.rs`): it rots by warmth and
+    // rain into a tuft of fresh grass; broken, it gives the dung.
+    r.block(&DUNG_PAT)
+        .sound_group("mud")
+        .textures("dung_pat_top", "dung_pat_side", "dung_pat_top")
+        // A plant first: `.plant()` makes the model a cross, so the pat's box comes after it.
+        .plant()
+        .model_box([2.0, 0.0, 2.0], [14.0, 1.5, 14.0])
+        // Its top's corners are clear (Art's tile), so the grass shows round the pat.
+        .cutout()
+        .needs_below("#plant_soil")
+        .no_item()
+        .grows(crate::growth::step_secs("base:dung_pat", 1, 1200.0), 0)
+        .on_grow(|e| {
+            // Rotted, or broken up at last (`vitals::soil::PAT_MOST_DAYS`): a tuft of fresh grass.
+            let rots = matches!(base_api::grow::step(e, "base:dung_pat", false), base_api::grow::Step::Grow)
+                || ((e.world().random() >> 11) as f32 / (1u64 << 53) as f32) < vitals::soil::pat_break_chance();
+            if rots {
+                e.world().set_block(e.pos(), TALL_GRASS.id());
+            }
+        });
+    r.loot(&DUNG_PAT).pool(Pool::new().item("dung"));
     plant(r, &DANDELION, "flower_dandelion");
     plant(r, &ROSE, "flower_rose");
     // A wild rose gives itself and, a time in four, its hips.
@@ -1070,7 +1112,11 @@ pub fn register(r: &mut Registry) {
         }
     }
     r.loot(&TALL_GRASS_DOUBLE)
-        .pool(Pool::new().when(Cond::Chance(0.125)).item("wheat_seeds"))
+        .pool(
+            Pool::new()
+                .when(Cond::Chance(vitals::crops::WHEAT_SEED_CHANCE))
+                .item("wheat_seeds"),
+        )
         .pool(
             Pool::new()
                 .when(Cond::Chance(vitals::clothing::FIBRE_CHANCE))
@@ -1151,7 +1197,7 @@ pub fn register(r: &mut Registry) {
 
     // What may grow or stand where, from the common `dirt` and `sand` tags like modern vanilla:
     // a mod's sand tagged `sand` gets cactus and sugar cane, in the world and from players.
-    r.tag("plant_soil", &["#dirt"]);
+    // (`plant_soil` from `#dirt` is set at the top of `register`.)
     r.tag("sugar_cane", &["sugar_cane"]);
     r.tag("hay_bale", &["hay_bale"]);
     r.tag("dyes/red", &["rose"]);
@@ -1276,4 +1322,10 @@ fn branch(r: &mut Registry, wood: &str) {
     })
     .drops("stick", 1)
     .tab(&crate::tabs::NATURAL);
+}
+
+/// Whether a dung pat lies within `vitals::soil::PAT_REACH` blocks of `pos` (a block up or down).
+pub fn pat_near(w: &World, [x, y, z]: [i32; 3]) -> bool {
+    let r = vitals::soil::PAT_REACH;
+    (-1..=1).any(|dy| (-r..=r).any(|dz| (-r..=r).any(|dx| DUNG_PAT.is(w.block([x + dx, y + dy, z + dz])))))
 }

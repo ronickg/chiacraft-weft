@@ -10,6 +10,9 @@
 /// oak 12.8, a 1350-log sequoia 222. Under 1, so the big trees aren't hopeless with the right
 /// axe; over 0.5, so they're still a job.
 pub const GROWTH: f32 = 0.75;
+/// A laid tree's log whose cell is taken (a crown's branches turn onto the same cells) lies on the
+/// first free one up to this many over it; past that it drops as its item.
+pub const PILE_UP: i32 = 3;
 
 /// A tree past its axe's tier takes this many times longer (and gives nothing).
 pub const PAST_TIER: f32 = 8.0;
@@ -166,8 +169,14 @@ pub fn piece(logs: u32) -> Felling {
     Felling { chops: (logs.max(1) as f32).powf(GROWTH), fruitful: true }
 }
 
-/// What a felling or a piece wears the axe by: its chops at the tier's pace (a tree past the tier
-/// takes longer, not more of the axe).
+/// What cutting a laid tree's piece wears the axe by (Planner, 11-04, option A): the felling is the
+/// hard work and wears the axe by its chops (`wear`); cutting the 15 pieces of a 60-log oak at
+/// `wear` each cost another 45, so a hand-lashed axe (cordage, 30 uses) broke on its first tree
+/// (PC run fh_natural2). At 1 a piece, one oak costs about 36: the first axe fells it and cuts it up.
+pub const PIECE_WEAR: u32 = 1;
+
+/// What a felling wears the axe by: its chops at the tier's pace (a tree past the tier takes
+/// longer, not more of the axe).
 pub fn wear(logs: u32) -> u32 {
     (logs.max(1) as f32).powf(GROWTH).round() as u32
 }
