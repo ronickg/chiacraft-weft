@@ -66,12 +66,15 @@ pub const ZOOM_START: usize = 1;
 /// Blocks a pixel the tiles' colours are worked out at (the finest zoom draws each twice).
 pub const TILE_PX_BLOCKS: i32 = 2;
 
-/// The minimap in the HUD's top right corner: its picture's side (GUI pixels, one image pixel each),
-/// the frame round it (GUI pixels), its zooms (blocks a pixel; N steps them) and how often it is
-/// painted again while the player moves (seconds). It reads the same atlas as the map: no world
-/// rendering.
+/// The minimap in the HUD's top right corner, round (Ronald: "a kind of round mini map", the compass
+/// map on his UI sheet): its picture's side (GUI pixels, one image pixel each), cut to the circle
+/// that fills it; the ring round it (`gui/minimap.png`, drawn by `notes/ui/kit2/minimap_ring.py`:
+/// its side and its four letter plates' side, GUI pixels); its zooms (blocks a pixel; N steps them)
+/// and how often it is painted again while the player moves (seconds). It reads the same atlas as
+/// the map: no world rendering.
 pub const MINI_PX: u32 = 64;
-pub const MINI_FRAME: f32 = 2.0;
+pub const MINI_RING: f32 = 76.0;
+pub const MINI_PLATE: f32 = 11.0;
 pub const MINI_ZOOMS: [i32; 3] = [1, 2, 4];
 pub const MINI_ZOOM_START: usize = 1;
 pub const MINI_REPAINT_SECS: f32 = 0.4;

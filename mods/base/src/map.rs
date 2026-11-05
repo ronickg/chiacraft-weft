@@ -233,17 +233,29 @@ pub fn register(r: &mut Registry) {
         s.mini_zoom = (s.mini_zoom + 1) % n::MINI_ZOOMS.len();
         s.mini_painted = None;
     });
-    // The frame (a bar always full, its fill clear) under the picture: the picture is opaque and
-    // covers the frame's middle, leaving its rim (the frame on top stretched its middle over the
-    // picture: PC look wm_mini1). The frame hides with the setting, and the picture is cleared then
-    // (`minimap`).
-    let (px, fr) = (n::MINI_PX as f32, n::MINI_FRAME);
+    // The round minimap: the picture (cut to its circle, `minimap`), the ring over it (a bar always
+    // full, its fill clear, `gui/minimap.png`: its middle is clear, its inner edge hides the cut's
+    // steps), and the game's letters on the ring's plates (`map.base.north`...), so they translate.
+    // All hide with the setting, and the picture is cleared then.
+    let (px, ring, plate) = (n::MINI_PX as f32, n::MINI_RING, n::MINI_PLATE);
+    let shown = |c: &ClientView| MINIMAP_ON.get() && crate::ley::seed_here(c).is_some();
     r.hud_element(&MINIMAP, hud_anchor::TOP_RIGHT, 2, move |ui| {
-        ui.column(S::column().size(px + 2.0 * fr, px + 2.0 * fr), |ui| {
-            ui.progress_bind("minimap", S::default().size(px + 2.0 * fr, px + 2.0 * fr).at(0.0, 0.0), |c| {
-                if MINIMAP_ON.get() && crate::ley::seed_here(c).is_some() { 1.0 } else { -1.0 }
+        ui.column(S::column().size(ring, ring), |ui| {
+            let inset = (ring - px) / 2.0;
+            ui.column(S::column().size(px, px).at(inset, inset), |ui| ui.image(MINI_IMAGE, px, px));
+            ui.progress_bind("minimap", S::default().size(ring, ring).at(0.0, 0.0), move |c| {
+                if shown(c) { 1.0 } else { -1.0 }
             });
-            ui.column(S::column().size(px, px).at(fr, fr), |ui| ui.image(MINI_IMAGE, px, px));
+            // The plates' corners (`minimap_ring.py`: centres 65 UI px, half a GUI px each, out).
+            let (mid, far) = ((ring - plate) / 2.0, ring - plate);
+            for (key, x, y) in [("north", mid, 0.0), ("east", far, mid), ("south", mid, far), ("west", 0.0, mid)] {
+                let key = format!("map.base.{key}");
+                ui.column(S::column().size(plate, plate).at(x, y).center(), move |ui| {
+                    ui.text_bind_styled(S::default().no_wrap(), move |c, out| {
+                        if shown(c) { out.set(&key, &[]) } else { out.text("") }
+                    });
+                });
+            }
         });
     });
     r.screen(&SCREEN, screen).on_key(|c, key| {
@@ -414,7 +426,17 @@ fn minimap(c: &Client, seed: u64, now: Instant) {
     s.mini_painted = Some((now, at, facing));
     s.mini_shown = true;
     drop(s);
-    let img = picture(c, seed, side, at, zoom, false);
+    let mut img = picture(c, seed, side, at, zoom, false);
+    // Round: clear outside the circle that fills the square (the ring's inner edge covers its steps).
+    let r = side as f32 / 2.0;
+    for y in 0..side {
+        for x in 0..side {
+            let (dx, dy) = (x as f32 + 0.5 - r, y as f32 + 0.5 - r);
+            if dx * dx + dy * dy > r * r {
+                img[(y * side + x) * 4 + 3] = 0;
+            }
+        }
+    }
     c.set_image(MINI_IMAGE, n::MINI_PX, n::MINI_PX, &img);
 }
 

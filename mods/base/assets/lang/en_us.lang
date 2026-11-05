@@ -1570,6 +1570,10 @@ hud.element.base.minimap = Minimap
 config.base.minimap = Minimap
 config.base.minimap.tooltip = A small map in the top right corner: where you walked, your waystones, and the ley lines while you hold the dowsing rod. N changes its zoom
 key.base.minimap_zoom = Minimap zoom
+map.base.north = N
+map.base.east = E
+map.base.south = S
+map.base.west = W
 web.base.tip.pick0 = {color:title}{0}{/} {color:dim}(item level {1}){/}
     {color:dim}Click to set it in.{/}
 web.base.tip.pick1 = {color:title}{0}{/} {color:dim}(item level {1}){/}

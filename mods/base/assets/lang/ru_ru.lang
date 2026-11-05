@@ -1572,6 +1572,10 @@ hud.element.base.minimap = Мини-карта
 config.base.minimap = Мини-карта
 config.base.minimap.tooltip = Маленькая карта в правом верхнем углу: где вы прошли, ваши путевые камни и лей-линии, пока в руке лоза. N меняет масштаб
 key.base.minimap_zoom = Масштаб мини-карты
+map.base.north = С
+map.base.east = В
+map.base.south = Ю
+map.base.west = З
 web.base.tip.pick0 = {color:title}{0}{/} {color:dim}(уровень предмета {1}){/}
     {color:dim}Нажмите, чтобы вставить.{/}
 web.base.tip.pick1 = {color:title}{0}{/} {color:dim}(уровень предмета {1}){/}
