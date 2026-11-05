@@ -1275,15 +1275,25 @@ Items on the ground vanish after five minutes, so a vulture must arrive in time.
 Ronald picked all four sets: idle life, needs and moods, fights and hunts, social.
 
 **The system** (`mods/animals/src/anim.rs`): the behaviour asks for a state by name, and the engine plays the species' clip of that name. A species without the clip carries on as before.
-- **Held** (`anim::hold`, until another or `clear`): stare, graze, drink, sleep, and stalk, which replaces the walk with a crouched creep. Held states loop.
-- **Once** (`anim::act`): alarm, pounce, bite, rear, howl, play, groom, nuzzle, stretch.
-- **By itself:**
+- **Held** (`anim::hold`): stare, graze, drink, sleep, watch (a sentinel's head-up look round). A held state lasts while the behaviour keeps asking, each tick or at least every `GRACE` (30) ticks, and ends by itself after, so a goal that loses the turn needs no clean-up; `clear` ends one at once, `hold_for` asks ahead (a goal that looks seldom, `/anim <clip> hold`). Held states loop.
+- **Gaits** (held too): stalk (a crouched creep), approach (a curious one's slow head-low walk), charge (head down). They play in place of the walk (and the run, for the charge) and go on under a strike.
+- **Once** (`anim::act`; `anim::play(clip, secs)` for a clip of a species' own, a boss's slam): alarm, pounce, bite, rear, howl, play, groom, nuzzle, stretch. A held state waits under it and comes back after if still asked for.
+- **By itself** (`anim::tick`, from `animal::upkeep`):
   - a flinch when hit (its own HURT handler);
-  - idle life every 15-40 s while it stands with nothing held (`anim::idle_life`): look round, sniff the ground, a scratch;
+  - idle life every 15-40 s while it stands with nothing held and nothing playing: look round, sniff the ground, a scratch;
   - breathing and ear and tail flicks, in every idle clip;
   - the death fall, the engine's `death` clip, which holds its last frame.
-- **Cheap:** the held state sits on the animal (`HELD`, not saved), and only a change goes over the network.
-- **Testing:** `/anim <clip> [hold|once|clear]` plays a clip on the nearest animal, for checks and looks.
+- **Cheap:** the state sits on the animal (`HELD`, not saved), and only a change goes over the network.
+- **Testing:** `/anim <clip> [hold|once|clear|loop]` on the nearest animal (`loop`: any clip looping in place, to see a gait with ticks frozen); `/anim log` logs every change ("anim: <id> holds|plays <clip>").
+
+**Where the creature AI calls it** (11-05):
+- `senses::stare` holds stare (half aware, before it bolts); a sentinel (`watch_goal`) holds watch; a curious one coming to look (`investigate`) holds approach.
+- `forage::eat` holds graze while it chews; `drink::drink` holds drink at the water.
+- Resting (`wild::settle`, `rest::settle`): lying (its last pose) it sleeps out of its hours or after a minute lying (`routines::asleep`); a rest that ends by itself ends in a stretch; woken (scared, hurt, called) it is up at once without one. The rest looks are other kinds with their own animation file, so each lying file has the sleep clip too.
+- `hunt::wary` plays the alarm as it bolts from a hunter, `taming::behave` as it bolts from a player.
+- `hunt::stands_ground`: it rears as it turns to face the hunter, stares it down, and charges when it comes within twice `CHARGE`.
+- `hunt::chase`: an ambusher stalks to its burst range, then pounces as it breaks cover.
+- `commands::fight_aiming`: each strike plays one of its species' attacks (`anim::play_named`).
 
 **Clips** are written per species in its `source/<model>` build as pose functions, exported by `to_bedrock`. Every clip other than idle, walk and run goes *over* what plays below, on the bones it moves (`override_previous_animation`), easing in and out (`as_action`; a clip's own `blend` and `loop` win). Added on top instead, a whole pose stacked on the idle's own moves. The poses that reach the ground are fitted with forward kinematics:
 - head down to sniff, drink or graze, with the legs bent as little as it takes;
@@ -1302,18 +1312,14 @@ The builds check every keyframe: no flicker, no loose joints, nothing poking alo
 
 Not yet: the other species, and young ones' play at their own scale (the pup models share the clips).
 
-**Paused (2026-11-05, Ronald: stop once the current work is done).** It stands on claude/animal-animations, not merged. The system and four species' clips are built and checked. The wolf's and deer's PC looks were seen; the raptor's and chihuahua's were queued. To pick it up:
-- merge `dev` in, then land `anim.rs` in dev (Creature AI needs the API there before calling it);
-- add the calls Creature AI listed (11-05), once its branch is merged and its files are free:
-  - `senses::stare` → `hold(Stare)`;
-  - forage.rs `eat()` → `hold(Graze)` while chewing, `clear` after;
-  - drink.rs `drink()` → `hold(Drink)`;
-  - wild.rs and rest.rs `settle` → `hold(Sleep)` (on the rest looks too: they swap the look entity);
-  - hunt.rs `chase()` → `hold(Stalk)`, then `clear` and `act(Pounce)` when it breaks cover;
-  - `commands::fight_aiming` → `act(Bite)`;
-  - hunt.rs `stands_ground` → `act(Rear)`;
-  - hunt.rs `wary` and taming.rs `behave` at the bolt → `act(Alarm)`;
-  - `wild::wake` / `rest::wake` → `act(Stretch)`;
-  - `anim::idle_life` from `animal::upkeep`, not the bottom of the goal list;
-- clips Creature AI's plan also wants: a sentinel's head-up look round, a slow head-low approach, and a charge beside the rear;
-- the other species' clip sets.
+**Restarted (2026-11-05, Ronald: "Yes, restart").** The system and the four species' clips merged with dev; the creature AI's calls built (above). The new clips: the deer's watch, approach and charge, the wolf's, raptor's and chihuahua's approach, sleep in each lying file. Fixed on the way:
+- the chihuahua's one-off clips were exported looping (the engine loops a clip whose file says so, whatever the call asks): a hit chihuahua flinched forever;
+- every stalk sank its feet up to 4 units into the ground, and the wolf's and chihuahua's moonwalked (the crouch's knee bend fought the step's lift). The builds now set a gait's height from its feet (`ground.grounded`) and check every gait for both.
+
+**Batch 2 (11-05):** the fox, coyote (with its howl) and jaguar have the behaviour clips too, from one shared module, `source/_clips/canid.py`. A species binds its helpers, fits its own head-down and death fall, and sets scales where its body differs (a fox's short neck and big brush; a cat's spine that can't twist, its thick neck). The poke check found each of those.
+
+The exporter now plays an action once unless its animation says it loops (`to_bedrock`). Every hunter's strike had been exported looping, so a fox, coyote, cat, jaguar, caiman, Utahraptor or wyvern kept biting after one bite; all of them are rebuilt (animations only).
+
+Found for Creature AI: the jaguar is a knock-out kind, and `hunt_` hands knock-out kinds to their anger before `chase()`, so the ambush path (stalk, then the pounce on breaking cover) is reached only by the caimans. The jaguar's stalk plays only through `/anim`.
+
+Not yet: the other species' sets; the social clips' calls (a mother nuzzling her young, grooming, young ones' play at their own scale).
