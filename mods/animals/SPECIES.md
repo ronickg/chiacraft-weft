@@ -27,34 +27,34 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | pacu | *Piaractus mesopotamicus* | uncommon | small | 0.37 m | 4 kg | herd | omnivore | wild | eggs, hatch 0.06 d | 8.65 d | 57.5 d | 2-8 | 26 |
 | red_fox | *Vulpes vulpes* | common | small | 0.38 m | 5.5 kg | pack | carnivore | wild | 1.08 d | 3.5 d | 19.2 d | 2-7 | 24 |
 | arctic_fox | *Vulpes lagopus* | common | small | 0.38 m | 3.5 kg | pack | carnivore | wild | 1.08 d | 3.5 d | 19.2 d | 3-10 | 24 |
-| raven | *Corvus corax* | uncommon | small | 0.34 m | 1.2 kg | solitary | carnivore | wild | 0.53 d | 6.51 d | 46 d | 2-6 | 17 |
+| raven | *Corvus corax* | uncommon | small | 0.34 m | 1.2 kg | solitary | carnivore | wild | eggs, hatch 0.53 d | 6.51 d | 46 d | 2-6 | 17 |
 | protoceratops | *Protoceratops andrewsi* | common | medium | 0.6 m | 83 kg | herd | herbivore | wild | eggs, hatch 1.54 d | 6 d | 53.7 d | 3-8 | 20 |
 | kryptobaatar | *Kryptobaatar dashzevegi* | common | small | 0.05 m | 0.04 kg | solitary | omnivore | wild | 0.53 d | 3 d | 16 d | 1-5 | 30 |
 | priscagama | *Priscagama gobiensis* | common | small | 0.04 m | 0.03 kg | solitary | carnivore | wild | eggs, hatch 1.21 d | 4.01 d | 23 d | 2-6 | 24 |
 | reindeer | *Rangifer tarandus* | common | large | 1.05 m | 120 kg | herd | herbivore | wild | 3.31 d | 4.58 d | 46 d | 1 | 20 |
 | coyote | *Canis latrans* | common | medium | 0.61 m | 13 kg | pack | carnivore | wild | 1.25 d | 3.5 d | 23 d | 2-8 | 22 |
-| house_sparrow | *Passer domesticus* | common | small | 0.1 m | 0.03 kg | herd | omnivore | wild | 0.36 d | 2.75 d | 14 d | 2-6 | 30 |
-| snow_bunting | *Plectrophenax nivalis* | common | small | 0.1 m | 0.035 kg | herd | omnivore | wild | 0.37 d | 2.75 d | 14 d | 2-7 | 30 |
-| great_horned_owl | *Bubo virginianus* | uncommon | small | 0.45 m | 1.4 kg | solitary | carnivore | wild | 0.77 d | 6.51 d | 49.8 d | 1-3 | 16 |
-| snowy_owl | *Bubo scandiacus* | uncommon | small | 0.45 m | 2 kg | solitary | carnivore | wild | 0.75 d | 6.51 d | 38.3 d | 2-8 | 15 |
-| golden_eagle | *Aquila chrysaetos* | uncommon | medium | 0.6 m | 4.5 kg | solitary | carnivore | wild | 0.94 d | 8.33 d | 76.7 d | 1-3 | 13 |
-| savanna_hawk | *Buteogallus meridionalis* | common | small | 0.6 m | 0.85 kg | solitary | carnivore | wild | 0.87 d | 6.51 d | 46 d | 1 | 18 |
-| turkey_vulture | *Cathartes aura* | common | small | 0.5 m | 1.4 kg | herd | carnivore | wild | 0.89 d | 4.58 d | 61.3 d | 1-3 | 24 |
-| herring_gull | *Larus argentatus* | common | small | 0.45 m | 1 kg | herd | carnivore | wild | 0.7 d | 4.58 d | 46 d | 1-4 | 24 |
+| house_sparrow | *Passer domesticus* | common | small | 0.1 m | 0.03 kg | herd | omnivore | wild | eggs, hatch 0.36 d | 2.75 d | 14 d | 2-6 | 30 |
+| snow_bunting | *Plectrophenax nivalis* | common | small | 0.1 m | 0.035 kg | herd | omnivore | wild | eggs, hatch 0.37 d | 2.75 d | 14 d | 2-7 | 30 |
+| great_horned_owl | *Bubo virginianus* | uncommon | small | 0.45 m | 1.4 kg | solitary | carnivore | wild | eggs, hatch 0.77 d | 6.51 d | 49.8 d | 1-3 | 16 |
+| snowy_owl | *Bubo scandiacus* | uncommon | small | 0.45 m | 2 kg | solitary | carnivore | wild | eggs, hatch 0.75 d | 6.51 d | 38.3 d | 2-8 | 15 |
+| golden_eagle | *Aquila chrysaetos* | uncommon | medium | 0.6 m | 4.5 kg | solitary | carnivore | wild | eggs, hatch 0.94 d | 8.33 d | 76.7 d | 1-3 | 13 |
+| savanna_hawk | *Buteogallus meridionalis* | common | small | 0.6 m | 0.85 kg | solitary | carnivore | wild | eggs, hatch 0.87 d | 6.51 d | 46 d | 1 | 18 |
+| turkey_vulture | *Cathartes aura* | common | small | 0.5 m | 1.4 kg | herd | carnivore | wild | eggs, hatch 0.89 d | 4.58 d | 61.3 d | 1-3 | 24 |
+| herring_gull | *Larus argentatus* | common | small | 0.45 m | 1 kg | herd | carnivore | wild | eggs, hatch 0.7 d | 4.58 d | 46 d | 1-4 | 24 |
 | yacare_caiman | *Caiman yacare* | common | large | 2.2 m | 35 kg | herd | carnivore | wild | eggs, hatch 1.4 d | 6.25 d | 75 d | 4-8 | 26 |
 | spectacled_caiman | *Caiman crocodilus* | common | large | 2.2 m | 25 kg | herd | carnivore | wild | eggs, hatch 1.4 d | 6.25 d | 75 d | 4-8 | 26 |
 | grey_wolf | *Canis lupus* | uncommon | medium | 0.8 m | 42 kg | pack | carnivore | passive | 1.25 d | 6.07 d | 46 d | 2-8 | 16 |
 | jaguar | *Panthera onca* | uncommon | large | 0.7 m | 85 kg | solitary | carnivore | knockout | 1.77 d | 7.54 d | 65.1 d | 1-2 | 12 |
 | lungfish | *Ceratodus kempae* | uncommon | small | 0.37 m | 3 kg | solitary | carnivore | wild | eggs, hatch 0.72 d | 10 d | 76.7 d | 1-4 | 14 |
-| lycoptera | *Lycoptera davidi* | common | small | 0.37 m | 0.02 kg | herd | carnivore | wild | eggs, hatch 0.19 d | 2.92 d | 15.3 d | 3-11 | 30 |
+| lycoptera | *Lycoptera davidi* | common | small | 0.37 m | 0.02 kg | herd | carnivore | wild | eggs, hatch 0.46 d | 2.92 d | 15.3 d | 3-11 | 30 |
 | psittacosaurus | *Psittacosaurus lujiatunensis* | common | medium | 0.5 m | 25 kg | herd | herbivore | wild | eggs, hatch 1.43 d | 6 d | 42.2 d | 3-8 | 20 |
 | gastonia | *Gastonia burgei* | common | large | 1.25 m | 1900 kg | herd | herbivore | wild | eggs, hatch 1.77 d | 6 d | 95.8 d | 1-4 | 12 |
 | pinacosaurus | *Pinacosaurus grangeri* | common | large | 1.25 m | 1900 kg | herd | herbivore | wild | eggs, hatch 1.77 d | 6 d | 95.8 d | 1-4 | 12 |
 | iguanodont | *Iguanacolossus fortis* | common | large | 2.2 m | 4000 kg | herd | herbivore | wild | eggs, hatch 1.9 d | 6 d | 115 d | 1-3 | 12 |
 | crocodyliform | *Neosuchia indet.* | uncommon | large | 2.2 m | 150 kg | solitary | carnivore | wild | eggs, hatch 1.5 d | 6.25 d | 75 d | 4-8 | 20 |
 | citipati | *Citipati osmolskae* | common | medium | 0.9 m | 90 kg | solitary | herbivore | wild | eggs, hatch 1.36 d | 6 d | 57.5 d | 2-6 | 18 |
-| confuciusornis | *Confuciusornis sanctus* | common | small | 0.3 m | 0.5 kg | herd | omnivore | wild | 0.7 d | 4.58 d | 38.3 d | 1-4 | 24 |
-| gobipteryx | *Gobipteryx minuta* | uncommon | small | 0.3 m | 0.3 kg | herd | omnivore | wild | 0.7 d | 6.25 d | 38.3 d | 1-4 | 24 |
+| confuciusornis | *Confuciusornis sanctus* | common | small | 0.3 m | 0.5 kg | herd | omnivore | wild | eggs, hatch 0.41 d | 4.58 d | 38.3 d | 1-4 | 24 |
+| gobipteryx | *Gobipteryx minuta* | uncommon | small | 0.3 m | 0.3 kg | herd | omnivore | wild | eggs, hatch 0.41 d | 6.25 d | 38.3 d | 1-4 | 24 |
 | cedarosaurus | *Cedarosaurus weiskopfae* | uncommon | large | 4.1 m | 10000 kg | herd | herbivore | wild | eggs, hatch 2.03 d | 6.67 d | 153.3 d | 1-2 | 10 |
 
 ## Stats at level 1
@@ -112,21 +112,21 @@ Damage and speed are each kind's own (1 = 100%).
 
 ## The food web
 
-Each biome's web, from the species' habitats and diets and the world's plant food (`core/src/web.rs`). Plant food is how much of any plant eater's food grows or is found there in each season, against fresh growth at its best (`vitals::forage`); the farm animals' wild kinds graze every overworld land biome. Grazing: in the best season for grass, what its grazers eat a day (as many of each as live together, `crowd`, by how common there) against what its tall grass grows back within the crowd's radius.
+Each biome's web, from the species' habitats and diets and the world's plant food (`core/src/web.rs`). Plant food is how much of any plant eater's food grows or is found there in each season, against fresh growth at its best (`vitals::forage`); the farm animals' wild kinds graze every overworld land biome. Grazing: in the best season for grass, what its grazers eat a day (as many of each as live together, `crowd_in`, the biome's stocking) against what its tall grass grows back within the crowd's radius, real grazing's quarter to half (`vitals::forage::GRAZED`, checked), and the most of that ground their dung pats cover at once (`vitals::soil`), in the season they lie longest.
 
 | Biome | Plant food (spring, summer, autumn, winter) | Grazing (best season) | Plant eaters | Hunters | Carrion |
 |---|---|---|---|---|---|
-| base:plains | 40%, 86%, 46%, 40% | summer: eaten 5% of the regrowth | hare, wood_mouse, white_tailed_deer, house_sparrow | dog (chihuahua), cat, red_fox, raven, coyote, great_horned_owl, golden_eagle, herring_gull, grey_wolf | dog (chihuahua), cat, brown_trout, red_fox, raven, coyote, golden_eagle, turkey_vulture, herring_gull, grey_wolf |
-| base:forest | 40%, 73%, 41%, 40% | summer: eaten 7% of the regrowth | hare, wood_mouse, white_tailed_deer, red_deer, house_sparrow | dog (chihuahua), cat, red_fox, raven, coyote, great_horned_owl, golden_eagle, grey_wolf | dog (chihuahua), cat, brown_trout, red_fox, raven, coyote, golden_eagle, turkey_vulture, grey_wolf |
-| base:birch_forest | 40%, 62%, 40%, 40% | summer: eaten 13% of the regrowth | mountain_hare, field_vole, red_deer | dog (chihuahua), cat, red_fox, raven, great_horned_owl, golden_eagle, grey_wolf | dog (chihuahua), cat, brown_trout, red_fox, raven, golden_eagle, grey_wolf |
-| base:taiga | 40%, 93%, 40%, 40% | summer: eaten 20% of the regrowth | mountain_hare, field_vole, reindeer, snow_bunting | cat, red_fox, arctic_fox, raven, great_horned_owl, snowy_owl, golden_eagle, grey_wolf | cat, brown_trout, red_fox, arctic_fox, raven, golden_eagle, grey_wolf |
+| base:plains | 40%, 86%, 46%, 40% | summer: eaten 34% of the regrowth; dung pats 0.67% of the ground | hare, wood_mouse, white_tailed_deer, house_sparrow | dog (chihuahua), cat, red_fox, raven, coyote, great_horned_owl, golden_eagle, herring_gull, grey_wolf | dog (chihuahua), cat, brown_trout, red_fox, raven, coyote, golden_eagle, turkey_vulture, herring_gull, grey_wolf |
+| base:forest | 40%, 73%, 41%, 40% | summer: eaten 37% of the regrowth; dung pats 0.55% of the ground | hare, wood_mouse, white_tailed_deer, red_deer, house_sparrow | dog (chihuahua), cat, red_fox, raven, coyote, great_horned_owl, golden_eagle, grey_wolf | dog (chihuahua), cat, brown_trout, red_fox, raven, coyote, golden_eagle, turkey_vulture, grey_wolf |
+| base:birch_forest | 40%, 62%, 40%, 40% | summer: eaten 37% of the regrowth; dung pats 0.44% of the ground | mountain_hare, field_vole, red_deer | dog (chihuahua), cat, red_fox, raven, great_horned_owl, golden_eagle, grey_wolf | dog (chihuahua), cat, brown_trout, red_fox, raven, golden_eagle, grey_wolf |
+| base:taiga | 40%, 93%, 40%, 40% | summer: eaten 36% of the regrowth; dung pats 0.29% of the ground | mountain_hare, field_vole, reindeer, snow_bunting | cat, red_fox, arctic_fox, raven, great_horned_owl, snowy_owl, golden_eagle, grey_wolf | cat, brown_trout, red_fox, arctic_fox, raven, golden_eagle, grey_wolf |
 | base:snowy_plains | 40%, 62%, 40%, 40% | - | mountain_hare, field_vole, reindeer, snow_bunting | arctic_fox, raven, snowy_owl, golden_eagle, grey_wolf | arctic_fox, raven, golden_eagle, grey_wolf |
 | base:desert | 55%, 78%, 55%, 40% | - | hare, wood_mouse, white_tailed_deer, house_sparrow | dog (chihuahua), cat, red_fox, raven, coyote, great_horned_owl, golden_eagle, jaguar | dog (chihuahua), cat, red_fox, raven, coyote, golden_eagle, turkey_vulture |
-| base:savanna | 43%, 100%, 100%, 40% | summer: eaten 2% of the regrowth | capybara, hare, wood_mouse, white_tailed_deer | dog (chihuahua), cat, great_horned_owl, savanna_hawk, yacare_caiman, spectacled_caiman, jaguar | dog (chihuahua), cat, turkey_vulture |
-| base:swamp | 40%, 100%, 96%, 40% | summer: eaten 8% of the regrowth | capybara, field_vole, white_tailed_deer, house_sparrow | great_horned_owl, savanna_hawk, herring_gull, yacare_caiman, spectacled_caiman, jaguar | turkey_vulture, herring_gull |
+| base:savanna | 43%, 100%, 100%, 40% | summer: eaten 28% of the regrowth; dung pats 0.70% of the ground | capybara, hare, wood_mouse, white_tailed_deer | dog (chihuahua), cat, great_horned_owl, savanna_hawk, yacare_caiman, spectacled_caiman, jaguar | dog (chihuahua), cat, turkey_vulture |
+| base:swamp | 40%, 100%, 96%, 40% | summer: eaten 34% of the regrowth; dung pats 0.63% of the ground | capybara, field_vole, white_tailed_deer, house_sparrow | great_horned_owl, savanna_hawk, herring_gull, yacare_caiman, spectacled_caiman, jaguar | turkey_vulture, herring_gull |
 | base:tropical_forest | 21%, 71%, 77%, 45% | - | **none** | **none** | **none** |
-| base:mountains | 60%, 95%, 76%, 40% | summer: eaten 27% of the regrowth | mountain_hare, field_vole, red_deer, reindeer, snow_bunting | red_fox, raven, coyote, great_horned_owl, snowy_owl, golden_eagle, grey_wolf | brown_trout, red_fox, raven, coyote, golden_eagle, turkey_vulture, grey_wolf |
-| base:sequoia_grove | 40%, 40%, 40%, 40% | summer: eaten 80% of the regrowth | mountain_hare, field_vole, red_deer | red_fox, raven, coyote, great_horned_owl, golden_eagle, grey_wolf | red_fox, raven, coyote, golden_eagle, turkey_vulture, grey_wolf |
+| base:mountains | 60%, 95%, 76%, 40% | summer: eaten 36% of the regrowth; dung pats 0.21% of the ground | mountain_hare, field_vole, red_deer, reindeer, snow_bunting | red_fox, raven, coyote, great_horned_owl, snowy_owl, golden_eagle, grey_wolf | brown_trout, red_fox, raven, coyote, golden_eagle, turkey_vulture, grey_wolf |
+| base:sequoia_grove | 40%, 40%, 40%, 40% | summer: eaten 48% of the regrowth; dung pats 0.08% of the ground | mountain_hare, field_vole, red_deer | red_fox, raven, coyote, great_horned_owl, golden_eagle, grey_wolf | red_fox, raven, coyote, golden_eagle, turkey_vulture, grey_wolf |
 | base:beach | 62%, 68%, 82%, 48% | - | hare, wood_mouse, house_sparrow | red_fox, raven, herring_gull | red_fox, raven, herring_gull |
 | animals:red_dunes | 40%, 40%, 40%, 40% | - | protoceratops, pinacosaurus, citipati, gobipteryx | raptor, osmolskae, wyvern | raptor, osmolskae, wyvern |
 | animals:scrubland | 40%, 43%, 40%, 40% | - | protoceratops, psittacosaurus, gastonia, pinacosaurus, citipati, gobipteryx | raptor, utahraptor, wyvern | raptor, utahraptor, wyvern |
@@ -191,6 +191,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | eats | meat 40%, carrion 20%, insects 15%, fruit 15%, seeds 10% |
 | hunts | 0.8%-80% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, brown_trout, raven, house_sparrow, great_horned_owl, savanna_hawk, turkey_vulture, herring_gull, base:chicken |
 | a meal that fills it | 0.25 kg; its biggest prey at home fills it in one kill |
+| room by its prey | plains 11, savanna 11, desert 9, forest 11, birch_forest 8 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.226 L a day; a drink lasts 17 min, thirsty after 8 |
 | feedings to tame at level 1 | 4 (2.5x at level 150) |
 | scared by a walking player within | 3 blocks (twice that running) |
@@ -255,6 +256,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | eats | meat 80%, insects 10%, carrion 5%, fish 5% |
 | hunts | 0.5%-40% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, brown_trout, raven, house_sparrow, snow_bunting, great_horned_owl, savanna_hawk, turkey_vulture, herring_gull, base:chicken |
 | a meal that fills it | 0.45 kg; its biggest prey at home fills it in one kill |
+| room by its prey | plains 5, forest 5, birch_forest 4, savanna 5, desert 4, taiga 4 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 50% of its 0.383 L a day; a drink lasts 35 min, thirsty after 18 |
 | feedings to tame at level 1 | 5 (2.5x at level 150) |
 | scared by a walking player within | 6 blocks (twice that running) |
@@ -376,6 +378,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | eats | meat 70%, carrion 25%, insects 5% |
 | hunts | 0.2%-600% of its mass alone (0.03-90 kg); at home: protoceratops, kryptobaatar, psittacosaurus, citipati, gobipteryx |
 | a meal that fills it | 1.5 kg; its biggest prey at home fills it in one kill |
+| room by its prey | red_dunes 10, scrubland 10 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 50% of its 1.133 L a day; a drink lasts 40 min, thirsty after 20 |
 | feedings to tame at level 1 | 10 (2.5x at level 150) |
 | scared by a walking player within | 8 blocks (twice that running) |
@@ -438,6 +441,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.4% of spawn 
 | eats | meat 80%, carrion 15%, fish 5% |
 | hunts | 1.0%-300% of its mass alone (3.00-900 kg); at home: protoceratops, lungfish, psittacosaurus, gastonia, pinacosaurus, iguanodont, crocodyliform, citipati |
 | a meal that fills it | 30 kg; its biggest prey at home fills it in one kill |
+| room by its prey | floodplain 5, scrubland 7, fern_forest 2 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 80% of its 16.79 L a day; a drink lasts 34 min, thirsty after 17 |
 | feedings to tame at level 1 | 18 (2.5x at level 150) |
 | scared by a walking player within | 10 blocks (twice that running) |
@@ -498,6 +502,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | eats | meat 70%, carrion 25%, insects 5% |
 | hunts | 0.2%-600% of its mass alone (0.03-90 kg); at home: protoceratops, kryptobaatar, citipati, gobipteryx |
 | a meal that fills it | 1.5 kg; its biggest prey at home fills it in one kill |
+| room by its prey | red_dunes 10 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 50% of its 1.133 L a day; a drink lasts 40 min, thirsty after 20 |
 | feedings to tame at level 1 | 10 (2.5x at level 150) |
 | scared by a walking player within | 8 blocks (twice that running) |
@@ -561,6 +566,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.06% of spa
 | eats | meat 80%, fish 10%, carrion 10% |
 | hunts | 0.1%-60% of its mass alone (5.00-3000 kg); at home: raptor, utahraptor, osmolskae, protoceratops, psittacosaurus, gastonia, pinacosaurus, crocodyliform, citipati |
 | a meal that fills it | 500 kg; its biggest prey at home fills it in one kill |
+| room by its prey | crags 1, fern_forest 3, red_dunes 5, scrubland 8 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 211.207 L a day; a drink lasts 36 min, thirsty after 18 |
 | feedings to tame at level 1 | 45 (2.5x at level 150) |
 | scared by a walking player within | nothing |
@@ -978,21 +984,21 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | Life | real | in the game |
 |---|---|---|
 | mass | 0.5 kg | |
-| lays | | 0.25 d after mating |
+| spawns | | in the water when mated; the fry come by her after the eggs' time |
 | eggs hatch in | 45 d | 0.97 d |
 | litter or clutch | 8 on average | 3-8 **set** |
 | between litters | 1 y | rests 5.07 d |
-| breeds in |  | out of it, only a tame well cared for |
+| breeds in | autumn and winter, most in autumn | out of it, only a tame well cared for |
 | comfortable in | 4 to 20 °C air | cold-blooded: slower in the cold |
 | grows up in | 3 y | 8.65 d |
 | lives | 12 y | 46 d, give or take a fifth; an elder from 80% of it |
 | lives in | solitary | room for 26 **set** within 48 blocks |
 
-**Balance** (uncommon): a generation 9.9 d; a line four deep in 30 d (10 h of play); 10.3 young per mother in 10 days, 29 in her life.
+**Balance** (uncommon): a generation 9.6 d; a line four deep in 29 d (10 h of play); 9.1 young per mother in 10 days, 26 in her life.
 
-- ✓ fourth generation: 29.6 days (want 20-40 days (uncommon))
+- ✓ fourth generation: 28.9 days (want 20-40 days (uncommon))
 - ✓ grown most of its life: grows 8.7 of 46 days (want under a fifth)
-- ✓ young in a life: 29.1 (want 6-40)
+- ✓ young in a life: 25.6 (want 6-40)
 - ✓ litter: 3-8 (want 1-12, fewest first)
 - ✓ room near: 26 (want 3-30)
 
@@ -1038,21 +1044,21 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn 
 | Life | real | in the game |
 |---|---|---|
 | mass | 4 kg | |
-| lays | | 0.25 d after mating |
+| spawns | | in the water when mated; the fry come by her after the eggs' time |
 | eggs hatch in | 1 d | 0.06 d |
 | litter or clutch | 6 on average | 2-8 |
 | between litters | 1 y | rests 5.07 d |
-| breeds in |  | out of it, only a tame well cared for |
+| breeds in | spring and summer, most in spring | out of it, only a tame well cared for |
 | comfortable in | 20 to 32 °C air | cold-blooded: slower in the cold |
 | grows up in | 3 y | 8.65 d |
 | lives | 15 y | 57.5 d, give or take a fifth; an elder from 80% of it |
 | lives in | herd | room for 26 within 48 blocks |
 
-**Balance** (uncommon): a generation 9 d; a line four deep in 27 d (9 h of play); 9.4 young per mother in 10 days, 35 in her life.
+**Balance** (uncommon): a generation 8.7 d; a line four deep in 26 d (9 h of play); 9.7 young per mother in 10 days, 36 in her life.
 
-- ✓ fourth generation: 26.9 days (want 20-40 days (uncommon))
+- ✓ fourth generation: 26.1 days (want 20-40 days (uncommon))
 - ✓ grown most of its life: grows 8.7 of 57 days (want under a fifth)
-- ✓ young in a life: 35.1 (want 6-40)
+- ✓ young in a life: 36.4 (want 6-40)
 - ✓ litter: 2-8 (want 1-12, fewest first)
 - ✓ room near: 26 (want 3-30)
 
@@ -1128,6 +1134,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | eats | meat 50%, fruit 20%, insects 15%, carrion 15% |
 | hunts | 0.4%-80% of its mass alone (0.02-4 kg); at home: hare, mountain_hare, wood_mouse, field_vole, brown_trout, raven, house_sparrow, snow_bunting, great_horned_owl, snowy_owl, turkey_vulture, herring_gull, base:chicken |
 | a meal that fills it | 0.55 kg; its biggest prey at home fills it in one kill |
+| room by its prey | forest 14, birch_forest 10, taiga 10, mountains 9, plains 23, desert 17, beach 11, sequoia_grove 5 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 50% of its 0.459 L a day; a drink lasts 36 min, thirsty after 18 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 10 blocks (twice that running) |
@@ -1188,6 +1195,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | eats | meat 55%, carrion 25%, fruit 10%, insects 5%, fish 5% |
 | hunts | 0.4%-100% of its mass alone (0.01-4 kg); at home: mountain_hare, field_vole, brown_trout, raven, snow_bunting, great_horned_owl, snowy_owl, base:chicken |
 | a meal that fills it | 0.35 kg; its biggest prey at home fills it in one kill |
+| room by its prey | snowy_plains 15, taiga 8 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 30% of its 0.306 L a day; a drink lasts 57 min, thirsty after 29 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 10 blocks (twice that running) |
@@ -1231,7 +1239,8 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | Life | real | in the game |
 |---|---|---|
 | mass | 1.2 kg | |
-| carries her young | 0 d | 0.53 d **set** |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 20 d | 0.53 d |
 | litter or clutch | 4.5 on average | 2-6 |
 | between litters | 1 y | rests 5.07 d |
 | breeds in | spring | out of it, only a tame well cared for |
@@ -1240,11 +1249,11 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | lives | 12 y | 46 d, give or take a fifth; an elder from 80% of it |
 | lives in | solitary | room for 17 within 48 blocks |
 
-**Balance** (uncommon): a generation 7.6 d; a line four deep in 23 d (8 h of play); 7.1 young per mother in 10 days, 22 in her life.
+**Balance** (uncommon): a generation 7.3 d; a line four deep in 22 d (7 h of play); 7.5 young per mother in 10 days, 23 in her life.
 
-- ✓ fourth generation: 22.7 days (want 20-40 days (uncommon))
+- ✓ fourth generation: 21.9 days (want 20-40 days (uncommon))
 - ✓ grown most of its life: grows 6.5 of 46 days (want under a fifth)
-- ✓ young in a life: 21.6 (want 6-40)
+- ✓ young in a life: 22.8 (want 6-40)
 - ✓ litter: 2-6 (want 1-12, fewest first)
 - ✓ room near: 17 (want 3-30)
 
@@ -1255,6 +1264,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | eats | carrion 40%, meat 20%, insects 15%, seeds 15%, fruit 10% |
 | hunts | 1.0%-10% of its mass alone (0.01-0 kg); at home: wood_mouse, field_vole, house_sparrow, snow_bunting |
 | a meal that fills it | 0.12 kg; its biggest prey at home in 3.4 kills |
+| room by its prey | taiga 5, mountains 3, forest 16, birch_forest 14, snowy_plains 17, desert 13, plains 17, beach 12, sequoia_grove 2 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 70% of its 0.117 L a day; a drink lasts 22 min, thirsty after 11 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 14 blocks (twice that running) |
@@ -1559,6 +1569,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | eats | meat 60%, fruit 15%, carrion 15%, insects 10% |
 | hunts | 0.1%-40% of its mass alone (0.01-5 kg); at home: cat, hare, mountain_hare, wood_mouse, field_vole, brown_trout, raven, house_sparrow, snow_bunting, great_horned_owl, snowy_owl, golden_eagle, turkey_vulture, herring_gull, base:chicken |
 | a meal that fills it | 1.3 kg; its biggest prey at home fills it in one kill |
+| room by its prey | plains 13, desert 9, forest 7, mountains 5, sequoia_grove 2 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.996 L a day; a drink lasts 20 min, thirsty after 10 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 14 blocks (twice that running) |
@@ -1598,7 +1609,8 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | Life | real | in the game |
 |---|---|---|
 | mass | 0.03 kg | |
-| carries her young | 0 d | 0.36 d **set** |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 12 d | 0.36 d |
 | litter or clutch | 4.5 on average | 2-6 |
 | between litters | 100 d | rests 1.39 d |
 | breeds in | spring and summer, most in spring | out of it, only a tame well cared for |
@@ -1607,11 +1619,11 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | lives | 3 y | 14 d **set**, give or take a fifth; an elder from 80% of it |
 | lives in | herd | room for 30 **set** within 48 blocks |
 
-**Balance** (common): a generation 3.5 d; a line four deep in 10 d (3 h of play); 22.8 young per mother in 10 days, 19 in her life.
+**Balance** (common): a generation 3.4 d; a line four deep in 10 d (3 h of play); 24.4 young per mother in 10 days, 21 in her life.
 
-- ✓ fourth generation: 10.4 days (want 10-25 days (common))
+- ✓ fourth generation: 10.1 days (want 10-25 days (common))
 - ✓ grown most of its life: grows 2.8 of 14 days (want under a fifth)
-- ✓ young in a life: 19.3 (want 6-40)
+- ✓ young in a life: 20.6 (want 6-40)
 - ✓ litter: 2-6 (want 1-12, fewest first)
 - ✓ room near: 30 (want 3-30)
 
@@ -1659,7 +1671,8 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | Life | real | in the game |
 |---|---|---|
 | mass | 0.035 kg | |
-| carries her young | 0 d | 0.37 d **set** |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 12 d | 0.37 d |
 | litter or clutch | 5 on average | 2-7 |
 | between litters | 1 y | rests 2.5 d **set** |
 | breeds in | summer | out of it, only a tame well cared for |
@@ -1668,11 +1681,11 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | lives | 3 y | 14 d **set**, give or take a fifth; an elder from 80% of it |
 | lives in | herd | room for 30 **set** within 48 blocks |
 
-**Balance** (common): a generation 3.5 d; a line four deep in 10 d (3 h of play); 15.7 young per mother in 10 days, 13 in her life.
+**Balance** (common): a generation 3.4 d; a line four deep in 10 d (3 h of play); 16.4 young per mother in 10 days, 14 in her life.
 
-- ✓ fourth generation: 10.5 days (want 10-25 days (common))
+- ✓ fourth generation: 10.1 days (want 10-25 days (common))
 - ✓ grown most of its life: grows 2.8 of 14 days (want under a fifth)
-- ✓ young in a life: 13.2 (want 6-40)
+- ✓ young in a life: 13.8 (want 6-40)
 - ✓ litter: 2-7 (want 1-12, fewest first)
 - ✓ room near: 30 (want 3-30)
 
@@ -1726,7 +1739,8 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | Life | real | in the game |
 |---|---|---|
 | mass | 1.4 kg | |
-| carries her young | 0 d | 0.77 d **set** |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 33 d | 0.77 d |
 | litter or clutch | 2 on average | 1-3 |
 | between litters | 1 y | rests 5.07 d |
 | breeds in | winter | out of it, only a tame well cared for |
@@ -1735,11 +1749,11 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | lives | 13 y | 49.8 d, give or take a fifth; an elder from 80% of it |
 | lives in | solitary | room for 16 within 48 blocks |
 
-**Balance** (uncommon): a generation 8.1 d; a line four deep in 24 d (8 h of play); 3.4 young per mother in 10 days, 11 in her life.
+**Balance** (uncommon): a generation 7.5 d; a line four deep in 23 d (8 h of play); 3.8 young per mother in 10 days, 13 in her life.
 
-- ✓ fourth generation: 24.2 days (want 20-40 days (uncommon))
+- ✓ fourth generation: 22.6 days (want 20-40 days (uncommon))
 - ✓ grown most of its life: grows 6.5 of 50 days (want under a fifth)
-- ✓ young in a life: 11.4 (want 6-40)
+- ✓ young in a life: 12.5 (want 6-40)
 - ✓ litter: 1-3 (want 1-12, fewest first)
 - ✓ room near: 16 (want 3-30)
 
@@ -1750,6 +1764,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | eats | meat 90%, insects 5%, fish 5% |
 | hunts | 0.5%-180% of its mass alone (0.01-3 kg); at home: dog, wood_mouse, field_vole, brown_trout, raven, house_sparrow, snow_bunting, savanna_hawk, turkey_vulture, herring_gull, base:chicken |
 | a meal that fills it | 0.14 kg; its biggest prey at home fills it in one kill |
+| room by its prey | forest 2, birch_forest 1, taiga 3, plains 3, mountains 2, desert 2, swamp 3, savanna 3, sequoia_grove 1 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.134 L a day; a drink lasts 16 min, thirsty after 8 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 14 blocks (twice that running) |
@@ -1787,7 +1802,8 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | Life | real | in the game |
 |---|---|---|
 | mass | 2 kg | |
-| carries her young | 0 d | 0.75 d **set** |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 32 d | 0.75 d |
 | litter or clutch | 6 on average | 2-8 |
 | between litters | 1 y | rests 5.07 d |
 | breeds in | spring | out of it, only a tame well cared for |
@@ -1796,11 +1812,11 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | lives | 10 y | 38.3 d, give or take a fifth; an elder from 80% of it |
 | lives in | solitary | room for 15 within 48 blocks |
 
-**Balance** (uncommon): a generation 8 d; a line four deep in 24 d (8 h of play); 8.6 young per mother in 10 days, 21 in her life.
+**Balance** (uncommon): a generation 7.5 d; a line four deep in 23 d (8 h of play); 9.4 young per mother in 10 days, 23 in her life.
 
-- ✓ fourth generation: 24.1 days (want 20-40 days (uncommon))
+- ✓ fourth generation: 22.6 days (want 20-40 days (uncommon))
 - ✓ grown most of its life: grows 6.5 of 38 days (want under a fifth)
-- ✓ young in a life: 20.7 (want 6-40)
+- ✓ young in a life: 22.7 (want 6-40)
 - ✓ litter: 2-8 (want 1-12, fewest first)
 - ✓ room near: 15 (want 3-30)
 
@@ -1811,6 +1827,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | eats | meat 100% |
 | hunts | 0.5%-120% of its mass alone (0.01-2 kg); at home: field_vole, brown_trout, raven, snow_bunting, turkey_vulture, base:chicken |
 | a meal that fills it | 0.2 kg; its biggest prey at home fills it in one kill |
+| room by its prey | snowy_plains 1, taiga 3, mountains 2 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.185 L a day; a drink lasts 16 min, thirsty after 8 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 16 blocks (twice that running) |
@@ -1853,7 +1870,8 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | Life | real | in the game |
 |---|---|---|
 | mass | 4.5 kg | |
-| carries her young | 0 d | 0.94 d **set** |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 43 d | 0.94 d |
 | litter or clutch | 2 on average | 1-3 |
 | between litters | 1 y | rests 5.07 d |
 | breeds in | spring | out of it, only a tame well cared for |
@@ -1862,11 +1880,11 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | lives | 20 y | 76.7 d, give or take a fifth; an elder from 80% of it |
 | lives in | solitary | room for 13 within 48 blocks |
 
-**Balance** (uncommon): a generation 10.2 d; a line four deep in 31 d (10 h of play); 3.3 young per mother in 10 days, 18 in her life.
+**Balance** (uncommon): a generation 9.5 d; a line four deep in 29 d (10 h of play); 3.8 young per mother in 10 days, 20 in her life.
 
-- ✓ fourth generation: 30.6 days (want 20-40 days (uncommon))
+- ✓ fourth generation: 28.6 days (want 20-40 days (uncommon))
 - ✓ grown most of its life: grows 8.3 of 77 days (want under a fifth)
-- ✓ young in a life: 17.6 (want 6-40)
+- ✓ young in a life: 19.9 (want 6-40)
 - ✓ litter: 1-3 (want 1-12, fewest first)
 - ✓ room near: 13 (want 3-30)
 
@@ -1877,6 +1895,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | eats | meat 85%, carrion 15% |
 | hunts | 1.0%-150% of its mass alone (0.04-7 kg); at home: dog, cat, hare, mountain_hare, brown_trout, red_fox, arctic_fox, raven, great_horned_owl, snowy_owl, turkey_vulture, herring_gull, base:chicken |
 | a meal that fills it | 0.45 kg; its biggest prey at home fills it in one kill |
+| room by its prey | mountains 11, plains 13, desert 9, taiga 8, snowy_plains 13, forest 11, birch_forest 10, sequoia_grove 7 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.383 L a day; a drink lasts 18 min, thirsty after 9 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 24 blocks (twice that running) |
@@ -1913,7 +1932,8 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | Life | real | in the game |
 |---|---|---|
 | mass | 0.85 kg | |
-| carries her young | 0 d | 0.87 d **set** |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 39 d | 0.87 d |
 | litter or clutch | 1 on average | 1 |
 | between litters | 1 y | rests 2.5 d **set** |
 | breeds in | winter | out of it, only a tame well cared for |
@@ -1922,11 +1942,11 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | lives | 12 y | 46 d, give or take a fifth; an elder from 80% of it |
 | lives in | solitary | room for 18 within 48 blocks |
 
-**Balance** (common): a generation 8.3 d; a line four deep in 25 d (8 h of play); 3 young per mother in 10 days, 9 in her life.
+**Balance** (common): a generation 7.6 d; a line four deep in 23 d (8 h of play); 3.6 young per mother in 10 days, 11 in her life.
 
-- ✓ fourth generation: 24.8 days (want 10-25 days (common))
+- ✓ fourth generation: 22.9 days (want 10-25 days (common))
 - ✓ grown most of its life: grows 6.5 of 46 days (want under a fifth)
-- ✓ young in a life: 9.0 (want 6-40)
+- ✓ young in a life: 11.0 (want 6-40)
 - ✓ litter: 1-1 (want 1-12, fewest first)
 - ✓ room near: 18 (want 3-30)
 
@@ -1937,6 +1957,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | eats | meat 70%, insects 20%, fish 10% |
 | hunts | 0.5%-60% of its mass alone (0.00-1 kg); at home: wood_mouse, field_vole, house_sparrow |
 | a meal that fills it | 0.085 kg; its biggest prey at home in 2.4 kills |
+| room by its prey | savanna 8, swamp 4 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.086 L a day; a drink lasts 15 min, thirsty after 7 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 16 blocks (twice that running) |
@@ -1978,7 +1999,8 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | Life | real | in the game |
 |---|---|---|
 | mass | 1.4 kg | |
-| carries her young | 0 d | 0.89 d **set** |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 40 d | 0.89 d |
 | litter or clutch | 2 on average | 1-3 |
 | between litters | 1 y | rests 3.33 d **set** |
 | breeds in | spring | out of it, only a tame well cared for |
@@ -1987,11 +2009,11 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | lives | 16 y | 61.3 d, give or take a fifth; an elder from 80% of it |
 | lives in | herd | room for 24 **set** within 48 blocks |
 
-**Balance** (common): a generation 6.4 d; a line four deep in 19 d (6 h of play); 4.7 young per mother in 10 days, 21 in her life.
+**Balance** (common): a generation 5.7 d; a line four deep in 17 d (6 h of play); 5.6 young per mother in 10 days, 25 in her life.
 
-- ✓ fourth generation: 19.1 days (want 10-25 days (common))
+- ✓ fourth generation: 17.2 days (want 10-25 days (common))
 - ✓ grown most of its life: grows 4.6 of 61 days (want under a fifth)
-- ✓ young in a life: 21.1 (want 6-40)
+- ✓ young in a life: 24.8 (want 6-40)
 - ✓ litter: 1-3 (want 1-12, fewest first)
 - ✓ room near: 24 (want 3-30)
 
@@ -2039,7 +2061,8 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | Life | real | in the game |
 |---|---|---|
 | mass | 1 kg | |
-| carries her young | 0 d | 0.7 d **set** |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 29 d | 0.7 d |
 | litter or clutch | 3 on average | 1-4 |
 | between litters | 1 y | rests 5.07 d |
 | breeds in | spring | out of it, only a tame well cared for |
@@ -2048,11 +2071,11 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | lives | 12 y | 46 d, give or take a fifth; an elder from 80% of it |
 | lives in | herd | room for 24 **set** within 48 blocks |
 
-**Balance** (common): a generation 6 d; a line four deep in 18 d (6 h of play); 4.3 young per mother in 10 days, 14 in her life.
+**Balance** (common): a generation 5.5 d; a line four deep in 17 d (6 h of play); 4.7 young per mother in 10 days, 15 in her life.
 
-- ✓ fourth generation: 17.9 days (want 10-25 days (common))
+- ✓ fourth generation: 16.6 days (want 10-25 days (common))
 - ✓ grown most of its life: grows 4.6 of 46 days (want under a fifth)
-- ✓ young in a life: 13.9 (want 6-40)
+- ✓ young in a life: 15.1 (want 6-40)
 - ✓ litter: 1-4 (want 1-12, fewest first)
 - ✓ room near: 24 (want 3-30)
 
@@ -2063,6 +2086,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | eats | fish 45%, carrion 25%, meat 10%, insects 10%, seeds 5%, fruit 5% |
 | hunts | 0.5%-30% of its mass alone (0.00-0 kg); at home: wood_mouse, field_vole, house_sparrow |
 | a meal that fills it | 0.1 kg; its biggest prey at home in 2.9 kills |
+| room by its prey | beach 5, plains 14, swamp 5 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.099 L a day; a drink lasts 15 min, thirsty after 8 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 10 blocks (twice that running) |
@@ -2124,6 +2148,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | eats | fish 60%, meat 30%, insects 10% |
 | hunts | 0.5%-100% of its mass alone (0.17-35 kg); at home: dog, cat, hare, pacu, great_horned_owl, savanna_hawk, turkey_vulture, herring_gull, base:chicken |
 | a meal that fills it | 3.5 kg; its biggest prey at home fills it in one kill |
+| room by its prey | swamp 17, savanna 26 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.486 L a day; a drink lasts 108 min, thirsty after 54 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 8 blocks (twice that running) |
@@ -2185,6 +2210,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | eats | fish 60%, meat 30%, insects 10% |
 | hunts | 0.5%-100% of its mass alone (0.12-25 kg); at home: dog, cat, hare, pacu, great_horned_owl, savanna_hawk, turkey_vulture, herring_gull, base:chicken |
 | a meal that fills it | 2.5 kg; its biggest prey at home fills it in one kill |
+| room by its prey | savanna 26, swamp 20 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 0.359 L a day; a drink lasts 105 min, thirsty after 52 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 8 blocks (twice that running) |
@@ -2250,6 +2276,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.8% of spawn 
 | eats | meat 85%, carrion 15% |
 | hunts | 2.0%-300% of its mass alone (0.84-126 kg); at home: cat, hare, mountain_hare, white_tailed_deer, red_deer, raven, reindeer, great_horned_owl, snowy_owl, golden_eagle, turkey_vulture, herring_gull, base:chicken, base:pig, base:sheep |
 | a meal that fills it | 4.2 kg; its biggest prey at home fills it in one kill |
+| room by its prey | taiga 1, forest 1, birch_forest 8, mountains 1, snowy_plains 2, plains 4, sequoia_grove 3 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 2.861 L a day; a drink lasts 22 min, thirsty after 11 |
 | feedings to tame at level 1 | 10 (2.5x at level 150) |
 | scared by a walking player within | 20 blocks (twice that running) |
@@ -2311,6 +2338,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | eats | meat 85%, fish 15% |
 | hunts | 1.0%-150% of its mass alone (0.85-128 kg); at home: dog, capybara, hare, white_tailed_deer, pacu, red_fox, raven, coyote, great_horned_owl, golden_eagle, savanna_hawk, turkey_vulture, herring_gull, yacare_caiman, spectacled_caiman, base:chicken, base:pig, base:sheep |
 | a meal that fills it | 8.5 kg; its biggest prey at home fills it in one kill |
+| room by its prey | swamp 5, savanna 10, desert 1 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 5.397 L a day; a drink lasts 24 min, thirsty after 12 |
 | feedings to tame at level 1 | 14 (2.5x at level 150) |
 | scared by a walking player within | 12 blocks (twice that running) |
@@ -2346,7 +2374,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | Life | real | in the game |
 |---|---|---|
 | mass | 3 kg | |
-| lays | | 0.25 d after mating |
+| spawns | | in the water when mated; the fry come by her after the eggs' time |
 | eggs hatch in | 30 d | 0.72 d |
 | litter or clutch | 6 on average | 1-4 **set** |
 | between litters | 1 y | rests 5.07 d |
@@ -2356,11 +2384,11 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | lives | 20 y | 76.7 d, give or take a fifth; an elder from 80% of it |
 | lives in | solitary | room for 14 within 48 blocks |
 
-**Balance** (uncommon): a generation 11 d; a line four deep in 33 d (11 h of play); 4.7 young per mother in 10 days, 24 in her life.
+**Balance** (uncommon): a generation 10.7 d; a line four deep in 32 d (11 h of play); 4.3 young per mother in 10 days, 22 in her life.
 
-- ✓ fourth generation: 32.9 days (want 20-40 days (uncommon))
+- ✓ fourth generation: 32.2 days (want 20-40 days (uncommon))
 - ✓ grown most of its life: grows 10.0 of 77 days (want under a fifth)
-- ✓ young in a life: 24.1 (want 6-40)
+- ✓ young in a life: 22.2 (want 6-40)
 - ✓ litter: 1-4 (want 1-12, fewest first)
 - ✓ room near: 14 (want 3-30)
 
@@ -2405,8 +2433,8 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | Life | real | in the game |
 |---|---|---|
 | mass | 0.02 kg | |
-| lays | | 0.25 d after mating |
-| eggs hatch in | 5 d | 0.19 d |
+| spawns | | in the water when mated; the fry come by her after the eggs' time |
+| eggs hatch in | 5 d | 0.46 d **set** |
 | litter or clutch | 8 on average | 3-11 |
 | between litters | 1 y | rests 5.07 d |
 | breeds in | the wet season | out of it, only a tame well cared for |
@@ -2415,11 +2443,11 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | lives | 4 y | 15.3 d, give or take a fifth; an elder from 80% of it |
 | lives in | herd | room for 30 **set** within 48 blocks |
 
-**Balance** (common): a generation 3.4 d; a line four deep in 10 d (3 h of play); 13.1 young per mother in 10 days, 12 in her life.
+**Balance** (common): a generation 3.4 d; a line four deep in 10 d (3 h of play); 12.7 young per mother in 10 days, 12 in her life.
 
 - ✓ fourth generation: 10.1 days (want 10-25 days (common))
 - ✓ grown most of its life: grows 2.9 of 15 days (want under a fifth)
-- ✓ young in a life: 12.3 (want 6-40)
+- ✓ young in a life: 11.8 (want 6-40)
 - ✓ litter: 3-11 (want 1-12, fewest first)
 - ✓ room near: 30 (want 3-30)
 
@@ -2737,6 +2765,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | eats | fish 60%, meat 30%, carrion 10% |
 | hunts | 0.3%-100% of its mass alone (0.45-150 kg); at home: lungfish, psittacosaurus, confuciusornis |
 | a meal that fills it | 15 kg; its biggest prey at home fills it in one kill |
+| room by its prey | floodplain 7, fern_forest 20 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 1.799 L a day; a drink lasts 125 min, thirsty after 63 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 6 blocks (twice that running) |
@@ -2798,6 +2827,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | eats | leaves 40%, seeds 25%, fruit 10%, meat 15%, insects 10% |
 | hunts | 0.0%-5% of its mass alone (0.04-4 kg); at home: kryptobaatar, gobipteryx |
 | a meal that fills it | 9 kg |
+| room by its prey | red_dunes 1, scrubland 1 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 5.681 L a day; a drink lasts 24 min, thirsty after 12 |
 | its food grows at home (spring/summer/autumn/winter) | red_dunes 40/40/40/40%, scrubland 40/40/40/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
@@ -2835,7 +2865,8 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | Life | real | in the game |
 |---|---|---|
 | mass | 0.5 kg | |
-| carries her young | 0 d | 0.7 d **set** |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 14 d | 0.41 d |
 | litter or clutch | 3 on average | 1-4 |
 | between litters | 1 y | rests 5.07 d |
 | breeds in | the wet season | out of it, only a tame well cared for |
@@ -2844,11 +2875,11 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | lives | 10 y | 38.3 d, give or take a fifth; an elder from 80% of it |
 | lives in | herd | room for 24 **set** within 48 blocks |
 
-**Balance** (common): a generation 5.7 d; a line four deep in 17 d (6 h of play); 4.3 young per mother in 10 days, 11 in her life.
+**Balance** (common): a generation 5.2 d; a line four deep in 16 d (5 h of play); 4.7 young per mother in 10 days, 12 in her life.
 
-- ✓ fourth generation: 17.1 days (want 10-25 days (common))
+- ✓ fourth generation: 15.7 days (want 10-25 days (common))
 - ✓ grown most of its life: grows 4.6 of 38 days (want under a fifth)
-- ✓ young in a life: 11.3 (want 6-40)
+- ✓ young in a life: 12.2 (want 6-40)
 - ✓ litter: 1-4 (want 1-12, fewest first)
 - ✓ room near: 24 (want 3-30)
 
@@ -2895,7 +2926,8 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn 
 | Life | real | in the game |
 |---|---|---|
 | mass | 0.3 kg | |
-| carries her young | 0 d | 0.7 d **set** |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 14 d | 0.41 d |
 | litter or clutch | 3 on average | 1-4 |
 | between litters | 1 y | rests 5.07 d |
 | breeds in | the wet season | out of it, only a tame well cared for |
@@ -2904,11 +2936,11 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn 
 | lives | 10 y | 38.3 d, give or take a fifth; an elder from 80% of it |
 | lives in | herd | room for 24 **set** within 48 blocks |
 
-**Balance** (uncommon): a generation 7.4 d; a line four deep in 22 d (7 h of play); 4.3 young per mother in 10 days, 11 in her life.
+**Balance** (uncommon): a generation 6.9 d; a line four deep in 21 d (7 h of play); 4.7 young per mother in 10 days, 11 in her life.
 
-- ✓ fourth generation: 22.1 days (want 20-40 days (uncommon))
+- ✓ fourth generation: 20.7 days (want 20-40 days (uncommon))
 - ✓ grown most of its life: grows 6.2 of 38 days (want under a fifth)
-- ✓ young in a life: 10.6 (want 6-40)
+- ✓ young in a life: 11.5 (want 6-40)
 - ✓ litter: 1-4 (want 1-12, fewest first)
 - ✓ room near: 24 (want 3-30)
 
@@ -2940,7 +2972,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn 
 | Where it lives | how common there |
 |---|---|
 | `animals:floodplain` | commonest |
-| `animals:fern_forest` | 50% |
+| `animals:fern_forest` | 20% |
 
 Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn attempts that pick it where commonest (uncommon).
 

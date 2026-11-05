@@ -167,16 +167,16 @@ What takes days in real life takes its time on the growing pace (`vitals::crafts
 
 An axe at a tree's foot fells it in one chop that takes logs^0.75 times one log's (`vitals::felling`), with the axe's own speed on top. Each tier of axe takes trees up to a size for their wood; past it a tree still falls, 8 times slower, and gives nothing. A tree that loses its foot, or a log of its trunk, by any means falls (none stands in the air); bare hands and other tools chop the foot as slowly as an axe past its tier, and as fruitlessly: the first axe is made by hand off the ground (`first`). Never more than 60 min. Felled, a tree within its tier lies on the ground in pieces of 4 logs, each cut as long as felling a tree of its logs takes; the axe wears by logs^0.75 for a felling or a piece. A tree falls as itself: a 1 s creak, then 2.5 s for one 10 high (2-5 s, by the square root of its height), its leaves breaking off past 20° until 70% have, the rest bursting on the ground; on the way leaves and branches in its path break, and a trunk it strikes falls too if the falling tree has 2x its logs, or else it catches there and settles as blocks; a creature it hits takes 2 + a tenth of its logs, up to 20. Seconds for a typical axe of each tier (a log is hardness 2), * past its tier:
 
-| tier | harvest | takes up to | speed | oak (43) | birch (9) | araucaria (64) | young sequoia (165) | sequoia (1015) |
+| tier | harvest | takes up to | speed | oak (16) | birch (20) | araucaria (61) | young sequoia (165) | sequoia (1015) |
 |---|---|---|---|---|---|---|---|---|
-| bare hands, other tools | - | nothing | 1 | 7 min * | 2 min * | 9 min * | 18 min * | 60 min * |
-| wood, gold | 0 | 56 logs | 2 | 25 s | 8 s | 5 min * | 9 min * | 36 min * |
-| bone, antler | 50 | 72 logs | 2.5 | 20 s | 6 s | 27 s | 7 min * | 29 min * |
-| flint, chert, obsidian, stone | 100 | 96 logs | 2.91 | 17 s | 5 s | 23 s | 6 min * | 25 min * |
-| copper | 150 | 192 logs | 4.85 | 10 s | 3 s | 14 s | 28 s | 15 min * |
-| bronze, iron, wrought iron | 200 | 512 logs | 6.79 | 7 s | 2 s | 10 s | 20 s | 11 min * |
-| steel, diamond (old) | 300 | 1536 logs | 7.76 | 6 s | 2 s | 9 s | 18 s | 70 s |
-| diamond | 400 | 4096 logs | 8 | 6 s | 2 s | 8 s | 17 s | 67 s |
+| bare hands, other tools | - | nothing | 1 | 3 min * | 4 min * | 9 min * | 18 min * | 60 min * |
+| wood, gold | 0 | 56 logs | 2 | 12 s | 14 s | 4 min * | 9 min * | 36 min * |
+| bone, antler | 50 | 72 logs | 2.5 | 10 s | 11 s | 26 s | 7 min * | 29 min * |
+| flint, chert, obsidian, stone | 100 | 96 logs | 2.91 | 8 s | 10 s | 23 s | 6 min * | 25 min * |
+| copper | 150 | 192 logs | 4.85 | 5 s | 6 s | 14 s | 28 s | 15 min * |
+| bronze, iron, wrought iron | 200 | 512 logs | 6.79 | 4 s | 4 s | 10 s | 20 s | 11 min * |
+| steel, diamond (old) | 300 | 1536 logs | 7.76 | 3 s | 4 s | 8 s | 18 s | 70 s |
+| diamond | 400 | 4096 logs | 8 | 3 s | 4 s | 8 s | 17 s | 67 s |
 
 ## Effects
 
@@ -284,6 +284,7 @@ What each growing plant needs (`vitals::plants`, from `reports/ecology/Plants an
 | base:cactus | saguaro | 10, 25-40, 50 | Dry | -7 °C | - | the game's | plains (su), forest (su), birch_forest (su), taiga (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au wi), tropical_forest (sp su au wi), sequoia_grove (su), ocean (sp su au), coral_reef (sp su au wi), lagoon (sp su au wi), beach (sp su au), red_dunes (su), scrubland (su), floodplain (sp su au), fern_forest (su), crags (su) |
 | base:sapling | oak | 5, 18-28, 38 | Moderate | hardy | - | the game's | plains (su au), forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), mountains (su), ocean (sp su au wi), coral_reef (su au), lagoon (su au), beach (au), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au) |
 | base:grazed_grass | prairie grass | 5, 15-30, 40 | Moderate | hardy | 18 | 7 | plains (su au), forest (su au), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), mountains (su), ocean (sp su au wi), coral_reef (su au), lagoon (su au), beach (au wi), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au) |
+| base:dung_pat | a cow pat (dung beetles, fungi) | 5, 20-30, 42 | Moderate | hardy | 45 | 14 | plains (su au), forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), mountains (su), ocean (sp su au wi), coral_reef (su au), lagoon (su au), beach (au), scrubland (su), floodplain (su au), fern_forest (su), crags (su au) |
 | base:sedge | sedges | -1, 8-22, 32 | Moderate | hardy | 18 | 7 | plains (sp su au), forest (sp su au), birch_forest (su au), taiga (su), snowy_plains (su), savanna (au), tropical_forest (au), mountains (su au), ocean (sp su au wi), coral_reef (au), lagoon (au), beach (au wi), floodplain (au), fern_forest (su au), crags (su au wi) |
 | base:cottongrass | cottongrass (Eriophorum) | -2, 6-16, 25 | Moderate | hardy | 18 | 7 | plains (sp au), forest (sp su au wi), birch_forest (su au), taiga (su), snowy_plains (su), mountains (sp su au), sequoia_grove (wi), ocean (sp au wi), beach (au wi), fern_forest (su au), crags (au wi) |
 | base:reindeer_lichen | reindeer lichen (Cladonia) | 0, 5-15, 25 | Dry | hardy | 3650 | 301 | plains (sp au), forest (sp su au), birch_forest (sp su au), taiga (su au), snowy_plains (su), mountains (sp su au), sequoia_grove (sp su au wi), ocean (sp au wi), beach (sp au wi), red_dunes (sp au wi), scrubland (sp au wi), floodplain (au wi), fern_forest (sp su au), crags (sp au wi) |
@@ -303,6 +304,9 @@ What each growing plant needs (`vitals::plants`, from `reports/ecology/Plants an
 | base:mushroom_brown | forest mushrooms | 5, 10-20, 30 | Moderate | -2 °C | 8 | 4 | plains (au), forest (su au), birch_forest (su au), taiga (su), mountains (su au), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au) |
 | base:mushroom_red | fly agaric | 5, 10-20, 30 | Moderate | -2 °C | 8 | 4 | plains (au), forest (su au), birch_forest (su au), taiga (su), mountains (su au), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au) |
 | base:water_hyacinth | water hyacinth | 12, 25-30, 38 | Wet | -1 °C | 10 | 5 | plains (su), forest (su), birch_forest (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), tropical_forest (sp su au wi), sequoia_grove (su), ocean (sp su au), coral_reef (sp su au wi), lagoon (sp su au wi), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (su) |
+| base:foxfire | honey fungus and bitter oyster mycelium | 5, 20-25, 30 | Moderate | hardy | 30 | 10 | plains (su au), forest (su), birch_forest (su), taiga (su), savanna (au), swamp (au), tropical_forest (au), mountains (su), ocean (sp su au wi), coral_reef (au), lagoon (au), beach (au), floodplain (au), fern_forest (su), crags (su au) |
+| base:glow_mycena | Mycena chlorophos | 18, 24-28, 32 | Wet | -1 °C | 8 | 4 | plains (su), desert (sp au), savanna (sp su au wi), swamp (sp su au wi), tropical_forest (sp su au wi), ocean (su), coral_reef (sp su au wi), lagoon (sp su au wi), beach (su), red_dunes (su), scrubland (su), floodplain (sp su au), crags (su) |
+| base:goblins_gold | goblin's gold moss (Schistostega pennata) | 0, 10-18, 25 | Moderate | hardy | 60 | 17 | plains (au), forest (sp su au), birch_forest (su au), taiga (su), mountains (su au), ocean (sp au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (au wi) |
 | base:mesquite_sapling | mesquite | 12, 25-38, 48 | Dry | -15 °C | - | the game's | plains (su), forest (su), birch_forest (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au wi), tropical_forest (sp su au wi), ocean (sp su au), coral_reef (sp su au wi), lagoon (sp su au wi), beach (su au), red_dunes (su), scrubland (su), floodplain (sp su au), fern_forest (su), crags (su) |
 | base:brazil_nut_sapling | Brazil nut (Bertholletia excelsa) | 18, 25-32, 38 | Moderate | 0 °C | - | the game's | plains (su), desert (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), coral_reef (su au), lagoon (su au), scrubland (su), floodplain (su), crags (su) |
 | base:cacao_sapling | cacao (Theobroma cacao) | 15, 22-30, 35 | Moderate | 0 °C | - | the game's | plains (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), ocean (su au), coral_reef (su au), lagoon (su au), scrubland (su), floodplain (su au), fern_forest (su), crags (su) |
@@ -319,7 +323,7 @@ What each growing plant needs (`vitals::plants`, from `reports/ecology/Plants an
 
 ## Crops
 
-What each crop is sown from and gives ripe (`vitals::crops`; how it grows is its plants row): picked unripe it gives back what sowed it, ripe its harvest and, with a seed of its own, up to 3 more seed. Its ripe harvest tires or feeds the farmland under it. Broken tall grass in the biomes listed gives one of their crops' seed a time in 16.
+What each crop is sown from and gives ripe (`vitals::crops`; how it grows is its plants row): picked unripe it gives back what sowed it, ripe its harvest and, with a seed of its own, up to 3 more seed. Its ripe harvest tires or feeds the farmland under it. Broken tall grass in the biomes listed gives one of their crops' seed a time in 32, and anywhere a wheat seed a time in 32.
 
 | crop | sown from | ripe gives | stages | soil | wild seed in |
 |---|---|---|---|---|---|
@@ -361,6 +365,9 @@ What the world grows besides grass and trees (`vitals::wild`): how each grows, t
 | base:mushroom_brown | Spreads | Soil | base:mushroom_brown | 0.6% | forest, birch_forest, taiga, mountains |
 | base:mushroom_red | Spreads | Soil | base:mushroom_red | 0.3% | forest, birch_forest, taiga |
 | base:water_hyacinth | Spreads | Water | - | 8.0% | swamp, savanna |
+| base:foxfire | Spreads | Soil | - | 0.4% | forest, birch_forest, taiga, swamp, tropical_forest, sequoia_grove |
+| base:glow_mycena | Spreads | Soil | - | 0.3% | tropical_forest, swamp |
+| base:goblins_gold | Spreads | Soil | - | 0.2% | forest, birch_forest, taiga |
 | base:cattail | Still | Shore | base:cattail_root | 15.0% | swamp, plains, forest, taiga, savanna |
 | base:reed | Still | Shore | - | 12.0% | plains, forest, birch_forest, taiga, swamp (4.0%) |
 | base:lily_pad | Still | Water | - | 12.0% | plains, forest, birch_forest, swamp, taiga, savanna |
@@ -390,7 +397,7 @@ What foraging animals eat of the world's blocks (`vitals::forage`), how much a m
 
 | block | kind | food | eaten | grows back as |
 |---|---|---|---|---|
-| base:tall_grass | grass | 10 | becomes base:grazed_grass | base:grazed_grass |
+| base:tall_grass | grass | 2 | becomes base:grazed_grass | base:grazed_grass |
 | base:berry_bush (age 3) | fruit | 8 | back to age 1 | base:berry_bush |
 | base:oak_leaves | leaves | 4 | stays | always there in base:forest, base:plains, base:swamp (spring, summer, autumn), worth 40% of fresh growth |
 | base:birch_leaves | leaves | 4 | stays | always there in base:forest, base:birch_forest (spring, summer, autumn), worth 40% of fresh growth |
@@ -485,6 +492,7 @@ On the ground, animals eat dropped food of their diet one item a mouthful: every
 | base:matamata_fruit | seeds | 20 |
 | animals:araucaria_cone | seeds | 50 |
 | animals:ginkgo_seed | fruit | 10 |
+| animals:carcass | carrion | 500 |
 
 ## Soil and compost
 
@@ -498,6 +506,26 @@ Farmland's fertility (`vitals::soil`): how fast crops grow at each level, what w
 | 0 | 20% |
 
 A ripe harvest of base:wheat, base:barley, base:rye, base:carrots, base:potatoes, base:beetroots, base:maize, base:paddy_rice, base:sorghum, base:millet, base:cassava, base:pumpkin_stem, base:melon_stem takes a level, of base:beans, base:tepary_beans gives one back; base:compost +2, base:dung +1; a season unplanted (about 14 game days, at grass's rate) gives one back. A compost bin fills in 7 steps: spoiled food 2, base:dung 2, base:rotten_flesh 2, base:oak_leaves 1, base:birch_leaves 1, base:spruce_leaves 1, base:acacia_leaves 1, base:sapling 1, base:wheat_seeds 1, base:wheat 1; full, it rots into compost in about 23 minutes.
+
+Dung pats: a grazer drops one every 100 mouthfuls where it stands on the ground, never within 2 blocks of another; it rots by warmth and soil water into a tuft of fresh grass (at most 3 game days, frozen or dry), and while it lies grazed grass within 2 blocks grows back x2. How long one lies, in game minutes (a game day is 20):
+
+| biome | spring | summer | autumn | winter |
+|---|---|---|---|---|
+| base:plains | 47 | 22 | 28 | 60 |
+| base:forest | 48 | 20 | 32 | 60 |
+| base:birch_forest | 58 | 22 | 37 | 60 |
+| base:taiga | 60 | 24 | 51 | 60 |
+| base:savanna | 25 | 16 | 17 | 36 |
+| base:swamp | 48 | 20 | 24 | 60 |
+| base:tropical_forest | 35 | 18 | 17 | 24 |
+| base:mountains | 58 | 24 | 41 | 60 |
+| base:sequoia_grove | 52 | 35 | 60 | 60 |
+| base:coral_reef | 45 | 21 | 20 | 31 |
+| base:lagoon | 45 | 21 | 20 | 31 |
+| animals:scrubland | 49 | 25 | 51 | 60 |
+| animals:floodplain | 47 | 20 | 20 | 60 |
+| animals:fern_forest | 53 | 19 | 30 | 60 |
+| animals:crags | 47 | 19 | 23 | 48 |
 
 ## Difficulty (the `base:difficulty` rule)
 

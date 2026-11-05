@@ -84,12 +84,18 @@ fn each_species_is_at_home_in_its_habitats() {
 #[test]
 fn eggs_hatch_where_and_when_they_are_laid() {
     let mut problems = Vec::new();
-    for s in SPECIES.iter().filter(|s| s.gestation() == 0) {
+    // A fish's eggs lie in the water, not a nest (`life::carrying`).
+    for s in SPECIES
+        .iter()
+        .filter(|s| s.gestation() == 0 && !s.in_water())
+    {
         let when = if s.bio.peak != 0 { s.bio.peak } else { s.bio.breeds };
         for season in (0..4).filter(|i| when >> i & 1 != 0) {
             for &(biome, _) in s.habitats {
                 let Some(c) = climate::of(biome) else { continue };
-                let cold = share(c, 1 << season, |a| !life::develops(life::egg_air(a, true)));
+                // A bird's nest is brooded (`nests`): its eggs develop whatever the air.
+                let brooded = animals_core::nests::site(s.name).is_some();
+                let cold = share(c, 1 << season, |a| !life::develops(life::egg_air_of(a, true, brooded)));
                 if cold > 0.5 {
                     problems.push(format!(
                         "{}: eggs in a nest in {biome} develop only {:.0}% of the day in season {season} (its breeding season, biology.rs): life::EGG_AIR {:?} against the biome's climate",
@@ -380,6 +386,89 @@ fn the_cretaceous_spawns_as_often_as_the_overworld() {
                 problems.push(format!("{} comes no more often than the wyvern in {biome}", s.name));
             }
         }
+    }
+    report(problems);
+}
+
+/// A biome's stocking scales its plant eaters' crowd and nothing else (`Species::crowd_in`,
+/// `STOCKING`): a capybara on the savanna has room for two and a half times its crowd, a red deer
+/// in the giant grove for a tenth (a pair at least); hunters and others keep theirs; and what
+/// spawning lets in, breeding and want agree on (none die of want at their stocked crowd).
+#[test]
+fn stocking_scales_plant_eaters_crowds() {
+    use animals_core::life::{room_for, want_chance};
+    use animals_core::species::{STOCKING, stocking};
+    let mut problems = Vec::new();
+    let find = |n: &str| SPECIES.iter().find(|s| s.name == n).expect(n);
+    let capybara = find("capybara");
+    let want = (capybara.crowd() as f32 * 2.5).round() as u32;
+    if capybara.crowd_in("base:savanna") != want {
+        problems.push(format!(
+            "capybara on the savanna: {} where 2.5 times {} is {want}",
+            capybara.crowd_in("base:savanna"),
+            capybara.crowd()
+        ));
+    }
+    // A hunter's isn't the biome's stocking but its prey's room (`hunters_never_eat_their_prey_out`):
+    // never over its own crowd, never under one.
+    let wolf = find("grey_wolf");
+    for &(b, _) in STOCKING {
+        let c = wolf.crowd_in(b);
+        if c == 0 || c > wolf.crowd() {
+            problems.push(format!("grey wolf in {b}: room for {c} (its crowd {})", wolf.crowd()));
+        }
+    }
+    for s in SPECIES.iter().filter(|s| s.forages_wild()) {
+        for &(b, _) in s.habitats {
+            let c = s.crowd_in(b);
+            if c < 2 {
+                problems.push(format!("{} in {b}: room for {c}, under a pair", s.name));
+            }
+            if !s.cretaceous() && (c as f32 - s.crowd() as f32 * stocking(b)).abs() > 0.5 && c > 2 {
+                problems.push(format!("{} in {b}: room for {c}, its crowd {} stocked {}", s.name, s.crowd(), stocking(b)));
+            }
+            if want_chance(1.0, c as f64, c, animals_core::species::ADULT) != 0.0 {
+                problems.push(format!("{} in {b}: dies of want at its stocked crowd {c}", s.name));
+            }
+            if !room_for(0.0, 1, c) {
+                problems.push(format!("{} in {b}: no room for one in an empty place", s.name));
+            }
+        }
+    }
+    report(problems);
+}
+
+/// Hunters and prey (`notes/ECOLOGY.md`, part 6): a biome's hunters, each at its room there
+/// (`needs::hunter_room`), never take more of a prey than the young it has a year, so the herd
+/// holds; and a thinly stocked place holds few hunters (the taiga's reindeer feed under a wolf
+/// pack's crowd).
+#[test]
+fn hunters_never_eat_their_prey_out() {
+    let mut problems = Vec::new();
+    for biome in animals_core::web::biomes() {
+        for p in animals_core::web::predation(biome) {
+            if p.share() > 1.0 {
+                let by: Vec<String> = p.taken.iter().map(|(h, t)| format!("{h} {t:.0}")).collect();
+                problems.push(format!(
+                    "{} in {biome}: its hunters take {:.0} a year, {:.0}% of its {:.0} young ({})",
+                    p.prey,
+                    p.taken(),
+                    p.share() * 100.0,
+                    p.young,
+                    by.join(", ")
+                ));
+            }
+        }
+    }
+    let wolf = SPECIES
+        .iter()
+        .find(|s| s.name == "grey_wolf")
+        .expect("wolf");
+    if wolf.crowd_in("base:taiga") >= wolf.crowd() {
+        problems.push(format!(
+            "grey wolf in the taiga: room for {}, its whole crowd, where its reindeer are stocked at 0.35",
+            wolf.crowd_in("base:taiga")
+        ));
     }
     report(problems);
 }

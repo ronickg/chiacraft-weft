@@ -78,6 +78,9 @@ struct Book {
     /// (Ronald's first-day test: the first slot stopped being what was just made); set when the
     /// book opens or its tab changes.
     order: Vec<u32>,
+    /// The items held when the book last opened: a makeable recipe using one gained since goes
+    /// first (World playtest round 13: after knapping a head, the axe wasn't the first slot).
+    held_before: Vec<u32>,
     pool: Vec<(u32, u32)>,
     /// The menu window the pool was asked for.
     asked: u32,
@@ -92,8 +95,33 @@ type Entry = (Recipe, u32, Option<(u32, u32, u32)>);
 /// The bag as the open book last saw it (`client_frame` above).
 static BAG_SIG: Mutex<u64> = Mutex::new(0);
 
-static BOOK: Mutex<Book> =
-    Mutex::new(Book { tab: 0, page: 0, picked: None, order: Vec::new(), pool: Vec::new(), asked: u32::MAX, ask: None });
+/// Crafts that take time (`first::book_secs`: a knapped head from memory), one at a time per
+/// player: each made when its time comes, from what the bag (or the chests) holds then, so nothing
+/// is taken before and a craft whose inputs went makes nothing and ends the line.
+struct Queued {
+    player: u64,
+    dim: u32,
+    station: Station,
+    recipe: u32,
+    left: u32,
+    /// The world time (ticks) the next one is made, and each one's ticks.
+    at: u64,
+    each: u64,
+}
+static QUEUED: Mutex<Vec<Queued>> = Mutex::new(Vec::new());
+static WORKING: Sound = Sound::named("block.stone.hit");
+static DONE: Sound = Sound::named("block.stone.break");
+
+static BOOK: Mutex<Book> = Mutex::new(Book {
+    tab: 0,
+    page: 0,
+    picked: None,
+    order: Vec::new(),
+    held_before: Vec::new(),
+    pool: Vec::new(),
+    asked: u32::MAX,
+    ask: None,
+});
 
 pub fn register(r: &mut Registry) {
     r.tag("chests", &["chest"]);
@@ -102,10 +130,17 @@ pub fn register(r: &mut Registry) {
         let player = p.player();
         let station = Station::from(v[2]);
         if let Some(recipe) = recipe_of(v[0] as u32) {
-            craft(&w, player, station, &recipe, (v[1] as u32).clamp(1, MAX_BATCH));
+            let count = (v[1] as u32).clamp(1, MAX_BATCH);
+            match timed(&recipe) {
+                Some(secs) => queue(&w, player, station, &recipe, count, secs),
+                None => {
+                    craft(&w, player, station, &recipe, count);
+                }
+            }
         }
         p.reply(&POOL, &encode(&chest_totals(&w, player, station)));
     });
+    r.world_tick(work_queued);
     r.packet(&POOL_ASK, |p, v| {
         let w = p.world();
         let station = Station::from(v[0]);
@@ -454,6 +489,80 @@ fn craft(w: &World, player: u64, station: Station, r: &Recipe, count: u32) -> u3
     made
 }
 
+/// Seconds `r` takes a craft from the book, if it takes any.
+fn timed(r: &Recipe) -> Option<f32> {
+    let (out, _) = r.outputs().into_iter().next()?;
+    crate::first::book_secs(out.item)
+}
+
+/// `count` of `r` asked for at `station`: added to the player's line (one more of the same recipe
+/// joins it; another replaces it), the first made in `secs`.
+fn queue(w: &World, player: u64, station: Station, r: &Recipe, count: u32, secs: f32) {
+    if station == Station::Hands && !fits_hands(r) || crate::first::locked_for(w, player, r) {
+        return;
+    }
+    let each = (secs * vitals::TICKS as f32).round().max(1.0) as u64;
+    let (recipe, now, dim) = (id_of(r), w.game_time(), w.dimension());
+    let started = {
+        let mut q = QUEUED.lock().unwrap();
+        match q.iter_mut().find(|e| e.player == player) {
+            Some(e) if e.recipe == recipe && e.station == station => {
+                e.left = (e.left + count).min(MAX_BATCH);
+                false
+            }
+            _ => {
+                q.retain(|e| e.player != player);
+                q.push(Queued { player, dim, station, recipe, left: count, at: now + each, each });
+                true
+            }
+        }
+    };
+    weft_sdk::info!(
+        "crafting: queued {count} x {} at {station:?} from the book, {secs} s each",
+        r.outputs().first().map_or("?", |o| item_name(o.0.item))
+    );
+    // Said once when a line starts; more of the same joins it quietly (a fast clicker queued four
+    // of the same hint, PC run fh_bookhead1).
+    if started {
+        base_api::hint(w, player, "hint.base.knapping_book", &[secs.round() as i64]);
+        if let Some(e) = w.entity(player) {
+            w.play_sound(&WORKING, e.pos, 0.7);
+        }
+    }
+}
+
+/// The lines of this world's players: a knock every second while one works, and each craft
+/// made when its time comes.
+fn work_queued(w: &World) {
+    let (now, dim) = (w.game_time(), w.dimension());
+    let mut due = Vec::new();
+    {
+        let mut q = QUEUED.lock().unwrap();
+        q.retain(|e| e.dim != dim || w.entity(e.player).is_some());
+        for e in q.iter_mut().filter(|e| e.dim == dim) {
+            if now >= e.at {
+                due.push((e.player, e.station, e.recipe));
+                e.left -= 1;
+                e.at = now + e.each;
+            } else if (e.at - now) % vitals::TICKS as u64 == 0
+                && let Some(p) = w.entity(e.player)
+            {
+                w.play_sound(&WORKING, p.pos, 0.5);
+            }
+        }
+        q.retain(|e| e.left > 0);
+    }
+    for (player, station, recipe) in due {
+        let made = recipe_of(recipe).map_or(0, |r| craft(w, player, station, &r, 1));
+        if made == 0 {
+            // Its inputs went (used, dropped, the table left behind): the line ends.
+            QUEUED.lock().unwrap().retain(|e| e.player != player);
+        } else if let Some(p) = w.entity(player) {
+            w.play_sound(&DONE, p.pos, 0.9);
+        }
+    }
+}
+
 /// A roll in 0..1 for a chance result, different for each craft.
 fn roll(player: u64, n: u32) -> f32 {
     let mut x = player ^ (n as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ 0xD1B5_4A32_D192_ED03;
@@ -548,12 +657,31 @@ pub fn book(ui: &mut Ui, station: Station) {
             }
         })
         .collect();
-    // What you can make first, then what you know, then what needs a table, then the near misses;
-    // otherwise as registered. Sorted when the book opens or its tab changes, then kept in that
-    // order while it is open (what becomes makeable or known later goes at the end).
+    // What you can make first, of it first what takes something gained since the book last
+    // opened, then what you know, then what needs a table, then the near misses; otherwise as
+    // registered. Sorted when the book opens or its tab changes, then kept in that order while it
+    // is open (what becomes makeable or known later goes at the end).
     let order = BOOK.lock().map(|b| b.order.clone()).unwrap_or_default();
     if order.is_empty() {
-        list.sort_by_key(|(r, n, near)| ((*n == 0) as u8, table_only(station, r) as u8, near.is_some() as u8));
+        let before = BOOK
+            .lock()
+            .map(|b| b.held_before.clone())
+            .unwrap_or_default();
+        let gained: Vec<u32> = have
+            .iter()
+            .map(|&(i, _)| i)
+            .filter(|i| !before.contains(i))
+            .collect();
+        let new = |r: &Recipe| {
+            !before.is_empty()
+                && r.inputs()
+                    .iter()
+                    .enumerate()
+                    .any(|(n, _)| gained.iter().any(|&i| r.accepts(n as u32, i)))
+        };
+        list.sort_by_key(|(r, n, near)| ((*n == 0) as u8, !(*n > 0 && new(r)) as u8, table_only(station, r) as u8, near.is_some() as u8));
+        let held: Vec<u32> = have.iter().map(|&(i, _)| i).collect();
+        edit(|b| b.held_before = held);
         let ids: Vec<u32> = list.iter().map(|(r, _, _)| id_of(r)).collect();
         edit(|b| b.order = ids);
     } else {
@@ -783,9 +911,12 @@ fn picked_recipe(ui: &mut Ui, station: Station, r: &Recipe, have: &[(u32, u32)])
                     .send(&CRAFT, &[index as u64, n as u64, station as u64]);
             });
         }
-        ui.button_args("crafting.book.craft_all", &[Arg::Int(can as i64)], S::default().h(14.0).pad(3.0).disabled(can == 0), move |c| {
+        // Max makes one of what doesn't stack (a tool, a drill): Max on the hand drill ate four
+        // sticks for two drills (the world playtester, round 13). Craft 5 still makes more.
+        let all = if weft_sdk::max_stack(out.item) <= 1 { can.min(1) } else { can };
+        ui.button_args("crafting.book.craft_all", &[Arg::Int(all as i64)], S::default().h(14.0).pad(3.0).disabled(all == 0), move |c| {
             c.client()
-                .send(&CRAFT, &[index as u64, can as u64, station as u64]);
+                .send(&CRAFT, &[index as u64, all as u64, station as u64]);
         });
     });
 }

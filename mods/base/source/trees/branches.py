@@ -13,7 +13,9 @@ import sys
 
 from PIL import Image, ImageDraw, ImageFont
 
-from audit import SPECIES, atlas, bbox
+from audit import SPECIES, atlas, bbox, BASE
+import os
+from PIL import Image as _Image
 from render import render, view_matrix
 import numpy as np
 
@@ -22,8 +24,33 @@ END = {1: ("east", "west"), 2: ("up", "down"), 3: ("south", "north")}
 DIRS = {"east": (1, 0, 0), "west": (-1, 0, 0), "up": (0, 1, 0), "down": (0, -1, 0), "south": (0, 0, 1), "north": (0, 0, -1)}
 
 
+def atlas_with_branches(sp):
+    """The log/leaves atlas with Art's branch bark after it (`branch_<wood>`, `_across`, `_end` at
+    u 96, 128, 160), or the log's own bark where there is none."""
+    a = atlas(sp)
+    wood = SPECIES[sp][0]
+    tiles = []
+    for t in ("", "_across", "_end"):
+        p = os.path.join(BASE, f"branch_{wood}{t}.png")
+        if os.path.exists(p):
+            tiles.append(np.array(_Image.open(p).convert("RGBA").resize((32, 32), _Image.NEAREST)))
+        else:
+            tiles.append(a[:, 32:64] if t == "_end" else a[:, 0:32])
+    return np.concatenate([a] + tiles, axis=1)
+
+
 def size_of(w):
     return 4 if w < THIN else 8 if w < MID else 16
+
+
+def tile(uv, k):
+    """`uv` (0..32) on tile `k` of the atlas (3 branch bark, 4 across, 5 end)."""
+    return [uv[0] + 32 * k, uv[1], uv[2] + 32 * k, uv[3]]
+
+
+GRAIN = {0: {"east": 5, "west": 5, "up": 4, "down": 4, "south": 4, "north": 4},
+         1: {"east": 3, "west": 3, "up": 5, "down": 5, "south": 3, "north": 3},
+         2: {"east": 4, "west": 4, "up": 3, "down": 3, "south": 5, "north": 5}}
 
 
 def bark(lo, hi, f):
@@ -63,8 +90,10 @@ def spec(blocks, branches, leaves=True):
         h = s / 32.0  # half its thickness in blocks
         c = np.array([x + 0.5, y + 0.5, z + 0.5])
         lo, hi = c - h, c + h
+        conn = [f for f, d in DIRS.items() if (x + d[0], y + d[1], z + d[2]) in wood]
+        along = 1 if any(f in conn for f in ("up", "down")) or not conn else (0 if any(f in conn for f in ("east", "west")) else 2)
         els.append({"name": f"p{x}_{y}_{z}", "bone": "root", "lo": list(lo), "hi": list(hi),
-                    "faces": {f: bark(lo, hi, f) for f in DIRS}})
+                    "faces": {f: tile(bark(lo, hi, f), GRAIN[along][f]) for f in DIRS if f not in conn}})
         for f, d in DIRS.items():
             n = (x + d[0], y + d[1], z + d[2])
             if n not in wood:
@@ -75,14 +104,15 @@ def spec(blocks, branches, leaves=True):
                     a_lo[i], a_hi[i] = hi[i], x + 1 if i == 0 else (y + 1 if i == 1 else z + 1)
                 elif d[i] < 0:
                     a_lo[i], a_hi[i] = (x, y, z)[i], lo[i]
+            ax = 0 if d[0] else (1 if d[1] else 2)
             els.append({"name": f"a{x}_{y}_{z}{f}", "bone": "root", "lo": list(a_lo), "hi": list(a_hi),
-                        "faces": {g: bark(a_lo, a_hi, g) for g in DIRS if g != f and DIRS[g] != tuple(-v for v in d)}})
+                        "faces": {g: tile(bark(a_lo, a_hi, g), GRAIN[ax][g]) for g in DIRS if DIRS[g] != tuple(-v for v in d)}})
     return {"bones": [{"name": "root", "parent": None, "pivot": [0, 0, 0]}], "elements": els}
 
 
 def main(src, out, sp="base:oak_log"):
     trees = json.load(open(src))[sp]
-    at = atlas(sp)
+    at = atlas_with_branches(sp)
     cell = (330, 380)
     font = ImageFont.load_default(18)
     small = ImageFont.load_default(14)

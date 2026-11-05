@@ -10,7 +10,9 @@
 //! arrives as fed as its prey are (`animal::arrive`), and a full one leaves them be.
 //!
 //! Prey keep watch (`wary`): a wild animal that sees a hunter able to take it runs off. In fog
-//! both see less far (`base_api::sight`).
+//! both see less far (`base_api::sight`). In a blood moon's totality (`animals_core::sky`) they
+//! watch half again as far, and a herd animal strayed from its herd walks back to its middle
+//! (`huddle`).
 
 use weft_sdk::*;
 
@@ -36,6 +38,8 @@ use animals_core::needs::{FULL, HUNGRY};
 const GIVE_UP: u64 = 600;
 const LOOK_EVERY: u64 = 60;
 const RUN: u64 = 80;
+/// Ticks a herd animal walks back to its herd before it looks again (`huddle`).
+const HUDDLE_WALK: u64 = 40;
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&HUNT, [0u64; 4], 0);
@@ -271,8 +275,10 @@ pub fn wary(w: &World, id: u64, st: &EntityState) -> bool {
     }
     let Some(me) = mass(w, id) else { return false };
     let mine = family(w, id);
+    let blood = animals_core::sky::totality(w.seed(), w.day_time());
+    let watch = WATCH * base_api::sight(w, st.pos.to_array()) as f64 * if blood { animals_core::sky::BLOOD_MOON_WATCH as f64 } else { 1.0 };
     let hunter = w
-        .targets_near(st.pos, WATCH * base_api::sight(w, st.pos.to_array()) as f64, None)
+        .targets_near(st.pos, watch, None)
         .into_iter()
         .filter(|&t| t != id && family(w, t) != mine && !animal::tamed(w, t))
         .filter_map(|t| {
@@ -286,5 +292,46 @@ pub fn wary(w: &World, id: u64, st: &EntityState) -> bool {
     let n = (x * x + z * z).sqrt().max(0.01);
     w.navigate(id, [st.pos.x + x / n * 10.0, st.pos.y, st.pos.z + z / n * 10.0], 1.6);
     w.component_mut(id, &WARY).map(|u| *u = now + RUN);
+    true
+}
+
+/// A goal for wild herd animals on the ground (not birds: a flock's `wary` takes off): in a blood
+/// moon's totality, one more than `HUDDLE` from the middle of its herd near walks back to it (held,
+/// as a flight from a hunter, for `HUDDLE_WALK` ticks).
+pub fn huddle(w: &World, id: u64, st: &EntityState) -> bool {
+    use animals_core::sky::{HUDDLE, HUDDLE_LOOK};
+    let now = w.game_time();
+    if !(now + id).is_multiple_of(20) || animal::tamed(w, id) || !animals_core::sky::totality(w.seed(), w.day_time()) {
+        return false;
+    }
+    let herd = w
+        .component(id, &ANIMAL)
+        .and_then(|a| a.species())
+        .is_some_and(|s| s.bio.social == animals_core::biology::Social::Herd);
+    if !herd {
+        return false;
+    }
+    let kind = w.entity(id).map(|e| e.kind);
+    let (mut sum, mut n) = ([0.0f64; 3], 0.0);
+    for o in w.entities_near(st.pos, HUDDLE_LOOK as f64, None) {
+        if o == id || animal::tamed(w, o) {
+            continue;
+        }
+        let Some(e) = w.entity(o).filter(|e| Some(e.kind) == kind) else { continue };
+        sum = [sum[0] + e.pos.x, sum[1] + e.pos.y, sum[2] + e.pos.z];
+        n += 1.0;
+    }
+    if n == 0.0 {
+        return false;
+    }
+    let mid = [sum[0] / n, sum[1] / n, sum[2] / n];
+    if dist2(mid, st.pos) <= (HUDDLE * HUDDLE) as f64 {
+        return false;
+    }
+    w.navigate(id, mid, 1.2);
+    weft_sdk::info!("animal {id} huddles back to its herd ({:.1} blocks out)", dist2(mid, st.pos).sqrt());
+    if let Some(u) = w.component_mut(id, &WARY) {
+        *u = now + HUDDLE_WALK;
+    }
     true
 }

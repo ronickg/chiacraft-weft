@@ -50,6 +50,21 @@ pub static TERRAIN_BUSY_NS: Counter = Counter::new();
 /// Distant terrain: tiles made (shown or cached) and asked for then called off.
 pub static LOD_MADE: Counter = Counter::new();
 pub static LOD_CALLED_OFF: Counter = Counter::new();
+/// Distant terrain's work per tile: the CPU-made features' heights (tiles, time), the meshing
+/// (tiles, time) and, for each tile made, the time from asking for it to having it.
+pub static LOD_HEIGHTS: Counter = Counter::new();
+pub static LOD_HEIGHTS_NS: Counter = Counter::new();
+pub static LOD_MESHED: Counter = Counter::new();
+pub static LOD_MESH_NS: Counter = Counter::new();
+pub static LOD_AGE_NS: Counter = Counter::new();
+/// Calls to the dimension's steep faces (`Faces::block`) while meshing tiles, and their time.
+pub static LOD_FACES: Counter = Counter::new();
+pub static LOD_FACES_NS: Counter = Counter::new();
+/// Distant terrain now: tiles wanted, wanted but not made (a coarser tile or nothing shows
+/// there), and asked for.
+pub static LOD_WANTED: AtomicU64 = AtomicU64::new(0);
+pub static LOD_MISSING: AtomicU64 = AtomicU64::new(0);
+pub static LOD_PENDING: AtomicU64 = AtomicU64::new(0);
 
 /// Messages and bytes per message kind: `[0]` to clients, `[1]` to the server.
 static NET: [[(AtomicU64, AtomicU64); 64]; 2] = [const { [const { (AtomicU64::new(0), AtomicU64::new(0)) }; 64] }; 2];
@@ -63,6 +78,22 @@ pub fn net_message(to_server: bool, kind: usize, count: u64, bytes: usize) {
         c.0.fetch_add(count, Ordering::Relaxed);
         c.1.fetch_add(bytes as u64, Ordering::Relaxed);
     }
+}
+
+/// The traffic counted since the last call (with the `net` channel at debug), one way: by message
+/// kind, how many and how many bytes encoded (before compression). For a headless server's stats
+/// line (`dedicated::stats`), where no frame report reads them.
+pub fn take_net(to_server: bool) -> Vec<(&'static str, u64, u64)> {
+    use crate::net::Message;
+    let kinds = if to_server { crate::net::ToServer::KINDS } else { crate::net::ToClient::KINDS };
+    NET[to_server as usize]
+        .iter()
+        .enumerate()
+        .filter_map(|(k, c)| {
+            let (count, bytes) = (c.0.swap(0, Ordering::Relaxed), c.1.swap(0, Ordering::Relaxed));
+            (count + bytes > 0).then(|| (kinds.get(k).copied().unwrap_or("?"), count, bytes))
+        })
+        .collect()
 }
 
 // ---------------------------------------------------------------- allocations
@@ -359,6 +390,7 @@ impl Reporter {
                 format!(" | server {:.2} ms: {}", sh.tick_us.load(Ordering::Relaxed) as f64 / 1000.0, phases.join(", "))
             });
             log::debug!(target: "frame", "{:.0} fps, frame avg {:.2} max {:.2} ms | cpu {} | gpu {}{server}", self.frames as f64 / secs, self.frame_sum / n, self.frame_max, cpu.join(", "), gpu.join(", "));
+            log_parts(n);
         }
         if on(Channel::Net, Level::Debug) {
             for (dir, name) in [(0, "to clients"), (1, "to server")] {
@@ -396,9 +428,22 @@ impl Reporter {
                     busy as f64 / secs / 1e7
                 );
             }
-            let (made, off) = (LOD_MADE.take(), LOD_CALLED_OFF.take());
-            if made + off > 0 {
-                log::debug!(target: "load", "distant terrain per {secs:.1} s: {made} tiles made, {off} called off");
+            let (made, off, age) = (LOD_MADE.take(), LOD_CALLED_OFF.take(), LOD_AGE_NS.take());
+            let (heights, heights_ns, meshed, mesh_ns) = (LOD_HEIGHTS.take(), LOD_HEIGHTS_NS.take(), LOD_MESHED.take(), LOD_MESH_NS.take());
+            let (faces, faces_ns) = (LOD_FACES.take(), LOD_FACES_NS.take());
+            let missing = LOD_MISSING.load(Ordering::Relaxed);
+            if made + off > 0 || missing > 0 {
+                log::debug!(
+                    target: "load",
+                    "distant terrain per {secs:.1} s: {made} tiles made ({:.0} ms from asked to made), {off} called off, {} wanted, {missing} not made yet, {} asked; heights {:.0} us, mesh {:.0} us each, of which {:.0} us in {:.0} face calls",
+                    age as f64 / made.max(1) as f64 / 1e6,
+                    LOD_WANTED.load(Ordering::Relaxed),
+                    LOD_PENDING.load(Ordering::Relaxed),
+                    heights_ns as f64 / heights.max(1) as f64 / 1000.0,
+                    mesh_ns as f64 / meshed.max(1) as f64 / 1000.0,
+                    faces_ns as f64 / meshed.max(1) as f64 / 1000.0,
+                    faces as f64 / meshed.max(1) as f64,
+                );
             }
         }
         if on(Channel::Mesh, Level::Debug) {
@@ -605,6 +650,60 @@ thread_local! {
 
 /// A frame record's step a frame times until it is dropped (`span`); only on the frame thread.
 pub struct Span(&'static str, Instant);
+
+thread_local! {
+    /// The parts of this thread's per-frame work (`part`): (name, ms summed, most in one frame,
+    /// this frame's so far), logged once a second as `update split` (`--log frame=debug`).
+    static PARTS: std::cell::RefCell<Vec<(&'static str, f64, f32, f32)>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Times a part of the frame's update until dropped, summed over a second (`log_parts`). Costs an
+/// `Instant::now` pair; nothing else until the frame channel is on.
+pub struct Part(&'static str, Instant);
+
+pub fn part(name: &'static str) -> Part {
+    Part(name, Instant::now())
+}
+
+impl Drop for Part {
+    fn drop(&mut self) {
+        let ms = self.1.elapsed().as_secs_f32() * 1000.0;
+        PARTS.with(|p| {
+            let mut p = p.borrow_mut();
+            match p.iter_mut().find(|e| e.0 == self.0) {
+                Some(e) => e.3 += ms,
+                None => p.push((self.0, 0.0, 0.0, ms)),
+            }
+        });
+    }
+}
+
+/// Ends a frame for `part`: each part's time this frame goes into its sum and maximum.
+pub fn end_parts() {
+    PARTS.with(|p| {
+        for e in p.borrow_mut().iter_mut() {
+            (e.1, e.2, e.3) = (e.1 + e.3 as f64, e.2.max(e.3), 0.0);
+        }
+    });
+}
+
+/// The parts' average and maximum per frame over `frames` frames, slowest first, and starts again.
+fn log_parts(frames: f64) {
+    let parts = PARTS.with(|p| std::mem::take(&mut *p.borrow_mut()));
+    if parts.is_empty() {
+        return;
+    }
+    let mut parts: Vec<_> = parts
+        .into_iter()
+        .map(|e| (e.0, e.1 / frames.max(1.0), e.2))
+        .collect();
+    parts.sort_by(|a, b| b.1.total_cmp(&a.1));
+    let line: Vec<String> = parts
+        .iter()
+        .map(|(k, avg, max)| format!("{k} {avg:.2} (max {max:.1})"))
+        .collect();
+    log::debug!(target: "frame", "update split ms a frame: {}", line.join(", "));
+}
 
 /// Times a step of recording the frame: a frame whose record took long logs its steps
 /// (`slow_record`). Nested ones ("render/world") are listed too, before the step they are in.

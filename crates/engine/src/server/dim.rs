@@ -51,6 +51,18 @@ pub enum DimEvent {
         biomes: Vec<u32>,
         weather: u16,
     },
+    /// What happens in its sky from now on (`Host::set_sky_event`).
+    SetSkyEvent {
+        dim: u32,
+        kind: u32,
+        strength: f32,
+    },
+    /// Something lands at `pos` in `seconds` (`Host::sky_landing`).
+    SkyLanding {
+        dim: u32,
+        pos: glam::DVec3,
+        seconds: f32,
+    },
     /// The air in its biomes from now on (`DimSet::set_air`).
     SetAir {
         dim: u32,
@@ -2229,7 +2241,8 @@ impl Dim {
                 }
                 let n = rule.group[0] + (self.rng.next() % (rule.group[1] - rule.group[0] + 1) as u64) as u32;
                 // A mod may turn it down (`question::NATURAL_SPAWN`: no food there for them).
-                let mut q = abi::Query { pos: abi::BlockPos { x, y, z }, other: rule.entity as u64, amount: n as f64, ..abi::Query::DEFAULT };
+                let mut q =
+                    abi::Query { pos: abi::BlockPos { x, y, z }, other: rule.entity as u64, amount: n as f64, ..abi::Query::DEFAULT };
                 if !self.ask(c, abi::question::NATURAL_SPAWN, &mut q) {
                     continue;
                 }

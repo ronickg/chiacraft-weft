@@ -194,7 +194,16 @@ fn camera_sides(lo: Vec3) -> [bool; 6] {
 /// rank, see `camera_sides`). The view's draws of the world start at the translucent layer (2): its
 /// opaque and cutout layers are `CubeTable`'s; a structure's, and the sun-shadow passes, all layers
 /// (0), or terrain would cast no shadows (chiacraft).
-fn mesh_draws(m: &GpuMesh, key: MeshKey, lo: Vec3, k: i32, cam_cube: IVec3, seen: [bool; 6], first_layer: usize, out: &mut Vec<DrawRecord>) -> u64 {
+fn mesh_draws(
+    m: &GpuMesh,
+    key: MeshKey,
+    lo: Vec3,
+    k: i32,
+    cam_cube: IVec3,
+    seen: [bool; 6],
+    first_layer: usize,
+    out: &mut Vec<DrawRecord>,
+) -> u64 {
     let rel = if k == 0 { key.1 - cam_cube } else { key.1 };
     let origin = [rel.x, rel.y, rel.z, k];
     let center = lo + Vec3::splat(8.0);
@@ -1635,18 +1644,24 @@ impl WorldRenderer {
             self.table.cull(gpu, early, frame.slot, pipe, vbuf, depths);
         }
         let groups = self.table.groups();
+        let capped = !gpu.indirect_count() && cap_draws();
+        let mut issued = (0u64, 0u64);
         for &(kind, layer, page, id, base, max) in &groups {
             let (pipe, buf) = self.pipe_of(kind, layer, page);
             self.bind_run(list, pipe, buf, self.table.out.as_ref().map_or(obuf, |o| o.origins));
             let Some(o) = self.table.out.as_ref() else { continue };
+            let seen = self.table.seen.get(id as usize).copied().flatten();
+            let draws = if capped { capped_draws(seen, max) } else { max };
+            issued = (issued.0 + draws as u64, issued.1 + max as u64);
             list.push(Cmd::DrawIndexedIndirectCount {
                 buffer: o.draws,
                 offset: base as u64 * 20,
                 count_buffer: self.table.buckets[frame.slot].0,
                 count_offset: id as u64 * 8,
-                max,
+                max: draws,
             });
         }
+        self.table.log_draws(gpu.indirect_count(), capped, issued);
         self.emit(list, 0..self.translucent);
     }
 
@@ -1718,6 +1733,14 @@ struct CubeTable {
     buckets: Vec<(BufferId, u32)>,
     views: Vec<(BufferId, u32)>,
     out: Option<TableOut>,
+    /// Without `drawIndirectCount` (`Backend::indirect_count`): per bucket how many draws the
+    /// culling wrote the last time this frame slot ran, read back before it is reset; `None`
+    /// while unknown (a slot's buffer just made). A draw then issues about that many, not all.
+    seen: Vec<Option<u32>>,
+    /// What the last frame issued and the culling had written: (draws issued, all records,
+    /// written), for the once-a-second log line.
+    issued: (u64, u64, u64, u32),
+    logged: Option<std::time::Instant>,
 }
 
 /// What `cull` writes: draws and where each one's cube is. One of each serves all frames in flight,
@@ -1731,6 +1754,52 @@ struct TableOut {
 /// Direction runs of a cube: as many sides as face a camera outside it, in order.
 const DRAWS_PER_FACES: u32 = 3;
 
+/// How many draw records `cull` may write for buckets with `per_bucket` places: what `TableOut`
+/// holds (at least 1).
+fn records_of(per_bucket: &[u32]) -> u32 {
+    per_bucket
+        .iter()
+        .enumerate()
+        .map(|(id, &n)| n * if id & 2 == 0 { DRAWS_PER_FACES } else { 1 })
+        .sum::<u32>()
+        .max(1)
+}
+
+/// The draw groups of buckets with `per_bucket` places: (kind, layer, page, bucket, first record,
+/// most records), in drawing order. Each one's records are the bucket's share of `records_of`.
+fn groups_of(per_bucket: &[u32]) -> Vec<(u8, u8, u32, u32, u32, u32)> {
+    let mut base = 0;
+    let mut out = Vec::new();
+    for (id, &n) in per_bucket.iter().enumerate() {
+        let id = id as u32;
+        let (page, kind, layer) = (id / 4, (id >> 1 & 1) as u8, (id & 1) as u8);
+        let max = n * if kind == 0 { DRAWS_PER_FACES } else { 1 };
+        if n > 0 {
+            out.push((kind, layer, page, id, base, max));
+        }
+        base += max;
+    }
+    out.sort_by_key(|g| (g.1, g.0, g.2));
+    out
+}
+
+/// Whether a GPU without `drawIndirectCount` draws about as many records as the culling wrote
+/// last time (`capped_draws`), not all of them: on by default, off with `--no-indirect-cap`
+/// (`WEFT_NO_INDIRECT_CAP`), to compare.
+fn cap_draws() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("WEFT_NO_INDIRECT_CAP").is_none())
+}
+
+/// How many of a group's `max` records to draw when the GPU can't read the count: what the
+/// culling wrote the last time this frame slot ran, `seen`, with room for half again as many and
+/// 256 more (turning, or coming nearer to more), all while it isn't known. A record past the count
+/// is zeroed and draws nothing, so drawing more is only slower; drawing fewer would leave cubes
+/// out for a frame, so the room is generous.
+fn capped_draws(seen: Option<u32>, max: u32) -> u32 {
+    seen.map_or(max, |n| n.saturating_add(n / 2).saturating_add(256).min(max))
+}
+
 impl CubeTable {
     fn new(gpu: &mut dyn Backend) -> CubeTable {
         CubeTable {
@@ -1743,6 +1812,9 @@ impl CubeTable {
             buckets: Vec::new(),
             views: Vec::new(),
             out: None,
+            seen: Vec::new(),
+            issued: (0, 0, 0, 0),
+            logged: None,
         }
     }
 
@@ -1856,13 +1928,7 @@ impl CubeTable {
         depths: Option<BufferId>,
     ) {
         self.upload(gpu);
-        let needed: u32 = self
-            .per_bucket
-            .iter()
-            .enumerate()
-            .map(|(id, &n)| n * if id & 2 == 0 { DRAWS_PER_FACES } else { 1 })
-            .sum::<u32>()
-            .max(1);
+        let needed = records_of(&self.per_bucket);
         if self.out.as_ref().is_none_or(|o| o.capacity < needed) {
             if let Some(o) = self.out.take() {
                 gpu.destroy_buffer(o.draws);
@@ -1876,6 +1942,7 @@ impl CubeTable {
             });
         }
         let Some(o) = &self.out else { return };
+        let before = self.buckets.get(slot).map(|b| b.0);
         let buckets = crate::gpu_layout::frame_buffer(
             gpu,
             &mut self.buckets,
@@ -1887,6 +1954,13 @@ impl CubeTable {
         );
         {
             let words: &mut [u32] = bytemuck::cast_slice_mut(gpu.mapped(buckets));
+            // What this slot's culling wrote last time (its frame is done on the GPU by now): a
+            // buffer made just now holds nothing yet.
+            let same = before == Some(buckets);
+            self.seen.resize(self.per_bucket.len(), None);
+            for (id, seen) in self.seen.iter_mut().enumerate() {
+                *seen = same.then(|| words[id * 2]);
+            }
             let mut base = 0;
             for (id, &n) in self.per_bucket.iter().enumerate() {
                 words[id * 2] = 0;
@@ -1896,6 +1970,13 @@ impl CubeTable {
             words[self.per_bucket.len() * 2] = 0;
         }
         use crate::gpu_layout::bind::occlusion as b;
+        if !gpu.indirect_count() {
+            // Its draws then draw every record (`Backend::indirect_count`): the ones the culling
+            // doesn't write this frame have to draw nothing, so all start zeroed. After the last
+            // frame's draws read them.
+            list.push(Cmd::Barrier);
+            list.push(Cmd::FillBuffer { buffer: o.draws, offset: 0, size: o.capacity as u64 * 20, value: 0 });
+        }
         list.push(Cmd::Barrier);
         list.pipeline(pipe);
         list.bind(b::VIEW, view);
@@ -1916,19 +1997,31 @@ impl CubeTable {
     /// The buckets with anything in them, in drawing order, opaque before cutout: kind, layer, page,
     /// bucket, where its draws start and how many it may have.
     fn groups(&self) -> Vec<(u8, u8, u32, u32, u32, u32)> {
-        let mut base = 0;
-        let mut out = Vec::new();
-        for (id, &n) in self.per_bucket.iter().enumerate() {
-            let id = id as u32;
-            let (page, kind, layer) = (id / 4, (id >> 1 & 1) as u8, (id & 1) as u8);
-            let max = n * if kind == 0 { DRAWS_PER_FACES } else { 1 };
-            if n > 0 {
-                out.push((kind, layer, page, id, base, max));
-            }
-            base += max;
+        groups_of(&self.per_bucket)
+    }
+
+    /// Adds a frame's indirect draws, and once a second (`--log frame=debug`) says how many
+    /// records the terrain's draws issued, of all there are and of what the culling wrote.
+    fn log_draws(&mut self, count: bool, capped: bool, (issued, all): (u64, u64)) {
+        let written: u64 = self.seen.iter().map(|s| s.unwrap_or(0) as u64).sum();
+        let t = &mut self.issued;
+        (t.0, t.1, t.2, t.3) = (t.0 + issued, t.1 + all, t.2 + written, t.3 + 1);
+        let now = std::time::Instant::now();
+        let since = *self.logged.get_or_insert(now);
+        if now - since < std::time::Duration::from_secs(1) {
+            return;
         }
-        out.sort_by_key(|g| (g.1, g.0, g.2));
-        out
+        let (i, a, w, n) = std::mem::take(&mut self.issued);
+        let n = n.max(1) as u64;
+        let how = if count {
+            "count from the GPU"
+        } else if capped {
+            "capped at last time's"
+        } else {
+            "every record"
+        };
+        log::debug!(target: "frame", "terrain draws: {} records issued a frame of {}, {} written ({how})", i / n, a / n, w / n);
+        self.logged = Some(now);
     }
 
     fn destroy(&mut self, gpu: &mut dyn Backend) {
@@ -2092,4 +2185,35 @@ fn box_planes(m: Mat4) -> [Vec4; 6] {
     let norm = |p: Vec4| p / p.truncate().length();
     let [a, b, c, d] = frustum_planes(m);
     [a, b, c, d, norm(r(2)), norm(r(3) - r(2))]
+}
+
+#[cfg(test)]
+mod indirect_count_tests {
+    use super::*;
+
+    #[test]
+    fn capped_draws_keep_room_and_stay_in_the_group() {
+        assert_eq!(capped_draws(None, 5000), 5000, "unknown: all");
+        assert_eq!(capped_draws(Some(0), 5000), 256);
+        assert_eq!(capped_draws(Some(1000), 5000), 1756);
+        assert_eq!(capped_draws(Some(4000), 5000), 5000, "never past the group");
+        assert_eq!(capped_draws(Some(u32::MAX), 7), 7);
+    }
+
+    /// Without `drawIndirectCount` every group draws all its records, so each must lie in the
+    /// zeroed `TableOut` (`records_of`) and no two may overlap.
+    #[test]
+    fn every_drawn_record_is_in_the_zeroed_buffer() {
+        for per_bucket in [vec![0], vec![5], vec![3, 0, 7, 2, 0, 0, 9, 1], vec![1; 13]] {
+            let all = records_of(&per_bucket);
+            let mut groups = groups_of(&per_bucket);
+            groups.sort_by_key(|g| g.4);
+            let mut end = 0;
+            for &(.., base, max) in &groups {
+                assert!(base >= end, "{per_bucket:?}: groups overlap");
+                end = base + max;
+                assert!(end <= all, "{per_bucket:?}: a group draws past the buffer ({end} > {all})");
+            }
+        }
+    }
 }

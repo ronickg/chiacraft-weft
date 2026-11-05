@@ -208,6 +208,10 @@ pub struct Shared {
     pub views: parking_lot::RwLock<Vec<(u32, View)>>,
     /// Achievements mods granted this tick (chiacraft, `achievements`): the server signs them.
     pub grants: parking_lot::Mutex<Vec<crate::chiacraft::achievements::Grant>>,
+    /// `weft --server --stats` (a load test, `crates/bots`): every tick's time and its phases in
+    /// microseconds, kept until the stats line takes them (`dedicated::stats`).
+    pub stats: AtomicBool,
+    pub tick_samples: parking_lot::Mutex<Vec<(u32, [u32; 6])>>,
     /// Boxes of cubes tickets keep loaded (dim, lowest, highest cube), for the same.
     pub forced: parking_lot::RwLock<Vec<(u32, IVec3, IVec3)>>,
 }
@@ -819,6 +823,10 @@ impl Server {
         let us = start.elapsed().as_micros() as u64;
         self.shared.tick_us.store(us, Ordering::Relaxed);
         self.shared.tick_max_us.fetch_max(us, Ordering::Relaxed);
+        if self.shared.stats.load(Ordering::Relaxed) {
+            let phases = std::array::from_fn(|i| self.shared.phase_us[i].load(Ordering::Relaxed) as u32);
+            self.shared.tick_samples.lock().push((us as u32, phases));
+        }
     }
 
     /// Whatever a player's or mod's action changed takes effect at once, wherever it reached:
@@ -922,6 +930,8 @@ impl Server {
                     }
                 }
                 DimEvent::SetAir { dim, air, heading } => self.dims[dim as usize].set_air(air, heading),
+                DimEvent::SetSkyEvent { dim, kind, strength } => self.dims[dim as usize].set_sky_event(kind, strength),
+                DimEvent::SkyLanding { dim, pos, seconds } => self.dims[dim as usize].landings.push((pos, seconds)),
                 DimEvent::SetTints { dim, tints } => self.dims[dim as usize].set_tints(tints),
                 DimEvent::SetRain { dim, biomes, weather } => {
                     // Only where weather comes at all.
@@ -1264,12 +1274,12 @@ impl Server {
             .send(ToClient::Edits { dim: to, specs: dims[to as usize].edits.iter().map(|e| e.spec(c)).collect(), all: true });
         p.conn
             .send(ToClient::Time { dim: to, time: dims[to as usize].day_time(), rate: dims[to as usize].day_rate as f32 });
-        p.conn.send(ToClient::Weather {
-            id: dims[to as usize].weather as u32,
-            only: dims[to as usize].rain_here().map(|o| o.to_vec()),
-        });
+        p.conn
+            .send(ToClient::Weather { id: dims[to as usize].weather as u32, only: dims[to as usize].rain_here().map(|o| o.to_vec()) });
         p.conn
             .send(ToClient::Air { air: dims[to as usize].air.0.clone(), heading: dims[to as usize].air.1 });
+        let (kind, strength) = dims[to as usize].sky_event;
+        p.conn.send(ToClient::SkyEvent { kind, strength });
         if to == c.void_dim && from != to as usize {
             p.conn
                 .send(ToClient::Show(crate::net::Shown::chat(void_note(c))));

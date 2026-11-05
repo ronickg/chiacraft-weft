@@ -44,7 +44,7 @@ pub fn register(r: &mut Registry) {
     for c in CROPS.iter().filter(|c| c.block != "base:wheat") {
         if vitals::food::find(c.seed).is_none() {
             r.item(Item::generated(short(c.seed).into()))
-                .places(&Block::generated(short(c.block).into()))
+                .places(Block::generated(short(c.block).into()))
                 .tag(&format!("crops/{}", short(c.seed)))
                 .tab(&crate::tabs::NATURAL);
         }

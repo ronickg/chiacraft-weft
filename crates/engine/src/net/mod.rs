@@ -380,6 +380,11 @@ messages! {
         /// snow lying 0..1, `air_flags`), and where the wind blows to, degrees clockwise from
         /// north (-z).
         Air { air: Vec<(u32, f32, f32, f32, u32)>, heading: f32 },
+        /// What happens in the dimension's sky (`weft_abi::sky_event`, a mod's `set_sky_event`,
+        /// chiacraft) and how strongly, 0 to 1.
+        SkyEvent { kind: u32, strength: f32 },
+        /// Something lands at `pos` in `seconds` (a mod's `sky_landing`, chiacraft).
+        SkyLanding { pos: DVec3, seconds: f32 },
         /// Every biome's tint colors (a mod's, `set_biome_tints`): biome by biome, one 0xRRGGBB
         /// per tint kind; empty for the content's.
         Tints { tints: Vec<u32> },

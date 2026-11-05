@@ -25,7 +25,7 @@ pub fn comfort_of(state: u32) -> u32 {
         "base:wool" | "base:hay_bale" => 16,
         "base:dandelion" | "base:rose" => 32,
         // A torch is a light, not a fire.
-        "base:glowstone" | "base:redstone_lamp" | "base:golden_lamp" | "base:torch" | "base:wall_torch" => 64,
+        "base:glowstone" | "base:redstone_lamp" | "base:golden_lamp" | "base:copper_lamp" | "base:torch" | "base:wall_torch" => 64,
         "base:bookshelf" => 128,
         _ => 0,
     }

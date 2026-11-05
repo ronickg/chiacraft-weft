@@ -944,9 +944,23 @@ vanilla's boxes. A long animal's head and tail still stick out of its box (one b
 a 9-block body). The bigger boxes need wider gaps to walk through, and the engine's path search
 led every walker one cell wide, so the big animals jammed between trunks (PC run aw_walk:
 cedarosaurs 0-6 blocks in 5 minutes against 5-14 with the old boxes); it now needs room across a
-body's whole footprint (`notes/ENGINE_CHANGES.md`, section 1). The sauropod's box stops at 5.5
+body's whole footprint (`notes/ENGINE_CHANGES.md`, section 1). The sauropod keeps to the open
+floodplain (its fern forest share 0.5 to 0.2, Planner's pick of option (a), 11-05): at 4.5 wide
+it stood still among the trunks. The sauropod's box stops at 5.5
 blocks (`bodies::LOW`): its neck reaches 8.6, above any reach from the ground, and a box that tall
 found no room under the fern forest's crowns.
+
+**Stocking by biome** (2026-11-05, with Plants; Ronald picked real grazing levels: herds eat 25-50%
+of what their grass grows back). A biome holds plant eaters as real grazer densities go: open
+grassland heavily, deep forest and the giant groves lightly (`STOCKING`: savanna 2.5, plains 1.4,
+forest 1, swamp 0.9, birch forest 0.55, taiga 0.35, mountains 0.26, sequoia grove 0.09; the
+Cretaceous 1). A plant eater's crowd there is its crowd times that, never under a pair
+(`Species::crowd_in`), and everything that weighs the crowd reads it at the animal's own biome:
+natural spawning's room, wild breeding, dying of want, the food webs' grazing. So a stocked
+savanna holds 40 capybaras where it held 16, and they don't starve back down. With Plants' grass
+feeding as real grass does (a tuft feeds 2, not 10), every grazed biome lands about a third. The
+savanna is held at 2.5 (3.5 would match the rest) until it has a heavy grazer, which eats as much
+with fewer animals.
 
 **Far animals keep time** (2026-11-05). With the engine's activation ranges an animal no player
 is within 48 blocks of rests, ticking only every `core:inactive_entity_interval` ticks (20). Its
@@ -1187,3 +1201,65 @@ Ronald: seasons tied in with mating and breeding; each species breeds in its rea
 - The animal screen says when its kind breeds and whether it's that season now; SPECIES.md has a
   "breeds in" row.
 - Not yet: the website's simulator (`web/`) breeds without seasons.
+
+## On a blood moon (2026-11-04)
+
+From Research round 17's addendum (Ronald: "Yes, as designed"). The numbers live in `animals_core::sky`. Totality runs 22:00-02:00 (`vitals::events`), and while it lasts:
+- **Prey watch half again as far** for hunters (`hunt::wary`, `BLOOD_MOON_WATCH` 1.5).
+- **Herds bunch up.** A herd animal on the ground (`Social::Herd`, from `wild.rs` and the capybara; a flock's wariness takes off, so birds don't) more than 4 blocks from the middle of its herd (looking 24 blocks around) walks back to it (`hunt::huddle`).
+- **Wild grey wolves howl once** in the first half hour of totality, using their ambient call. A pack's howls spread over a few seconds (`voices::howl_at_blood_moon`).
+
+This applies on every difficulty: on gentle the blood moon brings no monsters, but the animals still feel it. Coyotes don't howl at it yet.
+## Capybaras in a savanna winter (2026-11-05)
+
+Plants' herd run (`herd_sav_wi`: six capybaras at 10% food in a winter savanna) lost three of them from its counts within ten minutes. `aw_capy_winter` repeated it with every death logged (`breeding.rs`: species, id, cause, place) and found no winter deaths:
+- **One death, from the spawn:** the script places it at y 94 over ground at 72, so it died of the 22-block fall.
+- **The others were alive:** the census and entity lines count only within 48 blocks. The testkit's full entity list still held all five at 13 minutes, foraging farther out at 74-85% strength.
+
+Herd scripts should spawn on the ground and count a wider ring, or list every entity.
+
+## The field journal (2026-11-05)
+
+Ronald asked for "a dossier" on every animal. He picked a picture with basics and survival facts, unlocked by discovery, in an inventory tab.
+
+A species' page opens when the player sees one up close (within 8 blocks with no opaque block between), looks at it through the spyglass, or opens its screen. The client then gets a toast message. What the player does with it then fills in more:
+- **Seen:** Latin name, family, weight, biomes, active hours, diet and foods, temper, and group size.
+- **Hunted:** its drops (meat and hide).
+- **Tamed or ridden:** how it's tamed and with what foods, whether it can be ridden, and how fast.
+- **Bred:** breeding seasons, young (born or hatched), gestation or incubation, litter size, growth time, and lifespan.
+
+Every fact is read from the species' own rows (`animals_core::journal::facts`), so the journal says what the game does. Active hours are a new researched field, `Species::active`: Velociraptor at night and Protoceratops at any hour (from their scleral rings, Schmitz & Motani 2011), reindeer at any hour (van Oort et al. 2005), deer and wolves at dawn and dusk. The deeds are saved with the player (`journal::JOURNAL`). Creative reads every page. The screen is UI's (`journal_screen.rs`, with its inventory tab and the key I), and it reads `journal::entries(view)`. Each fact names its section on the page: the header, the chips, where it lives, or the survival rows.
+
+## Nests for the birds (2026-11-05)
+
+Birds now lay eggs in nests. Before this, their young came out as fledglings after the eggs' time, with no eggs at all (a gestation tune). Each bird builds its nest at its kind of site (`animals_core::nests::SITES`):
+- **Treetops:** the raven, the house sparrow, the great horned owl (which takes old nests in trees), the savanna hawk, and Confuciusornis (estimated).
+- **A high bare ledge, or failing that a treetop:** the golden eagle.
+- **The ground:** the snow bunting (crevices), the snowy owl (a scrape on a mound), the turkey vulture (a cave floor), the herring gull, and Gobipteryx (its eggs were found half buried in sand).
+
+When she lays (`eggs::lay_in_nest`), she looks 12 blocks around her for the highest open leaves or ledge, and uses the ground under her if there's none. A bird's nest is brooded (`life::egg_air_of`): its eggs are held at a sitting parent's 37 °C whatever the air, so a snowy owl's clutch hatches in the tundra. Before, a nest only pulled the air 60% of the way toward 37 °C. The young hatch in the nest.
+
+Not yet: a parent seen sitting on the nest, and egg eaters raiding wild nests.
+
+## Fish breed (2026-11-05)
+
+Fish now breed in their seasons; before, only the spawner made more. The seasons (researched, or estimated where only their relatives' are known):
+- **Brown trout:** autumn and early winter, on gravel in cold water, most in autumn.
+- **Pacu:** the wet season, as the rains begin.
+- **The Cretaceous's lungfish (Est.) and Lycoptera (Est.):** spring and summer.
+
+A fish in love swims to a mate of its kind within 24 blocks (`fish::court`, steering its swim; walking pathfinding doesn't work in water). When they meet, the female spawns.
+
+No egg entity is used. An egg only develops in 25-40 °C air, which suits a nest, not a trout stream. Instead the female carries her eggs' time (`life::carrying`), then her fry come out beside her. Lycoptera's eggs' time is paced up to 0.46 d so a line still takes ten days to four generations. The spawner still tops up what breeding doesn't fill.
+
+## Carcasses for the vulture (2026-11-05)
+
+The turkey vulture never ate before. A wild animal gets hungry only if it's a plant eater or a hunter with prey at home, and a vulture (95% carrion) is neither. Rotten flesh was left alone too, as poisonous. Now a scavenger (`Species::scavenges`: carrion is half its diet or more) works like this:
+- **Hunger:** it gets hungry in the wild.
+- **Smell:** hungry, it smells carrion within 64 blocks, even under a forest canopy, as turkey vultures do (Houston 1986), flies there (`birds::scent`), lands and eats.
+- **Food:** carcass pieces, a kill's meat (carrion to it), and rotten flesh, which a vulture's stomach acid makes safe.
+- **Survival:** it fasts instead of starving and gets its water from its food, so a world with patchy carrion doesn't wipe it out.
+
+Every one of our species of a kilogram or more that gives no meat leaves carcass pieces when it dies (`animals_core::meat::carcass`). Each piece is half a kilogram of carrion, and it leaves as many as its meat would be portions. For example, a wolf leaves fur plus 2-3 pieces. The carcass's icon is rotten flesh's until Art draws one.
+
+Items on the ground vanish after five minutes, so a vulture must arrive in time. Carcasses don't rot on the ground yet.

@@ -97,7 +97,7 @@ pub fn merge_effects() -> bool {
 /// The `pack.cfg` the options were read from, when it was written, and the names in it.
 type OptionsRead = Option<(PathBuf, Option<std::time::SystemTime>, Vec<String>)>;
 
-/// The settings the chosen pack reads (`options = a, b, ...` in its `pack.cfg`, at most 16):
+/// The settings the chosen pack reads (`options = a, b, ...` in its `pack.cfg`, at most 32):
 /// their values reach every pack shader as `scene.options` (`Client::scene`), in that order, so a
 /// pack's look can be tuned in the game's settings and swept with `--config` without editing
 /// shaders. Read again when the file changes.
@@ -123,7 +123,7 @@ pub fn pack_options() -> Vec<String> {
                 .collect::<Vec<_>>()
         })
         .filter(|n| !n.is_empty())
-        .take(16)
+        .take(32)
         .collect();
     *CACHE.write().unwrap() = Some((dir, stamp, names.clone()));
     names

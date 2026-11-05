@@ -45,6 +45,7 @@ pub fn init(r: &mut Registry) {
         .goals(
             Goals::new()
                 .then(crate::animal::upkeep(index))
+                .then(crate::voices::howl_at_blood_moon)
                 .then(crate::taming::behave(index))
                 .then(crate::hunt::wary)
                 .then(crate::hunt::hunt)

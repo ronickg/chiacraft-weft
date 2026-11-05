@@ -607,6 +607,10 @@ pub mod comp {
     /// Entity kinds and worn items: the liquids sprinting swims in (`str`, names and `#tags`
     /// apart by spaces); a worn item's add to its wearer's.
     pub const SWIMS_IN: &str = "swims_in";
+    /// Entity kinds (`f32`): how much bigger than they'd be held items are drawn in its own
+    /// first-person hand, about where they're held (1, or none: as held; a game whose items read
+    /// small in the view turns it up).
+    pub const FIRST_PERSON_HELD_SCALE: &str = "first_person_held_scale";
 }
 
 /// Harvest levels (`tool_level` of a tool, `harvest_level` of a block) of the vanilla tiers.
@@ -619,6 +623,20 @@ pub mod tool_tier {
 }
 
 // ---------------------------------------------------------------- content descriptors
+
+/// What happens in a dimension's sky (`Host::set_sky_event`), for shader packs (chiacraft's sky
+/// events: `vitals::events`).
+pub mod sky_event {
+    pub const NONE: u32 = 0;
+    /// The moon reddens, the night darkens; strength 1 in totality.
+    pub const BLOOD_MOON: u32 = 1;
+    /// A meteor shower; strength its rate (1 at the peak).
+    pub const METEORS: u32 = 2;
+    /// A fireball or a big impact on its way (with `Host::sky_landing`), by day too.
+    pub const FIREBALL: u32 = 3;
+    /// An aurora storm: brighter, further south, other colours.
+    pub const AURORA_STORM: u32 = 4;
+}
 
 /// What falls and blows in a biome's air (`Host::set_air`).
 pub mod air_flags {
@@ -3608,6 +3626,13 @@ pub struct Host {
     /// How fast this dimension's time of day runs: 1 the usual, 0.5 a day twice as long, 0 the
     /// sky still. Players' clocks run at the same pace; what waits on ticks keeps its own.
     pub set_day_rate: unsafe extern "C" fn(world: *mut WorldCtx, rate: f32),
+    /// chiacraft: what happens in this dimension's sky now (`sky_event`, `NONE` for nothing) and how
+    /// strongly (0 to 1), until the next call: for the players' shader packs (`scene.sky_event`).
+    /// Players hear only of a change.
+    pub set_sky_event: unsafe extern "C" fn(world: *mut WorldCtx, kind: u32, strength: f32),
+    /// chiacraft: something falls from the sky to land at `pos` (blocks) in `seconds`, for the
+    /// players' shader packs (`scene.sky_landing`): a meteorite's streak heading there.
+    pub sky_landing: unsafe extern "C" fn(world: *mut WorldCtx, pos: *const [f64; 3], seconds: f32),
 }
 
 /// Natural spawning around players (`Host::reg_spawn`). Every two seconds the engine tries a few

@@ -88,7 +88,8 @@ static WHISTLES: [(Key, &str); 5] = [
     (Key::named("whistle_follow"), "J"),
     (Key::named("whistle_stay"), "K"),
     (Key::named("whistle_come"), "H"),
-    (Key::named("whistle_attack"), "G"),
+    // Not G: Weft's swap hands took it in the 26.11.2 sync.
+    (Key::named("whistle_attack"), "Y"),
     (Key::named("whistle_passive"), "B"),
 ];
 

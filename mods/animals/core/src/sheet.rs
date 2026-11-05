@@ -124,8 +124,10 @@ fn web(w: &mut String) {
         "Each biome's web, from the species' habitats and diets and the world's plant food (`core/src/web.rs`). \
          Plant food is how much of any plant eater's food grows or is found there in each season, against fresh growth \
          at its best (`vitals::forage`); the farm animals' wild kinds graze every overworld land biome. Grazing: in \
-         the best season for grass, what its grazers eat a day (as many of each as live together, `crowd`, by how \
-         common there) against what its tall grass grows back within the crowd's radius.\n"
+         the best season for grass, what its grazers eat a day (as many of each as live together, `crowd_in`, the \
+         biome's stocking) against what its tall grass grows back within the crowd's radius, real grazing's quarter \
+         to half (`vitals::forage::GRAZED`, checked), and the most of that ground their dung pats cover at once \
+         (`vitals::soil`), in the season they lie longest.\n"
     );
     let _ =
         writeln!(w, "| Biome | Plant food (spring, summer, autumn, winter) | Grazing (best season) | Plant eaters | Hunters | Carrion |");
@@ -143,7 +145,12 @@ fn web(w: &mut String) {
             .map(|i| format!("{:.0}%", 100.0 * crate::web::food_in(Category::plant, biome, i)))
             .collect();
         let grazing = crate::web::grazing(biome).map_or("-".to_string(), |g| {
-            format!("{}: eaten {:.0}% of the regrowth", crate::web::SEASONS[g.season], 100.0 * g.eaten / g.regrown.max(1e-6))
+            format!(
+                "{}: eaten {:.0}% of the regrowth; dung pats {:.2}% of the ground",
+                crate::web::SEASONS[g.season],
+                100.0 * g.eaten / g.regrown.max(1e-6),
+                100.0 * g.pat_cover
+            )
         });
         let _ = writeln!(
             w,
@@ -259,6 +266,9 @@ fn species(w: &mut String, s: &Species) {
     let _ = writeln!(w, "| mass | {} kg | |", b.mass);
     if b.gestation > 0.0 || s.gestation() > 0 {
         let _ = writeln!(w, "| carries her young | {} | {}{} |", real(b.gestation), days(s.gestation()), set(t.gestation.is_some()));
+    } else if s.in_water() {
+        let _ = writeln!(w, "| spawns | | in the water when mated; the fry come by her after the eggs' time |");
+        let _ = writeln!(w, "| eggs hatch in | {} | {}{} |", real(b.incubation), days(s.incubation()), set(t.incubation.is_some()));
     } else {
         let _ = writeln!(w, "| lays | | {} after mating |", days(life::LAYING));
         let _ = writeln!(w, "| eggs hatch in | {} | {}{} |", real(b.incubation), days(s.incubation()), set(t.incubation.is_some()));
@@ -346,6 +356,23 @@ fn species(w: &mut String, s: &Species) {
         _ => String::new(),
     };
     let _ = writeln!(w, "| a meal that fills it | {} kg{kills} |", trim((s.bio.mass * needs::MEAL) as f64, 3));
+    // A hunter's room by its prey (`needs::hunter_room`): as many as a share of their young feed.
+    if s.hunts() {
+        let rooms: Vec<String> = s
+            .habitats
+            .iter()
+            .filter(|&&(b, _)| needs::hunter_room(s, b).is_some())
+            .map(|&(b, _)| format!("{} {}", b.split(':').nth(1).unwrap_or(b), s.crowd_in(b)))
+            .collect();
+        if !rooms.is_empty() {
+            let _ = writeln!(
+                w,
+                "| room by its prey | {} (as many as {}% of their young a year feed, at most its crowd) |",
+                rooms.join(", "),
+                trim((needs::HUNT_SHARE * 100.0) as f64, 0)
+            );
+        }
+    }
     // Water (`needs::drink_lasts`): how much it drinks of what it needs, and how long a drink lasts.
     let need = needs::litres_a_day(s, s.bio.mass);
     let drinks = match needs::drink_lasts(s, s.bio.mass) {

@@ -1260,7 +1260,6 @@ impl Content {
     pub fn source_of(&self, l: u16) -> u32 {
         self.liquids[l as usize].first_state
     }
-
 }
 
 // ---------------------------------------------------------------- registration side
@@ -2677,7 +2676,7 @@ fn number_blocks(mods: &[ModMeta], blocks: Vec<(ModId, RawBlock)>, textures: &mu
                 drag: 1.0,
                 conductor: false,
                 liquid: None,
-                        support: None,
+                support: None,
                 support_near: None,
                 spread: None,
                 smother: None,

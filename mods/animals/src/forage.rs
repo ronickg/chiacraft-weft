@@ -34,6 +34,9 @@ static FORAGE: Component<[f64; 4]> = Component::named("animal_forage");
 static ITEM: Component<u64> = Component::named("animal_forage_item");
 static GRAZED_GRASS: Block = Block::named("base:grazed_grass");
 static DUNG: Item = Item::named("base:dung");
+static DUNG_PAT: Block = Block::named("base:dung_pat");
+static TALL_GRASS: Block = Block::named("base:tall_grass");
+static PLANT_SOIL: Tag = Tag::named("plant_soil");
 
 /// Blocks it looks round, and up and down.
 const LOOK: i32 = 8;
@@ -46,9 +49,6 @@ use animals_core::needs::{FULL, HUNGRY};
 const CHEW: f64 = 30.0;
 const WALK: f64 = 160.0;
 const NOTHING: f64 = 300.0;
-/// A grazer leaves dung after about this many mouthfuls (`vitals::soil`: it feeds farmland and
-/// compost).
-const MOUTHFULS_A_DUNG: u32 = 6;
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&FORAGE, [0.0; 4], 0);
@@ -69,8 +69,9 @@ pub fn init(r: &mut Registry) {
         let w = q.world();
         let coming = q.query().amount.max(1.0) as u32;
         let near = kind_near(&w, s, q.pos().to_array());
-        if !animals_core::life::room_for(near, coming, s.crowd()) {
-            weft_sdk::info!("no room for {coming} {} at {:?}: {near:.1} near, room for {}", s.name, q.pos(), s.crowd());
+        let crowd = crate::species::crowd_at(&w, s, q.pos());
+        if !animals_core::life::room_for(near, coming, crowd) {
+            weft_sdk::info!("no room for {coming} {} at {:?}: {near:.1} near, room for {crowd}", s.name, q.pos());
             return Verdict::Deny;
         }
         if !s.forages_wild() {
@@ -204,7 +205,10 @@ fn edible(w: &World, s: &animals_core::species::Species, id: u64) -> Option<f32>
     let food = vitals::food::FOODS.iter().find(|f| f.name == name);
     // A poisonous one (a fly agaric, a spider's eye) it leaves where it lies, and salted meat,
     // too salty for an animal; dried and smoked meat a meat eater takes as it raids a camp (C6).
-    if food.is_some_and(|f| f.poison > 0.0) || name == "base:salted_meat" {
+    // A scavenger's stomach takes rotten flesh (a vulture's acid kills what's in it).
+    if food.is_some_and(|f| f.poison > 0.0 && !(s.scavenges() && f.category == vitals::food::Category::Carrion))
+        || name == "base:salted_meat"
+    {
         return None;
     }
     let spoiled = food.is_some_and(|f| {
@@ -212,6 +216,8 @@ fn edible(w: &World, s: &animals_core::species::Species, id: u64) -> Option<f32>
         vitals::food::freshness(f, age, base_api::difficulty().keep) == vitals::food::Freshness::Spoiled
     });
     let (c, grams) = vitals::forage::dropped(name, spoiled)?;
+    // To a scavenger a kill's meat lying there is carrion.
+    let c = if s.scavenges() && c == vitals::food::Category::Meat { vitals::food::Category::Carrion } else { c };
     // Kibble is every species' (`taming.rs`), though the food table files it as meat (C6); a
     // carcass gone off is the insects' as well, its beetles and grubs an insect eater's (the
     // Djadokhta's bones are bored by them), a share of it.
@@ -254,6 +260,9 @@ fn eat_item(w: &World, id: u64, a: &animal::Animal, item: u64, grams: f32) {
         name_of(abi::entry_kind::ITEM, stack.item),
         a.food.saturating_add(points).min(max as u16)
     );
+    if a.species().is_some_and(|s| s.scavenges()) {
+        weft_sdk::info!("scavenger {id} eats {} ({grams} g)", name_of(abi::entry_kind::ITEM, stack.item));
+    }
 }
 
 /// A goal: thirsty, it drinks first (`drink::drink`); hungry, it goes to the nearest food of its
@@ -334,8 +343,8 @@ pub fn forage(w: &World, id: u64, st: &EntityState) -> bool {
                 }
                 Eaten::Stays => {}
             }
-            if w.random_below(MOUTHFULS_A_DUNG) == 0 {
-                w.spawn_item(st.pos, ItemStack::new(DUNG.id(), 1));
+            if w.random_below(vitals::soil::MOUTHFULS_A_PAT) == 0 {
+                drop_pat(w, st.pos);
             }
             f[3] = now + CHEW;
             w.component_mut(id, &FORAGE).map(|c| *c = f);
@@ -368,5 +377,22 @@ fn becomes(name: &str) -> Option<u32> {
     match name {
         "base:grazed_grass" => Some(GRAZED_GRASS.id()),
         _ => None,
+    }
+}
+
+/// A grazer's dung (`vitals::soil`): a pat where it stands on the ground (on the soil, in the air
+/// or the grass there), none within `PAT_SPACING` of another; off the soil, the dung as an item.
+fn drop_pat(w: &World, pos: Vec3) {
+    let [x, y, z] = pos.block().to_array();
+    let feet = w.block([x, y, z]);
+    let open = feet == 0 || TALL_GRASS.is(feet) || GRAZED_GRASS.is(feet);
+    if !(open && PLANT_SOIL.on_block(w.block([x, y - 1, z]))) {
+        w.spawn_item(pos, ItemStack::new(DUNG.id(), 1));
+        return;
+    }
+    let r = vitals::soil::PAT_SPACING;
+    let crowded = (-1..=1).any(|dy| (-r..=r).any(|dz| (-r..=r).any(|dx| DUNG_PAT.is(w.block([x + dx, y + dy, z + dz])))));
+    if !crowded {
+        w.set_block([x, y, z], DUNG_PAT.id());
     }
 }

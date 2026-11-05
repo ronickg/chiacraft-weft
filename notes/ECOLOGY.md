@@ -730,6 +730,29 @@ and cactus.**
   - **Carcasses of our own species:** a kill's drops are eaten off the ground now (food off the
     ground, part 5), but the wild species drop nothing yet: a carcass item for them is to come.
   - **Not seen:** prey running from a hunter.
+- **Hunters' room by their prey (2026-11-05):** a hunter's crowd in a biome is as many as its
+  prey there can feed (`needs::hunter_room`): one hunter takes the meat share of its food a day,
+  shared among its prey by biomass, a kill filling it by the prey's mass; its room is how many
+  take at most `HUNT_SHARE` (30%) of each prey's young a year, at most its own crowd, at least one.
+  Natural spawning and wild breeding read it through `Species::crowd_in`, so wolves have room for
+  1 in the taiga (its reindeer stocked at 0.35) and 4 on the plains, jaguars 10 of 12 on the
+  stocked savanna. A group that comes to an empty place lives, but doesn't breed up past its
+  room (it dies of want only past its biggest group).
+  - **The check** (`places.rs`, `hunters_never_eat_their_prey_out`; `web::predation`, the
+    `predation` example): in every biome, all its hunters at their room take at most the young
+    their prey have a year. Before the room, wolves took 6.5 times the taiga's reindeer young and
+    Citipati twice the red dunes' Kryptobaatar's; now the most is 92% (the plains' great horned
+    owls, prey of six hunters).
+  - **Grazing** (Plants' 25-50%, `web::grazing`) stays counted at the grazers' full stocked
+    crowds, the worst case: hunters only take the herds' increase.
+  - **Seen on the PC** (aw_hunters, aw_hunters2): a taiga wolf has room for 1 and a second is
+    turned away; three jaguars on the stocked savanna live under their room with no want
+    deaths, and the capybara herd breeds on through a sprinted game day. Not seen there: a kill
+    (the jaguars came young or stayed fed, and the spot's hills buried some spawns).
+  - **Later** (paused for the performance push, 11-05): a look that shows kills over game days
+    (grown, hungry jaguars on flat open ground); kill pacing against real hunters' (a big cat
+    every 4-7 days; ours hunt about every 1.3 game days at full hunger); a heavy savanna grazer
+    (Plants' grazing plan); hunting players (a decision).
 
 
 - **What a hunter takes:** each species' own prey-size range, from its research. Hunters under
@@ -770,7 +793,7 @@ and cactus.**
 - **Not yet:**
   - **Standing water:** capacity ignores it, so a swamp feeds more in its dry season than the
     number says;
-  - **Hunters:** their capacity comes with their prey;
+  - **Hunters:** built 2026-11-05, below (part 6, "Hunters' room by their prey");
   - **Young without mothers:** young aren't spawned with a mother; they come in their groups.
 
 
@@ -794,14 +817,23 @@ and cactus.**
 ### 8. Death, dung and rot
 
 **Built in part (2026-11-03).**
-- **Dung:** grazers leave dung about every sixth mouthful (`forage.rs`).
+- **Dung pats** (2026-11-05, `vitals::soil`, `base:dung_pat`): a grazer drops a pat where it
+  stands on the soil every 100 mouthfuls (`MOUTHFULS_A_PAT`; 20 when a tuft fed 10), never within 2 blocks of another
+  (off the soil, the dung as an item). A pat rots by the plant rule, 45 real days at 20-30 °C
+  and wet (dung beetles, fungi): about 16-25 minutes in a warm wet season, longer dry or cold,
+  never past 3 game days (`PAT_MOST_DAYS`, frost and hooves), and leaves a tuft of fresh grass.
+  While it lies, grazed grass within 2 blocks grows back twice as fast. Broken, it gives the dung
+  (compost, farmland). A block is far bigger than a real pat, so they are rarer than droppings:
+  at most 0.7% of a herd's ground at once in any biome (`animals_core::web`, the "carpeted in
+  dung" check; the species sheet's grazing column), as in a grazed pasture.
 - **The compost bin** (`base:compost_bin`, crafted from planks) takes spoiled food of any kind,
   dung, rotten flesh, leaves, saplings, wheat and seeds (`vitals::soil::COMPOSTS`). Full, it
   rots into compost in about 23 minutes, the weeks hot compost takes, at the growing pace.
 - **Carcasses:** a kill's drops stay where it fell.
 - **Seen in the game:** the bin filling, its top turning to dirt.
 - **Not yet:**
-  - food and carcasses on the ground rotting away;
+  - food and carcasses on the ground rotting away: the engine clears every item after 5
+    minutes (`ITEM_LIFETIME`), so this needs a per-item lifetime in the engine first (Upstream);
   - scavengers eat food and carrion off the ground (part 5), but our species leave no carcass yet;
   - the generated art for dung, compost and the bin (placeholders now, `notes/STYLE.md`).
 
@@ -888,10 +920,13 @@ The world's food (`vitals::forage::SOURCES`) gained winter's standing hay, decid
 fallen mast, lichen (the tundra's and taiga's ground, the mountains' rocks), fungi, roots dug
 from the ground, insects in the grass, sand and the north's summer, and reeds and horsetails as
 water plants. A year holds too (`web::grazing`): in each biome's best season for grass, its
-grazers, as many of each as live together, eat at most 18% of what its tall grass grows back (the
-mountains; the plains 3%): nothing grazes a biome bare. That is far under what real grazers take
-of a grassland (a quarter to a half), so tall grass rarely looks grazed down but round a herd; a
-choice for later. The grass cover is now `vitals::forage::GRASS_COVER`, which the world reads.
+grazers eat a quarter to a half of what its tall grass grows back, as real grazers take of a
+grassland (Ronald 11-05, "Real levels, 25-50%"; `vitals::forage::GRAZED`, checked both ways:
+"hardly grazed" under, "grazed bare" over). Two levers got there: Animals' stocking per biome
+(`Species::crowd_in`, the savanna 2.5 to the sequoia grove 0.09) and a smaller mouthful, a tuft
+of tall grass feeding 2, not 10 (`vitals::forage::SOURCES`), so a grazer crops five tufts for what
+it ate of one. The best seasons now land at 28% (the savanna) to 48% (the sequoia grove), the rest
+34-37%. The grass cover is `vitals::forage::GRASS_COVER`, which the world reads.
 
 These are like `places.rs`: they read the tables, so a new biome, plant or species is checked
 the moment it's added.

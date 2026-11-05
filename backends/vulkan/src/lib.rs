@@ -153,6 +153,12 @@ pub struct VulkanBackend {
     capture_requested: bool,
     capture: Option<(vk::Buffer, Allocation, u32, u32, vk::Format)>,
     device_name: String,
+    /// `Backend::device_class` and `device_memory_mb`.
+    device_class: u32,
+    device_memory_mb: u64,
+    /// The device takes indirect draws' counts from a buffer (`drawIndirectCount`). MoltenVK
+    /// doesn't: then a count draw draws all its records (`Backend::indirect_count`).
+    indirect_count: bool,
     queries: vk::QueryPool,
     /// Pipelines compiled before, kept on disk between starts (`load_pipeline_cache`).
     pipeline_cache: vk::PipelineCache,
@@ -356,6 +362,20 @@ impl VulkanBackend {
                 .device_name_as_c_str()
                 .map(|s| s.to_string_lossy().into_owned())
                 .unwrap_or_default();
+            let device_class = match props.device_type {
+                vk::PhysicalDeviceType::INTEGRATED_GPU => 1,
+                vk::PhysicalDeviceType::DISCRETE_GPU => 2,
+                vk::PhysicalDeviceType::VIRTUAL_GPU | vk::PhysicalDeviceType::CPU => 3,
+                _ => 0,
+            };
+            let memory = instance.get_physical_device_memory_properties(pdev);
+            let device_memory_mb = memory.memory_heaps[..memory.memory_heap_count as usize]
+                .iter()
+                .filter(|h| h.flags.contains(vk::MemoryHeapFlags::DEVICE_LOCAL))
+                .map(|h| h.size)
+                .max()
+                .unwrap_or(0)
+                / (1024 * 1024);
             let mut indexing = vk::PhysicalDeviceDescriptorIndexingProperties::default();
             let mut driver = vk::PhysicalDeviceDriverProperties::default();
             let mut props2 = vk::PhysicalDeviceProperties2::default()
@@ -392,7 +412,6 @@ impl VulkanBackend {
             let base = has.features;
             let missing: Vec<&str> = [
                 ("multiDrawIndirect", base.multi_draw_indirect),
-                ("drawIndirectCount", has12.draw_indirect_count),
                 ("drawIndirectFirstInstance", base.draw_indirect_first_instance),
                 ("samplerAnisotropy", base.sampler_anisotropy),
                 ("fillModeNonSolid", base.fill_mode_non_solid),
@@ -414,6 +433,12 @@ impl VulkanBackend {
             if !missing.is_empty() {
                 return Err(Error(format!("{device_name} lacks what the game needs: {}", missing.join(", "))));
             }
+            // Optional: without it the count draws draw all their records (MoltenVK has none).
+            // `WEFT_NO_INDIRECT_COUNT=1` does without it on any GPU, to check that path.
+            let indirect_count = has12.draw_indirect_count != vk::FALSE && std::env::var_os("WEFT_NO_INDIRECT_COUNT").is_none();
+            if !indirect_count {
+                log::info!("{device_name}: no drawIndirectCount, indirect count draws draw every record");
+            }
 
             let features = vk::PhysicalDeviceFeatures::default()
                 .multi_draw_indirect(true)
@@ -428,8 +453,8 @@ impl VulkanBackend {
                 .descriptor_binding_partially_bound(true)
                 .descriptor_binding_sampled_image_update_after_bind(true)
                 .shader_sampled_image_array_non_uniform_indexing(true)
-                // Metal has no such draw, and nothing needs it yet.
-                .draw_indirect_count(has12.draw_indirect_count != vk::FALSE)
+                // Metal has no such draw: `indirect_count`.
+                .draw_indirect_count(indirect_count)
                 .scalar_block_layout(true);
             let mut f13 = vk::PhysicalDeviceVulkan13Features::default()
                 .dynamic_rendering(true)
@@ -657,6 +682,9 @@ impl VulkanBackend {
                 capture_requested: false,
                 capture: None,
                 device_name,
+                device_class,
+                device_memory_mb,
+                indirect_count,
                 queries,
                 pipeline_cache,
                 ts_period: props.limits.timestamp_period,
@@ -997,11 +1025,33 @@ impl VulkanBackend {
     }
 
     unsafe fn memory_barrier(&self, cmd: vk::CommandBuffer) {
+        // The host's reads (readbacks, mapped counts) are made visible once, at the end of the
+        // frame (`host_barrier`): a host stage here made MoltenVK go over every buffer and image
+        // at each of a frame's barriers. `WEFT_HOST_BARRIER_EACH=1` puts it back, to compare.
+        let (host_stage, host_read) = if host_barrier_each() {
+            (vk::PipelineStageFlags2::HOST, vk::AccessFlags2::HOST_READ)
+        } else {
+            (vk::PipelineStageFlags2::NONE, vk::AccessFlags2::NONE)
+        };
         let b = [vk::MemoryBarrier2::default()
             .src_stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS)
             .src_access_mask(vk::AccessFlags2::MEMORY_WRITE)
-            .dst_stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS | vk::PipelineStageFlags2::HOST)
-            .dst_access_mask(vk::AccessFlags2::MEMORY_READ | vk::AccessFlags2::MEMORY_WRITE | vk::AccessFlags2::HOST_READ)];
+            .dst_stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS | host_stage)
+            .dst_access_mask(vk::AccessFlags2::MEMORY_READ | vk::AccessFlags2::MEMORY_WRITE | host_read)];
+        unsafe {
+            self.device
+                .cmd_pipeline_barrier2(cmd, &vk::DependencyInfo::default().memory_barriers(&b))
+        };
+    }
+
+    /// Everything the frame's commands wrote, visible to the host once the frame's fence has
+    /// signalled: what the CPU reads back (captures, depth, counts).
+    unsafe fn host_barrier(&self, cmd: vk::CommandBuffer) {
+        let b = [vk::MemoryBarrier2::default()
+            .src_stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS)
+            .src_access_mask(vk::AccessFlags2::MEMORY_WRITE)
+            .dst_stage_mask(vk::PipelineStageFlags2::HOST)
+            .dst_access_mask(vk::AccessFlags2::HOST_READ)];
         unsafe {
             self.device
                 .cmd_pipeline_barrier2(cmd, &vk::DependencyInfo::default().memory_barriers(&b))
@@ -1278,8 +1328,20 @@ impl Backend for VulkanBackend {
         &self.device_name
     }
 
+    fn device_class(&self) -> u32 {
+        self.device_class
+    }
+
+    fn device_memory_mb(&self) -> u64 {
+        self.device_memory_mb
+    }
+
     fn frames_in_flight(&self) -> usize {
         FRAMES
+    }
+
+    fn indirect_count(&self) -> bool {
+        self.indirect_count
     }
 
     fn surface_size(&self) -> (u32, u32) {
@@ -1839,6 +1901,16 @@ impl Backend for VulkanBackend {
                         self.device
                             .cmd_draw_indexed_indirect(cmd, b, offset, count, size_of::<DrawIndexedArgs>() as u32);
                     }
+                    Cmd::DrawIndexedIndirectCount { buffer, offset, max, .. } if !self.indirect_count => {
+                        let b = self.buffers.get(buffer.0).raw;
+                        self.device
+                            .cmd_draw_indexed_indirect(cmd, b, offset, max, size_of::<DrawIndexedArgs>() as u32);
+                    }
+                    Cmd::DrawIndirectCount { buffer, offset, max, .. } if !self.indirect_count => {
+                        let b = self.buffers.get(buffer.0).raw;
+                        self.device
+                            .cmd_draw_indirect(cmd, b, offset, max, size_of::<DrawArgs>() as u32);
+                    }
                     Cmd::DrawIndexedIndirectCount { buffer, offset, count_buffer, count_offset, max } => {
                         let b = self.buffers.get(buffer.0).raw;
                         let c = self.buffers.get(count_buffer.0).raw;
@@ -1860,17 +1932,18 @@ impl Backend for VulkanBackend {
                     }
                     Cmd::Dispatch { x, y, z } => self.device.cmd_dispatch(cmd, x, y, z),
                     Cmd::Barrier => self.memory_barrier(cmd),
+                    Cmd::FillBuffer { buffer, offset, size, value } => {
+                        let b = self.buffers.get(buffer.0).raw;
+                        self.device.cmd_fill_buffer(cmd, b, offset, size, value);
+                    }
                     Cmd::CopyDepthToBuffer { depth, buffer } => {
                         let t = self.textures.get(depth.0);
-                        let (image, width, height) = (t.image, t.desc.width, t.desc.height);
+                        // From the layout it is in (`EndPass` leaves a sampled depth target
+                        // shader-readable), and back to it: assuming the attachment layout was
+                        // wrong, and left the effects sampling it in the attachment layout.
+                        let (image, width, height, was) = (t.image, t.desc.width, t.desc.height, t.layout);
                         let raw = self.buffers.get(buffer.0).raw;
-                        self.barrier_image(
-                            cmd,
-                            image,
-                            depth_range(),
-                            vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL,
-                            vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-                        );
+                        self.barrier_image(cmd, image, depth_range(), was, vk::ImageLayout::TRANSFER_SRC_OPTIMAL);
                         let region = vk::BufferImageCopy::default()
                             .image_subresource(vk::ImageSubresourceLayers {
                                 aspect_mask: vk::ImageAspectFlags::DEPTH,
@@ -1881,13 +1954,10 @@ impl Backend for VulkanBackend {
                             .image_extent(vk::Extent3D { width, height, depth: 1 });
                         self.device
                             .cmd_copy_image_to_buffer(cmd, image, vk::ImageLayout::TRANSFER_SRC_OPTIMAL, raw, &[region]);
-                        self.barrier_image(
-                            cmd,
-                            image,
-                            depth_range(),
-                            vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-                            vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL,
-                        );
+                        // An image never used yet goes back to being a depth attachment.
+                        let back = if was == vk::ImageLayout::UNDEFINED { vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL } else { was };
+                        self.barrier_image(cmd, image, depth_range(), vk::ImageLayout::TRANSFER_SRC_OPTIMAL, back);
+                        self.textures.get_mut(depth.0).layout = back;
                     }
                     Cmd::Mark => {
                         if marks < MAX_MARKS - 1 {
@@ -1933,6 +2003,9 @@ impl Backend for VulkanBackend {
             self.device
                 .cmd_write_timestamp2(cmd, vk::PipelineStageFlags2::ALL_COMMANDS, self.queries, first_query + marks);
             self.frames[self.slot].marks = marks + 1;
+            if !host_barrier_each() {
+                self.host_barrier(cmd);
+            }
             self.device.end_command_buffer(cmd).ok();
 
             let frame = &mut self.frames[self.slot];
@@ -2136,4 +2209,11 @@ mod tests {
         let unified = memory(&[vk::MemoryHeapFlags::DEVICE_LOCAL], &[(P::DEVICE_LOCAL, 0), (P::DEVICE_LOCAL | host, 0)]);
         assert_eq!(spill_types(&unified), 0);
     }
+}
+
+/// `WEFT_HOST_BARRIER_EACH=1`: every `Cmd::Barrier` also makes writes visible to the host, as
+/// before (`--host-barrier-each`), to compare with one host barrier at the end of the frame.
+fn host_barrier_each() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("WEFT_HOST_BARRIER_EACH").is_some())
 }

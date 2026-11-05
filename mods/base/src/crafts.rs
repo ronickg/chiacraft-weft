@@ -107,7 +107,7 @@ pub fn strip(u: &mut Use) -> bool {
         w.spawn_item(at, ItemStack::new(OAK_BARK.id(), BARK_PER_LOG));
     }
     if !w.outside_survival(player) {
-        hotbar.set(slot, crate::felling::worn(axe, 1, DURABILITY.on_item(axe.item).unwrap_or(0)));
+        hotbar.set(slot, crate::felling::worn(axe, 1, DURABILITY.on_stack(&axe).unwrap_or(0)));
     }
     true
 }

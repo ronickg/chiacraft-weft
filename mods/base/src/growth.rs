@@ -13,6 +13,25 @@ use weft_sdk::*;
 
 pub fn register(r: &mut Registry) {
     // The ground where the player stands, and how fast wheat would grow there now.
+    // What lies on the ground within `r` blocks, by item and count: litter, dung, carcasses, and
+    // what drops round a herd.
+    r.command("litter", "<r:int>", |cmd| {
+        let w = cmd.world();
+        let Some(st) = w.entity(cmd.player()) else { return };
+        let r = cmd.int("r").unwrap_or(16).clamp(1, 128) as f64;
+        let mut found: Vec<(String, u32)> = Vec::new();
+        for id in w.entities_near(st.pos, r, None) {
+            let Some(stack) = w.dropped_item(id) else { continue };
+            let name = item_name(stack.item).to_string();
+            match found.iter_mut().find(|(n, _)| *n == name) {
+                Some((_, c)) => *c += stack.count,
+                None => found.push((name, stack.count)),
+            }
+        }
+        found.sort_by_key(|f| std::cmp::Reverse(f.1));
+        let list: Vec<String> = found.iter().map(|(n, c)| format!("{n} {c}")).collect();
+        cmd.reply("command.base.litter", &[Arg::Int(r as i64), Arg::Text(&list.join(", "))]);
+    });
     r.command("growth", "", |cmd| {
         let w = cmd.world();
         let Some(st) = w.entity(cmd.player()) else { return };

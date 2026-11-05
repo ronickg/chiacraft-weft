@@ -663,6 +663,11 @@ pub static MILESTONES: Component<u32> = Component::named("base:milestones");
 pub mod milestones {
     /// Tamed an animal (the animals mod).
     pub const TAME: u32 = 1;
+    /// Saw a blood moon through to its end without dying (base's sky events).
+    pub const RED_NIGHT: u32 = 2;
+    /// Out under the open sky on a meteor shower's peak night, and on an aurora storm's.
+    pub const WISH_UPON: u32 = 4;
+    pub const SKY_ON_FIRE: u32 = 8;
 }
 
 /// Marks a milestone (`milestones::TAME`...) for `player`: the advancement for it comes within a
