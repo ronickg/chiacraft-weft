@@ -693,7 +693,8 @@ fn meteors(dir: vec3<f32>) -> vec3<f32> {
         return vec3(0.0);
     }
     let d = normalize(floor(dir * 220.0) / 220.0);
-    let t = scene.params.w;
+    // The shower's own clock (seconds since it began, real time: tests pin the shaders' time).
+    let t = scene.sky_event.z;
     var c = vec3(0.0);
     for (var layer = 0u; layer < 12u; layer++) {
         let at = t / 1.2 + f32(layer) * 0.0833;
@@ -936,6 +937,7 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         // Bodies shine through the tone curve; stars dim in the haze low down.
         // The sun shines through the tone curve; the moon keeps its markings.
         var shape = 1.0;
+        var tint_after = vec3(1.0);
         // (Within about 25° of the sun: the moon lags the day now and can stand on its side of the sky.)
         if s.ids.y == SKY_BODY && dot(dir, scene.sun.xyz) > 0.9 {
             // The sun as a round disc with a soft glow (Bliss's), not the picture's square: that
@@ -953,11 +955,14 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         }
         // A blood moon: copper, then a deep red disc, dimmer in totality.
         if s.ids.y == SKY_BODY && dot(dir, scene.moon.xyz) > 0.9 && blood_moon() > 0.0 {
-            rgb *= blood_tint() * mix(1.0, 0.6, smoothstep(0.5, 1.0, blood_moon()));
+            // Tinted after the curve as well: the moon's bright picture went white through it, and a
+            // copper moon showed only a faint pink (the sky-events check, 11-05).
+            rgb *= blood_tint() * mix(1.0, 0.45, smoothstep(0.5, 1.0, blood_moon()));
+            tint_after = blood_tint();
         }
         a *= 1.0 - rain_amount() * 0.9;
         // `display` lifts black a little: outside the sun's shape nothing may be added.
-        rgb = display(rgb) * shape;
+        rgb = display(rgb) * shape * tint_after;
     }
     return vec4(rgb * a, select(a, 0.0, s.ids.w != 0u));
 }

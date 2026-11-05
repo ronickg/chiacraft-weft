@@ -202,7 +202,7 @@ fn blood_moon() -> f32 {
 // The moon's colour on a blood moon night: copper as it reddens, a deep red in totality.
 fn blood_tint() -> vec3<f32> {
     let b = blood_moon();
-    return mix(vec3(1.0), mix(vec3(1.0, 0.55, 0.32), vec3(0.78, 0.12, 0.05), smoothstep(0.5, 1.0, b)), smoothstep(0.0, 0.45, b));
+    return mix(vec3(1.0), mix(vec3(1.0, 0.45, 0.2), vec3(0.75, 0.06, 0.02), smoothstep(0.5, 1.0, b)), smoothstep(0.0, 0.35, b));
 }
 
 fn light_strength() -> f32 {
@@ -244,7 +244,8 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     // The glow about the moon where it stands, as bright as its light (`scene.moon.w`): on a new
     // moon there is none, and a glow alone read as a dark-blue ring (the world playtester's nights).
     let moon = pow(max(dot(dir, scene.moon.xyz), 0.0), 24.0) * smoothstep(-0.05, -0.25, scene.sun.y) * scene.moon.w;
-    c += vec3(0.05, 0.07, 0.12) * moon;
+    // On a blood moon its glow goes copper, then red.
+    c += vec3(0.05, 0.07, 0.12) * mix(vec3(1.0), blood_tint() * vec3(2.0, 1.4, 1.0), smoothstep(0.0, 0.4, blood_moon())) * moon;
     if dir.y < 0.0 {
         // Below the horizon it darkens a little toward the ground the haze stands on.
         c = mix(c, p.horizon * 0.6 + p.ambient * 0.2, smoothstep(0.0, 0.4, -dir.y));
