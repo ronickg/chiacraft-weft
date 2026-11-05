@@ -29,6 +29,8 @@ static HUNT: Component<[u64; 4]> = Component::named("animal_hunt");
 static WARY: Component<u64> = Component::named("animal_wary");
 /// When an ambusher broke cover to charge (0: still stalking; not saved).
 static CHARGING: Component<u64> = Component::named("animal_charging");
+/// When it last stood its ground (`stands_ground`; not saved): a stand that begins is shown by a rear.
+static STOOD: Component<u64> = Component::named("animal_stood");
 
 /// Blocks a hunter looks for prey and prey watches for hunters, in clear air: fog, a blizzard or
 /// a dust storm close both in (`base_api::sight`).
@@ -47,10 +49,12 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&HUNT, [0u64; 4], 0);
     r.entity_component(&WARY, 0u64, 0);
     r.entity_component(&CHARGING, 0u64, 0);
+    r.entity_component(&STOOD, 0u64, 0);
     for s in &SPECIES {
         r.attach(s.kind, &HUNT);
         r.attach(s.kind, &WARY);
         r.attach(s.kind, &CHARGING);
+        r.attach(s.kind, &STOOD);
     }
     // A kill feeds the hunter that made it, by the prey's mass against its own.
     r.on(&actions::DIE, |b| {
@@ -399,14 +403,19 @@ fn stands_ground(w: &World, id: u64, st: &EntityState, threat: u64) -> bool {
         if d2 <= roles::CHARGE * roles::CHARGE * 4.0 {
             anim::hold(w, id, Act::Charge);
         } else {
-            // It rears as it turns to face it and every few seconds after (a threat: in the PC
-            // look a deer already staring never reared on the first test alone), staring it down.
-            let held = anim::held(w, id);
-            if held != Some(Act::Stare) || (w.game_time() + id) / crate::senses::EVERY % REAR_EVERY == 0 {
+            // It rears as a stand begins (it didn't stand at its last look; staring before isn't
+            // the start: the PC look's deer stared first and never reared) and every few seconds
+            // after, staring it down.
+            let now = w.game_time();
+            let began = w.component(id, &STOOD).is_none_or(|t| now > t + 3 * crate::senses::EVERY);
+            if began || ((now + id) / crate::senses::EVERY).is_multiple_of(REAR_EVERY) {
                 anim::act(w, id, Act::Rear);
             }
             anim::hold(w, id, Act::Stare);
         }
+    }
+    if let Some(c) = w.component_mut(id, &STOOD) {
+        *c = w.game_time();
     }
     if d2 <= roles::CHARGE * roles::CHARGE * 4.0 {
         w.navigate(id, t.pos, roles::CHARGE_SPEED);
