@@ -110,6 +110,17 @@ pub fn init(r: &mut Registry) {
                 && let Some(i) = SPECIES.iter().position(|s| s.kind.id() == d.kind)
             {
                 count(&DIED, i);
+                // What took it, for runs that watch a herd (a capybara gone from the list could
+                // have died or wandered off).
+                weft_sdk::info!(
+                    "{} {} died of {} at {:.0} {:.0} {:.0}",
+                    SPECIES[i].name,
+                    d.entity,
+                    name_of(abi::entry_kind::DAMAGE_CAUSE, d.cause),
+                    d.pos.x,
+                    d.pos.y,
+                    d.pos.z
+                );
             }
         }
     });
