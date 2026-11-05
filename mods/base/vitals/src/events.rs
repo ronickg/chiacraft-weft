@@ -115,8 +115,11 @@ pub const DUSK_LINE_HOURS: f32 = 2.0;
 /// What the sky does on the night at the end of `day` (days since the world began), in the world
 /// of `seed`. In order of priority: a blood moon, a shower's nights, an aurora storm, a fireball.
 pub fn tonight(seed: u64, day: u64) -> Option<Event> {
-    let r = mix(seed ^ 0x5348_5945_5645_4E54 ^ day.wrapping_mul(0x9E37_79B9_7F4A_7C15));
-    if day >= BLOOD_MOON_FROM_DAY && day.is_multiple_of(MOON_DAYS) && unit(r) < BLOOD_MOON_CHANCE {
+    // A roll of its own for each kind of event, from the hash's best-mixed (top) bits: the low
+    // bits of seeds a few bits apart gave three worlds the same first blood moons.
+    let r = mix(mix(seed ^ 0x5348_5945_5645_4E54) ^ day);
+    let (blood, aurora_roll, fireball) = (unit(r), unit(mix(r)), unit(mix(mix(r))));
+    if day >= BLOOD_MOON_FROM_DAY && day.is_multiple_of(MOON_DAYS) && blood < BLOOD_MOON_CHANCE {
         return Some(Event::BloodMoon);
     }
     let of_year = (day % YEAR_DAYS as u64) as u32;
@@ -134,10 +137,10 @@ pub fn tonight(seed: u64, day: u64) -> Option<Event> {
         of_year.abs_diff(equinox) <= EQUINOX_DAYS
     });
     let aurora = AURORA_STORM_CHANCE * if near_equinox { EQUINOX_BOOST } else { 1.0 };
-    if unit(r >> 20) < aurora {
+    if aurora_roll < aurora {
         return Some(Event::AuroraStorm);
     }
-    if unit(r >> 40) < FIREBALL_CHANCE {
+    if fireball < FIREBALL_CHANCE {
         return Some(Event::Fireball);
     }
     None
@@ -177,9 +180,9 @@ fn mix(mut z: u64) -> u64 {
     z ^ (z >> 31)
 }
 
-/// 0..1 from the low 20 bits.
+/// 0..1 from the top 20 bits.
 fn unit(r: u64) -> f32 {
-    (r & 0xF_FFFF) as f32 / 0x10_0000 as f32
+    (r >> 44) as f32 / (1u64 << 20) as f32
 }
 
 #[cfg(test)]
