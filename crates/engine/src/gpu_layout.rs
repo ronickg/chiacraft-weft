@@ -761,7 +761,8 @@ gpu_struct! {
         pub cam_cube: [i32; 4],
         /// x start of the overlay table in `frames` (per texture: overlay texture + 1, or 0),
         /// y how far across from the camera the cubes end, fading into distant terrain before it
-        /// (`WorldRenderer::lod_fade`, 0: no fade), z tint kinds, w half the width of `lod_mask`.
+        /// (`WorldRenderer::lod_fade`, 0: no fade), z tint kinds, w half the width of `lod_mask` in the
+        /// low 24 bits and `core:far_look` in the top 8 (chiacraft).
         pub extra: [u32; 4],
     }
 }
