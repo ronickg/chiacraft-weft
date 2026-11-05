@@ -10,6 +10,9 @@
 /// oak 12.8, a 1350-log sequoia 222. Under 1, so the big trees aren't hopeless with the right
 /// axe; over 0.5, so they're still a job.
 pub const GROWTH: f32 = 0.75;
+/// A laid tree's log whose cell is taken (a crown's branches turn onto the same cells) lies on the
+/// first free one up to this many over it; past that it drops as its item.
+pub const PILE_UP: i32 = 3;
 
 /// A tree past its axe's tier takes this many times longer (and gives nothing).
 pub const PAST_TIER: f32 = 8.0;
