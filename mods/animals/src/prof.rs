@@ -33,6 +33,21 @@ fn row(name: &'static str) -> usize {
     })
 }
 
+/// While the timer is on: a stamp for `slow`.
+pub fn stamp() -> Option<Instant> {
+    ON.load(Relaxed).then(Instant::now)
+}
+
+/// While the timer is on, logs `what` if it took more than 20 ms since `t` (`stamp`): where a spike
+/// in a goal comes from.
+pub fn slow(t: Option<Instant>, what: impl FnOnce() -> String) {
+    if let Some(t) = t
+        && t.elapsed().as_millis() >= 20
+    {
+        weft_sdk::warn!("ANIMAL_SLOW {} ms: {}", t.elapsed().as_millis(), what());
+    }
+}
+
 /// A goal, timed under `name` while the timer is on.
 pub struct Time<G> {
     row: usize,

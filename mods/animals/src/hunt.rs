@@ -137,6 +137,13 @@ pub(crate) fn mass(w: &World, id: u64) -> Option<f32> {
 /// A goal for wild hunters: hungry, it goes after the nearest prey it can take; it takes the turn
 /// while it chases (a knock-out kind fights through its anger, `knockout::behave`).
 pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
+    let t = crate::prof::stamp();
+    let r = hunt_(w, id, st);
+    crate::prof::slow(t, || format!("hunt of {id}"));
+    r
+}
+
+fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
     let Some(a) = w.component(id, &ANIMAL) else { return false };
     let Some(s) = a.species().filter(|s| s.hunts()) else { return false };
     let Some(mut h) = w.component(id, &HUNT) else { return false };

@@ -104,6 +104,8 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             return false;
         }
         let Some(t) = w.component(id, &TAMING) else { return false };
+        let t0 = crate::prof::stamp();
+        let _slow = Slow(t0, id);
         if t.scared > 0 {
             set(w, id, |t| t.scared = t.scared.saturating_sub(w.tick_elapsed(id)));
             if t.scared <= w.tick_elapsed(id) {
@@ -186,6 +188,15 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             });
         }
         false
+    }
+}
+
+/// Logs a slow `behave` as it ends (`prof::slow`).
+struct Slow(Option<std::time::Instant>, u64);
+
+impl Drop for Slow {
+    fn drop(&mut self) {
+        crate::prof::slow(self.0, || format!("taming::behave of {}", self.1));
     }
 }
 

@@ -194,6 +194,7 @@ pub fn sense(w: &World, id: u64, st: &EntityState, watch: impl Fn(f32) -> f64) -
     if s.at != 0 && (now < s.at + EVERY || !(now + id).is_multiple_of(EVERY)) && now < s.at + 4 * EVERY {
         return s;
     }
+    let t = crate::prof::stamp();
     if s.sight_at == 0 || now >= s.sight_at + SIGHT_EVERY {
         s.sight = base_api::sight(w, st.pos.to_array());
         let time = w.day_time();
@@ -206,10 +207,13 @@ pub fn sense(w: &World, id: u64, st: &EntityState, watch: impl Fn(f32) -> f64) -
         s.wind = w.air_at(st.block_pos()).wind;
         s.sight_at = now.max(1);
     }
+    crate::prof::slow(t, || format!("sight and wind of {id}"));
     let watch = watch(s.sight);
     // Seconds since it last looked (its awareness builds and fades by them), a second at most.
     let secs = if s.at == 0 { 0.5 } else { (now.saturating_sub(s.at) as f32 / 20.0).min(1.0) };
+    let t = crate::prof::stamp();
     look(w, id, st, &mut s, watch, secs);
+    crate::prof::slow(t, || format!("look round of {id} (sight {:.2}, wind {:.1})", s.sight, s.wind));
     s.at = now.max(1);
     if let Some(c) = w.component_mut(id, &SENSES) {
         *c = s;
