@@ -58,8 +58,8 @@ pub static EGG_ENTITY: EntityKind = EntityKind::named("egg");
 pub static NEST: EntityKind = EntityKind::named("nest");
 static NEST_ITEM: Item = Item::named("nest");
 static AIR: Block = Block::named("core:air");
-static LEAVES: Tag = Tag::named("base:leaves");
-static LOGS: Tag = Tag::named("base:logs");
+static LEAVES: Tag = Tag::named("leaves");
+static LOGS: Tag = Tag::named("logs");
 static TOOLS: CreativeTab = CreativeTab::named("base:tools");
 static CRAFTING: RecipeKind = RecipeKind::named("base:crafting");
 /// Each laying species' egg item, by its row in `SPECIES` (made once).
