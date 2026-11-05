@@ -81,6 +81,34 @@ Windows 10 or newer (x64), macOS 12 or newer.
 Saves, settings and logs go to the player's own folders (`%APPDATA%\Weft`,
 `~/.local/share/weft`, `~/Library/Application Support/Weft`), not into the unpacked folder.
 
+## Windows from a Mac, without GitHub
+
+`tools/release/cross-windows.sh [label]` builds the Windows x64 archive on a Mac (or on Linux).
+It costs no Actions minutes. It uses Rust's GNU target, `x86_64-pc-windows-gnu`, with
+mingw-w64, so it needs neither Microsoft's SDK nor accepting Microsoft's licence:
+
+```
+rustup target add x86_64-pc-windows-gnu
+brew install mingw-w64 nasm
+tools/release/cross-windows.sh          # dist/chiacraft-<commit>-windows-x64.zip
+```
+
+It builds as CI does (`--profile dist`, no debug info), niced with 4 jobs, then runs
+`package.sh` with `TARGET=x86_64-pc-windows-gnu`. A Windows `weft.exe` can't run on the Mac, so
+it can't make its own folder with `--dist`. `package.sh` then calls `tools/release/cross-pack.py`
+instead, which makes the same folder: the executable, `assets/core`, and each mod zipped with
+its `.dll` at the top and its `assets/`. The script also gives bindgen (run by aws-lc-sys)
+mingw's C headers. Without them the build stops with `'stdlib.h' file not found`. On the Mac
+(11-05), the first build of dev took 4.5 minutes and gave a 43 MB zip.
+
+How it differs from CI's MSVC build:
+- `weft.exe` and the mods import only Windows' own DLLs and the Universal C Runtime, which
+  Windows 10 and newer have. They need no mingw DLLs (`x86_64-w64-mingw32-objdump -p weft.exe`).
+- A mod that players build themselves with MSVC should still load, because mods talk to the
+  game over the C ABI (`crates/abi`). Nobody has tried one yet.
+- Crash backtraces may name fewer functions than MSVC's: the GNU build reads its own symbols,
+  not a `.pdb`. Nobody has checked this yet.
+
 ## macOS: unsigned, and signing
 
 Without signing secrets the macOS archives are unsigned. macOS stops them the first time, and
