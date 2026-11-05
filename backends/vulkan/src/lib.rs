@@ -828,7 +828,11 @@ impl VulkanBackend {
             // Android: the compositor turns the picture for a rotated display, so the game draws
             // upright (the device's own turn would have it draw rotated). Android also often has
             // only INHERIT for alpha.
-            let transform = if cfg!(target_os = "android") && caps.supported_transforms.contains(vk::SurfaceTransformFlagsKHR::IDENTITY) {
+            let transform = if cfg!(target_os = "android")
+                && caps
+                    .supported_transforms
+                    .contains(vk::SurfaceTransformFlagsKHR::IDENTITY)
+            {
                 vk::SurfaceTransformFlagsKHR::IDENTITY
             } else {
                 caps.current_transform
@@ -938,10 +942,12 @@ impl VulkanBackend {
                         vk::DescriptorPoolSize { ty: vk::DescriptorType::STORAGE_BUFFER, descriptor_count: 8192 },
                         vk::DescriptorPoolSize { ty: vk::DescriptorType::UNIFORM_BUFFER, descriptor_count: 2048 },
                     ];
-                    match self
-                        .device
-                        .create_descriptor_pool(&vk::DescriptorPoolCreateInfo::default().max_sets(2048).pool_sizes(&sizes), None)
-                    {
+                    match self.device.create_descriptor_pool(
+                        &vk::DescriptorPoolCreateInfo::default()
+                            .max_sets(2048)
+                            .pool_sizes(&sizes),
+                        None,
+                    ) {
                         Ok(p) => frame.set_pools.push(p),
                         Err(e) => {
                             log::error!("descriptor pool: {e:?}");
@@ -950,10 +956,11 @@ impl VulkanBackend {
                     }
                 }
                 let pool = frame.set_pools[frame.set_pool];
-                match self
-                    .device
-                    .allocate_descriptor_sets(&vk::DescriptorSetAllocateInfo::default().descriptor_pool(pool).set_layouts(&layouts))
-                {
+                match self.device.allocate_descriptor_sets(
+                    &vk::DescriptorSetAllocateInfo::default()
+                        .descriptor_pool(pool)
+                        .set_layouts(&layouts),
+                ) {
                     Ok(sets) => break sets[0],
                     Err(e) if fresh => {
                         log::error!("descriptor set: {e:?}");
@@ -1486,7 +1493,8 @@ impl Backend for VulkanBackend {
             .window_handle()
             .map_err(err("window handle"))?
             .as_raw();
-        self.surface = unsafe { ash_window::create_surface(&self._entry, &self.instance, display, raw, None) }.map_err(err("creating surface"))?;
+        self.surface =
+            unsafe { ash_window::create_surface(&self._entry, &self.instance, display, raw, None) }.map_err(err("creating surface"))?;
         self.dirty_swapchain = true;
         log::info!("surface restored");
         Ok(())

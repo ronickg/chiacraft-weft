@@ -49,10 +49,10 @@ pub use chiacraft::worlds::{admission, friends, links, saved_worlds, travel, wor
 pub use chiacraft::{account_screen, bridge, package_trust};
 
 pub use app::api::{exit_code, set_launch_options};
-pub use app::{BackendFactory, Options, run};
 /// Android (crates/android): the activity glue winit runs on, and the game started on it.
 #[cfg(target_os = "android")]
 pub use app::run_android;
+pub use app::{BackendFactory, Options, run};
 #[cfg(target_os = "android")]
 pub use winit::platform::android::activity as android_activity;
 

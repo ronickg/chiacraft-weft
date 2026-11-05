@@ -389,11 +389,13 @@ fn run_on(event_loop: EventLoop<()>, factory: BackendFactory, opts: Options) -> 
 /// source tree, or `--dev`) the source tree's.
 fn engine_assets(dev: bool) -> PathBuf {
     let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("assets");
-    let shipped = crate::paths::engine_assets().map(PathBuf::from).or_else(|| {
-        std::env::current_exe()
-            .ok()
-            .and_then(|p| p.parent().map(|d| d.join("assets").join("core")))
-    });
+    let shipped = crate::paths::engine_assets()
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::current_exe()
+                .ok()
+                .and_then(|p| p.parent().map(|d| d.join("assets").join("core")))
+        });
     match shipped {
         Some(s) if !dev && s.is_dir() => s,
         _ => source,
@@ -2241,13 +2243,7 @@ impl ApplicationHandler for App {
                 let scale = r.gui_scale();
                 let hud = &r.hud;
                 let slot_at = |p: Vec2| hud.hotbar_slot_at(p);
-                let mut cx = crate::touch::Cx {
-                    input: &mut r.input,
-                    play,
-                    scale,
-                    size: Vec2::new(w as f32, h as f32),
-                    slot_at: &slot_at,
-                };
+                let mut cx = crate::touch::Cx { input: &mut r.input, play, scale, size: Vec2::new(w as f32, h as f32), slot_at: &slot_at };
                 let at = Vec2::new(t.location.x as f32, t.location.y as f32);
                 if r.touch.event(t.phase, t.id, at, &mut cx) && !r.input.captured {
                     r.set_capture(true);
@@ -2256,7 +2252,8 @@ impl ApplicationHandler for App {
             WindowEvent::KeyboardInput { event, .. } => {
                 // Android's back button is Escape: out of a screen, or to the pause screen.
                 // (winit has no physical key for it, only the logical BrowserBack.)
-                let back = cfg!(target_os = "android") && event.logical_key == winit::keyboard::Key::Named(winit::keyboard::NamedKey::BrowserBack);
+                let back =
+                    cfg!(target_os = "android") && event.logical_key == winit::keyboard::Key::Named(winit::keyboard::NamedKey::BrowserBack);
                 let physical = if back { PhysicalKey::Code(KeyCode::Escape) } else { event.physical_key };
                 if let PhysicalKey::Code(code) = physical {
                     match event.state {

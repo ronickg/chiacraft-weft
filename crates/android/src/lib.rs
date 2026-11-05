@@ -148,9 +148,7 @@ fn unpack(app: &AndroidApp, game: &Path) -> Result<(), String> {
     let started = std::time::Instant::now();
     let _ = std::fs::remove_dir_all(game);
     std::fs::create_dir_all(game).map_err(|e| e.to_string())?;
-    let zip = assets
-        .open(c"game.zip")
-        .ok_or("no game.zip in the APK")?;
+    let zip = assets.open(c"game.zip").ok_or("no game.zip in the APK")?;
     let mut archive = zip::ZipArchive::new(zip).map_err(|e| e.to_string())?;
     archive.extract(game).map_err(|e| e.to_string())?;
     std::fs::write(game.join(".stamp"), &stamp).map_err(|e| e.to_string())?;

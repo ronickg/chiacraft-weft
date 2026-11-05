@@ -44,16 +44,8 @@ pub enum Button {
     Pause,
 }
 
-const BUTTONS: [Button; 8] = [
-    Button::Jump,
-    Button::Sneak,
-    Button::Attack,
-    Button::Use,
-    Button::Inventory,
-    Button::Drop,
-    Button::Chat,
-    Button::Pause,
-];
+const BUTTONS: [Button; 8] =
+    [Button::Jump, Button::Sneak, Button::Attack, Button::Use, Button::Inventory, Button::Drop, Button::Chat, Button::Pause];
 
 impl Button {
     /// The action it presses (`None`: Escape).
@@ -120,7 +112,9 @@ enum Role {
     /// A second finger in a menu: scrolls.
     Scroll,
     Look,
-    Stick { origin: Vec2 },
+    Stick {
+        origin: Vec2,
+    },
     Button(Button),
     /// A hotbar slot tapped (0-based).
     Slot(usize),
@@ -174,7 +168,13 @@ impl Touch {
                     Role::Button(b)
                 } else if let Some(i) = (cx.slot_at)(gui) {
                     Role::Slot(i)
-                } else if gui.x < size.x * 0.4 && gui.y > size.y * 0.3 && !self.fingers.iter().any(|f| matches!(f.role, Role::Stick { .. })) {
+                } else if gui.x < size.x * 0.4
+                    && gui.y > size.y * 0.3
+                    && !self
+                        .fingers
+                        .iter()
+                        .any(|f| matches!(f.role, Role::Stick { .. }))
+                {
                     Role::Stick { origin: gui }
                 } else {
                     Role::Look
@@ -218,10 +218,19 @@ impl Touch {
                     Role::Stick { origin } => {
                         let v = (gui - origin) / STICK;
                         let want = stick_keys(cx.input, v);
-                        for k in f.keys.iter().flatten().filter(|k| !want.contains(&Some(**k))) {
+                        for k in f
+                            .keys
+                            .iter()
+                            .flatten()
+                            .filter(|k| !want.contains(&Some(**k)))
+                        {
                             cx.input.key_up(*k);
                         }
-                        for k in want.iter().flatten().filter(|k| !f.keys.contains(&Some(**k))) {
+                        for k in want
+                            .iter()
+                            .flatten()
+                            .filter(|k| !f.keys.contains(&Some(**k)))
+                        {
                             cx.input.key_down(*k);
                         }
                         f.keys = want;
