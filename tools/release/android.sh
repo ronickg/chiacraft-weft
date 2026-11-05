@@ -14,6 +14,8 @@
 # ABIS: the CPUs, "arm64-v8a" (phones, the default) and/or "x86_64" (the emulator on a PC).
 # PROFILE: dist (default, what players get) or release (quicker, the crew's).
 # ANDROID_HOME (default ~/Android/Sdk), ANDROID_NDK_HOME (default its newest ndk/), JOBS (4).
+# VALIDATION_LAYERS: the folder of Khronos's android-binaries release (<abi>/libVkLayer_khronos_
+# validation.so) to pack beside the game, for a debug run with --gpu-debug in args.txt.
 # The APK lands in $OUT_DIR (default dist/) as chiacraft-<label>-android.apk, signed with a debug
 # key made once in ~/.android/debug.keystore (as Android Studio does). Install: adb install -r.
 # Niced, so the machine stays usable. Run it from the repository root.
@@ -90,6 +92,9 @@ for abi in $abis; do
 	cxx="$ndk/toolchains/llvm/prebuilt/$(uname -s | tr A-Z a-z)-x86_64/sysroot/usr/lib/$(triple "$abi" | sed 's/armv7/arm/')/libc++_shared.so"
 	[ -f "$cxx" ] || { echo "android: no $cxx" >&2; exit 1; }
 	cp "$cxx" "$stage/apk/lib/$abi/"
+	if [ -n "${VALIDATION_LAYERS:-}" ]; then
+		cp "$VALIDATION_LAYERS/$abi/libVkLayer_khronos_validation.so" "$stage/apk/lib/$abi/"
+	fi
 done
 
 version_code="$(git rev-list --count HEAD 2> /dev/null || echo 1)"

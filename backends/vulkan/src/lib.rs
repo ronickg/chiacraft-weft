@@ -141,6 +141,9 @@ pub struct VulkanBackend {
     /// None where the device has no `VK_KHR_push_descriptor` (the Android emulator): per-draw
     /// buffers then go through descriptor sets from each frame's pools (`bind_buffer_set`).
     push_fn: Option<khr::push_descriptor::Device>,
+    /// Android with `VK_EXT_image_compression_control`: render targets are made uncompressed
+    /// (`create_texture`). See `compression_off`.
+    no_compression: bool,
     allocator: ManuallyDrop<Allocator>,
     /// The memory types outside the GPU's own heaps (system memory), where a GPU-only allocation goes
     /// when the GPU's memory is full (`allocate`). None on a GPU that shares the system's memory.
@@ -497,6 +500,18 @@ impl VulkanBackend {
             } else {
                 log::info!("{device_name}: no VK_KHR_push_descriptor, per-draw buffers through descriptor sets");
             }
+            // Android: render targets without the GPU's framebuffer compression (`compression_off`).
+            let mut compression = vk::PhysicalDeviceImageCompressionControlFeaturesEXT::default();
+            let no_compression = cfg!(target_os = "android") && has_ext(ext::image_compression_control::NAME) && {
+                let mut f = vk::PhysicalDeviceFeatures2::default().push_next(&mut compression);
+                instance.get_physical_device_features2(pdev, &mut f);
+                compression.image_compression_control != vk::FALSE
+            };
+            if no_compression {
+                dev_exts.push(ext::image_compression_control::NAME.as_ptr());
+                log::info!("{device_name}: render targets without framebuffer compression");
+            }
+            let mut compression = vk::PhysicalDeviceImageCompressionControlFeaturesEXT::default().image_compression_control(no_compression);
             // A driver that has this extension requires it to be enabled.
             if has_ext(khr::portability_subset::NAME) {
                 dev_exts.push(khr::portability_subset::NAME.as_ptr());
@@ -511,7 +526,8 @@ impl VulkanBackend {
                     &vk::DeviceCreateInfo::default()
                         .queue_create_infos(&qinfo)
                         .enabled_extension_names(&dev_exts)
-                        .push_next(&mut f2),
+                        .push_next(&mut f2)
+                        .push_next(&mut compression),
                     None,
                 )
                 .map_err(err("vkCreateDevice"))?;
@@ -689,6 +705,7 @@ impl VulkanBackend {
                 queue,
                 swapchain_fn,
                 push_fn,
+                no_compression,
                 allocator: ManuallyDrop::new(allocator),
                 spill,
                 swapchain: None,
@@ -907,6 +924,25 @@ impl VulkanBackend {
             self.dirty_swapchain = false;
             Ok(())
         }
+    }
+
+    /// The swapchain still works but no longer fits the surface exactly: made again. On Android a
+    /// phone held sideways says so on every present, as the game leaves the turning to the
+    /// compositor (IDENTITY, `recreate_swapchain`): there only a new size counts. Made again each
+    /// time, the Pixel 10 rebuilt its swapchain (and waited for the GPU) every few frames.
+    fn suboptimal(&mut self) {
+        if cfg!(target_os = "android") {
+            let caps = unsafe {
+                self.surface_fn
+                    .get_physical_device_surface_capabilities(self.pdev, self.surface)
+            };
+            if let (Ok(caps), Some(sc)) = (caps, self.swapchain.as_ref())
+                && caps.current_extent == sc.extent
+            {
+                return;
+            }
+        }
+        self.dirty_swapchain = true;
     }
 
     unsafe fn destroy_swapchain(&mut self, sc: Swapchain) {
@@ -1665,21 +1701,26 @@ impl Backend for VulkanBackend {
             }
             u
         };
+        // The Pixel 10's PowerVR: a target cleared by its pass and then read as a texture came back
+        // as garbage in every tile only the clear had touched (black and random-coloured squares
+        // where the sky was, the water's copy of what is behind it); uncompressed, it reads right.
+        let mut compression_off = vk::ImageCompressionControlEXT::default().flags(vk::ImageCompressionFlagsEXT::DISABLED);
+        let mut info = vk::ImageCreateInfo::default()
+            .image_type(vk::ImageType::TYPE_2D)
+            .format(format)
+            .extent(vk::Extent3D { width: desc.width, height: desc.height, depth: 1 })
+            .mip_levels(desc.mips)
+            .array_layers(1)
+            .samples(vk::SampleCountFlags::TYPE_1)
+            .tiling(vk::ImageTiling::OPTIMAL)
+            .usage(usage);
+        if self.no_compression && (desc.render_target || depth) {
+            info = info.push_next(&mut compression_off);
+        }
         unsafe {
             let image = self
                 .device
-                .create_image(
-                    &vk::ImageCreateInfo::default()
-                        .image_type(vk::ImageType::TYPE_2D)
-                        .format(format)
-                        .extent(vk::Extent3D { width: desc.width, height: desc.height, depth: 1 })
-                        .mip_levels(desc.mips)
-                        .array_layers(1)
-                        .samples(vk::SampleCountFlags::TYPE_1)
-                        .tiling(vk::ImageTiling::OPTIMAL)
-                        .usage(usage),
-                    None,
-                )
+                .create_image(&info, None)
                 .expect("vkCreateImage");
             let requirements = self.device.get_image_memory_requirements(image);
             let alloc_desc = AllocationCreateDesc {
@@ -1926,11 +1967,12 @@ impl Backend for VulkanBackend {
         self.submit_split.begun = [t1 - t0, t1.elapsed()].map(|d| d.as_secs_f32() * 1000.0);
         match result {
             Ok((index, suboptimal)) => {
+                let extent = sc.extent;
                 if suboptimal {
-                    self.dirty_swapchain = true;
+                    self.suboptimal();
                 }
                 self.image_index = Some(index);
-                Some(FrameInfo { width: sc.extent.width, height: sc.extent.height, slot: self.slot })
+                Some(FrameInfo { width: extent.width, height: extent.height, slot: self.slot })
             }
             Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
                 self.dirty_swapchain = true;
@@ -2296,7 +2338,8 @@ impl Backend for VulkanBackend {
                 .image_indices(&indices);
             match self.swapchain_fn.queue_present(self.queue, &present) {
                 Ok(false) => {}
-                Ok(true) | Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => self.dirty_swapchain = true,
+                Ok(true) => self.suboptimal(),
+                Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => self.dirty_swapchain = true,
                 Err(e) => log::error!("vkQueuePresentKHR: {e:?}"),
             }
         }
