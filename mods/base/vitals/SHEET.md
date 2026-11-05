@@ -304,6 +304,9 @@ What each growing plant needs (`vitals::plants`, from `reports/ecology/Plants an
 | base:mushroom_brown | forest mushrooms | 5, 10-20, 30 | Moderate | -2 °C | 8 | 4 | plains (au), forest (su au), birch_forest (su au), taiga (su), mountains (su au), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au) |
 | base:mushroom_red | fly agaric | 5, 10-20, 30 | Moderate | -2 °C | 8 | 4 | plains (au), forest (su au), birch_forest (su au), taiga (su), mountains (su au), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au) |
 | base:water_hyacinth | water hyacinth | 12, 25-30, 38 | Wet | -1 °C | 10 | 5 | plains (su), forest (su), birch_forest (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), tropical_forest (sp su au wi), sequoia_grove (su), ocean (sp su au), coral_reef (sp su au wi), lagoon (sp su au wi), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (su) |
+| base:foxfire | honey fungus and bitter oyster mycelium | 5, 20-25, 30 | Moderate | hardy | 30 | 10 | plains (su au), forest (su), birch_forest (su), taiga (su), savanna (au), swamp (au), tropical_forest (au), mountains (su), ocean (sp su au wi), coral_reef (au), lagoon (au), beach (au), floodplain (au), fern_forest (su), crags (su au) |
+| base:glow_mycena | Mycena chlorophos | 18, 24-28, 32 | Wet | -1 °C | 8 | 4 | plains (su), desert (sp au), savanna (sp su au wi), swamp (sp su au wi), tropical_forest (sp su au wi), ocean (su), coral_reef (sp su au wi), lagoon (sp su au wi), beach (su), red_dunes (su), scrubland (su), floodplain (sp su au), crags (su) |
+| base:goblins_gold | goblin's gold moss (Schistostega pennata) | 0, 10-18, 25 | Moderate | hardy | 60 | 17 | plains (au), forest (sp su au), birch_forest (su au), taiga (su), mountains (su au), ocean (sp au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (au wi) |
 | base:mesquite_sapling | mesquite | 12, 25-38, 48 | Dry | -15 °C | - | the game's | plains (su), forest (su), birch_forest (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au wi), tropical_forest (sp su au wi), ocean (sp su au), coral_reef (sp su au wi), lagoon (sp su au wi), beach (su au), red_dunes (su), scrubland (su), floodplain (sp su au), fern_forest (su), crags (su) |
 | base:brazil_nut_sapling | Brazil nut (Bertholletia excelsa) | 18, 25-32, 38 | Moderate | 0 °C | - | the game's | plains (su), desert (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), coral_reef (su au), lagoon (su au), scrubland (su), floodplain (su), crags (su) |
 | base:cacao_sapling | cacao (Theobroma cacao) | 15, 22-30, 35 | Moderate | 0 °C | - | the game's | plains (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), ocean (su au), coral_reef (su au), lagoon (su au), scrubland (su), floodplain (su au), fern_forest (su), crags (su) |
@@ -362,6 +365,9 @@ What the world grows besides grass and trees (`vitals::wild`): how each grows, t
 | base:mushroom_brown | Spreads | Soil | base:mushroom_brown | 0.6% | forest, birch_forest, taiga, mountains |
 | base:mushroom_red | Spreads | Soil | base:mushroom_red | 0.3% | forest, birch_forest, taiga |
 | base:water_hyacinth | Spreads | Water | - | 8.0% | swamp, savanna |
+| base:foxfire | Spreads | Soil | - | 0.4% | forest, birch_forest, taiga, swamp, tropical_forest, sequoia_grove |
+| base:glow_mycena | Spreads | Soil | - | 0.3% | tropical_forest, swamp |
+| base:goblins_gold | Spreads | Soil | - | 0.2% | forest, birch_forest, taiga |
 | base:cattail | Still | Shore | base:cattail_root | 15.0% | swamp, plains, forest, taiga, savanna |
 | base:reed | Still | Shore | - | 12.0% | plains, forest, birch_forest, taiga, swamp (4.0%) |
 | base:lily_pad | Still | Water | - | 12.0% | plains, forest, birch_forest, swamp, taiga, savanna |

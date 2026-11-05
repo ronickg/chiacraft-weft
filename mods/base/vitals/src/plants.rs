@@ -62,7 +62,7 @@ const SPRING: u8 = 1;
 const SUMMER: u8 = 2;
 const SUMMER_AUTUMN: u8 = 2 | 4;
 
-pub const PLANTS: [Plant; 54] = [
+pub const PLANTS: [Plant; 57] = [
     // Frost (`reports/ecology/Plants and crops.md`, A1): spring wheat is sensitive (a hard frost,
     // about -2 °C, kills it; winter wheat, hardy, comes later); a blueberry's dormant bush is
     // hardy but its flowers and fruit die at -2; sugar cane takes none (the stalk dies, the base
@@ -155,6 +155,13 @@ pub const PLANTS: [Plant; 54] = [
     p("base:mushroom_brown", "forest mushrooms", (5.0, 10.0, 20.0, 30.0), Water::Moderate, 8.0, SUMMER_AUTUMN, -2.0),
     p("base:mushroom_red", "fly agaric", (5.0, 10.0, 20.0, 30.0), Water::Moderate, 8.0, SUMMER_AUTUMN, -2.0),
     p("base:water_hyacinth", "water hyacinth", (12.0, 25.0, 30.0, 38.0), Water::Wet, 10.0, ANY, -1.0),
+    // Plants that glow in the dark (`wild::GLOW`, `notes/NIGHT_GLOW.md`). Foxfire is honey
+    // fungus and bitter oyster mycelium creeping through the litter (growth 5-30 °C, best 20-25),
+    // a mycelium that frost doesn't kill; glow mycena (Mycena chlorophos) a tropical toadstool
+    // that fruits in warm wet weather and dies at a frost; goblin's gold a cool-loving moss.
+    p("base:foxfire", "honey fungus and bitter oyster mycelium", (5.0, 20.0, 25.0, 30.0), Water::Moderate, 30.0, ANY, HARDY),
+    p("base:glow_mycena", "Mycena chlorophos", (18.0, 24.0, 28.0, 32.0), Water::Wet, 8.0, ANY, -1.0),
+    p("base:goblins_gold", "goblin's gold moss (Schistostega pennata)", (0.0, 10.0, 18.0, 25.0), Water::Moderate, 60.0, ANY, HARDY),
     // Our trees' saplings, at the game's time as the oak's: mesquite, a desert legume that a
     // frost below about -15 kills; the tropical palms, killed by any frost.
     p("base:mesquite_sapling", "mesquite", (12.0, 25.0, 38.0, 48.0), Water::Dry, 0.0, ANY, -15.0),
