@@ -38,6 +38,8 @@ P = ["a", "e", "i", "o", "u"]                   # plain vowels
 C = ["p", "t", "k", "b", "d", "g", "m", "n", "s", "h", "f", "r", "w", "y", "l", "v", "ch", "sh", "ng", "kv"]
 F = ["e", "i", "ei"]                            # front vowels
 G = ["k", "g"]
+K = ["m", "n", "r", "s", "t", "k", "p"]       # consonants that can close a syllable
+B = ["b", "d", "g"]                            # stops that can't, but can start one before r
 
 # ---------------------------------------------------------------------------------------------
 # Peoples: each one's sounds, syllables and stress. `gen` draws from the weights; `check` holds
@@ -267,7 +269,11 @@ title = "Worn"
 used_for = "humans and traders, coasts, plains, swamps, deserts; the latest era"
 rules = [
   { sca = "h//#_", says = "h at the start of a word drops: has → as" },
-  { sca = "P//#(C)(C)VC_CV", says = "in words of three or more syllables, a vowel in the second syllable between single consonants drops: ekaru → ekru" },
+  # Rule 2 is section 9's "a vowel in the second syllable between single consonants drops", split
+  # in two so what is left stays sayable: the consonant before the gap must close a syllable (K), or
+  # be b d g that starts one with the r after it. Without that, dau + aru (dawaru) became dawro.
+  { sca = "P//#(C)(C)VK_CV", says = "in words of three or more syllables, a vowel in the second syllable between single consonants drops, where the first can close a syllable: ekaru → ekru" },
+  { sca = "P//#(C)(C)VB_rV", says = "and where b, d or g and r are left to start a syllable: abaru → abru" },
   { sca = "u/o/_", says = "u becomes o (but au stays): duk → dok, nu → no" },
   { sca = "n/ng/_G", says = "n becomes ng before k or g" },
   { sca = "sk/sh/_#", says = "a final sk becomes sh: kepesk → kepesh" },
@@ -358,8 +364,8 @@ ok = { means = "plural", example = "dundok, the kins" }
 #   byname   a dwarf's English byname, what players meet first
 #   home     an elvish home, whose dialect derives it
 #   irregular = "why"   a deliberate exception to the derivation
-#   lang_key the game's key, once it is in the lang files (`check` then wants it in en, ru, fr;
-#            the epithet under <key>.title). None yet: names go in after Ronald picks them.
+#   lang_key the game's key, once it is in the lang files (`check` then wants it in every language
+#            its mod has; the epithet under <key>.title). None yet: names go in after Ronald picks.
 # ---------------------------------------------------------------------------------------------
 
 # The ancients' world (section 10).
@@ -862,10 +868,10 @@ f = "ф"
 l = "л"
 v = "в"
 
-# Where `check` looks for lang keys, and which languages every key needs.
+# Where `check` looks for lang keys. A key must be in every language of the folder that holds it
+# (base has en and ru; the engine also fr), each showing the name (Russian in Cyrillic).
 [lang]
 dirs = ["crates/engine/assets/lang", "mods/base/assets/lang", "mods/animals/assets/lang", "mods/portals/assets/lang", "mods/packages/assets/lang"]
-files = ["en_us", "ru_ru", "fr_fr"]
 
 # `gen`: a candidate is too close to a word already in the lexicon when one edit turns one into
 # the other (for words of four letters or more), or when it has the same consonants with other
