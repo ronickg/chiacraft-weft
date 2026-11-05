@@ -154,7 +154,9 @@ def elements():
          el("neck", "neck", (-1.15, 1.15, 0.9), (1.15, 1.65, 3.9)),  # deep in the chest and the skull: it turns on them
          el("skull", "head", *SKULL0),
          el("snout", "head", (-1.05, 1.3, 4.6), (1.05, 1.85, 8.2)),  # long and flat
-         el("nose", "head", (-0.8, 1.2, 7.9), (0.8, 1.75, 9.4)),  # the nostrils raised on its tip
+         # The nostrils raised on its tip: its sides just past the snout's, its bottom just over the jaw (at 0.8 wide
+         # and down in the jaw, the jaw stood 0.8 out beside it and a texel of the jaw's front showed under it; linecheck).
+         el("nose", "head", (-1.11, 1.36, 7.9), (1.11, 1.75, 9.4)),
          el("mouth", "head", (-0.7, 1.12, 4.0), (0.7, 1.36, 8.4)),  # the pink inside, seen when it gapes
          el("jaw", "jaw", (-0.95, 0.75, 3.0), (0.95, 1.28, 9.0))]  # shorter than the snout: an overbite
     for k, (_, (hw, y0, y1, z0, z1)) in enumerate(TAIL):

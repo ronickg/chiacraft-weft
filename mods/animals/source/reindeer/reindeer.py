@@ -158,8 +158,11 @@ def antler(side):
     bone = f"antler_{side}"
     x0, y0, z0 = ANTLER0
     start = (s * x0, y0, z0)
-    E = [el(f"burr_{k}", bone, (s * x0 - 1.2, y0 - 1.0, z0 - 1.4), (s * x0 + 1.2, y0 + 2.4, z0 + 1.4))]
-    beam0, p1 = rod(f"beam0_{k}", bone, (start[0], y0 + 1.8, z0), (-52, 0, -s * 26), 12.0, 1.9)
+    # The burr 0.4 over the skull's top, the beam and the brow tine a unit lower than they were, from inside it
+    # (at y0 + 2.4 it stood a texel over the skull, a sliver; any taller it is a post under two texels across;
+    # linecheck).
+    E = [el(f"burr_{k}", bone, (s * x0 - 1.2, y0 - 1.0, z0 - 1.4), (s * x0 + 1.2, y0 + 1.0, z0 + 1.4))]
+    beam0, p1 = rod(f"beam0_{k}", bone, (start[0], y0 + 0.8, z0), (-52, 0, -s * 26), 12.0, 1.9)
     beam1, p2 = rod(f"beam1_{k}", bone, tuple(p1), (-14, 0, -s * 16), 12.0, 1.7)
     beam2, p3 = rod(f"beam2_{k}", bone, tuple(p2), (42, 0, -s * 6), 9.0, 1.5)
     E += [beam0, beam1, beam2]
@@ -173,13 +176,13 @@ def antler(side):
     bez, _ = rod(f"bez_{k}", bone, tuple(p1 + (p2 - p1) * 0.15), (80, 0, -s * 14), 7.0, 1.2)
     E.append(bez)
     if side == "L":
-        b0 = (start[0] - 0.4, y0 + 2.6, z0 + 0.6)
+        b0 = (start[0] - 0.4, y0 + 1.6, z0 + 0.6)
         brow, _ = rod("brow_l", bone, b0, (72, 0, -6), 7.0, 0.9)
         shovel = el("shovel_l", bone, (b0[0] - 0.95, b0[1] + 3.0, b0[2] - 4.4), (b0[0] + 0.95, b0[1] + 8.6, b0[2] + 1.0),
                     rot=(72, 0, -6), origin=b0)
         E += [brow, shovel]
     else:
-        brow, _ = rod("brow_r", bone, (start[0] + 0.4, y0 + 2.6, z0 + 0.6), (74, 0, 8), 5.0, 1.0)
+        brow, _ = rod("brow_r", bone, (start[0] + 0.4, y0 + 1.6, z0 + 0.6), (74, 0, 8), 5.0, 1.0)
         E.append(brow)
     return E
 
@@ -211,10 +214,14 @@ def elements():
     E = [el("hips", "spine_0", (-10.6, 35, -40), (10.6, 57.5, 0)),  # reaching deep into the chest, below the withers
          el("chest", "spine_1", (-11.4, 30, -8), (11.4, 60, 30)),  # deep and broad
          el("skull", "head", *SKULL0),
-         el("muzzle", "head", (-5.4, 59.6, 45.5), (5.4, 67.6, 55.0)),  # broad and blunt
-         el("nose", "head", (-4.6, 60.4, 54.5), (4.6, 66.6, 57.4)),  # furred to the lip
+         # Broad and blunt: its sides 0.4 in from the skull's (at 5.4, 1.6 in, the skull's front showed a rim
+         # beside it; linecheck).
+         el("muzzle", "head", (-6.6, 59.6, 45.5), (6.6, 67.6, 55.0)),
+         # Furred to the lip; out 4 from the muzzle's front, over two texels (at 57.4, out 2.4, its sides read as a rim; linecheck).
+         el("nose", "head", (-5.6, 60.4, 54.5), (5.6, 66.6, 59.0)),  # a unit in from the muzzle's sides, as before
          el("mouth", "head", (-3.5, 58.9, 44.5), (3.5, 60.9, 53.6)),
-         el("jaw", "jaw", (-4.0, 57.6, 44.0), (4.0, 60.4, 54.0))]  # shorter than the muzzle
+         # Shorter than the muzzle; its chin 3.7 below the muzzle, over two texels (at 57.6, 2 below, 1.5 texels, it read as a rim; linecheck).
+         el("jaw", "jaw", (-4.0, 55.9, 44.0), (4.0, 60.4, 54.0))]
     neck, _ = rod("neck", "neck", tuple(NECK0), NECK_ROT, NECK_LEN, NECK_W, back=6.0)  # slimmer than the head
     E.append(neck)
     # The mane: long pale hair down the throat, a box with locks hanging below it.

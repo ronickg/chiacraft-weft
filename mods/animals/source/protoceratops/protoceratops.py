@@ -129,7 +129,8 @@ def eye_box(side):
 
 
 LEGS = ("FL", "FR", "BL", "BR")
-FRONT_X, FRONT_Z, BACK_X, BACK_Z = 9.0, 14.0, 8.5, -12.0
+# The front legs at 7.35 (at 9 the shoulders stood 1.2 out of the chest: now 0.45 in; linecheck).
+FRONT_X, FRONT_Z, BACK_X, BACK_Z = 7.35, 14.0, 8.5, -12.0
 HEAD = (0.0, 33.0, 27.0)
 FRILL0 = (0.0, 37.0, 24.0)  # where the frill rises from the back of the skull
 TAIL = [((0, 37.0, -22.0), (6.2, 28.0, 44.5, -40.0, -21.0)), ((0, 35.5, -39.5), (4.2, 29.5, 41.5, -56.0, -38.5)),
@@ -158,21 +159,32 @@ def bones():
 
 
 def elements():
-    E = [el("hips", "spine_0", (-9.5, 26, -24), (9.5, 46, 6)),  # highest over the hips, the back sloping to the shoulders
-         el("chest", "spine_1", (-11.2, 21, 0), (11.2, 39.4, 22)),
+    # Highest over the hips, the back sloping to the shoulders; half a unit wider than the chest, the thighs half a
+    # unit past them (at 9.5 a 1.7 strip of the chest's top showed beside them; linecheck).
+    E = [el("hips", "spine_0", (-11.7, 26, -24), (11.7, 46, 6)),
+         # Its front half a unit short of the skull's back (at 22 a texel of neck showed between them; linecheck).
+         el("chest", "spine_1", (-11.2, 21, 0), (11.2, 39.4, 23.6)),
          el("neck", "neck", (-5.5, 27, 18), (5.5, 37.5, 30)),  # short and thick, slimmer than the skull
          el("skull", "head", *SKULL),
          el("snout", "head", (-4.2, 27.8, 42.5), (4.2, 38, 51)),
-         el("beak", "head", (-2.8, 25.6, 50.4), (2.8, 34.5, 55)),  # the hooked tip of the upper beak
-         el("nasal", "head", (-1.8, 37.6, 44.5), (1.8, 40.4, 48.5)),  # the bump on the nose
+         # The hooked tip of the upper beak: out 5 from the snout, its top 4.1 under the snout's, its sides half
+         # a unit in from the snout's and its hook 4 below it (out 4, 3.5 under, 1.4 in and 2.2 below, each read
+         # as a rim; linecheck).
+         el("beak", "head", (-3.8, 23.8, 50.4), (3.8, 33.5, 56)),
+         # The bump on the nose, over the snout's front: as wide as the snout and half a unit past its front, its
+         # back 2 texels clear of the skull (a narrower bump mid-snout left a 1.2-texel ring of snout top; linecheck).
+         # 4.8 proud of the snout, its back three texels tall (2.4, a texel, read as a lip; linecheck).
+         el("nasal", "head", (-4.7, 37.6, 47.4), (4.7, 42.8, 51.5)),
          el("mouth", "head", (-3.4, 26.6, 40), (3.4, 28.4, 50)),
-         el("jaw", "jaw", (-4.6, 22.5, 29), (4.6, 27.0, 49.5)),  # shorter than the upper beak
+         el("jaw", "jaw", (-4.6, 21.5, 29), (4.6, 27.0, 49.5)),  # shorter than the upper beak; down 1 to show 2 texels under the skull (1.5 read as a rim; linecheck)
          # The frill: a shield rising up and back over the neck from the back of the skull, thick
          # enough to read as a plate from the side (a thin one read as a stick).
          el("frill", "head", (-10.5, 34.5, 19.6), (10.5, 50.5, 24.6), rot=(-60, 0, 0), origin=FRILL0)]
     for s, n in ((1, "L"), (-1, "R")):
-        x0, x1 = sorted((s * 6.0, s * 8.4))
-        E.append(el(f"jugal_{n.lower()}", "head", (x0, 24.5, 33), (x1, 30, 38)))  # the cheek flange under the eye
+        # The cheek flange under the eye, flaring 4.2 out from the skull's side (its faces three texels across),
+        # its bottom flush with the skull's (out 1.9 and 1.5 below, its top, back and inside read as rims; linecheck).
+        x0, x1 = sorted((s * 5.6, s * 10.7))
+        E.append(el(f"jugal_{n.lower()}", "head", (x0, 25.6, 33), (x1, 30, 38)))
         za, zb, top, bottom = eye_box(s)
         h = top - bottom
         lx0, lx1 = (LID_X - h, LID_X) if s > 0 else (-LID_X, -LID_X + h)
@@ -419,7 +431,8 @@ def pose_lie(t, P=L):
     """Lying on its belly, the legs folded under, the head resting low (6 s)."""
     p = t / 6.0
     br = S(TAU * p * 2)
-    q = {"root": (0, -P["lie_drop"] + 0.2 * br, 0), "spine_1": (0.6 * br, 0, 0), "neck": (8, 0, 0), "head": (6, 6 * S(TAU * p), 0)}
+    # The head down 3.15 (6 before the jaw went a unit deeper): the chin as low as before, so the legs fold as they did (the fit is touchy).
+    q = {"root": (0, -P["lie_drop"] + 0.2 * br, 0), "spine_1": (0.6 * br, 0, 0), "neck": (8, 0, 0), "head": (3.15, 6 * S(TAU * p), 0)}
     for leg in ("FL", "FR"):
         q[f"leg_{leg}_upper"] = (P["lie_front"], 0, 0)
         q[f"leg_{leg}_lower"] = (-150, 0, 0)

@@ -116,8 +116,12 @@ LEGS = ("FL", "FR", "BL", "BR")
 # (x out from the middle, y, z); the upper leg runs out sideways, the lower one down to the foot.
 # Every face at least 0.35 from its neighbors' parallel faces (`boxcheck`), the front feet a hair up
 # so their soles never meet the hind feet's in a stride.
-LEG = {"F": dict(hip=(1.3, 1.15, 1.2), knee=(2.4, 1.0, 1.2), ankle=(2.4, 0.6, 1.2), upper=(1.1, 2.45, 0.9, 1.5, 0.7, 1.7),
-                 lower=(2.1, 2.8, 0.55, 1.15, 1.05, 1.35), foot=(1.75, 3.2, 0.2, 0.7, 0.3, 2.05)),
+# The front upper leg: 3.15 out, past the elbow (at 2.45 its top showed 0.75 beside the chest, under two
+# texels), up to 1.95, half a unit under the chest's top (at 1.5 a band of the chest's side over it read as a
+# stripe), and its front at 1.5, a texel back from the chest's (at 1.7, 0.8 of the chest's side showed in front
+# of it), its back at 0.55; the lower leg 0.15 back with it, clear of both (linecheck, boxcheck).
+LEG = {"F": dict(hip=(1.3, 1.15, 1.2), knee=(2.4, 1.0, 1.2), ankle=(2.4, 0.6, 1.2), upper=(1.1, 3.15, 0.9, 1.95, 0.55, 1.5),
+                 lower=(2.1, 2.8, 0.55, 1.15, 0.9, 1.2), foot=(1.75, 3.2, 0.2, 0.7, 0.3, 2.05)),
        "B": dict(hip=(1.1, 1.45, -1.9), knee=(2.45, 1.4, -1.9), ankle=(2.45, 0.6, -1.9), upper=(0.9, 2.6, 1.2, 1.7, -2.4, -1.4),
                  lower=(2.1, 3.0, 0.45, 1.35, -2.05, -1.75), foot=(1.7, 3.4, 0.0, 0.9, -2.8, -1.0))}
 TAIL = [((0, 1.35, -2.8), (0.9, 0.9, 1.8, -6.0, -2.6)), ((0, 1.3, -5.9), (0.55, 1.0, 1.6, -9.6, -5.4)),
