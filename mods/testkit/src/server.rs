@@ -1025,7 +1025,8 @@ const OPS: &[(&str, &str, Run)] = &[
         w.attribute_remove_modifier(owner(w, cmd)?, Attribute::generated(word(cmd, "attribute")?.to_string()), word(cmd, "mod")?);
         Ok(String::new())
     }),
-    ("loot", "<table:word> <n:int> [ctx:text]", |w, cmd, _, _| {
+    // `held` as the tool: the stack in the player's selected hotbar slot (a tool built from parts).
+    ("loot", "<table:word> <n:int> [ctx:text]", |w, cmd, player, _| {
         let table = LootTable::generated(word(cmd, "table")?.to_string());
         let n: u32 = int(cmd, "n")?;
         let mut ctx = LootCtx::default();
@@ -1035,7 +1036,7 @@ const OPS: &[(&str, &str, Run)] = &[
                 "player" => ctx.by_player = true,
                 // Mined by the tool, from the block the table is named after.
                 "mined" => ctx.mined = Block::lookup(table.name()).ok_or("not a block's table")?,
-                tool => ctx.tool = ItemStack::new(item(tool)?, 1),
+                tool => ctx.tool = tool_stack(w, player, tool)?,
             }
         }
         let mut totals: std::collections::BTreeMap<String, u32> = Default::default();
@@ -1050,10 +1051,11 @@ const OPS: &[(&str, &str, Run)] = &[
             .collect::<Vec<_>>()
             .join(" "))
     }),
-    ("break", "<pos:pos> [tool:item]", |w, cmd, player, _| {
-        let tool = cmd
-            .id("tool")
-            .map_or(ItemStack::EMPTY, |t| ItemStack::new(t, 1));
+    ("break", "<pos:pos> [tool:word]", |w, cmd, player, _| {
+        let tool = match cmd.text("tool") {
+            Some(t) => tool_stack(w, player, t)?,
+            None => ItemStack::EMPTY,
+        };
         Ok((w.break_block(pos(cmd, "pos")?, tool, player, true) as u32).to_string())
     }),
     // A melee hit's damage with what `item` makes of the player having fallen `fall` blocks.
@@ -1140,3 +1142,15 @@ const OPS: &[(&str, &str, Run)] = &[
         Ok(out.join(" "))
     }),
 ];
+
+/// A tool for `break` and `loot`: `held` is the stack in `player`'s selected hotbar slot (a tool
+/// built from parts, `/gear`), anything else an item by name.
+fn tool_stack(w: &World, player: u64, name: &str) -> Result<ItemStack, String> {
+    if name == "held" {
+        return Ok(w
+            .inventory(player)
+            .group("hotbar")
+            .get(w.selected_slot(player)));
+    }
+    Ok(ItemStack::new(item(name)?, 1))
+}

@@ -11,8 +11,7 @@
 //!
 //! - **Armour** the same way: a shell, a fastening and a lining make a helmet, chestplate,
 //!   leggings or boots (`ARMOUR_LOOKS` for how it's worn).
-//! - **`/gear`** builds one for checks and scripts; old saves' whole tools and armour become
-//!   their closest part-built ones (`whole.rs`).
+//! - **`/gear`** builds one (or one part) for checks and scripts.
 
 use crafting::combine::{ArmourStats, Life, Part, ToolStats, armour, combine};
 use crafting::kinds::Use;
@@ -556,7 +555,7 @@ fn built(kind: &Kind, parts: &[(Part, PartOf)]) -> ItemStack {
     combine(kind.id, &plain).map_or(ItemStack::EMPTY, |stats| tool_stack(kind, parts, &stats))
 }
 
-/// What a part of `kind`'s slot `slot` usually is when nothing names it (`/gear`, old saves):
+/// What a part of `kind`'s slot `slot` usually is when nothing names it (`/gear`):
 /// an oak haft or grip, a leather wrap, a wrought-iron wedge, leather straps, a wool lining.
 fn usual(kind: &Kind, role: Role, working: &str) -> &'static str {
     let metal = material_of(code(working))
@@ -576,7 +575,7 @@ fn usual(kind: &Kind, role: Role, working: &str) -> &'static str {
 }
 
 /// `kind_id` built of `materials` (its slots' in order, the usual ones for those left out), every
-/// part of grade `grade` and made on `day`: for `/gear`, scripts and old saves. Empty if they
+/// part of grade `grade` and made on `day`: for `/gear` and scripts. Empty if they
 /// don't make one.
 pub fn made_of(kind_id: &str, materials: &[&str], grade: u8, day: u32) -> ItemStack {
     let Some(kind) = crafting::kinds::kind(kind_id) else { return ItemStack::EMPTY };

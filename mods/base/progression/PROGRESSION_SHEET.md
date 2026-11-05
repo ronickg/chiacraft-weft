@@ -24,7 +24,7 @@ Power grows Ã—1.6 an age: `g(L) = 1.6^(L/10)` over area and item level L (tier Ã
 
 | tier | age | hours | EM | g at start | reference: hit / health / armour | things tagged | made | kit EM | of budget | everything once |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 530 | 145 | 49 | 34 % | 211 EM |
+| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 489 | 145 | 49 | 34 % | 211 EM |
 | 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 26 | 15 | 76 | 26 % | 53 EM |
 | 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 26 | 20 | 50 | 13 % | 242 EM |
 | 3 | Age of Steam | 18 | 1080 | 4.10 | 31.1 / 104 / 130 | 25 | 22 | 94 | 22 % | 263 EM |
@@ -261,15 +261,14 @@ Moving to the next age takes a key, one thing from each gate (materials and tool
 
 Every named item and block, by its tag (`content::RULES`). EM is the cheapest way to have one; "-" not had as an item.
 
-### Stone Age (530)
+### Stone Age (489)
 
-**tech** (83)
+**tech** (42)
 
 - tool: arrow (2.0), axe (0.48), bow (0.48), glider (7.8), hoe (0.70), knife (0.43), pickaxe (0.48), shovel (0.48), spear (0.70), sword (0.70)
 - armour: boots (0.70), chestplate (0.70), helmet (0.70), leggings (0.70)
 - station: furnace (1.2)
 - part: part_bar_guard (0.22), part_barbed_point (0.22), part_bearded_axe_head (0.22), part_boot_shell (0.22), part_bowstring (0.22), part_chest_shell (0.22), part_felling_axe_head (0.22), part_grip (0.22), part_haft (0.22), part_helmet_shell (0.22), part_hoe_blade (0.22), part_knife_blade (0.22), part_lashing (0.22), part_leaf_point (0.22), part_leg_shell (0.22), part_lining (0.22), part_long_blade (0.22), part_long_haft (0.22), part_pick_head (0.22), part_round_pommel (0.22), part_self_stave (0.22), part_shaft (0.22), part_short_blade (0.22), part_short_stave (0.22), part_shovel_blade (0.22), part_straight_blade (0.22), part_straps (0.22)
-- technical: diamond_axe (-), diamond_boots (-), diamond_chestplate (-), diamond_helmet (-), diamond_hoe (-), diamond_leggings (-), diamond_pickaxe (-), diamond_shovel (-), diamond_sword (-), gold_axe (-), gold_boots (-), gold_chestplate (-), gold_helmet (-), gold_hoe (-), gold_leggings (-), gold_pickaxe (-), gold_shovel (-), gold_sword (-), iron_axe (-), iron_boots (-), iron_chestplate (-), iron_helmet (-), iron_hoe (-), iron_leggings (-), iron_pickaxe (-), iron_shovel (-), iron_sword (-), leather_boots (-), leather_chestplate (-), leather_helmet (-), leather_leggings (-), stone_axe (-), stone_hoe (-), stone_pickaxe (-), stone_shovel (-), stone_sword (-), wood_axe (-), wood_hoe (-), wood_pickaxe (-), wood_shovel (-), wood_sword (-)
 
 **magic** (4)
 
@@ -314,7 +313,6 @@ Notes:
 - base:axe, base:pickaxe, base:shovel, base:hoe, base:knife, base:spear, base:sword, base:bow: built from parts: its parts' materials set its real age (`MATERIALS`)
 - base:helmet, base:chestplate, base:leggings, base:boots: built from a shell, fastening and lining: its shell sets its real age; a leather-look shell (leather, rawhide, bone)
 - base:part_*: a part's material sets its real age (`MATERIALS`)
-- base:wood_pickaxe, base:wood_axe, base:wood_shovel, base:wood_hoe, base:wood_sword, base:stone_pickaxe, base:stone_axe, base:stone_shovel, base:stone_hoe, base:stone_sword, base:iron_pickaxe, base:iron_axe, base:iron_shovel, base:iron_hoe, base:iron_sword, base:gold_pickaxe, base:gold_axe, base:gold_shovel, base:gold_hoe, base:gold_sword, base:diamond_pickaxe, base:diamond_axe, base:diamond_shovel, base:diamond_hoe, base:diamond_sword, base:leather_helmet, base:leather_chestplate, base:leather_leggings, base:leather_boots, base:iron_helmet, base:iron_chestplate, base:iron_leggings, base:iron_boots, base:gold_helmet, base:gold_chestplate, base:gold_leggings, base:gold_boots, base:diamond_helmet, base:diamond_chestplate, base:diamond_leggings, base:diamond_boots: the old whole tools and armour: kept only so old saves load, each turned into its closest part-built one on sight (`whole.rs`)
 - base:arrow: dropped by skeletons; no recipe yet
 - base:furnace: the Stone Age key's infrastructure: what it makes is the Bronze Age's
 - base:cooking_pot, base:stew: a clay pot (Ronald, 11-07: "move them to fit")

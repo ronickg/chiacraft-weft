@@ -388,7 +388,10 @@ async fn loot_tables(t: &T) -> R {
     let stone = counts(&t.op("loot base:stone 10").await?);
     t.check_eq(stone.get("base:cobblestone").copied(), Some(10), "drops() is a one entry table, broken by the world");
     t.check_eq(t.op("loot base:stone 10 mined").await?, String::new(), "stone mined by hand drops nothing");
-    let stone = counts(&t.op("loot base:stone 10 mined wood_pickaxe").await?);
+    let stone = counts(
+        &t.op("loot base:stone 10 mined testmod:steel_pickaxe")
+            .await?,
+    );
     t.check_eq(stone.get("base:cobblestone").copied(), Some(10), "stone mined with a pickaxe");
     t.check_eq(t.op("loot base:bricks 10 mined").await?, String::new(), "a block's own item needs the tool too");
     let shorn = counts(&t.op("loot base:oak_leaves 4000 mined").await?);
@@ -399,15 +402,17 @@ async fn loot_tables(t: &T) -> R {
 
 /// Harvest levels: iron ore needs a stone pickaxe; tiers are numbers, so the test mod's steel
 /// pickaxe (250) mines its reinforced stone (250) and what iron (200) does, not obsidian (300).
+/// Base's pickaxes are built from parts (`/gear`, held): a bone head harvests 80, ground stone 100,
+/// bronze 210 (`vitals::gear::harvest`).
 async fn tool_tiers(t: &T, o: [i32; 3]) -> R {
     let mut drops = 0;
     for (i, (block, tool, gets)) in [
         ("stone", "stick", false),
-        ("stone", "wood_pickaxe", true),
-        ("iron_ore", "wood_pickaxe", false),
-        ("iron_ore", "stone_pickaxe", true),
-        ("diamond_ore", "stone_pickaxe", false),
-        ("testmod:reinforced_stone", "iron_pickaxe", false),
+        ("stone", "pickaxe bone", true),
+        ("iron_ore", "pickaxe bone", false),
+        ("iron_ore", "pickaxe stone", true),
+        ("diamond_ore", "pickaxe stone", false),
+        ("testmod:reinforced_stone", "pickaxe bronze", false),
         ("testmod:reinforced_stone", "testmod:steel_pickaxe", true),
         ("gold_ore", "testmod:steel_pickaxe", true),
         ("obsidian", "testmod:steel_pickaxe", false),
@@ -417,7 +422,14 @@ async fn tool_tiers(t: &T, o: [i32; 3]) -> R {
     {
         let p = add(o, [i as i32 * 2 - 8, 0, 0]);
         t.set(p, block).await?;
-        t.op(&format!("break {} {tool}", at(p))).await?;
+        if tool.contains(' ') {
+            t.cmd(&format!("/gear {tool} slot=0")).await?;
+            t.c().select_slot(0);
+            t.frames(2).await?;
+            t.op(&format!("break {} held", at(p))).await?;
+        } else {
+            t.op(&format!("break {} {tool}", at(p))).await?;
+        }
         t.frames(5).await?;
         drops += gets as usize;
         t.check_eq(
@@ -433,11 +445,18 @@ async fn tool_tiers(t: &T, o: [i32; 3]) -> R {
 async fn interceptor(t: &T, p: [i32; 3]) -> R {
     t.set(p, "gold_block").await?;
     t.cmd("/rule testkit:protect_gold 1").await?;
-    let refused = t.op(&format!("break {} diamond_pickaxe", at(p))).await?;
+    let refused = t
+        .op(&format!("break {} testmod:steel_pickaxe", at(p)))
+        .await?;
     t.cmd("/rule testkit:protect_gold 0").await?;
     t.check_eq(refused, "0".into(), "break refused");
     t.check_eq(t.block(p).await?, "base:gold_block".into(), "the gold stays");
-    t.check_eq(t.op(&format!("break {} diamond_pickaxe", at(p))).await?, "1".into(), "break allowed again");
+    t.check_eq(
+        t.op(&format!("break {} testmod:steel_pickaxe", at(p)))
+            .await?,
+        "1".into(),
+        "break allowed again",
+    );
     t.check_eq(t.block(p).await?, "core:air".into(), "broken");
     Ok(())
 }

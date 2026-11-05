@@ -10,7 +10,7 @@ pub static WHEAT: Item = Item::named("wheat");
 pub static BUCKET: Item = Item::named("bucket");
 
 pub use base_api::{ARMOR, Armor, FLAMMABLE, FOOD, FUEL, Food};
-/// Tags of armor pieces, head to feet (every armour kind's items and the old whole pieces).
+/// Tags of armor pieces, head to feet (every armour kind's items).
 pub const ARMOR_SLOTS: [&str; 4] = ["armor_head", "armor_chest", "armor_legs", "armor_feet"];
 
 pub fn register(r: &mut Registry) {
@@ -131,6 +131,5 @@ pub fn register(r: &mut Registry) {
             .tag(name)
             .tab(&crate::tabs::INGREDIENTS);
     }
-    // Tools, weapons and armour are built from parts (`parts.rs`); the old whole ones are kept
-    // only to convert old saves (`whole.rs`).
+    // Tools, weapons and armour are built from parts (`parts.rs`; Ronald, 11-05: no whole ones).
 }

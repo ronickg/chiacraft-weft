@@ -165,24 +165,9 @@ diamond ... I kind of wanted to be a bit more realistic, but not completely". So
   and diamond armour have no recipe, no creative tab and no place in any list. Every tool and
   weapon is a kind item (`base:axe`, `base:sword` ...) assembled from parts; armour is a helmet,
   chestplate, leggings or boots assembled from a shell, a fastening and a lining.
-- **Old saves:** the engine drops an item name it doesn't know, so the old items stay registered
-  (`mods/base/src/whole.rs`) and each turns into its closest part-built one on sight: a player's
-  whole inventory when they join and every second, a chest's when it's opened. Same kind, Sound
-  (grade 4), wear carried over:
-
-  | Old | Becomes |
-  |---|---|
-  | iron tools | wrought-iron head, oak haft, wrought-iron wedge |
-  | iron sword | wrought-iron blade, guard and pommel, leather grip |
-  | diamond tools | diamond head, oak haft, wrought-iron wedge |
-  | diamond sword | diamond blade, wrought-iron guard and pommel, oak grip |
-  | stone tools | ground-stone head, oak haft, cordage lashing |
-  | wooden shovel, hoe | oak blade, oak haft, cordage |
-  | wooden axe, pick; wooden and stone swords | flint head; a flint blade set in oak (a macuahuitl) |
-  | gold tools, sword | copper head or blade, gold fittings, guard and pommel |
-  | leather, iron, diamond armour | a leather, wrought-iron or diamond-scale shell, leather straps (wrought-iron rivets for diamond), linen or wool lining |
-  | gold armour | bronze scales, gold rivets, linen lining |
-
+- **Old saves:** none of their logic (Ronald, 11-05: "I don't need to convert old saves ... we
+  don't need any logic for old saves at the moment because we're still building the game"). The
+  old items are simply gone: an old world loses them.
 - **`/gear <kind> <materials...> [grade=N] [slot=N]`** builds one for checks and scripts (game
   masters): the working part's material first, then its slots' in order, the usual ones for the
   rest (an oak haft, a leather grip on a bow, cordage on stone and wrought iron on metal, leather
@@ -761,8 +746,8 @@ are rows.
    5. **Signed history through portals**, with Phase 4's world DIDs.
 11. **Slow crafts** as machines (the tanning frame first), then **smithing and casting** with
    Content's copper, bronze and iron.
-12. **Parts only** (built 11-05, waiting for PC looks): the whole tools and armour gone, old
-    saves converted (`whole.rs`), armour from shell, fastening and lining, the roles checked
+12. **Parts only** (built 11-05, waiting for PC looks): the whole tools and armour gone (old
+    worlds lose them; no old-save logic, Ronald), armour from shell, fastening and lining, the roles checked
     against the real things, the numbers from the curve, `/gear`. Not yet: part art for armour
     (it wears today's four sets), copper, bronze and steel in the world (their parts exist, nothing
     to make them from).

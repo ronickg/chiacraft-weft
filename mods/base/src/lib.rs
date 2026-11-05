@@ -53,7 +53,6 @@ mod video;
 mod weather;
 mod weather_sound;
 mod web;
-mod whole;
 mod wild;
 mod window;
 mod worldgen;
@@ -123,7 +122,6 @@ fn init(r: &mut Registry) {
     book::register(r);
     discovery::register(r);
     parts::register(r);
-    whole::register(r);
     first::register(r);
     knapping::register(r);
     firebed::register(r);

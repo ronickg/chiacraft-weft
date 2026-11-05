@@ -1267,7 +1267,7 @@ pub async fn block_shapes(t: T) -> R {
     // Standing right beside it, where it drops either way, as above.
     t.c().teleport(centre(mix, 0.5, 0.0, 1.3));
     t.secs(0.3).await?;
-    t.op(&format!("break {} base:iron_pickaxe", at(mix)))
+    t.op(&format!("break {} testmod:steel_pickaxe", at(mix)))
         .await?;
     t.secs(1.5).await?;
     t.check_eq(t.slot("me", 2).await?.1, 8, "it gives back the one");
@@ -1732,7 +1732,11 @@ pub async fn own_names(t: T) -> R {
     t.check(t.c().ui_rect("text:Loot Box").is_some(), "the chest window shows its own name");
     t.c().screen_close();
     t.no_screen().await?;
-    t.op(&format!("break {} wood_axe", at(chest))).await?;
+    // Broken with a flint axe built from parts, held.
+    t.cmd("/gear axe flint slot=8").await?;
+    t.c().select_slot(8);
+    t.frames(2).await?;
+    t.op(&format!("break {} held", at(chest))).await?;
     t.c()
         .teleport([chest[0] as f64 + 0.5, chest[1] as f64, chest[2] as f64 + 0.5]);
     let back = t
