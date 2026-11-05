@@ -285,11 +285,15 @@ fn waystone_blocks(node: &Node, ground: &dyn Fn(i32, i32) -> i32, biome: &str) -
             put([x, gy + 2, z], way);
         }
     }
-    // Clear plants off the plinth's top and the pillar's foot (not water: the seabed stays wet).
+    // Clear plants off the plinth's top and the pillar's foot (not water: the seabed stays wet), at
+    // each column's own ground and at the plinth's: tall grass on the plinth stood in the way of a
+    // click on the stone (PC look wm_look2).
     if !matches!(style, Style::Seabed) {
-        for dz in -1..=1 {
-            for dx in -1..=1 {
-                out.push(([x + dx, ground(x + dx, z + dz) + 1, z + dz], 0, true));
+        for dz in -2..=2 {
+            for dx in -2..=2 {
+                for y in [ground(x + dx, z + dz) + 1, gy + 1, gy + 2] {
+                    out.push(([x + dx, y, z + dz], 0, true));
+                }
             }
         }
     }
