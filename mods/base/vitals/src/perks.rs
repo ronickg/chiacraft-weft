@@ -67,9 +67,11 @@ pub struct Node {
     pub region: Option<Skill>,
     /// The second skill a bridge needs.
     pub bridge: Option<Skill>,
-    /// Its ring (distance from the centre) and its angle, radians clockwise from the top.
+    /// Its depth in rings out from the centre (what its skill gate goes by, `GATES`), and where
+    /// it's drawn (GUI px from the centre at zoom 1, y down; `web_layout`).
     pub ring: f32,
-    pub angle: f32,
+    pub x: f32,
+    pub y: f32,
     /// Units it gives each family (a keystone's cost negative).
     pub gives: Vec<(Family, f32)>,
     pub special: Option<Special>,
@@ -84,8 +86,7 @@ pub struct Node {
 impl Node {
     /// Where it's drawn, in GUI pixels from the centre at zoom 1 (y down).
     pub fn pos(&self) -> (f32, f32) {
-        let r = radius(self.ring);
-        (r * self.angle.sin(), -r * self.angle.cos())
+        (self.x, self.y)
     }
 
     /// Its units in all, gains only (a keystone's power).
@@ -118,6 +119,8 @@ pub const LANE_PX: f32 = 16.0;
 pub struct Web {
     pub nodes: Vec<Node>,
     pub links: Vec<(u16, u16)>,
+    /// The links that curve: the centre of each one's arc (`web_layout::key` order).
+    pub arcs: crate::web_layout::Arcs,
     index: HashMap<u16, usize>,
     near: HashMap<u16, Vec<u16>>,
 }
@@ -175,8 +178,8 @@ const TEMPLATE: [T; 16] = [
 ];
 /// The bridge between a region and the next clockwise: a small node at ring 5.5 between this
 /// one's right lane and that one's left, and a notable past it at 6.5.
-const BRIDGE_SMALL: u16 = 40;
-const BRIDGE_NOTABLE: u16 = 41;
+pub const BRIDGE_SMALL: u16 = 40;
+pub const BRIDGE_NOTABLE: u16 = 41;
 const BRIDGE_RINGS: (f32, f32) = (5.5, 6.5);
 
 /// A named node: its key's tail and what it gives (a keystone: the family it gains and the one it
@@ -432,14 +435,27 @@ fn region_angle(i: usize) -> f32 {
     i as f32 * std::f32::consts::TAU / COUNT as f32
 }
 
+/// A point `ring` rings out at `angle` (the first web's wheel).
+fn polar(ring: f32, angle: f32) -> (f32, f32) {
+    let r = radius(ring);
+    (r * angle.sin(), -r * angle.cos())
+}
+
 fn build() -> Web {
+    build_with(crate::web_layout::STYLE)
+}
+
+/// The web laid out in a style (`web_layout`): the game's is `web_layout::STYLE`; the sheet and the
+/// layout pictures build the others to compare.
+pub fn build_with(style: crate::web_layout::Style) -> Web {
     let mut nodes = vec![Node {
         id: START,
         kind: Kind::Small,
         region: None,
         bridge: None,
         ring: 0.0,
-        angle: 0.0,
+        x: 0.0,
+        y: 0.0,
         gives: Vec::new(),
         special: None,
         key: "start".into(),
@@ -460,13 +476,15 @@ fn build() -> Web {
                 Side::Named(j) => (r.named[j].gives.to_vec(), r.named[j].key.to_string(), r.named[j].special),
             };
             let angle = mid + t.lane * LANE_PX / radius(t.ring);
+            let (x, y) = polar(t.ring, angle);
             nodes.push(Node {
                 id: id(r.skill, t.at),
                 kind: t.kind,
                 region: Some(r.skill),
                 bridge: None,
                 ring: t.ring,
-                angle,
+                x,
+                y,
                 gives,
                 special,
                 key,
@@ -490,7 +508,8 @@ fn build() -> Web {
             region: Some(r.skill),
             bridge: Some(next),
             ring: BRIDGE_RINGS.0,
-            angle: edge,
+            x: polar(BRIDGE_RINGS.0, edge).0,
+            y: polar(BRIDGE_RINGS.0, edge).1,
             gives: vec![(r.bridge.gives[0].0, 1.0)],
             special: None,
             key: format!("family.{}", r.bridge.gives[0].0.id()),
@@ -503,7 +522,8 @@ fn build() -> Web {
             region: Some(r.skill),
             bridge: Some(next),
             ring: BRIDGE_RINGS.1,
-            angle: edge,
+            x: polar(BRIDGE_RINGS.1, edge).0,
+            y: polar(BRIDGE_RINGS.1, edge).1,
             gives: r.bridge.gives.to_vec(),
             special: r.bridge.special,
             key: r.bridge.key.to_string(),
@@ -532,13 +552,15 @@ fn build() -> Web {
         links.push((id(REGIONS[r].skill, 2), sid));
         links.push((id(REGIONS[(r + 1) % COUNT].skill, 1), sid));
     }
+    let mut arcs = crate::web_layout::Arcs::new();
+    crate::web_layout::lay(style, &mut nodes, &mut links, &mut arcs);
     let index = nodes.iter().enumerate().map(|(i, n)| (n.id, i)).collect();
     let mut near: HashMap<u16, Vec<u16>> = HashMap::new();
     for &(a, b) in &links {
         near.entry(a).or_default().push(b);
         near.entry(b).or_default().push(a);
     }
-    Web { nodes, links, index, near }
+    Web { nodes, links, arcs, index, near }
 }
 
 /// Where the sockets are: deep in each region (its place 20, ring 5.6), past every second
@@ -554,13 +576,15 @@ const CENTRE_SOCKETS: [usize; 4] = [1, 5, 9, 13];
 pub const SOCKETS: usize = 48;
 
 fn socket_node(id: u16, region: Option<Skill>, bridge: Option<Skill>, ring: f32, angle: f32, socket: u8) -> Node {
+    let (x, y) = polar(ring, angle);
     Node {
         id,
         kind: Kind::Socket,
         region,
         bridge,
         ring,
-        angle,
+        x,
+        y,
         gives: Vec::new(),
         special: None,
         key: "socket".into(),
@@ -781,6 +805,11 @@ fn reach(taken: &Taken) -> HashSet<u16> {
 
 // ------------------------------------------------------------------ the checks
 
+/// The most a region gives in all its families together: an age and a quarter (the speciality
+/// rule, one age in any one family, is checked family by family; this bounds a bigger region's
+/// travel nodes and its bridge).
+pub const REGION_TOTAL: f32 = 37.5;
+
 /// Units each region gives (its own nodes and its bridges), nets (keystones count as nothing).
 pub fn region_units(skill: Skill) -> f32 {
     web()
@@ -855,8 +884,8 @@ pub fn problems() -> Vec<String> {
     // A region's budget: everything in it together at most one age in its speciality.
     for s in SKILLS {
         let u = region_units(s);
-        if u > units_to_ceiling() + 1e-4 {
-            out.push(format!("region {} gives {u} units, over its budget of {}", s.id(), units_to_ceiling()));
+        if u > REGION_TOTAL + 1e-4 {
+            out.push(format!("region {} gives {u} units, over its budget of {REGION_TOTAL}", s.id()));
         }
         for f in FAMILIES {
             let fu: f32 = web

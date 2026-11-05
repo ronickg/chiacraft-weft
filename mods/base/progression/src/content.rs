@@ -248,6 +248,8 @@ pub const RULES: &[Rule] = &[
         Made,
         "built from a shell, fastening and lining: its shell sets its real age; a leather-look shell (leather, rawhide, bone)",
     ),
+    // grapple.rs: wrought-iron flukes on a string cord (`vitals::grapple::IRON`).
+    r(&["base:grappling_hook"], 2, Tech, Tool, Made),
     n(
         &["base:helmet_mail", "base:chestplate_mail", "base:leggings_mail", "base:boots_mail"],
         2,
@@ -262,7 +264,7 @@ pub const RULES: &[Rule] = &[
         Tech,
         Armour,
         Not,
-        "a bronze or copper shell's worn look: no copper or bronze in the game yet, only old gold armour converted",
+        "a bronze or copper shell's worn look: no copper or bronze in the game yet (only `/gear`)",
     ),
     n(
         &["base:helmet_gem", "base:chestplate_gem", "base:leggings_gem", "base:boots_gem"],

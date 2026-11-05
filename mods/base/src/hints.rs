@@ -173,6 +173,11 @@ fn watch(w: &World) {
         if st.age % 20 != 7 || w.outside_survival(id) {
             continue;
         }
+        // Not while on a wall, a glider or a rope: the hands are busy and the hint would cover
+        // the view (Ronald, 11-05); it comes the next second they are free.
+        if [crate::climbing::CLIMB.id(), crate::glider::GLIDE.id(), crate::grapple::HANG.id()].contains(&st.pose) {
+            continue;
+        }
         let inv = w.inventory(id);
         let items: Vec<u32> = (0..inv.len())
             .map(|i| inv.get(i))

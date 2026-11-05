@@ -26,7 +26,7 @@ Power grows Ã—1.6 an age: `g(L) = 1.6^(L/10)` over area and item level L (tier Ã
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 489 | 145 | 49 | 34 % | 211 EM |
 | 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 26 | 15 | 76 | 26 % | 53 EM |
-| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 26 | 20 | 50 | 13 % | 242 EM |
+| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 27 | 21 | 50 | 13 % | 246 EM |
 | 3 | Age of Steam | 18 | 1080 | 4.10 | 31.1 / 104 / 130 | 25 | 22 | 94 | 22 % | 263 EM |
 | 4 | Age of Lightning | 20 | 1200 | 6.55 | 49.7 / 166 / 207 | 0 | 0 | 0 | 0 % | 0 EM |
 | 5 | Age of the Future | 18 | 1080 | 10.49 | 79.6 / 265 / 332 | 0 | 0 | 0 | 0 % | 0 EM |
@@ -335,16 +335,17 @@ Notes:
 Notes:
 - base:iron_ore, base:granite_iron_ore, base:red_sandstone_iron_ore, base:meteorite, base:gold_ore, base:granite_gold_ore: breaks into raw iron, meteoric iron or raw gold (a stone pickaxe)
 - base:pallasite: a stony-iron meteorite's olivine, found where one fell
-- base:helmet_scale, base:chestplate_scale, base:leggings_scale, base:boots_scale: a bronze or copper shell's worn look: no copper or bronze in the game yet, only old gold armour converted
+- base:helmet_scale, base:chestplate_scale, base:leggings_scale, base:boots_scale: a bronze or copper shell's worn look: no copper or bronze in the game yet (only `/gear`)
 - base:meteoric_iron: hammered cold, iron-grade before a player can smelt (Research round 17)
 - base:raw_gold, base:gold_ingot, base:gold_block: cast and soft: the Bronze Age's (Ronald, 11-07: "move them to fit")
 
-### Iron Age (26)
+### Iron Age (27)
 
-**tech** (14)
+**tech** (15)
 
 - ground: redstone_ore (-), star_steel_ore (-)
 - material: bucket (3.5), iron_block (11), iron_ingot (1.2), lava_bucket (4.1), raw_iron (1.0), star_steel_ingot (12), star_steel_lump (12), water_bucket (3.7)
+- tool: grappling_hook (3.8)
 - armour: boots_mail (2.8), chestplate_mail (4.0), helmet_mail (2.8), leggings_mail (4.0)
 
 **magic** (8)

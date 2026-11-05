@@ -29,6 +29,7 @@ pub mod food;
 pub mod forage;
 pub mod gear;
 pub mod glide;
+pub mod grapple;
 pub mod impact;
 pub mod layers;
 pub mod levels;
@@ -48,6 +49,7 @@ pub mod stomach;
 pub mod temperature;
 pub mod weather_sound;
 pub mod web;
+pub mod web_layout;
 pub mod web_sheet;
 pub mod wild;
 

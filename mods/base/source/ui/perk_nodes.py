@@ -7,6 +7,7 @@ size in GUI pixels, as the screen draws them: `mods/base/src/web.rs`).
     ~/.venvs/blocky/bin/python mods/base/source/ui/perk_nodes.py notes/ui-codex/perk_web_nodes.png mods/base/assets/textures/gui
     ~/.venvs/blocky/bin/python mods/base/source/ui/perk_nodes.py notes/ui-codex/perk_web_sockets.png mods/base/assets/textures/gui
 """
+import os
 import sys
 
 import numpy as np
@@ -29,6 +30,41 @@ def runs(mask):
     return out
 
 
+# Ronald, 11-05: "Generated ones", cut down to the kit's palette (the UI guide's pixel craft):
+# every pixel to the nearest of kit2's colours (`notes/ui/kit2/kit2.py`), compared in Lab so the
+# bevel's light and shade keep their steps.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", "notes", "ui", "kit2"))
+import kit2 as k  # noqa: E402
+
+PALETTE = [k.OUTLINE, k.INK_DARK, k.PANEL, k.PANEL_DEEP, k.WELL, k.WELL_D, k.WELL_L, k.SLIDER, k.SLIDER_D, k.SLIDER_L,
+           k.BRONZE_D, k.BRONZE, k.BRONZE_L, k.BRONZE_HI, k.SLOT, k.SLOT_D, k.SLOT_L, k.CREAM, k.DIM, k.GOLD_TEXT, k.ON_ORANGE,
+           k.GLOW, k.GLOW_D] + [c for name, face in k.FACES.items() if name != "danger" for c in face] + [c for m in ("cream", "brass", "wood", "blue", "dark") for c in k.MAT[m]]
+# (no "danger" red: the bevel's orange shade fell onto it and showed red on the rims)
+
+
+def lab(rgb):
+    c = np.asarray(rgb, float) / 255.0
+    c = np.where(c > 0.04045, ((c + 0.055) / 1.055) ** 2.4, c / 12.92)
+    xyz = c @ np.array([[0.4124, 0.2126, 0.0193], [0.3576, 0.7152, 0.1192], [0.1805, 0.0722, 0.9505]])
+    xyz = xyz / np.array([0.9505, 1.0, 1.089])
+    f = np.where(xyz > 0.008856, np.cbrt(xyz), 7.787 * xyz + 16 / 116)
+    return np.stack([116 * f[..., 1] - 16, 500 * (f[..., 0] - f[..., 1]), 200 * (f[..., 1] - f[..., 2])], -1)
+
+
+PAL_LAB = lab(np.array(sorted(set(PALETTE)), float))
+PAL_RGB = np.array(sorted(set(PALETTE)), np.uint8)
+
+
+def quantise(im):
+    a = np.array(im)
+    m = a[..., 3] > 0
+    if m.any():
+        d = ((lab(a[m][:, :3])[:, None, :] - PAL_LAB[None, :, :]) ** 2).sum(-1)
+        a[m, :3] = PAL_RGB[d.argmin(1)]
+        a[m, 3] = 255
+    return Image.fromarray(a)
+
+
 def cut(src, fg, box, n):
     """The box's art at n x n: each output pixel the colour at its cell's middle, magenta clear."""
     y0, y1, x0, x1 = box
@@ -46,7 +82,7 @@ def cut(src, fg, box, n):
 
 def write(out, name, normal, hover, n):
     for suffix, im in [("", normal), ("_pressed", normal), ("_disabled", normal), ("_hover", hover)]:
-        im.save(f"{out}/{name}{suffix}.png")
+        quantise(im).save(f"{out}/{name}{suffix}.png")
         with open(f"{out}/{name}{suffix}.gui", "w") as f:
             f.write(f"scaling = stretch\nsize = {n // 2} {n // 2}\n")
 
@@ -100,7 +136,7 @@ def main():
                 hover = cut(src, fg, (int(hb[0] + grow), int(hb[1] - grow), int(hb[2] + grow), int(hb[3] - grow)), n)
             for suffix, im in [("", normal), ("_pressed", normal), ("_disabled", normal), ("_hover", hover)]:
                 name = f"perk_{kind}_{state}{suffix}"
-                im.save(f"{out}/{name}.png")
+                quantise(im).save(f"{out}/{name}.png")
                 with open(f"{out}/{name}.gui", "w") as f:
                     f.write(f"scaling = stretch\nsize = {n // 2} {n // 2}\n")
     print("done")

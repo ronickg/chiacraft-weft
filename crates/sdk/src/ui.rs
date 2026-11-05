@@ -595,6 +595,16 @@ impl Ui {
         Icons { ui: self, node: Some(n), effects: Vec::new() }
     }
 
+    /// An image shown while `f` is above 0, that much opaque (up to 1): an overlay that comes and
+    /// goes (a glider's frame overhead while gliding). `s` sizes it; in `hud_anchor::TOP`,
+    /// `S::default().h(..)` spans the screen's width.
+    pub fn image_bind(&mut self, texture: &str, s: S, f: impl Fn(&ClientView) -> f32 + Send + Sync + 'static) {
+        let mut n = node(k::IMAGE, s);
+        n.text = Str::new(texture);
+        n.bind = bind_cb(f);
+        self.leaf(n)
+    }
+
     pub fn image(&mut self, texture: &str, w: f32, h: f32) {
         let mut n = node(k::IMAGE, S::default().size(w, h));
         n.text = Str::new(texture);
