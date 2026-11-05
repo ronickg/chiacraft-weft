@@ -61,6 +61,7 @@ mod lizard;
 mod meat;
 mod mouse;
 mod owl;
+mod prof;
 mod protoceratops;
 mod psittacosaurus;
 mod raptor;
@@ -105,6 +106,8 @@ fn data_dir() -> String {
 // ------------------------------------------------------------------ registration
 
 fn init(r: &mut Registry) {
+    // The goal timer first: its first row ("upkeep") is the one that logs.
+    prof::init(r);
     dog::init(r);
     for p in species::problems() {
         weft_sdk::error!("{p}");

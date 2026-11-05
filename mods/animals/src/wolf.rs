@@ -10,6 +10,7 @@ use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
 use crate::ModelFile;
+use crate::prof::Timed;
 
 pub(crate) static WOLF: EntityKind = EntityKind::named("grey_wolf");
 const TEXTURE: &str = "wolf/wolf";
@@ -44,18 +45,18 @@ pub fn init(r: &mut Registry) {
         })
         .goals(
             Goals::new()
-                .then(crate::animal::upkeep(index))
-                .then(crate::voices::howl_at_blood_moon)
-                .then(crate::taming::behave(index))
-                .then(crate::hunt::wary)
-                .then(crate::hunt::hunt)
-                .then(crate::commands::act(index))
-                .then(crate::breeding::behave(index))
-                .then(crate::rest::settle)
-                .then(crate::commands::hold)
-                .then(crate::comfort::seek)
-                .then(crate::forage::forage)
-                .then(ai::wander(0.4, 10.0)),
+                .timed("upkeep", crate::animal::upkeep(index))
+                .timed("howl", crate::voices::howl_at_blood_moon)
+                .timed("taming", crate::taming::behave(index))
+                .timed("wary", crate::hunt::wary)
+                .timed("hunt", crate::hunt::hunt)
+                .timed("commands", crate::commands::act(index))
+                .timed("breeding", crate::breeding::behave(index))
+                .timed("settle", crate::rest::settle)
+                .timed("hold", crate::commands::hold)
+                .timed("comfort", crate::comfort::seek)
+                .timed("forage", crate::forage::forage)
+                .timed("wander", ai::wander(0.4, 10.0)),
         )
         .on_hurt(|w, h| {
             crate::taming::hurt(w, h.entity);

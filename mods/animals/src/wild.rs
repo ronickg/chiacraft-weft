@@ -9,6 +9,7 @@ use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
 use crate::ModelFile;
+use crate::prof::Timed;
 
 /// One simple creature's body, for every species on its model.
 pub struct Body {
@@ -75,17 +76,17 @@ pub fn register(r: &mut Registry, kinds: &[&'static EntityKind], body: &'static 
             })
             .goals(
                 Goals::new()
-                    .then(crate::animal::upkeep(index))
-                    .then(startle)
-                    .then(crate::taming::behave(index))
-                    .then(|w: &World, id: u64, st: &EntityState| crate::hunt::wary(w, id, st) && woken(w, id))
-                    .then(|w: &World, id: u64, st: &EntityState| crate::hunt::huddle(w, id, st) && woken(w, id))
-                    .then(|w: &World, id: u64, st: &EntityState| crate::hunt::hunt(w, id, st) && woken(w, id))
-                    .then(crate::breeding::behave(index))
-                    .then(move |w: &World, id: u64, st: &EntityState| settle(w, id, st, look))
-                    .then(crate::comfort::seek)
-                    .then(crate::forage::forage)
-                    .then(ai::wander(body.wander, 8.0)),
+                    .timed("upkeep", crate::animal::upkeep(index))
+                    .timed("startle", startle)
+                    .timed("taming", crate::taming::behave(index))
+                    .timed("wary", |w: &World, id: u64, st: &EntityState| crate::hunt::wary(w, id, st) && woken(w, id))
+                    .timed("huddle", |w: &World, id: u64, st: &EntityState| crate::hunt::huddle(w, id, st) && woken(w, id))
+                    .timed("hunt", |w: &World, id: u64, st: &EntityState| crate::hunt::hunt(w, id, st) && woken(w, id))
+                    .timed("breeding", crate::breeding::behave(index))
+                    .timed("settle", move |w: &World, id: u64, st: &EntityState| settle(w, id, st, look))
+                    .timed("comfort", crate::comfort::seek)
+                    .timed("forage", crate::forage::forage)
+                    .timed("wander", ai::wander(body.wander, 8.0)),
             )
             .on_hurt(|w, h| {
                 crate::taming::hurt(w, h.entity);

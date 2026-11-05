@@ -11,6 +11,7 @@ use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
 use crate::ModelFile;
+use crate::prof::Timed;
 
 use crate::dist2;
 
@@ -98,15 +99,15 @@ pub fn register(r: &mut Registry, kinds: &[&'static EntityKind], wings: &'static
             })
             .goals(
                 Goals::new()
-                    .then(crate::animal::upkeep(index))
-                    .then(move |w: &World, id: u64, st: &EntityState| fly(w, id, st, wings))
-                    .then(crate::taming::behave(index))
-                    .then(move |w: &World, id: u64, st: &EntityState| crate::hunt::wary(w, id, st) && take_off(w, id, st, wings))
-                    .then(crate::hunt::hunt)
-                    .then(crate::breeding::behave(index))
-                    .then(crate::comfort::seek)
-                    .then(crate::forage::forage)
-                    .then(ai::wander(wings.wander, 8.0)),
+                    .timed("upkeep", crate::animal::upkeep(index))
+                    .timed("fly", move |w: &World, id: u64, st: &EntityState| fly(w, id, st, wings))
+                    .timed("taming", crate::taming::behave(index))
+                    .timed("wary", move |w: &World, id: u64, st: &EntityState| crate::hunt::wary(w, id, st) && take_off(w, id, st, wings))
+                    .timed("hunt", crate::hunt::hunt)
+                    .timed("breeding", crate::breeding::behave(index))
+                    .timed("comfort", crate::comfort::seek)
+                    .timed("forage", crate::forage::forage)
+                    .timed("wander", ai::wander(wings.wander, 8.0)),
             )
             .on_hurt(|w, h| crate::taming::hurt(w, h.entity));
     }
