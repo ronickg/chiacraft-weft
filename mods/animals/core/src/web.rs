@@ -190,11 +190,25 @@ pub fn gaps() -> Vec<Gap> {
             }
         }
     }
-    // A year in each biome holds: its grazers, as many as live together where commonest, can't
-    // eat its grass bare in its best season.
+    // A year in each biome holds, and herds crop it as real ones do: its grazers, as many as the
+    // biome's stocking lets live together, eat a quarter to a half of its grass's regrowth in its
+    // best season (`vitals::forage::GRAZED`); more is grazed bare, less a world that never shows it.
     for biome in biomes() {
         if let Some(g) = grazing(biome)
-            && g.eaten > g.regrown
+            && g.eaten < vitals::forage::GRAZED.0 * g.regrown
+        {
+            out.push(gap(
+                format!("{biome}: hardly grazed"),
+                format!(
+                    "{biome}: its grazers eat {:.0}% of the grass's regrowth in {} (at least {:.0}%): the stocking (Species::crowd_in) and hunger against vitals::forage's tuft food, GRASS_COVER and the grazed grass's growth",
+                    g.eaten / g.regrown * 100.0,
+                    SEASONS[g.season],
+                    vitals::forage::GRAZED.0 * 100.0
+                ),
+            ));
+        }
+        if let Some(g) = grazing(biome)
+            && g.eaten > vitals::forage::GRAZED.1 * g.regrown
         {
             out.push(gap(
                 format!("{biome}: grazed bare"),

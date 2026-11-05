@@ -397,7 +397,7 @@ What foraging animals eat of the world's blocks (`vitals::forage`), how much a m
 
 | block | kind | food | eaten | grows back as |
 |---|---|---|---|---|
-| base:tall_grass | grass | 10 | becomes base:grazed_grass | base:grazed_grass |
+| base:tall_grass | grass | 2 | becomes base:grazed_grass | base:grazed_grass |
 | base:berry_bush (age 3) | fruit | 8 | back to age 1 | base:berry_bush |
 | base:oak_leaves | leaves | 4 | stays | always there in base:forest, base:plains, base:swamp (spring, summer, autumn), worth 40% of fresh growth |
 | base:birch_leaves | leaves | 4 | stays | always there in base:forest, base:birch_forest (spring, summer, autumn), worth 40% of fresh growth |
@@ -506,7 +506,7 @@ Farmland's fertility (`vitals::soil`): how fast crops grow at each level, what w
 
 A ripe harvest of base:wheat, base:barley, base:rye, base:carrots, base:potatoes, base:beetroots, base:maize, base:paddy_rice, base:sorghum, base:millet, base:cassava, base:pumpkin_stem, base:melon_stem takes a level, of base:beans, base:tepary_beans gives one back; base:compost +2, base:dung +1; a season unplanted (about 14 game days, at grass's rate) gives one back. A compost bin fills in 7 steps: spoiled food 2, base:dung 2, base:rotten_flesh 2, base:oak_leaves 1, base:birch_leaves 1, base:spruce_leaves 1, base:acacia_leaves 1, base:sapling 1, base:wheat_seeds 1, base:wheat 1; full, it rots into compost in about 23 minutes.
 
-Dung pats: a grazer drops one every 20 mouthfuls where it stands on the ground, never within 2 blocks of another; it rots by warmth and soil water into a tuft of fresh grass (at most 3 game days, frozen or dry), and while it lies grazed grass within 2 blocks grows back x2. How long one lies, in game minutes (a game day is 20):
+Dung pats: a grazer drops one every 100 mouthfuls where it stands on the ground, never within 2 blocks of another; it rots by warmth and soil water into a tuft of fresh grass (at most 3 game days, frozen or dry), and while it lies grazed grass within 2 blocks grows back x2. How long one lies, in game minutes (a game day is 20):
 
 | biome | spring | summer | autumn | winter |
 |---|---|---|---|---|

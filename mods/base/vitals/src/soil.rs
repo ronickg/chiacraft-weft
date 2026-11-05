@@ -56,9 +56,10 @@ pub const COMPOSTS: [(&str, u8); 9] = [
 /// fast (a pat's ring of lush grass). Broken, it gives the dung item (`FEEDS`, `COMPOSTS`).
 ///
 /// A block is far bigger than a pat (a cow's is about 0.07 m²), so pats are rarer than real
-/// droppings: one every 20 mouthfuls keeps them to under 1% of a herd's ground at once, as in a
-/// grazed pasture, in every season (`animals_core::web`'s check).
-pub const MOUTHFULS_A_PAT: u32 = 20;
+/// droppings: one every 100 mouthfuls (a tuft feeds 2 now, `forage::SOURCES`; it was 20 at 10,
+/// the same dung for the food) keeps them to under 1% of a herd's ground at once, as in a grazed
+/// pasture, in every season (`animals_core::web`'s check).
+pub const MOUTHFULS_A_PAT: u32 = 100;
 pub const PAT_SPACING: i32 = 2;
 pub const PAT_REACH: i32 = 2;
 pub const PAT_GROWTH: u32 = 2;

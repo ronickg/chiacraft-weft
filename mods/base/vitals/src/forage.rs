@@ -86,7 +86,10 @@ const SCALE_CONIFERS: &[&str] = &["animals:red_dunes", "animals:scrubland", "ani
 const BIRCHES: &[&str] = &["base:forest", "base:birch_forest"];
 
 pub const SOURCES: [Source; 76] = [
-    s("base:tall_grass", None, Category::Grass, 10, Eaten::Becomes("base:grazed_grass"), Some("base:grazed_grass")),
+    // A tuft of tall grass feeds 2 (it fed 10): a grazer crops five tufts for what it used to eat
+    // of one, so herds crop their ground as real ones do, 25-50% of a biome's regrowth in its
+    // best season (`GRAZED`, Ronald 11-05: "Real levels, 25-50%"; with Animals' stocking).
+    s("base:tall_grass", None, Category::Grass, 2, Eaten::Becomes("base:grazed_grass"), Some("base:grazed_grass")),
     wild("base:berry_bush", 3, Category::Fruit, 8, Eaten::Age(1), wild::FORESTS),
     browse("base:oak_leaves", Category::Leaves, 4, OAKS, GREEN),
     browse("base:birch_leaves", Category::Leaves, 4, &["base:forest", "base:birch_forest"], GREEN),
@@ -328,6 +331,11 @@ pub const GRASS_COVER: [(&str, f32); 13] = [
     ("animals:fern_forest", 0.03),
 ];
 pub const GRASS_COVER_ELSE: f32 = 0.05;
+
+/// The share of its grass's regrowth a biome's grazers eat in its best season, at least and at
+/// most (`animals_core::web` checks it): real grazing takes a quarter to a half (Ronald 11-05,
+/// "Real levels, 25-50%"). The dry season may go over, and that is the grass cropped down.
+pub const GRAZED: (f32, f32) = (0.25, 0.5);
 /// Where no tall grass grows at all: frozen ground, and sand (no plant soil).
 const NO_GRASS: [&str; 4] = ["base:snowy_plains", "base:desert", "base:beach", "base:ocean"];
 
