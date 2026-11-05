@@ -204,6 +204,12 @@ impl Client {
                     sink: at(a::GLIDE_SINK),
                     wind: glam::DVec3::new(at(a::WIND_X), at(a::LIFT), at(a::WIND_Z)),
                 };
+                let raw = |i: u32| self.attributes[i as usize] as f64;
+                self.player.rope = (raw(a::ROPE_LENGTH) > 0.0).then(|| crate::physics::Rope {
+                    anchor: glam::DVec3::new(raw(a::ROPE_X), raw(a::ROPE_Y), raw(a::ROPE_Z)),
+                    length: raw(a::ROPE_LENGTH),
+                    reel: at(a::ROPE_REEL),
+                });
             }
             ToClient::BreakRefused { frame, pos } => {
                 self.refused_break = Some((frame, pos));

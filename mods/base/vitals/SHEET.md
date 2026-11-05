@@ -220,6 +220,10 @@ Any wall, pushing into it in the air: 1.5 blocks a second at grip 1, 6 stamina a
 
 The wind carries a glider at 0.75 of the surface wind. Rising air: thermals up to 1.6 blocks a second at 14:00 over bare ground (half over grass) in 0.3 of 40-block cells, none in rain; wind up a slope lifts by its rise over 8 blocks downwind, x0.8; at most 3 together.
 
+| grappling hook | reach | pulled in | let out | throws | stamina on the rope |
+|---|---|---|---|---|---|
+| `base:grappling_hook` | 22 | 3 a second | 2.1 a second | 236 | climbing's: 6 a second pulling, 2.1 hanging |
+
 ## Climates
 
 Each biome's real place (`reports/ecology/Biome climates.md`), year mean, humidity and half its summer-to-winter range, the air at sea level under an open sky (midwinter before dawn, midsummer mid afternoon), and the share of days with rain in spring, summer, autumn and winter.

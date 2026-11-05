@@ -237,6 +237,13 @@ pub enum Kind {
         texture: String,
         color: u32,
     },
+    /// An image shown while `bind` is above 0, that much opaque (up to 1): an overlay that comes
+    /// and goes with what the game says.
+    BoundImage {
+        texture: String,
+        bind: FloatBind,
+        value: f32,
+    },
     Item {
         bind: ItemBind,
         last: (u32, u32),

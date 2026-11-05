@@ -225,6 +225,10 @@ pub const RULES: &[Rule] = &[
     // ---- the first tools and fire (vitals::first)
     r(&["base:rock", "base:flint", "base:tektite", "base:stick", "base:plant_fibre", "base:sharp_flake"], 0, Shared, Material, Made),
     r(&["base:bow_drill", "base:hand_drill", "base:fire_bed", "base:campfire_laid"], 0, Shared, Station, Made),
+    // the ley lines (ley.rs, `vitals::ley`): the magic path's first step, and the ancients' stone
+    n(&["base:dowsing_rod"], 0, Magic, Tool, Made, "senses the ley lines: the Stone Age's magic route"),
+    n(&["base:ley_stone"], 0, Magic, Building, World(PICK, 3.0), "the ancients' carved stone round the waystones, some 600 blocks apart"),
+    n(&["base:waystone"], 0, Magic, Technical, Not, "a sleeping waystone on a great ley crossing: not carried off, woken later"),
     // ---- tools, weapons and armour: today's by material, and the ones built from parts
     n(
         &["base:axe", "base:pickaxe", "base:shovel", "base:hoe", "base:knife", "base:spear", "base:sword", "base:bow"],
@@ -256,6 +260,8 @@ pub const RULES: &[Rule] = &[
     r(&["base:leather_helmet", "base:leather_chestplate", "base:leather_leggings", "base:leather_boots"], 0, Tech, Armour, Made),
     // glider.rs: leather on a frame of sticks (`vitals::glide::HIDE`).
     r(&["base:glider"], 0, Tech, Tool, Made),
+    // grapple.rs: wrought-iron flukes on a string cord (`vitals::grapple::IRON`).
+    r(&["base:grappling_hook"], 2, Tech, Tool, Made),
     r(&["base:iron_pickaxe", "base:iron_axe", "base:iron_shovel", "base:iron_hoe", "base:iron_sword"], 2, Tech, Tool, Made),
     r(&["base:iron_helmet", "base:iron_chestplate", "base:iron_leggings", "base:iron_boots"], 2, Tech, Armour, Made),
     r(&["base:gold_pickaxe", "base:gold_axe", "base:gold_shovel", "base:gold_hoe", "base:gold_sword"], 1, Tech, Tool, Made),

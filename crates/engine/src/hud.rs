@@ -552,6 +552,10 @@ impl Hud {
         let ui = &mut self.ui;
         ui.clear();
         ui.root_style(Style::default().stretch());
+        // Across the top, the whole width, under everything after it: an overlay.
+        for e in at(a::TOP, false) {
+            emit(ui, e, Style::default().at(0.0, 0.0, [0.0, 0.0]).w(window.x), Align::Stretch);
+        }
         // Both halves start at zero height and split the rest evenly, so the crosshair sits at the
         // exact screen center whatever they contain.
         ui.container(Style::row().h(0.0).grow().pad(4.0).align(Align::Start), |ui| {
