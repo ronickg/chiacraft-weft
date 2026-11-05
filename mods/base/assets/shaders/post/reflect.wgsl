@@ -4,11 +4,12 @@
 // marched here per pixel as before. Only the first effect sees the image's alpha (the water's
 // share), so this stays first.
 
-// The half-size reflections round `p`: only from those of the four that were water (`a` not -1)
-// and lie about as far off as this pixel. Where none does, at the shore and along the far water
-// (where every screen row lies much farther than the one below it, so a half-size pixel took its
-// water from another distance or none), it is marched here instead: laid over from the land's
-// nothing, those rows came out as bright and dark lines along the far shore (fx-half's lake shots).
+// The half-size reflections round `p`: only from those of the four that were water (`a` not -1),
+// the nearer in distance to this pixel the more. Where none was, at the shore, it is marched here
+// instead: laid over from the land's nothing, the shore's rows came out as bright and dark lines
+// (fx-half's lake shots). Marching wherever none lay within 4% of this pixel's distance cost
+// 0.12 ms at 3456 and a forest's p99 went from 3.3 to 4.4 ms (Tester 2): along the far water every
+// screen row lies that much farther than the one below it.
 fn reflect_upsampled(p: PostPixel) -> vec4<f32> {
     let low = textures[p.low - 1u];
     let dims = vec2<i32>(textureDimensions(low));
@@ -22,11 +23,11 @@ fn reflect_upsampled(p: PostPixel) -> vec4<f32> {
         let o = vec2(j % 2, j / 2);
         let at = clamp(base + o, vec2(0), dims - 1);
         let r = textureLoad(low, at, 0);
-        let uv = (vec2<f32>(at) + 0.5) / vec2<f32>(dims);
-        let off = abs(length(post_position(p, uv)) - here) / max(here, 1.0);
-        if r.a < 0.0 || off > 0.04 {
+        if r.a < 0.0 {
             continue;
         }
+        let uv = (vec2<f32>(at) + 0.5) / vec2<f32>(dims);
+        let off = abs(length(post_position(p, uv)) - here) / max(here, 1.0);
         let bil = mix(1.0 - t.x, t.x, f32(o.x)) * mix(1.0 - t.y, t.y, f32(o.y));
         let w = (bil + 0.05) / (0.01 + off);
         sum += r * w;
