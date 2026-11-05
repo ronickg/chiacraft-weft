@@ -202,7 +202,9 @@ def elements():
             x, z = BACK_X * s, BACK_Z
             E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (x - 3.7, 19.5, z - 6.2), (x + 3.7, 42, z + 6.6)))
             E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x - 2.3, 5, z - 2.4), (x + 2.3, 22, z + 3.2)))
-            E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 3.3, 0, z - 3.4), (x + 3.3, 6, z + 9.4)))
+            # Its sides and back half a unit out from the shank's (rule 8: at 1 out its top showed a texel-thin rim
+            # round the shank; linecheck).
+            E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 2.8, 0, z - 2.9), (x + 2.8, 6, z + 9.4)))
     return E
 
 
@@ -492,7 +494,10 @@ def fit_poses(spec):
     def lie_cost(P):
         g = lowest(spec, pose_lie(0.0, dict(L, **P, lie_drop=0)), GROUPS)
         f = min(g.values())
-        return (g["body"] - f - 0.8) ** 2 + 0.3 * (g["front paws"] - f) ** 2 + 0.3 * (g["back paws"] - f) ** 2
+        # Near-ties (a few thousandths, as when the hind feet narrowed) go to the hips folded deep under (-85),
+        # the fold it was drawn with, not to whichever leg angle wins by a hair.
+        return (g["body"] - f - 0.8) ** 2 + 0.3 * (g["front paws"] - f) ** 2 + 0.3 * (g["back paws"] - f) ** 2 \
+            + 1e-4 * (P["lie_hip"] + 85) ** 2
     grid = {"lie_front": list(range(20, 101, 5)), "lie_hip": list(range(-110, -24, 5)), "lie_knee": list(range(60, 166, 5))}
     best = fit(grid, lie_cost)[1]
     g = lowest(spec, pose_lie(0.0, dict(L, **best, lie_drop=0)), GROUPS)

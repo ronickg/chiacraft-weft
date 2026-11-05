@@ -70,7 +70,9 @@ EYE_STYLE = os.environ.get("CAIMAN_EYES", "caiman_px")
 
 # In the lizard's space (scaled by K when the model is built).
 K_ = 5.2
-SKULL0 = ((-1.45, 0.85, 2.8), (1.45, 0.85 + 6 / K_, 2.8 + 11 / K_))  # whole texels once scaled: the eyelids line up with the eye
+# Whole texels once scaled: the eyelids line up with the eye. 8 tall (4 texels; 6 before), its top where it was:
+# room for a snout and a jaw two texels tall each (rule 7, Ronald 11-05: no parts a texel thick).
+SKULL0 = ((-1.45, 0.85 + 6 / K_ - 8 / K_, 2.8), (1.45, 0.85 + 6 / K_, 2.8 + 11 / K_))
 EYE_Z0, EYE_Y0 = 3.75, 1.7
 SKULL = tuple(tuple(v * K for v in c) for c in SKULL0)
 EYE_Z, EYE_Y = EYE_Z0 * K, EYE_Y0 * K
@@ -119,13 +121,16 @@ def el(name, bone, lo, hi, quad=None, rot=None, origin=None, cut=None):
 LEGS = ("FL", "FR", "BL", "BR")
 # Each leg (the lizard's, set out to the caiman's broader body): the shoulder or hip, the elbow or
 # knee out to the side, the wrist or ankle; the upper leg runs out sideways, the lower one down.
-LEG = {"F": dict(hip=(1.6, 1.1, 1.2), knee=(2.75, 0.95, 1.2), ankle=(2.75, 0.55, 1.2), upper=(1.4, 2.8, 0.85, 1.45, 0.7, 1.7),
+LEG = {"F": dict(hip=(1.6, 1.1, 1.2), knee=(2.75, 0.95, 1.2), ankle=(2.75, 0.55, 1.2), upper=(1.4, 2.8, 0.75, 1.55, 0.7, 1.7),
                  lower=(2.45, 3.15, 0.5, 1.1, 1.05, 1.35), foot=(2.05, 3.6, 0.15, 0.65, 0.3, 2.15)),
-       "B": dict(hip=(1.35, 1.35, -1.9), knee=(2.85, 1.3, -1.9), ankle=(2.85, 0.55, -1.9), upper=(1.15, 3.0, 1.1, 1.6, -2.45, -1.35),
+       "B": dict(hip=(1.35, 1.35, -1.9), knee=(2.85, 1.3, -1.9), ankle=(2.85, 0.55, -1.9), upper=(1.15, 3.0, 0.95, 1.75, -2.45, -1.35),
                  lower=(2.5, 3.4, 0.4, 1.3, -2.05, -1.75), foot=(2.05, 3.85, 0.0, 0.85, -2.9, -0.9))}
-# The tail: four segments, tall and flattened from the side (it swims with it), each smaller.
-TAIL = [((0, 1.3, -2.9), (1.15, 0.82, 1.82, -6.4, -2.0)), ((0, 1.3, -6.0), (0.8, 0.9, 1.72, -10.4, -4.8)),
-        ((0, 1.3, -10.0), (0.5, 1.0, 1.6, -14.5, -8.8)), ((0, 1.3, -14.1), (0.28, 1.07, 1.52, -18.0, -12.9))]  # each reaching deep into the one before
+# The upper legs 0.8 tall, two texels (0.6 and 0.5 before, a texel: rule 7, Ronald 11-05).
+# The tail: four segments, tall and flattened from the side (it swims with it), each smaller, each nested 0.06
+# inside the one before (boxcheck, pokes) and all as tall as the hips allow, so the last two are two texels
+# tall and the tip two wide (rule 7, Ronald 11-05: the tip was a texel each way).
+TAIL = [((0, 1.3, -2.9), (1.15, 0.76, 1.84, -6.4, -2.0)), ((0, 1.3, -6.0), (0.8, 0.82, 1.78, -10.4, -4.8)),
+        ((0, 1.3, -10.0), (0.5, 0.88, 1.72, -14.5, -8.8)), ((0, 1.3, -14.1), (0.41, 0.94, 1.66, -18.0, -13.7))]  # each reaching deep into the one before (the tip less: wider now, it would poke out of tail_2 as it swings)
 JAW0 = (0, 1.1, 3.3)  # the jaw's hinge, at the back of the head
 
 
@@ -150,15 +155,15 @@ def bones():
 
 def elements():
     E = [el("hips", "spine_0", (-1.6, 0.7, -3.2), (1.6, 1.9, -0.4)),
-         el("chest", "spine_1", (-2.0, 0.45, -0.8), (2.0, 2.2, 2.5)),  # broad and flat
+         el("chest", "spine_1", (-2.0, 0.38, -0.8), (2.0, 2.2, 2.5)),  # broad and flat; its belly 0.07 lower, clear of the deeper skull's in the bite (boxcheck)
          el("neck", "neck", (-1.15, 1.15, 0.9), (1.15, 1.65, 3.9)),  # deep in the chest and the skull: it turns on them
          el("skull", "head", *SKULL0),
-         el("snout", "head", (-1.05, 1.3, 4.6), (1.05, 1.85, 8.2)),  # long and flat
-         # The nostrils raised on its tip: its sides just past the snout's, its bottom just over the jaw (at 0.8 wide
-         # and down in the jaw, the jaw stood 0.8 out beside it and a texel of the jaw's front showed under it; linecheck).
-         el("nose", "head", (-1.11, 1.36, 7.9), (1.11, 1.75, 9.4)),
-         el("mouth", "head", (-0.7, 1.12, 4.0), (0.7, 1.36, 8.4)),  # the pink inside, seen when it gapes
-         el("jaw", "jaw", (-0.95, 0.75, 3.0), (0.95, 1.28, 9.0))]  # shorter than the snout: an overbite
+         # Long and flat, two texels tall (rule 7: one before), its top 0.07 under the skull's; to 9.4, where the
+         # nose box ended (rule 4, Ronald 11-05: the nostrils painted on its tip, no box).
+         el("snout", "head", (-1.05, 1.186, 4.6), (1.05, 1.934, 9.4)),
+         el("mouth", "head", (-0.88, 1.1, 4.0), (0.88, 1.26, 8.93)),  # the pink inside, seen when it gapes; its sides and front 0.07 in from the jaw's (linecheck)
+         # Shorter than the snout: an overbite; two texels tall (one before), its bottom 0.07 under the skull's.
+         el("jaw", "jaw", (-0.95, 0.396, 3.0), (0.95, 1.166, 9.0))]
     for k, (_, (hw, y0, y1, z0, z1)) in enumerate(TAIL):
         # Straight, each a size smaller than the one before (no two faces share a plane).
         E.append(el(f"tail_{k}", f"tail_{k}", (-hw, y0, z0), (hw, y1, z1)))
@@ -309,7 +314,7 @@ def paint_face(e, face, boxes):
     if e["name"] == "jaw" and face in ("east", "west") and h >= 3:  # (one texel tall at 32: its bars, no teeth)
         cols = np.arange(w)
         img[0, cols % 3 == 2, :3] = BASE[TOOTH]
-    if e["name"] == "nose" and face == "up":  # the nostrils: two slits on the raised tip
+    if e["name"] == "snout" and face == "up":  # the nostrils: two slits on its tip (rule 4: painted, no nose box)
         if h >= 6:
             img[h - 3, [w // 2 - 2, w // 2 + 1], :3] = BASE[CLAW]
         else:  # 4 texels by 4 at 32: the two side by side, toward the front
@@ -402,7 +407,8 @@ def pose_bite(t):
 def pose_bask(t, P=L):
     """Flat on the bank, the legs splayed, the jaws agape in the sun (6 s)."""
     p = t / 6.0
-    q = {"root": (0, -P["bask_drop"] + 0.1 * S(TAU * p), 0), "head": (-9, 2 * S(TAU * p), 0), "jaw": (13, 0, 0)}
+    # The head up 12.5 (9 before the jaw grew two texels tall: the jaw's tip clear of the bank as it was).
+    q = {"root": (0, -P["bask_drop"] + 0.1 * S(TAU * p), 0), "head": (-12.5, 2 * S(TAU * p), 0), "jaw": (13, 0, 0)}
     for leg in LEGS:
         s = 1 if leg[1] == "L" else -1
         sp = s * P["bask_splay"]

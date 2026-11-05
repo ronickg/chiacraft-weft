@@ -151,7 +151,9 @@ def elements():
          el("chest", "spine_1", (-1.7, 0.4, -0.8), (1.7, 2.5, 2.5)),
          el("neck", "neck", (-0.8, 1.2, 0.9), (0.8, 1.9, 4.2)),  # deep in the chest and the skull: it turns on them
          el("skull", "head", *SKULL),
-         el("snout", "head", (-0.8, 1.2, 4.6), (0.8, 1.9, 6.0))]
+         # Rule 7 (Ronald, 11-05: no parts a texel thick): 0.8 tall, its sides two texels (0.7, one), as tall as
+         # the head allows with its top and bottom 0.35 inside the skull's (boxcheck).
+         el("snout", "head", (-0.8, 1.15, 4.6), (0.8, 1.95, 6.0))]
     for s, n in ((1, "L"), (-1, "R")):
         # The eyelid: a quad the eye's size lying flat inside the head, hinged at the eye's top; a
         # blink swings it down over the eye. Tilted a few degrees about its hinge, so it is never

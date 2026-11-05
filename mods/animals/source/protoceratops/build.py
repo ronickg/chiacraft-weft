@@ -47,11 +47,10 @@ if __name__ == "__main__":
         assert not back, f"{anim} goes backwards: {back}"
     made = export(spec, os.path.join(OUT, "texture.png"), ASSETS, "protoceratops", SCALE, "protoceratops/protoceratops", pose_files=POSES)
     # No thin lines (Ronald, 11-05): no strip of a box under two texels showing beside another, checked
-    # on the model as the game has it (`linecheck.py` on the exported geo). Meant: the hind feet's tops
-    # round the shank, a joint's rim (the long foot reaches forward, so linecheck doesn't see it as one).
+    # on the model as the game has it (`linecheck.py` on the exported geo).
     from linecheck import density_of, lines, load  # noqa: E402
     boxes, tex = load(os.path.join(ASSETS, "models", "protoceratops.geo.json"), os.path.join(ASSETS, "textures", "entity", "protoceratops", "protoceratops.png"))
-    thin = [h for h in lines(boxes, tex, density_of(boxes), allow=("leg_BL_paw#0.up", "leg_BR_paw#0.up")) if h["kind"] == "line"]
+    thin = [h for h in lines(boxes, tex, density_of(boxes), allow=()) if h["kind"] == "line"]
     assert not thin, f"thin lines: {[(h['box'], h['face'], h['cover'], h['width']) for h in thin]}"
     # Its coat layers, for coats painted from genes in the game (`core/src/coats.rs`).
     shutil.copytree(os.path.join(OUT, "layers"), os.path.join(HERE, "..", "..", "genetics", "layers", "protoceratops"), dirs_exist_ok=True)
