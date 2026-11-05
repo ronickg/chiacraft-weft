@@ -137,9 +137,10 @@ fn land_near(w: &World, player: u64) {
     }
     let Some(e) = w.entity(player) else { return };
     let fields = base_api::land::fields(w.seed());
+    let (near, far) = ev::meteor_reach(crate::events::simulation());
     for _ in 0..TRIES {
         let angle = unit(w) as f64 * std::f64::consts::TAU;
-        let reach = ev::METEOR_REACH.0 as f64 + (ev::METEOR_REACH.1 - ev::METEOR_REACH.0) as f64 * unit(w) as f64;
+        let reach = near as f64 + (far - near) as f64 * unit(w) as f64;
         let (x, z) = ((e.pos.x + angle.cos() * reach).floor() as i32, (e.pos.z + angle.sin() * reach).floor() as i32);
         let Some(top) = crate::events::open_ground(w, x, crate::events::land_height(&fields, x, z), z) else { continue };
         if crate::events::near_built(w, top, ev::METEOR_CLEAR) || crate::mobs::campfire_near(w, top.center()).is_some() {

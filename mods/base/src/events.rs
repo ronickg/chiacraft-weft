@@ -422,7 +422,13 @@ fn impacts(w: &World) {
     }
 }
 
-/// Where a big impact lands: loaded land between `IMPACT_FROM_PLAYERS` and `IMPACT_REACH` from a
+/// The world's simulation distance in cubes: what is loaded round each player.
+pub(crate) fn simulation() -> i32 {
+    static SIMULATION: Config<u32> = Config::named("core:simulation_distance");
+    SIMULATION.get() as i32
+}
+
+/// Where a big impact lands: loaded land between `vitals::events::impact_reach` from a
 /// player, open to the sky, level and dry over the crater's width, and far from every player,
 /// their built cells, beds and tombstones, and the world spawn. None: it falls in the sea.
 fn site(w: &World) -> Result<BlockPos, String> {
@@ -435,9 +441,10 @@ fn site(w: &World) -> Result<BlockPos, String> {
         return Err("no players".into());
     }
     // What a site keeps away from: (x, z, how far).
+    let (near, far) = ev::impact_reach(simulation());
     let mut away: Vec<(f64, f64, f64)> = players
         .iter()
-        .map(|&(_, p)| (p.x, p.z, ev::IMPACT_FROM_PLAYERS as f64))
+        .map(|&(_, p)| (p.x, p.z, near as f64))
         .collect();
     let build = ev::IMPACT_FROM_BUILDS as f64;
     let spawn = crate::fair_spawn(w.seed());
@@ -468,7 +475,7 @@ fn site(w: &World) -> Result<BlockPos, String> {
     for _ in 0..ev::IMPACT_SITE_TRIES {
         let (_, from) = players[w.random_below(players.len() as u32) as usize];
         let angle = unit(w) as f64 * std::f64::consts::TAU;
-        let reach = ev::IMPACT_FROM_PLAYERS as f64 + (ev::IMPACT_REACH - ev::IMPACT_FROM_PLAYERS) as f64 * unit(w) as f64;
+        let reach = near as f64 + (far - near) as f64 * unit(w) as f64;
         let (x, z) = (from.x + angle.cos() * reach, from.z + angle.sin() * reach);
         if !clear(x, z) {
             near += 1;

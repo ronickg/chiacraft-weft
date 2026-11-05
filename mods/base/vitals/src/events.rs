@@ -130,6 +130,26 @@ pub const BIG_IMPACT_FROM_DAY: u64 = 21;
 pub const IMPACT_FROM_PLAYERS: i32 = 160;
 pub const IMPACT_REACH: i32 = 200;
 pub const IMPACT_FROM_BUILDS: i32 = 256;
+/// The land loaded round a player ends at the world's simulation distance (`core:simulation_distance`,
+/// 8 cubes = 128 blocks by default): a site 160-200 out is never loaded (PC run fh_impact6: 96 of 96
+/// tries). So the reach is the loaded edge less the crater's width and `LOADED_MARGIN`, and the least
+/// distance `IMPACT_FROM_PLAYERS` or `IMPACT_INSIDE` inside the reach, whichever is less (88-112 at
+/// 8: a crater's blast, 2 radii, still reaches no one).
+pub const LOADED_MARGIN: i32 = 4;
+pub const IMPACT_INSIDE: i32 = 24;
+
+/// An impact's (least, most) distance from a player with `simulation` cubes loaded round them.
+pub fn impact_reach(simulation: i32) -> (i32, i32) {
+    let reach = (simulation * 16 - IMPACT_SITE_RADIUS - LOADED_MARGIN).min(IMPACT_REACH);
+    (IMPACT_FROM_PLAYERS.min(reach - IMPACT_INSIDE), reach)
+}
+
+/// A meteor's (least, most) distance from its player, loaded land only.
+pub fn meteor_reach(simulation: i32) -> (i32, i32) {
+    let most = (simulation * 16 - LOADED_MARGIN).min(METEOR_REACH.1);
+    (METEOR_REACH.0.min(most - IMPACT_INSIDE), most)
+}
+
 /// The built-columns map: cells this many blocks across, and the most a player remembers.
 pub const BUILT_CELL: i32 = 64;
 pub const BUILT_CELLS: usize = 32;
@@ -393,6 +413,17 @@ mod tests {
                 .iter()
                 .all(|c| c.1 == 0 || (PALLASITE_BLOCKS.0..=PALLASITE_BLOCKS.1).contains(&c.1))
         );
+    }
+
+    #[test]
+    fn sites_lie_in_loaded_land() {
+        for sim in [4, 8, 12, 32] {
+            let (lo, hi) = impact_reach(sim);
+            assert!(lo < hi && hi + IMPACT_SITE_RADIUS < sim * 16 && lo >= IMPACT_SITE_RADIUS * 2, "sim {sim}: {lo}-{hi}");
+            let (lo, hi) = meteor_reach(sim);
+            assert!(lo < hi && hi < sim * 16, "sim {sim}: meteors {lo}-{hi}");
+        }
+        assert_eq!(impact_reach(32), (IMPACT_FROM_PLAYERS, IMPACT_REACH));
     }
 
     #[test]
