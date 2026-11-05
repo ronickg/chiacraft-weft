@@ -293,6 +293,17 @@ fn soft_density(s: Sky, at: vec2<f32>, a: f32, cover: f32, fine: bool) -> f32 {
     return clamp(d, 0.0, 1.0);
 }
 
+// How low the sun is for the clouds' light, 0 (high, or down) to 1 (just above the horizon).
+fn cloud_low_sun() -> f32 {
+    let e = scene.sun.y;
+    return (1.0 - smoothstep(0.06, 0.4, e)) * smoothstep(-0.04, 0.03, e) * (1.0 - rain_amount());
+}
+
+// The sunlight on the clouds against the palette's: an orange that deepens as the sun gets low.
+fn cloud_sun_tint() -> vec3<f32> {
+    return mix(vec3(1.0), vec3(1.05, 0.66, 0.38), cloud_low_sun() * 0.85);
+}
+
 // The soft clouds along `dir` from the camera, up to `far` (blocks): rgb the light they send toward
 // the eye (linear), a how much of what is behind still shows.
 // How far over the blocky clouds' height the soft layer's underside stands (blocks), less as rain
@@ -332,7 +343,11 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
     let mu = dot(dir, l);
     // Two lobes, forward (the silver lining toward the sun) and a little back.
     let phase = min(0.75 * cloud_hg(mu, 0.75) + 0.25 * cloud_hg(mu, -0.2), 0.6) * 12.566;
-    let sun = p.sun * light_strength() * (1.0 - s.axes[0].y * 0.55);
+    // With the sun low the light reaching the clouds is deeper orange and a little dimmer, so their
+    // lit sides glow orange against darker bellies (Bliss's sunsets); at its full strength it went
+    // white through the curve and the clouds stayed white at sunrise and sunset (the Bliss
+    // comparison, 11-05).
+    let sun = p.sun * light_strength() * (1.0 - s.axes[0].y * 0.55) * cloud_sun_tint();
     // Rain darkens the clouds' albedo and keeps their shapes (Photon: ×0.66); a storm's more.
     let albedo = mix(1.0, 0.66, s.axes[0].x) * mix(1.0, 0.6, storm);
     var through = 1.0;
@@ -373,7 +388,7 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
         let powder = mix(1.0 - exp(-sigma * 14.0), 1.0, 0.5 * (mu * 0.5 + 0.5) * (mu * 0.5 + 0.5) + 0.3);
         // The sky's light from above, brighter on the tops; under a storm the bellies darker.
         // Grey-blue shaded bases, bright tops: evenly lit, a clear day's read as flat white cut-outs.
-        let ambient = mix(p.horizon * 0.3 + p.ambient * 0.25, p.ambient * 1.2 + p.horizon * 0.2, smoothstep(0.0, 0.8, a)) * mix(1.0, 0.55, s.axes[0].y * (1.0 - a));
+        let ambient = mix(p.horizon * 0.3 + p.ambient * 0.25, p.ambient * 1.2 + p.horizon * 0.2, smoothstep(0.0, 0.8, a)) * mix(1.0, 0.55, s.axes[0].y * (1.0 - a)) * mix(1.0, 0.72, cloud_low_sun());
         let c = (sun * direct * powder * 0.9 + ambient) * albedo;
         let kept = exp(-sigma * step);
         light += through * (1.0 - kept) * c;
@@ -608,7 +623,7 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
                 albedo = mix(1.0, deep, storm) * mix(1.0, sweep, wet);
             }
             let below = mix(p.horizon * 0.9 + p.ambient * 0.6, p.ambient * 1.6, h) * mix(1.0, 0.4, dark * (1.0 - h)) * albedo;
-            c = below + p.sun * light_strength() * scatter * mix(0.6, 1.0, powder) * 0.55 * (1.0 - dark * 0.6) * albedo;
+            c = below * mix(1.0, 0.72, cloud_low_sun()) + p.sun * cloud_sun_tint() * light_strength() * scatter * mix(0.6, 1.0, powder) * 0.55 * (1.0 - dark * 0.6) * albedo;
             c += p.glow * (pow(mu, 3.0) * 0.5 + pow(mu, 12.0) * 0.8) * light_strength() * (0.4 + 0.6 * h);
         } else {
             c = vec3(mix(0.7, 1.0, h));
