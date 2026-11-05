@@ -351,9 +351,9 @@ fn fs_shadow(in: VOut) {
 // ---- shading ----
 
 // `paint` the tint the light takes (a biome's grass and leaf colour, `in.color`; white under snow).
-fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>) -> vec3<f32> {
+fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32> {
     let shadow = sun_shadow(in, n);
-    var light = paint * light_on(n, in.light, shadow, in.ao, in.pos, in.rel);
+    var light = paint * light_on(n, in.light, shadow, ao, in.pos, in.rel);
     // Leaves and plants let some sun through when it is behind them.
     if in.kind.x == TINT_FOLIAGE || in.kind.z != 0u {
         let back = max(-dot(normalize(in.rel), light_dir()), 0.0);
@@ -384,11 +384,9 @@ fn shade(in: VOut, albedo_in: vec4<f32>) -> vec4<f32> {
 
 // `shade` with the cubes' shading softened by `soft` (distant terrain passes 0: its mountains keep
 // their relief).
-fn shade_soft(in_: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
-    var in = in_;
-    in.ao = mix(in.ao, 1.0, soft);
-    in.normal = mix(normalize(in.normal), vec3(0.0, 1.0, 0.0), soft * 0.5);
-    let n = normalize(in.normal);
+fn shade_soft(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
+    let ao = mix(in.ao, 1.0, soft);
+    let n = normalize(mix(normalize(in.normal), vec3(0.0, 1.0, 0.0), soft * 0.5));
     var albedo = albedo_in;
     // Snow lying on the tops of blocks and leaves (not on plants, which it buries). The biome's
     // tint goes onto the light (`in.color`), so the snow takes it off there too: tinted with the
@@ -399,7 +397,7 @@ fn shade_soft(in_: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
         snow = snow_on(n, in.pos, in.light.x);
         albedo = vec4(mix(albedo.rgb, vec3(0.86, 0.9, 0.95), snow), albedo.a);
     }
-    var light = surface_light(in, n, mix(in.color, vec3(1.0), snow));
+    var light = surface_light(in, n, mix(in.color, vec3(1.0), snow), ao);
     if in.glow != 0xffffffffu {
         let e = textureSampleLevel(textures[in.glow], nearest_clamp, in.uv, 0.0).r;
         light = max(light, select(pow(in.tint, vec3(2.2)), vec3(1.0), in.overlay != 0u) * e * 1.7);
