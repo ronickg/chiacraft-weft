@@ -1381,6 +1381,100 @@ fn non_uniform_sampled_images(words: Vec<u32>) -> Vec<u32> {
     out
 }
 
+/// **(Weft bug, naga 30)** naga gives arrays in workgroup memory an `ArrayStride`, which Vulkan
+/// forbids there (VUID-StandaloneSpirv-None-10684; the validation layer names three of the
+/// engine's compute shaders). NVIDIA ignores it; on the Pixel 10's PowerVR the terrain those
+/// shaders build came out wrong (pieces of ground floating in the air, faces from under the ground
+/// showing through it). The decoration is dropped from arrays only workgroup memory uses.
+fn workgroup_arrays_without_stride(words: Vec<u32>) -> Vec<u32> {
+    use std::collections::{HashMap, HashSet};
+    const OP_TYPE_ARRAY: u32 = 28;
+    const OP_TYPE_RUNTIME_ARRAY: u32 = 29;
+    const OP_TYPE_STRUCT: u32 = 30;
+    const OP_TYPE_POINTER: u32 = 32;
+    const OP_VARIABLE: u32 = 59;
+    const OP_DECORATE: u32 = 71;
+    const ARRAY_STRIDE: u32 = 6;
+    const WORKGROUP: u32 = 4;
+    // Storage classes whose memory has an explicit layout: a type also used there keeps it.
+    const LAID_OUT: [u32; 4] = [2, 9, 12, 5349];
+    if words.len() < 5 {
+        return words;
+    }
+    let mut at = 5;
+    let mut ops = Vec::new();
+    while at < words.len() {
+        let (len, op) = ((words[at] >> 16) as usize, words[at] & 0xffff);
+        if len == 0 || at + len > words.len() {
+            return words;
+        }
+        ops.push((at, op, len));
+        at += len;
+    }
+    // What each array or struct type is made of, and each pointer type's class and pointee.
+    let mut parts: HashMap<u32, Vec<u32>> = HashMap::new();
+    let mut arrays: HashSet<u32> = HashSet::new();
+    let mut pointers: HashMap<u32, (u32, u32)> = HashMap::new();
+    let mut workgroup_vars: Vec<u32> = Vec::new();
+    for &(at, op, len) in &ops {
+        let w = &words[at..at + len];
+        match op {
+            OP_TYPE_ARRAY | OP_TYPE_RUNTIME_ARRAY if len >= 3 => {
+                arrays.insert(w[1]);
+                parts.insert(w[1], vec![w[2]]);
+            }
+            OP_TYPE_STRUCT if len >= 2 => {
+                parts.insert(w[1], w[2..].to_vec());
+            }
+            OP_TYPE_POINTER if len >= 4 => {
+                pointers.insert(w[1], (w[2], w[3]));
+            }
+            OP_VARIABLE if len >= 4 && w[3] == WORKGROUP => workgroup_vars.push(w[1]),
+            _ => {}
+        }
+    }
+    let reach = |from: u32| {
+        let mut seen = HashSet::new();
+        let mut todo = vec![from];
+        while let Some(t) = todo.pop() {
+            if seen.insert(t) {
+                todo.extend(parts.get(&t).into_iter().flatten().copied());
+            }
+        }
+        seen
+    };
+    let mut shared: HashSet<u32> = HashSet::new();
+    let mut laid_out: HashSet<u32> = HashSet::new();
+    for &(class, pointee) in pointers.values() {
+        if class == WORKGROUP {
+            shared.extend(reach(pointee));
+        } else if LAID_OUT.contains(&class) {
+            laid_out.extend(reach(pointee));
+        }
+    }
+    if workgroup_vars.is_empty() {
+        return words;
+    }
+    let drop: HashSet<u32> = shared
+        .iter()
+        .copied()
+        .filter(|t| arrays.contains(t) && !laid_out.contains(t))
+        .collect();
+    if drop.is_empty() {
+        return words;
+    }
+    let mut out = Vec::with_capacity(words.len());
+    out.extend_from_slice(&words[..5]);
+    for &(at, op, len) in &ops {
+        let w = &words[at..at + len];
+        if op == OP_DECORATE && len >= 4 && w[2] == ARRAY_STRIDE && drop.contains(&w[1]) {
+            continue;
+        }
+        out.extend_from_slice(w);
+    }
+    out
+}
+
 fn color_range(mips: u32) -> vk::ImageSubresourceRange {
     vk::ImageSubresourceRange {
         aspect_mask: vk::ImageAspectFlags::COLOR,
@@ -1485,7 +1579,7 @@ impl VulkanBackend {
             Some(&naga::back::spv::PipelineOptions { shader_stage: stage, entry_point: entry.to_string() }),
         )
         .map_err(|e| Error(format!("SPIR-V for {entry}: {e}")))?;
-        let words = non_uniform_sampled_images(words);
+        let words = workgroup_arrays_without_stride(non_uniform_sampled_images(words));
         unsafe {
             self.device
                 .create_shader_module(&vk::ShaderModuleCreateInfo::default().code(&words), None)
@@ -2516,6 +2610,40 @@ fn sample(in: VOut) -> vec4<f32> { return textureSample(textures[in.layer], samp
         );
         // Again changes nothing.
         assert_eq!(non_uniform_sampled_images(fixed.clone()), fixed);
+    }
+
+    /// A workgroup array loses its `ArrayStride`; one also in a storage buffer keeps it.
+    #[test]
+    fn workgroup_arrays_lose_their_stride() {
+        let src = r#"
+var<workgroup> tile: array<f32, 64>;
+@group(0) @binding(0) var<storage, read_write> out: array<u32, 16>;
+@compute @workgroup_size(64) fn cs(@builtin(local_invocation_index) i: u32) {
+    tile[i] = f32(i);
+    workgroupBarrier();
+    if i < 16u { out[i] = u32(tile[63u - i]); }
+}
+"#;
+        let module = naga::front::wgsl::parse_str(src).unwrap();
+        let info = naga::valid::Validator::new(naga::valid::ValidationFlags::all(), naga::valid::Capabilities::all())
+            .validate(&module)
+            .unwrap();
+        let words = naga::back::spv::write_vec(&module, &info, &Default::default(), None).unwrap();
+        let strides = |w: &[u32]| {
+            let mut at = 5;
+            let mut n = 0;
+            while at < w.len() {
+                let (len, op) = ((w[at] >> 16) as usize, w[at] & 0xffff);
+                if op == 71 && w[at + 2] == 6 {
+                    n += 1;
+                }
+                at += len;
+            }
+            n
+        };
+        let fixed = workgroup_arrays_without_stride(words.clone());
+        assert_eq!(strides(&fixed), strides(&words) - 1, "only the workgroup array's stride goes");
+        assert_eq!(workgroup_arrays_without_stride(fixed.clone()), fixed);
     }
 
     fn memory(heaps: &[vk::MemoryHeapFlags], types: &[(vk::MemoryPropertyFlags, u32)]) -> vk::PhysicalDeviceMemoryProperties {

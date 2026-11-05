@@ -92,8 +92,9 @@ the phone on USB, `ANDROID_HOME=~/Library/Android/sdk tools/release/android-run.
   `adb shell setprop debug.vulkan.khronos_validation.validate_sync true` adds sync checks. It
   found the swapchain loop at once; the compression bug it couldn't see (bisected with a copy of
   the pack, `--shader-pack dbg`, its `pack.cfg` switches one at a time).
-- **Still reported by validation:** three compute shaders with `ArrayStride` on workgroup arrays
-  (naga 30; drivers ignore it so far).
+- **Workgroup arrays:** three compute shaders had `ArrayStride` on workgroup arrays (naga 30), which
+  the Pixel's driver did not ignore: wrong terrain (ground floating in the air, underground faces
+  showing through). The backend now drops it; validation is clean apart from the rotation note.
 
 ## Build and run
 
