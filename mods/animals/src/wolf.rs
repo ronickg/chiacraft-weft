@@ -59,7 +59,7 @@ pub fn init(r: &mut Registry) {
                 .timed("wander", ai::wander(0.4, 10.0)),
         )
         .on_hurt(|w, h| {
-            crate::taming::hurt(w, h.entity);
+            crate::taming::hurt(w, h.entity, h.source);
             crate::rest::stop(w, h.entity);
         });
 }

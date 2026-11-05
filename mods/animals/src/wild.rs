@@ -89,7 +89,7 @@ pub fn register(r: &mut Registry, kinds: &[&'static EntityKind], body: &'static 
                     .timed("wander", ai::wander(body.wander, 8.0)),
             )
             .on_hurt(|w, h| {
-                crate::taming::hurt(w, h.entity);
+                crate::taming::hurt(w, h.entity, h.source);
                 wake(w, h.entity);
             });
     }

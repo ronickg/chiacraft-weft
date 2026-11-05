@@ -87,7 +87,7 @@ fn report(w: &World) -> String {
 pub fn init(r: &mut Registry) {
     // The rows in the same order every run.
     row("upkeep");
-    r.command("animalprof", "<what:word(on,off,dump,starve,count)>", |cmd| {
+    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite)>", |cmd| {
         let w = cmd.world();
         let text = match cmd.text("what").unwrap_or("") {
             "on" => {
@@ -96,6 +96,39 @@ pub fn init(r: &mut Registry) {
                 "animal goal timer on".to_string()
             }
             "dump" => report(&w),
+            "bite" => {
+                // The hunter nearest the player bites the animal nearest it (`taming::hurt` with
+                // the hunter as the source: the bitten one runs from it).
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let near = w.entities_near(me.pos, 48.0, None);
+                let species = |id: u64| {
+                    w.component(id, &crate::animal::ANIMAL)
+                        .and_then(|a| a.species())
+                };
+                let by_distance = |from: Vec3| {
+                    let mut v: Vec<(u64, f64)> = near
+                        .iter()
+                        .filter_map(|&id| Some((id, crate::dist2(w.entity(id)?.pos, from))))
+                        .collect();
+                    v.sort_by(|a, b| a.1.total_cmp(&b.1));
+                    v
+                };
+                let Some((hunter, _)) = by_distance(me.pos)
+                    .into_iter()
+                    .find(|&(id, _)| species(id).is_some_and(|s| s.hunts()))
+                else {
+                    return;
+                };
+                let Some(at) = w.entity(hunter).map(|e| e.pos) else { return };
+                let Some((prey, _)) = by_distance(at)
+                    .into_iter()
+                    .find(|&(id, _)| id != hunter && species(id).is_some_and(|s| !s.hunts()))
+                else {
+                    return;
+                };
+                w.damage(prey, 1.0, hunter, damage_cause::ATTACK);
+                format!("BITE {hunter} bites {prey}")
+            }
             "off" => {
                 ON.store(false, Relaxed);
                 "animal goal timer off".to_string()

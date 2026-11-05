@@ -109,7 +109,7 @@ pub fn register(r: &mut Registry, kinds: &[&'static EntityKind], wings: &'static
                     .timed("forage", crate::forage::forage)
                     .timed("wander", ai::wander(wings.wander, 8.0)),
             )
-            .on_hurt(|w, h| crate::taming::hurt(w, h.entity));
+            .on_hurt(|w, h| crate::taming::hurt(w, h.entity, h.source));
     }
 }
 

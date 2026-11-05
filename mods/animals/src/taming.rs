@@ -29,6 +29,8 @@ value! {
 }
 
 pub static TAMING: Component<Taming> = Component::named("taming");
+/// Who it runs from while scared (0: the nearest player): what hurt it (not saved).
+static FROM: Component<u64> = Component::named("taming_flee_from");
 /// Each food's bubble (by item name), made once.
 static BUBBLES: std::sync::OnceLock<Vec<(&'static str, &'static Particle)>> = std::sync::OnceLock::new();
 static HEART: Particle = Particle::named("heart");
@@ -52,8 +54,10 @@ pub const FRESH: Taming = Taming { progress: 0.0, effectiveness: 1.0, feedings: 
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&TAMING, FRESH, component_flags::SAVE | component_flags::SYNC_MENU | component_flags::SYNC_WATCHERS);
+    r.entity_component(&FROM, 0u64, 0);
     for s in &SPECIES {
         r.attach(s.kind, &TAMING);
+        r.attach(s.kind, &FROM);
     }
     // Kibble (`notes/ANIMALS.md`, "Kibble"): an egg, meat or a plant, wheat for fiber, and water;
     // every species takes it, and it tames fastest. Tiers by egg and cooking in a pot come with
@@ -102,7 +106,9 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
         let Some(t) = w.component(id, &TAMING) else { return false };
         if t.scared > 0 {
             set(w, id, |t| t.scared = t.scared.saturating_sub(w.tick_elapsed(id)));
-            if (w.game_time() + id) % 20 == 0 || !w.navigating(id) {
+            if t.scared <= w.tick_elapsed(id) {
+                w.component_mut(id, &FROM).map(|f| *f = 0);
+            } else if (w.game_time() + id) % 20 == 0 || !w.navigating(id) {
                 flee(w, id, st);
             }
             return true;
@@ -112,7 +118,7 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             && frightened(w, st, s.shy * shyness(w, id))
             && !crate::signatures::calm(w, st.pos.to_array())
         {
-            scare(w, id);
+            scare(w, id, 0);
             return true;
         }
         if wild {
@@ -211,8 +217,11 @@ fn frightened(w: &World, st: &EntityState, shy: f32) -> bool {
         })
 }
 
-/// Scared: stops asking and runs off for a while.
-fn scare(w: &World, id: u64) {
+/// Scared: stops asking and runs off for a while, from `from` (0: the nearest player).
+fn scare(w: &World, id: u64, from: u64) {
+    if let Some(f) = w.component_mut(id, &FROM) {
+        *f = from;
+    }
     set(w, id, |t| {
         t.scared = SCARED_TICKS;
         t.asking = 0;
@@ -223,25 +232,54 @@ fn scare(w: &World, id: u64) {
     }
 }
 
-/// Away from the nearest player, else anywhere.
+/// Away from what scared it (what hurt it), else from a hunter it saw lately (`senses`: a deer
+/// a walker startled doesn't bolt into the wolf), else from the nearest player, else anywhere.
 fn flee(w: &World, id: u64, st: &EntityState) {
-    let away = w
-        .players()
-        .into_iter()
-        .filter_map(|p| w.entity(p))
-        .min_by(|a, b| dist2(a, st).total_cmp(&dist2(b, st)))
-        .map(|p| (st.pos.x - p.pos.x, st.pos.z - p.pos.z))
+    let from = w
+        .component(id, &FROM)
+        .filter(|&f| f != 0 && f != id)
+        .and_then(|f| w.entity(f))
+        .map(|e| e.pos);
+    let hunter = || {
+        w.component(id, &crate::senses::SENSES)
+            .filter(|s| s.threat != 0 && w.game_time() < s.at + 2 * crate::senses::EVERY)
+            .map(|s| Vec3::from(s.threat_pos.map(f64::from)))
+    };
+    let away = from
+        .or_else(hunter)
+        .or_else(|| {
+            w.players()
+                .into_iter()
+                .filter_map(|p| w.entity(p))
+                .min_by(|a, b| dist2(a, st).total_cmp(&dist2(b, st)))
+                .map(|p| p.pos)
+        })
+        .map(|p| (st.pos.x - p.x, st.pos.z - p.z))
         .filter(|&(x, z)| x * x + z * z > 0.01);
     let (x, z) = away.unwrap_or_else(|| {
         let a = w.random_below(628) as f64 / 100.0;
         (a.cos(), a.sin())
     });
     let n = (x * x + z * z).sqrt().max(0.01);
-    w.navigate(id, [st.pos.x + x / n * 8.0, st.pos.y, st.pos.z + z / n * 8.0], 1.6);
+    let to = [st.pos.x + x / n * 8.0, st.pos.y, st.pos.z + z / n * 8.0];
+    if let Some(f) = from {
+        weft_sdk::info!(
+            "animal {id} at {:.1} {:.1} flees from what hurt it at {:.1} {:.1} to {:.1} {:.1}",
+            st.pos.x,
+            st.pos.z,
+            f.x,
+            f.z,
+            to[0],
+            to[2]
+        );
+    }
+    w.navigate(id, to, 1.6);
 }
 
-/// It was hurt: a taming under way loses effectiveness, and it runs off.
-pub fn hurt(w: &World, id: u64) {
+/// It was hurt by `source` (0: nothing, a fall, the cold): a taming under way loses effectiveness,
+/// and it runs off, from what hurt it (a deer a wolf bit runs from the wolf, not from the player
+/// who happens to be nearest).
+pub fn hurt(w: &World, id: u64, source: u64) {
     let passive = w
         .component(id, &ANIMAL)
         .and_then(|a| a.species())
@@ -254,7 +292,10 @@ pub fn hurt(w: &World, id: u64) {
             t.effectiveness = (t.effectiveness - HURT).max(0.0);
         }
     });
-    scare(w, id);
+    if source != 0 && source != id {
+        weft_sdk::info!("animal {id} hurt by {source}: runs from it");
+    }
+    scare(w, id, source);
 }
 
 /// A player right clicks a wild animal with `held`: food it eats goes toward taming it. True if
@@ -311,7 +352,7 @@ fn mistake(w: &World, id: u64, st: &EntityState, scares: bool) {
             .spread(0.2),
     );
     if scares {
-        scare(w, id);
+        scare(w, id, 0);
     }
 }
 

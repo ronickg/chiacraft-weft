@@ -83,7 +83,7 @@ fn register(r: &mut Registry, kind: &'static EntityKind, index: usize, texture: 
                 .then(ai::wander(0.6, 9.0)),
         )
         .on_hurt(|w, h| {
-            crate::taming::hurt(w, h.entity);
+            crate::taming::hurt(w, h.entity, h.source);
             crate::rest::stop(w, h.entity);
         });
 }
