@@ -454,8 +454,10 @@ fn rod_feel(c: &Client, s: &mut Rod, me: u64, st: &abi::EntityState, r: &ley::Re
     s.dip += (want_dip - s.dip) * ease;
     s.swing += (want_swing - s.swing) * ease;
     // The arm that holds it (`leftArm`, Weft's main arm at +x): items are flat pictures, so the
-    // hand dips and swings, not a bone of the rod.
-    c.bone_turn(me, "leftArm", [s.dip + jitter, s.swing + jitter * 0.5, 0.0]);
+    // hand dips and swings, not a bone of the rod. The bone's turn about its up axis is positive
+    // to the left, so a swing to the right (positive) turns it negative (PC look wm_twitch2: "tugs
+    // hard to the right" swung the rod left).
+    c.bone_turn(me, "leftArm", [s.dip + jitter, -(s.swing + jitter * 0.5), 0.0]);
     // The chime: faster and louder the stronger the pull.
     if feel > Feel::Still {
         s.tick_in -= dt;
