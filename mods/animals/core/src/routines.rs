@@ -68,3 +68,34 @@ mod tests {
         assert!(drinking_hour(18.5) && !drinking_hour(12.0));
     }
 }
+
+// ------------------------------------------------------------------ AI level of detail
+
+/// How much an animal's senses work by where the players are (`reports/Creature AI.md`, part 3,
+/// step 8 of its plan; the crew's step 9): spend detail where a mistake would be seen (the LOD
+/// trader). `Full` within `FULL_WITHIN` blocks of a player or in a player's view within
+/// `SEEN_WITHIN` (`VIEW` degrees round where they look); `Coarse` out of view within
+/// `COARSE_WITHIN` (the engine's activation distance): it looks round a quarter as often and
+/// takes no line of sight; `Far` past that (the engine rests it): an eighth, coarse.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Detail {
+    Full,
+    Coarse,
+    Far,
+}
+
+pub const FULL_WITHIN: f64 = 32.0;
+pub const SEEN_WITHIN: f64 = 64.0;
+pub const COARSE_WITHIN: f64 = 48.0;
+pub const VIEW: f32 = 140.0;
+
+impl Detail {
+    /// Ticks between its looks round.
+    pub fn every(self) -> u64 {
+        match self {
+            Detail::Full => 10,
+            Detail::Coarse => 40,
+            Detail::Far => 80,
+        }
+    }
+}

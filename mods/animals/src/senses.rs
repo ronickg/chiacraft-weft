@@ -15,6 +15,7 @@ use weft_sdk::*;
 
 use animals_core::perception::{self, NOTICED};
 use animals_core::roles;
+use animals_core::routines;
 
 use crate::animal::ANIMAL;
 use crate::dist2;
@@ -212,6 +213,11 @@ pub fn sense(w: &World, id: u64, st: &EntityState, watch: impl Fn(f32) -> f64) -
     if s.at != 0 && (now < s.at + EVERY || !(now + id).is_multiple_of(EVERY)) && now < s.at + 4 * EVERY {
         return s;
     }
+    // Less detail where no player would see a mistake (`routines::Detail`).
+    let detail = detail(w, st);
+    if s.at != 0 && now < s.at + detail.every() && now < s.at + 4 * detail.every() {
+        return s;
+    }
     let t = crate::prof::stamp();
     if s.sight_at == 0 || now >= s.sight_at + SIGHT_EVERY {
         s.sight = base_api::sight(w, st.pos.to_array());
@@ -228,9 +234,9 @@ pub fn sense(w: &World, id: u64, st: &EntityState, watch: impl Fn(f32) -> f64) -
     crate::prof::slow(t, || format!("sight and wind of {id}"));
     let watch = watch(s.sight);
     // Seconds since it last looked (its awareness builds and fades by them), a second at most.
-    let secs = if s.at == 0 { 0.5 } else { (now.saturating_sub(s.at) as f32 / 20.0).min(1.0) };
+    let secs = if s.at == 0 { 0.5 } else { (now.saturating_sub(s.at) as f32 / 20.0).min(4.0) };
     let t = crate::prof::stamp();
-    look(w, id, st, &mut s, watch, secs);
+    look(w, id, st, &mut s, watch, secs, detail == routines::Detail::Full);
     crate::prof::slow(t, || format!("look round of {id} (sight {:.2}, wind {:.1})", s.sight, s.wind));
     s.at = now.max(1);
     if let Some(c) = w.component_mut(id, &SENSES) {
@@ -327,7 +333,7 @@ fn aware_after(a: f32, s: Option<Sensed>, secs: f32) -> f32 {
 /// heard on the move, smelled downwind) and players the same way, its awareness of each building
 /// up or fading; its kin within `KIN` (`HUDDLE_LOOK` for a herd in a blood moon); and a hungry
 /// hunter's nearest prey within `hunt::LOOK`.
-fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs: f32) {
+fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs: f32, full: bool) {
     let Some(me) = w
         .component(id, &FACTS)
         .filter(|f| f.at != 0)
@@ -416,7 +422,14 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
         if s.sight > s.other {
             // Its sight of it in the light there, and only with nothing opaque between.
             let d = dist2(pos, p).sqrt() as f32;
-            let sight = if clear(w, eye, their_eye) { perception::gain(d, watch as f32 * lit(w, their_eye)) } else { 0.0 };
+            // Coarse, it takes no line of sight and no light (`routines::Detail`).
+            let sight = if !full {
+                perception::gain(d, watch as f32)
+            } else if clear(w, eye, their_eye) {
+                perception::gain(d, watch as f32 * lit(w, their_eye))
+            } else {
+                0.0
+            };
             s = Sensed { gain: sight.max(s.other), sight, smell_only: sight == 0.0 && s.hear == 0.0 && s.other > 0.0, ..s };
         }
         if s.gain > 0.0 && best.is_none_or(|b| s.gain > b.0.gain) {
@@ -466,7 +479,7 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
         _ => {}
     }
     if wild && mine.shy > 0.0 {
-        players(w, id, st, out, mine, facing, field, secs, player_noise);
+        players(w, id, st, out, mine, facing, field, secs, player_noise, full);
     }
     out.kin = kin;
     out.kin_mid = mid.map(|v| (v / kin as f64) as f32);
@@ -498,6 +511,7 @@ fn players(
     field: f32,
     secs: f32,
     noise: Option<(f32, u64)>,
+    full: bool,
 ) {
     let p = st.pos;
     let far = perception::SPRINT_HEARD.max(perception::SCENT) as f64;
@@ -516,7 +530,9 @@ fn players(
         let seen = if !moving {
             0.0
         } else {
-            shy * if sprint { 2.0 } else { 1.0 } * if sneak { perception::SNEAK_SEEN } else { 1.0 } * lit(w, e.eye())
+            shy * if sprint { 2.0 } else { 1.0 }
+                * if sneak { perception::SNEAK_SEEN } else { 1.0 }
+                * if full { lit(w, e.eye()) } else { 1.0 }
         };
         let heard = match (moving, sprint, sneak) {
             (false, ..) => 0.0,
@@ -535,7 +551,7 @@ fn players(
         }
     }
     let mut sensed = best.map(|(s, q, pos, their_eye)| {
-        let s = if s.sight > s.other && !clear(w, st.eye(), their_eye) {
+        let s = if full && s.sight > s.other && !clear(w, st.eye(), their_eye) {
             Sensed { gain: s.other, sight: 0.0, smell_only: s.hear == 0.0 && s.other > 0.0, ..s }
         } else {
             s
@@ -743,4 +759,26 @@ pub fn investigate(w: &World, id: u64, st: &EntityState) -> bool {
         stare(w, id, st, [e.pos.x as f32, e.pos.y as f32, e.pos.z as f32]);
     }
     true
+}
+
+/// How much detail `st`'s senses get now (`routines::Detail`): by the nearest player, and whether
+/// it is in a player's view.
+pub fn detail(w: &World, st: &EntityState) -> routines::Detail {
+    use animals_core::routines::{COARSE_WITHIN, Detail, FULL_WITHIN, SEEN_WITHIN, VIEW};
+    let mut best = Detail::Far;
+    for q in w.players_iter() {
+        let Some(p) = w.entity(q) else { continue };
+        let d2 = dist2(p.pos, st.pos);
+        if d2 <= FULL_WITHIN * FULL_WITHIN {
+            return Detail::Full;
+        }
+        let off = [(st.pos.x - p.pos.x) as f32, (st.pos.z - p.pos.z) as f32];
+        if d2 <= SEEN_WITHIN * SEEN_WITHIN && perception::in_view(weft_sdk::yaw_dir(p.yaw), off, VIEW) {
+            return Detail::Full;
+        }
+        if d2 <= COARSE_WITHIN * COARSE_WITHIN {
+            best = Detail::Coarse;
+        }
+    }
+    best
 }
