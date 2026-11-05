@@ -484,7 +484,9 @@ fn soft_pixel(in: CloudOut, s: Sky, dir: vec3<f32>) -> CloudPixel {
     // again once soft clouds were the default (PC shf2_rain).
     // By its distance along the ground: the rain falls under the deck, and a deck overhead seen
         // through its whole distance was misted pale, a storm's dark sky with it (PC shf3).
-        let misted = 1.0 - exp(-rain_depth(length(rel.xz)));
+        // Two fifths of the land's: at its full thickness a storm's deck a few hundred blocks off went
+        // pale grey, its dark sky lost (PC shf4); the far deck, thousands off, still fades fully.
+        let misted = 1.0 - exp(-rain_depth(length(rel.xz)) * 0.4);
     color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z))), misted);
     color = display(fog_through(rainbow_on(color, dir), dir * 220.0, 1.0));
     let alpha = alpha_cloud * (1.0 - smoothstep(0.85, 1.0, dist));
@@ -648,7 +650,9 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
         // line at the horizon (fading by the deck's reach alone could not close it).
         // By its distance along the ground: the rain falls under the deck, and a deck overhead seen
         // through its whole distance was misted pale, a storm's dark sky with it (PC shf3).
-        let misted = 1.0 - exp(-rain_depth(length(rel.xz)));
+        // Two fifths of the land's: at its full thickness a storm's deck a few hundred blocks off went
+        // pale grey, its dark sky lost (PC shf4); the far deck, thousands off, still fades fully.
+        let misted = 1.0 - exp(-rain_depth(length(rel.xz)) * 0.4);
         color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z))), misted);
         // A lightning flash glows inside the deck; its bolt hangs under the deck, in front of it.
         color += lightning_in_clouds(dir) * albedo + lightning_bolt(dir);
