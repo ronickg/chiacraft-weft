@@ -2563,7 +2563,10 @@ impl Client {
         let mut wet = 0;
         for dx in -1..=1 {
             for dz in -1..=1 {
-                if self.world.rains_at(at + IVec3::new(dx * WEATHER_REACH, 0, dz * WEATHER_REACH)) {
+                if self
+                    .world
+                    .rains_at(at + IVec3::new(dx * WEATHER_REACH, 0, dz * WEATHER_REACH))
+                {
                     wet += 1;
                 }
             }
