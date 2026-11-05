@@ -663,15 +663,26 @@ def pose_stalk(t):
     slow deliberate steps (1.2 s a cycle, in place of the walk)."""
     p = t / 1.2
     q = gait(p, (0.0, 0.5, 0.75, 0.25), 14, 30)
-    for leg in ("FL", "FR", "BL", "BR"):  # the legs bent: the body low
-        u = q[f"leg_{leg}_upper"][0]
-        q[f"leg_{leg}_upper"] = (u + (22 if leg[0] == "F" else -18), 0, 0)
-        lo = q[f"leg_{leg}_lower"][0]
-        q[f"leg_{leg}_lower"] = (lo + (-30 if leg[0] == "F" else 28), 0, 0)
-        pw = q[f"leg_{leg}_paw"][0]
-        q[f"leg_{leg}_paw"] = (pw + (8 if leg[0] == "F" else -10), 0, 0)
-    q.update({"root": (0, -4.0, 0), "spine_1": (2, 0, 0), "neck": (16, 0, 0), "head": (-14, 0, 0), "ear_L": (-12, 0, 0), "ear_R": (-12, 0, 0)})
+    # The legs bent the way a step lifts them, the paws kept flat: each pair 3.2 units shorter, so the
+    # body sinks 3.1 with the feet on the ground (bent the other way the feet sank 4 units into it
+    # and the gait moonwalked: the lift straightened the knee, so a foot was lowest mid-swing).
+    for leg in ("FL", "FR", "BL", "BR"):
+        bend = (-40, 60, -20) if leg[0] == "F" else (30, -50, 20)
+        for part, b in zip(("upper", "lower", "paw"), bend):
+            q[f"leg_{leg}_{part}"] = (q[f"leg_{leg}_{part}"][0] + b, 0, 0)
+    q.update({"root": (0, -3.1, 0), "spine_1": (2, 0, 0), "neck": (16, 0, 0), "head": (-14, 0, 0), "ear_L": (-12, 0, 0), "ear_R": (-12, 0, 0)})
     q.update({f"tail_{k}": tail_swing(k, 0, (30 if k == 0 else -2, 0, 0)) for k in range(len(TAIL))})
+    return q
+
+
+def pose_approach(t):
+    """Curious, coming to look: slow steps, the head low and stretched forward, nose working, the
+    ears pricked ahead, the tail level (1.4 s a cycle, in place of the walk). Not a stalk's crouch."""
+    p = t / 1.4
+    q = gait(p, (0.0, 0.5, 0.75, 0.25), 16, 32)
+    q.update({"root": (0, -1.0, 0), "spine_1": (2, 0, 0), "neck": (14, 0, 0), "head": (-10 + 2 * S(TAU * p * 4), 0, 0),
+              "ear_L": (-10, 0, 0), "ear_R": (-10, 0, 0)})
+    q.update({f"tail_{k}": tail_swing(k, 0, (16 if k == 0 else 0, 0, 0)) for k in range(len(TAIL))})
     return q
 
 
@@ -771,11 +782,12 @@ ANIMS = {"idle": (pose_idle, 8.0), "walk": (pose_walk, 0.6), "run": (pose_run, 0
          "stare": (pose_stare, 2.0), "sniff": (pose_sniff, 2.5), "drink": (pose_drink, 1.0), "look": (pose_look, 3.0),
          "scratch": (pose_scratch, 2.0), "stretch": (pose_stretch, 2.5), "sleep": (pose_sleep, 6.0), "stalk": (pose_stalk, 1.2),
          "alarm": (pose_alarm, 1.2), "howl": (pose_howl, 4.0), "play": (pose_play, 1.6), "groom": (pose_groom, 2.5),
-         "nuzzle": (pose_nuzzle, 2.0), "flinch": (pose_flinch, 0.45), "death": (pose_death, 1.2)}
+         "nuzzle": (pose_nuzzle, 2.0), "flinch": (pose_flinch, 0.45), "death": (pose_death, 1.2),
+         "approach": (pose_approach, 1.4)}
 # How each clip loops and eases (`to_bedrock.as_action`): held ones loop, the rest play once; the
 # flinch snaps in, the death holds its last frame.
-LOOPS = {"stare": True, "drink": True, "sleep": True, "stalk": True, "death": "hold_on_last_frame"}
-BLENDS = {"flinch": (0.05, 0.2), "death": (0.1, 0.0), "stalk": (0.3, 0.3), "sleep": (0.6, 0.6)}
+LOOPS = {"stare": True, "drink": True, "sleep": True, "stalk": True, "approach": True, "death": "hold_on_last_frame"}
+BLENDS = {"flinch": (0.05, 0.2), "death": (0.1, 0.0), "stalk": (0.3, 0.3), "approach": (0.3, 0.3), "sleep": (0.6, 0.6)}
 
 
 BLINKS = {"idle": [1.3, 3.2, 6.9], "lie": [2.1, 4.2], "sit": [1.0, 3.1], "stare": [1.4], "look": [1.5], "stalk": [], "drink": [0.5]}
