@@ -340,7 +340,9 @@ fn client(r: &mut Registry) {
         let st = c.state();
         let gw = st.window[0] as f32 / st.gui_scale.max(1.0);
         let width = (gw - 2.0 * HINT_SIDES).clamp(HINT_MIN_W, HINT_MAX_W);
-        c.screen_text_wrapped(0.5, HINT_Y, key, &args, 0xe4dacf00 | (alpha * 255.0) as u32, 1.0, width);
+        // On the HUD's plate, in the brighter cream (World playtest round 13: the first hint read as "a
+        // thin small line mid-screen").
+        c.screen_text_plated(0.5, HINT_Y, key, &args, 0xf4ead800 | (alpha * 255.0) as u32, 1.0, width);
     });
 }
 

@@ -2887,14 +2887,23 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
         let mut o = crate::ui::Ui::new();
         o.text_unit = text_unit;
         for (x, y, text, color, size, wrap) in labels {
+            // A negative width: on the HUD's plate, wrapped to the width.
+            let plate = wrap < 0.0;
+            let wrap = wrap.abs();
             let mut spans = text.spans(&r.lang, Some(&r.input));
             if wrap > 0.0 {
                 for s in &mut spans {
                     s.align = crate::ui::text::align::CENTER;
                 }
             }
+            let at = crate::ui::Style::default().at(x, y, [0.5, 0.0]);
+            if plate {
+                o.open(crate::ui::Kind::Container { class: Some("hud_plate".into()) }, at.pad(4.0));
+            }
             let id = o.text(spans, "label");
-            o.nodes[id].style = crate::ui::Style::default().at(x, y, [0.5, 0.0]);
+            if !plate {
+                o.nodes[id].style = at;
+            }
             if wrap > 0.0 {
                 o.nodes[id].style.max_w = wrap;
             }
@@ -2905,6 +2914,9 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
                 t.center = wrap > 0.0;
                 t.color = Some(color);
                 t.scale = size;
+            }
+            if plate {
+                o.close();
             }
         }
         o.layout(Vec2::new(sw as f32 / scale, sh as f32 / scale), &r.ui.font);

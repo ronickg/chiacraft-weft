@@ -412,7 +412,14 @@ impl Client {
         unsafe { (host().client_screen_text)(self.raw, x, y, size, color, abi_str(key), Slice::new(&raw)) }
     }
 
-    /// `screen_text` wrapped to at most `width` GUI pixels, its lines centered (0: one line).
+    /// `screen_text_wrapped` on the HUD's plate (`hud_plate`): a hint that should read as one.
+    #[allow(clippy::too_many_arguments)]
+    pub fn screen_text_plated(&self, x: f32, y: f32, key: &str, args: &[crate::Arg], color: u32, size: f32, width: f32) {
+        self.screen_text_wrapped(x, y, key, args, color, size, -width.abs().max(1.0));
+    }
+
+    /// `screen_text` wrapped to at most `width` GUI pixels, its lines centered (0: one line; less
+    /// than 0: on the HUD's plate, `screen_text_plated`).
     #[allow(clippy::too_many_arguments)]
     pub fn screen_text_wrapped(&self, x: f32, y: f32, key: &str, args: &[crate::Arg], color: u32, size: f32, width: f32) {
         let raw = crate::ui::raw_args(args);
