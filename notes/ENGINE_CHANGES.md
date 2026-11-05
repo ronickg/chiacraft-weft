@@ -108,6 +108,7 @@ These are the biggest changes. They live mostly in our crates, but each needed h
 ## 8. Test kit and settings for runs
 
 - **Settings set for a run hold for the whole run** (2fa0beff), **and in the worlds it opens** (b091ac8b), **`--config` and `--no-shadows`** (ee147880). *Why:* scripted PC looks and benches need fixed settings.
+- **Portal arrivals in the portal's dimension, facing away** (`chiacraft/worlds/travel.rs` `Arrival`, `Spot`; `bridge.rs` `spot`; `server/player_file.rs` join): a spot keeps the portal's dimension by name and a yaw (`portals.txt`: `link x y z [dimension yaw]`, older lines still read), and the join places the player there, turned away from the portal. *Why:* the join test (11-05) found a guest put at the sheet's end, one block east, walking straight past the portal home; and every arrival went to the spawn's dimension whatever the portal's.
 - **The network path in the log** (0a11b0ee): `net: path to <id> relay|direct|mixed <kind>` on every join, portal arrival and player coming in, and again on each change. **A relay-only test setting** (`core:net_relay_only`, on no screen): the endpoint gets no IP transport, so every connection goes through n0's relay. *Why:* Ronald asked whether joins really cross the network, and every two-machine check ran on one home network.
 
 - **Load-test hooks for many players** (Research round 18, branch `claude/jovial-einstein-158b8f`):
