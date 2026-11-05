@@ -109,10 +109,21 @@ impl Goal for Band {
                 break;
             }
         }
-        if took != doing
-            && let Some(d) = w.component_mut(id, &DOING)
-        {
-            *d = took;
+        if took != doing {
+            // What the fixed order never did: up from a rest, or away from a mate, for food or water.
+            let (was, now) = (doing, took);
+            if matches!(was, 1 | 2) && matches!(now, 5 | 6) {
+                weft_sdk::info!(
+                    "animal {id} leaves its {} to {} (scores: {:.2} against {:.2})",
+                    if was == Need::Love as u8 { "mate" } else { "rest" },
+                    if now == Need::Eat as u8 { "eat" } else { "drink" },
+                    s[now as usize],
+                    s[was as usize],
+                );
+            }
+            if let Some(d) = w.component_mut(id, &DOING) {
+                *d = took;
+            }
         }
         took != 0
     }
