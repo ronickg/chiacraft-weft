@@ -13,8 +13,10 @@ pub mod balance;
 pub mod calendar;
 pub mod climate;
 pub mod clothing;
+pub mod combat;
 pub mod crafts;
 pub mod crops;
+pub mod curve;
 pub mod difficulty;
 pub mod effects;
 pub mod events;
@@ -38,6 +40,7 @@ pub mod stats;
 pub mod stomach;
 pub mod temperature;
 pub mod weather_sound;
+pub mod web;
 pub mod wild;
 
 /// Ticks a second, as the game's.

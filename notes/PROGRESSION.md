@@ -277,5 +277,5 @@ of band.
 
 1. **Research:** how Ark, Vintage Story, Terraria, Skyrim, GregTech or All the Mods, Thaumcraft or Botania, and Valheim structure their progression and keep it balanced. What to take, what to avoid.
 2. **Ronald's next round:** age names, the first boss list per biome, the skill trees' perks, how ley lines feel in play, and tribe ranks.
-3. **The tier data and the graph check first**, before content: the shared crate, the curves and the test, then the existing early ages tagged with tiers.
+3. **The tier data and the graph check first**, before content: the shared crate, the curves and the test, then the existing early ages tagged with tiers. Built 11-07: `vitals::curve`, `vitals::combat`, `vitals::web`, `animals_core::danger`, and `mods/base/progression` (every item, block, recipe, tool-part material and species tagged, the checks, `PROGRESSION_SHEET.md`). Nothing in the game reads the curves yet: the sheet shows today's numbers beside them for Ronald's call.
 4. Then each age built as a branch at a time, with Tester runs.
