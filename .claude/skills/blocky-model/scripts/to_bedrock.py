@@ -136,7 +136,22 @@ def animation(spec_anim, scale):
     root = {f"{f['t']:g}": r4(np.array([-f["root"][0], f["root"][1], -f["root"][2]]) * scale) for f in frames}
     if any(any(abs(x) > 1e-6 for x in v) for v in root.values()):
         bones.setdefault("root", {})["position"] = root
-    return {"loop": True, "animation_length": spec_anim["length"], "bones": bones}
+    return {"loop": spec_anim.get("loop", True), "animation_length": spec_anim["length"], "bones": bones}
+
+
+# The engine's standing clips; every other name is an action (`World::action_play`, a held state or
+# a one-off: a pounce, grazing, an alarm), written to go *over* what plays below on the bones it
+# names (Weft's `override_previous_animation`), easing in and out. Added on top instead, a whole
+# pose (head down to graze) stacked on the idle's own moves (a wolf's howl) and twisted.
+STANDING = ("idle", "walk", "run")
+ACTION_BLEND = (0.25, 0.3)
+
+
+def as_action(anim):
+    """An action clip: over what is below on its bones, easing in and out (`ACTION_BLEND`, or the
+    animation's own `blend`)."""
+    blend_in, blend_out = anim.pop("blend", ACTION_BLEND)
+    return {**anim, "override_previous_animation": True, "blend_weight": 1, "blend_in": blend_in, "blend_out": blend_out}
 
 
 # Weft (like Bedrock) adds a walk or run on top of the idle it plays all along, so in each pose file
@@ -169,17 +184,24 @@ def write(path, value):
         f.write(text + "\n")
 
 
-def export(spec, texture, out, name, scale, tex_name, pup=None, pup_head=1.3, pose_files=POSE_FILES):
+def export(spec, texture, out, name, scale, tex_name, pup=None, pup_head=1.3, pose_files=POSE_FILES, anims_only=False):
+    """The game's files: each model (`<name>[_pup].geo.json`), its pose files' animations and its
+    texture. `anims_only` writes the animations alone, leaving the models and texture as they are
+    (a new clip on a model whose skin is not to change)."""
     variants = [(name, scale, 1.0)] + ([(f"{name}_pup", scale * pup, pup_head)] if pup else [])
     for model, s, hs in variants:
-        write(os.path.join(out, "models", f"{model}.geo.json"), geometry(spec, f"geometry.{model}", s, hs))
+        if not anims_only:
+            write(os.path.join(out, "models", f"{model}.geo.json"), geometry(spec, f"geometry.{model}", s, hs))
         for suffix, names in pose_files.items():
             idle = spec["animations"].get(names.get("idle"))
             anims = {f"animation.{model}{suffix}.{k}":
-                     animation(offset_from(spec["animations"][v], idle["frames"][0]) if k in LAYERED and idle else spec["animations"][v], s)
+                     (lambda a: a if k in STANDING else as_action({**a, "blend": spec["animations"][v].get("blend", ACTION_BLEND)}))(
+                         animation(offset_from(spec["animations"][v], idle["frames"][0]) if k in LAYERED and idle else spec["animations"][v], s))
                      for k, v in names.items() if v in spec["animations"]}
             write(os.path.join(out, "animations", f"{model}{suffix}.animation.json"),
                   {"format_version": "1.8.0", "animations": anims})
+    if anims_only:
+        return [v[0] for v in variants]
     dst = os.path.join(out, "textures", "entity", f"{tex_name}.png")
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     shutil.copyfile(texture, dst)
