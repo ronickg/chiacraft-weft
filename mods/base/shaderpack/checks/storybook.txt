@@ -1,0 +1,54 @@
+# The Fantasy looks (round 17, recs 2 and 3): a storybook hour (lavender shade at golden and blue
+# hour, silver moonlight, rods at night) and a magical night sky (nebula colour, pixel stars,
+# shooting stars, an aurora palette per night, a bigger moon), each view off then on, by
+# set_config. The clouds check's hill (149.5 75 -166.5) facing the evening sun (yaw 90) and away.
+# Seed 1, --view 12, 1280x720, --shader-pack chiacraft, a fresh world, spectator, mobs off.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode spectator
+chat /weather clear 99999
+chat /tp 149.5 80 -166.5
+loaded
+idle
+wait 8
+set_config base:look_storybook 0
+set_config base:fx_night_sky 0
+set_config base:fx_shooting_stars 0
+set_config base:moon_size 1
+chat /time set 11800
+look 270 8
+wait 3
+shot sb_1_golden_away_off.png
+set_config base:look_storybook 1
+wait 2
+shot sb_1b_golden_away_on.png
+chat /time set 12900
+look 90 10
+set_config base:look_storybook 0
+wait 3
+shot sb_2_bluehour_off.png
+set_config base:look_storybook 1
+wait 2
+shot sb_2b_bluehour_on.png
+chat /time set 18000
+look 180 40
+set_config base:look_storybook 0
+wait 3
+shot sb_3_night_off.png
+set_config base:look_storybook 1
+set_config base:fx_night_sky 2
+set_config base:fx_shooting_stars 1
+set_config base:moon_size 1.5
+wait 3
+shot sb_3b_night_on.png
+look 180 -10
+set_config base:look_storybook 0
+set_config base:fx_night_sky 0
+wait 2
+shot sb_4_night_land_off.png
+set_config base:look_storybook 1
+set_config base:fx_night_sky 2
+wait 2
+shot sb_4b_night_land_on.png
+quit
