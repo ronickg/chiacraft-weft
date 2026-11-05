@@ -545,6 +545,15 @@ class Builder:
                     k = len(cells)
                     w, h = (2, 2) if k <= 4 else (3, 3)
                 st = "hand" if w <= 2 and h <= 2 else "table"
+                # In the game's own grid (2 x 2 by hand, 3 x 3 at the table), from its top left.
+                g = 2 if st == "hand" else 3
+                full = [None] * (g * g)
+                if r["w"]:
+                    for k, c in enumerate(cells):
+                        full[(k // w) * g + k % w] = c
+                else:
+                    full[:len(cells)] = cells
+                cells, w, h = full, g, g
             elif r["kind"] == "base:smelting":
                 st, w, h = "furnace", 1, 1
             else:
@@ -570,9 +579,11 @@ class Builder:
                 st = "fire"
             elif o in kinds_out and raw == "Table":
                 k = o.split(":")[1]
-                slots = [sl for sl, _ in self.kinds[k]]
+                def slot_of(c):
+                    shape = c[0].split(":")[-1].removeprefix("part_")
+                    return next((sl for sh, kk, sl in self.shapes if sh == shape and kk == k), "")
                 add(o, {"st": "assembly", "w": len(cells), "h": 1, "cells": cells, "out": [o, r["n"], 1], "secs": None,
-                        "slots": slots[:len(cells)]})
+                        "slots": [slot_of(c) for c in cells]})
                 continue
             elif o in have:
                 continue
@@ -650,7 +661,7 @@ class Builder:
             self.add({"id": "skill:" + re.sub(r"\W+", "_", name.lower()).strip("_"), "mod": "base", "name": name, "is": "skill",
                       "group": "skills", "kind": row.get("Group", "").lower(), "tier": None, "age": "", "path": row.get("Path", ""),
                       "tab": "", "img": sk_url, "pix": True, "note": "raised by " + row.get("Raised by", ""), "made": [], "uses": [],
-                      "facts": facts, "region": name})
+                      "facts": facts, "region": next((k["id"] for k in self.reg.get("skills", []) if k["name"] == name), None)})
         web = self.reg.get("web")
         facts = []
         for h in ("Families", "Sockets and stones"):
@@ -660,7 +671,7 @@ class Builder:
         self.tex.used = set()
         self.add({"id": "skill:perk_web", "mod": "base", "name": "The perk web", "is": "web", "group": "skills", "kind": "web",
                   "tier": None, "age": "", "path": "shared", "tab": "", "img": web_url, "pix": True,
-                  "desc": re.sub(r"\s+", " ", md[md.index("## The web") + 11:].split("\n\n")[1]) if "## The web" in md else "",
+                  "desc": re.sub(r"\s+", " ", md[md.index("## The web") + 10:].strip().split("\n\n")[0]) if "## The web" in md else "",
                   "web": bool(web), "made": [], "uses": [], "facts": facts})
         if web:
             names = {}
