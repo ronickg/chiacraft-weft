@@ -1954,12 +1954,16 @@ impl EntityRenderer {
                 one.unwrap_or_else(|| swapped(item, hold_of(c, m, item)))
             };
             let held_how = Play { looping: true, aim: true, hand: true, ..how };
-            if e.held != 0 {
+            // Hands on a wall or a glider's bar: the pose's clip has the arms, not what is held.
+            let hands_busy = pose.when & (weft_abi::pose_when::CLIMBING | weft_abi::pose_when::GLIDING) != 0;
+            if hands_busy {
+                // Nothing of the hands: the item rides along on the raised arm.
+            } else if e.held != 0 {
                 m.play(&mut clips, m.action_seen(e.held, hold_in(e.held, e.off_held != 0), in_view), &held_how);
             } else if in_view {
                 m.play(&mut clips, m.action_seen(0, "hold_empty", true), &held_how);
             }
-            if e.off_held != 0 {
+            if e.off_held != 0 && !hands_busy {
                 m.play(&mut clips, m.action_seen(e.off_held, hold_in(e.off_held, true), in_view), &Play { mirror: true, ..held_how });
             }
             let progress = Play { drive: Drive::Progress, aim: in_view, hand: true, ..how };

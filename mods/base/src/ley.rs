@@ -128,7 +128,8 @@ fn dist2(n: &Node, x: f64, z: f64) -> i64 {
     dx * dx + dz * dz
 }
 
-/// Every second, each player's seed for its client's lines (none outside the overworld).
+/// Every second, each player's seed for its client's lines (none outside the overworld), and
+/// its ley sight from the perk web.
 fn hand_seed(w: &World) {
     if !w.game_time().is_multiple_of(20) {
         return;
@@ -141,6 +142,14 @@ fn hand_seed(w: &World) {
             && *s != want
         {
             *s = want;
+        }
+        // Ley sight from the perk web (Runecraft's node, or a socketed relic): the lines without
+        // a rod. The web is the truth; the component is what the client reads.
+        let sight = if base_api::skills::has(w, p, base_api::skills::Special::LeySight) { 1.0 } else { 0.0 };
+        if let Some(v) = w.component_mut(p, &base_api::LEY_SIGHT)
+            && *v != sight
+        {
+            *v = sight;
         }
     }
 }

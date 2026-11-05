@@ -123,6 +123,8 @@ fn tick(w: &World) {
         }
         if found > 0 && !creative {
             give_xp(w, id, found);
+            // Exploring rises by the same finds (a dimension's are ten a biome's).
+            crate::skills::discovered(w, id, found >= xp::DISCOVER * 10);
         }
         let Some(v) = w.component_mut(id, &VITALS) else { continue };
         let level = levels::level_of(v.xp).0;

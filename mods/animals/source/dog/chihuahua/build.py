@@ -39,9 +39,18 @@ if __name__ == "__main__":
         back = {f: v for f, v in gait(spec, anim, ["leg_FL_paw", "leg_FR_paw", "leg_BL_paw", "leg_BR_paw"]).items() if v is not None and v <= 0}
         assert not back, f"{anim} goes backwards: {back}"
     from to_bedrock import POSE_FILES  # noqa: E402
-    poses = {**POSE_FILES, "": {**POSE_FILES[""], "bite": "bite"}}  # its bite, for code to play
+    # Its bite and the behaviour clips (`mods/animals/src/anim.rs`), for code to play.
+    sys.path.insert(0, os.path.join(HERE, "tools"))
+    from blocky import CLIP_LENGTHS  # noqa: E402
+    poses = {**POSE_FILES, "": {**POSE_FILES[""], "bite": "bite", **{c: c for c in CLIP_LENGTHS}}}
+    # `--anims-only`: the animations alone, the models, texture and coat layers left as they are
+    # (2026-11-05: Upstream was looking into the chihuahua's texture; its skin wasn't to change).
+    only = "--anims-only" in sys.argv
     made = export(spec, os.path.join(OUT, "texture.png"), ASSETS, "chihuahua", SCALE, "chihuahua/chihuahua", PUP, PUP_HEAD,
-                  pose_files=poses)
+                  pose_files=poses, anims_only=only)
+    if only:
+        print("wrote the animations of", made, "into", os.path.normpath(ASSETS))
+        sys.exit(0)
     # Its coat layers, for coats painted from genes in the game (`core/src/coats.rs`).
     import shutil  # noqa: E402
     shutil.copytree(os.path.join(OUT, "layers"), os.path.join(HERE, "..", "..", "..", "genetics", "layers", "chihuahua"), dirs_exist_ok=True)

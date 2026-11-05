@@ -79,7 +79,7 @@ pub fn register(r: &mut Registry) {
 
 /// The day since the world began, the hour (06:00 at the day's start) and the season (in a
 /// dimension with a calendar).
-fn now(w: &World) -> (u64, f32, Option<usize>) {
+pub(crate) fn now(w: &World) -> (u64, f32, Option<usize>) {
     let time = w.day_time();
     let hour = ((time % calendar::DAY_TICKS) as f32 / 1000.0 + 6.0) % 24.0;
     let season = (SEASONS.on_dimension(w.dimension()).unwrap_or(0) > 0).then(|| calendar::date(time).season.index() as usize);
@@ -136,6 +136,21 @@ static MANUAL_RAIN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBoo
 fn now_heading(w: &World) -> f32 {
     let (day, hour, _) = now(w);
     air::heading(w.seed(), day, hour)
+}
+
+/// The wind at `pos` now, m/s, and where it blows to in degrees clockwise from north: its
+/// biome's air as the engine is told it (`/air` included). The glider drifts with it.
+pub(crate) fn wind_at(w: &World, pos: BlockPos) -> (f32, f32) {
+    let heading = match *SET.lock().unwrap() {
+        Some((_, _, h, _, until)) if w.game_time() < until => h,
+        _ => now_heading(w),
+    };
+    let id = w.biome(pos);
+    let speed = biomes()
+        .iter()
+        .find(|b| b.0 == id)
+        .map_or(0.0, |&(id, c)| air_of(w, id, &c).wind);
+    (speed, heading)
 }
 
 /// The air in biome `id` now: fog (blizzards and dust storms count as fog), wind, snow lying,

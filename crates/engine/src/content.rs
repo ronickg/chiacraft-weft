@@ -79,6 +79,8 @@ pub struct StateInfo {
     pub hardness: f32,
     pub friction: f32,
     pub drag: f32,
+    /// How well a climber holds on to its sides (`abi::comp::GRIP`).
+    pub grip: f32,
     /// Has the `conductor` tag (part of energy networks).
     pub conductor: bool,
     /// Liquid id (`Content::liquids`) for liquid blocks.
@@ -2557,6 +2559,7 @@ fn number_blocks(mods: &[ModMeta], blocks: Vec<(ModId, RawBlock)>, textures: &mu
         hardness: -1.0,
         friction: 0.6,
         drag: 1.0,
+        grip: 1.0,
         conductor: false,
         liquid: None,
         support: None,
@@ -2674,6 +2677,7 @@ fn number_blocks(mods: &[ModMeta], blocks: Vec<(ModId, RawBlock)>, textures: &mu
                 hardness: 1.0,
                 friction: 0.6,
                 drag: 1.0,
+                grip: 1.0,
                 conductor: false,
                 liquid: None,
                 support: None,
@@ -3227,6 +3231,7 @@ fn flatten_components(states: &mut [StateInfo], item_defs: &mut [ItemDef], compo
             .map(|t| (t as f64 * crate::world::TPS as f64, u32_of(st, abi::comp::GROW_LIGHT).unwrap_or(0)));
         s.friction = f32_of(st, abi::comp::FRICTION).unwrap_or(s.friction);
         s.drag = f32_of(st, abi::comp::DRAG).unwrap_or(s.drag);
+        s.grip = f32_of(st, abi::comp::GRIP).unwrap_or(s.grip);
         if let Some(l) = get(st, abi::comp::LIGHT) {
             s.light = [l[0], l[1], l[2]];
         }

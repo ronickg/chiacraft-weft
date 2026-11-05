@@ -202,6 +202,24 @@ An axe at a tree's foot fells it in one chop that takes logs^0.75 times one log'
 
 Rested lasts 480 s and a minute more a comfort level. The core temperature: Freezing, then Cold from 33 °C, Chilly from 35 °C, Comfortable from 36.5 °C, Warm from 37.6 °C, Hot from 38.6 °C, Heatstroke from 40.1 °C.
 
+## Climbing and gliding
+
+Any wall, pushing into it in the air: 1.5 blocks a second at grip 1, 6 stamina a second climbing and 2.1 hanging still (sneaking; sneaking into it climbs down). Grip: rough rock and logs 1.25, dressed stone and planks 0.6, loose ground 0.75, ice and glass 0. Run out and the hands let go until 15 is back.
+
+| on the climber | pace | stamina |
+|---|---|---|
+| encumbered | x0.8 | x1.25 |
+| overloaded | x0.55 | x1.6 |
+| wet | x0.85 | x1.15 |
+| cold | x0.9 | x1.15 |
+| freezing | x0.75 | x1.35 |
+
+| glider | airspeed | sink | glide ratio | from 40 up: still air | 4 m/s behind | 4 m/s against | seconds aloft |
+|---|---|---|---|---|---|---|---|
+| `base:glider` | 8 | 1.8 | 4.4 | 178 | 244 | 111 | 607 |
+
+The wind carries a glider at 0.75 of the surface wind. Rising air: thermals up to 1.6 blocks a second at 14:00 over bare ground (half over grass) in 0.3 of 40-block cells, none in rain; wind up a slope lifts by its rise over 8 blocks downwind, x0.8; at most 3 together.
+
 ## Climates
 
 Each biome's real place (`reports/ecology/Biome climates.md`), year mean, humidity and half its summer-to-winter range, the air at sea level under an open sky (midwinter before dawn, midsummer mid afternoon), and the share of days with rain in spring, summer, autumn and winter.

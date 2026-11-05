@@ -580,6 +580,7 @@ hud.element.base.effects = Эффекты
 hud.base.resting = {#c2ac88}Отдых у огня: {0} с{/}
 hud.base.comfort = {#c2ac88}Комфорт {0}{/}
 hud.element.base.temperature = Температура
+hud.element.base.climb_stamina = Выносливость при лазании
 hud.base.outside = {#c6a383}воздух{/} {0}°C
 hud.base.feels.freezing = {img:base:temp_freezing 12x12}
 hud.base.feels.cold = {img:base:temp_cold 12x12}
@@ -866,6 +867,8 @@ item.base.wool_cloak = Шерстяной плащ
 item.base.fur_robe = Меховая накидка
 item.base.rain_cape = Кожаная накидка от дождя
 item.base.rain_cape.tooltip = Под ней дождь вас не мочит.
+item.base.glider = Кожаный планер
+item.base.glider.tooltip = Прыгните в падении, чтобы раскрыть, и ещё раз, чтобы сложить. По ветру летит дальше.
 death.base.dropped = Надгробию негде было встать: ваши вещи упали там, где вы погибли.
 item.base.wool_cloak.tooltip = Носится поверх одежды и доспехов. Мокрым почти не теряет тепла.
 item.base.fur_robe.tooltip = Носится поверх одежды и доспехов: самая тёплая накидка, летом в ней жарко.
@@ -1233,6 +1236,221 @@ block.base.campfire_laid.tooltip = Два бревна и две палки, е�
 command.base.knap.no_room = Здесь нет места для желвака: встаньте на открытое место.
 command.base.impact.started = Падает метеорит: кратер радиусом {0} у {1} {2}, {3} столбцов за {4} тиков
 command.base.impact.no_ground = Нет загруженной земли для удара у {0} {1}
+
+# Навыки и сеть умений (skills.rs, web.rs; vitals::skills, vitals::perks)
+key.base.web = Навыки
+web.base.title = Навыки
+web.base.tab = Навыки
+web.base.keys = {#c6a383}WASD{/} сдвиг · {#c6a383}Z X{/} масштаб · {#c6a383}C{/} центр
+web.base.zoom_out = -
+web.base.zoom_out_tip = Отдалить (Z)
+web.base.zoom_in = +
+web.base.zoom_in_tip = Приблизить (X)
+web.base.centre = Центр
+web.base.centre_tip = Назад к началу (C)
+web.base.points = Очков умений: {0}
+web.base.refund_on = Забывание: осталось {0}
+web.base.refund_off = Забыть (осталось {0})
+web.base.refund_tip = Нажмите на взятый узел, чтобы вернуть его. Только тот, на котором не держатся другие.
+web.base.skill_tip = {color:title}{0}{/}
+    {color:dim}Растёт: {1}. Нажмите, чтобы увидеть его область.{/}
+web.base.level = {0}
+web.base.by.later = пока ничем: придёт с заклинаниями, машинами или торговцами
+web.base.state.taken = {#7fdc6a}Взято{/}
+web.base.state.open = {#ffbe45}Нажмите, чтобы взять (1 очко){/}
+web.base.state.waiting = {#c6a383}Нет очков умений: следующий уровень даст одно{/}
+web.base.state.far = {#6b6f86}Сначала возьмите соседний узел{/}
+web.base.state.locked = {#e8907a}Навык слишком низок{/}
+web.base.tip.start = {color:title}Начало{/}
+    {color:dim}Все начинают здесь. Растите к навыкам, которыми пользуетесь.{/}
+web.base.tip.1 = {color:title}{0}{/}
+    {1} {2}
+    {3}
+web.base.tip.2 = {color:title}{0}{/}
+    {1} {2}
+    {3} {4}
+    {5}
+web.base.tip.1n = {color:title}{0}{/}
+    {1} {2}
+    {color:dim}Нужно: {3} {4} (у вас {5}){/}
+    {6}
+web.base.tip.2n = {color:title}{0}{/}
+    {1} {2}
+    {3} {4}
+    {color:dim}Нужно: {5} {6} (у вас {7}){/}
+    {8}
+web.base.tip.1b = {color:title}{0}{/}
+    {1} {2}
+    {color:dim}Нужно: {3} и {4} {5} (у вас {6}){/}
+    {7}
+web.base.tip.2b = {color:title}{0}{/}
+    {1} {2}
+    {3} {4}
+    {color:dim}Нужно: {5} и {6} {7} (у вас {8}){/}
+    {9}
+web.base.tip.1s = {color:title}{0}{/}
+    {1} {2}
+    {3}
+    {4}
+web.base.tip.1sn = {color:title}{0}{/}
+    {1} {2}
+    {3}
+    {color:dim}Нужно: {4} {5} (у вас {6}){/}
+    {7}
+web.base.unlearn = Можно забыть узлов: {0}. Откройте навыки ({key:base:web})
+web.base.no_points = Нет очков умений: следующий уровень даст одно
+web.base.too_low = Навык слишком низок для этого узла
+web.base.not_next = Сначала возьмите соседний узел
+web.base.no_refunds = Сначала используйте камень забвения
+web.base.holds_others = На этом узле держатся другие
+web.base.skill_up = {0}: уровень {1}
+command.base.skill = {0}; очков умений {1}, возвратов {2}
+command.base.skill.unknown = Нет навыка {0}
+item.base.unlearning_stone = Камень забвения
+item.base.unlearning_stone.tooltip = Используйте, чтобы вернуть до 3 узлов сети навыков.
+perk.base.special.ley_sight = {#9ad7ff}Показывает лей-линии без лозы{/}
+web.base.skill.melee = Ближний бой
+web.base.by.melee = удары по существам вблизи
+web.base.skill.archery = Стрельба и метание
+web.base.by.archery = попадания издалека
+web.base.skill.defence = Защита
+web.base.by.defence = удары от существ
+web.base.skill.smithing = Кузнечество и мастерство
+web.base.by.smithing = изготовление инструментов, оружия, брони и деталей; плавка
+web.base.skill.engineering = Инженерия
+web.base.skill.mining = Горное дело
+web.base.by.mining = добыча камня и руды
+web.base.skill.building = Стройка и земледелие
+web.base.by.building = установка блоков; посев и сбор урожая
+web.base.skill.alchemy = Алхимия и готовка
+web.base.by.alchemy = готовка на костре или в котле
+web.base.skill.runecraft = Руны и зачарование
+web.base.skill.destruction = Разрушение
+web.base.skill.restoration = Восстановление
+web.base.skill.conjuring = Призыв и обереги
+web.base.skill.taming = Приручение и езда
+web.base.by.taming = приручение и езда на животных
+web.base.skill.survival = Выживание
+web.base.by.survival = рубка деревьев; изготовление обычных вещей
+web.base.skill.exploring = Исследование и картография
+web.base.by.exploring = открытие новых биомов и измерений
+web.base.skill.trading = Торговля
+perk.base.family.melee_damage = урон в ближнем бою
+perk.base.family.ranged_damage = урон издалека
+perk.base.family.spell_damage = урон заклинаний
+perk.base.family.defence = защита
+perk.base.family.health = здоровье
+perk.base.family.tame_damage = урон прирученных
+perk.base.family.taming_speed = скорость приручения
+perk.base.family.craft_grade = качество ремесла
+perk.base.family.gather_speed = скорость сбора
+perk.base.family.mine_speed = скорость добычи
+perk.base.family.move_speed = скорость движения
+perk.base.family.mana_cost = расход маны
+perk.base.family.stamina = выносливость
+perk.base.family.hunger = медленный голод
+perk.base.family.cooking = готовка
+perk.base.family.harvest = урожай
+perk.base.family.ride_speed = скорость езды
+perk.base.family.trade = торговля
+perk.base.family.smelting = скорость плавки
+perk.base.family.machine_speed = скорость машин
+perk.base.melee.heavy_blows = Тяжёлые удары
+perk.base.melee.second_wind = Второе дыхание
+perk.base.melee.executioner = Палач
+perk.base.melee.battle_rhythm = Ритм боя
+perk.base.melee.berserker = Берсерк
+perk.base.bridge.weapon_master = Мастер оружия
+perk.base.archery.steady_aim = Твёрдая рука
+perk.base.archery.light_feet = Лёгкий шаг
+perk.base.archery.piercing_shot = Пронзающий выстрел
+perk.base.archery.skirmisher = Застрельщик
+perk.base.archery.glass_arrow = Стеклянная стрела
+perk.base.bridge.shield_archer = Лучник со щитом
+perk.base.defence.thick_hide = Толстая шкура
+perk.base.defence.hardy = Выносливый
+perk.base.defence.shield_wall = Стена щитов
+perk.base.defence.unbroken = Несломленный
+perk.base.defence.iron_wall = Железная стена
+perk.base.bridge.armourer = Бронник
+perk.base.smithing.keen_eye = Зоркий глаз
+perk.base.smithing.bellows = Мехи
+perk.base.smithing.masters_touch = Рука мастера
+perk.base.smithing.hot_forge = Жаркий горн
+perk.base.smithing.forge_bound = Прикованный к горну
+perk.base.bridge.machine_forged = Машинная ковка
+perk.base.engineering.gearwright = Шестерёнщик
+perk.base.engineering.steady_fire = Ровный огонь
+perk.base.engineering.clockwork = Часовой механизм
+perk.base.engineering.pressure = Давление
+perk.base.engineering.overclock = Разгон
+perk.base.bridge.steam_drill = Паровой бур
+perk.base.mining.stonecutter = Камнерез
+perk.base.mining.strong_back = Крепкая спина
+perk.base.mining.vein_sense = Чутьё жилы
+perk.base.mining.tireless = Неутомимый
+perk.base.mining.tunnel_rat = Туннельная крыса
+perk.base.bridge.quarry_master = Хозяин каменоломни
+perk.base.building.green_thumb = Зелёные руки
+perk.base.building.quick_hands = Ловкие руки
+perk.base.building.bountiful = Щедрый урожай
+perk.base.building.builders_eye = Глаз строителя
+perk.base.building.homesteader = Поселенец
+perk.base.bridge.kitchen_garden = Огород
+perk.base.alchemy.hearty_meals = Сытная еда
+perk.base.alchemy.iron_stomach = Железный желудок
+perk.base.alchemy.fine_cook = Искусный повар
+perk.base.alchemy.lean_living = Скромная жизнь
+perk.base.alchemy.feaster = Пирующий
+perk.base.bridge.infuser = Настойщик
+perk.base.runecraft.ley_sight = Лей-зрение
+perk.base.runecraft.rune_carver = Резчик рун
+perk.base.runecraft.deep_runes = Глубокие руны
+perk.base.runecraft.glyph_weaver = Ткач глифов
+perk.base.runecraft.rune_bound = Связанный рунами
+perk.base.bridge.charged_runes = Заряженные руны
+perk.base.destruction.kindling = Растопка
+perk.base.destruction.focus = Сосредоточение
+perk.base.destruction.storm_call = Зов бури
+perk.base.destruction.overflow = Переполнение
+perk.base.destruction.ley_burn = Лей-ожог
+perk.base.bridge.balance = Равновесие
+perk.base.restoration.mending = Исцеление
+perk.base.restoration.calm_mind = Спокойный ум
+perk.base.restoration.renewal = Обновление
+perk.base.restoration.wellspring = Источник
+perk.base.restoration.lifeblood = Кровь жизни
+perk.base.bridge.warding_light = Оберегающий свет
+perk.base.conjuring.bound_spirit = Связанный дух
+perk.base.conjuring.ward = Оберег
+perk.base.conjuring.greater_summons = Великий призыв
+perk.base.conjuring.bastion = Бастион
+perk.base.conjuring.warden = Страж
+perk.base.bridge.rune_collars = Рунные ошейники
+perk.base.taming.gentle_hand = Мягкая рука
+perk.base.taming.saddle_sense = Чувство седла
+perk.base.taming.pack_leader = Вожак стаи
+perk.base.taming.swift_mount = Быстрый скакун
+perk.base.taming.beastmaster = Повелитель зверей
+perk.base.bridge.tracker = Следопыт
+perk.base.survival.woodsman = Лесоруб
+perk.base.survival.weathered = Закалённый
+perk.base.survival.forager = Собиратель
+perk.base.survival.hard_to_kill = Живучий
+perk.base.survival.wild_born = Рождённый в глуши
+perk.base.bridge.pathfinder = Первопроходец
+perk.base.exploring.long_stride = Широкий шаг
+perk.base.exploring.wayfarer = Странник
+perk.base.exploring.pathless = Бездорожье
+perk.base.exploring.far_walker = Дальноход
+perk.base.exploring.wanderer = Скиталец
+perk.base.bridge.caravan = Караван
+perk.base.trading.haggler = Торгаш
+perk.base.trading.pack_train = Вьючный обоз
+perk.base.trading.merchant_prince = Князь купцов
+perk.base.trading.caravaneer = Караванщик
+perk.base.trading.silver_tongue = Серебряный язык
+perk.base.bridge.sellsword = Наёмник
 item.base.dowsing_rod = Лоза лозоходца
 item.base.dowsing_rod.tooltip = Раздвоенная ветка с тектитом на конце. В руке она клонится к лей-линиям и слабо показывает их течение.
 block.base.ley_stone = Лей-камень

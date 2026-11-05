@@ -24,9 +24,9 @@ Power grows ×1.6 an age: `g(L) = 1.6^(L/10)` over area and item level L (tier �
 
 | tier | age | hours | EM | g at start | reference: hit / health / armour | things tagged | made | kit EM | of budget | everything once |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 492 | 148 | 49 | 34 % | 257 EM |
+| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 493 | 149 | 49 | 34 % | 265 EM |
 | 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 31 | 24 | 76 | 26 % | 164 EM |
-| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 26 | 24 | 62 | 16 % | 250 EM |
+| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 27 | 25 | 62 | 16 % | 270 EM |
 | 3 | Age of Steam | 18 | 1080 | 4.10 | 31.1 / 104 / 130 | 30 | 27 | 94 | 22 % | 512 EM |
 | 4 | Age of Lightning | 20 | 1200 | 6.55 | 49.7 / 166 / 207 | 0 | 0 | 0 | 0 % | 0 EM |
 | 5 | Age of the Future | 18 | 1080 | 10.49 | 79.6 / 265 / 332 | 0 | 0 | 0 | 0 % | 0 EM |
@@ -238,7 +238,7 @@ A saddle (and barding) of an age carries a tame up to that age's reference level
 
 ## The perk web's prices
 
-A unit is +2 % to one family; a small node gives 1, a notable 3-4, a keystone nets 0. Inside a family bonuses add, between families they multiply. A family tops out at ×1.6 (30 units: one age); everything together (gear, web, a tame's bond, food) at ×2.5 (two ages). Families: melee damage, ranged damage, spell damage, defence, health, tame damage, taming speed, craft grade, gathering speed, mining speed, move speed, mana cost. No node exists yet.
+A unit is +2 % to one family; a small node gives 1, a notable 3-4, a keystone nets 0. Inside a family bonuses add, between families they multiply. A family tops out at ×1.6 (30 units: one age); everything together (gear, web, a tame's bond, food) at ×2.5 (two ages). Families: melee damage, ranged damage, spell damage, defence, health, tame damage, taming speed, craft grade, gathering speed, mining speed, move speed, mana cost, stamina, slower hunger, cooking, harvest, riding speed, trade, smelting speed, machine speed. The nodes, skills and their checks: `mods/base/vitals/WEB_SHEET.md`.
 
 ## Age keys by path
 
@@ -258,11 +258,11 @@ Moving to the next age takes a key, one thing from each gate (materials and tool
 
 Every named item and block, by its tag (`content::RULES`). EM is the cheapest way to have one; "-" not had as an item.
 
-### Stone Age (492)
+### Stone Age (493)
 
-**tech** (45)
+**tech** (46)
 
-- tool: arrow (2.0), axe (0.48), bow (0.48), hoe (0.70), knife (0.43), pickaxe (0.48), shovel (0.48), spear (0.70), stone_axe (0.60), stone_hoe (0.45), stone_pickaxe (0.60), stone_shovel (0.30), stone_sword (0.40), sword (0.70), wood_axe (0.41), wood_hoe (0.33), wood_pickaxe (0.41), wood_shovel (0.24), wood_sword (0.28)
+- tool: arrow (2.0), axe (0.48), bow (0.48), glider (7.8), hoe (0.70), knife (0.43), pickaxe (0.48), shovel (0.48), spear (0.70), stone_axe (0.60), stone_hoe (0.45), stone_pickaxe (0.60), stone_shovel (0.30), stone_sword (0.40), sword (0.70), wood_axe (0.41), wood_hoe (0.33), wood_pickaxe (0.41), wood_shovel (0.24), wood_sword (0.28)
 - armour: leather_boots (9.1), leather_chestplate (18), leather_helmet (11), leather_leggings (16)
 - station: furnace (1.2)
 - part: part_bar_guard (0.22), part_barbed_point (0.22), part_bearded_axe_head (0.22), part_bowstring (0.22), part_felling_axe_head (0.22), part_grip (0.22), part_haft (0.22), part_hoe_blade (0.22), part_knife_blade (0.22), part_lashing (0.22), part_leaf_point (0.22), part_long_blade (0.22), part_long_haft (0.22), part_pick_head (0.22), part_round_pommel (0.22), part_self_stave (0.22), part_shaft (0.22), part_short_blade (0.22), part_short_stave (0.22), part_shovel_blade (0.22), part_straight_blade (0.22)
@@ -335,7 +335,7 @@ Notes:
 - base:meteoric_iron: hammered cold, iron-grade before a player can smelt (Research round 17)
 - base:raw_gold, base:gold_ingot, base:gold_block: cast and soft: the Bronze Age's (Ronald, 11-07: "move them to fit")
 
-### Iron Age (26)
+### Iron Age (27)
 
 **tech** (19)
 
@@ -344,8 +344,9 @@ Notes:
 - tool: iron_axe (3.6), iron_hoe (2.5), iron_pickaxe (3.6), iron_shovel (1.3), iron_sword (2.4)
 - armour: iron_boots (4.7), iron_chestplate (9.4), iron_helmet (5.9), iron_leggings (8.2)
 
-**magic** (3)
+**magic** (4)
 
+- material: unlearning_stone (20)
 - light: star_lantern (62)
 - sky: peridot (10), starheart (60)
 
@@ -361,6 +362,7 @@ Notes:
 Notes:
 - base:redstone_ore, base:star_steel_ore: breaks into its ore (an iron pickaxe)
 - base:star_lantern: a starheart in iron
+- base:unlearning_stone: a peridot ground with tektites: gives back perk web nodes (vitals::perks)
 - base:salt, base:salted_meat: salt is boiled from a water bucket (iron)
 - animals:wyvern_saddle: a dragon-sized saddle has an iron frame
 
