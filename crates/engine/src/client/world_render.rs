@@ -1754,6 +1754,14 @@ struct TableOut {
 /// Direction runs of a cube: as many sides as face a camera outside it, in order.
 const DRAWS_PER_FACES: u32 = 3;
 
+/// Where the faces' counter is in the buckets' buffer, in 32-bit words: after the `buckets`
+/// buckets' 8 bytes each, at a 256-byte boundary. It is bound on its own, and a storage buffer's
+/// offset must be a multiple of the GPU's `minStorageBufferOffsetAlignment` (at most 256): right
+/// after the buckets it was only when their count happened to suit (a validation error otherwise).
+fn faces_word(buckets: usize) -> usize {
+    (buckets * 8).next_multiple_of(256) / 4
+}
+
 /// How many draw records `cull` may write for buckets with `per_bucket` places: what `TableOut`
 /// holds (at least 1).
 fn records_of(per_bucket: &[u32]) -> u32 {
@@ -1914,7 +1922,13 @@ impl CubeTable {
         let draws = words[..n * 2]
             .chunks_exact(2)
             .fold(0u32, |sum, c| sum.saturating_add(c[0]));
-        (draws, words.get(self.per_bucket.len() * 2).copied().unwrap_or(0) as u64)
+        (
+            draws,
+            words
+                .get(faces_word(self.per_bucket.len()))
+                .copied()
+                .unwrap_or(0) as u64,
+        )
     }
 
     /// Makes this frame's draws. Before the world's pass.
@@ -1947,7 +1961,7 @@ impl CubeTable {
             gpu,
             &mut self.buckets,
             slot,
-            self.per_bucket.len() as u32 + 1,
+            faces_word(self.per_bucket.len()) as u32 / 2 + 1,
             8,
             usage::STORAGE | usage::INDIRECT,
             "table buckets",
@@ -1967,7 +1981,7 @@ impl CubeTable {
                 words[id * 2 + 1] = base;
                 base += n * if id & 2 == 0 { DRAWS_PER_FACES } else { 1 };
             }
-            words[self.per_bucket.len() * 2] = 0;
+            words[faces_word(self.per_bucket.len())] = 0;
         }
         use crate::gpu_layout::bind::occlusion as b;
         if !gpu.indirect_count() {
@@ -1985,7 +1999,7 @@ impl CubeTable {
         list.bind(b::OUT_DRAWS, o.draws);
         list.bind(b::OUT_ORIGINS, o.origins);
         // The faces' counter is the one after the last bucket.
-        list.bind_range(b::FACES_DRAWN, buckets, self.per_bucket.len() as u64 * 8, 8);
+        list.bind_range(b::FACES_DRAWN, buckets, faces_word(self.per_bucket.len()) as u64 * 4, 8);
         // Its use is decided in the shader, but all a shader mentions has to be bound.
         list.bind(b::DEPTHS, depths.unwrap_or(self.buffer));
         let count = self.entries.len() as u32;
@@ -2190,6 +2204,15 @@ fn box_planes(m: Mat4) -> [Vec4; 6] {
 #[cfg(test)]
 mod indirect_count_tests {
     use super::*;
+
+    #[test]
+    fn the_faces_counter_is_aligned_after_the_buckets() {
+        for n in [0, 1, 4, 9, 31, 32, 33, 100] {
+            let at = faces_word(n) * 4;
+            assert_eq!(at % 256, 0, "{n} buckets");
+            assert!(at >= n * 8, "{n} buckets: it would overlap them");
+        }
+    }
 
     #[test]
     fn capped_draws_keep_room_and_stay_in_the_group() {
