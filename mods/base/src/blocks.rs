@@ -11,6 +11,10 @@ pub static GRASS: Block = Block::named("grass");
 pub static SNOWY_GRASS: Block = Block::named("snowy_grass");
 pub static SAND: Block = Block::named("sand");
 pub static GRAVEL: Block = Block::named("gravel");
+/// A live impact crater's melt lining its bowl, and the broken rock (impact breccia) of its rim
+/// (`impact.rs`; Art's, Research round 17).
+pub static IMPACT_GLASS: Block = Block::named("impact_glass");
+pub static SUEVITE: Block = Block::named("suevite");
 pub static CLAY: Block = Block::named("clay");
 pub static SANDSTONE: Block = Block::named("sandstone");
 // The rock faces' stones (`land.rs`): granite on warm mountains, slate in the cold, limestone on
@@ -528,6 +532,17 @@ pub fn register(r: &mut Registry) {
         .hardness(0.6)
         .mineable("shovel")
         .falling()
+        .tab(&crate::tabs::NATURAL);
+    r.block(&IMPACT_GLASS)
+        .sound_group("glass")
+        .hardness(1.5)
+        .mineable("pickaxe")
+        .tab(&crate::tabs::NATURAL);
+    r.block(&SUEVITE)
+        .sound_group("stone")
+        .hardness(1.2)
+        .mineable("pickaxe")
+        .tag("rocks")
         .tab(&crate::tabs::NATURAL);
     r.block(&CLAY)
         .sound_group("gravel")
