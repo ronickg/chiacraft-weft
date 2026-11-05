@@ -618,8 +618,11 @@ impl Ui {
     /// kind's own texture, no painted coat), turning with the mouse like the others: an entry in a
     /// field guide. One 3D preview shows per screen.
     pub fn kind_model(&mut self, kind: &str, w: f32, h: f32) {
+        // Alive until the node is handed over (a temporary's pointer was read freed: the
+        // preview showed the player).
+        let text = format!("kind:{kind}");
         let mut n = node(k::PLAYER_MODEL, S::default().size(w, h));
-        n.text = Str::new(&format!("kind:{kind}"));
+        n.text = Str::new(&text);
         self.leaf(n)
     }
 

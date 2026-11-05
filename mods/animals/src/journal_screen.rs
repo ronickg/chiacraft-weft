@@ -25,8 +25,9 @@ static OPEN: AtomicUsize = AtomicUsize::new(0);
 static TOLD: Mutex<Option<(String, Instant)>> = Mutex::new(None);
 const TOLD_SECS: f32 = 3.5;
 const TOLD_FADE: f32 = 0.6;
-/// Where it shows, a share of the window's height down: under the top's clock and coordinates.
-const TOLD_Y: f32 = 0.2;
+/// Where it shows, a share of the window's height down: at the top, clear of a screen's window
+/// (at 0.2 it lay on the journal's own tabs).
+const TOLD_Y: f32 = 0.04;
 
 /// The list's width and the page's, GUI px; the picture's size.
 const LIST_W: f32 = 110.0;
@@ -154,14 +155,14 @@ fn page(ui: &mut Ui, e: &Entry) {
     ui.column(S::column().w(PAGE_W).gap(4.0), |ui| {
         ui.row(S::row().gap(6.0), |ui| {
             // The animal turning, or not met: a question mark where it would be.
-            ui.panel("portrait", S::row().size(PICTURE.0, PICTURE.1).center(), |ui| {
+            ui.panel("portrait", S::row().size(PICTURE.0, PICTURE.1).center().self_align(abi::ui_align::START), |ui| {
                 if met {
                     ui.kind_model(&e.kind, PICTURE.0 - 2.0, PICTURE.1 - 2.0);
                 } else {
                     ui.text_styled(S::default().class("dim").scale(2.0), "journal.animals.unknown_mark", &[]);
                 }
             });
-            ui.column(S::column().gap(2.0).grow(), |ui| {
+            ui.column(S::column().gap(2.0).grow().self_align(abi::ui_align::START), |ui| {
                 if !met {
                     ui.text_styled(S::column().class("title"), "journal.animals.unknown", &[]);
                     ui.text_styled(S::column().class("dim").max_w(PAGE_W - PICTURE.0 - 8.0), "journal.animals.not_met", &[]);
@@ -193,7 +194,7 @@ fn page(ui: &mut Ui, e: &Entry) {
                 ui.row(S::row().gap(4.0), |ui| {
                     let label = format!("journal.animals.{}", f.name);
                     ui.text_styled(S::default().w(LABEL_W).class(if *known { "title" } else { "dim" }), &label, &[]);
-                    ui.column(S::column().max_w(PAGE_W - LABEL_W - 12.0), |ui| {
+                    ui.column(S::column().max_w(PAGE_W - LABEL_W - 20.0), |ui| {
                         if *known && met {
                             value_text(ui, &f.value, "");
                         } else {
@@ -213,6 +214,9 @@ fn value_text(ui: &mut Ui, v: &Value, class: &'static str) {
     match v {
         Value::Text(t) => ui.text_styled(s, "journal.animals.as_is", &[Arg::Text(t)]),
         Value::Key(k) => ui.text_styled(s, k, &[]),
+        // An empty list says so (the golden eagle drops nothing: "join_0" showed).
+        Value::Keys(ks) if ks.is_empty() => ui.text_styled(s, "journal.animals.none", &[]),
+        Value::Names(ns) if ns.is_empty() => ui.text_styled(s, "journal.animals.none", &[]),
         Value::Keys(ks) => {
             let args: Vec<Arg> = joined(ks.iter().map(|k| Arg::Key(k)));
             ui.text_styled(s, &format!("journal.animals.join_{}", args.len()), &args)
@@ -238,7 +242,7 @@ fn joined<'a>(items: impl Iterator<Item = Arg<'a>>) -> Vec<Arg<'a>> {
             break;
         }
         if !out.is_empty() {
-            out.push(Arg::Key("journal.animals.comma"));
+            out.push(Arg::Text(", "));
         }
         out.push(a);
     }
