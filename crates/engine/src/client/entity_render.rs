@@ -766,7 +766,10 @@ impl EntityRenderer {
         self.seen_kinds = seen;
         self.seen_items = seen_items;
         self.load(gpu, assets, &c.game.entities[c.game.player_kind as usize].texture);
-        if let Some(k) = self.preview_kind.filter(|&k| (k as usize) < c.game.entities.len()) {
+        if let Some(k) = self
+            .preview_kind
+            .filter(|&k| (k as usize) < c.game.entities.len())
+        {
             self.load(gpu, assets, &c.game.entities[k as usize].texture);
         }
         for &i in worn {

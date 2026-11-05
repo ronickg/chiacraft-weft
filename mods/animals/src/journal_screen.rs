@@ -71,7 +71,9 @@ pub fn register(r: &mut Registry) {
 
 fn screen(ui: &mut Ui) {
     let all = entries(&ui.view());
-    let open = OPEN.load(Ordering::Relaxed).min(all.len().saturating_sub(1));
+    let open = OPEN
+        .load(Ordering::Relaxed)
+        .min(all.len().saturating_sub(1));
     framed(ui, |ui| {
         ui.row(S::row().gap(8.0), |ui| {
             list(ui, &all, open);
@@ -147,7 +149,9 @@ fn name_key(e: &Entry) -> String {
 
 /// The facts of `section` the reader knows, in page order.
 fn in_section(e: &Entry, section: Section) -> impl Iterator<Item = &(Fact, bool)> {
-    e.facts.iter().filter(move |(f, known)| f.section == section && *known)
+    e.facts
+        .iter()
+        .filter(move |(f, known)| f.section == section && *known)
 }
 
 fn page(ui: &mut Ui, e: &Entry) {
@@ -155,13 +159,20 @@ fn page(ui: &mut Ui, e: &Entry) {
     ui.column(S::column().w(PAGE_W).gap(4.0), |ui| {
         ui.row(S::row().gap(6.0), |ui| {
             // The animal turning, or not met: a question mark where it would be.
-            ui.panel("portrait", S::row().size(PICTURE.0, PICTURE.1).center().self_align(abi::ui_align::START), |ui| {
-                if met {
-                    ui.kind_model(&e.kind, PICTURE.0 - 2.0, PICTURE.1 - 2.0);
-                } else {
-                    ui.text_styled(S::default().class("dim").scale(2.0), "journal.animals.unknown_mark", &[]);
-                }
-            });
+            ui.panel(
+                "portrait",
+                S::row()
+                    .size(PICTURE.0, PICTURE.1)
+                    .center()
+                    .self_align(abi::ui_align::START),
+                |ui| {
+                    if met {
+                        ui.kind_model(&e.kind, PICTURE.0 - 2.0, PICTURE.1 - 2.0);
+                    } else {
+                        ui.text_styled(S::default().class("dim").scale(2.0), "journal.animals.unknown_mark", &[]);
+                    }
+                },
+            );
             ui.column(S::column().gap(2.0).grow().self_align(abi::ui_align::START), |ui| {
                 if !met {
                     ui.text_styled(S::column().class("title"), "journal.animals.unknown", &[]);
@@ -190,10 +201,20 @@ fn page(ui: &mut Ui, e: &Entry) {
         ui.panel("divider", S::row().h(1.0).stretch(), |_| {});
         // The survival facts, the ones not learned yet saying how to learn them.
         ui.column(S::column().gap(2.0).h(96.0).scroll(), |ui| {
-            for (f, known) in e.facts.iter().filter(|(f, _)| f.section == Section::Survival) {
+            for (f, known) in e
+                .facts
+                .iter()
+                .filter(|(f, _)| f.section == Section::Survival)
+            {
                 ui.row(S::row().gap(4.0), |ui| {
                     let label = format!("journal.animals.{}", f.name);
-                    ui.text_styled(S::default().w(LABEL_W).class(if *known { "title" } else { "dim" }), &label, &[]);
+                    ui.text_styled(
+                        S::default()
+                            .w(LABEL_W)
+                            .class(if *known { "title" } else { "dim" }),
+                        &label,
+                        &[],
+                    );
                     ui.column(S::column().max_w(PAGE_W - LABEL_W - 20.0), |ui| {
                         if *known && met {
                             value_text(ui, &f.value, "");
