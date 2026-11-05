@@ -72,6 +72,29 @@ The frame rate is the emulator's display path, not the game: the RTX 5090 does a
 under a millisecond. A phone's numbers will be different in every way; only memory says much
 (440 MB resident at view distance 12 is fine for a 6-8 GB phone).
 
+## On a real phone: Ronald's Pixel 10 (2026-11-05)
+
+Pixel 10: Tensor G5, PowerVR D-Series DXT-48-1536, Vulkan 1.4, Android 17, 2424 x 1080. It has
+everything the renderer needs (push descriptors, fillModeNonSolid, bindless). Run from the Mac:
+the phone on USB, `ANDROID_HOME=~/Library/Android/sdk tools/release/android-run.sh <apk> <out> 60
+--world <name>` (the Mac's GPU isn't used).
+
+- **Speed:** 28 fps in a world with the full look (shader pack, shadows, effects), GPU-bound (world
+  pass ~29 ms, shadows ~2.5 ms). It was 10-13 fps until the swapchain stopped being rebuilt every
+  few frames. Without the pack: 20 fps before that fix.
+- **Start:** the first start after an install compiles the pack's pipelines, about 38 s, behind the
+  loading screen. After that the saved pipeline cache opens a world in 0.4 s.
+- **Fixed for it:** render targets without framebuffer compression (tiles only cleared read back
+  as garbage: black and random-coloured squares over the sky); `NonUniform` on sampled images
+  (naga 30 leaves it off); new textures cleared; the swapchain kept on "suboptimal".
+- **Debugging on the phone:** `VALIDATION_LAYERS=<Khronos android-binaries folder>
+  tools/release/android.sh` packs the validation layer; `--gpu-debug` in args.txt turns it on;
+  `adb shell setprop debug.vulkan.khronos_validation.validate_sync true` adds sync checks. It
+  found the swapchain loop at once; the compression bug it couldn't see (bisected with a copy of
+  the pack, `--shader-pack dbg`, its `pack.cfg` switches one at a time).
+- **Still reported by validation:** three compute shaders with `ArrayStride` on workgroup arrays
+  (naga 30; drivers ignore it so far).
+
 ## Build and run
 
 On the PC everything is in `~/Android/Sdk` (command-line tools, platform 35, build tools 35.0.1,
