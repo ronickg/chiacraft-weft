@@ -2570,6 +2570,7 @@ fn update_game(r: &mut Running, dt: f64, frame_start: Instant) {
         g.client.render.occlusion.on = r.settings.occlusion_culling();
         g.client.sky.soft_wanted = r.settings.soft_clouds();
         r.post.use_low = r.settings.post_low();
+        r.post.bloom_levels = r.settings.bloom_levels();
         let t = Instant::now();
         if world_input {
             g.client.update(&mut *r.gpu, &r.textures, &mut r.input, dt);

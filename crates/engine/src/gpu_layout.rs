@@ -736,7 +736,9 @@ gpu_struct! {
         pub lightning: [f32; 4],
         /// How this frame is drawn: x 1 when into the HDR world (`post::hdr`: linear light past 1,
         /// the picture finished in the effects' last pass, so a pack's surfaces leave its tone
-        /// curve to that pass); 0 into the screen or a preview. yzw unused.
+        /// curve to that pass); 0 into the screen or a preview. y 1 when the last frame drew the
+        /// HDR world's bloom pyramid (`post::bloom`), which the last pass adds, so a pack's own
+        /// bloom effect leaves its glow out. zw unused.
         pub frame: [f32; 4],
     }
 }
@@ -1047,6 +1049,12 @@ gpu_struct! {
         /// `shaders/post_low/<name>.wgsl` drew before the effects (0: none; chiacraft).
         pub low: u32,
         pub spare: u32,
+        /// With the HDR world (chiacraft): bindless index + 1 of its bloom, the widest level of the
+        /// pyramid the pack's `fs_bloom_down`/`fs_bloom_up` drew from the world this frame, and of
+        /// this frame's exposure texel (`fs_exposure`); 0 without. In the pyramid's own passes `low`
+        /// is the second image they read and `strength` the seconds since the last frame.
+        pub bloom: u32,
+        pub exposure: u32,
     }
 }
 

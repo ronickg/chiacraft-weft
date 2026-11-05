@@ -667,6 +667,9 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // The world drawn in 16-bit float (linear light past 1) with the screen effects after it and
         // the picture finished in one last pass (chiacraft, the HDR world); read at start.
         ConfigDef::number("core:hdr_world", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // The HDR world's bloom (chiacraft): 0 none, 1 a pyramid of 4 levels, 2 of 6 (wider glow);
+        // live. Without the HDR world the pack's own bloom effect glows as before.
+        ConfigDef::number("core:bloom", ck::INT, 2.0, 0.0, 2.0, 1.0),
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:allow_avatars", ck::BOOL, 1.0, 0.0, 1.0, 0.0) },
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:keep_inventory", ck::BOOL, 0.0, 0.0, 1.0, 0.0) },
     ];
