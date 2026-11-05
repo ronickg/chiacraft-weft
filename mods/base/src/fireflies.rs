@@ -6,7 +6,6 @@
 //! light; the pack's particle shader makes them blink (Lighting).
 
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
 use vitals::{calendar, fireflies as ff};
@@ -52,16 +51,6 @@ pub fn register(r: &mut Registry) {
                 Arg::Float(n.hour as f64, 1),
                 Arg::Float(n.sunset as f64, 1),
                 Arg::Int(on_you),
-                Arg::Int(
-                    (w.game_time()
-                        .saturating_sub(LAST_COUNT.load(Ordering::Relaxed))
-                        / 20) as i64,
-                ),
-                Arg::Int(match LAST_SHARE.load(Ordering::Relaxed) {
-                    u64::MAX => -1,
-                    v => (f32::from_bits((v >> 1) as u32) * 100.0).round() as i64,
-                }),
-                Arg::Int(LAST_SHARE.load(Ordering::Relaxed) as i64 & 1),
             ],
         );
     });
@@ -95,12 +84,9 @@ impl Here {
     }
 }
 
-/// The game time `count` last went round the players, and what it found the last time it saw
-/// one: the share (bits of an f32) and whether the player had the component (for `/fireflies`).
-static LAST_COUNT: AtomicU64 = AtomicU64::new(0);
-static LAST_SHARE: AtomicU64 = AtomicU64::new(u64::MAX);
-
-/// Every `REFRESH_SECS`, each player's share (`vitals::fireflies::share`).
+/// Every `REFRESH_SECS`, each player's share (`vitals::fireflies::share`). Only players the world
+/// shows (`w.players()`): a spectator is hidden, so none fly round one (the sync looks were
+/// spectators and saw none; check them in creative).
 fn count(w: &World) {
     if !w
         .game_time()
@@ -111,11 +97,7 @@ fn count(w: &World) {
     for player in w.players() {
         let Some(st) = w.entity(player) else { continue };
         let n = Here::at(w, st.pos);
-        LAST_COUNT.store(w.game_time(), Ordering::Relaxed);
-        let has = w.component_mut(player, &HERE).is_some() as u64;
-        LAST_SHARE.store((n.share.to_bits() as u64) << 1 | has, Ordering::Relaxed);
-        // In place, as survival keeps its vitals: `set_component` on the player left it at 0 (the
-        // sync looks: /fireflies said 24% here, 0% on the player).
+        // In place, as survival keeps its vitals.
         let Some(here) = w.component_mut(player, &HERE) else { continue };
         if *here != n.share {
             weft_sdk::debug!(
@@ -178,7 +160,7 @@ fn frame(c: &Client) {
         .is_none_or(|l| now.duration_since(l).as_secs_f32() >= 5.0)
         && (me.is_none() || share.is_none())
     {
-        weft_sdk::info!("fireflies: no player state ({}) or share ({:?}) on the client", me.is_some(), share);
+        weft_sdk::debug!("fireflies: no player state ({}) or share ({:?}) on the client", me.is_some(), share);
         s.logged = Some(now);
     }
     let (Some(me), Some(share)) = (me, share) else { return };
@@ -192,7 +174,7 @@ fn frame(c: &Client) {
     if s.logged
         .is_none_or(|l| now.duration_since(l).as_secs_f32() >= 5.0)
     {
-        weft_sdk::info!(
+        weft_sdk::debug!(
             "fireflies: share {share:.2}, want {want:.0}, clusters {}, sent {}, spots turned down (no ground, not air, no light, sky or torch, crowded) {:?}",
             s.clusters.len(),
             s.sent,
