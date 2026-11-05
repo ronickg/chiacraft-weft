@@ -46,7 +46,7 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | grey_wolf | *Canis lupus* | uncommon | medium | 0.8 m | 42 kg | pack | carnivore | passive | 1.25 d | 6.07 d | 46 d | 2-8 | 16 |
 | jaguar | *Panthera onca* | uncommon | large | 0.7 m | 85 kg | solitary | carnivore | knockout | 1.77 d | 7.54 d | 65.1 d | 1-2 | 12 |
 | lungfish | *Ceratodus kempae* | uncommon | small | 0.37 m | 3 kg | solitary | carnivore | wild | eggs, hatch 0.72 d | 10 d | 76.7 d | 1-4 | 14 |
-| lycoptera | *Lycoptera davidi* | common | small | 0.37 m | 0.02 kg | herd | carnivore | wild | eggs, hatch 0.19 d | 2.92 d | 15.3 d | 3-11 | 30 |
+| lycoptera | *Lycoptera davidi* | common | small | 0.37 m | 0.02 kg | herd | carnivore | wild | eggs, hatch 0.46 d | 2.92 d | 15.3 d | 3-11 | 30 |
 | psittacosaurus | *Psittacosaurus lujiatunensis* | common | medium | 0.5 m | 25 kg | herd | herbivore | wild | eggs, hatch 1.43 d | 6 d | 42.2 d | 3-8 | 20 |
 | gastonia | *Gastonia burgei* | common | large | 1.25 m | 1900 kg | herd | herbivore | wild | eggs, hatch 1.77 d | 6 d | 95.8 d | 1-4 | 12 |
 | pinacosaurus | *Pinacosaurus grangeri* | common | large | 1.25 m | 1900 kg | herd | herbivore | wild | eggs, hatch 1.77 d | 6 d | 95.8 d | 1-4 | 12 |
@@ -978,21 +978,21 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | Life | real | in the game |
 |---|---|---|
 | mass | 0.5 kg | |
-| lays | | 0.25 d after mating |
+| spawns | | in the water when mated; the fry come by her after the eggs' time |
 | eggs hatch in | 45 d | 0.97 d |
 | litter or clutch | 8 on average | 3-8 **set** |
 | between litters | 1 y | rests 5.07 d |
-| breeds in |  | out of it, only a tame well cared for |
+| breeds in | autumn and winter, most in autumn | out of it, only a tame well cared for |
 | comfortable in | 4 to 20 °C air | cold-blooded: slower in the cold |
 | grows up in | 3 y | 8.65 d |
 | lives | 12 y | 46 d, give or take a fifth; an elder from 80% of it |
 | lives in | solitary | room for 26 **set** within 48 blocks |
 
-**Balance** (uncommon): a generation 9.9 d; a line four deep in 30 d (10 h of play); 10.3 young per mother in 10 days, 29 in her life.
+**Balance** (uncommon): a generation 9.6 d; a line four deep in 29 d (10 h of play); 9.1 young per mother in 10 days, 26 in her life.
 
-- ✓ fourth generation: 29.6 days (want 20-40 days (uncommon))
+- ✓ fourth generation: 28.9 days (want 20-40 days (uncommon))
 - ✓ grown most of its life: grows 8.7 of 46 days (want under a fifth)
-- ✓ young in a life: 29.1 (want 6-40)
+- ✓ young in a life: 25.6 (want 6-40)
 - ✓ litter: 3-8 (want 1-12, fewest first)
 - ✓ room near: 26 (want 3-30)
 
@@ -1038,21 +1038,21 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn 
 | Life | real | in the game |
 |---|---|---|
 | mass | 4 kg | |
-| lays | | 0.25 d after mating |
+| spawns | | in the water when mated; the fry come by her after the eggs' time |
 | eggs hatch in | 1 d | 0.06 d |
 | litter or clutch | 6 on average | 2-8 |
 | between litters | 1 y | rests 5.07 d |
-| breeds in |  | out of it, only a tame well cared for |
+| breeds in | spring and summer, most in spring | out of it, only a tame well cared for |
 | comfortable in | 20 to 32 °C air | cold-blooded: slower in the cold |
 | grows up in | 3 y | 8.65 d |
 | lives | 15 y | 57.5 d, give or take a fifth; an elder from 80% of it |
 | lives in | herd | room for 26 within 48 blocks |
 
-**Balance** (uncommon): a generation 9 d; a line four deep in 27 d (9 h of play); 9.4 young per mother in 10 days, 35 in her life.
+**Balance** (uncommon): a generation 8.7 d; a line four deep in 26 d (9 h of play); 9.7 young per mother in 10 days, 36 in her life.
 
-- ✓ fourth generation: 26.9 days (want 20-40 days (uncommon))
+- ✓ fourth generation: 26.1 days (want 20-40 days (uncommon))
 - ✓ grown most of its life: grows 8.7 of 57 days (want under a fifth)
-- ✓ young in a life: 35.1 (want 6-40)
+- ✓ young in a life: 36.4 (want 6-40)
 - ✓ litter: 2-8 (want 1-12, fewest first)
 - ✓ room near: 26 (want 3-30)
 
@@ -2355,7 +2355,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | Life | real | in the game |
 |---|---|---|
 | mass | 3 kg | |
-| lays | | 0.25 d after mating |
+| spawns | | in the water when mated; the fry come by her after the eggs' time |
 | eggs hatch in | 30 d | 0.72 d |
 | litter or clutch | 6 on average | 1-4 **set** |
 | between litters | 1 y | rests 5.07 d |
@@ -2365,11 +2365,11 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | lives | 20 y | 76.7 d, give or take a fifth; an elder from 80% of it |
 | lives in | solitary | room for 14 within 48 blocks |
 
-**Balance** (uncommon): a generation 11 d; a line four deep in 33 d (11 h of play); 4.7 young per mother in 10 days, 24 in her life.
+**Balance** (uncommon): a generation 10.7 d; a line four deep in 32 d (11 h of play); 4.3 young per mother in 10 days, 22 in her life.
 
-- ✓ fourth generation: 32.9 days (want 20-40 days (uncommon))
+- ✓ fourth generation: 32.2 days (want 20-40 days (uncommon))
 - ✓ grown most of its life: grows 10.0 of 77 days (want under a fifth)
-- ✓ young in a life: 24.1 (want 6-40)
+- ✓ young in a life: 22.2 (want 6-40)
 - ✓ litter: 1-4 (want 1-12, fewest first)
 - ✓ room near: 14 (want 3-30)
 
@@ -2414,8 +2414,8 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | Life | real | in the game |
 |---|---|---|
 | mass | 0.02 kg | |
-| lays | | 0.25 d after mating |
-| eggs hatch in | 5 d | 0.19 d |
+| spawns | | in the water when mated; the fry come by her after the eggs' time |
+| eggs hatch in | 5 d | 0.46 d **set** |
 | litter or clutch | 8 on average | 3-11 |
 | between litters | 1 y | rests 5.07 d |
 | breeds in | the wet season | out of it, only a tame well cared for |
@@ -2424,11 +2424,11 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | lives | 4 y | 15.3 d, give or take a fifth; an elder from 80% of it |
 | lives in | herd | room for 30 **set** within 48 blocks |
 
-**Balance** (common): a generation 3.4 d; a line four deep in 10 d (3 h of play); 13.1 young per mother in 10 days, 12 in her life.
+**Balance** (common): a generation 3.4 d; a line four deep in 10 d (3 h of play); 12.7 young per mother in 10 days, 12 in her life.
 
 - ✓ fourth generation: 10.1 days (want 10-25 days (common))
 - ✓ grown most of its life: grows 2.9 of 15 days (want under a fifth)
-- ✓ young in a life: 12.3 (want 6-40)
+- ✓ young in a life: 11.8 (want 6-40)
 - ✓ litter: 3-11 (want 1-12, fewest first)
 - ✓ room near: 30 (want 3-30)
 

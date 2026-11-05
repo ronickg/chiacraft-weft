@@ -1240,3 +1240,14 @@ Birds now lay eggs in nests. Before this, their young came out as fledglings aft
 When she lays (`eggs::lay_in_nest`), she looks 12 blocks around her for the highest open leaves or ledge, and uses the ground under her if there's none. A bird's nest is brooded (`life::egg_air_of`): its eggs are held at a sitting parent's 37 °C whatever the air, so a snowy owl's clutch hatches in the tundra. Before, a nest only pulled the air 60% of the way toward 37 °C. The young hatch in the nest.
 
 Not yet: a parent seen sitting on the nest, and egg eaters raiding wild nests.
+
+## Fish breed (2026-11-05)
+
+Fish now breed in their seasons; before, only the spawner made more. The seasons (researched, or estimated where only their relatives' are known):
+- **Brown trout:** autumn and early winter, on gravel in cold water, most in autumn.
+- **Pacu:** the wet season, as the rains begin.
+- **The Cretaceous's lungfish (Est.) and Lycoptera (Est.):** spring and summer.
+
+A fish in love swims to a mate of its kind within 24 blocks (`fish::court`, steering its swim; walking pathfinding doesn't work in water). When they meet, the female spawns.
+
+No egg entity is used. An egg only develops in 25-40 °C air, which suits a nest, not a trout stream. Instead the female carries her eggs' time (`life::carrying`), then her fry come out beside her. Lycoptera's eggs' time is paced up to 0.46 d so a line still takes ten days to four generations. The spawner still tops up what breeding doesn't fill.

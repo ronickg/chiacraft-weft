@@ -33,9 +33,17 @@ pub fn size(s: &Species, growing: u32) -> f32 {
     s.birth_size + (1.0 - s.birth_size) * grown
 }
 
-/// Ticks from mating to the young born, or the eggs laid.
+/// Ticks from mating to the young born, or the eggs laid; a fish's eggs, spawned into the water,
+/// stand for their incubation before the fry come (no egg entity: one would need the water's
+/// temperature, not a nest's).
 pub fn carrying(s: &Species) -> u32 {
-    if s.gestation() > 0 { s.gestation() } else { LAYING }
+    if s.gestation() > 0 {
+        s.gestation()
+    } else if s.in_water() {
+        s.incubation()
+    } else {
+        LAYING
+    }
 }
 
 /// How many young a litter or clutch has, `roll` any random number.

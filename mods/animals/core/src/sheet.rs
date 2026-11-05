@@ -265,6 +265,9 @@ fn species(w: &mut String, s: &Species) {
     let _ = writeln!(w, "| mass | {} kg | |", b.mass);
     if b.gestation > 0.0 || s.gestation() > 0 {
         let _ = writeln!(w, "| carries her young | {} | {}{} |", real(b.gestation), days(s.gestation()), set(t.gestation.is_some()));
+    } else if s.in_water() {
+        let _ = writeln!(w, "| spawns | | in the water when mated; the fry come by her after the eggs' time |");
+        let _ = writeln!(w, "| eggs hatch in | {} | {}{} |", real(b.incubation), days(s.incubation()), set(t.incubation.is_some()));
     } else {
         let _ = writeln!(w, "| lays | | {} after mating |", days(life::LAYING));
         let _ = writeln!(w, "| eggs hatch in | {} | {}{} |", real(b.incubation), days(s.incubation()), set(t.incubation.is_some()));

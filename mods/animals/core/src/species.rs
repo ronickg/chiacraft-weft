@@ -1310,8 +1310,9 @@ pub static SPECIES: [Species; 46] = [
             litter: 8.0,
             social: Social::Solitary,
             rarity: Rarity::Uncommon,
-            breeds: 0,
-            peak: 0,
+            // Spawns in autumn and early winter on gravel in cold running water, its eggs lying through the winter.
+            breeds: seasons::AUTUMN | seasons::WINTER,
+            peak: seasons::AUTUMN,
             // The water it does best in: 4-19 degrees; it suffers over 20.
             comfort: (4.0, 20.0),
             cold_blooded: true,
@@ -1359,8 +1360,9 @@ pub static SPECIES: [Species; 46] = [
             litter: 6.0,
             social: Social::Herd,
             rarity: Rarity::Uncommon,
-            breeds: 0,
-            peak: 0,
+            // Spawns as the rains begin, running upriver to the flooded forest (the wet season: spring and summer).
+            breeds: seasons::WET,
+            peak: seasons::SPRING,
             // Warm water: 20-32 degrees.
             comfort: (20.0, 32.0),
             cold_blooded: true,
@@ -2654,8 +2656,9 @@ pub static SPECIES: [Species; 46] = [
             litter: 6.0,
             social: Social::Solitary,
             rarity: Rarity::Uncommon,
-            breeds: 0,
-            peak: 0,
+            // Est.: as the living Australian lungfish, spawning on water plants in spring and early summer.
+            breeds: seasons::SPRING | seasons::SUMMER,
+            peak: seasons::SPRING,
             // A warm floodplain's rivers and ponds; it breathes air through the dry season.
             comfort: (14.0, 32.0),
             cold_blooded: true,
@@ -2700,15 +2703,18 @@ pub static SPECIES: [Species; 46] = [
             litter: 8.0,
             social: Social::Herd,
             rarity: Rarity::Common,
-            breeds: 0,
-            peak: 0,
+            // Est.: as small lake fish of the temperate Cretaceous, spawning in the warm half of the year.
+            breeds: seasons::SPRING | seasons::SUMMER,
+            peak: seasons::SPRING,
             // The Yixian's cool lakes.
             comfort: (4.0, 24.0),
             cold_blooded: true,
         },
         // A small fish of a short life: grown in its first season, and schools that keep to a
         // room a pond holds (the balance checks' growth and room).
-        tune: Tune { growth: Some(70_000), crowd: Some(30), ..Tune::NONE },
+        // Its eggs' time paced up from its derived 0.19 d (a fish carries it, `life::carrying`) so a
+        // line takes the common band's ten days to four generations (`balance::checks`).
+        tune: Tune { growth: Some(70_000), incubation: Some(11_000), crowd: Some(30), ..Tune::NONE },
         birth_size: 0.1,
         ..BASE
     },

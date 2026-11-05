@@ -84,7 +84,11 @@ fn each_species_is_at_home_in_its_habitats() {
 #[test]
 fn eggs_hatch_where_and_when_they_are_laid() {
     let mut problems = Vec::new();
-    for s in SPECIES.iter().filter(|s| s.gestation() == 0) {
+    // A fish's eggs lie in the water, not a nest (`life::carrying`).
+    for s in SPECIES
+        .iter()
+        .filter(|s| s.gestation() == 0 && !s.in_water())
+    {
         let when = if s.bio.peak != 0 { s.bio.peak } else { s.bio.breeds };
         for season in (0..4).filter(|i| when >> i & 1 != 0) {
             for &(biome, _) in s.habitats {
