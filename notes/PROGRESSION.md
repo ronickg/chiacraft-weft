@@ -17,12 +17,13 @@ material ladder) and `notes/ANIMALS.md`.
 | Lore | The star-born ancients (below) |
 | End | A final boss in the furthest dimension, then open play |
 | Length | 100+ hours from stone to the stars ("let's make the sort of the time it takes 100+ hours") |
-| Classes | Skill trees with no lock: points from levels, spent in any tree, scarce enough to specialise |
+| Classes | Skyrim-style: skills rise by doing, skill-ups give perk points for any tree; crafting, taming and life skills have trees too |
 | Bosses | Each biome its own: a giant native creature, summoned at an altar, tameable after (a young one or an egg), harder forms each age |
 | Boss loot | Random, with bad-luck help; summon again to try for a missing piece |
 | Tames | Work and farming, power before machines, mounts, in automation; and later better saddles, magic bonds, cyber and star beasts, tames linked to automation |
 | Magic | Runes and glyphs, spells and mana, rituals at altars, enchanted gear, plus a Skyrim-like spell tree. Spells are found in the world and roll in quality like crafted weapons: "you can try get lightning but which goes further" |
 | Exploring | Blueprints, relics, lore and map pieces, rare life. "I don't want everything to be done ... exploration is a good way to ... gate stuff" |
+| Endless gear | Path of Exile 2-like: "you can always end up getting something better or merging something to get it better" |
 | Extra systems | Ley lines, ruins of the ancients, creature genetics, a transport ladder, a modular power suit, dimensions as linked worlds, settlements and traders, expedition maps |
 | Multiplayer | Each player at their own pace |
 | Tribe shares | Knowledge, boss and world deeds, bases and storage. "Some things ... should be like your own thing" |
@@ -72,10 +73,37 @@ needs some of each, so none can be skipped, but a player leans on the one they l
 
 ## The systems
 
-### Classes and skill points
-- Levels give points to spend in any skill tree. The first trees are Warrior, Ranger, Mage, Beast-master, Engineer and Explorer.
-- Points are scarce, so a player specialises; a rare item resets them.
-- Skills and age are always the player's own, even in a tribe.
+### Skills and perks (like Skyrim)
+Ronald, 11-06: "like Skyrim, where you have your smithing progression ... just allows for more
+customizability". The model is Skyrim's:
+- **Skills rise by doing.** Forging raises Smithing, shooting raises Archery, taming raises Taming. A skill's level sets which of its perks can be taken.
+- **Skill-ups feed your level.** Each level gives a perk point to spend in any tree. Points are scarce, so a player specialises; a rare item resets them.
+- **Yours only.** Skills, perks and age are always the player's own, even in a tribe.
+
+The trees, grouped:
+
+| Group | Trees |
+|---|---|
+| Fighting | Melee (blades, axes, spears), Archery and throwing, Defence (shields, armour) |
+| Magic | Destruction, Restoration, Conjuring and wards; each school's perks open its stronger spells |
+| Crafting | Smithing and tinkering, Alchemy and cooking, Runecraft and enchanting, Building and farming |
+| Beasts | Taming and riding (Ronald: "also taming too") |
+| Proposed by Planner | Mining and prospecting, Engineering (machines and automation), Exploring and cartography, Trading, Survival (fishing, tracking, weather) |
+
+Crafting perks follow Smithing's shape: perks unlock working the next tier's materials, better
+grades and rolls, repairs, salvage, and later merging and upgrading items (see "Gear that keeps
+getting better").
+
+### Gear that keeps getting better
+Ronald, 11-06: "have a look into how Path of Exile 2 does things ... where you can effectively
+keep on playing and you can always end up getting something better or merging something to get it
+better". So gear never tops out:
+- items roll properties inside their tier's band, as spells do;
+- they can be improved, rerolled, merged or upgraded with materials found by exploring and fighting;
+- the endgame keeps dropping better rolls.
+
+How exactly waits on the research round (Path of Exile 2's crafting currencies and endgame maps,
+among others).
 
 ### Biome bosses
 - Every biome has its own: a giant creature native to it (a sand wyrm, a frost mammoth).
