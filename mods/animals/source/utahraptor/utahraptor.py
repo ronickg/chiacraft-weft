@@ -528,14 +528,16 @@ L = {"thigh": -32, "shin": 58, "foot": -46, "drop": 0.0,
      "rest_thigh": -70, "rest_shin": 140, "rest_foot": -100, "rest_drop": 0.0}
 
 
-def legs(base_t, base_s, base_f, swing_l=0.0, swing_r=0.0, lift_l=0.0, lift_r=0.0):
+def legs(base_t, base_s, base_f, swing_l=0.0, swing_r=0.0, lift_l=0.0, lift_r=0.0, lean=0.0):
+    """The legs' angles: the stance, a swing and a lift per leg; `lean`, the hips' pitch (spine_0),
+    taken off the thighs so the legs stand as they would and the toes stay flat."""
     q = {}
     for n, sw, lift in (("L", swing_l, lift_l), ("R", swing_r, lift_r)):
-        t = base_t + sw - 0.4 * lift
+        t = base_t + sw - 0.4 * lift - lean
         s = base_s + lift
         f = base_f - 0.4 * lift
         q[f"leg_{n}_thigh"], q[f"leg_{n}_shin"], q[f"leg_{n}_foot"] = (t, 0, 0), (s, 0, 0), (f, 0, 0)
-        q[f"leg_{n}_toes"] = (-(t + s + f), 0, 0)  # toes flat
+        q[f"leg_{n}_toes"] = (-(lean + t + s + f), 0, 0)  # toes flat
     return q
 
 
@@ -611,9 +613,11 @@ def pose_rest(t, P=L):
     for n in ("L", "R"):  # toes a little off flat, so they never lie in the belly's plane
         t = q[f"leg_{n}_toes"]
         q[f"leg_{n}_toes"] = (t[0] + 5, t[1], t[2])
+    # The arms tucked up against the chest, the wings folded at its sides: hanging as when it stands,
+    # their feathers went 7.3 into the ground.
     for n, s in (("L", 1), ("R", -1)):
-        q[f"arm_{n}"] = (35, 0, -s * 8)
-        q[f"forearm_{n}"] = (-80, 0, 0)
+        q[f"arm_{n}"] = (10, 0, s * 30)
+        q[f"forearm_{n}"] = (-100, 0, 0)
     q["neck"] = (10, 0, 0)
     q["head"] = (-8, 8 * S(TAU * p), 0)
     q.update({f"tail_{k}": (8 if k == 0 else 0, 4 * S(TAU * p - 0.5 * k) if k else 0, 0) for k in range(len(TAIL))})
@@ -669,10 +673,351 @@ def pose_kick(t):
     return q
 
 
-BLINKS = {"idle": [1.5], "rest": [1.2, 3.0]}
+# ------------------------------------------------------------------ behaviour clips (`anim.rs`)
+# Ported from the Velociraptor's (`../raptor`), heavier: slower and with smaller swings. Each a
+# whole-body pose over what plays below on the bones it moves (`to_bedrock.as_action`): the held
+# states and the gaits loop, the rest play once, the death holds its last frame. Its height is set
+# after (`ground_clips`): a standing clip's from its feet frame by frame, the fall's from its lowest
+# point. No hips' pitch moves a foot: a lean is taken off the thighs (`legs`). The chest (spine_1)
+# stays in line with the hips beyond a breath: bent, the hips' corners poke out of it (`ground.pokes`).
+
+FEET = ["toe3_L", "toe3_R", "toe4_L", "toe4_R"]  # what it stands on (toe II and the sickle held up)
+L.update({"low_neck": 40, "low_head": 10, "low_lean": 0, "low_crouch": 0.0, "sleep_neck": 30, "sleep_head": 10,
+          "scr": [-90.0, 0.0, 60.0, -40.0, 0.0]})
+
+
+def arms(out=0.0):
+    """The arms folded like a bird's wings (`out` 0), or flared by `out` (1: raised, out to the
+    sides and forward, the forearms open, the wing feathers spread to look big)."""
+    q = {}
+    for n, s in (("L", 1), ("R", -1)):
+        q[f"arm_{n}"] = (35 - 65 * out, s * 30 * out, s * (-8 + 58 * out))
+        q[f"forearm_{n}"] = (-80 + 60 * out, 0, 0)
+    return q
+
+
+def body(lean=0.0, crouch=0.0, **steps):
+    """The stance, the hips pitched by `lean` (the legs standing as they were), crouched deeper by
+    `crouch` (1: 14 degrees more at the hip, toes flat), the arms folded; `steps`: `legs`' swings
+    and lifts."""
+    q = {"root": (0, -L["drop"], 0), "spine_0": (lean, 0, 0), "neck": (NECK, 0, 0), "head": (-NECK, 0, 0)}
+    q.update(legs(L["thigh"] - 14 * crouch, L["shin"] + 26 * crouch, L["foot"] - 12 * crouch, lean=lean, **steps))
+    q.update(arms())
+    return q
+
+
+def level(q, pitch=0.0):
+    """The head's pitch that holds it at `pitch` degrees in the world (0 level, down positive)."""
+    return pitch - q.get("spine_0", (0, 0, 0))[0] - q.get("spine_1", (0, 0, 0))[0] - q["neck"][0]
+
+
+def head_down(d=1.0, P=None):
+    """The snout to the ground by `d` (1: half a unit over it, fitted in `fit_clips`): the body
+    tipped forward over its feet, the tail up as a counterweight, the neck lowered, the legs bent no
+    more than it takes. Callers sway the tail with `lift` -0.7 of the lean (`tail_lift`)."""
+    P = L if P is None else P
+    q = body(lean=P["low_lean"] * d, crouch=P["low_crouch"] * d)
+    q.update({"neck": (NECK + P["low_neck"] * d, 0, 0), "head": (-NECK + P["low_head"] * d, 0, 0)})
+    return q
+
+
+def tail_lift(q, k=0.7):
+    """The tail's lift that keeps it from rising all the way with a forward lean (at most 15
+    degrees: more, the tail's root pokes out of the hips)."""
+    return max(-15.0, -k * q["spine_0"][0])
+
+
+def ease(p, ps, vs):
+    return float(np.interp(p, ps, vs))
+
+
+def pose_stare(t):
+    """Half aware: frozen, the neck up, the head locked on, only the breath moving (2 s, held)."""
+    q = body()
+    br = S(TAU * t / 2.0)
+    q.update({"spine_1": (0.6 * br, 0, 0), "neck": (NECK - 8, 0, 0)})
+    q["head"] = (level(q, -4), 0, 0)
+    q.update(tail_sway(t / 2.0, 1, 1))
+    return q
+
+
+def pose_watch(t):
+    """The sentinel's look round: drawn up tall, the chest up, the head high, turning in a bird's
+    snaps to one side, the other and back (4 s, held)."""
+    p = t / 4.0
+    br = S(TAU * p * 2)
+    look = ease(p, [0, .1, .14, .4, .44, .7, .74, 1], [0, 0, 32, 32, -28, -28, 0, 0])
+    q = body(lean=-20)
+    q.update({"spine_1": (0.6 * br, 0, 0), "neck": (NECK - 2, 0.5 * look, 0)})
+    q["head"] = (level(q, 0), 0.35 * look, 0)
+    q.update(tail_sway(p, 1, 3, lift=12))
+    return q
+
+
+def pose_drink(t):
+    """Drinking like a bird: the snout dipped, lapping, then the head tipped up to swallow (2 s, held)."""
+    p = t / 2.0
+    d = ease(p, [0, .15, .45, .6, .85, 1], [0.25, 1, 1, 0.35, 0.35, 0.25])
+    lap = max(0.0, S(TAU * p * 6)) * float(np.clip((d - 0.9) / 0.1, 0, 1))
+    q = head_down(d - 0.08 * lap)  # the snout lifts a little as the jaw drops
+    q["head"] = (q["head"][0] - 16 * (1 - d), 0, 0)
+    q["jaw"] = (6 * lap + 0.01, 0, 0)
+    q.update(tail_sway(p, 1, 2, lift=tail_lift(q)))
+    return q
+
+
+def pose_sleep(t, P=None):
+    """Asleep, resting: the legs folded under, the head turned back and tucked along the body,
+    eyes shut, slow breath (6 s, held). The neck and head fitted to lie by the body (`fit_clips`)."""
+    P = L if P is None else P
+    q = pose_rest(0.0, P)
+    br = S(TAU * t / 6.0 * 2)
+    q["root"] = (0, -P["rest_drop"] + 0.12 * br, 0)
+    q.update({"spine_1": (0.6 * br, 0, 0), "neck": (P["sleep_neck"], 60, 0), "head": (P["sleep_head"], 30, 0), "jaw": (0.01, 0, 0)})
+    q.update({f"tail_{k}": (8 if k == 0 else 0.01, 0, 0) for k in range(len(TAIL))})
+    q.update({"eyelid_L": (0, 0, 90), "eyelid_R": (0, 0, -90)})
+    return q
+
+
+def steps(a, swing, lift):
+    """A walk's leg swings and lifts at phase `a`: a foot swings forward while it is lifted."""
+    return dict(swing_l=-swing * S(a), swing_r=swing * S(a), lift_l=lift * max(0.0, S(a + math.pi / 2)),
+                lift_r=lift * max(0.0, S(a - math.pi / 2)))
+
+
+def pose_stalk(t):
+    """Stalking: crouched low, the chest down, the neck out low and the head level and still, aimed;
+    the tail held level and stiff; slow, high, careful steps (1.6 s a cycle, in place of the walk)."""
+    p = t / 1.6
+    a = TAU * p
+    q = body(lean=6, crouch=1.8, **steps(a, 14, 30))
+    q.update({"neck": (NECK + 32, 0, 0)})
+    q["head"] = (level(q), 0, 0)
+    q.update(tail_sway(p, 1, 1.5, lift=-6))  # level
+    return q
+
+
+def pose_approach(t):
+    """Curious, coming to look: slow steps a little crouched, the neck stretched forward and low, the
+    head cocked one way and the other as a bird's does, the tail level (1.4 s a cycle, in place of
+    the walk)."""
+    p = t / 1.4
+    a = TAU * p
+    q = body(lean=4, crouch=0.45, **steps(a, 16, 26))
+    q.update({"neck": (NECK + 20, 0, 0)})
+    q["head"] = (level(q, 6), 0, 12 * S(a))
+    q.update(tail_sway(p, 1, 3, lift=-5))
+    return q
+
+
+def pose_alarm(t):
+    """Alarm: a hiss, the jaws wide, the head drawn low and forward, the feathered arms flared out
+    to look big, the tail up and lashing (1.2 s, once)."""
+    p = t / 1.2
+    up = ease(p, [0, .12, .8, 1], [0, 1, 1, 0])
+    q = body(lean=4 * up, crouch=0.3 * up)
+    q.update(arms(out=up * (1 + 0.04 * S(TAU * p * 8))))
+    q.update({"neck": (NECK + 14 * up, 0, 0), "jaw": (30 * up * (1 + 0.08 * S(TAU * p * 9)), 0, 0)})
+    q["head"] = (level(q, -6 * up), 0, 0)
+    q.update(tail_sway(p, 2, 6 * up, lift=10 * up))
+    return q
+
+
+def pounce_rise(t):
+    """How high the pounce's leap carries it over its feet's height (0 on the ground)."""
+    return ease(t / 1.0, [0, .4, .5, .6, .7, .78, 1], [0, 0, 6, 9, 6, 0, 0])
+
+
+LEAP = (0.4, 0.78)  # the pounce leaves the ground only between these times (s)
+
+
+def pose_pounce(t):
+    """The pounce: a deep crouch, a leap up and onto the prey feet first, the body tipped back, both
+    sickle claws swung forward, the arms spread to grab, the jaws open; landing on bent legs (1.0
+    s, once). In place: the game moves it forward."""
+    p = t / 1.0
+    c = ease(p, [0, .3, .4, .78, .86, 1], [0, 1, 0, 0, .7, 0])
+    air = ease(p, [0, .36, .46, .7, .78, 1], [0, 0, 1, 1, 0, 0])
+    q = body(lean=6 * c, crouch=1.6 * c)
+    # In the air the hips tip back, the thighs swing up and forward, the shins and feet reach out in
+    # front, the toes tipped up: the sickle claws out ahead (the world angles: thigh -75, shin -50,
+    # foot -95, toes 30 up).
+    fly = legs(-75, 25, -45, lean=-14)
+    for n in ("L", "R"):
+        fly[f"leg_{n}_toes"] = (fly[f"leg_{n}_toes"][0] - 30, 0, 0)
+    fly["spine_0"] = (-14, 0, 0)
+    q.update({k: tuple(np.array(q.get(k, (0, 0, 0)), float) + (np.array(v, float) - np.array(q.get(k, (0, 0, 0)), float)) * air)
+              for k, v in fly.items()})
+    q.update(arms(out=air))
+    q.update({"neck": (NECK + 12 * c + 6 * air, 0, 0), "jaw": (30 * air, 0, 0)})
+    q["head"] = (level(q, 4 * air), 0, 0)
+    q.update(tail_sway(p, 1, 2, lift=6 * air - 2 * c))
+    return q
+
+
+def pose_sniff(t):
+    """The snout down to the ground, a sniff along it side to side, and up (2.2 s, once)."""
+    p = t / 2.2
+    d = ease(p, [0, .22, .78, 1], [0, 1, 1, 0])
+    q = head_down(d)
+    q["head"] = (q["head"][0], 10 * d * S(TAU * p * 2), 0)
+    q.update(tail_sway(p, 1, 3, lift=tail_lift(q)))
+    return q
+
+
+def pose_look(t):
+    """Looking round, a bird's way: still, snap to one side, a tilt, snap to the other, back (2.8 s, once)."""
+    p = t / 2.8
+    look = ease(p, [0, .1, .13, .4, .43, .7, .73, 1], [0, 0, 40, 40, -36, -36, 0, 0])
+    tilt = ease(p, [0, .2, .23, .4, .43, 1], [0, 0, 12, 12, 0, 0])
+    q = body()
+    q.update({"neck": (NECK, 0.5 * look, 0), "head": (-NECK, 0.5 * look, tilt)})
+    q.update(tail_sway(p, 1, 3))
+    return q
+
+
+def pose_groom(t):
+    """Grooming: preening the right arm's feathers, the arm held out, the neck curled round to it and
+    the jaws working through the feathers (2.6 s, once)."""
+    p = t / 2.6
+    d = ease(p, [0, .2, .85, 1], [0, 1, 1, 0])
+    q = body()
+    q.update({"neck": (NECK + 30 * d, -44 * d, 0), "head": (-NECK + 6 * d, -16 * d, 0),
+              "jaw": (10 * d * max(0.0, S(TAU * p * 6)) + 0.01, 0, 0), "arm_R": (35 - 30 * d, 0, 8 + 40 * d),
+              "forearm_R": (-80 + 40 * d, 0, 0)})
+    q.update(tail_sway(p, 1, 3))
+    return q
+
+
+SCRATCH_TIP = (-5.2, 1.1, 7.5)  # the right foot's middle claw (on the toes' bone, at rest)
+
+
+def scratch_neck(d):
+    """The scratch's body: the body tipped forward, the neck bent down and round to the right, the head low
+    beside the right knee (as high as a 300 kg theropod's foot comes up), tilted to offer the throat."""
+    q = body(lean=25 * d)
+    q.update({"neck": (NECK + 90 * d, -60 * d, 0), "head": (-NECK - 15 * d, -8 * d, -12 * d)})
+    return q
+
+
+def scratch_target(q):
+    """The point the claw scratches: the throat behind the jaw, from below and outside (the neck's
+    end, the head's joint, out and down from it)."""
+    return world(RIG, q)["head"][1] + np.array([-2.0, -4.5, 0.0])
+
+
+
+def pose_scratch(t, P=None):
+    """An itch: on the left leg, the right foot drawn up and forward to the neck, bent down and round
+    to meet it, the claws raking it; then the foot set down (2.0 s, once). The leg's reach fitted
+    in `fit_clips`."""
+    P = L if P is None else P
+    p = t / 2.0
+    d = ease(p, [0, .25, .8, 1], [0, 1, 1, 0])
+    on = ease(p, [0, .25, .3, .75, .8, 1], [0, 0, 1, 1, 0, 0])
+    rake = 6 * S(TAU * p * 7) * on
+    q = scratch_neck(d)
+    st = q["leg_R_thigh"][0], q["leg_R_shin"][0], q["leg_R_foot"][0], q["leg_R_toes"][0]
+    T, Z, Sh, F, To = P["scr"]
+    fold = 4 * d * (1 - d)  # on the way up and down the knee bends more, so the foot clears the ground
+    q.update({"leg_R_thigh": (st[0] + (T - st[0]) * d, 0, Z * d), "leg_R_shin": (st[1] + (Sh - st[1]) * d + 50 * fold + rake, 0, 0),
+              "leg_R_foot": (st[2] + (F - st[2]) * d - 25 * fold - rake, 0, 0), "leg_R_toes": (st[3] + (To - st[3]) * d, 0, 0)})
+    q.update(arms(out=0.15 * d))
+    q.update(tail_sway(p, 1, 3, lift=tail_lift(q)))
+    q.update({"eyelid_L": (0, 0, 60 * on), "eyelid_R": (0, 0, -60 * on)})  # eyes half shut, enjoying it
+    return q
+
+
+def pose_stretch(t):
+    """Getting up: both arms spread wide and shaken, the neck long, a yawn; then the right leg
+    stretched out behind (2.5 s, once)."""
+    p = t / 2.5
+    a = ease(p, [0, .2, .55, .65, 1], [0, 1, 1, 0, 0])
+    b = ease(p, [0, .6, .72, .9, 1], [0, 0, 1, 1, 0])
+    yawn = ease(p, [0, .15, .25, .45, .55, 1], [0, 0, 1, 1, 0, 0])
+    q = body(swing_r=34 * b, lift_r=8 * b)
+    q.update(arms(out=a * (1 + 0.06 * S(TAU * p * 8))))
+    q.update({"spine_1": (-4 * a, 0, 0), "neck": (NECK - 10 * a, 0, 0), "jaw": (26 * yawn + 0.01, 0, 0)})
+    q["head"] = (level(q, -14 * a), 0, 0)
+    q.update(tail_sway(p, 3, 6 * a))
+    q.update({"eyelid_L": (0, 0, 80 * yawn), "eyelid_R": (0, 0, -80 * yawn)})
+    return q
+
+
+def pose_play(t):
+    """A young one's play: bouncing on bent legs, the chest wiggling side to side, the head tilting,
+    mock snaps, the arms flicking out, the tail wagging (1.6 s, once). The feet stay down."""
+    p = t / 1.6
+    bob = max(0.0, S(TAU * p * 2))
+    q = body(crouch=0.6 * bob)
+    q.update({"neck": (NECK + 8 * bob, 14 * S(TAU * p), 0), "jaw": (20 * max(0.0, S(TAU * p * 3)) + 0.01, 0, 0)})
+    q["head"] = (level(q, -4 * bob), 6 * S(TAU * p), 10 * bob)
+    q.update(arms(out=0.3 * bob))
+    q.update(tail_sway(p, 2, 8))
+    return q
+
+
+def pose_nuzzle(t):
+    """Nuzzling a young one: the head low, a gentle nudge and a nibble (2 s, once)."""
+    p = t / 2.0
+    d = ease(p, [0, .2, .85, 1], [0, 1, 1, 0])
+    push = max(0.0, S(TAU * p * 2))
+    q = head_down(0.6 * d)
+    q["head"] = (q["head"][0] - 8 * push, 0, 0)
+    q["jaw"] = (8 * d * push + 0.01, 0, 0)
+    q.update(tail_sway(p, 2, 3, lift=tail_lift(q)))
+    return q
+
+
+def pose_flinch(t):
+    """Hit: a jerk back and up, the head ducked, the arms snapped in, the eyes squeezed, the tail
+    lashing (0.45 s, once)."""
+    p = t / 0.45
+    d = ease(p, [0, .15, .45, 1], [0, 1, 0.8, 0])
+    q = body(lean=-8 * d)
+    q.update({"neck": (NECK + 16 * d, 0, 0), "head": (-NECK + 10 * d, 0, 0), "jaw": (12 * d + 0.01, 0, 0)})
+    for n, s in (("L", 1), ("R", -1)):  # snapped in (a forearm folded to -90 lies in the arm's underside: flicker)
+        q[f"arm_{n}"] = (35 + 8 * d, 0, -s * (8 - 4 * d))
+        q[f"forearm_{n}"] = (-80 - 5 * d, 0, 0)
+    q.update(tail_sway(p, 2, 7 * d, lift=5 * d))
+    q.update({"eyelid_L": (0, 0, 70 * d), "eyelid_R": (0, 0, -70 * d)})
+    return q
+
+
+def pose_death(t):
+    """Dying: the legs give, it topples onto its side, the neck and tail fall slack; it stays (1.4 s,
+    holds). Each frame rests on its lowest point (`ground_clips`)."""
+    p = t / 1.4
+    fall = ease(p, [0, .3, .7, 1], [0, 0.3, 1, 1])
+    q = body()
+    q.update({"spine_0": (0, 0, 84 * fall), "neck": (NECK + 30 * fall, 0, -10 * fall), "head": (-NECK + 10 * fall, 0, 0),
+              "jaw": (10 * fall + 0.01, 0, 0)})
+    q.update(legs(L["thigh"] + 20 * fall, L["shin"] - 30 * fall, L["foot"] + 10 * fall))
+    q.update({f"tail_{k}": (0.01, 0, 0) for k in range(len(TAIL))})
+    q.update({"eyelid_L": (0, 0, 90 * fall), "eyelid_R": (0, 0, -90 * fall)})
+    return q
+
+
+BLINKS = {"idle": [1.5], "rest": [1.2, 3.0], "stare": [1.2], "watch": [1.1, 3.1], "look": [1.4], "drink": [1.4], "approach": [0.9],
+          "sniff": [1.9], "nuzzle": [1.0]}
 BLINK = 0.09
 ANIMS = {"idle": (pose_idle, 3.0), "walk": (pose_walk, 0.9), "run": (pose_run, 0.5), "rest": (pose_rest, 4.0),
          "screech": (pose_screech, 1.6), "bite": (pose_bite, 0.7), "kick": (pose_kick, 0.8)}
+OWN = tuple(ANIMS)  # its own clips, exported as they were (no loop or blend of their own)
+CLIPS = {"stare": (pose_stare, 2.0), "watch": (pose_watch, 4.0), "drink": (pose_drink, 2.0), "sleep": (pose_sleep, 6.0),
+         "stalk": (pose_stalk, 1.6), "approach": (pose_approach, 1.4), "alarm": (pose_alarm, 1.2), "pounce": (pose_pounce, 1.0),
+         "sniff": (pose_sniff, 2.2), "look": (pose_look, 2.8), "scratch": (pose_scratch, 2.0), "stretch": (pose_stretch, 2.5),
+         "play": (pose_play, 1.6), "groom": (pose_groom, 2.6), "nuzzle": (pose_nuzzle, 2.0), "flinch": (pose_flinch, 0.45),
+         "death": (pose_death, 1.4)}
+ANIMS.update(CLIPS)
+# The held ones and the gaits loop; a clip played once must not (the engine loops a clip whose file
+# says so, whatever the game asks); the death holds its last frame.
+LOOPS = {"stare": True, "watch": True, "drink": True, "sleep": True, "stalk": True, "approach": True, "death": "hold_on_last_frame"}
+BLENDS = {"flinch": (0.05, 0.2), "death": (0.1, 0.0), "stalk": (0.3, 0.3), "approach": (0.3, 0.3), "sleep": (0.6, 0.6),
+          "watch": (0.4, 0.4), "pounce": (0.1, 0.2)}
+SHUT = ("sleep", "death", "scratch", "stretch", "flinch")  # their own lids: shut, half shut, a yawn's, squeezed
+FRAMES = {"watch": 40, "sleep": 36, "stalk": 32, "approach": 28, "alarm": 30, "pounce": 40, "sniff": 30, "look": 36, "scratch": 50,
+          "stretch": 30, "play": 32, "groom": 40, "flinch": 12}
 
 
 def eyelids(name, t):
@@ -681,7 +1026,10 @@ def eyelids(name, t):
 
 
 def frame_times(name, dur):
-    n = 30 if name in ("idle", "screech", "bite", "kick") else (12 if dur < 1 else 16)
+    if name in OWN:
+        n = 30 if name in ("idle", "screech", "bite", "kick") else (12 if dur < 1 else 16)
+    else:
+        n = FRAMES.get(name, 24)
     ts = {round(dur * k / n, 4) for k in range(n + 1)}
     for b in BLINKS.get(name, []):
         ts |= {round(b + d, 4) for d in (-BLINK, -BLINK / 2, 0, BLINK / 2, BLINK)}
@@ -692,14 +1040,35 @@ def animations(bone_names):
     out = {}
     for name, (fn, dur) in ANIMS.items():
         frames = []
+        loops = LOOPS.get(name, False)
         for t in frame_times(name, dur):
-            tt = t % dur if t < dur else 0.0
+            if name in OWN:
+                tt = t % dur if t < dur else 0.0
+            else:  # a loop's last frame is its first; a clip played once ends where it ends
+                tt = t % dur if t < dur else (0.0 if loops is True else dur)
             pose = fn(tt)
-            pose.update(eyelids(name, tt))
+            if name not in SHUT:
+                pose.update(eyelids(name, tt))
             frames.append({"t": round(t, 4), "rot": {b: [round(float(v), 4) for v in pose.get(b, (0, 0, 0))] for b in bone_names if b != "root"},
                            "root": [round(float(v), 4) for v in pose.get("root", (0, 0, 0))]})
         out[name] = {"length": dur, "frames": frames}
+        if name not in OWN:
+            out[name].update(loop=loops, blend=BLENDS.get(name, (0.25, 0.3)))
+    # A clip goes over what plays below only on the bones it writes, and the exporter leaves out a bone
+    # that stays at 0: kept at a hundredth of a degree, so the idle's (or resting's) head turn and tail
+    # don't show through a clip that holds them still. The eyelids are left to the idle's blinks.
+    for name in CLIPS:
+        below = ("idle", "rest") if name == "sleep" else ("idle",)
+        moved = {b for a in below for f in out[a]["frames"] for b, r in f["rot"].items() if any(abs(v) > 1e-6 for v in r)}
+        for b in moved - {"eyelid_L", "eyelid_R"}:
+            if all(not any(abs(v) > 1e-6 for v in f["rot"][b]) for f in out[name]["frames"]):
+                for f in out[name]["frames"]:
+                    f["rot"][b] = [0.01, 0.0, 0.0]
     return out
+
+
+RIG = [{"name": n, "parent": p, "pivot": [float(v) for v in pv]} for n, p, pv in bones()]
+PIV = {b["name"]: np.array(b["pivot"], float) for b in RIG}
 
 
 # ------------------------------------------------------------------ fitting poses to the ground
@@ -727,6 +1096,90 @@ def fit_poses(spec):
     g = lowest(spec, pose_rest(0.0, P), GROUPS)
     g.pop("sickle", None)
     L.update(best, rest_drop=round(float(min(g.values())), 2))
+    fit_clips(spec)
+
+
+def fit_clips(spec):
+    """The behaviour clips' reaches. Head down (sniffing, drinking): the snout half a unit over the
+    ground, with the body tipped forward and the neck lowered before the legs bend. Asleep: the head laid
+    by the body, just over the ground. Scratching: the right foot's claw at the neck."""
+    heads = {"head": lambda n: n in ("skull", "snout", "jaw", "mouth"), "toes": lambda n: n.startswith(("toe3_", "toe4_"))}
+
+    def nose(P):
+        g = lowest(spec, head_down(1.0, dict(L, **P)), heads)
+        return g["head"] - g["toes"]
+
+    def low_cost(P):  # the snout pointing down and forward, not tucked back past the vertical
+        pitch = P["low_lean"] + P["low_neck"] + P["low_head"]
+        return ((nose(P) - 0.5) ** 2 + 0.0002 * (P["low_neck"] ** 2 + P["low_head"] ** 2) + 0.0008 * P["low_lean"] ** 2
+                + 1.0 * P["low_crouch"] ** 2 + 0.01 * max(0.0, pitch - 70) ** 2)
+    best = fit({"low_neck": list(range(20, 141, 5)), "low_head": list(range(-60, 31, 5)), "low_lean": [0, 10, 20, 30, 40, 50],
+                "low_crouch": [0, .25, .5, .75, 1, 1.5]}, low_cost)[1]
+    L.update(best)
+    print("head down, snout over the ground:", round(float(nose({})), 2), best)
+
+    head = {"head": lambda n: n in ("skull", "snout", "jaw", "mouth")}
+
+    def sleep_cost(P):
+        g = lowest(spec, pose_sleep(0.0, dict(L, **P)), head)
+        return (g["head"] - 0.3) ** 2 + 0.0005 * (P["sleep_neck"] ** 2 + P["sleep_head"] ** 2)
+    best = fit({"sleep_neck": list(range(-10, 61, 5)), "sleep_head": list(range(-20, 41, 5))}, sleep_cost)[1]
+    L.update(best)
+    print("asleep, the head over the ground:", round(float(lowest(spec, pose_sleep(0.0), head)["head"]), 2), best)
+
+    from scipy.optimize import minimize
+    q0 = scratch_neck(1.0)
+    target = scratch_target(q0)
+
+    def tip(v):
+        q = dict(q0, leg_R_thigh=(v[0], 0, v[1]), leg_R_shin=(v[2], 0, 0), leg_R_foot=(v[3], 0, 0), leg_R_toes=(v[4], 0, 0))
+        R, tt = world(RIG, q)["leg_R_toes"]
+        return R @ (np.array(SCRATCH_TIP) - PIV["leg_R_toes"]) + tt
+
+    def inside(v):  # how far the raised knee and ankle come in under the body (outside x = -9, the thighs' side)
+        q = dict(q0, leg_R_thigh=(v[0], 0, v[1]), leg_R_shin=(v[2], 0, 0), leg_R_foot=(v[3], 0, 0), leg_R_toes=(v[4], 0, 0))
+        W = world(RIG, q)
+        return sum(max(0.0, float(W[b][1][0]) + 9) ** 2 for b in ("leg_R_shin", "leg_R_foot") if W[b][1][1] > 14)
+
+    def cost(v):
+        return float(np.sum((tip(v) - target) ** 2)) + 3 * inside(v) + 0.00005 * float(np.sum(np.square(v)))
+    bounds = [(-150, 0), (-60, 60), (0, 160), (-160, 40), (-90, 90)]
+    best = min((minimize(cost, np.array(s, float), method="L-BFGS-B", bounds=bounds)
+                for s in ([-90, -30, 60, -40, 0], [-110, -20, 90, -80, 30], [-70, -35, 40, -20, -20], [-60, -40, 110, -90, 20])),
+               key=lambda r: r.fun)
+    L["scr"] = [round(float(v), 2) for v in best.x]
+    print("scratching, the claw off the neck by", round(float(np.linalg.norm(tip(best.x) - target)), 2), "the leg in the body by",
+          round(inside(best.x), 2), L["scr"])
+
+
+PLANTED = {"scratch": ["toe3_L", "toe4_L"], "stretch": ["toe3_L", "toe4_L"]}  # standing on one leg
+
+
+def ground_clips(spec):
+    """Each standing clip's height from its feet, frame by frame (`ground.grounded`): crouches,
+    leans and steps stand on the ground; the pounce's leap added over it; the fall each frame on its
+    lowest point. Asleep it lies as it rests. The strikes, the walk and the run set the same way, the
+    run keeping its bounce: the hips' pitch carries the legs, and the bite and run sank their feet
+    0.8 and 1.8 units, the screech and kick lifted them 0.3; the walk floated 2.7 at mid-stride (both
+    legs swung apart, the root bobbing up), now each frame on its planted foot."""
+    from ground import grounded
+    A = spec["animations"]
+    everything = [e["name"] for e in spec["elements"]]
+    for name in CLIPS:
+        if name == "sleep":
+            continue
+        A[name] = grounded(spec, A[name], everything if name == "death" else PLANTED.get(name, FEET))
+        if name == "pounce":
+            for f in A[name]["frames"]:
+                f["root"][1] = round(f["root"][1] + pounce_rise(f["t"]), 4)
+        for f in A[name]["frames"]:
+            f["root"] = [round(float(v), 4) for v in f["root"]]
+    for name in ("walk", "screech", "bite", "kick"):
+        A[name] = grounded(spec, A[name], FEET)
+    A["run"] = grounded(spec, A["run"], FEET, bounds=True)
+    for name in ("walk", "screech", "bite", "kick", "run"):
+        for f in A[name]["frames"]:
+            f["root"] = [round(float(v), 4) for v in f["root"]]
 
 
 # ------------------------------------------------------------------ build
@@ -758,6 +1211,7 @@ def build():
             "bones": [{"name": n, "parent": p, "pivot": [float(v) for v in pv]} for n, p, pv in B], "elements": E}
     fit_poses(spec)
     spec["animations"] = animations([n for n, _, _ in B])
+    ground_clips(spec)
     spec["fitted"] = dict(L)
     return spec, sheet
 
