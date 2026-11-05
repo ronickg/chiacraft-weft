@@ -557,6 +557,9 @@ pub fn understory(r: &Recipe) -> Recipe {
 /// (`understory`). The cone and column trees and the palms keep `branchy`.
 pub const COLONIZED: &[crate::colonize::Colonize] = &[
     crate::colonize::OAK,
+    // The birch with its trunk forced to its top (Ronald, 11-05: "Try birch with its trunk forced
+    // to the top"), its fine twigs branch blocks.
+    crate::colonize::BIRCH,
     crate::colonize::ACACIA,
     crate::colonize::IPE,
     crate::colonize::ANDIROBA,
