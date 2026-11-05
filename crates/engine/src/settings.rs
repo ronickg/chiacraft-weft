@@ -246,6 +246,11 @@ impl Settings {
         number("core:occlusion_culling") != 0.0
     }
 
+    /// The HDR world (`post::world_format`), read once at start.
+    pub fn hdr_world(&self) -> bool {
+        number("core:hdr_world") != 0.0
+    }
+
     /// Soft clouds for packs that draw them (`client::soft_clouds`).
     pub fn soft_clouds(&self) -> bool {
         number("core:soft_clouds") != 0.0

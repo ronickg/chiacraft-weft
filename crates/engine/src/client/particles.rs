@@ -242,7 +242,7 @@ impl Particles {
                     shader: &s,
                     vertex: "vs",
                     fragment: Some(fs),
-                    color: Some(Format::Surface),
+                    color: Some(crate::post::world_format()),
                     depth: Some(depth),
                     blend,
                     cull_back: false,

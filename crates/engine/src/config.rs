@@ -646,6 +646,9 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // Soft volumetric clouds traced at a quarter of the pixels and blended over frames, for a
         // pack that draws them (chiacraft's); off, the pack's own (blocky) clouds.
         ConfigDef::number("core:soft_clouds", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // The world drawn in 16-bit float (linear light past 1) with the screen effects after it and
+        // the picture finished in one last pass (chiacraft, the HDR world); read at start.
+        ConfigDef::number("core:hdr_world", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:allow_avatars", ck::BOOL, 1.0, 0.0, 1.0, 0.0) },
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:keep_inventory", ck::BOOL, 0.0, 0.0, 1.0, 0.0) },
     ];

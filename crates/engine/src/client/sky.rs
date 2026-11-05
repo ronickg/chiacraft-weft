@@ -219,7 +219,7 @@ impl Sky {
                         shader: &shader,
                         vertex: "vs",
                         fragment: Some("fs"),
-                        color: Some(Format::Surface),
+                        color: Some(crate::post::world_format()),
                         // Depth 0 is the far plane: it passes only where nothing was drawn.
                         depth: Some(DepthState { write: false, compare: Compare::GreaterEqual }),
                         blend: Blend::Premultiplied,
@@ -235,7 +235,7 @@ impl Sky {
                         shader: &shader,
                         vertex: "vs_clouds",
                         fragment: Some("fs_clouds"),
-                        color: Some(Format::Surface),
+                        color: Some(crate::post::world_format()),
                         depth: Some(DepthState { write: true, compare: Compare::GreaterEqual }),
                         blend: Blend::Premultiplied,
                         cull_back: false,
