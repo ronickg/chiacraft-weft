@@ -36,6 +36,10 @@ pub fn register(r: &mut Registry) {
         let w = cmd.world();
         let Some(st) = w.entity(cmd.player()) else { return };
         let n = Here::at(&w, st.pos);
+        // What the server last put on you (`count`): the client's share.
+        let on_you = w
+            .component(Holder::entity(cmd.player()), &HERE)
+            .map_or(-1, |v| (v * 100.0).round() as i64);
         cmd.reply(
             "command.base.fireflies",
             &[
@@ -46,11 +50,7 @@ pub fn register(r: &mut Registry) {
                 Arg::Int((n.soil * 100.0).round() as i64),
                 Arg::Float(n.hour as f64, 1),
                 Arg::Float(n.sunset as f64, 1),
-                // What the server last put on you (`count`): the client's share.
-                Arg::Int(
-                    w.component(Holder::entity(cmd.player()), &HERE)
-                        .map_or(-1, |v| (v * 100.0).round() as i64),
-                ),
+                Arg::Int(on_you),
             ],
         );
     });
