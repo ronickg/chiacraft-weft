@@ -1541,4 +1541,5 @@ hint.base.waystone.cancel_moved = Вы сдвинулись: лей отпуск
 hint.base.waystone.cancel_hurt = Вас ранили: лей отпускает.
 hint.base.waystone.arrived = Вы выходите из лей-линии в {0} блоках отсюда. Путь вызывает лёгкий голод.
 command.base.waystone.none_near = Здесь нет путевого камня.
+command.base.waystone.goto = к путевому камню у {0} {1} ({2} линий), с юга
 command.base.waystone.list = пробуждённых камней: {0} ({1}); карта: {2} тайлов, {3} байт

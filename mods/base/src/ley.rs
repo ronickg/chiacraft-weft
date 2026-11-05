@@ -55,6 +55,7 @@ pub fn register(r: &mut Registry) {
         .hardness(2.5)
         .mineable("pickaxe")
         .needs_tool_level(0)
+        .on_use(crate::waystones::stone_used)
         .textures("ley_stone_top", "ley_stone_side", "ley_stone_top")
         .tag("ley_stone")
         .tab(&crate::tabs::BUILDING);

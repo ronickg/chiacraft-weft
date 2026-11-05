@@ -1540,4 +1540,5 @@ hint.base.waystone.cancel_moved = You moved: the ley lets go.
 hint.base.waystone.cancel_hurt = You were hurt: the ley lets go.
 hint.base.waystone.arrived = You step out of the ley, {0} blocks on. The trip leaves you a little hungry.
 command.base.waystone.none_near = No waystone here.
+command.base.waystone.goto = to the waystone at {0} {1} ({2} lines), from the south
 command.base.waystone.list = waystones awake: {0} ({1}); map: {2} tiles, {3} bytes

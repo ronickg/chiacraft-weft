@@ -15,7 +15,8 @@
 //!   no passengers, no tames.
 //!
 //! `/waystone` lists the player's woken waystones and map size; `/waystone wake` (game masters)
-//! wakes the nearest without the rod or offering, for runs.
+//! wakes the nearest without the rod or offering, and `/waystone goto` (game masters) stands the
+//! player 4 blocks south of the nearest waystone they haven't woken, for runs on any seed.
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
@@ -254,6 +255,31 @@ pub fn register(r: &mut Registry) {
     r.command("waystone", "[what:word]", |cmd| {
         let w = cmd.world();
         let p = cmd.player();
+        if cmd.text("what") == Some("goto") {
+            if w.permission(p) < permission::GAME_MASTER {
+                return;
+            }
+            let Some(st) = w.entity(p) else { return };
+            let woken = with_atlas(&w, p, |h| h.atlas.woken.clone());
+            let (x, z) = (st.pos.x, st.pos.z);
+            let Some(nd) = ley::waystones_near(w.seed(), x as i32, z as i32, 6 * ley::CELL)
+                .into_iter()
+                .filter(|nd| !woken.contains(&nd.cell))
+                .min_by_key(|nd| ((nd.x as f64 - x).powi(2) + (nd.z as f64 - z).powi(2)) as i64)
+            else {
+                cmd.reply("command.base.waystone.none_near", &[]);
+                return;
+            };
+            let f = base_api::land::fields(w.seed());
+            let (gx, gz) = (nd.x, nd.z + n::ARRIVE_SOUTH);
+            let y = (base_api::land::height(&f, gx * 16, gz * 16) >> 4).max(base_api::SEA) + 2;
+            w.entity_edit(p)
+                .pos([gx as f64 + 0.5, y as f64, gz as f64 + 0.5])
+                .velocity([0.0, 0.0, 0.0])
+                .fall_distance(0.0);
+            cmd.reply("command.base.waystone.goto", &[Arg::Int(nd.x as i64), Arg::Int(nd.z as i64), Arg::Int(nd.lines as i64)]);
+            return;
+        }
         if cmd.text("what") == Some("wake") {
             if w.permission(p) < permission::GAME_MASTER {
                 return;
@@ -381,8 +407,8 @@ fn wake(w: &World, player: u64, node: &Node) {
 
 // ------------------------------------------------------------------ travel
 
-/// Using a sleeping or woken waystone (not with the rod: that wakes it): a woken one opens the map
-/// to travel.
+/// Using a waystone or the ley stone of its structure (not with the rod: that wakes it), standing
+/// at its node: a woken one opens the map to travel. Ley stone placed elsewhere does nothing.
 pub fn stone_used(u: &mut Use) -> bool {
     let w = u.world();
     let p = u.player();
@@ -390,13 +416,7 @@ pub fn stone_used(u: &mut Use) -> bool {
     if DOWSING_ROD.id() != u32::MAX && held == DOWSING_ROD.id() {
         return false;
     }
-    let pos = u.pos();
-    let Some(node) = ley::waystones_near(w.seed(), pos.x, pos.z, 1)
-        .into_iter()
-        .find(|nd| nd.x == pos.x && nd.z == pos.z)
-    else {
-        return false;
-    };
+    let Some((node, _)) = near_waystone(&w, p) else { return false };
     if !with_atlas(&w, p, |h| h.atlas.woken.contains(&node.cell)) {
         w.hint(p, "hint.base.waystone.sleeps", &[]);
         return true;
