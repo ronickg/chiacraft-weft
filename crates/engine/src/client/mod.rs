@@ -1415,6 +1415,21 @@ impl Client {
                 if !flying {
                     self.player.vel += push;
                 }
+                // Out of any block it overlaps, before moving: movement doesn't clip against what
+                // the box is already inside (`physics::push_out`). From where it was too, so the
+                // eyes don't pass through the block on the way (`smooth_pos`).
+                // The same cells the move goes by: flying takes cubes not here yet for air.
+                if !self.player.noclip {
+                    let d = self.player.dims();
+                    let out = if flying {
+                        physics::push_out(c, &air_if_missing, self.player.pos, d.half_width, d.height)
+                    } else {
+                        physics::push_out(c, &block, self.player.pos, d.half_width, d.height)
+                    };
+                    if let Some(out) = out {
+                        (self.player.pos, self.player.prev) = (out, out);
+                    }
+                }
                 if flying {
                     step_player(&mut self.player, input, &air_if_missing, gravity, &bodies);
                 } else {
