@@ -156,6 +156,107 @@ Two files don't match the rest of the set and should not be used as reference: `
 
 ---
 
+## 9. How each family looks
+
+These describe **how the reference builds each kind of item**, not exact designs. Use them to explain the style to an image model in words. Copy the lines into a prompt when an image alone isn't clear enough. Each family ends with **Make it yours**: what to change so the result isn't a copy of the reference.
+
+**Tools** (`01`, `13`)
+- Lies diagonally, handle at the bottom left, head at the top right. The head takes about two-thirds of the canvas width.
+- The tool shape is the same in every tier. Only the head material and the handle fittings change.
+- Handles get fancier as the tier goes up: low tiers use plain dark wood with cream cord lashing where the head joins; middle tiers use a red-brown leather wrap with bands and a round metal pommel knob; top tiers add a metal collar at the joint with a small glowing gem.
+- Metal heads are mostly highlight, with a near-white bevel along the top edge and the shadow only on the lower edge.
+- **Make it yours:** keep the diagonal, the two-thirds head and the tier progression. Design your own head shapes and your own fitting for each tier.
+
+**Melee weapons** (`02`, `13`)
+- Swords sit on the same diagonal. The blade has a bright centre line running its length, a crossguard at the base and a round pommel at the end.
+- The crossguard and pommel carry the tier: plain wood or stone on low tiers, gold and gems on high tiers.
+- Spears are a long thin shaft with a small leaf-shaped head and a collar where they meet.
+- **Make it yours:** change the guard and blade shapes. Keep the bright centre line and the tier trim.
+
+**Bows, crossbows and states** (`02`, `14`)
+- Bows are curved dark wood limbs with metal tips and a red wrap at the grip. The string is a 1-px pale line, never dark.
+- Pulling states keep the bow in exactly the same place. Only the string and the arrow move back, a little more each frame.
+- The crossbow lies diagonally. "Loaded" adds an arrow or rocket along the stock, and nothing else changes.
+- Arrows have a dark shaft, a bright metal head and cream fletching. On tipped arrows only the head is coloured.
+- **Make it yours:** keep the fixed position across states and the pale 1-px string. The limbs and decoration can be anything.
+
+**Raw ores, ingots and nuggets** (`04`, `15`)
+- Raw ore is a lumpy cluster of 3–5 rounded nuggets, each with its own highlight. Copper shows green patina between the lumps.
+- Ingots are a bar lying on the diagonal, seen slightly from above, with a small **stamped mark** on the top face. The top is bright, the long side mid-tone and the end dark. Bricks use the same bar shape with no stamp.
+- Nuggets are one small lump plus a tiny detached speck, the same colours as the ingot.
+- Fuel (coal, charcoal) is matte, never glossy: coal is a heap of round black lumps, charcoal is a burnt stick.
+- **Make it yours:** the bar shape and lump count are free. Keep the three-face lighting.
+
+**Gems and minerals** (`05`, `15`)
+- Gems are faceted, with flat planes of 3–4 shades, white facet tips and one white plus-sign sparkle.
+- Each gem gets its own **form**, so they read apart even without colour: a cluster of small cubes (diamond), a star of long crystals (emerald), a pile of round beads (lapis), a fan of thin spikes (quartz), a single long shard (amethyst).
+- Powders (redstone, glowstone, sugar) are a heap or cluster of bright grains, with darker grains underneath.
+- Shards and flakes (prismarine, flint) are flat angular plates with one bright edge.
+- **Make it yours:** choose your own cut and cluster shape. Keep the white tips and the single sparkle.
+
+**Food** (`07`, `16`)
+- Raw meat is glossy pink-red with a pale fat rim and a light streak on the upper left.
+- Cooked food uses the same shape as the raw version, turned deep brown with darker grill stripes. Bones stay cream.
+- Fruit is round and glossy with a highlight on the upper left, plus a small stem or leaf. Golden variants are the same fruit in gold with a lemon highlight.
+- Fish lie diagonally, with a lighter belly, a fin on top and soft speckled scales.
+- Bowls are a wooden bowl seen slightly from above, with the contents' surface showing and often a spoon sticking out at the upper left.
+- **Make it yours:** cook state, gloss and diagonal fish are the style. The shapes of individual foods are free.
+
+**Containers, bottles and potions** (`08`, `18`)
+- Section D has full recipes. The short version: buckets are warm silver seen from slightly above, with a band round the middle; their contents show as a flat surface in the opening.
+- Bottles are a round glass flask with a **white** glass outline, a cork and a cloth tied round the neck.
+- Potion liquid is drawn grey and coloured by the game, so one bottle drawing serves every potion.
+- **Make it yours:** change the bucket band, the bottle shape and the neck wrap. Keep the white glass outline.
+
+**Books and maps** (`09`, `19`)
+- Books are a three-quarter view of a red leather cover with metal corner caps and a cream page edge on the side. Each variant adds one thing: a quill, a clasp or a gem.
+- Maps are curled parchment. Explorer maps put one bold icon in the middle (a red X, a building, a skull).
+- Banner patterns are a small rolled scroll with the pattern shown in pale grey.
+- **Make it yours:** cover colour and decoration are free. Keep the "one base, one added detail" rule.
+
+**Colour sets** (`17`)
+- Each set is one design copied 16 times. Only the coloured part changes; the outline, highlights and fixed parts (pot, string, metal) stay the same.
+- Dyes are a small pot of coloured powder with a spoon. Bags are drawstring sacks. Candles are thin sticks with a wick.
+- Dark colours (black, grey, brown) get lighter highlights so they still read on a dark slot.
+- **Make it yours:** you can use any base object. Keep the fixed parts identical in all 16.
+
+**Same-base sets** (`20` discs, `24` sherds and templates, `26` spawn eggs)
+- One base shape is shared by the whole set, and only a small picture, label or colour scheme changes.
+- Sherds are a terracotta tile with a carved top rim and a simple dark-red pictogram.
+- Templates are a rounded slab in a material colour with a glowing line rune.
+- Spawn eggs are an egg with the mob's face and colours painted on the front.
+- Music discs are a black vinyl disc **tilted into an ellipse**, with fine groove rings, one bright rim highlight and a small coloured centre label. Special discs swap the black vinyl for a coloured or patterned one.
+- **Make it yours:** design your own base. Keep pictures to 1–2 colours so they read at 32 px.
+
+**Mob drops and rare materials** (`06`, `21`)
+- Organic drops are soft and glossy: slime is a translucent-looking green ball, ink sacs are round pouches, membranes are curved flaps with a pale edge.
+- Glowing drops (blaze rod, ender pearl) have a bright core and a darker rim.
+- Rare items get the most detail and contrast, plus a small sparkle: a star, a heart orb, a totem.
+- **Make it yours:** the materials can be whatever your creatures drop. Keep "rarer means brighter and more detailed".
+
+**Seeds and plant items** (`22`)
+- Seeds are 3–5 small grains **scattered apart**, not touching, each with a highlight. Their colour says what they grow into.
+- Harvested plants are tied in a bundle with a pale cord (wheat, sugar cane) or shown as a single stalk or leaf (bamboo, kelp).
+- Small plants as items are the whole plant, centred, growing from the bottom edge.
+- **Make it yours:** keep "scattered grains" for seeds and "tied bundle" for harvests. The species are free.
+
+**Placeables and gadgets** (`23`)
+- Signs are a pale parchment board on a post, and only the post colour changes between wood types. Hanging signs use the same board on two chains.
+- Heads are the mob's front face filling the tile.
+- Throwables are simple round shapes with one highlight (snowball, eggs) or a bright core (fire charge).
+- **Make it yours:** keep "one board, wood-coloured post" for signs. Everything else is free.
+
+**Armour icons** (`03`)
+- Front view, symmetric, the same four pieces in every material.
+- Each material has its own trim: leather has cloth and laces, chain has a ring pattern over a tabard, iron has leather straps, gold has red cloth and gems, diamond has dark leather showing between the crystal plates, and netherite has gold lines. The monster guide describes how each looks when worn.
+- **Make it yours:** keep a fixed trim language per material, so icons and worn armour match.
+
+**Animal armour** (`25`)
+- Horse armour is drawn as a small horse head and blanket: a metal head piece and a coloured cloth blanket, with the material showing in the metal.
+- **Make it yours:** use one icon base for every material and change only the metal and cloth colours.
+
+---
+
 ## A) Style description for an image model
 
 **Style:** Hand-painted pixel art on a 32×32 transparent canvas, fully opaque pixels, no anti-aliasing. Warm rustic-medieval fantasy: red leather wraps and gold fittings with warm silver metal, bright orange copper and wood, sapphire-blue gems and vivid red-orange food, made to sit on dark brown slots inside bronze frames. Light and airy rather than heavy: shadows are mid-dark, never deep, and nothing goes near black. Each material uses a 5–8 step ramp; gold and fire shift toward lemon in the highlights. Light from the top-left. Metal is mostly bright, with a near-white top bevel. Subtle painted grain, no dithering. Small white sparkles on gems.
@@ -183,6 +284,9 @@ Two files don't match the rest of the set and should not be used as reference: `
 - Beans are clearly beans (kidney-shaped, glossy, with a speckle or a pale eye), never a pink lump that reads as meat; small round berries (crowberries) are glossy and big enough to see one by one.
 - Things tied to creatures show a little of their real size against each other, in a gentle range (Ronald, 11-04): the longest side runs from about 16 px of the 32 (60%, tiny things: an earthworm, a grub, a chicken's egg nearer 70%) to about 26 px (100%: a nest, a raptor egg, a saddle for the biggest mount), centred, never so small it can't be read. A saddle matches its mount; a spawn egg is scaled a little by its animal (a chicken's small, a cow's full). Very thin creatures (an earthworm, a snake) get a little more than their real scale, about 20 px, so they stay readable at 1x.
 - Bone, antler and horn are bone-pale to their tips (warm cream, #e0d6bc to #ece4d0), never pink or red at the points (Ronald, 11-05, Drenkaun's antler: "tips bone-pale"). A seed reads as a seed (a teardrop with a pale base scar and a sprout), never round and ribbed like a fruit.
+- Our approved items win over the family notes above (section 9) where they differ (the regen test, 11-05: Guides 3's notes turned our diamond into cubes and our coal grey). A diamond is our shard cluster: 3-4 faceted teal shards pointing outwards with white facet tips and one sparkle, never a cluster of cubes or a cut brilliant. Coal stays glossy black-brown with blue-grey glints, never matte grey, whatever the fuel note says.
+- Diamond armour is 3-5 large faceted crystal plates per piece (helmet, chestplate, leggings, boots) with dark leather showing between them, never small scales: "scales sewn on a backing" came out as noise at 2x in all three regen runs (11-05).
+- The hoe is the least stable design: one regen run in three drew it right, the others a spear point or a blade with a spike. Paste the hoe line above whole, attach a drawn hoe of ours with `--like`, and check its head sits across the haft before keeping it.
 
 How to prompt, check and cut it: `0 Making it.md`.
 
@@ -194,7 +298,7 @@ How to prompt, check and cut it: `0 Making it.md`.
 |---|---|
 | Tools | `01 Tools (diagonal).png` |
 | Swords, bows, crossbows, tridents, shields | `02 Weapons.png` |
-| Armour | `03 Armour (front view).png` |
+| Armour | `03 Armour (front view).png` (every material × helmet, chestplate, leggings, boots, plus dyed leather and the turtle helmet) |
 | Ingots and raw ore | `04 Ingots and raw ores.png` |
 | Gems and crystals | `05 Gems and crystals.png` |
 | Sticks, string, feathers, leather, bones | `06 Crafting materials.png` |
@@ -204,6 +308,31 @@ How to prompt, check and cut it: `0 Making it.md`.
 | Compass, spyglass, shears, rods, rope | `10 Small tricky objects.png` |
 | Saddles, bags, eggs, bowls, fish | `11 Soft and organic.png` |
 | Arrows, clocks, horns, charms | `12 Arrows, instruments and charms.png` |
+
+**Full sets (13–26).** Images 01–12 show a few hand-picked examples per kind. Images 13–26 show **every variant** in a family, in labelled rows. Attach one of them as well when you make a whole set, so the model sees how a family stays consistent and what changes between variants.
+
+| Making a whole set of… | Also attach |
+|---|---|
+| Tools and swords in every material tier | `13 Tools and weapons by tier.png` |
+| Bows, crossbows and items with use or animation states (pulling, loaded, cast, clock and compass frames) | `14 Ranged weapons and item states.png` |
+| Raw ores, ingots, nuggets, gems and minerals | `15 Ores, ingots, nuggets and gems.png` |
+| Food, raw and cooked pairs, bowls | `16 All food.png` |
+| Items that come in 16 colours (dyes, bags, candles, harnesses) | `17 Colour sets (16 colours).png` |
+| Buckets, bottles and potions (potion liquid is drawn grey and tinted) | `18 Buckets, bottles and potions.png` |
+| Books, maps and banner patterns | `19 Books, maps and patterns.png` |
+| Music discs or any "same shape, different label" set | `20 Music discs.png` |
+| Mob drops and rare materials | `21 Mob drops and crafting materials.png` |
+| Seeds and plants as items | `22 Seeds and plant items.png` |
+| Signs per wood type, frames, redstone, heads, throwables | `23 Placeable items and gadgets.png` |
+| Sets of near-identical items with one small picture each (sherds, templates, tokens) | `24 Pottery sherds and smithing templates.png` |
+| Animal armour (horse and other) | `25 Animal armour.png` |
+| Spawn eggs or any "one shape, many colour schemes" set | `26 Spawn eggs.png` |
+
+How the families work:
+- **Material tiers (13):** the shape stays identical across tiers; only the head or blade material changes. The handle gets fancier as the tier goes up (plain wood, then leather wrap, then gold fittings and a gem).
+- **States (14):** draw every state on the same canvas position, so swapping states doesn't make the item jump.
+- **Colour sets (17):** draw the design once, then recolour only the coloured part. Keep the outline, highlight and metal or string parts the same in all 16.
+- **Picture sets (20, 24, 26):** one shared base (disc, sherd, template, egg), with only the label, picture or colours changing.
 
 ## B) Material sheet
 

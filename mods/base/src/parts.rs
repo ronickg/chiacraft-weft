@@ -73,6 +73,9 @@ const SOURCES: &[(&str, &str)] = &[
     ("star_steel", "#ingots/star_steel"),
     ("tektite", "#tektite"),
     ("gold", "#ingots/gold"),
+    ("copper", "#ingots/copper"),
+    ("bronze", "#ingots/bronze"),
+    ("steel", "#ingots/steel"),
     ("diamond", "#gems/diamond"),
     ("plant_cordage", "#string"),
     ("leather", "#materials/leather"),
@@ -213,7 +216,19 @@ pub fn register(r: &mut Registry) {
                 .zip(names.get(1))
                 .map_or(ItemStack::EMPTY, |(shape, m)| part_of(shape, m, grade, day))
         } else {
-            made_of(&kind, &names, grade, day)
+            // `gems=a,b`: cut gems of those set in it (as many as it has sockets).
+            let gems: Vec<crate::gems::Set> = materials
+                .iter()
+                .find_map(|m| m.strip_prefix("gems="))
+                .map(|g| {
+                    g.split(',')
+                        .filter_map(crafting::gems::gem)
+                        .map(|g| crate::gems::cut(g, || (w.random() >> 40) as f32 / (1u64 << 24) as f32))
+                        .collect()
+                })
+                .unwrap_or_default();
+            let made = made_of(&kind, &names, grade, day);
+            if gems.is_empty() { made } else { rebuilt(&made, &gems) }
         };
         if made.is_empty() {
             cmd.reply("command.base.gear.cant", &[Arg::Text(&kind)]);
@@ -428,8 +443,13 @@ fn tool_stack(kind: &Kind, parts: &[(Part, PartOf)], stats: &ToolStats, gems: &[
     // Drawn from its parts (the engine's `core:look`), its gems set on it.
     let plain: Vec<Part> = parts.iter().map(|p| p.0).collect();
     let look = look_text(kind.id, &plain);
-    // Gems over a drawn tool only (a kind with no layers shows its plain icon).
-    let look = if look.is_empty() { look } else { look + &gem_layers(kind.id, &set) };
+    // Its gems over it; a kind with no layered art yet (a knife, a spear) is its plain icon under
+    // them, or with none set its plain icon alone.
+    let look = match (look.is_empty(), set.is_empty()) {
+        (false, _) => look + &gem_layers(kind.id, &set),
+        (true, false) => format!("base:item/{}", kind.id) + &gem_layers(kind.id, &set),
+        (true, true) => look,
+    };
     let stack = with_look(stack, (!look.is_empty()).then_some(look.as_str()));
     let worn = (used * uses as f32) as u32;
     if worn > 0 { stack.with(&DAMAGE, worn) } else { stack }
@@ -518,7 +538,11 @@ fn armour_stack(kind: &Kind, parts: &[(Part, PartOf)], a: &ArmourStats, gems: &[
         .with(&base_api::ITEM_LEVEL, a.level)
         .with(&base_api::WARMTH, warmth)
         .with(&crate::gems::GEMS_ON, crate::gems::gems_of(sockets, &set));
-    // Its icon is its shell's, in the shell's material (the worn look is its item's set).
+    // Worn, it's drawn from its parts too (the engine's `core:worn_look`); its item's set stays
+    // for anything that can't compose it.
+    let gem_ids: Vec<&str> = set.iter().map(|g| g.gem.id).collect();
+    let stack = with_worn_look(stack, Some(crafting::looks::worn_look(a.slot, a.shell, a.fastening, &gem_ids).as_str()));
+    // Its icon is its shell's, in the shell's material.
     let shell = parts
         .iter()
         .find(|(p, _)| p.slot == "shell")

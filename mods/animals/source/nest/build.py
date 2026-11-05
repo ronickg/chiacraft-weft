@@ -8,9 +8,11 @@ and the game's house style: `../../assets/models/nest.geo.json` and `textures/en
 The real thing: Velociraptor's nests aren't known. Its close relative Troodon dug a dish about a
 meter across with a pronounced raised rim of sediment, and set its eggs half into the ground,
 steeply tilted, their tops toward the middle; emus line such a scrape with grass, bark and leaves.
-So the nest is an earthen dish in a sloped rim (each side four stacked boxes, narrower going up,
-so it slopes in and out like heaped earth), about 1 m across and 12 cm high at the crest, the dish
-a little deeper in the middle where the claws dug. Variants:
+So the nest is an earthen dish in a stepped rim (each side a low bank and a crest on it, each two
+texels in from the one below on both sides, so it slopes in and out like heaped earth), about 1 m
+across and 12 cm high at the crest, the dish darker in the middle where the claws dug. No thin
+lines (Ronald, 11-05): every step is flush or two texels or more, so the rim has two steps, not
+four, and the dish is one floor (a lower middle was a step under a texel). Variants:
 
 - bare: the troodontid scrape: dry crust on the crest, clods and grit, claw scrapes in the dish,
   pebbles kicked out over the rim;
@@ -119,19 +121,22 @@ def stems(p, count, seed, region=(0, 21), length=(7, 13)):
 # ------------------------------------------------------------------ layout (units: texels, 64 a block)
 
 # A rim's layers from the outside in: (outer edge, inner edge, bottom, top) as distances on the
-# side's own axis (negative: toward its outside); each narrower and higher than the one below, so
-# the rim slopes in and out like heaped earth.
-PROFILE = [(-31, -17, 0.0, 3.0), (-29.5, -19, 0.5, 4.5), (-28, -21, 1.0, 6.0), (-26.5, -22.5, 1.5, 7.5)]
+# side's own axis (negative: toward its outside); the crest four units (two texels) in from the bank
+# on both sides and over five above it, the bank half a unit above the dish's floor (flush): every
+# step either flush or two texels clear, never the hairline a smaller step shows.
+PROFILE = [(-31, -17, 0.0, 2.0), (-27, -21, 0.5, 7.5)]
+FLOOR = 1.5  # the dish's floor, half a unit under the bank (the eggs stand on it, `eggs.rs`)
 
 
 def rim_side(name, axis, sign, half, rise):
     """A rim side: north/south (`axis` "x", running along x) or west/east, `sign` -1 on the
-    negative side; its crest `rise` higher or lower than the others'."""
+    negative side; its crest `rise` higher or lower than the others' (the bank stays flush with the
+    floor). The crest ends half a unit short of the bank's ends (inside the corners)."""
     E = []
     for k, (o, i, b, t) in enumerate(PROFILE):
-        h = half - k
+        h = half - 0.5 * k
         lo, hi = (o, i) if sign < 0 else (-i, -o)
-        top = t + rise * (k + 1) / len(PROFILE)
+        top = t + (rise if k else 0.0)
         box = ((-h, b, lo), (h, top, hi)) if axis == "x" else ((lo, b, -h), (hi, top, h))
         E.append(el(f"rim_{name}{k}", *box, part="rim", layer=k))
     return E
@@ -144,24 +149,21 @@ def rim_corner(name, sx, sz, rise):
     ux, uz = sx * math.sqrt(0.5), sz * math.sqrt(0.5)
     angle = -45 if sx * sz < 0 else 45
     for k, (o, i, b, t) in enumerate(PROFILE):
-        r, w, h = -(o + i) / 2, (i - o) / 2, 8.5 - k
+        r, w, h = -(o + i) / 2, (i - o) / 2, 8.5 - 0.5 * k
         cx, cz = ux * r, uz * r
-        top = t + rise * (k + 1) / len(PROFILE)
-        E.append(el(f"rim_{name}{k}", (cx - h, b + 0.25, cz - w), (cx + h, top + 0.25, cz + w), rot=(0, angle, 0),
+        # a quarter unit off the sides' faces (no faces meet): the bank lower than theirs (still
+        # over the floor, its bottom a little in the ground so it is a texel tall), the crest higher
+        top, bottom = (t + rise + 0.25, b + 0.25) if k else (t - 0.25, b - 0.25)
+        E.append(el(f"rim_{name}{k}", (cx - h, bottom, cz - w), (cx + h, top, cz + w), rot=(0, angle, 0),
                     origin=(cx, 0, cz), part="rim", layer=k))
     return E
 
 
 def elements(variant):
     E = [
-        # The dish: four floor slabs around a lower middle where the claws dug.
-        # Every overlapping pair differs by half a unit or more at top and bottom (bottoms may sink
-        # below the ground, which hides them).
-        el("floor_n", (-17, -0.5, -21), (17, 2.5, -9), part="floor"),
-        el("floor_s", (-16.5, -0.5, 9), (16.5, 2.5, 21), part="floor"),
-        el("floor_w", (-21, -1.0, -9.5), (-9, 2.0, 9.5), part="floor"),
-        el("floor_e", (9, -1.0, -9.5), (21, 1.5, 9.5), part="floor"),
-        el("floor_mid", (-10, 0.0, -10), (10, 1.0, 10), part="floor"),
+        # The dish: one floor, its edges under the rim (its bottom sunk below the ground). Four
+        # slabs round a lower middle stepped it by half a texel: thin lines all round.
+        el("floor", (-21, -0.5, -21), (21, FLOOR, 21), part="floor"),
     ]
     E += rim_side("n", "x", -1, 13.0, 0.5)
     E += rim_side("s", "x", 1, 12.5, 0.0)
@@ -169,12 +171,11 @@ def elements(variant):
     E += rim_side("e", "z", 1, 13.2, 0.25)
     for name, sx, sz, rise in (("ne", 1, -1, 0.0), ("nw", -1, -1, 0.75), ("se", 1, 1, -0.25), ("sw", -1, 1, 0.4)):
         E += rim_corner(name, sx, sz, rise)
-    # Pebbles: a wider bottom and a narrower top, so they read round.
+    # Pebbles: one box each, painted (a narrower top on a wider bottom stood a texel out: a lip).
     pebbles = {"bare": [(35, -6, 0.0), (-8, 35, 0.0), (-35, 14, 0.0)], "lined": [(35, 9, 0.0)],
                "grassy": [(35, -3, 0.0), (-34, -16, 0.0)]}[variant]  # kicked out over the rim
     for k, (x, z, y) in enumerate(pebbles):
-        E += [el(f"pebble{k}_low", (x - 2.5, y - 0.5, z - 2), (x + 2.5, y + 2, z + 2), part="pebble"),
-              el(f"pebble{k}_top", (x - 1.5, y + 1.5, z - 1.25), (x + 1.75, y + 3.75, z + 1.5), part="pebble")]
+        E.append(el(f"pebble{k}", (x - 2.5, y - 0.5, z - 2), (x + 2.5, y + 3.25, z + 2), part="pebble"))
     if variant == "lined":
         # Dry leaves lying in the dish (well above the floor, so no faces meet).
         for k, (x, z, a) in enumerate(((-6, 4, 30), (7, -5, -50), (2, 13, 80))):
@@ -277,7 +278,7 @@ def with_eggs(E, egg):
     spots = [(0.0, 0.0)] + [(12.8 * math.cos(a), 12.8 * math.sin(a)) for a in (0.4, 2.5, 4.4)]
     for k, (x, z) in enumerate(spots):
         yaw = math.degrees(math.atan2(-x, -z)) if k else 30.0
-        E += egg.elements(yaw=yaw, at=(x, 1.0 - 2.5, z), name=f"egg_{k}_")
+        E += egg.elements(yaw=yaw, at=(x, FLOOR - 2.5, z), name=f"egg_{k}_")
     return E
 
 
@@ -306,7 +307,18 @@ def build(variant, out, eggs=False):
     with open(os.path.join(out, "spec.json"), "w") as f:
         json.dump(spec, f)
     subprocess.run([sys.executable, os.path.join(SKILL, "boxcheck.py"), os.path.join(out, "spec.json")], check=True)
+    from linecheck import boxes_from_spec  # noqa: E402
+    no_thin_lines(boxes_from_spec(spec), sheet)
     return spec
+
+
+def no_thin_lines(boxes, tex):
+    """No thin lines (Ronald, 11-05): no strip of a box under two texels showing beside another.
+    Meant: the eggs' round taper (each layer a unit narrower than the next, as `egg/build.py`
+    allows), in the variants that show eggs in the dish."""
+    from linecheck import density_of, lines  # noqa: E402
+    thin = [h for h in lines(boxes, tex, density_of(boxes), allow=("egg_*",)) if h["kind"] == "line"]
+    assert not thin, f"thin lines: {[(h['box'], h['face'], h['cover'], h['width']) for h in thin]}"
 
 
 if __name__ == "__main__":
@@ -320,4 +332,6 @@ if __name__ == "__main__":
     else:
         spec = build(CHOSEN, OUT)
         made = export(spec, os.path.join(OUT, "texture.png"), ASSETS, "nest", SCALE, "nest/nest", pose_files={"": {}})
+        from linecheck import load  # noqa: E402
+        no_thin_lines(*load(os.path.join(ASSETS, "models", "nest.geo.json"), os.path.join(ASSETS, "textures", "entity", "nest", "nest.png")))
         print("wrote", made, "(", CHOSEN, ")")

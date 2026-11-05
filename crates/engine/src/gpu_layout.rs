@@ -700,7 +700,9 @@ gpu_struct! {
         /// when what is held gives none. It falls off like block light, a level a block.
         pub hand_light: [f32; 4],
         /// Where the player is: x how closed a forest's canopy is (0 open sky to 1 a rainforest's;
-        /// a mod's air, `air_flags::CANOPY_SHIFT`), for packs' light under the leaves; yzw unused.
+        /// a mod's air, `air_flags::CANOPY_SHIFT`), for packs' light under the leaves; y how wet
+        /// the ground is, 0..1: it follows what falls up and dries over minutes after (a mod's air
+        /// says how fast, `air_flags::DRYING_SHIFT`); zw unused.
         pub canopy: [f32; 4],
         /// Soft clouds (`core:soft_clouds`, with a pack whose sky has `fs_cloud_trace` and
         /// `fs_cloud_resolve`; chiacraft): x the bindless index + 1 of this frame's clouds, traced

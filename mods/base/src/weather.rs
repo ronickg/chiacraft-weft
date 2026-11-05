@@ -184,7 +184,9 @@ fn air_of(w: &World, id: u32, c: &Climate) -> BiomeAir {
         flags |= air_flags::DUST;
         fog = fog.max(dust * 0.95);
     }
-    BiomeAir { biome: id, fog, wind, snow, flags: flags | aurora }
+    // How fast the ground dries here after rain (the engine's wet ground, `Scene::canopy.y`).
+    let drying = air::drying_byte(air::drying_secs(place.air(day, hour, raining), c.humidity, wind));
+    BiomeAir { biome: id, fog, wind, snow, flags: flags | aurora | drying << air_flags::DRYING_SHIFT }
 }
 
 /// Biome `id`'s share in a per-biome list (`air::AURORA`, `air::CANOPY`) as 0 to 255, 0 for one

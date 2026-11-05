@@ -15,9 +15,14 @@ pub enum Station {
     TanningPit,
     /// A mound of logs under earth, lit and left to char.
     CharcoalClamp,
+    /// A clay crucible in a bellows-blown fire: copper and tin melted into bronze (the Bronze Age;
+    /// `metals.rs`).
+    Crucible,
+    /// A charcoal forge: wrought iron carburised into steel (the Iron Age).
+    Forge,
 }
 
-pub const STATIONS: [Station; 3] = [Station::TanningFrame, Station::TanningPit, Station::CharcoalClamp];
+pub const STATIONS: [Station; 5] = [Station::TanningFrame, Station::TanningPit, Station::CharcoalClamp, Station::Crucible, Station::Forge];
 
 impl Station {
     /// Its block (`base:tanning_frame`) and translations.
@@ -26,6 +31,8 @@ impl Station {
             Station::TanningFrame => "tanning_frame",
             Station::TanningPit => "tanning_pit",
             Station::CharcoalClamp => "charcoal_clamp",
+            Station::Crucible => "crucible",
+            Station::Forge => "forge",
         }
     }
 
@@ -35,6 +42,8 @@ impl Station {
             Station::TanningFrame => 1,
             Station::TanningPit => 8,
             Station::CharcoalClamp => 16,
+            Station::Crucible => 4,
+            Station::Forge => 4,
         }
     }
 }
@@ -54,10 +63,16 @@ pub struct Craft {
     pub real_days: f32,
 }
 
-pub const CRAFTS: [Craft; 3] = [
+pub const CRAFTS: [Craft; 5] = [
     Craft { station: Station::TanningFrame, input: "#hides", with: None, output: "base:leather", real_days: 3.0 },
     Craft { station: Station::TanningPit, input: "#hides", with: Some("#bark_tannin"), output: "base:sole_leather", real_days: 365.0 },
     Craft { station: Station::CharcoalClamp, input: "#logs", with: None, output: "base:coal", real_days: 7.0 },
+    // Bronze: a crucible smelt runs hours (a blowpipe crucible fire reached 1,300 °C in 15 min;
+    // the research, C1); a tin ingot for each copper one (the real alloy is 7:1, tin's ore keeps it
+    // scarce: about thirty times rarer than copper's).
+    Craft { station: Station::Crucible, input: "#ingots/copper", with: Some("#ingots/tin"), output: "base:bronze_ingot", real_days: 0.25 },
+    // Steel: iron heated in charcoal for hours, then quenched (C1, C3: 3-7 h in a bloomery).
+    Craft { station: Station::Forge, input: "#ingots/iron", with: Some("#gems/coal"), output: "base:steel_ingot", real_days: 0.5 },
 ];
 
 /// The craft a station does.

@@ -88,6 +88,31 @@ pub fn fog(days: [f32; 4], kind: Fog, season: Option<usize>, key: u64, day: u64,
     thick * fog_hours(kind, hour) * (1.0 - blown)
 }
 
+/// How long wet ground takes to dry once the rain stops, in seconds of play (`DRYING`, as the
+/// engine counts it): seven minutes in mild damp calm air (15 °C, humidity 0.6), twice as fast
+/// for every ten degrees warmer, slower in damp air, faster in a wind; from half a minute (hot,
+/// dry, windy) to an hour (frozen or close to it). Ronald's pick, 11-05: the ground and leaves
+/// stay wet after rain and dry over minutes by the air's warmth and wind.
+pub const DRYING: (f32, f32) = (30.0, 3600.0);
+
+pub fn drying_secs(celsius: f32, humidity: f32, wind: f32) -> f32 {
+    if celsius <= 0.5 {
+        return DRYING.1;
+    }
+    let warmth = 2.0f32.powf(-(celsius - 15.0) / 10.0);
+    let damp = (0.5 + humidity.clamp(0.0, 1.0)) / 1.1;
+    let breeze = 1.0 + wind.max(0.0) / 4.0;
+    // (Seven minutes: at three, a summer forest's ground was dry again within a minute, PC shw2.)
+    (420.0 * warmth * damp / breeze).clamp(DRYING.0, DRYING.1)
+}
+
+/// `drying_secs` as the engine's byte (`air_flags::DRYING_SHIFT`): 1 an hour to 255 half a minute,
+/// spaced evenly in the logarithm.
+pub fn drying_byte(secs: f32) -> u32 {
+    let t = (secs.clamp(DRYING.0, DRYING.1) / DRYING.1).ln() / (DRYING.0 / DRYING.1).ln();
+    1 + (t * 254.0).round() as u32
+}
+
 // ---- snow, blizzards and dust ----
 
 /// Below this air (°C, out in the open, the rain's cooling counted) what falls is snow.
@@ -347,6 +372,18 @@ fn unit(r: u64) -> f32 {
 mod tests {
     use super::*;
     use crate::climate::BIOMES;
+
+    /// Drying: faster warm, dry and windy, an hour when it freezes; the byte runs 1 (an hour) to 255
+    /// (half a minute) as the engine reads it.
+    #[test]
+    fn drying_by_warmth_damp_and_wind() {
+        let mild = drying_secs(15.0, 0.6, 0.0);
+        assert!((mild - 420.0).abs() < 1.0, "{mild}");
+        assert!(drying_secs(30.0, 0.6, 0.0) < mild && drying_secs(15.0, 0.9, 0.0) > mild && drying_secs(15.0, 0.6, 8.0) < mild);
+        assert_eq!(drying_secs(-5.0, 0.6, 0.0), DRYING.1);
+        assert_eq!(drying_byte(DRYING.1), 1);
+        assert_eq!(drying_byte(DRYING.0), 255);
+    }
 
     /// Every biome the per-biome shares name (aurorae, canopies) has a climate row, so a renamed
     /// biome can't silently lose its aurora or its light under the leaves.

@@ -162,6 +162,8 @@ What takes days in real life takes its time on the growing pace (`vitals::crafts
 | tanning_frame | #hides | - | base:leather | 3 | 2.8 min | 1 |
 | tanning_pit | #hides | #bark_tannin | base:sole_leather | 365 | 4.0 game days | 8 |
 | charcoal_clamp | #logs | - | base:coal | 7 | 5.0 min | 16 |
+| crucible | #ingots/copper | #ingots/tin | base:bronze_ingot | 0.25 | 0.5 min | 4 |
+| forge | #ingots/iron | #gems/coal | base:steel_ingot | 0.5 | 0.8 min | 4 |
 
 ## Felling
 

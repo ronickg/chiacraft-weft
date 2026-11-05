@@ -118,6 +118,9 @@ pub struct ClientEntity {
     pub health: f32,
     pub hurt: f32,
     pub worn: Vec<u32>,
+    /// What it wears drawn by its own looks (`abi::comp::WORN_LOOK`), in `worn`'s order; empty
+    /// for an item's own texture.
+    pub worn_looks: Vec<String>,
     /// A player's item in hand, 0 for none, and that stack's own look (`abi::comp::LOOK`).
     pub held: u32,
     pub held_look: Option<String>,
@@ -351,6 +354,7 @@ impl ClientEntity {
             health: f32::NAN,
             hurt: 0.0,
             worn: Vec::new(),
+            worn_looks: Vec::new(),
             held: 0,
             off_held: 0,
             using: None,
@@ -674,6 +678,8 @@ pub struct Client {
     aurora: f32,
     /// How closed the canopy is where the player is (a mod's air, `air_flags::CANOPY_SHIFT`).
     canopy: f32,
+    /// How wet the ground is where the player is, 0..1 (`weather_effects`, `Scene::canopy.y`).
+    wet: f32,
     /// What happens in the sky (`weft_abi::sky_event`, chiacraft), how strongly, and when it began
     /// (`shaders::time`).
     sky_event: (u32, f32, f32),
@@ -1011,6 +1017,7 @@ impl Client {
             dust: 0.0,
             aurora: 0.0,
             canopy: 0.0,
+            wet: 0.0,
             sky_event: (0, 0.0, 0.0),
             sky_landing: None,
             weather_id: 0,
@@ -2314,7 +2321,8 @@ impl Client {
     /// Copies an engine field component into the entity (or the own player) that shows it.
     fn engine_field(&mut self, id: u64, comp: u32, bytes: &[u8]) {
         let c = content();
-        let [health, burning, worn, shape, held, off_held, using, swaps, looping, effect, forced, riding, held_look] = c.game.field_comps;
+        let [health, burning, worn, shape, held, off_held, using, swaps, looping, effect, forced, riding, held_look, worn_looks] =
+            c.game.field_comps;
         let now = self.world.time;
         let f: Vec<f32> = words(bytes).map(f32::from_le_bytes).collect();
         let shaped = || {
@@ -2343,6 +2351,11 @@ impl Client {
             e.burning = bytes.first().is_some_and(|&b| b != 0);
         } else if comp == worn {
             e.worn = words(bytes).map(u32::from_le_bytes).collect();
+        } else if comp == worn_looks {
+            e.worn_looks = String::from_utf8_lossy(bytes)
+                .split('\n')
+                .map(str::to_string)
+                .collect();
         } else if comp == held {
             e.held = words(bytes).next().map_or(0, u32::from_le_bytes);
         } else if comp == held_look {
@@ -2393,6 +2406,19 @@ impl Client {
                 .0
                 .unwrap_or(c.game.entities[c.game.player_kind as usize].size());
         }
+    }
+
+    /// The worn looks of what the local player wears (`abi::comp::WORN_LOOK`), in `worn`'s order.
+    pub fn worn_looks(&self) -> Vec<String> {
+        let c = content();
+        let w = &c.game.player_layout.worn;
+        self.inventory
+            .get(w.start as usize..w.end as usize)
+            .unwrap_or_default()
+            .iter()
+            .filter(|s| !s.is_empty() && c.worn(s.item).is_some())
+            .map(|s| crate::stack::worn_look(s).unwrap_or("").to_string())
+            .collect()
     }
 
     /// Items the local player wears.
@@ -2535,6 +2561,15 @@ impl Client {
             .inventory
             .get(w.start as usize..w.end as usize)
             .map_or(Vec::new(), |s| s.iter().filter(|s| !s.is_empty()).map(|s| s.item).collect());
+        let worn_looks: Vec<String> = self
+            .inventory
+            .get(w.start as usize..w.end as usize)
+            .map_or(Vec::new(), |s| {
+                s.iter()
+                    .filter(|s| !s.is_empty())
+                    .map(|s| crate::stack::worn_look(s).unwrap_or("").to_string())
+                    .collect()
+            });
         let (pos, held, off_held) = (self.smooth_pos(), self.shown_held().item, self.off_held().item);
         let using = self
             .using
@@ -2544,6 +2579,7 @@ impl Client {
         me.held_look = held_look;
         (me.pos, me.target, me.yaw, me.target_yaw, me.pitch) = (pos, pos, self.player.yaw, self.player.yaw, self.player.pitch);
         (me.worn, me.held, me.off_held, me.using) = (worn, held, off_held, using);
+        me.worn_looks = worn_looks;
         (me.arm_swing, me.swing_off, me.pose, me.walked) = (self.hand_swing, self.hand_swing_off, self.player.pose, me.walk);
         me.sprinting = self.player.sprinting && self.player.on_ground;
         me.age = self.start.elapsed().as_secs_f32();
@@ -2647,6 +2683,17 @@ impl Client {
         self.aurora += (aurora - self.aurora).clamp(-dt / 20.0, dt / 20.0);
         let canopy = ((flags >> weft_abi::air_flags::CANOPY_SHIFT) & 255) as f32 / 255.0;
         self.canopy += (canopy - self.canopy).clamp(-dt / 10.0, dt / 10.0);
+        // The ground wets as the rain comes (in about twenty seconds) and dries after it at the
+        // pace the air there gives (a mod's `DRYING_SHIFT`; 0, about two minutes): it stayed wet
+        // only as long as the rain fell, gone 25 s after (Tester 2's after-rain shots, 11-05).
+        let falling = if self.snowing > 0.5 { 0.0 } else { self.look.falls };
+        if falling > self.wet {
+            self.wet = (self.wet + dt / 20.0).min(falling);
+        } else {
+            let drying = (flags >> weft_abi::air_flags::DRYING_SHIFT) & 255;
+            let secs = if drying == 0 { 120.0 } else { 3600.0 * (30.0f32 / 3600.0).powf((drying - 1) as f32 / 254.0) };
+            self.wet = (self.wet - dt / secs).max(falling);
+        }
         let heading = self.world.air.1.to_radians();
         let wind = Vec2::new(heading.sin(), -heading.cos()) * speed;
         self.wind += (wind - self.wind) * (1.0 - (-dt / 4.0).exp());
@@ -2749,7 +2796,7 @@ impl Client {
             options: pack_options(),
             hand: hand.0,
             hand_light: hand.1,
-            canopy: [self.canopy, 0.0, 0.0, 0.0],
+            canopy: [self.canopy, self.wet, 0.0, 0.0],
             // Filled in once the sky has readied them (`render`).
             soft_clouds: [0.0; 4],
             // Filled in once the sky has readied it (`render`).

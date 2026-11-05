@@ -20,6 +20,12 @@ fn rain_amount() -> f32 {
     return clamp(scene.fog_color.w, 0.0, 1.0);
 }
 
+// How wet the ground is where the player is, 0..1: it wets as rain falls and dries over minutes
+// after (`scene.canopy.y`, the engine's, at the pace the base mod's air gives).
+fn ground_wet() -> f32 {
+    return clamp(scene.canopy.y, 0.0, 1.0);
+}
+
 fn luma(c: vec3<f32>) -> f32 {
     return dot(c, vec3(0.2126, 0.7152, 0.0722));
 }
@@ -157,7 +163,8 @@ fn palette_made() -> Palette {
     // Night is dark and blue, a little lighter than vanilla's, so lanterns carry the scene.
     // Night is dark and blue, so firelight's orange stands out against it. (A blue-teal shade, as
     // Valheim's, mixed with the orange of a fire into olive on the ground: Tester 2's campfire.)
-    let night = key(vec3(0.006, 0.010, 0.030), vec3(0.025, 0.035, 0.070), vec3(0.10, 0.13, 0.22), vec3(0.17, 0.21, 0.30) * look_opt(OPT_NIGHT_MOON, 1.0), vec3(0.012, 0.017, 0.030) * look_opt(OPT_NIGHT_LIGHT, 1.0));
+    // (Its horizon a little lighter, so ridges stand against it: 0.025 0.035 0.070 before.)
+    let night = key(vec3(0.006, 0.010, 0.030), vec3(0.032, 0.044, 0.085), vec3(0.10, 0.13, 0.22), vec3(0.17, 0.21, 0.30) * look_opt(OPT_NIGHT_MOON, 1.0), vec3(0.012, 0.017, 0.030) * look_opt(OPT_NIGHT_LIGHT, 1.0));
     // The morning and the late afternoon between: a gold sun and a warm, cream horizon, the shade
     // still blue, so the day runs gold, warm, clear at noon, warm, gold. Golden hour ended 16° up
     // (sun.y 0.28), and on the leaned path of a long summer day the sun is over that from 05:00 to
@@ -189,7 +196,12 @@ fn palette_made() -> Palette {
     // (Night 4, Ronald "a bit lighter": a full moon high 6x, so shapes read and you can walk by it,
     // grass about luma 77 in the grade model; a new moon still a quarter, near black, a torch needed.
     // Its light less blue than it was, 0.17 0.21 0.30: blue 3.4x red turned stone a saturated blue.)
-    p.ambient *= mix(1.0, mix(0.25, 6.0, scene.moon.w), smoothstep(-0.14, -0.3, e));
+    // (Moonlit nights, Ronald's pick of 11-05: with no moon up, a quarter left the land pure black
+    // under the stars from 22:00 to 02:00 at the vista, the night curve's toe swallowing it. 1.6:
+    // the land's shapes, the water and the ridges against the sky faintly there, still far darker
+    // than a full moon's night, with its direct light, and a torch still needed. (At 2.5 the land
+    // read as moonlit, mean luma 26 against 9, the clouds glowing: PC run sh5.)
+    p.ambient *= mix(1.0, mix(1.6, 6.0, scene.moon.w), smoothstep(-0.14, -0.3, e));
     // Overcast: grey and dim, and the sun no more than a brighter part of the sky. A thunderstorm
     // darker again, its sky a moody slate (Bliss's rain: the land darker but in its colours, the
     // sky dark blue-grey). With the sky's light 0.4 of the sun's the land went a bright flat grey
@@ -538,6 +550,16 @@ fn cloud_cell_of(tex: u32, cell: vec2<f32>, origin: vec2<f32>, dims: vec2<f32>, 
     return select(0.0, 1.0, hash3(vec3(w.x, 51, w.y)) < fill);
 }
 
+// Fuzz for the clouds' edges at picture cell `cell` (absolute: the camera's cell plus the place
+// from it), -0.5..0.5: noise about a cell and a third across, so the cells' straight sides break
+// into soft, uneven puffs. The sky's clouds and their shadows both take it, only where a cloud's
+// edge is (its middle and the open sky ask no noise). (Softer clouds, Ronald's pick of 11-05: flat
+// slabs with hard edges and big flat polygons for shadows on the desert, Tester 2's hours sheet.)
+fn cloud_fuzz(cell: vec2<f32>) -> f32 {
+    let w = fract(cell / 4096.0) * 4096.0;
+    return noise3(vec3(w.x * 0.75, 7.3, w.y * 0.75)) - 0.5;
+}
+
 // How much of the sun the clouds let through to `rel` (camera relative): 1 under open sky, about
 // a fifth under a cloud's middle, soft at its edges. The point is followed toward the light to the
 // slab's middle, where the four nearest cells are blended as the sky draws them, so the shadows
@@ -564,11 +586,16 @@ fn cloud_shadow(rel: vec3<f32>) -> f32 {
     let b = cloud_cell_of(tex, base + vec2(1.0, 0.0), o, dims, c.w);
     let d = cloud_cell_of(tex, base + vec2(0.0, 1.0), o, dims, c.w);
     let e = cloud_cell_of(tex, base + vec2(1.0, 1.0), o, dims, c.w);
-    let cover = mix(mix(a, b, u.x), mix(d, e, u.x), u.y);
+    var cover = mix(mix(a, b, u.x), mix(d, e, u.x), u.y);
+    if cover > 0.02 && cover < 0.98 {
+        cover = clamp(cover + cloud_fuzz(base + o + f) * 0.45, 0.0, 1.0);
+    }
     // Fading in as the light climbs: long low shadows from far clouds would smear across the land.
     let lift = smoothstep(0.03, 0.15, l.y);
-    // The sky's puffs fill in over this range of the blend at their middle (`cloud_density`).
-    return 1.0 - 0.8 * smoothstep(0.35, 0.6, cover) * lift;
+    // The sky's puffs fill in over this range of the blend at their middle (`cloud_density`), and
+    // their shade's edge is wider than the cloud's own, a few blocks of soft penumbra (at 0.35-0.6
+    // it was a hard polygon on open sand); a little lighter in the middle (0.8 before).
+    return 1.0 - 0.72 * smoothstep(0.22, 0.75, cover) * lift;
 }
 
 // ---- the rain's cloud deck, shared by the sky and the light ----
@@ -634,7 +661,12 @@ fn held_light(rel: vec3<f32>, n: vec3<f32>) -> vec3<f32> {
     if dot(n, n) > 0.5 {
         facing = mix(0.5, 1.0, clamp(dot(n, to / max(d, 1e-3)), 0.0, 1.0));
     }
-    return max(l - vec3(d / 15.0), vec3(0.0)) * facing;
+    // A warm pool that lights the path ahead and fades into the dark over its eight to ten blocks (Ronald, 11-05: "between the two", Bliss's small pool at the hand and ours, a level a
+    // block to fourteen, which lit the whole night forest like dusk). It still lights the way.
+    // (From 2.5 blocks, gone by 10: at 6-11 all within six blocks kept its full light and a close
+    // forest still read as dusk, PC sht_torch.)
+    let pool = 1.0 - smoothstep(2.5, 10.0, d);
+    return max(l - vec3(d / 15.0), vec3(0.0)) * facing * pool;
 }
 
 // Light arriving at a surface with normal `n`. `light` is the world's (sky, red, green, blue, 0..1),

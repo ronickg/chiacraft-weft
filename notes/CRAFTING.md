@@ -173,10 +173,21 @@ diamond ... I kind of wanted to be a bit more realistic, but not completely". So
   rest (an oak haft, a leather grip on a bow, cordage on stone and wrought iron on metal, leather
   straps and a wool lining on armour). `/gear part <shape> <material>` gives one part, to assemble
   by hand at the table.
-- **Worn armour** shows today's four worn sets until its parts have region textures: a leather
-  look (leather, rawhide, bone shells), a grey one (`_mail`: the irons and steels), a yellow one
-  (`_scale`: copper and bronze), diamond's (`_gem`). They're items of their own only for their worn
-  texture (`parts::ARMOUR_LOOKS`); assembly picks the item by its shell.
+- **Worn armour is drawn from its parts** (11-05, Ronald: "Worn armour art"; after a try of painted
+  skins against box models, "A for all"): each shell material has its own worn set
+  (`base:entity/armor/worn/<material>_1`, `_2` in the skin layout, `looks::WORN_SETS`), painted
+  through game-art from that material's part icons, so a piece looks like its icon: leather a hood
+  and buttoned jerkin, rawhide the same laced with sinew, bone and antler a corded lamellar, the
+  metals plate with a visored helm (copper, bronze, wrought iron, meteoric iron, steel, star steel,
+  each its own colours, copper and bronze muted toward their ingots), diamond painted like the rest
+  with its quilted lattice on the plates. The piece's gems sit at their spots (`looks::worn_look`,
+  `WORN_GEM_SPOTS`; a helmet shows one, on the brow), over an under-layer where the painting rounds the helmet's
+  and pauldrons' corners (no skin shows there): a mail coif and sleeves for a metal fastening,
+  always iron-dark (steel's dark steps; Ronald: "Always iron-dark"), padding for leather, sinew and
+  cord in the fastening's own dark steps (`entity/armor/parts/under_*`), carried on the stack as `core:worn_look` (an engine
+  addition, `notes/ENGINE_CHANGES.md`). A new shell material wears steel's set until it has its own
+  (a check names it). The four look families (`parts::ARMOUR_LOOKS`: `_mail`, `_scale`, `_gem`)
+  stay as items, their own worn sets the fallback, and the pieces' icons.
 
 ### What each material can be
 
@@ -379,8 +390,8 @@ cooler". The modifier slots above become real gem sockets (`crafting::gems`, `mo
   Repairs keep the gems set.
 - **The look:** each gem shows on the icon and in hand at its socket's spot (`looks::GEM_SPOTS`:
   on an axe's or pick's head, a sword's guard and pommel, an armour shell's chest), a 5 px setting
-  (`base:parts/gem/set`) painted with the gem's ramp, made from its cut icon. Kinds without layered
-  art (knife, spear, bow) don't show their gems yet.
+  (`base:parts/gem/set`) painted with the gem's ramp, made from its cut icon. A knife and a spear,
+  with no part art yet, show their gems over their plain icon; the bow on its grip.
 - **For scripts:** `/gear gem <id> [slot=N]` gives a cut gem.
 
 ### Wear and repair, per part

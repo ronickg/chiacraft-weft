@@ -191,7 +191,9 @@ def elements():
          el("skull", "head", *SKULL),
          # A deep, straight snout over a shorter jaw (an overbite hides the mouth's inside).
          el("snout", "head", (-3.5, 37.5, 29), (3.5, 42.5, 38.5), rot=(-3, 0, 0), origin=(0, 40, 29)),
-         el("mouth", "head", (-2.5, 36.6, 29.5), (2.5, 39.2, 36.5)),
+         # Two texels in from the jaw's sides and front (at 2.5 wide and 36.5, 0.8- and 1.7-texel rims of the jaw's top
+         # showed round it under the upturned snout; linecheck).
+         el("mouth", "head", (-1.8, 36.6, 29.5), (1.8, 39.2, 36.3)),
          el("jaw", "jaw", (-3, 34.4, 28.5), (3, 37.8, 37.5))]
     for s, n in ((1, "L"), (-1, "R")):
         za, zb, top, bottom = eye_box(s)
@@ -199,8 +201,11 @@ def elements():
         x0, x1 = (LID_X - h, LID_X) if s > 0 else (-LID_X, -LID_X + h)
         E.append(el(f"eyelid_{n}", f"eyelid_{n}", (x0, top, za), (x1, top, zb), quad="down"))
         ax = 7.25 * s  # the shoulder (x = 6.5) inside both the chest and the arm
-        E.append(el(f"arm_{n}", f"arm_{n}", (ax - 1.5, 23.9, 12), (ax + 1.5, 30, 15.5)))
-        E.append(el(f"forearm_{n}", f"forearm_{n}", (ax - 1.1, 22.5, 13.5), (ax + 1.1, 25.5, 21.5)))
+        # Its bottom under two texels below the forearm's top (at 23.9, 0.7-texel strips of its front showed beside the
+        # forearm, 2.7 long; linecheck).
+        E.append(el(f"arm_{n}", f"arm_{n}", (ax - 1.5, 24.4, 12), (ax + 1.5, 30, 15.5)))
+        # Two texels below the chest (at 22.5, a 1.7-texel band of its side showed under the chest; linecheck).
+        E.append(el(f"forearm_{n}", f"forearm_{n}", (ax - 1.1, 22.2, 13.5), (ax + 1.1, 25.5, 21.5)))
         # Broad wing feathers, like a vulture's, from the forearm; more than 0.5 clear of the
         # thighs' side planes (legs swing about x).
         wx = 9.75 * s
@@ -217,8 +222,10 @@ def elements():
     for s, n in ((1, "L"), (-1, "R")):
         x = 5.2 * s
         E.append(el(f"thigh_{n}", f"leg_{n}_thigh", (x - 4, 17.5, -4.5), (x + 4, 30, 5.5)))
-        E.append(el(f"shin_{n}", f"leg_{n}_shin", (x - 2.6, 8, -3), (x + 2.6, 19.5, 2)))
-        E.append(el(f"foot_{n}", f"leg_{n}_foot", (x - 2, 2, -2.5), (x + 2, 9, 1.5)))
+        # The shin and foot a little thicker, the foot 0.4 past the side toes (at 2, 0.3 of the toes' tops showed beside
+        # it, a half-texel strip; linecheck), the shin 0.4 past the foot.
+        E.append(el(f"shin_{n}", f"leg_{n}_shin", (x - 3.1, 8, -3), (x + 3.1, 19.5, 2)))
+        E.append(el(f"foot_{n}", f"leg_{n}_foot", (x - 2.7, 2, -2.5), (x + 2.7, 9, 1.5)))
         # Three toes, each thinner than the foot: III long and IV outside it on the ground, II
         # inside, held up, with the sickle claw curving up from it.
         E.append(el(f"toe3_{n}", f"leg_{n}_toes", (x - 0.8, 0, -2), (x + 0.8, 2.2, 7.5)))

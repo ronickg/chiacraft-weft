@@ -34,7 +34,7 @@ const DOT_STEP: f32 = 3.0;
 /// The zoom steps; the screen opens at `ZOOM_START`. Zoom spreads the web; the nodes keep their
 /// size (the UI guide's one pixel grid: art only at whole multiples), doubled at the closest step.
 const ZOOMS: [f32; 5] = [0.55, 0.75, 1.0, 1.4, 2.0];
-const ZOOM_START: usize = 0;
+const ZOOM_START: usize = 1;
 /// The zoom from which nodes and links are drawn at twice their size.
 const ZOOM_DOUBLE: f32 = 2.0;
 /// GUI pixels a pan key moves the view, at zoom 1.
@@ -70,6 +70,20 @@ fn change(c: &ClientView, f: impl FnOnce(&mut View)) {
     c.client().rebuild_screen();
 }
 
+/// Opens on the island of the player's highest skill (Melee before any), at the opening zoom,
+/// where its rings read (Ronald, 11-05: "A, with clearer islands"); C goes back to the hub.
+fn open_on_home(c: &ClientView) {
+    let s = c.component(&SKILL_WEB).unwrap_or_default();
+    let best = SKILLS
+        .iter()
+        .copied()
+        .max_by_key(|sk| (s.level(*sk), std::cmp::Reverse(sk.index())))
+        .unwrap_or(vitals::skills::Skill::Melee);
+    let mut v = VIEW.lock().unwrap();
+    v.centre = perks::region_centre(best);
+    v.zoom = ZOOM_START;
+}
+
 /// Perk points the local player has.
 fn points(c: &ClientView, s: &SkillWeb) -> u32 {
     let level = c
@@ -101,6 +115,7 @@ fn signature(c: &ClientView) -> u64 {
 
 pub fn register(r: &mut Registry) {
     r.key(&OPEN, "K").on_press_client(|c| {
+        open_on_home(&c.view());
         c.screen_open(&SCREEN);
     });
     // Rebuilt when a node is taken, a skill rises or a point comes (the server's answer).
@@ -119,6 +134,7 @@ pub fn register(r: &mut Registry) {
     // A tab beside the inventory's own (Stats, Advancements).
     r.screen_part(&Screen::named(crate::window::FAMILY), "tabs", 5, |ui| {
         ui.button("web.base.tab", S::default().class("tab").h(13.0).pad(2.0), |c| {
+            open_on_home(c);
             c.client().screen_open(&SCREEN);
         });
     });
@@ -441,11 +457,18 @@ fn picker(ui: &mut Ui, c: &ClientView, socket: u16) {
             ui.text_styled(S::default().no_wrap(), "web.base.pick", &[]);
         }
         for (slot, st) in stones {
+            // Its rolls, as a socketed stone's tooltip says them (an item in a button has none).
+            let (tip, args) = STONE
+                .on_stack_own(&st)
+                .and_then(|d| d.stone())
+                .map_or(("web.base.pick".to_string(), Vec::new()), |stone| stone_tooltip(stone, "pick"));
+            let args: Vec<Arg> = args.iter().map(|a| a.as_arg()).collect();
             ui.button_with(
                 S::default()
                     .class("slot")
                     .size(PICK_ICON + 2.0, PICK_ICON + 2.0)
-                    .center(),
+                    .center()
+                    .tooltip_args(&tip, &args),
                 move |c| {
                     c.client()
                         .send(&crate::skills::SOCKET, &((socket as u32) << 16 | slot));
@@ -461,10 +484,16 @@ fn picker(ui: &mut Ui, c: &ClientView, socket: u16) {
 
 /// A socket's tooltip: empty with its state, or its stone and what it does.
 fn socket_tooltip(stone: Option<vitals::sockets::Stone>, st: State) -> (String, Vec<A>) {
-    use vitals::sockets::{Flow, Kind as K};
     let Some(stone) = stone else {
         return ("web.base.tip.socket".into(), vec![A::Int(perks::SOCKET_POINTS as i64), A::Key(st.key().into())]);
     };
+    stone_tooltip(stone, "stone")
+}
+
+/// A stone's tooltip: its name, item level and what it does, one line a boost (`web.base.tip.<kind><n>`:
+/// "stone" in a socket, "pick" in the picker).
+fn stone_tooltip(stone: vitals::sockets::Stone, kind: &str) -> (String, Vec<A>) {
+    use vitals::sockets::{Flow, Kind as K};
     let mut args = vec![A::Key(format!("item.base.{}", stone.kind.id())), A::Int(stone.level as i64)];
     let mut lines = 0;
     for (f, units) in stone.rolls.iter().flatten() {
@@ -490,7 +519,7 @@ fn socket_tooltip(stone: Option<vitals::sockets::Stone>, st: State) -> (String, 
         }
         _ => {}
     }
-    (format!("web.base.tip.stone{lines}"), args)
+    (format!("web.base.tip.{kind}{lines}"), args)
 }
 
 /// An owned tooltip argument.

@@ -55,7 +55,7 @@ At full rate means work at or above one's skill: Stone Age work at skill 7 teach
 
 ## The web
 
-345 nodes (221 small, 80 notables, 16 keystones, 28 sockets) in 16 regions around a free start, 426 links. A small node gives 2 % to its family, a notable 3-4 times that, a keystone 40 % to one family for as much off another. A family tops out at ×1.6 (one age), a keystone's cost at ×0.6. A rare item refunds 3 nodes, each one the rest don't hang from.
+355 nodes (231 small, 80 notables, 16 keystones, 28 sockets) in 16 regions around a free start, 436 links. A small node gives 2 % to its family, a notable 3-4 times that, a keystone 40 % to one family for as much off another. A family tops out at ×1.6 (one age), a keystone's cost at ×0.6. A rare item refunds 3 nodes, each one the rest don't hang from.
 
 Skill level each ring needs (rings 9-12 are room for later ages at the rim):
 
@@ -94,15 +94,15 @@ A region's budget is 30 units (one age in its speciality); keystones count as no
 | ranged damage | 42 | later |
 | spell damage | 40 | later |
 | defence | 75 | yes |
-| health | 44 | yes |
+| health | 46 | yes |
 | tame damage | 42 | later |
-| taming speed | 15 | yes |
-| craft grade | 71 | later |
+| taming speed | 16 | yes |
+| craft grade | 73 | later |
 | gathering speed | 27 | later |
 | mining speed | 40 | yes |
 | move speed | 50 | yes |
-| mana cost | 63 | later |
-| stamina | 34 | yes |
+| mana cost | 65 | later |
+| stamina | 37 | yes |
 | slower hunger | 39 | yes |
 | cooking | 40 | yes |
 | harvest | 38 | yes |
@@ -146,24 +146,24 @@ Each job's build is hill-climbed with 60 points at skill 45 everywhere, then sco
 
 | Build (points spent) | fighter | archer | tamer | miner | smith | farmer and cook | mage | explorer |
 |---|---|---|---|---|---|---|---|---|
-| fighter (44) | ×2.88 | ×2.03 | ×1.85 | ×1.94 | ×1.80 | ×1.85 | ×2.11 | ×1.98 |
-| archer (44) | ×1.89 | ×2.44 | ×1.51 | ×1.50 | ×1.50 | ×1.51 | ×1.71 | ×1.87 |
-| tamer (46) | ×1.86 | ×1.74 | ×2.82 | ×1.72 | ×1.69 | ×1.74 | ×1.81 | ×1.71 |
-| miner (44) | ×1.94 | ×1.81 | ×1.92 | ×2.38 | ×1.82 | ×1.87 | ×1.91 | ×1.96 |
-| smith (46) | ×1.68 | ×1.63 | ×1.62 | ×1.65 | ×2.44 | ×1.62 | ×1.62 | ×1.63 |
-| farmer and cook (44) | ×1.73 | ×1.72 | ×1.74 | ×1.69 | ×1.69 | ×2.94 | ×1.84 | ×1.89 |
-| mage (40) | ×1.84 | ×1.69 | ×1.51 | ×1.51 | ×1.50 | ×1.51 | ×2.68 | ×1.50 |
-| explorer (44) | ×2.01 | ×2.18 | ×1.85 | ×2.04 | ×1.78 | ×1.92 | ×1.85 | ×2.83 |
+| fighter (50) | ×2.80 | ×1.72 | ×1.51 | ×1.68 | ×1.54 | ×1.51 | ×1.63 | ×1.72 |
+| archer (48) | ×2.11 | ×2.36 | ×1.62 | ×1.63 | ×1.63 | ×1.62 | ×1.76 | ×1.91 |
+| tamer (40) | ×1.60 | ×1.42 | ×2.51 | ×1.42 | ×1.40 | ×1.40 | ×1.43 | ×1.40 |
+| miner (48) | ×1.84 | ×1.63 | ×1.69 | ×2.43 | ×1.63 | ×1.62 | ×1.63 | ×2.06 |
+| smith (40) | ×1.46 | ×1.40 | ×1.40 | ×1.44 | ×2.35 | ×1.40 | ×1.40 | ×1.40 |
+| farmer and cook (37) | ×1.40 | ×1.40 | ×1.40 | ×1.40 | ×1.44 | ×2.59 | ×1.44 | ×1.56 |
+| mage (46) | ×1.85 | ×1.67 | ×1.51 | ×1.50 | ×1.50 | ×1.51 | ×2.68 | ×1.50 |
+| explorer (47) | ×1.82 | ×1.96 | ×1.62 | ×1.97 | ×1.60 | ×1.68 | ×1.62 | ×2.70 |
 
 Most picked nodes:
 
 | Node | Builds |
 |---|---|
-|  socket (ring 2.6) | 7 of 8 |
-|  socket (ring 2.6) | 6 of 8 |
-|  socket (ring 2.6) | 6 of 8 |
-|  socket (ring 2.6) | 6 of 8 |
-| archery family.ranged_damage (ring 1) | 6 of 8 |
-| archery family.move_speed (ring 2) | 6 of 8 |
-| mining family.mine_speed (ring 1) | 5 of 8 |
-| mining family.stamina (ring 2) | 5 of 8 |
+|  family.stamina (ring 0.6) | 4 of 8 |
+|  family.stamina (ring 1.5) | 4 of 8 |
+|  socket (ring 2.6) | 3 of 8 |
+|  socket (ring 2.6) | 3 of 8 |
+|  family.health (ring 0.6) | 3 of 8 |
+|  family.health (ring 1.5) | 3 of 8 |
+|  family.stamina (ring 1.5) | 3 of 8 |
+| defence family.defence (ring 5.5) | 3 of 8 |

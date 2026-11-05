@@ -103,6 +103,10 @@ def rotm(rot):
 def geometry(c):
     """The parts' sizes and places from the knobs, in the raven's units."""
     hs, bw = c["head"], c["body_w"]
+    T = 1.0 / (c["TX"] * c["K"])  # a texel, in the raven's units
+    # The shin two texels thick at least, as painted (a texel thick, it read as a line under the thigh; linecheck).
+    shin = max(c["shin"], 0.78 * T)
+    thigh = max(1.1, c["shin"] + 0.6, shin + 0.35 / c["K"])  # a size bigger than the shin (a thickened one: a flush step)
     cy, cz = 18.0 + c["head_y"], 11.25
     hx, hy, hz = 2.6 * hs, 2.5 * hs, 2.75 * hs
     skull = ((-hx, cy - hy, cz - hz), (hx, cy + hy, cz + hz))
@@ -121,7 +125,7 @@ def geometry(c):
                 side=side, hand_x=hand_x, arm_end=side - 0.8 + 15.2 * w["arm"], hand_end=hand_x - 0.4 + 20.6 * w["hand"],
                 prim_end=hand_x - 0.2 + 21.4 * w["hand"], flight_z0=2.4 - 9.9 * w["chord"], prim_z0=2.8 - 9.3 * w["chord"],
                 tail_end=-5.0 - 14.6 * t["len"], fan_end=-8.0 - 13.0 * t["len"], tail_w=2.2 * t["w"], fan_w=3.6 * t["w"],
-                leg_x=min(1.9 * bw, 3.4 * bw - max(1.1, c["shin"] + 0.6) - 0.4 / c["K"]), fold_end=-4.0 - 11.0 * w["folded"], eye=eye,
+                leg_x=min(1.9 * bw, 3.4 * bw - thigh - 0.4 / c["K"]), T=T, shin=shin, thigh=thigh, fold_end=-4.0 - 11.0 * w["folded"], eye=eye,
                 fan_z1=-8.0, fold_z1=-4.0, prim_x0=hand_x - 0.2, prim_z1=2.8, fold_y=12.0, fold_h=2.0, u=1.0)  # u: the feathers' wiggles, in raven units
 
 
@@ -218,16 +222,25 @@ def elements(c):
 def raven_elements(c):
     g = G
     bw, t = c["body_w"], c["tail"]
+    T = g["T"]
+    two = 0.78 * T  # half of a part two texels thick as painted (a face 1.56 texels across paints 2)
     E = [el("hips", "spine_0", (-3.4 * bw, 9.0, -7.2), (3.4 * bw, 16.0, 1.4)),
          el("chest", "spine_1", (-4.0 * bw, 8.4, -0.4), (4.0 * bw, 16.6, 8.4))]
     if c["neck"]:
         nw, nz = 2.0 * c["neck_w"], 7.7 + (1 - c["neck_w"])  # a thin neck still holds both its joints
-        y0, y1, z0, z1 = c.get("neck_box") or (12.4, 18.2, nz - 2.7 * c["neck_w"], nz + 2.7 * c["neck_w"])
+        if g["side"] - nw < 2.05 * T:  # the chest's top beside it two texels wide (under two, a line along the neck; linecheck)
+            nw = min(nw, g["side"] - 2.1 * T)
+        bottom = g["skull"][0][1]  # its throat, before the chest and under the head, two texels deep (1.85 read as a strip; linecheck)
+        # Where it shows over the chest's top (16.6) and before its front (8.4), flush or two texels out (at
+        # 18.2 and 10.4, 1-1.75 texels read as a rim round the neck's root and a strip of throat; linecheck).
+        y0, y1, z0, z1 = c.get("neck_box") or (min(12.4, bottom - 2.1 * T), 16.6 + clear(1.6, c, T), nz - 2.7 * c["neck_w"],
+                                               8.4 + clear(nz + 2.7 * c["neck_w"] - 8.4, c, T))
         E.append(el("neck", "neck", (-nw, y0, z0), (nw, y1, z1)))  # deep in the head
     E += [el("skull", "head", *g["skull"]),
           el("bill", "head", *g["bill"], rot=(c["bill"]["rot"], 0, 0), origin=(0, (g["bill"][0][1] + g["bill"][1][1]) / 2, g["front"] - 0.5)),
           el("jaw", "jaw", *g["jaw"]),  # shorter than the bill
-          el("tail", "tail", (-g["tail_w"], 13.2 - max(0.6, 0.4 / c["K"]), g["tail_end"]), (g["tail_w"], 13.2 + max(0.6, 0.4 / c["K"]), -5.0)),
+          # Two texels thick at least (a texel thick, its sides read as a line out of the hips; linecheck).
+          el("tail", "tail", (-g["tail_w"], 13.2 - max(0.6, 0.4 / c["K"], two), g["tail_end"]), (g["tail_w"], 13.2 + max(0.6, 0.4 / c["K"], two), -5.0)),
           el("tail_fan", "tail", (-g["fan_w"], 13.2, g["fan_end"]), (g["fan_w"], 13.2, -8.0), quad="up", cut="tail")]
     if c["bill"]["hook"]:  # the hooked tip, turned down over the jaw
         (bx0, by0, bz0), (bx1, by1, bz1) = g["bill"]
@@ -236,29 +249,41 @@ def raven_elements(c):
                     rot=(c["bill"]["rot"] + 38, 0, 0), origin=(0, by1 - 0.4, bz1 - 0.6)))
     for s, n in ((1, "L"), (-1, "R")):
         side = g["side"]
-        x0, x1 = sorted((s * (side - 0.4), s * (side + 0.9)))
+        # On the chest's side, not in it (from side - 0.4, raised flush with the back, it hid the chest's top
+        # but for a strip under two texels beside the neck; linecheck).
+        wt = max(0.9, 2 * two)  # two texels thick (no boxes a texel thick: at 0.9 it was 0.6-0.9 texels; SKILL.md)
+        x0, x1 = sorted((s * side, s * (side + wt)))
         # Folded along the side, the primaries crossing over the tail's base.
-        E.append(el(f"wingf_{n.lower()}", f"wingf_{n}", (x0, 10.6, -6.0), (x1, 15.9, 7.0)))
-        px = s * (side + 0.3)
+        # Its top just over the chest's (16.6): flush (at 15.9 the wing's top, a texel wide beside the chest,
+        # read as a line along the back; linecheck).
+        E.append(el(f"wingf_{n.lower()}", f"wingf_{n}", (x0, 10.6, -6.0), (x1, 16.6 + 0.45 / c["K"], 7.0)))
+        px = s * (side + wt / 2)  # mid-wing: clear of its inner face, now on the chest's side (at + 0.3 they flickered)
         E.append(el(f"primariesf_{n.lower()}", f"wingf_{n}", (px, 10.4, g["fold_end"]), (px, 14.4, -4.0), quad="east" if s > 0 else "west",
                     cut="folded"))
         # Open: the arm, the hand, and the flight feathers behind them as cut-out panels.
         ax0, ax1 = sorted((s * (side - 0.8), s * g["arm_end"]))
-        ta = max(0.9, 0.42 / c["K"])  # thick enough round its feather panel, however small the bird
+        # The hand two texels thick at least (no boxes a texel thick: thinner, its front and back read as lines
+        # beside the arm; linecheck), and the arm round it with a flush step, so the arm too is two texels
+        # and more (thinner, its front and back read as lines beside the chest).
+        th = max(0.45, 0.4 / c["K"], two)
+        ta = max(0.9, 0.42 / c["K"], 2 * two / 1.95, (th + 0.35 / c["K"]) / 0.95)  # thick enough round its feather panel
         E.append(el(f"wing_{n.lower()}", f"wing_{n}", (ax0, 14.9 - ta, 1.8), (ax1, 14.9 + ta * 0.95, 8.0)))
         hx0, hx1 = sorted((s * (g["hand_x"] - 0.4), s * g["hand_end"]))
-        th = max(0.45, 0.4 / c["K"])
         E.append(el(f"hand_{n.lower()}", f"hand_{n}", (hx0, 14.9 - th, 2.2), (hx1, 14.9 + th, 7.0)))
         fx0, fx1 = sorted((s * (side - 0.4), s * (g["hand_x"] - 0.4)))
         E.append(el(f"flight_{n.lower()}", f"wing_{n}", (fx0, 14.9, g["flight_z0"]), (fx1, 14.9, 2.4), quad="down", cut="secondaries"))
         gx0, gx1 = sorted((s * (g["hand_x"] - 0.2), s * g["prim_end"]))
         E.append(el(f"primaries_{n.lower()}", f"hand_{n}", (gx0, 14.9, g["prim_z0"]), (gx1, 14.9, 2.8), quad="down", cut="primaries"))
         x = s * g["leg_x"]
-        sh, tf = c["shin"], c["toes"]
-        th = max(1.1, sh + 0.6)  # the thigh a size bigger than the shin
+        sh, tf = g["shin"], c["toes"]
+        th = g["thigh"]  # the thigh a size bigger than the shin
         E.append(el(f"thigh_{n.lower()}", f"leg_{n}_thigh", (x - th, 5.9, -2.0 - 2 * (th - 1.1)), (x + th, 11.0, 0.8)))  # feathered
         E.append(el(f"shin_{n.lower()}", f"leg_{n}_shin", (x - sh, 0.8, -0.6 - sh * 1.0), (x + sh, 6.6, -0.6 + sh * 1.0)))
-        E.append(el(f"toes_{n.lower()}", f"leg_{n}_toes", (x - 1.1 * tf, 0.0, -0.6 - 2.0 * tf), (x + 1.1 * tf, 1.2, -0.6 + 3.2 * tf)))
+        # Round the shin each edge of the toes flush with it or out two texels or more (a texel and a half
+        # out, the toes' top read as a line round the shin; linecheck).
+        ox, of, ob = (clear(o, c, T, out) for o, out in ((1.1 * tf - sh, False), (3.2 * tf - sh, True), (2.0 * tf - sh, True)))
+        toe_h = max(1.2, 2 * two * LEG_Y / (LEG_Y + c["D"]))  # two texels tall, as warped (no boxes a texel thick; SKILL.md)
+        E.append(el(f"toes_{n.lower()}", f"leg_{n}_toes", (x - sh - ox, 0.0, -0.6 - sh - ob), (x + sh + ox, toe_h, -0.6 + sh + of)))
         if c["tufts"]:
             th, tw = c["tufts"]
             (sx0, sy0, sz0), (sx1, sy1, sz1) = g["skull"]
@@ -270,6 +295,16 @@ def raven_elements(c):
         if e["origin"]:
             e["origin"] = [float(v) for v in warp(e["origin"], c)]
     return E
+
+
+def clear(o, c, T, out=True):
+    """How far a box's edge stands out from the box it lies in (raven units; `T` a texel): as asked
+    when that is flush (under 0.6 units: at least 0.3 apart, or they flicker) or two texels or more;
+    a step between would show a strip under two texels, a thin line (linecheck): then flush, or
+    with `out` two texels out."""
+    if 0.3 <= o * c["K"] < 0.6 or o >= 2.05 * T:
+        return o
+    return 2.1 * T if out and o * c["K"] >= 0.6 else 0.45 / c["K"]
 
 
 def add_eyelids(c, E):
