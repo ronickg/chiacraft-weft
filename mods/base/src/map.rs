@@ -233,15 +233,17 @@ pub fn register(r: &mut Registry) {
         s.mini_zoom = (s.mini_zoom + 1) % n::MINI_ZOOMS.len();
         s.mini_painted = None;
     });
-    // The picture inside the frame; the frame (a bar always full, its fill clear) hides with the
-    // setting, and the picture is cleared then (`minimap`).
+    // The frame (a bar always full, its fill clear) under the picture: the picture is opaque and
+    // covers the frame's middle, leaving its rim (the frame on top stretched its middle over the
+    // picture: PC look wm_mini1). The frame hides with the setting, and the picture is cleared then
+    // (`minimap`).
     let (px, fr) = (n::MINI_PX as f32, n::MINI_FRAME);
     r.hud_element(&MINIMAP, hud_anchor::TOP_RIGHT, 2, move |ui| {
         ui.column(S::column().size(px + 2.0 * fr, px + 2.0 * fr), |ui| {
-            ui.column(S::column().size(px, px).at(fr, fr), |ui| ui.image(MINI_IMAGE, px, px));
             ui.progress_bind("minimap", S::default().size(px + 2.0 * fr, px + 2.0 * fr).at(0.0, 0.0), |c| {
                 if MINIMAP_ON.get() && crate::ley::seed_here(c).is_some() { 1.0 } else { -1.0 }
             });
+            ui.column(S::column().size(px, px).at(fr, fr), |ui| ui.image(MINI_IMAGE, px, px));
         });
     });
     r.screen(&SCREEN, screen).on_key(|c, key| {
