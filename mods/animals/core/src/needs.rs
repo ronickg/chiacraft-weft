@@ -231,6 +231,12 @@ pub fn thirst_score(water: f32, drinking: bool) -> f32 {
     need_score(water, THIRSTY, DRINK_FLOOR, drinking)
 }
 
+/// `thirst_score` from `start` instead of `THIRSTY` (a plant eater's dawn and dusk drink,
+/// `routines::DRINKS_AT`).
+pub fn thirst_score_from(water: f32, start: f32, drinking: bool) -> f32 {
+    need_score(water, start.max(THIRSTY), DRINK_FLOOR, drinking)
+}
+
 fn need_score(have: f32, start: f32, floor: f32, at_it: bool) -> f32 {
     if have >= start && !at_it {
         return 0.0;

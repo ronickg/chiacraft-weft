@@ -83,7 +83,11 @@ fn scores(w: &World, id: u64, doing: u8) -> [f32; 10] {
             .map_or(1.0, |i| crate::routines::activity(w, i));
         let fed = a.food as f32 / a.stat(crate::species::FOOD).max(1.0);
         s[Need::Eat as usize] = needs::hunger_score(fed, at(Need::Eat));
-        s[Need::Drink as usize] = needs::thirst_score(1.0 - a.thirst, at(Need::Drink));
+        // A plant eater drinks at dawn and dusk from more water left (`routines::DRINKS_AT`), as
+        // its drink goal does.
+        let dusk = a.species().is_some_and(|s| s.forages_wild()) && animals_core::routines::drinking_hour(crate::routines::hour(w));
+        let start = if dusk { animals_core::routines::DRINKS_AT } else { needs::THIRSTY };
+        s[Need::Drink as usize] = needs::thirst_score_from(1.0 - a.thirst, start, at(Need::Drink));
     }
     s[Need::Comfort as usize] = match w
         .component(id, &BODY)
