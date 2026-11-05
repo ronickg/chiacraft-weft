@@ -818,13 +818,13 @@ and cactus.**
 
 **Built in part (2026-11-03).**
 - **Dung pats** (2026-11-05, `vitals::soil`, `base:dung_pat`): a grazer drops a pat where it
-  stands on the soil every 20 mouthfuls (`MOUTHFULS_A_PAT`), never within 2 blocks of another
+  stands on the soil every 100 mouthfuls (`MOUTHFULS_A_PAT`; 20 when a tuft fed 10), never within 2 blocks of another
   (off the soil, the dung as an item). A pat rots by the plant rule, 45 real days at 20-30 °C
   and wet (dung beetles, fungi): about 16-25 minutes in a warm wet season, longer dry or cold,
   never past 3 game days (`PAT_MOST_DAYS`, frost and hooves), and leaves a tuft of fresh grass.
   While it lies, grazed grass within 2 blocks grows back twice as fast. Broken, it gives the dung
   (compost, farmland). A block is far bigger than a real pat, so they are rarer than droppings:
-  at most 0.8% of a herd's ground at once in any biome (`animals_core::web`, the "carpeted in
+  at most 0.7% of a herd's ground at once in any biome (`animals_core::web`, the "carpeted in
   dung" check; the species sheet's grazing column), as in a grazed pasture.
 - **The compost bin** (`base:compost_bin`, crafted from planks) takes spoiled food of any kind,
   dung, rotten flesh, leaves, saplings, wheat and seeds (`vitals::soil::COMPOSTS`). Full, it
@@ -920,10 +920,13 @@ The world's food (`vitals::forage::SOURCES`) gained winter's standing hay, decid
 fallen mast, lichen (the tundra's and taiga's ground, the mountains' rocks), fungi, roots dug
 from the ground, insects in the grass, sand and the north's summer, and reeds and horsetails as
 water plants. A year holds too (`web::grazing`): in each biome's best season for grass, its
-grazers, as many of each as live together, eat at most 18% of what its tall grass grows back (the
-mountains; the plains 3%): nothing grazes a biome bare. That is far under what real grazers take
-of a grassland (a quarter to a half), so tall grass rarely looks grazed down but round a herd; a
-choice for later. The grass cover is now `vitals::forage::GRASS_COVER`, which the world reads.
+grazers eat a quarter to a half of what its tall grass grows back, as real grazers take of a
+grassland (Ronald 11-05, "Real levels, 25-50%"; `vitals::forage::GRAZED`, checked both ways:
+"hardly grazed" under, "grazed bare" over). Two levers got there: Animals' stocking per biome
+(`Species::crowd_in`, the savanna 2.5 to the sequoia grove 0.09) and a smaller mouthful, a tuft
+of tall grass feeding 2, not 10 (`vitals::forage::SOURCES`), so a grazer crops five tufts for what
+it ate of one. The best seasons now land at 28% (the savanna) to 48% (the sequoia grove), the rest
+34-37%. The grass cover is `vitals::forage::GRASS_COVER`, which the world reads.
 
 These are like `places.rs`: they read the tables, so a new biome, plant or species is checked
 the moment it's added.

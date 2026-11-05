@@ -124,9 +124,10 @@ fn web(w: &mut String) {
         "Each biome's web, from the species' habitats and diets and the world's plant food (`core/src/web.rs`). \
          Plant food is how much of any plant eater's food grows or is found there in each season, against fresh growth \
          at its best (`vitals::forage`); the farm animals' wild kinds graze every overworld land biome. Grazing: in \
-         the best season for grass, what its grazers eat a day (as many of each as live together, `crowd`, by how \
-         common there) against what its tall grass grows back within the crowd's radius, and the most of that ground \
-         their dung pats cover at once (`vitals::soil`), in the season they lie longest.\n"
+         the best season for grass, what its grazers eat a day (as many of each as live together, `crowd_in`, the \
+         biome's stocking) against what its tall grass grows back within the crowd's radius, real grazing's quarter \
+         to half (`vitals::forage::GRAZED`, checked), and the most of that ground their dung pats cover at once \
+         (`vitals::soil`), in the season they lie longest.\n"
     );
     let _ =
         writeln!(w, "| Biome | Plant food (spring, summer, autumn, winter) | Grazing (best season) | Plant eaters | Hunters | Carrion |");

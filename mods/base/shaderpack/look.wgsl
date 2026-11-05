@@ -46,6 +46,19 @@ const OPT_NIGHT_LIGHT: u32 = 10u;
 const OPT_NIGHT_MOON: u32 = 11u;
 const OPT_CANOPY: u32 = 12u;
 const OPT_SHAFTS: u32 = 13u;
+// The Fantasy group (round 17; `mods/base/src/video.rs`, rows UI made): read raw with `fantasy_opt`,
+// as their 0 is off, where `look_opt` takes 0 for a setting not found.
+const OPT_STORYBOOK: u32 = 15u;
+const OPT_NIGHT_SKY: u32 = 16u;
+const OPT_SHOOTING_STARS: u32 = 17u;
+const OPT_MOON_SIZE: u32 = 18u;
+const OPT_GLOW: u32 = 19u;
+const OPT_BIOME_AIR: u32 = 20u;
+const OPT_SPARKLE: u32 = 21u;
+
+fn fantasy_opt(i: u32) -> f32 {
+    return scene.options[i / 4u][i % 4u];
+}
 
 fn look_opt(i: u32, missing: f32) -> f32 {
     let v = scene.options[i / 4u][i % 4u];
@@ -161,6 +174,26 @@ fn palette() -> Palette {
     p.sun = p.sun * (1.0 - r * 0.9);
     // At night rain and its clouds darken the sky's light too (by day overcast only greys it).
     p.ambient *= mix(1.0, 1.0 - 0.6 * r, smoothstep(-0.14, -0.3, e));
+    // A storybook hour (round 17, rec. 2; `base:look_storybook`, 0 to 1): at golden hour and blue
+    // hour the shade goes lavender (Solas's 205 184 236) while the sun stays orange, the blue
+    // hour's zenith violet; at night the moon's light silver-blue (a 15000 K blackbody, Bliss's),
+    // not muddy green. Clear skies only: rain keeps its greys.
+    let tale = clamp(fantasy_opt(OPT_STORYBOOK), 0.0, 1.0) * (1.0 - r);
+    if tale > 0.0 {
+        // Blue hour: the sun just under the horizon, to about 14° below (it fell short of the
+        // 18:57 check at -0.2..-0.08).
+        let blue_hour = smoothstep(0.04, -0.02, e) * smoothstep(-0.32, -0.16, e);
+        // (`golden()` by hand: `palette` has a local of that name.)
+        let gold_hour = (1.0 - smoothstep(0.08, 0.35, e)) * smoothstep(-0.06, 0.03, e);
+        let hour = max(gold_hour, blue_hour);
+        // At 0.92 0.82 1.18 the lavender hardly showed at a sheet's size (the storybook check, 11-05).
+        p.ambient = mix(p.ambient, vec3(luma(p.ambient)) * vec3(0.95, 0.72, 1.4) * 1.15, tale * hour * 0.9);
+        p.horizon = mix(p.horizon, vec3(luma(p.horizon)) * vec3(1.08, 0.8, 1.15), tale * hour * 0.45);
+        p.zenith = mix(p.zenith, vec3(luma(p.zenith)) * vec3(0.8, 0.55, 1.6), tale * blue_hour * 0.8);
+        let moonlit = smoothstep(-0.14, -0.3, e);
+        p.sun = mix(p.sun, vec3(luma(p.sun)) * vec3(0.78, 0.9, 1.16), tale * moonlit);
+        p.ambient = mix(p.ambient, vec3(luma(p.ambient)) * vec3(0.82, 0.92, 1.12), tale * moonlit * 0.6);
+    }
     return p;
 }
 
@@ -185,11 +218,33 @@ fn light_dir() -> vec3<f32> {
 
 // How much of the palette's direct light there is: it fades out as the sun sets and the moon comes
 // up a little after.
+// ---- sky events (`scene.sky_event`: a blood moon, meteors, a fireball, an aurora storm) ----
+// Round 17, rec. 6, with gameplay (Ronald, "Gameplay too"): the base mod's schedule says when
+// (`vitals::events`), the pack draws them; none when `base:fx_sky_events` is off (nothing is sent).
+
+// How strong the sky event of `kind` (`weft_abi::sky_event`) is now, 0 when another or none.
+fn sky_event(kind: f32) -> f32 {
+    return select(0.0, clamp(scene.sky_event.y, 0.0, 1.0), abs(scene.sky_event.x - kind) < 0.5);
+}
+
+// The blood moon, 0..1: under 0.5 its copper dusk, 1 totality.
+fn blood_moon() -> f32 {
+    return sky_event(1.0);
+}
+
+// The moon's colour on a blood moon night: copper as it reddens, a deep red in totality.
+fn blood_tint() -> vec3<f32> {
+    let b = blood_moon();
+    return mix(vec3(1.0), mix(vec3(1.0, 0.45, 0.2), vec3(0.75, 0.06, 0.02), smoothstep(0.5, 1.0, b)), smoothstep(0.0, 0.35, b));
+}
+
 fn light_strength() -> f32 {
     let e = scene.sun.y;
     // At night the moon's light: its phase times how high it stands (`scene.moon.w`), none when it
     // is down or new.
-    return select(smoothstep(0.06, 0.2, -e) * scene.moon.w, smoothstep(-0.04, 0.05, e), e > -0.06);
+    // In a blood moon's totality the night is as dark as a new moon's (round 17's design).
+    let moon = scene.moon.w * mix(1.0, 0.12, smoothstep(0.5, 1.0, blood_moon()));
+    return select(smoothstep(0.06, 0.2, -e) * moon, smoothstep(-0.04, 0.05, e), e > -0.06);
 }
 
 // ---- the sky ----
@@ -222,7 +277,8 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     // The glow about the moon where it stands, as bright as its light (`scene.moon.w`): on a new
     // moon there is none, and a glow alone read as a dark-blue ring (the world playtester's nights).
     let moon = pow(max(dot(dir, scene.moon.xyz), 0.0), 24.0) * smoothstep(-0.05, -0.25, scene.sun.y) * scene.moon.w;
-    c += vec3(0.05, 0.07, 0.12) * moon;
+    // On a blood moon its glow goes copper, then red.
+    c += vec3(0.05, 0.07, 0.12) * mix(vec3(1.0), blood_tint() * vec3(2.0, 1.4, 1.0), smoothstep(0.0, 0.4, blood_moon())) * moon;
     if dir.y < 0.0 {
         // Below the horizon it darkens a little toward the ground the haze stands on.
         c = mix(c, p.horizon * 0.6 + p.ambient * 0.2, smoothstep(0.0, 0.4, -dir.y));
@@ -432,6 +488,16 @@ fn held_light(rel: vec3<f32>, n: vec3<f32>) -> vec3<f32> {
 
 // Light arriving at a surface with normal `n`. `light` is the world's (sky, red, green, blue, 0..1),
 // `shadow` 1 where the sun reaches it, `ao` the corner shading, `rel` where it is from the camera.
+// How much of block light shows where the sky's light is `sky` (0..1): all of it at night and
+// under cover, a quarter in the open by day. Vanilla takes the brighter of the two, not their sum:
+// summed, a lamp's level 15 at noon washed the stone about it out to a pale, glassy blue (First
+// hours' Starheart lantern, 11-05).
+fn block_by_day(sky: f32) -> f32 {
+    // By the sun's height, not the daylight value: that stays above zero at night, and a torch
+    // at midnight lost some of its warmth.
+    return 1.0 - 0.75 * smoothstep(0.5, 1.0, sky) * smoothstep(0.0, 0.25, scene.sun.y);
+}
+
 fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let p = palette();
     // The sky's light falls off steeply under cover (Bliss's lightmap, (L^15 x 2 + L^2.5) / 3: 1 in the
@@ -465,7 +531,7 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>
     let open = smoothstep(mix(0.5, 0.25, c_open), mix(0.95, 0.55, c_open), light.x);
     c += p.sun * light_strength() * sun_facing(n) * shadow * open * mix(0.75, 1.0, ao);
     // A held torch's light where it is brighter than the placed lights there (no doubling).
-    c += block_light(max(light.yzw, held_light(rel, n)), pos) * mix(0.5, 1.0, ao);
+    c += block_light(max(light.yzw, held_light(rel, n)), pos) * mix(0.5, 1.0, ao) * block_by_day(light.x);
     // A floor so caves are never quite black: the dimension's own and the Brightness setting.
     let floor_light = max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y));
     c += vec3(floor_light) * vec3(0.85, 0.9, 1.0) * ao;
@@ -478,7 +544,7 @@ fn light_round(light: vec4<f32>, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let sky = brightness_curve(light.x);
     var c = p.ambient * sky * 0.85;
     c += p.sun * light_strength() * 0.5 * smoothstep(0.5, 0.95, light.x);
-    c += block_light(max(light.yzw, held_light(rel, vec3(0.0))), pos);
+    c += block_light(max(light.yzw, held_light(rel, vec3(0.0))), pos) * block_by_day(light.x);
     c += vec3(max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y)));
     return c;
 }
@@ -956,5 +1022,14 @@ fn display(c: vec3<f32>) -> vec3<f32> {
     t = max(mix(vec3(y), t, mix(1.0, 1.2 * look_opt(OPT_SATURATION, 1.0), day)), vec3(0.0));
     // A cool floor so the night is never pure black; by day black stays black.
     t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034) * (1.0 - day);
+    // A storybook night (`base:look_storybook`): dim colours slide toward a blue-grey, as the eye's
+    // rods take over (Purkinje; Photon's, 0.05 × its setting), firelight kept: warm pixels, whose
+    // red outweighs their blue, keep their colour.
+    let dim_px = 1.0 - smoothstep(0.02, 0.16, luma(t));
+    let warm = smoothstep(-0.02, 0.06, t.r - t.b);
+    let rods = clamp(fantasy_opt(OPT_STORYBOOK), 0.0, 1.0) * (1.0 - day) * dim_px * (1.0 - warm) * 0.45;
+    t = mix(t, vec3(luma(t)) * vec3(0.84, 0.95, 1.18), rods);
+    // A blood moon's faint red cast over the night.
+    t *= mix(vec3(1.0), vec3(1.1, 0.88, 0.86), blood_moon() * 0.6 * (1.0 - day));
     return clamp(t, vec3(0.0), vec3(1.0));
 }

@@ -157,6 +157,8 @@ impl Server {
             d.day_moved = false;
             d.weather_moved = false;
             d.air_moved = false;
+            d.sky_event_moved = false;
+            d.landings.clear();
             d.tints_moved = false;
             for r in &mut d.regions {
                 for st in r.bodies.values_mut() {
@@ -278,6 +280,13 @@ fn send_clock(p: &mut Player, dim: &DimSet, tick: u64, rate: u32) {
     if dim.air_moved || p.first_sync {
         p.conn
             .send(ToClient::Air { air: dim.air.0.clone(), heading: dim.air.1 });
+    }
+    if dim.sky_event_moved || p.first_sync {
+        p.conn
+            .send(ToClient::SkyEvent { kind: dim.sky_event.0, strength: dim.sky_event.1 });
+    }
+    for &(pos, seconds) in &dim.landings {
+        p.conn.send(ToClient::SkyLanding { pos, seconds });
     }
     if dim.tints_moved || (p.first_sync && !dim.tints.is_empty()) {
         p.conn.send(ToClient::Tints { tints: dim.tints.to_vec() });
