@@ -6,6 +6,7 @@
     python3 tools/names/names.py derive esk+tem
     python3 tools/names/names.py check
     python3 tools/names/names.py sheet > notes/NAMES.md
+    python3 tools/names/names.py selftest        (check catches every fault in faults.toml)
 
 The lexicon is mods/base/lore/lexicon.toml: the peoples' sounds and syllables, the roots, the drifts
 (sound changes, in SCA² syntax), the names with their builds, banned patterns and bad words.
@@ -13,7 +14,8 @@ Why: reports/Naming and invented words.md. Standard library only (Python 3.11+ f
 
 `gen` only offers: a person picks the roots. `check` fails on unknown roots, names that don't
 re-derive (unless `irregular = "why"`), syllable-rule breaks, banned patterns and bad words, names of
-one kind one edit apart, lang keys missing from en, ru or fr, and a stale notes/NAMES.md.
+one kind one edit apart, lang keys missing from any language their mod has, drifts whose
+output breaks the syllable rules, and a stale notes/NAMES.md.
 """
 
 import argparse
@@ -427,8 +429,9 @@ class Lexicon:
 
     # -- syllables -----------------------------------------------------------------------
 
-    def syllables(self, word, people):
-        """A word split into syllables by its people's rules, or (None, why)."""
+    def syllables(self, word, people, root=False):
+        """A word split into syllables by its people's rules, or (None, why). A root on its own may
+        end in any coda a word may have inside it (kep, as in Kepesk)."""
         prof = self.profiles[people]
         multi = self.multi(people)
         segs = tokenize(word, multi)
@@ -436,6 +439,8 @@ class Lexicon:
         initial = prof.clusters("initial_onsets", multi)
         codas = prof.clusters("codas", multi)
         finals = prof.clusters("final_codas", multi)
+        if root:
+            finals = finals | codas
         for s in segs:
             if s not in prof.vowels and s not in prof.consonants:
                 return None, f"'{s}' isn't a sound of {prof.title}"
@@ -481,7 +486,7 @@ class Lexicon:
             return None, f"breaks {prof.title}'s syllable rules"
         return ["".join(s) for s in sy], None
 
-    def say(self, form, people, build=None):
+    def say(self, form, people, build=None, root=False):
         """Syllables with the stressed one in capitals: ES-ke-nai."""
         prof = self.profiles[people]
         words = form.lower().split(" ")
@@ -497,7 +502,7 @@ class Lexicon:
                     cur.append(p)
         out = []
         for n, w in enumerate(words):
-            sy, _ = self.syllables(w, people)
+            sy, _ = self.syllables(w, people, root)
             if not sy:
                 out.append(w)
                 continue
@@ -735,20 +740,58 @@ def cmd_derive(lex, args):
 # check
 # ---------------------------------------------------------------------------------------------
 
+def drift_people(lex, dkey):
+    """The people whose rules a drift's output must keep (a dialect drift: the people it extends)."""
+    seen = set()
+    while dkey and dkey not in seen:
+        seen.add(dkey)
+        for p in lex.profiles.values():
+            if p.drift == dkey:
+                return p.key
+        dkey = lex.d["drift"].get(dkey, {}).get("extends")
+    return None
+
+
 def lang_values(lex):
-    """{file: {key: value}} over every lang dir the lexicon names."""
-    conf = lex.d.get("lang", {})
-    out = {f: {} for f in conf.get("files", [])}
-    for d in conf.get("dirs", []):
-        for f in out:
-            p = REPO / d / f"{f}.lang"
-            if not p.exists():
-                continue
+    """{lang dir: {file: {key: value}}} for every lang dir the lexicon names, with the languages
+    each one actually has (base has en and ru; the engine also fr)."""
+    out = {}
+    for d in lex.d.get("lang", {}).get("dirs", []):
+        files = {}
+        for p in sorted((REPO / d).glob("*.lang")):
+            vals = {}
             for line in p.read_text(encoding="utf-8").splitlines():
                 if "=" in line and not line.lstrip().startswith("#"):
                     k, v = line.split("=", 1)
-                    out[f][k.strip()] = v.strip()
+                    vals[k.strip()] = v.strip()
+            files[p.stem] = vals
+        if files:
+            out[d] = files
     return out
+
+
+def lang_problems(lex, where, n, people, langs):
+    """A name's lang keys: in every language of the mod that holds them, each showing the name."""
+    lk = n.get("lang_key")
+    if not lk:
+        return []
+    wants = [lk] + ([f"{lk}.title"] if n.get("epithet") else [])
+    owners = [d for d, files in langs.items() if any(lk in vals for vals in files.values())]
+    if not owners:
+        parts = lk.split(".")
+        guess = f"mods/{parts[1]}/assets/lang" if len(parts) > 2 else "its mod's assets/lang"
+        return [f"{where}: lang key {lk} is in no lang file (put it in {guess}, every language there)"]
+    bad = []
+    for d in owners:
+        for f, vals in langs[d].items():
+            for k in wants:
+                if k not in vals:
+                    bad.append(f"{where}: lang key {k} missing from {d}/{f}.lang")
+            if lk in vals:
+                shown = lex.cyrillic(n["form"], people) if f.startswith("ru") else n["form"]
+                if shown not in vals[lk]:
+                    bad.append(f"{where}: {d}/{f}.lang {lk} = {vals[lk]!r} should show {shown}")
+    return bad
 
 
 def check(lex, sheet_path=SHEET):
@@ -771,18 +814,9 @@ def check(lex, sheet_path=SHEET):
     for root, r in lex.roots.items():
         if not r.get("means"):
             bad.append(f"root {root}: no meaning")
-        prof = lex.profiles["old"]
-        multi = lex.multi("old")
-        # A root may end in any coda: it is a word's start more often than its end.
-        sy, why = lex.syllables(root, "old")
+        sy, why = lex.syllables(root, "old", root=True)
         if not sy:
-            segs = tokenize(root, multi)
-            tail = []
-            while segs and not lex.is_vowel(segs[-1]):
-                tail.insert(0, segs.pop())
-            body_ok = bool(segs) and lex.syllables(spell(segs), "old")[0]
-            if not (body_ok and tuple(tail) in prof.clusters("codas", multi)):
-                bad.append(f"root {root}: {why}")
+            bad.append(f"root {root}: {why}")
         for h in lex.banned_hits(root, "old"):
             bad.append(f"root {root}: {h}")
         for h in lex.bad_hits(root):
@@ -815,6 +849,26 @@ def check(lex, sheet_path=SHEET):
             bad.append(f"dwarvish root {root}: no meaning")
         for h in lex.bad_hits(root):
             bad.append(f"dwarvish root {root}: reads as {h}")
+
+    # Every drift's output keeps its people's syllable rules: a sound change that leaves an illegal
+    # cluster (worn once turned dawaru into dawro) shows up here, not in a name months later.
+    builds = {(r,): f"root {r}" for r in lex.roots}
+    for x in lex.d.get("join_example", []) + lex.d.get("drift_example", []):
+        builds.setdefault(tuple(x["build"]), f"example {' + '.join(x['build'])}")
+    for key, n in lex.names.items():
+        if n.get("people") in lex.profiles and lex.profiles[n["people"]].source != "dwarvish":
+            builds.setdefault(tuple(n.get("build", [])), f"name {key}")
+    for dkey in lex.drifts:
+        people = drift_people(lex, dkey)
+        if not people:
+            continue
+        for build, where in builds.items():
+            if lex.old_form(list(build))[1]:
+                continue  # unknown roots are reported with the name
+            for w in lex.drifted(list(build), dkey).split(" "):
+                sy, why = lex.syllables(w, people, root=where.startswith("root "))
+                if not sy:
+                    bad.append(f"drift {dkey} turns {where} into {w}, which {why}")
 
     langs = lang_values(lex)
     for key, n in lex.names.items():
@@ -854,19 +908,7 @@ def check(lex, sheet_path=SHEET):
         if (lex.profiles[people].source == "dwarvish" and n.get("kind") == "person"
                 and not n.get("byname")):
             bad.append(f"{where}: a dwarf needs a byname (people.dwarvish.naming)")
-        lk = n.get("lang_key")
-        if lk:
-            wants = {lk: None}
-            if n.get("epithet"):
-                wants[f"{lk}.title"] = None
-            for f, vals in langs.items():
-                for k in wants:
-                    if k not in vals:
-                        bad.append(f"{where}: lang key {k} missing from {f}")
-                if lk in vals:
-                    shown = lex.cyrillic(n["form"], people) if f.startswith("ru") else n["form"]
-                    if shown not in vals[lk]:
-                        bad.append(f"{where}: {f} {lk} = {vals[lk]!r} should show {shown}")
+        bad += lang_problems(lex, where, n, people, langs)
 
     by_kind = {}
     for key, n in lex.names.items():
@@ -883,8 +925,77 @@ def check(lex, sheet_path=SHEET):
     if sheet_path is not None:
         now = sheet_path.read_text(encoding="utf-8") if sheet_path.exists() else ""
         if now != sheet(lex):
-            bad.append(f"{sheet_path.relative_to(REPO)} is out of date: {SHEET_CMD}")
+            shown = sheet_path.relative_to(REPO) if sheet_path.is_relative_to(REPO) else sheet_path
+            bad.append(f"{shown} is out of date: {SHEET_CMD}")
     return bad
+
+
+FAULTS = Path(__file__).resolve().parent / "faults.toml"
+WORN_RULE_2 = re.compile(r'  \{ sca = "P//#\(C\)\(C\)VK_CV".*\n  \{ sca = "P//#\(C\)\(C\)VB_rV".*\n')
+# What `check` must say about the fault set, one line each.
+EXPECTED = [
+    "name f_unknown: unknown roots zor",
+    "name f_unknown: Eskezor 'z' isn't a sound of Old Eskenai",
+    "name f_unknown: x, z, q and j used to look exotic",
+    "name f_mismatch: bor + duk in elvish gives borduga, not Borduk",
+    "name f_mismatch: Borduk breaks Elvish's syllable rules",
+    "name f_wen: reads as Tolkien or generic elf",
+    "name f_el: El- at the start of an elf's personal name",
+    "names Nogom and Nogom (boss) are one edit apart",
+    "name f_stormforge: epithet 'the Stormforge': grand English mash-ups",
+    "names Aru and Kru (rune) are one edit apart",
+    "name f_half: lang key rune.test.half missing from LANG/ru_ru.lang",
+    "name f_wrong: LANG/ru_ru.lang rune.test.wrong = 'Kru' should show Кру",
+    "name f_nowhere: lang key word.base.ber is in no lang file (put it in mods/base/assets/lang",
+    "name f_dwarf: a dwarf needs a byname",
+    "name f_letter: Telm 'l' isn't a sound of Old Eskenai",
+    "name f_rude: reads as kaka (ru)",
+    "dwarvish root dwir: i only come in loans",
+    "dwarvish root dwir: 'w' isn't a sound of Dwarvish",
+    "dwarvish loan kan: kaun through frost gives kon",
+    "drift f_broken: 'a/o': want target/replacement/environment[/exception]",
+    "drift f_broken: 'p,t/b/_Q': unknown category Q",
+    "drift f_broken: 'p,t,k/b,d/_': 3 targets but 2 replacements",
+    "drift worn turns example dau + aru into dawro, which breaks Worn speech",
+    "NAMES.md is out of date",
+]
+# Lines `check` must not say: f_stormforge's key is in both of its folder's languages (en, ru),
+# so no French is asked for.
+UNEXPECTED = ["rune.test.kru missing", "fr_fr"]
+
+
+def cmd_selftest(lex, args):
+    """The real lexicon plus tools/names/faults.toml must fail `check` in exactly the known ways."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        lang = tmp / "lang"
+        lang.mkdir()
+        (lang / "en_us.lang").write_text(
+            "rune.test.kru=Kru\nrune.test.kru.title=the Stormforge\nrune.test.half=Tun\nrune.test.wrong=Kru\n",
+            encoding="utf-8")
+        (lang / "ru_ru.lang").write_text(
+            "rune.test.kru=Кру\nrune.test.kru.title=Кузня бурь\nrune.test.wrong=Kru\n", encoding="utf-8")
+        text = lex.path.read_text(encoding="utf-8")
+        text, swapped = WORN_RULE_2.subn('  { sca = "P//#(C)(C)VC_CV", says = "rule 2 unsplit" },\n', text)
+        if swapped != 1:
+            sys.exit("selftest: couldn't find worn rule 2 to swap back")
+        text = text.replace("[lang]\ndirs = [", f'[lang]\ndirs = ["{lang}", ', 1)
+        broken = tmp / "lexicon.toml"
+        broken.write_text(text + "\n" + FAULTS.read_text(encoding="utf-8"), encoding="utf-8")
+        stale = tmp / "NAMES.md"
+        stale.write_text("stale\n", encoding="utf-8")
+        got = [b.replace(str(lang), "LANG") for b in check(Lexicon(broken), stale)]
+    missed = [e for e in EXPECTED if not any(e in g for g in got)]
+    unwanted = [g for g in got if any(u in g for u in UNEXPECTED)]
+    extra = [g for g in got if not any(e in g for e in EXPECTED)]
+    for m in missed:
+        print(f"✗ check missed: {m}")
+    for u in unwanted + [x for x in extra if x not in unwanted]:
+        print(f"✗ check said: {u}")
+    if missed or unwanted or extra:
+        sys.exit(1)
+    print(f"ok: check caught all {len(EXPECTED)} faults in {FAULTS.relative_to(REPO)}")
 
 
 def cmd_check(lex, args):
@@ -946,7 +1057,7 @@ def sheet(lex):
     rows = []
     for r, v in lex.roots.items():
         rows.append([f"**{r}**", v["means"]] + [lex.drifted([r], k) for k in lex.drifts]
-                    + [lex.say(r, "old") if lex.syllables(r, "old")[0] else r.upper(), lex.cyrillic(r, "old")])
+                    + [lex.say(r, "old", root=True), lex.cyrillic(r, "old")])
     w(table(rows, ["root", "means"] + [lex.drifts[k].title for k in lex.drifts] + ["say", "ru"]))
     w("")
     w("Endings: " + "; ".join(f"**-{e}** {v['means']} (*{v.get('example', '')}*)" for e, v in lex.endings.items()) + ".")
@@ -1085,9 +1196,11 @@ def main(argv=None):
     dv.add_argument("--drift", help="only this drift")
     sub.add_parser("check", help="fail on any break in the lexicon or a stale NAMES.md")
     sub.add_parser("sheet", help="print notes/NAMES.md")
+    sub.add_parser("selftest", help="check must catch every fault in tools/names/faults.toml")
     args = ap.parse_args(argv)
     lex = Lexicon(args.lexicon)
-    {"gen": cmd_gen, "derive": cmd_derive, "check": cmd_check, "sheet": cmd_sheet}[args.cmd](lex, args)
+    {"gen": cmd_gen, "derive": cmd_derive, "check": cmd_check, "sheet": cmd_sheet,
+     "selftest": cmd_selftest}[args.cmd](lex, args)
 
 
 if __name__ == "__main__":

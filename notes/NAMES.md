@@ -77,7 +77,7 @@ The modifier comes first and the head last. If three consonants would meet, or t
 
 Each applied in order, in SCA² syntax (`target/replacement/environment[/exception]`: `_` the sound changed, `#` a word's edge, capitals categories, `(X)` optional).
 
-Categories: `V` = a e i o u ai au ei; `P` = a e i o u; `C` = p t k b d g m n s h f r w y l v ch sh ng kv; `F` = e i ei; `G` = k g.
+Categories: `V` = a e i o u ai au ei; `P` = a e i o u; `C` = p t k b d g m n s h f r w y l v ch sh ng kv; `F` = e i ei; `G` = k g; `K` = m n r s t k p; `B` = b d g.
 
 **Soft** (Elvish, and the forest ruins)
 
@@ -97,10 +97,11 @@ Categories: `V` = a e i o u ai au ei; `P` = a e i o u; `C` = p t k b d g m n s h
 **Worn** (humans and traders, coasts, plains, swamps, deserts; the latest era)
 
 1. h at the start of a word drops: has → as `h//#_`
-2. in words of three or more syllables, a vowel in the second syllable between single consonants drops: ekaru → ekru `P//#(C)(C)VC_CV`
-3. u becomes o (but au stays): duk → dok, nu → no `u/o/_`
-4. n becomes ng before k or g `n/ng/_G`
-5. a final sk becomes sh: kepesk → kepesh `sk/sh/_#`
+2. in words of three or more syllables, a vowel in the second syllable between single consonants drops, where the first can close a syllable: ekaru → ekru `P//#(C)(C)VK_CV`
+3. and where b, d or g and r are left to start a syllable: abaru → abru `P//#(C)(C)VB_rV`
+4. u becomes o (but au stays): duk → dok, nu → no `u/o/_`
+5. n becomes ng before k or g `n/ng/_G`
+6. a final sk becomes sh: kepesk → kepesh `sk/sh/_#`
 
 One word in every form:
 
