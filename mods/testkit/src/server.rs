@@ -1236,10 +1236,50 @@ fn dump_registry() -> String {
             .collect()
     };
     format!(
-        "{{\"items\":[\n{}\n],\"blocks\":[\n{}\n],\"entities\":[\n{}\n],\"biomes\":[\n{}\n]}}\n",
+        "{{\"items\":[\n{}\n],\"blocks\":[\n{}\n],\"entities\":[\n{}\n],\"biomes\":[\n{}\n],\"menus\":[\n{}\n],\"recipes\":[\n{}\n]}}\n",
         items.join(",\n"),
         blocks.join(",\n"),
         named(ek::ENTITY).join(",\n"),
-        named(ek::BIOME).join(",\n")
+        named(ek::BIOME).join(",\n"),
+        named(ek::MENU).join(",\n"),
+        recipes_json().join(",\n")
     )
+}
+
+/// The recipe kinds the mods register (`base_api`, `parts.rs`).
+static DUMP_KINDS: [RecipeKind; 3] =
+    [RecipeKind::named("base:crafting"), RecipeKind::named("base:smelting"), RecipeKind::named("base:parts")];
+
+/// Every recipe of the mods' kinds: its grid (0 x 0 shapeless), cells or ingredients (kind,
+/// count, the item shown), outputs with their chances and its time in ticks.
+fn recipes_json() -> Vec<String> {
+    let mut out = Vec::new();
+    for kind in &DUMP_KINDS {
+        for r in recipes(kind) {
+            let (w, h) = r.shape().unwrap_or((0, 0));
+            let ins: Vec<String> = r
+                .inputs()
+                .iter()
+                .map(|i| {
+                    let shown = if i.shown == 0 { String::new() } else { item_name(i.shown).to_string() };
+                    format!("[{},{},{}]", i.kind, i.count, js(&shown))
+                })
+                .collect();
+            let outs: Vec<String> = r
+                .outputs()
+                .iter()
+                .map(|(s, chance)| format!("[{},{},{}]", js(item_name(s.item)), s.count, chance))
+                .collect();
+            out.push(format!(
+                "{{\"kind\":{},\"index\":{},\"time\":{},\"hidden\":{},\"w\":{w},\"h\":{h},\"in\":[{}],\"out\":[{}]}}",
+                js(r.kind()),
+                r.index(),
+                r.time(),
+                r.hidden(),
+                ins.join(","),
+                outs.join(",")
+            ));
+        }
+    }
+    out
 }
