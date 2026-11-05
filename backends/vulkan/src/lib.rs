@@ -1030,11 +1030,12 @@ impl VulkanBackend {
         old: vk::ImageLayout,
         new: vk::ImageLayout,
     ) {
+        let ((src_stage, src_access), (dst_stage, dst_access)) = (layout_stages(old, true), layout_stages(new, false));
         let b = [vk::ImageMemoryBarrier2::default()
-            .src_stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS)
-            .src_access_mask(vk::AccessFlags2::MEMORY_WRITE)
-            .dst_stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS)
-            .dst_access_mask(vk::AccessFlags2::MEMORY_READ | vk::AccessFlags2::MEMORY_WRITE)
+            .src_stage_mask(src_stage)
+            .src_access_mask(src_access)
+            .dst_stage_mask(dst_stage)
+            .dst_access_mask(dst_access)
             .old_layout(old)
             .new_layout(new)
             .image(image)
@@ -2020,9 +2021,13 @@ impl Backend for VulkanBackend {
 
             let frame = &mut self.frames[self.slot];
             let rendered = self.swapchain.as_ref().unwrap().rendered[image_index as usize];
+            // Only drawing into the swapchain image waits for it (its barriers from UNDEFINED or
+            // PRESENT start at this stage): the frame's uploads, compute and offscreen passes go first.
+            let acquire_at =
+                if all_barriers() { vk::PipelineStageFlags2::ALL_COMMANDS } else { vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT };
             let waits = [vk::SemaphoreSubmitInfo::default()
                 .semaphore(frame.acquired)
-                .stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS)];
+                .stage_mask(acquire_at)];
             let signals = [vk::SemaphoreSubmitInfo::default()
                 .semaphore(rendered)
                 .stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS)];
@@ -2226,4 +2231,49 @@ mod tests {
 fn early_wait() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ON.get_or_init(|| std::env::var_os("WEFT_EARLY_WAIT").is_some())
+}
+
+/// The stages and accesses an image barrier waits on (`src`, for the layout it leaves) or makes
+/// wait (for the layout it enters), from how an image in that layout is used here. They were all
+/// `ALL_COMMANDS` both ways: a full drain at each of a frame's 40-50 pass edges on desktop GPUs,
+/// and on MoltenVK every pass's vertex stage waiting on the last one's fragments (perf review).
+/// `WEFT_ALL_BARRIERS=1` puts every barrier back to `ALL_COMMANDS`, to compare.
+fn layout_stages(layout: vk::ImageLayout, src: bool) -> (vk::PipelineStageFlags2, vk::AccessFlags2) {
+    use vk::{AccessFlags2 as A, ImageLayout as L, PipelineStageFlags2 as S};
+    let shaders = S::VERTEX_SHADER | S::FRAGMENT_SHADER | S::COMPUTE_SHADER;
+    if all_barriers() {
+        return if src { (S::ALL_COMMANDS, A::MEMORY_WRITE) } else { (S::ALL_COMMANDS, A::MEMORY_READ | A::MEMORY_WRITE) };
+    }
+    match (layout, src) {
+        // Contents dropped: only the work that last used the image (for writing it again after
+        // it was read) and the swapchain's acquire, which waits at colour output.
+        (L::UNDEFINED, true) => {
+            (shaders | S::COLOR_ATTACHMENT_OUTPUT | S::EARLY_FRAGMENT_TESTS | S::LATE_FRAGMENT_TESTS | S::ALL_TRANSFER, A::NONE)
+        }
+        (L::COLOR_ATTACHMENT_OPTIMAL, true) => (S::COLOR_ATTACHMENT_OUTPUT, A::COLOR_ATTACHMENT_WRITE),
+        (L::COLOR_ATTACHMENT_OPTIMAL, false) => (S::COLOR_ATTACHMENT_OUTPUT, A::COLOR_ATTACHMENT_READ | A::COLOR_ATTACHMENT_WRITE),
+        (L::DEPTH_ATTACHMENT_OPTIMAL, true) => (S::EARLY_FRAGMENT_TESTS | S::LATE_FRAGMENT_TESTS, A::DEPTH_STENCIL_ATTACHMENT_WRITE),
+        (L::DEPTH_ATTACHMENT_OPTIMAL, false) => {
+            (S::EARLY_FRAGMENT_TESTS | S::LATE_FRAGMENT_TESTS, A::DEPTH_STENCIL_ATTACHMENT_READ | A::DEPTH_STENCIL_ATTACHMENT_WRITE)
+        }
+        // Sampled: reads only, so what follows just waits for them to finish (no access to flush).
+        (L::SHADER_READ_ONLY_OPTIMAL, true) => (shaders, A::NONE),
+        (L::SHADER_READ_ONLY_OPTIMAL, false) => (shaders, A::SHADER_SAMPLED_READ | A::SHADER_READ),
+        (L::TRANSFER_DST_OPTIMAL, true) => (S::ALL_TRANSFER, A::TRANSFER_WRITE),
+        (L::TRANSFER_DST_OPTIMAL, false) => (S::ALL_TRANSFER, A::TRANSFER_WRITE),
+        (L::TRANSFER_SRC_OPTIMAL, true) => (S::ALL_TRANSFER, A::NONE),
+        (L::TRANSFER_SRC_OPTIMAL, false) => (S::ALL_TRANSFER, A::TRANSFER_READ),
+        // From presenting: after the acquire, which waits at colour output. To presenting: the
+        // semaphore that present waits on covers it.
+        (L::PRESENT_SRC_KHR, true) => (S::COLOR_ATTACHMENT_OUTPUT, A::NONE),
+        (L::PRESENT_SRC_KHR, false) => (S::NONE, A::NONE),
+        (_, true) => (S::ALL_COMMANDS, A::MEMORY_WRITE),
+        (_, false) => (S::ALL_COMMANDS, A::MEMORY_READ | A::MEMORY_WRITE),
+    }
+}
+
+/// `WEFT_ALL_BARRIERS=1`: image barriers and the acquire wait at `ALL_COMMANDS`, as before.
+fn all_barriers() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("WEFT_ALL_BARRIERS").is_some())
 }
