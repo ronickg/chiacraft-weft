@@ -1,6 +1,6 @@
 # Builds the workspace, lints it and runs every check that has no person in it, on every push to
 # dev and main and every pull request: the unit tests, the mods' checks (including the sheets that fail
-# when SHEET.md, SPECIES.md or NAMES.md is stale), the animals' rules through WASM, and the testkit against
+# when SHEET.md, SPECIES.md, PROGRESSION_SHEET.md or NAMES.md is stale), the animals' rules through WASM, and the testkit against
 # the real game. Linux has no GPU here: the game draws with Mesa's software Vulkan (lavapipe)
 # into a virtual X screen.
 name: CI
@@ -91,10 +91,11 @@ jobs:
         timeout-minutes: 15
         run: cargo test --doc -p weft_engine
 
-      # Unit tests, tests/places.rs, and tests/sheet.rs: SHEET.md and SPECIES.md are what the code
-      # says.
-      - name: Tests (survival numbers, animals)
-        run: cargo nextest run --profile ci -p vitals -p animals_core
+      # Unit tests, tests/places.rs, and tests/sheet.rs: SHEET.md, SPECIES.md and
+      # PROGRESSION_SHEET.md are what the code says; progression's checks (everything tagged with
+      # an age and path, reachable, in tier order, inside its fight bands).
+      - name: Tests (survival numbers, animals, progression)
+        run: cargo nextest run --profile ci -p vitals -p animals_core -p progression
 
       - name: Tests (base, its API, packages mod)
         run: cargo nextest run --profile ci -p base -p base_api -p packages
