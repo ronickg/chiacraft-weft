@@ -449,6 +449,18 @@ impl World {
     /// `BiomeAir`, and where the wind blows to (`heading`, degrees clockwise from north, -z).
     /// Biomes not named are clear and still. Players see it (`scene.weather` in shader packs) and
     /// mods read it back (`air_at`).
+    /// chiacraft: what happens in this dimension's sky now (`weft_abi::sky_event`) and how strongly
+    /// (0 to 1), until the next call. Call it every tick if you like: players hear only of a change.
+    pub fn set_sky_event(&self, kind: u32, strength: f32) {
+        unsafe { (host().set_sky_event)(self.raw(), kind, strength) }
+    }
+
+    /// chiacraft: something falls from the sky to land at `pos` in `seconds` (a meteorite, a big
+    /// impact): its streak heads there in the players' skies.
+    pub fn sky_landing(&self, pos: [f64; 3], seconds: f32) {
+        unsafe { (host().sky_landing)(self.raw(), &pos, seconds) }
+    }
+
     pub fn set_air(&self, air: &[crate::BiomeAir], heading: f32) {
         let biomes: Vec<u32> = air.iter().map(|a| a.biome).collect();
         let fog: Vec<f32> = air.iter().map(|a| a.fog).collect();

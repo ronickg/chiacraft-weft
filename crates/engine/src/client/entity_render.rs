@@ -1107,9 +1107,10 @@ impl EntityRenderer {
         if loaded.is_none() {
             log::warn!("missing entity texture {name}");
         }
-        if let Some(mask) = crate::assets::emission_mask(assets, name) {
+        // Two channels (`emission_mask_rg`): r the glow, g a pack's own (the blood moon's eyes).
+        if let Some(mask) = crate::assets::emission_mask_rg(assets, name) {
             let t = gpu.create_texture(
-                &TextureDesc { width: mask.width, height: mask.height, mips: 1, format: Format::R8Unorm, render_target: false },
+                &TextureDesc { width: mask.width, height: mask.height, mips: 1, format: Format::Rgba8Unorm, render_target: false },
                 name,
             );
             gpu.write_texture(t, 0, &mask.rgba);

@@ -215,6 +215,8 @@ pub static HOST: Host = Host {
     raining_at,
     set_air,
     air_at,
+    set_sky_event,
+    sky_landing,
     set_biome_tints,
     content_tint,
     entity_effect,
@@ -2785,6 +2787,23 @@ unsafe extern "C" fn set_rain(w: *mut abi::WorldCtx, biomes: *const u32, len: u3
         let biomes = if len == 0 { Vec::new() } else { std::slice::from_raw_parts(biomes, len as usize).to_vec() };
         d.events
             .push(crate::server::DimEvent::SetRain { dim: d.id, biomes, weather: weather as u16 });
+    }
+}
+
+unsafe extern "C" fn set_sky_event(w: *mut abi::WorldCtx, kind: u32, strength: f32) {
+    unsafe {
+        let d = dim(w);
+        d.events
+            .push(crate::server::DimEvent::SetSkyEvent { dim: d.id, kind, strength: strength.clamp(0.0, 1.0) });
+    }
+}
+
+unsafe extern "C" fn sky_landing(w: *mut abi::WorldCtx, pos: *const [f64; 3], seconds: f32) {
+    unsafe {
+        let d = dim(w);
+        let pos = glam::DVec3::from_array(*pos);
+        d.events
+            .push(crate::server::DimEvent::SkyLanding { dim: d.id, pos, seconds: seconds.max(0.0) });
     }
 }
 

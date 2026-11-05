@@ -659,7 +659,10 @@ fn milky_way(dir: vec3<f32>) -> vec3<f32> {
 // latitude): curtains of ridged noise in the northern sky, green low and purple higher up, drifting
 // slowly, on a coarse grid of directions so they stay blocky.
 fn aurora(dir: vec3<f32>) -> vec3<f32> {
-    let strength = scene.ground.w * smoothstep(-0.1, -0.25, scene.sun.y) * (1.0 - rain_amount()) * (1.0 - scene.weather.z);
+    // An aurora storm (a sky event) reaches further and burns brighter; where it reaches comes with
+    // the biomes' aurora shares the base mod widens for it.
+    let storm = sky_event(4.0);
+    let strength = max(scene.ground.w, storm * 0.6) * mix(1.0, 2.2, storm) * smoothstep(-0.1, -0.25, scene.sun.y) * (1.0 - rain_amount()) * (1.0 - scene.weather.z);
     if strength <= 0.0 || dir.y <= 0.02 {
         return vec3(0.0);
     }
@@ -671,8 +674,80 @@ fn aurora(dir: vec3<f32>) -> vec3<f32> {
     let ridge = 1.0 - abs(noise3(vec3(p.x * 0.35 + t * 0.03, t * 0.05, p.y * 0.12)) * 2.0 - 1.0);
     let curtain = pow(ridge, 6.0) * (0.6 + 0.4 * noise3(vec3(p.x * 1.3, t * 0.2, p.y * 0.4)));
     let height = smoothstep(0.02, 0.15, d.y) * (1.0 - smoothstep(0.35, 0.75, d.y));
-    let color = mix(vec3(0.1, 0.9, 0.45), vec3(0.55, 0.25, 0.85), smoothstep(0.15, 0.55, d.y));
-    return color * curtain * height * north * strength * 0.12;
+    var color = mix(vec3(0.1, 0.9, 0.45), vec3(0.55, 0.25, 0.85), smoothstep(0.15, 0.55, d.y));
+    // A storm's palette: red low, violet above.
+    color = mix(color, mix(vec3(0.95, 0.15, 0.25), vec3(0.6, 0.2, 0.95), smoothstep(0.1, 0.5, d.y)), storm * 0.8);
+    // A storm reaches over the whole sky, not only the north.
+    let reach = mix(north, max(north, 0.6), storm);
+    return color * curtain * height * reach * strength * 0.12;
+}
+
+// Shooting stars on a meteor shower's night (a sky event): pixel-snapped streaks, as many as the
+// shower's strength (1 at its peak), each a fraction of a second. In twelve layers of slots of
+// 1.2 s, each slot holds one streak or none, from a hash of the slot alone: at four the whole sky
+// held about one at a time, and a view rarely caught it (the sky-events check, 11-05).
+fn meteors(dir: vec3<f32>) -> vec3<f32> {
+    let shower = sky_event(2.0);
+    let dark = smoothstep(-0.1, -0.25, scene.sun.y) * (1.0 - rain_amount());
+    if shower <= 0.0 || dark <= 0.0 || dir.y <= 0.05 {
+        return vec3(0.0);
+    }
+    let d = normalize(floor(dir * 220.0) / 220.0);
+    // The shower's own clock (seconds since it began, real time: tests pin the shaders' time).
+    let t = scene.sky_event.z;
+    var c = vec3(0.0);
+    for (var layer = 0u; layer < 12u; layer++) {
+        let at = t / 1.2 + f32(layer) * 0.0833;
+        let slot = u32(floor(at));
+        let h = hash(slot * 4u + layer + 7u);
+        // About two a second at the peak, a few a minute on a side night.
+        if unit(h) > mix(0.04, 0.8, shower) {
+            continue;
+        }
+        let f = fract(at) / 0.45;
+        if f > 1.0 {
+            continue;
+        }
+        // Where it starts (above 25°) and which way it falls, from the slot's hash.
+        let az = unit(h * 3u + 1u) * 6.2831853;
+        let el = mix(0.45, 1.2, unit(h * 3u + 2u));
+        let start = vec3(cos(az) * cos(el), sin(el), sin(az) * cos(el));
+        let side = normalize(cross(start, vec3(0.0, 1.0, 0.0)) + vec3(0.0, 1e-4, 0.0));
+        let fall = normalize(side * (unit(h * 5u + 3u) * 2.0 - 1.0) - vec3(0.0, 0.6, 0.0) * start.y);
+        let head = normalize(start + fall * 0.3 * f);
+        // Distance to the streak between where it began and its head.
+        let ab = head - start;
+        let k = clamp(dot(d - start, ab) / max(dot(ab, ab), 1e-6), 0.0, 1.0);
+        let off = length(d - (start + ab * k));
+        let line = 1.0 - smoothstep(0.003, 0.006, off);
+        // Brightest at the head, fading along the trail and as it burns out.
+        let fade = k * k * (1.0 - smoothstep(0.7, 1.0, f));
+        c += vec3(0.95, 0.97, 1.0) * line * fade * 0.9;
+    }
+    return c * dark;
+}
+
+// A fireball or a big impact on its way (`scene.sky_landing`): a burning head and a long smoky
+// trail coming down toward where it lands, by day too, from 10 s before until it lands.
+fn fireball(dir: vec3<f32>) -> vec3<f32> {
+    let left = scene.sky_landing.w;
+    if left < -0.5 || left > 10.0 {
+        return vec3(0.0);
+    }
+    // It comes in steep from the south-west at about 60 blocks a second.
+    let v = normalize(vec3(0.35, 1.0, 0.25));
+    let head = scene.sky_landing.xyz + v * 60.0 * max(left, 0.0);
+    let tail = head + v * 240.0;
+    let d = normalize(floor(dir * 220.0) / 220.0);
+    let hd = normalize(head);
+    let tl = normalize(tail);
+    let ab = tl - hd;
+    let k = clamp(dot(d - hd, ab) / max(dot(ab, ab), 1e-6), 0.0, 1.0);
+    let off = length(d - (hd + ab * k));
+    let trail = (1.0 - smoothstep(0.003, 0.009, off)) * (1.0 - k);
+    let glow = exp(-length(d - hd) * 90.0);
+    let flash = 1.0 - smoothstep(0.0, 0.5, -left);
+    return (vec3(1.0, 0.55, 0.2) * trail * 1.5 + vec3(1.0, 0.85, 0.6) * glow * 6.0) * flash;
 }
 
 // A rainbow opposite the sun while a shower passes with the sun out (Research round 15, 5): the
@@ -734,7 +809,7 @@ fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
         return vec4(scene.fog_color.rgb, 1.0);
     }
     if open_sky() && !in_liquid() {
-        var c = sky_color(dir) + milky_way(dir) + aurora(dir);
+        var c = sky_color(dir) + milky_way(dir) + aurora(dir) + meteors(dir) + fireball(dir);
         // The rainbow in the rain, in front of the high cirrus.
         c = rainbow_on(cirrus(c, dir), dir);
         if dir.y < 0.0 {
@@ -862,6 +937,7 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         // Bodies shine through the tone curve; stars dim in the haze low down.
         // The sun shines through the tone curve; the moon keeps its markings.
         var shape = 1.0;
+        var tint_after = vec3(1.0);
         // (Within about 25° of the sun: the moon lags the day now and can stand on its side of the sky.)
         if s.ids.y == SKY_BODY && dot(dir, scene.sun.xyz) > 0.9 {
             // The sun as a round disc with a soft glow (Bliss's), not the picture's square: that
@@ -877,9 +953,16 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
             rgb = mix(vec3(1.0, 0.96, 0.86), vec3(1.0, 0.52, 0.2), g) * (disc * mix(3.0, 1.5, g) + halo);
             shape = smoothstep(0.0, 0.004, disc + halo);
         }
+        // A blood moon: copper, then a deep red disc, dimmer in totality.
+        if s.ids.y == SKY_BODY && dot(dir, scene.moon.xyz) > 0.9 && blood_moon() > 0.0 {
+            // Tinted after the curve as well: the moon's bright picture went white through it, and a
+            // copper moon showed only a faint pink (the sky-events check, 11-05).
+            rgb *= blood_tint() * mix(1.0, 0.45, smoothstep(0.5, 1.0, blood_moon()));
+            tint_after = blood_tint();
+        }
         a *= 1.0 - rain_amount() * 0.9;
         // `display` lifts black a little: outside the sun's shape nothing may be added.
-        rgb = display(rgb) * shape;
+        rgb = display(rgb) * shape * tint_after;
     }
     return vec4(rgb * a, select(a, 0.0, s.ids.w != 0u));
 }
