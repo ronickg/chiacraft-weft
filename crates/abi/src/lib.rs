@@ -526,6 +526,10 @@ pub mod comp {
     /// region's ramp (an 8 x 1 texture, one colour per step). `+dx,dy` after a layer moves it that
     /// many pixels (a handle meeting its head's anchor). Without it the item's icon shows.
     pub const LOOK: &str = "core:look";
+    /// chiacraft: how a worn stack is drawn on its wearer instead of its item's `WORN_TEXTURE`, as
+    /// `LOOK` is written (layers in the wearer's skin layout, shade maps painted with ramps, `+dx,dy`
+    /// moves); armour built from parts paints its shell, fastening and lining and sets its gems.
+    pub const WORN_LOOK: &str = "core:worn_look";
     /// Blocks connecting energy networks.
     pub const CONDUCTOR: &str = "conductor";
     /// Entity or stack component, layout `Energy`.

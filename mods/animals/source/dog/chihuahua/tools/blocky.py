@@ -139,7 +139,9 @@ L = {
     "leg_top": 14, "knee": 8, "ankle": 3,
     # Sit and lie, fit with tools/ground.py so the paws and body rest on the ground.
     "sit_angle": 19, "sit_hip": -70, "sit_knee": 144, "sit_drop": 7.5, "sit_back": 0,
-    "lie_front": -74, "lie_hip": -86, "lie_knee": 160, "lie_drop": 8.4, "lie_neck": 70, "lie_head": -58,
+    # lie_hip -98 and lie_knee 156 (were -86, 160): refit for the thighs pulled in for linecheck,
+    # whose backs, under them lying, had risen a unit off the ground.
+    "lie_front": -74, "lie_hip": -98, "lie_knee": 156, "lie_drop": 8.4, "lie_neck": 70, "lie_head": -58,
 }
 FACES = {"north": (2, -1), "south": (2, 1), "west": (0, -1), "east": (0, 1), "down": (1, -1), "up": (1, 1)}
 
@@ -157,12 +159,17 @@ def el(name, bone, lo, hi, quad=None, cut=False, rot=None, origin=None, view=Non
 def elements():
     E = []
     # Body: the front half on spine_1, the back half on spine_0.
-    E.append(el("chest", "spine_1", (-8, 12, -1), (8, 26, 13)))
+    E.append(el("chest", "spine_1", (-8, 12, -1), (8, 27.5, 13)))  # top half a unit under the skull (was 26: the neck showed as a band between them); linecheck
     E.append(el("hips", "spine_0", (-7.5, 13, -19), (7.5, 24.6, -1)))  # a bit inside the chest: the two bend apart
-    E.append(el("britches", "spine_0", (-7, 14, -22), (7, 24, -19)))
+    # Within 0.4 of the hips' sides and top and half a unit under their bottom (was 14 wide from y 14
+    # to 24: their back showed round it as a rim); linecheck
+    E.append(el("britches", "spine_0", (-7.1, 12.5, -22), (7.1, 24.2, -19)))
     E.append(el("neck", "neck", (-7.5, 22, 1), (7.5, 31, 11)))
     # The bib: a solid block and a quad in front of it cut to the sheet's locks.
-    E.append(el("bib", "spine_1", (-10, 14, 11), (10, 29, 16)))  # short: the locks' V hangs below it
+    # short: the locks' V hangs below it. Half a unit out from the chest's sides and bottom (was 20
+    # wide from y 14: the chest showed under it and its back as a rim beside the chest), and deep
+    # enough (from z 8.5, was 11) that its sides are two texels, not a strip under the skull; linecheck
+    E.append(el("bib", "spine_1", (-8.5, 12.5, 8.5), (8.5, 29, 16)))
     E.append(el("bib_locks", "spine_1", (-12, 4, 16.5), (12, 30, 16.5), quad="south", cut=True))
     # Belly fringe along both sides, cut from the side views.
     for side, face in ((1, "east"), (-1, "west")):
@@ -175,7 +182,7 @@ def elements():
     # Muzzle: the upper part on the head, the lower jaw on its own bone (hinged at the back) so
     # the mouth opens; a dark box inside is the mouth you see when it does; the tongue on its
     # own bone pivots at the lip so it can hang out over the jaw.
-    E.append(el("muzzle", "head", (-5, 30, 16), (5, 35, 25)))
+    E.append(el("muzzle", "head", (-5, 30, 20), (5, 35, 25)))  # from the skull's front (was 16, inside it: its top showed as a strip in front of the skull); linecheck
     E.append(el("mouth", "head", (-3.5, 28.5, 18), (3.5, 31, 21.3)))
     E.append(el("jaw", "jaw", (-4, 27, 17.5), (4, 30, 22.5)))  # shorter than the muzzle: the tongue bends out of sight
     # The tongue: a base lying in the mouth on the jaw, then two parts that bend over the lip's
@@ -213,7 +220,12 @@ def elements():
         E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (lx - 2.5, 3, lz - 2.5), (lx + 2.5, 8, lz + 2.5)))  # thinner than the upper leg: folded, their sides never share a plane
         E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (lx - 4, 0, lz - 3.5), (lx + 4, 3, lz + 4.5)))  # 8 wide: three toes
         if not front:
-            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (lx - 3.5, 10, lz - 5), (lx + 3.5, 21, lz + 5)))
+            # Half a unit out from the hips' side, within 0.4 of their top and bottom (under half a
+            # sample, so the check reads it flush), inside their back (was 2 units out, from y 10 to 21
+            # and z -20: the hips showed above it as a band and it a rim round them); linecheck
+            side = 1 if leg[1] == "L" else -1
+            x0, x1 = sorted((lx - side * 3.5, side * 8.0))
+            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (x0, 12.6, lz - 3.5), (x1, 24.2, lz + 5)))
     return E
 
 

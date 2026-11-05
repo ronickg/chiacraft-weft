@@ -125,7 +125,7 @@ const E = DATA.entries;
 const GROUPS = ["items","blocks","parts","gems","food","tools and weapons","armour","clothing","plants","animals","monsters","skills","features"];
 const FACETS = [
   {key:"group", label:"Group", get:e=>e.group, order:GROUPS},
-  {key:"mod", label:"Mod", get:e=>e.mod},
+  {key:"mod", label:"Mod", get:e=>e.mod||"—"},
   {key:"age", label:"Age", get:e=>e.age||"no age", order:[...DATA.ages,"no age"]},
   {key:"path", label:"Path", get:e=>e.path||"none", order:["tech","magic","beasts","shared","none"]},
   {key:"art", label:"Art", get:e=>artAge(e), order:["today","this week","this month","older","—"]},
@@ -215,7 +215,7 @@ function slotHTML(c, bg, label){
   const st = `style="background-image:url(${bg||G.slot})"`;
   if(!c) return `<div class="slot" ${st}>${label?`<span class="lbl">${esc(label)}</span>`:""}</div>`;
   const [id,n,any]=c; const i=BYID.get(id); const e=i!==undefined?E[i]:null;
-  const pic = e&&e.img?`<img class="${e.pix?"pix":""}" src="${e.img}" alt="" loading="lazy">`:`<span class="any" style="position:static;color:#3b3127;font-size:9px">${esc(String(id).replace(/^#/,"").split(":").pop())}</span>`;
+  const pic = e&&e.img?`<img class="${e.pix?"pix":""}" src="${e.img}" alt="">`:`<span class="any" style="position:static;color:#3b3127;font-size:9px">${esc(String(id).replace(/^#/,"").split(":").pop())}</span>`;
   return `<div class="slot${e?" link":""}" ${st} ${e?`data-go="${i}"`:""} title="${esc((e?e.name:id)+(any?" (or any of its kind)":"")+(n>1?" × "+n:""))}">${pic}${n>1?`<span class="n">${Number.isInteger(n)?n:n.toFixed(1)}</span>`:""}${any?`<span class="any">any</span>`:""}${label?`<span class="lbl">${esc(label)}</span>`:""}</div>`;
 }
 function stationName(st){ if(DATA.stations[st]) return DATA.stations[st]; const i=BYID.get(st); return i!==undefined?E[i].name:st; }
@@ -254,18 +254,18 @@ function webHTML(region){
   const xs=W.nodes.map(n=>n.x), ys=W.nodes.map(n=>n.y), pad=30;
   const x0=Math.min(...xs)-pad, y0=Math.min(...ys)-pad, w=Math.max(...xs)-x0+pad, h=Math.max(...ys)-y0+pad;
   const byId=new Map(W.nodes.map(n=>[n.id,n]));
-  const size={Small:8,Notable:13,Keystone:17,Socket:12};
+  const size={Small:16,Notable:26,Keystone:34,Socket:24};
   const dim=n=>region&&n.region!==region&&n.bridge!==region;
-  const lines=W.links.map(([a,b])=>{const p=byId.get(a),q=byId.get(b); if(!p||!q) return ""; const d=dim(p)&&dim(q); return `<line x1="${p.x}" y1="${p.y}" x2="${q.x}" y2="${q.y}" stroke="${d?"#3a3128":"#7d6a52"}" stroke-width="1.5"/>`}).join("");
+  const lines=W.links.map(([a,b])=>{const p=byId.get(a),q=byId.get(b); if(!p||!q) return ""; const d=dim(p)&&dim(q); return `<line x1="${p.x}" y1="${p.y}" x2="${q.x}" y2="${q.y}" stroke="${d?"#3a3128":"#7d6a52"}" stroke-width="2.5"/>`}).join("");
   const nodes=W.nodes.map(n=>{
-    const k=(n.kind||"").replace(/\W/g,""), r=n.region===null&&n.id===0?11:(size[k]||8), d=dim(n);
+    const k=(n.kind||"").replace(/\W/g,""), r=n.region===null&&n.id===0?24:(size[k]||16), d=dim(n);
     const nm=W.names[n.key]||n.key, gives=(n.gives||[]).map(([f,u])=>`${u>0?"+":""}${u} ${f}`).join(", ");
     const tip=`${nm}${n.socket!==null?" (socket)":""} — ${k}${gives?": "+gives+" units (a unit is +2%)":""}${n.special?" · "+n.special.replace("_"," "):""}${n.needs?` · needs ${n.region||""} ${n.needs}`:""}${n.bridge?` and ${n.bridge} ${n.needs}`:""}`;
     const sprite=n.id===0?W.start:(W.sprites[k.toLowerCase()]||W.sprites.small);
     return `<g opacity="${d?0.25:1}"><circle cx="${n.x}" cy="${n.y}" r="${r*0.62}" fill="${col(n.region)}" opacity=".55"/>${sprite?`<image href="${sprite}" x="${n.x-r/2}" y="${n.y-r/2}" width="${r}" height="${r}" style="image-rendering:pixelated"/>`:""}<title>${esc(tip)}</title></g>`;
   }).join("");
   const legend=regs.map(r=>`<span class="tag" style="border-color:${col(r)}"><span style="color:${col(r)}">●</span> ${esc(r.replace(/_/g," "))}</span>`).join(" ");
-  return `<div class="sec"><h4>The perk web ${region?"(its region lit)":""}</h4><div class="tags">${legend}</div><div style="background:var(--well);border:1px solid var(--line);border-radius:6px;overflow:auto;max-height:80vh"><svg viewBox="${x0} ${y0} ${w} ${h}" style="width:100%;min-width:640px;display:block">${lines}${nodes}</svg></div><div class="dim">Hover a node for its name and effect. ${W.nodes.length} nodes, ${W.links.length} links.</div></div>`;
+  return `<div class="sec"><h4>The perk web ${region?"(its region lit)":""}</h4><div class="tags">${legend}</div><div style="background:var(--well);border:1px solid var(--line);border-radius:6px;overflow:auto;max-height:80vh"><svg viewBox="${x0} ${y0} ${w} ${h}" style="width:100%;min-width:900px;display:block">${lines}${nodes}</svg></div><div class="dim">Hover a node for its name and effect. ${W.nodes.length} nodes, ${W.links.length} links.</div></div>`;
 }
 function open(i){
   const e=E[i]; const b=[];
@@ -290,7 +290,7 @@ function open(i){
   if(e.links&&e.links.length) b.push(`<div class="sec"><h4>Its things <span class="dim">${e.links.length}</span></h4><div class="vgrid">${e.links.map(id=>{const i=BYID.get(id); if(i===undefined) return ""; const x=E[i]; return `<div class="v link" data-go="${i}" style="cursor:pointer">${x.img?`<img class="${x.pix?"pix":""}" loading="lazy" src="${x.img}" alt="">`:""}<div>${esc(x.name)}</div></div>`}).join("")}</div></div>`);
   if(e.features&&e.features.length) b.push(`<div class="sec"><h4>Part of</h4><div class="tags">${e.features.map(id=>{const i=BYID.get(id); return i===undefined?"":`<span class="tag link" data-go="${i}" style="cursor:pointer">${esc(E[i].name)}</span>`}).join("")}</div></div>`);
   if(e.web) b.push(webHTML(null));
-  if(e.region&&DATA.web) b.push(webHTML(DATA.web.nodes.find(n=>n.region&&n.region.replace(/_/g," ")===e.region.toLowerCase())?.region || null));
+  if(e.region&&DATA.web) b.push(webHTML(e.region));
   b.push(screensHTML(e.screens,"How it's made"));
   if(e.made&&e.made.length) b.push(`<div class="sec"><h4>${e.screens&&e.screens.length?"In the progression graph":"What makes it"}</h4><ul>${e.made.map(m=>`<li>${esc(m)}</li>`).join("")}</ul></div>`);
   b.push(screensHTML(e.makes,"Made here",12));

@@ -26,8 +26,8 @@ Power grows Ã—1.6 an age: `g(L) = 1.6^(L/10)` over area and item level L (tier Ã
 | tier | age | hours | EM | g at start | reference: hit / health / armour | things tagged | made | kit EM | of budget | everything once |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 496 | 149 | 52 | 36 % | 221 EM |
-| 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 26 | 15 | 76 | 26 % | 53 EM |
-| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 28 | 22 | 50 | 13 % | 256 EM |
+| 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 34 | 21 | 137 | 48 % | 76 EM |
+| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 30 | 24 | 60 | 16 % | 264 EM |
 | 3 | Age of Steam | 18 | 1080 | 4.10 | 31.1 / 104 / 130 | 26 | 23 | 94 | 22 % | 273 EM |
 | 4 | Age of Lightning | 20 | 1200 | 6.55 | 49.7 / 166 / 207 | 0 | 0 | 0 | 0 % | 0 EM |
 | 5 | Age of the Future | 18 | 1080 | 10.49 | 79.6 / 265 / 332 | 0 | 0 | 0 | 0 % | 0 EM |
@@ -341,13 +341,14 @@ Notes:
 - animals:warden_antler, animals:warden_bark: Drenkaun's part breaks and loot
 - animals:kibble: an egg, food, grain and fibre (no iron bucket; Ronald, 11-07: "move them to fit")
 
-### Bronze Age (26)
+### Bronze Age (34)
 
-**tech** (25)
+**tech** (33)
 
-- ground: gold_ore (-), granite_gold_ore (-), granite_iron_ore (-), iron_ore (-), meteorite (-), red_sandstone_iron_ore (-)
-- material: gold_block (29), gold_ingot (3.2), meteoric_iron (10), raw_gold (3.0)
+- ground: copper_ore (-), gold_ore (-), granite_gold_ore (-), granite_iron_ore (-), iron_ore (-), meteorite (-), red_sandstone_iron_ore (-), tin_ore (-)
+- material: bronze_ingot (7.3), copper_ingot (1.7), gold_block (29), gold_ingot (3.2), meteoric_iron (10), raw_copper (1.5), raw_gold (3.0), raw_tin (5.0), tin_ingot (5.2)
 - armour: boots_scale (-), chestplate_scale (-), helmet_scale (-), leggings_scale (-)
+- station: crucible (2.2)
 - building: blue_stained_glass (0.47), bricks (0.27), glass (0.27), green_stained_glass (0.52), red_stained_glass (0.42), stone (0.32), stone_bricks (0.33)
 - light: blue_lamp (1.4), glowstone (1.2), green_lamp (1.4), red_lamp (1.3)
 
@@ -356,20 +357,22 @@ Notes:
 - sky: pallasite (20)
 
 Notes:
+- base:copper_ore, base:tin_ore: breaks into raw copper or raw tin (a stone pickaxe): copper in cold, dry and beach land, tin on beaches and in mountains (`metals.rs`)
 - base:iron_ore, base:granite_iron_ore, base:red_sandstone_iron_ore, base:meteorite, base:gold_ore, base:granite_gold_ore: breaks into raw iron, meteoric iron or raw gold (a stone pickaxe)
 - base:pallasite: a stony-iron meteorite's olivine, found where one fell
 - base:helmet_scale, base:chestplate_scale, base:leggings_scale, base:boots_scale: a bronze or copper shell's worn look: no copper or bronze in the game yet (only `/gear`)
 - base:meteoric_iron: hammered cold, iron-grade before a player can smelt (Research round 17)
 - base:raw_gold, base:gold_ingot, base:gold_block: cast and soft: the Bronze Age's (Ronald, 11-07: "move them to fit")
 
-### Iron Age (28)
+### Iron Age (30)
 
-**tech** (16)
+**tech** (18)
 
 - ground: redstone_ore (-), star_steel_ore (-)
-- material: bucket (3.5), gem_peridot (10), iron_block (11), iron_ingot (1.2), lava_bucket (4.1), raw_iron (1.0), star_steel_ingot (12), star_steel_lump (12), water_bucket (3.7)
+- material: bucket (3.5), gem_peridot (10), iron_block (11), iron_ingot (1.2), lava_bucket (4.1), raw_iron (1.0), star_steel_ingot (12), star_steel_lump (12), steel_ingot (2.3), water_bucket (3.7)
 - tool: grappling_hook (3.8)
 - armour: boots_mail (2.8), chestplate_mail (4.0), helmet_mail (2.8), leggings_mail (4.0)
+- station: forge (6.1)
 
 **magic** (8)
 
@@ -429,11 +432,11 @@ Each `crafting::MATERIALS` row's age, and what a part of it is made from in the 
 | antler | Stone Age | - |
 | stone | Stone Age | base:cobblestone |
 | diamond | Age of Steam | base:diamond |
-| copper | Bronze Age | - |
-| bronze | Bronze Age | - |
+| copper | Bronze Age | base:copper_ingot |
+| bronze | Bronze Age | base:bronze_ingot |
 | wrought_iron | Iron Age | base:iron_ingot |
 | meteoric_iron | Bronze Age | base:meteoric_iron |
-| steel | Iron Age | - |
+| steel | Iron Age | base:steel_ingot |
 | star_steel | Iron Age | base:star_steel_ingot |
 | gold | Bronze Age | base:gold_ingot |
 | oak | Stone Age | base:oak_planks |

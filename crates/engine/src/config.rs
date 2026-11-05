@@ -658,8 +658,10 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::number("core:show_avatars", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         ConfigDef::number("core:occlusion_culling", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         // Soft volumetric clouds traced at a quarter of the pixels and blended over frames, for a
-        // pack that draws them (chiacraft's); off, the pack's own (blocky) clouds.
-        ConfigDef::number("core:soft_clouds", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // pack that draws them (chiacraft's); off, the pack's own (blocky) clouds. On by default
+        // (Tester 2 and the shader look sheets, 11-05: real cumulus where the blocky ones are flat
+        // slabs, at the same GPU time).
+        ConfigDef::number("core:soft_clouds", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         // Screen effects' half-size parts (`post_low`); off, every effect at full size, as before.
         ConfigDef::number("core:post_low", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:allow_avatars", ck::BOOL, 1.0, 0.0, 1.0, 0.0) },

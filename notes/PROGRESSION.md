@@ -111,6 +111,13 @@ today's systems through chains and attributes, and the K screen (`mods/base/src/
 `web.rs`). The magic schools, Engineering and Trading are data until spells, machines and traders
 come.
 
+**The web's layout** (Ronald, 11-05, on the first even wheel: "it sohuldnt be uniform, if that
+makes sesne check poe2 one"; then "A, with clearer islands"): each region its own island in one
+ring round the start, sized by its room, notables on rings of small nodes, keystones at the rim,
+bridges across the gaps; a small start hub of five gates (one a group) whose roads split at
+junctions near neighbouring islands of one group. The screen opens on the island of your highest
+skill. `vitals::web_layout`.
+
 **Sockets and found stones** (Ronald, 11-05: "It would be cool if you can then insert items which
 generate boosts and you find those items in the world, relics or whatever. It's a bit like how Path
 of Exile 2 has that, where you have certain slots where you can insert them"). Built 11-05:

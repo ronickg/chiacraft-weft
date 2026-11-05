@@ -36,6 +36,14 @@ if __name__ == "__main__":
     from ground import gait, joints, pokes  # noqa: E402
     loose = joints(spec)  # every joint inside both parts it joins, or they come apart when it turns
     assert not loose, f"loose joints: {loose}"
+    # No thin lines (Ronald, 11-05): no strip of a box under two texels showing beside another,
+    # measured at the size the game draws it (a layout unit here is 4 * SCALE of linecheck's).
+    from linecheck import boxes_from_spec, lines  # noqa: E402
+    from PIL import Image  # noqa: E402
+    import numpy as np  # noqa: E402
+    boxes = [dict(b, unit=4 * SCALE) for b in boxes_from_spec(spec)]
+    thin = [h for h in lines(boxes, np.array(Image.open(os.path.join(OUT, "texture.png")).convert("RGBA"))) if h["kind"] == "line"]
+    assert not thin, f"thin lines: {[(h['box'], h['face'], h['cover'], h['width']) for h in thin]}"
     # Along the body's axis nothing pokes out of its neighbor in any pose (a neck's corner through
     # the head, a tail segment's through the one before).
     poking = pokes(spec, ["neck", "skull", "chest", "hips", "tail_"])

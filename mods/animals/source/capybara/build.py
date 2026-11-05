@@ -40,6 +40,12 @@ if __name__ == "__main__":
         back = {f: v for f, v in gait(spec, anim, ["leg_FL_paw", "leg_FR_paw", "leg_BL_paw", "leg_BR_paw"]).items() if v is not None and v <= 0}
         assert not back, f"{anim} goes backwards: {back}"
     made = export(spec, os.path.join(OUT, "texture.png"), ASSETS, "capybara", SCALE, "capybara/capybara", pose_files=POSES)
+    # No thin lines (Ronald, 11-05): no strip of a box under two texels showing beside another, checked
+    # on the model as the game has it (`linecheck.py` on the exported geo).
+    from linecheck import density_of, lines, load  # noqa: E402
+    boxes, tex = load(os.path.join(ASSETS, "models", "capybara.geo.json"), os.path.join(ASSETS, "textures", "entity", "capybara", "capybara.png"))
+    thin = [h for h in lines(boxes, tex, density_of(boxes), allow=()) if h["kind"] == "line"]
+    assert not thin, f"thin lines: {[(h['box'], h['face'], h['cover'], h['width']) for h in thin]}"
     # Its coat layers, for coats painted from genes in the game (`core/src/coats.rs`).
     import shutil  # noqa: E402
     shutil.copytree(os.path.join(OUT, "layers"), os.path.join(HERE, "..", "..", "genetics", "layers", "capybara"), dirs_exist_ok=True)

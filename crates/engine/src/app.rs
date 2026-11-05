@@ -2979,10 +2979,11 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
     r.list.clear();
     if let Some(g) = &mut r.game {
         let worn = g.client.worn();
+        let worn_looks = g.client.worn_looks();
         let held = [g.client.shown_held(), g.client.off_held()];
         g.client
             .entity_render
-            .preload(&mut *r.gpu, &r.assets, &g.client.entities, &g.client.entity_components, &worn, held);
+            .preload(&mut *r.gpu, &r.assets, &g.client.entities, &g.client.entity_components, &worn, &worn_looks, held);
         if g.client
             .entity_render
             .draw_icons(&mut *r.gpu, &mut r.list, info)
@@ -2993,6 +2994,7 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
     if let Some(g) = r.game.as_mut().filter(|_| !r.screens.is_empty()) {
         if let Some(&([x, y, w, h], whose)) = r.previews.first() {
             let worn = g.client.worn();
+            let worn_looks = g.client.worn_looks();
             let look = r.input.cursor - Vec2::new(x, y);
             // The menu's own entity, or a kind alone (no entity: its own texture, nothing painted).
             let subject = match whose {
@@ -3015,6 +3017,7 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
                 [w.round() as u32, h.round() as u32],
                 look,
                 &worn,
+                &worn_looks,
                 subject,
             );
             drop(s);

@@ -136,6 +136,14 @@ pub const RULES: &[Rule] = &[
     ),
     n(&["base:coal_ore", "base:banded_clay_coal_ore"], 0, Shared, Ground, Not, "breaks into coal"),
     n(
+        &["base:copper_ore", "base:tin_ore"],
+        1,
+        Tech,
+        Ground,
+        Not,
+        "breaks into raw copper or raw tin (a stone pickaxe): copper in cold, dry and beach land, tin on beaches and in mountains (`metals.rs`)",
+    ),
+    n(
         &[
             "base:iron_ore",
             "base:granite_iron_ore",
@@ -282,6 +290,11 @@ pub const RULES: &[Rule] = &[
     n(&["base:arrow"], 0, Tech, Tool, Drop(2.0), "dropped by skeletons; no recipe yet"),
     // ---- metals and gems
     r(&["base:coal", "base:coal_block"], 0, Shared, Material, Made),
+    // Copper, tin and bronze (`metals.rs`): the Bronze Age's; steel the Iron Age's.
+    r(&["base:raw_copper", "base:copper_ingot", "base:raw_tin", "base:tin_ingot", "base:bronze_ingot"], 1, Tech, Material, Made),
+    r(&["base:crucible"], 1, Tech, Station, Made),
+    r(&["base:steel_ingot"], 2, Tech, Material, Made),
+    r(&["base:forge"], 2, Tech, Station, Made),
     n(&["base:meteoric_iron"], 1, Tech, Material, Made, "hammered cold, iron-grade before a player can smelt (Research round 17)"),
     r(
         &["base:raw_iron", "base:iron_ingot", "base:iron_block", "base:bucket", "base:water_bucket", "base:lava_bucket"],
@@ -739,11 +752,11 @@ pub const MATERIALS: &[MaterialTag] = &[
     mt("antler", ""),
     mt("stone", "base:cobblestone"),
     mt("diamond", "base:diamond"),
-    mt("copper", ""),
-    mt("bronze", ""),
+    mt("copper", "base:copper_ingot"),
+    mt("bronze", "base:bronze_ingot"),
     mt("wrought_iron", "base:iron_ingot"),
     mt("meteoric_iron", "base:meteoric_iron"),
-    mt("steel", ""),
+    mt("steel", "base:steel_ingot"),
     mt("star_steel", "base:star_steel_ingot"),
     mt("gold", "base:gold_ingot"),
     mt("oak", "base:oak_planks"),

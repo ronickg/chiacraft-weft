@@ -40,6 +40,16 @@ if __name__ == "__main__":
     from ground import feet_low, gait, grounded, joints, pokes  # noqa: E402
     loose = joints(spec)  # every joint inside both parts it joins, or they come apart when it turns
     assert not loose, f"loose joints: {loose}"
+    # No thin lines (Ronald, 11-05): no strip of a box under two texels showing beside another.
+    # Meant: the mouth's dark wedge between the jaw and the upturned snout (the exported model lists it).
+    from linecheck import boxes_from_spec, lines  # noqa: E402
+    from PIL import Image  # noqa: E402
+    import numpy as np  # noqa: E402
+    meant = ("mouth.west", "mouth.east", "mouth.south")
+    boxes = [dict(b, unit=4 * SCALE) for b in boxes_from_spec(spec)]  # at the size the game draws it (4 * SCALE of linecheck's units)
+    thin = [h for h in lines(boxes, np.array(Image.open(os.path.join(OUT, "texture.png")).convert("RGBA")), allow=meant)
+            if h["kind"] == "line"]
+    assert not thin, f"thin lines: {[(h['box'], h['face'], h['cover'], h['width']) for h in thin]}"
     # Along the body's axis nothing pokes out of its neighbor in any pose (a neck's corner through
     # the head, a tail segment's through the one before).
     poking = pokes(spec, ["neck", "skull", "chest", "hips", "tail_"])

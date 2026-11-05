@@ -53,7 +53,14 @@ def export(model):
 
     # A neck hidden inside the breast and the head (a songbird, an owl) shows no corners: left out.
     axis = ["skull", "chest", "hips", "tail"] if mod.CFG.get("neck_hidden") else ["neck", "skull", "chest", "hips", "tail"]
+    from linecheck import boxes_from_spec, lines  # noqa: E402
+    import numpy as np  # noqa: E402
+
+    tex = np.array(Image.open(os.path.join(out, "texture.png")).convert("RGBA"))
     for spec in (ground, fly):
+        # No thin lines (Ronald, 11-05): no strip of a box under two texels showing beside another.
+        thin = [h for h in lines(boxes_from_spec(spec), tex) if h["kind"] == "line"]
+        assert not thin, f"{spec['name']}: thin lines: {[(h['box'], h['face'], h['cover'], h['width']) for h in thin]}"
         loose = joints(spec)  # every joint inside both parts it joins, or they come apart when it turns
         assert not loose, f"{spec['name']}: loose joints: {loose}"
         poking = pokes(spec, axis)  # no neck corner through the head or the back

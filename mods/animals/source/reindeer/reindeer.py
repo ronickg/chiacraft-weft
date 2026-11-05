@@ -149,39 +149,72 @@ TAIL0 = np.array([0.0, 53.5, -40.0])  # on the rump's back face: a flap hinged o
 ANTLER0 = (3.6, 71.4, 36.5)  # where the left antler's burr sits on the skull
 
 
+# Rule 7 (Ronald, 11-05, "What the best ones do"): thin parts are cut-out planes, never boxes a
+# texel thick. The antlers were a burr and eleven rods a side, most a texel thick or less; now each is
+# one cut-out plane on the antler bone, as the deer's (`../deer/deer.py`), drawn in its texture a texel
+# thick by an alpha mask (`cut_mask`, "antler") in the old rods' shape and size: from the burr the beam
+# sweeps up and back, then forward in a C to the palm with three points; the bez tine forward from low
+# on the beam; over the face the brow tine, on the left as the flat 'shovel', on the right a plain point
+# (most have one shovel). A texel is 2 units drawn (2 / K in the deer's space). The plane faces sideways,
+# turned out with the beam's sweep and leaning out as the beam did.
+# The beam and the palm two texels thick (Ronald, 11-05: one texel read wiry, a thin outline loop from
+# the side), the points and tines one or two.
+ANTLER_ART = {
+    "L": ["....#..#..#...",  # rows top down, columns back to front, in texels; B the burr (its lower row in the skull)
+          "....#..#..#...",
+          "...#########..",  # the palm
+          "..##########..",
+          ".####.........",
+          ".###..........",
+          "###...........",
+          "##............",
+          "##............",
+          "##............",
+          "###...........",
+          ".###..........",
+          ".#######......",  # the bez tine, forward off the beam
+          "..###.........",
+          "...###....##..",  # the shovel over the face
+          "....###...##..",
+          ".....######...",  # the beam's root and the brow tine
+          ".......BB.##..",
+          ".......BB....."],
+    "R": ["....#..#..#...",
+          "....#..#..#...",
+          "...#########..",
+          "..##########..",
+          ".####.........",
+          ".###..........",
+          "###...........",
+          "##............",
+          "##............",
+          "##............",
+          "###...........",
+          ".###..........",
+          ".#######......",
+          "..###.........",
+          "...###........",
+          "....###.......",
+          ".....#####....",  # the plain brow point
+          ".......BB.....",
+          ".......BB....."]}
+ANTLER_T = 2.0 / K  # a texel, in the deer's space
+ANTLER_Y0, ANTLER_Z0 = -1.4, -14.3  # the drawing's bottom and back edge from the burr's pivot, in the deer's space
+ANTLER_TURN = (0, 19, -20)  # the left plane's turn (rx, ry, rz) about the pivot; the right's mirrored
+
+
 def antler(side):
-    """A reindeer's antler: the beam sweeping up and back, then forward in a C to a flattened palm
-    with short points; a bez tine forward from low on the beam; and over the face the brow tine,
-    on the left as the flat 'shovel', on the right a plain point (most have one shovel)."""
+    """The antler: one cut-out quad on its bone facing out, exactly the drawing's size, the right one
+    a mirrored quad (a west quad, the turn mirrored), so both are lit alike."""
     s = 1 if side == "L" else -1
-    k = side.lower()
-    bone = f"antler_{side}"
-    x0, y0, z0 = ANTLER0
-    start = (s * x0, y0, z0)
-    E = [el(f"burr_{k}", bone, (s * x0 - 1.2, y0 - 1.0, z0 - 1.4), (s * x0 + 1.2, y0 + 2.4, z0 + 1.4))]
-    beam0, p1 = rod(f"beam0_{k}", bone, (start[0], y0 + 1.8, z0), (-52, 0, -s * 26), 12.0, 1.9)
-    beam1, p2 = rod(f"beam1_{k}", bone, tuple(p1), (-14, 0, -s * 16), 12.0, 1.7)
-    beam2, p3 = rod(f"beam2_{k}", bone, tuple(p2), (42, 0, -s * 6), 9.0, 1.5)
-    E += [beam0, beam1, beam2]
-    # The palm: a plate along the beam's end, three short points up off it.
-    E.append(el(f"palm_{k}", bone, (p3[0] - 0.55, p3[1] - 1.0, p3[2] - 2.6), (p3[0] + 0.55, p3[1] + 3.6, p3[2] + 2.4),
-                rot=(42, 0, -s * 6), origin=tuple(p3)))
-    for j, (dz, length) in enumerate(((-1.6, 4.0), (0.4, 5.0), (2.2, 3.6))):
-        at = p3 + rotm((42, 0, -s * 6)) @ np.array([0, 2.6, dz])
-        tine, _ = rod(f"point{j}_{k}", bone, tuple(at), (8 + 18 * j, 0, -s * 12), length, 0.9)
-        E.append(tine)
-    bez, _ = rod(f"bez_{k}", bone, tuple(p1 + (p2 - p1) * 0.15), (80, 0, -s * 14), 7.0, 1.2)
-    E.append(bez)
-    if side == "L":
-        b0 = (start[0] - 0.4, y0 + 2.6, z0 + 0.6)
-        brow, _ = rod("brow_l", bone, b0, (72, 0, -6), 7.0, 0.9)
-        shovel = el("shovel_l", bone, (b0[0] - 0.95, b0[1] + 3.0, b0[2] - 4.4), (b0[0] + 0.95, b0[1] + 8.6, b0[2] + 1.0),
-                    rot=(72, 0, -6), origin=b0)
-        E += [brow, shovel]
-    else:
-        brow, _ = rod("brow_r", bone, (start[0] + 0.4, y0 + 2.6, z0 + 0.6), (74, 0, 8), 5.0, 1.0)
-        E.append(brow)
-    return E
+    o = np.array((s * ANTLER0[0], ANTLER0[1], ANTLER0[2]))
+    art = ANTLER_ART[side]
+    rows, cols = len(art), len(art[0])
+    lo = (o[0], o[1] + ANTLER_Y0, o[2] + ANTLER_Z0)
+    hi = (o[0], o[1] + ANTLER_Y0 + ANTLER_T * rows, o[2] + ANTLER_Z0 + ANTLER_T * cols)
+    rx, ry, rz = ANTLER_TURN
+    return [el(f"antler_{side.lower()}", f"antler_{side}", lo, hi, quad="east" if s > 0 else "west", rot=(rx, s * ry, s * rz),
+               origin=tuple(o), cut="antler")]
 
 
 def bones():
@@ -211,10 +244,13 @@ def elements():
     E = [el("hips", "spine_0", (-10.6, 35, -40), (10.6, 57.5, 0)),  # reaching deep into the chest, below the withers
          el("chest", "spine_1", (-11.4, 30, -8), (11.4, 60, 30)),  # deep and broad
          el("skull", "head", *SKULL0),
-         el("muzzle", "head", (-5.4, 59.6, 45.5), (5.4, 67.6, 55.0)),  # broad and blunt
-         el("nose", "head", (-4.6, 60.4, 54.5), (4.6, 66.6, 57.4)),  # furred to the lip
-         el("mouth", "head", (-3.5, 58.9, 44.5), (3.5, 60.9, 53.6)),
-         el("jaw", "jaw", (-4.0, 57.6, 44.0), (4.0, 60.4, 54.0))]  # shorter than the muzzle
+         # Broad and blunt, half the skull's width (rule 4, Ronald 11-05: 40-70%), so the skull's front shows two
+         # texels each side of it; to 59.0, where the nose box ended (rule 4: the furred nose painted on its
+         # front, no box; the box was 4 proud).
+         el("muzzle", "head", (-3.4, 59.6, 45.5), (3.4, 67.6, 59.0)),
+         el("mouth", "head", (-2.4, 58.9, 44.5), (2.4, 60.9, 53.6)),  # half a unit inside the jaw
+         # Shorter than the muzzle; its chin 3.7 below the muzzle, over two texels (at 57.6, 2 below, 1.5 texels, it read as a rim; linecheck).
+         el("jaw", "jaw", (-2.9, 55.9, 44.0), (2.9, 60.4, 54.0))]  # its sides half a unit in from the muzzle's
     neck, _ = rod("neck", "neck", tuple(NECK0), NECK_ROT, NECK_LEN, NECK_W, back=6.0)  # slimmer than the head
     E.append(neck)
     # The mane: long pale hair down the throat, a box with locks hanging below it.
@@ -261,7 +297,7 @@ def elements():
 # ------------------------------------------------------------------ painting
 
 FACES = {"north": (2, -1), "south": (2, 1), "west": (0, -1), "east": (0, 1), "down": (1, -1), "up": (1, 1)}
-ANTLER_PARTS = ("burr_", "beam", "palm_", "point", "bez_", "brow_", "shovel_")
+ANTLER_PARTS = ("antler_",)
 
 
 def face_frame(lo, hi, face):
@@ -331,12 +367,6 @@ def area(e, face, p, uu, vv, h):
             a[:] = LEG
             a = np.where(z > 52.6, FUR, a)  # the grey of the furred nose
             a = np.where(y < 61.0, PALE, a)  # the pale lip and chin
-    elif name == "nose":
-        a[:] = FUR
-        if face == "down":
-            a[:] = PALE
-        elif face != "up":
-            a = np.where(y < 61.6, PALE, FUR)
     elif name == "jaw":
         a[:] = MOUTH if face == "up" else PALE
     elif name == "mouth":
@@ -372,8 +402,26 @@ def area(e, face, p, uu, vv, h):
     return a
 
 
+def antler_texels(e, p):
+    """The antler's drawing at the face's texel centers `p`: "." none, "#" bone, "B" the burr; and
+    whether each is the top of a point."""
+    art = ANTLER_ART["L" if e["name"].endswith("_l") else "R"]
+    R = rotm(e["rot"])
+    loc = (p - np.array(e["origin"])) @ R / K  # the quad's own frame, the deer's space: y up, z forward
+    r = len(art) - 1 - np.floor((loc[..., 1] - ANTLER_Y0) / ANTLER_T).astype(int)
+    c = np.floor((loc[..., 2] - ANTLER_Z0) / ANTLER_T).astype(int)
+    rows, cols = len(art), len(art[0])
+    get = lambda rr, cc: art[rr][cc] if 0 <= rr < rows and 0 <= cc < cols else "."  # noqa: E731
+    k = np.array([[get(rr, cc) for rr, cc in zip(R_, C_)] for R_, C_ in zip(r, c)])
+    tip = np.array([[get(rr, cc) == "#" and get(rr - 1, cc) == "." and rr <= 1 for rr, cc in zip(R_, C_)] for R_, C_ in zip(r, c)])
+    return k, tip
+
+
 def cut_mask(e, p):
-    """Cut-out outlines: the ear's short oval, the mane's locks (in the neck's own frame)."""
+    """Cut-out outlines: the ear's short oval, the mane's locks (in the neck's own frame), an
+    antler's drawing (`ANTLER_ART`)."""
+    if e["cut"] == "antler":
+        return antler_texels(e, p)[0] != "."
     if e["cut"] == "ear":
         x, y = p[..., 0] / K, p[..., 1] / K
         cx = e["origin"][0] / K
@@ -438,14 +486,18 @@ def paint_face(e, face, boxes):
     col = paint_face_smooth(a, TONES, light_face, out=cap, coat=COAT,
                             y_world=p[..., 1] if not e["name"].startswith(ANTLER_PARTS) else None,
                             occ=occ, quad=bool(e["quad"]), seed=sum(map(ord, e["name"] + face)) % 97, down=down,
-                            tuft=e["name"] not in ("skull", "muzzle", "nose"), merge=e["name"] != "skull")  # keep the eye ring
+                            tuft=e["name"] not in ("skull", "muzzle"), merge=e["name"] != "skull")  # keep the eye ring
     img = np.dstack([np.clip(np.round(col), 0, 255), np.full((h, w), 255)]).astype(np.uint8)
     if e["cut"]:
         img[..., 3] = np.where(cut_mask(e, p), 255, 0)
+    if e["cut"] == "antler":  # bone; the burr a shade darker, the points' tips lighter
+        k, tip = antler_texels(e, p)
+        img[k == "B", :3] = (img[k == "B", :3] * 0.8).astype(np.uint8)
+        img[tip, :3] = np.clip(img[tip, :3] * 1.15, 0, 255).astype(np.uint8)
     if e["name"] == "skull" and face in ("east", "west"):
         s = 1 if face == "east" else -1
         stamp_eyes(img, [eye_center(s)], eye_style(s))
-    if e["name"] == "nose" and face == "south":  # nostrils as slits, the split lip
+    if e["name"] == "muzzle" and face == "south":  # nostrils as slits, the split lip (the nose painted here: rule 4)
         c = w // 2
         if w >= 10 and h >= 4:
             img[2, [c - 4, c - 3, c + 2, c + 3], :3] = (82, 66, 58)
@@ -588,7 +640,7 @@ def animations(bone_names):
 # ------------------------------------------------------------------ fitting poses to the ground
 
 GROUPS = {"front paws": lambda n: n in ("leg_FL_paw", "leg_FR_paw"), "back paws": lambda n: n in ("leg_BL_paw", "leg_BR_paw"),
-          "body": lambda n: n in ("hips", "chest"), "muzzle": lambda n: n in ("nose", "jaw"),
+          "body": lambda n: n in ("hips", "chest"), "muzzle": lambda n: n in ("muzzle", "jaw"),
           "legs": lambda n: n.startswith(("leg_", "thigh_")), "antlers": lambda n: n.startswith(ANTLER_PARTS),
           "mane": lambda n: n in ("mane", "fringe_mane")}
 

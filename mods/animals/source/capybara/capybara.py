@@ -120,16 +120,21 @@ def bones():
 
 def elements():
     E = [el("hips", "spine_0", (-8.5, 9, -20), (8.5, 25, -2)),
-         el("rump", "spine_0", (-7.5, 11, -22.5), (7.5, 23, -19.5)),  # the round back end (no tail)
+         # The round back end (no tail): its sides and bottom flush with the hips' (half a unit in), its top 3.5
+         # under theirs and out 3.5 behind, two texels each (in by 1 and 2, out 2.5, a ring of hips showed round it; linecheck).
+         el("rump", "spine_0", (-8.0, 9.5, -23.5), (8.0, 21.5, -19.5)),
          el("chest", "spine_1", (-9, 8.5, -2.5), (9, 25.5, 14)),
          el("neck", "neck", (-6.5, 15, 11), (6.5, 25, 18)),
          el("skull", "head", *SKULL),
-         el("muzzle", "head", (-5, 15.5, 25.5), (5, 24, 32)),  # long and blunt
-         el("mouth", "head", (-3, 15, 25), (3, 17, 30.5)),
-         el("jaw", "jaw", (-4, 14, 24), (4, 16, 31))]  # shorter than the muzzle
+         # Long and blunt; its sides half a unit in from the skull's, its bottom half a unit over the jaw's (at 5
+         # and 15.5 the skull's front showed a rim beside it and the jaw 1.5 under it; linecheck).
+         el("muzzle", "head", (-5.5, 14.5, 25.5), (5.5, 24, 32)),
+         el("mouth", "head", (-3, 15, 25.9), (3, 17, 30.5)),  # its back clear of the jaw's, moved back to 25
+         el("jaw", "jaw", (-4, 14, 25), (4, 16, 31))]  # shorter than the muzzle; its back half a unit behind the muzzle's (at 24 its top showed; linecheck)
     for s, n in ((1, "L"), (-1, "R")):
         x0, x1 = (3, 5.5) if s > 0 else (-5.5, -3)
-        E.append(el(f"ear_{n}", f"ear_{n}", (x0, 27.5, 17), (x1, 30.5, 19.5)))  # small and round
+        # Small and round; 3.3 above the skull, over two texels (at 30.5, 1.7 texels, it read as a sliver; linecheck).
+        E.append(el(f"ear_{n}", f"ear_{n}", (x0, 27.5, 17), (x1, 31.3, 19.5)))
         za, zb, top, bottom = eye_box(s)
         h = top - bottom
         lx0, lx1 = (LID_X - h, LID_X) if s > 0 else (-LID_X, -LID_X + h)

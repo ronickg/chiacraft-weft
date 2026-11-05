@@ -188,6 +188,10 @@ fn cloud_density(s: Sky, cellp: vec2<f32>, h: f32, dims: vec2<f32>) -> f32 {
     let c = cloud_cell(s, base + vec2(0.0, 1.0), dims);
     let d = cloud_cell(s, base + vec2(1.0, 1.0), dims);
     var cover = mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+    // Fuzzy edges (`cloud_fuzz`), only at an edge: the cores and the open sky ask no noise.
+    if cover > 0.02 && cover < 0.98 {
+        cover = clamp(cover + cloud_fuzz(q + s.uv.zw) * 0.45, 0.0, 1.0);
+    }
     // In rain the cells give way to the deck's large forms: with the cell picture alone a rainy sky
     // stayed a blocky patchwork (the storm-light check, 11-05).
     let rainy = s.axes[0].x;
@@ -199,7 +203,8 @@ fn cloud_density(s: Sky, cellp: vec2<f32>, h: f32, dims: vec2<f32>) -> f32 {
     // bright sky showing through them.
     // Where the storm's field is lowest the deck breaks open a little.
     let deck = s.axes[0].z * smoothstep(0.0, 0.4, middle);
-    let shaped = max(smoothstep(0.35, 0.6, cover - (1.0 - middle) * 0.5), deck);
+    // (A wider edge, 0.3-0.7: at 0.35-0.6 the slabs' sides were hard.)
+    let shaped = max(smoothstep(0.3, 0.7, cover - (1.0 - middle) * 0.5), deck);
     // In rain the deck breaks open where its large forms are lowest, wider on the sun's side (the
     // light shafts in `post/volume.wgsl` come through the same breaks).
     let wet = max(s.axes[0].x, scene.weather.w);

@@ -942,6 +942,20 @@ menu.base.tanning_pit = Дубильная яма
 block.base.charcoal_clamp = Угольная куча
 block.base.charcoal_clamp.tooltip = Брёвна под землёй минут за пять обугливаются в уголь, без топлива.
 menu.base.charcoal_clamp = Угольная куча
+block.base.crucible = Тигель
+block.base.crucible.tooltip = Здесь медь сплавляется с оловом в бронзу: слиток бронзы за каждый слиток меди и олова, примерно за полминуты.
+menu.base.crucible = Тигель
+block.base.forge = Кузнечный горн
+block.base.forge.tooltip = Железо, прокалённое в угле, становится сталью: уголь на каждый слиток железа, меньше чем за минуту.
+menu.base.forge = Кузнечный горн
+block.base.copper_ore = Медная руда
+block.base.tin_ore = Оловянная руда
+item.base.raw_copper = Сырая медь
+item.base.raw_tin = Сырое олово
+item.base.copper_ingot = Медный слиток
+item.base.tin_ingot = Оловянный слиток
+item.base.bronze_ingot = Бронзовый слиток
+item.base.steel_ingot = Стальной слиток
 item.base.hide = Сырая шкура
 item.base.hide.tooltip = С коров, оленей и капибар. Выделайте её на раме или в дубильной яме.
 item.base.sole_leather = Подошвенная кожа
@@ -1522,3 +1536,17 @@ ley.base.feel.strong = сильно тянет
 ley.base.feel.on_line = на линии
 ley.base.feel.at_node = в узле
 command.base.ley = лей здесь {0} ({1}); ближайшая линия в {2} блоках, у {3} {4}; ближайший узел {5} {6} ({7} линий), в {8} блоках; ближайший путевой камень {9} {10}, в {11} блоках
+web.base.tip.pick0 = {color:title}{0}{/} {color:dim}(уровень предмета {1}){/}
+    {color:dim}Нажмите, чтобы вставить.{/}
+web.base.tip.pick1 = {color:title}{0}{/} {color:dim}(уровень предмета {1}){/}
+    {2} {3}
+    {color:dim}Нажмите, чтобы вставить.{/}
+web.base.tip.pick2 = {color:title}{0}{/} {color:dim}(уровень предмета {1}){/}
+    {2} {3}
+    {4} {5}
+    {color:dim}Нажмите, чтобы вставить.{/}
+web.base.tip.pick3 = {color:title}{0}{/} {color:dim}(уровень предмета {1}){/}
+    {2} {3}
+    {4} {5}
+    {6} {7}
+    {color:dim}Нажмите, чтобы вставить.{/}
