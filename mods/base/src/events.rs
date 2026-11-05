@@ -476,14 +476,14 @@ fn site(w: &World) -> Result<BlockPos, String> {
     };
     let radius = ev::IMPACT_SITE_RADIUS;
     // Why tries failed: near something, no open dry ground there, not level.
-    let (mut near, mut ground, mut uneven) = (0, 0, 0);
+    let (mut blocked, mut ground, mut uneven) = (0, 0, 0);
     for _ in 0..ev::IMPACT_SITE_TRIES {
         let (_, from) = players[w.random_below(players.len() as u32) as usize];
         let angle = unit(w) as f64 * std::f64::consts::TAU;
         let reach = near as f64 + (far - near) as f64 * unit(w) as f64;
         let (x, z) = (from.x + angle.cos() * reach, from.z + angle.sin() * reach);
         if !clear(x, z) {
-            near += 1;
+            blocked += 1;
             continue;
         }
         let (x, z) = (x.floor() as i32, z.floor() as i32);
@@ -505,7 +505,7 @@ fn site(w: &World) -> Result<BlockPos, String> {
         uneven += 1;
     }
     Err(format!(
-        "{near} near players, builds or spawn, {ground} not open dry loaded ground, {uneven} not level; reach {lo}-{hi} at simulation {}",
+        "{blocked} near players, builds or spawn, {ground} not open dry loaded ground, {uneven} not level; reach {lo}-{hi} at simulation {}",
         simulation(),
         lo = ev::impact_reach(simulation()).0,
         hi = ev::impact_reach(simulation()).1
