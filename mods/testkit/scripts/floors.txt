@@ -8,6 +8,7 @@ chat /time set 6000
 chat /tk attr_mod me core:entity_reach testkit:reach 0 3 0
 chat /tk attr_mod me core:max_health testkit:hp 0 200 0
 # ---- F0_stone_utahraptor: stone sword, leather armour vs utahraptor (level 0) in a 3x3 pit, 64 swings
+chat /tk mode spectator
 chat /tp 0.5 205 -0.5
 wait 2
 loaded
@@ -20,6 +21,8 @@ chat /tk fill 0 202 -1 0 202 -1 stone
 chat /tp 0.5 200 -0.5
 wait 1
 loaded
+chat /tk mode survival
+chat /tp 0.5 200 -0.5
 chat /tk put me 0 base:stone_sword 1
 chat /tk put me 36 base:leather_helmet 1
 chat /tk put me 37 base:leather_chestplate 1
@@ -236,6 +239,7 @@ entities 10
 where F0_stone_utahraptor_end
 shot floors_F0_stone_utahraptor_end.png
 # ---- F1_iron_utahraptor: iron sword, iron armour vs utahraptor (level 0) in a 3x3 pit, 48 swings
+chat /tk mode spectator
 chat /tp 16.5 205 -0.5
 wait 2
 loaded
@@ -248,6 +252,8 @@ chat /tk fill 16 202 -1 16 202 -1 stone
 chat /tp 16.5 200 -0.5
 wait 1
 loaded
+chat /tk mode survival
+chat /tp 16.5 200 -0.5
 chat /tk put me 0 base:iron_sword 1
 chat /tk put me 36 base:iron_helmet 1
 chat /tk put me 37 base:iron_chestplate 1
@@ -415,6 +421,7 @@ entities 10
 where F1_iron_utahraptor_end
 shot floors_F1_iron_utahraptor_end.png
 # ---- F2_diamond_utahraptor: diamond sword, diamond armour vs utahraptor (level 0) in a 3x3 pit, 48 swings
+chat /tk mode spectator
 chat /tp 32.5 205 -0.5
 wait 2
 loaded
@@ -427,6 +434,8 @@ chat /tk fill 32 202 -1 32 202 -1 stone
 chat /tp 32.5 200 -0.5
 wait 1
 loaded
+chat /tk mode survival
+chat /tp 32.5 200 -0.5
 chat /tk put me 0 base:diamond_sword 1
 chat /tk put me 36 base:diamond_helmet 1
 chat /tk put me 37 base:diamond_chestplate 1
@@ -594,6 +603,7 @@ entities 10
 where F2_diamond_utahraptor_end
 shot floors_F2_diamond_utahraptor_end.png
 # ---- F3_diamond_iguanodont: diamond sword, diamond armour vs iguanodont (level 0) in a 5x5 pit, 100 swings
+chat /tk mode spectator
 chat /tp 48.5 205 -0.5
 wait 2
 loaded
@@ -606,6 +616,8 @@ chat /tk fill 48 202 -1 48 202 -1 stone
 chat /tp 48.5 200 -0.5
 wait 1
 loaded
+chat /tk mode survival
+chat /tp 48.5 200 -0.5
 chat /tk put me 0 base:diamond_sword 1
 chat /tk put me 36 base:diamond_helmet 1
 chat /tk put me 37 base:diamond_chestplate 1
