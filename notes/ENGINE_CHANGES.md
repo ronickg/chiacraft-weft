@@ -14,6 +14,8 @@ for now is bug fixes only, written and opened by him.
 
 ## 1. Bug fixes (upstream candidates)
 
+Ronald, 11-05: no more PRs to Weft. Engine bugs that are Weft's own are marked **(Weft bug)** with one line on the bug, so they can be found later. Their old clean branches on upstream/master stay as they are (`notes/crew/upstream/for-ronald.md` is the archive of their notes).
+
 | Change | Why | Upstream? |
 |---|---|---|
 | Flat blocks on macOS: texture sizes without `arrayLength` | Blocks drew flat on Apple GPUs | Merged upstream (#67) |
@@ -23,7 +25,12 @@ for now is bug fixes only, written and opened by him.
 | Vulkan: order upload copies that write the same bytes (0b06e383) | Overlapping writes in the wrong order | #84 closed; upstream re-implemented it (1049ba95). Take theirs |
 | Vulkan: GPU-only memory spills to system memory when full (a3606d48, f88e5a7c) | Two games on one GPU panicked with "Out of memory" | #97 closed for now; clean branch ready for Ronald |
 | Far terrain: a scatter that forces all its blocks takes its commonest block (414e4e88) | Boulders drew as purple missing-texture blocks in the distance | #96 closed for now; clean branch ready |
-| Vulkan: `drawIndirectCount` optional (`Backend::indirect_count`, `Cmd::FillBuffer`): without it the table's count draws draw all their records, zeroed before the culling writes them; `--no-indirect-count` forces it | Since Weft's GPU terrain culling (c376cf9c) the game wouldn't start on any Mac: "Apple M3 Max lacks what the game needs: drawIndirectCount" (MoltenVK has none) | Candidate 6: clean branch for Ronald |
+| **(Weft bug)** Vulkan: `drawIndirectCount` optional (branch fix/indirect-count-optional; `Backend::indirect_count`, `Cmd::FillBuffer`): without it the table's count draws draw all their records, zeroed before the culling writes them; `--no-indirect-count` forces it | Since Weft's GPU terrain culling (c376cf9c) the game wouldn't start on any Mac: "Apple M3 Max lacks what the game needs: drawIndirectCount" (MoltenVK has none) | Not a PR |
+| **(Weft bug)** SDK: mob moods (anger, fear) cleared when another world opens (4c159155; branch fix/mob-moods-new-world) | They were process-wide by entity id and tick, so a new world's spider took the last world's zombie's anger (neutral_mobs) | Not a PR (Ronald, 11-05) |
+| **(Weft bug)** Particles: a cell whose cube hasn't arrived is no liquid (sync; branch fix/particles-unloaded-cell) | Spawning indexed the states with `u32::MAX`: a panic right after a teleport (SYNC4) | Not a PR |
+| **(Weft bug)** First person cuts worn layers by bone as well as by role (58562745; branch fix/first-person-worn-bones) | A worn item naming its bones (a shirt) drew whole at the camera | Not a PR |
+| **(Weft bug)** Riding: `MountMove` says whether the steering flew the mount, which then counts no fall (6617ffe1; branch fix/flying-mount-no-fall) | A flying mount landed hurt | Not a PR |
+| **(Weft bug)** Test: redstone_on_a_structure looks from above the lift wherever it is (f65451fc; branch fix/test-wire-on-a-lift) | After the reload the lift rose above the fixed camera: 4 of 5 fails on Weft master | Not a PR |
 | HUD: crosshair only in first person (6a394c0d) | It sat on the player's back in third person | #98 closed for now; clean branch ready |
 | `/rule` reads values the way the rule takes them (a2f4c81c) | `false` was refused, `2` and `999` clamped silently | Clean branch ready, never opened |
 | Box-model blocks' far faces use their boxes' textures (e1f48a48) | Magenta in distant terrain | Maybe |
@@ -144,7 +151,7 @@ These are the biggest changes. They live mostly in our crates, but each needed h
     gone), riding (seats, steering), camera modes (`camera_flags` for the crosshair, the hand and
     one's own shadow), the Vulkan upload fixes, mining on the server (our broken-tool rule is in
     `mining_rate`, keep-broken in `stack::worn`).
-  - **Fixed in upstream's code (PR candidates):** `sdk/ai.rs` mob moods cleared when another
+  - **Fixed in upstream's code (Weft bugs, rows in section 1):** `sdk/ai.rs` mob moods cleared when another
     world opens (they were process-wide by entity id and tick, so a zombie's anger landed on the
     next world's spider: `neutral_mobs`); particles' spawn on a cell not arrived yet; first person
     cutting worn layers by bone mask; a ridden flyer's flight counted as a fall (MountMove `flies`).
