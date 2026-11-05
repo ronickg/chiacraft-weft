@@ -1068,7 +1068,11 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
             let disc = 1.0 - smoothstep(0.12, 0.15, r);
             let halo = exp(-r * 6.0) * (1.0 - smoothstep(0.55, 0.95, r)) * 0.7;
             let g = golden();
-            rgb = mix(vec3(1.0, 0.96, 0.86), vec3(1.0, 0.52, 0.2), g) * (disc * mix(3.0, 1.5, g) + halo);
+            // In the HDR world the disc is as bright as the sun is against the sky (about 16 times
+            // what the screen's white could hold here), so the bloom spreads a wide glare round it
+            // as Bliss's low sun has, and the curve keeps the disc itself white-gold.
+            let hot = select(1.0, 16.0, scene.frame.x > 0.5);
+            rgb = mix(vec3(1.0, 0.96, 0.86), vec3(1.0, 0.52, 0.2), g) * (disc * mix(3.0, 1.5, g) * hot + halo);
             shape = smoothstep(0.0, 0.004, disc + halo);
         }
         // A blood moon: copper, then a deep red disc, dimmer in totality.
