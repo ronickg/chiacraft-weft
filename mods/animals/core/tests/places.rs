@@ -383,3 +383,48 @@ fn the_cretaceous_spawns_as_often_as_the_overworld() {
     }
     report(problems);
 }
+
+/// A biome's stocking scales its plant eaters' crowd and nothing else (`Species::crowd_in`,
+/// `STOCKING`): a capybara on the savanna has room for two and a half times its crowd, a red deer
+/// in the giant grove for a tenth (a pair at least); hunters and others keep theirs; and what
+/// spawning lets in, breeding and want agree on (none die of want at their stocked crowd).
+#[test]
+fn stocking_scales_plant_eaters_crowds() {
+    use animals_core::life::{room_for, want_chance};
+    use animals_core::species::{STOCKING, stocking};
+    let mut problems = Vec::new();
+    let find = |n: &str| SPECIES.iter().find(|s| s.name == n).expect(n);
+    let capybara = find("capybara");
+    let want = (capybara.crowd() as f32 * 2.5).round() as u32;
+    if capybara.crowd_in("base:savanna") != want {
+        problems.push(format!(
+            "capybara on the savanna: {} where 2.5 times {} is {want}",
+            capybara.crowd_in("base:savanna"),
+            capybara.crowd()
+        ));
+    }
+    let wolf = find("grey_wolf");
+    for &(b, _) in STOCKING {
+        if wolf.crowd_in(b) != wolf.crowd() {
+            problems.push(format!("grey wolf in {b}: {} where it hunts (its crowd {})", wolf.crowd_in(b), wolf.crowd()));
+        }
+    }
+    for s in SPECIES.iter().filter(|s| s.forages_wild()) {
+        for &(b, _) in s.habitats {
+            let c = s.crowd_in(b);
+            if c < 2 {
+                problems.push(format!("{} in {b}: room for {c}, under a pair", s.name));
+            }
+            if !s.cretaceous() && (c as f32 - s.crowd() as f32 * stocking(b)).abs() > 0.5 && c > 2 {
+                problems.push(format!("{} in {b}: room for {c}, its crowd {} stocked {}", s.name, s.crowd(), stocking(b)));
+            }
+            if want_chance(1.0, c as f64, c, animals_core::species::ADULT) != 0.0 {
+                problems.push(format!("{} in {b}: dies of want at its stocked crowd {c}", s.name));
+            }
+            if !room_for(0.0, 1, c) {
+                problems.push(format!("{} in {b}: no room for one in an empty place", s.name));
+            }
+        }
+    }
+    report(problems);
+}

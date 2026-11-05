@@ -69,8 +69,9 @@ pub fn init(r: &mut Registry) {
         let w = q.world();
         let coming = q.query().amount.max(1.0) as u32;
         let near = kind_near(&w, s, q.pos().to_array());
-        if !animals_core::life::room_for(near, coming, s.crowd()) {
-            weft_sdk::info!("no room for {coming} {} at {:?}: {near:.1} near, room for {}", s.name, q.pos(), s.crowd());
+        let crowd = crate::species::crowd_at(&w, s, q.pos());
+        if !animals_core::life::room_for(near, coming, crowd) {
+            weft_sdk::info!("no room for {coming} {} at {:?}: {near:.1} near, room for {crowd}", s.name, q.pos());
             return Verdict::Deny;
         }
         if !s.forages_wild() {

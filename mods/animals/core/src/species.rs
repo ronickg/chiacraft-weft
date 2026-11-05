@@ -393,6 +393,17 @@ impl Species {
     pub fn crowd(&self) -> u32 {
         self.tune.crowd.unwrap_or_else(|| self.bio.crowd())
     }
+    /// Its crowd in `biome`: a plant eater's (`forages_wild`) as heavily as the biome is stocked
+    /// (`STOCKING`), others' as they are; never under two, a pair. What natural spawning, wild
+    /// breeding, dying of want and the food webs' grazing all weigh (`life::room_for`,
+    /// `love_chance`, `want_chance`, `web::grazing`), so a stocked place holds its grazers and
+    /// doesn't starve them back down.
+    pub fn crowd_in(&self, biome: &str) -> u32 {
+        if !self.forages_wild() {
+            return self.crowd();
+        }
+        ((self.crowd() as f32 * stocking(biome)).round() as u32).max(2)
+    }
     /// Young born or hatched at once (`breeding.rs`), fewest and most.
     pub fn litter(&self) -> (u32, u32) {
         self.tune.litter.unwrap_or_else(|| self.bio.litter())
@@ -402,6 +413,32 @@ impl Species {
 /// What a Cretaceous biome's spawn rules average (`Species::spawn_chance`): about the
 /// overworld's plains, whose own animals and base's farm animals (5%) come to this.
 pub const CRETACEOUS_FLOW: f32 = 0.025;
+
+/// How heavily each biome is stocked with plant eaters, against their crowd (`Species::crowd_in`;
+/// 1 where unlisted, the Cretaceous's too): open grassland heavily, deep forest and the giant
+/// groves lightly, as real grazer densities go. With grass feeding as real grass does (Plants'
+/// tufts, `vitals::forage`), every grazed biome's herds eat about a third of what its grass
+/// grows back, as real herds take 25-50% (`notes/ECOLOGY.md`; Plants' and Animals' grazing plan,
+/// 2026-11-05). The savanna is held at 2.5 (3.5 would land it with the rest) until it has a heavy
+/// grazer, which eats as much with fewer animals.
+pub const STOCKING: &[(&str, f32)] = &[
+    ("base:savanna", 2.5),
+    ("base:plains", 1.4),
+    ("base:forest", 1.0),
+    ("base:swamp", 0.9),
+    ("base:birch_forest", 0.55),
+    ("base:taiga", 0.35),
+    ("base:mountains", 0.26),
+    ("base:sequoia_grove", 0.09),
+];
+
+/// How heavily `biome` is stocked with plant eaters (`STOCKING`, 1 unlisted).
+pub fn stocking(biome: &str) -> f32 {
+    STOCKING
+        .iter()
+        .find(|(b, _)| *b == biome)
+        .map_or(1.0, |&(_, s)| s)
+}
 
 /// ARK's shape: health grows fastest, speed slowest, torpor only from wild points.
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
