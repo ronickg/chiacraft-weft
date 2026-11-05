@@ -336,24 +336,6 @@ pub fn fall(drop: i32, s: i32) -> i32 {
     (drop.max(0) * 3 + 2 * s - 1) / (2 * s)
 }
 
-/// How far column (`x`, `z`) falls to its lowest neighbour, one block off (base's `fall`, what the
-/// cubes' surface goes by), from the dimension's terrain; `None` without one.
-fn real_fall(c: &Content, dim: u32, seed: u64, x: i32, z: i32) -> Option<i32> {
-    let d = c.dims.get(dim as usize)?;
-    let start = std::time::Instant::now();
-    let h = |x: i32, z: i32| d.column(seed, x, z).map(|c| c.height);
-    let h0 = h(x, z)?;
-    let fall = [(1, 0), (-1, 0), (0, 1), (0, -1)]
-        .iter()
-        .filter_map(|&(dx, dz)| h(x + dx, z + dz))
-        .map(|n| h0 - n)
-        .max()
-        .unwrap_or(0);
-    crate::diag::LOD_REAL_FALLS.add(1);
-    crate::diag::LOD_REAL_FALLS_NS.add(start.elapsed().as_nanos() as u64);
-    Some(fall.max(0))
-}
-
 /// Blocks of soil under a column's top before the stone, as most surface rules have it.
 const FILLER: i32 = 3;
 /// Bands a steep wall is drawn in at most, each asking the face what it shows there.
@@ -404,18 +386,11 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
             // coarse cells, and at the seam where the cubes end a pale sand or snow face met the
             // same slope drawn as striped rock, the "glass slabs" (Far view, 11-05).
             let drop = (y - low).max(0);
-            let (x, z) = (o.x + i * s + s / 2, o.y + j * s + s / 2);
-            let mut fall = if slope { drop / s } else { (drop + s - 1) / s };
-            // Near the faces' threshold a fine cell asks the real one-block fall at its middle, as the
-            // cubes' own surface does (base's `fall`): where cells end in the cubes at the view's
-            // edge, an estimate either way drew a slope bare that the cubes keep in sand or snow, or
-            // the other way round (Planner, 11-05: "make the near-threshold real-fall check").
-            if !slope && fall + 2 >= f.fall && fall <= f.fall + 3 {
-                fall = real_fall(c, dim, seed, x, z).unwrap_or(fall);
-            }
+            let fall = if slope { drop / s } else { (drop + s - 1) / s };
             if fall < f.fall {
                 continue;
             }
+            let (x, z) = (o.x + i * s + s / 2, o.y + j * s + s / 2);
             let shown = |wy: i32, before: u32| face_block(f, seed, dim, [x, wy, z], y, biome, fall, before);
             tops[k] = shown(y, top);
             // The wall below the top block, to the skirt's depth at most.

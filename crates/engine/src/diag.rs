@@ -73,9 +73,6 @@ pub fn lod_box_quads(q: [usize; 4]) {
 }
 /// Calls to the dimension's steep faces (`Faces::block`) while meshing tiles, and their time.
 pub static LOD_FACES: Counter = Counter::new();
-/// chiacraft: real one-block falls asked while meshing far tiles (`lod::real_fall`), and their time.
-pub static LOD_REAL_FALLS: Counter = Counter::new();
-pub static LOD_REAL_FALLS_NS: Counter = Counter::new();
 pub static LOD_FACES_NS: Counter = Counter::new();
 /// Distant terrain now: tiles wanted, wanted but not made (a coarser tile or nothing shows
 /// there), and asked for.
@@ -450,7 +447,6 @@ impl Reporter {
             let (made, off, age) = (LOD_MADE.take(), LOD_CALLED_OFF.take(), LOD_AGE_NS.take());
             let (heights, heights_ns, meshed, mesh_ns) = (LOD_HEIGHTS.take(), LOD_HEIGHTS_NS.take(), LOD_MESHED.take(), LOD_MESH_NS.take());
             let (faces, faces_ns) = (LOD_FACES.take(), LOD_FACES_NS.take());
-            let (falls, falls_ns) = (LOD_REAL_FALLS.take(), LOD_REAL_FALLS_NS.take());
             let boxq: Vec<u64> = LOD_BOX.iter().map(Counter::take).collect();
             if boxq[0] > 0 {
                 let per = |n: u64| n / boxq[0];
@@ -468,7 +464,7 @@ impl Reporter {
             if made + off > 0 || missing > 0 {
                 log::debug!(
                     target: "load",
-                    "distant terrain per {secs:.1} s: {made} tiles made ({:.0} ms from asked to made), {off} called off, {} wanted, {missing} not made yet, {} asked; heights {:.0} us, mesh {:.0} us each, of which {:.0} us in {:.0} face calls and {:.0} us in {:.0} real falls",
+                    "distant terrain per {secs:.1} s: {made} tiles made ({:.0} ms from asked to made), {off} called off, {} wanted, {missing} not made yet, {} asked; heights {:.0} us, mesh {:.0} us each, of which {:.0} us in {:.0} face calls",
                     age as f64 / made.max(1) as f64 / 1e6,
                     LOD_WANTED.load(Ordering::Relaxed),
                     LOD_PENDING.load(Ordering::Relaxed),
@@ -476,8 +472,6 @@ impl Reporter {
                     mesh_ns as f64 / meshed.max(1) as f64 / 1000.0,
                     faces_ns as f64 / meshed.max(1) as f64 / 1000.0,
                     faces as f64 / meshed.max(1) as f64,
-                    falls_ns as f64 / meshed.max(1) as f64 / 1000.0,
-                    falls as f64 / meshed.max(1) as f64,
                 );
             }
         }
