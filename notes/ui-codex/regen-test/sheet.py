@@ -5,7 +5,10 @@ in the game's inventory slot (`gui/slot.png`, the icon 2 px in) at 2x and 4x, wi
 mixes run 2's icons with established neighbours from the approved 11-04 set, as a hotbar. Blocks
 show one tile at 4x and a 3 x 3 patch at 2x (leaves tinted a plains green, as the game does).
 
-    python3 notes/ui-codex/regen-test/sheet.py CURRENT_DIR RUN1_DIR RUN2_DIR NOTES.json OUT_DIR
+    python3 notes/ui-codex/regen-test/sheet.py CURRENT_DIR NOTES.json OUT_DIR RUN [RUN...]
+
+Each RUN is `label=dir[+dir...]:item prefix:block prefix`, e.g. "run 2 (guides 2)=A/run2+A/run2x:n2:b2";
+a run's pictures are looked up in its dirs in order.
 """
 import json
 import os
@@ -24,8 +27,13 @@ bold = ImageFont.truetype(F + "Arial Bold.ttf", 16)
 big = ImageFont.truetype(F + "Arial Bold.ttf", 24)
 BG, INK, MUTED, GOLD = (26, 19, 19), (228, 218, 207), (198, 163, 131), (242, 218, 154)
 
-cur, run1, run2, notes, out = sys.argv[1:6]
+cur, notes, out = sys.argv[1:4]
 notes = json.load(open(notes))
+RUNS = []
+for r in sys.argv[4:]:
+    label, rest = r.split("=", 1)
+    dirs, ip, bp = rest.rsplit(":", 2)
+    RUNS.append((label, dirs.split("+"), ip, bp))
 os.makedirs(out, exist_ok=True)
 BLOCKS = os.path.join(ROOT, "mods/base/assets/textures/block")
 FOLIAGE = (92, 160, 48)
@@ -88,20 +96,20 @@ GROUPS = {
         title="Diamond armour: shells and built pieces",
         sub="In game now, a diamond piece's icon is its shell's map painted with the diamond ramp (the loose shell and "
             "the built piece look the same). 11-04 is the approved whole diamond item, no longer in any list. "
-            "Run 2 attached the item guide's 03 Armour sheet.",
+            "Runs 2 and 3 attached the item guide's 03 Armour sheet.",
         neighbours=["approved_diamond", "approved_iron_chestplate", "approved_gold_helmet", "approved_iron_ingot"],
         rows=ARMOUR_ROWS,
         set_row=[("now", ["shell_helmet_shell", "shell_chest_shell", "shell_leg_shell", "shell_boot_shell"]),
                  ("11-04", ["approved_diamond_helmet", "approved_diamond_chestplate", "approved_diamond_leggings",
                             "approved_diamond_boots"]),
-                 ("run 1", ["1:diamond_helmet", "1:diamond_chestplate", "1:diamond_leggings", "1:diamond_boots"]),
-                 ("run 2", ["2:diamond_helmet", "2:diamond_chestplate", "2:diamond_leggings", "2:diamond_boots"])]),
+                 *[(f"run {k}", [f"{k}:diamond_helmet", f"{k}:diamond_chestplate", f"{k}:diamond_leggings",
+                                    f"{k}:diamond_boots"]) for k in (1, 2, 3)]]),
     "tools": dict(
         title="Diamond tools: working parts and built tools",
         sub="In game now, a loose part has one grey icon in every material; its diamond drawing exists only as the "
             "painted head layer of the built tool ('on the tool'; the sword's is the straight blade). Built tools are "
             "composed as the engine does: the diamond head on the oak haft map, wrought-iron guard and pommel; the "
-            "spear has no look yet, so its plain icon shows. Run 2 attached 01 Tools or 02 Weapons plus 13 by tier.",
+            "spear has no look yet, so its plain icon shows. Runs 2 and 3 attached 01 Tools or 02 Weapons plus 13 by tier.",
         neighbours=["approved_diamond", "approved_iron_sword", "approved_stick", "approved_coal"],
         rows=[("Long blade", "part_long_blade", "part_long_blade", "layer_sword"),
               ("Short blade", "part_short_blade", "part_short_blade", None),
@@ -118,7 +126,7 @@ GROUPS = {
               ("Spear", "built_spear", "diamond_spear", None)]),
     "food": dict(
         title="Food",
-        sub="Today's food icons in the game beside both runs. Run 2 attached 07 Food (11 Soft and organic for the "
+        sub="Today's food icons in the game beside the runs. Runs 2 and 3 attached 07 Food (11 Soft and organic for the "
             "egg, stew and trout) plus 16 All food.",
         neighbours=["food_berries", "food_baked_potato", "food_cooked_chicken", "food_melon_slice"],
         rows=[("Bread", "food_bread", "bread", None), ("Apple", "food_apple", "apple", None),
@@ -128,11 +136,21 @@ GROUPS = {
     "blocks": dict(
         title="Blocks: a natural cube, an ore, a log and leaves",
         sub="Made with `art.py block` from the block guide's type lines. Run 1 is the old way (our key only, "
-            "`--no-ref`); run 2 attached the block guide's sheet for the type (01 Natural cube, 03 Ores, 04 Logs, "
+            "`--no-ref`); runs 2 and 3 attached the block guide's sheet for the type (01 Natural cube, 03 Ores, 04 Logs, "
             "07 Leaves). Each: one tile at 4x and a 3 x 3 patch at 2x; leaves are grey in the game and shown tinted "
             "a plains green.",
         rows=[("Stone", "block:stone", "stone", None), ("Diamond ore", "block:diamond_ore", "diamond_ore", None),
               ("Oak log", "block:log_oak", "log_oak", None), ("Oak leaves", "block:leaves_oak", "leaves_oak", None)]),
+    "guides3": dict(
+        title="What Guides 3 changed: gems, ingots, fuel, seeds, grass",
+        sub="Guides 3 added or rewrote the family notes for raw ores and ingots (a stamped bar on the diagonal, matte "
+            "fuel), gems (each its own form: diamond 'a cluster of small cubes'), seeds (scattered grains), and grass "
+            "(a fringe over the dirt's top edge). These are made with Guides 2 and then Guides 3, the same request and "
+            "sheets; only the family notes differ. Run 1 (old guides) made none of them.",
+        neighbours=["approved_iron_sword", "approved_gold_ingot", "approved_leather", "approved_stick"],
+        rows=[("Diamond", "approved_diamond", "diamond", None), ("Iron ingot", "approved_iron_ingot", "iron_ingot", None),
+              ("Coal", "approved_coal", "coal", None), ("Wheat seeds", "food_wheat_seeds", "wheat_seeds", None),
+              ("Grass top", "block:grass_top", "@grass_top", None), ("Grass side", "block:grass_side", "@grass_side", None)]),
 }
 
 
@@ -142,18 +160,22 @@ def cur_icon(name):
     return icon(os.path.join(cur, name + ".png"))
 
 
-def run_name(g, k, n):
-    if g == "blocks":
-        return f"b{k}_{n}"
-    return f"{'rt' if k == 1 else 'n2'}_{n}"
+def is_block(g, n):
+    return g == "blocks" or n.startswith("@")
 
 
-def run_dir(g, k):
-    return run2 if g == "blocks" or k == 2 else run1  # both block runs were made in run 2's batch
+def find(g, k, n, ext):
+    """Run k's file for item or block n (its prefix, looked up in its dirs in order), or None."""
+    _, dirs, ip, bp = RUNS[k - 1]
+    name = f"{bp if is_block(g, n) else ip}_{n.lstrip('@')}{ext}"
+    for d in dirs:
+        if os.path.exists(os.path.join(d, name)):
+            return os.path.join(d, name)
+    return None
 
 
 def run_icon(g, k, n):
-    return icon(os.path.join(run_dir(g, k), run_name(g, k, n) + "_px.png"))
+    return icon(find(g, k, n, "_px.png"))
 
 
 def text(d, xy, s, f, fill, width):
@@ -166,8 +188,8 @@ def text(d, xy, s, f, fill, width):
 
 
 def tries(g, k, n):
-    chk = os.path.join(run_dir(g, k), run_name(g, k, n) + "_checks.json")
-    if not os.path.exists(chk):
+    chk = find(g, k, n, "_checks.json")
+    if not chk:
         return ""
     t = json.load(open(chk))["tries"]
     last = t[-1] if t else {}
@@ -176,13 +198,14 @@ def tries(g, k, n):
 
 for g, G in GROUPS.items():
     blocks = g == "blocks"
-    W = 2060 if blocks else 1960
-    cell = 336 if blocks else 230
-    rowh = (200 if blocks else 144) + 40
-    X = [24, 170, 170 + cell, 170 + 2 * cell, 170 + 3 * cell]
-    gen_x = X[4] if blocks else X[4] + cell
-    note_x = gen_x + 150
-    H = 400 + len(G["rows"]) * rowh + (4 * 90 + 60 if "set_row" in G else 0)
+    nr = len(RUNS)
+    cell = 336 if blocks or g == "guides3" else 230
+    W = 170 + (nr + 1) * cell + (0 if blocks else 230) + 200 + 540
+    rowh = (200 if blocks or g == "guides3" else 144) + 40 + (30 if nr > 2 else 0)
+    X = [24] + [170 + i * cell for i in range(nr + 2)]
+    gen_x = X[nr + 2] if blocks else X[nr + 2] + 0
+    note_x = None
+    H = 500 + len(G["rows"]) * rowh + (5 * 90 + 60 if "set_row" in G else 0)
     im = Image.new("RGBA", (W, H), BG + (255,))
     d = ImageDraw.Draw(im)
     d.text((24, 18), f"Art regen test 11-05: {G['title']}", font=big, fill=GOLD)
@@ -190,47 +213,53 @@ for g, G in GROUPS.items():
              "shows 2x at GUI scale 2)."), font, MUTED, 230)
     if not blocks:
         y += 8
-        d.text((24, y), "In context at 2x: run 2's icons (marked) among approved 11-04 neighbours", font=bold, fill=INK)
+        d.text((24, y), f"In context at 2x: {RUNS[-1][0]}'s icons (marked) among approved 11-04 neighbours", font=bold, fill=INK)
         y += 26
         mix, nb = [], G["neighbours"]
         for i, r in enumerate(G["rows"]):
+            if r[2].startswith("@"):
+                continue
             mix.append(("new", r[2]))
             if i % 3 == 2:
                 mix.append(("old", nb[(i // 3) % len(nb)]))
         x = 24
         for kind, n in mix[:24]:
-            sl = slot(run_icon(g, 2, n) if kind == "new" else cur_icon(n), 2)
+            sl = slot(run_icon(g, nr, n) if kind == "new" else cur_icon(n), 2)
             im.alpha_composite(sl, (x, y))
             if kind == "new":
                 d.rectangle([x + 30, y + 74, x + 42, y + 78], fill=GOLD)
             x += sl.width + 2
         y += 100
-    heads = ["", "in game now", "run 1 (old guides)", "run 2 (guides 2)"]
+    heads = ["", "in game now"] + [r[0] for r in RUNS]
     if not blocks:
         heads.append("11-04 / on the tool" if g == "tools" else ("approved 11-04" if g == "armour" else ""))
     for cx, t in zip(X, heads):
         d.text((cx, y), t, font=bold, fill=GOLD)
-    d.text((gen_x, y), "as generated (1, 2)", font=bold, fill=GOLD)
+    gen_x = X[nr + 2] if blocks or g == "guides3" else X[nr + 2]
+    gen_x = gen_x if blocks or g == "guides3" else X[nr + 1] + cell
+    d.text((gen_x, y), "as generated", font=bold, fill=GOLD)
+    note_x = gen_x + 170
     d.text((note_x, y), "what changed", font=bold, fill=GOLD)
     y += 30
     for label, c, n, third in G["rows"]:
         d.line([(24, y - 6), (W - 24, y - 6)], fill=(60, 44, 38))
         d.text((24, y + 50), label, font=bold, fill=INK)
-        tint = blocks and "leaves" in n
-        pics = [cur_icon(c), run_icon(g, 1, n), run_icon(g, 2, n)]
-        for x, ic in zip(X[1:4], pics):
+        tint = "leaves" in n or n == "@grass_top"
+        pics = [cur_icon(c)] + [run_icon(g, k, n) for k in range(1, nr + 1)]
+        for x, ic in zip(X[1:nr + 2], pics):
             if ic is None:
-                d.text((x, y + 60), "not made", font=font, fill=(216, 34, 30))
+                d.text((x, y + 60), "not made", font=font, fill=(150, 120, 110))
                 continue
-            im.alpha_composite(tile(ic, tint) if blocks else pair(ic), (x, y))
+            im.alpha_composite(tile(ic, tint) if is_block(g, n) else pair(ic), (x, y))
         if third:
-            im.alpha_composite(pair(cur_icon(third)), (X[4], y))
-        for k, oy in ((1, 0), (2, 70)):
-            gen = os.path.join(run_dir(g, k), run_name(g, k, n) + ".png")
-            if os.path.exists(gen):
-                im.alpha_composite(Image.open(gen).convert("RGBA").resize((64, 64), Image.LANCZOS), (gen_x, y + oy))
-            d.text((gen_x + 70, y + oy + 24), tries(g, k, n).replace(" tr", "\ntr", 1), font=small, fill=MUTED)
-        text(d, (note_x, y + 4), notes.get(f"{g}:{n}", ""), font, INK, 62)
+            im.alpha_composite(pair(cur_icon(third)), (X[nr + 2], y))
+        for k in range(1, nr + 1):
+            oy = (k - 1) * 70 if nr <= 2 else (k - 1) * 56
+            gen = find(g, k, n, ".png")
+            if gen:
+                im.alpha_composite(Image.open(gen).convert("RGBA").resize((52, 52), Image.LANCZOS), (gen_x, y + oy))
+                d.text((gen_x + 58, y + oy + 10), tries(g, k, n).replace(" tr", "\ntr", 1), font=small, fill=MUTED)
+        text(d, (note_x, y + 4), notes.get(f"{g}:{n.lstrip('@')}", ""), font, INK, 62)
         y += rowh
     if "set_row" in G:
         y += 10
@@ -250,5 +279,7 @@ for g, G in GROUPS.items():
         d.text((24, y), "Verdict", font=bold, fill=GOLD)
         y = text(d, (24, y + 26), notes[f"{g}:verdict"], font, INK, 230)
     im = im.crop((0, 0, W, y + 24))
-    im.convert("RGB").save(os.path.join(out, f"regen3_{g}.png"))
-    print(os.path.join(out, f"regen3_{g}.png"))
+    if not any(find(g, k, r[2], "_px.png") for k in range(1, nr + 1) for r in G["rows"]):
+        continue  # no run made this group
+    im.convert("RGB").save(os.path.join(out, f"regen{nr + 1}_{g}.png"))
+    print(os.path.join(out, f"regen{nr + 1}_{g}.png"))

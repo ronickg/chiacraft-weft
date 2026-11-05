@@ -161,8 +161,11 @@ def key_path(kind):
 
 
 # The guides' reference sheets are cut from another texture pack, so they stay out of git
-# (guides/.gitignore): a checkout without them reads Ronald's own copy of the guides.
-REFS_HOME = os.environ.get("GUIDE_REFS", os.path.expanduser("~/Downloads/Game Art Style Guides 2"))
+# (guides/.gitignore): a checkout without them reads the archived copy of the guide set this skill
+# holds (every version Ronald sends is kept in ~/Coding/chiacraft-archive/references/style-guides/).
+GUIDES_VERSION = "guides-2"
+REFS_HOME = os.environ.get("GUIDE_REFS", os.path.expanduser(
+    f"~/Coding/chiacraft-archive/references/style-guides/{GUIDES_VERSION}"))
 
 
 def ref_dir(kind):

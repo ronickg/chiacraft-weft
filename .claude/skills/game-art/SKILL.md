@@ -43,8 +43,10 @@ reference sheet for that kind (`--ref 01,13` by number, or picked from what is d
 type), and puts the family's "How each family looks" notes with their "Make it yours" line into the
 prompt: the sheet shows how such things are built, our key decides the look, and no design is copied.
 Keep "Minecraft" out of the prompt (he finds Faithful too clean and wants our own style). The sheets
-are cut from a resource pack, so they stay out of git; a checkout without them reads Ronald's copy
-(`GUIDE_REFS`, default `~/Downloads/Game Art Style Guides 2`).
+are cut from a resource pack, so they stay out of git. Every guide set Ronald sends is kept whole
+in `~/Coding/chiacraft-archive/references/style-guides/guides-<N>/` (1, 2, 3 so far; copy a new one
+there before using it, Downloads gets cleaned), and a checkout without the sheets reads the set this
+skill holds from there (`art.py`'s `GUIDES_VERSION`; `GUIDE_REFS` overrides).
 
 **Never throw away a generated image** (Ronald, 2026-11-04: "never throw away generated images pls
 so I can also check back"). Every try, every candidate, every review sheet and every old texture an

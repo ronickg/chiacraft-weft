@@ -51,7 +51,7 @@ for n in ["diamond_helmet", "diamond_chestplate", "diamond_leggings", "diamond_b
           "iron_sword", "iron_chestplate", "gold_helmet", "stick", "leather", "coal"]:
     made[f"approved_{n}"] = (tex.get(f"base:item/{n}"), f"base:item/{n}")
 for n in ["bread", "apple", "cooked_beef", "beef", "animals:item/trout", "stew", "egg", "carrot", "berries",
-          "baked_potato", "cooked_chicken", "porkchop", "melon_slice", "potato", "animals:item/cooked_trout"]:
+          "baked_potato", "cooked_chicken", "porkchop", "melon_slice", "potato", "animals:item/cooked_trout", "wheat_seeds"]:
     a = tex.get(n if ":" in n else f"base:item/{n}")
     made[f"food_{n.split('/')[-1]}"] = (a, n)
 for k, (a, look) in made.items():

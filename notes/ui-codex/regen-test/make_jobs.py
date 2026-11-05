@@ -6,6 +6,10 @@ from the item guide's material sheet and recipes, run with `art.py batch`.
     python3 notes/ui-codex/regen-test/make_jobs.py v2 > jobs_v2.json   # run 2: guides 2, sheets attached
     python3 notes/ui-codex/regen-test/make_jobs.py blocks > blocks.json  # 4 blocks, both ways
 
+Run 3 (Guides 3, 11-05) is run 2 again (`v3`: its families for this set are unchanged) plus the
+extras whose families Guides 3 changed (`extras v2` / `extras v3`: a diamond, an iron ingot, coal, wheat
+seeds, a grass block top and side).
+
 Run 2 is the same requests with Ronald's guides 2 (11-05): each attaches the guide's sheet for its kind
 and, for a whole set, the set sheet (13 tools and weapons by tier, 16 all food), named `n2_...`.
 """
@@ -140,7 +144,35 @@ B = [("stone", "natural cube", False,
       "oak leaves: overlapping rounded oak leaves 3-5 px long with transparent gaps covering 25-35% of the tile, tileable, "
       "drawn in light greyscale for biome tinting (the shading of #27380f to #74a72e turned grey)")]
 
-if sys.argv[1:] == ["v2"]:
+X = [dict(kind="item", name="diamond", ref="05,15", what=(
+          "a diamond gem: faceted diamond (#48aeba base, #468594/#3a5a62 teal shadow, #c6f9fb to white facet tips, "
+          "#3a8490/#26555b teal outline), one white plus-shaped sparkle; centred, about 22 x 22 px")),
+     dict(kind="item", name="iron_ingot", ref="04,15", what=(
+          "an iron ingot: warm silver bar (#c9c3be base, #8e8884 shadow, #5a5553 deepest, near-white #ece6e2 top "
+          "bevel, #6a6461/#48423f outline), seen slightly from above; centred, about 24 x 16 px")),
+     dict(kind="item", name="coal", ref="04,15", what=(
+          "a lump of coal: deep black-brown (#2a2420 base, #1a1512 shadow) with bright blue-grey glints (#8a95a0) on its "
+          "facets, #4a403a outline; centred, about 22 x 20 px")),
+     dict(kind="item", name="wheat_seeds", ref="22", what=(
+          "wheat seeds: a few plump golden-tan grains (#d9b45a base, #a5813a shadow, #f2dc96 highlight, #6b5224 "
+          "outline), each with a light top-left; centred, about 20 x 18 px")),
+     dict(kind="block", name="grass_top", type="grass block", what=(
+          "a grass block top: seamless leafy grass tufts filling the whole tile, drawn in light greyscale for biome "
+          "tinting")),
+     dict(kind="block", name="grass_side", type="grass block", what=(
+          "a grass block side: brown dirt clods (#3a2926 to #94724b) with a green grass fringe (#5e9a2c, #395123 "
+          "shadow) hanging 4-8 px down from the top edge with irregular tips"))]
+
+if sys.argv[1:3] == ["extras", "v2"] or sys.argv[1:3] == ["extras", "v3"]:
+    k = sys.argv[2][1]
+    jobs = [dict(j, name=("n" if j["kind"] == "item" else "b") + k + "_" + j["name"]) for j in X]
+elif sys.argv[1:] == ["v3"]:
+    for j in jobs:
+        j["name"] = "n3_" + j["name"][3:]
+        j["ref"] = sheet("n2_" + j["name"][3:])
+    for name, t, cut, what in B:
+        jobs.append(dict(kind="block", name="b3_" + name, type=t, cutout=cut, what=what))
+elif sys.argv[1:] == ["v2"]:
     for j in jobs:
         j["name"] = "n2_" + j["name"][3:]
         j["ref"] = sheet(j["name"])
