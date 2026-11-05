@@ -224,13 +224,27 @@ pub const GEM_SPOTS: &[(&str, [[i32; 2]; 3])] = &[
     ("boots", [[11, 10], [20, 10], [15, 6]]),
 ];
 
-/// Worn armour drawn from its parts (`abi::comp::WORN_LOOK`): one shade map per worn layer in the
-/// wearer's skin layout (`base:entity/armor/parts/plates_<1|2>`, made from the approved iron set:
-/// the plates its shell, the trim its fastening, the hem its lining), painted with the three parts'
-/// ramps; leggings are the inner layer (2), the rest the outer (1).
+/// How a shell is built, and so drawn (Ronald, 11-05: "Fix all as recommended"): hardened leather
+/// and rawhide as the approved leather set, bone and antler as a lamellar of laced slats, diamond as
+/// the approved diamond set's quilted scales, the metals as plate (the approved iron set).
+pub fn shell_family(material: &str) -> &'static str {
+    match material {
+        "leather" | "rawhide" => "leather",
+        "bone" | "antler" => "bone",
+        "diamond" => "diamond",
+        _ => "plate",
+    }
+}
+
+/// Worn armour drawn from its parts (`abi::comp::WORN_LOOK`): its shell family's shade map per worn
+/// layer in the wearer's skin layout (`base:entity/armor/parts/<family>_<1|2>`, made from that
+/// family's approved set: region 0 its shell, 1 its fastening, 2 its lining, each pixel the nearest
+/// step of its source material's ramp), painted with the three parts' ramps; leggings are the inner
+/// layer (2), the rest the outer (1).
 pub fn worn_look(slot: usize, shell: &str, fastening: &str, lining: &str, gems: &[&str]) -> String {
     let layer = if slot == 2 { 2 } else { 1 };
-    let mut look = format!("base:entity/armor/parts/plates_{layer}@{},{},{}", ramp(shell), ramp(fastening), ramp(lining));
+    let family = shell_family(shell);
+    let mut look = format!("base:entity/armor/parts/{family}_{layer}@{},{},{}", ramp(shell), ramp(fastening), ramp(lining));
     for (i, g) in gems.iter().enumerate() {
         if let Some(spot) = WORN_GEM_SPOTS.get(slot).and_then(|s| s.get(i)) {
             let (x, y) = (spot[0] - GEM_SIZE / 2, spot[1] - GEM_SIZE / 2);
@@ -278,7 +292,13 @@ pub fn part_look(shape: &str, material: &str) -> Option<String> {
     } else {
         format!(",{}", ramp("wrought_iron"))
     };
-    Some(format!("base:parts/armour/{shape}@{}{buckle}", ramp(material)))
+    // A shell is drawn as its family is built: a leather cap, bone slats.
+    let drawn = match (shell_family(material), shape) {
+        ("leather", "helmet_shell") => "cap_shell".to_string(),
+        ("bone", s) if s.ends_with("_shell") => format!("bone_{s}"),
+        _ => shape.to_string(),
+    };
+    Some(format!("base:parts/armour/{drawn}@{}{buckle}", ramp(material)))
 }
 
 #[cfg(test)]
@@ -323,11 +343,14 @@ mod tests {
         assert_eq!(part_look("chest_shell", "bronze").unwrap(), "base:parts/armour/chest_shell@base:ramps/bronze");
         assert_eq!(part_look("straps", "leather").unwrap(), "base:parts/armour/straps@base:ramps/leather,base:ramps/wrought_iron");
         assert!(part_look("haft", "oak").is_none());
+        assert_eq!(part_look("helmet_shell", "leather").unwrap(), "base:parts/armour/cap_shell@base:ramps/leather");
+        assert_eq!(part_look("leg_shell", "bone").unwrap(), "base:parts/armour/bone_leg_shell@base:ramps/bone");
+        assert!(worn_look(2, "diamond", "leather", "wool", &[]).starts_with("base:entity/armor/parts/diamond_2@"));
         assert_eq!(gem_look("sword", 0, "diamond").unwrap(), "base:parts/gem/set@base:ramps/gem_diamond+7,20");
         assert!(gem_look("axe", 3, "diamond").is_none() && gem_look("sword", 3, "diamond").is_none());
         assert_eq!(
             worn_look(1, "bronze", "gold", "wool", &["amber"]),
-            "base:entity/armor/parts/plates_1@base:ramps/bronze,base:ramps/gold,base:ramps/wool;base:entity/armor/parts/gem_set@base:ramps/gem_amber+46,44"
+            "base:entity/armor/parts/plate_1@base:ramps/bronze,base:ramps/gold,base:ramps/wool;base:entity/armor/parts/gem_set@base:ramps/gem_amber+46,44"
         );
     }
 }
