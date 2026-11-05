@@ -55,6 +55,8 @@ pub static SKY_IMPACTS: Config<u32> = Config::named("sky_impacts");
 static STAR_MARK: HudElement = HudElement::named("fallen_star");
 /// The day the last big impact fell in each dimension, so it falls once.
 static FELL: Mutex<Vec<(u32, u64)>> = Mutex::new(Vec::new());
+/// The day each dimension's impact was last said to be waiting (logged once).
+static WAITED: Mutex<Vec<(u32, u64)>> = Mutex::new(Vec::new());
 /// The 8 directions' keys, north first and clockwise (`vitals::events::compass`).
 static LEAVES: Tag = Tag::named("leaves");
 const DIRECTIONS: [&str; 8] = ["north", "north_east", "east", "south_east", "south", "south_west", "west", "north_west"];
@@ -387,7 +389,15 @@ fn impacts(w: &World) {
             weft_sdk::info!("events: no site for day {day}'s impact by its end ({why}): into the sea");
             None
         }
-        Err(_) => return,
+        Err(why) => {
+            let mut told = WAITED.lock().unwrap();
+            if !told.contains(&(dim, day)) {
+                told.retain(|&(d, _)| d != dim);
+                told.push((dim, day));
+                weft_sdk::info!("events: day {day}'s impact is due and waits for a site ({why})");
+            }
+            return;
+        }
     };
     {
         let mut fell = FELL.lock().unwrap();
@@ -447,6 +457,7 @@ fn site(w: &World) -> Result<BlockPos, String> {
             away.push((g.x as f64, g.z as f64, build));
         }
     }
+    let fields = base_api::land::fields(w.seed());
     let clear = |x: f64, z: f64| {
         away.iter()
             .all(|&(ax, az, r)| (ax - x).powi(2) + (az - z).powi(2) >= r * r)
@@ -464,7 +475,9 @@ fn site(w: &World) -> Result<BlockPos, String> {
             continue;
         }
         let (x, z) = (x.floor() as i32, z.floor() as i32);
-        let Some(top) = open_ground(w, x, from.y.floor() as i32, z) else {
+        // From the land's own height there, not the player's: one flying, up a cliff or in a
+        // cave looked 48 blocks round itself and found no ground (PC run fh_impact2).
+        let Some(top) = open_ground(w, x, land_height(&fields, x, z), z) else {
             ground += 1;
             continue;
         };
@@ -480,6 +493,11 @@ fn site(w: &World) -> Result<BlockPos, String> {
         uneven += 1;
     }
     Err(format!("{near} near players, builds or spawn, {ground} not open dry loaded ground, {uneven} not level"))
+}
+
+/// The land's height at block (`x`, `z`), as worldgen shapes it (before caves and plants).
+pub(crate) fn land_height(f: &weft_sdk::noise::fixed::Fields, x: i32, z: i32) -> i32 {
+    base_api::land::height(f, x * 16, z * 16) >> 4
 }
 
 /// The ground's top in column (`x`, `z`) near `y`: loaded, open to the sky, not water.
