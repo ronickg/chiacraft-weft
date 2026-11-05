@@ -185,11 +185,33 @@ fn light_dir() -> vec3<f32> {
 
 // How much of the palette's direct light there is: it fades out as the sun sets and the moon comes
 // up a little after.
+// ---- sky events (`scene.sky_event`: a blood moon, meteors, a fireball, an aurora storm) ----
+// Round 17, rec. 6, with gameplay (Ronald, "Gameplay too"): the base mod's schedule says when
+// (`vitals::events`), the pack draws them; none when `base:fx_sky_events` is off (nothing is sent).
+
+// How strong the sky event of `kind` (`weft_abi::sky_event`) is now, 0 when another or none.
+fn sky_event(kind: f32) -> f32 {
+    return select(0.0, clamp(scene.sky_event.y, 0.0, 1.0), abs(scene.sky_event.x - kind) < 0.5);
+}
+
+// The blood moon, 0..1: under 0.5 its copper dusk, 1 totality.
+fn blood_moon() -> f32 {
+    return sky_event(1.0);
+}
+
+// The moon's colour on a blood moon night: copper as it reddens, a deep red in totality.
+fn blood_tint() -> vec3<f32> {
+    let b = blood_moon();
+    return mix(vec3(1.0), mix(vec3(1.0, 0.55, 0.32), vec3(0.78, 0.12, 0.05), smoothstep(0.5, 1.0, b)), smoothstep(0.0, 0.45, b));
+}
+
 fn light_strength() -> f32 {
     let e = scene.sun.y;
     // At night the moon's light: its phase times how high it stands (`scene.moon.w`), none when it
     // is down or new.
-    return select(smoothstep(0.06, 0.2, -e) * scene.moon.w, smoothstep(-0.04, 0.05, e), e > -0.06);
+    // In a blood moon's totality the night is as dark as a new moon's (round 17's design).
+    let moon = scene.moon.w * mix(1.0, 0.12, smoothstep(0.5, 1.0, blood_moon()));
+    return select(smoothstep(0.06, 0.2, -e) * moon, smoothstep(-0.04, 0.05, e), e > -0.06);
 }
 
 // ---- the sky ----
@@ -956,5 +978,7 @@ fn display(c: vec3<f32>) -> vec3<f32> {
     t = max(mix(vec3(y), t, mix(1.0, 1.2 * look_opt(OPT_SATURATION, 1.0), day)), vec3(0.0));
     // A cool floor so the night is never pure black; by day black stays black.
     t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034) * (1.0 - day);
+    // A blood moon's faint red cast over the night.
+    t *= mix(vec3(1.0), vec3(1.1, 0.88, 0.86), blood_moon() * 0.6 * (1.0 - day));
     return clamp(t, vec3(0.0), vec3(1.0));
 }

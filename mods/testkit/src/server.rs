@@ -1082,6 +1082,18 @@ const OPS: &[(&str, &str, Run)] = &[
         Ok((w.damage(int(cmd, "id")?, amount, player, abi::damage_cause::ATTACK) as u32).to_string())
     }),
     ("pose", "", |w, _, player, _| Ok(w.entity(player).map_or(0, |e| e.pose).to_string())),
+    // What happens in the sky (`weft_abi::sky_event`: 1 blood moon, 2 meteors, 3 fireball, 4 aurora
+    // storm, 0 none) and how strongly, for the pack's looks; the base mod's schedule sets it in play.
+    ("sky_event", "<kind:int> <strength:float>", |w, cmd, _, _| {
+        w.set_sky_event(int(cmd, "kind")?, cmd.float("strength").ok_or("missing strength")? as f32);
+        Ok(String::new())
+    }),
+    // Something lands at x y z in `seconds` (a fireball's streak).
+    ("sky_landing", "<x:float> <y:float> <z:float> <seconds:float>", |w, cmd, _, _| {
+        let f = |n: &str| cmd.float(n).ok_or(format!("missing {n}"));
+        w.sky_landing([f("x")?, f("y")?, f("z")?], f("seconds")? as f32);
+        Ok(String::new())
+    }),
     ("hurt_me", "<amount:float>", |w, cmd, player, _| {
         let amount = cmd.float("amount").ok_or("missing amount")? as f32;
         Ok((w.damage(player, amount, 0, abi::damage_cause::ATTACK) as u32).to_string())
