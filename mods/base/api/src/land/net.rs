@@ -348,7 +348,10 @@ impl<V> Shared<V> {
             let (_, &mut cut, _) = ages.select_nth_unstable(keep / 4);
             self.map.retain(|k, v| *k == key || v.1 > cut);
         }
-        let e = self.map.entry(key).or_insert_with(|| (Slot::default(), now));
+        let e = self
+            .map
+            .entry(key)
+            .or_insert_with(|| (Slot::default(), now));
         e.1 = now;
         e.0.clone()
     }
@@ -376,7 +379,8 @@ impl Tile {
                 let here = Here::new(f, p[0] * 16, p[1] * 16);
                 t.pos.push(p);
                 t.height.push(route_height(&here));
-                t.rain.push(dry + (((ONE - dry) * ramp(here.humidity(), q12(RIVER_RAIN.0), q12(RIVER_RAIN.1))) >> 12));
+                t.rain
+                    .push(dry + (((ONE - dry) * ramp(here.humidity(), q12(RIVER_RAIN.0), q12(RIVER_RAIN.1))) >> 12));
             }
         }
         t
@@ -403,8 +407,12 @@ thread_local! {
 /// Tile (`ti`, `tj`) of the routing's nodes, sampled once for every region and thread.
 fn tile_at(f: &Fields, ti: i32, tj: i32) -> Arc<Tile> {
     let key = (f.seed, ti, tj);
-    let slot = TILES.lock().unwrap_or_else(|e| e.into_inner()).slot(key, KEEP_TILES);
-    slot.get_or_init(|| Arc::new(Tile::build(f, ti, tj))).clone()
+    let slot = TILES
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .slot(key, KEEP_TILES);
+    slot.get_or_init(|| Arc::new(Tile::build(f, ti, tj)))
+        .clone()
 }
 
 /// The region holding block (`bx`, `bz`), worked out once for every thread.
@@ -421,7 +429,10 @@ pub(super) fn region_at(f: &Fields, bx: i32, bz: i32) -> Arc<Region> {
     }) {
         return hit;
     }
-    let slot = REGIONS.lock().unwrap_or_else(|e| e.into_inner()).slot(key, KEEP);
+    let slot = REGIONS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .slot(key, KEEP);
     let region = slot
         .get_or_init(|| Arc::new(Region::build(f, key.1, key.2)))
         .clone();
