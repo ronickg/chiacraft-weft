@@ -160,9 +160,18 @@ fn threads_cpu() -> Vec<(String, f64)> {
         let Ok(stat) = std::fs::read_to_string(task.path().join("stat")) else { continue };
         // pid (name) state ... utime stime are the 14th and 15th fields, counted after the name.
         let (Some(open), Some(close)) = (stat.find('('), stat.rfind(')')) else { continue };
-        let name: String = stat[open + 1..close].trim_end_matches(|c: char| c.is_ascii_digit() || c == ' ').to_string();
+        let name: String = stat[open + 1..close]
+            .trim_end_matches(|c: char| c.is_ascii_digit() || c == ' ')
+            .to_string();
         let fields: Vec<&str> = stat[close + 2..].split(' ').collect();
-        let ticks = fields.get(11).and_then(|u| u.parse::<f64>().ok()).unwrap_or(0.0) + fields.get(12).and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
+        let ticks = fields
+            .get(11)
+            .and_then(|u| u.parse::<f64>().ok())
+            .unwrap_or(0.0)
+            + fields
+                .get(12)
+                .and_then(|s| s.parse::<f64>().ok())
+                .unwrap_or(0.0);
         let secs = ticks / 100.0;
         match out.iter_mut().find(|(n, _)| *n == name) {
             Some(e) => e.1 += secs,
