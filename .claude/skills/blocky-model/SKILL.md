@@ -36,6 +36,11 @@ The numbers are in `scripts/house.py`; build scripts import them instead of choo
   128; the owl at 64 too (its face is its two big eyes, 4 by 4 texels at 32). Everything else at
   32, the chihuahua and cat included: Ronald, 2026-11-04, shown both at 32 and finer, "32, one
   look". A new animal follows the same rule. Boxes, export scale and in-game size stay the same.
+- **Keep 32 for small animals** (Ronald, 2026-11-07, after the chihuahua, red fox and brown hare
+  side by side at 32 and 64: "Keep 32"): every animal stays at 32 texels a block, small ones too.
+  A small face (a chihuahua's 5 by 4) is not a reason to paint finer: design its eyes and marks
+  for the texels it has. `fine` is only for a face that can't hold an eye at all (under
+  `MIN_FACE` at 32: the birds, fish and rodents above). Don't offer a 64 version again.
 - **Faces at 32 are small** (a wolf's 7 by 6 texels, a cat's 6 by 5, a chihuahua's 5 by 4): eyes
   are 2-3 texel designs with no halo (`paint.EYES` `px2`, `px3`..., or the animal's own; two front
   eyes placed with `paint.eye_corner` so they land mirror-symmetric), a mark is a texel or more
