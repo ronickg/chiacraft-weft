@@ -18,4 +18,4 @@ Merge e9c8405c on sync/weft-26.11.2. Things the merge dropped or left for an own
 ## Test fails that are not the sync (SYNC8, Tester)
 
 - distant_terrain_from_above: 618 tiles shown, 198 still pending at y 1024 after 20 s: slow, not missing. Distant terrain's priority work; the test's 20 s limit may need raising after it.
-- inventory_crafting (planks from one log in the hand grid) and crafting_table_tags (two planks in a column give sticks): both fail on dev b5815f09 too. Our first hours give planks through the book, not the hand grid; First hours and Plants to say what the grid should give, then Tester rewrites the tests.
+- inventory_crafting and crafting_table_tags: both fail on dev b5815f09 too, before any crafting, on menu slot numbers (slot 37 isn't hotbar 0 any more), as inventory_hotkeys did; the recipes are right (one log gives 4 planks, two planks in a column 4 sticks; First hours). Tester is fixing the slot numbers.
