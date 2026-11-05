@@ -973,8 +973,8 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     out.tint = tint;
     out.color = pow(tint, vec3(2.2));
     // Shut in by the land round it (`lod_occ`, 0 to 3): valley floors and the ground between crowns
-    // get less of the sky and the low sun, down to 0.58 (Far view, 11-05: far land evenly lit).
-    out.color *= 1.0 - 0.14 * f32(lod_occ(w0));
+    // get less of the sky and the low sun, down to 0.46 (Far view, 11-05: far land evenly lit).
+    out.color *= 1.0 - 0.18 * f32(lod_occ(w0));
     return out;
 }
 
@@ -985,7 +985,7 @@ const CROWN_UNDER: f32 = 0.5;
 // as even green fields): a crown's top is laid with crowns about `CROWN_CELL` blocks across, each a
 // dome lit by the sun on its side and dark in the gaps between, where the far boxes are too coarse to
 // draw single trees. x: how much of a dome is there (1 its top, 0 a gap), yz: which way it slopes.
-const CROWN_CELL: f32 = 5.0;
+const CROWN_CELL: f32 = 4.0;
 fn crown_clumps(xz: vec2<f32>) -> vec3<f32> {
     let q = xz / CROWN_CELL;
     let base = vec2<i32>(floor(q));
@@ -1092,8 +1092,8 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
             let amount = smoothstep(150.0, 260.0, in.dist) * (1.0 - smoothstep(0.3, 0.9, fw));
             if amount > 0.0 {
                 let k = crown_clumps(in.pos.xz);
-                albedo = vec4(albedo.rgb * mix(1.0, mix(0.5, 1.08, k.x), amount), albedo.a);
-                lit_in.normal = normalize(vec3(k.y * amount, 1.0, k.z * amount));
+                albedo = vec4(albedo.rgb * mix(1.0, mix(0.3, 1.12, k.x), amount), albedo.a);
+                lit_in.normal = normalize(vec3(k.y * 1.5 * amount, 1.0, k.z * 1.5 * amount));
             }
         }
     }
