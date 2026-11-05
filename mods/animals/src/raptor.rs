@@ -7,19 +7,20 @@
 //! ones near each other fight better. Too small to ride (the Utahraptor is the mount). A pose is a look (`World::set_look`), as the chihuahua's. The model, its animations and texture are built from `source/raptor` (see
 //! `docs/creatures.md`).
 
+use crate::choose::{Band, Need, Stops, WithBand};
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
-pub(crate) static RAPTOR: Entity = Entity::named("raptor");
-pub(crate) static OSMOLSKAE: Entity = Entity::named("velociraptor_osmolskae");
+use crate::ModelFile;
+
+pub(crate) static RAPTOR: EntityKind = EntityKind::named("raptor");
+pub(crate) static OSMOLSKAE: EntityKind = EntityKind::named("velociraptor_osmolskae");
 /// Each species: its kind and its texture.
-static KINDS: [(&Entity, &str); 2] = [(&RAPTOR, "raptor/raptor"), (&OSMOLSKAE, "raptor/osmolskae")];
+static KINDS: [(&EntityKind, &str); 2] = [(&RAPTOR, "raptor/raptor"), (&OSMOLSKAE, "raptor/osmolskae")];
 
 /// How near a pack keeps together: helping, hunting, fighting better.
 const PACK_RANGE: f64 = 8.0;
 const AID_RANGE: f64 = 16.0;
-/// What a pack hunts.
-
 pub fn init(r: &mut Registry) {
     // Tamed raptors fight better together: a tenth more damage for each other tame raptor of
     // its species within 8 blocks, up to three.
@@ -30,7 +31,7 @@ pub fn init(r: &mut Registry) {
         }
         let Some(st) = w.entity(id) else { return };
         let pack = w
-            .near(st.pos, PACK_RANGE, kind_of(&w, id))
+            .entities_near(st.pos, PACK_RANGE, kind_of(&w, id))
             .into_iter()
             .filter(|&o| o != id && is_tame_raptor(&w, o))
             .count()
@@ -44,14 +45,14 @@ pub fn init(r: &mut Registry) {
 
 /// One species: the kind, and its resting pose (a look) drawn in place of it lying down
 /// (`rest.rs`).
-fn register(r: &mut Registry, kind: &'static Entity, index: usize, texture: &str) {
+fn register(r: &mut Registry, kind: &'static EntityKind, index: usize, texture: &str) {
     let settle = crate::rest::Settle { chance: 300, ticks: (400, 1200), lie_after: 0 };
     crate::rest::register(r, kind, settle, "raptor", texture, (0.6, 0.9), &[("_rest", &rest_look(kind))]);
-    r.entity(kind)
-        .size(0.6, 0.9)
-        .health(14.0)
-        .speed(4.0)
-        .attack_damage(4.0)
+    crate::riding::rideable(r.entity(kind), index)
+        .size(animals_core::bodies::of("raptor").0, animals_core::bodies::of("raptor").1)
+        .max_health(crate::animal::health(index))
+        .walk_speed(4.0)
+        .attack_damage(crate::animal::hit(index))
         .passive()
         .model_file("raptor")
         .animations("raptor")
@@ -64,6 +65,7 @@ fn register(r: &mut Registry, kind: &'static Entity, index: usize, texture: &str
             {
                 crate::commands::interact(&w, id, player);
             }
+            false
         })
         .goals(
             Goals::new()
@@ -73,27 +75,33 @@ fn register(r: &mut Registry, kind: &'static Entity, index: usize, texture: &str
                 .then(crate::hunt::wary)
                 .then(crate::hunt::hunt)
                 .then(crate::commands::act(index))
-                .then(crate::breeding::behave(index))
                 .then(crate::eggs::nest(index))
-                .then(crate::rest::settle)
-                .then(crate::commands::hold)
-                .then(crate::comfort::seek)
-                .then(crate::forage::forage)
-                .then(ai::wander(0.6, 9.0)),
+                // What it does when nothing is after it or ordered, the most pressing first (`choose.rs`).
+                .band(
+                    "needs",
+                    Band::new()
+                        .with(Need::Love, crate::breeding::behave(index))
+                        .with(Need::Rest, Stops { goal: crate::rest::settle, stop: crate::rest::stop })
+                        .with(Need::Hold, crate::commands::hold)
+                        .with(Need::Comfort, crate::comfort::seek)
+                        .with(Need::Drink, crate::drink::drink)
+                        .with(Need::Eat, crate::forage::eat)
+                        .with(Need::Wander, ai::wander(0.6, 9.0)),
+                ),
         )
         .on_hurt(|w, h| {
-            crate::taming::hurt(w, h.entity);
+            crate::taming::hurt(w, h.entity, h.source);
             crate::rest::stop(w, h.entity);
         });
 }
 
 /// A species' resting look (`raptor_rest`, `velociraptor_osmolskae_rest`).
-fn rest_look(kind: &Entity) -> String {
+fn rest_look(kind: &EntityKind) -> String {
     format!("{}_rest", kind.path())
 }
 
 /// The kind of raptor `id` is.
-fn kind_of(w: &World, id: u64) -> Option<&'static Entity> {
+fn kind_of(w: &World, id: u64) -> Option<&'static EntityKind> {
     let k = w.entity(id)?.kind;
     KINDS.iter().map(|(e, _)| *e).find(|e| e.id() == k)
 }
@@ -114,7 +122,7 @@ pub fn aid(w: &World, id: u64, at: u64) {
         return;
     }
     let Some(st) = w.entity(id) else { return };
-    for other in w.near(st.pos, AID_RANGE, None) {
+    for other in w.entities_near(st.pos, AID_RANGE, None) {
         if other == id || crate::animal::tamed(w, other) || w.entity(other).is_none_or(|e| e.kind != st.kind) {
             continue;
         }

@@ -25,6 +25,7 @@ A snippet is a file `shaders/<kind>/<name>.wgsl` in your mod, holding one functi
 | text effects | `shaders/fx/` | `fn effect(g: Glyph) -> Glyph` | `{fx:mymod:name}` in a translation |
 | panels | `shaders/gui/` | `fn fill(p: GuiPixel) -> vec4<f32>` | a class's `.gui`: `shader = mymod:name` |
 | entities | `shaders/entity/` | `fn shade(p: EntityPixel) -> vec4<f32>` | `r.entity(..).shader("name")` |
+| entity effects | `shaders/entity_effect/` | `fn effect(p: EntityPixel, c: vec4<f32>, strength: f32) -> vec4<f32>` | `r.entity_effect(&E)`, then `w.entity_effect(id, &E, strength, ticks)` |
 | blocks | `shaders/block/` | `fn shade(p: BlockPixel) -> vec4<f32>` | `r.block(..).shader("name")` |
 | particles | `shaders/particle/` | `fn shade(p: ParticleFrag) -> vec4<f32>` | `r.particle(..).shader("name")` |
 | sky | `shaders/sky/` | `fn shade(p: SkyPixel) -> vec4<f32>` | `r.sky_body(..).shader("name")`, see the [sky guide](sky.md#shaders) |
@@ -73,9 +74,11 @@ fn shade(p: EntityPixel) -> vec4<f32> {
 }
 ```
 ```rust
-r.entity(&WISP).texture("wisp", 32, 16).model(..).shader("ghost");
+r.entity(&WISP).texture("wisp").model(model.uv_size(32, 16)).shader("ghost");
 ```
-`EntityPixel` has `uv`, `albedo` (the skin's texel, linear, `a` is its alpha), `light` (a vec3 with shading, the hurt flash and glow already included) and `time`. A returned alpha under 0.5 cuts the pixel out, which is how the wisp gets its holes. The `_e` glow masks of the [textures guide](textures.md#emission) are a separate and simpler way to make parts of a skin shine.
+`EntityPixel` has `uv`, `albedo` (the skin's texel, linear, `a` is its alpha), `light` (a vec3 with shading and the glow mask already included) and `time`. A returned alpha under 0.5 cuts the pixel out, which is how the wisp gets its holes. The `_e` glow masks of the [textures guide](textures.md#emission) are a separate and simpler way to make parts of a skin shine.
+
+An entity effect goes on top of whatever shaded a mob, for a while: it gets the color `c` and a `strength`, and returns the new color. The engine's are effects too, `core:hurt` is the red a hit leaves, `core:flash` a creeper's white and `core:glow` lights a mob up whatever the light around (`entity_effects::GLOW`). `w.entity_effect(id, &MY_EFFECT, 0.6, 40)` puts one on for everyone who sees it, players arriving later included, and one at a time: a new one replaces it, `0` ticks takes it off. `w.flash(id)` is the white one for two ticks.
 
 ## Blocks
 A block shader colors the pixels of a block's faces and takes over from the normal lighting the same way:
@@ -117,7 +120,7 @@ fn apply(p: PostPixel) -> vec4<f32> {
 ```
 ```rust
 static DREAM: Key = Key::named("dream");
-r.key(&DREAM, "N").on_press(|c| c.post_effect("dream", 1.0));
+r.key(&DREAM, "N").on_press_client(|c| c.post_effect("dream", 1.0));
 ```
 `PostPixel` has `uv` (0 to 1, top left first), `color` (the picture so far at that point, linear), `strength`, `time` and `size` in pixels, and `scene_at(p, uv)` reads the picture anywhere else, for blur and waves. `post_effect(name, 0.0)` turns an effect off, and several can be on at once, applied one after another in the order they were turned on.
 
@@ -128,22 +131,46 @@ Snippets add to the engine's shaders, a shader pack replaces them. It is a folde
 |---|---|
 | `world.wgsl` | blocks and liquids |
 | `model.wgsl` | mobs and the player's model |
-| `entity.wgsl` | the first-person hand and held items |
+| `entity.wgsl` | held items |
 | `particle.wgsl` | particles |
 | `weather.wgsl` | rain and snow |
 | `sky.wgsl` | the sky, what is in it, and the overlay from inside a liquid |
 | `post.wgsl` | screen effects |
 | `ui.wgsl` | all screens and text |
 
-A file replaces its shader completely and the ones a pack doesn't have stay as they were, so the easiest start is a copy of the original from `crates/engine/assets/shaders/`. A replacement writes only functions (and its own private structs like `VOut`): the buffer structs, the bindings, the constants and the shared helpers of `common.wgsl` come from the engine's prelude (`crates/engine/src/gpu_layout.rs`), so a pack can't get them wrong and keeps working when they change. It has to keep the entry points. If it doesn't compile, the log says why and the built-in shader is used instead, so a broken pack can't leave anyone with a black screen. Mods' snippets keep working inside a pack's shaders, and an optional `pack.cfg` (`name = ...`, `description = ...`) names the pack in the list. `sun_shadows = true` there has the engine draw the terrain from the sun (or the moon) into a shadow map each frame, which the pack reads through `scene.shadow_view_proj` and `scene.shadow` (its bindless index, size, whether it holds this frame, blocks per texel); the pack's `world.wgsl` then needs an `fs_shadow` fragment entry (depth only, it may `discard` see-through texels). `translucent_depth = true` there makes water, glass and other see-through blocks write depth, so screen effects see their surface (water reflections); blended particles behind them are then hidden.
+A file replaces its shader completely and the ones a pack doesn't have stay as they were, so the easiest start is a copy of the original from `crates/engine/assets/shaders/`. A replacement writes only functions (and its own private structs like `VOut`): the buffer structs, the bindings, the constants and the shared helpers of `common.wgsl` come from the engine's prelude (`crates/engine/src/gpu_layout.rs`), so a pack can't get them wrong and keeps working when they change. It has to keep the entry points. If it doesn't compile, the log says why and the built-in shader is used instead, so a broken pack can't leave anyone with a black screen. Mods' snippets keep working inside a pack's shaders, and an optional `pack.cfg` (`name = ...`, `description = ...`) names the pack in the list. `sun_shadows = true` there has the engine draw the terrain from the sun (or the moon) into a shadow map each frame, which the pack reads through `scene.shadow_view_proj` and `scene.shadow` (its bindless index, size, whether it holds this frame, blocks per texel); the pack's `world.wgsl` then needs an `fs_shadow` fragment entry (depth only, it may `discard` see-through texels). With an `fs_lod_shadow` entry as well (depth only; it should `discard` where `fs_lod` does, the columns real cubes show), the distant terrain casts into the far cascade too, so hills past the render distance throw shadows. The far map (`scene.shadow_far_view_proj`, `scene.shadow_far`, 400 blocks to each side) is drawn again only when the light or the terrain changed. The settings `core:shadows` (0 off, 1 near map only, 2 near and far) and `core:shadow_size` (1024, 2048 or 4096 texels) choose how much of this the engine draws. `translucent_depth = true` there makes water, glass and other see-through blocks write depth, so screen effects see their surface (water reflections); blended particles behind them are then hidden.
 
 ### What the frame knows
-Every shader's prelude has `scene`: `fog_color` (linear rgb, and in `w` how hard it rains, 0 to 1), `params` (x and y where the fog starts and ends, z the daylight from 0 to 1, w seconds), `light` (x the dimension's ambient light, y the Brightness setting, z game ticks), `sun` (below), `weather` (x and y the wind where the player is along the world's x and z, in m/s the way it blows, z how foggy it is there from 0 to 1, w how hard it thunders; still and clear unless a mod sets the air with `World::set_air`) `eye` (the camera in the world, x and z wrapped every 8192 blocks) and `ground` (x the snow lying where the player is from 0 to 1, y how much of what falls is snow, z how much dust blows).
+Every shader's prelude has `scene`: `fog_color` (linear rgb, and in `w` how hard it rains, 0 to 1), `params` (x and y where the fog starts and ends, z the daylight from 0 to 1, w seconds), `light` (x the dimension's ambient light, y the Brightness setting, z game ticks), `sun` (below), `weather` (x and y the wind where the player is along the world's x and z, in m/s the way it blows, z how foggy it is there from 0 to 1, w how hard it thunders; still and clear unless a mod sets the air with `World::set_air`) `eye` (the camera in the world, x and z wrapped every 8192 blocks) and `ground` (x the snow lying where the player is from 0 to 1, y how much of what falls is snow, z how much dust blows). `clouds` and `cloud_cells` describe the sky's cloud layer, for cloud shadows: `clouds.x` its picture's bindless index plus one (0 when there are no clouds), `y` the blocks one picture cell covers, `z` the height of its underside over the camera, `w` how much of the picture's gaps the weather fills; `cloud_cells.xy` is the camera's place in its cell (0 to 1) and `zw` that cell in the picture. `moon` points toward the moon where the sky draws it (xyz) and in `w` says how much light it gives: its phase times how high it stands, 0 when it is down or new; for night light and moon shadows (the shadow maps follow it at night). `options` holds the values of up to 32 settings the pack names in its `pack.cfg` (`options = base:look_exposure, base:look_sun, ...`), four to a row in that order (0 for one the engine can't find): a pack's look can then be tuned in the game's settings, or for one run with `--config`, without editing its shaders. `hand` and `hand_light` are the light the player holds, for dynamic light: `hand.xyz` where it is (camera relative, by the hand), `hand_light.rgb` its block light levels from 0 to 1 (a torch 14/15), all zeros when what is held gives no light; it should fall off as block light does, a level a block. `canopy.x` is how closed a forest's canopy is where the player is, 0 (open sky) to 1 (a rainforest's), from the biome's air (`air_flags::CANOPY_SHIFT`), for the light under the leaves. `sky_event` is what happens in the sky (chiacraft, a mod's `Game::set_sky_event`): `x` the kind (`weft_abi::sky_event`: 0 none, 1 blood moon, 2 meteors, 3 fireball, 4 aurora storm), `y` how strongly from 0 to 1, `z` seconds since it began. `sky_landing` is something falling from the sky (a mod's `Game::sky_landing`): `xyz` where it lands, camera relative, `w` seconds until it does (negative after, -1000000 when nothing falls).
 
 ### Screen effects
 A screen effect (`shaders/post/<name>.wgsl`, `fn apply(p: PostPixel) -> vec4<f32>`, turned on by a mod with `Client::post_effect`) reads the picture so far through `p.scene` and also gets `scene`, the frame the world was drawn with: `scene.view_proj * vec4(scene.sun.xyz * 1000.0, 1.0)` puts the sun on the screen, as the base game's light shafts do (`mods/base/assets/shaders/post/shafts.wgsl`). Without a world it is all zeros.
+
+An effect can have a half-size part (chiacraft): `shaders/post_low/<name>.wgsl` with `fn low(p: PostPixel) -> vec4<f32>`, drawn before the effects into an image of its own at half the size each way (Rgba16Float), with the world's image and depth as the effects see them. The effect of the same name then reads it through `p.low` (its bindless index + 1, 0 when there is none): `post_low_at(p, uv)` filtered, or `post_low_upsampled(p)` from the four nearest texels weighted by depth, so it doesn't bleed across silhouettes. Both files are composed into one shader, so the effect can call the part's functions itself when `p.low` is 0. The base game's volumetric light works this way (`post_low/volume.wgsl`).
 
 ### Sun shadows
 A pack that wants shadows gets the two things it needs from the world shader's prelude: `scene.sun` (xyz points toward the sun, w is how high it stands, 0 at night and in dimensions without sky) and `solid_at(p: vec3<i32>) -> bool`, which says whether the block at `p` casts a shadow (anything that dims sky light, liquids aside). It knows the blocks about 112 blocks around the camera and answers false beyond them, so march from the pixel toward `scene.sun.xyz` through block cells and stop at the first solid one. The engine only keeps these blocks on the GPU while the chosen pack's `world.wgsl` calls `solid_at`, so packs without shadows pay nothing.
 
 Textures and models stay with resource packs, see the [resource packs guide](resourcepacks.md).
+
+### Tuning chiacraft's look
+
+chiacraft's pack reads these settings (`mods/base/src/look.rs`; Mod Settings in the game; `--config "base:<name>=<value>"` for one run, so a PC job can sweep a few values). Each is 1 (or 0) at the look as made, but `look_haze` (1.6, Ronald's pick):
+
+| setting | default, range | what it does |
+|---|---|---|
+| `base:look_exposure` | 1, 0.5-2 | how bright the day is taken |
+| `base:look_sun` | 1, 0.5-2 | the sun's strength by day |
+| `base:look_sun_warmth` | 0, -1..1 | the sun's colour: -1 whiter, +1 toward a 4300 K orange (0: 6300 K) |
+| `base:look_fill` | 1, 0.5-2 | the sky's light in the shade by day |
+| `base:look_fill_cool` | 0, -1..1 | the shade's colour: -1 neutral, +1 bluer (0: blue 1.4x red) |
+| `base:look_contrast` | 1, 0.8-1.3 | the day curve's contrast (Lottes's a, 1.2 as made) |
+| `base:look_saturation` | 1, 0.7-1.3 | saturation after the curve, by day (1.2 as made) |
+| `base:look_shade` | 1, 0.5-2 | how fast the sky's light fades under leaves and roofs (more: darker forest floors) |
+| `base:look_haze` | 1.6, 0-3 | the air's veil over distance: clear air blues the far land (more in blue than red, so it stays crisp); rain, the weather's fog and a forest's damp air add a grey haze. (Ronald's pick, 1.6; 1 is crisper). Rain's own mist does not follow it |
+| `base:look_fog` | 1, 0-2 | how bright fog is |
+| `base:night_light` | 1, 0.3-2 | the night's sky light (nights are dark by design) |
+| `base:night_moon` | 1, 0.3-2 | the moon's light at night |
+| `base:look_canopy` | 1, 0.2-2 | under a forest's canopy (`vitals::air::CANOPY`): how dim and green the shade under the leaves is, and how freely the sunflecks come through |
+| `base:look_shafts` | 1, 0.2-3 | how strong the light shafts through a forest's crown gaps are (most in morning mist) |
+

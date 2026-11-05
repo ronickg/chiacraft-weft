@@ -5,7 +5,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::config;
-use crate::input::{Chord, Input, Key};
+use crate::input::{Binding, Input, Slots};
 
 #[derive(Clone)]
 pub struct Settings {
@@ -14,9 +14,98 @@ pub struct Settings {
     pub read_only: bool,
 }
 
+/// The 3D world's share of the window's pixels each way: the setting, or on auto (0) two
+/// thirds on a high-density screen (`density`, physical pixels per point, 2 on Retina), where
+/// shading every pixel cost several times what it bought, and all of them elsewhere.
+pub fn render_scale(density: f64) -> f32 {
+    let set = number("core:render_scale") as f32;
+    if set > 0.0 {
+        return set.clamp(0.5, 1.0);
+    }
+    if density >= 1.5 { 0.67 } else { 1.0 }
+}
+
 /// The largest GUI scale a window shows whole (vanilla's 320x240 per step); auto uses it.
+/// The GUI pixels every screen needs to fit whole (chiacraft: the widest and tallest window, the
+/// animal screen at about 385 x 300 with its tab, and a margin round it). The automatic scale,
+/// and the most the setting goes to, keeps at least this much room, so nothing is cut off on a
+/// small or high-density screen (a 3456 x 2234 MacBook: 6, where 320 x 240 gave 9).
+pub const GUI_MIN: (u32, u32) = (400, 320);
+
+/// The largest GUI scale at which a window of `window` physical pixels still holds `GUI_MIN`: an
+/// even number, and never under 2 (a window too small for 2 at `GUI_MIN` scrolls its screens,
+/// `App::open`, rather than drop to 1, where the text came out twice its boxes' size: Playtest B9 at
+/// 760 x 600 and 640 x 360). A UI pixel (a frame's, an item's, a
+/// letter's) is half a GUI pixel, so only at the even scales does it land on whole screen pixels:
+/// at 3 a frame pixel is 1.5, and at 1 it is half a screen pixel, so the text, which is never drawn
+/// smaller than a screen pixel a font pixel, came out twice the size its boxes were laid out for
+/// (Playtest B9: the animal screen at GUI scale 1, its buttons' labels over each other; Researcher,
+/// round 13; Minecraft keeps to even scales for the same reason with its half-size font).
 pub fn max_gui_scale(window: (u32, u32)) -> u32 {
-    (window.0 / 320).min(window.1 / 240).max(1)
+    even_scale((window.0 / GUI_MIN.0).min(window.1 / GUI_MIN.1)).max(2)
+}
+
+/// `s` rounded down to a scale the UI pixel sits whole on: 2, 4, 6... (1 below 2).
+pub fn even_scale(s: u32) -> u32 {
+    if s <= 1 { 1 } else { s - s % 2 }
+}
+
+/// The scale the GUI is drawn at for the setting `setting` (0: auto) in a window that allows up to
+/// `max`: auto is `max`; a setting is kept even, at least 2 (a 1 or a 3 saved before scales were
+/// kept even shows at 2), and no more than `max`.
+pub fn applied_gui_scale(setting: u32, max: u32) -> u32 {
+    if setting == 0 { max } else { even_scale(setting.max(2)).min(max) }
+}
+
+/// The GUI scale setting's next step: auto (0), then the even scales up to `max`, then auto.
+pub fn next_gui_scale(now: u32, max: u32) -> u32 {
+    let next = match now {
+        0 => 2,
+        n => even_scale(n.max(2)) + 2,
+    };
+    if next > max.max(2) { 0 } else { next }
+}
+
+#[cfg(test)]
+mod gui_scale_tests {
+    use super::*;
+
+    #[test]
+    fn scales_are_even() {
+        assert_eq!(max_gui_scale((1280, 720)), 2);
+        assert_eq!(max_gui_scale((1920, 1080)), 2);
+        assert_eq!(max_gui_scale((2560, 1440)), 4);
+        assert_eq!(max_gui_scale((3456, 2234)), 6);
+        // too small for 2 at `GUI_MIN`: still 2, its screens scroll
+        assert_eq!(max_gui_scale((640, 480)), 2);
+        assert_eq!(max_gui_scale((640, 360)), 2);
+        assert_eq!(even_scale(3), 2);
+        assert_eq!(even_scale(7), 6);
+    }
+
+    #[test]
+    fn a_setting_of_one_shows_at_two() {
+        assert_eq!(applied_gui_scale(1, 2), 2);
+        assert_eq!(applied_gui_scale(3, 6), 2);
+        assert_eq!(applied_gui_scale(0, 6), 6);
+        assert_eq!(applied_gui_scale(8, 6), 6);
+        // a window too small for 2 at `GUI_MIN` still gets 2
+        assert_eq!(applied_gui_scale(1, max_gui_scale((760, 600))), 2);
+        assert_eq!(applied_gui_scale(0, max_gui_scale((640, 360))), 2);
+    }
+
+    #[test]
+    fn the_setting_steps_through_even_scales() {
+        let mut s = 0;
+        let mut seen = vec![];
+        for _ in 0..5 {
+            s = next_gui_scale(s, 6);
+            seen.push(s);
+        }
+        assert_eq!(seen, vec![2, 4, 6, 0, 2]);
+        assert_eq!(next_gui_scale(0, 2), 2);
+        assert_eq!(next_gui_scale(2, 2), 0);
+    }
 }
 
 fn id(name: &str) -> u32 {
@@ -36,6 +125,22 @@ pub struct ChatLook {
     pub closed_height: f32,
     /// Of the dark behind it, 0..255.
     pub dim: u8,
+}
+
+/// Which chat lines a player wants.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum ChatVisibility {
+    All,
+    System,
+    Hidden,
+}
+
+pub fn chat_visibility() -> ChatVisibility {
+    match number("core:chat_visibility") as u32 {
+        0 => ChatVisibility::All,
+        1 => ChatVisibility::System,
+        _ => ChatVisibility::Hidden,
+    }
 }
 
 pub fn chat_look() -> ChatLook {
@@ -65,6 +170,11 @@ impl Settings {
         config::text(id("core:language"))
     }
     /// 0 = automatic.
+    /// Frames a second at most, 0 for no cap.
+    pub fn fps_cap(&self) -> u32 {
+        number("core:fps_cap") as u32
+    }
+
     pub fn gui_scale(&self) -> u32 {
         number("core:gui_scale") as u32
     }
@@ -93,18 +203,16 @@ impl Settings {
         number("core:invert_y") != 0.0
     }
     /// The sneak key switches sneaking on and off instead of being held.
-    pub fn toggle_sneak(&self) -> bool {
-        number("core:toggle_sneak") != 0.0
-    }
     /// The sprint key switches sprinting on and off instead of being held.
-    pub fn toggle_sprint(&self) -> bool {
-        number("core:toggle_sprint") != 0.0
-    }
     pub fn name(&self) -> String {
         config::text(id("core:name"))
     }
     pub fn server_port(&self) -> u16 {
         number("core:server_port") as u16
+    }
+    /// Every connection through the relay only (`core:net_relay_only`, a test setting).
+    pub fn net_relay_only(&self) -> bool {
+        number("core:net_relay_only") != 0.0
     }
     /// Extra iroh relay URLs; empty uses the public defaults.
     pub fn relays(&self) -> Vec<String> {
@@ -118,6 +226,15 @@ impl Settings {
     pub fn chain_peers(&self) -> Vec<String> {
         list("core:chain_peers")
     }
+    /// What listing a world locks, in mojos (phase 5).
+    pub fn listing_deposit(&self) -> u64 {
+        number("core:listing_deposit").max(1.0) as u64
+    }
+
+    /// The fee a listing pays, in mojos (`core:listing_fee`).
+    pub fn listing_fee(&self) -> u64 {
+        number("core:listing_fee").max(0.0) as u64
+    }
     /// DID sponsors' addresses (iroh endpoint ids), tried in order.
     pub fn sponsors(&self) -> Vec<String> {
         list("core:sponsors")
@@ -128,6 +245,28 @@ impl Settings {
     }
     pub fn shader_pack(&self) -> Option<String> {
         Some(config::text(id("core:shader_pack"))).filter(|p| !p.is_empty())
+    }
+
+    pub fn occlusion_culling(&self) -> bool {
+        number("core:occlusion_culling") != 0.0
+    }
+
+    /// Screen effects' half-size parts (`post::HOOK_LOW`), live.
+    pub fn post_low(&self) -> bool {
+        number("core:post_low") != 0.0
+    }
+
+    /// Soft clouds for packs that draw them (`client::soft_clouds`).
+    pub fn soft_clouds(&self) -> bool {
+        number("core:soft_clouds") != 0.0
+    }
+
+    pub fn show_avatars(&self) -> bool {
+        number("core:show_avatars") != 0.0
+    }
+
+    pub fn first_person_model(&self) -> bool {
+        number("core:first_person_model") != 0.0
     }
 
     pub fn set(&self, name: &str, v: f64) {
@@ -148,21 +287,72 @@ impl Settings {
     pub fn apply_binds(&self, input: &mut Input) {
         let actions: Vec<String> = input.binds.iter().map(|b| b.action.clone()).collect();
         for action in actions {
-            match parse_chord(&config::text(id(&format!("core:key.{action}")))) {
+            match Binding::parse_slots(&config::text(id(&format!("core:key.{action}")))) {
                 Some(k) => input.rebind(&action, k),
                 None => log::warn!("key binding {action}: unknown key {}", config::text(id(&format!("core:key.{action}")))),
             }
         }
     }
 
-    pub fn set_bind(&self, action: &str, key: Chord) {
-        config::set_text(id(&format!("core:key.{action}")), &chord_id(key));
+    pub fn set_bind(&self, action: &str, keys: &Slots) {
+        config::set_text(id(&format!("core:key.{action}")), &Binding::slots_id(keys));
+    }
+}
+
+/// Brings settings files written by older versions up to date.
+pub fn migrate(run_dir: &Path) {
+    let config = crate::paths::config(run_dir);
+    merge_settings(&config);
+    for dir in [config, run_dir.join("test-config")] {
+        migrate_bindings(&dir.join("core.txt"));
+    }
+}
+
+/// Sneak and sprint switched by two settings of their own become toggled bindings, and a sprint
+/// or fly key saved when they had one binding gets the double tap the engine now gives them.;
+/// TODO remove in 26.11.3
+fn migrate_bindings(path: &Path) {
+    let Ok(src) = std::fs::read_to_string(path) else { return };
+    let mut pairs: Vec<(String, String)> = crate::kv::pairs(&src)
+        .map(|(_, k, v)| (k.to_string(), v.to_string()))
+        .collect();
+    let before = pairs.clone();
+    let mut toggled = Vec::new();
+    pairs.retain(|(k, v)| match k.strip_prefix("toggle_") {
+        Some(action @ ("sneak" | "sprint")) => {
+            if matches!(v.as_str(), "true" | "1") {
+                toggled.push(format!("key.core:{action}"));
+            }
+            false
+        }
+        _ => true,
+    });
+    for (k, v) in &mut pairs {
+        match (k.as_str(), v.as_str()) {
+            ("key.core:sprint", "ControlLeft") => *v = "ControlLeft, double KeyW".into(),
+            ("key.core:fly", "KeyF") => *v = "KeyF, double Space".into(),
+            _ => {}
+        }
+        if toggled.contains(k) && !v.starts_with("toggle ") {
+            *v = format!("toggle {v}");
+        }
+    }
+    if pairs != before {
+        let out: String = pairs
+            .iter()
+            .map(|(k, v)| {
+                format!(
+                    "{k} = {v}
+"
+                )
+            })
+            .collect();
+        let _ = std::fs::write(path, out);
     }
 }
 
 /// The old `config/settings.txt` joins `config/core.txt` once (lists were one line per entry).
-pub fn migrate(run_dir: &Path) {
-    let config = crate::paths::config(run_dir);
+fn merge_settings(config: &Path) {
     let (old, new) = (config.join("settings.txt"), config.join("core.txt"));
     let Ok(src) = std::fs::read_to_string(&old) else { return };
     let mut out = std::fs::read_to_string(&new).unwrap_or_default();
@@ -206,213 +396,4 @@ fn sys_locale_ru() -> bool {
 #[cfg(not(windows))]
 fn sys_locale_ru() -> bool {
     false
-}
-
-pub fn key_id(k: Key) -> String {
-    match k {
-        Key::Mouse(b) => format!("mouse{b}"),
-        Key::Code(c) => format!("{c:?}"),
-    }
-}
-
-const MODIFIERS: [(u8, &str); 3] = [(crate::input::CTRL, "ctrl"), (crate::input::SHIFT, "shift"), (crate::input::ALT, "alt")];
-
-/// `ctrl+shift+KeyT`: the modifiers, then the key.
-pub fn chord_id(c: Chord) -> String {
-    let mut out = String::new();
-    for (bit, name) in MODIFIERS {
-        if c.mods & bit != 0 {
-            out += name;
-            out.push('+');
-        }
-    }
-    out + &key_id(c.key)
-}
-
-/// A key with modifiers in front (`ctrl+T`, `shift+alt+F6`), or a key alone.
-pub fn parse_chord(s: &str) -> Option<Chord> {
-    let mut parts: Vec<&str> = s.split('+').map(str::trim).collect();
-    let key = parse_key(parts.pop()?)?;
-    let mut mods = 0;
-    for p in parts {
-        mods |= MODIFIERS
-            .iter()
-            .find(|m| m.1.eq_ignore_ascii_case(p) || (m.1 == "ctrl" && p.eq_ignore_ascii_case("control")))?
-            .0;
-    }
-    Some(Chord { key, mods })
-}
-
-pub fn parse_key(s: &str) -> Option<Key> {
-    if let Some(b) = s.strip_prefix("mouse") {
-        return b.parse().ok().map(Key::Mouse);
-    }
-    use winit::keyboard::KeyCode::*;
-    const ALL: &[winit::keyboard::KeyCode] = &[
-        KeyA,
-        KeyB,
-        KeyC,
-        KeyD,
-        KeyE,
-        KeyF,
-        KeyG,
-        KeyH,
-        KeyI,
-        KeyJ,
-        KeyK,
-        KeyL,
-        KeyM,
-        KeyN,
-        KeyO,
-        KeyP,
-        KeyQ,
-        KeyR,
-        KeyS,
-        KeyT,
-        KeyU,
-        KeyV,
-        KeyW,
-        KeyX,
-        KeyY,
-        KeyZ,
-        Digit0,
-        Digit1,
-        Digit2,
-        Digit3,
-        Digit4,
-        Digit5,
-        Digit6,
-        Digit7,
-        Digit8,
-        Digit9,
-        F1,
-        F2,
-        F3,
-        F4,
-        F5,
-        F6,
-        F7,
-        F8,
-        F9,
-        F10,
-        F11,
-        F12,
-        Space,
-        Enter,
-        Tab,
-        Backspace,
-        Escape,
-        ShiftLeft,
-        ShiftRight,
-        ControlLeft,
-        ControlRight,
-        AltLeft,
-        AltRight,
-        ArrowUp,
-        ArrowDown,
-        ArrowLeft,
-        ArrowRight,
-        Minus,
-        Equal,
-        BracketLeft,
-        BracketRight,
-        Backslash,
-        Semicolon,
-        Quote,
-        Comma,
-        Period,
-        Slash,
-        Backquote,
-        CapsLock,
-        Insert,
-        Delete,
-        Home,
-        End,
-        PageUp,
-        PageDown,
-        Numpad0,
-        Numpad1,
-        Numpad2,
-        Numpad3,
-        Numpad4,
-        Numpad5,
-        Numpad6,
-        Numpad7,
-        Numpad8,
-        Numpad9,
-        NumpadAdd,
-        NumpadSubtract,
-        NumpadMultiply,
-        NumpadDivide,
-        NumpadDecimal,
-        NumpadEnter,
-        NumpadEqual,
-        NumLock,
-        ScrollLock,
-        PrintScreen,
-        Pause,
-        ContextMenu,
-        IntlBackslash,
-        F13,
-        F14,
-        F15,
-        F16,
-        F17,
-        F18,
-        F19,
-        F20,
-        F21,
-        F22,
-        F23,
-        F24,
-        SuperLeft,
-        SuperRight,
-    ];
-    // Short names ("R", "5", "space", "lshift") as well as winit's ("KeyR", "Digit5", "ShiftLeft").
-    let short = match s.to_ascii_lowercase().as_str() {
-        l if l.len() == 1 && l.as_bytes()[0].is_ascii_alphabetic() => format!("Key{}", l.to_ascii_uppercase()),
-        l if l.len() == 1 && l.as_bytes()[0].is_ascii_digit() => format!("Digit{l}"),
-        "lshift" | "shift" => "ShiftLeft".into(),
-        "rshift" => "ShiftRight".into(),
-        "lctrl" | "ctrl" | "control" => "ControlLeft".into(),
-        "rctrl" => "ControlRight".into(),
-        "lalt" | "alt" => "AltLeft".into(),
-        "ralt" => "AltRight".into(),
-        "esc" => "Escape".into(),
-        "up" => "ArrowUp".into(),
-        "down" => "ArrowDown".into(),
-        "left" => "ArrowLeft".into(),
-        "right" => "ArrowRight".into(),
-        _ => s.into(),
-    };
-    ALL.iter()
-        .find(|c| format!("{c:?}").eq_ignore_ascii_case(&short))
-        .map(|c| Key::Code(*c))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use winit::keyboard::KeyCode;
-
-    #[test]
-    fn key_names() {
-        assert_eq!(parse_key("R"), Some(Key::Code(KeyCode::KeyR)));
-        assert_eq!(parse_key("KeyR"), Some(Key::Code(KeyCode::KeyR)));
-        assert_eq!(parse_key("5"), Some(Key::Code(KeyCode::Digit5)));
-        assert_eq!(parse_key("space"), Some(Key::Code(KeyCode::Space)));
-        assert_eq!(parse_key("LShift"), Some(Key::Code(KeyCode::ShiftLeft)));
-        assert_eq!(parse_key("F6"), Some(Key::Code(KeyCode::F6)));
-        assert_eq!(parse_key("mouse3"), Some(Key::Mouse(3)));
-        assert_eq!(parse_key("Rr"), None);
-        assert_eq!(parse_chord("ctrl+T"), Some(Chord { key: Key::Code(KeyCode::KeyT), mods: crate::input::CTRL }));
-        assert_eq!(
-            parse_chord("Shift + Alt + F6"),
-            Some(Chord { key: Key::Code(KeyCode::F6), mods: crate::input::SHIFT | crate::input::ALT })
-        );
-        assert_eq!(parse_chord("LShift"), Some(Chord { key: Key::Code(KeyCode::ShiftLeft), mods: 0 }));
-        assert_eq!(parse_chord("meta+T"), None);
-        let c = parse_chord("ctrl+shift+R").unwrap();
-        assert_eq!(parse_chord(&chord_id(c)), Some(c));
-    }
 }

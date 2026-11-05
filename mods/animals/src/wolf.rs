@@ -9,7 +9,11 @@
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
-pub(crate) static WOLF: Entity = Entity::named("grey_wolf");
+use crate::ModelFile;
+use crate::choose::{Band, Need, Stops, WithBand};
+use crate::prof::Timed;
+
+pub(crate) static WOLF: EntityKind = EntityKind::named("grey_wolf");
 const TEXTURE: &str = "wolf/wolf";
 
 pub fn init(r: &mut Registry) {
@@ -25,10 +29,10 @@ pub fn init(r: &mut Registry) {
         &[("_sit", "wolf_sit"), ("_lie", "wolf_lie")],
     );
     r.entity(&WOLF)
-        .size(0.6, 0.85)
-        .health(30.0)
-        .speed(5.5)
-        .attack_damage(6.0)
+        .size(animals_core::bodies::of("wolf").0, animals_core::bodies::of("wolf").1)
+        .max_health(crate::animal::health(index))
+        .walk_speed(5.5)
+        .attack_damage(crate::animal::hit(index))
         .passive()
         .model_file("wolf")
         .animations("wolf")
@@ -38,23 +42,32 @@ pub fn init(r: &mut Registry) {
             if !crate::screen::interact(&w, id, player) && !crate::taming::feed(&w, id, player) {
                 crate::commands::interact(&w, id, player);
             }
+            false
         })
         .goals(
             Goals::new()
-                .then(crate::animal::upkeep(index))
-                .then(crate::taming::behave(index))
-                .then(crate::hunt::wary)
-                .then(crate::hunt::hunt)
-                .then(crate::commands::act(index))
-                .then(crate::breeding::behave(index))
-                .then(crate::rest::settle)
-                .then(crate::commands::hold)
-                .then(crate::comfort::seek)
-                .then(crate::forage::forage)
-                .then(ai::wander(0.4, 10.0)),
+                .timed("upkeep", crate::animal::upkeep(index))
+                .timed("howl", crate::voices::howl_at_blood_moon)
+                .timed("taming", crate::taming::behave(index))
+                .timed("wary", crate::hunt::wary)
+                .timed("hunt", crate::hunt::hunt)
+                .timed("commands", crate::commands::act(index))
+                // What it does when nothing is after it or ordered, the most pressing first
+                // (`choose.rs`).
+                .band(
+                    "needs",
+                    Band::new()
+                        .with(Need::Love, crate::breeding::behave(index))
+                        .with(Need::Rest, Stops { goal: crate::rest::settle, stop: crate::rest::stop })
+                        .with(Need::Hold, crate::commands::hold)
+                        .with(Need::Comfort, crate::comfort::seek)
+                        .with(Need::Drink, crate::drink::drink)
+                        .with(Need::Eat, crate::forage::eat)
+                        .with(Need::Wander, ai::wander(0.4, 10.0)),
+                ),
         )
         .on_hurt(|w, h| {
-            crate::taming::hurt(w, h.entity);
+            crate::taming::hurt(w, h.entity, h.source);
             crate::rest::stop(w, h.entity);
         });
 }

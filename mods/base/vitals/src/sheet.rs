@@ -7,7 +7,9 @@ use std::fmt::Write;
 use crate::effects;
 use crate::food::{self, NUTRIENT_NAMES};
 use crate::stats::{self, Growth};
-use crate::{air, calendar, climate, clothing, difficulty, forage, levels, meals, plants, preserve, shelter, soil, temperature, wild};
+use crate::{
+    air, calendar, climate, clothing, crafts, difficulty, forage, levels, meals, plants, preserve, shelter, soil, temperature, wild,
+};
 
 pub fn markdown() -> String {
     let mut w = String::new();
@@ -21,9 +23,12 @@ pub fn markdown() -> String {
     cooking(&mut w);
     clothes(&mut w);
     rooms(&mut w);
+    waiting(&mut w);
+    felling_table(&mut w);
     effects_table(&mut w);
     climates(&mut w);
     plant_table(&mut w);
+    crop_table(&mut w);
     wild_table(&mut w);
     forage_table(&mut w);
     soil_table(&mut w);
@@ -125,6 +130,81 @@ fn cooking(w: &mut String) {
             .map(|p| format!("{:.0}", food::FOODS[p].keeps.0 + food::FOODS[p].keeps.1))
             .collect();
         let _ = writeln!(w, "| {} ({:.0}) | {} | {} |", f.name, f.keeps.0 + f.keeps.1, made.join(" | "), keeps.join(", "));
+    }
+    let _ = writeln!(w);
+}
+
+fn felling_table(w: &mut String) {
+    use crate::felling::{self, LONGEST_SECS, PAST_TIER, SHEET_TREES, TIERS};
+    let _ = write!(
+        w,
+        "## Felling\n\nAn axe at a tree's foot fells it in one chop that takes logs^{} times one log's (`vitals::felling`), with the axe's own speed on top. Each tier of axe takes trees up to a size for their wood; past it a tree still falls, {} times slower, and gives nothing. A tree that loses its foot, or a log of its trunk, by any means falls (none stands in the air); bare hands and other tools chop the foot as slowly as an axe past its tier, and as fruitlessly: the first axe is made by hand off the ground (`first`). Never more than {} min. Felled, a tree within its tier lies on the ground in pieces of {} logs, each cut as long as felling a tree of its logs takes; the axe wears by logs^{} for a felling or a piece. A tree falls as itself: a {} s creak, then {:.1} s for one 10 high ({}-{} s, by the square root of its height), its leaves breaking off past {}° until {:.0}% have, the rest bursting on the ground; on the way leaves and branches in its path break, and a trunk it strikes falls too if the falling tree has {}x its logs, or else it catches there and settles as blocks; a creature it hits takes 2 + a tenth of its logs, up to {}. Seconds for a typical axe of each tier (a log is hardness 2), * past its tier:\n\n| tier | harvest | takes up to | speed |",
+        felling::GROWTH,
+        PAST_TIER,
+        LONGEST_SECS / 60.0,
+        felling::PIECE,
+        felling::GROWTH,
+        felling::CREAK_TICKS as f32 / crate::TICKS as f32,
+        felling::FALL_SECS.0,
+        felling::FALL_SECS.1,
+        felling::FALL_SECS.2,
+        felling::SHED_FROM,
+        felling::SHED_SHARE * 100.0,
+        felling::KNOCK_FELLS,
+        felling::HURT_MOST
+    );
+    for (name, logs) in SHEET_TREES {
+        let _ = write!(w, " {name} ({logs}) |");
+    }
+    let _ = write!(w, "\n|---|---|---|---|");
+    for _ in SHEET_TREES {
+        let _ = write!(w, "---|");
+    }
+    let _ = writeln!(w);
+    // Bare hands and every tool but an axe: slow and fruitless at the foot (Planner, 11-05).
+    let _ = write!(w, "| bare hands, other tools | - | nothing | 1 |");
+    for &(_, logs) in SHEET_TREES {
+        let f = felling::by_hand(logs);
+        let secs = felling::seconds(f, felling::log_secs(2.0, 1.0));
+        let time = if secs < 120.0 { format!("{secs:.0} s") } else { format!("{:.0} min", secs / 60.0) };
+        let _ = write!(w, " {time}{} |", if f.fruitful { "" } else { " *" });
+    }
+    let _ = writeln!(w);
+    for t in TIERS {
+        let _ = write!(w, "| {} | {} | {} logs | {} |", t.name, t.harvest, t.logs, t.speed);
+        let one = felling::log_secs(2.0, t.speed);
+        for &(_, logs) in SHEET_TREES {
+            let f = felling::felling(logs, t.harvest);
+            let secs = felling::seconds(f, one);
+            let time = if secs < 120.0 { format!("{secs:.0} s") } else { format!("{:.0} min", secs / 60.0) };
+            let _ = write!(w, " {time}{} |", if f.fruitful { "" } else { " *" });
+        }
+        let _ = writeln!(w);
+    }
+    let _ = writeln!(w);
+}
+
+fn waiting(w: &mut String) {
+    let _ = writeln!(
+        w,
+        "## Crafts that wait\n\nWhat takes days in real life takes its time on the growing pace (`vitals::crafts`; game days = {} · real days^{}), at a station that keeps working unwatched.\n\n| station | in | with | out | real days | in the game | holds |\n|---|---|---|---|---|---|---|",
+        crate::plants::GROWING.0,
+        crate::plants::GROWING.1
+    );
+    for c in crafts::CRAFTS {
+        let secs = c.secs();
+        let time =
+            if secs < crate::DAY_SECS { format!("{:.1} min", secs / 60.0) } else { format!("{:.1} game days", secs / crate::DAY_SECS) };
+        let _ = writeln!(
+            w,
+            "| {} | {} | {} | {} | {} | {time} | {} |",
+            c.station.name(),
+            c.input,
+            c.with.unwrap_or("-"),
+            c.output,
+            c.real_days,
+            c.station.holds()
+        );
     }
     let _ = writeln!(w);
 }
@@ -260,7 +340,7 @@ fn climates(w: &mut String) {
     let _ = writeln!(w);
     let _ = writeln!(
         w,
-        "## Wind and fog\n\nEach place's mean wind in m/s and its share of days with fog, in spring, summer, autumn and winter (`reports/ecology/Wind and fog.md`), and when its fog lies (`vitals::air`). A day blows from {:.0}% to {:.0}% of the mean, a quarter more mid afternoon than before dawn, {:.1} times under a thunderstorm; still fog clears from {} to {} m/s, sea fog from {} to {}. Under {} °C what falls is snow; a day of it lays {} of a deep cover and each degree of a day's mean above freezing melts {}; falling snow in {} to {} m/s of wind is a blizzard, dry ground (humidity under {}) lifts dust from {} to {} m/s. Out in the open the wind chills the cold (the wind chill index, 10 °C and under), and in thick fog animals see {:.0}% as far.\n\n| biome | wind: spring | summer | autumn | winter | fog: spring | summer | autumn | winter | fog lies |\n|---|---|---|---|---|---|---|---|---|---|",
+        "## Wind and fog\n\nEach place's mean wind in m/s and its share of days with fog, in spring, summer, autumn and winter (`reports/ecology/Wind and fog.md`), and when its fog lies (`vitals::air`). A day blows from {:.0}% to {:.0}% of the mean, a quarter more mid afternoon than before dawn, {:.1} times under a thunderstorm; still fog clears from {} to {} m/s, sea fog from {} to {}. Under {} °C what falls is snow; a day of it lays {} of a deep cover and each degree of a day's mean above freezing melts {}; near players it lies as snow layers (an eighth of a block each) from {} of a cover, {} of them when deep, burying plants from {}, a column looked at every {:.0} s and a layer melting in {:.0} s in air of {} °C or warmer (fewer the colder, none in a frost); open still water near players freezes to ice under {} °C (every visit from {} °C), and its lake ice thaws as the snow melts, a step every {} s; falling snow in {} to {} m/s of wind is a blizzard; a place's air is its own and its neighbours' over a band {} blocks wide, and deep in a closed forest ({} blocks in from the edge) the wind is {:.0}% of the open's, with its chill and blizzard; dry ground (humidity under {}) lifts dust from {} to {} m/s. Out in the open the wind chills the cold (the wind chill index, 10 °C and under), and in thick fog animals see {:.0}% as far.\n\n| biome | wind: spring | summer | autumn | winter | fog: spring | summer | autumn | winter | fog lies |\n|---|---|---|---|---|---|---|---|---|---|",
         air::DAY_SPREAD.0 * 100.0,
         air::DAY_SPREAD.1 * 100.0,
         air::STORM,
@@ -271,8 +351,20 @@ fn climates(w: &mut String) {
         air::SNOWS_BELOW,
         air::SNOWFALL,
         air::MELT,
+        air::SNOW_LAYER_FROM,
+        air::SNOW_LAYERS_DEEP,
+        air::SNOW_BURIES,
+        air::snow_visit_secs(),
+        air::SNOW_MELT_SECS,
+        air::SNOW_MELT_WARM,
+        air::FREEZE_BELOW,
+        air::FREEZE_HARD,
+        air::ICE_THAW_SECS,
         air::BLIZZARD.0,
         air::BLIZZARD.1,
+        air::AIR_BLEND,
+        air::FOREST_EDGE,
+        (1.0 - air::FOREST_CALM) * 100.0,
         air::DRY,
         air::DUST.0,
         air::DUST.1,
@@ -331,6 +423,22 @@ fn plant_table(w: &mut String) {
     let _ = writeln!(w);
 }
 
+fn crop_table(w: &mut String) {
+    let _ = writeln!(
+        w,
+        "## Crops\n\nWhat each crop is sown from and gives ripe (`vitals::crops`; how it grows is its plants row): picked unripe it gives back what sowed it, ripe its harvest and, with a seed of its own, up to {} more seed. Its ripe harvest tires or feeds the farmland under it. Broken tall grass in the biomes listed gives one of their crops' seed a time in {:.0}, and anywhere a wheat seed a time in {:.0}.\n\n| crop | sown from | ripe gives | stages | soil | wild seed in |\n|---|---|---|---|---|---|",
+        crate::crops::EXTRA_SEEDS,
+        1.0 / crate::crops::WILD_SEED_CHANCE,
+        1.0 / crate::crops::WHEAT_SEED_CHANCE
+    );
+    for c in &crate::crops::CROPS {
+        let wild = if c.wild.is_empty() { "tall grass anywhere".to_string() } else { c.wild.join(", ") };
+        let _ =
+            writeln!(w, "| {} | {} | {} {}-{} | {} | {:?} | {wild} |", c.block, c.seed, c.gives, c.count.0, c.count.1, c.ripe + 1, c.soil);
+    }
+    let _ = writeln!(w);
+}
+
 fn wild_table(w: &mut String) {
     let _ = writeln!(
         w,
@@ -340,7 +448,11 @@ fn wild_table(w: &mut String) {
         let found = p
             .found
             .iter()
-            .map(|b| b.split(':').nth(1).unwrap_or(b))
+            .map(|b| {
+                let short = b.split(':').nth(1).unwrap_or(b);
+                let c = wild::cover_in(p, b);
+                if c == p.cover { short.to_string() } else { format!("{short} ({:.1}%)", c * 100.0) }
+            })
             .collect::<Vec<_>>()
             .join(", ");
         let _ =
@@ -411,13 +523,45 @@ fn soil_table(w: &mut String) {
         .join(", ");
     let _ = writeln!(
         w,
-        "\nA ripe harvest of {} takes a level; {feeds}; a season unplanted (about {:.0} game days, at grass's rate) gives one back. A compost bin fills in {} steps: spoiled food {}, {composts}; full, it rots into compost in about {:.0} minutes.\n",
-        soil::TIRES.join(", "),
+        "\nA ripe harvest of {} takes a level, of {} gives one back; {feeds}; a season unplanted (about {:.0} game days, at grass's rate) gives one back. A compost bin fills in {} steps: spoiled food {}, {composts}; full, it rots into compost in about {:.0} minutes.\n",
+        crops(crate::crops::Soil::Tires),
+        crops(crate::crops::Soil::Feeds),
         soil::FALLOW_SECS / crate::DAY_SECS,
         soil::BIN_FULL,
         soil::SPOILED,
         soil::compost_secs() / 60.0
     );
+    let _ = writeln!(
+        w,
+        "Dung pats: a grazer drops one every {} mouthfuls where it stands on the ground, never within {} blocks of another; it rots by warmth and soil water into a tuft of fresh grass (at most {} game days, frozen or dry), and while it lies grazed grass within {} blocks grows back x{}. How long one lies, in game minutes (a game day is {:.0}):\n\n| biome | spring | summer | autumn | winter |\n|---|---|---|---|---|",
+        soil::MOUTHFULS_A_PAT,
+        soil::PAT_SPACING,
+        soil::PAT_MOST_DAYS,
+        soil::PAT_REACH,
+        soil::PAT_GROWTH,
+        crate::DAY_SECS / 60.0
+    );
+    for c in crate::climate::BIOMES
+        .iter()
+        .filter(|c| !c.underground && crate::forage::grass_grows(c.biome) > 0.0)
+    {
+        let lies = (0..4)
+            .map(|s| format!("{:.0}", soil::pat_season_secs(c.celsius, c.seasons, c.rain, s) / 60.0))
+            .collect::<Vec<_>>()
+            .join(" | ");
+        let _ = writeln!(w, "| {} | {lies} |", c.biome);
+    }
+    let _ = writeln!(w);
+}
+
+/// The crops that leave the soil so, by name.
+fn crops(soil: crate::crops::Soil) -> String {
+    crate::crops::CROPS
+        .iter()
+        .filter(|c| c.soil == soil)
+        .map(|c| c.block)
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn difficulties(w: &mut String) {

@@ -10,16 +10,16 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use crossbeam_channel::{Receiver, Sender};
 use glam::IVec3;
-use weft_abi::TerrainColumn;
-use weft_noise::fixed::{Fields, seed32};
+use weft_abi::{TerrainColumn, expr as ek};
+use weft_noise::fixed::seed32;
 use weft_render::{Backend, BufferId, Cmd, CommandList, ComputeDesc, PipelineId, usage};
 
 use crate::content::{Content, content};
 use crate::server::area::{self, AreaFill};
-use crate::server::terrain::{Height, Mask};
+use crate::server::terrain::Expr;
 use crate::world::Cube;
 
-use crate::gpu_layout::terrain::{self as layout, binding, d, limit, mask, words};
+use crate::gpu_layout::terrain::{self as layout, binding, d, words};
 
 const OUT_WORDS: usize = words::OUT as usize;
 const CUSTOM_WORDS: usize = words::CUSTOM as usize;
@@ -31,7 +31,7 @@ const LOD_BATCH: usize = 64;
 pub static GPU_CUBES: AtomicU64 = AtomicU64::new(0);
 pub static GPU_MISMATCHES: AtomicU64 = AtomicU64::new(0);
 
-/// A cube for the GPU, with the heights of mods' own features (their code runs here).
+/// A cube for the GPU, with the heights of the features made on the CPU (mods' code runs here).
 pub struct Job {
     pub epoch: u64,
     pub dim: u32,
@@ -42,18 +42,20 @@ pub struct Job {
     pub done: Sender<super::terrain::Made>,
 }
 
-/// What `terrain.wgsl` reads for dimension `dim`, and the indices of the features that run
-/// mods' code (their heights go up with each cube); `None` when the GPU cannot make it.
+/// What `terrain.wgsl` reads for dimension `dim`, and the indices of the features made on the
+/// CPU (`Feature::custom`: mods' code; their heights go up with each job); `None` when the GPU
+/// cannot make it.
 pub fn describe(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<usize>)> {
     let def = &c.dims[dim as usize];
     let t = def.terrain.as_ref().filter(|_| def.builtin.is_none())?;
-    if t.features.len() > limit::FEATURES as usize || c.states.len() > 65536 {
+    if c.states.len() > 65536 {
         return None;
     }
     let mut w = vec![0i32; d::LEN as usize];
     let mut put = |at: u32, v: i32| w[at as usize] = v;
     put(d::STONE, t.stone as i32);
     put(d::BASE, t.base);
+    put(d::CONT_SCALE, t.continent_scale);
     if let Some((level, water)) = t.sea {
         put(d::HAS_SEA, 1);
         put(d::SEA, level);
@@ -65,61 +67,68 @@ pub fn describe(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<usize
         put(d::LAVA_FROM, caves.lava_from);
         put(d::LAVA_TO, caves.lava_to);
     }
+    put(d::FIELDS, t.fields.len() as i32);
     put(d::FEATURES, t.features.len() as i32);
     put(d::RULES, t.rules.len() as i32);
     put(d::CAVE_BIOMES, t.cave_biomes.len() as i32);
     for (i, (_, salt)) in layout::SEEDS.iter().enumerate() {
         put(d::SEEDS + i as u32, seed32(seed, *salt) as i32);
     }
-    // Features, their masks after them.
+    // The records of fields, features and rules; their steps and conditions go after them.
+    w[d::FIELD_OFF as usize] = w.len() as i32;
+    let at = w.len();
+    let fw = words::FIELD as usize;
+    w.resize(at + t.fields.len() * fw, 0);
+    for (i, f) in t.fields.iter().enumerate() {
+        let (start, len) = steps(&mut w, &f.expr, seed);
+        w[at + i * fw..at + (i + 1) * fw].copy_from_slice(&[start, len]);
+    }
     w[d::FEAT_OFF as usize] = w.len() as i32;
     let at = w.len();
     let fw = words::FEATURE as usize;
     w.resize(at + t.features.len() * fw, 0);
     let mut custom = Vec::new();
     for (i, f) in t.features.iter().enumerate() {
-        let r = at + i * fw;
-        match f.height {
-            Height::Preset(kind, p) => {
-                w[r] = kind as i32;
-                w[r + 1..r + 5].copy_from_slice(&p);
-                w[r + 5] = -1;
-            }
-            Height::Custom(..) => {
-                w[r + 5] = custom.len() as i32;
-                custom.push(i);
-            }
-        }
-        if let Some(m) = &f.mask {
-            let start = w.len();
-            if postfix(m, seed, &mut w, 0)? > limit::MASK_DEPTH as usize {
-                return None;
-            }
-            w[r + 6] = start as i32;
-            w[r + 7] = ((w.len() - start) / words::MASK as usize) as i32;
-        }
+        let (height, mask) = (steps(&mut w, &f.height, seed), f.mask.as_ref().map_or((0, 0), |m| steps(&mut w, m, seed)));
+        let slot = if f.custom.is_some() {
+            custom.push(i);
+            custom.len() as i32 - 1
+        } else {
+            -1
+        };
+        w[at + i * fw..at + (i + 1) * fw].copy_from_slice(&[height.0, height.1, mask.0, mask.1, slot]);
     }
     w[d::RULE_OFF as usize] = w.len() as i32;
+    let at = w.len();
+    let rw = words::RULE as usize;
+    w.resize(at + t.rules.len() * rw, 0);
     let opt = |v: Option<u32>| v.map_or(-1, |v| v as i32);
-    for r in &t.rules {
-        let mut rule = [0i32; words::RULE as usize];
-        rule[0] = r.biome as i32;
-        (rule[1], rule[2]) = r.temperature;
-        (rule[3], rule[4]) = r.humidity;
-        (rule[5], rule[6]) = r.continent;
-        (rule[7], rule[8]) = r.height;
-        (rule[9], rule[10], rule[11]) = match r.feature {
-            None => (-1, 0, 0),
-            Some((i, lo, hi)) => (if i < 32 { i as i32 } else { -2 }, lo, hi),
-        };
-        rule[12] = opt(r.top);
-        rule[13] = opt(r.filler);
-        rule[14] = r.depth;
-        (rule[15], rule[16]) = r.under.map_or((-1, 0), |(b, n)| (b as i32, n));
-        (rule[17], rule[18]) = r.deep_top.map_or((-1, 0), |(b, y)| (b as i32, y));
-        rule[19] = opt(r.ice);
-        (rule[22], rule[23]) = r.bare_above.map_or((0, 0), |y| (1, y));
-        w.extend_from_slice(&rule);
+    for (i, r) in t.rules.iter().enumerate() {
+        let conditions = w.len() as i32;
+        for &(field, from, to) in &r.ranges {
+            w.extend_from_slice(&[field as i32, from, to]);
+        }
+        let under = r.under.map_or((-1, 0), |(b, n)| (b as i32, n));
+        let deep = r.deep_top.map_or((-1, 0), |(b, y)| (b as i32, y));
+        let bare = r.bare_above.map_or((0, 0), |y| (1, y));
+        let rule: [i32; words::RULE as usize] = [
+            r.biome as i32,
+            r.height.0,
+            r.height.1,
+            conditions,
+            r.ranges.len() as i32,
+            opt(r.top),
+            opt(r.filler),
+            r.depth,
+            under.0,
+            under.1,
+            deep.0,
+            deep.1,
+            opt(r.ice),
+            bare.0,
+            bare.1,
+        ];
+        w[at + i * rw..at + (i + 1) * rw].copy_from_slice(&rule);
     }
     w[d::CAVE_OFF as usize] = w.len() as i32;
     for (k, b) in t.cave_biomes.iter().enumerate() {
@@ -130,113 +139,193 @@ pub fn describe(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<usize
     Some((w, custom))
 }
 
-/// `describe` for distant terrain, with the dimension's scattered things (trees) after it
-/// (`d::SCATTER_OFF` points there): per scatter its cell, reach and hash seed, then per biome the chance
-/// as a threshold on the site's bits (`dim::scatter_site`'s test, exactly), and the canopy its
-/// shape callback makes there (radius, top above the site, block), from a few sample runs.
+/// Appends the steps of `e` (the noise seeds made from `seed`); returns where they start and how many.
+fn steps(w: &mut Vec<i32>, e: &Expr, seed: u64) -> (i32, i32) {
+    let start = w.len() as i32;
+    for s in &e.0 {
+        let noisy = matches!(s.kind, ek::NOISE | ek::SITE);
+        w.extend_from_slice(&[s.kind as i32, if noisy { seed32(seed, s.salt) as i32 } else { 0 }, s.a, s.b, s.c]);
+    }
+    (start, e.0.len() as i32)
+}
+
+/// `describe` for distant terrain, with what steep faces need (`d::FACE_FALL`) and the
+/// dimension's scattered things (trees) after it (`d::SCATTER_OFF` points there): per scatter
+/// its cell, reach, hash seed, biome count and thinning (`ScatterThin`: its mask's place and
+/// length, keep), the mask's steps, then per biome the chance as a threshold on the site's bits
+/// (`dim::scatter_site`'s test, exactly), whether the thinning applies there and the crowns its
+/// shape callback makes there (`crown_of`), each site drawn with one of them; then the ground it
+/// stands on (`ScatterDef::ground`) as state ranges (count, then first and count each), none for
+/// any.
+///
+/// The crowns come from sample runs of the shape on real ground spread over the world: a run at
+/// one spot only said what that spot allowed (a clearing, a rock face), for every site.
 pub fn describe_lod(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<usize>)> {
     let (mut w, custom) = describe(c, dim, seed)?;
     let def = &c.dims[dim as usize];
+    w[d::FACE_FALL as usize] = def
+        .terrain
+        .as_ref()
+        .and_then(|t| t.faces)
+        .map_or(i32::MAX, |f| f.fall);
     w[d::SCATTER_OFF as usize] = w.len() as i32;
     w.push(def.scatters.len() as i32);
     let biomes = c.biomes.len().max(1);
-    let mut buf = vec![weft_abi::ScatterBlock { offset: [0; 3], state: 0, force: 0 }; 4096];
+    let mut buf = vec![weft_abi::ScatterBlock { offset: [0; 3].into(), state: 0, force: 0 }; 4096];
+    // Where the sample runs stand: spread over some 20 km, on the ground there.
+    let spots: Vec<[i32; 3]> = (0..RUN_SPOTS as i32)
+        .filter_map(|k| {
+            let (x, z) = ((k * 2_741 + 113) % 20_011 - 10_000, (k * 7_919 + 457) % 20_021 - 10_000);
+            let col = def.column(seed, x, z)?;
+            (col.height != i32::MIN).then_some([x, col.height + 1, z])
+        })
+        .collect();
     for sc in &def.scatters {
         let key = seed ^ sc.salt;
         w.extend_from_slice(&[sc.cell, sc.reach, key as u32 as i32, (key >> 32) as u32 as i32, biomes as i32]);
+        let head = w.len();
+        w.extend_from_slice(&[0, 0, 0]);
+        if let Some(t) = &sc.thin {
+            let (start, len) = steps(&mut w, t.mask.expr(), seed);
+            (w[head], w[head + 1], w[head + 2]) = (start, len, t.keep as i32);
+        }
         for b in 0..biomes as u32 {
             let density = sc
                 .density
                 .and_then(|d| c.components.get::<f32>(crate::components::BIOME, b, d))
                 .unwrap_or(0.0);
             let threshold = (density as f64 * (1u64 << 53) as f64).ceil() as u64;
-            let (mut tops, mut radii, mut states) = (Vec::new(), Vec::new(), rustc_hash::FxHashMap::<u32, u32>::default());
-            for k in 0..8u64 {
+            // Each run's crown, with its top for sorting.
+            let mut runs: Vec<(i32, [u32; 2])> = Vec::new();
+            for (k, &pos) in spots.iter().enumerate() {
+                if threshold == 0 || runs.len() >= RUNS {
+                    break;
+                }
                 let mut args = weft_abi::ScatterArgs {
                     seed,
                     dim,
-                    pos: [0, 64, 0],
+                    pos: pos.into(),
                     biome: b,
-                    random: weft_noise::mix(k),
+                    random: weft_noise::mix(k as u64),
                     out: buf.as_mut_ptr(),
                     cap: buf.len() as u32,
                     len: 0,
                 };
-                if threshold == 0 || !crate::host::invoke(sc.owner, sc.shape, &mut args) {
+                if !crate::host::invoke(sc.owner, sc.shape, &mut args) {
                     continue;
                 }
                 let blocks = &buf[..(args.len as usize).min(buf.len())];
-                let Some(top) = blocks.iter().map(|b| b.offset[1]).max() else { continue };
-                tops.push(top);
-                radii.push(
-                    blocks
-                        .iter()
-                        .filter(|b| b.offset[1] >= 1)
-                        .map(|b| b.offset[0].abs().max(b.offset[2].abs()))
-                        .max()
-                        .unwrap_or(0),
-                );
-                for b in blocks.iter().filter(|b| b.force == 0) {
-                    *states.entry(b.state).or_default() += 1;
+                if let Some(run) = crown_of(blocks) {
+                    runs.push(run);
                 }
             }
-            if tops.is_empty() {
-                w.extend_from_slice(&[0; words::SCATTER_BIOME as usize]);
-                continue;
+            let thinned = sc.thin.as_ref().is_some_and(|t| {
+                t.biomes
+                    .is_none_or(|comp| c.components.has(crate::components::BIOME, b, comp))
+            });
+            let mut entry = [0i32; words::SCATTER_BIOME as usize];
+            if !runs.is_empty() {
+                (entry[0], entry[1], entry[2]) = (threshold as u32 as i32, (threshold >> 32) as u32 as i32, thinned as i32);
+                // Crowns spread over the runs from the lowest to the tallest, so the sites keep the
+                // mix of sizes (a forest's few emergents among the rest), not one median tree.
+                runs.sort_by_key(|r| r.0);
+                let n = layout::lod::SHAPES as usize;
+                for i in 0..n {
+                    let run = runs[(2 * i + 1) * runs.len() / (2 * n)].1;
+                    entry[3 + 2 * i] = run[0] as i32;
+                    entry[4 + 2 * i] = run[1] as i32;
+                }
             }
-            tops.sort_unstable();
-            radii.sort_unstable();
-            let state = states.into_iter().max_by_key(|e| e.1).map_or(0, |e| e.0);
-            let entry: [i32; words::SCATTER_BIOME as usize] =
-                [threshold as u32 as i32, (threshold >> 32) as u32 as i32, radii[radii.len() / 2], tops[tops.len() / 2], state as i32];
             w.extend_from_slice(&entry);
+        }
+        w.push(sc.ground.len() as i32);
+        for &b in &sc.ground {
+            let bd = &c.blocks[b as usize];
+            w.extend_from_slice(&[bd.first_state as i32, bd.states as i32]);
         }
     }
     Some((w, custom))
 }
 
-/// Writes a mask as postfix steps (`words::MASK` each); returns the stack depth it needs.
-fn postfix(m: &Mask, seed: u64, w: &mut Vec<i32>, depth: usize) -> Option<usize> {
-    Some(match m {
-        Mask::Noise { salt, scale, octaves, from, to } => {
-            w.extend_from_slice(&[mask::NOISE as i32, seed32(seed, *salt) as i32, *scale, *octaves as i32, *from, *to]);
-            depth + 1
+/// Sample runs of a scatter's shape per biome for its crowns, and the spots tried for them.
+const RUNS: usize = 16;
+const RUN_SPOTS: usize = 48;
+
+/// What a run of a scatter's shape looks like from afar (`gpu_layout::terrain::crown`), and its
+/// top: its crown, of the block it puts most into air (a tree's leaves; else the one it forces
+/// most, a boulder's stone, as none at all was air, drawn violet), and the trunk under it. None
+/// when it put nothing.
+fn crown_of(blocks: &[weft_abi::ScatterBlock]) -> Option<(i32, [u32; 2])> {
+    use layout::crown as cr;
+    let commonest = |forced: bool, keep: &dyn Fn(&weft_abi::ScatterBlock) -> bool| {
+        let mut n = rustc_hash::FxHashMap::<u32, u32>::default();
+        for b in blocks
+            .iter()
+            .filter(|b| (b.force != 0) == forced && keep(b))
+        {
+            *n.entry(b.state).or_default() += 1;
         }
-        Mask::Continent(a, b) => {
-            w.extend_from_slice(&[mask::CONTINENT as i32, 0, 0, 0, *a, *b]);
-            depth + 1
-        }
-        Mask::Temperature(a, b) => {
-            w.extend_from_slice(&[mask::TEMPERATURE as i32, 0, 0, 0, *a, *b]);
-            depth + 1
-        }
-        Mask::Humidity(a, b) => {
-            w.extend_from_slice(&[mask::HUMIDITY as i32, 0, 0, 0, *a, *b]);
-            depth + 1
-        }
-        Mask::All(v) => {
-            let mut most = depth;
-            for (i, m) in v.iter().enumerate() {
-                most = most.max(postfix(m, seed, w, depth + i)?);
-            }
-            w.extend_from_slice(&[mask::ALL as i32, v.len() as i32, 0, 0, 0, 0]);
-            most.max(depth + 1)
-        }
-        Mask::Not(m) => {
-            let most = postfix(m, seed, w, depth)?;
-            w.extend_from_slice(&[mask::NOT as i32, 0, 0, 0, 0, 0]);
-            most
-        }
-    })
+        n.into_iter().max_by_key(|e| (e.1, e.0)).map(|e| e.0)
+    };
+    let leaves = commonest(false, &|_| true).or_else(|| commonest(true, &|_| true))?;
+    let crown: Vec<_> = blocks.iter().filter(|b| b.state == leaves).collect();
+    let top = crown.iter().map(|b| b.offset.y).max()?;
+    let bottom = crown.iter().map(|b| b.offset.y).min()?.clamp(0, top);
+    // Out from the trunk at a layer, and at all.
+    let out = |b: &&weft_abi::ScatterBlock| ((b.offset.x * b.offset.x + b.offset.z * b.offset.z) as f32).sqrt();
+    let width = |y: i32| {
+        crown
+            .iter()
+            .filter(|b| b.offset.y == y)
+            .map(out)
+            .fold(0.0f32, f32::max)
+    };
+    let radius = crown.iter().map(out).fold(0.0f32, f32::max);
+    // The widest layer, the middle one of a tie.
+    let layers: Vec<f32> = (bottom..=top).map(width).collect();
+    let most = layers.iter().copied().fold(0.0f32, f32::max);
+    let wide: Vec<i32> = (bottom..=top)
+        .filter(|&y| layers[(y - bottom) as usize] >= most - 0.01)
+        .collect();
+    let widest = (wide[0] + wide[wide.len() - 1]) / 2;
+    let fifteenths = |part: i32, whole: i32| if whole <= 0 { 0 } else { ((part * 15 + whole / 2) / whole).clamp(0, 15) };
+    let round =
+        if radius < 0.5 || top == widest { 15 } else { ((width((widest + top + 1) / 2) / radius * 15.0).round() as i32).clamp(1, 15) };
+    // The trunk: what stands under the crown at its middle, as wide as it is at the bottom.
+    let under = |b: &weft_abi::ScatterBlock| {
+        b.state != leaves && b.offset.x.abs() <= 3 && b.offset.z.abs() <= 3 && (0..bottom).contains(&b.offset.y)
+    };
+    let trunk = commonest(false, &under).or_else(|| commonest(true, &under));
+    let trunk_width = trunk.map_or(0, |t| {
+        let low = blocks
+            .iter()
+            .filter(|b| b.state == t && under(b))
+            .map(|b| b.offset.y)
+            .min()
+            .unwrap_or(0);
+        let n = blocks
+            .iter()
+            .filter(|b| b.state == t && under(b) && b.offset.y == low)
+            .count();
+        ((n as f32).sqrt().round() as u32).clamp(1, cr::TRUNK_MASK)
+    });
+    let shape = (radius.round() as u32).min(cr::RADIUS_MASK)
+        | (top as u32).min(cr::TOP_MASK) << cr::TOP_SHIFT
+        | (bottom as u32).min(cr::BOTTOM_MASK) << cr::BOTTOM_SHIFT
+        | (fifteenths(widest - bottom, top - bottom) as u32) << cr::WIDEST_SHIFT
+        | (round as u32) << cr::ROUND_SHIFT
+        | trunk_width << cr::TRUNK_SHIFT;
+    // Round 15 is never 0: a crown's first word always says it is there.
+    Some((top, [shape, (leaves & cr::BLOCK_MASK) | (trunk.unwrap_or(0) & cr::BLOCK_MASK) << cr::TRUNK_BLOCK_SHIFT]))
 }
 
-/// Heights of the mod features `custom` at the columns and corners of cube column (`x`, `z`),
+/// Heights of the CPU-made features `custom` at the columns and corners of cube column (`x`, `z`),
 /// for its jobs.
 pub fn custom_heights(c: &Content, dim: u32, seed: u64, x: i32, z: i32, custom: &[usize]) -> Arc<Vec<i32>> {
     let def = &c.dims[dim as usize];
     def.custom_cache.get(seed, x, z, || {
         let Some(t) = def.terrain.as_ref() else { return Vec::new() };
-        let f = Fields { seed };
+        let f = t.fields(seed);
         let (ox, oz) = (x * 16, z * 16);
         let mut out = Vec::with_capacity(custom.len() * CUSTOM_WORDS);
         for &i in custom {
@@ -269,6 +358,29 @@ struct Slot {
     lod_flight: Vec<super::lod::LodJob>,
 }
 
+type LodDesc = ((u32, u64), Arc<std::sync::OnceLock<Option<(Vec<i32>, usize)>>>);
+
+/// Distant terrain's description of (`dim`, `seed`) and its count of features made on the CPU,
+/// worked out once on LOD's threads (it runs mods' shapes) by whoever asks first: `Lod` asks when
+/// the dimension changes, so it is done by the time the first tile's job is in, not started then
+/// behind every tile's heights. Inside: `None` while not done, then `None` when the GPU can't
+/// make it.
+pub fn lod_desc(dim: u32, seed: u64) -> LodDesc {
+    static LAST: std::sync::Mutex<Option<LodDesc>> = std::sync::Mutex::new(None);
+    let mut last = LAST.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(d) = last.as_ref().filter(|d| d.0 == (dim, seed)) {
+        return d.clone();
+    }
+    let cell = Arc::new(std::sync::OnceLock::new());
+    let out = cell.clone();
+    super::lod::pool().spawn(move || {
+        let _ = out.set(describe_lod(content(), dim, seed).map(|(w, custom)| (w, custom.len())));
+    });
+    let d = ((dim, seed), cell);
+    *last = Some(d.clone());
+    d
+}
+
 /// A frame slot's output buffer as workers read it, straight from where the GPU wrote it.
 struct Readback(*const u32, usize);
 
@@ -297,7 +409,9 @@ pub struct GpuTerrain {
     slots: Vec<Slot>,
     /// (dim, seed) and its description and mod features, for cubes and for tiles.
     desc: Option<((u32, u64), Vec<i32>, usize)>,
-    lod_desc: Option<((u32, u64), Vec<i32>, usize)>,
+    /// The same for tiles, worked out on LOD's threads (it runs mods' shapes): `None` inside
+    /// while not done, then `None` when the GPU can't make it.
+    lod_desc: Option<LodDesc>,
     /// Set once the pipeline works: the terrain thread sends jobs here instead of to the CPU.
     pub on: Arc<AtomicBool>,
 }
@@ -385,16 +499,19 @@ impl GpuTerrain {
             }
         }
         self.lod_queue.extend(self.lod_rx.try_iter());
+        // Tiles called off meanwhile (`LodJob::live`) aren't made.
+        self.lod_queue.retain(super::lod::LodJob::live);
         let Some(first) = self.lod_queue.front() else { return };
         let key = (first.dim, first.seed);
         if self.lod_desc.as_ref().is_none_or(|d| d.0 != key) {
-            let Some((words, custom)) = describe_lod(content(), key.0, key.1) else {
-                self.lod_queue.clear();
-                return;
-            };
-            self.lod_desc = Some((key, words, custom.len()));
+            self.lod_desc = Some(lod_desc(key.0, key.1));
         }
-        let (_, words, custom) = self.lod_desc.as_ref().unwrap();
+        let cell = self.lod_desc.as_ref().unwrap().1.clone();
+        let Some(made) = cell.get() else { return };
+        let Some((words, custom)) = made else {
+            self.lod_queue.clear();
+            return;
+        };
         let mut batch = Vec::new();
         while batch.len() < LOD_BATCH
             && self
@@ -409,7 +526,7 @@ impl GpuTerrain {
         for (i, j) in batch.iter().enumerate() {
             let r = i * stride;
             let o = j.key.origin();
-            jobs[r..r + 3].copy_from_slice(&[o.x, o.y, j.key.level as i32]);
+            jobs[r..r + 4].copy_from_slice(&[o.x, o.y, j.key.level as i32, j.key.smooth() as i32]);
             if j.custom.len() == custom * SAMPLES {
                 jobs[r + 4..r + stride].copy_from_slice(&j.custom);
             }
@@ -459,7 +576,7 @@ impl GpuTerrain {
                     drop(back);
                     crate::server::dim::warm_scatters(content(), made[0].0.dim, made[0].0.seed, x, z);
                     for (job, words) in made {
-                        crate::background().spawn(move || finish(job, unpack(&words)));
+                        crate::client_terrain().spawn(move || finish(job, unpack(&words)));
                     }
                 });
             }
@@ -478,7 +595,7 @@ impl GpuTerrain {
             let Some((words, custom)) = describe(content(), key.0, key.1) else {
                 // The terrain thread asked for a dimension the GPU cannot make: done by the CPU.
                 for job in self.queue.drain(..) {
-                    crate::background().spawn(move || cpu(job));
+                    crate::client_terrain().spawn(move || cpu(job));
                 }
                 return;
             };

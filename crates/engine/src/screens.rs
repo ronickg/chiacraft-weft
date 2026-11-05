@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use crate::app::Running;
 use crate::app::{Ctx, Request};
-use crate::input::{Input, Key};
+use crate::input::{Binding, Input, Key, Trigger};
 use crate::settings::Settings;
 use crate::ui::lang::Lang;
 use crate::ui::text::{self, Arg, Span};
@@ -118,6 +118,8 @@ pub fn named(name: &str) -> Option<Box<dyn Screen>> {
         "core:mods" => Box::new(ModList::default()),
         "core:profile" => Box::new(Profile::default()),
         "core:account" => Box::new(crate::account_screen::Account::default()),
+        "core:finder" => Box::new(crate::chiacraft::worlds::finder_screen::FinderScreen),
+        "core:achievements" => Box::new(crate::chiacraft::achievements_screen::Achievements),
         "core:admission" => Box::new(crate::chiacraft::worlds::admission_screen::Admission),
         _ => return None,
     })
@@ -343,9 +345,16 @@ impl Screen for Profile {
                     label(ui, cx, "profile.account_backup", &[], "dim");
                 }
                 button(ui, cx, "profile.account", &[], 160.0, |c| c.requests.push(Request::Screen("core:account".into())));
+                // What worlds signed for this account (chiacraft, phase 4).
+                let n = crate::chiacraft::achievements::load().credentials.len();
+                let id = button(ui, cx, "profile.achievements", &[Arg::Int(n as i64)], 160.0, |c| {
+                    c.requests.push(Request::Screen("core:achievements".into()))
+                });
+                ui.set_id(id, "achievements");
                 ui.add(Kind::Container { class: None }, Style::default().h(4.0));
                 label(ui, cx, "profile.skin", &[], "default");
                 label(ui, cx, "profile.skin_hint", &[], "dim");
+                label(ui, cx, "profile.avatar_hint", &[], "dim");
                 let dir = cx.settings.run_dir.join("skins");
                 button(ui, cx, "profile.skins_folder", &[], 120.0, move |_| crate::packs::open_folder(&dir));
             });
@@ -385,7 +394,7 @@ impl Screen for ModScreen {
     fn key(&mut self, key: Key, ctx: &mut Ctx) -> bool {
         if self.0.on_key.is_some() {
             ctx.requests
-                .push(Request::ModKey(self.0.owner, self.0.on_key, crate::input::key_name(key)));
+                .push(Request::ModKey(self.0.owner, self.0.on_key, key.id()));
         }
         false
     }
@@ -452,10 +461,17 @@ pub fn frame(ui: &mut Ui, cx: &BuildCx, title: &str, f: impl FnOnce(&mut Ui)) {
     let bg = if cx.in_game { "overlay" } else { "background" };
     ui.root_style(Style::default().stretch());
     ui.panel(bg, Style::default().grow().center().pad(12.0).gap(10.0), |ui| {
+        // Over the title's picture the title sits on a plate (thin type on the sky and trees was
+        // hard to read, Tester's audit, 11-04); in a world the overlay dims what is behind it.
+        let plate =
+            if cx.in_game { None } else { Some(ui.open(Kind::Container { class: Some("tooltip".into()) }, Style::default().pad(4.0))) };
         let t = label(ui, cx, title, &[], "title");
         if let Some(t) = ui.text_mut(t) {
             t.scale = 2.0;
             t.wrap = false;
+        }
+        if plate.is_some() {
+            ui.close();
         }
         f(ui);
     });
@@ -496,16 +512,22 @@ impl Screen for Title {
                         open(c, "core:multiplayer")
                     });
                     ui.nodes[mp].style.grow = 1.0;
-                    let face = face_texture(cx);
+                    // The player's face from their skin, or with no skin yet the Singleplayer
+                    // figure (the face of a skin that isn't there was a blank square: Tester's
+                    // audit, 11-04).
+                    let skin = cx.settings.run_dir.join("skins").join("skin.png");
+                    let face = if skin.exists() { Some(face_texture(cx)) } else { cx.look.texture("menu_singleplayer", "") };
                     let p = ui.button(
                         "button_secondary",
                         Style::default().w(20.0).h(20.0),
                         Rc::new(|c: &mut Ctx| open(c, "core:profile")),
                         |ui| {
-                            ui.add(
-                                Kind::Image { texture: face, color: 0xFFFFFFFF },
-                                Style::default().w(8.0).h(8.0).at(6.0, 6.0, [0.0, 0.0]),
-                            );
+                            if let Some(face) = face {
+                                ui.add(
+                                    Kind::Image { texture: face, color: 0xFFFFFFFF },
+                                    Style::default().w(8.0).h(8.0).at(6.0, 6.0, [0.0, 0.0]),
+                                );
+                            }
                         },
                     );
                     ui.nodes[p].tooltip = Some(cx.t("menu.profile", &[]));
@@ -612,7 +634,10 @@ impl Screen for SettingsScreen {
                     pad: [8.0; 4],
                     gap: 6.0,
                     align: abi::ui_align::STRETCH,
-                    width: 320.0,
+                    // Its rows are 300 wide (two of 147 and a gap of 6): 300 + its padding (16) and
+                    // the scrollbar's room (14) keep them whole; at 320 they ran under the
+                    // scrollbar and past the left edge (the label check, 11-04).
+                    width: 334.0,
                     height: 0.0,
                     grow: 1.0,
                     min: [0.0, 40.0],
@@ -629,9 +654,9 @@ impl Screen for SettingsScreen {
                     let scale =
                         if s.gui_scale() == 0 { Arg::Key("settings.gui_scale.auto".into()) } else { Arg::Int(s.gui_scale() as i64) };
                     d.button("settings.gui_scale", &[scale], 300.0, false, |r| {
-                        // Auto, then every scale the window can actually show.
+                        // Auto, then every scale the window can show whole: the even ones.
                         let max = crate::settings::max_gui_scale(r.stats.window);
-                        let next = if r.settings.gui_scale() >= max { 0 } else { r.settings.gui_scale() + 1 };
+                        let next = crate::settings::next_gui_scale(r.settings.gui_scale(), max);
                         r.settings.set("gui_scale", next as f64);
                     });
                     d.button("settings.vsync", &[on_off(s.vsync())], 300.0, false, |r| {
@@ -665,6 +690,16 @@ impl Screen for SettingsScreen {
                     } else {
                         d.button("settings.chat", &[], 300.0, false, screen("core:chat_settings"));
                     }
+                    d.button("settings.first_person_model", &[on_off(s.first_person_model())], 300.0, false, |r| {
+                        r.settings
+                            .set("first_person_model", !r.settings.first_person_model() as u8 as f64);
+                        r.handle(vec![Request::Rebuild]);
+                    });
+                    d.button("settings.show_avatars", &[on_off(s.show_avatars())], 300.0, false, |r| {
+                        r.settings
+                            .set("show_avatars", !r.settings.show_avatars() as u8 as f64);
+                        r.handle(vec![Request::Rebuild]);
+                    });
                     d.parts("core:settings", "buttons");
                 });
                 d.button("menu.done", &[], 200.0, false, |r| r.handle(vec![Request::Close]));
@@ -701,6 +736,13 @@ impl Screen for ChatSettings {
                     d.slider("settings.chat_height", "core:chat_height", 1.0);
                     d.slider("settings.chat_height_closed", "core:chat_height_closed", 1.0);
                     d.slider("settings.chat_opacity", "core:chat_opacity", 1.0);
+                    let id = crate::config::by_name("core:chat_visibility").unwrap_or(0);
+                    let now = ["all", "system", "hidden"][crate::config::get(id) as usize % 3];
+                    let shown = [Arg::Key(format!("settings.chat_visibility.{now}"))];
+                    d.button("settings.chat_visibility", &shown, 304.0, false, move |r| {
+                        crate::config::set(id, (crate::config::get(id) + 1.0) % 3.0);
+                        r.handle(vec![Request::Rebuild]);
+                    });
                 });
                 d.button("menu.done", &[], 200.0, false, |r| r.handle(vec![Request::Close]));
             });
@@ -877,7 +919,7 @@ impl Screen for ConfigScreen {
                         let mut spans = if cx.lang.has(&tip) { cx.t(&tip, &[]) } else { Vec::new() };
                         for (on, note) in [
                             (locked, "settings.config_synced"),
-                            (d.flags & weft_abi::config_flags::RESTART != 0, "settings.config_restart"),
+                            (d.flags & weft_abi::config_flags::RESTART_REQUIRED != 0, "settings.config_restart"),
                         ] {
                             if on {
                                 if !spans.is_empty() {
@@ -951,11 +993,39 @@ impl Screen for LanguageScreen {
 
 #[derive(Default)]
 pub struct Controls {
-    /// The action waiting for its key.
-    waiting: Option<String>,
+    /// The binding waiting for its key: the action and which of its slots.
+    waiting: Option<(String, usize)>,
     /// A modifier pressed while waiting: with a key it makes a chord (`ctrl+T`), let go alone
     /// it is the key.
     modifier: Option<Key>,
+    /// The key pressed while waiting, kept for a moment: pressed again in time it binds a double
+    /// tap.
+    first: Option<(crate::input::Chord, std::time::Instant)>,
+}
+
+impl Controls {
+    /// The action's bindings with `slot` changed by `f`.
+    fn change(ctx: &mut Ctx, action: &str, slot: usize, f: impl FnOnce(Option<Binding>) -> Option<Binding>) {
+        let Some(b) = ctx.input.binds.iter().find(|b| b.action == action) else { return };
+        let mut keys = b.keys;
+        keys[slot] = f(keys[slot]);
+        ctx.requests.push(Request::Rebind(action.to_string(), keys));
+        ctx.requests.push(Request::Rebuild);
+    }
+
+    /// Binds what was pressed to the slot waiting, a toggle staying a toggle.
+    fn bind(&mut self, ctx: &mut Ctx, chord: crate::input::Chord, double: bool) {
+        let Some((action, slot)) = self.waiting.take() else { return };
+        (self.modifier, self.first) = (None, None);
+        Self::change(ctx, &action, slot, |old| {
+            let trigger = match (double, old.map(|b| b.trigger)) {
+                (true, _) => Trigger::Double,
+                (false, Some(Trigger::Toggle)) => Trigger::Toggle,
+                _ => Trigger::Hold,
+            };
+            Some(Binding { chord, trigger })
+        });
+    }
 }
 
 impl Screen for Controls {
@@ -980,27 +1050,62 @@ impl Screen for Controls {
             self.modifier = Some(key);
             return true;
         }
-        let action = self.waiting.take().unwrap_or_default();
         // Only a key the settings file can name: anything else would be back to the default
         // after a restart.
-        let can_save = matches!(key, Key::Mouse(_)) || crate::settings::parse_key(&crate::input::key_name(key)).is_some();
-        if key != Key::Code(winit::keyboard::KeyCode::Escape) && can_save {
-            ctx.requests
-                .push(Request::Rebind(action, crate::input::Chord { key, mods: ctx.input.mods() }));
+        if key == Key::Code(winit::keyboard::KeyCode::Escape) || Key::parse(&key.id()).is_none() {
+            (self.waiting, self.modifier, self.first) = (None, None, None);
+            ctx.requests.push(Request::Rebuild);
+            return true;
         }
-        self.modifier = None;
-        ctx.requests.push(Request::Rebuild);
+        let chord = crate::input::Chord { key, mods: ctx.input.mods() };
+        match self.first {
+            Some((first, _)) if first == chord => self.bind(ctx, chord, true),
+            Some((first, _)) => self.bind(ctx, first, false),
+            None => self.first = Some((chord, std::time::Instant::now())),
+        }
         true
     }
 
     fn key_up(&mut self, key: Key, ctx: &mut Ctx) -> bool {
-        if self.modifier != Some(key) {
+        if self.modifier != Some(key) || self.first.is_some() || self.waiting.is_none() {
             return false;
         }
-        let Some(action) = self.waiting.take() else { return false };
-        self.modifier = None;
-        ctx.requests.push(Request::Rebind(action, key.into()));
-        ctx.requests.push(Request::Rebuild);
+        self.bind(ctx, key.into(), false);
+        true
+    }
+
+    /// A key pressed once binds when the time for a second press is over; the right button
+    /// clears a binding, with Shift it switches between held and toggled.
+    fn pointer(&mut self, cursor: glam::Vec2, ui: &mut Ui, ctx: &mut Ctx, _hud: &mut crate::hud::Hud) -> bool {
+        if let Some((chord, at)) = self
+            .first
+            .filter(|f| f.1.elapsed() >= crate::input::DOUBLE_TAP)
+        {
+            let _ = at;
+            self.bind(ctx, chord, false);
+            return true;
+        }
+        if self.waiting.is_some() || !ctx.input.pressed_button(1) {
+            return false;
+        }
+        let cell = ui
+            .hit(cursor)
+            .and_then(|h| ui.nodes[h].id.as_deref())
+            .and_then(|id| id.strip_prefix("bind:"))
+            .and_then(|id| id.rsplit_once(':'))
+            .and_then(|(action, slot)| Some((action.to_string(), slot.parse::<usize>().ok()?)));
+        let Some((action, slot)) = cell else { return false };
+        if ctx.input.mods() & crate::input::SHIFT != 0 {
+            Self::change(ctx, &action, slot, |old| {
+                old.map(|b| match b.trigger {
+                    Trigger::Hold => Binding { trigger: Trigger::Toggle, ..b },
+                    Trigger::Toggle => Binding { trigger: Trigger::Hold, ..b },
+                    Trigger::Double => b,
+                })
+            });
+        } else {
+            Self::change(ctx, &action, slot, |_| None);
+        }
         true
     }
 
@@ -1008,7 +1113,7 @@ impl Screen for Controls {
         let conflicts = cx.input.conflicts();
         let waiting = self.waiting.clone();
         frame(ui, cx, "controls.title", |ui| {
-            if let Some(a) = &waiting {
+            if let Some((a, _)) = &waiting {
                 label(ui, cx, "controls.press", &[Arg::Name(text::Name::Key(a.clone()))], "default");
             }
             let list = ui.panel(
@@ -1017,30 +1122,27 @@ impl Screen for Controls {
                     .pad(8.0)
                     .gap(3.0)
                     .stretch()
-                    .w(380.0)
+                    .w(420.0)
                     .h(0.0)
                     .grow()
                     .min_h(60.0)
                     .scroll(),
                 |ui| {
                     let s = cx.settings;
-                    for (name, on) in [("invert_y", s.invert_y()), ("toggle_sneak", s.toggle_sneak()), ("toggle_sprint", s.toggle_sprint())]
-                    {
-                        let spans = cx.t(&format!("settings.{name}"), &[on_off(on)]);
-                        ui.button(
-                            "button",
-                            Style::default().min_h(20.0).pad_xy(6.0, 4.0).stretch(),
-                            Rc::new(move |c: &mut Ctx| {
-                                c.settings.set(name, !on as u8 as f64);
-                                c.requests.push(Request::Rebuild);
-                            }),
-                            |ui| {
-                                ui.text(spans, "button");
-                            },
-                        );
-                    }
+                    let on = s.invert_y();
+                    let spans = cx.t("settings.invert_y", &[on_off(on)]);
+                    ui.button(
+                        "button",
+                        Style::default().min_h(20.0).pad_xy(6.0, 4.0).stretch(),
+                        Rc::new(move |c: &mut Ctx| {
+                            c.settings.set("invert_y", !on as u8 as f64);
+                            c.requests.push(Request::Rebuild);
+                        }),
+                        |ui| {
+                            ui.text(spans, "button");
+                        },
+                    );
                     for b in &cx.input.binds {
-                        let action = b.action.clone();
                         let name = text::Name::Key(b.action.clone());
                         let clash: Vec<String> = conflicts
                             .iter()
@@ -1064,24 +1166,9 @@ impl Screen for Controls {
                                     .collect();
                                 ui.text(cx.t("controls.conflict", &[Arg::Text(names.join(", "))]), "default");
                             }
-                            let a2 = action.clone();
-                            let kb = ui.button(
-                                "button",
-                                Style::default().min_w(70.0).h(20.0).pad_xy(4.0, 0.0),
-                                Rc::new(move |c: &mut Ctx| {
-                                    if let Some(s) = c.screen::<Controls>() {
-                                        s.waiting = Some(a2.clone());
-                                    }
-                                    c.requests.push(Request::Rebuild);
-                                }),
-                                |ui| {
-                                    ui.text(text::plain(&text::display_chord(cx.lang, b.key)), "button");
-                                },
-                            );
-                            if let Kind::Button { selected, .. } = &mut ui.nodes[kb].kind {
-                                *selected = waiting.as_deref() == Some(action.as_str());
+                            for slot in 0..crate::input::SLOTS {
+                                bind_cell(ui, cx, &b.action, slot, b.keys[slot], waiting.as_ref());
                             }
-                            ui.set_id(kb, &format!("bind:{action}"));
                         });
                     }
                 },
@@ -1093,6 +1180,38 @@ impl Screen for Controls {
             });
         });
     }
+}
+
+/// One binding of an action: what it is (a toggle in its own frame), clicked to bind anew.
+fn bind_cell(ui: &mut Ui, cx: &BuildCx, action: &str, slot: usize, binding: Option<Binding>, waiting: Option<&(String, usize)>) {
+    let toggled = binding.is_some_and(|b| b.trigger == Trigger::Toggle);
+    let shown = binding.map_or(String::new(), |b| text::display_binding(cx.lang, b));
+    let a = action.to_string();
+    let cell = ui.button(
+        if toggled { "bind_toggle" } else { "button" },
+        Style::default().w(90.0).h(20.0).pad_xy(4.0, 0.0),
+        Rc::new(move |c: &mut Ctx| {
+            if let Some(s) = c.screen::<Controls>() {
+                (s.waiting, s.first, s.modifier) = (Some((a.clone(), slot)), None, None);
+            }
+            c.requests.push(Request::Rebuild);
+        }),
+        |ui| {
+            ui.text(text::plain(&shown), "button");
+        },
+    );
+    if let Kind::Button { selected, .. } = &mut ui.nodes[cell].kind {
+        *selected = waiting.is_some_and(|w| w.0 == action && w.1 == slot);
+    }
+    let mode = if toggled { "controls.mode_toggle" } else { "controls.mode_hold" };
+    let mut tip = cx.t(mode, &[]);
+    tip.push(Span::text(
+        "
+", None,
+    ));
+    tip.extend(cx.t("controls.cell_help", &[]));
+    ui.nodes[cell].tooltip = Some(tip);
+    ui.set_id(cell, &format!("bind:{action}:{slot}"));
 }
 
 /// Shows a message with a back button (disconnects, errors).

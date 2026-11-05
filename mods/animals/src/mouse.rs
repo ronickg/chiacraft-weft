@@ -7,17 +7,15 @@ use weft_sdk::*;
 
 use crate::wild::{self, Body};
 
-pub(crate) static WOOD_MOUSE: Entity = Entity::named("wood_mouse");
+pub(crate) static WOOD_MOUSE: EntityKind = EntityKind::named("wood_mouse");
 
 static BODY: Body = Body {
     model: "mouse",
     texture: "mouse/mouse",
-    size: (0.2, 0.15),
-    health: 2.0,
     // Scurrying about, darting off at about 3 m/s.
     speed: 3.0,
     wander: 0.35,
-    damage: 0.0,
+    bites: false,
     rest: ("mouse_sit", (0.15, 0.2)),
 };
 

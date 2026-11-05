@@ -37,14 +37,14 @@ pub fn problems() -> Vec<String> {
         }
     }
 
-    // A new player's arrival meal: past half of max health and stamina, not well fed.
+    // A new player's arrival meal: max health 90 or more as shown (the loaf, apple and chicken come
+    // a hair under 90, shown as 90), stamina past half (Ronald, 11-04, "Bigger arrival meal": a
+    // fall took 61% of a fresh player's 54). Being well fed from it for a while
+    // is his meal's (a loaf, an apple and meat are three foods).
     let arrival = crate::stomach::arrival();
     let (health, stamina) = crate::stomach::max_health_stamina(100.0, 100.0, &arrival, capacity);
-    if arrival.portions.iter().filter(|p| p.food > 0).count() != crate::stomach::ARRIVAL.len() || health < 50.0 || stamina < 50.0 {
-        out.push(format!("a new player arrives with max health {health:.0} and stamina {stamina:.0} (over 50 wanted)"));
-    }
-    if arrival.well_fed(capacity) {
-        out.push("a new player arrives well fed".into());
+    if arrival.portions.iter().filter(|p| p.food > 0).count() != crate::stomach::ARRIVAL.len() || health < 89.5 || stamina < 50.0 {
+        out.push(format!("a new player arrives with max health {health:.0} (90 wanted) and stamina {stamina:.0} (over 50 wanted)"));
     }
 
     if best_meal(capacity).is_none() {
@@ -243,6 +243,20 @@ pub fn problems() -> Vec<String> {
         let (dm, ds) = (temperature::day_mean(&desert), temperature::air(&desert));
         if room_of(Wall::Earth).air(dm, ds, 0.0) > ds - 5.0 {
             out.push("an earthen room isn't cooler than a desert afternoon".into());
+        }
+    }
+
+    // Crafts that wait (`crafts`): a buckskin while one eats (2 to 4 minutes), a charcoal clamp a
+    // few minutes (4 to 6), sole leather most of a game week (3 to 5 game days), as CONTENT.md has
+    // them.
+    for (station, lo, hi) in [
+        (crate::crafts::Station::TanningFrame, 120.0, 240.0),
+        (crate::crafts::Station::CharcoalClamp, 240.0, 360.0),
+        (crate::crafts::Station::TanningPit, 3.0 * crate::DAY_SECS, 5.0 * crate::DAY_SECS),
+    ] {
+        let secs = crate::crafts::craft(station).secs();
+        if !(lo..=hi).contains(&secs) {
+            out.push(format!("{} takes {secs:.0} s ({lo:.0} to {hi:.0} wanted)", station.name()));
         }
     }
 

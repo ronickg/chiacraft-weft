@@ -1,7 +1,8 @@
 //! Connected and varied block textures. A `<texture>.ctm` file next to a block texture (in a mod
 //! or a resource pack) holds rules for every cube face showing that texture, on any block and any
-//! face (a log side is just its side texture); methods and keys follow
-//! OptiFine/MCPatcher CTM so existing packs port with little more than renaming files:
+//! face (a log side is just its side texture); a pack that replaces the picture without a file of
+//! its own leaves it with none. Methods and keys follow OptiFine/MCPatcher CTM so existing packs
+//! port with little more than renaming files:
 //!
 //! ```text
 //! method = compact       # ctm (47 tiles), compact (5), horizontal, vertical, h+v, v+h (4/4/7/7),
@@ -39,7 +40,7 @@ use std::sync::{Arc, RwLock};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use super::looks::{Drawn, Looks, Names};
-use super::mesher::{Neighborhood, pidx};
+use super::mesher::{NORMALS, Neighborhood, pidx};
 use crate::assets::Assets;
 use crate::content::{Content, ModelBox};
 
@@ -203,8 +204,6 @@ const AXES: [([i32; 3], [i32; 3]); 6] = [
     ([1, 0, 0], [0, 1, 0]),
 ];
 
-const NORMALS: [[i32; 3]; 6] = [[-1, 0, 0], [1, 0, 0], [0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1]];
-
 fn faces(v: &str) -> u8 {
     v.split_whitespace().fold(0, |m, f| {
         m | match f {
@@ -260,7 +259,7 @@ fn tile_names(v: &str, texture: &str) -> Vec<Option<String>> {
 
 /// Whether something drawn other than as a cube shows `tex`, on a face in `faces`.
 fn off_cube(d: &Drawn, tex: u32, faces: u8) -> bool {
-    d.model != weft_abi::Model::Cube && (0..6).any(|f| faces & (1 << f) != 0 && d.on_face(f).contains(&tex))
+    d.model != weft_abi::BlockModel::Cube && (0..6).any(|f| faces & (1 << f) != 0 && d.on_face(f).contains(&tex))
 }
 
 /// The tile `name` as a model, if it has a file. A face the file names no texture for shows the
@@ -302,7 +301,8 @@ pub fn load(assets: &Assets, c: &Content, looks: &Looks, mut names: Names) -> (C
             overlays.push((tex, names.id(&over) + 1));
         }
         let Some(src) = assets
-            .read(&name, "textures", "ctm")
+            .sidecar(&name, "textures", "png", "ctm")
+            .and_then(|p| std::fs::read(p).ok())
             .map(|b| String::from_utf8_lossy(&b).into_owned())
         else {
             continue;
@@ -550,7 +550,7 @@ impl Ctm {
             .enumerate()
             .map(|(st, s)| {
                 let d = looks.drawn(st as u32, s);
-                (d.model != weft_abi::Model::Cube || d.textures != s.textures).then(|| Box::new(std::array::from_fn(|f| d.on_face(f))))
+                (d.model != weft_abi::BlockModel::Cube || d.textures != s.textures).then(|| Box::new(std::array::from_fn(|f| d.on_face(f))))
             })
             .collect();
         if any_models {
@@ -770,21 +770,21 @@ mod tests {
 
     #[test]
     fn only_what_shows_a_texture_off_a_cube_counts() {
-        use weft_abi::Model;
+        use weft_abi::BlockModel;
         let (t, sides_only) = ([7; 6], 0b110011);
         let plain = |model| Drawn { model, boxes: &[], textures: t };
-        assert!(off_cube(&plain(Model::Cross), 7, 0b111111));
-        assert!(!off_cube(&plain(Model::Cross), 8, 0b111111));
-        assert!(!off_cube(&plain(Model::Cube), 7, 0b111111));
+        assert!(off_cube(&plain(BlockModel::Cross), 7, 0b111111));
+        assert!(!off_cube(&plain(BlockModel::Cross), 8, 0b111111));
+        assert!(!off_cube(&plain(BlockModel::Cube), 7, 0b111111));
         let top = [ModelBox::whole([0, 0, 0, 7, 0, 0])];
-        let boxes = Drawn { model: Model::Boxes, boxes: &top, textures: [0; 6] };
+        let boxes = Drawn { model: BlockModel::Boxes, boxes: &top, textures: [0; 6] };
         assert!(off_cube(&boxes, 7, 0b111111));
         assert!(!off_cube(&boxes, 7, sides_only), "not on the faces the rule is for");
         // A face the file leaves out holds a texture only to fill the field.
         let mut gone = ModelBox::whole([7; 6]);
-        gone.uv = [[crate::block_model::NO_FACE, 0.0, 0.0, 0.0]; 6];
+        gone.uv = [weft_abi::UV_NO_FACE; 6];
         let gone = [gone];
-        assert!(!off_cube(&Drawn { model: Model::Boxes, boxes: &gone, textures: [0; 6] }, 7, 0b111111));
+        assert!(!off_cube(&Drawn { model: BlockModel::Boxes, boxes: &gone, textures: [0; 6] }, 7, 0b111111));
     }
 
     #[test]

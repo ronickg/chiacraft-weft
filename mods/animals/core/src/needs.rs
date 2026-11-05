@@ -34,7 +34,13 @@ pub fn fills(own: f32, kg: f32) -> f32 {
 pub const ARRIVES_FED: f32 = 0.3;
 
 /// Seconds a wild one lives on an empty stomach at full health before it starves (a game day).
+/// A scavenger (`Species::scavenges`) never starves in the wild: a turkey vulture fasts two
+/// weeks, and the world's carrion is too patchy to hold its life to a game day.
 pub const STARVES_SECS: f32 = 1200.0;
+
+/// Blocks a hungry scavenger smells carrion from, from the air or the ground (a turkey vulture
+/// finds a carcass hidden under a forest's canopy by its smell, Houston 1986); it flies there.
+pub const SCENT: f64 = 64.0;
 
 /// The prey of `hunter` that live in `biome`: species of other families it takes alone, by their
 /// grown masses (farm animals aren't here: they don't come and go with the seasons).
@@ -42,6 +48,62 @@ pub fn prey_in<'a>(hunter: &'a Species, biome: &'a str) -> impl Iterator<Item = 
     SPECIES.iter().filter(move |o| {
         o.family.name != hunter.family.name && hunter.takes(hunter.bio.mass, o.bio.mass) && o.habitats.iter().any(|&(b, _)| b == biome)
     })
+}
+
+/// The share of its prey's young a year one hunter species may take where it lives
+/// (`hunter_room`): real predators take 10-36% of a prey's numbers a year, paid by the herd's own
+/// increase; the rest is the herd's, and other hunters'.
+pub const HUNT_SHARE: f32 = 0.3;
+
+/// A species' share of `biome` by its habitat weight (0 where it doesn't live).
+pub fn habitat_weight(s: &Species, biome: &str) -> f32 {
+    s.habitats
+        .iter()
+        .find(|&&(b, _)| b == biome)
+        .map_or(0.0, |&(_, w)| w)
+}
+
+/// What one `hunter` takes of each of its prey in `biome` a game year, and that prey's numbers
+/// near and young a year (at their stocked crowds, `Species::stocked_in`, by habitat weight). It
+/// eats the meat share of its food a day (`Species::hunger`), shared among its prey by their
+/// biomass, each kill filling it by the prey's mass (`fills`). Empty: no prey of its sizes there.
+pub fn takes_a_year(hunter: &Species, biome: &str) -> Vec<(&'static Species, f32, f32, f32)> {
+    let numbers = |s: &Species| s.stocked_in(biome) as f32 * habitat_weight(s, biome);
+    let prey: Vec<&'static Species> = prey_in(hunter, biome)
+        .filter(|p| numbers(p) > 0.0)
+        .collect();
+    let biomass: f32 = prey.iter().map(|p| numbers(p) * p.bio.mass).sum();
+    if biomass <= 0.0 {
+        return Vec::new();
+    }
+    let meat: f32 = hunter
+        .eats
+        .iter()
+        .filter(|(c, _)| matches!(c, crate::species::Category::Meat | crate::species::Category::Fish))
+        .map(|(_, v)| v)
+        .sum();
+    let year = vitals::calendar::YEAR_DAYS as f32;
+    let food_day = vitals::DAY_SECS / hunter.hunger.max(1.0) * meat;
+    let full = hunter.base[crate::species::FOOD].max(1.0);
+    prey.into_iter()
+        .map(|p| {
+            let diet = numbers(p) * p.bio.mass / biomass;
+            let kills = food_day * diet / (fills(hunter.bio.mass, p.bio.mass) * full) * year;
+            let young = numbers(p) * 0.5 * crate::balance::report(p).young_per_ten as f32 / 10.0 * year;
+            (p, kills, numbers(p), young)
+        })
+        .collect()
+}
+
+/// How many of `hunter` its prey in `biome` feed (`HUNT_SHARE` of each prey's young a year);
+/// `None`: no prey of its sizes lives there.
+pub fn hunter_room(hunter: &Species, biome: &str) -> Option<u32> {
+    takes_a_year(hunter, biome)
+        .into_iter()
+        .filter(|&(_, kills, _, _)| kills > 0.0)
+        .map(|(_, kills, _, young)| HUNT_SHARE * young / kills)
+        .reduce(f32::min)
+        .map(|n| n.floor() as u32)
 }
 
 /// How many of its biggest prey at home fill `hunter` (`fills`): one hunt, or several small
@@ -130,4 +192,73 @@ pub fn litres_a_day(s: &Species, kg: f32) -> f32 {
 pub fn drink_lasts(s: &Species, kg: f32) -> Option<f32> {
     let drunk = litres_a_day(s, kg) * drinks(s);
     (drunk > 0.0).then(|| SPARE * kg / drunk * DRINK_DAY_SECS)
+}
+
+// ------------------------------------------------------------------ choosing between needs
+
+// What an animal does when nothing is after it (`reports/Creature AI.md`, part 3, step 3): each
+// need scores itself 0 to 1 from how pressing it is, and the most pressing that has something to
+// do goes first (`mods/animals/src/choose.rs`), not a fixed order. So a starving deer gets up to
+// eat, and one parched leaves its mate to drink. Hunger and thirst grow as the square of how far
+// past their start they are (Dave Mark's quadratic response curve): mild hunger waits for a rest
+// to end, real hunger doesn't.
+
+/// What a need scores when it is barely pressing (hunger just under `HUNGRY`, thirst just under
+/// `THIRSTY`) and when it is all there is (empty, parched).
+pub const EAT_FLOOR: f32 = 0.3;
+pub const DRINK_FLOOR: f32 = 0.35;
+/// A mate in its season, and a rest: what a hungry or thirsty one sets aside only once the need
+/// presses (the square past about 0.25 and 0.36 of the way to empty).
+pub const LOVE: f32 = 0.5;
+pub const REST: f32 = 0.45;
+/// The air: cold or hot, and freezing or in a heatstroke.
+pub const UNEASY: f32 = 0.4;
+pub const SUFFERING: f32 = 0.85;
+/// Wandering, last of all.
+pub const WANDER: f32 = 0.01;
+/// What it is doing already counts this much more (Blumberg's hysteresis: it doesn't flicker
+/// between two needs near the same).
+pub const KEEP_AT: f32 = 1.2;
+
+/// How pressing hunger is at `fed` (its share of its food): 0 when fed (`HUNGRY` or more and not
+/// eating already), `EAT_FLOOR` just under, 1 empty.
+pub fn hunger_score(fed: f32, eating: bool) -> f32 {
+    need_score(fed, HUNGRY, EAT_FLOOR, eating)
+}
+
+/// How pressing thirst is at `water` (its share of its water): as hunger, from `THIRSTY`.
+pub fn thirst_score(water: f32, drinking: bool) -> f32 {
+    need_score(water, THIRSTY, DRINK_FLOOR, drinking)
+}
+
+/// `thirst_score` from `start` instead of `THIRSTY` (a plant eater's dawn and dusk drink,
+/// `routines::DRINKS_AT`).
+pub fn thirst_score_from(water: f32, start: f32, drinking: bool) -> f32 {
+    need_score(water, start.max(THIRSTY), DRINK_FLOOR, drinking)
+}
+
+fn need_score(have: f32, start: f32, floor: f32, at_it: bool) -> f32 {
+    if have >= start && !at_it {
+        return 0.0;
+    }
+    let past = ((start - have) / start).clamp(0.0, 1.0);
+    floor + (1.0 - floor) * past * past
+}
+
+#[cfg(test)]
+mod choosing {
+    use super::*;
+
+    #[test]
+    fn real_hunger_beats_a_rest_and_real_thirst_beats_love() {
+        // Mild hunger waits for its rest; a starving one gets up (the rest held at `KEEP_AT`).
+        assert!(hunger_score(0.5, false) < REST * KEEP_AT);
+        assert!(hunger_score(0.1, false) > REST * KEEP_AT);
+        // Thirst leaves a mate only once it presses.
+        assert!(thirst_score(0.45, false) < LOVE);
+        assert!(thirst_score(0.15, false) > LOVE);
+        // Fed and watered, neither asks for the turn; a meal under way keeps going.
+        assert_eq!(hunger_score(0.8, false), 0.0);
+        assert!(hunger_score(0.8, true) > 0.0);
+    }
 }

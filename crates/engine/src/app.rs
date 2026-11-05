@@ -71,7 +71,7 @@ pub enum Request {
     /// Starts the game anew the way it was started, then leaves: what mods are on takes effect.
     Restart,
     Rebuild,
-    Rebind(String, crate::input::Chord),
+    Rebind(String, crate::input::Slots),
     ResetBinds,
     StartWorld(WorldMeta),
     /// Without asking about mods that are missing.
@@ -203,6 +203,43 @@ pub(crate) const CLIENT_COMMANDS: &[(&str, &str, fn(&mut Running, &crate::comman
         }
         None => vec![Msg::new("command.music.no_device", Vec::new())],
     }),
+    // What this client hears now, most important first (also in the log, for scripts).
+    ("sounds", "[which:word]", |r, args| match &r.audio {
+        Some(a) if args.text("which") == Some("recent") => {
+            // The last sounds started, newest first (also in the log): one-shots that already ended.
+            let mut out = Vec::new();
+            for (name, volume, looped) in a.recent() {
+                log::info!("sound recent: {name} volume {volume:.2}{}", if looped { " loop" } else { "" });
+                let key = if looped { "command.sounds.loop" } else { "command.sounds.one" };
+                out.push(Msg::new(key, vec![Arg::Text(name), Arg::Float(volume as f64, 2)]));
+            }
+            if out.is_empty() {
+                out.push(Msg::new("command.sounds.none_recent", Vec::new()));
+            }
+            out
+        }
+        Some(a) => {
+            let (playing, held) = a.counts();
+            log::info!("sounds: {playing} playing, {held} held, {} played, {} dropped", a.played, a.dropped);
+            let mut out =
+                vec![Msg::new("command.sounds.count", vec![Arg::Int(playing as i64), Arg::Int(held as i64), Arg::Int(a.dropped as i64)])];
+            for (name, volume, looped, waiting) in a.describe() {
+                log::info!(
+                    "sound: {name} volume {volume:.2}{}{}",
+                    if looped { " loop" } else { "" },
+                    if waiting { " reading" } else { "" }
+                );
+                let key = match (looped, waiting) {
+                    (_, true) => "command.sounds.reading",
+                    (true, _) => "command.sounds.loop",
+                    _ => "command.sounds.one",
+                };
+                out.push(Msg::new(key, vec![Arg::Text(name), Arg::Float(volume as f64, 2)]));
+            }
+            out
+        }
+        None => vec![Msg::new("command.music.no_device", Vec::new())],
+    }),
 ];
 
 pub(crate) struct Running {
@@ -280,7 +317,8 @@ pub(crate) struct Running {
     ui_cached: Vec<crate::ui::render::Quad>,
     ui_animated: Vec<crate::ui::render::Animated>,
     /// Where UI asked for the player model, physical pixels.
-    /// Where 3D previews go, and whose: the player (0) or the open menu's own entity (1).
+    /// Where 3D previews go, and whose: the player (0), the open menu's own entity (1), or an
+    /// entity kind alone (2 + its index).
     previews: Vec<([f32; 4], u64)>,
     /// Texture holding the rendered inventory figure, drawn by the UI.
     preview_tex: Option<u32>,
@@ -293,7 +331,8 @@ pub(crate) struct Running {
     mod_gizmos: Vec<crate::net::GizmoShape>,
     /// Sounds of the UI and of mods' client code, played after this frame's world sounds.
     ui_sounds: Vec<crate::audio::Play>,
-    mod_screen_text: Vec<(f32, f32, Msg, u32, f32)>,
+    /// Mods' screen text: where (window fractions), what, colour, size, the width it wraps to.
+    mod_screen_text: Vec<(f32, f32, Msg, u32, f32, f32)>,
     frame_no: u64,
     frame_dt: f32,
     /// The top screen as of the last frame (stack depth, name) and frames since it changed.
@@ -388,6 +427,13 @@ impl App {
         if let Some(v) = self.opts.view {
             crate::config::override_for_run("core:view_distance", &v.to_string());
         }
+        // `--config "core:lod_distance=0,core:shader_pack="`: settings for this run only, as the
+        // file writes them (benchmarks varying one thing at a time).
+        if let Some(list) = api::launch_options().get("config") {
+            for (name, value) in list.split(',').filter_map(|kv| kv.split_once('=')) {
+                crate::config::override_for_run(name.trim(), value.trim());
+            }
+        }
         let mut settings = Settings::new(&self.opts.run_dir);
         log::info!("player name '{}' (setting core:name)", settings.name());
         // Links between worlds, and the inbox for them, open while the game runs (chiacraft).
@@ -397,6 +443,14 @@ impl App {
         if chiacraft_account::current().is_some() {
             net::p2p::start_account(&settings);
             crate::chiacraft::chain::configure(&settings.run_dir, &settings.chain(), settings.chain_peers());
+            // The account's first address on that chain, public, in a file: where to send it test
+            // coins (a listing's deposit, phase 5).
+            if let (Some(s), Ok(net)) = (chiacraft_account::current(), crate::chiacraft::chain::network(&settings.chain()))
+                && let Some(ph) = s.first_puzzle_hash()
+            {
+                let address = chiacraft_wallet::chain::address(chiacraft_wallet::chain::Bytes32::from(ph), net);
+                let _ = std::fs::write(s.home.join(format!("address-{}.txt", net.name())), format!("{address}\n"));
+            }
         }
         let icon = crate::assets::decode_png_file(&engine_assets(self.opts.dev).join("icon.png"))
             .and_then(|(w, h, px)| winit::window::Icon::from_rgba(px, w, h).ok());
@@ -407,7 +461,7 @@ impl App {
         // Automated runs work in the background: no focus taken, under other windows, off the
         // desktop (still rendered at full size, so screenshots are the same).
         if recording() {
-            // Sized to what the owner's OBS scene keeps of the left monitor (crops 30 px above, 50 below).
+            // Fixed size and place, for a screen recorder to crop to.
             attrs = attrs
                 .with_decorations(false)
                 .with_window_level(winit::window::WindowLevel::AlwaysOnTop)
@@ -429,6 +483,13 @@ impl App {
             debug: self.opts.gpu_debug,
         })
         .map_err(|e| e.to_string())?;
+        // The pipelines the driver compiled last time, before any is made (saved at exit).
+        let cache = self.opts.cache_dir.join("pipelines.bin");
+        if let Ok(data) = std::fs::read(&cache) {
+            gpu.load_pipeline_cache(&data);
+            log::info!("pipeline cache: {} KB from the last start", data.len() / 1024);
+        }
+        let _ = PIPELINE_CACHE.set(cache);
 
         let mut roots: Vec<(String, PathBuf)> = vec![("core".into(), engine_assets(self.opts.dev))];
         // Code mods' and data packages' assets alike.
@@ -455,7 +516,7 @@ impl App {
         let post = crate::post::Post::new(&mut *gpu, &assets);
         let mut input = Input::default();
         for (action, key) in &content().game.keys {
-            match crate::settings::parse_chord(key) {
+            match crate::input::Binding::parse_slots(key) {
                 Some(k) => input.register(action, k),
                 None => log::warn!("key binding {action}: unknown key {key}"),
             }
@@ -465,6 +526,15 @@ impl App {
         crate::shaders::pin_time(self.opts.automated && !recording());
         let depth = make_depth(&mut *gpu, size.width, size.height);
         let gpu_name = gpu.device_name().to_string();
+        // What the GPU is, for mods (`core:gpu_*`): as found, whatever a file says.
+        for (name, v) in [("core:gpu_class", gpu.device_class() as f64), ("core:gpu_memory_mb", gpu.device_memory_mb() as f64)] {
+            if let Some(id) = crate::config::by_name(name) {
+                crate::config::put(id, v);
+            }
+        }
+        if let Some(id) = crate::config::by_name("core:gpu_name") {
+            crate::config::put_text(id, &gpu_name);
+        }
         let mut r = Running {
             gpu,
             window,
@@ -567,17 +637,58 @@ impl App {
     }
 }
 
+/// The size the 3D world is drawn at this frame: the screen's times `core:render_scale` (the
+/// screen effects' last pass scales it up and the UI is drawn over it whole), or the screen's when
+/// there is no world or no post pipeline to scale it with.
+fn world_frame(r: &Running, info: &weft_render::FrameInfo) -> weft_render::FrameInfo {
+    let s = crate::settings::render_scale(r.window.scale_factor());
+    if s >= 0.999 || r.game.is_none() || !r.post.can_scale() {
+        return weft_render::FrameInfo { ..*info };
+    }
+    let scaled = |v: u32| ((v as f32 * s).round() as u32).max(1);
+    weft_render::FrameInfo { width: scaled(info.width), height: scaled(info.height), slot: info.slot }
+}
+
 fn make_depth(gpu: &mut dyn Backend, w: u32, h: u32) -> (TextureId, u32, u32) {
     let t = gpu
         .create_texture(&TextureDesc { width: w.max(1), height: h.max(1), mips: 1, format: Format::Depth32, render_target: true }, "depth");
     (t, w, h)
 }
 
+/// Where the driver's compiled pipelines are kept between starts (`Backend::pipeline_cache_data`).
+static PIPELINE_CACHE: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
+/// Keeps the driver's compiled pipelines for the next start: the shaders then skip most of their
+/// compiling (on the Mac, MoltenVK's translation too). Written aside and moved, never half.
+fn save_pipeline_cache(gpu: &dyn Backend) {
+    let Some(path) = PIPELINE_CACHE.get() else { return };
+    let data = gpu.pipeline_cache_data();
+    if data.is_empty() {
+        return;
+    }
+    let tmp = path.with_extension("bin.tmp");
+    let saved = path
+        .parent()
+        .map_or(Ok(()), std::fs::create_dir_all)
+        .and_then(|_| std::fs::write(&tmp, &data))
+        .and_then(|_| std::fs::rename(&tmp, path));
+    match saved {
+        Ok(()) => log::debug!("pipeline cache: {} KB saved", data.len() / 1024),
+        Err(e) => log::warn!("pipeline cache {}: {e}", path.display()),
+    }
+}
+
+/// A screen taller than the window scrolls (its root, with the wheel and a bar), as in a small
+/// window at GUI scale 2 (Playtest B9: at 640 x 360 the animal screen's tabs and bottom were cut
+/// off); it stays centred while it fits.
+fn scroll_when_taller(ui: &mut Ui) {
+    ui.nodes[0].style.scroll = true;
+}
+
 impl Running {
     fn gui_scale(&self) -> f32 {
         let max = crate::settings::max_gui_scale(self.gpu.surface_size());
-        let s = if self.settings.gui_scale() == 0 { max } else { self.settings.gui_scale().min(max) };
-        s as f32
+        crate::settings::applied_gui_scale(self.settings.gui_scale(), max) as f32
     }
 
     fn build_cx(&self) -> BuildCx<'_> {
@@ -606,6 +717,7 @@ impl Running {
         }
         let mut ui = Ui::new();
         s.build(&mut ui, &self.build_cx());
+        scroll_when_taller(&mut ui);
         self.screens.push((s, ui));
         self.quads_dirty = true;
         self.set_capture(false);
@@ -628,6 +740,7 @@ impl Running {
                 .collect();
             ui.clear();
             s.build(ui, &self.build_cx());
+            scroll_when_taller(ui);
             // Typed text survives rebuilds (language switch, resize).
             for (id, v, c) in inputs {
                 if let Some(n) = ui.find(&id) {
@@ -657,13 +770,17 @@ impl Running {
             self.window.set_cursor_visible(false);
         } else if self.settings.read_only {
         } else if on {
-            let _ = self
-                .window
-                .set_cursor_grab(CursorGrabMode::Locked)
-                .or_else(|_| self.window.set_cursor_grab(CursorGrabMode::Confined));
+            // Into the middle first, like vanilla: a cursor left by the edge (or outside, after an
+            // alt-tab) is no cursor kept in, where Windows only confines it.
+            self.center_cursor();
+            self.grab_cursor();
             self.window.set_cursor_visible(false);
         } else {
             let _ = self.window.set_cursor_grab(CursorGrabMode::None);
+            // A screen opening from play starts with the pointer in the middle, as vanilla's.
+            if self.input.captured {
+                self.center_cursor();
+            }
             self.window.set_cursor_visible(true);
         }
         self.input.captured = on;
@@ -699,6 +816,8 @@ impl Running {
                 .reload_shaders(&mut *self.gpu, &self.textures, &self.assets);
             g.client.render.set_textures(&mut *self.gpu, &self.textures);
             g.client.entity_render.reload(&mut *self.gpu, &self.assets);
+            // Slots may show pictures that are gone now.
+            self.quads_dirty = true;
             g.client.particles.reload(&mut *self.gpu, &self.assets);
             g.client.wires.reload(&mut *self.gpu, &self.assets);
             g.client.weather_render.reload(&mut *self.gpu, &self.assets);
@@ -729,16 +848,11 @@ impl Running {
         // Keys the new content brings (a package's client half, chiacraft phase 6): known to the
         // input as the start's are, with the player's binding if they set one.
         for (action, key) in &content().game.keys {
-            if let Some(k) = crate::settings::parse_chord(key) {
+            if let Some(k) = crate::input::Binding::parse_slots(key) {
                 self.input.register(action, k);
             }
-            let bound = crate::config::by_name(&format!("core:key.{action}"))
-                .map(crate::config::text)
-                .and_then(|t| crate::settings::parse_chord(&t));
-            if let Some(k) = bound {
-                self.input.rebind(action, k);
-            }
         }
+        self.settings.apply_binds(&mut self.input);
     }
 
     /// The join in progress: answers what it reports, until the game is let in or it fails.
@@ -885,6 +999,7 @@ impl Running {
             &key,
             self.settings.view_distance(),
             std::fs::read(self.settings.run_dir.join("skins").join("skin.png")).ok(),
+            read_avatar(&self.settings.run_dir),
         ) {
             Ok(mut client) => {
                 client.sent = load_chat_history(&self.settings.run_dir);
@@ -895,6 +1010,19 @@ impl Running {
             }
             Err(e) => log::error!("{e}"),
         }
+    }
+
+    fn grab_cursor(&self) {
+        let _ = self
+            .window
+            .set_cursor_grab(CursorGrabMode::Locked)
+            .or_else(|_| self.window.set_cursor_grab(CursorGrabMode::Confined));
+    }
+
+    fn center_cursor(&self) {
+        let size = self.window.inner_size();
+        let middle = winit::dpi::PhysicalPosition::new(size.width as f64 / 2.0, size.height as f64 / 2.0);
+        let _ = self.window.set_cursor_position(middle);
     }
 
     fn start_world(&mut self, mut meta: WorldMeta) {
@@ -944,6 +1072,23 @@ impl Running {
     }
 
     /// Plays in the world `server` runs in this process.
+    /// A listed world is there to be found: while it is open it is hosted under its own key, the
+    /// one its listing names, without its owner opening it to others on Multiplayer. Otherwise
+    /// every finder saw it offline (finder3, 11-04).
+    fn host_if_listed(&mut self) {
+        if net::p2p::HOSTING.lock().is_some() {
+            return;
+        }
+        if let Some(Game { server: Some(s), identity: Some(id), world, .. }) = &self.game
+            && s.dir
+                .as_deref()
+                .is_some_and(|d| crate::chiacraft::worlds::listing::load(d).is_some())
+        {
+            log::info!("'{world}' is listed: hosting it under its own key {}", id.key());
+            net::host(s, id.clone(), world, &self.settings);
+        }
+    }
+
     fn play_local(&mut self, server: ServerHandle, world: String, identity: Option<Arc<crate::world_address::WorldIdentity>>) {
         crate::admission::set_local_world(server.dir.clone(), identity.clone());
         let (client_conn, server_conn) = net::local_pair();
@@ -958,10 +1103,14 @@ impl Running {
             &key,
             self.settings.view_distance(),
             std::fs::read(self.settings.run_dir.join("skins").join("skin.png")).ok(),
+            read_avatar(&self.settings.run_dir),
         ) {
             Ok(mut client) => {
                 client.sent = load_chat_history(&self.settings.run_dir);
+                // The synced settings the player changes here are this world's.
+                crate::config::playing_in(Some(server.configs.clone()));
                 self.game = Some(Game { client, server: Some(server), world, identity });
+                self.host_if_listed();
                 self.screens.clear();
                 self.hud.invalidate();
                 self.quads_dirty = true;
@@ -985,6 +1134,8 @@ impl Running {
             return;
         }
         let Some(mut g) = self.game.take() else { return };
+        // Away from it: the visited world's rules stay out of it.
+        crate::config::playing_in(None);
         g.client.leave();
         self.gpu.wait_idle();
         g.client.destroy(&mut *self.gpu);
@@ -1037,6 +1188,7 @@ impl Running {
 
     fn leave_world_silent(&mut self) {
         if let Some(mut g) = self.game.take() {
+            crate::config::playing_in(None);
             if g.server.is_none() {
                 // A remote server's synced settings were in force; back to our own.
                 crate::config::left_server(&self.settings.run_dir);
@@ -1054,19 +1206,39 @@ impl Running {
         self.set_capture(false);
     }
 
+    /// Screens just went: with none left it is back to the game, otherwise those left look again.
+    /// The one place that decides that.
+    fn screens_gone(&mut self) {
+        self.quads_dirty = true;
+        if self.screens.is_empty() {
+            self.set_capture(true);
+        } else {
+            self.rebuild_all();
+        }
+    }
+
+    /// Closes the screens `drop` picks.
+    pub(crate) fn close_screens(&mut self, drop: impl Fn(&dyn Screen) -> bool) {
+        self.screens.retain(|(s, _)| !drop(s.as_ref()));
+        self.screens_gone();
+    }
+
+    /// Closes the top screen, and the menu it shows if it does.
+    pub(crate) fn close_top(&mut self) {
+        if self.screens.last().is_some_and(|(s, _)| s.shows_menu()) {
+            if let Some(g) = &mut self.game {
+                g.client.close_menu();
+            }
+        }
+        self.screens.pop();
+        self.screens_gone();
+    }
+
     pub(crate) fn handle(&mut self, reqs: Vec<Request>) {
         for r in reqs {
             match r {
                 Request::Open(s) => self.open(s),
-                Request::Close => {
-                    self.screens.pop();
-                    self.quads_dirty = true;
-                    if self.screens.is_empty() {
-                        self.set_capture(true);
-                    } else {
-                        self.rebuild_all();
-                    }
-                }
+                Request::Close => self.close_top(),
                 Request::Quit => self.quit = true,
                 Request::Restart => {
                     match crate::paths::own_program().and_then(|exe| {
@@ -1098,12 +1270,12 @@ impl Running {
                     Some(s) => self.open(s),
                     None => log::warn!("no screen {name}"),
                 },
-                Request::Rebind(action, key) => {
-                    self.input.rebind(&action, key);
-                    self.settings.set_bind(&action, key);
+                Request::Rebind(action, keys) => {
+                    self.input.rebind(&action, keys);
+                    self.settings.set_bind(&action, &keys);
                 }
                 Request::ResetBinds => {
-                    let defaults: Vec<(String, crate::input::Chord)> = self
+                    let defaults: Vec<(String, crate::input::Slots)> = self
                         .input
                         .binds
                         .iter()
@@ -1111,7 +1283,7 @@ impl Running {
                         .collect();
                     for (a, k) in defaults {
                         self.input.rebind(&a, k);
-                        self.settings.set_bind(&a, k);
+                        self.settings.set_bind(&a, &k);
                     }
                     self.rebuild_all();
                 }
@@ -1143,8 +1315,7 @@ impl Running {
                     if let Some(g) = &mut self.game {
                         g.client.send(net::ToServer::Respawn);
                     }
-                    self.screens.retain(|(s, _)| !s.closes_on_respawn());
-                    self.set_capture(true);
+                    self.close_screens(|s| s.closes_on_respawn());
                 }
                 Request::SendChat(text) => {
                     if self.game.is_some() && !self.client_command(&text) && !text.trim().is_empty() {
@@ -1495,8 +1666,15 @@ impl Running {
                         .iter()
                         .find(|(_, b)| p.x >= b[0] && p.x <= b[2] && p.y >= b[1] && p.y <= b[3])
                         .map(|l| l.0.clone());
-                    if let Some(n) = target.and_then(|t| ui.find(&t)) {
-                        ui.focused = Some(n);
+                    match target.as_deref().map(|t| t.strip_prefix("open:").ok_or(t)) {
+                        // A file or folder, opened with what the system opens it with.
+                        Some(Ok(path)) => crate::packs::open_path(std::path::Path::new(path)),
+                        Some(Err(t)) => {
+                            if let Some(n) = ui.find(t) {
+                                ui.focused = Some(n);
+                            }
+                        }
+                        None => {}
                     }
                 }
             }
@@ -1645,6 +1823,35 @@ impl Running {
                     if let Some(g) = &mut self.game {
                         g.client.entity_effects(&a);
                     }
+                }
+            }
+        }
+        // Who only watches, every one of them; the local player is an entity to them as well.
+        if !c.game.client_entity_watchers.is_empty() {
+            let mine = self
+                .game
+                .as_ref()
+                .map(|g| g.client.me.args(g.client.player_id, dt));
+            let others = self.game.as_ref().map_or(Vec::new(), |g| {
+                g.client
+                    .entities
+                    .iter()
+                    .filter(|(_, e)| e.item.is_empty() && e.structure.is_none())
+                    .filter(|(_, e)| c.game.client_entity_watchers.contains_key(&e.kind))
+                    .map(|(&id, e)| e.args(id, dt))
+                    .collect()
+            });
+            for mut a in others.into_iter().chain(mine) {
+                for &(owner, cb) in c
+                    .game
+                    .client_entity_watchers
+                    .get(&a.kind)
+                    .into_iter()
+                    .flatten()
+                {
+                    let mut v = self.frame_view();
+                    a.client = v.raw();
+                    crate::host::invoke(owner, cb, &mut a);
                 }
             }
         }
@@ -1830,7 +2037,7 @@ impl Running {
         let dev = self.lang.dev;
         let test = |t: &text::Test| match t {
             text::Test::Keys(keys) => keys.iter().all(|k| {
-                if k.contains(':') { ctx.input.held(k) } else { crate::settings::parse_key(k).is_some_and(|key| ctx.input.held_key(key)) }
+                if k.contains(':') { ctx.input.held(k) } else { crate::input::Key::parse(k).is_some_and(|key| ctx.input.held_key(key)) }
             }),
             text::Test::Fixed(holds) => *holds,
             text::Test::If(name) => {
@@ -1864,9 +2071,18 @@ impl Running {
                         }
                         relayout |= text::refresh(&mut t.spans, &test);
                     }
-                    // Jumping about needs drawing again, whatever the value does.
-                    Kind::Icons { bind, value, shake: true, .. } if (0.0..=4.0).contains(value) => {
-                        *value = bind(&ctx);
+                    // Moving icons need drawing again, whatever the value does.
+                    Kind::Icons { bind, value, shake, effects, change, .. }
+                        if !effects.is_empty() || shake.is_some_and(|s| (0.0..=s).contains(value)) =>
+                    {
+                        let v = bind(&ctx);
+                        if (v - *value).abs() > 1e-4 && *value >= 0.0 && v >= 0.0 {
+                            *change = Some((*value, crate::shaders::clock(), v > *value));
+                        }
+                        *value = v;
+                        for e in effects.iter_mut() {
+                            e.value = e.bind.as_ref().map_or(1.0, |b| b(&ctx));
+                        }
                         redraw = true;
                     }
                     Kind::Progress { bind, value, .. } | Kind::Icons { bind, value, .. } => {
@@ -1903,23 +2119,21 @@ impl Running {
     }
 }
 
-/// `{if:name}`: the engine's conditions, then mods' (`Host::reg_text_condition`); unknown ones
-/// are false.
+/// `{if:name}`: `debug` and `dev`, else a registered condition (`Host::reg_condition`, game
+/// modes by name); unknown ones are false.
 fn text_condition(name: &str, client: Option<&Client>, debug: bool, dev: bool) -> bool {
-    use crate::world::GameMode;
-    let mode = client.map(|c| c.mode);
     match name {
-        "creative" => mode == Some(GameMode::Creative),
-        "survival" => mode == Some(GameMode::Survival),
-        "spectator" => mode == Some(GameMode::Spectator),
         "debug" => debug,
         "dev" => dev,
         _ => {
-            let Some(&(owner, cb)) = content().game.text_conditions.get(name) else { return false };
-            let mut v = crate::client::modui::ClientView::new(client);
-            let mut a = abi::TextConditionArgs { client: v.raw(), result: 0 };
-            crate::host::invoke(owner, cb, &mut a);
-            a.result != 0
+            // The engine's go without their namespace: `{if:creative}`.
+            let names = &content().game.condition_names;
+            let id = names.get(name).or_else(|| {
+                (!name.contains(':'))
+                    .then(|| names.get(&format!("core:{name}")))
+                    .flatten()
+            });
+            id.is_some_and(|&id| crate::conditions::on_client(client, id))
         }
     }
 }
@@ -1953,6 +2167,11 @@ impl ApplicationHandler for App {
             WindowEvent::Resized(size) => {
                 r.gpu.resize(size.width, size.height);
                 r.rebuild_all();
+            }
+            // Windows lets go of a confined cursor while another window has the focus.
+            WindowEvent::Focused(true) if !self.opts.automated && r.input.captured && !r.settings.read_only => {
+                r.center_cursor();
+                r.grab_cursor();
             }
             WindowEvent::Focused(false) if !self.opts.automated => {
                 r.input.release_all();
@@ -2021,10 +2240,12 @@ impl ApplicationHandler for App {
     }
 
     fn exiting(&mut self, _el: &ActiveEventLoop) {
+        finish_screenshots();
         if let Some(mut r) = self.run.take() {
             r.gpu.wait_idle();
             r.leave_world_silent();
             r.close_home();
+            save_pipeline_cache(&*r.gpu);
             drop(r.gpu);
         }
     }
@@ -2041,6 +2262,14 @@ struct UiCallbacks {
 /// One frame. Returns true when the app should quit.
 fn frame(r: &mut Running, opts: &Options) -> bool {
     r.retired = None;
+    // The fps cap: what is left of this frame's share of a second, slept away.
+    let cap = r.settings.fps_cap();
+    if cap > 0 {
+        let share = std::time::Duration::from_secs_f64(1.0 / cap as f64);
+        if let Some(rest) = share.checked_sub(r.last.elapsed()) {
+            std::thread::sleep(rest);
+        }
+    }
     let now = Instant::now();
     let dt = (now - r.last).as_secs_f64();
     r.last = now;
@@ -2052,6 +2281,9 @@ fn frame(r: &mut Running, opts: &Options) -> bool {
     }
     f3_keys(r);
     toggle_keys(r);
+    if crate::chiacraft::worlds::listing::HOST_NOW.swap(false, std::sync::atomic::Ordering::Relaxed) {
+        r.host_if_listed();
+    }
     if r.packs_pending
         && !r
             .screens
@@ -2099,18 +2331,32 @@ fn frame(r: &mut Running, opts: &Options) -> bool {
     let Some(info) = r.gpu.begin_frame() else { return false };
     let t2 = Instant::now();
     r.prof[2] = t2.duration_since(t).as_secs_f32() * 1000.0;
-    if (r.depth.1, r.depth.2) != (info.width, info.height) {
+    let world = world_frame(r, &info);
+    if (r.depth.1, r.depth.2) != (world.width, world.height) {
+        log::info!(
+            "world drawn at {}x{} of the window's {}x{} (render scale {:.2}, density {:.1})",
+            world.width,
+            world.height,
+            info.width,
+            info.height,
+            crate::settings::render_scale(r.window.scale_factor()),
+            r.window.scale_factor()
+        );
         r.gpu.destroy_texture(r.depth.0);
-        r.depth = make_depth(&mut *r.gpu, info.width, info.height);
+        r.depth = make_depth(&mut *r.gpu, world.width, world.height);
     }
     if r.quads_dirty {
+        let _s = crate::diag::span("ui quads");
         build_ui_quads(r, scale);
     }
+    let s = crate::diag::span("overlays");
     draw_overlays(r, &info, scale, text_unit);
-    record_passes(r, &info, scale);
+    drop(s);
+    record_passes(r, &info, &world, scale);
     let capture_now = r.shot_pending;
     let t3 = Instant::now();
     r.prof[3] = t3.duration_since(t2).as_secs_f32() * 1000.0;
+    crate::diag::slow_record(r.prof[3]);
     r.gpu.end_frame(&r.list);
     r.prof[4] = t3.elapsed().as_secs_f32() * 1000.0;
     report_frame(r, dt);
@@ -2126,13 +2372,15 @@ fn start_frame(r: &mut Running, opts: &Options, dt: f64) {
     // Link requests and answers arrive in the background: the links screen shows them as they do.
     let links_now = crate::links::GENERATION.load(std::sync::atomic::Ordering::Relaxed)
         + crate::friends::GENERATION.load(std::sync::atomic::Ordering::Relaxed)
-        + crate::admission::GENERATION.load(std::sync::atomic::Ordering::Relaxed);
+        + crate::admission::GENERATION.load(std::sync::atomic::Ordering::Relaxed)
+        + crate::chiacraft::achievements::GENERATION.load(std::sync::atomic::Ordering::Relaxed)
+        + crate::chiacraft::worlds::finder::GENERATION.load(std::sync::atomic::Ordering::Relaxed);
     if links_now != r.links_seen {
         r.links_seen = links_now;
-        if r.screens
-            .last()
-            .is_some_and(|(s, _)| ["core:links", "core:multiplayer", "core:friends", "core:admission", "core:account"].contains(&s.name()))
-        {
+        if r.screens.last().is_some_and(|(s, _)| {
+            ["core:links", "core:multiplayer", "core:friends", "core:admission", "core:account", "core:achievements", "core:finder"]
+                .contains(&s.name())
+        }) {
             r.rebuild_all();
         }
     }
@@ -2194,11 +2442,6 @@ fn screen_keys_first(r: &mut Running, requests: &mut Vec<Request>) -> bool {
 fn escape(r: &mut Running, requests: &mut Vec<Request>) {
     if r.screens.last().is_some_and(|(s, _)| !s.escape_closes()) {
     } else if r.screens.len() > 1 || (r.game.is_some() && !r.screens.is_empty()) {
-        if r.screens.last().is_some_and(|(s, _)| s.shows_menu()) {
-            if let Some(g) = &mut r.game {
-                g.client.close_menu();
-            }
-        }
         requests.push(Request::Close);
     } else if r.game.is_some() && r.screens.is_empty() {
         r.open(screens::engine("core:pause"));
@@ -2213,7 +2456,7 @@ const F3_COMBOS: &[(KeyCode, F3Action)] = &[
     // Through the command, so permissions still apply.
     (KeyCode::F4, |r| {
         if let Some(g) = &mut r.game {
-            let all = crate::world::GameMode::ALL;
+            let all: Vec<_> = crate::world::GameMode::all().collect();
             let next = all[(all.iter().position(|&m| m == g.client.mode).unwrap_or(0) + 1) % all.len()];
             g.client
                 .send(net::ToServer::Chat(format!("/gamemode {}", next.name())));
@@ -2239,8 +2482,8 @@ fn toggle_gizmo(r: &mut Running, group: &str) {
 fn f3_keys(r: &mut Running) {
     let f3 = r
         .input
-        .key_of("core:debug")
-        .is_some_and(|k| r.input.held_key(k.key));
+        .binding_of("core:debug")
+        .is_some_and(|b| r.input.held_key(b.chord.key));
     if r.input.pressed("core:debug") {
         r.f3_combo = Some(false);
     }
@@ -2320,12 +2563,17 @@ fn update_game(r: &mut Running, dt: f64, frame_start: Instant) {
         }
         g.client.fov = r.settings.fov();
         g.client.brightness = r.settings.brightness();
+        g.client.first_person_model = r.settings.first_person_model();
+        g.client.entity_render.show_avatars = r.settings.show_avatars();
+        g.client.render.occlusion.on = r.settings.occlusion_culling();
+        g.client.sky.soft_wanted = r.settings.soft_clouds();
+        r.post.use_low = r.settings.post_low();
         let t = Instant::now();
         if world_input {
-            g.client.update(&mut *r.gpu, &r.textures, &r.input, dt);
+            g.client.update(&mut *r.gpu, &r.textures, &mut r.input, dt);
         } else {
             g.client
-                .update(&mut *r.gpu, &r.textures, &Input::default(), dt);
+                .update(&mut *r.gpu, &r.textures, &mut Input::default(), dt);
         }
         r.prof[0] = t.elapsed().as_secs_f32() * 1000.0;
         r.prof[1] = Instant::now().duration_since(frame_start).as_secs_f32() * 1000.0;
@@ -2364,11 +2612,7 @@ fn client_events(r: &mut Running) {
                 r.screens.retain(|(s, _)| !s.shows_menu());
                 r.open(Box::new(crate::game_screens::MenuScreen::new(kind)));
             }
-            crate::client::ClientEvent::CloseMenu => {
-                r.screens.retain(|(s, _)| !s.shows_menu());
-                r.quads_dirty = true;
-                r.set_capture(true);
-            }
+            crate::client::ClientEvent::CloseMenu => r.close_screens(|s| s.shows_menu()),
             crate::client::ClientEvent::Died => {
                 r.screens.clear();
                 r.open(screens::engine("core:death"));
@@ -2389,8 +2633,8 @@ fn world_keys(r: &mut Running) {
         let command = r.input.pressed("core:command");
         let f3_held = r
             .input
-            .key_of("core:debug")
-            .is_some_and(|k| r.input.held_key(k.key));
+            .binding_of("core:debug")
+            .is_some_and(|b| r.input.held_key(b.chord.key));
         if command || (r.input.pressed("core:chat") && !f3_held) {
             r.open(Box::new(crate::game_screens::Chat::new(if command { "/" } else { "" })));
             r.input.typed.clear();
@@ -2424,9 +2668,7 @@ fn world_keys(r: &mut Running) {
                 _ => None,
             })
         });
-        r.screens.pop();
-        r.set_capture(true);
-        r.quads_dirty = true;
+        r.close_top();
         if let Some(t) = text.filter(|t| !t.trim().is_empty()) {
             if let Some(g) = &mut r.game {
                 if g.client.sent.last() != Some(&t) {
@@ -2447,9 +2689,25 @@ fn world_keys(r: &mut Running) {
         if let Some(g) = &mut r.game {
             g.client.close_menu();
         }
-        r.screens.retain(|(s, _)| !s.shows_menu());
-        r.set_capture(true);
-        r.quads_dirty = true;
+        r.close_screens(|s| s.shows_menu());
+    }
+    // Into the screen's search field: the first text field whose id says it is one
+    // (`creative_search`, `tag_search`, a mod's own).
+    if r.input.pressed("core:focus_search") && !typing {
+        if let Some((_, ui)) = r.screens.last_mut() {
+            let field = (0..ui.nodes.len()).find(|&i| {
+                matches!(ui.nodes[i].kind, Kind::Input { .. })
+                    && ui.nodes[i]
+                        .id
+                        .as_deref()
+                        .is_some_and(|id| id.contains("search"))
+            });
+            if let Some(f) = field {
+                ui.focused = Some(f);
+                ui.dirty = true;
+                r.quads_dirty = true;
+            }
+        }
     }
 }
 
@@ -2477,8 +2735,6 @@ fn handle_disconnect(r: &mut Running) {
 fn end_input(r: &mut Running) {
     r.input.sensitivity = r.settings.sensitivity();
     r.input.invert_y = r.settings.invert_y();
-    r.input.toggle_sneak = r.settings.toggle_sneak();
-    r.input.toggle_sprint = r.settings.toggle_sprint();
     r.input.end_frame();
     let top = (
         r.screens.len(),
@@ -2500,6 +2756,7 @@ fn end_input(r: &mut Running) {
 fn refresh_hud(r: &mut Running) {
     if let Some(g) = &r.game {
         let chat_open = r.screens.last().is_some_and(|(s, _)| s.shows_chat());
+        let menu_open = !r.screens.is_empty() && !chat_open;
         if r.hud.editing()
             && !r
                 .screens
@@ -2509,7 +2766,7 @@ fn refresh_hud(r: &mut Running) {
             r.hud.set_edit(None);
         }
         if r.hud
-            .update(&g.client, r.debug, r.settings.debug_groups(), chat_open, &r.lang, &r.input)
+            .update(&g.client, r.debug, r.settings.debug_groups(), chat_open, menu_open, &r.lang, &r.input)
         {
             r.quads_dirty = true;
         }
@@ -2565,7 +2822,12 @@ fn build_ui_quads(r: &mut Running, scale: f32) {
     let preview_tex = r.preview_tex;
     let mut layers: Vec<&Ui> = Vec::new();
     let mut animated = Vec::new();
-    if r.game.is_some() && !hud_hidden() && !(r.hud_off && r.screens.is_empty()) {
+    let hud = r
+        .game
+        .as_ref()
+        .is_some_and(|g| g.client.camera_has(weft_abi::camera_flags::HUD))
+        || !r.screens.is_empty();
+    if r.game.is_some() && hud && !hud_hidden() && !(r.hud_off && r.screens.is_empty()) {
         layers.push(&r.hud.ui);
     }
     // Only the top screen shows, like vanilla: the ones under it are not drawn through its
@@ -2612,7 +2874,7 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
     }
     // Gizmo labels and mods' screen text: text nodes placed at points (GUI pixels), the same
     // text as anywhere else.
-    let mut labels: Vec<(f32, f32, &crate::ui::text::Msg, u32, f32)> = Vec::new();
+    let mut labels: Vec<(f32, f32, &crate::ui::text::Msg, u32, f32, f32)> = Vec::new();
     if let Some(g) = &r.game {
         let cam = g.client.render_camera();
         let view_proj = cam.proj(info.width as f32 / info.height.max(1) as f32) * cam.view();
@@ -2622,7 +2884,7 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
                 continue;
             }
             let (x, y) = ((clip.x / clip.w * 0.5 + 0.5) * info.width as f32, (0.5 - clip.y / clip.w * 0.5) * info.height as f32);
-            labels.push((x / scale, y / scale - 4.0, text, *color, *size));
+            labels.push((x / scale, y / scale - 4.0, text, *color, *size, 0.0));
         }
     }
     let (sw, sh) = r.gpu.surface_size();
@@ -2630,19 +2892,43 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
         labels.extend(
             r.mod_screen_text
                 .iter()
-                .map(|(x, y, text, color, size)| (x * sw as f32 / scale, y * sh as f32 / scale, text, *color, *size)),
+                .map(|(x, y, text, color, size, wrap)| (x * sw as f32 / scale, y * sh as f32 / scale, text, *color, *size, *wrap)),
         );
     }
     if !labels.is_empty() {
         let mut o = crate::ui::Ui::new();
         o.text_unit = text_unit;
-        for (x, y, text, color, size) in labels {
-            let id = o.text(text.spans(&r.lang, Some(&r.input)), "label");
-            o.nodes[id].style = crate::ui::Style::default().at(x, y, [0.5, 0.0]);
+        for (x, y, text, color, size, wrap) in labels {
+            // A negative width: on the HUD's plate, wrapped to the width.
+            let plate = wrap < 0.0;
+            let wrap = wrap.abs();
+            let mut spans = text.spans(&r.lang, Some(&r.input));
+            if wrap > 0.0 {
+                for s in &mut spans {
+                    s.align = crate::ui::text::align::CENTER;
+                }
+            }
+            let at = crate::ui::Style::default().at(x, y, [0.5, 0.0]);
+            if plate {
+                o.open(crate::ui::Kind::Container { class: Some("hud_plate".into()) }, at.pad(4.0));
+            }
+            let id = o.text(spans, "label");
+            if !plate {
+                o.nodes[id].style = at;
+            }
+            if wrap > 0.0 {
+                o.nodes[id].style.max_w = wrap;
+            }
             if let crate::ui::Kind::Text(t) = &mut o.nodes[id].kind {
-                t.wrap = false;
+                // A width given: wrapped to it, the lines centered (a mod's long hint in a narrow
+                // window ran over the HUD's top-left column, 11-04).
+                t.wrap = wrap > 0.0;
+                t.center = wrap > 0.0;
                 t.color = Some(color);
                 t.scale = size;
+            }
+            if plate {
+                o.close();
             }
         }
         o.layout(Vec2::new(sw as f32 / scale, sh as f32 / scale), &r.ui.font);
@@ -2666,16 +2952,62 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
     }
 }
 
-fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
+/// The player's own model, if `skins/avatar` has one: a Blockbench geometry and its picture, and
+/// if they like clips, what bones do by themselves and a glow mask.
+fn read_avatar(run_dir: &std::path::Path) -> Option<crate::net::AvatarData> {
+    let dir = run_dir.join("skins").join("avatar");
+    let file = |name: &str| std::fs::read(dir.join(name)).unwrap_or_default();
+    let a = crate::net::AvatarData {
+        geo: file("avatar.geo.json"),
+        animations: file("avatar.animation.json"),
+        bones: file("avatar.bones"),
+        png: file("avatar.png"),
+        glow: file("avatar_e.png"),
+    };
+    if a.geo.is_empty() || a.png.is_empty() {
+        return None;
+    }
+    if a.size() > crate::net::AVATAR_BYTES {
+        log::warn!("avatar: {} bytes, at most {} are sent", a.size(), crate::net::AVATAR_BYTES);
+        return None;
+    }
+    Some(a)
+}
+
+/// `info` is the screen's frame, `world` the size the 3D world is drawn at (`world_frame`).
+fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &weft_render::FrameInfo, scale: f32) {
     r.list.clear();
+    if let Some(g) = &mut r.game {
+        let worn = g.client.worn();
+        let held = [g.client.shown_held(), g.client.off_held()];
+        g.client
+            .entity_render
+            .preload(&mut *r.gpu, &r.assets, &g.client.entities, &g.client.entity_components, &worn, held);
+        if g.client
+            .entity_render
+            .draw_icons(&mut *r.gpu, &mut r.list, info)
+        {
+            r.quads_dirty = true;
+        }
+    }
     if let Some(g) = r.game.as_mut().filter(|_| !r.screens.is_empty()) {
         if let Some(&([x, y, w, h], whose)) = r.previews.first() {
             let worn = g.client.worn();
             let look = r.input.cursor - Vec2::new(x, y);
-            let subject = (whose == 1)
-                .then(|| g.client.menu.as_ref().map(|m| m.owner))
-                .flatten()
-                .and_then(|id| g.client.entities.get(&id).map(|e| (id, e.kind)));
+            // The menu's own entity, or a kind alone (no entity: its own texture, nothing painted).
+            let subject = match whose {
+                1 => g
+                    .client
+                    .menu
+                    .as_ref()
+                    .map(|m| m.owner)
+                    .and_then(|id| g.client.entities.get(&id).map(|e| (id, e.kind))),
+                k if k >= 2 => Some((u64::MAX, (k - 2) as u32)),
+                _ => None,
+            };
+            // A kind alone: its skin loads with the others (none of it may be in the world).
+            g.client.entity_render.preview_kind = (whose >= 2).then(|| (whose - 2) as u32);
+            let s = crate::diag::span("preview");
             let tex = g.client.entity_render.draw_preview(
                 &mut *r.gpu,
                 &mut r.list,
@@ -2685,6 +3017,7 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
                 &worn,
                 subject,
             );
+            drop(s);
             if tex != r.preview_tex {
                 r.preview_tex = tex;
                 r.quads_dirty = true;
@@ -2695,50 +3028,112 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
         let [r, g, b, _rain] = g.client.fog_color();
         [r, g, b, 1.0]
     });
-    // Screen effects need the world in an image they can read.
-    let post = r.post.on() && r.game.is_some();
-    let world_target = if post { Target::Texture(r.post.scene_target(&mut *r.gpu, info.width, info.height)) } else { Target::Surface };
+    // Screen effects need the world in an image they can read, and so does a world drawn smaller
+    // than the screen (`render_scale`), which their last pass scales up.
+    let scaled = (world_info.width, world_info.height) != (info.width, info.height);
+    let post = (r.post.on() || scaled) && r.game.is_some();
+    let world_target = if post {
+        Target::Texture(
+            r.post
+                .scene_target(&mut *r.gpu, world_info.width, world_info.height),
+        )
+    } else {
+        Target::Surface
+    };
     if let Some(g) = &mut r.game {
+        let s = crate::diag::span("terrain gpu");
         g.client
             .gpu_terrain
             .frame(&mut *r.gpu, &mut r.list, info.slot);
+        drop(s);
+        let s = crate::diag::span("particles");
         let cam = g.client.render_camera();
         g.client
             .particles
             .simulate(&mut *r.gpu, &mut r.list, info.slot, &r.textures, &g.client.world, &cam);
+        drop(s);
+        let s = crate::diag::span("wires and sun");
         g.client.update_wires(&mut *r.gpu, &r.textures);
         // The sun's light for shadow maps (packs that use them), which the world's scene samples.
         g.client.prepare_shadows(&mut *r.gpu);
+        // A copy of the world for what is seen through it (`water_behind` packs, with post on).
+        drop(s);
+        g.client.behind = [0.0; 4];
+        if post && crate::packs::water_behind() {
+            if let Some([c, d]) = r
+                .post
+                .behind_targets(&mut *r.gpu, world_info.width, world_info.height)
+            {
+                g.client.behind = [c as f32, d as f32, 1.0, 0.0];
+            }
+        }
     }
+    // GPU time parts (`bench::GPU_PARTS`): terrain made and particles simulated so far, then the
+    // shadow map, then the world.
+    r.list.push(Cmd::Mark);
+    // What the world's draws go by has to be done before its pass, and is known only making them.
     let mut world = std::mem::take(&mut r.world_list);
     world.clear();
-    world.push(Cmd::BeginPass { color: Some((world_target, Some(clear))), depth: Some((r.depth.0, Some(0.0))) });
     if let Some(g) = &mut r.game {
-        let worn = g.client.worn();
-        let held = g.client.held().item;
+        let s = crate::diag::span("client render");
         g.client
-            .entity_render
-            .preload(&mut *r.gpu, &r.assets, &g.client.entities, &g.client.entity_components, &worn, held);
-        g.client.render(&mut *r.gpu, &mut world, info, &r.textures);
+            .render(&mut *r.gpu, &mut world, &mut r.list, world_info, &r.textures);
+        drop(s);
+        // What the pack's look works out once a frame, before anything that reads it.
+        r.list.append(&mut g.client.sky.frame_look.passes);
         // The shadow map once the models are posed, ahead of the world's pass that samples it.
-        g.client.render_shadows(&mut *r.gpu, &mut r.list, info);
+        let s = crate::diag::span("shadows");
+        g.client
+            .render_shadows(&mut *r.gpu, &mut r.list, world_info);
+        drop(s);
+        // The opaque world copied, then what is seen through it drawn over it, reading the copy.
+        if g.client.behind[2] > 0.5 {
+            world.push(Cmd::EndPass);
+            if let Some(scene) = g.client.scene_buffer(info.slot) {
+                let depth = r.gpu.texture_index(r.depth.0);
+                r.post
+                    .copy_behind(&mut *r.gpu, &mut world, world_info, scene, depth);
+            }
+            // Soft clouds traced against that copy, before the sky draws them (chiacraft).
+            world.append(&mut g.client.sky.soft.passes);
+            world.push(Cmd::BeginPass { color: Some((world_target, None)), depth: Some((r.depth.0, None)) });
+            world.append(&mut g.client.late_out);
+            // The "translucent" part ends here: the copy, the sky, clouds, water, particles and the
+            // hand (the client leaves this mark to the app when the world is copied).
+            world.push(Cmd::Mark);
+        }
     }
-    world.push(Cmd::EndPass);
+    r.list.push(Cmd::Mark);
+    r.list
+        .push(Cmd::BeginPass { color: Some((world_target, Some(clear))), depth: Some((r.depth.0, Some(0.0))) });
     r.list.append(&mut world);
     r.world_list = world;
+    r.list.push(Cmd::EndPass);
+    if let Some(g) = &mut r.game {
+        g.client
+            .render
+            .occlusion
+            .take_depth(&mut *r.gpu, &mut r.list, r.depth.0, [r.depth.1, r.depth.2]);
+    }
     if post {
         let scene = r
             .game
             .as_ref()
             .and_then(|g| g.client.scene_buffer(info.slot));
         let depth = r.gpu.texture_index(r.depth.0);
-        r.post.apply(&mut *r.gpu, &mut r.list, info, scene, depth);
+        let _s = crate::diag::span("effects");
+        r.post
+            .apply(&mut *r.gpu, &mut r.list, world_info, scene, depth, scaled);
+        r.list.push(Cmd::Mark);
     } else {
+        r.list.push(Cmd::Mark);
         // The UI pipeline has no depth, so it cannot draw in a pass that has one.
         r.list
             .push(Cmd::BeginPass { color: Some((Target::Surface, None)), depth: None });
     }
+    let s = crate::diag::span("ui draw");
     r.ui.draw(&mut *r.gpu, &mut r.list, info, scale);
+    drop(s);
     r.list.push(Cmd::Mark);
     r.list.push(Cmd::EndPass);
 }
@@ -2776,6 +3171,7 @@ fn report_frame(r: &mut Running, dt: f64) {
             };
             let line = b.report(&extra);
             log::info!("{line}");
+            log::info!("{}", b.pacing());
             r.bench_last = b.summary();
             r.bench_line = line;
             r.benches += 1;
@@ -2787,6 +3183,8 @@ fn report_frame(r: &mut Running, dt: f64) {
 fn save_screenshot(r: &mut Running) {
     r.shot_pending = false;
     if let Some(cap) = r.gpu.take_capture() {
+        // The player's own (F2) says where it went; a mod's knows.
+        let own = r.shot_path.is_none();
         let path = r.shot_path.take().unwrap_or_else(|| {
             r.settings
                 .run_dir
@@ -2796,13 +3194,47 @@ fn save_screenshot(r: &mut Running) {
         if let Some(dir) = path.parent() {
             let _ = std::fs::create_dir_all(dir);
         }
-        match crate::assets::encode_png(&path, cap.width, cap.height, &cap.rgba) {
-            Ok(()) => log::info!("screenshot saved to {}", path.display()),
-            Err(e) => log::error!("screenshot: {e}"),
+        // Encoded on a thread: a PNG at 3456 x 2234 took 0.4-0.6 s of the frame (perf review).
+        // The chat line can say where it goes now; quitting waits for it (`finish_screenshots`).
+        if let Some(g) = r.game.as_mut().filter(|_| own) {
+            let open = |p: &std::path::Path, label: &str| {
+                Arg::Msg(Msg::template(&format!("{{link:open:{}}}{{lang:{label}}}{{/link}}", p.display())))
+            };
+            let folder = path.parent().unwrap_or(&path);
+            g.client.chat_line(Msg::new(
+                "chat.screenshot",
+                vec![open(&path, "chat.screenshot.picture"), open(folder, "chat.screenshot.folder")],
+            ));
         }
-        if let Some(id) = r.shot_image.take() {
-            api::store_image(id, cap.width, cap.height, cap.rgba);
+        let rgba = match r.shot_image.take() {
+            Some(id) => {
+                api::store_image(id, cap.width, cap.height, cap.rgba.clone());
+                cap.rgba
+            }
+            None => cap.rgba,
+        };
+        let (w, h) = (cap.width, cap.height);
+        let job = std::thread::Builder::new()
+            .name("screenshot".into())
+            .spawn(move || match crate::assets::encode_png(&path, w, h, &rgba) {
+                Ok(()) => log::info!("screenshot saved to {}", path.display()),
+                Err(e) => log::error!("screenshot: {e}"),
+            });
+        match job {
+            Ok(j) => SHOTS.lock().unwrap_or_else(|e| e.into_inner()).push(j),
+            Err(e) => log::error!("screenshot: no thread to save it: {e}"),
         }
+    }
+}
+
+/// Screenshots still being encoded and written.
+static SHOTS: std::sync::Mutex<Vec<std::thread::JoinHandle<()>>> = std::sync::Mutex::new(Vec::new());
+
+/// Waits for the screenshots still being written (before the game quits).
+fn finish_screenshots() {
+    let jobs = std::mem::take(&mut *SHOTS.lock().unwrap_or_else(|e| e.into_inner()));
+    for j in jobs {
+        let _ = j.join();
     }
 }
 

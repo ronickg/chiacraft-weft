@@ -1,0 +1,11 @@
+[package]
+name = "progression"
+version = "0.1.0"
+edition.workspace = true
+license = "MIT"
+description = "The progression and balance checks (notes/PROGRESSION.md): every item, block, recipe, tool part and species tagged with its age and path, the progression graph, the combat matrix, tweak bounds and each age's crafting budget, written to PROGRESSION_SHEET.md"
+
+[dependencies]
+vitals.workspace = true
+crafting.workspace = true
+animals_core = { path = "../../animals/core" }

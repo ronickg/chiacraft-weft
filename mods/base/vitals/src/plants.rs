@@ -58,21 +58,53 @@ const fn p(
 }
 
 const ANY: u8 = 15;
+const SPRING: u8 = 1;
 const SUMMER: u8 = 2;
 const SUMMER_AUTUMN: u8 = 2 | 4;
 
-pub const PLANTS: [Plant; 28] = [
+pub const PLANTS: [Plant; 57] = [
     // Frost (`reports/ecology/Plants and crops.md`, A1): spring wheat is sensitive (a hard frost,
     // about -2 °C, kills it; winter wheat, hardy, comes later); a blueberry's dormant bush is
     // hardy but its flowers and fruit die at -2; sugar cane takes none (the stalk dies, the base
     // sprouts again); a saguaro takes brief frost down to about -7.
     p("base:wheat", "spring wheat", (0.0, 15.0, 23.0, 34.0), Water::Moderate, 110.0, ANY, -2.0),
+    // The crops (`crops::CROPS`), the research's middle days. Cool-season ones grow from about
+    // freezing (barley, rye) or 4-7 °C (carrot, beetroot, potato) and suffer past 30; warm-season
+    // ones need about 10 °C and die at a frost; sorghum and pearl millet take drought (half speed
+    // on dry ground), paddy rice grows only by water. Winter rye is hardy to -30 and needs a
+    // winter's cold to set grain: sown in autumn, it ripens only in summer. Cassava takes 8-18
+    // months.
+    p("base:barley", "barley", (0.0, 15.0, 20.0, 32.0), Water::Moderate, 105.0, ANY, -4.0),
+    p("base:rye", "winter rye", (0.0, 12.0, 20.0, 30.0), Water::Moderate, 300.0, SUMMER, -30.0),
+    p("base:carrots", "carrot", (4.0, 16.0, 21.0, 30.0), Water::Moderate, 95.0, ANY, -5.0),
+    p("base:potatoes", "potato", (7.0, 15.0, 20.0, 30.0), Water::Moderate, 135.0, ANY, -1.0),
+    p("base:beetroots", "beetroot", (4.5, 15.0, 20.0, 30.0), Water::Moderate, 72.0, ANY, -3.0),
+    p("base:maize", "maize", (10.0, 24.0, 30.0, 38.0), Water::Moderate, 150.0, ANY, 0.0),
+    p("base:paddy_rice", "paddy rice", (10.0, 25.0, 30.0, 35.0), Water::Wet, 120.0, ANY, 0.0),
+    p("base:beans", "common bean", (10.0, 18.0, 25.0, 30.0), Water::Moderate, 100.0, ANY, 0.0),
+    p("base:sorghum", "sorghum", (8.0, 27.0, 34.0, 42.0), Water::Dry, 125.0, ANY, 0.0),
+    p("base:millet", "pearl millet", (10.0, 30.0, 34.0, 45.0), Water::Dry, 105.0, ANY, 0.0),
+    // Tepary bean (the research's A1): base about 12, best 25-32, up past 40, no frost, 60-120
+    // days; it yields on 200-350 mm, the driest bean.
+    p("base:tepary_beans", "tepary bean (Phaseolus acutifolius)", (12.0, 25.0, 32.0, 42.0), Water::Dry, 75.0, SUMMER_AUTUMN, 0.0),
+    p("base:cassava", "cassava", (12.0, 25.0, 29.0, 37.0), Water::Moderate, 390.0, ANY, 0.0),
+    // Pumpkin and melon stems (the research's rows): warm-season, killed by frost; the fruit sets
+    // in summer and autumn (`SUMMER_AUTUMN`, the stem's last step).
+    p("base:pumpkin_stem", "pumpkin, squash", (10.0, 20.0, 30.0, 35.0), Water::Moderate, 110.0, SUMMER_AUTUMN, 0.0),
+    p("base:melon_stem", "melon", (12.0, 25.0, 30.0, 38.0), Water::Moderate, 140.0, SUMMER_AUTUMN, 0.0),
     p("base:berry_bush", "blueberry", (7.0, 20.0, 26.0, 32.0), Water::Moderate, 75.0, SUMMER_AUTUMN, -2.0),
     p("base:sugar_cane", "sugar cane", (12.0, 22.0, 30.0, 38.0), Water::Wet, 0.0, ANY, -1.0),
+    // Kelp (Laminaria, Saccharina): cold-water seaweed, growing best at 5-15 °C and failing
+    // past about 20; it stands under water, so frost never reaches it.
+    p("base:kelp", "kelp (Laminaria)", (0.0, 5.0, 15.0, 22.0), Water::Wet, 0.0, ANY, HARDY),
     p("base:cactus", "saguaro", (10.0, 25.0, 40.0, 50.0), Water::Dry, 0.0, ANY, -7.0),
     p("base:sapling", "oak", (5.0, 18.0, 28.0, 38.0), Water::Moderate, 0.0, ANY, HARDY),
     // Grazed grass growing back to tall grass: 15-21 days in spring (`vitals::forage`).
     p("base:grazed_grass", "prairie grass", (5.0, 15.0, 30.0, 40.0), Water::Moderate, 18.0, ANY, HARDY),
+    // A dung pat rotting into the grass (`vitals::soil`, the pats): dung beetles bury it and fungi
+    // and rain break it down, a cow pat in about 45 days of a warm wet summer; dried out, or in the
+    // cold, it lies for months (pasture studies: one to three months, a year in a drought).
+    p("base:dung_pat", "a cow pat (dung beetles, fungi)", (5.0, 20.0, 30.0, 42.0), Water::Moderate, 45.0, ANY, HARDY),
     // The wild plants (`vitals::wild`; the research's estimates where it has no source). A tuft
     // or a mat grazed down grows back in `days`: sedges and cottongrass as grass, white clover in
     // 20-40 days, reindeer lichen in about ten years (it grows millimetres a year and takes
@@ -83,6 +115,9 @@ pub const PLANTS: [Plant; 28] = [
     p("base:sedge", "sedges", (-1.0, 8.0, 22.0, 32.0), Water::Moderate, 18.0, ANY, HARDY),
     p("base:cottongrass", "cottongrass (Eriophorum)", (-2.0, 6.0, 16.0, 25.0), Water::Moderate, 18.0, ANY, HARDY),
     p("base:reindeer_lichen", "reindeer lichen (Cladonia)", (0.0, 5.0, 15.0, 25.0), Water::Dry, 3650.0, ANY, HARDY),
+    // American beachgrass, the dunes' builder, grazed down grows back in about a month, from
+    // early spring to autumn (estimates).
+    p("base:dune_grass", "American beachgrass (Ammophila breviligulata)", (5.0, 18.0, 26.0, 35.0), Water::Dry, 30.0, ANY, HARDY),
     p("base:clover", "white clover", (5.0, 18.0, 25.0, 32.0), Water::Moderate, 30.0, ANY, HARDY),
     // Bushes, flower to ripe fruit: lingonberries flower in June and ripen August to October;
     // cloudberries, bog plants, June to July and August, their flowers killed by a June frost;
@@ -92,11 +127,27 @@ pub const PLANTS: [Plant; 28] = [
     p("base:cloudberry_bush", "cloudberry", (0.0, 8.0, 16.0, 25.0), Water::Wet, 45.0, SUMMER, -2.0),
     p("base:crowberry_bush", "crowberry", (-1.0, 6.0, 15.0, 25.0), Water::Moderate, 60.0, SUMMER_AUTUMN, HARDY),
     p("base:hazel_bush", "hazel", (5.0, 16.0, 24.0, 32.0), Water::Moderate, 180.0, SUMMER_AUTUMN, HARDY),
+    // The mountains' black huckleberry (Rockies, 1,000-2,000 m) flowers in June and ripens in
+    // August and September; the beach plum on Atlantic dunes flowers in May and ripens August to
+    // September, its blossom killed by a late frost.
+    p(
+        "base:huckleberry_bush",
+        "black huckleberry (Vaccinium membranaceum)",
+        (3.0, 12.0, 22.0, 30.0),
+        Water::Moderate,
+        70.0,
+        SUMMER_AUTUMN,
+        -2.0,
+    ),
+    p("base:beach_plum_bush", "beach plum (Prunus maritima)", (5.0, 16.0, 26.0, 34.0), Water::Dry, 100.0, SUMMER_AUTUMN, -2.0),
     p("base:bramble_bush", "raspberry and blackberry", (5.0, 16.0, 25.0, 32.0), Water::Moderate, 60.0, SUMMER_AUTUMN, -2.0),
     // Fruit and seed in their season: prickly pears flower in April and May and ripen July to
     // September, and frost below about -10 kills the pads; wild sunflowers take 125-130 days and
     // die at a light frost; the Pantanal's wild rices seed in 120-180 days as the flood peaks.
     p("base:prickly_pear", "prickly pear (Opuntia)", (10.0, 20.0, 35.0, 45.0), Water::Dry, 90.0, SUMMER_AUTUMN, -10.0),
+    // Desert chia, a winter annual: it comes up after the winter rains and sets its seed March to
+    // June, in about three months, then dries (the Sonoran's and Mojave's seed staple).
+    p("base:chia", "desert chia (Salvia columbariae)", (5.0, 15.0, 28.0, 38.0), Water::Dry, 90.0, SPRING, -3.0),
     p("base:wild_sunflower", "wild sunflower", (6.0, 20.0, 28.0, 38.0), Water::Dry, 125.0, SUMMER_AUTUMN, -2.0),
     p("base:wild_rice", "wild rice (Oryza latifolia)", (12.0, 25.0, 32.0, 38.0), Water::Wet, 150.0, SUMMER_AUTUMN, 0.0),
     // Spreading: mushrooms come up after late-summer rain and last days (3-14 to fruit); water
@@ -104,10 +155,30 @@ pub const PLANTS: [Plant; 28] = [
     p("base:mushroom_brown", "forest mushrooms", (5.0, 10.0, 20.0, 30.0), Water::Moderate, 8.0, SUMMER_AUTUMN, -2.0),
     p("base:mushroom_red", "fly agaric", (5.0, 10.0, 20.0, 30.0), Water::Moderate, 8.0, SUMMER_AUTUMN, -2.0),
     p("base:water_hyacinth", "water hyacinth", (12.0, 25.0, 30.0, 38.0), Water::Wet, 10.0, ANY, -1.0),
+    // Plants that glow in the dark (`wild::GLOW`, `notes/NIGHT_GLOW.md`). Foxfire is honey
+    // fungus and bitter oyster mycelium creeping through the litter (growth 5-30 °C, best 20-25),
+    // a mycelium that frost doesn't kill; glow mycena (Mycena chlorophos) a tropical toadstool
+    // that fruits in warm wet weather and dies at a frost; goblin's gold a cool-loving moss.
+    p("base:foxfire", "honey fungus and bitter oyster mycelium", (5.0, 20.0, 25.0, 30.0), Water::Moderate, 30.0, ANY, HARDY),
+    p("base:glow_mycena", "Mycena chlorophos", (18.0, 24.0, 28.0, 32.0), Water::Wet, 8.0, ANY, -1.0),
+    p("base:goblins_gold", "goblin's gold moss (Schistostega pennata)", (0.0, 10.0, 18.0, 25.0), Water::Moderate, 60.0, ANY, HARDY),
     // Our trees' saplings, at the game's time as the oak's: mesquite, a desert legume that a
     // frost below about -15 kills; the tropical palms, killed by any frost.
     p("base:mesquite_sapling", "mesquite", (12.0, 25.0, 38.0, 48.0), Water::Dry, 0.0, ANY, -15.0),
+    // The tropical forest's trees: the Brazil nut, an emergent of the terra firme that no frost
+    // ever reaches (it grows where the mean stays above 24 °C), and cacao in its shade, damaged at
+    // about 10 °C and killed by any frost (estimates from their ranges).
+    p("base:brazil_nut_sapling", "Brazil nut (Bertholletia excelsa)", (18.0, 25.0, 32.0, 38.0), Water::Moderate, 0.0, ANY, 0.0),
+    p("base:cacao_sapling", "cacao (Theobroma cacao)", (15.0, 22.0, 30.0, 35.0), Water::Moderate, 0.0, ANY, 0.0),
+    // The canopy's: andiroba and matamatá of the terra firme, the golden ipê; none takes a frost.
+    p("base:andiroba_sapling", "andiroba (Carapa guianensis)", (18.0, 24.0, 32.0, 38.0), Water::Moderate, 0.0, ANY, 0.0),
+    p("base:matamata_sapling", "matamatá (Eschweilera coriacea)", (18.0, 24.0, 32.0, 38.0), Water::Moderate, 0.0, ANY, 0.0),
+    p("base:ipe_sapling", "golden ipê (Handroanthus serratifolius)", (15.0, 22.0, 32.0, 40.0), Water::Dry, 0.0, ANY, -1.0),
     p("base:acuri_palm_sapling", "acuri palm (Attalea phalerata)", (15.0, 24.0, 32.0, 40.0), Water::Moderate, 0.0, ANY, 0.0),
+    // The giant sequoia: the Sierra Nevada's western slopes at 1,400-2,000 m, growing from about
+    // 5 degrees, best in a mild summer, hardy to about -24 under snow; its seedlings need the
+    // soil kept moist (Weatherspoon 1990, Silvics of North America).
+    p("base:sequoia_sapling", "giant sequoia (Sequoiadendron giganteum)", (5.0, 15.0, 24.0, 35.0), Water::Moderate, 0.0, ANY, -24.0),
     p("base:moriche_palm_sapling", "moriche palm (Mauritia flexuosa)", (15.0, 24.0, 32.0, 40.0), Water::Wet, 0.0, ANY, 0.0),
     // The Cretaceous's saplings (the animals mod's), at the game's time: its greenhouse warmth
     // suits them all; living kin give the frost they take (Araucaria about -5, ginkgo hardy, the

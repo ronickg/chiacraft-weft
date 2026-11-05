@@ -1,0 +1,73 @@
+# The air and the light, toward Valheim (reports/valheim-look.md on look-valheim, items 1, 2, 3, 6,
+# 8): the haze glowing warm toward a low sun and cool away from it, far land paling, warm light and
+# cool shade at golden hour, a blue-teal night where firelight carries, a light vignette.
+# Before/after: run once on the build before the change and once after, same everything.
+# Seed 1, --view 12, 1280x720, --shader-pack chiacraft, a fresh world name per run.
+# Spectator, absolute /tp, mobs off. Yaw 0 faces -z (north), 90 -x (west, the afternoon sun),
+# 270 +x (east).
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode spectator
+chat /weather clear 99999
+# 1. High over hills: noon, then golden hour toward and away from the sun, then dusk.
+chat /time set 6000
+chat /tp -450 210 535
+loaded
+idle
+wait 12
+look 45 -12
+wait 3
+shot air_1_noon.png
+chat /time set 11000
+wait 4
+look 90 -8
+wait 2
+shot air_2_golden_toward.png
+look 270 -8
+wait 2
+shot air_2_golden_away.png
+look 0 -8
+wait 2
+shot air_2_golden_side.png
+chat /time set 12600
+wait 4
+look 90 -6
+wait 2
+shot air_3_dusk_toward.png
+look 270 -6
+wait 2
+shot air_3_dusk_away.png
+# 2. Along the ground to far hills at golden hour (warm faces, cool shade, pale far ridges).
+chat /tp -689 120 -122
+loaded
+idle
+wait 10
+chat /time set 11000
+wait 3
+look 45 -4
+wait 2
+shot air_4_ground_golden.png
+look 225 -4
+wait 2
+shot air_4_ground_golden_back.png
+# 3. A campfire and torches at night on a stone floor high in the open (firelight against the
+#    blue-teal night).
+chat /tp 40 200 40
+wait 3
+chat /tk fill ~-10 ~-3 ~-10 ~10 ~-3 ~10 stone
+chat /tk fill ~4 ~-2 ~0 ~4 ~-2 ~0 campfire
+chat /tk fill ~-4 ~-2 ~-6 ~-4 ~-2 ~-6 torch
+chat /tk fill ~-4 ~-2 ~6 ~-4 ~-2 ~6 torch
+chat /tk fill ~8 ~-2 ~-3 ~8 ~0 ~3 stone
+chat /time set 18000
+wait 5
+look 270 -20
+wait 3
+shot air_5_campfire_night.png
+look 90 -30
+wait 2
+shot air_5_night_away.png
+wait 1
+bench 5 air_night
+quit

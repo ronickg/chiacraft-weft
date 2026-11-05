@@ -33,9 +33,17 @@ pub fn size(s: &Species, growing: u32) -> f32 {
     s.birth_size + (1.0 - s.birth_size) * grown
 }
 
-/// Ticks from mating to the young born, or the eggs laid.
+/// Ticks from mating to the young born, or the eggs laid; a fish's eggs, spawned into the water,
+/// stand for their incubation before the fry come (no egg entity: one would need the water's
+/// temperature, not a nest's).
 pub fn carrying(s: &Species) -> u32 {
-    if s.gestation() > 0 { s.gestation() } else { LAYING }
+    if s.gestation() > 0 {
+        s.gestation()
+    } else if s.in_water() {
+        s.incubation()
+    } else {
+        LAYING
+    }
 }
 
 /// How many young a litter or clutch has, `roll` any random number.
@@ -171,6 +179,40 @@ pub fn want_chance(days: f64, near: f64, crowd: u32, stage: u8) -> f64 {
 /// Of a crowd twice its size, the share of grown ones dying of want a day.
 pub const DEATHS_WHEN_CROWDED: f64 = 0.1;
 
+/// Whether a group of `coming` finds room where `near` of its kind already live (counted by
+/// `crowding`, within `CROWD_RADIUS`) with room for `crowd`: natural spawning brings none past the
+/// room, so a place fills to its crowd and no further. Without it the engine's spawner, which caps
+/// only all creatures together, added packs to a place already full, and they died of want
+/// (`want_chance`) as fast as they came. A group bigger than the room still comes to an empty
+/// place.
+pub fn room_for(near: f64, coming: u32, crowd: u32) -> bool {
+    near + coming as f64 <= crowd.max(coming) as f64
+}
+
+/// Ticks in a second.
+pub const SECOND: u64 = 20;
+
+/// Whether an animal's once-a-second upkeep (its body, hunger and thirst) runs this tick, and
+/// how many seconds it covers: `time` is the world's tick, `elapsed` the ticks since the animal
+/// last ticked (`World::tick_elapsed`). It runs on the tick a second turns over for it
+/// (`(time + id) % SECOND < elapsed`) and covers what passed (`elapsed / SECOND`, at least one).
+/// One no player is near rests and ticks only every `core:inactive_entity_interval` ticks: run on
+/// `(time + id) % 20 == 0` alone, it lived a second for every wake whatever the interval (half as
+/// fast at 40, a third at 60; at 30 two wakes in three were missed).
+pub fn seconds_due(time: u64, id: u64, elapsed: u32) -> Option<f32> {
+    let e = elapsed.max(1) as u64;
+    ((time + id) % SECOND < e).then(|| (e as f32 / SECOND as f32).max(1.0))
+}
+
+/// How many of its every-`every`-seconds steps fall in the `secs` seconds (`seconds_due`) up to
+/// tick `time` (a point of food used every so many seconds, `animal::hunger`): the windows of
+/// successive upkeeps meet, so none is missed or counted twice.
+pub fn steps_in(time: u64, secs: f32, every: u64) -> u64 {
+    let period = every.max(1) * SECOND;
+    let window = (secs * SECOND as f32).round() as u64;
+    time / period - time.saturating_sub(window) / period
+}
+
 /// Ticks since an animal was last seen (its area loaded) past which its time away is caught up
 /// on load, as lazy simulations do (Vintage Story's crops, Minecraft's Elapsed): timers run out,
 /// young are born, it ages, and a wild one that died meanwhile has a successor.
@@ -194,7 +236,80 @@ pub fn egg_air(air: f32, nest: bool) -> f32 {
     if nest { air + (BROODING - air) * NEST_HOLDS } else { air }
 }
 
+/// The air at an egg in `air`: in a brooded nest (a bird's, `nests::site`) a sitting parent's
+/// whatever the air, else as `egg_air`.
+pub fn egg_air_of(air: f32, nest: bool, brooded: bool) -> f32 {
+    if nest && brooded { BROODING } else { egg_air(air, nest) }
+}
+
 /// Whether an egg develops in that air (`egg_air`).
 pub fn develops(egg_air: f32) -> bool {
     (EGG_AIR.0..=EGG_AIR.1).contains(&egg_air)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A far animal lives as fast as a near one (`seconds_due`, `steps_in`): ticking only every
+    /// 20, 30, 40, 60 or 200 ticks (`core:inactive_entity_interval`), or every tick, its upkeep
+    /// covers a minute in a minute, its points of food are used on time, and a countdown run
+    /// down by the ticks elapsed (taming's fright and wait, a dog's sitting, breeding) ends
+    /// within one wake of when it is due.
+    #[test]
+    fn a_far_animal_keeps_time() {
+        for interval in [1u64, 7, 20, 30, 40, 60, 200] {
+            for id in [0u64, 3, 17, 1234] {
+                let (mut secs, mut food, mut last, mut left, mut ended) = (0.0f32, 0u64, 0u64, 600u32, None);
+                // Ticks as the engine wakes a resting entity: when (time + id) % interval == 0.
+                for time in 1..=1200u64 {
+                    if (time + id) % interval != 0 {
+                        continue;
+                    }
+                    let elapsed = if last == 0 { 1 } else { (time - last) as u32 };
+                    last = time;
+                    left = left.saturating_sub(elapsed);
+                    if left == 0 && ended.is_none() {
+                        ended = Some(time);
+                    }
+                    if let Some(s) = seconds_due(time, id, elapsed) {
+                        secs += s;
+                        food += steps_in(time, s, 5);
+                    }
+                }
+                assert!(
+                    (secs - 60.0).abs() <= interval as f32 / SECOND as f32 + 1.0,
+                    "interval {interval}, id {id}: {secs} s of upkeep in 60"
+                );
+                assert!(food.abs_diff(12) <= 1 + interval / 100, "interval {interval}, id {id}: {food} points of food in a minute, not 12");
+                let ended = ended.expect("the countdown ended");
+                assert!(ended >= 600 && ended < 600 + 2 * interval, "interval {interval}, id {id}: a 600-tick countdown ended at {ended}");
+            }
+        }
+    }
+
+    /// Natural spawning fills a place to its crowd and no further (the 48-minute PC soak: wolves
+    /// at 21-52 where there is room for 16, dying of want): a grey wolf's pack comes while it
+    /// fits, not into a place already full, and a pack bigger than the room still comes to an
+    /// empty one.
+    #[test]
+    fn natural_spawns_stop_at_the_room() {
+        let wolf = crate::species::SPECIES
+            .iter()
+            .find(|s| s.name == "grey_wolf")
+            .expect("the grey wolf's row");
+        let (crowd, (few, most)) = (wolf.crowd(), wolf.bio.social.group());
+        assert!(room_for(0.0, most, crowd), "a pack of {most} doesn't fit an empty place with room for {crowd}");
+        assert!(room_for((crowd - few) as f64, few, crowd), "the last {few} of the room were turned away");
+        assert!(!room_for(crowd as f64, few, crowd), "a pack of {few} came to a full place ({crowd})");
+        assert!(!room_for((crowd - few) as f64 + 0.5, few, crowd), "a pack came past the room");
+        // Every species: a place at its crowd takes no more, and one where none live takes a group.
+        for s in &crate::species::SPECIES {
+            let (few, most) = s.bio.social.group();
+            assert!(room_for(0.0, most, s.crowd()), "{}: no room for its group in an empty place", s.name);
+            assert!(!room_for(s.crowd() as f64, few.max(1), s.crowd()), "{}: room past its crowd", s.name);
+            // Nothing that comes is past what dies of want (`want_chance` is 0 up to the crowd).
+            assert_eq!(want_chance(1.0, s.crowd() as f64, s.crowd(), ADULT), 0.0);
+        }
+    }
 }

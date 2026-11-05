@@ -9,18 +9,16 @@ use weft_sdk::*;
 
 use crate::wild::{self, Body};
 
-pub(crate) static GASTONIA: Entity = Entity::named("gastonia");
-pub(crate) static PINACOSAURUS: Entity = Entity::named("pinacosaurus");
+pub(crate) static GASTONIA: EntityKind = EntityKind::named("gastonia");
+pub(crate) static PINACOSAURUS: EntityKind = EntityKind::named("pinacosaurus");
 
 static BODY: Body = Body {
     model: "ankylosaur",
     texture: "ankylosaur/ankylosaur",
-    size: (1.8, 1.3),
-    health: 120.0,
     // Slow and heavy: a walk, and a lumbering trot at most (est.).
     speed: 2.8,
     wander: 0.25,
-    damage: 0.0,
+    bites: false,
     rest: ("ankylosaur_lie", (1.8, 0.95)),
 };
 

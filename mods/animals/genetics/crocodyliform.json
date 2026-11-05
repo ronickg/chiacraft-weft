@@ -17,6 +17,24 @@
    "mean": 0.95,
    "sd": 0.04,
    "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  },
+  {
+   "id": "Cu",
+   "name": "Curiosity",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "h": 0.35,
+   "about": "aloof to curious: whether it comes to look at a player standing still nearby instead of keeping away"
+  },
+  {
+   "id": "Fi",
+   "name": "Fierceness",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "h": 0.35,
+   "about": "timid to fierce: a hunter's eagerness to hunt and to keep at a chase, a plant eater's readiness to stand its ground"
   }
  ],
  "eyes": [

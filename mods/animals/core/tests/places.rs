@@ -84,12 +84,18 @@ fn each_species_is_at_home_in_its_habitats() {
 #[test]
 fn eggs_hatch_where_and_when_they_are_laid() {
     let mut problems = Vec::new();
-    for s in SPECIES.iter().filter(|s| s.gestation() == 0) {
+    // A fish's eggs lie in the water, not a nest (`life::carrying`).
+    for s in SPECIES
+        .iter()
+        .filter(|s| s.gestation() == 0 && !s.in_water())
+    {
         let when = if s.bio.peak != 0 { s.bio.peak } else { s.bio.breeds };
         for season in (0..4).filter(|i| when >> i & 1 != 0) {
             for &(biome, _) in s.habitats {
                 let Some(c) = climate::of(biome) else { continue };
-                let cold = share(c, 1 << season, |a| !life::develops(life::egg_air(a, true)));
+                // A bird's nest is brooded (`nests`): its eggs develop whatever the air.
+                let brooded = animals_core::nests::site(s.name).is_some();
+                let cold = share(c, 1 << season, |a| !life::develops(life::egg_air_of(a, true, brooded)));
                 if cold > 0.5 {
                     problems.push(format!(
                         "{}: eggs in a nest in {biome} develop only {:.0}% of the day in season {season} (its breeding season, biology.rs): life::EGG_AIR {:?} against the biome's climate",
@@ -257,4 +263,212 @@ fn desert_animals_barely_drink() {
 #[test]
 fn taming_foods_are_in_the_diet() {
     report(animals_core::species::foods_off_diet());
+}
+
+/// Every taming food has its bubble, shown above an animal asking for it (`taming.rs`:
+/// `textures/particle/want_<food>.png`; make one with `source/bubbles/bubbles.py`), or the log
+/// fills with missing textures.
+#[test]
+fn every_taming_food_has_its_bubble() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../assets/textures/particle");
+    let mut problems = Vec::new();
+    for s in &SPECIES {
+        for f in s.foods {
+            let name = f.item.split_once(':').map_or(f.item, |(_, n)| n);
+            if !dir.join(format!("want_{name}.png")).exists() {
+                problems.push(format!("{}: no bubble for {} (want_{name}.png; source/bubbles/bubbles.py)", s.name, f.item));
+            }
+        }
+    }
+    report(problems);
+}
+
+/// Each species lives in one world (`Species::cretaceous`): its habitats are all the
+/// Cretaceous's own biomes (`animals:`) or all the overworld's (`base:`), and it spawns only in
+/// that dimension. A Cretaceous species on a `base:` biome would spawn nowhere there but the
+/// shared beaches and seas; a modern one on an `animals:` biome nowhere at all.
+#[test]
+fn each_species_lives_in_one_world() {
+    let mut problems = Vec::new();
+    for s in &SPECIES {
+        let (old, new): (Vec<&str>, Vec<&str>) = s
+            .habitats
+            .iter()
+            .map(|(b, _)| *b)
+            .partition(|b| b.starts_with("animals:"));
+        if !old.is_empty() && !new.is_empty() {
+            problems.push(format!("{}: Cretaceous habitats {old:?} and overworld ones {new:?}", s.name));
+        }
+        if s.habitats.is_empty() && !s.name.is_empty() && s.cretaceous() {
+            problems.push(format!("{}: no habitats", s.name));
+        }
+    }
+    for name in ["hare", "wood_mouse", "red_fox", "raven", "house_sparrow", "herring_gull"] {
+        let s = SPECIES
+            .iter()
+            .find(|s| s.name == name)
+            .expect("a modern species");
+        if s.cretaceous() {
+            problems.push(format!("{name} counts as a Cretaceous species"));
+        }
+    }
+    for name in ["utahraptor", "wyvern", "crocodyliform", "lungfish", "lycoptera", "pinacosaurus"] {
+        let s = SPECIES
+            .iter()
+            .find(|s| s.name == name)
+            .expect("a Cretaceous species");
+        if !s.cretaceous() {
+            problems.push(format!("{name} doesn't count as a Cretaceous species"));
+        }
+    }
+    report(problems);
+}
+
+/// Natural spawning brings the Cretaceous's animals as often as the overworld's
+/// (`Species::spawn_chance`, `CRETACEOUS_FLOW`): each of its biomes' land rules average the
+/// flow, each species keeps its share there by rarity (a wyvern stays the rarest), and the
+/// overworld's chances are their rarity's, as before.
+#[test]
+fn the_cretaceous_spawns_as_often_as_the_overworld() {
+    use animals_core::species::CRETACEOUS_FLOW;
+    let mut problems = Vec::new();
+    let mut biomes: Vec<&str> = SPECIES
+        .iter()
+        .flat_map(|s| s.habitats.iter().map(|(b, _)| *b))
+        .collect();
+    biomes.sort();
+    biomes.dedup();
+    for biome in biomes {
+        for water in [false, true] {
+            let here: Vec<&Species> = SPECIES
+                .iter()
+                .filter(|s| s.in_water() == water && s.habitats.iter().any(|(b, _)| *b == biome))
+                .collect();
+            if here.is_empty() {
+                continue;
+            }
+            let raw = |s: &Species| s.bio.rarity.spawn_chance() * s.habitats.iter().find(|(b, _)| *b == biome).unwrap().1;
+            if !here[0].cretaceous() {
+                for s in &here {
+                    if (s.spawn_chance(biome) - raw(s)).abs() > 1e-6 {
+                        problems.push(format!("{} in {biome}: {} where its rarity gives {}", s.name, s.spawn_chance(biome), raw(s)));
+                    }
+                }
+                continue;
+            }
+            let mean = here.iter().map(|s| s.spawn_chance(biome)).sum::<f32>() / here.len() as f32;
+            if mean < CRETACEOUS_FLOW * 0.999 {
+                problems.push(format!(
+                    "{biome} ({}): its rules average {mean:.4}, under the flow {CRETACEOUS_FLOW}",
+                    if water { "fish" } else { "land" }
+                ));
+            }
+            for a in &here {
+                for b in &here {
+                    let (ra, rb) = (a.spawn_chance(biome) / b.spawn_chance(biome), raw(a) / raw(b));
+                    if (ra / rb - 1.0).abs() > 1e-3 {
+                        problems.push(format!("{biome}: {} against {} is {ra:.3}, its rarity says {rb:.3}", a.name, b.name));
+                    }
+                }
+            }
+        }
+    }
+    let wyvern = SPECIES
+        .iter()
+        .find(|s| s.name == "wyvern")
+        .expect("the wyvern");
+    for &(biome, _) in wyvern.habitats {
+        for s in SPECIES
+            .iter()
+            .filter(|s| s.name != "wyvern" && !s.in_water() && s.habitats.iter().any(|(b, _)| *b == biome))
+        {
+            if s.spawn_chance(biome) <= wyvern.spawn_chance(biome) {
+                problems.push(format!("{} comes no more often than the wyvern in {biome}", s.name));
+            }
+        }
+    }
+    report(problems);
+}
+
+/// A biome's stocking scales its plant eaters' crowd and nothing else (`Species::crowd_in`,
+/// `STOCKING`): a capybara on the savanna has room for two and a half times its crowd, a red deer
+/// in the giant grove for a tenth (a pair at least); hunters and others keep theirs; and what
+/// spawning lets in, breeding and want agree on (none die of want at their stocked crowd).
+#[test]
+fn stocking_scales_plant_eaters_crowds() {
+    use animals_core::life::{room_for, want_chance};
+    use animals_core::species::{STOCKING, stocking};
+    let mut problems = Vec::new();
+    let find = |n: &str| SPECIES.iter().find(|s| s.name == n).expect(n);
+    let capybara = find("capybara");
+    let want = (capybara.crowd() as f32 * 2.5).round() as u32;
+    if capybara.crowd_in("base:savanna") != want {
+        problems.push(format!(
+            "capybara on the savanna: {} where 2.5 times {} is {want}",
+            capybara.crowd_in("base:savanna"),
+            capybara.crowd()
+        ));
+    }
+    // A hunter's isn't the biome's stocking but its prey's room (`hunters_never_eat_their_prey_out`):
+    // never over its own crowd, never under one.
+    let wolf = find("grey_wolf");
+    for &(b, _) in STOCKING {
+        let c = wolf.crowd_in(b);
+        if c == 0 || c > wolf.crowd() {
+            problems.push(format!("grey wolf in {b}: room for {c} (its crowd {})", wolf.crowd()));
+        }
+    }
+    for s in SPECIES.iter().filter(|s| s.forages_wild()) {
+        for &(b, _) in s.habitats {
+            let c = s.crowd_in(b);
+            if c < 2 {
+                problems.push(format!("{} in {b}: room for {c}, under a pair", s.name));
+            }
+            if !s.cretaceous() && (c as f32 - s.crowd() as f32 * stocking(b)).abs() > 0.5 && c > 2 {
+                problems.push(format!("{} in {b}: room for {c}, its crowd {} stocked {}", s.name, s.crowd(), stocking(b)));
+            }
+            if want_chance(1.0, c as f64, c, animals_core::species::ADULT) != 0.0 {
+                problems.push(format!("{} in {b}: dies of want at its stocked crowd {c}", s.name));
+            }
+            if !room_for(0.0, 1, c) {
+                problems.push(format!("{} in {b}: no room for one in an empty place", s.name));
+            }
+        }
+    }
+    report(problems);
+}
+
+/// Hunters and prey (`notes/ECOLOGY.md`, part 6): a biome's hunters, each at its room there
+/// (`needs::hunter_room`), never take more of a prey than the young it has a year, so the herd
+/// holds; and a thinly stocked place holds few hunters (the taiga's reindeer feed under a wolf
+/// pack's crowd).
+#[test]
+fn hunters_never_eat_their_prey_out() {
+    let mut problems = Vec::new();
+    for biome in animals_core::web::biomes() {
+        for p in animals_core::web::predation(biome) {
+            if p.share() > 1.0 {
+                let by: Vec<String> = p.taken.iter().map(|(h, t)| format!("{h} {t:.0}")).collect();
+                problems.push(format!(
+                    "{} in {biome}: its hunters take {:.0} a year, {:.0}% of its {:.0} young ({})",
+                    p.prey,
+                    p.taken(),
+                    p.share() * 100.0,
+                    p.young,
+                    by.join(", ")
+                ));
+            }
+        }
+    }
+    let wolf = SPECIES
+        .iter()
+        .find(|s| s.name == "grey_wolf")
+        .expect("wolf");
+    if wolf.crowd_in("base:taiga") >= wolf.crowd() {
+        problems.push(format!(
+            "grey wolf in the taiga: room for {}, its whole crowd, where its reindeer are stocked at 0.35",
+            wolf.crowd_in("base:taiga")
+        ));
+    }
+    report(problems);
 }

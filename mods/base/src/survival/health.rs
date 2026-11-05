@@ -30,10 +30,10 @@ pub fn tick(
     let engine_max = max_health / HEALTH_SCALE;
     if (v.max_health - max_health).abs() > 0.01 {
         v.max_health = max_health;
-        w.add_modifier(id, &attribute::MAX_HEALTH, "base:fed", attr_op::ADD, (engine_max - ENGINE_HEALTH) as f64, 0);
+        w.attribute_add_modifier(id, &attribute::MAX_HEALTH, "base:fed", attr_op::ADD, (engine_max - ENGINE_HEALTH) as f64, 0);
         if st.health > engine_max {
             st.health = engine_max;
-            w.set_entity(id, st);
+            w.entity_edit(id).health(st.health);
         }
     }
     if !pulse {
@@ -42,7 +42,7 @@ pub fn tick(
     if st.health > 0.0 && st.health < engine_max {
         let back = stamina::health_regen(max_health, full, mods) / HEALTH_SCALE;
         st.health = (st.health + back).min(engine_max);
-        w.set_entity(id, st);
+        w.entity_edit(id).health(st.health);
     }
     if mods.health_loss > 0.0 && st.health > 0.0 {
         let floor = if d.deadly { 0.0 } else { engine_max * 0.1 };
@@ -53,7 +53,7 @@ pub fn tick(
                     .health_loss
                     .total_cmp(&b.modifiers().health_loss)
             });
-            w.damage(id, loss, 0, worst.map_or(damage::GENERIC, super::body::cause_of));
+            w.damage(id, loss, 0, worst.map_or(damage_causes::GENERIC.id(), super::body::cause_of));
         }
     }
     if mods.stamina_loss > 0.0 {

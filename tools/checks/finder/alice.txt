@@ -1,0 +1,22 @@
+# Phase 5, slices 1-2 on testnet11: the owner's side. Run beside bob.txt from the same folder;
+# the copies wait for each other through finder-mark-* files. See README.md.
+loaded
+chat /tk mode creative                 # long waits: no freezing at night
+screen core:account
+tap_once core:account id:get_did      # our sponsor launches her DID
+wait 240
+screen core:admission
+tap_once core:admission id:world_did_get   # the world's DID, then her DID lists it
+wait 600
+wait 120                              # the change of that spend (the sponsor's gift less its fee) read
+screen core:admission
+tap_once core:admission id:list_world # the listing: 0.000001 TXCH (this check's deposit) locked in a coin hinted to the tag
+wait 300
+shot finder-alice-1-listed.png
+mark finder-mark-listed
+await_file finder-mark-bob-done 1500
+screen core:admission
+tap_once core:admission id:delist_world   # the deposit comes back
+wait 300
+shot finder-alice-2-delisted.png
+quit

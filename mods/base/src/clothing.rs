@@ -23,7 +23,7 @@ fn sewn_from(material: &str) -> &'static str {
     match material {
         "fur" => "#pelts",
         "wool" => "wool",
-        "hide" => "#materials/leather",
+        "hide" => "#leather",
         _ => "#cloth",
     }
 }
@@ -70,7 +70,7 @@ fn cloak_recipe(name: &str) -> (&'static str, &'static [&'static str]) {
     match name {
         "wool_cloak" => ("wool", &["XsX", " X "]),
         "fur_robe" => ("#pelts", &["XXX", "XsX"]),
-        _ => ("#materials/leather", &["XsX", "XXX"]),
+        _ => ("#leather", &["XsX", "XXX"]),
     }
 }
 const CLOAK_INFLATE: f32 = 1.2;
@@ -99,14 +99,14 @@ const INFLATE: [f32; 4] = [0.45, 0.3, 0.25, 0.35];
 static DRESSED: Component<u8> = Component::named("base:dressed");
 
 pub fn register(r: &mut Registry) {
-    r.entity_component(&DRESSED, 0, component_flags::SAVE | component_flags::KEEP);
+    r.entity_component(&DRESSED, 0, component_flags::SAVE | component_flags::KEEP_ON_RESPAWN);
     r.attach(&PLAYER, &DRESSED);
-    r.entity_component(&base_api::MILESTONES, 0, component_flags::SAVE | component_flags::KEEP);
+    r.entity_component(&base_api::MILESTONES, 0, component_flags::SAVE | component_flags::KEEP_ON_RESPAWN);
     r.attach(&PLAYER, &base_api::MILESTONES);
     r.entity_component(
         &base_api::GRAVE,
         base_api::Grave { x: 0, y: 0, z: 0, set: 0 },
-        component_flags::SAVE | component_flags::KEEP | component_flags::SYNC_OWNER,
+        component_flags::SAVE | component_flags::KEEP_ON_RESPAWN | component_flags::SYNC_OWNER,
     );
     r.attach(&PLAYER, &base_api::GRAVE);
     // A new player arrives in plain clothes, once (Research round 3, B1).
@@ -121,7 +121,7 @@ pub fn register(r: &mut Registry) {
             dress(&w, p.player);
         }
     });
-    r.entity_component(&KEPT, [0; 5], component_flags::SAVE | component_flags::KEEP);
+    r.entity_component(&KEPT, [0; 5], component_flags::SAVE | component_flags::KEEP_ON_RESPAWN);
     r.attach(&PLAYER, &KEPT);
     // Back from the dead in what one wore: the tombstone leaves clothes and the cloak out (`set_aside`),
     // so a death costs no clothes and gives none (integration review: each death was a free set);
@@ -129,10 +129,10 @@ pub fn register(r: &mut Registry) {
     r.on(&PLAYER_RESPAWNED, |b| {
         let w = b.world();
         for p in b.iter() {
-            if w.creative(p.player) {
+            if w.outside_survival(p.player) {
                 continue;
             }
-            let kept = w.component(p.player, &KEPT).copied().unwrap_or([0; 5]);
+            let kept = w.component(p.player, &KEPT).unwrap_or([0; 5]);
             if let Some(slots) = w.inventory(p.player).find_group(EQUIPMENT_GROUP) {
                 for (i, &item) in kept.iter().enumerate() {
                     let at = 4 + i as u32;

@@ -7,17 +7,15 @@ use weft_sdk::*;
 
 use crate::wild::{self, Body};
 
-pub(crate) static PRISCAGAMA: Entity = Entity::named("priscagama");
+pub(crate) static PRISCAGAMA: EntityKind = EntityKind::named("priscagama");
 
 static BODY: Body = Body {
     model: "lizard",
     texture: "lizard/lizard",
-    size: (0.2, 0.1),
-    health: 2.0,
     // A dash of a few metres a second (est., as agamas').
     speed: 3.5,
     wander: 0.3,
-    damage: 0.0,
+    bites: false,
     rest: ("lizard_bask", (0.2, 0.07)),
 };
 

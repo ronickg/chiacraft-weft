@@ -63,9 +63,14 @@ deep shade of the block's own colour (never black), restrained highlights, top-l
    | `crop` | crop stages | cut out (drawn to read 4 times in a # shape) |
    | `cutout` | ladder, glass frame: fills the square, open parts magenta | cut out |
    | `flat` | lily pads, water hyacinth (seen from above) | cut out |
-4. **Generate**: `python3 notes/blocks/blocks.py gen batches/<x>.tsv [image ...]` (4 Codex runs at
-   once, a fresh `codex exec` each, so nothing drifts; an image that exists is skipped, delete it
-   to redo). Look at each `gen/<image>.png`.
+   | `fleaves` | leaves with flowers or fruit drawn in (dogwood) | cut out like leaves, kept in their own colours (a tint would turn the flowers green) |
+4. **Generate**: `python3 notes/blocks/blocks.py gen batches/<x>.tsv [image ...]` (2 Codex runs at
+   once, the crew's limit; run it niced, a fresh `codex exec` each, so nothing drifts; an image that exists is skipped, delete it
+   to redo). Look at each `gen/<image>.png`. The approved key holds no plants yet, so for plants and
+   for a family that must match a texture (a tree's mossy bark, a column's top) attach the game's own
+   with `BLOCK_LIKE=kelp,cattail,/abs/path/bark.png` (names from the mods or `tiles/`, or absolute
+   paths), and say the batch's `BLOCK_LIKE` in its first comment line. A column's top must start its
+   stalk where the block below ends it: check the bottom row's pixels and shift the tile if needed.
 5. **Cut**: `python3 notes/blocks/blocks.py cut batches/<x>.tsv` writes `tiles/<name>.png`.
 6. **Preview**: `python3 notes/blocks/blocks.py preview batches/<x>.tsv` writes
    `preview/<x>.png`: each tile flat, and as it stands in the world (a cube with its own sides
@@ -85,6 +90,34 @@ deep shade of the block's own colour (never black), restrained highlights, top-l
 9. **Approve**: add the approved tiles to `approved.txt`; they become part of the style key.
    Commit the tiles, the batch and the game textures together, one family a commit.
 
+## The grade: tune, don't redraw
+
+Ronald, 11-04: "ideally it should be something we can tune easily without having to like now redo
+every asset of the game if it's too dark or too light or high contrast, low contrast ... but ideally
+something that's quick". So a tile that is too dark, too light, too flat, too busy or off-colour is
+fixed in the grade table first; only a tile wrong in shape or idea is regenerated.
+
+- **Sources stay untouched**: every graded tile's approved drawing (and its CTM variants) lives in
+  `mods/<mod>/source/blocks/tiles/`; the game's tile is built from it.
+- **The table**: `mods/base/source/blocks/grade.toml`, material groups (stone, ore, wood, planks,
+  leaves, grass, sand, soil, clay, plants, liquids) and per-tile rows, with the knobs gamma, gain,
+  contrast or spread (target p10-p90 in codes), saturation, hue and pull. The file explains them.
+- **One command**: `python3 notes/blocks/regrade.py --all [--packs DIR] [--preview out.png]` rebuilds
+  every graded tile in under a second, prints luma, saturation and spread before and after against
+  the vanilla band, and draws a tiled before/after of each changed tile. `--with other.toml --dry`
+  previews proposals without writing (`notes/blocks/vanilla_proposals.py <packs>` writes the vanilla
+  comparison's as `grade_proposed.toml`; approved rows move into `grade.toml`).
+- **Item icons too**: `[item_groups.*]` and `[items.*]` in the same table grade
+  `mods/<mod>/assets/textures/item/` from `mods/<mod>/source/items/tiles/`; the knob `outline` scales
+  an icon's 1-px edge only (our items guide: a dark shade of each part's own colour, 15-45%).
+  `notes/blocks/items_audit.py` checks the set against the guide, our own medians and seven packs.
+- **Ores in a rock** are rows with `base = "<host tile>"` and `overlay = "<name>"`: the overlay
+  (drawn alone on magenta, `mods/base/source/blocks/overlays/`) is laid on the host's own graded tile
+  and variants, so the ore follows the rock's tuning.
+- **Safe with other sessions**: a tile graded for the first time is adopted from the game as its
+  source; a game tile someone replaced since the last build (`grade.lock.json`) becomes the new
+  source and is graded on top, never silently overwritten. After `blocks.py install`, run the grade.
+
 ## Made in code, not generated
 
 `notes/blocks/derive.py` makes what must keep its layout or is a recolour of an approved tile,
@@ -93,6 +126,23 @@ glass (the glass recoloured, see-through inside), water and lava (16 looping fra
 grey for its tint), and the small model textures (beds, torches, lever, button, repeater,
 comparator, anchor, floater, observer back, piston inner): the old 16 px picture doubled, each of
 its colours drawn with the matching approved material. Rerun it after a material it uses changes.
+
+Spring bloom on leaves (`notes/blocks/bloom.py a|b <out>`): each tree's flower as small stamps on
+its approved leaf tile, wrapping across the edges. A tinted (grey) leaf blooms as a pair, the
+engine's tinted overlay as on grass_side: `leaves_<x>_bloom` (untinted base: silhouette plus
+flowers in their own colours) and `leaves_<x>_bloom_overlay` (the leaf with the flowers cut out).
+A leaf drawn in its own colours (willow, creosote, juniper) blooms as one tile. Copy the sources
+to source/blocks/tiles and the game folder, then `regrade.py --all` (the leaves group grades them).
+`bloom.py bushes <out>` adds flowers to the fruiting bushes' stage 2 (their drawings kept in
+source/blocks/bloom/, outside the grade); copy the results to the game folder. Cloudberry keeps its
+one flower to a stem.
+
+**Block-breaking cracks** (`notes/blocks/destroy.py <out>`, into `crates/engine/assets/textures/block/
+destroy_0..9.png`; Ronald, 11-05: approved "as drawn", after "the block break animation looks pretty bad,
+glitchy"): 32 px, never 16 (16 px pixels come out twice our blocks' own and read as chunky noise). Thin
+one-pixel cracks grown from one point near the middle that fork outward, each stage holding the last,
+reaching about a sixth of the face at stage 9 (the old set covered half). One dark colour (20, 20, 20)
+with alpha on clear: the pack reads only the alpha and darkens the block, so the cracks work on every block.
 
 ## Colour ramps (dark to light)
 
@@ -134,6 +184,57 @@ toward the UI's own colours (`notes/STYLE.md`).
 - **Thin plants go muddy at 32 px** (the first cattail almost vanished, the mushroom's spots
   blurred): give them a clear silhouette, a size in px, and few parts. If one still reads
   badly, ask for "a 1-px outline in a darker shade of its own colour".
+- **Tile values follow the daytime report** (`reports/Daytime look targets.md`, (e); Ronald, 11-04:
+  "Yes, switch", replacing the earlier "at least 0.24" floor). Measure luma (0.2126 R + 0.7152 G +
+  0.0722 B on sRGB, 0..1) over opaque pixels, tinted tiles with vanilla's plains tints:
+  - tile means from **0.15 to 0.85**; snow and sand near 0.8-0.95, so the top of the range is used;
+  - every pixel at least **30 sRGB codes** (50 for a strict check); obsidian and coal are the exceptions;
+  - **darkness in shade is the shader's job**: don't lift a whole dark tile to make shade readable;
+  - leaves darker than the ground they shade, about 0.25-0.32;
+  - in-tile contrast as the p10-p90 spread in codes: **quiet ground 20-30** (grass top, stone, sand,
+    podzol), **busy blocks 45-80** (cobble, dirt, logs, planks, ores). Ronald, 11-04: "Yes, stone,
+    gravel, planks": stone calmed to 30, gravel to 42, planks given grain at 48.
+  - **walked-on ground's saturation** (Ronald, 11-04: "Yes, apply"; the red sand floor read neon orange
+    in the PC's light, since Lighting's look adds saturation): keep it in the middle of vanilla, Faithful
+    32x and Pixel Perfection, not at their top. Measured bands: red sand about 0.63 (vanilla 0.83, Pixel
+    Perfection 0.50), level with our red sandstone (0.62); dirt and coarse dirt 0.48 (vanilla 0.50, PP
+    0.35); leaf litter 0.55; sand 0.38, grass top 0.53 (tinted), podzol 0.42, gravel 0.25 already fine.
+    A Cretaceous copy of a tile (animals) gets the same row as base's.
+  Fix a tile's level, contrast or colour in the grade table, not in its pixels (see "The grade"). The six tiles lifted for the
+  earlier floor (slate, termite mound, red sandstone, sequoia and spruce bark, podzol) stay until
+  they're re-judged under Lighting's new grade; leaves and grass top wait for it too ("After the
+  grade").
+- **Close to vanilla's colour, so packs and shaders fit** (Ronald, 11-04: "it doesn't have to be
+  one-to-one matching, but it has to be close, because when it's similar, then also the shaders or
+  other resource packs will just fit in seamlessly"). Check every new or changed tile against vanilla
+  1.21.4 and two vanilla-style packs (Faithful 32x, Pixel Perfection CE):
+  `notes/blocks/vanilla_compare.py <worktree> <packs dir> <out>` then `vanilla_sheet.py` for the sheet.
+  Fetch the packs' `assets/minecraft/textures/block/` with a sparse git checkout into the scratchpad
+  (InventivetalentDev/minecraft-assets branch 1.21.4, Faithful-Resource-Pack/Faithful-32x-Java
+  java-latest, Athemis/PixelPerfectionCE master), read them as images only, and never commit them.
+  A tile passes when its mean hue is within 15 deg (coloured tiles only), luma within 0.05 and
+  saturation within 0.10 of the packs' range, tinted tiles measured with vanilla's tints (grass
+  #91BD59, foliage #77AB2F, spruce #619961, birch #80A755, lily pad #208030). Ours without a vanilla
+  twin are compared with their nearest relative (sequoia with spruce, termite mound with terracotta,
+  canyon bands with sandstone and terracotta) and may keep their own identity.
+- **Streaks and stripes never repeat in step from block to block** (Ronald, 11-04, on the karst
+  limestone: "Yes, loosen streaks"; the first version put rain streaks in the same columns in every
+  variant, and a tall tower looked corrugated). Give each variant its own positions, gaps and
+  lengths, ending inside the tile, so a face reads as one weathered surface. Strata that must join
+  sideways (a band's level lines) are the exception: those rows stay fixed and only run across.
+- **Blades finer than a game pixel break into dots** when cut (the first two-block grass's upper
+  half, 11-04): ask for "each blade 2 px wide (never 1 px), solid shapes that read at 32 px".
+- **Random variants go in after `install`, and `install` wipes them** (coral, 11-04): `install` removes
+  a tile's `<name>/` variants and `<name>.ctm` on purpose, so reinstalling a batch (to add its other
+  rows) deleted the coral blocks' variants. Install a batch once, then copy the `_vN` tiles to
+  `<name>/N.png` and write the `.ctm`; if a batch must be reinstalled, put them back afterwards, and
+  copy the ungraded tiles to `source/blocks/tiles` too, or the grade takes an already-graded tile as its
+  source and grades it twice.
+- **Check a name is free in `tiles/` before a batch**: a new `fern` overwrote the approved
+  Cretaceous fern's tile (11-04). Give a new plant its own name (`bracken`) and let the block point
+  at it.
+- **Two-block plants** (tall grass): put the upper half above the lower in one image (top right
+  over bottom right) and say both continue across the line; check the joining rows meet.
 - **Ores**: the base must be the same stone as `stone.png`; generate the ore in the same image
   as stone, or say "exactly the same stone base as the stone texture".
 - **Families drift between images**: keep a tree, a crop's stages or a colour set in one image,

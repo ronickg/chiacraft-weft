@@ -24,12 +24,14 @@ declare_mod!(deps: ["base"], init: init);
 
 mod animal;
 mod ankylosaur;
+mod armour;
 mod birds;
 mod breath;
 mod breeding;
 mod caiman;
 mod capybara;
 mod cat;
+mod choose;
 mod citipati;
 mod coats;
 mod comfort;
@@ -53,12 +55,16 @@ mod hare;
 mod hunt;
 mod iguanodont;
 mod jaguar;
+pub mod journal;
+mod journal_screen;
 mod knockout;
 mod kryptobaatar;
 mod lizard;
 mod meat;
+mod memory;
 mod mouse;
 mod owl;
+mod prof;
 mod protoceratops;
 mod psittacosaurus;
 mod raptor;
@@ -66,15 +72,18 @@ mod raven;
 mod reindeer;
 mod rest;
 mod riding;
+mod routines;
 mod sauropod;
 mod scars;
 mod screen;
+mod senses;
 mod signatures;
 mod small_bird;
 mod species;
 mod store;
 mod taming;
 mod utahraptor;
+mod voices;
 mod vole;
 mod vulture;
 mod wild;
@@ -102,6 +111,9 @@ fn data_dir() -> String {
 // ------------------------------------------------------------------ registration
 
 fn init(r: &mut Registry) {
+    // The goal timer first: its first row ("upkeep") is the one that logs.
+    prof::init(r);
+    armour::init(r);
     dog::init(r);
     for p in species::problems() {
         weft_sdk::error!("{p}");
@@ -141,12 +153,18 @@ fn init(r: &mut Registry) {
     caiman::init(r);
     wolf::init(r);
     jaguar::init(r);
+    voices::init(r);
+    journal::init(r);
+    journal_screen::register(r);
     breath::init(r);
     animal::init(r);
     comfort::init(r);
     forage::init(r);
     drink::init(r);
     hunt::init(r);
+    senses::init(r);
+    memory::init(r);
+    choose::init(r);
     screen::init(r);
     taming::init(r);
     commands::init(r);
@@ -161,11 +179,17 @@ fn init(r: &mut Registry) {
             .iter()
             .find(|h| h.0 == s.name)
             .map(|&(_, item, lo, hi)| Pool::new().items(item, lo, hi));
-        let pools: Vec<Pool> = hide.into_iter().chain(meat::pool(s.name)).collect();
+        // One that gives no meat leaves carcass pieces for the scavengers.
+        let carcass = animals_core::meat::carcass(s.name).map(|(lo, hi)| Pool::new().items(animals_core::meat::CARCASS, lo, hi));
+        let pools: Vec<Pool> = hide
+            .into_iter()
+            .chain(meat::pool(s.name))
+            .chain(carcass)
+            .collect();
         if !pools.is_empty() {
             pools
                 .into_iter()
-                .fold(r.loot(&Entity::named(s.name)), |l, p| l.pool(p));
+                .fold(r.loot(&EntityKind::named(s.name)), |l, p| l.pool(p));
         }
     }
     coats::init(r);
@@ -187,8 +211,9 @@ fn init(r: &mut Registry) {
 }
 
 /// The squared distance between two points (blocks²).
-pub(crate) fn dist2(a: [f64; 3], b: [f64; 3]) -> f64 {
-    (a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)
+pub(crate) fn dist2(a: impl Into<Vec3>, b: impl Into<Vec3>) -> f64 {
+    let (a, b) = (a.into(), b.into());
+    (a.x - b.x).powi(2) + (a.y - b.y).powi(2) + (a.z - b.z).powi(2)
 }
 
 /// Knocked out: lying down (the raptors, the wyvern and the jaguar as they rest, `rest.rs`).
@@ -201,4 +226,17 @@ fn sleep(w: &World, id: u64, _index: usize) {
 fn wake(w: &World, id: u64, _index: usize) {
     rest::wake(w, id);
     wild::wake(w, id);
+}
+
+/// An entity kind's model from `models/<name>.geo.json` (Bedrock geometry, as Blockbench exports
+/// it), as Weft's `model_file` did before it went: the kind's `MODEL` text component.
+trait ModelFile {
+    fn model_file(self, name: &str) -> Self;
+}
+
+impl ModelFile for EntityBuilder<'_> {
+    fn model_file(self, name: &str) -> Self {
+        let full = if name.contains(':') { name.to_string() } else { format!("{}:{name}", weft_sdk::mod_id()) };
+        self.set_text(&weft_sdk::MODEL, &full)
+    }
 }

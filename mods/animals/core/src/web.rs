@@ -29,15 +29,20 @@ pub struct Gap {
 pub const WAITING: &[(&str, &str)] = &[
     // The overworld: what wave two (`notes/ECOLOGY.md`) left.
     ("herring_gull: no prey in base:ocean", "the open sea's web: its fish (later; the gull hunts on the beach meanwhile)"),
+    // The tropical forest (Terrain's, 11-04): its climate is in, its animals come with its trees.
+    ("base:tropical_forest: no hunters", "the tropical forest's animals (jaguar, ocelot, harpy eagle)"),
+    ("base:tropical_forest: no a carrion eater", "the tropical forest's animals (king vulture)"),
     // The Cretaceous's tier 2 and 3.
 ];
 
-/// The biomes the webs are for: every climate but the caves (no web of their own) and the open
-/// sea (its web, gulls and seals, comes later; its fish live in the rivers and lakes).
+/// The biomes the webs are for: every climate but the caves (no web of their own) and the sea: the
+/// open sea and the warm lagoons and reefs, whose webs (gulls, seals, reef fish) come later; their
+/// fish live in the rivers and lakes meanwhile.
 pub fn biomes() -> impl Iterator<Item = &'static str> {
     BIOMES
         .iter()
-        .filter(|c| !c.underground && c.biome != "base:ocean")
+        // The warm sea's lagoons and reefs are sea too: their web (reef fish, turtles) comes with it.
+        .filter(|c| !c.underground && !matches!(c.biome, "base:ocean" | "base:lagoon" | "base:coral_reef"))
         .map(|c| c.biome)
 }
 
@@ -185,11 +190,25 @@ pub fn gaps() -> Vec<Gap> {
             }
         }
     }
-    // A year in each biome holds: its grazers, as many as live together where commonest, can't
-    // eat its grass bare in its best season.
+    // A year in each biome holds, and herds crop it as real ones do: its grazers, as many as the
+    // biome's stocking lets live together, eat a quarter to a half of its grass's regrowth in its
+    // best season (`vitals::forage::GRAZED`); more is grazed bare, less a world that never shows it.
     for biome in biomes() {
         if let Some(g) = grazing(biome)
-            && g.eaten > g.regrown
+            && g.eaten < vitals::forage::GRAZED.0 * g.regrown
+        {
+            out.push(gap(
+                format!("{biome}: hardly grazed"),
+                format!(
+                    "{biome}: its grazers eat {:.0}% of the grass's regrowth in {} (at least {:.0}%): the stocking (Species::crowd_in) and hunger against vitals::forage's tuft food, GRASS_COVER and the grazed grass's growth",
+                    g.eaten / g.regrown * 100.0,
+                    SEASONS[g.season],
+                    vitals::forage::GRAZED.0 * 100.0
+                ),
+            ));
+        }
+        if let Some(g) = grazing(biome)
+            && g.eaten > vitals::forage::GRAZED.1 * g.regrown
         {
             out.push(gap(
                 format!("{biome}: grazed bare"),
@@ -199,6 +218,21 @@ pub fn gaps() -> Vec<Gap> {
                     crate::life::CROWD_RADIUS,
                     SEASONS[g.season],
                     g.regrown
+                ),
+            ));
+        }
+    }
+    // Pats don't carpet a herd's ground: rotting keeps up with what its grazers drop.
+    for biome in biomes() {
+        if let Some(g) = grazing(biome)
+            && g.pat_cover > PAT_COVER
+        {
+            out.push(gap(
+                format!("{biome}: carpeted in dung"),
+                format!(
+                    "{biome}: its grazers' dung pats cover {:.1}% of their ground at once (at most {:.0}%): vitals::soil's pats (MOUTHFULS_A_PAT, the base:dung_pat plant) against the grazers' crowds and hunger",
+                    g.pat_cover * 100.0,
+                    PAT_COVER * 100.0
                 ),
             ));
         }
@@ -215,6 +249,9 @@ pub struct Grazing {
     /// Food a day its grazers eat of it there, as many of each as live together (`crowd`, by how
     /// common it is there) and the grass's share of their diets.
     pub eaten: f32,
+    /// The share of that ground their dung pats cover at once at the most (`vitals::soil`), in
+    /// the season they lie longest.
+    pub pat_cover: f32,
 }
 
 /// The tall grass's balance in a biome's best season for grass (`None`: no grass, or nothing
@@ -254,12 +291,75 @@ pub fn grazing(biome: &str) -> Option<Grazing> {
     let blocks = std::f32::consts::PI * (crate::life::CROWD_RADIUS as f32).powi(2) * cover;
     let mouthful = tuft.food as f32 * (0.4 + 0.6 * rate);
     let regrown = blocks * mouthful * rate * vitals::DAY_SECS / secs;
-    let eaten = grazers
+    let eaten: f32 = grazers
         .iter()
-        .map(|&(s, share)| s.crowd() as f32 * share * vitals::DAY_SECS / s.hunger.max(1.0))
+        .map(|&(s, share)| s.crowd_in(biome) as f32 * share * vitals::DAY_SECS / s.hunger.max(1.0))
         .sum();
-    Some(Grazing { season, regrown, eaten })
+    // Dung pats (`vitals::soil`): a pat every few mouthfuls, each lying as long as it takes to rot
+    // or break up that season; the most of the crowd's ground they cover at once, in any season.
+    let season_secs = vitals::calendar::SEASON_DAYS as f32 * vitals::DAY_SECS;
+    let pats = (0..4)
+        .map(|i| {
+            let rate = vitals::plants::season_rate_in(plant, c.celsius, c.seasons, c.rain, i);
+            let mouthfuls = eaten / (tuft.food as f32 * (0.4 + 0.6 * rate));
+            let lies = vitals::soil::pat_season_secs(c.celsius, c.seasons, c.rain, i).min(season_secs);
+            mouthfuls / vitals::soil::MOUTHFULS_A_PAT as f32 * lies / vitals::DAY_SECS
+        })
+        .fold(0.0f32, f32::max);
+    let area = std::f32::consts::PI * (crate::life::CROWD_RADIUS as f32).powi(2);
+    Some(Grazing { season, regrown, eaten, pat_cover: pats / area })
 }
+
+/// What a biome's hunters take of one of its prey species in a game year (`notes/ECOLOGY.md`,
+/// part 6): each hunter living there, at its crowd near (`Species::crowd_in`) by its habitat
+/// weight, eats the meat share of its food a day (`Species::hunger`), shared among its prey there
+/// by their biomass, each kill filling it by the prey's mass (`needs::fills`). Real predators take
+/// 10-36% of a prey's numbers a year, one hunter species each.
+#[derive(Clone, Debug)]
+pub struct Predation {
+    pub prey: &'static str,
+    /// Its numbers near (its crowd there, by its habitat weight), and the young they have a game
+    /// year (half of them mothers, `balance::report`'s young per mother).
+    pub numbers: f32,
+    pub young: f32,
+    /// Taken a game year, by each hunter.
+    pub taken: Vec<(&'static str, f32)>,
+}
+
+impl Predation {
+    /// Taken a year by all its hunters there.
+    pub fn taken(&self) -> f32 {
+        self.taken.iter().map(|t| t.1).sum()
+    }
+    /// The share of its young a year (`young`) its hunters take: over 1, they eat it out.
+    pub fn share(&self) -> f32 {
+        self.taken() / self.young.max(0.01)
+    }
+}
+
+/// What each of `biome`'s prey loses to its hunters a year (`Predation`), prey that some hunter
+/// there takes only: each hunter at its crowd there (`Species::crowd_in`, its prey's room) by its
+/// habitat weight, taking what `needs::takes_a_year` says one takes.
+pub fn predation(biome: &str) -> Vec<Predation> {
+    let mut out: Vec<Predation> = Vec::new();
+    for h in SPECIES.iter().filter(|h| h.hunts()) {
+        let n = h.crowd_in(biome) as f32 * crate::needs::habitat_weight(h, biome);
+        if n <= 0.0 {
+            continue;
+        }
+        for (p, kills, numbers, young) in crate::needs::takes_a_year(h, biome) {
+            let taken = n * kills;
+            match out.iter_mut().find(|o| o.prey == p.name) {
+                Some(o) => o.taken.push((h.name, taken)),
+                None => out.push(Predation { prey: p.name, numbers, young, taken: vec![(h.name, taken)] }),
+            }
+        }
+    }
+    out
+}
+
+/// The most of a crowd's ground (within `life::CROWD_RADIUS`) its dung pats may cover at once.
+pub const PAT_COVER: f32 = 0.01;
 
 /// The gaps not in `WAITING`, and the `WAITING` entries no longer gaps: what the test asks to be
 /// empty.

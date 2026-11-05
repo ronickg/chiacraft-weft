@@ -146,7 +146,7 @@ fn box_vertex(b: Box, v: u32) -> VOut {
         }
         let n = normalize(vec3(dot(b.rows[0].xyz, d), dot(b.rows[1].xyz, d), dot(b.rows[2].xyz, d)) + vec3(0.0, 1e-6, 0.0));
         let l = unpack_light(b.ids2.y);
-        let light = light_on(n, l, sun_on_body(world, n, l.x), 1.0, world) * mix(0.8, 1.0, shade);
+        let light = light_on(n, l, sun_on_body(world, n, l.x), 1.0, world, world) * mix(0.8, 1.0, shade);
         out.color = vec4(pow(tint * mix(vec3(1.0), vec3(1.0, 0.4, 0.4), hurt), vec3(2.2)) * light, 1.0);
     } else {
         out.color = vec4(pow(tint * lit * shade * mix(vec3(1.0), vec3(1.0, 0.4, 0.4), hurt), vec3(2.2)), 1.0);
@@ -199,26 +199,39 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         discard;
     }
     var light = in.color.rgb;
+    var lit = albedo.rgb;
     if (in.mode == BOX_MODE_FACES || in.mode == BOX_MODE_TEXEL) && in.glow != 0xffffffffu {
-        let e = textureSampleLevel(textures[in.glow], nearest_clamp, in.uv, 0.0).r;
-        light = max(light, in.tint * pow(e, 2.2));
+        let mask = textureSampleLevel(textures[in.glow], nearest_clamp, in.uv, 0.0);
+        light = max(light, in.tint * pow(mask.r, 2.2));
+        lit = albedo.rgb * light;
+        // On a blood moon the monsters' eyes burn red: their glow masks' green channel (Art's
+        // `entity/<skin>_e.png`, red 0 so no glow on other nights), brighter in totality. Deep red that stays red through the night's curve (at 2.4 0.2 0.05 it
+        // clipped to orange, the eyes check, 11-05).
+        let g = mask.g * blood_moon();
+        lit = mix(lit, vec3(1.15, 0.03, 0.01), g);
+    } else {
+        lit = albedo.rgb * light;
     }
     // In the world, solid (the reflections' mask); on a screen, opaque.
-    return vec4(fog(in, albedo.rgb * light), select(1.0, SOLID_ALPHA, in.graded != 0u));
+    return vec4(fog(in, lit), select(1.0, SOLID_ALPHA, in.graded != 0u));
 }
+
+// How much a crack darkens the face under it (0 none, 1 black).
+const CRACK_DARKEN: f32 = 0.6;
 
 @fragment
 fn fs_overlay(in: VOut) -> @location(0) vec4<f32> {
-    // Block faces mode: the breaking cracks, lit like the block.
+    // Block faces mode: the breaking cracks. They darken the block's own face, as vanilla's do
+    // (a multiply), rather than being painted over it: the crack pictures are near black at 0.9
+    // alpha, and drawn as they are, lit only by the light inside the block itself, each stage
+    // stamped a hard black maze on the face that read as glitchy (Ronald, 11-04). Their alpha
+    // still says where a crack is; the face shows through at under half its brightness there.
     if in.mode == BOX_MODE_FACES {
         let t = textureSample(textures[in.layer], nearest_mipped, in.uv);
         if t.a < 0.1 {
             discard;
         }
-        if in.graded != 0u {
-            return vec4(display(t.rgb * in.color.rgb), t.a);
-        }
-        return vec4(t.rgb * in.color.rgb, t.a);
+        return vec4(vec3(0.0), t.a * CRACK_DARKEN);
     }
     if in.mode == BOX_MODE_FILLED {
         return vec4(in.color.rgb, bitcast<f32>(in.layer));

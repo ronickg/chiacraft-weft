@@ -8,18 +8,16 @@ use weft_sdk::*;
 
 use crate::wild::{self, Body};
 
-pub(crate) static WHITE_TAILED_DEER: Entity = Entity::named("white_tailed_deer");
-pub(crate) static RED_DEER: Entity = Entity::named("red_deer");
+pub(crate) static WHITE_TAILED_DEER: EntityKind = EntityKind::named("white_tailed_deer");
+pub(crate) static RED_DEER: EntityKind = EntityKind::named("red_deer");
 
 static BODY: Body = Body {
     model: "deer",
     texture: "deer/deer",
-    size: (0.9, 1.3),
-    health: 30.0,
     // Ambling while it feeds, bounding off at up to 60 km/h.
     speed: 5.0,
     wander: 0.25,
-    damage: 0.0,
+    bites: false,
     rest: ("deer_lie", (0.9, 0.7)),
 };
 

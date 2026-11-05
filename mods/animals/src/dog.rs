@@ -18,13 +18,16 @@
 //! layout, so the same picture fits. A pose is the look's animation file, whose
 //! `idle` holds it (sitting, lying down), so every player sees it whenever they come by.
 
+use crate::choose::{Band, Need, WithBand};
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
+
+use crate::ModelFile;
 
 use crate::animal;
 use crate::{commands, screen, signatures, species, taming};
 
-pub(crate) static CHIHUAHUA: Entity = Entity::named("chihuahua");
+pub(crate) static CHIHUAHUA: EntityKind = EntityKind::named("chihuahua");
 
 /// The dog's texture, its coat painted over it (`coats.rs`).
 const TEXTURE: &str = "chihuahua/chihuahua";
@@ -93,15 +96,16 @@ pub fn init(r: &mut Registry) {
     // The looks, drawn in place of a dog of that age and pose.
     for puppy in [false, true] {
         for pose in POSES {
-            let kind = Entity::generated(
+            let kind = EntityKind::generated(
                 look_name(puppy, pose)
                     .trim_start_matches("animals:")
                     .to_string(),
             );
             let model = if puppy { "chihuahua_pup" } else { "chihuahua" };
+            let (w, h) = animals_core::bodies::of(model);
             drop(
                 r.entity(kind)
-                    .size(0.25, 0.36)
+                    .size(w, h)
                     .passive()
                     .model_file(model)
                     .animations(&format!("{model}{}", pose.suffix()))
@@ -110,10 +114,10 @@ pub fn init(r: &mut Registry) {
         }
     }
     r.entity(&CHIHUAHUA)
-        .size(0.25, 0.36)
-        .health(8.0)
-        .speed(2.8)
-        .attack_damage(2.0)
+        .size(animals_core::bodies::of("chihuahua").0, animals_core::bodies::of("chihuahua").1)
+        .max_health(crate::animal::health(species::of(&CHIHUAHUA)))
+        .walk_speed(2.8)
+        .attack_damage(crate::animal::hit(species::of(&CHIHUAHUA)))
         .passive()
         .model_file("chihuahua")
         .animations("chihuahua")
@@ -121,9 +125,12 @@ pub fn init(r: &mut Registry) {
         .attach(&DOG)
         .attach(&SEEN)
         .goals(goals())
-        .on_interact(interact)
+        .on_interact(|e| {
+            interact(e);
+            false
+        })
         .on_hurt(|w, h| {
-            taming::hurt(w, h.entity);
+            taming::hurt(w, h.entity, h.source);
             if let Some(d) = w.component_mut(h.entity, &DOG)
                 && d.tamed == 0
             {
@@ -150,17 +157,23 @@ fn goals() -> Goals {
             if w.component(id, &DOG).is_none_or(|d| d.panic == 0) {
                 return false;
             }
-            if w.time() % 20 == id % 20 || !w.navigating(id) {
+            if w.game_time() % 20 == id % 20 || !w.navigating(id) {
                 let a = w.random_below(628) as f64 / 100.0;
-                w.navigate(id, [st.pos[0] + a.cos() * 6.0, st.pos[1], st.pos[2] + a.sin() * 6.0], 1.8);
+                w.navigate(id, [st.pos.x + a.cos() * 6.0, st.pos.y, st.pos.z + a.sin() * 6.0], 1.8);
             }
             true
         })
-        .then(crate::breeding::behave(index))
-        .then(commands::hold)
-        .then(crate::comfort::seek)
-        .then(crate::forage::forage)
-        .then(ai::wander(0.45, 6.0))
+        // What it does when nothing is after it or ordered, the most pressing first (`choose.rs`).
+        .band(
+            "needs",
+            Band::new()
+                .with(Need::Love, crate::breeding::behave(index))
+                .with(Need::Hold, crate::commands::hold)
+                .with(Need::Comfort, crate::comfort::seek)
+                .with(Need::Drink, crate::drink::drink)
+                .with(Need::Eat, crate::forage::eat)
+                .with(Need::Wander, ai::wander(0.45, 6.0)),
+        )
 }
 
 /// Every tick, after its level and growing up (`animal::upkeep`): its look applied, time passing.
@@ -171,7 +184,7 @@ fn upkeep(w: &World, id: u64, _st: &EntityState) -> bool {
     // A tame told to stay sits (once it is there).
     let sitting = d.tamed != 0 && commands::command(w, id) == commands::STAY && !w.navigating(id);
     let Some(s) = w.component_mut(id, &SEEN) else { return false };
-    s.sat = if sitting { s.sat.saturating_add(1) } else { 0 };
+    s.sat = if sitting { s.sat.saturating_add(w.tick_elapsed(id)) } else { 0 };
     let pose = match (sitting, s.sat > LIE_TICKS) {
         (false, _) => Pose::Stand,
         (true, false) => Pose::Sit,
@@ -181,8 +194,10 @@ fn upkeep(w: &World, id: u64, _st: &EntityState) -> bool {
     let look = 1 + puppy as u32 + 2 * pose as u32;
     if s.look != look {
         s.look = look;
-        w.set_look(id, Some(&look_name(puppy, pose)));
-        w.set_size(id, puppy.then_some([0.15, 0.18, 0.15]));
+        w.set_appearance(id, Some(&look_name(puppy, pose)));
+        // A puppy's box is its own model's (`animals_core::bodies`), its eyes at its middle.
+        let (pw, ph) = animals_core::bodies::of("chihuahua_pup");
+        w.set_size(id, puppy.then_some(EntitySize { width: pw, height: ph, eye: ph * 0.6 }));
     }
     false
 }
@@ -196,7 +211,7 @@ fn interact(e: &mut EntityEvent) {
         return;
     }
     let held = w.inventory(player).get(w.selected_slot(player));
-    let Some(d) = w.component(id, &DOG).copied() else { return };
+    let Some(d) = w.component(id, &DOG) else { return };
     if d.tamed == 0 {
         taming::feed(&w, id, player);
         return;

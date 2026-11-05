@@ -42,6 +42,8 @@ KINDS = {
     "framed": ("A 1-px bevelled frame around the face, light on the top and left of the frame, shadow on the bottom and right.", False, False, False),
     "face": ("One picture filling the whole face, seen straight on.", False, False, False),
     "leaves": ("Overlapping individual leaves 3-5 px long, with gaps of flat solid magenta covering 25-35% of the tile, tileable.", False, True, True),
+    # Leaves with flowers or fruit drawn in: cut out like leaves but kept in their own colours (no tint).
+    "fleaves": ("Overlapping individual leaves 3-5 px long, with gaps of flat solid magenta covering 25-35% of the tile, tileable.", False, True, False),
     "plant": (PLANT, False, True, False),
     "tplant": (PLANT + " Light green, it is tinted by the biome in the game.", False, True, True),
     "crop": ("A row of stalks rising from the bottom edge that reads well when the texture is placed 4 times in a # shape. " + PLANT, False, True, False),
@@ -87,10 +89,32 @@ def approved_sheet():
     return out
 
 
+def like_sheet(names):
+    """The game's own textures a batch names (`BLOCK_LIKE=kelp,cattail`): a third reference, for
+    families the approved key doesn't hold yet (plants, water plants)."""
+    s = 192
+    sheet = Image.new("RGB", (len(names) * s, s), (255, 0, 255))
+    for i, n in enumerate(names):
+        path = n if os.path.isabs(n) else next((os.path.join(d, n + ".png") for d in MODS.values() if os.path.exists(os.path.join(d, n + ".png"))),
+                    os.path.join(TILES, n + ".png"))
+        t = Image.open(path).convert("RGBA").resize((s, s), Image.NEAREST)
+        sheet.paste(t, (i * s, 0), t)
+    # Named by its contents, so two runs at once don't overwrite each other's.
+    out = os.path.join(GEN, "like_" + "_".join(os.path.basename(n).split(".")[0] for n in names)[:80] + ".png")
+    sheet.save(out)
+    return out
+
+
 def gen(rows):
     style = open(os.path.join(HERE, "style.txt")).read()
     os.makedirs(GEN, exist_ok=True)
     refs = ["-i", PALETTE, "-i", approved_sheet()]
+    like = [n for n in os.environ.get("BLOCK_LIKE", "").split(",") if n]
+    if like:
+        refs += ["-i", like_sheet(like)]
+        style = style.replace("Match their pixel size, shading and colour.",
+                              "Match their pixel size, shading and colour. The third image shows textures already in the game "
+                              f"({', '.join(os.path.basename(n).split('.')[0] for n in like)}, left to right): match their pixel size, outline and shading.")
 
     def one(row):
         image, entries = row
@@ -105,7 +129,8 @@ def gen(rows):
                             "-o", f"last_{image}.txt", prompt], cwd=GEN, stdin=subprocess.DEVNULL, stdout=log, stderr=log)
         return f"{image}: {'ok' if os.path.exists(os.path.join(GEN, image + '.png')) else 'FAILED, see gen/run_' + image + '.log'}"
 
-    with ThreadPoolExecutor(4) as pool:
+    # Two at a time (the crew's rule for batch scripts on the Mac).
+    with ThreadPoolExecutor(2) as pool:
         for r in pool.map(one, rows):
             print(r, flush=True)
 
@@ -218,7 +243,7 @@ def preview(rows, name):
         flat = Image.new("RGBA", (192, 192), (156, 198, 224, 255) if KINDS[e["kind"]][2] else (0, 0, 0, 0))
         flat.alpha_composite(t.resize((192, 192), Image.NEAREST))
         sheet.paste(flat, (x, y), flat)
-        if KINDS[e["kind"]][2] and e["kind"] != "leaves":
+        if KINDS[e["kind"]][2] and e["kind"] not in ("leaves", "fleaves"):
             if ground:
                 sheet.paste(ground, (x + 200, y + a // 2), ground)
             s = t.resize((int(1.4 * a), int(1.4 * a)), Image.NEAREST)
@@ -261,7 +286,9 @@ def install(rows):
                     a = np.asarray(Image.open(os.path.join(home, n + ".png")).convert("RGB")).astype(int)
                     fire = (a[..., 0] > 190) & (a[..., 1] > 90) & (a[..., 0] - a[..., 2] > 90)
                     m = np.where(fire, 255, 0).astype(np.uint8)
-                    Image.fromarray(np.dstack([m, m, m, np.full_like(m, 255)]), "RGBA").save(os.path.join(home, n + "_e.png"))
+                    # a mask with no fire in its face (ore flecks, glowing plants: emissive.py) is kept as it is
+                    if fire.any():
+                        Image.fromarray(np.dstack([m, m, m, np.full_like(m, 255)]), "RGBA").save(os.path.join(home, n + "_e.png"))
                 done.append(n)
     print(f"{len(done)} textures in the game: {' '.join(done)}")
 

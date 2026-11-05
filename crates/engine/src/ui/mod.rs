@@ -25,6 +25,14 @@ pub type NodeId = usize;
 pub type Action = Rc<dyn Fn(&mut Ctx)>;
 pub type TextBind = Box<dyn Fn(&Ctx) -> (String, Vec<Arg>)>;
 pub type FloatBind = Box<dyn Fn(&Ctx) -> f32>;
+
+/// One of a row of icons' `abi::icon_effect`s, with its value this frame.
+pub struct IconEffect {
+    pub kind: u32,
+    pub bind: Option<FloatBind>,
+    pub amount: f32,
+    pub value: f32,
+}
 pub type ItemBind = Box<dyn Fn(&Ctx) -> (u32, u32)>;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -241,14 +249,17 @@ pub enum Kind {
         dir: u32,
     },
     /// `count` icons showing `value` in half steps (hearts): textures `gui/<class>_full`, `_half`, `_empty`.
-    /// `shake`: at 4 or less they jump about, like hearts near the end.
+    /// `shake`: at this or less they jump about, like hearts near the end.
     Icons {
         class: String,
         count: u32,
         bind: FloatBind,
         value: f32,
         dir: u32,
-        shake: bool,
+        shake: Option<f32>,
+        effects: Vec<IconEffect>,
+        /// The last change: the value before it, when (`shaders::clock`), whether up.
+        change: Option<(f32, f32, bool)>,
     },
     /// Single-line text field; `caret` is a char index.
     Input {
@@ -402,10 +413,14 @@ impl Ui {
 
     /// Scrolls the innermost scrolling node under `p` by `lines` wheel steps; true if one moved.
     pub fn scroll_at(&mut self, p: Vec2, lines: f32) -> bool {
-        let Some(id) = (0..self.nodes.len())
-            .rev()
-            .find(|&i| self.nodes[i].style.scroll && self.nodes[i].rect.contains(p) && self.nodes[i].clip.is_none_or(|c| c.contains(p)))
-        else {
+        let Some(id) = (0..self.nodes.len()).rev().find(|&i| {
+            self.nodes[i].style.scroll
+                    && self.nodes[i].rect.contains(p)
+                    && self.nodes[i].clip.is_none_or(|c| c.contains(p))
+                    // a screen's root scrolls only when the screen is taller than the window, and
+                    // leaves the wheel to the rest otherwise
+                    && (i != 0 || self.nodes[0].scrollbar.is_some())
+        }) else {
             return false;
         };
         // Held to its end, a node counts from there: up is further from it.
@@ -695,6 +710,10 @@ impl Ui {
                         text::layout_with(&t.spans, font, Some(inner.w / (t.scale * unit)), t.line.unwrap_or(font.line_height), t.mono);
                 } else if t.layout.width > 0.0 {
                     t.scale = (inner.w / (t.layout.width * unit)).max(0.25);
+                    // Squeezed text is smaller than the UI's one size (UI guide: one font, one
+                    // size): said once per text, so a check run lists every box too narrow for its
+                    // words in that language (the Russian pass, 11-04).
+                    squeezed(&text::plain_text(&t.spans), t.scale, inner.w);
                 }
             }
             return;
@@ -777,14 +796,28 @@ impl Ui {
                 self.nodes[id].scrollbar = Some(Scrollbar { track, offset, max });
             }
         }
+        // A centred thing's odd leftover pixel goes below or right of it, never split: its offset
+        // is rounded down to the UI pixel (`text_unit`) here, not rounded by `snapped` later
+        // (which put half a pixel up, and labels a pixel low in kit 2's buttons, whose faces are
+        // made for it: 2 px of frame above, 3 below).
+        let unit = self.text_unit;
+        let down = |v: f32| if unit > 0.0 { (v / unit + 1e-4).floor() * unit } else { v };
+        // A button's label taller than the room inside its padding (a small button with the
+        // default padding) still centres, sticking out of the padding evenly: clamping its
+        // overflow to nothing put the label on the top padding, 4 UI px low in an 11 px button
+        // (the label check, 11-04). Other containers keep their overflow at the end.
+        let overflow_centres = matches!(self.nodes[id].kind, Kind::Button { .. });
+        let free_c = if overflow_centres { free } else { free.max(0.0) };
         let (mut pos, spacing) = match style.justify {
             Justify::Start => (-scrolled, style.gap),
-            Justify::Center => (free.max(0.0) / 2.0, style.gap),
+            // Centred, or from the top once it overflows a scrolling node, and scrolled from there
+            // (a screen taller than a small window: its root scrolls, `App::open`).
+            Justify::Center => (down(free_c / 2.0) - scrolled, style.gap),
             // Overflowing content sticks out at the start, the end edge stays put. Scrolling goes
             // from there.
             Justify::End => (free - past_end, style.gap),
             Justify::Between if children.len() > 1 => (0.0, style.gap + free.max(0.0) / (children.len() - 1) as f32),
-            Justify::Between => (free.max(0.0) / 2.0, style.gap),
+            Justify::Between => (down(free.max(0.0) / 2.0), style.gap),
         };
         for (i, &c) in children.iter().enumerate() {
             let s = sizes[i];
@@ -796,7 +829,7 @@ impl Ui {
             }
             let off = match align {
                 Align::Start | Align::Stretch => 0.0,
-                Align::Center => (cross_size - cc) / 2.0,
+                Align::Center => down((cross_size - cc) / 2.0),
                 Align::End => cross_size - cc,
             };
             let r = if style.row {
@@ -836,4 +869,20 @@ impl Ui {
         walk(self, 0, p, false, &mut best);
         best
     }
+}
+
+/// Logs, once per text and box width, that a no-wrap text was shrunk to fit a box narrower than its words.
+fn squeezed(text: &str, scale: f32, width: f32) {
+    thread_local! {
+        static SAID: std::cell::RefCell<rustc_hash::FxHashSet<String>> = Default::default();
+    }
+    if text.trim().is_empty() {
+        return;
+    }
+    SAID.with(|s| {
+        // per text and box: the same words can be too wide for one box and fit another
+        if s.borrow_mut().insert(format!("{text}\u{0}{width:.1}")) {
+            log::warn!("ui: \"{text}\" squeezed to {:.0}% to fit {width:.1} GUI px", scale * 100.0);
+        }
+    });
 }

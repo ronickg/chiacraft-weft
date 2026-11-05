@@ -33,7 +33,7 @@ pub enum In {
         cube: Arc<Cube>,
         edit: bool,
     },
-    Blocks(Vec<(IVec3, u32)>),
+    Blocks(Vec<(IVec3, u32)>, Vec<(IVec3, Vec<u32>)>),
     Unload(IVec3),
     Saved(Vec<IVec3>),
     Edits {
@@ -60,7 +60,7 @@ pub enum Out {
         cube: Arc<Cube>,
         around: Around,
     },
-    Blocks(Vec<(IVec3, u32)>),
+    Blocks(Vec<(IVec3, u32)>, Vec<(IVec3, Vec<u32>)>),
     Unload(IVec3),
     /// The view now spans cubes `lo..=hi` up and down.
     Range {
@@ -342,8 +342,8 @@ struct Terrain {
     out: Vec<Out>,
     pending: Arc<AtomicU64>,
     gpu: Option<(Sender<super::terrain_gpu::Job>, Arc<std::sync::atomic::AtomicBool>)>,
-    /// The features of this dimension whose heights the CPU gives the GPU; `None`: the GPU
-    /// cannot make its terrain.
+    /// The features of this dimension whose heights the CPU gives the GPU (chiacraft, mods'
+    /// own features); `None`: the GPU cannot make its terrain.
     gpu_custom: Option<Arc<Vec<usize>>>,
     vis: crate::server::visibility::Visibility,
     /// Which faces of each cube see each other, for `vis`; cubes changed since go into
@@ -485,7 +485,7 @@ impl Terrain {
                 self.arrived(pos);
                 self.emit_all(changed);
             }
-            In::Blocks(changes) => {
+            In::Blocks(changes, extras) => {
                 self.whole = true;
                 for &(p, s) in &changes {
                     let cp = crate::world::cube_of(p);
@@ -496,7 +496,12 @@ impl Terrain {
                         }
                     }
                 }
-                self.out.push(Out::Blocks(changes));
+                for (p, parts) in &extras {
+                    if let Some(cube) = self.cubes.get_mut(&crate::world::cube_of(*p)) {
+                        Arc::make_mut(cube).set_extras(crate::world::local_index(*p), parts.clone());
+                    }
+                }
+                self.out.push(Out::Blocks(changes, extras));
             }
             In::Unload(pos) => {
                 self.server.remove(&pos);
@@ -625,7 +630,7 @@ impl Terrain {
                 .as_ref()
                 .is_some_and(|g| g.1.load(Ordering::Relaxed));
         self.gpu_on = gpu;
-        let budget = if gpu { 65536 } else { crate::background().current_num_threads() * 64 };
+        let budget = if gpu { 65536 } else { crate::client_terrain().current_num_threads() * 64 };
         if self.vis_on {
             self.request_visible(budget);
             return;
@@ -790,8 +795,7 @@ impl Terrain {
         self.ask_column(vec![pos]);
     }
 
-    /// Has the cubes `list` of one cube column made, together: what the GPU needs from mods'
-    /// code is the same for all of them.
+    /// Has the cubes `list` of one cube column made.
     fn ask_column(&mut self, list: Vec<IVec3>) {
         let c = content();
         let (tx, epoch, dim, seed, edits) = (self.gen_tx.clone(), self.epoch, self.dim, self.seed, self.edits.clone());
@@ -824,12 +828,12 @@ impl Terrain {
                 send(Arc::new(Vec::new()));
             } else {
                 // Mods' features run their code: on a worker, not here.
-                crate::background().spawn(move || send(super::terrain_gpu::custom_heights(c, dim, seed, first.x, first.z, &custom)));
+                crate::client_terrain().spawn(move || send(super::terrain_gpu::custom_heights(c, dim, seed, first.x, first.z, &custom)));
             }
         }
         for pos in on_cpu {
             let (tx, edits) = (tx.clone(), edits.clone());
-            crate::background().spawn(move || {
+            crate::client_terrain().spawn(move || {
                 let mut cube = crate::server::dim::generate(c, dim, seed, pos);
                 crate::server::dim::prepare(c, dim, &edits, pos, &mut cube);
                 let _ = tx.send((epoch, pos, cube));
@@ -978,7 +982,7 @@ impl Terrain {
         let def = &content().dims[self.dim as usize];
         let mut around = Around::default();
         for i in 0..27u32 {
-            let n = pos + IVec3::new(i as i32 % 3 - 1, i as i32 / 9 - 1, i as i32 / 3 % 3 - 1);
+            let n = pos + crate::world::cube::around(i as i32);
             if i == 13 || n.y < def.min_cube_y || n.y > def.max_cube_y || self.cubes.contains_key(&n) {
                 continue;
             }

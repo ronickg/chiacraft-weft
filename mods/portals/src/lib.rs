@@ -16,7 +16,7 @@ use weft_sdk::*;
 declare_mod!(deps: [], init: init);
 
 static PORTAL: Block = Block::named("portal");
-static PORTAL_ENTITY: Entity = Entity::named("portal");
+static PORTAL_ENTITY: EntityKind = EntityKind::named("portal");
 /// The link the portal holds: its id as 64 hex digits, or zeros.
 static LINK: Component<[u8; 64]> = Component::named("link");
 static BUILDING: CreativeTab = CreativeTab::named("base:building");
@@ -63,15 +63,17 @@ fn link(id: &str) -> Option<(String, String)> {
 
 fn init(r: &mut Registry) {
     r.block(&PORTAL)
+        .sound_group("base:block.glass")
         .hardness(1.5)
         .not_solid()
         .translucent()
         .light(11)
         .tab(&BUILDING)
+        .block_entity()
         .on_use(|u| {
             let (w, player, pos) = (u.world(), u.player(), u.pos());
             let owner = is_owner(player);
-            let mut msg = format!("{}\n{} {} {}\n", if owner { "owner" } else { "guest" }, pos[0], pos[1], pos[2]);
+            let mut msg = format!("{}\n{} {} {}\n", if owner { "owner" } else { "guest" }, pos.x, pos.y, pos.z);
             if owner {
                 for l in ask("links", "").lines() {
                     let mut f = l.split('\t');
@@ -83,13 +85,9 @@ fn init(r: &mut Registry) {
             w.send(player, &OPEN, &msg);
             true
         });
-    drop(
-        r.entity(&PORTAL_ENTITY)
-            .flags(abi::entity_flags::NO_GRAVITY | abi::entity_flags::INVULNERABLE),
-    );
+    // The block's own block entity (`block_entity`, named like the block) holds the link.
     r.entity_component(&LINK, [0u8; 64], abi::component_flags::SAVE);
     r.attach(&PORTAL_ENTITY, &LINK);
-    r.block_entity(&PORTAL, &PORTAL_ENTITY, 0);
 
     r.packet(&BIND, |p, text| bind(p, &text));
     r.world_tick(walk_in);
@@ -104,7 +102,7 @@ fn link_at(w: &World, pos: [i32; 3]) -> Option<String> {
         return None;
     }
     let bytes = w.component(e, &LINK)?;
-    (bytes[0] != 0).then(|| String::from_utf8_lossy(bytes).into_owned())
+    (bytes[0] != 0).then(|| String::from_utf8_lossy(&bytes).into_owned())
 }
 
 /// The owner binds a portal (and every portal block touching it) to a link of this world.
@@ -118,7 +116,7 @@ fn bind(p: &Packet, text: &str) {
     let (pos, id) = text.split_once('\t').unwrap_or((text, ""));
     let c: Vec<i32> = pos.split(' ').filter_map(|n| n.parse().ok()).collect();
     let [x, y, z] = c[..] else { return };
-    if !PORTAL.is(w.get([x, y, z])) {
+    if !PORTAL.is(w.block([x, y, z])) {
         return;
     }
     let old = link_at(&w, [x, y, z]);
@@ -137,20 +135,11 @@ fn bind(p: &Packet, text: &str) {
         name
     };
     // The whole portal: every portal block connected to this one, within reason.
-    let mut todo = vec![[x, y, z]];
-    let mut seen = HashSet::new();
-    let mut blocks = Vec::new();
-    while let Some(at) = todo.pop() {
-        if seen.len() >= 64 || !seen.insert(at) || !PORTAL.is(w.get(at)) {
-            continue;
-        }
-        blocks.push(at);
+    let blocks = portal_blocks(&w, [x, y, z]);
+    for &at in &blocks {
         let e = w.block_entity(at);
         if let Some(v) = (e != 0).then(|| w.component_mut(e, &LINK)).flatten() {
             *v = value;
-        }
-        for d in [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]] {
-            todo.push([at[0] + d[0], at[1] + d[1], at[2] + d[2]]);
         }
     }
     // Where arrivals through this link stand: beside the portal, on solid ground, with room. The
@@ -158,38 +147,103 @@ fn bind(p: &Packet, text: &str) {
     if let Some(old) = old.filter(|o| o != id) {
         ask("unspot", &old);
     }
-    if !id.is_empty() {
-        match arrival_spot(&w, &blocks) {
-            Some(s) => {
-                ask("spot", &format!("{id} {} {} {}", s[0], s[1], s[2]));
-            }
-            None => say(&w, player, "portals.msg.no_room", ""),
-        }
+    if !id.is_empty() && !save_spot(&w, id, &blocks) {
+        say(&w, player, "portals.msg.no_room", "");
     }
     if name.is_empty() {
-        say(&w, player, "portals.msg.unbound", &seen.len().to_string());
+        say(&w, player, "portals.msg.unbound", &blocks.len().to_string());
     } else {
         say(&w, player, "portals.msg.bound", &name);
     }
 }
 
-/// A place beside the portal to put arrivals: next to one of its blocks, not in it, with two
-/// blocks of room and solid ground below; the lowest such place.
-fn arrival_spot(w: &World, blocks: &[[i32; 3]]) -> Option<[i32; 3]> {
-    let solid = |p: [i32; 3]| w.flags(p) & abi::block_flags::SOLID != 0;
-    let mut best: Option<[i32; 3]> = None;
+/// Every portal block connected to the one at `start`, at most 64.
+fn portal_blocks(w: &World, start: [i32; 3]) -> Vec<[i32; 3]> {
+    let mut todo = vec![start];
+    let mut seen = HashSet::new();
+    let mut blocks = Vec::new();
+    while let Some(at) = todo.pop() {
+        if seen.len() >= 64 || !seen.insert(at) || !PORTAL.is(w.block(at)) {
+            continue;
+        }
+        blocks.push(at);
+        for d in [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]] {
+            todo.push([at[0] + d[0], at[1] + d[1], at[2] + d[2]]);
+        }
+    }
+    blocks
+}
+
+/// Saves where arrivals through link `id` stand for the portal made of `blocks`, with its
+/// dimension (by name: ids shift when mods come or go) and the way to face. False if it has no room.
+fn save_spot(w: &World, id: &str, blocks: &[[i32; 3]]) -> bool {
+    let Some((s, yaw)) = arrival_spot(w, blocks) else { return false };
+    let dim = name_of(abi::entry_kind::DIMENSION, w.dimension());
+    ask("spot", &format!("{id} {} {} {} {dim} {yaw:.4}", s[0], s[1], s[2]));
+    true
+}
+
+/// Links whose arrival spot was worked out again this run: a portal bound before spots kept their
+/// dimension and facing (11-05), or whose ground changed, is set right the first time a player
+/// comes near it.
+static RESPOTTED: Mutex<Option<HashSet<String>>> = Mutex::new(None);
+
+/// Where arrivals stand, and the way they face (yaw in radians, 0 looking along -z): in front of
+/// one of the portal's faces, right against it, facing away. Walking straight on leads away from
+/// it; turning round and stepping forward walks back in (the join test, 11-05: arriving at the
+/// sheet's end, a guest walked straight past the portal without touching it).
+fn arrival_spot(w: &World, blocks: &[[i32; 3]]) -> Option<([i32; 3], f32)> {
+    let solid = |p: [i32; 3]| w.block_flags(p) & abi::block_flags::SOLID != 0;
+    let free = |p: [i32; 3]| !solid(p) && !PORTAL.is(w.block(p));
+    arrival_in(blocks, &solid, &free)
+}
+
+/// `arrival_spot` on any world: `solid` and `free` say what is at a block.
+fn arrival_in(blocks: &[[i32; 3]], solid: &dyn Fn([i32; 3]) -> bool, free: &dyn Fn([i32; 3]) -> bool) -> Option<([i32; 3], f32)> {
+    if blocks.is_empty() {
+        return None;
+    }
+    // A sheet standing along z (one x) faces east and west; along x (one z), north and south. A
+    // single column or a shape of neither kind: any side.
+    let one = |f: fn(&[i32; 3]) -> i32| blocks.iter().all(|b| f(b) == f(&blocks[0]));
+    let (one_x, one_z) = (one(|b| b[0]), one(|b| b[2]));
+    let faces: &[[i32; 2]] = match (one_x, one_z) {
+        (true, false) => &[[1, 0], [-1, 0]],
+        (false, true) => &[[0, 1], [0, -1]],
+        _ => &[[1, 0], [-1, 0], [0, 1], [0, -1]],
+    };
+    let n = blocks.len() as f64;
+    let middle = [blocks.iter().map(|b| b[0] as f64).sum::<f64>() / n, blocks.iter().map(|b| b[2] as f64).sum::<f64>() / n];
+    // Lowest first, then the side with the most open ground ahead (not facing a wall), then the
+    // middle of the sheet.
+    // The spot and its facing, and its rank: (height, minus the open ground ahead, off the middle).
+    type Ranked = (([i32; 3], f32), (i32, i32, f64));
+    let mut best: Option<Ranked> = None;
     for b in blocks {
-        for d in [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1]] {
-            let at = [b[0] + d[0], b[1], b[2] + d[2]];
-            let up = [at[0], at[1] + 1, at[2]];
-            let down = [at[0], at[1] - 1, at[2]];
-            let free = |p: [i32; 3]| !solid(p) && !PORTAL.is(w.get(p));
-            if free(at) && free(up) && solid(down) && best.is_none_or(|b| at[1] < b[1]) {
-                best = Some(at);
+        for d in faces {
+            let at = [b[0] + d[0], b[1], b[2] + d[1]];
+            if !(free(at) && free([at[0], at[1] + 1, at[2]]) && solid([at[0], at[1] - 1, at[2]])) {
+                continue;
+            }
+            let open = (1..=3)
+                .take_while(|k| {
+                    let p = [at[0] + d[0] * k, at[1], at[2] + d[1] * k];
+                    free(p) && free([p[0], p[1] + 1, p[2]])
+                })
+                .count() as i32;
+            let off = (b[0] as f64 - middle[0]).abs() + (b[2] as f64 - middle[1]).abs();
+            let rank = (at[1], -open, off);
+            if best
+                .as_ref()
+                .is_none_or(|(_, r)| rank.0 < r.0 || (rank.0 == r.0 && (rank.1, rank.2) < (r.1, r.2)))
+            {
+                // Facing along the face's normal, away from the portal.
+                let yaw = (-(d[0] as f32)).atan2(-(d[1] as f32));
+                best = Some(((at, yaw), rank));
             }
         }
     }
-    best
+    best.map(|(s, _)| s)
 }
 
 /// Players standing in a portal, so entering (not standing) sends them; and since when each player
@@ -206,12 +260,12 @@ static STEPS: Mutex<Option<Steps>> = Mutex::new(None);
 
 /// A player stepping into a bound portal is sent to the linked world.
 fn walk_in(w: &World) {
-    for player in w.each_player() {
+    for player in w.players() {
         let Some(st) = w.entity(player) else { continue };
-        let feet = [st.pos[0].floor() as i32, st.pos[1].floor() as i32, st.pos[2].floor() as i32];
+        let feet = [st.pos.x.floor() as i32, st.pos.y.floor() as i32, st.pos.z.floor() as i32];
         let at = [feet, [feet[0], feet[1] + 1, feet[2]]]
             .into_iter()
-            .find(|p| PORTAL.is(w.get(*p)));
+            .find(|p| PORTAL.is(w.block(*p)));
         let mut steps = STEPS.lock().unwrap();
         let steps = steps.get_or_insert_with(Steps::default);
         let Some(at) = at else {
@@ -252,7 +306,7 @@ type Nearby = (std::time::Instant, Vec<(String, std::time::Instant)>);
 
 /// Players walking up to a bound portal: their game warms up the trip (see `bridge`'s `warm`).
 fn near_portals(w: &World) {
-    for player in w.each_player() {
+    for player in w.players() {
         let Some(st) = w.entity(player) else { continue };
         let mut nearby = NEARBY.lock().unwrap();
         let entry = nearby
@@ -264,22 +318,30 @@ fn near_portals(w: &World) {
         }
         entry.0 = std::time::Instant::now();
         entry.1.retain(|(_, t)| t.elapsed().as_secs() < 30);
-        let c = [st.pos[0].floor() as i32, st.pos[1].floor() as i32, st.pos[2].floor() as i32];
+        let c = [st.pos.x.floor() as i32, st.pos.y.floor() as i32, st.pos.z.floor() as i32];
         let mut found = None;
         'search: for dy in -1..=2 {
             for dx in -NEAR_BLOCKS..=NEAR_BLOCKS {
                 for dz in -NEAR_BLOCKS..=NEAR_BLOCKS {
                     let p = [c[0] + dx, c[1] + dy, c[2] + dz];
-                    if PORTAL.is(w.get(p))
+                    if PORTAL.is(w.block(p))
                         && let Some(id) = link_at(w, p)
                     {
-                        found = Some(id);
+                        found = Some((id, p));
                         break 'search;
                     }
                 }
             }
         }
-        let Some(id) = found else { continue };
+        let Some((id, p)) = found else { continue };
+        if RESPOTTED
+            .lock()
+            .unwrap()
+            .get_or_insert_with(HashSet::new)
+            .insert(id.clone())
+        {
+            save_spot(w, &id, &portal_blocks(w, p));
+        }
         if entry.1.iter().any(|(l, _)| *l == id) {
             continue;
         }
@@ -314,24 +376,24 @@ fn client(r: &mut Registry) {
             .map(|(id, name)| (id.to_string(), name.to_string()))
             .collect();
         *MENU.lock().unwrap() = Some(Menu { owner, pos, links });
-        c.open_screen(&SCREEN);
+        c.screen_open(&SCREEN);
     });
     // A line for the player goes through a command of the mod's own, whose reply the client
     // shows in its own language.
     r.client_packet(&SAY, |c, text| {
         let (key, arg) = text.split_once('\t').unwrap_or((&text, ""));
-        c.chat(&format!("/portal_note {key} {arg}"));
+        c.say(&format!("/portal_note {key} {arg}"));
     });
     r.client_packet(&NEAR, |c, text| {
         let (key, name) = text.split_once('\t').unwrap_or((&text, ""));
         ask("warm", key);
-        c.chat(&format!("/portal_note portals.msg.near {name}"));
+        c.say(&format!("/portal_note portals.msg.near {name}"));
     });
     r.client_packet(&TRAVEL, |c, text| {
         let mut f = text.split('\t');
         let (key, name, ticket) = (f.next().unwrap_or(""), f.next().unwrap_or(""), f.next().unwrap_or(""));
         weft_sdk::info!("going to '{name}' through a portal");
-        c.chat(&format!("/portal_note portals.msg.going {name}"));
+        c.say(&format!("/portal_note portals.msg.going {name}"));
         let mut address = format!("chiacraft://w/{key}");
         if !ticket.is_empty() {
             address.push_str("?t=");
@@ -346,7 +408,7 @@ fn client(r: &mut Registry) {
     });
     r.client_frame(|c| {
         if let Some(key) = GO.lock().unwrap().take() {
-            c.join(&key);
+            c.world_join(&key);
         }
     });
     r.client_command("portal_note", "<line:text>", |cmd| {
@@ -359,8 +421,8 @@ fn client(r: &mut Registry) {
     r.screen(&SCREEN, |ui| {
         let menu = MENU.lock().unwrap();
         let Some(m) = menu.as_ref() else { return };
-        ui.panel("panel", S::col().pad(8.0).gap(4.0).min_w(300.0), |ui| {
-            ui.text_styled(S::col().class("title").scale(1.5).no_wrap(), "portals.title", &[]);
+        ui.panel("panel", S::column().pad(8.0).gap(4.0).min_w(300.0), |ui| {
+            ui.text_styled(S::column().class("title").scale(1.5).no_wrap(), "portals.title", &[]);
             if !m.owner {
                 ui.text("portals.not_owner");
             } else if m.links.is_empty() {
@@ -371,16 +433,71 @@ fn client(r: &mut Registry) {
                     let msg = format!("{}\t{id}", m.pos);
                     ui.button_args("portals.to", &[Arg::Text(name)], S::default().w(280.0), move |v| {
                         v.client().send(&BIND, &msg);
-                        v.client().close_screen();
+                        v.client().screen_close();
                     });
                 }
                 let msg = format!("{}\t", m.pos);
                 ui.button("portals.unbind", S::default().w(280.0), move |v| {
                     v.client().send(&BIND, &msg);
-                    v.client().close_screen();
+                    v.client().screen_close();
                 });
             }
-            ui.button("portals.close", S::default().w(280.0), |v| v.client().close_screen());
+            ui.button("portals.close", S::default().w(280.0), |v| v.client().screen_close());
         });
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::arrival_in;
+
+    /// Flat ground at y 63 (solid at 63 and below), a portal sheet, open air elsewhere.
+    fn world(portal: &[[i32; 3]]) -> (impl Fn([i32; 3]) -> bool + '_, impl Fn([i32; 3]) -> bool + '_) {
+        let solid = |p: [i32; 3]| p[1] <= 63;
+        let free = move |p: [i32; 3]| p[1] > 63 && !portal.contains(&p);
+        (solid, free)
+    }
+
+    fn ahead(yaw: f32) -> [i32; 2] {
+        [(-yaw.sin()).round() as i32, (-yaw.cos()).round() as i32]
+    }
+
+    #[test]
+    fn arrivals_stand_before_a_face_and_look_away() {
+        // A sheet along x (one z, at 10): its faces look north and south.
+        let sheet: Vec<[i32; 3]> = (0..3)
+            .flat_map(|x| (64..67).map(move |y| [x, y, 10]))
+            .collect();
+        let (solid, free) = world(&sheet);
+        let (at, yaw) = arrival_in(&sheet, &solid, &free).unwrap();
+        assert_eq!(at[1], 64);
+        assert!(at[2] == 9 || at[2] == 11, "beside a face, not the sheet's end: {at:?}");
+        assert_eq!(at[0], 1, "in front of the middle");
+        let a = ahead(yaw);
+        assert_eq!([0, at[2] - 10], a, "facing away from the portal");
+        // Turning round and stepping forward walks into the portal.
+        let back = [at[0] - a[0], at[1], at[2] - a[1]];
+        assert!(sheet.contains(&back));
+
+        // A sheet along z (one x): east or west of it.
+        let sheet: Vec<[i32; 3]> = (0..2)
+            .flat_map(|z| (64..67).map(move |y| [5, y, z]))
+            .collect();
+        let (solid, free) = world(&sheet);
+        let (at, yaw) = arrival_in(&sheet, &solid, &free).unwrap();
+        assert!(at[0] == 4 || at[0] == 6);
+        assert_eq!(ahead(yaw), [at[0] - 5, 0]);
+    }
+
+    #[test]
+    fn a_wall_on_one_side_sends_arrivals_to_the_other() {
+        let sheet: Vec<[i32; 3]> = (0..3)
+            .flat_map(|x| (64..67).map(move |y| [x, y, 10]))
+            .collect();
+        // A wall two blocks south of the sheet: the north face has the open ground.
+        let solid = |p: [i32; 3]| p[1] <= 63 || p[2] == 12;
+        let free = |p: [i32; 3]| p[1] > 63 && p[2] != 12 && !sheet.contains(&p);
+        let (at, _) = arrival_in(&sheet, &solid, &free).unwrap();
+        assert_eq!(at[2], 9);
+    }
 }

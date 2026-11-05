@@ -15,7 +15,10 @@ use vitals::effects::Effect;
 use weft_sdk::*;
 
 /// The hints, by their bit in `SEEN`: `hint.base.<name>` in the lang files.
-const HINTS: [&str; 11] = ["logs", "table", "night", "cold", "freezing", "wet", "empty", "raw_meat", "grave", "hot", "rest"];
+const HINTS: [&str; 16] = [
+    "logs", "table", "night", "cold", "freezing", "wet", "empty", "raw_meat", "grave", "hot", "rest", "knap", "flake", "lash", "tree",
+    "tree_far",
+];
 const LOGS: u32 = 0;
 const TABLE: u32 = 1;
 const NIGHT: u32 = 2;
@@ -27,9 +30,16 @@ const RAW_MEAT: u32 = 7;
 const GRAVE_AT: u32 = 8;
 const HOT: u32 = 9;
 const REST: u32 = 10;
+/// The first hours (`first.rs`): a rock and flint in the bag, a sharp flake, an axe head.
+const KNAP: u32 = 11;
+const FLAKE: u32 = 12;
+const LASH: u32 = 13;
+/// The first axe: where the nearest tree foot is (`TREE_FAR` when none is near; one seen bit).
+const TREE: u32 = 14;
+const TREE_FAR: u32 = 15;
 
-/// Seconds played before the first hint about logs.
-const LOGS_AFTER: u64 = 60;
+/// Seconds played before the first hint, that bare hands can't fell a tree (`first.rs`).
+const LOGS_AFTER: u64 = 20;
 /// The felt air under which being wet is worth a word, °C.
 const WET_BELOW: f32 = 15.0;
 
@@ -46,10 +56,14 @@ value! {
 static HINT: Channel<Hint> = Channel::named("hint");
 
 static LOG_TAG: Tag = Tag::named("logs");
+static AXES_TAG: Tag = Tag::named("tools/axe");
+static LEAVES_TAG: Tag = Tag::named("leaves");
 static TABLE_TAG: Tag = Tag::named("crafting_tables");
 static FURNACE_TAG: Tag = Tag::named("furnaces");
 static RAW_MEAT_TAG: Tag = Tag::named("raw_meat");
 static CAMPFIRE_TAG: Tag = Tag::named("campfires");
+static ROCKS_TAG: Tag = Tag::named("rocks");
+static FLINT_TAG: Tag = Tag::named("flint");
 /// The evening the night hint was last shown (the day count; not saved).
 static NIGHT_SHOWN: Component<u32> = Component::named("hints_night_shown");
 /// Game hours before sunset the night hint comes (the sunset by the calendar's daylight: 18:00 at
@@ -58,7 +72,7 @@ const DUSK_BEFORE: f32 = 2.0;
 
 pub fn register(r: &mut Registry) {
     r.config(&SHOW).bool(true);
-    r.entity_component(&SEEN, 0, component_flags::SAVE | component_flags::KEEP);
+    r.entity_component(&SEEN, 0, component_flags::SAVE | component_flags::KEEP_ON_RESPAWN);
     r.attach(&PLAYER, &SEEN);
     r.entity_component(&WAS_FREEZING, 0, 0);
     r.attach(&PLAYER, &WAS_FREEZING);
@@ -67,7 +81,7 @@ pub fn register(r: &mut Registry) {
     r.world_tick(watch);
     // A campfire built: the night hint has done its work (Ronald, 11-04: "Campfire keeps you
     // safe"; its light keeps monsters from spawning near it).
-    r.on(&BLOCK_PLACED, |b| {
+    r.on(&actions::PLACE_BLOCK, |b| {
         let w = b.world();
         for c in b.iter() {
             if CAMPFIRE_TAG.on_block(c.state) {
@@ -107,16 +121,60 @@ fn once(w: &World, player: u64, hint: u32) {
     }
 }
 
+/// The nearest tree foot to `from` (a log standing on something that isn't a log or air), ring by
+/// ring out to `vitals::first::TREE_LOOK`, the nearest in height first within a ring.
+fn nearest_tree(w: &World, from: BlockPos) -> Option<BlockPos> {
+    use vitals::first::{TREE_LOOK, TREE_UP};
+    // A log on the ground with a tree on it as felling sees one (a trunk, leaves among it), of
+    // at least `TREE_LOGS`: a shrub's log or a lone stump is no tree to fell.
+    let foot = |p: BlockPos| {
+        let state = w.block(p);
+        LOG_TAG.on_block(state)
+            && {
+                // On the ground: not a branch resting on leaves (seed 7's hint pointed at one, 6
+                // up in a crown, PC probe fh_probe7).
+                let below = w.block(p.below());
+                below != 0 && !LOG_TAG.on_block(below) && !LEAVES_TAG.on_block(below)
+            }
+            && crate::felling::tree_on(w, p.to_array(), state).is_some_and(|logs| logs.len() + 1 >= vitals::first::TREE_LOGS)
+    };
+    for r in 0..=TREE_LOOK {
+        let mut best: Option<(i32, BlockPos)> = None;
+        for dz in -r..=r {
+            for dx in -r..=r {
+                if dx.abs().max(dz.abs()) != r {
+                    continue;
+                }
+                for dy in 0..=TREE_UP {
+                    if best.is_some_and(|(b, _)| b <= dy) {
+                        break;
+                    }
+                    for y in [dy, -dy] {
+                        let p = from.offset(dx, y, dz);
+                        if foot(p) {
+                            best = Some((dy, p));
+                        }
+                    }
+                }
+            }
+        }
+        if let Some((_, p)) = best {
+            return Some(p);
+        }
+    }
+    None
+}
+
 /// Each player's state, once a second.
 fn watch(w: &World) {
     let hour = ((w.day_time() % 24000) as f32 / 1000.0 + 6.0) % 24.0;
     for id in w.players() {
         let Some(st) = w.entity(id) else { continue };
-        if st.age % 20 != 7 || w.creative(id) {
+        if st.age % 20 != 7 || w.outside_survival(id) {
             continue;
         }
         let inv = w.inventory(id);
-        let items: Vec<u32> = (0..inv.size())
+        let items: Vec<u32> = (0..inv.len())
             .map(|i| inv.get(i))
             .filter(|s| !s.is_empty())
             .map(|s| s.item)
@@ -138,6 +196,33 @@ fn watch(w: &World) {
         if logs && !table {
             once(w, id, TABLE);
         }
+        // The way to the first axe, a step at a time.
+        let flake = has(&crate::first::CUTTERS);
+        let head = items
+            .iter()
+            .any(|&i| item_name(i) == "base:part_felling_axe_head");
+        if has(&ROCKS_TAG) && has(&FLINT_TAG) && !flake {
+            once(w, id, KNAP);
+        }
+        if flake && !logs {
+            once(w, id, FLAKE);
+        }
+        if head && !logs {
+            once(w, id, LASH);
+        }
+        if !logs && !seen(w, id, TREE) && has(&AXES_TAG) {
+            mark(w, id, TREE);
+            let hint = match nearest_tree(w, st.pos.block()) {
+                Some(p) => Hint { hint: TREE, a: p.x, b: p.z },
+                None => Hint { hint: TREE_FAR, a: 0, b: 0 },
+            };
+            weft_sdk::info!(
+                "hints: first axe for {id} at {:?}: tree {}",
+                st.pos.block(),
+                if hint.hint == TREE { format!("at x {} z {}", hint.a, hint.b) } else { "none near".into() }
+            );
+            w.send(id, &HINT, &hint);
+        }
         // Each evening at dusk until a campfire is built, by the season's sunset (as the HUD clock
         // and beds have it; integration review: fixed at 16-18 it came after dark in winter).
         let sunset = w
@@ -147,6 +232,8 @@ fn watch(w: &World) {
                 let light = vitals::calendar::daylight_hours((v.date - 1) as f32, base_api::calendars::swing(v.calendar));
                 12.0 + light / 2.0
             });
+        // Tonight's sky event, foretold before sunset (`events.rs`).
+        crate::events::dusk(w, id, hour, sunset);
         if (sunset - DUSK_BEFORE..sunset).contains(&hour) && !seen(w, id, NIGHT) {
             let day = (w.day_time() / 24000) as u32;
             if let Some(shown) = w.component_mut(id, &NIGHT_SHOWN)
@@ -194,6 +281,12 @@ fn watch(w: &World) {
 /// Where the hint line sits, a share of the window's height down: over the crosshair's lower
 /// half and clear of the chat in the bottom left (at 0.78 the two overlapped, Tester 2 11-04).
 const HINT_Y: f32 = 0.64;
+/// The widest a hint is (GUI px), and the room kept on each side for the HUD's top-left column
+/// (the shortcuts, about 100 wide): a long hint wraps rather than running over it in a narrow
+/// window (760 x 600, the audit, 11-04). It wraps no narrower than `HINT_MIN_W`.
+const HINT_MAX_W: f32 = 360.0;
+const HINT_SIDES: f32 = 108.0;
+const HINT_MIN_W: f32 = 140.0;
 /// Seconds a hint stays, and fades at the end.
 const SHOW_SECS: f32 = 6.0;
 const FADE_SECS: f32 = 0.6;
@@ -252,6 +345,16 @@ fn client(r: &mut Registry) {
         }
         let alpha = ((SHOW_SECS - since) / FADE_SECS).clamp(0.0, 1.0);
         let args: Vec<Arg> = args.iter().map(|&a| Arg::Int(a)).collect();
-        c.screen_text(0.5, HINT_Y, key, &args, 0xe4dacf00 | (alpha * 255.0) as u32, 1.0);
+        let st = c.state();
+        let gw = st.window[0] as f32 / st.gui_scale.max(1.0);
+        let width = (gw - 2.0 * HINT_SIDES).clamp(HINT_MIN_W, HINT_MAX_W);
+        // On the HUD's plate, in the brighter cream (World playtest round 13: the first hint read as "a
+        // thin small line mid-screen").
+        c.screen_text_plated(0.5, HINT_Y, key, &args, 0xf4ead800 | (alpha * 255.0) as u32, 1.0, width);
     });
+}
+
+/// A fire lit by `player` (`firebed.rs`): the night hint has done its work, as for one placed.
+pub fn fire_lit(w: &World, player: u64) {
+    mark(w, player, NIGHT);
 }

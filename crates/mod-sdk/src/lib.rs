@@ -42,7 +42,7 @@ use std::rc::Rc;
 #[doc(hidden)]
 pub mod bindings {
     wit_bindgen::generate!({
-        path: "../sandbox/wit/v1.2",
+        path: "../sandbox/wit/v1.3",
         world: "server-mod",
         pub_export_macro: true,
         export_macro_name: "__export",
@@ -73,7 +73,7 @@ pub use types::{
 pub use weft_abi::{component_flags, permission, stage};
 
 /// The API version this SDK builds for.
-pub const API: &str = "1.2.0";
+pub const API: &str = "1.3.0";
 
 // ------------------------------------------------------------------ entry point
 
@@ -652,7 +652,7 @@ impl Registry {
             (component_flags::SAVE, registry::ComponentFlags::SAVE),
             (component_flags::SYNC_OWNER, registry::ComponentFlags::SYNC_OWNER),
             (component_flags::SYNC_WATCHERS, registry::ComponentFlags::SYNC_WATCHERS),
-            (component_flags::KEEP, registry::ComponentFlags::KEEP),
+            (component_flags::KEEP_ON_RESPAWN, registry::ComponentFlags::KEEP),
         ] {
             if flags & bit != 0 {
                 f = f | flag;
@@ -1163,6 +1163,14 @@ impl World {
     /// their own channel for this).
     pub fn tell(&self, player: u64, key: &str, args: &[Arg]) {
         wworld::tell(player, key, &wire_args(args));
+    }
+    /// The player earned an achievement here (1.3): the world signs a credential for them that
+    /// outlives the world (`docs/sandboxed-mods.md`, "Achievements"). `id` is the mod's own name
+    /// (the package's namespace goes in front); `title` and `description` are the package's lang
+    /// keys or text; `icon` an item's full name. Granting it again signs it again: keep who has
+    /// what in `storage`.
+    pub fn grant_achievement(&self, player: u64, id: &str, title: &str, description: &str, icon: Option<&str>) {
+        wworld::grant_achievement(player, id, title, description, icon);
     }
     /// Who a player is: their key, the same in every world (ours).
     pub fn player_key(&self, player: u64) -> String {

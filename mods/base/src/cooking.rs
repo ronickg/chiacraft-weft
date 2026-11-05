@@ -75,13 +75,18 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::FOOD);
     r.item(&SALT).tag("salt").tab(&crate::tabs::INGREDIENTS);
     r.shaped(&CRAFTING, "bowl", 4, &["p p", " p "], &[('p', "#planks")]);
-    // Sea water boiled dry; the bucket comes back (`use_one` in the furnace).
+    // Sea water boiled dry; the bucket comes back (`consume_one` in the furnace).
     r.shapeless(&SMELTING, "salt", 1, &["water_bucket"], preserve::SALT_TICKS);
     r.shapeless(&CRAFTING, "salted_meat", 1, &["#raw_meat", "#salt"], 0);
-    r.shaped(&CRAFTING, "cooking_pot", 1, &["i i", "i i", "iii"], &[('i', "#ingots/iron")]);
+    // A clay pot (the Stone Age's, Ronald, 11-07: "move them to fit"; it hardens on its first
+    // fire), not iron.
+    r.shaped(&CRAFTING, "cooking_pot", 1, &["c c", "c c", "ccc"], &[('c', "#clay")]);
     r.shaped(&CRAFTING, "drying_rack", 1, &["sss", "s s"], &[('s', "#stick")]);
     // In the inventory's own grid: a fire comes before a crafting table (Research round 4).
-    r.shaped(&CRAFTING, "campfire", 1, &["ss", "ll"], &[('s', "#stick"), ('l', "#logs")]);
+    // Laid unlit, and lit with a drill like a fire bed (`firebed.rs`; Planner, 11-05, from Ronald's
+    // "Fire bed + bow drill": one rule for fire). Broken, it gives the laid one back.
+    r.shaped(&CRAFTING, "campfire_laid", 1, &["ss", "ll"], &[('s', "#stick"), ('l', "#logs")]);
+    r.loot(&CAMPFIRE).pool(Pool::new().item("campfire_laid"));
     r.entity_component(&ROASTING, Roasting { cook: 0, cook_max: 0, item: 0 }, component_flags::SAVE | component_flags::SYNC_MENU);
     r.system(&ROASTING, tick_campfires);
     // It cooks what a furnace cooks of food, a little slower, with no fuel.
@@ -101,7 +106,7 @@ pub fn register(r: &mut Registry) {
         .group("output", Slots::single().output())
         .attach(&ROASTING)
         .screen(|ui| {
-            crate::window::window(ui, S::col().pad(7.0).gap(4.0).stretch(), &[], |ui| {
+            crate::window::window(ui, S::column().pad(7.0).gap(4.0).stretch(), &[], |ui| {
                 ui.row(S::row().gap(8.0), |ui| {
                     ui.spacer();
                     ui.group("input");
@@ -148,11 +153,11 @@ pub fn register(r: &mut Registry) {
         .group("output", Slots::single().output())
         .attach(&COOKING)
         .screen(|ui| {
-            crate::window::window(ui, S::col().pad(7.0).gap(4.0).stretch(), &[], |ui| {
+            crate::window::window(ui, S::column().pad(7.0).gap(4.0).stretch(), &[], |ui| {
                 ui.row(S::row().gap(8.0), |ui| {
                     ui.spacer();
                     ui.group("ingredients");
-                    ui.column(S::col().gap(2.0), |ui| {
+                    ui.column(S::column().gap(2.0), |ui| {
                         ui.group("bowl");
                         ui.progress_bind_dir("flame", S::default().size(14.0, 14.0), abi::ui_dir::UP, |c| {
                             c.menu_component(&COOKING)
@@ -187,10 +192,10 @@ pub fn register(r: &mut Registry) {
         .group("rack", Slots::row(4).accepts("food"))
         .attach(&DRYING)
         .screen(|ui| {
-            crate::window::window(ui, S::col().pad(7.0).gap(4.0).stretch(), &[], |ui| {
+            crate::window::window(ui, S::column().pad(7.0).gap(4.0).stretch(), &[], |ui| {
                 ui.row(S::row().gap(8.0), |ui| {
                     ui.spacer();
-                    ui.column(S::col().gap(2.0), |ui| {
+                    ui.column(S::column().gap(2.0), |ui| {
                         ui.group("rack");
                         ui.progress_bind("attack_bar", S::default().size(72.0, 4.0), |c| {
                             c.menu_component(&DRYING)
@@ -321,7 +326,7 @@ fn pot_step(w: &World, id: u64, s: &mut Cooking) -> bool {
         let f = fuel.get(0);
         if let Some(t) = FUEL.on_item(f.item).filter(|_| !f.is_empty()) {
             (s.burn, s.burn_max) = (t, t);
-            fuel.set(0, use_one(f));
+            fuel.set(0, consume_one(f));
         }
     }
     if s.burn > 0 && can {
@@ -333,10 +338,10 @@ fn pot_step(w: &World, id: u64, s: &mut Cooking) -> bool {
                 let st = ings.get(i);
                 if good(&st) {
                     used = used.max(crate::survival::life_used(&st, now).unwrap_or(0.0));
-                    ings.set(i, use_one(st));
+                    ings.set(i, consume_one(st));
                 }
             }
-            bowl.set(0, use_one(bowl.get(0)));
+            bowl.set(0, consume_one(bowl.get(0)));
             output.set(0, stew(w, &foods, used));
         }
         true
@@ -358,14 +363,14 @@ fn tick_racks(b: &mut SystemBatch<Drying>) {
         s.wait = 0;
         let Some(st) = w.entity(id) else { continue };
         let pos = st.block_pos();
-        let smoking = (1..=preserve::SMOKE_REACH).any(|dy| base_api::heat_of(w.get([pos[0], pos[1] - dy, pos[2]])) >= preserve::SMOKE_HEAT);
+        let smoking = (1..=preserve::SMOKE_REACH).any(|dy| base_api::heat_of(w.block([pos.x, pos.y - dy, pos.z])) >= preserve::SMOKE_HEAT);
         s.smoking = smoking as u32;
         let rate = if smoking {
             preserve::smoke_rate()
         } else {
             let air = base_api::air_at(
                 &w,
-                [pos[0] as f64 + 0.5, pos[1] as f64, pos[2] as f64 + 0.5],
+                [pos.x as f64 + 0.5, pos.y as f64, pos.z as f64 + 0.5],
                 1.0,
                 false,
                 vitals::temperature::FIRE_REACH,

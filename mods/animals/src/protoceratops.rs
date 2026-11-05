@@ -8,17 +8,15 @@ use weft_sdk::*;
 
 use crate::wild::{self, Body};
 
-pub(crate) static PROTOCERATOPS: Entity = Entity::named("protoceratops");
+pub(crate) static PROTOCERATOPS: EntityKind = EntityKind::named("protoceratops");
 
 static BODY: Body = Body {
     model: "protoceratops",
     texture: "protoceratops/protoceratops",
-    size: (0.7, 0.75),
-    health: 35.0,
     // A heavy trot, about 4 m/s at its fastest (est., from its build).
     speed: 4.0,
     wander: 0.3,
-    damage: 0.0,
+    bites: false,
     rest: ("protoceratops_lie", (0.7, 0.45)),
 };
 

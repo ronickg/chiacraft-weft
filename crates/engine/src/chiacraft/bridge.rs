@@ -14,6 +14,9 @@
 //! - `spot <link id> <x> <y> <z>`: arrivals through the link stand here; `unspot <link id>` forgets it;
 //! - `data_dir <mod>`: a folder in the world's save for that mod's own files (made if missing),
 //!   or empty (no world open, or a name that isn't lowercase letters, digits and `_`).
+//! - `achievement <player entity>\t<id>\t<title>\t<description>\t<icon item or empty>`: the
+//!   player earned it here; the world signs a credential for them (`achievements`), the title and
+//!   description as lang keys or text;
 //! - `world`: `<run>\t<folder>`: which run of a server this is (a world opened again is a new one)
 //!   and the world's folder (empty for a world that isn't saved). Sandboxed mods run anew in each.
 //!
@@ -136,6 +139,19 @@ fn answer(q: &str, arg: &str) -> String {
             let to = if l.body.from == *world { &l.body.to } else { &l.body.from };
             crate::travel::issue(id, &player, link, to)
         }
+        "achievement" => {
+            let mut f = arg.split('\t');
+            let (Some(player), Some(id), Some(title)) = (f.next().and_then(|p| p.parse().ok()), f.next(), f.next()) else {
+                return String::new();
+            };
+            let description = f.next().unwrap_or("").to_string();
+            let icon = f.next().filter(|i| !i.is_empty()).map(str::to_string);
+            info.shared
+                .grants
+                .lock()
+                .push(crate::chiacraft::achievements::Grant { player, id: id.to_string(), title: title.to_string(), description, icon });
+            String::new()
+        }
         "data_dir" => {
             let Some(dir) = &info.dir else { return String::new() };
             if arg.is_empty()
@@ -158,13 +174,19 @@ fn answer(q: &str, arg: &str) -> String {
             let Some(dir) = &info.dir else { return String::new() };
             let mut f = arg.split(' ');
             let link = f.next().unwrap_or("");
-            let p: Vec<i32> = f.filter_map(|n| n.parse().ok()).collect();
-            let pos = match (q, &p[..]) {
-                ("spot", [x, y, z]) => Some([*x, *y, *z]),
+            // `link x y z [dimension yaw]`: the portal's dimension by name and the way arrivals face.
+            let p: Vec<i32> = f.by_ref().take(3).filter_map(|n| n.parse().ok()).collect();
+            let dim = f.next().filter(|d| !d.is_empty()).map(str::to_string);
+            let yaw = f
+                .next()
+                .and_then(|v| v.parse::<f32>().ok())
+                .filter(|v| v.is_finite());
+            let spot = match (q, &p[..]) {
+                ("spot", [x, y, z]) => Some(([*x, *y, *z], dim, yaw)),
                 ("spot", _) => return String::new(),
                 _ => None,
             };
-            crate::travel::set_spot(dir, link, pos);
+            crate::travel::set_spot(dir, link, spot);
             "1".into()
         }
         _ => String::new(),

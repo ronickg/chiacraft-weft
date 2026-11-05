@@ -23,6 +23,9 @@ pub const FULL: [f32; NUTRIENTS] = [100.0, 250.0, 50.0, 25.0, 500.0];
 pub struct Per100 {
     pub water: f32,
     pub protein: f32,
+    /// Available carbohydrate, without the fiber: USDA's "carbohydrate, by difference" counts
+    /// the fiber too, so it is that minus `fiber` (or water, protein, carbs, fat and fiber add up
+    /// to more than 100 g, `balance`).
     pub carbs: f32,
     pub fat: f32,
     pub fiber: f32,
@@ -126,7 +129,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:apple",
         grams: 180.0,
-        per100: per(85.6, 0.3, 13.8, 0.2, 2.4, 4.6),
+        per100: per(85.6, 0.3, 11.4, 0.2, 2.4, 4.6),
         meal: Meal::Cooling,
         raw: false,
         keeps: (20.0, 20.0),
@@ -186,7 +189,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:chicken",
         grams: 300.0,
-        per100: per(68.6, 18.6, 0.0, 15.0, 0.0, 0.0),
+        per100: per(66.0, 18.6, 0.0, 15.1, 0.0, 0.0),
         meal: Meal::Plain,
         raw: true,
         keeps: (2.0, 2.0),
@@ -258,7 +261,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:apple_pie",
         grams: 200.0,
-        per100: per(52.0, 2.4, 37.1, 12.5, 1.6, 1.7),
+        per100: per(52.4, 1.9, 32.4, 12.5, 1.6, 1.7),
         meal: Meal::Cooked,
         raw: false,
         keeps: (4.0, 4.0),
@@ -269,7 +272,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:berries",
         grams: 100.0,
-        per100: per(84.2, 0.7, 14.5, 0.3, 2.4, 9.7),
+        per100: per(84.2, 0.7, 12.1, 0.3, 2.4, 9.7),
         meal: Meal::Cooling,
         raw: false,
         keeps: (6.0, 6.0),
@@ -314,7 +317,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:dried_apple",
         grams: 40.0,
-        per100: per(31.8, 0.9, 65.9, 0.3, 8.7, 3.9),
+        per100: per(31.8, 0.9, 57.2, 0.3, 8.7, 3.9),
         meal: Meal::Plain,
         raw: false,
         keeps: (56.0, 56.0),
@@ -325,7 +328,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:dried_berries",
         grams: 30.0,
-        per100: per(15.0, 2.5, 80.0, 2.5, 7.5, 2.0),
+        per100: per(15.0, 2.5, 72.5, 2.5, 7.5, 2.0),
         meal: Meal::Plain,
         raw: false,
         keeps: (56.0, 56.0),
@@ -339,7 +342,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:lingonberries",
         grams: 100.0,
-        per100: per(87.3, 0.5, 12.0, 0.1, 3.6, 14.0),
+        per100: per(87.3, 0.5, 8.4, 0.1, 3.6, 14.0),
         meal: Meal::Cooling,
         raw: false,
         keeps: (20.0, 20.0),
@@ -349,7 +352,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:cloudberries",
         grams: 100.0,
-        per100: per(85.0, 2.4, 8.6, 0.8, 6.3, 100.0),
+        per100: per(85.0, 2.4, 2.3, 0.8, 6.3, 100.0),
         meal: Meal::Cooling,
         raw: false,
         keeps: (3.0, 3.0),
@@ -370,10 +373,32 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:raspberries",
         grams: 100.0,
-        per100: per(85.8, 1.2, 11.9, 0.7, 6.5, 26.2),
+        per100: per(85.8, 1.2, 5.4, 0.7, 6.5, 26.2),
         meal: Meal::Cooling,
         raw: false,
         keeps: (2.0, 2.0),
+        poison: 0.0,
+        category: Category::Fruit,
+    },
+    // Black huckleberries (USDA's wild blueberries stand in) and beach plums (USDA's plums stand
+    // in, the wild fruit tarter), a handful each.
+    Food {
+        name: "base:huckleberries",
+        grams: 100.0,
+        per100: per(84.2, 0.7, 12.1, 0.3, 2.4, 9.7),
+        meal: Meal::Cooling,
+        raw: false,
+        keeps: (5.0, 5.0),
+        poison: 0.0,
+        category: Category::Fruit,
+    },
+    Food {
+        name: "base:beach_plums",
+        grams: 100.0,
+        per100: per(87.2, 0.7, 10.0, 0.3, 1.4, 9.5),
+        meal: Meal::Cooling,
+        raw: false,
+        keeps: (5.0, 5.0),
         poison: 0.0,
         category: Category::Fruit,
     },
@@ -381,7 +406,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:prickly_pear_fruit",
         grams: 100.0,
-        per100: per(87.6, 0.7, 9.6, 0.5, 3.6, 14.0),
+        per100: per(87.6, 0.7, 6.0, 0.5, 3.6, 14.0),
         meal: Meal::Cooling,
         raw: false,
         keeps: (7.0, 7.0),
@@ -393,7 +418,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:rose_hip",
         grams: 30.0,
-        per100: per(58.7, 1.6, 38.2, 0.3, 24.1, 426.0),
+        per100: per(58.7, 1.6, 14.1, 0.3, 24.1, 426.0),
         meal: Meal::Cooling,
         raw: false,
         keeps: (30.0, 30.0),
@@ -405,7 +430,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:hazelnut",
         grams: 30.0,
-        per100: per(5.3, 15.0, 16.7, 60.8, 9.7, 6.3),
+        per100: per(5.3, 15.0, 7.0, 60.8, 9.7, 6.3),
         meal: Meal::Plain,
         raw: false,
         keeps: (60.0, 60.0),
@@ -415,17 +440,98 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:pine_nut",
         grams: 30.0,
-        per100: per(2.3, 13.7, 13.1, 68.4, 3.7, 0.8),
+        per100: per(2.3, 13.7, 9.4, 68.4, 3.7, 0.8),
         meal: Meal::Plain,
         raw: false,
         keeps: (60.0, 60.0),
         poison: 0.0,
         category: Category::Seeds,
     },
+    // Chia seeds (USDA's Salvia hispanica stands in for the desert's columbariae), a handful
+    // (30 g): fat, protein and a great deal of fibre, keeping a year; tepary beans, dry (estimates
+    // near the common bean's dry seed: about 24% protein, 17% fibre), a handful (50 g).
+    Food {
+        name: "base:chia_seeds",
+        grams: 30.0,
+        per100: per(5.8, 16.5, 7.7, 30.7, 34.4, 1.6),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (365.0, 365.0),
+        poison: 0.0,
+        category: Category::Seeds,
+    },
+    Food {
+        name: "base:tepary_beans",
+        grams: 50.0,
+        per100: per(10.0, 23.6, 43.0, 1.4, 17.0, 0.0),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (365.0, 365.0),
+        poison: 0.0,
+        category: Category::Seeds,
+    },
+    // Brazil nuts (USDA, dried), a handful (30 g, about six): the richest in fat of the nuts, and
+    // in selenium; keeping for months in the shell.
+    Food {
+        name: "base:brazil_nut",
+        grams: 30.0,
+        per100: per(3.4, 14.3, 4.8, 67.1, 7.5, 0.7),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (180.0, 180.0),
+        poison: 0.0,
+        category: Category::Seeds,
+    },
+    // A cacao pod's pulp (the sweet white flesh round the beans, eaten fresh where it grows;
+    // estimates near its kin cupuaçu's), a pod's worth (100 g), keeping a week.
+    Food {
+        name: "base:cacao_pod",
+        grams: 100.0,
+        per100: per(81.0, 1.0, 13.0, 0.5, 2.0, 10.0),
+        meal: Meal::Cooling,
+        raw: false,
+        keeps: (7.0, 7.0),
+        poison: 0.0,
+        category: Category::Fruit,
+    },
+    // A cacao pod's beans, dried in the sun (estimates near cocoa nibs': half fat, a fifth fibre,
+    // bitter), a handful (30 g), keeping a year; roasted, a little drier, keeping half a year.
+    Food {
+        name: "base:cacao_beans",
+        grams: 30.0,
+        per100: per(5.0, 12.9, 13.0, 46.0, 21.0, 0.0),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (365.0, 365.0),
+        poison: 0.0,
+        category: Category::Seeds,
+    },
+    Food {
+        name: "base:roasted_cacao",
+        grams: 30.0,
+        per100: per(2.0, 13.5, 13.5, 48.0, 21.5, 0.0),
+        meal: Meal::Cooked,
+        raw: false,
+        keeps: (180.0, 180.0),
+        poison: 0.0,
+        category: Category::Seeds,
+    },
+    // A hand of the wild banana's fruit (USDA, raw banana; carbs without the fiber; the wild
+    // ones are seedy and smaller), a few small fruit (150 g), keeping under a week once picked.
+    Food {
+        name: "base:bananas",
+        grams: 150.0,
+        per100: per(74.9, 1.1, 20.2, 0.3, 2.6, 8.7),
+        meal: Meal::Cooling,
+        raw: false,
+        keeps: (6.0, 6.0),
+        poison: 0.0,
+        category: Category::Fruit,
+    },
     Food {
         name: "base:sunflower_seeds",
         grams: 30.0,
-        per100: per(4.7, 20.8, 20.0, 51.5, 8.6, 1.4),
+        per100: per(4.7, 20.8, 11.4, 51.5, 8.6, 1.4),
         meal: Meal::Plain,
         raw: false,
         keeps: (90.0, 90.0),
@@ -460,7 +566,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:cooked_wild_rice",
         grams: 150.0,
-        per100: per(73.9, 4.0, 21.3, 0.3, 1.8, 0.0),
+        per100: per(73.9, 4.0, 19.5, 0.3, 1.8, 0.0),
         meal: Meal::Cooked,
         raw: false,
         keeps: (3.0, 3.0),
@@ -583,6 +689,126 @@ pub const FOODS: &[Food] = &[
         keeps: (90.0, 90.0),
         poison: 0.0,
         category: Category::Meat,
+    },
+    // The crops' foods (`crops::CROPS`; USDA, raw unless cooked), last so saved stomachs keep
+    // their indexes. A carrot 60 g, kept a cellar's weeks; a potato 170 g, raw (starchy and hard
+    // to digest, but food), baked 140 g with its skin (it loses water); a beetroot 80 g; an ear of
+    // sweet corn's kernels 100 g, raw or boiled, which keeps only days off the stalk; a handful
+    // (100 g) of green beans, the bean plant's young pods; a bowl (150 g) of white rice, boiled
+    // from the paddy's grain; a cassava root's 100 g, which rots in two or three days once dug,
+    // and raw holds the cyanide its cooking takes out (the bitter kinds' more): a chance of
+    // poisoning.
+    Food {
+        name: "base:carrot",
+        grams: 60.0,
+        per100: per(88.3, 0.9, 6.8, 0.2, 2.8, 5.9),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (20.0, 20.0),
+        poison: 0.0,
+        category: Category::Roots,
+    },
+    Food {
+        name: "base:potato",
+        grams: 170.0,
+        per100: per(79.3, 2.0, 17.5, 0.1, 2.1, 19.7),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (30.0, 30.0),
+        poison: 0.0,
+        category: Category::Roots,
+    },
+    Food {
+        name: "base:baked_potato",
+        grams: 140.0,
+        per100: per(74.9, 2.5, 21.2, 0.1, 2.2, 9.6),
+        meal: Meal::Cooked,
+        raw: false,
+        keeps: (3.0, 3.0),
+        poison: 0.0,
+        category: Category::Roots,
+    },
+    Food {
+        name: "base:beetroot",
+        grams: 80.0,
+        per100: per(87.6, 1.6, 6.8, 0.2, 2.8, 4.9),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (20.0, 20.0),
+        poison: 0.0,
+        category: Category::Roots,
+    },
+    Food {
+        name: "base:corn",
+        grams: 100.0,
+        per100: per(76.0, 3.3, 17.0, 1.4, 2.0, 6.8),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (2.0, 2.0),
+        poison: 0.0,
+        category: Category::Seeds,
+    },
+    Food {
+        name: "base:roasted_corn",
+        grams: 100.0,
+        per100: per(73.4, 3.4, 18.6, 1.5, 2.4, 5.5),
+        meal: Meal::Cooked,
+        raw: false,
+        keeps: (3.0, 3.0),
+        poison: 0.0,
+        category: Category::Seeds,
+    },
+    Food {
+        name: "base:beans",
+        grams: 100.0,
+        per100: per(90.3, 1.8, 4.3, 0.2, 2.7, 12.2),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (5.0, 5.0),
+        poison: 0.0,
+        category: Category::Seeds,
+    },
+    Food {
+        name: "base:cooked_rice",
+        grams: 150.0,
+        per100: per(68.4, 2.7, 28.2, 0.3, 0.4, 0.0),
+        meal: Meal::Cooked,
+        raw: false,
+        keeps: (3.0, 3.0),
+        poison: 0.0,
+        category: Category::Seeds,
+    },
+    Food {
+        name: "base:cassava",
+        grams: 100.0,
+        per100: per(59.7, 1.4, 36.3, 0.3, 1.8, 20.6),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (2.0, 2.0),
+        poison: 0.2,
+        category: Category::Roots,
+    },
+    // The stems' fruit (`crops::CROPS`, USDA, raw; carbs without the fiber): a slice of pumpkin,
+    // a fifth of a small one, and a slice of watermelon, cooling.
+    Food {
+        name: "base:pumpkin_slice",
+        grams: 200.0,
+        per100: per(91.6, 1.0, 6.0, 0.1, 0.5, 9.0),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (4.0, 4.0),
+        poison: 0.0,
+        category: Category::Fruit,
+    },
+    Food {
+        name: "base:melon_slice",
+        grams: 150.0,
+        per100: per(91.5, 0.6, 7.2, 0.2, 0.4, 8.1),
+        meal: Meal::Cooling,
+        raw: false,
+        keeps: (2.0, 2.0),
+        poison: 0.0,
+        category: Category::Fruit,
     },
 ];
 

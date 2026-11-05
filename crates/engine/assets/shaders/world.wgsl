@@ -79,11 +79,10 @@ struct Frame {
 }
 
 fn texture_frame(name: u32) -> Frame {
-    let base = tex_info[name * 2u];
-    let info = tex_info[name * 2u + 1u];
-    // The sizes start after two words per texture; `frames[0]` holds the count (`arrayLength`
-    // is wrong on some drivers, see `GameTextures::world_tables`).
-    let size = f32(tex_info[frames[0] * 2u + name]);
+    let base = tex_info[name * 4u];
+    let info = tex_info[name * 4u + 1u];
+    // A size of 0 would make every derivative NaN, and the sampler the smallest mip.
+    let size = f32(max(tex_info[name * 4u + 2u], 1u));
     if info == 0u {
         return Frame(base, base, 0.0, size);
     }
@@ -114,12 +113,31 @@ fn on_body(l: vec4<f32>, k: i32) -> vec4<f32> {
     if k == 0 {
         return l;
     }
-    let w = unpack_light(bitcast<u32>(offsets[k].w));
+    let w = unpack_light(bitcast<u32>(offsets[k * 3].w));
+    // A leaning one (a falling tree) lit its own blocks as if nothing stood beside them, so a
+    // trunk under its crown came out dark: lit as in the open.
+    if offsets[k * 3 + 2].w > 0.5 {
+        return max(l, w);
+    }
     return vec4(min(l.x, w.x), max(l.yzw, w.yzw));
 }
 
+// `v` turned by quaternion `q` (x, y, z, w).
+fn quat_turn(q: vec4<f32>, v: vec3<f32>) -> vec3<f32> {
+    let t = 2.0 * cross(q.xyz, v);
+    return v + q.w * t + cross(q.xyz, t);
+}
+
+// Each structure has three vec4 in `offsets`: its offset (and light), its rotation and its pivot
+// in its own coordinates (chiacraft: a leaning body, a falling tree; upright for the rest).
 fn finish(local: vec3<f32>, origin: vec4<i32>) -> vec4<f32> {
-    let pos = vec3<f32>(origin.xyz) * 16.0 + local - g.cam_frac.xyz + offsets[origin.w].xyz;
+    var at = vec3<f32>(origin.xyz) * 16.0 + local;
+    let k = origin.w;
+    if k != 0 {
+        let pivot = offsets[k * 3 + 2].xyz;
+        at = quat_turn(offsets[k * 3 + 1], at - pivot) + pivot;
+    }
+    let pos = at - g.cam_frac.xyz + offsets[k * 3].xyz;
     return vec4(pos, 1.0);
 }
 
@@ -143,7 +161,7 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     var out: VOut;
     out.clip = scene.view_proj * pos;
     out.dist = length(pos.xyz);
-    out.uv = UVS[c];
+    out.uv = UVS[(c + ((w0 >> FACE_TURN_SHIFT) & FACE_TURN_MASK)) % 4u];
     let tex_id = w1 & FACE_TEX_MASK;
     let fr = texture_frame(tex_id);
     out.size = fr.size;
@@ -332,12 +350,10 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     let c = vi % 4u;
     let w0 = records[f * 4u];
     let w1 = records[f * 4u + 1u];
-    let w2 = records[f * 4u + 2u];
-    let w3 = records[f * 4u + 3u];
-    let dir = lod_dir(w0);
-    let lo = lod_pos(w0, w2) - vec3(0.0, 0.125, 0.0);
-    let size = lod_size(w2, w3);
-    let local = lo + CORNERS[dir * 4u + c] * size;
+    // A box's face, or a far tile's smooth cell (`lod_corner`, in the prelude).
+    let corner = lod_corner(f, c, finish(vec3(0.0), origins[ii]).xyz);
+    let dir = corner.dir;
+    let local = corner.local;
     let pos = finish(local, origins[ii]);
     var out: VOut;
     out.clip = scene.view_proj * pos;
@@ -357,7 +373,7 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     let kind = lod_tint(w0);
     var tint = vec3(1.0);
     if kind != 0u {
-        tint = unpack_rgb(biomes[(w1 >> FACE_BIOME_SHIFT) * g.extra.z + kind - 1u]);
+        tint = unpack_rgb(biomes[corner.biome * g.extra.z + kind - 1u]);
     }
     out.tint = tint;
     out.color = tint * SHADE[dir];
@@ -366,7 +382,7 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
 
 @fragment
 fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
-    let half = i32(g.extra.w);
+    let half = i32(g.extra.w & 0xFFFFFFu);
     let col = vec2<i32>(floor(in.pos.xz / 16.0));
     let d = col - g.cam_cube.xz;
     if abs(d.x) <= half && abs(d.y) <= half {

@@ -143,8 +143,12 @@ impl Dim {
         let mut carried = Vec::new();
         let mut blocks: Vec<(IVec3, u32)> = also.to_vec();
         let mut arriving = FxHashMap::default();
+        let mut extras: Vec<(IVec3, Vec<u32>)> = Vec::new();
         for l in cells {
             let whole = self.get(l.from);
+            if !self.space.extras(l.from).is_empty() {
+                extras.push((l.local, self.space.extras(l.from).to_vec()));
+            }
             let Some((state, entity, signal)) = self.take_block(c, l.from) else { continue };
             let state = l.part.unwrap_or(state);
             // Pieces of wire on what stays, stay.
@@ -170,6 +174,9 @@ impl Dim {
         let cell = Transform::of(self.place.to_world(at)).cell(None);
         space.cell = Some(cell);
         space.build(c, &blocks);
+        for (at, parts) in extras {
+            space.put_extras(at, parts);
+        }
         self.bodies.insert(body, Box::new(space));
         // What it lit with doesn't go off for a moment. Its light is in the world's, from there on
         // a body too; that gets to it when it looks.
@@ -272,7 +279,7 @@ impl Dim {
                 .copied()
                 .unwrap_or(IVec3::ZERO)
                 * level as i32;
-            breaks |= s.mode == 1;
+            breaks |= s.flags as u32 & weft_abi::signal_flags::BREAKS != 0;
         }
         (sum.signum(), breaks)
     }
@@ -336,10 +343,10 @@ impl Dim {
         Some(out)
     }
 
-    fn break_for_body(&mut self, c: &'static Content, cells: Vec<IVec3>) {
+    pub(super) fn break_for_body(&mut self, c: &'static Content, cells: Vec<IVec3>) {
         for p in cells {
             if let Some(s) = self.get(p).filter(|s| *s != AIR) {
-                self.drop_block_loot(c, p, s, abi::ItemStack::EMPTY, false, None);
+                self.drop_block_loot(c, p, s, abi::ItemStack::EMPTY, false, 0);
                 self.set(c, p, AIR);
             }
         }
@@ -449,7 +456,7 @@ impl Dim {
                     for p in off {
                         if let Some(s) = d.get(p).filter(|s| *s != AIR) {
                             log::debug!("{} riding on a platform at {p} came off", c.state_name(s));
-                            d.drop_block_loot(c, p, s, abi::ItemStack::EMPTY, false, None);
+                            d.drop_block_loot(c, p, s, abi::ItemStack::EMPTY, false, 0);
                             d.set(c, p, AIR);
                         }
                     }
@@ -558,7 +565,14 @@ impl Dim {
                 .bodies
                 .get(&body)
                 .map_or_else(Moved::default, |s| s.signals.carry_out(b.local));
+            let extras = self
+                .bodies
+                .get(&body)
+                .map_or(Vec::new(), |s| s.extras(b.local).to_vec());
             self.land_block(c, b.to, b.state, b.entity, signal);
+            if self.get(b.to) == Some(b.state) {
+                self.set_extras(b.to, extras);
+            }
             if let Some(was) = was.filter(|was| self.get(b.to) != Some(*was)) {
                 cells.push((b.to, was));
             }
@@ -613,7 +627,7 @@ impl Dim {
             self.drop_inventory(c, id);
             self.entities.remove(id);
         }
-        self.drop_block_loot(c, at, state, abi::ItemStack::EMPTY, false, None);
+        self.drop_block_loot(c, at, state, abi::ItemStack::EMPTY, false, 0);
     }
 
     /// Landed bodies, a tick on: they get shown, and go.
@@ -698,10 +712,16 @@ impl Dim {
             }
         }
         for (at, state) in blocks {
-            if let Some(cb) = c.block_of(state).cb.on_pass {
+            if let Some(cb) = c.block_of(state).cb.on_carried {
                 let owner = c.block_of(state).owner;
                 let cell = at + now;
-                self.call(owner, cb, |w| abi::BlockEventArgs { world: w, pos: cell.to_array(), state, other: at.to_array(), entity: id });
+                self.call(owner, cb, |w| abi::BlockEventArgs {
+                    world: w,
+                    pos: cell.to_array().into(),
+                    state,
+                    other: at.to_array().into(),
+                    entity: id,
+                });
             }
         }
     }
@@ -781,7 +801,7 @@ impl Dim {
         if !lights.is_empty() {
             self.space.body_lights.insert(id, lights);
         }
-        let Space { cubes, body_light, body_lights, light_dirty, .. } = &mut *self.space;
+        let Space { cubes, body_light, body_lights, body_light_changes, light_dirty, .. } = &mut *self.space;
         let mut changed = Vec::new();
         for &cell in &touched {
             let all = body_lights
@@ -796,6 +816,7 @@ impl Dim {
                     None => body_light.remove(&cell),
                 };
                 changed.push(cell);
+                body_light_changes.push((cell, all));
             }
         }
         let def = &c.dims[self.id as usize];
@@ -911,9 +932,7 @@ impl Dim {
         for at in s.cells {
             if self.space.not_shown.get(&at).is_some_and(|n| n.1 == s.body) {
                 self.space.not_shown.remove(&at);
-                if let Some(now) = self.get(at) {
-                    self.space.changes.push((at, now));
-                }
+                self.resend_cell(at);
             }
         }
         // What has already moved on doesn't stay behind in the body.
@@ -941,9 +960,7 @@ impl Dim {
             self.bodies.remove(&s.body);
         }
         for (at, _) in std::mem::take(&mut self.space.not_shown) {
-            if let Some(now) = self.get(at) {
-                self.space.changes.push((at, now));
-            }
+            self.resend_cell(at);
         }
         for (body, _) in std::mem::take(&mut self.space.lingering) {
             self.entities.remove(body);

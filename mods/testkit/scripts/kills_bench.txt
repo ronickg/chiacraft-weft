@@ -1,0 +1,48 @@
+# Kills bench (reports/Creature AI.md; Planner 11-06: pin the 0.1-1 s goal-call spikes on kills).
+# 500 animals within 4-24 blocks, a fifth of them hunters, all made hungry so they hunt, eat and
+# kill for three minutes. Read: 'slow mod call' (the engine's, any mod callback over 50 ms of its own)
+# and ANIMAL_SLOW (the animals mod's: a look round, taming, hunt or a death off its gene pool over
+# 20 ms) lines, the BENCH lines' server max, the ANIMAL_GOALS lines' max per goal, and how many died.
+# Run as a bench: t2q.py bench <id> <TREE> <this> --limit 300 -- --seed 1
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /weather clear 99999
+chat /tk mode spectator
+chat /tk time 6000
+wait 5
+chat /tk ring animals:grey_wolf 60 4 24
+chat /tk ring animals:red_fox 60 4 24
+chat /tk ring animals:raven 20 4 24
+chat /tk ring animals:hare 150 4 24
+chat /tk ring animals:wood_mouse 100 4 24
+chat /tk ring animals:red_deer 60 4 24
+chat /tk ring animals:reindeer 50 4 24
+wait 5
+chat /animalprof on
+chat /animalprof starve
+bench 25 kills1
+chat /animalprof dump
+chat /animalprof count
+chat /animalprof starve
+bench 25 kills2
+chat /animalprof dump
+chat /animalprof count
+chat /animalprof starve
+bench 25 kills3
+chat /animalprof dump
+chat /animalprof count
+chat /animalprof starve
+bench 25 kills4
+chat /animalprof dump
+chat /animalprof count
+chat /animalprof starve
+bench 25 kills5
+chat /animalprof dump
+chat /animalprof count
+chat /animalprof starve
+bench 25 kills6
+chat /animalprof dump
+chat /animalprof count
+chat /animalprof starve
+quit

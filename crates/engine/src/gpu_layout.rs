@@ -29,6 +29,9 @@ shared! {
         AO_SHIFT = 16,
         AO_MASK = 3,
         TINT_SHIFT = 24,
+        /// Quarter turns of the picture.
+        TURN_SHIFT = 28,
+        TURN_MASK = 3,
         TEX_MASK = 0xFFFF,
         BIOME_SHIFT = 16,
         /// Corner light: a channel per 4 bits, a corner per 16.
@@ -57,6 +60,12 @@ shared! {
     /// Distant terrain record (`client::lod`), four words in the faces' pages: x, z in the tile
     /// (11 bits each), direction, tint kind; texture and biome like a face's; y (signed 16 bits)
     /// and the box's height; its width and depth.
+    ///
+    /// Direction `GRID` is a cell of a far tile's smooth ground instead (`lod_grid_cell`): word 2
+    /// is its record's place in the tile, whose first `GRID_WORDS` words are the heights and
+    /// biomes of its `GRID_SIDE` x `GRID_SIDE` corners (from one before the tile's first, `lod_grid`),
+    /// word 3 its cell (i, j) and level. Its corners morph to the next level's shape with distance
+    /// (`lod_corner`).
     lod_face {
         POS_MASK = 2047,
         Z_SHIFT = 11,
@@ -64,6 +73,12 @@ shared! {
         TINT_SHIFT = 25,
         HALF_SHIFT = 16,
         HALF_MASK = 0xFFFF,
+        GRID = 6,
+        GRID_SIDE = 34,
+        GRID_WORDS = 34 * 34,
+        CELL_MASK = 63,
+        CELL_J_SHIFT = 6,
+        LEVEL_SHIFT = 12,
     }
     /// Tint kinds of faces and quads (0 none); mods' kinds follow the engine's.
     tint {
@@ -78,6 +93,12 @@ shared! {
         TEXEL = 4,
         FILLED = 5,
         QUAD = 6,
+    }
+    /// `Quad::layer` of a texture animated as a strip: the frame, the next and how many there are.
+    ui_strip {
+        BITS = 11,
+        MASK = 2047,
+        COUNT_SHIFT = 22,
     }
     /// UI quad modes (`ui.wgsl`).
     ui_mode {
@@ -113,33 +134,57 @@ pub mod terrain {
         /// Header words of the description (`terrain_gpu::describe`).
         d {
             STONE = 0, BASE = 1, HAS_SEA = 2, SEA = 3, WATER = 4, HAS_CAVES = 5, LAVA = 6,
-            LAVA_FROM = 7, LAVA_TO = 8, FEATURES = 9, RULES = 10, CAVE_BIOMES = 11,
+            LAVA_FROM = 7, LAVA_TO = 8, FIELDS = 9, FEATURES = 10, RULES = 11, CAVE_BIOMES = 12,
             /// The noise seeds, in `SEEDS` order.
-            SEEDS = 12,
-            FEAT_OFF = 26, RULE_OFF = 27, CAVE_OFF = 28,
+            SEEDS = 13,
+            FIELD_OFF = 21, FEAT_OFF = 22, RULE_OFF = 23, CAVE_OFF = 24,
             /// Distant terrain's scattered things (`describe_lod`).
-            SCATTER_OFF = 29,
+            SCATTER_OFF = 25,
+            /// Distant terrain: from what fall (`lod::fall`) the ground is a bare face, where no
+            /// scattered things stand (`Terrain::faces`; `i32::MAX`: none).
+            FACE_FALL = 26,
+            /// The continent noise's scale (Q4, `Terrain::continent_scale`).
+            CONT_SCALE = 27,
             /// The header's length.
-            LEN = 30,
+            LEN = 28,
         }
-        /// Words per record of the description, per cube's mods' heights and per cube made.
+        /// Words per record of the description and per cube made. A rule is: biome, lowest and
+        /// highest surface height, the word where its conditions start and how many there
+        /// are, top block, filler block, depth, under block and layers, deep top block
+        /// and the height below which it applies, ice block, a flag for bare stone and the
+        /// height above which that is.
         words {
-            FEATURE = 8,
-            /// A mask step: kind, then five words.
-            MASK = 6,
-            RULE = 24,
+            /// An expression step: kind, the noise seed (made from its salt), then `a`, `b`, `c`.
+            STEP = 5,
+            /// A field: where its steps start (a word index in the description) and how many.
+            FIELD = 2,
+            /// A feature: start and count of its height's steps, and of its mask's (count 0: none),
+            /// then its place among the features made on the CPU (`Feature::custom`), whose heights
+            /// come with each job (`CUSTOM`, or a tile's `lod::SAMPLES`) instead of its steps
+            /// (-1: none).
+            FEATURE = 5,
+            RULE = 15,
+            /// A condition of a rule: the field, from, to.
+            COND = 3,
             CAVE = 5,
-            /// Per scatter and biome: threshold (two words), canopy radius, top, block.
-            SCATTER_BIOME = 5,
-            /// Per mod feature and cube: heights at the 256 columns and the 25 corners caves
-            /// measure from.
+            /// Per scatter: cell, reach, hash seed (two words), biomes, its thinning mask's steps
+            /// (where they start and how many, `STEP` each) and keep. After it the mask's steps,
+            /// a `SCATTER_BIOME` per biome, then the ground it stands on (`ScatterDef::ground`) as
+            /// state ranges: how many, then first and count each (none: any).
+            SCATTER = 8,
+            /// Per scatter and biome: threshold (two words), thinned, then `lod::SHAPES` crowns
+            /// its shape callback made there, two words each (`crown`).
+            SCATTER_BIOME = 3 + 2 * 8,
+            /// Per CPU-made feature (`Feature::custom`) and cube: heights at the 256 columns and
+            /// the 25 corners caves measure from, after the job's own words.
             CUSTOM = 281,
             OUT = 2560,
         }
-        /// Sizes of the shader's own arrays.
+        /// Sizes of the shader's own arrays: the values of the fields at one column, and what an
+        /// expression keeps on its stack.
         limit {
-            FEATURES = 32,
-            MASK_DEPTH = 8,
+            FIELDS = 32,
+            DEPTH = 16,
         }
         /// Where things are in a cube made (`words::OUT`): blocks two per word from 0, then biomes
         /// (cave biomes included) two per word, column heights, column biomes two per word.
@@ -153,45 +198,78 @@ pub mod terrain {
         lod {
             SIDE = 34,
             SAMPLES = 34 * 34,
+            /// Words per sample coming back: the ground (height and top, biome and under) and
+            /// the crown over it (`lod_out`).
+            WORDS = 4,
+            /// Crowns sampled per scatter and biome; each site takes one by its hash.
+            SHAPES = 8,
         }
-        /// Mask step kinds.
-        mask {
-            NOISE = weft_abi::terrain_mask::NOISE,
-            CONTINENT = weft_abi::terrain_mask::CONTINENT,
-            TEMPERATURE = weft_abi::terrain_mask::TEMPERATURE,
-            HUMIDITY = weft_abi::terrain_mask::HUMIDITY,
-            ALL = weft_abi::terrain_mask::ALL,
-            NOT = weft_abi::terrain_mask::NOT,
+        /// A sampled crown (`terrain_gpu::describe_lod`), first word: radius, top above the site,
+        /// its lowest leaves, the widest layer (fifteenths of the way from the lowest to the top),
+        /// how round its top is (its width halfway from the widest layer to the top, fifteenths
+        /// of the radius), the trunk's width. Second word: its leaves, its trunk's block. A first
+        /// word of 0: nothing there.
+        crown {
+            RADIUS_MASK = 63,
+            TOP_SHIFT = 6,
+            TOP_MASK = 255,
+            BOTTOM_SHIFT = 14,
+            BOTTOM_MASK = 127,
+            WIDEST_SHIFT = 21,
+            ROUND_SHIFT = 25,
+            FIFTEENTHS = 15,
+            TRUNK_SHIFT = 29,
+            TRUNK_MASK = 7,
+            BLOCK_MASK = 0xFFFF,
+            TRUNK_BLOCK_SHIFT = 16,
         }
-        /// Feature presets.
-        preset {
-            CONTINENTS = weft_abi::terrain_preset::CONTINENTS,
-            HILLS = weft_abi::terrain_preset::HILLS,
-            MOUNTAINS = weft_abi::terrain_preset::MOUNTAINS,
-            PLATEAUS = weft_abi::terrain_preset::PLATEAUS,
-            CANYONS = weft_abi::terrain_preset::CANYONS,
-            DUNES = weft_abi::terrain_preset::DUNES,
-            CRATERS = weft_abi::terrain_preset::CRATERS,
+        /// A sample's crown, words 2 and 3 of it: the crown's top block (signed 16 bits) and its
+        /// leaves (none: no crown); how many blocks it reaches down under its top, the trunk
+        /// standing in its cell (its place in the cell, two bits each, and width; 0: none) and
+        /// the trunk's block.
+        lod_out {
+            HALF_SHIFT = 16,
+            HALF_MASK = 0xFFFF,
+            DEPTH_MASK = 255,
+            TRUNK_DZ_SHIFT = 8,
+            TRUNK_DX_SHIFT = 10,
+            TRUNK_W_SHIFT = 12,
+            PLACE_MASK = 3,
+            TRUNK_W_MASK = 15,
+        }
+        /// Expression step kinds.
+        expr {
+            CONST = weft_abi::expr::CONST,
+            X = weft_abi::expr::X,
+            Z = weft_abi::expr::Z,
+            FIELD = weft_abi::expr::FIELD,
+            ADD = weft_abi::expr::ADD,
+            SUB = weft_abi::expr::SUB,
+            MUL = weft_abi::expr::MUL,
+            DIV = weft_abi::expr::DIV,
+            REM = weft_abi::expr::REM,
+            MIN = weft_abi::expr::MIN,
+            MAX = weft_abi::expr::MAX,
+            ABS = weft_abi::expr::ABS,
+            RAMP = weft_abi::expr::RAMP,
+            NOISE = weft_abi::expr::NOISE,
+            SITE = weft_abi::expr::SITE,
         }
     }
 
     /// The noise seeds the description carries from `d::SEEDS` on, the shader's `S_<name>`:
     /// made from the salts the CPU uses.
-    pub const SEEDS: [(&str, u64); 14] = [
-        ("CONT", salt::CONTINENT),
-        ("TEMP", salt::TEMPERATURE),
-        ("HUM", salt::HUMIDITY),
-        ("HILLS", salt::HILLS),
-        ("MTN", salt::MOUNTAINS),
-        ("PLAT", salt::PLATEAUS),
-        ("CAN", salt::CANYONS),
-        ("DUNE", salt::DUNES),
-        ("CRAT", salt::CRATERS),
+    /// The last three are the standard fields' own noise, which distant terrain's thinning masks
+    /// read (`continent()`, `temperature()`, `humidity()`) where the terrain's fields may be pruned.
+    pub const SEEDS: [(&str, u64); 8] = [
         ("C1", salt::CAVE_A),
         ("C2", salt::CAVE_B),
         ("C3", salt::CAVERN),
         ("C4", salt::CAVERN_ROOF),
         ("LAKE", salt::LAVA),
+        ("CONT", salt::CONTINENT),
+        ("TEMP", salt::TEMPERATURE),
+        ("HUM", salt::HUMIDITY),
     ];
 
     /// What goes in front of `terrain.wgsl`: the constants, the seeds' indices, the bindings
@@ -214,7 +292,7 @@ pub mod terrain {
 ",
             "@group(1) @binding(0) var<storage, read> desc: array<i32>;
 ",
-            "// Per cube: x, y, z, unused, then per mod feature `WORDS_CUSTOM` heights.
+            "// Per cube: x, y, z, unused.
 ",
             "@group(1) @binding(1) var<storage, read> jobs: array<i32>;
 ",
@@ -249,13 +327,14 @@ pub const CORNERS: [[[i32; 3]; 4]; 6] = weft_abi::FACE_CORNERS;
 /// A block face record (`face`): (x, y, z) in the cube, `ao` 2 bits per corner, `light` per
 /// corner (`corner_light`).
 #[inline]
-pub fn face_record(pos: [i32; 3], dir: u32, ao: u32, tint: u32, tex: u32, biome: u32, light: [u32; 4]) -> [u32; 4] {
+pub fn face_record(pos: [i32; 3], dir: u32, ao: u32, tint: u32, turn: u32, tex: u32, biome: u32, light: [u32; 4]) -> [u32; 4] {
     let w0 = pos[0] as u32
         | (pos[1] as u32) << face::Y_SHIFT
         | (pos[2] as u32) << face::Z_SHIFT
         | dir << face::DIR_SHIFT
         | ao << face::AO_SHIFT
-        | tint << face::TINT_SHIFT;
+        | tint << face::TINT_SHIFT
+        | (turn & face::TURN_MASK) << face::TURN_SHIFT;
     [w0, tex | biome << face::BIOME_SHIFT, light[0] | light[1] << face::CORNER_SHIFT, light[2] | light[3] << face::CORNER_SHIFT]
 }
 
@@ -291,6 +370,10 @@ pub fn quad_middle(q: &[u32; 8]) -> [i32; 3] {
 /// A quad's uv word, and what goes on top of each of its corners' words: `uv` (u0, v0, u1, v1, 16
 /// across a texture), tint kind and flags.
 #[inline]
+pub fn ui_strip_record(frame: u32, next: u32, count: u32) -> u32 {
+    frame.min(ui_strip::MASK) | next.min(ui_strip::MASK) << ui_strip::BITS | count << ui_strip::COUNT_SHIFT
+}
+
 pub fn quad_uv(uv: [f32; 4], tint: u32) -> (u32, [u32; 4]) {
     let e = uv.map(|v| ((v * 8.0).round() as i32).clamp(0, (quad::UV_MASK as i32 + 1) * 8 - 1) as u32);
     let [whole, fine] = [e.map(|v| v >> quad::UV_FINE_BITS), e.map(|v| v & ((1 << quad::UV_FINE_BITS) - 1))];
@@ -317,6 +400,102 @@ pub fn lod_record(dir: u32, pos: [i32; 3], size: [i32; 3], tex: u32, tint: u32, 
     ]
 }
 
+/// A cell of a far tile's smooth ground (`lod_face::GRID`): cell (i, j) of a level `level` tile,
+/// the `k`th record of the tile, its top block's texture, tint kind and biome.
+pub fn lod_grid_cell(i: u32, j: u32, level: u32, k: u32, tex: u32, tint: u32, biome: u32) -> [u32; 4] {
+    let s = 1 << level;
+    [
+        i * s | (j * s) << lod_face::Z_SHIFT | lod_face::GRID << lod_face::DIR_SHIFT | tint << lod_face::TINT_SHIFT,
+        tex | biome << face::BIOME_SHIFT,
+        k,
+        i | j << lod_face::CELL_J_SHIFT | level << lod_face::LEVEL_SHIFT,
+    ]
+}
+
+/// A far tile's corner for its smooth ground: the top block's y and the biome.
+pub fn lod_grid(y: i32, biome: u32) -> u32 {
+    (y as u32 & lod_face::HALF_MASK) | biome << lod_face::HALF_SHIFT
+}
+
+/// Distant terrain's vertices, for `vs_lod` (engine's and packs'): needs `records`.
+const LOD_CORNER: &str = "
+// A distant terrain vertex: where it is in its tile, its normal, the face's direction (a smooth
+// cell's is up) and the biome its tint is from.
+struct LodCorner {
+    local: vec3<f32>,
+    normal: vec3<f32>,
+    dir: u32,
+    biome: u32,
+}
+
+fn lod_grid_word(base: u32, i: i32, j: i32) -> u32 {
+    let n = i32(LOD_FACE_GRID_SIDE) - 1;
+    return records[base + u32(clamp(j + 1, 0, n)) * LOD_FACE_GRID_SIDE + u32(clamp(i + 1, 0, n))];
+}
+
+fn lod_grid_y(base: u32, i: i32, j: i32) -> f32 {
+    return f32(bitcast<i32>(lod_grid_word(base, i, j) << LOD_FACE_HALF_SHIFT) >> LOD_FACE_HALF_SHIFT);
+}
+
+// Corner (`i`, `j`) of a smooth tile, `m` of the way to the next level's shape: on its grid of
+// even corners, odd ones lie on the line or square between them (CDLOD's morph). That level's
+// tiles have these very corners, so tiles meet without a seam and a level swap doesn't jump.
+fn lod_grid_morphed(base: u32, i: i32, j: i32, m: f32) -> f32 {
+    let h = lod_grid_y(base, i, j);
+    let oi = (i & 1) != 0;
+    let oj = (j & 1) != 0;
+    var t = h;
+    if oi && oj {
+        t = 0.25 * (lod_grid_y(base, i - 1, j - 1) + lod_grid_y(base, i + 1, j - 1) + lod_grid_y(base, i - 1, j + 1) + lod_grid_y(base, i + 1, j + 1));
+    } else if oi {
+        t = 0.5 * (lod_grid_y(base, i - 1, j) + lod_grid_y(base, i + 1, j));
+    } else if oj {
+        t = 0.5 * (lod_grid_y(base, i, j - 1) + lod_grid_y(base, i, j + 1));
+    }
+    return mix(h, t, m);
+}
+
+fn lod_box_normal(dir: u32) -> vec3<f32> {
+    switch dir {
+        case 0u: { return vec3(-1.0, 0.0, 0.0); }
+        case 1u: { return vec3(1.0, 0.0, 0.0); }
+        case 2u: { return vec3(0.0, -1.0, 0.0); }
+        case 3u: { return vec3(0.0, 1.0, 0.0); }
+        case 4u: { return vec3(0.0, 0.0, -1.0); }
+        default: { return vec3(0.0, 0.0, 1.0); }
+    }
+}
+
+// Corner `c` of record `f`; `at` is its tile's origin from the camera. A level's tiles are shown
+// from about 4 to 8 of their widths away; a smooth one has the next level's shape from 8 on, its
+// own from 6 in.
+fn lod_corner(f: u32, c: u32, at: vec3<f32>) -> LodCorner {
+    let w0 = records[f * 4u];
+    let w1 = records[f * 4u + 1u];
+    let w2 = records[f * 4u + 2u];
+    let w3 = records[f * 4u + 3u];
+    let dir = lod_dir(w0);
+    if dir != LOD_FACE_GRID {
+        let lo = lod_pos(w0, w2) - vec3(0.0, 0.125, 0.0);
+        return LodCorner(lo + CORNERS[dir * 4u + c] * lod_size(w2, w3), lod_box_normal(dir), dir, w1 >> FACE_BIOME_SHIFT);
+    }
+    let base = (f - w2) * 4u;
+    let s = f32(1u << ((w3 >> LOD_FACE_LEVEL_SHIFT) & 7u));
+    let k = CORNERS[3u * 4u + c];
+    let i = i32(w3 & LOD_FACE_CELL_MASK) + i32(k.x);
+    let j = i32((w3 >> LOD_FACE_CELL_J_SHIFT) & LOD_FACE_CELL_MASK) + i32(k.z);
+    let xz = vec2(f32(i), f32(j)) * s;
+    let width = 32.0 * s;
+    let m = clamp((length(at.xz + xz) - 6.0 * width) / (2.0 * width), 0.0, 1.0);
+    let y = lod_grid_morphed(base, i, j, m);
+    let dx = lod_grid_y(base, i + 1, j) - lod_grid_y(base, i - 1, j);
+    let dz = lod_grid_y(base, i, j + 1) - lod_grid_y(base, i, j - 1);
+    let normal = normalize(vec3(-dx, 2.0 * s, -dz));
+    let biome = lod_grid_word(base, i, j) >> LOD_FACE_HALF_SHIFT;
+    return LodCorner(vec3(xz.x, y + 1.0 - 0.125, xz.y), normal, 3u, biome);
+}
+";
+
 /// The WGSL side of the records above: `CORNERS` and their decoders.
 fn records() -> String {
     let corners: Vec<String> = CORNERS
@@ -325,6 +504,11 @@ fn records() -> String {
         .map(|c| format!("vec3({:.1}, {:.1}, {:.1})", c[0] as f32, c[1] as f32, c[2] as f32))
         .collect();
     let mut s = format!("var<private> CORNERS: array<vec3<f32>, 24> = array<vec3<f32>, 24>({});\n", corners.join(", "));
+    let dirs: Vec<String> = weft_abi::FACE_DIRS
+        .iter()
+        .map(|d| format!("vec3({:.1}, {:.1}, {:.1})", d[0] as f32, d[1] as f32, d[2] as f32))
+        .collect();
+    s.push_str(&format!("var<private> FACE_DIRS: array<vec3<f32>, 6> = array<vec3<f32>, 6>({});\n", dirs.join(", ")));
     s.push_str(concat!(
         "fn face_pos(w0: u32) -> vec3<f32> {\n",
         "    return vec3<f32>(f32(w0 & FACE_POS_MASK), f32((w0 >> FACE_Y_SHIFT) & FACE_POS_MASK), f32((w0 >> FACE_Z_SHIFT) & FACE_POS_MASK));\n",
@@ -395,16 +579,18 @@ pub fn frame_buffer(
 /// WGSL spelling of a field type.
 pub trait Wgsl {
     const TY: &'static str;
+    /// Alignment and size in a WGSL storage buffer.
+    const LAYOUT: (usize, usize);
 }
 
 macro_rules! wgsl_types {
-    ($($t:ty => $s:literal),* $(,)?) => { $(impl Wgsl for $t { const TY: &'static str = $s; })* };
+    ($($t:ty => $s:literal, $a:literal, $n:literal),* $(,)?) => { $(impl Wgsl for $t { const TY: &'static str = $s; const LAYOUT: (usize, usize) = ($a, $n); })* };
 }
 wgsl_types! {
-    f32 => "f32", u32 => "u32", i32 => "i32",
-    [f32; 2] => "vec2<f32>", [f32; 3] => "vec3<f32>", [f32; 4] => "vec4<f32>",
-    [u32; 4] => "vec4<u32>", [i32; 4] => "vec4<i32>",
-    [[f32; 4]; 3] => "array<vec4<f32>, 3>", [[f32; 4]; 4] => "mat4x4<f32>", [[f32; 4]; 6] => "array<vec4<f32>, 6>",
+    f32 => "f32", 4, 4, u32 => "u32", 4, 4, i32 => "i32", 4, 4,
+    [f32; 2] => "vec2<f32>", 8, 8, [f32; 3] => "vec3<f32>", 16, 12, [f32; 4] => "vec4<f32>", 16, 16,
+    [u32; 4] => "vec4<u32>", 16, 16, [i32; 4] => "vec4<i32>", 16, 16,
+    [[f32; 4]; 3] => "array<vec4<f32>, 3>", 16, 48, [[f32; 4]; 4] => "mat4x4<f32>", 16, 64, [[f32; 4]; 6] => "array<vec4<f32>, 6>", 16, 96, [[f32; 4]; 8] => "array<vec4<f32>, 8>", 16, 128,
 }
 
 /// Declares a GPU buffer struct: the Rust type and, from the same fields, its WGSL text
@@ -415,6 +601,21 @@ macro_rules! gpu_struct {
         #[repr(C)]
         #[derive(Clone, Copy, Default, bytemuck::Pod, bytemuck::Zeroable)]
         pub struct $name { $($(#[$fm])* pub $f: $t),* }
+
+        // The shader reads every field where Rust puts it, and arrays of it by the same stride.
+        const _: () = {
+            let (mut off, mut align) = (0usize, 4usize);
+            $(
+                let (a, n) = <$t as Wgsl>::LAYOUT;
+                off = off.div_ceil(a) * a;
+                assert!(off == core::mem::offset_of!($name, $f), concat!(stringify!($name), ".", stringify!($f), " sits elsewhere in WGSL"));
+                off += n;
+                if a > align {
+                    align = a;
+                }
+            )*
+            assert!(off.div_ceil(align) * align == core::mem::size_of::<$name>(), concat!(stringify!($name), " has another size in WGSL: pad it"));
+        };
 
         impl $name {
             pub fn wgsl() -> String {
@@ -468,6 +669,65 @@ gpu_struct! {
         /// x the shadow map's bindless index, y its size in texels, z 1 while it holds this
         /// frame's shadows (0: none, fall back), w the blocks a texel covers.
         pub shadow: [f32; 4],
+        /// The world as it was before what is seen through it was drawn (`water_behind` packs):
+        /// x its color's bindless index, y its depth's, z 1 while they hold this frame's (0: none),
+        /// w unused. Only what is drawn after (water, glass) may read them.
+        pub behind: [f32; 4],
+        /// The far shadow cascade, as `shadow_view_proj` and `shadow` for the near one: coarser,
+        /// 400 blocks to each side, where the near one ends.
+        pub shadow_far_view_proj: [[f32; 4]; 4],
+        pub shadow_far: [f32; 4],
+        /// The sky's cloud layer, for packs' cloud shadows: x its picture's bindless index + 1 (0:
+        /// no clouds), y the blocks a picture cell covers, z its underside's height over the camera
+        /// (blocks), w how much of the picture's gaps the weather fills (0..1, a hash per cell
+        /// decides which).
+        pub clouds: [f32; 4],
+        /// Where the camera is under it: x and z (in `xy`) its place in its cell, 0..1, and the
+        /// cell in the picture (`zw`), as the sky's cloud pass reads them.
+        pub cloud_cells: [f32; 4],
+        /// xyz toward the moon where the sky draws it (it lags the day by its phase: up all night
+        /// when full, only by day when new), w the light it gives: its phase times how high it
+        /// stands, 0 below the horizon. For packs' night light and moon shadows.
+        pub moon: [f32; 4],
+        /// The values of the settings the pack names in its `pack.cfg` (`options = a, b, ...`), 32
+        /// at most (16 before chiacraft's fantasy settings), four to a row in that order
+        /// (`packs::pack_options`); 0 for one not found.
+        pub options: [[f32; 4]; 8],
+        /// The light the player holds (a torch, a lantern), for packs' dynamic light: xyz where it
+        /// is (camera relative, by the hand), w unused.
+        pub hand: [f32; 4],
+        /// Its light per channel (r, g, b) as block light levels 0..1 (a torch 14/15); zeros
+        /// when what is held gives none. It falls off like block light, a level a block.
+        pub hand_light: [f32; 4],
+        /// Where the player is: x how closed a forest's canopy is (0 open sky to 1 a rainforest's;
+        /// a mod's air, `air_flags::CANOPY_SHIFT`), for packs' light under the leaves; yzw unused.
+        pub canopy: [f32; 4],
+        /// Soft clouds (`core:soft_clouds`, with a pack whose sky has `fs_cloud_trace` and
+        /// `fs_cloud_resolve`; chiacraft): x the bindless index + 1 of this frame's clouds, traced
+        /// at a quarter of the pixels each way and blended over frames, which `fs_clouds` draws
+        /// from (0: off, the blocky clouds); y the index + 1 of last frame's, the history
+        /// `fs_cloud_resolve` blends into; z the bindless index of the noise volume
+        /// (`soft_clouds::noise_atlas`: 64 slices of 64², eight to a row, each in a 66² cell with
+        /// a wrapped border, so a linear sample within a cell tiles); w how many frames the history
+        /// holds (0: none yet, take this frame's alone).
+        pub soft_clouds: [f32; 4],
+        /// Last frame's `view_proj` (camera relative then), for reprojecting the clouds.
+        pub prev_view_proj: [[f32; 4]; 4],
+        /// xyz: where last frame's camera stands from this one's, less how far the wind carried
+        /// the clouds since (blocks): a cloud at camera-relative `p` now stood at `p + xyz` from
+        /// last frame's camera. w: the frame's number (for the trace's jitter).
+        pub cloud_moved: [f32; 4],
+        /// What happens in the sky (chiacraft, a mod's `set_sky_event`): x the kind
+        /// (`weft_abi::sky_event`: 0 none, 1 blood moon, 2 meteors, 3 fireball, 4 aurora storm),
+        /// y how strongly (0..1), z seconds since it began, w unused.
+        pub sky_event: [f32; 4],
+        /// What falls from the sky (a mod's `sky_landing`): xyz where it lands (camera relative),
+        /// w seconds until it does (negative after; -1e6 when nothing falls).
+        pub sky_landing: [f32; 4],
+        /// What the pack's look works out once a frame (`client::frame_look`, a pack whose sky
+        /// has `fs_frame_look`; chiacraft): x the bindless index + 1 of its row of texels (0:
+        /// none this frame, each shader works them out itself), yzw unused.
+        pub frame_look: [f32; 4],
     }
 }
 
@@ -500,7 +760,9 @@ gpu_struct! {
         /// Origins are relative to this cube.
         pub cam_cube: [i32; 4],
         /// x start of the overlay table in `frames` (per texture: overlay texture + 1, or 0),
-        /// z tint kinds, w half the width of `lod_mask`.
+        /// y how far across from the camera the cubes end, fading into distant terrain before it
+        /// (`WorldRenderer::lod_fade`, 0: no fade), z tint kinds, w half the width of `lod_mask` in the
+        /// low 24 bits and `core:far_look` in the top 8 (chiacraft).
         pub extra: [u32; 4],
     }
 }
@@ -534,21 +796,27 @@ gpu_struct! {
         pub cuboids: u32,
         pub cuboid_count: u32,
         pub vertices: u32,
-        /// Tint (rgb) and hurt flash.
+        /// Tint (rgb), and the strength of `effect`.
         pub color: [f32; 3],
-        pub hurt: f32,
+        pub strength: f32,
         pub tex: u32,
         /// Extra model pixels on every side (worn layers).
         pub inflate: f32,
         pub tex_size: [f32; 2],
-        /// Bit per part role this layer draws.
+        /// Bit per part role this layer draws, and bit per bone (the first 32) it draws too.
         pub roles: u32,
+        pub bone_mask: u32,
         /// Entity shader slot (`shaders/entity/<name>.wgsl`, 0 none) and glow mask texture (all
         /// ones: none).
         pub shader: u32,
         pub glow: u32,
         /// Light as the world stores it, all ones: full light.
         pub light: u32,
+        /// Entity effect slot (`shaders/entity_effect/<name>.wgsl`, 0 none).
+        pub effect: u32,
+        // Whole 16 bytes: WGSL rounds the array stride up to them.
+        pub pad0: u32,
+        pub pad1: u32,
     }
 }
 
@@ -607,9 +875,67 @@ gpu_struct! {
         pub motion: [f32; 4],
         /// x color, y color at the end, z `abi::particle_flags`, w shader slot.
         pub data: [u32; 4],
-        /// x first in `frames`, y how many, none for block dust.
+        /// x first in `frames`, y how many, none for block dust; z first in `rules`, w how many.
         pub frames: [u32; 4],
+        /// What one turning into it starts with: life and size, each from and to.
+        pub start: [f32; 4],
     }
+}
+
+gpu_struct! {
+    /// A kind's `registry::ParticleRule`.
+    pub struct GpuParticleRule as "ParticleRule" {
+        /// x event | place << 4 | tag << 8 | action << 16, y the share a bounce keeps (f32
+        /// bits), z the kind it turns into.
+        pub data: [u32; 4],
+    }
+}
+
+/// `occlusion.wgsl`'s push constants.
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct OcclusionArgs {
+    /// Building a level: the size of the one it is made from, where that starts and where it goes.
+    pub size: [u32; 2],
+    pub src: u32,
+    pub dst: u32,
+    /// Testing: how many records there are.
+    pub count: u32,
+    pub pad: u32,
+}
+
+/// What `occlusion.wgsl` goes by this frame.
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct OcclusionView {
+    /// The last frame's camera: what it saw is what is known.
+    pub prev: [[f32; 4]; 4],
+    /// This frame's sides of the view.
+    pub planes: [[f32; 4]; 4],
+    /// From this frame's camera to that one's (xyz), and how much bigger cubes are for it (w).
+    pub moved: [f32; 4],
+    pub cam_frac: [f32; 4],
+    pub cam_cube: [i32; 4],
+    /// The depth's size.
+    pub size: [u32; 2],
+    /// Records made by the CPU that aren't cubes.
+    pub skip: [u32; 2],
+    pub levels: u32,
+    /// Whether there is a last frame to go by.
+    pub hiz: u32,
+    pub pad: [u32; 2],
+}
+
+/// A place in `occlusion.wgsl`'s table: a cube's draws of one layer of one kind on one page.
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct CubeEntry {
+    pub cube: [i32; 3],
+    /// `page * 4 + kind * 2 + layer`, `u32::MAX` for a free place.
+    pub bucket: u32,
+    pub start: u32,
+    /// Faces by direction rank, 16 bits each; quads: how many, in the first.
+    pub counts: [u32; 3],
 }
 
 /// `particle_sim.wgsl`'s push constants.
@@ -674,13 +1000,13 @@ gpu_struct! {
         pub v: [f32; 2],
         /// Text effect slot (top bit set on shadows) or GUI fill slot.
         pub fx: u32,
-        /// Glyph number in its text.
+        /// Glyph number in its text, or how far an animated texture has blended into its next frame.
         pub index: f32,
         pub uv: [f32; 4],
         pub color: u32,
         pub tex: u32,
-        /// A texture animated as a strip of square frames: frame count | ticks per frame << 16
-        /// (0: still). For text (`FONT`): 1 if the font is smooth, sampled linearly.
+        /// A texture animated as a strip of frames: `ui_strip_record` (0: still). For text
+        /// (`FONT`): 1 if the font is smooth, sampled linearly.
         pub layer: u32,
         pub mode: u32,
         /// Visible rectangle in physical pixels; empty (all zero) means unclipped.
@@ -707,6 +1033,10 @@ gpu_struct! {
         /// Bindless index of the world's depth (reverse Z: 0 is the far plane, the sky).
         pub depth: u32,
         pub pad: u32,
+        /// Bindless index + 1 of this effect's own image at half the size each way, which its
+        /// `shaders/post_low/<name>.wgsl` drew before the effects (0: none; chiacraft).
+        pub low: u32,
+        pub spare: u32,
     }
 }
 
@@ -782,10 +1112,22 @@ bindings! {
         PARTICLES "particles": "array<Particle>",
         SCENE "scene": "Scene",
     }
+    occlusion "occlusion.wgsl" {
+        DEPTHS "depths": "array<f32>",
+        ORIGINS "origins": "array<vec4<i32>>",
+        DRAWS "draws": "array<u32>",
+        VIEW "view": "View",
+        TABLE "table": "array<Entry>",
+        BUCKETS "buckets": "array<Bucket>",
+        OUT_DRAWS "out_draws": "array<u32>",
+        OUT_ORIGINS "out_origins": "array<vec4<i32>>",
+        FACES_DRAWN "faces_drawn": "Counter",
+    }
     particle_sim "particle_sim.wgsl" {
         SIM "sim": "array<SimParticle>",
         DST "dst": "array<Particle>",
         KINDS "kinds": "array<ParticleKind>",
+        RULES "rules": "array<ParticleRule>",
         FRAMES "frames": "array<u32>",
         CELLS "cells": "array<u32>",
     }
@@ -846,6 +1188,7 @@ fn structs() -> String {
         GpuParticle::wgsl(),
         GpuSimParticle::wgsl(),
         GpuParticleKind::wgsl(),
+        GpuParticleRule::wgsl(),
         GpuWireQuad::wgsl(),
         GpuWeather::wgsl(),
         GpuSky::wgsl(),
@@ -868,9 +1211,22 @@ pub fn prelude(shader: &str, common: &str) -> String {
     }
     if shader == "world.wgsl" {
         s.push_str(SOLID_AT);
+        s.push_str(LOD_CORNER);
     }
     s.push_str(common);
     s.push('\n');
+    s
+}
+
+/// What goes in front of `occlusion.wgsl`.
+pub fn occlusion_prelude() -> String {
+    let mut s = String::from(
+        "struct View {\n    prev: mat4x4<f32>,\n    planes: array<vec4<f32>, 4>,\n    moved: vec4<f32>,\n    cam_frac: vec4<f32>,\n    cam_cube: vec4<i32>,\n    size: vec2<u32>,\n    skip: vec2<u32>,\n    levels: u32,\n    hiz: u32,\n    pad: vec2<u32>,\n}\nstruct Entry {\n    cube: vec3<i32>,\n    bucket: u32,\n    start: u32,\n    counts: array<u32, 3>,\n}\nstruct Bucket {\n    count: atomic<u32>,\n    base: u32,\n}\nstruct Counter {\n    count: atomic<u32>,\n}\nstruct Args {\n    size: vec2<u32>,\n    src: u32,\n    dst: u32,\n    count: u32,\n    pad: u32,\n}\nvar<immediate> args: Args;\n",
+    );
+    for (i, (name, ty)) in bindings("occlusion.wgsl").iter().enumerate() {
+        let access = if matches!(*name, "origins" | "view" | "table") { "read" } else { "read_write" };
+        s.push_str(&format!("@group(1) @binding({i}) var<storage, {access}> {name}: {ty};\n"));
+    }
     s
 }
 
@@ -882,11 +1238,31 @@ pub fn particle_sim_prelude(window_reach: i32) -> String {
         let access = if matches!(*name, "sim" | "dst") { "read_write" } else { "read" };
         s.push_str(&format!("@group(1) @binding({i}) var<storage, {access}> {name}: {ty};\n"));
     }
-    use weft_abi::particle_flags as pf;
+    use weft_abi::{particle_event as pe, particle_flags as pf, particle_then as pt, particle_when as pw};
     s.push_str(&format!(
-        "struct SimArgs {{\n    first: u32,\n    count: u32,\n    dt: f32,\n    pad: f32,\n    shift: vec4<f32>,\n    rel: vec4<f32>,\n    origin: vec4<i32>,\n    center: vec4<i32>,\n}}\nvar<immediate> args: SimArgs;\nconst WINDOW_REACH: i32 = {window_reach};\nconst PARTICLE_FLAG_COLLIDE: u32 = {}u;\nconst PARTICLE_FLAG_FULLBRIGHT: u32 = {}u;\nconst PARTICLE_FLAG_SHRINK: u32 = {}u;\nconst PARTICLE_FLAG_DIES_ON_LAND: u32 = {}u;\n",
-        pf::COLLIDE, pf::FULLBRIGHT, pf::SHRINK, pf::DIES_ON_LAND
+        "struct SimArgs {{\n    first: u32,\n    count: u32,\n    dt: f32,\n    pad: f32,\n    shift: vec4<f32>,\n    rel: vec4<f32>,\n    origin: vec4<i32>,\n    center: vec4<i32>,\n}}\nvar<immediate> args: SimArgs;\nconst WINDOW_REACH: i32 = {window_reach};\nconst PARTICLE_FLAG_COLLIDE: u32 = {}u;\nconst PARTICLE_FLAG_FULLBRIGHT: u32 = {}u;\nconst PARTICLE_FLAG_SHRINK: u32 = {}u;\n",
+        pf::COLLIDE, pf::FULLBRIGHT, pf::SHRINK
     ));
+    let consts = [
+        ("EVENT_LAND", pe::LAND),
+        ("EVENT_WALL", pe::WALL),
+        ("EVENT_CEILING", pe::CEILING),
+        ("EVENT_ENTER_LIQUID", pe::ENTER_LIQUID),
+        ("EVENT_LEAVE_LIQUID", pe::LEAVE_LIQUID),
+        ("EVENT_EXPIRE", pe::EXPIRE),
+        ("WHEN_ANY", pw::ANY),
+        ("WHEN_LIQUID", pw::LIQUID),
+        ("WHEN_TAG", pw::TAG),
+        ("THEN_DIE", pt::DIE),
+        ("THEN_STOP", pt::STOP),
+        ("THEN_SLIDE", pt::SLIDE),
+        ("THEN_BOUNCE", pt::BOUNCE),
+        ("THEN_BECOME", pt::BECOME),
+        ("THEN_BECOME_STILL", pt::BECOME_STILL),
+    ];
+    for (name, v) in consts {
+        s.push_str(&format!("const {name}: u32 = {v}u;\n"));
+    }
     s
 }
 
@@ -921,7 +1297,7 @@ mod tests {
     /// compile against the same constants (the pictures of the visual tests check the rest).
     #[test]
     fn records_round_trip() {
-        let f = face_record([3, 14, 9], 5, 0b10_01_11_00, 7, 1234, 42, [0x1234, 0xFFFF, 0, 0xABCD]);
+        let f = face_record([3, 14, 9], 5, 0b10_01_11_00, 7, 2, 1234, 42, [0x1234, 0xFFFF, 0, 0xABCD]);
         assert_eq!(face_dir(&f), 5);
         assert_eq!(f[0] & face::POS_MASK, 3);
         assert_eq!((f[0] >> face::Y_SHIFT) & face::POS_MASK, 14);
@@ -954,13 +1330,42 @@ mod tests {
             .expect("records validate");
     }
 
-    /// The terrain prelude parses, and the header has room for every seed.
+    /// Distant terrain's vertex helper compiles against the records' decoders, and a smooth
+    /// cell's words hold what it reads.
+    #[test]
+    fn lod_corner_compiles() {
+        let cell = lod_grid_cell(31, 5, 4, 300, 77, 2, 9);
+        assert_eq!((cell[0] >> lod_face::DIR_SHIFT) & face::DIR_MASK, lod_face::GRID);
+        assert_eq!([cell[0] & lod_face::POS_MASK, (cell[0] >> lod_face::Z_SHIFT) & lod_face::POS_MASK], [31 * 16, 5 * 16]);
+        assert_eq!(
+            [cell[3] & lod_face::CELL_MASK, (cell[3] >> lod_face::CELL_J_SHIFT) & lod_face::CELL_MASK, cell[3] >> lod_face::LEVEL_SHIFT],
+            [31, 5, 4]
+        );
+        assert_eq!(((lod_grid(-7, 3) << 16) as i32) >> 16, -7);
+        assert_eq!(lod_face::GRID_WORDS % 4, 0);
+        let src = format!(
+            "{}{}@group(0) @binding(0) var<storage, read> records: array<u32>;\n{LOD_CORNER}\n\
+             @vertex fn main(@builtin(vertex_index) vi: u32) -> @builtin(position) vec4<f32> {{ let k = lod_corner(vi / 4u, vi % 4u, vec3(1.0)); return vec4(k.local + k.normal, f32(k.dir + k.biome)); }}\n",
+            wgsl(),
+            records(),
+        );
+        let module = naga::front::wgsl::parse_str(&src).expect("lod_corner parses");
+        naga::valid::Validator::new(naga::valid::ValidationFlags::all(), naga::valid::Capabilities::all())
+            .validate(&module)
+            .expect("lod_corner validates");
+    }
+
+    /// The terrain shader with its prelude validates, and the header has room for every seed.
     #[test]
     fn terrain_prelude() {
         use terrain::*;
-        assert_eq!(d::SEEDS as usize + SEEDS.len(), d::FEAT_OFF as usize);
+        assert_eq!(d::SEEDS as usize + SEEDS.len(), d::FIELD_OFF as usize);
         assert!(d::SCATTER_OFF < d::LEN);
-        naga::front::wgsl::parse_str(&prelude()).expect("terrain prelude parses");
+        let src = prelude() + include_str!("../assets/shaders/terrain.wgsl");
+        let module = naga::front::wgsl::parse_str(&src).expect("terrain shader parses");
+        naga::valid::Validator::new(naga::valid::ValidationFlags::all(), naga::valid::Capabilities::all())
+            .validate(&module)
+            .expect("terrain shader validates");
     }
 
     /// naga's layout of every generated struct matches the Rust one, so a field the WGSL rules
@@ -994,4 +1399,9 @@ mod tests {
             assert_eq!(layouter[h].size as usize, rust, "{name}");
         }
     }
+}
+
+/// A transform as the three rows the shaders read.
+pub fn rows(m: glam::Mat4) -> [[f32; 4]; 3] {
+    [m.row(0).to_array(), m.row(1).to_array(), m.row(2).to_array()]
 }

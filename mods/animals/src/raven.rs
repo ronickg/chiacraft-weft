@@ -7,19 +7,17 @@ use weft_sdk::*;
 
 use crate::birds::{self, Wings};
 
-pub(crate) static RAVEN: Entity = Entity::named("raven");
+pub(crate) static RAVEN: EntityKind = EntityKind::named("raven");
 
 static WINGS: Wings = Wings {
     model: "raven",
     texture: "raven/raven",
-    size: (0.35, 0.35),
     fly_size: (0.4, 0.3),
-    health: 6.0,
     // On the ground it walks and hops at about 2.5 m/s; it flies at about 9.
     speed: 2.5,
     air: 3.5,
     wander: 0.35,
-    damage: 1.0,
+    bites: true,
     height: 6.0,
     reach: 16.0,
     flight: 400,

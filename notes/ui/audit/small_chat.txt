@@ -1,0 +1,24 @@
+# The chat over the game in a short window (B9c, 760 x 600 at core:gui_scale=1): its lines keep under
+# the shortcuts and effects at the top left (Tester, 11-04).
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /time set 6000
+chat /weather clear 99999
+chat /tk mode survival
+chat /tk fill ~-14 ~-1 ~-14 ~14 ~-1 ~14 base:stone
+chat /tk fill ~-14 ~0 ~-14 ~14 ~5 ~14 base:stone
+chat /tk fill ~-13 ~0 ~-13 ~13 ~5 ~13 core:air
+wait 1
+chat /tk give base:oak_log 64
+chat /tk give base:torch 12
+chat /tk give base:stone 33
+chat /tk give base:bread 7
+chat /tk hurt_me 4
+wait 2
+shot 01_hud.png
+chat /tk hurt_me 2
+chat /tk give base:apple 3
+wait 1
+shot 02_hud_more_chat.png
+quit

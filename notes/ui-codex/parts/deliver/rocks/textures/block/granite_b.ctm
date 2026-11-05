@@ -1,0 +1,5 @@
+# granite_b picked at random among its drawing and 3 variants, so a cliff doesn't show its tile repeating.
+method = random
+tiles = <default> granite_b/1-3
+weights = 4 2 2 2
+symmetry = all

@@ -68,6 +68,14 @@ impl ConfigDef {
         }
     }
 
+    /// A value typed for it (`/rule`): what `parse` takes, and for numbers only those within
+    /// its range, so a typo is refused rather than clamped into a different value.
+    pub fn read(&self, s: &str) -> Option<f64> {
+        let v = self.parse(s)?;
+        let in_range = matches!(self.kind, ck::BOOL | ck::CHOICE) || (v >= self.min.min(self.max) && v <= self.max.max(self.min));
+        in_range.then_some(v)
+    }
+
     pub fn show(&self, v: f64) -> String {
         match self.kind {
             ck::BOOL => (v != 0.0).to_string(),
@@ -219,6 +227,17 @@ pub fn server_values() -> std::sync::Arc<ServerValues> {
     ))
 }
 
+/// The values of the server this game's player is playing in, when it runs in this process:
+/// the synced settings the game changes (a mod, the settings screen) go to it too, or the host's
+/// changes would never reach the world or its other players. None while on a remote server or
+/// visiting another world (a visited world's rules must not reach home).
+static PLAYING: Mutex<Option<std::sync::Arc<ServerValues>>> = Mutex::new(None);
+
+/// The player is now in the world whose server keeps `v` (None: no world run here).
+pub fn playing_in(v: Option<std::sync::Arc<ServerValues>>) {
+    *PLAYING.lock().unwrap() = v;
+}
+
 /// This thread reads and writes the synced settings in `v` from now on (`None`: the game's).
 pub fn for_thread(v: Option<std::sync::Arc<ServerValues>>) {
     SERVER.with(|s| *s.borrow_mut() = v);
@@ -292,6 +311,12 @@ pub fn put(id: u32, v: f64) {
         if slot.swap(bits, Ordering::Relaxed) != bits {
             GENERATION.fetch_add(1, Ordering::Relaxed);
         }
+        if d.synced()
+            && let Some(server) = PLAYING.lock().unwrap().as_ref()
+            && let Some(s) = server.0.get(id as usize)
+        {
+            s.store(bits, Ordering::Relaxed);
+        }
     }
 }
 
@@ -305,13 +330,31 @@ pub fn put_text(id: u32, v: &str) {
 
 /// Sets a value and saves it where its scope keeps it (a world's are saved with the world).
 pub fn set(id: u32, v: f64) {
+    if held_for_run(id) {
+        return;
+    }
     put(id, v);
     save_of(id);
 }
 
 pub fn set_text(id: u32, v: &str) {
+    if held_for_run(id) {
+        return;
+    }
     put_text(id, v);
     save_of(id);
+}
+
+/// Whether `id` was set for this run (`override_for_run`): it keeps that value however it is
+/// changed after. The test kit put back vsync, a view of 12 and no shader pack when each test
+/// began, so every lag bench (11-04) ran with vsync on, `--view 8` at 12 and without the pack,
+/// whatever its `--no-vsync`, `--view` or `--config` said.
+pub(crate) fn held_for_run(id: u32) -> bool {
+    let held = OVERRIDES.lock().unwrap().iter().any(|o| o.0 == id);
+    if held {
+        log::debug!("config {}: kept as set for this run", def(id).map_or("?", |d| d.name.as_str()));
+    }
+    held
 }
 
 fn save_of(id: u32) {
@@ -333,7 +376,8 @@ pub fn set_automated(on: bool) {
     AUTOMATED.store(on, Ordering::Relaxed);
 }
 
-/// A value for this run only (`--view`, `--no-vsync`), as the file writes it.
+/// A value for this run only (`--view`, `--no-vsync`, `--config`), as the file writes it; it
+/// holds for the run (`held_for_run`).
 pub fn override_for_run(name: &str, value: &str) {
     let Some(id) = by_name(name) else { return };
     let saved = shown(id);
@@ -502,6 +546,14 @@ pub fn load_world(saved: &[(String, f64)]) {
                 .map_or(d.default, |s| s.1),
         );
     }
+    // A world rule set for the run (`--config core:mob_spawning=0`) holds in the worlds it opens
+    // too: the world's own value came after it, and the hold (`held_for_run`) then refused the
+    // script's `/rule core:mob_spawning 0`, so monsters spawned in every look on the PC (11-04).
+    for (id, value, _) in OVERRIDES.lock().unwrap().iter() {
+        if def(*id).is_some_and(|d| d.scope == scope::WORLD) {
+            put_value(*id, value);
+        }
+    }
 }
 
 /// Settings the engine itself reads: the client's options, `core:mob_spawning` for worlds, and
@@ -518,14 +570,37 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::number("core:view_distance", ck::INT, 12.0, 2.0, 64.0, 1.0),
         // Distant terrain beyond the view (`client::lod`), in cubes; 0 off.
         ConfigDef::number("core:lod_distance", ck::INT, 256.0, 0.0, 2048.0, 16.0),
+        // chiacraft: the far ground's look for shader packs (`Globals.extra.w`'s top byte), bits:
+        // 1 small plants thin out, 2 block-scale shading softens, 4 textures give way to their
+        // average colour, all with distance (Ronald, 11-06: all three).
+        ConfigDef::number("core:far_look", ck::INT, 7.0, 0.0, 255.0, 1.0),
+        // The 3D world's share of the window's pixels each way (`app::world_frame`), the UI
+        // always whole; 0 picks it by the screen (fewer on high-density ones).
+        ConfigDef::number("core:render_scale", ck::FLOAT, 0.0, 0.0, 1.0, 0.05),
+        // The GPU, as the renderer found it (`Backend::device_*`), for mods to read: put at start,
+        // never saved by a player (the base game's first quality preset, Research round 19, 7).
+        ConfigDef::text("core:gpu_name", ""),
+        ConfigDef::number("core:gpu_class", ck::INT, 0.0, 0.0, 3.0, 1.0),
+        ConfigDef::number("core:gpu_memory_mb", ck::INT, 0.0, 0.0, 1.0e7, 1.0),
         // Blocks clouds float above where their dimension puts them.
         ConfigDef::number("core:cloud_height", ck::INT, 0.0, 0.0, 512.0, 8.0),
+        // Sun shadows, for shader packs that draw them: 0 off, 1 the near map only (80 blocks
+        // about the player), 2 near and far (400). The maps' size in texels: 1024, 2048 or 4096.
+        ConfigDef::number("core:shadows", ck::INT, 2.0, 0.0, 2.0, 1.0),
+        ConfigDef::number("core:shadow_size", ck::INT, 2048.0, 1024.0, 4096.0, 1024.0),
         // Vanilla's: in GUI pixels, and percent of the dark behind the text.
         ConfigDef::number("core:chat_width", ck::INT, 320.0, 40.0, 1000.0, 10.0),
         ConfigDef::number("core:chat_height", ck::INT, 180.0, 20.0, 1000.0, 10.0),
         ConfigDef::number("core:chat_height_closed", ck::INT, 110.0, 20.0, 1000.0, 10.0),
         ConfigDef::number("core:chat_opacity", ck::INT, 50.0, 0.0, 100.0, 5.0),
+        ConfigDef {
+            kind: ck::CHOICE,
+            choices: vec!["all".into(), "system".into(), "hidden".into()],
+            ..ConfigDef::number("core:chat_visibility", ck::CHOICE, 0.0, 0.0, 2.0, 0.0)
+        },
         ConfigDef::number("core:vsync", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
+        // Frames a second at most (0: as many as it can draw): less heat and battery, steadier.
+        ConfigDef::number("core:fps_cap", ck::INT, 0.0, 0.0, 360.0, 10.0),
         ConfigDef::number("core:fullscreen", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         ConfigDef::number("core:terrain_gpu", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         ConfigDef::number("core:terrain_check", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
@@ -535,8 +610,6 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::number("core:brightness", ck::FLOAT, 0.5, 0.0, 1.0, 0.0),
         ConfigDef::number("core:debug_groups", ck::INT, u32::MAX as f64, 0.0, u32::MAX as f64, 1.0),
         ConfigDef::number("core:invert_y", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
-        ConfigDef::number("core:toggle_sneak", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
-        ConfigDef::number("core:toggle_sprint", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         ConfigDef::text("core:debug_lines", ""),
         ConfigDef::text("core:name", &user),
         ConfigDef::text("core:relays", ""),
@@ -548,11 +621,28 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // Ours: testnet11, run on Ronald's Mac from a throwaway wallet while we test (HANDOFF.md,
         // "Our DID sponsor").
         ConfigDef::text("core:sponsors", "d468728d7e0e3f417c822af6e87ff924c0adbdeeb89a3c0f2d0745b2de40a792"),
+        // chiacraft (phase 5): what listing a world locks, in mojos (0.0001 TXCH; the game spends
+        // only on testnet11). Taken back by delisting.
+        ConfigDef::number("core:listing_deposit", ck::INT, 100_000_000.0, 1.0, 1e15, 1.0),
+        // chiacraft (phase 5): a fee a listing may pay, in mojos, for a busy testnet11 to take it
+        // in sooner; the game spends only on testnet11. None by default: a wallet holding only
+        // a sponsor's small gift has no coin for the deposit and a fee of 0.00005 TXCH, and
+        // couldn't list at all (Tester 2, 11-05); with none a listing took 17 blocks (207 s).
+        ConfigDef::number("core:listing_fee", ck::INT, 0.0, 0.0, 1e12, 1.0),
         // Where others reach this game by address; forward it, TCP and UDP.
         ConfigDef::number("core:server_port", ck::INT, 27182.0, 1.0, 65535.0, 1.0),
+        // A test setting, on no screen (Ronald, 11-04: "Yes, relay-only test"): every connection goes
+        // through the relay, never a direct path, to see joins work over the internet from one
+        // home network (`--config core:net_relay_only=true`; `net: path to` then reads `relay`).
+        ConfigDef::number("core:net_relay_only", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         ConfigDef::text("core:resource_packs", ""),
         ConfigDef::text("core:shader_pack", ""),
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:mob_spawning", ck::BOOL, 1.0, 0.0, 1.0, 0.0) },
+        // chiacraft: the world signs an achievement credential for each player who earns one.
+        ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:sign_achievements", ck::BOOL, 1.0, 0.0, 1.0, 0.0) },
+        // chiacraft: the owner's game commits each day's achievements to the chain (one spend from
+        // the owner's wallet a day); off unless the owner turns it on.
+        ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:anchor_achievements", ck::BOOL, 0.0, 0.0, 1.0, 0.0) },
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:simulation_distance", ck::INT, 8.0, 2.0, 64.0, 1.0) },
         // Entities are sent to players within this many blocks (at most the simulation
         // distance); their moves every tick within a third of it, every 2nd within two
@@ -562,6 +652,18 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // `core:inactive_entity_interval` ticks; 0: all tick every tick.
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:entity_activation_distance", ck::INT, 48.0, 0.0, 512.0, 16.0) },
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:inactive_entity_interval", ck::INT, 20.0, 1.0, 200.0, 1.0) },
+        // Most cubes mods' tickets keep loaded with no player near (`Host::force_load`).
+        ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:max_forced_cubes", ck::INT, 4096.0, 0.0, 1048576.0, 1.0) },
+        ConfigDef::number("core:first_person_model", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        ConfigDef::number("core:show_avatars", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
+        ConfigDef::number("core:occlusion_culling", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
+        // Soft volumetric clouds traced at a quarter of the pixels and blended over frames, for a
+        // pack that draws them (chiacraft's); off, the pack's own (blocky) clouds.
+        ConfigDef::number("core:soft_clouds", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // Screen effects' half-size parts (`post_low`); off, every effect at full size, as before.
+        ConfigDef::number("core:post_low", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
+        ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:allow_avatars", ck::BOOL, 1.0, 0.0, 1.0, 0.0) },
+        ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:keep_inventory", ck::BOOL, 0.0, 0.0, 1.0, 0.0) },
     ];
     out.extend(
         keys.iter()
@@ -614,5 +716,16 @@ mod tests {
         assert_eq!((c.parse("high"), c.parse("mid"), c.show(0.0)), (Some(1.0), None, "low".into()));
         let b = ConfigDef { kind: ck::BOOL, ..d };
         assert_eq!((b.parse("on"), b.show(1.0)), (Some(1.0), "true".into()));
+    }
+
+    /// `/rule core:mob_spawning false` was refused as not a whole number, and `2` was clamped to
+    /// true: a switch takes its words and 0/1, a number its range, and nothing else.
+    #[test]
+    fn typed_values_are_read_or_refused() {
+        let b = ConfigDef::number("t:mobs", ck::BOOL, 1.0, 0.0, 1.0, 0.0);
+        assert_eq!([b.read("false"), b.read("0"), b.read("true"), b.read("1")], [Some(0.0), Some(0.0), Some(1.0), Some(1.0)]);
+        assert_eq!([b.read("2"), b.read("no"), b.read("")], [None, None, None]);
+        let n = ConfigDef::number("t:dist", ck::INT, 8.0, 2.0, 64.0, 1.0);
+        assert_eq!([n.read("12"), n.read("1"), n.read("65"), n.read("far")], [Some(12.0), None, None, None]);
     }
 }

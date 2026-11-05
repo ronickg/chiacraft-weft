@@ -30,7 +30,7 @@ fn biomes() -> &'static [(u32, Climate)] {
 
 fn tick(w: &World) {
     // A second at a time, and only on a new quarter day (or a time set by hand).
-    if w.time() % 20 != 0 || SEASONS.on_dimension(w.dimension()).unwrap_or(0) != calendars::FOUR {
+    if w.game_time() % 20 != 0 || SEASONS.on_dimension(w.dimension()).unwrap_or(0) != calendars::FOUR {
         return;
     }
     let time = w.day_time();
@@ -47,6 +47,15 @@ fn tick(w: &World) {
     let day = quarter as f32 / 4.0 % calendar::YEAR_DAYS as f32;
     let mut tints = Vec::new();
     for &(id, c) in biomes() {
+        // Where the rain makes the year (the llanos, the Pantanal), the grass follows it.
+        let rainy = foliage::rain_strength(c.seasons, c.rain);
+        if rainy > 0.0 {
+            let base = w.content_tint(id, &tints::GRASS);
+            let now = foliage::rain_tint(base, day, c.rain, rainy);
+            if now != base {
+                tints.push((id, &tints::GRASS, now));
+            }
+        }
         let strength = foliage::strength(c.seasons);
         if strength <= 0.0 {
             continue;

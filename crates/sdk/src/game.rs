@@ -1,10 +1,11 @@
-use crate::abi::{self, ItemStack, Slice, Str};
-use crate::component::{Component, ENERGY, Value};
+use crate::abi::{self, Holder, ItemStack, Slice, Str};
+use crate::abi::{BlockPos, Vec3};
+use crate::component::{Component, Storage, Value};
 use crate::content::{
-    Biome, Block, Entity, EntityCategory, EquipmentSlot, GizmoGroup, HudElement, Menu, Pending, RecipeKind, Screen, TintKind,
+    Biome, Block, EntityCategory, EntityKind, EquipmentSlot, GizmoGroup, HudElement, Menu, Pending, RecipeKind, Screen, TintKind,
 };
-use crate::ui::{Ui, ui_callback};
-use crate::{Registry, World, callback, host, qualify};
+use crate::ui::{Ui, ui_cb};
+use crate::{Id, Registry, World, callback, host, qualify};
 
 /// A skin being painted (`Registry::entity_skin`): the kind's texture, to change in place, and
 /// the entity's build (`scale_bone`).
@@ -33,51 +34,125 @@ impl Skin<'_> {
     }
 }
 
-pub use abi::{Energy, EntityState, component_flags, damage, entity_flags, slot_flags};
-
-/// Eye height as a share of an entity's height, the engine's default too.
-pub const EYE_SHARE: f32 = 0.85;
+pub use abi::{EYE_SHARE, Energy, EntityState, component_flags, damage_cause, damage_flags, entity_flags, slot_flags};
 
 /// The engine's player kind, for hooks and components on players.
-pub static PLAYER: Entity = Entity::named("core:player");
+pub static PLAYER: EntityKind = EntityKind::named("core:player");
+/// The engine's kind for dropped stacks (`World::spawn_item`).
+pub static ITEM: EntityKind = EntityKind::named("core:item");
+
+/// How a spawned entity starts (`World::spawn_with`); what isn't set is the kind's default.
+#[derive(Clone, Copy, Debug)]
+pub struct Spawn {
+    desc: abi::SpawnEntityDesc,
+}
+
+impl Default for Spawn {
+    fn default() -> Self {
+        Spawn::new()
+    }
+}
+
+impl Spawn {
+    pub fn new() -> Spawn {
+        Spawn {
+            desc: abi::SpawnEntityDesc {
+                kind: 0,
+                pos: [0.0; 3].into(),
+                set: 0,
+                stack: ItemStack::EMPTY,
+                velocity: [0.0; 3].into(),
+                yaw: 0.0,
+                pickup_delay: 0,
+            },
+        }
+    }
+    /// What an item entity is.
+    pub fn stack(mut self, s: ItemStack) -> Self {
+        self.desc.stack = s;
+        self
+    }
+    /// Blocks per second.
+    pub fn velocity(mut self, v: impl Into<Vec3>) -> Self {
+        self.desc.velocity = v.into();
+        self.desc.set |= abi::spawn_set::VELOCITY;
+        self
+    }
+    /// Radians, like `EntityState::yaw`.
+    pub fn yaw(mut self, radians: f32) -> Self {
+        self.desc.yaw = radians;
+        self.desc.set |= abi::spawn_set::YAW;
+        self
+    }
+    /// Ticks before an item can be picked up (10 by default, 40 for one a player threw).
+    pub fn pickup_delay(mut self, ticks: u32) -> Self {
+        self.desc.pickup_delay = ticks;
+        self.desc.set |= abi::spawn_set::PICKUP_DELAY;
+        self
+    }
+}
 
 // ---------------------------------------------------------------- world helpers
 
 impl World {
     /// Entity `id` plays keyframe animation `name` for everyone who sees it (looping until
     /// another starts); an empty name goes back to idle and walk.
-    pub fn play_animation(&self, id: u64, name: &str, looping: bool) {
-        unsafe { (host().play_animation)(self.raw(), id, Str::new(name), looping as u32) }
+    pub fn action_play(&self, id: u64, name: &str, looping: bool) {
+        unsafe { (host().action_play)(self.raw(), id, Str::new(name), looping as u32) }
     }
 
-    pub fn light(&self, pos: [i32; 3]) -> u32 {
+    /// Stops the action `action_play` started.
+    pub fn action_stop(&self, id: u64) {
+        self.action_play(id, "", false);
+    }
+
+    /// While this holds, entity `id` plays action `to` wherever it would play `from`: a creeper
+    /// running from a cat plays its own run instead of `walk`. Everyone who sees it sees it, and
+    /// without a clip for `to` it goes on playing `from`.
+    pub fn action_override(&self, id: u64, from: &str, to: &str) {
+        unsafe { (host().action_override)(self.raw(), id, Str::new(from), Str::new(to)) }
+    }
+
+    /// Ends `action_override`.
+    pub fn action_override_clear(&self, id: u64, from: &str) {
+        unsafe { (host().action_override)(self.raw(), id, Str::new(from), Str::new("")) }
+    }
+
+    pub fn light(&self, pos: impl Into<BlockPos>) -> u32 {
+        let pos = pos.into();
         unsafe { (host().light)(self.raw(), &pos) }
     }
     /// Biome id at `pos` (`Biome::id`, `Tag::on_biome`); underground biomes differ from the
     /// surface's.
-    pub fn biome(&self, pos: [i32; 3]) -> u32 {
+    pub fn biome(&self, pos: impl Into<BlockPos>) -> u32 {
+        let pos = pos.into();
         unsafe { (host().biome_at)(self.raw(), &pos) }
     }
     /// Sky light level at `pos` (0..15).
-    pub fn sky_light(&self, pos: [i32; 3]) -> u32 {
-        abi::light::sky(self.light(pos))
+    pub fn sky_light(&self, pos: impl Into<BlockPos>) -> u32 {
+        abi::light::sky(self.light(pos.into()))
     }
     /// Strongest block light channel at `pos`.
-    pub fn block_light(&self, pos: [i32; 3]) -> u32 {
-        abi::light::block(self.light(pos))
+    pub fn block_light(&self, pos: impl Into<BlockPos>) -> u32 {
+        abi::light::block(self.light(pos.into()))
     }
     pub fn daylight(&self) -> f32 {
         unsafe { (host().daylight)(self.raw()) }
     }
-    pub fn spawn(&self, kind: &Entity, pos: [f64; 3]) -> u64 {
-        self.spawn_kind(kind.id(), pos)
+    /// An entity of a kind (a handle, or its id); 0 if there is no such kind.
+    pub fn spawn(&self, kind: impl Into<Id<EntityKind>>, pos: impl Into<Vec3>) -> u64 {
+        let pos = pos.into();
+        self.spawn_with(kind, pos, &Spawn::new())
     }
-    /// By entity kind id (`find_entity`), 0 if there is no such kind.
-    pub fn spawn_kind(&self, kind: u32, pos: [f64; 3]) -> u64 {
-        unsafe { (host().entity_spawn)(self.raw(), kind, &pos) }
+    /// `spawn` with what it starts with: `Spawn::new().velocity(v).yaw(1.57)`, and for an item
+    /// entity its stack.
+    pub fn spawn_with(&self, kind: impl Into<Id<EntityKind>>, pos: impl Into<Vec3>, how: &Spawn) -> u64 {
+        let pos = pos.into();
+        let desc = abi::SpawnEntityDesc { kind: kind.into().raw(), pos, ..how.desc };
+        unsafe { (host().entity_spawn)(self.raw(), &desc) }
     }
-    pub fn remove(&self, id: u64) {
-        unsafe { (host().entity_remove)(self.raw(), id) }
+    pub fn despawn(&self, id: u64) {
+        unsafe { (host().entity_despawn)(self.raw(), id) }
     }
     pub fn entity(&self, id: u64) -> Option<EntityState> {
         let mut s = EntityState::default();
@@ -85,21 +160,23 @@ impl World {
     }
     /// Places `template` with its lowest corner at `pos`; false (and nothing placed) when part
     /// of it isn't loaded.
-    pub fn place(&self, template: &crate::Template, pos: [i32; 3]) -> bool {
-        unsafe { (host().world_place)(self.raw(), Str::new(template.name()), &pos) != 0 }
+    pub fn place_template(&self, template: &crate::Template, pos: impl Into<BlockPos>) -> bool {
+        let pos = pos.into();
+        unsafe { (host().place_template)(self.raw(), Str::new(template.name()), &pos) != 0 }
     }
-    pub fn set_entity(&self, id: u64, s: &EntityState) {
-        unsafe { (host().entity_set)(self.raw(), id, s) }
+    /// Changes what the entity is now, only what is named, when the edit is dropped:
+    /// `w.entity_edit(id).velocity(v).yaw(y);`. Players' own clients follow.
+    pub fn entity_edit(&self, id: u64) -> EntityEdit {
+        EntityEdit { world: *self, id, set: 0, state: EntityState::DEFAULT }
     }
     /// Adds `v` (blocks per second) to its velocity, players included: a trampoline, a blast.
-    pub fn push(&self, id: u64, v: [f64; 3]) {
+    pub fn push(&self, id: u64, v: impl Into<Vec3>) {
+        let v = v.into();
         unsafe { (host().entity_push)(self.raw(), id, &v) }
     }
-    /// The entity's own box (width, height, eye height); `None` goes back to its kind's.
-    /// Crouching still shrinks it.
-    pub fn set_size(&self, id: u64, size: Option<[f32; 3]>) {
-        let [w, h, eye] = size.unwrap_or([0.0; 3]);
-        unsafe { (host().set_entity_size)(self.raw(), id, w, h, eye) }
+    /// The entity's own box; `None` goes back to its kind's. Crouching still shrinks it.
+    pub fn set_size(&self, id: u64, size: Option<abi::EntitySize>) {
+        unsafe { (host().set_entity_size)(self.raw(), id, size.unwrap_or_default()) }
     }
     /// Draws `id` `scale` times as big as its kind (or its own `set_size` box), its box and eyes
     /// scaled alike, for every player: individuals of a kind that differ in size (1: its own).
@@ -107,55 +184,25 @@ impl World {
     pub fn set_scale(&self, id: u64, scale: f32) {
         unsafe { (host().set_entity_scale)(self.raw(), id, scale) }
     }
-    /// `rider` (a player, or any entity) sits on `mount`, `seat` blocks above the mount's feet.
-    /// A riding player stays on the seat and its movement keys are only read (`keys`): steer the
-    /// mount with them (`walk`), and let it off (`dismount`) when it sneaks. False if either is
-    /// gone, or the mount is the rider or rides it. Not saved.
-    pub fn mount(&self, rider: u64, mount: u64, seat: f32) -> bool {
-        mount != 0 && unsafe { (host().entity_mount)(self.raw(), rider, mount, seat) != 0 }
-    }
-    /// `mount`, the seat also `forward` blocks ahead of the mount's middle along the way it faces.
-    pub fn mount_at(&self, rider: u64, mount: u64, seat: f32, forward: f32) -> bool {
-        mount != 0 && unsafe { (host().entity_mount_seat)(self.raw(), rider, mount, seat, forward) != 0 }
-    }
     /// Sets `id` on fire for at least `ticks` (it burns as in lava's heat; water puts it out).
     pub fn ignite(&self, id: u64, ticks: u32) {
         unsafe { (host().entity_ignite)(self.raw(), id, ticks) }
     }
-    /// Gets off where it is (put it beside the mount with `teleport`).
-    pub fn dismount(&self, rider: u64) {
-        unsafe { (host().entity_mount)(self.raw(), rider, 0, 0.0) };
-    }
-    /// What `id` rides and its seat height.
-    pub fn mount_of(&self, id: u64) -> Option<(u64, f32)> {
-        let mut seat = 0.0;
-        let m = unsafe { (host().entity_mount_of)(self.raw(), id, &mut seat) };
-        (m != 0).then_some((m, seat))
-    }
-    /// Who rides `mount`.
-    pub fn rider_of(&self, mount: u64) -> Option<u64> {
-        let r = unsafe { (host().entity_rider)(self.raw(), mount) };
-        (r != 0).then_some(r)
-    }
-    /// The movement keys player `id` holds (`abi::held_keys`: forward, back, left, right, jump,
-    /// sprint, sneak); 0 for anything that isn't a player.
-    pub fn keys(&self, id: u64) -> u32 {
-        unsafe { (host().entity_keys)(self.raw(), id) }
-    }
     /// Draws the entity as another kind (model, texture, animations); `None` as itself. It stays
     /// the same entity with its own behavior.
-    pub fn set_look(&self, id: u64, kind: Option<&str>) {
-        unsafe { (host().set_entity_look)(self.raw(), id, Str::new(kind.unwrap_or(""))) }
+    pub fn set_appearance(&self, id: u64, kind: Option<&str>) {
+        unsafe { (host().set_entity_appearance)(self.raw(), id, Str::new(kind.unwrap_or(""))) }
     }
-    /// The box entities of a kind have (width, height, eye height).
-    pub fn kind_size(&self, kind: &str) -> Option<[f32; 3]> {
-        let mut out = [0.0; 3];
+    /// The box entities of a kind have.
+    pub fn kind_size(&self, kind: &str) -> Option<abi::EntitySize> {
+        let mut out = abi::EntitySize::default();
         (unsafe { (host().entity_kind_size)(Str::new(kind), &mut out) } != 0).then_some(out)
     }
     /// `id` walks to `target` by itself, around obstacles, at `speed` times its walking speed
     /// (0 stops it). Call it again as the target moves. The path is found later in the tick;
     /// `navigating` turns false when the walk ends (arrived, or stuck for two seconds).
-    pub fn navigate(&self, id: u64, target: [f64; 3], speed: f32) -> bool {
+    pub fn navigate(&self, id: u64, target: impl Into<Vec3>, speed: f32) -> bool {
+        let target = target.into();
         unsafe { (host().navigate)(self.raw(), id, &target, speed) != 0 }
     }
     /// The world's seed, the one its terrain comes from. The same in every dimension.
@@ -164,23 +211,28 @@ impl World {
     }
     /// A random number that belongs to this block of this world and never changes: what a chest
     /// should hold when first opened, a villager's trades. Several from one spot:
-    /// `noise::hash(w.position_seed(pos), 1, 0, 0)`, and so on. On a body `pos` is in the body's
+    /// `noise::hash(w.seed_at(pos), 1, 0, 0)`, and so on. On a body `pos` is in the body's
     /// coordinates, like anything there.
-    pub fn position_seed(&self, pos: [i32; 3]) -> u64 {
-        crate::noise::hash(self.seed(), pos[0] as i64, pos[1] as i64, pos[2] as i64)
+    pub fn seed_at(&self, pos: impl Into<BlockPos>) -> u64 {
+        let pos = pos.into();
+        crate::noise::hash(self.seed(), pos.x as i64, pos.y as i64, pos.z as i64)
     }
     /// The same for the whole cube (16 blocks each way) `pos` is in.
-    pub fn cube_seed(&self, pos: [i32; 3]) -> u64 {
-        crate::noise::hash(self.seed() ^ 0x5EED_C0BE, (pos[0] >> 4) as i64, (pos[1] >> 4) as i64, (pos[2] >> 4) as i64)
+    pub fn seed_of_cube(&self, pos: impl Into<BlockPos>) -> u64 {
+        let pos = pos.into();
+        crate::noise::hash(self.seed() ^ 0x5EED_C0BE, (pos.x >> 4) as i64, (pos.y >> 4) as i64, (pos.z >> 4) as i64)
     }
     /// Lowest corner of the nearest structure `name` (full name) within `radius` blocks of
     /// `pos`, generated yet or not.
-    pub fn structure_near(&self, name: &str, pos: [i32; 3], radius: i32) -> Option<[i32; 3]> {
-        let mut out = [0; 3];
+    pub fn structure_near(&self, name: &str, pos: impl Into<BlockPos>, radius: i32) -> Option<BlockPos> {
+        let pos = pos.into();
+        let mut out = BlockPos::ZERO;
         (unsafe { (host().structure_near)(self.raw(), Str::new(name), &pos, radius, &mut out) } != 0).then_some(out)
     }
-    /// The block at `pos` falls as an entity (sand, gravel) and is placed again where it lands.
-    pub fn fall(&self, pos: [i32; 3]) -> u64 {
+    /// The block at `pos` falls as an entity (sand, gravel) and is placed again where it lands:
+    /// `body_fall` of a body of that one block.
+    pub fn fall_block(&self, pos: impl Into<BlockPos>) -> u64 {
+        let pos = pos.into();
         unsafe { (host().fall_block)(self.raw(), &pos) }
     }
     /// Whether `id` is still walking where `navigate` sent it.
@@ -203,15 +255,31 @@ impl World {
     pub fn fly(&self, id: u64, dir: [f32; 3], speed: f32) {
         unsafe { (host().entity_fly)(self.raw(), id, &dir, speed) }
     }
-    /// The block `id` looks at within `max` blocks (liquids count if `liquids`): position, face
-    /// hit (-X, +X, -Y, +Y, -Z, +Z) and state.
-    pub fn look_at(&self, id: u64, max: f64, liquids: bool) -> Option<LookAt> {
-        let (mut pos, mut face, mut frame) = ([0; 3], 0, 0);
-        let s = unsafe { (host().entity_look_at)(self.raw(), id, max, liquids as u32, &mut pos, &mut face, &mut frame) };
-        (s != 0).then(|| LookAt { pos, face, state: s - 1, frame })
+    /// The first block a ray from `from` along `dir` hits within `max` blocks (liquids count if
+    /// `liquids`): position, face hit (-X, +X, -Y, +Y, -Z, +Z) and state. A turret's line, a
+    /// mob checking whether it sees a player, an arrow's next step.
+    pub fn raycast(&self, from: impl Into<Vec3>, dir: impl Into<Vec3>, max: f64, liquids: bool) -> Option<LookAt> {
+        let from = from.into();
+        let dir = dir.into();
+        let (mut pos, mut face, mut body) = (BlockPos::ZERO, 0, 0);
+        let s = unsafe { (host().raycast)(self.raw(), &from, &dir, max, liquids as u32, &mut pos, &mut face, &mut body) };
+        (s != 0).then(|| LookAt { pos, face, state: s - 1, body })
     }
-    pub fn damage(&self, id: u64, amount: f32, source: u64, cause: u32) -> bool {
-        unsafe { (host().entity_damage)(self.raw(), id, amount, source, cause) != 0 }
+    /// The block `id` looks at within `max` blocks: `raycast` from its eyes along its look.
+    pub fn target_block(&self, id: u64, max: f64, liquids: bool) -> Option<LookAt> {
+        let s = self.entity(id)?;
+        self.raycast(s.eye(), crate::look_dir(s.yaw, s.pitch), max, liquids)
+    }
+    /// Up to its maximum: `damage` with a negative amount.
+    pub fn heal(&self, id: u64, amount: f32) -> bool {
+        self.damage(id, -amount.max(0.0), 0, &crate::damage_causes::HEAL)
+    }
+    /// Hurts `id` (`source`: the entity that did it, 0 for none): the `HURT` question, the
+    /// `DAMAGE` chain, the `actions::HURT` event, armor and death as the cause says. A negative
+    /// `amount` heals instead, through the `HEAL` chain and the `ENTITY_HEALED` event, with none
+    /// of damage's consequences. True if health changed.
+    pub fn damage(&self, id: u64, amount: f32, source: u64, cause: impl Into<Id<crate::DamageCause>>) -> bool {
+        unsafe { (host().entity_damage)(self.raw(), id, amount, source, cause.into().raw()) != 0 }
     }
     /// `id` hits `target` the way players do: other mods can forbid it (`question::ATTACK`) or
     /// change it (`chain::ATTACK_DAMAGE`). A player hits with what it holds, which wears; a mob
@@ -219,28 +287,10 @@ impl World {
     pub fn attack(&self, id: u64, target: u64) -> bool {
         unsafe { (host().entity_attack)(self.raw(), id, target) != 0 }
     }
-    /// Entity ids within `radius`; `kind` None = any kind.
-    pub fn near(&self, pos: [f64; 3], radius: f64, kind: Option<&Entity>) -> Vec<u64> {
-        let k = kind.map_or(u32::MAX, |k| k.id());
-        let mut buf = vec![0u64; 64];
-        let n = unsafe { (host().entities_near)(self.raw(), &pos, radius, k, buf.as_mut_ptr(), buf.len()) };
-        if n > buf.len() {
-            buf.resize(n, 0);
-            unsafe { (host().entities_near)(self.raw(), &pos, radius, k, buf.as_mut_ptr(), buf.len()) };
-        }
-        buf.truncate(n);
-        buf
-    }
-    /// Like `near`, only what can be hit: no dropped items, block entities, spectators or the dead.
-    pub fn near_bodies(&self, pos: [f64; 3], radius: f64) -> Vec<u64> {
-        let mut buf = vec![0u64; 64];
-        let n = unsafe { (host().entities_near_bodies)(self.raw(), &pos, radius, buf.as_mut_ptr(), buf.len()) };
-        if n > buf.len() {
-            buf.resize(n, 0);
-            unsafe { (host().entities_near_bodies)(self.raw(), &pos, radius, buf.as_mut_ptr(), buf.len()) };
-        }
-        buf.truncate(n);
-        buf
+    /// Whether `target` is within `id`'s reach (the `ENTITY_REACH` attribute, from its eyes to
+    /// the nearest point of the target's box): the same test for players and mobs.
+    pub fn in_reach(&self, id: u64, target: u64) -> bool {
+        unsafe { (host().entity_in_reach)(self.raw(), id, target) != 0 }
     }
     /// What a dropped item carries (`None` for any other entity): food on the ground, for one.
     pub fn dropped_item(&self, id: u64) -> Option<ItemStack> {
@@ -254,19 +304,30 @@ impl World {
     }
     /// Whether that point is under a liquid's surface, which a block that isn't full lies below
     /// its top: for what the block alone can't tell, like a head above shallow water.
-    pub fn in_liquid(&self, pos: [f64; 3]) -> bool {
+    pub fn in_liquid(&self, pos: impl Into<Vec3>) -> bool {
+        let pos = pos.into();
         unsafe { (host().in_liquid)(self.raw(), &pos) != 0 }
     }
     /// How charged a player's next swing is, 0..1, with what it holds now.
     pub fn swing_strength(&self, player: u64) -> f32 {
         unsafe { (host().entity_swing_strength)(self.raw(), player) }
     }
-    /// An entity's component, read only (`component_mut` to change it).
-    pub fn component<T: Value>(&self, id: u64, c: &Component<T>) -> Option<&T> {
-        let p = unsafe { (host().component)(self.raw(), id, c.id()) };
-        (!p.is_null()).then(|| unsafe { &*(p as *const T) })
+    /// The value of `c` on any holder: an entity, a block's entity, a stack in a slot.
+    pub fn component<T: Value>(&self, h: impl Into<Holder>, c: &Component<T>) -> Option<T> {
+        // Read straight into the value: mob AI reads several a mob a tick, and a heap buffer each
+        // time was most of what they cost.
+        let mut out = std::mem::MaybeUninit::<T>::uninit();
+        let len = size_of::<T>();
+        let n = unsafe { (host().component_get)(self.raw(), &h.into(), c.id(), out.as_mut_ptr() as *mut u8, len as u32) };
+        (n as usize == len).then(|| unsafe { out.assume_init() })
     }
-    /// The component to write; changes are saved and synced like any other.
+    /// Sets `c` on any holder. An entity has it only if its kind attaches it; a stack takes any.
+    pub fn set_component<T: Value>(&self, h: impl Into<Holder>, c: &Component<T>, v: T) -> bool {
+        let bytes = crate::component::value_bytes(&v);
+        unsafe { (host().component_set)(self.raw(), &h.into(), c.id(), Slice::new(&bytes)) != 0 }
+    }
+    /// An entity's component changed in place (a stack's is a value: `set_component`); changes
+    /// are saved and synced like any other.
     // The bytes live in the host, not in `World` (a handle to it), as every `&self` call that
     // changes the world.
     #[allow(clippy::mut_from_ref)]
@@ -274,142 +335,415 @@ impl World {
         let p = unsafe { (host().component)(self.raw(), id, c.id()) };
         (!p.is_null()).then(|| unsafe { &mut *(p as *mut T) })
     }
-    /// A player in creative mode: no damage, hunger or item costs.
+    /// Holds `id` in `pose` (a pet sitting, a zombie crawling, a player in a chair; its client
+    /// follows), or with `None` gives it back to what its movement makes.
+    /// With `facing` (degrees, feet that way when lying) it also stays still and turned so: in a bed.
+    pub fn set_pose(&self, id: u64, pose: Option<&crate::Pose>, facing: Option<f32>) {
+        let yaw = facing.map_or(f32::NAN, f32::to_radians);
+        unsafe { (host().entity_set_pose)(self.raw(), id, pose.map_or(u32::MAX, |p| p.id()), yaw) }
+    }
+    /// A player in creative mode.
     pub fn creative(&self, id: u64) -> bool {
-        unsafe { (host().is_creative)(self.raw(), id) != 0 }
+        self.game_mode(id) == abi::game_mode::CREATIVE
     }
-    /// The entity's `energy` state, if it takes part in the energy contract.
-    pub fn energy(&self, id: u64) -> Option<&Energy> {
-        self.component(id, &ENERGY)
+    /// A player whose mode spares it damage, hunger and air (creative, spectator).
+    pub fn outside_survival(&self, id: u64) -> bool {
+        crate::GameMode::flags_of(self.game_mode(id)) & abi::game_mode_flags::INVULNERABLE != 0
     }
-    pub fn energy_mut(&self, id: u64) -> Option<&mut Energy> {
-        self.component_mut(id, &ENERGY)
+    /// The id of its game mode (`game_modes::CREATIVE.id()`): survival for what isn't a player.
+    pub fn game_mode(&self, id: u64) -> u32 {
+        unsafe { (host().game_mode)(self.raw(), id) }
     }
-
-    /// Accepts up to `amount`, respecting capacity and input rate. Returns what was accepted.
-    pub fn insert_energy(&self, id: u64, amount: i64, simulate: bool) -> i64 {
-        unsafe { (host().energy_insert)(self.raw(), id, amount, simulate as u32) }
-    }
-
-    pub fn extract_energy(&self, id: u64, amount: i64, simulate: bool) -> i64 {
-        unsafe { (host().energy_extract)(self.raw(), id, amount, simulate as u32) }
+    /// Energy (the `ENERGY` component, read and set like any other) moves `amount` in (positive) or out (negative) within capacity and rate limits; returns
+    /// what moved (or would, with `simulate`), with the same sign.
+    pub fn energy_move(&self, h: impl Into<Holder>, amount: i64, simulate: bool) -> i64 {
+        unsafe { (host().energy_move)(self.raw(), &h.into(), amount, simulate as u32) }
     }
 
     pub fn players(&self) -> Vec<u64> {
-        self.each_player().collect()
+        self.players_iter().collect()
     }
     /// `players` without collecting them (mob AI asks every tick).
-    pub fn each_player(&self) -> impl Iterator<Item = u64> + '_ {
+    pub fn players_iter(&self) -> impl Iterator<Item = u64> + '_ {
         let n = unsafe { (host().player_count)(self.raw()) };
         (0..n).map(move |i| unsafe { (host().player_at)(self.raw(), i) })
     }
-    pub fn inventory(&self, owner: u64) -> Inventory {
-        Inventory { world: *self, owner }
+    /// The inventory of an entity, a block (`[x, y, z]`, through its block entity) or a held
+    /// stack (`Holder::held(player, slot)`, a backpack).
+    pub fn inventory(&self, h: impl Into<Holder>) -> Inventory {
+        Inventory { world: *self, holder: h.into() }
     }
     pub fn selected_slot(&self, player: u64) -> u32 {
         unsafe { (host().selected_slot)(self.raw(), player) }
     }
-    pub fn spawn_item(&self, pos: [f64; 3], stack: ItemStack) {
-        unsafe { (host().spawn_item)(self.raw(), &pos, stack) }
+    /// A dropped stack, tossed a little; 0 for an empty one. `spawn_with(&ITEM, ..)` to throw
+    /// it somewhere.
+    pub fn spawn_item(&self, pos: impl Into<Vec3>, stack: ItemStack) -> u64 {
+        let pos = pos.into();
+        self.spawn_with(&ITEM, pos, &Spawn::new().stack(stack))
     }
     /// Entity attached to the block at `pos` (furnace, chest), 0 if none.
-    pub fn block_entity(&self, pos: [i32; 3]) -> u64 {
+    pub fn block_entity(&self, pos: impl Into<BlockPos>) -> u64 {
+        let pos = pos.into();
         unsafe { (host().block_entity)(self.raw(), &pos) }
     }
-    pub fn open_menu(&self, player: u64, menu: &Menu, owner: u64) {
-        self.open_menu_kind(player, menu.id(), owner)
-    }
-    /// By menu id (`find_menu`); `owner` 0 for menus without one.
-    pub fn open_menu_kind(&self, player: u64, menu: u32, owner: u64) {
-        unsafe { (host().open_menu)(self.raw(), player, menu, owner) }
+    /// Opens a menu (a handle, or its id) on a holder: an entity, a block, a held stack, or
+    /// `Holder::NONE` for menus without one. False (and a logged reason) when the holder isn't
+    /// there or holds no items.
+    pub fn open_menu(&self, player: u64, menu: impl Into<Id<Menu>>, h: impl Into<Holder>) -> bool {
+        unsafe { (host().open_menu)(self.raw(), player, menu.into().raw(), &h.into()) != 0 }
     }
 
     /// Whether a player here shows the gizmo group `group` (`/gizmo mymod:pipes`; the mod's
     /// namespace is added to bare names). Check before computing what to draw.
-    pub fn gizmo_on(&self, group: &GizmoGroup) -> bool {
-        unsafe { (host().gizmo_on)(self.raw(), Str::new(group.name())) != 0 }
+    pub fn gizmo_shown(&self, group: &GizmoGroup) -> bool {
+        unsafe { (host().gizmo_shown)(self.raw(), Str::new(group.name())) != 0 }
     }
     /// A line seen by players showing `group`, color `0xRRGGBBAA`, for `ticks`.
-    pub fn draw_line(&self, group: &GizmoGroup, a: [f64; 3], b: [f64; 3], color: u32, ticks: u32) {
-        self.gizmo(group, abi::gizmo_kind::LINE, a, b, color, ticks, "", &[]);
+    pub fn draw_line(&self, group: &GizmoGroup, a: impl Into<Vec3>, b: impl Into<Vec3>, color: u32, ticks: u32) {
+        let a = a.into();
+        let b = b.into();
+        self.draw(group, abi::gizmo_kind::LINE, a, b, color, ticks);
     }
-    pub fn draw_box(&self, group: &GizmoGroup, min: [f64; 3], max: [f64; 3], color: u32, ticks: u32) {
-        self.gizmo(group, abi::gizmo_kind::BOX, min, max, color, ticks, "", &[]);
+    pub fn draw_box(&self, group: &GizmoGroup, min: impl Into<Vec3>, max: impl Into<Vec3>, color: u32, ticks: u32) {
+        let min = min.into();
+        let max = max.into();
+        self.draw(group, abi::gizmo_kind::BOX, min, max, color, ticks);
     }
     /// See-through by `color`'s alpha.
-    pub fn draw_fill(&self, group: &GizmoGroup, min: [f64; 3], max: [f64; 3], color: u32, ticks: u32) {
-        self.gizmo(group, abi::gizmo_kind::FILL, min, max, color, ticks, "", &[]);
+    pub fn draw_fill(&self, group: &GizmoGroup, min: impl Into<Vec3>, max: impl Into<Vec3>, color: u32, ticks: u32) {
+        let min = min.into();
+        let max = max.into();
+        self.draw(group, abi::gizmo_kind::FILL, min, max, color, ticks);
     }
-    /// The translation `key` with `args` at `pos`, in each viewer's language.
-    /// `size` times as big as menu text.
-    #[allow(clippy::too_many_arguments)]
-    pub fn draw_text(&self, group: &GizmoGroup, pos: [f64; 3], key: &str, args: &[crate::Arg], color: u32, size: f32, ticks: u32) {
-        self.gizmo(group, abi::gizmo_kind::LABEL, pos, [size as f64, 0.0, 0.0], color, ticks, key, args);
+
+    /// Moves an entity (players included) at the end of the tick, to `dim` or the same dimension.
+    pub fn teleport(&self, id: u64, dim: Option<&crate::Dimension>, pos: impl Into<Vec3>) {
+        let pos = pos.into();
+        let d = dim.map_or(u32::MAX, |d| d.id());
+        unsafe { (host().entity_teleport)(self.raw(), id, d, &pos) }
     }
+
+    /// Rain or thunder in this dimension for `ticks`, after which it changes by itself.
+    pub fn set_weather(&self, weather: impl Into<crate::Id<crate::Weather>>, ticks: u32) {
+        unsafe { (host().set_weather)(self.raw(), weather.into().raw(), ticks) }
+    }
+
+    /// The weather's id now (`weathers::RAIN.id()`).
+    pub fn weather(&self) -> u32 {
+        unsafe { (host().weather_now)(self.raw()) }
+    }
+
+    /// chiacraft: raining (or snowing) at `pos`: in this dimension, and in that biome when a mod
+    /// says where it rains (`set_rain`).
+    pub fn raining_at(&self, pos: impl Into<BlockPos>) -> bool {
+        let pos = pos.into();
+        unsafe { (host().raining_at)(self.raw(), &pos) != 0 }
+    }
+
+    /// chiacraft: `weather` from now on only in `biomes` of this dimension (none: clear
+    /// everywhere), until the next call: weather by place and season, instead of the dimension's
+    /// own timing. A `/weather` command still wins for its time.
+    pub fn set_rain(&self, biomes: &[u32], weather: impl Into<crate::Id<crate::Weather>>) {
+        unsafe { (host().set_rain)(self.raw(), biomes.as_ptr(), biomes.len() as u32, weather.into().raw()) }
+    }
+
+    /// chiacraft: the air in this dimension's biomes until the next call, for each biome its
+    /// `BiomeAir`, and where the wind blows to (`heading`, degrees clockwise from north, -z).
+    /// Biomes not named are clear and still. Players see it (`scene.weather` in shader packs) and
+    /// mods read it back (`air_at`).
+    /// chiacraft: what happens in this dimension's sky now (`weft_abi::sky_event`) and how strongly
+    /// (0 to 1), until the next call. Call it every tick if you like: players hear only of a change.
+    pub fn set_sky_event(&self, kind: u32, strength: f32) {
+        unsafe { (host().set_sky_event)(self.raw(), kind, strength) }
+    }
+
+    /// chiacraft: something falls from the sky to land at `pos` in `seconds` (a meteorite, a big
+    /// impact): its streak heads there in the players' skies.
+    pub fn sky_landing(&self, pos: [f64; 3], seconds: f32) {
+        unsafe { (host().sky_landing)(self.raw(), &pos, seconds) }
+    }
+
+    pub fn set_air(&self, air: &[crate::BiomeAir], heading: f32) {
+        let biomes: Vec<u32> = air.iter().map(|a| a.biome).collect();
+        let fog: Vec<f32> = air.iter().map(|a| a.fog).collect();
+        let wind: Vec<f32> = air.iter().map(|a| a.wind).collect();
+        let snow: Vec<f32> = air.iter().map(|a| a.snow).collect();
+        let flags: Vec<u32> = air.iter().map(|a| a.flags).collect();
+        unsafe {
+            (host().set_air)(
+                self.raw(),
+                biomes.as_ptr(),
+                fog.as_ptr(),
+                wind.as_ptr(),
+                snow.as_ptr(),
+                flags.as_ptr(),
+                air.len() as u32,
+                heading,
+            )
+        }
+    }
+
+    /// chiacraft: tint colors from now on, over the content's while the world runs (a mod's
+    /// seasons): for each entry a biome (id, as `biome` gives it), a tint kind (another mod's too)
+    /// and its 0xRRGGBB. Players see it: grass and leaves take the new colors, blended across
+    /// biome borders as before. What is not named keeps the content's color; each call replaces
+    /// the last; an empty list goes back to the content's colors.
+    pub fn set_biome_tints(&self, tints: &[(u32, &crate::TintKind, u32)]) {
+        let biomes: Vec<u32> = tints.iter().map(|t| t.0).collect();
+        let kinds: Vec<Str> = tints.iter().map(|t| Str::new(t.1.name())).collect();
+        let colors: Vec<u32> = tints.iter().map(|t| t.2).collect();
+        unsafe { (host().set_biome_tints)(self.raw(), biomes.as_ptr(), kinds.as_ptr(), colors.as_ptr(), tints.len() as u32) }
+    }
+
+    /// chiacraft: the content's color (0xRRGGBB) of `kind` in biome `biome` (id), whatever
+    /// `set_biome_tints` set since: the biome's own, else the kind's default; 0 for an unknown
+    /// kind.
+    pub fn content_tint(&self, biome: u32, kind: &crate::TintKind) -> u32 {
+        unsafe { (host().content_tint)(biome, Str::new(kind.name())) }
+    }
+
+    /// chiacraft: the air set (`set_air`) in the biome at `pos`; clear and still if none was.
+    pub fn air_at(&self, pos: impl Into<BlockPos>) -> crate::BiomeAir {
+        let pos = pos.into();
+        let mut out = [0.0f32; 4];
+        unsafe { (host().air_at)(self.raw(), &pos, &mut out) };
+        crate::BiomeAir { biome: 0, fog: out[0], wind: out[1], snow: out[2], flags: out[3] as u32 }
+    }
+
+    /// chiacraft: how fast this dimension's time of day runs (1 the usual, 0.5 half as fast),
+    /// until set again; a world opened again starts at 1. Only the sky and what follows the day:
+    /// what waits on ticks keeps its pace.
+    pub fn set_day_rate(&self, rate: f32) {
+        unsafe { (host().set_day_rate)(self.raw(), rate) }
+    }
+
+    /// Shader effect `effect` on an entity for everyone who sees it, at `strength` (0..1) for
+    /// `ticks` (0 ends it): `w.entity_effect(id, &entity_effects::GLOW, 1.0, 200)`, or one of
+    /// your own (`Registry::entity_effect`). A new one replaces the last.
+    pub fn entity_effect(&self, id: u64, effect: impl Into<crate::Id<crate::EntityEffect>>, strength: f32, ticks: u32) {
+        unsafe { (host().entity_effect)(self.raw(), id, effect.into().raw(), strength, ticks) }
+    }
+
+    /// A white flash on an entity for everyone who sees it (a creeper about to go off).
+    pub fn flash(&self, id: u64) {
+        self.entity_effect(id, &crate::entity_effects::FLASH, 1.0, 2)
+    }
+
+    /// A player's `abi::permission` level: ask it before anything only some may do.
+    pub fn permission(&self, player: u64) -> u32 {
+        unsafe { (host().player_permission)(self.raw(), player) }
+    }
+
+    /// Gives a player a level, remembered with the world.
+    pub fn set_permission(&self, player: u64, level: u32) {
+        unsafe { (host().set_player_permission)(self.raw(), player, level) }
+    }
+
+    /// Sets this dimension's time of day (0 sunrise, 6000 noon, 18000 midnight). Only the sky and
+    /// what follows the day move: what waits on ticks keeps its pace.
+    pub fn set_day_time(&self, time: u64) {
+        unsafe { (host().set_day_time)(self.raw(), time) }
+    }
+
+    /// This dimension's time of day, counting on past a day. `w.time()` is another clock: ticks
+    /// the world has run, which nothing moves.
+    pub fn day_time(&self) -> u64 {
+        unsafe { (host().day_time)(self.raw()) }
+    }
+
+    /// As if `ticks` passed at once: the day moves on, and growth, machines and timers catch up.
+    pub fn skip_ticks(&self, ticks: u64) {
+        unsafe { (host().skip_ticks)(self.raw(), ticks) }
+    }
+
+    /// `w.set_game_mode(player, &game_modes::CREATIVE)`, or a mod's own mode.
+    pub fn set_game_mode(&self, player: u64, mode: impl Into<crate::Id<crate::GameMode>>) {
+        unsafe { (host().set_game_mode)(self.raw(), player, mode.into().raw()) }
+    }
+
+    /// The outline of a shape: where a fill or a search will reach, before it does.
+    pub fn draw_shape(&self, group: &GizmoGroup, shape: &crate::Shape, color: u32, ticks: u32) {
+        for (a, b) in shape.outline() {
+            self.draw_line(group, a, b, color, ticks);
+        }
+    }
+    /// The translation `key` with `args` at `pos`, in each viewer's language, `size` times as
+    /// big as menu text.
     #[allow(clippy::too_many_arguments)]
-    fn gizmo(&self, group: &GizmoGroup, kind: u32, a: [f64; 3], b: [f64; 3], color: u32, ticks: u32, key: &str, args: &[crate::Arg]) {
-        let raw = crate::ui::raw_args(args);
-        unsafe { (host().gizmo)(self.raw(), Str::new(group.name()), kind, &a, &b, color, ticks, Str::new(key), abi::Slice::new(&raw)) }
+    pub fn draw_text(&self, group: &GizmoGroup, pos: impl Into<Vec3>, key: &str, args: &[crate::Arg], color: u32, size: f32, ticks: u32) {
+        let (pos, raw) = (pos.into(), crate::ui::raw_args(args));
+        unsafe { (host().gizmo_text)(self.raw(), Str::new(group.name()), &pos, size, color, ticks, Str::new(key), abi::Slice::new(&raw)) }
+    }
+    fn draw(&self, group: &GizmoGroup, kind: u32, a: Vec3, b: Vec3, color: u32, ticks: u32) {
+        unsafe { (host().gizmo)(self.raw(), Str::new(group.name()), kind, &a, &b, color, ticks) }
+    }
+}
+
+/// What `World::entity_edit` changes, sent when dropped.
+pub struct EntityEdit {
+    world: World,
+    id: u64,
+    set: u32,
+    state: EntityState,
+}
+
+impl EntityEdit {
+    fn with(mut self, field: u32, f: impl FnOnce(&mut EntityState)) -> Self {
+        self.set |= field;
+        f(&mut self.state);
+        self
+    }
+    /// A player is teleported there.
+    pub fn pos(self, pos: impl Into<Vec3>) -> Self {
+        let pos = pos.into();
+        self.with(abi::entity_set::POS, |s| s.pos = pos)
+    }
+    /// Blocks per second.
+    pub fn velocity(self, v: impl Into<Vec3>) -> Self {
+        let v = v.into();
+        self.with(abi::entity_set::VELOCITY, |s| s.vel = v)
+    }
+    /// Radians, like `EntityState::yaw`.
+    pub fn yaw(self, yaw: f32) -> Self {
+        self.with(abi::entity_set::YAW, |s| s.yaw = yaw)
+    }
+    pub fn pitch(self, pitch: f32) -> Self {
+        self.with(abi::entity_set::PITCH, |s| s.pitch = pitch)
+    }
+    /// Up to its max health; 0 or less kills it (`damage_cause::VOID`). Only a respawn brings
+    /// back the dead.
+    pub fn health(self, health: f32) -> Self {
+        self.with(abi::entity_set::HEALTH, |s| s.health = health)
+    }
+    /// What the next landing hurts by: 0 after a mace's smash, a parachute opening.
+    pub fn fall_distance(self, blocks: f32) -> Self {
+        self.with(abi::entity_set::FALL_DISTANCE, |s| s.fall_distance = blocks)
+    }
+    /// Players: flying or not, whatever the game mode allows (landing still stops it).
+    pub fn flying(self, on: bool) -> Self {
+        self.with(abi::entity_set::FLYING, |s| s.flying = on as u32)
+    }
+    /// Ticks it burns for, 0 puts it out.
+    pub fn fire(self, ticks: u32) -> Self {
+        self.with(abi::entity_set::FIRE, |s| s.fire = ticks)
+    }
+    /// Players: the hotbar slot in hand.
+    pub fn selected(self, slot: u32) -> Self {
+        self.with(abi::entity_set::SELECTED, |s| s.selected = slot)
+    }
+}
+
+impl Drop for EntityEdit {
+    fn drop(&mut self) {
+        if self.set != 0 && !std::thread::panicking() {
+            unsafe { (host().entity_set)(self.world.raw(), self.id, self.set, &self.state) }
+        }
     }
 }
 
 #[derive(Clone, Copy)]
 pub struct Inventory {
     world: World,
-    owner: u64,
+    holder: Holder,
 }
 
 impl Inventory {
-    pub fn size(&self) -> u32 {
-        unsafe { (host().inv_size)(self.world.raw(), self.owner) }
+    /// Slots, 0 when the holder has no inventory.
+    pub fn len(&self) -> u32 {
+        unsafe { (host().inventory_len)(self.world.raw(), &self.holder) }
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
     pub fn get(&self, slot: u32) -> ItemStack {
-        unsafe { (host().inv_get)(self.world.raw(), self.owner, slot) }
+        unsafe { (host().inventory_get)(self.world.raw(), &self.holder, slot) }
     }
     pub fn set(&self, slot: u32, stack: ItemStack) {
-        unsafe { (host().inv_set)(self.world.raw(), self.owner, slot, stack) }
+        unsafe { (host().inventory_set)(self.world.raw(), &self.holder, slot, stack) }
     }
     /// Returns what did not fit.
     pub fn insert(&self, stack: ItemStack) -> ItemStack {
-        unsafe { (host().inv_insert)(self.world.raw(), self.owner, stack) }
+        unsafe { (host().inventory_insert)(self.world.raw(), &self.holder, stack) }
     }
     /// A machine's slot group (`MachineBuilder::group`) in this inventory; a name it doesn't
     /// have is logged as a mistake and gives no slots.
-    pub fn group(&self, name: &str) -> InventoryGroup {
+    pub fn group(&self, name: &str) -> SlotGroup<'static> {
         self.find_group(name).unwrap_or_else(|| {
-            crate::error!("the inventory of entity {} has no group {name}", self.owner);
-            InventoryGroup { inv: Inventory { world: self.world, owner: self.owner }, start: 0, len: 0 }
+            crate::error!("the inventory of {:?} has no group {name}", self.holder);
+            SlotGroup::empty(GroupIn::Inventory(*self))
         })
     }
 
     /// The group if this inventory has it: a player's equipment, which mobs don't have.
-    pub fn find_group(&self, name: &str) -> Option<InventoryGroup> {
-        let mut out = [0u32; 2];
-        let found = unsafe { (host().inventory_group)(self.world.raw(), self.owner, Str::new(name), &mut out) } != 0;
-        found.then(|| InventoryGroup { inv: Inventory { world: self.world, owner: self.owner }, start: out[0], len: out[1] })
+    pub fn find_group(&self, name: &str) -> Option<SlotGroup<'static>> {
+        let mut out = abi::SlotGroup::default();
+        let found = unsafe { (host().inventory_group)(self.world.raw(), &self.holder, Str::new(name), &mut out) } != 0;
+        found.then(|| SlotGroup::of(GroupIn::Inventory(*self), out))
     }
 }
 
-/// Slots of one group in an inventory, numbered from 0.
-pub struct InventoryGroup {
-    inv: Inventory,
-    start: u32,
-    len: u32,
+#[derive(Clone, Copy)]
+enum GroupIn {
+    Inventory(Inventory),
+    Menu(*mut abi::MenuCtx),
 }
 
-impl InventoryGroup {
+/// Slots of one group, numbered from 0: of an inventory (`w.inventory(h).group(..)`) or of an
+/// open menu (`m.group(..)`, whoever's inventory they show), valid while the menu callback runs.
+pub struct SlotGroup<'a> {
+    of: GroupIn,
+    start: u32,
+    len: u32,
+    cols: u32,
+    _p: std::marker::PhantomData<&'a MenuCtx>,
+}
+
+impl SlotGroup<'_> {
+    fn of(of: GroupIn, g: abi::SlotGroup) -> Self {
+        SlotGroup { of, start: g.start, len: g.len, cols: g.cols, _p: std::marker::PhantomData }
+    }
+    fn empty(of: GroupIn) -> Self {
+        SlotGroup { of, start: 0, len: 0, cols: 0, _p: std::marker::PhantomData }
+    }
     pub fn len(&self) -> u32 {
         self.len
+    }
+    /// The inventory slot of its `i`th, for `Inventory::get` and `set`.
+    pub fn slot(&self, i: u32) -> u32 {
+        self.start + i
+    }
+    /// chiacraft: where menu or inventory slot `slot` (`MenuCtx::slot`) is in this group, if it
+    /// is one of its.
+    pub fn index_of(&self, slot: u32) -> Option<u32> {
+        (slot >= self.start && slot < self.start + self.len).then(|| slot - self.start)
     }
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
+    /// Its width as laid out (a 3 x 3 grid has 3).
+    pub fn cols(&self) -> u32 {
+        self.cols
+    }
+    pub fn rows(&self) -> u32 {
+        self.len.div_ceil(self.cols.max(1))
+    }
     pub fn get(&self, i: u32) -> ItemStack {
-        if i < self.len { self.inv.get(self.start + i) } else { ItemStack::EMPTY }
+        if i >= self.len {
+            return ItemStack::EMPTY;
+        }
+        match self.of {
+            GroupIn::Inventory(inv) => inv.get(self.start + i),
+            GroupIn::Menu(m) => unsafe { (host().menu_get)(m, self.start + i) },
+        }
     }
     pub fn set(&self, i: u32, stack: ItemStack) {
-        if i < self.len {
-            self.inv.set(self.start + i, stack)
+        if i >= self.len {
+            return;
+        }
+        match self.of {
+            GroupIn::Inventory(inv) => inv.set(self.start + i, stack),
+            GroupIn::Menu(m) => unsafe { (host().menu_set)(m, self.start + i, stack) },
         }
     }
 }
@@ -440,7 +774,7 @@ impl Drop for PlayerInventoryBuilder<'_> {
     }
 }
 
-pub fn recipe_match(kind: &RecipeKind, grid: &[ItemStack], width: u32, height: u32) -> ItemStack {
+pub fn recipe_grid_output(kind: &RecipeKind, grid: &[ItemStack], width: u32, height: u32) -> ItemStack {
     unsafe { (host().recipe_match)(Str::new(kind.name()), grid.as_ptr(), width, height) }
 }
 
@@ -480,23 +814,17 @@ impl EntityEvent {
     pub fn other(&self) -> u64 {
         self.args.other
     }
-    pub fn amount(&self) -> f32 {
-        self.args.amount
-    }
-    pub fn set_amount(&mut self, a: f32) {
-        self.args.amount = a;
-    }
-    pub fn cause(&self) -> u32 {
-        self.args.cause
-    }
 }
 
 fn tick_cb(f: impl Fn(&EntityTick) + Send + Sync + 'static) -> abi::Callback {
     callback(move |a: &mut abi::EntityTickArgs| f(unsafe { &*(a as *const abi::EntityTickArgs as *const EntityTick) }))
 }
 
-fn event_cb(f: impl Fn(&mut EntityEvent) + Send + Sync + 'static) -> abi::Callback {
-    callback(move |a: &mut abi::EntityEventArgs| f(unsafe { &mut *(a as *mut abi::EntityEventArgs as *mut EntityEvent) }))
+fn event_cb(f: impl Fn(&mut EntityEvent) -> bool + Send + Sync + 'static) -> abi::Callback {
+    callback(move |a: &mut abi::EntityEventArgs| {
+        let handled = f(unsafe { &mut *(a as *mut abi::EntityEventArgs as *mut EntityEvent) });
+        a.handled = handled as u32;
+    })
 }
 
 /// A model part (a bone): its name, pivot, boxes, free-form triangles, and the part it hangs
@@ -505,7 +833,7 @@ fn event_cb(f: impl Fn(&mut EntityEvent) + Send + Sync + 'static) -> abi::Callba
 /// out, like a zombie's, only sway), `body` leans when sneaking, `leg0`..`leg3` are a
 /// quadruped's and `leg0`..`leg7` a spider's sweeping legs; other names keep still. Keyframe
 /// animations address bones by the same names.
-pub struct Part {
+pub struct ModelPart {
     pub pivot: [f32; 3],
     pub boxes: Vec<abi::ModelCuboid>,
     pub rest: [f32; 3],
@@ -514,43 +842,43 @@ pub struct Part {
     pub mesh: Vec<abi::MeshVertex>,
 }
 
-impl Part {
-    pub fn new(name: &str, pivot: [f32; 3]) -> Part {
-        Part { pivot, boxes: Vec::new(), rest: [0.0; 3], name: name.to_string(), parent: -1, mesh: Vec::new() }
+impl ModelPart {
+    pub fn new(name: &str, pivot: [f32; 3]) -> ModelPart {
+        ModelPart { pivot, boxes: Vec::new(), rest: [0.0; 3], name: name.to_string(), parent: -1, mesh: Vec::new() }
     }
-    /// Resting rotation in radians about x, y, z (applied in that order).
-    pub fn rotation(mut self, x: f32, y: f32, z: f32) -> Part {
-        self.rest = [x, y, z];
+    /// Resting rotation in degrees about x, y, z (applied in that order).
+    pub fn rotation(mut self, x: f32, y: f32, z: f32) -> ModelPart {
+        self.rest = [x, y, z].map(f32::to_radians);
         self
     }
     /// Box relative to the pivot in model pixels, `uv` = top-left texel of its unwrap.
-    pub fn cube(mut self, origin: [f32; 3], size: [f32; 3], uv: [f32; 2]) -> Part {
+    pub fn cuboid(mut self, origin: [f32; 3], size: [f32; 3], uv: [f32; 2]) -> ModelPart {
         self.boxes
             .push(abi::ModelCuboid { origin, extent: size, uv, ..abi::ModelCuboid::DEFAULT });
         self
     }
     /// The last box grown by this much on every side, its texture staying the same (wool, a skin's
     /// outer layer).
-    pub fn inflated(mut self, by: f32) -> Part {
+    pub fn inflated(mut self, by: f32) -> ModelPart {
         if let Some(b) = self.boxes.last_mut() {
             b.inflate = by;
         }
         self
     }
     /// The last box's unwrap mirrored left to right.
-    pub fn mirrored(mut self) -> Part {
+    pub fn mirrored(mut self) -> ModelPart {
         if let Some(b) = self.boxes.last_mut() {
             b.mirror = 1;
         }
         self
     }
     /// Hangs from the part at `index` in the same model: moves and turns with it.
-    pub fn child_of(mut self, index: usize) -> Part {
+    pub fn child_of(mut self, index: usize) -> ModelPart {
         self.parent = index as i32;
         self
     }
     /// Free-form triangles (three corners each), in model pixels like the pivot.
-    pub fn mesh(mut self, triangles: Vec<abi::MeshVertex>) -> Part {
+    pub fn mesh(mut self, triangles: Vec<abi::MeshVertex>) -> ModelPart {
         self.mesh.extend(triangles);
         self
     }
@@ -558,7 +886,7 @@ impl Part {
 
 /// A sphere of triangles around `center` (model pixels), its texture stretched over the texel
 /// rectangle `uv` (x, y, width, height) like a globe's map.
-pub fn sphere(center: [f32; 3], radius: f32, rings: u32, segments: u32, uv: [f32; 4]) -> Vec<abi::MeshVertex> {
+pub fn sphere_mesh(center: [f32; 3], radius: f32, rings: u32, segments: u32, uv: [f32; 4]) -> Vec<abi::MeshVertex> {
     use std::f32::consts::{PI, TAU};
     let (rings, segments) = (rings.max(2), segments.max(3));
     let at = |i: u32, j: u32| {
@@ -582,20 +910,20 @@ pub fn sphere(center: [f32; 3], radius: f32, rings: u32, segments: u32, uv: [f32
 /// A model built in code: its parts and the size of the skin its UVs are laid out on (the
 /// picture itself may be bigger, a pack's high resolution skin keeps lining up).
 pub struct Model {
-    pub parts: Vec<Part>,
+    pub parts: Vec<ModelPart>,
     pub uv: [u32; 2],
 }
 
 impl Model {
     /// The UV size, if the layout isn't on a 64 x 32 skin.
-    pub fn uv(mut self, width: u32, height: u32) -> Self {
+    pub fn uv_size(mut self, width: u32, height: u32) -> Self {
         self.uv = [width, height];
         self
     }
 }
 
-impl From<Vec<Part>> for Model {
-    fn from(parts: Vec<Part>) -> Model {
+impl From<Vec<ModelPart>> for Model {
+    fn from(parts: Vec<ModelPart>) -> Model {
         Model { parts, uv: [64, 32] }
     }
 }
@@ -603,22 +931,22 @@ impl From<Vec<Part>> for Model {
 /// Classic humanoid on a 64x32 skin, the player's too; `arms_forward` for zombies.
 /// The limbs at -x have their unwrap mirrored: looking at the front +x is on the left, where the
 /// limb drawn as it lies in the unwrap goes (`rightArm` is the one at -x all the same).
-pub fn biped(arms_forward: bool) -> Model {
-    let arms = if arms_forward { std::f32::consts::FRAC_PI_2 } else { 0.0 };
+pub fn humanoid(arms_forward: bool) -> Model {
+    let arms = if arms_forward { 90.0 } else { 0.0 };
     Model::from(vec![
-        Part::new("head", [0.0, 24.0, 0.0]).cube([-4.0, 0.0, -4.0], [8.0, 8.0, 8.0], [0.0, 0.0]),
-        Part::new("body", [0.0, 24.0, 0.0]).cube([-4.0, -12.0, -2.0], [8.0, 12.0, 4.0], [16.0, 16.0]),
-        Part::new("rightArm", [-6.0, 22.0, 0.0])
-            .cube([-2.0, -10.0, -2.0], [4.0, 12.0, 4.0], [40.0, 16.0])
+        ModelPart::new("head", [0.0, 24.0, 0.0]).cuboid([-4.0, 0.0, -4.0], [8.0, 8.0, 8.0], [0.0, 0.0]),
+        ModelPart::new("body", [0.0, 24.0, 0.0]).cuboid([-4.0, -12.0, -2.0], [8.0, 12.0, 4.0], [16.0, 16.0]),
+        ModelPart::new("rightArm", [-6.0, 22.0, 0.0])
+            .cuboid([-2.0, -10.0, -2.0], [4.0, 12.0, 4.0], [40.0, 16.0])
             .mirrored()
             .rotation(arms, 0.0, 0.0),
-        Part::new("leftArm", [6.0, 22.0, 0.0])
-            .cube([-2.0, -10.0, -2.0], [4.0, 12.0, 4.0], [40.0, 16.0])
+        ModelPart::new("leftArm", [6.0, 22.0, 0.0])
+            .cuboid([-2.0, -10.0, -2.0], [4.0, 12.0, 4.0], [40.0, 16.0])
             .rotation(arms, 0.0, 0.0),
-        Part::new("rightLeg", [-2.0, 12.0, 0.0])
-            .cube([-2.0, -12.0, -2.0], [4.0, 12.0, 4.0], [0.0, 16.0])
+        ModelPart::new("rightLeg", [-2.0, 12.0, 0.0])
+            .cuboid([-2.0, -12.0, -2.0], [4.0, 12.0, 4.0], [0.0, 16.0])
             .mirrored(),
-        Part::new("leftLeg", [2.0, 12.0, 0.0]).cube([-2.0, -12.0, -2.0], [4.0, 12.0, 4.0], [0.0, 16.0]),
+        ModelPart::new("leftLeg", [2.0, 12.0, 0.0]).cuboid([-2.0, -12.0, -2.0], [4.0, 12.0, 4.0], [0.0, 16.0]),
     ])
 }
 
@@ -626,9 +954,9 @@ pub fn biped(arms_forward: bool) -> Model {
 pub fn spider() -> Model {
     use std::f32::consts::FRAC_PI_4 as Q;
     let mut parts = vec![
-        Part::new("head", [0.0, 9.0, -3.0]).cube([-4.0, -4.0, -8.0], [8.0, 8.0, 8.0], [32.0, 4.0]),
-        Part::new("neck", [0.0, 9.0, 0.0]).cube([-3.0, -3.0, -3.0], [6.0, 6.0, 6.0], [0.0, 0.0]),
-        Part::new("body", [0.0, 9.0, 9.0]).cube([-5.0, -4.0, -6.0], [10.0, 8.0, 12.0], [0.0, 12.0]),
+        ModelPart::new("head", [0.0, 9.0, -3.0]).cuboid([-4.0, -4.0, -8.0], [8.0, 8.0, 8.0], [32.0, 4.0]),
+        ModelPart::new("neck", [0.0, 9.0, 0.0]).cuboid([-3.0, -3.0, -3.0], [6.0, 6.0, 6.0], [0.0, 0.0]),
+        ModelPart::new("body", [0.0, 9.0, 9.0]).cuboid([-5.0, -4.0, -6.0], [10.0, 8.0, 12.0], [0.0, 12.0]),
     ];
     // (z, sideways splay, fan) back to front, a left leg then its right twin: leg0, leg1 ...
     for (i, (z, splay, fan)) in [(2.0, 1.0, 2.0), (1.0, 0.74, 1.0), (0.0, 0.74, -1.0), (-1.0, 1.0, -2.0)]
@@ -636,14 +964,14 @@ pub fn spider() -> Model {
         .enumerate()
     {
         parts.push(
-            Part::new(&format!("leg{}", i * 2), [-4.0, 9.0, z])
-                .cube([-15.0, -1.0, -1.0], [16.0, 2.0, 2.0], [18.0, 0.0])
-                .rotation(0.0, fan * Q / 2.0, splay * Q),
+            ModelPart::new(&format!("leg{}", i * 2), [-4.0, 9.0, z])
+                .cuboid([-15.0, -1.0, -1.0], [16.0, 2.0, 2.0], [18.0, 0.0])
+                .rotation(0.0, (fan * Q / 2.0).to_degrees(), (splay * Q).to_degrees()),
         );
         parts.push(
-            Part::new(&format!("leg{}", i * 2 + 1), [4.0, 9.0, z])
-                .cube([-1.0, -1.0, -1.0], [16.0, 2.0, 2.0], [18.0, 0.0])
-                .rotation(0.0, -fan * Q / 2.0, -splay * Q),
+            ModelPart::new(&format!("leg{}", i * 2 + 1), [4.0, 9.0, z])
+                .cuboid([-1.0, -1.0, -1.0], [16.0, 2.0, 2.0], [18.0, 0.0])
+                .rotation(0.0, (-fan * Q / 2.0).to_degrees(), (-splay * Q).to_degrees()),
         );
     }
     Model::from(parts)
@@ -662,37 +990,42 @@ pub fn quadruped(body: [f32; 3], leg: f32, head: [f32; 3]) -> Model {
         ("leg3", [-bw / 2.0 + 2.0, y, -bl / 2.0 + 2.0]),
     ];
     let mut parts = vec![
-        Part::new("body", [0.0, y, 0.0]).cube([-bw / 2.0, 0.0, -bl / 2.0], [bw, bh, bl], [0.0, 32.0]),
-        Part::new("head", [0.0, y + bh * 0.75, -bl / 2.0]).cube([-head[0] / 2.0, -head[1] / 2.0, -head[2]], head, [0.0, 0.0]),
+        ModelPart::new("body", [0.0, y, 0.0]).cuboid([-bw / 2.0, 0.0, -bl / 2.0], [bw, bh, bl], [0.0, 32.0]),
+        ModelPart::new("head", [0.0, y + bh * 0.75, -bl / 2.0]).cuboid([-head[0] / 2.0, -head[1] / 2.0, -head[2]], head, [0.0, 0.0]),
     ];
     for (name, pivot) in legs {
-        parts.push(Part::new(name, pivot).cube([-2.0, -leg, -2.0], [4.0, leg, 4.0], [0.0, 16.0]));
+        parts.push(ModelPart::new(name, pivot).cuboid([-2.0, -leg, -2.0], [4.0, leg, 4.0], [0.0, 16.0]));
     }
-    Model::from(parts).uv(64, 64)
+    Model::from(parts).uv_size(64, 64)
 }
 
 pub struct EntityBuilder<'a> {
     no_egg: bool,
     reg: &'a mut Registry,
     name: String,
-    handle: Option<&'static Entity>,
+    handle: Option<&'static EntityKind>,
     components: Vec<Pending>,
     width: f32,
     height: f32,
-    eye: f32,
+    eye: Option<f32>,
     speed: f32,
     flags: u32,
     texture: String,
     texture_size: [u32; 2],
-    parts: Vec<Part>,
+    parts: Vec<ModelPart>,
     on_tick: abi::Callback,
     on_interact: abi::Callback,
     replace: bool,
     carry_height: f32,
     category_name: String,
     template: String,
+    slots: u32,
     /// Components (full name, starting value) every entity of this kind gets.
     attached: Vec<(&'static str, Vec<u8>)>,
+    seats: Vec<crate::riding::Seat>,
+    steering: Option<crate::riding::Steering>,
+    rider_rules: Option<crate::riding::RiderRules>,
+    ride_camera: f32,
 }
 
 /// Components of the kind (not per entity; see `Registry::entity_component` for that).
@@ -713,7 +1046,12 @@ impl EntityBuilder<'_> {
     /// `attach` with another starting value.
     pub fn attach_with<T: Value>(mut self, component: &'static Component<T>, value: T) -> Self {
         self.attached
-            .push((component.name(), crate::component::pod_bytes(&value)));
+            .push((component.name(), crate::component::value_bytes(&value)));
+        self
+    }
+    /// Every entity of the kind carries `storage` (declared with `r.storage`), empty at first.
+    pub fn storage(mut self, storage: &'static Storage) -> Self {
+        self.attached.push((storage.name(), Vec::new()));
         self
     }
     /// A solid body: others stand on it and ride along, bump into it and get pushed by it
@@ -722,7 +1060,7 @@ impl EntityBuilder<'_> {
         self.flags = (self.flags | entity_flags::SOLID) & !entity_flags::PUSHABLE;
         self
     }
-    /// Takes no damage (no hurt flash, health stays); `/kill` and the void still remove it.
+    /// Takes no damage (no hurt flash, health stays); `/clear` and the void still remove it.
     pub fn invulnerable(mut self) -> Self {
         self.flags |= entity_flags::INVULNERABLE;
         self
@@ -735,7 +1073,7 @@ impl EntityBuilder<'_> {
     /// Moved exactly by the velocity mod logic gives it (`set_entity`), through blocks, no
     /// gravity: lifts, airships, contraptions.
     pub fn kinematic(mut self) -> Self {
-        self.flags |= entity_flags::KINEMATIC | entity_flags::NO_GRAVITY;
+        self.flags |= entity_flags::KINEMATIC;
         self
     }
     /// A solid body that hurts what it squeezes into blocks instead of only pushing it.
@@ -765,7 +1103,11 @@ impl EntityBuilder<'_> {
     pub fn size(mut self, width: f32, height: f32) -> Self {
         self.width = width;
         self.height = height;
-        self.eye = height * EYE_SHARE;
+        self
+    }
+    /// Eye height in blocks, `EYE_SHARE` of its height when not said.
+    pub fn eye_height(mut self, blocks: f32) -> Self {
+        self.eye = Some(blocks);
         self
     }
     /// No spawn egg. Every entity has one otherwise, `<name>_spawn_egg`, called after it and looking
@@ -783,19 +1125,33 @@ impl EntityBuilder<'_> {
     pub fn attack_speed(self, per_second: f32) -> Self {
         crate::WithComponents::set(self, &crate::component::ATTACK_SPEED, per_second)
     }
-    pub fn health(mut self, h: f32) -> Self {
+    /// How far it hits (the `ENTITY_REACH` attribute, from its eyes to the target's box); a
+    /// modifier changes it like any attribute.
+    pub fn reach(mut self, blocks: f64) -> Self {
+        self.components
+            .retain(|p| p.name != abi::attribute::ENTITY_REACH);
+        self.components
+            .push(Pending::value(abi::attribute::ENTITY_REACH, "f64".into(), crate::component::value_bytes(&blocks)));
+        self
+    }
+    pub fn max_health(mut self, h: f32) -> Self {
         self.components
             .retain(|p| p.name != abi::attribute::MAX_HEALTH);
         self.components
-            .push(Pending::value(abi::attribute::MAX_HEALTH, "f64".into(), crate::component::pod_bytes(&(h as f64))));
+            .push(Pending::value(abi::attribute::MAX_HEALTH, "f64".into(), crate::component::value_bytes(&(h as f64))));
         self
     }
-    pub fn speed(mut self, s: f32) -> Self {
+    pub fn walk_speed(mut self, s: f32) -> Self {
         self.speed = s;
         self
     }
     pub fn flags(mut self, f: u32) -> Self {
         self.flags |= f;
+        self
+    }
+    /// Every entity of this kind carries an inventory of `slots` (`w.inventory(id)`).
+    pub fn inventory(mut self, slots: u32) -> Self {
+        self.slots = slots;
         self
     }
     /// A category registered with `Registry::entity_category` (any mod's), for spawn caps and
@@ -862,15 +1218,9 @@ impl EntityBuilder<'_> {
             .push(Pending::text(abi::comp::SOUND, &prefix));
         self
     }
-    /// Model from `models/<name>.geo.json` (Bedrock geometry, as Blockbench exports it) instead of
-    /// the parts in code. A file named like the kind is used even without this.
-    pub fn model_file(mut self, name: &str) -> Self {
-        let name = crate::asset("", name);
-        self.components.push(Pending::text(abi::comp::MODEL, &name));
-        self
-    }
+
     /// Keyframe animations from `animations/<name>.animation.json`: `idle` and `walk` play by
-    /// themselves, others with `World::play_animation`. A file named like the kind is used even
+    /// themselves, others with `World::action_play`. A file named like the kind is used even
     /// without this.
     pub fn animations(mut self, name: &str) -> Self {
         let name = crate::asset("", name);
@@ -878,10 +1228,10 @@ impl EntityBuilder<'_> {
             .push(Pending::text(abi::comp::ANIMATIONS, &name));
         self
     }
-    /// A moving structure built of `template` (`Registry::template`; block (0, 0, 0) is
+    /// A moving body built of `template` (`Registry::template`; block (0, 0, 0) is
     /// centered on the entity's position, its box is what the blocks fill). Blocks are placed and
     /// broken on it like in the world, and it carries what stands on it; usually `.solid()`.
-    pub fn blocks(mut self, template: &crate::Template) -> Self {
+    pub fn body(mut self, template: &crate::Template) -> Self {
         self.template = template.name().to_string();
         self
     }
@@ -897,27 +1247,18 @@ impl EntityBuilder<'_> {
         self.on_tick = tick_cb(f);
         self
     }
-    /// Behavior from goals (`ai::Goals`), run every tick; replaces `on_tick`.
+    /// Behavior from goals and what sets it off (`ai::Goals`), run every tick; replaces `on_tick`.
     pub fn goals(self, goals: crate::ai::Goals) -> Self {
-        self.on_tick(move |t| goals.tick(t))
+        let hurt = goals.reactions.clone();
+        self.on_hurt(move |w, h| crate::ai::Goals::hurt(&hurt, w, h))
+            .on_tick(move |t| goals.tick(t))
     }
-    /// Leaves a player alone while `calm(world, the mob, the player)` holds, unless they hit it
-    /// in the last 20 seconds: a spider by day, or one that only minds you within so many
-    /// blocks. The kind's goals go by it through `ai::melee`, `ai::follow_player` and `ai::target`.
-    pub fn neutral(self, calm: impl Fn(&World, &EntityState, &EntityState) -> bool + Send + Sync + 'static) -> Self {
-        let Some(kind) = self.handle else { return self };
-        if crate::ai::add_neutral(kind, Box::new(calm)) {
-            self.reg
-                .entity_component(&crate::ai::ANGER, crate::ai::Anger::default(), 0);
-        }
-        self.attach(&crate::ai::ANGER).on_hurt(crate::ai::provoked)
-    }
-    /// One of these was hurt: `ENTITY_HURT` for this kind, after the damage, with the other
+    /// One of these was hurt: `actions::HURT` for this kind, after the damage, with the other
     /// events at the end of the tick. Changing the damage is `r.modify(&chain::DAMAGE, ..)`,
-    /// preventing it `r.intercept(&question::HURT, ..)`.
+    /// preventing it `r.intercept(&actions::HURT, ..)`.
     pub fn on_hurt(self, f: impl Fn(&World, &crate::Hurt) + Send + Sync + 'static) -> Self {
         let Some(kind) = self.handle else { return self };
-        self.reg.on(&crate::ENTITY_HURT, move |b| {
+        self.reg.on(&crate::actions::HURT, move |b| {
             let w = b.world();
             for h in b
                 .iter()
@@ -928,10 +1269,10 @@ impl EntityBuilder<'_> {
         });
         self
     }
-    /// One of these died: `ENTITY_DIED` for this kind.
-    pub fn on_death(self, f: impl Fn(&World, &crate::Death) + Send + Sync + 'static) -> Self {
+    /// One of these died: `actions::DIE` for this kind.
+    pub fn on_died(self, f: impl Fn(&World, &crate::Death) + Send + Sync + 'static) -> Self {
         let Some(kind) = self.handle else { return self };
-        self.reg.on(&crate::ENTITY_DIED, move |b| {
+        self.reg.on(&crate::actions::DIE, move |b| {
             let w = b.world();
             for d in b.iter().filter(|d| d.kind == kind.id()) {
                 f(&w, d);
@@ -939,15 +1280,45 @@ impl EntityBuilder<'_> {
         });
         self
     }
-    /// A player right clicked one, and `question::INTERACT_ENTITY` let it; `e.handled()` swings
-    /// the player's arm.
-    pub fn on_interact(mut self, f: impl Fn(&mut EntityEvent) + Send + Sync + 'static) -> Self {
+    /// A player right clicked one, and `actions::INTERACT_ENTITY` let it; true if it did something,
+    /// which swings the player's arm.
+    pub fn on_interact(mut self, f: impl Fn(&mut EntityEvent) -> bool + Send + Sync + 'static) -> Self {
         self.on_interact = event_cb(f);
         self
     }
+    /// A place to ride it, in the order seats are numbered (`crate::riding::Seat`).
+    pub fn seat(mut self, seat: crate::riding::Seat) -> Self {
+        self.seats.push(seat);
+        self
+    }
+    /// How the keys of a player in a seat that steers move it (`steer::*`, or your own).
+    pub fn steering(mut self, s: crate::riding::Steering) -> Self {
+        self.steering = Some(s);
+        self
+    }
+    /// What its riders may do (`RiderRules`).
+    pub fn rider_rules(mut self, rules: crate::riding::RiderRules) -> Self {
+        self.rider_rules = Some(rules);
+        self
+    }
+    /// Its falls hurt its riders too, as a horse's.
+    pub fn riders_fall(mut self) -> Self {
+        self.flags |= entity_flags::RIDERS_FALL;
+        self
+    }
+    /// Blocks the third-person camera stays further back while riding it, 0 for none; without
+    /// this, by its size.
+    pub fn ride_camera(mut self, blocks: f32) -> Self {
+        self.ride_camera = blocks;
+        self
+    }
+    /// A right click gets on it, in its first free seat (`on_interact` doing `w.mount`).
+    pub fn rideable(self) -> Self {
+        self.on_interact(|e| e.world().mount(e.other(), e.entity()))
+    }
 }
 
-fn raw_part(p: &Part) -> abi::ModelPart {
+fn raw_part(p: &ModelPart) -> abi::ModelPart {
     abi::ModelPart {
         pivot: p.pivot,
         cuboids: Slice::new(&p.boxes),
@@ -959,13 +1330,13 @@ fn raw_part(p: &Part) -> abi::ModelPart {
     }
 }
 
-impl Registry {
-    /// The model of a kind registered elsewhere, another mod's or the engine's (`core:player`
-    /// is drawn with `biped(false)` by base); a later mod's wins.
-    pub fn entity_model(&mut self, kind: &Entity, model: impl Into<Model>) {
-        let m = model.into();
-        let parts: Vec<abi::ModelPart> = m.parts.iter().map(raw_part).collect();
-        unsafe { (host().reg_entity_model)(self.raw, Str::new(kind.name()), Slice::new(&parts), m.uv[0], m.uv[1]) }
+impl crate::content::ModelSource for Model {
+    /// A kind's model, another mod's or the engine's (`core:player` is drawn with `biped(false)` by
+    /// base); a later mod's wins.
+    fn set_on(self, r: &mut Registry, what: crate::content::Target<'_>) {
+        let parts: Vec<abi::ModelPart> = self.parts.iter().map(raw_part).collect();
+        let kind = crate::qualify(r.ns, what.name());
+        unsafe { (host().reg_entity_model)(r.raw, Str::new(&kind), Slice::new(&parts), self.uv[0], self.uv[1]) }
     }
 }
 
@@ -975,7 +1346,7 @@ impl Drop for EntityBuilder<'_> {
             return;
         }
         if !self.no_egg && !self.replace {
-            let mob = Entity::generated(self.name.clone());
+            let mob = EntityKind::generated(self.name.clone());
             self.reg
                 .item(crate::Item::generated(format!("{}_spawn_egg", self.name)))
                 .spawns(mob)
@@ -983,13 +1354,31 @@ impl Drop for EntityBuilder<'_> {
         }
         let parts: Vec<abi::ModelPart> = self.parts.iter().map(raw_part).collect();
         let mut scratch = Vec::new();
-        let values = crate::content::raw_values_pub(&self.components, &mut scratch);
+        let values = crate::content::raw_values(&self.components, &mut scratch);
+        let seats: Vec<abi::SeatDesc> = self.seats.iter().map(|s| s.desc).collect();
+        let steer = self
+            .steering
+            .take()
+            .map_or(abi::Callback::NONE, |s| callback(move |a: &mut abi::SteerArgs| a.out = (s.0)(&a.input, &a.mount)));
+        let exits: Vec<Option<crate::riding::ExitFn>> = self.seats.iter().map(|s| s.exit.clone()).collect();
+        let dismount = if exits.iter().any(Option::is_some) {
+            callback(move |a: &mut abi::DismountArgs| {
+                if let Some(Some(f)) = exits.get(a.seat as usize) {
+                    a.out = f(&World::from_raw(a.world), a.mount, a.rider, a.out);
+                }
+            })
+        } else {
+            abi::Callback::NONE
+        };
+        if let Some(rules) = self.rider_rules.take() {
+            crate::riding::register_rules(self.reg, EntityKind::generated(self.name.clone()), rules);
+        }
         let desc = abi::EntityDesc {
             name: Str::new(&self.name),
-            cell: self.handle.map_or(std::ptr::null(), |h| h.cell()),
+            cell: self.handle.map_or(std::ptr::null(), |h| h.id_cell()),
             width: self.width,
             height: self.height,
-            eye: self.eye,
+            eye: self.eye.unwrap_or(self.height * EYE_SHARE),
             speed: self.speed,
             flags: self.flags,
             texture: Str::new(&self.texture),
@@ -997,16 +1386,20 @@ impl Drop for EntityBuilder<'_> {
             parts: Slice::new(&parts),
             on_tick: self.on_tick,
             on_interact: self.on_interact,
-            replace: self.replace as u32,
+            replacing: self.replace as u32,
             components: Slice::new(&values),
             carry_height: self.carry_height,
             category_name: Str::new(&self.category_name),
             template: Str::new(&self.template),
-            ..abi::EntityDesc::DEFAULT
+            slots: self.slots,
+            seats: Slice::new(&seats),
+            steer,
+            dismount,
+            ride_camera: self.ride_camera,
         };
         unsafe { (host().reg_entity)(self.reg.raw, &desc) }
         for (comp, value) in &self.attached {
-            unsafe { (host().reg_attach_value)(self.reg.raw, Str::new(&self.name), Str::new(comp), Slice::new(value)) }
+            unsafe { (host().reg_attach)(self.reg.raw, Str::new(&self.name), Str::new(comp), Slice::new(value)) }
         }
     }
 }
@@ -1022,47 +1415,28 @@ impl MenuCtx {
     pub fn player(&self) -> u64 {
         self.args.player
     }
-    /// Block entity the menu belongs to, 0 for player menus.
-    pub fn owner(&self) -> u64 {
-        self.args.owner
+    /// What the menu was opened on (a machine's block entity, a pouch in a slot); `None` for
+    /// the player's own and a crafting table's.
+    pub fn owner(&self) -> Option<Holder> {
+        (self.args.owner.kind != abi::holder::NONE).then_some(self.args.owner)
     }
-    /// Slot group `name` of this menu.
-    pub fn group(&self, name: &str) -> MenuGroup<'_> {
-        let mut out = [0u32; 3];
-        unsafe { (host().menu_group)(self.args.menu, Str::new(name), &mut out) };
-        MenuGroup { m: self, start: out[0], len: out[1], cols: out[2] }
+    /// The slot this call is about (the one taken from, for `on_take`), as the menu numbers them.
+    pub fn slot(&self) -> u32 {
+        self.args.slot
     }
-}
-
-/// Slots of one group of an open menu, numbered from 0, whoever's inventory they show.
-pub struct MenuGroup<'a> {
-    m: &'a MenuCtx,
-    start: u32,
-    len: u32,
-    cols: u32,
-}
-
-impl MenuGroup<'_> {
-    pub fn len(&self) -> u32 {
-        self.len
+    /// Slot group `name` of this menu; asking for one it doesn't have is a mistake that gets
+    /// logged, and the group is empty.
+    pub fn group(&self, name: &str) -> SlotGroup<'_> {
+        self.find_group(name).unwrap_or_else(|| {
+            crate::reg_mistake(&format!("the menu has no group {name}"));
+            SlotGroup::empty(GroupIn::Menu(self.args.menu))
+        })
     }
-    /// Its width as laid out (a 3 x 3 grid has 3).
-    pub fn cols(&self) -> u32 {
-        self.cols
-    }
-    pub fn rows(&self) -> u32 {
-        self.len.div_ceil(self.cols.max(1))
-    }
-    pub fn is_empty(&self) -> bool {
-        self.len == 0
-    }
-    pub fn get(&self, i: u32) -> ItemStack {
-        if i < self.len { unsafe { (host().menu_get)(self.m.args.menu, self.start + i) } } else { ItemStack::EMPTY }
-    }
-    pub fn set(&self, i: u32, stack: ItemStack) {
-        if i < self.len {
-            unsafe { (host().menu_set)(self.m.args.menu, self.start + i, stack) }
-        }
+    /// `group`, when not having it is fine.
+    pub fn find_group(&self, name: &str) -> Option<SlotGroup<'_>> {
+        let mut out = abi::SlotGroup::default();
+        let found = unsafe { (host().menu_group)(self.args.menu, Str::new(name), &mut out) } != 0;
+        found.then(|| SlotGroup::of(GroupIn::Menu(self.args.menu), out))
     }
 }
 
@@ -1133,7 +1507,7 @@ impl Slots {
     }
     /// The inventory of the entity the menu opened on. The default for `MachineBuilder::group`.
     pub fn machine(mut self) -> Self {
-        self.owner = Some(abi::slot_owner::BLOCK);
+        self.owner = Some(abi::slot_owner::MACHINE);
         self
     }
     /// The player's hotbar, in `Registry::player_inventory`.
@@ -1149,6 +1523,13 @@ impl Slots {
     /// Items only go in (a machine uses them up).
     pub fn input(mut self) -> Self {
         self.flags |= abi::slot_flags::INPUT;
+        self
+    }
+    /// Holds `capacity` millibuckets of one liquid: its item (`Item::named` the liquid's
+    /// name), poured in and taken out with buckets by hand, read and set like any slot.
+    pub fn liquid(mut self, capacity: u32) -> Self {
+        self.flags |= abi::slot_flags::LIQUID;
+        self.limit = capacity;
         self
     }
     /// Items only come out (results).
@@ -1300,7 +1681,7 @@ impl MenuBuilder<'_> {
         self
     }
     pub fn screen(mut self, f: impl Fn(&mut Ui) + Send + Sync + 'static) -> Self {
-        self.desc.screen = ui_callback(f);
+        self.desc.screen = ui_cb(f);
         self
     }
 }
@@ -1311,7 +1692,7 @@ impl Drop for MenuBuilder<'_> {
             return;
         }
         self.desc.name = Str::new(&self.name);
-        self.desc.cell = self.handle.map_or(std::ptr::null(), |h| h.cell());
+        self.desc.cell = self.handle.map_or(std::ptr::null(), |h| h.id_cell());
         let groups = self.groups.descs();
         self.desc.groups = Slice::new(&groups);
         self.desc.entity = Str::new(&self.entity);
@@ -1322,7 +1703,7 @@ impl Drop for MenuBuilder<'_> {
 }
 
 impl Registry {
-    pub fn entity<'a>(&'a mut self, kind: &'static Entity) -> EntityBuilder<'a> {
+    pub fn entity<'a>(&'a mut self, kind: &'static EntityKind) -> EntityBuilder<'a> {
         let d = abi::EntityDesc::DEFAULT;
         EntityBuilder {
             no_egg: false,
@@ -1332,7 +1713,7 @@ impl Registry {
             components: Vec::new(),
             width: d.width,
             height: d.height,
-            eye: d.eye,
+            eye: None,
             speed: d.speed,
             flags: d.flags,
             texture: crate::asset("entity", kind.name()),
@@ -1344,30 +1725,45 @@ impl Registry {
             carry_height: 0.0,
             category_name: String::new(),
             template: String::new(),
+            slots: d.slots,
             attached: Vec::new(),
+            seats: Vec::new(),
+            steering: None,
+            rider_rules: None,
+            ride_camera: f32::NAN,
         }
+    }
+
+    /// Declares `comp` for anything that holds a value of its own: entities (as
+    /// `entity_component` does) and stacks (as `stack_component`). With
+    /// `component_flags::CARRIED` the value goes from a broken machine onto its item and back
+    /// when placed, as a renamed chest's name does.
+    pub fn instance_component<T: Value>(&mut self, comp: &Component<T>, default: T, flags: u32) {
+        self.entity_component(comp, default, flags);
+        let no_save = if flags & component_flags::SAVE == 0 { abi::stack_flags::NO_SAVE } else { 0 };
+        self.stack_component(comp, no_save);
     }
 
     /// Declares per-entity storage for `comp`: the value an entity starts with and the
     /// `component_flags` (saved, synced to whom). Kinds carry it with `.attach(&COMP)` (or
     /// `r.attach(&KIND, &COMP)` for another mod's kind).
     pub fn entity_component<T: Value>(&mut self, comp: &Component<T>, default: T, flags: u32) {
-        let bytes = crate::component::pod_bytes(&default);
+        let bytes = crate::component::value_bytes(&default);
         let schema = T::schema();
-        let desc = abi::ComponentDesc {
+        let desc = abi::EntityComponentDesc {
             name: Str::new(comp.name()),
             schema: Str::new(&schema),
             value_size: size_of::<T>() as u32,
             flags,
             default: Slice::new(&bytes),
-            ..abi::ComponentDesc::DEFAULT
+            ..abi::EntityComponentDesc::DEFAULT
         };
-        unsafe { (host().reg_component)(self.raw, &desc) }
+        unsafe { (host().reg_entity_component)(self.raw, &desc) }
     }
 
     /// Logic that is nobody's own (players' hunger, a mod's weather): once per tick in every
     /// region of every dimension, where `w.players()` are the players in that region. Another
-    /// mod's entities are reached through events (`r.on(&ENTITY_HURT, ..)`) and questions.
+    /// mod's entities are reached through events (`r.on(&actions::HURT, ..)`) and questions.
     pub fn world_tick(&mut self, f: impl Fn(&World) + Send + Sync + 'static) {
         let cb = crate::callback(move |a: &mut abi::WorldTickArgs| f(&World::from_raw(a.world)));
         unsafe { (host().reg_world_tick)(self.raw, cb) }
@@ -1394,12 +1790,15 @@ impl Registry {
         PlayerInventoryBuilder { raw: self.raw, groups: GroupList::new(), _p: std::marker::PhantomData }
     }
 
-    /// An equipment slot of players (head, chest...): what is worn there covers `parts`
-    /// (`worn_parts`) of the model, `background` (from `gui/`) shows while it is empty. Items go
-    /// there with `.wearable(&SLOT, ..)`; menus show the slots with `.equipment()`.
-    pub fn equipment_slot(&mut self, slot: &EquipmentSlot, parts: u32, background: &str) {
+    /// An equipment slot of players (head, chest...): what is worn there covers the bones named
+    /// in `covers` (`worn::CHEST`, `&["leftWing", "rightWing"]`); a name with a role (`head`,
+    /// `leftArm`, `leg0`) covers every bone of that role. `background` (from `gui/`) shows while
+    /// it is empty. Items go there with `.wearable(&SLOT, ..)`; menus show the slots with
+    /// `.equipment()`.
+    pub fn equipment_slot(&mut self, slot: &EquipmentSlot, covers: &[&str], background: &str) {
         let bg = crate::asset("gui", background);
-        unsafe { (host().reg_equipment_slot)(self.raw, Str::new(slot.name()), parts, Str::new(&bg)) }
+        let bones = covers.join(" ");
+        unsafe { (host().reg_equipment_slot)(self.raw, Str::new(slot.name()), Str::new(&bones), Str::new(&bg)) }
     }
 
     /// The menu the inventory key opens.
@@ -1407,21 +1806,39 @@ impl Registry {
         unsafe { (host().set_player_menu)(self.raw, Str::new(menu.name())) }
     }
 
-    /// Gives `block` a block entity of kind `entity` with an inventory of `slots`.
-    pub fn block_entity(&mut self, block: &Block, entity: &Entity, slots: u32) {
-        unsafe { (host().set_block_entity)(self.raw, Str::new(block.name()), Str::new(entity.name()), slots) }
+    /// Gives `block` a block entity of a kind of its own, named like the block, with an
+    /// inventory of `slots` (what `BlockBuilder::inventory` and `machine` do).
+    pub(crate) fn block_entity(&mut self, block: &Block, slots: u32) -> &'static EntityKind {
+        let kind = EntityKind::generated(block.name().to_string());
+        drop(
+            self.entity(kind)
+                .no_egg()
+                .flags(entity_flags::NO_GRAVITY | entity_flags::INVULNERABLE),
+        );
+        unsafe { (host().set_block_entity)(self.raw, Str::new(block.name()), Str::new(kind.name()), slots) }
+        kind
     }
 
     /// Every entity of `kind` (any mod's, `&PLAYER`) carries `component`, starting at its
     /// declared value.
-    pub fn attach<T: Value>(&mut self, kind: &Entity, component: &Component<T>) {
-        unsafe { (host().reg_attach_value)(self.raw, Str::new(kind.name()), Str::new(component.name()), Slice::EMPTY) }
+    pub fn attach<T: Value>(&mut self, kind: &EntityKind, component: &Component<T>) {
+        unsafe { (host().reg_attach)(self.raw, Str::new(kind.name()), Str::new(component.name()), Slice::EMPTY) }
+    }
+
+    /// Every entity of `kind` (any mod's, `&PLAYER`) carries `storage`, empty at first.
+    pub fn attach_storage(&mut self, kind: &EntityKind, storage: &Storage) {
+        unsafe { (host().reg_attach)(self.raw, Str::new(kind.name()), Str::new(storage.name()), Slice::EMPTY) }
+    }
+
+    /// An inventory of `slots` a holder can keep besides its own (`Storage`).
+    pub fn storage(&mut self, storage: &Storage, slots: u32) {
+        unsafe { (host().reg_storage)(self.raw, Str::new(storage.name()), slots) }
     }
 
     /// `attach` with another starting value (a battery's capacity).
-    pub fn attach_with<T: Value>(&mut self, kind: &Entity, component: &Component<T>, value: T) {
-        let bytes = crate::component::pod_bytes(&value);
-        unsafe { (host().reg_attach_value)(self.raw, Str::new(kind.name()), Str::new(component.name()), Slice::new(&bytes)) }
+    pub fn attach_with<T: Value>(&mut self, kind: &EntityKind, component: &Component<T>, value: T) {
+        let bytes = crate::component::value_bytes(&value);
+        unsafe { (host().reg_attach)(self.raw, Str::new(kind.name()), Str::new(component.name()), Slice::new(&bytes)) }
     }
 
     /// Chat command `/name` run on the server; `usage` declares its arguments (`<name:type>`,
@@ -1437,7 +1854,7 @@ impl Registry {
         f: impl Fn(&mut crate::ServerCommand) + Send + Sync + 'static,
     ) -> crate::CommandOptions {
         let cb = crate::command::server_cb(f);
-        unsafe { (host().reg_command)(self.raw, Str::new(name), Str::new(usage), cb) };
+        unsafe { (host().reg_command)(self.raw, Str::new(name), Str::new(usage), 0, cb) };
         crate::CommandOptions::new(self.raw, name)
     }
 
@@ -1445,20 +1862,20 @@ impl Registry {
     /// server: for what only the player's own game has (views, local settings, debug output).
     pub fn client_command(&mut self, name: &str, usage: &str, f: impl Fn(&mut crate::ClientCommand) + Send + Sync + 'static) {
         let cb = crate::command::client_cb(f);
-        unsafe { (host().reg_client_command)(self.raw, Str::new(name), Str::new(usage), cb) }
+        unsafe { (host().reg_command)(self.raw, Str::new(name), Str::new(usage), 1, cb) }
     }
 
     /// Adds words to a word set: command parameters `word(#set)` complete from it. The
     /// engine's are `core:rules` and `core:gizmos` (or see `gizmo_group`); a mod's command can
     /// declare its own set that other mods add to.
-    pub fn words(&mut self, set: &str, words: &[&str]) {
+    pub fn add_words(&mut self, set: &str, words: &[&str]) {
         let words = words.join(",");
         unsafe { (host().reg_words)(self.raw, Str::new(set), Str::new(&words)) }
     }
 
     /// A gizmo group of this mod, offered by `/gizmo`'s completion.
     pub fn gizmo_group(&mut self, group: &GizmoGroup) {
-        self.words("core:gizmos", &[group.name()]);
+        self.add_words("core:gizmos", &[group.name()]);
     }
 
     /// A new branch of an existing server command, handled here: `r.command_branch("time",
@@ -1479,18 +1896,18 @@ impl Registry {
     /// `r.screen_part(&screens::TITLE, "buttons", 0, |ui| ..)`. Lower `order` comes first. The
     /// engine's places: `TITLE` `buttons` and `side`, `PAUSE` `buttons`, `SETTINGS` `buttons`.
     pub fn screen_part(&mut self, screen: &Screen, area: &str, order: i32, f: impl Fn(&mut Ui) + Send + Sync + 'static) {
-        let cb = crate::ui::ui_callback(f);
+        let cb = crate::ui::ui_cb(f);
         unsafe { (host().reg_screen_part)(self.raw, Str::new(screen.name()), Str::new(area), order, cb) }
     }
 
-    /// A screen opened with `Client::open_screen` (or `--screen <name>`); registering an engine
+    /// A screen opened with `Client::screen_open` (or `--screen <name>`); registering an engine
     /// screen's handle (`screens::PAUSE`) replaces that one. How it behaves is declared on it,
     /// the same properties the engine's screens have: `r.screen(&screens::PAUSE, build).pauses()`.
     pub fn screen<'a>(&'a mut self, screen: &Screen, f: impl Fn(&mut Ui) + Send + Sync + 'static) -> ScreenBuilder<'a> {
         ScreenBuilder {
             raw: self.raw,
             name: screen.name().to_string(),
-            desc: abi::ScreenDesc { build: ui_callback(f), ..abi::ScreenDesc::DEFAULT },
+            desc: abi::ScreenDesc { build: ui_cb(f), ..abi::ScreenDesc::DEFAULT },
             _p: std::marker::PhantomData,
         }
     }
@@ -1501,7 +1918,12 @@ impl Registry {
     /// painted again when the value changes. For looks that follow from a few bytes, such as an
     /// animal's genes: they travel instead of pictures. `f` may also scale the entity's bones
     /// (`Skin::scale_bone`): its build, drawn in every look of it.
-    pub fn entity_skin<T: Value>(&mut self, kind: &Entity, comp: &'static Component<T>, f: impl Fn(&T, &mut Skin) + Send + Sync + 'static) {
+    pub fn entity_skin<T: Value>(
+        &mut self,
+        kind: &EntityKind,
+        comp: &'static Component<T>,
+        f: impl Fn(&T, &mut Skin) + Send + Sync + 'static,
+    ) {
         let cb = callback(move |a: &mut abi::SkinArgs| {
             if a.data.len != size_of::<T>() || a.rgba.is_null() {
                 return;
@@ -1524,7 +1946,7 @@ impl Registry {
 
     /// HUD element at `anchor` (`hud_anchor::*`); `order` 0 sits nearest the anchor's edge.
     pub fn hud_element(&mut self, element: &HudElement, anchor: &str, order: i32, f: impl Fn(&mut Ui) + Send + Sync + 'static) {
-        unsafe { (host().reg_hud_element)(self.raw, Str::new(element.name()), Str::new(anchor), order, ui_callback(f)) }
+        unsafe { (host().reg_hud_element)(self.raw, Str::new(element.name()), Str::new(anchor), order, ui_cb(f)) }
     }
 
     /// Shaped recipe: `pattern` rows use the characters in `keys`; ingredients are item names or `#tag`.
@@ -1542,8 +1964,8 @@ impl Registry {
 
     /// An entity category: at most `cap` of it spawn naturally near a player; with `despawn` > 0
     /// they vanish when no player is within that many blocks.
-    pub fn entity_category(&mut self, category: &EntityCategory, cap: u32, despawn: f32) {
-        unsafe { (host().reg_entity_category)(self.raw, Str::new(category.name()), cap, despawn) }
+    pub fn entity_category(&mut self, category: &EntityCategory, cap: u32, despawn: f32) -> CategoryBuilder<'_> {
+        CategoryBuilder { raw: self.raw, name: category.name().to_string(), cap, despawn, cap_radius: 64.0, _p: std::marker::PhantomData }
     }
 
     /// Registers a recipe kind this mod owns, and how the recipe viewer shows it.
@@ -1589,7 +2011,7 @@ impl Registry {
     }
 
     /// Shapeless recipe or a processing recipe (inputs used up over `time` ticks). Inputs are
-    /// items, `#tags` or `fluid:<liquid>`.
+    /// items or `#tags`; a liquid is its item, named like it, counted in millibuckets.
     pub fn shapeless<'a>(&'a mut self, kind: &RecipeKind, output: &str, count: u32, inputs: &[&str], time: u32) -> RecipeBuilder<'a> {
         let inputs = inputs.iter().map(|n| self.ingredient(n)).collect();
         let output = self.ingredient(output);
@@ -1610,11 +2032,7 @@ impl Registry {
     }
 
     fn ingredient(&self, n: &str) -> String {
-        match n.strip_prefix("fluid:") {
-            Some(f) => format!("fluid:{}", qualify(self.ns, f)),
-            None if n.starts_with('#') => n.to_string(),
-            None => qualify(self.ns, n),
-        }
+        if n.starts_with('#') { n.to_string() } else { qualify(self.ns, n) }
     }
 }
 
@@ -1635,17 +2053,17 @@ pub struct RecipeBuilder<'a> {
 }
 
 impl RecipeBuilder<'_> {
-    /// How many of each input it takes, in the order of the inputs (millibuckets for fluids).
+    /// How many of each input it takes, in the order of the inputs (millibuckets for liquids).
     pub fn input_amounts(mut self, counts: &[u32]) -> Self {
         self.counts = counts.to_vec();
         self
     }
-    /// Another result (an item or `fluid:<liquid>`).
+    /// Another result (an item, or a liquid by its name and millibuckets).
     pub fn output(self, item: &str, count: u32) -> Self {
-        self.chance_output(item, count, 1.0)
+        self.output_chance(item, count, 1.0)
     }
     /// A result that comes out with chance `chance` (0..1) each time.
-    pub fn chance_output(mut self, item: &str, count: u32, chance: f32) -> Self {
+    pub fn output_chance(mut self, item: &str, count: u32, chance: f32) -> Self {
         let item = self.reg.ingredient(item);
         self.outputs.push((item, count, chance));
         self
@@ -1681,7 +2099,7 @@ impl Drop for RecipeBuilder<'_> {
             .map(|(n, c, ch)| abi::RecipeOutput { item: Str::new(n), count: *c, chance: *ch })
             .collect();
         let mut scratch = Vec::new();
-        let values = crate::content::raw_values_pub(&self.values, &mut scratch);
+        let values = crate::content::raw_values(&self.values, &mut scratch);
         let desc = abi::RecipeDesc {
             kind: Str::new(&self.kind),
             pattern: Slice::new(&pattern),
@@ -1753,16 +2171,27 @@ impl Drop for RecipeKindBuilder<'_> {
             output_grid: self.output_grid,
             info: Str::new(&self.info),
             info_values: Slice::new(&values),
-            display: self.display,
+            layout: self.display,
         };
         unsafe { (host().reg_recipe_kind)(self.raw, &desc) }
     }
 }
 
-/// One recipe of a kind, found by `recipe_find` (or shown by a kind's `display`).
+/// One recipe of a kind, found by `recipe_find` or listed by `recipes` (or shown by a kind's
+/// `display`).
 pub struct Recipe {
     kind: String,
     index: u32,
+}
+
+/// Every recipe of `kind`, in the order they were registered (hidden ones too: `hidden()`).
+pub fn recipes(kind: &RecipeKind) -> Vec<Recipe> {
+    let mut out = Vec::new();
+    let mut info = abi::RecipeInfo::default();
+    while unsafe { (host().recipe_info)(Str::new(kind.name()), out.len() as u32, &mut info) } != 0 {
+        out.push(Recipe { kind: kind.name().to_string(), index: out.len() as u32 });
+    }
+    out
 }
 
 /// The first recipe of `kind` whose inputs, with their counts, are all among `stacks`.
@@ -1777,11 +2206,47 @@ impl Recipe {
         unsafe { (host().recipe_info)(Str::new(&self.kind), self.index, &mut out) };
         out
     }
+    /// Recipe `index` of `kind` (as `recipes` numbers them), if there is one.
+    pub fn at(kind: &RecipeKind, index: u32) -> Option<Recipe> {
+        let mut info = abi::RecipeInfo::default();
+        (unsafe { (host().recipe_info)(Str::new(kind.name()), index, &mut info) } != 0)
+            .then(|| Recipe { kind: kind.name().to_string(), index })
+    }
+    /// Its number in its kind.
+    pub fn index(&self) -> u32 {
+        self.index
+    }
+    /// Its kind's name (`base:crafting`).
+    pub fn kind(&self) -> &str {
+        &self.kind
+    }
     /// Its time in ticks.
     pub fn time(&self) -> u32 {
         self.info().time
     }
-    /// Its results with their chances; fluids are not stacks and show as empty ones.
+    /// Kept out of the recipe viewer.
+    pub fn hidden(&self) -> bool {
+        self.info().flags & abi::recipe_flags::HIDDEN != 0
+    }
+    /// A shaped recipe's grid (width, height); `None` for a shapeless one.
+    pub fn shape(&self) -> Option<(u32, u32)> {
+        let i = self.info();
+        (i.width > 0).then_some((i.width, i.height))
+    }
+    /// Its inputs: a shaped one's cells row by row (empty ones too), else its ingredients.
+    pub fn inputs(&self) -> Vec<abi::RecipeInput> {
+        let mut out = Vec::new();
+        let mut one = abi::RecipeInput::default();
+        while unsafe { (host().recipe_input)(Str::new(&self.kind), self.index, out.len() as u32, &mut one) } != 0 {
+            out.push(one);
+        }
+        out
+    }
+    /// Whether `item` fits input `index` (numbered as `inputs`).
+    pub fn accepts(&self, index: u32, item: u32) -> bool {
+        unsafe { (host().recipe_accepts)(Str::new(&self.kind), self.index, index, item) != 0 }
+    }
+    /// Its results with their chances; a liquid's is its item by the millibucket.
     pub fn outputs(&self) -> Vec<(ItemStack, f32)> {
         (0..self.info().outputs)
             .map(|i| {
@@ -1805,21 +2270,80 @@ impl Recipe {
     }
 }
 
+/// An entity category being registered (`Registry::entity_category`).
+pub struct CategoryBuilder<'a> {
+    raw: *mut abi::Registrar,
+    name: String,
+    cap: u32,
+    despawn: f32,
+    cap_radius: f32,
+    _p: std::marker::PhantomData<&'a mut Registry>,
+}
+
+impl CategoryBuilder<'_> {
+    /// How close to a player its mobs count for the cap (64 by default).
+    pub fn cap_radius(mut self, blocks: f32) -> Self {
+        self.cap_radius = blocks;
+        self
+    }
+}
+
+impl Drop for CategoryBuilder<'_> {
+    fn drop(&mut self) {
+        if !std::thread::panicking() {
+            unsafe { (host().reg_entity_category)(self.raw, Str::new(&self.name), self.cap, self.despawn, self.cap_radius) }
+        }
+    }
+}
+
+/// What the base game's armor slots cover (`Registry::equipment_slot`): bones by role, so they fit
+/// any model with bones of those names.
+pub mod worn {
+    pub const HEAD: &[&str] = &["head"];
+    pub const CHEST: &[&str] = &["body", "leftArm", "rightArm"];
+    pub const LEGS: &[&str] = &["body", "leftLeg", "rightLeg", "leg2", "leg3"];
+    pub const FEET: &[&str] = &["leftLeg", "rightLeg", "leg2", "leg3"];
+}
+
+/// Where a natural spawn stands (`SpawnBuilder::place`).
+#[derive(Clone, Copy, Debug)]
+pub struct SpawnPlace {
+    kind: u32,
+    tag: Option<&'static str>,
+}
+
+impl SpawnPlace {
+    /// On a solid block, in air.
+    pub fn ground() -> SpawnPlace {
+        SpawnPlace { kind: abi::spawn_place::GROUND, tag: None }
+    }
+    /// Inside a liquid with this tag (`"#water"`): fish, squid.
+    pub fn in_liquid(tag: &'static str) -> SpawnPlace {
+        SpawnPlace { kind: abi::spawn_place::IN_LIQUID, tag: Some(tag) }
+    }
+    /// Hanging under a solid block: bats.
+    pub fn ceiling() -> SpawnPlace {
+        SpawnPlace { kind: abi::spawn_place::CEILING, tag: None }
+    }
+}
+
 /// A natural spawning rule (see `abi::SpawnDesc`):
 /// `r.spawn("pig").biome("#animals").ground("#animal_spawn").light(9, 15).group(2, 3).chance(0.05)`.
 pub struct SpawnBuilder<'a> {
     raw: *mut abi::Registrar,
     names: [String; 4],
+    condition: String,
     desc: abi::SpawnDesc,
     _p: std::marker::PhantomData<&'a mut Registry>,
 }
 
 impl Registry {
-    pub fn spawn<'a>(&'a mut self, entity: &Entity) -> SpawnBuilder<'a> {
+    pub fn natural_spawn<'a>(&'a mut self, entity: &EntityKind) -> SpawnBuilder<'a> {
         let entity = entity.name().to_string();
         SpawnBuilder {
             raw: self.raw,
             names: [entity, String::new(), String::new(), String::new()],
+            condition: String::new(),
             desc: abi::SpawnDesc::DEFAULT,
             _p: std::marker::PhantomData,
         }
@@ -1832,14 +2356,28 @@ impl SpawnBuilder<'_> {
         self.names[1] = tag.to_string();
         self
     }
-    /// Only on blocks with this tag.
+    /// Only on blocks with this tag (under the spot; what `place` says it rests on).
     pub fn ground(mut self, tag: &str) -> Self {
         self.names[2] = tag.to_string();
+        self
+    }
+    /// What kind of spot it takes: on the ground (the default), in a liquid, under a ceiling.
+    /// The mob's height decides how much room it needs.
+    pub fn place(mut self, place: SpawnPlace) -> Self {
+        self.desc.place = place.kind;
+        if let Some(t) = place.tag {
+            self.names[2] = t.to_string();
+        }
         self
     }
     /// Full dimension name.
     pub fn dimension(mut self, name: &str) -> Self {
         self.names[3] = name.to_string();
+        self
+    }
+    /// Only where this condition holds too.
+    pub fn when(mut self, condition: &crate::Condition) -> Self {
+        self.condition = condition.name().to_string();
         self
     }
     /// Light at the spot, inclusive (0..15).
@@ -1851,7 +2389,7 @@ impl SpawnBuilder<'_> {
         self.desc.y = [min, max];
         self
     }
-    pub fn group(mut self, min: u32, max: u32) -> Self {
+    pub fn pack_size(mut self, min: u32, max: u32) -> Self {
         self.desc.group = [min, max];
         self
     }
@@ -1876,6 +2414,7 @@ impl Drop for SpawnBuilder<'_> {
             biome: Str::new(biome),
             ground: Str::new(ground),
             dimension: Str::new(dimension),
+            condition: Str::new(&self.condition),
             ..self.desc
         };
         unsafe { (host().reg_spawn)(self.raw, &desc) }
@@ -1901,25 +2440,35 @@ type BlockLook = Box<dyn for<'r> FnOnce(crate::BlockBuilder<'r>) -> crate::Block
 pub struct MachineBuilder<'a> {
     reg: &'a mut Registry,
     block_handle: &'static Block,
-    menu: &'static Menu,
+    menu: Option<&'static Menu>,
     block: Option<BlockLook>,
     groups: Vec<(String, Slots)>,
     recipes: Vec<String>,
-    with: Vec<Box<dyn FnOnce(&mut Registry, &Entity)>>,
+    with: Vec<Box<dyn FnOnce(&mut Registry, &EntityKind)>>,
     screen: Option<Box<dyn Fn(&mut Ui) + Send + Sync>>,
+    plain_screen: bool,
 }
 
 impl Registry {
-    /// The machine's entity kind is named like its block: `Entity::named("furnace")`.
+    /// The machine's entity kind is named like its block: `EntityKind::named("furnace")`.
     pub fn machine<'a>(&'a mut self, block: &'static Block, menu: &'static Menu) -> MachineBuilder<'a> {
+        let mut m = self.machine_without_menu(block);
+        m.menu = Some(menu);
+        m
+    }
+
+    /// A machine with no screen: using it opens nothing (a spring engine with its state and
+    /// energy). Its groups are still its inventory, for pipes and hoppers.
+    pub fn machine_without_menu<'a>(&'a mut self, block: &'static Block) -> MachineBuilder<'a> {
         MachineBuilder {
             block_handle: block,
             reg: self,
-            menu,
+            menu: None,
             block: None,
             groups: Vec::new(),
             recipes: Vec::new(),
             with: Vec::new(),
+            plain_screen: false,
             screen: None,
         }
     }
@@ -1961,6 +2510,11 @@ impl MachineBuilder<'_> {
         self.screen = Some(Box::new(f));
         self
     }
+    /// The usual menu screen: its title, its groups in order, the player's inventory.
+    pub fn default_screen(mut self) -> Self {
+        self.plain_screen = true;
+        self
+    }
 }
 
 impl Drop for MachineBuilder<'_> {
@@ -1970,32 +2524,43 @@ impl Drop for MachineBuilder<'_> {
         }
         let (block, menu, reg) = (self.block_handle, self.menu, &mut *self.reg);
         let full = block.name().to_string();
-        let kind = Entity::generated(full.clone());
         let look = self.block.take().unwrap_or_else(|| Box::new(|b| b));
-        look(reg.block(block)).opens(menu);
-        drop(
-            reg.entity(kind)
-                .no_egg()
-                .flags(entity_flags::NO_GRAVITY | entity_flags::INVULNERABLE),
-        );
-        for f in self.with.drain(..) {
-            f(reg, kind);
-        }
+        let b = look(reg.block(block));
+        drop(match menu {
+            Some(menu) => b.opens(menu),
+            None => b,
+        });
         // The inventory holds every group of the machine's own, wherever they start.
         let mut size = 0;
         let mut next = 0;
         for (_, s) in &self.groups {
-            if s.owner.is_none_or(|o| o == abi::slot_owner::BLOCK) {
+            if s.owner.is_none_or(|o| o == abi::slot_owner::MACHINE) {
                 let start = if s.start == u32::MAX { next } else { s.start };
                 next = start + s.cols * s.rows;
                 size = size.max(next);
             }
         }
-        reg.block_entity(block, kind, size);
+        let kind = reg.block_entity(block, size);
+        for f in self.with.drain(..) {
+            f(reg, kind);
+        }
+        let Some(menu) = menu else { return };
+        if self.plain_screen {
+            let names: Vec<String> = self.groups.iter().map(|g| g.0.clone()).collect();
+            self.screen = Some(Box::new(move |ui| {
+                ui.panel("panel", crate::ui::S::column().pad(7.0).gap(4.0), |ui| {
+                    ui.title();
+                    for name in &names {
+                        ui.group(name);
+                    }
+                    ui.player_inventory(true);
+                });
+            }));
+        }
         let mut m = reg.menu(menu);
         for (g, s) in self.groups.drain(..) {
             let ns = m.reg.ns;
-            m.groups.push(ns, &g, s, abi::slot_owner::BLOCK);
+            m.groups.push(ns, &g, s, abi::slot_owner::MACHINE);
         }
         m.entity = full.clone();
         m.recipes = std::mem::take(&mut self.recipes);
@@ -2044,7 +2609,7 @@ impl ScreenBuilder<'_> {
         self.desc.flags |= abi::screen_flags::SHOWS_CHAT;
         self
     }
-    /// Keys pressed while it is on top, by their settings name (`Enter`, `KeyE`), before
+    /// Keys pressed while it is on top, by their settings name (`Enter`, `KeyE`, `mouse3`), before
     /// Escape and the other global keys.
     pub fn on_key(mut self, f: impl Fn(&crate::ClientView, &str) + Send + Sync + 'static) -> Self {
         self.desc.on_key =
@@ -2063,12 +2628,12 @@ impl Drop for ScreenBuilder<'_> {
     }
 }
 
-/// What an entity looks at (`World::look_at`): a block of the world (`frame` 0) or of a moving
-/// structure (`frame` its entity, `pos` in its blocks).
+/// What an entity looks at (`World::target_block`): a block of the world (`body` 0) or of a
+/// moving body (`body` its entity, `pos` in its blocks).
 #[derive(Clone, Copy, Debug)]
 pub struct LookAt {
-    pub pos: [i32; 3],
+    pub pos: BlockPos,
     pub face: u32,
     pub state: u32,
-    pub frame: u64,
+    pub body: u64,
 }

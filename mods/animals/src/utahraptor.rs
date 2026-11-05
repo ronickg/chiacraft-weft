@@ -6,15 +6,14 @@
 //! chihuahua's. The model, its animations and texture are built from `source/utahraptor` (see
 //! `docs/creatures.md`).
 
+use crate::choose::{Band, Need, Stops, WithBand};
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
-pub(crate) static UTAHRAPTOR: Entity = Entity::named("utahraptor");
-const TEXTURE: &str = "utahraptor/utahraptor";
-/// Its box: wide and tall enough for the body and the raised head.
-const SIZE: (f32, f32) = (1.2, 2.4);
+use crate::ModelFile;
 
-/// What it hunts.
+pub(crate) static UTAHRAPTOR: EntityKind = EntityKind::named("utahraptor");
+const TEXTURE: &str = "utahraptor/utahraptor";
 
 pub fn init(r: &mut Registry) {
     let index = crate::species::of(&UTAHRAPTOR);
@@ -25,14 +24,14 @@ pub fn init(r: &mut Registry) {
         crate::rest::Settle { chance: 400, ticks: (600, 1600), lie_after: 0 },
         "utahraptor",
         TEXTURE,
-        (SIZE.0, SIZE.1),
+        animals_core::bodies::of("utahraptor"),
         &[("_rest", "utahraptor_rest")],
     );
-    r.entity(&UTAHRAPTOR)
-        .size(SIZE.0, SIZE.1)
-        .health(60.0)
-        .speed(3.6)
-        .attack_damage(10.0)
+    crate::riding::rideable(r.entity(&UTAHRAPTOR), index)
+        .size(animals_core::bodies::of("utahraptor").0, animals_core::bodies::of("utahraptor").1)
+        .max_health(crate::animal::health(index))
+        .walk_speed(3.6)
+        .attack_damage(crate::animal::hit(index))
         .passive()
         .model_file("utahraptor")
         .animations("utahraptor")
@@ -45,6 +44,7 @@ pub fn init(r: &mut Registry) {
             {
                 crate::commands::interact(&w, id, player);
             }
+            false
         })
         .goals(
             Goals::new()
@@ -54,16 +54,22 @@ pub fn init(r: &mut Registry) {
                 .then(crate::hunt::wary)
                 .then(crate::hunt::hunt)
                 .then(crate::commands::act(index))
-                .then(crate::breeding::behave(index))
                 .then(crate::eggs::nest(index))
-                .then(crate::rest::settle)
-                .then(crate::commands::hold)
-                .then(crate::comfort::seek)
-                .then(crate::forage::forage)
-                .then(ai::wander(0.5, 12.0)),
+                // What it does when nothing is after it or ordered, the most pressing first (`choose.rs`).
+                .band(
+                    "needs",
+                    Band::new()
+                        .with(Need::Love, crate::breeding::behave(index))
+                        .with(Need::Rest, Stops { goal: crate::rest::settle, stop: crate::rest::stop })
+                        .with(Need::Hold, crate::commands::hold)
+                        .with(Need::Comfort, crate::comfort::seek)
+                        .with(Need::Drink, crate::drink::drink)
+                        .with(Need::Eat, crate::forage::eat)
+                        .with(Need::Wander, ai::wander(0.5, 12.0)),
+                ),
         )
         .on_hurt(|w, h| {
-            crate::taming::hurt(w, h.entity);
+            crate::taming::hurt(w, h.entity, h.source);
             crate::rest::stop(w, h.entity);
         });
 }

@@ -19,6 +19,7 @@ puts where the pixel font's baseline is. Positions in the `.font` are atlas pixe
 from the pen and how far the pen moves on. Characters the font lacks are left to Unifont.
 """
 import os
+import sys
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
@@ -147,15 +148,46 @@ def pixel_main(path, also=None):
     top = 2
     baseline = top + ascent + (14 - (room + cap_h))
     glyphs = []
+    # The Cyrillic drawn on PixelOperator's grid (`cyrillic_pixel.py`): its baseline in the cell
+    # is the first font's, found from its "H".
+    import cyrillic_pixel as cyr
+    h_img = Image.new("L", (cw, ch))
+    ImageDraw.Draw(h_img).text((PAD, top), "H", font=f0, fill=255)
+    h_rows = np.nonzero(np.asarray(h_img.point(lambda v: 255 if v >= 128 else 0)).max(1))[0]
+    base_row = int(h_rows.max()) + 1
     for c in CHARS:
+        if c in cyr.GLYPHS or c in cyr.SAME_AS:
+            if c in cyr.SAME_AS:
+                img = Image.new("L", (cw, ch))
+                ImageDraw.Draw(img).text((PAD, top), cyr.SAME_AS[c], font=f0, fill=255)
+                img = img.point(lambda v: 255 if v >= 128 else 0)
+                a = np.asarray(img)
+                cols = np.nonzero(a.max(0))[0]
+                left, right = int(cols[0]), int(cols[-1]) + 1
+                glyphs.append((c, img, left, right - left, left - PAD, round(f0.getlength(cyr.SAME_AS[c]))))
+            else:
+                above, rows = cyr.GLYPHS[c]
+                a = np.zeros((ch, cw), np.uint8)
+                x0 = PAD + 1
+                for r, bits in enumerate(rows):
+                    for x, v in enumerate(bits):
+                        if v == "#":
+                            a[base_row - above + r, x0 + x] = 255
+                w = len(rows[0])
+                glyphs.append((c, Image.fromarray(a), x0, w, 1, w + 2))
+            continue
         for p, size, f in fonts:
             if c != " " and np.asarray(f.getmask(c, mode="1")).sum() == 0:
                 continue
             if c != " " and not has_glyph(p, c):
                 continue
             img = Image.new("L", (cw, ch))
-            # every font's baseline on the first one's
-            ImageDraw.Draw(img).text((PAD, top + ascent - f.getmetrics()[0]), c, font=f, fill=255)
+            # every font's baseline on the first one's, a font with smaller capitals lifted by half
+            # the difference so its capitals sit centred where the first one's are (Pixeloid's
+            # Cyrillic capitals are 7 px to PixelOperator's 9: on the same baseline they sat a pixel
+            # low in every button, the Russian pass, 11-04)
+            lift = (cap_h - (f.getbbox("H")[3] - f.getbbox("H")[1])) // 2 if f is not f0 else 0
+            ImageDraw.Draw(img).text((PAD, top + ascent - f.getmetrics()[0] - lift), c, font=f, fill=255)
             img = img.point(lambda v: 255 if v >= 128 else 0)
             a = np.asarray(img)
             cols = np.nonzero(a.max(0))[0]
@@ -196,6 +228,8 @@ def has_glyph(path, c):
         _CMAPS[path] = TTFont(path).getBestCmap()
     return ord(c) in _CMAPS[path]
 
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 if __name__ == "__main__":
     import sys

@@ -1,0 +1,744 @@
+# The block tiles' grade: how each approved drawing is turned into the game's tile.
+#
+# Sources stay untouched in mods/<mod>/source/blocks/tiles/ (CTM variants too); the game's tiles in
+# mods/<mod>/assets/textures/block/ are built from them by `python3 notes/blocks/regrade.py --all`.
+# A tile too dark, too light, too flat or too busy is fixed here, not redrawn (Ronald, 11-04: "something
+# we can tune easily without having to ... redo every asset"); only a tile wrong in shape or idea is
+# regenerated. Edit a number, rerun, look at the preview it writes.
+#
+# Knobs, applied in this order, all neutral by default:
+#   gamma      = 1.0    rgb ** gamma; below 1 lifts the shadows most
+#   gain       = 1.0    rgb * gain; the tile's brightness
+#   contrast   = 1.0    luminance spread around the tile's mean (hue and mean kept)
+#   spread     = <n>    instead of contrast: the p10-p90 spread wanted, in sRGB codes
+#                       (reports/Daytime look targets.md: quiet ground 20-30, busy blocks 45-80)
+#   saturation = 1.0    mixes each pixel toward its own grey (1 keeps, 0 greys)
+#   hue        = 0.0    degrees, turned in HSV
+#   pull       = [r, g, b], pull_amount = 0..1: a share of each pixel's grey taken in that colour
+#
+# A tile takes its group's knobs, then its own row's on top (a row's knob replaces the group's).
+# Tile keys: "name" for base, "animals:name" for the animals mod; a key covers its CTM variants.
+# Each group's `match` lists names; a trailing * matches any ending.
+
+[groups.stone]
+match = ["stone", "cobblestone", "mossy_cobblestone", "stonebrick", "granite*", "slate_*", "limestone_*", "weathered_limestone_side", "deepslate*", "andesite", "diorite"]
+
+[groups.ore]
+match = ["*_ore"]
+
+[groups.wood]
+match = ["log_*"]
+
+[groups.planks]
+match = ["planks_*"]
+# Ronald, 11-04: "Yes, stone, gravel, planks": busy blocks get grain (report: 45-80).
+spread = 48
+
+[groups.leaves]
+match = ["leaves_*"]
+# Under Colour 9 sunlit foliage measured luma median 143 (target 125-170), its brightest tenth 170-181:
+# a small step down (Ronald, 11-04: "Tints -15% + small step"; the -15% is the biome tints', in Plants).
+gain = 0.94
+
+[groups.grass]
+match = ["grass_top", "tallgrass", "tall_grass_*", "sword_fern", "bracken"]
+gain = 0.94  # with the leaves (Ronald, 11-04: "Tints -15% + small step")
+
+[groups.sand]
+match = ["sand", "red_sand", "*sandstone_*", "sandstone_*"]
+
+[groups.soil]
+match = ["dirt", "coarse_dirt", "podzol", "gravel", "farmland*", "moss_block_*", "leaf_litter_*", "clay"]
+
+[groups.clay]
+match = ["banded_clay_*", "termite_mound*"]
+
+[groups.plants]
+match = ["sapling_*", "mushroom_*", "honey_fungus", "chanterelle", "porcini", "lupine", "kelp*", "seagrass", "reed*", "cattail", "lily_pad"]
+
+[groups.observer]
+match = ["observer_*"]
+# Closer to vanilla's dark observer, in our sage stone (Planner, 11-04: the observer and piston pass).
+gain = 0.8
+
+[groups.glacier]
+match = ["glacier_ice_*"]
+# Terrain's glacier ice (11-04): a little bluer and darker, toward the middle of vanilla's packed ice
+# (luma 0.69-0.82, sat 0.35-0.43, hue 193-219): luma 0.81 -> 0.77, sat 0.26 -> 0.35.
+saturation = 1.35
+gain = 0.95
+
+[tiles.glacier_ice_side]  # flattened for irregular layers (glacier_bands.py): grain back to quiet ground's 20,
+spread = 20               # and a little less blue than the group, to sit with the top
+saturation = 1.2
+
+[groups.coral]
+match = ["*_coral_block"]
+
+[tiles.brain_coral_block]  # luma 0.35 -> 0.43, hue 343 -> 336; ~ brain_coral_block (0.45-0.47, 324-327)
+gain = 1.23
+hue = -7
+spread = 75
+
+[tiles.staghorn_coral_block]  # a busy block, spread 109 -> 75 (report: busy 45-80)
+spread = 75
+
+[tiles.porites_coral_block]  # darker than sand (0.83) and lumpier: luma 0.58 -> 0.51, spread 40 -> 50
+gain = 0.88
+spread = 50
+
+[tiles.coral_rubble]  # pale bone-grey, not sand: sat 0.39 -> 0.23 (sand 0.38), luma 0.76
+saturation = 0.6
+
+[groups.liquids]
+match = ["water_*", "lava_*"]
+
+# --- per-tile rows ----------------------------------------------------------------------------------
+
+# Lifted for the darker grade (Ronald, 11-04: "Yes, all four", "Yes, both"); they stay until they're
+# re-judged under Lighting's new grade.
+[tiles.slate_side]
+gamma = 0.74
+saturation = 0.85
+pull = [118, 132, 126]
+pull_amount = 0.25
+
+[tiles.slate_top]
+gamma = 0.74
+saturation = 0.85
+pull = [118, 132, 126]
+pull_amount = 0.25
+
+[tiles."animals:termite_mound_side"]  # closer to vanilla: luma 0.35->0.38, sat 0.70->0.63, hue 14->14; ~ terracotta (half way)
+gamma = 0.8
+saturation = 0.734
+gain = 1.079
+
+[tiles."animals:termite_mound_upper_side"]  # closer to vanilla: luma 0.34->0.37, sat 0.74->0.65, hue 14->14; ~ terracotta (half way)
+gamma = 0.8
+saturation = 0.697
+gain = 1.104
+
+[tiles."animals:termite_mound_top"]
+gamma = 0.8
+saturation = 0.88
+
+[tiles.red_sandstone_side]
+gamma = 0.82
+saturation = 0.8
+
+[tiles.log_sequoia]
+gamma = 0.85
+saturation = 0.85
+
+[tiles.log_spruce]
+gamma = 0.85
+
+[tiles.podzol]  # closer to vanilla: luma 0.30->0.32, sat 0.42->0.42, hue 18->30; ~ podzol_top
+gamma = 0.85
+saturation = 0.95
+hue = 11.3
+
+# The block reads as one material with its lifted side (Planner, 11-04).
+
+[tiles.red_sandstone_top]
+saturation = 0.75
+
+[tiles.red_sandstone_bottom]
+saturation = 0.75
+
+# Quiet ground and calmer gravel (Ronald, 11-04: "Yes, stone, gravel, planks").
+[tiles.stone]
+spread = 30
+
+[tiles.gravel]  # closer to vanilla: luma 0.35->0.42, sat 0.25->0.25, hue 25->25; ~ gravel
+spread = 42
+gain = 1.22
+
+# Closer to vanilla, so packs and shaders fit (Ronald, 11-04: "Yes, all 31"); each comment: before -> after,
+# against vanilla 1.21.4, Faithful 32x and Pixel Perfection CE (notes/blocks/vanilla_compare.py).
+[tiles.kelp]  # luma 0.41->0.43, sat 0.72->0.72, hue 47->88; ~ kelp
+hue = 40.6
+
+[tiles.lily_pad]  # luma 0.48->0.46, sat 0.56->0.55, hue 89->125; ~ lily_pad
+hue = 36.1
+
+[tiles.snow]  # luma 0.85->0.91, sat 0.12->0.12, hue 214->213; ~ snow
+gain = 1.073
+
+[tiles.wool_white]  # luma 0.75->0.81, sat 0.08->0.08, hue 25->25; ~ white_wool
+gain = 1.081
+
+[tiles.crafting_table_side]  # luma 0.33->0.41, sat 0.48->0.48, hue 27->27; ~ crafting_table_side
+gain = 1.248
+
+[tiles.crafting_table_front]  # luma 0.34->0.40, sat 0.46->0.46, hue 28->28; ~ crafting_table_front
+gain = 1.19
+
+[tiles.granite]  # luma 0.50->0.50, sat 0.16->0.28, hue 15->15; ~ granite
+saturation = 1.857
+
+[tiles.coarse_dirt]  # luma 0.30->0.36, sat 0.56->0.56, hue 19->19; ~ coarse_dirt
+gain = 1.175
+saturation = 0.8  # walked-on ground (11-04): sat 0.56 -> 0.48, inside vanilla's 0.35-0.50
+
+[tiles.moss_block_top]  # luma 0.29->0.39, sat 0.58->0.58, hue 90->90; ~ moss_block
+gain = 1.332
+
+[tiles.glowstone]  # luma 0.59->0.59, sat 0.73->0.56, hue 36->36; ~ glowstone
+saturation = 0.708
+
+[tiles.slime_block]  # luma 0.57->0.57, sat 0.68->0.52, hue 100->100; ~ slime_block
+saturation = 0.743
+
+[tiles.ladder]  # luma 0.35->0.35, sat 0.75->0.56, hue 25->25; ~ ladder
+saturation = 0.664
+
+[tiles.redstone_lamp_on]  # luma 0.43->0.43, sat 0.70->0.57, hue 32->32; ~ redstone_lamp_on
+saturation = 0.762
+
+[tiles.lily_of_the_valley]  # luma 0.48->0.47, sat 0.58->0.46, hue 72->90; ~ lily_of_the_valley
+hue = 17.8
+saturation = 0.767
+
+[tiles.sapling_oak]  # luma 0.45->0.38, sat 0.56->0.57, hue 65->82; ~ oak_sapling
+hue = 15.3
+gain = 0.854
+
+[tiles.mushroom_red]  # luma 0.50->0.43, sat 0.57->0.57, hue 14->14; ~ red_mushroom
+gain = 0.861
+
+[tiles.mushroom_brown]  # luma 0.51->0.51, sat 0.57->0.46, hue 27->27; ~ brown_mushroom
+saturation = 0.743
+
+[tiles.redstone_ore]  # luma 0.40->0.40, sat 0.17->0.15, hue 27->20; ~ redstone_ore
+hue = -15.2
+
+[tiles.obsidian]  # luma 0.19->0.19, sat 0.25->0.25, hue 280->264; ~ obsidian
+hue = -15.0
+
+[tiles.iron_block]  # luma 0.58->0.58, sat 0.13->0.00, hue 22->0; ~ iron_block
+saturation = 0.0
+
+[tiles.log_acacia_top]  # luma 0.45->0.39, sat 0.68->0.68, hue 22->22; ~ acacia_log_top
+gain = 0.868
+saturation = 0.906  # wood pass: luma 0.39->0.39, sat 0.68->0.63; ~ acacia_log_top (0.39-0.39, 0.41-0.63)
+[tiles.observer_back]  # luma 0.47 -> 0.35; ~ observer_back (0.27-0.31)
+gain = 0.75
+
+[tiles.observer_back_on]  # the same back, its socket lit (derive.py)
+gain = 0.75
+
+[tiles.piston_bottom]  # sat 0.19 -> 0.11: grey stone, not mossy; ~ piston_bottom
+saturation = 0.55
+
+[tiles.piston_inner]  # the bottom's stone with the shaft (derive.py), graded as the bottom
+saturation = 0.55
+
+[tiles.piston_side]  # luma 0.40->0.40, sat 0.42->0.20, hue 32->32; ~ piston_side
+saturation = 0.443
+
+[tiles.piston_top]  # luma 0.36->0.36, sat 0.56->0.44, hue 24->24; ~ piston_top
+saturation = 0.726
+
+[tiles.lever]  # luma 0.32->0.37, sat 0.49->0.49, hue 30->30; ~ lever
+gain = 1.161
+
+[tiles.ochre_sandstone_side]  # luma 0.63->0.63, sat 0.70->0.55, hue 34->34; ~ sandstone (half way)
+saturation = 0.728
+
+[tiles.ochre_sandstone_top]  # luma 0.72->0.72, sat 0.60->0.50, hue 36->36; ~ sandstone_top (half way)
+saturation = 0.794
+
+[tiles.planks_mesquite]  # luma 0.26->0.33, sat 0.72->0.72, hue 14->14; ~ acacia_planks (half way)
+gain = 1.302
+
+# Farmland read brick-red on Plants' crop sheet (11-04): hue 14 deg against vanilla's 26 and Pixel Perfection's 21,
+# and darker than both. Turned toward their orange-brown and lifted a little; the wet one keeps its darkness;
+# the worn stages (already less red) turned less, keeping their paler-per-level ladder.
+[tiles.farmland]
+hue = 9.0
+gain = 1.2
+
+[tiles.farmland_wet]
+hue = 9.0
+
+[tiles.farmland_worn_1]
+hue = 7.0
+gain = 1.19
+
+[tiles.farmland_worn_2]
+hue = 4.0
+gain = 1.17
+
+[tiles.farmland_worn_3]
+hue = 1.0
+gain = 1.12
+
+# Ores in the rock faces (Terrain, 11-04; Ronald: "All 3: 1, 2, 3"): the host rock's own graded tile and
+# variants with an ore overlay (mods/base/source/blocks/overlays/) laid on, so the rock reads as the
+# wall's and follows its tuning. `shifts`: where the marks sit per variant; a seam keeps dy 0 so it
+# stays level and runs on into the next block.
+[tiles.banded_clay_coal_ore]
+base = "banded_clay_side"
+overlay = "ore_coal_seam"
+shifts = [[0, 0], [9, 0], [17, 0], [25, 0]]
+
+[tiles.red_sandstone_iron_ore]
+base = "red_sandstone_side"
+overlay = "ore_ironstone"
+
+[tiles.granite_gold_ore]
+base = "granite"
+overlay = "ore_gold_quartz"
+
+[tiles.granite_iron_ore]
+base = "granite"
+overlay = "ore_magnetite"
+
+# --- item icons ----------------------------------------------------------------------------------------
+# Outlines brought into our items guide's range (a dark shade of each part's own colour, about 15-45%;
+# .claude/skills/game-art/guides/1 Items/). `outline` scales the 1-px edge only; each lands at 0.40, near
+# the guide's upper end, so our lighter style stays. Ronald, 11-04: "Yes, all 66".
+[items.bandage]  # outline 0.47 -> 0.40
+outline = 0.853
+
+[items.bone]  # outline 0.49 -> 0.40
+outline = 0.81
+
+[items.bow]  # outline 0.52 -> 0.40
+outline = 0.774
+
+[items.cattail_root]  # outline 0.51 -> 0.40
+outline = 0.792
+
+[items.chicken]  # outline 0.58 -> 0.40
+outline = 0.691
+
+[items.cloth]  # outline 0.61 -> 0.40
+outline = 0.651
+
+[items.comparator]  # outline 0.50 -> 0.40
+outline = 0.8
+
+[items.cooked_egg]  # outline 0.54 -> 0.40
+outline = 0.745
+
+[items.creeper_spawn_egg]  # outline 0.48 -> 0.40
+outline = 0.826
+
+[items.diamond_axe]  # outline 0.48 -> 0.40
+outline = 0.83
+
+[items.diamond_sword]  # outline 0.54 -> 0.40
+outline = 0.742
+
+# items.egg: redrawn at 75% of the frame (Ronald: "Yes, redraw"); its new outline (0.42) needs no row.
+
+[items.feather]  # outline 0.53 -> 0.40
+outline = 0.755
+
+[items.fur_coat]  # outline 0.47 -> 0.40
+outline = 0.853
+
+[items.fur_hat]  # outline 0.50 -> 0.40
+outline = 0.794
+
+[items.gold_sword]  # outline 0.55 -> 0.40
+outline = 0.725
+
+[items.hide]  # outline 0.47 -> 0.40
+outline = 0.842
+
+[items.hide_boots]  # outline 0.48 -> 0.40
+outline = 0.84
+
+[items.hide_coat]  # outline 0.51 -> 0.40
+outline = 0.786
+
+[items.iron_sword]  # outline 0.48 -> 0.40
+outline = 0.835
+
+[items.kelp]  # outline 0.48 -> 0.40
+outline = 0.832
+
+[items.linen_boots]  # outline 0.61 -> 0.40
+outline = 0.659
+
+[items.linen_coat]  # outline 0.64 -> 0.40
+outline = 0.622
+
+[items.linen_hat]  # outline 0.64 -> 0.40
+outline = 0.627
+
+[items.linen_trousers]  # outline 0.53 -> 0.40
+outline = 0.753
+
+[items.mesquite_pod]  # outline 0.53 -> 0.40
+outline = 0.759
+
+[items.millet]  # outline 0.57 -> 0.40
+outline = 0.702
+
+[items.paper]  # outline 0.66 -> 0.40
+outline = 0.611
+
+[items.part_barbed_point]  # outline 0.54 -> 0.40
+outline = 0.739
+
+[items.part_bearded_axe_head]  # outline 0.45 -> 0.40
+outline = 0.885
+
+[items.part_bowstring]  # outline 0.56 -> 0.40
+outline = 0.709
+
+[items.part_hoe_blade]  # outline 0.47 -> 0.40
+outline = 0.844
+
+[items.part_knife_blade]  # outline 0.61 -> 0.40
+outline = 0.65
+
+[items.part_lashing]  # outline 0.47 -> 0.40
+outline = 0.853
+
+[items.part_leaf_point]  # outline 0.49 -> 0.40
+outline = 0.823
+
+[items.part_long_blade]  # outline 0.60 -> 0.40
+outline = 0.667
+
+[items.part_round_pommel]  # outline 0.47 -> 0.40
+outline = 0.858
+
+[items.part_shaft]  # outline 0.57 -> 0.40
+outline = 0.696
+
+[items.part_short_blade]  # outline 0.60 -> 0.40
+outline = 0.661
+
+[items.part_shovel_blade]  # outline 0.50 -> 0.40
+outline = 0.802
+
+[items.part_straight_blade]  # outline 0.55 -> 0.40
+outline = 0.73
+
+[items.plant_fibre]  # outline 0.60 -> 0.40
+outline = 0.664
+
+[items.porkchop]  # outline 0.51 -> 0.40
+outline = 0.787
+
+[items.potato]  # outline 0.48 -> 0.40
+outline = 0.84
+
+[items.pumpkin_seeds]  # outline 0.45 -> 0.40
+outline = 0.887
+
+[items.rice]  # outline 0.64 -> 0.40
+outline = 0.627
+
+[items.rye]  # outline 0.57 -> 0.40
+outline = 0.703
+
+[items.salt]  # outline 0.68 -> 0.40
+outline = 0.585
+
+[items.sheep_spawn_egg]  # outline 0.58 -> 0.40
+outline = 0.692
+
+[items.skeleton_spawn_egg]  # outline 0.52 -> 0.40
+outline = 0.766
+
+[items.spear]  # outline 0.53 -> 0.40
+outline = 0.759
+
+[items.string]  # outline 0.60 -> 0.40
+outline = 0.67
+
+[items.sugar]  # outline 0.79 -> 0.40
+outline = 0.507
+
+[items.sword]  # outline 0.48 -> 0.40
+outline = 0.835
+
+[items.wheat]  # outline 0.56 -> 0.40
+outline = 0.712
+
+[items.wheat_seeds]  # outline 0.46 -> 0.40
+outline = 0.87
+
+[items.wool_boots]  # outline 0.59 -> 0.40
+outline = 0.679
+
+[items.wool_coat]  # outline 0.64 -> 0.40
+outline = 0.621
+
+[items.wool_hat]  # outline 0.53 -> 0.40
+outline = 0.756
+
+[items.wool_trousers]  # outline 0.47 -> 0.40
+outline = 0.86
+
+[items.zombie_spawn_egg]  # outline 0.50 -> 0.40
+outline = 0.8
+
+[items."animals:ginkgo_seed"]  # outline 0.62 -> 0.40
+outline = 0.641
+
+[items."animals:kibble"]  # outline 0.47 -> 0.40
+outline = 0.851
+
+[items."animals:sedative"]  # outline 0.78 -> 0.40
+outline = 0.514
+
+[items."animals:tranquilizer_dart"]  # outline 0.46 -> 0.40
+outline = 0.875
+
+[items."animals:trout"]  # outline 0.45 -> 0.40
+outline = 0.883
+
+# Gold ore with more gold (11-04, the vanilla comparison: whole-tile saturation 0.09 vs vanilla's 0.27): gold veins
+# laid on stone's own graded tile and variants, so it matches stone and follows its tuning. Option A, chunky
+# nuggets, is overlay "ore_gold" (saturation 0.24, hue 50); B, the veins, lands nearer vanilla (0.31, hue 44 vs 0.27, 42).
+[tiles.gold_ore]
+base = "stone"
+overlay = "ore_gold_b"
+
+[items.tepary_beans]  # outline 0.60 -> 0.40 (new, Plants' batch 3: pale beans, the edge too light)
+outline = 0.67
+
+# The tropical forest (11-04): cacao's pale bark down into our logs' range (0.24-0.36); its grey bark
+# and the Brazil nut's are the species' own (identity, like the sequoia), so they keep it.
+[tiles.log_cacao]  # luma 0.43 -> 0.36
+gain = 0.84
+
+[tiles.log_cacao_top]  # luma 0.52 -> 0.47
+gain = 0.894  # wood pass: luma 0.46->0.46, sat 0.41->0.47; ~ jungle_log_top (0.34-0.46, 0.53-0.54) half way
+saturation = 1.172  # wood pass: luma 0.46->0.46, sat 0.41->0.47; ~ jungle_log_top (0.34-0.46, 0.53-0.54) half way
+[tiles.planks_andiroba]  # sat 0.68 -> 0.60, into jungle planks' band (0.49-0.52 +0.10)
+saturation = 0.757  # wood pass: luma 0.32->0.33, sat 0.63->0.57; ~ jungle_planks (0.34-0.50, 0.49-0.52) half way
+gain = 1.028  # wood pass: luma 0.32->0.33, sat 0.63->0.57; ~ jungle_planks (0.34-0.50, 0.49-0.52) half way
+[items.ipe_seed]  # outline 0.64 -> 0.40 (new, the tropical forest: pale papery wings, the edge too light)
+outline = 0.62
+
+# Walked-on ground (Planner, 11-04: the red sand floor read very saturated orange in the PC looks).
+# Vanilla's red sand is 0.83 and Pixel Perfection's 0.50; ours moves to the middle, with base's graded
+# red sandstone (0.62), so a canyon floor and its walls match. The Cretaceous copies (animals) had no rows.
+[tiles."animals:red_sand"]  # luma 0.45 -> 0.47, sat 0.75 -> 0.63; ~ red_sand (0.46-0.60, 0.50-0.83)
+saturation = 0.76
+gain = 1.04
+
+[tiles."animals:red_sandstone_top"]  # as base's red_sandstone_top: sat 0.73 -> 0.62
+saturation = 0.75
+
+[tiles."animals:red_sandstone_bottom"]  # as base's red_sandstone_bottom
+saturation = 0.75
+
+[tiles."animals:red_sandstone_side"]  # luma 0.40 -> 0.43, sat 0.74 -> 0.61, as base's side
+saturation = 0.74
+gain = 1.08
+
+[tiles.dirt]  # sat 0.54 -> 0.48, inside vanilla's 0.35-0.50
+saturation = 0.84
+
+[tiles.leaf_litter_top]  # sat 0.66 -> 0.55, with the soils
+saturation = 0.76
+
+# Stripped logs (the Felling worker, 11-05): each stripped side between its log top and planks, and
+# inside vanilla's stripped log where one exists (oak 0.40-0.58 / 0.42-0.52, birch 0.57-0.70,
+# spruce 0.35-0.36, acacia sat 0.45-0.66).
+[tiles.log_oak_stripped]  # 0.56/0.62 -> ~0.50/0.52
+gain = 0.9
+saturation = 0.788  # wood pass: luma 0.51->0.51, sat 0.52->0.52; ~ stripped_oak_log (0.40-0.58, 0.42-0.52)
+
+[tiles.log_birch_stripped]  # luma 0.76 -> ~0.71
+gain = 0.914  # wood pass: luma 0.72->0.70, sat 0.27->0.34; ~ stripped_birch_log (0.57-0.70, 0.34-0.40)
+saturation = 1.339  # wood pass: luma 0.72->0.70, sat 0.27->0.34; ~ stripped_birch_log (0.57-0.70, 0.34-0.40)
+[tiles.log_spruce_stripped]  # luma 0.29 -> ~0.33
+gain = 1.191  # wood pass: luma 0.34->0.35, sat 0.49->0.51; ~ stripped_spruce_log (0.35-0.36, 0.51-0.55)
+saturation = 1.043  # wood pass: luma 0.34->0.35, sat 0.49->0.51; ~ stripped_spruce_log (0.35-0.36, 0.51-0.55)
+[tiles.log_acacia_stripped]  # sat 0.74 -> ~0.66
+saturation = 0.836  # wood pass: luma 0.42->0.42, sat 0.67->0.66; ~ stripped_acacia_log (0.42-0.45, 0.45-0.66)
+gain = 1.01  # wood pass: luma 0.42->0.42, sat 0.67->0.66; ~ stripped_acacia_log (0.42-0.45, 0.45-0.66)
+[tiles.log_dogwood_stripped]  # luma 0.74 -> ~0.63, near its top (0.58)
+gain = 0.85
+saturation = 0.925  # wood pass: luma 0.63->0.63, sat 0.37->0.35; ~ stripped_cherry_log (0.63-0.63, 0.32-0.33) half way
+[tiles.log_acuri_palm_stripped]  # luma 0.63 -> ~0.50, toward its planks (0.42)
+gain = 0.8
+
+[tiles.log_moriche_palm_stripped]  # luma 0.52 -> ~0.48
+gain = 0.93
+
+[tiles.log_cacao_stripped]  # 0.53/0.62 -> ~0.49/0.50, toward its top and planks
+gain = 0.92
+saturation = 0.78
+
+[tiles.log_andiroba_stripped]  # sat 0.73 -> ~0.65, as its planks' row
+saturation = 0.761  # wood pass: luma 0.37->0.39, sat 0.67->0.62; ~ stripped_jungle_log (0.40-0.55, 0.50-0.57) half way
+gain = 1.052  # wood pass: luma 0.37->0.39, sat 0.67->0.62; ~ stripped_jungle_log (0.40-0.55, 0.50-0.57) half way
+[tiles.log_matamata_stripped]  # 0.65/0.51 -> ~0.58/0.44
+gain = 0.874  # wood pass: luma 0.58->0.56, sat 0.45->0.47; ~ stripped_jungle_log (0.40-0.55, 0.50-0.57) half way
+saturation = 0.904  # wood pass: luma 0.58->0.56, sat 0.45->0.47; ~ stripped_jungle_log (0.40-0.55, 0.50-0.57) half way
+
+[tiles.log_ipe_stripped]  # sat 0.61 -> ~0.55
+saturation = 0.842  # wood pass: luma 0.39->0.37, sat 0.55->0.53; ~ stripped_dark_oak_log (0.23-0.35, 0.28-0.51) half way
+gain = 0.956  # wood pass: luma 0.39->0.37, sat 0.55->0.53; ~ stripped_dark_oak_log (0.23-0.35, 0.28-0.51) half way
+
+# The wood pass (Planner, 11-05; the ground pass's way): each wood's log, top, planks and stripped log into the
+# packs' band (vanilla, Faithful 32x, Pixel Perfection CE); a wood without a vanilla twin half way toward its
+# nearest relative (notes/blocks/woods_pass.py). Identity kept: sequoia bark and planks, mesquite planks, the
+# palms', dogwood's and spruce's bark (spruce's lift was Ronald's).
+[tiles.log_oak]  # luma 0.28->0.31, sat 0.48->0.48; ~ oak_log (0.31-0.34, 0.34-0.54)
+gain = 1.1
+
+[tiles.log_oak_top]  # luma 0.48->0.48, sat 0.55->0.52; ~ oak_log_top (0.38-0.49, 0.41-0.52)
+saturation = 0.922
+
+[tiles.planks_oak]  # luma 0.38->0.39, sat 0.46->0.46; ~ oak_planks (0.39-0.55, 0.41-0.52)
+gain = 1.016
+
+[tiles.log_oak_stripped_top]  # luma 0.61->0.52, sat 0.59->0.52; ~ stripped_oak_log_top (0.39-0.52, 0.41-0.52)
+saturation = 0.845
+gain = 0.851
+
+[tiles.log_birch]  # luma 0.71->0.74, sat 0.08->0.08; ~ birch_log (0.74-0.88, 0.02-0.11)
+gain = 1.051
+
+[tiles.log_birch_top]  # luma 0.69->0.69, sat 0.25->0.26; ~ birch_log_top (0.55-0.73, 0.26-0.30)
+saturation = 1.073
+
+[tiles.planks_birch]  # luma 0.73->0.70, sat 0.29->0.32; ~ birch_planks (0.45-0.70, 0.32-0.38)
+saturation = 1.129
+gain = 0.966
+
+[tiles.log_birch_stripped_top]  # luma 0.74->0.67, sat 0.31->0.32; ~ stripped_birch_log_top (0.47-0.67, 0.32-0.39)
+saturation = 1.065
+gain = 0.912
+
+[tiles.planks_spruce]  # luma 0.29->0.29, sat 0.43->0.44; ~ spruce_planks (0.26-0.36, 0.44-0.58)
+saturation = 1.014
+
+[tiles.log_acacia]  # luma 0.36->0.37, sat 0.31->0.25; ~ acacia_log (0.37-0.39, 0.16-0.25)
+saturation = 0.785
+gain = 1.039
+
+[tiles.planks_acacia]  # luma 0.44->0.43, sat 0.73->0.70; ~ acacia_planks (0.41-0.43, 0.44-0.70)
+saturation = 0.949
+gain = 0.991
+
+[tiles.log_acacia_stripped_top]  # luma 0.44->0.42, sat 0.74->0.69; ~ stripped_acacia_log_top (0.41-0.42, 0.43-0.69)
+saturation = 0.886
+gain = 0.953
+
+[tiles.log_mesquite]  # luma 0.26->0.32, sat 0.44->0.34; ~ acacia_log (0.37-0.39, 0.16-0.25) half way
+saturation = 0.726
+gain = 1.22
+
+[tiles.log_mesquite_top]  # luma 0.34->0.37, sat 0.68->0.66; ~ acacia_log_top (0.39-0.39, 0.41-0.63) half way
+saturation = 0.953
+gain = 1.073
+
+[tiles.log_mesquite_stripped]  # luma 0.35->0.39, sat 0.72->0.69; ~ stripped_acacia_log (0.42-0.45, 0.45-0.66) half way
+saturation = 0.931
+gain = 1.099
+
+[tiles.log_mesquite_stripped_top]  # luma 0.39->0.40, sat 0.72->0.70; ~ stripped_acacia_log_top (0.41-0.42, 0.43-0.69) half way
+saturation = 0.972
+gain = 1.023
+
+[tiles.log_sequoia_top]  # luma 0.34->0.34, sat 0.73->0.65; ~ spruce_log_top (0.28-0.33, 0.47-0.57) half way
+saturation = 0.816
+gain = 0.985
+
+[tiles.log_sequoia_stripped]  # luma 0.36->0.36, sat 0.76->0.65; ~ stripped_spruce_log (0.35-0.36, 0.51-0.55) half way
+saturation = 0.765
+
+[tiles.log_sequoia_stripped_top]  # luma 0.40->0.37, sat 0.75->0.66; ~ stripped_spruce_log_top (0.32-0.35, 0.49-0.56) half way
+saturation = 0.791
+gain = 0.944
+
+[tiles.log_dogwood_top]  # luma 0.58->0.58, sat 0.40->0.33; ~ cherry_log_top (0.59-0.59, 0.26-0.26) half way
+saturation = 0.793
+gain = 1.009
+
+[tiles.log_dogwood_stripped_top]  # luma 0.72->0.71, sat 0.39->0.34; ~ stripped_cherry_log_top (0.69-0.69, 0.28-0.29) half way
+saturation = 0.848
+gain = 0.982
+
+[tiles.log_acuri_palm_top]  # luma 0.52->0.49, sat 0.47->0.50; ~ jungle_log_top (0.34-0.46, 0.53-0.54) half way
+saturation = 1.074
+gain = 0.939
+
+[tiles.planks_acuri_palm]  # luma 0.42->0.42, sat 0.55->0.54; ~ jungle_planks (0.34-0.50, 0.49-0.52) half way
+saturation = 0.958
+
+[tiles.log_acuri_palm_stripped_top]  # luma 0.66->0.58, sat 0.47->0.49; ~ stripped_jungle_log_top (0.37-0.51, 0.51-0.54) half way
+saturation = 1.051
+gain = 0.883
+
+[tiles.log_moriche_palm_top]  # luma 0.48->0.47, sat 0.44->0.48; ~ jungle_log_top (0.34-0.46, 0.53-0.54) half way
+saturation = 1.138
+gain = 0.977
+
+[tiles.log_moriche_palm_stripped_top]  # luma 0.57->0.54, sat 0.50->0.50; ~ stripped_jungle_log_top (0.37-0.51, 0.51-0.54) half way
+saturation = 1.014
+gain = 0.941
+
+[tiles.log_brazil_nut_stripped_top]  # luma 0.47->0.47, sat 0.56->0.55; ~ stripped_jungle_log_top (0.37-0.51, 0.51-0.54) half way
+saturation = 0.97
+
+[tiles.log_cacao_stripped_top]  # luma 0.57->0.54, sat 0.58->0.56; ~ stripped_jungle_log_top (0.37-0.51, 0.51-0.54) half way
+saturation = 0.954
+gain = 0.944
+
+[tiles.log_andiroba_stripped_top]  # luma 0.41->0.41, sat 0.70->0.62; ~ stripped_jungle_log_top (0.37-0.51, 0.51-0.54) half way
+saturation = 0.815
+
+[tiles.log_matamata_stripped_top]  # luma 0.64->0.57, sat 0.46->0.48; ~ stripped_jungle_log_top (0.37-0.51, 0.51-0.54) half way
+saturation = 1.061
+gain = 0.895
+
+[tiles.log_ipe_stripped_top]  # luma 0.45->0.39, sat 0.58->0.58; ~ stripped_dark_oak_log_top (0.18-0.33, 0.27-0.66) half way
+gain = 0.861
+
+# The wood pass for the tropical woods (Planner, 11-05; from art-tropical 6457dfb4): tops and planks half way to
+# jungle's (dark oak's for ipe) band; their grey barks are the species' own (approved), kept.
+[tiles.log_brazil_nut_top]  # luma 0.43->0.43, sat 0.52->0.52; ~ jungle_log_top (0.34-0.46, 0.53-0.54) half way
+saturation = 1.016
+
+[tiles.planks_brazil_nut]  # luma 0.39->0.39, sat 0.56->0.54; ~ jungle_planks (0.34-0.50, 0.49-0.52) half way
+saturation = 0.938
+
+[tiles.planks_cacao]  # luma 0.47->0.47, sat 0.47->0.48; ~ jungle_planks (0.34-0.50, 0.49-0.52) half way
+saturation = 1.023
+
+[tiles.log_andiroba_top]  # luma 0.33->0.33, sat 0.63->0.59; ~ jungle_log_top (0.34-0.46, 0.53-0.54) half way
+saturation = 0.892
+gain = 1.015
+
+[tiles.log_matamata_top]  # luma 0.56->0.51, sat 0.39->0.46; ~ jungle_log_top (0.34-0.46, 0.53-0.54) half way
+saturation = 1.211
+gain = 0.909
+
+[tiles.planks_matamata]  # luma 0.54->0.52, sat 0.44->0.47; ~ jungle_planks (0.34-0.50, 0.49-0.52) half way
+saturation = 1.073
+gain = 0.963
+
+[tiles.log_ipe_top]  # luma 0.37->0.34, sat 0.53->0.53; ~ dark_oak_log_top (0.18-0.30, 0.27-0.67) half way
+gain = 0.906
+
+[tiles.planks_ipe]  # luma 0.32->0.31, sat 0.53->0.53; ~ dark_oak_planks (0.18-0.29, 0.31-0.70) half way
+gain = 0.965
+
+[items.roasted_cacao]  # darker chocolate than the dried beans, less orange: sat 0.79 -> ~0.6, luma 0.25 -> ~0.22
+saturation = 0.75
+gain = 0.9
+
+[items.flint]  # outline 0.51 -> 0.40 (the first hours: a pale chalky rind, the edge too light)
+outline = 0.79
+
+[items.fire_bed]  # outline 0.55 -> 0.40 (the first hours: pale tinder round the sticks)
+outline = 0.72
+
+[items.hand_drill]  # outline 0.47 -> 0.40 (pale dry wood)
+outline = 0.86

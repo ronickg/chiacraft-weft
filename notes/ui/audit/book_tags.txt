@@ -1,0 +1,20 @@
+# The recipe book with a tag missing (Playtest B12): only a stick held, so the club's log (any log)
+# is lacking: "Any Logs: 0/1" (B12 again: a group held none of is named as one).
+loaded
+idle
+chat /tk mode survival
+chat /tk time 6000
+wait 2
+chat /tk give base:stick 1
+wait 1
+press core:inventory
+wait 1.5
+shot bt_01_hands.png
+# The stick's slot (the third row's first, at 1280 x 720): its tooltip, then picked.
+cursor 0.602 0.524
+wait 1
+shot bt_02_stick_tip.png
+click 0
+wait 1
+shot bt_03_stick.png
+quit

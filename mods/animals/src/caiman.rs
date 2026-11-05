@@ -10,20 +10,18 @@ use weft_sdk::*;
 
 use crate::wild::{self, Body};
 
-pub(crate) static YACARE_CAIMAN: Entity = Entity::named("yacare_caiman");
-pub(crate) static SPECTACLED_CAIMAN: Entity = Entity::named("spectacled_caiman");
+pub(crate) static YACARE_CAIMAN: EntityKind = EntityKind::named("yacare_caiman");
+pub(crate) static SPECTACLED_CAIMAN: EntityKind = EntityKind::named("spectacled_caiman");
 /// The Cretaceous's crocodyliform, on the same model drawn bigger by its genes.
-pub(crate) static CROCODYLIFORM: Entity = Entity::named("crocodyliform");
+pub(crate) static CROCODYLIFORM: EntityKind = EntityKind::named("crocodyliform");
 
 static BODY: Body = Body {
     model: "caiman",
     texture: "caiman/caiman",
-    size: (0.9, 0.45),
-    health: 30.0,
     // A slow walk on land, a short rush at prey.
     speed: 3.0,
     wander: 0.15,
-    damage: 5.0,
+    bites: true,
     rest: ("caiman_bask", (0.9, 0.3)),
 };
 

@@ -8,20 +8,18 @@ use weft_sdk::*;
 
 use crate::birds::{self, Wings};
 
-pub(crate) static HOUSE_SPARROW: Entity = Entity::named("house_sparrow");
-pub(crate) static SNOW_BUNTING: Entity = Entity::named("snow_bunting");
+pub(crate) static HOUSE_SPARROW: EntityKind = EntityKind::named("house_sparrow");
+pub(crate) static SNOW_BUNTING: EntityKind = EntityKind::named("snow_bunting");
 
 static WINGS: Wings = Wings {
     model: "small_bird",
     texture: "small_bird/small_bird",
-    size: (0.2, 0.15),
     fly_size: (0.25, 0.12),
-    health: 2.0,
     // Hopping at about 1.5 m/s; it flies at about 10.
     speed: 1.5,
     air: 5.0,
     wander: 0.4,
-    damage: 0.0,
+    bites: false,
     height: 2.0,
     reach: 8.0,
     flight: 200,

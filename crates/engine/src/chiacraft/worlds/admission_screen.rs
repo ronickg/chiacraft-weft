@@ -99,6 +99,13 @@ impl Screen for Admission {
                             run(c, format!("/didrule required {}", if required { "off" } else { "on" }))
                         });
                         ui.set_id(id, "did_required");
+                        // A DID the chain can't be asked about just now: guest or not yet.
+                        let guest = rules.did_unchecked_guest;
+                        let shown = Arg::Key(if guest { "admission.did_unchecked.guest" } else { "admission.did_unchecked.refuse" }.into());
+                        let id = button(ui, cx, "admission.screen.did_unchecked", &[shown], 260.0, move |c| {
+                            run(c, format!("/didrule unchecked {}", if guest { "refuse" } else { "guest" }))
+                        });
+                        ui.set_id(id, "did_unchecked");
                         ui.container(Style::row().gap(4.0), |ui| {
                             label(ui, cx, "admission.screen.did_days", &[Arg::Int(days as i64)], "default");
                             let less = DAYS.iter().rev().find(|d| **d < days).copied().unwrap_or(0);
@@ -150,6 +157,43 @@ impl Screen for Admission {
                                 ui.set_id(id, "world_did_list");
                             }
                             _ => {}
+                        }
+                    });
+                    // Finding this world (phase 5): listed on chain, a deposit locked.
+                    ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(400.0), |ui| {
+                        use crate::chiacraft::worlds::listing;
+                        label(ui, cx, "listing.title", &[], "default");
+                        let listed = dir.as_deref().and_then(listing::load);
+                        let deposit = listing::txch(cx.settings.listing_deposit());
+                        match &listed {
+                            Some(l) if l.confirmed => label(ui, cx, "listing.is_listed", &[Arg::Text(listing::txch(l.amount))], "dim"),
+                            Some(_) => label(ui, cx, "listing.is_pending", &[], "dim"),
+                            None => label(ui, cx, "listing.not_listed", &[Arg::Text(deposit)], "dim"),
+                        };
+                        ui.text_bound(
+                            "dim",
+                            Box::new(|_: &Ctx| {
+                                let (key, args) = listing::state();
+                                (key, args.into_iter().map(Arg::Text).collect())
+                            }),
+                        );
+                        match listed {
+                            None => {
+                                let id = button(ui, cx, "listing.list", &[], 200.0, |c| {
+                                    if let Some(dir) = adm::local_world() {
+                                        listing::list(c.settings, dir);
+                                    }
+                                });
+                                ui.set_id(id, "list_world");
+                            }
+                            Some(_) => {
+                                let id = button(ui, cx, "listing.delist", &[], 200.0, |c| {
+                                    if let Some(dir) = adm::local_world() {
+                                        listing::delist(c.settings, dir);
+                                    }
+                                });
+                                ui.set_id(id, "delist_world");
+                            }
                         }
                     });
                     // Players here now, and anyone else by name, key or DID.

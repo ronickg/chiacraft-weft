@@ -3,7 +3,8 @@
 // the cave grid, then the blocks.
 
 // The prelude (`gpu_layout::terrain`) declares the bindings, the description's layout (`D_*`),
-// record sizes (`WORDS_*`), outputs (`OUT_*`), mask kinds and presets, and the seeds (`S_*`).
+// record sizes (`WORDS_*`), outputs (`OUT_*`), expression step kinds (`EXPR_*`) and the cave
+// seeds (`S_*`).
 
 fn seed(i: u32) -> u32 {
     return bitcast<u32>(desc[D_SEEDS + i]);
@@ -124,12 +125,10 @@ fn ramp(v: i32, lo: i32, hi: i32) -> i32 {
     return clamp(clamp(v - lo, -(1 << 18), 1 << 18) * ONE / (hi - lo), 0, ONE);
 }
 
-fn ridge(s: u32, x: i32, z: i32, scale: i32) -> i32 {
-    return ONE - min(abs(fbm(s, x, z, scale, 4u) * 2), ONE);
-}
-
+// The standard fields as `weft_noise::fixed::Fields` makes them, for scatter thinning (its mask
+// sees only these, `server::terrain::Mask`; the terrain's own field values may be pruned).
 fn continent(x: i32, z: i32) -> i32 {
-    return ((fbm(seed(S_CONT), x, z, 900 * 16, 4u) * 6554) >> 12u) + 614;
+    return ((fbm(seed(S_CONT), x, z, desc[D_CONT_SCALE], 4u) * 6554) >> 12u) + 614;
 }
 
 fn temperature(x: i32, z: i32) -> i32 {
@@ -140,18 +139,19 @@ fn humidity(x: i32, z: i32) -> i32 {
     return (fbm(seed(S_HUM), x, z, 800 * 16, 3u) * 5734) >> 12u;
 }
 
-fn craters(x: i32, z: i32, radius: i32, depth: i32, spacing: i32) -> i32 {
+// `weft_noise::fixed::site`.
+fn site(s: u32, x: i32, z: i32, spacing: i32, chance: i32, radius: i32) -> i32 {
     let sp = clamp(spacing, 16, 512 * 16);
     let cx = div_floor(x, sp).x;
     let cz = div_floor(z, sp).x;
     let bx = x >> 4u;
     let bz = z >> 4u;
-    var total = 0;
+    var nearest = 2 * ONE;
     for (var dz = -1; dz <= 1; dz++) {
         for (var dx = -1; dx <= 1; dx++) {
-            let h = hash(seed(S_CRAT), cx + dx, 0, cz + dz);
+            let h = hash(s, cx + dx, 0, cz + dz);
             let h2 = fmix(h);
-            if (i32(h & 4095u) > 2458) {
+            if (i32(h & 4095u) > chance) {
                 continue;
             }
             let r = ((clamp(radius, 16, 512 * 16) * (2048 + i32((h >> 12u) & 4095u))) >> 12u) >> 4u;
@@ -162,85 +162,78 @@ fn craters(x: i32, z: i32, radius: i32, depth: i32, spacing: i32) -> i32 {
             if (d2 >= r2 * 2) {
                 continue;
             }
-            let d = i32((u32(d2) * 4096u) / u32(r2));
-            if (d < ONE) {
-                total -= ((ONE - d) * depth) >> 12u;
-            } else if (d < 6554) {
-                let rim = max(ONE - abs(d - 5325) * ONE / 1229, 0);
-                total += ((rim * depth) >> 12u) / 4;
-            }
+            nearest = min(nearest, i32((u32(d2) * 4096u) / u32(r2)));
         }
     }
-    return total;
+    return nearest;
 }
 
-fn preset(kind: i32, a: i32, b: i32, c: i32, x: i32, z: i32) -> i32 {
-    switch (u32(kind)) {
-        case PRESET_CONTINENTS: { return (clamp(continent(x, z) * 5 / 2, -ONE, ONE) * a) >> 12u; }
-        case PRESET_HILLS: { return (fbm(seed(S_HILLS), x, z, b, 4u) * a) >> 12u; }
-        case PRESET_MOUNTAINS: {
-            let r = ridge(seed(S_MTN), x, z, b);
-            return ((((r * r) >> 12u) * a) >> 12u) + ((fbm(seed(S_HILLS), x, z, 60 * 16, 4u) * a) >> 12u) / 7;
-        }
-        case PRESET_PLATEAUS: {
-            let v = (ramp(fbm(seed(S_PLAT), x, z, b, 3u), 0, 1024) * a) >> 12u;
-            let step = max(c, 1);
-            return div_floor(v, step).x * step;
-        }
-        case PRESET_CANYONS: {
-            let r = ridge(seed(S_CAN), x, z, min(b, 1 << 20) * 40);
-            return -((ramp(r, 3994, ONE) * a) >> 12u);
-        }
-        case PRESET_DUNES: {
-            let wl = clamp(b, 1, (1 << 18) - 1);
-            let warp = (fbm(seed(S_DUNE), x, z, wl * 4, 2u) * wl) >> 12u;
-            let t = div_floor(x + z / 2 + warp, wl).y * ONE / wl;
-            var profile = 0;
-            if (t < 3277) {
-                profile = t * ONE / 3277;
-            } else {
-                profile = (ONE - t) * ONE / 819;
-            }
-            return (profile * a) >> 12u;
-        }
-        case PRESET_CRATERS: { return craters(x, z, a, b, c); }
-        default: { return 0; }
-    }
-}
-
-// Postfix mask steps: kind, then 5 words (noise: seed, scale, octaves, from, to; ranges: from,
-// to; all: count).
-fn mask(at: u32, len: u32, x: i32, z: i32) -> i32 {
-    var stack: array<i32, LIMIT_MASK_DEPTH>;
+// The expression of `len` steps from word `at` at (x, z), as `server::terrain::Expr::eval`;
+// `fv` holds the fields computed so far.
+fn eval(at: u32, len: u32, x: i32, z: i32, fv: ptr<function, array<i32, LIMIT_FIELDS>>) -> i32 {
+    var st: array<i32, LIMIT_DEPTH>;
     var sp = 0u;
     for (var i = 0u; i < len; i++) {
-        let m = at + i * WORDS_MASK;
-        let kind = desc[m];
+        let m = at + i * WORDS_STEP;
+        let kind = u32(desc[m]);
         var v = 0;
-        switch (u32(kind)) {
-            case MASK_NOISE: { v = ramp(fbm(bitcast<u32>(desc[m + 1u]), x, z, desc[m + 2u], u32(desc[m + 3u])), desc[m + 4u], desc[m + 5u]); }
-            case MASK_CONTINENT: { v = ramp(continent(x, z), desc[m + 4u], desc[m + 5u]); }
-            case MASK_TEMPERATURE: { v = ramp(temperature(x, z), desc[m + 4u], desc[m + 5u]); }
-            case MASK_HUMIDITY: { v = ramp(humidity(x, z), desc[m + 4u], desc[m + 5u]); }
-            case MASK_ALL: {
-                let n = u32(desc[m + 1u]);
-                var acc = ONE;
-                for (var k = sp - n; k < sp; k++) {
-                    acc = (acc * stack[k]) >> 12u;
-                }
-                sp -= n;
-                v = acc;
-            }
-            // MASK_NOT
-            default: {
+        switch (kind) {
+            case EXPR_CONST: { v = desc[m + 2u]; }
+            case EXPR_X: { v = x; }
+            case EXPR_Z: { v = z; }
+            case EXPR_FIELD: { v = (*fv)[u32(desc[m + 2u])]; }
+            case EXPR_ABS: {
                 sp -= 1u;
-                v = ONE - stack[sp];
+                v = abs(st[sp]);
+            }
+            case EXPR_RAMP: {
+                sp -= 1u;
+                v = ramp(st[sp], desc[m + 2u], desc[m + 3u]);
+            }
+            case EXPR_NOISE: {
+                sp -= 2u;
+                v = fbm(bitcast<u32>(desc[m + 1u]), st[sp], st[sp + 1u], desc[m + 2u], u32(desc[m + 3u]));
+            }
+            case EXPR_SITE: {
+                sp -= 2u;
+                v = site(bitcast<u32>(desc[m + 1u]), st[sp], st[sp + 1u], desc[m + 2u], desc[m + 3u], desc[m + 4u]);
+            }
+            default: {
+                sp -= 2u;
+                let l = st[sp];
+                let r = st[sp + 1u];
+                switch (kind) {
+                    case EXPR_ADD: { v = l + r; }
+                    case EXPR_SUB: { v = l - r; }
+                    case EXPR_MUL: { v = (clamp(l, -46340, 46340) * clamp(r, -46340, 46340)) >> 12u; }
+                    case EXPR_DIV: {
+                        if (r != 0) {
+                            v = l / r;
+                        }
+                    }
+                    case EXPR_REM: { v = div_floor(l, max(r, 1)).y; }
+                    case EXPR_MIN: { v = min(l, r); }
+                    default: { v = max(l, r); }
+                }
             }
         }
-        stack[sp] = v;
+        st[sp] = v;
         sp += 1u;
     }
-    return stack[0];
+    if (sp == 0u) {
+        return 0;
+    }
+    return st[0];
+}
+
+// chiacraft: a scatter's thinning mask at (x, z) (Q4), over the standard fields
+// (`server::terrain::Mask`).
+fn thin_mask(at: u32, len: u32, x: i32, z: i32) -> i32 {
+    var fv: array<i32, LIMIT_FIELDS>;
+    fv[0] = temperature(x, z);
+    fv[1] = humidity(x, z);
+    fv[2] = continent(x, z);
+    return eval(at, len, x, z, &fv);
 }
 
 struct Column {
@@ -249,36 +242,38 @@ struct Column {
     rule: i32,
 }
 
-// Column at block (`bx`, `bz`); `ci` indexes the uploaded heights of mods' own features, `stride`
-// of them per feature.
+// Column at block (`bx`, `bz`). chiacraft: a feature made on the CPU (`Feature::custom`) takes
+// its height from job `job`'s words, `stride` of them per such feature, the column's at `ci`.
 fn column(job: u32, bx: i32, bz: i32, ci: u32, stride: u32) -> Column {
     let x = bx * 16;
     let z = bz * 16;
+    var fv: array<i32, LIMIT_FIELDS>;
+    let nfi = u32(desc[D_FIELDS]);
+    let fio = u32(desc[D_FIELD_OFF]);
+    for (var i = 0u; i < nfi; i++) {
+        let f = fio + i * WORDS_FIELD;
+        fv[i] = eval(u32(desc[f]), u32(desc[f + 1u]), x, z, &fv);
+    }
     var h = desc[D_BASE];
-    var strengths: array<i32, LIMIT_FEATURES>;
     let nf = u32(desc[D_FEATURES]);
     let fo = u32(desc[D_FEAT_OFF]);
     for (var i = 0u; i < nf; i++) {
         let f = fo + i * WORDS_FEATURE;
         var w = ONE;
-        if (desc[f + 7u] > 0) {
-            w = mask(u32(desc[f + 6u]), u32(desc[f + 7u]), x, z);
+        if (desc[f + 3u] > 0) {
+            w = min(eval(u32(desc[f + 2u]), u32(desc[f + 3u]), x, z, &fv), ONE);
         }
-        strengths[i] = w;
         if (w > 0) {
             var fh = 0;
-            if (desc[f + 5u] >= 0) {
-                fh = jobs[job + 4u + u32(desc[f + 5u]) * stride + ci];
+            if (desc[f + 4u] >= 0) {
+                fh = jobs[job + 4u + u32(desc[f + 4u]) * stride + ci];
             } else {
-                fh = preset(desc[f], desc[f + 1u], desc[f + 2u], desc[f + 3u], x, z);
+                fh = eval(u32(desc[f]), u32(desc[f + 1u]), x, z, &fv);
             }
-            h += (w * fh) >> 12u;
+            h += (w * clamp(fh, -262144, 262144)) >> 12u;
         }
     }
     let height = h >> 4u;
-    let temp = temperature(x, z);
-    let humid = humidity(x, z);
-    let cont = continent(x, z);
     let nr = u32(desc[D_RULES]);
     let ro = u32(desc[D_RULE_OFF]);
     var rule = i32(nr) - 1;
@@ -287,13 +282,11 @@ fn column(job: u32, bx: i32, bz: i32, ci: u32, stride: u32) -> Column {
     }
     for (var i = 0u; i < nr; i++) {
         let r = ro + i * WORDS_RULE;
-        var ok = height >= desc[r + 7u] && height <= desc[r + 8u]
-            && temp >= desc[r + 1u] && temp < desc[r + 2u]
-            && humid >= desc[r + 3u] && humid < desc[r + 4u]
-            && cont >= desc[r + 5u] && cont < desc[r + 6u];
-        let fi = desc[r + 9u];
-        if (ok && fi != -1) {
-            ok = fi >= 0 && fi < 32 && strengths[fi] > desc[r + 10u] && strengths[fi] <= desc[r + 11u];
+        var ok = height >= desc[r + 1u] && height <= desc[r + 2u];
+        for (var k = 0u; ok && k < u32(desc[r + 4u]); k++) {
+            let c = u32(desc[r + 3u]) + k * WORDS_COND;
+            let v = fv[u32(desc[c])];
+            ok = v >= desc[c + 1u] && v < desc[c + 2u];
         }
         if (ok) {
             rule = i32(i);
@@ -386,6 +379,25 @@ fn surface(x: u32, z: u32) -> i32 {
     return (c00 * (4 - fx) + c10 * fx) * (4 - fz) + (c01 * (4 - fx) + c11 * fx) * fz;
 }
 
+fn lerp2(a: vec2<i32>, b: vec2<i32>, t: i32) -> vec2<i32> {
+    return vec2<i32>(lerp(a.x, b.x, t), lerp(a.y, b.y, t));
+}
+
+// Whether caves take block (x, y, z) of a column standing alone, `ground` its smoothed height
+// (Q4): as `block` does with a cube's nodes, as `Terrain::surface_carved` does on the CPU.
+fn carved_at(x: i32, y: i32, z: i32, ground: i32) -> bool {
+    let gx = div_floor(x, 4).x * 4;
+    let gy = div_floor(y, 4).x * 4;
+    let gz = div_floor(z, 4).x * 4;
+    let fx = (x - gx) * 1024;
+    let fy = (y - gy) * 1024;
+    let fz = (z - gz) * 1024;
+    let a = lerp2(lerp2(cave_node(gx, gy, gz), cave_node(gx + 4, gy, gz), fx), lerp2(cave_node(gx, gy, gz + 4), cave_node(gx + 4, gy, gz + 4), fx), fz);
+    let b = lerp2(lerp2(cave_node(gx, gy + 4, gz), cave_node(gx + 4, gy + 4, gz), fx), lerp2(cave_node(gx, gy + 4, gz + 4), cave_node(gx + 4, gy + 4, gz + 4), fx), fz);
+    let n = lerp2(a, b, fy);
+    return carves(n.x > 0, n.y, cavern_roof(x, z), ground - y * 16);
+}
+
 // The block at local (x, y, z) of column `i`, as `Terrain::generate`.
 fn block(x: u32, y: u32, z: u32, ox: i32, oy: i32, oz: i32, cave: bool) -> u32 {
     let i = z * 16u + x;
@@ -407,22 +419,22 @@ fn block(x: u32, y: u32, z: u32, ox: i32, oy: i32, oz: i32, cave: bool) -> u32 {
     let ri = u32(col_rule[i]);
     if (ri < nr) {
         let r = u32(desc[D_RULE_OFF]) + ri * WORDS_RULE;
-        if (desc[r + 22u] != 0 && h > desc[r + 23u]) {
+        if (desc[r + 13u] != 0 && h > desc[r + 14u]) {
             bare = true;
         }
-        if (desc[r + 12u] >= 0) {
-            top = desc[r + 12u];
+        if (desc[r + 5u] >= 0) {
+            top = desc[r + 5u];
         }
-        if (desc[r + 17u] >= 0 && h < desc[r + 18u]) {
-            top = desc[r + 17u];
+        if (desc[r + 10u] >= 0 && h < desc[r + 11u]) {
+            top = desc[r + 10u];
         }
-        if (desc[r + 13u] >= 0) {
-            filler = desc[r + 13u];
+        if (desc[r + 6u] >= 0) {
+            filler = desc[r + 6u];
         }
-        depth = desc[r + 14u];
-        under_b = desc[r + 15u];
-        under_n = desc[r + 16u];
-        ice = desc[r + 19u];
+        depth = desc[r + 7u];
+        under_b = desc[r + 8u];
+        under_n = desc[r + 9u];
+        ice = desc[r + 12u];
     }
     let wy = oy + i32(y);
     var s = 0;
@@ -583,6 +595,16 @@ fn hash64(seed: vec2<u32>, x: i32, z: i32) -> vec2<u32> {
     return h ^ shr64(h, 31u);
 }
 
+// `weft_noise::hash(seed, x, y, z)`.
+fn hash64y(seed: vec2<u32>, x: i32, y: i32, z: i32) -> vec2<u32> {
+    var h = seed ^ mul64(widen(x), vec2<u32>(0x7F4A7C15u, 0x9E3779B9u));
+    h = h ^ mul64(widen(y), vec2<u32>(0x27D4EB4Fu, 0xC2B2AE3Du));
+    h = h ^ mul64(widen(z), vec2<u32>(0x9E3779F9u, 0x165667B1u));
+    h = mul64(h ^ shr64(h, 30u), vec2<u32>(0x1CE4E5B9u, 0xBF58476Du));
+    h = mul64(h ^ shr64(h, 27u), vec2<u32>(0x133111EBu, 0x94D049BBu));
+    return h ^ shr64(h, 31u);
+}
+
 fn mod64(a: vec2<u32>, m: u32) -> u32 {
     let wrap = (4294967295u % m + 1u) % m;
     return ((a.y % m) * wrap + a.x % m) % m;
@@ -590,13 +612,30 @@ fn mod64(a: vec2<u32>, m: u32) -> u32 {
 
 // Distant terrain (`client::lod`): a tile of 32x32 cells of 2^level blocks and a cell around it,
 // each its column at the cell's middle: the block on top (water above the ground under the sea),
-// the one under it, the biome. Caves are left out.
+// the one under it, the biome. Caves are left out. A smooth tile (the job's fourth word set)
+// takes the columns at the cells' corners instead, from one before its first to its last.
 const LOD_LAST: i32 = i32(LOD_SIDE) - 1;
 // Per sample: ground height (low half) and biome; and what scattered things put on it: the
-// highest canopy top + 32768 and its block, and how many of its blocks they cover.
+// highest crown (its top above the sample's ground, 9 bits, how far it reaches down from there,
+// 7, its leaves), how many of its blocks crowns cover, and the tallest trunk standing in it (the
+// crown's top, 8 bits, the trunk's width, 4, and place, 2 and 2, its block).
 var<workgroup> lod_ground: array<u32, LOD_SAMPLES>;
 var<workgroup> canopy: array<atomic<u32>, LOD_SAMPLES>;
 var<workgroup> cover: array<atomic<u32>, LOD_SAMPLES>;
+var<workgroup> trunk: array<atomic<u32>, LOD_SAMPLES>;
+
+// The ground height of sample (`i`, `j`), clamped to the tile's samples.
+fn lod_height(i: i32, j: i32) -> i32 {
+    let g = lod_ground[u32(clamp(j, 0, LOD_LAST)) * LOD_SIDE + u32(clamp(i, 0, LOD_LAST))];
+    return bitcast<i32>(g << 16u) >> 16u;
+}
+
+// How far the ground at sample (`i`, `j`) falls to its lowest neighbour, per block, from samples
+// `s` blocks apart (`lod::fall`, the same on the CPU).
+fn lod_fall(i: i32, j: i32, s: i32) -> i32 {
+    let low = min(min(lod_height(i - 1, j), lod_height(i + 1, j)), min(lod_height(i, j - 1), lod_height(i, j + 1)));
+    return (max(lod_height(i, j) - low, 0) * 3 + 2 * s - 1) / (2 * s);
+}
 
 @compute @workgroup_size(256)
 fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t: u32) {
@@ -608,11 +647,13 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
     let ox = jobs[job];
     let oz = jobs[job + 1u];
     let s = 1 << u32(jobs[job + 2u]);
+    // Corners: the samples sit half a cell lower than the middles, `off` from where cells start.
+    let off = select(0, s / 2, jobs[job + 3u] != 0);
     let nr = u32(desc[D_RULES]);
     let stone = desc[D_STONE];
     for (var k = t; k < LOD_SAMPLES; k += 256u) {
-        let bx = ox + (i32(k % LOD_SIDE) - 1) * s + s / 2;
-        let bz = oz + (i32(k / LOD_SIDE) - 1) * s + s / 2;
+        let bx = ox + (i32(k % LOD_SIDE) - 1) * s + s / 2 - off;
+        let bz = oz + (i32(k / LOD_SIDE) - 1) * s + s / 2 - off;
         let c = column(job, bx, bz, k, LOD_SAMPLES);
         var top = stone;
         var under = stone;
@@ -620,19 +661,19 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
         let ri = u32(c.rule);
         if (ri < nr) {
             let r = u32(desc[D_RULE_OFF]) + ri * WORDS_RULE;
-            let bare = desc[r + 22u] != 0 && c.height > desc[r + 23u];
+            let bare = desc[r + 13u] != 0 && c.height > desc[r + 14u];
             if (!bare) {
-                if (desc[r + 12u] >= 0) {
-                    top = desc[r + 12u];
+                if (desc[r + 5u] >= 0) {
+                    top = desc[r + 5u];
                 }
-                if (desc[r + 17u] >= 0 && c.height < desc[r + 18u]) {
-                    top = desc[r + 17u];
+                if (desc[r + 10u] >= 0 && c.height < desc[r + 11u]) {
+                    top = desc[r + 10u];
                 }
-                if (desc[r + 13u] >= 0 && desc[r + 14u] > 0) {
-                    under = desc[r + 13u];
+                if (desc[r + 6u] >= 0 && desc[r + 7u] > 0) {
+                    under = desc[r + 6u];
                 }
             }
-            ice = desc[r + 19u];
+            ice = desc[r + 12u];
         }
         var y = c.height;
         if (desc[D_HAS_SEA] != 0 && c.height < desc[D_SEA]) {
@@ -643,17 +684,51 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
             }
             under = top;
         }
-        let o = (tile * LOD_SAMPLES + k) * 2u;
+        // Where caves open the ground, the floor they leave, as far down as distance shows.
+        if (desc[D_HAS_CAVES] != 0 && (desc[D_HAS_SEA] == 0 || c.height > desc[D_SEA])) {
+            let gx = div_floor(bx, 4).x * 4;
+            let gz = div_floor(bz, 4).x * 4;
+            let fx = bx - gx;
+            let fz = bz - gz;
+            // chiacraft: the corners aren't samples, so they have no CPU-made heights; with
+            // features made on the CPU the sample's own height stands for them.
+            var ground = c.height * 16;
+            if (params.custom == 0u) {
+                let c00 = column(job, gx, gz, 0u, 0u).height;
+                let c10 = column(job, gx + 4, gz, 0u, 0u).height;
+                let c01 = column(job, gx, gz + 4, 0u, 0u).height;
+                let c11 = column(job, gx + 4, gz + 4, 0u, 0u).height;
+                ground = (c00 * (4 - fx) + c10 * fx) * (4 - fz) + (c01 * (4 - fx) + c11 * fx) * fz;
+            }
+            var wy = c.height;
+            while (wy > c.height - 48 && carved_at(bx, wy, bz, ground)) {
+                wy -= 1;
+            }
+            if (wy < c.height) {
+                y = wy;
+                top = stone;
+                under = stone;
+            }
+        }
+        let o = (tile * LOD_SAMPLES + k) * LOD_WORDS;
         outp[o] = (u32(y) & 65535u) | (u32(top) << 16u);
         outp[o + 1u] = (u32(c.biome) & 65535u) | (u32(under) << 16u);
+        outp[o + 2u] = 0u;
+        outp[o + 3u] = 0u;
         lod_ground[k] = (u32(c.height) & 65535u) | (u32(c.biome) << 16u);
         atomicStore(&canopy[k], 0u);
         atomicStore(&cover[k], 0u);
+        atomicStore(&trunk[k], 0u);
     }
+    // The samples' tops in `outp` are read back below.
+    storageBarrier();
     workgroupBarrier();
-    // Trees: every site whose canopy may reach the samples, found as `dim::scatter_site` does
-    // (standing on the nearest sample's ground), its canopy laid over the samples it covers.
+    // Trees: every site whose crown may reach the samples, found as `dim::scatter_site` does
+    // (standing on the nearest sample's ground, thinned where it stands), one of its biome's
+    // sampled crowns (`crown`) laid over the samples it covers, its trunk in the one it stands in.
+    // None on bare faces, which the shapes leave alone.
     let so = u32(desc[D_SCATTER_OFF]);
+    let face_fall = desc[D_FACE_FALL];
     var sea = -2147483647 - 1;
     if (desc[D_HAS_SEA] != 0) {
         sea = desc[D_SEA];
@@ -665,11 +740,16 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
         let reach = desc[at + 1u];
         let key = vec2<u32>(u32(desc[at + 2u]), u32(desc[at + 3u]));
         let nb = u32(desc[at + 4u]);
-        let table = at + 5u;
-        at = table + nb * WORDS_SCATTER_BIOME;
-        let c0 = div_floor(ox - s - reach, cell).x;
+        let thin_at = u32(desc[at + 5u]);
+        let thin_len = u32(desc[at + 6u]);
+        let keep = u32(desc[at + 7u]);
+        let table = at + WORDS_SCATTER + thin_len * WORDS_STEP;
+        let ng = u32(desc[table + nb * WORDS_SCATTER_BIOME]);
+        let ground = table + nb * WORDS_SCATTER_BIOME + 1u;
+        at = ground + ng * 2u;
+        let c0 = div_floor(ox - s - off - reach, cell).x;
         let c1 = div_floor(ox + LOD_LAST * s + reach, cell).x;
-        let d0 = div_floor(oz - s - reach, cell).x;
+        let d0 = div_floor(oz - s - off - reach, cell).x;
         let d1 = div_floor(oz + LOD_LAST * s + reach, cell).x;
         let wide = u32(c1 - c0 + 1);
         let cells = wide * u32(d1 - d0 + 1);
@@ -679,13 +759,26 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
             let h = hash64(key, cx, cz);
             let px = cx * cell + i32(mod64(h, u32(cell)));
             let pz = cz * cell + i32(mod64(shr64(h, 8u), u32(cell)));
-            let si = clamp(div_floor(px - ox, s).x + 1, 0, LOD_LAST);
-            let sj = clamp(div_floor(pz - oz, s).x + 1, 0, LOD_LAST);
+            let si = clamp(div_floor(px - ox + off, s).x + 1, 0, LOD_LAST);
+            let sj = clamp(div_floor(pz - oz + off, s).x + 1, 0, LOD_LAST);
             let g = lod_ground[u32(sj) * LOD_SIDE + u32(si)];
             let gh = bitcast<i32>(g << 16u) >> 16u;
             let biome = g >> 16u;
             if (gh < sea || biome >= nb) {
                 continue;
+            }
+            // Only on its ground, as `dim::scatter_site`: the sample's top, which is stone where
+            // caves opened it.
+            if (ng > 0u) {
+                let top = i32(outp[(tile * LOD_SAMPLES + u32(sj) * LOD_SIDE + u32(si)) * LOD_WORDS] >> 16u);
+                var on = false;
+                for (var q = 0u; q < ng; q++) {
+                    let first = desc[ground + q * 2u];
+                    on = on || (top >= first && top < first + desc[ground + q * 2u + 1u]);
+                }
+                if (!on) {
+                    continue;
+                }
             }
             let b = table + biome * WORDS_SCATTER_BIOME;
             let limit = vec2<u32>(u32(desc[b]), u32(desc[b + 1u]));
@@ -693,38 +786,94 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
             if (!(bits.y < limit.y || (bits.y == limit.y && bits.x < limit.x))) {
                 continue;
             }
-            let r = desc[b + 2u];
-            let top = u32(gh + 1 + desc[b + 3u] + 32768);
-            let packed = (top << 16u) | u32(desc[b + 4u]);
-            let a0 = clamp(div_floor(px - r - ox, s).x + 1, 0, LOD_LAST);
-            let a1 = clamp(div_floor(px + r - ox, s).x + 1, 0, LOD_LAST);
-            let e0 = clamp(div_floor(pz - r - oz, s).x + 1, 0, LOD_LAST);
-            let e1 = clamp(div_floor(pz + r - oz, s).x + 1, 0, LOD_LAST);
+            if (thin_len > 0u && desc[b + 2u] != 0) {
+                let random = hash64y(h, 1, 2, 3);
+                if ((keep == 0u || mod64(random, keep) != 0u) && thin_mask(thin_at, thin_len, px * 16, pz * 16) > 0) {
+                    continue;
+                }
+            }
+            if (lod_fall(si, sj, s) >= face_fall) {
+                continue;
+            }
+            // Which crown: the site's own bits, mixed apart from those its chance took.
+            var m = h.x ^ (h.y * 0x9E3779B9u);
+            m = (m ^ (m >> 16u)) * 0x85EBCA6Bu;
+            m = m ^ (m >> 13u);
+            let sh = b + 3u + (m % LOD_SHAPES) * 2u;
+            let shape = u32(desc[sh]);
+            if (shape == 0u) {
+                continue;
+            }
+            let blocks = u32(desc[sh + 1u]);
+            let leaves = blocks & CROWN_BLOCK_MASK;
+            let r = i32(shape & CROWN_RADIUS_MASK);
+            let top = i32((shape >> CROWN_TOP_SHIFT) & CROWN_TOP_MASK);
+            let bottom = i32((shape >> CROWN_BOTTOM_SHIFT) & CROWN_BOTTOM_MASK);
+            let widest = bottom + (top - bottom) * i32((shape >> CROWN_WIDEST_SHIFT) & CROWN_FIFTEENTHS) / 15;
+            // Its top falls off as 1 - u^p out from the trunk (u from 0 to 1 at the edge): p from how
+            // wide it is halfway up from its widest layer (a pine's spire low, an oak's dome about 2).
+            let rounded = clamp(f32((shape >> CROWN_ROUND_SHIFT) & CROWN_FIFTEENTHS) / 15.0, 0.07, 0.97);
+            let p = log(0.5) / log(rounded);
+            let edge = f32(r) + 0.5;
+            let a0 = clamp(div_floor(px - r - ox + off, s).x + 1, 0, LOD_LAST);
+            let a1 = clamp(div_floor(px + r - ox + off, s).x + 1, 0, LOD_LAST);
+            let e0 = clamp(div_floor(pz - r - oz + off, s).x + 1, 0, LOD_LAST);
+            let e1 = clamp(div_floor(pz + r - oz + off, s).x + 1, 0, LOD_LAST);
             for (var j = e0; j <= e1; j++) {
                 for (var i = a0; i <= a1; i++) {
-                    let x0 = ox + (i - 1) * s;
-                    let z0 = oz + (j - 1) * s;
+                    let x0 = ox + (i - 1) * s - off;
+                    let z0 = oz + (j - 1) * s - off;
                     let wx = min(px + r + 1, x0 + s) - max(px - r, x0);
                     let wz = min(pz + r + 1, z0 + s) - max(pz - r, z0);
-                    if (wx > 0 && wz > 0) {
-                        let q = u32(j) * LOD_SIDE + u32(i);
-                        atomicAdd(&cover[q], u32(wx * wz));
-                        atomicMax(&canopy[q], packed);
+                    // The crown is round: how far its nearest point in the cell is from the trunk.
+                    let nx = f32(clamp(px, x0, x0 + s - 1) - px);
+                    let nz = f32(clamp(pz, z0, z0 + s - 1) - pz);
+                    let d = sqrt(nx * nx + nz * nz);
+                    if (wx <= 0 || wz <= 0 || d > edge) {
+                        continue;
                     }
+                    let u = min(d / edge, 1.0);
+                    let up = 1.0 - pow(u, p);
+                    let down = 1.0 - u * u;
+                    let ct = gh + 1 + widest + i32(round(f32(top - widest) * up));
+                    let cb = gh + 1 + widest - i32(round(f32(widest - bottom) * down));
+                    // Over water from the water's top.
+                    let ground = max(lod_height(i, j), sea);
+                    let above = ct - ground;
+                    if (above <= 0) {
+                        continue;
+                    }
+                    let depth = min(ct - max(cb, ground + 1), 127);
+                    let packed = (u32(min(above, 511)) << 23u) | (u32(depth) << 16u) | leaves;
+                    let q = u32(j) * LOD_SIDE + u32(i);
+                    atomicAdd(&cover[q], u32(wx * wz));
+                    atomicMax(&canopy[q], packed);
                 }
+            }
+            // Its trunk, in the cell it stands in (its place there in 2 bits: box tiles' cells are 4
+            // blocks at most).
+            let width = (shape >> CROWN_TRUNK_SHIFT) & CROWN_TRUNK_MASK;
+            let tx = px - (ox + (si - 1) * s - off);
+            let tz = pz - (oz + (sj - 1) * s - off);
+            if (width > 0u && tx >= 0 && tx < s && tz >= 0 && tz < s) {
+                let place = (width << 4u) | (u32(min(tx, 3)) << 2u) | u32(min(tz, 3));
+                let word = (u32(min(top, 255)) << 24u) | (place << 16u) | (blocks >> CROWN_TRUNK_BLOCK_SHIFT);
+                atomicMax(&trunk[u32(sj) * LOD_SIDE + u32(si)], word);
             }
         }
     }
     workgroupBarrier();
-    // A sample is canopy where trees cover a third of it (a forest from afar, single trees up
-    // close), as high as the highest.
+    // A sample has a crown where crowns cover a third of it (a forest from afar, single trees up
+    // close), the highest one's.
     for (var k = t; k < LOD_SAMPLES; k += 256u) {
         let p = atomicLoad(&canopy[k]);
         if (p != 0u && atomicLoad(&cover[k]) * 3u >= u32(s * s)) {
-            let o = (tile * LOD_SAMPLES + k) * 2u;
-            let leaves = p & 65535u;
-            outp[o] = ((u32(i32(p >> 16u) - 32768)) & 65535u) | (leaves << 16u);
-            outp[o + 1u] = (outp[o + 1u] & 65535u) | (leaves << 16u);
+            let o = (tile * LOD_SAMPLES + k) * LOD_WORDS;
+            let ground = max(bitcast<i32>(lod_ground[k] << 16u) >> 16u, sea);
+            let top = ground + i32(p >> 23u);
+            let tr = atomicLoad(&trunk[k]);
+            outp[o + 2u] = (u32(top) & LOD_OUT_HALF_MASK) | ((p & 65535u) << LOD_OUT_HALF_SHIFT);
+            outp[o + 3u] = ((p >> 16u) & 127u) | (((tr >> 16u) & 255u) << LOD_OUT_TRUNK_DZ_SHIFT) | ((tr & 65535u) << LOD_OUT_HALF_SHIFT);
         }
     }
 }

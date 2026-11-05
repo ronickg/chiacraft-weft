@@ -100,8 +100,9 @@ much it can eat before starving), **damage**, **speed**, **carry weight**, **oxy
 (underwater), **torpor** (how much it takes to knock out; only goes down, never placed by
 players) and **fortitude** (heat, cold, poison resistance).
 
-**Wild levels.** A wild animal spawns with a level, 1 to 150 (proposed, a world setting; ARK's
-difficulty), most of them low: proposed weights 1-30 common, 31-90 uncommon, 91-150 rare. Each
+**Wild levels.** A wild animal spawns with a level, 0 to 200 everywhere (Ronald, 11-06: "0-200
+acrso the board"; a level-200 one is about five times a level-0 one of its species), most of them
+low: 0-39 common (60%), 40-119 uncommon (30%), 120-200 rare (10%). Each
 level is one **wild point** placed on a random stat (never torpor alone). Its stats are known
 from its level and its points, so two level-100 raptors differ: one with 30 points in speed is a
 different animal from one with 30 in health.
@@ -112,8 +113,13 @@ different animal from one with 30 in health.
 value = base * (1 + wild_points * wild_step) * (1 + tamed_points * tamed_step) * (1 + bonus)
 ```
 
-`wild_step` and `tamed_step` are per species and stat (about 0.2 health, 0.05 damage, 0.01
-speed); `bonus` is the imprint bonus (up to +20%) plus the bond bonus (up to +5%).
+`base`'s health, damage and armour come from the species' size class (by mass), role and tweaks
+on the progression curve (`animals_core::danger`, `PROGRESSION_SHEET.md`; Ronald, 11-07: "Yes, all
+of them"); small ones scale by mass inside their class (a fox beats a mouse). `wild_step` is
+0.18 for health and damage (`danger::LEVEL_STEP`: a level's points fall on the nine stats alike,
+so 200 levels make five times the base), 0.01 speed; `tamed_step` per species and stat; `bonus` is
+the imprint bonus (up to +20%) plus the bond bonus (up to +5%), and tamed points and bonus
+together stop at ×1.6 (`danger::TAME_CEILING`, as gear's grade and marks).
 
 **Taming bonus.** A tame gains `floor(level * effectiveness / 2)` bonus levels, placed like wild
 points. A clean tame of a level-100 animal becomes level 150.
@@ -342,7 +348,7 @@ ride and breed it.
 | Setting | Default |
 |---|---|
 | Tame cap per player or tribe | None |
-| Wild level range | 1-150 |
+| Wild level range | 0-200 |
 | Taming speed, breeding interval, growth speed | 1x |
 | Tames from other worlds through portals | Owner's choice per world or link (proposed default: off) |
 | Highest level of a visiting tame | No limit |
@@ -526,7 +532,7 @@ Sources: [canid immobilization](https://pmc.ncbi.nlm.nih.gov/articles/PMC3141559
   0.01/0.015...), hunger rate.
 - `animal.rs`: the `animal` component (saved; sent to whoever has its screen open): species,
   sex, life stage, bond, imprint, command, wild and tamed points per stat, unspent points, food,
-  XP. A new animal rolls its level (60% 1-30, 30% 31-90, 10% 91-150) and places a point per level
+  XP. A new animal rolls its level (60% 0-39, 30% 40-119, 10% 120-200) and places a point per level
   on a random stat. Health and speed are attribute modifiers (`animals:stats`, applied again
   after loading); damage is a step of `chain::ATTACK_DAMAGE`; the rest are kept and shown. Tames
   use food at their species' rate (meat feeds a chihuahua); nothing happens at 0 yet. The owner
@@ -889,6 +895,87 @@ young adults 90%, full in their prime, fading from the elder years to 60% at an 
 end; health, stamina, damage, speed and carrying go with it (shown on its screen). Testing:
 `/animal speed <n>`, `/animal census`, `/animal reset` (`mods/animals/tests/README.md`).
 
+**Each species in its own world, and the Cretaceous as lively as the overworld** (2026-11-05,
+the creatures playtest cret2: hares, wood mice, red foxes, ravens, house sparrows and herring
+gulls had a share of the Cretaceous, and no utahraptor, wyvern, crocodyliform or fish came in 7
+minutes, the same on old dev). Spawn rules match biomes only, and the Cretaceous's beaches and
+seas are base's own `base:beach` and `base:ocean`: now a species spawns only in its own world
+(`Species::cretaceous`: its habitats are `animals:` biomes; fish too). And the engine picks a
+fitting rule at random, then rolls its chance: the overworld's biomes also hold base's farm
+animals at 5%, so their rules average about 0.025 a try, while the Cretaceous's, only its own and
+rarer, averaged 0.004 (crags) to 0.012 (red dunes): a group every minute or two near a player, a
+utahraptor about one floodplain group in twenty. Its biomes' chances are now raised together to
+average `CRETACEOUS_FLOW` (0.025), each species keeping its share by rarity (a floodplain group is
+a crocodyliform one time in ten, a utahraptor one in twenty; a crag group a wyvern one in twenty);
+the overworld's are unchanged. The engine's cap (6 passive within 64 blocks of a player) still
+holds a spot to two or three groups, so the rare ones show as a player moves on.
+PC runs aw_cr2 (seven stops of the new land, 75 s each, twice before and twice after): 11 groups
+and 27 animals before, a flock of house sparrows on the Cretaceous's beach among them; 16 groups
+and 39 animals after, no modern ones. Plant eaters still come only as often as their food grows
+(`NATURAL_SPAWN`, its wet and dry seasons), and the engine scans for a spot only 16 blocks above
+and below the player.
+
+**Natural spawning stops at the room** (2026-11-04, the 48-minute PC soak f706e44f: wild grey
+wolves at 21-52 near one spot with room for 16, dying of want again and again). That soak's
+overshoot was its own script: it `/tk spawn`ed 10 wolves at the same home spot in each of 12 loops
+(120 in all); the log has no births, no nests and no natural spawns (mob spawning was off), and
+the 9 deaths of want in 48 minutes are `want_chance` at work (10% a day at twice the crowd).
+`/tk spawn` ignores the room on purpose. But looking for it found a real gap: the engine's spawner
+caps only all passive creatures together (6 within 64 blocks of a player), and our natural-spawn
+answer asked only about food, so a group could come where its kind already filled the place (two
+players a little apart, a big species whose group is larger than its crowd). Now a group comes
+only while it fits its room (`life::room_for`: its kind within `CROWD_RADIUS`, counted by
+`crowding`, plus the group, at most its crowd; a group bigger than the room still comes to an
+empty place), checked for every species, hunters too, before the food roll (`forage.rs`).
+PC run aw_wolves3 (30 wild grey wolves in one pen with water, venison every quarter day, 10 game
+days by `/tick sprint`): 30 down to 15, ten of them dying of want one by one, no births (out of
+season), and `/animal room` (the guard's own count) turned a pack away at 30 near and let one come
+at 13. Without water (aw_wolves2) or food (aw_wolves) a pen dies of thirst or hunger within days
+instead, as it should.
+
+**Hitboxes fit their models** (2026-11-05; Ronald: "do the hitboxes from our animals, mobs, etc.,
+all work correctly?"). A creature's box is what a sword, an arrow or a click hits, what a rider
+sits on, and what bumps into the world; it is square, stands on the feet, and scales with the
+model (genes, growth). Measured against the models, the big Cretaceous animals' boxes were half
+their size or less (an iguanodont 1.8 wide round a 9-block body, a sauropod 4.2 high under an
+8.6-block neck, a utahraptor 1.2 round 4.8), the dogs', wolves' and jaguars' a little small, and
+the caimans' and fish's too tall. Every box is now a row in `animals_core::bodies` by model, at
+Minecraft's proportions: its height the model's top, its width about the geometric mean of the
+model's width and length (a wolf's box is its body's average, not nose to tail), the model
+centred on it. `core/tests/boxes.rs` measures each `geo.json` at rest (the engine's bone
+rotations) and holds every box to that (0.75-1.35 of the top, 0.75-1.5 of the mean, centred
+within 0.3 of the width; the tiniest a tenth of a block more, to click). The wyvern's width is
+excused: its wings are most of its bounds, and its box is its body. Base's vanilla mobs keep
+vanilla's boxes. A long animal's head and tail still stick out of its box (one box can't follow
+a 9-block body). The bigger boxes need wider gaps to walk through, and the engine's path search
+led every walker one cell wide, so the big animals jammed between trunks (PC run aw_walk:
+cedarosaurs 0-6 blocks in 5 minutes against 5-14 with the old boxes); it now needs room across a
+body's whole footprint (`notes/ENGINE_CHANGES.md`, section 1). The sauropod keeps to the open
+floodplain (its fern forest share 0.5 to 0.2, Planner's pick of option (a), 11-05): at 4.5 wide
+it stood still among the trunks. The sauropod's box stops at 5.5
+blocks (`bodies::LOW`): its neck reaches 8.6, above any reach from the ground, and a box that tall
+found no room under the fern forest's crowns.
+
+**Stocking by biome** (2026-11-05, with Plants; Ronald picked real grazing levels: herds eat 25-50%
+of what their grass grows back). A biome holds plant eaters as real grazer densities go: open
+grassland heavily, deep forest and the giant groves lightly (`STOCKING`: savanna 2.5, plains 1.4,
+forest 1, swamp 0.9, birch forest 0.55, taiga 0.35, mountains 0.26, sequoia grove 0.09; the
+Cretaceous 1). A plant eater's crowd there is its crowd times that, never under a pair
+(`Species::crowd_in`), and everything that weighs the crowd reads it at the animal's own biome:
+natural spawning's room, wild breeding, dying of want, the food webs' grazing. So a stocked
+savanna holds 40 capybaras where it held 16, and they don't starve back down. With Plants' grass
+feeding as real grass does (a tuft feeds 2, not 10), every grazed biome lands about a third. The
+savanna is held at 2.5 (3.5 would match the rest) until it has a heavy grazer, which eats as much
+with fewer animals.
+
+**Far animals keep time** (2026-11-05). With the engine's activation ranges an animal no player
+is within 48 blocks of rests, ticking only every `core:inactive_entity_interval` ticks (20). Its
+countdowns run down by the ticks elapsed (`World::tick_elapsed`: breeding, gifts, anger, taming's
+fright and wait, a dog's sitting; the last three still counted one a call, so a far one stayed
+frightened twenty times as long), and its once-a-second body, hunger and thirst run on the tick a
+second turns over for it and cover the seconds that passed (`life::seconds_due`, `steps_in`):
+before, they lived one second a wake, right only at the default interval.
+
 **Time away** (2026-11-02; Ronald: "my animals should die even while I'm gone"). Animals only
 live where a player is: the engine spawns them 20-45 blocks from players (at most 6 passive ones
 within 64) and ticks only loaded areas. So what happens elsewhere is caught up when an area loads,
@@ -1120,3 +1207,65 @@ Ronald: seasons tied in with mating and breeding; each species breeds in its rea
 - The animal screen says when its kind breeds and whether it's that season now; SPECIES.md has a
   "breeds in" row.
 - Not yet: the website's simulator (`web/`) breeds without seasons.
+
+## On a blood moon (2026-11-04)
+
+From Research round 17's addendum (Ronald: "Yes, as designed"). The numbers live in `animals_core::sky`. Totality runs 22:00-02:00 (`vitals::events`), and while it lasts:
+- **Prey watch half again as far** for hunters (`hunt::wary`, `BLOOD_MOON_WATCH` 1.5).
+- **Herds bunch up.** A herd animal on the ground (`Social::Herd`, from `wild.rs` and the capybara; a flock's wariness takes off, so birds don't) more than 4 blocks from the middle of its herd (looking 24 blocks around) walks back to it (`hunt::huddle`).
+- **Wild grey wolves howl once** in the first half hour of totality, using their ambient call. A pack's howls spread over a few seconds (`voices::howl_at_blood_moon`).
+
+This applies on every difficulty: on gentle the blood moon brings no monsters, but the animals still feel it. Coyotes don't howl at it yet.
+## Capybaras in a savanna winter (2026-11-05)
+
+Plants' herd run (`herd_sav_wi`: six capybaras at 10% food in a winter savanna) lost three of them from its counts within ten minutes. `aw_capy_winter` repeated it with every death logged (`breeding.rs`: species, id, cause, place) and found no winter deaths:
+- **One death, from the spawn:** the script places it at y 94 over ground at 72, so it died of the 22-block fall.
+- **The others were alive:** the census and entity lines count only within 48 blocks. The testkit's full entity list still held all five at 13 minutes, foraging farther out at 74-85% strength.
+
+Herd scripts should spawn on the ground and count a wider ring, or list every entity.
+
+## The field journal (2026-11-05)
+
+Ronald asked for "a dossier" on every animal. He picked a picture with basics and survival facts, unlocked by discovery, in an inventory tab.
+
+A species' page opens when the player sees one up close (within 8 blocks with no opaque block between), looks at it through the spyglass, or opens its screen. The client then gets a toast message. What the player does with it then fills in more:
+- **Seen:** Latin name, family, weight, biomes, active hours, diet and foods, temper, and group size.
+- **Hunted:** its drops (meat and hide).
+- **Tamed or ridden:** how it's tamed and with what foods, whether it can be ridden, and how fast.
+- **Bred:** breeding seasons, young (born or hatched), gestation or incubation, litter size, growth time, and lifespan.
+
+Every fact is read from the species' own rows (`animals_core::journal::facts`), so the journal says what the game does. Active hours are a new researched field, `Species::active`: Velociraptor at night and Protoceratops at any hour (from their scleral rings, Schmitz & Motani 2011), reindeer at any hour (van Oort et al. 2005), deer and wolves at dawn and dusk. The deeds are saved with the player (`journal::JOURNAL`). Creative reads every page. The screen is UI's (`journal_screen.rs`, with its inventory tab and the key I), and it reads `journal::entries(view)`. Each fact names its section on the page: the header, the chips, where it lives, or the survival rows.
+
+## Nests for the birds (2026-11-05)
+
+Birds now lay eggs in nests. Before this, their young came out as fledglings after the eggs' time, with no eggs at all (a gestation tune). Each bird builds its nest at its kind of site (`animals_core::nests::SITES`):
+- **Treetops:** the raven, the house sparrow, the great horned owl (which takes old nests in trees), the savanna hawk, and Confuciusornis (estimated).
+- **A high bare ledge, or failing that a treetop:** the golden eagle.
+- **The ground:** the snow bunting (crevices), the snowy owl (a scrape on a mound), the turkey vulture (a cave floor), the herring gull, and Gobipteryx (its eggs were found half buried in sand).
+
+When she lays (`eggs::lay_in_nest`), she looks 12 blocks around her for the highest open leaves or ledge, and uses the ground under her if there's none. A bird's nest is brooded (`life::egg_air_of`): its eggs are held at a sitting parent's 37 °C whatever the air, so a snowy owl's clutch hatches in the tundra. Before, a nest only pulled the air 60% of the way toward 37 °C. The young hatch in the nest.
+
+Not yet: a parent seen sitting on the nest, and egg eaters raiding wild nests.
+
+## Fish breed (2026-11-05)
+
+Fish now breed in their seasons; before, only the spawner made more. The seasons (researched, or estimated where only their relatives' are known):
+- **Brown trout:** autumn and early winter, on gravel in cold water, most in autumn.
+- **Pacu:** the wet season, as the rains begin.
+- **The Cretaceous's lungfish (Est.) and Lycoptera (Est.):** spring and summer.
+
+A fish in love swims to a mate of its kind within 24 blocks (`fish::court`, steering its swim; walking pathfinding doesn't work in water). When they meet, the female spawns.
+
+No egg entity is used. An egg only develops in 25-40 °C air, which suits a nest, not a trout stream. Instead the female carries her eggs' time (`life::carrying`), then her fry come out beside her. Lycoptera's eggs' time is paced up to 0.46 d so a line still takes ten days to four generations. The spawner still tops up what breeding doesn't fill.
+
+## Carcasses for the vulture (2026-11-05)
+
+The turkey vulture never ate before. A wild animal gets hungry only if it's a plant eater or a hunter with prey at home, and a vulture (95% carrion) is neither. Rotten flesh was left alone too, as poisonous. Now a scavenger (`Species::scavenges`: carrion is half its diet or more) works like this:
+- **Hunger:** it gets hungry in the wild.
+- **Smell:** hungry, it smells carrion within 64 blocks, even under a forest canopy, as turkey vultures do (Houston 1986), flies there (`birds::scent`), lands and eats.
+- **Food:** carcass pieces, a kill's meat (carrion to it), and rotten flesh, which a vulture's stomach acid makes safe.
+- **Survival:** it fasts instead of starving and gets its water from its food, so a world with patchy carrion doesn't wipe it out.
+
+Every one of our species of a kilogram or more that gives no meat leaves carcass pieces when it dies (`animals_core::meat::carcass`). Each piece is half a kilogram of carrion, and it leaves as many as its meat would be portions. For example, a wolf leaves fur plus 2-3 pieces. The carcass's icon is rotten flesh's until Art draws one.
+
+Items on the ground vanish after five minutes, so a vulture must arrive in time. Carcasses don't rot on the ground yet.

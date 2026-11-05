@@ -72,6 +72,7 @@ const TURF: &[&str] = &[
     "base:savanna",
     "base:swamp",
     "base:mountains",
+    "base:sequoia_grove",
     "animals:scrubland",
     "animals:floodplain",
     "animals:fern_forest",
@@ -84,13 +85,22 @@ const ARAUCARIAS: &[&str] = &["animals:scrubland", "animals:floodplain", "animal
 const SCALE_CONIFERS: &[&str] = &["animals:red_dunes", "animals:scrubland", "animals:crags"];
 const BIRCHES: &[&str] = &["base:forest", "base:birch_forest"];
 
-pub const SOURCES: [Source; 67] = [
-    s("base:tall_grass", None, Category::Grass, 10, Eaten::Becomes("base:grazed_grass"), Some("base:grazed_grass")),
+pub const SOURCES: [Source; 76] = [
+    // A tuft of tall grass feeds 2 (it fed 10): a grazer crops five tufts for what it used to eat
+    // of one, so herds crop their ground as real ones do, 25-50% of a biome's regrowth in its
+    // best season (`GRAZED`, Ronald 11-05: "Real levels, 25-50%"; with Animals' stocking).
+    s("base:tall_grass", None, Category::Grass, 2, Eaten::Becomes("base:grazed_grass"), Some("base:grazed_grass")),
     wild("base:berry_bush", 3, Category::Fruit, 8, Eaten::Age(1), wild::FORESTS),
     browse("base:oak_leaves", Category::Leaves, 4, OAKS, GREEN),
     browse("base:birch_leaves", Category::Leaves, 4, &["base:forest", "base:birch_forest"], GREEN),
     // Evergreen: a winter's browse (and the tundra's few trees).
-    browse("base:spruce_leaves", Category::Leaves, 4, &["base:taiga", "base:snowy_plains", "base:mountains"], ALL_YEAR),
+    browse(
+        "base:spruce_leaves",
+        Category::Leaves,
+        4,
+        &["base:taiga", "base:snowy_plains", "base:mountains", "base:sequoia_grove"],
+        ALL_YEAR,
+    ),
     browse("base:acacia_leaves", Category::Leaves, 4, &["base:savanna"], ALL_YEAR),
     // Cactus pads, the desert's browse (jackrabbits live on them in the dry months).
     browse("base:cactus", Category::Leaves, 3, &["base:desert"], ALL_YEAR),
@@ -100,7 +110,17 @@ pub const SOURCES: [Source; 67] = [
         "base:tall_grass",
         Category::Seeds,
         3,
-        &["base:plains", "base:forest", "base:birch_forest", "base:taiga", "base:savanna", "base:swamp", "base:mountains", "base:beach"],
+        &[
+            "base:plains",
+            "base:forest",
+            "base:birch_forest",
+            "base:taiga",
+            "base:savanna",
+            "base:swamp",
+            "base:mountains",
+            "base:sequoia_grove",
+            "base:beach",
+        ],
         SUMMER_AUTUMN,
     ),
     browse("base:dead_bush", Category::Seeds, 2, &["base:desert"], ALL_YEAR),
@@ -193,9 +213,24 @@ pub const SOURCES: [Source; 67] = [
     browse("animals:flowering_shrub", Category::Leaves, 4, wild::FLOWERING, GREEN),
     browse("animals:water_lily", Category::WaterPlants, 5, wild::PONDS, ALL_YEAR),
     // Kelp washed up on the beach, all year.
-    browse("base:kelp", Category::WaterPlants, 4, &["base:beach"], ALL_YEAR),
+    browse("base:kelp_wrack", Category::WaterPlants, 4, &["base:beach"], ALL_YEAR),
+    // Turtle grass on the lagoons' floor, all year (green turtles and manatees graze it).
+    browse("base:turtle_grass", Category::WaterPlants, 5, wild::LAGOONS, ALL_YEAR),
     // Grubs and beetles in the rotten logs, all year.
     browse("animals:rotten_log", Category::Insects, 3, wild::DEADWOOD, ALL_YEAR),
+    // The next batch (`wild::WILD`): beachgrass grazed and growing back, beach plums and
+    // huckleberries ripe on their bushes, chia's seed heads in spring; dwarf birch's leaves in
+    // summer and its buds and catkins in winter (the ptarmigan's winter food).
+    wild("base:dune_grass", 1, Category::Grass, 4, Eaten::Age(0), &["base:beach"]),
+    wild("base:beach_plum_bush", 3, Category::Fruit, 6, Eaten::Age(1), &["base:beach"]),
+    wild("base:huckleberry_bush", 3, Category::Fruit, 8, Eaten::Age(1), &["base:mountains"]),
+    wild("base:chia", 1, Category::Seeds, 6, Eaten::Age(0), wild::DESERT),
+    browse("base:dwarf_birch", Category::Leaves, 4, &["base:snowy_plains"], GREEN),
+    browse("base:dwarf_birch", Category::Leaves, 2, &["base:snowy_plains"], WINTER),
+    // Termites in their mounds on the dry lands, all year (the lizards', the small mammals', the
+    // birds'), the crown as the mound.
+    browse("animals:termite_mound", Category::Insects, 3, wild::TERMITE_LANDS, ALL_YEAR),
+    browse("animals:termite_mound_upper", Category::Insects, 3, wild::TERMITE_LANDS, ALL_YEAR),
     // Our trees (`worldgen.rs`, `cretaceous.rs`), as browse where they grow: mesquite's leaves
     // and, June to October, its pods (the desert's biggest single food); the acuri palm's nuts
     // in the Pantanal's dry season and the moriche's fruit from the llanos' late dry season
@@ -219,7 +254,7 @@ pub const SOURCES: [Source; 67] = [
 /// Food on the ground (`notes/ECOLOGY.md`, parts 5 and 8): items animals eat that aren't a
 /// player's food (`food::FOODS` has those, each with its kind and weight): grain and seeds, as
 /// they fall from a field or a hand. By name, kind and grams.
-pub const DROPPED: [(&str, Category, f32); 10] = [
+pub const DROPPED: [(&str, Category, f32); 15] = [
     // A handful of seed, and an ear's grain.
     ("base:wheat_seeds", Category::Seeds, 10.0),
     ("base:wheat", Category::Seeds, 50.0),
@@ -233,8 +268,19 @@ pub const DROPPED: [(&str, Category, f32); 10] = [
     ("base:mesquite_pod", Category::Seeds, 30.0),
     ("base:acuri_nut", Category::Seeds, 30.0),
     ("base:moriche_fruit", Category::Fruit, 50.0),
+    // The tropical forest's: a handful of Brazil nuts (agoutis open the pods and bury the nuts),
+    // a cacao pod's sweet pulp (monkeys and birds).
+    ("base:brazil_nut", Category::Seeds, 30.0),
+    ("base:cacao_pod", Category::Fruit, 40.0),
+    // Andiroba's oily seeds (pacas and agoutis), matamatá's seeds from their woody capsules
+    // (monkeys and parrots).
+    ("base:andiroba_seed", Category::Seeds, 20.0),
+    ("base:matamata_fruit", Category::Seeds, 20.0),
     ("animals:araucaria_cone", Category::Seeds, 50.0),
     ("animals:ginkgo_seed", Category::Fruit, 10.0),
+    // What's left of a dead animal that gives no meat of its own (`animals_core::meat::CARCASS`):
+    // a scavenger's, half a kilogram a piece.
+    ("animals:carcass", Category::Carrion, 500.0),
 ];
 
 /// What a dropped item `name` is to animals: its kind of food and grams (a food's portion,
@@ -270,7 +316,7 @@ pub fn of(block: &str, age: Option<u8>, eats: impl Fn(Category) -> bool, season:
 /// `cretaceous.rs` read it): the grass that grazers eat and that grows back. A biome not listed
 /// gets the world's default (`GRASS_COVER_ELSE`) wherever its ground takes plants; frozen ground
 /// and sand take none (`grass_grows`).
-pub const GRASS_COVER: [(&str, f32); 11] = [
+pub const GRASS_COVER: [(&str, f32); 13] = [
     ("base:plains", 0.25),
     ("base:forest", 0.12),
     ("base:birch_forest", 0.12),
@@ -278,12 +324,21 @@ pub const GRASS_COVER: [(&str, f32); 11] = [
     ("base:savanna", 0.35),
     ("base:swamp", 0.2),
     ("base:mountains", 0.05),
+    // The groves' floor is duff and ferns; the grass is in the clearings and the meadows.
+    ("base:sequoia_grove", 0.06),
+    // The rainforest's canopy shades out grass: a little in its gaps.
+    ("base:tropical_forest", 0.03),
     ("animals:red_dunes", 0.0),
     ("animals:scrubland", 0.1),
     ("animals:floodplain", 0.05),
     ("animals:fern_forest", 0.03),
 ];
 pub const GRASS_COVER_ELSE: f32 = 0.05;
+
+/// The share of its grass's regrowth a biome's grazers eat in its best season, at least and at
+/// most (`animals_core::web` checks it): real grazing takes a quarter to a half (Ronald 11-05,
+/// "Real levels, 25-50%"). The dry season may go over, and that is the grass cropped down.
+pub const GRAZED: (f32, f32) = (0.25, 0.5);
 /// Where no tall grass grows at all: frozen ground, and sand (no plant soil).
 const NO_GRASS: [&str; 4] = ["base:snowy_plains", "base:desert", "base:beach", "base:ocean"];
 

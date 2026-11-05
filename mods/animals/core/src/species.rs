@@ -42,6 +42,28 @@ pub enum Size {
     Large,
 }
 
+/// When in the day an animal is about.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum Active {
+    Day,
+    Night,
+    /// Dawn and dusk (crepuscular).
+    Twilight,
+    /// Any hour (cathemeral).
+    AnyTime,
+}
+
+impl Active {
+    pub fn name(self) -> &'static str {
+        match self {
+            Active::Day => "day",
+            Active::Night => "night",
+            Active::Twilight => "twilight",
+            Active::AnyTime => "any_time",
+        }
+    }
+}
+
 /// What kind of eater it is, from its diet's plant share (`Species::diet`).
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Diet {
@@ -182,6 +204,9 @@ pub struct Species {
     pub name: &'static str,
     /// Its scientific name: genus and species ("Canis familiaris").
     pub binomial: &'static str,
+    /// When in the day it is about (the field journal's active hours; from research, `Est.` where
+    /// only its relatives' are known). Day unless its row says.
+    pub active: Active,
     pub family: &'static Family,
     pub subfamily: &'static str,
     /// The breed, for domestic species that have them (the gene file's breed).
@@ -195,7 +220,8 @@ pub struct Species {
     /// Velociraptor up to six times its own (the Fighting Dinosaurs).
     pub prey: (f32, f32),
     pub taming: Taming,
-    /// Each stat's value at level 1 (damage and speed as the kind's own: 100%).
+    /// Each stat's value at level 0 (speed as the kind's own: 100%). Health and damage are 0 here:
+    /// they come from the species' size, role and tweaks (`danger`); read them with `base_stat`.
     pub base: [f32; STATS],
     /// What a point adds, as a share of the base: a wild point, a tamed point.
     pub wild_step: [f32; STATS],
@@ -252,6 +278,16 @@ pub struct Species {
 }
 
 impl Species {
+    /// Stat `i` at level 0: health and damage (a hit, engine points) from its danger (size class,
+    /// role, mass and tweaks, `danger::body`), the rest from its row.
+    pub fn base_stat(&self, i: usize) -> f32 {
+        match i {
+            HEALTH => crate::danger::body(self).health,
+            DAMAGE => crate::danger::body(self).hit,
+            _ => self.base[i],
+        }
+    }
+
     /// The share of its food that is plants.
     pub fn plant_share(&self) -> f32 {
         self.eats
@@ -281,6 +317,41 @@ impl Species {
     /// eater, whose food the world grows.
     pub fn forages_wild(&self) -> bool {
         self.plant_share() >= 0.5
+    }
+    /// Whether it lives in the Cretaceous rather than the overworld: its habitats are that
+    /// dimension's biomes (`animals:`; the overworld's are `base:`). Each species lives in one, and
+    /// spawns only there (`habitats.rs`), even where the two share a biome (the Cretaceous's
+    /// beaches and seas are `base:beach` and `base:ocean`: hares, mice, foxes, sparrows, gulls and
+    /// ravens came to its shores).
+    pub fn cretaceous(&self) -> bool {
+        self.habitats.iter().any(|(b, _)| b.starts_with("animals:"))
+    }
+    /// The chance a natural spawn that picks it in `biome` brings a group (0 where it doesn't
+    /// live): its rarity's, by how common it is there (`Rarity::spawn_chance`, its habitat's
+    /// share). In the Cretaceous, each biome's rules are raised together until they average
+    /// `CRETACEOUS_FLOW`, each keeping its share by rarity: the engine picks a rule at random and
+    /// then rolls its chance, and the overworld's biomes also hold base's farm animals at 5%,
+    /// so the Cretaceous, with only its own and rarer ones, brought a half to a fifth as many
+    /// (the creatures playtest: no utahraptor, wyvern, crocodyliform or fish in 7 minutes).
+    /// Fish count among fish (their own spawner, `fish.rs`), the rest among the rest.
+    pub fn spawn_chance(&self, biome: &str) -> f32 {
+        let at = |t: &Species| {
+            t.habitats
+                .iter()
+                .find(|(b, _)| *b == biome)
+                .map(|&(_, share)| t.bio.rarity.spawn_chance() * share)
+        };
+        let Some(mine) = at(self) else { return 0.0 };
+        if !self.cretaceous() {
+            return mine;
+        }
+        let peers: Vec<f32> = SPECIES
+            .iter()
+            .filter(|t| t.cretaceous() && t.in_water() == self.in_water())
+            .filter_map(at)
+            .collect();
+        let mean = peers.iter().sum::<f32>() / peers.len().max(1) as f32;
+        (mine * (CRETACEOUS_FLOW / mean).max(1.0)).min(1.0)
     }
     /// Whether it hunts at all.
     pub fn hunts(&self) -> bool {
@@ -329,7 +400,18 @@ impl Species {
     /// Whether a wild one gets hungry: a plant eater, or a hunter with prey where it lives (a
     /// hunter with none waits for its prey to come to the world).
     pub fn hungry_in_the_wild(&self) -> bool {
-        self.forages_wild() || self.prey_at_home().next().is_some()
+        self.forages_wild() || self.prey_at_home().next().is_some() || self.scavenges()
+    }
+    /// Whether it lives on the dead: half its diet or more carrion (the vulture). It gets hungry in
+    /// the wild, smells carrion from afar (`needs::SCENT`), takes a carcass's meat as carrion and
+    /// rotten flesh without harm, and never starves in the wild (`needs::STARVES_SECS`).
+    pub fn scavenges(&self) -> bool {
+        self.eats
+            .iter()
+            .filter(|(c, _)| *c == Carrion)
+            .map(|(_, s)| s)
+            .sum::<f32>()
+            >= 0.5
     }
     /// Ticks a mother carries her young (an in-game day is 24 000); 0: it lays eggs.
     pub fn gestation(&self) -> u32 {
@@ -358,14 +440,71 @@ impl Species {
     pub fn crowd(&self) -> u32 {
         self.tune.crowd.unwrap_or_else(|| self.bio.crowd())
     }
+    /// Its crowd in `biome`: a plant eater's (`forages_wild`) as heavily as the biome is stocked
+    /// (`STOCKING`), others' as they are; never under two, a pair. What natural spawning, wild
+    /// breeding, dying of want and the food webs' grazing all weigh (`life::room_for`,
+    /// `love_chance`, `want_chance`, `web::grazing`), so a stocked place holds its grazers and
+    /// doesn't starve them back down.
+    ///
+    /// A hunter's is as many as its prey there can feed (`needs::hunter_room`: a share of their
+    /// young a year), never over its own crowd nor under one: where its prey feed less than a
+    /// pair, one may come (a group still comes to an empty place, `life::room_for`) but its kind
+    /// doesn't breed up there. Its capacity comes with its prey
+    /// (`notes/ECOLOGY.md`, part 7), so wolves don't eat a lightly stocked taiga's reindeer out.
+    pub fn crowd_in(&self, biome: &str) -> u32 {
+        let stocked = self.stocked_in(biome);
+        if !self.hunts() {
+            return stocked;
+        }
+        hunter_room_cached(self.name, biome).map_or(stocked, |room| room.clamp(1, stocked))
+    }
+    /// Its crowd in `biome` by the biome's stocking alone (a plant eater's; others' as they are).
+    pub fn stocked_in(&self, biome: &str) -> u32 {
+        if !self.forages_wild() {
+            return self.crowd();
+        }
+        ((self.crowd() as f32 * stocking(biome)).round() as u32).max(2)
+    }
     /// Young born or hatched at once (`breeding.rs`), fewest and most.
     pub fn litter(&self) -> (u32, u32) {
         self.tune.litter.unwrap_or_else(|| self.bio.litter())
     }
 }
 
+/// What a Cretaceous biome's spawn rules average (`Species::spawn_chance`): about the
+/// overworld's plains, whose own animals and base's farm animals (5%) come to this.
+pub const CRETACEOUS_FLOW: f32 = 0.025;
+
+/// How heavily each biome is stocked with plant eaters, against their crowd (`Species::crowd_in`;
+/// 1 where unlisted, the Cretaceous's too): open grassland heavily, deep forest and the giant
+/// groves lightly, as real grazer densities go. With grass feeding as real grass does (Plants'
+/// tufts, `vitals::forage`), every grazed biome's herds eat about a third of what its grass
+/// grows back, as real herds take 25-50% (`notes/ECOLOGY.md`; Plants' and Animals' grazing plan,
+/// 2026-11-05). The savanna is held at 2.5 (3.5 would land it with the rest) until it has a heavy
+/// grazer, which eats as much with fewer animals.
+pub const STOCKING: &[(&str, f32)] = &[
+    ("base:savanna", 2.5),
+    ("base:plains", 1.4),
+    ("base:forest", 1.0),
+    ("base:swamp", 0.9),
+    ("base:birch_forest", 0.55),
+    ("base:taiga", 0.35),
+    ("base:mountains", 0.26),
+    ("base:sequoia_grove", 0.09),
+];
+
+/// How heavily `biome` is stocked with plant eaters (`STOCKING`, 1 unlisted).
+pub fn stocking(biome: &str) -> f32 {
+    STOCKING
+        .iter()
+        .find(|(b, _)| *b == biome)
+        .map_or(1.0, |&(_, s)| s)
+}
+
 /// ARK's shape: health grows fastest, speed slowest, torpor only from wild points.
-pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
+/// Health and damage step by `danger::LEVEL_STEP`, so a level-200 one is five times a level-0 one
+/// (Ronald, 11-06).
+pub const WILD_STEP: [f32; STATS] = [crate::danger::LEVEL_STEP, 0.1, 0.1, crate::danger::LEVEL_STEP, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
 /// What most rows share, written once (`..BASE` ends every row; Research round 5, item 4): a wild
@@ -376,6 +515,7 @@ const BASE: Species = Species {
     model: "",
     name: "",
     binomial: "",
+    active: Active::Day,
     family: &NO_FAMILY,
     subfamily: "",
     breed: None,
@@ -436,7 +576,7 @@ pub static SPECIES: [Species; 46] = [
         prey: (0.008, 0.8),
         taming: Taming::Passive,
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [8.0, 100.0, 80.0, 2.0, 1.0, 40.0, 100.0, 60.0, 10.0],
+        base: [0.0, 100.0, 80.0, 0.0, 1.0, 40.0, 100.0, 60.0, 10.0],
         hunger: 30.0,
         foods: &[
             eats("base:beef", 10),
@@ -486,6 +626,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "cat",
         name: "cat",
+        // Active: crepuscular, as its wildcat ancestor.
+        active: Active::Twilight,
         binomial: "Felis catus",
         family: &FELIDAE,
         subfamily: "Felinae",
@@ -493,7 +635,7 @@ pub static SPECIES: [Species; 46] = [
         eats: &[(Meat, 0.8), (Insects, 0.1), (Carrion, 0.05), (Fish, 0.05)],
         prey: (0.005, 0.4),
         taming: Taming::Passive,
-        base: [6.0, 80.0, 60.0, 1.0, 1.0, 30.0, 80.0, 40.0, 10.0],
+        base: [0.0, 80.0, 60.0, 0.0, 1.0, 30.0, 80.0, 40.0, 10.0],
         hunger: 40.0,
         // No fish in the game yet: birds and eggs are what it likes best.
         foods: &[
@@ -552,6 +694,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "capybara",
         name: "capybara",
+        // Active: grazes at dawn and dusk, rests in the day's heat.
+        active: Active::Twilight,
         binomial: "Hydrochoerus hydrochaeris",
         family: &CAVIIDAE,
         subfamily: "Hydrochoerinae",
@@ -559,7 +703,7 @@ pub static SPECIES: [Species; 46] = [
         eats: &[(Grass, 0.7), (WaterPlants, 0.2), (Seeds, 0.05), (Fruit, 0.05)],
         taming: Taming::Passive,
         // It holds its breath for five minutes.
-        base: [12.0, 150.0, 200.0, 1.0, 1.0, 150.0, 400.0, 150.0, 20.0],
+        base: [0.0, 150.0, 200.0, 0.0, 1.0, 150.0, 400.0, 150.0, 20.0],
         hunger: 25.0,
         foods: &[
             eats("base:wheat", 10),
@@ -609,6 +753,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "raptor",
         name: "raptor",
+        // Active: Velociraptor: nocturnal by its scleral ring (Schmitz & Motani 2011, Science).
+        active: Active::Night,
         binomial: "Velociraptor mongoliensis",
         family: &DROMAEOSAURIDAE,
         subfamily: "Velociraptorinae",
@@ -616,7 +762,7 @@ pub static SPECIES: [Species; 46] = [
         eats: &[(Meat, 0.7), (Carrion, 0.25), (Insects, 0.05)],
         prey: (0.002, 6.0),
         taming: Taming::Knockout,
-        base: [14.0, 150.0, 150.0, 4.0, 1.0, 140.0, 150.0, 200.0, 15.0],
+        base: [0.0, 150.0, 150.0, 0.0, 1.0, 140.0, 150.0, 200.0, 15.0],
         hunger: 20.0,
         foods: &[eats("base:chicken", 10), eats("base:mutton", 10), eats("base:porkchop", 12), favorite("base:beef", 15), KIBBLE],
         feedings: 10.0,
@@ -656,6 +802,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "utahraptor",
         name: "utahraptor",
+        // Active: Est.: a dromaeosaurid, as Velociraptor (Schmitz & Motani 2011).
+        active: Active::Night,
         binomial: "Utahraptor ostrommaysi",
         family: &DROMAEOSAURIDAE,
         subfamily: "Dromaeosaurinae",
@@ -663,7 +811,7 @@ pub static SPECIES: [Species; 46] = [
         eats: &[(Meat, 0.8), (Carrion, 0.15), (Fish, 0.05)],
         prey: (0.01, 3.0),
         taming: Taming::Knockout,
-        base: [60.0, 300.0, 400.0, 10.0, 1.0, 400.0, 200.0, 700.0, 30.0],
+        base: [0.0, 300.0, 400.0, 0.0, 1.0, 400.0, 200.0, 700.0, 30.0],
         hunger: 12.0,
         foods: &[eats("base:chicken", 10), eats("base:porkchop", 15), favorite("base:beef", 20), favorite("base:mutton", 15), KIBBLE],
         feedings: 18.0,
@@ -706,6 +854,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "raptor",
         name: "osmolskae",
+        // Active: Est.: Velociraptor, as V. mongoliensis (Schmitz & Motani 2011).
+        active: Active::Night,
         binomial: "Velociraptor osmolskae",
         family: &DROMAEOSAURIDAE,
         subfamily: "Velociraptorinae",
@@ -713,7 +863,7 @@ pub static SPECIES: [Species; 46] = [
         eats: &[(Meat, 0.7), (Carrion, 0.25), (Insects, 0.05)],
         prey: (0.002, 6.0),
         taming: Taming::Knockout,
-        base: [14.0, 150.0, 150.0, 4.0, 1.0, 140.0, 150.0, 200.0, 15.0],
+        base: [0.0, 150.0, 150.0, 0.0, 1.0, 140.0, 150.0, 200.0, 15.0],
         hunger: 20.0,
         foods: &[eats("base:chicken", 10), eats("base:mutton", 10), eats("base:porkchop", 12), favorite("base:beef", 15), KIBBLE],
         feedings: 10.0,
@@ -752,6 +902,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "wyvern",
         name: "wyvern",
+        // Active: a fantasy one: hunts at dusk.
+        active: Active::Twilight,
         binomial: "Wyverna montana",
         family: &WYVERNIDAE,
         subfamily: "Wyverninae",
@@ -760,7 +912,7 @@ pub static SPECIES: [Species; 46] = [
         prey: (0.001, 0.6),
         taming: Taming::Knockout,
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [400.0, 800.0, 2000.0, 30.0, 1.0, 1200.0, 400.0, 3000.0, 80.0],
+        base: [0.0, 800.0, 2000.0, 0.0, 1.0, 1200.0, 400.0, 3000.0, 80.0],
         hunger: 5.0,
         foods: &[
             eats("base:chicken", 10),
@@ -820,6 +972,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "hare",
         name: "hare",
+        // Active: crepuscular and nocturnal.
+        active: Active::Twilight,
         binomial: "Lepus europaeus",
         family: &LEPORIDAE,
         subfamily: "Leporinae",
@@ -827,7 +981,7 @@ pub static SPECIES: [Species; 46] = [
         // Grasses most of the year, herbs and crops, twigs and bark in winter.
         eats: &[(Grass, 0.55), (Leaves, 0.25), (Roots, 0.1), (Seeds, 0.05), (Fruit, 0.05)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [5.0, 120.0, 40.0, 0.5, 1.0, 15.0, 60.0, 20.0, 5.0],
+        base: [0.0, 120.0, 40.0, 0.0, 1.0, 15.0, 60.0, 20.0, 5.0],
         hunger: 30.0,
         foods: &[eats("base:wheat", 8), eats("base:wheat_seeds", 2), favorite("base:apple", 10), favorite("base:berries", 6)],
         // It sits tight in its form, then bolts when a walker comes within about 12 m.
@@ -871,13 +1025,15 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "hare",
         name: "mountain_hare",
+        // Active: crepuscular and nocturnal.
+        active: Active::Twilight,
         binomial: "Lepus timidus",
         family: &LEPORIDAE,
         subfamily: "Leporinae",
         size: Size::Small,
         // Grasses and herbs in summer; in winter birch, willow and heather twigs and bark.
         eats: &[(Grass, 0.4), (Leaves, 0.5), (Fruit, 0.05), (Lichen, 0.05)],
-        base: [5.0, 120.0, 40.0, 0.5, 1.0, 13.0, 60.0, 20.0, 5.0],
+        base: [0.0, 120.0, 40.0, 0.0, 1.0, 13.0, 60.0, 20.0, 5.0],
         hunger: 30.0,
         foods: &[eats("base:crowberries", 4), favorite("base:lingonberries", 6)],
         shy: 12.0,
@@ -889,7 +1045,13 @@ pub static SPECIES: [Species; 46] = [
         size_spread: 0.1,
         height: (0.30, "shoulder"),
         // The boreal forest, birch woods, the tundra and the Alps (700-3,800 m).
-        habitats: &[("base:taiga", 1.0), ("base:birch_forest", 1.0), ("base:snowy_plains", 0.75), ("base:mountains", 0.75)],
+        habitats: &[
+            ("base:taiga", 1.0),
+            ("base:birch_forest", 1.0),
+            ("base:snowy_plains", 0.75),
+            ("base:mountains", 0.75),
+            ("base:sequoia_grove", 0.3),
+        ],
         bio: Biology {
             mass: 3.0,
             gestation: 50.0,
@@ -922,6 +1084,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "mouse",
         name: "wood_mouse",
+        // Active: nocturnal (Apodemus sylvaticus).
+        active: Active::Night,
         binomial: "Apodemus sylvaticus",
         family: &MURIDAE,
         subfamily: "Murinae",
@@ -930,7 +1094,7 @@ pub static SPECIES: [Species; 46] = [
         // roots later.
         eats: &[(Seeds, 0.45), (Insects, 0.2), (Fruit, 0.15), (Grass, 0.1), (Fungi, 0.05), (Roots, 0.05)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [2.0, 60.0, 15.0, 0.2, 1.0, 2.0, 30.0, 5.0, 2.0],
+        base: [0.0, 60.0, 15.0, 0.0, 1.0, 2.0, 30.0, 5.0, 2.0],
         hunger: 30.0,
         foods: &[eats("base:wheat_seeds", 4), eats("base:wheat", 6), favorite("base:berries", 4)],
         shy: 6.0,
@@ -978,6 +1142,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "vole",
         name: "field_vole",
+        // Active: active round the clock in short bouts.
+        active: Active::AnyTime,
         binomial: "Microtus agrestis",
         family: &CRICETIDAE,
         subfamily: "Arvicolinae",
@@ -985,7 +1151,7 @@ pub static SPECIES: [Species; 46] = [
         // Grasses and herbs, root tubers and moss; bark in winter; a few insect larvae.
         eats: &[(Grass, 0.6), (Leaves, 0.15), (Roots, 0.15), (Seeds, 0.05), (Insects, 0.05)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [2.0, 60.0, 15.0, 0.2, 1.0, 3.0, 30.0, 5.0, 2.0],
+        base: [0.0, 60.0, 15.0, 0.0, 1.0, 3.0, 30.0, 5.0, 2.0],
         hunger: 30.0,
         foods: &[eats("base:wheat", 6), eats("base:wheat_seeds", 3), favorite("base:sunflower_seeds", 6)],
         shy: 5.0,
@@ -1004,6 +1170,7 @@ pub static SPECIES: [Species; 46] = [
             ("base:snowy_plains", 0.8),
             ("base:mountains", 0.8),
             ("base:swamp", 0.6),
+            ("base:sequoia_grove", 1.0),
         ],
         bio: Biology {
             mass: 0.035,
@@ -1041,6 +1208,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "deer",
         name: "white_tailed_deer",
+        // Active: crepuscular.
+        active: Active::Twilight,
         binomial: "Odocoileus virginianus",
         family: &CERVIDAE,
         subfamily: "Capreolinae",
@@ -1048,7 +1217,7 @@ pub static SPECIES: [Species; 46] = [
         // A browser: leaves, twigs and buds first, grass and herbs, acorns and other mast, fruit, fungi.
         eats: &[(Leaves, 0.5), (Grass, 0.2), (Fruit, 0.15), (Seeds, 0.1), (Fungi, 0.05)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [30.0, 200.0, 120.0, 2.0, 1.0, 70.0, 80.0, 60.0, 15.0],
+        base: [0.0, 200.0, 120.0, 0.0, 1.0, 70.0, 80.0, 60.0, 15.0],
         hunger: 15.0,
         foods: &[eats("base:wheat", 8), favorite("base:apple", 12), favorite("base:berries", 6)],
         shy: 16.0,
@@ -1087,13 +1256,15 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "deer",
         name: "red_deer",
+        // Active: crepuscular.
+        active: Active::Twilight,
         binomial: "Cervus elaphus",
         family: &CERVIDAE,
         subfamily: "Cervinae",
         size: Size::Large,
         // A mixed feeder: grasses and sedges, browse of trees and shrubs, heather, mast and fruit.
         eats: &[(Grass, 0.5), (Leaves, 0.4), (Fruit, 0.05), (Seeds, 0.05)],
-        base: [45.0, 250.0, 180.0, 3.0, 1.0, 120.0, 80.0, 90.0, 20.0],
+        base: [0.0, 250.0, 180.0, 0.0, 1.0, 120.0, 80.0, 90.0, 20.0],
         hunger: 15.0,
         foods: &[eats("base:wheat", 10), favorite("base:apple", 12)],
         shy: 20.0,
@@ -1106,7 +1277,7 @@ pub static SPECIES: [Species; 46] = [
         height: (0.95, "shoulder"),
         // Europe's deer of the forests (Białowieża), birch woods and the Alps, wintering lower in the
         // woods, summering high.
-        habitats: &[("base:forest", 1.0), ("base:birch_forest", 0.8), ("base:mountains", 0.8)],
+        habitats: &[("base:forest", 1.0), ("base:birch_forest", 0.8), ("base:mountains", 0.8), ("base:sequoia_grove", 0.8)],
         bio: Biology {
             mass: 160.0,
             gestation: 250.0,
@@ -1143,6 +1314,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "fish",
         name: "brown_trout",
+        // Active: feeds most at dusk and dawn.
+        active: Active::Twilight,
         binomial: "Salmo trutta",
         family: &SALMONIDAE,
         subfamily: "Salmoninae",
@@ -1150,7 +1323,7 @@ pub static SPECIES: [Species; 46] = [
         // Insects (larvae and those fallen on the water), crustaceans and snails, small fish.
         eats: &[(Insects, 0.65), (Fish, 0.3), (Carrion, 0.05)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [3.0, 60.0, 20.0, 0.3, 1.0, 5.0, 400.0, 10.0, 3.0],
+        base: [0.0, 60.0, 20.0, 0.0, 1.0, 5.0, 400.0, 10.0, 3.0],
         hunger: 30.0,
         foods: &[],
         shy: 6.0,
@@ -1175,8 +1348,9 @@ pub static SPECIES: [Species; 46] = [
             litter: 8.0,
             social: Social::Solitary,
             rarity: Rarity::Uncommon,
-            breeds: 0,
-            peak: 0,
+            // Spawns in autumn and early winter on gravel in cold running water, its eggs lying through the winter.
+            breeds: seasons::AUTUMN | seasons::WINTER,
+            peak: seasons::AUTUMN,
             // The water it does best in: 4-19 degrees; it suffers over 20.
             comfort: (4.0, 20.0),
             cold_blooded: true,
@@ -1200,7 +1374,7 @@ pub static SPECIES: [Species; 46] = [
         // and small fish the rest of the year.
         // (Under half plants: it doesn't forage on land, `Species::forages_wild`.)
         eats: &[(Fruit, 0.3), (Seeds, 0.15), (Insects, 0.35), (Fish, 0.2)],
-        base: [6.0, 80.0, 40.0, 0.5, 1.0, 20.0, 400.0, 15.0, 4.0],
+        base: [0.0, 80.0, 40.0, 0.0, 1.0, 20.0, 400.0, 15.0, 4.0],
         hunger: 25.0,
         foods: &[],
         shy: 5.0,
@@ -1224,8 +1398,9 @@ pub static SPECIES: [Species; 46] = [
             litter: 6.0,
             social: Social::Herd,
             rarity: Rarity::Uncommon,
-            breeds: 0,
-            peak: 0,
+            // Spawns as the rains begin, running upriver to the flooded forest (the wet season: spring and summer).
+            breeds: seasons::WET,
+            peak: seasons::SPRING,
             // Warm water: 20-32 degrees.
             comfort: (20.0, 32.0),
             cold_blooded: true,
@@ -1239,6 +1414,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "fox",
         name: "red_fox",
+        // Active: crepuscular and nocturnal.
+        active: Active::Twilight,
         binomial: "Vulpes vulpes",
         family: &CANIDAE,
         subfamily: "Caninae",
@@ -1249,7 +1426,7 @@ pub static SPECIES: [Species; 46] = [
         // Voles and mice from about 20 g to hares near its own size (most under a fifth of it).
         prey: (0.004, 0.8),
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [10.0, 120.0, 60.0, 2.0, 1.0, 30.0, 80.0, 40.0, 10.0],
+        base: [0.0, 120.0, 60.0, 0.0, 1.0, 30.0, 80.0, 40.0, 10.0],
         hunger: 30.0,
         foods: &[eats("base:chicken", 10), eats("base:beef", 10), favorite("base:berries", 6)],
         shy: 10.0,
@@ -1272,6 +1449,7 @@ pub static SPECIES: [Species; 46] = [
             ("base:plains", 0.6),
             ("base:desert", 0.4),
             ("base:beach", 0.4),
+            ("base:sequoia_grove", 0.6),
         ],
         bio: Biology {
             mass: 5.5,
@@ -1303,6 +1481,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "fox",
         name: "arctic_fox",
+        // Active: active at any hour, by the season's light.
+        active: Active::AnyTime,
         binomial: "Vulpes lagopus",
         family: &CANIDAE,
         subfamily: "Caninae",
@@ -1312,7 +1492,7 @@ pub static SPECIES: [Species; 46] = [
         eats: &[(Meat, 0.55), (Carrion, 0.25), (Fruit, 0.1), (Insects, 0.05), (Fish, 0.05)],
         // Lemmings to an Arctic hare about its own size.
         prey: (0.004, 1.0),
-        base: [8.0, 120.0, 60.0, 1.6, 1.0, 22.0, 80.0, 35.0, 12.0],
+        base: [0.0, 120.0, 60.0, 0.0, 1.0, 22.0, 80.0, 35.0, 12.0],
         hunger: 30.0,
         foods: &[eats("base:chicken", 10), eats("base:beef", 10), favorite("base:berries", 6)],
         shy: 10.0,
@@ -1368,7 +1548,7 @@ pub static SPECIES: [Species; 46] = [
         // Mice and voles to a nestling or a young hare, a tenth of its own mass.
         prey: (0.01, 0.1),
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [6.0, 120.0, 40.0, 1.0, 1.0, 10.0, 60.0, 20.0, 5.0],
+        base: [0.0, 120.0, 40.0, 0.0, 1.0, 10.0, 60.0, 20.0, 5.0],
         hunger: 30.0,
         foods: &[eats("base:beef", 10), eats("base:wheat_seeds", 2), favorite("base:rotten_flesh", 8)],
         shy: 14.0,
@@ -1391,6 +1571,7 @@ pub static SPECIES: [Species; 46] = [
             ("base:desert", 0.4),
             ("base:plains", 0.3),
             ("base:beach", 0.3),
+            ("base:sequoia_grove", 0.8),
         ],
         bio: Biology {
             mass: 1.2,
@@ -1413,9 +1594,7 @@ pub static SPECIES: [Species; 46] = [
             comfort: (-30.0, 32.0),
             cold_blooded: false,
         },
-        // No nests yet (Ronald, 2026-11-03): eggs laid on the ground would never hatch in the
-        // north's cold (`eggs.rs`), so its young come out as fledglings after the eggs' time.
-        tune: Tune { gestation: Some(12_700), ..Tune::NONE },
+        // It lays in a nest it builds (`nests::SITES`), its eggs brooded whatever the cold.
         birth_size: 0.3,
         ..BASE
     },
@@ -1425,6 +1604,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "protoceratops",
         name: "protoceratops",
+        // Active: cathemeral by its scleral ring (Schmitz & Motani 2011).
+        active: Active::AnyTime,
         binomial: "Protoceratops andrewsi",
         family: &PROTOCERATOPSIDAE,
         subfamily: "Protoceratopsinae",
@@ -1433,7 +1614,7 @@ pub static SPECIES: [Species; 46] = [
         // 2009): ferns, cycads and shrubs, their roots and seeds.
         eats: &[(Leaves, 0.75), (Roots, 0.15), (Seeds, 0.1)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [35.0, 200.0, 120.0, 2.0, 1.0, 90.0, 80.0, 70.0, 18.0],
+        base: [0.0, 200.0, 120.0, 0.0, 1.0, 90.0, 80.0, 70.0, 18.0],
         hunger: 15.0,
         foods: &[eats("animals:fern", 8), eats("base:wheat", 8), favorite("animals:cycad_seed", 10)],
         shy: 12.0,
@@ -1483,6 +1664,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "kryptobaatar",
         name: "kryptobaatar",
+        // Active: Est.: small multituberculates, as most small Mesozoic mammals, nocturnal.
+        active: Active::Night,
         binomial: "Kryptobaatar dashzevegi",
         family: &DJADOCHTATHERIIDAE,
         subfamily: "Djadochtatheriinae",
@@ -1491,7 +1674,7 @@ pub static SPECIES: [Species; 46] = [
         // fruit and roots.
         eats: &[(Insects, 0.6), (Seeds, 0.25), (Fruit, 0.1), (Roots, 0.05)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [2.0, 60.0, 15.0, 0.2, 1.0, 2.0, 30.0, 5.0, 2.0],
+        base: [0.0, 60.0, 15.0, 0.0, 1.0, 2.0, 30.0, 5.0, 2.0],
         hunger: 30.0,
         foods: &[eats("base:wheat_seeds", 4), eats("base:wheat", 6), favorite("base:berries", 4)],
         shy: 6.0,
@@ -1545,7 +1728,7 @@ pub static SPECIES: [Species; 46] = [
         // Insects first (as agamas), a few leaves and flowers.
         eats: &[(Insects, 0.9), (Leaves, 0.1)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [2.0, 60.0, 12.0, 0.2, 1.0, 2.0, 40.0, 5.0, 2.0],
+        base: [0.0, 60.0, 12.0, 0.0, 1.0, 2.0, 40.0, 5.0, 2.0],
         hunger: 40.0,
         foods: &[favorite("base:spider_eye", 4)],
         shy: 5.0,
@@ -1587,6 +1770,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "reindeer",
         name: "reindeer",
+        // Active: no daily rhythm in the polar summer and winter (van Oort et al. 2005, Nature).
+        active: Active::AnyTime,
         binomial: "Rangifer tarandus",
         family: &CERVIDAE,
         subfamily: "Capreolinae",
@@ -1595,7 +1780,7 @@ pub static SPECIES: [Species; 46] = [
         // leaves in summer, mushrooms in autumn.
         eats: &[(Lichen, 0.4), (Grass, 0.35), (Leaves, 0.2), (Fungi, 0.05)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [40.0, 260.0, 160.0, 3.0, 1.0, 110.0, 80.0, 80.0, 25.0],
+        base: [0.0, 260.0, 160.0, 0.0, 1.0, 110.0, 80.0, 80.0, 25.0],
         hunger: 15.0,
         foods: &[eats("base:mushroom_brown", 8)],
         shy: 18.0,
@@ -1652,6 +1837,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "coyote",
         name: "coyote",
+        // Active: crepuscular.
+        active: Active::Twilight,
         binomial: "Canis latrans",
         family: &CANIDAE,
         subfamily: "Caninae",
@@ -1662,7 +1849,7 @@ pub static SPECIES: [Species; 46] = [
         // deer).
         prey: (0.001, 0.4),
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [18.0, 150.0, 80.0, 3.5, 1.0, 45.0, 80.0, 60.0, 12.0],
+        base: [0.0, 150.0, 80.0, 0.0, 1.0, 45.0, 80.0, 60.0, 12.0],
         hunger: 30.0,
         foods: &[eats("base:beef", 12), favorite("base:chicken", 10), eats("base:berries", 4)],
         shy: 14.0,
@@ -1676,7 +1863,7 @@ pub static SPECIES: [Species; 46] = [
         size_spread: 0.2,
         height: (0.61, "shoulder"),
         // The prairie and the desert first (its old range), into the woods and the mountains.
-        habitats: &[("base:plains", 1.0), ("base:desert", 1.0), ("base:forest", 0.4), ("base:mountains", 0.4)],
+        habitats: &[("base:plains", 1.0), ("base:desert", 1.0), ("base:forest", 0.4), ("base:mountains", 0.4), ("base:sequoia_grove", 0.6)],
         bio: Biology {
             // Southern ones about 11.5 kg, northern ones 18.
             mass: 13.0,
@@ -1706,8 +1893,7 @@ pub static SPECIES: [Species; 46] = [
     },
     // The small birds (`reports/ecology/Overworld food webs.md`: the songbirds of every land biome, the
     // cat's, the owl's and the hawk's prey): two wild species on one model (`source/small_bird`), on
-    // the ground and in the air (`small_bird.rs`). No nests yet (Ronald, 2026-11-03): as the raven's,
-    // their young come out as fledglings after the eggs' time.
+    // the ground and in the air (`small_bird.rs`). They lay in nests (`nests::SITES`).
     Species {
         model: "small_bird",
         name: "house_sparrow",
@@ -1718,7 +1904,7 @@ pub static SPECIES: [Species; 46] = [
         // Seeds and grain first, insects (most of what the nestlings get), buds and berries.
         eats: &[(Seeds, 0.6), (Insects, 0.3), (Fruit, 0.1)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [2.0, 60.0, 15.0, 0.2, 1.0, 1.0, 40.0, 5.0, 2.0],
+        base: [0.0, 60.0, 15.0, 0.0, 1.0, 1.0, 40.0, 5.0, 2.0],
         hunger: 20.0,
         foods: &[eats("base:wheat_seeds", 2), favorite("base:berries", 3)],
         shy: 8.0,
@@ -1754,12 +1940,12 @@ pub static SPECIES: [Species; 46] = [
             comfort: (-25.0, 38.0),
             cold_blooded: false,
         },
-        // No nests yet: the young come out as fledglings after the eggs' time. Its life paced as the
+        // It lays in a nest (`nests::SITES`). Its life paced as the
         // mouse's (a small animal's derived span is too short for a line to be bred), growing up a
         // fifth of it; many live close together, at feeders and in hedges (`balance::checks`).
         // Room near raised so a small wild group of its kind lasts on its own (`web/test.mjs`: two pairs
         // left alone at their room neither die out nor flood); the food web's grazing still holds.
-        tune: Tune { gestation: Some(8_665), growth: Some(66_000), lifespan: Some(336_000), crowd: Some(30), ..Tune::NONE },
+        tune: Tune { growth: Some(66_000), lifespan: Some(336_000), crowd: Some(30), ..Tune::NONE },
         birth_size: 0.6,
         ..BASE
     },
@@ -1773,7 +1959,7 @@ pub static SPECIES: [Species; 46] = [
         // Seeds of grasses and sedges, their shoots and willow buds, insects in the Arctic summer
         // (what the young are raised on).
         eats: &[(Seeds, 0.4), (Insects, 0.3), (Grass, 0.15), (Leaves, 0.1), (Fruit, 0.05)],
-        base: [2.0, 60.0, 15.0, 0.2, 1.0, 1.2, 40.0, 5.0, 3.0],
+        base: [0.0, 60.0, 15.0, 0.0, 1.0, 1.2, 40.0, 5.0, 3.0],
         hunger: 20.0,
         foods: &[eats("base:wheat_seeds", 2), favorite("base:berries", 3)],
         shy: 8.0,
@@ -1806,28 +1992,22 @@ pub static SPECIES: [Species; 46] = [
             comfort: (-40.0, 18.0),
             cold_blooded: false,
         },
-        // No nests yet: the young come out as fledglings after the eggs' time; paced as the sparrow,
+        // It lays in a nest (`nests::SITES`); paced as the sparrow,
         // a second brood in a long summer, flocks close together (`balance::checks`).
         // Room near raised so a small wild group of its kind lasts on its own (`web/test.mjs`: two pairs
         // left alone at their room neither die out nor flood); the food web's grazing still holds.
-        tune: Tune {
-            gestation: Some(8_935),
-            growth: Some(66_000),
-            lifespan: Some(336_000),
-            recovery: Some(60_000),
-            crowd: Some(30),
-            ..Tune::NONE
-        },
+        tune: Tune { growth: Some(66_000), lifespan: Some(336_000), recovery: Some(60_000), crowd: Some(30), ..Tune::NONE },
         birth_size: 0.6,
         ..BASE
     },
     // The owls (`reports/ecology/Overworld food webs.md`: the night's hunter of every land biome, the
     // rodent's and the hare's): two wild species on one model (`source/owl`), on the ground and in
-    // the air (`owl.rs`). No nests yet (Ronald, 2026-11-03): as the raven's, their young come out as
-    // fledglings after the eggs' time.
+    // the air (`owl.rs`). They lay in nests (`nests::SITES`).
     Species {
         model: "owl",
         name: "great_horned_owl",
+        // Active: nocturnal, hunting from dusk.
+        active: Active::Night,
         binomial: "Bubo virginianus",
         family: &STRIGIDAE,
         subfamily: "Striginae",
@@ -1837,7 +2017,7 @@ pub static SPECIES: [Species; 46] = [
         // A deer mouse of 20 g to a hare or a skunk near twice its own mass.
         prey: (0.005, 1.8),
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [8.0, 100.0, 40.0, 2.5, 1.0, 14.0, 60.0, 20.0, 6.0],
+        base: [0.0, 100.0, 40.0, 0.0, 1.0, 14.0, 60.0, 20.0, 6.0],
         hunger: 30.0,
         foods: &[eats("base:beef", 10), favorite("base:chicken", 10)],
         shy: 14.0,
@@ -1861,6 +2041,7 @@ pub static SPECIES: [Species; 46] = [
             ("base:desert", 0.6),
             ("base:swamp", 0.6),
             ("base:savanna", 0.4),
+            ("base:sequoia_grove", 0.8),
         ],
         bio: Biology {
             mass: 1.4,
@@ -1883,7 +2064,6 @@ pub static SPECIES: [Species; 46] = [
             comfort: (-35.0, 38.0),
             cold_blooded: false,
         },
-        tune: Tune { gestation: Some(18_505), ..Tune::NONE },
         birth_size: 0.3,
         ..BASE
     },
@@ -1898,7 +2078,7 @@ pub static SPECIES: [Species; 46] = [
         eats: &[(Meat, 1.0)],
         // A lemming of 50 g to a hare about its own mass.
         prey: (0.005, 1.2),
-        base: [10.0, 110.0, 45.0, 3.0, 1.0, 20.0, 60.0, 24.0, 8.0],
+        base: [0.0, 110.0, 45.0, 0.0, 1.0, 20.0, 60.0, 24.0, 8.0],
         hunger: 30.0,
         foods: &[eats("base:beef", 10), favorite("base:chicken", 10)],
         shy: 16.0,
@@ -1933,7 +2113,6 @@ pub static SPECIES: [Species; 46] = [
             comfort: (-50.0, 16.0),
             cold_blooded: false,
         },
-        tune: Tune { gestation: Some(18_083), ..Tune::NONE },
         birth_size: 0.3,
         ..BASE
     },
@@ -1941,8 +2120,7 @@ pub static SPECIES: [Species; 46] = [
     // the hare's, the marmot's, the fawn's and the small dog's): the golden eagle of the north's and
     // the dry country's open land, and the savanna hawk of the llanos and the Pantanal, where there
     // are no golden eagles: two wild species on one model (`source/eagle`), the hawk drawn smaller
-    // by its size genes; on the ground and in the air (`eagle.rs`). No nests yet (Ronald,
-    // 2026-11-03): their young come out as fledglings after the eggs' time.
+    // by its size genes; on the ground and in the air (`eagle.rs`). They lay in nests (`nests::SITES`).
     Species {
         model: "eagle",
         name: "golden_eagle",
@@ -1956,7 +2134,7 @@ pub static SPECIES: [Species; 46] = [
         // A vole to a fawn or a fox, up to about one and a half times its own mass.
         prey: (0.01, 1.5),
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [16.0, 150.0, 60.0, 4.0, 1.0, 30.0, 60.0, 40.0, 10.0],
+        base: [0.0, 150.0, 60.0, 0.0, 1.0, 30.0, 60.0, 40.0, 10.0],
         hunger: 30.0,
         foods: &[eats("base:beef", 12), favorite("base:chicken", 10), eats("base:rotten_flesh", 4)],
         shy: 24.0,
@@ -1978,6 +2156,7 @@ pub static SPECIES: [Species; 46] = [
             ("base:snowy_plains", 0.3),
             ("base:forest", 0.3),
             ("base:birch_forest", 0.3),
+            ("base:sequoia_grove", 0.3),
         ],
         bio: Biology {
             mass: 4.5,
@@ -2000,10 +2179,10 @@ pub static SPECIES: [Species; 46] = [
             comfort: (-40.0, 38.0),
             cold_blooded: false,
         },
-        // No nests yet: the young come out as fledglings after the eggs' time. A young eagle flies in
+        // Its young hatch in a nest (`nests::SITES`). A young eagle flies in
         // its first summer and looks grown in a year; it waits years to breed, which no line of
         // breeding in the game could wait for (`balance::checks`: a fourth generation in 40 days).
-        tune: Tune { gestation: Some(22_568), growth: Some(200_000), ..Tune::NONE },
+        tune: Tune { growth: Some(200_000), ..Tune::NONE },
         birth_size: 0.3,
         ..BASE
     },
@@ -2017,7 +2196,7 @@ pub static SPECIES: [Species; 46] = [
         // Rodents, lizards, snakes, frogs and crabs, big insects; following fires and the plough.
         eats: &[(Meat, 0.7), (Insects, 0.2), (Fish, 0.1)],
         prey: (0.005, 0.6),
-        base: [8.0, 110.0, 40.0, 2.0, 1.0, 10.0, 60.0, 20.0, 6.0],
+        base: [0.0, 110.0, 40.0, 0.0, 1.0, 10.0, 60.0, 20.0, 6.0],
         hunger: 30.0,
         foods: &[eats("base:beef", 8), favorite("base:chicken", 8)],
         shy: 16.0,
@@ -2049,17 +2228,17 @@ pub static SPECIES: [Species; 46] = [
             comfort: (5.0, 42.0),
             cold_blooded: false,
         },
-        // No nests yet: fledglings after the eggs' time. One young a year: her rest set shorter so
+        // Its young hatch in a nest (`nests::SITES`). One young a year: her rest set shorter so
         // the wild replaces its dead (`balance::checks`: six young in a life).
-        tune: Tune { gestation: Some(20_975), recovery: Some(60_000), ..Tune::NONE },
+        tune: Tune { recovery: Some(60_000), ..Tune::NONE },
         birth_size: 0.3,
         ..BASE
     },
     // The turkey vulture (`reports/ecology/Overworld food webs.md`: something for the dead in the warm
     // biomes, the raven's counterpart): a wild bird on its own model (`source/vulture`), on the
     // ground and in the air (`vulture.rs`), finding the dead by smell from the air. It hunts nothing;
-    // carcasses as food in the world come with the web's third tier. No nests yet (Ronald,
-    // 2026-11-03): its young come out as fledglings after the eggs' time.
+    // carcasses as food in the world come with the web's third tier. It lays on a cave's floor
+    // (`nests::SITES`).
     Species {
         model: "vulture",
         name: "turkey_vulture",
@@ -2071,7 +2250,7 @@ pub static SPECIES: [Species; 46] = [
         // left out: it hunts nothing here).
         eats: &[(Carrion, 0.95), (Fruit, 0.05)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [10.0, 140.0, 50.0, 1.0, 1.0, 14.0, 60.0, 24.0, 10.0],
+        base: [0.0, 140.0, 50.0, 0.0, 1.0, 14.0, 60.0, 24.0, 10.0],
         hunger: 40.0,
         foods: &[favorite("base:rotten_flesh", 10)],
         shy: 16.0,
@@ -2091,6 +2270,7 @@ pub static SPECIES: [Species; 46] = [
             ("base:plains", 0.6),
             ("base:forest", 0.3),
             ("base:mountains", 0.3),
+            ("base:sequoia_grove", 0.4),
         ],
         bio: Biology {
             mass: 1.4,
@@ -2112,18 +2292,17 @@ pub static SPECIES: [Species; 46] = [
             comfort: (-12.0, 42.0),
             cold_blooded: false,
         },
-        // No nests yet: fledglings after the eggs' time. A young vulture is grown in its first year
+        // Its young hatch in a nest (`nests::SITES`). A young vulture is grown in its first year
         // and breeds at three, which no line in the game could wait for (`balance::checks`).
         // Roosts of dozens, but spread over a big range by day: room near as a herd's at most.
         // Her rest after a brood set shorter, so a roost of a few lasts on its own (`web/test.mjs`).
-        tune: Tune { gestation: Some(21_377), growth: Some(110_000), recovery: Some(80_000), crowd: Some(24), ..Tune::NONE },
+        tune: Tune { growth: Some(110_000), recovery: Some(80_000), crowd: Some(24), ..Tune::NONE },
         birth_size: 0.3,
         ..BASE
     },
     // The herring gull (`reports/ecology/Overworld food webs.md`: the coast's hunter and its eater of
     // the dead): a wild bird on its own model (`source/gull`), on the ground and in the air
-    // (`gull.rs`). No nests yet (Ronald, 2026-11-03): its young come out as fledglings after the
-    // eggs' time.
+    // (`gull.rs`). It nests on the ground (`nests::SITES`).
     Species {
         model: "gull",
         name: "herring_gull",
@@ -2136,7 +2315,7 @@ pub static SPECIES: [Species; 46] = [
         // Small fish and mice to a young rabbit or a duckling, under a third of its mass.
         prey: (0.005, 0.3),
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [8.0, 130.0, 40.0, 1.5, 1.0, 10.0, 70.0, 20.0, 8.0],
+        base: [0.0, 130.0, 40.0, 0.0, 1.0, 10.0, 70.0, 20.0, 8.0],
         hunger: 30.0,
         foods: &[eats("base:beef", 8), favorite("base:bread", 6), eats("base:rotten_flesh", 6)],
         shy: 10.0,
@@ -2172,10 +2351,10 @@ pub static SPECIES: [Species; 46] = [
             comfort: (-15.0, 34.0),
             cold_blooded: false,
         },
-        // No nests yet: fledglings after the eggs' time. A young gull flies in five or six weeks and
+        // Its young hatch in a nest (`nests::SITES`). A young gull flies in five or six weeks and
         // is grown in a year; it waits four years to breed, which no line in the game could wait for
         // (`balance::checks`).
-        tune: Tune { gestation: Some(16_796), growth: Some(110_000), crowd: Some(24), ..Tune::NONE },
+        tune: Tune { growth: Some(110_000), crowd: Some(24), ..Tune::NONE },
         birth_size: 0.3,
         ..BASE
     },
@@ -2187,6 +2366,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "caiman",
         name: "yacare_caiman",
+        // Active: hunts mostly at night, basks by day.
+        active: Active::Night,
         binomial: "Caiman yacare",
         family: &ALLIGATORIDAE,
         subfamily: "Caimaninae",
@@ -2197,7 +2378,7 @@ pub static SPECIES: [Species; 46] = [
         // A snail or a minnow to a capybara near its own mass.
         prey: (0.005, 1.0),
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [30.0, 160.0, 120.0, 5.0, 1.0, 80.0, 300.0, 60.0, 30.0],
+        base: [0.0, 160.0, 120.0, 0.0, 1.0, 80.0, 300.0, 60.0, 30.0],
         hunger: 60.0,
         foods: &[eats("base:beef", 14), favorite("base:chicken", 12), eats("base:porkchop", 12)],
         shy: 8.0,
@@ -2254,6 +2435,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "caiman",
         name: "spectacled_caiman",
+        // Active: hunts mostly at night, basks by day.
+        active: Active::Night,
         binomial: "Caiman crocodilus",
         family: &ALLIGATORIDAE,
         subfamily: "Caimaninae",
@@ -2264,7 +2447,7 @@ pub static SPECIES: [Species; 46] = [
         // A snail or a minnow to a capybara near its own mass.
         prey: (0.005, 1.0),
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [26.0, 150.0, 100.0, 4.5, 1.0, 60.0, 300.0, 50.0, 26.0],
+        base: [0.0, 150.0, 100.0, 0.0, 1.0, 60.0, 300.0, 50.0, 26.0],
         hunger: 60.0,
         foods: &[eats("base:beef", 14), favorite("base:chicken", 12), eats("base:porkchop", 12)],
         shy: 8.0,
@@ -2325,6 +2508,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "wolf",
         name: "grey_wolf",
+        // Active: crepuscular, travelling and hunting at dawn and dusk.
+        active: Active::Twilight,
         binomial: "Canis lupus",
         family: &CANIDAE,
         subfamily: "Caninae",
@@ -2337,7 +2522,7 @@ pub static SPECIES: [Species; 46] = [
         prey: (0.02, 3.0),
         taming: Taming::Passive,
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [30.0, 220.0, 120.0, 6.0, 1.0, 60.0, 80.0, 90.0, 20.0],
+        base: [0.0, 220.0, 120.0, 0.0, 1.0, 60.0, 80.0, 90.0, 20.0],
         hunger: 40.0,
         foods: &[
             eats("base:beef", 10),
@@ -2369,6 +2554,7 @@ pub static SPECIES: [Species; 46] = [
             ("base:mountains", 0.5),
             ("base:snowy_plains", 0.4),
             ("base:plains", 0.1),
+            ("base:sequoia_grove", 0.3),
         ],
         bio: Biology {
             mass: 42.0,
@@ -2404,6 +2590,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "jaguar",
         name: "jaguar",
+        // Active: crepuscular and nocturnal.
+        active: Active::Twilight,
         binomial: "Panthera onca",
         family: &FELIDAE,
         subfamily: "Pantherinae",
@@ -2415,7 +2603,7 @@ pub static SPECIES: [Species; 46] = [
         prey: (0.01, 1.5),
         taming: Taming::Knockout,
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [45.0, 260.0, 200.0, 9.0, 1.0, 120.0, 160.0, 300.0, 25.0],
+        base: [0.0, 260.0, 200.0, 0.0, 1.0, 120.0, 160.0, 300.0, 25.0],
         hunger: 20.0,
         foods: &[eats("base:chicken", 8), eats("base:porkchop", 14), favorite("base:beef", 18), eats("base:mutton", 14), KIBBLE],
         feedings: 14.0,
@@ -2473,6 +2661,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "fish",
         name: "lungfish",
+        // Active: Est.: lungfishes forage mostly at night.
+        active: Active::Night,
         binomial: "Ceratodus kempae",
         family: &CERATODONTIDAE,
         subfamily: "",
@@ -2480,7 +2670,7 @@ pub static SPECIES: [Species; 46] = [
         // Snails, insect larvae and crayfish, water plants, small fish.
         eats: &[(Insects, 0.5), (WaterPlants, 0.2), (Fish, 0.3)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [8.0, 90.0, 40.0, 0.6, 1.0, 12.0, 600.0, 20.0, 6.0],
+        base: [0.0, 90.0, 40.0, 0.0, 1.0, 12.0, 600.0, 20.0, 6.0],
         hunger: 30.0,
         foods: &[],
         shy: 6.0,
@@ -2504,8 +2694,9 @@ pub static SPECIES: [Species; 46] = [
             litter: 6.0,
             social: Social::Solitary,
             rarity: Rarity::Uncommon,
-            breeds: 0,
-            peak: 0,
+            // Est.: as the living Australian lungfish, spawning on water plants in spring and early summer.
+            breeds: seasons::SPRING | seasons::SUMMER,
+            peak: seasons::SPRING,
             // A warm floodplain's rivers and ponds; it breathes air through the dry season.
             comfort: (14.0, 32.0),
             cold_blooded: true,
@@ -2526,7 +2717,7 @@ pub static SPECIES: [Species; 46] = [
         // Insect larvae and plankton.
         eats: &[(Insects, 1.0)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [1.0, 40.0, 8.0, 0.1, 1.0, 1.0, 300.0, 4.0, 1.0],
+        base: [0.0, 40.0, 8.0, 0.0, 1.0, 1.0, 300.0, 4.0, 1.0],
         hunger: 30.0,
         foods: &[],
         shy: 6.0,
@@ -2550,15 +2741,18 @@ pub static SPECIES: [Species; 46] = [
             litter: 8.0,
             social: Social::Herd,
             rarity: Rarity::Common,
-            breeds: 0,
-            peak: 0,
+            // Est.: as small lake fish of the temperate Cretaceous, spawning in the warm half of the year.
+            breeds: seasons::SPRING | seasons::SUMMER,
+            peak: seasons::SPRING,
             // The Yixian's cool lakes.
             comfort: (4.0, 24.0),
             cold_blooded: true,
         },
         // A small fish of a short life: grown in its first season, and schools that keep to a
         // room a pond holds (the balance checks' growth and room).
-        tune: Tune { growth: Some(70_000), crowd: Some(30), ..Tune::NONE },
+        // Its eggs' time paced up from its derived 0.19 d (a fish carries it, `life::carrying`) so a
+        // line takes the common band's ten days to four generations (`balance::checks`).
+        tune: Tune { growth: Some(70_000), incubation: Some(11_000), crowd: Some(30), ..Tune::NONE },
         birth_size: 0.1,
         ..BASE
     },
@@ -2568,6 +2762,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "psittacosaurus",
         name: "psittacosaurus",
+        // Active: Est.: as the small ornithischians (Schmitz & Motani 2011).
+        active: Active::AnyTime,
         binomial: "Psittacosaurus lujiatunensis",
         family: &PSITTACOSAURIDAE,
         subfamily: "",
@@ -2576,7 +2772,7 @@ pub static SPECIES: [Species; 46] = [
         // fronds first, seeds and nuts, some fruit.
         eats: &[(Leaves, 0.6), (Seeds, 0.3), (Fruit, 0.1)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [22.0, 160.0, 80.0, 1.5, 1.1, 45.0, 70.0, 45.0, 14.0],
+        base: [0.0, 160.0, 80.0, 0.0, 1.1, 45.0, 70.0, 45.0, 14.0],
         hunger: 15.0,
         foods: &[eats("animals:fern", 8), eats("animals:ginkgo_seed", 8), favorite("base:berries", 10)],
         shy: 12.0,
@@ -2622,6 +2818,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "ankylosaur",
         name: "gastonia",
+        // Active: Est.: big plant eaters were cathemeral (Schmitz & Motani 2011).
+        active: Active::AnyTime,
         binomial: "Gastonia burgei",
         family: &POLACANTHIDAE,
         subfamily: "",
@@ -2629,7 +2827,7 @@ pub static SPECIES: [Species; 46] = [
         // Low plants: ferns, horsetails, cycads' fronds, a little fruit and seed.
         eats: &[(Leaves, 0.9), (Fruit, 0.05), (Seeds, 0.05)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [120.0, 300.0, 400.0, 6.0, 0.8, 600.0, 200.0, 400.0, 60.0],
+        base: [0.0, 300.0, 400.0, 0.0, 0.8, 600.0, 200.0, 400.0, 60.0],
         hunger: 12.0,
         foods: &[eats("animals:fern", 10), favorite("animals:cycad_seed", 12)],
         shy: 8.0,
@@ -2675,6 +2873,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "ankylosaur",
         name: "pinacosaurus",
+        // Active: Est.: big plant eaters were cathemeral (Schmitz & Motani 2011).
+        active: Active::AnyTime,
         binomial: "Pinacosaurus grangeri",
         family: &ANKYLOSAURIDAE,
         subfamily: "",
@@ -2682,7 +2882,7 @@ pub static SPECIES: [Species; 46] = [
         // Low plants, perhaps pulpy fruit, roots and a few insects (speculative).
         eats: &[(Leaves, 0.8), (Fruit, 0.1), (Roots, 0.05), (Insects, 0.05)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [120.0, 300.0, 400.0, 6.0, 0.8, 600.0, 200.0, 400.0, 60.0],
+        base: [0.0, 300.0, 400.0, 0.0, 0.8, 600.0, 200.0, 400.0, 60.0],
         hunger: 12.0,
         foods: &[eats("animals:fern", 10), favorite("base:berries", 12)],
         shy: 8.0,
@@ -2729,6 +2929,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "iguanodont",
         name: "iguanodont",
+        // Active: Est.: big plant eaters were cathemeral (Schmitz & Motani 2011).
+        active: Active::AnyTime,
         binomial: "Iguanacolossus fortis",
         family: &STYRACOSTERNA,
         subfamily: "",
@@ -2736,7 +2938,7 @@ pub static SPECIES: [Species; 46] = [
         // Browse up to about 4 m: ferns, horsetails, conifers and cycads; a few seeds and fruit.
         eats: &[(Leaves, 0.85), (Seeds, 0.1), (Fruit, 0.05)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [150.0, 400.0, 600.0, 8.0, 1.0, 800.0, 250.0, 500.0, 50.0],
+        base: [0.0, 400.0, 600.0, 0.0, 1.0, 800.0, 250.0, 500.0, 50.0],
         hunger: 12.0,
         foods: &[eats("animals:fern", 10), favorite("animals:cycad_seed", 14)],
         shy: 10.0,
@@ -2782,6 +2984,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "caiman",
         name: "crocodyliform",
+        // Active: Est.: as the living crocodilians.
+        active: Active::Night,
         binomial: "Neosuchia indet.",
         family: &NEOSUCHIA,
         subfamily: "",
@@ -2791,7 +2995,7 @@ pub static SPECIES: [Species; 46] = [
         // A fish or a bird at the water (as crocodiles take them) to a young dinosaur near its own mass.
         prey: (0.003, 1.0),
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [45.0, 180.0, 160.0, 7.0, 1.0, 120.0, 400.0, 90.0, 40.0],
+        base: [0.0, 180.0, 160.0, 0.0, 1.0, 120.0, 400.0, 90.0, 40.0],
         hunger: 60.0,
         foods: &[eats("animals:trout", 10), favorite("animals:venison", 14)],
         shy: 6.0,
@@ -2845,6 +3049,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "citipati",
         name: "citipati",
+        // Active: Est.: oviraptorosaurs, as other cathemeral theropods.
+        active: Active::AnyTime,
         binomial: "Citipati osmolskae",
         family: &OVIRAPTORIDAE,
         subfamily: "Citipatiinae",
@@ -2855,7 +3061,7 @@ pub static SPECIES: [Species; 46] = [
         // A lizard (50 g) to a Kryptobaatar or a hatchling.
         prey: (0.0004, 0.05),
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [40.0, 220.0, 120.0, 3.0, 1.2, 80.0, 90.0, 80.0, 20.0],
+        base: [0.0, 220.0, 120.0, 0.0, 1.2, 80.0, 90.0, 80.0, 20.0],
         hunger: 15.0,
         foods: &[eats("animals:cycad_seed", 8), favorite("base:berries", 10), eats("base:wheat_seeds", 3)],
         shy: 12.0,
@@ -2909,7 +3115,7 @@ pub static SPECIES: [Species; 46] = [
         // takes none (its fish are what lies on the shore).
         prey: (0.0, 0.0),
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [6.0, 120.0, 30.0, 1.0, 1.0, 6.0, 60.0, 15.0, 6.0],
+        base: [0.0, 120.0, 30.0, 0.0, 1.0, 6.0, 60.0, 15.0, 6.0],
         hunger: 30.0,
         foods: &[eats("animals:cycad_seed", 4), favorite("base:wheat_seeds", 3)],
         shy: 10.0,
@@ -2942,9 +3148,9 @@ pub static SPECIES: [Species; 46] = [
             comfort: (0.0, 34.0),
             cold_blooded: false,
         },
-        // No nests yet: fledglings after the eggs' time, as the other birds (`birds.rs`), grown in
+        // Its young hatch in a nest (`nests::SITES`), as the other birds', grown in
         // a few weeks of the game's, and a room that lets a flock last (`web/test.mjs`).
-        tune: Tune { gestation: Some(16_796), growth: Some(110_000), crowd: Some(24), ..Tune::NONE },
+        tune: Tune { growth: Some(110_000), crowd: Some(24), ..Tune::NONE },
         birth_size: 0.3,
         ..BASE
     },
@@ -2960,7 +3166,7 @@ pub static SPECIES: [Species; 46] = [
         eats: &[(Insects, 0.5), (Seeds, 0.4), (Leaves, 0.1)],
         prey: (0.0, 0.0),
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [6.0, 120.0, 30.0, 1.0, 1.0, 6.0, 60.0, 15.0, 6.0],
+        base: [0.0, 120.0, 30.0, 0.0, 1.0, 6.0, 60.0, 15.0, 6.0],
         hunger: 30.0,
         foods: &[eats("animals:cycad_seed", 4), favorite("base:wheat_seeds", 3)],
         shy: 10.0,
@@ -2993,9 +3199,9 @@ pub static SPECIES: [Species; 46] = [
             comfort: (0.0, 40.0),
             cold_blooded: false,
         },
-        // No nests yet: fledglings after the eggs' time, as the other birds (`birds.rs`), grown in
+        // Its young hatch in a nest (`nests::SITES`), as the other birds', grown in
         // a few weeks of the game's, and a room that lets a flock last (`web/test.mjs`).
-        tune: Tune { gestation: Some(16_796), growth: Some(150_000), crowd: Some(24), ..Tune::NONE },
+        tune: Tune { growth: Some(150_000), crowd: Some(24), ..Tune::NONE },
         birth_size: 0.3,
         ..BASE
     },
@@ -3005,6 +3211,8 @@ pub static SPECIES: [Species; 46] = [
     Species {
         model: "sauropod",
         name: "cedarosaurus",
+        // Active: Est.: sauropodomorphs were cathemeral (Schmitz & Motani 2011).
+        active: Active::AnyTime,
         binomial: "Cedarosaurus weiskopfae",
         family: &BRACHIOSAURIDAE,
         subfamily: "",
@@ -3012,7 +3220,7 @@ pub static SPECIES: [Species; 46] = [
         // High browse: conifers (Araucaria), horsetails, ferns; a few seeds and cones.
         eats: &[(Leaves, 0.95), (Seeds, 0.05)],
         //     health stamina food damage speed weight oxygen torpor fortitude
-        base: [300.0, 600.0, 1200.0, 10.0, 0.8, 2000.0, 400.0, 1200.0, 80.0],
+        base: [0.0, 600.0, 1200.0, 0.0, 0.8, 2000.0, 400.0, 1200.0, 80.0],
         hunger: 10.0,
         foods: &[eats("animals:fern", 10), favorite("animals:araucaria_cone", 16)],
         shy: 6.0,
@@ -3024,7 +3232,10 @@ pub static SPECIES: [Species; 46] = [
         // At the shoulder (the back slopes down to the hips).
         height: (4.1, "shoulder"),
         // The floodplain first; the fern forest (as Dongbeititan) less often.
-        habitats: &[("animals:floodplain", 1.0), ("animals:fern_forest", 0.5)],
+        // The open floodplain, seldom among the fern forest's trunks: at 4.5 blocks wide its body
+        // finds few clearings between them and stood still there (PC runs aw_walk_path, 11-05;
+        // Ronald: "keep to open floodplain").
+        habitats: &[("animals:floodplain", 1.0), ("animals:fern_forest", 0.2)],
         bio: Biology {
             // About 10 t (est.).
             mass: 10000.0,
@@ -3058,4 +3269,21 @@ pub static SPECIES: [Species; 46] = [
 /// two species of one genus are not.
 pub fn same_species(a: &Species, b: &Species) -> bool {
     a.binomial == b.binomial
+}
+
+/// `needs::hunter_room` worked out once a hunter and biome (it reads every prey's balance; spawns
+/// and wild breeding ask it often).
+fn hunter_room_cached(name: &'static str, biome: &str) -> Option<u32> {
+    use std::collections::HashMap;
+    use std::sync::{Mutex, OnceLock};
+    type Rooms = HashMap<(&'static str, String), Option<u32>>;
+    static ROOMS: OnceLock<Mutex<Rooms>> = OnceLock::new();
+    let rooms = ROOMS.get_or_init(|| Mutex::new(HashMap::new()));
+    if let Some(&r) = rooms.lock().ok()?.get(&(name, biome.to_string())) {
+        return r;
+    }
+    let s = SPECIES.iter().find(|s| s.name == name)?;
+    let room = crate::needs::hunter_room(s, biome);
+    rooms.lock().ok()?.insert((name, biome.to_string()), room);
+    room
 }

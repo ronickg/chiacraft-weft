@@ -7,19 +7,17 @@ use weft_sdk::*;
 
 use crate::birds::{self, Wings};
 
-pub(crate) static TURKEY_VULTURE: Entity = Entity::named("turkey_vulture");
+pub(crate) static TURKEY_VULTURE: EntityKind = EntityKind::named("turkey_vulture");
 
 static WINGS: Wings = Wings {
     model: "vulture",
     texture: "vulture/vulture",
-    size: (0.45, 0.55),
     fly_size: (1.1, 0.35),
-    health: 10.0,
     // It walks little; it soars at about 12 m/s.
     speed: 1.5,
     air: 5.5,
     wander: 0.2,
-    damage: 0.0,
+    bites: false,
     height: 12.0,
     reach: 32.0,
     flight: 800,

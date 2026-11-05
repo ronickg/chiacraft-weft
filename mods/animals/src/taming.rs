@@ -29,6 +29,8 @@ value! {
 }
 
 pub static TAMING: Component<Taming> = Component::named("taming");
+/// Who it runs from while scared (0: the nearest player): what hurt it (not saved).
+static FROM: Component<u64> = Component::named("taming_flee_from");
 /// Each food's bubble (by item name), made once.
 static BUBBLES: std::sync::OnceLock<Vec<(&'static str, &'static Particle)>> = std::sync::OnceLock::new();
 static HEART: Particle = Particle::named("heart");
@@ -52,8 +54,10 @@ pub const FRESH: Taming = Taming { progress: 0.0, effectiveness: 1.0, feedings: 
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&TAMING, FRESH, component_flags::SAVE | component_flags::SYNC_MENU | component_flags::SYNC_WATCHERS);
+    r.entity_component(&FROM, 0u64, 0);
     for s in &SPECIES {
         r.attach(s.kind, &TAMING);
+        r.attach(s.kind, &FROM);
     }
     // Kibble (`notes/ANIMALS.md`, "Kibble"): an egg, meat or a plant, wheat for fiber, and water;
     // every species takes it, and it tames fastest. Tiers by egg and cooking in a pot come with
@@ -62,7 +66,9 @@ pub fn init(r: &mut Registry) {
     r.tag("kibble_meat", &["base:beef", "base:porkchop", "base:chicken", "base:mutton"]);
     r.tag("kibble_plant", &["base:apple", "base:sugar_cane"]);
     for filling in ["#kibble_meat", "#kibble_plant"] {
-        r.shapeless(&CRAFTING, "kibble", 4, &["base:egg", filling, "base:wheat", "base:water_bucket"], 0);
+        // Fibre for the binding, not a water bucket: an iron bucket put kibble in the Iron Age, and
+        // taming starts in the Stone Age (Ronald, 11-07: "move them to fit").
+        r.shapeless(&CRAFTING, "kibble", 4, &["base:egg", filling, "base:wheat", "base:plant_fibre"], 0);
     }
     // A bubble with each food in it, shown above an animal asking for it.
     let mut bubbles: Vec<(&'static str, &'static Particle)> = Vec::new();
@@ -99,17 +105,43 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
         if !(s.taming == Method::Passive || wild) || animal::tamed(w, id) {
             return false;
         }
-        let Some(t) = w.component(id, &TAMING).copied() else { return false };
+        let Some(t) = w.component(id, &TAMING) else { return false };
+        let t0 = crate::prof::stamp();
+        let _slow = Slow(t0, id);
         if t.scared > 0 {
-            set(w, id, |t| t.scared -= 1);
-            if (w.time() + id) % 20 == 0 || !w.navigating(id) {
+            set(w, id, |t| t.scared = t.scared.saturating_sub(w.tick_elapsed(id)));
+            if t.scared <= w.tick_elapsed(id) {
+                if let Some(f) = w.component_mut(id, &FROM) {
+                    *f = 0;
+                }
+            } else if (w.game_time() + id) % 20 == 0 || !w.navigating(id) {
                 flee(w, id, st);
             }
             return true;
         }
-        if (w.time() + id) % 10 == 0 && s.shy > 0.0 && frightened(w, st, s.shy * shyness(w, id)) && !crate::signatures::calm(w, st.pos) {
-            scare(w, id);
-            return true;
+        // Its awareness of players (`senses`): it notices one by sight, sound and scent, stops
+        // to stare when half aware, and bolts when it has noticed.
+        if s.shy > 0.0 {
+            let seen = crate::senses::sense(w, id, st, |sight| crate::hunt::watch(w, sight));
+            if seen.player != 0 && !crate::signatures::calm(w, st.pos.to_array()) {
+                if seen.fright >= animals_core::perception::NOTICED {
+                    let p = seen.player_pos.map(f64::from);
+                    weft_sdk::info!(
+                        "{} {id} bolts from player {} {:.1} blocks off (awareness {:.2})",
+                        s.name,
+                        seen.player,
+                        crate::dist2(p, st.pos).sqrt(),
+                        seen.fright
+                    );
+                    scare(w, id, 0);
+                    crate::senses::ran(w, id, true);
+                    return true;
+                }
+                if seen.fright >= animals_core::perception::STARE {
+                    crate::senses::stare(w, id, st, seen.player_pos);
+                    return true;
+                }
+            }
         }
         if wild {
             return false;
@@ -125,11 +157,11 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             let bubble = BUBBLES
                 .get()
                 .and_then(|b| b.iter().find(|(item, _)| Some(*item) == food));
-            if (w.time() + id) % 20 == 0
+            if (w.game_time() + id) % 20 == 0
                 && let Some((_, p)) = bubble
             {
                 drop(
-                    w.spawn_particles(p, [st.pos[0], st.pos[1] + st.size[1] as f64 + 0.45, st.pos[2]])
+                    w.spawn_particles(p, [st.pos.x, st.pos.y + st.size.height as f64 + 0.45, st.pos.z])
                         .count(1)
                         .spread(0.0),
                 );
@@ -140,10 +172,10 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             return true;
         }
         if t.wait > 0 {
-            set(w, id, |t| t.wait -= 1);
+            set(w, id, |t| t.wait = t.wait.saturating_sub(w.tick_elapsed(id)));
             return false;
         }
-        if (w.time() + id) % 20 == 0 && near_player(w, st).is_some() {
+        if (w.game_time() + id) % 20 == 0 && near_player(w, st).is_some() {
             // Its favorite half the time, else anything it eats (kibble it never asks for:
             // that it always takes).
             let pick: Vec<usize> = (0..s.foods.len())
@@ -158,6 +190,15 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             });
         }
         false
+    }
+}
+
+/// Logs a slow `behave` as it ends (`prof::slow`).
+struct Slow(Option<std::time::Instant>, u64);
+
+impl Drop for Slow {
+    fn drop(&mut self) {
+        crate::prof::slow(self.0, || format!("taming::behave of {}", self.1));
     }
 }
 
@@ -188,27 +229,16 @@ fn dist2(a: &EntityState, b: &EntityState) -> f64 {
 
 /// How far its temperament (`coats::temperament`) moves its kind's shy distance: a calm one (0)
 /// lets a walker come to 0.6 of it, a skittish one (1) runs at 1.4 times it.
-fn shyness(w: &World, id: u64) -> f32 {
+pub(crate) fn shyness(w: &World, id: u64) -> f32 {
     w.component(id, &crate::coats::GENOME)
-        .map_or(1.0, |g| 0.6 + 0.8 * crate::coats::temperament(g))
+        .map_or(1.0, |g| 0.6 + 0.8 * crate::coats::temperament(&g))
 }
 
-/// A player walking upright within `shy` blocks, or running within twice that.
-fn frightened(w: &World, st: &EntityState, shy: f32) -> bool {
-    let shy = shy as f64;
-    w.players()
-        .into_iter()
-        .filter_map(|p| w.entity(p))
-        .any(|p| {
-            let d2 = dist2(&p, st);
-            let sneaking = p.pose == abi::pose::CROUCH;
-            let walking = p.moved > 0.01;
-            (p.sprinting != 0 && d2 < 4.0 * shy * shy) || (!sneaking && walking && d2 < shy * shy)
-        })
-}
-
-/// Scared: stops asking and runs off for a while.
-fn scare(w: &World, id: u64) {
+/// Scared: stops asking and runs off for a while, from `from` (0: the nearest player).
+fn scare(w: &World, id: u64, from: u64) {
+    if let Some(f) = w.component_mut(id, &FROM) {
+        *f = from;
+    }
     set(w, id, |t| {
         t.scared = SCARED_TICKS;
         t.asking = 0;
@@ -219,25 +249,54 @@ fn scare(w: &World, id: u64) {
     }
 }
 
-/// Away from the nearest player, else anywhere.
+/// Away from what scared it (what hurt it), else from a hunter it saw lately (`senses`: a deer
+/// a walker startled doesn't bolt into the wolf), else from the nearest player, else anywhere.
 fn flee(w: &World, id: u64, st: &EntityState) {
-    let away = w
-        .players()
-        .into_iter()
-        .filter_map(|p| w.entity(p))
-        .min_by(|a, b| dist2(a, st).total_cmp(&dist2(b, st)))
-        .map(|p| (st.pos[0] - p.pos[0], st.pos[2] - p.pos[2]))
+    let from = w
+        .component(id, &FROM)
+        .filter(|&f| f != 0 && f != id)
+        .and_then(|f| w.entity(f))
+        .map(|e| e.pos);
+    let hunter = || {
+        w.component(id, &crate::senses::SENSES)
+            .filter(|s| s.threat != 0 && w.game_time() < s.at + 2 * crate::senses::EVERY)
+            .map(|s| Vec3::from(s.threat_pos.map(f64::from)))
+    };
+    let away = from
+        .or_else(hunter)
+        .or_else(|| {
+            w.players()
+                .into_iter()
+                .filter_map(|p| w.entity(p))
+                .min_by(|a, b| dist2(a, st).total_cmp(&dist2(b, st)))
+                .map(|p| p.pos)
+        })
+        .map(|p| (st.pos.x - p.x, st.pos.z - p.z))
         .filter(|&(x, z)| x * x + z * z > 0.01);
     let (x, z) = away.unwrap_or_else(|| {
         let a = w.random_below(628) as f64 / 100.0;
         (a.cos(), a.sin())
     });
-    let n = (x * x + z * z).sqrt().max(0.01);
-    w.navigate(id, [st.pos[0] + x / n * 8.0, st.pos[1], st.pos[2] + z / n * 8.0], 1.6);
+    // Away over ground it can run on (no cliff, no water: `senses::escape`).
+    let to = crate::senses::escape(w, st, [st.pos.x - x, st.pos.y, st.pos.z - z], 8.0, crate::senses::herd_mid(w, id));
+    if let Some(f) = from {
+        weft_sdk::info!(
+            "animal {id} at {:.1} {:.1} flees from what hurt it at {:.1} {:.1} to {:.1} {:.1}",
+            st.pos.x,
+            st.pos.z,
+            f.x,
+            f.z,
+            to[0],
+            to[2]
+        );
+    }
+    w.navigate(id, to, 1.6);
 }
 
-/// It was hurt: a taming under way loses effectiveness, and it runs off.
-pub fn hurt(w: &World, id: u64) {
+/// It was hurt by `source` (0: nothing, a fall, the cold): a taming under way loses effectiveness,
+/// and it runs off, from what hurt it (a deer a wolf bit runs from the wolf, not from the player
+/// who happens to be nearest).
+pub fn hurt(w: &World, id: u64, source: u64) {
     let passive = w
         .component(id, &ANIMAL)
         .and_then(|a| a.species())
@@ -250,14 +309,17 @@ pub fn hurt(w: &World, id: u64) {
             t.effectiveness = (t.effectiveness - HURT).max(0.0);
         }
     });
-    scare(w, id);
+    if source != 0 && source != id {
+        weft_sdk::info!("animal {id} hurt by {source}: runs from it");
+    }
+    scare(w, id, source);
 }
 
 /// A player right clicks a wild animal with `held`: food it eats goes toward taming it. True if
 /// the click was used.
 pub fn feed(w: &World, id: u64, player: u64) -> bool {
-    let Some(a) = w.component(id, &ANIMAL).copied() else { return false };
-    let (Some(s), Some(t)) = (a.species(), w.component(id, &TAMING).copied()) else { return false };
+    let Some(a) = w.component(id, &ANIMAL) else { return false };
+    let (Some(s), Some(t)) = (a.species(), w.component(id, &TAMING)) else { return false };
     if s.taming != Method::Passive || animal::tamed(w, id) || t.scared > 0 {
         return false;
     }
@@ -273,6 +335,7 @@ pub fn feed(w: &World, id: u64, player: u64) -> bool {
     };
     take_one(w, player);
     animal::feed(w, id, food.food);
+    crate::memory::fed(w, id, player);
     if t.asking == 0 {
         // Fed when it wasn't asking: it eats, warily.
         mistake(w, id, &st, w.random_below(3) == 0);
@@ -282,7 +345,7 @@ pub fn feed(w: &World, id: u64, player: u64) -> bool {
     let wanted = t.want as usize == index + 1;
     let needed = s.feedings * (1.0 + a.level() as f32 / 100.0);
     // Near a capybara it takes to you a quarter faster.
-    let calm = if crate::signatures::calm(w, st.pos) { 1.25 } else { 1.0 };
+    let calm = if crate::signatures::calm(w, st.pos.to_array()) { 1.25 } else { 1.0 };
     let gain = food.liking.taming() * if wanted { 1.25 } else { 1.0 } * calm / needed;
     let wait = WAIT_TICKS.0 + w.random_below(WAIT_TICKS.1 - WAIT_TICKS.0);
     set(w, id, |t| {
@@ -291,7 +354,7 @@ pub fn feed(w: &World, id: u64, player: u64) -> bool {
         t.asking = 0;
         t.wait = wait;
     });
-    hearts(w, st.pos, 2);
+    hearts(w, st.pos.to_array(), 2);
     if t.progress + gain >= 1.0 {
         tame(w, id, player, t.effectiveness);
     }
@@ -302,18 +365,20 @@ pub fn feed(w: &World, id: u64, player: u64) -> bool {
 fn mistake(w: &World, id: u64, st: &EntityState, scares: bool) {
     set(w, id, |t| t.effectiveness = (t.effectiveness - MISTAKE).max(0.0));
     drop(
-        w.spawn_particles(&POOF, [st.pos[0], st.pos[1] + 0.5, st.pos[2]])
+        w.spawn_particles(&POOF, [st.pos.x, st.pos.y + 0.5, st.pos.z])
             .count(4)
             .spread(0.2),
     );
     if scares {
-        scare(w, id);
+        scare(w, id, 0);
     }
 }
 
 /// `id` becomes `player`'s, with `floor(level * effectiveness / 2)` bonus levels placed on
 /// random stats (never torpor).
 pub fn tame(w: &World, id: u64, player: u64, effectiveness: f32) {
+    // Its level first: the bonus levels and the XP go by it.
+    crate::animal::ensure_rolled(w, id);
     // Out of the wild: its genes leave its place's pool.
     if !crate::animal::tamed(w, id) {
         crate::evolution::count(w, id, -1.0);
@@ -337,6 +402,7 @@ pub fn tame(w: &World, id: u64, player: u64, effectiveness: f32) {
         weft_sdk::info!("animal {id} tamed at {:.0}%: {bonus} bonus levels, now level {}", effectiveness * 100.0, a.level());
         let level = a.level();
         crate::xp::tamed(w, player, level);
+        crate::journal::note_animal(w, player, id, animals_core::journal::TAMED);
         // The first time this player tames one: how to give it orders (a line under the
         // crosshair, `base_api::hint`), then Survival's "A Friend" advancement
         // (`base_api::milestones`), which also marks that they have.
@@ -352,7 +418,7 @@ pub fn tame(w: &World, id: u64, player: u64, effectiveness: f32) {
     crate::commands::tamed(w, id);
     crate::dog::on_tamed(w, id);
     if let Some(st) = w.entity(id) {
-        hearts(w, st.pos, 7);
+        hearts(w, st.pos.to_array(), 7);
     }
 }
 
@@ -367,7 +433,7 @@ fn hearts(w: &World, at: [f64; 3], count: u32) {
 
 /// One of the held item used up (unless in creative).
 pub fn take_one(w: &World, player: u64) {
-    if w.creative(player) {
+    if w.outside_survival(player) {
         return;
     }
     let inv = w.inventory(player);

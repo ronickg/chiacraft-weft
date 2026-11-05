@@ -18,15 +18,17 @@ struct Material {
     level: u32,
     speed: f32,
     durability: u32,
-    damage: f32,
 }
 
+/// Today's tool sets: harvest level, mining speed and uses. Their damage and swings come from the
+/// curve by their material's age (`vitals::gear`); a material the parts know harvests at its
+/// level there (diamond above steel, `notes/CRAFTING.md`).
 const MATERIALS: [Material; 5] = [
-    Material { name: "wood", level: tool_tier::WOOD, speed: 2.0, durability: 59, damage: 0.0 },
-    Material { name: "stone", level: tool_tier::STONE, speed: 4.0, durability: 131, damage: 1.0 },
-    Material { name: "iron", level: tool_tier::IRON, speed: 6.0, durability: 250, damage: 2.0 },
-    Material { name: "diamond", level: tool_tier::DIAMOND, speed: 8.0, durability: 1561, damage: 3.0 },
-    Material { name: "gold", level: tool_tier::WOOD, speed: 12.0, durability: 32, damage: 0.0 },
+    Material { name: "wood", level: tool_tier::WOOD, speed: 2.0, durability: 59 },
+    Material { name: "stone", level: tool_tier::STONE, speed: 4.0, durability: 131 },
+    Material { name: "iron", level: tool_tier::IRON, speed: 6.0, durability: 250 },
+    Material { name: "gold", level: tool_tier::WOOD, speed: 12.0, durability: 32 },
+    Material { name: "diamond", level: tool_tier::DIAMOND, speed: 8.0, durability: 1561 },
 ];
 
 pub fn register(r: &mut Registry) {
@@ -59,7 +61,7 @@ pub fn register(r: &mut Registry) {
         .tag("materials/diamond")
         .tab(&crate::tabs::INGREDIENTS);
     r.item(&WHEAT_SEEDS)
-        .placed_block(&crate::blocks::WHEAT)
+        .places(&crate::blocks::WHEAT)
         .tab(&crate::tabs::NATURAL);
     r.item(&WHEAT)
         .tag("crops/wheat")
@@ -110,9 +112,13 @@ pub fn register(r: &mut Registry) {
         let i = if vitals::preserve::PRODUCTS.contains(&f.name) { i.tag("preserved") } else { i };
         // Any raw meat salts (`cooking.rs`).
         let i = if tag.starts_with("raw_meat/") { i.tag("raw_meat") } else { i };
-        // Berries are planted like seeds: a new bush; so are the wild plants' fruit and seeds.
-        let i = match crate::wild::planted_by(name) {
-            Some(b) => i.placed_block(b),
+        // Berries are planted like seeds: a new bush; so are the wild plants' fruit and seeds,
+        // and the roots a crop is sown from (`crops.rs`).
+        let i = match crate::wild::planted_by(name)
+            .or_else(|| crate::crops::planted_by(name))
+            .or_else(|| crate::blocks::sapling_planted_by(name))
+        {
+            Some(b) => i.places(b),
             None => i,
         };
         if !tag.is_empty() {
@@ -122,18 +128,20 @@ pub fn register(r: &mut Registry) {
     // Seeds animals eat off the ground (`vitals::forage::DROPPED`): acorns, which plant an oak,
     // and wild rice's grain, which plants wild rice.
     r.item(Item::generated("acorn".into()))
-        .placed_block(&crate::blocks::SAPLING)
+        .places(&crate::blocks::SAPLING)
         .tab(&crate::tabs::NATURAL);
     let rice = r
         .item(Item::generated("rice".into()))
         .tag("rice")
         .tab(&crate::tabs::NATURAL);
     match crate::wild::planted_by("rice") {
-        Some(b) => drop(rice.placed_block(b)),
+        Some(b) => drop(rice.places(b)),
         None => drop(rice),
     }
+    // Buckskin, brain-tanned from a hide at a tanning frame (`crafts.rs`): clothes and books. Leather
+    // armor is sole leather's (`materials/leather`), bark-tanned for days in a pit.
     r.item(Item::generated("leather".into()))
-        .tag("materials/leather")
+        .tag("leather")
         .tab(&crate::tabs::INGREDIENTS);
     // paper (from sugar cane) and books (paper and leather) make bookshelves
     for name in ["bone", "string", "sugar", "gunpowder", "feather", "arrow", "egg", "paper", "book"] {
@@ -144,11 +152,12 @@ pub fn register(r: &mut Registry) {
 
     for m in &MATERIALS {
         // `.tool(kind)` tags it `tools/<kind>`; `<kind>s/<material>` picks its recipe.
-        let tool = |r: &mut Registry, kind: &str, damage: f32, speed: f32| {
+        let tool = |r: &mut Registry, kind: &str| {
+            let (damage, speed) = vitals::gear::weapon_of(kind, m.name).unwrap_or((1.0, 1.0));
             let b = r
                 .item(Item::generated(format!("{}_{kind}", m.name)))
                 .tool(kind)
-                .tool_level(m.level)
+                .tool_level(crafting::materials::material(m.name).map_or(m.level, |x| x.harvest))
                 .mining_speed(m.speed)
                 .durability(m.durability)
                 .attack_damage(damage)
@@ -164,19 +173,9 @@ pub fn register(r: &mut Registry) {
                 b.on_use(crate::farming::till);
             }
         };
-        tool(r, "pickaxe", 2.0 + m.damage, 1.2);
-        tool(r, "shovel", 2.5 + m.damage, 1.0);
-        tool(r, "sword", 4.0 + m.damage, 1.6);
-        // Modern's: slow and strong axes, hoes barely hit but swing fast with the material.
-        let (axe_damage, axe_speed, hoe_speed) = match m.name {
-            "wood" => (7.0, 0.8, 1.0),
-            "stone" => (9.0, 0.8, 2.0),
-            "iron" => (9.0, 0.9, 3.0),
-            "diamond" => (9.0, 1.0, 4.0),
-            _ => (7.0, 1.0, 1.0),
-        };
-        tool(r, "axe", axe_damage, axe_speed);
-        tool(r, "hoe", 1.0, hoe_speed);
+        for kind in ["pickaxe", "shovel", "sword", "axe", "hoe"] {
+            tool(r, kind);
+        }
     }
 
     // Points per piece, head to feet, as in modern.

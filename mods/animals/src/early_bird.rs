@@ -8,20 +8,18 @@ use weft_sdk::*;
 
 use crate::birds::{self, Wings};
 
-pub(crate) static CONFUCIUSORNIS: Entity = Entity::named("confuciusornis");
-pub(crate) static GOBIPTERYX: Entity = Entity::named("gobipteryx");
+pub(crate) static CONFUCIUSORNIS: EntityKind = EntityKind::named("confuciusornis");
+pub(crate) static GOBIPTERYX: EntityKind = EntityKind::named("gobipteryx");
 
 static WINGS: Wings = Wings {
     model: "early_bird",
     texture: "early_bird/early_bird",
-    size: (0.35, 0.35),
     fly_size: (0.7, 0.25),
-    health: 6.0,
     // No record: a crow-sized bird's walk and flight (est.).
     speed: 2.0,
     air: 4.5,
     wander: 0.35,
-    damage: 1.0,
+    bites: true,
     height: 5.0,
     reach: 14.0,
     flight: 300,

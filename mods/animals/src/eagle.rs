@@ -8,20 +8,18 @@ use weft_sdk::*;
 
 use crate::birds::{self, Wings};
 
-pub(crate) static GOLDEN_EAGLE: Entity = Entity::named("golden_eagle");
-pub(crate) static SAVANNA_HAWK: Entity = Entity::named("savanna_hawk");
+pub(crate) static GOLDEN_EAGLE: EntityKind = EntityKind::named("golden_eagle");
+pub(crate) static SAVANNA_HAWK: EntityKind = EntityKind::named("savanna_hawk");
 
 static WINGS: Wings = Wings {
     model: "eagle",
     texture: "eagle/eagle",
-    size: (0.55, 0.65),
     fly_size: (1.2, 0.4),
-    health: 16.0,
     // It walks little; it soars at about 14 m/s.
     speed: 1.5,
     air: 6.5,
     wander: 0.2,
-    damage: 4.0,
+    bites: true,
     height: 10.0,
     reach: 28.0,
     flight: 700,

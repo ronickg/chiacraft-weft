@@ -1,0 +1,64 @@
+# Distance haze on a clear day (Ronald, 11-05: "still a bit hazy ... much clearer ... crisp"). From
+# a low hill and from y 150 at seed 1's spawn, four ways, at noon and at 17:00, clear weather, no
+# fog (/air 0 0). Then a rainy noon and a misty dawn (/air 0.6 0) from the hill, so the fog still
+# shows when it should. Seed 1, --view 12, 1280x720, --shader-pack chiacraft, a fresh world.
+# Spectator, absolute /tp, plain waits. Yaw 0 faces -z (north).
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode spectator
+chat /weather clear 99999
+chat /time set 6000
+chat /tp 149.5 95 -166.5
+loaded
+wait 25
+chat /air 0 0
+wait 10
+look 0 -4
+wait 3
+shot haze_hill_n_noon.png
+look 90 -4
+wait 2
+shot haze_hill_w_noon.png
+look 180 -4
+wait 2
+shot haze_hill_s_noon.png
+look 270 -4
+wait 2
+shot haze_hill_e_noon.png
+chat /tp 149.5 150 -166.5
+wait 12
+look 0 -10
+wait 3
+shot haze_high_n_noon.png
+look 180 -10
+wait 2
+shot haze_high_s_noon.png
+chat /time set 11000
+wait 4
+look 270 -10
+wait 3
+shot haze_high_e_1700.png
+look 90 -10
+wait 2
+shot haze_high_w_1700.png
+chat /tp 149.5 95 -166.5
+wait 10
+chat /time set 6000
+chat /weather rain 99999
+wait 12
+look 0 -4
+wait 3
+shot haze_hill_n_rain.png
+chat /weather clear 99999
+chat /time set 500
+chat /air 0.6 0
+wait 15
+look 270 -4
+wait 3
+shot haze_hill_e_mistdawn.png
+look 0 -8
+wait 2
+shot haze_hill_n_mistdawn.png
+chat /air 0 0
+quit

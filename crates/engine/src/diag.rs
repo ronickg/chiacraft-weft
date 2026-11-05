@@ -47,6 +47,38 @@ pub static TERRAIN_FINISHED: Counter = Counter::new();
 pub static TERRAIN_FINISH_NS: Counter = Counter::new();
 pub static TERRAIN_JOINED: Counter = Counter::new();
 pub static TERRAIN_BUSY_NS: Counter = Counter::new();
+/// Near cubes' meshes handed to the GPU on the frame thread (`WorldRenderer::upload`), and the time.
+pub static UPLOADS: Counter = Counter::new();
+pub static UPLOAD_NS: Counter = Counter::new();
+/// Distant terrain: tiles made (shown or cached) and asked for then called off.
+pub static LOD_MADE: Counter = Counter::new();
+pub static LOD_CALLED_OFF: Counter = Counter::new();
+/// Distant terrain's work per tile: the CPU-made features' heights (tiles, time), the meshing
+/// (tiles, time) and, for each tile made, the time from asking for it to having it.
+pub static LOD_HEIGHTS: Counter = Counter::new();
+pub static LOD_HEIGHTS_NS: Counter = Counter::new();
+pub static LOD_MESHED: Counter = Counter::new();
+pub static LOD_MESH_NS: Counter = Counter::new();
+pub static LOD_AGE_NS: Counter = Counter::new();
+/// Box tiles meshed and their quads by kind: ground tops, walls, crowns' tops and undersides,
+/// crowns' sides and trunks.
+static LOD_BOX: [Counter; 5] = [const { Counter::new() }; 5];
+
+/// A box tile's quads by kind (`lod::mesh`).
+pub fn lod_box_quads(q: [usize; 4]) {
+    LOD_BOX[0].add(1);
+    for (c, n) in LOD_BOX[1..].iter().zip(q) {
+        c.add(n as u64);
+    }
+}
+/// Calls to the dimension's steep faces (`Faces::block`) while meshing tiles, and their time.
+pub static LOD_FACES: Counter = Counter::new();
+pub static LOD_FACES_NS: Counter = Counter::new();
+/// Distant terrain now: tiles wanted, wanted but not made (a coarser tile or nothing shows
+/// there), and asked for.
+pub static LOD_WANTED: AtomicU64 = AtomicU64::new(0);
+pub static LOD_MISSING: AtomicU64 = AtomicU64::new(0);
+pub static LOD_PENDING: AtomicU64 = AtomicU64::new(0);
 
 /// Messages and bytes per message kind: `[0]` to clients, `[1]` to the server.
 static NET: [[(AtomicU64, AtomicU64); 64]; 2] = [const { [const { (AtomicU64::new(0), AtomicU64::new(0)) }; 64] }; 2];
@@ -60,6 +92,22 @@ pub fn net_message(to_server: bool, kind: usize, count: u64, bytes: usize) {
         c.0.fetch_add(count, Ordering::Relaxed);
         c.1.fetch_add(bytes as u64, Ordering::Relaxed);
     }
+}
+
+/// The traffic counted since the last call (with the `net` channel at debug), one way: by message
+/// kind, how many and how many bytes encoded (before compression). For a headless server's stats
+/// line (`dedicated::stats`), where no frame report reads them.
+pub fn take_net(to_server: bool) -> Vec<(&'static str, u64, u64)> {
+    use crate::net::Message;
+    let kinds = if to_server { crate::net::ToServer::KINDS } else { crate::net::ToClient::KINDS };
+    NET[to_server as usize]
+        .iter()
+        .enumerate()
+        .filter_map(|(k, c)| {
+            let (count, bytes) = (c.0.swap(0, Ordering::Relaxed), c.1.swap(0, Ordering::Relaxed));
+            (count + bytes > 0).then(|| (kinds.get(k).copied().unwrap_or("?"), count, bytes))
+        })
+        .collect()
 }
 
 // ---------------------------------------------------------------- allocations
@@ -296,7 +344,7 @@ pub struct Reporter {
     frame_sum: f64,
     frame_max: f32,
     cpu: [f64; 5],
-    gpu: [f64; 5],
+    gpu: [f64; crate::bench::GPU_N],
     gpu_frames: u32,
     mods: ModWindow,
 }
@@ -316,7 +364,7 @@ impl Reporter {
         for (a, v) in self.cpu.iter_mut().zip(s.cpu) {
             *a += *v as f64;
         }
-        if s.gpu.len() >= 5 {
+        if s.gpu.len() >= crate::bench::GPU_N {
             for (a, v) in self.gpu.iter_mut().zip(s.gpu) {
                 *a += *v as f64;
             }
@@ -356,6 +404,7 @@ impl Reporter {
                 format!(" | server {:.2} ms: {}", sh.tick_us.load(Ordering::Relaxed) as f64 / 1000.0, phases.join(", "))
             });
             log::debug!(target: "frame", "{:.0} fps, frame avg {:.2} max {:.2} ms | cpu {} | gpu {}{server}", self.frames as f64 / secs, self.frame_sum / n, self.frame_max, cpu.join(", "), gpu.join(", "));
+            log_parts(n);
         }
         if on(Channel::Net, Level::Debug) {
             for (dir, name) in [(0, "to clients"), (1, "to server")] {
@@ -385,12 +434,44 @@ impl Reporter {
         if on(Channel::Load, Level::Debug) {
             let (gpu, fin, fin_ns, joined, busy) =
                 (TERRAIN_GPU.take(), TERRAIN_FINISHED.take(), TERRAIN_FINISH_NS.take(), TERRAIN_JOINED.take(), TERRAIN_BUSY_NS.take());
-            if gpu + fin + joined > 0 {
+            let (uploads, upload_ns) = (UPLOADS.take(), UPLOAD_NS.take());
+            if gpu + fin + joined + uploads > 0 {
                 log::debug!(
                     target: "load",
-                    "terrain per {secs:.1} s: {gpu} from the GPU, {fin} finished ({:.0} us each on a worker), {joined} put in, terrain thread busy {:.0}%",
+                    "terrain per {secs:.1} s: {gpu} from the GPU, {fin} finished ({:.0} us each on a worker), {joined} put in, terrain thread busy {:.0}%; {uploads} meshes uploaded ({:.1} us each on the frame thread)",
                     fin_ns as f64 / fin.max(1) as f64 / 1000.0,
-                    busy as f64 / secs / 1e7
+                    busy as f64 / secs / 1e7,
+                    upload_ns as f64 / uploads.max(1) as f64 / 1000.0
+                );
+            }
+            let (made, off, age) = (LOD_MADE.take(), LOD_CALLED_OFF.take(), LOD_AGE_NS.take());
+            let (heights, heights_ns, meshed, mesh_ns) = (LOD_HEIGHTS.take(), LOD_HEIGHTS_NS.take(), LOD_MESHED.take(), LOD_MESH_NS.take());
+            let (faces, faces_ns) = (LOD_FACES.take(), LOD_FACES_NS.take());
+            let boxq: Vec<u64> = LOD_BOX.iter().map(Counter::take).collect();
+            if boxq[0] > 0 {
+                let per = |n: u64| n / boxq[0];
+                log::debug!(
+                    target: "load",
+                    "distant terrain box tiles per {secs:.1} s: {}, quads each: {} tops, {} walls, {} crown tops and undersides, {} crown sides and trunks",
+                    boxq[0],
+                    per(boxq[1]),
+                    per(boxq[2]),
+                    per(boxq[3]),
+                    per(boxq[4])
+                );
+            }
+            let missing = LOD_MISSING.load(Ordering::Relaxed);
+            if made + off > 0 || missing > 0 {
+                log::debug!(
+                    target: "load",
+                    "distant terrain per {secs:.1} s: {made} tiles made ({:.0} ms from asked to made), {off} called off, {} wanted, {missing} not made yet, {} asked; heights {:.0} us, mesh {:.0} us each, of which {:.0} us in {:.0} face calls",
+                    age as f64 / made.max(1) as f64 / 1e6,
+                    LOD_WANTED.load(Ordering::Relaxed),
+                    LOD_PENDING.load(Ordering::Relaxed),
+                    heights_ns as f64 / heights.max(1) as f64 / 1000.0,
+                    mesh_ns as f64 / meshed.max(1) as f64 / 1000.0,
+                    faces_ns as f64 / meshed.max(1) as f64 / 1000.0,
+                    faces as f64 / meshed.max(1) as f64,
                 );
             }
         }
@@ -408,7 +489,7 @@ impl Reporter {
         self.frame_sum = 0.0;
         self.frame_max = 0.0;
         self.cpu = [0.0; 5];
-        self.gpu = [0.0; 5];
+        self.gpu = [0.0; crate::bench::GPU_N];
         self.gpu_frames = 0;
     }
 
@@ -465,6 +546,38 @@ pub fn size(bytes: u64) -> String {
 
 thread_local! {
     static CURRENT_MOD: Cell<u32> = const { Cell::new(u32::MAX) };
+    /// Whether this thread is the server's (its own or its pool's): mod time here is the
+    /// server's, the rest (drawing, the client's hooks) is not counted per tick.
+    static SERVER: Cell<bool> = const { Cell::new(false) };
+    /// Nanoseconds the mod calls made inside the one running took, so it isn't charged them too.
+    static INNER_NS: Cell<u64> = const { Cell::new(0) };
+}
+
+/// This thread is the server's (`host::invoke` charges mod time here to `mod_totals`).
+pub fn mark_server_thread() {
+    SERVER.with(|s| s.set(true));
+}
+
+/// Whether this thread is the server's.
+#[inline]
+pub fn on_server() -> bool {
+    SERVER.with(|s| s.get())
+}
+
+/// A mod call starts: what its caller's inner calls took so far, to give back at the end.
+#[inline]
+pub fn inner_start() -> u64 {
+    INNER_NS.with(|c| c.replace(0))
+}
+
+/// A mod call that took `ns` ends: its own time (less the calls it made), and the caller's inner
+/// time now (`saved` and this call).
+#[inline]
+pub fn inner_end(saved: u64, ns: u64) -> u64 {
+    INNER_NS.with(|c| {
+        let inner = c.replace(saved + ns);
+        ns.saturating_sub(inner)
+    })
 }
 
 /// Marks this thread as running `m`'s code; returns what to restore afterwards.
@@ -588,4 +701,100 @@ mod native {
         // Let Windows end the process as it would have.
         0
     }
+}
+
+// ---------------------------------------------------------------- slow frames, step by step
+
+thread_local! {
+    static SPANS: std::cell::RefCell<Vec<(&'static str, f32)>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// A frame record's step a frame times until it is dropped (`span`); only on the frame thread.
+pub struct Span(&'static str, Instant);
+
+thread_local! {
+    /// The parts of this thread's per-frame work (`part`): (name, ms summed, most in one frame,
+    /// this frame's so far), logged once a second as `update split` (`--log frame=debug`).
+    static PARTS: std::cell::RefCell<Vec<(&'static str, f64, f32, f32)>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Times a part of the frame's update until dropped, summed over a second (`log_parts`). Costs an
+/// `Instant::now` pair; nothing else until the frame channel is on.
+pub struct Part(&'static str, Instant);
+
+pub fn part(name: &'static str) -> Part {
+    Part(name, Instant::now())
+}
+
+impl Drop for Part {
+    fn drop(&mut self) {
+        let ms = self.1.elapsed().as_secs_f32() * 1000.0;
+        PARTS.with(|p| {
+            let mut p = p.borrow_mut();
+            match p.iter_mut().find(|e| e.0 == self.0) {
+                Some(e) => e.3 += ms,
+                None => p.push((self.0, 0.0, 0.0, ms)),
+            }
+        });
+    }
+}
+
+/// Ends a frame for `part`: each part's time this frame goes into its sum and maximum.
+pub fn end_parts() {
+    PARTS.with(|p| {
+        for e in p.borrow_mut().iter_mut() {
+            (e.1, e.2, e.3) = (e.1 + e.3 as f64, e.2.max(e.3), 0.0);
+        }
+    });
+}
+
+/// The parts' average and maximum per frame over `frames` frames, slowest first, and starts again.
+fn log_parts(frames: f64) {
+    let parts = PARTS.with(|p| std::mem::take(&mut *p.borrow_mut()));
+    if parts.is_empty() {
+        return;
+    }
+    let mut parts: Vec<_> = parts
+        .into_iter()
+        .map(|e| (e.0, e.1 / frames.max(1.0), e.2))
+        .collect();
+    parts.sort_by(|a, b| b.1.total_cmp(&a.1));
+    let line: Vec<String> = parts
+        .iter()
+        .map(|(k, avg, max)| format!("{k} {avg:.2} (max {max:.1})"))
+        .collect();
+    log::debug!(target: "frame", "update split ms a frame: {}", line.join(", "));
+}
+
+/// Times a step of recording the frame: a frame whose record took long logs its steps
+/// (`slow_record`). Nested ones ("render/world") are listed too, before the step they are in.
+pub fn span(name: &'static str) -> Span {
+    Span(name, Instant::now())
+}
+
+impl Drop for Span {
+    fn drop(&mut self) {
+        let ms = self.1.elapsed().as_secs_f32() * 1000.0;
+        SPANS.with(|s| s.borrow_mut().push((self.0, ms)));
+    }
+}
+
+/// Recording frames over this many ms log their steps (`span`).
+const SLOW_RECORD_MS: f32 = 20.0;
+
+/// Ends a frame's record: with `--log frame=debug`, one that took `record_ms` over
+/// `SLOW_RECORD_MS` logs its timed steps, slowest first. The hitches standing still in Ronald's
+/// window (11-04: 25-77 ms frames about once a second, nothing loading) were all in "record".
+pub fn slow_record(record_ms: f32) {
+    let mut spans = SPANS.with(|s| std::mem::take(&mut *s.borrow_mut()));
+    if record_ms < SLOW_RECORD_MS {
+        return;
+    }
+    spans.sort_by(|a, b| b.1.total_cmp(&a.1));
+    let steps: Vec<String> = spans
+        .iter()
+        .filter(|s| s.1 >= 0.05)
+        .map(|(name, ms)| format!("{name} {ms:.2}"))
+        .collect();
+    log::debug!(target: "frame", "slow record {record_ms:.1} ms: {}", steps.join(", "));
 }

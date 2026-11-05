@@ -9,15 +9,14 @@
 //! (`World::set_look`), as the Utahraptor's. The model, its animations and texture are built from
 //! `source/wyvern` (see `docs/creatures.md`).
 
+use crate::choose::{Band, Need, Stops, WithBand};
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
-pub(crate) static WYVERN: Entity = Entity::named("wyvern");
-const TEXTURE: &str = "wyvern/wyvern";
-/// Its box: about its body (the neck and tail reach well out of it), as tall as its shoulders.
-const SIZE: (f32, f32) = (3.4, 4.0);
-/// Its row in `species::SPECIES`.
+use crate::ModelFile;
 
+pub(crate) static WYVERN: EntityKind = EntityKind::named("wyvern");
+const TEXTURE: &str = "wyvern/wyvern";
 /// How near a player can come before a wild one goes for them, in blocks; near its nest, further.
 const TERRITORY: f64 = 14.0;
 const NEST_TERRITORY: f64 = 24.0;
@@ -31,14 +30,14 @@ pub fn init(r: &mut Registry) {
         crate::rest::Settle { chance: 500, ticks: (800, 2400), lie_after: 0 },
         "wyvern",
         TEXTURE,
-        (SIZE.0, SIZE.1 * 0.5),
+        (animals_core::bodies::of("wyvern").0, animals_core::bodies::of("wyvern").1 * 0.5),
         &[("_rest", "wyvern_rest")],
     );
-    r.entity(&WYVERN)
-        .size(SIZE.0, SIZE.1)
-        .health(400.0)
-        .speed(5.0)
-        .attack_damage(30.0)
+    crate::riding::rideable(r.entity(&WYVERN), index)
+        .size(animals_core::bodies::of("wyvern").0, animals_core::bodies::of("wyvern").1)
+        .max_health(crate::animal::health(index))
+        .walk_speed(5.0)
+        .attack_damage(crate::animal::hit(index))
         .attack_speed(0.8)
         .passive()
         .model_file("wyvern")
@@ -52,6 +51,7 @@ pub fn init(r: &mut Registry) {
             {
                 crate::commands::interact(&w, id, player);
             }
+            false
         })
         .goals(
             Goals::new()
@@ -63,16 +63,22 @@ pub fn init(r: &mut Registry) {
                 .then(guard)
                 .then(crate::hunt::hunt)
                 .then(crate::commands::act(index))
-                .then(crate::breeding::behave(index))
                 .then(crate::eggs::nest(index))
-                .then(crate::rest::settle)
-                .then(crate::commands::hold)
-                .then(crate::comfort::seek)
-                .then(crate::forage::forage)
-                .then(ai::wander(0.4, 20.0)),
+                // What it does when nothing is after it or ordered, the most pressing first (`choose.rs`).
+                .band(
+                    "needs",
+                    Band::new()
+                        .with(Need::Love, crate::breeding::behave(index))
+                        .with(Need::Rest, Stops { goal: crate::rest::settle, stop: crate::rest::stop })
+                        .with(Need::Hold, crate::commands::hold)
+                        .with(Need::Comfort, crate::comfort::seek)
+                        .with(Need::Drink, crate::drink::drink)
+                        .with(Need::Eat, crate::forage::eat)
+                        .with(Need::Wander, ai::wander(0.4, 20.0)),
+                ),
         )
         .on_hurt(|w, h| {
-            crate::taming::hurt(w, h.entity);
+            crate::taming::hurt(w, h.entity, h.source);
             crate::rest::stop(w, h.entity);
         });
 }
@@ -90,7 +96,7 @@ fn guard(w: &World, id: u64, st: &EntityState) -> bool {
         return false;
     }
     let nest = !w
-        .near(st.pos, NEST_TERRITORY, Some(&crate::eggs::NEST))
+        .entities_near(st.pos, NEST_TERRITORY, Some(&crate::eggs::NEST))
         .is_empty();
     if let Some((p, _)) = ai::nearest_player(w, st, if nest { NEST_TERRITORY } else { TERRITORY }) {
         weft_sdk::info!("wyvern {id} goes for player {p}");
@@ -114,7 +120,7 @@ fn breathe_at_foe(w: &World, id: u64, st: &EntityState) -> bool {
         return false;
     };
     let Some(f) = w.entity(foe) else { return false };
-    let d2 = (f.pos[0] - st.pos[0]).powi(2) + (f.pos[2] - st.pos[2]).powi(2);
+    let d2 = (f.pos.x - st.pos.x).powi(2) + (f.pos.z - st.pos.z).powi(2);
     if (25.0..256.0).contains(&d2) {
         crate::breath::start(w, id, foe);
     }

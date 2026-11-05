@@ -10,6 +10,27 @@ use weft_sdk::*;
 
 use super::{DT, set};
 
+use std::collections::HashMap;
+use std::sync::Mutex;
+use std::time::Instant;
+
+/// Server to client: why eating was refused, by its index in `REFUSED` (Tester, 11-04: a full
+/// stomach let nothing be eaten on a 4 s hold, and nothing said why).
+static REFUSED: Channel<u32> = Channel::named("food_refused");
+/// The lines, `food.base.refused.<name>`: no room for it, or every portion's place taken.
+const REFUSALS: [&str; 2] = ["full", "too_many"];
+const FULL: u32 = 0;
+const TOO_MANY: u32 = 1;
+/// A hold asks every tick: the line goes out once in this many ticks a player, and shows this long.
+const REFUSED_EVERY: u64 = 30;
+const REFUSED_SECS: f32 = 2.5;
+const REFUSED_FADE: f32 = 0.5;
+/// Where it shows, a share of the screen's height down: the bed's messages' line.
+const REFUSED_Y: f32 = 0.72;
+/// The tick each player was last told (server), and the line showing (client).
+static TOLD: Mutex<Option<HashMap<u64, u64>>> = Mutex::new(None);
+static SHOWING: Mutex<Option<(u32, Instant)>> = Mutex::new(None);
+
 pub fn register(r: &mut Registry) {
     // Food's stamps, kept and saved with each stack (`age`).
     r.stack_component(&MADE, 0);
@@ -17,28 +38,66 @@ pub fn register(r: &mut Registry) {
     r.stack_component(&FRESHNESS, 0);
     // No room in the stomach: it doesn't start eating (the other way round it would only find out
     // at the end).
-    r.intercept(&question::USE_ITEM, |q| {
+    r.intercept(&actions::USE_ITEM, |q| {
         let w = q.world();
-        if w.creative(q.entity()) {
+        if w.outside_survival(q.entity()) {
             return Verdict::Abstain;
         }
-        let full = if FOOD.on_item(q.item()).is_some() {
-            !base_api::has_room(&w, q.entity(), q.item())
+        let player = q.entity();
+        // How many portions it takes, and whether there's room for it.
+        let (portions, room) = if FOOD.on_item(q.item()).is_some() {
+            (1, base_api::has_room(&w, player, q.item()))
         } else if q.item() == crate::cooking::STEW.id() {
             // A stew all at once: what it holds is on the stack in hand.
             let held = w
-                .inventory(q.entity())
+                .inventory(player)
                 .group("hotbar")
-                .get(w.selected_slot(q.entity()));
-            held.item == q.item() && !base_api::has_room_for_meal(&w, q.entity(), &held)
+                .get(w.selected_slot(player));
+            if held.item != q.item() {
+                return Verdict::Abstain;
+            }
+            (meals::ingredients(MEAL.on_stack_own(&held).unwrap_or(0)).len(), base_api::has_room_for_meal(&w, player, &held))
         } else {
-            false
+            return Verdict::Abstain;
         };
-        if full { Verdict::Deny } else { Verdict::Abstain }
+        let free = w
+            .component(player, &VITALS)
+            .map_or(stomach::PORTIONS, |v| v.stomach().portions.iter().filter(|p| p.food == 0).count());
+        let refused = if !room {
+            FULL
+        } else if free < portions {
+            TOO_MANY
+        } else {
+            return Verdict::Abstain;
+        };
+        let now = w.game_time();
+        let mut told = TOLD.lock().unwrap();
+        let last = told
+            .get_or_insert_with(HashMap::new)
+            .entry(player)
+            .or_insert(0);
+        if *last == 0 || now >= *last + REFUSED_EVERY || now < *last {
+            *last = now.max(1);
+            w.send(player, &REFUSED, &refused);
+        }
+        Verdict::Deny
+    });
+    r.client_packet(&REFUSED, |_, why| *SHOWING.lock().unwrap() = Some((why, Instant::now())));
+    r.client_frame(|c| {
+        let mut showing = SHOWING.lock().unwrap();
+        let Some((why, at)) = *showing else { return };
+        let t = at.elapsed().as_secs_f32();
+        if t > REFUSED_SECS {
+            *showing = None;
+            return;
+        }
+        let alpha = ((REFUSED_SECS - t) / REFUSED_FADE).clamp(0.0, 1.0);
+        let key = format!("food.base.refused.{}", REFUSALS[why as usize % REFUSALS.len()]);
+        c.draw_screen_text(0.5, REFUSED_Y, &key, &[], 0xffffff00 | (alpha * 255.0) as u32, 1.0);
     });
     // Opening a chest (or any block's inventory) brings its food's freshness up to date: it has
     // aged all along from its stamp, the stamp just says so now.
-    r.intercept(&question::USE_BLOCK, |q| {
+    r.intercept(&actions::USE_BLOCK, |q| {
         let w = q.world();
         let be = w.block_entity(q.pos());
         if be != 0 {
@@ -95,7 +154,7 @@ pub fn age(w: &World, player: u64) {
 pub fn age_inventory(w: &World, id: u64, merge: bool) {
     let inv = w.inventory(id);
     let now = w.day_time();
-    let size = inv.size();
+    let size = inv.len();
     let before: Vec<ItemStack> = (0..size).map(|i| inv.get(i)).collect();
     let mut after = before.clone();
     for stack in after.iter_mut() {
@@ -120,8 +179,9 @@ pub fn age_inventory(w: &World, id: u64, merge: bool) {
 /// it cools.
 pub fn merge_food(stacks: &mut [ItemStack]) {
     let alike = |s: &ItemStack| ItemStack { count: 1, ..s.without(&MADE) };
-    let mergeable =
-        |s: &ItemStack| !s.is_empty() && FRESHNESS.on_item(s.item).is_some() && HOT.stack_only(s).is_none() && MEAL.stack_only(s).is_none();
+    let mergeable = |s: &ItemStack| {
+        !s.is_empty() && FRESHNESS.on_item(s.item).is_some() && HOT.on_stack_own(s).is_none() && MEAL.on_stack_own(s).is_none()
+    };
     for i in 0..stacks.len() {
         if !mergeable(&stacks[i]) {
             continue;
@@ -136,7 +196,7 @@ pub fn merge_food(stacks: &mut [ItemStack]) {
                 continue;
             }
             let n = room.min(s.count);
-            let made = match (MADE.stack_only(&t), MADE.stack_only(&s)) {
+            let made = match (MADE.on_stack_own(&t), MADE.on_stack_own(&s)) {
                 (Some(a), Some(b)) if a > 0 && b > 0 => a.min(b),
                 (Some(a), _) if a > 0 => a,
                 (_, Some(b)) => b,
@@ -155,7 +215,7 @@ pub fn merge_food(stacks: &mut [ItemStack]) {
 /// A food stack stamped and its freshness moved on, at day time `now`.
 fn aged(stack: ItemStack, now: u64) -> ItemStack {
     let today = (now / calendar::DAY_TICKS) as u32 + 1;
-    let keeps = if let Some(packed) = MEAL.stack_only(&stack) {
+    let keeps = if let Some(packed) = MEAL.on_stack_own(&stack) {
         meals::keeps(&meals::ingredients(packed))
     } else if let Some(f) = food::find(item_name(stack.item)).map(|f| &food::FOODS[f]) {
         f.keeps
@@ -165,11 +225,11 @@ fn aged(stack: ItemStack, now: u64) -> ItemStack {
     let mut new = stack;
     // Stamped with today when first seen; hot only where it was cooked (the furnace, the campfire,
     // the pot stamp it), not here: crafted bread came out hot (integration review).
-    if MADE.stack_only(&stack).unwrap_or(0) == 0 {
+    if MADE.on_stack_own(&stack).unwrap_or(0) == 0 {
         new = new.with(&MADE, today);
     }
     let (age, hot) = base_api::food_age(&new, now);
-    if HOT.stack_only(&new).is_some() && !hot {
+    if HOT.on_stack_own(&new).is_some() && !hot {
         new = new.without(&HOT);
     }
     let state = if hot {
@@ -181,7 +241,7 @@ fn aged(stack: ItemStack, now: u64) -> ItemStack {
             food::Freshness::Spoiled => freshness::SPOILED,
         }
     };
-    if FRESHNESS.stack_only(&new) != Some(state) {
+    if FRESHNESS.on_stack_own(&new) != Some(state) {
         new = new.with(&FRESHNESS, state);
     }
     new
@@ -189,7 +249,7 @@ fn aged(stack: ItemStack, now: u64) -> ItemStack {
 
 /// Game days a food stack keeps fresh, then stale (a stew by its ingredients), if it is a food.
 fn keeps_of(stack: &ItemStack) -> Option<(f32, f32)> {
-    if let Some(packed) = MEAL.stack_only(stack) {
+    if let Some(packed) = MEAL.on_stack_own(stack) {
         return Some(meals::keeps(&meals::ingredients(packed)));
     }
     food::find(item_name(stack.item)).map(|f| food::FOODS[f].keeps)

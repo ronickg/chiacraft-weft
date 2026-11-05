@@ -18,6 +18,8 @@ pub enum Ground {
     Shore,
     /// Floating on still, shallow water.
     Water,
+    /// Rooted on the bottom under still water, standing in it (`depths` says how deep).
+    Bed,
 }
 
 /// How it grows.
@@ -36,8 +38,14 @@ pub enum Form {
     Still,
     /// A fallen log lying on the ground, a full block, rotting (grubs live in it).
     Log,
+    /// A stalk standing in water, growing up a block at a time until one below the surface
+    /// (kelp); the world makes it a random height of that.
+    Column,
     /// A flat mat lying on the ground (kelp washed up at the tide line).
     Mat,
+    /// A mound standing on the ground, a full block, and in one place in two its crown on it (the
+    /// block `<block>_upper`): a termite mound.
+    Mound,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -87,7 +95,7 @@ const SWAMP: &[&str] = &["base:swamp"];
 const MOUNTAINS: &[&str] = &["base:mountains"];
 const BEACH: &[&str] = &["base:beach"];
 
-pub const FLOWERS: [Flower; 45] = [
+pub const FLOWERS: [Flower; 46] = [
     // The Konza Prairie's tallgrass.
     f("base:purple_coneflower", PLAINS, Ground::Soil, SU),
     f("base:black_eyed_susan", PLAINS, Ground::Soil, SU),
@@ -133,6 +141,9 @@ pub const FLOWERS: [Flower; 45] = [
     f("base:alligator_flag", SWAMP, Ground::Soil, SU),
     // Davos's subalpine meadows.
     f("base:alpenrose", MOUNTAINS, Ground::Soil, SU),
+    // The tropical forest's heliconia (lobster-claw), in bloom through Manaus's rains (summer and
+    // autumn, its months six on).
+    f("base:heliconia", &["base:tropical_forest"], Ground::Soil, SU | AU),
     f("base:gentian", MOUNTAINS, Ground::Soil, SP | SU),
     f("base:edelweiss", MOUNTAINS, Ground::Soil, SU),
     f("base:globeflower", MOUNTAINS, Ground::Soil, SU),
@@ -184,7 +195,7 @@ impl Turn {
 /// Every tree's leaves and how they turn: the conifers, palms and the tree fern stay green;
 /// birches and ginkgos go gold; oaks, acacias, mesquite and the swamp cypress (a deciduous conifer)
 /// go russet.
-pub const LEAVES: [(&str, Turn); 12] = [
+pub const LEAVES: [(&str, Turn); 22] = [
     ("base:oak_leaves", Turn::Orange),
     ("base:birch_leaves", Turn::Yellow),
     ("base:spruce_leaves", Turn::Evergreen),
@@ -192,12 +203,58 @@ pub const LEAVES: [(&str, Turn); 12] = [
     ("base:mesquite_leaves", Turn::Orange),
     ("base:acuri_palm_leaves", Turn::Evergreen),
     ("base:moriche_palm_leaves", Turn::Evergreen),
+    ("base:sequoia_leaves", Turn::Evergreen),
+    // The tropical forest's, evergreen as the forest is.
+    ("base:brazil_nut_leaves", Turn::Evergreen),
+    ("base:cacao_leaves", Turn::Evergreen),
+    ("base:andiroba_leaves", Turn::Evergreen),
+    ("base:matamata_leaves", Turn::Evergreen),
+    ("base:ipe_leaves", Turn::Evergreen),
+    // Drawn in its own colours (white bracts), so its tint isn't used (`blocks.rs`, `grove`).
+    ("base:dogwood_leaves", Turn::Orange),
+    // The shrubs', in their own colours too (`blocks.rs`).
+    ("base:willow_leaves", Turn::Yellow),
+    ("base:juniper_leaves", Turn::Evergreen),
+    ("base:creosote_leaves", Turn::Evergreen),
     ("animals:araucaria_leaves", Turn::Evergreen),
     ("animals:ginkgo_leaves", Turn::Yellow),
     ("animals:swamp_cypress_leaves", Turn::Orange),
     ("animals:scale_conifer_leaves", Turn::Evergreen),
     ("animals:tempskya_leaves", Turn::Evergreen),
 ];
+
+/// Trees and shrubs whose leaves flower (the bloom look), and the seasons they bloom in, bits spring
+/// first: their leaves show `leaves_<x>_bloom` then (the tinted ones under a tinted `_bloom_overlay`,
+/// so the leaves keep their biome's and season's green), a growth step every few minutes looking at
+/// the season as the wild flowers do. In spring, all from their real flowering: the Pacific dogwood's
+/// white bracts (April-May); the umbrella thorn's cream puffballs, as its rains begin; honey
+/// mesquite's yellow catkins (April-June); the creosote bush's small yellow flowers (February-April);
+/// the willow's catkins (March-April, with the first leaves).
+pub const BLOOMS: [(&str, u8); 6] = [
+    ("base:dogwood_leaves", SP),
+    ("base:acacia_leaves", SP),
+    ("base:mesquite_leaves", SP),
+    ("base:creosote_leaves", SP),
+    ("base:willow_leaves", SP),
+    // The golden ipê (Handroanthus serratifolius) flowers leafless at the dry season's end
+    // (August-September at Manaus: the game's spring, its months six on), its whole crown yellow.
+    ("base:ipe_leaves", SP),
+];
+
+/// Leaves drawn in their own colours, not tinted by the biome: the tropical canopy's, each crown a
+/// different green (Manaus's canopy from above is a patchwork, research's reference 05).
+pub const OWN_COLOURS: [&str; 3] = ["base:andiroba_leaves", "base:matamata_leaves", "base:ipe_leaves"];
+
+/// The seasons `leaves` bloom in (`BLOOMS`), if they do.
+pub fn blooms(leaves: &str) -> Option<u8> {
+    BLOOMS.iter().find(|(l, _)| *l == leaves).map(|&(_, s)| s)
+}
+
+/// Whether leaves blooming in `seasons` (`BLOOMS`) are in flower in `season` (spring 0; `None`: a
+/// world without a calendar, where nothing blooms).
+pub fn in_bloom(seasons: u8, season: Option<usize>) -> bool {
+    season.is_some_and(|s| seasons >> s & 1 != 0)
+}
 
 /// How `leaves` turn (`Turn::Orange` for leaves not listed).
 pub fn turn(leaves: &str) -> Turn {
@@ -215,7 +272,27 @@ pub const POND_LANDS: [(&str, f32); 2] = [("base:swamp", 0.35), ("animals:floodp
 /// Cordage plants: the chance cutting one gives plant fibre (`clothing`; tall grass gives it a time
 /// in eight). Sedges, cottongrass and cattail leaves were twisted into cord wherever they grow, so
 /// the tundra and the marshes have fibre too (Research round 3, B3).
-pub const FIBRE: [(&str, f32); 3] = [("base:sedge", 0.5), ("base:cottongrass", 0.5), ("base:cattail", 1.0)];
+pub const FIBRE: [(&str, f32); 4] = [("base:sedge", 0.5), ("base:cottongrass", 0.5), ("base:cattail", 1.0), ("base:dune_grass", 0.3)];
+
+/// The chance a wild banana, cut, gives a hand of its fruit (`food`'s `bananas`): a stem fruits once
+/// and dies back, so at any time about one plant in three of a stand carries a bunch.
+pub const BANANA_FRUIT: f32 = 0.3;
+
+/// Plants that glow in the dark, and their block light (`notes/NIGHT_GLOW.md`; Research round 17,
+/// recommendation 4): foxfire (Armillaria and Panellus mycelium in rotting twigs), glow mycena
+/// (Mycena chlorophos) and goblin's gold moss (Schistostega pennata). Dim, under Vintage Story's
+/// glow worms (7): the sun washes them out by day, and the pack's `base:fx_glow` scales their glow.
+pub const GLOW: [(&str, u8); 3] = [("base:foxfire", 2), ("base:glow_mycena", 3), ("base:goblins_gold", 2)];
+
+/// Spreading plants that lie flat on the ground, a sixteenth high, instead of standing as a cross.
+pub const LIES_FLAT: [&str; 2] = ["base:foxfire", "base:goblins_gold"];
+
+/// A plant's own light (0: it gives none).
+pub fn glow(block: &str) -> u8 {
+    GLOW.iter()
+        .find(|(b, _)| *b == block)
+        .map_or(0, |&(_, l)| l)
+}
 
 /// The most of one ground all its wild plants cover in a biome (the world rolls for them first).
 pub const MOST: f32 = 0.3;
@@ -236,6 +313,11 @@ pub const AGARICS: &[&str] = &["base:forest", "base:birch_forest", "base:taiga"]
 /// Where the berry bush (blueberries) grows: the forests' floor.
 pub const FORESTS: &[&str] = &["base:forest", "base:birch_forest", "base:taiga"];
 pub const WETLANDS: &[&str] = &["base:swamp", "base:savanna"];
+/// Foxfire: the damp forests, where wood rots on the floor.
+pub const FOXFIRE_WOODS: &[&str] =
+    &["base:forest", "base:birch_forest", "base:taiga", "base:swamp", "base:tropical_forest", "base:sequoia_grove"];
+/// Glow mycena: the warm wet forests.
+pub const MYCENA_WOODS: &[&str] = &["base:tropical_forest", "base:swamp"];
 pub const MARSHES: &[&str] = &["base:swamp", "base:plains", "base:forest", "base:taiga", "base:savanna"];
 pub const DESERT: &[&str] = &["base:desert"];
 pub const PRAIRIE: &[&str] = &["base:plains"];
@@ -244,8 +326,27 @@ pub const PRAIRIE: &[&str] = &["base:plains"];
 pub const CYCAD_LANDS: &[&str] = &["animals:red_dunes", "animals:scrubland", "animals:floodplain", "animals:fern_forest", "animals:crags"];
 pub const FLOWERING: &[&str] = &["animals:floodplain", "animals:scrubland"];
 pub const PONDS: &[&str] = &["animals:floodplain", "animals:red_dunes"];
+/// Still fresh water in the temperate and boreal lands: white water lilies' (Nymphaea alba, and
+/// N. tetragona into the taiga).
+/// Water lilies on still water; the llanos' and the Pantanal's lagoons have theirs too.
+pub const LAKES: &[&str] = &["base:plains", "base:forest", "base:birch_forest", "base:swamp", "base:taiga", "base:savanna"];
+/// Common reed (Phragmites australis) rings the temperate and boreal lakes; the swamp's and the
+/// llanos' shores are mostly the cattails' and the wild rice's, with a few reeds (`COVER_IN`).
+pub const REEDBEDS: &[&str] = &["base:plains", "base:forest", "base:birch_forest", "base:taiga", "base:swamp"];
+/// Sheltered sea floor: eelgrass meadows (Zostera) off the beaches.
+pub const SEA_MEADOWS: &[&str] = &["base:ocean", "base:beach"];
+/// Kelp forests: the open sea's rocky and sandy floor.
+pub const KELP_FORESTS: &[&str] = &["base:ocean"];
+/// The warm sea's reefs and lagoons (Terrain's, Key West's climate): the reef top 2 under the
+/// surface, the lagoon's sand floor 3 to 5 under.
+pub const REEFS: &[&str] = &["base:coral_reef"];
+pub const LAGOONS: &[&str] = &["base:lagoon"];
+pub const WARM_SEA: &[&str] = &["base:coral_reef", "base:lagoon"];
 /// Where the Cretaceous's trees fall and rot: its forests and the wooded floodplain.
 pub const DEADWOOD: &[&str] = &["animals:floodplain", "animals:fern_forest"];
+/// The Djadokhta's dry lands, where termites built (the report's "termite and ant nests: red
+/// dunes, scrubland").
+pub const TERMITE_LANDS: &[&str] = &["animals:red_dunes", "animals:scrubland"];
 
 const fn w(
     block: &'static str,
@@ -261,7 +362,7 @@ const fn w(
 /// Covers are shares of the cells of that ground (tall grass covers 5-35% of the turf, berry bushes
 /// 0.4% of the forest's; `forage::GRASS_COVER`): the tundra's sedges and cottongrass are its grass,
 /// the bushes and mushrooms are found, not walked through.
-pub const WILD: [Wild; 22] = [
+pub const WILD: [Wild; 41] = [
     w("base:sedge", Form::Tuft, Ground::Soil, None, SEDGE_LANDS, 0.12),
     w("base:cottongrass", Form::Tuft, Ground::Soil, None, TUNDRA, 0.08),
     w("base:reindeer_lichen", Form::Tuft, Ground::Soil, None, NORTH, 0.05),
@@ -278,19 +379,75 @@ pub const WILD: [Wild; 22] = [
     w("base:mushroom_brown", Form::Spreads, Ground::Soil, Some("base:mushroom_brown"), FOREST_FLOOR, 0.006),
     w("base:mushroom_red", Form::Spreads, Ground::Soil, Some("base:mushroom_red"), AGARICS, 0.003),
     w("base:water_hyacinth", Form::Spreads, Ground::Water, None, WETLANDS, 0.08),
-    w("base:cattail", Form::Still, Ground::Shore, Some("base:cattail_root"), MARSHES, 0.1),
+    // The glowing ones (`GLOW`), rare: foxfire on the damp forests' floors, glow mycena in the
+    // tropical forest and the swamp, goblin's gold in the cool forests' dark corners. Each picked
+    // is itself.
+    w("base:foxfire", Form::Spreads, Ground::Soil, None, FOXFIRE_WOODS, 0.004),
+    w("base:glow_mycena", Form::Spreads, Ground::Soil, None, MYCENA_WOODS, 0.003),
+    w("base:goblins_gold", Form::Spreads, Ground::Soil, None, AGARICS, 0.002),
+    w("base:cattail", Form::Still, Ground::Shore, Some("base:cattail_root"), MARSHES, 0.15),
+    w("base:reed", Form::Still, Ground::Shore, None, REEDBEDS, 0.12),
+    w("base:lily_pad", Form::Still, Ground::Water, None, LAKES, 0.12),
+    w("base:seagrass", Form::Still, Ground::Bed, None, SEA_MEADOWS, 0.2),
+    // Kelp standing in the sea; picked, a handful of kelp (`food::FOODS`).
+    w("base:kelp", Form::Column, Ground::Bed, Some("base:kelp"), KELP_FORESTS, 0.08),
     w("animals:cycad", Form::Still, Ground::Soil, Some("animals:cycad_seed"), CYCAD_LANDS, 0.01),
     w("animals:flowering_shrub", Form::Still, Ground::Soil, None, FLOWERING, 0.02),
     w("animals:water_lily", Form::Still, Ground::Water, None, PONDS, 0.06),
     w("animals:rotten_log", Form::Log, Ground::Soil, None, DEADWOOD, 0.004),
+    // Termite mounds on the dry lands' red sand and soil, rare: their termites the insect eaters'.
+    w("animals:termite_mound", Form::Mound, Ground::Soil, None, TERMITE_LANDS, 0.003),
     // Kelp washed up on the beach (wrack, the beach's food: sand fleas and flies on it feed the
-    // shorebirds). Kelp growing under the sea waits for a block that stands in water.
-    w("base:kelp", Form::Mat, Ground::Sand, Some("base:kelp"), &["base:beach"], 0.03),
+    // shorebirds); the kelp standing in the sea is `base:kelp` above.
+    w("base:kelp_wrack", Form::Mat, Ground::Sand, Some("base:kelp"), &["base:beach"], 0.03),
+    // The next batch from the research's gaps (part E): the beach's American beachgrass (dunes'
+    // grass, grazed and growing back; cordage) and beach plums; the mountains' black
+    // huckleberries; the desert's chia, a spring seed; dwarf birch in the tundra (hares and
+    // ptarmigan: its leaves in summer, buds and catkins in winter). (The Cretaceous's horsetails
+    // were already in: the animals mod's ground cover, grazed as grass.)
+    w("base:dune_grass", Form::Tuft, Ground::Sand, None, &["base:beach"], 0.1),
+    w("base:beach_plum_bush", Form::Bush, Ground::Sand, Some("base:beach_plums"), &["base:beach"], 0.006),
+    w("base:huckleberry_bush", Form::Bush, Ground::Soil, Some("base:huckleberries"), &["base:mountains"], 0.01),
+    w("base:chia", Form::Ripens, Ground::Sand, Some("base:chia_seeds"), DESERT, 0.02),
+    w("base:dwarf_birch", Form::Still, Ground::Soil, None, &["base:snowy_plains"], 0.02),
+    // The warm reefs and lagoons (Art's, Ronald 11-05 "Yes, approve"), as on the Florida Reef
+    // Tract: staghorn and elkhorn coral on the reef (elkhorn the shallowest, in the surf), sea
+    // fans on it, finger coral and sea rods on reef and lagoon, turtle grass on the lagoon's sand.
+    w("base:staghorn_coral", Form::Still, Ground::Bed, None, REEFS, 0.09),
+    w("base:elkhorn_coral", Form::Still, Ground::Bed, None, REEFS, 0.06),
+    w("base:sea_fan", Form::Still, Ground::Bed, None, REEFS, 0.05),
+    w("base:finger_coral", Form::Still, Ground::Bed, None, WARM_SEA, 0.05),
+    w("base:sea_rod", Form::Still, Ground::Bed, None, WARM_SEA, 0.04),
+    w("base:turtle_grass", Form::Still, Ground::Bed, None, LAGOONS, 0.2),
 ];
+
+/// How deep the water over a plant rooted on the bed is, from its floor to the surface, in
+/// blocks: eelgrass in the shallows, kelp further out.
+pub fn depths(block: &str) -> std::ops::RangeInclusive<i32> {
+    match block {
+        "base:kelp" => 6..=20,
+        // Elkhorn in the surf on the reef's crest; sea fans down the reef's face too.
+        "base:elkhorn_coral" => 1..=3,
+        "base:sea_fan" => 1..=8,
+        _ => 1..=6,
+    }
+}
 
 /// A wild plant by its block's full name.
 pub fn of(block: &str) -> Option<&'static Wild> {
     WILD.iter().find(|p| p.block == block)
+}
+
+/// A plant's cover in one biome where it isn't its usual (`Wild::cover`): reeds in the swamp at
+/// 4%, leaving its shore to the wild rice (spring's grain and the capybaras' food) and the cattails.
+pub const COVER_IN: [(&str, &str, f32); 1] = [("base:reed", "base:swamp", 0.04)];
+
+/// `p`'s cover in `biome`: its own, unless `COVER_IN` gives that biome another.
+pub fn cover_in(p: &Wild, biome: &str) -> f32 {
+    COVER_IN
+        .iter()
+        .find(|&&(b, at, _)| b == p.block && at == biome)
+        .map_or(p.cover, |&(_, _, c)| c)
 }
 
 /// Which wild plant (its index in `WILD`) grows on a cell of `ground` in `biome`, for a roll in
@@ -301,7 +458,7 @@ pub fn pick(biome: &str, ground: Ground, roll: f32) -> Option<usize> {
         if p.ground != ground || !p.found.contains(&biome) {
             continue;
         }
-        at += p.cover;
+        at += cover_in(p, biome);
         if roll < at {
             return Some(i);
         }
@@ -313,10 +470,20 @@ pub fn pick(biome: &str, ground: Ground, roll: f32) -> Option<usize> {
 mod tests {
     use super::*;
 
+    /// Glowing plants stay dim: light 1-4, nothing like a torch (`notes/NIGHT_GLOW.md`).
+    #[test]
+    fn glow_is_dim() {
+        for (block, light) in GLOW {
+            assert!((1..=4).contains(&light), "{block}: light {light}");
+            assert_eq!(glow(block), light);
+        }
+        assert_eq!(glow("base:mushroom_brown"), 0);
+    }
+
     #[test]
     fn every_wild_plant_has_its_numbers() {
         for p in &WILD {
-            if !matches!(p.form, Form::Still | Form::Log | Form::Mat) {
+            if !matches!(p.form, Form::Still | Form::Log | Form::Mat | Form::Mound) {
                 assert!(crate::plants::of(p.block).is_some(), "{}: no row in plants::PLANTS", p.block);
             }
             if let Some(item) = p.gives.filter(|g| *g != p.block) {
@@ -341,10 +508,23 @@ mod tests {
                 let all: f32 = WILD
                     .iter()
                     .filter(|q| q.ground == p.ground && q.found.contains(b))
-                    .map(|q| q.cover)
+                    .map(|q| cover_in(q, b))
                     .sum();
                 assert!(all < MOST, "{b}: wild plants cover {:.0}% of its {:?} ground", all * 100.0, p.ground);
             }
         }
+    }
+
+    /// Each blooming tree or shrub is one of the world's leaves, blooms in some season, and nothing
+    /// blooms in a world without a calendar.
+    #[test]
+    fn blooms_are_known_leaves() {
+        for (leaves, seasons) in BLOOMS {
+            assert!(LEAVES.iter().any(|(l, _)| *l == leaves), "{leaves} isn't in LEAVES");
+            assert!(seasons != 0 && seasons < 16, "{leaves}: seasons {seasons:b}");
+            assert!((0..4).any(|s| in_bloom(seasons, Some(s))), "{leaves} never blooms");
+            assert!(!in_bloom(seasons, None), "{leaves} blooms without a calendar");
+        }
+        assert_eq!(blooms("base:oak_leaves"), None);
     }
 }

@@ -29,7 +29,7 @@ pub use storage::Storage;
 
 mod bindings {
     wasmtime::component::bindgen!({
-        path: "wit/v1.2",
+        path: "wit/v1.3",
         world: "host",
     });
 }
@@ -44,7 +44,7 @@ pub use bindings::exports::chiacraft::mods::hooks::{BlockChange, Death, EventVal
 
 /// The API version this game serves.
 /// Its version is `chiacraft_packages::code::API`; a test checks the two agree.
-pub const API: &str = "1.2.0";
+pub const API: &str = "1.3.0";
 /// Strikes within this long stop a mod in a world.
 pub const STRIKE_WINDOW: Duration = Duration::from_secs(600);
 pub const STRIKES: usize = 3;
@@ -53,6 +53,8 @@ pub const STRIKES: usize = 3;
 const LOG_LINES: u32 = 64;
 const LOG_CHARS: usize = 512;
 const TELLS: u32 = 32;
+/// Achievements a call may grant (1.3).
+const ACHIEVEMENTS: u32 = 8;
 const REPLIES: u32 = 32;
 const BLOCK_SETS: u32 = 4096;
 const SPAWNS: u32 = 64;
@@ -101,6 +103,9 @@ pub trait Game: Send {
     fn give(&mut self, owner: u64, stack: ItemStack) -> ItemStack;
     fn spawn_item(&mut self, pos: [f64; 3], stack: ItemStack);
     fn tell(&mut self, player: u64, key: &str, args: &[Arg]);
+    /// The player earned achievement `id` (a full name, `<package>:<name>`) here: the world signs
+    /// it for them (1.3).
+    fn grant_achievement(&mut self, _player: u64, _id: &str, _title: &str, _description: &str, _icon: Option<&str>) {}
     fn player_key(&mut self, player: u64) -> String;
     /// A command's answer to whoever ran it; nothing outside a command.
     fn reply(&mut self, key: &str, args: &[Arg]);
@@ -341,6 +346,7 @@ struct Counts {
     stored: u64,
     schedules: u32,
     sends: u32,
+    achievements: u32,
 }
 
 impl State {
@@ -694,6 +700,21 @@ impl world::Host for State {
     }
     fn player_key(&mut self, player: u64) -> String {
         self.game().map_or(String::new(), |g| g.player_key(player))
+    }
+    fn grant_achievement(&mut self, player: u64, id: String, title: String, description: String, icon: Option<String>) {
+        self.counts.achievements += 1;
+        if self.counts.achievements > ACHIEVEMENTS || id.is_empty() || id.len() > 64 {
+            return;
+        }
+        // The package's own namespace in front, as for every name it registers.
+        let name = id.rsplit(':').next().unwrap_or(&id);
+        let full = format!("{}:{name}", self.package);
+        let cut = |s: &str, n: usize| s.chars().take(n).collect::<String>();
+        let (title, description) = (cut(&title, 64), cut(&description, 256));
+        let icon = icon.map(|i| cut(&i, 128));
+        if let Some(g) = self.game() {
+            g.grant_achievement(player, &full, &title, &description, icon.as_deref())
+        }
     }
 
     fn get_component(&mut self, id: u64, component: String) -> Option<Vec<u8>> {

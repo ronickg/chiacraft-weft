@@ -80,6 +80,55 @@ pub fn sun_shadows() -> bool {
     pack_flag("sun_shadows")
 }
 
+/// The chosen pack's `pack.cfg` says `water_behind = true`: the world is copied before what is seen
+/// through it is drawn, for water that bends and tints what lies under it (`scene.behind`).
+pub fn water_behind() -> bool {
+    pack_flag("water_behind")
+}
+
+/// The chosen pack's `pack.cfg` says `merge_effects = true`: the screen effects run in one pass,
+/// each on the color the one before it left at its own pixel; what one reads elsewhere on the
+/// screen (`scene_at`) is the image before them all. On tile-based GPUs that saves storing and
+/// loading the whole image between effects (`Post::apply`).
+pub fn merge_effects() -> bool {
+    pack_flag("merge_effects")
+}
+
+/// The `pack.cfg` the options were read from, when it was written, and the names in it.
+type OptionsRead = Option<(PathBuf, Option<std::time::SystemTime>, Vec<String>)>;
+
+/// The settings the chosen pack reads (`options = a, b, ...` in its `pack.cfg`, at most 32):
+/// their values reach every pack shader as `scene.options` (`Client::scene`), in that order, so a
+/// pack's look can be tuned in the game's settings and swept with `--config` without editing
+/// shaders. Read again when the file changes.
+pub fn pack_options() -> Vec<String> {
+    static CACHE: RwLock<OptionsRead> = RwLock::new(None);
+    let Some(dir) = SHADER_PACK.read().unwrap().clone() else { return Vec::new() };
+    let path = dir.join("pack.cfg");
+    let stamp = std::fs::metadata(&path).and_then(|m| m.modified()).ok();
+    if let Some((d, t, names)) = &*CACHE.read().unwrap()
+        && *d == dir
+        && *t == stamp
+    {
+        return names.clone();
+    }
+    let names: Vec<String> = std::fs::read_to_string(&path)
+        .unwrap_or_default()
+        .lines()
+        .filter_map(|l| l.split_once('='))
+        .filter(|(k, _)| k.trim() == "options")
+        .flat_map(|(_, v)| {
+            v.split(',')
+                .map(|n| n.trim().to_string())
+                .collect::<Vec<_>>()
+        })
+        .filter(|n| !n.is_empty())
+        .take(32)
+        .collect();
+    *CACHE.write().unwrap() = Some((dir, stamp, names.clone()));
+    names
+}
+
 /// `name = true` in the chosen shader pack's `pack.cfg`.
 fn pack_flag(name: &str) -> bool {
     let Some(dir) = SHADER_PACK.read().unwrap().clone() else { return false };
@@ -159,6 +208,11 @@ pub fn compose(
 
 pub(crate) fn open_folder(dir: &Path) {
     let _ = std::fs::create_dir_all(dir);
+    open_path(dir);
+}
+
+/// Opens a file or folder the way the system does (Explorer, Finder, xdg-open).
+pub(crate) fn open_path(path: &Path) {
     let opener = if cfg!(windows) {
         "explorer"
     } else if cfg!(target_os = "macos") {
@@ -166,8 +220,8 @@ pub(crate) fn open_folder(dir: &Path) {
     } else {
         "xdg-open"
     };
-    if let Err(e) = std::process::Command::new(opener).arg(dir).spawn() {
-        log::warn!("opening {}: {e}", dir.display());
+    if let Err(e) = std::process::Command::new(opener).arg(path).spawn() {
+        log::warn!("opening {}: {e}", path.display());
     }
 }
 

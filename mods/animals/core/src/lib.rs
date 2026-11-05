@@ -7,14 +7,24 @@ use std::sync::Mutex;
 
 pub mod balance;
 pub mod biology;
+pub mod bodies;
 pub mod coats;
+pub mod danger;
 pub mod evolution;
 pub mod hides;
+pub mod journal;
 pub mod life;
 pub mod meat;
+pub mod memory;
 pub mod needs;
+pub mod nests;
+pub mod perception;
+pub mod roles;
+pub mod routines;
 pub mod sheet;
+pub mod sky;
 pub mod species;
+pub mod voices;
 pub mod web;
 
 static PROBLEMS: Mutex<Vec<String>> = Mutex::new(Vec::new());

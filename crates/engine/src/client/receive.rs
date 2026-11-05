@@ -6,16 +6,21 @@ impl Client {
     pub(super) fn receive(&mut self) {
         // World messages go to the terrain thread, all of a frame together.
         let mut fwd = Vec::new();
+        let p = crate::diag::part("messages");
         while let Some(msg) = self.conn.recv() {
             self.receive_message(msg, &mut fwd);
         }
+        drop(p);
         if !fwd.is_empty() {
             let _ = self.terrain.tx.send(terrain::In::Many(fwd));
         }
+        let p = crate::diag::part("take terrain");
         self.take_terrain();
+        drop(p);
         if self.conn.is_closed() && self.disconnected.is_none() {
             self.disconnected = Some("connection lost".into());
         }
+        let _p = crate::diag::part("removed cubes");
         for pos in std::mem::take(&mut self.world.removed) {
             self.render.remove((0, pos));
         }
@@ -50,8 +55,8 @@ impl Client {
                 self.wires.cube_gone(0, pos);
                 fwd.push(terrain::In::Unload(pos));
             }
-            ToClient::Blocks { dim, frame: 0, changes } if dim == self.world.dim => fwd.push(terrain::In::Blocks(changes)),
-            ToClient::Blocks { dim, frame, changes } if dim == self.world.dim => {
+            ToClient::Blocks { dim, frame: 0, changes, extras } if dim == self.world.dim => fwd.push(terrain::In::Blocks(changes, extras)),
+            ToClient::Blocks { dim, frame, changes, extras } if dim == self.world.dim => {
                 if let Some(s) = self
                     .entities
                     .get_mut(&frame)
@@ -60,15 +65,20 @@ impl Client {
                     for (p, state) in changes {
                         s.set_block(p, state);
                     }
+                    for (p, parts) in extras {
+                        s.set_extras(p, parts);
+                    }
                     s.scan_bounds();
                 }
             }
             ToClient::Saved { dim, cubes } if dim == self.world.dim => fwd.push(terrain::In::Saved(cubes)),
             ToClient::Edits { dim, specs, all } if dim == self.world.dim => fwd.push(terrain::In::Edits { specs, all }),
             ToClient::Signals { dim, frame, changes } if dim == self.world.dim => self.wires.power_changed(frame, &changes),
-            ToClient::Time { dim, time } if dim == self.world.dim => {
+            ToClient::BodyGlow { dim, cells } if dim == self.world.dim => self.world.body_glow_changed(cells),
+            ToClient::Time { dim, time, rate } if dim == self.world.dim => {
                 self.world.time = time;
-                self.since_time = 0;
+                self.day_rate = rate;
+                self.since_time = 0.0;
             }
             ToClient::Teleport { dim, pos, frame } => self.teleported(dim, pos, frame, fwd),
             ToClient::Spawn(list) => self.spawn_entities(list),
@@ -78,9 +88,27 @@ impl Client {
                     e.world_light = lights.into_iter().collect();
                 }
             }
-            ToClient::Swing { used_item } => {
+            ToClient::BodyLean { frame, pivot, rot, ticks } => {
+                if let Some(e) = self.entities.get_mut(&frame) {
+                    let to = glam::Quat::from_array(rot).normalize();
+                    e.lean = if to.abs_diff_eq(glam::Quat::IDENTITY, 1e-6) {
+                        None
+                    } else {
+                        let from = e.lean.map_or(glam::Quat::IDENTITY, |l| l.now());
+                        Some(super::Lean {
+                            pivot: glam::Vec3::from_array(pivot),
+                            from,
+                            to,
+                            secs: ticks as f32 / crate::world::TPS as f32,
+                            t: 0.0,
+                        })
+                    };
+                }
+            }
+            ToClient::Swing { used_item, off_hand } => {
                 self.swing_arm();
-                if used_item && !self.held().is_empty() {
+                self.hand_swing_off = off_hand;
+                if used_item && !off_hand && !self.held().is_empty() {
                     self.hand_height = 0.0;
                 }
             }
@@ -109,8 +137,9 @@ impl Client {
             ToClient::Players(names) => self.players = names,
             ToClient::GameMode(mode) => {
                 self.mode = mode;
-                self.player.flying = mode == GameMode::Spectator || (mode == GameMode::Creative && self.player.flying);
-                self.player.noclip = mode == GameMode::Spectator;
+                self.player.flying =
+                    mode.has(weft_abi::game_mode_flags::ALWAYS_FLY) || (mode.has(weft_abi::game_mode_flags::CAN_FLY) && self.player.flying);
+                self.player.noclip = mode.has(weft_abi::game_mode_flags::NOCLIP);
                 self.player.fly_speed = 1.0;
             }
             ToClient::Inventory(slots) => {
@@ -166,7 +195,6 @@ impl Client {
                 }
                 self.player.speed_mul = self.attributes[a::MOVEMENT_SPEED as usize] as f64;
                 self.player.jump_mul = self.attributes[a::JUMP_STRENGTH as usize] as f64;
-                self.player.swim_anywhere = self.attributes[a::SWIM_ANYWHERE as usize] >= 1.0;
                 self.player.can_sprint = self.attributes[a::CAN_SPRINT as usize] >= 1.0;
             }
             ToClient::BreakRefused { frame, pos } => {
@@ -174,47 +202,68 @@ impl Client {
                 self.breaking = None;
             }
             ToClient::Permission(level) => self.permission = level,
-            ToClient::Using(ticks) => self.using = ticks.map(|t| (t as f32, t as f32)),
+            ToClient::Using(ticks) => {
+                self.using = ticks.map(|(t, _)| (t as f32, t as f32));
+                self.using_off = ticks.is_some_and(|(_, off)| off);
+            }
             ToClient::Air { air, heading } => self.world.air = (air, heading),
+            ToClient::SkyEvent { kind, strength } => {
+                let began = if kind == self.sky_event.0 { self.sky_event.2 } else { crate::shaders::clock() };
+                self.sky_event = (kind, strength, began);
+            }
+            ToClient::SkyLanding { pos, seconds } => self.sky_landing = Some((pos, crate::shaders::clock() + seconds)),
             ToClient::Tints { tints } => self.world.set_tints(tints),
-            ToClient::Weather { raining, thunder, only } => {
-                self.weather = (raining, thunder);
+            ToClient::Weather { id, only } => {
+                self.weather_id = (id as usize).min(content().game.weathers.len() - 1) as u16;
                 self.world.rain_in = only;
             }
-            ToClient::Flash(id) => {
+
+            ToClient::EntitySwing { id, off } => {
                 if let Some(e) = self.entities.get_mut(&id) {
-                    e.flash = 0.1;
-                }
-            }
-            ToClient::EntitySwing(id) => {
-                if let Some(e) = self.entities.get_mut(&id) {
-                    if e.arm_swing.is_none_or(|p| p >= 0.5) {
-                        e.arm_swing = Some(0.0);
-                    }
+                    restart_swing(&mut e.arm_swing);
+                    e.swing_off = off;
                 }
             }
             ToClient::Cracks(list) => self.others_mining = list,
-            ToClient::StopSprint => self.controls.stop_sprint(),
-            ToClient::Push((add, halve)) => {
-                let v = &mut self.player.vel;
-                if halve {
-                    *v /= 2.0;
-                }
-                *v += DVec3::new(add[0] as f64, add[1] as f64, add[2] as f64);
-                v.y = (v.y + 0.4).min(0.4);
+            ToClient::StopSprint => self.sprint_stopped = true,
+            ToClient::LodColumns { dim, all, cols } => self.lod.set_columns(dim, all, &cols),
+            ToClient::Camera { mode, locked, transition, easing } => self.camera_from_server(mode, locked, transition, easing),
+            ToClient::Knock { away } => {
+                let away = Vec3::from_array(away).as_dvec3();
+                self.player.vel = physics::knock(self.player.vel, away, self.player.on_ground);
             }
+            ToClient::Velocity { add } => self.player.vel += Vec3::from_array(add).as_dvec3(),
+            ToClient::SetVelocity(v) => self.player.vel = Vec3::from_array(v).as_dvec3(),
+            ToClient::Look([yaw, pitch]) => (self.player.yaw, self.player.pitch) = (yaw, pitch),
+            ToClient::Flying(on) => self.player.flying = on,
+            ToClient::Selected(slot) => self.selected = (slot as usize).min(content().game.player_layout.hotbar.saturating_sub(1) as usize),
+            ToClient::TickRate(rate) => self.tick_rate = rate.max(1) as f64,
             ToClient::Died => {
                 self.dead = true;
                 self.events.push(ClientEvent::Died);
             }
-            ToClient::Chat(line) => {
-                log::info!("[chat] {} {:?}", line.key, line.args);
-                self.chat_line(line);
+            ToClient::Show(s) => {
+                let in_chat = s.place == weft_abi::show_place::CHAT;
+                if in_chat {
+                    log::info!("[chat] {} {:?}", s.msg.key, s.msg.args);
+                }
+                let hidden = match crate::settings::chat_visibility() {
+                    crate::settings::ChatVisibility::All => false,
+                    crate::settings::ChatVisibility::System => s.from == crate::net::Shown::PLAYER,
+                    crate::settings::ChatVisibility::Hidden => s.from != crate::net::Shown::REPLY,
+                };
+                if !(in_chat && hidden) {
+                    self.show(s);
+                }
             }
             ToClient::CommandReply { id, lines } => {
                 self.command_replies.insert(id, lines);
             }
             ToClient::Disconnect(reason) => self.disconnected = Some(reason),
+            ToClient::Achievement(json) => crate::chiacraft::achievements::received(&json),
+            ToClient::AchievementAnchor { hash, anchor } => crate::chiacraft::achievements::anchored(&hash, &anchor),
+            ToClient::Revocations(json) => crate::chiacraft::achievements::revocations_received(&json),
+            ToClient::AskAchievement { id } => self.send(crate::net::ToServer::Proofs(crate::chiacraft::achievements::proofs(&id))),
             ToClient::Refused(why) => {
                 self.disconnected = Some(why.key.clone());
                 self.refused = Some(why);
@@ -234,12 +283,17 @@ impl Client {
                 }
             }
             ToClient::Skin { entity, png } => self.entity_render.skin_pending.push((entity, png)),
-            ToClient::Animate(list) => {
+            ToClient::Avatar { entity, avatar } => self
+                .entity_render
+                .avatar_pending
+                .push((entity, std::sync::Arc::new(avatar))),
+            ToClient::PlayerGone { entity } => self.entity_render.gone_pending.push(entity),
+            ToClient::PlayAction(list) => {
                 for (id, name, looping) in list {
                     if id == self.player_id {
-                        self.self_anim = (!name.is_empty()).then(|| (name, self.start.elapsed().as_secs_f32(), looping));
+                        self.me.action = (!name.is_empty()).then(|| (name, self.me.age, looping));
                     } else if let Some(e) = self.entities.get_mut(&id) {
-                        e.anim = (!name.is_empty()).then(|| (name, e.age, looping));
+                        e.action = (!name.is_empty()).then(|| (name, e.age, looping));
                     }
                 }
             }
@@ -278,61 +332,29 @@ impl Client {
 
     fn spawn_entities(&mut self, list: Vec<crate::net::EntityView>) {
         for e in list {
-            self.entities.insert(
-                e.id,
-                ClientEntity {
-                    kind: e.kind,
-                    pos: e.pos,
-                    target: e.pos,
-                    yaw: e.yaw,
-                    target_yaw: e.yaw,
-                    body_yaw: e.yaw,
-                    arm_swing: None,
-                    flash: 0.0,
-                    pitch: e.pitch,
-                    item: e.item,
-                    // Arrives as a component right after: no hurt flash for the first.
-                    health: f32::NAN,
-                    hurt: 0.0,
-                    worn: Vec::new(),
-                    held: 0,
-                    walk: 0.0,
-                    walked: 0.0,
-                    swing: 0.0,
-                    age: 0.0,
-                    burning: false,
-                    dying: None,
-                    next_step: 0.0,
-                    anim: None,
-                    pose: Pose::Stand,
-                    track: Default::default(),
-                    pulled: None,
-                    size: None,
-                    scale: 1.0,
-                    look: None,
-                    frame: 0,
-                    rel: DVec3::ZERO,
-                    rel_target: None,
-                    mount: None,
-                    seat_forward: 0.0,
-                    structure: None,
-                    world_light: Default::default(),
-                },
-            );
+            self.entities
+                .insert(e.id, ClientEntity::new(e.kind, e.pos, e.yaw, e.pitch, e.item));
         }
     }
 
     fn receive_moves(&mut self, tick: u64, list: Vec<crate::net::Move>) {
         // A long stall (or the first move) starts the timeline over.
-        let sample = self.body_clock - STEP + self.accum - tick as f64 * STEP;
+        let sample = self.body_clock - STEP + self.accum - tick as f64 / self.tick_rate;
         match self.tick_offset {
             Some(o) if (sample - o).abs() < 0.25 => self.offset_target += (sample - self.offset_target) * 0.1,
             _ => (self.tick_offset, self.offset_target) = (Some(sample), sample),
         }
         let solid = |k: u32| content().game.entities[k as usize].is(weft_abi::entity_flags::SOLID);
-        for &(id, pos, yaw, pitch, pose, frame) in &list {
+        // Physics looks a step of its own back, many ticks at a high `/tick rate`.
+        let keep = ((self.tick_rate * STEP).ceil() as usize * 2 + 4).max(8);
+        // The mount this client steers goes where it moves it.
+        let driving = self.me.vehicle.map(|v| v.0);
+        for &(id, pos, yaw, pitch, pose, sprinting, frame) in &list {
+            if Some(id) == driving {
+                continue;
+            }
             if let Some(e) = self.entities.get_mut(&id) {
-                e.pose = pose;
+                (e.pose, e.sprinting) = (pose, sprinting);
                 let was = e.target;
                 e.target = pos;
                 e.target_yaw = yaw;
@@ -354,7 +376,7 @@ impl Client {
                         }
                         _ => e.track.push_back((t, pos)),
                     }
-                    while e.track.len() > 8 {
+                    while e.track.len() > keep {
                         e.track.pop_front();
                     }
                 }
@@ -403,9 +425,12 @@ impl Client {
             while let Some(o) = items.next() {
                 match o {
                     terrain::Out::Cube { pos, cube, around } => self.world.insert(pos, cube, around),
-                    terrain::Out::Blocks(changes) => {
+                    terrain::Out::Blocks(changes, extras) => {
                         for (p, s) in changes {
                             self.world.set_block(p, s);
+                        }
+                        for (p, parts) in extras {
+                            self.world.set_extras(p, parts);
                         }
                     }
                     terrain::Out::Unload(pos) => self.world.remove(pos),
@@ -419,6 +444,7 @@ impl Client {
                     break;
                 }
             }
+            let _p = crate::diag::part("end batch (no budget)");
             self.world.end_batch();
         }
     }

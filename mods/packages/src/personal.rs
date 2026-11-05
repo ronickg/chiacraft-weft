@@ -122,7 +122,9 @@ fn load_all(run_dir: &Path) -> Vec<Personal> {
             Ok(m) => {
                 let hooks = m.hooks().to_vec();
                 info!("personal mod {name}: {} registrations", hooks.len());
-                out.push(Personal { name, half: Arc::new(Half::personal(Arc::new(m), Words::load(&d))), hooks });
+                let half = Arc::new(Half::personal(Arc::new(m), Words::load(&d)));
+                crate::client_half::track(&half);
+                out.push(Personal { name, half, hooks });
             }
             Err(e) => warn!("personal mod {name}: {e}"),
         }
@@ -143,7 +145,7 @@ pub fn open_screen(c: Client, half: &Arc<Half>, name: &str) {
     });
     if let Some(s) = found {
         *SHOWING.lock().unwrap_or_else(|e| e.into_inner()) = Some(s);
-        c.open_screen(&SCREEN);
+        c.screen_open(&SCREEN);
     }
 }
 
@@ -184,7 +186,7 @@ pub fn register(r: &mut Registry) {
     });
     for (slot, key) in KEY_SLOTS.iter().enumerate() {
         r.key(key, &format!("shift+alt+{}", slot + 1))
-            .on_press(move |c| {
+            .on_press_client(move |c| {
                 if !allowed() {
                     return;
                 }
@@ -234,7 +236,7 @@ pub fn register(r: &mut Registry) {
 /// Once per world and value of the rule: in a world, tells the player which of their personal
 /// mods are off there (or on, when they are).
 fn tell(c: &Client) {
-    if c.view().me().is_none() {
+    if c.view().player_state().is_none() {
         // Not in a world: forget, so the next one is told.
         *TOLD.lock().unwrap_or_else(|e| e.into_inner()) = None;
         return;

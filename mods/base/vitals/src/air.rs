@@ -100,6 +100,68 @@ pub const SNOWFALL: f32 = 0.4;
 pub const MELT: f32 = 0.05;
 pub const SNOW_DAYS: u64 = 12;
 
+/// Snow lying as blocks (`base:snow_layer`, an eighth of a block each), near players on open
+/// ground: none under `SNOW_LAYER_FROM` of a cover (the shader pack's dusting shows it, and on
+/// far land all of it), one layer from there, `SNOW_LAYERS_DEEP` (half a block, about 6 cm of
+/// water) in a deep cover. Over buried plants from `SNOW_BURIES` layers.
+pub const SNOW_LAYER_FROM: f32 = 0.2;
+pub const SNOW_LAYERS_DEEP: u8 = 4;
+pub const SNOW_BURIES: u8 = 2;
+
+/// How the layers follow the cover cheaply: each tick `SNOW_SAMPLES` columns at random within
+/// `SNOW_REACH` blocks of each player move a layer toward it (a column every
+/// `snow_visit_secs()` on average), and each layer block may step down on its own every
+/// `SNOW_MELT_SECS` on average while there is less snow than it, also while nobody is near
+/// (caught up when its land loads). A column is looked down `SNOW_SCAN` blocks from above
+/// the player.
+pub const SNOW_SAMPLES: u32 = 12;
+pub const SNOW_REACH: i32 = 40;
+pub const SNOW_SCAN: i32 = 48;
+pub const SNOW_MELT_SECS: f32 = 20.0;
+/// Snow melts with the warmth where it lies (World playtester, 11-04: with the cover gone,
+/// layers still lay at dusk; Planner: gone within minutes on a warm day, kept only by a frost).
+/// A step down comes only with the air there above freezing, every step at `SNOW_MELT_WARM` °C
+/// and warmer (3 layers in about a minute), fewer the colder; at 0 °C and under none (and the
+/// sampler near players melts it no faster).
+pub const SNOW_MELT_WARM: f32 = 8.0;
+
+/// Still water freezes (Planner, 11-04: tarns, lakes and ponds get a skin of ice and thaw in the
+/// warmth, by the snow's rule): near players (the snow layers' sampler) the open top of still
+/// water turns to lake ice (`base:lake_ice`) where the air there is under `FREEZE_BELOW` °C, every visit
+/// from `FREEZE_HARD` and colder, fewer nearer freezing; it thaws back to water as snow melts
+/// (`melt_chance`), on a visit or on its own every `ICE_THAW_SECS` on average (caught up when its
+/// land loads).
+pub const FREEZE_BELOW: f32 = 0.0;
+pub const FREEZE_HARD: f32 = -6.0;
+pub const ICE_THAW_SECS: f32 = 30.0;
+
+/// The chance a visit freezes open still water at `celsius` (the air there): 0 from freezing up,
+/// 1 from `FREEZE_HARD` down.
+pub fn freeze_chance(celsius: f32) -> f32 {
+    ((FREEZE_BELOW - celsius) / (FREEZE_BELOW - FREEZE_HARD)).clamp(0.0, 1.0)
+}
+
+/// The chance a melt step takes a layer at `celsius` (the air where it lies): 0 in a frost, 1 from
+/// `SNOW_MELT_WARM`.
+pub fn melt_chance(celsius: f32) -> f32 {
+    (celsius / SNOW_MELT_WARM).clamp(0.0, 1.0)
+}
+
+/// How many snow layers a cover of `snow` (0..1, `Place::snow_lying`) lies as.
+pub fn snow_layers(snow: f32) -> u8 {
+    if snow < SNOW_LAYER_FROM {
+        return 0;
+    }
+    let deep = ((snow.min(1.0) - SNOW_LAYER_FROM) / (1.0 - SNOW_LAYER_FROM) * (SNOW_LAYERS_DEEP - 1) as f32).round();
+    1 + deep as u8
+}
+
+/// Seconds between the samples' visits to one column near a player, on average.
+pub fn snow_visit_secs() -> f32 {
+    let side = (2 * SNOW_REACH + 1) as f32;
+    side * side / SNOW_SAMPLES as f32 / 20.0
+}
+
 /// Snow in a wind is a blizzard: from `BLIZZARD.0` m/s the snow hides the land, all of it by
 /// `BLIZZARD.1`.
 pub const BLIZZARD: (f32, f32) = (6.0, 12.0);
@@ -174,6 +236,67 @@ impl Place {
     }
 }
 
+/// A blizzard as fog: how much of the land it hides at its thickest.
+pub const BLIZZARD_FOG: f32 = 0.9;
+
+// ---- the air across borders, and in the forest ----
+
+/// A place's air is its own and its neighbours' (Planner, 11-04: crossing a border shouldn't snap
+/// the weather or the snow): the climate and the weather at a body's feet, counted twice, and at
+/// the 8 points of `AIR_RING` `AIR_BLEND / 2` blocks round it, averaged, so the air turns from
+/// one biome's to the next over a band `AIR_BLEND` blocks wide.
+pub const AIR_BLEND: i32 = 32;
+pub const AIR_RING: [(f32, f32); 8] =
+    [(1.0, 0.0), (0.707, 0.707), (0.0, 1.0), (-0.707, 0.707), (-1.0, 0.0), (-0.707, -0.707), (0.0, -1.0), (0.707, -0.707)];
+
+/// The 9 points of a place's air round (`x`, `z`) `radius` blocks out: the middle first.
+pub fn ring(x: i32, z: i32, radius: i32) -> [(i32, i32); 9] {
+    let mut out = [(x, z); 9];
+    for (o, (dx, dz)) in out[1..].iter_mut().zip(AIR_RING) {
+        *o = (x + (dx * radius as f32).round() as i32, z + (dz * radius as f32).round() as i32);
+    }
+    out
+}
+
+/// The average of `values` at the points of `ring` (the middle counted twice).
+pub fn blend(values: [f32; 9]) -> f32 {
+    (values[0] * 2.0 + values[1..].iter().sum::<f32>()) / 10.0
+}
+
+/// Inside a forest the wind drops: under a closed canopy, a tree height or two in from the edge,
+/// to about a quarter of the open wind at a body's height (`FOREST_CALM` of it taken; forest
+/// interiors keep some 10-40 % of the open wind near the ground, Raupach and Finnigan's canopy
+/// flows), and with it the wind chill and the blizzard. How closed the canopy is comes from the
+/// biome (`CANOPY`, full shelter from `CANOPY_SHELTERS`), how far in from how many of the 8
+/// points `FOREST_EDGE` blocks round have leaves over them (`cover` 0..1): from `EDGE_COVER.0`
+/// some shelter, all of it from `EDGE_COVER.1`. At the edge half the ring is open: no shelter.
+pub const FOREST_CALM: f32 = 0.75;
+pub const CANOPY_SHELTERS: f32 = 0.4;
+pub const FOREST_EDGE: i32 = 12;
+pub const EDGE_COVER: (f32, f32) = (0.5, 0.9);
+
+/// How sheltered from the wind a place is, 0 open to 1 deep in a closed forest: its canopy
+/// (`CANOPY`'s share, blended) and how much of the ring round it is under leaves.
+pub fn shelter(canopy: f32, cover: f32) -> f32 {
+    let closed = (canopy / CANOPY_SHELTERS).clamp(0.0, 1.0);
+    let inside = ((cover - EDGE_COVER.0) / (EDGE_COVER.1 - EDGE_COVER.0)).clamp(0.0, 1.0);
+    closed * inside
+}
+
+/// The wind `wind` m/s at a place that `shelter` (0..1) shelters.
+pub fn sheltered_wind(wind: f32, shelter: f32) -> f32 {
+    wind * (1.0 - FOREST_CALM * shelter.clamp(0.0, 1.0))
+}
+
+/// The fog `fog` (0..1, the weather's) where the wind drops from `wind` to `calm` m/s: in falling
+/// snow the blizzard's part of it drops with the wind.
+pub fn sheltered_fog(fog: f32, wind: f32, calm: f32, snowing: bool) -> f32 {
+    if !snowing {
+        return fog;
+    }
+    (fog - (blizzard(wind) - blizzard(calm)) * BLIZZARD_FOG).max(0.0)
+}
+
 /// How thick a blizzard is in falling snow with the wind at `wind` m/s, 0 to 1.
 pub fn blizzard(wind: f32) -> f32 {
     ((wind - BLIZZARD.0) / (BLIZZARD.1 - BLIZZARD.0)).clamp(0.0, 1.0)
@@ -225,6 +348,16 @@ mod tests {
     use super::*;
     use crate::climate::BIOMES;
 
+    /// Every biome the per-biome shares name (aurorae, canopies) has a climate row, so a renamed
+    /// biome can't silently lose its aurora or its light under the leaves.
+    #[test]
+    fn shares_name_real_biomes() {
+        for (name, share) in AURORA.iter().chain(CANOPY.iter()) {
+            assert!(crate::climate::of(name).is_some(), "{name} has no climate row");
+            assert!((0.0..=1.0).contains(share), "{name}: share {share}");
+        }
+    }
+
     /// Over many years a biome has fog on about its share of each season's days, and its wind
     /// averages the season's mean.
     #[test]
@@ -273,6 +406,79 @@ mod tests {
         assert!(lying(summer) < 0.01, "summer {}", lying(summer));
     }
 
+    /// Snow layers follow the cover: none for a dusting, one from `SNOW_LAYER_FROM`, half a
+    /// block when deep, never more as it thins; a deep cover builds within a few minutes near
+    /// a player, and a layer block melts within minutes too.
+    #[test]
+    fn snow_layers_follow_the_cover() {
+        assert_eq!(snow_layers(0.0), 0);
+        assert_eq!(snow_layers(SNOW_LAYER_FROM - 0.01), 0);
+        assert_eq!(snow_layers(SNOW_LAYER_FROM), 1);
+        assert_eq!(snow_layers(1.0), SNOW_LAYERS_DEEP);
+        assert_eq!(snow_layers(2.0), SNOW_LAYERS_DEEP);
+        let mut last = 0;
+        for i in 0..=100 {
+            let n = snow_layers(i as f32 / 100.0);
+            assert!(n >= last && n <= 8, "{i}: {n}");
+            last = n;
+        }
+        // A layer a visit: deep in under five minutes, gone in under five.
+        assert!(snow_visit_secs() * SNOW_LAYERS_DEEP as f32 <= 300.0, "{}", snow_visit_secs());
+        assert!(SNOW_MELT_SECS * SNOW_LAYERS_DEEP as f32 <= 300.0);
+        // The warmth: none in a frost, all from a mild spring day, half at half of it; 3 layers
+        // on a warm day in under 2 minutes on average.
+        assert_eq!(melt_chance(-5.0), 0.0);
+        assert_eq!(melt_chance(0.0), 0.0);
+        assert_eq!(melt_chance(SNOW_MELT_WARM * 2.0), 1.0);
+        assert!((melt_chance(SNOW_MELT_WARM / 2.0) - 0.5).abs() < 1e-6);
+        assert!(SNOW_MELT_SECS * 3.0 / melt_chance(12.0) <= 120.0);
+        // Ice: none forms at or over freezing, all of it in a hard frost; it never forms and
+        // thaws at the same warmth.
+        assert_eq!(freeze_chance(2.0), 0.0);
+        assert_eq!(freeze_chance(FREEZE_BELOW), 0.0);
+        assert_eq!(freeze_chance(FREEZE_HARD - 1.0), 1.0);
+        for c in -20..=20 {
+            let c = c as f32;
+            assert!(freeze_chance(c) == 0.0 || melt_chance(c) == 0.0, "{c} °C both freezes and thaws");
+        }
+        // The scan reaches the ground below a player on a hill and above one in a valley; plants
+        // are buried by a cover that has layers.
+        const { assert!(SNOW_SCAN >= 32 && SNOW_BURIES >= 1 && SNOW_BURIES <= 8) };
+    }
+
+    /// Crossing a border the air turns over the band: a place half in each biome gets half of
+    /// each. Deep in a closed forest the wind is a quarter of the open's and a blizzard thins;
+    /// at the edge (half the ring open) and in open country nothing changes.
+    #[test]
+    fn air_blends_and_forests_calm_the_wind() {
+        let r = ring(0, 0, AIR_BLEND / 2);
+        assert_eq!(r[0], (0, 0));
+        assert!(
+            r[1..]
+                .iter()
+                .all(|&(x, z)| ((x * x + z * z) as f32).sqrt().round() as i32 == AIR_BLEND / 2)
+        );
+        // East of the border (x > 0) 10 °C, west 0: on the border, about half.
+        let half: [f32; 9] = r.map(|(x, _)| if x >= 0 { 10.0 } else { 0.0 });
+        assert!((4.0..=7.0).contains(&blend(half)), "{}", blend(half));
+        assert_eq!(blend([3.0; 9]), 3.0);
+        // The forest.
+        assert_eq!(shelter(1.0, 0.5), 0.0, "the edge is open");
+        assert_eq!(shelter(0.0, 1.0), 0.0, "no canopy, no shelter");
+        assert_eq!(shelter(1.0, 1.0), 1.0);
+        assert!((sheltered_wind(8.0, 1.0) - 2.0).abs() < 1e-4);
+        assert_eq!(sheltered_wind(8.0, 0.0), 8.0);
+        for &(name, share) in &CANOPY {
+            let deep = sheltered_wind(10.0, shelter(share, 1.0));
+            assert!((2.5..=5.0).contains(&deep), "{name}: {deep} m/s of 10 deep inside");
+        }
+        // A blizzard in 12 m/s, deep in a forest: the fog thins with the wind; no snow, no change.
+        let fog = blizzard(12.0) * BLIZZARD_FOG;
+        let calm = sheltered_wind(12.0, 1.0);
+        assert!(sheltered_fog(fog, 12.0, calm, true) < 0.2, "{}", sheltered_fog(fog, 12.0, calm, true));
+        assert_eq!(sheltered_fog(0.4, 12.0, calm, false), 0.4);
+    }
+
     /// Dawn fog is gone by noon and the wind clears it.
     #[test]
     fn dawn_fog_burns_off_and_blows_away() {
@@ -296,3 +502,18 @@ mod tests {
 /// best aurora places on Earth; the snowy plains, Utqiaġvik at 71.3°), the birch forest (Moscow,
 /// 55.8°) a rare faint one. How strong, 0..1 (`reports/sky-weather-life.md`).
 pub const AURORA: [(&str, f32); 3] = [("base:taiga", 1.0), ("base:snowy_plains", 1.0), ("base:birch_forest", 0.2)];
+
+/// How closed each forest's canopy is, 0..1, for the light under the leaves (the shader pack's
+/// green shade and sunflecks): a rainforest's lets about 1-2 % of the sun reach the floor, much of
+/// it as brief sunflecks (the central Amazon, `images/vegetation/2026-11-04/tropical_refs/real/NOTES.md`);
+/// a temperate broadleaf wood in leaf 3-10 %, a conifer or birch wood more, and an open grove or a
+/// swamp's scattered trees more again (Lighting's estimates from those shares). Biomes not listed
+/// have open sky.
+pub const CANOPY: [(&str, f32); 6] = [
+    ("base:tropical_forest", 1.0),
+    ("base:sequoia_grove", 0.6),
+    ("base:forest", 0.5),
+    ("base:taiga", 0.4),
+    ("base:birch_forest", 0.35),
+    ("base:swamp", 0.3),
+];

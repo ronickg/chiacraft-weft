@@ -11,7 +11,7 @@
 
 use base_api::CLIMATE;
 use base_api::{CLOUDS, MOON, STARS, SUN};
-use weft_sdk::terrain::{BiomeRule, Mask, preset};
+use weft_sdk::terrain::BiomeRule;
 use weft_sdk::*;
 
 pub static CRETACEOUS: Dimension = Dimension::named("cretaceous");
@@ -47,6 +47,8 @@ static BUILDING: CreativeTab = CreativeTab::named("base:building");
 
 /// Sea level, as the overworld's.
 const SEA: i32 = 63;
+/// The floodplain: the low ground by the rivers, lakes and coasts, this high over the sea at most.
+const FLOODPLAIN_RISE: i32 = 6;
 
 pub fn init(r: &mut Registry) {
     r.block(&RED_SAND)
@@ -62,7 +64,7 @@ pub fn init(r: &mut Registry) {
         .textures("red_sandstone_top", "red_sandstone_side", "red_sandstone_bottom")
         .hardness(0.8)
         .mineable("pickaxe")
-        .needs_tool(0)
+        .needs_tool_level(0)
         .tab(&BUILDING);
     for plant in [&FERN, &HORSETAIL] {
         r.block(plant)
@@ -81,6 +83,22 @@ pub fn init(r: &mut Registry) {
     {
         let block = Block::generated(p.block.into());
         let name = p.block.split_once(':').map_or(p.block, |(_, n)| n);
+        // A termite mound: hard-baked earth, a full block, and its crown (`<name>_upper`, which
+        // the world puts on one in two, `wild::upper_of` in base); broken, the crown is a mound
+        // block again.
+        if p.form == vitals::wild::Form::Mound {
+            let upper = Block::generated(format!("{name}_upper"));
+            for (b, side) in [(block, format!("{name}_side")), (upper, format!("{name}_upper_side"))] {
+                r.block(b)
+                    .sound_group("base:block.gravel")
+                    .textures(&format!("{name}_top"), &side, &format!("{name}_top"))
+                    .hardness(0.9)
+                    .mineable("shovel")
+                    .tab(&NATURAL);
+            }
+            r.loot(upper).pool(Pool::new().entry(Entry::item(p.block)));
+            continue;
+        }
         // A rotten log lies on the ground: a soft, crumbling block, not a plant.
         if p.form == vitals::wild::Form::Log {
             r.block(block)
@@ -102,7 +120,7 @@ pub fn init(r: &mut Registry) {
                 .pool(Pool::new().entry(Entry::item(p.block)))
                 .pool(Pool::new().when(Cond::Chance(0.5)).item(seed));
             r.item(Item::generated(seed.into()))
-                .placed_block(block)
+                .places(block)
                 .tab(&NATURAL);
         }
     }
@@ -112,6 +130,10 @@ pub fn init(r: &mut Registry) {
     let (grass, foliage, water) = (&tints::GRASS, &tints::FOLIAGE, &tints::WATER);
     // Wind-blown red dunes: Velociraptor's, and osmolskae's.
     r.biome(&DUNES)
+        .tint(grass, vitals::foliage::muted(vitals::foliage::ENGINE_GRASS))
+        .tint(foliage, vitals::foliage::muted(vitals::foliage::ENGINE_FOLIAGE))
+        .tint(&base_api::trees::EVERGREEN, vitals::foliage::muted(vitals::foliage::LEAVES))
+        .tint(&base_api::trees::YELLOW_LEAVES, vitals::foliage::muted(vitals::foliage::LEAVES))
         .set(&CLIMATE, base_api::climate("animals:red_dunes"))
         .humidity(..-0.12)
         .surface("red_sand", "red_sand", 4)
@@ -130,10 +152,10 @@ pub fn init(r: &mut Registry) {
         .set(&BOULDERS, 0.08)
         .humidity(-0.12..0.05)
         .surface("base:grass", "base:dirt", 3)
-        .tint(grass, 0xb5ad5a)
-        .tint(foliage, 0x8f9a3c)
-        .tint(&base_api::trees::EVERGREEN, 0x8f9a3c)
-        .tint(&base_api::trees::YELLOW_LEAVES, 0x8f9a3c)
+        .tint(grass, vitals::foliage::muted(0xb5ad5a))
+        .tint(foliage, vitals::foliage::muted(0x8f9a3c))
+        .tint(&base_api::trees::EVERGREEN, vitals::foliage::muted(0x8f9a3c))
+        .tint(&base_api::trees::YELLOW_LEAVES, vitals::foliage::muted(0x8f9a3c))
         .tag("hot")
         .set(&TREES, 0.02)
         .set(&GRASS_COVER, vitals::forage::grass_cover("animals:scrubland").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
@@ -145,10 +167,10 @@ pub fn init(r: &mut Registry) {
         .set(&CLIMATE, base_api::climate("animals:floodplain"))
         .humidity(0.05..)
         .surface("base:grass", "base:dirt", 3)
-        .tint(grass, 0x7fa64a)
-        .tint(foliage, 0x5d8f35)
-        .tint(&base_api::trees::EVERGREEN, 0x5d8f35)
-        .tint(&base_api::trees::YELLOW_LEAVES, 0x5d8f35)
+        .tint(grass, vitals::foliage::muted(0x7fa64a))
+        .tint(foliage, vitals::foliage::muted(0x5d8f35))
+        .tint(&base_api::trees::EVERGREEN, vitals::foliage::muted(0x5d8f35))
+        .tint(&base_api::trees::YELLOW_LEAVES, vitals::foliage::muted(0x5d8f35))
         .tint(water, 0x4a6e5a)
         .tag("wet")
         .set(&TREES, 0.04)
@@ -162,10 +184,10 @@ pub fn init(r: &mut Registry) {
         .set(&CLIMATE, base_api::climate("animals:fern_forest"))
         .humidity(0.05..)
         .surface("base:grass", "base:dirt", 3)
-        .tint(grass, 0x6f9c40)
-        .tint(foliage, 0x4f8a2c)
-        .tint(&base_api::trees::EVERGREEN, 0x4f8a2c)
-        .tint(&base_api::trees::YELLOW_LEAVES, 0x4f8a2c)
+        .tint(grass, vitals::foliage::muted(0x6f9c40))
+        .tint(foliage, vitals::foliage::muted(0x4f8a2c))
+        .tint(&base_api::trees::EVERGREEN, vitals::foliage::muted(0x4f8a2c))
+        .tint(&base_api::trees::YELLOW_LEAVES, vitals::foliage::muted(0x4f8a2c))
         .tag("forest")
         .set(&TREES, 0.35)
         .set(&STAND_TREES, 0.18)
@@ -179,7 +201,10 @@ pub fn init(r: &mut Registry) {
         .set(&BOULDERS, 0.3)
         .surface("base:grass", "base:dirt", 3)
         .bare_above(115)
-        .tint(grass, 0x8aa864)
+        .tint(grass, vitals::foliage::muted(0x8aa864))
+        .tint(foliage, vitals::foliage::muted(vitals::foliage::ENGINE_FOLIAGE))
+        .tint(&base_api::trees::EVERGREEN, vitals::foliage::muted(vitals::foliage::LEAVES))
+        .tint(&base_api::trees::YELLOW_LEAVES, vitals::foliage::muted(vitals::foliage::LEAVES))
         .tag("mountain")
         .set(&TREES, 0.04)
         .set_text(&TREE_KINDS, "animals:araucaria_log:1 animals:scale_conifer_log:2")
@@ -193,51 +218,74 @@ pub fn init(r: &mut Registry) {
         .day_length(24000)
         .seasons(vitals::calendar::YEAR_DAYS, base_api::calendars::WET_AND_DRY_SWING)
         .set(&base_api::SEASONS, base_api::calendars::WET_AND_DRY)
-        .weather();
+        .weathers(&[&weathers::RAIN, &weathers::THUNDER]);
     r.sky_stars(&CRETACEOUS, &STARS).count(1500);
     r.sky_clouds(&CRETACEOUS, &CLOUDS).texture("base:clouds");
     r.sky_body(&CRETACEOUS, &SUN)
         .texture("base:sun")
-        .additive()
+        .blend_add()
         .size(33.0)
         .glow(0xFFE633);
     r.sky_body(&CRETACEOUS, &MOON)
         .texture("base:moon_phases")
-        .additive()
+        .blend_add()
         .frames(4, 2)
         .size(23.0)
         .phase(0.5);
 
-    r.terrain(&CRETACEOUS)
+    // The overworld's land (Ronald, 11-04: "all three", Terrain's fourth sheet): its continents,
+    // hills, mountain ranges, rivers by flow, lakes and coasts (`base_api::land`), the same seed,
+    // so a gateway opens onto the same land a hundred million years earlier: the rivers and lakes
+    // a player knows, the Cretaceous's own biomes on them. Crags on the ranges, floodplain on the
+    // low ground by the water, red dunes and scrub where it's dry, fern forest where it's wet.
+    let mut t = r
+        .terrain(&CRETACEOUS)
         .stone("base:stone")
         .base_height(SEA as f64)
-        .sea(SEA, "base:water")
-        .feature(preset::continents(18.0))
-        .feature(preset::hills(14.0, 120.0))
-        // The dunes where it is dry.
-        .feature(preset::dunes(5.0, 24.0).mask(Mask::Humidity(-0.08, -0.16)))
-        .feature(
-            preset::mountains(140.0, 240.0)
-                .mask(
-                    Mask::noise(650.0, -0.05, 0.3)
-                        .salt(0x5c)
-                        .and(Mask::Continent(0.0, 0.2)),
-                )
-                .named("crags"),
-        )
-        .biome(BiomeRule::new("base:ocean").height(..=SEA - 2))
-        .biome(
-            BiomeRule::new("base:beach")
-                .height(..=SEA + 1)
-                .continent(..0.1),
-        )
-        .biome(BiomeRule::new("crags").feature("crags", 0.45..))
-        .biome(BiomeRule::new("red_dunes"))
-        .biome(BiomeRule::new("scrubland"))
-        .biome(BiomeRule::new("floodplain").height(..=SEA + 10))
-        .biome(BiomeRule::new("fern_forest"));
+        .continent_scale(base_api::land::CONTINENT_SCALE)
+        .sea(SEA, "base:water");
+    for (name, field) in base_api::land::rule_fields() {
+        t = t.field(name, field);
+    }
+    for f in base_api::land::features() {
+        t = t.feature(f);
+    }
+    // The warm seas' lagoons and reefs as the overworld's (`base_api::land::reef_part`); the
+    // coral blocks are the overworld's decoration, the Cretaceous's reefs are bare (its own reef
+    // builders, rudist clams, if anyone draws them).
+    t.biome(
+        BiomeRule::new("base:coral_reef")
+            .height(SEA - 2..=SEA - 2)
+            .temperature(base_api::land::REEF_WARM_RULE..)
+            .continent(..base_api::land::REEF_COAST),
+    )
+    .biome(
+        BiomeRule::new("base:lagoon")
+            .height(SEA - base_api::land::REEF_LAGOON.1..=SEA - base_api::land::REEF_LAGOON.0)
+            .temperature(base_api::land::REEF_WARM_RULE..)
+            .continent(..base_api::land::REEF_COAST),
+    )
+    .biome(
+        BiomeRule::new("base:ocean")
+            .height(..=SEA - 2)
+            .continent(..base_api::land::OCEAN_CONTINENT),
+    )
+    .biome(
+        BiomeRule::new("base:beach")
+            .height(..=SEA + 1)
+            .continent(..0.1),
+    )
+    .biome(BiomeRule::new("crags").field(base_api::land::MOUNTAINS_FIELD, base_api::land::MOUNTAIN_BIOME..))
+    .biome(
+        BiomeRule::new("floodplain")
+            .height(..=SEA + FLOODPLAIN_RISE)
+            .humidity(-0.12..),
+    )
+    .biome(BiomeRule::new("red_dunes"))
+    .biome(BiomeRule::new("scrubland"))
+    .biome(BiomeRule::new("fern_forest"));
 
-    r.decorate(ferns).dimension(&CRETACEOUS);
+    r.decoration(ferns).dimension(&CRETACEOUS);
 }
 
 /// The Cretaceous's trees (`reports/ecology/Cretaceous food webs.md`), which base's worldgen grows
@@ -272,6 +320,8 @@ fn woods(r: &mut Registry) {
             .tag("logs")
             .tag(&format!("logs/{wood}"))
             .prop("axis", ["y", "x", "z"])
+            // Lying after a felling, in alternating pieces (`felled`): chopped a piece at a time.
+            .prop("felled", ["no", "a", "b"])
             .states(move |p, s| match p.get("axis") {
                 "y" => s.textures(&top, &side, &top),
                 "x" => s.faces([&top, &top, &side, &side, &side, &side]),
@@ -280,7 +330,7 @@ fn woods(r: &mut Registry) {
             .placement(|p, props| {
                 props.set(
                     "axis",
-                    match p.face() {
+                    match p.face().face() {
                         0 | 1 => "x",
                         4 | 5 => "z",
                         _ => "y",
@@ -294,7 +344,9 @@ fn woods(r: &mut Registry) {
             .texture(&format!("leaves_{wood}"))
             .hardness(0.2)
             .cutout()
-            .opacity(1)
+            // Faces between two leaves of one kind aren't drawn, as base's (`blocks.rs`).
+            .cull_same()
+            .light_opacity(1)
             .tint(base_api::trees::leaf_tint(vitals::wild::turn(&format!("animals:{wood}_leaves"))))
             .tag("leaves")
             .mineable("shears")
@@ -317,16 +369,16 @@ fn woods(r: &mut Registry) {
                 .texture(&format!("sapling_{wood}"))
                 .plant()
                 .needs_below("#plant_soil")
-                .growth(base_api::grow::step_secs(plant, 1, 470.0), 9)
+                .grows(base_api::grow::step_secs(plant, 1, 470.0), 9)
                 .on_grow(move |e| match base_api::grow::step(e, plant, false) {
                     base_api::grow::Step::Grow => {
                         if let Some(id) = Block::lookup(log) {
-                            base_api::trees::grow_tree(e.world(), e.pos(), id);
+                            base_api::trees::grow_tree(e.world(), e.pos().to_array(), id);
                         }
                     }
                     // A frost kills a sapling of the warm Cretaceous.
                     base_api::grow::Step::Frost => {
-                        e.world().set(e.pos(), 0);
+                        e.world().set_block(e.pos(), 0);
                     }
                     base_api::grow::Step::Rest => {}
                 })
@@ -340,7 +392,7 @@ fn woods(r: &mut Registry) {
 fn ferns(g: &mut Gen) {
     let Some(&cols) = g.columns() else { return };
     let seed = g.seed();
-    let [ox, oy, oz] = g.origin();
+    let [ox, oy, oz] = g.origin().to_array();
     for z in 0..16usize {
         for x in 0..16usize {
             let col = &cols[z * 16 + x];

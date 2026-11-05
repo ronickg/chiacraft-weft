@@ -1193,6 +1193,157 @@
   }
  },
  {
+  "biome": "base:tropical_forest",
+  "place": "Manaus, Amazonas, Brazil (the central Amazon rainforest)",
+  "lat": -3.1,
+  "lon": -60.02,
+  "elevation_m": 67,
+  "hemisphere": "south",
+  "koppen": "Am",
+  "months": [
+   {
+    "month": "Jan",
+    "t_mean": 26.6,
+    "t_min": 23.6,
+    "t_max": 31.3,
+    "precip_mm": 305.6,
+    "rain_days": 18.7,
+    "snow_cover": 0
+   },
+   {
+    "month": "Feb",
+    "t_mean": 26.6,
+    "t_min": 23.6,
+    "t_max": 31.1,
+    "precip_mm": 296.8,
+    "rain_days": 17.6,
+    "snow_cover": 0
+   },
+   {
+    "month": "Mar",
+    "t_mean": 26.6,
+    "t_min": 23.7,
+    "t_max": 31.2,
+    "precip_mm": 320.9,
+    "rain_days": 19,
+    "snow_cover": 0
+   },
+   {
+    "month": "Apr",
+    "t_mean": 26.7,
+    "t_min": 23.7,
+    "t_max": 31.3,
+    "precip_mm": 331.0,
+    "rain_days": 17.5,
+    "snow_cover": 0
+   },
+   {
+    "month": "May",
+    "t_mean": 27.0,
+    "t_min": 23.9,
+    "t_max": 31.5,
+    "precip_mm": 233.3,
+    "rain_days": 15.5,
+    "snow_cover": 0
+   },
+   {
+    "month": "Jun",
+    "t_mean": 27.3,
+    "t_min": 23.8,
+    "t_max": 31.9,
+    "precip_mm": 117.2,
+    "rain_days": 10.4,
+    "snow_cover": 0
+   },
+   {
+    "month": "Jul",
+    "t_mean": 27.5,
+    "t_min": 23.7,
+    "t_max": 32.5,
+    "precip_mm": 67.1,
+    "rain_days": 6.8,
+    "snow_cover": 0
+   },
+   {
+    "month": "Aug",
+    "t_mean": 28.2,
+    "t_min": 24.1,
+    "t_max": 33.6,
+    "precip_mm": 56.1,
+    "rain_days": 5.7,
+    "snow_cover": 0
+   },
+   {
+    "month": "Sep",
+    "t_mean": 28.6,
+    "t_min": 24.5,
+    "t_max": 34.1,
+    "precip_mm": 79.0,
+    "rain_days": 6.1,
+    "snow_cover": 0
+   },
+   {
+    "month": "Oct",
+    "t_mean": 28.5,
+    "t_min": 24.6,
+    "t_max": 34.0,
+    "precip_mm": 113.9,
+    "rain_days": 8.3,
+    "snow_cover": 0
+   },
+   {
+    "month": "Nov",
+    "t_mean": 28.0,
+    "t_min": 24.4,
+    "t_max": 33.0,
+    "precip_mm": 188.0,
+    "rain_days": 10.3,
+    "snow_cover": 0
+   },
+   {
+    "month": "Dec",
+    "t_mean": 27.2,
+    "t_min": 24.0,
+    "t_max": 32.0,
+    "precip_mm": 253.5,
+    "rain_days": 15.3,
+    "snow_cover": 0
+   }
+  ],
+  "wet_months": [
+   "Jan",
+   "Feb",
+   "Mar",
+   "Apr",
+   "May",
+   "Jun",
+   "Oct",
+   "Nov",
+   "Dec"
+  ],
+  "dry_months": [
+   "Aug"
+  ],
+  "sources": [
+   "https://portal.inmet.gov.br/normais (INMET Normais Climatologicas do Brasil 1991-2020)",
+   "https://en.wikipedia.org/wiki/Manaus (climate box citing INMET 1991-2020)"
+  ],
+  "estimate": false,
+  "notes": "INMET 1991-2020 normals for Manaus, rain_days >=1.0 mm. SOUTHERN HEMISPHERE (3 S): months here are the place's own; shift by six months for the game's calendar. Hot and wet all year: the months' means span 26.6-28.6 C; the rains run December-May (300+ mm a month January-April) and ease July-October (August the driest, 56 mm). Relative humidity 75-86% by month. Added 2026-11-04 for Terrain's tropical forest (Ronald approved it for the hot, wet corner).",
+  "rain_days_threshold": "1.0 mm",
+  "snow_cover_unit": "days in the month with snow lying on the ground (none here)",
+  "summary": {
+   "year_mean_c": 27.4,
+   "half_range_c": 1.0,
+   "precip_year_mm": 2362.4,
+   "rain_days_year": 151.2,
+   "mean_daily_range_c": 8.3,
+   "mean_rh_pct": 81.0,
+   "humidity_implied_by_daily_range": 0.75,
+   "wet_dry_rule": "tropical: wet = month >= 100 mm; dry = P < 2T (Walter-Lieth)"
+  }
+ },
+ {
   "biome": "base:mountains",
   "place": "Davos, Graubuenden, Switzerland (subalpine valley, 1,594 m)",
   "lat": 46.81,
@@ -1334,6 +1485,156 @@
    "mean_daily_range_c": 9.9,
    "mean_rh_pct": 74.2,
    "humidity_implied_by_daily_range": 0.88,
+   "wet_dry_rule": "wet = month at or above the monthly average; dry = P(mm) < 2 x T(C) (Walter-Lieth), not counting wet months"
+  }
+ },
+ {
+  "biome": "base:sequoia_grove",
+  "place": "Giant Forest, Sequoia National Park, California, USA (giant sequoia grove, 1,721 m)",
+  "lat": 36.56,
+  "lon": -118.77,
+  "elevation_m": 1721,
+  "hemisphere": "north",
+  "koppen": "Csb",
+  "months": [
+   {
+    "month": "Jan",
+    "t_mean": 3.3,
+    "t_min": -1.7,
+    "t_max": 8.4,
+    "precip_mm": 193,
+    "rain_days": 7.0,
+    "snow_cover": null
+   },
+   {
+    "month": "Feb",
+    "t_mean": 3.4,
+    "t_min": -1.8,
+    "t_max": 8.7,
+    "precip_mm": 182,
+    "rain_days": 8.0,
+    "snow_cover": null
+   },
+   {
+    "month": "Mar",
+    "t_mean": 4.8,
+    "t_min": -0.6,
+    "t_max": 10.3,
+    "precip_mm": 173,
+    "rain_days": 7.6,
+    "snow_cover": null
+   },
+   {
+    "month": "Apr",
+    "t_mean": 7.0,
+    "t_min": 1.3,
+    "t_max": 12.8,
+    "precip_mm": 92,
+    "rain_days": 6.2,
+    "snow_cover": null
+   },
+   {
+    "month": "May",
+    "t_mean": 11.4,
+    "t_min": 5.2,
+    "t_max": 17.7,
+    "precip_mm": 45,
+    "rain_days": 4.6,
+    "snow_cover": null
+   },
+   {
+    "month": "Jun",
+    "t_mean": 15.9,
+    "t_min": 9.3,
+    "t_max": 22.4,
+    "precip_mm": 17,
+    "rain_days": 1.9,
+    "snow_cover": null
+   },
+   {
+    "month": "Jul",
+    "t_mean": 20.2,
+    "t_min": 13.7,
+    "t_max": 26.7,
+    "precip_mm": 8,
+    "rain_days": 1.7,
+    "snow_cover": null
+   },
+   {
+    "month": "Aug",
+    "t_mean": 19.8,
+    "t_min": 12.9,
+    "t_max": 26.8,
+    "precip_mm": 4,
+    "rain_days": 1.2,
+    "snow_cover": null
+   },
+   {
+    "month": "Sep",
+    "t_mean": 16.8,
+    "t_min": 10.1,
+    "t_max": 23.6,
+    "precip_mm": 18,
+    "rain_days": 1.8,
+    "snow_cover": null
+   },
+   {
+    "month": "Oct",
+    "t_mean": 11.9,
+    "t_min": 5.9,
+    "t_max": 17.9,
+    "precip_mm": 50,
+    "rain_days": 3.1,
+    "snow_cover": null
+   },
+   {
+    "month": "Nov",
+    "t_mean": 6.6,
+    "t_min": 1.4,
+    "t_max": 11.7,
+    "precip_mm": 110,
+    "rain_days": 4.5,
+    "snow_cover": null
+   },
+   {
+    "month": "Dec",
+    "t_mean": 3.3,
+    "t_min": -1.2,
+    "t_max": 7.7,
+    "precip_mm": 155,
+    "rain_days": 6.6,
+    "snow_cover": null
+   }
+  ],
+  "wet_months": [
+   "Nov",
+   "Dec",
+   "Jan",
+   "Feb",
+   "Mar"
+  ],
+  "dry_months": [
+   "Jun",
+   "Jul",
+   "Aug",
+   "Sep"
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/Sequoia_National_Park (climate boxes: Giant Forest Visitor Center from the PRISM Climate Group; Lodgepole, 2,053 m, NOAA 1991-2020 normals)",
+   "https://prism.oregonstate.edu/ (PRISM 30-year normals)",
+   "https://www.ncei.noaa.gov/products/land-based-station/us-climate-normals (Lodgepole, CA, 1991-2020)"
+  ],
+  "estimate": false,
+  "notes": "Temperatures and precipitation: Giant Forest Visitor Center (PRISM), inside the Giant Forest grove, in the groves' 1,400-2,100 m band. rain_days are Lodgepole's (2,053 m, 5 km away, NOAA 1991-2020, days >= 0.01 in = 0.25 mm) times 0.8 for days >= 1.0 mm, the usual gap between the thresholds. Lodgepole: 5.6 m of snow a year (220 in), 41.6 days with snow. Winter (Nov-Mar) brings over four fifths of the year's precipitation and summer is dry: a Mediterranean mountain climate (Csb). snow_cover not given (no monthly snow-cover normal found).",
+  "rain_days_threshold": "1.0 mm (from 0.25 mm counts x 0.8)",
+  "snow_cover_unit": "days in the month with snow lying on the ground (see notes for which are estimates)",
+  "summary": {
+   "year_mean_c": 10.4,
+   "half_range_c": 8.4,
+   "precip_year_mm": 1047.0,
+   "rain_days_year": 54.2,
+   "mean_daily_range_c": 11.7,
+   "humidity_implied_by_daily_range": 0.49,
    "wet_dry_rule": "wet = month at or above the monthly average; dry = P(mm) < 2 x T(C) (Walter-Lieth), not counting wet months"
   }
  },
@@ -1484,6 +1785,306 @@
    "mean_rh_pct": 80.5,
    "humidity_implied_by_daily_range": 1.0,
    "wet_dry_rule": "wet = month at or above the monthly average; dry = P(mm) < 2 x T(C) (Walter-Lieth), not counting wet months"
+  }
+ },
+ {
+  "biome": "base:coral_reef",
+  "place": "Key West, Florida Keys (the Florida Reef Tract's reef top)",
+  "lat": 24.55,
+  "lon": -81.75,
+  "elevation_m": 1,
+  "hemisphere": "north",
+  "koppen": "Aw",
+  "months": [
+   {
+    "month": "Jan",
+    "t_mean": 21.4,
+    "t_min": 18.6,
+    "t_max": 24.3,
+    "precip_mm": 46,
+    "rain_days": 6.9,
+    "snow_cover": 0
+   },
+   {
+    "month": "Feb",
+    "t_mean": 22.4,
+    "t_min": 19.5,
+    "t_max": 25.2,
+    "precip_mm": 39,
+    "rain_days": 4.9,
+    "snow_cover": 0
+   },
+   {
+    "month": "Mar",
+    "t_mean": 23.6,
+    "t_min": 20.7,
+    "t_max": 26.4,
+    "precip_mm": 39,
+    "rain_days": 4.8,
+    "snow_cover": 0
+   },
+   {
+    "month": "Apr",
+    "t_mean": 25.5,
+    "t_min": 22.8,
+    "t_max": 28.1,
+    "precip_mm": 53,
+    "rain_days": 4.5,
+    "snow_cover": 0
+   },
+   {
+    "month": "May",
+    "t_mean": 27.3,
+    "t_min": 24.7,
+    "t_max": 29.9,
+    "precip_mm": 79,
+    "rain_days": 7.5,
+    "snow_cover": 0
+   },
+   {
+    "month": "Jun",
+    "t_mean": 28.9,
+    "t_min": 26.3,
+    "t_max": 31.5,
+    "precip_mm": 107,
+    "rain_days": 11.2,
+    "snow_cover": 0
+   },
+   {
+    "month": "Jul",
+    "t_mean": 29.7,
+    "t_min": 27.0,
+    "t_max": 32.3,
+    "precip_mm": 92,
+    "rain_days": 11.6,
+    "snow_cover": 0
+   },
+   {
+    "month": "Aug",
+    "t_mean": 29.7,
+    "t_min": 26.9,
+    "t_max": 32.6,
+    "precip_mm": 136,
+    "rain_days": 14.6,
+    "snow_cover": 0
+   },
+   {
+    "month": "Sep",
+    "t_mean": 28.9,
+    "t_min": 26.2,
+    "t_max": 31.7,
+    "precip_mm": 184,
+    "rain_days": 15.8,
+    "snow_cover": 0
+   },
+   {
+    "month": "Oct",
+    "t_mean": 27.4,
+    "t_min": 24.9,
+    "t_max": 29.9,
+    "precip_mm": 144,
+    "rain_days": 12.1,
+    "snow_cover": 0
+   },
+   {
+    "month": "Nov",
+    "t_mean": 24.8,
+    "t_min": 22.3,
+    "t_max": 27.2,
+    "precip_mm": 52,
+    "rain_days": 6.3,
+    "snow_cover": 0
+   },
+   {
+    "month": "Dec",
+    "t_mean": 22.8,
+    "t_min": 20.2,
+    "t_max": 25.4,
+    "precip_mm": 55,
+    "rain_days": 6.4,
+    "snow_cover": 0
+   }
+  ],
+  "sea_temperature_c": [
+   21.8,
+   21.8,
+   22.9,
+   25.4,
+   27.0,
+   28.5,
+   29.7,
+   30.5,
+   29.7,
+   28.2,
+   25.8,
+   23.6
+  ],
+  "sources": [
+   "https://www.ncei.noaa.gov/products/land-based-station/us-climate-normals (NOAA 1991-2020 normals, Key West Int'l)",
+   "https://en.wikipedia.org/wiki/Key_West (climate box citing NOAA 1991-2020; sea temperature from Weather Atlas)"
+  ],
+  "estimate": false,
+  "notes": "NOAA 1991-2020 normals for Key West International Airport; rain_days count days with 0.01 in (0.25 mm) or more, a fifth more than from 1 mm. The sea warms from about 22 C in winter to 30 C in August. Wet season June-October (hurricane season); dry and breezy (trade winds) November-April. Added 2026-11-04 for Terrain's warm lagoons and coral reefs (Ronald approved them); the reef and the lagoon share the station.",
+  "rain_days_threshold": "0.01 in (0.25 mm)",
+  "snow_cover_unit": "days in the month with snow lying on the ground (none here)",
+  "summary": {
+   "year_mean_c": 26.1,
+   "half_range_c": 4.2,
+   "precip_year_mm": 1027,
+   "rain_days_year": 106.6,
+   "mean_daily_range_c": 5.4,
+   "humidity_implied_by_daily_range": 0.97,
+   "wet_dry_rule": "tropical: wet = month >= 100 mm; dry = P < 2T (Walter-Lieth)"
+  }
+ },
+ {
+  "biome": "base:lagoon",
+  "place": "Key West, Florida Keys (the Florida Reef Tract's back-reef lagoon)",
+  "lat": 24.55,
+  "lon": -81.75,
+  "elevation_m": 1,
+  "hemisphere": "north",
+  "koppen": "Aw",
+  "months": [
+   {
+    "month": "Jan",
+    "t_mean": 21.4,
+    "t_min": 18.6,
+    "t_max": 24.3,
+    "precip_mm": 46,
+    "rain_days": 6.9,
+    "snow_cover": 0
+   },
+   {
+    "month": "Feb",
+    "t_mean": 22.4,
+    "t_min": 19.5,
+    "t_max": 25.2,
+    "precip_mm": 39,
+    "rain_days": 4.9,
+    "snow_cover": 0
+   },
+   {
+    "month": "Mar",
+    "t_mean": 23.6,
+    "t_min": 20.7,
+    "t_max": 26.4,
+    "precip_mm": 39,
+    "rain_days": 4.8,
+    "snow_cover": 0
+   },
+   {
+    "month": "Apr",
+    "t_mean": 25.5,
+    "t_min": 22.8,
+    "t_max": 28.1,
+    "precip_mm": 53,
+    "rain_days": 4.5,
+    "snow_cover": 0
+   },
+   {
+    "month": "May",
+    "t_mean": 27.3,
+    "t_min": 24.7,
+    "t_max": 29.9,
+    "precip_mm": 79,
+    "rain_days": 7.5,
+    "snow_cover": 0
+   },
+   {
+    "month": "Jun",
+    "t_mean": 28.9,
+    "t_min": 26.3,
+    "t_max": 31.5,
+    "precip_mm": 107,
+    "rain_days": 11.2,
+    "snow_cover": 0
+   },
+   {
+    "month": "Jul",
+    "t_mean": 29.7,
+    "t_min": 27.0,
+    "t_max": 32.3,
+    "precip_mm": 92,
+    "rain_days": 11.6,
+    "snow_cover": 0
+   },
+   {
+    "month": "Aug",
+    "t_mean": 29.7,
+    "t_min": 26.9,
+    "t_max": 32.6,
+    "precip_mm": 136,
+    "rain_days": 14.6,
+    "snow_cover": 0
+   },
+   {
+    "month": "Sep",
+    "t_mean": 28.9,
+    "t_min": 26.2,
+    "t_max": 31.7,
+    "precip_mm": 184,
+    "rain_days": 15.8,
+    "snow_cover": 0
+   },
+   {
+    "month": "Oct",
+    "t_mean": 27.4,
+    "t_min": 24.9,
+    "t_max": 29.9,
+    "precip_mm": 144,
+    "rain_days": 12.1,
+    "snow_cover": 0
+   },
+   {
+    "month": "Nov",
+    "t_mean": 24.8,
+    "t_min": 22.3,
+    "t_max": 27.2,
+    "precip_mm": 52,
+    "rain_days": 6.3,
+    "snow_cover": 0
+   },
+   {
+    "month": "Dec",
+    "t_mean": 22.8,
+    "t_min": 20.2,
+    "t_max": 25.4,
+    "precip_mm": 55,
+    "rain_days": 6.4,
+    "snow_cover": 0
+   }
+  ],
+  "sea_temperature_c": [
+   21.8,
+   21.8,
+   22.9,
+   25.4,
+   27.0,
+   28.5,
+   29.7,
+   30.5,
+   29.7,
+   28.2,
+   25.8,
+   23.6
+  ],
+  "sources": [
+   "https://www.ncei.noaa.gov/products/land-based-station/us-climate-normals (NOAA 1991-2020 normals, Key West Int'l)",
+   "https://en.wikipedia.org/wiki/Key_West (climate box citing NOAA 1991-2020; sea temperature from Weather Atlas)"
+  ],
+  "estimate": false,
+  "notes": "NOAA 1991-2020 normals for Key West International Airport; rain_days count days with 0.01 in (0.25 mm) or more, a fifth more than from 1 mm. The sea warms from about 22 C in winter to 30 C in August. Wet season June-October (hurricane season); dry and breezy (trade winds) November-April. Added 2026-11-04 for Terrain's warm lagoons and coral reefs (Ronald approved them); the reef and the lagoon share the station.",
+  "rain_days_threshold": "0.01 in (0.25 mm)",
+  "snow_cover_unit": "days in the month with snow lying on the ground (none here)",
+  "summary": {
+   "year_mean_c": 26.1,
+   "half_range_c": 4.2,
+   "precip_year_mm": 1027,
+   "rain_days_year": 106.6,
+   "mean_daily_range_c": 5.4,
+   "humidity_implied_by_daily_range": 0.97,
+   "wet_dry_rule": "tropical: wet = month >= 100 mm; dry = P < 2T (Walter-Lieth)"
   }
  },
  {

@@ -13,11 +13,15 @@ use weft_render::*;
 use crate::assets::{self, Anim, Assets, LoadedTexture};
 use crate::content::Content;
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, PartialEq)]
 enum Source {
     File,
     /// Quarters of four other entries (connected textures' compact form).
     Composite([u32; 4]),
+    /// A stack's look (`abi::comp::LOOK`), its text the entry's name, composed from its layers.
+    Look,
+    /// Pictures one over the other, each tinted (a stack's `layers`).
+    Layers(Vec<(String, u32)>),
 }
 
 struct Entry {
@@ -31,11 +35,14 @@ struct Entry {
     stamp: u64,
     requested: bool,
     size: u32,
+    /// A look's composed pixels at their own size, for held items' texel boxes.
+    pixels: Option<(u32, Vec<u8>)>,
 }
 
 struct Inner {
     entries: Vec<Entry>,
-    /// Entry per texture id: the content's, then connected texture tiles and composites.
+    /// Entry per texture id: the content's, then connected texture tiles and composites, then
+    /// looks as they are first drawn.
     ids: Vec<u32>,
     requests: Vec<u32>,
     /// Glow mask index per bindless color index (`u32::MAX` none), on the GPU too.
@@ -45,6 +52,11 @@ struct Inner {
     glow_dirty: bool,
     generation: u64,
     assets: Assets,
+    /// Texture id per look text, made at runtime after the fixed ones.
+    looks: FxHashMap<String, u32>,
+    looks_full: bool,
+    /// Texture id of each stack's `layers` made so far, by its text.
+    layered: FxHashMap<String, u32>,
 }
 
 pub struct GameTextures {
@@ -60,7 +72,11 @@ struct Loaded {
     entry: u32,
     tex: LoadedTexture,
     stamp: u64,
+    pixels: Option<(u32, Vec<u8>)>,
 }
+
+/// Looks composed at most: each is a texture of its own, and stacks come from other players.
+const MAX_LOOKS: usize = 4096;
 
 /// Generations count up across reloads, so a table built from an older set never looks current.
 static GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
@@ -95,6 +111,7 @@ impl GameTextures {
                     stamp: 0,
                     requested: false,
                     size: 16,
+                    pixels: None,
                 });
                 entries.len() as u32 - 1
             })
@@ -130,6 +147,9 @@ impl GameTextures {
                 glow_dirty: true,
                 generation: next_generation(),
                 assets: assets.clone(),
+                looks: FxHashMap::default(),
+                looks_full: false,
+                layered: FxHashMap::default(),
             }),
             overlays,
             blank,
@@ -153,17 +173,101 @@ impl GameTextures {
         en.frames[n as usize % en.frames.len()]
     }
 
+    /// The texture id of a stack's `layers` text, made the first time it is asked for; loaded like
+    /// any texture once drawn.
+    pub fn layered(&self, spec: &str) -> u32 {
+        let mut i = self.inner.borrow_mut();
+        if let Some(&id) = i.layered.get(spec) {
+            return id;
+        }
+        let parts = crate::stack::parse_layers(spec)
+            .into_iter()
+            .map(|(n, t)| (n.to_string(), t))
+            .collect();
+        i.entries.push(Entry {
+            name: format!("layers:{spec}"),
+            source: Source::Layers(parts),
+            frames: Vec::new(),
+            glow: Vec::new(),
+            anim: None,
+            images: Vec::new(),
+            stamp: 0,
+            requested: false,
+            size: 16,
+            pixels: None,
+        });
+        let entry = i.entries.len() as u32 - 1;
+        i.ids.push(entry);
+        let id = i.ids.len() as u32 - 1;
+        i.layered.insert(spec.to_string(), id);
+        id
+    }
+
     /// First frame of texture `id` (a block's face, an item's icon, a particle's frame).
     pub fn texture(&self, id: u32) -> u32 {
-        self.frame_of(id, 0)
-    }
-
-    pub fn frame_of(&self, id: u32, n: u32) -> u32 {
         let e = self.inner.borrow().ids.get(id as usize).copied();
-        self.frame(e, n)
+        self.frame(e, 0)
     }
 
-    /// Texture ids there are: the content's and the connected texture tiles.
+    /// The frame of texture `id` at `ticks`, as its `.anim` plays it.
+    pub fn frame_now(&self, id: u32, ticks: f32) -> u32 {
+        let e = self.inner.borrow().ids.get(id as usize).copied();
+        self.frame(e, self.strip_frame(id, ticks))
+    }
+
+    /// Which frame of its strip that is, for what draws the file's own picture. Nothing while it
+    /// isn't loaded.
+    pub fn strip_frame(&self, id: u32, ticks: f32) -> u32 {
+        let i = self.inner.borrow();
+        let en = i
+            .ids
+            .get(id as usize)
+            .and_then(|&e| i.entries.get(e as usize));
+        en.and_then(|en| en.anim.as_ref())
+            .map_or(0, |a| a.frame_at(ticks).0)
+    }
+
+    /// The texture id of a stack's look, its entry made on first use and loaded like any other.
+    /// `None` past `MAX_LOOKS`: the item's own icon shows instead.
+    pub fn look(&self, look: &str) -> Option<u32> {
+        let mut i = self.inner.borrow_mut();
+        if let Some(&id) = i.looks.get(look) {
+            return Some(id);
+        }
+        if i.looks.len() >= MAX_LOOKS {
+            if !std::mem::replace(&mut i.looks_full, true) {
+                log::warn!("more than {MAX_LOOKS} stack looks: the rest show their item's icon");
+            }
+            return None;
+        }
+        i.entries.push(Entry {
+            name: look.to_string(),
+            source: Source::Look,
+            frames: Vec::new(),
+            glow: Vec::new(),
+            anim: None,
+            images: Vec::new(),
+            stamp: 0,
+            requested: false,
+            size: 16,
+            pixels: None,
+        });
+        let (entry, id) = (i.entries.len() as u32 - 1, i.ids.len() as u32);
+        i.ids.push(entry);
+        i.looks.insert(look.to_string(), id);
+        // Tables sized by the ids are built again; the world's never point at a look anyway.
+        i.generation = next_generation();
+        Some(id)
+    }
+
+    /// A look's composed pixels (size, RGBA) once it has loaded.
+    pub fn look_pixels(&self, id: u32) -> Option<(u32, Vec<u8>)> {
+        let i = self.inner.borrow();
+        let e = *i.ids.get(id as usize)?;
+        i.entries[e as usize].pixels.clone()
+    }
+
+    /// Texture ids there are: the content's, the connected texture tiles and looks so far.
     pub fn count(&self) -> usize {
         self.inner.borrow().ids.len()
     }
@@ -176,6 +280,29 @@ impl GameTextures {
     /// Changes whenever textures were loaded, so tables built from them can be redone.
     pub fn generation(&self) -> u64 {
         self.inner.borrow().generation
+    }
+
+    /// Every texture not loaded yet (blocks, their overlays and connected tiles, items, entities,
+    /// particles, the GUI), loaded now; how many. Joining does this once: loaded when first
+    /// shown, they were decoded inside a mesh upload with the frame waiting, and drawn blank until
+    /// then (perf review #9).
+    pub fn load_all(&self, gpu: &mut dyn Backend) -> usize {
+        let n = {
+            let mut i = self.inner.borrow_mut();
+            let todo: Vec<u32> = (0..i.entries.len() as u32)
+                .filter(|&e| {
+                    let en = &i.entries[e as usize];
+                    en.frames.is_empty() && !en.requested
+                })
+                .collect();
+            for &e in &todo {
+                i.entries[e as usize].requested = true;
+            }
+            i.requests.extend(&todo);
+            todo.len()
+        };
+        self.load_requested(gpu);
+        n
     }
 
     /// Block textures `ids` (and their overlays) loaded now: a mesh about to be drawn uses them.
@@ -234,39 +361,33 @@ impl GameTextures {
         gpu.write_buffer(i.glow_buffer, 0, bytemuck::cast_slice(&words));
     }
 
-    /// The world shader's tables, per texture id. `info`: two words, static -> (index, 0),
-    /// animated -> (offset into `frames`, count | total ticks << 16 | interpolate << 31), then
-    /// every texture's size. Shader packs are copies of that shader, also of older ones: new
-    /// things go after what they read.
-    /// `frames`: the number of texture ids (where `info`'s sizes start, over two), animation
-    /// frames (index | ticks << 16), then from `overlays` per block texture its overlay id + 1 or
-    /// 0. The count is there because `arrayLength` is not to be trusted: on macOS (MoltenVK, push
-    /// descriptors) it came back longer than the table, and sizes read past it drew every block
-    /// in one flat color.
+    /// The world shader's tables, per texture id. `info`: four words, nothing read past them or
+    /// worked out from the table's length (on macOS, MoltenVK, `arrayLength` came back longer
+    /// than it, and every block drew in one flat color): static -> (index, 0, size, 0), animated
+    /// -> (offset into `frames`, count | total ticks << 16 | interpolate << 31, size, 0).
+    /// `frames`: animation frames (index | ticks << 16), then from `overlays` per block texture
+    /// its overlay id + 1 or 0.
     pub fn world_tables(&self) -> (Vec<u32>, Vec<u32>, u32) {
         let i = self.inner.borrow();
-        let mut info: Vec<u32> = Vec::with_capacity(i.ids.len() * 3);
-        let mut sizes: Vec<u32> = Vec::with_capacity(i.ids.len());
-        let mut frames: Vec<u32> = vec![i.ids.len() as u32];
+        let mut info: Vec<u32> = Vec::with_capacity(i.ids.len() * 4);
+        let mut frames: Vec<u32> = Vec::new();
         for &e in &i.ids {
             let en = &i.entries[e as usize];
-            sizes.push(if en.frames.is_empty() { 16 } else { en.size.max(1) });
+            let size = if en.frames.is_empty() { 16 } else { en.size.max(1) };
             match (&en.anim, en.frames.is_empty()) {
                 (Some(a), false) if !a.frames.is_empty() => {
                     let total: u32 = a.frames.iter().map(|f| f.1).sum::<u32>().min(0x7FFF);
-                    info.push(frames.len() as u32);
-                    info.push(a.frames.len() as u32 | total << 16 | (a.interpolate as u32) << 31);
+                    info.extend([frames.len() as u32, a.frames.len() as u32 | total << 16 | (a.interpolate as u32) << 31, size, 0]);
                     frames.extend(
                         a.frames
                             .iter()
                             .map(|&(f, ticks)| en.frames[f as usize % en.frames.len()] | ticks.min(0xFFFF) << 16),
                     );
                 }
-                (_, false) => info.extend([en.frames[0], 0]),
-                (_, true) => info.extend([self.blank.1, 0]),
+                (_, false) => info.extend([en.frames[0], 0, size, 0]),
+                (_, true) => info.extend([self.blank.1, 0, size, 0]),
             }
         }
-        info.extend(sizes);
         let overlays = frames.len() as u32;
         frames.extend((0..i.ids.len()).map(|b| self.overlays.get(b).copied().unwrap_or(0)));
         (info, frames, overlays)
@@ -284,7 +405,8 @@ impl GameTextures {
             .entries
             .iter()
             .enumerate()
-            .filter(|(_, e)| !e.frames.is_empty())
+            // Looks are composed again when next drawn.
+            .filter(|(_, e)| !e.frames.is_empty() && e.source != Source::Look)
             .map(|(k, e)| (e.name.clone(), k as u32))
             .collect();
         let (mut kept, mut redo) = (0, 0);
@@ -299,11 +421,14 @@ impl GameTextures {
             let entries = &n.entries;
             let same: Vec<bool> = entries
                 .par_iter()
-                .map(|e| match e.source {
+                .map(|e| match &e.source {
                     Source::File => unchanged(&e.name),
                     Source::Composite(parts) => loaded
                         .get(&e.name)
-                        .is_some_and(|&o| composite_stamp(assets, entries, parts) == old.entries[o as usize].stamp),
+                        .is_some_and(|&o| composite_stamp(assets, entries, *parts) == old.entries[o as usize].stamp),
+                    Source::Look => false,
+                    // Made again when next asked for.
+                    Source::Layers(_) => false,
                 })
                 .collect();
             for k in 0..n.entries.len() {
@@ -356,6 +481,17 @@ fn composite_stamp(assets: &Assets, entries: &[Entry], parts: [u32; 4]) -> u64 {
         .fold(weft_noise::FNV, |h, &p| weft_noise::fnv_step(h, assets::texture_stamp(assets, &entries[p as usize].name)))
 }
 
+/// A stack's `layers` from their files: the same picture for its icon, its sprite in the hand
+/// and on the ground.
+pub fn layered(assets: &Assets, parts: &[(String, u32)]) -> assets::LoadedTexture {
+    let loaded: Vec<assets::LoadedTexture> = parts
+        .iter()
+        .map(|(n, _)| assets::load_texture(assets, n))
+        .collect();
+    let refs: Vec<(&assets::LoadedTexture, u32)> = loaded.iter().zip(parts).map(|(l, p)| (l, p.1)).collect();
+    assets::layered_texture(&refs)
+}
+
 fn set_glow(map: &mut Vec<u32>, color: u32, glow: u32) {
     if color as usize >= map.len() {
         map.resize(color as usize + 1, u32::MAX);
@@ -368,17 +504,29 @@ fn load(entries: &[Entry], assets: &Assets, ids: &[u32]) -> Vec<Loaded> {
     ids.par_iter()
         .map(|&e| {
             let en = &entries[e as usize];
-            match en.source {
-                Source::File => {
-                    Loaded { entry: e, tex: assets::load_texture(assets, &en.name), stamp: assets::texture_stamp(assets, &en.name) }
-                }
-                Source::Composite(ids) => {
+            match &en.source {
+                Source::File => Loaded {
+                    entry: e,
+                    tex: assets::load_texture(assets, &en.name),
+                    stamp: assets::texture_stamp(assets, &en.name),
+                    pixels: None,
+                },
+                Source::Layers(parts) => Loaded { entry: e, tex: layered(assets, parts), stamp: 0, pixels: None },
+                &Source::Composite(ids) => {
                     let parts = ids.map(|p| assets::load_texture(assets, &entries[p as usize].name));
                     Loaded {
                         entry: e,
                         tex: assets::composite_texture([&parts[0], &parts[1], &parts[2], &parts[3]]),
                         stamp: composite_stamp(assets, entries, ids),
+                        pixels: None,
                     }
+                }
+                Source::Look => {
+                    let pixels = super::stack_look::compose(&en.name, |n| assets::read_image(assets, n));
+                    let tex = pixels
+                        .as_ref()
+                        .map_or_else(assets::missing_texture, |(size, rgba)| assets::image_texture(*size, rgba.clone()));
+                    Loaded { entry: e, tex, stamp: 0, pixels }
                 }
             }
         })
@@ -416,5 +564,5 @@ fn upload(gpu: &mut dyn Backend, i: &mut Inner, l: Loaded) {
     for t in std::mem::replace(&mut en.images, images) {
         gpu.destroy_texture(t);
     }
-    (en.frames, en.glow, en.anim, en.stamp, en.requested, en.size) = (frames, glows, l.tex.anim, l.stamp, false, size);
+    (en.frames, en.glow, en.anim, en.stamp, en.requested, en.size, en.pixels) = (frames, glows, l.tex.anim, l.stamp, false, size, l.pixels);
 }

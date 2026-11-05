@@ -16,7 +16,7 @@ pub static AMBER_ORE: Block = Block::named("amber_ore");
 pub static AMBER_BLOCK: Block = Block::named("amber_block");
 pub static GATEWAY: Block = Block::named("gateway");
 static TORCH: Item = Item::named("base:torch");
-static PLAYER: Entity = Entity::named("core:player");
+static PLAYER: EntityKind = EntityKind::named("core:player");
 static CRAFTING: RecipeKind = RecipeKind::named("base:crafting");
 static NATURAL: CreativeTab = CreativeTab::named("base:natural");
 static BUILDING: CreativeTab = CreativeTab::named("base:building");
@@ -46,7 +46,7 @@ pub fn init(r: &mut Registry) {
         .sound_group("base:block.stone")
         .hardness(3.0)
         .mineable("pickaxe")
-        .needs_tool(1)
+        .needs_tool_level(1)
         .drops("amber", 1)
         .tab(&NATURAL);
     r.block(&AMBER_BLOCK)
@@ -58,7 +58,7 @@ pub fn init(r: &mut Registry) {
         .on_use(|u| {
             let w = u.world();
             let held = w.inventory(u.player()).get(w.selected_slot(u.player()));
-            held.item == TORCH.id() && light(&w, u.pos())
+            held.item == TORCH.id() && light(&w, u.pos().to_array())
         });
     r.block(&GATEWAY)
         .sound_group("base:block.glass")
@@ -74,13 +74,13 @@ pub fn init(r: &mut Registry) {
         .dimension(&OVERWORLD)
         .y(0, 64)
         .veins(3)
-        .size(4)
+        .vein_size(4)
         .replace("#stone_ore_replaceables");
     r.ore(&AMBER_ORE)
         .dimension(&CRETACEOUS)
         .y(0, 80)
         .veins(6)
-        .size(5)
+        .vein_size(5)
         .replace("#stone_ore_replaceables");
 
     r.entity_component(&CROSSING, Crossing::default(), 0);
@@ -95,7 +95,7 @@ fn light(w: &World, at: [i32; 3]) -> bool {
     match opening(w, at) {
         Some(cells) => {
             for c in &cells {
-                w.set(*c, GATEWAY.id());
+                w.set_block(*c, GATEWAY.id());
             }
             true
         }
@@ -114,7 +114,7 @@ fn opening(w: &World, at: [i32; 3]) -> Option<Vec<[i32; 3]>> {
         };
         let up = |p: [i32; 3], d: i32| [p[0], p[1] + d, p[2]];
         for start in [step(at, 1), step(at, -1), up(at, 1), up(at, -1)] {
-            if w.get(start) != AIR {
+            if w.block(start) != AIR {
                 continue;
             }
             // The empty cells joined to it in this plane, as long as they stay small.
@@ -128,7 +128,7 @@ fn opening(w: &World, at: [i32; 3]) -> Option<Vec<[i32; 3]>> {
                     if cells.contains(&n) {
                         continue;
                     }
-                    match w.get(n) {
+                    match w.block(n) {
                         AIR => cells.push(n),
                         s if AMBER_BLOCK.is(s) => {}
                         _ => ok = false,
@@ -158,8 +158,8 @@ fn opening(w: &World, at: [i32; 3]) -> Option<Vec<[i32; 3]>> {
 fn cross(w: &World) {
     for id in w.players() {
         let Some(st) = w.entity(id) else { continue };
-        let feet = st.pos.map(|v| v.floor() as i32);
-        let inside = GATEWAY.is(w.get(feet)) || GATEWAY.is(w.get([feet[0], feet[1] + 1, feet[2]]));
+        let feet = st.pos.to_array().map(|v| v.floor() as i32);
+        let inside = GATEWAY.is(w.block(feet)) || GATEWAY.is(w.block([feet[0], feet[1] + 1, feet[2]]));
         let Some(c) = w.component_mut(id, &CROSSING) else { continue };
         match c.state {
             1 => {
@@ -188,7 +188,7 @@ fn cross(w: &World) {
 /// Where player `id` came out at `feet`: a gateway near to step out of, or one built beside
 /// them. False while the place isn't loaded yet.
 fn arrive(w: &World, id: u64, feet: [i32; 3]) -> bool {
-    if w.get_loaded(feet).is_none() {
+    if w.block_loaded(feet).is_none() {
         return false;
     }
     if let Some(g) = nearest_gateway(w, feet) {
@@ -211,7 +211,7 @@ fn nearest_gateway(w: &World, at: [i32; 3]) -> Option<[i32; 3]> {
             for dx in -NEAR..=NEAR {
                 let p = [at[0] + dx, at[1] + dy, at[2] + dz];
                 let d = dx * dx + dy * dy + dz * dz;
-                if best.is_none_or(|b| d < b.0) && w.get_loaded(p).is_some_and(|s| GATEWAY.is(s)) {
+                if best.is_none_or(|b| d < b.0) && w.block_loaded(p).is_some_and(|s| GATEWAY.is(s)) {
                     best = Some((d, p));
                 }
             }
@@ -222,11 +222,11 @@ fn nearest_gateway(w: &World, at: [i32; 3]) -> Option<[i32; 3]> {
 
 /// A spot beside gateway block `g` with room to stand and ground under it.
 fn beside(w: &World, g: [i32; 3]) -> Option<[i32; 3]> {
-    let solid = |p: [i32; 3]| w.flags(p) & abi::block_flags::SOLID != 0;
+    let solid = |p: [i32; 3]| w.block_flags(p) & abi::block_flags::SOLID != 0;
     for d in [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1]] {
         for dy in -3..=0 {
             let p = [g[0] + d[0], g[1] + dy, g[2] + d[2]];
-            if !solid(p) && !solid([p[0], p[1] + 1, p[2]]) && solid([p[0], p[1] - 1, p[2]]) && !GATEWAY.is(w.get(p)) {
+            if !solid(p) && !solid([p[0], p[1] + 1, p[2]]) && solid([p[0], p[1] - 1, p[2]]) && !GATEWAY.is(w.block(p)) {
                 return Some(p);
             }
         }
@@ -238,28 +238,28 @@ fn beside(w: &World, g: [i32; 3]) -> Option<[i32; 3]> {
 /// opening 2 wide and 3 tall, on a floor of amber (over water too), the space round it cleared.
 fn build(w: &World, feet: [i32; 3]) {
     let [x, y, z] = [feet[0], feet[1], feet[2] + 2];
-    let solid = |p: [i32; 3]| w.flags(p) & abi::block_flags::SOLID != 0;
+    let solid = |p: [i32; 3]| w.block_flags(p) & abi::block_flags::SOLID != 0;
     for dx in -1..=2 {
         for dz in -2..=1 {
             for dy in 0..=4 {
                 if dz != 0 || dy == 4 {
-                    w.set([x + dx, y + dy, z + dz], AIR);
+                    w.set_block([x + dx, y + dy, z + dz], AIR);
                 }
             }
             // Ground to stand on round it.
             if !solid([x + dx, y - 1, z + dz]) {
-                w.set([x + dx, y - 1, z + dz], AMBER_BLOCK.id());
+                w.set_block([x + dx, y - 1, z + dz], AMBER_BLOCK.id());
             }
         }
     }
     for dx in -1..=2 {
-        w.set([x + dx, y - 1, z], AMBER_BLOCK.id());
-        w.set([x + dx, y + 3, z], AMBER_BLOCK.id());
+        w.set_block([x + dx, y - 1, z], AMBER_BLOCK.id());
+        w.set_block([x + dx, y + 3, z], AMBER_BLOCK.id());
     }
     for dy in 0..3 {
-        w.set([x - 1, y + dy, z], AMBER_BLOCK.id());
-        w.set([x + 2, y + dy, z], AMBER_BLOCK.id());
-        w.set([x, y + dy, z], GATEWAY.id());
-        w.set([x + 1, y + dy, z], GATEWAY.id());
+        w.set_block([x - 1, y + dy, z], AMBER_BLOCK.id());
+        w.set_block([x + 2, y + dy, z], AMBER_BLOCK.id());
+        w.set_block([x, y + dy, z], GATEWAY.id());
+        w.set_block([x + 1, y + dy, z], GATEWAY.id());
     }
 }

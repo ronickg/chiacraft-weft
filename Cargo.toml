@@ -1,12 +1,12 @@
 [workspace]
 resolver = "3"
-members = ["crates/*", "backends/*", "mods/*", "mods/base/api", "mods/base/vitals", "mods/animals/core", "mods/animals/web"]
+members = ["crates/*", "backends/*", "mods/*", "mods/base/api", "mods/base/vitals", "mods/base/crafting", "mods/base/progression", "mods/animals/core", "mods/animals/web"]
 # Bare `cargo build`/`cargo run` build the game and its mods, and `cargo run` starts the game (the
 # wallet's live test tool is a second binary); use `--workspace` or `-p` for everything else.
 default-members = ["crates/app", "mods/*"]
 
 [workspace.package]
-version = "26.10.4"
+version = "26.11.2"
 edition = "2024"
 license = "MPL-2.0"
 rust-version = "1.95"
@@ -20,6 +20,7 @@ weft_engine = { path = "crates/engine" }
 weft_vulkan = { path = "backends/vulkan" }
 base_api = { path = "mods/base/api" }
 vitals = { path = "mods/base/vitals" }
+crafting = { path = "mods/base/crafting" }
 
 ash = "0.38"
 ash-window = "0.13"
@@ -54,3 +55,12 @@ opt-level = 3
 
 [profile.release]
 debug = "line-tables-only"
+
+# What players get (the release builds of CI): thin LTO and one codegen unit. On the PC, far
+# terrain made its tiles 17 % (heights) and 10 % (meshing) faster than `release`; frames the same
+# (GPU-bound); fat LTO only 3 % more. It builds about 6x slower, so the crew's runs keep `release`
+# (perf review, 11-05). `cargo build --profile dist`, output in target/dist.
+[profile.dist]
+inherits = "release"
+lto = "thin"
+codegen-units = 1

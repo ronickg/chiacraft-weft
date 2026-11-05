@@ -37,6 +37,7 @@ pub mod anchor;
 pub mod cache;
 pub mod did;
 pub mod holdings;
+pub mod listing;
 pub mod offer;
 pub mod reader;
 #[cfg(feature = "sim")]

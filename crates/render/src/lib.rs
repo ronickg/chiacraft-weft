@@ -172,6 +172,16 @@ pub enum Cmd {
         offset: u64,
         count: u32,
     },
+    /// Up to `max` [`DrawIndexedArgs`] records, how many a shader wrote at `count_offset`.
+    /// Without [`Backend::indirect_count`] all `max` are drawn, so records past the count must
+    /// draw nothing (zeroed with [`Cmd::FillBuffer`] before the shader writes them).
+    DrawIndexedIndirectCount {
+        buffer: BufferId,
+        offset: u64,
+        count_buffer: BufferId,
+        count_offset: u64,
+        max: u32,
+    },
     DrawIndirectCount {
         buffer: BufferId,
         offset: u64,
@@ -186,6 +196,19 @@ pub enum Cmd {
     },
     /// Makes shader writes visible to later commands. Only needed between compute and its consumers.
     Barrier,
+    /// Sets `size` bytes of `buffer` from `offset` to the 32-bit `value`, on the GPU. Outside a
+    /// pass; offset and size multiples of 4. Ordered with later commands by a [`Cmd::Barrier`].
+    FillBuffer {
+        buffer: BufferId,
+        offset: u64,
+        size: u64,
+        value: u32,
+    },
+    /// Copies a depth texture to the start of a buffer, 32-bit floats row by row. Outside a pass.
+    CopyDepthToBuffer {
+        depth: TextureId,
+        buffer: BufferId,
+    },
     /// GPU timestamp, see [`Backend::gpu_times`].
     Mark,
 }
@@ -306,7 +329,21 @@ pub trait Backend: Send {
     fn device_name(&self) -> &str {
         ""
     }
+    /// What kind of GPU it is: 0 not known, 1 integrated, 2 discrete, 3 another (virtual, CPU).
+    /// The base game picks its first quality preset by it (Research round 19, 7).
+    fn device_class(&self) -> u32 {
+        0
+    }
+    /// Its own memory (the largest device-local heap), MB; 0 not known.
+    fn device_memory_mb(&self) -> u64 {
+        0
+    }
     fn frames_in_flight(&self) -> usize;
+    /// Whether the `*IndirectCount` draws take their count from the GPU (Vulkan 1.2's
+    /// `drawIndirectCount`). Without it (MoltenVK) they draw all `max` records.
+    fn indirect_count(&self) -> bool {
+        true
+    }
     fn surface_size(&self) -> (u32, u32);
     fn resize(&mut self, width: u32, height: u32);
     fn set_vsync(&mut self, vsync: bool);
@@ -341,5 +378,13 @@ pub trait Backend: Send {
     fn gpu_times(&self) -> &[f32] {
         &[]
     }
+    /// The driver's compiled pipelines, to keep on disk and hand back to `load_pipeline_cache`
+    /// next start, when pipelines made again skip most of their compiling. Empty if it keeps none.
+    fn pipeline_cache_data(&self) -> Vec<u8> {
+        Vec::new()
+    }
+    /// What an earlier `pipeline_cache_data` gave, before any pipeline is made. Data from another
+    /// driver or device is ignored.
+    fn load_pipeline_cache(&mut self, _data: &[u8]) {}
     fn wait_idle(&mut self);
 }

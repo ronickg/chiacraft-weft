@@ -7,17 +7,15 @@ use weft_sdk::*;
 
 use crate::wild::{self, Body};
 
-pub(crate) static CITIPATI: Entity = Entity::named("citipati");
+pub(crate) static CITIPATI: EntityKind = EntityKind::named("citipati");
 
 static BODY: Body = Body {
     model: "citipati",
     texture: "citipati/citipati",
-    size: (0.7, 1.7),
-    health: 40.0,
     // A long-legged runner, as an emu (est.).
     speed: 6.0,
     wander: 0.3,
-    damage: 3.0,
+    bites: true,
     rest: ("citipati_lie", (1.2, 1.15)),
 };
 

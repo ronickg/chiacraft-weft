@@ -163,6 +163,26 @@ pub struct Rules {
     /// ... and only with a DID at least this many days old (0: any age). Implies a DID.
     #[serde(default)]
     pub did_min_days: u32,
+    /// When the chain can't be asked about a player's DID (no chain peer answered in time): let
+    /// them in as an unverified guest (true), or refuse until it can be checked (false, the
+    /// default). Only where the rules ask for a DID; elsewhere they come in without one either way.
+    #[serde(default)]
+    pub did_unchecked_guest: bool,
+    /// Only players who earned this achievement in a world it trusts (phase 4).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub achievement: Option<AchievementRule>,
+}
+
+/// An achievement a world asks of who comes in: its id (`base:workbench`), its title as a lang
+/// key or text (for the refusal), and the issuers whose credential counts (identity keys, hex:
+/// the world's own owner when the rule was set, and any the owner added).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AchievementRule {
+    pub id: String,
+    #[serde(default)]
+    pub title: String,
+    #[serde(default)]
+    pub from: Vec<String>,
 }
 
 impl Rules {
@@ -305,6 +325,12 @@ pub struct Who {
     pub did: Option<String>,
     /// That DID's age in days, as the chain says.
     pub did_days: Option<u32>,
+    /// The player claimed a DID (a proof that checks out) the chain couldn't be asked about: no
+    /// chain peer answered. `did` is `None` then: never counted as verified.
+    pub did_unchecked: bool,
+    /// Achievements the player showed when the world asked (checked credentials): (id, issuer
+    /// identity hex).
+    pub achievements: Vec<(String, String)>,
 }
 
 impl Who {
@@ -362,11 +388,25 @@ pub fn verdict(rules: &Rules, bans: &Bans, lists: &[BanList], who: &Who, trusted
     if rules.only_listed {
         return Verdict::Refuse(Msg::new("admission.not_listed", Vec::new()));
     }
-    if rules.needs_did() && who.did.is_none() {
+    // A DID the chain couldn't be asked about: the world's rule says guest or not now.
+    let unchecked_guest = rules.needs_did() && who.did.is_none() && who.did_unchecked && rules.did_unchecked_guest;
+    if rules.needs_did() && who.did.is_none() && !unchecked_guest {
+        if who.did_unchecked {
+            return Verdict::Refuse(Msg::new("admission.did_unchecked", Vec::new()));
+        }
         let key = if rules.did_min_days > 0 { "admission.did_required_days" } else { "admission.did_required" };
         return Verdict::Refuse(Msg::new(key, vec![Arg::Int(rules.did_min_days as i64)]));
     }
-    if rules.did_min_days > 0 && who.did_days.unwrap_or(0) < rules.did_min_days {
+    if let Some(r) = &rules.achievement
+        && !who
+            .achievements
+            .iter()
+            .any(|(id, issuer)| *id == r.id && r.from.contains(issuer))
+    {
+        let title = if r.title.contains('.') && !r.title.contains(' ') { Arg::Key(r.title.clone()) } else { Arg::Text(r.title.clone()) };
+        return Verdict::Refuse(Msg::new("admission.achievement_required", vec![title]));
+    }
+    if rules.did_min_days > 0 && !unchecked_guest && who.did_days.unwrap_or(0) < rules.did_min_days {
         return Verdict::Refuse(Msg::new(
             "admission.did_too_young",
             vec![Arg::Int(rules.did_min_days as i64), Arg::Int(who.did_days.unwrap_or(0) as i64)],
@@ -406,6 +446,9 @@ pub fn summary(rules: &Rules) -> Vec<(String, i64)> {
     let mut out = Vec::new();
     if rules.only_listed {
         out.push(("admission.summary.listed".to_string(), 0));
+    }
+    if rules.achievement.is_some() {
+        out.push(("admission.summary.achievement".to_string(), 0));
     }
     if rules.did_min_days > 0 {
         out.push(("admission.summary.did_days".to_string(), rules.did_min_days as i64));
@@ -550,9 +593,16 @@ pub fn held_list(world: &Path, maintainer: &str) -> Option<Vec<u8>> {
 /// identity and the DID.
 pub fn at_the_door(world: &Path, key: &str) -> Option<Msg> {
     let gate = Gate::new(Some(world.to_path_buf()));
-    let rules = Rules { only_listed: false, did_required: false, did_min_days: 0, ..gate.rules.clone() };
+    door_verdict(&gate.rules, &gate.bans, &gate.lists, key, crate::saves::now_secs())
+}
+
+/// [`at_the_door`]'s verdict: bans only. The rules are rebuilt from what the door can judge (the
+/// allow list, which wins over a followed list, and the lists), so a rule that needs the join
+/// (the allow list alone, a DID, an achievement shown when asked) never refuses here.
+fn door_verdict(rules: &Rules, bans: &Bans, lists: &[BanList], key: &str, now: u64) -> Option<Msg> {
+    let rules = Rules { allow: rules.allow.clone(), lists: rules.lists.clone(), ..Default::default() };
     let who = Who { key: key.to_string(), ..Default::default() };
-    match verdict(&rules, &gate.bans, &gate.lists, &who, false, crate::saves::now_secs()) {
+    match verdict(&rules, bans, lists, &who, false, now) {
         Verdict::Refuse(m) => Some(m),
         Verdict::Admit => None,
     }
@@ -778,7 +828,7 @@ mod tests {
     use super::*;
 
     fn who(key: &str, identity: Option<&str>) -> Who {
-        Who { name: "bob".into(), key: key.into(), identity: identity.map(str::to_string), did: None, did_days: None }
+        Who { name: "bob".into(), key: key.into(), identity: identity.map(str::to_string), ..Default::default() }
     }
 
     #[test]
@@ -857,6 +907,45 @@ mod tests {
         ban_all(&mut bans, &Who { did: Some("did:chia:1abc".into()), ..Default::default() }, "", "alice", None);
         let other = Who { key: "k9".into(), did: Some("did:chia:1abc".into()), did_days: Some(99), ..Default::default() };
         assert!(matches!(verdict(&Rules::default(), &bans, &[], &other, false, 0), Verdict::Refuse(_)));
+    }
+
+    #[test]
+    fn an_achievement_rule_takes_only_trusted_issuers() {
+        let rules = Rules {
+            achievement: Some(AchievementRule {
+                id: "base:workbench".into(),
+                title: "advancement.base.workbench".into(),
+                from: vec!["owner".into()],
+            }),
+            ..Default::default()
+        };
+        let mut bob = who("k1", Some("id1"));
+        let Verdict::Refuse(m) = verdict(&rules, &Bans::default(), &[], &bob, false, 0) else { panic!("admitted") };
+        assert_eq!((m.key.as_str(), &m.args[0]), ("admission.achievement_required", &Arg::Key("advancement.base.workbench".into())));
+        // Earned elsewhere (signed by someone the rule doesn't trust), or another achievement: no.
+        bob.achievements = vec![("base:workbench".into(), "stranger".into()), ("base:timber".into(), "owner".into())];
+        assert!(matches!(verdict(&rules, &Bans::default(), &[], &bob, false, 0), Verdict::Refuse(_)));
+        bob.achievements
+            .push(("base:workbench".into(), "owner".into()));
+        assert_eq!(verdict(&rules, &Bans::default(), &[], &bob, false, 0), Verdict::Admit);
+        assert_eq!(summary(&rules), vec![("admission.summary.achievement".into(), 0)]);
+    }
+
+    #[test]
+    fn the_door_refuses_bans_only() {
+        let rules = Rules {
+            only_listed: true,
+            did_required: true,
+            did_min_days: 30,
+            achievement: Some(AchievementRule { id: "base:workbench".into(), title: String::new(), from: vec!["owner".into()] }),
+            ..Default::default()
+        };
+        // Nobody is refused at the door for what the join shows later.
+        assert_eq!(door_verdict(&rules, &Bans::default(), &[], "k1", 0), None);
+        let mut bans = Bans::default();
+        ban_all(&mut bans, &who("k1", None), "", "alice", None);
+        assert!(door_verdict(&rules, &bans, &[], "k1", 0).is_some());
+        assert_eq!(door_verdict(&rules, &bans, &[], "k2", 0), None);
     }
 
     #[test]
@@ -995,5 +1084,25 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("chiacraft-admission-account-{}", std::process::id()));
         chiacraft_account::use_file_store();
         chiacraft_account::open(&dir).expect("a test account");
+    }
+
+    #[test]
+    fn a_did_the_chain_could_not_check_follows_the_rule() {
+        let unchecked = Who { key: "k1".into(), did_unchecked: true, ..Default::default() };
+        // A world that asks for no DID lets them in either way.
+        assert_eq!(verdict(&Rules::default(), &Bans::default(), &[], &unchecked, false, 0), Verdict::Admit);
+        // One that does refuses until it can check, saying so...
+        let mut rules = Rules { did_required: true, did_min_days: 30, ..Default::default() };
+        match verdict(&rules, &Bans::default(), &[], &unchecked, false, 0) {
+            Verdict::Refuse(m) => assert_eq!(m.key, "admission.did_unchecked"),
+            v => panic!("{v:?}"),
+        }
+        // ... or lets them in as a guest, never as verified.
+        rules.did_unchecked_guest = true;
+        assert_eq!(verdict(&rules, &Bans::default(), &[], &unchecked, false, 0), Verdict::Admit);
+        assert!(unchecked.did.is_none());
+        // A DID the chain said isn't theirs is refused whatever the guest rule.
+        let not_held = Who { key: "k2".into(), ..Default::default() };
+        assert!(matches!(verdict(&rules, &Bans::default(), &[], &not_held, false, 0), Verdict::Refuse(_)));
     }
 }

@@ -4,11 +4,15 @@
 //! the ground a bird walks or hops about, foraging, and a hunter or a scavenger takes what it can
 //! (`hunt::hunt`); a walker or a hunter near, or just now and then, it takes off (`fly`): up a few
 //! blocks, a stretch through the air with its wings open (its flying model, a look of its own),
-//! and down again somewhere else. No nests yet (Ronald, 2026-11-03): their young come out as
-//! fledglings (`Tune::gestation` in their rows).
+//! and down again somewhere else. They lay in nests at their kind of site (`eggs::lay_in_nest`,
+//! `animals_core::nests`), and their young hatch there.
 
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
+
+use crate::ModelFile;
+use crate::choose::{Band, Need, WithBand};
+use crate::prof::Timed;
 
 use crate::dist2;
 
@@ -20,16 +24,16 @@ pub struct Wings {
     /// its texture.
     pub model: &'static str,
     pub texture: &'static str,
-    /// Its box on the ground and in the air, width and height in blocks.
-    pub size: (f32, f32),
+    /// Its box in the air, width and height in blocks (on the ground its model's:
+    /// `animals_core::bodies`).
     pub fly_size: (f32, f32),
-    pub health: f32,
     /// Its speed on the ground, and in the air as a multiple of it.
     pub speed: f32,
     pub air: f32,
     pub wander: f32,
-    /// What its bite or talons do (0: it never fights).
-    pub damage: f32,
+    /// Whether its bite or talons hurt; how much, and its health, come from its species
+    /// (`animals_core::danger::body`).
+    pub bites: bool,
     /// How high it climbs (blocks above where it took off, and a random share as much again), how
     /// far it flies (blocks, and as much again at random) and the ticks a flight may last.
     pub height: f64,
@@ -65,24 +69,25 @@ fn fly_look(wings: &Wings) -> String {
 }
 
 /// Registers `kinds` (each a species' entity kind) on one body.
-pub fn register(r: &mut Registry, kinds: &[&'static Entity], wings: &'static Wings) {
+pub fn register(r: &mut Registry, kinds: &[&'static EntityKind], wings: &'static Wings) {
     // In the air: the wings open and beating.
     let look = fly_look(wings);
     drop(
-        r.entity(Entity::generated(look.clone()))
+        r.entity(EntityKind::generated(look.clone()))
             .size(wings.fly_size.0, wings.fly_size.1)
             .passive()
             .model_file(&look)
             .animations(&look)
             .texture(wings.texture),
     );
+    let (bw, bh) = animals_core::bodies::of(wings.model);
     for &kind in kinds {
         let index = crate::species::of(kind);
         r.entity(kind)
-            .size(wings.size.0, wings.size.1)
-            .health(wings.health)
-            .speed(wings.speed)
-            .attack_damage(wings.damage)
+            .size(bw, bh)
+            .max_health(crate::animal::health(index))
+            .walk_speed(wings.speed)
+            .attack_damage(if wings.bites { crate::animal::hit(index) } else { 0.0 })
             .passive()
             .model_file(wings.model)
             .animations(wings.model)
@@ -91,20 +96,28 @@ pub fn register(r: &mut Registry, kinds: &[&'static Entity], wings: &'static Win
             .on_interact(|e| {
                 let (w, id, player) = (e.world(), e.entity(), e.other());
                 crate::screen::interact(&w, id, player);
+                false
             })
             .goals(
                 Goals::new()
-                    .then(crate::animal::upkeep(index))
-                    .then(move |w: &World, id: u64, st: &EntityState| fly(w, id, st, wings))
-                    .then(crate::taming::behave(index))
-                    .then(move |w: &World, id: u64, st: &EntityState| crate::hunt::wary(w, id, st) && take_off(w, id, st, wings))
-                    .then(crate::hunt::hunt)
-                    .then(crate::breeding::behave(index))
-                    .then(crate::comfort::seek)
-                    .then(crate::forage::forage)
-                    .then(ai::wander(wings.wander, 8.0)),
+                    .timed("upkeep", crate::animal::upkeep(index))
+                    .timed("fly", move |w: &World, id: u64, st: &EntityState| fly(w, id, st, wings))
+                    .timed("taming", crate::taming::behave(index))
+                    .timed("wary", move |w: &World, id: u64, st: &EntityState| crate::hunt::wary(w, id, st) && take_off(w, id, st, wings))
+                    .timed("hunt", crate::hunt::hunt)
+                    // What it does when nothing is after it, the most pressing first
+                    // (`choose.rs`).
+                    .band(
+                        "needs",
+                        Band::new()
+                            .with(Need::Love, crate::breeding::behave(index))
+                            .with(Need::Comfort, crate::comfort::seek)
+                            .with(Need::Drink, crate::drink::drink)
+                            .with(Need::Eat, crate::forage::eat)
+                            .with(Need::Wander, ai::wander(wings.wander, 8.0)),
+                    ),
             )
-            .on_hurt(|w, h| crate::taming::hurt(w, h.entity));
+            .on_hurt(|w, h| crate::taming::hurt(w, h.entity, h.source));
     }
 }
 
@@ -122,11 +135,15 @@ fn take_off(w: &World, id: u64, st: &EntityState, wings: &Wings) -> bool {
         .min_by(|a, b| dist2(*a, st.pos).total_cmp(&dist2(*b, st.pos)))
         .filter(|p| dist2(*p, st.pos) < 24.0 * 24.0);
     let a = match from {
-        Some(p) if dist2(p, st.pos) > 0.01 => (st.pos[2] - p[2]).atan2(st.pos[0] - p[0]) + (random(w) - 0.5),
+        Some(p) if dist2(p, st.pos) > 0.01 => (st.pos.z - p.z).atan2(st.pos.x - p.x) + (random(w) - 0.5),
         _ => random(w) * std::f64::consts::TAU,
     };
     let r = wings.reach * (1.0 + random(w));
-    let to = [st.pos[0] + a.cos() * r, st.pos[1], st.pos[2] + a.sin() * r];
+    lift(w, id, st, wings, [st.pos.x + a.cos() * r, st.pos.y, st.pos.z + a.sin() * r])
+}
+
+/// Up into the air, flying to `to`.
+fn lift(w: &World, id: u64, st: &EntityState, wings: &Wings, to: [f64; 3]) -> bool {
     set(
         w,
         id,
@@ -134,11 +151,11 @@ fn take_off(w: &World, id: u64, st: &EntityState, wings: &Wings) -> bool {
             flying: true,
             landing: false,
             to: to.map(|v| v as f32),
-            cruise: (st.pos[1] + wings.height * (1.0 + random(w))) as f32,
+            cruise: (st.pos.y + wings.height * (1.0 + random(w))) as f32,
             left: wings.flight,
         },
     );
-    w.set_look(id, Some(&format!("animals:{}", fly_look(wings))));
+    w.set_appearance(id, Some(&format!("animals:{}", fly_look(wings))));
     if let Some(t) = w.component_mut(id, &TAMING) {
         t.scared = 0;
     }
@@ -149,8 +166,13 @@ fn take_off(w: &World, id: u64, st: &EntityState, wings: &Wings) -> bool {
 /// Every tick: take off when scared or now and then; in the air, fly to where it's going at its
 /// height, then come down and land.
 fn fly(w: &World, id: u64, st: &EntityState, wings: &Wings) -> bool {
-    let Some(mut f) = w.component(id, &STATE).copied() else { return false };
+    let Some(mut f) = w.component(id, &STATE) else { return false };
+    let smelled = scent(w, id, st);
     if !f.flying {
+        if let Some(at) = smelled {
+            weft_sdk::info!("bird {id} smells carrion {:.0} blocks off", dist2(at, st.pos).sqrt());
+            return lift(w, id, st, wings, at);
+        }
         let scared = w.component(id, &TAMING).is_some_and(|t| t.scared > 0);
         if scared || (!w.navigating(id) && !crate::forage::busy(w, id) && w.random_below(wings.restless) == 0) {
             return take_off(w, id, st, wings);
@@ -163,11 +185,14 @@ fn fly(w: &World, id: u64, st: &EntityState, wings: &Wings) -> bool {
             return take_off(w, id, st, wings);
         }
         set(w, id, Flight::default());
-        w.set_look(id, None);
+        w.set_appearance(id, None);
         return false;
     }
+    if let Some(at) = smelled.filter(|_| !f.landing) {
+        f.to = at.map(|v| v as f32);
+    }
     f.left = f.left.saturating_sub(w.tick_elapsed(id));
-    let (dx, dz) = (f.to[0] as f64 - st.pos[0], f.to[2] as f64 - st.pos[2]);
+    let (dx, dz) = (f.to[0] as f64 - st.pos.x, f.to[2] as f64 - st.pos.z);
     let flat = (dx * dx + dz * dz).sqrt();
     if f.left == 0 || flat < 2.0 {
         f.landing = true;
@@ -178,14 +203,30 @@ fn fly(w: &World, id: u64, st: &EntityState, wings: &Wings) -> bool {
         [(dx / n * 0.3) as f32, -0.7, (dz / n * 0.3) as f32]
     } else {
         // Climbing to its height (straight up where something holds it back), then level.
-        let blocked = f.left < wings.flight.saturating_sub(20) && st.vel[0].hypot(st.vel[2]) < 0.05;
-        let climb = if blocked { 1.5 } else { ((f.cruise as f64 - st.pos[1]) / 4.0).clamp(-0.4, 0.8) };
+        let blocked = f.left < wings.flight.saturating_sub(20) && st.vel.x.hypot(st.vel.z) < 0.05;
+        let climb = if blocked { 1.5 } else { ((f.cruise as f64 - st.pos.y) / 4.0).clamp(-0.4, 0.8) };
         let n = (1.0 + climb * climb).sqrt();
         [(dx / flat / n) as f32, (climb / n) as f32, (dz / flat / n) as f32]
     };
     w.fly(id, dir, if f.landing { wings.air * 0.5 } else { wings.air });
     set(w, id, f);
     true
+}
+
+/// A hungry scavenger (`Species::scavenges`) smells carrion within `needs::SCENT` beyond its
+/// foraging reach (inside it, it walks there, `forage.rs`): where it lies. Looked for every two
+/// seconds.
+fn scent(w: &World, id: u64, st: &EntityState) -> Option<[f64; 3]> {
+    if !(w.game_time() + id).is_multiple_of(40) || crate::animal::tamed(w, id) {
+        return None;
+    }
+    let a = w.component(id, &crate::animal::ANIMAL)?;
+    let s = a.species()?;
+    if !s.scavenges() || a.food as f32 >= a.stat(crate::species::FOOD) * animals_core::needs::HUNGRY {
+        return None;
+    }
+    let (_, at) = crate::forage::ground_food(w, s, st.pos.to_array(), animals_core::needs::SCENT)?;
+    (dist2(at, st.pos) > crate::forage::ITEM_LOOK * crate::forage::ITEM_LOOK).then_some(at)
 }
 
 fn set(w: &World, id: u64, f: Flight) {

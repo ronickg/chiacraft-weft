@@ -8,6 +8,8 @@ use rustc_hash::FxHashMap;
 use weft_abi::sky_kind;
 use weft_render::*;
 
+use super::frame_look::FrameLook;
+use super::soft_clouds::SoftClouds;
 use super::world_render::Camera;
 use crate::assets::{Assets, decode_png};
 use crate::content::{DimensionDef, content};
@@ -37,7 +39,7 @@ pub fn rgb(c: u32) -> Vec3 {
 }
 
 /// Where on its orbit it is, in turns.
-fn turn_of(s: &SkyDef, d: &DimensionDef, time: f64) -> f64 {
+pub(super) fn turn_of(s: &SkyDef, d: &DimensionDef, time: f64) -> f64 {
     let moved = if s.orbit.is_infinite() {
         d.day_turn(time)
     } else if s.orbit == 0.0 {
@@ -49,7 +51,7 @@ fn turn_of(s: &SkyDef, d: &DimensionDef, time: f64) -> f64 {
 }
 
 /// Its frame in the world at `turn`: x toward it, y along its way, z out of the orbit's plane.
-fn frame_of(s: &SkyDef, turn: f64) -> Mat3 {
+pub(super) fn frame_of(s: &SkyDef, turn: f64) -> Mat3 {
     Mat3::from_rotation_y(s.heading) * Mat3::from_rotation_x(s.tilt) * Mat3::from_rotation_z((turn * std::f64::consts::TAU) as f32)
 }
 
@@ -105,8 +107,10 @@ struct Picture {
     size: [u32; 2],
 }
 
-/// How much faster than the wind on the ground the clouds move (the air up there is freer).
-const CLOUD_WIND: f64 = 3.0;
+/// How fast the wind carries the clouds, against its speed on the ground (m/s): slow, near
+/// vanilla's pace (about a block in 3 s) in a breeze, a few blocks a second in a gale. Three
+/// times the ground wind was true to the air up there but read as clouds racing (Ronald).
+const CLOUD_WIND: f64 = 0.12;
 
 pub struct Sky {
     pipe: Option<PipelineId>,
@@ -124,6 +128,17 @@ pub struct Sky {
     overlay: Option<(BufferId, u32, u32)>,
     /// How far the wind has carried the clouds (blocks along x and z), on top of their own drift.
     cloud_drift: glam::DVec2,
+    /// The cloud layer as the last frame drew it, for shader packs' cloud shadows
+    /// (`Scene::clouds`, `Scene::cloud_cells`); zeros without one.
+    pub cloud_shade: [[f32; 4]; 2],
+    /// Soft clouds (chiacraft, `core:soft_clouds`): their targets, history and passes.
+    pub soft: SoftClouds,
+    /// What the pack's look works out once a frame (`client::frame_look`).
+    pub frame_look: FrameLook,
+    /// Soft clouds wanted (the setting) and possible this frame (the world copied, whose depth the
+    /// trace stops at); the client sets both before `draw`.
+    pub soft_wanted: bool,
+    pub soft_possible: bool,
 }
 
 /// A picture over the whole screen, drawn last: from inside a liquid, a block or a fire.
@@ -132,8 +147,6 @@ pub struct Overlay {
     /// Linear rgb and how much shows.
     pub color: [f32; 4],
     pub tiles: f32,
-    /// Slides with the look, in tiles.
-    pub slide: [f32; 2],
     /// Only the lower part of the screen.
     pub lower: bool,
     /// Which frame of an animated picture.
@@ -177,6 +190,11 @@ impl Sky {
             liquid_colors: Vec::new(),
             overlay: None,
             cloud_drift: glam::DVec2::ZERO,
+            cloud_shade: [[0.0; 4]; 2],
+            soft: SoftClouds::default(),
+            frame_look: FrameLook::default(),
+            soft_wanted: false,
+            soft_possible: false,
         };
         s.reload(gpu, assets);
         s
@@ -228,10 +246,12 @@ impl Sky {
                         topology: Topology::Triangles,
                     })
                     .map_err(|e| e.0)?;
-                Ok((pipe, clouds, slots.pop().unwrap_or_default()))
+                Ok((pipe, clouds, slots.pop().unwrap_or_default(), shader))
             });
         match made {
-            Ok((pipe, clouds, slots)) => {
+            Ok((pipe, clouds, slots, shader)) => {
+                self.soft.set_shader(gpu, &shader);
+                self.frame_look.set_shader(gpu, &shader);
                 if let Some(old) = self.pipe.replace(pipe) {
                     gpu.destroy_pipeline(old);
                 }
@@ -270,7 +290,7 @@ impl Sky {
             let frame_h = w as f32 / h as f32;
             self.list.push(GpuSky {
                 axes: [[0.0; 4]; 3],
-                uv: [o.slide[0], o.slide[1], 1.0, frame_h],
+                uv: [0.0, 0.0, 1.0, frame_h],
                 color: o.color,
                 ids: [index, kind::OVERLAY, 0, 0],
                 extra: [o.tiles, o.lower as u32 as f32, (o.frame as f32 * frame_h).fract(), 0.0],
@@ -306,6 +326,8 @@ impl Sky {
 
     pub fn destroy(&mut self, gpu: &mut dyn Backend) {
         self.drop_pictures(gpu);
+        self.soft.destroy(gpu);
+        self.frame_look.destroy(gpu);
         for p in [self.pipe.take(), self.clouds_pipe.take()]
             .into_iter()
             .flatten()
@@ -356,36 +378,50 @@ impl Sky {
         time: f64,
         eye_y: f64,
         in_liquid: bool,
-        rain: f32,
-        thunder: f32,
+        look: &weft_abi::WeatherLook,
         wind: glam::Vec2,
         dt: f32,
         overlays: &[Overlay],
     ) {
         self.overlay = None;
-        // Clouds ride the wind where the player is (m/s, the way it blows), faster than it blows
-        // on the ground: the air up there is freer.
+        self.cloud_shade = [[0.0; 4]; 2];
+        // For packs' weather (`cover`, `cloud_shade`): how much falls, and how stormy it is
+        // (thunder's clouds go 0.95 dark).
+        let rain = look.falls.clamp(0.0, 1.0);
+        let thunder = (look.cloud_dark / 0.95).clamp(0.0, 1.0);
+        // Clouds ride the wind where the player is (m/s, the way it blows), at a game's pace.
         self.cloud_drift += wind.as_dvec2() * CLOUD_WIND * dt.clamp(0.0, 0.25) as f64;
         let Some(pipe) = self.pipe else { return };
         let c = content();
         let d = &c.dims[dim];
-        // From inside a liquid its fog hides the sky.
+        // From inside a liquid its fog hides the sky: only the gradient is drawn, marked so
+        // (`extra.x` 1), which the engine's sky draws as the fog and a pack as its own water (the
+        // world's gaps showed the clear colour, a band of navy streaks where the near sea floor
+        // ended, the world playtester's under-water shots).
         if in_liquid {
+            self.soft
+                .prepare(gpu, false, frame.width, frame.height, glam::Mat4::IDENTITY, cam.pos, glam::DVec2::ZERO);
             self.list.clear();
-            let n = self.overlay_entries(gpu, overlays);
-            if n > 0 {
-                let buf = crate::gpu_layout::frame_buffer(
-                    gpu,
-                    &mut self.buffers,
-                    frame.slot,
-                    n,
-                    size_of::<GpuSky>() as u64,
-                    usage::STORAGE,
-                    "sky",
-                );
-                gpu.mapped(buf)[..self.list.len() * size_of::<GpuSky>()].copy_from_slice(bytemuck::cast_slice(&self.list));
-                self.overlay = Some((buf, 0, n));
-            }
+            let aspect = frame.width as f32 / frame.height.max(1) as f32;
+            let (o, px, py) = screen_rays(cam, aspect);
+            let m = Mat3::from_cols(px - o, py - o, o);
+            self.list.push(GpuSky {
+                axes: [m.x_axis.extend(0.0).to_array(), m.y_axis.extend(0.0).to_array(), m.z_axis.extend(0.0).to_array()],
+                uv: [0.0; 4],
+                color: [0.0, 0.0, 0.0, 1.0],
+                ids: [u32::MAX, kind::GRADIENT, 0, 0],
+                extra: [1.0, 0.0, 0.0, 0.0],
+            });
+            let over = self.overlay_entries(gpu, overlays);
+            let n = self.list.len() as u32;
+            let stride = size_of::<GpuSky>() as u64;
+            let buf = crate::gpu_layout::frame_buffer(gpu, &mut self.buffers, frame.slot, n, stride, usage::STORAGE, "sky");
+            gpu.mapped(buf)[..self.list.len() * stride as usize].copy_from_slice(bytemuck::cast_slice(&self.list));
+            self.overlay = (over > 0).then_some((buf, 1, over));
+            list.pipeline(pipe);
+            list.bind(bind::sky::OBJECTS, buf);
+            list.bind(bind::sky::SCENE, scene);
+            list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: 0 });
             return;
         }
         let turn = d.day_turn(time);
@@ -402,7 +438,7 @@ impl Sky {
         self.list.push(GpuSky {
             axes: axes(Mat3::from_cols(px - o, py - o, o)),
             uv: [below as u32 as f32, 0.0, 0.0, 0.0],
-            color: rained(rgb(d.sky_color) * if d.sky_light { light } else { 1.0 }, rain, 0.75)
+            color: rained(rgb(d.sky_color) * if d.sky_light { light } else { 1.0 }, 1.0, look.sky_gray)
                 .powf(2.2)
                 .extend(1.0)
                 .to_array(),
@@ -414,8 +450,9 @@ impl Sky {
         let objects = c.game.sky.get(dim).map_or(&[][..], |l| &l[..]);
         let mut clouds = None;
         for (i, s) in objects.iter().enumerate() {
-            // Rain hides what is up there, domes aside: those are the sky.
-            let opacity = (s.opacity[0] + (s.opacity[1] - s.opacity[0]) * night) * if s.kind == sky_kind::DOME { 1.0 } else { 1.0 - rain };
+            // Weather hides what is up there, domes aside: those are the sky.
+            let opacity =
+                (s.opacity[0] + (s.opacity[1] - s.opacity[0]) * night) * if s.kind == sky_kind::DOME { 1.0 } else { 1.0 - look.sky_cover };
             if s.kind == sky_kind::CLOUDS {
                 let Some((index, [w, h])) = self.picture(gpu, &s.texture) else { continue };
                 const CELL: f64 = 12.0;
@@ -434,20 +471,37 @@ impl Sky {
                 let (x, z) = ((cam.pos.x + time * s.drift as f64 - self.cloud_drift.x) / CELL, (cam.pos.z - self.cloud_drift.y) / CELL);
                 // Vanilla's: rain grays them, the time of day colors them, thunder darkens the rest.
                 let day = if d.sky_light { (height * 2.0 + 0.5).clamp(0.0, 1.0) } else { 1.0 };
-                let color = rained(rgb(s.color), rain, 0.95) * Vec3::new(day * 0.9 + 0.1, day * 0.9 + 0.1, day * 0.85 + 0.15);
-                let color = color.lerp(Vec3::splat((color.x * 0.3 + color.y * 0.59 + color.z * 0.11) * 0.2), thunder * 0.95);
+                let color = rained(rgb(s.color), 1.0, look.cloud_gray) * Vec3::new(day * 0.9 + 0.1, day * 0.9 + 0.1, day * 0.85 + 0.15);
+                let color = color.lerp(Vec3::splat((color.x * 0.3 + color.y * 0.59 + color.z * 0.11) * 0.2), look.cloud_dark);
                 clouds = Some(self.list.len() as u32);
+                // Soft clouds: this frame's targets and the scene's fields for them, where the
+                // picture's cells stand (`offset`: what is added to a place to find it in them).
+                let offset = glam::DVec2::new(time * s.drift as f64 - self.cloud_drift.x, -self.cloud_drift.y);
+                let view_proj = cam.proj(aspect) * cam.view();
+                self.soft
+                    .prepare(gpu, self.soft_wanted && self.soft_possible, frame.width, frame.height, view_proj, cam.pos, offset);
+                let trace = self
+                    .soft
+                    .trace_index()
+                    .filter(|_| self.soft.scene.0[0] != 0.0)
+                    .map_or(0.0, |i| i as f32 + 1.0);
                 // The weather for packs: x how much more of the sky they cover as rain comes, y how
                 // dark their undersides go, z an overcast deck in a storm.
                 let cover = (rain * 0.75 + thunder * 0.25).min(1.0);
+                let cells = [
+                    x.rem_euclid(1.0) as f32,
+                    z.rem_euclid(1.0) as f32,
+                    x.floor().rem_euclid(4096.0) as f32,
+                    z.floor().rem_euclid(4096.0) as f32,
+                ];
+                // The bindless index + 1 (0: none), the cell size, its height over the camera
+                // (its underside) and how much of the gaps the weather fills (`fs_clouds`' `cloud_cell`).
+                self.cloud_shade = [[index as f32 + 1.0, CELL as f32, (lifted - cam.pos.y) as f32, cover * 0.6 + thunder * 0.35], cells];
                 self.list.push(GpuSky {
-                    axes: [[cover, (rain * 0.6 + thunder * 0.4).min(1.0), thunder, 0.0], [0.0; 4], [0.0; 4]],
-                    uv: [
-                        x.rem_euclid(1.0) as f32,
-                        z.rem_euclid(1.0) as f32,
-                        x.floor().rem_euclid(4096.0) as f32,
-                        z.floor().rem_euclid(4096.0) as f32,
-                    ],
+                    // axes[1].x: the soft clouds' trace target, bindless index + 1 (0: none), for
+                    // `fs_cloud_resolve`.
+                    axes: [[cover, (rain * 0.6 + thunder * 0.4).min(1.0), thunder, 0.0], [trace, 0.0, 0.0, 0.0], [0.0; 4]],
+                    uv: cells,
                     color: color.powf(2.2).extend(0.8 + 0.15 * cover).to_array(),
                     ids: [index, kind::CLOUDS, w, h],
                     extra: [CELL as f32, 4.0, (lifted - cam.pos.y) as f32, reach as f32],
@@ -460,7 +514,19 @@ impl Sky {
             let t = turn_of(s, d, time);
             let spin =
                 if s.spin != 0.0 { Mat3::from_rotation_x((time / s.spin as f64 * std::f64::consts::TAU) as f32) } else { Mat3::IDENTITY };
-            let m = frame_of(s, t) * spin;
+            let mut m = frame_of(s, t) * spin;
+            // A body on a leaned path (`tilt`) keeps its picture upright, its edges level with the
+            // horizon: leaned with the path, the moon's square stood as a diamond (the world
+            // playtester's "white rotated square"). Its picture's up toward the world's up; right
+            // at the zenith the path's own frame.
+            if s.kind == sky_kind::BODY && s.tilt != 0.0 && s.spin == 0.0 {
+                let toward = m.x_axis;
+                let right = toward.cross(Vec3::Y);
+                if right.length() > 0.05 {
+                    let right = right.normalize();
+                    m = Mat3::from_cols(toward, right.cross(toward), right);
+                }
+            }
             let picture = self.picture(gpu, &s.texture);
             let slot = self
                 .slots
@@ -528,6 +594,13 @@ impl Sky {
         list.bind(bind::sky::SCENE, scene);
         for (vertices, first_instance) in draws {
             list.push(Cmd::Draw { vertices, instances: 1, first_vertex: 0, first_instance });
+        }
+        self.frame_look.frame(gpu, buf, scene);
+        match clouds {
+            Some(first_instance) => self.soft.record(buf, scene, first_instance),
+            None => self
+                .soft
+                .prepare(gpu, false, frame.width, frame.height, glam::Mat4::IDENTITY, cam.pos, glam::DVec2::ZERO),
         }
         if let (Some(first_instance), Some(pipe)) = (clouds, self.clouds_pipe) {
             list.pipeline(pipe);
