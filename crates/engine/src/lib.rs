@@ -38,6 +38,7 @@ pub mod settings;
 pub mod shaders;
 pub mod shape;
 pub mod stack;
+pub mod touch;
 pub mod ui;
 pub mod wire;
 pub mod world;
@@ -49,6 +50,11 @@ pub use chiacraft::{account_screen, bridge, package_trust};
 
 pub use app::api::{exit_code, set_launch_options};
 pub use app::{BackendFactory, Options, run};
+/// Android (crates/android): the activity glue winit runs on, and the game started on it.
+#[cfg(target_os = "android")]
+pub use app::run_android;
+#[cfg(target_os = "android")]
+pub use winit::platform::android::activity as android_activity;
 
 /// Background workers (generation, meshing, region ticks) leave two cores to the render and
 /// server threads: a full pool starved the render thread during loading and frames missed vsync.

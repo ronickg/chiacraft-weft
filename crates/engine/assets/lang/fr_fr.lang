@@ -650,3 +650,13 @@ finder.refresh = Actualiser
 chat.screenshot = Capture d'écran enregistrée : {0}, {1}
 chat.screenshot.picture = ouvrir l'image
 chat.screenshot.folder = ouvrir le dossier
+
+# Commandes tactiles à l'écran (touch.rs).
+touch.jump = Saut
+touch.sneak = Accr
+touch.attack = Frap
+touch.use = Util
+touch.inventory = Inv
+touch.drop = Jeter
+touch.chat = Chat
+touch.pause = II

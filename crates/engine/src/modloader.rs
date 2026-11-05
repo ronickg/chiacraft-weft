@@ -53,9 +53,11 @@ fn set_names(names: Vec<String>) {
 /// library may also sit next to the engine executable instead (development builds,
 /// `target/<profile>/`).
 pub fn discover(mod_dirs: &[PathBuf], cache: &Path) -> Vec<(String, PathBuf, PathBuf)> {
-    let exe_dir = std::env::current_exe()
-        .ok()
-        .and_then(|p| p.parent().map(Path::to_path_buf));
+    let exe_dir = crate::paths::library_dir().map(Path::to_path_buf).or_else(|| {
+        std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(Path::to_path_buf))
+    });
     let mut found = Vec::new();
     for dir in mod_dirs {
         let Ok(entries) = std::fs::read_dir(dir) else { continue };

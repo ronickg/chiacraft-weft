@@ -342,6 +342,8 @@ pub(crate) struct Running {
     benches: u32,
     bench_last: [f32; 5],
     bench_line: String,
+    /// The on-screen controls of a touch screen (`touch::enabled`).
+    touch: crate::touch::Touch,
 }
 
 struct App {
@@ -349,12 +351,28 @@ struct App {
     opts: Options,
     run: Option<Running>,
     error: Option<String>,
+    /// The window has no surface (Android, in the background): no frames until it's back.
+    suspended: bool,
 }
 
 pub fn run(factory: BackendFactory, opts: Options) -> Result<(), String> {
-    let event_loop = EventLoop::new().map_err(|e| e.to_string())?;
+    run_on(EventLoop::new().map_err(|e| e.to_string())?, factory, opts)
+}
+
+/// Android: the event loop of the activity `android_main` was given (crates/android).
+#[cfg(target_os = "android")]
+pub fn run_android(app: winit::platform::android::activity::AndroidApp, factory: BackendFactory, opts: Options) -> Result<(), String> {
+    use winit::platform::android::EventLoopBuilderExtAndroid;
+    let event_loop = EventLoop::builder()
+        .with_android_app(app)
+        .build()
+        .map_err(|e| e.to_string())?;
+    run_on(event_loop, factory, opts)
+}
+
+fn run_on(event_loop: EventLoop<()>, factory: BackendFactory, opts: Options) -> Result<(), String> {
     event_loop.set_control_flow(ControlFlow::Poll);
-    let mut app = App { factory, opts, run: None, error: None };
+    let mut app = App { factory, opts, run: None, error: None, suspended: false };
     event_loop.run_app(&mut app).map_err(|e| e.to_string())?;
     match app.error {
         Some(e) => Err(e),
@@ -366,9 +384,11 @@ pub fn run(factory: BackendFactory, opts: Options) -> Result<(), String> {
 /// source tree, or `--dev`) the source tree's.
 fn engine_assets(dev: bool) -> PathBuf {
     let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("assets");
-    let shipped = std::env::current_exe()
-        .ok()
-        .and_then(|p| p.parent().map(|d| d.join("assets").join("core")));
+    let shipped = crate::paths::engine_assets().map(PathBuf::from).or_else(|| {
+        std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|d| d.join("assets").join("core")))
+    });
     match shipped {
         Some(s) if !dev && s.is_dir() => s,
         _ => source,
@@ -616,6 +636,7 @@ impl App {
             benches: 0,
             bench_last: [0.0; 5],
             bench_line: String::new(),
+            touch: crate::touch::Touch::default(),
         };
         if let Some(world) = &self.opts.world {
             let saves_dir = r.settings.saves_dir();
@@ -2140,7 +2161,18 @@ fn text_condition(name: &str, client: Option<&Client>, debug: bool, dev: bool) -
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, el: &ActiveEventLoop) {
-        if self.run.is_some() {
+        if let Some(r) = &mut self.run {
+            // Android: back from the background, with a new surface for the same window.
+            if self.suspended {
+                self.suspended = false;
+                el.set_control_flow(ControlFlow::Poll);
+                if let Err(e) = r.gpu.surface_restored(&*r.window) {
+                    log::error!("{e}");
+                }
+                let size = r.window.inner_size();
+                r.gpu.resize(size.width, size.height);
+                r.rebuild_all();
+            }
             return;
         }
         match self.start(el) {
@@ -2150,6 +2182,21 @@ impl ApplicationHandler for App {
                 el.exit();
             }
         }
+    }
+
+    /// Android sends the app to the background: its surface goes. The world pauses, as when the
+    /// window loses the focus.
+    fn suspended(&mut self, el: &ActiveEventLoop) {
+        let Some(r) = &mut self.run else { return };
+        self.suspended = true;
+        el.set_control_flow(ControlFlow::Wait);
+        r.touch.release_all(&mut r.input);
+        r.input.release_all();
+        if r.game.is_some() && r.screens.is_empty() {
+            r.open(screens::engine("core:pause"));
+        }
+        r.set_capture(false);
+        r.gpu.surface_lost();
     }
 
     fn device_event(&mut self, _el: &ActiveEventLoop, _id: DeviceId, event: DeviceEvent) {
@@ -2180,8 +2227,30 @@ impl ApplicationHandler for App {
                 }
                 r.set_capture(false);
             }
+            WindowEvent::Touch(t) if crate::touch::enabled() => {
+                let play = r.game.is_some() && r.screens.is_empty();
+                let (w, h) = r.gpu.surface_size();
+                let scale = r.gui_scale();
+                let hud = &r.hud;
+                let slot_at = |p: Vec2| hud.hotbar_slot_at(p);
+                let mut cx = crate::touch::Cx {
+                    input: &mut r.input,
+                    play,
+                    scale,
+                    size: Vec2::new(w as f32, h as f32),
+                    slot_at: &slot_at,
+                };
+                let at = Vec2::new(t.location.x as f32, t.location.y as f32);
+                if r.touch.event(t.phase, t.id, at, &mut cx) && !r.input.captured {
+                    r.set_capture(true);
+                }
+            }
             WindowEvent::KeyboardInput { event, .. } => {
-                if let PhysicalKey::Code(code) = event.physical_key {
+                // Android's back button is Escape: out of a screen, or to the pause screen.
+                // (winit has no physical key for it, only the logical BrowserBack.)
+                let back = cfg!(target_os = "android") && event.logical_key == winit::keyboard::Key::Named(winit::keyboard::NamedKey::BrowserBack);
+                let physical = if back { PhysicalKey::Code(KeyCode::Escape) } else { event.physical_key };
+                if let PhysicalKey::Code(code) = physical {
                     match event.state {
                         ElementState::Pressed if event.repeat => r.input.key_repeat(Key::Code(code)),
                         ElementState::Pressed => r.input.key_down(Key::Code(code)),
@@ -2222,6 +2291,7 @@ impl ApplicationHandler for App {
             WindowEvent::CursorMoved { position, .. } => {
                 r.input.cursor = Vec2::new(position.x as f32, position.y as f32);
             }
+            WindowEvent::RedrawRequested if self.suspended => {}
             WindowEvent::RedrawRequested => {
                 if frame(r, &self.opts) || r.quit {
                     r.leave_world_silent();
@@ -2234,7 +2304,9 @@ impl ApplicationHandler for App {
     }
 
     fn about_to_wait(&mut self, _el: &ActiveEventLoop) {
-        if let Some(r) = &self.run {
+        if let Some(r) = &self.run
+            && !self.suspended
+        {
             r.window.request_redraw();
         }
     }
@@ -2932,6 +3004,18 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
             }
         }
         o.layout(Vec2::new(sw as f32 / scale, sh as f32 / scale), &r.ui.font);
+        let game = crate::content::try_content().map(|c| (c, &r.textures));
+        r.ui.append(&mut *r.gpu, &r.assets, &o, &r.look, scale, game, &mut |_, _, _, _, _, _| {});
+    }
+    // A touch screen's controls, over play (`touch`).
+    if crate::touch::enabled() && r.game.is_some() && r.screens.is_empty() && !hud_hidden() {
+        let size = Vec2::new(sw as f32 / scale, sh as f32 / scale);
+        let mut o = crate::ui::Ui::new();
+        o.text_unit = text_unit;
+        let (lang, input) = (&r.lang, &r.input);
+        r.touch
+            .draw(&mut o, size, scale, &|key| Msg::new(key, Vec::new()).spans(lang, Some(input)));
+        o.layout(size, &r.ui.font);
         let game = crate::content::try_content().map(|c| (c, &r.textures));
         r.ui.append(&mut *r.gpu, &r.assets, &o, &r.look, scale, game, &mut |_, _, _, _, _, _| {});
     }

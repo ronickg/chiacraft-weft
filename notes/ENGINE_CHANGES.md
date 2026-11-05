@@ -163,6 +163,19 @@ These are the biggest changes. They live mostly in our crates, but each needed h
 
   *Why:* our bot client (`crates/bots`, `weft-bots`) joins over the real protocol by the hundred, and the server had no tick timing without a game window. Off unless asked for. *Upstream?* Maybe the stats line.
 
+## 8b. Android (branch claude/android-port-3dedde)
+
+- **Android glue in the engine** (Ronald, 11-05: "Can we get the game compiled to Android?" ... "Yes, start it"), all of it idle on a desktop:
+  - `render::Backend::surface_lost` / `surface_restored`, and the Vulkan backend's: the surface and swapchain are dropped when Android sends the app to the background and made again for the window's new surface on its return; `begin_frame` draws nothing between. On Android the swapchain asks for the IDENTITY transform (the compositor turns the picture on a phone held sideways) and takes INHERIT alpha where OPAQUE isn't offered (the only one many Android drivers have); a desktop picks as before.
+  - `app.rs`: `run_android` (the event loop on the activity crates/android was given; `run` shares `run_on`), `suspended`/`resumed` (pause screen, keys let go, no frames and a waiting event loop while in the background), the back button as Escape, touch events to `touch.rs`.
+  - `touch.rs` (new): on-screen controls over play (move stick, look by dragging, jump, sneak, hit, use, inventory, drop, chat, pause; a hotbar slot by tapping it), pressing the actions' own bindings; in menus the finger is the mouse and a second finger scrolls. On with Android, or `WEFT_TOUCH=1`. Labels `touch.*` in en, ru, fr. `hud::hotbar_slot_at`.
+  - `settings::max_gui_scale`: on a touch screen the auto GUI scale fits 400 x 240 GUI pixels instead of 400 x 320 (a phone sideways, 2400 x 1080, gets 4 instead of 2, which a finger can hit).
+  - `paths::set_engine_assets` and `set_library_dir`: where the engine's assets and the mods' libraries are when not beside the executable (on Android the executable is the system's `app_process`; mods' libraries come per CPU from the APK's `lib/`, their zips carry only assets).
+  - `diag.rs`: the process's and the machine's memory from `/proc` on Android as on Linux (the frame report's memory).
+  - `clipboard.rs`: arboard has no Android, so there the clipboard is the game's own; arboard is a dependency only off Android. winit gets `android-native-activity` on Android.
+
+  *Why:* the first Android milestone (title screen, a world, touch movement). Our own parts are `crates/android` (`android_main`: unpacks the game from the APK, stdout/stderr to logcat, launch options from `args.txt`) and `tools/release/android.sh` (the APK without Gradle). *Upstream?* Maybe the surface lost/restored part.
+
 ## 9. Removed
 
 - **The texture pack built from a player's Minecraft copy** (159b507c). *Why:* Mojang's assets must not ship or be generated from; Weft's AI_POLICY also forbids "generated look-alikes".

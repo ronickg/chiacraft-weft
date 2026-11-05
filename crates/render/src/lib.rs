@@ -345,6 +345,13 @@ pub trait Backend: Send {
         true
     }
     fn surface_size(&self) -> (u32, u32);
+    /// The window's surface is going away (Android sends the app to the background): drop it and
+    /// its swapchain, keeping everything else. No frames until `surface_restored`.
+    fn surface_lost(&mut self) {}
+    /// The window has a surface again (Android brought the app back): make one for it.
+    fn surface_restored(&mut self, _window: &dyn Window) -> Result<(), Error> {
+        Ok(())
+    }
     fn resize(&mut self, width: u32, height: u32);
     fn set_vsync(&mut self, vsync: bool);
 

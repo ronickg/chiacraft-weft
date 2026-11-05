@@ -1338,6 +1338,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "chiacraft-android"
+version = "26.11.2"
+dependencies = [
+ "libc",
+ "log",
+ "weft_engine",
+ "weft_render",
+ "weft_vulkan",
+ "zip",
+]
+
+[[package]]
 name = "chiacraft-bridge"
 version = "26.11.2"
 dependencies = [

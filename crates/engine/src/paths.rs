@@ -75,6 +75,32 @@ fn per_user(os: &str, env: &dyn Fn(&str) -> Option<PathBuf>) -> Option<Dirs> {
 }
 
 static CONFIG: OnceLock<PathBuf> = OnceLock::new();
+static ENGINE_ASSETS: OnceLock<PathBuf> = OnceLock::new();
+
+/// Once, at start, where the engine's own assets are when they aren't beside the executable
+/// (Android: unpacked from the APK into the app's storage; the executable is the system's).
+pub fn set_engine_assets(dir: PathBuf) {
+    let _ = ENGINE_ASSETS.set(dir);
+}
+
+static LIBRARIES: OnceLock<PathBuf> = OnceLock::new();
+
+/// Once, at start, where mods' libraries are when not in their folders or zips and the
+/// executable's folder isn't the game's (Android: the APK's native libraries, one set per CPU,
+/// so the mods' zips carry only their assets).
+pub fn set_library_dir(dir: PathBuf) {
+    let _ = LIBRARIES.set(dir);
+}
+
+/// What `set_library_dir` was given.
+pub fn library_dir() -> Option<&'static Path> {
+    LIBRARIES.get().map(PathBuf::as_path)
+}
+
+/// What `set_engine_assets` was given.
+pub fn engine_assets() -> Option<&'static Path> {
+    ENGINE_ASSETS.get().map(PathBuf::as_path)
+}
 
 /// Once, at start, with what `config` should answer.
 pub fn set_config(dir: PathBuf) {

@@ -246,6 +246,14 @@ impl Hud {
             .map(|n| self.ui.nodes[n].rect)
     }
 
+    /// The hotbar slot under a point (GUI pixels): a touch screen picks a slot by tapping it.
+    pub fn hotbar_slot_at(&self, p: glam::Vec2) -> Option<usize> {
+        self.ui.nodes.iter().find_map(|n| match n.kind {
+            Kind::Custom { tag: TAG_HOTBAR, data } if n.rect.contains(p) => Some(data as usize),
+            _ => None,
+        })
+    }
+
     /// The smallest element under a point, so one lying inside another can be reached.
     pub fn element_at(&self, p: glam::Vec2) -> Option<String> {
         let area = |r: &Rect| r.w * r.h;

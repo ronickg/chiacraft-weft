@@ -97,6 +97,10 @@ struct Frame {
     fence: vk::Fence,
     staging: Staging,
     deferred: Vec<Deferred>,
+    /// Without push descriptors: the pools this frame's buffer sets come from, reset when the
+    /// slot is ready again, and the one in use.
+    set_pools: Vec<vk::DescriptorPool>,
+    set_pool: usize,
     waited: bool,
     /// Timestamps written by the frame now in flight in this slot.
     marks: u32,
@@ -134,7 +138,9 @@ pub struct VulkanBackend {
     device: ash::Device,
     queue: vk::Queue,
     swapchain_fn: khr::swapchain::Device,
-    push_fn: khr::push_descriptor::Device,
+    /// None where the device has no `VK_KHR_push_descriptor` (the Android emulator): per-draw
+    /// buffers then go through descriptor sets from each frame's pools (`bind_buffer_set`).
+    push_fn: Option<khr::push_descriptor::Device>,
     allocator: ManuallyDrop<Allocator>,
     /// The memory types outside the GPU's own heaps (system memory), where a GPU-only allocation goes
     /// when the GPU's memory is full (`allocate`). None on a GPU that shares the system's memory.
@@ -476,14 +482,23 @@ impl VulkanBackend {
                 .push_next(&mut f11)
                 .push_next(&mut f12)
                 .push_next(&mut f13);
-            let mut dev_exts = vec![khr::swapchain::NAME.as_ptr(), khr::push_descriptor::NAME.as_ptr()];
+            let has_ext = |name: &std::ffi::CStr| {
+                instance
+                    .enumerate_device_extension_properties(pdev)
+                    .unwrap_or_default()
+                    .iter()
+                    .any(|e| e.extension_name_as_c_str() == Ok(name))
+            };
+            let mut dev_exts = vec![khr::swapchain::NAME.as_ptr()];
+            // Optional: the Android emulator's Vulkan has none (descriptor sets instead).
+            let push = has_ext(khr::push_descriptor::NAME);
+            if push {
+                dev_exts.push(khr::push_descriptor::NAME.as_ptr());
+            } else {
+                log::info!("{device_name}: no VK_KHR_push_descriptor, per-draw buffers through descriptor sets");
+            }
             // A driver that has this extension requires it to be enabled.
-            if instance
-                .enumerate_device_extension_properties(pdev)
-                .unwrap_or_default()
-                .iter()
-                .any(|e| e.extension_name_as_c_str() == Ok(khr::portability_subset::NAME))
-            {
+            if has_ext(khr::portability_subset::NAME) {
                 dev_exts.push(khr::portability_subset::NAME.as_ptr());
             }
             let prio = [1.0];
@@ -514,7 +529,7 @@ impl VulkanBackend {
             let spill = spill_types(&instance.get_physical_device_memory_properties(pdev));
 
             let swapchain_fn = khr::swapchain::Device::new(&instance, &device);
-            let push_fn = khr::push_descriptor::Device::new(&instance, &device);
+            let push_fn = push.then(|| khr::push_descriptor::Device::new(&instance, &device));
 
             let mut frames = Vec::new();
             for _ in 0..FRAMES {
@@ -544,6 +559,8 @@ impl VulkanBackend {
                         .map_err(err("fence"))?,
                     staging: Staging { chunks: Vec::new(), current: 0, used: 0 },
                     deferred: Vec::new(),
+                    set_pools: Vec::new(),
+                    set_pool: 0,
                     waited: false,
                     marks: 0,
                 });
@@ -808,6 +825,18 @@ impl VulkanBackend {
             if caps.max_image_count > 0 {
                 count = count.min(caps.max_image_count);
             }
+            // Android: the compositor turns the picture for a rotated display, so the game draws
+            // upright (the device's own turn would have it draw rotated). Android also often has
+            // only INHERIT for alpha.
+            let transform = if cfg!(target_os = "android") && caps.supported_transforms.contains(vk::SurfaceTransformFlagsKHR::IDENTITY) {
+                vk::SurfaceTransformFlagsKHR::IDENTITY
+            } else {
+                caps.current_transform
+            };
+            let alpha = [vk::CompositeAlphaFlagsKHR::OPAQUE, vk::CompositeAlphaFlagsKHR::INHERIT]
+                .into_iter()
+                .find(|a| caps.supported_composite_alpha.contains(*a))
+                .unwrap_or(vk::CompositeAlphaFlagsKHR::OPAQUE);
             let old = self.swapchain.take();
             let raw = self
                 .swapchain_fn
@@ -821,8 +850,8 @@ impl VulkanBackend {
                         .image_array_layers(1)
                         .image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC)
                         .image_sharing_mode(vk::SharingMode::EXCLUSIVE)
-                        .pre_transform(caps.current_transform)
-                        .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
+                        .pre_transform(transform)
+                        .composite_alpha(alpha)
                         .present_mode(mode)
                         .clipped(true)
                         .old_swapchain(old.as_ref().map_or(vk::SwapchainKHR::null(), |s| s.raw)),
@@ -888,6 +917,74 @@ impl VulkanBackend {
         }
     }
 
+    /// Without push descriptors: a set for `set_layout` from this frame's pools with every buffer
+    /// in `bound` the pipeline reads (`wanted`), bound as set 1.
+    unsafe fn bind_buffer_set(
+        &mut self,
+        cmd: vk::CommandBuffer,
+        layout: vk::PipelineLayout,
+        set_layout: vk::DescriptorSetLayout,
+        bind_point: vk::PipelineBindPoint,
+        wanted: &[(u32, vk::DescriptorType)],
+        bound: &[(u32, vk::DescriptorType, vk::DescriptorBufferInfo)],
+    ) {
+        unsafe {
+            let layouts = [set_layout];
+            let set = loop {
+                let frame = &mut self.frames[self.slot];
+                let fresh = frame.set_pool == frame.set_pools.len();
+                if fresh {
+                    let sizes = [
+                        vk::DescriptorPoolSize { ty: vk::DescriptorType::STORAGE_BUFFER, descriptor_count: 8192 },
+                        vk::DescriptorPoolSize { ty: vk::DescriptorType::UNIFORM_BUFFER, descriptor_count: 2048 },
+                    ];
+                    match self
+                        .device
+                        .create_descriptor_pool(&vk::DescriptorPoolCreateInfo::default().max_sets(2048).pool_sizes(&sizes), None)
+                    {
+                        Ok(p) => frame.set_pools.push(p),
+                        Err(e) => {
+                            log::error!("descriptor pool: {e:?}");
+                            return;
+                        }
+                    }
+                }
+                let pool = frame.set_pools[frame.set_pool];
+                match self
+                    .device
+                    .allocate_descriptor_sets(&vk::DescriptorSetAllocateInfo::default().descriptor_pool(pool).set_layouts(&layouts))
+                {
+                    Ok(sets) => break sets[0],
+                    Err(e) if fresh => {
+                        log::error!("descriptor set: {e:?}");
+                        return;
+                    }
+                    // Full: the next pool (made when there is none).
+                    Err(_) => frame.set_pool += 1,
+                }
+            };
+            let infos: Vec<[vk::DescriptorBufferInfo; 1]> = wanted
+                .iter()
+                .filter_map(|&(b, ty)| bound.iter().find(|x| x.0 == b && x.1 == ty).map(|x| [x.2]))
+                .collect();
+            let writes: Vec<vk::WriteDescriptorSet> = wanted
+                .iter()
+                .filter(|&&(b, ty)| bound.iter().any(|x| x.0 == b && x.1 == ty))
+                .zip(&infos)
+                .map(|(&(b, ty), info)| {
+                    vk::WriteDescriptorSet::default()
+                        .dst_set(set)
+                        .dst_binding(b)
+                        .descriptor_type(ty)
+                        .buffer_info(info)
+                })
+                .collect();
+            self.device.update_descriptor_sets(&writes, &[]);
+            self.device
+                .cmd_bind_descriptor_sets(cmd, bind_point, layout, 1, &[set], &[]);
+        }
+    }
+
     fn vk_format(&self, f: Format) -> vk::Format {
         match f {
             Format::Rgba8Srgb => vk::Format::R8G8B8A8_SRGB,
@@ -915,6 +1012,14 @@ impl VulkanBackend {
                 .ok();
         }
         frame.waited = true;
+        for &pool in &frame.set_pools {
+            unsafe {
+                self.device
+                    .reset_descriptor_pool(pool, vk::DescriptorPoolResetFlags::empty())
+                    .ok();
+            }
+        }
+        frame.set_pool = 0;
         frame.staging.current = 0;
         frame.staging.used = 0;
         for (to, data) in std::mem::take(&mut self.early) {
@@ -1300,7 +1405,11 @@ impl VulkanBackend {
                 .create_descriptor_set_layout(
                     &vk::DescriptorSetLayoutCreateInfo::default()
                         .bindings(&bindings)
-                        .flags(vk::DescriptorSetLayoutCreateFlags::PUSH_DESCRIPTOR_KHR),
+                        .flags(if self.push_fn.is_some() {
+                            vk::DescriptorSetLayoutCreateFlags::PUSH_DESCRIPTOR_KHR
+                        } else {
+                            vk::DescriptorSetLayoutCreateFlags::empty()
+                        }),
                     None,
                 )
                 .map_err(err("push descriptor layout"))?;
@@ -1348,6 +1457,39 @@ impl Backend for VulkanBackend {
         self.swapchain
             .as_ref()
             .map_or(self.want_size, |s| (s.extent.width, s.extent.height))
+    }
+
+    fn surface_lost(&mut self) {
+        unsafe {
+            self.device.device_wait_idle().ok();
+            if let Some(sc) = self.swapchain.take() {
+                self.destroy_swapchain(sc);
+            }
+            if self.surface != vk::SurfaceKHR::null() {
+                self.surface_fn.destroy_surface(self.surface, None);
+                self.surface = vk::SurfaceKHR::null();
+            }
+        }
+        self.image_index = None;
+        log::info!("surface lost: swapchain and surface dropped");
+    }
+
+    fn surface_restored(&mut self, window: &dyn Window) -> Result<(), Error> {
+        if self.surface != vk::SurfaceKHR::null() {
+            return Ok(());
+        }
+        let display = window
+            .display_handle()
+            .map_err(err("display handle"))?
+            .as_raw();
+        let raw = window
+            .window_handle()
+            .map_err(err("window handle"))?
+            .as_raw();
+        self.surface = unsafe { ash_window::create_surface(&self._entry, &self.instance, display, raw, None) }.map_err(err("creating surface"))?;
+        self.dirty_swapchain = true;
+        log::info!("surface restored");
+        Ok(())
     }
 
     fn resize(&mut self, width: u32, height: u32) {
@@ -1678,6 +1820,10 @@ impl Backend for VulkanBackend {
     }
 
     fn begin_frame(&mut self) -> Option<FrameInfo> {
+        // Between `surface_lost` and `surface_restored` (the app in the background on Android).
+        if self.surface == vk::SurfaceKHR::null() {
+            return None;
+        }
         let t0 = std::time::Instant::now();
         self.ensure_slot_ready();
         let t1 = std::time::Instant::now();
@@ -1740,6 +1886,9 @@ impl Backend for VulkanBackend {
             let mut marks = 2;
             let sets = [self.global_set];
             let mut current: Option<u32> = None;
+            // Without push descriptors: the buffers bound so far (binding, type, buffer), which
+            // each new set carries, as a push keeps the bindings it doesn't write.
+            let mut bound: Vec<(u32, vk::DescriptorType, vk::DescriptorBufferInfo)> = Vec::new();
             let mut in_pass_targets: Vec<u32> = Vec::new();
             let mut in_pass_depth: Option<u32> = None;
             let (sc_image, sc_view, sc_extent) = {
@@ -1875,12 +2024,19 @@ impl Backend for VulkanBackend {
                         let b = self.buffers.get(buffer.0);
                         let range = if size == u64::MAX { vk::WHOLE_SIZE } else { size };
                         let info = [vk::DescriptorBufferInfo { buffer: b.raw, offset, range }];
-                        let write = vk::WriteDescriptorSet::default()
-                            .dst_binding(binding)
-                            .descriptor_type(ty)
-                            .buffer_info(&info);
-                        self.push_fn
-                            .cmd_push_descriptor_set(cmd, pl.bind_point, pl.layout, 1, &[write]);
+                        if let Some(push_fn) = &self.push_fn {
+                            let write = vk::WriteDescriptorSet::default()
+                                .dst_binding(binding)
+                                .descriptor_type(ty)
+                                .buffer_info(&info);
+                            push_fn.cmd_push_descriptor_set(cmd, pl.bind_point, pl.layout, 1, &[write]);
+                        } else {
+                            bound.retain(|b| b.0 != binding);
+                            bound.push((binding, ty, info[0]));
+                            let (layout, set_layout, bind_point) = (pl.layout, pl.set_layout, pl.bind_point);
+                            let wanted: Vec<(u32, vk::DescriptorType)> = pl.buffers.clone();
+                            self.bind_buffer_set(cmd, layout, set_layout, bind_point, &wanted, &bound);
+                        }
                     }
                     Cmd::PushConstants { start, len } => {
                         let Some(p) = current else { continue };
@@ -2139,6 +2295,9 @@ impl Drop for VulkanBackend {
                 }
                 let f = &self.frames[i];
                 self.device.destroy_command_pool(f.pool, None);
+                for &pool in &f.set_pools {
+                    self.device.destroy_descriptor_pool(pool, None);
+                }
                 self.device.destroy_semaphore(f.acquired, None);
                 self.device.destroy_fence(f.fence, None);
             }
