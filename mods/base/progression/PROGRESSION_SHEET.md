@@ -26,7 +26,7 @@ Power grows ×1.6 an age: `g(L) = 1.6^(L/10)` over area and item level L (tier �
 | tier | age | hours | EM | g at start | reference: hit / health / armour | things tagged | made | kit EM | of budget | everything once |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 496 | 149 | 52 | 36 % | 221 EM |
-| 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 34 | 21 | 137 | 48 % | 76 EM |
+| 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 39 | 23 | 150 | 52 % | 84 EM |
 | 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 30 | 24 | 60 | 16 % | 264 EM |
 | 3 | Age of Steam | 18 | 1080 | 4.10 | 31.1 / 104 / 130 | 26 | 23 | 94 | 22 % | 273 EM |
 | 4 | Age of Lightning | 20 | 1200 | 6.55 | 49.7 / 166 / 207 | 0 | 0 | 0 | 0 % | 0 EM |
@@ -255,6 +255,13 @@ Each boss is a titan at its form's age (`animals_core::bosses`): its numbers fro
 
 drenkaun: a titan apex; attacks charge (×0.75 hit, 1.2 s tell), sweep (×0.50 hit, 0.8 s tell), stomp (×0.40 hit, 0.9 s tell), roots (×0.25 hit, 1.4 s tell); parts left_antler at 10 %, right_antler at 20 %, crown at 30 %; knocked down by 8 % of its health in stagger; loot animals:warden_heartseed 35 % (certain by kill 3), animals:warden_antler 60 % (certain by kill 2), animals:warden_bark 100 %, leather 100 %, bone 100 %; its young animals:drenkaun_calf (30 %, certain by kill 4).
 
+| borkon | Bronze Age | animals:mountain_offering | 15 | 1459 | 49.7 | 45.3 | 444 s / 0.6 | 218 s / 1.1 | 156 s / 1.5 | 156 s / 1.5 | 156 s / 1.5 |
+| borkon | Iron Age | - | 25 | 2334 | 79.5 | 72.4 | 952 s / 0.4 | 444 s / 0.6 | 218 s / 1.1 | 156 s / 1.5 | 156 s / 1.5 |
+| borkon | Age of Steam | - | 35 | 3734 | 127.2 | 115.9 | 2141 s / 0.2 | 952 s / 0.4 | 444 s / 0.6 | 218 s / 1.1 | 156 s / 1.5 |
+| borkon | Age of Lightning | - | 45 | 5975 | 203.5 | 185.4 | 3936 s / 0.1 | 2141 s / 0.2 | 952 s / 0.4 | 444 s / 0.6 | 156 s / 1.5 |
+
+borkon: a titan apex; attacks charge (×0.75 hit, 1.4 s tell), toss (×0.55 hit, 0.9 s tell), rockfall (×0.35 hit, 1.6 s tell), leap (×0.50 hit, 1.0 s tell); parts left_horn at 10 %, right_horn at 20 %, fleece at 30 %; knocked down by 8 % of its health in stagger; loot animals:summit_stone 35 % (certain by kill 3), animals:borkon_horn 60 % (certain by kill 2), animals:height_fleece 100 %, wool 100 %, raw_gold 100 %, bone 100 %; its young animals:borkon_kid (30 %, certain by kill 4).
+
 ## The perk web's prices
 
 A unit is +2 % to one family; a small node gives 1, a notable 3-4, a keystone nets 0. Inside a family bonuses add, between families they multiply. A family tops out at ×1.6 (30 units: one age); everything together (gear, web, a tame's bond, food) at ×2.5 (two ages). Families: melee damage, ranged damage, spell damage, defence, health, tame damage, taming speed, craft grade, gathering speed, mining speed, move speed, mana cost, stamina, slower hunger, cooking, harvest, riding speed, trade, smelting speed, machine speed. The nodes, skills and their checks: `mods/base/vitals/WEB_SHEET.md`.
@@ -266,7 +273,7 @@ Moving to the next age takes a key, one thing from each gate (materials and tool
 | age | tech | magic | beasts | not built yet |
 |---|---|---|---|---|
 | Stone Age | base:pickaxe, base:furnace, animals:warden_heartseed | base:dowsing_rod, animals:warden_heartseed | animals:club, animals:tranquilizer_dart, animals:nest, animals:warden_heartseed | knowledge: a ruin's blueprint or lore page |
-| Bronze Age | - | - | - | all of it |
+| Bronze Age | animals:summit_stone | animals:summit_stone | animals:summit_stone | materials and tools: the Bronze Age's own; knowledge: a ruin's blueprint or lore page; infrastructure: a working setup from the Bronze Age |
 | Iron Age | - | - | - | all of it |
 | Age of Steam | - | - | - | all of it |
 | Age of Lightning | - | - | - | all of it |
@@ -341,7 +348,7 @@ Notes:
 - animals:warden_antler, animals:warden_bark: Drenkaun's part breaks and loot
 - animals:kibble: an egg, food, grain and fibre (no iron bucket; Ronald, 11-07: "move them to fit")
 
-### Bronze Age (34)
+### Bronze Age (39)
 
 **tech** (33)
 
@@ -356,6 +363,12 @@ Notes:
 
 - sky: pallasite (20)
 
+**shared** (5)
+
+- material: animals:borkon_horn (20), animals:height_fleece (20), animals:mountain_offering (3.8)
+- station: animals:borkon_altar (5.1)
+- part: animals:summit_stone (60)
+
 Notes:
 - base:copper_ore, base:tin_ore: breaks into raw copper or raw tin (a stone pickaxe): copper in cold, dry and beach land, tin on beaches and in mountains (`metals.rs`)
 - base:iron_ore, base:granite_iron_ore, base:red_sandstone_iron_ore, base:meteorite, base:gold_ore, base:granite_gold_ore: breaks into raw iron, meteoric iron or raw gold (a stone pickaxe)
@@ -363,6 +376,10 @@ Notes:
 - base:helmet_scale, base:chestplate_scale, base:leggings_scale, base:boots_scale: a bronze or copper shell's worn look: no copper or bronze in the game yet (only `/gear`)
 - base:meteoric_iron: hammered cold, iron-grade before a player can smelt (Research round 17)
 - base:raw_gold, base:gold_ingot, base:gold_block: cast and soft: the Bronze Age's (Ronald, 11-07: "move them to fit")
+- animals:borkon_altar: the Height-Keeper's altar: stone bricks and gold (the Bronze Age's)
+- animals:mountain_offering: the heights' offering, with a gold ingot: calls Borkon, tames its kid
+- animals:summit_stone: Borkon's loot, certain by the third kill: the Bronze Age key's boss part
+- animals:borkon_horn, animals:height_fleece: Borkon's part breaks and loot
 
 ### Iron Age (30)
 
