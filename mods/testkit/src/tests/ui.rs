@@ -707,7 +707,12 @@ pub async fn inventory_hotkeys(t: T) -> R {
     t.op("put me 21 cobblestone 4").await?;
     t.press("core:inventory");
     t.screen("core:menu").await?;
-    let hover = |slot: u32| -> R {
+    // The menu's slot of the player's inventory slot `i` (9..36 the backpack): the backpack comes
+    // just before the hotbar, past the grid, the worn slots (clothes among them) and the result.
+    let hot: u32 = t.hotbar(0).trim_start_matches("slot:").parse().map_err(|_| "no hotbar".to_string())?;
+    let menu = |i: u32| hot - 27 + (i - 9);
+    let hover = |inv: u32| -> R {
+        let slot = menu(inv);
         let Some(Rect { x, y, w, h }) = t.c().ui_rect(&format!("slot:{slot}")) else { return Err(format!("no slot {slot}")) };
         t.c().input_cursor(x + w / 2.0, y + h / 2.0);
         Ok(())
