@@ -216,7 +216,19 @@ pub fn register(r: &mut Registry) {
                 .zip(names.get(1))
                 .map_or(ItemStack::EMPTY, |(shape, m)| part_of(shape, m, grade, day))
         } else {
-            made_of(&kind, &names, grade, day)
+            // `gems=a,b`: cut gems of those set in it (as many as it has sockets).
+            let gems: Vec<crate::gems::Set> = materials
+                .iter()
+                .find_map(|m| m.strip_prefix("gems="))
+                .map(|g| {
+                    g.split(',')
+                        .filter_map(crafting::gems::gem)
+                        .map(|g| crate::gems::cut(g, || (w.random() >> 40) as f32 / (1u64 << 24) as f32))
+                        .collect()
+                })
+                .unwrap_or_default();
+            let made = made_of(&kind, &names, grade, day);
+            if gems.is_empty() { made } else { rebuilt(&made, &gems) }
         };
         if made.is_empty() {
             cmd.reply("command.base.gear.cant", &[Arg::Text(&kind)]);
