@@ -1010,6 +1010,8 @@ const CROWN_UNDER: f32 = 0.5;
 // dome lit by the sun on its side and dark in the gaps between, where the far boxes are too coarse to
 // draw single trees. x: how much of a dome is there (1 its top, 0 a gap), yz: which way it slopes.
 const CROWN_CELL: f32 = 4.0;
+// The domes' mean shade (`crown_clumps` over a cell), what a canopy too far for them still takes.
+const CROWN_MEAN: f32 = 0.72;
 fn crown_clumps(xz: vec2<f32>) -> vec3<f32> {
     let q = xz / CROWN_CELL;
     let base = vec2<i32>(floor(q));
@@ -1111,12 +1113,17 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
         lit_in.ao = 0.95;
         albedo = vec4(albedo.rgb * in.ao, albedo.a);
         if in.normal.y > 0.5 {
-            let fw = length(fwidth(in.pos.xz)) / CROWN_CELL;
-            let amount = smoothstep(150.0, 260.0, in.dist) * (1.0 - smoothstep(0.3, 0.9, fw));
+            // Faded by the pixel's smaller side on the ground (seen at a slant its long side runs away
+            // and spans blocks), and toward the domes' mean darkness, not to none: a canopy too far
+            // for its crowns still lies darker than open ground, the shade between the trees in it.
+            let fw = min(length(dpdx(in.pos.xz)), length(dpdy(in.pos.xz))) / CROWN_CELL;
+            let amount = smoothstep(150.0, 260.0, in.dist);
+            let resolved = 1.0 - smoothstep(0.35, 1.0, fw);
             if amount > 0.0 {
                 let k = crown_clumps(in.pos.xz);
-                albedo = vec4(albedo.rgb * mix(1.0, mix(0.3, 1.12, k.x), amount), albedo.a);
-                lit_in.normal = normalize(vec3(k.y * 1.5 * amount, 1.0, k.z * 1.5 * amount));
+                let shade = mix(CROWN_MEAN, mix(0.3, 1.12, k.x), resolved);
+                albedo = vec4(albedo.rgb * mix(1.0, shade, amount), albedo.a);
+                lit_in.normal = normalize(vec3(k.y * 1.5 * amount * resolved, 1.0, k.z * 1.5 * amount * resolved));
             }
         }
     }
