@@ -189,29 +189,32 @@ def elements():
           el("mouth", "head", (-3.0, 90.4, 42.0), (3.0, 92.2, 54.4)),
           el("jaw", "jaw", (-4.3, 87.0, 41.5), (4.3, 92.6, 55.0)),  # deep, shorter than the upper beak
           # The crest: a tall, rounded casque over the beak, as a cassowary's, rising straight from the
-          # beak in front and stepping down behind; three boxes, each narrower and shorter than the
+          # beak in front and stepping down behind; two boxes, the upper narrower and shorter than the
           # one below, so it reads round.
           # Each 0.4 narrower than the one below and its front flush, its back two texels short (at 2.1 wide, rims of
           # skull showed beside it; at 1.5-texel steps behind, bands; linecheck).
           # Two texels over the skull (at 106, one texel of its side showed above it; linecheck).
           el("crest", "head", (-1.9, 96.0, 44.0), (1.9, 108.0, 58.6)),
-          # Deeper in the crest and each showing two texels over the one below (crest_1 showed 1.8 over the crest,
-          # crest_top 1.5 over crest_1; linecheck): crest_top half a unit higher, both sunk deeper.
-          el("crest_1", "head", (-1.5, 104.5, 48.0), (1.5, 112.0, 58.2)),
-          el("crest_top", "head", (-1.1, 110.9, 52.0), (1.1, 116.0, 57.8))]
+          # Deep in the crest, showing over two texels above it (at 105.5, 1.8; linecheck); the top tier, ending the
+          # crest (rule 7: a third tier, a texel across, read as a line on top).
+          el("crest_1", "head", (-1.5, 104.5, 48.0), (1.5, 115.0, 58.2))]
     for s, n in ((1, "L"), (-1, "R")):
         za, zb, top, bottom = eye_box(s)
         h = top + LID_UP - bottom + 0.4  # a little over the eye all round, so no rim of it shows when shut
         lx0, lx1 = (LID_X - h, LID_X) if s > 0 else (-LID_X, -LID_X + h)
         E.append(el(f"eyelid_{n}", f"eyelid_{n}", (lx0, top + LID_UP, za - 0.5), (lx1, top + LID_UP, zb + 0.5), quad="down"))
         # The wing, folded along the flank: the upper arm back from the shoulder, the forearm and hand
-        # on back, each thinner than the last; the feathers hang from forearm and hand as panels.
+        # on back, each a little thinner than the last and 0.4 inside it (flush); the feathers hang
+        # from forearm and hand as panels. Every part two texels across or more (rule 7: no boxes a
+        # texel thick; the forearm and hand were 1.1 and 0.6 texels, lines beside the arm), the arm
+        # out over two texels from the chest's side.
         ax = ARM_X * s
-        # Two texels out from the chest's side (at ax + 1.6, its top showed a 1.25-texel strip beside the chest; linecheck).
-        a0, a1 = sorted((ax - 1.6 * s, ax + 3.6 * s))
+        a0, a1 = sorted((ax - 1.6 * s, ax + 4.7 * s))
         E.append(el(f"arm_{n}", f"arm_{n}", (a0, 60.0, 12.5), (a1, 65.5, 27.5)))
-        E.append(el(f"forearm_{n}", f"forearm_{n}", (ax - 1.1, 60.5, 0.0), (ax + 1.1, 64.5, 15.0)))
-        E.append(el(f"hand_{n}", f"hand_{n}", (ax - 0.6, 61.0, -11.0), (ax + 0.6, 64.0, 2.5)))
+        f0, f1 = sorted((s * 10.9, s * 15.7))
+        E.append(el(f"forearm_{n}", f"forearm_{n}", (f0, 60.5, 0.0), (f1, 65.1, 15.0)))
+        h0, h1 = sorted((s * 11.3, s * 15.3))
+        E.append(el(f"hand_{n}", f"hand_{n}", (h0, 61.0, -11.0), (h1, 64.7, 2.5)))
         q = "east" if s > 0 else "west"
         E.append(el(f"wing_{n}", f"forearm_{n}", (s * 13.6, 46.0, -1.0), (s * 13.6, 64.0, 15.5), quad=q, cut="wing"))
         E.append(el(f"primaries_{n}", f"hand_{n}", (s * 14.6, 46.0, -24.0), (s * 14.6, 64.5, 2.5), quad=q, cut="primaries"))

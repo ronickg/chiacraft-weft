@@ -41,12 +41,11 @@ if __name__ == "__main__":
     loose = joints(spec)  # every joint inside both parts it joins, or they come apart when it turns
     assert not loose, f"loose joints: {loose}"
     # No thin lines (Ronald, 11-05): no strip of a box under two texels showing beside another.
-    # Meant: the forearms, a texel across all through (their tops beside the upper arms), and the
-    # mouth's dark wedge between the jaw and the upturned snout (the exported model lists it).
+    # Meant: the mouth's dark wedge between the jaw and the upturned snout (the exported model lists it).
     from linecheck import boxes_from_spec, lines  # noqa: E402
     from PIL import Image  # noqa: E402
     import numpy as np  # noqa: E402
-    meant = ("forearm_L.up", "forearm_R.up", "mouth.west", "mouth.east", "mouth.south")
+    meant = ("mouth.west", "mouth.east", "mouth.south")
     boxes = [dict(b, unit=4 * SCALE) for b in boxes_from_spec(spec)]  # at the size the game draws it (4 * SCALE of linecheck's units)
     thin = [h for h in lines(boxes, np.array(Image.open(os.path.join(OUT, "texture.png")).convert("RGBA")), allow=meant)
             if h["kind"] == "line"]

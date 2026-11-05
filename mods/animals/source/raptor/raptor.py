@@ -179,11 +179,14 @@ def elements():
         x0, x1 = (LID_X - h, LID_X) if s > 0 else (-LID_X, -LID_X + h)
         E.append(el(f"eyelid_{n}", f"eyelid_{n}", (x0, top, za), (x1, top, zb), quad="down"))
         ax = 6.75 * s  # the shoulder (x = 6) inside both the chest and the arm
-        # Out two texels from the chest's side (at ax + 1.25, 1.2 texels of its front showed beside the chest; linecheck).
-        a0, a1 = sorted((ax - 1.25 * s, ax + 2.95 * s))
+        # Out over two texels from the chest's side (at ax + 1.25, 1.2 texels of its front showed beside the chest;
+        # linecheck), and the forearm two texels across (rule 7: at 1.8 units a box a texel thick, a line along
+        # the arm), its sides flush: 0.35 out from the chest's, 0.4 in from the arm's.
+        a0, a1 = sorted((ax - 1.25 * s, ax + 3.35 * s))
         E.append(el(f"arm_{n}", f"arm_{n}", (a0, 24, 12), (a1, 30, 15)))
-        E.append(el(f"forearm_{n}", f"forearm_{n}", (ax - 0.9, 23, 13.5), (ax + 0.9, 25.5, 21.5)))
-        wx = ax + s * 1.6  # the wing feathers hang from the forearm, outside it
+        f0, f1 = sorted((s * 6.35, s * 9.7))
+        E.append(el(f"forearm_{n}", f"forearm_{n}", (f0, 23, 13.5), (f1, 25.5, 21.5)))
+        wx = ax + s * 1.6  # the wing feathers hang from under the forearm
         E.append(el(f"wing_{n}", f"forearm_{n}", (wx, 16.5, 11.5), (wx, 25, 21.5), quad="east" if s > 0 else "west", cut="wing"))
     pts = tail_points()
     for k, (length, w) in enumerate(TAIL):
