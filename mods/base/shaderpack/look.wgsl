@@ -157,8 +157,13 @@ fn palette_made() -> Palette {
     let fill_hue = select(mix(vec3(0.85, 0.95, 1.2), vec3(1.0, 1.0, 1.0), -cool), mix(vec3(0.85, 0.95, 1.2), vec3(0.7, 0.92, 1.45), cool), cool >= 0.0);
     let day = key(vec3(0.137, 0.289, 0.612), vec3(0.378, 0.538, 0.797), vec3(1.0, 0.92, 0.78), sun_hue * 1.92 * look_opt(OPT_SUN, 1.0), fill_hue * 0.3 * look_opt(OPT_FILL, 1.0));
     // Golden hour is orange, not white: a warm horizon, an orange glow and sun.
-    let golden = key(vec3(0.11, 0.25, 0.78), vec3(0.92, 0.62, 0.42), vec3(1.0, 0.58, 0.26), vec3(1.55, 0.80, 0.38), vec3(0.22, 0.24, 0.38));
-    let sunset = key(vec3(0.08, 0.10, 0.38), vec3(1.05, 0.46, 0.34), vec3(1.0, 0.50, 0.26), vec3(1.50, 0.76, 0.38), vec3(0.27, 0.22, 0.36));
+    // Golder sunrises and sunsets with the sun just up (0-12°): horizons and glow toward gold-yellow,
+    // less red-violet (the Look session's Bliss checkpoint, 11-05: ours read pink-lavender at
+    // 05:00-07:00 where Bliss's are gold). The pinks and violets stay for the dusk, under the horizon.
+    // (Before: golden horizon 0.92 0.62 0.42, glow 1.0 0.58 0.26; sunset horizon 1.05 0.46 0.34,
+    // glow 1.0 0.50 0.26, ambient 0.27 0.22 0.36.)
+    let golden = key(vec3(0.11, 0.25, 0.78), vec3(0.96, 0.72, 0.40), vec3(1.0, 0.66, 0.26), vec3(1.55, 0.84, 0.38), vec3(0.24, 0.24, 0.34));
+    let sunset = key(vec3(0.08, 0.10, 0.38), vec3(1.05, 0.58, 0.30), vec3(1.0, 0.58, 0.22), vec3(1.50, 0.78, 0.36), vec3(0.28, 0.23, 0.31));
     let dusk = key(vec3(0.045, 0.05, 0.16), vec3(0.30, 0.15, 0.27), vec3(0.45, 0.20, 0.25), vec3(0.0, 0.0, 0.0), vec3(0.10, 0.09, 0.17));
     // Night is dark and blue, a little lighter than vanilla's, so lanterns carry the scene.
     // Night is dark and blue, so firelight's orange stands out against it. (A blue-teal shade, as
@@ -400,7 +405,9 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     let mu = dot(dir, scene.sun.xyz);
     let low = 1.0 - smoothstep(0.0, 0.2, abs(scene.sun.y));
     // Away from the sun the sunset sky goes rose and violet.
-    let away = (0.5 - 0.5 * mu) * (1.0 - h) * low;
+    // Most of it once the sun is down (the blue hour); with the sun up a little only (it tinted the
+    // whole sunrise sky lavender).
+    let away = (0.5 - 0.5 * mu) * (1.0 - h) * low * mix(0.35, 1.0, smoothstep(0.03, -0.05, scene.sun.y));
     c = mix(c, c * vec3(0.97, 0.80, 1.06) + vec3(0.03, 0.0, 0.03), away * 0.4);
     // Toward it, a warmer band low on the horizon.
     let toward = pow(max(mu, 0.0), 2.0) * pow(1.0 - h, 3.0) * low;
