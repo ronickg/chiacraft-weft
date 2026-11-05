@@ -19,7 +19,7 @@ chat /tk spawn base:creeper 41 200 45
 chat /tk spawn base:spider 43.5 200 45
 wait 1
 chat /tick freeze
-chat /tp 40 199.4 49.5
+chat /tp 40 200 49.5
 look 0 2
 chat /tk sky_event 1 1
 wait 3
