@@ -168,6 +168,8 @@ pub fn owns(w: &World, id: u64, player: u64) -> bool {
 /// the turn.
 pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send + Sync + 'static {
     move |w, id, st| {
+        // What its body shows: a held state no longer asked for ends, idle life (`anim.rs`).
+        crate::anim::tick(w, id);
         let Some(a) = w.component_mut(id, &ANIMAL) else { return false };
         let new = a.species == 0;
         if new {

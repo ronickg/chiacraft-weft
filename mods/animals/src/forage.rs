@@ -327,9 +327,11 @@ pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
         if let (Some(e), Some(grams)) = (w.entity(item), edible(w, s, item)) {
             if reach(e.pos.to_array(), st.pos.to_array()) {
                 if now < f[3] {
+                    crate::anim::hold(w, id, crate::anim::Act::Graze);
                     return true; // chewing
                 }
                 eat_item(w, id, &a, item, grams);
+                crate::anim::hold(w, id, crate::anim::Act::Graze);
                 f[3] = now + CHEW;
                 w.component_mut(id, &FORAGE).map(|c| *c = f);
                 return true;
@@ -350,6 +352,7 @@ pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
     });
     if close && let Some(t) = target {
         if now < f[3] {
+            crate::anim::hold(w, id, crate::anim::Act::Graze);
             return true; // chewing
         }
         let at = t.map(|v| v as i32);
@@ -378,6 +381,7 @@ pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
             if w.random_below(vitals::soil::MOUTHFULS_A_PAT) == 0 {
                 drop_pat(w, st.pos);
             }
+            crate::anim::hold(w, id, crate::anim::Act::Graze);
             f[3] = now + CHEW;
             w.component_mut(id, &FORAGE).map(|c| *c = f);
             return true;

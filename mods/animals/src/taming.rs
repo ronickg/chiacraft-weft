@@ -134,6 +134,7 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
                         seen.fright
                     );
                     scare(w, id, 0);
+                    crate::anim::act(w, id, crate::anim::Act::Alarm);
                     crate::senses::ran(w, id, true);
                     return true;
                 }
