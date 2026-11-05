@@ -1009,6 +1009,16 @@ fn inspect(w: &World, player: u64, mut reply: impl FnMut(&str, &[Arg])) {
                 ],
             );
         }
+        let gems = crate::gems::on(&held);
+        reply("command.base.inspect.gems", &[Arg::Int(gems.len() as i64), Arg::Int(sockets_of(&held) as i64)]);
+        for g in &gems {
+            let pct: i64 = g
+                .boosts()
+                .iter()
+                .map(|b| (b.1 * vitals::web::UNIT * 100.0).round() as i64)
+                .sum();
+            reply("command.base.inspect.gem", &[Arg::Key(g.gem.key), Arg::Int(g.data.level as i64), Arg::Int(pct)]);
+        }
     } else {
         reply("command.base.inspect.plain", &[]);
     }
