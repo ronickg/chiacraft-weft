@@ -21,6 +21,8 @@ pub const BOXES: &[(&str, (f32, f32))] = &[
     ("raptor", (0.7, 0.9)),
     ("utahraptor", (2.0, 2.3)),
     ("wyvern", (5.0, 5.5)),
+    // Its antlers spread 4.7 blocks over a body 1.5 wide and 6.4 long (`source/drenkaun`).
+    ("drenkaun", (4.2, 5.0)),
     ("wolf", (0.7, 1.0)),
     ("jaguar", (0.9, 1.0)),
     ("hare", (0.4, 0.45)),

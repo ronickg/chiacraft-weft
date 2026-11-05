@@ -19,8 +19,8 @@
 //!   kept per player), including the Stone Age key's part, `warden_heartseed`; sometimes its calf
 //!   stays behind, to tame with an offering.
 //!
-//! Its model is the reindeer's, drawn `SCALE` times as big, until its own (`blocky-model`) is
-//! approved; its clips come with the animation system (`claude/animal-animations`).
+//! Its model and clips are `source/drenkaun` (blocky-model, concept A's colors): `rise`, a
+//! `<attack>_tell` and `<attack>` for each attack, `stunned` and `down`, played by name.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -52,13 +52,13 @@ static DIRT: Block = Block::named("base:dirt");
 static OAK_LOG: Block = Block::named("base:oak_log");
 static OAK_LEAVES: Block = Block::named("base:oak_leaves");
 
-/// Its look until its own model: the reindeer's, this many times as big (a 1 m reindeer box: a
-/// guardian over 3 m wide and 5 m tall).
-const MODEL: &str = "reindeer";
-const TEXTURE: &str = "reindeer/reindeer";
-pub const SCALE: f32 = 3.2;
-/// Its calf: the same, small.
-const CALF_SCALE: f32 = 0.8;
+/// Its model (`source/drenkaun`, built with the blocky-model skill on concept A's colors: about 4 m
+/// at the shoulder, its antlers 4.7 blocks across), drawn at its own size.
+const MODEL: &str = "drenkaun";
+const TEXTURE: &str = "drenkaun/drenkaun";
+pub const SCALE: f32 = 1.0;
+/// Its calf: the same model, small (about 1.4 blocks tall to its antler tips).
+const CALF_SCALE: f32 = 0.22;
 /// Its walking speed, and its charge's times that.
 const SPEED: f32 = 2.6;
 const CHARGE_SPEED: f32 = 3.2;

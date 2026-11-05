@@ -1,7 +1,33 @@
-# Drenkaun, the Wood-Warden: its box model (to build)
+# Drenkaun, the Wood-Warden: its box model
 
-The old forests' boss (`mods/animals/src/drenkaun.rs`, `animals_core::bosses`). Until this model is
-built and approved, the game draws the reindeer's model 3.2 times as big (`drenkaun::SCALE`).
+The old forests' boss (`mods/animals/src/drenkaun.rs`, `animals_core::bosses`), made with the
+`blocky-model` skill on the reindeer's build (`../reindeer`), at 32 texels a block, in concept A's
+colors (Ronald, 11-05: "A: lighter, leaner elk"; the concept in
+`~/Coding/chiacraft-archive/images/boss-drenkaun/2026-11-05/concept_A_clean.png`).
+
+## Rebuild
+
+```
+~/.venvs/blocky/bin/python build.py      # any Python with numpy, scipy and Pillow
+```
+
+`drenkaun.py` lays out, paints and animates it into `out/` (not committed); `build.py` checks
+flicker (at rest and in every clip), joints, pokes and gait, and exports
+`models/drenkaun.geo.json`, `animations/drenkaun.animation.json` (idle, walk, run and the fight's
+clips) and `textures/entity/drenkaun/drenkaun.png` into `../../assets`. Its body box is
+`animals_core::bodies` ("drenkaun", 4.2 by 5.0). No coat genes: one of its kind.
+
+## How it's made
+
+- The reindeer's layout in the deer's units, drawn `K = 4` times bigger: the withers 3.75 m up,
+  6.4 blocks nose to tail, its antlers 4.7 blocks across and 6.5 up.
+- Antlers like oak boughs, wide like a lyre: four beam lengths and five tines a side, bark-brown
+  to bone-pale tips, moss dripping from the beam, leaves at the tines' roots; each antler its own
+  bone (`antler_L`, `antler_R`: the `left_antler` and `right_antler` breaks).
+- A moss cape over the withers with locks hanging down its sides (cut-out quads), the moss mane
+  under the neck, bark plates on each shoulder and the back, a bark crown between the antlers.
+- Amber eyes, 4 by 3 texels (`EYES["warden"]`), with blinking lids.
+- Carriage: the neck raised and the head level in every standing clip (`HEAD_UP`).
 
 ## The real animals it is built on
 
