@@ -16,7 +16,15 @@ fn reflect_upsampled(p: PostPixel) -> vec4<f32> {
     let f = p.uv * vec2<f32>(dims) - 0.5;
     let base = vec2<i32>(floor(f));
     let t = fract(f);
-    let here = length(post_position(p, p.uv));
+    let pos = post_position(p, p.uv);
+    let here = length(pos);
+    // Water seen within about 3.5 degrees of level: there each half-size row covers many screen
+    // rows' worth of distance, so the mirrored far shore landed on the wrong rows as bright and
+    // dark lines (fx-half's golden lake shot; gone with reflections off, not with contact or
+    // bloom). Marched per pixel; it is a thin band of the screen.
+    if -pos.y < 0.06 * here {
+        return reflect_result(p);
+    }
     var sum = vec4(0.0);
     var weight = 0.0;
     for (var j = 0; j < 4; j++) {
