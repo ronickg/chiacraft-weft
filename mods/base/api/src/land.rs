@@ -732,18 +732,9 @@ pub fn features() -> Vec<Feature> {
         preset::mountains(MOUNTAINS.0, MOUNTAINS.1)
             .mask(MOUNTAINS_RISE.mask())
             .named("mountain_rise"),
-        Feature::custom(mesa).named("mesas"),
-        Feature::custom(canyons).named("canyons"),
-        Feature::custom(karst).named("karst"),
-        Feature::custom(reefs).named("reefs"),
-        Feature::custom(lakes).named("lakes"),
-        Feature::custom(rivers).named("rivers"),
-        // Last: a crater is measured from its ground, the rivers' cut included (none reach one).
-        Feature::custom(craters).named("craters"),
-        // After the craters: a tarn is measured from the ground they leave (none meet).
-        Feature::custom(tarns).named("tarns"),
-        // After the tarns: their streams' channels, down from them.
-        Feature::custom(tarn_streams).named("tarn_streams"),
+        // Mesas, canyons, karst, reefs, lakes, rivers, craters, tarns and their streams: one
+        // callback, so a column's ground under them is worked out once (`customs`).
+        Feature::custom(customs).named("land"),
     ]
 }
 
@@ -775,14 +766,48 @@ pub fn land_height(f: &Fields, x: i32, z: i32) -> i32 {
 }
 
 fn land_height_at(h: &Here) -> i32 {
-    let ground = ground_at(h);
+    land_on(h, base_ground(h))
+}
+
+/// `land_height_at` over ground `base` (`base_ground`).
+fn land_on(h: &Here, base: i32) -> i32 {
+    let ground = ground_on(h, base);
     ground + lakes_on(h, ground)
 }
 
 /// The ground before the lakes and the rivers.
 fn ground_at(h: &Here) -> i32 {
-    let base = base_ground(h);
+    ground_on(h, base_ground(h))
+}
+
+/// `ground_at` over ground `base` (`base_ground`).
+fn ground_on(h: &Here, base: i32) -> i32 {
     base + canyons::cut(h, base) + karst::add(h, base) + karst::sink(h, || base) + reefs::add(h, base)
+}
+
+/// What the custom features add at (`x`, `z`) (Q4), summed: the mesas, canyons, karst, reefs,
+/// lakes, rivers, craters, tarns and their streams, each as its own function gives it, with the
+/// ground under them (`base_ground`, `land_height`, the ground before the tarns) worked out once
+/// and only where one asks. Distant terrain asks this at every sample of every far tile: as nine
+/// callbacks they took the ground over again each (12 ms a tile, Terrain 11-05).
+pub fn customs(f: &Fields, x: i32, z: i32) -> i32 {
+    use std::cell::OnceCell;
+    let h = Here::new(f, x, z);
+    let (base, land, before) = (OnceCell::new(), OnceCell::new(), OnceCell::new());
+    let base = || *base.get_or_init(|| base_ground(&h));
+    let land = || *land.get_or_init(|| land_on(&h, base()));
+    let mesa = mesa_at(&h);
+    let canyons = if !canyons::near(&h) { 0 } else { canyons::cut(&h, base()) };
+    let karst = if KARST_AREA.at(&h) == 0 { 0 } else { karst::add(&h, base()) } + karst::sink(&h, base);
+    let reefs = if reefs::warm(&h) < q12(0.5) { 0 } else { reefs::add(&h, base()) };
+    let lakes = lakes_on(&h, i32::MIN);
+    let rivers = rivers_on(&h, &land);
+    let craters = craters::add(&h, || land() + rivers);
+    // The ground before the tarns: the land, the rivers' cut and the craters'.
+    let before = || *before.get_or_init(|| land() + rivers + craters);
+    let tarns = tarns::cut(f, x, z, &before, &|x, z| before_tarns(f, x * 16, z * 16) >> 4);
+    let streams = stream_cut(f, x, z, || before() + tarns);
+    mesa + canyons + karst + reefs + lakes + rivers + craters + tarns + streams
 }
 
 /// The ground before the karst towers (which stand on it, or rise out of the water over it).
@@ -1066,15 +1091,21 @@ fn lake_cut(h: &Here, lake: Lake, ground: &mut i32) -> i32 {
 /// What the rivers take off the ground (Q4, zero or less) at (`x`, `z`) (Q4): the deepest cut
 /// of the river stretches near (`net`), so tributaries join their river.
 pub fn rivers(f: &Fields, x: i32, z: i32) -> i32 {
+    let here = Here::new(f, x, z);
+    rivers_on(&here, &|| land_height_at(&here))
+}
+
+/// `rivers` at `here`, the land under them (`land_height`) from `land`, asked only near a river.
+fn rivers_on(here: &Here, land: &dyn Fn() -> i32) -> i32 {
+    let (f, x, z) = (here.f, here.x, here.z);
     let (bx, bz) = (x >> 4, z >> 4);
     let region = net::region_at(f, bx, bz);
     let mut segs = region.near(bx, bz).peekable();
     if segs.peek().is_none() {
         return 0;
     }
-    let here = Here::new(f, x, z);
     let p = net::meander(f, x, z);
-    let mountains = net::mountains(&here);
+    let mountains = net::mountains(here);
     if mountains == 0 {
         return 0;
     }
@@ -1088,7 +1119,7 @@ pub fn rivers(f: &Fields, x: i32, z: i32) -> i32 {
             continue;
         }
         if h0 == i32::MIN {
-            h0 = land_height_at(&here);
+            h0 = land();
         }
         let rise = (h0 - sea) >> 4;
         if rise < 0 {
