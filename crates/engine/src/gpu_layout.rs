@@ -717,6 +717,13 @@ gpu_struct! {
         /// the clouds since (blocks): a cloud at camera-relative `p` now stood at `p + xyz` from
         /// last frame's camera. w: the frame's number (for the trace's jitter).
         pub cloud_moved: [f32; 4],
+        /// What happens in the sky (chiacraft, a mod's `set_sky_event`): x the kind
+        /// (`weft_abi::sky_event`: 0 none, 1 blood moon, 2 meteors, 3 fireball, 4 aurora storm),
+        /// y how strongly (0..1), z seconds since it began, w unused.
+        pub sky_event: [f32; 4],
+        /// What falls from the sky (a mod's `sky_landing`): xyz where it lands (camera relative),
+        /// w seconds until it does (negative after; -1e6 when nothing falls).
+        pub sky_landing: [f32; 4],
     }
 }
 

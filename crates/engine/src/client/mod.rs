@@ -652,6 +652,11 @@ pub struct Client {
     aurora: f32,
     /// How closed the canopy is where the player is (a mod's air, `air_flags::CANOPY_SHIFT`).
     canopy: f32,
+    /// What happens in the sky (`weft_abi::sky_event`, chiacraft), how strongly, and when it began
+    /// (`shaders::time`).
+    sky_event: (u32, f32, f32),
+    /// What is falling from the sky: where it lands, and when (`shaders::time`).
+    sky_landing: Option<(DVec3, f32)>,
     /// The weather's look as it is by now, going over to the weather's own (`weather_effects`).
     look: weft_abi::WeatherLook,
     frame_dt: f32,
@@ -967,6 +972,8 @@ impl Client {
             dust: 0.0,
             aurora: 0.0,
             canopy: 0.0,
+            sky_event: (0, 0.0, 0.0),
+            sky_landing: None,
             weather_id: 0,
             look: Default::default(),
             lightning: 0.0,
@@ -2622,6 +2629,11 @@ impl Client {
             soft_clouds: [0.0; 4],
             prev_view_proj: [[0.0; 4]; 4],
             cloud_moved: [0.0; 4],
+            sky_event: [self.sky_event.0 as f32, self.sky_event.1, crate::shaders::time() - self.sky_event.2, 0.0],
+            sky_landing: match self.sky_landing {
+                Some((at, when)) => (at - cam.pos).as_vec3().extend(when - crate::shaders::time()).to_array(),
+                None => [0.0, 0.0, 0.0, -1e6],
+            },
             shadow_view_proj: self.shadow.0.to_cols_array_2d(),
             shadow_far_view_proj: self.shadow_far.0.to_cols_array_2d(),
             shadow_far: match self.shadow_far_map {
