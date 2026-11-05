@@ -168,7 +168,13 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
     let Some(mut d) = w.component(id, &DRINK) else { return false };
     let water = 1.0 - a.thirst;
     // The cheap reasons first: most animals most of the time aren't thirsty.
-    let calm = water >= SLAKED || (d[3] == 0.0 && water >= THIRSTY);
+    // A plant eater goes to water at dawn and dusk (`routines::DRINKS_AT`): herds at the river.
+    let thirsty = if s.forages_wild() && animals_core::routines::drinking_hour(crate::routines::hour(w)) {
+        animals_core::routines::DRINKS_AT.max(THIRSTY)
+    } else {
+        THIRSTY
+    };
+    let calm = water >= SLAKED || (d[3] == 0.0 && water >= thirsty);
     if calm || !((s.hungry_in_the_wild() || animal::tamed(w, id)) && lasts(w, id, &a).is_some()) {
         if d[3] != 0.0 {
             w.component_mut(id, &DRINK).map(|d| *d = [0.0; 4]);

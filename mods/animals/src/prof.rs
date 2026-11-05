@@ -114,7 +114,7 @@ fn report(w: &World) -> String {
 pub fn init(r: &mut Registry) {
     // The rows in the same order every run.
     row("upkeep");
-    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear)> [value:float]", |cmd| {
+    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water)> [value:float]", |cmd| {
         let w = cmd.world();
         let text = match cmd.text("what").unwrap_or("") {
             "on" => {
@@ -123,6 +123,21 @@ pub fn init(r: &mut Registry) {
                 "animal goal timer on".to_string()
             }
             "dump" => report(&w),
+            "water" => {
+                // Every wild animal within 96 blocks has this share of its water.
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let v = cmd.float("value").unwrap_or(0.5) as f32;
+                let mut n = 0;
+                for id in w.entities_near(me.pos, 96.0, None) {
+                    if let Some(a) = w.component_mut(id, &crate::animal::ANIMAL)
+                        && a.species != 0
+                    {
+                        a.thirst = (1.0 - v).clamp(0.0, 1.0);
+                        n += 1;
+                    }
+                }
+                format!("{n} animals at {:.0}% water", v * 100.0)
+            }
             "kill" => {
                 // The player kills the wild animal nearest him (a hunter's kill: fear there, and
                 // its kind's reputation of him falls).
@@ -184,7 +199,7 @@ pub fn init(r: &mut Registry) {
                         let s = w.component(id, &crate::senses::SENSES)?;
                         let kind = name_of(abi::entry_kind::ENTITY, w.entity(id)?.kind);
                         Some(format!(
-                            "{id} {kind} at {:.1}: player {} fright {:.2}, hunter {} aware {:.2}, kin {}{}, wind {:.0} {:.1} m/s, persona {}",
+                            "{id} {kind} at {:.1}: player {} fright {:.2}, hunter {} aware {:.2}, kin {}{}, wind {:.0} {:.1} m/s, persona {}, about {:.2} doing {}",
                             d2.sqrt(),
                             s.player,
                             s.fright,
@@ -196,7 +211,11 @@ pub fn init(r: &mut Registry) {
                             s.wind,
                             w.component(id, &crate::senses::FACTS)
                                 .map(|f| f.persona().map(|v| format!("{v:.2}")).join("/"))
-                                .unwrap_or_default()
+                                .unwrap_or_default(),
+                            crate::routines::activity_of(&w, id),
+                            ["-", "love", "rest", "hold", "comfort", "drink", "eat", "wander", "watch", "investigate"]
+                                .get(crate::choose::doing(&w, id) as usize)
+                                .unwrap_or(&"?")
                         ))
                     })
                     .collect();

@@ -195,6 +195,11 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
         return false;
     }
     h[2] = now + LOOK_EVERY;
+    // Out of its hours it rests rather than hunts, unless hunger presses (`routines::HUNTS_FROM`).
+    if crate::routines::activity(w, s.index()) < animals_core::routines::HUNTS_FROM && full >= animals_core::routines::HUNTS_ANYWAY {
+        w.component_mut(id, &HUNT).map(|c| *c = h);
+        return false;
+    }
     // Food lying near (a carcass, dropped meat) is a meal without a chase: it eats that first
     // (`forage.rs`).
     if crate::forage::ground_food(w, s, st.pos.to_array(), crate::forage::ITEM_LOOK).is_some() {

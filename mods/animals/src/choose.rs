@@ -75,7 +75,12 @@ impl Band {
 fn scores(w: &World, id: u64, doing: u8) -> [f32; 10] {
     let mut s = [0.0f32; 10];
     let at = |n: Need| doing == n as u8;
+    let mut active = 1.0;
     if let Some(a) = w.component(id, &ANIMAL) {
+        // Out of its hours it is sleepy (`animals_core::routines`).
+        active = (a.species as usize)
+            .checked_sub(1)
+            .map_or(1.0, |i| crate::routines::activity(w, i));
         let fed = a.food as f32 / a.stat(crate::species::FOOD).max(1.0);
         s[Need::Eat as usize] = needs::hunger_score(fed, at(Need::Eat));
         s[Need::Drink as usize] = needs::thirst_score(1.0 - a.thirst, at(Need::Drink));
@@ -89,7 +94,7 @@ fn scores(w: &World, id: u64, doing: u8) -> [f32; 10] {
         _ => 0.0,
     };
     s[Need::Love as usize] = LOVE;
-    s[Need::Rest as usize] = REST;
+    s[Need::Rest as usize] = REST + animals_core::routines::SLEEPY * (1.0 - active);
     s[Need::Wander as usize] = WANDER;
     s[Need::Watch as usize] = animals_core::roles::WATCH;
     s[Need::Investigate as usize] = animals_core::roles::INVESTIGATE;
