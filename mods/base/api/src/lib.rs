@@ -11,6 +11,7 @@ pub mod branchy;
 pub mod colonize;
 pub mod grow;
 pub mod land;
+pub mod skills;
 pub mod tree_recipes;
 pub mod trees;
 

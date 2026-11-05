@@ -103,6 +103,14 @@ The regions, grouped:
 | Beasts | Taming and riding (Ronald: "also taming too") |
 | Proposed by Planner | Mining and prospecting, Engineering (machines and automation), Exploring and cartography, Trading, Survival (fishing, tracking, weather) |
 
+**Built 11-05** (branch claude/perk-web-a4441b): the 16 skills rising by doing, priced in effort
+minutes with tier against skill (`vitals::skills`); one web of 288 nodes, a region per skill from
+one template, bridges, keystones, depth gated by skill, refunds with the Unlearning Stone
+(`vitals::perks`, checked and written to `mods/base/vitals/WEB_SHEET.md`); the effects that touch
+today's systems through chains and attributes, and the K screen (`mods/base/src/skills.rs`,
+`web.rs`). The magic schools, Engineering and Trading are data until spells, machines and traders
+come.
+
 Crafting perks follow Smithing's shape: perks unlock working the next tier's materials, better
 grades and rolls, repairs, salvage, and later merging and upgrading items (see "Gear that keeps
 getting better").
