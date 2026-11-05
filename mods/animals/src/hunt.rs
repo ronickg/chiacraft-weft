@@ -29,6 +29,8 @@ static HUNT: Component<[u64; 4]> = Component::named("animal_hunt");
 static WARY: Component<u64> = Component::named("animal_wary");
 /// When an ambusher broke cover to charge (0: still stalking; not saved).
 static CHARGING: Component<u64> = Component::named("animal_charging");
+/// When it last stood its ground (`stands_ground`; not saved): a stand that begins is shown by a rear.
+static STOOD: Component<u64> = Component::named("animal_stood");
 
 /// Blocks a hunter looks for prey and prey watches for hunters, in clear air: fog, a blizzard or
 /// a dust storm close both in (`base_api::sight`).
@@ -47,10 +49,12 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&HUNT, [0u64; 4], 0);
     r.entity_component(&WARY, 0u64, 0);
     r.entity_component(&CHARGING, 0u64, 0);
+    r.entity_component(&STOOD, 0u64, 0);
     for s in &SPECIES {
         r.attach(s.kind, &HUNT);
         r.attach(s.kind, &WARY);
         r.attach(s.kind, &CHARGING);
+        r.attach(s.kind, &STOOD);
     }
     // A kill feeds the hunter that made it, by the prey's mass against its own.
     r.on(&actions::DIE, |b| {
@@ -243,6 +247,10 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
     true
 }
 
+/// While it stands its ground and doesn't charge, it rears once in this many of its looks
+/// (`senses::EVERY` ticks each): every 4 seconds.
+const REAR_EVERY: u64 = 8;
+
 /// Its kind's speed a pack chases at (one alone: 1.4, `commands::fight`): a wolf 5.5 blocks a
 /// second, at this nearly 10, past a fleeing deer's 8.
 const PACK_SPEED: f32 = 1.75;
@@ -297,6 +305,8 @@ pub fn wary(w: &World, id: u64, st: &EntityState) -> bool {
         let to = crate::senses::escape(w, st, h, 10.0, crate::senses::herd_mid(w, id));
         weft_sdk::debug!("animal {id} runs from {} (awareness {:.2}) to {to:?}", seen.threat, seen.aware);
         w.navigate(id, to, 1.6);
+        // The alarm as it bolts: a snort, the tail flagged, a bark (whatever its kind's is).
+        crate::anim::act(w, id, crate::anim::Act::Alarm);
         w.component_mut(id, &WARY).map(|u| *u = now + RUN);
         crate::senses::ran(w, id, false);
         return true;
@@ -386,8 +396,28 @@ fn stands_ground(w: &World, id: u64, st: &EntityState, threat: u64) -> bool {
     if !(big_alone || mother) {
         return false;
     }
-    crate::senses::stare(w, id, st, [t.pos.x as f32, t.pos.y as f32, t.pos.z as f32]);
+    crate::senses::face(w, id, st, [t.pos.x as f32, t.pos.y as f32, t.pos.z as f32]);
     let d2 = dist2(t.pos, st.pos);
+    {
+        use crate::anim::{self, Act};
+        if d2 <= roles::CHARGE * roles::CHARGE * 4.0 {
+            anim::hold(w, id, Act::Charge);
+        } else {
+            // It rears as a stand begins (it didn't stand at its last look; staring before isn't
+            // the start: the PC look's deer stared first and never reared) and every few seconds
+            // after (not over a rear still on), staring it down.
+            let now = w.game_time();
+            let began = w.component(id, &STOOD).is_none_or(|t| now > t + 3 * crate::senses::EVERY);
+            let again = !anim::busy(w, id) && ((now + id) / crate::senses::EVERY).is_multiple_of(REAR_EVERY);
+            if began || again {
+                anim::act(w, id, Act::Rear);
+            }
+            anim::hold(w, id, Act::Stare);
+        }
+    }
+    if let Some(c) = w.component_mut(id, &STOOD) {
+        *c = w.game_time();
+    }
     if d2 <= roles::CHARGE * roles::CHARGE * 4.0 {
         w.navigate(id, t.pos, roles::CHARGE_SPEED);
     }
@@ -438,11 +468,15 @@ fn chase(w: &World, id: u64, st: &EntityState, s: &Species, prey: u64, pack: boo
     if !pack && roles::ambushes(s.family.name) {
         let started = w.component(id, &CHARGING).unwrap_or(0);
         if d > roles::BURST && started == 0 {
+            // Creeping in, crouched low.
+            crate::anim::hold(w, id, crate::anim::Act::Stalk);
             return (Some(aim), roles::STALK);
         }
         if started == 0 {
             w.component_mut(id, &CHARGING).map(|c| *c = now.max(1));
             weft_sdk::info!("{} {id} breaks cover and charges {prey} ({d:.1} blocks)", s.name);
+            crate::anim::clear(w, id);
+            crate::anim::act(w, id, crate::anim::Act::Pounce);
         } else if now > started + roles::BURST_TICKS {
             // A charge that failed: it gives up and stalks again later.
             w.component_mut(id, &CHARGING).map(|c| *c = 0);

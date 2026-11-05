@@ -694,6 +694,21 @@ def pose_stalk(t):
     return q
 
 
+def pose_approach(t):
+    """Curious, coming to look: slow steps a little crouched, the neck stretched forward and low, the
+    head cocked one way and the other as a bird's does, the tail level (1.2 s a cycle, in place of the
+    walk). Its height is set from its feet in the build (`ground.grounded`)."""
+    p = t / 1.2
+    a = TAU * p
+    q = {"root": (0, -L["drop"], 0)}
+    q.update(legs(L["thigh"] - 6, L["shin"] + 12, L["foot"] - 6, -18 * S(a), 18 * S(a), 28 * max(0.0, S(a + math.pi / 2)),
+                  28 * max(0.0, S(a - math.pi / 2))))
+    q.update(arms())
+    q.update({"spine_0": (5, 0, 0), "neck": (NECK + 18, 0, 0), "head": (-NECK - 22, 0, 14 * S(a))})
+    q.update(tail_sway(p, 1, 3, lift=-4))
+    return q
+
+
 def pose_alarm(t):
     """Alarm: the head snapped up, a sharp double chirp, the arms half spread (1.0 s, once)."""
     p = t / 1.0
@@ -775,9 +790,9 @@ ANIMS = {"idle": (pose_idle, 3.0), "walk": (pose_walk, 0.9), "run": (pose_run, 0
          "stare": (pose_stare, 2.0), "sniff": (pose_sniff, 2.0), "drink": (pose_drink, 2.0), "look": (pose_look, 2.5),
          "scratch": (pose_scratch, 1.8), "groom": (pose_groom, 2.6), "stretch": (pose_stretch, 2.4), "sleep": (pose_sleep, 6.0),
          "stalk": (pose_stalk, 1.3), "alarm": (pose_alarm, 1.0), "pounce": (pose_pounce, 1.0), "play": (pose_play, 1.4),
-         "nuzzle": (pose_nuzzle, 2.0), "flinch": (pose_flinch, 0.4), "death": (pose_death, 1.2)}
-LOOPS = {"stare": True, "drink": True, "sleep": True, "stalk": True, "death": "hold_on_last_frame"}
-BLENDS = {"flinch": (0.05, 0.2), "death": (0.1, 0.0), "stalk": (0.3, 0.3), "sleep": (0.6, 0.6)}
+         "nuzzle": (pose_nuzzle, 2.0), "flinch": (pose_flinch, 0.4), "death": (pose_death, 1.2), "approach": (pose_approach, 1.2)}
+LOOPS = {"stare": True, "drink": True, "sleep": True, "stalk": True, "approach": True, "death": "hold_on_last_frame"}
+BLENDS = {"flinch": (0.05, 0.2), "death": (0.1, 0.0), "stalk": (0.3, 0.3), "approach": (0.3, 0.3), "sleep": (0.6, 0.6)}
 
 
 def eyelids(name, t):
@@ -789,7 +804,7 @@ def frame_times(name, dur):
     if name in ("walk", "run", "rest"):
         n = 12 if dur < 1 else 16
     else:
-        n = 30 if name in ("idle", "screech", "bite", "kick", "look", "pounce", "play", "stalk") else 24
+        n = 30 if name in ("idle", "screech", "bite", "kick", "look", "pounce", "play", "stalk", "approach") else 24
     ts = {round(dur * k / n, 4) for k in range(n + 1)}
     for b in BLINKS.get(name, []):
         ts |= {round(b + d, 4) for d in (-BLINK, -BLINK / 2, 0, BLINK / 2, BLINK)}
