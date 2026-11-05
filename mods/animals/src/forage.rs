@@ -293,16 +293,10 @@ fn eat_item(w: &World, id: u64, a: &animal::Animal, item: u64, grams: f32) {
     }
 }
 
-/// A goal: thirsty, it drinks first (`drink::drink`); hungry, it goes to the nearest food of its
-/// diet (on the ground first, then growing) and eats there; it takes the turn while it does. With nothing near it lets the next goal
-/// (wandering) take it elsewhere.
-pub fn forage(w: &World, id: u64, st: &EntityState) -> bool {
-    // Thirst first: water is the more urgent (`drink.rs`).
-    crate::drink::drink(w, id, st) || eat(w, id, st)
-}
-
-/// `forage` without drinking first: for the animals that weigh thirst against hunger
-/// (`choose.rs`).
+/// A goal: hungry, it goes to the nearest food of its diet (on the ground first, then growing) and
+/// eats there; it takes the turn while it does. With nothing near it lets the next goal
+/// (wandering) take it elsewhere. Thirst is weighed against it by the needs band (`choose.rs`,
+/// `drink::drink`).
 pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
     let Some(a) = w.component(id, &ANIMAL) else { return false };
     let Some(s) = a.species() else { return false };

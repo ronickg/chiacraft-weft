@@ -18,6 +18,7 @@
 //! layout, so the same picture fits. A pose is the look's animation file, whose
 //! `idle` holds it (sitting, lying down), so every player sees it whenever they come by.
 
+use crate::choose::{Band, Need, WithBand};
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
@@ -162,11 +163,17 @@ fn goals() -> Goals {
             }
             true
         })
-        .then(crate::breeding::behave(index))
-        .then(commands::hold)
-        .then(crate::comfort::seek)
-        .then(crate::forage::forage)
-        .then(ai::wander(0.45, 6.0))
+        // What it does when nothing is after it or ordered, the most pressing first (`choose.rs`).
+        .band(
+            "needs",
+            Band::new()
+                .with(Need::Love, crate::breeding::behave(index))
+                .with(Need::Hold, crate::commands::hold)
+                .with(Need::Comfort, crate::comfort::seek)
+                .with(Need::Drink, crate::drink::drink)
+                .with(Need::Eat, crate::forage::eat)
+                .with(Need::Wander, ai::wander(0.45, 6.0)),
+        )
 }
 
 /// Every tick, after its level and growing up (`animal::upkeep`): its look applied, time passing.
