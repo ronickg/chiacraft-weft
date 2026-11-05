@@ -181,12 +181,16 @@ def iso_boxes(boxes, top, south, east, size=128, tint_top=None, tint_sides=None)
     """Boxes of a block (x0, y0, z0, x1, y1, z1 in block units) as the inventory shows a block:
     tops and two sides (south on the left, east on the right) in 2:1 isometric, sides darker,
     each face showing the part of its texture where it sits in the block, nearest drawn last."""
-    s = size / 2
+    # As Minecraft's inventory draws a block (turned 45°, tipped 30°): the top a 2:1 diamond and
+    # the upright edges cos 30° / sin 45° = 1.225 times the diamond's half-width (they were drawn
+    # 1.0 times, which squashed every block; Ronald, 11-05: "the blocks are sqished a litlte").
+    u = size / (1 + 1.2247)
+    V = 1.2247 * u
     out = np.zeros((size, size, 4), np.uint8)
     depth = np.full((size, size), -1e9)
     gy, gx = np.mgrid[0:size, 0:size]
     px, py = gx + 0.5, gy + 0.5
-    P = lambda x, y, z: np.array([s + (x - z) * s, (x + z) * 0.5 * s + (1 - y) * s])
+    P = lambda x, y, z: np.array([size / 2 + (x - z) * u, (x + z) * 0.5 * u + (1 - y) * V])
 
     def face(img, c0, c1, c2, uv, shade, tint):
         """The face spanned from corner c0 along c1 - c0 and c2 - c0 (3D); `uv(a, b)` the texture
