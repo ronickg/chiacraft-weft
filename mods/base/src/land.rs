@@ -476,6 +476,15 @@ fn landmarks(g: &mut Gen) {
             }
         }
     }
+    // The meteorites buried under old craters (`base_api::land::crater_meteorites`): First
+    // hours' block (with the sky events), none until it is there.
+    static METEORITE: Block = Block::named("meteorite");
+    let meteorite = METEORITE.id();
+    for [mx, my, mz] in l::crater_meteorites(&f, ox + 8, oz + 8, 8 + (l::CRATER_RADIUS.1 as f64 * l::CRATER_METEORITE_SPREAD) as i32 + 1) {
+        if meteorite != u32::MAX && inside(mx, my, mz) {
+            g.set((mx - ox) as usize, (my - oy) as usize, (mz - oz) as usize, meteorite);
+        }
+    }
     let water = WATER.id();
     for w in l::landmarks::waterfalls_near(&f, ox + 8, oz + 8, 9) {
         let [sx, sy, sz] = w.spring;

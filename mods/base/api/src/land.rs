@@ -68,6 +68,7 @@ pub mod salt {
     pub const FALLS: u64 = 0xFA11;
     pub const SINKS: u64 = 0x4A9;
     pub const CRATERS: u64 = 0xC4A7;
+    pub const CRATER_METEORITES: u64 = 0xC4A8;
     pub const TARNS: u64 = 0x7A27;
     pub const STREAMS: u64 = 0x57EA;
     pub const FACE_COAL: u64 = 0x0C0A;
@@ -448,6 +449,15 @@ pub const CRATER_RADIUS: (i32, i32) = (20, 30);
 pub const CRATER_DEPTH: f64 = 0.65;
 pub const CRATER_RIM: (i32, i32) = (5, 8);
 pub const CRATER_RIM_OUT: f64 = 1.8;
+
+/// Old craters keep what fell (Research round 17, addendum 1, approved by Ronald 11-06): this
+/// share of them holds `CRATER_METEORITES` meteorite blocks, `CRATER_METEORITE_DEPTH` blocks
+/// under the floor, within `CRATER_METEORITE_SPREAD` radii of the middle, for a daytime player
+/// to dig for.
+pub const CRATER_METEORITE_CHANCE: f64 = 1.0 / 3.0;
+pub const CRATER_METEORITES: (i32, i32) = (2, 5);
+pub const CRATER_METEORITE_DEPTH: (i32, i32) = (2, 6);
+pub const CRATER_METEORITE_SPREAD: f64 = 0.2;
 
 /// Cirque tarns (Planner, 11-04: mountain lakes, water above the sea's level): one per `TARN_CELL`
 /// square at most, kept with `TARN_CHANCE`, in a hollow of the mountains (their biome's strength)
@@ -1214,6 +1224,12 @@ pub fn reef_rubble(f: &Fields, x: i32, z: i32) -> bool {
 /// What the meteor craters add at (`x`, `z`) (Q4), as the engine adds it.
 pub fn craters(f: &Fields, x: i32, z: i32) -> i32 {
     craters::add(&Here::new(f, x, z), || land_height(f, x, z) + rivers(f, x, z))
+}
+
+/// The meteorites buried under the old craters' floors (blocks) within `r` blocks of (`x`, `z`)
+/// (blocks): `CRATER_METEORITES` of them under 1 crater in 3.
+pub fn crater_meteorites(f: &Fields, x: i32, z: i32, r: i32) -> Vec<[i32; 3]> {
+    craters::meteorites(f, x, z, r)
 }
 
 /// The meteor craters (middle x, z and radius, blocks) within `r` blocks of (`x`, `z`) (blocks).
@@ -2092,6 +2108,27 @@ mod tests {
             }
         }
         assert!(frayed > 0 && frayed < 4_000, "{frayed} frayed columns of 40 000");
+    }
+
+    #[test]
+    fn some_old_craters_hide_meteorites_under_their_floors() {
+        let f = fields(42);
+        let sites = craters_near(&f, 0, 0, 8000);
+        let mut holding = 0;
+        for &(x, z, r) in &sites {
+            let found = crater_meteorites(&f, x, z, 0);
+            let spread = (r as f64 * CRATER_METEORITE_SPREAD) as i32 + 1;
+            let mine: Vec<_> = found.iter().filter(|m| (m[0] - x).abs() <= spread && (m[2] - z).abs() <= spread).collect();
+            if !mine.is_empty() {
+                holding += 1;
+                assert!((CRATER_METEORITES.0..=CRATER_METEORITES.1).contains(&(mine.len() as i32)), "crater at {x} {z}: {} meteorites", mine.len());
+            }
+            for m in mine {
+                let below = (height(&f, m[0] * 16, m[2] * 16) >> 4) - m[1];
+                assert!((CRATER_METEORITE_DEPTH.0..=CRATER_METEORITE_DEPTH.1).contains(&below), "meteorite at {m:?}: {below} under the floor");
+            }
+        }
+        assert!(holding > 0 && holding < sites.len(), "{holding} of {} craters hold meteorites", sites.len());
     }
 
     #[test]

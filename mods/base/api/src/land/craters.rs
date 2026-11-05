@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use weft_sdk::noise::fixed::{self, ONE, div_floor, q4, q12};
 
 use super::{
-    CRATER_CELL, CRATER_CHANCE, CRATER_DEPTH, CRATER_RADIUS, CRATER_RIM, CRATER_RIM_OUT, FOREST_HUMIDITY, Here, KARST_AREA, MOUNTAINS_AREA,
+    CRATER_CELL, CRATER_CHANCE, CRATER_DEPTH, CRATER_METEORITE_CHANCE, CRATER_METEORITE_DEPTH, CRATER_METEORITE_SPREAD, CRATER_METEORITES, CRATER_RADIUS, CRATER_RIM, CRATER_RIM_OUT, FOREST_HUMIDITY, Here, KARST_AREA, MOUNTAINS_AREA,
     TAIGA_BELOW, base_ground, lakes_on, rivers, salt,
 };
 use crate::SEA;
@@ -149,6 +149,29 @@ pub(super) fn near(f: &weft_sdk::noise::fixed::Fields, x: i32, z: i32, r: i32) -
             if let Some(c) = crater(&h, cx, cz) {
                 out.push((c.x, c.z, c.radius));
             }
+        }
+    }
+    out
+}
+
+/// The meteorites under the floors of the craters whose middles are within `r` blocks of (`x`,
+/// `z`) (blocks): 1 crater in 3 (`CRATER_METEORITE_CHANCE`) holds `CRATER_METEORITES`, each
+/// `CRATER_METEORITE_DEPTH` under the floor over it, near the middle.
+pub(super) fn meteorites(f: &weft_sdk::noise::fixed::Fields, x: i32, z: i32, r: i32) -> Vec<[i32; 3]> {
+    let pick = |v: u32, (lo, hi): (i32, i32)| lo + (v % (hi - lo + 1) as u32) as i32;
+    let mut out = Vec::new();
+    for (cx, cz, radius) in near(f, x, z, r) {
+        let seed = fixed::seed32(f.seed, salt::CRATER_METEORITES);
+        let hash = fixed::hash(seed, cx, 0, cz);
+        if (fixed::fmix(hash) & 4095) >= q12(CRATER_METEORITE_CHANCE) as u32 {
+            continue;
+        }
+        let spread = ((radius as f64 * CRATER_METEORITE_SPREAD) as i32).max(1);
+        for i in 0..pick(hash >> 12, CRATER_METEORITES) {
+            let k = fixed::fmix(fixed::hash(seed, cx, i + 1, cz));
+            let (mx, mz) = (cx + pick(k, (-spread, spread)), cz + pick(k >> 10, (-spread, spread)));
+            let floor = super::height(f, mx * 16, mz * 16) >> 4;
+            out.push([mx, floor - pick(k >> 20, CRATER_METEORITE_DEPTH), mz]);
         }
     }
     out
