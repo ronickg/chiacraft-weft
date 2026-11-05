@@ -145,10 +145,10 @@ pub fn lay(w: &World, foot: [i32; 3], logs: &[[i32; 3]], states: &[u32], d: [i32
         // an 8 px one a stick, a 4 px one every other; turned, its arms would point the old way.
         if BRANCHES.on_block(state) {
             let thick = state_prop(state, "size") == Some("8");
-            if thick || (at[0] + at[1] + at[2]).rem_euclid(2) == 0 {
-                if let Some(stick) = Item::lookup("base:stick") {
-                    w.spawn_item([at[0] as f64 + 0.5, at[1] as f64 + 0.5, at[2] as f64 + 0.5], ItemStack::new(stick, 1));
-                }
+            if (thick || (at[0] + at[1] + at[2]).rem_euclid(2) == 0)
+                && let Some(stick) = Item::lookup("base:stick")
+            {
+                w.spawn_item([at[0] as f64 + 0.5, at[1] as f64 + 0.5, at[2] as f64 + 0.5], ItemStack::new(stick, 1));
             }
             continue;
         }
