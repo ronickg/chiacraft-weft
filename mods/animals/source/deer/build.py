@@ -26,7 +26,10 @@ from house import SCALE  # noqa: E402  the house density: 64 texels a block
 
 # Which animations go in which file: the engine plays `idle`, `walk` and `run` by itself; lying
 # down is a look of its own.
-POSES = {"": {"idle": "idle", "walk": "walk", "run": "run"},
+# The behaviour clips (`mods/animals/src/anim.rs`) go in the standing file too, by their own names.
+CLIPS = ["stare", "graze", "drink", "sniff", "look", "scratch", "stretch", "sleep", "alarm", "rear", "play", "groom", "nuzzle", "flinch",
+         "death"]
+POSES = {"": {"idle": "idle", "walk": "walk", "run": "run", **{c: c for c in CLIPS}},
          "_lie": {"idle": "lie", "walk": "walk"}}
 FEET = ["leg_FL_paw", "leg_FR_paw", "leg_BL_paw", "leg_BR_paw"]
 AXIS = ["neck", "skull", "chest", "hips"]  # the tail is a flap hinged on the rump (the tongue rule), checked by eye
