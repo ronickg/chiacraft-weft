@@ -4,7 +4,7 @@ Written by `notes/overview/build.py` from `notes/overview/pieces.json`; edit tha
 
 **The goal.** Players open their own worlds, find other people's without any central service, link them with portals and walk between them; missing mods download on the way; identity and achievements live on Chia. The game in those worlds: survival in the Valheim spirit with real temperatures and seasons, and animals to tame, breed and raise, from real facts.
 
-■ built and seen working: 79 · ◧ partly built: 53 · □ not built yet: 10 · ◌ planned for later: 6
+■ built and seen working: 79 · ◧ partly built: 54 · □ not built yet: 10 · ◌ planned for later: 6
 
 ## Core next
 
@@ -31,7 +31,7 @@ What's missing that the rest leans on (marked `core` in the data).
 
 ## Engine
 
-Weft, the voxel engine we forked: world, rendering, interface, modding. We change it only where our goals need it. 8 of 10 parts built.
+Weft, the voxel engine we forked: world, rendering, interface, modding. We change it only where our goals need it. 8 of 11 parts built.
 
 | | Part | Notes |
 |---|---|---|
@@ -45,6 +45,7 @@ Weft, the voxel engine we forked: world, rendering, interface, modding. We chang
 | ■ | Seasons | Day length through the year per dimension (`.seasons`). Docs: `docs/sky.md`. |
 | ◧ | Blocks that stand in water | Ours, generic (2026-11-04): `.holds_liquid(&WATER)` makes a block's states stand in still water (kelp, seagrass, waterlogged slabs). The cell is a source of it for flow, swimming, drowning, light, fog, rain, drips, fish and #water supports; breaking, pistons, fills and mods' set leave the water; placing fills a dry twin, buckets drain it. Unit tests in server/liquid.rs, testkit held_water_*; testmod's waterweed and sea slab. Waiting: Tester's runs. Used by base's kelp and seagrass (Plants by the place). Code: `crates/engine/src/server/liquid.rs`, `crates/engine/src/content.rs`, `crates/engine/src/client/mesher.rs`, `mods/testkit/src/tests/held.rs`. Docs: `docs/modding.md`, `docs/worldgen.md`. |
 | ◧ | Sound: handles, loops, a voice cap | Built on claude/sound-engine (2026-11-04), not yet heard in a run: a client starts a sound with a handle, loops it, eases its volume, pitch, place and a low-pass, and fades it out; at most 64 at once by priority, per-event caps, round robin; files read off the frame's thread, large ones streamed, broken or too large ones play nothing. /sounds lists what plays. Next: room reverb and occlusion per sound, music rules, footstep pieces (reports/sound.md E5-E8). Code: `crates/engine/src/audio.rs`, `crates/sdk/src/effects.rs`. Docs: `docs/modding.md`, `reports/sound.md`. |
+| ◧ | Android | First milestone (2026-11-05, branch claude/android-port-3dedde): tools/release/android.sh builds an APK without Gradle (cargo-ndk; arm64-v8a for phones, x86_64 for the emulator), crates/android is the NativeActivity's library. On the PC's emulator (Android 15, RTX 5090 through gfxstream): title screen, a world with the shader pack, on-screen touch controls (stick, look by drag, jump, sneak, hit, use, inventory, chat, drop, pause, hotbar taps), pause and resume, the back button. Not yet: a real phone, a mobile performance preset, a full touch UI (dragging stacks, text input), controllers, sound checked. Code: `crates/android`, `crates/engine/src/touch.rs`, `tools/release/android.sh`. Docs: `notes/ANDROID.md`. |
 
 Code: `crates/engine`, `crates/render`, `crates/sdk`, `crates/abi`, `crates/noise`, `crates/app`. Docs: `README.md`, `docs/architecture.html`, `docs/modding.md`.
 
