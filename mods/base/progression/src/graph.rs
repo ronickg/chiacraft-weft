@@ -235,6 +235,7 @@ const RECIPES_LIST: &[Recipe] = &[
     b("base:starheart", 1.0, &[("base:star_steel_ore", 1.0)], PICK_IRON, 3600.0),
     c("base:peridot", 2.0, &[("base:pallasite", 1.0)], Hand),
     c("base:star_lantern", 1.0, &[("base:iron_ingot", 2.0), ("base:starheart", 1.0)], Table),
+    c("base:unlearning_stone", 1.0, &[("base:peridot", 1.0), ("base:tektite", 2.0)], Table),
     Recipe { out: "base:star_steel_ingot", n: 1.0, ins: &[("base:star_steel_lump", 1.0)], at: Furnace, secs: 20.0 },
     Recipe { out: "base:water_bucket", n: 1.0, ins: &[("base:bucket", 1.0)], at: Fill, secs: 10.0 },
     Recipe { out: "base:lava_bucket", n: 1.0, ins: &[("base:bucket", 1.0)], at: Fill, secs: 30.0 },

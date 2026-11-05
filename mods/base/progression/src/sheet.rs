@@ -296,7 +296,7 @@ fn tames(w: &mut String) {
 fn web_prices(w: &mut String) {
     let _ = writeln!(
         w,
-        "## The perk web's prices\n\nA unit is +{:.0} % to one family; a small node gives 1, a notable 3-4, a keystone nets 0. Inside a family bonuses add, between families they multiply. A family tops out at ×{} ({:.0} units: one age); everything together (gear, web, a tame's bond, food) at ×{} (two ages). Families: {}. No node exists yet.\n",
+        "## The perk web's prices\n\nA unit is +{:.0} % to one family; a small node gives 1, a notable 3-4, a keystone nets 0. Inside a family bonuses add, between families they multiply. A family tops out at ×{} ({:.0} units: one age); everything together (gear, web, a tame's bond, food) at ×{} (two ages). Families: {}. The nodes, skills and their checks: `mods/base/vitals/WEB_SHEET.md`.\n",
         web::UNIT * 100.0,
         web::FAMILY_CEILING,
         web::units_to_ceiling(),
