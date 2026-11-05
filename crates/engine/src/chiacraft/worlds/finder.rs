@@ -138,6 +138,20 @@ fn find(settings: &crate::settings::Settings) -> Result<(), String> {
         .listings(deposit, MAX_READ, Duration::from_secs(60))
         .map_err(|e| e.to_string())?;
     let read_in = started.elapsed();
+    // This game's own listings the chain doesn't show yet: pending, shown at once.
+    let on_chain: std::collections::HashSet<[u8; 32]> = listings
+        .iter()
+        .map(|l| l.coin.coin_id().to_bytes())
+        .collect();
+    let pending: Vec<String> = crate::saves::list(&settings.saves_dir())
+        .into_iter()
+        .filter_map(|m| {
+            let l = super::listing::load(&m.dir)?;
+            let coin = l.coin()?;
+            (!on_chain.contains(&coin.coin_id().to_bytes())).then_some(m.name)
+        })
+        .collect();
+    update(|f| f.pending = pending.clone());
     let peak = reader.status().peak.unwrap_or(0);
     if snapshot().worlds.is_empty() {
         update(|f| f.phase = ("finder.checking".into(), vec![listings.len().to_string()]));
@@ -224,19 +238,6 @@ fn find(settings: &crate::settings::Settings) -> Result<(), String> {
         checked_in.as_secs_f32(),
         todo.len()
     );
-    // This game's own listings the chain doesn't show yet: pending.
-    let on_chain: std::collections::HashSet<[u8; 32]> = listings
-        .iter()
-        .map(|l| l.coin.coin_id().to_bytes())
-        .collect();
-    let pending: Vec<String> = crate::saves::list(&settings.saves_dir())
-        .into_iter()
-        .filter_map(|m| {
-            let l = super::listing::load(&m.dir)?;
-            let coin = l.coin()?;
-            (!on_chain.contains(&coin.coin_id().to_bytes())).then_some(m.name)
-        })
-        .collect();
     let n = worlds.len();
     // Keep what each world said last time until it answers again, so the list doesn't blink.
     let before = snapshot().worlds;

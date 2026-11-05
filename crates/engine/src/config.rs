@@ -615,10 +615,11 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // chiacraft (phase 5): what listing a world locks, in mojos (0.0001 TXCH; the game spends
         // only on testnet11). Taken back by delisting.
         ConfigDef::number("core:listing_deposit", ck::INT, 100_000_000.0, 1.0, 1e15, 1.0),
-        // chiacraft (phase 5): the fee a listing pays, in mojos, so a busy testnet11 takes it
-        // into a block soon: with none it waited 3-6 minutes (the join test, 11-05). 0.00005
-        // TXCH; the game spends only on testnet11. `0` lists without a fee.
-        ConfigDef::number("core:listing_fee", ck::INT, 50_000_000.0, 0.0, 1e12, 1.0),
+        // chiacraft (phase 5): a fee a listing may pay, in mojos, for a busy testnet11 to take it
+        // in sooner; the game spends only on testnet11. None by default: a wallet holding only
+        // a sponsor's small gift has no coin for the deposit and a fee of 0.00005 TXCH, and
+        // couldn't list at all (Tester 2, 11-05); with none a listing took 17 blocks (207 s).
+        ConfigDef::number("core:listing_fee", ck::INT, 0.0, 0.0, 1e12, 1.0),
         // Where others reach this game by address; forward it, TCP and UDP.
         ConfigDef::number("core:server_port", ck::INT, 27182.0, 1.0, 65535.0, 1.0),
         // A test setting, on no screen (Ronald, 11-04: "Yes, relay-only test"): every connection goes
