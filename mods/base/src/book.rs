@@ -112,8 +112,16 @@ static QUEUED: Mutex<Vec<Queued>> = Mutex::new(Vec::new());
 static WORKING: Sound = Sound::named("block.stone.hit");
 static DONE: Sound = Sound::named("block.stone.break");
 
-static BOOK: Mutex<Book> =
-    Mutex::new(Book { tab: 0, page: 0, picked: None, order: Vec::new(), held_before: Vec::new(), pool: Vec::new(), asked: u32::MAX, ask: None });
+static BOOK: Mutex<Book> = Mutex::new(Book {
+    tab: 0,
+    page: 0,
+    picked: None,
+    order: Vec::new(),
+    held_before: Vec::new(),
+    pool: Vec::new(),
+    asked: u32::MAX,
+    ask: None,
+});
 
 pub fn register(r: &mut Registry) {
     r.tag("chests", &["chest"]);
@@ -655,13 +663,22 @@ pub fn book(ui: &mut Ui, station: Station) {
     // is open (what becomes makeable or known later goes at the end).
     let order = BOOK.lock().map(|b| b.order.clone()).unwrap_or_default();
     if order.is_empty() {
-        let before = BOOK.lock().map(|b| b.held_before.clone()).unwrap_or_default();
+        let before = BOOK
+            .lock()
+            .map(|b| b.held_before.clone())
+            .unwrap_or_default();
         let gained: Vec<u32> = have
             .iter()
             .map(|&(i, _)| i)
             .filter(|i| !before.contains(i))
             .collect();
-        let new = |r: &Recipe| !before.is_empty() && r.inputs().iter().enumerate().any(|(n, _)| gained.iter().any(|&i| r.accepts(n as u32, i)));
+        let new = |r: &Recipe| {
+            !before.is_empty()
+                && r.inputs()
+                    .iter()
+                    .enumerate()
+                    .any(|(n, _)| gained.iter().any(|&i| r.accepts(n as u32, i)))
+        };
         list.sort_by_key(|(r, n, near)| ((*n == 0) as u8, !(*n > 0 && new(r)) as u8, table_only(station, r) as u8, near.is_some() as u8));
         let held: Vec<u32> = have.iter().map(|&(i, _)| i).collect();
         edit(|b| b.held_before = held);
