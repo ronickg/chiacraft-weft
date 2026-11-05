@@ -59,6 +59,14 @@ fn cool_step() -> u32 {
     (ev::METEORITE_COOLS * vitals::calendar::DAY_TICKS as f32 / 24.0 / HEAT as f32).round() as u32
 }
 
+/// A hot meteorite at `pos`, cooling from light 9 over `METEORITE_COOLS` (a landing's, an impact's
+/// core: Terrain's carve calls it).
+pub fn hot(w: &World, pos: BlockPos) {
+    let hot = state_with(METEORITE.id(), "heat", &HEAT.to_string()).unwrap_or(METEORITE.id());
+    w.set_block(pos, hot);
+    w.schedule_tick(pos, cool_step());
+}
+
 /// A hot meteorite cools a step.
 fn cool(e: &mut BlockEvent) {
     let (w, pos) = (e.world(), e.pos());
@@ -135,7 +143,6 @@ fn land_near(w: &World, player: u64) {
 /// The pit at ground `top`: the 3 x 3 middle a block lower, scorched 2 round, 1-3 hot meteorites
 /// in its floor, and the boom. How many meteorites.
 fn land(w: &World, top: BlockPos) -> u32 {
-    let hot = state_with(METEORITE.id(), "heat", &HEAT.to_string()).unwrap_or(METEORITE.id());
     let scorch = |p: BlockPos| {
         let s = w.block(p);
         if GRASS.is(s) || SNOWY_GRASS.is(s) || DIRT.is(s) {
@@ -160,9 +167,7 @@ fn land(w: &World, top: BlockPos) -> u32 {
     let n = 1 + w.random_below(3);
     let spots = [(0, 0), (1, 0), (0, 1), (-1, 0), (0, -1)];
     for &(dx, dz) in spots.iter().take(n as usize) {
-        let p = top.offset(dx, -1, dz);
-        w.set_block(p, hot);
-        w.schedule_tick(p, cool_step());
+        hot(w, top.offset(dx, -1, dz));
     }
     w.play_sound(&BOOM, top.center(), 4.0);
     n
