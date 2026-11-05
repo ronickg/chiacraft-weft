@@ -362,7 +362,25 @@ fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>) -> vec3<f32> {
     return light;
 }
 
-fn shade(in: VOut, albedo_in: vec4<f32>) -> vec4<f32> {
+// EXPERIMENT (far-look): `core:far_look`'s bits.
+fn far_look() -> u32 {
+    return g.extra.w >> 24u;
+}
+
+// EXPERIMENT (far-look, bit 2): with distance, block-scale shading goes: corner shade toward none
+// and the faces' normals lean up, so one-block steps don't each draw a dark line.
+fn far_soft(in: VOut) -> f32 {
+    if (far_look() & 2u) == 0u {
+        return 0.0;
+    }
+    return smoothstep(48.0, 160.0, in.dist);
+}
+
+fn shade(in_: VOut, albedo_in: vec4<f32>) -> vec4<f32> {
+    var in = in_;
+    let soft = far_soft(in);
+    in.ao = mix(in.ao, 1.0, soft);
+    in.normal = mix(normalize(in.normal), vec3(0.0, 1.0, 0.0), soft * 0.5);
     let n = normalize(in.normal);
     var albedo = albedo_in;
     // Snow lying on the tops of blocks and leaves (not on plants, which it buries). The biome's
@@ -742,6 +760,15 @@ fn fs_opaque(in: VOut) -> @location(0) vec4<f32> {
 
 @fragment
 fn fs_cutout(in: VOut) -> @location(0) vec4<f32> {
+    // EXPERIMENT (far-look, bit 1): small plants thin out from 40 to 96 blocks, so far ground
+    // isn't speckled with flowers and tufts a pixel or two across.
+    if (far_look() & 1u) != 0u && in.kind.z != 0u {
+        let f = smoothstep(40.0, 96.0, in.dist);
+        let p = floor(in.clip.xy);
+        if fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y)) < f {
+            discard;
+        }
+    }
     let du = dpdx(in.uv);
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
@@ -872,7 +899,7 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
 // Whether real cubes show this distant tile pixel's column (`Lod::mask`): then they stand there,
 // and the tile is left out.
 fn lod_hidden(in: VOut) -> bool {
-    let half = i32(g.extra.w);
+    let half = i32(g.extra.w & 0xFFFFFFu);
     let col = vec2<i32>(floor(in.pos.xz / 16.0));
     let d = col - g.cam_cube.xz;
     if abs(d.x) <= half && abs(d.y) <= half {
