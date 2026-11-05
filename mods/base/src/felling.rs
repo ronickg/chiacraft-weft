@@ -161,7 +161,7 @@ pub fn register(r: &mut Registry) {
                     w.break_block(p, tool, e.player, survival);
                 }
                 if let (true, Some(h)) = (survival, &hotbar) {
-                    let by = vitals::felling::wear(piece.len() as u32 + 1);
+                    let by = vitals::felling::PIECE_WEAR;
                     h.set(slot, worn(tool, by, DURABILITY.on_item(tool.item).unwrap_or(0)));
                 }
                 continue;
