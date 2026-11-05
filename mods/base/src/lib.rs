@@ -33,6 +33,8 @@ mod machines;
 mod meteors;
 mod mobs;
 mod parts;
+mod plants3d;
+mod plants3d_files;
 mod player;
 mod recipes;
 mod redstone;
@@ -137,6 +139,7 @@ fn init(r: &mut Registry) {
     redstone::register(r);
     look::register(r);
     shaderpack::register(r);
+    plants3d::register(r);
     shaderpack::register_for_scripts(r);
     shaderpack::register_shafts(r);
     video::register(r);
