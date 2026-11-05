@@ -188,10 +188,17 @@ fn palette_made() -> Palette {
     p.zenith = mix(p.zenith, grey * (0.72 - 0.32 * storm), r * 0.85);
     p.horizon = mix(p.horizon, grey * (1.0 - 0.45 * storm), r * 0.85);
     p.glow = p.glow * (1.0 - r * 0.8);
-    p.ambient = mix(p.ambient, vec3(luma(p.ambient + p.sun * 0.25)) * vec3(0.93, 0.97, 1.02) * (1.0 - 0.35 * storm), r * 0.85);
+    // (A little dimmer, a storm more so, with more of it from above in `light_on`: lit evenly from
+    // all round, rain's land read flat; Tester 2's weather sheet, 11-05.)
+    p.ambient = mix(p.ambient, vec3(luma(p.ambient + p.sun * 0.2)) * vec3(0.93, 0.97, 1.02) * (1.0 - 0.42 * storm), r * 0.85);
     p.sun = p.sun * (1.0 - r * 0.9);
     // At night rain and its clouds darken the sky's light too (by day overcast only greys it).
     p.ambient *= mix(1.0, 1.0 - 0.6 * r, smoothstep(-0.14, -0.3, e));
+    // A lightning flash lights the land and the sky, a cold white, for its strokes.
+    let flash = lightning_flash();
+    p.ambient += vec3(0.5, 0.55, 0.7) * flash;
+    p.zenith += vec3(0.22, 0.24, 0.32) * flash;
+    p.horizon += vec3(0.3, 0.32, 0.42) * flash;
     // A storybook hour (round 17, rec. 2; `base:look_storybook`, 0 to 1): at golden hour and blue
     // hour the shade goes lavender (Solas's 205 184 236) while the sun stays orange, the blue
     // hour's zenith violet; at night the moon's light silver-blue (a 15000 K blackbody, Bliss's),
@@ -256,6 +263,86 @@ fn blood_tint() -> vec3<f32> {
     return mix(vec3(1.0), mix(vec3(1.0, 0.45, 0.2), vec3(0.75, 0.06, 0.02), smoothstep(0.5, 1.0, b)), smoothstep(0.0, 0.35, b));
 }
 
+// ---- lightning (`scene.lightning`, the engine's flash where the player is) ----
+// Ronald, 11-05: "add lightning flashes" (Tester 2's four storm shots showed none: the engine's
+// flash only lifted the daylight for 0.15 s, which the pack's light never read). A flash is two to
+// four strokes over half a second, each a sharp rise and a fast fade, as real return strokes; it
+// lights the land and the deck, and two strikes in three show their bolt in the sky, the rest a
+// glow inside the clouds. Where and how far is the flash's own random number.
+
+fn lightning_stroke(t: f32, at: f32, k: f32) -> f32 {
+    return select(0.0, k * exp(-(t - at) / 0.055), t >= at);
+}
+
+// How bright the flash is now, 0 (none) to about 1.5 at a stroke, times how near it struck.
+fn lightning_flash() -> f32 {
+    let t = scene.lightning.x;
+    if t > 1.0 || scene.lightning.z < 0.05 {
+        return 0.0;
+    }
+    let r = scene.lightning.y;
+    var f = lightning_stroke(t, 0.0, 1.0) + lightning_stroke(t, 0.06 + 0.06 * fract(r * 7.3), 0.75);
+    f += select(0.0, lightning_stroke(t, 0.2 + 0.1 * fract(r * 13.7), 0.6), fract(r * 3.1) > 0.3);
+    f += select(0.0, lightning_stroke(t, 0.42 + 0.15 * fract(r * 29.1), 0.45), fract(r * 5.7) > 0.55);
+    return f * lightning_near() * smoothstep(0.05, 0.4, scene.lightning.z);
+}
+
+// How near the strike is, 1 close to 0.35 far.
+fn lightning_near() -> f32 {
+    return mix(1.0, 0.35, fract(scene.lightning.y * 47.3));
+}
+
+// Toward the strike along the horizon (a unit vector, x and z).
+fn lightning_toward() -> vec2<f32> {
+    let a = scene.lightning.y * 6.2831853;
+    return vec2(sin(a), -cos(a));
+}
+
+// The bolt in the sky along `dir` (linear light): a jagged line from the deck's underside down to
+// the ground where it struck, a few hundred to two and a half thousand blocks off, with one branch;
+// none for a strike inside the clouds.
+fn lightning_bolt(dir: vec3<f32>) -> vec3<f32> {
+    let f = lightning_flash();
+    let r = scene.lightning.y;
+    if f <= 0.0 || fract(r * 91.7) < 0.33 {
+        return vec3(0.0);
+    }
+    let far = mix(400.0, 2500.0, fract(r * 47.3));
+    let top = atan2(max(scene.clouds.z, 40.0), far);
+    let bottom = atan2(-max(scene.eye.y - SEA_LEVEL, 2.0), far);
+    let el = asin(clamp(dir.y, -1.0, 1.0));
+    let u = (el - bottom) / max(top - bottom, 1e-3);
+    if u < 0.0 || u > 1.0 {
+        return vec3(0.0);
+    }
+    // The angle along the horizon from the strike, and the bolt's wander from it as it comes down.
+    let toward = lightning_toward();
+    let flat = normalize(vec2(dir.x, dir.z) + vec2(1e-5, 0.0));
+    let side = toward.x * flat.y - toward.y * flat.x;
+    let across = atan2(side, dot(toward, flat)) * cos(el);
+    let wander = (noise3(vec3(u * 5.0, r * 97.0, 1.0)) - 0.5) * 0.07 + (noise3(vec3(u * 19.0, r * 53.0, 2.0)) - 0.5) * 0.02;
+    let dx = across - wander * (top - bottom) * 2.5;
+    // A branch splitting off a third of the way down, drifting off to one side.
+    let fork = clamp((0.68 - u) / 0.3, 0.0, 1.0) * select(0.0, 1.0, u < 0.68 && u > 0.38);
+    let dx2 = dx - (0.68 - u) * select(-0.09, 0.09, fract(r * 17.0) > 0.5) * (top - bottom) * 2.0;
+    let w = 0.0011;
+    let core = exp(-(dx / w) * (dx / w)) + 0.5 * fork * exp(-(dx2 / w) * (dx2 / w));
+    let glow = exp(-abs(dx) / 0.012) * 0.35 + fork * exp(-abs(dx2) / 0.012) * 0.15;
+    let fade = smoothstep(0.0, 0.06, u) * smoothstep(1.0, 0.92, u);
+    return vec3(0.82, 0.86, 1.0) * (core * 9.0 + glow) * f * fade;
+}
+
+// The flash inside the deck along `dir`: brightest toward the strike, all of it lit a little.
+fn lightning_in_clouds(dir: vec3<f32>) -> vec3<f32> {
+    let f = lightning_flash();
+    if f <= 0.0 {
+        return vec3(0.0);
+    }
+    let flat = normalize(vec2(dir.x, dir.z) + vec2(1e-5, 0.0));
+    let toward = dot(flat, lightning_toward()) * 0.5 + 0.5;
+    return vec3(0.62, 0.66, 0.85) * f * (0.18 + 0.9 * pow(toward, 6.0));
+}
+
 fn light_strength() -> f32 {
     let e = scene.sun.y;
     // At night the moon's light: its phase times how high it stands (`scene.moon.w`), none when it
@@ -297,6 +384,12 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     let moon = pow(max(dot(dir, scene.moon.xyz), 0.0), 24.0) * smoothstep(-0.05, -0.25, scene.sun.y) * scene.moon.w;
     // On a blood moon its glow goes copper, then red.
     c += vec3(0.05, 0.07, 0.12) * mix(vec3(1.0), blood_tint() * vec3(2.0, 1.4, 1.0), smoothstep(0.0, 0.4, blood_moon())) * moon;
+    // Rain's sky low down, and the mist over the land that takes this colour (`haze_lit`), a darker
+    // slate, darker in a storm: the deck fades into it at the horizon and the land's mist meets it
+    // there, one colour (a brighter band of sky lay between a storm's deck and the land, and the
+    // deck's edge drew a hard line along it: Tester 2's rain and thunder shots, 11-05).
+    let wet = rain_amount() * (1.0 - smoothstep(0.0, 0.35, dir.y));
+    c *= mix(vec3(1.0), vec3(0.76, 0.8, 0.86) - vec3(0.12) * scene.weather.w, wet);
     if dir.y < 0.0 {
         // Below the horizon it darkens a little toward the ground the haze stands on.
         c = mix(c, p.horizon * 0.6 + p.ambient * 0.2, smoothstep(0.0, 0.4, -dir.y));
@@ -552,7 +645,9 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>
     let leaves = mix(vec3(1.0), LEAF_LIGHT, under * 0.5);
     // More of the sky's light comes from above than from the sides, and less from below: tops 1,
     // sides 0.75, bottoms 0.5 (Complementary's), so shade still shows form.
-    let hemi = 0.75 + 0.25 * n.y;
+    // Under rain's overcast more so (tops 1, sides 0.6, bottoms 0.2): the sky's light is nearly all
+    // the light then, and even from all round it made the land flat.
+    let hemi = mix(0.75 + 0.25 * n.y, 0.6 + 0.4 * n.y, rain_amount());
     var c = p.ambient * sky * hemi * ao * leaves;
     // Under a forest's canopy most of the floor's light is the sun's, come down through the leaves:
     // green and soft (a rainforest's floor gets 1-2 % of the sun, more of it this way than from the
@@ -871,24 +966,11 @@ fn under_water(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     return out;
 }
 
-fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
-    let c = fog_through(c_in, rel, smoothstep(0.25, 0.75, sky));
-    let dist = length(rel);
-    if in_water() {
-        return under_water(c, rel);
-    }
-    if in_liquid() || !open_sky() {
-        return mix(c, scene.fog_color.rgb, fog_amount(dist, scene.params.x, scene.params.y));
-    }
-    let dir = rel / max(dist, 1e-4);
-    let end = scene.params.y;
-    // Straight down there is no level direction left: never a zero vector (its normalize is NaN,
-    // and the Mac's fast math has no safety net).
-    let air = vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z);
-    let color = sky_color(normalize(air));
-    // Thinner looking up at what is high, so hills stand out against a hazy valley.
+// How much of what lies `rel` away (camera relative, `dist` its length) the air veils, per channel:
+// clear air's blue haze, the grey of fog and damp air, rain's mist (`haze_lit`). What is seen
+// through the water (`world.wgsl`) is veiled by it too.
+fn haze_veil(rel: vec3<f32>, dist: f32) -> vec3<f32> {
     let thin = exp(-max(rel.y, 0.0) / 90.0);
-    let rain = rain_amount();
     // The air's own depth, whatever the view distance: with distant terrain the fog's end lies
     // thousands of blocks off, and the haze would barely start where the kept blocks give way to it.
     // Clear air veils by wavelength, as Bliss's and Photon's atmospheres do: the sky's blue
@@ -907,9 +989,33 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // 150 (at twice that, a thunderstorm went white).
     // Its mist mainly in the distance, as Bliss's: next to none within about 20 blocks, so the near
     // land keeps its colour (it began at the eye and the whole land went grey).
-    let downpour = rain * (0.0035 + 0.0055 * scene.weather.w);
+    // (Then thinner, and darker in `sky_color`: at 0.0035 + 0.0055 a storm hid all but the nearest
+    // land in a flat light grey, a wash brighter than the deck over it, from the vista 200 blocks up
+    // nothing but grey (Tester 2's weather sheet, 11-05). Now a third gone at about 180 blocks in
+    // rain, about 90 in a storm: the land keeps its shapes and colours, darker, under a slate sky.)
+    let downpour = rain_amount() * (0.0022 + 0.0030 * scene.weather.w);
     let wet_far = max(dist - 20.0, 0.0) * smoothstep(10.0, 60.0, dist);
-    let veil = vec3(1.0) - exp(-((rayleigh + vec3(mie)) * far + vec3(downpour) * wet_far));
+    return vec3(1.0) - exp(-((rayleigh + vec3(mie)) * far + vec3(downpour) * wet_far));
+}
+
+fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
+    let c = fog_through(c_in, rel, smoothstep(0.25, 0.75, sky));
+    let dist = length(rel);
+    if in_water() {
+        return under_water(c, rel);
+    }
+    if in_liquid() || !open_sky() {
+        return mix(c, scene.fog_color.rgb, fog_amount(dist, scene.params.x, scene.params.y));
+    }
+    let dir = rel / max(dist, 1e-4);
+    let end = scene.params.y;
+    // Straight down there is no level direction left: never a zero vector (its normalize is NaN,
+    // and the Mac's fast math has no safety net).
+    let air = vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z);
+    let color = sky_color(normalize(air));
+    let rain = rain_amount();
+    // Thinner looking up at what is high, so hills stand out against a hazy valley (`haze_veil`).
+    let veil = haze_veil(rel, dist);
     // Only the last sixth of the view hands over to the sky's colour where the terrain ends.
     let edge = smoothstep(end * 0.84, end, dist);
     // Valheim's air: lit from behind by the sun, so the haze toward it glows warm (a forward
@@ -926,7 +1032,8 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // air, a storm's mist was pale under a dark sky.
     // (The sky's colour it starts from is already the rain's; darker than it, the land under a
     // storm's horizon met a bright band of sky.)
-    lit *= mix(1.0, 0.82 - 0.1 * scene.weather.w, rain);
+    // (Now in `sky_color` itself, low in the sky: the deck fades into the same colour at the
+    // horizon, the sky's gradient there too, so no brighter band lies between the deck and the land.)
     // Far ridges still lose a little colour (as before, but only where the veil has begun), then
     // the veil per channel (its blue thicker than its red), then the handover at the end.
     // In rain everything takes a little grey-blue wash, near too.

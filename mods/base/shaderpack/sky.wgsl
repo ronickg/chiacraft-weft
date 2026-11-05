@@ -612,14 +612,19 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
         // the Researcher's weather findings, 11-05); the bellies still darken (`dark`).
         let albedo = max(s.color.rgb / max(dimmed, vec3(0.005)), vec3(0.55, 0.58, 0.64) * scene.weather.w);
         color = albedo * light / alpha_cloud;
-        color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) + 1e-3, dir.z))), smoothstep(0.3, 1.0, dist));
+        color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) + 1e-3, dir.z))), smoothstep(mix(0.3, 0.15, wet), mix(1.0, 0.85, wet), dist));
         // The rainbow stands in the falling rain under the clouds, in front of them: drawn in the sky
         // alone, the shower's clouds hid it (the after-rain check from under the clouds, 11-05).
+        // A lightning flash glows inside the deck; its bolt hangs under the deck, in front of it.
+        color += lightning_in_clouds(dir) * albedo + lightning_bolt(dir);
         color = display(fog_through(rainbow_on(color, dir), dir * 220.0, 1.0));
     } else {
         color = mix(s.color.rgb * light / alpha_cloud, scene.fog_color.rgb, smoothstep(0.5, 1.0, dist));
     }
-    let alpha = s.color.a * alpha_cloud * (1.0 - smoothstep(0.8, 1.0, dist));
+    // In rain the deck thins out over the second half of its reach into the low sky, whose colour
+    // the land's mist takes too: faded only in its last fifth, a storm's deck ended in a hard
+    // straight line at the horizon (Tester 2's rain and thunder shots, 11-05).
+    let alpha = s.color.a * alpha_cloud * (1.0 - smoothstep(mix(0.8, 0.4, wet), 1.0, dist));
     let clip = scene.view_proj * vec4(rel, 1.0);
     return CloudPixel(vec4(color * alpha, alpha), clip.z / clip.w);
 }
@@ -862,7 +867,7 @@ fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
         return vec4(scene.fog_color.rgb, 1.0);
     }
     if open_sky() && !in_liquid() {
-        var c = sky_color(dir) + milky_way(dir) + aurora(dir) + meteors(dir) + shooting_stars(dir) + fireball(dir);
+        var c = sky_color(dir) + milky_way(dir) + aurora(dir) + meteors(dir) + shooting_stars(dir) + fireball(dir) + lightning_bolt(dir);
         // The rainbow in the rain, in front of the high cirrus.
         c = rainbow_on(cirrus(c, dir), dir);
         if dir.y < 0.0 {
