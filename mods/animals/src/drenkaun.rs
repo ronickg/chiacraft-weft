@@ -45,6 +45,8 @@ static CRAFTING: RecipeKind = RecipeKind::named("base:crafting");
 static BUILDING: CreativeTab = CreativeTab::named("base:building");
 static INGREDIENTS: CreativeTab = CreativeTab::named("base:ingredients");
 static BITS: Particle = Particle::named("core:block");
+/// Its health line at the top of the screen, for players near it (a place in the HUD editor).
+static BAR: TextPlace = TextPlace::named("boss_health");
 static LOGS: Tag = Tag::named("logs");
 static DIRT: Block = Block::named("base:dirt");
 static OAK_LOG: Block = Block::named("base:oak_log");
@@ -189,6 +191,11 @@ pub fn init(r: &mut Registry) {
         m.value = hurt(&w, q.entity, q.other, q.cause, m.value as f32) as f64;
     });
 
+    r.text_place(&BAR)
+        .at(0.5, 0.0, 0.0, 30.0)
+        .scale(1.2)
+        .times(0.0, 1.5, 0.4)
+        .sample("hud.animals.boss_health.sample");
     r.command("drenkaun", "<action:word(state,hurt,kill,luck)> [amount:float]", command);
     r.item(&OFFERING).tab(&INGREDIENTS);
     r.item(&HEARTSEED).tab(&INGREDIENTS);
@@ -327,6 +334,24 @@ fn fight(w: &World, id: u64, st: &EntityState) -> bool {
         }
     }
     let fierce = st.health < st.max_health * b.fierce_at;
+    // Its health line, once a second, for the players near.
+    if (w.game_time() + id).is_multiple_of(20) {
+        let state = match c.state {
+            DOWN => "hud.animals.boss_health.down",
+            STUNNED => "hud.animals.boss_health.stunned",
+            _ if fierce => "hud.animals.boss_health.fierce",
+            _ => "hud.animals.boss_health.fighting",
+        };
+        let pct = (100.0 * st.health / st.max_health.max(1.0)).ceil() as i64;
+        for p in w.entities_near(st.pos, SIGHT, Some(&PLAYER)) {
+            drop(w.show_at(
+                p,
+                &BAR,
+                "hud.animals.boss_health",
+                &[Arg::Key("title.animals.drenkaun"), Arg::Int(st.health.ceil() as i64), Arg::Int(st.max_health.ceil() as i64), Arg::Int(pct), Arg::Key(state)],
+            ));
+        }
+    }
     // A titan stands its ground: the engine knocks back whatever is hit (PC look boss_drenkaun1:
     // twenty hits flung it 20 blocks off its arena), so outside its own charge that is undone.
     let charging = c.state == ACT && b.attacks[c.attack as usize % b.attacks.len()].name == "charge";
