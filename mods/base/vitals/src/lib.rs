@@ -11,8 +11,8 @@
 pub mod air;
 pub mod balance;
 pub mod calendar;
-pub mod climb;
 pub mod climate;
+pub mod climb;
 pub mod clothing;
 pub mod combat;
 pub mod crafts;

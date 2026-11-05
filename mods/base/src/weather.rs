@@ -146,7 +146,10 @@ pub(crate) fn wind_at(w: &World, pos: BlockPos) -> (f32, f32) {
         _ => now_heading(w),
     };
     let id = w.biome(pos);
-    let speed = biomes().iter().find(|b| b.0 == id).map_or(0.0, |&(id, c)| air_of(w, id, &c).wind);
+    let speed = biomes()
+        .iter()
+        .find(|b| b.0 == id)
+        .map_or(0.0, |&(id, c)| air_of(w, id, &c).wind);
     (speed, heading)
 }
 

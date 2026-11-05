@@ -1059,8 +1059,7 @@ pub fn wall_grip(c: &Content, block: &impl Cells, pos: DVec3, half_width: f64, h
                         let st = &c.states[s as usize];
                         let touches = st.collision.iter().any(|bx| {
                             let bx = bx.map(|v| v as f64);
-                            Aabb { min: b + DVec3::new(bx[0], bx[1], bx[2]), max: b + DVec3::new(bx[3], bx[4], bx[5]) }
-                                .intersects(&feel)
+                            Aabb { min: b + DVec3::new(bx[0], bx[1], bx[2]), max: b + DVec3::new(bx[3], bx[4], bx[5]) }.intersects(&feel)
                         });
                         if touches && st.grip > 0.0 {
                             best = Some(best.map_or(st.grip as f64, |g: f64| g.max(st.grip as f64)));
