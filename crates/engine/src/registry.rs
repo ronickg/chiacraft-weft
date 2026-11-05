@@ -2349,8 +2349,9 @@ pub fn freeze(
         .filter(|(_, d)| d.runtime && d.flags & weft_abi::component_flags::CARRIED != 0)
         .map(|(i, _)| i as u32)
         .collect();
-    g.field_comps = [HEALTH, BURNING, WORN, SHAPE, HELD, OFF_HELD, USING, SWAPS, LOOPING_ACTION, EFFECT, FORCED_POSE, RIDING, HELD_LOOK, WORN_LOOKS]
-        .map(|n| g.component_names[n]);
+    g.field_comps =
+        [HEALTH, BURNING, WORN, SHAPE, HELD, OFF_HELD, USING, SWAPS, LOOPING_ACTION, EFFECT, FORCED_POSE, RIDING, HELD_LOOK, WORN_LOOKS]
+            .map(|n| g.component_names[n]);
     g.simulated_comp = g.component_names[SIMULATED];
     let with_flag = |f: u32| {
         g.components

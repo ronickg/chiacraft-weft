@@ -356,7 +356,12 @@ mod tests {
         assert_eq!(worn_look(2, "diamond", &[]), "base:entity/armor/worn/diamond_2");
         assert_eq!(worn_look(0, "unobtainium", &[]), "base:entity/armor/worn/steel_1");
         // A helmet shows one gem however many it holds.
-        assert_eq!(worn_look(0, "steel", &["amber", "diamond", "peridot"]).matches(';').count(), 1);
+        assert_eq!(
+            worn_look(0, "steel", &["amber", "diamond", "peridot"])
+                .matches(';')
+                .count(),
+            1
+        );
         assert_eq!(gem_look("sword", 0, "diamond").unwrap(), "base:parts/gem/set@base:ramps/gem_diamond+7,20");
         assert!(gem_look("axe", 3, "diamond").is_none() && gem_look("sword", 3, "diamond").is_none());
         assert_eq!(
