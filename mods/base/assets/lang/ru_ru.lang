@@ -580,6 +580,7 @@ hud.element.base.effects = Эффекты
 hud.base.resting = {#c2ac88}Отдых у огня: {0} с{/}
 hud.base.comfort = {#c2ac88}Комфорт {0}{/}
 hud.element.base.temperature = Температура
+hud.element.base.climb_stamina = Выносливость при лазании
 hud.base.outside = {#c6a383}воздух{/} {0}°C
 hud.base.feels.freezing = {img:base:temp_freezing 12x12}
 hud.base.feels.cold = {img:base:temp_cold 12x12}
@@ -866,6 +867,8 @@ item.base.wool_cloak = Шерстяной плащ
 item.base.fur_robe = Меховая накидка
 item.base.rain_cape = Кожаная накидка от дождя
 item.base.rain_cape.tooltip = Под ней дождь вас не мочит.
+item.base.glider = Кожаный планер
+item.base.glider.tooltip = Прыгните в падении, чтобы раскрыть, и ещё раз, чтобы сложить. По ветру летит дальше.
 death.base.dropped = Надгробию негде было встать: ваши вещи упали там, где вы погибли.
 item.base.wool_cloak.tooltip = Носится поверх одежды и доспехов. Мокрым почти не теряет тепла.
 item.base.fur_robe.tooltip = Носится поверх одежды и доспехов: самая тёплая накидка, летом в ней жарко.
@@ -1233,3 +1236,278 @@ block.base.campfire_laid.tooltip = Два бревна и две палки, е�
 command.base.knap.no_room = Здесь нет места для желвака: встаньте на открытое место.
 command.base.impact.started = Падает метеорит: кратер радиусом {0} у {1} {2}, {3} столбцов за {4} тиков
 command.base.impact.no_ground = Нет загруженной земли для удара у {0} {1}
+
+# Навыки и сеть умений (skills.rs, web.rs; vitals::skills, vitals::perks)
+key.base.web = Навыки
+web.base.title = Навыки
+web.base.tab = Навыки
+web.base.keys = {#c6a383}WASD{/} сдвиг · {#c6a383}Z X{/} масштаб · {#c6a383}C{/} центр
+web.base.zoom_out = -
+web.base.zoom_out_tip = Отдалить (Z)
+web.base.zoom_in = +
+web.base.zoom_in_tip = Приблизить (X)
+web.base.centre = Центр
+web.base.centre_tip = Назад к началу (C)
+web.base.points = Очков умений: {0}
+web.base.refund_on = Забывание: осталось {0}
+web.base.refund_off = Забыть (осталось {0})
+web.base.refund_tip = Нажмите на взятый узел, чтобы вернуть его. Только тот, на котором не держатся другие.
+web.base.skill_tip = {color:title}{0}{/}
+    {color:dim}Растёт: {1}. Нажмите, чтобы увидеть его область.{/}
+web.base.level = {0}
+web.base.by.later = пока ничем: придёт с заклинаниями, машинами или торговцами
+web.base.state.taken = {#7fdc6a}Взято{/}
+web.base.state.open = {#ffbe45}Нажмите, чтобы взять (1 очко){/}
+web.base.state.waiting = {#c6a383}Не хватает очков умений: каждый уровень даёт одно{/}
+web.base.state.far = {#6b6f86}Сначала возьмите соседний узел{/}
+web.base.state.locked = {#e8907a}Навык слишком низок{/}
+web.base.tip.start = {color:title}Начало{/}
+    {color:dim}Все начинают здесь. Растите к навыкам, которыми пользуетесь.{/}
+web.base.tip.1 = {color:title}{0}{/}
+    {1} {2}
+    {3}
+web.base.tip.2 = {color:title}{0}{/}
+    {1} {2}
+    {3} {4}
+    {5}
+web.base.tip.1n = {color:title}{0}{/}
+    {1} {2}
+    {color:dim}Нужно: {3} {4} (у вас {5}){/}
+    {6}
+web.base.tip.2n = {color:title}{0}{/}
+    {1} {2}
+    {3} {4}
+    {color:dim}Нужно: {5} {6} (у вас {7}){/}
+    {8}
+web.base.tip.1b = {color:title}{0}{/}
+    {1} {2}
+    {color:dim}Нужно: {3} и {4} {5} (у вас {6}){/}
+    {7}
+web.base.tip.2b = {color:title}{0}{/}
+    {1} {2}
+    {3} {4}
+    {color:dim}Нужно: {5} и {6} {7} (у вас {8}){/}
+    {9}
+web.base.tip.1s = {color:title}{0}{/}
+    {1} {2}
+    {3}
+    {4}
+web.base.tip.1sn = {color:title}{0}{/}
+    {1} {2}
+    {3}
+    {color:dim}Нужно: {4} {5} (у вас {6}){/}
+    {7}
+web.base.unlearn = Можно забыть узлов: {0}. Откройте навыки ({key:base:web})
+web.base.no_points = Нет очков умений: следующий уровень даст одно
+web.base.too_low = Навык слишком низок для этого узла
+web.base.not_next = Сначала возьмите соседний узел
+web.base.no_refunds = Сначала используйте камень забвения
+web.base.holds_others = На этом узле держатся другие
+web.base.skill_up = {0}: уровень {1}
+command.base.skill = {0}; очков умений {1}, возвратов {2}
+command.base.skill.unknown = Нет навыка {0}
+item.base.unlearning_stone = Камень забвения
+item.base.unlearning_stone.tooltip = Используйте, чтобы вернуть до 3 узлов сети навыков.
+perk.base.special.ley_sight = {#9ad7ff}Показывает лей-линии без лозы{/}
+web.base.skill.melee = Ближний бой
+web.base.by.melee = удары по существам вблизи
+web.base.skill.archery = Стрельба и метание
+web.base.by.archery = попадания издалека
+web.base.skill.defence = Защита
+web.base.by.defence = удары от существ
+web.base.skill.smithing = Кузнечество и мастерство
+web.base.by.smithing = изготовление инструментов, оружия, брони и деталей; плавка
+web.base.skill.engineering = Инженерия
+web.base.skill.mining = Горное дело
+web.base.by.mining = добыча камня и руды
+web.base.skill.building = Стройка и земледелие
+web.base.by.building = установка блоков; посев и сбор урожая
+web.base.skill.alchemy = Алхимия и готовка
+web.base.by.alchemy = готовка на костре или в котле
+web.base.skill.runecraft = Руны и зачарование
+web.base.skill.destruction = Разрушение
+web.base.skill.restoration = Восстановление
+web.base.skill.conjuring = Призыв и обереги
+web.base.skill.taming = Приручение и езда
+web.base.by.taming = приручение и езда на животных
+web.base.skill.survival = Выживание
+web.base.by.survival = рубка деревьев; изготовление обычных вещей
+web.base.skill.exploring = Исследование и картография
+web.base.by.exploring = открытие новых биомов и измерений
+web.base.skill.trading = Торговля
+perk.base.family.melee_damage = урон в ближнем бою
+perk.base.family.ranged_damage = урон издалека
+perk.base.family.spell_damage = урон заклинаний
+perk.base.family.defence = защита
+perk.base.family.health = здоровье
+perk.base.family.tame_damage = урон прирученных
+perk.base.family.taming_speed = скорость приручения
+perk.base.family.craft_grade = качество ремесла
+perk.base.family.gather_speed = скорость сбора
+perk.base.family.mine_speed = скорость добычи
+perk.base.family.move_speed = скорость движения
+perk.base.family.mana_cost = расход маны
+perk.base.family.stamina = выносливость
+perk.base.family.hunger = медленный голод
+perk.base.family.cooking = готовка
+perk.base.family.harvest = урожай
+perk.base.family.ride_speed = скорость езды
+perk.base.family.trade = торговля
+perk.base.family.smelting = скорость плавки
+perk.base.family.machine_speed = скорость машин
+perk.base.melee.heavy_blows = Тяжёлые удары
+perk.base.melee.second_wind = Второе дыхание
+perk.base.melee.executioner = Палач
+perk.base.melee.battle_rhythm = Ритм боя
+perk.base.melee.berserker = Берсерк
+perk.base.bridge.weapon_master = Мастер оружия
+perk.base.archery.steady_aim = Твёрдая рука
+perk.base.archery.light_feet = Лёгкий шаг
+perk.base.archery.piercing_shot = Пронзающий выстрел
+perk.base.archery.skirmisher = Застрельщик
+perk.base.archery.glass_arrow = Стеклянная стрела
+perk.base.bridge.shield_archer = Лучник со щитом
+perk.base.defence.thick_hide = Толстая шкура
+perk.base.defence.hardy = Выносливый
+perk.base.defence.shield_wall = Стена щитов
+perk.base.defence.unbroken = Несломленный
+perk.base.defence.iron_wall = Железная стена
+perk.base.bridge.armourer = Бронник
+perk.base.smithing.keen_eye = Зоркий глаз
+perk.base.smithing.bellows = Мехи
+perk.base.smithing.masters_touch = Рука мастера
+perk.base.smithing.hot_forge = Жаркий горн
+perk.base.smithing.forge_bound = Прикованный к горну
+perk.base.bridge.machine_forged = Машинная ковка
+perk.base.engineering.gearwright = Шестерёнщик
+perk.base.engineering.steady_fire = Ровный огонь
+perk.base.engineering.clockwork = Часовой механизм
+perk.base.engineering.pressure = Давление
+perk.base.engineering.overclock = Разгон
+perk.base.bridge.steam_drill = Паровой бур
+perk.base.mining.stonecutter = Камнерез
+perk.base.mining.strong_back = Крепкая спина
+perk.base.mining.vein_sense = Чутьё жилы
+perk.base.mining.tireless = Неутомимый
+perk.base.mining.tunnel_rat = Туннельная крыса
+perk.base.bridge.quarry_master = Хозяин каменоломни
+perk.base.building.green_thumb = Зелёные руки
+perk.base.building.quick_hands = Ловкие руки
+perk.base.building.bountiful = Щедрый урожай
+perk.base.building.builders_eye = Глаз строителя
+perk.base.building.homesteader = Поселенец
+perk.base.bridge.kitchen_garden = Огород
+perk.base.alchemy.hearty_meals = Сытная еда
+perk.base.alchemy.iron_stomach = Железный желудок
+perk.base.alchemy.fine_cook = Искусный повар
+perk.base.alchemy.lean_living = Скромная жизнь
+perk.base.alchemy.feaster = Пирующий
+perk.base.bridge.infuser = Настойщик
+perk.base.runecraft.ley_sight = Лей-зрение
+perk.base.runecraft.rune_carver = Резчик рун
+perk.base.runecraft.deep_runes = Глубокие руны
+perk.base.runecraft.glyph_weaver = Ткач глифов
+perk.base.runecraft.rune_bound = Связанный рунами
+perk.base.bridge.charged_runes = Заряженные руны
+perk.base.destruction.kindling = Растопка
+perk.base.destruction.focus = Сосредоточение
+perk.base.destruction.storm_call = Зов бури
+perk.base.destruction.overflow = Переполнение
+perk.base.destruction.ley_burn = Лей-ожог
+perk.base.bridge.balance = Равновесие
+perk.base.restoration.mending = Исцеление
+perk.base.restoration.calm_mind = Спокойный ум
+perk.base.restoration.renewal = Обновление
+perk.base.restoration.wellspring = Источник
+perk.base.restoration.lifeblood = Кровь жизни
+perk.base.bridge.warding_light = Оберегающий свет
+perk.base.conjuring.bound_spirit = Связанный дух
+perk.base.conjuring.ward = Оберег
+perk.base.conjuring.greater_summons = Великий призыв
+perk.base.conjuring.bastion = Бастион
+perk.base.conjuring.warden = Страж
+perk.base.bridge.rune_collars = Рунные ошейники
+perk.base.taming.gentle_hand = Мягкая рука
+perk.base.taming.saddle_sense = Чувство седла
+perk.base.taming.pack_leader = Вожак стаи
+perk.base.taming.swift_mount = Быстрый скакун
+perk.base.taming.beastmaster = Повелитель зверей
+perk.base.bridge.tracker = Следопыт
+perk.base.survival.woodsman = Лесоруб
+perk.base.survival.weathered = Закалённый
+perk.base.survival.forager = Собиратель
+perk.base.survival.hard_to_kill = Живучий
+perk.base.survival.wild_born = Рождённый в глуши
+perk.base.bridge.pathfinder = Первопроходец
+perk.base.exploring.long_stride = Широкий шаг
+perk.base.exploring.wayfarer = Странник
+perk.base.exploring.pathless = Бездорожье
+perk.base.exploring.far_walker = Дальноход
+perk.base.exploring.wanderer = Скиталец
+perk.base.bridge.caravan = Караван
+perk.base.trading.haggler = Торгаш
+perk.base.trading.pack_train = Вьючный обоз
+perk.base.trading.merchant_prince = Князь купцов
+perk.base.trading.caravaneer = Караванщик
+perk.base.trading.silver_tongue = Серебряный язык
+perk.base.bridge.sellsword = Наёмник
+
+# Гнёзда сети и камни (vitals::sockets; skills.rs, web.rs)
+item.base.maunduk = Маундук (камень разума)
+item.base.maunduk.tooltip = Камень древних. Вставьте его в гнездо сети навыков ({key:base:web}).
+item.base.aruduk = Арудук (камень потока)
+item.base.aruduk.tooltip = Камень древних: действует на малые узлы вокруг своего гнезда в сети навыков ({key:base:web}).
+item.base.remaru = Ремару, Страж потока
+item.base.remaru.tooltip = Реликвия древних. В сети навыков ({key:base:web}) показывает лей-линии и бережёт ману.
+item.base.emakaun = Эмакаун, Хранитель жизни
+item.base.emakaun.tooltip = Реликвия древних. В сети навыков ({key:base:web}) каждый взятый рядом узел даёт здоровье.
+tagged.base.stone = {#c6a383}Уровень предмета {value.level}{/}{if:value.f0==0}\n{#9ad7ff}+{value.p0} % урон в ближнем бою{/}{/if}{if:value.f0==1}\n{#9ad7ff}+{value.p0} % урон издалека{/}{/if}{if:value.f0==2}\n{#9ad7ff}+{value.p0} % урон заклинаний{/}{/if}{if:value.f0==3}\n{#9ad7ff}+{value.p0} % защита{/}{/if}{if:value.f0==4}\n{#9ad7ff}+{value.p0} % здоровье{/}{/if}{if:value.f0==5}\n{#9ad7ff}+{value.p0} % урон прирученных{/}{/if}{if:value.f0==6}\n{#9ad7ff}+{value.p0} % скорость приручения{/}{/if}{if:value.f0==7}\n{#9ad7ff}+{value.p0} % качество ремесла{/}{/if}{if:value.f0==8}\n{#9ad7ff}+{value.p0} % скорость сбора{/}{/if}{if:value.f0==9}\n{#9ad7ff}+{value.p0} % скорость добычи{/}{/if}{if:value.f0==10}\n{#9ad7ff}+{value.p0} % скорость движения{/}{/if}{if:value.f0==11}\n{#9ad7ff}+{value.p0} % расход маны{/}{/if}{if:value.f0==12}\n{#9ad7ff}+{value.p0} % выносливость{/}{/if}{if:value.f0==13}\n{#9ad7ff}+{value.p0} % медленный голод{/}{/if}{if:value.f0==14}\n{#9ad7ff}+{value.p0} % готовка{/}{/if}{if:value.f0==15}\n{#9ad7ff}+{value.p0} % урожай{/}{/if}{if:value.f0==16}\n{#9ad7ff}+{value.p0} % скорость езды{/}{/if}{if:value.f0==17}\n{#9ad7ff}+{value.p0} % торговля{/}{/if}{if:value.f0==18}\n{#9ad7ff}+{value.p0} % скорость плавки{/}{/if}{if:value.f0==19}\n{#9ad7ff}+{value.p0} % скорость машин{/}{/if}{if:value.f1==0}\n{#9ad7ff}+{value.p1} % урон в ближнем бою{/}{/if}{if:value.f1==1}\n{#9ad7ff}+{value.p1} % урон издалека{/}{/if}{if:value.f1==2}\n{#9ad7ff}+{value.p1} % урон заклинаний{/}{/if}{if:value.f1==3}\n{#9ad7ff}+{value.p1} % защита{/}{/if}{if:value.f1==4}\n{#9ad7ff}+{value.p1} % здоровье{/}{/if}{if:value.f1==5}\n{#9ad7ff}+{value.p1} % урон прирученных{/}{/if}{if:value.f1==6}\n{#9ad7ff}+{value.p1} % скорость приручения{/}{/if}{if:value.f1==7}\n{#9ad7ff}+{value.p1} % качество ремесла{/}{/if}{if:value.f1==8}\n{#9ad7ff}+{value.p1} % скорость сбора{/}{/if}{if:value.f1==9}\n{#9ad7ff}+{value.p1} % скорость добычи{/}{/if}{if:value.f1==10}\n{#9ad7ff}+{value.p1} % скорость движения{/}{/if}{if:value.f1==11}\n{#9ad7ff}+{value.p1} % расход маны{/}{/if}{if:value.f1==12}\n{#9ad7ff}+{value.p1} % выносливость{/}{/if}{if:value.f1==13}\n{#9ad7ff}+{value.p1} % медленный голод{/}{/if}{if:value.f1==14}\n{#9ad7ff}+{value.p1} % готовка{/}{/if}{if:value.f1==15}\n{#9ad7ff}+{value.p1} % урожай{/}{/if}{if:value.f1==16}\n{#9ad7ff}+{value.p1} % скорость езды{/}{/if}{if:value.f1==17}\n{#9ad7ff}+{value.p1} % торговля{/}{/if}{if:value.f1==18}\n{#9ad7ff}+{value.p1} % скорость плавки{/}{/if}{if:value.f1==19}\n{#9ad7ff}+{value.p1} % скорость машин{/}{/if}{if:value.f2==0}\n{#9ad7ff}+{value.p2} % урон в ближнем бою{/}{/if}{if:value.f2==1}\n{#9ad7ff}+{value.p2} % урон издалека{/}{/if}{if:value.f2==2}\n{#9ad7ff}+{value.p2} % урон заклинаний{/}{/if}{if:value.f2==3}\n{#9ad7ff}+{value.p2} % защита{/}{/if}{if:value.f2==4}\n{#9ad7ff}+{value.p2} % здоровье{/}{/if}{if:value.f2==5}\n{#9ad7ff}+{value.p2} % урон прирученных{/}{/if}{if:value.f2==6}\n{#9ad7ff}+{value.p2} % скорость приручения{/}{/if}{if:value.f2==7}\n{#9ad7ff}+{value.p2} % качество ремесла{/}{/if}{if:value.f2==8}\n{#9ad7ff}+{value.p2} % скорость сбора{/}{/if}{if:value.f2==9}\n{#9ad7ff}+{value.p2} % скорость добычи{/}{/if}{if:value.f2==10}\n{#9ad7ff}+{value.p2} % скорость движения{/}{/if}{if:value.f2==11}\n{#9ad7ff}+{value.p2} % расход маны{/}{/if}{if:value.f2==12}\n{#9ad7ff}+{value.p2} % выносливость{/}{/if}{if:value.f2==13}\n{#9ad7ff}+{value.p2} % медленный голод{/}{/if}{if:value.f2==14}\n{#9ad7ff}+{value.p2} % готовка{/}{/if}{if:value.f2==15}\n{#9ad7ff}+{value.p2} % урожай{/}{/if}{if:value.f2==16}\n{#9ad7ff}+{value.p2} % скорость езды{/}{/if}{if:value.f2==17}\n{#9ad7ff}+{value.p2} % торговля{/}{/if}{if:value.f2==18}\n{#9ad7ff}+{value.p2} % скорость плавки{/}{/if}{if:value.f2==19}\n{#9ad7ff}+{value.p2} % скорость машин{/}{/if}{if:value.flow==1}\n{#9ad7ff}+{value.sp} % к каждому малому узлу рядом с гнездом{/}{/if}{if:value.turn==0}\n{#9ad7ff}Малые узлы рядом с гнездом дают урон в ближнем бою{/}{/if}{if:value.turn==1}\n{#9ad7ff}Малые узлы рядом с гнездом дают урон издалека{/}{/if}{if:value.turn==2}\n{#9ad7ff}Малые узлы рядом с гнездом дают урон заклинаний{/}{/if}{if:value.turn==3}\n{#9ad7ff}Малые узлы рядом с гнездом дают защита{/}{/if}{if:value.turn==4}\n{#9ad7ff}Малые узлы рядом с гнездом дают здоровье{/}{/if}{if:value.turn==5}\n{#9ad7ff}Малые узлы рядом с гнездом дают урон прирученных{/}{/if}{if:value.turn==6}\n{#9ad7ff}Малые узлы рядом с гнездом дают скорость приручения{/}{/if}{if:value.turn==7}\n{#9ad7ff}Малые узлы рядом с гнездом дают качество ремесла{/}{/if}{if:value.turn==8}\n{#9ad7ff}Малые узлы рядом с гнездом дают скорость сбора{/}{/if}{if:value.turn==9}\n{#9ad7ff}Малые узлы рядом с гнездом дают скорость добычи{/}{/if}{if:value.turn==10}\n{#9ad7ff}Малые узлы рядом с гнездом дают скорость движения{/}{/if}{if:value.turn==11}\n{#9ad7ff}Малые узлы рядом с гнездом дают расход маны{/}{/if}{if:value.turn==12}\n{#9ad7ff}Малые узлы рядом с гнездом дают выносливость{/}{/if}{if:value.turn==13}\n{#9ad7ff}Малые узлы рядом с гнездом дают медленный голод{/}{/if}{if:value.turn==14}\n{#9ad7ff}Малые узлы рядом с гнездом дают готовка{/}{/if}{if:value.turn==15}\n{#9ad7ff}Малые узлы рядом с гнездом дают урожай{/}{/if}{if:value.turn==16}\n{#9ad7ff}Малые узлы рядом с гнездом дают скорость езды{/}{/if}{if:value.turn==17}\n{#9ad7ff}Малые узлы рядом с гнездом дают торговля{/}{/if}{if:value.turn==18}\n{#9ad7ff}Малые узлы рядом с гнездом дают скорость плавки{/}{/if}{if:value.turn==19}\n{#9ad7ff}Малые узлы рядом с гнездом дают скорость машин{/}{/if}
+web.base.tip.socket = {color:title}Гнездо{/}
+    {color:dim}Держит камень, найденный в мире: руины, боссы, лей-узлы, редкие звери, упавшие звёзды. Стоит {0} очка; камни вынимаются и вставляются свободно.{/}
+    {1}
+web.base.tip.stone0 = {color:title}{0}{/} {color:dim}(уровень предмета {1}){/}
+    {color:dim}Нажмите, чтобы вынуть.{/}
+web.base.tip.stone1 = {color:title}{0}{/} {color:dim}(уровень предмета {1}){/}
+    {2} {3}
+    {color:dim}Нажмите, чтобы вынуть.{/}
+web.base.tip.stone2 = {color:title}{0}{/} {color:dim}(уровень предмета {1}){/}
+    {2} {3}
+    {4} {5}
+    {color:dim}Нажмите, чтобы вынуть.{/}
+web.base.tip.stone3 = {color:title}{0}{/} {color:dim}(уровень предмета {1}){/}
+    {2} {3}
+    {4} {5}
+    {6} {7}
+    {color:dim}Нажмите, чтобы вынуть.{/}
+web.base.stone.amplify = к каждому малому узлу рядом
+web.base.stone.remaru = {#9ad7ff}Показывает лей-линии без лозы{/}
+web.base.stone.emakaun = здоровья за каждый взятый рядом узел
+web.base.pick = Вставить камень:
+web.base.pick_none = Камней нет: их находят в руинах, у боссов, в лей-узлах, у редких зверей и в упавших звёздах.
+web.base.pick_cancel = Отмена
+command.base.stone = {0}, уровень предмета {1}
+command.base.perk_show = сеть даёт: {0}
+item.base.dowsing_rod = Лоза лозоходца
+item.base.dowsing_rod.tooltip = Раздвоенная ветка с тектитом на конце. В руке она клонится к лей-линиям и слабо показывает их течение.
+block.base.ley_stone = Лей-камень
+block.base.ley_stone.tooltip = Вытесан звёздными древними, проложившими лей-линии.
+block.base.waystone = Спящий путевой камень
+block.base.waystone.tooltip = Древний камень на большом перекрёстке лей-линий. Он спит.
+hint.base.ley.still = Лоза висит неподвижно.
+hint.base.ley.faint = Лоза слабо шевелится {0}.
+hint.base.ley.pull = Лозу тянет {0}.
+hint.base.ley.strong = Лозу сильно тянет {0}.
+hint.base.ley.on_line = Лоза дрожит: здесь проходит лей-линия.
+hint.base.ley.at_node = Лоза вертится: здесь сходятся лей-линии.
+hint.base.ley.at_waystone = Лоза вертится: большой перекрёсток лей-линий и его спящий путевой камень.
+ley.base.dir.ahead = вперёд
+ley.base.dir.behind = назад
+ley.base.dir.left = влево
+ley.base.dir.right = вправо
+ley.base.feel.still = тихо
+ley.base.feel.faint = слабо
+ley.base.feel.pull = тянет
+ley.base.feel.strong = сильно тянет
+ley.base.feel.on_line = на линии
+ley.base.feel.at_node = в узле
+command.base.ley = лей здесь {0} ({1}); ближайшая линия в {2} блоках, у {3} {4}; ближайший узел {5} {6} ({7} линий), в {8} блоках; ближайший путевой камень {9} {10}, в {11} блоках

@@ -543,6 +543,10 @@ pub fn on_take(m: &MenuCtx) -> bool {
     if m.group("assembled").index_of(m.slot()).is_none() {
         return false;
     }
+    // Smithing for the maker, by the tool its parts make (the result slot is already taken).
+    let stacks: Vec<ItemStack> = (0..ASSEMBLY.len()).map(|i| asm_get(m, i)).collect();
+    let parts = stacks.iter().filter(|s| !s.is_empty()).count() as u32;
+    crate::skills::made(&m.world(), m.player(), &assembled(&stacks), parts);
     for i in 0..ASSEMBLY.len() {
         let s = asm_get(m, i);
         if !s.is_empty() {

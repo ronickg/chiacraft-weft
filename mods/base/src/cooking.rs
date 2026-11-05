@@ -285,6 +285,9 @@ fn roast_step(w: &World, id: u64, s: &mut Roasting) -> bool {
     if s.cook >= s.cook_max {
         s.cook = 0;
         input.set(0, st.shrink(1));
+        // Its cook learns, and their web may make it two (`skills::cooked`), as room allows.
+        let room = max_stack(made.item).saturating_sub(out_now.count);
+        let made = ItemStack { count: crate::skills::cooked(w, id, &made, 1).clamp(1, room.max(1)), ..made };
         output.set(0, if out_now.is_empty() { made } else { out_now.grow(made.count) });
     }
     true
@@ -342,7 +345,10 @@ fn pot_step(w: &World, id: u64, s: &mut Cooking) -> bool {
                 }
             }
             bowl.set(0, consume_one(bowl.get(0)));
-            output.set(0, stew(w, &foods, used));
+            let stew = stew(w, &foods, used);
+            // Its cook learns (a stew teaches by what went in); a pot makes one stew a bowl.
+            crate::skills::cooked(w, id, &stew, foods.len() as u32);
+            output.set(0, stew);
         }
         true
     } else {

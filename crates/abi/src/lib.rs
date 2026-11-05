@@ -491,6 +491,9 @@ pub mod comp {
     pub const FRICTION: &str = "friction";
     /// Block: movement speed multiplier inside it (`f32`, 1 by default; cobweb, liquids).
     pub const DRAG: &str = "drag";
+    /// Block: how well a climber holds on to its sides (`f32`, 1 by default; 0 can't be climbed:
+    /// ice, glass), times `attribute::CLIMB_SPEED`.
+    pub const GRIP: &str = "grip";
     /// Block: emitted light per color channel (`[u8;3]`). 15 is a full-strength source (torch
     /// 14); higher values reach further.
     pub const LIGHT: &str = "light";
@@ -2118,6 +2121,10 @@ pub mod pose_when {
     pub const NOT_FLYING: u32 = 2;
     /// Sprinting: the sprint action held while moving forward, with the food for it.
     pub const SPRINTING: u32 = 4;
+    /// Holding on to a wall it climbs (`attribute::CLIMB_SPEED`), not a ladder.
+    pub const CLIMBING: u32 = 8;
+    /// Gliding (`attribute::GLIDE_SPEED`) in the air.
+    pub const GLIDING: u32 = 16;
 }
 
 /// A pose (`Host::reg_pose`). Of the poses whose conditions hold the one with the highest
@@ -4563,6 +4570,19 @@ pub mod attribute {
     /// Multiplier on a player's field of view (1), on top of the setting and of flying and
     /// sprinting: a zoom, a speed rush.
     pub const FOV: &str = "core:fov";
+    /// Blocks a second it climbs up any wall it pushes into, times the wall's `comp::GRIP` (0:
+    /// only ladders). It holds on while sneaking and slides down slowly otherwise.
+    pub const CLIMB_SPEED: &str = "core:climb_speed";
+    /// Over 0: it glides while in the air, at this airspeed in blocks a second where it looks,
+    /// sinking `GLIDE_SINK` a second through the air, carried by the wind (`WIND_X`, `WIND_Z`)
+    /// and lifted by rising air (`LIFT`). No fall is counted while gliding.
+    pub const GLIDE_SPEED: &str = "core:glide_speed";
+    pub const GLIDE_SINK: &str = "core:glide_sink";
+    /// The air's movement where it is, blocks a second toward +X and +Z: a glider drifts with it.
+    pub const WIND_X: &str = "core:wind_x";
+    pub const WIND_Z: &str = "core:wind_z";
+    /// Rising air under it, blocks a second (a thermal, a ridge's updraft).
+    pub const LIFT: &str = "core:lift";
 }
 
 /// How an attribute modifier applies, like vanilla: ADD amounts sum onto the base, then times
