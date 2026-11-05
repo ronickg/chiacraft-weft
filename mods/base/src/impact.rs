@@ -208,10 +208,12 @@ fn surface(u: f64, radius: i32, rim: i32) -> i32 {
 }
 
 /// The top of the ground at (`x`, `z`) near `guess`: the highest full block that isn't a tree.
-/// None where it isn't loaded, or water lies on it.
+/// None where it isn't loaded, or water lies on it. A cube of air over the ground may not be
+/// loaded at all (impact_carve1: every strike 160 blocks out came back without ground), so what
+/// isn't loaded counts as air until the ground is found.
 fn ground(w: &World, x: i32, z: i32, guess: i32) -> Option<i32> {
     for y in (guess - 24..=guess + 24).rev() {
-        let s = w.block_loaded([x, y, z])?;
+        let Some(s) = w.block_loaded([x, y, z]) else { continue };
         if s == 0 {
             continue;
         }
