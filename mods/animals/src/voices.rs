@@ -63,6 +63,7 @@ pub fn howl_at_blood_moon(w: &World, id: u64, st: &EntityState) -> bool {
         *n = night;
     }
     w.play_sound(&HOWL, st.pos, 1.0);
+    crate::anim::act(w, id, crate::anim::Act::Howl);
     weft_sdk::info!("grey_wolf {id} howls at the blood moon");
     false
 }
