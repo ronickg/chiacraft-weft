@@ -24,7 +24,10 @@ gait = tail_swing = tail_sway = pose_lie = None
 TAIL, L = [], {}
 # A species' own scales for what its body allows: how far the scratch turns its neck, how hard
 # play wags its tail (a fox's short neck and big brush poke through at the wolf's).
-K = {"scratch": 1.0, "wag": 1.0}
+K = {"scratch": 1.0, "wag": 1.0, "bend": 1.0, "twist": 1.0, "lift": 1.0, "neck": 1.0, "neck_max": 130}
+# scratch: the scratch's neck and body turn; wag: play's wag; bend: the spine's flex in a stretch and
+# play; twist: the spine turned sideways (scratch, play; a cat's chest and hips poke at any); lift: the tail's root raised (alarm, play); neck: the neck's pitch grooming and nuzzling;
+# neck_max: the most the head-down fit may bend the neck (a cat's thick neck pokes out of its chest).
 
 
 def bind(m, **scales):
@@ -110,7 +113,7 @@ def pose_scratch(t):
     d = float(np.interp(p, [0, .2, .85, 1], [0, 1, 1, 0]))
     q = still(t)
     k = K["scratch"]
-    q.update({"spine_1": (0, 16 * d, 0), "neck": (18 * d * k, 55 * d * k, 0), "head": (8 * d, 14 * d, 0),
+    q.update({"spine_1": (0, 16 * d * k * K["twist"], 0), "neck": (18 * d * k, 55 * d * k, 0), "head": (8 * d, 14 * d, 0),
               "jaw": (10 * d * max(0.0, S(TAU * p * 6)), 0, 0), "ear_L": (10 * d, 0, 0), "ear_R": (10 * d, 0, 0)})
     return q
 
@@ -122,7 +125,7 @@ def pose_stretch(t):
     bow = float(np.interp(p, [0, .15, .45, .55, 1], [0, 1, 1, 0, 0]))
     back = float(np.interp(p, [0, .55, .7, .9, 1], [0, 0, 1, 1, 0]))
     q = still(t)
-    q.update({"root": (0, -2.5 * bow, 0), "spine_0": (-10 * bow + 4 * back, 0, 0), "spine_1": (16 * bow, 0, 0),
+    q.update({"root": (0, -2.5 * bow, 0), "spine_0": ((-10 * bow + 4 * back) * K["bend"], 0, 0), "spine_1": (16 * bow * K["bend"], 0, 0),
               "neck": (-10 * bow, 0, 0), "head": (-8 * bow, 0, 0), "jaw": (14 * bow, 0, 0)})
     for leg in ("FL", "FR"):
         q[f"leg_{leg}_upper"] = (-55 * bow, 0, 0)
@@ -132,7 +135,7 @@ def pose_stretch(t):
         q[f"leg_{leg}_upper"] = (12 * bow + 30 * back, 0, 0)
         q[f"leg_{leg}_lower"] = (-8 * back, 0, 0)
         q[f"leg_{leg}_paw"] = (-12 * bow - 22 * back, 0, 0)
-    q.update(tail_sway(p, 2, 6, [(14 * bow, 0, 0)] + [(0, 0, 0)] * (len(TAIL) - 1)))
+    q.update({f"tail_{k}": tail_swing(k, 6 * S(TAU * p * 2 - 0.7 * k)) for k in range(1, len(TAIL))})
     q["tail_0"] = tail_swing(0, 0, (14 * bow, 0, 0))
     return q
 
@@ -184,7 +187,7 @@ def pose_alarm(t):
     q = still(t)
     q.update({"spine_1": (-4 * up, 0, 0), "neck": (-22 * up, 0, 0), "head": (-6 * up, 0, 0), "jaw": (18 * bark, 0, 0),
               "ear_L": (-14 * up, 0, 0), "ear_R": (-14 * up, 0, 0)})
-    q.update({f"tail_{k}": tail_swing(k, 0, (-10 * up if k == 0 else -8 * up, 0, 0)) for k in range(len(TAIL))})
+    q.update({f"tail_{k}": tail_swing(k, 0, ((-10 if k == 0 else -8) * up * K["lift"], 0, 0)) for k in range(len(TAIL))})
     return q
 
 
@@ -206,7 +209,7 @@ def pose_play(t):
     bow = float(np.interp(p, [0, .12, .4, .5, 1], [0, 1, 1, 0, 0]))
     hop = max(0.0, S(TAU * (p - 0.5) * 2)) if p > 0.5 else 0.0
     q = still(t)
-    q.update({"root": (0, -2.5 * bow + 3.0 * hop, 0), "spine_0": (-10 * bow, 0, 0), "spine_1": (16 * bow, 30 * hop, 0),
+    q.update({"root": (0, -2.5 * bow + 3.0 * hop, 0), "spine_0": (-10 * bow * K["bend"], 0, 0), "spine_1": (16 * bow * K["bend"], 30 * hop * K["twist"], 0),
               "neck": (-10 * bow, 20 * hop, 0), "head": (-8 * bow, 0, 12 * hop), "jaw": (12 * (bow + hop), 0, 0)})
     for leg in ("FL", "FR"):
         q[f"leg_{leg}_upper"] = (-55 * bow - 25 * hop, 0, 0)
@@ -215,8 +218,9 @@ def pose_play(t):
     for leg in ("BL", "BR"):
         q[f"leg_{leg}_upper"] = (12 * bow, 0, 0)
         q[f"leg_{leg}_paw"] = (-12 * bow, 0, 0)
-    q.update(tail_sway(p, 6, 16 * K["wag"], [(-8, 0, 0)] + [(-6 * K["wag"], 0, 0)] * (len(TAIL) - 1)))
-    q["tail_0"] = tail_swing(0, 0, (-8, 0, 0))  # the wag in the brush, its root still
+    # The wag in the brush, its root still (written out: a felid's `tail_sway` takes one base).
+    q.update({f"tail_{k}": tail_swing(k, 16 * K["wag"] * S(TAU * p * 6 - 0.7 * k), (-6 * K["wag"], 0, 0)) for k in range(1, len(TAIL))})
+    q["tail_0"] = tail_swing(0, 0, (-8 * K["lift"], 0, 0))
     return q
 
 
@@ -225,7 +229,7 @@ def pose_groom(t):
     p = t / 2.5
     d = float(np.interp(p, [0, .2, .85, 1], [0, 1, 1, 0]))
     q = still(t)
-    q.update({"neck": (36 * d, 10 * d, 0), "head": (12 * d, 4 * d, 0), "jaw": (8 * d * max(0.0, S(TAU * p * 5)), 0, 0),
+    q.update({"neck": (36 * d * K["neck"], 10 * d, 0), "head": (12 * d, 4 * d, 0), "jaw": (8 * d * max(0.0, S(TAU * p * 5)), 0, 0),
               "leg_FL_upper": (-20 * d, 0, 0), "leg_FL_lower": (24 * d, 0, 0)})
     return q
 
@@ -236,7 +240,7 @@ def pose_nuzzle(t):
     d = float(np.interp(p, [0, .2, .85, 1], [0, 1, 1, 0]))
     push = max(0.0, S(TAU * p * 2))
     q = still(t)
-    q.update({"neck": (32 * d + 4 * push, 0, 0), "head": (6 * d - 6 * push, 0, 0), "jaw": (6 * d * push, 0, 0),
+    q.update({"neck": ((32 * d + 4 * push) * K["neck"], 0, 0), "head": (6 * d - 6 * push, 0, 0), "jaw": (6 * d * push, 0, 0),
               "ear_L": (12 * d, 0, 0), "ear_R": (12 * d, 0, 0)})
     q.update(tail_sway(p, 3, 6))
     q["tail_0"] = tail_swing(0, 0)
@@ -303,7 +307,7 @@ def fit(spec, groups):
     def low_cost(P):
         nose, _ = low_pose(P)
         return (nose - 0.5) ** 2 + 0.0002 * (P["low_neck"] ** 2 + P["low_head"] ** 2) + 2.0 * P["low_crouch"] ** 2
-    best = grid_fit({"low_neck": list(range(40, 131, 5)), "low_head": list(range(0, 61, 5)), "low_crouch": [0, .5, 1, 1.5, 2, 2.5, 3]},
+    best = grid_fit({"low_neck": list(range(40, K["neck_max"] + 1, 5)), "low_head": list(range(0, 61, 5)), "low_crouch": [0, .5, 1, 1.5, 2, 2.5, 3]},
                     low_cost)[1]
     nose, drop = low_pose(best)
     L.update(best, low_drop=round(float(drop), 2))
