@@ -538,6 +538,16 @@ fn cloud_cell_of(tex: u32, cell: vec2<f32>, origin: vec2<f32>, dims: vec2<f32>, 
     return select(0.0, 1.0, hash3(vec3(w.x, 51, w.y)) < fill);
 }
 
+// Fuzz for the clouds' edges at picture cell `cell` (absolute: the camera's cell plus the place
+// from it), -0.5..0.5: noise about a cell and a third across, so the cells' straight sides break
+// into soft, uneven puffs. The sky's clouds and their shadows both take it, only where a cloud's
+// edge is (its middle and the open sky ask no noise). (Softer clouds, Ronald's pick of 11-05: flat
+// slabs with hard edges and big flat polygons for shadows on the desert, Tester 2's hours sheet.)
+fn cloud_fuzz(cell: vec2<f32>) -> f32 {
+    let w = fract(cell / 4096.0) * 4096.0;
+    return noise3(vec3(w.x * 0.75, 7.3, w.y * 0.75)) - 0.5;
+}
+
 // How much of the sun the clouds let through to `rel` (camera relative): 1 under open sky, about
 // a fifth under a cloud's middle, soft at its edges. The point is followed toward the light to the
 // slab's middle, where the four nearest cells are blended as the sky draws them, so the shadows
@@ -564,11 +574,16 @@ fn cloud_shadow(rel: vec3<f32>) -> f32 {
     let b = cloud_cell_of(tex, base + vec2(1.0, 0.0), o, dims, c.w);
     let d = cloud_cell_of(tex, base + vec2(0.0, 1.0), o, dims, c.w);
     let e = cloud_cell_of(tex, base + vec2(1.0, 1.0), o, dims, c.w);
-    let cover = mix(mix(a, b, u.x), mix(d, e, u.x), u.y);
+    var cover = mix(mix(a, b, u.x), mix(d, e, u.x), u.y);
+    if cover > 0.02 && cover < 0.98 {
+        cover = clamp(cover + cloud_fuzz(base + o + f) * 0.45, 0.0, 1.0);
+    }
     // Fading in as the light climbs: long low shadows from far clouds would smear across the land.
     let lift = smoothstep(0.03, 0.15, l.y);
-    // The sky's puffs fill in over this range of the blend at their middle (`cloud_density`).
-    return 1.0 - 0.8 * smoothstep(0.35, 0.6, cover) * lift;
+    // The sky's puffs fill in over this range of the blend at their middle (`cloud_density`), and
+    // their shade's edge is wider than the cloud's own, a few blocks of soft penumbra (at 0.35-0.6
+    // it was a hard polygon on open sand); a little lighter in the middle (0.8 before).
+    return 1.0 - 0.72 * smoothstep(0.22, 0.75, cover) * lift;
 }
 
 // ---- the rain's cloud deck, shared by the sky and the light ----
