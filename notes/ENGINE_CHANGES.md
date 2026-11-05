@@ -61,6 +61,7 @@ Weft's shader packs could only replace shaders. Our pack needed data the engine 
 ## 4. Gameplay the engine had to allow
 
 - **Riding** (2ab12f97, 868b4fad), **a size per entity** (f3d8a0fe), **skins painted by mods** (92315d8d), **up to 12 drawn layers** (d1c06be7, for the cloak), **the inventory's 3D preview for any entity** (7bc57d30). *Why:* the animals mod: rideable raptors and wyverns, per-animal coats, the animal screen's portrait.
+- **Held items bigger in the own first-person hand** (`comp::FIRST_PERSON_HELD_SCALE` on an entity kind, `f32`, 1 without it; 7295827c): `place_carried` scales the display of items in the player's own first-person hand about where they're held; base sets it on `core:player`. *Why:* after the Weft sync the items sit in Weft's posed hand, smaller than our old corner; Ronald kept Weft's hand but wanted "our items a bit bigger". **Upstream?** Maybe (a game-wide knob).
 - **Entity send and activation ranges** (249afe81). *Why:* far animals cost the server too much (Research round 2, E1).
 - **Items:** a stack's own tool numbers win over its item's (a9fcb688), items that keep when broken (4e03dc83), a stack's look from layers (988c4077). *Why:* tools built from parts (crafting).
 - **A player's break drops at their feet** (8cb72890, 6eaf25b5). *Why:* chopped logs landed out of reach (first-day test).
