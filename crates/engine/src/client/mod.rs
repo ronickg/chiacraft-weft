@@ -3406,6 +3406,8 @@ fn swims_in(c: &crate::content::Content, kind: u32, worn: &[u32]) -> Vec<bool> {
 
 /// Where on a player a rope holds it: its hands over its head, as a share of its height.
 const ROPE_HOLD: f64 = 1.05;
+/// The air's drag a step on a body swinging on a taut rope (0.91 off it).
+const ROPE_DRAG: f64 = 0.995;
 
 fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, gravity: f64, bodies: &[physics::Body]) {
     let c = content();
@@ -3603,7 +3605,18 @@ fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, 
                 p.rope_len = (p.rope_len + rope.reel * 0.7).min(rope.length);
             }
             let hold = height * ROPE_HOLD;
-            let taut = physics::rope_hold(c, block, bodies, &mut p.pos, &mut p.vel, hw, height, hold, rope.anchor, p.rope_len);
+            // Hands on a wall: the rope runs slack behind as it climbs, past the anchor too.
+            if w.on_wall {
+                let reach = (p.pos + DVec3::Y * hold).distance(rope.anchor);
+                p.rope_len = p.rope_len.max(reach).min(rope.length);
+            }
+            let taut = !w.on_wall && physics::rope_hold(c, block, bodies, &mut p.pos, &mut p.vel, hw, height, hold, rope.anchor, p.rope_len);
+            // Swinging on a taut rope keeps its way: little of the air's drag (0.91 a step,
+            // which stops a pendulum in a swing).
+            if taut && !w.on_ground {
+                p.vel.x *= ROPE_DRAG / 0.91;
+                p.vel.z *= ROPE_DRAG / 0.91;
+            }
             p.on_rope = !w.on_ground && (taut || p.pos.distance(rope.anchor) <= p.rope_len + hold + 0.5);
         }
         None => p.rope_for = None,

@@ -41,6 +41,8 @@ const REFRESH: u64 = 10;
 const HANDS: f64 = 1.9;
 /// Let go when this much farther from the anchor than the rope is long (a teleport).
 const SNAPS: f64 = 8.0;
+/// A wall hit this many blocks or fewer under its top is caught over the edge.
+const OVER: i32 = 3;
 
 pub fn register(r: &mut Registry) {
     r.entity_component(
@@ -115,11 +117,17 @@ fn throw(u: &mut ItemUse) -> bool {
     match hit.filter(|h| holds(h.state)) {
         Some(h) => {
             let n = FACES[h.face.min(5) as usize];
-            let anchor = Vec3::new(
-                h.pos.x as f64 + 0.5 + n[0] * 0.52,
-                h.pos.y as f64 + 0.5 + n[1] * 0.52,
-                h.pos.z as f64 + 0.5 + n[2] * 0.52,
-            );
+            // On a wall's side within `OVER` of its top it catches over the edge, as a grapnel does.
+            let top = (n[1] == 0.0)
+                .then(|| (0..=OVER).map(|k| h.pos.offset(0, k, 0)).take_while(|p| holds(w.block(*p))).last())
+                .flatten()
+                .filter(|p| !holds(w.block(p.offset(0, 1, 0))));
+            let (at, n) = match top {
+                Some(p) => (p, [n[0] * 0.3, 0.5, n[2] * 0.3]),
+                None => (h.pos, [n[0] * 0.52, n[1] * 0.52, n[2] * 0.52]),
+            };
+            let anchor = Vec3::new(at.x as f64 + 0.5 + n[0], at.y as f64 + 0.5 + n[1], at.z as f64 + 0.5 + n[2]);
+            let h = LookAt { pos: at, ..h };
             let hands = st.pos.offset(0.0, HANDS, 0.0);
             let length = ((anchor - hands).length_squared().sqrt() + 0.3).min(hook.reach as f64 + 2.0);
             weft_sdk::info!(
