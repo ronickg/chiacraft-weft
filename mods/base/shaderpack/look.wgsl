@@ -20,6 +20,12 @@ fn rain_amount() -> f32 {
     return clamp(scene.fog_color.w, 0.0, 1.0);
 }
 
+// How wet the ground is where the player is, 0..1: it wets as rain falls and dries over minutes
+// after (`scene.canopy.y`, the engine's, at the pace the base mod's air gives).
+fn ground_wet() -> f32 {
+    return clamp(scene.canopy.y, 0.0, 1.0);
+}
+
 fn luma(c: vec3<f32>) -> f32 {
     return dot(c, vec3(0.2126, 0.7152, 0.0722));
 }
@@ -660,7 +666,12 @@ fn held_light(rel: vec3<f32>, n: vec3<f32>) -> vec3<f32> {
     if dot(n, n) > 0.5 {
         facing = mix(0.5, 1.0, clamp(dot(n, to / max(d, 1e-3)), 0.0, 1.0));
     }
-    return max(l - vec3(d / 15.0), vec3(0.0)) * facing;
+    // A warm pool that lights the path ahead and fades into the dark over its eight to ten blocks (Ronald, 11-05: "between the two", Bliss's small pool at the hand and ours, a level a
+    // block to fourteen, which lit the whole night forest like dusk). It still lights the way.
+    // (From 2.5 blocks, gone by 10: at 6-11 all within six blocks kept its full light and a close
+    // forest still read as dusk, PC sht_torch.)
+    let pool = 1.0 - smoothstep(2.5, 10.0, d);
+    return max(l - vec3(d / 15.0), vec3(0.0)) * facing * pool;
 }
 
 // Light arriving at a surface with normal `n`. `light` is the world's (sky, red, green, blue, 0..1),

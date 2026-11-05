@@ -678,6 +678,8 @@ pub struct Client {
     aurora: f32,
     /// How closed the canopy is where the player is (a mod's air, `air_flags::CANOPY_SHIFT`).
     canopy: f32,
+    /// How wet the ground is where the player is, 0..1 (`weather_effects`, `Scene::canopy.y`).
+    wet: f32,
     /// What happens in the sky (`weft_abi::sky_event`, chiacraft), how strongly, and when it began
     /// (`shaders::time`).
     sky_event: (u32, f32, f32),
@@ -1015,6 +1017,7 @@ impl Client {
             dust: 0.0,
             aurora: 0.0,
             canopy: 0.0,
+            wet: 0.0,
             sky_event: (0, 0.0, 0.0),
             sky_landing: None,
             weather_id: 0,
@@ -2680,6 +2683,17 @@ impl Client {
         self.aurora += (aurora - self.aurora).clamp(-dt / 20.0, dt / 20.0);
         let canopy = ((flags >> weft_abi::air_flags::CANOPY_SHIFT) & 255) as f32 / 255.0;
         self.canopy += (canopy - self.canopy).clamp(-dt / 10.0, dt / 10.0);
+        // The ground wets as the rain comes (in about twenty seconds) and dries after it at the
+        // pace the air there gives (a mod's `DRYING_SHIFT`; 0, about two minutes): it stayed wet
+        // only as long as the rain fell, gone 25 s after (Tester 2's after-rain shots, 11-05).
+        let falling = if self.snowing > 0.5 { 0.0 } else { self.look.falls };
+        if falling > self.wet {
+            self.wet = (self.wet + dt / 20.0).min(falling);
+        } else {
+            let drying = (flags >> weft_abi::air_flags::DRYING_SHIFT) & 255;
+            let secs = if drying == 0 { 120.0 } else { 3600.0 * (30.0f32 / 3600.0).powf((drying - 1) as f32 / 254.0) };
+            self.wet = (self.wet - dt / secs).max(falling);
+        }
         let heading = self.world.air.1.to_radians();
         let wind = Vec2::new(heading.sin(), -heading.cos()) * speed;
         self.wind += (wind - self.wind) * (1.0 - (-dt / 4.0).exp());
@@ -2782,7 +2796,7 @@ impl Client {
             options: pack_options(),
             hand: hand.0,
             hand_light: hand.1,
-            canopy: [self.canopy, 0.0, 0.0, 0.0],
+            canopy: [self.canopy, self.wet, 0.0, 0.0],
             // Filled in once the sky has readied them (`render`).
             soft_clouds: [0.0; 4],
             // Filled in once the sky has readied it (`render`).
