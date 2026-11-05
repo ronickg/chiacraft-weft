@@ -2118,14 +2118,24 @@ mod tests {
         for &(x, z, r) in &sites {
             let found = crater_meteorites(&f, x, z, 0);
             let spread = (r as f64 * CRATER_METEORITE_SPREAD) as i32 + 1;
-            let mine: Vec<_> = found.iter().filter(|m| (m[0] - x).abs() <= spread && (m[2] - z).abs() <= spread).collect();
+            let mine: Vec<_> = found
+                .iter()
+                .filter(|m| (m[0] - x).abs() <= spread && (m[2] - z).abs() <= spread)
+                .collect();
             if !mine.is_empty() {
                 holding += 1;
-                assert!((CRATER_METEORITES.0..=CRATER_METEORITES.1).contains(&(mine.len() as i32)), "crater at {x} {z}: {} meteorites", mine.len());
+                assert!(
+                    (CRATER_METEORITES.0..=CRATER_METEORITES.1).contains(&(mine.len() as i32)),
+                    "crater at {x} {z}: {} meteorites",
+                    mine.len()
+                );
             }
             for m in mine {
                 let below = (height(&f, m[0] * 16, m[2] * 16) >> 4) - m[1];
-                assert!((CRATER_METEORITE_DEPTH.0..=CRATER_METEORITE_DEPTH.1).contains(&below), "meteorite at {m:?}: {below} under the floor");
+                assert!(
+                    (CRATER_METEORITE_DEPTH.0..=CRATER_METEORITE_DEPTH.1).contains(&below),
+                    "meteorite at {m:?}: {below} under the floor"
+                );
             }
         }
         assert!(holding > 0 && holding < sites.len(), "{holding} of {} craters hold meteorites", sites.len());

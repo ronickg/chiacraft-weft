@@ -99,7 +99,10 @@ pub fn register(r: &mut Registry) {
         let x = cmd.int("x").map_or(px, |v| v as i32);
         let z = cmd.int("z").map_or(pz - 200, |v| v as i32);
         match start(&w, x, z, radius, ticks) {
-            Some(columns) => cmd.reply("command.base.impact.started", &[Arg::Int(radius as i64), Arg::Int(x as i64), Arg::Int(z as i64), Arg::Int(columns as i64), Arg::Int(ticks as i64)]),
+            Some(columns) => cmd.reply(
+                "command.base.impact.started",
+                &[Arg::Int(radius as i64), Arg::Int(x as i64), Arg::Int(z as i64), Arg::Int(columns as i64), Arg::Int(ticks as i64)],
+            ),
             None => cmd.reply("command.base.impact.no_ground", &[Arg::Int(x as i64), Arg::Int(z as i64)]),
         }
     });
@@ -258,7 +261,13 @@ fn tick(w: &World) {
         if c.columns.is_empty() {
             weft_sdk::info!(
                 "impact at {} {} {}: radius {}, rim {}, {} block edits, {} columns skipped",
-                c.at[0], c.at[1], c.at[2], c.radius, c.rim, c.edits, c.skipped
+                c.at[0],
+                c.at[1],
+                c.at[2],
+                c.radius,
+                c.rim,
+                c.edits,
+                c.skipped
             );
             return false;
         }
