@@ -73,6 +73,7 @@ pub fn ores(r: &mut Registry) {
             .veins(veins)
             .vein_size(size)
             .replace("#stone_ore_replaceables");
-        drop(if biome.is_empty() { o } else { o.biome(biome) });
+        // A biome tag is written `#cold`.
+        drop(if biome.is_empty() { o } else { o.biome(&format!("#{biome}")) });
     }
 }
