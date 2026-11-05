@@ -368,16 +368,16 @@ fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32>
         // lime flash at 06:00-07:00 and 17:00-18:00 (Tester 2's forest hours, 11-05). Its brightest
         // part is held back while the sun is under about 45° (none at noon or at golden hour's
         // dim light), so leaves stay vivid at other hours.
+        let back = max(-dot(normalize(in.rel), light_dir()), 0.0);
+        light += paint * palette().sun * light_strength() * pow(back, 3.0) * 0.35 * shadow * smoothstep(0.5, 0.95, in.light.x);
         let low = 1.0 - smoothstep(0.5, 0.72, scene.sun.y);
         let lum = luma(light / max(paint, vec3(0.05)));
         light *= 1.0 / (1.0 + 0.9 * max(lum - 1.0, 0.0) * low);
-        // And some colour out of that brightest part: held back alone it kept a near-pure yellow-
-        // green (sRGB 135 170 7, a gold morning sun has little blue), 3 % of the frame at 06:00
-        // where it was 6 % (PC run sh3).
-        let hot = smoothstep(0.9, 1.6, lum) * low;
+        // And some colour out of the sunlit part: held back alone it kept a near-pure yellow-green
+        // (sRGB 135 170 7, a gold morning sun has little blue), 3 % of the frame at 06:00 where it
+        // was 6 % (PC run sh3); from a lower light up, a leaf by the eye at 18:00 stayed lime (sh3b).
+        let hot = smoothstep(0.6, 1.3, lum) * low;
         light = mix(light, vec3(luma(light)) * vec3(0.9, 1.06, 0.86), hot * 0.4);
-        let back = max(-dot(normalize(in.rel), light_dir()), 0.0);
-        light += paint * palette().sun * light_strength() * pow(back, 3.0) * 0.35 * shadow * smoothstep(0.5, 0.95, in.light.x);
     }
     return light;
 }
