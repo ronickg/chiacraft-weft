@@ -86,7 +86,8 @@ pub async fn held_items(t: T) -> R {
         ("sword", probe::cyan, 0.03),
         ("block", probe::light, 0.03),
         ("flower", probe::red, 0.02),
-        ("torch", probe::dark, 0.01),
+        // our torch is its flame (dark was the old stick): fire orange
+        ("torch", probe::orange, 0.03),
     ];
     for (i, (name, color, min)) in looks.into_iter().enumerate() {
         t.c().select_slot(i as u32);
