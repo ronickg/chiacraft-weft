@@ -67,7 +67,8 @@ The numbers are in `scripts/house.py`; build scripts import them instead of choo
   into it, not blocks with their own model: block models here take only coarse texture
   coordinates (a 128th of the texture), and a painted sheet on one came out a flat color.
 - **Built from source**: every model is `mods/<mod>/source/<thing>/build.py`, which writes its
-  assets and asserts the checks (`boxcheck`, `ground.joints`, `ground.pokes`, `ground.gait`).
+  assets and asserts the checks (`boxcheck`, `linecheck`, `ground.joints`, `ground.pokes`,
+  `ground.gait`).
   Never edit an exported asset by hand.
 
 ## Rules that decide the look
@@ -113,6 +114,26 @@ Geometry
   "hips", "tail_"])` checks it at rest and in every keyframe; build scripts assert it's empty.
   Without the list it also shows limb joints (knee, ankle, toes) and an opening jaw: there a
   small step at the bend is the usual box joint and reads as one.
+
+- **No thin lines: flush, or two texels clear** (Ronald, 11-05, on a strip of Drenkaun's
+  shoulders showing beside a moss pad: "a thin line there, which makes no sense to have there";
+  he had seen it on several models). Where a box lies on or in another (a pad of moss or armour
+  on a back, a haunch on the hips, a nose on a muzzle, a tuft on a neck), every edge of the one
+  against the other is either **flush** (within half a unit, the step `boxcheck` asks for) or
+  **clearly out, two texels or more**. A step of a quarter texel to two texels shows the box
+  underneath as a hairline in its own colour: brown fur beside green moss, a dark nose's side
+  as a rim, the hips' side as a band behind the thigh. It reads as a mistake (a sliver poking
+  out, a texture edge) because it has no shape of its own. The usual causes, all found in our
+  models: a pad a little narrower than the back it lies on (Drenkaun's first moss pad, the
+  ankylosaur's shield); a part a texel too tall (a thigh's top a texel above the hips: a lip);
+  a nose or snout out from the muzzle by a texel and a half; tufts in a row whose ends differ by
+  a fraction; a box sitting a texel or so proud of the surface. Fix by moving the edge, not by
+  painting: make the cover reach half a unit past the edge, pull the poking box in, or push it
+  out to two texels so it reads as a step on purpose. `scripts/linecheck.py` finds every one
+  (`line`, with the box, face, width and the box beside it; `--shot` marks them magenta on a
+  render); build scripts assert none, naming in `allow` the few that are meant. A chain's
+  joint rim (a hoof's top round the shank, the chest's back round the hips) and parts meeting
+  at an angle (a neck into a head: `ground.pokes`) are not lines. Undersides are listed apart.
 
 Texture (paint it like an illustration; each face is a small pixel painting)
 - One light, from above and a bit front-left, baked in: tops lightest, sides mid, bottoms
@@ -244,6 +265,15 @@ Animation
   foot, in walk and run; build scripts assert it. Short legs need a clear lift (a big knee
   bend, a small swing) and fine keyframes (20-24 a cycle), or the foot only shuffles and the
   check can't tell forward from back.
+- **Every gait, not just walk and run**: a clip that plays in place of the walk (a crouched
+  stalk, a slow approach, a charge) is checked the same way. A crouch made by adding a knee bend
+  *against* the way the lift bends it straightens the knee as the foot lifts, so the foot is
+  lowest mid-swing and the gait moonwalks (the first stalks did, on four species, 2026-11-05):
+  bend each joint the way a step lifts it, paw kept flat (`upper + lower + paw = 0`), and search
+  the bends with `gait` and `feet_low`. Bending a leg also shortens it less than you guess: set
+  such a clip's height from its feet with `ground.grounded(spec, anim, feet)` (each frame on its
+  lowest foot; `bounds=True` for a run's or charge's bounce) and assert `feet_low` within 0.3 of
+  the ground, as the builds do. A hand-set root drop sank the first stalk 4 units into the ground.
 - **Feet that don't slide** (big creatures, where sliding shows): give each foot a path (on the
   ground moving back at the ground speed, then lifted and swung forward) and solve the limb's
   angles to it every frame (least squares on the model's bones, warm-started from the last frame,
@@ -370,6 +400,8 @@ Animation
    via `Modes.options.animate.select(); anim.select(); Timeline.setTime(t); Animator.preview();`):
    - [ ] `boxcheck` 0 at rest and in poses; look from below and from the side at every resting
          pose: nothing flickers
+   - [ ] `linecheck` 0 lines: no strip of a box under two texels showing beside another (look at
+         `--shot`: nothing magenta); every pad, haunch, nose and tuft flush or two texels out
    - [ ] two eyes on the front only; no stray eye/nose texels on sides or top; face reads cute;
          a blink frame closes the eyes completely
    - [ ] no part reads wrong side-on (stray flaps); thin parts solid, no gaps between layers;
@@ -582,6 +614,12 @@ system numpy and Pillow). Homebrew's own `python3` has no scipy and refuses inst
   `front_flat`, `side_flat`, `top`, `back` (flat views to hold against a reference sheet).
 - `scripts/boxcheck.py spec.json` — coplanar overlapping faces (z-fighting) at rest and, with
   animations in the spec, in every keyframe (`check_posed`); exit 1 if any.
+- `scripts/linecheck.py spec.json texture.png [--shot out.png] [--all-kinds]` (or a `.geo.json`
+  and its texture; `--all [repo]` for every model in `mods/*/assets/models`) — thin lines:
+  strips under two texels of one box beside another (`line`), whole faces under a texel
+  (`thin`), texture rectangles off whole texels or with a gutter unlike their edge (`bleed`);
+  joint rims as `seam`, undersides as `under`. `lines(boxes_from_spec(spec), tex, allow=...)`
+  for build scripts. Exit 1 on any line or bleed.
 - `scripts/paint.py` — `tones`, `occlusion`, `paint_face_smooth` (default look), `EYES` (ten eye
   types: six Hytale-style, four cute) and `stamp_eyes`, `stamp`, `majority`, `pack`;
   `ramp`/`paint_face` (flat five-step look).
@@ -591,7 +629,9 @@ system numpy and Pillow). Homebrew's own `python3` has no scipy and refuses inst
   `joints(spec)`: joints whose pivot isn't inside both parts (parts that come apart);
   `pokes(spec, parts)`: corners poking out of a neighbor at an angled joint, at rest and in every
   keyframe (`python ground.py spec.json neck skull ...` prints them);
-  `gait(spec, anim, feet)`: whether a walk or run moves forward (positive per foot).
+  `gait(spec, anim, feet)`: whether a walk or run moves forward (positive per foot);
+  `feet_low(spec, anim, feet)`: the feet's lowest y in each frame; `grounded(spec, anim, feet,
+  bounds=False)`: the clip with its root's height set so its feet stand on the ground.
 - `scripts/variants.py model.glb out.json name=tex.png ...` — texture variants padded to the
   GLB's texture size, as data URLs for the viewer.
 - `scripts/layers.py` — per-texel layers for coats painted on the fly (see above).

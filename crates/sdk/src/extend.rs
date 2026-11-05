@@ -91,6 +91,7 @@ pub mod attribute {
     pub static ROPE_Z: Attribute = Attribute::named(crate::abi::attribute::ROPE_Z);
     /// Blocks a second jump pulls the rope in and sneak lets it out.
     pub static ROPE_REEL: Attribute = Attribute::named(crate::abi::attribute::ROPE_REEL);
+    pub static KNOCKBACK_RESISTANCE: Attribute = Attribute::named(crate::abi::attribute::KNOCKBACK_RESISTANCE);
 }
 
 const UNRESOLVED: u32 = u32::MAX - 1;

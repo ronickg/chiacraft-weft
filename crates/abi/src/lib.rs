@@ -4593,6 +4593,9 @@ pub mod attribute {
     pub const ROPE_Y: &str = "core:rope_y";
     pub const ROPE_Z: &str = "core:rope_z";
     pub const ROPE_REEL: &str = "core:rope_reel";
+    /// How much of a hit's knockback it shrugs off, 0 (all of it moves it) to 1 (none): big
+    /// creatures stand their ground. Mobs only (a player's knockback is its client's).
+    pub const KNOCKBACK_RESISTANCE: &str = "core:knockback_resistance";
 }
 
 /// How an attribute modifier applies, like vanilla: ADD amounts sum onto the base, then times

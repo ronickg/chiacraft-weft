@@ -195,7 +195,10 @@ def export(spec, texture, out, name, scale, tex_name, pup=None, pup_head=1.3, po
         for suffix, names in pose_files.items():
             idle = spec["animations"].get(names.get("idle"))
             anims = {f"animation.{model}{suffix}.{k}":
-                     (lambda a: a if k in STANDING else as_action({**a, "blend": spec["animations"][v].get("blend", ACTION_BLEND)}))(
+                     # An action plays once unless its animation says it loops: the engine loops a clip
+                     # whose file says so whatever the game asks (a fox's bite went on forever).
+                     (lambda a: a if k in STANDING else as_action({**a, "loop": spec["animations"][v].get("loop", False),
+                                                                   "blend": spec["animations"][v].get("blend", ACTION_BLEND)}))(
                          animation(offset_from(spec["animations"][v], idle["frames"][0]) if k in LAYERED and idle else spec["animations"][v], s))
                      for k, v in names.items() if v in spec["animations"]}
             write(os.path.join(out, "animations", f"{model}{suffix}.animation.json"),

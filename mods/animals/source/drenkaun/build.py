@@ -29,11 +29,19 @@ if __name__ == "__main__":
     subprocess.run([sys.executable, os.path.join(SKILL, "boxcheck.py"), os.path.join(OUT, "spec.json")], check=True)
     from to_bedrock import export  # noqa: E402
     from ground import gait, joints, pokes  # noqa: E402
+    from linecheck import boxes_from_spec, lines  # noqa: E402
     from drenkaun import CLIPS  # noqa: E402
 
     spec = json.load(open(os.path.join(OUT, "spec.json")))
     loose = joints(spec)
     assert not loose, f"loose joints: {loose}"
+    # No thin lines (Ronald, 11-05): no strip of a box under two texels showing beside another.
+    # Meant: the mane's back behind the skull, seen only from behind the head.
+    from PIL import Image  # noqa: E402
+    import numpy as np  # noqa: E402
+    thin = [h for h in lines(boxes_from_spec(spec), np.array(Image.open(os.path.join(OUT, "texture.png")).convert("RGBA")),
+                             allow=("moss_tuft0.south",)) if h["kind"] in ("line", "thin")]
+    assert not thin, f"thin lines: {[(h['box'], h['face'], h['cover'], h['width']) for h in thin]}"
     poking = pokes(spec, AXIS)
     assert not poking, f"poking through: {sorted(poking)}"
     for anim in ("walk", "run"):

@@ -519,11 +519,20 @@ def pose_bite(t):
     return q
 
 
+# The behaviour clips (`mods/animals/src/anim.rs`), shared by the canids (`../_clips/canid.py`).
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_clips"))
+import canid  # noqa: E402
+
+canid.bind(sys.modules[__name__])
+
 ANIMS = {"idle": (pose_idle, 8.0), "walk": (pose_walk, 0.6), "run": (pose_run, 0.4), "lie": (pose_lie, 5.0),
          "pounce": (pose_pounce, 1.0), "bite": (pose_bite, 0.5)}
+ANIMS.update(canid.anims(howl=True))
+LOOPS, BLENDS = canid.LOOPS, canid.BLENDS
 
 
 BLINKS = {"idle": [1.3, 3.2, 6.9], "lie": [2.1, 4.2]}
+BLINKS.update(canid.BLINKS)
 BLINK = 0.09
 
 
@@ -533,7 +542,7 @@ def eyelids(name, t):
 
 
 def frame_times(name, dur):
-    n = {"idle": 96, "lie": 40, "walk": 24, "run": 20, "pounce": 30, "bite": 24}.get(name, 16)
+    n = {"idle": 96, "lie": 40, "walk": 24, "run": 20, "pounce": 30, "bite": 24}.get(name, canid.FRAMES.get(name, 24))
     ts = {round(dur * k / n, 4) for k in range(n + 1)}
     for b in BLINKS.get(name, []):
         ts |= {round(b + d, 4) for d in (-BLINK, -BLINK / 2, 0, BLINK / 2, BLINK)}
@@ -544,13 +553,16 @@ def animations(bone_names):
     out = {}
     for name, (fn, dur) in ANIMS.items():
         frames = []
+        loops = LOOPS.get(name, name in ("idle", "walk", "run", "lie"))
         for t in frame_times(name, dur):
-            tt = t % dur if t < dur else 0.0
+            # A loop's last frame is its first; a clip played once ends where it ends.
+            tt = t % dur if t < dur else (0.0 if loops is True else dur)
             pose = fn(tt)
-            pose.update(eyelids(name, tt))
+            if name not in canid.SHUT:
+                pose.update(eyelids(name, tt))
             frames.append({"t": round(t, 4), "rot": {b: [round(float(v), 4) for v in pose.get(b, (0, 0, 0))] for b in bone_names if b != "root"},
                            "root": [round(float(v), 4) for v in pose.get("root", (0, 0, 0))]})
-        out[name] = {"length": dur, "frames": frames}
+        out[name] = {"length": dur, "frames": frames, "loop": loops, "blend": BLENDS.get(name, (0.25, 0.3))}
     return out
 
 
@@ -572,6 +584,8 @@ def fit_poses(spec):
     best = fit(grid, lie_cost)[1]
     g = lowest(spec, pose_lie(0.0, dict(L, **best, lie_drop=0)), GROUPS)
     L.update(best, lie_drop=round(float(min(g.values())), 2))
+    # Head down to the ground (sniffing, drinking) and the death fall (`canid.fit`).
+    canid.fit(spec, GROUPS)
 
 
 # ------------------------------------------------------------------ build

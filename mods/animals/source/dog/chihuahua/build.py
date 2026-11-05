@@ -32,17 +32,26 @@ if __name__ == "__main__":
     from to_bedrock import export  # noqa: E402
 
     spec = json.load(open(os.path.join(OUT, "spec.json")))
-    from ground import gait, joints  # noqa: E402
+    from ground import feet_low, gait, grounded, joints  # noqa: E402
     loose = joints(spec)  # every joint inside both parts it joins, or they come apart when it turns
     assert not loose, f"loose joints: {loose}"
-    for anim in ("walk", "run"):  # a foot in the air must swing forward, or it moonwalks
-        back = {f: v for f, v in gait(spec, anim, ["leg_FL_paw", "leg_FR_paw", "leg_BL_paw", "leg_BR_paw"]).items() if v is not None and v <= 0}
+    FEET = ["leg_FL_paw", "leg_FR_paw", "leg_BL_paw", "leg_BR_paw"]
+    for anim in ("walk", "run", "stalk", "approach"):  # a foot in the air must swing forward, or it moonwalks
+        back = {f: v for f, v in gait(spec, anim, FEET).items() if v is not None and v <= 0}
         assert not back, f"{anim} goes backwards: {back}"
+    # The gaits written as angles stand on their feet: the root's height from the feet, frame by
+    # frame, and checked: no foot sinks into the ground or floats over it.
+    for clip in ("stalk", "approach"):
+        spec["animations"][clip] = grounded(spec, spec["animations"][clip], FEET)
+        low = min(feet_low(spec, spec["animations"][clip], FEET))
+        assert abs(low) < 0.3, f"{clip}'s feet at {low:.2f}, not on the ground"
     from to_bedrock import POSE_FILES  # noqa: E402
     # Its bite and the behaviour clips (`mods/animals/src/anim.rs`), for code to play.
     sys.path.insert(0, os.path.join(HERE, "tools"))
     from blocky import CLIP_LENGTHS  # noqa: E402
-    poses = {**POSE_FILES, "": {**POSE_FILES[""], "bite": "bite", **{c: c for c in CLIP_LENGTHS}}}
+    # Asleep it lies in its look (`rest.rs` settle): the sleep clip goes in the lying file too.
+    poses = {**POSE_FILES, "": {**POSE_FILES[""], "bite": "bite", **{c: c for c in CLIP_LENGTHS}},
+             "_lie": {**POSE_FILES["_lie"], "sleep": "sleep"}}
     # `--anims-only`: the animations alone, the models, texture and coat layers left as they are
     # (2026-11-05: Upstream was looking into the chihuahua's texture; its skin wasn't to change).
     only = "--anims-only" in sys.argv
