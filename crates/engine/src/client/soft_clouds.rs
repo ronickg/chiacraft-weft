@@ -125,6 +125,14 @@ pub fn noise_atlas() -> Vec<u8> {
         let c = v.0 % 4;
         *o = ((v.1 - lo[c]) / (hi[c] - lo[c]).max(1e-6) * 255.0).round().clamp(0.0, 255.0) as u8;
     }
+    // The billows (r) equalized: each value by its rank, so a cover of 0.5 lets half of them
+    // through. Stretched alone they still sat mostly low, and a clear day showed none (11-05).
+    let mut order: Vec<usize> = (0..ATLAS * ATLAS).collect();
+    order.sort_by(|&a, &b| raw[a * 4].total_cmp(&raw[b * 4]));
+    let last = (order.len() - 1).max(1) as f32;
+    for (rank, &i) in order.iter().enumerate() {
+        out[i * 4] = (rank as f32 / last * 255.0).round() as u8;
+    }
     out
 }
 
