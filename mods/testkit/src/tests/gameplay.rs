@@ -2426,7 +2426,7 @@ pub async fn crafting_table_tags(t: T) -> R {
     let planks = item("base:birch_planks");
     // The hotbar is the menu's last nine slots (37 once; `t.hotbar` finds them as the menus change).
     let hot = t.hotbar(0);
-    t.click_ui(&hot, 0);
+    t.click_settled(&hot, 0).await?;
     t.until("planks on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().item == planks)
         .await
         .map_err(|e| {
@@ -2437,9 +2437,9 @@ pub async fn crafting_table_tags(t: T) -> R {
                 t.c().inventory_slot(0)
             )
         })?;
-    t.click_ui("slot:0", 1);
+    t.click_settled("slot:0", 1).await?;
     t.frames(3).await?;
-    t.click_ui("slot:3", 1);
+    t.click_settled("slot:3", 1).await?;
     let stick = item("base:stick");
     let made = t
         .until("sticks in the result", Duration::from_secs(5), |t| t.c().menu_slot(9).item == stick)

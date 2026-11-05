@@ -2046,9 +2046,16 @@ pub async fn redstone_on_a_structure(t: T) -> R {
     t.op(&format!("structureset {id} 0 1 -1 base:redstone[faces=4]"))
         .await?;
     let uid: u64 = id.parse().map_err(|_| "not an id".to_string())?;
-    // From above.
+    // From above, wherever the lift is now: it goes 4 blocks up and down from where it was saved,
+    // so after the reload it may be up to 4 blocks higher than it was spawned, which put it above
+    // a fixed camera and showed the stone's underside (4 runs of 5).
     t.c().set_flying(true);
-    t.cmd(&format!("/tp {} {} {}", f[0] + 4, f[1] + 7, f[2] - 8))
+    let o = t
+        .c()
+        .entity(uid)
+        .map(|e| e.pos)
+        .ok_or("the lift isn't shown")?;
+    t.cmd(&format!("/tp {:.2} {:.2} {:.2}", o.x, o.y + 7.0, o.z - 4.0))
         .await?;
     t.secs(0.5).await?;
     let mut red = false;

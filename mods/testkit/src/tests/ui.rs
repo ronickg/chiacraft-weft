@@ -245,10 +245,10 @@ pub async fn inventory_crafting(t: T) -> R {
     // Menu slots: 0-3 grid, 4 result, 5-13 equipment (armor, clothes, cloak), 14-40 main, 41-49 the
     // hotbar (`t.hotbar`, which finds it).
     let (log, planks) = (id("base:oak_log"), id("base:oak_planks"));
-    t.click_ui(&t.hotbar(0), 0);
+    t.click_settled(&t.hotbar(0), 0).await?;
     t.until("logs on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().item == log)
         .await?;
-    t.click_ui("slot:0", 1);
+    t.click_settled("slot:0", 1).await?;
     t.until("planks in the result", Duration::from_secs(5), |t| t.c().menu_slot(4).item == planks)
         .await
         .map_err(|e| {
@@ -264,14 +264,14 @@ pub async fn inventory_crafting(t: T) -> R {
             )
         })?;
     t.check_eq(t.c().menu_slot(4).count, 4, "planks from one log");
-    t.click_ui(&t.hotbar(0), 0);
+    t.click_settled(&t.hotbar(0), 0).await?;
     t.until("cursor empty", Duration::from_secs(5), |t| t.c().cursor_stack().is_empty())
         .await?;
     t.shot("grid").await?;
-    t.click_ui("slot:4", 0);
+    t.click_settled("slot:4", 0).await?;
     t.until("planks on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().item == planks)
         .await?;
-    t.click_ui(&t.hotbar(1), 0);
+    t.click_settled(&t.hotbar(1), 0).await?;
     t.until("planks in the hotbar", Duration::from_secs(5), |t| t.c().inventory_slot(1).item == planks)
         .await?;
     t.c().screen_close();
