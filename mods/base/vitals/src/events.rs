@@ -133,7 +133,10 @@ pub const IMPACT_FROM_BUILDS: i32 = 256;
 /// The built-columns map: cells this many blocks across, and the most a player remembers.
 pub const BUILT_CELL: i32 = 64;
 pub const BUILT_CELLS: usize = 32;
-/// Tries at a site before it falls in the sea instead.
+/// From its hour a big impact waits for a round with a free site (a player out in the wilds: none
+/// is near spawn or a base), and with none by the day's last this-many hours falls in the sea.
+pub const IMPACT_LAST_HOURS: f32 = 0.2;
+/// Tries at a site each round.
 pub const IMPACT_SITE_TRIES: u32 = 96;
 /// The widest live crater (Terrain's `vitals::impact::IMPACT_RADIUS`): a site is level and dry
 /// that far round.

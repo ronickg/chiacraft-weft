@@ -338,23 +338,41 @@ fn impacts(w: &World) {
     let rule = SKY_IMPACTS.get();
     let day = w.day_time() / vitals::calendar::DAY_TICKS;
     let Some(at) = ev::impact_on(w.seed(), day) else { return };
-    let hour = ev::hour_of(w.day_time());
-    // A game hour is 50 s at the usual clock: the window a round (2 s) can't miss.
-    if rule == 0 || !(at..at + 0.1).contains(&hour) {
+    // Through the day from 06:00 (0) to the next 06:00 (1), the impact's hour on the same scale.
+    let now = (w.day_time() % vitals::calendar::DAY_TICKS) as f32 / vitals::calendar::DAY_TICKS as f32;
+    let due = (at - 6.0).rem_euclid(24.0) / 24.0;
+    if rule == 0 || now < due {
         return;
     }
+    let dim = w.dimension();
+    if FELL
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|&(d, f)| d == dim && f == day)
+    {
+        return;
+    }
+    // From its hour it falls the first round a site is free, when a player is out in the wilds
+    // (none is near spawn or anyone's base: PC run fh_impact1 stood at spawn and found none), and
+    // into the sea in the day's last minutes if none was.
+    let last = now >= 1.0 - ev::IMPACT_LAST_HOURS / 24.0;
+    let site = match site(w) {
+        Ok(p) => Some(p),
+        Err(why) if last => {
+            weft_sdk::info!("events: no site for day {day}'s impact by its end ({why}): into the sea");
+            None
+        }
+        Err(_) => return,
+    };
     {
         let mut fell = FELL.lock().unwrap();
-        let dim = w.dimension();
-        if fell.iter().any(|&(d, f)| d == dim && f == day) {
-            return;
-        }
         fell.retain(|&(d, _)| d != dim);
         fell.push((dim, day));
     }
-    let site = site(w);
     weft_sdk::info!(
-        "events: a big impact on day {day} at {at:.1}h: {}",
+        "events: a big impact on day {day} (due {at:.1}h, now {:.1}h): {}",
+        ev::hour_of(w.day_time()),
         match site {
             Some(p) => format!("at {p:?}"),
             None => "into the sea".into(),
@@ -373,14 +391,14 @@ fn impacts(w: &World) {
 /// Where a big impact lands: loaded land between `IMPACT_FROM_PLAYERS` and `IMPACT_REACH` from a
 /// player, open to the sky, level and dry over the crater's width, and far from every player,
 /// their built cells, beds and tombstones, and the world spawn. None: it falls in the sea.
-fn site(w: &World) -> Option<BlockPos> {
+fn site(w: &World) -> Result<BlockPos, String> {
     let players: Vec<(u64, Vec3)> = w
         .players()
         .into_iter()
         .filter_map(|p| w.entity(p).map(|e| (p, e.pos)))
         .collect();
     if players.is_empty() {
-        return None;
+        return Err("no players".into());
     }
     // What a site keeps away from: (x, z, how far).
     let mut away: Vec<(f64, f64, f64)> = players
@@ -410,16 +428,22 @@ fn site(w: &World) -> Option<BlockPos> {
             .all(|&(ax, az, r)| (ax - x).powi(2) + (az - z).powi(2) >= r * r)
     };
     let radius = ev::IMPACT_SITE_RADIUS;
+    // Why tries failed: near something, no open dry ground there, not level.
+    let (mut near, mut ground, mut uneven) = (0, 0, 0);
     for _ in 0..ev::IMPACT_SITE_TRIES {
         let (_, from) = players[w.random_below(players.len() as u32) as usize];
         let angle = unit(w) as f64 * std::f64::consts::TAU;
         let reach = ev::IMPACT_FROM_PLAYERS as f64 + (ev::IMPACT_REACH - ev::IMPACT_FROM_PLAYERS) as f64 * unit(w) as f64;
         let (x, z) = (from.x + angle.cos() * reach, from.z + angle.sin() * reach);
         if !clear(x, z) {
+            near += 1;
             continue;
         }
         let (x, z) = (x.floor() as i32, z.floor() as i32);
-        let Some(top) = open_ground(w, x, from.y.floor() as i32, z) else { continue };
+        let Some(top) = open_ground(w, x, from.y.floor() as i32, z) else {
+            ground += 1;
+            continue;
+        };
         // Level and dry across the crater: eight points round it within `IMPACT_LEVEL`.
         let level = (0..8).all(|k| {
             let a = k as f64 * std::f64::consts::FRAC_PI_4;
@@ -427,10 +451,11 @@ fn site(w: &World) -> Option<BlockPos> {
             open_ground(w, px, top.y, pz).is_some_and(|p| (p.y - top.y).abs() <= ev::IMPACT_LEVEL)
         });
         if level {
-            return Some(top);
+            return Ok(top);
         }
+        uneven += 1;
     }
-    None
+    Err(format!("{near} near players, builds or spawn, {ground} not open dry loaded ground, {uneven} not level"))
 }
 
 /// The ground's top in column (`x`, `z`) near `y`: loaded, open to the sky, not water.
