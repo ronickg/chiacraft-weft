@@ -520,9 +520,14 @@ pub struct Client {
     shadow_far: (glam::Mat4, bool),
     shadow_far_bufs: Vec<BufferId>,
     shadow_far_index: u32,
-    /// What the far map holds: its light and the terrain's `terrain_epoch` when it was drawn.
-    /// It is drawn again only when either moved (`render_shadows`).
+    /// What the far map holds: its light about its anchor and the terrain's `terrain_epoch` when it
+    /// was drawn. It is drawn again only when either moved (`render_shadows`).
     shadow_far_drawn: Option<([f32; 16], u64)>,
+    /// The far map's light about its anchor (`prepare_shadows`): a place in the world snapped to
+    /// `FAR_ANCHOR`, so walking does not move it; `shadow_far` is it seen from the camera.
+    shadow_far_anchored: glam::Mat4,
+    /// Frames since the far map was last drawn (terrain that changed waits a little).
+    shadow_far_age: u32,
     /// The maps' size in texels (`core:shadow_size`), as they were made.
     shadow_size: u32,
     pub target: Option<Hit>,
@@ -889,6 +894,8 @@ impl Client {
             shadow_far_bufs: Vec::new(),
             shadow_far_index: 0,
             shadow_far_drawn: None,
+            shadow_far_anchored: glam::Mat4::IDENTITY,
+            shadow_far_age: 0,
             shadow_size: 2048,
             target: None,
             target_entity: None,
@@ -2846,7 +2853,16 @@ impl Client {
         }
         let cam = self.render_camera();
         self.shadow = (light_box(dir, cam.pos, SHADOW_REACH, SHADOW_DEPTH, size), true);
-        self.shadow_far = (light_box(dir, cam.pos, FAR_REACH, FAR_DEPTH, size), level >= 2);
+        // The far map about a place in the world, not the camera: built about the camera, its box
+        // moved by a fraction of a texel every frame the player moved, and it was drawn again each
+        // frame (Research round 16, #8: +4,500 draw records a frame walking, about 0.6 ms on the
+        // Mac). Snapped to `FAR_ANCHOR` blocks, it stays put until the player crosses into
+        // another cell; seen from the camera it is the same box, moved by camera less anchor.
+        let anchor = ((cam.pos / FAR_ANCHOR).floor() + 0.5) * FAR_ANCHOR;
+        let anchored = light_box(dir, anchor, FAR_REACH, FAR_DEPTH, size);
+        self.shadow_far_anchored = anchored;
+        let from_cam = glam::Mat4::from_translation((cam.pos - anchor).as_vec3());
+        self.shadow_far = (anchored * from_cam, level >= 2);
     }
 
     /// The sun's shadow map, after `render` posed this frame's models (the pass is put before the
@@ -2885,13 +2901,19 @@ impl Client {
         list.push(weft_render::Cmd::EndPass);
         // The far cascade: the terrain alone, coarser, to where hills stand far off.
         let (Some(far_map), (far, true)) = (self.shadow_far_map, self.shadow_far) else { return };
-        // Kept from an earlier frame while neither the light (in whole texels and `settled` steps)
-        // nor the terrain has moved: standing still, the far map costs nothing.
-        let drawn = (far.to_cols_array(), self.render.terrain_epoch);
-        if self.shadow_far_drawn == Some(drawn) {
+        // Kept from an earlier frame while neither the light about its anchor (in whole texels and
+        // `settled` steps) nor the terrain has moved: walking within a cell, the far map costs
+        // nothing. Terrain that loads (every mesh bumps `terrain_epoch`) waits FAR_TERRAIN_WAIT
+        // frames, so streaming chunks don't redraw it every frame.
+        self.shadow_far_age = self.shadow_far_age.saturating_add(1);
+        let drawn = (self.shadow_far_anchored.to_cols_array(), self.render.terrain_epoch);
+        let light_moved = self.shadow_far_drawn.is_none_or(|d| d.0 != drawn.0);
+        let terrain_moved = self.shadow_far_drawn.is_some_and(|d| d.1 != drawn.1);
+        if !light_moved && (!terrain_moved || self.shadow_far_age < FAR_TERRAIN_WAIT) {
             return;
         }
         self.shadow_far_drawn = Some(drawn);
+        self.shadow_far_age = 0;
         while self.shadow_far_bufs.len() < gpu.frames_in_flight() {
             self.shadow_far_bufs.push(gpu.create_buffer(
                 size_of::<Scene>() as u64,
@@ -3095,6 +3117,11 @@ fn shadow_setting(name: &str, default: f64) -> f64 {
 }
 /// The far cascade's reach and depth (blocks): hills a few hundred blocks off have shadows too.
 const FAR_REACH: f32 = 400.0;
+/// The far shadow map's anchor snaps to this many blocks (`prepare_shadows`): its 400 blocks to
+/// each side cover the camera wherever it stands in the cell.
+const FAR_ANCHOR: f64 = 32.0;
+/// Frames the far map waits before drawing in terrain that changed (about a sixth of a second).
+const FAR_TERRAIN_WAIT: u32 = 10;
 const FAR_DEPTH: f32 = 1200.0;
 
 /// The values of the settings the shader pack reads (`Scene::options`).

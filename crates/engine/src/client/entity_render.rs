@@ -160,6 +160,9 @@ struct Sprite {
 pub struct EntityRenderer {
     /// What the head's move in an action does to the camera: offset in view space, roll, pitch.
     pub camera_kick: (Vec3, f32, f32),
+    /// An entity kind a UI preview shows alone (`Ui::kind_model`): its skin is loaded although
+    /// none of it is in the world (the Field Journal's picture was empty).
+    pub preview_kind: Option<u32>,
     pipeline: PipelineId,
     overlay: PipelineId,
     /// Model pipelines for the screen and for the inventory figure's image.
@@ -340,6 +343,7 @@ impl EntityRenderer {
             preview,
             preview_pipe,
             preview_target: None,
+            preview_kind: None,
             skins: FxHashMap::default(),
             player_skins: FxHashMap::default(),
             skin_pending: Vec::new(),
@@ -762,6 +766,12 @@ impl EntityRenderer {
         self.seen_kinds = seen;
         self.seen_items = seen_items;
         self.load(gpu, assets, &c.game.entities[c.game.player_kind as usize].texture);
+        if let Some(k) = self
+            .preview_kind
+            .filter(|&k| (k as usize) < c.game.entities.len())
+        {
+            self.load(gpu, assets, &c.game.entities[k as usize].texture);
+        }
         for &i in worn {
             if let Some((_, t)) = c.worn(i) {
                 self.load(gpu, assets, t);

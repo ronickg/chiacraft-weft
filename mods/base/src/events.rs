@@ -55,6 +55,8 @@ pub static SKY_IMPACTS: Config<u32> = Config::named("sky_impacts");
 static STAR_MARK: HudElement = HudElement::named("fallen_star");
 /// The day the last big impact fell in each dimension, so it falls once.
 static FELL: Mutex<Vec<(u32, u64)>> = Mutex::new(Vec::new());
+/// The day each dimension's impact was last said to be waiting (logged once).
+static WAITED: Mutex<Vec<(u32, u64)>> = Mutex::new(Vec::new());
 /// The 8 directions' keys, north first and clockwise (`vitals::events::compass`).
 static LEAVES: Tag = Tag::named("leaves");
 const DIRECTIONS: [&str; 8] = ["north", "north_east", "east", "south_east", "south", "south_west", "west", "north_west"];
@@ -162,6 +164,7 @@ fn tick(w: &World) {
     }
     pointers(w);
     let event = tonight(w);
+    sky_watchers(w, event);
     let strength = if event == Some(Event::BloodMoon) { ev::blood_moon_strength(ev::hour_of(w.day_time())) } else { 0.0 };
     watch(w, strength);
     let dim = w.dimension();
@@ -285,12 +288,35 @@ fn walk_off(w: &World) {
                 w.navigate(id, e.pos + away * (GONE_AT / len), 1.0);
                 true
             }
-            _ => {
+            nearest => {
+                let far = nearest.map_or(f64::INFINITY, |&p| (p - e.pos).length_squared().sqrt());
+                weft_sdk::info!("events: a blood-moon monster ({id}) walked off, gone {far:.0} blocks from the nearest player");
                 w.despawn(id);
                 false
             }
         }
     });
+}
+
+/// Players out under the open sky in the dark of a shower's peak (from 23:00) or an aurora storm
+/// (from full dark, 21:00) to 05:00: Wish Upon and Sky on Fire.
+fn sky_watchers(w: &World, event: Option<Event>) {
+    let (from, milestone) = match event {
+        Some(Event::Meteors { peak: true }) => (23.0, base_api::milestones::WISH_UPON),
+        Some(Event::AuroraStorm) => (21.0, base_api::milestones::SKY_ON_FIRE),
+        _ => return,
+    };
+    let hour = ev::hour_of(w.day_time());
+    if !(hour >= from || hour < 5.0) {
+        return;
+    }
+    for p in w.players() {
+        let Some(e) = w.entity(p) else { continue };
+        let head = BlockPos::new(e.pos.x.floor() as i32, (e.pos.y + e.size.eye as f64).floor() as i32, e.pos.z.floor() as i32);
+        if w.sky_light(head) >= 15 {
+            base_api::milestone(w, p, milestone);
+        }
+    }
 }
 
 /// "Red Night": players out when a blood moon starts are watched; those still alive when it has
@@ -363,7 +389,15 @@ fn impacts(w: &World) {
             weft_sdk::info!("events: no site for day {day}'s impact by its end ({why}): into the sea");
             None
         }
-        Err(_) => return,
+        Err(why) => {
+            let mut told = WAITED.lock().unwrap();
+            if !told.contains(&(dim, day)) {
+                told.retain(|&(d, _)| d != dim);
+                told.push((dim, day));
+                weft_sdk::info!("events: day {day}'s impact is due and waits for a site ({why})");
+            }
+            return;
+        }
     };
     {
         let mut fell = FELL.lock().unwrap();
@@ -388,7 +422,18 @@ fn impacts(w: &World) {
     }
 }
 
-/// Where a big impact lands: loaded land between `IMPACT_FROM_PLAYERS` and `IMPACT_REACH` from a
+/// The world's simulation distance in cubes: what is loaded round each player.
+pub(crate) fn simulation() -> i32 {
+    static SIMULATION: Config<u32> = Config::named("core:simulation_distance");
+    // The engine's default (8) when the setting reads nothing (PC run fh_impact8 tried 16-40 blocks
+    // out, a reach from 0).
+    match SIMULATION.get() as i32 {
+        n if n >= 2 => n,
+        _ => ev::SIMULATION_DEFAULT,
+    }
+}
+
+/// Where a big impact lands: loaded land between `vitals::events::impact_reach` from a
 /// player, open to the sky, level and dry over the crater's width, and far from every player,
 /// their built cells, beds and tombstones, and the world spawn. None: it falls in the sea.
 fn site(w: &World) -> Result<BlockPos, String> {
@@ -401,9 +446,10 @@ fn site(w: &World) -> Result<BlockPos, String> {
         return Err("no players".into());
     }
     // What a site keeps away from: (x, z, how far).
+    let (near, far) = ev::impact_reach(simulation());
     let mut away: Vec<(f64, f64, f64)> = players
         .iter()
-        .map(|&(_, p)| (p.x, p.z, ev::IMPACT_FROM_PLAYERS as f64))
+        .map(|&(_, p)| (p.x, p.z, near as f64))
         .collect();
     let build = ev::IMPACT_FROM_BUILDS as f64;
     let spawn = crate::fair_spawn(w.seed());
@@ -423,26 +469,42 @@ fn site(w: &World) -> Result<BlockPos, String> {
             away.push((g.x as f64, g.z as f64, build));
         }
     }
+    let fields = base_api::land::fields(w.seed());
     let clear = |x: f64, z: f64| {
         away.iter()
             .all(|&(ax, az, r)| (ax - x).powi(2) + (az - z).powi(2) >= r * r)
     };
     let radius = ev::IMPACT_SITE_RADIUS;
     // Why tries failed: near something, no open dry ground there, not level.
-    let (mut near, mut ground, mut uneven) = (0, 0, 0);
+    let (mut blocked, mut ground, mut uneven) = (0, 0, 0);
+    let (mut unloaded, mut water, mut shut, mut nothing, mut shut_light) = (0, 0, 0, 0, 0);
     for _ in 0..ev::IMPACT_SITE_TRIES {
         let (_, from) = players[w.random_below(players.len() as u32) as usize];
         let angle = unit(w) as f64 * std::f64::consts::TAU;
-        let reach = ev::IMPACT_FROM_PLAYERS as f64 + (ev::IMPACT_REACH - ev::IMPACT_FROM_PLAYERS) as f64 * unit(w) as f64;
+        let reach = near as f64 + (far - near) as f64 * unit(w) as f64;
         let (x, z) = (from.x + angle.cos() * reach, from.z + angle.sin() * reach);
         if !clear(x, z) {
-            near += 1;
+            blocked += 1;
             continue;
         }
         let (x, z) = (x.floor() as i32, z.floor() as i32);
-        let Some(top) = open_ground(w, x, from.y.floor() as i32, z) else {
-            ground += 1;
-            continue;
+        // From the land's own height there, not the player's: one flying, up a cliff or in a
+        // cave looked 48 blocks round itself and found no ground (PC run fh_impact2).
+        let top = match ground_or_why(w, x, land_height(&fields, x, z), z) {
+            Ok(top) => top,
+            Err(why) => {
+                ground += 1;
+                match why {
+                    NoGround::Unloaded => unloaded += 1,
+                    NoGround::Water => water += 1,
+                    NoGround::Shut(light) => {
+                        shut += 1;
+                        shut_light = shut_light.max(light);
+                    }
+                    NoGround::Nothing => nothing += 1,
+                }
+                continue;
+            }
         };
         // Level and dry across the crater: eight points round it within `IMPACT_LEVEL`.
         let level = (0..8).all(|k| {
@@ -455,28 +517,57 @@ fn site(w: &World) -> Result<BlockPos, String> {
         }
         uneven += 1;
     }
-    Err(format!("{near} near players, builds or spawn, {ground} not open dry loaded ground, {uneven} not level"))
+    Err(format!(
+        "{blocked} near players, builds or spawn, {ground} no open dry loaded ground ({unloaded} unloaded, {water} water, {shut} under cover (sky light up to {shut_light}), {nothing} nothing solid), {uneven} not level; reach {lo}-{hi} at simulation {}",
+        simulation(),
+        lo = ev::impact_reach(simulation()).0,
+        hi = ev::impact_reach(simulation()).1
+    ))
+}
+
+/// The land's height at block (`x`, `z`), as worldgen shapes it (before caves and plants).
+pub(crate) fn land_height(f: &weft_sdk::noise::fixed::Fields, x: i32, z: i32) -> i32 {
+    base_api::land::height(f, x * 16, z * 16) >> 4
 }
 
 /// The ground's top in column (`x`, `z`) near `y`: loaded, open to the sky, not water.
 pub(crate) fn open_ground(w: &World, x: i32, y: i32, z: i32) -> Option<BlockPos> {
+    ground_or_why(w, x, y, z).ok()
+}
+
+/// Why a column has no open ground: none of it loaded, water on it, the sky shut off (with the
+/// light it found), or nothing solid within the look.
+pub(crate) enum NoGround {
+    Unloaded,
+    Water,
+    Shut(u32),
+    Nothing,
+}
+
+/// `open_ground`, saying why not (the impact's waiting line counts them).
+pub(crate) fn ground_or_why(w: &World, x: i32, y: i32, z: i32) -> Result<BlockPos, NoGround> {
     const LOOK: i32 = 48;
+    let mut loaded = false;
     for gy in (y - LOOK..=y + LOOK).rev() {
         let p = BlockPos::new(x, gy, z);
-        let state = w.block_loaded(p)?;
+        // Air cubes high over the land may not be loaded at all: passed over, not the end of
+        // the look (PC run fh_impact5: 96 of 96 tries stopped above the ground).
+        let Some(state) = w.block_loaded(p) else { continue };
+        loaded = true;
         if state == 0 || LEAVES.on_block(state) {
             continue;
         }
         let flags = w.block_flags(p);
         if flags & abi::block_flags::LIQUID != 0 {
-            return None;
+            return Err(NoGround::Water);
         }
         if flags & abi::block_flags::SOLID == 0 {
             continue;
         }
-        return (w.sky_light(p.above()) >= 15).then_some(p);
+        let sky = w.sky_light(p.above());
+        return if sky >= 15 { Ok(p) } else { Err(NoGround::Shut(sky)) };
     }
-    None
+    Err(if loaded { NoGround::Nothing } else { NoGround::Unloaded })
 }
 
 /// Whether `pos` is within `clear` blocks of a cell an online player built in.
@@ -544,7 +635,9 @@ fn pointers(w: &World) {
 
 /// The crater and what lies in it: Terrain's live carve (`impact::start`, on its branch, not in
 /// dev yet). Until it lands an impact on land is the looks only, as `sky_impacts` 1 has it.
-fn carve(_w: &World, site: BlockPos) {
+fn carve(w: &World, site: BlockPos) {
+    // What the core will hold, decided by the site (`stars::core_block` places it with the carve).
+    crate::stars::core_begins(w, w.seed_at(site));
     weft_sdk::info!("events: the crater at {site:?} waits for Terrain's impact::start");
 }
 

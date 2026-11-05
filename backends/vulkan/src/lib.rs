@@ -153,6 +153,9 @@ pub struct VulkanBackend {
     capture_requested: bool,
     capture: Option<(vk::Buffer, Allocation, u32, u32, vk::Format)>,
     device_name: String,
+    /// The device takes indirect draws' counts from a buffer (`drawIndirectCount`). MoltenVK
+    /// doesn't: then a count draw draws all its records (`Backend::indirect_count`).
+    indirect_count: bool,
     queries: vk::QueryPool,
     /// Pipelines compiled before, kept on disk between starts (`load_pipeline_cache`).
     pipeline_cache: vk::PipelineCache,
@@ -392,7 +395,6 @@ impl VulkanBackend {
             let base = has.features;
             let missing: Vec<&str> = [
                 ("multiDrawIndirect", base.multi_draw_indirect),
-                ("drawIndirectCount", has12.draw_indirect_count),
                 ("drawIndirectFirstInstance", base.draw_indirect_first_instance),
                 ("samplerAnisotropy", base.sampler_anisotropy),
                 ("fillModeNonSolid", base.fill_mode_non_solid),
@@ -414,6 +416,12 @@ impl VulkanBackend {
             if !missing.is_empty() {
                 return Err(Error(format!("{device_name} lacks what the game needs: {}", missing.join(", "))));
             }
+            // Optional: without it the count draws draw all their records (MoltenVK has none).
+            // `WEFT_NO_INDIRECT_COUNT=1` does without it on any GPU, to check that path.
+            let indirect_count = has12.draw_indirect_count != vk::FALSE && std::env::var_os("WEFT_NO_INDIRECT_COUNT").is_none();
+            if !indirect_count {
+                log::info!("{device_name}: no drawIndirectCount, indirect count draws draw every record");
+            }
 
             let features = vk::PhysicalDeviceFeatures::default()
                 .multi_draw_indirect(true)
@@ -428,8 +436,8 @@ impl VulkanBackend {
                 .descriptor_binding_partially_bound(true)
                 .descriptor_binding_sampled_image_update_after_bind(true)
                 .shader_sampled_image_array_non_uniform_indexing(true)
-                // Metal has no such draw, and nothing needs it yet.
-                .draw_indirect_count(has12.draw_indirect_count != vk::FALSE)
+                // Metal has no such draw: `indirect_count`.
+                .draw_indirect_count(indirect_count)
                 .scalar_block_layout(true);
             let mut f13 = vk::PhysicalDeviceVulkan13Features::default()
                 .dynamic_rendering(true)
@@ -657,6 +665,7 @@ impl VulkanBackend {
                 capture_requested: false,
                 capture: None,
                 device_name,
+                indirect_count,
                 queries,
                 pipeline_cache,
                 ts_period: props.limits.timestamp_period,
@@ -1282,6 +1291,10 @@ impl Backend for VulkanBackend {
         FRAMES
     }
 
+    fn indirect_count(&self) -> bool {
+        self.indirect_count
+    }
+
     fn surface_size(&self) -> (u32, u32) {
         self.swapchain
             .as_ref()
@@ -1839,6 +1852,16 @@ impl Backend for VulkanBackend {
                         self.device
                             .cmd_draw_indexed_indirect(cmd, b, offset, count, size_of::<DrawIndexedArgs>() as u32);
                     }
+                    Cmd::DrawIndexedIndirectCount { buffer, offset, max, .. } if !self.indirect_count => {
+                        let b = self.buffers.get(buffer.0).raw;
+                        self.device
+                            .cmd_draw_indexed_indirect(cmd, b, offset, max, size_of::<DrawIndexedArgs>() as u32);
+                    }
+                    Cmd::DrawIndirectCount { buffer, offset, max, .. } if !self.indirect_count => {
+                        let b = self.buffers.get(buffer.0).raw;
+                        self.device
+                            .cmd_draw_indirect(cmd, b, offset, max, size_of::<DrawArgs>() as u32);
+                    }
                     Cmd::DrawIndexedIndirectCount { buffer, offset, count_buffer, count_offset, max } => {
                         let b = self.buffers.get(buffer.0).raw;
                         let c = self.buffers.get(count_buffer.0).raw;
@@ -1860,6 +1883,10 @@ impl Backend for VulkanBackend {
                     }
                     Cmd::Dispatch { x, y, z } => self.device.cmd_dispatch(cmd, x, y, z),
                     Cmd::Barrier => self.memory_barrier(cmd),
+                    Cmd::FillBuffer { buffer, offset, size, value } => {
+                        let b = self.buffers.get(buffer.0).raw;
+                        self.device.cmd_fill_buffer(cmd, b, offset, size, value);
+                    }
                     Cmd::CopyDepthToBuffer { depth, buffer } => {
                         let t = self.textures.get(depth.0);
                         let (image, width, height) = (t.image, t.desc.width, t.desc.height);

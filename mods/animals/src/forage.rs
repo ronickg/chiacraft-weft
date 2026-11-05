@@ -34,6 +34,9 @@ static FORAGE: Component<[f64; 4]> = Component::named("animal_forage");
 static ITEM: Component<u64> = Component::named("animal_forage_item");
 static GRAZED_GRASS: Block = Block::named("base:grazed_grass");
 static DUNG: Item = Item::named("base:dung");
+static DUNG_PAT: Block = Block::named("base:dung_pat");
+static TALL_GRASS: Block = Block::named("base:tall_grass");
+static PLANT_SOIL: Tag = Tag::named("plant_soil");
 
 /// Blocks it looks round, and up and down.
 const LOOK: i32 = 8;
@@ -46,9 +49,6 @@ use animals_core::needs::{FULL, HUNGRY};
 const CHEW: f64 = 30.0;
 const WALK: f64 = 160.0;
 const NOTHING: f64 = 300.0;
-/// A grazer leaves dung after about this many mouthfuls (`vitals::soil`: it feeds farmland and
-/// compost).
-const MOUTHFULS_A_DUNG: u32 = 6;
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&FORAGE, [0.0; 4], 0);
@@ -343,8 +343,8 @@ pub fn forage(w: &World, id: u64, st: &EntityState) -> bool {
                 }
                 Eaten::Stays => {}
             }
-            if w.random_below(MOUTHFULS_A_DUNG) == 0 {
-                w.spawn_item(st.pos, ItemStack::new(DUNG.id(), 1));
+            if w.random_below(vitals::soil::MOUTHFULS_A_PAT) == 0 {
+                drop_pat(w, st.pos);
             }
             f[3] = now + CHEW;
             w.component_mut(id, &FORAGE).map(|c| *c = f);
@@ -377,5 +377,22 @@ fn becomes(name: &str) -> Option<u32> {
     match name {
         "base:grazed_grass" => Some(GRAZED_GRASS.id()),
         _ => None,
+    }
+}
+
+/// A grazer's dung (`vitals::soil`): a pat where it stands on the ground (on the soil, in the air
+/// or the grass there), none within `PAT_SPACING` of another; off the soil, the dung as an item.
+fn drop_pat(w: &World, pos: Vec3) {
+    let [x, y, z] = pos.block().to_array();
+    let feet = w.block([x, y, z]);
+    let open = feet == 0 || TALL_GRASS.is(feet) || GRAZED_GRASS.is(feet);
+    if !(open && PLANT_SOIL.on_block(w.block([x, y - 1, z]))) {
+        w.spawn_item(pos, ItemStack::new(DUNG.id(), 1));
+        return;
+    }
+    let r = vitals::soil::PAT_SPACING;
+    let crowded = (-1..=1).any(|dy| (-r..=r).any(|dz| (-r..=r).any(|dx| DUNG_PAT.is(w.block([x + dx, y + dy, z + dz])))));
+    if !crowded {
+        w.set_block([x, y, z], DUNG_PAT.id());
     }
 }

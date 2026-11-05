@@ -57,6 +57,7 @@ static HINT: Channel<Hint> = Channel::named("hint");
 
 static LOG_TAG: Tag = Tag::named("logs");
 static AXES_TAG: Tag = Tag::named("tools/axe");
+static LEAVES_TAG: Tag = Tag::named("leaves");
 static TABLE_TAG: Tag = Tag::named("crafting_tables");
 static FURNACE_TAG: Tag = Tag::named("furnaces");
 static RAW_MEAT_TAG: Tag = Tag::named("raw_meat");
@@ -124,11 +125,18 @@ fn once(w: &World, player: u64, hint: u32) {
 /// ring out to `vitals::first::TREE_LOOK`, the nearest in height first within a ring.
 fn nearest_tree(w: &World, from: BlockPos) -> Option<BlockPos> {
     use vitals::first::{TREE_LOOK, TREE_UP};
+    // A log on the ground with a tree on it as felling sees one (a trunk, leaves among it), of
+    // at least `TREE_LOGS`: a shrub's log or a lone stump is no tree to fell.
     let foot = |p: BlockPos| {
-        LOG_TAG.on_block(w.block(p)) && {
-            let below = w.block(p.below());
-            below != 0 && !LOG_TAG.on_block(below)
-        }
+        let state = w.block(p);
+        LOG_TAG.on_block(state)
+            && {
+                // On the ground: not a branch resting on leaves (seed 7's hint pointed at one, 6
+                // up in a crown, PC probe fh_probe7).
+                let below = w.block(p.below());
+                below != 0 && !LOG_TAG.on_block(below) && !LEAVES_TAG.on_block(below)
+            }
+            && crate::felling::tree_on(w, p.to_array(), state).is_some_and(|logs| logs.len() + 1 >= vitals::first::TREE_LOGS)
     };
     for r in 0..=TREE_LOOK {
         let mut best: Option<(i32, BlockPos)> = None;
@@ -340,7 +348,9 @@ fn client(r: &mut Registry) {
         let st = c.state();
         let gw = st.window[0] as f32 / st.gui_scale.max(1.0);
         let width = (gw - 2.0 * HINT_SIDES).clamp(HINT_MIN_W, HINT_MAX_W);
-        c.screen_text_wrapped(0.5, HINT_Y, key, &args, 0xe4dacf00 | (alpha * 255.0) as u32, 1.0, width);
+        // On the HUD's plate, in the brighter cream (World playtest round 13: the first hint read as "a
+        // thin small line mid-screen").
+        c.screen_text_plated(0.5, HINT_Y, key, &args, 0xf4ead800 | (alpha * 255.0) as u32, 1.0, width);
     });
 }
 

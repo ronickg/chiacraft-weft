@@ -123,7 +123,7 @@ pub fn register(r: &mut Registry) {
 
 /// A loose thing's block: its counting props (0 to the most), then small boxes lying on the ground
 /// with `tex` on them, no collision, broken at a touch, on something solid.
-fn loose(r: &mut Registry, b: &'static Block, props: &[(&str, u32)], group: &str, tex: &str, boxes: &[([f32; 3], [f32; 3])]) {
+pub(crate) fn loose(r: &mut Registry, b: &'static Block, props: &[(&str, u32)], group: &str, tex: &str, boxes: &[([f32; 3], [f32; 3])]) {
     let mut bb = r.block(b);
     for &(name, most) in props {
         bb = bb.prop(name, 0..=most);
