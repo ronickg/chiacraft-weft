@@ -477,6 +477,59 @@ pub fn collides(c: &Content, block: &impl Cells, area: Aabb) -> bool {
     each_solid(c, block, area, |s| s.intersects(&area))
 }
 
+/// Feet moved out of solid blocks: a box with feet at `pos` that overlaps something solid goes the
+/// shortest way along one axis to where it overlaps nothing (up when about as short), at most
+/// `PUSH_REACH` blocks. `None` when it is clear, or no way out is that near. Movement clips a box
+/// against what it moves into, not what it already overlaps, so one left inside (a teleport onto
+/// a block's edge, a block placed or grown into it, a correction) walked or flew on through, and
+/// the eyes inside a block saw the world from inside, black (Ronald, 11-06).
+pub fn push_out(c: &Content, block: &impl Cells, pos: DVec3, half_width: f64, height: f64) -> Option<DVec3> {
+    let me = Aabb::around(pos, half_width, height);
+    let mut inside = Vec::new();
+    each_solid(c, block, me, |s| {
+        if s.intersects(&me) {
+            inside.push(s);
+        }
+        false
+    });
+    if inside.is_empty() {
+        return None;
+    }
+    let free = |b: Aabb| !collides(c, block, b);
+    out_of(me, &inside, free).map(|by| pos + by)
+}
+
+/// The farthest a player is pushed out of blocks in one go.
+pub const PUSH_REACH: f64 = 1.5;
+
+/// `push_out`'s choice: of the six ways along an axis that clear all of `inside` from `me`, the
+/// shortest that `free` allows and `PUSH_REACH` reaches, up first on a near tie.
+fn out_of(me: Aabb, inside: &[Aabb], free: impl Fn(Aabb) -> bool) -> Option<DVec3> {
+    const EPS: f64 = 1e-4;
+    let mut best: Option<(f64, DVec3)> = None;
+    for axis in [1usize, 0, 2] {
+        for up in [true, false] {
+            let d = inside
+                .iter()
+                .map(|s| if up { s.max[axis] - me.min[axis] } else { me.max[axis] - s.min[axis] })
+                .fold(0.0f64, f64::max)
+                + EPS;
+            if d > PUSH_REACH {
+                continue;
+            }
+            let mut by = DVec3::ZERO;
+            by[axis] = if up { d } else { -d };
+            // Up wins a tie it is within a hundredth of.
+            let cost = d - if axis == 1 && up { 0.01 } else { 0.0 };
+            if best.is_some_and(|b| b.0 <= cost) || !free(me.shifted(by)) {
+                continue;
+            }
+            best = Some((cost, by));
+        }
+    }
+    best.map(|b| b.1)
+}
+
 thread_local! {
     /// `move_box_with`'s obstacles, kept between calls.
     static SOLIDS: std::cell::RefCell<Vec<Aabb>> = const { std::cell::RefCell::new(Vec::new()) };
@@ -957,6 +1010,42 @@ pub fn collision_top(c: &Content, state: u32) -> Option<f64> {
 #[cfg(test)]
 mod knock_tests {
     use super::*;
+
+    fn cell(x: i32, y: i32, z: i32) -> Aabb {
+        Aabb { min: DVec3::new(x as f64, y as f64, z as f64), max: DVec3::new(x as f64 + 1.0, y as f64 + 1.0, z as f64 + 1.0) }
+    }
+
+    /// Ronald's black view: a player teleported to x 146.0 overlapped the wall at x 145; pushed
+    /// out the 0.3 its half width reached in, not up or through.
+    #[test]
+    fn pushed_out_of_a_wall_the_short_way() {
+        let walls = [cell(145, 64, 10), cell(145, 65, 10)];
+        let me = Aabb::around(DVec3::new(146.0, 64.0, 10.5), 0.3, 1.8);
+        let free = |b: Aabb| !walls.iter().any(|w| w.intersects(&b));
+        let by = out_of(me, &walls, free).expect("a way out");
+        assert!((by.x - 0.3).abs() < 1e-3 && by.y == 0.0 && by.z == 0.0, "{by}");
+    }
+
+    #[test]
+    fn up_out_of_the_ground_and_never_into_another_block() {
+        // Sunk 0.2 into the ground: up. With a block above too, sideways instead.
+        let ground = [cell(0, 9, 0)];
+        let me = Aabb::around(DVec3::new(0.5, 9.8, 0.5), 0.3, 1.8);
+        let free = |b: Aabb| !ground.iter().any(|w| w.intersects(&b));
+        let by = out_of(me, &ground, free).unwrap();
+        assert!((by.y - 0.2).abs() < 1e-3, "{by}");
+        let shut = [cell(0, 9, 0), cell(0, 11, 0)];
+        let free = |b: Aabb| !shut.iter().any(|w| w.intersects(&b));
+        let by = out_of(me, &ground, free).unwrap();
+        assert!(by.y == 0.0 && (by.x.abs() > 0.7 || by.z.abs() > 0.7), "{by}");
+        // Buried deep: no push past the reach.
+        let deep: Vec<Aabb> = (0..4)
+            .flat_map(|y| (-2..3).flat_map(move |x| (-2..3).map(move |z| cell(x, 8 + y, z))))
+            .collect();
+        let me = Aabb::around(DVec3::new(0.5, 9.0, 0.5), 0.3, 1.8);
+        let free = |b: Aabb| !deep.iter().any(|w| w.intersects(&b));
+        assert!(out_of(me, &deep, free).is_none());
+    }
 
     #[test]
     fn knock_is_vanillas() {
