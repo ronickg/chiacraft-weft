@@ -121,10 +121,19 @@ def el(name, bone, lo, hi, quad=None, rot=None, origin=None, cut=None):
 LEGS = ("FL", "FR", "BL", "BR")
 # Each leg (the lizard's, set out to the caiman's broader body): the shoulder or hip, the elbow or
 # knee out to the side, the wrist or ankle; the upper leg runs out sideways, the lower one down.
+# Rule 7 and "No thin lines" (Ronald, 11-05): the lower legs were rods 0.8 texel deep (front 1.8 x 1.6
+# x 0.8 texels, hind 2.3 x 2.3 x 0.8), their sides and the feet's tops a texel or so out from each other.
+# Now each lower leg is the elbow or knee coming down at the upper leg's end: as deep as the upper leg
+# (0.07 inside its front and back: flush; 2.2 and 2.5 texels deep), its top 0.07 under the upper's, its
+# inner and outer sides 0.07 inside the foot's, so it shows as a column two texels across (0.78 past
+# the upper's end) and 2.2 tall (above the foot). The feet's heels flush behind it (0.105 out, and
+# 0.035 behind the upper's back, which they'd share a plane with as the leg lifts: boxcheck), their
+# toes 2.1 texels in front (were 1.2-1.4 texels out on every side, a thin line round the foot's top).
+# The hind one's bottom 0.47, inside the foot, so it doesn't meet the chest's bottom plane in the run.
 LEG = {"F": dict(hip=(1.6, 1.1, 1.2), knee=(2.75, 0.95, 1.2), ankle=(2.75, 0.55, 1.2), upper=(1.4, 2.8, 0.75, 1.55, 0.7, 1.7),
-                 lower=(2.45, 3.15, 0.5, 1.1, 1.05, 1.35), foot=(2.05, 3.6, 0.15, 0.65, 0.3, 2.15)),
+                 lower=(2.12, 3.58, 0.5, 1.48, 0.77, 1.63), foot=(2.05, 3.65, 0.15, 0.65, 0.665, 2.45)),
        "B": dict(hip=(1.35, 1.35, -1.9), knee=(2.85, 1.3, -1.9), ankle=(2.85, 0.55, -1.9), upper=(1.15, 3.0, 0.95, 1.75, -2.45, -1.35),
-                 lower=(2.5, 3.4, 0.4, 1.3, -2.05, -1.75), foot=(2.05, 3.85, 0.0, 0.85, -2.9, -0.9))}
+                 lower=(2.12, 3.78, 0.47, 1.68, -2.38, -1.42), foot=(2.05, 3.85, 0.0, 0.85, -2.485, -0.6))}
 # The upper legs 0.8 tall, two texels (0.6 and 0.5 before, a texel: rule 7, Ronald 11-05).
 # The tail: four segments, tall and flattened from the side (it swims with it), each smaller, each nested 0.06
 # inside the one before (boxcheck, pokes) and all as tall as the hips allow, so the last two are two texels
