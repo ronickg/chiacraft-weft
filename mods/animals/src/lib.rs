@@ -54,6 +54,7 @@ mod hunt;
 mod iguanodont;
 mod jaguar;
 pub mod journal;
+mod journal_screen;
 mod knockout;
 mod kryptobaatar;
 mod lizard;
@@ -145,6 +146,7 @@ fn init(r: &mut Registry) {
     jaguar::init(r);
     voices::init(r);
     journal::init(r);
+    journal_screen::register(r);
     breath::init(r);
     animal::init(r);
     comfort::init(r);
