@@ -772,6 +772,7 @@ pub struct Ids {
     pub damage: Option<u32>,
     pub name: Option<u32>,
     pub look: Option<u32>,
+    pub worn_look: Option<u32>,
     pub conductor: Option<u32>,
     pub worn: Option<u32>,
     pub loot_rolls: Option<u32>,
@@ -2977,6 +2978,7 @@ fn declare_components(
         (crate::registry::FORCED_POSE, "bytes"),
         (crate::registry::RIDING, "bytes"),
         (crate::registry::HELD_LOOK, "bytes"),
+        (crate::registry::WORN_LOOKS, "bytes"),
         (crate::registry::SHAPE, "bytes"),
         (crate::registry::SIMULATED, "u64"),
     ] {
@@ -3197,6 +3199,7 @@ fn component_ids(components: &Components) -> Ids {
         damage: id(abi::comp::WEAR),
         name: id(abi::comp::NAME),
         look: id(abi::comp::LOOK),
+        worn_look: id(abi::comp::WORN_LOOK),
         conductor: id(abi::comp::CONDUCTOR),
         worn: id(abi::comp::WORN),
         loot_rolls: id(abi::comp::LOOT_ROLLS),
