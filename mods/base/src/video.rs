@@ -131,7 +131,14 @@ fn detect(window: [u32; 2]) -> (usize, bool) {
 /// Chooses the preset from the GPU (`detect`) and says so on the Video screen.
 fn apply_detected(window: [u32; 2]) {
     let (p, half) = detect(window);
-    weft_sdk::info!("video: {} ({}, {} MB): the {} preset{}", GPU_NAME.get(), gpu_class(), GPU_MEMORY.get(), PRESET_NAMES[p], if half { ", half render scale" } else { "" });
+    weft_sdk::info!(
+        "video: {} ({}, {} MB): the {} preset{}",
+        GPU_NAME.get(),
+        gpu_class(),
+        GPU_MEMORY.get(),
+        PRESET_NAMES[p],
+        if half { ", half render scale" } else { "" }
+    );
     apply(p);
     if half {
         RENDER_SCALE_NEXT.set(0.5);
@@ -561,7 +568,14 @@ pub fn register(r: &mut Registry) {
                     match PRESET_NAMES.get(DETECTED.get() as usize) {
                         Some(p) => {
                             let key = if DETECTED_HALF.get() { "video.base.detected.half" } else { "video.base.detected.preset" };
-                            t.set(key, &[Arg::Text(&shown), Arg::Key(&format!("video.base.gpu.{class}")), Arg::Key(&format!("video.base.preset.{p}"))]);
+                            t.set(
+                                key,
+                                &[
+                                    Arg::Text(&shown),
+                                    Arg::Key(&format!("video.base.gpu.{class}")),
+                                    Arg::Key(&format!("video.base.preset.{p}")),
+                                ],
+                            );
                         }
                         None => t.set("video.base.detected.gpu", &[Arg::Text(&shown), Arg::Key(&format!("video.base.gpu.{class}"))]),
                     }
