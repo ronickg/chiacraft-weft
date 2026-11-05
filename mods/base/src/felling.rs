@@ -162,7 +162,7 @@ pub fn register(r: &mut Registry) {
                 }
                 if let (true, Some(h)) = (survival, &hotbar) {
                     let by = vitals::felling::PIECE_WEAR;
-                    h.set(slot, worn(tool, by, DURABILITY.on_item(tool.item).unwrap_or(0)));
+                    h.set(slot, worn(tool, by, DURABILITY.on_stack(&tool).unwrap_or(0)));
                 }
                 continue;
             }
@@ -215,7 +215,7 @@ pub fn register(r: &mut Registry) {
             // An axe wears by the felling's chops (not past them).
             if let (true, true, Some(h)) = (survival, axe, &hotbar) {
                 let by = vitals::felling::wear(logs.len() as u32);
-                h.set(slot, worn(tool, by, DURABILITY.on_item(tool.item).unwrap_or(0)));
+                h.set(slot, worn(tool, by, DURABILITY.on_stack(&tool).unwrap_or(0)));
             }
         }
     });
