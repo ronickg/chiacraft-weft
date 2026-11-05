@@ -377,7 +377,7 @@ fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32>
         // (sRGB 135 170 7, a gold morning sun has little blue), 3 % of the frame at 06:00 where it
         // was 6 % (PC run sh3); from a lower light up, a leaf by the eye at 18:00 stayed lime (sh3b).
         let hot = smoothstep(0.6, 1.3, lum) * low;
-        light = mix(light, vec3(luma(light)) * vec3(0.9, 1.06, 0.86), hot * 0.4);
+        light = mix(light, vec3(luma(light)) * vec3(0.9, 1.06, 0.86), hot * 0.2);
     }
     return light;
 }
@@ -438,7 +438,7 @@ fn shade_soft(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
             // (Not only the bright: the 18:00 leaf is mid-bright, luma about 0.3 before the curve, and
             // lime by its colour alone; from 0.25 it hardly counted, 3 % of the frame left, PC sh6b.)
             let k = smoothstep(0.06, 0.22, luma(c)) * smoothstep(0.55, 0.85, sat) * smoothstep(0.25, 0.45, c.r / c.g) * low;
-            lit = vec4(mix(c, vec3(luma(c)) * vec3(0.92, 1.05, 0.88), k * 0.35) * (1.0 - 0.18 * k), lit.a);
+            lit = vec4(mix(c, vec3(luma(c)) * vec3(0.92, 1.05, 0.88), k * 0.175) * (1.0 - 0.18 * k), lit.a);
         }
     } else {
         lit = block_shade(in.slot, BlockPixel(in.uv, albedo, light, in.pos, scene.params.w));
