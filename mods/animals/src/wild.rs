@@ -9,6 +9,8 @@ use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
 use crate::ModelFile;
+use crate::choose::{Band, Need, Stops, WithBand};
+use crate::prof::Timed;
 
 /// One simple creature's body, for every species on its model.
 pub struct Body {
@@ -75,20 +77,29 @@ pub fn register(r: &mut Registry, kinds: &[&'static EntityKind], body: &'static 
             })
             .goals(
                 Goals::new()
-                    .then(crate::animal::upkeep(index))
-                    .then(startle)
-                    .then(crate::taming::behave(index))
-                    .then(|w: &World, id: u64, st: &EntityState| crate::hunt::wary(w, id, st) && woken(w, id))
-                    .then(|w: &World, id: u64, st: &EntityState| crate::hunt::huddle(w, id, st) && woken(w, id))
-                    .then(|w: &World, id: u64, st: &EntityState| crate::hunt::hunt(w, id, st) && woken(w, id))
-                    .then(crate::breeding::behave(index))
-                    .then(move |w: &World, id: u64, st: &EntityState| settle(w, id, st, look))
-                    .then(crate::comfort::seek)
-                    .then(crate::forage::forage)
-                    .then(ai::wander(body.wander, 8.0)),
+                    .timed("upkeep", crate::animal::upkeep(index))
+                    .timed("startle", startle)
+                    .timed("taming", crate::taming::behave(index))
+                    .timed("wary", |w: &World, id: u64, st: &EntityState| crate::hunt::wary(w, id, st) && woken(w, id))
+                    .timed("huddle", |w: &World, id: u64, st: &EntityState| crate::hunt::huddle(w, id, st) && woken(w, id))
+                    .timed("hunt", |w: &World, id: u64, st: &EntityState| crate::hunt::hunt(w, id, st) && woken(w, id))
+                    // What it does when nothing is after it, the most pressing first (`choose.rs`).
+                    .band(
+                        "needs",
+                        Band::new()
+                            .with(Need::Love, crate::breeding::behave(index))
+                            .with(
+                                Need::Rest,
+                                Stops { goal: move |w: &World, id: u64, st: &EntityState| settle(w, id, st, look), stop: wake },
+                            )
+                            .with(Need::Comfort, crate::comfort::seek)
+                            .with(Need::Drink, crate::drink::drink)
+                            .with(Need::Eat, crate::forage::eat)
+                            .with(Need::Wander, ai::wander(body.wander, 8.0)),
+                    ),
             )
             .on_hurt(|w, h| {
-                crate::taming::hurt(w, h.entity);
+                crate::taming::hurt(w, h.entity, h.source);
                 wake(w, h.entity);
             });
     }

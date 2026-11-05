@@ -1,0 +1,27 @@
+# Choosing between needs (reports/Creature AI.md, part 3, step 3): 24 deer and hares on open
+# ground near the player (spectator, still), left a minute to settle (some lie down to rest), then
+# all made hungry and thirsty (/animalprof starve: food 15%, water 25%). Before, a resting animal
+# kept resting until its rest ran out; now it gets up to eat or drink. Read the "leaves its rest
+# to eat" lines (and the ANIMAL_GOALS line's "needs" row), and the shots: before (some lying) and
+# after (up and grazing or walking to water).
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode spectator
+chat /tk time 6000
+chat /tk ring animals:red_deer 8 5 14
+chat /tk ring animals:white_tailed_deer 8 5 14
+chat /tk ring animals:hare 8 4 12
+chat /animalprof on
+wait 60
+look 0 -25
+wait 1
+shot needs_before.png
+wait 1
+chat /animalprof starve
+wait 20
+look 0 -25
+wait 1
+shot needs_after.png
+chat /animalprof dump
+quit

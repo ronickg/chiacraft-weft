@@ -79,6 +79,23 @@ pub static SPECIES: [Species; 46] = [
 ];
 
 impl Species {
+    /// Its row in `SPECIES`.
+    pub fn index(&'static self) -> usize {
+        (self as *const Species as usize - SPECIES.as_ptr() as usize) / size_of::<Species>()
+    }
+
+    /// `data::Species::hungry_in_the_wild`, worked out once a species: it looks over every
+    /// species' habitats, and foraging and drinking ask it for every animal every tick.
+    pub fn hungry_in_the_wild(&'static self) -> bool {
+        static HUNGRY: std::sync::OnceLock<Vec<bool>> = std::sync::OnceLock::new();
+        HUNGRY.get_or_init(|| {
+            SPECIES
+                .iter()
+                .map(|s| s.data.hungry_in_the_wild())
+                .collect()
+        })[self.index()]
+    }
+
     /// The name of its kind, without the namespace (`entity.animals.<it>`, its saddle).
     pub fn kind_name(&self) -> &'static str {
         self.kind.path()

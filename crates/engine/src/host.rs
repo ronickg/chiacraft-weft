@@ -936,6 +936,9 @@ unsafe extern "C" fn entity_set(w: *mut abi::WorldCtx, id: u64, set: u32, s: *co
         if player {
             d.entities.told.extend(told.into_iter().map(|t| (id, t)));
         }
+        if teleport && !player {
+            d.entities.moved_to(c, id);
+        }
         if teleport && player {
             d.events
                 .push(crate::server::DimEvent::Teleport { from: d.id, id, dim: d.id, pos: d.place.to_world(pos) });
@@ -1537,9 +1540,20 @@ unsafe extern "C" fn energy_move(w: *mut abi::WorldCtx, h: *const abi::Holder, a
 
 unsafe extern "C" fn component_get(w: *mut abi::WorldCtx, h: *const abi::Holder, comp: u32, out: *mut u8, cap: u32) -> u32 {
     unsafe {
-        let Some(v) = held(w, h).and_then(|at| crate::server::holder::component(dim(w), at, comp)) else { return 0 };
-        std::ptr::copy_nonoverlapping(v.as_ptr(), out, v.len().min(cap as usize));
-        v.len() as u32
+        let copy = |v: &[u8]| {
+            std::ptr::copy_nonoverlapping(v.as_ptr(), out, v.len().min(cap as usize));
+            v.len() as u32
+        };
+        match held(w, h) {
+            // An entity's straight from where it lives: mob AI reads several a mob a tick.
+            Some(crate::server::holder::At::Entity(id)) => dim(w)
+                .entities
+                .comps
+                .get(&(id, comp))
+                .map_or(0, |v| copy(v)),
+            Some(at) => crate::server::holder::component(dim(w), at, comp).map_or(0, |v| copy(&v)),
+            None => 0,
+        }
     }
 }
 

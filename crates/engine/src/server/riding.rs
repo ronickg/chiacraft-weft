@@ -98,6 +98,7 @@ impl Dim {
         if let Some(e) = self.entities.get_mut(rider) {
             e.pos = at;
         }
+        self.entities.moved_to(c, rider);
         // A player's client moves it: it is told where it went.
         if self.entities.get(rider).is_some_and(|e| e.player) {
             self.events

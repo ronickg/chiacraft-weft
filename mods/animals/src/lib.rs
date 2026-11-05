@@ -30,6 +30,7 @@ mod breeding;
 mod caiman;
 mod capybara;
 mod cat;
+mod choose;
 mod citipati;
 mod coats;
 mod comfort;
@@ -61,6 +62,7 @@ mod lizard;
 mod meat;
 mod mouse;
 mod owl;
+mod prof;
 mod protoceratops;
 mod psittacosaurus;
 mod raptor;
@@ -71,6 +73,7 @@ mod riding;
 mod sauropod;
 mod scars;
 mod screen;
+mod senses;
 mod signatures;
 mod small_bird;
 mod species;
@@ -105,6 +108,8 @@ fn data_dir() -> String {
 // ------------------------------------------------------------------ registration
 
 fn init(r: &mut Registry) {
+    // The goal timer first: its first row ("upkeep") is the one that logs.
+    prof::init(r);
     dog::init(r);
     for p in species::problems() {
         weft_sdk::error!("{p}");
@@ -153,6 +158,8 @@ fn init(r: &mut Registry) {
     forage::init(r);
     drink::init(r);
     hunt::init(r);
+    senses::init(r);
+    choose::init(r);
     screen::init(r);
     taming::init(r);
     commands::init(r);
