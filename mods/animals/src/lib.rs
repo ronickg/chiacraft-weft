@@ -22,6 +22,7 @@ use weft_sdk::*;
 
 declare_mod!(deps: ["base"], init: init);
 
+pub mod anim;
 mod animal;
 mod ankylosaur;
 mod armour;
@@ -164,6 +165,7 @@ fn init(r: &mut Registry) {
     forage::init(r);
     drink::init(r);
     hunt::init(r);
+    anim::init(r);
     senses::init(r);
     memory::init(r);
     choose::init(r);
