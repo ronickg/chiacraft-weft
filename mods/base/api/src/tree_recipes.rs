@@ -653,8 +653,11 @@ pub fn varied_colonized(c: &crate::colonize::Colonize, v: Variant) -> crate::col
     }
 }
 
+/// A tree's block with its wood's width (0 for leaves): `colonize::blocks`, `grown_widths`.
+pub type WideBlock = (i32, i32, i32, crate::branchy::Part, f32);
+
 /// A grown tree of `log` with each wood block's width (`colonize::blocks`, `branchy::wood_widths`).
-pub fn grown_widths(log: &str, seed: u64) -> Option<Vec<(i32, i32, i32, crate::branchy::Part, f32)>> {
+pub fn grown_widths(log: &str, seed: u64) -> Option<Vec<WideBlock>> {
     if let Some(c) = colonized(log) {
         return Some(crate::colonize::blocks(c, seed));
     }
@@ -673,7 +676,7 @@ pub fn grown_widths(log: &str, seed: u64) -> Option<Vec<(i32, i32, i32, crate::b
 
 /// A tree's wood as felling counts it (`felling.rs`): a log one, a branch block (a broadleaf
 /// tree's wood under `trees::BRANCH_UNDER` wide) a quarter, rounded up.
-pub fn felling_wood(log: &str, blocks: &[(i32, i32, i32, crate::branchy::Part, f32)]) -> usize {
+pub fn felling_wood(log: &str, blocks: &[WideBlock]) -> usize {
     let wood = log
         .split(':')
         .next_back()
