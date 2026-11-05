@@ -25,16 +25,13 @@ pub fn register(r: &mut Registry) {
                 .prop("lit", ["false", "true"])
                 .states(|p, s| {
                     let lit = p.is("lit", "true");
-                    let mut f = ["furnace_side"; 6];
-                    f[2] = "furnace_top";
-                    f[3] = "furnace_top";
-                    f[p.facing().face() as usize] = if lit { "furnace_front_lit" } else { "furnace_front" };
-                    let s = s.faces(f);
+                    let s =
+                        s.front_faces(p.facing(), "furnace_side", "furnace_top", if lit { "furnace_front_lit" } else { "furnace_front" });
                     if lit { s.light_rgb(13, 11, 8) } else { s }
                 })
                 .hardness(3.5)
                 .mineable("pickaxe")
-                .needs_tool(0)
+                .needs_tool_level(0)
                 .tab(&crate::tabs::FUNCTIONAL)
         })
         .group("input", Slots::single())
@@ -43,10 +40,10 @@ pub fn register(r: &mut Registry) {
         .recipes(&crate::recipes::SMELTING)
         .attach(&SMELTING)
         .screen(|ui| {
-            crate::window::window(ui, S::col().pad(7.0).gap(4.0).stretch(), &[], |ui| {
+            crate::window::window(ui, S::column().pad(7.0).gap(4.0).stretch(), &[], |ui| {
                 ui.row(S::row().gap(8.0), |ui| {
                     ui.spacer();
-                    ui.column(S::col().gap(2.0), |ui| {
+                    ui.column(S::column().gap(2.0), |ui| {
                         ui.group("input");
                         ui.progress_bind_dir("flame", S::default().size(14.0, 14.0), abi::ui_dir::UP, |c| {
                             c.menu_component(&SMELTING)
@@ -70,12 +67,8 @@ pub fn register(r: &mut Registry) {
             b.sound_group("wood")
                 .facing(Facings::HORIZONTAL, Toward::Player)
                 .states(|p, s| {
-                    let d = p.facing();
-                    let mut f = ["chest_side"; 6];
-                    f[2] = "chest_top";
-                    f[3] = "chest_top";
-                    f[d.face() as usize] = "chest_front";
-                    s.faces(f).model_box([1.0, 0.0, 1.0], [15.0, 14.0, 15.0])
+                    s.front_faces(p.facing(), "chest_side", "chest_top", "chest_front")
+                        .model_box([1.0, 0.0, 1.0], [15.0, 14.0, 15.0])
                 })
                 .hardness(2.5)
                 .mineable("axe")
@@ -83,7 +76,7 @@ pub fn register(r: &mut Registry) {
         })
         .group("chest", Slots::chest(3))
         .screen(|ui| {
-            crate::window::window(ui, S::col().pad(7.0).gap(4.0), &[], |ui| {
+            crate::window::window(ui, S::column().pad(7.0).gap(4.0), &[], |ui| {
                 ui.group("chest");
                 ui.player_inventory(true);
             });
@@ -109,7 +102,8 @@ fn cooked(w: &World, out: ItemStack) -> ItemStack {
 }
 
 /// Items the output slot still takes of `out`, as whole results (by item: what's there keeps its
-/// stamps).
+/// stamps). The SDK's `ItemStack::room_for` goes by `stacks_with`, which a cooked stamp (made,
+/// hot) would stop.
 fn room_for(output: ItemStack, out: ItemStack) -> u32 {
     let room = if output.is_empty() {
         max_stack(out.item)
@@ -134,12 +128,12 @@ fn catch_up(w: &World, id: u64, s: &mut Smelting, ticks: u32) {
         .flatten()
     {
         let q = abi::Query { entity: id, item: input.item, ..query() };
-        s.cook_max = w.compute(&SMELT_TIME, time as f64, &q).round().max(1.0) as u32;
+        s.cook_max = w
+            .chain_compute(&SMELT_TIME, time as f64, &q)
+            .round()
+            .max(1.0) as u32;
         let items = (input.count).min(room_for(output, out)) as u64;
-        let per_fuel = FUEL
-            .on_item(fuel.item)
-            .filter(|_| !fuel.is_empty())
-            .unwrap_or(0) as u64;
+        let per_fuel = FUEL.on_stack_item(&fuel).unwrap_or(0) as u64;
         let fuel_items = if per_fuel > 0 { fuel.count as u64 } else { 0 };
         let work = (items * s.cook_max as u64).saturating_sub(s.cook as u64);
         let worked = idle.min(work).min(s.burn as u64 + fuel_items * per_fuel);
@@ -147,7 +141,7 @@ fn catch_up(w: &World, id: u64, s: &mut Smelting, ticks: u32) {
         if lit > 0 {
             let mut left = fuel;
             for _ in 0..lit {
-                left = use_one(left);
+                left = consume_one(left);
             }
             fuel_slot.set(0, left);
             s.burn_max = per_fuel as u32;
@@ -158,10 +152,7 @@ fn catch_up(w: &World, id: u64, s: &mut Smelting, ticks: u32) {
         s.cook = (total % s.cook_max as u64) as u32;
         if done > 0 {
             input_slot.set(0, input.shrink(done));
-            output_slot.set(
-                0,
-                if output.is_empty() { cooked(w, ItemStack { count: out.count * done, ..out }) } else { output.grow(out.count * done) },
-            );
+            output_slot.set(0, if output.is_empty() { cooked(w, output.merged(out, done)) } else { output.merged(out, done) });
             for _ in 0..done {
                 w.emit(&SMELTED, Smelted { furnace: id, input: input.item, output: out });
             }
@@ -181,8 +172,8 @@ fn tick_furnaces(b: &mut SystemBatch<Smelting>) {
             let was_lit = s.burn > 0;
             catch_up(&w, id, s, ticks);
             let pos = st.block_pos();
-            if (s.burn > 0) != was_lit && FURNACE.is(w.get(pos)) {
-                w.set_prop(pos, "lit", if s.burn > 0 { "true" } else { "false" });
+            if (s.burn > 0) != was_lit && FURNACE.is(w.block(pos)) {
+                w.prop_set(pos, "lit", if s.burn > 0 { "true" } else { "false" });
             }
             continue;
         }
@@ -202,26 +193,28 @@ fn tick_furnaces(b: &mut SystemBatch<Smelting>) {
         let recipe = (!input.is_empty())
             .then(|| recipe_process(&crate::recipes::SMELTING, input.item))
             .flatten();
-        let fits = recipe
-            .is_some_and(|(out, _)| output.is_empty() || (output.item == out.item && output.count + out.count <= max_stack(out.item)));
+        let fits = recipe.is_some_and(|(out, _)| room_for(output, out) > 0);
         if s.burn == 0 && fits {
-            if let Some(ticks) = FUEL.on_item(fuel.item).filter(|_| !fuel.is_empty()) {
+            if let Some(ticks) = FUEL.on_stack_item(&fuel) {
                 s.burn = ticks;
                 s.burn_max = ticks;
-                fuel_slot.set(0, use_one(fuel));
+                fuel_slot.set(0, consume_one(fuel));
             }
         }
         if s.burn > 0 && fits {
             let (out, time) = recipe.unwrap();
             let q = abi::Query { entity: id, item: input.item, ..query() };
-            s.cook_max = w.compute(&SMELT_TIME, time as f64, &q).round().max(1.0) as u32;
+            s.cook_max = w
+                .chain_compute(&SMELT_TIME, time as f64, &q)
+                .round()
+                .max(1.0) as u32;
             s.cook += 1;
             if s.cook >= s.cook_max {
                 s.cook = 0;
                 // The last one leaves its remainder: a water bucket boiled to salt, the bucket.
-                input_slot.set(0, use_one(input));
+                input_slot.set(0, consume_one(input));
                 // Into a slot already holding some, it takes the stamps there (`cooked`).
-                let merged = if output.is_empty() { cooked(&w, out) } else { output.grow(out.count) };
+                let merged = if output.is_empty() { cooked(&w, output.merged(out, 1)) } else { output.merged(out, 1) };
                 output_slot.set(0, merged);
                 w.emit(&SMELTED, Smelted { furnace: id, input: input.item, output: out });
             }
@@ -232,8 +225,8 @@ fn tick_furnaces(b: &mut SystemBatch<Smelting>) {
             s.cook = s.cook.saturating_sub(2);
         }
         let lit = s.burn > 0;
-        if lit != was_lit && FURNACE.is(w.get(pos)) {
-            w.set_prop(pos, "lit", if lit { "true" } else { "false" });
+        if lit != was_lit && FURNACE.is(w.block(pos)) {
+            w.prop_set(pos, "lit", if lit { "true" } else { "false" });
         }
     }
 }

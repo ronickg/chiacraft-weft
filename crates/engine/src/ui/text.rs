@@ -49,9 +49,17 @@ pub struct Msg {
     pub args: Vec<Arg>,
 }
 
+/// What a key starts with to be its own template: no translation to look for and warn about.
+const TEMPLATE: char = '\u{1}';
+
 impl Msg {
     pub fn new(key: &str, args: Vec<Arg>) -> Msg {
         Msg { key: key.to_string(), args }
+    }
+
+    /// `template` as it is, not a translation, formatting and all.
+    pub fn template(template: &str) -> Msg {
+        Msg { key: format!("{TEMPLATE}{template}"), args: Vec::new() }
     }
 
     pub fn spans(&self, lang: &Lang, input: Option<&Input>) -> Vec<Span> {
@@ -437,12 +445,20 @@ pub fn format(template: &str, args: &[Arg], cx: &Ctx, out: &mut Vec<Span>) {
 /// from code, like a ticket or a profile line), and nothing without one (a mod's bound text that
 /// set nothing this frame: it showed "{0}", Playtest B2).
 pub fn message(key: &str, args: &[Arg], cx: &Ctx, out: &mut Vec<Span>) {
+    if key.is_empty() && args.is_empty() {
+        return;
+    }
+    format(template_of(key, cx), args, cx, out);
+}
+
+/// What a message's key stands for: its translation, the template it carries, or its one argument.
+fn template_of<'a>(key: &'a str, cx: &Ctx<'a>) -> &'a str {
     if key.is_empty() {
-        if !args.is_empty() {
-            format("{0}", args, cx, out);
-        }
+        "{0}"
+    } else if let Some(template) = key.strip_prefix(TEMPLATE) {
+        template
     } else {
-        format(cx.lang.get(key), args, cx, out);
+        cx.lang.get(key)
     }
 }
 
@@ -558,8 +574,8 @@ fn format_depth(template: &str, args: &[Arg], cx: &Ctx, out: &mut Vec<Span>, st:
             // `key:` in brackets for sentences ("press [E]"), `keyname:` bare beside a picture.
             let name = cx
                 .input
-                .and_then(|i| i.key_of(action))
-                .map(|k| display_chord(cx.lang, k))
+                .and_then(|i| i.binding_of(action))
+                .map(|b| display_binding(cx.lang, b))
                 .unwrap_or_else(|| "?".into());
             let color = st
                 .color
@@ -650,7 +666,7 @@ fn format_depth(template: &str, args: &[Arg], cx: &Ctx, out: &mut Vec<Span>, st:
                 Some(Arg::Name(n)) => push_name(n, cx, out, st, depth),
                 Some(Arg::Msg(m)) if depth < 4 => {
                     let color = st.color;
-                    format_depth(cx.lang.get(&m.key), &m.args, cx, out, st, color, depth + 1);
+                    format_depth(template_of(&m.key, cx), &m.args, cx, out, st, color, depth + 1);
                     st.color = color;
                 }
                 Some(Arg::Key(k)) if depth < 4 => {
@@ -690,8 +706,32 @@ fn push_name(n: &Name, cx: &Ctx, out: &mut Vec<Span>, st: &mut State, depth: u32
             format_depth(cx.lang.get("item.spawn_egg"), &args, cx, out, st, color, depth + 1);
             st.color = color;
         }
+        // So is a stair nobody named after what it is made of.
+        None if depth < 4 && shape_of(n).is_some() => {
+            let color = st.color;
+            let (source, key) = shape_of(n).unwrap_or_default();
+            format_depth(cx.lang.get(&key), &[Arg::Name(Name::Block(source))], cx, out, st, color, depth + 1);
+            st.color = color;
+        }
         _ => push_text(out, &n.keys().1, st),
     }
+}
+
+/// What a block made of another is made of (its first state), and the lang key for that.
+fn shape_of(n: &Name) -> Option<(u32, String)> {
+    let c = crate::content::try_content()?;
+    let name = match n {
+        Name::Item(i) => &c.items.get(*i as usize)?.name,
+        Name::Block(s) => &c.block_of(*c.states.get(*s as usize).map(|_| s)?).name,
+        _ => return None,
+    };
+    let (source, key) = c.shapes.get(name)?;
+    Some((
+        c.block_names
+            .get(source)
+            .map(|&b| c.blocks[b as usize].first_state)?,
+        key.clone(),
+    ))
 }
 
 /// Re-evaluates conditional spans; `test` answers a condition without its `!`. True if anything
@@ -927,11 +967,20 @@ pub fn layout_with(spans: &[Span], font: &Font, max_width: Option<f32>, line_hei
 
 /// A key's name for players: translated (`keyname.ShiftLeft`) when the language has it.
 /// `Ctrl+T`: the modifiers (`keyname.ctrl` ..., either side's key), then the key.
+/// What a player reads for a binding: its keys, `x2` after a double tap's (`Wx2`).
+pub fn display_binding(lang: &Lang, b: crate::input::Binding) -> String {
+    let chord = display_chord(lang, b.chord);
+    match b.trigger {
+        crate::input::Trigger::Double => format!("{chord}x2"),
+        _ => chord,
+    }
+}
+
 pub fn display_chord(lang: &Lang, c: crate::input::Chord) -> String {
     let mut out = String::new();
-    for (bit, name) in [(crate::input::CTRL, "keyname.ctrl"), (crate::input::SHIFT, "keyname.shift"), (crate::input::ALT, "keyname.alt")] {
+    for (bit, name, ..) in crate::input::MODIFIERS {
         if c.mods & bit != 0 {
-            out += lang.get(name);
+            out += lang.get(&format!("keyname.{name}"));
             out.push('+');
         }
     }

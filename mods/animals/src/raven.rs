@@ -7,7 +7,7 @@ use weft_sdk::*;
 
 use crate::birds::{self, Wings};
 
-pub(crate) static RAVEN: Entity = Entity::named("raven");
+pub(crate) static RAVEN: EntityKind = EntityKind::named("raven");
 
 static WINGS: Wings = Wings {
     model: "raven",

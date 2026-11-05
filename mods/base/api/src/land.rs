@@ -2,7 +2,8 @@
 //! base's terrain is made of, so the registration (`mods/base/src/land.rs`), the map preview
 //! (`cargo run -p base_api --example land_map`) and any other mod read one source.
 //!
-//! The engine sums the features; two of ours are mods' code (`Feature::new`) because they need to
+//! The engine sums the features; most are its expressions (`Expr`, run on the CPU and the GPU
+//! alike), several of ours are mods' code (`Feature::custom`, on the CPU) because they need to
 //! know the land around them:
 //! - **Rivers** run where the rain gathers: a network of nodes, each draining downhill to a
 //!   neighbour (`net`), so streams meet into rivers that grow toward the sea or a lake, and end
@@ -23,7 +24,7 @@
 use std::cell::Cell;
 
 use weft_sdk::noise::fixed::{self, Fields, ONE, div_floor, q4, q12, ramp, shape};
-use weft_sdk::terrain::{Feature, Mask, preset};
+use weft_sdk::terrain::{Expr, Feature, preset};
 
 use crate::SEA;
 
@@ -82,7 +83,7 @@ pub mod salt {
 /// One factor of where a feature applies: 0 at `from`, 1 at `to` (Q12 after `q12`).
 #[derive(Clone, Copy, Debug)]
 pub enum Ramp {
-    /// A noise of its own, patches about `scale` blocks across (3 octaves, as `Mask::noise`).
+    /// A noise of its own, patches about `scale` blocks across (3 octaves, as `Expr::noise`).
     Noise {
         salt: u64,
         scale: f64,
@@ -95,7 +96,7 @@ pub enum Ramp {
 }
 
 /// Where a feature applies: the product of its ramps, turned around with `not`. The engine's
-/// `Mask` and `value` give the same integers.
+/// mask (`expr`) and `value` give the same integers.
 #[derive(Clone, Copy, Debug)]
 pub struct Area {
     pub all: &'static [Ramp],
@@ -147,12 +148,12 @@ impl Ramp {
         }
     }
 
-    fn mask(&self) -> Mask {
+    fn expr(&self) -> Expr {
         match *self {
-            Ramp::Noise { salt, scale, from, to } => Mask::noise(scale, from, to).salt(salt),
-            Ramp::Continent(a, b) => Mask::Continent(a, b),
-            Ramp::Temperature(a, b) => Mask::Temperature(a, b),
-            Ramp::Humidity(a, b) => Mask::Humidity(a, b),
+            Ramp::Noise { salt, scale, from, to } => Expr::fbm(salt, scale, 3).ramp(from, to),
+            Ramp::Continent(a, b) => Expr::continent().ramp(a, b),
+            Ramp::Temperature(a, b) => Expr::temperature().ramp(a, b),
+            Ramp::Humidity(a, b) => Expr::humidity().ramp(a, b),
         }
     }
 }
@@ -174,14 +175,11 @@ impl Area {
         if self.not { ONE - v } else { v }
     }
 
-    /// The engine's mask for it.
-    pub fn mask(&self) -> Mask {
+    /// The engine's mask for it: the ramps multiplied in order, as `at` folds them.
+    pub fn mask(&self) -> Expr {
         let mut it = self.all.iter();
-        let first = it.next().expect("an area has a ramp").mask();
-        let m = match self.all.len() {
-            1 => first,
-            _ => it.fold(first, |m, r| m.and(r.mask())),
-        };
+        let first = it.next().expect("an area has a ramp").expr();
+        let m = it.fold(first, |m, r| m.and(r.expr()));
         if self.not { m.not() } else { m }
     }
 }
@@ -720,43 +718,47 @@ pub fn features() -> Vec<Feature> {
         preset::continents(CONTINENTS),
         preset::hills(HILLS.0 * COAST_CALM, HILLS.1).mask(HILLS_AREA.mask()),
         preset::hills(HILLS.0 * (1.0 - COAST_CALM), HILLS.1).mask(HILLS_INLAND.mask()),
-        Feature::new(|_, _, _| q4(COAST_CLIFF))
+        Feature::new(Expr::blocks(COAST_CLIFF))
             .mask(COAST_CLIFF_AREA.mask())
             .named("coast_cliffs"),
-        Feature::new(|_, _, _| -q4(OCEAN_DEEP)).mask(OCEAN_DEEP_AREA.mask()),
-        Feature::new(|_, _, _| q4(ISLAND_HEIGHT))
+        Feature::new(Expr::blocks(-OCEAN_DEEP)).mask(OCEAN_DEEP_AREA.mask()),
+        Feature::new(Expr::blocks(ISLAND_HEIGHT))
             .mask(ISLANDS_AREA.mask())
             .named("islands"),
-        Feature::new(|_, _, _| q4(HIGHLANDS))
+        Feature::new(Expr::blocks(HIGHLANDS))
             .mask(HIGHLANDS_AREA.mask())
             .named("highlands"),
         preset::dunes(DUNES.0, DUNES.1).mask(DUNES_AREA.mask()),
         preset::mountains(MOUNTAINS.0, MOUNTAINS.1)
             .mask(MOUNTAINS_RISE.mask())
             .named("mountain_rise"),
-        Feature::new(mesa).named("mesas"),
-        Feature::new(canyons).named("canyons"),
-        Feature::new(karst).named("karst"),
-        Feature::new(reefs).named("reefs"),
-        Feature::new(lakes).named("lakes"),
-        Feature::new(rivers).named("rivers"),
+        Feature::custom(mesa).named("mesas"),
+        Feature::custom(canyons).named("canyons"),
+        Feature::custom(karst).named("karst"),
+        Feature::custom(reefs).named("reefs"),
+        Feature::custom(lakes).named("lakes"),
+        Feature::custom(rivers).named("rivers"),
         // Last: a crater is measured from its ground, the rivers' cut included (none reach one).
-        Feature::new(craters).named("craters"),
+        Feature::custom(craters).named("craters"),
         // After the craters: a tarn is measured from the ground they leave (none meet).
-        Feature::new(tarns).named("tarns"),
+        Feature::custom(tarns).named("tarns"),
         // After the tarns: their streams' channels, down from them.
-        Feature::new(tarn_streams).named("tarn_streams"),
-        // No height: their masks say where the snow drifts and where the sequoias stand (rules
-        // ask for them).
-        preset::hills(0.0, 64.0)
-            .mask(SEQUOIA_AREA.mask())
-            .named("sequoia_groves"),
-        preset::hills(0.0, 64.0)
-            .mask(MOUNTAINS_AREA.mask())
-            .named("mountains"),
-        preset::hills(0.0, 64.0)
-            .mask(Mask::noise(SNOW_DRIFT_SIZE, -0.2, 0.2).salt(salt::SNOW_DRIFT))
-            .named("snow_drift"),
+        Feature::custom(tarn_streams).named("tarn_streams"),
+    ]
+}
+
+/// The fields biome rules ask for (`TerrainBuilder::field`, declared before the rules): where the
+/// mountains stand (`MOUNTAINS_AREA`), the sequoia groves (`SEQUOIA_AREA`) and the snow's drifts,
+/// each 0 to 1. Rules take a field's range as `from <= value < to` (`overworld_biome` likewise).
+pub const MOUNTAINS_FIELD: &str = "base:mountains";
+pub const SEQUOIA_FIELD: &str = "base:sequoia_groves";
+pub const SNOW_DRIFT_FIELD: &str = "base:snow_drift";
+
+pub fn rule_fields() -> Vec<(&'static str, Expr)> {
+    vec![
+        (MOUNTAINS_FIELD, MOUNTAINS_AREA.mask()),
+        (SEQUOIA_FIELD, SEQUOIA_AREA.mask()),
+        (SNOW_DRIFT_FIELD, Expr::fbm(salt::SNOW_DRIFT, SNOW_DRIFT_SIZE, 3).ramp(-0.2, 0.2)),
     ]
 }
 
@@ -1400,14 +1402,14 @@ pub fn biome_edge(f: &Fields, x: i32, z: i32, height: i32) -> Option<Edge> {
     let (t, hu, c) = (here.temperature(), here.humidity(), here.continent());
     let m = MOUNTAINS_AREA.at(&here);
     let line = q12(MOUNTAIN_BIOME);
-    let grove = SEQUOIA_AREA.at(&here) > q12(SEQUOIA_GROVE);
-    let own = climate_biome(t, hu, c, height, m > line, grove);
+    let grove = SEQUOIA_AREA.at(&here) >= q12(SEQUOIA_GROVE);
+    let own = climate_biome(t, hu, c, height, m >= line, grove);
     let band = q12(EDGE_BAND);
     let mut best: Option<Edge> = None;
     for k in 1..=3 {
         let step = band * k / 3;
         for (dt, dh, dm) in [(step, 0, 0), (-step, 0, 0), (0, step, 0), (0, -step, 0), (0, 0, step), (0, 0, -step)] {
-            let to = climate_biome(t + dt, hu + dh, c, height, m + dm > line, grove);
+            let to = climate_biome(t + dt, hu + dh, c, height, m + dm >= line, grove);
             if to != own {
                 let near = ONE - (k - 1) * ONE / 3;
                 if best.is_none_or(|b| near > b.near) {
@@ -1528,7 +1530,7 @@ pub fn snow_line(t: i32) -> i32 {
 pub fn snowy(f: &Fields, x: i32, z: i32, height: i32) -> bool {
     let line = snow_line(f.temperature(x, z));
     let drift = ramp(f.fbm(salt::SNOW_DRIFT, x, z, q4(SNOW_DRIFT_SIZE), 3), q12(-0.2), q12(0.2));
-    height >= line || (height >= line - SNOW_DRIFT && drift > q12(SNOW_DRIFT_FROM))
+    height >= line || (height >= line - SNOW_DRIFT && drift >= q12(SNOW_DRIFT_FROM))
 }
 
 /// The rocks a column's face shows (`rock_set`).
@@ -1721,9 +1723,9 @@ fn biome_at(f: &Fields, x: i32, z: i32, h: i32) -> &'static str {
         "ocean"
     } else if h <= SEA + 1 && c < at(BEACH_CONTINENT) {
         if t < at(SNOWY_BELOW) { "snowy_plains" } else { "beach" }
-    } else if MOUNTAINS_AREA.at(&here) > at(MOUNTAIN_BIOME) || snowy(f, x, z, h) {
+    } else if MOUNTAINS_AREA.at(&here) >= at(MOUNTAIN_BIOME) || snowy(f, x, z, h) {
         "mountains"
-    } else if sequoia_fits(t, hu, h) && SEQUOIA_AREA.at(&here) > at(SEQUOIA_GROVE) {
+    } else if sequoia_fits(t, hu, h) && SEQUOIA_AREA.at(&here) >= at(SEQUOIA_GROVE) {
         "sequoia_grove"
     } else if t < at(SNOWY_BELOW) {
         "snowy_plains"

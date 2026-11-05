@@ -364,6 +364,25 @@ fn cloud_shadow(rel: vec3<f32>) -> f32 {
     return 1.0 - 0.8 * smoothstep(0.35, 0.6, cover) * lift;
 }
 
+// ---- the rain's cloud deck, shared by the sky and the light ----
+
+// The deck's large forms at `cell` (the cloud picture's cells, absolute: the place in the cell plus
+// the cell, as `scene.cloud_cells` and the sky's `uv` give them), 0..1: masses about nine cells
+// (a hundred blocks) across with forms of forty inside them. Low where the deck breaks open, high
+// where it stands up in towers. At three and a half cells the deck read as small repeating lumps,
+// "scales", beside Bliss's clouds hundreds of blocks big (Ronald: "Still looks so much worse the
+// bliss why ?", 11-05).
+fn deck_field(cell: vec2<f32>) -> f32 {
+    return noise3(vec3(cell.x / 9.0, 5.5, cell.y / 9.0)) * 0.7 + noise3(vec3(cell.x / 3.5, 9.5, cell.y / 3.5)) * 0.3;
+}
+
+// How open the deck is at a field value `n`, 0 closed to 1 a clear break; `wide` (0..1) opens the
+// breaks further (toward the sun, where light breaks through).
+fn deck_open(n: f32, wide: f32) -> f32 {
+    // At 0.24-0.4 a break opened in about one place in twenty and no beams showed (c2f2eb1c).
+    return 1.0 - smoothstep(0.32 + 0.08 * wide, 0.46 + 0.08 * wide, n);
+}
+
 // ---- light on things ----
 
 // Block light (red, green and blue levels 0..1) as color: warm firelight, whiter right at the
@@ -529,13 +548,21 @@ fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
     // dawn, 25-35 blocks up).
     let low = exp(-max(h - 3.0, 0.0) / mix(7.0 + 12.0 * min(canopy(), 1.0), 40.0, s));
     let high = exp(-max(h, 0.0) / 45.0);
-    let drift = vec3(wind_now().x, 0.0, wind_now().y) * scene.params.w * mix(0.6, 2.0, s);
-    let q = p - drift;
-    let shape = noise3(q * vec3(1.0 / 38.0, 1.0 / 12.0, 1.0 / 38.0)) * 0.7 + noise3(q * vec3(1.0 / 15.0, 1.0 / 8.0, 1.0 / 15.0)) * 0.3;
-    let eaten = noise3(q * vec3(1.0 / 6.0, 1.0 / 4.0, 1.0 / 6.0) + vec3(0.0, scene.params.w * 0.04, 0.0));
-    let banks = smoothstep(0.45, 0.66, shape - 0.25 * eaten + 0.12);
     // Deep under it, in the ground, there is none.
     let open = smoothstep(-24.0, -10.0, h);
+    // Banks: a broad octave, and a fine one that both shapes and eats them, rising slowly (one
+    // octave fewer than before: three noises a step were most of the mist's cost, +3.4 ms on the
+    // PC at 3456 px, Research round 15). Its weight keeps the mix's spread, so the banks cover as
+    // much. Well above the low layer, or under the ground, the banks barely count: their mean
+    // stands in and no noise is walked.
+    var banks = 0.3;
+    if low * open > 0.02 {
+        let drift = vec3(wind_now().x, 0.0, wind_now().y) * scene.params.w * mix(0.6, 2.0, s);
+        let q = p - drift;
+        let broad = noise3(q * vec3(1.0 / 38.0, 1.0 / 12.0, 1.0 / 38.0));
+        let fine = noise3(q * vec3(1.0 / 9.0, 1.0 / 5.5, 1.0 / 9.0) + vec3(0.0, scene.params.w * 0.03, 0.0));
+        banks = smoothstep(0.45, 0.66, broad * 0.7 + fine * 0.39 - 0.05);
+    }
     // The sun thins the banks by day to a third (mornings and evenings keep them); a storm's
     // blowing snow or dust it leaves.
     let burn = mix(1.0, mix(0.35, 1.0, s), smoothstep(0.25, 0.65, scene.sun.y));
@@ -632,10 +659,14 @@ fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let shaded_sky = light.sky * mix(vec3(1.0), LEAF_LIGHT * 0.2, leafy * 0.85) + light.leaf * leafy;
     // Jittered along the view per pixel, so the shafts' edges don't band.
     let jitter = fract(sin(dot(rel, vec3(12.9898, 78.233, 37.719))) * 43758.547) - 0.5;
-    let steps = 12u;
+    // 8 steps (12 before), and the shadow map asked once for each pair of them, between the two:
+    // the jitter blends the coarser shafts (Research round 15: the mist's cost, the shadow taps
+    // about 3 ms of it on the Mac).
+    let steps = 8u;
     var through = 1.0;
     var gained = vec3(0.0);
     var last = 0.0;
+    var lit = 1.0;
     for (var i = 1u; i <= steps; i++) {
         let k = f32(i) / f32(steps);
         let near = (exp(2.2 * k) - 1.0) / (exp(2.2) - 1.0);
@@ -646,7 +677,10 @@ fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
         let mid = at - step * (0.5 + 0.35 * jitter);
         let d = fog_density(eye + dir * mid, floor) * sky;
         let kept = exp(-d * step);
-        let lit = sun_reaches(dir * mid);
+        if (i & 1u) == 1u {
+            // At this step's far end, the pair's middle.
+            lit = sun_reaches(dir * (at - step * 0.35 * jitter));
+        }
         gained += through * (1.0 - kept) * (mix(shaded_sky, light.sky, lit) + light.sun * lit);
         through *= kept;
         last = at;
@@ -789,7 +823,54 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // In rain everything takes a little grey-blue wash, near too.
     let pale = mix(mix(c, vec3(luma(c)), clamp(veil.b * 0.6, 0.0, 0.3)), vec3(luma(c)) * vec3(0.92, 0.97, 1.05), rain * 0.08);
     let seen = mix(pale, lit, veil);
-    return mix(seen, lit, edge);
+    return mix(seen, lit, edge) + held_in_fog(rel, fog_here(sky));
+}
+
+// ---- light in the fog: torches (Research round 15, 6: Valheim's warm firelight in the mist) ----
+
+// How thick the air is about the eye, per block: the weather's mist where the player stands, rain's
+// own, and a little always; `sky` (0..1) the sky light where it is seen, as the mist and the rain
+// are out under the sky only.
+fn fog_here(sky: f32) -> f32 {
+    let mist = fog_density(scene.eye.xyz, fog_floor(vec3(0.0)));
+    let rain = rain_amount() * (0.0035 + 0.0055 * scene.weather.w);
+    return (mist + rain) * smoothstep(0.2, 0.7, sky) + 0.0015;
+}
+
+// The held light (`scene.hand`) scattered by the air between the eye and `rel`, `sigma` the air's
+// thickness (`fog_here`). A point light in even fog has a closed form along a straight look (the
+// airlight integral, without its dimming): the light falls off as the square of the distance, so
+// the integral of 1 / (h^2 + (t - t0)^2) over the look, h how far the look passes the light. The
+// flame is no point: h is never under about 0.7. Looking where the torch is held the glow is
+// strongest; looking back, half as much.
+fn held_in_fog(rel: vec3<f32>, sigma: f32) -> vec3<f32> {
+    let l = scene.hand_light.rgb;
+    if max(max(l.x, l.y), l.z) <= 0.0 {
+        return vec3(0.0);
+    }
+    let len = length(rel);
+    let dist = min(len, 48.0);
+    let dir = rel / max(len, 1e-4);
+    let at = scene.hand.xyz;
+    let t0 = dot(at, dir);
+    let h = sqrt(max(dot(at, at) - t0 * t0, 0.0) + 0.5);
+    let along = (atan((dist - t0) / h) + atan(t0 / h)) / h;
+    // Lit as surfaces are (a block away, its full light), scattered all round. Thick mist is capped:
+    // with its whole thickness, and a quarter of what a surface sends back, a torch in a dawn bank
+    // washed the whole view beige, the sky too (the after-rain check, 11-05).
+    // At 0.07 it hardly read at a sheet's size (+11 of 255 in red); twice that reads as firelight in
+    // the mist without washing it.
+    return block_light(l, scene.eye.xyz + at) * min(sigma, 0.04) * along * 0.14;
+}
+
+// Placed lights in the fog: the air just before a lit surface glows with the light there (`b`, its
+// block light levels), as deep as a few blocks of fog. Cheaper than walking the light: it stops at
+// the silhouettes, which the bloom softens.
+fn placed_in_fog(b: vec3<f32>, rel: vec3<f32>, pos: vec3<f32>, sigma: f32) -> vec3<f32> {
+    if max(max(b.x, b.y), b.z) <= 0.0 {
+        return vec3(0.0);
+    }
+    return block_light(b, pos) * min(sigma, 0.04) * min(length(rel), 4.0) * 0.6;
 }
 
 // ---- to the screen ----

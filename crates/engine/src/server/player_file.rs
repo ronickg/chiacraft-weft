@@ -82,7 +82,7 @@ impl Server {
         e.mode = self
             .storage
             .as_ref()
-            .map_or(GameMode::Survival, |s| saved_mode(&s.lock(), &key));
+            .map_or(GameMode::SURVIVAL, |s| saved_mode(&s.lock(), &key));
         (e.yaw, e.pitch) = (look[0], look[1]);
         (e.flying, e.fire) = (flying, fire);
         // The first connection is the one playing on this machine, the world's owner.
@@ -122,8 +122,9 @@ impl Server {
         p.joined = true;
         p.dim = dim;
         p.entity = id;
-        p.last_y = pos.y;
+        p.last_place = (None, pos);
         p.first_sync = true;
+        p.glow_sent = false;
         match &p.identity {
             Some(identity) => log::info!("{} joined (account identity {identity})", p.name),
             None => log::info!("{} joined", p.name),
@@ -132,16 +133,22 @@ impl Server {
             let left = self.players[pi].probation_left(&probation);
             self.players[pi]
                 .conn
-                .send(ToClient::Chat(Msg::new("admission.probation_on", vec![Arg::Int(left.div_ceil(60) as i64)])));
+                .send(ToClient::Show(crate::net::Shown::chat(Msg::new(
+                    "admission.probation_on",
+                    vec![Arg::Int(left.div_ceil(60) as i64)],
+                ))));
         }
         let p = &mut self.players[pi];
         let line = Msg::new("multiplayer.joined", vec![Arg::Text(p.name.clone())]);
         for q in self.players.iter_mut().filter(|q| q.joined) {
-            q.conn.send(ToClient::Chat(line.clone()));
+            q.conn
+                .send(ToClient::Show(crate::net::Shown::chat(line.clone())));
         }
         let p = &mut self.players[pi];
         p.conn
             .send(ToClient::Welcome { player: id, dim, pos, seed: self.cfg.seed, look, selected, flying });
+        self.send_lod_columns(pi, dim);
+        let p = &mut self.players[pi];
         p.conn.send(ToClient::Edits {
             dim,
             specs: self.dims[dim as usize]
@@ -161,7 +168,8 @@ impl Server {
             p.conn.send(ToClient::Died);
         }
         if dim == c.void_dim {
-            p.conn.send(ToClient::Chat(void_note(c)));
+            p.conn
+                .send(ToClient::Show(crate::net::Shown::chat(void_note(c))));
         }
         // The anchors of their achievements from this world (chiacraft), since they were here.
         self.send_anchor_proofs(pi);
@@ -176,6 +184,17 @@ impl Server {
             self.players[pi]
                 .conn
                 .send(ToClient::Skin { entity, png: png.to_vec() });
+        }
+        let avatars: Vec<(u64, Arc<crate::net::AvatarData>)> = self
+            .players
+            .iter()
+            .filter(|o| o.joined && o.entity != id)
+            .filter_map(|o| o.avatar.clone().map(|a| (o.entity, a)))
+            .collect();
+        for (entity, avatar) in avatars {
+            self.players[pi]
+                .conn
+                .send(ToClient::Avatar { entity, avatar: (*avatar).clone() });
         }
     }
 }
@@ -204,7 +223,7 @@ pub(super) fn save_player(s: &Storage, p: &Player, d: &Dim) {
     if p.lifted {
         text.push_str("probation = lifted\n");
     }
-    if e.mode != GameMode::Survival {
+    if e.mode != GameMode::SURVIVAL {
         text.push_str(&format!("mode = {}\n", e.mode.name()));
     }
     if let Some(inv) = d.entities.inventories.get(&p.entity) {
@@ -222,7 +241,9 @@ pub(super) fn save_player(s: &Storage, p: &Player, d: &Dim) {
     }
     for ((id, comp), bytes) in &d.entities.comps {
         if *id == p.entity && c.game.components[*comp as usize].flags & cf::SAVE != 0 {
-            text.push_str(&format!("comp.{} = {}\n", c.game.components[*comp as usize].name, persist::hex(bytes)));
+            let named = crate::stack::holds_stacks(c, *comp).then(|| crate::stack::contents_to_names(c, bytes));
+            let bytes = named.as_deref().unwrap_or(bytes);
+            text.push_str(&format!("comp.{} = {}\n", c.game.components[*comp as usize].name, crate::kv::hex(bytes)));
         }
     }
     // Whole or not at all: a crash in the middle must not leave half a player.
@@ -341,12 +362,9 @@ pub(super) fn load_player(c: &Content, s: &Storage, key: &str) -> Option<PlayerD
                         log::warn!("player {key}: dropped component {name} (not registered now)");
                     }
                     if let Some(id) = id {
-                        let mut b = persist::unhex(v);
-                        let size = c.game.components[id as usize].size as usize;
-                        if size > 0 {
-                            b.resize(size, 0);
-                        }
-                        comps.push((id, b.into_boxed_slice()));
+                        let bytes = crate::kv::unhex(v);
+                        let bytes = if crate::stack::holds_stacks(c, id) { crate::stack::contents_from_names(c, &bytes) } else { bytes };
+                        comps.push((id, c.game.fit_component(id, bytes)));
                     }
                 }
             }

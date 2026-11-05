@@ -23,7 +23,7 @@ async fn wait_text(t: &T, text: &str) -> R {
 
 pub async fn account(t: T) -> R {
     t.screen("core:title").await?;
-    t.check(t.c().open_screen(&screens::PROFILE), "cannot open the profile");
+    t.check(t.c().screen_open(&screens::PROFILE), "cannot open the profile");
     t.screen("core:profile").await?;
     t.frames(2).await?;
     t.shot("profile").await?;
@@ -69,7 +69,7 @@ pub async fn account(t: T) -> R {
     // Words that are not a phrase are refused; a phrase becomes the account from the next start.
     t.check(t.click_ui("id:restore_words", 0), "the restore field");
     t.frames(2).await?;
-    t.c().type_text("these are not the words");
+    t.c().input_type("these are not the words");
     t.frames(2).await?;
     t.check(t.click_ui("id:restore", 0), "the Restore button");
     t.frames(6).await?;
@@ -77,22 +77,22 @@ pub async fn account(t: T) -> R {
     t.check(!shown(&t, "Restored account"), "nonsense words restore nothing");
 
     // A fresh screen has an empty field.
-    t.c().close_screen();
+    t.c().screen_close();
     t.screen("core:profile").await?;
     t.click_until_screen("text:Account and Words", "core:account")
         .await?;
     t.frames(2).await?;
     t.check(t.click_ui("id:restore_words", 0), "the restore field again");
     t.frames(2).await?;
-    t.c().type_text(WORDS);
+    t.c().input_type(WORDS);
     t.frames(2).await?;
     t.check(t.click_ui("id:restore", 0), "the Restore button again");
     wait_text(&t, "Restored account").await?;
     t.shot("restored").await?;
 
-    t.c().close_screen();
+    t.c().screen_close();
     t.screen("core:profile").await?;
-    t.c().close_screen();
+    t.c().screen_close();
     t.screen("core:title").await?;
     Ok(())
 }

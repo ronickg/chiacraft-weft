@@ -10,16 +10,16 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use crossbeam_channel::{Receiver, Sender};
 use glam::IVec3;
-use weft_abi::TerrainColumn;
+use weft_abi::{TerrainColumn, expr as ek};
 use weft_noise::fixed::seed32;
 use weft_render::{Backend, BufferId, Cmd, CommandList, ComputeDesc, PipelineId, usage};
 
 use crate::content::{Content, content};
 use crate::server::area::{self, AreaFill};
-use crate::server::terrain::{Height, Mask};
+use crate::server::terrain::Expr;
 use crate::world::Cube;
 
-use crate::gpu_layout::terrain::{self as layout, binding, d, limit, mask, words};
+use crate::gpu_layout::terrain::{self as layout, binding, d, words};
 
 const OUT_WORDS: usize = words::OUT as usize;
 const CUSTOM_WORDS: usize = words::CUSTOM as usize;
@@ -31,7 +31,7 @@ const LOD_BATCH: usize = 64;
 pub static GPU_CUBES: AtomicU64 = AtomicU64::new(0);
 pub static GPU_MISMATCHES: AtomicU64 = AtomicU64::new(0);
 
-/// A cube for the GPU, with the heights of mods' own features (their code runs here).
+/// A cube for the GPU, with the heights of the features made on the CPU (mods' code runs here).
 pub struct Job {
     pub epoch: u64,
     pub dim: u32,
@@ -42,12 +42,13 @@ pub struct Job {
     pub done: Sender<super::terrain::Made>,
 }
 
-/// What `terrain.wgsl` reads for dimension `dim`, and the indices of the features that run
-/// mods' code (their heights go up with each cube); `None` when the GPU cannot make it.
+/// What `terrain.wgsl` reads for dimension `dim`, and the indices of the features made on the
+/// CPU (`Feature::custom`: mods' code; their heights go up with each job); `None` when the GPU
+/// cannot make it.
 pub fn describe(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<usize>)> {
     let def = &c.dims[dim as usize];
     let t = def.terrain.as_ref().filter(|_| def.builtin.is_none())?;
-    if t.features.len() > limit::FEATURES as usize || c.states.len() > 65536 {
+    if c.states.len() > 65536 {
         return None;
     }
     let mut w = vec![0i32; d::LEN as usize];
@@ -66,61 +67,68 @@ pub fn describe(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<usize
         put(d::LAVA_FROM, caves.lava_from);
         put(d::LAVA_TO, caves.lava_to);
     }
+    put(d::FIELDS, t.fields.len() as i32);
     put(d::FEATURES, t.features.len() as i32);
     put(d::RULES, t.rules.len() as i32);
     put(d::CAVE_BIOMES, t.cave_biomes.len() as i32);
     for (i, (_, salt)) in layout::SEEDS.iter().enumerate() {
         put(d::SEEDS + i as u32, seed32(seed, *salt) as i32);
     }
-    // Features, their masks after them.
+    // The records of fields, features and rules; their steps and conditions go after them.
+    w[d::FIELD_OFF as usize] = w.len() as i32;
+    let at = w.len();
+    let fw = words::FIELD as usize;
+    w.resize(at + t.fields.len() * fw, 0);
+    for (i, f) in t.fields.iter().enumerate() {
+        let (start, len) = steps(&mut w, &f.expr, seed);
+        w[at + i * fw..at + (i + 1) * fw].copy_from_slice(&[start, len]);
+    }
     w[d::FEAT_OFF as usize] = w.len() as i32;
     let at = w.len();
     let fw = words::FEATURE as usize;
     w.resize(at + t.features.len() * fw, 0);
     let mut custom = Vec::new();
     for (i, f) in t.features.iter().enumerate() {
-        let r = at + i * fw;
-        match f.height {
-            Height::Preset(kind, p) => {
-                w[r] = kind as i32;
-                w[r + 1..r + 5].copy_from_slice(&p);
-                w[r + 5] = -1;
-            }
-            Height::Custom(..) => {
-                w[r + 5] = custom.len() as i32;
-                custom.push(i);
-            }
-        }
-        if let Some(m) = &f.mask {
-            let start = w.len();
-            if postfix(m, seed, &mut w, 0)? > limit::MASK_DEPTH as usize {
-                return None;
-            }
-            w[r + 6] = start as i32;
-            w[r + 7] = ((w.len() - start) / words::MASK as usize) as i32;
-        }
+        let (height, mask) = (steps(&mut w, &f.height, seed), f.mask.as_ref().map_or((0, 0), |m| steps(&mut w, m, seed)));
+        let slot = if f.custom.is_some() {
+            custom.push(i);
+            custom.len() as i32 - 1
+        } else {
+            -1
+        };
+        w[at + i * fw..at + (i + 1) * fw].copy_from_slice(&[height.0, height.1, mask.0, mask.1, slot]);
     }
     w[d::RULE_OFF as usize] = w.len() as i32;
+    let at = w.len();
+    let rw = words::RULE as usize;
+    w.resize(at + t.rules.len() * rw, 0);
     let opt = |v: Option<u32>| v.map_or(-1, |v| v as i32);
-    for r in &t.rules {
-        let mut rule = [0i32; words::RULE as usize];
-        rule[0] = r.biome as i32;
-        (rule[1], rule[2]) = r.temperature;
-        (rule[3], rule[4]) = r.humidity;
-        (rule[5], rule[6]) = r.continent;
-        (rule[7], rule[8]) = r.height;
-        (rule[9], rule[10], rule[11]) = match r.feature {
-            None => (-1, 0, 0),
-            Some((i, lo, hi)) => (if i < 32 { i as i32 } else { -2 }, lo, hi),
-        };
-        rule[12] = opt(r.top);
-        rule[13] = opt(r.filler);
-        rule[14] = r.depth;
-        (rule[15], rule[16]) = r.under.map_or((-1, 0), |(b, n)| (b as i32, n));
-        (rule[17], rule[18]) = r.deep_top.map_or((-1, 0), |(b, y)| (b as i32, y));
-        rule[19] = opt(r.ice);
-        (rule[22], rule[23]) = r.bare_above.map_or((0, 0), |y| (1, y));
-        w.extend_from_slice(&rule);
+    for (i, r) in t.rules.iter().enumerate() {
+        let conditions = w.len() as i32;
+        for &(field, from, to) in &r.ranges {
+            w.extend_from_slice(&[field as i32, from, to]);
+        }
+        let under = r.under.map_or((-1, 0), |(b, n)| (b as i32, n));
+        let deep = r.deep_top.map_or((-1, 0), |(b, y)| (b as i32, y));
+        let bare = r.bare_above.map_or((0, 0), |y| (1, y));
+        let rule: [i32; words::RULE as usize] = [
+            r.biome as i32,
+            r.height.0,
+            r.height.1,
+            conditions,
+            r.ranges.len() as i32,
+            opt(r.top),
+            opt(r.filler),
+            r.depth,
+            under.0,
+            under.1,
+            deep.0,
+            deep.1,
+            opt(r.ice),
+            bare.0,
+            bare.1,
+        ];
+        w[at + i * rw..at + (i + 1) * rw].copy_from_slice(&rule);
     }
     w[d::CAVE_OFF as usize] = w.len() as i32;
     for (k, b) in t.cave_biomes.iter().enumerate() {
@@ -131,12 +139,24 @@ pub fn describe(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<usize
     Some((w, custom))
 }
 
+/// Appends the steps of `e` (the noise seeds made from `seed`); returns where they start and how many.
+fn steps(w: &mut Vec<i32>, e: &Expr, seed: u64) -> (i32, i32) {
+    let start = w.len() as i32;
+    for s in &e.0 {
+        let noisy = matches!(s.kind, ek::NOISE | ek::SITE);
+        w.extend_from_slice(&[s.kind as i32, if noisy { seed32(seed, s.salt) as i32 } else { 0 }, s.a, s.b, s.c]);
+    }
+    (start, e.0.len() as i32)
+}
+
 /// `describe` for distant terrain, with what steep faces need (`d::FACE_FALL`) and the
 /// dimension's scattered things (trees) after it (`d::SCATTER_OFF` points there): per scatter
 /// its cell, reach, hash seed, biome count and thinning (`ScatterThin`: its mask's place and
 /// length, keep), the mask's steps, then per biome the chance as a threshold on the site's bits
 /// (`dim::scatter_site`'s test, exactly), whether the thinning applies there and the crowns its
-/// shape callback makes there (`crown_of`), each site drawn with one of them.
+/// shape callback makes there (`crown_of`), each site drawn with one of them; then the ground it
+/// stands on (`ScatterDef::ground`) as state ranges (count, then first and count each), none for
+/// any.
 ///
 /// The crowns come from sample runs of the shape on real ground spread over the world: a run at
 /// one spot only said what that spot allowed (a clearing, a rock face), for every site.
@@ -151,7 +171,7 @@ pub fn describe_lod(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<u
     w[d::SCATTER_OFF as usize] = w.len() as i32;
     w.push(def.scatters.len() as i32);
     let biomes = c.biomes.len().max(1);
-    let mut buf = vec![weft_abi::ScatterBlock { offset: [0; 3], state: 0, force: 0 }; 4096];
+    let mut buf = vec![weft_abi::ScatterBlock { offset: [0; 3].into(), state: 0, force: 0 }; 4096];
     // Where the sample runs stand: spread over some 20 km, on the ground there.
     let spots: Vec<[i32; 3]> = (0..RUN_SPOTS as i32)
         .filter_map(|k| {
@@ -166,14 +186,8 @@ pub fn describe_lod(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<u
         let head = w.len();
         w.extend_from_slice(&[0, 0, 0]);
         if let Some(t) = &sc.thin {
-            let start = w.len();
-            if postfix(&t.mask, seed, &mut w, 0).is_some_and(|depth| depth <= limit::MASK_DEPTH as usize) {
-                w[head] = start as i32;
-                w[head + 1] = ((w.len() - start) / words::MASK as usize) as i32;
-                w[head + 2] = t.keep as i32;
-            } else {
-                w.truncate(start);
-            }
+            let (start, len) = steps(&mut w, t.mask.expr(), seed);
+            (w[head], w[head + 1], w[head + 2]) = (start, len, t.keep as i32);
         }
         for b in 0..biomes as u32 {
             let density = sc
@@ -190,7 +204,7 @@ pub fn describe_lod(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<u
                 let mut args = weft_abi::ScatterArgs {
                     seed,
                     dim,
-                    pos,
+                    pos: pos.into(),
                     biome: b,
                     random: weft_noise::mix(k as u64),
                     out: buf.as_mut_ptr(),
@@ -224,6 +238,11 @@ pub fn describe_lod(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<u
             }
             w.extend_from_slice(&entry);
         }
+        w.push(sc.ground.len() as i32);
+        for &b in &sc.ground {
+            let bd = &c.blocks[b as usize];
+            w.extend_from_slice(&[bd.first_state as i32, bd.states as i32]);
+        }
     }
     Some((w, custom))
 }
@@ -250,14 +269,14 @@ fn crown_of(blocks: &[weft_abi::ScatterBlock]) -> Option<(i32, [u32; 2])> {
     };
     let leaves = commonest(false, &|_| true).or_else(|| commonest(true, &|_| true))?;
     let crown: Vec<_> = blocks.iter().filter(|b| b.state == leaves).collect();
-    let top = crown.iter().map(|b| b.offset[1]).max()?;
-    let bottom = crown.iter().map(|b| b.offset[1]).min()?.clamp(0, top);
+    let top = crown.iter().map(|b| b.offset.y).max()?;
+    let bottom = crown.iter().map(|b| b.offset.y).min()?.clamp(0, top);
     // Out from the trunk at a layer, and at all.
-    let out = |b: &&weft_abi::ScatterBlock| ((b.offset[0] * b.offset[0] + b.offset[2] * b.offset[2]) as f32).sqrt();
+    let out = |b: &&weft_abi::ScatterBlock| ((b.offset.x * b.offset.x + b.offset.z * b.offset.z) as f32).sqrt();
     let width = |y: i32| {
         crown
             .iter()
-            .filter(|b| b.offset[1] == y)
+            .filter(|b| b.offset.y == y)
             .map(out)
             .fold(0.0f32, f32::max)
     };
@@ -274,19 +293,19 @@ fn crown_of(blocks: &[weft_abi::ScatterBlock]) -> Option<(i32, [u32; 2])> {
         if radius < 0.5 || top == widest { 15 } else { ((width((widest + top + 1) / 2) / radius * 15.0).round() as i32).clamp(1, 15) };
     // The trunk: what stands under the crown at its middle, as wide as it is at the bottom.
     let under = |b: &weft_abi::ScatterBlock| {
-        b.state != leaves && b.offset[0].abs() <= 3 && b.offset[2].abs() <= 3 && (0..bottom).contains(&b.offset[1])
+        b.state != leaves && b.offset.x.abs() <= 3 && b.offset.z.abs() <= 3 && (0..bottom).contains(&b.offset.y)
     };
     let trunk = commonest(false, &under).or_else(|| commonest(true, &under));
     let trunk_width = trunk.map_or(0, |t| {
         let low = blocks
             .iter()
             .filter(|b| b.state == t && under(b))
-            .map(|b| b.offset[1])
+            .map(|b| b.offset.y)
             .min()
             .unwrap_or(0);
         let n = blocks
             .iter()
-            .filter(|b| b.state == t && under(b) && b.offset[1] == low)
+            .filter(|b| b.state == t && under(b) && b.offset.y == low)
             .count();
         ((n as f32).sqrt().round() as u32).clamp(1, cr::TRUNK_MASK)
     });
@@ -300,42 +319,7 @@ fn crown_of(blocks: &[weft_abi::ScatterBlock]) -> Option<(i32, [u32; 2])> {
     Some((top, [shape, (leaves & cr::BLOCK_MASK) | (trunk.unwrap_or(0) & cr::BLOCK_MASK) << cr::TRUNK_BLOCK_SHIFT]))
 }
 
-/// Writes a mask as postfix steps (`words::MASK` each); returns the stack depth it needs.
-fn postfix(m: &Mask, seed: u64, w: &mut Vec<i32>, depth: usize) -> Option<usize> {
-    Some(match m {
-        Mask::Noise { salt, scale, octaves, from, to } => {
-            w.extend_from_slice(&[mask::NOISE as i32, seed32(seed, *salt) as i32, *scale, *octaves as i32, *from, *to]);
-            depth + 1
-        }
-        Mask::Continent(a, b) => {
-            w.extend_from_slice(&[mask::CONTINENT as i32, 0, 0, 0, *a, *b]);
-            depth + 1
-        }
-        Mask::Temperature(a, b) => {
-            w.extend_from_slice(&[mask::TEMPERATURE as i32, 0, 0, 0, *a, *b]);
-            depth + 1
-        }
-        Mask::Humidity(a, b) => {
-            w.extend_from_slice(&[mask::HUMIDITY as i32, 0, 0, 0, *a, *b]);
-            depth + 1
-        }
-        Mask::All(v) => {
-            let mut most = depth;
-            for (i, m) in v.iter().enumerate() {
-                most = most.max(postfix(m, seed, w, depth + i)?);
-            }
-            w.extend_from_slice(&[mask::ALL as i32, v.len() as i32, 0, 0, 0, 0]);
-            most.max(depth + 1)
-        }
-        Mask::Not(m) => {
-            let most = postfix(m, seed, w, depth)?;
-            w.extend_from_slice(&[mask::NOT as i32, 0, 0, 0, 0, 0]);
-            most
-        }
-    })
-}
-
-/// Heights of the mod features `custom` at the columns and corners of cube column (`x`, `z`),
+/// Heights of the CPU-made features `custom` at the columns and corners of cube column (`x`, `z`),
 /// for its jobs.
 pub fn custom_heights(c: &Content, dim: u32, seed: u64, x: i32, z: i32, custom: &[usize]) -> Arc<Vec<i32>> {
     let def = &c.dims[dim as usize];

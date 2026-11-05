@@ -7,7 +7,7 @@ use weft_sdk::*;
 
 use crate::birds::{self, Wings};
 
-pub(crate) static TURKEY_VULTURE: Entity = Entity::named("turkey_vulture");
+pub(crate) static TURKEY_VULTURE: EntityKind = EntityKind::named("turkey_vulture");
 
 static WINGS: Wings = Wings {
     model: "vulture",

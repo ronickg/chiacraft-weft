@@ -16,7 +16,7 @@ pub fn register(r: &mut Registry) {
     r.command("growth", "", |cmd| {
         let w = cmd.world();
         let Some(st) = w.entity(cmd.player()) else { return };
-        let pos = st.pos.map(|v| v.floor() as i32);
+        let pos = st.pos.block().to_array();
         let g = base_api::ground_at(&w, pos);
         // Standing on farmland (a little lower than a block: the feet are in its block), its
         // fertility too (`farming.rs`).
@@ -68,16 +68,15 @@ pub fn bear(e: &mut BlockEvent, block: &str, step: impl FnOnce(&mut BlockEvent))
 fn frost(e: &mut BlockEvent, block: &str) {
     let w = e.world();
     let pos = e.pos();
-    let below = [pos[0], pos[1] - 1, pos[2]];
-    let above = [pos[0], pos[1] + 1, pos[2]];
+    let (below, above) = (pos.below(), pos.above());
     match block {
         // A crop dies; the farmland stays.
         b if vitals::crops::of(b).is_some() => {
-            w.set(pos, 0);
+            w.set_block(pos, 0);
         }
         // The stalk dies from the top, down to the base, which sprouts again in spring.
-        "base:sugar_cane" | "base:cactus" if w.get(below) == e.state() && w.get(above) != e.state() => {
-            w.set(pos, 0);
+        "base:sugar_cane" | "base:cactus" if w.block(below) == e.state() && w.block(above) != e.state() => {
+            w.set_block(pos, 0);
         }
         _ => crate::wild::frost(e, block),
     }
@@ -89,7 +88,7 @@ pub fn next_age(e: &mut BlockEvent, max: u32) {
         .and_then(|a| a.parse::<u32>().ok())
         .unwrap_or(max);
     if age < max {
-        e.world().set_prop(e.pos(), "age", &(age + 1).to_string());
+        e.world().prop_set(e.pos(), "age", &(age + 1).to_string());
     }
 }
 

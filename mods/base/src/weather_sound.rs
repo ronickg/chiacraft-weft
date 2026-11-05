@@ -97,7 +97,7 @@ fn frame(c: &Client) {
         leafy: Default::default(),
     });
     let dt = st.dt.clamp(0.0, 0.5);
-    let eye = [st.pos[0], st.pos[1] + EYE, st.pos[2]];
+    let eye = [st.pos.x, st.pos.y + EYE, st.pos.z];
     // A flash: its thunder is on the way.
     if st.lightnings != s.flashes {
         s.flashes = st.lightnings;

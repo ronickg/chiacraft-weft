@@ -8,7 +8,9 @@
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
-pub(crate) static JAGUAR: Entity = Entity::named("jaguar");
+use crate::ModelFile;
+
+pub(crate) static JAGUAR: EntityKind = EntityKind::named("jaguar");
 const TEXTURE: &str = "jaguar/jaguar";
 
 pub fn init(r: &mut Registry) {
@@ -25,8 +27,8 @@ pub fn init(r: &mut Registry) {
     );
     r.entity(&JAGUAR)
         .size(animals_core::bodies::of("jaguar").0, animals_core::bodies::of("jaguar").1)
-        .health(45.0)
-        .speed(5.0)
+        .max_health(45.0)
+        .walk_speed(5.0)
         .attack_damage(9.0)
         .passive()
         .model_file("jaguar")
@@ -37,6 +39,7 @@ pub fn init(r: &mut Registry) {
             if !crate::screen::interact(&w, id, player) && !crate::knockout::feed(&w, id, player) {
                 crate::commands::interact(&w, id, player);
             }
+            false
         })
         .goals(
             Goals::new()

@@ -44,7 +44,7 @@ pub fn register(r: &mut Registry) {
     for c in CROPS.iter().filter(|c| c.block != "base:wheat") {
         if vitals::food::find(c.seed).is_none() {
             r.item(Item::generated(short(c.seed).into()))
-                .placed_block(Block::generated(short(c.block).into()))
+                .places(&Block::generated(short(c.block).into()))
                 .tag(&format!("crops/{}", short(c.seed)))
                 .tab(&crate::tabs::NATURAL);
         }
@@ -83,10 +83,10 @@ pub fn register(r: &mut Registry) {
     r.shapeless(c, "melon_seeds", 2, &["melon_slice"], 0);
 
     // Tall grass broken by a player gives now and then a seed of one of its biome's crops.
-    r.on(&BLOCK_BROKEN, |b| {
+    r.on(&actions::BREAK_BLOCK, |b| {
         let w = b.world();
         for e in b.iter().filter(|e| e.player != 0 && TALL_GRASS.is(e.state)) {
-            if w.creative(e.player) || unit(w.random()) >= crops::WILD_SEED_CHANCE {
+            if w.outside_survival(e.player) || unit(w.random()) >= crops::WILD_SEED_CHANCE {
                 continue;
             }
             let biome = name_of(abi::entry_kind::BIOME, w.biome(e.pos));
@@ -97,7 +97,7 @@ pub fn register(r: &mut Registry) {
             let c = found[(w.random() % found.len() as u64) as usize];
             if let Some(id) = Item::lookup(c.seed) {
                 let p = e.pos;
-                w.spawn_item([p[0] as f64 + 0.5, p[1] as f64 + 0.3, p[2] as f64 + 0.5], ItemStack::new(id, 1));
+                w.spawn_item([p.x as f64 + 0.5, p.y as f64 + 0.3, p.z as f64 + 0.5], ItemStack::new(id, 1));
             }
         }
     });
@@ -124,7 +124,7 @@ fn crop(r: &mut Registry, c: &'static Crop) {
         .no_item()
         // By warmth and water (`growth.rs`): `ripe` stages over its real days' pace; its last
         // waits for the season it ripens in (winter rye's summer).
-        .growth(growth::step_secs(c.block, ripe, 205.0), 9)
+        .grows(growth::step_secs(c.block, ripe, 205.0), 9)
         .on_grow(move |e| {
             let age = growth::age(e);
             // A ripe stem sets its fruit beside it in its season (`set_fruit`), again and again.
@@ -137,8 +137,7 @@ fn crop(r: &mut Registry, c: &'static Crop) {
             growth::grow(e, c.block, last, |e| grow_up(e, c))
         });
     // Paddy rice stands by water.
-    let b =
-        if vitals::plants::of(c.block).is_some_and(|p| p.water == vitals::plants::Water::Wet) { b.needs_near_support("#water") } else { b };
+    let b = if vitals::plants::of(c.block).is_some_and(|p| p.water == vitals::plants::Water::Wet) { b.needs_near("#water") } else { b };
     drop(b);
     if let Some(from) = c.tall {
         top(r, c, from);
@@ -184,9 +183,9 @@ fn top(r: &mut Registry, c: &'static Crop, from: u32) {
                 if b.player == 0 {
                     return;
                 }
-                let below = [b.pos[0], b.pos[1] - 1, b.pos[2]];
+                let below = b.pos.below();
                 let tool = if b.item == 0 { ItemStack::EMPTY } else { ItemStack::new(b.item, 1) };
-                w.break_block(below, tool, b.player, !w.creative(b.player));
+                w.break_block(below, tool, b.player, !w.outside_survival(b.player));
             }),
     );
 }
@@ -200,16 +199,15 @@ fn grow_up(e: &mut BlockEvent, c: &Crop) {
     }
     if c.tall_at(next) {
         let w = e.world();
-        let [x, y, z] = e.pos();
-        let above = [x, y + 1, z];
+        let above = e.pos().above();
         let Some(top) = Block::lookup(&format!("{}_top", c.block)) else { return };
-        let here = w.get(above);
+        let here = w.block(above);
         if here == 0 {
-            w.set(above, top);
+            w.set_block(above, top);
         } else if block_name(here).split('[').next() != block_name(top).split('[').next() {
             return;
         }
-        w.set_prop(above, "age", &next.to_string());
+        w.prop_set(above, "age", &next.to_string());
     }
     growth::next_age(e, c.ripe)
 }
@@ -218,12 +216,12 @@ fn grow_up(e: &mut BlockEvent, c: &Crop) {
 /// lies beside it (a vine bears one at a time where it lies).
 fn set_fruit(e: &mut BlockEvent, fruit: &str) {
     let w = e.world();
-    let [x, y, z] = e.pos();
+    let [x, y, z] = e.pos().to_array();
     let Some(id) = Block::lookup(fruit) else { return };
     const SIDES: [(i32, i32); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
     if SIDES
         .iter()
-        .any(|&(dx, dz)| w.get([x + dx, y, z + dz]) == id)
+        .any(|&(dx, dz)| w.block([x + dx, y, z + dz]) == id)
     {
         return;
     }
@@ -231,8 +229,8 @@ fn set_fruit(e: &mut BlockEvent, fruit: &str) {
     for k in 0..4 {
         let (dx, dz) = SIDES[(start + k) % 4];
         let at = [x + dx, y, z + dz];
-        if w.get(at) == 0 && PLANT_SOIL.on_block(w.get([x + dx, y - 1, z + dz])) {
-            w.set(at, id);
+        if w.block(at) == 0 && PLANT_SOIL.on_block(w.block([x + dx, y - 1, z + dz])) {
+            w.set_block(at, id);
             return;
         }
     }

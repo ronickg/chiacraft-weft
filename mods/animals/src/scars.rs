@@ -11,7 +11,7 @@ use crate::coats::{self, GENOME};
 use crate::species;
 
 pub fn init(r: &mut Registry) {
-    r.on(&ENTITY_HURT, |b| {
+    r.on(&actions::HURT, |b| {
         let w = b.world();
         for h in b.iter() {
             hurt(&w, h);
@@ -22,7 +22,7 @@ pub fn init(r: &mut Registry) {
 /// A blow: the bigger the share of its health it took, the likelier a scar (none under a
 /// twelfth, at most six in ten).
 fn hurt(w: &World, h: &abi::Hurt) {
-    let Some(a) = w.component(h.entity, &ANIMAL).copied() else { return };
+    let Some(a) = w.component(h.entity, &ANIMAL) else { return };
     let Some(s) = a.species() else { return };
     let max = a.stat(species::HEALTH);
     if max <= 0.0 {
@@ -33,9 +33,9 @@ fn hurt(w: &World, h: &abi::Hurt) {
         return;
     }
     let kind = match h.cause {
-        damage::FIRE | damage::LAVA | damage::EXPLOSION => coats::BURN,
-        damage::ATTACK => by_attacker(w, h.source),
-        damage::GENERIC => coats::SLASH,
+        damage_cause::FIRE | damage_cause::LAVA | damage_cause::EXPLOSION => coats::BURN,
+        damage_cause::ATTACK => by_attacker(w, h.source),
+        damage_cause::GENERIC => coats::SLASH,
         // Falls, crushing, drowning, hunger leave nothing to see.
         _ => return,
     };

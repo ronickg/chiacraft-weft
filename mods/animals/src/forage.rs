@@ -68,7 +68,7 @@ pub fn init(r: &mut Registry) {
         };
         let w = q.world();
         let coming = q.query().amount.max(1.0) as u32;
-        let near = kind_near(&w, s, q.pos());
+        let near = kind_near(&w, s, q.pos().to_array());
         if !animals_core::life::room_for(near, coming, s.crowd()) {
             weft_sdk::info!("no room for {coming} {} at {:?}: {near:.1} near, room for {}", s.name, q.pos(), s.crowd());
             return Verdict::Deny;
@@ -77,7 +77,7 @@ pub fn init(r: &mut Registry) {
             return Verdict::Abstain;
         }
         let floor = animals_core::needs::SPAWN_FLOOR;
-        let come = floor + (1.0 - floor) * season_lush(&w, s, q.pos());
+        let come = floor + (1.0 - floor) * season_lush(&w, s, q.pos().to_array());
         if (w.random_below(10_000) as f32) < come * 10_000.0 { Verdict::Abstain } else { Verdict::Deny }
     });
 }
@@ -85,7 +85,7 @@ pub fn init(r: &mut Registry) {
 /// How much its kind crowds the spot `pos` (`life::crowding` each, within `life::CROWD_RADIUS`):
 /// what natural spawning weighs against its room (`life::room_for`; `/animal room` shows it).
 pub fn kind_near(w: &World, s: &Species, pos: [i32; 3]) -> f64 {
-    w.near(pos.map(|v| v as f64 + 0.5), animals_core::life::CROWD_RADIUS, Some(s.kind))
+    w.entities_near(pos.map(|v| v as f64 + 0.5), animals_core::life::CROWD_RADIUS, Some(s.kind))
         .into_iter()
         .filter_map(|o| w.component(o, &ANIMAL))
         .map(|o| animals_core::life::crowding(o.stage))
@@ -183,7 +183,7 @@ fn nearest(w: &World, s: &Species, pos: [f64; 3]) -> Option<[i32; 3]> {
                 if best.is_some_and(|(_, b)| d >= b) {
                     continue;
                 }
-                match food(s, w.get(at), now) {
+                match food(s, w.block(at), now) {
                     Some(src) if !src.fallback() => best = Some((at, d)),
                     Some(_) if ground.is_none_or(|(_, b)| d < b) => ground = Some((at, d)),
                     _ => {}
@@ -224,10 +224,10 @@ fn edible(w: &World, s: &animals_core::species::Species, id: u64) -> Option<f32>
 
 /// The nearest dropped food of its diet within `radius` blocks of `pos`: the item, where it is.
 pub fn ground_food(w: &World, s: &animals_core::species::Species, pos: [f64; 3], radius: f64) -> Option<(u64, [f64; 3])> {
-    w.near(pos, radius, None)
+    w.entities_near(pos, radius, None)
         .into_iter()
         .filter(|&t| edible(w, s, t).is_some())
-        .filter_map(|t| Some((t, w.entity(t)?.pos)))
+        .filter_map(|t| Some((t, w.entity(t)?.pos.to_array())))
         .min_by(|a, b| dist2(a.1, pos).total_cmp(&dist2(b.1, pos)))
 }
 
@@ -264,9 +264,9 @@ pub fn forage(w: &World, id: u64, st: &EntityState) -> bool {
     if crate::drink::drink(w, id, st) {
         return true;
     }
-    let Some(a) = w.component(id, &ANIMAL).copied() else { return false };
+    let Some(a) = w.component(id, &ANIMAL) else { return false };
     let Some(s) = a.species() else { return false };
-    let Some(mut f) = w.component(id, &FORAGE).copied() else { return false };
+    let Some(mut f) = w.component(id, &FORAGE) else { return false };
     let full = a.food as f32 / a.stat(species::FOOD).max(1.0);
     // Only an animal that gets hungry, and whose food the world grows or drops.
     let grows = s.eats.iter().any(|&(c, _)| vitals::forage::grows(c));
@@ -279,12 +279,12 @@ pub fn forage(w: &World, id: u64, st: &EntityState) -> bool {
         }
         return false;
     }
-    let now = w.time() as f64;
+    let now = w.game_time() as f64;
     // Going to food on the ground, or eating it.
-    let item = w.component(id, &ITEM).copied().unwrap_or(0);
+    let item = w.component(id, &ITEM).unwrap_or(0);
     if item != 0 {
         if let (Some(e), Some(grams)) = (w.entity(item), edible(w, s, item)) {
-            if reach(e.pos, st.pos) {
+            if reach(e.pos.to_array(), st.pos.to_array()) {
                 if now < f[3] {
                     return true; // chewing
                 }
@@ -303,16 +303,16 @@ pub fn forage(w: &World, id: u64, st: &EntityState) -> bool {
     }
     let target = (!f[0].is_nan() && f[3] != 0.0).then(|| [f[0], f[1], f[2]]);
     let close = target.is_some_and(|t| {
-        let (dx, dz) = (t[0] + 0.5 - st.pos[0], t[2] + 0.5 - st.pos[2]);
+        let (dx, dz) = (t[0] + 0.5 - st.pos.x, t[2] + 0.5 - st.pos.z);
         // Within reach of its mouth: two blocks for even a small one standing beside it.
-        dx * dx + dz * dz <= 4.0 && (t[1] - st.pos[1]).abs() <= 2.5
+        dx * dx + dz * dz <= 4.0 && (t[1] - st.pos.y).abs() <= 2.5
     });
     if close && let Some(t) = target {
         if now < f[3] {
             return true; // chewing
         }
         let at = t.map(|v| v as i32);
-        if let Some(src) = food(s, w.get(at), season(w)) {
+        if let Some(src) = food(s, w.block(at), season(w)) {
             // Growing food feeds as well as it grows now: dry-season grass is poor fodder.
             let fodder = if src.renews.is_some() { 0.4 + 0.6 * lush(w, s, at) } else { 1.0 };
             animal::feed(w, id, (src.food as f32 * fodder).round().max(1.0) as u16);
@@ -326,11 +326,11 @@ pub fn forage(w: &World, id: u64, st: &EntityState) -> bool {
             match src.eaten {
                 Eaten::Becomes(name) => {
                     if let Some(b) = becomes(name) {
-                        w.set(at, b);
+                        w.set_block(at, b);
                     }
                 }
                 Eaten::Age(age) => {
-                    w.set_prop(at, "age", &age.to_string());
+                    w.prop_set(at, "age", &age.to_string());
                 }
                 Eaten::Stays => {}
             }
@@ -345,14 +345,14 @@ pub fn forage(w: &World, id: u64, st: &EntityState) -> bool {
         // Walking to it; or nothing near, wandering on.
         return target.is_some();
     }
-    if let Some((t, p)) = ground_food(w, s, st.pos, ITEM_LOOK) {
+    if let Some((t, p)) = ground_food(w, s, st.pos.to_array(), ITEM_LOOK) {
         w.navigate(id, p, 1.0);
         w.component_mut(id, &ITEM).map(|i| *i = t);
         w.component_mut(id, &FORAGE)
             .map(|c| *c = [p[0], p[1], p[2], now + WALK]);
         return true;
     }
-    match grows.then(|| nearest(w, s, st.pos)).flatten() {
+    match grows.then(|| nearest(w, s, st.pos.to_array())).flatten() {
         Some(p) => {
             w.navigate(id, [p[0] as f64 + 0.5, p[1] as f64, p[2] as f64 + 0.5], 1.0);
             f = [p[0] as f64, p[1] as f64, p[2] as f64, now + WALK];

@@ -72,7 +72,7 @@ const SCENTS: [(&str, &str); 17] = [
     ("base:arrow", "base:skeleton"),
 ];
 /// The kinds tracked, made once (by `SCENTS`' animal).
-static TRACKED: std::sync::OnceLock<Vec<(&'static str, &'static Entity)>> = std::sync::OnceLock::new();
+static TRACKED: std::sync::OnceLock<Vec<(&'static str, &'static EntityKind)>> = std::sync::OnceLock::new();
 
 /// Two minutes of tracking; a mark lasts five seconds.
 const TRACK_TICKS: u32 = 2400;
@@ -133,10 +133,10 @@ pub fn init(r: &mut Registry) {
     );
     r.loot(&GIFTS[3])
         .pool(Pool::new().entry(gift("base:diamond", 1)));
-    let mut tracked: Vec<(&'static str, &'static Entity)> = Vec::new();
+    let mut tracked: Vec<(&'static str, &'static EntityKind)> = Vec::new();
     for (_, kind) in SCENTS {
         if !tracked.iter().any(|(k, _)| *k == kind) {
-            tracked.push((kind, Entity::generated(kind.to_string())));
+            tracked.push((kind, EntityKind::generated(kind.to_string())));
         }
     }
     let _ = TRACKED.set(tracked);
@@ -158,7 +158,7 @@ fn alarm_range(a: &animal::Animal) -> f64 {
 /// A goal for chihuahuas (never takes the turn): a tame barks at the nearest monster that came
 /// within range and marks it; the mark shows above it for a while.
 pub fn alarm(w: &World, id: u64, st: &EntityState) -> bool {
-    let Some(sig) = w.component(id, &SIGNATURE).copied() else { return false };
+    let Some(sig) = w.component(id, &SIGNATURE) else { return false };
     if sig.mark_ticks > 0 {
         let e = w.tick_elapsed(id);
         set(w, id, |s| s.mark_ticks = s.mark_ticks.saturating_sub(e));
@@ -168,13 +168,13 @@ pub fn alarm(w: &World, id: u64, st: &EntityState) -> bool {
             mark(w, &m);
         }
     }
-    if (w.time() + id) % 10 != 0 || !animal::tamed(w, id) {
+    if (w.game_time() + id) % 10 != 0 || !animal::tamed(w, id) {
         return false;
     }
-    let Some(a) = w.component(id, &ANIMAL).copied() else { return false };
+    let Some(a) = w.component(id, &ANIMAL) else { return false };
     let range = alarm_range(&a);
     let nearest = w
-        .near(st.pos, range, None)
+        .entities_near(st.pos, range, None)
         .into_iter()
         .filter_map(|t| Some((t, w.entity(t)?)))
         .filter(|(_, e)| HOSTILE.on_entity(e.kind) && e.health > 0.0)
@@ -184,7 +184,7 @@ pub fn alarm(w: &World, id: u64, st: &EntityState) -> bool {
         && t != sig.barked_at
         && sig.mark_ticks + 40 < MARK_TICKS
     {
-        bark(w, st.pos);
+        bark(w, st.pos.to_array());
         mark(w, &e);
         set(w, id, |s| {
             s.barked_at = t;
@@ -201,14 +201,14 @@ fn bark(w: &World, at: [f64; 3]) {
 
 fn mark(w: &World, e: &EntityState) {
     drop(
-        w.spawn_particles(&MARK, [e.pos[0], e.pos[1] + e.size[1] as f64 + 0.5, e.pos[2]])
+        w.spawn_particles(&MARK, [e.pos.x, e.pos.y + e.size.height as f64 + 0.5, e.pos.z])
             .count(1)
             .spread(0.0),
     );
 }
 
 /// The animal a chihuahua finds by `item`, if it has a scent.
-fn scent(item: u32) -> Option<(u32, &'static Entity)> {
+fn scent(item: u32) -> Option<(u32, &'static EntityKind)> {
     let name = item_name(item);
     let kind = SCENTS.iter().find(|(i, _)| *i == name)?.1;
     let tracked = TRACKED.get()?;
@@ -231,7 +231,7 @@ pub fn track(w: &World, id: u64, item: u32) -> bool {
         s.track_ticks = TRACK_TICKS;
     });
     if let Some(st) = w.entity(id) {
-        bark(w, st.pos);
+        bark(w, st.pos.to_array());
     }
     true
 }
@@ -239,14 +239,14 @@ pub fn track(w: &World, id: u64, item: u32) -> bool {
 /// A goal for chihuahuas, before commands: tracking, it heads for the nearest animal of the
 /// kind, waits when its owner falls behind, and barks and marks it when there.
 pub fn tracking(w: &World, id: u64, st: &EntityState) -> bool {
-    let Some(sig) = w.component(id, &SIGNATURE).copied().filter(|s| s.track > 0) else { return false };
+    let Some(sig) = w.component(id, &SIGNATURE).filter(|s| s.track > 0) else { return false };
     if sig.track_ticks == 0 || w.component(id, &ORDERS).is_some_and(|o| o.target != 0) {
         set(w, id, |s| s.track = 0);
         return false;
     }
     let e = w.tick_elapsed(id);
     set(w, id, |s| s.track_ticks = s.track_ticks.saturating_sub(e));
-    if (w.time() + id) % 10 != 0 {
+    if (w.game_time() + id) % 10 != 0 {
         return true;
     }
     let Some(kind) = TRACKED
@@ -257,14 +257,14 @@ pub fn tracking(w: &World, id: u64, st: &EntityState) -> bool {
         return false;
     };
     let found = w
-        .near(st.pos, TRACK_RANGE, Some(kind))
+        .entities_near(st.pos, TRACK_RANGE, Some(kind))
         .into_iter()
         .filter_map(|t| Some((t, w.entity(t)?)))
         .min_by(|a, b| dist2(a.1.pos, st.pos).total_cmp(&dist2(b.1.pos, st.pos)));
     let Some((t, e)) = found else {
         // Nothing to find: it gives up.
         drop(
-            w.spawn_particles(&POOF, [st.pos[0], st.pos[1] + 0.5, st.pos[2]])
+            w.spawn_particles(&POOF, [st.pos.x, st.pos.y + 0.5, st.pos.z])
                 .count(4)
                 .spread(0.2),
         );
@@ -272,7 +272,7 @@ pub fn tracking(w: &World, id: u64, st: &EntityState) -> bool {
         return false;
     };
     if dist2(e.pos, st.pos) < 3.0 * 3.0 {
-        bark(w, st.pos);
+        bark(w, st.pos.to_array());
         set(w, id, |s| {
             s.track = 0;
             s.marked = t;
@@ -302,8 +302,8 @@ pub fn gifts(w: &World, id: u64, st: &EntityState) -> bool {
     if !animal::tamed(w, id) {
         return false;
     }
-    let Some(sig) = w.component(id, &SIGNATURE).copied() else { return false };
-    let Some(a) = w.component(id, &ANIMAL).copied() else { return false };
+    let Some(sig) = w.component(id, &SIGNATURE) else { return false };
+    let Some(a) = w.component(id, &ANIMAL) else { return false };
     if sig.carrying == 0 {
         if sig.timer == 0 {
             let wait = GIFT_TICKS.0 + w.random_below(GIFT_TICKS.1 - GIFT_TICKS.0);
@@ -327,18 +327,18 @@ pub fn gifts(w: &World, id: u64, st: &EntityState) -> bool {
     }
     if dist2(p.pos, st.pos) > 1.8 * 1.8 {
         crate::wake(w, id, 1);
-        if (w.time() + id) % 10 == 0 || !w.navigating(id) {
+        if (w.game_time() + id) % 10 == 0 || !w.navigating(id) {
             w.navigate(id, p.pos, 1.1);
         }
         return true;
     }
     for stack in w.roll_loot(&GIFTS[gift_tier(w, &a)], &no_loot_ctx()) {
-        w.spawn_item([p.pos[0], p.pos[1] + 0.3, p.pos[2]], stack);
+        w.spawn_item([p.pos.x, p.pos.y + 0.3, p.pos.z], stack);
     }
     weft_sdk::info!("cat {id} brought {player} a gift");
     set(w, id, |s| s.carrying = 0);
     drop(
-        w.spawn_particles(&HEART, [st.pos[0], st.pos[1] + 0.6, st.pos[2]])
+        w.spawn_particles(&HEART, [st.pos.x, st.pos.y + 0.6, st.pos.z])
             .count(3)
             .spread(0.3)
             .velocity([0.0, 0.6, 0.0]),
@@ -380,23 +380,23 @@ fn aura(a: &animal::Animal) -> f64 {
 
 /// Whether `pos` is within some capybara's calm.
 pub fn calm(w: &World, pos: [f64; 3]) -> bool {
-    w.near(pos, 20.0, Some(&crate::capybara::CAPYBARA))
+    w.entities_near(pos, 20.0, Some(&crate::capybara::CAPYBARA))
         .into_iter()
         .any(|c| {
             let (Some(e), Some(a)) = (w.entity(c), w.component(c, &ANIMAL)) else { return false };
-            dist2(e.pos, pos) < aura(a).powi(2)
+            dist2(e.pos, pos) < aura(&a).powi(2)
         })
 }
 
 /// A goal for capybaras (never takes the turn): once a second, the animals around it settle;
 /// tames staying there grow their bond now and then. A few motes show the calm.
 pub fn calm_aura(w: &World, id: u64, st: &EntityState) -> bool {
-    if (w.time() + id) % 20 != 0 {
+    if (w.game_time() + id) % 20 != 0 {
         return false;
     }
-    let Some(a) = w.component(id, &ANIMAL).copied() else { return false };
+    let Some(a) = w.component(id, &ANIMAL) else { return false };
     let radius = aura(&a);
-    for other in w.near(st.pos, radius, None) {
+    for other in w.entities_near(st.pos, radius, None) {
         if other == id || w.component(other, &ANIMAL).is_none() {
             continue;
         }
@@ -419,7 +419,7 @@ pub fn calm_aura(w: &World, id: u64, st: &EntityState) -> bool {
         let a = w.random_below(628) as f64 / 100.0;
         let r = 1.0 + w.random_below(100) as f64 / 100.0 * (radius / 3.0);
         drop(
-            w.spawn_particles(&CALM, [st.pos[0] + a.cos() * r, st.pos[1] + 0.4, st.pos[2] + a.sin() * r])
+            w.spawn_particles(&CALM, [st.pos.x + a.cos() * r, st.pos.y + 0.4, st.pos.z + a.sin() * r])
                 .count(1)
                 .spread(0.2),
         );

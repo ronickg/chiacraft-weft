@@ -20,6 +20,11 @@ pub fn terrain(r: &mut Registry) {
         .sea(SEA, "water");
     // Biomes shape the land through their climate, not their borders, so nothing seams: the cold
     // flattens hills into tundra, deserts get dunes and mesas, rivers run where it's wet enough.
+    // The fields the rules ask for (the mountains, the sequoia groves, the snow's drifts), then
+    // the features.
+    for (name, field) in l::rule_fields() {
+        t = t.field(name, field);
+    }
     for f in l::features() {
         t = t.feature(f);
     }
@@ -71,21 +76,21 @@ pub fn terrain(r: &mut Registry) {
         t = t.biome(snow(format!("snow_{i}")).height(line..)).biome(
             snow(format!("snow_{i}_drift"))
                 .height(line - l::SNOW_DRIFT..)
-                .feature("snow_drift", l::SNOW_DRIFT_FROM..),
+                .field(l::SNOW_DRIFT_FIELD, l::SNOW_DRIFT_FROM..),
         );
         low = below;
     }
     // A creek in the mountains lies on gravel.
     t = t.biome(
         BiomeRule::new("mountains")
-            .feature("mountains", l::MOUNTAIN_BIOME..)
+            .field(l::MOUNTAINS_FIELD, l::MOUNTAIN_BIOME..)
             .deep_top("gravel", SEA),
     );
     // Giant sequoia groves, on the mountains' front slopes (`base_api::land::SEQUOIA_AREA`).
     t = t.biome(
         BiomeRule::new("sequoia_grove")
             .height(SEA + l::SEQUOIA_RISE.0..=SEA + l::SEQUOIA_RISE.1)
-            .feature("sequoia_groves", l::SEQUOIA_GROVE..),
+            .field(l::SEQUOIA_FIELD, l::SEQUOIA_GROVE..),
     );
     for (biome, bed) in l::RIVER_BEDS {
         let mut rule = BiomeRule::new(biome).deep_top(bed, SEA);
@@ -106,15 +111,15 @@ pub fn terrain(r: &mut Registry) {
             }
         });
 
-    r.decorate(rock_faces).dimension(&crate::OVERWORLD);
-    r.decorate(cave_mouths).dimension(&crate::OVERWORLD);
-    r.decorate(glaciers).dimension(&crate::OVERWORLD);
-    r.decorate(tarn_water).dimension(&crate::OVERWORLD);
-    r.decorate(fray_borders).dimension(&crate::OVERWORLD);
-    r.decorate(sea_sand).dimension(&crate::OVERWORLD);
-    r.decorate(coral).dimension(&crate::OVERWORLD);
-    r.decorate(landmarks).dimension(&crate::OVERWORLD);
-    r.decorate(tropical_water).dimension(&crate::OVERWORLD);
+    r.decoration(rock_faces).dimension(&crate::OVERWORLD);
+    r.decoration(cave_mouths).dimension(&crate::OVERWORLD);
+    r.decoration(glaciers).dimension(&crate::OVERWORLD);
+    r.decoration(tarn_water).dimension(&crate::OVERWORLD);
+    r.decoration(fray_borders).dimension(&crate::OVERWORLD);
+    r.decoration(sea_sand).dimension(&crate::OVERWORLD);
+    r.decoration(coral).dimension(&crate::OVERWORLD);
+    r.decoration(landmarks).dimension(&crate::OVERWORLD);
+    r.decoration(tropical_water).dimension(&crate::OVERWORLD);
 }
 
 static WET: Tag = Tag::named("wet");
@@ -254,7 +259,7 @@ static SOIL: std::sync::LazyLock<[u32; 5]> = std::sync::LazyLock::new(|| [GRASS.
 fn rock_faces(g: &mut Gen) {
     let Some(&cols) = g.columns() else { return };
     let seed = g.seed();
-    let [ox, oy, oz] = g.origin();
+    let [ox, oy, oz] = g.origin().to_array();
     let max_h = cols.iter().map(|c| c.height).max().unwrap_or(0);
     let min_h = cols.iter().map(|c| c.height).min().unwrap_or(0);
     if oy > max_h || oy + 15 < min_h - l::ROCK_MAX_DEPTH {
@@ -289,7 +294,7 @@ fn rock_faces(g: &mut Gen) {
 /// on the ground stay). After the rock faces, before the plants, which then grow on what it left.
 fn fray_borders(g: &mut Gen) {
     let Some(&cols) = g.columns() else { return };
-    let [ox, oy, oz] = g.origin();
+    let [ox, oy, oz] = g.origin().to_array();
     let f = l::fields(g.seed());
     for z in 0..16usize {
         for x in 0..16usize {
@@ -314,7 +319,7 @@ fn fray_borders(g: &mut Gen) {
 /// become sand. After the borders' fray, before the plants (which then find sand).
 fn sea_sand(g: &mut Gen) {
     let Some(&cols) = g.columns() else { return };
-    let [ox, oy, oz] = g.origin();
+    let [ox, oy, oz] = g.origin().to_array();
     if oy > SEA + 1 || oy + 15 < SEA - 1 - l::SEA_SAND_DEEP {
         return;
     }
@@ -340,7 +345,7 @@ fn sea_sand(g: &mut Gen) {
 /// it is in the same cube, so neighbouring cubes agree.
 fn cave_mouths(g: &mut Gen) {
     let Some(&cols) = g.columns() else { return };
-    let [ox, oy, oz] = g.origin();
+    let [ox, oy, oz] = g.origin().to_array();
     let max_h = cols.iter().map(|c| c.height).max().unwrap_or(0);
     let min_h = cols.iter().map(|c| c.height).min().unwrap_or(0);
     // The surface and the few blocks under it.
@@ -433,7 +438,7 @@ fn cave_mouths(g: &mut Gen) {
 /// on its own: the spring a source, the block in front of it flowing (amount 7, `drop_off` 1),
 /// under that a falling column down to the sea's surface, which doesn't spread over the sea.
 fn landmarks(g: &mut Gen) {
-    let [ox, oy, oz] = g.origin();
+    let [ox, oy, oz] = g.origin().to_array();
     let seed = g.seed();
     let f = l::fields(seed);
     let inside = |x: i32, y: i32, z: i32| (ox..ox + 16).contains(&x) && (oy..oy + 16).contains(&y) && (oz..oz + 16).contains(&z);
@@ -474,7 +479,7 @@ fn landmarks(g: &mut Gen) {
 /// `GLACIER_THICK` blocks of a valley's floor glacier ice, under the snow. After the rock faces.
 fn glaciers(g: &mut Gen) {
     let Some(&cols) = g.columns() else { return };
-    let [ox, oy, oz] = g.origin();
+    let [ox, oy, oz] = g.origin().to_array();
     let max_h = cols.iter().map(|c| c.height).max().unwrap_or(0);
     let min_h = cols.iter().map(|c| c.height).min().unwrap_or(0);
     // High ground only: the lowest snow line less the glaciers' reach under it.
@@ -523,7 +528,7 @@ fn glaciers(g: &mut Gen) {
 fn tropical_water(g: &mut Gen) {
     let Some(&cols) = g.columns() else { return };
     let tropical = crate::worldgen::TROPICAL_FOREST.id();
-    let [ox, oy, oz] = g.origin();
+    let [ox, oy, oz] = g.origin().to_array();
     if !cols.iter().any(|c| c.biome == tropical) || oy > SEA + l::IGAPO_RISE.max(l::IGARAPE_RISE) || oy + 15 < SEA - 1 {
         return;
     }
@@ -559,7 +564,7 @@ fn tropical_water(g: &mut Gen) {
 /// run out. After the glaciers, before the plants.
 fn tarn_water(g: &mut Gen) {
     let Some(&cols) = g.columns() else { return };
-    let [ox, oy, oz] = g.origin();
+    let [ox, oy, oz] = g.origin().to_array();
     let lowest = cols.iter().map(|c| c.height).min().unwrap_or(0);
     // Tarns stand high: under the lowest snow line, in the mountains; nothing here under the sea.
     if oy + 15 < lowest - 1 || oy + 15 <= SEA {
@@ -603,7 +608,7 @@ fn tarn_water(g: &mut Gen) {
 fn coral(g: &mut Gen) {
     let Some(&cols) = g.columns() else { return };
     let (reef, lagoon) = (crate::worldgen::CORAL_REEF.id(), crate::worldgen::LAGOON.id());
-    let [ox, oy, oz] = g.origin();
+    let [ox, oy, oz] = g.origin().to_array();
     if oy > SEA || oy + 15 < SEA - 8 || !cols.iter().any(|c| c.biome == reef || c.biome == lagoon) {
         return;
     }

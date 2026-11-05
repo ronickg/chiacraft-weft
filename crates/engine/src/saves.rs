@@ -39,12 +39,14 @@ pub struct WorldMeta {
     pub times: Vec<(String, u64)>,
     /// What `/time` moved each dimension's time of day by.
     pub day_offsets: Vec<(String, i64)>,
-    /// Each dimension's weather: raining, thunder, the tick it changes.
-    pub weather: Vec<(String, bool, bool, u64)>,
+    /// Each dimension's weather by name, and the tick it changes.
+    pub weather: Vec<(String, String, u64)>,
     /// Players given a permission level: their key and the level.
     pub ops: Vec<(String, u32)>,
     /// Area edits per dimension (`server::area::AreaFill::spec`), in order.
     pub edits: Vec<(String, String)>,
+    /// Cubes kept loaded per dimension (`server::forced`).
+    pub forced: Vec<(String, String)>,
     pub next_entity: u64,
     /// The world's settings (`config_scope::WORLD`: game rules, `/rule`).
     pub configs: Vec<(String, f64)>,
@@ -79,6 +81,7 @@ impl WorldMeta {
             ops: Vec::new(),
             weather: Vec::new(),
             edits: Vec::new(),
+            forced: Vec::new(),
             next_entity: 1,
             configs: Vec::new(),
             mods: Vec::new(),
@@ -99,13 +102,22 @@ impl WorldMeta {
                 "created" => m.created = v.parse().unwrap_or(0),
                 _ => {
                     if let Some(d) = k.strip_prefix("weather.") {
-                        let n: Vec<u64> = v
-                            .split_whitespace()
-                            .filter_map(|x| x.parse().ok())
-                            .collect();
-                        if let [rain, thunder, until] = n[..] {
-                            m.weather
-                                .push((d.to_string(), rain != 0, thunder != 0, until));
+                        let w: Vec<&str> = v.split_whitespace().collect();
+                        match w[..] {
+                            [name, until] => m
+                                .weather
+                                .push((d.to_string(), name.to_string(), until.parse().unwrap_or(0))),
+                            // chiacraft's worlds from before weather by name: rain, thunder, until.
+                            [rain, thunder, until] => {
+                                let name = match (rain, thunder) {
+                                    (_, "1") => "core:thunder",
+                                    ("1", _) => "core:rain",
+                                    _ => "core:clear",
+                                };
+                                m.weather
+                                    .push((d.to_string(), name.to_string(), until.parse().unwrap_or(0)));
+                            }
+                            _ => {}
                         }
                     } else if let Some(key) = k.strip_prefix("op.") {
                         m.ops.push((key.to_string(), v.parse().unwrap_or(0)));
@@ -117,6 +129,9 @@ impl WorldMeta {
                         // `edit.<dimension>.<n>`: the dimension's name has a colon, not a dot.
                         let d = d.rsplit_once('.').map_or(d, |(d, _)| d);
                         m.edits.push((d.to_string(), v.to_string()));
+                    } else if let Some(d) = k.strip_prefix("forced.") {
+                        let d = d.rsplit_once('.').map_or(d, |(d, _)| d);
+                        m.forced.push((d.to_string(), v.to_string()));
                     } else if let Some(r) = k.strip_prefix("config.") {
                         m.configs.push((r.to_string(), v.parse().unwrap_or(0.0)));
                     } else if let Some(id) = k.strip_prefix("mod.") {
@@ -138,8 +153,8 @@ impl WorldMeta {
         if let Some(i) = self.key_index {
             s.push_str(&format!("key_index = {i}\nkey_generation = {}\ncreated = {}\n", self.key_generation, self.created));
         }
-        for (d, rain, thunder, until) in &self.weather {
-            s.push_str(&format!("weather.{d} = {} {} {until}\n", *rain as u8, *thunder as u8));
+        for (d, weather, until) in &self.weather {
+            s.push_str(&format!("weather.{d} = {weather} {until}\n"));
         }
         for (key, level) in &self.ops {
             s.push_str(&format!("op.{key} = {level}\n"));
@@ -152,6 +167,9 @@ impl WorldMeta {
         }
         for (i, (d, e)) in self.edits.iter().enumerate() {
             s.push_str(&format!("edit.{d}.{i} = {e}\n"));
+        }
+        for (i, (d, f)) in self.forced.iter().enumerate() {
+            s.push_str(&format!("forced.{d}.{i} = {f}\n"));
         }
         for (r, v) in &self.configs {
             s.push_str(&format!("config.{r} = {v}\n"));
@@ -212,6 +230,7 @@ pub fn create(saves: &Path, name: &str, seed: u64) -> WorldMeta {
         ops: Vec::new(),
         weather: Vec::new(),
         edits: Vec::new(),
+        forced: Vec::new(),
         next_entity: 1,
         configs: Vec::new(),
         mods: Vec::new(),
@@ -450,6 +469,8 @@ pub struct Storage {
     unknown: FxHashMap<(u32, IVec3), Vec<(usize, u32)>>,
     /// What was last written for a cube this session: an unchanged one is not appended again.
     last_written: FxHashMap<(u32, IVec3), u64>,
+    /// Per dimension, what distant terrain needs of the saved cubes (`lod_tops`).
+    pub lod: Vec<crate::server::lod_tops::DimTops>,
 }
 
 fn region_of(cube: IVec3) -> (IVec3, usize) {
@@ -514,6 +535,13 @@ impl Storage {
                 }
             }
         }
+        let lod = dim_dirs
+            .iter()
+            .enumerate()
+            .map(|(dim, dir)| {
+                crate::server::lod_tops::DimTops::read(&dir.join("lod.bin"), c, dim as u32, meta.seed, &mut |w| ids.runtime_id(w))
+            })
+            .collect();
         Storage {
             meta,
             ids,
@@ -523,6 +551,7 @@ impl Storage {
             saved,
             unknown: FxHashMap::default(),
             last_written: FxHashMap::default(),
+            lod,
         }
     }
 
@@ -608,7 +637,11 @@ impl Storage {
         }
         cube.compact();
         let mut map: FxHashMap<u32, u32> = FxHashMap::default();
-        for &s in cube.palette() {
+        for &s in cube
+            .palette()
+            .iter()
+            .chain(cube.all_extras().flat_map(|(_, parts)| parts))
+        {
             let w = match kept.get(&s) {
                 Some(&w) => w,
                 None => self.ids.world_id(c, s),
@@ -637,9 +670,16 @@ impl Storage {
             }
         }
         self.saved[dim as usize].insert(pos);
+        let seed = self.meta.seed;
+        self.lod[dim as usize].saved(c, dim, seed, pos, &cube);
     }
 
     pub fn flush(&mut self) {
+        let c = crate::content::content();
+        for (dim, tops) in self.lod.iter_mut().enumerate() {
+            let ids = &mut self.ids;
+            tops.write(&self.dim_dirs[dim].join("lod.bin"), &mut |s| ids.world_id(c, s));
+        }
         self.ids.save(&self.meta.dir);
         self.meta.last_played = now_secs();
         self.meta.save();

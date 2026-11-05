@@ -10,6 +10,8 @@
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
+use crate::ModelFile;
+
 use crate::dist2;
 
 use crate::taming::TAMING;
@@ -65,11 +67,11 @@ fn fly_look(wings: &Wings) -> String {
 }
 
 /// Registers `kinds` (each a species' entity kind) on one body.
-pub fn register(r: &mut Registry, kinds: &[&'static Entity], wings: &'static Wings) {
+pub fn register(r: &mut Registry, kinds: &[&'static EntityKind], wings: &'static Wings) {
     // In the air: the wings open and beating.
     let look = fly_look(wings);
     drop(
-        r.entity(Entity::generated(look.clone()))
+        r.entity(EntityKind::generated(look.clone()))
             .size(wings.fly_size.0, wings.fly_size.1)
             .passive()
             .model_file(&look)
@@ -81,8 +83,8 @@ pub fn register(r: &mut Registry, kinds: &[&'static Entity], wings: &'static Win
         let index = crate::species::of(kind);
         r.entity(kind)
             .size(bw, bh)
-            .health(wings.health)
-            .speed(wings.speed)
+            .max_health(wings.health)
+            .walk_speed(wings.speed)
             .attack_damage(wings.damage)
             .passive()
             .model_file(wings.model)
@@ -92,6 +94,7 @@ pub fn register(r: &mut Registry, kinds: &[&'static Entity], wings: &'static Win
             .on_interact(|e| {
                 let (w, id, player) = (e.world(), e.entity(), e.other());
                 crate::screen::interact(&w, id, player);
+                false
             })
             .goals(
                 Goals::new()
@@ -123,11 +126,11 @@ fn take_off(w: &World, id: u64, st: &EntityState, wings: &Wings) -> bool {
         .min_by(|a, b| dist2(*a, st.pos).total_cmp(&dist2(*b, st.pos)))
         .filter(|p| dist2(*p, st.pos) < 24.0 * 24.0);
     let a = match from {
-        Some(p) if dist2(p, st.pos) > 0.01 => (st.pos[2] - p[2]).atan2(st.pos[0] - p[0]) + (random(w) - 0.5),
+        Some(p) if dist2(p, st.pos) > 0.01 => (st.pos.z - p.z).atan2(st.pos.x - p.x) + (random(w) - 0.5),
         _ => random(w) * std::f64::consts::TAU,
     };
     let r = wings.reach * (1.0 + random(w));
-    let to = [st.pos[0] + a.cos() * r, st.pos[1], st.pos[2] + a.sin() * r];
+    let to = [st.pos.x + a.cos() * r, st.pos.y, st.pos.z + a.sin() * r];
     set(
         w,
         id,
@@ -135,11 +138,11 @@ fn take_off(w: &World, id: u64, st: &EntityState, wings: &Wings) -> bool {
             flying: true,
             landing: false,
             to: to.map(|v| v as f32),
-            cruise: (st.pos[1] + wings.height * (1.0 + random(w))) as f32,
+            cruise: (st.pos.y + wings.height * (1.0 + random(w))) as f32,
             left: wings.flight,
         },
     );
-    w.set_look(id, Some(&format!("animals:{}", fly_look(wings))));
+    w.set_appearance(id, Some(&format!("animals:{}", fly_look(wings))));
     if let Some(t) = w.component_mut(id, &TAMING) {
         t.scared = 0;
     }
@@ -150,7 +153,7 @@ fn take_off(w: &World, id: u64, st: &EntityState, wings: &Wings) -> bool {
 /// Every tick: take off when scared or now and then; in the air, fly to where it's going at its
 /// height, then come down and land.
 fn fly(w: &World, id: u64, st: &EntityState, wings: &Wings) -> bool {
-    let Some(mut f) = w.component(id, &STATE).copied() else { return false };
+    let Some(mut f) = w.component(id, &STATE) else { return false };
     if !f.flying {
         let scared = w.component(id, &TAMING).is_some_and(|t| t.scared > 0);
         if scared || (!w.navigating(id) && !crate::forage::busy(w, id) && w.random_below(wings.restless) == 0) {
@@ -164,11 +167,11 @@ fn fly(w: &World, id: u64, st: &EntityState, wings: &Wings) -> bool {
             return take_off(w, id, st, wings);
         }
         set(w, id, Flight::default());
-        w.set_look(id, None);
+        w.set_appearance(id, None);
         return false;
     }
     f.left = f.left.saturating_sub(w.tick_elapsed(id));
-    let (dx, dz) = (f.to[0] as f64 - st.pos[0], f.to[2] as f64 - st.pos[2]);
+    let (dx, dz) = (f.to[0] as f64 - st.pos.x, f.to[2] as f64 - st.pos.z);
     let flat = (dx * dx + dz * dz).sqrt();
     if f.left == 0 || flat < 2.0 {
         f.landing = true;
@@ -179,8 +182,8 @@ fn fly(w: &World, id: u64, st: &EntityState, wings: &Wings) -> bool {
         [(dx / n * 0.3) as f32, -0.7, (dz / n * 0.3) as f32]
     } else {
         // Climbing to its height (straight up where something holds it back), then level.
-        let blocked = f.left < wings.flight.saturating_sub(20) && st.vel[0].hypot(st.vel[2]) < 0.05;
-        let climb = if blocked { 1.5 } else { ((f.cruise as f64 - st.pos[1]) / 4.0).clamp(-0.4, 0.8) };
+        let blocked = f.left < wings.flight.saturating_sub(20) && st.vel.x.hypot(st.vel.z) < 0.05;
+        let climb = if blocked { 1.5 } else { ((f.cruise as f64 - st.pos.y) / 4.0).clamp(-0.4, 0.8) };
         let n = (1.0 + climb * climb).sqrt();
         [(dx / flat / n) as f32, (climb / n) as f32, (dz / flat / n) as f32]
     };

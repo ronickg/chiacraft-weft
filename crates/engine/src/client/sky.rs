@@ -137,8 +137,6 @@ pub struct Overlay {
     /// Linear rgb and how much shows.
     pub color: [f32; 4],
     pub tiles: f32,
-    /// Slides with the look, in tiles.
-    pub slide: [f32; 2],
     /// Only the lower part of the screen.
     pub lower: bool,
     /// Which frame of an animated picture.
@@ -276,7 +274,7 @@ impl Sky {
             let frame_h = w as f32 / h as f32;
             self.list.push(GpuSky {
                 axes: [[0.0; 4]; 3],
-                uv: [o.slide[0], o.slide[1], 1.0, frame_h],
+                uv: [0.0, 0.0, 1.0, frame_h],
                 color: o.color,
                 ids: [index, kind::OVERLAY, 0, 0],
                 extra: [o.tiles, o.lower as u32 as f32, (o.frame as f32 * frame_h).fract(), 0.0],
@@ -362,14 +360,17 @@ impl Sky {
         time: f64,
         eye_y: f64,
         in_liquid: bool,
-        rain: f32,
-        thunder: f32,
+        look: &weft_abi::WeatherLook,
         wind: glam::Vec2,
         dt: f32,
         overlays: &[Overlay],
     ) {
         self.overlay = None;
         self.cloud_shade = [[0.0; 4]; 2];
+        // For packs' weather (`cover`, `cloud_shade`): how much falls, and how stormy it is
+        // (thunder's clouds go 0.95 dark).
+        let rain = look.falls.clamp(0.0, 1.0);
+        let thunder = (look.cloud_dark / 0.95).clamp(0.0, 1.0);
         // Clouds ride the wind where the player is (m/s, the way it blows), at a game's pace.
         self.cloud_drift += wind.as_dvec2() * CLOUD_WIND * dt.clamp(0.0, 0.25) as f64;
         let Some(pipe) = self.pipe else { return };
@@ -417,7 +418,7 @@ impl Sky {
         self.list.push(GpuSky {
             axes: axes(Mat3::from_cols(px - o, py - o, o)),
             uv: [below as u32 as f32, 0.0, 0.0, 0.0],
-            color: rained(rgb(d.sky_color) * if d.sky_light { light } else { 1.0 }, rain, 0.75)
+            color: rained(rgb(d.sky_color) * if d.sky_light { light } else { 1.0 }, 1.0, look.sky_gray)
                 .powf(2.2)
                 .extend(1.0)
                 .to_array(),
@@ -429,8 +430,9 @@ impl Sky {
         let objects = c.game.sky.get(dim).map_or(&[][..], |l| &l[..]);
         let mut clouds = None;
         for (i, s) in objects.iter().enumerate() {
-            // Rain hides what is up there, domes aside: those are the sky.
-            let opacity = (s.opacity[0] + (s.opacity[1] - s.opacity[0]) * night) * if s.kind == sky_kind::DOME { 1.0 } else { 1.0 - rain };
+            // Weather hides what is up there, domes aside: those are the sky.
+            let opacity =
+                (s.opacity[0] + (s.opacity[1] - s.opacity[0]) * night) * if s.kind == sky_kind::DOME { 1.0 } else { 1.0 - look.sky_cover };
             if s.kind == sky_kind::CLOUDS {
                 let Some((index, [w, h])) = self.picture(gpu, &s.texture) else { continue };
                 const CELL: f64 = 12.0;
@@ -449,8 +451,8 @@ impl Sky {
                 let (x, z) = ((cam.pos.x + time * s.drift as f64 - self.cloud_drift.x) / CELL, (cam.pos.z - self.cloud_drift.y) / CELL);
                 // Vanilla's: rain grays them, the time of day colors them, thunder darkens the rest.
                 let day = if d.sky_light { (height * 2.0 + 0.5).clamp(0.0, 1.0) } else { 1.0 };
-                let color = rained(rgb(s.color), rain, 0.95) * Vec3::new(day * 0.9 + 0.1, day * 0.9 + 0.1, day * 0.85 + 0.15);
-                let color = color.lerp(Vec3::splat((color.x * 0.3 + color.y * 0.59 + color.z * 0.11) * 0.2), thunder * 0.95);
+                let color = rained(rgb(s.color), 1.0, look.cloud_gray) * Vec3::new(day * 0.9 + 0.1, day * 0.9 + 0.1, day * 0.85 + 0.15);
+                let color = color.lerp(Vec3::splat((color.x * 0.3 + color.y * 0.59 + color.z * 0.11) * 0.2), look.cloud_dark);
                 clouds = Some(self.list.len() as u32);
                 // The weather for packs: x how much more of the sky they cover as rain comes, y how
                 // dark their undersides go, z an overcast deck in a storm.

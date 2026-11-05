@@ -155,7 +155,7 @@ impl Server {
         let minutes = player.probation_left(p).div_ceil(60) as i64;
         player
             .conn
-            .send(ToClient::Chat(Msg::new(key, vec![Arg::Int(minutes)])));
+            .send(ToClient::Show(crate::net::Shown::chat(Msg::new(key, vec![Arg::Int(minutes)]))));
     }
 
     /// Whether player `pi` may do `act`; when not, they are told why.
@@ -496,7 +496,7 @@ pub(super) fn probation(s: &mut Server, x: &Ctx) -> Vec<Msg> {
                 log::info!("{} is off probation", s.players[pi].name);
                 s.players[pi]
                     .conn
-                    .send(ToClient::Chat(Msg::new("admission.probation_lifted_you", Vec::new())));
+                    .send(ToClient::Show(crate::net::Shown::chat(Msg::new("admission.probation_lifted_you", Vec::new()))));
                 say("probation_lifted", vec![text(&s.players[pi].name.clone())])
             }
             Some((who, None)) => match &s.storage {

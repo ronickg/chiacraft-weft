@@ -92,9 +92,11 @@ struct Frame {
 }
 
 fn texture_frame(name: u32) -> Frame {
-    let base = tex_info[name * 2u];
-    let info = tex_info[name * 2u + 1u];
-    let size = f32(tex_info[frames[0] * 2u + name]);
+    // Four words a texture (Weft 26.11.2): base, frames, size; a size of 0 would make every
+    // derivative NaN, and the sampler the smallest mip.
+    let base = tex_info[name * 4u];
+    let info = tex_info[name * 4u + 1u];
+    let size = f32(max(tex_info[name * 4u + 2u], 1u));
     if info == 0u {
         return Frame(base, base, 0.0, size);
     }
@@ -179,7 +181,10 @@ fn wind(p_world: vec3<f32>) -> vec3<f32> {
     let q = t * (1.0 + 0.8 * s);
     let a = sin(q * 1.7 + p.x * 0.63 + p.z * 0.41 + p.y * 0.2) * 0.6 + sin(q * 2.9 + p.x * 1.21 - p.z * 0.83) * 0.25;
     let b = sin(q * 1.3 + p.z * 0.71 - p.x * 0.37) * 0.5 + sin(q * 3.4 + p.z * 1.4 + p.x * 0.6) * 0.2;
-    let flutter = vec3(a, 0.0, b) * (0.35 + 0.65 * s) * g;
+    // Rain beats on the leaves and grass: they flutter more while it falls (Photon's 0.25 + 0.66 rain,
+    // here on top of the wind's own; Research round 15).
+    let beaten = 1.0 + 0.9 * rain_amount();
+    let flutter = vec3(a, 0.0, b) * (0.35 + 0.65 * s) * g * beaten;
     let lean = vec3(dir.x, 0.0, dir.y) * s * g * 1.3;
     return flutter + lean;
 }
@@ -211,7 +216,8 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     out.clip = scene.view_proj * pos;
     out.dist = length(pos.xyz);
     out.rel = pos.xyz;
-    out.uv = UVS[c];
+    // A face's texture turned in quarters (Weft 26.11.2's block faces with a rotation).
+    out.uv = UVS[(c + ((w0 >> FACE_TURN_SHIFT) & FACE_TURN_MASK)) % 4u];
     let tex_id = w1 & FACE_TEX_MASK;
     let fr = texture_frame(tex_id);
     out.size = fr.size;
@@ -386,7 +392,9 @@ fn shade(in: VOut, albedo_in: vec4<f32>) -> vec4<f32> {
         let sheen = pow(1.0 - max(dot(n, v), 0.0), 5.0) * 0.12;
         lit = vec4(lit.rgb * mix(1.0, 0.7, wet) + sky_color(reflect(-v, n)) * sheen * wet, lit.a);
     }
-    return vec4(display(haze_lit(lit.rgb, in.rel, in.light.x)), lit.a);
+    // The air before it glows with the placed lights' light (the held one is in `haze_lit`).
+    let glow = placed_in_fog(in.light.yzw, in.rel, in.pos, fog_here(in.light.x));
+    return vec4(display(haze_lit(lit.rgb + glow, in.rel, in.light.x)), lit.a);
 }
 
 // ---- water ----

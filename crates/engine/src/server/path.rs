@@ -60,17 +60,15 @@ pub fn footprint(width: f32) -> std::ops::RangeInclusive<i32> {
 /// when `to` is out of reach or more than `MAX_NODES` cells away. A wide body needs room across
 /// its whole footprint, so it isn't led between tree trunks it can't pass (the animals mod's big
 /// Cretaceous animals, 2 to 4.5 blocks wide, jammed in its forests on one-cell paths).
-pub fn find(c: &Content, block: &impl Fn(IVec3) -> Option<u32>, from: IVec3, to: IVec3, height: i32, width: f32) -> Vec<IVec3> {
+pub fn find(c: &Content, block: &impl crate::physics::Cells, from: IVec3, to: IVec3, height: i32, width: f32) -> Vec<IVec3> {
     // Judged by the collision boxes walking bumps into, like the step itself.
     let top = |s: u32| crate::physics::collision_top(c, s);
     let open = |p: IVec3| {
-        block(p).is_some_and(|s| {
+        let free = |s: u32| {
             let st = &c.states[s as usize];
-            top(s).is_none()
-                && st
-                    .liquid_in()
-                    .is_none_or(|l| c.liquids[l as usize].temperature < crate::server::liquid::BURNING)
-        })
+            top(s).is_none() && st.liquid.is_none_or(|l| !c.liquids[l as usize].burns())
+        };
+        block.main(p).is_some_and(free) && block.extras(p).iter().all(|&s| free(s))
     };
     let cells = footprint(width);
     let wide = cells.start() != cells.end();
@@ -92,14 +90,19 @@ pub fn find(c: &Content, block: &impl Fn(IVec3) -> Option<u32>, from: IVec3, to:
     };
     let burns = |s: u32| {
         c.states[s as usize]
-            .liquid_in()
-            .is_some_and(|l| c.liquids[l as usize].temperature >= 1000)
+            .liquid
+            .is_some_and(|l| c.liquids[l as usize].burns())
     };
     let ground = |p: IVec3| {
-        block(p - IVec3::Y).is_some_and(|s| !burns(s) && (c.states[s as usize].liquid_in().is_some() || top(s).is_some_and(|t| t >= 0.5)))
+        let below = p - IVec3::Y;
+        let holds = |s: u32| c.states[s as usize].liquid.is_some() || top(s).is_some_and(|t| t >= 0.5);
+        block.main(below).is_some_and(|s| {
+            let extras = block.extras(below);
+            !burns(s) && !extras.iter().any(|&e| burns(e)) && (holds(s) || extras.iter().any(|&e| holds(e)))
+        })
     };
     let standable = |p: IVec3| room(p) && ground(p);
-    let wet = |p: IVec3| block(p).is_some_and(|s| c.states[s as usize].liquid_in().is_some());
+    let wet = |p: IVec3| block.liquid(c, p).is_some();
     let h = |p: IVec3| (p - to).as_vec3().length();
 
     let (mut came, mut queue) = SCRATCH.with_borrow_mut(std::mem::take);
@@ -193,7 +196,7 @@ pub fn steer(nav: &mut Nav, pos: DVec3, blocked: bool) -> Option<([f32; 2], bool
 
 #[cfg(test)]
 mod tests {
-    use weft_abi::{self as abi, Layer, ModId, Model, block_flags as bf};
+    use weft_abi::{self as abi, BlockModel, ModId, RenderLayer, block_flags as bf};
 
     use super::*;
     use crate::content::{AIR, ModMeta, RawBlock, RawRegistrar, RawSignal, RawState};
@@ -207,13 +210,23 @@ mod tests {
             flags: bf::SOLID | bf::OPAQUE,
             filter: [0; 3],
             opacity: 15,
-            layer: Layer::Opaque,
-            model: Model::Cube,
+            layer: RenderLayer::Opaque,
+            model: BlockModel::Cube,
             textures: std::array::from_fn(|_| "t:block/x".to_string()),
+            turns: [0; 6],
             boxes: Vec::new(),
-            collision: Vec::new(),
-            selection: Vec::new(),
-            signal: RawSignal { kind: abi::SignalDesc::DEFAULT.kind, attach: 6, front: 6, delay: 0, mode: 0, head: String::new() },
+            hitbox: Vec::new(),
+            outline: Vec::new(),
+            liquid_walls: 0,
+            signal: RawSignal {
+                kind: abi::SignalDesc::DEFAULT.kind,
+                attach: 6,
+                front: 6,
+                delay: 0,
+                flags: 0,
+                inputs: 0,
+                head: String::new(),
+            },
             components: Vec::new(),
         };
         r.blocks.push(RawBlock {
@@ -228,6 +241,10 @@ mod tests {
             retexture: Vec::new(),
             opens: String::new(),
             extra_cells: Vec::new(),
+            derive: None,
+            shares_cell: Vec::new(),
+            model_file: String::new(),
+            model_textures: Vec::new(),
         });
         let c = crate::content::freeze(mods, vec![r]).unwrap_or_else(|e| panic!("{e:?}"));
         let c: &'static Content = Box::leak(Box::new(c));

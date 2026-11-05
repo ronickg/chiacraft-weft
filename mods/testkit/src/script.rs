@@ -15,6 +15,9 @@
 //! chat /give stone 10
 //! chatf ticket.txt /banlist follow {}   # chat, with `{}` replaced by that file's text (waits for it)
 //! say_config testmod:x  # a config's value as this client has it, into the chat
+//! view 32             # view distance, for measuring: tests and scripts start at 12
+//! vsync off           # the same for vsync
+//! occlusion off       # and for occlusion culling, to compare
 //! shot name.png       # into run/screenshots (or --shot-dir)
 //! bench 5 label       # BENCH line over 5 seconds
 //! host ticket.txt     # host, write the join ticket there
@@ -318,7 +321,7 @@ impl Cond {
     /// Whether it holds now, and what was there instead.
     async fn check(&self, t: &T) -> Result<(bool, String), String> {
         let s = t.state();
-        let feet = [s.pos[0].floor(), s.pos[1].floor(), s.pos[2].floor()];
+        let feet = [s.pos.x.floor(), s.pos.y.floor(), s.pos.z.floor()];
         Ok(match self {
             Cond::Block(p, want) => {
                 let at = [p[0].at(feet[0]) as i32, p[1].at(feet[1]) as i32, p[2].at(feet[2]) as i32];
@@ -326,9 +329,9 @@ impl Cond {
                 (block_matches(&got, want), format!("{got} at {} {} {}", at[0], at[1], at[2]))
             }
             Cond::Near(p, r) => {
-                let at = [p[0].at(s.pos[0]), p[1].at(s.pos[1]), p[2].at(s.pos[2])];
-                let d = ((s.pos[0] - at[0]).powi(2) + (s.pos[1] - at[1]).powi(2) + (s.pos[2] - at[2]).powi(2)).sqrt();
-                (d <= *r, format!("at {:.2} {:.2} {:.2}, {d:.2} away", s.pos[0], s.pos[1], s.pos[2]))
+                let at = [p[0].at(s.pos.x), p[1].at(s.pos.y), p[2].at(s.pos.z)];
+                let d = ((s.pos.x - at[0]).powi(2) + (s.pos.y - at[1]).powi(2) + (s.pos.z - at[2]).powi(2)).sqrt();
+                (d <= *r, format!("at {:.2} {:.2} {:.2}, {d:.2} away", s.pos.x, s.pos.y, s.pos.z))
             }
             Cond::Flag(_, f, want) => (t.flag(*f) == *want, format!("flags {:#x}", s.flags)),
             Cond::Mode(m) => (s.mode == *m, format!("mode {}", s.mode)),
@@ -446,17 +449,17 @@ async fn run_lines(t: T, src: String) -> R {
                     t.secs(secs).await?;
                 }
             }
-            "click" => t.c().click(num(0, 0.0) as u32, 0.0),
-            "cursor" => t.c().cursor(num(0, 0.5), num(1, 0.5)),
-            "scroll" => t.c().scroll(num(0, -1.0)),
-            "type" => t.c().type_text(rest),
+            "click" => t.c().input_click(num(0, 0.0) as u32, 0.0),
+            "cursor" => t.c().input_cursor(num(0, 0.5), num(1, 0.5)),
+            "scroll" => t.c().input_scroll(num(0, -1.0)),
+            "type" => t.c().input_type(rest),
             "key" => {
-                if !t.c().key(rest, 0.0) {
+                if !t.c().input_key(rest, 0.0) {
                     t.fail(format!("unknown key {rest}"));
                 }
             }
-            "look" => t.c().look(num(0, 0.0), num(1, 0.0)),
-            "chat" => t.c().chat(rest),
+            "look" => t.c().set_look(num(0, 0.0), num(1, 0.0)),
+            "chat" => t.c().say(rest),
             "chatf" => {
                 let (file, text) = rest.split_once(' ').unwrap_or((rest, ""));
                 let mut content = String::new();
@@ -468,11 +471,18 @@ async fn run_lines(t: T, src: String) -> R {
                     !content.is_empty()
                 })
                 .await?;
-                t.c().chat(&text.replace("{}", &content));
+                t.c().say(&text.replace("{}", &content));
+            }
+            // `view 64 vsync off`-like settings, past what `same_conditions` fixed.
+            "view" => weft_sdk::settings::VIEW_DISTANCE.set(rest.parse().map_err(|_| "view: a number")?),
+            "vsync" => weft_sdk::settings::VSYNC.set(rest == "on"),
+            "occlusion" => {
+                static OCCLUSION: weft_sdk::Config<bool> = weft_sdk::Config::named("core:occlusion_culling");
+                OCCLUSION.set(rest == "on");
             }
             "say_config" => {
                 let cfg = weft_sdk::Config::<f64>::named(Box::leak(rest.to_string().into_boxed_str()));
-                t.c().chat(&format!("config {rest} = {}", cfg.get()));
+                t.c().say(&format!("config {rest} = {}", cfg.get()));
             }
             // `set_config base:fx_reflect 0`: changes a setting mid-run, so one run benches each
             // effect on and off over the same loaded world (Research round 16).
@@ -489,18 +499,23 @@ async fn run_lines(t: T, src: String) -> R {
                 };
                 t.c().screenshot(&path);
             }
+            // A bench that goes on while the next lines run: for measuring while flying.
+            "bench_bg" => {
+                let (secs, label) = rest.split_once(' ').unwrap_or((rest, ""));
+                t.c().bench(secs.parse().unwrap_or(5.0), label.trim());
+            }
             "bench" => {
                 let (secs, label) = rest.split_once(' ').unwrap_or((rest, ""));
                 t.bench(secs.parse().unwrap_or(5.0), label.trim()).await?;
             }
             "host" => {
-                t.c().host_world();
+                t.c().world_host();
                 t.until("hosting", Duration::from_secs(60), |t| t.flag(cf::HOSTING))
                     .await?;
                 let _ = std::fs::write(rest, t.c().ticket());
             }
             "open" => {
-                t.c().open_world(rest, 1);
+                t.c().world_open(rest, 1);
                 // The old world's client is gone by the next frames; then wait for the new one.
                 t.frames(3).await?;
                 t.until("the world open", Duration::from_secs(60), |t| t.flag(cf::JOINED))
@@ -517,7 +532,7 @@ async fn run_lines(t: T, src: String) -> R {
                 }
                 for _ in 0..9 {
                     t.frames(15).await?;
-                    if t.c().screen() != screen || !t.c().click_ui(query, 0) {
+                    if t.c().screen() != screen || !t.c().ui_click(query, 0) {
                         break;
                     }
                 }
@@ -538,7 +553,7 @@ async fn run_lines(t: T, src: String) -> R {
             }
             "screen" => {
                 let screen = weft_sdk::Screen::generated(rest.to_string());
-                if !t.c().open_screen(screen) {
+                if !t.c().screen_open(screen) {
                     t.fail(format!("no screen {rest}"));
                 }
                 t.screen(rest).await?;
@@ -556,7 +571,7 @@ async fn run_lines(t: T, src: String) -> R {
                     .await?;
             }
             "leave" => {
-                t.c().leave_world();
+                t.c().world_leave();
                 t.screen("core:title").await?;
             }
             "join" => {
@@ -569,12 +584,12 @@ async fn run_lines(t: T, src: String) -> R {
                     !ticket.is_empty()
                 })
                 .await?;
-                t.c().join(&ticket);
+                t.c().world_join(&ticket);
             }
-            "origin" => origin = t.state().pos,
+            "origin" => origin = (t.state().pos).to_array(),
             "where" => {
                 let s = t.state();
-                weft_sdk::info!("script: where {:.3} {:.3} {:.3} {rest}", s.pos[0], s.pos[1], s.pos[2]);
+                weft_sdk::info!("script: where {:.3} {:.3} {:.3} {rest}", s.pos.x, s.pos.y, s.pos.z);
             }
             "entities" => entities(&t, num(0, 16.0)).await?,
             "rec" => weft_sdk::info!("REC {rest}"),
@@ -588,16 +603,16 @@ async fn run_lines(t: T, src: String) -> R {
                 None => t.fail(format!("bad waypoint '{line}'")),
             },
             "travel" => {
-                let eye = t.c().entity(0).map_or(1.62, |e| e.size[2] as f64);
+                let eye = t.c().entity(0).map_or(1.62, |e| e.size.eye as f64);
                 let s = t.state();
-                let mut pts = vec![[s.pos[0], s.pos[1] + eye, s.pos[2], (s.yaw as f64).to_degrees(), (s.pitch as f64).to_degrees()]];
+                let mut pts = vec![[s.pos.x, s.pos.y + eye, s.pos.z, (s.yaw as f64).to_degrees(), (s.pitch as f64).to_degrees()]];
                 pts.append(&mut via);
                 fly(&t, pts, num(0, 5.0) as f64, eye).await?;
             }
             "glide" => {
                 let s = t.state();
-                let from = [s.pos[0], s.pos[1] + 0.0, s.pos[2]];
-                let eye = t.c().entity(0).map_or(1.62, |e| e.size[2] as f64);
+                let from = [s.pos.x, s.pos.y + 0.0, s.pos.z];
+                let eye = t.c().entity(0).map_or(1.62, |e| e.size.eye as f64);
                 let a = [from[0], from[1] + eye, from[2], (s.yaw as f64).to_degrees(), (s.pitch as f64).to_degrees()];
                 let b = [a[0], a[1], a[2], num(0, 0.0) as f64, num(1, 0.0) as f64];
                 fly(&t, vec![a, b], num(2, 2.0) as f64, eye).await?;
@@ -648,7 +663,7 @@ async fn run_lines(t: T, src: String) -> R {
 async fn entities(t: &T, r: f32) -> R {
     let me = t.state().pos;
     let near = t
-        .op(&format!("near {:.0} {:.0} {:.0} {r}", me[0].floor(), me[1].floor(), me[2].floor()))
+        .op(&format!("near {:.0} {:.0} {:.0} {r}", me.x.floor(), me.y.floor(), me.z.floor()))
         .await?;
     let mut ids: Vec<u64> = near
         .split_whitespace()
@@ -656,7 +671,7 @@ async fn entities(t: &T, r: f32) -> R {
         .collect();
     let c = t.c();
     let mine = c.entities();
-    let close = |p: [f64; 3]| (0..3).map(|i| (p[i] - me[i]).powi(2)).sum::<f64>() <= (r as f64).powi(2);
+    let close = |p: weft_sdk::Vec3| (p - me).length_squared() <= (r as f64).powi(2);
     let only_mine: Vec<u64> = mine
         .iter()
         .copied()
@@ -665,9 +680,9 @@ async fn entities(t: &T, r: f32) -> R {
     ids.extend(only_mine);
     weft_sdk::info!(
         "entities: me at {:.2} {:.2} {:.2}, server {} within {r}, client knows {} in all",
-        me[0],
-        me[1],
-        me[2],
+        me.x,
+        me.y,
+        me.z,
         near.split_whitespace().count(),
         mine.len()
     );
@@ -697,13 +712,13 @@ async fn entities(t: &T, r: f32) -> R {
         };
         let client = match c.entity(id) {
             Some(e) => {
-                let feet = [e.pos[0].floor() as i32, e.pos[1].floor() as i32, e.pos[2].floor() as i32];
+                let feet = [e.pos.x.floor() as i32, e.pos.y.floor() as i32, e.pos.z.floor() as i32];
                 let below = [feet[0], feet[1] - 1, feet[2]];
                 format!(
                     "at {:.2} {:.2} {:.2}, health {}, size {:?}, block under {:?}, light {:?}, cube shown {}",
-                    e.pos[0],
-                    e.pos[1],
-                    e.pos[2],
+                    e.pos.x,
+                    e.pos.y,
+                    e.pos.z,
                     e.health,
                     e.size,
                     c.block(below).map(weft_sdk::block_name),
@@ -819,8 +834,8 @@ async fn fly(t: &T, mut pts: Vec<[f64; 5]>, secs: f64, eye: f64) -> R {
         let c = t.c();
         c.control(&weft_sdk::abi::PlayerControl {
             mask: weft_sdk::abi::control_mask::POS | weft_sdk::abi::control_mask::VEL | weft_sdk::abi::control_mask::LOOK,
-            pos: [p[0], p[1] - eye, p[2]],
-            vel: [0.0; 3],
+            pos: [p[0], p[1] - eye, p[2]].into(),
+            vel: [0.0; 3].into(),
             yaw: p[3].to_radians() as f32,
             pitch: p[4].to_radians() as f32,
             ..weft_sdk::abi::PlayerControl::DEFAULT

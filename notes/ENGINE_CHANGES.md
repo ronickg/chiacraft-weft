@@ -54,6 +54,7 @@ Weft's shader packs could only replace shaders. Our pack needed data the engine 
 - **Far trees as crowns over trunks** (branch lod-crowns). Each scatter's shape is sampled 16 times per biome and 8 of the runs kept as crowns (radius, top, lowest leaves, widest layer, how round its top is, trunk width and block, leaves); each far site takes one by its hash and lays it over the cells round or tapering, over the real ground, with a trunk at levels 1-2. A sample comes back as 4 words, not 2, and the LOD compute pass uses 18.5 KB of workgroup memory (was 13.9; Apple GPUs allow 32). The old `TALL_CROWN` taper is gone, the profile covers it. *Why:* Ronald, 11-05: "why the lods still boxes ?": far forests were flat-topped leaf pillars down to the ground, one median tree per scatter.
 - **Far steps keep their top's colour down a cell's height** (66a12a45, `lod::mesh`). *Why:* at 3456 px (Ronald's Mac) far terraces showed rows of dirt dashes, one block of grass over dirt per 2- or 4-block step.
 - **A dithered fade where the cubes end** (branch lod-fade). The world renderer draws the cube meshes near the view's end with the pack's `fs_opaque_fade`/`fs_cutout_fade`/`fs_translucent_fade` (six more pipelines, made only when the pack has them; the translucent ones since lod-polish, so near water fades too), which dither pixels away over the last 24 blocks; `fs_lod` draws exactly those pixels; meshes past the end aren't drawn (the view's square corners). `Globals.extra.y` carries where the cubes end. *Why:* Ronald chose all three LOD fixes on 11-05; the cube edge showed as a hard line (reports/lod.md:89, Distant Horizons' fade).
+- **Far tiles load faster and stand in one level coarser** (branch lod-loading, `lod::pool`, `Lod::request`, `Lod::update`). LOD's own pool has a third of the cores (3 to 6, was 3) at the near-cube pool's low priority (half the cores at normal priority starved the near cubes: 7 s to come in after a teleport, not 1.5); tiles are asked for nearest first in tile widths (coarse before fine at the same reach, the land by the camera before the horizon), each missing tile's parent before it, so a stand-in hides at most its three siblings. Inside `terrain::one_column` (distant terrain's face calls) `Terrain::surface_block` works out only the column asked for unless its cube's are cached (it computed all 256 of the cube column, 1-2 ms, for each far steep cell the dimension's faces asked about: most of a far tile's meshing); elsewhere it is as before (doing that everywhere slowed the near cubes' scattered things, 1.5 to 4-5 s after a teleport). The `load` log times each tile's heights, mesh, face calls and wait, and says how long until every wanted tile was made. *Why:* Research round 16: the far boxes were slow loading (about 20 tiles a second of the 800 a view wants, CPU-bound), and a missing tile's coarse ancestor hid every finished tile under it.
 - **Scatters up to 96 blocks high** (3cfc8a9c). *Why:* giant sequoias didn't fit the old cap.
 - **A continent scale per dimension** (587208ff, f081de3b). *Why:* Ronald picked 1800-block land masses for the overworld (the default is 900).
 - **Blocks that stand in still liquid, `holds_liquid`** (c1ee7fe0, cbbeeb9b). *Why:* water plants, kelp and lily pads need water in the same block.
@@ -67,6 +68,7 @@ Weft's shader packs could only replace shaders. Our pack needed data the engine 
 - **A time-of-day rate per dimension, sent to clients** (1e138839, protocol 11 to 12). *Why:* Ronald's slow first day, starting at 10:00.
 - **A moving structure can lean** (416f25cf, protocol 12 to 13): `World::body_turn(entity, pivot, rot, ticks)` gives a body a pose, a pivot and a rotation the clients ease to (`ToClient::BodyLean`); `world.wgsl` (the engine's and the base pack's) turns its vertices and the pack its normals (`offsets` is three vec4 a structure: offset and light, rotation, pivot); a leaning body is only drawn: the server's physics and picking and the client's collision and raycast skip it. *Why:* Ronald, 11-05: trees "fall down sideways and like the leaves to sort of start breaking while it's falling": the tree's own blocks, lifted (`World::lift`), lean over the stump and shed leaves as they go (`mods/base/src/fall.rs`). Ronald chose this over a box-model tree ("Yes, the real tree falls").
 - **A leaning structure casts its shadow** (70f1b361): the sun's shadow pass draws leaning structures (`WorldRenderer::draw_shadow` takes them with their pose; its offsets as `draw`'s), turned like their blocks. *Why:* a falling tree threw no shadow (Planner's follow-up, 11-05; Lighting agreed the pack needs nothing, its shadow vertex goes through `finish()`). Other moving structures still cast none.
+- **The free camera on F6** (`input.rs`, `core:freecam`; Weft has P). *Why:* P is the base game's Stats screen, and the two on one key opened Stats instead of the camera (Ronald, 11-04: freecam to F6, P stays Stats). Camera keys don't fire while F3 is held (`client/camera.rs`), so F3+F6 only opens the debug options.
 - **A world never takes a nameless player** (dc1d8b7b); **a headless server has its own identity** (432889c9). *Why:* bugs found in multiplayer checks.
 
 ## 5. UI the engine had to allow
@@ -108,7 +110,28 @@ These are the biggest changes. They live mostly in our crates, but each needed h
 
 ## What this means for syncing with upstream
 
-- Upstream (VortexSo4/Weft master 10fdced5) is 173 commits ahead of our base. The next sync will conflict where we both changed the same code: Vulkan uploads (take upstream's versions), item stacks and icons (upstream now has "stack values over item values" and layered item icons, close to ours), and anything in `server/dim.rs`, `config.rs` and the UI.
+- **Synced with Weft v26.11.2** (upstream `2db18c23`) on `sync/weft-26.11.2`, merge `e9c8405c`
+  (plan: `notes/crew/upstream/sync-plan.md`, Ronald's calls 1-6). Upstream's engine is the base;
+  what stays ours on top of it:
+  - **Terrain:** CPU callback features beside upstream's expression features
+    (`FeatureDesc.custom`, `Feature::custom`, `FeatureArgs.continent_scale`), `FACES` (16),
+    `CONTINENT_SCALE` (17), scatter `thin` as an expression mask; the GPU cube path takes the CPU
+    features' heights (`gpu_custom`, `custom_cache`).
+  - **Distant terrain:** our smooth tiles, wall bands and faces, with upstream's saved columns.
+  - **Weather:** upstream's weather ids, with our rain by biome on them (`set_rain(biomes,
+    weather)`, `weather_in`, `ToClient::Weather { id, only }`), air, tints and the `/weather`
+    override; packs' rain/thunder inputs come from the weather's look.
+  - **Kept as before:** sun and moon shadows (`mesh_draws` with all layers for the shadow passes,
+    `table_only` meshes cast too), painted skins, bone builds, mob shadows, day rate, drops at the
+    feet, felling's leaning bodies (`body_turn`), probation and the chiacraft layers, protocol 14.
+  - **Taken from upstream instead of ours:** waterlogging (cell parts; our `holds_liquid` is
+    gone), riding (seats, steering), camera modes (`camera_flags` for the crosshair, the hand and
+    one's own shadow), the Vulkan upload fixes, mining on the server (our broken-tool rule is in
+    `mining_rate`, keep-broken in `stack::worn`).
+  - **Fixed in upstream's code (PR candidates):** `sdk/ai.rs` mob moods cleared when another
+    world opens (they were process-wide by entity id and tick, so a zombie's anger landed on the
+    next world's spider: `neutral_mobs`); particles' spawn on a cell not arrived yet; first person
+    cutting worn layers by bone mask; a ridden flyer's flight counted as a fall (MountMove `flies`).
 - The bug fixes in section 1 are the natural PRs. Upstream already has its own versions of #83 and #84. The clean branches for #96 to #98 and `/rule` are in `notes/crew/upstream/for-ronald.md`.
 - Everything else is ours to keep in the fork unless Ronald decides to offer it.
 

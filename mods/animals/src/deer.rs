@@ -8,8 +8,8 @@ use weft_sdk::*;
 
 use crate::wild::{self, Body};
 
-pub(crate) static WHITE_TAILED_DEER: Entity = Entity::named("white_tailed_deer");
-pub(crate) static RED_DEER: Entity = Entity::named("red_deer");
+pub(crate) static WHITE_TAILED_DEER: EntityKind = EntityKind::named("white_tailed_deer");
+pub(crate) static RED_DEER: EntityKind = EntityKind::named("red_deer");
 
 static BODY: Body = Body {
     model: "deer",

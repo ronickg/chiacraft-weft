@@ -7,7 +7,7 @@ use weft_sdk::*;
 
 use crate::wild::{self, Body};
 
-pub(crate) static WOOD_MOUSE: Entity = Entity::named("wood_mouse");
+pub(crate) static WOOD_MOUSE: EntityKind = EntityKind::named("wood_mouse");
 
 static BODY: Body = Body {
     model: "mouse",

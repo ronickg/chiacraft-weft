@@ -13,13 +13,15 @@ use weft_render::*;
 use crate::assets::{self, Anim, Assets, LoadedTexture};
 use crate::content::Content;
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, PartialEq)]
 enum Source {
     File,
     /// Quarters of four other entries (connected textures' compact form).
     Composite([u32; 4]),
     /// A stack's look (`abi::comp::LOOK`), its text the entry's name, composed from its layers.
     Look,
+    /// Pictures one over the other, each tinted (a stack's `layers`).
+    Layers(Vec<(String, u32)>),
 }
 
 struct Entry {
@@ -53,6 +55,8 @@ struct Inner {
     /// Texture id per look text, made at runtime after the fixed ones.
     looks: FxHashMap<String, u32>,
     looks_full: bool,
+    /// Texture id of each stack's `layers` made so far, by its text.
+    layered: FxHashMap<String, u32>,
 }
 
 pub struct GameTextures {
@@ -145,6 +149,7 @@ impl GameTextures {
                 assets: assets.clone(),
                 looks: FxHashMap::default(),
                 looks_full: false,
+                layered: FxHashMap::default(),
             }),
             overlays,
             blank,
@@ -168,14 +173,58 @@ impl GameTextures {
         en.frames[n as usize % en.frames.len()]
     }
 
-    /// First frame of texture `id` (a block's face, an item's icon, a particle's frame).
-    pub fn texture(&self, id: u32) -> u32 {
-        self.frame_of(id, 0)
+    /// The texture id of a stack's `layers` text, made the first time it is asked for; loaded like
+    /// any texture once drawn.
+    pub fn layered(&self, spec: &str) -> u32 {
+        let mut i = self.inner.borrow_mut();
+        if let Some(&id) = i.layered.get(spec) {
+            return id;
+        }
+        let parts = crate::stack::parse_layers(spec)
+            .into_iter()
+            .map(|(n, t)| (n.to_string(), t))
+            .collect();
+        i.entries.push(Entry {
+            name: format!("layers:{spec}"),
+            source: Source::Layers(parts),
+            frames: Vec::new(),
+            glow: Vec::new(),
+            anim: None,
+            images: Vec::new(),
+            stamp: 0,
+            requested: false,
+            size: 16,
+            pixels: None,
+        });
+        let entry = i.entries.len() as u32 - 1;
+        i.ids.push(entry);
+        let id = i.ids.len() as u32 - 1;
+        i.layered.insert(spec.to_string(), id);
+        id
     }
 
-    pub fn frame_of(&self, id: u32, n: u32) -> u32 {
+    /// First frame of texture `id` (a block's face, an item's icon, a particle's frame).
+    pub fn texture(&self, id: u32) -> u32 {
         let e = self.inner.borrow().ids.get(id as usize).copied();
-        self.frame(e, n)
+        self.frame(e, 0)
+    }
+
+    /// The frame of texture `id` at `ticks`, as its `.anim` plays it.
+    pub fn frame_now(&self, id: u32, ticks: f32) -> u32 {
+        let e = self.inner.borrow().ids.get(id as usize).copied();
+        self.frame(e, self.strip_frame(id, ticks))
+    }
+
+    /// Which frame of its strip that is, for what draws the file's own picture. Nothing while it
+    /// isn't loaded.
+    pub fn strip_frame(&self, id: u32, ticks: f32) -> u32 {
+        let i = self.inner.borrow();
+        let en = i
+            .ids
+            .get(id as usize)
+            .and_then(|&e| i.entries.get(e as usize));
+        en.and_then(|en| en.anim.as_ref())
+            .map_or(0, |a| a.frame_at(ticks).0)
     }
 
     /// The texture id of a stack's look, its entry made on first use and loaded like any other.
@@ -289,39 +338,33 @@ impl GameTextures {
         gpu.write_buffer(i.glow_buffer, 0, bytemuck::cast_slice(&words));
     }
 
-    /// The world shader's tables, per texture id. `info`: two words, static -> (index, 0),
-    /// animated -> (offset into `frames`, count | total ticks << 16 | interpolate << 31), then
-    /// every texture's size. Shader packs are copies of that shader, also of older ones: new
-    /// things go after what they read.
-    /// `frames`: the number of texture ids (where `info`'s sizes start, over two), animation
-    /// frames (index | ticks << 16), then from `overlays` per block texture its overlay id + 1 or
-    /// 0. The count is there because `arrayLength` is not to be trusted: on macOS (MoltenVK, push
-    /// descriptors) it came back longer than the table, and sizes read past it drew every block
-    /// in one flat color.
+    /// The world shader's tables, per texture id. `info`: four words, nothing read past them or
+    /// worked out from the table's length (on macOS, MoltenVK, `arrayLength` came back longer
+    /// than it, and every block drew in one flat color): static -> (index, 0, size, 0), animated
+    /// -> (offset into `frames`, count | total ticks << 16 | interpolate << 31, size, 0).
+    /// `frames`: animation frames (index | ticks << 16), then from `overlays` per block texture
+    /// its overlay id + 1 or 0.
     pub fn world_tables(&self) -> (Vec<u32>, Vec<u32>, u32) {
         let i = self.inner.borrow();
-        let mut info: Vec<u32> = Vec::with_capacity(i.ids.len() * 3);
-        let mut sizes: Vec<u32> = Vec::with_capacity(i.ids.len());
-        let mut frames: Vec<u32> = vec![i.ids.len() as u32];
+        let mut info: Vec<u32> = Vec::with_capacity(i.ids.len() * 4);
+        let mut frames: Vec<u32> = Vec::new();
         for &e in &i.ids {
             let en = &i.entries[e as usize];
-            sizes.push(if en.frames.is_empty() { 16 } else { en.size.max(1) });
+            let size = if en.frames.is_empty() { 16 } else { en.size.max(1) };
             match (&en.anim, en.frames.is_empty()) {
                 (Some(a), false) if !a.frames.is_empty() => {
                     let total: u32 = a.frames.iter().map(|f| f.1).sum::<u32>().min(0x7FFF);
-                    info.push(frames.len() as u32);
-                    info.push(a.frames.len() as u32 | total << 16 | (a.interpolate as u32) << 31);
+                    info.extend([frames.len() as u32, a.frames.len() as u32 | total << 16 | (a.interpolate as u32) << 31, size, 0]);
                     frames.extend(
                         a.frames
                             .iter()
                             .map(|&(f, ticks)| en.frames[f as usize % en.frames.len()] | ticks.min(0xFFFF) << 16),
                     );
                 }
-                (_, false) => info.extend([en.frames[0], 0]),
-                (_, true) => info.extend([self.blank.1, 0]),
+                (_, false) => info.extend([en.frames[0], 0, size, 0]),
+                (_, true) => info.extend([self.blank.1, 0, size, 0]),
             }
         }
-        info.extend(sizes);
         let overlays = frames.len() as u32;
         frames.extend((0..i.ids.len()).map(|b| self.overlays.get(b).copied().unwrap_or(0)));
         (info, frames, overlays)
@@ -355,12 +398,14 @@ impl GameTextures {
             let entries = &n.entries;
             let same: Vec<bool> = entries
                 .par_iter()
-                .map(|e| match e.source {
+                .map(|e| match &e.source {
                     Source::File => unchanged(&e.name),
                     Source::Composite(parts) => loaded
                         .get(&e.name)
-                        .is_some_and(|&o| composite_stamp(assets, entries, parts) == old.entries[o as usize].stamp),
+                        .is_some_and(|&o| composite_stamp(assets, entries, *parts) == old.entries[o as usize].stamp),
                     Source::Look => false,
+                    // Made again when next asked for.
+                    Source::Layers(_) => false,
                 })
                 .collect();
             for k in 0..n.entries.len() {
@@ -413,6 +458,17 @@ fn composite_stamp(assets: &Assets, entries: &[Entry], parts: [u32; 4]) -> u64 {
         .fold(weft_noise::FNV, |h, &p| weft_noise::fnv_step(h, assets::texture_stamp(assets, &entries[p as usize].name)))
 }
 
+/// A stack's `layers` from their files: the same picture for its icon, its sprite in the hand
+/// and on the ground.
+pub fn layered(assets: &Assets, parts: &[(String, u32)]) -> assets::LoadedTexture {
+    let loaded: Vec<assets::LoadedTexture> = parts
+        .iter()
+        .map(|(n, _)| assets::load_texture(assets, n))
+        .collect();
+    let refs: Vec<(&assets::LoadedTexture, u32)> = loaded.iter().zip(parts).map(|(l, p)| (l, p.1)).collect();
+    assets::layered_texture(&refs)
+}
+
 fn set_glow(map: &mut Vec<u32>, color: u32, glow: u32) {
     if color as usize >= map.len() {
         map.resize(color as usize + 1, u32::MAX);
@@ -425,14 +481,15 @@ fn load(entries: &[Entry], assets: &Assets, ids: &[u32]) -> Vec<Loaded> {
     ids.par_iter()
         .map(|&e| {
             let en = &entries[e as usize];
-            match en.source {
+            match &en.source {
                 Source::File => Loaded {
                     entry: e,
                     tex: assets::load_texture(assets, &en.name),
                     stamp: assets::texture_stamp(assets, &en.name),
                     pixels: None,
                 },
-                Source::Composite(ids) => {
+                Source::Layers(parts) => Loaded { entry: e, tex: layered(assets, parts), stamp: 0, pixels: None },
+                &Source::Composite(ids) => {
                     let parts = ids.map(|p| assets::load_texture(assets, &entries[p as usize].name));
                     Loaded {
                         entry: e,

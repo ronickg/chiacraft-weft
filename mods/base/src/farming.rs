@@ -24,13 +24,13 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::NATURAL);
     r.shaped(&base_api::CRAFTING, "compost_bin", 1, &["# #", "# #", "###"], &[('#', "#planks")]);
     // A ripe harvest wears the farmland under it, or feeds it (beans; `vitals::crops`).
-    r.on(&BLOCK_BROKEN, |b| {
+    r.on(&actions::BREAK_BLOCK, |b| {
         let w = b.world();
         for e in b.iter() {
             let name = block_name(e.state).split('[').next().unwrap_or("");
             let Some(c) = vitals::crops::of(name) else { continue };
             if state_prop(e.state, "age").and_then(|a| a.parse::<u32>().ok()) == Some(c.ripe) {
-                let below = [e.pos[0], e.pos[1] - 1, e.pos[2]];
+                let below = e.pos.below().to_array();
                 wear(&w, below, if c.soil == vitals::crops::Soil::Tires { 1 } else { -1 });
             }
         }
@@ -46,37 +46,35 @@ pub fn fertility(w: &World, pos: [i32; 3]) -> Option<u8> {
 fn wear(w: &World, pos: [i32; 3], by: i32) {
     let Some(f) = fertility(w, pos) else { return };
     let worn = (soil::MAX as i32 - f as i32 + by).clamp(0, soil::MAX as i32);
-    w.set_prop(pos, "worn", &worn.to_string());
+    w.prop_set(pos, "worn", &worn.to_string());
 }
 
 /// A hoe on the top of grass or dirt with air above: farmland, the hoe worn a little.
 pub fn till(u: &mut ItemUse) -> bool {
-    let Some((p, face)) = u.target() else { return false };
+    let Some((p, face)) = u.target_block() else { return false };
     let w = u.world();
-    let state = w.get(p);
-    if face != 3 || !(GRASS.is(state) || DIRT.is(state)) || w.get([p[0], p[1] + 1, p[2]]) != 0 {
+    let state = w.block(p);
+    if face != 3 || !(GRASS.is(state) || DIRT.is(state)) || w.block(p.above()) != 0 {
         return false;
     }
-    w.set(p, FARMLAND.id());
-    if !w.creative(u.player()) {
-        let s = u.stack();
-        let damage = s.damage() + 1;
-        let max = DURABILITY.on_item(s.item).unwrap_or(0);
-        u.set_stack(if max > 0 && damage >= max { ItemStack::EMPTY } else { s.with_damage(damage) });
+    w.set_block(p, FARMLAND.id());
+    if !w.outside_survival(u.player()) {
+        u.set_stack(u.stack().add_wear(1));
     }
     true
 }
 
 /// Dung or compost on farmland: its levels back.
 fn fertilize(u: &mut ItemUse) -> bool {
-    let Some((p, _)) = u.target() else { return false };
+    let Some((p, _)) = u.target_block() else { return false };
+    let p = p.to_array();
     let w = u.world();
     let Some(levels) = soil::feeds(item_name(u.stack().item)) else { return false };
     if fertility(&w, p).is_none_or(|f| f >= soil::MAX) {
         return false;
     }
     wear(&w, p, -(levels as i32));
-    if !w.creative(u.player()) {
+    if !w.outside_survival(u.player()) {
         u.set_stack(StackData::shrink(u.stack(), 1));
     }
     true
@@ -86,10 +84,10 @@ fn fertilize(u: &mut ItemUse) -> bool {
 pub fn fallow(e: &mut BlockEvent) {
     let w = e.world();
     let p = e.pos();
-    if fertility(&w, p).is_none_or(|f| f >= soil::MAX) || w.get([p[0], p[1] + 1, p[2]]) != 0 {
+    if fertility(&w, p.to_array()).is_none_or(|f| f >= soil::MAX) || w.block(p.above()) != 0 {
         return;
     }
-    crate::growth::grow(e, "base:grazed_grass", false, |e| wear(&e.world(), e.pos(), -1));
+    crate::growth::grow(e, "base:grazed_grass", false, |e| wear(&e.world(), e.pos().to_array(), -1));
 }
 
 /// Using a compost bin: a full one gives its compost; else what one holds goes in, if it rots.
@@ -100,8 +98,8 @@ pub fn bin(u: &mut Use) -> bool {
         .and_then(|v| v.parse::<u8>().ok())
         .unwrap_or(0);
     if level > soil::BIN_FULL {
-        w.spawn_item([p[0] as f64 + 0.5, p[1] as f64 + 1.1, p[2] as f64 + 0.5], ItemStack::new(COMPOST.id(), 1));
-        w.set_prop(p, "level", "0");
+        w.spawn_item([p.x as f64 + 0.5, p.y as f64 + 1.1, p.z as f64 + 0.5], ItemStack::new(COMPOST.id(), 1));
+        w.prop_set(p, "level", "0");
         return true;
     }
     if level >= soil::BIN_FULL {
@@ -113,10 +111,10 @@ pub fn bin(u: &mut Use) -> bool {
     if held.is_empty() {
         return false;
     }
-    let spoiled = FRESHNESS.stack_only(&held) == Some(freshness::SPOILED);
+    let spoiled = FRESHNESS.on_stack_own(&held) == Some(freshness::SPOILED);
     let Some(adds) = (if spoiled { Some(soil::SPOILED) } else { soil::composts(item_name(held.item)) }) else { return false };
-    w.set_prop(p, "level", &(level + adds).min(soil::BIN_FULL).to_string());
-    if !w.creative(player) {
+    w.prop_set(p, "level", &(level + adds).min(soil::BIN_FULL).to_string());
+    if !w.outside_survival(player) {
         inv.set(slot, StackData::shrink(held, 1));
     }
     true
@@ -126,6 +124,6 @@ pub fn bin(u: &mut Use) -> bool {
 pub fn rot(e: &mut BlockEvent) {
     if state_prop(e.state(), "level") == Some(&*soil::BIN_FULL.to_string()) {
         e.world()
-            .set_prop(e.pos(), "level", &(soil::BIN_FULL + 1).to_string());
+            .prop_set(e.pos(), "level", &(soil::BIN_FULL + 1).to_string());
     }
 }

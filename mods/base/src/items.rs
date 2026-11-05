@@ -25,8 +25,8 @@ const MATERIALS: [Material; 5] = [
     Material { name: "wood", level: tool_tier::WOOD, speed: 2.0, durability: 59, damage: 0.0 },
     Material { name: "stone", level: tool_tier::STONE, speed: 4.0, durability: 131, damage: 1.0 },
     Material { name: "iron", level: tool_tier::IRON, speed: 6.0, durability: 250, damage: 2.0 },
-    Material { name: "diamond", level: tool_tier::DIAMOND, speed: 8.0, durability: 1561, damage: 3.0 },
     Material { name: "gold", level: tool_tier::WOOD, speed: 12.0, durability: 32, damage: 0.0 },
+    Material { name: "diamond", level: tool_tier::DIAMOND, speed: 8.0, durability: 1561, damage: 3.0 },
 ];
 
 pub fn register(r: &mut Registry) {
@@ -59,7 +59,7 @@ pub fn register(r: &mut Registry) {
         .tag("materials/diamond")
         .tab(&crate::tabs::INGREDIENTS);
     r.item(&WHEAT_SEEDS)
-        .placed_block(&crate::blocks::WHEAT)
+        .places(&crate::blocks::WHEAT)
         .tab(&crate::tabs::NATURAL);
     r.item(&WHEAT)
         .tag("crops/wheat")
@@ -116,7 +116,7 @@ pub fn register(r: &mut Registry) {
             .or_else(|| crate::crops::planted_by(name))
             .or_else(|| crate::blocks::sapling_planted_by(name))
         {
-            Some(b) => i.placed_block(b),
+            Some(b) => i.places(b),
             None => i,
         };
         if !tag.is_empty() {
@@ -126,14 +126,14 @@ pub fn register(r: &mut Registry) {
     // Seeds animals eat off the ground (`vitals::forage::DROPPED`): acorns, which plant an oak,
     // and wild rice's grain, which plants wild rice.
     r.item(Item::generated("acorn".into()))
-        .placed_block(&crate::blocks::SAPLING)
+        .places(&crate::blocks::SAPLING)
         .tab(&crate::tabs::NATURAL);
     let rice = r
         .item(Item::generated("rice".into()))
         .tag("rice")
         .tab(&crate::tabs::NATURAL);
     match crate::wild::planted_by("rice") {
-        Some(b) => drop(rice.placed_block(b)),
+        Some(b) => drop(rice.places(b)),
         None => drop(rice),
     }
     // Buckskin, brain-tanned from a hide at a tanning frame (`crafts.rs`): clothes and books. Leather

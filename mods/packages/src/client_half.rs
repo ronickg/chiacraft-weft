@@ -97,7 +97,7 @@ pub fn load(r: &mut Registry, package: &str, dir: &std::path::Path) -> Result<()
                 // A key's binding is a setting: the engine carries settings over by name when
                 // the content switches (`config::content_switched`), so a package may add one.
                 r.key(Key::generated(name.clone()), default)
-                    .on_press(move |c| {
+                    .on_press_client(move |c| {
                         let g = game(*c, true, &h);
                         lock(&h).key(g, cb)
                     });
@@ -240,7 +240,7 @@ fn class(name: &str) -> &'static str {
 
 fn style(p: &Part) -> S {
     let s = &p.style;
-    let mut out = if s.row { S::row() } else { S::col() };
+    let mut out = if s.row { S::row() } else { S::column() };
     out.width = s.width;
     out.height = s.height;
     out.gap = s.gap;
@@ -279,7 +279,7 @@ fn args(a: &[WArg]) -> Vec<Arg<'_>> {
 }
 
 pub(crate) fn build(ui: &mut Ui, h: &Arc<Half>, cb: u32) {
-    let view = ui.client();
+    let view = ui.view();
     let parts = lock(h).build(game(view.client(), false, h), cb);
     let mut i = 0;
     while i < parts.len() {
@@ -370,7 +370,10 @@ fn find(kind: u32, name: &str) -> Option<u32> {
 
 impl ClientGame for PlayerGame {
     fn me(&mut self) -> Option<([f64; 3], f32, f32)> {
-        self.c.view().me().map(|e| (e.pos, e.health, e.max_health))
+        self.c
+            .view()
+            .player_state()
+            .map(|e| ([e.pos.x, e.pos.y, e.pos.z], e.health, e.max_health))
     }
     fn day_time(&mut self) -> u64 {
         self.c.view().day_time()
@@ -379,7 +382,7 @@ impl ClientGame for PlayerGame {
         self.c.view().raining()
     }
     fn creative(&mut self) -> bool {
-        self.c.view().creative()
+        self.c.view().outside_survival()
     }
     fn component(&mut self, name: &str) -> Option<Vec<u8>> {
         // A personal mod has no components of its own in any world.
@@ -409,11 +412,11 @@ impl ClientGame for PlayerGame {
         if self.half.personal.is_some() {
             crate::personal::open_screen(self.c, &self.half, name);
         } else if let Some((_, s)) = self.half.screens.iter().find(|(n, _)| n == name) {
-            self.c.open_screen(s);
+            self.c.screen_open(s);
         }
     }
     fn close_screen(&mut self) {
-        self.c.close_screen();
+        self.c.screen_close();
     }
     fn show(&mut self, key: &str, args: &[WArg]) {
         let (key, args) = worded(&self.half, key, args);

@@ -22,15 +22,19 @@ value! {
 pub static KNOWN: Component<Known> = Component::named("base:known_items");
 
 pub fn register(r: &mut Registry) {
-    r.entity_component(&KNOWN, Known { bits: [0; WORDS] }, component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP);
+    r.entity_component(
+        &KNOWN,
+        Known { bits: [0; WORDS] },
+        component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP_ON_RESPAWN,
+    );
     r.attach(&PLAYER, &KNOWN);
     r.world_tick(|w| {
-        if w.time() % EVERY != 0 {
+        if w.game_time() % EVERY != 0 {
             return;
         }
         for player in w.players() {
             let inv = w.inventory(player);
-            let held: Vec<u32> = (0..inv.size())
+            let held: Vec<u32> = (0..inv.len())
                 .map(|i| inv.get(i))
                 .filter(|s| !s.is_empty())
                 .map(|s| s.item)

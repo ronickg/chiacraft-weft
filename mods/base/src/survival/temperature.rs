@@ -34,8 +34,8 @@ pub fn register(r: &mut Registry) {
     // "Sheltered · log walls, +18 °C" (over the air outside), under the vitals' bars while in a room.
     r.hud_element(&HUD_ROOM, hud_anchor::TOP_LEFT, 8, |ui| {
         // One line, wide enough not to wrap (in a narrow top-left column it broke a letter a line).
-        ui.text_bind_styled(S::col().min_w(150.0).no_wrap(), |c, out| match c.component(&ROOM) {
-            Some(r) if r.wall > 0 && !c.creative() => {
+        ui.text_bind_styled(S::column().min_w(150.0).no_wrap(), |c, out| match c.component(&ROOM) {
+            Some(r) if r.wall > 0 && !c.outside_survival() => {
                 let wall = WALLS[(r.wall as usize - 1).min(WALLS.len() - 1)].name();
                 let gain = format!("{:+}", r.gain);
                 out.set("hud.base.room", &[Arg::Key(&format!("hud.base.wall.{wall}")), Arg::Text(&gain)]);
@@ -83,7 +83,8 @@ pub fn register(r: &mut Registry) {
 /// comfort around (`camp::comfort_of`), found in the same search for fires.
 pub fn feel(w: &World, id: u64, st: &EntityState, v: &mut Vitals, s: &stomach::Stomach, fortitude: f32, fat: f32) -> (Air, u32) {
     let mut comfort = 0u32;
-    let here = base_api::air_at(w, st.pos, st.size[2], st.in_liquid != 0, HEAT_REACH, |state| comfort |= super::camp::comfort_of(state));
+    let here =
+        base_api::air_at(w, st.pos.into(), st.size.eye, st.in_liquid != 0, HEAT_REACH, |state| comfort |= super::camp::comfort_of(state));
     (v.date, v.calendar) = (here.day, here.calendar);
     let worn = worn(w, id);
     // A rain cape keeps the rain off; water still soaks.
@@ -109,7 +110,7 @@ pub fn feel(w: &World, id: u64, st: &EntityState, v: &mut Vitals, s: &stomach::S
     // Through windproof clothes, only part of the wind chills; in a room (`shelter.rs`) the wind
     // is shut out, its walls even out the day and a fire in it warms it by its walls.
     let outdoors = temperature::through_clothes(here.still, here.celsius, worn.windproof);
-    let feet = st.pos.map(|v| v.floor() as i32);
+    let feet = block_pos_of(st.pos).to_array();
     let room = if here.underground || st.in_liquid != 0 { None } else { super::shelter::room(w, feet) };
     let felt = room.map_or(outdoors, |r| r.air(here.mean, here.still - here.fire, here.fire));
     if let Some(r) = w.component_mut(id, &ROOM) {

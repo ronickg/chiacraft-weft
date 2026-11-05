@@ -67,8 +67,8 @@ pub struct Listener {
     /// No sky light at the head: caves echo.
     pub enclosed: bool,
     pub dim: u32,
-    pub day: bool,
-    pub creative: bool,
+    /// The conditions music asks for that hold now, by id.
+    pub holds: Vec<u32>,
 }
 
 /// A file as far as it has been read.
@@ -155,6 +155,10 @@ struct Voice {
     pos: Option<DVec3>,
     /// Blocks away it is still heard.
     reach: f32,
+    /// Blocks within which it is at full volume (`SoundDesc::full_within`), and the curve it
+    /// fades by beyond (`falloff`).
+    near: f32,
+    falloff: i32,
     /// Asked for before it started (its file was being read).
     lowpass: f32,
     started: Instant,
@@ -463,7 +467,7 @@ impl Audio {
 
     /// How much a voice matters: its priority, then how loud it is at the listener.
     fn importance(&self, v: &Voice) -> (i32, f32) {
-        (v.priority, audible(v.volume, v.pos, v.reach, self.ear))
+        (v.priority, audible(v.volume, v.pos, v.near, v.reach, self.ear))
     }
 
     /// Makes room for a sound of event `sound` that matters `new`: false if it should not play.
@@ -810,10 +814,11 @@ impl Audio {
         };
         let volume = p.volume.max(0.0);
         let pitch = if p.pitch > 0.0 { p.pitch } else { def.pitch[0] + (def.pitch[1] - def.pitch[0]) * self.random() };
-        // Heard up to `range` blocks (further for loud ones), full volume within one.
+        // Heard up to `range` blocks (further for loud ones), full volume within `full_within`.
         let reach = (def.range * (volume * def.volume).max(1.0)).max(1.5);
+        let near = def.full_within.clamp(0.0, reach - 0.5);
         let stream = matches!(self.file(assets, &name), File::Stream(_));
-        if !self.room(p.sound, def.voices, stream, (def.priority, audible(volume, p.pos, reach, self.ear))) {
+        if !self.room(p.sound, def.voices, stream, (def.priority, audible(volume, p.pos, near, reach, self.ear))) {
             log::debug!("sound {}: no room", def.name);
             self.live.remove(&id);
             self.dropped += 1;
@@ -831,6 +836,8 @@ impl Audio {
             fade,
             pos: p.pos,
             reach,
+            near,
+            falloff: def.falloff,
             lowpass,
             started: Instant::now(),
             track: Track::None,
@@ -861,7 +868,6 @@ impl Audio {
     }
 
     fn music(&mut self, assets: &Assets, l: &Listener) {
-        use weft_abi::music_when as mw;
         if self
             .music
             .as_ref()
@@ -872,15 +878,7 @@ impl Audio {
         }
         self.music = None;
         let c = content();
-        let fits = |m: &crate::registry::MusicDef| {
-            let w = m.when;
-            m.dimension.is_none_or(|d| d == l.dim)
-                && (w & (mw::DAY | mw::NIGHT) == 0 || (w & mw::DAY != 0 && l.day) || (w & mw::NIGHT != 0 && !l.day))
-                && (w & (mw::UNDERGROUND | mw::SURFACE) == 0
-                    || (w & mw::UNDERGROUND != 0 && l.enclosed)
-                    || (w & mw::SURFACE != 0 && !l.enclosed))
-                && (w & mw::CREATIVE == 0 || l.creative)
-        };
+        let fits = |m: &crate::registry::MusicDef| m.dimension.is_none_or(|d| d == l.dim) && m.when.iter().all(|w| l.holds.contains(w));
         // Quiet for a few minutes between tracks, like vanilla's (shorter: there is less music).
         self.next_music = Instant::now() + Duration::from_secs(120 + (self.random() * 180.0) as u64);
         let Some(m) = c
@@ -931,11 +929,11 @@ impl Audio {
     }
 }
 
-/// How loud a sound of `volume` at `pos` is at `ear`: full within a block, nothing past `reach`.
-fn audible(volume: f32, pos: Option<DVec3>, reach: f32, ear: DVec3) -> f32 {
+/// How loud a sound of `volume` at `pos` is at `ear`: full within `near`, nothing past `reach`.
+fn audible(volume: f32, pos: Option<DVec3>, near: f32, reach: f32, ear: DVec3) -> f32 {
     let Some(p) = pos else { return volume };
-    let d = (p.distance(ear) as f32 - 1.0).max(0.0);
-    volume * (1.0 - d / (reach - 1.0).max(0.5)).clamp(0.0, 1.0)
+    let d = (p.distance(ear) as f32 - near).max(0.0);
+    volume * (1.0 - d / (reach - near).max(0.5)).clamp(0.0, 1.0)
 }
 
 impl Voice {
@@ -945,8 +943,14 @@ impl Voice {
         let filter = FilterBuilder::new().cutoff(self.lowpass as f64);
         self.track = match self.pos {
             Some(pos) => {
+                let curve = match self.falloff {
+                    0 => kira::Easing::Linear,
+                    n if n > 0 => kira::Easing::InPowi(n),
+                    n => kira::Easing::OutPowi(-n),
+                };
                 let mut b = SpatialTrackBuilder::new()
-                    .distances((1.0, self.reach))
+                    .distances((self.near, self.reach))
+                    .attenuation_function(curve)
                     .persist_until_sounds_finish(true);
                 if self.held {
                     self.filter = Some(b.add_effect(filter));

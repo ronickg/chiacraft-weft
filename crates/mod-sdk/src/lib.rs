@@ -652,7 +652,7 @@ impl Registry {
             (component_flags::SAVE, registry::ComponentFlags::SAVE),
             (component_flags::SYNC_OWNER, registry::ComponentFlags::SYNC_OWNER),
             (component_flags::SYNC_WATCHERS, registry::ComponentFlags::SYNC_WATCHERS),
-            (component_flags::KEEP, registry::ComponentFlags::KEEP),
+            (component_flags::KEEP_ON_RESPAWN, registry::ComponentFlags::KEEP),
         ] {
             if flags & bit != 0 {
                 f = f | flag;
