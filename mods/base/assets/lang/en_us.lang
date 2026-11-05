@@ -1253,9 +1253,11 @@ web.base.centre_tip = Back to the start (C)
 web.base.points = {0} perk points
 web.base.refund_on = Unlearning: {0} left
 web.base.refund_off = Unlearn ({0} left)
-web.base.refund_tip = Click a taken node to give it back. Only ones the rest don't hang from.
+web.base.refund_tip = Click a taken node to give it back.
+    Only one the rest don't hang from.
 web.base.skill_tip = {color:title}{0}{/}
-    {color:dim}Rises by {1}. Click to see its region.{/}
+    {color:dim}Rises by {1}.{/}
+    {color:dim}Click to see its region.{/}
 web.base.level = {0}
 web.base.by.later = nothing yet: it comes with spells, machines or traders
 web.base.state.taken = {#7fdc6a}Taken{/}
@@ -1264,7 +1266,8 @@ web.base.state.waiting = {#c6a383}Not enough perk points: each level gives one{/
 web.base.state.far = {#6b6f86}Take a node next to it first{/}
 web.base.state.locked = {#e8907a}Your skill is too low{/}
 web.base.tip.start = {color:title}The start{/}
-    {color:dim}Everyone begins here. Grow out to the skills you use.{/}
+    {color:dim}Everyone begins here.{/}
+    {color:dim}Grow out to the skills you use.{/}
 web.base.tip.1 = {color:title}{0}{/}
     {1} {2}
     {3}
@@ -1465,7 +1468,11 @@ item.base.emakaun = Emakaun, the Life-Keeper
 item.base.emakaun.tooltip = A relic of the ancients. Set in the skill web ({key:base:web}), every node taken near it gives health.
 tagged.base.stone = {#c6a383}Item level {value.level}{/}{if:value.f0==0}\n{#9ad7ff}+{value.p0} % melee damage{/}{/if}{if:value.f0==1}\n{#9ad7ff}+{value.p0} % ranged damage{/}{/if}{if:value.f0==2}\n{#9ad7ff}+{value.p0} % spell damage{/}{/if}{if:value.f0==3}\n{#9ad7ff}+{value.p0} % defence{/}{/if}{if:value.f0==4}\n{#9ad7ff}+{value.p0} % health{/}{/if}{if:value.f0==5}\n{#9ad7ff}+{value.p0} % tame damage{/}{/if}{if:value.f0==6}\n{#9ad7ff}+{value.p0} % taming speed{/}{/if}{if:value.f0==7}\n{#9ad7ff}+{value.p0} % craft grade{/}{/if}{if:value.f0==8}\n{#9ad7ff}+{value.p0} % gathering speed{/}{/if}{if:value.f0==9}\n{#9ad7ff}+{value.p0} % mining speed{/}{/if}{if:value.f0==10}\n{#9ad7ff}+{value.p0} % move speed{/}{/if}{if:value.f0==11}\n{#9ad7ff}+{value.p0} % mana cost{/}{/if}{if:value.f0==12}\n{#9ad7ff}+{value.p0} % stamina{/}{/if}{if:value.f0==13}\n{#9ad7ff}+{value.p0} % slower hunger{/}{/if}{if:value.f0==14}\n{#9ad7ff}+{value.p0} % cooking{/}{/if}{if:value.f0==15}\n{#9ad7ff}+{value.p0} % harvest{/}{/if}{if:value.f0==16}\n{#9ad7ff}+{value.p0} % riding speed{/}{/if}{if:value.f0==17}\n{#9ad7ff}+{value.p0} % trade{/}{/if}{if:value.f0==18}\n{#9ad7ff}+{value.p0} % smelting speed{/}{/if}{if:value.f0==19}\n{#9ad7ff}+{value.p0} % machine speed{/}{/if}{if:value.f1==0}\n{#9ad7ff}+{value.p1} % melee damage{/}{/if}{if:value.f1==1}\n{#9ad7ff}+{value.p1} % ranged damage{/}{/if}{if:value.f1==2}\n{#9ad7ff}+{value.p1} % spell damage{/}{/if}{if:value.f1==3}\n{#9ad7ff}+{value.p1} % defence{/}{/if}{if:value.f1==4}\n{#9ad7ff}+{value.p1} % health{/}{/if}{if:value.f1==5}\n{#9ad7ff}+{value.p1} % tame damage{/}{/if}{if:value.f1==6}\n{#9ad7ff}+{value.p1} % taming speed{/}{/if}{if:value.f1==7}\n{#9ad7ff}+{value.p1} % craft grade{/}{/if}{if:value.f1==8}\n{#9ad7ff}+{value.p1} % gathering speed{/}{/if}{if:value.f1==9}\n{#9ad7ff}+{value.p1} % mining speed{/}{/if}{if:value.f1==10}\n{#9ad7ff}+{value.p1} % move speed{/}{/if}{if:value.f1==11}\n{#9ad7ff}+{value.p1} % mana cost{/}{/if}{if:value.f1==12}\n{#9ad7ff}+{value.p1} % stamina{/}{/if}{if:value.f1==13}\n{#9ad7ff}+{value.p1} % slower hunger{/}{/if}{if:value.f1==14}\n{#9ad7ff}+{value.p1} % cooking{/}{/if}{if:value.f1==15}\n{#9ad7ff}+{value.p1} % harvest{/}{/if}{if:value.f1==16}\n{#9ad7ff}+{value.p1} % riding speed{/}{/if}{if:value.f1==17}\n{#9ad7ff}+{value.p1} % trade{/}{/if}{if:value.f1==18}\n{#9ad7ff}+{value.p1} % smelting speed{/}{/if}{if:value.f1==19}\n{#9ad7ff}+{value.p1} % machine speed{/}{/if}{if:value.f2==0}\n{#9ad7ff}+{value.p2} % melee damage{/}{/if}{if:value.f2==1}\n{#9ad7ff}+{value.p2} % ranged damage{/}{/if}{if:value.f2==2}\n{#9ad7ff}+{value.p2} % spell damage{/}{/if}{if:value.f2==3}\n{#9ad7ff}+{value.p2} % defence{/}{/if}{if:value.f2==4}\n{#9ad7ff}+{value.p2} % health{/}{/if}{if:value.f2==5}\n{#9ad7ff}+{value.p2} % tame damage{/}{/if}{if:value.f2==6}\n{#9ad7ff}+{value.p2} % taming speed{/}{/if}{if:value.f2==7}\n{#9ad7ff}+{value.p2} % craft grade{/}{/if}{if:value.f2==8}\n{#9ad7ff}+{value.p2} % gathering speed{/}{/if}{if:value.f2==9}\n{#9ad7ff}+{value.p2} % mining speed{/}{/if}{if:value.f2==10}\n{#9ad7ff}+{value.p2} % move speed{/}{/if}{if:value.f2==11}\n{#9ad7ff}+{value.p2} % mana cost{/}{/if}{if:value.f2==12}\n{#9ad7ff}+{value.p2} % stamina{/}{/if}{if:value.f2==13}\n{#9ad7ff}+{value.p2} % slower hunger{/}{/if}{if:value.f2==14}\n{#9ad7ff}+{value.p2} % cooking{/}{/if}{if:value.f2==15}\n{#9ad7ff}+{value.p2} % harvest{/}{/if}{if:value.f2==16}\n{#9ad7ff}+{value.p2} % riding speed{/}{/if}{if:value.f2==17}\n{#9ad7ff}+{value.p2} % trade{/}{/if}{if:value.f2==18}\n{#9ad7ff}+{value.p2} % smelting speed{/}{/if}{if:value.f2==19}\n{#9ad7ff}+{value.p2} % machine speed{/}{/if}{if:value.flow==1}\n{#9ad7ff}+{value.sp} % of every small node near its socket{/}{/if}{if:value.turn==0}\n{#9ad7ff}Small nodes near its socket give melee damage{/}{/if}{if:value.turn==1}\n{#9ad7ff}Small nodes near its socket give ranged damage{/}{/if}{if:value.turn==2}\n{#9ad7ff}Small nodes near its socket give spell damage{/}{/if}{if:value.turn==3}\n{#9ad7ff}Small nodes near its socket give defence{/}{/if}{if:value.turn==4}\n{#9ad7ff}Small nodes near its socket give health{/}{/if}{if:value.turn==5}\n{#9ad7ff}Small nodes near its socket give tame damage{/}{/if}{if:value.turn==6}\n{#9ad7ff}Small nodes near its socket give taming speed{/}{/if}{if:value.turn==7}\n{#9ad7ff}Small nodes near its socket give craft grade{/}{/if}{if:value.turn==8}\n{#9ad7ff}Small nodes near its socket give gathering speed{/}{/if}{if:value.turn==9}\n{#9ad7ff}Small nodes near its socket give mining speed{/}{/if}{if:value.turn==10}\n{#9ad7ff}Small nodes near its socket give move speed{/}{/if}{if:value.turn==11}\n{#9ad7ff}Small nodes near its socket give mana cost{/}{/if}{if:value.turn==12}\n{#9ad7ff}Small nodes near its socket give stamina{/}{/if}{if:value.turn==13}\n{#9ad7ff}Small nodes near its socket give slower hunger{/}{/if}{if:value.turn==14}\n{#9ad7ff}Small nodes near its socket give cooking{/}{/if}{if:value.turn==15}\n{#9ad7ff}Small nodes near its socket give harvest{/}{/if}{if:value.turn==16}\n{#9ad7ff}Small nodes near its socket give riding speed{/}{/if}{if:value.turn==17}\n{#9ad7ff}Small nodes near its socket give trade{/}{/if}{if:value.turn==18}\n{#9ad7ff}Small nodes near its socket give smelting speed{/}{/if}{if:value.turn==19}\n{#9ad7ff}Small nodes near its socket give machine speed{/}{/if}
 web.base.tip.socket = {color:title}A socket{/}
-    {color:dim}Holds a stone found in the world: ruins, bosses, ley nodes, rare animals, fallen stars. Costs {0} points; stones come out and go in freely.{/}
+    {color:dim}Holds a stone found in the world:{/}
+    {color:dim}ruins, bosses, ley nodes,{/}
+    {color:dim}rare animals, fallen stars.{/}
+    {color:dim}Costs {0} points. Stones come out{/}
+    {color:dim}and go in freely.{/}
     {1}
 web.base.tip.stone0 = {color:title}{0}{/} {color:dim}(item level {1}){/}
     {color:dim}Click to take it out.{/}
@@ -1485,7 +1492,8 @@ web.base.stone.amplify = to every small node near it
 web.base.stone.remaru = {#9ad7ff}Shows ley lines without a dowsing rod{/}
 web.base.stone.emakaun = health for every node taken near it
 web.base.pick = Set a stone:
-web.base.pick_none = No stones carried: they're found in ruins, on bosses, at ley nodes, on rare animals and in fallen stars.
+web.base.pick_none = No stones carried: find them in ruins, on bosses,
+    at ley nodes, on rare animals and in fallen stars.
 web.base.pick_cancel = Cancel
 command.base.stone = a {0}, item level {1}
 command.base.perk_show = the web gives: {0}
