@@ -173,10 +173,13 @@ diamond ... I kind of wanted to be a bit more realistic, but not completely". So
   rest (an oak haft, a leather grip on a bow, cordage on stone and wrought iron on metal, leather
   straps and a wool lining on armour). `/gear part <shape> <material>` gives one part, to assemble
   by hand at the table.
-- **Worn armour** shows today's four worn sets until its parts have region textures: a leather
-  look (leather, rawhide, bone shells), a grey one (`_mail`: the irons and steels), a yellow one
-  (`_scale`: copper and bronze), diamond's (`_gem`). They're items of their own only for their worn
-  texture (`parts::ARMOUR_LOOKS`); assembly picks the item by its shell.
+- **Worn armour is drawn from its parts** (11-05, Ronald: "Worn armour art"): one shade map per
+  worn layer in the skin layout (`base:entity/armor/parts/plates_1`, `_2`, made in code from the
+  approved iron set: its plates are the shell, its trim the fastening, its hem the lining), painted
+  with the three parts' ramps, its gems set at their spots (`looks::worn_look`, `WORN_GEM_SPOTS`),
+  carried on the stack as `core:worn_look` (an engine addition, `notes/ENGINE_CHANGES.md`). The
+  four look families (`parts::ARMOUR_LOOKS`: `_mail`, `_scale`, `_gem`) stay as items, their own
+  worn sets the fallback, and the pieces' icons.
 
 ### What each material can be
 

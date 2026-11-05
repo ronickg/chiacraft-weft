@@ -219,6 +219,27 @@ pub const GEM_SPOTS: &[(&str, [[i32; 2]; 3])] = &[
     ("boots", [[11, 10], [20, 10], [15, 6]]),
 ];
 
+/// Worn armour drawn from its parts (`abi::comp::WORN_LOOK`): one shade map per worn layer in the
+/// wearer's skin layout (`base:entity/armor/parts/plates_<1|2>`, made from the approved iron set:
+/// the plates its shell, the trim its fastening, the hem its lining), painted with the three parts'
+/// ramps; leggings are the inner layer (2), the rest the outer (1).
+pub fn worn_look(slot: usize, shell: &str, fastening: &str, lining: &str, gems: &[&str]) -> String {
+    let layer = if slot == 2 { 2 } else { 1 };
+    let mut look = format!("base:entity/armor/parts/plates_{layer}@{},{},{}", ramp(shell), ramp(fastening), ramp(lining));
+    for (i, g) in gems.iter().enumerate() {
+        if let Some(spot) = WORN_GEM_SPOTS.get(slot).and_then(|s| s.get(i)) {
+            let (x, y) = (spot[0] - GEM_SIZE / 2, spot[1] - GEM_SIZE / 2);
+            look += &format!(";base:entity/armor/parts/gem_set@{}+{x},{y}", ramp(&format!("gem_{g}")));
+        }
+    }
+    look
+}
+
+/// Where gems sit on worn armour, the centre of each socket's in the 128 x 64 skin layout, head to
+/// feet: the helmet's brow, the chest, the thigh, the shin.
+pub const WORN_GEM_SPOTS: [[[i32; 2]; 3]; 4] =
+    [[[24, 19], [20, 19], [28, 19]], [[48, 46], [43, 46], [53, 46]], [[12, 44], [12, 50], [12, 56]], [[12, 58], [10, 54], [14, 54]]];
+
 /// The gem drawing's size: a shade map with the gem in its top-left corner
 /// (`base:parts/gem/set`), moved to its socket's spot.
 pub const GEM_SIZE: i32 = 5;
@@ -299,5 +320,9 @@ mod tests {
         assert!(part_look("haft", "oak").is_none());
         assert_eq!(gem_look("sword", 0, "diamond").unwrap(), "base:parts/gem/set@base:ramps/gem_diamond+7,20");
         assert!(gem_look("knife", 0, "diamond").is_none() && gem_look("sword", 3, "diamond").is_none());
+        assert_eq!(
+            worn_look(1, "bronze", "gold", "wool", &["amber"]),
+            "base:entity/armor/parts/plates_1@base:ramps/bronze,base:ramps/gold,base:ramps/wool;base:entity/armor/parts/gem_set@base:ramps/gem_amber+46,44"
+        );
     }
 }

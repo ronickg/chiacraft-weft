@@ -741,7 +741,7 @@ impl Dim {
     /// Writes the fields clients show (`registry::HEALTH` ...) into their synced components when
     /// they differ, so they travel like mods' components. Absent ones stay absent while default.
     pub fn mirror_fields(&mut self, c: &Content) {
-        let [health, burning, worn, shape, held, off_held, using, .., riding, held_look] = c.game.field_comps;
+        let [health, burning, worn, shape, held, off_held, using, .., riding, held_look, worn_looks] = c.game.field_comps;
         let maxes: Vec<(u64, f32)> = self
             .entities
             .list
@@ -794,6 +794,17 @@ impl Dim {
                 put(comps, held, &item.to_le_bytes());
                 let look = if main.is_empty() { "" } else { crate::stack::layers(&main).unwrap_or("") };
                 put(comps, held_look, look.as_bytes());
+                // What it wears drawn by its own looks, in `WORN`'s order (`worn_of`).
+                let w = &c.game.player_layout.worn;
+                let looks: Vec<&str> = inv
+                    .get(w.start as usize..w.end as usize)
+                    .unwrap_or_default()
+                    .iter()
+                    .filter(|s| !s.is_empty() && c.worn(s.item).is_some())
+                    .map(|s| crate::stack::worn_look(s).unwrap_or(""))
+                    .collect();
+                let looks = if looks.iter().all(|l| l.is_empty()) { String::new() } else { looks.join("\n") };
+                put(comps, worn_looks, looks.as_bytes());
                 let off = crate::content::in_off_hand(c, inv);
                 let off = if off.is_empty() { 0 } else { off.item };
                 put(comps, off_held, &off.to_le_bytes());
