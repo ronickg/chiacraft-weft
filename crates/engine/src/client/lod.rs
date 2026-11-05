@@ -101,6 +101,8 @@ pub struct LodJob {
     pub live: Arc<AtomicBool>,
     /// What the server said of columns, taken over the terrain's where the tile samples them.
     pub columns: Arc<Columns>,
+    /// When it was asked for (`diag::LOD_AGE_NS`).
+    pub asked: std::time::Instant,
 }
 
 impl LodJob {
@@ -109,13 +111,17 @@ impl LodJob {
     }
 }
 
-/// LOD's own threads, at low priority: its mods' heights and meshing never hold up the pool that
-/// finishes the near cubes (joining and flying wait on those).
+/// LOD's own threads, apart from the pool that finishes the near cubes: a third of the cores (3 to
+/// 6), at that pool's low priority, so they share the CPU with it by count. At 3 threads its
+/// meshing waited on base's steep faces (fixed in `Terrain::surface_block`); at half the cores and
+/// normal priority (Distant Horizons gives its LOD that) the near cubes took 7 s to come in after
+/// a teleport instead of 1.5 (PC, 11-05), worse than the far boxes it cleared.
 pub fn pool() -> &'static rayon::ThreadPool {
     static POOL: std::sync::OnceLock<rayon::ThreadPool> = std::sync::OnceLock::new();
     POOL.get_or_init(|| {
+        let cores = std::thread::available_parallelism().map_or(4, |n| n.get());
         rayon::ThreadPoolBuilder::new()
-            .num_threads(3)
+            .num_threads((cores / 3).clamp(3, 6))
             .thread_name(|i| format!("distant terrain {i}"))
             .start_handler(|_| crate::lower_priority())
             .build()
@@ -132,6 +138,7 @@ pub struct LodMesh {
     pub quads: Vec<[u32; 4]>,
     pub skip: u32,
     pub y: (i32, i32),
+    pub asked: std::time::Instant,
 }
 
 /// What came back for `job`, meshed on a worker.
@@ -143,6 +150,7 @@ pub fn made(job: LodJob, mut words: Vec<u32>) {
         if !job.live() {
             return;
         }
+        let start = std::time::Instant::now();
         if !job.columns.is_empty() {
             take_columns(&job, &mut words);
         }
@@ -152,9 +160,11 @@ pub fn made(job: LodJob, mut words: Vec<u32>) {
             let (quads, y) = mesh(content(), job.dim, job.seed, job.key, &words);
             (quads, 0, y)
         };
+        crate::diag::LOD_MESHED.add(1);
+        crate::diag::LOD_MESH_NS.add(start.elapsed().as_nanos() as u64);
         let _ = job
             .done
-            .send(LodMesh { dim: job.dim, seed: job.seed, key: job.key, quads, skip, y });
+            .send(LodMesh { dim: job.dim, seed: job.seed, key: job.key, quads, skip, y, asked: job.asked });
     });
 }
 
@@ -174,6 +184,17 @@ fn take_columns(job: &LodJob, words: &mut [u32]) {
             words[w + 3] = 0;
         }
     }
+}
+
+/// What a steep face shows (`Faces::block`, the dimension's mod), its surface lookups one column
+/// each (`terrain::one_column`), timed for `diag`.
+#[allow(clippy::too_many_arguments)]
+fn face_block(f: crate::server::terrain::Faces, seed: u64, dim: u32, pos: [i32; 3], height: i32, biome: u32, fall: i32, block: u32) -> u32 {
+    let start = std::time::Instant::now();
+    let b = crate::server::terrain::one_column(|| f.block(seed, dim, pos, height, biome, fall, block));
+    crate::diag::LOD_FACES.add(1);
+    crate::diag::LOD_FACES_NS.add(start.elapsed().as_nanos() as u64);
+    b
 }
 
 /// Sample (i, j)'s ground (from -1 to 32): its height, top block, biome and the block under.
@@ -314,7 +335,7 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                 continue;
             }
             let (x, z) = (o.x + i * s + s / 2, o.y + j * s + s / 2);
-            let shown = |wy: i32, before: u32| f.block(seed, dim, [x, wy, z], y, biome, fall, before);
+            let shown = |wy: i32, before: u32| face_block(f, seed, dim, [x, wy, z], y, biome, fall, before);
             tops[k] = shown(y, top);
             // The wall below the top block, to the skirt's depth at most.
             let bottom = low.min(y - 1) - 2 * s;
@@ -517,7 +538,7 @@ pub fn mesh_smooth(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]
                 let fall = fall(high - low, s);
                 if fall >= f.fall {
                     let (x, z) = (o.x + i * s + s / 2, o.y + j * s + s / 2);
-                    top = f.block(seed, dim, [x, high, z], high, biome, fall, top);
+                    top = face_block(f, seed, dim, [x, high, z], high, biome, fall, top);
                 }
             }
             let (tex, tint) = face_of(top, 3);
@@ -580,6 +601,8 @@ pub struct Lod {
     columns_dim: u32,
     /// Made tiles to make again for columns that changed, shown as they are till then.
     stale: FxHashSet<TileKey>,
+    /// Since when some wanted tiles are not made, and the most missing since (`diag`).
+    missing_since: Option<(std::time::Instant, usize)>,
 }
 
 /// Columns the mask reaches past the view radius (cubes are kept that far).
@@ -608,6 +631,7 @@ impl Lod {
             columns: Arc::default(),
             columns_dim: u32::MAX,
             stale: FxHashSet::default(),
+            missing_since: None,
         }
     }
 
@@ -717,6 +741,7 @@ impl Lod {
             render.upload_lod(gpu, textures, m.key, &m.quads, m.skip, m.y);
             self.ready.insert(m.key);
             crate::diag::LOD_MADE.add(1);
+            crate::diag::LOD_AGE_NS.add(m.asked.elapsed().as_nanos() as u64);
         }
         if reach == 0 || self.custom.is_none() {
             render.lod_draw.clear();
@@ -733,10 +758,13 @@ impl Lod {
         }
         // Shown: each wanted tile when made, else its children when all four are, else its
         // nearest made ancestor, which then stands in for every wanted tile under it: a child
-        // shows only with its three siblings, never over its parent.
+        // shows only with its three siblings, never over its parent. A missing tile's parent is
+        // asked for first (`request`), so the stand-in is one level coarser and hides at most its
+        // three siblings, not every finished tile of a far coarser one.
         let mut keep = FxHashSet::default();
         let mut made = Vec::new();
         let mut standing = FxHashSet::default();
+        let mut missing = 0;
         for &key in &self.wanted {
             keep.insert(key);
             if self.ready.contains(&key) {
@@ -747,6 +775,10 @@ impl Lod {
                 made.extend(key.children());
                 keep.extend(key.children());
                 continue;
+            }
+            missing += 1;
+            if key.level < MAX_LEVEL {
+                keep.insert(key.parent());
             }
             let mut a = key;
             while a.level < MAX_LEVEL {
@@ -767,6 +799,7 @@ impl Lod {
             }
             false
         };
+        self.count_missing(missing);
         let mut shown: FxHashSet<TileKey> = made.into_iter().filter(|&k| !under_standing(k)).collect();
         shown.extend(standing.iter().copied());
         // It is a shell over the land with nothing under it: from deep below, its walls would hang
@@ -812,6 +845,28 @@ impl Lod {
             on
         });
         self.request();
+    }
+
+    /// Keeps `diag`'s gauges, and says how long it took until every wanted tile was made again.
+    fn count_missing(&mut self, missing: usize) {
+        use std::sync::atomic::Ordering::Relaxed;
+        crate::diag::LOD_WANTED.store(self.wanted.len() as u64, Relaxed);
+        crate::diag::LOD_MISSING.store(missing as u64, Relaxed);
+        crate::diag::LOD_PENDING.store(self.pending.len() as u64, Relaxed);
+        match (&mut self.missing_since, missing) {
+            (None, 0) => {}
+            (None, n) => self.missing_since = Some((std::time::Instant::now(), n)),
+            (Some((_, most)), n) if n > 0 => *most = (*most).max(n),
+            (Some((since, most)), _) => {
+                log::debug!(
+                    target: "load",
+                    "distant terrain: every wanted tile made ({} of them), {:.1} s after some were missing (at most {most})",
+                    self.wanted.len(),
+                    since.elapsed().as_secs_f64()
+                );
+                self.missing_since = None;
+            }
+        }
     }
 
     /// Well under the land at the camera's column, so its sky can't be seen. Near the surface a cave
@@ -923,12 +978,39 @@ impl Lod {
         self.split = split;
     }
 
-    /// Asks for the nearest wanted tiles not made yet, or made before columns changed.
+    /// Asks for the wanted tiles not made yet, or made before columns changed, nearest first in
+    /// tile widths (distance over size): coarse before fine where they are as near, as a tile
+    /// costs the same at every level (Distant Horizons loads coarse first), while the land by the
+    /// camera still comes before the horizon (strictly coarse first left holes beside the player
+    /// for the first seconds). A missing tile's parent goes first too, being half as many widths
+    /// away: it stands in, one level coarser, until the tile is made, rather than a far coarser
+    /// tile that hides every finished one under it, or nothing.
     fn request(&mut self) {
         let c = content();
         let custom = self.custom.clone().unwrap();
         let columns = if self.columns_dim == self.dim { self.columns.clone() } else { Arc::default() };
+        let p = self.wanted_at.map_or(glam::DVec2::ZERO, |w| w.0);
+        let widths = |k: TileKey| k.distance(p).0 / k.size() as f64;
+        let mut order: Vec<(f64, TileKey)> = Vec::new();
+        let mut parents = FxHashSet::default();
         for &key in &self.wanted {
+            if self.ready.contains(&key) && !self.stale.contains(&key) {
+                continue;
+            }
+            order.push((widths(key), key));
+            // A stale tile still shows as it was: no stand-in for it.
+            let up = key.parent();
+            if !self.ready.contains(&key)
+                && key.level < MAX_LEVEL
+                && !self.ready.contains(&up)
+                && !key.children().iter().all(|k| self.ready.contains(k))
+                && parents.insert(up)
+            {
+                order.push((widths(up), up));
+            }
+        }
+        order.sort_by(|a, b| a.0.total_cmp(&b.0).then(b.1.level.cmp(&a.1.level)));
+        for (_, key) in order {
             if self.pending.len() >= IN_FLIGHT {
                 break;
             }
@@ -939,8 +1021,9 @@ impl Lod {
             let live = Arc::new(AtomicBool::new(true));
             self.pending.insert(key, live.clone());
             let (dim, seed, done, jobs, columns) = (self.dim, self.seed, self.done.0.clone(), self.jobs.clone(), columns.clone());
+            let asked = std::time::Instant::now();
             if custom.is_empty() {
-                let _ = jobs.send(LodJob { dim, seed, key, custom: Vec::new(), done, live, columns });
+                let _ = jobs.send(LodJob { dim, seed, key, custom: Vec::new(), done, live, columns, asked });
                 continue;
             }
             let custom = custom.clone();
@@ -949,8 +1032,11 @@ impl Lod {
                 if !live.load(Ordering::Relaxed) {
                     return;
                 }
+                let start = std::time::Instant::now();
                 let heights = custom_heights(c, dim, seed, key, &custom);
-                let _ = jobs.send(LodJob { dim, seed, key, custom: heights, done, live, columns });
+                crate::diag::LOD_HEIGHTS.add(1);
+                crate::diag::LOD_HEIGHTS_NS.add(start.elapsed().as_nanos() as u64);
+                let _ = jobs.send(LodJob { dim, seed, key, custom: heights, done, live, columns, asked });
             });
         }
         self.stale.retain(|k| self.ready.contains(k));
