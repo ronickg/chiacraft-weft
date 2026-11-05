@@ -482,8 +482,23 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                 // The top block's own color down the step, a cell's height at most: a gentle slope's
                 // steps read as its grass from afar, not as rows of dirt dashes (bare faces keep
                 // their bands under a block of it).
+                // A fine cell's riser as tall as the faces' fall is a bare face in the cubes too (each
+                // column at its edge falls that far): the faces say what it shows. Drawn in the top
+                // block over the one under it, a mesa's sand terraces read as one cream slope where the
+                // cubes show their banded risers, and where finer tiles met coarser ones (whose walls
+                // ask the faces) a straight edge ran across the slope (Far view, 11-05: the "glass
+                // slabs" of the forest vista and Tester 2's far snow shot).
+                let riser = (!slope && walls[k].is_none() && top != under)
+                    .then_some(faces)
+                    .flatten()
+                    .filter(|f| y - ny >= f.fall)
+                    .map(|f| {
+                        let (x, z) = (o.x + i * s + s / 2, o.y + j * s + s / 2);
+                        face_block(f, seed, dim, [x, y - 1, z], y, biome, y - ny, under)
+                    })
+                    .filter(|&b| b != under);
                 // (A coarse cell's whole wall: it stands for a slope of its top.)
-                let band = if walls[k].is_some() {
+                let band = if walls[k].is_some() || riser.is_some() {
                     1
                 } else if slope {
                     y - ny
@@ -510,7 +525,7 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                         }
                     }
                     None => {
-                        let (tex, tint) = face_of(under, dir);
+                        let (tex, tint) = face_of(riser.unwrap_or(under), dir);
                         out.push(occluded(quad(dir as u32, i * s, ny + 1, j * s, (s, y - band - ny, s), tex, tint, biome), occ_at(i, j)));
                     }
                 }
