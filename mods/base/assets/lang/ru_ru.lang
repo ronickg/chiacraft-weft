@@ -1098,6 +1098,7 @@ block.base.loose_rock = Лежащая галька
 block.base.meteorite = Метеорит
 block.base.star_steel_ore = Руда звёздной стали
 block.base.pallasite = Палласит
+block.base.loose_tektite = Россыпь тектита
 block.base.star_lantern = Звёздный фонарь
 block.base.loose_flint = Желвак кремня
 block.base.fallen_branch = Упавшая ветка

@@ -21,6 +21,8 @@ use weft_sdk::*;
 pub static STAR_STEEL_ORE: Block = Block::named("star_steel_ore");
 pub static PALLASITE: Block = Block::named("pallasite");
 pub static STAR_LANTERN: Block = Block::named("star_lantern");
+/// Tektite lying in a crater's strewn field (Terrain's carve places it): a few green shards.
+pub static LOOSE_TEKTITE: Block = Block::named("loose_tektite");
 pub static STAR_STEEL_LUMP: Item = Item::named("star_steel_lump");
 pub static STAR_STEEL_INGOT: Item = Item::named("star_steel_ingot");
 pub static PERIDOT: Item = Item::named("peridot");
@@ -55,6 +57,16 @@ pub fn register(r: &mut Registry) {
                 .when(Cond::BlockState("heart=1"))
                 .item("starheart"),
         );
+    crate::first::loose(
+        r,
+        &LOOSE_TEKTITE,
+        &[],
+        "glass",
+        "loose_tektite",
+        &[([3.0, 0.0, 4.0], [7.0, 2.0, 8.0]), ([9.0, 0.0, 9.0], [12.0, 1.5, 12.0]), ([8.0, 0.0, 3.0], [10.0, 1.0, 5.0])],
+    );
+    r.loot(&LOOSE_TEKTITE)
+        .pool(Pool::new().items("tektite", ev::TEKTITE_PER_SHARDS.0, ev::TEKTITE_PER_SHARDS.1));
     r.block(&PALLASITE)
         .sound_group("stone")
         .texture("pallasite")

@@ -178,6 +178,8 @@ pub const PERIDOT_PER_PALLASITE: u32 = 2;
 pub const STARHEART_CHANCE: f32 = 0.33;
 pub const PALLASITE_CHANCE: f32 = 0.25;
 pub const PALLASITE_BLOCKS: (u32, u32) = (2, 4);
+/// Tektite a loose shard block gives (the strewn field's 12-30 pieces in some 8-15 blocks).
+pub const TEKTITE_PER_SHARDS: (u32, u32) = (1, 2);
 
 /// What a core of the impact `seed` holds: a Starheart, and how many pallasite blocks.
 pub fn core_kind(seed: u64) -> (bool, u32) {

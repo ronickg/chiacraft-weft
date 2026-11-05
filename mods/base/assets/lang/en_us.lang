@@ -1097,6 +1097,7 @@ block.base.loose_rock = Loose Rock
 block.base.meteorite = Meteorite
 block.base.star_steel_ore = Star Steel Ore
 block.base.pallasite = Pallasite
+block.base.loose_tektite = Loose Tektite
 block.base.star_lantern = Star Lantern
 block.base.loose_flint = Flint Nodule
 block.base.fallen_branch = Fallen Branch
