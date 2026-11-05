@@ -545,6 +545,12 @@ pub const RULES: &[Rule] = &[
         "Drenkaun's loot, certain by the third kill: the Stone Age key's boss part",
     ),
     n(&["animals:warden_antler", "animals:warden_bark"], 0, Shared, Material, Drop(15.0), "Drenkaun's part breaks and loot"),
+    // Borkon (borkon.rs): the Bronze Age's boss, its altar of granite, stone bricks and gold, its
+    // offering with the dwarves' gold; a Bronze fight about 4 minutes
+    n(&["animals:borkon_altar"], 1, Shared, Station, Made, "the Height-Keeper's altar: stone bricks and gold (the Bronze Age's)"),
+    n(&["animals:mountain_offering"], 1, Shared, Material, Made, "the heights' offering, with a gold ingot: calls Borkon, tames its kid"),
+    n(&["animals:summit_stone"], 1, Shared, Part, Drop(60.0), "Borkon's loot, certain by the third kill: the Bronze Age key's boss part"),
+    n(&["animals:borkon_horn", "animals:height_fleece"], 1, Shared, Material, Drop(20.0), "Borkon's part breaks and loot"),
     n(&["animals:kibble"], 0, Beasts, Beast, Made, "an egg, food, grain and fibre (no iron bucket; Ronald, 11-07: \"move them to fit\")"),
     n(&["animals:wyvern_saddle"], 2, Beasts, Beast, Made, "a dragon-sized saddle has an iron frame"),
     r(&["animals:spyglass"], 2, Shared, Tool, Made),

@@ -37,6 +37,8 @@ mod citipati;
 mod coats;
 mod comfort;
 mod commands;
+mod boss;
+mod borkon;
 mod coyote;
 mod cretaceous;
 mod deer;
@@ -142,7 +144,9 @@ fn init(r: &mut Registry) {
     citipati::init(r);
     early_bird::init(r);
     sauropod::init(r);
+    boss::init(r);
     drenkaun::init(r);
+    borkon::init(r);
     kryptobaatar::init(r);
     lizard::init(r);
     reindeer::init(r);
