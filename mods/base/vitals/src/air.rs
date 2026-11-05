@@ -89,7 +89,7 @@ pub fn fog(days: [f32; 4], kind: Fog, season: Option<usize>, key: u64, day: u64,
 }
 
 /// How long wet ground takes to dry once the rain stops, in seconds of play (`DRYING`, as the
-/// engine counts it): three minutes in mild damp calm air (15 °C, humidity 0.6), twice as fast
+/// engine counts it): seven minutes in mild damp calm air (15 °C, humidity 0.6), twice as fast
 /// for every ten degrees warmer, slower in damp air, faster in a wind; from half a minute (hot,
 /// dry, windy) to an hour (frozen or close to it). Ronald's pick, 11-05: the ground and leaves
 /// stay wet after rain and dry over minutes by the air's warmth and wind.
@@ -102,7 +102,8 @@ pub fn drying_secs(celsius: f32, humidity: f32, wind: f32) -> f32 {
     let warmth = 2.0f32.powf(-(celsius - 15.0) / 10.0);
     let damp = (0.5 + humidity.clamp(0.0, 1.0)) / 1.1;
     let breeze = 1.0 + wind.max(0.0) / 4.0;
-    (180.0 * warmth * damp / breeze).clamp(DRYING.0, DRYING.1)
+    // (Seven minutes: at three, a summer forest's ground was dry again within a minute, PC shw2.)
+    (420.0 * warmth * damp / breeze).clamp(DRYING.0, DRYING.1)
 }
 
 /// `drying_secs` as the engine's byte (`air_flags::DRYING_SHIFT`): 1 an hour to 255 half a minute,
@@ -377,7 +378,7 @@ mod tests {
     #[test]
     fn drying_by_warmth_damp_and_wind() {
         let mild = drying_secs(15.0, 0.6, 0.0);
-        assert!((mild - 180.0).abs() < 1.0, "{mild}");
+        assert!((mild - 420.0).abs() < 1.0, "{mild}");
         assert!(drying_secs(30.0, 0.6, 0.0) < mild && drying_secs(15.0, 0.9, 0.0) > mild && drying_secs(15.0, 0.6, 8.0) < mild);
         assert_eq!(drying_secs(-5.0, 0.6, 0.0), DRYING.1);
         assert_eq!(drying_byte(DRYING.1), 1);
