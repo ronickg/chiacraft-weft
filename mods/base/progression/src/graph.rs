@@ -308,6 +308,9 @@ const RECIPES_LIST: &[Recipe] = &[
         Hand,
     ),
     c("animals:drenkaun_altar", 1.0, &[("base:mossy_cobblestone", 7.0), ("base:flint", 1.0), ("#logs", 2.0)], Table),
+    // borkon.rs: the high passes' boss
+    c("animals:mountain_offering", 1.0, &[("base:edelweiss", 1.0), ("base:gentian", 1.0), ("base:wool", 1.0), ("base:gold_ingot", 1.0)], Hand),
+    c("animals:borkon_altar", 1.0, &[("base:granite", 4.0), ("base:gold_ingot", 1.0), ("base:stone_bricks", 4.0)], Table),
     s("animals:cooked_venison", &[("animals:venison", 1.0)], Fire),
     s("animals:cooked_hare", &[("animals:hare", 1.0)], Fire),
     s("animals:cooked_trout", &[("animals:trout", 1.0)], Fire),
@@ -408,7 +411,7 @@ pub struct Key {
     pub missing: &'static [&'static str],
 }
 
-/// The keys so far: only the Stone Age has parts of one (11-07).
+/// The keys so far: the Stone Age's, and the Bronze Age's boss part (11-05).
 pub const KEYS: &[Key] = &[Key {
     age: Age::Stone,
     routes: &[
@@ -417,6 +420,20 @@ pub const KEYS: &[Key] = &[Key {
         (Path::Magic, &["base:dowsing_rod", "animals:warden_heartseed"]),
     ],
     missing: &["knowledge: a ruin's blueprint or lore page"],
+},
+// The Bronze Age's key: only its boss part is built (Borkon's Summit Stone, by every route).
+Key {
+    age: Age::Bronze,
+    routes: &[
+        (Path::Tech, &["animals:summit_stone"]),
+        (Path::Beasts, &["animals:summit_stone"]),
+        (Path::Magic, &["animals:summit_stone"]),
+    ],
+    missing: &[
+        "materials and tools: the Bronze Age's own",
+        "knowledge: a ruin's blueprint or lore page",
+        "infrastructure: a working setup from the Bronze Age",
+    ],
 }];
 
 // ------------------------------------------------------------------ the graph, solved
@@ -723,6 +740,8 @@ pub const KITS: &[(Age, &[(&str, f32)])] = &[
             ("base:glowstone", 2.0),
             ("base:meteoric_iron", 4.0),
             ("base:gold_ingot", 4.0),
+            ("animals:borkon_altar", 1.0),
+            ("animals:mountain_offering", 2.0),
         ],
     ),
     (
