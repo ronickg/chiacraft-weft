@@ -1090,6 +1090,7 @@ hint.base.flake = A sharp flake cuts grass for fibre. Two fibres twist into stri
 hint.base.lash = Lash the head to a stick with two string in your inventory's grid ({key:core:inventory}). A flake on a stick with one string is a knife.
 hint.base.tree = An axe fells a tree: chop its lowest log, and cut the trunk where it lies. The nearest tree stands at x {0}, z {1}.
 hint.base.tree_far = An axe fells a tree: chop its lowest log, and cut the trunk where it lies. No tree grows near here: look for a wood.
+hint.base.knapping_book = Knapping from memory: {0} s a head. Keep the flint in your bag.
 knapping.base.title = Knapping
 knapping.base.how = Strike away the flint outside the head's outline. A strike inside it breaks the nodule.
 knapping.base.keep_tip = Part of the head: a strike here breaks the nodule

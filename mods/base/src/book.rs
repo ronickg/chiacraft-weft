@@ -92,6 +92,23 @@ type Entry = (Recipe, u32, Option<(u32, u32, u32)>);
 /// The bag as the open book last saw it (`client_frame` above).
 static BAG_SIG: Mutex<u64> = Mutex::new(0);
 
+/// Crafts that take time (`first::book_secs`: a knapped head from memory), one at a time per
+/// player: each made when its time comes, from what the bag (or the chests) holds then, so nothing
+/// is taken before and a craft whose inputs went makes nothing and ends the line.
+struct Queued {
+    player: u64,
+    dim: u32,
+    station: Station,
+    recipe: u32,
+    left: u32,
+    /// The world time (ticks) the next one is made, and each one's ticks.
+    at: u64,
+    each: u64,
+}
+static QUEUED: Mutex<Vec<Queued>> = Mutex::new(Vec::new());
+static WORKING: Sound = Sound::named("block.stone.hit");
+static DONE: Sound = Sound::named("block.stone.break");
+
 static BOOK: Mutex<Book> =
     Mutex::new(Book { tab: 0, page: 0, picked: None, order: Vec::new(), pool: Vec::new(), asked: u32::MAX, ask: None });
 
@@ -102,10 +119,17 @@ pub fn register(r: &mut Registry) {
         let player = p.player();
         let station = Station::from(v[2]);
         if let Some(recipe) = recipe_of(v[0] as u32) {
-            craft(&w, player, station, &recipe, (v[1] as u32).clamp(1, MAX_BATCH));
+            let count = (v[1] as u32).clamp(1, MAX_BATCH);
+            match timed(&recipe) {
+                Some(secs) => queue(&w, player, station, &recipe, count, secs),
+                None => {
+                    craft(&w, player, station, &recipe, count);
+                }
+            }
         }
         p.reply(&POOL, &encode(&chest_totals(&w, player, station)));
     });
+    r.world_tick(work_queued);
     r.packet(&POOL_ASK, |p, v| {
         let w = p.world();
         let station = Station::from(v[0]);
@@ -452,6 +476,70 @@ fn craft(w: &World, player: u64, station: Station, r: &Recipe, count: u32) -> u3
         );
     }
     made
+}
+
+/// Seconds `r` takes a craft from the book, if it takes any.
+fn timed(r: &Recipe) -> Option<f32> {
+    let (out, _) = r.outputs().into_iter().next()?;
+    crate::first::book_secs(out.item)
+}
+
+/// `count` of `r` asked for at `station`: added to the player's line (one more of the same recipe
+/// joins it; another replaces it), the first made in `secs`.
+fn queue(w: &World, player: u64, station: Station, r: &Recipe, count: u32, secs: f32) {
+    if station == Station::Hands && !fits_hands(r) || crate::first::locked_for(w, player, r) {
+        return;
+    }
+    let each = (secs * vitals::TICKS as f32).round().max(1.0) as u64;
+    let (recipe, now, dim) = (id_of(r), w.game_time(), w.dimension());
+    let mut q = QUEUED.lock().unwrap();
+    match q.iter_mut().find(|e| e.player == player) {
+        Some(e) if e.recipe == recipe && e.station == station => e.left = (e.left + count).min(MAX_BATCH),
+        _ => {
+            q.retain(|e| e.player != player);
+            q.push(Queued { player, dim, station, recipe, left: count, at: now + each, each });
+        }
+    }
+    weft_sdk::info!(
+        "crafting: queued {count} x {} at {station:?} from the book, {secs} s each",
+        r.outputs().first().map_or("?", |o| item_name(o.0.item))
+    );
+    base_api::hint(w, player, "hint.base.knapping_book", &[secs.round() as i64]);
+    if let Some(e) = w.entity(player) {
+        w.play_sound(&WORKING, e.pos, 0.7);
+    }
+}
+
+/// The lines of this world's players: a knock every second while one works, and each craft
+/// made when its time comes.
+fn work_queued(w: &World) {
+    let (now, dim) = (w.game_time(), w.dimension());
+    let mut due = Vec::new();
+    {
+        let mut q = QUEUED.lock().unwrap();
+        q.retain(|e| e.dim != dim || w.entity(e.player).is_some());
+        for e in q.iter_mut().filter(|e| e.dim == dim) {
+            if now >= e.at {
+                due.push((e.player, e.station, e.recipe));
+                e.left -= 1;
+                e.at = now + e.each;
+            } else if (e.at - now) % vitals::TICKS as u64 == 0
+                && let Some(p) = w.entity(e.player)
+            {
+                w.play_sound(&WORKING, p.pos, 0.5);
+            }
+        }
+        q.retain(|e| e.left > 0);
+    }
+    for (player, station, recipe) in due {
+        let made = recipe_of(recipe).map_or(0, |r| craft(w, player, station, &r, 1));
+        if made == 0 {
+            // Its inputs went (used, dropped, the table left behind): the line ends.
+            QUEUED.lock().unwrap().retain(|e| e.player != player);
+        } else if let Some(p) = w.entity(player) {
+            w.play_sound(&DONE, p.pos, 0.9);
+        }
+    }
 }
 
 /// A roll in 0..1 for a chance result, different for each craft.

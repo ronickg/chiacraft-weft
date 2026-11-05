@@ -228,6 +228,10 @@ pub struct Drill {
 pub const BOW_DRILL: Drill = Drill { item: "bow_drill", secs: 6.0, chance: 0.7, uses: 12 };
 pub const HAND_DRILL: Drill = Drill { item: "hand_drill", secs: 10.0, chance: 0.35, uses: 6 };
 pub const DRILLS: [Drill; 2] = [BOW_DRILL, HAND_DRILL];
+/// Seconds a knapped head takes from the book, from memory (FIRST_HOURS.md: "8 s from a nodule
+/// and a cobble"); the first one of a shape is the knapping screen's, by hand.
+pub const HEAD_FROM_BOOK_SECS: f32 = 8.0;
+
 /// Blocks over a fire bed that keep the rain off it.
 pub const ROOF_REACH: i32 = 24;
 
