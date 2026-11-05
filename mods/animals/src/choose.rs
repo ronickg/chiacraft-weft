@@ -34,6 +34,8 @@ pub enum Need {
     Drink,
     Eat,
     Wander,
+    /// A herd's sentinel standing watch (`senses::watch_goal`).
+    Watch,
 }
 
 /// The need whose goal took the turn last tick (0: none; not saved).
@@ -63,8 +65,8 @@ impl Band {
 }
 
 /// How pressing each need is for `id` now, by need (index `Need as usize`).
-fn scores(w: &World, id: u64, doing: u8) -> [f32; 8] {
-    let mut s = [0.0f32; 8];
+fn scores(w: &World, id: u64, doing: u8) -> [f32; 9] {
+    let mut s = [0.0f32; 9];
     let at = |n: Need| doing == n as u8;
     if let Some(a) = w.component(id, &ANIMAL) {
         let fed = a.food as f32 / a.stat(crate::species::FOOD).max(1.0);
@@ -82,6 +84,7 @@ fn scores(w: &World, id: u64, doing: u8) -> [f32; 8] {
     s[Need::Love as usize] = LOVE;
     s[Need::Rest as usize] = REST;
     s[Need::Wander as usize] = WANDER;
+    s[Need::Watch as usize] = animals_core::roles::WATCH;
     // Staying put outranks what would move it, and nothing else.
     s[Need::Hold as usize] = s[Need::Comfort as usize]
         .max(s[Need::Drink as usize])
@@ -98,7 +101,7 @@ impl Goal for Band {
         let doing = w.component(id, &DOING).unwrap_or(0);
         let s = scores(w, id, doing);
         // Most pressing first; a tie keeps the list's order.
-        let mut order: [usize; 8] = std::array::from_fn(|i| i);
+        let mut order: [usize; 9] = std::array::from_fn(|i| i);
         let order = &mut order[..self.goals.len()];
         order.sort_by(|&a, &b| s[self.goals[b].0 as usize].total_cmp(&s[self.goals[a].0 as usize]));
         let mut took = 0u8;

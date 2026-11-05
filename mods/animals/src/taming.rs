@@ -276,7 +276,7 @@ fn flee(w: &World, id: u64, st: &EntityState) {
         (a.cos(), a.sin())
     });
     // Away over ground it can run on (no cliff, no water: `senses::escape`).
-    let to = crate::senses::escape(w, st, [st.pos.x - x, st.pos.y, st.pos.z - z], 8.0);
+    let to = crate::senses::escape(w, st, [st.pos.x - x, st.pos.y, st.pos.z - z], 8.0, crate::senses::herd_mid(w, id));
     if let Some(f) = from {
         weft_sdk::info!(
             "animal {id} at {:.1} {:.1} flees from what hurt it at {:.1} {:.1} to {:.1} {:.1}",

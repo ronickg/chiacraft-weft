@@ -27,6 +27,8 @@ use crate::species::{self, OTHER_PREY, SPECIES, Species};
 static HUNT: Component<[u64; 4]> = Component::named("animal_hunt");
 /// Until when it runs from a hunter (not saved).
 static WARY: Component<u64> = Component::named("animal_wary");
+/// When an ambusher broke cover to charge (0: still stalking; not saved).
+static CHARGING: Component<u64> = Component::named("animal_charging");
 
 /// Blocks a hunter looks for prey and prey watches for hunters, in clear air: fog, a blizzard or
 /// a dust storm close both in (`base_api::sight`).
@@ -44,9 +46,11 @@ const HUDDLE_WALK: u64 = 40;
 pub fn init(r: &mut Registry) {
     r.entity_component(&HUNT, [0u64; 4], 0);
     r.entity_component(&WARY, 0u64, 0);
+    r.entity_component(&CHARGING, 0u64, 0);
     for s in &SPECIES {
         r.attach(s.kind, &HUNT);
         r.attach(s.kind, &WARY);
+        r.attach(s.kind, &CHARGING);
     }
     // A kill feeds the hunter that made it, by the prey's mass against its own.
     r.on(&actions::DIE, |b| {
@@ -173,11 +177,13 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
                 }
                 return false;
             }
-            crate::commands::fight_at(w, id, st, h[0], if pack { PACK_SPEED } else { 1.4 });
+            let (aim, speed) = chase(w, id, st, s, h[0], pack, now);
+            crate::commands::fight_aiming(w, id, st, h[0], speed, aim);
             return true;
         }
         weft_sdk::info!("{} {id} gives up on {} ({})", s.name, h[0], if alive { "too long" } else { "gone" });
         h = [0, 0, now + LOOK_EVERY, 0];
+        w.component_mut(id, &CHARGING).map(|c| *c = 0);
     }
     if now < h[2] {
         w.component_mut(id, &HUNT).map(|c| *c = h);
@@ -267,7 +273,18 @@ pub fn wary(w: &World, id: u64, st: &EntityState) -> bool {
     let seen = crate::senses::sense(w, id, st, |sight| watch(w, sight));
     let h = seen.threat_pos.map(f64::from);
     if seen.aware >= animals_core::perception::NOTICED && (seen.threat != 0 || h != [0.0; 3]) {
-        let to = crate::senses::escape(w, st, h, 10.0);
+        // A big plant eater faces a lone hunter, a mother stays between it and her young.
+        if seen.threat != 0 && stands_ground(w, id, st, seen.threat) {
+            w.component_mut(id, &WARY)
+                .map(|u| *u = now + crate::senses::EVERY);
+            return true;
+        }
+        // It calls: its herd or pack near know at once and run with it.
+        let heard = crate::senses::alarm(w, id, st, seen.threat, seen.threat_pos);
+        if heard > 0 {
+            weft_sdk::info!("animal {id} calls the alarm: {heard} of its kind near run too");
+        }
+        let to = crate::senses::escape(w, st, h, 10.0, crate::senses::herd_mid(w, id));
         weft_sdk::debug!("animal {id} runs from {} (awareness {:.2}) to {to:?}", seen.threat, seen.aware);
         w.navigate(id, to, 1.6);
         w.component_mut(id, &WARY).map(|u| *u = now + RUN);
@@ -324,4 +341,104 @@ pub fn huddle(w: &World, id: u64, st: &EntityState) -> bool {
         *u = now + HUDDLE_WALK;
     }
     true
+}
+
+/// Whether `id` stands its ground against hunter `threat` instead of running
+/// (`animals_core::roles`): a big plant eater against a lone hunter, or a mother big enough with
+/// her young near. It faces the hunter, and charges one that comes within `CHARGE` blocks.
+fn stands_ground(w: &World, id: u64, st: &EntityState, threat: u64) -> bool {
+    use animals_core::roles;
+    let Some(me) = crate::senses::facts(w, id) else { return false };
+    let Some(s) = me.species() else { return false };
+    if s.hunts() || me.young != 0 || me.tamed != 0 {
+        return false;
+    }
+    let Some(t) = w.entity(threat) else { return false };
+    let big_alone = me.mass >= roles::STANDS_KG && {
+        // Lone: no other of its kind near it.
+        w.targets_near(t.pos, roles::LONE, None)
+            .into_iter()
+            .filter(|&o| o != threat && w.entity(o).is_some_and(|e| e.kind == t.kind))
+            .count()
+            == 0
+    };
+    let mother = me.mass >= roles::GUARDS_KG
+        && w.component(id, &ANIMAL).is_some_and(|a| a.female != 0)
+        && w.entities_near(st.pos, roles::YOUNG_NEAR, Some(s.kind))
+            .into_iter()
+            .any(|o| {
+                o != id
+                    && w.component(o, &crate::breeding::BREEDING)
+                        .is_some_and(|b| b.mother == id && b.growing > 0)
+            });
+    if !(big_alone || mother) {
+        return false;
+    }
+    crate::senses::stare(w, id, st, [t.pos.x as f32, t.pos.y as f32, t.pos.z as f32]);
+    let d2 = dist2(t.pos, st.pos);
+    if d2 <= roles::CHARGE * roles::CHARGE * 4.0 {
+        w.navigate(id, t.pos, roles::CHARGE_SPEED);
+    }
+    if d2 <= roles::CHARGE * roles::CHARGE {
+        w.damage(threat, t.max_health * roles::CHARGE_HIT, id, damage_cause::ATTACK);
+        weft_sdk::info!("{} {id} charges {} ({})", s.name, threat, if mother { "guarding its young" } else { "a lone hunter" });
+    } else if (w.game_time() + id).is_multiple_of(40) {
+        weft_sdk::info!(
+            "{} {id} stands its ground against {} ({})",
+            s.name,
+            threat,
+            if mother { "guarding its young" } else { "a lone hunter" }
+        );
+    }
+    true
+}
+
+/// Where a chasing hunter runs and how fast (`animals_core::roles`): at where its prey will be
+/// (`LEAD_SECS` ahead at most); in a pack, all but the driver wide at its flanks while it is
+/// farther than `FLANK_FROM`; an ambusher stalks slowly to `BURST` blocks, then charges (giving
+/// up a charge after `BURST_TICKS`).
+fn chase(w: &World, id: u64, st: &EntityState, s: &Species, prey: u64, pack: bool, now: u64) -> (Option<[f64; 3]>, f32) {
+    use animals_core::roles;
+    let Some(e) = w.entity(prey) else { return (None, 1.4) };
+    let (dx, dz) = (e.pos.x - st.pos.x, e.pos.z - st.pos.z);
+    let d = (dx * dx + dz * dz).sqrt();
+    // Where it will be: its velocity (blocks a second) over the time to close in, at most a second.
+    let lead = (d / 8.0).min(roles::LEAD_SECS);
+    let mut aim = [e.pos.x + e.vel.x * lead, e.pos.y, e.pos.z + e.vel.z * lead];
+    let speed = if pack { PACK_SPEED } else { 1.4 };
+    if pack && d > roles::FLANK_FROM {
+        // The driver straight in; the others to its sides, a little ahead.
+        let side = match id % 3 {
+            1 => 1.0,
+            2 => -1.0,
+            _ => 0.0,
+        };
+        let (hx, hz) = {
+            let v = (e.vel.x * e.vel.x + e.vel.z * e.vel.z).sqrt();
+            if v > 0.5 { (e.vel.x / v, e.vel.z / v) } else { (dx / d.max(0.01), dz / d.max(0.01)) }
+        };
+        aim = [
+            aim[0] + (-hz * side + hx * 0.5 * side.abs()) * roles::FLANK,
+            aim[1],
+            aim[2] + (hx * side + hz * 0.5 * side.abs()) * roles::FLANK,
+        ];
+    }
+    if !pack && roles::ambushes(s.family.name) {
+        let started = w.component(id, &CHARGING).unwrap_or(0);
+        if d > roles::BURST && started == 0 {
+            return (Some(aim), roles::STALK);
+        }
+        if started == 0 {
+            w.component_mut(id, &CHARGING).map(|c| *c = now.max(1));
+            weft_sdk::info!("{} {id} breaks cover and charges {prey} ({d:.1} blocks)", s.name);
+        } else if now > started + roles::BURST_TICKS {
+            // A charge that failed: it gives up and stalks again later.
+            w.component_mut(id, &CHARGING).map(|c| *c = 0);
+            w.component_mut(id, &HUNT)
+                .map(|h| *h = [0, 0, now + LOOK_EVERY, 0]);
+            return (None, 0.0);
+        }
+        return (Some(aim), 1.6);
+    }
+    (Some(aim), speed)
 }

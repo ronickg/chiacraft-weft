@@ -19,6 +19,7 @@ pub mod memory;
 pub mod needs;
 pub mod nests;
 pub mod perception;
+pub mod roles;
 pub mod sheet;
 pub mod sky;
 pub mod species;
