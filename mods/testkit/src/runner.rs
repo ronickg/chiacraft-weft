@@ -412,6 +412,19 @@ impl T {
         format!("slot:{}", last.map_or(36 + i, |l| l.saturating_sub(8) + i))
     }
 
+    /// Clicks a UI element after the cursor has rested on it for two frames. `click_ui` moves the
+    /// cursor and presses in one frame, which may land on what the cursor was over before: with a
+    /// stack held, a right click meant for a grid cell then goes back onto the slot it was taken from.
+    pub async fn click_settled(&self, query: &str, button: u32) -> R {
+        let Some(Rect { x, y, w, h }) = self.c().ui_rect(query) else {
+            return Err(format!("no UI element {query} on {}", self.0.borrow().screen));
+        };
+        self.c().input_cursor(x + w / 2.0, y + h / 2.0);
+        self.frames(2).await?;
+        self.c().input_click(button, 0.0);
+        Ok(())
+    }
+
     pub fn click_ui(&self, query: &str, button: u32) -> bool {
         let ok = self.c().ui_click(query, button);
         if !ok {
