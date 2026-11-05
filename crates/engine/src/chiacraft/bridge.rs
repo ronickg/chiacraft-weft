@@ -174,13 +174,19 @@ fn answer(q: &str, arg: &str) -> String {
             let Some(dir) = &info.dir else { return String::new() };
             let mut f = arg.split(' ');
             let link = f.next().unwrap_or("");
-            let p: Vec<i32> = f.filter_map(|n| n.parse().ok()).collect();
-            let pos = match (q, &p[..]) {
-                ("spot", [x, y, z]) => Some([*x, *y, *z]),
+            // `link x y z [dimension yaw]`: the portal's dimension by name and the way arrivals face.
+            let p: Vec<i32> = f.by_ref().take(3).filter_map(|n| n.parse().ok()).collect();
+            let dim = f.next().filter(|d| !d.is_empty()).map(str::to_string);
+            let yaw = f
+                .next()
+                .and_then(|v| v.parse::<f32>().ok())
+                .filter(|v| v.is_finite());
+            let spot = match (q, &p[..]) {
+                ("spot", [x, y, z]) => Some(([*x, *y, *z], dim, yaw)),
                 ("spot", _) => return String::new(),
                 _ => None,
             };
-            crate::travel::set_spot(dir, link, pos);
+            crate::travel::set_spot(dir, link, spot);
             "1".into()
         }
         _ => String::new(),

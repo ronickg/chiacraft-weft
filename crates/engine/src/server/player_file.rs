@@ -45,7 +45,7 @@ impl Server {
             .as_ref()
             .and_then(|s| load_player(c, &s.lock(), &key));
         let spawn = || (c.spawn_dim, self.dims[c.spawn_dim as usize].spawn_point(c));
-        let (mut dim, mut pos, health, inv, comps, look, selected, flying, fire) = match saved {
+        let (mut dim, mut pos, health, inv, comps, mut look, selected, flying, fire) = match saved {
             // A dimension that is gone (its mod removed), or the void while a real one exists:
             // everything else is kept, the player starts at the spawn.
             Some(s) => {
@@ -69,10 +69,31 @@ impl Server {
             .as_ref()
             .map(|s| s.lock().meta.dir.clone())
             .and_then(|d| crate::travel::arrival(&d, &key));
-        if let Some(at) = arrived {
-            dim = c.spawn_dim;
-            pos = glam::DVec3::from_array(at);
-            log::info!("{name} arrives through a portal at {:.0} {:.0} {:.0}", pos.x, pos.y, pos.z);
+        if let Some(at) = &arrived {
+            // In the portal's own dimension (by name; the spawn's for spots kept before it was
+            // saved, or if that dimension is gone), facing away from the portal.
+            dim = match &at.dim {
+                Some(n) => c.dims.iter().position(|d| d.name == *n).map_or_else(
+                    || {
+                        log::warn!("{name}'s portal is in dimension {n}, which is not there now: placed in the spawn's");
+                        c.spawn_dim
+                    },
+                    |i| i as u32,
+                ),
+                None => c.spawn_dim,
+            };
+            pos = glam::DVec3::from_array(at.pos);
+            if let Some(yaw) = at.yaw {
+                look = [yaw, 0.0];
+            }
+            log::info!(
+                "{name} arrives through a portal at {:.0} {:.0} {:.0} in {}, facing {:.2}",
+                pos.x,
+                pos.y,
+                pos.z,
+                c.dims[dim as usize].name,
+                look[0]
+            );
         }
         let time = self.dims[dim as usize].day_time();
         let r = self.dims[dim as usize].ensure_region(c, pos);
