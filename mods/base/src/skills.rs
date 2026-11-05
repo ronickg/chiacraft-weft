@@ -201,6 +201,10 @@ fn tick(w: &World) {
         return;
     }
     for id in w.players() {
+        // Builds saved before the start hub keep their regions: their roads are given (`perks::migrate`).
+        if let Some(s) = w.component_mut(id, &SKILL_WEB) {
+            perks::migrate(&mut s.taken);
+        }
         // Riding: a second in the saddle, moving, raises Taming (`gain::RIDE_SEC`).
         if let Some((mount, _)) = w.vehicle(id)
             && let Some(m) = w.entity(mount)

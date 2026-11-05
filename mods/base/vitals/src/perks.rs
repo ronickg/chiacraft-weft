@@ -435,6 +435,66 @@ fn region_angle(i: usize) -> f32 {
     i as f32 * std::f32::consts::TAU / COUNT as f32
 }
 
+/// The start hub's gates, one a group, and the family each gives (ids `GATE_FROM` up, in this
+/// order).
+pub const GATES_OF: [(crate::skills::Group, Family); 5] = [
+    (crate::skills::Group::Fighting, Health),
+    (crate::skills::Group::Crafting, CraftGrade),
+    (crate::skills::Group::Life, Stamina),
+    (crate::skills::Group::Beasts, TamingSpeed),
+    (crate::skills::Group::Magic, ManaCost),
+];
+/// The first gate's id (1-4 are the centre sockets).
+pub const GATE_FROM: u16 = 5;
+
+/// A group's gate.
+pub fn gate_id(g: crate::skills::Group) -> u16 {
+    GATE_FROM + GATES_OF.iter().position(|x| x.0 == g).unwrap_or(0) as u16
+}
+
+/// The first junction's id (after the gates).
+pub const JUNCTION_FROM: u16 = GATE_FROM + 5;
+
+/// Runs of neighbouring regions of one group (two or more, by index in `REGIONS`): each shares
+/// one road from its gate, splitting at a junction.
+pub fn junctions() -> Vec<Vec<usize>> {
+    let mut runs: Vec<Vec<usize>> = Vec::new();
+    for (i, r) in REGIONS.iter().enumerate() {
+        match runs.last_mut() {
+            Some(run) if REGIONS[run[0]].skill.group() == r.skill.group() => run.push(i),
+            _ => runs.push(vec![i]),
+        }
+    }
+    runs.into_iter().filter(|r| r.len() > 1).collect()
+}
+
+/// What a region's entry hangs from: its junction, else its group's gate.
+pub fn road_to(skill: Skill) -> u16 {
+    let i = skill.index();
+    junctions()
+        .iter()
+        .position(|run| run.contains(&i))
+        .map_or(gate_id(skill.group()), |j| JUNCTION_FROM + j as u16)
+}
+
+/// Saved builds from before the hub (11-05) took a region's entry straight from the start: give
+/// such a build its road (junction and gate), so the entry still hangs from it. True if it changed.
+pub fn migrate(taken: &mut Taken) -> bool {
+    let mut changed = false;
+    for s in SKILLS {
+        if !has(taken, id(s, 0)) {
+            continue;
+        }
+        for n in [road_to(s), gate_id(s.group())] {
+            if !has(taken, n) {
+                set(taken, n, true);
+                changed = true;
+            }
+        }
+    }
+    changed
+}
+
 /// A point `ring` rings out at `angle` (the first web's wheel).
 fn polar(ring: f32, angle: f32) -> (f32, f32) {
     let r = radius(ring);
@@ -492,7 +552,9 @@ pub fn build_with(style: crate::web_layout::Style) -> Web {
                 socket: None,
             });
             if t.from.is_empty() {
-                links.push((START, id(r.skill, t.at)));
+                // A region's entry hangs from its road: its group's junction where neighbouring
+                // regions of one group share one, else its group's gate at the start hub.
+                links.push((road_to(r.skill), id(r.skill, t.at)));
             }
             for &f in t.from {
                 links.push((id(r.skill, f), id(r.skill, t.at)));
@@ -543,6 +605,51 @@ pub fn build_with(style: crate::web_layout::Style) -> Web {
             nodes.push(socket_node(by, Some(r.skill), Some(next), BRIDGE_SOCKET_RING, edge, 20 + (i / 2) as u8));
             links.push((notable, by));
         }
+    }
+    // The start hub: a gate a group (Ronald, 11-05: "A, with clearer islands": a small start hub
+    // with a handful of exits, not 16 spokes from the centre).
+    for (g, &(group, fam)) in GATES_OF.iter().enumerate() {
+        let (x, y) = polar(0.6, g as f32 * std::f32::consts::TAU / GATES_OF.len() as f32);
+        nodes.push(Node {
+            id: gate_id(group),
+            kind: Kind::Small,
+            region: None,
+            bridge: None,
+            ring: 0.6,
+            x,
+            y,
+            gives: vec![(fam, 1.0)],
+            special: None,
+            key: format!("family.{}", fam.id()),
+            needs: 0,
+            socket: None,
+        });
+        links.push((START, gate_id(group)));
+    }
+    // The junctions: a road from a gate splitting near the islands, giving the gate's family.
+    for (j, run) in junctions().iter().enumerate() {
+        let group = REGIONS[run[0]].skill.group();
+        let fam = GATES_OF
+            .iter()
+            .find(|g| g.0 == group)
+            .map_or(Family::Stamina, |g| g.1);
+        let angle = run.iter().map(|&i| region_angle(i)).sum::<f32>() / run.len() as f32;
+        let (x, y) = polar(1.5, angle);
+        nodes.push(Node {
+            id: JUNCTION_FROM + j as u16,
+            kind: Kind::Small,
+            region: None,
+            bridge: None,
+            ring: 1.5,
+            x,
+            y,
+            gives: vec![(fam, 1.0)],
+            special: None,
+            key: format!("family.{}", fam.id()),
+            needs: 0,
+            socket: None,
+        });
+        links.push((gate_id(group), JUNCTION_FROM + j as u16));
     }
     // Four near the centre, between region pairs a quarter round apart, from both entries.
     for (j, &r) in CENTRE_SOCKETS.iter().enumerate() {
@@ -966,6 +1073,17 @@ pub fn score(taken: &Taken, job: &Job) -> f32 {
         }
     }
     worth(&u)
+}
+
+/// The middle of a region's island (the average of its nodes, its bridge's left out).
+pub fn region_centre(skill: Skill) -> (f32, f32) {
+    let ns: Vec<&Node> = web()
+        .nodes
+        .iter()
+        .filter(|n| n.region == Some(skill) && n.bridge.is_none())
+        .collect();
+    let k = ns.len().max(1) as f32;
+    (ns.iter().map(|n| n.x).sum::<f32>() / k, ns.iter().map(|n| n.y).sum::<f32>() / k)
 }
 
 /// Sockets in a region (its own and its bridge's).

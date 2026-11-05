@@ -92,10 +92,12 @@ def main():
     # close up at the 1.4 step.
     side = int(2 * ext * 0.55) + 20
     draw(layout, taken, 100, 0.55, (0, 0), (side, side), out + "_whole.png")
-    draw(layout, taken, 100, 0.55, (0, 0), (340, 236), out + "_screen.png")
-    melee = [n for n in layout["nodes"] if n["region"] == 0]
+    melee = [n for n in layout["nodes"] if n["region"] == 0 and not (40 <= n["id"] % 64 <= 42)]
     cx = sum(n["x"] for n in melee) / len(melee)
     cy = sum(n["y"] for n in melee) / len(melee)
+    # The screen opens on the player's main island at 0.75 (`web.rs`, `open_on_home`).
+    draw(layout, taken, 100, 0.75, (cx, cy), (340, 236), out + "_screen.png")
+    draw(layout, taken, 100, 0.55, (0, 0), (340, 236), out + "_hub.png")
     draw(layout, taken, 100, 1.4, (cx, cy), (340, 236), out + "_region.png")
 
 
