@@ -872,7 +872,7 @@ fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
         // The fog on the land hides the horizon and fades upward.
         c = fog_through(c, dir * 220.0, 1.0);
         // A held torch's glow in the mist goes on over the sky (`haze_lit` gives it the land's).
-        c += held_in_fog(dir * 48.0, fog_here(1.0));
+        c += held_in_fog(dir * 48.0, 1.0);
         return vec4(display(c), 1.0);
     }
     if dir.y <= 0.0 {

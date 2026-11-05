@@ -294,7 +294,11 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
 // then guesses as it would without one).
 // One cascade of the sun's shadows: its matrix `m`, `info` (bindless index, size, 1 when it holds
 // this frame's, the blocks a texel covers), its round reach and depth (blocks).
-fn shadow_in(m: mat4x4<f32>, info: vec4<f32>, round: f32, depth: f32, rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
+// `cheap`: four texels filtered (a 2x2 of the map, weighed by where the point lies among them)
+// instead of the 4x4 and its nine taps, for the far land, where a far-map texel is blocks wide and
+// the cracks the 4x4 closes don't show (Distant terrain's probe: the far cascade's 16 loads were
+// 0.21 ms of the far land at 3456).
+fn shadow_in(m: mat4x4<f32>, info: vec4<f32>, round: f32, depth: f32, rel: vec3<f32>, n: vec3<f32>, cheap: bool) -> vec2<f32> {
     if info.z < 0.5 {
         return vec2(1.0, 0.0);
     }
@@ -320,6 +324,19 @@ fn shadow_in(m: mat4x4<f32>, info: vec4<f32>, round: f32, depth: f32, rel: vec3<
     // depth: no floating shadows at the foot of things.
     let slope = min(sqrt(max(1.0 - ndl * ndl, 0.0)) / max(ndl, 0.05), 4.0);
     let bias = (0.03 + texel * 0.5 * slope) / depth;
+    let low = smoothstep(0.02, 0.06, light_dir().y);
+    if cheap {
+        let p = vec2(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5) * f32(size) - 0.5;
+        let base = vec2<i32>(floor(p));
+        let f = fract(p);
+        var lit4 = vec4(0.0);
+        for (var k = 0; k < 4; k++) {
+            let t = clamp(base + vec2(k % 2, k / 2), vec2(0), vec2(size - 1));
+            lit4[k] = select(0.0, 1.0, textureLoad(textures[index], t, 0).r <= ndc.z + bias);
+        }
+        let lit = mix(mix(lit4.x, lit4.y, f.x), mix(lit4.z, lit4.w, f.x), f.y);
+        return vec2(lit, (1.0 - smoothstep(0.85, 0.97, reach)) * low);
+    }
     // A 4x4 of the map about the point; each of the 3x3 taps takes the nearest to the light of its
     // texel and the ones right and below. That closes the one-texel cracks between neighbouring
     // meshes, through which sunlight would draw thin dotted lines across a shadow.
@@ -342,7 +359,6 @@ fn shadow_in(m: mat4x4<f32>, info: vec4<f32>, round: f32, depth: f32, rel: vec3<
     lit /= 9.0;
     // Near its edge it hands over to the caller's guess, and so it does as the light nears the
     // horizon (long smeared shadows, then the swap from the sun to the moon).
-    let low = smoothstep(0.02, 0.06, light_dir().y);
     return vec2(lit, (1.0 - smoothstep(0.85, 0.97, reach)) * low);
 }
 
@@ -350,11 +366,12 @@ fn shadow_in(m: mat4x4<f32>, info: vec4<f32>, round: f32, depth: f32, rel: vec3<
 // about the player, fine) where it holds, the far one's (400 blocks, coarser) beyond, handing over
 // smoothly; x 1 lit to 0 in shadow, y how far to trust it.
 fn shadow_at(rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
-    let near = shadow_in(scene.shadow_view_proj, scene.shadow, 80.0, 400.0, rel, n);
+    let near = shadow_in(scene.shadow_view_proj, scene.shadow, 80.0, 400.0, rel, n, false);
     if near.y >= 0.999 {
         return near;
     }
-    let far = shadow_in(scene.shadow_far_view_proj, scene.shadow_far, 400.0, 1200.0, rel, n);
+    // Past 250 blocks (the far land's tiles start about 180 out), the far map's cheap filter.
+    let far = shadow_in(scene.shadow_far_view_proj, scene.shadow_far, 400.0, 1200.0, rel, n, length(rel) > 250.0);
     let trust = max(near.y, far.y);
     if trust <= 0.0 {
         return vec2(1.0, 0.0);
@@ -889,7 +906,7 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // In rain everything takes a little grey-blue wash, near too.
     let pale = mix(mix(c, vec3(luma(c)), clamp(veil.b * 0.6, 0.0, 0.3)), vec3(luma(c)) * vec3(0.92, 0.97, 1.05), rain * 0.08);
     let seen = mix(pale, lit, veil);
-    return mix(seen, lit, edge) + held_in_fog(rel, fog_here(sky));
+    return mix(seen, lit, edge) + held_in_fog(rel, sky);
 }
 
 // ---- light in the fog: torches (Research round 15, 6: Valheim's warm firelight in the mist) ----
@@ -909,11 +926,15 @@ fn fog_here(sky: f32) -> f32 {
 // the integral of 1 / (h^2 + (t - t0)^2) over the look, h how far the look passes the light. The
 // flame is no point: h is never under about 0.7. Looking where the torch is held the glow is
 // strongest; looking back, half as much.
-fn held_in_fog(rel: vec3<f32>, sigma: f32) -> vec3<f32> {
+// `sky` the sky light where it is seen (`fog_here`'s), asked only when a light is held: as an
+// argument the mist at the eye (two noises) was worked out for every pixel of the world, light or
+// none (Distant terrain's probe: 0.13 ms of the far land's 1.5 at 3456).
+fn held_in_fog(rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let l = scene.hand_light.rgb;
     if max(max(l.x, l.y), l.z) <= 0.0 {
         return vec3(0.0);
     }
+    let sigma = fog_here(sky);
     let len = length(rel);
     let dist = min(len, 48.0);
     let dir = rel / max(len, 1e-4);
@@ -932,11 +953,12 @@ fn held_in_fog(rel: vec3<f32>, sigma: f32) -> vec3<f32> {
 // Placed lights in the fog: the air just before a lit surface glows with the light there (`b`, its
 // block light levels), as deep as a few blocks of fog. Cheaper than walking the light: it stops at
 // the silhouettes, which the bloom softens.
-fn placed_in_fog(b: vec3<f32>, rel: vec3<f32>, pos: vec3<f32>, sigma: f32) -> vec3<f32> {
+// `sky` as `held_in_fog`'s, asked only where there is block light.
+fn placed_in_fog(b: vec3<f32>, rel: vec3<f32>, pos: vec3<f32>, sky: f32) -> vec3<f32> {
     if max(max(b.x, b.y), b.z) <= 0.0 {
         return vec3(0.0);
     }
-    return block_light(b, pos) * min(sigma, 0.04) * min(length(rel), 4.0) * 0.6;
+    return block_light(b, pos) * min(fog_here(sky), 0.04) * min(length(rel), 4.0) * 0.6;
 }
 
 // ---- to the screen ----
