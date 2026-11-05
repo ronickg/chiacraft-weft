@@ -590,7 +590,7 @@ wgsl_types! {
     f32 => "f32", 4, 4, u32 => "u32", 4, 4, i32 => "i32", 4, 4,
     [f32; 2] => "vec2<f32>", 8, 8, [f32; 3] => "vec3<f32>", 16, 12, [f32; 4] => "vec4<f32>", 16, 16,
     [u32; 4] => "vec4<u32>", 16, 16, [i32; 4] => "vec4<i32>", 16, 16,
-    [[f32; 4]; 3] => "array<vec4<f32>, 3>", 16, 48, [[f32; 4]; 4] => "mat4x4<f32>", 16, 64, [[f32; 4]; 6] => "array<vec4<f32>, 6>", 16, 96,
+    [[f32; 4]; 3] => "array<vec4<f32>, 3>", 16, 48, [[f32; 4]; 4] => "mat4x4<f32>", 16, 64, [[f32; 4]; 6] => "array<vec4<f32>, 6>", 16, 96, [[f32; 4]; 8] => "array<vec4<f32>, 8>", 16, 128,
 }
 
 /// Declares a GPU buffer struct: the Rust type and, from the same fields, its WGSL text
@@ -689,9 +689,10 @@ gpu_struct! {
         /// when full, only by day when new), w the light it gives: its phase times how high it
         /// stands, 0 below the horizon. For packs' night light and moon shadows.
         pub moon: [f32; 4],
-        /// The values of the settings the pack names in its `pack.cfg` (`options = a, b, ...`), 16
-        /// at most, four to a row in that order (`packs::pack_options`); 0 for one not found.
-        pub options: [[f32; 4]; 4],
+        /// The values of the settings the pack names in its `pack.cfg` (`options = a, b, ...`), 32
+        /// at most (16 before chiacraft's fantasy settings), four to a row in that order
+        /// (`packs::pack_options`); 0 for one not found.
+        pub options: [[f32; 4]; 8],
         /// The light the player holds (a torch, a lantern), for packs' dynamic light: xyz where it
         /// is (camera relative, by the hand), w unused.
         pub hand: [f32; 4],
@@ -701,6 +702,21 @@ gpu_struct! {
         /// Where the player is: x how closed a forest's canopy is (0 open sky to 1 a rainforest's;
         /// a mod's air, `air_flags::CANOPY_SHIFT`), for packs' light under the leaves; yzw unused.
         pub canopy: [f32; 4],
+        /// Soft clouds (`core:soft_clouds`, with a pack whose sky has `fs_cloud_trace` and
+        /// `fs_cloud_resolve`; chiacraft): x the bindless index + 1 of this frame's clouds, traced
+        /// at a quarter of the pixels each way and blended over frames, which `fs_clouds` draws
+        /// from (0: off, the blocky clouds); y the index + 1 of last frame's, the history
+        /// `fs_cloud_resolve` blends into; z the bindless index of the noise volume
+        /// (`soft_clouds::noise_atlas`: 64 slices of 64², eight to a row, each in a 66² cell with
+        /// a wrapped border, so a linear sample within a cell tiles); w how many frames the history
+        /// holds (0: none yet, take this frame's alone).
+        pub soft_clouds: [f32; 4],
+        /// Last frame's `view_proj` (camera relative then), for reprojecting the clouds.
+        pub prev_view_proj: [[f32; 4]; 4],
+        /// xyz: where last frame's camera stands from this one's, less how far the wind carried
+        /// the clouds since (blocks): a cloud at camera-relative `p` now stood at `p + xyz` from
+        /// last frame's camera. w: the frame's number (for the trace's jitter).
+        pub cloud_moved: [f32; 4],
     }
 }
 

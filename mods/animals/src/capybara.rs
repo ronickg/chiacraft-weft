@@ -44,6 +44,7 @@ pub fn init(r: &mut Registry) {
                 .then(crate::animal::upkeep(index))
                 .then(crate::taming::behave(index))
                 .then(crate::hunt::wary)
+                .then(crate::hunt::huddle)
                 .then(crate::signatures::calm_aura)
                 .then(crate::commands::act(index))
                 .then(crate::breeding::behave(index))

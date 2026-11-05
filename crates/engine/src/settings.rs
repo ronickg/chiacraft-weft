@@ -246,6 +246,11 @@ impl Settings {
         number("core:occlusion_culling") != 0.0
     }
 
+    /// Soft clouds for packs that draw them (`client::soft_clouds`).
+    pub fn soft_clouds(&self) -> bool {
+        number("core:soft_clouds") != 0.0
+    }
+
     pub fn show_avatars(&self) -> bool {
         number("core:show_avatars") != 0.0
     }

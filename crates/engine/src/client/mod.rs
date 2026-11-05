@@ -10,6 +10,7 @@ pub mod modui;
 pub mod particles;
 mod receive;
 pub mod sky;
+pub mod soft_clouds;
 pub mod stack_look;
 pub mod terrain;
 pub mod terrain_gpu;
@@ -2617,6 +2618,10 @@ impl Client {
             hand: hand.0,
             hand_light: hand.1,
             canopy: [self.canopy, 0.0, 0.0, 0.0],
+            // Filled in once the sky has readied them (`render`).
+            soft_clouds: [0.0; 4],
+            prev_view_proj: [[0.0; 4]; 4],
+            cloud_moved: [0.0; 4],
             shadow_view_proj: self.shadow.0.to_cols_array_2d(),
             shadow_far_view_proj: self.shadow_far.0.to_cols_array_2d(),
             shadow_far: match self.shadow_far_map {
@@ -2918,7 +2923,7 @@ impl Client {
             self.entity_render.set_skin(gpu, entity, &png);
         }
         let cam = self.render_camera();
-        let scene = self.scene(&cam, frame);
+        let mut scene = self.scene(&cam, frame);
         while self.scene_bufs.len() < gpu.frames_in_flight() {
             self.scene_bufs.push(gpu.create_buffer(
                 size_of::<Scene>() as u64,
@@ -2973,6 +2978,8 @@ impl Client {
         // The sky fills what the opaque world left, and translucent things are seen against it.
         let overlays = self.overlays(textures);
         let s = crate::diag::span("render/sky");
+        // Soft clouds trace against the copy of the world (`behind`), made after this.
+        self.sky.soft_possible = self.behind[2] > 0.5;
         self.sky.draw(
             gpu,
             &mut late,
@@ -2989,6 +2996,9 @@ impl Client {
             &overlays,
         );
         drop(s);
+        // The sky readied this frame's soft clouds: their fields in the scene.
+        (scene.soft_clouds, scene.prev_view_proj, scene.cloud_moved) = self.sky.soft.scene;
+        gpu.mapped(scene_buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
         self.render.draw_translucent(&mut late);
         let alive = !self.dead && !self.mode.has(weft_abi::game_mode_flags::NO_INTERACT);
         let hand = (alive && self.camera_has(weft_abi::camera_flags::HAND) && !self.hide_gui).then(|| entity_render::Hand {
@@ -3088,10 +3098,10 @@ const FAR_REACH: f32 = 400.0;
 const FAR_DEPTH: f32 = 1200.0;
 
 /// The values of the settings the shader pack reads (`Scene::options`).
-fn pack_options() -> [[f32; 4]; 4] {
-    let mut out = [[0.0; 4]; 4];
+fn pack_options() -> [[f32; 4]; 8] {
+    let mut out = [[0.0; 4]; 8];
     let names = &content().game.config_names;
-    for (i, name) in crate::packs::pack_options().iter().enumerate().take(16) {
+    for (i, name) in crate::packs::pack_options().iter().enumerate().take(32) {
         if let Some(&id) = names.get(name.as_str()) {
             out[i / 4][i % 4] = crate::config::get(id) as f32;
         }

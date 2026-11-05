@@ -79,6 +79,7 @@ pub fn register(r: &mut Registry, kinds: &[&'static EntityKind], body: &'static 
                     .then(startle)
                     .then(crate::taming::behave(index))
                     .then(|w: &World, id: u64, st: &EntityState| crate::hunt::wary(w, id, st) && woken(w, id))
+                    .then(|w: &World, id: u64, st: &EntityState| crate::hunt::huddle(w, id, st) && woken(w, id))
                     .then(|w: &World, id: u64, st: &EntityState| crate::hunt::hunt(w, id, st) && woken(w, id))
                     .then(crate::breeding::behave(index))
                     .then(move |w: &World, id: u64, st: &EntityState| settle(w, id, st, look))

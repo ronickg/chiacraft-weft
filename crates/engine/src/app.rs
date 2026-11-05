@@ -2555,6 +2555,7 @@ fn update_game(r: &mut Running, dt: f64, frame_start: Instant) {
         g.client.first_person_model = r.settings.first_person_model();
         g.client.entity_render.show_avatars = r.settings.show_avatars();
         g.client.render.occlusion.on = r.settings.occlusion_culling();
+        g.client.sky.soft_wanted = r.settings.soft_clouds();
         let t = Instant::now();
         if world_input {
             g.client.update(&mut *r.gpu, &r.textures, &mut r.input, dt);
@@ -3058,6 +3059,8 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
                 r.post
                     .copy_behind(&mut *r.gpu, &mut world, world_info, scene, depth);
             }
+            // Soft clouds traced against that copy, before the sky draws them (chiacraft).
+            world.append(&mut g.client.sky.soft.passes);
             world.push(Cmd::BeginPass { color: Some((world_target, None)), depth: Some((r.depth.0, None)) });
             world.append(&mut g.client.late_out);
         }

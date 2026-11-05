@@ -1187,11 +1187,12 @@ fn command(cmd: &mut ServerCommand) {
                 .int("count")
                 .map_or(s.bio.social.group().1, |n| n.max(1) as u32);
             let near = crate::forage::kind_near(&w, s, at);
-            let comes = animals_core::life::room_for(near, coming, s.crowd());
+            let crowd = crate::species::crowd_at(&w, s, at);
+            let comes = animals_core::life::room_for(near, coming, crowd);
             let line = format!(
                 "room: {} at {at:?}: {near:.1} near, room for {}: a group of {coming} {}",
                 s.name,
-                s.crowd(),
+                crowd,
                 if comes { "would come" } else { "is turned away" }
             );
             weft_sdk::info!("{line}");

@@ -944,9 +944,23 @@ vanilla's boxes. A long animal's head and tail still stick out of its box (one b
 a 9-block body). The bigger boxes need wider gaps to walk through, and the engine's path search
 led every walker one cell wide, so the big animals jammed between trunks (PC run aw_walk:
 cedarosaurs 0-6 blocks in 5 minutes against 5-14 with the old boxes); it now needs room across a
-body's whole footprint (`notes/ENGINE_CHANGES.md`, section 1). The sauropod's box stops at 5.5
+body's whole footprint (`notes/ENGINE_CHANGES.md`, section 1). The sauropod keeps to the open
+floodplain (its fern forest share 0.5 to 0.2, Planner's pick of option (a), 11-05): at 4.5 wide
+it stood still among the trunks. The sauropod's box stops at 5.5
 blocks (`bodies::LOW`): its neck reaches 8.6, above any reach from the ground, and a box that tall
 found no room under the fern forest's crowns.
+
+**Stocking by biome** (2026-11-05, with Plants; Ronald picked real grazing levels: herds eat 25-50%
+of what their grass grows back). A biome holds plant eaters as real grazer densities go: open
+grassland heavily, deep forest and the giant groves lightly (`STOCKING`: savanna 2.5, plains 1.4,
+forest 1, swamp 0.9, birch forest 0.55, taiga 0.35, mountains 0.26, sequoia grove 0.09; the
+Cretaceous 1). A plant eater's crowd there is its crowd times that, never under a pair
+(`Species::crowd_in`), and everything that weighs the crowd reads it at the animal's own biome:
+natural spawning's room, wild breeding, dying of want, the food webs' grazing. So a stocked
+savanna holds 40 capybaras where it held 16, and they don't starve back down. With Plants' grass
+feeding as real grass does (a tuft feeds 2, not 10), every grazed biome lands about a third. The
+savanna is held at 2.5 (3.5 would match the rest) until it has a heavy grazer, which eats as much
+with fewer animals.
 
 **Far animals keep time** (2026-11-05). With the engine's activation ranges an animal no player
 is within 48 blocks of rests, ticking only every `core:inactive_entity_interval` ticks (20). Its
@@ -1187,3 +1201,19 @@ Ronald: seasons tied in with mating and breeding; each species breeds in its rea
 - The animal screen says when its kind breeds and whether it's that season now; SPECIES.md has a
   "breeds in" row.
 - Not yet: the website's simulator (`web/`) breeds without seasons.
+
+## On a blood moon (2026-11-04)
+
+From Research round 17's addendum (Ronald: "Yes, as designed"). The numbers live in `animals_core::sky`. Totality runs 22:00-02:00 (`vitals::events`), and while it lasts:
+- **Prey watch half again as far** for hunters (`hunt::wary`, `BLOOD_MOON_WATCH` 1.5).
+- **Herds bunch up.** A herd animal on the ground (`Social::Herd`, from `wild.rs` and the capybara; a flock's wariness takes off, so birds don't) more than 4 blocks from the middle of its herd (looking 24 blocks around) walks back to it (`hunt::huddle`).
+- **Wild grey wolves howl once** in the first half hour of totality, using their ambient call. A pack's howls spread over a few seconds (`voices::howl_at_blood_moon`).
+
+This applies on every difficulty: on gentle the blood moon brings no monsters, but the animals still feel it. Coyotes don't howl at it yet.
+## Capybaras in a savanna winter (2026-11-05)
+
+Plants' herd run (`herd_sav_wi`: six capybaras at 10% food in a winter savanna) lost three of them from its counts within ten minutes. `aw_capy_winter` repeated it with every death logged (`breeding.rs`: species, id, cause, place) and found no winter deaths:
+- **One death, from the spawn:** the script places it at y 94 over ground at 72, so it died of the 22-block fall.
+- **The others were alive:** the census and entity lines count only within 48 blocks. The testkit's full entity list still held all five at 13 minutes, foraging farther out at 74-85% strength.
+
+Herd scripts should spawn on the ground and count a wider ring, or list every entity.
