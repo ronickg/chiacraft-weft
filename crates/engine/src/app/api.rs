@@ -38,6 +38,22 @@ pub fn mc_days() -> bool {
     *ON.get_or_init(|| launch_options().contains_key("mc-days"))
 }
 
+/// chiacraft, test only: `--bliss-sun`, Bliss's sun for like-for-like shots against it: Minecraft's
+/// clock (no day swing, as `mc_days`) but the path still leaned, as Bliss leans it
+/// (`sunPathRotation`, 35 degrees by default; base's sun leans 35 too). With `--sun-tilt <degrees>`
+/// the lean is set outright (`sun_tilt`), to try the sign against Bliss's shadows (Trees, 11-06).
+pub fn bliss_sun() -> bool {
+    static ON: OnceLock<bool> = OnceLock::new();
+    *ON.get_or_init(|| launch_options().contains_key("bliss-sun"))
+}
+
+/// chiacraft, test only: `--sun-tilt <degrees>`, every sky body's path leaned by that instead of
+/// its own (radians here).
+pub fn sun_tilt() -> Option<f32> {
+    static ON: OnceLock<Option<f32>> = OnceLock::new();
+    *ON.get_or_init(|| launch_options().get("sun-tilt").and_then(|v| v.parse::<f32>().ok()).map(f32::to_radians))
+}
+
 /// Exit code a mod asked for with `client_op::QUIT`.
 pub fn exit_code() -> i32 {
     EXIT_CODE.load(Ordering::Relaxed)
