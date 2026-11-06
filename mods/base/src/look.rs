@@ -84,6 +84,6 @@ pub fn register(r: &mut Registry) {
     r.config(&LOOK_WHITE).float(1.6, -1.0, 2.5);
     r.config(&LOOK_AO_TEST).float(0.0, 0.0, 1.0);
     r.config(&LOOK_SHARPEN).float(0.4, 0.0, 1.0);
-    r.config(&LOOK_LEAF_SUN).float(2.0, 0.5, 4.0);
+    r.config(&LOOK_LEAF_SUN).float(1.0, 0.5, 4.0);
     r.config(&LOOK_LEAF_HOLES).float(1.0, 0.0, 1.0);
 }

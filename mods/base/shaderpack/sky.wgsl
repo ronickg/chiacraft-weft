@@ -226,8 +226,7 @@ fn cloud_density(s: Sky, cellp: vec2<f32>, h: f32, dims: vec2<f32>) -> f32 {
 // The soft layer over its underside (blocks): fair-weather cumulus, and a storm's deck with towers.
 const SOFT_THICK: f32 = 120.0;
 const SOFT_STORM_THICK: f32 = 190.0;
-// How far a look is followed (blocks): beyond, the clouds fade into the sky.
-const SOFT_REACH: f32 = 4000.0;
+// How far a look is followed: `SOFT_REACH` (look.wgsl, which the screen effects read too).
 // The HDR world's sunlight and skylight on the soft clouds, against today's (`soft_march`).
 const CLOUD_SUN_HDR: f32 = 1.0;
 const CLOUD_SKY_HDR: f32 = 1.0;

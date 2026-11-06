@@ -150,6 +150,9 @@ An effect can have a half-size part (chiacraft): `shaders/post_low/<name>.wgsl` 
 
 With the HDR world (`core:hdr_world`, chiacraft) the world is drawn in linear light past 1 and the effects' last pass finishes the picture (`Pass::spare` 1 there). A pack whose post.wgsl has `fs_bloom_down`, `fs_bloom_up` and `fs_exposure` also gets a bloom pyramid and an exposure texel drawn before the effects, which each effect's pass names in `bloom` and `exposure` (bindless index + 1; `core:bloom` 0 none, 1 four levels, 2 six); `scene.frame.y` is 1 while it draws, so an effect's own glow can step aside.
 
+### Temporal anti-aliasing and motion
+With `core:aa` 1 the world is drawn a fraction of a pixel aside each frame and gathered over frames by `taa.wgsl` (the engine's; a pack may replace it, keeping `vs`, `fs_taa` and `fs_taa_motion`), right after the world and before the screen effects, which then read the gathered picture. `scene.taa.xy` is this frame's jitter in NDC (a clip position's `xy / w - scene.taa.xy` is where it would be without), `scene.taa.z` 1 when there is a last frame to gather from (0: the shaders skip their motion), `scene.taa.w` the shaders' clock last frame, and `scene.taa_prev` last frame's view and projection without the jitter, taking this frame's camera-relative positions. Blocks, distant terrain and the sky need nothing: their motion comes from the depth. What moves by itself writes its motion as a second output, `@location(1) vec4<f32>`, from common's `screen_motion(clip, scene.taa_prev * vec4(where_it_was, 1.0), scene.taa.xy)` per vertex and `motion_texel(m, in.clip.z)` in the fragment (chiacraft's swaying leaves and grass, mobs through `prev_bones`, the hand as still). A fragment entry without that output leaves the motion as it is, so older packs keep working. Its w is a reactive share: chiacraft's rain and snow write how much they cover, and that much more of the new frame is taken there, so their streaks don't wash out.
+
 ### Sun shadows
 A pack that wants shadows gets the two things it needs from the world shader's prelude: `scene.sun` (xyz points toward the sun, w is how high it stands, 0 at night and in dimensions without sky) and `solid_at(p: vec3<i32>) -> bool`, which says whether the block at `p` casts a shadow (anything that dims sky light, liquids aside). It knows the blocks about 112 blocks around the camera and answers false beyond them, so march from the pixel toward `scene.sun.xyz` through block cells and stop at the first solid one. The engine only keeps these blocks on the GPU while the chosen pack's `world.wgsl` calls `solid_at`, so packs without shadows pay nothing.
 
@@ -183,6 +186,6 @@ chiacraft's pack reads these settings (`mods/base/src/look.rs`; Mod Settings in 
 | `base:look_foliage_test` | 0, 0-1 | a test: grass and leaf tints darker and less yellow (1: 30% darker) |
 | `base:look_ao_test` | 0, 0-1 | a test: takes the corner shade (AO) away |
 | `base:look_sharpen` | 0.4, 0-1 | with the HDR world: contrast-adaptive sharpening in the last pass (Bliss runs 0.35-0.4) |
-| `base:look_leaf_sun` | 2, 0.5-4 | with the HDR world: the sun on leaves' lit faces (1 as before) |
+| `base:look_leaf_sun` | 1, 0.5-4 | with the HDR world: the sun on leaves' lit faces (not on plants; 2 overshot on real meshes in Bliss's own world) |
 | `base:look_leaf_holes` | 1, 0-1 | with the HDR world: leaves keep their see-through holes at a distance (alpha one mip sharper, cut at 0.5, as Minecraft's leaves); 0 the old 0.1 cut |
 

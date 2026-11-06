@@ -65,6 +65,7 @@ impl Weather {
                     blend: Blend::Alpha,
                     cull_back: false,
                     topology: Topology::Triangles,
+                    motion: crate::post::motion(),
                 })
                 .map_err(|e| e.0)
             });
