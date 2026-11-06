@@ -621,6 +621,8 @@ fn put_with_branches(
     z: i32,
     put: &mut impl FnMut(i32, i32, i32, u32, bool),
 ) {
+    // No bare wood on the crown's top (`tree_recipes::capped`).
+    let b = &crate::tree_recipes::capped(b);
     let wood: std::collections::HashSet<_> = b
         .iter()
         .filter(|e| matches!(e.3, branchy::Part::Log { .. }))
