@@ -1245,7 +1245,10 @@ fn gbuffer(in: VOut, albedo: vec4<f32>) -> GbOut {
     let metal = m.metal > 0.5;
     // No maps, no shine (as the world's pass, which adds `mat_shine` only with them): F0 0.
     let f0 = select(select(m.f0, paint, metal), vec3(0.0), !m.has);
-    return GbOut(vec4(select(paint, vec3(0.0), metal), m.metal), vec4(n, 1.0 - m.smoothness), vec4(f0, m.sss));
+    // A metal keeps half its diffuse light, as the world's pass draws it (`lit * (1 - 0.5 * metal)`,
+    // our grade): with none, the storeroom's iron and gold blocks traced near black, mirroring
+    // only the dark room (pt1_rtxd_m2).
+    return GbOut(vec4(paint * (1.0 - 0.5 * m.metal), m.metal), vec4(n, 1.0 - m.smoothness), vec4(f0, m.sss));
 }
 
 @fragment
