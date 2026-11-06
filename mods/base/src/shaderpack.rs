@@ -15,6 +15,14 @@ use weft_sdk::*;
 
 pub const ID: &str = "chiacraft";
 
+/// chiacraft's pack, or a variant of it for a look check (`shaderpacks/chiacraft_<name>/`, a copy
+/// with one change, picked with `--shader-pack chiacraft_<name>`): both get the screen effects, so
+/// a shader change can be tried on a PC run without a build of its own (Trees, 11-06). Only
+/// `chiacraft` itself is written and kept up to date by the game.
+fn is_ours(pack: &str) -> bool {
+    pack == ID || pack.strip_prefix(ID).is_some_and(|rest| rest.starts_with('_'))
+}
+
 const LOOK: &str = include_str!("../shaderpack/look.wgsl");
 
 /// Numbers the pack shares with the game's own code, written in front of every file so there is
@@ -92,7 +100,7 @@ pub fn register_shafts(r: &mut Registry) {
             *APPLIED.lock().unwrap() = [-1.0; 5];
             return;
         }
-        let pack = SHADER_PACK.get() == ID;
+        let pack = is_ours(&SHADER_PACK.get());
         let option = |name: &str| weft_sdk::client::launch_option(name).is_some();
         // The video settings (`video.rs`): 0 off, 1 low (fewer steps: strength 0.5), 2 on.
         let level = |v: i32| [0.0, 0.5, 1.0][v.clamp(0, 2) as usize];
