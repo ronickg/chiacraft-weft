@@ -545,6 +545,9 @@ impl Post {
                 };
                 // The HDR world's bloom pyramid and exposure, when the pack's post.wgsl has them.
                 let bloom = if hdr() {
+                    // Said only when a pack's post.wgsl is in use and lacks them: the built-in one
+                    // never has them, and its lines at every start read as a fault (Tester's Mac run).
+                    let from_pack = crate::packs::pack_source("post.wgsl").is_some();
                     let mut make = |label: &'static str, fragment: &'static str| {
                         gpu.create_pipeline(&PipelineDesc {
                             label,
@@ -558,7 +561,11 @@ impl Post {
                             topology: Topology::Triangles,
                             motion: false,
                         })
-                        .map_err(|e| log::info!("post: no bloom pyramid ({fragment}): {}", e.0))
+                        .map_err(|e| {
+                            if from_pack {
+                                log::info!("post: no bloom pyramid ({fragment}): {}", e.0)
+                            }
+                        })
                         .ok()
                     };
                     match (make("bloom down", "fs_bloom_down"), make("bloom up", "fs_bloom_up"), make("exposure", "fs_exposure")) {
