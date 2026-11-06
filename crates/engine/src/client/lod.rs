@@ -411,7 +411,14 @@ const BANDS: i32 = 8;
 /// `imported` (chiacraft, test only): an imported world's far grid, whose cells' walls are their own
 /// blocks, not the dimension's rock faces (`Faces`: base's sandstone strata by our climate stood as
 /// terracotta and pale stone outcrops on the imported world's grass hills, Far view 11-06).
-pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32], imported: Option<&crate::chiacraft::mc_import::FarTerrain>) -> (Vec<[u32; 4]>, (i32, i32)) {
+pub fn mesh(
+    c: &Content,
+    dim: u32,
+    seed: u64,
+    key: TileKey,
+    words: &[u32],
+    imported: Option<&crate::chiacraft::mc_import::FarTerrain>,
+) -> (Vec<[u32; 4]>, (i32, i32)) {
     let s = 1 << key.level;
     let at = |i: i32, j: i32| ground(words, i, j);
     let canopy = key.level >= CANOPY_LEVEL;
@@ -737,7 +744,14 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32], impor
 /// (`lod_grid_cell`) in the block most of its corners have on top (bare rock where the ground
 /// falls steeply, `Terrain::faces`), and short skirts under its edges against cracks where a tile
 /// of another level is beside it. The shader morphs its corners into the next level's.
-pub fn mesh_smooth(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32], imported: Option<&crate::chiacraft::mc_import::FarTerrain>) -> (Vec<[u32; 4]>, u32, (i32, i32)) {
+pub fn mesh_smooth(
+    c: &Content,
+    dim: u32,
+    seed: u64,
+    key: TileKey,
+    words: &[u32],
+    imported: Option<&crate::chiacraft::mc_import::FarTerrain>,
+) -> (Vec<[u32; 4]>, u32, (i32, i32)) {
     use crate::gpu_layout::{lod_face, lod_grid, lod_grid_cell};
     let s = 1 << key.level;
     // Corner (i, j), from -1 to 32: its ground, or a forest's crowns over it as a canopy (its top
@@ -1210,8 +1224,20 @@ impl Lod {
         let changed = world.take_changed_columns();
         let inside = |col: IVec2, at: IVec2| (col - at).abs().max_element() <= half;
         // chiacraft, test only: an imported world's ground height there, not our generator's.
-        let far = self.far.as_ref().filter(|f| f.0 == self.dim).map(|f| f.1.clone());
-        let shown = |col: IVec2| world.column_shown(col, seed, far.as_ref().and_then(|f| f.cell(col.x * 16 + 8, col.y * 16 + 8)).map(|c| c.0));
+        let far = self
+            .far
+            .as_ref()
+            .filter(|f| f.0 == self.dim)
+            .map(|f| f.1.clone());
+        let shown = |col: IVec2| {
+            world.column_shown(
+                col,
+                seed,
+                far.as_ref()
+                    .and_then(|f| f.cell(col.x * 16 + 8, col.y * 16 + 8))
+                    .map(|c| c.0),
+            )
+        };
         if half != self.half || self.mask.is_empty() {
             self.half = half;
             self.mask = vec![0; ((w * w) as usize).div_ceil(32)];

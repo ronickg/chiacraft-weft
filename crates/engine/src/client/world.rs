@@ -293,10 +293,12 @@ impl ClientWorld {
         let c = crate::content::content();
         let see_through = |cube: &crate::world::Cube| {
             cube.uniform_state() == Some(AIR)
-                || cube
-                    .palette()
-                    .iter()
-                    .all(|&st| st == AIR || c.states.get(st as usize).is_some_and(|i| i.liquid.is_some()))
+                || cube.palette().iter().all(|&st| {
+                    st == AIR
+                        || c.states
+                            .get(st as usize)
+                            .is_some_and(|i| i.liquid.is_some())
+                })
         };
         shows_ground(self.range, self.eye, land_below, |y| {
             self.cubes
