@@ -382,10 +382,7 @@ impl WorldRenderer {
         rt.frame_no += 1;
         rt.slot = slot;
         let frames = gpu.frames_in_flight() as u64;
-        let (done, keep): (Vec<_>, Vec<_>) = rt
-            .later
-            .drain(..)
-            .partition(|l| l.0 + frames < rt.frame_no);
+        let (done, keep): (Vec<_>, Vec<_>) = rt.later.drain(..).partition(|l| l.0 + frames < rt.frame_no);
         rt.later = keep;
         for (_, start, len) in done {
             rt.free_copy(start, len);

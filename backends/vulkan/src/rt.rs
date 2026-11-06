@@ -29,16 +29,8 @@ pub(crate) struct TlasSlot {
 }
 
 pub(crate) enum Accel {
-    Blas {
-        mem: AccelMem,
-        geometries: Vec<BlasGeometry>,
-        scratch: u64,
-        built: bool,
-        serial: u64,
-    },
-    Tlas {
-        slots: Vec<TlasSlot>,
-    },
+    Blas { mem: AccelMem, geometries: Vec<BlasGeometry>, scratch: u64, built: bool, serial: u64 },
+    Tlas { slots: Vec<TlasSlot> },
 }
 
 pub(crate) struct Rt {
@@ -157,9 +149,9 @@ impl VulkanBackend {
                     None,
                 )
                 .expect("vkCreateAccelerationStructureKHR");
-            let address = rt
-                .accel_fn
-                .get_acceleration_structure_device_address(&vk::AccelerationStructureDeviceAddressInfoKHR::default().acceleration_structure(raw));
+            let address = rt.accel_fn.get_acceleration_structure_device_address(
+                &vk::AccelerationStructureDeviceAddressInfoKHR::default().acceleration_structure(raw),
+            );
             self.rt.as_mut().unwrap().memory += size;
             AccelMem { raw, buffer, alloc, size, address }
         }
@@ -182,10 +174,7 @@ impl VulkanBackend {
     }
 
     pub(crate) fn rt_create_blas(&mut self, geometries: &[BlasGeometry], label: &str) -> AccelId {
-        let descs: Vec<_> = geometries
-            .iter()
-            .map(|g| geometry_desc(g, 0, 0))
-            .collect();
+        let descs: Vec<_> = geometries.iter().map(|g| geometry_desc(g, 0, 0)).collect();
         let counts: Vec<u32> = geometries.iter().map(|g| g.triangles).collect();
         let info = vk::AccelerationStructureBuildGeometryInfoKHR::default()
             .ty(vk::AccelerationStructureTypeKHR::BOTTOM_LEVEL)
