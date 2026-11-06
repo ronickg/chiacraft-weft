@@ -283,25 +283,31 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     if dot(ng, l) > 0.0 && light_strength() > 0.0 {
         sun = dot(rt_sun_soft(h.rel, ng, l, false, PT_SUN_CONE, px, false), vec3(1.0 / 3.0));
     }
-    // Diffuse. The world's light (its sky light from the lightmap), and its sky's share alone.
+    // Diffuse. The world's light (its sky light from the lightmap); the sky's share of it, as the
+    // lightmap gives it (already lowered under cover) and as the open sky would give it.
     let lit = light_on(n, h.light, sun, 1.0, h.world, h.rel);
-    let sky_part = max(lit - light_on(n, vec4(0.0, h.light.yzw), sun, 1.0, h.world, h.rel), vec3(0.0));
-    // One bounce: open sky keeps the sky's share; a surface takes its place, lit as the world.
+    let dark = light_on(n, vec4(0.0), 0.0, 1.0, h.world, h.rel);
+    let sky_part = max(light_on(n, vec4(h.light.x, 0.0, 0.0, 0.0), 0.0, 1.0, h.world, h.rel) - dark, vec3(0.0));
+    let sky_open = max(light_on(n, vec4(1.0, 0.0, 0.0, 0.0), 0.0, 1.0, h.world, h.rel) - dark, vec3(0.0));
+    // One bounce in place of the lightmap's sky: a surface met gives its own light, and a ray that
+    // gets out gives the open sky's: the rays themselves say how much of the sky is hidden. (With
+    // the lightmap's lowered share there, cover counted twice and a roofless ruin's walls came out
+    // a quarter darker than the world draws them, NVIDIA's cathedral, pt1_rtxd_d3.)
     let b = rt_hit(h.rel + ng * 0.01, pt_cosine(n, pt_noise(px)), 96.0, 2.0);
     var bounce = vec3(0.0);
-    var diffuse = lit;
     var diffuse_t = PT_SKY_T;
     if b.hit {
         bounce = pt_lit(b, l, pt_noise(px + vec2(3.0, 11.0)));
-        diffuse = lit - sky_part + bounce;
         // Above 0 on every traced pixel: the denoisers read diffuse's a > 0 as "traced".
         diffuse_t = max(b.t, 1e-3);
     }
+    let indirect = select(sky_open, bounce, b.hit);
+    var diffuse = lit - sky_part + indirect;
     // Into the cache: the indirect light found here (one pixel in four a frame).
     if ((id.x + id.y * 3u + u32(scene.rt.y)) & 3u) == 0u {
         let i = pt_cache_find(pt_cell(h.world, ng, dist, pt_noise(px + vec2(7.0, 5.0))), true);
         if i >= 0 {
-            pt_cache_add(u32(i), select(sky_part, bounce, b.hit));
+            pt_cache_add(u32(i), indirect);
         }
     }
     // Specular, where the texture has maps (F0 above 0), as the world's `mat_shine`: the sun's
