@@ -1429,11 +1429,39 @@ fn froxel_at(uv: vec2<f32>, k: i32) -> vec4<f32> {
 fn froxel_fog(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let clip = scene.view_proj * vec4(rel, 1.0);
     let uv = clamp(vec2(clip.x, -clip.y) / max(clip.w, 1e-4) * 0.5 + 0.5, vec2(0.0), vec2(1.0));
-    let f = froxel_slice(min(length(rel), FROXEL_FAR));
-    let k = i32(floor(f));
-    let v = mix(froxel_at(uv, k - 1), froxel_at(uv, min(k, i32(FROXEL_SLICES) - 1)), fract(f));
-    let through = pow(max(v.a, 1e-6), sky);
-    return c * through + v.rgb * (1.0 - through) / max(1.0 - v.a, 1e-4);
+    let dist = min(length(rel), FROXEL_FAR);
+    let k = i32(trunc(froxel_slice(dist)));
+    // The volume's sums up to where the last slice starts, then the rest of the way to the point
+    // walked here, for this pixel: four taps of the mist from the slice's start to the point, lit
+    // with the slice's own light. Read off the volume by how far into its slice the point lay (as
+    // if the slice's mist were even through it), a mist lying on the land, all at the far end of
+    // the slice where the ground is, came in by where the ground fell in its slice: rings round
+    // the eye again, one a slice (the ring fix's third run, 11-06). And the mist where it lies on
+    // the land is at the pixel's own detail, not the volume's cells.
+    let before = froxel_at(uv, k - 1);
+    let a0 = froxel_end(f32(k) - 1.0);
+    let dir = rel / max(length(rel), 1e-4);
+    let flo = fog_floor(rel);
+    let banks = fog_banks_at(scene.eye.xyz + dir * (0.5 * (a0 + dist)), flo);
+    var depth = 0.0;
+    for (var i = 0; i < 4; i++) {
+        depth += fog_density_with(scene.eye.xyz + dir * mix(a0, dist, (f32(i) + 0.5) / 4.0), flo, banks);
+    }
+    let kept = exp(-depth * max(dist - a0, 0.0) / 4.0);
+    let left = before.a * kept;
+    let gained = before.rgb + before.a * (1.0 - kept) * froxel_light_at(uv, min(k, i32(FROXEL_SLICES) - 1));
+    let through = pow(max(left, 1e-6), sky);
+    return c * through + gained * (1.0 - through) / max(1.0 - left, 1e-4);
+}
+
+// Slice `k`'s own light at screen `uv` (`fs_froxel_light`'s rgb: what its mist sends toward the eye
+// where it is thick), for the last stretch `froxel_fog` walks itself.
+fn froxel_light_at(uv: vec2<f32>, k: i32) -> vec3<f32> {
+    let grid = scene.froxels.zw;
+    let cell = clamp(uv * grid, vec2(0.5), grid - 0.5);
+    let tile = vec2(f32(max(k, 0) % 8), f32(max(k, 0) / 8));
+    let at = (tile * grid + cell) / (grid * vec2(8.0, FROXEL_SLICES / 8.0));
+    return textureSampleLevel(textures[u32(scene.froxels.y)], linear_clamp, at, 0.0).rgb;
 }
 
 // How much of what lies `rel` away (camera relative) the mist lets through, 0..1, with `sky` (0..1)
