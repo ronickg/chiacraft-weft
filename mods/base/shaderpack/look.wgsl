@@ -1085,13 +1085,9 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f
     // (with the curve above, a top in the shade takes 3.75x what it did): crowns lit from above
     // with dark sides and gaps, and a forest floor as bright as Bliss's (the vista from above and
     // Trees' forest, k6 runs, 11-06).
-    if scene.frame.x > 0.5 {
-        // Bliss's shape by facing at every hour; by night and deep twilight scaled so a top gets what
-        // it did (1; sides 0.37, bottoms 0.08): the light's shape is the whole picture then, and with
-        // the old even split the 05:00 forest read the wrong way round, dark crowns over pale gaps
-        // (Shader's shprJ4 against Bliss's 05:00). Nights keep their brightness on tops.
+    if bliss_sky > 0.0 {
         let facing = select(mix(0.93, 0.2, -n.y), mix(0.93, 2.5, n.y), n.y >= 0.0);
-        hemi = mix(hemi, facing * mix(0.4, 1.0, bliss_sky), 1.0 - rain_amount());
+        hemi = mix(hemi, mix(facing, hemi, rain_amount()), bliss_sky);
     }
     var c = p.ambient * sky * hemi * ao * leaves;
     // In the HDR world a cloud overhead takes some of the sky's light too, not the sun's alone: with
