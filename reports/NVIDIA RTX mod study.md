@@ -1,8 +1,8 @@
 # NVIDIA's RTX mod for Minecraft: how it works, and how we'd do the same
 
 Study for chiacraft's ultra look on the PC (RTX 5090). Started 2026-11-05 from the mod's and the
-runtime's public source, read on GitHub. The PC test (shots, frame times) is still to come: see
-[The PC test](#the-pc-test). Study only: none of its code, shaders, configs or art go into our
+runtime's public source, read on GitHub. The first PC try (2026-11-06, under Wine) failed to start
+the renderer; shots and frame times need native Windows: see [The PC test](#the-pc-test). Study only: none of its code, shaders, configs or art go into our
 repository or game. We learn how it's built, then write our own.
 
 ## What it is
@@ -20,8 +20,9 @@ repository or game. We learn how it's built, then write our own.
   tiny-cuda-nn) and SHaRC.
 - **Runs on**: Windows 10/11 only, on GeForce RTX 30 or newer, driver 616.92+. The bridge loads
   the runtime's `d3d9.dll`, so it needs Windows Java. On Linux, people run the whole Windows game
-  under Wine: plain Wine 11.20 works, and Proton flips the world and loses the UI unless a GL
-  interop flag is set (issue [#41][i41]).
+  under Proton: the world comes out upside down with no UI unless the GL memory import is marked
+  dedicated (a community mixin, issue [#41][i41]); plain Wine does not start the renderer at all
+  (our try, below).
 - **Extras**: the *RTX Remix Materials* pack (LabPBR normal and specular maps, plus their own
   `_sss` subsurface maps) and the *RTX Remix Showcase World* by BlockWorks, which the renderer
   was tuned for. Both are on CurseForge and inside the release zip.
@@ -280,10 +281,34 @@ path tracer, and lets the Mac keep the same picture without the rays.
 
 ## The PC test
 
-*Pending.* Plan: a 20-minute PC queue hold, run the mod in Ronald's Minecraft on the PC
-(Wine, or Windows if Ronald boots it), shoot the scenes of `tester-tools/mc-shaders/` plus
-close-ups of reflections, bounce light and shadows, and measure frame times at 1440p with DLSS-RR
-on each quality tier. Every shot goes to the crew gallery under "RTX".
+**First try, 2026-11-06, plain Wine: the renderer does not start.** Windows Prism Launcher 11.1.1
+and Microsoft OpenJDK 21.0.13 in a Wine 11.21 prefix on the PC (CachyOS, RTX 5090, driver
+615.78.08), Ronald's account, MC 1.21.1 + Fabric 0.16.5 + the mod's release jar + Fabric API,
+materials pack on, on a rootful Xwayland at 2560×1440. The jar loads, the Remix API starts
+(runtime log: Vulkan device up with `VK_KHR_external_semaphore_win32`), then:
+
+- **GL interop fails**: `glImportSemaphoreWin32HandleEXT` on Remix's "dxvk done" semaphore gives
+  `GL_INVALID_VALUE` (0x501); the interop info also comes back with no image handle and a 0×0 size.
+  Wine's OpenGL doesn't hand the Win32 handles of its own Vulkan objects to the host GL driver.
+  The mod then shuts Remix down and Minecraft runs in plain OpenGL (title screen in the gallery).
+- **No DLSS**: NGX reports "not available on this hardware/platform" for every feature. Plain Wine
+  has no `nvngx`/NVAPI path, so DLSS-RR and NRC, which the defaults lean on (sparse rendering at
+  0.3 needs DLSS-RR), would be missing even if the interop worked.
+
+Logs: `chiacraft-archive/references/rtx-mod/run-logs/2026-11-06/` (`latest.log`,
+`remix-dxvk.log`); shot: `chiacraft-archive/images/rtx-mod-study/2026-11-06/fail1.png`.
+
+**What's left**: the picture and the frame times need native Windows on the PC (it dual-boots), with
+Ronald at it, or Proton plus a third-party fix mixin, which this study doesn't run (downloads only from
+the mod's official source). The scene script is ready in
+`chiacraft-archive/tester-tools/rtx-mod/rtx_scenes.txt`:
+- the MC comparison's vista, forest, water and snow places, with `/rtx off` A/B pairs;
+- close-ups of a pool and metal blocks, coloured glass, wall and overhang shadows, and a white room
+  with a red wall, by day and by torch;
+- frame times at 1440p from F3 and `nvidia-smi`, on each `/rtx preset`.
+
+The study's conclusions about how it works and what we'd build don't depend on this run; the run would
+add how it looks next to the MC shader packs and what it costs on a 5090.
 
 [nv]: https://www.nvidia.com/en-us/geforce/news/remix-1-6-dlss-5-comfyui-2-0-minecraft-rtx-beta/
 [repo]: https://github.com/NVIDIAGameWorks/rtx-remix-minecraft
