@@ -1758,17 +1758,7 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let mixed = mix(pale, toward, v);
     let own = mix(pale, toward, v * mix(0.7, 1.0, wet));
     let seen = max(vec3(luma(mixed)) + own - vec3(luma(own)), vec3(0.0));
-    // Where the terrain ends, the sky the sky pass draws behind it (`sky.wgsl`'s `gradient`: the sky
-    // at the land's own height over the horizon, then the mist over it), not the bare sky a little
-    // over the horizon: the farthest ridges stood as flat pale cut-outs 10-20 brighter than the sky
-    // round them, a stack of theatre flats over the far ridge (Planner's full-size pass on the
-    // forest vista, 11-06; Bliss's border fog takes the land into the sky's own colour, its
-    // `composite1` 1305).
-    var end_sky = lit;
-    if edge > 0.0 {
-        end_sky = fog_through(sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) + 1e-3, dir.z))), dir * 220.0, 1.0);
-    }
-    var out = mix(seen, end_sky, edge);
+    var out = mix(seen, lit, edge);
     // The HDR world with the sun low: a thin mist lying on the far land at about the sea's height,
     // a flat white band along the horizon with hills standing out of it, as Bliss's evening (its
     // 17:00-18:00 vista: rows at 40% of the height 20 brighter than round them, saturation about
@@ -1781,9 +1771,7 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
         // the band lies, took the sky's colour over it, lk_eb1.)
         // (From 600 blocks it lay on the nearer hills too, a wide pale wash, not Bliss's thin band
         // at the far horizon: lk_eb2.)
-        // (And gone again where the land hands over to the sky, as the sky has none: on the last
-        // ridges it stood whiter than the sky behind them.)
-        let far_band = smoothstep(1000.0, 2200.0, dist) * low * (1.0 - edge);
+        let far_band = smoothstep(1000.0, 2200.0, dist) * low;
         if far_band > 0.0 {
             let y = scene.eye.y + rel.y - (SEA_LEVEL + 4.0);
             let inside = min(min(BAND_DEPTH / max(-dir.y, 0.008), dist), 1500.0);
