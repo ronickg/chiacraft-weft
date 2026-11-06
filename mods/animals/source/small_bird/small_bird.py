@@ -165,7 +165,8 @@ def layout():
          el("tail_fan", "tail", (-1.25, 3.55, -6.2), (1.25, 3.55, -2.5), quad="up", cut="tail")]
     for s, n in ((1, "L"), (-1, "R")):
         k = n.lower()
-        B += [(f"wingf_{n}", "spine_1", (s * 1.55, 3.6, 1.2)), (f"wing_{n}", "spine_1", (s * 1.1, 3.6, 1.3)),
+        # The folded wing hinged at its shoulder (its top inner front corner), so it opens away from the body.
+        B += [(f"wingf_{n}", "spine_1", (s * 1.6, 4.25, 2.0)), (f"wing_{n}", "spine_1", (s * 1.1, 3.6, 1.3)),
               (f"hand_{n}", f"wing_{n}", (s * 4.8, 3.6, 1.3)), (f"leg_{n}_thigh", "spine_0", (s * 0.45, 3.0, -0.45)),
               (f"leg_{n}_shin", f"leg_{n}_thigh", (s * 0.45, 1.8, -0.45)), (f"leg_{n}_toes", f"leg_{n}_shin", (s * 0.45, 0.5, -0.45))]
         X = lambda a, b: sorted((s * a, s * b))  # noqa: E731

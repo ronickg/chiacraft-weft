@@ -48,4 +48,12 @@ horns levelled), `toss_tell` (head low, horns hooked under) and `toss` (flung up
 `rockfall_tell` (rearing high) and `rockfall` (down hard on the forefeet), `leap_tell` (crouched on
 its haunches, fitted so all four hooves stay on the ground) and `leap` (forelegs tucked, hind legs
 stretched, then reaching down), `stunned` and `down` (on its belly, heaving); with `idle`, `walk`,
-`run` and `lie`. One-off clips don't loop.
+`run` and `lie`. Ambient (`boss.rs`): `watch` (5 s, held: head high, slow sweeps), `stare` (2.5 s,
+held: head low, horns forward, a forehoof scraping twice, its knee and hoof fitted to the ground,
+a snort) and `death` (2.4 s, holding its last frame: onto its knees, onto its belly, rolled onto its
+side, the head propped on its horn; each frame grounded). One-off clips don't loop and end on their
+own last pose. Every standing clip stands on its planted hooves in every keyframe (`plant`: the
+root on the planted hooves, a sinking leg drawn up at the knee or hock; the rockfall's landing and
+the stun's sway keep their dip in the legs); the crouch is fitted at each step, the lie holds its
+chest up on the forelegs so its hanging hair stays out of the ground. `build.py` asserts it, and
+that nothing but `rise` goes below the ground.

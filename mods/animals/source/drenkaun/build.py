@@ -47,6 +47,25 @@ if __name__ == "__main__":
     for anim in ("walk", "run"):
         back = {f: v for f, v in gait(spec, anim, FEET).items() if v is not None and v <= 0}
         assert not back, f"{anim} goes backwards: {back}"
-    poses = {"": {"idle": "idle", "walk": "walk", "run": "run", **{c: c for c in CLIPS}}}
+    # The ambient clips (boss.rs): watch and stare loop and stand with every hoof within 0.3 of the
+    # ground in every keyframe, nothing below -0.3; death plays once and holds its last frame,
+    # every frame resting on its lowest point (mid-roll the legs swing out below where it ends).
+    from ground import feet_low, grounded  # noqa: E402
+    anims = spec["animations"]
+    everything = [e["name"] for e in spec["elements"]]
+    for clip in ("watch", "stare"):
+        assert anims[clip]["loop"] is True, f"{clip} must loop"
+        for leg in FEET:
+            low = feet_low(spec, anims[clip], [leg])
+            assert min(low) > -0.3, f"{clip}: {leg} sinks to {min(low):.2f}"
+            if not (clip == "stare" and leg == "leg_FR_paw"):  # its one stamp
+                assert max(low) < 0.3, f"{clip}: {leg} lifts to {max(low):.2f}"
+        assert min(feet_low(spec, anims[clip], everything)) > -0.3, f"{clip} goes into the ground"
+    assert anims["death"]["loop"] == "hold_on_last_frame", "death plays once and holds"
+    anims["death"] = grounded(spec, anims["death"], everything)
+    low = feet_low(spec, anims["death"], everything)
+    assert min(low) > -0.3 and max(low) < 0.3, f"dying, its lowest point from {min(low):.2f} to {max(low):.2f}"
+    assert not any(anims[c]["loop"] for c in CLIPS if c not in ("stunned", "down", "watch", "stare", "death")), "a one-off clip loops"
+    poses = {"":{"idle": "idle", "walk": "walk", "run": "run", **{c: c for c in CLIPS}}}
     made = export(spec, os.path.join(OUT, "texture.png"), ASSETS, "drenkaun", SCALE, "drenkaun/drenkaun", pose_files=poses)
     print("wrote", made, "into", os.path.normpath(ASSETS))

@@ -324,6 +324,7 @@ pub fn rise(def: &'static Def, w: &World, player: u64, at: [i32; 3], form: &Form
     );
     w.entity_edit(id).health(max);
     w.set_component(id, &WARDEN, Warden { form: form.age.tier() as u32, state: RISING, target: player, altar: at, ..Warden::default() });
+    crate::anim::clear(w, id);
     w.action_play(id, "rise", false);
     burst(w, spot, def.dust.id(), 40, 1.5);
     for p in w.entities_near(spot, SIGHT, Some(&PLAYER)) {
@@ -400,6 +401,7 @@ pub fn fight(def: &'static Def, w: &World, id: u64, st: &EntityState) -> bool {
     }
     let fierce = st.health < st.max_health * b.fierce_at;
     health_line(def, w, id, st, &c, fierce);
+    crate::anim::expire(w, id);
     match c.state {
         RISING => {
             stand(w, id, st);
@@ -411,6 +413,7 @@ pub fn fight(def: &'static Def, w: &World, id: u64, st: &EntityState) -> bool {
             stand(w, id, st);
             let ticks = if c.state == DOWN { (b.down_secs * TICKS) as u32 } else { STUN_TICKS };
             if c.t >= ticks {
+                crate::anim::clear(w, id);
                 w.action_play(id, "", false);
                 go(&mut c, CHASE);
             }
@@ -418,6 +421,8 @@ pub fn fight(def: &'static Def, w: &World, id: u64, st: &EntityState) -> bool {
         CHASE => {
             let Some(t) = target.and_then(|p| w.entity(p)) else {
                 stand(w, id, st);
+                // No one near: it looks round for its challenger.
+                crate::anim::hold(w, id, crate::anim::Act::Watch);
                 w.set_component(id, &WARDEN, c);
                 return true;
             };
@@ -434,6 +439,7 @@ pub fn fight(def: &'static Def, w: &World, id: u64, st: &EntityState) -> bool {
                     (def.begin)(&ctx, &mut next);
                     c = next;
                     w.navigate(id, st.pos, 0.0);
+                    crate::anim::clear(w, id);
                     w.action_play(id, &format!("{}_tell", b.attacks[i].name), false);
                     go(&mut c, WINDUP);
                 }
@@ -442,8 +448,11 @@ pub fn fight(def: &'static Def, w: &World, id: u64, st: &EntityState) -> bool {
                 None if dist - half < CLOSE => {
                     stand(w, id, st);
                     face(w, id, dir);
+                    // Between attacks it stares its challenger down.
+                    crate::anim::hold(w, id, crate::anim::Act::Stare);
                 }
                 None => {
+                    crate::anim::clear(w, id);
                     w.navigate(id, t.pos, 1.0);
                 }
             }
@@ -454,6 +463,7 @@ pub fn fight(def: &'static Def, w: &World, id: u64, st: &EntityState) -> bool {
             face(w, id, c.dir);
             (def.tell)(w, id, st, &c, a);
             if c.t as f32 >= a.windup * TICKS {
+                crate::anim::clear(w, id);
                 w.action_play(id, a.name, false);
                 TRAMPLED
                     .lock()
@@ -481,6 +491,7 @@ pub fn fight(def: &'static Def, w: &World, id: u64, st: &EntityState) -> bool {
                     c.cooldown[i] = strike.cooldown;
                     weft_sdk::info!("{} {id}: stunned", def.name);
                     burst(w, (def.head)(st), def.bits.id(), 20, 1.0);
+                    crate::anim::clear(w, id);
                     w.action_play(id, "stunned", true);
                     go(&mut c, STUNNED);
                 }
@@ -727,6 +738,7 @@ fn hurt(def: &Def, w: &World, id: u64, other: u64, cause: u32, raw: f32) -> f32 
             .unwrap()
             .get_or_insert_with(HashMap::new)
             .remove(&id);
+        crate::anim::clear(w, id);
         w.action_play(id, "down", true);
         go(&mut c, DOWN);
         weft_sdk::info!("{} {id}: knocked down", def.name);

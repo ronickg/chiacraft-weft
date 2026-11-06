@@ -571,6 +571,7 @@ BLINK = 0.09
 ANIMS = {"idle": (pose_idle, 3.0), "walk": (pose_walk, 0.9), "run": (pose_run, 0.5), "sit": (pose_sit, 3.0),
          "lie": (pose_lie, 4.0), "meow": (pose_meow, 1.6), "swipe": (pose_swipe, 0.6), "bite": (pose_bite, 0.5)}
 OWN = tuple(ANIMS)  # the cat's own clips, exported as they were (no loop or blend of their own)
+OWN_ONCE = ("meow", "swipe", "bite")  # of those, the ones played once (the exporter's actions): they end on their last pose
 
 # ------------------------------------------------------------------ behaviour clips
 
@@ -991,9 +992,9 @@ def animations(bone_names):
         frames = []
         loops = LOOPS.get(name, False)
         for t in frame_times(name, dur):
-            if name in OWN:
+            if name in OWN and name not in OWN_ONCE:
                 tt = t % dur if t < dur else 0.0
-            else:  # a loop's last frame is its first; a clip played once ends where it ends
+            else:  # a loop's last frame is its first; a clip played once ends where it ends (its own strikes too)
                 tt = t % dur if t < dur else (0.0 if loops is True else dur)
             pose = fn(tt)
             if name not in SHUT:

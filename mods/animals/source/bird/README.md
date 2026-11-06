@@ -16,6 +16,16 @@ the vulture and the gull. Made with the `blocky-model` skill
 - Animations: idle (looking about in holds and snaps; an owl's head turned far round), walk (or
   hops), run (hopping), and the flying model's wingbeat, which a big bird holds open in a glide
   part of the cycle. Blinks in idle: side eyelids for side eyes, front lids for an owl's.
+- Behaviour clips (`mods/animals/src/anim.rs`), in the standing file, written once in `bird.py`
+  (`behaviour`, also called by the raven's build) and fitted to each standing model: stare, watch,
+  graze (pecks), drink, sleep (the head turned back into the wing, on one leg where the tucked leg
+  fits) and approach loop; sniff, look, alarm, scratch (a foot over the wing to the head), stretch,
+  groom (preening), play (a hop and flap), nuzzle (allopreening) and flinch play once; death holds
+  its last frame. No stalk, pounce, rear or charge (the eagle and owl strike from the air). The
+  folded wings hinge at the shoulder (their top inner front corner), so they open away from the
+  body. Big head turns are snaps (no key inside one): a neck box turned partway pokes a corner
+  through the head or the breast. `check_clips` checks loops, feet, the ground, the gait, the lids
+  and that no wing, foot or head goes into the body further than standing or in the idle.
 - `export.py <model>` builds `../<model>/<model>.py`'s `CFG`, checks flicker (at rest and in every
   keyframe), joints, pokes along the body's axis, thin lines (`linecheck`) and a forward walk, and exports
   `models/<model>[_fly].geo.json`, their animations and `textures/entity/<model>/<model>.png`, and

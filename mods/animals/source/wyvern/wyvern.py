@@ -27,7 +27,7 @@ SKILL = os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "
 sys.path.insert(0, SKILL)
 from paint import EYES  # noqa: E402
 from prop import FACES, el, rotm  # noqa: E402
-from rig import euler  # noqa: E402
+from rig import euler, qmul, quat  # noqa: E402
 from house import TX  # noqa: E402
 
 # Painted at the house density, 32 texels a block (TX = 0.5 texels a unit): the face that carries
@@ -779,7 +779,8 @@ def pose_idle(t):
     p["neck_3"] = (p["neck_3"][0], look * 0.5, 0)
     p["head"] = (p["head"][0], look, 0)
     p.update(mirror(tail_curve(sway=5, t=t / 4.0)))
-    return p
+    # The breath moves the shoulders: the wrists kept where they stand (they sank up to 4.5 into the ground).
+    return plant(p, lifted=False)
 
 
 def flying_body():
@@ -851,6 +852,10 @@ GAITS = {
     # it one after the other and drive it on; a moment in the air after each pair.
     "run": {"length": 3.0, "duty": 0.3, "phase": {"wing_L": 0.0, "wing_R": 0.16, "leg_L": 0.5, "leg_R": 0.64},
             "lift": {"leg": 52, "wing": 64}, "out": 12, "roll": 0.6},
+    # The curious approach (a behaviour clip, in place of the walk): the walk's order, shorter, lower
+    # steps, the body rolling less, the neck stretched out low and the head level, looking.
+    "approach": {"length": 1.6, "duty": 0.7, "phase": {"leg_L": 0.0, "wing_R": 0.25, "leg_R": 0.5, "wing_L": 0.75},
+                 "lift": {"leg": 24, "wing": 40}, "out": 10, "roll": 0.6},
 }
 
 
@@ -928,7 +933,17 @@ def gait_body(gait, u):
     # shifts over it, the shoulders roll down onto it and turn the other wing's shoulder forward
     # as that wing swings round, the hips turn against them, the head stays on what it looks at.
     lean = g["roll"] * math.cos(2 * math.pi * (u - g["phase"]["wing_L"] - g["duty"] / 2))
-    if gait == "walk":
+    if gait == "approach":
+        w = 2 * math.pi * u
+        p["root"] = (3 * lean, -FIT["drop"] - 2 * math.cos(2 * w), 0)
+        p["spine_0"] = (0, -1.5 * lean, 1.0 * lean)
+        p["spine_1"] = (0, 4 * lean, -2.5 * lean)
+        p.update(neck_pose((16, 8, -2, -6)))  # low and stretched out, as the stare's
+        p["neck_3"] = (p["neck_3"][0], 6 * math.sin(w), 0)
+        p["head"] = (head_pitch(p, 2), 8 * math.sin(w), 8 * math.sin(w - 0.8))  # looking about, the head cocked
+        p.update({f"tail_{k}": (-4 * (1 if k < 3 else 0.4), -5 * math.sin(2 * math.pi * (u - g["phase"]["wing_L"]) - 0.6 * k), 0)
+                  for k in range(len(TAIL))})
+    elif gait == "walk":
         w = 2 * math.pi * u
         p["root"] = (5 * lean, -FIT["drop"] - 3 * math.cos(2 * w), 0)
         p["spine_0"] = (0, -2.5 * lean, 1.5 * lean)
@@ -1101,7 +1116,7 @@ def pose_bite(t):
         q[b] = (q[b][0] + (v - q[b][0]) * abs(d), 0, 0)
     q["spine_1"] = (4 * d, 0, 0)
     q["jaw"] = (float(np.interp(p, [0, .3, .48, .56, 1], [0, 20, 36, 0, 0])), 0, 0)
-    return q
+    return plant(q, lifted=False)  # the lean moves the shoulders: the wrists kept down (they sank 12 into the ground)
 
 
 CLAW_KEYS = ([0, .35, .55, .7, 1], [(0, 0, 0), (25, 150, 40), (0, 3, 130), (0, 3, 130), (0, 0, 0)])  # out, up, ahead
@@ -1140,15 +1155,741 @@ def pose_tail(t):
     return q
 
 
-BLINKS = {}
+# ------------------------------------------------------------------ behaviour clips (`anim.rs`)
+#
+# What the game's AI asks for by name (`mods/animals/src/anim.rs`): held states (stare, watch,
+# drink, sleep) and the curious approach (a gait, in place of the walk) loop; the rest play once
+# over what plays below, on the bones they write (`to_bedrock.as_action`); the death holds its last
+# frame. A big hunter: no graze (it eats meat), no rear or charge (plant eaters' and mothers'), no
+# stalk or pounce (it isn't an ambusher: `roles::AMBUSHERS`). It has no lids: its eyes stay open.
+#
+# It stands on its hind feet and the wrists of its folded wings: a clip moving the chest moves the
+# shoulders, so each frame sets the wrists back down where they stand (`plant`: the arm and forearm
+# solved so the hand, and the sail on it, keep their place and turn). The hips (spine_0) and the
+# root stay as they stand, so the hind feet stay planted. Each frame's height is checked from the
+# feet in the build.
+
+TAU = 2 * math.pi
+
+
+def keys(p, ps, vs):
+    return float(np.interp(p, ps, vs))
+
+
+def smooth(p, ps, vs):
+    """Eased between keys (each stretch smoothstepped)."""
+    i = int(np.clip(np.searchsorted(ps, p, side="right") - 1, 0, len(ps) - 2))
+    return vs[i] + (vs[i + 1] - vs[i]) * ease((p - ps[i]) / max(ps[i + 1] - ps[i], 1e-9))
+
+
+def chain_world(pose, names):
+    """{bone: (R, t)} for the bones in `names` (a chain from the root, parents first): `ground.world`
+    for those alone (the wrists are solved for every frame)."""
+    from ground import rot
+    piv = {b["name"]: np.array(b["pivot"], float) for b in SKELETON}
+    par = {b["name"]: b.get("parent") for b in SKELETON}
+    out = {}
+    for n in names:
+        p = par[n]
+        if p is None:
+            out[n] = (np.eye(3), piv[n] + np.array(pose.get("root", (0, 0, 0)), float))
+            continue
+        PR, Pt = out[p]
+        out[n] = (PR @ rot(*pose.get(n, (0, 0, 0))), Pt + PR @ (piv[n] - piv[p]))
+    return out
+
+
+ARM_CHAIN = ("root", "spine_0", "spine_1", "arm_L", "forearm_L", "hand_L")
+PLANT = {}  # where a wrist stands: the stand's left hand (its turn and place), on the ground
+
+
+def hand_target(lifted=True):
+    """The stand's left hand: its turn and place, `lifted` onto the ground (0.05 over it) or as it
+    stands (the same, since `ground_fold`)."""
+    if not PLANT:
+        R, t = chain_world({k: v for k, v in stand().items() if k != "scale"}, ARM_CHAIN)["hand_L"]
+        piv = next(np.array(b["pivot"], float) for b in SKELETON if b["name"] == "hand_L")
+        low = min((R @ (np.array(c, float) - piv) + t)[1] for c in HAND_LOW)
+        PLANT.update({True: dict(R=R, t=t + np.array([0.0, 0.05 - low, 0.0])), False: dict(R=R, t=t)})
+    return PLANT[lifted]
+
+
+WING_CHAIN = ("arm", "forearm", "hand")
+
+
+def ground_fold():
+    """The folded wing's fit left the wrist's hand 1.9 into the ground (`fit_wing` can't reach both its
+    targets): the arm, forearm and hand turned just enough to lift it onto the ground, its turn kept
+    (the sail on it unchanged), so the stand rests on its wrists and hind feet together. Kept in
+    `fit.json` ("wing", "wing_lift": how far it was lifted)."""
+    PLANT.clear()
+    lift = float(hand_target(True)["t"][1] - hand_target(False)["t"][1])
+    q = plant({k: v for k, v in stand().items() if k != "scale"}, sides=("L",))
+    FIT["wing"] = {f"{b}_L": [round(float(v), 4) for v in q[f"{b}_L"]] for b in WING_CHAIN}
+    FIT["wing_lift"] = round(lift, 2)
+    PLANT.clear()
+    with open(FIT_FILE, "w") as f:
+        json.dump(FIT, f, indent=1)
+    print("the folded wing's hand lifted", round(lift, 2), "onto the ground:", FIT["wing"])
+
+
+def plant(q, sides=("L", "R"), lifted=True, move=None):
+    """`q` with its wrists set down where they stand: each side's arm, forearm and hand solved, for
+    the body as `q` poses it, so the hand (and the sail on it) keeps the stand's place and turn on
+    the ground (the right as the left in the mirrored body). `lifted` False: where the stand has it,
+    1.9 in the ground (the idle's and the bite's, whose first frames stay the stand). `move`: the
+    left wrist moved by so much (lifted off the ground, the sail on it kept upright)."""
+    from scipy.optimize import least_squares
+    T = hand_target(lifted)
+    fold = np.array([v for b in WING_CHAIN for v in FIT["wing"][f"{b}_L"]], float)
+    central = {k: v for k, v in q.items() if k in ("root", "spine_0", "spine_1")}
+    out = dict(q)
+    for side in sides:
+        body = central if side == "L" else flipped(central)
+
+        goal = T["t"] + (np.asarray(move, float) if move is not None and side == "L" else 0.0)
+
+        def res(x):
+            R, t = chain_world(dict(body, **{f"{b}_L": tuple(x[3 * i:3 * i + 3]) for i, b in enumerate(WING_CHAIN)}),
+                               ARM_CHAIN)["hand_L"]
+            return [*(t - goal), *((R - T["R"]).ravel() * 200), *(0.001 * (x - fold))]
+        x = least_squares(res, fold, xtol=1e-10, ftol=1e-12, gtol=1e-12).x
+        for i, b in enumerate(WING_CHAIN):
+            v = tuple(float(a) for a in x[3 * i:3 * i + 3])
+            out[f"{b}_{side}"] = v if side == "L" else (v[0], -v[1], -v[2])
+    return out
+
+
+def neck_pose(pitch=(0, 0, 0, 0), yaw=(0, 0, 0, 0), lift=1.0):
+    """The stand's S-neck (`neck_s`, raised by `lift`), each segment pitched (+ down) and turned
+    (+ to its left) by as much more."""
+    p = neck_s(lift)
+    for k in range(len(NECK)):
+        p[f"neck_{k}"] = (p[f"neck_{k}"][0] + pitch[k], yaw[k], 0)
+    return p
+
+
+def head_pitch(q, world_pitch=0.0):
+    """The head's pitch that holds it `world_pitch` degrees down (0 level), the hips, chest and neck as `q` has them."""
+    return world_pitch - sum(q.get(b, (0, 0, 0))[0] for b in ["spine_0", "spine_1"] + [f"neck_{k}" for k in range(len(NECK))])
+
+
+def body(chest=0.0, pitch=(0, 0, 0, 0), yaw=(0, 0, 0, 0), lift=1.0, look=0.0, tilt=0.0, roll=0.0, turn=0.0):
+    """The stand with the chest pitched by `chest` (+ down) and rolled by `roll`, the neck as
+    `neck_pose`, the head held `look` degrees down from level and tilted by `tilt`, the chest turned
+    to its left by `turn`; the wrists
+    still to plant (`plant`)."""
+    q = stand()
+    q["spine_1"] = (chest, turn, roll)
+    q.update(neck_pose(pitch, yaw, lift))
+    q["head"] = (head_pitch(q, look), 0, tilt)
+    q["jaw"] = (0.01, 0, 0)
+    return q
+
+
+def sway(q, p, n=1, amp=4.0, droop=6.0, lift=0.0):
+    """The tail swaying `amp` degrees `n` times a cycle (`p` 0..1), lifted by `lift`."""
+    q.update(mirror(tail_curve(droop=droop - lift, sway=amp, t=n * p)))
+    return q
+
+
+def breath(t, period, amp=0.8):
+    return amp * math.sin(TAU * t / period)
+
+
+def pose_stare(t):
+    """Half aware, eyes on it: the neck lowered and stretched forward, the head level and aimed, quite
+    still but for the breath (2.4 s, held)."""
+    q = body(chest=breath(t, 2.4), pitch=(26, 12, -4, -10), look=6)
+    q = sway(q, t / 2.4, 1, 1.0)
+    return plant(q)
+
+
+def pose_watch(t):
+    """On watch: the neck drawn up high, the head turning slowly to one side, the other and back (4.8
+    s, held)."""
+    p = t / 4.8
+    look = smooth(p, [0, .1, .35, .45, .75, .85, 1], [0, 0, 34, 34, -30, -30, 0])
+    q = body(chest=breath(t, 2.4), pitch=(-18, -8, 6, 10), yaw=(0.15 * look, 0.2 * look, 0.25 * look, 0.2 * look), look=-4)
+    q["head"] = (q["head"][0], 0.2 * look, 0)
+    q = sway(q, p, 1, 2.0)
+    return plant(q)
+
+
+def pose_look(t):
+    """Looking round: the head turned to one side, then the other, a tilt, and back (2.8 s, once)."""
+    p = t / 2.8
+    look = smooth(p, [0, .12, .38, .5, .78, .9, 1], [0, 40, 40, -36, -36, 0, 0])
+    tilt = smooth(p, [0, .2, .3, .4, .55, .7, .8, 1], [0, 0, 10, 0, 0, -8, 0, 0])
+    q = body(chest=breath(t, 2.8, 0.5), yaw=(0.15 * look, 0.2 * look, 0.25 * look, 0.2 * look), tilt=tilt)
+    q["head"] = (q["head"][0], 0.2 * look, tilt)
+    q = sway(q, p, 1, 3.0)
+    return plant(q)
+
+
+def pose_flinch(t):
+    """Hit: a jerk back, the chest up, the neck snapped back and the head ducked, the jaws parted, the
+    sails jerked in, the tail lashing (0.45 s, once)."""
+    p = t / 0.45
+    d = keys(p, [0, .15, .45, 1], [0, 1, 0.8, 0])
+    q = body(chest=-4 * d, pitch=(-10 * d, -6 * d, 6 * d, 10 * d), look=14 * d)
+    q["jaw"] = (12 * d + 0.01, 0, 0)
+    q.update(fan(-0.25 * d))
+    q = sway(q, p, 1, 9 * d, lift=4 * d)
+    return plant(q)
+
+
+def fan(open_=0.0):
+    """The folded fan opened by `open_` (1: spread as wide as the wing's rest, the last finger kept
+    where it folds, the first swung up and forward; below 0: drawn in tighter), the panels between
+    the fingers following it."""
+    out = {}
+    first = FINGERS[0][0]
+    keep = (FINGERS[-1][0] - first) * (1 - FAN_CLOSED)  # the last finger's turn, folded
+    for k, (yaw, _, _) in enumerate(FINGERS):
+        closed = (yaw - first) * (1 - FAN_CLOSED)
+        opened = keep  # every finger turned as the last is: the spread of the wing's rest
+        out[f"finger{k}_L"] = (0, closed + (opened - closed) * open_, 0)
+    for k in range(len(FINGERS) - 1):
+        gap = FINGERS[k][0] - FINGERS[k + 1][0]
+        out[f"mem{k}_L"] = (0, -gap * (1 - FAN_CLOSED) / 2 * (1 - open_), 0)
+    return mirror(out)
+
+
+def pose_alarm(t):
+    """Alarm: a roar, the neck thrown up and forward, the jaws wide, the folded wings' fans flared open
+    beside it to look bigger, the wrists staying down, the tail lashing (1.4 s, once)."""
+    p = t / 1.4
+    up = smooth(p, [0, .2, .78, 1], [0, 1, 1, 0])
+    roar = smooth(p, [0, .15, .25, .7, .85, 1], [0, 0.4, 1, 1, 0, 0])
+    q = body(chest=-4 * up, pitch=(-12 * up, -6 * up, 8 * up, 6 * up), look=-10 * up)
+    q["jaw"] = (40 * roar * (1 + 0.05 * math.sin(TAU * p * 9)) + 0.01, 0, 0)
+    q["head"] = (q["head"][0] + 1.5 * roar * math.sin(TAU * p * 11), 0, 0)
+    q.update(fan(0.85 * up))
+    q = sway(q, p, 2, 8 * up, lift=6 * up)
+    return plant(q)
+
+
+CF = {}  # the clips' fitted reaches (`fit_clips`)
+MOUTH_PARTS = ("snout", "nose", "jaw", "mouth")  # what drinks
+
+
+def head_down(d=1.0, turn=0.0):
+    """The snout brought down to the ground by `d` (1: half a unit over it, fitted in `fit_clips`):
+    the neck lowered, the chest dipped a little, the head pointing down; the legs not bent. `turn`
+    swings the head to its left (degrees, over the last neck segments and the head)."""
+    P = CF["low"]
+    q = body(chest=P[0] * d, pitch=tuple(v * d for v in P[1:5]), yaw=(0, 0.2 * turn, 0.3 * turn, 0.3 * turn), look=P[5] * d)
+    # (tilted a little: lowered, the head's pitch on the neck passes 0, where the skull's underside and
+    # the neck's lie in one plane and flicker)
+    q["head"] = (q["head"][0], 0.2 * turn, 3.0 * min(1.0, 3 * d))
+    return q
+
+
+def pose_drink(t):
+    """Drinking: the snout down at the water, lapping (the jaw working), every so often the head
+    lifted a little to swallow (2.4 s, held)."""
+    p = t / 2.4
+    d = smooth(p, [0, .5, .65, .85, 1], [1, 1, 0.85, 0.85, 1])
+    lap = max(0.0, math.sin(TAU * p * 5)) * keys(p, [0, .45, .5, 1], [1, 1, 0, 0])
+    q = head_down(d - 0.1 * lap)  # the snout lifted as the jaw drops, so the jaw laps at the water
+    q["jaw"] = (7 * lap + 0.01, 0, 0)
+    q = sway(q, p, 1, 2.0)
+    return plant(q)
+
+
+def pose_sniff(t):
+    """Sniffing the ground: the snout down to it and swept to one side and the other, then up (2.4 s, once)."""
+    p = t / 2.4
+    d = smooth(p, [0, .2, .8, 1], [0, 1, 1, 0])
+    turn = smooth(p, [0, .25, .45, .65, .8, 1], [0, 18, -18, 14, 0, 0])
+    q = head_down(0.92 * d, turn * d)
+    q["jaw"] = (0.01, 0, 0)
+    q = sway(q, p, 1, 3.0)
+    return plant(q)
+
+
+def pose_nuzzle(t):
+    """Nuzzling a young one: the head lowered toward it, two gentle nudges of the snout (2.0 s, once)."""
+    p = t / 2.0
+    d = smooth(p, [0, .25, .8, 1], [0, 1, 1, 0])
+    push = max(0.0, math.sin(TAU * (p - .25) / .55 * 2)) * keys(p, [0, .25, .26, .79, .8, 1], [0, 0, 1, 1, 0, 0])
+    q = head_down(0.75 * d)
+    q["head"] = (q["head"][0] - 10 * push, 0, 6 * push)
+    q["neck_3"] = (q["neck_3"][0] - 4 * push, 0, 0)
+    q = sway(q, p, 1, 3.0)
+    return plant(q)
+
+
+def pose_groom(t):
+    """Grooming: the neck curled round to the left wing, the snout worked along its forearm from near
+    the elbow toward the wrist, nibbling at each spot, and back (2.6 s, once). The reach fitted in
+    `fit_clips`."""
+    p = t / 2.6
+    d = smooth(p, [0, .22, .82, 1], [0, 1, 1, 0])
+    along = smooth(p, [0, .22, .45, .62, .82, 1], [0, 0, 1, 0.5, 1, 1])
+    keys_ = np.array(CF["groom"])  # fitted near the elbow, midway, near the wrist
+    k = min(along * (len(keys_) - 1), len(keys_) - 1 - 1e-9)
+    i = int(k)
+    f = k - i  # from one spot to the next the head draws back a little (straight across, it went into the forearm)
+    # (held at 0.94 of the fitted reach: at the full reach the nose grazes into the forearm between keys)
+    x = (keys_[i] + (keys_[i + 1] - keys_[i]) * f) * (1 - 0.3 * math.sin(math.pi * f)) * d * 0.94
+    q = body(chest=breath(t, 2.6, 0.4), pitch=tuple(x[0:4]), yaw=tuple(x[4:8]))
+    q["head"] = (q["head"][0] + x[8], x[9], x[10])
+    nib = max(0.0, math.sin(TAU * p * 8)) * keys(p, [0, .22, .25, .8, .82, 1], [0, 0, 1, 1, 0, 0])
+    q["jaw"] = (8 * nib + 0.01, 0, 0)
+    q = sway(q, p, 1, 3.0)
+    return plant(q)
+
+
+def point_on(q, bone, local):
+    """Where a point (given at rest) of `bone` is, posed by `q`."""
+    from ground import world
+    R, t = world(SKELETON, {k: v for k, v in q.items() if k != "scale"})[bone]
+    piv = next(np.array(b["pivot"], float) for b in SKELETON if b["name"] == bone)
+    return R @ (np.asarray(local, float) - piv) + t
+
+
+def head_pose(st, x):
+    """`st` with the neck and head turned by the fitted numbers `x`: the neck's four pitches (+ down)
+    and four turns (+ to its left), the head's pitch from level, turn and tilt."""
+    q = dict(st)
+    q.update(neck_pose(tuple(x[0:4]), tuple(x[4:8])))
+    q["head"] = (head_pitch(q) + x[8], x[9], x[10])
+    return q
+
+
+SCRATCH_WRIST = (-40.0, 90.0, 60.0)  # the left wrist lifted in toward the head to scratch (units)
+SCRATCH_LEAN = 5.0  # the chest dipped toward it (degrees)
+SCRATCH_TURN = 15.0  # and turned toward it
+SCRATCH_OFF = np.array([6.0, 0.0, 0.0])  # the claw held off the cheek by so much more than fitted, raking along it
+
+
+def pose_scratch(t):
+    """An itch: the left wrist lifted off the ground and in toward the head (the folded sail upright on
+    it), the chest dipped and turned and the neck bent round to meet it, the cheek raked up and down by
+    the thumb's claw; then set down again (2.0 s, once). The reach fitted in `fit_clips`."""
+    p = t / 2.0
+    d = smooth(p, [0, .25, .82, 1], [0, 1, 1, 0])
+    rake = 8 * math.sin(TAU * max(0.0, p - .25) / .19) * keys(p, [0, .25, .3, .77, .82, 1], [0, 0, 1, 1, 0, 0])
+    q = body(chest=SCRATCH_LEAN * d, turn=SCRATCH_TURN * d)
+    q = plant(q, move=(np.array(SCRATCH_WRIST) + SCRATCH_OFF) * d + np.array([0, 0, rake]))  # raking along the cheek
+    q = head_pose(q, np.array(CF["scratch"]) * d)
+    q["jaw"] = (6 * d + 0.01, 0, 0)  # (its mouth a little open, enjoying it)
+    return sway(q, p, 1, 4.0)
+
+
+def from_euler(e):
+    return quat(*e)
+
+
+def near(e, ref):
+    """The Euler angles of the same turn as `e` nearest `ref` (each angle by whole turns, and the
+    other solution of the three), so keys in a row don't jump."""
+    x, y, z = e
+    best = None
+    for c in ((x, y, z), (x + 180, 180 - y, z + 180)):
+        c = tuple(v + 360 * round((r - v) / 360) for v, r in zip(c, ref))
+        dist = sum((v - r) ** 2 for v, r in zip(c, ref))
+        if best is None or dist < best[0]:
+            best = (dist, c)
+    return best[1]
+
+
+def slerp(a, b, k):
+    """Euler angles `k` of the way from turn `a` to turn `b`, along the shortest way round, written on
+    from `a` (followed in small steps, so the angles never jump to the turn's other writing)."""
+    qa, qb = from_euler(a), from_euler(b)
+    if np.dot(qa, qb) < 0:
+        qb = -qb
+    c = min(1.0, max(-1.0, float(np.dot(qa, qb))))
+    w = math.acos(c)
+    out = tuple(a)
+    for kk in list(np.arange(0.02, k, 0.02)) + [k]:
+        q = qa if w < 1e-6 else (math.sin((1 - kk) * w) * qa + math.sin(kk * w) * qb) / math.sin(w)
+        out = near(euler(q / np.linalg.norm(q)), out)
+    return out
+
+
+def raised(e, deg):
+    """A turn `e` raised by `deg` about the body's long axis (a left wing lifted)."""
+    return near(euler(qmul(quat(0, 0, deg), from_euler(e))), e)
+
+
+def fan_spread(open_=0.0):
+    """The folded fan opened by `open_` to the wing's rest spread (1: the fingers as they grow, the
+    panels between them as they're cut)."""
+    out = {}
+    first = FINGERS[0][0]
+    for k, (yaw, _, _) in enumerate(FINGERS):
+        out[f"finger{k}_L"] = (0, (yaw - first) * (1 - FAN_CLOSED) * (1 - open_), 0)
+    for k in range(len(FINGERS) - 1):
+        gap = FINGERS[k][0] - FINGERS[k + 1][0]
+        out[f"mem{k}_L"] = (0, -gap * (1 - FAN_CLOSED) / 2 * (1 - open_), 0)
+    return mirror(out)
+
+
+SPREAD = {"arm_L": (0.0, -8.0, 40.0), "forearm_L": (0.0, 4.0, 10.0), "hand_L": (0.0, 0.0, 4.0)}  # wings spread wide and up
+
+
+def pose_stretch(t):
+    """Stretching (getting up): the chest raised, the wings lifted off the ground and spread wide and
+    up, held with a shiver and a yawn, then folded and set down again (2.5 s, once). Standing on its
+    hind legs while they're up."""
+    p = t / 2.5
+    chest = smooth(p, [0, .2, .75, 1], [0, 1, 1, 0])
+    q = plant(body(chest=-4 * chest, pitch=(0, -8 * chest, 2 * chest, 2 * chest), look=-12 * chest))
+    # The wing's way: planted, lifted folded, spread; back the same way.
+    lift = smooth(p, [0, .08, .22, .8, .94, 1], [0, 0, 1, 1, 0, 0])
+    spread = smooth(p, [0, .12, .42, .68, .88, 1], [0, 0, 1, 1, 0, 0])
+    shiver = 2.5 * math.sin(TAU * p * 10) * keys(p, [0, .45, .5, .64, .68, 1], [0, 0, 1, 1, 0, 0])
+    for b in WING_CHAIN:
+        folded = q[f"{b}_L"]
+        up = raised(folded, 35) if b == "arm" else folded
+        e = slerp(folded, up, lift)
+        e = slerp(e, SPREAD[f"{b}_L"], spread)
+        if b == "arm":
+            e = (e[0], e[1], e[2] + shiver)
+        q[f"{b}_L"] = e
+        q[f"{b}_R"] = (e[0], -e[1], -e[2])
+    q.update(fan_spread(spread))
+    # The skin from the last finger to the body let out as the wing opens (drawn in to slivers, folded),
+    # the inner panel turned with the upper arm as in flight.
+    k = spread ** 2
+    sc = fan_closed()["scale"]
+    q["memb_L"] = slerp(fan_closed()["memb_L"], q["arm_L"], spread)
+    q["memb_R"] = (q["memb_L"][0], -q["memb_L"][1], -q["memb_L"][2])
+    q["scale"] = mirror({"scale": {b: tuple(v + (1 - v) * k for v in sc[b]) for b in ("memb_L", "memo_L")}})["scale"]
+    yawn = smooth(p, [0, .35, .45, .62, .72, 1], [0, 0, 1, 1, 0, 0])
+    q["jaw"] = (34 * yawn + 0.01, 0, 0)
+    return sway(q, p, 1, 3.0, lift=4 * chest)
+
+
+HOP = (0.3, 0.62)  # the play's hop: the wrists off the ground only between these fractions of it
+
+
+def pose_play(t):
+    """A young one's play: a bow, the chest dipped low and the head up, then a bounce of the
+    forequarters off the ground and down again, a mock snap, the tail swishing wide (1.6 s, once)."""
+    p = t / 1.6
+    bow = smooth(p, [0, .22, .34, .62, .72, .85, 1], [0, 1, 0, 0, .6, .6, 0])
+    hop = smooth(p, [0, HOP[0], .44, .5, HOP[1], 1], [0, 0, 1, 1, 0, 0])
+    q = body(chest=6 * bow - 9 * hop, pitch=(10 * bow - 6 * hop, 4 * bow, -4 * bow, -6 * bow), look=-10 * bow, tilt=10 * hop)
+    planted = plant(q)
+    if hop > 0:  # in the air the wings keep the stand's fold, lifted with the chest and a little more
+        st = plant(body())
+        for b in WING_CHAIN:
+            e = np.array(planted[f"{b}_L"]) + (np.array(st[f"{b}_L"]) - np.array(planted[f"{b}_L"])) * hop
+            if b == "arm":
+                e = np.array(raised(tuple(e), 6 * hop))
+            planted[f"{b}_L"] = tuple(e)
+            planted[f"{b}_R"] = (e[0], -e[1], -e[2])
+    q = planted
+    q["jaw"] = (24 * smooth(p, [0, .5, .58, .68, 1], [0, 0, 1, 0, 0]) + 0.01, 0, 0)
+    q.update(mirror(tail_curve(droop=6, sway=9, t=p * 1.5)))
+    return q
+
+
+def pose_sleep(t):
+    """Asleep: lying as it rests, the head laid on its left wing's forearm, slow breath (6 s, held).
+    The head's place fitted in `fit_clips`. (No lids: the eyes stay open.)"""
+    q = rest_pose(FIT["rest"])
+    q = head_pose(dict(q, **{f"neck_{k}": (0, 0, 0) for k in range(len(NECK))}), np.array(CF["sleep"]))
+    for k in range(len(NECK)):  # the fitted turns over the rest's neck
+        q[f"neck_{k}"] = (q[f"neck_{k}"][0] + FIT["rest"][4 + k] - neck_s()[f"neck_{k}"][0], q[f"neck_{k}"][1], 0)
+    q["head"] = (CF["sleep_head"], CF["sleep"][9], CF["sleep"][10])
+    q["spine_1"] = (0.8 * math.sin(TAU * t / 6.0), 0, 0)
+    q["jaw"] = (0.01, 0, 0)
+    for k in (6, 7):
+        q[f"tail_{k}"] = (q[f"tail_{k}"][0], q[f"tail_{k}"][1] + 3 * math.sin(TAU * t / 6.0 - k), 0)
+    q["scale"] = mirror({"scale": fan_closed()["scale"]})["scale"]
+    return grounded_pose(q)  # (the rest's keel was 0.36 in the ground)
+
+
+FEET = [f"{n}_{s}" for s in ("L", "R") for n in ("foot", "toe0", "toe1", "toe2", "toeclaw0", "toeclaw1", "toeclaw2", "toetip0", "toetip1",
+                                                 "toetip2", "hindtoe", "hindclaw", "hand", "thumbclaw")]  # what it stands on
+ELEMENTS = []  # the model's elements (`elements()`, for the membranes' outlines), set on first use
+
+
+def low_points(q, names=None):
+    """The lowest point of the named elements (all by default) posed by `q`, its scales included:
+    a box by its corners, a membrane by its cut outline's corners."""
+    from ground import corners, world
+    if not ELEMENTS:
+        ELEMENTS[:] = elements()
+    W = world(SKELETON, {k: v for k, v in q.items() if k != "scale"})
+    piv = {b["name"]: np.array(b["pivot"], float) for b in SKELETON}
+    sc = q.get("scale") or {}
+    low = np.inf
+    for e in ELEMENTS:
+        if names is not None and e["name"] not in names:
+            continue
+        pts = np.array(e["poly"], float) if e.get("poly") else corners(e)
+        o = piv[e["bone"]]
+        if e["bone"] in sc:
+            pts = (pts - o) * np.array(sc[e["bone"]], float) + o
+        R, tt = W[e["bone"]]
+        low = min(low, float(((pts - o) @ R.T + tt)[:, 1].min()))
+    return low
+
+
+def grounded_pose(q, names=None):
+    """`q` with the root's height set so its lowest point (of `names`) is on the ground."""
+    r = q.get("root", (0, 0, 0))
+    return dict(q, root=(r[0], r[1] - low_points(q, names), r[2]))
+
+
+def death_pose(x=None):
+    """Dead, on its right side: the hips rolled over, the legs slack, the neck, head and tail laid
+    along the ground, the wings loose (fitted in `fit_clips`: `x` its numbers, else the fitted: the
+    neck's four turns, the head's, the tail's eight, then each wing's arm, forearm and hand)."""
+    x = CF["death"] if x is None else x
+    q = stand()
+    q["spine_0"] = (0, 0, 80)
+    q.update(mirror({"thigh_L": (-30, 0, 0), "shin_L": (70, 0, 0), "foot_L": (-40, 0, 0), "toes_L": (-10, 0, 0)}))
+    q["thigh_L"] = (-12, 0, 6)  # the upper leg falls a little over the lower
+    q.update(neck_pose((6, 6, 4, 2), tuple(x[0:4])))
+    q["head"] = (head_pitch(q, 10), x[4], 0)
+    q["jaw"] = (14, 0, 0)
+    q.update({f"tail_{k}": (-2.0 if k < 3 else 0.01, x[5 + k], 0) for k in range(len(TAIL))})
+    q.update(fan_spread(0.3))
+    for i, b in enumerate(WING_CHAIN):
+        q[f"{b}_L"] = tuple(x[13 + 3 * i:16 + 3 * i])
+        q[f"{b}_R"] = tuple(x[22 + 3 * i:25 + 3 * i])
+    return q
+
+
+def pose_death(t):
+    """Dying: the legs give, it rolls slowly onto its right side, the neck and tail falling to the
+    ground, the wings sprawling loose; it stays (2.0 s, holds). Each frame on its lowest point."""
+    p = t / 2.0
+    f = smooth(p, [0, .15, .75, 1], [0, 0.08, 1, 1])
+    fw = smooth(p, [0, .05, .4, 1], [0, 0, 1, 1])  # the wing it falls on drawn in first, out from under it
+    a, b = plant(body()), death_pose()
+    q = dict(a)
+    for k in set(a) | set(b):
+        if k in ("scale", "root"):
+            continue
+        va, vb = np.array(a.get(k, (0, 0, 0)), float), np.array(b.get(k, (0, 0, 0)), float)
+        q[k] = tuple(va + (vb - va) * (fw if k.endswith("_R") and k.startswith(WING_CHAIN) else f))
+    q["root"] = a["root"]
+    return grounded_pose(q)
+
+
+def boxes_posed(spec, pose, names):
+    """Each named box element posed: (centres, axes, half sizes), for `overlaps`."""
+    from ground import rot, world
+    W = world(spec["bones"], {k: v for k, v in pose.items() if k != "scale"})
+    piv = {b["name"]: np.array(b["pivot"], float) for b in spec["bones"]}
+    els = {e["name"]: e for e in spec["elements"]}
+    C, A, H = [], [], []
+    for n in names:
+        e = els[n]
+        R, t = W[e["bone"]]
+        E = rot(*e["rot"]) if e.get("rot") else np.eye(3)
+        o = np.array(e["origin"], float) if e.get("rot") else piv[e["bone"]]
+        lo, hi = np.array(e["lo"], float), np.array(e["hi"], float)
+        C.append(R @ (E @ ((lo + hi) / 2 - o) + o - piv[e["bone"]]) + t)
+        A.append(R @ E)
+        H.append((hi - lo) / 2)
+    return np.array(C), np.array(A), np.array(H)
+
+
+def overlaps(spec, pose, names_a, names_b):
+    """{(a, b): how deep box a and box b go into each other} for the pairs that do (the separating
+    axis test on the posed boxes: the least overlap over their 15 axes)."""
+    ca, Aa, ha = boxes_posed(spec, pose, names_a)
+    cb, Ab, hb = boxes_posed(spec, pose, names_b)
+    out = {}
+    for i, a in enumerate(names_a):
+        for j, b in enumerate(names_b):
+            if a == b or np.linalg.norm(ca[i] - cb[j]) > np.linalg.norm(ha[i]) + np.linalg.norm(hb[j]):
+                continue
+            axes = [Aa[i][:, k] for k in range(3)] + [Ab[j][:, k] for k in range(3)]
+            axes += [v / np.linalg.norm(v) for v in (np.cross(Aa[i][:, k], Ab[j][:, m]) for k in range(3) for m in range(3))
+                     if np.linalg.norm(v) > 1e-6]
+            d, best = cb[j] - ca[i], np.inf
+            for L in axes:
+                o = np.sum(ha[i] * np.abs(Aa[i].T @ L)) + np.sum(hb[j] * np.abs(Ab[j].T @ L)) - abs(d @ L)
+                best = min(best, o)
+                if best <= 0:
+                    break
+            if best > 0:
+                out[(a, b)] = float(best)
+    return out
+
+
+def wing_parts(spec, side):
+    """A wing's solid parts (no membranes), and the upper arm apart."""
+    return [e["name"] for e in spec["elements"] if e["name"].endswith("_" + side) and not e.get("quad")
+            and e["name"].startswith(("forearm", "hand", "thumb", "finger"))]
+
+
+def body_parts(spec):
+    """Every solid part not on a wing."""
+    return [e["name"] for e in spec["elements"] if not e.get("quad") and not (e["name"].endswith(("_L", "_R"))
+            and e["name"].startswith(("arm", "forearm", "hand", "thumb", "finger")))]
+
+
+HEAD_PARTS = ("skull", "snout", "nose", "jaw", "brow_", "horn_", "cheek_")
+SHOULDER_PARTS = ("chest", "ribs", "shoulders", "pec_", "delt_", "keel")  # where the upper arms grow from
+
+
+def fit_clips(spec, only=None):
+    """The behaviour clips' reaches, fitted once (minutes) and kept in `fit.json` ("clips"; rerun with
+    `--refit-clips`): the snout down to the ground (drinking, sniffing, nuzzling), the snout along the
+    left forearm (grooming), the cheek at the left thumb's claw (scratching), the head laid on the left
+    forearm (asleep), and how it lies dead (the neck, tail and wings on the ground, none in it or in
+    the body)."""
+    from scipy.optimize import minimize
+    from ground import lowest
+    solid = lambda n: not n.startswith("mem")  # noqa: E731
+    groups = {"mouth": lambda n: n in MOUTH_PARTS, "solid": solid}
+
+    if only is None or "low" in only:
+        def low_cost(P):
+            CF["low"] = P
+            lo = lowest(spec, {k: v for k, v in head_down(1.0).items() if k != "scale"}, groups)
+            n = np.asarray(P[1:5])
+            return (100 * (lo["mouth"] - 0.5) ** 2 + 100 * min(0.0, lo["solid"]) ** 2 + 0.002 * float(np.sum(n ** 2))
+                    + 0.01 * float(np.sum(np.diff(n) ** 2)) + 0.5 * max(0.0, P[0] - 6) ** 2 + 0.5 * max(0.0, -P[0]) ** 2
+                    + 0.5 * max(0.0, P[5] - 50) ** 2)
+        r = minimize(low_cost, [4, 30, 20, 10, 0, 60], method="Powell", options={"maxiter": 20000, "xtol": 1e-3, "ftol": 1e-8})
+        CF["low"] = [round(float(v), 3) for v in r.x]
+        lo = lowest(spec, {k: v for k, v in head_down(1.0).items() if k != "scale"}, groups)
+        print("head down:", CF["low"], {k: round(float(v), 2) for k, v in lo.items()})
+
+    head = [e["name"] for e in spec["elements"] if e["name"].startswith(HEAD_PARTS)]
+    necks = [f"neck_{k}" for k in range(len(NECK))]
+    wing = wing_parts(spec, "L")
+    hz = neck_points()[-1][2]
+
+    def reach(st, point, target, x0, avoid, label, extra=None, bone="head"):
+        """The neck's and head's turns (`head_pose`) that bring `point` (on the head, at rest) to
+        `target`, the head and neck in none of `avoid`, the arms not in the neck."""
+        def cost(x):
+            q = head_pose(st, x)
+            e = float(np.sum((point_on(q, bone, point) - target) ** 2))
+            e += 20 * sum(v ** 2 for v in overlaps(spec, q, head + necks, avoid).values())
+            e += 20 * sum(v ** 2 for v in overlaps(spec, q, ["arm_L", "arm_R"], necks).values())
+            e += 50 * min(0.0, lowest(spec, {k: v for k, v in q.items() if k != "scale"},
+                                      {"s": lambda n: n.startswith(HEAD_PARTS + ("neck_",))})["s"] - 1) ** 2  # nothing in the ground
+            e += extra(q) if extra else 0.0
+            # Each joint within its range (a neck bends, it doesn't zigzag).
+            e += 0.5 * sum(max(0.0, abs(v) - 40) ** 2 for v in x[:8]) + 0.5 * sum(max(0.0, abs(v) - 45) ** 2 for v in x[8:])
+            return e + 0.002 * float(np.sum(np.square(x))) + 0.05 * x[4] ** 2
+        r = minimize(cost, x0, method="Powell", options={"maxiter": 6000, "xtol": 1e-2, "ftol": 1e-6})
+        q = head_pose(st, r.x)
+        print(label, "off by", round(float(np.linalg.norm(point_on(q, "head", point) - target)), 1), "in what it avoids by",
+              round(max(overlaps(spec, q, head + necks, avoid).values(), default=0.0), 2))
+        return [round(float(v), 2) for v in r.x]
+
+    if only is None or "groom" in only:
+        # Grooming: the nose's tip at the left forearm's inner side, near the elbow, then near the wrist.
+        st = plant(body())
+        nose = np.array([0.0, 271.0, hz + 112])
+        neck0 = point_on(st, "neck_0", neck_points()[0])
+        CF["groom"] = []
+        for f in (0.3, 0.52, 0.75):
+            on = point_on(st, "forearm_L", (146 + f * (424 - 146), 270, 140))
+            inward = (neck0 - on) * np.array([1, 0, 1])
+            target = on + inward / np.linalg.norm(inward) * 26
+            x0 = CF["groom"][-1] if CF["groom"] else [20, 10, 10, 10, 0, 25, 25, 25, 10, 10, 0]
+            CF["groom"].append(reach(st, nose, target, x0, wing, f"grooming at {f} of the forearm:"))
+
+    if only is None or "scratch" in only:
+        # Scratching: the left cheek (the jaw's side, behind the teeth) at the thumb's claw, the wrist lifted
+        # in toward it, the chest dipped and turned to it.
+        cheek = np.array([20.0, 232.0, hz + 30])
+        lifted = plant(body(chest=SCRATCH_LEAN, turn=SCRATCH_TURN), move=SCRATCH_WRIST)
+        claw = point_on(lifted, "thumb_L", THUMB_TIP)
+        CF["scratch"] = reach(lifted, cheek, claw + np.array([3.0, 0.0, 0.0]), [30, 20, 10, 0, 0, 20, 25, 25, 20, 10, -20],
+                              [n for n in wing if n != "thumbclaw_L"], "scratching, the cheek at the claw:")
+
+    if only is None or "sleep" in only:
+        # Asleep: the jaw's underside laid on the left forearm near the wrist, in the resting pose.
+        rest = rest_pose(FIT["rest"])
+        base = dict(rest, **{f"neck_{k}": (0, 0, 0) for k in range(len(NECK))})
+        on = point_on(rest, "forearm_L", (146 + 0.7 * (424 - 146), 284, 140))
+        chin = np.array([0.0, 222.0, hz + 60])
+        solid_low = lambda q: 50 * min(0.0, lowest(spec, {k: v for k, v in q.items() if k != "scale"},  # noqa: E731
+                                                    {"s": lambda n: n.startswith(HEAD_PARTS + ("neck_",))})["s"]) ** 2
+        CF["sleep"] = reach(base, chin, on + np.array([0, 2.0, 0]), [30, 10, 10, 10, 0, 15, 15, 15, 10, 10, 0], wing,
+                            "asleep, the chin on the forearm:", extra=solid_low)
+        q = head_pose(base, CF["sleep"])
+        CF["sleep_head"] = round(float(q["head"][0]), 2)
+
+    if only is None or "death" in only:
+        # Dead: the neck and head and the tail laid along the ground (each segment just on it), each wing
+        # lying loose, low, none of it in the ground, the body or the other wing.
+        others = body_parts(spec)
+        wl, wr = ["arm_L"] + wing_parts(spec, "L"), ["arm_R"] + wing_parts(spec, "R")
+        rest_others = [n for n in others]
+        fold = [v for b in WING_CHAIN for v in FIT["wing"][f"{b}_L"]]
+        x = np.array(CF["death"] if "death" in CF else [-6.0] * 4 + [-10.0] + [-1.0] * len(TAIL) + fold
+                     + [v * s for b in WING_CHAIN for v, s in zip(FIT["wing"][f"{b}_L"], (1, -1, -1))], float)
+        lying = [[f"neck_{k}"] for k in range(len(NECK))] + [head] + [[f"tail_{k}"] for k in range(len(TAIL))]
+
+        def axis_cost(v):
+            xx = x.copy()
+            xx[0:13] = v
+            q = grounded_pose(death_pose(xx), rest_others)
+            lows = [low_points(q, set(g)) for g in lying]
+            return sum(50 * min(0.0, lo) ** 2 + (lo - 1) ** 2 for lo in lows) + 0.01 * float(np.sum(np.square(v)))
+        r = minimize(axis_cost, x[0:13], method="Powell", options={"maxiter": 20000, "xtol": 1e-2, "ftol": 1e-8})
+        x[0:13] = r.x
+
+        def wing_cost(idx, parts, other):
+            side = parts[0][-2:]
+            mem = {e["name"] for e in spec["elements"] if e.get("quad") and e["name"].endswith(side)}
+
+            def cost(v):
+                xx = x.copy()
+                xx[idx] = v
+                q = grounded_pose(death_pose(xx), rest_others)
+                lows = [low_points(q, {n}) for n in parts]
+                e = 50 * min(0.0, min(lows + [low_points(q, mem)])) ** 2 + 0.002 * sum(max(0.0, lo) for lo in lows)
+                e += 20 * sum(d ** 2 for d in overlaps(spec, q, parts[1:], others + other).values())
+                e += 20 * sum(d ** 2 for d in overlaps(spec, q, parts[:1], [n for n in others if not n.startswith(SHOULDER_PARTS)] + other).values())
+                return e + 0.0005 * float(np.sum((np.asarray(v) - x[idx]) ** 2))
+            return cost
+        for idx, parts, other in ((slice(22, 31), wr, wl), (slice(13, 22), wl, wr)):
+            r = minimize(wing_cost(idx, parts, other), x[idx], method="Powell", options={"maxiter": 8000, "xtol": 1e-2, "ftol": 1e-7})
+            v = r.x
+            # Written the way nearest the folded wing's angles (the fall turns them there from the fold).
+            ref = x[idx]
+            x[idx] = [a for i in range(3) for a in near(euler(quat(*v[3 * i:3 * i + 3])), tuple(ref[3 * i:3 * i + 3]))]
+        CF["death"] = [round(float(v), 2) for v in x]
+        q = grounded_pose(death_pose(), rest_others)
+        print("dead: lowest", round(low_points(q), 2), "wings in the body by",
+              round(max(overlaps(spec, q, wl[1:] + wr[1:], others).values(), default=0.0), 2), CF["death"])
+
+
 ANIMS = {"idle": (pose_idle, 4.0), "walk": (pose_gait("walk"), GAITS["walk"]["length"]),
          "run": (pose_gait("run"), GAITS["run"]["length"]), "breathe": (pose_breathe, 3.0), "rest": (pose_rest, 5.0),
          "bite": (pose_bite, 0.9), "claw": (pose_claw, 1.0), "tail": (pose_tail, 1.0),
          "fly": (pose_fly, 1.0), "glide": (pose_glide, 3.0)}
+OWN = tuple(ANIMS)  # its own clips, made as they were (no loop or blend of their own)
+CLIPS = {"stare": (pose_stare, 2.4), "watch": (pose_watch, 4.8), "drink": (pose_drink, 2.4), "sleep": (pose_sleep, 6.0),
+         "approach": (lambda t: grounded_pose(pose_gait("approach")(t), FEET), GAITS["approach"]["length"]),
+         "alarm": (pose_alarm, 1.4), "sniff": (pose_sniff, 2.4), "look": (pose_look, 2.8), "scratch": (pose_scratch, 2.0),
+         "stretch": (pose_stretch, 2.5), "play": (pose_play, 1.6), "groom": (pose_groom, 2.6), "nuzzle": (pose_nuzzle, 2.0),
+         "flinch": (pose_flinch, 0.45), "death": (pose_death, 2.0)}
+ANIMS.update(CLIPS)
+# The held ones and the gait loop; a clip played once must not (the engine loops a clip whose file
+# says so, whatever the game asks); the death holds its last frame.
+LOOPS = {"stare": True, "watch": True, "drink": True, "sleep": True, "approach": True, "death": "hold_on_last_frame"}
+BLENDS = {"flinch": (0.05, 0.2), "death": (0.1, 0.0), "approach": (0.3, 0.3), "sleep": (0.8, 0.8), "watch": (0.4, 0.4),
+          "stretch": (0.3, 0.4)}
+FRAMES = {"flinch": 12, "stare": 24, "watch": 48, "look": 36, "alarm": 36, "drink": 40, "sniff": 36, "scratch": 50, "groom": 52,
+          "nuzzle": 32, "sleep": 36, "approach": 32, "stretch": 50, "play": 40, "death": 40}
 
 
 def frame_times(name, dur):
-    n = 24 if name in ("fly",) else 32
+    if name in OWN:
+        n = 24 if name in ("fly",) else 32
+    else:
+        n = FRAMES.get(name, 32)
     return [round(dur * k / n, 4) for k in range(n + 1)]
 
 
@@ -1156,12 +1897,29 @@ def animations(bone_names):
     out = {}
     for name, (fn, dur) in ANIMS.items():
         frames = []
+        loops = LOOPS.get(name, False)
         for t in frame_times(name, dur):
-            pose = fn(t % dur if t < dur else 0.0)
+            if name in OWN:
+                tt = t % dur if t < dur else 0.0
+            else:  # a loop's last frame is its first; a clip played once ends where it ends
+                tt = t % dur if t < dur else (0.0 if loops is True else dur)
+            pose = fn(tt)
             frames.append({"t": t, "rot": {b: [round(float(v), 4) for v in pose.get(b, (0, 0, 0))] for b in bone_names if b != "root"},
                            "root": [round(float(v), 4) for v in pose.get("root", (0, 0, 0))],
                            **({"scale": {b: [float(v) for v in sc] for b, sc in pose["scale"].items()}} if "scale" in pose else {})})
         out[name] = {"length": dur, "frames": frames}
+        if name not in OWN:
+            out[name].update(loop=loops, blend=BLENDS.get(name, (0.25, 0.3)))
+    # A clip goes over what plays below only on the bones it writes, and the exporter leaves out a bone
+    # that stays at 0: kept at a hundredth of a degree, so the idle's (or resting's) moves don't show
+    # through a clip that holds them still.
+    for name in CLIPS:
+        below = ("idle", "rest") if name == "sleep" else ("idle",)
+        moved = {b for a in below for f in out[a]["frames"] for b, r in f["rot"].items() if any(abs(v) > 1e-6 for v in r)}
+        for b in moved:
+            if all(not any(abs(v) > 1e-6 for v in f["rot"][b]) for f in out[name]["frames"]):
+                for f in out[name]["frames"]:
+                    f["rot"][b] = [0.01, 0.0, 0.0]
     return out
 
 
@@ -1334,6 +2092,15 @@ def build():
     global HAND_LOW
     hand = next(e for e in spec["elements"] if e["name"] == "hand_L")
     HAND_LOW = [(x, y, z) for x in (hand["lo"][0], hand["hi"][0]) for y in (hand["lo"][1], hand["hi"][1]) for z in (hand["lo"][2], hand["hi"][2])]
+    if "wing_lift" not in FIT or "--refit" in sys.argv:
+        ground_fold()
+    if "clips" in FIT and "--refit-clips" not in sys.argv:
+        CF.update(FIT["clips"])
+    else:
+        fit_clips(spec)
+        FIT["clips"] = dict(CF)
+        with open(FIT_FILE, "w") as f:
+            json.dump(FIT, f, indent=1)
     spec["animations"] = animations([b["name"] for b in spec["bones"]])
     spec["fitted"] = dict(FIT)
     return spec, sheet
