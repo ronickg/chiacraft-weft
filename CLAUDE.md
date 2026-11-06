@@ -59,6 +59,7 @@ in our crates and mods.
 `run/saves/<name>`, and a reused name keeps its inventory: use a fresh name per check.
 Two traps that broke several scripts: `hold` waits until it releases unless given `nowait` (with `nowait`, follow it with a `wait` of its length),
 and in `look <yaw> <pitch>` a positive pitch looks up (look down to aim at the ground).
+A third, for noise and dither in shots: under `/tick freeze` the shader clock (`params.w`) stops, so an effect jittered by it shows a standing pattern in a frozen shot that TAA cannot average; `scene.frame.w` (the frame count) keeps moving. Check which clock your jitter uses, and judge noise or grain also in a shot with ticks running.
 Never launch the game yourself: the testers ("Tester", "Tester 2") run every script
 (`.claude/skills/session-crew/SKILL.md`).
 
