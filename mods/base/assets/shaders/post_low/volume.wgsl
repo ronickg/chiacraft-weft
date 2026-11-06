@@ -104,11 +104,16 @@ fn vol_glow(p: PostPixel) -> vec3<f32> {
     // meet in every pixel and no grain is left; a random hash per texel left a fine speckle wherever
     // the air was thick (Trees' forest at Max, rtx-showcase's nave), and this pass runs after the
     // temporal AA, so moving it each frame would only have made it flicker.
+    // Strength under 0.75 (the Video screen's Low): as strong, in half the steps, and a 2 x 2
+    // pattern, as its full-size part averages 2 x 2 blocks.
+    let cheap = p.strength < 0.75;
     let px = vec2<u32>(p.uv * p.size * 0.5);
     let bayer = array<u32, 16>(0u, 8u, 2u, 10u, 12u, 4u, 14u, 6u, 3u, 11u, 1u, 9u, 15u, 7u, 13u, 5u);
-    let jitter = (f32(bayer[(px.y & 3u) * 4u + (px.x & 3u)]) + 0.5) / 16.0;
-    // Strength under 0.75 (the Video screen's Low): as strong, in half the steps.
-    let cheap = p.strength < 0.75;
+    let bayer2 = array<u32, 4>(0u, 2u, 3u, 1u);
+    var jitter = (f32(bayer[(px.y & 3u) * 4u + (px.x & 3u)]) + 0.5) / 16.0;
+    if cheap {
+        jitter = (f32(bayer2[(px.y & 1u) * 2u + (px.x & 1u)]) + 0.5) / 4.0;
+    }
     let steps = select(VOL_STEPS, VOL_STEPS / 2, cheap) + select(0, 8, leafy > 0.25);
     let rain = clamp(scene.fog_color.w, 0.0, 1.0);
     var lit = 0.0;
