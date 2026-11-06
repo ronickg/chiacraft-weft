@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Wind life's pollen mote, drawn as a pixel map (the leaves and petals are Art's, generated with
+"""Wind life's pollen mote and sand grain, drawn as a pixel map (the leaves and petals are Art's, generated with
 the game-art skill on 11-06: ~/Coding/chiacraft-archive/images/wind-life/2026-11-06/art/; these
-maps were their first placeholders). Writes mods/base/assets/textures/particle/pollen.png."""
+maps were their first placeholders). Writes mods/base/assets/textures/particle/pollen.png and
+sand_grain.png (a rounded, shaded grain: the sand block's dust drew hard squares, pt4_dust)."""
 import os
 from PIL import Image
 
@@ -66,6 +67,13 @@ POLLEN = [
     "....",
 ]
 
+SAND_GRAIN = [
+    ".+#.",
+    "+##-",
+    "##--",
+    ".--.",
+]
+
 
 def draw(rows, name):
     h, w = len(rows), len(rows[0])
@@ -81,6 +89,7 @@ def draw(rows, name):
 def main():
     os.makedirs(OUT, exist_ok=True)
     draw(POLLEN, "pollen")
+    draw(SAND_GRAIN, "sand_grain")
 
 
 if __name__ == "__main__":

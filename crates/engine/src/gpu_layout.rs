@@ -755,9 +755,9 @@ gpu_struct! {
         /// curve to that pass); 0 into the screen or a preview. y 1 when the last frame drew the
         /// HDR world's bloom pyramid (`post::bloom`), which the last pass adds, so a pack's own
         /// bloom effect leaves its glow out. z the pixels a mist volume cell covers each way
-        /// (`client::froxels`: 8, or 4 at ultra), for a pack that spends more on finer cells. w how a world
-        /// drawn smaller than the screen is scaled up (`core:upscaler`: 0 bilinear, 1 FSR 1's EASU, 2
-        /// Snapdragon GSR 1, `world_upscaled` in common.wgsl).
+        /// (`client::froxels`: 8, or 4 at ultra), for a pack that spends more on finer cells. w,
+        /// chiacraft: the frame's number, 0 to 63 and round again, for dithers that change each
+        /// frame (a temporal blend's history averages them out; without one they shimmer finely).
         pub frame: [f32; 4],
         /// The soft clouds' shadow on the land (`client::cloud_shadow`, with the HDR world; a pack
         /// whose sky has `fs_cloud_shadow`): x the map's bindless index + 1 (0: none this frame), y
@@ -768,6 +768,9 @@ gpu_struct! {
         /// from the eye (0: none this frame), y the index of each cell's own, zw the cells across
         /// the view; 32 slices deep, eight to a row of the image.
         pub froxels: [f32; 4],
+        /// How a world drawn smaller than the screen is scaled up: x `core:upscaler` (0 bilinear, 1
+        /// FSR 1's EASU, 2 Snapdragon GSR 1; `world_upscaled` in common.wgsl), yzw unused.
+        pub upscale: [f32; 4],
     }
 }
 

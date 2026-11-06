@@ -1676,6 +1676,9 @@ fn lottes(x: vec3<f32>) -> vec3<f32> {
     return xa / (pow(max(x, vec3(1e-6)), vec3(ad)) * b + vec3(c));
 }
 
+// The light under Hejl's toe kept at this share of itself (`finish_picture`).
+const HEJL_TOE: f32 = 0.25;
+
 fn hejl(c: vec3<f32>, white: f32) -> vec3<f32> {
     let v = vec4(c, white);
     let a = 1.425 * v + vec4(0.05);
@@ -1762,7 +1765,13 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     if curve > 1.5 {
         day_t = agx(max(c, vec3(0.0)) * 0.55 * exposure() * look_opt(OPT_EXPOSURE, 1.0));
     } else if curve > 0.5 {
-        day_t = hejl(max(c, vec3(0.0)) * exposure() * look_opt(OPT_EXPOSURE, 1.0), 3.5);
+        // A floor under Hejl's toe, which takes everything under about 1% to black: there the
+        // light at `HEJL_TOE` of itself, so deep shade keeps its colour (Bliss's near shade is a
+        // dark blue, sRGB 19 39 65; ours went to 0 0 0 on Tester 2's calm noon, more fill light
+        // didn't lift it, sh1b; at 0.15 the grass spot's darkest tenth was 17, at 0.25 24, today's
+        // LDR 30, the land's middle and brights the same). Above about 0.1 the curve is Hejl's own.
+        let x = max(c, vec3(0.0)) * exposure() * look_opt(OPT_EXPOSURE, 1.0);
+        day_t = max(hejl(x, 3.5), x * HEJL_TOE);
     }
     var t = mix(night_t, day_t, day);
     // The HDR world's white balance by day (`base:look_white`): warmer, less blue (our land read

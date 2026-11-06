@@ -159,7 +159,7 @@ struct ParticleFrag {
     time: f32,
 }
 
-// ---- upscaling (`core:upscaler`, `scene.frame.w`) ----
+// ---- upscaling (`core:upscaler`, `scene.upscale.x`) ----
 
 // AMD FidelityFX Super Resolution 1's edge-adaptive upscale (EASU), its 32-bit path ported from
 // `ffx_fsr1.h` (GPUOpen-Effects/FidelityFX-FSR, MIT licence: Copyright (c) 2021 Advanced Micro

@@ -18,7 +18,7 @@ pub struct Settings {
 /// thirds on a high-density screen (`density`, physical pixels per point, 2 on Retina), where
 /// shading every pixel cost several times what it bought, and all of them elsewhere.
 /// How a world drawn smaller than the window is scaled up (`core:upscaler`): 0 bilinear, 1 FSR 1's
-/// EASU, 2 Snapdragon GSR 1. For the shaders as `scene.frame.w`.
+/// EASU, 2 Snapdragon GSR 1. For the shaders as `scene.upscale.x`.
 pub fn upscaler() -> u32 {
     number("core:upscaler") as u32
 }

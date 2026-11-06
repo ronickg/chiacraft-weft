@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Wind life's colours, from our own block textures: each leaf texture's mean colour (what a leaf
 off it is, before the biome's tint), each blossom's and each flower's petal colour (its texture's
-pixels that aren't stem or leaf green). Writes mods/base/src/wind_life_colours.rs.
+pixels that aren't stem or leaf green), and blown sand's shades (the sand texture's pixels at four
+brightnesses: grains vary as the ground does). Writes mods/base/src/wind_life_colours.rs.
 
 Run from the repository root: python3 tools/wind_life/colours.py
 """
@@ -79,6 +80,11 @@ def main():
     out += [f'    ("{m}:{n}_leaves", {hexed(c)}),' for (m, n), c in sorted(blossoms.items())]
     out += ["];", "", "/// Flowers (blocks with a bloom look) and their petals' colour.", f"pub const FLOWERS: [(&str, u32); {len(flowers)}] = ["]
     out += [f'    ("{n}", {hexed(c)}),' for n, c in sorted(flowers.items())]
+    out += ["];", ""]
+    sand = sorted(pixels(f"{ROOT}/mods/base/assets/textures/block/sand.png"), key=lambda p: p[0] + p[1] + p[2])
+    shades = [mean(sand[int(len(sand) * a): int(len(sand) * b)]) for a, b in ((0.0, 0.25), (0.25, 0.5), (0.5, 0.75), (0.75, 1.0))]
+    out += ["/// Blown sand's shades, darkest first: the sand texture's pixels in four bands of brightness.", "pub const SAND: [u32; 4] = ["]
+    out += [f"    {hexed(c)}," for c in shades]
     out += ["];", ""]
     with open(f"{ROOT}/mods/base/src/wind_life_colours.rs", "w") as f:
         f.write("\n".join(out))

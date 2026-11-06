@@ -24,17 +24,26 @@ pub const BRANCH_THIN: f32 = 0.4;
 /// and fronds hide a conifer's or a palm's wood, which keep their logs. Felling counts a branch
 /// block a quarter of a log (`tree_recipes::felling_wood`).
 pub const BRANCH_WOODS: &[&str] = &["oak", "birch", "acacia", "mesquite", "dogwood", "cherry", "ipe", "andiroba", "matamata", "brazil_nut"];
-/// The world's tree style (`base:tree_style`, a world setting, `/rule base:tree_style 0|1`): 0
-/// simple, Minecraft-style trees, a straight log trunk under a crown of leaves shaped by its log's
-/// tag (`Crown`), no branch blocks; 1 branched, grown from the species' recipes (`tree_recipes`,
-/// `colonize`) with branch blocks. Ronald, 11-05: "lets also maybe switch back to having trees
-/// without our branch system just for now too to help with testing with bliss/distant horizons
-/// and for android speed testing too". Simple for now; the recipes stay behind the setting.
+/// The world's tree style (`base:tree_style`, a world setting, `--config base:tree_style=...`):
+/// 0 simple, a straight log trunk under a crown of leaves shaped by its log's tag (`Crown`) and
+/// sized by its stand's layer (`vitals::canopy`), no branch blocks; 1 branched, grown from the
+/// species' recipes (`tree_recipes`, `colonize`) with branch blocks; 2 minecraft, Minecraft's own
+/// oaks, fancy oaks, birches and spruces block for block (`mc_standing`), for like-for-like looks
+/// against Bliss and Distant Horizons (Planner, 11-06: in the test world our tall clear-trunk
+/// trees showed trunks between the crowns where Bliss's forest is a blanket of small oak crowns).
+/// Ronald, 11-05: "lets also maybe switch back to having trees without our branch system just for
+/// now too to help with testing with bliss/distant horizons and for android speed testing too".
+/// Simple for now; the recipes stay behind the setting.
 pub static TREE_STYLE: Config<u32> = Config::named("tree_style");
 
-/// Whether trees grow simple, Minecraft-style (`TREE_STYLE` 0).
+/// Whether trees grow without branch blocks (`TREE_STYLE` simple or minecraft).
 pub fn simple_trees() -> bool {
-    TREE_STYLE.get() == 0
+    TREE_STYLE.get() != 1
+}
+
+/// Whether trees grow as Minecraft's own (`TREE_STYLE` minecraft).
+pub fn minecraft_trees() -> bool {
+    TREE_STYLE.get() == 2
 }
 
 /// Logs with this tag grow into cones (spruces), the others round (oaks, birches).
@@ -105,6 +114,8 @@ pub struct TreeAt {
     lean: (i32, i32),
     /// Its seed, for a tree grown from branches (`branchy`).
     seed: u64,
+    /// Grown as Minecraft's own tree (`minecraft`).
+    mc: bool,
 }
 
 impl TreeAt {
@@ -112,7 +123,35 @@ impl TreeAt {
     /// its height and crown by the tier. A sapling's and a lone tree's are canopy trees.
     pub fn with_tier(mut self, tier: Tier) -> Self {
         self.tier = tier;
-        self.height = height_of(self.crown, self.form, tier, self.seed);
+        if !self.mc {
+            self.height = height_of(self.crown, self.form, tier, self.seed);
+        }
+        self
+    }
+
+    /// The same tree as Minecraft grows it (`TREE_STYLE` minecraft, `mc_standing`): its height
+    /// Minecraft's for its kind, one stand layer; only an oak grows big (a fancy oak), and none
+    /// crooked, twinned, a stump or a snag. Palms and flat crowns stay as they are.
+    pub fn minecraft(mut self) -> Self {
+        if kind_of(self.crown).is_none() {
+            return self;
+        }
+        self.mc = true;
+        self.form = match self.form {
+            Form::Big if self.crown == Crown::Round => Form::Big,
+            Form::Fallen => Form::Fallen,
+            _ => Form::Standing,
+        };
+        let h = self.seed;
+        self.height = match (self.crown, self.form) {
+            // A fancy oak's trunk (`FancyTrunkPlacer`, 3 + 0..11: kept within the scatter's reach).
+            (Crown::Round, Form::Big) => 6 + (h % 6) as i32,
+            // Oak 4-6 logs, birch 5-7 (`StraightTrunkPlacer`), the leaves' top one over them.
+            (Crown::Round, _) => 4 + (h % 3) as i32,
+            (Crown::Slim, _) => 5 + (h % 3) as i32,
+            // Spruce 5-8 logs.
+            _ => 5 + (h % 3) as i32 + (h >> 4 & 1) as i32,
+        };
         self
     }
 
@@ -158,7 +197,8 @@ fn shaped(log: u32, x: i32, y: i32, z: i32, h: u64, wild: bool) -> Option<TreeAt
     } else {
         Crown::Round
     };
-    Some(simple_at(crown, log, leaves, x, y, z, h, wild))
+    let t = simple_at(crown, log, leaves, x, y, z, h, wild);
+    Some(if minecraft_trees() { t.minecraft() } else { t })
 }
 
 /// A tree of crown `crown` growing from `log` under `leaves` (no lookups: the canopy sheet's
@@ -178,7 +218,7 @@ pub fn simple_at(crown: Crown, log: u32, leaves: u32, x: i32, y: i32, z: i32, h:
     };
     let height = height_of(crown, form, Tier::Canopy, h);
     let lean = LEANS[(h >> 20) as usize % 4];
-    TreeAt { x, y, z, log, leaves, crown, form, height, tier: Tier::Canopy, lean, seed: h }
+    TreeAt { x, y, z, log, leaves, crown, form, height, tier: Tier::Canopy, lean, seed: h, mc: false }
 }
 
 /// The stand-structure kind of a crown (`vitals::canopy`): palms and flat crowns stand alone.
@@ -316,6 +356,10 @@ pub fn tree_blocks(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
 /// A standing tree's trunk and crown by its crown shape (simple trees, and every species without
 /// a recipe): no lookups, so the canopy sheet (`forest_canopy`) grows the same trees off the game.
 pub fn simple_standing(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
+    if t.mc {
+        mc_standing(t, &mut put);
+        return;
+    }
     let log = t.log;
     let top = t.y + t.height;
     // A crooked trunk steps aside once, two or three blocks under its top, and its crown with it.
@@ -334,6 +378,83 @@ pub fn simple_standing(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)
         for y in t.y..second {
             put(sx, y, sz, log, true);
         }
+    }
+}
+
+/// Minecraft's own oak, fancy oak, birch or spruce (`TREE_STYLE` minecraft), as its feature
+/// places it: a straight trunk under a blob of leaves 5 across (`BlobFoliagePlacer`: two layers
+/// of 5 x 5 and two of 3 x 3, the lower corners there on half the trees' layers, the top's never);
+/// a spruce's rows stepping out and back in (`SpruceFoliagePlacer`) from near its foot; a fancy
+/// oak's round clusters (`FancyFoliagePlacer`) at its top and on a limb or two.
+fn mc_standing(t: &TreeAt, put: &mut impl FnMut(i32, i32, i32, u32, bool)) {
+    let (s, leaves) = (t.seed, t.leaves);
+    let top = t.y + t.height;
+    match t.crown {
+        Crown::Cone => {
+            let radius = 2 + (s >> 8 & 1) as i32;
+            let offset = ((s >> 10) % 3) as i32;
+            let low = (t.height - 1 - (s >> 12 & 1) as i32).max(4);
+            let (mut r, mut most, mut back) = ((s >> 14 & 1) as i32, 1, 0);
+            for dy in (-low..=offset).rev() {
+                for dz in -r..=r {
+                    for dx in -r..=r {
+                        if r > 0 && dx.abs() == r && dz.abs() == r {
+                            continue;
+                        }
+                        put(t.x + dx, top + dy, t.z + dz, leaves, false);
+                    }
+                }
+                if r >= most {
+                    r = back;
+                    back = 1;
+                    most = (most + 1).min(radius);
+                } else {
+                    r += 1;
+                }
+            }
+        }
+        Crown::Round if t.form == Form::Big => {
+            // A cluster at the top, and one or two on limbs lower down, out two or three blocks.
+            let mut clusters = vec![(t.x, top - 3, t.z)];
+            for i in 0..1 + (s >> 16 & 1) as i64 {
+                let (dx, dz) = LEANS[((s >> (18 + i * 2)) & 3) as usize];
+                let out = 2 + (s >> (22 + i) & 1) as i32;
+                let (cx, cy, cz) = (t.x + dx * out, t.y + t.height / 2 + i as i32 * 2, t.z + dz * out);
+                clusters.push((cx, cy, cz));
+                for k in 1..=out {
+                    put(t.x + dx * k, cy + 1, t.z + dz * k, t.log, true);
+                }
+            }
+            for (cx, cy, cz) in clusters {
+                for k in 0..5 {
+                    let r: i32 = if k == 0 || k == 4 { 2 } else { 3 };
+                    for dz in -r..=r {
+                        for dx in -r..=r {
+                            if ((dx * dx + dz * dz) as f32) <= (r as f32 + 0.5).powi(2) {
+                                put(cx + dx, cy + k, cz + dz, leaves, false);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        _ => {
+            for dy in -3i32..=0 {
+                let r = 1 - dy / 2;
+                for dz in -r..=r {
+                    for dx in -r..=r {
+                        let corner = dx.abs() == r && dz.abs() == r;
+                        if corner && (dy == 0 || hash(s, dx as i64, dy as i64, dz as i64) & 1 == 0) {
+                            continue;
+                        }
+                        put(t.x + dx, top + dy, t.z + dz, leaves, false);
+                    }
+                }
+            }
+        }
+    }
+    for y in t.y..top {
+        put(t.x, y, t.z, t.log, true);
     }
 }
 
@@ -466,6 +587,10 @@ pub fn giant_tree_blocks(log: u32, x: i32, y: i32, z: i32, h: u64, mut put: impl
     // Simple trees (`TREE_STYLE`): a big emergent of its crown shape, half again as tall.
     if simple_trees() {
         if let Some(mut t) = shaped(log, x, y, z, h, false) {
+            if t.mc {
+                tree_blocks(&t, put);
+                return;
+            }
             t.form = Form::Big;
             let mut t = t.with_tier(Tier::Emergent);
             t.height = t.height * 3 / 2;
@@ -518,7 +643,8 @@ pub fn giant_tree_blocks(log: u32, x: i32, y: i32, z: i32, h: u64, mut put: impl
 /// Calls `put(x, y, z, state, force)` for every block.
 pub fn young_tree_blocks(log: u32, x: i32, y: i32, z: i32, h: u64, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
     let Some(leaves) = TREE_LEAVES.on_block(log).map(|l| l.0) else { return };
-    if PALM_TREE.on_block(log) || FLAT_TREE.on_block(log) {
+    // Minecraft's woods have no young trees under their canopy (`TREE_STYLE` minecraft).
+    if PALM_TREE.on_block(log) || FLAT_TREE.on_block(log) || minecraft_trees() {
         return;
     }
     // A species with a recipe grows its young from it, small (`tree_recipes::understory`), so a
@@ -674,6 +800,32 @@ mod tests {
                         leaves += (s == 2) as u32;
                     });
                     assert!(leaves > 0, "{crown:?} {tier:?}: a crown");
+                }
+            }
+        }
+    }
+
+    /// Minecraft's trees (`TREE_STYLE` minecraft) as Minecraft grows them: an oak's or birch's
+    /// crown five across and four deep over a trunk of 4-6 (birch 5-7) with a leaf on top, a
+    /// fancy oak and a spruce inside the scatters' reach.
+    #[test]
+    fn minecraft_trees_minecraft_sized() {
+        for crown in [Crown::Round, Crown::Cone, Crown::Slim] {
+            for seed in 0..400u64 {
+                let t = simple_at(crown, 1, 2, 0, 0, 0, hash(seed, 3, 5, 7) >> 32, false).minecraft();
+                let (mut lo, mut hi, mut wide, mut logs) = (i32::MAX, i32::MIN, 0, 0);
+                simple_standing(&t, |x, y, z, s, _| {
+                    assert!(x.abs() <= 8 && z.abs() <= 8 && (0..32).contains(&y), "{crown:?} {seed}: {x} {y} {z}");
+                    if s == 2 {
+                        (lo, hi, wide) = (lo.min(y), hi.max(y), wide.max(x.abs()).max(z.abs()));
+                    } else if x == 0 && z == 0 {
+                        logs += 1;
+                    }
+                });
+                if crown != Crown::Cone && t.form != Form::Big {
+                    let trunk = if crown == Crown::Round { 4..=6 } else { 5..=7 };
+                    assert!(trunk.contains(&logs), "{crown:?} {seed}: {logs} logs");
+                    assert_eq!((hi - lo, hi, wide), (3, logs, 2), "{crown:?} {seed}");
                 }
             }
         }
