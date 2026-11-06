@@ -1,0 +1,5 @@
+# Material maps (notes/blocks/matmaps.py): rules per texture.
+# Existing blocks (RTX showcase, 11-06).
+iron_block	base	metal=iron tile=0 smooth=0.72 normal=lum:1.5 dark=0.32:smooth=0.35:depth=0.25
+gold_block	base	metal=gold tile=0 smooth=0.86 normal=lum:1.2 dark=0.3:smooth=0.5:depth=0.2
+glass	base	f0=10 smooth=0.92 normal=flat
