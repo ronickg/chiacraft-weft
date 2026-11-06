@@ -150,6 +150,16 @@ The shaders are in Slang. Remix has both ray-query compute versions and ray-trac
 versions (raygen, closest-hit, miss) of its passes, and can use Shader Execution Reordering on
 RTX 40 and newer.
 
+Two details that matter for blocks:
+- **See-through texels in ray queries** (`algorithm/visibility.slangh`). Cutout and translucent
+  triangles go into the BLAS as non-opaque, so the GPU hands each one back to the shader as a
+  candidate. For a shadow ray, the shader looks up the texel, multiplies the ray's colour by what
+  that texel lets through, and keeps going; only when almost nothing gets through does it accept
+  the hit. That one loop gives leaves their dappled shadows and stained glass its coloured ones.
+- **Primary rays through glass and water** (`algorithm/resolve.slangh`): up to 128 see-through
+  hits per primary ray (32 for later bounces), sorted into four distance bins and blended, so
+  layered glass and particles look right without sorting meshes.
+
 So the mod is **full path tracing**, not hybrid: no rasterised world at all. It leans on three
 NVIDIA-only parts to be fast enough: DLSS-RR (denoising and upscaling), NRC (bounce light) and
 frame generation.
@@ -237,6 +247,32 @@ better version of it, not a different game.
    Vulkan builds), with its own licence terms and attribution, and it's what makes Remix's sparse
    tracing work. Before we use it, Ronald decides on the licence. Our own denoisers from steps 3
    to 5 come first either way.
+
+**A first sketch of the backend side** (our own design, to be refined on its branch):
+
+```rust
+// weft_render: new, only when Backend::ray_tracing() is true
+pub struct BlasDesc<'a> {
+    pub vertices: BufferId, pub vertex_stride: u32, pub vertex_count: u32, // positions as f32x3
+    pub indices: BufferId, pub index_count: u32,
+    pub opaque: bool, // false: cutout/translucent, hands candidates to the shader
+}
+fn create_blas(&mut self, geometries: &[BlasDesc], label: &str) -> BlasId; // fast trace + compaction
+fn destroy_blas(&mut self, blas: BlasId);
+// Per frame: the instances (BLAS, 3x4 transform, custom index for the material table, mask).
+fn build_tlas(&mut self, tlas: TlasId, instances: &[TlasInstance]); // recorded as a Cmd before the passes
+```
+
+WGSL then gets `@group(0) @binding(N) var scene_tlas: acceleration_structure;` in the world
+prelude, and a helper in `common.wgsl`, such as `sun_visible(p, n) -> vec3<f32>`
+(colour let through), written once with the see-through loop above. A pack calls it where it
+calls `solid_at` now. Our chunk meshes have no float vertex buffer: a section is a page of
+packed face records (four words a face, `gpu_layout::face`, free quads eight words) that
+`vs_face` and `vs_quad` turn into corners. So a small compute pass expands a section's records
+into float positions (four corners a face, one shared index pattern for every quad) in a
+scratch buffer, the BLAS is built from that, and the scratch is reused; the record's index is
+the primitive index, so a hit looks its face record up again for texture, tint and light. Remix
+does the same kind of expansion for its games (`pass/interleave_geometry.comp.slang`).
 
 We don't copy Remix's full path tracer. A hybrid (rasterised first hit, rays for shadows,
 reflections and bounce light) fits our look and our shader packs, costs far less than a full
