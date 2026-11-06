@@ -521,7 +521,11 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     if scene.frame.x > 0.5 {
         let m = max(mu, 0.0);
         let mie = (pow(m, 8.0) * 0.45 + pow(m, 64.0) * 2.2) * (0.35 + 0.65 * low) * (1.0 - rain_amount());
-        c += p.sun * mie * 0.5;
+        // In a gold of the sun's own brightness (Mie scattering keeps the low sun's colour), and a
+        // third weaker: in the sun's pale mid-morning colour the glow went cream-white through the
+        // curve's shoulder (08:00 sky saturation 23 against Bliss's 43, warmth +15 against +36).
+        let gold = vec3(1.0, 0.72, 0.4) * luma(p.sun) * 1.4;
+        c += mix(p.sun, gold, 0.6 * (1.0 - smoothstep(0.6, 0.9, scene.sun.y))) * mie * 0.34;
     }
     // The glow about the moon where it stands, as bright as its light (`scene.moon.w`): on a new
     // moon there is none, and a glow alone read as a dark-blue ring (the world playtester's nights).
