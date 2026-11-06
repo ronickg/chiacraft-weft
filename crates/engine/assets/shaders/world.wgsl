@@ -424,7 +424,8 @@ fn fs_translucent(in: VOut) -> @location(0) vec4<f32> {
 // Water at `albedo`'s alpha over a dark sea floor, mixed in gamma, then fogged (`fs_lod`'s far water).
 fn far_water(in: VOut, albedo: vec4<f32>) -> vec3<f32> {
     let lit = shade_unfogged(in, vec4(albedo.rgb, 1.0)).rgb;
-    let bed = FAR_BED * to_gamma(shade_unfogged(in, vec4(1.0)).rgb / max(in.tint, vec3(0.01)));
+    // The light alone: the tint taken out in linear light, as `shade_unfogged` put it in.
+    let bed = FAR_BED * to_gamma(shade_unfogged(in, vec4(1.0)).rgb / max(pow(in.tint, vec3(2.2)), vec3(1e-4)));
     let water = pow(mix(bed, to_gamma(lit), albedo.a), vec3(2.2));
     return fogged(water, plain_fog(in.dist));
 }
