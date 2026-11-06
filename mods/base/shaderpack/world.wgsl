@@ -385,6 +385,20 @@ const PLANT_SHADOW_LIFT: f32 = 0.7;
 
 fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
     let sky = smoothstep(0.75, 1.0, in.light.x);
+    // Traced (`core:rt_shadows`, a GPU with ray queries): one ray toward the light through the
+    // cubes and the distant terrain, by the leaves' holes, so no texels, no acne and shadows as far
+    // as the land goes; still never deep under cover. Its colour through stained glass is kept for
+    // later (`rt_sun`'s rgb); here its brightness.
+    if scene.rt.x > 0.5 {
+        // A solid face turned from the light is in its own shade (leaves and plants let it through).
+        if dot(n, light_dir()) <= 0.0 && in.kind.z == 0u && in.kind.x != TINT_FOLIAGE {
+            return 0.0;
+        }
+        let t = rt_sun(in.rel, n, light_dir(), in.kind.z != 0u);
+        let c = min(canopy(), 1.0);
+        let cover = smoothstep(mix(0.3, 0.15, c), mix(0.8, 0.5, c), in.light.x);
+        return min(dot(t, vec3(1.0 / 3.0)), cover) * models_shadow(in.rel, n) * cloud_shadow(in.rel);
+    }
     // A plant's blade asks the map from most of a block toward the sun: the blades round it, as
     // thin as a few of the map's texels, shaded each other in fine crossing stripes, pale and
     // banded tall grass up close at 3456 px (Ronald's Mac, 11-06; gone with shadows off). Trees,
@@ -827,7 +841,12 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     // coarse texels shaded far water wrongly (duller, no sun's path), and the near map's edge, a
     // square seen at a slant, showed as a hard-edged rectangle of bright water (the LOD worker's
     // sea views, very likely Ronald's lake; it went with shadows off, 11-05).
-    let near_map = shadow_in(scene.shadow_view_proj, scene.shadow, 80.0, 400.0, in.rel, vec3(0.0, 1.0, 0.0), false);
+    var near_map = shadow_in(scene.shadow_view_proj, scene.shadow, 80.0, 400.0, in.rel, vec3(0.0, 1.0, 0.0), false);
+    // Traced (`core:rt_shadows`): the water's surface everywhere, as the land.
+    if scene.rt.x > 0.5 {
+        let up = vec3(0.0, 1.0, 0.0);
+        near_map = vec2(dot(rt_sun(in.rel, up, light_dir(), false), vec3(1.0 / 3.0)) * models_shadow(in.rel, up), 1.0);
+    }
     let shadow = mix(1.0, min(near_map.x, smoothstep(0.3, 0.8, in.light.x)), near_map.y) * smoothstep(0.75, 1.0, max(in.light.x, near_map.y)) * cloud_shadow(in.rel);
     let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, shadow, 1.0, in.pos, in.rel);
     // What the light in the water sends back up: a muted teal-green, light in the shallows and dark
