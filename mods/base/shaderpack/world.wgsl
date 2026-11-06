@@ -684,7 +684,12 @@ fn mat_shine(in: VOut, m_in: Mat, n: vec3<f32>, albedo: vec3<f32>, light: vec3<f
     let sky = mix(light * 0.5, sky_seen, open * open);
     // A rough surface mirrors little (its lobe is spread over the whole sky's dimmer average).
     let gloss = 1.0 - clamp(m.rough * 1.6, 0.0, 0.85);
-    out += mat_fresnel(m.f0, ndv) * sky * gloss;
+    // Only what the face itself looks out at: a normal map's tilt (a mortar joint's groove) turned the
+    // mirrored ray toward the open sky behind the face, and stone bricks in the shade showed a bright
+    // blue line at every vertical joint (rt-sun-shadows' crop of NVIDIA's cathedral, 11-06; its path
+    // tracer has the same term).
+    let horizon = smoothstep(-0.05, 0.3, dot(r, normalize(in.normal)));
+    out += mat_fresnel(m.f0, ndv) * sky * gloss * horizon;
     return out;
 }
 
