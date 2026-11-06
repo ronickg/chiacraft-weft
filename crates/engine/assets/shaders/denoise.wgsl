@@ -416,9 +416,13 @@ fn fs_test(in: VOut) -> Pair {
     let r_ = dn_position(clamp(at + vec2(1, 0), vec2(0), isize - 1), dn_depth(d.depth, at + vec2(1, 0), isize), d.size);
     let u_ = dn_position(clamp(at - vec2(0, 1), vec2(0), isize - 1), dn_depth(d.depth, at - vec2(0, 1), isize), d.size);
     let w_ = dn_position(clamp(at + vec2(0, 1), vec2(0), isize - 1), dn_depth(d.depth, at + vec2(0, 1), isize), d.size);
-    let dx = select(c - l_, r_ - c, length(r_ - c) < length(c - l_));
-    let dy = select(c - u_, w_ - c, length(w_ - c) < length(c - u_));
-    var n = normalize(cross(dy, dx));
+    // As `upscale_guides.wgsl`: at the last column or row the clamped neighbour is the texel itself.
+    let right = at.x + 1 < isize.x && (at.x == 0 || length(r_ - c) < length(c - l_));
+    let down = at.y + 1 < isize.y && (at.y == 0 || length(w_ - c) < length(c - u_));
+    let dx = select(c - l_, r_ - c, right);
+    let dy = select(c - u_, w_ - c, down);
+    let cr = cross(dy, dx);
+    var n = select(-normalize(c), cr / max(length(cr), 1e-20), length(cr) > 1e-12);
     if dot(n, c) > 0.0 {
         n = -n;
     }

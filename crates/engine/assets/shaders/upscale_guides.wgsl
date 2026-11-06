@@ -61,10 +61,21 @@ fn guide_normal(depth: u32, at: vec2<i32>, size: vec2<i32>) -> vec3<f32> {
     let r = guide_position(depth, at + vec2(1, 0), size);
     let u = guide_position(depth, at - vec2(0, 1), size);
     let d = guide_position(depth, at + vec2(0, 1), size);
-    // Each way the nearer neighbour: across an edge the far one lies on another surface.
-    let dx = select(c - l, r - c, length(r - c) < length(c - l));
-    let dy = select(c - u, d - c, length(d - c) < length(c - u));
-    var n = normalize(cross(dy, dx));
+    // Each way the nearer neighbour: across an edge the far one lies on another surface. At the
+    // picture's last column or row the neighbour past it is the texel itself (clamped): the one on
+    // the other side then. A zero difference gave a NaN normal along the bottom and right edges,
+    // which Ray Reconstruction spread into black tiles (NGX run ptd_ngx1, 11-06).
+    let right = at.x + 1 < size.x && (at.x == 0 || length(r - c) < length(c - l));
+    let down = at.y + 1 < size.y && (at.y == 0 || length(d - c) < length(c - u));
+    let dx = select(c - l, r - c, right);
+    let dy = select(c - u, d - c, down);
+    var n = cross(dy, dx);
+    let len = length(n);
+    // Nothing to go by (a one-texel picture, a surface seen exactly edge-on): facing the camera.
+    if !(len > 1e-12) {
+        return -normalize(c);
+    }
+    n = n / len;
     // Facing the camera (which is at the origin).
     if dot(n, c) > 0.0 {
         n = -n;
