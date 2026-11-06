@@ -485,6 +485,11 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
             // lime by its colour alone; from 0.25 it hardly counted, 3 % of the frame left, PC sh6b.)
             let k = smoothstep(0.06, 0.22, luma(c)) * smoothstep(0.55, 0.85, sat) * smoothstep(0.25, 0.45, c.r / c.g) * low;
             lit = vec4(mix(c, vec3(luma(c)) * vec3(0.92, 1.05, 0.88), k * 0.175) * (1.0 - 0.18 * k), lit.a);
+            // And its red pulled down, so it turns green rather than grey (Ronald: "a bit greener"):
+            // the crown by the eye still read yellow-lime at 17:00-18:00, sRGB 88 125 3, hue 82
+            // where noon's lit leaves are about 100 (Tester 2's f0d78419 hours, 11-06). At 0.55 of
+            // its red, linear red/green 0.47 goes to about 0.26, hue about 95.
+            lit = vec4(lit.r * mix(1.0, 0.55, k), lit.g, lit.b, lit.a);
         }
     } else {
         lit = block_shade(in.slot, BlockPixel(in.uv, albedo, light, in.pos, scene.params.w));
