@@ -310,17 +310,20 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
     // overhead and gold toward a low sun (08:00, saturation 26 against 43). Not in rain.
     let size = vec2<i32>(pass_.size);
     let px = clamp(vec2<i32>(uv * pass_.size), vec2(0), size - vec2(1));
-    if textureLoad(textures[pass_.depth], px, 0).r <= 0.0 {
+    let sky_px = textureLoad(textures[pass_.depth], px, 0).r <= 0.0;
+    if sky_px {
         let y = luma(col);
         // More as the sun climbs, where the land's saturation is taken down most (0.62 of it with a
         // high sun, `finish_picture`): the sky kept its blue, which already read paler than Bliss's
         // (mc_forest noon 22 against 31, 08:00 27 against 43).
         let open = smoothstep(0.0, 0.15, scene.sun.y) * (1.0 - rain_amount());
-        let k = 1.0 + (0.3 + 0.6 * smoothstep(0.3, 0.75, scene.sun.y)) * open;
+        // (Twice the first try's rise: 0.6 more was all taken back by the land's lower saturation
+        // and the curve's shoulder, noon 22 still, gr2.)
+        let k = 1.0 + (0.3 + 1.2 * smoothstep(0.3, 0.75, scene.sun.y)) * open;
         col = max(vec3(y) + (col - vec3(y)) * k, vec3(0.0));
         // And 15% dimmer by day: ours read brighter than Bliss's at every hour (mc_forest 08:00
-        // 216 against 208, noon 217 against 192, 17:00 193 against 171), more so with the day's
-        // brightening below.
+        // 216 against 208, noon 217 against 192, 17:00 193 against 171). The day's brightening
+        // below leaves it out (on it too, the 08:00 sky went to 224, gr2).
         col *= 1.0 - 0.15 * open;
     }
     if pass_.bloom != 0u {
@@ -341,7 +344,8 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
             // A high sun's land a little brighter (the noon land read 91-93 against Bliss's 113),
             // from a sun about 12° up (at the like-for-like mc_forest vista the land read dark
             // through the day: 08:00 78 against Bliss's 89, 17:00 81 against 113).
-            col *= mix(1.0, 1.25, smoothstep(0.2, 0.6, scene.sun.y) * (1.0 - rain_amount()));
+            // The land only: the sky has its own (15% dimmer, above).
+            col *= mix(1.0, 1.25, smoothstep(0.2, 0.6, scene.sun.y) * (1.0 - rain_amount()) * select(1.0, 0.0, sky_px));
         }
     }
     return col;
