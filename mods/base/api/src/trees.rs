@@ -22,7 +22,7 @@ pub const BRANCH_THIN: f32 = 0.4;
 /// the log as `TREE_BRANCH`): the broadleaf trees (Ronald, 11-05: "All broadleaf trees"); needles
 /// and fronds hide a conifer's or a palm's wood, which keep their logs. Felling counts a branch
 /// block a quarter of a log (`tree_recipes::felling_wood`).
-pub const BRANCH_WOODS: &[&str] = &["oak", "birch", "acacia", "mesquite", "dogwood", "ipe", "andiroba", "matamata", "brazil_nut"];
+pub const BRANCH_WOODS: &[&str] = &["oak", "birch", "acacia", "mesquite", "dogwood", "cherry", "ipe", "andiroba", "matamata", "brazil_nut"];
 /// Logs with this tag grow into cones (spruces), the others round (oaks, birches).
 pub static CONE_TREE: Tag = Tag::named("cone_tree");
 /// A tall bare trunk under one wide, flat crown (the acacia).

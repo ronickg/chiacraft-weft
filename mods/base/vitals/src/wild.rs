@@ -195,7 +195,7 @@ impl Turn {
 /// Every tree's leaves and how they turn: the conifers, palms and the tree fern stay green;
 /// birches and ginkgos go gold; oaks, acacias, mesquite and the swamp cypress (a deciduous conifer)
 /// go russet.
-pub const LEAVES: [(&str, Turn); 22] = [
+pub const LEAVES: [(&str, Turn); 23] = [
     ("base:oak_leaves", Turn::Orange),
     ("base:birch_leaves", Turn::Yellow),
     ("base:spruce_leaves", Turn::Evergreen),
@@ -210,6 +210,8 @@ pub const LEAVES: [(&str, Turn); 22] = [
     ("base:andiroba_leaves", Turn::Evergreen),
     ("base:matamata_leaves", Turn::Evergreen),
     ("base:ipe_leaves", Turn::Evergreen),
+    // The wild cherry's go orange-red in autumn; drawn in their own colours (`OWN_COLOURS`).
+    ("base:cherry_leaves", Turn::Orange),
     // Drawn in its own colours (white bracts), so its tint isn't used (`blocks.rs`, `grove`).
     ("base:dogwood_leaves", Turn::Orange),
     // The shrubs', in their own colours too (`blocks.rs`).
@@ -230,7 +232,7 @@ pub const LEAVES: [(&str, Turn); 22] = [
 /// white bracts (April-May); the umbrella thorn's cream puffballs, as its rains begin; honey
 /// mesquite's yellow catkins (April-June); the creosote bush's small yellow flowers (February-April);
 /// the willow's catkins (March-April, with the first leaves).
-pub const BLOOMS: [(&str, u8); 6] = [
+pub const BLOOMS: [(&str, u8); 7] = [
     ("base:dogwood_leaves", SP),
     ("base:acacia_leaves", SP),
     ("base:mesquite_leaves", SP),
@@ -239,11 +241,23 @@ pub const BLOOMS: [(&str, u8); 6] = [
     // The golden ipê (Handroanthus serratifolius) flowers leafless at the dry season's end
     // (August-September at Manaus: the game's spring, its months six on), its whole crown yellow.
     ("base:ipe_leaves", SP),
+    // The wild cherry blossoms in April-May, before and with its first leaves: its crown pink
+    // (Ronald, 11-05, for Bliss's pink groves; the wild tree's are white flushed pink).
+    ("base:cherry_leaves", SP),
 ];
 
 /// Leaves drawn in their own colours, not tinted by the biome: the tropical canopy's, each crown a
 /// different green (Manaus's canopy from above is a patchwork, research's reference 05).
-pub const OWN_COLOURS: [&str; 3] = ["base:andiroba_leaves", "base:matamata_leaves", "base:ipe_leaves"];
+pub const OWN_COLOURS: [&str; 4] = ["base:andiroba_leaves", "base:matamata_leaves", "base:ipe_leaves", "base:cherry_leaves"];
+
+/// Wild cherry groves (Ronald, 11-05: "Yes, add wild cherry", for Bliss's pink groves): where the
+/// grove noise (patches some `CHERRY_GROVE_SIZE` blocks across) is over `CHERRY_GROVE_FROM`, a
+/// cherry per 4 x 4 cell by these chances, among the forest's own trees. Prunus avium grows on
+/// rich soil in the broadleaf woods and at their edges, in clumps from its suckers and the
+/// birds' dropped stones; in the old growth's gaps most.
+pub const CHERRY_GROVES: [(&str, f32); 3] = [("base:old_growth_forest", 0.7), ("base:forest", 0.6), ("base:birch_forest", 0.35)];
+pub const CHERRY_GROVE_SIZE: f64 = 140.0;
+pub const CHERRY_GROVE_FROM: f64 = 0.38;
 
 /// The seasons `leaves` bloom in (`BLOOMS`), if they do.
 pub fn blooms(leaves: &str) -> Option<u8> {

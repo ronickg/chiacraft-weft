@@ -55,6 +55,9 @@ pub static FLOOR_COVER: Component<f32> = Component::named("floor_cover");
 pub static FERNS: Component<f32> = Component::named("ferns");
 pub static SHRUBS: Component<f32> = Component::named("shrubs");
 pub static SHRUB_KINDS: Component<BlockList> = Component::named("shrub_kinds");
+/// Wild cherries in their groves (`vitals::wild::CHERRY_GROVES`): the chance per 4 x 4 cell in a
+/// grove patch.
+pub static CHERRY_TREES: Component<f32> = Component::named("cherry_trees");
 /// Young trees of the biome's `YOUNG_KINDS` (else its `TREE_KINDS`), the chance per 5 x 5 cell,
 /// out of the thick stands.
 pub static YOUNG_TREES: Component<f32> = Component::named("young_trees");
@@ -442,6 +445,11 @@ pub fn register(r: &mut Registry) {
         }
     }
 
+    // Wild cherry groves (`vitals::wild::CHERRY_GROVES`).
+    for (biome, chance) in vitals::wild::CHERRY_GROVES {
+        r.set_on(Target::Biome(biome), &CHERRY_TREES, chance);
+    }
+
     // The overworld's shape, its snow and its bare rock (`land.rs`), before the plants below.
     crate::land::terrain(r);
 
@@ -473,6 +481,21 @@ pub fn register(r: &mut Registry) {
         .density(&STAND_TREES)
         .thin(stand_over(STAND + 1).not(), 0)
         .shape(tree);
+    // Wild cherries in groves (`CHERRY_TREES`): a site per 4 x 4 cell only in the grove patches (a
+    // noise some 140 blocks across), among the forest's trees; a little taller than the oaks, so
+    // their spring blossom shows over the canopy.
+    r.scatter(&CHERRY_SITES)
+        .cell(4)
+        .reach(8)
+        .ground("#plant_soil")
+        .density(&CHERRY_TREES)
+        .thin(
+            Expr::fbm(0xC4E77, vitals::wild::CHERRY_GROVE_SIZE, 1)
+                .ramp(vitals::wild::CHERRY_GROVE_FROM, vitals::wild::CHERRY_GROVE_FROM)
+                .not(),
+            0,
+        )
+        .shape(cherry);
     // Boulders where a biome has them (`BOULDERS`): a heap of stone two to five blocks across, half
     // sunk in the ground, mossy in the woods and the wet.
     r.scatter(&BOULDER_SITES)
@@ -593,6 +616,7 @@ fn boulder(s: &mut Site) {
 }
 
 static TREE_SITES: Scatter = Scatter::named("trees");
+static CHERRY_SITES: Scatter = Scatter::named("cherry_trees");
 static STAND_SITES: Scatter = Scatter::named("stand_trees");
 static GIANT_SITES: Scatter = Scatter::named("giant_trees");
 
@@ -832,14 +856,26 @@ const CLEARING: i32 = 1600;
 /// A tree of the biome's kinds (`TREE_KINDS`) at a scatter's site; none on a bare rock face
 /// (`land::site_on_rock`).
 fn tree(s: &mut Site) {
-    if !site_open(s) {
-        return;
-    }
-    let [x, y, z] = s.pos().to_array();
     let log = TREE_KINDS
         .on_biome(s.biome())
         .and_then(|l| l.pick(s.random() >> 40))
         .unwrap_or(OAK_LOG.id());
+    tree_of(s, log);
+}
+
+/// A wild cherry at a grove's site (`CHERRY_SITES`).
+fn cherry(s: &mut Site) {
+    if let Some(log) = Block::lookup("base:cherry_log") {
+        tree_of(s, log);
+    }
+}
+
+/// A tree of `log` at a scatter's site; none on a bare rock face.
+fn tree_of(s: &mut Site, log: u32) {
+    if !site_open(s) {
+        return;
+    }
+    let [x, y, z] = s.pos().to_array();
     let h = s.random();
     // In a treefall gap no canopy tree stands: one lies fallen, or young growth comes up.
     if let Some(inside) = TREEFALL

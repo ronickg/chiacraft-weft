@@ -198,7 +198,9 @@ fn log(r: &mut Registry, handle: &'static Block, wood: &str, leaves: &str, shape
 /// The tropical forest's canopy, 28-32 blocks up, three of Manaus's commonest trees, each in its
 /// own colours (`vitals::wild::OWN_COLOURS`): andiroba's dark glossy crown, matamatá's olive one
 /// (the commonest tree there), ipê's light green that turns all golden yellow in its spring bloom.
-const WOODS: [(&str, Option<&str>, &str); 9] = [
+/// The wild cherry (Prunus avium) of the old-growth and temperate forests, in groves, pink with
+/// blossom in spring (its leaves in their own colours), its cherries a summer fruit.
+const WOODS: [(&str, Option<&str>, &str); 10] = [
     ("mesquite", Some("flat_tree"), "mesquite_pod"),
     ("acuri_palm", Some("palm_tree"), "acuri_nut"),
     ("moriche_palm", Some("palm_tree"), "moriche_fruit"),
@@ -208,6 +210,7 @@ const WOODS: [(&str, Option<&str>, &str); 9] = [
     ("andiroba", None, "andiroba_seed"),
     ("matamata", None, "matamata_fruit"),
     ("ipe", None, "ipe_seed"),
+    ("cherry", None, "cherry"),
 ];
 
 /// The sapling a tree's fruit plants (`WOODS`), for fruit that's a food (`items.rs` registers
@@ -1260,7 +1263,7 @@ fn grow_column(e: &mut BlockEvent, me: &'static Block) {
 /// as its boxes; an axe takes it; a stick for it.
 /// The woods Art has drawn young bark for (`branch_<wood>`, `_across`, `_end`; all nine, Ronald:
 /// "Approve all"); another wood wears its log's until then.
-const BRANCH_BARK: &[&str] = &["oak", "birch", "acacia", "mesquite", "dogwood", "ipe", "andiroba", "matamata", "brazil_nut"];
+const BRANCH_BARK: &[&str] = &["oak", "birch", "acacia", "mesquite", "dogwood", "cherry", "ipe", "andiroba", "matamata", "brazil_nut"];
 
 /// A thin branch of `wood` (`base:<wood>_branch`, named on its log as `TREE_BRANCH`): a post 4 or 8
 /// px thick in the block's middle with an arm to each side it joins (`n` `s` `e` `w` `u` `d`, set by

@@ -49,6 +49,7 @@ A portion, its kind for the animals' diets, what it holds of each nutrient, how 
 | base:lingonberries | fruit | 100 | 10 | 0 | 8 | 0 | 5 | 87 | 5 min | 20 + 20 | cooling |
 | base:cloudberries | fruit | 100 | 10 | 2 | 2 | 1 | 16 | 85 | 6 min | 3 + 3 | cooling |
 | base:crowberries | fruit | 100 | 10 | 1 | 7 | 1 | 5 | 85 | 6 min | 10 + 10 | cooling |
+| base:cherry | fruit | 100 | 10 | 1 | 14 | 0 | 3 | 82 | 6 min | 3 + 3 | cooling |
 | base:raspberries | fruit | 100 | 10 | 1 | 5 | 1 | 9 | 86 | 5 min | 2 + 2 | cooling |
 | base:huckleberries | fruit | 100 | 10 | 1 | 12 | 0 | 3 | 84 | 5 min | 5 + 5 | cooling |
 | base:beach_plums | fruit | 100 | 10 | 1 | 10 | 0 | 2 | 87 | 5 min | 5 + 5 | cooling |
@@ -107,6 +108,7 @@ Preserving (`vitals::preserve`): a drying rack dries in 20 min in the best air (
 | base:lingonberries (40) | base:dried_berries | - | - | 112 |
 | base:cloudberries (6) | base:dried_berries | - | - | 112 |
 | base:crowberries (20) | base:dried_berries | - | - | 112 |
+| base:cherry (6) | base:dried_berries | - | - | 112 |
 | base:raspberries (4) | base:dried_berries | - | - | 112 |
 | base:huckleberries (10) | base:dried_berries | - | - | 112 |
 | base:beach_plums (10) | base:dried_berries | - | - | 112 |
@@ -338,6 +340,7 @@ What each growing plant needs (`vitals::plants`, from `reports/ecology/Plants an
 | base:cacao_sapling | cacao (Theobroma cacao) | 15, 22-30, 35 | Moderate | 0 °C | - | the game's | plains (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), ocean (su au), coral_reef (su au), lagoon (su au), scrubland (su), floodplain (su au), fern_forest (su), crags (su) |
 | base:andiroba_sapling | andiroba (Carapa guianensis) | 18, 24-32, 38 | Moderate | 0 °C | - | the game's | plains (su), desert (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), coral_reef (su au), lagoon (su au), scrubland (su), floodplain (su), crags (su) |
 | base:matamata_sapling | matamatá (Eschweilera coriacea) | 18, 24-32, 38 | Moderate | 0 °C | - | the game's | plains (su), desert (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), coral_reef (su au), lagoon (su au), scrubland (su), floodplain (su), crags (su) |
+| base:cherry_sapling | wild cherry (Prunus avium) | 5, 16-24, 32 | Moderate | -30 °C | - | the game's | plains (su au), forest (su au), old_growth_forest (su), birch_forest (su), taiga (su), savanna (su au), swamp (au), tropical_forest (au), mountains (su), ocean (sp su au wi), coral_reef (au), lagoon (au), beach (au), floodplain (au), fern_forest (su au), crags (su au) |
 | base:ipe_sapling | golden ipê (Handroanthus serratifolius) | 15, 22-32, 40 | Dry | -1 °C | - | the game's | plains (su), birch_forest (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au wi), tropical_forest (sp su au wi), ocean (su au), coral_reef (sp su au wi), lagoon (sp su au wi), beach (su au), red_dunes (su), scrubland (su), floodplain (sp su au), fern_forest (su), crags (su) |
 | base:acuri_palm_sapling | acuri palm (Attalea phalerata) | 15, 24-32, 40 | Moderate | 0 °C | - | the game's | plains (su), desert (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), ocean (su), coral_reef (su au), lagoon (su au), scrubland (su), floodplain (su au), crags (su) |
 | base:sequoia_sapling | giant sequoia (Sequoiadendron giganteum) | 5, 15-24, 35 | Moderate | -24 °C | - | the game's | plains (su au), forest (su au), old_growth_forest (su), birch_forest (su), taiga (su), savanna (su au), swamp (su au), tropical_forest (su au wi), mountains (su), ocean (sp su au wi), coral_reef (au), lagoon (au), beach (au wi), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au) |
