@@ -532,8 +532,12 @@ fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32>
             let open = smoothstep(mix(0.5, 0.25, c_open), mix(0.95, 0.55, c_open), in.light.x);
             light += paint * palette().sun * light_strength() * sun_facing(n) * shadow * open * (k_sun - 1.0);
         }
-        // A leaf cube's light through it is `leaf_sss`'s (`shade_soft_lit`), from its colour.
-        if LEAF_CUBE && leaf_light() > 0.0 {
+        // A leaf cube's light through it is `leaf_sss`'s (`shade_soft_lit`), from its colour, and
+        // only with the leaf light on; off, none, as Ronald's Bliss (no SSS). With `leaf_through`'s
+        // glow on every face, a crown's shaded sides took green sun light and the canopy from above
+        // read an even green carpet: its shade 48 63 46 at noon against Bliss's 30 53 78; without it
+        // 42 49 44, roughness 8.7 -> 10.2 (Bliss's world vista, trb_s7_lk10_v).
+        if LEAF_CUBE {
             LEAF_SHADOW = shadow;
             return light;
         }
