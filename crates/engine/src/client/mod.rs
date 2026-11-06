@@ -2697,6 +2697,22 @@ impl Client {
         self.gpu_terrain.destroy(gpu);
     }
 
+    /// The daylight the lightmap is given (`Scene.params.z`). chiacraft, test only: with
+    /// `--mc-days`, vanilla's own (`getSkyDarken`: the sun's height doubled plus 0.2, then 0.8 of
+    /// it over a floor of 0.2), which the lightmap (`common.wgsl`, 26.1's) was made for. Ours
+    /// (`daylight`) adds 0.5, vanilla's curve for whole sky-light levels, so by 06:00 and 18:00
+    /// vanilla's land had dimmed to 0.73 of noon and ours to 0.95 (Bliss's world, shaders off).
+    fn lightmap_day(&self) -> f32 {
+        let dim = &content().dims[self.world.dim as usize];
+        if !crate::app::api::mc_days() || !dim.sky_light || !dim.daylight.is_empty() {
+            return self.daylight();
+        }
+        let turn = dim.day_turn(self.world.time as f64);
+        let g = ((turn * std::f64::consts::TAU).sin() * 2.0 + 0.2).clamp(0.0, 1.0) as f32;
+        let day = (g * 0.8 + 0.2) * (1.0 - self.look.darkness);
+        if self.lightning > 0.0 { (day + 0.5).min(1.0) } else { day }
+    }
+
     /// Fraction of full daylight for the current dimension and time.
     pub fn daylight(&self) -> f32 {
         // Rain takes away a third of the day, a lightning brings it back for a moment.
@@ -2900,7 +2916,7 @@ impl Client {
             right: inv.transform_vector3(Vec3::X).extend(0.0).to_array(),
             up: inv.transform_vector3(Vec3::Y).extend(0.0).to_array(),
             fog_color: self.fog_color(),
-            params: [fog_start, fog_end, self.daylight(), crate::shaders::time()],
+            params: [fog_start, fog_end, self.lightmap_day(), crate::shaders::time()],
             light: [content().dims[self.world.dim as usize].ambient as f32 / 15.0, self.brightness, ticks, 0.0],
             sun: self.sun(),
             weather: [self.wind.x, self.wind.y, self.fog, self.thunder()],
@@ -2958,7 +2974,7 @@ impl Client {
                 self.render.rt_traced() as u32 as f32,
                 (self.render.rt_frame_no() % (1 << 24)) as f32,
                 (shadow_setting("core:rt_shadows", 0.0) > 1.5) as u32 as f32,
-                0.0,
+                self.render.rt_reflects() as u32 as f32,
             ],
             shadow: match self.shadow_map {
                 Some(t) if self.shadow.1 => {
@@ -3117,8 +3133,10 @@ impl Client {
     /// `core:rt_shadows` turned on or off: the scene made (or let go), and whether the world shader
     /// has to be composed again (the app does it before anything of the frame draws with it).
     pub fn rt_switch(&mut self, gpu: &mut dyn Backend) -> bool {
-        self.render
-            .set_rt(gpu, shadow_setting("core:rt_shadows", 0.0) > 0.5);
+        let shadows = shadow_setting("core:rt_shadows", 0.0) > 0.5;
+        let reflections = shadow_setting("core:rt_reflections", 0.0) > 0.5;
+        self.render.set_rt_modes(shadows, reflections);
+        self.render.set_rt(gpu, shadows || reflections);
         self.render.rt_reload
     }
 

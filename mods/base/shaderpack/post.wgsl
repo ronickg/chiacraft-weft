@@ -359,6 +359,8 @@ fn sky_or_cloud(uv: vec2<f32>, d: f32) -> bool {
 
 // How much of the sky's light the HDR world's veiling glare lays over the picture (`hdr_light`).
 const GLARE_HDR: f32 = 0.02;
+// The land's lift in the evening twilight (`hdr_light`).
+const TWILIGHT_LAND_HDR: f32 = 1.55;
 
 // The HDR world's light before the tone curve: the bloom mixed in and the exposure applied.
 fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
@@ -412,8 +414,20 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
     // its shade is blue at every distance (sRGB 27 47 69 at noon), where ours went to 0 0 0 in the
     // curve's toe (Tester 2's calm noon: the shaded block sides; more fill light didn't lift them,
     // sh1b). Not at night or in rain.
+    // As much as the view is bright (the exposure's mean against an average sunlit view's), as a
+    // lens's glare is: at a fixed share of the sky's light, a dark forest's shade went a neutral
+    // blue-grey (shaded leaves' hue 172-180°, saturation 0.17-0.20) where Bliss's is green and
+    // near black (69-107°, 0.92-1.0); without the glare ours went green again (Trees' runs
+    // trb_s2, Bliss's world, mc_world_forest). Open land keeps it.
+    var lens = 1.0;
+    if pass_.exposure != 0u {
+        let m = textureLoad(textures[pass_.exposure - 1u], vec2(0, 0), 0).g;
+        if m == m && m > 0.0 {
+            lens = clamp(m / EXPOSURE_REF, 0.0, 1.5);
+        }
+    }
     let p = palette();
-    col += (p.zenith * 0.4 + p.horizon * 0.6) * GLARE_HDR * smoothstep(-0.05, 0.2, scene.sun.y) * (1.0 - rain_amount());
+    col += (p.zenith * 0.4 + p.horizon * 0.6) * GLARE_HDR * lens * smoothstep(-0.05, 0.2, scene.sun.y) * (1.0 - rain_amount());
     if pass_.exposure != 0u {
         let e = textureLoad(textures[pass_.exposure - 1u], vec2(0, 0), 0).g;
         if e == e && e > 0.0 {
@@ -430,6 +444,14 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
             let wp = scene.inv_view_proj * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, d, 1.0);
             let near = 1.0 - smoothstep(300.0, 900.0, length(wp.xyz / wp.w));
             col *= mix(1.0, land, (1.0 - rain_amount()) * select(1.0, 0.0, sky_px) * near);
+            // Evening twilight, the sun just under the horizon in the west: the land lit up against the
+            // sky, as Bliss's evening (its own world at 19:00: land 86 against a sky of 138, ours 60
+            // against 162; a stronger exposure lifted both, tw1). Its morning at the same depth stays
+            // a dark blue, as ours. Not out to the far ridges, which meet the sky's own colour, and
+            // not into the night (dark by design).
+            let dusk = smoothstep(0.05, -0.05, scene.sun.x) * smoothstep(0.03, -0.02, scene.sun.y) * smoothstep(-0.16, -0.08, scene.sun.y);
+            let near_dusk = 1.0 - smoothstep(600.0, 1500.0, length(wp.xyz / wp.w));
+            col *= mix(1.0, TWILIGHT_LAND_HDR, dusk * (1.0 - rain_amount()) * select(1.0, 0.0, sky_px) * near_dusk);
         }
     }
     return col;

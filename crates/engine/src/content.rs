@@ -603,7 +603,7 @@ impl DimensionDef {
     /// (with its fraction): a day of `daylight` turns of light maps its half to a quarter turn,
     /// the night the rest.
     fn daylight_clock(&self, from_noon: f64, days: f64) -> f64 {
-        if self.year_days == 0 || self.day_swing <= 0.0 || self.day_length == 0 {
+        if self.year_days == 0 || self.day_swing <= 0.0 || self.day_length == 0 || crate::app::api::mc_days() {
             return from_noon;
         }
         let year = self.year_days as f64;
