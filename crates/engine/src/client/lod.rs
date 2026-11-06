@@ -288,6 +288,42 @@ fn quad(dir: u32, x: i32, y: i32, z: i32, size: (i32, i32, i32), tex: u32, tint:
     crate::gpu_layout::lod_record(dir, [x, y, z], [size.0, size.1, size.2], tex, tint, biome)
 }
 
+/// chiacraft, after upstream Weft f69243fd (PR #107): sets a box face's corner shade, vanilla's AO
+/// 0 (darkest) to 3 (none) per corner in `CORNERS` order, 2 bits each (`lod_face::AO_LO_SHIFT`).
+fn shaded(mut r: [u32; 4], ao: u32) -> [u32; 4] {
+    use crate::gpu_layout::lod_face as f;
+    let stored = !ao & 0xFF;
+    r[3] |= (stored & 15) << f::AO_LO_SHIFT | (stored >> 4) << f::AO_HI_SHIFT;
+    r
+}
+
+/// chiacraft, after upstream Weft f69243fd: vanilla's corner shade for the `dir` face of cell (i,
+/// j) at block height `by`, from whether the ground of the cells round it rises to the blocks by its
+/// corners (`solid`; the cells a block across, the heights in blocks).
+fn corner_ao(solid: &dyn Fn(i32, i32, i32) -> bool, i: i32, j: i32, dir: usize, by: i32) -> u32 {
+    let nrm = weft_abi::FACE_DIRS[dir];
+    let (ta, tb) = match dir / 2 {
+        0 => (1, 2),
+        1 => (0, 2),
+        _ => (0, 1),
+    };
+    let base = [i + nrm[0], by + nrm[1], j + nrm[2]];
+    let mut bits = 0u32;
+    for (k, corner) in crate::gpu_layout::CORNERS[dir].iter().enumerate() {
+        let (sa, sb) = (corner[ta] * 2 - 1, corner[tb] * 2 - 1);
+        let (mut p1, mut p2, mut p3) = (base, base, base);
+        p1[ta] += sa;
+        p2[tb] += sb;
+        p3[ta] += sa;
+        p3[tb] += sb;
+        let at = |p: [i32; 3]| solid(p[0], p[1], p[2]);
+        let (s1, s2, s3) = (at(p1), at(p2), at(p3));
+        let ao = if s1 && s2 { 0 } else { 3 - u32::from(s1) - u32::from(s2) - u32::from(s3) };
+        bits |= ao << (2 * k);
+    }
+    bits
+}
+
 /// chiacraft: marks a record as a tree crown's face (`lod_face::CROWN_SHIFT`): packs shade far
 /// canopies as crowns, lit on top and dark in the gaps and under them.
 fn crowned(mut r: [u32; 4]) -> [u32; 4] {
@@ -344,8 +380,11 @@ fn face_of(c: &Content, looks: &super::looks::Looks, ctm: &super::ctm::Ctm, stat
     // the tint. Tinted whole, a cherry's pink blossom (its young leaves a tinted overlay) came out
     // brown-red far off in spring, round patches across the forests (Planner, 11-06: the test
     // world's shots).
+    // (The tint kind is kept for an overlay's tint: the shaders leave the base untinted where the
+    // texture has an overlay, `frames`' overlay table, as near.)
     let overlay = ctm.has_overlay(tex & face::TEX_MASK);
-    let tint = if crate::content::face_paint(info, dir, overlay).base_tinted { info.tint as u32 } else { 0 };
+    let paint = crate::content::face_paint(info, dir, overlay);
+    let tint = if paint.base_tinted || paint.overlay_tinted { info.tint as u32 } else { 0 };
     (tex & face::TEX_MASK, tint)
 }
 
@@ -482,6 +521,19 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
         l
     };
     let as_ground = |r: [u32; 4], state: u32| if leafy(state) { crowned(r) } else { r };
+    // chiacraft, after upstream Weft f69243fd (PR #107): the ground's faces take vanilla's corner
+    // shade from the cells round them (crowns and water keep none: their own shading, and water's
+    // surface is flat). A wall's lower edge takes its foot's corners, its upper its top's.
+    let solid = |ci: i32, by: i32, cj: i32| at(ci.clamp(-1, CELLS), cj.clamp(-1, CELLS)).0 >= by;
+    let ground_ao = |i: i32, j: i32, dir: usize, by: i32| corner_ao(&solid, i, j, dir, by);
+    let span_ao = |i: i32, j: i32, dir: usize, top: i32, bot: i32| {
+        let (hi, lo) = (ground_ao(i, j, dir, top), ground_ao(i, j, dir, bot));
+        crate::gpu_layout::CORNERS[dir]
+            .iter()
+            .enumerate()
+            .fold(0, |bits, (k, c)| bits | (((if c[1] == 1 { hi } else { lo }) >> (2 * k)) & 3) << (2 * k))
+    };
+    let wet = |state: u32| c.states.get(state as usize).is_some_and(|st| st.liquid.is_some());
     // A crown sitting right on the ground hides its top.
     let covered = |i: i32, j: i32| crown_at(i, j).is_some_and(|c| c.bottom <= at(i, j).0 + 1);
     for j in 0..CELLS {
@@ -492,18 +544,24 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
             let hidden = covered(i, j);
             let mut end = i + 1;
             let occ = occ_at(i, j);
+            // Tops keep none: shaded, their runs split on every slope and the far tiles' faces (and
+            // the shadow pass's) grew, about 5% of the GPU's frame (lb_aft against lb_dev); the
+            // walls carry the shade at the steps, where it shows.
+            let ao = 0xFF;
+            let ao_at = |_: i32| 0xFF;
             while end < CELLS
                 && at(end, j).0 == y
                 && top_at(end, j) == top
                 && at(end, j).2 == biome
                 && covered(end, j) == hidden
                 && occ_at(end, j) == occ
+                && ao_at(end) == ao
             {
                 end += 1;
             }
             if !hidden {
                 let (tex, tint) = face_of(top, 3);
-                out.push(as_ground(occluded(quad(3, i * s, y, j * s, ((end - i) * s, 1, s), tex, tint, biome), occ), top));
+                out.push(as_ground(shaded(occluded(quad(3, i * s, y, j * s, ((end - i) * s, 1, s), tex, tint, biome), occ), ao), top));
             }
             (lo, hi) = (lo.min(y), hi.max(y + 1));
             i = end;
@@ -550,8 +608,9 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                     s.min(y - ny)
                 };
                 let (tex, tint) = face_of(top, 3);
+                let ao = if wet(top) || leafy(top) { 0xFF } else { span_ao(i, j, dir, y, y + 1 - band) };
                 out.push(as_ground(
-                    occluded(quad(dir as u32, i * s, y + 1 - band, j * s, (s, band, s), tex, tint, biome), occ_at(i, j)),
+                    shaded(occluded(quad(dir as u32, i * s, y + 1 - band, j * s, (s, band, s), tex, tint, biome), occ_at(i, j)), ao),
                     top,
                 ));
                 lo = lo.min(ny + 1);
@@ -567,13 +626,15 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                                 break;
                             }
                             let (tex, tint) = face_of(block, dir);
-                            out.push(occluded(quad(dir as u32, i * s, b, j * s, (s, from + 1 - b, s), tex, tint, biome), occ_at(i, j)));
+                            let ao = span_ao(i, j, dir, from, b);
+                            out.push(shaded(occluded(quad(dir as u32, i * s, b, j * s, (s, from + 1 - b, s), tex, tint, biome), occ_at(i, j)), ao));
                             from = b - 1;
                         }
                     }
                     None => {
                         let (tex, tint) = face_of(under, dir);
-                        out.push(occluded(quad(dir as u32, i * s, ny + 1, j * s, (s, y - band - ny, s), tex, tint, biome), occ_at(i, j)));
+                        let ao = span_ao(i, j, dir, y - band, ny + 1);
+                        out.push(shaded(occluded(quad(dir as u32, i * s, ny + 1, j * s, (s, y - band - ny, s), tex, tint, biome), occ_at(i, j)), ao));
                     }
                 }
             }
