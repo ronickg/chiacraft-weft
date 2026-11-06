@@ -174,13 +174,13 @@ fn air_of(w: &World, id: u32, c: &Climate) -> BiomeAir {
         && climate::thunders(c.celsius, c.seasons, season, key, day);
     let wind = air::wind(c.wind, season, key, day, hour, storm);
     let mut fog = air::fog(c.fog, climate::Fog::from_index(c.fog_kind), season, key, day, hour, wind);
-    // A light dawn mist on calm, clear, damp mornings that are no fog day, at the season's sunrise.
+    // A thin dawn mist on every calm, clear morning that is no fog day, at the season's sunrise.
     let sunrise = if season.is_some() {
         12.0 - calendar::daylight_hours((day % calendar::YEAR_DAYS as u64) as f32 + hour / 24.0, base_api::calendars::FOUR_SWING) / 2.0
     } else {
         6.0
     };
-    fog = fog.max(air::dawn_mist(c.humidity, sunrise, hour, wind, raining, key, day));
+    fog = fog.max(air::dawn_mist(c.humidity, sunrise, hour, wind, raining));
     let mut flags = 0;
     if raining && place.air(day, hour, true) < air::SNOWS_BELOW {
         flags |= air_flags::SNOWING;
