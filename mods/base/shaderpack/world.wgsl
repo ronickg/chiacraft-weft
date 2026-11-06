@@ -673,7 +673,15 @@ fn water_under(in: VOut, n: vec3<f32>, v: vec3<f32>, scatter: vec3<f32>, shadow:
 // shallows (lighter and greener there), blue and opaque where deep, a mirror of the sky toward the
 // horizon (Fresnel), a path of sun glitter toward a low sun and a soft line of foam at the shore.
 // The screen's reflections (`post/reflect.wgsl`) then mirror the hills into it.
-fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
+// Water before the haze, for `translucent` to haze once: `pre` goes through the haze, `below` (the
+// bottom seen through the surface, already veiled) is added after it.
+struct WaterLit {
+    pre: vec3<f32>,
+    below: vec3<f32>,
+    a: f32,
+}
+
+fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     let v = -normalize(in.rel);
     let top = in.normal.y > 0.5;
     // The surface from below, the eye in the water: not the texture's navy but the water's own
@@ -690,10 +698,11 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
     if in_water() && abs(in.normal.y) > 0.5 && v.y < 0.0 {
         let window = smoothstep(0.55, 0.85, -v.y);
         let sky = mix(0.6, 2.4, window) * mix(0.15, 1.0, brightness_curve(in.light.x));
-        return vec4(display(haze_lit(underwater_color() * sky, in.rel, in.light.x)), 1.0);
+        return WaterLit(underwater_color() * sky, vec3(0.0), 1.0);
     }
     if (top && v.y <= 0.0) || in_liquid() {
-        return shade(in, albedo);
+        let l = shade_soft_lit(in, albedo, far_soft(in));
+        return WaterLit(l.rgb, vec3(0.0), l.a);
     }
     var n = normalize(in.normal);
     var depth = 3.0;
@@ -782,12 +791,12 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
             let d = length(in.rel);
             below *= (vec3(1.0) - haze_veil(in.rel, d)) * (1.0 - smoothstep(scene.params.y * 0.84, scene.params.y, d));
         }
-        return vec4(below + display(haze_lit(surface, in.rel, in.light.x)), 1.0);
+        return WaterLit(surface, below, 1.0);
     }
     let lost = (1.0 - fresnel) * through;
     let a = clamp(max(1.0 - lost, max(luma(glint), foam)), 0.02, 1.0);
     let c = (refl * fresnel + scatter * (1.0 - fresnel) * (1.0 - through) + glint + (lit * 0.9 + vec3(0.03)) * foam) / a;
-    return vec4(display(haze_lit(c, in.rel, in.light.x)), a);
+    return WaterLit(c, vec3(0.0), a);
 }
 
 // ---- texture sampling (the engine's) ----
@@ -989,10 +998,22 @@ fn translucent(in: VOut) -> vec4<f32> {
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     let albedo = with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv);
+    // Water and glass each lit, then one haze for both (one copy of it in the shader, as for distant
+    // terrain in `lod_color`; Android port, 11-06). The same colours.
+    var pre: vec3<f32>;
+    var below = vec3(0.0);
+    var a: f32;
     if in.kind.x == TINT_WATER {
-        return water(in, albedo, true);
+        let wl = water(in, albedo, true);
+        pre = wl.pre;
+        below = wl.below;
+        a = wl.a;
+    } else {
+        let l = shade_soft_lit(in, albedo, far_soft(in));
+        pre = l.rgb;
+        a = l.a;
     }
-    return shade(in, albedo);
+    return vec4(below + display(haze_lit(pre, in.rel, in.light.x)), a);
 }
 
 @fragment
@@ -1069,11 +1090,7 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
 // Far water (distant terrain's): deep, a dark mirror of the sky with the sun's path on it, as Photon's
 // and Bliss's far seas are (Planner, 11-05: "its far water is a flat dark mirror reflecting the sky").
 // Through `water()` it took the near water's shallow depth and bottom, and read pale and milky.
-fn far_water(in: VOut) -> vec3<f32> {
-    return display(haze_lit(far_water_lit(in), in.rel, in.light.x));
-}
-
-// `far_water` before the haze.
+// (Before the haze, which `lod_color` adds once for land and water.)
 fn far_water_lit(in: VOut) -> vec3<f32> {
     let v = -normalize(in.rel);
     let n = wave_normal(in.pos, in.dist, v.y);
