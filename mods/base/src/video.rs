@@ -790,6 +790,7 @@ pub(crate) fn measured_rows(tab: crate::video_costs::Tab) -> Vec<crate::video_co
                 // A new world shader each change, and its scene.
                 keys.push(("rt_shadows", 2.0));
                 keys.push(("rt_reflections", 2.0));
+                keys.push(("pt_denoiser", 1.0));
             }
             pick(&EXTRA_ROWS, &keys)
         }
