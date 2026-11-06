@@ -227,8 +227,9 @@ pub struct PtGuides {
     pub albedo: TextureId,
     /// rgb the reflectance at normal incidence (F0).
     pub spec: TextureId,
-    /// The path tracer's specular light; a how far its ray went (blocks).
-    pub specular: TextureId,
+    /// The path tracer's specular light; a how far its ray went (blocks). None before it has one:
+    /// no hit distance then.
+    pub specular: Option<TextureId>,
 }
 
 static BLOOM: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -330,6 +331,9 @@ pub struct Post {
     /// From the path tracer's G-buffer (`set_pt_guides`): this frame's, the pipeline drawing the
     /// specular albedo and hit distance from it (`fs_pt_guides`), and those two images.
     pt_guides: Option<PtGuides>,
+    /// `fs_pt_guides_a` (normals + roughness and albedo from the G-buffer, estimated where it is
+    /// empty) and `fs_pt_guides` (specular albedo and hit distance).
+    pt_pipe_a: Option<PipelineId>,
     pt_pipe: Option<PipelineId>,
     pt_targets: Option<([TextureId; 2], (u32, u32))>,
     up_held: Option<(UpscaleMode, bool, (u32, u32), (u32, u32))>,
@@ -376,6 +380,7 @@ impl Post {
             upscale: None,
             denoiser: crate::denoise::Denoiser::new(gpu, assets),
             pt_guides: None,
+            pt_pipe_a: None,
             pt_pipe: None,
             pt_targets: None,
             up_out: None,
@@ -441,7 +446,10 @@ impl Post {
             gpu.destroy_pipeline(a);
             gpu.destroy_pipeline(b);
         }
-        if let Some(p) = self.pt_pipe.take() {
+        for p in [self.pt_pipe.take(), self.pt_pipe_a.take()]
+            .into_iter()
+            .flatten()
+        {
             gpu.destroy_pipeline(p);
         }
         let info = gpu.upscaler();
@@ -469,7 +477,12 @@ impl Post {
                 // Normals and roughness, with the albedo beside them (the second image).
                 let guides = make("upscale guides", "fs_guides", true)?;
                 match make("upscale specular", "fs_specular", false) {
-                    Ok(sp) => Ok((guides, sp, make("upscale pt guides", "fs_pt_guides", true))),
+                    Ok(sp) => Ok((
+                        guides,
+                        sp,
+                        make("upscale pt guides", "fs_pt_guides", true)
+                            .and_then(|b| make("upscale pt guides a", "fs_pt_guides_a", true).map(|a| (a, b))),
+                    )),
                     Err(e) => {
                         gpu.destroy_pipeline(guides);
                         Err(e)
@@ -480,7 +493,10 @@ impl Post {
             Ok((g, sp, pt)) => {
                 self.guide_pipes = Some((g, sp));
                 match pt {
-                    Ok(p) => self.pt_pipe = Some(p),
+                    Ok((a, b)) => {
+                        self.pt_pipe_a = Some(a);
+                        self.pt_pipe = Some(b);
+                    }
                     Err(e) => log::error!("upscaler guides from the G-buffer: {e}"),
                 }
             }
@@ -940,7 +956,25 @@ impl Post {
             let mut g = [NO_TEXTURE; 3];
             let mut hit = NO_TEXTURE;
             let pt = self.pt_guides.take();
-            if let (true, Some(pt), Some(pt_pipe)) = (u.reconstruct, pt, self.pt_pipe) {
+            if let (true, Some(pt), Some(pt_pipe), Some(pt_pipe_a)) = (u.reconstruct, pt, self.pt_pipe, self.pt_pipe_a) {
+                if self.guides.is_none_or(|t| t.1 != (w, h)) {
+                    if let Some((old, _)) = self.guides.take() {
+                        old.into_iter().for_each(|t| gpu.destroy_texture(t));
+                    }
+                    let t = [rt(gpu, w, h, "guide normals"), rt(gpu, w, h, "guide albedo"), rt(gpu, w, h, "guide specular")];
+                    self.guides = Some((t, (w, h)));
+                }
+                let ga = self.guides.unwrap().0;
+                // Normals and albedo: the G-buffer's, estimated from the picture where it drew nothing.
+                taa_entries.push(Pass {
+                    scene: idx[0],
+                    size: [w as f32, h as f32],
+                    depth,
+                    low: gpu.texture_index(pt.normal) + 1,
+                    bloom: gpu.texture_index(pt.albedo) + 1,
+                    ..Pass::default()
+                });
+                taa_draws.push((ga[0], Some(ga[1]), pt_pipe_a, taa_entries.len() - 1));
                 if self.pt_targets.is_none_or(|t| t.1 != (w, h)) {
                     if let Some((old, _)) = self.pt_targets.take() {
                         old.into_iter().for_each(|t| gpu.destroy_texture(t));
@@ -952,14 +986,14 @@ impl Post {
                     scene: gpu.texture_index(pt.spec),
                     size: [w as f32, h as f32],
                     depth,
-                    low: gpu.texture_index(pt.normal) + 1,
-                    bloom: gpu.texture_index(pt.specular) + 1,
+                    low: gpu.texture_index(ga[0]) + 1,
+                    bloom: pt.specular.map_or(0, |s| gpu.texture_index(s) + 1),
                     ..Pass::default()
                 };
                 taa_entries.push(pt_entry);
                 taa_draws.push((t[0], Some(t[1]), pt_pipe, taa_entries.len() - 1));
-                g = [pt.normal, pt.albedo, t[0]];
-                hit = t[1];
+                g = [ga[0], ga[1], t[0]];
+                hit = if pt.specular.is_some() { t[1] } else { NO_TEXTURE };
             } else if let (true, Some((guide_pipe, spec_pipe))) = (u.reconstruct, self.guide_pipes) {
                 if self.guides.is_none_or(|t| t.1 != (w, h)) {
                     if let Some((old, _)) = self.guides.take() {

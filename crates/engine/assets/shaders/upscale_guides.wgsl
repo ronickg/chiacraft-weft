@@ -90,6 +90,12 @@ struct GuideOut {
 
 @fragment
 fn fs_guides(in: VOut) -> GuideOut {
+    return guides_estimated(in);
+}
+
+// The estimates from the picture and depth (`fs_guides`, and `fs_pt_guides_a` where the G-buffer
+// is empty).
+fn guides_estimated(in: VOut) -> GuideOut {
     let pass_ = passes[in.pass_index];
     let size = vec2<i32>(pass_.size);
     let at = vec2<i32>(in.clip.xy);
@@ -129,7 +135,26 @@ struct PtGuideOut {
     @location(1) hit_distance: vec4<f32>,
 }
 
-// From the path tracer's G-buffer (`post::PtGuides`): the specular albedo by the surface's own F0
+// From the path tracer's G-buffer (`post::PtGuides`), first pass: its normals + roughness and
+// albedo as they are, and where it drew nothing on a surface (mobs, distant tiles, water and glass:
+// it holds opaque and cutout terrain only) the estimates `fs_guides` makes. Entry: `scene` the
+// world's picture, `low` the G-buffer's normals + 1, `bloom` its albedo + 1, `depth`, `size`.
+@fragment
+fn fs_pt_guides_a(in: VOut) -> GuideOut {
+    let pass_ = passes[in.pass_index];
+    let size = vec2<i32>(pass_.size);
+    let at = vec2<i32>(in.clip.xy);
+    let nr = textureLoad(textures[pass_.low - 1u], at, 0);
+    if textureLoad(textures[pass_.depth], at, 0).r > 0.0 && length(nr.xyz) > 0.5 {
+        var out: GuideOut;
+        out.normal_roughness = vec4(normalize(nr.xyz), clamp(nr.w, 0.0, 1.0));
+        out.albedo = vec4(textureLoad(textures[pass_.bloom - 1u], at, 0).rgb, 1.0);
+        return out;
+    }
+    return guides_estimated(in);
+}
+
+// Second pass: the specular albedo by the surface's own F0
 // and roughness (the same `pt_spec_albedo` the path tracer divided by), and the specular hit
 // distance in r. Entry: `scene` the F0 image, `low` the normals + roughness + 1, `bloom` the path
 // tracer's specular light + 1 (its alpha the hit distance), `depth`, `size`.
@@ -139,16 +164,23 @@ fn fs_pt_guides(in: VOut) -> PtGuideOut {
     let size = vec2<i32>(pass_.size);
     let at = vec2<i32>(in.clip.xy);
     var out: PtGuideOut;
-    if textureLoad(textures[pass_.depth], at, 0).r <= 0.0 || pass_.low == 0u || pass_.bloom == 0u {
+    if textureLoad(textures[pass_.depth], at, 0).r <= 0.0 || pass_.low == 0u {
         out.specular = vec4(0.0);
         out.hit_distance = vec4(0.0);
         return out;
     }
     let nr = textureLoad(textures[pass_.low - 1u], at, 0);
-    let f0 = textureLoad(textures[pass_.scene], at, 0).rgb;
+    var f0 = textureLoad(textures[pass_.scene], at, 0).rgb;
+    if max(f0.r, max(f0.g, f0.b)) <= 0.0 {
+        f0 = vec3(0.04);
+    }
     let v = -normalize(guide_position(pass_.depth, at, size));
     let n = normalize(nr.xyz + vec3(0.0, 0.0, 1e-6));
     out.specular = vec4(pt_spec_albedo(f0, nr.w, abs(dot(n, v))), 1.0);
-    out.hit_distance = vec4(max(textureLoad(textures[pass_.bloom - 1u], at, 0).a, 0.0), 0.0, 0.0, 1.0);
+    var hit = 0.0;
+    if pass_.bloom != 0u {
+        hit = max(textureLoad(textures[pass_.bloom - 1u], at, 0).a, 0.0);
+    }
+    out.hit_distance = vec4(hit, 0.0, 0.0, 1.0);
     return out;
 }
