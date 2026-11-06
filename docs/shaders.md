@@ -186,6 +186,6 @@ chiacraft's pack reads these settings (`mods/base/src/look.rs`; Mod Settings in 
 | `base:look_foliage_test` | 0, 0-1 | a test: grass and leaf tints darker and less yellow (1: 30% darker) |
 | `base:look_ao_test` | 0, 0-1 | a test: takes the corner shade (AO) away |
 | `base:look_sharpen` | 0.4, 0-1 | with the HDR world: contrast-adaptive sharpening in the last pass (Bliss runs 0.35-0.4) |
-| `base:look_leaf_sun` | 2, 0.5-4 | with the HDR world: the sun on leaves' lit faces (1 as before) |
+| `base:look_leaf_sun` | 1, 0.5-4 | with the HDR world: the sun on leaves' lit faces (not on plants; 2 overshot on real meshes in Bliss's own world) |
 | `base:look_leaf_holes` | 1, 0-1 | with the HDR world: leaves keep their see-through holes at a distance (alpha one mip sharper, cut at 0.5, as Minecraft's leaves); 0 the old 0.1 cut |
 

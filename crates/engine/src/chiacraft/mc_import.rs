@@ -160,7 +160,7 @@ fn first_dir(list: &[PathBuf]) -> Option<PathBuf> {
 }
 
 /// Imports the Minecraft world `--import-mc` names into `meta`'s world, if asked and not done yet.
-pub fn maybe_import(meta: &WorldMeta, c: &Content) {
+pub fn maybe_import(meta: &mut WorldMeta, c: &Content) {
     let opts = crate::app::api::launch_options();
     let Some(src) = opts.get("import-mc") else { return };
     let marker = meta.dir.join("mc_import.txt");
@@ -180,6 +180,11 @@ pub fn maybe_import(meta: &WorldMeta, c: &Content) {
         log::error!("mc import: no region folder in {}", src.display());
         return;
     };
+    // A test scene: nothing spawns in it from the first tick (scripts set the rule only after
+    // they load, and players spawned into the imported land were killed before that).
+    meta.configs.retain(|(name, _)| name != "core:mob_spawning");
+    meta.configs.push(("core:mob_spawning".into(), 0.0));
+    meta.save();
     let start = Instant::now();
     let def = &c.dims[dim];
     // Minecraft's overworld is y -64 to 319: cubes -4 to 19.
