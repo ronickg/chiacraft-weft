@@ -497,7 +497,11 @@ fn wave_height(p: vec2<f32>, t: f32, detail: f32) -> f32 {
     var h = wave_layer(q, t, 0.0, vec2(6.0, 1.6), 0.10);
     h += wave_layer(q, t, 1.0, vec2(1.6, 6.0), 0.08);
     h += wave_layer(q, t, 2.0, vec2(3.2, 3.2), 0.07);
-    h += wave_layer(q, t * 1.3, 3.0, vec2(0.8, 0.8), 0.022) * detail;
+    // The finest ripples only where they show: past 56 blocks `detail` is 0 and their noise was
+    // worked out for nothing, three times a pixel over all far water (Android port, 11-06).
+    if detail > 0.0 {
+        h += wave_layer(q, t * 1.3, 3.0, vec2(0.8, 0.8), 0.022) * detail;
+    }
     return h * (0.7 + 0.3 * smoothstep(1.0, 8.0, speed));
 }
 
