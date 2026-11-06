@@ -17,8 +17,8 @@ press core:use
 until screen core:menu within 10
 wait 1
 tap core:menu text:parts
-tap_once core:menu class:slot
-tap core:menu text:all (
+tap_once core:menu icon:base:part_felling_axe_head
+tap core:menu text:max (
 wait 1
 key Escape
 until screen none within 10
@@ -27,8 +27,8 @@ press core:use
 until screen core:menu within 10
 wait 1
 tap core:menu text:parts
-tap_once core:menu class:slot
-tap core:menu text:all (
+tap_once core:menu icon:base:part_haft
+tap core:menu text:max (
 wait 1
 key Escape
 until screen none within 10
@@ -37,8 +37,8 @@ press core:use
 until screen core:menu within 10
 wait 1
 tap core:menu text:parts
-tap_once core:menu class:slot
-tap core:menu text:all (
+tap_once core:menu icon:base:part_lashing
+tap core:menu text:max (
 wait 1
 # 2. Build the axe and hold it.
 tap_once core:menu slot:43
