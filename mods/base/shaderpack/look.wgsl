@@ -597,6 +597,17 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
             c = mix(c, cream * (luma(c) / luma(cream)), dawn * 0.7);
         }
     }
+    // In the HDR world by day the band just over the horizon darker and a blue-grey, not the sky's
+    // brightest part: in Bliss's own world 2-6 degrees up reads 164-177 at noon and 152-158 at 17-18,
+    // ours 187-208, a flat warm cream at 17-18, and the far land fogged into it as bright (Look's
+    // measures, mist off, 11-06). Here, so the land's haze that reads this colour comes down with it.
+    if scene.frame.x > 0.5 {
+        let band = 1.0 - smoothstep(0.0, 0.13, dir.y);
+        let day = smoothstep(0.0, 0.1, scene.sun.y) * (1.0 - rain_amount());
+        let k = band * day;
+        let grey = vec3(luma(c)) * vec3(0.9, 0.97, 1.08);
+        c = mix(c, grey, k * 0.45) * (1.0 - 0.4 * k);
+    }
     c += sun_glow(dir, p);
     // In the HDR world the air round the sun glows as bright as it really is (Mie scattering's
     // forward peak, a wide lobe and a tight one in the sun's own colour, strongest low), which the
