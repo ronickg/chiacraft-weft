@@ -11,13 +11,13 @@ until screen core:menu within 10
 wait 1
 shot book_hands_open.png
 # The first recipe is the one you can make: oak planks from the log.
-tap_once core:menu class:slot
+tap_once core:menu icon:base:oak_planks
 wait 1
 shot book_hands_picked.png
-tap core:menu text:all (
+tap core:menu text:max (
 wait 1
 chat /tk inv me
-until chat base:oak_bark within 5
+until chat 0:base:oak_planks:4 within 5
 shot book_hands_after.png
 key Escape
 until screen none within 10
