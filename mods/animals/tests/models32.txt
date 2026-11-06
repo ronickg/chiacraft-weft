@@ -216,8 +216,8 @@ shot m32_big_b.png
 chat /tp 540 ~ 0
 wait 3
 chat /tk spawn animals:nest ~0 ~ ~3
-chat /tk spawn animals:egg ~1 ~ ~3
-chat /tk spawn animals:egg ~-1 ~ ~4
+chat /tk spawn animals:egg_dromaeosaur ~1 ~ ~3
+chat /tk spawn animals:egg_wyvern ~-1 ~ ~4
 wait 1
 look 180 -55
 wait 1
