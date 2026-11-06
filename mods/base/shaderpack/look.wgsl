@@ -1622,7 +1622,8 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // 20; none at noon). Only far off (from about 900 blocks), so the near land stays clear, and
     // as deep as a look runs inside the layer, so it is a band, not a veil.
     if hdr_air > 0.0 {
-        let low = (1.0 - smoothstep(0.2, 0.45, scene.sun.y));
+        // (Through 17:00 too, the sun 22° up: from 0.2 it was a third there and barely showed, lk_eb3.)
+        let low = (1.0 - smoothstep(0.32, 0.52, scene.sun.y));
         // (After the handover to the sky where the terrain ends: before it, the farthest land, where
         // the band lies, took the sky's colour over it, lk_eb1.)
         // (From 600 blocks it lay on the nearer hills too, a wide pale wash, not Bliss's thin band
