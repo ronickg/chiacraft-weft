@@ -338,6 +338,11 @@ impl Settings {
         number("core:pt_denoise_test") != 0.0
     }
 
+    /// The denoiser's tuning (`core:pt_dn_phi`, `core:pt_dn_steps`), live.
+    pub fn pt_dn_tuning(&self) -> (f32, u32) {
+        ((number("core:pt_dn_phi") as f32).clamp(0.25, 16.0), (number("core:pt_dn_steps") as u32).clamp(1, 5))
+    }
+
     /// How the path tracer's light is denoised (`core:pt_denoiser`: 0 raw, 1 ours), live.
     pub fn pt_denoiser(&self) -> u32 {
         (number("core:pt_denoiser") as u32).min(crate::denoise::SVGF)

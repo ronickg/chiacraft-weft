@@ -90,6 +90,10 @@ pub struct Denoiser {
     pub mode: u32,
     /// Ray Reconstruction denoises this frame (`core:dlss_rr` under DLSS): the raw light then.
     pub reconstruct: bool,
+    /// How far the light may differ between texels the à-trous steps join (standard deviations of
+    /// its noise) and how many steps run (1-5, each twice as wide): `core:pt_dn_phi`, `core:pt_dn_steps`.
+    pub phi_color: f32,
+    pub steps: u32,
     /// The test's images (`run_test`): noisy light, normals, zero specular and F0, the result.
     test: Option<((u32, u32), [TextureId; 4])>,
     test_frame: u32,
@@ -124,6 +128,8 @@ impl Denoiser {
             params: Vec::new(),
             mode: SVGF,
             reconstruct: false,
+            phi_color: 4.0,
+            steps: STEPS,
             test: None,
             test_frame: 0,
             test_sky: false,
@@ -252,7 +258,7 @@ impl Denoiser {
             size: [f.size.0 as f32, f.size.1 as f32],
             alpha: 0.05,
             max_len: 32.0,
-            phi_color: 4.0,
+            phi_color: self.phi_color,
             phi_normal: 128.0,
             ..DenoisePass::default()
         };
@@ -290,7 +296,7 @@ impl Denoiser {
             // between the step pair.
             let mut src = (im.step_diffuse[0].1, im.step_specular[0].1);
             let mut next = 1;
-            for k in 0..STEPS {
+            for k in 0..self.steps.clamp(1, STEPS) {
                 let (td, ts) =
                     if k == 0 { (im.feed_diffuse[cur], im.feed_specular[cur]) } else { (im.step_diffuse[next], im.step_specular[next]) };
                 entries.push(DenoisePass { diffuse: src.0, specular: src.1, step: 1 << k, ..lit });
