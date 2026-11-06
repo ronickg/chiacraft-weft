@@ -183,7 +183,9 @@ struct Sweep {
     secs: f32,
     frames: u32,
     sum: f64,
-    results: Vec<f64>,
+    sum2: f64,
+    /// Each step's mean GPU ms and its standard error.
+    results: Vec<(f64, f64)>,
     before: Vec<f64>,
     window: [u32; 2],
 }
@@ -197,7 +199,9 @@ pub fn sweep_secs(rows: &[Measured]) -> f32 {
         .sum()
 }
 
-const MEASURE_SECS: f32 = 0.5;
+/// How long each value is measured: long enough that a few tenths of a millisecond stand out of a
+/// frame's own spread (the PC's sweep: ±0.4 ms between frames under traced shadows).
+const MEASURE_SECS: f32 = 0.8;
 
 /// Starts measuring `rows` (none while one runs).
 pub fn start(rows: Vec<Measured>, window: [u32; 2]) {
@@ -212,7 +216,19 @@ pub fn start(rows: Vec<Measured>, window: [u32; 2]) {
         .collect();
     let before = rows.iter().map(|r| (r.get)()).collect();
     weft_sdk::info!("video costs: measuring {} rows", rows.len());
-    *s = Some(Sweep { rows, steps, at: 0, measuring: false, secs: 0.0, frames: 0, sum: 0.0, results: Vec::new(), before, window });
+    *s = Some(Sweep {
+        rows,
+        steps,
+        at: 0,
+        measuring: false,
+        secs: 0.0,
+        frames: 0,
+        sum: 0.0,
+        sum2: 0.0,
+        results: Vec::new(),
+        before,
+        window,
+    });
     OFFERED.set(true);
 }
 
@@ -258,19 +274,23 @@ fn frame(c: &Client) {
     s.frames += 1;
     if !s.measuring {
         if s.secs >= s.rows[row].settle && s.frames >= 10 {
-            (s.measuring, s.secs, s.frames, s.sum) = (true, 0.0, 0, 0.0);
+            (s.measuring, s.secs, s.frames, s.sum, s.sum2) = (true, 0.0, 0, 0.0, 0.0);
         }
         return;
     }
     s.sum += st.gpu_ms as f64;
-    if s.secs >= MEASURE_SECS && s.frames >= 20 {
-        s.results.push(s.sum / s.frames as f64);
-        (s.measuring, s.secs, s.frames, s.sum) = (false, 0.0, 0, 0.0);
+    s.sum2 += (st.gpu_ms as f64).powi(2);
+    if s.secs >= MEASURE_SECS && s.frames >= 30 {
+        let n = s.frames as f64;
+        let mean = s.sum / n;
+        let var = (s.sum2 / n - mean * mean).max(0.0);
+        s.results.push((mean, (var / n).sqrt()));
+        (s.measuring, s.secs, s.frames, s.sum, s.sum2) = (false, 0.0, 0, 0.0, 0.0);
         s.at += 1;
     }
 }
 
-/// The sweep's costs kept (each over its row's cheapest), and every row as it was.
+/// The sweep's costs kept (each over its row's first value), and every row as it was.
 fn finish(s: &mut Sweep) {
     for (i, r) in s.rows.iter().enumerate() {
         (r.set)(s.before[i]);
@@ -289,19 +309,21 @@ fn finish(s: &mut Sweep) {
         );
     }
     for (i, r) in s.rows.iter().enumerate() {
-        let got: Vec<(f64, f64)> = s
+        let got: Vec<(f64, (f64, f64))> = s
             .steps
             .iter()
             .zip(&s.results)
             .filter(|(st, _)| st.0 == i)
-            .map(|(st, ms)| (st.1, *ms))
+            .map(|(st, m)| (st.1, *m))
             .collect();
-        let Some(cheapest) = got.iter().map(|g| g.1).min_by(|a, b| a.total_cmp(b)) else {
-            continue;
-        };
-        for (v, ms) in got {
-            let cost = (ms - cheapest).max(0.0);
-            weft_sdk::info!("video cost: {} {} {:.3} ms (frame {:.3} ms)", r.key, v, cost, ms);
+        // Against the row's first value, its Off or least (Ronald: "Against Off").
+        let Some(&(_, (base, base_se))) = got.first() else { continue };
+        for (v, (ms, se)) in got {
+            // Within twice the two means' error it is the frame's own spread, not a cost.
+            let d = ms - base;
+            let noise = 2.0 * (se * se + base_se * base_se).sqrt();
+            let cost = if d > noise { d } else { 0.0 };
+            weft_sdk::info!("video cost: {} {} {:.3} ms (frame {:.3} ms ±{:.3})", r.key, v, cost, ms, se);
             kept.push(format!("{}={}:{:.3}", r.key, v, cost));
         }
     }
