@@ -340,7 +340,11 @@ fn corner_data(
         let r3 = (t(i3).lets_into(t(i1), to_b) && r1) || (t(i3).lets_into(t(i2), to_a) && r2);
         let mut sum = [0u32; 4];
         let mut count = 0;
-        for (idx, solid) in [(i0, false), (i1, s1 || !r1), (i2, s2 || !r2), (i3, s3 || (s1 && s2) || !r3)] {
+        // Light comes from every cell but solid ones; leaves under `core:mc_leaves` shade the
+        // corner (AO above) and still give their own light, as vanilla's do.
+        let lit = |i: usize| ctm.hides(c.tight[n.states[i] as usize].flags, n.states[i]);
+        let (h1, h2, h3) = (lit(i1), lit(i2), lit(i3));
+        for (idx, solid) in [(i0, false), (i1, h1 || !r1), (i2, h2 || !r2), (i3, h3 || (h1 && h2) || !r3)] {
             // A block with holes is still opaque to light, there is none in it to go by.
             if solid || n.light[idx] == ABSENT || ctm.is_open(n.states[idx]) {
                 continue;
