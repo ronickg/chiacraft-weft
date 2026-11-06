@@ -44,10 +44,11 @@ fn taa_rgb(c: vec3<f32>) -> vec3<f32> {
 
 // This frame's color at a texel, finite, and weighed down where it is bright (Karis): one sun
 // glint or a lit leaf's edge then can't flicker the whole gathered pixel.
-fn taa_texel(tex: u32, at: vec2<i32>, size: vec2<i32>) -> vec3<f32> {
-    let c = textureLoad(textures[tex], clamp(at, vec2(0), size - 1), 0).rgb;
-    let f = select(vec3(0.0), min(c, vec3(6.0e4)), c == c);
-    return max(f, vec3(0.0));
+// Its alpha (the world image's, chiacraft's water mask) as it is, in w: one load for both.
+fn taa_texel(tex: u32, at: vec2<i32>, size: vec2<i32>) -> vec4<f32> {
+    let t = textureLoad(textures[tex], clamp(at, vec2(0), size - 1), 0);
+    let f = select(vec3(0.0), min(t.rgb, vec3(6.0e4)), t.rgb == t.rgb);
+    return vec4(max(f, vec3(0.0)), t.a);
 }
 
 fn taa_tone(c: vec3<f32>) -> vec3<f32> {
@@ -85,7 +86,7 @@ fn taa_camera_motion(at: vec2<i32>, d: f32, size: vec2<f32>) -> vec2<f32> {
 fn taa_motion(motion: u32, depth: u32, at: vec2<i32>, size: vec2<i32>) -> vec2<f32> {
     let p = clamp(at, vec2(0), size - 1);
     let d = textureLoad(textures[depth], p, 0).r;
-    if motion != 0u {
+    if motion != 0u && motion != 0xffffffffu {
         let m = textureLoad(textures[motion - 1u], p, 0);
         if m.z > 0.0 && abs(m.z - d) <= max(d * 4.0e-3, 1.0e-7) {
             return m.xy;
@@ -121,7 +122,8 @@ fn taa_history(tex: u32, uv: vec2<f32>) -> vec4<f32> {
 
 struct TaaOut {
     @location(0) color: vec4<f32>,
-    // The frames gathered here (r), read next frame as `exposure`.
+    // The frames gathered here (r), read next frame as `exposure`, and how far this pixel moved this
+    // frame in pixels (g), for a pack's sharpening in motion (`Scene::taa_frame`).
     @location(1) count: vec4<f32>,
 }
 
@@ -161,8 +163,9 @@ fn fs_taa(in: VOut) -> TaaOut {
     for (var j = -1; j <= 1; j++) {
         for (var i = -1; i <= 1; i++) {
             let p = at + vec2(i, j);
-            let c = taa_ycocg(taa_tone(taa_texel(pass_.scene, p, isize)));
-            let a = clamp(textureLoad(textures[pass_.scene], clamp(p, vec2(0), isize - 1), 0).a, 0.0, 1.0);
+            let texel = taa_texel(pass_.scene, p, isize);
+            let c = taa_ycocg(taa_tone(texel.rgb));
+            let a = clamp(texel.a, 0.0, 1.0);
             lo_a = min(lo_a, a);
             hi_a = max(hi_a, a);
             if i == 0 && j == 0 {
@@ -222,7 +225,7 @@ fn fs_taa(in: VOut) -> TaaOut {
     let out = taa_untone(taa_rgb(mix(clipped, here, w)));
     // The alpha (the water mask) gathered as the color, held to this frame's neighbourhood.
     let a = mix(clamp(hist.a, lo_a, hi_a), here_a, w);
-    return TaaOut(vec4(max(out, vec3(0.0)), a), vec4(mix(n + 1.0, 1.0, reactive), 0.0, 0.0, 0.0));
+    return TaaOut(vec4(max(out, vec3(0.0)), a), vec4(mix(n + 1.0, 1.0, reactive), px, 0.0, 0.0));
 }
 
 // The whole motion image for an upscaler (DLSS, Arm ASR: `post::TemporalInputs`): xy the motion

@@ -170,6 +170,7 @@ entity.animals.egg_bird_hawk = Hawk Egg
 entity.animals.egg_bird_vulture = Vulture Egg
 entity.animals.egg_bird_mesozoic = Ancient Bird Egg
 entity.animals.nest = Nest
+entity.animals.nest_cup = Bird's Nest
 item.animals.nest = Nest
 item.animals.raptor_egg = Velociraptor Egg
 item.animals.utahraptor_egg = Utahraptor Egg

@@ -91,6 +91,13 @@ shared! {
         /// (`client::lod`'s `openness`), for packs that darken valleys and the gaps between crowns.
         OCC_SHIFT = 29,
         OCC_MASK = 3,
+        /// chiacraft, after upstream Weft f69243fd (PR #107): word 3's spare bits (the sizes take 11
+        /// of each 16) hold a box face's corner shade, 2 bits per corner (`CORNERS` order), stored
+        /// as 3 minus vanilla's AO (0: none, so faces without it read open): corners 0-1 from bit
+        /// 12, 2-3 from bit 28 (`client::lod`, WGSL `lod_ao`).
+        AO_LO_SHIFT = 12,
+        AO_HI_SHIFT = 28,
+        SIZE_MASK = 2047,
     }
     /// Tint kinds of faces and quads (0 none); mods' kinds follow the engine's.
     tint {
@@ -557,12 +564,13 @@ fn records() -> String {
         "    return vec3<f32>(f32(w0 & LOD_FACE_POS_MASK), f32(bitcast<i32>(w2 << LOD_FACE_HALF_SHIFT) >> LOD_FACE_HALF_SHIFT), f32((w0 >> LOD_FACE_Z_SHIFT) & LOD_FACE_POS_MASK));\n",
         "}\n",
         "fn lod_size(w2: u32, w3: u32) -> vec3<f32> {\n",
-        "    return vec3<f32>(f32(w3 & LOD_FACE_HALF_MASK), f32(w2 >> LOD_FACE_HALF_SHIFT), f32(w3 >> LOD_FACE_HALF_SHIFT));\n",
+        "    return vec3<f32>(f32(w3 & LOD_FACE_SIZE_MASK), f32(w2 >> LOD_FACE_HALF_SHIFT), f32((w3 >> LOD_FACE_HALF_SHIFT) & LOD_FACE_SIZE_MASK));\n",
         "}\n",
         "fn lod_dir(w0: u32) -> u32 {\n    return (w0 >> LOD_FACE_DIR_SHIFT) & FACE_DIR_MASK;\n}\n",
         "fn lod_tint(w0: u32) -> u32 {\n    return (w0 >> LOD_FACE_TINT_SHIFT) & TINT_MASK;\n}\n",
         "fn lod_crown(w0: u32) -> bool {\n    return (w0 >> LOD_FACE_CROWN_SHIFT) != 0u;\n}\n",
         "fn lod_occ(w0: u32) -> u32 {\n    return (w0 >> LOD_FACE_OCC_SHIFT) & LOD_FACE_OCC_MASK;\n}\n",
+        "fn lod_ao(w3: u32) -> vec4<u32> {\n    let a = ((w3 >> LOD_FACE_AO_LO_SHIFT) & 15u) | (((w3 >> LOD_FACE_AO_HI_SHIFT) & 15u) << 4u);\n    return vec4<u32>(3u) - vec4<u32>(a & 3u, (a >> 2u) & 3u, (a >> 4u) & 3u, (a >> 6u) & 3u);\n}\n",
     ));
     s
 }
@@ -778,7 +786,9 @@ gpu_struct! {
         pub upscale: [f32; 4],
         /// Ray-traced sun and moon shadows (`core:rt_shadows`, a GPU with ray queries): x 1 when
         /// the world's shader traces them this frame (its prelude then has `rt_sun`; the near shadow
-        /// map then holds the models alone, the far one the terrain as before), yzw unused.
+        /// map then holds the models alone, the far one the terrain as before), y a frame count
+        /// (to 2^24, for noise that moves every frame), z 1 for soft edges from more rays a pixel
+        /// (`core:rt_shadows` 2: `rt_sun_soft`'s `fine`), w unused.
         pub rt: [f32; 4],
         /// Temporal anti-aliasing (`post::Temporal`, `core:aa`): xy this frame's jitter in NDC
         /// (`view_proj` has it, `taa_prev` not; a clip position's `xy / w - taa.xy` is where it
@@ -790,6 +800,16 @@ gpu_struct! {
         /// (`@location(1)`, `weft_render::MOTION_FORMAT`) puts a point's position last frame
         /// through it.
         pub taa_prev: [[f32; 4]; 4],
+        /// What temporal anti-aliasing writes this frame, for the screen effects after it: x the
+        /// bindless index + 1 of its count image (r the frames gathered in each pixel, g how far
+        /// the pixel moved this frame in pixels: a gathered picture is softer where it moves, and
+        /// a pack may sharpen it more there); 0 without. y 1 when the world's pass has the motion
+        /// image (`core:aa` 1): shaders skip their motion's work without it. zw unused.
+        pub taa_frame: [f32; 4],
+        /// Under the backend's upscaler (DLSS, `post::set_upscaling`): x the texture mip bias, in
+        /// levels (NVIDIA's log2(render / output) - 1; 0 without), which a pack's world shader adds
+        /// to its block textures' level; yzw unused.
+        pub dlss: [f32; 4],
     }
 }
 
@@ -1246,6 +1266,10 @@ bindings! {
         PASSES "passes": "array<Pass>",
         SCENE "scene": "Scene",
     }
+    upscale_guides "upscale_guides.wgsl" {
+        PASSES "passes": "array<Pass>",
+        SCENE "scene": "Scene",
+    }
 }
 
 /// Whether the block at `p` (block coordinates) casts a shadow, as far as the client has it
@@ -1404,6 +1428,7 @@ pub fn prelude(shader: &str, common: &str) -> String {
         s.push_str(if RT_PRELUDE.load(std::sync::atomic::Ordering::Relaxed) { RT_SUN } else { RT_SUN_OFF });
     }
     s.push_str(CALM_OFF);
+    s.push_str(DRY_OFF);
     s.push_str(common);
     s.push('\n');
     s
@@ -1430,6 +1455,12 @@ pub mod rt_bind {
 
 const RT_SUN_OFF: &str = "
 fn rt_sun(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool) -> vec3<f32> {
+    return vec3(1.0);
+}
+fn rt_cone(l: vec3<f32>, radius: f32, px: vec2<f32>) -> vec3<f32> {
+    return l;
+}
+fn rt_sun_soft(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool, radius: f32, px: vec2<f32>, fine: bool) -> vec3<f32> {
     return vec3(1.0);
 }
 ";
@@ -1459,6 +1490,60 @@ fn rt_lod_hidden(rel: vec3<f32>) -> bool {
         return ((lod_mask[i / 32u] >> (i % 32u)) & 1u) != 0u;
     }
     return false;
+}
+
+// A direction toward a point of the light's disc round `l` (unit), `radius` radians across from its
+// middle, for the pixel at `px` (`@builtin(position)`): a different point each frame of temporal
+// anti-aliasing's jitter (`scene.taa.xy`), so its history averages one ray a pixel into the
+// penumbra a light of that size casts (soft shadows from one ray). `l` itself without the jitter.
+fn rt_cone(l: vec3<f32>, radius: f32, px: vec2<f32>) -> vec3<f32> {
+    return rt_cone_at(l, radius, px, 0.0);
+}
+
+// The same, turned by `turn` (0..1 of a circle) and its distance from the middle mirrored for odd
+// halves, for further rays of one pixel spread over the disc (`rt_sun_soft`).
+fn rt_cone_at(l: vec3<f32>, radius: f32, px: vec2<f32>, turn: f32) -> vec3<f32> {
+    let j = scene.taa.xy;
+    if j.x == 0.0 && j.y == 0.0 {
+        return l;
+    }
+    // Interleaved gradient noise, moved on every frame (`scene.rt.y`, a frame count: TAA's jitter
+    // has only a few phases, and a pattern repeating every 8 frames left a grain its history kept).
+    let k = f32(u32(scene.rt.y) % 64u);
+    let p = px + vec2(5.588238 * k);
+    var u1 = fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
+    if fract(turn * 2.0) >= 0.5 {
+        u1 = 1.0 - u1;
+    }
+    let u2 = fract(52.9829189 * fract(dot(p.yx + vec2(17.0, 31.0), vec2(0.06711056, 0.00583715))) + turn);
+    let r = radius * sqrt(u1);
+    let a = 6.2831853 * u2;
+    let t = normalize(cross(l, select(vec3(0.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), abs(l.y) > 0.9)));
+    let b = cross(l, t);
+    return normalize(l + (t * cos(a) + b * sin(a)) * r);
+}
+
+// `rt_sun` toward a light of disc `radius` (radians), soft-edged: with temporal anti-aliasing's
+// jitter on, one ray to a point of the disc that moves every frame, the history averaging them into
+// the penumbra. `fine`: two rays to opposite sides of the disc, and where they disagree (a penumbra)
+// two more across it, smooth within the frame but about three times the cost (PC, 11-06: +0.7-2.5
+// ms at 1440p against +0.2-0.7). Without the jitter one ray to the middle.
+fn rt_sun_soft(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool, radius: f32, px: vec2<f32>, fine: bool) -> vec3<f32> {
+    let j = scene.taa.xy;
+    if j.x == 0.0 && j.y == 0.0 {
+        return rt_sun(rel, n, l, plant);
+    }
+    let a = rt_sun(rel, n, rt_cone_at(l, radius, px, 0.0), plant);
+    if !fine {
+        return a;
+    }
+    let b = rt_sun(rel, n, rt_cone_at(l, radius, px, 0.5), plant);
+    if all(abs(a - b) < vec3(0.05)) {
+        return (a + b) * 0.5;
+    }
+    let c = rt_sun(rel, n, rt_cone_at(l, radius, px, 0.25), plant);
+    let d = rt_sun(rel, n, rt_cone_at(l, radius, px, 0.75), plant);
+    return (a + b + c + d) * 0.25;
 }
 
 struct RtTexel {
@@ -1564,6 +1649,13 @@ pub fn rt_expand_prelude() -> String {
 /// port: on the Pixel 10 the rare paths' size alone cost the vista a fifth of its world pass).
 pub const CALM_OFF: &str = "const CALM: bool = false;\n";
 pub const CALM_ON: &str = "const CALM: bool = true;\n";
+/// `DRY` in every shader: false, but true in the world's calm-and-dry pipelines (level 2 of
+/// `WorldRenderer::set_calm`), used while the scene is calm and also has no rain
+/// (`scene.fog_color.w` 0), dry ground (`scene.canopy.y` 0), no puddles (`scene.canopy.z` 0) and no
+/// snow lying where the player is (`scene.ground.x` 0). A pack leaves out what those draw behind
+/// `if !DRY` (Android port: 1.8 ms of the Pixel 10's vista).
+pub const DRY_OFF: &str = "const DRY: bool = false;\n";
+pub const DRY_ON: &str = "const DRY: bool = true;\n";
 
 /// What goes in front of `occlusion.wgsl`.
 pub fn occlusion_prelude() -> String {

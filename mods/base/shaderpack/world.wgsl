@@ -55,9 +55,10 @@ fn world_out(in: VOut, c: vec4<f32>) -> WorldOut {
     return WorldOut(c, motion_texel(in.motion, in.clip.z));
 }
 
-// Whether this frame writes motion: temporal anti-aliasing on, with a last frame to come from.
+// Whether this frame writes motion: temporal anti-aliasing on with the motion image (`core:aa` 1),
+// with a last frame to come from.
 fn taa_moving() -> bool {
-    return scene.taa.z > 0.5;
+    return scene.taa.z > 0.5 && scene.taa_frame.y > 0.5;
 }
 
 fn shader_of(tex: u32) -> u32 {
@@ -175,6 +176,21 @@ fn finish(local: vec3<f32>, origin: vec4<i32>) -> vec4<f32> {
     return vec4(pos, 1.0);
 }
 
+// Where `finish` put this vertex last frame, camera relative as now (temporal anti-aliasing's
+// motion): a moving structure's place and turn then, after the table's three vec4 a structure
+// (`offsets[2].w` structures, then two vec4 each: offset, rotation). The world's own cubes stay.
+fn finish_prev(local: vec3<f32>, origin: vec4<i32>) -> vec3<f32> {
+    let k = origin.w;
+    var at = vec3<f32>(origin.xyz) * 16.0 + local;
+    if k == 0 {
+        return at - g.cam_frac.xyz;
+    }
+    let base = (i32(offsets[2].w) + 1) * 3;
+    let pivot = offsets[k * 3 + 2].xyz;
+    at = quat_turn(offsets[base + k * 2 + 1], at - pivot) + pivot;
+    return at - g.cam_frac.xyz + offsets[base + k * 2].xyz;
+}
+
 fn body_normal(n: vec3<f32>, k: i32) -> vec3<f32> {
     if k == 0 {
         return n;
@@ -261,6 +277,10 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
         }
     }
     out.clip = scene.view_proj * pos;
+    // A moving structure's blocks (a boat, a falling tree): where they were last frame.
+    if origins[ii].w != 0 && taa_moving() {
+        out.motion = vec3(screen_motion(out.clip, scene.taa_prev * vec4(finish_prev(local, origins[ii]), 1.0), scene.taa.xy), 1.0);
+    }
     out.dist = length(pos.xyz);
     out.rel = pos.xyz;
     // A face's texture turned in quarters (Weft 26.11.2's block faces with a rotation).
@@ -339,6 +359,9 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
         }
     }
     out.clip = scene.view_proj * pos;
+    if origins[ii].w != 0 && taa_moving() {
+        out.motion = vec3(screen_motion(out.clip, scene.taa_prev * vec4(finish_prev(local, origins[ii]), 1.0), scene.taa.xy), 1.0);
+    }
     out.dist = length(pos.xyz);
     out.rel = pos.xyz;
     out.uv = uvs[c];
@@ -384,6 +407,10 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
 // file must not name the engine's block lookup: its name anywhere in it makes the engine upload
 // the blocks around the camera every frame.
 const PLANT_SHADOW_LIFT: f32 = 0.7;
+// Traced shadows: the radius of the sun's (and moon's) disc the rays aim into (radians), with
+// temporal anti-aliasing on (`rt_sun_soft`): soft edges that widen with the distance to what casts
+// them. The real sun's is 0.0047; a little more, as shader packs' suns, reads as softer light.
+const SUN_CONE: f32 = 0.012;
 
 fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
     let sky = smoothstep(0.75, 1.0, in.light.x);
@@ -396,7 +423,7 @@ fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
         if dot(n, light_dir()) <= 0.0 && in.kind.z == 0u && in.kind.x != TINT_FOLIAGE {
             return 0.0;
         }
-        let t = rt_sun(in.rel, n, light_dir(), in.kind.z != 0u);
+        let t = rt_sun_soft(in.rel, n, light_dir(), in.kind.z != 0u, SUN_CONE, in.clip.xy, scene.rt.z > 0.5);
         let c = min(canopy(), 1.0);
         let cover = smoothstep(mix(0.3, 0.15, c), mix(0.8, 0.5, c), in.light.x);
         return min(dot(t, vec3(1.0 / 3.0)), cover) * models_shadow(in.rel, n) * cloud_shadow(in.rel);
@@ -576,7 +603,8 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     // small ones, a long rain many and wide. A film of water: the ground under it dark, the sky
     // mirrored by Fresnel, and rings where the rain still falls on it.
     let puddles = clamp(scene.canopy.z, 0.0, 1.0) * open_top;
-    if puddles > 0.01 && !leafy && n.y > 0.95 {
+    // (None in the calm-and-dry pipelines, `DRY`.)
+    if !DRY && puddles > 0.01 && !leafy && n.y > 0.95 {
         // In cells three blocks across, some hold a puddle (one hash each against a share that grows
         // with the rain: a shower a few, a long rain most), a round pool about a jittered middle
         // that widens as it fills, edged in the blocks' own pixels.
@@ -941,7 +969,7 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     // Traced (`core:rt_shadows`): the water's surface everywhere, as the land.
     if scene.rt.x > 0.5 {
         let up = vec3(0.0, 1.0, 0.0);
-        near_map = vec2(dot(rt_sun(in.rel, up, light_dir(), false), vec3(1.0 / 3.0)) * models_shadow(in.rel, up), 1.0);
+        near_map = vec2(dot(rt_sun_soft(in.rel, up, light_dir(), false, SUN_CONE, in.clip.xy, scene.rt.z > 0.5), vec3(1.0 / 3.0)) * models_shadow(in.rel, up), 1.0);
     }
     let shadow = mix(1.0, min(near_map.x, smoothstep(0.3, 0.8, in.light.x)), near_map.y) * smoothstep(0.75, 1.0, max(in.light.x, near_map.y)) * cloud_shadow(in.rel);
     let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, shadow, 1.0, in.pos, in.rel);
@@ -1019,6 +1047,13 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
 
 // ---- texture sampling (the engine's) ----
 
+// The texture footprint's scale for the mip level: 1, or under DLSS 2^(its mip bias)
+// (`Scene::dlss.x`, NVIDIA's log2(render / output) - 1: the textures as sharp as at the
+// screen's size, which the upscaler then keeps from aliasing).
+fn mip_scale() -> f32 {
+    return exp2(scene.dlss.x);
+}
+
 fn nearest_uv(size: f32, uv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec2<f32> {
     let inv_s = 1.0 / size;
     let t = uv * size;
@@ -1064,8 +1099,8 @@ fn far_flat(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
 }
 
 fn opaque(in: VOut) -> vec4<f32> {
-    let du = dpdx(in.uv);
-    let dv = dpdy(in.uv);
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     let albedo = far_flat(in, with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv));
     return vec4(shade(in, albedo).rgb, mirror_alpha(in, albedo.rgb));
@@ -1108,8 +1143,8 @@ fn fs_cutout(in: VOut) -> WorldOut {
             discard;
         }
     }
-    let du = dpdx(in.uv);
-    let dv = dpdy(in.uv);
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     var albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
     if albedo.a <= cutout_edge(in, nuv, du, dv) {
@@ -1137,8 +1172,8 @@ fn cutout_thinned(in: VOut) -> bool {
 }
 
 fn cutout_albedo(in: VOut) -> vec4<f32> {
-    let du = dpdx(in.uv);
-    let dv = dpdy(in.uv);
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     return with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
 }
@@ -1146,8 +1181,8 @@ fn cutout_albedo(in: VOut) -> vec4<f32> {
 // Cut as `fs_cutout` cuts (`cutout_edge`), so the shading finds its depth wherever it drew.
 @fragment
 fn fs_cutout_depth(in: VOut) {
-    let du = dpdx(in.uv);
-    let dv = dpdy(in.uv);
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     let a = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv).a;
     let edge = cutout_edge(in, nuv, du, dv);
@@ -1216,8 +1251,8 @@ fn fs_cutout_fade(in: VOut) -> WorldOut {
     if faded(in) {
         discard;
     }
-    let du = dpdx(in.uv);
-    let dv = dpdy(in.uv);
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     var albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
     if albedo.a <= cutout_edge(in, nuv, du, dv) {
@@ -1230,8 +1265,8 @@ fn fs_cutout_fade(in: VOut) -> WorldOut {
 }
 
 fn translucent(in: VOut) -> vec4<f32> {
-    let du = dpdx(in.uv);
-    let dv = dpdy(in.uv);
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     let albedo = with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv);
     // Water and glass each lit, then one haze for both (one copy of it in the shader, as for distant
@@ -1284,9 +1319,18 @@ const LOD_DETAIL: vec2<f32> = vec2(220.0, 520.0);
 @vertex
 fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut {
     let f = vi / 4u;
-    let c = vi % 4u;
     let w0 = records[f * 4u];
     let w1 = records[f * 4u + 1u];
+    // Vanilla's corner shade on the ground's box faces (`lod_ao`; after upstream Weft f69243fd),
+    // the quad split along its lighter diagonal, as the cubes'.
+    var a = vec4<u32>(3u);
+    if lod_dir(w0) != LOD_FACE_GRID {
+        a = lod_ao(records[f * 4u + 3u]);
+    }
+    var c = vi % 4u;
+    if a.x + a.z < a.y + a.w {
+        c = (c + 1u) % 4u;
+    }
     // A box's face, or a far tile's smooth cell (`lod_corner`, in the prelude).
     let corner = lod_corner(f, c, finish(vec3(0.0), origins[ii]).xyz);
     let dir = corner.dir;
@@ -1310,7 +1354,7 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     let o = origins[ii] + g.cam_cube;
     out.pos = vec3<f32>(o.xyz * 16) + local;
     out.normal = corner.normal;
-    out.ao = mix(0.85, 0.95, clamp(corner.normal.y, 0.0, 1.0));
+    out.ao = mix(0.85, 0.95, clamp(corner.normal.y, 0.0, 1.0)) * mix(0.55, 1.0, f32(a[c]) / 3.0);
     // A crown's sides go dark toward its bottom, where the canopy shades itself (`fs_lod` takes it
     // as the crown's own shade, `CROWN_UNDER`).
     if lod_crown(w0) && dir != 2u && dir != 3u {
@@ -1321,7 +1365,9 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     let kind = lod_tint(w0);
     out.kind = vec4(kind, 1u, 0u, select(0u, 1u, lod_crown(w0)));
     var tint = vec3(1.0);
-    if kind != 0u {
+    // Not with an overlay: then the tint is the overlay's, and far off only the base is drawn (a
+    // cherry's pink blossom tinted whole came out brown-red).
+    if kind != 0u && frames[g.extra.x + (w1 & FACE_TEX_MASK)] == 0u {
         tint = unpack_rgb(biomes[corner.biome * g.extra.z + kind - 1u]);
     }
     out.tint = tint;
