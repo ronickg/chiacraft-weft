@@ -260,7 +260,10 @@ fn soft_cover(s: Sky, at: vec2<f32>) -> f32 {
     // where the slow field peaks (over 0.6) the billows all passed and a clear day stood under a
     // flat grey deck that never moved off, a birch forest's sky through its gaps grey at every
     // hour (Tester 2's looks4, 11-05, once soft clouds were the default).
-    return clamp(mix(0.46, 0.8, wet) + (field - 0.5) * mix(0.35, 0.5, wet), 0.0, 1.0);
+    // Clear days from 0.40 (0.46 before): about 70 % of the mc_forest sky was cloud, large merged
+    // masses, where Bliss's vista is 59-70 % with more blue between them (Look's clouds.py split,
+    // 11-06).
+    return clamp(mix(0.40, 0.8, wet) + (field - 0.5) * mix(0.35, 0.5, wet), 0.0, 1.0);
 }
 
 // The cloud's density at `at` (its frame, blocks) and `a` (0 at the layer's underside, 1 at its
