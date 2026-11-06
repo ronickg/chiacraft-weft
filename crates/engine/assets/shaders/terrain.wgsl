@@ -686,11 +686,16 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
             ice = desc[r + 12u];
         }
         var y = c.height;
+        // chiacraft: how deep the water stands over the sea floor, 1 (a block) to 31, 0 none; in
+        // bits 11-15 of the sample's second word, beside the biome (`lod::ground`).
+        var depth = 0;
         if (desc[D_HAS_SEA] != 0 && c.height < desc[D_SEA]) {
             y = desc[D_SEA];
             top = desc[D_WATER];
+            depth = min(desc[D_SEA] - c.height, 31);
             if (ice >= 0) {
                 top = ice;
+                depth = 0;
             }
             under = top;
         }
@@ -722,7 +727,7 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
         }
         let o = (tile * LOD_SAMPLES + k) * LOD_WORDS;
         outp[o] = (u32(y) & 65535u) | (u32(top) << 16u);
-        outp[o + 1u] = (u32(c.biome) & 65535u) | (u32(under) << 16u);
+        outp[o + 1u] = (u32(c.biome) & 2047u) | (u32(depth) << 11u) | (u32(under) << 16u);
         outp[o + 2u] = 0u;
         outp[o + 3u] = 0u;
         lod_ground[k] = (u32(c.height) & 65535u) | (u32(c.biome) << 16u);
