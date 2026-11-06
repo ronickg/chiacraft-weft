@@ -13,7 +13,9 @@ The detailed notes, module by module, are in [`recrafted-study/`](recrafted-stud
 - [particles, foliage and sounds](recrafted-study/C_particles_foliage_sounds.md)
 - [ImmersiveVFX](recrafted-study/D_immersivevfx.md), added on Ronald's word (11-05, through Planner): "This mod also looks pretty interesting ... interesting things here as well that we can learn from, or even add features". It is ImmersiveVFX 1.5.1 by Shinyflvres (NeoForge, MC 26.3, All Rights Reserved), CurseForge file 9451348. Section [ImmersiveVFX](#immersivevfx) below.
 
-**What was seen in game:** Minecraft 26.2 with Fabric, Sodium, Polytone and Recrafted on the PC (instance `mc-recrafted`). Shots are in [In the game](#in-the-game) below.
+**What was seen in game:** on the PC, Minecraft 26.2 with Fabric, Sodium, Polytone and Recrafted (instance `mc-recrafted`), and Minecraft 26.3 with NeoForge and ImmersiveVFX (instance `mc-ivfx`). Shots are in [In the game](#in-the-game) below. Two things there change the plan. ImmersiveVFX's sandstorm shows how far our dust storm is behind: ours is a flat whiteout, while its storm keeps the near air clear and puts the motion into flying sand (item 2, with a pack-only first step). Recrafted's grass tufts are the best look in his part a (item 5). Falling leaves were missed under the canopy in part a. Part b shoots them from a cleared column, and its sheet will be added here.
+
+**Sheets** (in `~/Coding/chiacraft-archive/images/recrafted/2026-11-05/`): `side_by_side_weather.jpg` (ours, Recrafted and ImmersiveVFX side by side), `recrafted_a_sheet.jpg`, `ivfx2_v_sheet.jpg`.
 
 **His licence forbids reuse:** none of his textures, models, sounds, shaders or code may go into projects that don't require Recrafted, or be ported to another game. So this report describes techniques only. Everything we build is our own code, art from the game-art skill, and our own (CC0) sounds. His files stay in Ronald's Downloads and on the PC's private `~/recrafted-study`, never in the repository or the archive's shared folders.
 
@@ -122,7 +124,27 @@ What it has that Recrafted doesn't:
 
 ## The plan, ranked
 
-Ranked by how much realism each adds for what it costs, with the leaves first because they are what Ronald asked about. "Engine" means `crates/` (a `notes/ENGINE_CHANGES.md` line each); "pack" means `mods/base/shaderpack`.
+Ranked by how much realism each adds for what it costs, with the leaves first because they are what Ronald asked about. "Engine" means `crates/` (a `notes/ENGINE_CHANGES.md` line each); "pack" means `mods/base/shaderpack`. "Seen" says whether the PC shots (11-05) back the item or it comes from the code only.
+
+| # | What | Cost | Owner | Seen |
+|---|---|---|---|---|
+| 1 | Leaves in the wind: falling, blown, settling, tumbling | cheap to moderate (GPU particles; engine wind, tumble, rest) | new **Wind life** session | from code; part b's clearing shots to follow |
+| 2 | Dust storms in layers: clear near air, fog far, grains and curtains | 2a cheap (pack only, can start now); 2b cheap once 1's wind exists | 2a **Shader session**; 2b Wind life | **yes**: ImmersiveVFX's sandstorm vs our flat beige whiteout |
+| 3 | The rest of the small life: petals, spindrift, pollen, drips | cheap after 1 | Wind life | petals on the ground seen (cherry); flying ones from code |
+| 4 | Wet ground that lasts, and puddles | cheap | **Shader session** (+ a wetness value in `weather.rs`) | from code; not seen within 20 s of rain |
+| 5 | Fuller grass tufts | moderate (more quads per plant; art) | art (game-art / block-textures) + meshing check | **yes**: Recrafted's strongest look in part a |
+| 6 | Snow above a line on mountains | cheap | **Shader session** + `vitals` lapse rate | from code |
+| 7 | Grass parts round the player | cheap | **Shader session** | from code |
+| 8 | Ambient sound: leaves, grass, insects | cheap | weather sound owner | (sound; not shot) |
+| 9 | Frost on leaves | cheap | **Shader session** | from code; not visible in the snowy taiga shots |
+| 10 | Snow drifts, dunes, footprints | relief cheap; footprints moderate | **Shader session**; footprints a later engine piece | from code |
+| 11 | Placed blocks spring in | cheap | engine client, small session | from code |
+| 12 | Pixel-snapped shadow edges | cheap ALU + shadow resolution | **Shader session**; a look choice for Ronald | from code |
+| 13 | Shore foam that runs along the shore | cheap | **Shader session** | from code; the beach shot missed the shore |
+| 14 | Water wakes | moderate | later | from code |
+| 15 | Smaller things (below) | each cheap | various | from code |
+
+The Shader session's items, in order: 2a, 4, 6, 7, 9, 10 (relief), 12, 13. Items 1, 2b and 3 share one new engine piece (particles that feel the wind), so they belong in one session.
 
 ### 1. Leaves in the wind: falling, blown, settling and tumbling (Ronald's ask)
 
@@ -142,19 +164,28 @@ Ranked by how much realism each adds for what it costs, with the leaves first be
 - **Driven by:** our wind (speed, heading, storm gusts), the seasons (fall rate and colour), weather (storm lift), sky light (calm under cover).
 - **Owner:** a new session, "Wind life: leaves, petals, blown snow and dust", engine particles plus base. It touches `particle_sim.wgsl` and `crates/engine/src/client/particles.rs` (Planner to check the board for anyone holding them). The Shader session only needs `gust()` moved to the shared prelude, a small change to agree on.
 
-### 2. The rest of the wind's small life, on the same plumbing
+### 2. Dust storms in layers (seen: ImmersiveVFX)
+
+- **Adds:** a dust storm you stand inside. Today ours turns the whole view a flat beige, even a few blocks away (`ours/rc_desert_dust_0.png`). In ImmersiveVFX's sandstorm (`ivfx2_v/v_desert_sandstorm.png` and its burst) the ground near you stays readable, the far trees fade to yellow silhouettes, and the motion comes from three layers of flying sand: tumbling clumps of several sizes close to the camera, a cloud of fine grains further out with thin fast streaks, and the sky in the same yellow. You see the storm because something moves past you, not because everything is hidden.
+- **Build:**
+  - **2a, pack, now:** grade the dust fog by distance. Keep a clear bubble of about 8-16 blocks (thinner as the wind rises) and let it close fully only at the far range. Tint the sky and the far fog the same dust colour, with a little darker low-sun warmth in savannas (`air_flags::DUST` with the biome's soil colour, if the air carries it). This needs no particles and fixes the whiteout on its own.
+  - **2b, after item 1:** the grain layers as wind particles. Fine specks round the player; a few long, thin gust streaks (5-50 blocks) along the wind; and now and then a fast curtain of sand, spawned 40 blocks upwind, that crosses the view in a few seconds. Plus a handful of bigger tumbling clumps near the camera. They come from our real dust storms (dry places, wind 7-11 m/s), not from "rain in a desert". In savannas the same storm sheds leaves from nearby trees, which item 1 covers.
+- **Cost:** 2a cheap (fog maths already paid). 2b a few thousand particles.
+- **Driven by:** `air_flags::DUST`, wind speed and heading, sun height.
+- **Owner:** 2a the **Shader session**; 2b the Wind life session.
+
+### 3. The rest of the wind's small life, on the same plumbing
 
 - **Adds:**
-  - petals blowing off flowers in bloom, and kicked up as you walk through them (`vitals::wild::BLOOMS`);
+  - petals blowing off flowers in bloom, and kicked up as you walk through them (`vitals::wild::BLOOMS`). Recrafted's cherry grove (`recrafted_a/cherry_clear.png`) shows the petals that have landed, a pink litter under the crowns, which is the settled end of the same particles (item 1's rest);
   - spindrift streaming across snow in a blizzard (`SNOWING` + wind > `air::BLIZZARD.0`);
-  - sand and dust streaming low over deserts in a dust storm (`air_flags::DUST`; Recrafted has none). ImmersiveVFX shows the shape that works: fine specks round the player; a few long, thin gust streaks (5-50 blocks) along the wind; and now and then a fast curtain of sand, spawned 40 blocks upwind, that crosses the view in a few seconds. Ours would come from our real dust storms (dry places, wind 7-11 m/s) instead of "rain in a desert". In savannas the same storm sheds leaves from nearby trees, which item 1 covers;
   - pollen motes in spring sun;
   - drips from leaves for a while after rain.
 - **Cost:** cheap, once 1 exists.
-- **Driven by:** the same air, the blooms, our dust and blizzard flags, a wetness value (see 3).
+- **Driven by:** the same air, the blooms, our blizzard flag, a wetness value (see 4).
 - **Owner:** the same Wind life session, after 1. Art from the game-art skill.
 
-### 3. Wet ground that lasts, and puddles
+### 4. Wet ground that lasts, and puddles
 
 - **Adds:** after rain the ground stays dark and puddled, then dries by sun and warmth. Puddles reflect the sky and ring in the rain.
 - **Build:**
@@ -164,7 +195,15 @@ Ranked by how much realism each adds for what it costs, with the leaves first be
 - **Driven by:** our rain spells by place, the sun, temperature, humidity.
 - **Owner:** **the Shader session** (it owns the pack's weather look now). The wetness value is a small piece of `weather.rs` and `vitals::air`, the same session or a helper.
 
-### 4. Snow above a line on mountains
+### 5. Fuller grass tufts (seen: Recrafted)
+
+- **Adds:** a meadow that reads as one field, not a grid of blocks. In Recrafted (`recrafted_a/plains_clear.png`, `flowers_clear.png`) short grass is a tuft of tall, bent blades that spill over the block's edges, and flowers stand in it at the same scale. It's the strongest single look in his part a, and it costs no shader.
+- **Build:** a grass model with more, longer and bent blades that lean past the block edge, with a few variants picked by position hash so neighbours differ. Our wind sway (`world.wgsl` `wind()`) then moves each blade's tip. Compare with ours in the same light first: Tester 2 shoots one of our meadows beside his `plains_clear`.
+- **Art:** through the block-textures and game-art skills, our own blades (his models are his).
+- **Cost:** moderate. More quads per grass plant, which is the most common plant, so measure the mesh size and frame time on the PC bench. An LOD rule (full tufts near, today's beyond 32 blocks) keeps it bounded.
+- **Owner:** an art and plants session with the block-textures skill; the Shader session only if the sway needs a per-blade weight.
+
+### 6. Snow above a line on mountains
 
 - **Adds:** a rainy biome's peaks get snow. Rain turns to snow as you climb, with a soft band between.
 - **Build:**
@@ -175,14 +214,14 @@ Ranked by how much realism each adds for what it costs, with the leaves first be
 - **Driven by:** climate °C, height.
 - **Owner:** the Shader session for the look, Survival or `vitals` for the lapse (it also changes body temperature on peaks, which belongs in `SYSTEMS.md`).
 
-### 5. Grass that parts round the player
+### 7. Grass that parts round the player
 
 - **Adds:** walking through tall grass, ferns and crops bends them away, and they spring back slowly.
 - **Build:** the pack's `world.wgsl` `wind()` adds a push away from the camera's feet (the eye minus 1.6) within ~1.1 blocks, flattening within 0.45. The "stays bent a while" part needs a short trail of positions: either `scene.eye` history from the engine (4 points) or skip it.
 - **Cost:** cheap.
 - **Owner:** the Shader session; the trail is one engine uniform.
 
-### 6. Ambient sound: leaves, grass and insects
+### 8. Ambient sound: leaves, grass and insects
 
 - **Adds:**
   - leaves rustling in the crowns as the wind gets up, louder in gusts;
@@ -199,14 +238,14 @@ Ranked by how much realism each adds for what it costs, with the leaves first be
 - **Driven by:** wind, canopy, climate, calendar, time.
 - **Owner:** whoever owns weather sound (Survival's `weather_sound`); else a small new session.
 
-### 7. Frost and snow on leaves
+### 9. Frost and snow on leaves
 
 - **Adds:** in a snowy winter the crowns go white on top, not only the ground.
 - **Build:** pack only. `snow_on` already works per pixel on up-faces. Extend it to leaf blocks' top faces and the upper part of their sides, masked by the leaf texture's luminance (snow catches on the bright leaves, the gaps stay dark).
 - **Cost:** cheap.
 - **Owner:** the Shader session.
 
-### 8. Snow drifts, dunes and footprints
+### 10. Snow drifts, dunes and footprints
 
 - **Adds:** wind-shaped snow and sand that read as surfaces, not flat textures. Tracks that fill in.
 - **Build:**
@@ -215,7 +254,7 @@ Ranked by how much realism each adds for what it costs, with the leaves first be
 - **Cost:** moderate (the footprint map).
 - **Owner:** relief to the Shader session; footprints to a later engine session.
 
-### 9. Placed blocks spring in (ImmersiveVFX)
+### 11. Placed blocks spring in (ImmersiveVFX)
 
 - **Adds:** building feels alive. A placed block pops in with a squash and a small tilt for less than half a second, and a row placed together ripples along.
 - **Build:** engine client.
@@ -226,28 +265,28 @@ Ranked by how much realism each adds for what it costs, with the leaves first be
 - **Driven by:** placement only.
 - **Owner:** an engine client piece; small, its own session or a UI/feel session. A feel choice for Ronald first: it's playful, and a survival game may want it subtle.
 
-### 10. Shadow edges in the blocks' own pixels (ImmersiveVFX)
+### 12. Shadow edges in the blocks' own pixels (ImmersiveVFX)
 
 - **Adds:** shadow edges that step in exact 1/16-block pixels, matching the texture grid: the pixel-art look of the rest of the world, instead of soft or diagonal-aliased edges.
 - **Build:** in the pack's `sun_shadow` and `shadow_in`, move the pixel's world position to the centre of its texture texel (from screen derivatives) before the shadow lookup. This needs a near cascade at 16 texels a block or close to it.
 - **Cost:** cheap (a few ALU), plus whatever shadow resolution it needs.
 - **Owner:** the Shader session; **a look choice for Ronald** (a pixel-art edge versus our soft 3x3 or 4x4 edge), shown side by side.
 
-### 11. Shore foam that runs along the shore (ImmersiveVFX)
+### 13. Shore foam that runs along the shore (ImmersiveVFX)
 
 - **Adds:** foam that laps in and out in pixel steps along a beach, instead of a fixed wobbling line.
 - **Build:** our `world.wgsl` foam already uses `shore_distance` on the pixel grid. Make the foam front a wave that travels along the shore and in and out with time, stepped in 1/16 block, with sparse dots on the retreating side. Caustics can be snapped to the same texel grid.
 - **Cost:** cheap.
 - **Owner:** the Shader session.
 
-### 12. Water wakes
+### 14. Water wakes
 
 - **Adds:** rings and V-wakes behind swimmers, boats and animals wading.
 - **Build:** a 256-512² wave-equation grid round the camera on the GPU, stamped by entities in water, added to `wave_normal`.
 - **Cost:** moderate.
 - **Owner:** later. The Shader session or a water session.
 
-### 13. Smaller things worth a line each
+### 15. Smaller things worth a line each
 
 - **Burning blocks glow** with crawling crack veins (charcoal to orange to yellow), and fires light the air round them in a cheap screen pass (ImmersiveVFX). This is for when fire spreads in our game (pack plus engine; later).
 - **A cave probe for ambience:** 40 rays round the player, 2 a tick, giving how open, how stony and how big the space is (ImmersiveVFX). It would feed cave or outdoor sound beds. Our `weather_sound` already samples cover in rings for the muffling, so extend that rather than add another (sound owner).
