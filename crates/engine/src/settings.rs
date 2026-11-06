@@ -42,8 +42,13 @@ pub const GUI_MIN: (u32, u32) = (400, 320);
 /// (Playtest B9: the animal screen at GUI scale 1, its buttons' labels over each other; Researcher,
 /// round 13; Minecraft keeps to even scales for the same reason with its half-size font).
 pub fn max_gui_scale(window: (u32, u32)) -> u32 {
-    even_scale((window.0 / GUI_MIN.0).min(window.1 / GUI_MIN.1)).max(2)
+    let min = if crate::touch::enabled() { GUI_MIN_TOUCH } else { GUI_MIN };
+    even_scale((window.0 / min.0).min(window.1 / min.1)).max(2)
 }
+
+/// `GUI_MIN` on a touch screen: a phone held sideways (2400 x 1080) gets scale 4, whose GUI
+/// pixels a finger can hit, rather than 2; screens taller than its 270 GUI pixels scroll.
+pub const GUI_MIN_TOUCH: (u32, u32) = (400, 240);
 
 /// `s` rounded down to a scale the UI pixel sits whole on: 2, 4, 6... (1 below 2).
 pub fn even_scale(s: u32) -> u32 {

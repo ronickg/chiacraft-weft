@@ -342,6 +342,11 @@ pub(crate) struct Running {
     benches: u32,
     bench_last: [f32; 5],
     bench_line: String,
+    /// The on-screen controls of a touch screen (`touch::enabled`).
+    touch: crate::touch::Touch,
+    /// A world to start once the loading screen has been on the screen this many frames
+    /// (`begin_world`).
+    pending_world: Option<(WorldMeta, u32)>,
 }
 
 struct App {
@@ -349,12 +354,33 @@ struct App {
     opts: Options,
     run: Option<Running>,
     error: Option<String>,
+    /// The window has no surface (Android, in the background): no frames until it's back.
+    suspended: bool,
 }
 
 pub fn run(factory: BackendFactory, opts: Options) -> Result<(), String> {
-    let event_loop = EventLoop::new().map_err(|e| e.to_string())?;
+    run_on(EventLoop::new().map_err(|e| e.to_string())?, factory, opts)
+}
+
+/// Android: the event loop of the activity `android_main` was given (crates/android).
+#[cfg(target_os = "android")]
+pub fn run_android(app: winit::platform::android::activity::AndroidApp, factory: BackendFactory, opts: Options) -> Result<(), String> {
+    use winit::platform::android::EventLoopBuilderExtAndroid;
+    let event_loop = EventLoop::builder()
+        .with_android_app(app)
+        .build()
+        .map_err(|e| e.to_string())?;
+    run_on(event_loop, factory, opts)
+}
+
+/// Android destroyed the activity (seen in winit's log, `log.rs`): the game saves and ends, which
+/// Android's main thread waits for.
+#[cfg(target_os = "android")]
+pub(crate) static ANDROID_DESTROYED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+fn run_on(event_loop: EventLoop<()>, factory: BackendFactory, opts: Options) -> Result<(), String> {
     event_loop.set_control_flow(ControlFlow::Poll);
-    let mut app = App { factory, opts, run: None, error: None };
+    let mut app = App { factory, opts, run: None, error: None, suspended: false };
     event_loop.run_app(&mut app).map_err(|e| e.to_string())?;
     match app.error {
         Some(e) => Err(e),
@@ -366,9 +392,13 @@ pub fn run(factory: BackendFactory, opts: Options) -> Result<(), String> {
 /// source tree, or `--dev`) the source tree's.
 fn engine_assets(dev: bool) -> PathBuf {
     let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("assets");
-    let shipped = std::env::current_exe()
-        .ok()
-        .and_then(|p| p.parent().map(|d| d.join("assets").join("core")));
+    let shipped = crate::paths::engine_assets()
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::current_exe()
+                .ok()
+                .and_then(|p| p.parent().map(|d| d.join("assets").join("core")))
+        });
     match shipped {
         Some(s) if !dev && s.is_dir() => s,
         _ => source,
@@ -618,6 +648,8 @@ impl App {
             benches: 0,
             bench_last: [0.0; 5],
             bench_line: String::new(),
+            touch: crate::touch::Touch::default(),
+            pending_world: None,
         };
         if let Some(world) = &self.opts.world {
             let saves_dir = r.settings.saves_dir();
@@ -625,7 +657,7 @@ impl App {
                 .into_iter()
                 .find(|w| &w.name == world)
                 .unwrap_or_else(|| saves::create(&saves_dir, world, self.opts.seed.unwrap_or(1)));
-            r.start_world(meta);
+            r.begin_world(meta);
         } else {
             r.open(screens::engine("core:title"));
             if let Some(name) = &self.opts.screen {
@@ -1027,6 +1059,19 @@ impl Running {
         let _ = self.window.set_cursor_position(middle);
     }
 
+    /// Starts a world after the loading screen has been drawn: starting builds every pipeline and
+    /// waits for the world, the frame thread busy all the while, and that frame stays on the
+    /// screen meanwhile instead of black or a frozen menu. Scripted runs start at once, as before.
+    fn begin_world(&mut self, meta: WorldMeta) {
+        if self.settings.read_only {
+            self.start_world(meta);
+            return;
+        }
+        self.screens.clear();
+        self.open(Box::new(screens::Loading));
+        self.pending_world = Some((meta, 0));
+    }
+
     fn start_world(&mut self, mut meta: WorldMeta) {
         log::info!("opening world '{}' (seed {})", meta.name, meta.seed);
         if meta.format != saves::SAVE_FORMAT {
@@ -1117,6 +1162,11 @@ impl Running {
                 self.hud.invalidate();
                 self.quads_dirty = true;
                 self.set_capture(true);
+                // The world's pipelines are built: kept now, as Android ends an app without the
+                // exit that saves them (a phone compiled the shader pack's for 38 s every start).
+                if cfg!(target_os = "android") {
+                    save_pipeline_cache(&*self.gpu);
+                }
             }
             Err(e) => {
                 log::error!("{e}");
@@ -1293,12 +1343,12 @@ impl Running {
                     let mut missing = meta.missing_mods(content());
                     missing.extend(modloader::for_world(&meta).1);
                     if missing.is_empty() {
-                        self.start_world(meta);
+                        self.begin_world(meta);
                     } else {
                         self.open(Box::new(saves::MissingMods { world: meta, missing }));
                     }
                 }
-                Request::StartWorldAnyway(meta) => self.start_world(meta),
+                Request::StartWorldAnyway(meta) => self.begin_world(meta),
                 Request::LeaveWorld => self.leave_world(),
                 Request::Host => {
                     match &self.game {
@@ -2142,7 +2192,18 @@ fn text_condition(name: &str, client: Option<&Client>, debug: bool, dev: bool) -
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, el: &ActiveEventLoop) {
-        if self.run.is_some() {
+        if let Some(r) = &mut self.run {
+            // Android: back from the background, with a new surface for the same window.
+            if self.suspended {
+                self.suspended = false;
+                el.set_control_flow(ControlFlow::Poll);
+                if let Err(e) = r.gpu.surface_restored(&*r.window) {
+                    log::error!("{e}");
+                }
+                let size = r.window.inner_size();
+                r.gpu.resize(size.width, size.height);
+                r.rebuild_all();
+            }
             return;
         }
         match self.start(el) {
@@ -2152,6 +2213,26 @@ impl ApplicationHandler for App {
                 el.exit();
             }
         }
+    }
+
+    /// Android sends the app to the background: its surface goes. The world pauses, as when the
+    /// window loses the focus.
+    fn suspended(&mut self, el: &ActiveEventLoop) {
+        let Some(r) = &mut self.run else { return };
+        self.suspended = true;
+        el.set_control_flow(ControlFlow::Wait);
+        r.touch.release_all(&mut r.input);
+        r.input.release_all();
+        if r.game.is_some() && r.screens.is_empty() {
+            r.open(screens::engine("core:pause"));
+        }
+        r.set_capture(false);
+        if let Some(server) = r.game.as_ref().and_then(|g| g.server.as_ref()) {
+            server.save_now();
+        }
+        // Android ends a background app without the exit that saves it otherwise.
+        save_pipeline_cache(&*r.gpu);
+        r.gpu.surface_lost();
     }
 
     fn device_event(&mut self, _el: &ActiveEventLoop, _id: DeviceId, event: DeviceEvent) {
@@ -2182,8 +2263,25 @@ impl ApplicationHandler for App {
                 }
                 r.set_capture(false);
             }
+            WindowEvent::Touch(t) if crate::touch::enabled() => {
+                let play = r.game.is_some() && r.screens.is_empty();
+                let (w, h) = r.gpu.surface_size();
+                let scale = r.gui_scale();
+                let hud = &r.hud;
+                let slot_at = |p: Vec2| hud.hotbar_slot_at(p);
+                let mut cx = crate::touch::Cx { input: &mut r.input, play, scale, size: Vec2::new(w as f32, h as f32), slot_at: &slot_at };
+                let at = Vec2::new(t.location.x as f32, t.location.y as f32);
+                if r.touch.event(t.phase, t.id, at, &mut cx) && !r.input.captured {
+                    r.set_capture(true);
+                }
+            }
             WindowEvent::KeyboardInput { event, .. } => {
-                if let PhysicalKey::Code(code) = event.physical_key {
+                // Android's back button is Escape: out of a screen, or to the pause screen.
+                // (winit has no physical key for it, only the logical BrowserBack.)
+                let back =
+                    cfg!(target_os = "android") && event.logical_key == winit::keyboard::Key::Named(winit::keyboard::NamedKey::BrowserBack);
+                let physical = if back { PhysicalKey::Code(KeyCode::Escape) } else { event.physical_key };
+                if let PhysicalKey::Code(code) = physical {
                     match event.state {
                         ElementState::Pressed if event.repeat => r.input.key_repeat(Key::Code(code)),
                         ElementState::Pressed => r.input.key_down(Key::Code(code)),
@@ -2224,6 +2322,7 @@ impl ApplicationHandler for App {
             WindowEvent::CursorMoved { position, .. } => {
                 r.input.cursor = Vec2::new(position.x as f32, position.y as f32);
             }
+            WindowEvent::RedrawRequested if self.suspended => {}
             WindowEvent::RedrawRequested => {
                 if frame(r, &self.opts) || r.quit {
                     r.leave_world_silent();
@@ -2236,7 +2335,19 @@ impl ApplicationHandler for App {
     }
 
     fn about_to_wait(&mut self, _el: &ActiveEventLoop) {
-        if let Some(r) = &self.run {
+        #[cfg(target_os = "android")]
+        if ANDROID_DESTROYED.load(std::sync::atomic::Ordering::Relaxed) {
+            log::info!("android: the activity was destroyed, saving and ending");
+            if let Some(r) = &mut self.run {
+                r.leave_world_silent();
+                r.close_home();
+            }
+            _el.exit();
+            return;
+        }
+        if let Some(r) = &self.run
+            && !self.suspended
+        {
             r.window.request_redraw();
         }
     }
@@ -2264,6 +2375,14 @@ struct UiCallbacks {
 /// One frame. Returns true when the app should quit.
 fn frame(r: &mut Running, opts: &Options) -> bool {
     r.retired = None;
+    // The loading screen has been shown (two frames, so one was presented): now the slow start.
+    if let Some((meta, shown)) = r.pending_world.take() {
+        if shown >= 2 {
+            r.start_world(meta);
+        } else {
+            r.pending_world = Some((meta, shown + 1));
+        }
+    }
     // The fps cap: what is left of this frame's share of a second, slept away.
     let cap = r.settings.fps_cap();
     if cap > 0 {
@@ -2940,6 +3059,18 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
             }
         }
         o.layout(Vec2::new(sw as f32 / scale, sh as f32 / scale), &r.ui.font);
+        let game = crate::content::try_content().map(|c| (c, &r.textures));
+        r.ui.append(&mut *r.gpu, &r.assets, &o, &r.look, scale, game, &mut |_, _, _, _, _, _| {});
+    }
+    // A touch screen's controls, over play (`touch`).
+    if crate::touch::enabled() && r.game.is_some() && r.screens.is_empty() && !hud_hidden() {
+        let size = Vec2::new(sw as f32 / scale, sh as f32 / scale);
+        let mut o = crate::ui::Ui::new();
+        o.text_unit = text_unit;
+        let (lang, input) = (&r.lang, &r.input);
+        r.touch
+            .draw(&mut o, size, scale, &|key| Msg::new(key, Vec::new()).spans(lang, Some(input)));
+        o.layout(size, &r.ui.font);
         let game = crate::content::try_content().map(|c| (c, &r.textures));
         r.ui.append(&mut *r.gpu, &r.assets, &o, &r.look, scale, game, &mut |_, _, _, _, _, _| {});
     }

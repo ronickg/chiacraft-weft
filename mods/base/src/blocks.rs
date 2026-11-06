@@ -430,6 +430,26 @@ pub fn made_leaves(state: u32) -> u32 {
         .map_or(state, |&(_, open)| open)
 }
 
+/// The state far crowns of `state` leaves are drawn in at day time `time` (distant terrain's
+/// `far_leaves`): its crowns come from trees made once, in flower (`made_leaves`), so out of the
+/// bloomer's seasons the bloom is taken off (the dense-forest session, 11-05: far wild cherries
+/// stayed pink all year).
+pub fn far_leaves(time: u64, state: u32) -> u32 {
+    static OPEN: std::sync::OnceLock<Vec<(u32, u32, u8)>> = std::sync::OnceLock::new();
+    let open = OPEN.get_or_init(|| {
+        vitals::wild::BLOOMS
+            .iter()
+            .filter_map(|&(name, seasons)| {
+                let id = Block::lookup(name)?;
+                Some((state_with(id, "bloom", "1")?, id, seasons))
+            })
+            .collect()
+    });
+    let Some(&(_, shut, seasons)) = open.iter().find(|o| o.0 == state) else { return state };
+    let season = vitals::calendar::date(time).season.index() as usize;
+    if vitals::wild::in_bloom(seasons, Some(season)) { state } else { shut }
+}
+
 /// A tree's leaves: they decay once no log is near (`leaf_decay`), unless a player placed them
 /// (`placed`, set as they are placed). The shrubs' leaves have no logs and keep.
 fn tree_leaves(b: BlockBuilder<'_>) -> BlockBuilder<'_> {
