@@ -11,12 +11,16 @@ What it does, per drawing `<material>__<part>_px.png` (32 x 32, cut by art.py):
   look at when it floats off its haft (`gap`, texels from the haft's end to the head), pixels fell off
   the canvas, or a gem spot (`GEM_SPOTS`) misses the icon. A flagged drawing wants redrawing to today's
   size and socket, not moving: a loose head's eye sits mid-head, while today's hafts stop where the old
-  heads covered them.
+  heads covered them. Today's binding (the haft's top and its lashing, wrap or collar, cut as the
+  joint band when today's files were made) is pasted back over each redrawn head (`--no-binding` keeps
+  the drawing's own).
 - **Parts the game draws by a plain icon today** (the knife's blade, art `short_blade`, and the spear's
   leaf point): written as `parts/knife/knife_blade/<art>.png` and `parts/spear/leaf_point/<art>.png` with
   their anchor (the tang's or socket's end, the corner toward the bottom left), and a Rust snippet for
   their `LOOKS` rows (a knife grip from the sword's hilt map, a spear shaft drawn in code from the
   haft's shading), in `looks_snippet.rs`.
+- **Loose parts**: each head and blade it installs, centred, as that part's icon in the bag
+  (`parts/loose/<shape>/<art>.png`, `crafting::looks::part_look`).
 - **Armour shells** (`<material>__<shell>`, leather, bone, iron, gold, diamond): written as painted shells
   `parts/armour/<shell>/<art>.png` for `part_look` to use where drawn (the others keep their family's
   shade map); reported as waiting while they aren't drawn.
@@ -41,7 +45,10 @@ from PIL import Image, ImageDraw
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 TEX = os.path.join(ROOT, "mods", "base", "assets", "textures")
-SRC = os.path.expanduser("~/Coding/chiacraft-archive/images/art-redo-v3/tools")
+# Where the drawings are, first found wins: the redrawn heads with today's haft top and wrap pasted back
+# by the art session (tools2b/, the last redraws stubbed into it too), the redrawn heads (tools2/, drawn
+# to today's size and socket), the first round (tools/).
+SRC = ",".join(os.path.expanduser(f"~/Coding/chiacraft-archive/images/art-redo-v3/{d}") for d in ("tools2b", "tools2", "tools"))
 OUT = os.path.expanduser("~/Coding/chiacraft-archive/images/art-redo-v3/install")
 
 MATS = ["wood", "stone", "flint", "copper", "bronze", "iron", "steel", "gold", "diamond"]
@@ -58,6 +65,57 @@ SHELLS = ["helmet_shell", "chest_shell", "leg_shell", "boot_shell"]
 SHELL_MATS = ["leather", "bone", "iron", "gold", "diamond"]
 # Today's anchors and sockets (crafting::looks::LOOKS), for the previews.
 LOOKS_RS = os.path.join(ROOT, "mods", "base", "crafting", "src", "looks.rs")
+
+
+def drawing(src, name):
+    """The first folder of `src` (comma-separated) that has `name`; the last one's path if none does."""
+    dirs = src.split(",")
+    for d in dirs:
+        if os.path.exists(os.path.join(d, name)):
+            return os.path.join(d, name)
+    return os.path.join(dirs[-1], name)
+
+
+def binding(kind, m):
+    """Today's joint band of a head (the haft's top and its binding: lashing, wrap or collar) as a
+    mask on the head's canvas, from the cut that made today's files (`export2.py`, `toolfix.regions`);
+    None where there's no such drawing."""
+    try:
+        sys.path.insert(0, HERE)
+        import export2
+        import toolfix as tf
+    except Exception:
+        return None
+    if kind not in export2.TOOLS:
+        return None
+    a = tf.drawn(export2.TOOLS[kind](m))
+    if a is None:
+        return None
+    lab, _ = tf.regions(a, "axe")
+    return lab == tf.JOINT
+
+
+COOL = {"stone", "flint", "iron", "steel", "diamond"}
+
+
+def warm_mask(a):
+    """Pixels coloured like wood or a wrap: warm hue (red to yellow), saturated, on."""
+    import colorsys
+    out = np.zeros(a.shape[:2], bool)
+    for y, x in zip(*np.nonzero(a[..., 3] > 0)):
+        h, l, sat = colorsys.rgb_to_hls(*(a[y, x, :3] / 255.0))
+        out[y, x] = (h < 0.14 or h > 0.95) and sat > 0.35 and 0.12 < l < 0.85
+    return out
+
+
+def centred(a):
+    """A drawing moved to the middle of its canvas: a loose part's icon (`parts/loose/`)."""
+    ys, xs = np.nonzero(a[..., 3] > 0)
+    if not len(xs):
+        return a
+    dx = int(round(15.5 - (xs.min() + xs.max()) / 2))
+    dy = int(round(15.5 - (ys.min() + ys.max()) / 2))
+    return moved(a, dx, dy)
 
 
 def load(path):
@@ -208,10 +266,13 @@ def main():
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--only", default="")
     ap.add_argument("--parts", default="")
-    ap.add_argument("--src", default=SRC)
+    ap.add_argument("--skip", default="", help="kind/material to leave as today's, comma-separated (hoe/steel)")
+    ap.add_argument("--no-binding", action="store_true", help="keep the drawing's own haft top, not today's binding")
+    ap.add_argument("--src", default=SRC, help="folders of drawings, comma-separated, first found wins")
     args = ap.parse_args()
     only = set(filter(None, args.only.split(",")))
     pick = set(filter(None, args.parts.split(",")))
+    skip = set(filter(None, args.skip.split(",")))
     want = lambda m, p: (not only or m in only) and (not pick or p in pick)
     os.makedirs(OUT, exist_ok=True)
     looks = anchors_today()
@@ -224,14 +285,24 @@ def main():
         handle_map = load(os.path.join(TEX, "parts", kind, "grip.png" if kind == "sword" else "haft.png"))
         handle = paint(handle_map, [leather, iron, iron] if kind == "sword" else [oak])
         for m in MATS:
-            src = os.path.join(args.src, f"{m}__{part}_px.png")
+            src = drawing(args.src, f"{m}__{part}_px.png")
             if not want(m, part):
                 continue
             if not os.path.exists(src):
                 report["missing"].append(f"{m}__{part}")
                 continue
+            if f"{kind}/{m}" in skip:
+                # Today's stays; its loose icon is today's head, centred.
+                today = os.path.join(OUT, "replaced", "parts", kind, shape, f"{m}.png")
+                today = today if os.path.exists(today) else os.path.join(TEX, "parts", kind, shape, f"{m}.png")
+                if os.path.exists(today):
+                    write(centred(load(today)), f"parts/loose/{shape}/{m}.png", args.apply)
+                continue
             new = load(src)
-            old_p = os.path.join(TEX, "parts", kind, shape, f"{m}.png")
+            # Today's drawing: the one the first --apply kept, if it ran already.
+            rel = os.path.join("parts", kind, shape, f"{m}.png")
+            old_p = os.path.join(OUT, "replaced", rel)
+            old_p = old_p if os.path.exists(old_p) else os.path.join(TEX, rel)
             old = load(old_p) if os.path.exists(old_p) else None
             a = anchors.get(m)
             shift = (int(round(a[0] - socket[0])), int(round(a[1] - socket[1]))) if a else (0, 0)
@@ -241,9 +312,22 @@ def main():
             else:
                 score, dx, dy = (place_tip if how == "tip" else place_overlap)(new, old)
             placed = moved(new, dx, dy)
+            # Today's binding back over a redrawn head (drawn in head material where it was the haft's
+            # top and its wrap), unless --no-binding.
+            joint = binding(kind, m) if (old is not None and not args.no_binding) else None
+            if joint is not None:
+                placed[joint] = old[joint]
+            if old is not None and not args.no_binding and m in COOL:
+                # On a cool head the haft's top and its wrap are the warm pixels (wood, red and gold
+                # cord): today's warm pixels go back where the redraw drew head there.
+                warm = warm_mask(old) & ~warm_mask(placed)
+                placed[warm] = old[warm]
             write(placed, f"parts/{kind}/{shape}/{m}.png", args.apply)
+            write(centred(placed), f"parts/loose/{shape}/{m}.png", args.apply)
             full = icon(kind, placed, shift, handle)
-            misses = gem_misses(full, spots.get(kind, []))
+            # Only spots today's head doesn't miss too (some of today's already sit half off it).
+            before = gem_misses(icon(kind, old, shift, handle), spots.get(kind, [])) if old is not None else []
+            misses = [g for g in gem_misses(full, spots.get(kind, [])) if g not in before]
             cl = clipped(new, dx, dy)
             # How far the head floats off its haft: from the haft's end to the nearest head pixel.
             gap = 0.0
@@ -264,7 +348,7 @@ def main():
     for part, (kind, shape) in NEW.items():
         anchors = {}
         for m in MATS:
-            src = os.path.join(args.src, f"{m}__{part}_px.png")
+            src = drawing(args.src, f"{m}__{part}_px.png")
             if not want(m, part):
                 continue
             if not os.path.exists(src):
@@ -272,13 +356,19 @@ def main():
                 continue
             new = load(src)
             write(new, f"parts/{kind}/{shape}/{m}.png", args.apply)
-            anchors[m] = base(new)
+            write(centred(new), f"parts/loose/{shape}/{m}.png", args.apply)
+            b = base(new)
+            # A knife's tang runs 2 texels under the guard; a spear's socket meets the shaft's end.
+            anchors[m] = (b[0] + 2, b[1] - 2) if kind == "knife" else b
         if not anchors:
             continue
         ref = anchors.get("iron") or next(iter(anchors.values()))
         if kind == "knife":
             # The sword's hilt, its socket moved to the iron blade's base; regions grip, fitting (the guard).
-            hmap, sock = grip, gsock
+            # The sword's hilt, moved so its guard meets the iron blade's anchor (the handles move by
+            # anchor - socket, a texel or two).
+            mv = (int(round(ref[0] - gsock[0])), int(round(ref[1] - gsock[1])))
+            hmap, sock = moved(grip, *mv), ref
             regions = '&["grip", "fitting"]'
             layers = [("blade", '&["blade"]', "false", "true"), ("hilt", regions, "true", "false")]
             handle_rel = None
@@ -290,7 +380,7 @@ def main():
         report["new"][kind] = {m: [round(a[0], 1), round(a[1], 1)] for m, a in anchors.items()}
         handle = paint(hmap, [leather, iron] if kind == "knife" else [oak])
         for m, a in anchors.items():
-            new = load(os.path.join(args.src, f"{m}__{part}_px.png"))
+            new = load(drawing(args.src, f"{m}__{part}_px.png"))
             shift = (int(round(a[0] - sock[0])), int(round(a[1] - sock[1])))
             c = np.zeros((32, 32, 4), np.int32)
             if kind == "knife":
@@ -304,15 +394,15 @@ def main():
         snippet[kind] = (f'    KindLook {{\n        kind: "{kind}",\n        socket: [{sock[0]:.1f}, {sock[1]:.1f}],\n'
                          f'        anchors: &[\n{anc},\n        ],\n        layers: &[\n{lay},\n        ],\n    }},\n'
                          + (f"    // its handle map: {handle_rel} (written by install_v3.py)\n" if handle_rel else
-                            "    // its hilt map: parts/knife/grip.png, a copy of parts/sword/grip.png\n"))
+                            "    // its hilt map: parts/knife/grip.png, parts/sword/grip.png moved to the iron blade\n"))
         if kind == "knife":
-            write(grip, "parts/knife/grip.png", args.apply)
+            write(hmap, "parts/knife/grip.png", args.apply)
     open(os.path.join(OUT, "looks_snippet.rs"), "w").write("".join(snippet.values()))
 
     # Armour shells: painted per material where drawn.
     for m in SHELL_MATS:
         for s in SHELLS:
-            src = os.path.join(args.src, f"{m}__{s}_px.png")
+            src = drawing(args.src, f"{m}__{s}_px.png")
             if not want(m, s):
                 continue
             if not os.path.exists(src):

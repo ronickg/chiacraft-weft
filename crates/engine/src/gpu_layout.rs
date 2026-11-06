@@ -711,7 +711,10 @@ gpu_struct! {
         /// Where the player is: x how closed a forest's canopy is (0 open sky to 1 a rainforest's;
         /// a mod's air, `air_flags::CANOPY_SHIFT`), for packs' light under the leaves; y how wet
         /// the ground is, 0..1: it follows what falls up and dries over minutes after (a mod's air
-        /// says how fast, `air_flags::DRYING_SHIFT`); zw unused.
+        /// says how fast, `air_flags::DRYING_SHIFT`); z how far puddles have grown, 0..1: over
+        /// about ten minutes of rain, drying three times slower than the ground after; w where rain
+        /// turns to snow up a mountain, blocks above the sea (a mod's air,
+        /// `air_flags::SNOWLINE_SHIFT`; 400 for none).
         pub canopy: [f32; 4],
         /// Soft clouds (`core:soft_clouds`, with a pack whose sky has `fs_cloud_trace` and
         /// `fs_cloud_resolve`; chiacraft): x the bindless index + 1 of this frame's clouds, traced
@@ -1266,10 +1269,19 @@ pub fn prelude(shader: &str, common: &str) -> String {
         s.push_str(SOLID_AT);
         s.push_str(LOD_CORNER);
     }
+    s.push_str(CALM_OFF);
     s.push_str(common);
     s.push('\n');
     s
 }
+
+/// `CALM` in every shader: false, but true in the world's calm pipelines (`WorldRenderer::set_calm`),
+/// used while the scene has no fog in the air (`scene.weather.z` 0), no thunder (`scene.lightning.z`
+/// under 0.05), no held light (`scene.hand_light` 0) and the eye is in no liquid. A pack leaves
+/// out what does nothing then behind `if !CALM`: a smaller shader for the same picture (Android
+/// port: on the Pixel 10 the rare paths' size alone cost the vista a fifth of its world pass).
+pub const CALM_OFF: &str = "const CALM: bool = false;\n";
+pub const CALM_ON: &str = "const CALM: bool = true;\n";
 
 /// What goes in front of `occlusion.wgsl`.
 pub fn occlusion_prelude() -> String {

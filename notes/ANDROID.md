@@ -119,6 +119,21 @@ the phone on USB, `ANDROID_HOME=~/Library/Android/sdk tools/release/android-run.
   - leaves in two passes on Android (e870c0bc: depth with the alpha test, then shaded with no
     discard where the depth is theirs): 19 / 25, forest world 37.5 -> 29.6 ms (25.5 with leaves
     drawn solid, the bound).
+  - after the dev merge (simpler trees, leaf holes; 589df211: 17 / 26, vista world 49.9 ms), far
+    land and far water hazed by one call instead of a copy in each path (26a4d810): 20 / 26, vista
+    world 40.1 ms. Removing single parts of the haze (its veil, its sun lobe) made the shader
+    slower, not faster: what cost was the second copy of the whole haze in one shader (fewer pixels
+    in flight). Near water and glass the same way (74006387): no change, the same picture.
+  - the far land's fixed inputs written in as constants (`lod_color`: `vs_lod` always sets no glow
+    texture, block shader slot 0, no placed light, not a plant, so the compiler drops those paths,
+    which it cannot see through the interpolants): vista world 39.8 -> 34.2 ms, 22 -> 25 fps in the
+    `var_sweep.sh` vista bench (two runs each, within 0.1 ms).
+  - a calm world shader (1ee44aa6, engine + pack: `CALM`, notes/ENGINE_CHANGES.md): the world's
+    colour pipelines built a second time without the paths that draw nothing in clear air with no
+    torch in hand and the eye out of water (the fog walk, dust, under water, held light, lightning),
+    swapped in while the scene is so. Their size alone cost: vista world 35.1 -> 26.2 ms, forest
+    26.2 -> 21.7 ms (`var_sweep2.sh`, two runs each), 24 / 30 -> 31 / 34 fps. Desktop equal (also in
+    rain and with a torch at night, `an_look_calm.txt`) and faster (vista 1815 -> 1935 fps).
   Tried and dropped: haze per vertex (slower). Left: half precision (no `shaderFloat16` path in
   the engine yet), the far land's crowns and cloud shadow.
 - **Settings on the phone** (`sweep.sh`, the same bench): sun shadows cost the forest 4 ms and
