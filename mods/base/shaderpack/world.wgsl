@@ -362,6 +362,14 @@ fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32>
     let shadow = sun_shadow(in, n);
     var light = paint * light_on(n, in.light, shadow, ao, in.pos, in.rel);
     // Leaves and plants let some sun through when it is behind them.
+    // In the HDR world the light through leaves (`leaf_through`), the curve rolling its brights off
+    // (the screen's hold-back below was for today's look).
+    // Far crowns too, whatever their tint (distant terrain's crown flag, `in.kind.w`: spruce, birch
+    // and tropical leaves keep their own colours), so near and far tops light alike (Far view).
+    let crown = in.kind.y == 1u && in.kind.w != 0u;
+    if (in.kind.x == TINT_FOLIAGE || in.kind.z != 0u || crown) && scene.frame.x > 0.5 {
+        return light + paint * palette().sun * leaf_through(in.rel, shadow, in.light.x);
+    }
     if in.kind.x == TINT_FOLIAGE || in.kind.z != 0u {
         // A low morning or evening sun full on a crown's side: light about as strong as on the tops
         // at noon, but on the light birch green seen from below it went through the curve as a
