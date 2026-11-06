@@ -1324,6 +1324,9 @@ const RT_SUN_OFF: &str = "
 fn rt_sun(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool) -> vec3<f32> {
     return vec3(1.0);
 }
+fn rt_cone(l: vec3<f32>, radius: f32, px: vec2<f32>) -> vec3<f32> {
+    return l;
+}
 ";
 
 /// `rt_sun(rel, n, l, plant)`: how much of the light coming along `l` (unit, toward the sun or
@@ -1351,6 +1354,27 @@ fn rt_lod_hidden(rel: vec3<f32>) -> bool {
         return ((lod_mask[i / 32u] >> (i % 32u)) & 1u) != 0u;
     }
     return false;
+}
+
+// A direction toward a point of the light's disc round `l` (unit), `radius` radians across from its
+// middle, for the pixel at `px` (`@builtin(position)`): a different point each frame of temporal
+// anti-aliasing's jitter (`scene.taa.xy`), so its history averages one ray a pixel into the
+// penumbra a light of that size casts (soft shadows from one ray). `l` itself without the jitter.
+fn rt_cone(l: vec3<f32>, radius: f32, px: vec2<f32>) -> vec3<f32> {
+    let j = scene.taa.xy;
+    if j.x == 0.0 && j.y == 0.0 {
+        return l;
+    }
+    // Interleaved gradient noise, moved on by the jitter's phase.
+    let k = f32(u32(abs(j.x) * 7919.0 + abs(j.y) * 4271.0) % 64u);
+    let p = px + vec2(5.588238 * k);
+    let u1 = fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
+    let u2 = fract(52.9829189 * fract(dot(p.yx + vec2(17.0, 31.0), vec2(0.06711056, 0.00583715))));
+    let r = radius * sqrt(u1);
+    let a = 6.2831853 * u2;
+    let t = normalize(cross(l, select(vec3(0.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), abs(l.y) > 0.9)));
+    let b = cross(l, t);
+    return normalize(l + (t * cos(a) + b * sin(a)) * r);
 }
 
 struct RtTexel {
