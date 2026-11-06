@@ -113,6 +113,14 @@ static CLOUD_SHADOWS: Config<bool> = Config::named("core:cloud_shadows");
 static BLOOM_LEVELS: Config<i32> = Config::named("core:bloom");
 static SHADOW_FAR: Config<i32> = Config::named("core:shadow_far");
 static POST_LOW: Config<bool> = Config::named("core:post_low");
+/// DLSS where the renderer has it (windows-dlss5's `dlss.rs`, its own tab): the modes it offers
+/// (bit 1 DLAA; 0 none, also before that branch is in), whether Ray Reconstruction runs, the mode
+/// (0 off, 1 DLAA), DLAA's model and Ray Reconstruction on.
+static GPU_DLSS_MODES: Config<i32> = Config::named("core:gpu_dlss_modes");
+static GPU_DLSS_RR: Config<bool> = Config::named("core:gpu_dlss_rr");
+static DLSS: Config<i32> = Config::named("core:dlss");
+static DLSS_MODEL_DLAA: Config<i32> = Config::named("core:dlss_model_dlaa");
+static DLSS_RR: Config<bool> = Config::named("core:dlss_rr");
 /// What the detection chose (Research round 19, 7: "quality chosen by the GPU at first start"):
 /// the preset (-1 none yet), and whether the render scale went to half with it.
 static DETECTED: Config<i32> = Config::named("gpu_preset");
@@ -243,6 +251,14 @@ fn max_extras() {
     RT_SHADOWS.set(GPU_RAY_QUERY.get() && !on_phone());
     FX_WIND_LIFE.set(3);
     SOFT_CLOUDS.set(true);
+    // DLAA (DLSS at the screen's own size) where the renderer has it, with its newest model (M,
+    // 13) and Ray Reconstruction where that runs (windows-dlss5, 11-06): the engine then skips its
+    // own gathering for the frame. Elsewhere TAA as above.
+    if GPU_DLSS_MODES.get() & (1 << 1) != 0 {
+        DLSS.set(1);
+        DLSS_MODEL_DLAA.set(13);
+        DLSS_RR.set(GPU_DLSS_RR.get());
+    }
 }
 
 /// Preset `q`'s name (`video.base.preset.<name>`); None for Custom and not chosen.
@@ -351,6 +367,9 @@ fn apply(p: usize) {
     QUALITY.set(p as i32);
     if p == MAX {
         max_extras();
+    } else if GPU_DLSS_MODES.get() != 0 {
+        // DLSS is live: off again with any other preset, as Max is the one that turns it on.
+        DLSS.set(0);
     }
     fantasy_caps(p, true);
 }
