@@ -191,7 +191,13 @@ fn preset(q: usize) -> Option<&'static [f64; 12]> {
 
 /// Preset `q`'s name (`video.base.preset.<name>`); None for Custom and not chosen.
 fn preset_name(q: i32) -> Option<&'static str> {
-    if q == PHONE as i32 { Some("phone") } else { usize::try_from(q).ok().and_then(|q| PRESET_NAMES.get(q).copied()) }
+    if q == PHONE as i32 {
+        Some("phone")
+    } else {
+        usize::try_from(q)
+            .ok()
+            .and_then(|q| PRESET_NAMES.get(q).copied())
+    }
 }
 
 fn word(k: &str) -> (String, i64) {

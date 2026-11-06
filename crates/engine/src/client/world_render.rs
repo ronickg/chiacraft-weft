@@ -648,14 +648,30 @@ impl WorldRenderer {
     /// `cutout_split`: None when `cutout_prepass()` is off, the pack lacks `fs_cutout_depth` or
     /// `fs_cutout_shade`, or one fails.
     fn cutout_split_pipelines(gpu: &mut dyn Backend, shader: &Shader) -> Option<[PipelineId; 4]> {
-        if !cutout_prepass() || !["fs_cutout_depth", "fs_cutout_shade"].iter().all(|e| crate::packs::pack_uses("world.wgsl", e)) {
+        if !cutout_prepass()
+            || !["fs_cutout_depth", "fs_cutout_shade"]
+                .iter()
+                .all(|e| crate::packs::pack_uses("world.wgsl", e))
+        {
             return None;
         }
         let mut made = Vec::new();
         for (label, vs, fs, depth, blend) in [
-            ("faces cutout depth", "vs_face", "fs_cutout_depth", DepthState { write: true, compare: Compare::GreaterEqual }, Blend::NoColor),
+            (
+                "faces cutout depth",
+                "vs_face",
+                "fs_cutout_depth",
+                DepthState { write: true, compare: Compare::GreaterEqual },
+                Blend::NoColor,
+            ),
             ("faces cutout shade", "vs_face", "fs_cutout_shade", DepthState { write: false, compare: Compare::Equal }, Blend::None),
-            ("quads cutout depth", "vs_quad", "fs_cutout_depth", DepthState { write: true, compare: Compare::GreaterEqual }, Blend::NoColor),
+            (
+                "quads cutout depth",
+                "vs_quad",
+                "fs_cutout_depth",
+                DepthState { write: true, compare: Compare::GreaterEqual },
+                Blend::NoColor,
+            ),
             ("quads cutout shade", "vs_quad", "fs_cutout_shade", DepthState { write: false, compare: Compare::Equal }, Blend::None),
         ] {
             match gpu.create_pipeline(&PipelineDesc {
@@ -1646,10 +1662,8 @@ impl WorldRenderer {
                     vertex_offset: ((a.offset + skip) * 4) as i32,
                     first_instance: 0,
                 };
-                let cols = (
-                    o.div_euclid(IVec2::splat(16)) - cam_col,
-                    (o + IVec2::splat(key.size() - 1)).div_euclid(IVec2::splat(16)) - cam_col,
-                );
+                let cols =
+                    (o.div_euclid(IVec2::splat(16)) - cam_col, (o + IVec2::splat(key.size() - 1)).div_euclid(IVec2::splat(16)) - cam_col);
                 let masked = cols.0.x <= mask_half && cols.1.x >= -mask_half && cols.0.y <= mask_half && cols.1.y >= -mask_half;
                 let kind = if open && !masked { 6 } else { 3 };
                 Some((kind, 0, a.page, args, [o.x / 16 - cam_cube.x, -cam_cube.y, o.y / 16 - cam_cube.z, 0], center))
