@@ -23,6 +23,19 @@ pub const BRANCH_THIN: f32 = 0.4;
 /// and fronds hide a conifer's or a palm's wood, which keep their logs. Felling counts a branch
 /// block a quarter of a log (`tree_recipes::felling_wood`).
 pub const BRANCH_WOODS: &[&str] = &["oak", "birch", "acacia", "mesquite", "dogwood", "cherry", "ipe", "andiroba", "matamata", "brazil_nut"];
+/// The world's tree style (`base:tree_style`, a world setting, `/rule base:tree_style 0|1`): 0
+/// simple, Minecraft-style trees, a straight log trunk under a crown of leaves shaped by its log's
+/// tag (`Crown`), no branch blocks; 1 branched, grown from the species' recipes (`tree_recipes`,
+/// `colonize`) with branch blocks. Ronald, 11-05: "lets also maybe switch back to having trees
+/// without our branch system just for now too to help with testing with bliss/distant horizons
+/// and for android speed testing too". Simple for now; the recipes stay behind the setting.
+pub static TREE_STYLE: Config<u32> = Config::named("tree_style");
+
+/// Whether trees grow simple, Minecraft-style (`TREE_STYLE` 0).
+pub fn simple_trees() -> bool {
+    TREE_STYLE.get() == 0
+}
+
 /// Logs with this tag grow into cones (spruces), the others round (oaks, birches).
 pub static CONE_TREE: Tag = Tag::named("cone_tree");
 /// A tall bare trunk under one wide, flat crown (the acacia).
@@ -193,6 +206,8 @@ pub fn tree_blocks(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
     // (A giant's species in a tree's site grows its young recipe, below: the grown giant is the
     // giant scatter's.)
     let giant_young = crate::tree_recipes::YOUNG.iter().any(|y| y.log == name);
+    // Simple trees (`TREE_STYLE`): every species by its crown shape, below.
+    let simple = simple_trees();
     // Its form (rolled in `shaped`): big and old, crooked or a twin, or as its recipe grows.
     let variant = match t.form {
         Form::Big => crate::tree_recipes::Variant::Big,
@@ -201,7 +216,7 @@ pub fn tree_blocks(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
         _ => crate::tree_recipes::Variant::Standing,
     };
     if let Some(c) = crate::tree_recipes::colonized(name)
-        .filter(|_| !giant_young)
+        .filter(|_| !giant_young && !simple)
         .map(|c| crate::tree_recipes::varied_colonized(c, variant))
     {
         let c = &c;
@@ -223,7 +238,9 @@ pub fn tree_blocks(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
         put(t.x, t.y - 1, t.z, DIRT.id(), true);
         return;
     }
-    let recipe = crate::tree_recipes::sapling_of(name).map(|r| crate::tree_recipes::varied(r, variant));
+    let recipe = crate::tree_recipes::sapling_of(name)
+        .filter(|_| !simple)
+        .map(|r| crate::tree_recipes::varied(r, variant));
     let recipe = recipe.as_ref();
     if let (Some(recipe), Some(branch)) = (recipe, TREE_BRANCH.on_block(log).map(|b| b.0)) {
         grow_with_branches(recipe, log, t.leaves, branch, t.x, t.y, t.z, t.seed, &mut put);
@@ -349,6 +366,15 @@ fn crown(t: &TreeAt, cx: i32, cz: i32, top: i32, put: &mut impl FnMut(i32, i32, 
 /// a scatter of its own: nothing for a log without a recipe. Calls `put(x, y, z, state, force)`.
 pub fn giant_tree_blocks(log: u32, x: i32, y: i32, z: i32, h: u64, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
     let Some(leaves) = TREE_LEAVES.on_block(log).map(|l| l.0) else { return };
+    // Simple trees (`TREE_STYLE`): a big one of its crown shape, twice a big tree's height.
+    if simple_trees() {
+        if let Some(mut t) = shaped(log, x, y, z, h, false) {
+            t.form = Form::Big;
+            t.height *= 2;
+            tree_blocks(&t, put);
+        }
+        return;
+    }
     let name = block_name(log).split('[').next().unwrap_or("");
     // A colonized giant (the Brazil nut): its trunk from its recipe, its crown by colonization.
     if let Some(c) = crate::tree_recipes::colonized(name) {
@@ -400,7 +426,7 @@ pub fn young_tree_blocks(log: u32, x: i32, y: i32, z: i32, h: u64, mut put: impl
     // A species with a recipe grows its young from it, small (`tree_recipes::understory`), so a
     // young oak reads as an oak and a young birch as a birch.
     let name = block_name(log).split('[').next().unwrap_or("");
-    if let Some(recipe) = crate::tree_recipes::of(name) {
+    if let Some(recipe) = crate::tree_recipes::of(name).filter(|_| !simple_trees()) {
         let young = crate::tree_recipes::understory(recipe);
         branchy::grow(&young, x, y, z, h, |x, y, z, part| match part {
             branchy::Part::Log { axis } => {
