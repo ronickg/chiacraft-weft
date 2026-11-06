@@ -1452,7 +1452,7 @@ struct RtHit {
 fn rt_miss() -> RtHit {
     return RtHit(false, 0.0, vec3(0.0), vec3(0.0), vec3(0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), 0u, 0u, false);
 }
-fn rt_hit(rel: vec3<f32>, dir: vec3<f32>, t_max: f32) -> RtHit {
+fn rt_hit(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, blur: f32) -> RtHit {
     return rt_miss();
 }
 fn rt_sun(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool) -> vec3<f32> {
@@ -1616,7 +1616,8 @@ fn rt_miss() -> RtHit {
 // The first surface along `dir` (unit) from `rel` (camera relative), out to `t_max` blocks: through
 // the leaves' and plants' holes, as `rt_sun`, but water and glass are surfaces here. For a
 // reflection: the pack shades what comes back as it shades the world.
-fn rt_hit(rel: vec3<f32>, dir: vec3<f32>, t_max: f32) -> RtHit {
+// `blur`: mips more for the hit's colour (a rippled or rough mirror softens what it shows).
+fn rt_hit(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, blur: f32) -> RtHit {
     var rq: ray_query;
     rayQueryInitialize(&rq, rt_scene, RayDesc(RAY_FLAG_NONE, 0xFFu, 0.0, t_max, rel + g.cam_frac.xyz, dir));
     while rayQueryProceed(&rq) {
@@ -1661,7 +1662,7 @@ fn rt_hit(rel: vec3<f32>, dir: vec3<f32>, t_max: f32) -> RtHit {
     let tri = c.primitive_index % 2u;
     let b = c.barycentrics;
     // A 32-texel block's mip by how far the reflected way runs (a pixel about 1/700 across).
-    let lod = clamp(log2(max((length(rel) + c.t) * 0.045, 1.0)), 0.0, 4.0);
+    let lod = clamp(log2(max((length(rel) + c.t) * 0.045, 1.0)) + blur, 0.0, 5.0);
     let w = vec3(1.0 - b.x - b.y, b.x, b.y);
     let k1 = select(1u, 2u, tri == 1u);
     let k2 = select(2u, 3u, tri == 1u);
