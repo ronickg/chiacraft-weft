@@ -607,7 +607,9 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                 // (Ground with leaves on top, an imported world's trees: its whole wall the leaves, as
                 // a crown's side; under one band of them the block under the leaves showed, a
                 // birch's white log, standing out of far canopies as pale pillars. Stage 1, 11-06.)
-                let band = if leafy(top) {
+                // (And water: its wall all water, not the sand or gravel under it, which through the
+                // near water read as a pale band across bays.)
+                let band = if leafy(top) || wet(top) {
                     y - ny
                 } else if walls[k].is_some() {
                     1
