@@ -122,10 +122,12 @@ fn main() {
             let tier = if old { Tier::Canopy } else { tier };
             let v = if (h >> 40) % 100 < 14 { Variant::Big } else { Variant::Standing };
             let b: Vec<(i32, i32, i32, Part)> = match colonized(log) {
-                Some(c) => base_api::colonize::blocks(&tiered_colonized(&varied_colonized(c, v), tier), h >> 32)
-                    .into_iter()
-                    .map(|(x, y, z, p, _)| (x, y, z, p))
-                    .collect(),
+                Some(c) => {
+                    base_api::tree_recipes::capped(&base_api::colonize::blocks(&tiered_colonized(&varied_colonized(c, v), tier), h >> 32))
+                        .into_iter()
+                        .map(|(x, y, z, p, _)| (x, y, z, p))
+                        .collect()
+                }
                 None => base_api::branchy::blocks(&tiered(&varied(of(log).unwrap(), v), tier), h >> 32),
             };
             for (dx, dy, dz, part) in b {
