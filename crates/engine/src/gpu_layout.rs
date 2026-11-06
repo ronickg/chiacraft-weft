@@ -1156,6 +1156,10 @@ gpu_struct! {
         pub step: u32,
         /// 1: nothing of last frame is used (a teleport, a new world).
         pub reset: u32,
+        /// Last frame's gathered light, whose alpha is the frames gathered (`prev_diffuse` and
+        /// `prev_specular` are then its first à-trous step: SVGF's history).
+        pub prev_len_diffuse: u32,
+        pub prev_len_specular: u32,
         pub size: [f32; 2],
         /// The least share of a new frame, and the most frames gathered.
         pub alpha: f32,

@@ -9,8 +9,9 @@
 //
 // Entry fields (`DenoisePass`, `dn`), by pass:
 // - `fs_temporal` (diffuse, specular gathered; alpha the frames gathered): `diffuse`/`specular` the
-//   path tracer's, `normal`, `depth`, `motion` + 1, `prev_*` last frame's (`prev_guide` + 1, 0: start
-//   anew), `alpha` the least share of a new frame, `max_len` the most frames;
+//   path tracer's, `normal`, `depth`, `motion` + 1, `prev_*` last frame's (`prev_diffuse` and
+//   `prev_specular` its first à-trous step, `prev_len_*` its gathered light for the frame counts,
+//   `prev_guide` + 1, 0: start anew), `alpha` the least share of a new frame, `max_len` the most frames;
 // - `fs_moments` (the light's luminance moments, and this frame's guide for the next): as above,
 //   `prev_moments` last frame's;
 // - `fs_variance` (diffuse, specular with their variance in alpha): `diffuse`/`specular` the gathered,
@@ -196,12 +197,14 @@ fn fs_temporal(in: VOut) -> Pair {
         out.specular = vec4(cs, 1.0);
         return out;
     }
+    // Last frame's light after its first à-trous step (SVGF's history: less noise carried on), the
+    // frames gathered from the gathered light's alpha.
     let hd = dn_fetch(d.prev_diffuse, r);
     let hs = dn_fetch(d.prev_specular, r);
     // Smooth surfaces' reflections move with the eye, not the surface: they keep fewer frames.
     let rough = dn_normal(d.normal, at, isize).w;
-    let len_d = min(hd.a + 1.0, d.max_len);
-    let len_s = min(hs.a + 1.0, mix(4.0, d.max_len, clamp(rough * 2.0, 0.0, 1.0)));
+    let len_d = min(dn_fetch(d.prev_len_diffuse, r).a + 1.0, d.max_len);
+    let len_s = min(dn_fetch(d.prev_len_specular, r).a + 1.0, mix(4.0, d.max_len, clamp(rough * 2.0, 0.0, 1.0)));
     out.diffuse = vec4(mix(hd.rgb, cd, max(1.0 / len_d, d.alpha)), len_d);
     out.specular = vec4(mix(hs.rgb, cs, max(1.0 / len_s, d.alpha)), len_s);
     return out;
@@ -232,7 +235,7 @@ fn fs_moments(in: VOut) -> MomentsOut {
     var m = vec4(ld, ld * ld, ls, ls * ls);
     let r = dn_reproject(d, at);
     if r.ok {
-        let len = min(dn_fetch(d.prev_diffuse, r).a + 1.0, d.max_len);
+        let len = min(dn_fetch(d.prev_len_diffuse, r).a + 1.0, d.max_len);
         m = mix(dn_fetch(d.prev_moments, r), m, max(1.0 / len, 0.2));
     }
     out.moments = m;

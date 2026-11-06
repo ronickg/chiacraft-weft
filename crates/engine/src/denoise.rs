@@ -72,6 +72,9 @@ struct Images {
     guide: [Image; 2],
     step_diffuse: [Image; 2],
     step_specular: [Image; 2],
+    /// The first à-trous step, kept as next frame's history (SVGF's feedback).
+    feed_diffuse: [Image; 2],
+    feed_specular: [Image; 2],
 }
 
 pub struct Denoiser {
@@ -153,9 +156,18 @@ impl Denoiser {
             return;
         }
         if let Some(old) = self.images.take() {
-            for (t, _) in [old.diffuse, old.specular, old.moments, old.guide, old.step_diffuse, old.step_specular]
-                .into_iter()
-                .flatten()
+            for (t, _) in [
+                old.diffuse,
+                old.specular,
+                old.moments,
+                old.guide,
+                old.step_diffuse,
+                old.step_specular,
+                old.feed_diffuse,
+                old.feed_specular,
+            ]
+            .into_iter()
+            .flatten()
             {
                 gpu.destroy_texture(t);
             }
@@ -177,6 +189,8 @@ impl Denoiser {
             guide: pair("denoise guide"),
             step_diffuse: pair("denoise step diffuse"),
             step_specular: pair("denoise step specular"),
+            feed_diffuse: pair("denoise feed diffuse"),
+            feed_specular: pair("denoise feed specular"),
         });
         self.held = false;
     }
@@ -217,8 +231,10 @@ impl Denoiser {
             let (cur, last) = (self.cur, 1 - self.cur);
             let held = self.held && !f.reset;
             let prev = DenoisePass {
-                prev_diffuse: im.diffuse[last].1,
-                prev_specular: im.specular[last].1,
+                prev_diffuse: im.feed_diffuse[last].1,
+                prev_specular: im.feed_specular[last].1,
+                prev_len_diffuse: im.diffuse[last].1,
+                prev_len_specular: im.specular[last].1,
                 prev_moments: im.moments[last].1,
                 prev_guide: if held { im.guide[last].1 + 1 } else { 0 },
                 reset: !held as u32,
@@ -230,14 +246,21 @@ impl Denoiser {
             draws.push((im.moments[cur].0, Some(im.guide[cur].0), moments_pipe, entries.len() - 1));
             entries.push(DenoisePass { diffuse: im.diffuse[cur].1, specular: im.specular[cur].1, moments: im.moments[cur].1, ..base });
             draws.push((im.step_diffuse[0].0, Some(im.step_specular[0].0), variance, entries.len() - 1));
-            let mut from = 0;
+            // The first step into this frame's feedback pair (next frame's history), the rest in turn
+            // between the step pair.
+            let mut src = (im.step_diffuse[0].1, im.step_specular[0].1);
+            let mut next = 1;
             for k in 0..STEPS {
-                let to = 1 - from;
-                entries.push(DenoisePass { diffuse: im.step_diffuse[from].1, specular: im.step_specular[from].1, step: 1 << k, ..base });
-                draws.push((im.step_diffuse[to].0, Some(im.step_specular[to].0), atrous, entries.len() - 1));
-                from = to;
+                let (td, ts) =
+                    if k == 0 { (im.feed_diffuse[cur], im.feed_specular[cur]) } else { (im.step_diffuse[next], im.step_specular[next]) };
+                entries.push(DenoisePass { diffuse: src.0, specular: src.1, step: 1 << k, ..base });
+                draws.push((td.0, Some(ts.0), atrous, entries.len() - 1));
+                src = (td.1, ts.1);
+                if k > 0 {
+                    next = 1 - next;
+                }
             }
-            light = (im.step_diffuse[from].1, im.step_specular[from].1);
+            light = src;
             self.cur = last;
             self.held = true;
         } else {
