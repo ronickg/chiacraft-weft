@@ -571,7 +571,8 @@ fn far_look() -> u32 {
 // How far a cube's shading has softened (far look 2): from 48 to 160 blocks its corner shade goes
 // and its faces' normals lean halfway up, so one-block steps don't each draw a dark line.
 fn far_soft(in: VOut) -> f32 {
-    if (far_look() & 2u) == 0u {
+    // Not leaves (`LEAF_CUBE`): see `far_flat`.
+    if (far_look() & 2u) == 0u || LEAF_CUBE {
         return 0.0;
     }
     return smoothstep(48.0, 160.0, in.dist);
@@ -1201,8 +1202,12 @@ fn with_overlay(in: VOut, albedo: vec4<f32>, nuv: vec2<f32>, du: vec2<f32>, dv: 
 // Far look 4: from 64 to 192 blocks a block's texture gives way to its average colour (its
 // smallest mip), as Distant Horizons' far blocks are one colour and Voxy's mips converge on it, so
 // far grass, sand and leaves aren't grainy.
+// Not leaves (`LEAF_CUBE`): a crown's texture and its faces' shading are what a forest shows from
+// 60 to 200 blocks; flattened, crowns there were untextured light-green discs on dark gaps, "paper
+// cut-outs" (rt-sun-shadows' spot C, 11-06), and Bliss's world vista's canopy smooth lime blobs where
+// Bliss's keeps each crown's light and shade (Ronald, 08:00).
 fn far_flat(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
-    if (far_look() & 4u) == 0u {
+    if (far_look() & 4u) == 0u || LEAF_CUBE {
         return albedo;
     }
     let f = smoothstep(64.0, 192.0, in.dist);
