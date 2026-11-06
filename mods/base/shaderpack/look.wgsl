@@ -1503,10 +1503,12 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // noon Bliss's is near neutral (saturation 54, -19) where ours was bluer and more saturated (87,
     // -48; the Look session's measures on the forest vista, 11-05). 0.6 of the way to the sun's hue
     // with it under about 33°, easing to 0.3 by 64°, and the veil's channels evened out, about a third
-    // with the sun low, three tenths at noon (less of Rayleigh's blue; half took too much of 08:00's
+    // with the sun low, half at noon (less of Rayleigh's blue; half took too much of 08:00's
     // colour, and seven tenths left the noon far land grey where Bliss's is a coloured blue-green:
-    // saturation 35 against 54, the Look session's spot C measures, 11-05; at 0.45 still 41), and at
-    // noon the veil a quarter darker (its far band luma 168 against Bliss's 148; 161 at 15%). Less
+    // saturation 35 against 54 at spot C, 11-05), and at noon the veil a little darker. Tuned at the
+    // test world's like-for-like vista (base:mc_forest, the Look session's measures, 11-06): with
+    // three tenths and a quarter darker, from spot C, the noon far band came out darker and bluer
+    // than Bliss's (luma 124, saturation 66, warmth -31 against 148, 54, -19). Less
     // evening with the sun low left 08:00 greyer, not more coloured (saturation 36 to 33). The HDR path only
     // (`scene.frame.x`), so today's look stays as it is.
     let hdr_air = select(0.0, 1.0, scene.frame.x > 0.5) * (1.0 - wet) * smoothstep(-0.02, 0.06, scene.sun.y);
@@ -1520,8 +1522,8 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
         // against 72; the Look session, 11-06).
         let morning = smoothstep(0.2, 0.34, scene.sun.y) * (1.0 - smoothstep(0.6, 0.7, scene.sun.y));
         let far_off = smoothstep(250.0, 800.0, dist);
-        toward = mix(toward, luma(toward) * sun_tint, mix(0.6, 0.9, morning * far_off) * low_sun * hdr_air) * (1.0 - 0.25 * noon * hdr_air);
-        v = mix(v, vec3((v.r + v.g + v.b) / 3.0), mix(0.35, 0.3, noon) * hdr_air);
+        toward = mix(toward, luma(toward) * sun_tint, mix(0.6, 0.9, morning * far_off) * low_sun * hdr_air) * (1.0 - 0.05 * noon * hdr_air);
+        v = mix(v, vec3((v.r + v.g + v.b) / 3.0), mix(0.35, 0.5, noon) * hdr_air);
     }
     let mixed = mix(pale, toward, v);
     let own = mix(pale, toward, v * mix(0.7, 1.0, wet));
