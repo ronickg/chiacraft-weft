@@ -1,0 +1,231 @@
+# NVIDIA's RTX mod for Minecraft: how it works, and how we'd do the same
+
+Study for chiacraft's ultra look on the PC (RTX 5090). Started 2026-11-05 from the mod's and the
+runtime's public source, read on GitHub. The PC test (shots, frame times) is still to come: see
+[The PC test](#the-pc-test). Study only: none of its code, shaders, configs or art go into our
+repository or game. We learn how it's built, then write our own.
+
+## What it is
+
+- **Name**: *RTX Remix for Minecraft*, version 0.1.0 (beta), released by NVIDIA on 2026-10-23 as
+  part of RTX Remix 1.6 ([NVIDIA's page][nv]).
+- **For**: Minecraft Java 1.21.1, Fabric (loader 0.16.5+, Fabric API 0.116.10+), Java 21.
+- **Source**: [NVIDIAGameWorks/rtx-remix-minecraft][repo], Apache-2.0. It's the Java mod plus a
+  small JNI bridge (`rtxremix-java/`) over the RTX Remix C API.
+- **The renderer**: the RTX Remix runtime, [NVIDIAGameWorks/dxvk-remix][dxvk] (zlib licence).
+  It's a fork of DXVK, which normally turns Direct3D 9 games into Vulkan. Here it's used through
+  its C API (`remix_c.h`), not as a D3D9 wrapper. The release ships it prebuilt (pinned by
+  `packman/remix-sdk.packman.xml`), together with closed NVIDIA parts: DLSS (Super Resolution,
+  Ray Reconstruction, Frame Generation), NRD, the Neural Radiance Cache (`NRC_Vulkan.dll`, built on
+  tiny-cuda-nn) and SHaRC.
+- **Runs on**: Windows 10/11 only, on GeForce RTX 30 or newer, driver 616.92+. The bridge loads
+  the runtime's `d3d9.dll`, so it needs Windows Java. On Linux, people run the whole Windows game
+  under Wine: plain Wine 11.20 works, and Proton flips the world and loses the UI unless a GL
+  interop flag is set (issue [#41][i41]).
+- **Extras**: the *RTX Remix Materials* pack (LabPBR normal and specular maps, plus their own
+  `_sss` subsurface maps) and the *RTX Remix Showcase World* by BlockWorks, which the renderer
+  was tuned for. Both are on CurseForge and inside the release zip.
+
+## The big picture
+
+Minecraft keeps running as usual: its game logic, its chunk meshing workers, its OpenGL UI. The
+mod takes the 3D world away from OpenGL and gives it to Remix, which path-traces it in Vulkan.
+
+```
+Minecraft (Java, OpenGL)                       RTX Remix runtime (C++, Vulkan)
+──────────────────────────                     ────────────────────────────────
+section meshes from vanilla's workers  ──►  mesh pages ──► one BLAS each (built once)
+entities, block entities, particles    ──►  instances (retained, or per frame) ─► TLAS
+atlas sprites + LabPBR maps            ──►  textures + materials
+block lights (rules per block state)   ──►  lights (sphere/rect/disk), drawn per frame
+sky dome (GL compute, Rayleigh+Mie)    ──►  dome light
+camera                                 ──►  SetupCamera ─► path trace ─► image in Vulkan
+GL draws the UI onto that image  ◄──  shared image (EXT_memory_object + EXT_semaphore)
+                                      ──►  Present
+```
+
+Everything goes over about 30 C calls: `CreateMesh`, `CreateMaterial`, `CreateTextureFromMemory`,
+`UpdateTextureFromMemory`, `SceneInstanceAdd/Update/Remove` (instances kept from frame to frame),
+`DrawInstance` (one frame only), `CreateLight` / `DrawLightInstance`, `SetupCamera`,
+`SetConfigVariable` and the config layers, `Submit`, `Present`, and a few interop calls
+(`dxvk_GetInteropInfo`, `dxvk_GetVkImage`).
+
+## The Java side: what the mod feeds the renderer
+
+About 75 mixins hook vanilla. The parts that matter for us:
+
+**Terrain.** Vanilla's chunk workers still build section meshes. A low-priority executor merges a
+whole chunk column into one asset, split by kind into four categories (solid, cutout with
+alpha test, translucent, overlay decals) and into pages capped in bytes. Each page is one Remix
+mesh, and with `rtx.minimizeBlasMerging` each mesh gets **its own BLAS, built once and never
+rebuilt** (without it, small meshes are merged into one BLAS that is rebuilt every frame). Pages
+sit in the scene as retained instances; moving the camera never changes who owns what. Changed
+columns are found by a fingerprint per category, so only the changed category is rebuilt. Uploads
+go through a per-frame budget on the render thread, with up to 256 MB of meshes pending.
+Opacity micromaps are off ("Minecraft's high-volume terrain workload").
+
+**No far terrain.** There is no LOD. The scene is what Minecraft loaded (32 chunks at most, 512
+blocks), and the renderer fades terrain into the sky over 70 to 80% of the render distance
+(`rtx.viewDistance.*`, a stable world-space noise for rays after the first).
+
+**Entities and particles.** Entities vanilla already draws are captured in place, so each model
+is posed once. Entities outside the view are still swept up, nearest first under a budget,
+because a path tracer needs them for shadows and reflections. Particles are built on a worker,
+one frame behind the scene. First-person arms and held items go through Remix's separate
+view-model camera.
+
+**Materials.** Every atlas sprite gets its own material, and the atlas gets PBR, emissive and
+luminance textures. LabPBR maps are converted (`LabPBRConverter`). Animated sprites are
+forwarded as texture updates. Without the materials pack, vanilla textures get simple built-in
+materials. Biome tints travel as vertex colour.
+
+**Lights.** Block lights come from resource-pack rules keyed by block state, and each one is
+drawn again every frame, so not drawing one culls it. Culling: the chunk-column box, then a flood
+through connected sections, then a reach test by the light's power (brighter lights reach
+further). Lanterns and sea pickles glow through their surface instead of having a separate light.
+The new Copper Beacon is a disk light that really lights rain and walls.
+
+**Sky and clouds.** The sky is a Rayleigh and Mie panorama made by GL compute shaders from the
+time of day, read back and published as a dome light; rain blends an overcast dome over it. The
+sun's path is tilted, "matching popular shader packs (BSL, Complementary)". Clouds are real
+meshes: marching cubes over a density field, the same on every client from the world time.
+
+**Looks by situation.** Remix config layers fade in and out: dawn, day, dusk, night, rain,
+thunder, under water, caves, biomes, and zones a map author places. They mostly change exposure,
+bloom and fog. A few numbers worth knowing: `rtx.sceneScale = 0.01` (Remix's fog grid was made for
+games measured in centimetres), fog to 256 blocks, auto exposure between -2.5 and +1.5 EV, a high
+bloom threshold by day and a low one at night, and local tonemapping.
+
+**Engineering around Java.** Much of the work is keeping Minecraft from stalling the renderer:
+chunk delivery and unloads are paced by measured render-thread cost, hot vanilla paths are made
+allocation-free (the collector's pauses stretched frames), and section meshes live in C-allocated
+buffers outside the JDK's limit.
+
+## The GPU side: what Remix does each frame
+
+From `RtxContext::injectRTX` and `dispatchPathTracing` in dxvk-remix, in order:
+
+1. **Volumetrics**: a froxel grid (camera-aligned 3D cells) lit by its own light sampling. God
+   rays, haze, underwater fog.
+2. **Sparse rendering**: picks which pixels get traced this frame (Minecraft sets quality 0.3) and
+   packs them together. It only runs with DLSS Ray Reconstruction and the neural cache on.
+3. **G-buffer by ray tracing**: primary rays instead of rasterising. *PSR* (primary surface
+   replacement) follows perfect mirrors and glass: the surface seen in a mirror or through water
+   becomes the pixel's surface, so reflections and refractions get full lighting and denoising.
+4. **RTXDI** (ReSTIR for direct light): every pixel picks a few of thousands of lights and reuses
+   good picks from its neighbours and from the last frame, then traces one shadow ray.
+5. **NEE cache**: a world-space cache of which lights matter where, for the bounced rays.
+6. **Integrate direct and indirect**: shade the first hit, then the indirect path (up to about
+   four bounces, NVIDIA says). Paths end early in a radiance cache: **NRC** (a small neural
+   network trained on the fly, CUDA) or **SHaRC** (a hash grid in world space).
+7. **ReSTIR GI**: reuses indirect light samples between pixels and frames.
+8. **Demodulate, then denoise**: divide out the albedo, denoise (NRD's ReBLUR/ReLAX, or let DLSS-RR
+   do it all), then put the albedo back in **composite**.
+9. **Upscale**: DLSS-RR (denoise and upscale in one network), or DLSS, XeSS, NIS, TAA-U.
+10. **Post**: bloom, motion blur, auto exposure, tonemapping (ACES, local tonemap), lens
+    effects, sRGB with dither, then DLSS frame generation and the blit to the game's image.
+
+The shaders are in Slang. Remix has both ray-query compute versions and ray-tracing-pipeline
+versions (raygen, closest-hit, miss) of its passes, and can use Shader Execution Reordering on
+RTX 40 and newer.
+
+So the mod is **full path tracing**, not hybrid: no rasterised world at all. It leans on three
+NVIDIA-only parts to be fast enough: DLSS-RR (denoising and upscaling), NRC (bounce light) and
+frame generation.
+
+## What it costs
+
+- The release is 1.03 GB, and about 3 GB stays installed. 16 GB of RAM is recommended.
+- No measured frame times have been published yet (searched 11-05). Issue #39 reports 16 fps
+  windowed against 52 fps full screen at the same size on one machine.
+- The CPU side is a large part of the work: much of the mod is pacing, budgets and
+  allocation-free rewrites to keep Java from stalling the renderer.
+- Our own measurements on the RTX 5090: see [The PC test](#the-pc-test).
+
+## What looks best (from the source; to confirm in the shots)
+
+- Coloured light through glass and water, and coloured shadows from them (`enableDirect/Indirect
+  TranslucentShadows`).
+- Real reflections and refractions on water and glass through PSR, lit like the rest of the scene.
+- Bounce light: the colour of a lit wall on its neighbours, and dark corners in caves without
+  ambient occlusion tricks.
+- Many lights that all cast shadows (torches, lava, the beacon), thanks to RTXDI.
+- Volumetric light through the fog and under water.
+- Clouds as volume-like meshes that cast shadows.
+
+Weak spots it admits: nothing past the render distance, other mods' rendering breaks, and things
+the showcase world never visits have had less care.
+
+## How we could do the same in Weft
+
+**Where we stand.** Our engine has its own renderer: `weft_render` (a backend trait) and
+`backends/vulkan` (Vulkan 1.3 through ash 0.38, dynamic rendering, bindless textures, push
+descriptors). Shaders are WGSL, turned into SPIR-V by naga 30. It rasterises; shadows come from
+shadow maps (near and far cascades) and, in packs, a voxel march through `solid_at` (blocks
+about 112 around the camera). Far land comes from GPU-made LOD tiles (`client/lod.rs`). Nothing
+uses ray tracing yet.
+
+**What helps us.**
+- naga 30 already reads ray queries in WGSL (`enable wgpu_ray_query;`, the
+  `acceleration_structure` and `ray_query` types) and writes them to SPIR-V. So a pack's
+  `world.wgsl` or a compute pass could trace rays without leaving WGSL. It has no full
+  ray-tracing pipeline in WGSL yet, so we'd build on **ray queries**, inline in compute and
+  fragment shaders. That's also simpler to fit into our backend.
+- Our world is voxels, and our meshes are already built per chunk. One BLAS per chunk section
+  (opaque, cutout and translucent as separate geometries), built when the section is meshed and
+  kept until it changes, is exactly the scheme Remix ended up with (`minimizeBlasMerging`).
+  The TLAS (a few thousand instances) is rebuilt every frame and costs little.
+- We already have far terrain, which Remix doesn't. LOD tiles can get coarse BLASes of their own,
+  so far hills cast shadows and show in reflections.
+
+**Which GPUs.** Ray tracing is an ultra setting, off unless the device has
+`VK_KHR_acceleration_structure` and `VK_KHR_ray_query`:
+- the PC (RTX 5090), and any RTX 20 or newer or RDNA2 or newer card: yes;
+- the Mac: no. MoltenVK doesn't expose Vulkan ray tracing, so the Mac keeps today's look;
+- Android: some new phones expose ray queries, but they're far too slow for this. Off.
+The look without ray tracing stays the reference, and every ray-traced step must look like a
+better version of it, not a different game.
+
+**Steps, each its own branch, each benched and shot on the PC.**
+
+1. **Ray tracing in the backend.** Turn on the extensions and buffer device address when
+   present; add BLAS and TLAS (create, build, compact, update) to the `Backend` trait; put the
+   TLAS into the world's bindings; a capability flag the settings read. Check: a debug view
+   showing hit distance per pixel.
+2. **Scene upload.** A BLAS per meshed section (and per LOD tile), the TLAS each frame, models
+   and held items as instances. Materials as a bindless table: albedo, our normal and specular
+   maps, emission. Cutout leaves alpha-tested in the ray query loop. Check: build time per frame
+   and VRAM, at 16 and 32 chunks.
+3. **Ray-traced sun and moon shadows.** One ray per pixel toward the sun, a little jittered for
+   soft edges, then a small temporal and spatial filter. It replaces the shadow maps on ultra and
+   reaches as far as the LOD tiles. This is the cheapest big win, and a pack can call it the way
+   it calls `solid_at` now.
+4. **Reflections on water, glass and polished blocks.** One ray from the surface, shaded with our
+   own world shading at the hit and the sky where it misses, denoised by roughness. It replaces
+   screen-space reflections, so things off screen show too.
+5. **Bounce light.** One diffuse ray per pixel (or per two), ending in a world-space hash-grid
+   radiance cache we write ourselves (the idea behind SHaRC, published by NVIDIA), with a
+   temporal and an à-trous spatial denoiser of our own. Then caves and rooms get coloured bounce
+   light without ambient tricks.
+6. **Many lights.** Our own ReSTIR for block lights (the papers are public: Bitterli et al.
+   2020, and NVIDIA's RTXDI notes), so every torch casts shadows. Only after 3 to 5 look right.
+7. **Denoising and upscaling with DLSS-RR**: optional. It's NVIDIA's closed SDK (it has Linux and
+   Vulkan builds), with its own licence terms and attribution, and it's what makes Remix's sparse
+   tracing work. Before we use it, Ronald decides on the licence. Our own denoisers from steps 3
+   to 5 come first either way.
+
+We don't copy Remix's full path tracer. A hybrid (rasterised first hit, rays for shadows,
+reflections and bounce light) fits our look and our shader packs, costs far less than a full
+path tracer, and lets the Mac keep the same picture without the rays.
+
+## The PC test
+
+*Pending.* Plan: a 20-minute PC queue hold, run the mod in Ronald's Minecraft on the PC
+(Wine, or Windows if Ronald boots it), shoot the scenes of `tester-tools/mc-shaders/` plus
+close-ups of reflections, bounce light and shadows, and measure frame times at 1440p with DLSS-RR
+on each quality tier. Every shot goes to the crew gallery under "RTX".
+
+[nv]: https://www.nvidia.com/en-us/geforce/news/remix-1-6-dlss-5-comfyui-2-0-minecraft-rtx-beta/
+[repo]: https://github.com/NVIDIAGameWorks/rtx-remix-minecraft
+[dxvk]: https://github.com/NVIDIAGameWorks/dxvk-remix
+[i41]: https://github.com/NVIDIAGameWorks/rtx-remix-minecraft/issues/41
