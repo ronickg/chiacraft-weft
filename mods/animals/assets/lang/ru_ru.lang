@@ -170,6 +170,7 @@ entity.animals.egg_bird_hawk = Яйцо ястреба
 entity.animals.egg_bird_vulture = Яйцо грифа
 entity.animals.egg_bird_mesozoic = Яйцо древней птицы
 entity.animals.nest = Гнездо
+entity.animals.nest_cup = Птичье гнездо
 item.animals.nest = Гнездо
 item.animals.raptor_egg = Яйцо велоцираптора
 item.animals.utahraptor_egg = Яйцо ютараптора

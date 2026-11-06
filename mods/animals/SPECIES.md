@@ -992,7 +992,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | Life | real | in the game |
 |---|---|---|
 | mass | 0.5 kg | |
-| spawns | | in the water when mated; the fry come by her after the eggs' time |
+| spawns | | 0.25 d after mating: roe on the bottom, developing in the water |
 | eggs hatch in | 45 d | 0.97 d |
 | litter or clutch | 8 on average | 3-8 **set** |
 | between litters | 1 y | rests 5.07 d |
@@ -1002,11 +1002,11 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | lives | 12 y | 46 d, give or take a fifth; an elder from 80% of it |
 | lives in | solitary | room for 26 **set** within 48 blocks |
 
-**Balance** (uncommon): a generation 9.6 d; a line four deep in 29 d (10 h of play); 9.1 young per mother in 10 days, 26 in her life.
+**Balance** (uncommon): a generation 9.9 d; a line four deep in 30 d (10 h of play); 10.3 young per mother in 10 days, 29 in her life.
 
-- ✓ fourth generation: 28.9 days (want 20-40 days (uncommon))
+- ✓ fourth generation: 29.6 days (want 20-40 days (uncommon))
 - ✓ grown most of its life: grows 8.7 of 46 days (want under a fifth)
-- ✓ young in a life: 25.6 (want 6-40)
+- ✓ young in a life: 29.1 (want 6-40)
 - ✓ litter: 3-8 (want 1-12, fewest first)
 - ✓ room near: 26 (want 3-30)
 
@@ -1052,7 +1052,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn 
 | Life | real | in the game |
 |---|---|---|
 | mass | 4 kg | |
-| spawns | | in the water when mated; the fry come by her after the eggs' time |
+| spawns | | 0.25 d after mating: roe on the bottom, developing in the water |
 | eggs hatch in | 1 d | 0.06 d |
 | litter or clutch | 6 on average | 2-8 |
 | between litters | 1 y | rests 5.07 d |
@@ -1062,11 +1062,11 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn 
 | lives | 15 y | 57.5 d, give or take a fifth; an elder from 80% of it |
 | lives in | herd | room for 26 within 48 blocks |
 
-**Balance** (uncommon): a generation 8.7 d; a line four deep in 26 d (9 h of play); 9.7 young per mother in 10 days, 36 in her life.
+**Balance** (uncommon): a generation 9 d; a line four deep in 27 d (9 h of play); 9.4 young per mother in 10 days, 35 in her life.
 
-- ✓ fourth generation: 26.1 days (want 20-40 days (uncommon))
+- ✓ fourth generation: 26.9 days (want 20-40 days (uncommon))
 - ✓ grown most of its life: grows 8.7 of 57 days (want under a fifth)
-- ✓ young in a life: 36.4 (want 6-40)
+- ✓ young in a life: 35.1 (want 6-40)
 - ✓ litter: 2-8 (want 1-12, fewest first)
 - ✓ room near: 26 (want 3-30)
 
@@ -2390,7 +2390,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | Life | real | in the game |
 |---|---|---|
 | mass | 3 kg | |
-| spawns | | in the water when mated; the fry come by her after the eggs' time |
+| spawns | | 0.25 d after mating: roe on the bottom, developing in the water |
 | eggs hatch in | 30 d | 0.72 d |
 | litter or clutch | 6 on average | 1-4 **set** |
 | between litters | 1 y | rests 5.07 d |
@@ -2400,11 +2400,11 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | lives | 20 y | 76.7 d, give or take a fifth; an elder from 80% of it |
 | lives in | solitary | room for 14 within 48 blocks |
 
-**Balance** (uncommon): a generation 10.7 d; a line four deep in 32 d (11 h of play); 4.3 young per mother in 10 days, 22 in her life.
+**Balance** (uncommon): a generation 11 d; a line four deep in 33 d (11 h of play); 4.7 young per mother in 10 days, 24 in her life.
 
-- ✓ fourth generation: 32.2 days (want 20-40 days (uncommon))
+- ✓ fourth generation: 32.9 days (want 20-40 days (uncommon))
 - ✓ grown most of its life: grows 10.0 of 77 days (want under a fifth)
-- ✓ young in a life: 22.2 (want 6-40)
+- ✓ young in a life: 24.1 (want 6-40)
 - ✓ litter: 1-4 (want 1-12, fewest first)
 - ✓ room near: 14 (want 3-30)
 
@@ -2449,7 +2449,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | Life | real | in the game |
 |---|---|---|
 | mass | 0.02 kg | |
-| spawns | | in the water when mated; the fry come by her after the eggs' time |
+| spawns | | 0.25 d after mating: roe on the bottom, developing in the water |
 | eggs hatch in | 5 d | 0.46 d **set** |
 | litter or clutch | 8 on average | 3-11 |
 | between litters | 1 y | rests 5.07 d |
@@ -2459,11 +2459,11 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | lives | 4 y | 15.3 d, give or take a fifth; an elder from 80% of it |
 | lives in | herd | room for 30 **set** within 48 blocks |
 
-**Balance** (common): a generation 3.4 d; a line four deep in 10 d (3 h of play); 12.7 young per mother in 10 days, 12 in her life.
+**Balance** (common): a generation 3.6 d; a line four deep in 11 d (4 h of play); 13.1 young per mother in 10 days, 12 in her life.
 
-- ✓ fourth generation: 10.1 days (want 10-25 days (common))
+- ✓ fourth generation: 10.9 days (want 10-25 days (common))
 - ✓ grown most of its life: grows 2.9 of 15 days (want under a fifth)
-- ✓ young in a life: 11.8 (want 6-40)
+- ✓ young in a life: 12.3 (want 6-40)
 - ✓ litter: 3-11 (want 1-12, fewest first)
 - ✓ room near: 30 (want 3-30)
 
@@ -2781,7 +2781,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | eats | fish 60%, meat 30%, carrion 10% |
 | hunts | 0.3%-100% of its mass alone (0.45-150 kg); at home: lungfish, psittacosaurus, confuciusornis |
 | a meal that fills it | 15 kg; its biggest prey at home fills it in one kill |
-| room by its prey | floodplain 7, fern_forest 20 (as many as 30% of their young a year feed, at most its crowd) |
+| room by its prey | floodplain 8, fern_forest 20 (as many as 30% of their young a year feed, at most its crowd) |
 | drinks | 100% of its 1.799 L a day; a drink lasts 125 min, thirsty after 63 |
 | feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 6 blocks (twice that running) |

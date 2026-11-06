@@ -1,0 +1,41 @@
+chiacraft DLSS on Windows: the test (about 30 minutes, most of it unattended)
+============================================================================
+
+BEFORE, on CachyOS (2 minutes)
+  1. Terminal:  ~/win/chiacraft-dlss-kit/copy-to-windows.sh
+     (asks your password once to mount the "Storage" drive, copies the kit, ~2.5 GB)
+  2. Reboot into Windows.
+
+ON WINDOWS
+  3. Driver: any recent Game Ready driver runs DLSS and Ray Reconstruction. (DLSS 5 will need
+     616.64 or newer, later.)
+  4. Explorer > Storage drive > chiacraft-dlss-kit. Click the address bar, type  powershell , Enter.
+  5. Quick check (~4 minutes; the game window opens and closes by itself three times):
+        powershell -ExecutionPolicy Bypass -File .\run_kit.ps1 -Quick
+     Open results\<newest>\summary.txt. Good when:
+       - no-streamline : says core:dlss 1 (dlaa) is off  (the game starts without NVIDIA's files)
+       - dlaa          : says "streamline: DLSS ... ready" and "upscaler dlaa: world 2560x1440"
+     If dlaa says failed / missing / not supported: run the same line with  -Dev  added and keep
+     chiacraft\streamline-dev\sl.log. Skip to step 8.
+     Smaller screen than 2560x1440? Add  -Size 1920x1080  to each line.
+  6. Full run (~25 minutes, you can leave it):
+        powershell -ExecutionPolicy Bypass -File .\run_kit.ps1
+  7. Look, 2 minutes: in results\<newest>\ compare  spotc_off\vistac_h08.png  with  spotc_dlaa,
+     spotc_sr-quality,  spotc_sr-quality-cnn  (the older model)  and  spotc_rr  (same file), and the
+     *_moving.png  shots (taken mid-strafe).
+     Note in a few words: sharper or softer than off? shimmer? ghost trails behind leaves? black or
+     broken frames? Which looks best?
+     And one word: is  sr-jitterflip  worse (speckled canopy) than  sr-quality?  (yes / no / same)
+
+AFTER, back on CachyOS
+  8. Terminal:  ~/win/chiacraft-dlss-kit/fetch-results.sh   then tell Planner "DLSS results in"
+     with your notes from step 7. (Frame times are in summary.txt: BENCH lines, "frame avg".)
+
+GOOD TO KNOW
+  - DLSS 5 rows are skipped: NVIDIA has not published its plugin (sl.dlss_nr) in the public SDK.
+    To get it, sign in at developer.nvidia.com and ask for DLSS 5 / Neural Rendering access.
+  - Ray Reconstruction gets approximate inputs for now (normals from depth, albedo from the picture).
+  - In the game: Options > Video and Quality > the DLSS tab: mode, model per mode, Ray Reconstruction
+    and its model, all live.
+  - Nothing here changes Windows or the driver. The game writes only inside this folder
+    (chiacraft\run, results\). A run that hangs is stopped after 5 minutes.

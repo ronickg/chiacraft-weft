@@ -78,6 +78,8 @@ pub const BOXES: &[(&str, (f32, f32))] = &[
     ("egg_dromaeosaur_large", (0.4, 0.77)),
     ("egg_ceratopsian_small", (0.26, 0.17)),
     ("nest", (0.9, 0.15)),
+    // A bird's cup nest (`source/nest/cup.py`), scaled up for bigger birds' eggs.
+    ("nest_cup", (0.44, 0.17)),
 ];
 
 /// Boxes the height rule doesn't hold to, and why.

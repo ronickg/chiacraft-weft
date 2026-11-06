@@ -1,0 +1,41 @@
+# DLSS kit: Bliss's own world (imported, --import-mc), the vista (165.5 200 168.5, yaw -120 -12) as bliss_env's mc_world:
+# spring 8, clear, calm, HUD off; 08:00 and 12:00 frozen (a shot and an 8 s bench each), then a slow strafe for motion.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /weather clear 99999
+chat /season spring 8
+chat /time set 6000
+chat /tk mode spectator
+key F1
+set_config core:vsync 0
+set_config core:fps_cap 0
+chat /tp 165.5 200 168.5
+wait 10
+loaded
+wait 30
+look -120 -12
+wait 2
+chat /air 0 1 0 mist
+wait 12
+chat /time set 2000
+wait 1
+chat /tick freeze
+wait 10
+shot vista_h08.png
+wait 1
+bench 8 vista_h08
+chat /tick unfreeze
+chat /time set 6000
+wait 1
+chat /tick freeze
+wait 10
+shot vista_h12.png
+wait 1
+bench 8 vista_h12
+hold core:right 4 nowait
+wait 2
+shot vista_moving.png
+wait 2
+chat /tick unfreeze
+quit
