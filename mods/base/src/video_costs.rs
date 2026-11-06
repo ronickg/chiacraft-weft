@@ -54,19 +54,18 @@ static RENDER_SCALE: Config<f32> = Config::named("core:render_scale");
 /// Rows read at start come from paired runs.
 const TABLE: &[(&str, f64, f64, f64)] = &[
     // key, value, PC ms, Pixel ms. The PC's from the sweep at mc_forest noon, view 32, the rest of
-    // Max around it (tester-tools/temporal-aa/costs_sweep4.txt, 11-06: ±0.02 ms a value); rows it
-    // found nothing for there (mist, fireflies by night, contact shadows under trees) cost where
-    // they show, which a player's own measuring finds.
+    // Max around it, after the traced light's view-32 work (dev 16878e62; tester-tools/temporal-aa/
+    // costs_sweep5.txt, 11-06: ±0.02-0.04 ms a value; before it traced shadows cost 4.1 and 11.0 ms).
+    // Rows it found nothing for there (fireflies by night, contact shadows under trees, the mist in
+    // fog) cost where they show, which a player's own measuring finds.
     ("shadows", 1.0, 0.28, f64::NAN),
     ("shadows", 2.0, 0.49, f64::NAN),
-    ("reflect", 1.0, 0.07, f64::NAN),
-    ("reflect", 2.0, 0.06, f64::NAN),
-    ("volume", 1.0, 0.07, f64::NAN),
-    ("volume", 2.0, 0.20, f64::NAN),
-    ("rt_shadows", 1.0, 4.08, f64::NAN),
-    ("rt_shadows", 2.0, 10.98, f64::NAN),
-    ("fireflies", 1.0, 0.07, f64::NAN),
-    ("clouds", 1.0, 0.07, f64::NAN),
+    ("reflect", 2.0, 0.12, f64::NAN),
+    ("volume", 2.0, 0.13, f64::NAN),
+    ("mist_volume", 2.0, 0.08, f64::NAN),
+    ("rt_shadows", 1.0, 0.70, f64::NAN),
+    ("rt_shadows", 2.0, 2.02, f64::NAN),
+    ("rt_reflections", 1.0, 0.11, f64::NAN),
     // From paired benches (11-06): TAA +0.07-0.10 ms on the PC; on the Pixel the motion image cost
     // its world pass 9 ms and the resolve 2.4 (Android).
     ("aa", 1.0, 0.09, 11.4),
