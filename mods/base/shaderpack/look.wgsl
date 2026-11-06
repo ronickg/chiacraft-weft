@@ -137,7 +137,22 @@ fn blend(a: Palette, b: Palette, t: f32) -> Palette {
 // member), or worked out here without that (previews, a pack reload's first frame). Worked out
 // here it was some 150 instructions in up to ten places of every pixel, and the Mac's world pass
 // spilled registers (Tester's trace, 11-05).
+// Read once per invocation and kept (`PAL`): each call read five texels of the frame's row again,
+// and the far land's pixel calls it some ten times (the haze's two sky colours, the light, the
+// water); on the Pixel 10 the world pass went 52.3 -> 45.0 ms at the vista, 42.0 -> 37.0 in the
+// forest, the same values (Android port, 11-06).
+var<private> PAL: Palette;
+var<private> PAL_READ: bool = false;
+
 fn palette() -> Palette {
+    if !PAL_READ {
+        PAL = palette_now();
+        PAL_READ = true;
+    }
+    return PAL;
+}
+
+fn palette_now() -> Palette {
     var p = palette_read();
     // The sky's light test (`base:look_sky_light`): its light in the shade scaled, the sun's kept.
     // In the HDR world 0.45 of it as made (the gap sheets: our shade never went dark against
