@@ -10,6 +10,7 @@
 // `pt_out` and `pt_in` come from it.
 
 const PT_SUN_CONE: f32 = 0.012;
+const PT_REACH: f32 = 384.0;
 
 fn pt_unpack_rgb(c: u32) -> vec3<f32> {
     return vec3<f32>(f32((c >> 16u) & 255u), f32((c >> 8u) & 255u), f32(c & 255u)) / 255.0;
@@ -77,6 +78,11 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     let c = scene.inv_view_proj * vec4(ndc, d, 1.0);
     let rel = c.xyz / c.w;
     let dist = length(rel);
+    // The far land keeps the world's own light (traced shadows hand it to the far map from 256
+    // blocks too): its rays are the dearest and its detail the least.
+    if dist > PT_REACH {
+        return;
+    }
     let h = rt_hit(vec3(0.0), rel / dist, dist * 1.1 + 2.0, 0.0);
     // Terrain at the depth drawn there: anything else (water, glass, a model, a particle) keeps the
     // world's own pixel.
