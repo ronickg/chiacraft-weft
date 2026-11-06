@@ -390,13 +390,17 @@ fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32>
         // beside Bliss's (light-range sweep lr1, 11-06: x2 took the canopy's roughness at 150
         // blocks 7.6/11.7 to 8.9/13.8; x3 no further, the curve rolls it off; darker shaded faces
         // took it down, not up).
+        // Leaves only, not plants (`in.kind.z`): on tall grass it bleached the sunlit blades pale
+        // yellow-white beside black gaps (Tester 2's calm noon, -470 520, HDR on against off).
         let k_sun = look_opt(OPT_LEAF_SUN, 1.0);
-        if k_sun != 1.0 {
+        if k_sun != 1.0 && in.kind.z == 0u {
             let c_open = min(canopy(), 1.0);
             let open = smoothstep(mix(0.5, 0.25, c_open), mix(0.95, 0.55, c_open), in.light.x);
             light += paint * palette().sun * light_strength() * sun_facing(n) * shadow * open * (k_sun - 1.0);
         }
-        return light + paint * palette().sun * leaf_through(in.rel, shadow, in.light.x);
+        // Plants half of it: with all of it tall grass in the sun went pale yellow-white beside black
+        // gaps (Tester 2's calm noon, HDR on against off).
+        return light + paint * palette().sun * leaf_through(in.rel, shadow, in.light.x) * select(1.0, 0.5, in.kind.z != 0u);
     }
     if in.kind.x == TINT_FOLIAGE || in.kind.z != 0u {
         // A low morning or evening sun full on a crown's side: light about as strong as on the tops
