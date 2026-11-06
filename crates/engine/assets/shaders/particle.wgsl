@@ -19,14 +19,23 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
     let c = CORNER[vi % 6u];
     var across = scene.right.xyz;
     var down = -scene.up.xyz;
-    if p.extra.y > 0.5 {
+    var stretch = p.pos_size.w;
+    if p.extra.y >= 2.0 {
+        // A streak along its motion (blown sand): as long as `extra.y - 2`, its width across it
+        // turned to the camera.
+        let c2 = cos(p.extra.w);
+        down = vec3(c2 * cos(p.extra.z), sin(p.extra.w), c2 * sin(p.extra.z));
+        let side = cross(down, p.pos_size.xyz);
+        across = select(scene.right.xyz, normalize(side), length(side) > 1e-4);
+        stretch = max(p.extra.y - 2.0, p.pos_size.w);
+    } else if p.extra.y > 0.5 {
         // A card that turns in 3D (a falling leaf): flat, then tipped by `extra.w` about the line
         // its heading `extra.z` gives.
         let h = vec2(cos(p.extra.z), sin(p.extra.z));
         across = vec3(h.x, 0.0, h.y);
         down = vec3(-h.y, 0.0, h.x) * cos(p.extra.w) + vec3(0.0, sin(p.extra.w), 0.0);
     }
-    let world = p.pos_size.xyz + (across * (c.x - 0.5) + down * (c.y - 0.5)) * p.pos_size.w;
+    let world = p.pos_size.xyz + across * (c.x - 0.5) * p.pos_size.w + down * (c.y - 0.5) * stretch;
     var out: VOut;
     out.clip = scene.view_proj * vec4(world, 1.0);
     let r = vec4<f32>(f32(p.data.z & 255u), f32((p.data.z >> 8u) & 255u), f32((p.data.z >> 16u) & 255u), f32(p.data.z >> 24u)) / 255.0;

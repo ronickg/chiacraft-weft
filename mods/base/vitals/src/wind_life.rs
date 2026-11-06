@@ -118,8 +118,24 @@ pub const SAND_LIFE: (f32, f32) = (1.0, 2.5);
 pub const SAND_SIZE: (f32, f32) = (0.03, 0.06);
 pub const SAND_AIR: f32 = 7.0;
 pub const SAND_SINK: f32 = 0.6;
-/// In a dust storm: grains a second put in the air round the player at its thickest.
+/// In a dust storm: grains a second put in the air round the player at its thickest, within the
+/// clear air the pack's dust fog leaves round the eye (its `dust_reach`, Shader's: 16 blocks at
+/// 7 m/s, 8 at 11): farther out the fog hides them.
 pub const DUST_STORM: f32 = 120.0;
+pub const DUST_CLEAR: [(f32, f32); 2] = [(7.0, 16.0), (11.0, 8.0)];
+/// And thin streaks of sand along the wind, 5 to 40 blocks out (the study's gust streaks), a
+/// second at its thickest; each drawn as long as `STREAK_SECS` of its flight.
+pub const DUST_STREAKS: f32 = 30.0;
+pub const STREAK_REACH: (f32, f32) = (5.0, 40.0);
+pub const STREAK_SECS: f32 = 0.12;
+pub const STREAK_LIFE: (f32, f32) = (0.6, 1.4);
+pub const STREAK_SIZE: (f32, f32) = (0.025, 0.04);
+
+/// The clear air's radius round the eye in a dust storm at `wind` m/s (`DUST_CLEAR`).
+pub fn dust_clear(wind: f32) -> f32 {
+    let [(w0, r0), (w1, r1)] = DUST_CLEAR;
+    r0 + (r1 - r0) * ((wind - w0) / (w1 - w0)).clamp(0.0, 1.0)
+}
 
 // ---- drips ----
 

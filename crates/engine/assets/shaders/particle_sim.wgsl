@@ -457,6 +457,11 @@ fn simulate(@builtin(global_invocation_id) id: vec3<u32>) {
             lie.y = 0.02;
         }
     }
+    // A streak along its motion (blown sand): its heading and climb, and its length.
+    let speed = length(l.vel);
+    if kind.motion.w > 0.0 && speed > 0.01 && (l.flags & STOPPED) == 0u {
+        card = vec3(2.0 + speed * kind.motion.w, atan2(l.vel.z, l.vel.x), asin(clamp(l.vel.y / speed, -1.0, 1.0)));
+    }
     if carried {
         // Grows in as it comes off and shrinks away at the end, not popping.
         size *= smoothstep(0.0, 0.25, l.age) * smoothstep(0.0, 2.0, l.life - l.age);

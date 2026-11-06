@@ -536,6 +536,8 @@ pub struct ParticleDef {
     pub sink: f32,
     pub flutter: f32,
     pub lift: f32,
+    /// Seconds of its motion it is drawn stretched over (`abi::ParticleDesc::streak`).
+    pub streak: f32,
 }
 
 /// `abi::ParticleRule` with what it names as numbers.
@@ -2948,6 +2950,7 @@ fn freeze_particles(g: &mut Game, raws: Vec<RawParticle>, errors: &mut Vec<Strin
             sink: d.sink,
             flutter: d.flutter.clamp(0.0, 1.0),
             lift: d.lift.max(0.0),
+            streak: d.streak.max(0.0),
         });
     }
     let translucent = |k: &ParticleDef| k.flags & abi::particle_flags::TRANSLUCENT != 0;

@@ -552,7 +552,7 @@ impl Particles {
                         data: [r.event | r.when << 4 | r.tag << 8 | r.then << 16, r.amount.to_bits(), r.into, 0],
                     }));
                     GpuParticleKind {
-                        motion: [k.gravity, k.drag.powf(ticks), ground, 0.0],
+                        motion: [k.gravity, k.drag.powf(ticks), ground, k.streak],
                         data: [k.color, k.color_end, k.flags, self.kind_slots.get(i).copied().unwrap_or(0)],
                         frames: [at, k.frames.len() as u32, first_rule, k.rules.len() as u32],
                         start: [k.life_min, k.life_max, k.size_min, k.size_max],

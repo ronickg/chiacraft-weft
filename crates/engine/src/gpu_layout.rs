@@ -906,7 +906,8 @@ gpu_struct! {
 gpu_struct! {
     /// What `particle_sim.wgsl` needs of a kind, for this frame's step.
     pub struct GpuParticleKind as "ParticleKind" {
-        /// x gravity, y speed kept this step, z speed kept on the ground this step.
+        /// x gravity, y speed kept this step, z speed kept on the ground this step, w the seconds
+        /// of its motion it is drawn stretched over (0: a square).
         pub motion: [f32; 4],
         /// x color, y color at the end, z `abi::particle_flags`, w shader slot.
         pub data: [u32; 4],
@@ -1029,8 +1030,10 @@ gpu_struct! {
         /// unlit.
         pub data: [u32; 4],
         /// x life fraction 0..1; y 1 for a card that turns in 3D (a fluttering kind,
-        /// `ParticleDef::flutter`), 0 one facing the camera; z the card's heading and w how far it
-        /// is tipped about it (radians; 0 lying flat).
+        /// `ParticleDef::flutter`), 0 one facing the camera, 2 + its length (blocks) for a streak
+        /// along its motion (`ParticleDef::streak`); z the card's heading and w how far it is
+        /// tipped about it (radians; 0 lying flat), or for a streak the motion's heading and
+        /// climb.
         pub extra: [f32; 4],
     }
 }

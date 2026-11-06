@@ -4112,6 +4112,9 @@ pub struct ParticleDesc {
     /// After landing, the wind (m/s, gusts included) that blows it on along the ground or up again
     /// (litter in a gust); 0, it stays where it lies.
     pub lift: f32,
+    /// Drawn stretched along its motion over this many seconds of it (a streak of blown sand), a
+    /// card `size` wide facing the camera as it can; 0, a plain square.
+    pub streak: f32,
 }
 defaults!(ParticleDesc {
     name: Str::EMPTY,
@@ -4132,6 +4135,7 @@ defaults!(ParticleDesc {
     sink: 0.0,
     flutter: 0.0,
     lift: 0.0,
+    streak: 0.0,
 });
 
 /// How much a player may do, for commands and anything else that asks: modern's levels. A player

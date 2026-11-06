@@ -26,6 +26,8 @@ static POLLEN: Particle = Particle::named("pollen");
 /// Snow and sand grains: pieces of the block they blow off (block dust).
 static SPINDRIFT: Particle = Particle::named("spindrift");
 static SAND_GRAIN: Particle = Particle::named("sand_grain");
+/// A dust storm's streak of sand, drawn along its flight.
+static SAND_STREAK: Particle = Particle::named("sand_streak");
 static DRIP: Particle = Particle::named("core:drip");
 
 /// The season's leaf fall where the player stands (`wl::fall`), the server's.
@@ -83,6 +85,12 @@ pub fn register(r: &mut Registry) {
         .life(wl::SAND_LIFE.0, wl::SAND_LIFE.1)
         .size(wl::SAND_SIZE.0, wl::SAND_SIZE.1)
         .carried(wl::SAND_AIR, wl::SAND_SINK)
+        .on_land(When::any(), Then::die());
+    r.particle(&SAND_STREAK)
+        .life(wl::STREAK_LIFE.0, wl::STREAK_LIFE.1)
+        .size(wl::STREAK_SIZE.0, wl::STREAK_SIZE.1)
+        .carried(wl::SAND_AIR, wl::SAND_SINK * 0.3)
+        .streak(wl::STREAK_SECS)
         .on_land(When::any(), Then::die());
     r.world_tick(tell);
     r.client_frame(frame);
@@ -379,15 +387,24 @@ fn frame(c: &Client) {
             }
         }
     }
-    // A dust storm fills the air round the player with sand, whatever the ground.
+    // A dust storm fills the clear air round the player with sand, whatever the ground (the fog
+    // hides farther), and draws streaks along the wind farther out.
     if dust > 0.0 {
+        let sand = sand_state();
+        let v = [wind[0] as f64, 0.0, wind[1] as f64];
+        let clear = wl::dust_clear(speed) as f64;
         let n = wl::draw(wl::DUST_STORM * dust * density * dt, life.unit());
         if n > 0 {
-            let sand = sand_state();
-            let ahead = [me[0] - dir[0] as f64 * 8.0, me[1] + 1.5, me[2] - dir[1] as f64 * 8.0];
-            let v = [wind[0] as f64, 0.0, wind[1] as f64];
-            drop(c.spawn_particles(&SAND_GRAIN, ahead).spread_box([14.0, 3.0, 14.0]).velocity(v).speed(1.0).count(n).block(sand));
+            // Centred a little upwind, so the wind carries them through.
+            let at = [me[0] - dir[0] as f64 * clear * 0.4, me[1] + 1.5, me[2] - dir[1] as f64 * clear * 0.4];
+            drop(c.spawn_particles(&SAND_GRAIN, at).spread_box([clear, 2.5, clear]).velocity(v).speed(1.0).count(n).block(sand));
             life.sent[4] += n;
+        }
+        for _ in 0..wl::draw(wl::DUST_STREAKS * dust * density * dt, life.unit()) {
+            let (a, r) = (life.unit() as f64 * std::f64::consts::TAU, wl::STREAK_REACH.0 + (wl::STREAK_REACH.1 - wl::STREAK_REACH.0) * life.unit());
+            let at = [me[0] + a.cos() * r as f64, me[1] + 0.5 + life.unit() as f64 * 4.0, me[2] + a.sin() * r as f64];
+            drop(c.spawn_particles(&SAND_STREAK, at).velocity(v).speed(1.5).block(sand));
+            life.sent[4] += 1;
         }
     }
     stir(c, life, &st, density);

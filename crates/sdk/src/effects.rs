@@ -184,6 +184,12 @@ impl ParticleBuilder<'_> {
         self.desc.lift = wind;
         self
     }
+    /// Drawn as a streak along its motion, as long as `seconds` of it (blown sand in a storm), `size`
+    /// wide.
+    pub fn streak(mut self, seconds: f32) -> Self {
+        self.desc.streak = seconds;
+        self
+    }
     /// Floats on liquids, drifting with the wind; for `carried` kinds.
     pub fn floats(mut self) -> Self {
         self.desc.flags |= pf::FLOATS;
