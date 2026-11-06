@@ -81,7 +81,8 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
 @fragment
 fn fs(in: VOut) -> @location(0) vec4<f32> {
     let first = passes[in.pass_index];
-    var color = textureSampleLevel(textures[first.scene], linear_clamp, in.uv, 0.0);
+    // Scaled up by `core:upscaler`'s filter when the world is drawn smaller (`world_upscaled`).
+    var color = world_upscaled(textures[first.scene], in.uv, in.clip.xy, scene.frame.w);
     let count = max(first.pad, 1u);
     for (var k = 0u; k < count; k++) {
         let pass_ = passes[in.pass_index + k];

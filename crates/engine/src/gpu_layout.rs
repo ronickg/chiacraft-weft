@@ -755,7 +755,9 @@ gpu_struct! {
         /// curve to that pass); 0 into the screen or a preview. y 1 when the last frame drew the
         /// HDR world's bloom pyramid (`post::bloom`), which the last pass adds, so a pack's own
         /// bloom effect leaves its glow out. z the pixels a mist volume cell covers each way
-        /// (`client::froxels`: 8, or 4 at ultra), for a pack that spends more on finer cells. w unused.
+        /// (`client::froxels`: 8, or 4 at ultra), for a pack that spends more on finer cells. w how a world
+        /// drawn smaller than the screen is scaled up (`core:upscaler`: 0 bilinear, 1 FSR 1's EASU,
+        /// `world_upscaled` in common.wgsl).
         pub frame: [f32; 4],
         /// The soft clouds' shadow on the land (`client::cloud_shadow`, with the HDR world; a pack
         /// whose sky has `fs_cloud_shadow`): x the map's bindless index + 1 (0: none this frame), y

@@ -577,6 +577,9 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // The 3D world's share of the window's pixels each way (`app::world_frame`), the UI
         // always whole; 0 picks it by the screen (fewer on high-density ones).
         ConfigDef::number("core:render_scale", ck::FLOAT, 0.0, 0.0, 1.0, 0.05),
+        // How a world drawn smaller than the window (`core:render_scale`) is scaled up: 0 bilinear,
+        // 1 FSR 1's edge-adaptive upscale (`easu` in common.wgsl). Live.
+        ConfigDef::number("core:upscaler", ck::INT, 0.0, 0.0, 1.0, 1.0),
         // The GPU, as the renderer found it (`Backend::device_*`), for mods to read: put at start,
         // never saved by a player (the base game's first quality preset, Research round 19, 7).
         ConfigDef::text("core:gpu_name", ""),
