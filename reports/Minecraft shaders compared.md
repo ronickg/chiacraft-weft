@@ -4,9 +4,10 @@ What the best Minecraft shader packs do that chiacraft's look doesn't, how they 
 Ronald (11-05): "find some of the best shaders from Minecraft and do some screenshots ... comparisons ... especially ones
 with Voxy or Horizon". Shot on the PC (RTX 5090), 11-05, by the MC shaders session.
 
-**Status (11-05, 23:40): draft.**
-- Shot and compared: Bliss (with the far-view set), Complementary Unbound, Photon and Complementary Reimagined.
-- Solas is shooting now. BSL, Mellow and the Voxy far view for the six Voxy packs are armed for 00:41–02:10.
+**Status (11-06, 02:50): all shot.**
+- Shot and compared: all seven packs (Bliss, Complementary Unbound and Reimagined, Photon, Solas, BSL, Mellow), with DH.
+- The Voxy far view is shot under Unbound, Reimagined, Solas and BSL. It failed for Photon (the world never loaded) and for
+  Mellow (Mellow's shaders crash with Voxy).
 - Our side is reshot on current dev at the equinox (spring 8), once with dev's default look and once with the HDR match set.
   That shows what today's work fixed: see [Ours today](#ours-today-dev-default-vs-the-hdr-match-set).
 - The technique study of all seven packs is done: [mc-shader-techniques.md](mc-shader-techniques.md).
@@ -140,8 +141,6 @@ Sheets: `sheets3_sp8/<Pack>/<Pack>_vs_ours3_*.jpg`. Today's dev work, as it read
 
 ## The other packs
 
-(Filled in as each pack's window lands: Solas, BSL, Mellow, then the Voxy far view for the six Voxy packs.)
-
 ### Take from each pack, ranked
 
 - **Bliss:**
@@ -164,6 +163,13 @@ Sheets: `sheets3_sp8/<Pack>/<Pack>_vs_ours3_*.jpg`. Today's dev work, as it read
 - **Solas:**
   1. rain that keeps the land bright and readable under a pale deck
   2. a pastel pink-lavender dawn and dusk with cirrus, a softer alternative to gold
+  3. the clearest far land under Voxy (light haze, colours kept)
+- **BSL:**
+  1. the grey ground haze at 07:00 over old growth: a low, flat-topped morning layer, the shape our mist still lacks
+  2. a strong sun halo and bloom through thin cloud
+  - not to take: its rain is a flat blue fog wall, and its all-day blue haze hides the land
+- **Mellow:** nothing new. It is close to vanilla: clear and saturated by day, rain barely shows, nights dark. It confirms
+  that clear daylight colour is a fine baseline, and that our look is already further from vanilla than Mellow.
 
 ### Solas 3.9 (with DH)
 
@@ -175,6 +181,45 @@ Bliss's gold.
   packs out of four. Ours goes grey and milky, and the HDR thunderstorm adds a dark band at the top of the frame.
 - **Night:** very dark and cool. The held torch lights nothing (no handheld light), as in Photon. Ours is far brighter at
   night, and our held torch still floods the forest at 00:00 on both looks.
+
+### BSL 10.1.8 (with DH)
+
+Sheets: `sheets3_sp8/BSL/` (dev | HDR | BSL), `sheets/bsl/`, crops in `crops/bsl/`. A thick blue-grey atmosphere all day.
+- **Day:** heavy blue haze over the whole vista from 08:00 to 16:00; far land fades early. Ours keeps the land far more
+  readable, which we want.
+- **Dawn:** deep orange land at 05:00 under a dark cloud band, then warm dense air with a big sun halo at 06:00. At 07:00
+  over old growth there's a grey, flat-topped ground haze: the low top edge our mist still needs (item 2).
+- **Clouds:** soft and blurry, almost 2D, with a bright glow around the sun. Ours are more shaped.
+- **Rain:** the worst of the packs. Everything turns into a flat blue fog wall within 4 s, and the land is gone. Ours keeps
+  more land, but goes milky.
+- **Night:** dark, with a small torch pool, like Bliss.
+
+### Mellow 3.5 (with DH)
+
+Sheets: `sheets3_sp8/Mellow/`, `sheets/mellow/`, crops in `crops/mellow/`. Clear and saturated, close to vanilla.
+- **Day:** crisp, saturated greens and blue water with almost no haze. Shadows are light.
+- **Dawn and dusk:** a muted pink-violet sky with a dark land. Less warm than ours.
+- **Rain:** it barely shows. The sky greys a little and the land stays as on a clear day; only the thunderstorm darkens
+  the sky.
+- **Night:** very dark, with a small torch pool.
+- **Voxy:** Mellow's shaders crash with Voxy (a shader compile error, then "close the existing render pass"), so no far
+  view.
+
+### Far view with Voxy (Unbound, Reimagined, Solas, BSL)
+
+Sheets: `sheets/voxy/` (wide, FOV 30 targets, full-res crops, F3). Each row is ours, then Bliss with DH, then each pack with
+Voxy, then Voxy with shaders off. The Voxy camera was at y170 (below the packs' clouds) and DH's at y200, so the FOV 30
+targets point at slightly different land.
+- **Voxy's own geometry** (shaders off) is clean: the same blocks as the near terrain, no seam or floating pieces at FOV 30,
+  and a sharp far horizon. That's better than DH with shaders off, which showed a flipped horizon band.
+- **Under shaders:**
+  - Unbound, Reimagined and BSL wash the distance into a pale blue-white haze. Far land becomes shapes without colour.
+  - Solas keeps the far land the clearest: autumn reds, green and the shore line stay readable to the horizon.
+  - Bliss with DH sits between: blue haze, with saturated colour kept.
+- **Ours:** keeps far colour and tree shapes better than all but Solas. The gap is the same as with DH: our faceted far peaks
+  and shore curtains, and no sun-tinted haze to give depth (items 1 and 8).
+- **Photon:** its Voxy run never got into the world (quick play failed, then every command timed out). It's not redone;
+  Photon's far view with DH is in its own section.
 
 ### Forest from above: all packs vs our old-growth spot C
 
@@ -243,7 +288,7 @@ Sheets: `sheets/photon/Photon_vs_ours_*.jpg`, crops in `crops/photon/`.
 ## What we should take, ranked
 
 Each item names the shot that shows it and the technique; costs are from [mc-shader-techniques.md](mc-shader-techniques.md).
-Where today's dev stands on each, at 11-05 23:40, with the HDR world:
+Where today's dev stands on each, at 11-06 02:50 (dev 28671a47), with the HDR world:
 
 | # | Item | Dev today (HDR world) |
 |---|---|---|
@@ -263,7 +308,8 @@ Where today's dev stands on each, at 11-05 23:40, with the HDR world:
    where fog covers the scene (bloomy fog). Fixes our flat, milky depth and the "land stays daylight at dawn". Cost: a
    lobe in the haze term, plus one mix once a mip-chain bloom exists.
 2. **Morning and valley mist from a time-of-day density table plus a 7-block-half-life ground layer.** Bliss
-   `mist_valley_h06` and `mist_morning_h06`. Cost: arithmetic; the density table can live on the CPU.
+   `mist_valley_h06` and `mist_morning_h06`; BSL's 07:00 ground haze over old growth (`sheets3_sp8/BSL/BSL_vs_ours3_mist_damp.jpg`)
+   shows the low flat top we want. Cost: arithmetic; the density table can live on the CPU.
 3. **Cloud lighting with taps toward the sun, plus Rayleigh reddening near the horizon.** Bliss `clouds_sunset_h18`,
    `clouds_sunrise_h06`. 1–2 extra taps per cloud step give silver edges, dark bellies and orange undersides.
 4. **Cloud shadows inside the god rays and the rain deck.** Bliss `wx_heavyrain_30s`, `wx_thunder_h12`: sunbeams through
