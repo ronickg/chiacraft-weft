@@ -79,7 +79,9 @@ pub fn block(mc: &str) -> (Vec<String>, bool) {
             let props = if of == "log" { axis(&s) } else { String::new() };
             let mut v: Vec<String> = Vec::new();
             // Our block of the very same name first (`base:yellow_poplar_leaves`), if we have it.
-            let kinds = std::iter::once(kind).chain(wood(kind).iter().copied().filter(|k| *k != kind));
+            // Dark oak's bark and planks are nearest spruce's (its leaves stay oak's, tinted).
+            let near: &[&str] = if kind == "dark_oak" && of != "leaves" { &["dark_oak", "spruce", "oak"] } else { wood(kind) };
+            let kinds = std::iter::once(kind).chain(near.iter().copied().filter(|k| *k != kind));
             for k in kinds {
                 // Leaves as placed: ours decay farther than 4 or so from a log, Minecraft's only
                 // past 6, so a poplar's crown fell off and left a bare trunk.
@@ -196,7 +198,9 @@ pub fn block(mc: &str) -> (Vec<String>, bool) {
             let half = s.prop("half").unwrap_or("lower");
             (vec![format!("base:wild_sunflower[half={half}]"), if half == "lower" { "base:dandelion".into() } else { AIR.into() }], false)
         }
-        "pink_petals" | "wildflowers" => near(&["base:clover", AIR]),
+        // 26.3's wildflowers are mostly yellow patches on the forest floor.
+        "wildflowers" => near(&["base:dandelion", "base:clover", AIR]),
+        "pink_petals" => near(&["base:clover", AIR]),
         // A thin layer on the floor in Minecraft; ours is a whole block.
         "leaf_litter" => (vec![AIR.into()], false),
         "bush" | "firefly_bush" | "azalea" | "flowering_azalea" | "sweet_berry_bush" => near(&["base:hazel_bush", "base:tall_grass"]),
