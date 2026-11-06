@@ -1,11 +1,13 @@
 //! Wood showing on top of a crown: per species, form and stand layer (`vitals::canopy`), how many
 //! of `count` grown trees have a wood block with no leaves over it in the top third of the tree,
-//! and how wide their crowns are (for the branched style's layer sizes).
+//! how wide their crowns are and how much trunk stands clear under them; and the simple style's
+//! heights and clear trunks per layer.
 //!
 //!     cargo run -p base_api --example tree_tops -- [count]
 
 use base_api::branchy::Part;
 use base_api::tree_recipes::{RECIPES, Variant, colonized, tiered, tiered_colonized, varied, varied_colonized};
+use base_api::trees::{Crown, simple_at, simple_standing};
 use vitals::canopy::Tier;
 
 fn main() {
@@ -13,12 +15,37 @@ fn main() {
         .nth(1)
         .and_then(|s| s.parse().ok())
         .unwrap_or(40);
+    // Simple trees (`base:tree_style` simple): height and clear trunk (the lowest leaves) per layer.
+    for crown in [Crown::Round, Crown::Cone, Crown::Slim] {
+        for tier in [Tier::Under, Tier::Canopy, Tier::Emergent] {
+            let (mut height, mut clear, mut lo, mut hi) = (0.0, 0.0, i32::MAX, i32::MIN);
+            for seed in 0..count {
+                let t = simple_at(crown, 1, 2, 0, 0, 0, weft_sdk::noise::hash(seed, 9, 9, 9) >> 32, false).with_tier(tier);
+                let mut low = i32::MAX;
+                simple_standing(&t, |_, y, _, s, _| {
+                    if s == 2 {
+                        low = low.min(y);
+                    }
+                });
+                height += t.height() as f64;
+                clear += low as f64;
+                (lo, hi) = (lo.min(low), hi.max(low));
+            }
+            println!(
+                "simple   {:16} {:9} height {:.1}  clear trunk {:.1} ({lo}-{hi})",
+                format!("{crown:?}"),
+                format!("{tier:?}"),
+                height / count as f64,
+                clear / count as f64
+            );
+        }
+    }
     for r in RECIPES
         .iter()
         .filter(|r| ["base:oak_log", "base:birch_log", "base:spruce_log"].contains(&r.log))
     {
         for tier in [Tier::Under, Tier::Canopy, Tier::Emergent] {
-            let (mut bare, mut width, mut height) = (0, 0.0, 0.0);
+            let (mut bare, mut width, mut height, mut clear) = (0, 0.0, 0.0, 0.0);
             for seed in 0..count {
                 let v = if seed % 7 == 0 { Variant::Big } else { Variant::Standing };
                 let b: Vec<(i32, i32, i32, Part)> = match colonized(r.log) {
@@ -68,14 +95,16 @@ fn main() {
                     .unwrap_or(0);
                 width += w as f64;
                 height += top as f64;
+                clear += b.iter().filter(|e| matches!(e.3, Part::Leaves)).map(|e| e.1).min().unwrap_or(0) as f64;
             }
             println!(
-                "{:16} {:9} bare-topped {:3}/{count}  crown half-width {:.1}  height {:.1}",
+                "branched {:16} {:9} bare-topped {:3}/{count}  crown half-width {:.1}  height {:.1}  clear trunk {:.1}",
                 r.log,
                 format!("{tier:?}"),
                 bare,
                 width / count as f64,
-                height / count as f64
+                height / count as f64,
+                clear / count as f64
             );
         }
     }

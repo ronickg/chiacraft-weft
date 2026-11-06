@@ -681,10 +681,14 @@ pub fn varied_colonized(c: &crate::colonize::Colonize, v: Variant) -> crate::col
 /// giant's recipe (its own `reach`) keeps its size.
 pub fn tiered(r: &Recipe, tier: vitals::canopy::Tier) -> Recipe {
     let f = vitals::canopy::branched_height(tier);
-    if r.reach > 0 || f == 1.0 {
+    if r.reach > 0 {
         return *r;
     }
-    Recipe { height: r.height * f, branch_len: r.branch_len / f.max(1.0), ..*r }
+    let height = r.height * f;
+    // Its limbs start over a clear trunk (`canopy::clear_trunk`; a conifer's whorls over its share,
+    // `cone_bare`).
+    let clear = if r.leaf_along { vitals::canopy::cone_bare(tier) } else { vitals::canopy::clear_trunk(tier) / height };
+    Recipe { height, branch_len: r.branch_len / f.max(1.0), branch_start: r.branch_start.max(clear.min(0.6)), ..*r }
 }
 
 /// `c` grown into `tier` of its stand: under the canopy a small crown on a short trunk, over it a
@@ -707,11 +711,17 @@ pub fn tiered_colonized(c: &crate::colonize::Colonize, tier: vitals::canopy::Tie
             min_trunk: c.min_trunk * 0.7,
             ..*c
         },
-        Tier::Canopy => crate::colonize::Colonize { crown_r: c.crown_r * 0.7, points: (c.points as f32 * 0.75) as u32, ..*c },
+        // Over a clear trunk (`canopy::clear_trunk`), within the tree's height.
+        Tier::Canopy => crate::colonize::Colonize {
+            trunk: c.trunk.max(vitals::canopy::clear_trunk(tier)).min(max_h as f32 - c.crown_h - 1.0).max(c.trunk),
+            crown_r: c.crown_r * 0.7,
+            points: (c.points as f32 * 0.75) as u32,
+            ..*c
+        },
         Tier::Emergent => {
             let f = vitals::canopy::branched_height(tier);
-            let trunk = (c.trunk + (c.trunk + c.crown_h) * (f - 1.0)).min(max_h as f32 - c.crown_h * 1.1 - 1.0);
-            crate::colonize::Colonize { trunk: trunk.max(c.trunk), crown_h: c.crown_h * 1.1, ..*c }
+            let trunk = (c.trunk + (c.trunk + c.crown_h) * (f - 1.0)).max(vitals::canopy::clear_trunk(tier));
+            crate::colonize::Colonize { trunk: trunk.min(max_h as f32 - c.crown_h * 1.1 - 1.0).max(c.trunk), crown_h: c.crown_h * 1.1, ..*c }
         }
     }
 }
