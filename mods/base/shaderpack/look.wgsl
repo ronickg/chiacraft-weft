@@ -1890,8 +1890,10 @@ fn display(c: vec3<f32>) -> vec3<f32> {
         // stays as dark as made.
         let night = smoothstep(-0.12, -0.3, scene.sun.y) * (1.0 - smoothstep(0.04, 0.3, luma(c)));
         if night > 0.0 {
-            let blue = vec3(0.3, 0.6, 1.3);
-            return max(mix(c, blue * (luma(c) / luma(blue)), night * 0.75), vec3(0.0));
+            // (N2: deeper and all the way: at 0.3 0.6 1.3 and three quarters the land's saturation rose
+            // only from about 100 to 140, the curve taking some back; Bliss's is 200-250, PC shnt1.)
+            let blue = vec3(0.18, 0.5, 1.6);
+            return max(mix(c, blue * (luma(c) / luma(blue)), night), vec3(0.0));
         }
         return max(c, vec3(0.0));
     }
