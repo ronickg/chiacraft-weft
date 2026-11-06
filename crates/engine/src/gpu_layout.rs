@@ -91,6 +91,13 @@ shared! {
         /// (`client::lod`'s `openness`), for packs that darken valleys and the gaps between crowns.
         OCC_SHIFT = 29,
         OCC_MASK = 3,
+        /// chiacraft, after upstream Weft f69243fd (PR #107): word 3's spare bits (the sizes take 11
+        /// of each 16) hold a box face's corner shade, 2 bits per corner (`CORNERS` order), stored
+        /// as 3 minus vanilla's AO (0: none, so faces without it read open): corners 0-1 from bit
+        /// 12, 2-3 from bit 28 (`client::lod`, WGSL `lod_ao`).
+        AO_LO_SHIFT = 12,
+        AO_HI_SHIFT = 28,
+        SIZE_MASK = 2047,
     }
     /// Tint kinds of faces and quads (0 none); mods' kinds follow the engine's.
     tint {
@@ -557,12 +564,13 @@ fn records() -> String {
         "    return vec3<f32>(f32(w0 & LOD_FACE_POS_MASK), f32(bitcast<i32>(w2 << LOD_FACE_HALF_SHIFT) >> LOD_FACE_HALF_SHIFT), f32((w0 >> LOD_FACE_Z_SHIFT) & LOD_FACE_POS_MASK));\n",
         "}\n",
         "fn lod_size(w2: u32, w3: u32) -> vec3<f32> {\n",
-        "    return vec3<f32>(f32(w3 & LOD_FACE_HALF_MASK), f32(w2 >> LOD_FACE_HALF_SHIFT), f32(w3 >> LOD_FACE_HALF_SHIFT));\n",
+        "    return vec3<f32>(f32(w3 & LOD_FACE_SIZE_MASK), f32(w2 >> LOD_FACE_HALF_SHIFT), f32((w3 >> LOD_FACE_HALF_SHIFT) & LOD_FACE_SIZE_MASK));\n",
         "}\n",
         "fn lod_dir(w0: u32) -> u32 {\n    return (w0 >> LOD_FACE_DIR_SHIFT) & FACE_DIR_MASK;\n}\n",
         "fn lod_tint(w0: u32) -> u32 {\n    return (w0 >> LOD_FACE_TINT_SHIFT) & TINT_MASK;\n}\n",
         "fn lod_crown(w0: u32) -> bool {\n    return (w0 >> LOD_FACE_CROWN_SHIFT) != 0u;\n}\n",
         "fn lod_occ(w0: u32) -> u32 {\n    return (w0 >> LOD_FACE_OCC_SHIFT) & LOD_FACE_OCC_MASK;\n}\n",
+        "fn lod_ao(w3: u32) -> vec4<u32> {\n    let a = ((w3 >> LOD_FACE_AO_LO_SHIFT) & 15u) | (((w3 >> LOD_FACE_AO_HI_SHIFT) & 15u) << 4u);\n    return vec4<u32>(3u) - vec4<u32>(a & 3u, (a >> 2u) & 3u, (a >> 4u) & 3u, (a >> 6u) & 3u);\n}\n",
     ));
     s
 }
@@ -1420,6 +1428,7 @@ pub fn prelude(shader: &str, common: &str) -> String {
         s.push_str(if RT_PRELUDE.load(std::sync::atomic::Ordering::Relaxed) { RT_SUN } else { RT_SUN_OFF });
     }
     s.push_str(CALM_OFF);
+    s.push_str(DRY_OFF);
     s.push_str(common);
     s.push('\n');
     s
@@ -1640,6 +1649,13 @@ pub fn rt_expand_prelude() -> String {
 /// port: on the Pixel 10 the rare paths' size alone cost the vista a fifth of its world pass).
 pub const CALM_OFF: &str = "const CALM: bool = false;\n";
 pub const CALM_ON: &str = "const CALM: bool = true;\n";
+/// `DRY` in every shader: false, but true in the world's calm-and-dry pipelines (level 2 of
+/// `WorldRenderer::set_calm`), used while the scene is calm and also has no rain
+/// (`scene.fog_color.w` 0), dry ground (`scene.canopy.y` 0), no puddles (`scene.canopy.z` 0) and no
+/// snow lying where the player is (`scene.ground.x` 0). A pack leaves out what those draw behind
+/// `if !DRY` (Android port: 1.8 ms of the Pixel 10's vista).
+pub const DRY_OFF: &str = "const DRY: bool = false;\n";
+pub const DRY_ON: &str = "const DRY: bool = true;\n";
 
 /// What goes in front of `occlusion.wgsl`.
 pub fn occlusion_prelude() -> String {

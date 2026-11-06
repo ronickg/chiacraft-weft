@@ -39,6 +39,32 @@ macro_rules! tests {
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 
+thread_local! {
+    /// The script clock (`script_clock`): game time as the test sees it, advanced once a frame.
+    static SCRIPT_TIME: std::cell::Cell<Duration> = const { std::cell::Cell::new(Duration::ZERO) };
+    static LAST_FRAME: std::cell::Cell<Option<Instant>> = const { std::cell::Cell::new(None) };
+}
+
+/// The longest step one frame adds to the script clock. A game stopped for a while (the PC runner
+/// freezes looks with SIGSTOP while a bench runs) or a hitch of seconds adds this much, no more.
+const MAX_FRAME_STEP: Duration = Duration::from_secs(1);
+
+/// The script clock: every `wait`, `until ... within` and reply timeout of a test or script counts
+/// this, not the wall clock, so a game that was stopped (SIGSTOP) and continued finds its waits
+/// where it left them. It advances by the real time since the last frame, capped at `MAX_FRAME_STEP`.
+pub(crate) fn script_clock() -> Duration {
+    SCRIPT_TIME.with(|t| t.get())
+}
+
+/// Advances the script clock; called once at the start of every frame.
+fn tick_script_clock() {
+    let now = Instant::now();
+    if let Some(last) = LAST_FRAME.with(|l| l.replace(Some(now))) {
+        let step = now.saturating_duration_since(last).min(MAX_FRAME_STEP);
+        SCRIPT_TIME.with(|t| t.set(t.get() + step));
+    }
+}
+
 pub struct Inner {
     client: Option<Client>,
     pub state: ClientState,
@@ -186,7 +212,7 @@ impl T {
 
     /// Waits until `f` holds, failing after `timeout`.
     pub fn until<F: FnMut(&T) -> bool + Unpin>(&self, what: &str, timeout: Duration, f: F) -> Wait<F> {
-        Wait { t: self.clone(), f, deadline: Instant::now() + timeout, what: what.to_string() }
+        Wait { t: self.clone(), f, deadline: script_clock() + timeout, what: what.to_string() }
     }
 
     pub fn frames(&self, n: u64) -> Wait<impl FnMut(&T) -> bool + Unpin> {
@@ -196,8 +222,8 @@ impl T {
 
     /// A plain delay, for things that take game time (smelting, falling).
     pub fn secs(&self, s: f32) -> Wait<impl FnMut(&T) -> bool + Unpin> {
-        let end = Instant::now() + Duration::from_secs_f32(s);
-        self.until("time", Duration::from_secs_f32(s + 600.0), move |_| Instant::now() >= end)
+        let end = script_clock() + Duration::from_secs_f32(s);
+        self.until("time", Duration::from_secs_f32(s + 600.0), move |_| script_clock() >= end)
     }
 
     /// The world around the player is loaded and meshed.
@@ -207,14 +233,14 @@ impl T {
 
     /// Nothing left to generate, send or mesh.
     pub fn idle(&self) -> Wait<impl FnMut(&T) -> bool + Unpin> {
-        let mut since: Option<Instant> = None;
+        let mut since: Option<Duration> = None;
         self.until("idle", Duration::from_secs(120), move |t| {
             // Cubes sent may still be in flight when the server reports idle.
             if !t.flag(cf::IDLE) {
                 since = None;
                 return false;
             }
-            since.get_or_insert_with(Instant::now).elapsed() >= Duration::from_millis(300)
+            script_clock() - *since.get_or_insert_with(script_clock) >= Duration::from_millis(300)
         })
     }
 
@@ -259,7 +285,7 @@ impl T {
     pub async fn cmd(&self, line: &str) -> Result<String, String> {
         let before = self.c().chat_line(0);
         let marker = self.0.borrow().state.frame;
-        let sent = Instant::now();
+        let sent = script_clock();
         self.c().say(line);
         let mut seen = String::new();
         // A reply the same as the line before (time frozen) or none at all (`/rename`) shows as no
@@ -267,7 +293,7 @@ impl T {
         // came in time on a software renderer (a few frames a second).
         self.until(&format!("reply to {line}"), Duration::from_secs(10), |t| {
             let now = t.c().chat_line(0);
-            if now != before || t.state().frame > marker + 600 || sent.elapsed() > Duration::from_secs(5) {
+            if now != before || t.state().frame > marker + 600 || script_clock() - sent > Duration::from_secs(5) {
                 seen = now;
                 true
             } else {
@@ -325,10 +351,10 @@ impl T {
 
     /// Polls a slot until something is in it (machines), giving what was there at the end.
     pub async fn wait_slot(&self, owner: &str, slot: u32, secs: f32) -> Result<(String, u32, u32), String> {
-        let deadline = Instant::now() + Duration::from_secs_f32(secs);
+        let deadline = script_clock() + Duration::from_secs_f32(secs);
         loop {
             let s = self.slot(owner, slot).await?;
-            if s.1 > 0 || Instant::now() > deadline {
+            if s.1 > 0 || script_clock() > deadline {
                 return Ok(s);
             }
             self.secs(0.25).await?;
@@ -653,7 +679,7 @@ pub fn scenario<F: Future<Output = R> + 'static>(t: &T, name: &str, f: impl FnOn
 pub struct Wait<F> {
     t: T,
     f: F,
-    deadline: Instant,
+    deadline: Duration,
     what: String,
 }
 
@@ -663,7 +689,7 @@ impl<F: FnMut(&T) -> bool + Unpin> Future for Wait<F> {
         let me = &mut *self;
         if (me.f)(&me.t) {
             Poll::Ready(Ok(()))
-        } else if Instant::now() > me.deadline {
+        } else if script_clock() > me.deadline {
             Poll::Ready(Err(format!("timed out waiting for {}", me.what)))
         } else {
             Poll::Pending
@@ -725,6 +751,7 @@ pub fn start(queue: Vec<TestDef>) {
 }
 
 pub fn frame(c: &Client) {
+    tick_script_clock();
     RUNNER.with(|r| {
         let mut guard = r.borrow_mut();
         let Some(run) = guard.as_mut() else { return };

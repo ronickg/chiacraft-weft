@@ -559,6 +559,7 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
         lit = vec4(albedo.rgb * light, albedo.a);
         if mat.has {
             lit = vec4(lit.rgb * (1.0 - 0.5 * mat.metal) + mat_shine(in, mat, n, albedo.rgb, light), lit.a);
+            lit = vec4(lit.rgb + mat_through(in, mat, albedo.rgb), lit.a);
         }
         // A low sun full on a bright, saturated yellow-green (the birch's untinted leaves, whose
         // own picture is that green, so `surface_light` never sees them as leaves): some of its
@@ -602,7 +603,8 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     // small ones, a long rain many and wide. A film of water: the ground under it dark, the sky
     // mirrored by Fresnel, and rings where the rain still falls on it.
     let puddles = clamp(scene.canopy.z, 0.0, 1.0) * open_top;
-    if puddles > 0.01 && !leafy && n.y > 0.95 {
+    // (None in the calm-and-dry pipelines, `DRY`.)
+    if !DRY && puddles > 0.01 && !leafy && n.y > 0.95 {
         // In cells three blocks across, some hold a puddle (one hash each against a share that grows
         // with the rain: a shower a few, a long rain most), a round pool about a jittered middle
         // that widens as it fills, edged in the blocks' own pixels.
@@ -684,6 +686,21 @@ fn mat_shine(in: VOut, m_in: Mat, n: vec3<f32>, albedo: vec3<f32>, light: vec3<f
     let gloss = 1.0 - clamp(m.rough * 1.6, 0.0, 0.85);
     out += mat_fresnel(m.f0, ndv) * sky * gloss;
     return out;
+}
+
+// Light that comes through a subsurface material (LabPBR `_s` blue over 64: blue ice, wax, the
+// leaves of packs that set it): the day's sky and sun, scattered on its way through, in the
+// material's own colour squared (deep blue for blue ice), the more the less sky reaches the face
+// directly, so a tunnel through ice glows and its outside barely changes. A guess at thickness, not a
+// trace: NVIDIA's showcase ice tunnel glowed deep blue where ours was grey (`notes/RTX_SHOWCASE.md`).
+fn mat_through(in: VOut, m: Mat, albedo: vec3<f32>) -> vec3<f32> {
+    if m.sss <= 0.0 {
+        return vec3(0.0);
+    }
+    let day = smoothstep(-0.05, 0.25, scene.sun.w);
+    let outside = sky_color(vec3(0.0, 1.0, 0.0)) * 0.6 + palette().sun * light_strength() * 0.25 * day;
+    let hidden = 1.0 - 0.75 * smoothstep(0.3, 1.0, in.light.x);
+    return albedo * albedo * m.sss * outside * hidden;
 }
 
 // The world image's alpha for an opaque pixel: SOLID_ALPHA, or for a smooth material (a polished
@@ -1302,9 +1319,18 @@ const LOD_DETAIL: vec2<f32> = vec2(220.0, 520.0);
 @vertex
 fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut {
     let f = vi / 4u;
-    let c = vi % 4u;
     let w0 = records[f * 4u];
     let w1 = records[f * 4u + 1u];
+    // Vanilla's corner shade on the ground's box faces (`lod_ao`; after upstream Weft f69243fd),
+    // the quad split along its lighter diagonal, as the cubes'.
+    var a = vec4<u32>(3u);
+    if lod_dir(w0) != LOD_FACE_GRID {
+        a = lod_ao(records[f * 4u + 3u]);
+    }
+    var c = vi % 4u;
+    if a.x + a.z < a.y + a.w {
+        c = (c + 1u) % 4u;
+    }
     // A box's face, or a far tile's smooth cell (`lod_corner`, in the prelude).
     let corner = lod_corner(f, c, finish(vec3(0.0), origins[ii]).xyz);
     let dir = corner.dir;
@@ -1328,7 +1354,7 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     let o = origins[ii] + g.cam_cube;
     out.pos = vec3<f32>(o.xyz * 16) + local;
     out.normal = corner.normal;
-    out.ao = mix(0.85, 0.95, clamp(corner.normal.y, 0.0, 1.0));
+    out.ao = mix(0.85, 0.95, clamp(corner.normal.y, 0.0, 1.0)) * mix(0.55, 1.0, f32(a[c]) / 3.0);
     // A crown's sides go dark toward its bottom, where the canopy shades itself (`fs_lod` takes it
     // as the crown's own shade, `CROWN_UNDER`).
     if lod_crown(w0) && dir != 2u && dir != 3u {
@@ -1339,7 +1365,9 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     let kind = lod_tint(w0);
     out.kind = vec4(kind, 1u, 0u, select(0u, 1u, lod_crown(w0)));
     var tint = vec3(1.0);
-    if kind != 0u {
+    // Not with an overlay: then the tint is the overlay's, and far off only the base is drawn (a
+    // cherry's pink blossom tinted whole came out brown-red).
+    if kind != 0u && frames[g.extra.x + (w1 & FACE_TEX_MASK)] == 0u {
         tint = unpack_rgb(biomes[corner.biome * g.extra.z + kind - 1u]);
     }
     out.tint = tint;
