@@ -4,7 +4,7 @@
 //! by its pose (an offset per structure, `origin.w` in the shader): a block placed on one
 //! remeshes only its cube.
 
-use glam::{DVec3, IVec3, Mat4, Vec3, Vec4};
+use glam::{DVec3, IVec2, IVec3, Mat4, Vec3, Vec4};
 use rayon::prelude::*;
 use rustc_hash::FxHashMap;
 use weft_render::*;
@@ -342,6 +342,18 @@ pub struct WorldRenderer {
     face_pipes: [PipelineId; 3],
     quad_pipes: [PipelineId; 3],
     lod_pipe: PipelineId,
+    /// Distant terrain's tiles that lie wholly outside the cubes' mask (`lod_half`), when the pack's
+    /// `world.wgsl` has `fs_lod_open`: no `discard`, which can't happen there anyway, so a tiled GPU
+    /// keeps its hidden-surface removal for them (Android port: on the Pixel 10's PowerVR the
+    /// discard alone cost a third of the world pass at the vista).
+    lod_open_pipe: Option<PipelineId>,
+    /// Cutout blocks (leaves) in two passes, when the pack has `fs_cutout_depth` and
+    /// `fs_cutout_shade` and `cutout_prepass()`: their depth with the alpha test alone (no color),
+    /// then their color where the depth is theirs, with no `discard`. Faces depth, faces shade,
+    /// quads depth, quads shade. The same picture; a tiled GPU then keeps hidden-surface removal
+    /// for the shading (Android port: on the Pixel 10 the leaves' discard cost the forest about a
+    /// third of its world pass).
+    cutout_split: Option<[PipelineId; 4]>,
     /// Faces opaque, cutout, translucent, then quads the same, for the cubes near where they end,
     /// when the pack's `world.wgsl` has `fs_opaque_fade`: dithered away toward `lod_fade`, distant
     /// terrain taking the pixels they leave (Distant Horizons' fade), so the edge isn't a line.
@@ -469,6 +481,8 @@ impl WorldRenderer {
         let (shader, slots) = world_shader(assets).map_err(|e| e.0)?;
         let (face_pipes, quad_pipes, lod_pipe) = Self::pipelines(gpu, &shader)?;
         let fade_pipes = Self::fade_pipelines(gpu, &shader);
+        let lod_open_pipe = Self::lod_open_pipeline(gpu, &shader);
+        let cutout_split = Self::cutout_split_pipelines(gpu, &shader);
         let shadow_pipes = Self::shadow_pipelines(gpu, &shader);
         let lod_shadow_pipe = Self::lod_shadow_pipeline(gpu, &shader, shadow_pipes.is_some());
         let tex_shader = shader_table(gpu, c, textures, &slots);
@@ -510,6 +524,8 @@ impl WorldRenderer {
             face_pipes,
             quad_pipes,
             lod_pipe,
+            lod_open_pipe,
+            cutout_split,
             fade_pipes,
             lod_fade: 0,
             lod: FxHashMap::default(),
@@ -607,6 +623,86 @@ impl WorldRenderer {
         ];
         let lod = make("distant terrain", "vs_lod", "fs_lod", depth_write, Blend::None, true)?;
         Ok((faces, quads, lod))
+    }
+
+    /// `lod_open_pipe`: None when the pack lacks `fs_lod_open`, or it fails.
+    fn lod_open_pipeline(gpu: &mut dyn Backend, shader: &Shader) -> Option<PipelineId> {
+        if !crate::packs::pack_uses("world.wgsl", "fs_lod_open") {
+            return None;
+        }
+        gpu.create_pipeline(&PipelineDesc {
+            label: "distant terrain open",
+            shader,
+            vertex: "vs_lod",
+            fragment: Some("fs_lod_open"),
+            color: Some(crate::post::world_format()),
+            depth: Some(DepthState { write: true, compare: Compare::GreaterEqual }),
+            blend: Blend::None,
+            cull_back: true,
+            topology: Topology::Triangles,
+        })
+        .map_err(|e| log::error!("world shader fs_lod_open: {}", e.0))
+        .ok()
+    }
+
+    /// `cutout_split`: None when `cutout_prepass()` is off, the pack lacks `fs_cutout_depth` or
+    /// `fs_cutout_shade`, or one fails.
+    fn cutout_split_pipelines(gpu: &mut dyn Backend, shader: &Shader) -> Option<[PipelineId; 4]> {
+        if !cutout_prepass()
+            || !["fs_cutout_depth", "fs_cutout_shade"]
+                .iter()
+                .all(|e| crate::packs::pack_uses("world.wgsl", e))
+        {
+            return None;
+        }
+        let mut made = Vec::new();
+        for (label, vs, fs, depth, blend) in [
+            (
+                "faces cutout depth",
+                "vs_face",
+                "fs_cutout_depth",
+                DepthState { write: true, compare: Compare::GreaterEqual },
+                Blend::NoColor,
+            ),
+            ("faces cutout shade", "vs_face", "fs_cutout_shade", DepthState { write: false, compare: Compare::Equal }, Blend::None),
+            (
+                "quads cutout depth",
+                "vs_quad",
+                "fs_cutout_depth",
+                DepthState { write: true, compare: Compare::GreaterEqual },
+                Blend::NoColor,
+            ),
+            ("quads cutout shade", "vs_quad", "fs_cutout_shade", DepthState { write: false, compare: Compare::Equal }, Blend::None),
+        ] {
+            match gpu.create_pipeline(&PipelineDesc {
+                label,
+                shader,
+                vertex: vs,
+                fragment: Some(fs),
+                color: Some(crate::post::world_format()),
+                depth: Some(depth),
+                blend,
+                cull_back: true,
+                topology: Topology::Triangles,
+            }) {
+                Ok(p) => made.push(p),
+                Err(e) => {
+                    log::error!("world shader {fs}: {}", e.0);
+                    for p in made {
+                        gpu.destroy_pipeline(p);
+                    }
+                    return None;
+                }
+            }
+        }
+        made.try_into().ok()
+    }
+
+    /// The two passes of a run of `kind` (0 faces, 1 quads) and `layer` (1 cutout) when cutout
+    /// blocks are split (`cutout_split`): depth, then shade.
+    fn split_of(&self, kind: u8, layer: u8) -> Option<(PipelineId, PipelineId)> {
+        let s = self.cutout_split?;
+        (layer == 1 && kind < 2).then(|| (s[kind as usize * 2], s[kind as usize * 2 + 1]))
     }
 
     /// `fade_pipes`: None when the pack lacks `fs_opaque_fade`, `fs_cutout_fade` or
@@ -937,12 +1033,16 @@ impl WorldRenderer {
                     .into_iter()
                     .flatten()
                     .chain(self.lod_shadow_pipe.take())
+                    .chain(self.lod_open_pipe.take())
+                    .chain(self.cutout_split.take().into_iter().flatten())
                     .chain(self.fade_pipes.take().into_iter().flatten())
                 {
                     gpu.destroy_pipeline(p);
                 }
                 if let Ok((s, _)) = world_shader(assets) {
                     self.fade_pipes = Self::fade_pipelines(gpu, &s);
+                    self.lod_open_pipe = Self::lod_open_pipeline(gpu, &s);
+                    self.cutout_split = Self::cutout_split_pipelines(gpu, &s);
                     self.shadow_pipes = Self::shadow_pipelines(gpu, &s);
                     self.lod_shadow_pipe = Self::lod_shadow_pipeline(gpu, &s, self.shadow_pipes.is_some());
                     self.terrain_epoch += 1;
@@ -1056,6 +1156,8 @@ impl WorldRenderer {
             .chain([self.lod_pipe])
             .chain(self.shadow_pipes.take().into_iter().flatten())
             .chain(self.lod_shadow_pipe.take())
+            .chain(self.lod_open_pipe.take())
+            .chain(self.cutout_split.take().into_iter().flatten())
             .chain(self.fade_pipes.take().into_iter().flatten())
         {
             gpu.destroy_pipeline(p);
@@ -1532,7 +1634,13 @@ impl WorldRenderer {
         // `sort_translucent` has seen to it.
         trans.par_sort_unstable_by_key(|d| std::cmp::Reverse(d.5.length_squared().to_bits()));
 
-        // Distant terrain after the cubes (nearer, they hide most of it), a run per page.
+        // Distant terrain after the cubes (nearer, they hide most of it), a run per page: the tiles
+        // that reach into the cubes' mask first (kind 3), then the rest without its discard (kind 6,
+        // `lod_open_pipe`). A column a tile's edge walls stand on may be the next one: a column's
+        // margin.
+        let open = self.lod_open_pipe.is_some();
+        let mask_half = self.lod_half as i32 + 1;
+        let cam_col = IVec2::new(cam_cube.x, cam_cube.z);
         let mut lod: Vec<DrawRecord> = self
             .lod_draw
             .iter()
@@ -1554,10 +1662,14 @@ impl WorldRenderer {
                     vertex_offset: ((a.offset + skip) * 4) as i32,
                     first_instance: 0,
                 };
-                Some((3, 0, a.page, args, [o.x / 16 - cam_cube.x, -cam_cube.y, o.y / 16 - cam_cube.z, 0], center))
+                let cols =
+                    (o.div_euclid(IVec2::splat(16)) - cam_col, (o + IVec2::splat(key.size() - 1)).div_euclid(IVec2::splat(16)) - cam_col);
+                let masked = cols.0.x <= mask_half && cols.1.x >= -mask_half && cols.0.y <= mask_half && cols.1.y >= -mask_half;
+                let kind = if open && !masked { 6 } else { 3 };
+                Some((kind, 0, a.page, args, [o.x / 16 - cam_cube.x, -cam_cube.y, o.y / 16 - cam_cube.z, 0], center))
             })
             .collect();
-        lod.sort_by_key(|d| (d.2, d.5.length_squared().to_bits()));
+        lod.sort_by_key(|d| (d.0, d.2, d.5.length_squared().to_bits()));
         let lods = lod.len() as u32;
         let n = opaque + lods + trans.len() as u32;
         let (gpu_draws, gpu_faces) = self.table.drawn_last(gpu, frame.slot);
@@ -1636,8 +1748,8 @@ impl WorldRenderer {
         }
         for (j, d) in lod.iter().enumerate() {
             match runs.last_mut() {
-                Some(r) if r.0 == 3 && r.2 == d.2 => r.4 += 1,
-                _ => runs.push((3, 0, d.2, opaque + j as u32, 1)),
+                Some(r) if r.0 == d.0 && r.2 == d.2 => r.4 += 1,
+                _ => runs.push((d.0, 0, d.2, opaque + j as u32, 1)),
             }
         }
         self.translucent = runs.len();
@@ -1709,12 +1821,33 @@ impl WorldRenderer {
                 .count()
         };
         let mut cpu_opaque_drawn = old_order();
-        for &(kind, layer, page, id, base, max) in &groups {
+        // Each group's pipeline; split cutout groups (`cutout_split`) all lay their depth first,
+        // then shade, so each pixel of leaves is shaded once.
+        let mut steps: Vec<(PipelineId, BufferId, usize, bool)> = Vec::with_capacity(groups.len() + 4);
+        let mut depth_laid = false;
+        for (i, &(kind, layer, page, ..)) in groups.iter().enumerate() {
+            let (pipe, buf) = self.pipe_of(kind, layer, page);
+            match self.split_of(kind, layer) {
+                Some((_, shade)) => {
+                    if !depth_laid {
+                        depth_laid = true;
+                        for (j, &(k, l, pg, ..)) in groups.iter().enumerate().skip(i) {
+                            if let Some((depth, _)) = self.split_of(k, l) {
+                                steps.push((depth, self.pipe_of(k, l, pg).1, j, false));
+                            }
+                        }
+                    }
+                    steps.push((shade, buf, i, true));
+                }
+                None => steps.push((pipe, buf, i, true)),
+            }
+        }
+        for (pipe, buf, i, counted) in steps {
+            let (_, layer, _, id, base, max) = groups[i];
             if layer > 0 && !cpu_opaque_drawn {
                 self.emit(list, 0..firsts);
                 cpu_opaque_drawn = true;
             }
-            let (pipe, buf) = self.pipe_of(kind, layer, page);
             self.bind_run(list, pipe, buf, self.table.out.as_ref().map_or(obuf, |o| o.origins));
             let Some(o) = self.table.out.as_ref() else { continue };
             let seen = self
@@ -1725,7 +1858,9 @@ impl WorldRenderer {
                 .flatten()
                 .map(|n| n.max(self.table.peak.get(id as usize).copied().unwrap_or(0)));
             let draws = if capped { capped_draws(seen, max) } else { max };
-            issued = (issued.0 + draws as u64, issued.1 + max as u64);
+            if counted {
+                issued = (issued.0 + draws as u64, issued.1 + max as u64);
+            }
             list.push(Cmd::DrawIndexedIndirectCount {
                 buffer: o.draws,
                 offset: base as u64 * 20,
@@ -1754,6 +1889,11 @@ impl WorldRenderer {
         let Some((_, obuf, ibuf, _, _)) = self.buffers else { return };
         for &(kind, layer, page, start, count) in &self.runs[range] {
             let (pipe, buf) = self.pipe_of(kind, layer, page);
+            if let Some((depth, _)) = self.split_of(kind, layer) {
+                self.bind_run(list, depth, buf, obuf);
+                list.push(Cmd::DrawIndexedIndirect { buffer: ibuf, offset: start as u64 * 20, count });
+            }
+            let pipe = self.split_of(kind, layer).map_or(pipe, |s| s.1);
             self.bind_run(list, pipe, buf, obuf);
             list.push(Cmd::DrawIndexedIndirect { buffer: ibuf, offset: start as u64 * 20, count });
         }
@@ -1765,6 +1905,7 @@ impl WorldRenderer {
         match (kind, self.fade_pipes) {
             (0, _) => (self.face_pipes[layer as usize], self.faces.pages[page as usize].0),
             (3, _) => (self.lod_pipe, self.faces.pages[page as usize].0),
+            (6, _) => (self.lod_open_pipe.unwrap_or(self.lod_pipe), self.faces.pages[page as usize].0),
             (4, Some(f)) => (f[layer as usize], self.faces.pages[page as usize].0),
             (5, Some(f)) => (f[3 + layer as usize], self.quads.pages[page as usize].0),
             (4, None) => (self.face_pipes[layer as usize], self.faces.pages[page as usize].0),
@@ -2277,6 +2418,17 @@ impl Occlusion {
 
 /// `WEFT_OLD_ORDER=1`: the world pass in the order before opaque-first (the table's groups, then
 /// the CPU's runs), to compare.
+/// Cutout blocks drawn depth first, then shaded with no discard (`cutout_split`): on Android, where
+/// GPUs are tiled (`WEFT_CUTOUT_PREPASS=0/1` to compare or to try it elsewhere).
+fn cutout_prepass() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| match std::env::var("WEFT_CUTOUT_PREPASS").as_deref() {
+        Ok("0") => false,
+        Ok(_) => true,
+        Err(_) => cfg!(target_os = "android"),
+    })
+}
+
 fn old_order() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ON.get_or_init(|| std::env::var_os("WEFT_OLD_ORDER").is_some())

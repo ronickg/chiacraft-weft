@@ -1575,6 +1575,7 @@ fn compare_op(c: Compare) -> vk::CompareOp {
         Compare::GreaterEqual => vk::CompareOp::GREATER_OR_EQUAL,
         Compare::Less => vk::CompareOp::LESS,
         Compare::LessEqual => vk::CompareOp::LESS_OR_EQUAL,
+        Compare::Equal => vk::CompareOp::EQUAL,
     }
 }
 
@@ -1985,6 +1986,7 @@ impl Backend for VulkanBackend {
                     .src_alpha_blend_factor(vk::BlendFactor::ZERO)
                     .dst_alpha_blend_factor(vk::BlendFactor::ONE)
                     .alpha_blend_op(vk::BlendOp::ADD),
+                Blend::NoColor => a.color_write_mask(vk::ColorComponentFlags::empty()),
             }
         };
         let attachments = [blend_attachment];
