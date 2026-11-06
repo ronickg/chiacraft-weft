@@ -378,6 +378,7 @@ impl EntityRenderer {
                 blend: Blend::None,
                 cull_back: true,
                 topology: Topology::Triangles,
+                motion: crate::post::motion(),
             })
             .map_err(|e| e.0)
         };
@@ -397,6 +398,7 @@ impl EntityRenderer {
                 blend: Blend::None,
                 cull_back: true,
                 topology: Topology::Triangles,
+                motion: crate::post::motion(),
             })
             .map_err(|e| e.0)?;
         let overlay = gpu
@@ -410,6 +412,7 @@ impl EntityRenderer {
                 blend: Blend::Alpha,
                 cull_back: true,
                 topology: Topology::Triangles,
+                motion: crate::post::motion(),
             })
             .map_err(|e| e.0)?;
         Ok((main, overlay))
@@ -464,6 +467,7 @@ impl EntityRenderer {
                 blend: Blend::None,
                 cull_back: true,
                 topology: Topology::Triangles,
+                motion: color == crate::post::world_format() && crate::post::motion(),
             })
             .map_err(|e| e.0)
         };
@@ -484,6 +488,7 @@ impl EntityRenderer {
                     blend: Blend::None,
                     cull_back: false,
                     topology: Topology::Triangles,
+                    motion: false,
                 })
                 .map_err(|e| log::warn!("models cast no sun shadows: {}", e.0))
                 .ok()
@@ -1346,7 +1351,7 @@ impl EntityRenderer {
             s.used = used;
         }
         let keep = if new_sheet { Some([0.0; 4]) } else { None };
-        list.push(Cmd::BeginPass { color: Some((Target::Texture(color), keep)), depth: Some((depth, Some(0.0))) });
+        list.push(Cmd::BeginPass { motion: None, color: Some((Target::Texture(color), keep)), depth: Some((depth, Some(0.0))) });
         let vb = self.icon_views[frame.slot];
         self.models
             .draw(gpu, list, frame, super::models::Batch::Icon, self.preview_pipe, vb);
@@ -1450,7 +1455,7 @@ impl EntityRenderer {
         // Full daylight, no fog.
         let v = Scene { view_proj: proj.to_cols_array_2d(), params: [1e9, 2e9, 1.0, crate::shaders::time()], ..Default::default() };
         gpu.mapped(vb)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&v));
-        list.push(Cmd::BeginPass { color: Some((Target::Texture(col), Some([0.0; 4]))), depth: Some((dep, Some(0.0))) });
+        list.push(Cmd::BeginPass { motion: None, color: Some((Target::Texture(col), Some([0.0; 4]))), depth: Some((dep, Some(0.0))) });
         self.models
             .draw(gpu, list, frame, super::models::Batch::Preview, self.preview_pipe, vb);
         list.push(Cmd::EndPass);

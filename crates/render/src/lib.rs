@@ -157,7 +157,16 @@ pub struct PipelineDesc<'a> {
     pub blend: Blend,
     pub cull_back: bool,
     pub topology: Topology,
+    /// Drawn in a pass with a motion image as well ([`Cmd::BeginPass`]'s `motion`,
+    /// [`MOTION_FORMAT`]): the fragment entry writes it at `@location(1)` if it has that output,
+    /// and leaves it as it is (write mask 0) if not, so shaders without motion keep working.
+    pub motion: bool,
 }
+
+/// The motion image's format (`PipelineDesc::motion`): xy where the pixel was last frame minus
+/// where it is now, in UV (0..1 across the image, y down), z the depth of the surface that wrote
+/// it (reverse Z), w the share of the pixel that is not to be gathered over frames (reactive).
+pub const MOTION_FORMAT: Format = Format::Rgba16Float;
 
 pub struct ComputeDesc<'a> {
     pub label: &'a str,
@@ -176,6 +185,9 @@ pub enum Cmd {
     BeginPass {
         color: Option<(Target, Option<[f32; 4]>)>,
         depth: Option<(TextureId, Option<f32>)>,
+        /// A second color image, at `@location(1)` ([`MOTION_FORMAT`]); every pipeline drawn in
+        /// the pass must be made with `PipelineDesc::motion`.
+        motion: Option<(TextureId, Option<[f32; 4]>)>,
     },
     EndPass,
     SetPipeline(PipelineId),

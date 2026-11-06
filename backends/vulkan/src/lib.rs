@@ -1526,6 +1526,27 @@ fn workgroup_arrays_without_stride(words: Vec<u32>) -> Vec<u32> {
     out
 }
 
+/// Whether the fragment entry `entry` of `shader` has an output at `@location(location)`.
+fn writes_location(shader: &Shader, entry: &str, location: u32) -> bool {
+    let m = &shader.module;
+    let Some(ep) = m
+        .entry_points
+        .iter()
+        .find(|e| e.name == entry && e.stage == naga::ShaderStage::Fragment)
+    else {
+        return false;
+    };
+    let Some(result) = &ep.function.result else { return false };
+    let at = |b: &Option<naga::Binding>| matches!(b, Some(naga::Binding::Location { location: l, .. }) if *l == location);
+    if at(&result.binding) {
+        return true;
+    }
+    match &m.types[result.ty].inner {
+        naga::TypeInner::Struct { members, .. } => members.iter().any(|mb| at(&mb.binding)),
+        _ => false,
+    }
+}
+
 fn color_range(mips: u32) -> vk::ImageSubresourceRange {
     vk::ImageSubresourceRange {
         aspect_mask: vk::ImageAspectFlags::COLOR,
@@ -2033,13 +2054,36 @@ impl Backend for VulkanBackend {
                 Blend::NoColor => a.color_write_mask(vk::ColorComponentFlags::empty()),
             }
         };
-        let attachments = [blend_attachment];
-        let blend = vk::PipelineColorBlendStateCreateInfo::default().attachments(if desc.color.is_some() { &attachments } else { &[] });
+        // The motion image (`PipelineDesc::motion`): written, never blended, by a fragment entry
+        // with a `@location(1)` output; left as it is by the rest.
+        let motion_attachment = vk::PipelineColorBlendAttachmentState::default().color_write_mask(
+            if desc
+                .fragment
+                .is_some_and(|f| writes_location(desc.shader, f, 1))
+            {
+                vk::ColorComponentFlags::RGBA
+            } else {
+                vk::ColorComponentFlags::empty()
+            },
+        );
+        let attachments = [blend_attachment, motion_attachment];
+        let count = match (desc.color.is_some(), desc.motion) {
+            (false, _) => 0,
+            (true, false) => 1,
+            (true, true) => 2,
+        };
+        let blend = vk::PipelineColorBlendStateCreateInfo::default().attachments(&attachments[..count]);
         let dynamic = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
         let dynamic = vk::PipelineDynamicStateCreateInfo::default().dynamic_states(&dynamic);
-        let color_formats = desc.color.map(|f| [self.vk_format(f)]);
+        let color_formats: Vec<vk::Format> = desc
+            .color
+            .map(|f| self.vk_format(f))
+            .into_iter()
+            .chain(desc.motion.then(|| self.vk_format(MOTION_FORMAT)))
+            .take(count)
+            .collect();
         let mut rendering = vk::PipelineRenderingCreateInfo::default()
-            .color_attachment_formats(color_formats.as_ref().map_or(&[][..], |f| &f[..]))
+            .color_attachment_formats(&color_formats)
             .depth_attachment_format(if desc.depth.is_some() { DEPTH_FORMAT } else { vk::Format::UNDEFINED });
         let info = vk::GraphicsPipelineCreateInfo::default()
             .stages(&stages)
@@ -2214,8 +2258,12 @@ impl Backend for VulkanBackend {
                 let mut open: Option<Cmd> = None;
                 for c in &list.cmds {
                     match *c {
-                        Cmd::BeginPass { color, depth } => {
-                            open = Some(Cmd::BeginPass { color: color.map(|(t, _)| (t, None)), depth: depth.map(|(t, _)| (t, None)) });
+                        Cmd::BeginPass { color, depth, motion } => {
+                            open = Some(Cmd::BeginPass {
+                                color: color.map(|(t, _)| (t, None)),
+                                depth: depth.map(|(t, _)| (t, None)),
+                                motion: motion.map(|(t, _)| (t, None)),
+                            });
                             out.push(*c);
                         }
                         Cmd::EndPass => {
@@ -2248,9 +2296,24 @@ impl Backend for VulkanBackend {
                     blas_batch.clear();
                 }
                 match *cmd_item {
-                    Cmd::BeginPass { color, depth } => {
+                    Cmd::BeginPass { color, depth, motion } => {
                         let mut extent = sc_extent;
                         let mut color_att = None;
+                        // The motion image, a second color attachment (`Cmd::BeginPass::motion`).
+                        let motion_att = motion.map(|(t, clear)| {
+                            let tex = self.textures.get_mut(t.0);
+                            let old = if clear.is_some() { vk::ImageLayout::UNDEFINED } else { tex.layout };
+                            tex.layout = vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL;
+                            let (image, view) = (tex.image, tex.view);
+                            in_pass_targets.push(t.0);
+                            self.barrier_image(cmd, image, color_range(1), old, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
+                            vk::RenderingAttachmentInfo::default()
+                                .image_view(view)
+                                .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                                .load_op(if clear.is_some() { vk::AttachmentLoadOp::CLEAR } else { vk::AttachmentLoadOp::LOAD })
+                                .store_op(vk::AttachmentStoreOp::STORE)
+                                .clear_value(vk::ClearValue { color: vk::ClearColorValue { float32: clear.unwrap_or_default() } })
+                        });
                         if let Some((target, clear)) = color {
                             let (image, view, old) = match target {
                                 Target::Surface => {
@@ -2309,7 +2372,7 @@ impl Backend for VulkanBackend {
                                     depth_stencil: vk::ClearDepthStencilValue { depth: clear.unwrap_or(0.0), stencil: 0 },
                                 })
                         });
-                        let colors: Vec<_> = color_att.into_iter().collect();
+                        let colors: Vec<_> = color_att.into_iter().chain(motion_att).collect();
                         let mut info = vk::RenderingInfo::default()
                             .render_area(vk::Rect2D { offset: Default::default(), extent })
                             .layer_count(1)

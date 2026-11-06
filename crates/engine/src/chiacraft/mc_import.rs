@@ -155,12 +155,39 @@ fn chunk_cubes(c: &Content, r: &Resolver, dim: usize, chunk: &anvil::Chunk, lo: 
     out
 }
 
+/// The column new players start on: the vista of the Bliss + DH shots (x, z).
+const SPAWN: [i32; 2] = [165, 168];
+/// The file in the world's folder that says where they start: `<dimension> x y z`.
+const SPAWN_FILE: &str = "mc_spawn.txt";
+
+/// The highest block of column (x, z) that stands solid, among a chunk's cubes.
+fn top_solid(c: &Content, cubes: &[(IVec3, Cube)], x: i32, z: i32) -> Option<i32> {
+    use weft_abi::block_flags as bf;
+    cubes.iter().rev().find_map(|(pos, cube)| {
+        (0..16usize).rev().find_map(|y| {
+            let s = cube.get(cube::index(x as usize, y, z as usize));
+            (s != AIR && c.states[s as usize].flags & bf::SOLID != 0).then_some(pos.y * 16 + y as i32)
+        })
+    })
+}
+
+/// Where new players start in an imported world (`mc_spawn.txt`), if it is one: the dimension and
+/// the place.
+pub fn spawn(c: &Content, world_dir: &std::path::Path) -> Option<(u32, glam::DVec3)> {
+    let text = std::fs::read_to_string(world_dir.join(SPAWN_FILE)).ok()?;
+    let mut w = text.split_whitespace();
+    let name = w.next()?;
+    let dim = c.dims.iter().position(|d| d.name == name)? as u32;
+    let mut n = || w.next()?.parse::<f64>().ok();
+    Some((dim, glam::DVec3::new(n()?, n()?, n()?)))
+}
+
 fn first_dir(list: &[PathBuf]) -> Option<PathBuf> {
     list.iter().find(|p| p.is_dir()).cloned()
 }
 
 /// Imports the Minecraft world `--import-mc` names into `meta`'s world, if asked and not done yet.
-pub fn maybe_import(meta: &WorldMeta, c: &Content) {
+pub fn maybe_import(meta: &mut WorldMeta, c: &Content) {
     let opts = crate::app::api::launch_options();
     let Some(src) = opts.get("import-mc") else { return };
     let marker = meta.dir.join("mc_import.txt");
@@ -180,6 +207,11 @@ pub fn maybe_import(meta: &WorldMeta, c: &Content) {
         log::error!("mc import: no region folder in {}", src.display());
         return;
     };
+    // A test scene: nothing spawns in it from the first tick (scripts set the rule only after
+    // they load, and players spawned into the imported land were killed before that).
+    meta.configs.retain(|(name, _)| name != "core:mob_spawning");
+    meta.configs.push(("core:mob_spawning".into(), 0.0));
+    meta.save();
     let start = Instant::now();
     let def = &c.dims[dim];
     // Minecraft's overworld is y -64 to 319: cubes -4 to 19.
@@ -189,11 +221,17 @@ pub fn maybe_import(meta: &WorldMeta, c: &Content) {
     let regions = anvil::regions(&region_dir);
     log::info!("mc import: {} region files from {} into {} cubes {lo} to {hi}", regions.len(), region_dir.display(), dim_name);
     let chunks = std::sync::atomic::AtomicU64::new(0);
+    // Where new players start: on the ground under the vista (our own spawn search would put
+    // them anywhere in the imported land, the sea included).
+    let ground = Mutex::new(None);
     {
         use rayon::prelude::*;
         regions.par_iter().for_each(|(_, _, path)| {
             for chunk in anvil::read_region(path) {
                 let cubes = chunk_cubes(c, &r, dim, &chunk, lo, hi);
+                if (chunk.x, chunk.z) == (SPAWN[0] >> 4, SPAWN[1] >> 4) {
+                    *ground.lock().unwrap() = top_solid(c, &cubes, SPAWN[0] & 15, SPAWN[1] & 15);
+                }
                 let mut st = storage.lock().unwrap();
                 for (pos, cube) in &cubes {
                     st.save_imported(c, dim as u32, *pos, cube);
@@ -249,6 +287,13 @@ pub fn maybe_import(meta: &WorldMeta, c: &Content) {
         None => report += "far grid: none (no dh0.bin)\n",
     }
     storage.flush();
+    match ground.into_inner().unwrap() {
+        Some(y) => {
+            let _ = std::fs::write(meta.dir.join(SPAWN_FILE), format!("{dim_name} {}.5 {} {}.5\n", SPAWN[0], y + 1, SPAWN[1]));
+            report += &format!("spawn: {} {} {}\n", SPAWN[0], y + 1, SPAWN[1]);
+        }
+        None => report += "spawn: none (no ground under the vista)\n",
+    }
     let mut stand_ins: Vec<(String, (String, u64))> = r.stand_ins.into_inner().unwrap().into_iter().collect();
     stand_ins.sort_by(|a, b| b.1.1.cmp(&a.1.1));
     report += "stand-ins (minecraft state -> ours, blocks):\n";

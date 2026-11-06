@@ -158,3 +158,28 @@ struct ParticleFrag {
     life: f32,
     time: f32,
 }
+
+// ---- temporal anti-aliasing's motion (`post::Post`, `weft_render::MOTION_FORMAT`) ----
+
+// How far a point drawn at `clip` (this frame's `view_proj`, jittered) moved on the screen since
+// last frame, in UV (y down), without the jitter: `prev_clip` is its place then (`scene.taa_prev`
+// times where it was, this frame's camera-relative), `jitter` is `scene.taa.xy`. Per vertex: a
+// face's motion is close to linear across it.
+fn screen_motion(clip: vec4<f32>, prev_clip: vec4<f32>, jitter: vec2<f32>) -> vec2<f32> {
+    if clip.w <= 1e-4 || prev_clip.w <= 1e-4 {
+        return vec2(0.0);
+    }
+    let now = clip.xy / clip.w - jitter;
+    let then = prev_clip.xy / prev_clip.w;
+    return clamp((then - now) * vec2(0.5, -0.5), vec2(-1.0), vec2(1.0));
+}
+
+// What a surface writes to the motion image (`@location(1)`): with `m.z` 1, its own motion `m.xy`
+// tagged with its depth (`clip.z` in the fragment), which the gathering checks against the world's
+// depth there; else a depth of -1, the camera's motion (`taa.wgsl`).
+fn motion_texel(m: vec3<f32>, depth: f32) -> vec4<f32> {
+    if m.z > 0.5 {
+        return vec4(m.xy, depth, 0.0);
+    }
+    return vec4(0.0, 0.0, -1.0, 0.0);
+}
