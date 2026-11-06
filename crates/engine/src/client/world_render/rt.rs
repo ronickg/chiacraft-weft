@@ -116,7 +116,7 @@ pub fn rt_setting() -> bool {
 
 /// The path tracer's pipelines (`pathtrace.wgsl` in the shader pack, with the world's traced
 /// prelude): its compute, and the composite drawing its pixels over the world's image.
-pub(super) fn pt_pipelines(gpu: &mut dyn Backend, assets: &crate::assets::Assets) -> Option<[PipelineId; 3]> {
+pub(super) fn pt_pipelines(gpu: &mut dyn Backend, assets: &crate::assets::Assets) -> Option<[PipelineId; 4]> {
     let shader = match crate::packs::world_side_shader(assets, "pathtrace.wgsl", crate::gpu_layout::PT_DECLS)? {
         Ok(s) => s,
         Err(e) => {
@@ -151,10 +151,25 @@ pub(super) fn pt_pipelines(gpu: &mut dyn Backend, assets: &crate::assets::Assets
         .create_compute(&ComputeDesc { label: "radiance cache", shader: &shader, entry: "cs_cache" })
         .map_err(|e| log::error!("path tracer cache: {}", e.0))
         .ok();
-    match (fs, resolve) {
-        (Some(fs), Some(resolve)) => Some([cs, fs, resolve]),
-        (fs, resolve) => {
-            for p in [Some(cs), fs, resolve].into_iter().flatten() {
+    let finish = gpu
+        .create_pipeline(&PipelineDesc {
+            label: "path trace finish",
+            shader: &shader,
+            vertex: "vs_pt",
+            fragment: Some("fs_pt_finish"),
+            color: Some(crate::post::world_format()),
+            depth: None,
+            blend: Blend::None,
+            cull_back: false,
+            topology: Topology::Triangles,
+            motion: false,
+        })
+        .map_err(|e| log::error!("path tracer finish: {}", e.0))
+        .ok();
+    match (fs, resolve, finish) {
+        (Some(fs), Some(resolve), Some(finish)) => Some([cs, fs, resolve, finish]),
+        (fs, resolve, finish) => {
+            for p in [Some(cs), fs, resolve, finish].into_iter().flatten() {
                 gpu.destroy_pipeline(p);
             }
             None
@@ -436,7 +451,7 @@ impl WorldRenderer {
         debug: u32,
         denoised: bool,
     ) {
-        let (Some([cs, fs, resolve]), true, Some(page), Some((albedo, normal, spec, gb_size))) = (
+        let (Some([cs, fs, resolve, _]), true, Some(page), Some((albedo, normal, spec, gb_size))) = (
             self.pt_pipes,
             self.rt_traced() || self.rt_reflects() || self.rt.is_some(),
             self.faces.pages.first().map(|p| p.0),
@@ -492,6 +507,8 @@ impl WorldRenderer {
             normal: gpu.texture_index(normal),
             spec: gpu.texture_index(spec),
             mode: u32::from(denoised && debug == 0),
+            light: 0,
+            pad: [0; 3],
         };
         let origins = page;
         self.bind_run(list, cs, page, origins);
@@ -511,6 +528,54 @@ impl WorldRenderer {
         list.push(Cmd::BeginPass { color: Some((target, None)), depth: None, motion: Some((diffuse, Some(none))) });
         self.bind_run(list, fs, page, origins);
         list.bind(pt_bind::IN, out);
+        list.push_constants(&args);
+        list.draw(3, 1);
+        list.push(Cmd::EndPass);
+    }
+
+    /// The image a denoiser writes its denoised light into (diffuse x albedo + specular x
+    /// specular albedo, the air's transmittance already in; 0 where untraced) when `path_trace`
+    /// ran `denoised`: Rgba16F at the world's `size`, made here. `pt_finish` then puts it in.
+    pub fn pt_light(&mut self, gpu: &mut dyn Backend, size: (u32, u32)) -> TextureId {
+        if self.pt_light_image.is_none_or(|l| l.1 != size) {
+            if let Some((t, _)) = self.pt_light_image.take() {
+                gpu.destroy_texture(t);
+            }
+            let t = gpu.create_texture(
+                &TextureDesc { width: size.0, height: size.1, mips: 1, format: Format::Rgba16Float, render_target: true },
+                "path traced light",
+            );
+            self.pt_light_image = Some((t, size));
+        }
+        self.pt_light_image.unwrap().0
+    }
+
+    /// After a denoiser wrote `pt_light` (a `denoised` `path_trace` this frame, slot `slot`): each
+    /// traced pixel of the world's image `target` becomes the air's light plus the denoised light,
+    /// finished as the world's pass finishes its pixels (the pack's `display`: the night's blue).
+    pub fn pt_finish(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, slot: usize, target: Target, size: (u32, u32)) {
+        let (Some([_, _, _, finish]), Some(page), Some((light, lsize))) =
+            (self.pt_pipes, self.faces.pages.first().map(|p| p.0), self.pt_light_image)
+        else {
+            return;
+        };
+        if lsize != size || self.pt_out.len() <= slot || self.buffers.is_none() {
+            return;
+        }
+        let args = crate::gpu_layout::PtArgs {
+            size: [size.0, size.1],
+            depth: 0,
+            debug: 0,
+            albedo: 0,
+            normal: 0,
+            spec: 0,
+            mode: 1,
+            light: gpu.texture_index(light),
+            pad: [0; 3],
+        };
+        list.push(Cmd::BeginPass { color: Some((target, None)), depth: None, motion: None });
+        self.bind_run(list, finish, page, page);
+        list.bind(crate::gpu_layout::pt_bind::IN, self.pt_out[slot].0);
         list.push_constants(&args);
         list.draw(3, 1);
         list.push(Cmd::EndPass);

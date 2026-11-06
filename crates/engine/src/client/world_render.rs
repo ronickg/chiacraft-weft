@@ -478,8 +478,9 @@ pub struct WorldRenderer {
     rt_modes: (bool, bool),
     /// The path tracer (`rt.rs` `path_trace`, the pack's `pathtrace.wgsl`): its compute and its
     /// composite, made with the traced world shader; its output per frame slot.
-    /// The path tracer's pipelines: the trace, the composite, the radiance cache's resolve.
-    pt_pipes: Option<[PipelineId; 3]>,
+    /// The path tracer's pipelines: the trace, the composite, the radiance cache's resolve, the
+    /// finish after a denoiser (`pt_finish`).
+    pt_pipes: Option<[PipelineId; 4]>,
     pt_out: Vec<(BufferId, u32)>,
     /// The radiance cache (`pathtrace.wgsl`'s `pt_cache`, `gpu_layout::PT_CACHE` cells), made zeroed
     /// with the first traced frame.
@@ -496,6 +497,8 @@ pub struct WorldRenderer {
     /// by the albedo; a the bounce's distance) and specular (rgb divided by `pt_spec_albedo`; a the
     /// reflection's distance, 65504 the sky), for the denoisers.
     pub pt_images: Option<(TextureId, TextureId, (u32, u32))>,
+    /// The denoised light a denoiser writes for `pt_finish` (Rgba16F, the world's size; `pt_light`).
+    pt_light_image: Option<(TextureId, (u32, u32))>,
     /// The setting changed: the app composes the world shader again (`reload_shaders`).
     pub rt_reload: bool,
 }
@@ -676,6 +679,7 @@ impl WorldRenderer {
             gb_draws_slot: 0,
             gb_images: None,
             pt_images: None,
+            pt_light_image: None,
             rt_reload: false,
             calm_sets: [Self::calm_pipes(gpu, assets, false), Self::calm_pipes(gpu, assets, true)],
             calm_level: 0,
@@ -1360,6 +1364,9 @@ impl WorldRenderer {
             for t in [a, b, c] {
                 gpu.destroy_texture(t);
             }
+        }
+        if let Some((t, _)) = self.pt_light_image.take() {
+            gpu.destroy_texture(t);
         }
         if let Some((a, b, _)) = self.pt_images.take() {
             gpu.destroy_texture(a);

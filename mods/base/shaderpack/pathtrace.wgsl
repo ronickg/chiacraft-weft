@@ -373,8 +373,8 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     pt_out[at + 1u] = vec4(spe, specular_t);
     // The picture's own (mode 0), or what the denoiser adds onto (1).
     // The picture as the world's pass finishes it (`display`: the night's blue, or the LDR tone
-    // curve); under a denoiser that adds the light later, the air alone (its night shift is then
-    // the composite's to make).
+    // curve); under a denoiser (mode 1) the air's light alone, which `fs_pt_finish` adds the
+    // denoised light to and finishes.
     let under = select(display(air + dif * albedo + spe * s_alb), air, pt.mode == 1u);
     pt_out[at + 2u] = vec4(under, 1.0);
 }
@@ -411,4 +411,17 @@ fn fs_pt(in: PtOut) -> PtFrag {
         return PtFrag(vec4(pt_in[at].rgb, 0.0), vec4(0.0), vec4(0.0));
     }
     return PtFrag(vec4(kind.rgb, 0.0), pt_in[at], pt_in[at + 1u]);
+}
+
+// After a denoiser: each traced pixel the air's light (`pt_in` [2]) and the denoised light it
+// wrote (`textures[pt.light]`), finished as the world's pass finishes (`display`).
+@fragment
+fn fs_pt_finish(in: PtOut) -> @location(0) vec4<f32> {
+    let px = vec2<u32>(in.clip.xy);
+    let kind = pt_in[(px.y * pt.size.x + px.x) * 3u + 2u];
+    if kind.a < 0.5 || kind.a > 1.5 {
+        discard;
+    }
+    let light = textureLoad(textures[pt.light], vec2<i32>(px), 0).rgb;
+    return vec4(display(kind.rgb + light), 0.0);
 }

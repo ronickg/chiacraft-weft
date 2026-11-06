@@ -1792,6 +1792,10 @@ struct PtArgs {
     normal: u32,
     spec: u32,
     mode: u32,
+    light: u32,
+    pad0: u32,
+    pad1: u32,
+    pad2: u32,
 }
 var<immediate> pt: PtArgs;
 @group(1) @binding(34) var<storage, read_write> pt_out: array<vec4<f32>>;
@@ -1822,9 +1826,12 @@ pub struct PtArgs {
     pub albedo: u32,
     pub normal: u32,
     pub spec: u32,
-    /// 0: the composite writes the traced light itself; 1: a denoiser adds it (the composite
-    /// writes what lies under it: the air's share).
+    /// 0: the composite writes the traced light itself; 1: a denoiser makes it (the composite
+    /// leaves the traced pixels to `pt_finish`).
     pub mode: u32,
+    /// The denoised light (`texture_index`), for the finish.
+    pub light: u32,
+    pub pad: [u32; 3],
 }
 
 /// What goes in front of `rt_expand.wgsl` (ray tracing's scene, `world_render::rt`): the
