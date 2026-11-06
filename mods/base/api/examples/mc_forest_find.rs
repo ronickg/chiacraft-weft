@@ -9,7 +9,13 @@
 //! land, the cold's flat tundra), so a view over the overworld's temperate land is preferred: the
 //! share of its near and middle bands that the overworld gives another climate costs it.
 //!
+//! With `floor <x> <z>` it finds the forest-floor shot's spot instead (the Minecraft one stands in
+//! dark forest under a closed canopy: x -378.5 y 70.7 z 1000.5, looking 15 up): the nearest place
+//! to (`x`, `z`) whose ground is old growth all round for 48 blocks, dry and gentle, with the
+//! camera 1.6 over its ground.
+//!
 //!     cargo run -p base_api --example mc_forest_find -- <seed> [reach] [step] [count]
+//!     cargo run -p base_api --example mc_forest_find -- <seed> floor <x> <z>
 
 use base_api::SEA;
 use base_api::land::{self as l};
@@ -31,7 +37,42 @@ const BANDS: [(f64, f64, [f64; 4]); 3] = [
 type View = (f64, i32, i32, Vec<[f64; 4]>, bool);
 
 fn main() {
-    l::with_mc_land(find);
+    let a: Vec<String> = std::env::args().skip(1).collect();
+    if a.get(1).map(String::as_str) == Some("floor") {
+        let arg = |i: usize| a.get(i).and_then(|s| s.parse::<i32>().ok()).unwrap_or(0);
+        l::with_mc_land(|| floor(a[0].parse().unwrap_or(1), arg(2), arg(3)));
+    } else {
+        l::with_mc_land(find);
+    }
+}
+
+/// The forest floor's spot nearest (`cx`, `cz`): old growth for 48 blocks round, no water, the
+/// ground within 6 blocks of the middle's.
+fn floor(seed: u64, cx: i32, cz: i32) {
+    let f = l::fields(seed);
+    let ground = |x: i32, z: i32| l::height(&f, x * 16, z * 16) >> 4;
+    for r in (0..3000).step_by(16) {
+        for k in 0..(r / 16).max(1) * 6 {
+            let t = k as f64 / ((r / 16).max(1) * 6) as f64 * std::f64::consts::TAU;
+            let (x, z) = (cx + (r as f64 * t.cos()) as i32, cz + (r as f64 * t.sin()) as i32);
+            let h = ground(x, z);
+            if h < SEA + 2 || l::mc_forest_biome(&f, x * 16, z * 16) != "old_growth_forest" {
+                continue;
+            }
+            let fits = (-3..=3).all(|j| {
+                (-3..=3).all(|i| {
+                    let (px, pz) = (x + i * 16, z + j * 16);
+                    let g = ground(px, pz);
+                    g > SEA && (g - h).abs() <= 6 && l::mc_forest_biome(&f, px * 16, pz * 16) == "old_growth_forest"
+                })
+            });
+            if fits {
+                println!("/tp {x} {:.1} {z}  look {YAW} 15   (ground {h}, {r} blocks from {cx} {cz})", h as f64 + 1.6);
+                return;
+            }
+        }
+    }
+    println!("none within 3 km of {cx} {cz}");
 }
 
 fn find() {
