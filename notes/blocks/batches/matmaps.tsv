@@ -21,3 +21,12 @@ bronze_plate	base	metal=albedo tile=0 smooth=0.65 normal=lum:1.2 dark=0.22:smoot
 steel_plate	base	metal=iron tile=0 smooth=0.72 normal=lum:0.6
 bronze_lantern	base	metal=albedo tile=0 smooth=0.6 normal=lum:0.8 emit=0.8 light=0.8:f0=10:smooth=0.5
 bronze_lantern_top	base	metal=albedo tile=0 smooth=0.6 normal=lum:0.8 emit=0.8 light=0.8:f0=10:smooth=0.5
+# Existing lamps (RTX showcase): their glass shines and glows a little, their frames are metal.
+copper_lamp	base	metal=copper tile=0 smooth=0.7 normal=lum:0.8 dark=0.3:smooth=0.4:depth=0.2
+copper_lamp_lit	base	metal=copper tile=0 smooth=0.7 normal=lum:0.8 emit=0.7 light=0.8:f0=10:smooth=0.8
+lamp_red	base	f0=10 tile=0 smooth=0.8 normal=lum:0.6 emit=0.5
+lamp_green	base	f0=10 tile=0 smooth=0.8 normal=lum:0.6 emit=0.5
+lamp_blue	base	f0=10 tile=0 smooth=0.8 normal=lum:0.6 emit=0.5
+glass_red	base	f0=10 smooth=0.95 normal=flat solid=:f0=10:smooth=0.3
+glass_green	base	f0=10 smooth=0.95 normal=flat solid=:f0=10:smooth=0.3
+glass_blue	base	f0=10 smooth=0.95 normal=flat solid=:f0=10:smooth=0.3

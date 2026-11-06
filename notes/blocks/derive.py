@@ -124,7 +124,9 @@ def showcase_tiles():
     squares with a grout line), verdigris copper (the copper block under a pale green patina,
     thickest in its hollows, flecks of bare copper left), and the green and red glazed tiles (the
     blue glaze recoloured, its grout and glints kept)."""
-    lime, slate = tile("polished_limestone"), tile("slate_tiles")
+    lime = tile("polished_limestone")
+    regrid("rsb_stone", 3, 4, [0x26, 0x2A, 0x2E], "slate_tiles", edge=0.08)
+    slate = tile("slate_tiles")
     check = lime.copy()
     yy, xx = np.mgrid[0:32, 0:32]
     dark = ((yy // 16) + (xx // 16)) % 2 == 1
@@ -136,12 +138,16 @@ def showcase_tiles():
     copper = tile("copper_block")
     rng = np.random.default_rng(11)
     lum = (copper[..., :3] @ [0.3, 0.55, 0.15]) / 255
-    patina = np.clip(1.15 - lum * 1.4 + rng.random((32, 32)) * 0.45, 0, 1)
-    green = np.array([0x5E, 0xA8, 0x8E], float) * (0.75 + 0.5 * lum[..., None])
+    # Patches, not specks: a coarse noise (8 x 8, smoothed up) and a little fine.
+    coarse = np.asarray(Image.fromarray((rng.random((8, 8)) * 255).astype(np.uint8)).resize((32, 32), Image.BICUBIC)).astype(float) / 255
+    patina = 0.95 - lum * 1.2 + coarse * 0.55 + rng.random((32, 32)) * 0.12
+    green = np.array([0x5E, 0xA8, 0x8E], float) * (0.5 + 1.0 * lum[..., None])
     v = copper.copy()
-    k = (patina > 0.42)[..., None]
+    k = (patina > 0.66)[..., None]
     v[..., :3] = np.where(k, green, copper[..., :3] * 0.85)
     save(v, "verdigris_copper")
+    regrid("rsb_metal", 3, 4, [0xD8, 0xCF, 0xBA], "glazed_tiles_blue")
+    regrid("rsb_stone", 3, 4, [0x26, 0x2A, 0x2E], "slate_tiles", edge=0.08)
     blue = tile("glazed_tiles_blue")
     rgb = blue[..., :3]
     lum = (rgb @ [0.3, 0.55, 0.15]) / 255
@@ -152,6 +158,31 @@ def showcase_tiles():
         tint = np.array(c, float) * (0.35 + 1.3 * lum[..., None])
         a[..., :3] = np.where(glaze[..., None], np.minimum(tint, 255), rgb)
         save(a, f"glazed_tiles_{name}")
+
+
+def regrid(image, quadrant, n, grout, out, edge=0.12):
+    """A tile set of n x n square tiles from a generated image's quadrant (0 top left .. 3 bottom
+    right), redrawn on an exact grid: each cell's middle averaged down to (32/n - 1) px, a 1-px grout
+    line below and right of it, its top and left rows a little lighter (the bevel). Cutting the whole
+    square to 32 px left the tiles and grout uneven (11-06, glazed and slate tiles)."""
+    g = np.asarray(Image.open(os.path.join(HERE, "gen", image + ".png")).convert("RGB")).astype(float)
+    h = g.shape[0] // 2
+    q = g[(quadrant // 2) * h:(quadrant // 2 + 1) * h, (quadrant % 2) * h:(quadrant % 2 + 1) * h]
+    step = 32 // n
+    inner = step - 1
+    a = np.zeros((32, 32, 4))
+    a[..., :3] = grout
+    a[..., 3] = 255
+    span = q.shape[0] / n
+    for cy in range(n):
+        for cx in range(n):
+            m = int(span * 0.1)
+            cell = q[int(cy * span) + m:int((cy + 1) * span) - m, int(cx * span) + m:int((cx + 1) * span) - m]
+            small = np.asarray(Image.fromarray(cell.astype(np.uint8)).resize((inner, inner), Image.BOX)).astype(float)
+            small[0, :] = np.minimum(small[0, :] * (1 + edge) + 6, 255)
+            small[:, 0] = np.minimum(small[:, 0] * (1 + edge) + 6, 255)
+            a[cy * step:cy * step + inner, cx * step:cx * step + inner, :3] = small
+    save(a, out)
 
 
 def drift(size=32, frames=16, seed=0, top=4):

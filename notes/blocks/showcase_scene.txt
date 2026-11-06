@@ -7,8 +7,8 @@
 # Run with --shader-pack chiacraft and --config "core:hdr_world=1" (the mirror floors' screen reflections
 # need the HDR world), and once more with core:rt_shadows=1 on the RT branch.
 #
-# v0 (11-06): today's blocks only (stone bricks, iron and gold blocks, glass, stained glass, lamps,
-# glowstone) to check the material maps; the showcase blocks replace them once they're in.
+# v1 (11-06): the showcase blocks (v0, today's blocks only, is in chiacraft-archive's
+# tester-tools/rtx-showcase/showcase_v0.txt).
 loaded
 idle
 chat /rule core:mob_spawning 0
@@ -19,51 +19,63 @@ chat /time set 4000
 wait 1
 # Clear the air and lay a base.
 chat /tk fill 135 73 -171 163 92 -129 core:air
-chat /tk fill 135 64 -171 163 72 -129 base:stone_bricks
-# Floor (y 72): iron in a band round the pool, gold along its rim.
-chat /tk fill 143 72 -162 155 72 -138 base:iron_block
-chat /tk fill 145 72 -160 153 72 -140 base:gold_block
-# The pool: a basin two deep, water to the floor.
+chat /tk fill 135 64 -171 163 72 -129 base:slate_tiles
+# Floor (y 72): checker tiles, a band of polished obsidian (the black mirror) round the pool, a
+# polished limestone rim, red glazed tiles edging the band.
+chat /tk fill 139 72 -165 159 72 -135 base:checker_tiles
+chat /tk fill 143 72 -162 155 72 -138 base:red_glazed_tiles
+chat /tk fill 144 72 -161 154 72 -139 base:polished_obsidian
+chat /tk fill 145 72 -160 153 72 -140 base:polished_limestone
+# The pool: a basin of blue glazed tiles two deep, water to the floor.
+chat /tk fill 145 69 -160 153 71 -140 base:blue_glazed_tiles
 chat /tk fill 146 70 -159 152 72 -141 base:water
-# Walls (x 139 and 159, z -165 and -135), 9 high.
-chat /tk fill 139 73 -165 139 81 -135 base:stone_bricks
-chat /tk fill 159 73 -165 159 81 -135 base:stone_bricks
-chat /tk fill 139 73 -165 159 81 -165 base:stone_bricks
-chat /tk fill 139 73 -135 159 81 -135 base:stone_bricks
-# Tall windows in the side walls, every 6 blocks: clear glass, the middle one stained.
-chat /tk fill 139 75 -161 139 79 -159 base:glass
-chat /tk fill 139 75 -155 139 79 -153 base:blue_stained_glass
-chat /tk fill 139 75 -149 139 79 -147 base:glass
-chat /tk fill 139 75 -143 139 79 -141 base:red_stained_glass
-chat /tk fill 159 75 -161 159 79 -159 base:glass
-chat /tk fill 159 75 -155 159 79 -153 base:green_stained_glass
-chat /tk fill 159 75 -149 159 79 -147 base:glass
-chat /tk fill 159 75 -143 159 79 -141 base:red_stained_glass
-# The back window (north wall): a stained mosaic in a glass field.
-chat /tk fill 143 74 -165 155 80 -165 base:glass
-chat /tk fill 146 75 -165 148 79 -165 base:red_stained_glass
-chat /tk fill 149 75 -165 149 79 -165 base:green_stained_glass
-chat /tk fill 150 75 -165 152 79 -165 base:blue_stained_glass
-# The doorway (south wall), 3 wide, 4 high.
+# Walls (x 139 and 159, z -165 and -135), 9 high: limestone tiles on a course of slate tiles, a
+# green glazed band at the back.
+chat /tk fill 139 73 -165 139 81 -135 base:limestone_tiles
+chat /tk fill 159 73 -165 159 81 -135 base:limestone_tiles
+chat /tk fill 139 73 -165 159 81 -165 base:limestone_tiles
+chat /tk fill 139 73 -135 159 81 -135 base:limestone_tiles
+chat /tk fill 139 73 -165 139 73 -135 base:slate_tiles
+chat /tk fill 159 73 -165 159 73 -135 base:slate_tiles
+chat /tk fill 139 73 -135 159 73 -135 base:slate_tiles
+chat /tk fill 139 73 -165 159 73 -165 base:green_glazed_tiles
+# Tall windows in the side walls, every 6 blocks: leaded, frosted, smoked and clear glass.
+chat /tk fill 139 75 -161 139 79 -159 base:leaded_glass
+chat /tk fill 139 75 -155 139 79 -153 base:frosted_glass
+chat /tk fill 139 75 -149 139 79 -147 base:smoked_glass
+chat /tk fill 139 75 -143 139 79 -141 base:glass
+chat /tk fill 159 75 -161 159 79 -159 base:leaded_glass
+chat /tk fill 159 75 -155 159 79 -153 base:glass
+chat /tk fill 159 75 -149 159 79 -147 base:frosted_glass
+chat /tk fill 159 75 -143 159 79 -141 base:leaded_glass
+# The back window (north wall): leaded glass framed by stained panes, in a steel surround.
+chat /tk fill 142 74 -165 156 80 -165 base:steel_plate
+chat /tk fill 143 75 -165 155 79 -165 base:leaded_glass
+chat /tk fill 143 75 -165 143 79 -165 base:red_stained_glass
+chat /tk fill 155 75 -165 155 79 -165 base:blue_stained_glass
+# The doorway (south wall), 3 wide, 4 high, in a steel frame.
+chat /tk fill 147 73 -135 151 77 -135 base:steel_plate
 chat /tk fill 148 73 -135 150 76 -135 core:air
-# Columns of iron inside the side walls, gold caps, a lamp on each.
-chat /tk fill 141 73 -158 141 79 -158 base:iron_block
-chat /tk fill 141 73 -150 141 79 -150 base:iron_block
-chat /tk fill 141 73 -142 141 79 -142 base:iron_block
-chat /tk fill 157 73 -158 157 79 -158 base:iron_block
-chat /tk fill 157 73 -150 157 79 -150 base:iron_block
-chat /tk fill 157 73 -142 157 79 -142 base:iron_block
-chat /tk fill 141 80 -158 141 80 -158 base:red_lamp
-chat /tk fill 141 80 -150 141 80 -150 base:glowstone
-chat /tk fill 141 80 -142 141 80 -142 base:blue_lamp
-chat /tk fill 157 80 -158 157 80 -158 base:green_lamp
-chat /tk fill 157 80 -150 157 80 -150 base:glowstone
-chat /tk fill 157 80 -142 157 80 -142 base:red_lamp
-# A gold trim along the walls' top, the roof over it, a glass skylight down the middle.
-chat /tk fill 140 81 -164 158 81 -164 base:gold_block
-chat /tk fill 140 81 -136 158 81 -136 base:gold_block
-chat /tk fill 139 82 -165 159 82 -135 base:stone_bricks
-chat /tk fill 147 82 -162 151 82 -138 base:glass
+# Columns inside the side walls: copper, one weathered to verdigris; bronze lanterns on top.
+chat /tk fill 141 73 -158 141 79 -158 base:copper_block
+chat /tk fill 141 73 -150 141 79 -150 base:verdigris_copper
+chat /tk fill 141 73 -142 141 79 -142 base:copper_block
+chat /tk fill 157 73 -158 157 79 -158 base:copper_block
+chat /tk fill 157 73 -150 157 79 -150 base:copper_block
+chat /tk fill 157 73 -142 157 79 -142 base:verdigris_copper
+chat /tk fill 141 80 -158 141 80 -158 base:bronze_lantern
+chat /tk fill 141 80 -150 141 80 -150 base:bronze_lantern
+chat /tk fill 141 80 -142 141 80 -142 base:bronze_lantern
+chat /tk fill 157 80 -158 157 80 -158 base:bronze_lantern
+chat /tk fill 157 80 -150 157 80 -150 base:bronze_lantern
+chat /tk fill 157 80 -142 157 80 -142 base:bronze_lantern
+# A bronze trim along the walls' top, a roof of limestone tiles, a frosted skylight down the middle.
+chat /tk fill 140 81 -164 158 81 -164 base:bronze_plate
+chat /tk fill 140 81 -136 158 81 -136 base:bronze_plate
+chat /tk fill 140 81 -164 140 81 -136 base:bronze_plate
+chat /tk fill 158 81 -164 158 81 -136 base:bronze_plate
+chat /tk fill 139 82 -165 159 82 -135 base:limestone_tiles
+chat /tk fill 147 82 -162 151 82 -138 base:frosted_glass
 wait 2
 where
 # ---- inside, looking north along the pool
@@ -123,6 +135,16 @@ wait 1
 chat /tick freeze
 wait 3
 shot metal_close_h10.png
+chat /tick unfreeze
+# ---- the west wall's windows from inside, the coloured light on the floor (the afternoon sun)
+chat /tp 152.5 76.5 -151.5
+wait 3
+look 75 -25
+chat /time set 8000
+wait 1
+chat /tick freeze
+wait 3
+shot windows_h14.png
 chat /tick unfreeze
 # ---- outside, from the south-east
 chat /tp 172.5 88 -118.5

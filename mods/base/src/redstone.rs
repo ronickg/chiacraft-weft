@@ -335,8 +335,8 @@ pub fn register(r: &mut Registry) {
         .mineable("pickaxe")
         .tab(&crate::tabs::REDSTONE);
 
-    // Our copper lamp, the golden lamp's twin in copper: each new pulse flips it. Creative only for now: its
-    // recipe waits for copper ore and ingots (notes/overview/pieces.json).
+    // Our copper lamp, the golden lamp's twin in copper: each new pulse flips it. Made as the golden
+    // lamp is, with copper ingots (the RTX showcase, 11-06: copper is in the game now).
     r.block(&COPPER_LAMP)
         .signal_sink()
         .prop("power", ["off", "on"])
@@ -448,6 +448,7 @@ pub fn register(r: &mut Registry) {
     r.shaped(C, "sticky_piston", 1, &["s", "p"], &[('s', "slime_block"), ('p', "piston")]);
     r.shaped(C, "floater", 1, &["ipi", "iri", "ipi"], &[('i', "iron_ingot"), ('r', "redstone"), ('p', "piston")]);
     r.shaped(C, "golden_lamp", 1, &[" c ", "crc", " c "], &[('c', "gold_ingot"), ('r', "redstone")]);
+    r.shaped(C, "copper_lamp", 1, &[" c ", "crc", " c "], &[('c', "#ingots/copper"), ('r', "redstone")]);
     r.shaped(C, "anchor", 1, &["iii", "iri", "iii"], &[('i', "iron_ingot"), ('r', "redstone")]);
     r.shaped(C, "observer", 1, &["ccc", "rri", "ccc"], &[('c', "#cobblestone"), ('r', "redstone"), ('i', "iron_ingot")]);
     r.shaped(C, "dispenser", 1, &["ccc", "csc", "crc"], &[('c', "#cobblestone"), ('s', "#stick"), ('r', "redstone")]);

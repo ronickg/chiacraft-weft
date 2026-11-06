@@ -279,6 +279,7 @@ const RECIPES_LIST: &[Recipe] = &[
     c("base:sticky_piston", 1.0, &[("base:slime_block", 1.0), ("base:piston", 1.0)], Hand),
     c("base:floater", 1.0, &[("base:iron_ingot", 4.0), ("base:redstone", 1.0), ("base:piston", 2.0)], Table),
     c("base:golden_lamp", 1.0, &[("base:gold_ingot", 4.0), ("base:redstone", 1.0)], Table),
+    c("base:copper_lamp", 1.0, &[("base:copper_ingot", 4.0), ("base:redstone", 1.0)], Table),
     c("base:anchor", 1.0, &[("base:iron_ingot", 8.0), ("base:redstone", 1.0)], Table),
     c("base:observer", 1.0, &[("#cobblestone", 6.0), ("base:redstone", 2.0), ("base:iron_ingot", 1.0)], Table),
     c("base:dispenser", 1.0, &[("#cobblestone", 7.0), ("#stick", 1.0), ("base:redstone", 1.0)], Table),

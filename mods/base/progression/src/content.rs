@@ -170,7 +170,7 @@ pub const RULES: &[Rule] = &[
         "the Cretaceous gateway is built of amber blocks; a mound's top",
     ),
     n(&["portals:portal", "packages:unknown"], 0, Shared, Technical, Not, "a linked world's door; a missing package's stand-in"),
-    n(&["base:copper_lamp"], 3, Tech, Machine, Not, "no recipe yet (no copper in the game)"),
+    n(&["base:copper_lamp"], 3, Tech, Machine, Made, "the golden lamp's twin in copper; a redstone machine (the Age of Steam's)"),
     // ---- the ground
     r(
         &[
