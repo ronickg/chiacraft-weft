@@ -333,6 +333,11 @@ impl Settings {
         (number("core:dlss5_intensity") as f32).clamp(0.0, 1.0)
     }
 
+    /// The denoiser's check on today's frame (`core:pt_denoise_test`), live.
+    pub fn pt_denoise_test(&self) -> bool {
+        number("core:pt_denoise_test") != 0.0
+    }
+
     /// How the path tracer's light is denoised (`core:pt_denoiser`: 0 raw, 1 ours), live.
     pub fn pt_denoiser(&self) -> u32 {
         (number("core:pt_denoiser") as u32).min(crate::denoise::SVGF)

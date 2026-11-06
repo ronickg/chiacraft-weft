@@ -58,6 +58,8 @@ struct Pipes {
     variance: PipelineId,
     atrous: PipelineId,
     composite: PipelineId,
+    /// The test's noisy light and normals from today's picture (`run_test`).
+    test: PipelineId,
 }
 
 type Image = (TextureId, u32);
@@ -88,13 +90,41 @@ pub struct Denoiser {
     pub mode: u32,
     /// Ray Reconstruction denoises this frame (`core:dlss_rr` under DLSS): the raw light then.
     pub reconstruct: bool,
+    /// The test's images (`run_test`): noisy light, normals, zero specular and F0, the result.
+    test: Option<((u32, u32), [TextureId; 4])>,
+    test_frame: u32,
+}
+
+static TEST: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// `core:pt_denoise_test` (live) or `WEFT_PT_DENOISE_TEST=1`: the denoiser on today's frame
+/// before the path tracer exists (`run_test`), set by the app.
+pub fn set_test(on: bool) {
+    let on = on || std::env::var_os("WEFT_PT_DENOISE_TEST").is_some_and(|v| v != "0");
+    if TEST.swap(on, std::sync::atomic::Ordering::Relaxed) != on {
+        log::info!("denoise: test on today's frame {}", if on { "on" } else { "off" });
+    }
+}
+
+pub fn test_on() -> bool {
+    TEST.load(std::sync::atomic::Ordering::Relaxed)
 }
 
 const MAX_PASSES: usize = 4 + STEPS as usize;
 
 impl Denoiser {
     pub fn new(gpu: &mut dyn Backend, assets: &Assets) -> Denoiser {
-        let mut d = Denoiser { pipes: None, images: None, cur: 0, held: false, params: Vec::new(), mode: SVGF, reconstruct: false };
+        let mut d = Denoiser {
+            pipes: None,
+            images: None,
+            cur: 0,
+            held: false,
+            params: Vec::new(),
+            mode: SVGF,
+            reconstruct: false,
+            test: None,
+            test_frame: 0,
+        };
         d.reload(gpu, assets);
         d
     }
@@ -102,7 +132,7 @@ impl Denoiser {
     /// Its pipelines from `denoise.wgsl` (a pack's, else the engine's).
     pub fn reload(&mut self, gpu: &mut dyn Backend, assets: &Assets) {
         if let Some(p) = self.pipes.take() {
-            for id in [p.temporal, p.moments, p.variance, p.atrous, p.composite] {
+            for id in [p.temporal, p.moments, p.variance, p.atrous, p.composite, p.test] {
                 gpu.destroy_pipeline(id);
             }
         }
@@ -133,6 +163,7 @@ impl Denoiser {
                     ("denoise variance", "fs_variance", true, Blend::None, f),
                     ("denoise atrous", "fs_atrous", true, Blend::None, f),
                     ("denoise composite", "fs_composite", false, Blend::Additive, crate::post::world_format()),
+                    ("denoise test", "fs_test", true, Blend::None, f),
                 ] {
                     ids.push(make(label, entry, two, blend, color)?);
                 }
@@ -140,7 +171,8 @@ impl Denoiser {
             });
         match made {
             Ok(ids) => {
-                self.pipes = Some(Pipes { temporal: ids[0], moments: ids[1], variance: ids[2], atrous: ids[3], composite: ids[4] });
+                self.pipes =
+                    Some(Pipes { temporal: ids[0], moments: ids[1], variance: ids[2], atrous: ids[3], composite: ids[4], test: ids[5] });
             }
             Err(e) => log::error!("path tracing denoiser: {e}"),
         }
@@ -201,7 +233,8 @@ impl Denoiser {
         let Some(p) = &self.pipes else { return };
         let (temporal, moments_pipe, variance, atrous, composite) = (p.temporal, p.moments, p.variance, p.atrous, p.composite);
         while self.params.len() < gpu.frames_in_flight() {
-            let size = (size_of::<DenoisePass>() * MAX_PASSES) as u64;
+            // One more for `run_test`'s own entry.
+            let size = (size_of::<DenoisePass>() * (MAX_PASSES + 1)) as u64;
             self.params
                 .push(gpu.create_buffer(size, usage::STORAGE | usage::HOST, "denoise passes"));
         }
@@ -289,5 +322,93 @@ impl Denoiser {
         bind(list, composite);
         list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: comp_entry as u32 });
         list.push(Cmd::EndPass);
+    }
+
+    /// A check of the denoiser before the path tracer is there (`test_on`): today's picture
+    /// `picture` is taken as the albedo, the light as a noise of mean 1 a pixel (each frame anew,
+    /// heavy-tailed like one path a pixel), the normals from `depth`, no specular; the denoised light
+    /// times the picture is drawn into an image of its own, which it returns (the frame's world in
+    /// the picture's place). With `core:pt_denoiser` 0 that is the raw noise times the picture.
+    #[allow(clippy::too_many_arguments)]
+    pub fn run_test(
+        &mut self,
+        gpu: &mut dyn Backend,
+        list: &mut CommandList,
+        slot: usize,
+        scene: BufferId,
+        picture: TextureId,
+        depth: TextureId,
+        motion: Option<TextureId>,
+        size: (u32, u32),
+    ) -> Option<TextureId> {
+        let pipe = self.pipes.as_ref()?.test;
+        if self.test.is_none_or(|t| t.0 != size) {
+            if let Some((_, old)) = self.test.take() {
+                old.into_iter().for_each(|t| gpu.destroy_texture(t));
+            }
+            let desc =
+                TextureDesc { width: size.0.max(1), height: size.1.max(1), mips: 1, format: Format::Rgba16Float, render_target: true };
+            let out_desc = TextureDesc { format: crate::post::world_format(), ..desc.clone() };
+            self.test = Some((
+                size,
+                [
+                    gpu.create_texture(&desc, "denoise test light"),
+                    gpu.create_texture(&desc, "denoise test normals"),
+                    gpu.create_texture(&desc, "denoise test zero"),
+                    gpu.create_texture(&out_desc, "denoise test result"),
+                ],
+            ));
+        }
+        let [light, normal, zero, out] = self.test.unwrap().1;
+        self.test_frame = self.test_frame.wrapping_add(1);
+        // Its own entry, after the denoiser's (`run` writes from the start of the buffer).
+        while self.params.len() < gpu.frames_in_flight() {
+            let bytes = (size_of::<DenoisePass>() * (MAX_PASSES + 1)) as u64;
+            self.params
+                .push(gpu.create_buffer(bytes, usage::STORAGE | usage::HOST, "denoise passes"));
+        }
+        let buf = self.params[slot % self.params.len()];
+        let entry = DenoisePass {
+            diffuse: gpu.texture_index(picture),
+            depth: gpu.texture_index(depth),
+            step: self.test_frame,
+            size: [size.0 as f32, size.1 as f32],
+            ..DenoisePass::default()
+        };
+        let at = MAX_PASSES * size_of::<DenoisePass>();
+        gpu.mapped(buf)[at..at + size_of::<DenoisePass>()].copy_from_slice(bytemuck::bytes_of(&entry));
+        list.push(Cmd::BeginPass {
+            motion: Some((normal, Some([0.0; 4]))),
+            color: Some((Target::Texture(light), Some([0.0; 4]))),
+            depth: None,
+        });
+        list.pipeline(pipe);
+        list.bind(crate::gpu_layout::bind::denoise::PASSES, buf);
+        list.bind(crate::gpu_layout::bind::denoise::SCENE, scene);
+        list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: MAX_PASSES as u32 });
+        list.push(Cmd::EndPass);
+        for t in [zero, out] {
+            list.push(Cmd::BeginPass { motion: None, color: Some((Target::Texture(t), Some([0.0; 4]))), depth: None });
+            list.push(Cmd::EndPass);
+        }
+        self.run(
+            gpu,
+            list,
+            &PtFrame {
+                size,
+                slot,
+                scene,
+                depth,
+                motion,
+                albedo: picture,
+                normal,
+                spec: zero,
+                diffuse: light,
+                specular: zero,
+                target: out,
+                reset: false,
+            },
+        );
+        Some(out)
     }
 }

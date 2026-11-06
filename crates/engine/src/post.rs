@@ -877,11 +877,28 @@ impl Post {
                 .push(gpu.create_buffer((size_of::<Pass>() * MAX_PASSES) as u64, usage::STORAGE | usage::HOST, "post passes"));
         }
         let time = crate::shaders::time();
+        // The denoiser's check before the path tracer exists (`denoise::test_on`): its result is
+        // this frame's world from here on.
+        let (mut world_tex, mut world_idx) = (tex[0], idx[0]);
+        if crate::denoise::test_on() && self.denoiser.ready() {
+            if let Some(d) = self.depth_tex {
+                let motion = self
+                    .motion_tex
+                    .filter(|m| m.2 == (frame.width, frame.height))
+                    .map(|m| m.0);
+                if let Some(out) = self
+                    .denoiser
+                    .run_test(gpu, list, frame.slot, scene, tex[0], d, motion, (frame.width, frame.height))
+                {
+                    (world_tex, world_idx) = (out, gpu.texture_index(out));
+                }
+            }
+        }
         // Temporal anti-aliasing first: this frame's world gathered into the picture so far, which
         // all after it read in the world's place (`src`): the bloom, the half-size parts and the
         // effects, so their sharpening (chiacraft's `sharpen_delta`) works on the gathered picture,
         // not on this frame's aliasing. An upscaler's result (`set_upscaled`) takes its place.
-        let mut src = idx[0];
+        let mut src = world_idx;
         let mut taa_entries: Vec<Pass> = Vec::new();
         // (target, pipeline, entry among `taa_entries`)
         let mut taa_draws: Vec<(TextureId, Option<TextureId>, PipelineId, usize)> = Vec::new();
@@ -913,7 +930,8 @@ impl Post {
                 self.full_motion = Some((t, gpu.texture_index(t), (w, h)));
             }
             let (full, ..) = self.full_motion.unwrap();
-            let entry = Pass { scene: idx[0], slot: 0, time, size: [w as f32, h as f32], depth, bloom: motion_idx + 1, ..Pass::default() };
+            let entry =
+                Pass { scene: world_idx, slot: 0, time, size: [w as f32, h as f32], depth, bloom: motion_idx + 1, ..Pass::default() };
             taa_entries.push(entry);
             taa_draws.push((full, None, fill, taa_entries.len() - 1));
             // Ray Reconstruction's guides: from the path tracer's G-buffer when it drew this frame
@@ -986,7 +1004,7 @@ impl Post {
             let start = list.data.len() as u32;
             list.data.extend_from_slice(bytemuck::bytes_of(&params));
             up_cmd = Some(Cmd::Upscale {
-                color: tex[0],
+                color: world_tex,
                 depth: depth_tex,
                 motion: full,
                 output: out,
@@ -1018,7 +1036,7 @@ impl Post {
             let (counts, cidx, _) = self.counts.unwrap();
             let (cur, last) = (self.taa_cur, 1 - self.taa_cur);
             let entry = Pass {
-                scene: idx[0],
+                scene: world_idx,
                 slot: 0,
                 strength: self.taa_blend,
                 time,
@@ -1062,7 +1080,7 @@ impl Post {
             }
             let j = jitter();
             self.inputs = Some(TemporalInputs {
-                color: tex[0],
+                color: world_tex,
                 depth: self.depth_tex.unwrap_or(TextureId(u32::MAX)),
                 motion: full,
                 size: (frame.width, frame.height),

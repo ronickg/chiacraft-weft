@@ -727,6 +727,9 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // A stand-in upscaler that only scales the picture up, for checking the upscaler's path
         // where the renderer has none (the Linux PC); read at start.
         ConfigDef::number("core:upscale_standin", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // A check of the path tracer's denoiser on today's frame, before the path tracer exists
+        // (`denoise::test_on`; checks only, no menu row): today's picture as the albedo, a noisy light.
+        ConfigDef::number("core:pt_denoise_test", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         // DLSS 5's strength (its intensity control), live.
         ConfigDef::number("core:dlss5_intensity", ck::FLOAT, 0.5, 0.0, 1.0, 0.05),
         // The HDR world's bloom (chiacraft): 0 none, 1 a pyramid of 4 levels, 2 of 6 (wider glow);

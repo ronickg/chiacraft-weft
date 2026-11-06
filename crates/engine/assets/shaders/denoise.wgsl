@@ -385,3 +385,43 @@ fn fs_composite(in: VOut) -> @location(0) vec4<f32> {
     let specular = dn_light(d.specular, at, isize).rgb * pt_spec_albedo(f0, nr.w, abs(dot(nr.xyz, v)));
     return vec4(diffuse + specular, 1.0);
 }
+
+// The check before the path tracer exists (`Denoiser::run_test`, `WEFT_PT_DENOISE_TEST`): a light
+// of mean 1 a pixel, new each frame (`step` the frame), heavy-tailed as one path a pixel is
+// (-log of a uniform), and the normals from the depth (the nearer neighbour each way, as
+// `upscale_guides.wgsl`), roughness 1. `diffuse` the picture (taken as the albedo), `depth`.
+fn dn_hash(x: u32) -> u32 {
+    var h = x * 747796405u + 2891336453u;
+    h = ((h >> ((h >> 28u) + 4u)) ^ h) * 277803737u;
+    return (h >> 22u) ^ h;
+}
+
+@fragment
+fn fs_test(in: VOut) -> Pair {
+    let d = dn[in.pass_index];
+    let isize = vec2<i32>(d.size);
+    let at = vec2<i32>(in.clip.xy);
+    var out: Pair;
+    let dep = dn_depth(d.depth, at, isize);
+    if dep <= 0.0 {
+        out.diffuse = vec4(0.0);
+        out.specular = vec4(0.0, 0.0, 1.0, 1.0);
+        return out;
+    }
+    let u = f32(dn_hash(u32(at.x) + dn_hash(u32(at.y) + dn_hash(d.step))) >> 8u) / 16777216.0;
+    let l = min(-log(max(1.0 - u, 1e-6)), 12.0);
+    out.diffuse = vec4(vec3(l), 0.0);
+    let c = dn_position(at, dep, d.size);
+    let l_ = dn_position(clamp(at - vec2(1, 0), vec2(0), isize - 1), dn_depth(d.depth, at - vec2(1, 0), isize), d.size);
+    let r_ = dn_position(clamp(at + vec2(1, 0), vec2(0), isize - 1), dn_depth(d.depth, at + vec2(1, 0), isize), d.size);
+    let u_ = dn_position(clamp(at - vec2(0, 1), vec2(0), isize - 1), dn_depth(d.depth, at - vec2(0, 1), isize), d.size);
+    let w_ = dn_position(clamp(at + vec2(0, 1), vec2(0), isize - 1), dn_depth(d.depth, at + vec2(0, 1), isize), d.size);
+    let dx = select(c - l_, r_ - c, length(r_ - c) < length(c - l_));
+    let dy = select(c - u_, w_ - c, length(w_ - c) < length(c - u_));
+    var n = normalize(cross(dy, dx));
+    if dot(n, c) > 0.0 {
+        n = -n;
+    }
+    out.specular = vec4(n, 1.0);
+    return out;
+}
