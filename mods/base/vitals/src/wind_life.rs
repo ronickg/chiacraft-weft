@@ -37,7 +37,9 @@ pub const LOOKS_PER_SEC: f32 = 6000.0;
 /// showed none in a shot, wl_look1a.)
 /// At 0.012 with autumn at 4x the birch forest put 140-500 leaves a second about, 16,000 alive
 /// (the particles' cap; wind_look1b), though only some tens were in view.
-pub const LEAF_RATE: f32 = 0.008;
+/// Half of 0.008 (Trees, 11-06, Planner: "smaller, fewer"): at the Max preset (ultra, 6x) Bliss's
+/// own forest had leaf flakes in the air all over the shot at 08:00, where Bliss shows none.
+pub const LEAF_RATE: f32 = 0.004;
 pub const NEEDLE_RATE: f32 = 0.002;
 /// In the windiest part of the day more come off: the rate times `1 + LEAF_WIND * wind / 10 m/s`.
 pub const LEAF_WIND: f32 = 0.8;
@@ -50,8 +52,9 @@ pub const RAIN_MORE: f32 = 1.0;
 /// Seconds a leaf lives, shortest and longest: its fall and then lying as litter (Recrafted's
 /// complete preset: 4 minutes).
 pub const LEAF_LIFE: (f32, f32) = (45.0, 110.0);
-/// A leaf's size (blocks): 5 to 7 of the world's 32 texels.
-pub const LEAF_SIZE: (f32, f32) = (0.16, 0.22);
+/// A leaf's size (blocks): 3 to 4.5 of the world's 32 texels, a real leaf's 10-15 cm (at 5 to 7,
+/// 0.16-0.22, the near ones read as cards a hand across in Bliss's forest, Trees 11-06).
+pub const LEAF_SIZE: (f32, f32) = (0.10, 0.14);
 /// How fast a leaf takes the air's speed (per second), and how fast it falls through still air
 /// (blocks a second; a real broadleaf about 1-1.5 m/s).
 pub const LEAF_AIR: f32 = 3.0;
@@ -230,12 +233,12 @@ mod tests {
         }
     }
 
-    /// In a forest of some 1,000 open leaf undersides in reach some leaves a second come off in
+    /// In a forest of some 1,000 open leaf undersides in reach a few leaves a second come off in
     /// calm air on the default setting; a gust's burst many more.
     #[test]
     fn the_rates() {
         let calm = 1000.0 * LEAF_RATE * weather(2.0, 0.0) * DENSITY[1];
-        assert!((5.0..20.0).contains(&calm), "calm {calm}");
+        assert!((2.5..10.0).contains(&calm), "calm {calm}");
         assert!(burst(1.0) == 1.0 && (burst(2.0) - GUST_BURST).abs() < 1e-6);
     }
 

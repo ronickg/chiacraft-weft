@@ -55,12 +55,32 @@ fn unpack_color(c: u32) -> vec4<f32> {
     return vec4(pow(v.rgb, vec3(2.2)), v.a);
 }
 
+// The light on a particle (no facing: `light_round`'s), but under cover as on the surfaces about
+// it: the sky's light falls off steeply under leaves (`light_on`'s Bliss curve) and the sun reaches
+// it only where the sky is open. With `light_round`'s half sun wherever there is some sky light,
+// falling leaves glowed lime in a forest's shade, in front of near-black leaves (Trees, Bliss's own
+// world at 08:00, 11-06). In the open the same light as before.
+fn particle_light(light: vec4<f32>, rel: vec3<f32>) -> vec3<f32> {
+    let p = palette();
+    let steep = (pow(light.x, 15.0) * 2.0 + pow(light.x, 2.5)) / 3.0;
+    let sky = mix(steep, brightness_curve(light.x), smoothstep(0.9, 1.0, light.x));
+    var c = p.ambient * sky * 0.85;
+    c += p.sun * light_strength() * 0.5 * smoothstep(0.85, 1.0, light.x);
+    var held = vec3(0.0);
+    if !CALM {
+        held = held_light(rel, vec3(0.0));
+    }
+    c += block_light(max(light.yzw, held), vec3(0.0)) * block_by_day(light.x);
+    c += vec3(max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y)));
+    return c;
+}
+
 fn shade(in: VOut) -> vec4<f32> {
     let albedo = textureSampleLevel(textures[in.data.y & PARTICLE_TEX_MASK], nearest_clamp, in.uv, 0.0);
     var color = unpack_color(in.data.x);
     color = particle_shade(in.data.y >> PARTICLE_SLOT_SHIFT, ParticleFrag(in.quad, albedo, color, in.life, scene.params.w));
     if in.data.w != 0xffffffffu {
-        color = vec4(color.rgb * light_round(unpack_light(in.data.w), vec3(0.0), in.rel), color.a);
+        color = vec4(color.rgb * particle_light(unpack_light(in.data.w), in.rel), color.a);
     } else {
         // Fullbright particles (sparks, flames) glow.
         color = vec4(color.rgb * 1.5, color.a);

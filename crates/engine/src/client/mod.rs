@@ -3561,10 +3561,10 @@ const FAR_TERRAIN_WAIT: u32 = 10;
 const FAR_DEPTH: f32 = 1200.0;
 
 /// The values of the settings the shader pack reads (`Scene::options`).
-fn pack_options() -> [[f32; 4]; 8] {
-    let mut out = [[0.0; 4]; 8];
+fn pack_options() -> [[f32; 4]; 12] {
+    let mut out = [[0.0; 4]; 12];
     let names = &content().game.config_names;
-    for (i, name) in crate::packs::pack_options().iter().enumerate().take(32) {
+    for (i, name) in crate::packs::pack_options().iter().enumerate().take(48) {
         if let Some(&id) = names.get(name.as_str()) {
             out[i / 4][i % 4] = crate::config::get(id) as f32;
         }
