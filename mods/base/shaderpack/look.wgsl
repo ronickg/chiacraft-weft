@@ -1430,7 +1430,13 @@ fn froxel_cell(dir: vec3<f32>, at: f32, floor: f32) -> vec4<f32> {
     // was all in a slice where the middle fell in it and none where it didn't, so the land under a
     // dawn mist wore rings round the eye at the slices' distances, 50-120 blocks deep out there
     // (Ronald, 11-06, pt_compare_v2 "low over the river": "what is this weird, like a ripple thing").
-    let j = fract(fract(sin(dot(dir, vec3(12.9898, 78.233, 37.719))) * 43758.547) + scene.params.w * 47.37);
+    // Where in its half each tap falls: interleaved gradient noise over the cells, moved on every
+    // frame, which temporal anti-aliasing averages evenly (a random hash a cell left speckle at the
+    // mist's edges, the first ring-fix run, 11-06).
+    let clip = scene.view_proj * vec4(dir, 1.0);
+    let cell = trunc((vec2(clip.x, -clip.y) / max(clip.w, 1e-4) * 0.5 + 0.5) * scene.froxels.zw);
+    let frame = trunc(scene.params.w * 60.0) % 64.0;
+    let j = fract(52.9829189 * fract(dot(cell + vec2(5.588238 * frame + 7.0 * k, 0.0), vec2(0.06711056, 0.00583715))));
     let d = 0.5 * (fog_density(scene.eye.xyz + dir * (at + span * (j - 1.0) * 0.5), floor)
         + fog_density(scene.eye.xyz + dir * (at + span * j * 0.5), floor));
     if d <= 0.0 {
