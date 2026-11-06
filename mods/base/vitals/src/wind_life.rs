@@ -128,7 +128,7 @@ pub const SPINDRIFT_SINK: f32 = 0.35;
 pub const SAND: (f32, f32) = (7.0, 13.0);
 pub const SAND_RATE: f32 = 0.12;
 pub const SAND_LIFE: (f32, f32) = (1.0, 2.5);
-pub const SAND_SIZE: (f32, f32) = (0.03, 0.06);
+pub const SAND_SIZE: (f32, f32) = (0.04, 0.08);
 pub const SAND_AIR: f32 = 7.0;
 pub const SAND_SINK: f32 = 0.6;
 /// In a dust storm: grains a second put in the air round the player at its thickest, within the
@@ -140,9 +140,12 @@ pub const DUST_CLEAR: [(f32, f32); 2] = [(7.0, 16.0), (11.0, 8.0)];
 /// second at its thickest; each drawn as long as `STREAK_SECS` of its flight.
 pub const DUST_STREAKS: f32 = 30.0;
 pub const STREAK_REACH: (f32, f32) = (5.0, 40.0);
-pub const STREAK_SECS: f32 = 0.12;
+pub const STREAK_SECS: f32 = 0.18;
 pub const STREAK_LIFE: (f32, f32) = (0.6, 1.4);
-pub const STREAK_SIZE: (f32, f32) = (0.025, 0.04);
+pub const STREAK_SIZE: (f32, f32) = (0.035, 0.06);
+/// What a storm's grains and streaks are coloured by (times the sand's texture): a little darker
+/// than the lit dust round them, which they matched and vanished into (wind_look3b).
+pub const DUST_GRAIN_TINT: u32 = 0xB08A60;
 
 /// The clear air's radius round the eye in a dust storm at `wind` m/s (`DUST_CLEAR`).
 pub fn dust_clear(wind: f32) -> f32 {
