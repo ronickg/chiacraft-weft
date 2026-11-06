@@ -266,8 +266,8 @@ fn shade(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
 }
 
 // How far the fog has closed in at `dist`: vanilla's from 0.6 of the terrain's end, and (chiacraft)
-// with distant terrain, a linear far fog from half the cubes' reach out to its end, as Distant
-// Horizons draws its far fog. With the fog only from 0.6 of a 4096-block far end, the far land
+// with distant terrain, a far fog from half the cubes' reach out to its end that closes in toward
+// it, as Distant Horizons fogs the land under the horizon. With the fog only from 0.6 of a 4096-block far end, the far land
 // stood clear and dark under a pale horizon (Far view, 11-06: the imported Bliss world with
 // shaders off, the strip under the horizon luma 83 against Minecraft + DH's 112). In a liquid
 // (fog start not 0.6 of its end) only the liquid's.
@@ -277,7 +277,11 @@ fn plain_fog(dist: f32) -> f32 {
     if abs(scene.params.x - 0.6 * scene.params.y) > 0.5 || near <= 0.0 || scene.params.y <= near {
         return fog;
     }
-    return max(fog, clamp((dist - 0.5 * near) / (scene.params.y - 0.5 * near), 0.0, 1.0));
+    // Closing in near the end (a cube): linear, the land 400-800 blocks out took half its fog and
+    // went pale where Minecraft + DH's is clear (luma 130-145 against 65; it only fogs the strip
+    // under the horizon).
+    let t = clamp((dist - 0.5 * near) / (scene.params.y - 0.5 * near), 0.0, 1.0);
+    return max(fog, t * t * t);
 }
 
 // Nearest texels with antialiased borders (vanilla 26.1's sampleNearest): up close each texel
