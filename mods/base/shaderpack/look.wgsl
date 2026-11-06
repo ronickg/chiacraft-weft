@@ -61,6 +61,23 @@ const OPT_MOON_SIZE: u32 = 18u;
 const OPT_GLOW: u32 = 19u;
 const OPT_BIOME_AIR: u32 = 20u;
 const OPT_SPARKLE: u32 = 21u;
+// The HDR world's picture (`base:look_curve`, `look_bloom`, `look_auto_exposure`), read raw: 0 is
+// Lottes's curve (1 Hejl's, 2 AgX), no bloom, a fixed exposure.
+const OPT_CURVE: u32 = 22u;
+const OPT_BLOOM: u32 = 23u;
+const OPT_AUTO_EXPOSURE: u32 = 24u;
+// Gap tests (Planner's breakdown against Bliss, 11-05), read raw: the sky's light in the shade
+// (`base:look_sky_light`, 1 as made), and grass and leaves darker and less yellow
+// (`base:look_foliage_test`, 0 as made to 1: 30% darker).
+const OPT_SKY_LIGHT: u32 = 25u;
+const OPT_FOLIAGE_TEST: u32 = 26u;
+// The HDR world's white balance after the curve (`base:look_white`, 0 neutral as made, + warmer).
+const OPT_WHITE: u32 = 27u;
+
+// The colour a grass or leaf tint is multiplied by for the foliage test: 1 as made.
+fn foliage_test() -> vec3<f32> {
+    return mix(vec3(1.0), vec3(0.62, 0.72, 0.66), clamp(fantasy_opt(OPT_FOLIAGE_TEST), 0.0, 1.0));
+}
 
 fn fantasy_opt(i: u32) -> f32 {
     return scene.options[i / 4u][i % 4u];
@@ -121,6 +138,17 @@ fn blend(a: Palette, b: Palette, t: f32) -> Palette {
 // here it was some 150 instructions in up to ten places of every pixel, and the Mac's world pass
 // spilled registers (Tester's trace, 11-05).
 fn palette() -> Palette {
+    var p = palette_read();
+    // The sky's light test (`base:look_sky_light`): its light in the shade scaled, the sun's kept.
+    // In the HDR world 0.45 of it as made (the gap sheets: our shade never went dark against
+    // Bliss's, the near forest at 08:00 luma 93 against 58; agreed with Shader, 11-05, so today's
+    // approved look keeps its keys).
+    let k = fantasy_opt(OPT_SKY_LIGHT);
+    p.ambient *= select(1.0, k, k > 0.0) * select(1.0, 0.45, scene.frame.x > 0.5);
+    return p;
+}
+
+fn palette_read() -> Palette {
     if scene.frame_look.x > 0.5 {
         let t = textures[u32(scene.frame_look.x) - 1u];
         return Palette(
@@ -157,8 +185,14 @@ fn palette_made() -> Palette {
     let fill_hue = select(mix(vec3(0.85, 0.95, 1.2), vec3(1.0, 1.0, 1.0), -cool), mix(vec3(0.85, 0.95, 1.2), vec3(0.7, 0.92, 1.45), cool), cool >= 0.0);
     let day = key(vec3(0.137, 0.289, 0.612), vec3(0.378, 0.538, 0.797), vec3(1.0, 0.92, 0.78), sun_hue * 1.92 * look_opt(OPT_SUN, 1.0), fill_hue * 0.3 * look_opt(OPT_FILL, 1.0));
     // Golden hour is orange, not white: a warm horizon, an orange glow and sun.
-    let golden = key(vec3(0.11, 0.25, 0.78), vec3(0.92, 0.62, 0.42), vec3(1.0, 0.58, 0.26), vec3(1.55, 0.80, 0.38), vec3(0.22, 0.24, 0.38));
-    let sunset = key(vec3(0.08, 0.10, 0.38), vec3(1.05, 0.46, 0.34), vec3(1.0, 0.50, 0.26), vec3(1.50, 0.76, 0.38), vec3(0.27, 0.22, 0.36));
+    // Golder sunrises and sunsets with the sun just up (0-12°): horizons and glow toward gold-yellow,
+    // less red-violet (the Look session's Bliss checkpoint, 11-05: ours read pink-lavender at
+    // 05:00-07:00 where Bliss's are gold). The pinks and violets stay for the dusk, under the horizon.
+    // (Before: golden horizon 0.92 0.62 0.42, glow 1.0 0.58 0.26; sunset horizon 1.05 0.46 0.34,
+    // glow 1.0 0.50 0.26, ambient 0.27 0.22 0.36.)
+    // (A first pass, sunset horizon 1.05 0.58 0.30, hardly showed on the forest vista: PC shv_gold.)
+    let golden = key(vec3(0.11, 0.25, 0.78), vec3(1.0, 0.78, 0.38), vec3(1.0, 0.70, 0.24), vec3(1.55, 0.88, 0.36), vec3(0.26, 0.25, 0.30));
+    let sunset = key(vec3(0.08, 0.10, 0.38), vec3(1.08, 0.66, 0.26), vec3(1.0, 0.64, 0.20), vec3(1.50, 0.82, 0.34), vec3(0.30, 0.25, 0.27));
     let dusk = key(vec3(0.045, 0.05, 0.16), vec3(0.30, 0.15, 0.27), vec3(0.45, 0.20, 0.25), vec3(0.0, 0.0, 0.0), vec3(0.10, 0.09, 0.17));
     // Night is dark and blue, a little lighter than vanilla's, so lanterns carry the scene.
     // Night is dark and blue, so firelight's orange stands out against it. (A blue-teal shade, as
@@ -290,6 +324,13 @@ fn blood_tint() -> vec3<f32> {
     return mix(vec3(1.0), mix(vec3(1.0, 0.45, 0.2), vec3(0.75, 0.06, 0.02), smoothstep(0.5, 1.0, b)), smoothstep(0.0, 0.35, b));
 }
 
+// How far over the blocky clouds' height the soft layer's underside stands (blocks), less as rain
+// comes (a storm's deck hangs low): cumulus three hundred blocks across at the blocky clouds'
+// height, 150 blocks over a forest floor, filled every gap in the canopy with one flat grey base,
+// looking up from under the trees (Tester 2's looks4, 11-05); higher, they stand in the sky as
+// clouds with blue between them, as Bliss's do.
+const SOFT_LIFT: f32 = 220.0;
+
 // ---- lightning (`scene.lightning`, the engine's flash where the player is) ----
 // Ronald, 11-05: "add lightning flashes" (Tester 2's four storm shots showed none: the engine's
 // flash only lifted the daylight for 0.15 s, which the pack's light never read). A flash is two to
@@ -297,21 +338,26 @@ fn blood_tint() -> vec3<f32> {
 // lights the land and the deck, and two strikes in three show their bolt in the sky, the rest a
 // glow inside the clouds. Where and how far is the flash's own random number.
 
-fn lightning_stroke(t: f32, at: f32, k: f32) -> f32 {
-    return select(0.0, k * exp(-(t - at) / 0.055), t >= at);
+fn lightning_stroke(t: f32, at: f32, k: f32, fade: f32) -> f32 {
+    return select(0.0, k * exp(-(t - at) / fade), t >= at);
+}
+
+// The strokes of the flash, each fading over `fade` seconds.
+fn lightning_strokes(fade: f32) -> f32 {
+    let t = scene.lightning.x;
+    if t > 1.2 || scene.lightning.z < 0.05 {
+        return 0.0;
+    }
+    let r = scene.lightning.y;
+    var f = lightning_stroke(t, 0.0, 1.0, fade) + lightning_stroke(t, 0.06 + 0.06 * fract(r * 7.3), 0.75, fade);
+    f += select(0.0, lightning_stroke(t, 0.2 + 0.1 * fract(r * 13.7), 0.6, fade), fract(r * 3.1) > 0.3);
+    f += select(0.0, lightning_stroke(t, 0.42 + 0.15 * fract(r * 29.1), 0.45, fade), fract(r * 5.7) > 0.55);
+    return f * lightning_near() * smoothstep(0.05, 0.4, scene.lightning.z);
 }
 
 // How bright the flash is now, 0 (none) to about 1.5 at a stroke, times how near it struck.
 fn lightning_flash() -> f32 {
-    let t = scene.lightning.x;
-    if t > 1.0 || scene.lightning.z < 0.05 {
-        return 0.0;
-    }
-    let r = scene.lightning.y;
-    var f = lightning_stroke(t, 0.0, 1.0) + lightning_stroke(t, 0.06 + 0.06 * fract(r * 7.3), 0.75);
-    f += select(0.0, lightning_stroke(t, 0.2 + 0.1 * fract(r * 13.7), 0.6), fract(r * 3.1) > 0.3);
-    f += select(0.0, lightning_stroke(t, 0.42 + 0.15 * fract(r * 29.1), 0.45), fract(r * 5.7) > 0.55);
-    return f * lightning_near() * smoothstep(0.05, 0.4, scene.lightning.z);
+    return lightning_strokes(0.055);
 }
 
 // How near the strike is, 1 close to 0.35 far.
@@ -319,23 +365,71 @@ fn lightning_near() -> f32 {
     return mix(1.0, 0.35, fract(scene.lightning.y * 47.3));
 }
 
-// Toward the strike along the horizon (a unit vector, x and z).
+// Toward the strike along the horizon (a unit vector, x and z). Two strikes in three come down
+// within about 40° of where the camera looked as the flash began: anywhere round
+// the compass, a quarter of them were in view and a burst of 400 shots caught flashes but no bolt
+// (Tester 2's looks3, 11-05). The rest anywhere, so storms still flash all round.
 fn lightning_toward() -> vec2<f32> {
-    let a = scene.lightning.y * 6.2831853;
+    let r = scene.lightning.y;
+    var a = r * 6.2831853;
+    // Where the camera faced as the flash began (`scene.lightning.w`, the engine's), so the bolt
+    // stays put while the player turns (Ronald, 11-05: it followed the camera).
+    if fract(r * 61.3) < 0.67 {
+        a = scene.lightning.w + (fract(r * 23.1) - 0.5) * 1.4;
+    }
     return vec2(sin(a), -cos(a));
+}
+
+// How far off the strike is (blocks).
+fn lightning_far() -> f32 {
+    return mix(250.0, 1200.0, fract(scene.lightning.y * 47.3));
+}
+
+// The bolt in front of land that lies beyond it (`haze_lit`): drawn in the sky alone, the land
+// covered all of it below the horizon and only a short piece showed between the horizon and the
+// deck (PC shbo2_bolts). Nothing while no flash is on.
+fn lightning_bolt_over(dir: vec3<f32>, dist: f32) -> vec3<f32> {
+    if scene.lightning.x > 1.2 || scene.lightning.z < 0.05 || dist < lightning_far() {
+        return vec3(0.0);
+    }
+    return lightning_bolt(dir);
+}
+
+// In the HDR world the strike lights the land and the air round where it hits (a bolt's flash is
+// thousands of times the night; the whole-sky flash is the deck's): camera-relative `rel`, a cold
+// white falling off over about 180 blocks from the strike, at the place `lightning_bolt` draws it.
+// None for a strike inside the clouds, or without the HDR world (`palette`'s even flash alone).
+fn lightning_glow_at(rel: vec3<f32>) -> vec3<f32> {
+    let r = scene.lightning.y;
+    if scene.frame.x < 0.5 || fract(r * 91.7) < 0.33 {
+        return vec3(0.0);
+    }
+    let f = lightning_flash();
+    if f <= 0.0 {
+        return vec3(0.0);
+    }
+    let at = lightning_toward() * lightning_far();
+    let d = length(rel.xz - at);
+    let near = 180.0 * 180.0 / (180.0 * 180.0 + d * d);
+    return vec3(0.75, 0.8, 1.0) * f * 3.0 * near;
 }
 
 // The bolt in the sky along `dir` (linear light): a jagged line from the deck's underside down to
 // the ground where it struck, a few hundred to two and a half thousand blocks off, with one branch;
 // none for a strike inside the clouds.
 fn lightning_bolt(dir: vec3<f32>) -> vec3<f32> {
-    let f = lightning_flash();
+    // The channel glows on a little after each stroke's flash (0.12 s against 0.055), as a real
+    // bolt's afterimage does: it showed for a frame or two only.
+    let f = lightning_strokes(0.12);
     let r = scene.lightning.y;
     if f <= 0.0 || fract(r * 91.7) < 0.33 {
         return vec3(0.0);
     }
-    let far = mix(400.0, 2500.0, fract(r * 47.3));
-    let top = atan2(max(scene.clouds.z, 40.0), far);
+    // Nearer than before (400-2500) and from the deck's underside, the soft one 220 higher, so the
+    // bolt stands tall in view: it was a short squiggle at the horizon (PC shbo_bolts).
+    let far = lightning_far();
+    let base = scene.clouds.z + select(0.0, SOFT_LIFT * (1.0 - 0.7 * max(min(rain_amount() * 0.75 + scene.weather.w * 0.25, 1.0), scene.weather.w)), scene.soft_clouds.x > 0.5);
+    let top = atan2(max(base, 40.0), far);
     let bottom = atan2(-max(scene.eye.y - SEA_LEVEL, 2.0), far);
     let el = asin(clamp(dir.y, -1.0, 1.0));
     let u = (el - bottom) / max(top - bottom, 1e-3);
@@ -400,12 +494,23 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     let mu = dot(dir, scene.sun.xyz);
     let low = 1.0 - smoothstep(0.0, 0.2, abs(scene.sun.y));
     // Away from the sun the sunset sky goes rose and violet.
-    let away = (0.5 - 0.5 * mu) * (1.0 - h) * low;
+    // Most of it once the sun is down (the blue hour); with the sun up a little only (it tinted the
+    // whole sunrise sky lavender).
+    let away = (0.5 - 0.5 * mu) * (1.0 - h) * low * mix(0.35, 1.0, smoothstep(0.03, -0.05, scene.sun.y));
     c = mix(c, c * vec3(0.97, 0.80, 1.06) + vec3(0.03, 0.0, 0.03), away * 0.4);
     // Toward it, a warmer band low on the horizon.
     let toward = pow(max(mu, 0.0), 2.0) * pow(1.0 - h, 3.0) * low;
     c += vec3(0.55, 0.22, 0.05) * toward;
     c += sun_glow(dir, p);
+    // In the HDR world the air round the sun glows as bright as it really is (Mie scattering's
+    // forward peak, a wide lobe and a tight one in the sun's own colour, strongest low), which the
+    // curve rolls off and the bloom spreads: Bliss's low sun stands in a great gold glare. The
+    // haze over the land toward the sun takes it too (it reads this colour).
+    if scene.frame.x > 0.5 {
+        let m = max(mu, 0.0);
+        let mie = (pow(m, 8.0) * 0.45 + pow(m, 64.0) * 2.2) * (0.35 + 0.65 * low) * (1.0 - rain_amount());
+        c += p.sun * mie * 0.5;
+    }
     // The glow about the moon where it stands, as bright as its light (`scene.moon.w`): on a new
     // moon there is none, and a glow alone read as a dark-blue ring (the world playtester's nights).
     let moon = pow(max(dot(dir, scene.moon.xyz), 0.0), 24.0) * smoothstep(-0.05, -0.25, scene.sun.y) * scene.moon.w;
@@ -517,7 +622,9 @@ fn shadow_at(rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
         return near;
     }
     // Past 250 blocks (the far land's tiles start about 180 out), the far map's cheap filter.
-    let far = shadow_in(scene.shadow_far_view_proj, scene.shadow_far, 400.0, 1200.0, rel, n, length(rel) > 250.0);
+    // Its reach from its texels (`core:shadow_far`: 400 as made, more at ultra), its depth three times that.
+    let far_reach = max(scene.shadow_far.w * scene.shadow_far.y * 0.5, 1.0);
+    let far = shadow_in(scene.shadow_far_view_proj, scene.shadow_far, far_reach, far_reach * 3.0, rel, n, length(rel) > 250.0);
     let trust = max(near.y, far.y);
     if trust <= 0.0 {
         return vec2(1.0, 0.0);
@@ -565,7 +672,36 @@ fn cloud_fuzz(cell: vec2<f32>) -> f32 {
 // slab's middle, where the four nearest cells are blended as the sky draws them, so the shadows
 // are the clouds overhead, drifting with them across near and far land alike (Bliss's moving
 // shade on the hills).
+// The soft clouds' shadow map (`client::cloud_shadow`, the HDR world): this many blocks across,
+// about the camera, on the plane through the cloud layer's middle (its height over the camera in
+// every texel's g), r how much of the sun gets through there.
+const CLOUD_SHADOW_SPAN: f32 = 4096.0;
+
+// The soft clouds' shadow at `rel` from their map, 1 out of it or without it.
+fn soft_cloud_shadow(rel: vec3<f32>) -> f32 {
+    let l = light_dir();
+    if l.y < 0.03 {
+        return 1.0;
+    }
+    let t = textures[u32(scene.cloud_shadow.x) - 1u];
+    let half = i32(scene.cloud_shadow.y) / 2;
+    let mid = textureLoad(t, vec2(half, half), 0).g;
+    let q = rel.xz + l.xz * (mid - rel.y) / l.y;
+    let uv = q / CLOUD_SHADOW_SPAN + 0.5;
+    if any(uv < vec2(0.0)) || any(uv > vec2(1.0)) {
+        return 1.0;
+    }
+    let through = textureSampleLevel(t, linear_clamp, uv, 0.0).r;
+    // Fading in as the light climbs: long low shadows from far clouds would smear across the land.
+    return mix(1.0, through, smoothstep(0.03, 0.15, l.y));
+}
+
 fn cloud_shadow(rel: vec3<f32>) -> f32 {
+    // In the HDR world the soft clouds' own shadow, where their map is (Bliss's cloud masses throw
+    // shadow patches across the land; the blocky picture's matched nothing in the sky).
+    if scene.frame.x > 0.5 && scene.cloud_shadow.x > 0.5 {
+        return soft_cloud_shadow(rel);
+    }
     let c = scene.clouds;
     let l = light_dir();
     if c.x < 0.5 || l.y < 0.03 {
@@ -715,6 +851,8 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>
     let c_open = min(canopy(), 1.0);
     let open = smoothstep(mix(0.5, 0.25, c_open), mix(0.95, 0.55, c_open), light.x);
     c += p.sun * light_strength() * sun_facing(n) * shadow * open * mix(0.75, 1.0, ao);
+    // The ground round a lightning strike, lit by it (the HDR world).
+    c += lightning_glow_at(rel) * sky * hemi * ao;
     // A held torch's light where it is brighter than the placed lights there (no doubling).
     c += block_light(max(light.yzw, held_light(rel, n)), pos) * mix(0.5, 1.0, ao) * block_by_day(light.x);
     // A floor so caves are never quite black: the dimension's own and the Brightness setting.
@@ -794,7 +932,12 @@ fn storm() -> f32 {
 fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
     let f = scene.weather.z;
     let s = storm();
-    let h = p.y - floor;
+    // The mist (not a storm's dust or snow) lies below a height of its own, `MIST_TOP` over the
+    // sea (`vitals::air`), as Bliss's does: rivers, lakes and valleys fill, and ridges and forests higher up stand
+    // out of it. Lying on whatever ground was under it, it blanketed the hills too, and from the
+    // forest vista 210 up the dawn mist was a pink-white sea from 04:00 to 08:00 (the Look
+    // session's checkpoint, 11-05; the same rule as its HDR path, 5124c25f).
+    let h = p.y - mix(min(floor, SEA_LEVEL + MIST_TOP), floor, s);
     // In a forest the morning mist rises into the crowns (a rainforest's lies on its canopy at
     // dawn, 25-35 blocks up).
     let low = exp(-max(h - 3.0, 0.0) / mix(7.0 + 12.0 * min(canopy(), 1.0), 40.0, s));
@@ -817,6 +960,18 @@ fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
     // The sun thins the banks by day to a third (mornings and evenings keep them); a storm's
     // blowing snow or dust it leaves.
     let burn = mix(1.0, mix(0.35, 1.0, s), smoothstep(0.25, 0.65, scene.sun.y));
+    // In the HDR world the mist lies in banks, as Bliss's does: the low layer is mostly banks with
+    // clear lanes between them (their edges sharper), a fifth of the thin haze up high, so ridges
+    // and tree tops stand out of it and the beams have clear air to cross. (One even veil read as
+    // milk over the whole view: the mist sheet, 11-05.)
+    if scene.frame.x > 0.5 {
+        // As the sun climbs the banks lift and dissolve into a thin even haze (they burned off as
+        // grey smudges on the forest by 08:00, the checkpoint sheet).
+        let b = mix(smoothstep(0.25, 0.75, banks), 0.3, smoothstep(0.15, 0.45, scene.sun.y));
+        // Lying in the valleys only, the dawn mist's amount read thin (the mist-height sheet): the
+        // low layer two and a half times as dense there, none higher up.
+        return f * open * burn * (low * (mix(0.05, 0.7, s) + mix(6.5, 0.6, s) * b) + 0.012 * high) * 0.11;
+    }
     return f * open * burn * (low * (mix(0.05, 0.7, s) + mix(1.7, 0.6, s) * banks) + 0.06 * high) * 0.11;
 }
 
@@ -832,6 +987,12 @@ struct FogLight {
     leaf: vec3<f32>,
 }
 
+// Henyey-Greenstein's phase for asymmetry `g` at the cosine `mu` from the light, 1 where it scatters
+// alike every way.
+fn hg_phase(mu: f32, g: f32) -> f32 {
+    return (1.0 - g * g) / pow(max(1.0 + g * g - 2.0 * g * mu, 1e-4), 1.5);
+}
+
 fn fog_light(dir: vec3<f32>) -> FogLight {
     let p = palette();
     let mu = dot(dir, light_dir());
@@ -840,7 +1001,14 @@ fn fog_light(dir: vec3<f32>) -> FogLight {
     // The sun's glow in the fog capped: uncapped it was over twice the sunlight looking toward a high
     // sun, and noon fog by a river or on snow went a milky white-out (the world playtester's shots,
     // frame luma 0.76, saturation 0.06). Valheim's daytime fog reads grey and soft.
-    let phase = min(hg * 1.6, 0.9) + 0.3;
+    var phase = min(hg * 1.6, 0.9) + 0.3;
+    // In the HDR world the curve rolls the brights off, so the glow toward the sun can be what
+    // droplets really do: strongly forward (two Henyey-Greenstein lobes, g 0.8 and 0.1, as Bliss's
+    // mist: about 30x toward the sun what it is across it), so a low sun through mist is a bright
+    // gold haze with beams, and the mist away from it stays dim and lets the land through.
+    if scene.frame.x > 0.5 {
+        phase = (0.7 * hg_phase(mu, 0.8) + 0.3 * hg_phase(mu, 0.1)) * 0.45;
+    }
     // Droplets are white, snow whiter, dust the color of sand.
     let tint = mix(mix(vec3(0.9), vec3(1.0, 1.0, 1.03), scene.ground.y), vec3(0.95, 0.68, 0.42), scene.ground.z);
     // At dawn and dusk the mist is lit gold toward the low sun and dims away from it (the
@@ -852,8 +1020,20 @@ fn fog_light(dir: vec3<f32>) -> FogLight {
     // Dimmer too: thick mist lit at the sun's full strength toward it clipped to white, and white
     // shows no colour (the dawn check's 07:30 mist, luma p50 170, saturation 0.03).
     let warm = 1.0 - smoothstep(0.1, 0.65, scene.sun.y);
-    let sky_part = (p.ambient * 1.25 + p.horizon * 0.2) * mix(1.0, 0.5, warm);
-    let sun_part = p.sun * mix(vec3(1.0), MIST_GOLD * 0.65, warm) * light_strength() * phase;
+    // With the sun up and low, the sky's light in the mist goes gold too (sunlight scattered all
+    // round in it): lit by the sky's cool fill, a dawn mist read pale pink-white where Bliss's is
+    // gold (the Look session's checkpoint, 11-05). None before sunrise: the blue hour keeps its blue.
+    let sunlit_low = warm * smoothstep(-0.02, 0.06, scene.sun.y) * (1.0 - rain_amount());
+    var sky_part = mix(p.ambient * 1.25 + p.horizon * 0.2, vec3(luma(p.ambient * 1.25 + p.horizon * 0.2)) * vec3(1.25, 1.0, 0.62), sunlit_low * 0.7) * mix(1.0, 0.5, warm);
+    // In the HDR world the sun's forward glow carries the mist's light toward it, and away from it
+    // the mist is dim, the sky's light alone (Bliss's mist across the sun is a blue-grey that lets
+    // the land through, not a bright veil).
+    if scene.frame.x > 0.5 {
+        sky_part *= 0.55;
+    }
+    // In the HDR world the sunlit mist a deeper gold (Bliss's dawn mist, saturation 181 against our 99).
+    let gold = select(MIST_GOLD * 0.65, vec3(1.0, 0.58, 0.2) * 0.7, scene.frame.x > 0.5);
+    let sun_part = p.sun * mix(vec3(1.0), gold, warm) * light_strength() * phase;
     let k = 0.75 * tint * look_opt(OPT_FOG, 1.0);
     let leaf_part = p.sun * mix(vec3(1.0), MIST_GOLD, warm) * light_strength() * 0.06 * LEAF_LIGHT;
     return FogLight(sky_part * k, sun_part * k, leaf_part * k);
@@ -892,6 +1072,9 @@ fn sun_reaches(rel: vec3<f32>) -> f32 {
 fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     if scene.weather.z < 0.005 || in_liquid() || !open_sky() || sky <= 0.0 {
         return c;
+    }
+    if scene.froxels.x > 0.5 {
+        return froxel_fog(c, rel, sky);
     }
     // The whole view: walked only to 220 blocks, the fog lying on the land ended 220 blocks out, a
     // flat pale disc seen from high up (the world playtester, y 250 over snow, 11-04).
@@ -937,6 +1120,80 @@ fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
         last = at;
     }
     return c * through + gained;
+}
+
+// The mist as a volume (`client::froxels`, `core:froxels`): the view cut into cells an eighth of
+// the pixels each way and 32 slices deep, out to 1500 blocks, closer together near the eye. The
+// sky fills it before the world is drawn (`fs_froxel_light`: each cell's own mist and light, as
+// `fog_through` walks them; `fs_froxel_sum`: all of it from the eye to each cell's far end), and
+// every surface reads it in two filtered taps instead of walking the mist in 8 steps: the mist,
+// with its shadow taps, was among the Mac's dearest parts (Research rounds 15 and 19).
+const FROXEL_SLICES: f32 = 32.0;
+const FROXEL_FAR: f32 = 1500.0;
+const FROXEL_CURVE: f32 = 6.0;
+
+// Where slice `k` ends, blocks from the eye (the first under a block, the last at 1500).
+fn froxel_end(k: f32) -> f32 {
+    return FROXEL_FAR * (exp(FROXEL_CURVE * (k + 1.0) / FROXEL_SLICES) - 1.0) / (exp(FROXEL_CURVE) - 1.0);
+}
+
+// The slices from the eye to `d` blocks: k + 1 at the end of slice k.
+fn froxel_slice(d: f32) -> f32 {
+    return FROXEL_SLICES * log(1.0 + d * (exp(FROXEL_CURVE) - 1.0) / FROXEL_FAR) / FROXEL_CURVE;
+}
+
+// The sums from the eye to the end of slice `k` at screen `uv`: rgb the light gathered, a how much
+// gets through (none before the first: nothing, all).
+fn froxel_at(uv: vec2<f32>, k: i32) -> vec4<f32> {
+    if k < 0 {
+        return vec4(0.0, 0.0, 0.0, 1.0);
+    }
+    let grid = scene.froxels.zw;
+    let cell = clamp(uv * grid, vec2(0.5), grid - 0.5);
+    let tile = vec2(f32(k % 8), f32(k / 8));
+    let at = (tile * grid + cell) / (grid * vec2(8.0, FROXEL_SLICES / 8.0));
+    return textureSampleLevel(textures[u32(scene.froxels.x) - 1u], linear_clamp, at, 0.0);
+}
+
+// `fog_through` from the volume. `sky` thins the mist on the way as it did each step there: what
+// gets through to the power `sky`, and the light gathered by as much.
+fn froxel_fog(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
+    let clip = scene.view_proj * vec4(rel, 1.0);
+    let uv = clamp(vec2(clip.x, -clip.y) / max(clip.w, 1e-4) * 0.5 + 0.5, vec2(0.0), vec2(1.0));
+    let f = froxel_slice(min(length(rel), FROXEL_FAR));
+    let k = i32(floor(f));
+    let v = mix(froxel_at(uv, k - 1), froxel_at(uv, min(k, i32(FROXEL_SLICES) - 1)), fract(f));
+    let through = pow(max(v.a, 1e-6), sky);
+    return c * through + v.rgb * (1.0 - through) / max(1.0 - v.a, 1e-4);
+}
+
+// One cell's own mist and light for the volume (`fs_froxel_light`): toward `dir`, `at` blocks out,
+// with the mist's floor `floor` (`fog_floor` of what lies behind it): rgb the light the mist sends
+// toward the eye there (as `fog_through` lights each step: the sky's, and the sun's where it
+// reaches), a its density (per block).
+fn froxel_cell(dir: vec3<f32>, at: f32, floor: f32) -> vec4<f32> {
+    let light = fog_light(dir);
+    let leafy = min(canopy(), 1.0);
+    let shaded_sky = light.sky * mix(vec3(1.0), LEAF_LIGHT * 0.2, leafy * 0.85) + light.leaf * leafy;
+    let d = fog_density(scene.eye.xyz + dir * at, floor);
+    if d <= 0.0 {
+        return vec4(0.0);
+    }
+    // Three taps of the shadow map through the cell's depth (a quarter, a half and three quarters
+    // between `at`'s neighbours' ends), so a shaft narrower than a cell is part-lit, not all or none.
+    let k = froxel_slice(at);
+    let span = froxel_end(k) - froxel_end(k - 1.0);
+    var lit = (sun_reaches(dir * (at - span * 0.25)) + sun_reaches(dir * at) + sun_reaches(dir * (at + span * 0.25))) / 3.0;
+    // The clouds' shadow in the air too (the HDR world): beams of sun through their gaps, the mist
+    // under a cloud dim.
+    if scene.frame.x > 0.5 && scene.cloud_shadow.x > 0.5 {
+        lit *= soft_cloud_shadow(dir * at);
+    }
+    // Ultra (`core:froxels` 2, finer cells: `scene.frame.z` 4): six taps, the beams' edges finer.
+    if scene.frame.z > 0.5 && scene.frame.z < 6.0 {
+        lit = lit * 0.5 + (sun_reaches(dir * (at - span * 0.4)) + sun_reaches(dir * (at - span * 0.1)) + sun_reaches(dir * (at + span * 0.4))) / 6.0;
+    }
+    return vec4(mix(shaded_sky, light.sky, lit) + light.sun * lit + lightning_glow_at(dir * at) * 0.6, d);
 }
 
 // How much snow lies on a surface with normal `n` at `pos` (world) with `sky` light: on what
@@ -1028,7 +1285,9 @@ fn haze_veil(rel: vec3<f32>, dist: f32) -> vec3<f32> {
     // blue, about a fifth of the way to the sky's colour at 1000 blocks). Grey haze (Mie) comes
     // with the conditions: rain, the weather's fog, a forest's damp air, and a little always.
     let k = look_opt(OPT_HAZE, 1.6) * mix(0.45, 1.0, thin);
-    let rayleigh = vec3(0.35, 0.6, 1.0) * 2.6e-4 * k;
+    // A third thicker than it was (Far view, 11-05: Bliss's far land is about two thirds sky-blue
+    // at 2000 blocks, ours was under 0.6): far land reads as far, the near stays as clear.
+    let rayleigh = vec3(0.35, 0.6, 1.0) * 3.4e-4 * k;
     let mie = (0.4e-4 + 2.0e-4 * scene.weather.z + 0.8e-4 * min(canopy(), 1.0)) * k;
     let far = dist * smoothstep(90.0, 450.0, dist);
     // Rain's own mist starts at the eye (Ronald, 11-05: "when raining shouldn't it be more
@@ -1047,7 +1306,12 @@ fn haze_veil(rel: vec3<f32>, dist: f32) -> vec3<f32> {
 // the clouds take it too (`sky.wgsl`), so a deck and the land at the same distance go the same
 // colour and meet at the horizon without a line.
 fn rain_depth(dist: f32) -> f32 {
-    let downpour = rain_amount() * (0.0022 + 0.0030 * scene.weather.w);
+    // A quarter of what it was (0.0022 + 0.0030): a storm's land lost 60 % of its colour at 200
+    // blocks, one veil over the whole land, contrast 7-11 on the forest vista where Photon's and
+    // Unbound's stay green and readable under the deck (the Look session's rain check, 11-05). Now
+    // the land at 100-300 blocks keeps most of its own colour (a storm a fifth gone at 300), the
+    // veil builds far out (two thirds gone at 1500), and the horizon still fades into the deck.
+    let downpour = rain_amount() * (0.0006 + 0.0007 * scene.weather.w);
     return downpour * max(dist - 20.0, 0.0) * smoothstep(10.0, 60.0, dist);
 }
 
@@ -1065,7 +1329,14 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // Straight down there is no level direction left: never a zero vector (its normalize is NaN,
     // and the Mac's fast math has no safety net).
     let air = vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z);
-    let color = sky_color(normalize(air));
+    let horizon = sky_color(normalize(air));
+    // Aerial perspective: the air's own blue, the sky's a little above the horizon (about 6°, a
+    // third of the way to the zenith's colour), not the horizon's pale band: veiled toward that, far
+    // land went milky white and lost its contrast, where Bliss's goes a deep sky blue (Far view, the
+    // Distant Horizons comparison, 11-05). It hands over to the horizon's colour where the terrain
+    // ends, so the last ridges still meet the sky without a line, standing a little bluer than it.
+    let blue = sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 0.1, dir.z)));
+    let color = mix(blue, horizon, smoothstep(end * 0.55, end, dist));
     let rain = rain_amount();
     // Thinner looking up at what is high, so hills stand out against a hazy valley (`haze_veil`).
     let veil = haze_veil(rel, dist);
@@ -1090,9 +1361,36 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // Far ridges still lose a little colour (as before, but only where the veil has begun), then
     // the veil per channel (its blue thicker than its red), then the handover at the end.
     // In rain everything takes a little grey-blue wash, near too.
-    let pale = mix(mix(c, vec3(luma(c)), clamp(veil.b * 0.6, 0.0, 0.3)), vec3(luma(c)) * vec3(0.92, 0.97, 1.05), rain * 0.08);
-    let seen = mix(pale, lit, veil);
-    return mix(seen, lit, edge) + held_in_fog(rel, sky);
+    // (Clear air takes less of its colour: a fifth of the veil, a tenth at most, as far biome colours
+    // under Bliss stay saturated, a snowfield white and a forest green; rain's grey as before.)
+    let grey = mix(clamp(veil.b * 0.2, 0.0, 0.1), clamp(veil.b * 0.6, 0.0, 0.3), max(rain, scene.weather.z));
+    let pale = mix(mix(c, vec3(luma(c)), grey), vec3(luma(c)) * vec3(0.92, 0.97, 1.05), rain * 0.08);
+    // Haze keeps the land's colour (Ronald, 11-05, on the glass slabs: "Haze keeps land colour"):
+    // in clear air the veil stops at four fifths, the land veils toward a tenth under the sky's
+    // brightness, and its hue and saturation take only seven tenths of the veil (its brightness all
+    // of it). Veiled all the way to the sky's own colour, pale bare rock 400-500 blocks off read as
+    // glass, the land behind seen through it. Rain and the weather's fog veil as before (the Shader
+    // session's), and the handover where the terrain ends is still the sky's.
+    let wet = clamp(max(rain, scene.weather.z), 0.0, 1.0);
+    var v = mix(min(veil, vec3(0.8)), veil, wet);
+    var toward = lit * mix(0.9, 1.0, wet);
+    // The clear air's haze takes the sun's colour, most with it low, not the sky's blue: Bliss's 08:00
+    // far land is warm (red minus blue +27), ours was blue-grey (-15) at the same brightness, and at
+    // noon Bliss's is near neutral (saturation 54, -19) where ours was bluer and more saturated (87,
+    // -48; the Look session's measures on the forest vista, 11-05). 0.6 of the way to the sun's hue
+    // with it under about 33°, easing to 0.3 by 64°, and the veil's channels evened out, about a third
+    // with the sun low, seven tenths at noon (less of Rayleigh's blue; half took too much of 08:00's colour). The HDR path only (`scene.frame.x`), so today's look stays as it is.
+    let hdr_air = select(0.0, 1.0, scene.frame.x > 0.5) * (1.0 - wet) * smoothstep(-0.02, 0.06, scene.sun.y);
+    if hdr_air > 0.0 {
+        let low_sun = mix(0.3, 1.0, 1.0 - smoothstep(0.55, 0.9, scene.sun.y));
+        let sun_tint = p.sun / max(luma(p.sun), 1e-3);
+        toward = mix(toward, luma(toward) * sun_tint, 0.6 * low_sun * hdr_air);
+        v = mix(v, vec3((v.r + v.g + v.b) / 3.0), mix(0.35, 0.7, smoothstep(0.55, 0.9, scene.sun.y)) * hdr_air);
+    }
+    let mixed = mix(pale, toward, v);
+    let own = mix(pale, toward, v * mix(0.7, 1.0, wet));
+    let seen = max(vec3(luma(mixed)) + own - vec3(luma(own)), vec3(0.0));
+    return mix(seen, lit, edge) + held_in_fog(rel, sky) + lightning_bolt_over(dir, dist);
 }
 
 // ---- light in the fog: torches (Research round 15, 6: Valheim's warm firelight in the mist) ----
@@ -1189,6 +1487,35 @@ fn hejl(c: vec3<f32>, white: f32) -> vec3<f32> {
     return pow(max(f.rgb / f.w, vec3(0.0)), vec3(2.2));
 }
 
+// AgX, Troy Sobotka's display transform, in Benjamin Wrensch's minimal fit (MIT License,
+// Copyright (c) 2024 Missing Deadlines (Benjamin Wrensch), iolite-engine.com): the light into a
+// log space between -12.47 and +4.03 stops round mid-grey, through a polynomial S curve, back out of
+// its inset primaries. Brights roll off toward white in their own hue instead of clipping.
+fn agx_curve(x: vec3<f32>) -> vec3<f32> {
+    let x2 = x * x;
+    let x4 = x2 * x2;
+    return 15.5 * x4 * x2 - 40.14 * x4 * x + 31.96 * x4 - 6.868 * x2 * x + 0.4298 * x2 + 0.1191 * x - vec3(0.00232);
+}
+
+// Linear light in, display-linear out (as `lottes`), for the sRGB screen.
+fn agx(c: vec3<f32>) -> vec3<f32> {
+    let inset = mat3x3<f32>(
+        vec3(0.842479062253094, 0.0423282422610123, 0.0423756549057051),
+        vec3(0.0784335999999992, 0.878468636469772, 0.0784336),
+        vec3(0.0792237451477643, 0.0791661274605434, 0.879142973793104),
+    );
+    let outset = mat3x3<f32>(
+        vec3(1.19687900512017, -0.0528968517574562, -0.0529716355144438),
+        vec3(-0.0980208811401368, 1.15190312990417, -0.0980434501171241),
+        vec3(-0.0990297440797205, -0.0989611768448433, 1.15107367264116),
+    );
+    let min_ev = -12.47393;
+    let max_ev = 4.026069;
+    let v = clamp(log2(max(inset * c, vec3(1e-10))), vec3(min_ev), vec3(max_ev));
+    let shaped = agx_curve((v - min_ev) / (max_ev - min_ev));
+    return pow(clamp(outset * shaped, vec3(0.0), vec3(1.0)), vec3(2.2));
+}
+
 // How bright the picture is taken: the filmic curve deepens the mid-tones, so by day it is opened
 // up to keep them where they were, and more as night falls and under water, the eye adjusting.
 fn exposure() -> f32 {
@@ -1206,7 +1533,18 @@ fn exposure() -> f32 {
     return mix(day, 4.0, smoothstep(0.0, -0.2, scene.sun.y));
 }
 
+// What a surface writes: into the HDR world (`scene.frame.x`, the engine's `core:hdr_world`) its light
+// as it is, linear and past 1, which the screen effects work on and the effects' last pass then
+// finishes (`finish_picture`, in this pack's post.wgsl); into the screen, finished here as always.
 fn display(c: vec3<f32>) -> vec3<f32> {
+    if scene.frame.x > 0.5 {
+        return max(c, vec3(0.0));
+    }
+    return finish_picture(c);
+}
+
+// The picture finished: exposure, the tone curve and the grade, from linear light to the screen.
+fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     // By day Timothy Lottes's curve (his published formula, GDC 2016; Complementary's settings:
     // contrast 1.05, mid-grey 0.25 in and out, peak 8) at exposure 1.3: black stays black (no toe
     // lift, which raised the black point and halved saturation: Colour 4-7) and the darks keep their
@@ -1214,8 +1552,26 @@ fn display(c: vec3<f32>) -> vec3<f32> {
     // dark by design), blended as the sun comes up.
     let day = smoothstep(-0.05, 0.15, scene.sun.y) * select(1.0, 0.0, in_liquid());
     let night_t = hejl(max(c, vec3(0.0)) * exposure(), 3.0);
-    let day_t = min(lottes(max(c, vec3(0.0)) * 1.3 * look_opt(OPT_EXPOSURE, 1.0)), vec3(1.0));
+    var day_t = min(lottes(max(c, vec3(0.0)) * 1.3 * look_opt(OPT_EXPOSURE, 1.0)), vec3(1.0));
+    // Or Hejl's 2015 curve by day (`base:look_curve` 1, the HDR world's default: Ronald's pick of
+    // 11-05, "Hejl 2015", as in his Bliss settings): a real toe, so
+    // the shade goes deep and the mids keep their colour, a long shoulder to white at 3.5.
+    // Or AgX (`base:look_curve` 2): Blender's and Bliss's current default.
+    // Only in the HDR world: without it the look stays as made (Lottes's), whatever the setting.
+    let curve = select(0.0, fantasy_opt(OPT_CURVE), scene.frame.x > 0.5);
+    if curve > 1.5 {
+        day_t = agx(max(c, vec3(0.0)) * 0.55 * exposure() * look_opt(OPT_EXPOSURE, 1.0));
+    } else if curve > 0.5 {
+        day_t = hejl(max(c, vec3(0.0)) * exposure() * look_opt(OPT_EXPOSURE, 1.0), 3.5);
+    }
     var t = mix(night_t, day_t, day);
+    // The HDR world's white balance by day (`base:look_white`): warmer, less blue (our land read
+    // much bluer than Bliss's at every hour, red less blue -37 against -10 at noon: the gap sheet).
+    if scene.frame.x > 0.5 {
+        // Warmer still at golden hour (Bliss's dawn land: warmth +106 against our +47).
+        let w = fantasy_opt(OPT_WHITE) * day * (1.0 + 1.3 * golden());
+        t *= vec3(1.0 + 0.08 * w, 1.0, 1.0 - 0.14 * w);
+    }
     // Only true darks go cool (most daylit ground is mid-tone and keeps its color).
     let lights = smoothstep(0.02, 0.22, luma(t));
     let shade = mix(vec3(0.975, 0.99, 1.03), vec3(0.92, 0.96, 1.10), golden());
@@ -1227,7 +1583,13 @@ fn display(c: vec3<f32>) -> vec3<f32> {
     t = mix(vec3(dim), t, keep);
     // By day 1.2 of saturation after the curve (Colour 9; 1.07, Complementary's, read pale here).
     let y = luma(t);
-    t = max(mix(vec3(y), t, mix(1.0, 1.2 * look_opt(OPT_SATURATION, 1.0), day)), vec3(0.0));
+    // In the HDR world 0.8 of it (its curve keeps more colour; at 1.2 the noon land measured 131
+    // of saturation against Bliss's 75: the gap sheets, 11-05).
+    // In the HDR world it follows the sun: 0.95 of it with the sun under about 17° (with the far
+    // haze's gold, 1.12 overshot dawn: 222 against Bliss's 181), 0.78 of
+    // it from about 48° (the match checkpoints: 08:00 100 and noon 89 against Bliss's 72 and 75).
+    let sat = 1.2 * look_opt(OPT_SATURATION, 1.0) * select(1.0, mix(0.95, 0.78, smoothstep(0.3, 0.75, scene.sun.y)), scene.frame.x > 0.5);
+    t = max(mix(vec3(y), t, mix(1.0, sat, day)), vec3(0.0));
     // A cool floor so the night is never pure black; by day black stays black.
     t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034) * (1.0 - day);
     // A storybook night (`base:look_storybook`): dim colours slide toward a blue-grey, as the eye's

@@ -79,6 +79,13 @@ shared! {
         CELL_MASK = 63,
         CELL_J_SHIFT = 6,
         LEVEL_SHIFT = 12,
+        /// chiacraft: word 0's top bit: the face is a tree crown's (`client::lod`), for packs that
+        /// shade far canopies apart from the ground.
+        CROWN_SHIFT = 31,
+        /// chiacraft: word 0's bits 29-30: how much the land round shuts the face's sky out, 0 to 3
+        /// (`client::lod`'s `openness`), for packs that darken valleys and the gaps between crowns.
+        OCC_SHIFT = 29,
+        OCC_MASK = 3,
     }
     /// Tint kinds of faces and quads (0 none); mods' kinds follow the engine's.
     tint {
@@ -549,6 +556,8 @@ fn records() -> String {
         "}\n",
         "fn lod_dir(w0: u32) -> u32 {\n    return (w0 >> LOD_FACE_DIR_SHIFT) & FACE_DIR_MASK;\n}\n",
         "fn lod_tint(w0: u32) -> u32 {\n    return (w0 >> LOD_FACE_TINT_SHIFT) & TINT_MASK;\n}\n",
+        "fn lod_crown(w0: u32) -> bool {\n    return (w0 >> LOD_FACE_CROWN_SHIFT) != 0u;\n}\n",
+        "fn lod_occ(w0: u32) -> u32 {\n    return (w0 >> LOD_FACE_OCC_SHIFT) & LOD_FACE_OCC_MASK;\n}\n",
     ));
     s
 }
@@ -733,9 +742,27 @@ gpu_struct! {
         /// The last lightning flash where the player is (a weather with `lightning`, chiacraft):
         /// x seconds since it began (1e4 when none yet; real time, not the shaders' clock, which
         /// tests pin), y a random number 0..1 of its own (for where it strikes), z how hard it
-        /// thunders now (as `weather.w`), w unused. The engine's own flash only brightens the
+        /// thunders now (as `weather.w`), w where the camera faced as it began (radians,
+        /// clockwise from -z, as `atan2(forward.x, -forward.z)`), so a pack can aim strikes into
+        /// view and keep them put while the player turns. The engine's own flash only brightens the
         /// daylight for 0.15 s; packs draw the bolt and the flicker from this.
         pub lightning: [f32; 4],
+        /// How this frame is drawn: x 1 when into the HDR world (`post::hdr`: linear light past 1,
+        /// the picture finished in the effects' last pass, so a pack's surfaces leave its tone
+        /// curve to that pass); 0 into the screen or a preview. y 1 when the last frame drew the
+        /// HDR world's bloom pyramid (`post::bloom`), which the last pass adds, so a pack's own
+        /// bloom effect leaves its glow out. z the pixels a mist volume cell covers each way
+        /// (`client::froxels`: 8, or 4 at ultra), for a pack that spends more on finer cells. w unused.
+        pub frame: [f32; 4],
+        /// The soft clouds' shadow on the land (`client::cloud_shadow`, with the HDR world; a pack
+        /// whose sky has `fs_cloud_shadow`): x the map's bindless index + 1 (0: none this frame), y
+        /// its texels each way, zw unused.
+        pub cloud_shadow: [f32; 4],
+        /// The mist's volume (`client::froxels`, `core:froxels`, with a pack whose sky has
+        /// `fs_froxel_light` and `fs_froxel_sum`; chiacraft): x the bindless index + 1 of the sums
+        /// from the eye (0: none this frame), y the index of each cell's own, zw the cells across
+        /// the view; 32 slices deep, eight to a row of the image.
+        pub froxels: [f32; 4],
     }
 }
 
@@ -1045,6 +1072,12 @@ gpu_struct! {
         /// `shaders/post_low/<name>.wgsl` drew before the effects (0: none; chiacraft).
         pub low: u32,
         pub spare: u32,
+        /// With the HDR world (chiacraft): bindless index + 1 of its bloom, the widest level of the
+        /// pyramid the pack's `fs_bloom_down`/`fs_bloom_up` drew from the world this frame, and of
+        /// this frame's exposure texel (`fs_exposure`); 0 without. In the pyramid's own passes `low`
+        /// is the second image they read and `strength` the seconds since the last frame.
+        pub bloom: u32,
+        pub exposure: u32,
     }
 }
 

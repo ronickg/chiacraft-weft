@@ -79,6 +79,7 @@ pub mod salt {
     pub const CANYONS: u64 = 0xCA1;
     pub const CANYON_AREA: u64 = 0xCA2;
     pub const CANYON_WARP: u64 = 0xCA3;
+    pub const OLD_GROWTH: u64 = 0x01D6;
 }
 
 /// One factor of where a feature applies: 0 at `from`, 1 at `to` (Q12 after `q12`).
@@ -227,6 +228,29 @@ pub const SEQUOIA_AREA: Area = Area {
         Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: RANGE_SCALE, from: RANGE_WIDTH * 0.5, to: RANGE_WIDTH * 0.8 },
         Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: RANGE_SCALE, from: RANGE_WIDTH * 3.2, to: RANGE_WIDTH * 2.2 },
         Ramp::Continent(0.15, 0.25),
+    ],
+    not: false,
+};
+
+/// Old-growth forest (Ronald, 11-05: "a biome looking similar to the one shown in bliss ... with all
+/// those trees"): a closed canopy of old oaks over rolling hills, rivers and lakes through it,
+/// Białowieża's strict reserve (`vitals::climate`). In big patches of its own noise (some
+/// `OLD_GROWTH_SIZE` blocks across, a forest seen to the horizon from a hill) over the temperate
+/// land that isn't dry (neither the taiga's cold nor the warm lands' heat), inland, where
+/// `OLD_GROWTH_AREA` is over `OLD_GROWTH_FROM` and the ground no more than `OLD_GROWTH_TOP` over the
+/// sea. It takes the forest, birch wood, swamp and plains it covers: each ramp's halfway point is
+/// the edge, so it holds where the patch noise is over 0.05, the temperature within ±0.105, the
+/// humidity over -0.04 and the continent over 0.1.
+pub const OLD_GROWTH_SIZE: f64 = 3000.0;
+pub const OLD_GROWTH_FROM: f64 = 0.5;
+pub const OLD_GROWTH_TOP: i32 = 52;
+pub const OLD_GROWTH_AREA: Area = Area {
+    all: &[
+        Ramp::Noise { salt: salt::OLD_GROWTH, scale: OLD_GROWTH_SIZE, from: 0.0, to: 0.1 },
+        Ramp::Temperature(-0.13, -0.08),
+        Ramp::Temperature(0.13, 0.08),
+        Ramp::Humidity(-0.06, -0.02),
+        Ramp::Continent(0.06, 0.14),
     ],
     not: false,
 };
@@ -655,12 +679,14 @@ pub const SEA_SAND_DEEP: i32 = 3;
 /// The land's biome rules in the order they're tried, after the coasts and the mountains, with
 /// the bed under their water: gravel in the north and the birch woods, sand in the warm lands,
 /// mud (dirt) in the swamp.
-pub const RIVER_BEDS: [(&str, &str); 9] = [
+pub const RIVER_BEDS: [(&str, &str); 10] = [
     ("snowy_plains", "gravel"),
     ("taiga", "gravel"),
     ("desert", "sand"),
     ("savanna", "sand"),
     ("tropical_forest", "dirt"),
+    // Before the swamp: the old growth takes its low wet land too (rivers and lakes in the woods).
+    ("old_growth_forest", "sand"),
     ("swamp", "dirt"),
     ("forest", "sand"),
     ("birch_forest", "gravel"),
@@ -754,12 +780,14 @@ pub fn features() -> Vec<Feature> {
 pub const MOUNTAINS_FIELD: &str = "base:mountains";
 pub const SEQUOIA_FIELD: &str = "base:sequoia_groves";
 pub const SNOW_DRIFT_FIELD: &str = "base:snow_drift";
+pub const OLD_GROWTH_FIELD: &str = "base:old_growth";
 
 pub fn rule_fields() -> Vec<(&'static str, Expr)> {
     vec![
         (MOUNTAINS_FIELD, MOUNTAINS_AREA.mask()),
         (SEQUOIA_FIELD, SEQUOIA_AREA.mask()),
         (SNOW_DRIFT_FIELD, Expr::fbm(salt::SNOW_DRIFT, SNOW_DRIFT_SIZE, 3).ramp(-0.2, 0.2)),
+        (OLD_GROWTH_FIELD, OLD_GROWTH_AREA.mask()),
     ]
 }
 
@@ -1295,7 +1323,7 @@ pub fn spawn_where(seed: u64, open: &dyn Fn(i32, i32) -> bool) -> [i32; 3] {
             && MOUNTAINS_AREA.value(&f, x * 16, z * 16) < q12(0.2)
             && near(x, z, SPAWN_WATER, 4, &|px, pz| h(px, pz) < SEA && biome(px, pz) != "ocean")
             && near(x, z, SPAWN_WOODS, 8, &|px, pz| {
-                matches!(biome(px, pz), "forest" | "birch_forest" | "taiga" | "sequoia_grove" | "tropical_forest")
+                matches!(biome(px, pz), "forest" | "birch_forest" | "taiga" | "sequoia_grove" | "tropical_forest" | "old_growth_forest")
             })
     };
     let plains = |x: i32, z: i32| biome(x, z) == "plains" && h(x, z) > SEA + 1 && level(x, z, h(x, z));
@@ -1413,7 +1441,7 @@ pub struct Edge {
 pub const EDGE_BAND: f64 = 0.03;
 
 /// The biome the climate rules pick for these fields (`overworld_biome` without the coasts).
-fn climate_biome(t: i32, hu: i32, c: i32, h: i32, mountain: bool, grove: bool) -> &'static str {
+fn climate_biome(t: i32, hu: i32, c: i32, h: i32, mountain: bool, grove: bool, old: bool) -> &'static str {
     let at = q12;
     if mountain || h >= snow_line(t) {
         "mountains"
@@ -1431,6 +1459,8 @@ fn climate_biome(t: i32, hu: i32, c: i32, h: i32, mountain: bool, grove: bool) -
         // Before the swamp: the tropical forest takes its low wet land too (Ronald: "Yes, take
         // the low land"), so the flooded forest has room along its rivers.
         "tropical_forest"
+    } else if old && h <= SEA + OLD_GROWTH_TOP {
+        "old_growth_forest"
     } else if t >= at(SWAMP.0) && hu >= at(SWAMP.1) && h <= SEA + 12 && c >= at(0.1) {
         "swamp"
     } else if hu >= at(FOREST_HUMIDITY) {
@@ -1451,13 +1481,14 @@ pub fn biome_edge(f: &Fields, x: i32, z: i32, height: i32) -> Option<Edge> {
     let m = MOUNTAINS_AREA.at(&here);
     let line = q12(MOUNTAIN_BIOME);
     let grove = SEQUOIA_AREA.at(&here) >= q12(SEQUOIA_GROVE);
-    let own = climate_biome(t, hu, c, height, m >= line, grove);
+    let old = OLD_GROWTH_AREA.at(&here) >= q12(OLD_GROWTH_FROM);
+    let own = climate_biome(t, hu, c, height, m >= line, grove, old);
     let band = q12(EDGE_BAND);
     let mut best: Option<Edge> = None;
     for k in 1..=3 {
         let step = band * k / 3;
         for (dt, dh, dm) in [(step, 0, 0), (-step, 0, 0), (0, step, 0), (0, -step, 0), (0, 0, step), (0, 0, -step)] {
-            let to = climate_biome(t + dt, hu + dh, c, height, m + dm >= line, grove);
+            let to = climate_biome(t + dt, hu + dh, c, height, m + dm >= line, grove, old);
             if to != own {
                 let near = ONE - (k - 1) * ONE / 3;
                 if best.is_none_or(|b| near > b.near) {
@@ -1787,6 +1818,8 @@ fn biome_at(f: &Fields, x: i32, z: i32, h: i32) -> &'static str {
         // Before the swamp: the tropical forest takes its low wet land too (Ronald: "Yes, take
         // the low land"), so the flooded forest has room along its rivers.
         "tropical_forest"
+    } else if OLD_GROWTH_AREA.at(&here) >= at(OLD_GROWTH_FROM) && h <= SEA + OLD_GROWTH_TOP {
+        "old_growth_forest"
     } else if t >= at(SWAMP.0) && hu >= at(SWAMP.1) && h <= SEA + 12 && c >= at(0.1) {
         "swamp"
     } else if hu >= at(FOREST_HUMIDITY) {

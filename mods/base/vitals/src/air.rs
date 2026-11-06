@@ -117,7 +117,7 @@ pub fn drying_byte(secs: f32) -> u32 {
 /// pick, 11-05: no mist at 05:00-06:00 in a clear summer, Tester 2's mist shots, where `/air`'s
 /// forced mist looked right): the ground cools through the night and the damp air above it
 /// condenses in the last hours before sunrise, lying in valleys and over water (the shader pack
-/// lays any fog low); the sun burns it off two to three hours after it rises. Dry air (humidity
+/// lays it below sea level + 8); the sun burns it off within two hours after it rises. Dry air (humidity
 /// under `DAWN_MIST_DAMP.0`) none, the dampest `DAWN_MIST` thick. Only on some mornings: each
 /// day's, the same on every machine. `sunrise` the hour the sun rises that day.
 // (0.1: at 0.42 a damp morning over the birch forest went a golden white-out, at 0.2 it still hid
@@ -135,10 +135,19 @@ pub fn dawn_mist(humidity: f32, sunrise: f32, hour: f32, wind: f32, raining: boo
         return 0.0;
     }
     let ramp = |from: f32, to: f32| ((hour - from) / (to - from)).clamp(0.0, 1.0);
-    let hours = ramp(sunrise - 3.0, sunrise - 0.5) * (1.0 - ramp(sunrise + 1.5, sunrise + 3.5));
+    // From two and a half hours before sunrise, burnt off within two after it (it lasted three and
+    // a half, a white sea at the vista to 08:00 at the equinox: the Look session's checkpoint).
+    let hours = ramp(sunrise - 2.5, sunrise - 0.5) * (1.0 - ramp(sunrise + 0.5, sunrise + 2.0));
     let blown = ((wind - CLEARS.0) / (CLEARS.1 - CLEARS.0)).clamp(0.0, 1.0);
     DAWN_MIST * damp * hours * (1.0 - blown)
 }
+
+/// How high over sea level the mist lies at most (blocks): under it valleys, rivers and lakes fill,
+/// above it ridges and forests stand out of it. The shader pack reads it (`MIST_TOP` in its
+/// shaders, written by `mods/base/src/shaderpack.rs`), today's look and the HDR path alike. 18, as
+/// the Look session found: our land stands higher than Minecraft's, and at 8 a hilly forest got
+/// mist only along its rivers (11-05).
+pub const MIST_TOP: f32 = 18.0;
 
 // ---- snow, blizzards and dust ----
 
@@ -589,8 +598,10 @@ pub const AURORA: [(&str, f32); 3] = [("base:taiga", 1.0), ("base:snowy_plains",
 /// a temperate broadleaf wood in leaf 3-10 %, a conifer or birch wood more, and an open grove or a
 /// swamp's scattered trees more again (Lighting's estimates from those shares). Biomes not listed
 /// have open sky.
-pub const CANOPY: [(&str, f32); 6] = [
+pub const CANOPY: [(&str, f32); 7] = [
     ("base:tropical_forest", 1.0),
+    // Białowieża's old oaks and hornbeams in leaf: a closed temperate canopy, 2-5 % of the sun.
+    ("base:old_growth_forest", 0.75),
     ("base:sequoia_grove", 0.6),
     ("base:forest", 0.5),
     ("base:taiga", 0.4),

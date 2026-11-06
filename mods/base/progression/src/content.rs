@@ -478,6 +478,7 @@ pub const RULES: &[Rule] = &[
     r(
         &[
             "base:apple",
+            "base:cherry",
             "base:berries",
             "base:lingonberries",
             "base:cloudberries",

@@ -40,9 +40,12 @@ static TWITCH: Sound = Sound::named("ley.twitch");
 static SEED: Component<[u32; 3]> = Component::named("ley_seed");
 
 pub fn register(r: &mut Registry) {
+    // Held on use at a sleeping waystone it wakes it (`waystones.rs`).
     r.item(&DOWSING_ROD)
         .max_stack(1)
         .handheld()
+        .use_ticks(vitals::waystones::WAKE_TICKS)
+        .on_use(crate::waystones::rod_used)
         .tag("dowsing_rods")
         .tab(&crate::tabs::TOOLS);
     // A forked branch lashed with cordage, a tektite (star glass, the ancients' own) at its tip.
@@ -52,6 +55,7 @@ pub fn register(r: &mut Registry) {
         .hardness(2.5)
         .mineable("pickaxe")
         .needs_tool_level(0)
+        .on_use(crate::waystones::stone_used)
         .textures("ley_stone_top", "ley_stone_side", "ley_stone_top")
         .tag("ley_stone")
         .tab(&crate::tabs::BUILDING);
@@ -59,6 +63,7 @@ pub fn register(r: &mut Registry) {
     r.block(&WAYSTONE)
         .sound_group("stone")
         .unbreakable()
+        .on_use(crate::waystones::stone_used)
         .textures("waystone_top", "waystone_side", "ley_stone_top")
         .tag("waystones")
         .tab(&crate::tabs::BUILDING);
@@ -154,6 +159,23 @@ fn hand_seed(w: &World) {
     }
 }
 
+/// The world's seed on the client while its player is in the overworld (the lines and the map are
+/// the overworld's), from the server (`SEED`).
+pub(crate) fn seed_here(view: &ClientView) -> Option<u64> {
+    view.component(&SEED)
+        .filter(|s| s[2] != 0)
+        .map(|[lo, hi, _]| lo as u64 | (hi as u64) << 32)
+}
+
+/// Whether the local player sees the ley lines now: the rod in a hand, or ley sight.
+pub(crate) fn sees_lines(c: &Client) -> bool {
+    let view = c.view();
+    let me = view.player();
+    let rod = DOWSING_ROD.id();
+    let holding = rod != u32::MAX && (c.held_item(me, Hand::Main) == rod || c.held_item(me, Hand::Off) == rod);
+    holding || view.component(&base_api::LEY_SIGHT).unwrap_or(0.0) > 0.0
+}
+
 // ------------------------------------------------------------------ the waystones
 
 /// How a waystone's structure is built, by its biome.
@@ -181,7 +203,7 @@ impl Style {
             "mountains" | "snowy_plains" | "taiga" => Style::Cairn,
             "swamp" | "tropical_forest" => Style::Sunken,
             "ocean" | "coral_reef" | "lagoon" => Style::Seabed,
-            "forest" | "birch_forest" | "sequoia_grove" => Style::Menhir { mossy: true },
+            "forest" | "birch_forest" | "sequoia_grove" | "old_growth_forest" => Style::Menhir { mossy: true },
             _ => Style::Menhir { mossy: false },
         }
     }
@@ -263,11 +285,15 @@ fn waystone_blocks(node: &Node, ground: &dyn Fn(i32, i32) -> i32, biome: &str) -
             put([x, gy + 2, z], way);
         }
     }
-    // Clear plants off the plinth's top and the pillar's foot (not water: the seabed stays wet).
+    // Clear plants off the plinth's top and the pillar's foot (not water: the seabed stays wet), at
+    // each column's own ground and at the plinth's: tall grass on the plinth stood in the way of a
+    // click on the stone (PC look wm_look2).
     if !matches!(style, Style::Seabed) {
-        for dz in -1..=1 {
-            for dx in -1..=1 {
-                out.push(([x + dx, ground(x + dx, z + dz) + 1, z + dz], 0, true));
+        for dz in -2..=2 {
+            for dx in -2..=2 {
+                for y in [ground(x + dx, z + dz) + 1, gy + 1, gy + 2] {
+                    out.push(([x + dx, y, z + dz], 0, true));
+                }
             }
         }
     }
@@ -311,11 +337,10 @@ fn waystones(g: &mut Gen) {
     }
 }
 
-/// A ley node's heart opened: what waking a sleeping waystone does (`notes/PROGRESSION.md`, "From
-/// the survival research": waystones, ancient ley nodes you wake), not built yet. Waking calls this
-/// with the age it happens in; the perk web's socket stone may drop at the stone
-/// (`StoneSource::LeyNode`: a quarter of the time, depth 5). True when one dropped.
-#[allow(dead_code)]
+/// A ley node's heart opened: what waking a sleeping waystone does (`waystones.rs`, `notes/
+/// PROGRESSION.md` "From the survival research": waystones, ancient ley nodes you wake), with the
+/// age it happens in; the perk web's socket stone may drop at the stone (`StoneSource::LeyNode`: a
+/// quarter of the time, depth 5). True when one dropped.
 pub(crate) fn heart_opened(w: &World, node: &Node, tier: u8, top: i32) -> bool {
     let at = [node.x as f64 + 0.5, top as f64 + 1.2, node.z as f64 + 0.5];
     base_api::skills::drop_stone(w, base_api::skills::StoneSource::LeyNode, tier, at)
@@ -429,8 +454,10 @@ fn rod_feel(c: &Client, s: &mut Rod, me: u64, st: &abi::EntityState, r: &ley::Re
     s.dip += (want_dip - s.dip) * ease;
     s.swing += (want_swing - s.swing) * ease;
     // The arm that holds it (`leftArm`, Weft's main arm at +x): items are flat pictures, so the
-    // hand dips and swings, not a bone of the rod.
-    c.bone_turn(me, "leftArm", [s.dip + jitter, s.swing + jitter * 0.5, 0.0]);
+    // hand dips and swings, not a bone of the rod. The bone's turn about its up axis is positive
+    // to the left, so a swing to the right (positive) turns it negative (PC look wm_twitch2: "tugs
+    // hard to the right" swung the rod left).
+    c.bone_turn(me, "leftArm", [s.dip + jitter, -(s.swing + jitter * 0.5), 0.0]);
     // The chime: faster and louder the stronger the pull.
     if feel > Feel::Still {
         s.tick_in -= dt;

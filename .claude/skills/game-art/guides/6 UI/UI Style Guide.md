@@ -172,4 +172,6 @@ Ronald (2026-11-04), on the round-2 stance buttons: "ui better but still seems w
 
 Where these come from: the pages linked above (fetched 2026-11-04), plus common practice in Stardew Valley, Terraria and Celeste (crisp 9-sliced frames, a 1 px darker shadow, whole-pixel layout); I didn't find a primary source for those games' rules. Slynyrd's palettes (https://www.slynyrd.com/blog/2018/1/10/pixelblog-1-color-palettes): shift the hue toward warm as a ramp brightens.
 
+**Round parts** (Ronald, 11-05, on the round minimap: "Yes, as drawn"): a round frame is the kit's panel frame made round, drawn in code (`notes/ui/kit2/minimap_ring.py`): outline, a 3 px bronze band whose outer row is lit where it faces the top left and inner row the other way round, the groove, the inner bronze line, an inner outline; plates on it are round kit faces with a 1 px bronze rim, the main orange marking the one that matters (north). The game writes letters on them (translated). The darker kit bronze was kept over his sheet's brighter, thicker ring.
+
 The shared parts are drawn by `notes/ui/kit2/kit2.py`, and `notes/ui/kit2/components_sheet.py` draws the sheet of them at 1x and 2x. Ronald sees a new or changed part on that sheet before any screen uses it.
