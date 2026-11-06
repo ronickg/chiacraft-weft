@@ -533,7 +533,11 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
             .enumerate()
             .fold(0, |bits, (k, c)| bits | (((if c[1] == 1 { hi } else { lo }) >> (2 * k)) & 3) << (2 * k))
     };
-    let wet = |state: u32| c.states.get(state as usize).is_some_and(|st| st.liquid.is_some());
+    let wet = |state: u32| {
+        c.states
+            .get(state as usize)
+            .is_some_and(|st| st.liquid.is_some())
+    };
     // A crown sitting right on the ground hides its top.
     let covered = |i: i32, j: i32| crown_at(i, j).is_some_and(|c| c.bottom <= at(i, j).0 + 1);
     for j in 0..CELLS {
@@ -627,14 +631,20 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                             }
                             let (tex, tint) = face_of(block, dir);
                             let ao = span_ao(i, j, dir, from, b);
-                            out.push(shaded(occluded(quad(dir as u32, i * s, b, j * s, (s, from + 1 - b, s), tex, tint, biome), occ_at(i, j)), ao));
+                            out.push(shaded(
+                                occluded(quad(dir as u32, i * s, b, j * s, (s, from + 1 - b, s), tex, tint, biome), occ_at(i, j)),
+                                ao,
+                            ));
                             from = b - 1;
                         }
                     }
                     None => {
                         let (tex, tint) = face_of(under, dir);
                         let ao = span_ao(i, j, dir, y - band, ny + 1);
-                        out.push(shaded(occluded(quad(dir as u32, i * s, ny + 1, j * s, (s, y - band - ny, s), tex, tint, biome), occ_at(i, j)), ao));
+                        out.push(shaded(
+                            occluded(quad(dir as u32, i * s, ny + 1, j * s, (s, y - band - ny, s), tex, tint, biome), occ_at(i, j)),
+                            ao,
+                        ));
                     }
                 }
             }
