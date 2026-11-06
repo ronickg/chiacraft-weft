@@ -614,7 +614,7 @@ wgsl_types! {
     f32 => "f32", 4, 4, u32 => "u32", 4, 4, i32 => "i32", 4, 4,
     [f32; 2] => "vec2<f32>", 8, 8, [f32; 3] => "vec3<f32>", 16, 12, [f32; 4] => "vec4<f32>", 16, 16,
     [u32; 4] => "vec4<u32>", 16, 16, [i32; 4] => "vec4<i32>", 16, 16,
-    [[f32; 4]; 3] => "array<vec4<f32>, 3>", 16, 48, [[f32; 4]; 4] => "mat4x4<f32>", 16, 64, [[f32; 4]; 6] => "array<vec4<f32>, 6>", 16, 96, [[f32; 4]; 8] => "array<vec4<f32>, 8>", 16, 128,
+    [[f32; 4]; 3] => "array<vec4<f32>, 3>", 16, 48, [[f32; 4]; 4] => "mat4x4<f32>", 16, 64, [[f32; 4]; 6] => "array<vec4<f32>, 6>", 16, 96, [[f32; 4]; 8] => "array<vec4<f32>, 8>", 16, 128, [[f32; 4]; 12] => "array<vec4<f32>, 12>", 16, 192,
 }
 
 /// Declares a GPU buffer struct: the Rust type and, from the same fields, its WGSL text
@@ -713,10 +713,10 @@ gpu_struct! {
         /// when full, only by day when new), w the light it gives: its phase times how high it
         /// stands, 0 below the horizon. For packs' night light and moon shadows.
         pub moon: [f32; 4],
-        /// The values of the settings the pack names in its `pack.cfg` (`options = a, b, ...`), 32
-        /// at most (16 before chiacraft's fantasy settings), four to a row in that order
-        /// (`packs::pack_options`); 0 for one not found.
-        pub options: [[f32; 4]; 8],
+        /// The values of the settings the pack names in its `pack.cfg` (`options = a, b, ...`), 48
+        /// at most (16 before chiacraft's fantasy settings, 32 until its leaf light), four to a row
+        /// in that order (`packs::pack_options`); 0 for one not found.
+        pub options: [[f32; 4]; 12],
         /// The light the player holds (a torch, a lantern), for packs' dynamic light: xyz where it
         /// is (camera relative, by the hand), w unused.
         pub hand: [f32; 4],
@@ -1472,10 +1472,12 @@ struct RtHit {
     tint: u32,
     biome: u32,
     lod: bool,
+    // A translucent record (water, glass).
+    clear: bool,
 }
 
 fn rt_miss() -> RtHit {
-    return RtHit(false, 0.0, vec3(0.0), vec3(0.0), vec3(0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), 0u, 0u, false);
+    return RtHit(false, 0.0, vec3(0.0), vec3(0.0), vec3(0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), 0u, 0u, false, false);
 }
 fn rt_hit(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, blur: f32) -> RtHit {
     return rt_miss();
@@ -1632,10 +1634,12 @@ struct RtHit {
     tint: u32,
     biome: u32,
     lod: bool,
+    // A translucent record (water, glass).
+    clear: bool,
 }
 
 fn rt_miss() -> RtHit {
-    return RtHit(false, 0.0, vec3(0.0), vec3(0.0), vec3(0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), 0u, 0u, false);
+    return RtHit(false, 0.0, vec3(0.0), vec3(0.0), vec3(0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), 0u, 0u, false, false);
 }
 
 // The first surface along `dir` (unit) from `rel` (camera relative), out to `t_max` blocks: through
@@ -1684,6 +1688,7 @@ fn rt_hit(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, blur: f32) -> RtHit {
     }
     let clear = row.w == 0u || c.geometry_index == 1u;
     let rec = select(0u, row.w, clear) + c.primitive_index / 2u;
+    out.clear = row.z != 2u && rec >= row.y;
     let tri = c.primitive_index % 2u;
     let b = c.barycentrics;
     // A 32-texel block's mip by how far the reflected way runs (a pixel about 1/700 across).
@@ -1777,6 +1782,59 @@ fn rt_sun(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool) -> vec3<f32> 
     return through;
 }
 ";
+
+/// The path tracer's own declarations (`pathtrace.wgsl`, composed after the world shader's prelude):
+/// its push constants and the per-pixel output it writes (`pt_out`) and its composite reads (`pt_in`).
+pub const PT_DECLS: &str = "
+struct PtArgs {
+    size: vec2<u32>,
+    depth: u32,
+    debug: u32,
+    albedo: u32,
+    normal: u32,
+    spec: u32,
+    mode: u32,
+    light: u32,
+    pad0: u32,
+    pad1: u32,
+    pad2: u32,
+}
+var<immediate> pt: PtArgs;
+@group(1) @binding(34) var<storage, read_write> pt_out: array<vec4<f32>>;
+@group(1) @binding(35) var<storage, read> pt_in: array<vec4<f32>>;
+const PT_CACHE: u32 = 1048576u;
+@group(1) @binding(36) var<storage, read_write> pt_cache: array<atomic<u32>>;
+";
+
+/// The radiance cache's cells (`PT_CACHE` in `PT_DECLS`: change both), ten words each.
+pub const PT_CACHE: u32 = 1 << 20;
+pub const PT_CACHE_BYTES: u64 = PT_CACHE as u64 * 40;
+
+/// `pathtrace.wgsl`'s bindings: what it writes, what the composite reads.
+pub mod pt_bind {
+    pub const OUT: u32 = 34;
+    pub const IN: u32 = 35;
+    pub const CACHE: u32 = 36;
+}
+
+/// The path tracer's push constants (`PT_DECLS`).
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct PtArgs {
+    pub size: [u32; 2],
+    pub depth: u32,
+    pub debug: u32,
+    /// The G-buffer's images (`texture_index`): albedo, normal and roughness, spec.
+    pub albedo: u32,
+    pub normal: u32,
+    pub spec: u32,
+    /// 0: the composite writes the traced light itself; 1: a denoiser makes it (the composite
+    /// leaves the traced pixels to `pt_finish`).
+    pub mode: u32,
+    /// The denoised light (`texture_index`), for the finish.
+    pub light: u32,
+    pub pad: [u32; 3],
+}
 
 /// What goes in front of `rt_expand.wgsl` (ray tracing's scene, `world_render::rt`): the
 /// constants and record decoders, the job, what it reads and writes.

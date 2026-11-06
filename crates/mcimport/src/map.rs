@@ -79,11 +79,19 @@ pub fn block(mc: &str) -> (Vec<String>, bool) {
             let props = if of == "log" { axis(&s) } else { String::new() };
             let mut v: Vec<String> = Vec::new();
             // Our block of the very same name first (`base:yellow_poplar_leaves`), if we have it.
-            let kinds = std::iter::once(kind).chain(wood(kind).iter().copied().filter(|k| *k != kind));
+            // Dark oak's bark and planks are nearest spruce's (its leaves stay oak's, tinted).
+            let near: &[&str] = if kind == "dark_oak" && of != "leaves" { &["dark_oak", "spruce", "oak"] } else { wood(kind) };
+            let kinds = std::iter::once(kind).chain(near.iter().copied().filter(|k| *k != kind));
             for k in kinds {
-                // Minecraft's cherry is pink all year; ours only in its spring bloom.
-                if of == "leaves" && k == "cherry" {
-                    v.push("base:cherry_leaves[bloom=1]".into());
+                // Leaves as placed: ours decay farther than 4 or so from a log, Minecraft's only
+                // past 6, so a poplar's crown fell off and left a bare trunk.
+                if of == "leaves" {
+                    // Minecraft's cherry is pink all year; ours only in its spring bloom.
+                    if k == "cherry" {
+                        v.push("base:cherry_leaves[bloom=1,placed=true]".into());
+                        v.push("base:cherry_leaves[bloom=1]".into());
+                    }
+                    v.push(format!("base:{k}_leaves[placed=true]"));
                 }
                 v.push(format!("base:{stripped}{k}_{of}{props}"));
                 v.push(format!("base:{stripped}{k}_{of}"));
@@ -190,7 +198,9 @@ pub fn block(mc: &str) -> (Vec<String>, bool) {
             let half = s.prop("half").unwrap_or("lower");
             (vec![format!("base:wild_sunflower[half={half}]"), if half == "lower" { "base:dandelion".into() } else { AIR.into() }], false)
         }
-        "pink_petals" | "wildflowers" => near(&["base:clover", AIR]),
+        // 26.3's wildflowers are mostly yellow patches on the forest floor.
+        "wildflowers" => near(&["base:dandelion", "base:clover", AIR]),
+        "pink_petals" => near(&["base:clover", AIR]),
         // A thin layer on the floor in Minecraft; ours is a whole block.
         "leaf_litter" => (vec![AIR.into()], false),
         "bush" | "firefly_bush" | "azalea" | "flowering_azalea" | "sweet_berry_bush" => near(&["base:hazel_bush", "base:tall_grass"]),
@@ -328,7 +338,8 @@ mod tests {
         assert!(exact);
         assert_eq!(v[0], "base:spruce_log[axis=x]");
         let (v, _) = block("minecraft:cherry_leaves[distance=1,persistent=false,waterlogged=false]");
-        assert_eq!(v[0], "base:cherry_leaves[bloom=1]");
+        assert_eq!(v[0], "base:cherry_leaves[bloom=1,placed=true]");
+        assert_eq!(block("minecraft:oak_leaves[distance=6]").0[0], "base:oak_leaves[placed=true]");
         assert!(v.contains(&"base:oak_leaves".to_string()));
         let (v, _) = block("minecraft:stripped_birch_log[axis=y]");
         assert_eq!(v[0], "base:stripped_birch_log[axis=y]");
