@@ -191,6 +191,14 @@ pub fn shader(assets: &Assets, name: &str) -> Result<Shader, ShaderError> {
     Shader::from_wgsl(name, &with_common(assets, name, &engine_source(assets, name)))
 }
 
+/// A shader pack's file composed with the world shader's prelude and the engine's `extra` after it
+/// (the path tracer, `pathtrace.wgsl`); None when the pack has no such file.
+pub fn world_side_shader(assets: &Assets, name: &str, extra: &str) -> Option<Result<Shader, ShaderError>> {
+    let src = pack_source(name)?;
+    let prelude = crate::gpu_layout::prelude("world.wgsl", &engine_source(assets, "common.wgsl"));
+    Some(Shader::from_wgsl(name, &format!("{prelude}{extra}{src}")))
+}
+
 /// `shader` for engine shaders that take mod snippets (`shaders::compose`).
 pub fn compose(
     assets: &Assets,
