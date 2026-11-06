@@ -186,9 +186,6 @@ impl Mapped {
 
 /// Blocks over which the cubes fade into distant terrain, before `lod_fade`.
 const FADE_BAND: f32 = 24.0;
-/// The share of distant terrain's reach past which its tiles take `lod_end_pipe` (chiacraft): the
-/// pack fades the land out from there (`fs_lod_end`).
-pub const END_FADE: f32 = 0.85;
 
 /// Meshes are kept in regions of this many cubes a side (log2), culled as a whole first.
 const REGION: i32 = 3;
@@ -352,7 +349,6 @@ struct ColorPipes {
     quad: [PipelineId; 3],
     lod: PipelineId,
     lod_open: Option<PipelineId>,
-    lod_end: Option<PipelineId>,
     cutout_split: Option<[PipelineId; 4]>,
     fade: Option<[PipelineId; 6]>,
 }
@@ -384,12 +380,6 @@ pub struct WorldRenderer {
     /// keeps its hidden-surface removal for them (Android port: on the Pixel 10's PowerVR the
     /// discard alone cost a third of the world pass at the vista).
     lod_open_pipe: Option<PipelineId>,
-    /// Those of them that reach toward where distant terrain ends (past `END_FADE` of its reach),
-    /// when the pack's `world.wgsl` has `fs_lod_end` (chiacraft, Far view): faded out there by an
-    /// ordered dither, so what is drawn behind (the sky, the cloud layer seen edge on) shows
-    /// through, as Distant Horizons fades its far edge (`dh_fade`). Only that last ring takes the
-    /// `discard` (on a phone's tiled GPU it costs: Android keeps the plain open path there).
-    lod_end_pipe: Option<PipelineId>,
     /// Cutout blocks (leaves) in two passes, when the pack has `fs_cutout_depth` and
     /// `fs_cutout_shade` and `cutout_prepass()`: their depth with the alpha test alone (no color),
     /// then their color where the depth is theirs, with no `discard`. Faces depth, faces shade,
@@ -587,8 +577,7 @@ impl WorldRenderer {
         };
         let ((face_pipes, quad_pipes, lod_pipe), shader, slots) = made?;
         let fade_pipes = Self::fade_pipelines(gpu, &shader);
-        let lod_open_pipe = Self::lod_open_pipeline(gpu, &shader, "fs_lod_open");
-        let lod_end_pipe = Self::lod_open_pipeline(gpu, &shader, "fs_lod_end");
+        let lod_open_pipe = Self::lod_open_pipeline(gpu, &shader);
         let cutout_split = Self::cutout_split_pipelines(gpu, &shader);
         let shadow_pipes = Self::shadow_pipelines(gpu, &shader);
         let lod_shadow_pipe = Self::lod_shadow_pipeline(gpu, &shader, shadow_pipes.is_some());
@@ -632,7 +621,6 @@ impl WorldRenderer {
             quad_pipes,
             lod_pipe,
             lod_open_pipe,
-            lod_end_pipe,
             cutout_split,
             fade_pipes,
             lod_fade: 0,
@@ -712,8 +700,7 @@ impl WorldRenderer {
             face,
             quad,
             lod,
-            lod_open: Self::lod_open_pipeline(gpu, &s, "fs_lod_open"),
-            lod_end: Self::lod_open_pipeline(gpu, &s, "fs_lod_end"),
+            lod_open: Self::lod_open_pipeline(gpu, &s),
             cutout_split: Self::cutout_split_pipelines(gpu, &s),
             fade: Self::fade_pipelines(gpu, &s),
         })
@@ -725,7 +712,6 @@ impl WorldRenderer {
         std::mem::swap(&mut self.quad_pipes, &mut set.quad);
         std::mem::swap(&mut self.lod_pipe, &mut set.lod);
         std::mem::swap(&mut self.lod_open_pipe, &mut set.lod_open);
-        std::mem::swap(&mut self.lod_end_pipe, &mut set.lod_end);
         std::mem::swap(&mut self.cutout_split, &mut set.cutout_split);
         std::mem::swap(&mut self.fade_pipes, &mut set.fade);
     }
@@ -767,7 +753,6 @@ impl WorldRenderer {
                 .chain(set.quad)
                 .chain([set.lod])
                 .chain(set.lod_open)
-                .chain(set.lod_end)
                 .chain(set.cutout_split.into_iter().flatten())
                 .chain(set.fade.into_iter().flatten())
             {
@@ -836,22 +821,16 @@ impl WorldRenderer {
         Ok((faces, quads, lod))
     }
 
-    /// `lod_open_pipe` (`entry` "fs_lod_open") or `lod_end_pipe` ("fs_lod_end"): None when the
-    /// pack lacks the entry, or it fails.
-    fn lod_open_pipeline(gpu: &mut dyn Backend, shader: &Shader, entry: &str) -> Option<PipelineId> {
-        if !crate::packs::pack_uses("world.wgsl", entry) {
-            return None;
-        }
-        // Not on a phone until measured there: its `discard` costs a tiled GPU's hidden-surface
-        // removal (the Pixel 10: a third of the world pass for `fs_lod`'s).
-        if entry == "fs_lod_end" && cfg!(target_os = "android") {
+    /// `lod_open_pipe`: None when the pack lacks `fs_lod_open`, or it fails.
+    fn lod_open_pipeline(gpu: &mut dyn Backend, shader: &Shader) -> Option<PipelineId> {
+        if !crate::packs::pack_uses("world.wgsl", "fs_lod_open") {
             return None;
         }
         gpu.create_pipeline(&PipelineDesc {
-            label: if entry == "fs_lod_end" { "distant terrain end" } else { "distant terrain open" },
+            label: "distant terrain open",
             shader,
             vertex: "vs_lod",
-            fragment: Some(entry),
+            fragment: Some("fs_lod_open"),
             color: Some(crate::post::world_format()),
             depth: Some(DepthState { write: true, compare: Compare::GreaterEqual }),
             blend: Blend::None,
@@ -859,7 +838,7 @@ impl WorldRenderer {
             topology: Topology::Triangles,
             motion: crate::post::motion(),
         })
-        .map_err(|e| log::error!("world shader {entry}: {}", e.0))
+        .map_err(|e| log::error!("world shader fs_lod_open: {}", e.0))
         .ok()
     }
 
@@ -1276,7 +1255,6 @@ impl WorldRenderer {
                     .flatten()
                     .chain(self.lod_shadow_pipe.take())
                     .chain(self.lod_open_pipe.take())
-                    .chain(self.lod_end_pipe.take())
                     .chain(self.cutout_split.take().into_iter().flatten())
                     .chain(self.fade_pipes.take().into_iter().flatten())
                 {
@@ -1284,8 +1262,7 @@ impl WorldRenderer {
                 }
                 if let Ok((s, _)) = world_shader(assets) {
                     self.fade_pipes = Self::fade_pipelines(gpu, &s);
-                    self.lod_open_pipe = Self::lod_open_pipeline(gpu, &s, "fs_lod_open");
-                    self.lod_end_pipe = Self::lod_open_pipeline(gpu, &s, "fs_lod_end");
+                    self.lod_open_pipe = Self::lod_open_pipeline(gpu, &s);
                     self.cutout_split = Self::cutout_split_pipelines(gpu, &s);
                     self.shadow_pipes = Self::shadow_pipelines(gpu, &s);
                     self.lod_shadow_pipe = Self::lod_shadow_pipeline(gpu, &s, self.shadow_pipes.is_some());
@@ -1436,7 +1413,6 @@ impl WorldRenderer {
             .chain(self.shadow_pipes.take().into_iter().flatten())
             .chain(self.lod_shadow_pipe.take())
             .chain(self.lod_open_pipe.take())
-            .chain(self.lod_end_pipe.take())
             .chain(self.cutout_split.take().into_iter().flatten())
             .chain(self.fade_pipes.take().into_iter().flatten())
         {
@@ -1923,11 +1899,9 @@ impl WorldRenderer {
 
         // Distant terrain after the cubes (nearer, they hide most of it), a run per page: the tiles
         // that reach into the cubes' mask first (kind 3), then the rest without its discard (kind 6,
-        // `lod_open_pipe`), and last those reaching toward its end, faded there (kind 7, `lod_end_pipe`). A column a tile's edge walls stand on may be the next one: a column's
+        // `lod_open_pipe`). A column a tile's edge walls stand on may be the next one: a column's
         // margin.
         let open = self.lod_open_pipe.is_some();
-        let end = self.lod_end_pipe.is_some();
-        let end_from = END_FADE * crate::client::lod::Lod::distance() as f32;
         let mask_half = self.lod_half as i32 + 1;
         let cam_col = IVec2::new(cam_cube.x, cam_cube.z);
         let mut lod: Vec<DrawRecord> = self
@@ -1954,15 +1928,7 @@ impl WorldRenderer {
                 let cols =
                     (o.div_euclid(IVec2::splat(16)) - cam_col, (o + IVec2::splat(key.size() - 1)).div_euclid(IVec2::splat(16)) - cam_col);
                 let masked = cols.0.x <= mask_half && cols.1.x >= -mask_half && cols.0.y <= mask_half && cols.1.y >= -mask_half;
-                // Its corner farthest across the ground, toward where distant terrain ends.
-                let far = glam::Vec2::new(center.x.abs() + half.x, center.z.abs() + half.z).length();
-                let kind = if masked || !open {
-                    3
-                } else if end && far > end_from {
-                    7
-                } else {
-                    6
-                };
+                let kind = if open && !masked { 6 } else { 3 };
                 Some((kind, 0, a.page, args, [o.x / 16 - cam_cube.x, -cam_cube.y, o.y / 16 - cam_cube.z, 0], center))
             })
             .collect();
@@ -2239,7 +2205,6 @@ impl WorldRenderer {
             (0, _) => (self.face_pipes[layer as usize], self.faces.pages[page as usize].0),
             (3, _) => (self.lod_pipe, self.faces.pages[page as usize].0),
             (6, _) => (self.lod_open_pipe.unwrap_or(self.lod_pipe), self.faces.pages[page as usize].0),
-            (7, _) => (self.lod_end_pipe.or(self.lod_open_pipe).unwrap_or(self.lod_pipe), self.faces.pages[page as usize].0),
             (4, Some(f)) => (f[layer as usize], self.faces.pages[page as usize].0),
             (5, Some(f)) => (f[3 + layer as usize], self.quads.pages[page as usize].0),
             (4, None) => (self.face_pipes[layer as usize], self.faces.pages[page as usize].0),

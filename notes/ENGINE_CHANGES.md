@@ -271,4 +271,3 @@ These are the biggest changes. They live mostly in our crates, but each needed h
 ## Our own crates (additions, not core changes)
 
 `sandbox` (wasmtime mod host), `packages` (data packages), `account`, `bridge`, `bots` (`weft-bots`, headless load-test players).
-- **Distant terrain fades out at its end into what is behind it** (branch claude/plain-stage1; `WorldRenderer::lod_end_pipe`, kind 7 records, `END_FADE`). Tiles out of the cubes' mask whose far corner reaches past 0.85 of distant terrain's reach draw with the pack's `fs_lod_end` (a discard dither that moves each frame, averaged by TAA), not on Android. *Why:* the farthest ridges ended as flat cut-outs about 20 brighter than the cloud layer seen edge on behind them; Distant Horizons fades its far edge the same way (`dh_fade`). Planner, 11-06: "Go with A".
