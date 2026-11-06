@@ -172,16 +172,8 @@ fn draw_block(
                     let light = std::array::from_fn(|k| darker_by_ao(light[k], (ao >> (k * 2)) & 3));
                     mesh.quads[RenderLayer::Translucent as usize].push(quad(corners, WHOLE, tex, biome, tint, light));
                 } else {
-                    let mut rec = crate::gpu_layout::face_record(
-                        [x, y, z],
-                        dir as u32,
-                        ao,
-                        tint as u32,
-                        info.turns[dir] as u32,
-                        tex,
-                        biome,
-                        light,
-                    );
+                    let mut rec =
+                        crate::gpu_layout::face_record([x, y, z], dir as u32, ao, tint as u32, info.turns[dir] as u32, tex, biome, light);
                     // Its back face hidden by the same block behind it (leaves in a crown): its
                     // holes would show past the crown, the sky from under a canopy.
                     if info.layer == RenderLayer::Cutout && info.flags & bf::CULL_SAME != 0 {
