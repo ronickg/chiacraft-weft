@@ -29,6 +29,12 @@ from paint import EYES, eye_corner, occlusion, pack, paint_face_smooth, stamp_ey
 from ground import lowest  # noqa: E402
 from house import SCALE, fine, texels  # noqa: E402
 
+sys.path.insert(0, os.path.join(HERE, "..", "bird"))
+import bird  # noqa: E402  the birds' build, made on this one: its behaviour clips are shared
+
+# The raven's knobs, as the birds' build reads them (its defaults are the raven's), for the clips.
+CFG = bird.config(dict(name="raven", tilt=-18, neck_share=0.4, idle="look", walk="walk"))
+
 # Texels a unit. The eye sits on the head's side, 5.5 units by 5: at the house's 32 a block that is
 # 2.75 by 2.5 texels, under `house.MIN_FACE` (3), so it paints at twice that (k = 2, 64 a block): 6 by 5.
 TX = texels(SCALE, fine(5.0))
@@ -114,7 +120,8 @@ def bones():
     B = [("root", None, (0, 0, 0)), ("spine_0", "root", (0, 12.5, -2.0)), ("spine_1", "spine_0", (0, 12.5, 0.6)),
          ("neck", "spine_1", NECK0), ("head", "neck", HEAD), ("jaw", "head", (0, 16.6, 13.6)), ("tail", "spine_0", (0, 13.2, -6.4))]
     for s, n in ((1, "L"), (-1, "R")):
-        B += [(f"wingf_{n}", "spine_1", (s * 3.9, 14.6, 5.0)),  # folded
+        # Folded, hinged at its shoulder (its top inner front corner), so it opens away from the body.
+        B += [(f"wingf_{n}", "spine_1", (s * 3.6, 15.9, 7.0)),
               (f"wing_{n}", "spine_1", (s * 3.6, 14.9, 5.0)), (f"hand_{n}", f"wing_{n}", (s * 17.8, 14.9, 5.0)),  # open
               (f"leg_{n}_thigh", "spine_0", (s * 1.9, 10.0, -0.6)), (f"leg_{n}_shin", f"leg_{n}_thigh", (s * 1.9, 6.4, -0.6)),
               (f"leg_{n}_toes", f"leg_{n}_shin", (s * 1.9, 1.0, -0.6))]
@@ -410,7 +417,10 @@ def build():
               "elements": [e for e in E if not OPEN(e["name"])]}
     fit_poses(ground)
     ground["animations"] = animations(ANIMS, names)
-    ground["fitted"] = dict(L)
+    # The behaviour clips (`mods/animals/src/anim.rs`), written once for every bird in `../bird/bird.py`.
+    clips, fitted = bird.behaviour(ground, CFG, L["drop"])
+    ground["animations"].update(clips)
+    ground["fitted"] = dict(L, clips=fitted)
     fly = {"name": "raven_fly", "texture": ground["texture"], "bones": bones_json, "elements": [e for e in E if not FOLDED(e["name"])]}
     fly["animations"] = animations(FLY_ANIMS, names)
     return ground, fly, sheet
