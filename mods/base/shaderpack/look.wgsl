@@ -1361,7 +1361,12 @@ fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // Plants' rainforest, 11-04).
     let shaded_sky = light.sky * mix(vec3(1.0), LEAF_LIGHT * 0.2, leafy * 0.85) + light.leaf * leafy;
     // Jittered along the view per pixel, so the shafts' edges don't band.
-    let jitter = fract(sin(dot(rel, vec3(12.9898, 78.233, 37.719))) * 43758.547) - 0.5;
+    // Interleaved gradient noise over the screen (a fixed grid of it), moved on each frame (`scene.frame.w`, which counts
+    // frames even while the clock is frozen): temporal anti-aliasing averages it. A hash of the
+    // point stood still, a fixed grain on everything in the mist with the volume off.
+    let clip = scene.view_proj * vec4(rel, 1.0);
+    let px = trunc((vec2(clip.x, -clip.y) / max(clip.w, 1e-4) * 0.5 + 0.5) * vec2(2048.0, 1152.0)) + 5.588238 * scene.frame.w;
+    let jitter = fract(52.9829189 * fract(dot(px, vec2(0.06711056, 0.00583715)))) - 0.5;
     // 8 steps (12 before), and the shadow map asked once for each pair of them, between the two:
     // the jitter blends the coarser shafts (Research round 15: the mist's cost, the shadow taps
     // about 3 ms of it on the Mac).
