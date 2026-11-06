@@ -20,9 +20,18 @@ fn relief_hash(p: vec2<f32>) -> f32 {
 }
 
 // How far out the far relief counts (0 none, 1 all): from 150-300 blocks, where the sun shadows'
-// far cascade and the near land's own shade end, out to 1500-2000, where the haze has the land.
+// far cascade and the near land's own shade end, easing out from 500 to 2000 as the haze takes the
+// land (darkened under it, the haze went a dirty grey where Bliss's far land is a soft blue: Look,
+// 11-06). Long before the haze hands the land over to the sky (`haze_lit`'s `edge`, from 0.84 of
+// the far end).
 fn relief_weight(dist: f32) -> f32 {
-    return smoothstep(150.0, 300.0, dist) * (1.0 - smoothstep(1500.0, 2000.0, dist));
+    return smoothstep(150.0, 300.0, dist) * (1.0 - smoothstep(500.0, 2000.0, dist));
+}
+
+// A cloud, not land: over the clouds' underside less a margin (the clouds write their depth; the
+// pack's `sky_or_cloud`, which the engine's own post shader lacks). Camera relative.
+fn relief_cloud(pos: vec3<f32>) -> bool {
+    return scene.clouds.x > 0.5 && pos.y > scene.clouds.z - 20.0;
 }
 
 // The surface's normal at `uv` from its neighbours' depth, each axis taking the neighbour nearer in
@@ -56,7 +65,7 @@ fn relief_dark(p: PostPixel) -> vec2<f32> {
     let pos = post_position(p, p.uv);
     let dist = length(pos);
     let w = relief_weight(dist);
-    if w <= 0.0 {
+    if w <= 0.0 || relief_cloud(pos) {
         return vec2(1.0);
     }
     let n = relief_normal(p, p.uv, pos);
@@ -75,9 +84,10 @@ fn relief_dark(p: PostPixel) -> vec2<f32> {
         if !relief_on_screen(at) || post_depth(p, at) <= 0.0 {
             continue;
         }
-        let v = post_position(p, at) - pos;
+        let seen = post_position(p, at);
+        let v = seen - pos;
         let d2 = dot(v, v);
-        if d2 < 1e-4 {
+        if d2 < 1e-4 || relief_cloud(seen) {
             continue;
         }
         counted += 1.0;
@@ -112,7 +122,11 @@ fn relief_dark(p: PostPixel) -> vec2<f32> {
                 continue;
             }
             let ray = length(q);
-            let seen = length(post_position(p, at));
+            let there = post_position(p, at);
+            if relief_cloud(there) {
+                continue;
+            }
+            let seen = length(there);
             if seen < ray - pixel && ray - seen < 0.035 * ray {
                 sun = 0.0;
                 break;
