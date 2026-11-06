@@ -281,7 +281,9 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     }
     out.normal = body_normal(NORMAL[dir], origins[ii].w);
     out.ao = AO[a[c]];
-    out.kind = vec4(tint_kind, select(0u, 1u, origins[ii].w != 0), 0u, 0u);
+    // w: 2 on a see-through face with the same block behind it (`FACE_BACKED`), its holes filled
+    // (distant terrain's crown flag is 1).
+    out.kind = vec4(tint_kind, select(0u, 1u, origins[ii].w != 0), 0u, select(0u, 2u, (w0 & FACE_BACKED) != 0u));
     var tint = vec3(1.0);
     if tint_kind != 0u {
         tint = tint_color(tint_kind, w1 >> FACE_BIOME_SHIFT, o.x * 16 + i32(local.x), o.z * 16 + i32(local.z));
@@ -435,7 +437,7 @@ fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32>
     // (the screen's hold-back below was for today's look).
     // Far crowns too, whatever their tint (distant terrain's crown flag, `in.kind.w`: spruce, birch
     // and tropical leaves keep their own colours), so near and far tops light alike (Far view).
-    let crown = in.kind.y == 1u && in.kind.w != 0u;
+    let crown = in.kind.y == 1u && in.kind.w == 1u;
     if (in.kind.x == TINT_FOLIAGE || in.kind.z != 0u || crown) && scene.frame.x > 0.5 {
         // More sun on the leaves' lit faces (`base:look_leaf_sun`, 2): our crowns' tops sat dull
         // beside Bliss's (light-range sweep lr1, 11-06: x2 took the canopy's roughness at 150
@@ -973,6 +975,16 @@ fn opaque(in: VOut) -> vec4<f32> {
     return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
 }
 
+// What a hole in a face with the same block behind it shows (`FACE_BACKED`): that block's leaves
+// deeper in, its texture's own colour (the smallest mip, opaque texels only) in their shade, as
+// Minecraft's fancy leaves draw the faces between leaves. The crown's outer shell opened on the sky
+// (faces between leaves aren't drawn, `cull_same`): under a canopy 11-20% sky where Minecraft and
+// Bliss show 0.5% (Bliss's own world, mc_world_forest noon).
+fn backed_hole(in: VOut, nuv: vec2<f32>) -> vec4<f32> {
+    let avg = textureSampleLevel(textures[in.layer], linear_mipped, nuv, 16.0);
+    return vec4(avg.rgb * 0.35, 1.0);
+}
+
 fn sample_cutout(in: VOut, nuv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec4<f32> {
     let size = in.size;
     let lod = max(log2(max(min(length(du * size), length(dv * size)), 1e-6)), 0.0);
@@ -1005,7 +1017,10 @@ fn fs_cutout(in: VOut) -> WorldOut {
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     var albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
     if albedo.a <= cutout_edge(in, nuv, du, dv) {
-        discard;
+        if in.kind.w != 2u {
+            discard;
+        }
+        albedo = backed_hole(in, nuv);
     }
     if in.kind.z == 0u {
         albedo = far_flat(in, albedo);
@@ -1040,7 +1055,7 @@ fn fs_cutout_depth(in: VOut) {
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     let a = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv).a;
     let edge = cutout_edge(in, nuv, du, dv);
-    if cutout_thinned(in) || a <= edge {
+    if cutout_thinned(in) || (a <= edge && in.kind.w != 2u) {
         discard;
     }
 }
@@ -1108,9 +1123,12 @@ fn fs_cutout_fade(in: VOut) -> WorldOut {
     let du = dpdx(in.uv);
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
-    let albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
+    var albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
     if albedo.a <= cutout_edge(in, nuv, du, dv) {
-        discard;
+        if in.kind.w != 2u {
+            discard;
+        }
+        albedo = backed_hole(in, nuv);
     }
     return world_out(in, vec4(shade(in, albedo).rgb, SOLID_ALPHA));
 }
