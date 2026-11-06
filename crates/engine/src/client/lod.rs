@@ -469,6 +469,19 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
         .map(|k| openness(&high, k % CELLS, k / CELLS, at(k % CELLS, k / CELLS).0 + 1, s))
         .collect();
     let occ_at = |i: i32, j: i32| ground_occ[(j * CELLS + i) as usize];
+    // chiacraft: ground whose top block is leaves (the far data of an imported world, saved
+    // columns where trees stand) is drawn as a crown's (`crowned`), so packs shade it as a canopy:
+    // as ground, the imported Bliss world's far forests took none of it (mc-world-import, 11-06).
+    let leaf_memo = std::cell::RefCell::new(Vec::<(u32, bool)>::new());
+    let leafy = |state: u32| {
+        if let Some(&(_, l)) = leaf_memo.borrow().iter().find(|m| m.0 == state) {
+            return l;
+        }
+        let l = c.state_name(state).contains("leaves");
+        leaf_memo.borrow_mut().push((state, l));
+        l
+    };
+    let as_ground = |r: [u32; 4], state: u32| if leafy(state) { crowned(r) } else { r };
     // A crown sitting right on the ground hides its top.
     let covered = |i: i32, j: i32| crown_at(i, j).is_some_and(|c| c.bottom <= at(i, j).0 + 1);
     for j in 0..CELLS {
@@ -490,7 +503,7 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
             }
             if !hidden {
                 let (tex, tint) = face_of(top, 3);
-                out.push(occluded(quad(3, i * s, y, j * s, ((end - i) * s, 1, s), tex, tint, biome), occ));
+                out.push(as_ground(occluded(quad(3, i * s, y, j * s, ((end - i) * s, 1, s), tex, tint, biome), occ), top));
             }
             (lo, hi) = (lo.min(y), hi.max(y + 1));
             i = end;
@@ -537,7 +550,10 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                     s.min(y - ny)
                 };
                 let (tex, tint) = face_of(top, 3);
-                out.push(occluded(quad(dir as u32, i * s, y + 1 - band, j * s, (s, band, s), tex, tint, biome), occ_at(i, j)));
+                out.push(as_ground(
+                    occluded(quad(dir as u32, i * s, y + 1 - band, j * s, (s, band, s), tex, tint, biome), occ_at(i, j)),
+                    top,
+                ));
                 lo = lo.min(ny + 1);
                 if y - band <= ny {
                     continue;

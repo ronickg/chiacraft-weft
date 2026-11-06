@@ -42,7 +42,13 @@ pub fn rgb(c: u32) -> Vec3 {
 
 /// Where on its orbit it is, in turns.
 pub(super) fn turn_of(s: &SkyDef, d: &DimensionDef, time: f64) -> f64 {
-    let moved = if s.orbit.is_infinite() {
+    // chiacraft, test only: `--mc-moon` keeps a body on its own orbit (base's moon, a turn every
+    // 8/7 days) turning with the day instead, at its phase: the moon opposite the sun all month, as
+    // Minecraft's, so like-for-like shots of an evening aren't skewed by our gibbous moon high in
+    // the sky (Planner, 11-06).
+    static MC_MOON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    let mc_moon = *MC_MOON.get_or_init(|| crate::app::api::launch_options().contains_key("mc-moon"));
+    let moved = if s.orbit.is_infinite() || (mc_moon && s.orbit > 0.0) {
         d.day_turn(time)
     } else if s.orbit == 0.0 {
         0.0
@@ -245,6 +251,7 @@ impl Sky {
                         blend: Blend::Premultiplied,
                         cull_back: false,
                         topology: Topology::Triangles,
+                        motion: crate::post::motion(),
                     })
                     .map_err(|e| e.0)?;
                 // Clouds are things in the world: they hide what is behind them, and the shader says
@@ -260,6 +267,7 @@ impl Sky {
                         blend: Blend::Premultiplied,
                         cull_back: false,
                         topology: Topology::Triangles,
+                        motion: crate::post::motion(),
                     })
                     .map_err(|e| e.0)?;
                 Ok((pipe, clouds, slots.pop().unwrap_or_default(), shader))

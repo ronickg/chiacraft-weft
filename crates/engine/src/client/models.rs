@@ -399,6 +399,12 @@ pub struct Models {
     instances: [Vec<(BufferId, u32)>; 5],
     bones: [Vec<(BufferId, u32)>; 4],
     uploaded: Option<BufferId>,
+    /// The bones last frame at this frame's indices (`prev_bones`, temporal anti-aliasing's
+    /// motion), per frame slot; this frame's once uploaded; and the world batch's rows, who was
+    /// posed where and from where, kept from the last frame.
+    prev_bones: Vec<(BufferId, u32)>,
+    prev_uploaded: Option<BufferId>,
+    last_world: (Vec<[[f32; 4]; 3]>, Vec<(u64, u32, u32)>, glam::DVec3),
     /// This frame: (kind, instance) and bone rows.
     queued: Vec<(u32, Instance)>,
     /// This frame's instances for the sun's shadow map only (the player's own body in the first
@@ -894,6 +900,9 @@ impl Models {
             corners: gpu.create_buffer(16, usage::STORAGE, "model corners"),
             instances: Default::default(),
             bones: Default::default(),
+            prev_bones: Vec::new(),
+            prev_uploaded: None,
+            last_world: (Vec::new(), Vec::new(), glam::DVec3::ZERO),
             uploaded: None,
             clips: Vec::new(),
             builds: Vec::new(),
@@ -1336,6 +1345,7 @@ impl Models {
             self.instances
                 .iter_mut()
                 .chain(&mut self.bones)
+                .chain(std::iter::once(&mut self.prev_bones))
                 .flat_map(|v| v.drain(..))
                 .map(|b| b.0),
         ) {
@@ -1351,6 +1361,29 @@ impl Models {
         self.builds.clear();
         self.located.clear();
         self.uploaded = None;
+        self.prev_uploaded = None;
+    }
+
+    /// This frame's bone rows as they were last frame (`prev_bones`), in this frame's
+    /// camera-relative positions: each entity posed both frames (by entity and model) takes its
+    /// rows then, moved by how far the camera went; the rest (new this frame) their rows now.
+    fn prev_rows(&self) -> Vec<[[f32; 4]; 3]> {
+        let mut out = self.rows.clone();
+        let (rows, located, from) = &self.last_world;
+        let shift = (*from - self.located_from).as_vec3().to_array();
+        for &(id, kind, first) in &self.located {
+            let Some(&(_, _, was)) = located.iter().find(|l| l.0 == id && l.1 == kind) else { continue };
+            let n = self.kinds.get(kind as usize).map_or(0, |m| m.parts.len());
+            for i in 0..n {
+                let (Some(dst), Some(src)) = (out.get_mut(first as usize + i), rows.get(was as usize + i)) else { break };
+                let mut r = *src;
+                for (row, by) in r.iter_mut().zip(shift) {
+                    row[3] += by;
+                }
+                *dst = r;
+            }
+        }
+        out
     }
 
     /// Poses a model into `scratch` by clips and a look.
@@ -1640,12 +1673,29 @@ impl Models {
                 b
             }
         };
+        // Last frame's bones for the world's own models (and the hand's, which share them), with
+        // temporal anti-aliasing; elsewhere this frame's stand in (the shaders don't read them).
+        let pb = match self.prev_uploaded {
+            Some(p) => p,
+            None if bone_set(batch) == 0 && crate::post::motion() => {
+                let prev = self.prev_rows();
+                let p = grow(gpu, &mut self.prev_bones, frame.slot, prev.len().max(1) as u32, 48, usage::STORAGE, "model bones before");
+                gpu.mapped(p)[..prev.len() * 48].copy_from_slice(bytemuck::cast_slice(&prev));
+                if matches!(batch, Batch::World) {
+                    self.last_world = (self.rows.clone(), self.located.clone(), self.located_from);
+                }
+                self.prev_uploaded = Some(p);
+                p
+            }
+            None => bb,
+        };
         list.pipeline(pipe);
         list.bind(crate::gpu_layout::bind::model::INSTANCES, ib);
         list.bind(crate::gpu_layout::bind::model::SCENE, view);
         list.bind(crate::gpu_layout::bind::model::CUBOIDS, self.cuboids);
         list.bind(crate::gpu_layout::bind::model::CORNERS, self.corners);
         list.bind(crate::gpu_layout::bind::model::BONES, bb);
+        list.bind(crate::gpu_layout::bind::model::PREV_BONES, pb);
         let mut i = 0;
         while i < queued.len() {
             let kind = queued[i].0;

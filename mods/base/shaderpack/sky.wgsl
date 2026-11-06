@@ -226,8 +226,7 @@ fn cloud_density(s: Sky, cellp: vec2<f32>, h: f32, dims: vec2<f32>) -> f32 {
 // The soft layer over its underside (blocks): fair-weather cumulus, and a storm's deck with towers.
 const SOFT_THICK: f32 = 120.0;
 const SOFT_STORM_THICK: f32 = 190.0;
-// How far a look is followed (blocks): beyond, the clouds fade into the sky.
-const SOFT_REACH: f32 = 4000.0;
+// How far a look is followed: `SOFT_REACH` (look.wgsl, which the screen effects read too).
 // The HDR world's sunlight and skylight on the soft clouds, against today's (`soft_march`).
 const CLOUD_SUN_HDR: f32 = 1.0;
 const CLOUD_SKY_HDR: f32 = 1.0;
@@ -311,7 +310,10 @@ fn cloud_low_sun() -> f32 {
 
 // The sunlight on the clouds against the palette's: an orange that deepens as the sun gets low.
 fn cloud_sun_tint() -> vec3<f32> {
-    return mix(vec3(1.0), vec3(1.05, 0.66, 0.38), cloud_low_sun() * 0.85);
+    // Gold, not orange (0.66 0.38 in green and blue before): in Bliss's own world at 06:00 its
+    // clouds are gold against a gold-cream sky, ours went strong orange against lavender-blue,
+    // much warmer than the land's own gold (Look's and Tester 2's sheets, 11-06).
+    return mix(vec3(1.0), vec3(1.05, 0.8, 0.5), cloud_low_sun() * 0.85);
 }
 
 // The soft clouds along `dir` from the camera, up to `far` (blocks): rgb the light they send toward
@@ -368,7 +370,15 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
     // In the HDR world the sun lights them less: they stood on the curve's shoulder, brighter than
     // Bliss's at every hour and harder lit (mc_forest cloud luma noon 228 against 201, 17:00 208
     // against 176; their spread 20 against 15, 19 against 7). Bliss's read as soft cream masses.
-    let sun = p.sun * strength * (1.0 - s.axes[0].y * 0.55) * cloud_sun_tint() * select(1.0, CLOUD_SUN_HDR, scene.frame.x > 0.5);
+    var sun = p.sun * strength * (1.0 - s.axes[0].y * 0.55) * cloud_sun_tint() * select(1.0, CLOUD_SUN_HDR, scene.frame.x > 0.5);
+    // In the HDR world, clouds seen away from a low sun take its light pale cream, not orange: Bliss's
+    // clouds at 17:00-18:00 with the sun behind the camera are cream with grey bellies where ours
+    // went strong orange; toward the sun they keep its gold (its 06:00 clouds, facing the sun).
+    if scene.frame.x > 0.5 {
+        let away = 1.0 - smoothstep(-0.2, 0.6, mu);
+        let low_sun = 1.0 - smoothstep(0.2, 0.55, scene.sun.y);
+        sun = mix(sun, vec3(luma(sun)) * vec3(1.06, 0.98, 0.86), away * low_sun * 0.75);
+    }
     // Rain darkens the clouds' albedo and keeps their shapes (Photon: ×0.66); a storm's more.
     let albedo = mix(1.0, 0.66, s.axes[0].x) * mix(1.0, 0.6, storm);
     var through = 1.0;

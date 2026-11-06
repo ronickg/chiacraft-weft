@@ -394,6 +394,9 @@ fn blood_tint() -> vec3<f32> {
 // looking up from under the trees (Tester 2's looks4, 11-05); higher, they stand in the sky as
 // clouds with blue between them, as Bliss's do.
 const SOFT_LIFT: f32 = 220.0;
+// How far a look into the soft clouds is followed (blocks): beyond, they fade into the sky. Their
+// depth is held there, so what stands at this distance is cloud, never land (`sky_or_cloud`).
+const SOFT_REACH: f32 = 4000.0;
 
 // ---- lightning (`scene.lightning`, the engine's flash where the player is) ----
 // Ronald, 11-05: "add lightning flashes" (Tester 2's four storm shots showed none: the engine's
@@ -569,6 +572,31 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         let toward = pow(max(mu, 0.0), 2.0) * pow(1.0 - h, 3.0) * low;
         c += vec3(0.55, 0.22, 0.05) * toward;
     }
+    // (B5: on the sky's own colour, before the sun's glow and glare are added: on top of them it
+    // turned the glare gold, and the dawn mist that reads it went flat orange over the land, PC
+    // shdawnB3/B4.)
+    if scene.frame.x > 0.5 {
+        // With the sun low, the whole of its half of the sky goes gold-cream at its own brightness,
+        // as Bliss's dawn: ours stayed lavender-blue there round a gold glare (Bliss's own world at
+        // 06:00, sky band saturation 105 and warmth +85 against Bliss's 122 and +94; Look, 11-06).
+        // Its own window, full with the sun up to about 9 degrees and gone by about 20 (the sunset
+        // band's `low` is nearly 0 by Bliss's 06:00 sun at 10 degrees, so this did nothing, PC
+        // shdawnB2).
+        let morning = (1.0 - smoothstep(0.15, 0.35, scene.sun.y)) * smoothstep(-0.03, 0.02, scene.sun.y);
+        if morning > 0.0 {
+            // (That orange, 231 172 68 against Bliss's 201 172 108 at 06:00, was the dawn mist,
+            // which the script left free and which came and went between runs: with it pinned off
+            // a third at 1.0 0.87 0.66 only halved the lavender gaps, 6.7 % to 3.3 %; PC shdawnm0,
+            // shdawnm5.)
+            let cream = vec3(1.0, 0.84, 0.58);
+            // Over the sun's whole half, overhead too (about a third there): a lobe about the sun
+            // alone left the gaps between the clouds lavender (7 % of the 06:00 sky band, Bliss's
+            // none; PC shdawn0).
+            let wide = 0.5 + 0.5 * mu;
+            let dawn = pow(wide, 1.5) * morning * (1.0 - rain_amount());
+            c = mix(c, cream * (luma(c) / luma(cream)), dawn * 0.7);
+        }
+    }
     c += sun_glow(dir, p);
     // In the HDR world the air round the sun glows as bright as it really is (Mie scattering's
     // forward peak, a wide lobe and a tight one in the sun's own colour, strongest low), which the
@@ -694,6 +722,17 @@ fn shadow_in(m: mat4x4<f32>, info: vec4<f32>, round: f32, depth: f32, rel: vec3<
 // smoothly; x 1 lit to 0 in shadow, y how far to trust it.
 fn shadow_at(rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
     let near = shadow_in(scene.shadow_view_proj, scene.shadow, 80.0, 400.0, rel, n, false);
+    // With traced shadows (`scene.rt`) the near map holds the models alone and the far one the
+    // terrain: what doesn't trace (mobs, the mist) takes the darker of both.
+    if scene.rt.x > 0.5 {
+        let far_reach = max(scene.shadow_far.w * scene.shadow_far.y * 0.5, 1.0);
+        let far = shadow_in(scene.shadow_far_view_proj, scene.shadow_far, far_reach, far_reach * 3.0, rel, n, length(rel) > 250.0);
+        let trust = max(near.y, far.y);
+        if trust <= 0.0 {
+            return vec2(1.0, 0.0);
+        }
+        return vec2(min(mix(1.0, near.x, near.y), mix(1.0, far.x, far.y)), far.y);
+    }
     if near.y >= 0.999 {
         return near;
     }
@@ -706,6 +745,13 @@ fn shadow_at(rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
         return vec2(1.0, 0.0);
     }
     return vec2(mix(far.x, near.x, near.y / trust), trust);
+}
+
+// With traced shadows (`scene.rt`): the shade of the models (mobs, the player) at `rel` facing
+// `n`, from the near map that then holds them alone; 1 out of it.
+fn models_shadow(rel: vec3<f32>, n: vec3<f32>) -> f32 {
+    let m = shadow_in(scene.shadow_view_proj, scene.shadow, 80.0, 400.0, rel, n, false);
+    return mix(1.0, m.x, m.y);
 }
 
 // The sun on a mob or a model at `rel` facing `n` with sky light `sky`: the shadow map where it
@@ -1002,10 +1048,14 @@ fn wind_now() -> vec2<f32> {
 // How hard the wind pushes at `p` now, about 1 for its mean: gusts are bands of stronger wind that
 // sweep across the land the way it blows, so a field bends in waves.
 fn gust(p: vec3<f32>) -> f32 {
+    return gust_at(p, scene.params.w);
+}
+
+// `gust` at the shaders' clock `t` (last frame's for the motion image, `scene.taa.w`).
+fn gust_at(p: vec3<f32>, t: f32) -> f32 {
     let w = wind_now();
     let speed = length(w);
     let dir = select(vec2(1.0, 0.0), w / max(speed, 1e-4), speed > 0.01);
-    let t = scene.params.w;
     let along = dot(p.xz, dir) - t * max(speed, 1.0) * 0.9;
     let band = noise3(vec3(along / 14.0, t * 0.05, dot(p.xz, vec2(-dir.y, dir.x)) / 30.0));
     return 0.55 + 1.1 * smoothstep(0.35, 0.85, band);
@@ -1815,7 +1865,12 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     // evening the land at 17:00 and 18:00 measured 139-153 of saturation against Bliss's 56-84
     // (mc_forest, gr4), where Bliss's misty mornings run 181.
     let low_sat = mix(0.75, 0.95, smoothstep(0.02, 0.1, scene.weather.z));
-    let sat = 1.2 * look_opt(OPT_SATURATION, 1.0) * select(1.0, mix(low_sat, 0.62, smoothstep(0.3, 0.75, scene.sun.y)), scene.frame.x > 0.5);
+    // In Bliss's own world (imported block for block) the land with the sun 30-55° up came out
+    // grey-green at the cut tuned on the test world (0.62 at noon): land saturation 52 against
+    // Bliss's 72 at 08:00, 61 against 92 at noon, where 17:00 matched (75 against 83). A quarter
+    // more there (the canopy sweep cs1: x1.25 took 08:00 to 67, noon to 78), as it was with the sun
+    // under about 20°.
+    let sat = 1.2 * look_opt(OPT_SATURATION, 1.0) * select(1.0, mix(low_sat, 0.85, smoothstep(0.38, 0.55, scene.sun.y)), scene.frame.x > 0.5);
     t = max(mix(vec3(y), t, mix(1.0, sat, day)), vec3(0.0));
     // A cool floor so the night is never pure black; by day black stays black.
     t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034) * (1.0 - day);

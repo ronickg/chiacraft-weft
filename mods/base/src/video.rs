@@ -93,6 +93,9 @@ pub static SCREEN: Screen = Screen::named("video");
 static GPU_NAME: TextConfig = TextConfig::named("core:gpu_name");
 static GPU_CLASS: Config<i32> = Config::named("core:gpu_class");
 static GPU_MEMORY: Config<i32> = Config::named("core:gpu_memory_mb");
+/// The GPU can trace rays (`core:gpu_ray_query`): the traced shadows' row is shown.
+static GPU_RAY_QUERY: Config<bool> = Config::named("core:gpu_ray_query");
+static RT_SHADOWS: Config<bool> = Config::named("core:rt_shadows");
 /// What the detection chose (Research round 19, 7: "quality chosen by the GPU at first start"):
 /// the preset (-1 none yet), and whether the render scale went to half with it.
 static DETECTED: Config<i32> = Config::named("gpu_preset");
@@ -519,6 +522,20 @@ fn row_ui(ui: &mut Ui, rows: &'static [Row], i: usize, step: fn(usize, i32)) {
     });
 }
 
+/// Traced sun and moon shadows (`core:rt_shadows`), only where the GPU can trace rays: outside the
+/// presets, so no preset changes the look by it (an ultra choice the player makes).
+const RT_ROWS: [Row; 1] = [Row {
+    key: "rt_shadows",
+    values: &[0.0, 1.0],
+    get: || RT_SHADOWS.get() as u8 as f64,
+    set: |v| RT_SHADOWS.set(v > 0.0),
+    shown: |v| word(if v > 0.0 { "on" } else { "off" }),
+}];
+
+fn step_rt(i: usize, dir: i32) {
+    step_row(&RT_ROWS[i], dir);
+}
+
 fn step_fantasy(i: usize, dir: i32) {
     step_row(&FANTASY_ROWS[i], dir);
     FANTASY.set(3);
@@ -652,6 +669,9 @@ pub fn register(r: &mut Registry) {
             });
             for i in 0..ROWS.len() {
                 row_ui(ui, &ROWS, i, step);
+            }
+            if GPU_RAY_QUERY.get() {
+                row_ui(ui, &RT_ROWS, 0, step_rt);
             }
         });
     });

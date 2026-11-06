@@ -313,6 +313,15 @@ fn sky_or_cloud(uv: vec2<f32>, d: f32) -> bool {
         return true;
     }
     let w = scene.inv_view_proj * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, d, 1.0);
+    // The soft deck's far end: low over the horizon its looks reach the layer past `SOFT_REACH`,
+    // and its depth is held at that distance, under the deck's height there, so the height test
+    // below took a band of it for land (a dashed line at the deck's end that temporal
+    // anti-aliasing, gathering the deck's faint edge, made a solid pale band: mc_forest noon, 11-06).
+    // Only at that distance: distant terrain reaches past it (256 chunks), and its far land
+    // stays land.
+    if scene.soft_clouds.x > 0.5 && abs(length(w.xyz / w.w) - SOFT_REACH) < 4.0 {
+        return true;
+    }
     // The soft deck's underside (as the lightning's, `look.wgsl`), less a margin; the blocky
     // clouds' slab without soft ones.
     let lift = select(0.0, SOFT_LIFT * (1.0 - 0.7 * max(min(rain_amount() * 0.75 + scene.weather.w * 0.25, 1.0), scene.weather.w)), scene.soft_clouds.x > 0.5);
@@ -380,6 +389,13 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
         let e = textureLoad(textures[pass_.exposure - 1u], vec2(0, 0), 0).g;
         if e == e && e > 0.0 {
             col *= pow(auto_exposure(e), fantasy_opt(OPT_AUTO_EXPOSURE));
+            // The land a little dimmer against the sky with the sun 30-55° up: in Bliss's own world
+            // the sky matched at every hour (08:00 204 against 208, noon 189 against 192), the land
+            // was over it (113 against 89 at 08:00, 132 against 113 at noon; 17:00 115 against 113).
+            // Not the sky (its own dim is above), not in rain.
+            let morning = smoothstep(0.38, 0.52, scene.sun.y);
+            let land = 1.0 - 0.2 * morning + 0.06 * smoothstep(0.6, 0.82, scene.sun.y);
+            col *= mix(1.0, land, (1.0 - rain_amount()) * select(1.0, 0.0, sky_px));
         }
     }
     return col;

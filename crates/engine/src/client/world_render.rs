@@ -12,6 +12,8 @@ use weft_render::*;
 use super::mesher::Mesh;
 use super::textures::GameTextures;
 use crate::content::Content;
+
+mod rt;
 pub use crate::gpu_layout::Globals;
 
 const FACE_WORDS: u32 = 4;
@@ -142,7 +144,23 @@ impl Camera {
         self.bobbing() * glam::camera::rh::view::look_to_mat4(Vec3::ZERO, self.forward(), Vec3::Y)
     }
 
+    /// The projection the world is drawn with: `proj_plain` moved by this frame's jitter
+    /// (`post::jitter`, a fraction of a pixel; none without temporal anti-aliasing).
     pub fn proj(&self, aspect: f32) -> Mat4 {
+        let mut m = self.proj_plain(aspect);
+        let j = crate::post::jitter();
+        if j != glam::Vec2::ZERO {
+            // Clip x and y moved by j times w: the whole image moved by j in NDC.
+            for c in [&mut m.x_axis, &mut m.y_axis, &mut m.z_axis, &mut m.w_axis] {
+                c.x += j.x * c.w;
+                c.y += j.y * c.w;
+            }
+        }
+        m
+    }
+
+    /// The projection without the jitter.
+    pub fn proj_plain(&self, aspect: f32) -> Mat4 {
         // Y-up clip space: naga already flips Y for Vulkan.
         glam::camera::rh::proj::directx::perspective_infinite_reverse(self.fov.to_radians(), aspect, 0.05)
     }
@@ -439,6 +457,18 @@ pub struct WorldRenderer {
     solid: Solid,
     pub drawn: u32,
     pub faces_drawn: u64,
+    /// Ray tracing's scene (`rt.rs`, `core:rt_shadows`), and its compute pipeline where the GPU
+    /// has ray queries.
+    rt: Option<rt::RtScene>,
+    rt_expand: Option<PipelineId>,
+    /// The world shader traces (`gpu_layout::set_rt_prelude`; the shader pack's `world.wgsl` calls
+    /// `rt_sun`): every draw then binds the scene, which is kept while it does.
+    rt_compiled: bool,
+    rt_wanted: bool,
+    /// The shader pack's `world.wgsl` calls `rt_sun` (as of the last composing).
+    rt_pack: bool,
+    /// The setting changed: the app composes the world shader again (`reload_shaders`).
+    pub rt_reload: bool,
 }
 
 /// Block shaders: `fn shade(p: BlockPixel) -> vec4<f32>` in `shaders/block/<name>.wgsl`, for
@@ -493,8 +523,27 @@ impl WorldRenderer {
         textures: &GameTextures,
         assets: &crate::assets::Assets,
     ) -> Result<WorldRenderer, String> {
-        let (shader, slots) = world_shader(assets).map_err(|e| e.0)?;
-        let (face_pipes, quad_pipes, lod_pipe) = Self::pipelines(gpu, &shader)?;
+        // Traced sun shadows (`core:rt_shadows` where the GPU has ray queries): the world shader
+        // with the scene's bindings; should that fail, the shader without (`rt.rs`).
+        let rt_expand = rt::RtScene::expand_pipeline(gpu, assets);
+        let rt_pack = crate::packs::pack_uses("world.wgsl", "rt_sun");
+        let mut rt_compiled = rt_expand.is_some() && rt::rt_setting() && rt_pack;
+        crate::gpu_layout::set_rt_prelude(rt_compiled);
+        let made = world_shader(assets)
+            .map_err(|e| e.0)
+            .and_then(|(s, slots)| Ok((Self::pipelines(gpu, &s)?, s, slots)));
+        let made = match made {
+            Err(e) if rt_compiled => {
+                log::error!("world shader with traced shadows: {e}; without them");
+                rt_compiled = false;
+                crate::gpu_layout::set_rt_prelude(false);
+                world_shader(assets)
+                    .map_err(|e| e.0)
+                    .and_then(|(s, slots)| Ok((Self::pipelines(gpu, &s)?, s, slots)))
+            }
+            m => m,
+        };
+        let ((face_pipes, quad_pipes, lod_pipe), shader, slots) = made?;
         let fade_pipes = Self::fade_pipelines(gpu, &shader);
         let lod_open_pipe = Self::lod_open_pipeline(gpu, &shader);
         let cutout_split = Self::cutout_split_pipelines(gpu, &shader);
@@ -579,6 +628,15 @@ impl WorldRenderer {
             solid: Solid::new(gpu, c),
             drawn: 0,
             faces_drawn: 0,
+            rt: match (rt_expand, rt::rt_setting()) {
+                (Some(p), true) => Some(rt::RtScene::new(gpu, p)),
+                _ => None,
+            },
+            rt_expand,
+            rt_compiled,
+            rt_wanted: rt_expand.is_some() && rt::rt_setting(),
+            rt_pack,
+            rt_reload: false,
             calm_alt: Self::calm_pipes(gpu, assets),
             calm_on: false,
         })
@@ -682,6 +740,7 @@ impl WorldRenderer {
                 blend,
                 cull_back: cull,
                 topology: Topology::Triangles,
+                motion: crate::post::motion(),
             })
             .map_err(|e| e.0)
         };
@@ -717,6 +776,7 @@ impl WorldRenderer {
             blend: Blend::None,
             cull_back: true,
             topology: Topology::Triangles,
+            motion: crate::post::motion(),
         })
         .map_err(|e| log::error!("world shader fs_lod_open: {}", e.0))
         .ok()
@@ -761,6 +821,7 @@ impl WorldRenderer {
                 blend,
                 cull_back: true,
                 topology: Topology::Triangles,
+                motion: crate::post::motion(),
             }) {
                 Ok(p) => made.push(p),
                 Err(e) => {
@@ -812,6 +873,7 @@ impl WorldRenderer {
                 blend,
                 cull_back: true,
                 topology: Topology::Triangles,
+                motion: crate::post::motion(),
             }) {
                 Ok(p) => made.push(p),
                 Err(e) => {
@@ -851,6 +913,7 @@ impl WorldRenderer {
                 blend: Blend::None,
                 cull_back: false,
                 topology: Topology::Triangles,
+                motion: false,
             }) {
                 Ok(p) => made.push(p),
                 Err(e) => {
@@ -881,6 +944,7 @@ impl WorldRenderer {
             blend: Blend::None,
             cull_back: false,
             topology: Topology::Triangles,
+            motion: false,
         })
         .map_err(|e| log::error!("distant terrain shadows: {}", e.0))
         .ok()
@@ -1088,6 +1152,11 @@ impl WorldRenderer {
     /// Recompiles the world shader; keeps the old pipelines when the new source has errors.
     pub fn reload_shaders(&mut self, gpu: &mut dyn Backend, textures: &GameTextures, assets: &crate::assets::Assets) {
         self.occlusion.reload(gpu, assets);
+        // Traced only with the scene there to bind (`set_rt` makes it first).
+        self.rt_pack = crate::packs::pack_uses("world.wgsl", "rt_sun");
+        let rt = self.rt_wanted && self.rt.is_some() && self.rt_pack;
+        crate::gpu_layout::set_rt_prelude(rt);
+        self.rt_reload = false;
         match world_shader(assets)
             .map_err(|e| e.0)
             .and_then(|(s, slots)| Ok((Self::pipelines(gpu, &s)?, slots)))
@@ -1105,6 +1174,7 @@ impl WorldRenderer {
                 self.face_pipes = f;
                 self.quad_pipes = q;
                 self.lod_pipe = l;
+                self.rt_compiled = rt;
                 for p in self
                     .shadow_pipes
                     .take()
@@ -1170,6 +1240,9 @@ impl WorldRenderer {
 
     pub fn remove(&mut self, key: MeshKey) {
         self.terrain_epoch += 1;
+        if let Some(rt) = &mut self.rt {
+            rt.mesh_changed(key);
+        }
         let m = if let Some(m) = self.table_only.remove(&key) {
             m
         } else {
@@ -1196,6 +1269,12 @@ impl WorldRenderer {
     }
 
     pub fn destroy(&mut self, gpu: &mut dyn Backend) {
+        if let Some(rt) = self.rt.take() {
+            rt.destroy(gpu);
+        }
+        if let Some(p) = self.rt_expand.take() {
+            gpu.destroy_pipeline(p);
+        }
         self.drop_calm(gpu);
         self.meshes.clear();
         self.regions.clear();
@@ -1332,6 +1411,9 @@ impl WorldRenderer {
         gpu.write_buffer(self.faces.pages[a.page as usize].0, a.offset as u64 * 16, bytemuck::cast_slice(quads));
         self.lod.insert(key, (a, quads.len() as u32, y, skip));
         self.terrain_epoch += 1;
+        if let Some(rt) = &mut self.rt {
+            rt.lod_changed(key);
+        }
     }
 
     /// The columns shown by cubes (`Lod::mask`).
@@ -1352,6 +1434,9 @@ impl WorldRenderer {
         if let Some((a, ..)) = self.lod.remove(&key) {
             self.faces.free(a);
             self.terrain_epoch += 1;
+            if let Some(rt) = &mut self.rt {
+                rt.lod_changed(key);
+            }
         }
     }
 
@@ -2010,6 +2095,16 @@ impl WorldRenderer {
         list.bind(b::SCENE, scene);
         list.bind(b::LOD_MASK, self.lod_mask.0);
         list.bind(b::SOLID, self.solid.buf);
+        if self.rt_compiled
+            && let Some(rt) = &self.rt
+        {
+            use crate::gpu_layout::rt_bind as r;
+            list.push(Cmd::BindAccel { binding: r::TLAS, accel: rt.tlas() });
+            if let Some((records, table)) = rt.tables() {
+                list.bind(r::INSTANCES, table);
+                list.bind(r::RECORDS, records);
+            }
+        }
     }
 }
 

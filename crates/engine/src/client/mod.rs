@@ -660,6 +660,9 @@ pub struct Client {
     /// frame; and with it on, what is drawn after the opaque world goes into `late_out` for the app
     /// to put after the copy instead of into the frame's list.
     pub behind: [f32; 4],
+    /// Last frame's projection and view without the jitter, where its camera stood and the
+    /// shaders' clock then, for temporal anti-aliasing's `Scene::taa_prev` and `taa`.
+    taa_last: Option<(glam::Mat4, DVec3, f32)>,
     pub late_out: CommandList,
     /// Seconds until the next dust piece from the block being hit, and until its next knock.
     hit_dust: f32,
@@ -986,6 +989,7 @@ impl Client {
             late: CommandList::default(),
             hand_late: CommandList::default(),
             behind: [0.0; 4],
+            taa_last: None,
             late_out: CommandList::default(),
             hit_dust: 0.0,
             hit_sound: 0.0,
@@ -2798,6 +2802,25 @@ impl Client {
     }
 
     /// The frame as every world pass sees it (`gpu_layout::Scene`).
+    /// Temporal anti-aliasing's fields (`Scene::taa`, `taa_prev`): this frame's jitter, and last
+    /// frame's camera without it, taking this frame's camera-relative positions, with the
+    /// shaders' clock then. A camera that moved more than 32 blocks (a teleport, a respawn) or a
+    /// clock that went back starts it anew, and so does a frame without it (`post::taa_active`):
+    /// `taa.z` 0 then, and the shaders skip their motion.
+    fn taa_frame(&mut self, cam: &Camera, frame: &FrameInfo) -> ([f32; 4], [[f32; 4]; 4]) {
+        let aspect = frame.width as f32 / frame.height.max(1) as f32;
+        let now = cam.proj_plain(aspect) * cam.view();
+        let j = crate::post::jitter();
+        let t = crate::shaders::time();
+        match self.taa_last.replace((now, cam.pos, t)) {
+            Some((last, at, then)) if crate::post::taa_active() && (cam.pos - at).length() < 32.0 && then <= t => {
+                let moved = glam::Mat4::from_translation((cam.pos - at).as_vec3());
+                ([j.x, j.y, 1.0, then], (last * moved).to_cols_array_2d())
+            }
+            _ => ([j.x, j.y, 0.0, t], now.to_cols_array_2d()),
+        }
+    }
+
     fn scene(&self, cam: &Camera, frame: &FrameInfo) -> Scene {
         // Fog ends where the terrain does: the view, or the distant terrain beyond it.
         let view_distance = (self.view_radius * 16).max(lod::Lod::distance()) as f32;
@@ -2843,6 +2866,9 @@ impl Client {
             lightning: [self.lightning_seen.0, self.lightning_seen.1, self.thunder(), self.lightning_seen.2],
             froxels: [0.0; 4],
             upscale: [crate::settings::upscaler() as f32, 0.0, 0.0, 0.0],
+            // Filled in by `render` (`taa_frame`).
+            taa: [0.0; 4],
+            taa_prev: [[0.0; 4]; 4],
             cloud_shadow: [0.0; 4],
             prev_view_proj: [[0.0; 4]; 4],
             cloud_moved: [0.0; 4],
@@ -2870,6 +2896,7 @@ impl Client {
                 }
                 _ => [0.0; 4],
             },
+            rt: [self.render.rt_traced() as u32 as f32, 0.0, 0.0, 0.0],
             shadow: match self.shadow_map {
                 Some(t) if self.shadow.1 => {
                     [self.shadow_index(t) as f32, self.shadow_size as f32, 1.0, 2.0 * SHADOW_REACH / self.shadow_size as f32]
@@ -3024,6 +3051,14 @@ impl Client {
         self.shadow_index
     }
 
+    /// `core:rt_shadows` turned on or off: the scene made (or let go), and whether the world shader
+    /// has to be composed again (the app does it before anything of the frame draws with it).
+    pub fn rt_switch(&mut self, gpu: &mut dyn Backend) -> bool {
+        self.render
+            .set_rt(gpu, shadow_setting("core:rt_shadows", 0.0) > 0.5);
+        self.render.rt_reload
+    }
+
     /// Sun shadows (`sun_shadows` packs), first their light, before the world is drawn (its scene
     /// samples the map with it): from the sun, or the moon once it has set, an orthographic box
     /// `SHADOW_REACH` blocks to each side of the camera along the light, moved in whole texels so
@@ -3110,8 +3145,7 @@ impl Client {
     /// The sun's shadow map, after `render` posed this frame's models (the pass is put before the
     /// world's in the frame's list): the terrain and the models, the player's own body too.
     pub fn render_shadows(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, frame: &FrameInfo) {
-        let (light, true) = self.shadow else { return };
-        let Some(map) = self.shadow_map else { return };
+        let (Some(map), Some(far_map)) = (self.shadow_map, self.shadow_far_map) else { return };
         let cam = self.render_camera();
         while self.shadow_bufs.len() < gpu.frames_in_flight() {
             self.shadow_bufs.push(gpu.create_buffer(
@@ -3121,12 +3155,30 @@ impl Client {
             ));
         }
         let mut scene = self.scene(&cam, frame);
-        scene.view_proj = light.to_cols_array_2d();
         // The map is the pass's target: nothing in it may sample it.
         scene.shadow = [0.0; 4];
+        if let (light, true) = self.shadow {
+            self.render_near_shadows(gpu, list, frame, &cam, light, map, scene);
+        }
+        self.render_far_shadows(gpu, list, frame, &cam, far_map, scene);
+    }
+
+    /// The near cascade: the terrain and the models, the player's own body too.
+    #[allow(clippy::too_many_arguments)]
+    fn render_near_shadows(
+        &mut self,
+        gpu: &mut dyn Backend,
+        list: &mut CommandList,
+        frame: &FrameInfo,
+        cam: &Camera,
+        light: glam::Mat4,
+        map: weft_render::TextureId,
+        mut scene: Scene,
+    ) {
+        scene.view_proj = light.to_cols_array_2d();
         let buf = self.shadow_bufs[frame.slot];
         gpu.mapped(buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
-        list.push(weft_render::Cmd::BeginPass { color: None, depth: Some((map, Some(0.0))) });
+        list.push(weft_render::Cmd::BeginPass { motion: None, color: None, depth: Some((map, Some(0.0))) });
         // Leaning structures (chiacraft, a falling tree) cast theirs, turned.
         let leaning: Vec<(u64, DVec3, (Vec3, glam::Quat))> = self
             .entities
@@ -3137,12 +3189,27 @@ impl Client {
                     .map(|l| (id, physics::Transform::of(e.pos).origin(), (l.pivot, l.now())))
             })
             .collect();
-        self.render
-            .draw_shadow(gpu, list, frame, &cam, light, buf, 0, &leaning);
+        // With traced shadows (`core:rt_shadows`) the terrain casts by its rays: the near map then
+        // holds the models alone (mobs, the player), which the world's rays don't see.
+        if !self.render.rt_traced() {
+            self.render
+                .draw_shadow(gpu, list, frame, cam, light, buf, 0, &leaning);
+        }
         self.entity_render.draw_shadow(gpu, list, frame, buf);
         list.push(weft_render::Cmd::EndPass);
-        // The far cascade: the terrain alone, coarser, to where hills stand far off.
-        let (Some(far_map), (far, true)) = (self.shadow_far_map, self.shadow_far) else { return };
+    }
+
+    /// The far cascade: the terrain alone, coarser, to where hills stand far off.
+    fn render_far_shadows(
+        &mut self,
+        gpu: &mut dyn Backend,
+        list: &mut CommandList,
+        frame: &FrameInfo,
+        cam: &Camera,
+        far_map: weft_render::TextureId,
+        mut scene: Scene,
+    ) {
+        let (far, true) = self.shadow_far else { return };
         // Kept from an earlier frame while neither the light about its anchor (in whole texels and
         // `settled` steps) nor the terrain has moved: walking within a cell, the far map costs
         // nothing. Terrain that loads (every mesh bumps `terrain_epoch`) waits FAR_TERRAIN_WAIT
@@ -3167,9 +3234,9 @@ impl Client {
         scene.shadow_far = [0.0; 4];
         let far_buf = self.shadow_far_bufs[frame.slot];
         gpu.mapped(far_buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
-        list.push(weft_render::Cmd::BeginPass { color: None, depth: Some((far_map, Some(0.0))) });
+        list.push(weft_render::Cmd::BeginPass { motion: None, color: None, depth: Some((far_map, Some(0.0))) });
         self.render
-            .draw_shadow(gpu, list, frame, &cam, far, far_buf, 1, &[]);
+            .draw_shadow(gpu, list, frame, cam, far, far_buf, 1, &[]);
         list.push(weft_render::Cmd::EndPass);
     }
 
@@ -3187,7 +3254,11 @@ impl Client {
             self.entity_render.set_skin(gpu, entity, &png);
         }
         let cam = self.render_camera();
+        // Ray tracing's scene (`core:rt_shadows`): this frame's builds and its TLAS, before the
+        // world's draws that bind it (`app` switched the world shader before this, `rt_switch`).
+        self.render.rt_frame(gpu, early, frame.slot, &cam);
         let mut scene = self.scene(&cam, frame);
+        (scene.taa, scene.taa_prev) = self.taa_frame(&cam, frame);
         // The calm world pipelines (`gpu_layout::CALM_OFF`) while nothing they leave out is on, read
         // from the scene the shaders see: no fog in the air, no thunder, no held light, the eye in
         // no liquid (the fog then starts at 0.6 of its end).

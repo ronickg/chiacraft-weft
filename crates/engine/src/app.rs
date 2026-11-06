@@ -545,6 +545,8 @@ impl App {
         let ui = UiRenderer::new(&mut *gpu, &assets)?;
         // The HDR world's format, before any pipeline drawing into the world is made.
         crate::post::set_hdr(settings.hdr_world());
+        // And whether they draw the motion image too, for temporal anti-aliasing.
+        crate::post::set_motion(settings.aa());
         let post = crate::post::Post::new(&mut *gpu, &assets);
         let mut input = Input::default();
         for (action, key) in &content().game.keys {
@@ -559,7 +561,11 @@ impl App {
         let depth = make_depth(&mut *gpu, size.width, size.height);
         let gpu_name = gpu.device_name().to_string();
         // What the GPU is, for mods (`core:gpu_*`): as found, whatever a file says.
-        for (name, v) in [("core:gpu_class", gpu.device_class() as f64), ("core:gpu_memory_mb", gpu.device_memory_mb() as f64)] {
+        for (name, v) in [
+            ("core:gpu_class", gpu.device_class() as f64),
+            ("core:gpu_memory_mb", gpu.device_memory_mb() as f64),
+            ("core:gpu_ray_query", gpu.ray_query() as u8 as f64),
+        ] {
             if let Some(id) = crate::config::by_name(name) {
                 crate::config::put(id, v);
             }
@@ -2691,6 +2697,8 @@ fn update_game(r: &mut Running, dt: f64, frame_start: Instant) {
         g.client.render.occlusion.on = r.settings.occlusion_culling();
         g.client.sky.soft_wanted = r.settings.soft_clouds();
         r.post.use_low = r.settings.post_low();
+        r.post.use_taa = r.settings.aa();
+        r.post.taa_blend = r.settings.taa_blend();
         r.post.bloom_levels = r.settings.bloom_levels();
         // The mist volume with the HDR world only, until today's (LDR) look takes it on Ronald's
         // word (its look was never shown to him there); `core:froxels` 0 turns it off there too.
@@ -3006,7 +3014,7 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
     let mut labels: Vec<(f32, f32, &crate::ui::text::Msg, u32, f32, f32)> = Vec::new();
     if let Some(g) = &r.game {
         let cam = g.client.render_camera();
-        let view_proj = cam.proj(info.width as f32 / info.height.max(1) as f32) * cam.view();
+        let view_proj = cam.proj_plain(info.width as f32 / info.height.max(1) as f32) * cam.view();
         for (pos, text, color, size) in &g.client.gizmo_labels {
             let clip = view_proj * (*pos - cam.pos).as_vec3().extend(1.0);
             if clip.w < 0.1 || (*pos - cam.pos).length_squared() > 24.0 * 24.0 {
@@ -3176,7 +3184,18 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
     // than the screen (`render_scale`), which their last pass scales up.
     let scaled = (world_info.width, world_info.height) != (info.width, info.height);
     // The HDR world always ends in the effects' last pass, which finishes the picture.
-    let post = (r.post.on() || scaled || crate::post::hdr()) && r.game.is_some();
+    let post = (r.post.on() || scaled || crate::post::hdr() || r.post.taa_on()) && r.game.is_some();
+    // Gathered over frames (temporal anti-aliasing), the world is drawn a fraction of a pixel
+    // aside each frame, and its pass draws the motion image too (whenever the pipelines have it).
+    crate::post::next_jitter(post && r.post.taa_on(), world_info.width, world_info.height);
+    let motion = r
+        .game
+        .is_some()
+        .then(|| {
+            r.post
+                .motion_target(&mut *r.gpu, world_info.width, world_info.height)
+        })
+        .flatten();
     let world_target = if post {
         Target::Texture(
             r.post
@@ -3200,6 +3219,13 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         drop(s);
         let s = crate::diag::span("wires and sun");
         g.client.update_wires(&mut *r.gpu, &r.textures);
+        // `core:rt_shadows` changed: the world shader composed again, tracing or not, before
+        // anything of this frame is drawn with it.
+        if g.client.rt_switch(&mut *r.gpu) {
+            g.client
+                .render
+                .reload_shaders(&mut *r.gpu, &r.textures, &r.assets);
+        }
         // The sun's light for shadow maps (packs that use them), which the world's scene samples.
         g.client.prepare_shadows(&mut *r.gpu);
         // A copy of the world for what is seen through it (`water_behind` packs, with post on).
@@ -3233,6 +3259,7 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         let s = crate::diag::span("shadows");
         g.client
             .render_shadows(&mut *r.gpu, &mut r.list, world_info);
+
         // The mist's volume, which reads the shadow maps, before the world that reads it.
         r.list.append(&mut g.client.sky.froxels.passes);
         drop(s);
@@ -3246,7 +3273,11 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
             }
             // Soft clouds traced against that copy, before the sky draws them (chiacraft).
             world.append(&mut g.client.sky.soft.passes);
-            world.push(Cmd::BeginPass { color: Some((world_target, None)), depth: Some((r.depth.0, None)) });
+            world.push(Cmd::BeginPass {
+                motion: motion.map(|m| (m, None)),
+                color: Some((world_target, None)),
+                depth: Some((r.depth.0, None)),
+            });
             world.append(&mut g.client.late_out);
             // The "translucent" part ends here: the copy, the sky, clouds, water, particles and the
             // hand (the client leaves this mark to the app when the world is copied).
@@ -3254,8 +3285,12 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         }
     }
     r.list.push(Cmd::Mark);
-    r.list
-        .push(Cmd::BeginPass { color: Some((world_target, Some(clear))), depth: Some((r.depth.0, Some(0.0))) });
+    r.list.push(Cmd::BeginPass {
+        // A depth of -1: no surface wrote its own motion there (`taa.wgsl`).
+        motion: motion.map(|m| (m, Some([0.0, 0.0, -1.0, 0.0]))),
+        color: Some((world_target, Some(clear))),
+        depth: Some((r.depth.0, Some(0.0))),
+    });
     r.list.append(&mut world);
     r.world_list = world;
     r.list.push(Cmd::EndPass);
@@ -3271,6 +3306,7 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
             .as_ref()
             .and_then(|g| g.client.scene_buffer(info.slot));
         let depth = r.gpu.texture_index(r.depth.0);
+        r.post.set_depth(r.depth.0);
         let _s = crate::diag::span("effects");
         r.post
             .apply(&mut *r.gpu, &mut r.list, world_info, scene, depth, scaled);
@@ -3279,7 +3315,7 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         r.list.push(Cmd::Mark);
         // The UI pipeline has no depth, so it cannot draw in a pass that has one.
         r.list
-            .push(Cmd::BeginPass { color: Some((Target::Surface, None)), depth: None });
+            .push(Cmd::BeginPass { motion: None, color: Some((Target::Surface, None)), depth: None });
     }
     let s = crate::diag::span("ui draw");
     r.ui.draw(&mut *r.gpu, &mut r.list, info, scale);
