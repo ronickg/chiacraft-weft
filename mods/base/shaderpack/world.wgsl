@@ -1191,7 +1191,16 @@ fn fs_lod_open(in: VOut) -> @location(0) vec4<f32> {
     return lod_color(in);
 }
 
-fn lod_color(in: VOut) -> vec4<f32> {
+fn lod_color(in_lod: VOut) -> vec4<f32> {
+    // What `vs_lod` always sets, set here again as constants: the compiler then drops the lighting
+    // paths they rule out (block shaders, glow textures, placed lights, plants), which it cannot see
+    // through the interpolants. The same colours from a smaller shader (Android port, 11-06).
+    var in = in_lod;
+    in.glow = 0xffffffffu;
+    in.slot = 0u;
+    in.overlay = 0u;
+    in.light = vec4(1.0, 0.0, 0.0, 0.0);
+    in.kind = vec4(in_lod.kind.x, 1u, 0u, in_lod.kind.w);
     // A texture per block, laid from the world position on the face's plane (top
     // faces and gentle slopes by x and z, walls by their side and height, up the right way), its
     // gradients from that unbroken position so block borders don't jump to a coarse mip. Far off
