@@ -365,11 +365,6 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
         // to 213, gr3.)
         // (25%: with the clouds dimmed too, 30% took the blue between them to 155 against 172, skf.)
         col *= 1.0 - 0.25 * open;
-        // And darker still just over the horizon, at any hour of the day: Bliss's sky there is a
-        // darker blue-grey band over the far land (its evening's mist lies under it), ours was the
-        // brightest of the sky (Bliss's own world, the rows 2-6° up: 152-158 at 17:00 against our
-        // 197-205, 164-177 at noon against 187-194).
-        col *= 1.0 - 0.2 * open * (1.0 - smoothstep(0.0, 0.12, normalize(wv.xyz / wv.w).y));
     }
     if pass_.bloom != 0u {
         let glow = bloom_tap(pass_.bloom - 1u, uv);

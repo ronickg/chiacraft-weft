@@ -1625,7 +1625,9 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
         let low = (1.0 - smoothstep(0.2, 0.45, scene.sun.y));
         // (After the handover to the sky where the terrain ends: before it, the farthest land, where
         // the band lies, took the sky's colour over it, lk_eb1.)
-        let far_band = smoothstep(600.0, 1500.0, dist) * low;
+        // (From 600 blocks it lay on the nearer hills too, a wide pale wash, not Bliss's thin band
+        // at the far horizon: lk_eb2.)
+        let far_band = smoothstep(1000.0, 2200.0, dist) * low;
         if far_band > 0.0 {
             let y = scene.eye.y + rel.y - (SEA_LEVEL + 4.0);
             let inside = min(min(BAND_DEPTH / max(-dir.y, 0.008), dist), 1500.0);
