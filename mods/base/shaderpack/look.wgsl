@@ -955,7 +955,7 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f
     // the sky's full fill a cloud's shadow kept the land at about 0.72 of its lit brightness, where
     // Bliss's shaded forest falls to 0.4-0.6 (PC shcs_off/shcs_on against Bliss's vista, 11-06).
     if scene.frame.x > 0.5 && scene.cloud_shadow.x > 0.5 {
-        c *= mix(0.75, 1.0, soft_cloud_shadow(rel));
+        c *= mix(0.6, 1.0, soft_cloud_shadow(rel));
     }
     // Under a forest's canopy most of the floor's light is the sun's, come down through the leaves:
     // green and soft (a rainforest's floor gets 1-2 % of the sun, more of it this way than from the
