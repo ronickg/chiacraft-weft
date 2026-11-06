@@ -495,7 +495,9 @@ fn lod_corner(f: u32, c: u32, at: vec3<f32>) -> LodCorner {
     let w3 = records[f * 4u + 3u];
     let dir = lod_dir(w0);
     if dir != LOD_FACE_GRID {
-        let lo = lod_pos(w0, w2) - vec3(0.0, 0.125, 0.0);
+        // A far water top lies a quarter lower still: under near water whose bed hasn't come it shows
+        // through, and at the near surface's height the two fought (chiacraft, stage 1).
+        let lo = lod_pos(w0, w2) - vec3(0.0, select(0.125, 0.375, dir == 3u && lod_tint(w0) == 3u), 0.0);
         return LodCorner(lo + CORNERS[dir * 4u + c] * lod_size(w2, w3), lod_box_normal(dir), dir, w1 >> FACE_BIOME_SHIFT);
     }
     let base = (f - w2) * 4u;

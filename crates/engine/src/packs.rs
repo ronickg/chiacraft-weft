@@ -82,8 +82,10 @@ pub fn sun_shadows() -> bool {
 
 /// The chosen pack's `pack.cfg` says `water_behind = true`: the world is copied before what is seen
 /// through it is drawn, for water that bends and tints what lies under it (`scene.behind`).
+/// Without a pack too (chiacraft): the engine's own water blends over it as vanilla's does (`world.wgsl`'s
+/// `fs_translucent`).
 pub fn water_behind() -> bool {
-    pack_flag("water_behind")
+    pack_flag("water_behind") || SHADER_PACK.read().unwrap().is_none()
 }
 
 /// The chosen pack's `pack.cfg` says `merge_effects = true`: the screen effects run in one pass,
