@@ -170,7 +170,7 @@ pub const RULES: &[Rule] = &[
         "the Cretaceous gateway is built of amber blocks; a mound's top",
     ),
     n(&["portals:portal", "packages:unknown"], 0, Shared, Technical, Not, "a linked world's door; a missing package's stand-in"),
-    n(&["base:copper_lamp"], 3, Tech, Machine, Not, "no recipe yet (no copper in the game)"),
+    n(&["base:copper_lamp"], 3, Tech, Machine, Made, "the golden lamp's twin in copper; a redstone machine (the Age of Steam's)"),
     // ---- the ground
     r(
         &[
@@ -328,6 +328,36 @@ pub const RULES: &[Rule] = &[
     n(&["base:furnace"], 0, Tech, Station, Made, "the Stone Age key's infrastructure: what it makes is the Bronze Age's"),
     r(&["base:glass", "base:*_stained_glass", "base:bricks", "base:stone", "base:stone_bricks"], 1, Tech, Building, Made),
     r(&["base:glowstone", "base:red_lamp", "base:green_lamp", "base:blue_lamp"], 1, Tech, Light, Made),
+    // The RTX showcase blocks (`showcase.rs`): of their materials' ages.
+    r(
+        &[
+            "base:frosted_glass",
+            "base:smoked_glass",
+            "base:leaded_glass",
+            "base:polished_limestone",
+            "base:limestone_tiles",
+            "base:checker_tiles",
+            "base:*_glazed_tiles",
+            "base:copper_block",
+            "base:bronze_plate",
+        ],
+        1,
+        Tech,
+        Building,
+        Made,
+    ),
+    r(&["base:slate_tiles"], 0, Tech, Building, Made),
+    r(&["base:steel_plate"], 2, Tech, Building, Made),
+    r(&["base:polished_obsidian"], 3, Tech, Building, Made),
+    r(&["base:bronze_lantern"], 1, Tech, Light, Made),
+    n(
+        &["base:verdigris_copper"],
+        1,
+        Tech,
+        Building,
+        Not,
+        "a copper block weathered in the open air (`vitals::weathering`); breaks into the copper block",
+    ),
     // ---- machines (redstone: the Age of Steam's first machines)
     n(
         &[
