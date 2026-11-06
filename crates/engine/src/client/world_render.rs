@@ -476,6 +476,29 @@ pub struct WorldRenderer {
     rt_pack: bool,
     /// What the scene is traced for: sun shadows, reflections (`set_rt_modes`).
     rt_modes: (bool, bool),
+    /// The path tracer (`rt.rs` `path_trace`, the pack's `pathtrace.wgsl`): its compute and its
+    /// composite, made with the traced world shader; its output per frame slot.
+    /// The path tracer's pipelines: the trace, the composite, the radiance cache's resolve, the
+    /// finish after a denoiser (`pt_finish`).
+    pt_pipes: Option<[PipelineId; 4]>,
+    pt_out: Vec<(BufferId, u32)>,
+    /// The radiance cache (`pathtrace.wgsl`'s `pt_cache`, `gpu_layout::PT_CACHE` cells), made zeroed
+    /// with the first traced frame.
+    pt_cache: Option<BufferId>,
+    /// The path tracer's G-buffer (`rt.rs` `gbuffer_pass`): its pipelines (faces opaque, faces
+    /// cutout, quads opaque, quads cutout), the last `draw`'s opaque and cutout table draws (kind,
+    /// layer, page, group, first, draws) with its frame slot (the CPU-made runs before
+    /// `translucent` are drawn again too), and its images (albedo, normal, spec) at the world's size.
+    gb_pipes: Option<[PipelineId; 4]>,
+    gb_draws: Vec<(u8, u8, u32, u32, u32, u32)>,
+    gb_draws_slot: usize,
+    pub gb_images: Option<(TextureId, TextureId, TextureId, (u32, u32))>,
+    /// The path tracer's light (`path_trace`), at the world's size, Rgba16F: diffuse (rgb divided
+    /// by the albedo; a the bounce's distance) and specular (rgb divided by `pt_spec_albedo`; a the
+    /// reflection's distance, 65504 the sky), for the denoisers.
+    pub pt_images: Option<(TextureId, TextureId, (u32, u32))>,
+    /// The denoised light a denoiser writes for `pt_finish` (Rgba16F, the world's size; `pt_light`).
+    pt_light_image: Option<(TextureId, (u32, u32))>,
     /// The setting changed: the app composes the world shader again (`reload_shaders`).
     pub rt_reload: bool,
 }
@@ -648,6 +671,15 @@ impl WorldRenderer {
             rt_wanted: rt_expand.is_some() && rt::rt_setting(),
             rt_pack,
             rt_modes: (false, false),
+            pt_pipes: if rt_compiled { rt::pt_pipelines(gpu, assets) } else { None },
+            pt_out: Vec::new(),
+            pt_cache: None,
+            gb_pipes: if rt_compiled { rt::gb_pipelines(gpu, &shader) } else { None },
+            gb_draws: Vec::new(),
+            gb_draws_slot: 0,
+            gb_images: None,
+            pt_images: None,
+            pt_light_image: None,
             rt_reload: false,
             calm_sets: [Self::calm_pipes(gpu, assets, false), Self::calm_pipes(gpu, assets, true)],
             calm_level: 0,
@@ -1204,6 +1236,18 @@ impl WorldRenderer {
                 self.quad_pipes = q;
                 self.lod_pipe = l;
                 self.rt_compiled = rt;
+                for p in self.pt_pipes.take().into_iter().flatten() {
+                    gpu.destroy_pipeline(p);
+                }
+                for p in self.gb_pipes.take().into_iter().flatten() {
+                    gpu.destroy_pipeline(p);
+                }
+                if rt {
+                    self.pt_pipes = rt::pt_pipelines(gpu, assets);
+                    if let Ok((s, _)) = world_shader(assets) {
+                        self.gb_pipes = rt::gb_pipelines(gpu, &s);
+                    }
+                }
                 for p in self
                     .shadow_pipes
                     .take()
@@ -1303,6 +1347,30 @@ impl WorldRenderer {
         }
         if let Some(p) = self.rt_expand.take() {
             gpu.destroy_pipeline(p);
+        }
+        for p in self.pt_pipes.take().into_iter().flatten() {
+            gpu.destroy_pipeline(p);
+        }
+        for (b, _) in self.pt_out.drain(..) {
+            gpu.destroy_buffer(b);
+        }
+        if let Some(b) = self.pt_cache.take() {
+            gpu.destroy_buffer(b);
+        }
+        for p in self.gb_pipes.take().into_iter().flatten() {
+            gpu.destroy_pipeline(p);
+        }
+        if let Some((a, b, c, _)) = self.gb_images.take() {
+            for t in [a, b, c] {
+                gpu.destroy_texture(t);
+            }
+        }
+        if let Some((t, _)) = self.pt_light_image.take() {
+            gpu.destroy_texture(t);
+        }
+        if let Some((a, b, _)) = self.pt_images.take() {
+            gpu.destroy_texture(a);
+            gpu.destroy_texture(b);
         }
         self.drop_calm(gpu);
         self.meshes.clear();
@@ -2063,6 +2131,9 @@ impl WorldRenderer {
                 None => steps.push((pipe, buf, i, true)),
             }
         }
+        // The path tracer's G-buffer replays the opaque and cutout terrain's draws (`draw_gbuffer`).
+        self.gb_draws.clear();
+        self.gb_draws_slot = frame.slot;
         for (pipe, buf, i, counted) in steps {
             let (_, layer, _, id, base, max) = groups[i];
             if layer > 0 && !cpu_opaque_drawn {
@@ -2079,6 +2150,13 @@ impl WorldRenderer {
                 .flatten()
                 .map(|n| n.max(self.table.peak.get(id as usize).copied().unwrap_or(0)));
             let draws = if capped { capped_draws(seen, max) } else { max };
+            if counted {
+                let (kind, layer, page, ..) = groups[i];
+                if layer < 2 && matches!(kind, 0 | 1 | 4 | 5) {
+                    self.gb_draws
+                        .push((kind as u8, layer as u8, page as u32, id as u32, base as u32, draws as u32));
+                }
+            }
             if counted {
                 issued = (issued.0 + draws as u64, issued.1 + max as u64);
             }
