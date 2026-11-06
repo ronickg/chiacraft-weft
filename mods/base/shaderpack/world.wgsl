@@ -412,22 +412,41 @@ const PLANT_SHADOW_LIFT: f32 = 0.7;
 // them. The real sun's is 0.0047; a little more, as shader packs' suns, reads as softer light.
 const SUN_CONE: f32 = 0.012;
 
+// Traced shadows reach this far from the eye (blocks); the far shadow map (the terrain alone while
+// tracing) takes over past it, over the last fifth. At view 32 the far land is most of the frame,
+// and its long rays through thousands of distant tiles cost the most (Planner's sweep, 11-06: +4 ms
+// On, +11 ms Ultra at 1080p).
+const RT_REACH: f32 = 256.0;
+
 fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
-    let sky = smoothstep(0.75, 1.0, in.light.x);
     // Traced (`core:rt_shadows`, a GPU with ray queries): one ray toward the light through the
-    // cubes and the distant terrain, by the leaves' holes, so no texels, no acne and shadows as far
-    // as the land goes; still never deep under cover. Its colour through stained glass is kept for
-    // later (`rt_sun`'s rgb); here its brightness.
-    if scene.rt.x > 0.5 {
-        // A solid face turned from the light is in its own shade (leaves and plants let it through).
-        if dot(n, light_dir()) <= 0.0 && in.kind.z == 0u && in.kind.x != TINT_FOLIAGE {
-            return 0.0;
-        }
-        let t = rt_sun_soft(in.rel, n, light_dir(), in.kind.z != 0u, SUN_CONE, in.clip.xy, scene.rt.z > 0.5);
-        let c = min(canopy(), 1.0);
-        let cover = smoothstep(mix(0.3, 0.15, c), mix(0.8, 0.5, c), in.light.x);
-        return min(dot(t, vec3(1.0 / 3.0)), cover) * models_shadow(in.rel, n) * cloud_shadow(in.rel);
+    // cubes and the distant terrain, by the leaves' holes, so no texels and no acne; still never
+    // deep under cover. Its colour through stained glass is kept for later (`rt_sun`'s rgb); here
+    // its brightness.
+    if scene.rt.x < 0.5 || in.dist >= RT_REACH {
+        return sun_shadow_mapped(in, n);
     }
+    // A solid face turned from the light is in its own shade (leaves and plants let it through).
+    if dot(n, light_dir()) <= 0.0 && in.kind.z == 0u && in.kind.x != TINT_FOLIAGE {
+        return 0.0;
+    }
+    let c = min(canopy(), 1.0);
+    let cover = smoothstep(mix(0.3, 0.15, c), mix(0.8, 0.5, c), in.light.x);
+    // Deep under cover (a cave, a room): no sun to trace.
+    if cover <= 0.0 {
+        return 0.0;
+    }
+    let t = rt_sun_soft(in.rel, n, light_dir(), in.kind.z != 0u, SUN_CONE, in.clip.xy, scene.rt.z > 0.5);
+    let traced = min(dot(t, vec3(1.0 / 3.0)), cover) * models_shadow(in.rel, n) * cloud_shadow(in.rel);
+    let fade = smoothstep(RT_REACH * 0.8, RT_REACH, in.dist);
+    if fade <= 0.0 {
+        return traced;
+    }
+    return mix(traced, sun_shadow_mapped(in, n), fade);
+}
+
+fn sun_shadow_mapped(in: VOut, n: vec3<f32>) -> f32 {
+    let sky = smoothstep(0.75, 1.0, in.light.x);
     // A plant's blade asks the map from most of a block toward the sun: the blades round it, as
     // thin as a few of the map's texels, shaded each other in fine crossing stripes, pale and
     // banded tall grass up close at 3456 px (Ronald's Mac, 11-06; gone with shadows off). Trees,
@@ -985,9 +1004,10 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     // sea views, very likely Ronald's lake; it went with shadows off, 11-05).
     var near_map = shadow_in(scene.shadow_view_proj, scene.shadow, 80.0, 400.0, in.rel, vec3(0.0, 1.0, 0.0), false);
     // Traced (`core:rt_shadows`): the water's surface everywhere, as the land.
-    if scene.rt.x > 0.5 {
+    if scene.rt.x > 0.5 && in.dist < RT_REACH {
         let up = vec3(0.0, 1.0, 0.0);
-        near_map = vec2(dot(rt_sun_soft(in.rel, up, light_dir(), false, SUN_CONE, in.clip.xy, scene.rt.z > 0.5), vec3(1.0 / 3.0)) * models_shadow(in.rel, up), 1.0);
+        let traced = vec2(dot(rt_sun_soft(in.rel, up, light_dir(), false, SUN_CONE, in.clip.xy, scene.rt.z > 0.5), vec3(1.0 / 3.0)) * models_shadow(in.rel, up), 1.0);
+        near_map = mix(traced, near_map, smoothstep(RT_REACH * 0.8, RT_REACH, in.dist));
     }
     let shadow = mix(1.0, min(near_map.x, smoothstep(0.3, 0.8, in.light.x)), near_map.y) * smoothstep(0.75, 1.0, max(in.light.x, near_map.y)) * cloud_shadow(in.rel);
     let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, shadow, 1.0, in.pos, in.rel);
