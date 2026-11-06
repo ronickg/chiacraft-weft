@@ -4,7 +4,7 @@ Written by `notes/overview/build.py` from `notes/overview/pieces.json`; edit tha
 
 **The goal.** Players open their own worlds, find other people's without any central service, link them with portals and walk between them; missing mods download on the way; identity and achievements live on Chia. The game in those worlds: survival in the Valheim spirit with real temperatures and seasons, and animals to tame, breed and raise, from real facts.
 
-■ built and seen working: 80 · ◧ partly built: 57 · □ not built yet: 10 · ◌ planned for later: 6
+■ built and seen working: 80 · ◧ partly built: 58 · □ not built yet: 10 · ◌ planned for later: 6
 
 ## Core next
 
@@ -268,7 +268,7 @@ Code: `mods/base/source/ui`, `mods/base/source/items`, `mods/animals/source`. Do
 
 ## Tools and checks
 
-What keeps it all working: game scripts and tests, balance and cross-system checks, generated sheets, this map. 7 of 8 parts built.
+What keeps it all working: game scripts and tests, balance and cross-system checks, generated sheets, this map. 7 of 9 parts built.
 
 | | Part | Notes |
 |---|---|---|
@@ -278,6 +278,7 @@ What keeps it all working: game scripts and tests, balance and cross-system chec
 | ■ | Generated sheets | Code: `mods/base/vitals/src/sheet.rs`, `mods/animals/core/src/sheet.rs`, `tools/names/names.py`. |
 | ■ | Tests on CI | ci.yml: build, clippy, unit tests, sheets and the testkit on software Vulkan, on pushes to dev and main and on pull requests; runs on GitHub only once those branches are pushed. Code: `.github/workflows/ci.yml`. |
 | ■ | Fuzzing on CI | fuzz.yml: packages and sandbox targets, five minutes each, weekly. Code: `.github/workflows/fuzz.yml`. |
+| ◧ | Minecraft forest test world | Ronald, 11-05: "lets also make our biome kinda match the one from mc/bliss too to help with testing". base:mc_forest (/dim base:mc_forest, then /tp): the overworld's land on the same seed under Minecraft's temperate forest mix, for like-for-like shots with the Minecraft shader comparisons (seed 1's vista, Minecraft yaw 300 = ours -120). The coasts, mountains and snow keep the overworld's rules; a patch noise shares the rest out as base_api::land::MC_MIX (plains 35%, birch 5%, forest 25%, old growth 35% standing for Minecraft's dense dark-crowned forest, from its region files' counts: forest 67% and plains 20% within 500 blocks). Its own rivers (Planner: "wide winding rivers through forest like Bliss's scene (ours show mostly lakes)"): Minecraft's along a noise's lines, 20-52 blocks across, kilometres long, in valleys (mc_rivers), over the overworld's drainage rivers, a basin lake in one cell in seven (MC_RIVERS, a river style the land code reads per terrain). Tools: base_api examples mc_forest_map (both worlds' biomes and water) and mc_forest_find (views like the Minecraft vista). Looks: ~/Coding/chiacraft-archive/tester-tools/look-bliss/lb_mcforest_*.txt. Trees and leaf colours are Far view's script switches (base:tree_style, base:mc_leaf_colours). For the normal overworld (not done): reports/Rivers like Bliss.md. Code: `mods/base/api/src/land.rs`, `mods/base/src/land.rs`, `mods/base/api/examples/mc_forest_map.rs`, `mods/base/api/examples/mc_forest_find.rs`. |
 | ◧ | Release builds | chiacraft-build.yml: Windows, Linux and macOS archives by hand or on a chiacraft-v* tag, optional macOS signing and notarization (docs/release-builds.md). Linux packaging checked on the PC (2026-11-04: packed, server and a look from the unpacked folder); first GitHub run 2026-11-05 passed for all three (Windows 43 MB, Linux 129 MB, macOS 48 MB, unsigned); the Windows and macOS archives not yet started by anyone; builds now drop debug info (Linux was mostly that). Windows also builds on the Mac without Actions: tools/release/cross-windows.sh (GNU target, mingw-w64), first zip 2026-11-05 not yet run on Windows. macOS signing never run; Windows signing not set up. Code: `.github/workflows/chiacraft-build.yml`, `tools/release`. Docs: `docs/release-builds.md`. |
 | ■ | Species website | The animals' logic as WASM. Code: `mods/animals/web`. |
 
