@@ -588,9 +588,10 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // about the player), 2 near and far (400). The maps' size in texels: 1024, 2048 or 4096.
         ConfigDef::number("core:shadows", ck::INT, 2.0, 0.0, 2.0, 1.0),
         ConfigDef::number("core:shadow_size", ck::INT, 2048.0, 1024.0, 4096.0, 1024.0),
-        // The far shadow map's reach to each side (blocks): 400 as made; more (ultra) shadows hills
-        // and forests farther out at coarser texels (`client::prepare_shadows`).
-        ConfigDef::number("core:shadow_far", ck::INT, 400.0, 200.0, 2400.0, 100.0),
+        // The far shadow map's reach to each side (blocks): 0 auto, 2000 with the HDR world (at no
+        // measurable cost, more far hills and crowns shadowed: Far view, 11-05) and 400 without
+        // (today's look as made); a number sets it (`client::prepare_shadows`).
+        ConfigDef::number("core:shadow_far", ck::INT, 0.0, 0.0, 2400.0, 100.0),
         // The soft clouds' shadow on the land (with the HDR world; `client::cloud_shadow`).
         ConfigDef::number("core:cloud_shadows", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         // Vanilla's: in GUI pixels, and percent of the dark behind the text.
