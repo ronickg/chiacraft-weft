@@ -585,13 +585,17 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         // With the sun low, the whole of its half of the sky goes gold-cream at its own brightness,
         // as Bliss's dawn: ours stayed lavender-blue there round a gold glare (Bliss's own world at
         // 06:00, sky band saturation 105 and warmth +85 against Bliss's 122 and +94; Look, 11-06).
-        if low > 0.0 {
+        // Its own window, full with the sun up to about 9 degrees and gone by about 20 (the sunset
+        // band's `low` is nearly 0 by Bliss's 06:00 sun at 10 degrees, so this did nothing, PC
+        // shdawnB2).
+        let morning = (1.0 - smoothstep(0.15, 0.35, scene.sun.y)) * smoothstep(-0.03, 0.02, scene.sun.y);
+        if morning > 0.0 {
             let cream = vec3(1.0, 0.82, 0.55);
             // Over the sun's whole half, overhead too (about a third there): a lobe about the sun
             // alone left the gaps between the clouds lavender (7 % of the 06:00 sky band, Bliss's
             // none; PC shdawn0).
             let wide = 0.5 + 0.5 * mu;
-            let dawn = wide * wide * low * (1.0 - rain_amount()) * smoothstep(-0.03, 0.02, scene.sun.y);
+            let dawn = wide * wide * morning * (1.0 - rain_amount());
             c = mix(c, cream * (luma(c) / luma(cream)), dawn * 0.6);
         }
     }
