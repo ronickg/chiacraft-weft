@@ -19,6 +19,8 @@ What it does, per drawing `<material>__<part>_px.png` (32 x 32, cut by art.py):
   their anchor (the tang's or socket's end, the corner toward the bottom left), and a Rust snippet for
   their `LOOKS` rows (a knife grip from the sword's hilt map, a spear shaft drawn in code from the
   haft's shading), in `looks_snippet.rs`.
+- **Loose parts**: each head and blade it installs, centred, as that part's icon in the bag
+  (`parts/loose/<shape>/<art>.png`, `crafting::looks::part_look`).
 - **Armour shells** (`<material>__<shell>`, leather, bone, iron, gold, diamond): written as painted shells
   `parts/armour/<shell>/<art>.png` for `part_look` to use where drawn (the others keep their family's
   shade map); reported as waiting while they aren't drawn.
@@ -103,6 +105,16 @@ def warm_mask(a):
         h, l, sat = colorsys.rgb_to_hls(*(a[y, x, :3] / 255.0))
         out[y, x] = (h < 0.14 or h > 0.95) and sat > 0.35 and 0.12 < l < 0.85
     return out
+
+
+def centred(a):
+    """A drawing moved to the middle of its canvas: a loose part's icon (`parts/loose/`)."""
+    ys, xs = np.nonzero(a[..., 3] > 0)
+    if not len(xs):
+        return a
+    dx = int(round(15.5 - (xs.min() + xs.max()) / 2))
+    dy = int(round(15.5 - (ys.min() + ys.max()) / 2))
+    return moved(a, dx, dy)
 
 
 def load(path):
@@ -253,11 +265,13 @@ def main():
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--only", default="")
     ap.add_argument("--parts", default="")
+    ap.add_argument("--skip", default="", help="kind/material to leave as today's, comma-separated (hoe/steel)")
     ap.add_argument("--no-binding", action="store_true", help="keep the drawing's own haft top, not today's binding")
     ap.add_argument("--src", default=SRC, help="folders of drawings, comma-separated, first found wins")
     args = ap.parse_args()
     only = set(filter(None, args.only.split(",")))
     pick = set(filter(None, args.parts.split(",")))
+    skip = set(filter(None, args.skip.split(",")))
     want = lambda m, p: (not only or m in only) and (not pick or p in pick)
     os.makedirs(OUT, exist_ok=True)
     looks = anchors_today()
@@ -275,6 +289,12 @@ def main():
                 continue
             if not os.path.exists(src):
                 report["missing"].append(f"{m}__{part}")
+                continue
+            if f"{kind}/{m}" in skip:
+                # Today's stays; its loose icon is today's head, centred.
+                today = os.path.join(TEX, "parts", kind, shape, f"{m}.png")
+                if os.path.exists(today):
+                    write(centred(load(today)), f"parts/loose/{shape}/{m}.png", args.apply)
                 continue
             new = load(src)
             old_p = os.path.join(TEX, "parts", kind, shape, f"{m}.png")
@@ -298,6 +318,7 @@ def main():
                 warm = warm_mask(old) & ~warm_mask(placed)
                 placed[warm] = old[warm]
             write(placed, f"parts/{kind}/{shape}/{m}.png", args.apply)
+            write(centred(placed), f"parts/loose/{shape}/{m}.png", args.apply)
             full = icon(kind, placed, shift, handle)
             # Only spots today's head doesn't miss too (some of today's already sit half off it).
             before = gem_misses(icon(kind, old, shift, handle), spots.get(kind, [])) if old is not None else []
@@ -330,13 +351,19 @@ def main():
                 continue
             new = load(src)
             write(new, f"parts/{kind}/{shape}/{m}.png", args.apply)
-            anchors[m] = base(new)
+            write(centred(new), f"parts/loose/{shape}/{m}.png", args.apply)
+            b = base(new)
+            # A knife's tang runs 2 texels under the guard; a spear's socket meets the shaft's end.
+            anchors[m] = (b[0] + 2, b[1] - 2) if kind == "knife" else b
         if not anchors:
             continue
         ref = anchors.get("iron") or next(iter(anchors.values()))
         if kind == "knife":
             # The sword's hilt, its socket moved to the iron blade's base; regions grip, fitting (the guard).
-            hmap, sock = grip, gsock
+            # The sword's hilt, moved so its guard meets the iron blade's anchor (the handles move by
+            # anchor - socket, a texel or two).
+            mv = (int(round(ref[0] - gsock[0])), int(round(ref[1] - gsock[1])))
+            hmap, sock = moved(grip, *mv), ref
             regions = '&["grip", "fitting"]'
             layers = [("blade", '&["blade"]', "false", "true"), ("hilt", regions, "true", "false")]
             handle_rel = None
@@ -362,9 +389,9 @@ def main():
         snippet[kind] = (f'    KindLook {{\n        kind: "{kind}",\n        socket: [{sock[0]:.1f}, {sock[1]:.1f}],\n'
                          f'        anchors: &[\n{anc},\n        ],\n        layers: &[\n{lay},\n        ],\n    }},\n'
                          + (f"    // its handle map: {handle_rel} (written by install_v3.py)\n" if handle_rel else
-                            "    // its hilt map: parts/knife/grip.png, a copy of parts/sword/grip.png\n"))
+                            "    // its hilt map: parts/knife/grip.png, parts/sword/grip.png moved to the iron blade\n"))
         if kind == "knife":
-            write(grip, "parts/knife/grip.png", args.apply)
+            write(hmap, "parts/knife/grip.png", args.apply)
     open(os.path.join(OUT, "looks_snippet.rs"), "w").write("".join(snippet.values()))
 
     # Armour shells: painted per material where drawn.
