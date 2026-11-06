@@ -136,7 +136,11 @@ fn vol_glow(p: PostPixel) -> vec3<f32> {
     let canopy = min(scene.canopy.x, 1.0) * select(k, 1.0, k == 0.0);
     // At 0.004 + 0.02 x fog the beams under Plants' rainforest were faint (Lighting's dawn checks,
     // 11-04); Planner: make the shafts the canopy's signature.
-    let density = (0.0012 + 0.002 * low + 0.03 * scene.weather.z + canopy * (0.018 + 0.04 * scene.weather.z)) * (1.0 - 0.6 * rain) + 0.004 * rain;
+    // (Under a canopy 0.004 by clear air, not 0.018: thick air there glowed in hard-edged patches
+    // behind the near trunks, each the shape of the far surface a look ends on, where Bliss's air in
+    // the same forest is clear; box region at 08:00 luma 80 against 35 without the light in the air,
+    // Trees' runs, traced shadows on or off alike. Its morning mist part stays.)
+    let density = (0.0012 + 0.002 * low + 0.03 * scene.weather.z + canopy * (0.004 + 0.04 * scene.weather.z)) * (1.0 - 0.6 * rain) + 0.004 * rain;
     let air = 1.0 - exp(-density * end);
     // Gold while the sun is under about 30° (the fog's MIST_GOLD in look.wgsl), white toward noon.
     let color = mix(vec3(1.0, 0.62, 0.3), vec3(1.0, 0.95, 0.85), smoothstep(0.1, 0.65, sun.y));
@@ -147,7 +151,7 @@ fn vol_glow(p: PostPixel) -> vec3<f32> {
     // most of the view's air is lit (the open water by a forest's edge) it is not: at `leafy` alone
     // the flooded forest's misty river went a white glare (luma p50 185 -> 201).
     let beams = max(lit * (1.0 - lit) * 4.0, leafy * (1.0 - lit));
-    let glow = color * mix(lit * 0.35, lit, beams) * air * phase * day * select(min(p.strength, 1.0), 1.0, cheap) * mix(0.6, 1.6, canopy * (1.0 - lit));
+    let glow = color * mix(lit * 0.35, lit, beams) * air * phase * day * select(min(p.strength, 1.0), 1.0, cheap) * mix(0.6, 1.0, canopy * (1.0 - lit));
     return glow;
 }
 
