@@ -25,7 +25,11 @@ fn main() {
     let wet = |x: i32, z: i32| l::height(&f, x * 16, z * 16) >> 4 < SEA;
     // The water's run through (`x`, `z`) along (`dx`, `dz`), up to 200 blocks.
     let run = |x: i32, z: i32, dx: i32, dz: i32| {
-        let side = |s: i32| (1..100).take_while(|&k| wet(x + s * dx * k, z + s * dz * k)).count() as i32;
+        let side = |s: i32| {
+            (1..100)
+                .take_while(|&k| wet(x + s * dx * k, z + s * dz * k))
+                .count() as i32
+        };
         1 + side(1) + side(-1)
     };
     for z in (-radius..=radius).step_by(step) {

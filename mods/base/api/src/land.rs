@@ -2482,7 +2482,13 @@ mod tests {
             let f = fields(seed);
             for w in vitals::ley::waystones_near(seed, 0, 0, 6000) {
                 let here = Here::new(&f, w.x * 16, w.z * 16);
-                assert_eq!(line_rivers(&here, &|| land_height_at(&here)), 0, "seed {seed}: a long river through the waystone at {} {}", w.x, w.z);
+                assert_eq!(
+                    line_rivers(&here, &|| land_height_at(&here)),
+                    0,
+                    "seed {seed}: a long river through the waystone at {} {}",
+                    w.x,
+                    w.z
+                );
             }
         }
     }
