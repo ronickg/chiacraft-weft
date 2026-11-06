@@ -1716,7 +1716,11 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
         // sky where today's picture from the same palette had +17 and +33, Bliss's +14 and -21
         // (Shader's evening sheet, 11-06). A low sun's gold is the palette's, the haze's and the
         // mist's to give.
-        let w = fantasy_opt(OPT_WHITE) * day * mix(1.0, 0.25, smoothstep(0.4, 0.75, scene.sun.y)) * (1.0 - 0.7 * golden());
+        // In mist the gold kept, more of it (Bliss's misty dawn is all gold, 181 of saturation and
+        // +106 warmth; with the cut, ours fell from 174/+101 to 151/+88, gr5m): the low sun's gold
+        // is the mist's light.
+        let misty = smoothstep(0.02, 0.1, scene.weather.z) * (1.0 - rain_amount());
+        let w = fantasy_opt(OPT_WHITE) * day * mix(1.0, 0.25, smoothstep(0.4, 0.75, scene.sun.y)) * mix(1.0 - 0.7 * golden(), 1.0 + 0.6 * golden(), misty);
         t *= vec3(1.0 + 0.08 * w, 1.0, 1.0 - 0.14 * w);
     }
     // Only true darks go cool (most daylit ground is mid-tone and keeps its color).
