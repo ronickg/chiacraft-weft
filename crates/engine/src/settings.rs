@@ -291,10 +291,10 @@ impl Settings {
         number("core:aa") >= 1.0
     }
 
-    /// The backend's temporal upscaler (`core:upscaler`, `weft_render::UpscaleMode`), live; off
-    /// unless the backend has one (DLSS: the `streamline` build on Windows).
-    pub fn upscaler(&self) -> weft_render::UpscaleMode {
-        weft_render::UpscaleMode::from_number(number("core:upscaler").max(0.0) as u32)
+    /// DLSS, the backend's temporal upscaler (`core:dlss`, `weft_render::UpscaleMode`), live; off
+    /// unless the backend has one (the `streamline` build on Windows).
+    pub fn dlss(&self) -> weft_render::UpscaleMode {
+        weft_render::UpscaleMode::from_number(number("core:dlss").max(0.0) as u32)
     }
 
     /// The stand-in upscaler for checks (`core:upscale_standin`), read at start.
@@ -302,19 +302,19 @@ impl Settings {
         number("core:upscale_standin") != 0.0
     }
 
-    /// Ray Reconstruction with the upscaler (`core:upscaler_rr`), live.
-    pub fn upscaler_rr(&self) -> bool {
-        number("core:upscaler_rr") != 0.0
+    /// Ray Reconstruction with DLSS (`core:dlss_rr`), live.
+    pub fn dlss_rr(&self) -> bool {
+        number("core:dlss_rr") != 0.0
     }
 
-    /// The upscaler's model for `mode` (`core:upscaler_model_<mode>`, 0 its default), live.
-    pub fn upscaler_model(&self, mode: weft_render::UpscaleMode) -> u32 {
-        number(&format!("core:upscaler_model_{}", mode.name())).max(0.0) as u32
+    /// DLSS's model for `mode` (`core:dlss_model_<mode>`, 0 its default), live.
+    pub fn dlss_model(&self, mode: weft_render::UpscaleMode) -> u32 {
+        number(&format!("core:dlss_model_{}", mode.name())).max(0.0) as u32
     }
 
-    /// Ray Reconstruction's model (`core:upscaler_rr_model`), live.
-    pub fn upscaler_rr_model(&self) -> u32 {
-        number("core:upscaler_rr_model").max(0.0) as u32
+    /// Ray Reconstruction's model (`core:dlss_rr_model`), live.
+    pub fn dlss_rr_model(&self) -> u32 {
+        number("core:dlss_rr_model").max(0.0) as u32
     }
 
     /// DLSS 5 over the upscaled picture (`core:dlss5`), live.

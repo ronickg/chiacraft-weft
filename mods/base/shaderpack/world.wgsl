@@ -929,10 +929,10 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
 // ---- texture sampling (the engine's) ----
 
 // The texture footprint's scale for the mip level: 1, or under DLSS 2^(its mip bias)
-// (`Scene::upscale.x`, NVIDIA's log2(render / output) - 1: the textures as sharp as at the
+// (`Scene::dlss.x`, NVIDIA's log2(render / output) - 1: the textures as sharp as at the
 // screen's size, which the upscaler then keeps from aliasing).
 fn mip_scale() -> f32 {
-    return exp2(scene.upscale.x);
+    return exp2(scene.dlss.x);
 }
 
 fn nearest_uv(size: f32, uv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec2<f32> {

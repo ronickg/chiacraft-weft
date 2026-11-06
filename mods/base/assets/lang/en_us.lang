@@ -1616,17 +1616,17 @@ web.base.tip.pick3 = {color:title}{0}{/} {color:dim}(item level {1}){/}
     {6} {7}
     {color:dim}Click to set it in.{/}
 
-# The upscaler's tab (DLSS: mods/base/src/upscaler.rs)
-video.base.upscaler.title = DLSS
-video.base.upscaler.name = Upscaler: {0}
-video.base.upscaler = Mode
-video.base.upscaler.what = Drawn at a share of the screen and rebuilt by DLSS: DLAA keeps the full size, Quality to Ultra Performance draw fewer pixels for more frames
-video.base.upscaler_model = Model
-video.base.upscaler_model.what = DLSS's network for this mode: Default lets NVIDIA choose; CNN the older models, transformer the newer (sharper, steadier, a little slower)
-video.base.upscaler_rr = Ray Reconstruction
-video.base.upscaler_rr.what = DLSS cleans the lighting as it rebuilds the picture, at the mode's size
-video.base.upscaler_rr_model = RR model
-video.base.upscaler_rr_model.what = Ray Reconstruction's network: Default lets NVIDIA choose
+# The upscaler's tab (DLSS: mods/base/src/dlss.rs)
+video.base.dlss.title = DLSS
+video.base.dlss.name = Upscaler: {0}
+video.base.dlss = Mode
+video.base.dlss.what = Drawn at a share of the screen and rebuilt by DLSS: DLAA keeps the full size, Quality to Ultra Performance draw fewer pixels for more frames
+video.base.dlss_model = Model
+video.base.dlss_model.what = DLSS's network for this mode: Default lets NVIDIA choose; CNN the older models, transformer the newer (sharper, steadier, a little slower)
+video.base.dlss_rr = Ray Reconstruction
+video.base.dlss_rr.what = DLSS cleans the lighting as it rebuilds the picture, at the mode's size
+video.base.dlss_rr_model = RR model
+video.base.dlss_rr_model.what = Ray Reconstruction's network: Default lets NVIDIA choose
 video.base.dlss5 = DLSS 5
 video.base.dlss5.what = NVIDIA's neural rendering over the finished picture
 video.base.dlss5_intensity = DLSS 5 strength

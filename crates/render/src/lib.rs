@@ -306,7 +306,7 @@ pub enum Cmd {
 pub const NO_TEXTURE: TextureId = TextureId(u32::MAX);
 
 /// How much of the screen a temporal upscaler draws the world at ([`Cmd::Upscale`]). The numbers
-/// are the `core:upscaler` setting's. Ray Reconstruction is a flag beside it
+/// are the `core:dlss` setting's. Ray Reconstruction is a flag beside it
 /// ([`UpscaleParams::reconstruct`]), at the same sizes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u32)]
@@ -353,7 +353,7 @@ impl UpscaleMode {
         }
     }
 
-    /// For logs, config key suffixes (`core:upscaler_model_<name>`) and the Video menu's words.
+    /// For logs, config key suffixes (`core:dlss_model_<name>`) and the Video menu's words.
     pub fn name(self) -> &'static str {
         match self {
             UpscaleMode::Off => "off",
@@ -445,7 +445,7 @@ impl UpscalerInfo {
         mode != UpscaleMode::Off && self.modes & (1 << mode as u32) != 0
     }
 
-    /// The model numbers as bits (`core:gpu_upscaler_models`).
+    /// The model numbers as bits (`core:gpu_dlss_models`).
     pub fn model_bits(models: &[UpscaleModel]) -> u32 {
         models.iter().fold(0, |b, m| b | 1 << m.id.min(31))
     }

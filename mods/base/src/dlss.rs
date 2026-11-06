@@ -1,37 +1,37 @@
-//! The upscaler's own Video tab (Ronald, 11-06: DLSS and the rest as settings to turn on and off,
+//! DLSS's own Video tab (Ronald, 11-06: DLSS and the rest as settings to turn on and off,
 //! "as much freedom as possible", the model choice too): the mode (Off, DLAA, Quality, Balanced,
 //! Performance, Ultra Performance), its model for each mode, Ray Reconstruction and its model,
-//! DLSS 5 and its strength. Only where the renderer has an upscaler (`core:gpu_upscaler*`, which
+//! DLSS 5 and its strength. Only where the renderer has an upscaler (`core:gpu_dlss*`, which
 //! the engine puts at start: DLSS through Streamline on Windows, NGX on Linux later), and only the
 //! rows that do something there: the models with a mode on, Ray Reconstruction where it runs, its
 //! model with it on, DLSS 5 where NVIDIA's plugin is (not public yet). Changing the mode, Ray
 //! Reconstruction or DLSS 5 builds the tab again, so rows come and go. Everything is the engine's
-//! `core:upscaler*` settings, live. Frame generation gets its rows when the renderer has it
+//! `core:dlss*` settings, live. Frame generation gets its rows when the renderer has it
 //! (`core:gpu_frame_gen`).
 
 use weft_sdk::*;
 
-pub static SCREEN: Screen = Screen::named("video_upscaler");
+pub static SCREEN: Screen = Screen::named("video_dlss");
 
-static NAME: TextConfig = TextConfig::named("core:gpu_upscaler");
+static NAME: TextConfig = TextConfig::named("core:gpu_dlss");
 /// What the upscaler runs, as bits: modes by number, models by their number.
-static MODES: Config<i32> = Config::named("core:gpu_upscaler_modes");
-static MODELS: Config<i32> = Config::named("core:gpu_upscaler_models");
-static RR_OK: Config<bool> = Config::named("core:gpu_upscaler_rr");
-static RR_MODELS: Config<i32> = Config::named("core:gpu_upscaler_rr_models");
-static DLSS5_OK: Config<bool> = Config::named("core:gpu_upscaler_dlss5");
+static MODES: Config<i32> = Config::named("core:gpu_dlss_modes");
+static MODELS: Config<i32> = Config::named("core:gpu_dlss_models");
+static RR_OK: Config<bool> = Config::named("core:gpu_dlss_rr");
+static RR_MODELS: Config<i32> = Config::named("core:gpu_dlss_rr_models");
+static DLSS5_OK: Config<bool> = Config::named("core:gpu_dlss5");
 
-static MODE: Config<i32> = Config::named("core:upscaler");
+static MODE: Config<i32> = Config::named("core:dlss");
 /// The model per mode, in mode order from DLAA (mode 1).
 static MODEL: [Config<i32>; 5] = [
-    Config::named("core:upscaler_model_dlaa"),
-    Config::named("core:upscaler_model_quality"),
-    Config::named("core:upscaler_model_balanced"),
-    Config::named("core:upscaler_model_performance"),
-    Config::named("core:upscaler_model_ultra_performance"),
+    Config::named("core:dlss_model_dlaa"),
+    Config::named("core:dlss_model_quality"),
+    Config::named("core:dlss_model_balanced"),
+    Config::named("core:dlss_model_performance"),
+    Config::named("core:dlss_model_ultra_performance"),
 ];
-static RR: Config<bool> = Config::named("core:upscaler_rr");
-static RR_MODEL: Config<i32> = Config::named("core:upscaler_rr_model");
+static RR: Config<bool> = Config::named("core:dlss_rr");
+static RR_MODEL: Config<i32> = Config::named("core:dlss_rr_model");
 static DLSS5: Config<bool> = Config::named("core:dlss5");
 static DLSS5_INTENSITY: Config<f32> = Config::named("core:dlss5_intensity");
 
@@ -108,7 +108,7 @@ fn row(ui: &mut Ui, key: &'static str, shown: fn() -> (String, i64), step: fn(i3
 fn mode_row(ui: &mut Ui) {
     row(
         ui,
-        "upscaler",
+        "dlss",
         || (MODE_NAMES[mode() as usize].to_string(), 0),
         |dir| MODE.set(cycle(&[0, 1, 2, 3, 4, 5], mode(), dir, |m| m == 0 || bit(MODES.get(), m))),
         true,
@@ -118,7 +118,7 @@ fn mode_row(ui: &mut Ui) {
 fn model_row(ui: &mut Ui) {
     row(
         ui,
-        "upscaler_model",
+        "dlss_model",
         || model_word(&MODEL_KEYS, MODEL[(mode() - 1).max(0) as usize].get()),
         |dir| {
             let c = &MODEL[(mode() - 1).max(0) as usize];
@@ -130,13 +130,13 @@ fn model_row(ui: &mut Ui) {
 }
 
 fn rr_row(ui: &mut Ui) {
-    row(ui, "upscaler_rr", || (if RR.get() { "on" } else { "off" }.into(), 0), |_| RR.set(!RR.get()), true);
+    row(ui, "dlss_rr", || (if RR.get() { "on" } else { "off" }.into(), 0), |_| RR.set(!RR.get()), true);
 }
 
 fn rr_model_row(ui: &mut Ui) {
     row(
         ui,
-        "upscaler_rr_model",
+        "dlss_rr_model",
         || model_word(&RR_MODEL_KEYS, RR_MODEL.get()),
         |dir| {
             let ids: Vec<i32> = RR_MODEL_KEYS.iter().map(|k| k.0).collect();
@@ -175,11 +175,11 @@ pub fn register(r: &mut Registry) {
                 c.client().screen_open(&crate::video::FANTASY_SCREEN);
             }),
         ];
-        crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.upscaler.title", &tabs, |ui| {
+        crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.dlss.title", &tabs, |ui| {
             ui.row(S::row().gap(3.0), |ui| {
                 ui.row(S::row().w(84.0), |_| {});
                 ui.text_bind_styled(S::default().class("dim").max_w(260.0), |_, t| {
-                    t.set("video.base.upscaler.name", &[Arg::Text(&NAME.get())]);
+                    t.set("video.base.dlss.name", &[Arg::Text(&NAME.get())]);
                 });
             });
             mode_row(ui);

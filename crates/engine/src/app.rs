@@ -259,7 +259,7 @@ struct UpscaleChoice {
 pub(crate) struct Running {
     gpu: Box<dyn Backend>,
     /// The backend's temporal upscaler (DLSS through Streamline on Windows), as it said at start;
-    /// the mode this frame goes to it with (`core:upscaler`), and the sizes last asked of it
+    /// the mode this frame goes to it with (`core:dlss`), and the sizes last asked of it
     /// (mode, screen, world).
     upscaler: weft_render::UpscalerInfo,
     upscale_now: Option<UpscaleChoice>,
@@ -568,7 +568,7 @@ impl App {
         // The HDR world's format, before any pipeline drawing into the world is made.
         crate::post::set_hdr(settings.hdr_world());
         // And whether they draw the motion image too, for temporal anti-aliasing.
-        // An upscaler (DLSS) reads it too: with one, the world always draws it, so `core:upscaler`
+        // An upscaler (DLSS) reads it too: with one, the world always draws it, so `core:dlss`
         // can be switched on while playing.
         crate::post::set_motion(settings.aa() || gpu.upscaler().modes != 0);
         let post = crate::post::Post::new(&mut *gpu, &assets);
@@ -598,24 +598,24 @@ impl App {
             crate::config::put_text(id, &gpu_name);
         }
         let upscaler = gpu.upscaler();
-        // What it runs, for the Video menu (`core:gpu_upscaler*`), as found.
+        // What it runs, for the Video menu's DLSS tab (`core:gpu_dlss*`), as found.
         for (name, v) in [
-            ("core:gpu_upscaler_modes", upscaler.modes as f64),
-            ("core:gpu_upscaler_models", weft_render::UpscalerInfo::model_bits(&upscaler.models) as f64),
-            ("core:gpu_upscaler_rr", upscaler.reconstruct as u8 as f64),
-            ("core:gpu_upscaler_rr_models", weft_render::UpscalerInfo::model_bits(&upscaler.rr_models) as f64),
-            ("core:gpu_upscaler_dlss5", upscaler.neural as u8 as f64),
+            ("core:gpu_dlss_modes", upscaler.modes as f64),
+            ("core:gpu_dlss_models", weft_render::UpscalerInfo::model_bits(&upscaler.models) as f64),
+            ("core:gpu_dlss_rr", upscaler.reconstruct as u8 as f64),
+            ("core:gpu_dlss_rr_models", weft_render::UpscalerInfo::model_bits(&upscaler.rr_models) as f64),
+            ("core:gpu_dlss5", upscaler.neural as u8 as f64),
             ("core:gpu_frame_gen", upscaler.frame_gen as f64),
         ] {
             if let Some(id) = crate::config::by_name(name) {
                 crate::config::put(id, v);
             }
         }
-        if let Some(id) = crate::config::by_name("core:gpu_upscaler") {
+        if let Some(id) = crate::config::by_name("core:gpu_dlss") {
             crate::config::put_text(id, &upscaler.name);
         }
         if !upscaler.name.is_empty() {
-            log::info!("upscaler: {} (core:upscaler picks the mode)", upscaler.name);
+            log::info!("upscaler: {} (core:dlss picks the mode)", upscaler.name);
         }
         let mut r = Running {
             upscaler,
@@ -737,13 +737,13 @@ fn world_frame(r: &Running, info: &weft_render::FrameInfo) -> weft_render::Frame
     weft_render::FrameInfo { width: scaled(info.width), height: scaled(info.height), slot: info.slot }
 }
 
-/// With the backend's upscaler on (`core:upscaler`, a mode the backend runs): the size it wants
+/// With DLSS on (`core:dlss`, a mode the backend runs): the size it wants
 /// the world drawn at, and this frame goes to it (`Running::upscale_now`, with Ray Reconstruction,
 /// the models and DLSS 5 as set, where it runs them). None: the world as always.
 fn upscale_frame(r: &mut Running, info: &weft_render::FrameInfo) -> Option<weft_render::FrameInfo> {
     use weft_render::UpscaleMode;
     r.upscale_now = None;
-    let mode = r.settings.upscaler();
+    let mode = r.settings.dlss();
     if mode == UpscaleMode::Off || r.game.is_none() || !r.post.can_upscale() {
         return None;
     }
@@ -758,14 +758,14 @@ fn upscale_frame(r: &mut Running, info: &weft_render::FrameInfo) -> Option<weft_
     };
     if !r.upscaler.has(mode) {
         say(
-            &format!("core:upscaler {} ({})", mode as u32, mode.name()),
+            &format!("core:dlss {} ({})", mode as u32, mode.name()),
             "the renderer has no upscaler for it (DLSS: the streamline build on Windows, with its files)",
         );
         return None;
     }
-    let reconstruct = r.settings.upscaler_rr() && {
+    let reconstruct = r.settings.dlss_rr() && {
         if !r.upscaler.reconstruct {
-            say("core:upscaler_rr", "the upscaler has no Ray Reconstruction here");
+            say("core:dlss_rr", "the upscaler has no Ray Reconstruction here");
         }
         r.upscaler.reconstruct
     };
@@ -780,8 +780,8 @@ fn upscale_frame(r: &mut Running, info: &weft_render::FrameInfo) -> Option<weft_
     let choice = UpscaleChoice {
         mode,
         reconstruct,
-        model: known(r.settings.upscaler_model(mode), &r.upscaler.models),
-        rr_model: known(r.settings.upscaler_rr_model(), &r.upscaler.rr_models),
+        model: known(r.settings.dlss_model(mode), &r.upscaler.models),
+        rr_model: known(r.settings.dlss_rr_model(), &r.upscaler.rr_models),
         neural,
     };
     let screen = (info.width, info.height);

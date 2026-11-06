@@ -2920,7 +2920,7 @@ impl Client {
             // Filled in by `render` (`taa_frame`).
             taa: [0.0; 4],
             taa_prev: [[0.0; 4]; 4],
-            upscale: [crate::post::mip_bias(), 0.0, 0.0, 0.0],
+            dlss: [crate::post::mip_bias(), 0.0, 0.0, 0.0],
             cloud_shadow: [0.0; 4],
             prev_view_proj: [[0.0; 4]; 4],
             cloud_moved: [0.0; 4],

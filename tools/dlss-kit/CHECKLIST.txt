@@ -13,7 +13,7 @@ ON WINDOWS
   5. Quick check (~4 minutes; the game window opens and closes by itself three times):
         powershell -ExecutionPolicy Bypass -File .\run_kit.ps1 -Quick
      Open results\<newest>\summary.txt. Good when:
-       - no-streamline : says core:upscaler 1 (dlaa) is off  (the game starts without NVIDIA's files)
+       - no-streamline : says core:dlss 1 (dlaa) is off  (the game starts without NVIDIA's files)
        - dlaa          : says "streamline: DLSS ... ready" and "upscaler dlaa: world 2560x1440"
      If dlaa says failed / missing / not supported: run the same line with  -Dev  added and keep
      chiacraft\streamline-dev\sl.log. Skip to step 8.

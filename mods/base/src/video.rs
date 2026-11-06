@@ -625,10 +625,10 @@ pub fn register(r: &mut Registry) {
         let mut tabs: Vec<crate::window::Tab> = vec![("video.base.fantasy.title", |c| {
             c.client().screen_open(&FANTASY_SCREEN);
         })];
-        // The upscaler's tab (DLSS), where the renderer has one.
-        if crate::upscaler::available() {
-            tabs.push(("video.base.upscaler.title", |c| {
-                c.client().screen_open(&crate::upscaler::SCREEN);
+        // DLSS's tab, where the renderer has it.
+        if crate::dlss::available() {
+            tabs.push(("video.base.dlss.title", |c| {
+                c.client().screen_open(&crate::dlss::SCREEN);
             }));
         }
         crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.title", &tabs, |ui| {
@@ -685,9 +685,9 @@ pub fn register(r: &mut Registry) {
         let mut tabs: Vec<crate::window::Tab> = vec![("video.base.title", |c| {
             c.client().screen_open(&SCREEN);
         })];
-        if crate::upscaler::available() {
-            tabs.push(("video.base.upscaler.title", |c| {
-                c.client().screen_open(&crate::upscaler::SCREEN);
+        if crate::dlss::available() {
+            tabs.push(("video.base.dlss.title", |c| {
+                c.client().screen_open(&crate::dlss::SCREEN);
             }));
         }
         crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.fantasy.title", &tabs, |ui| {

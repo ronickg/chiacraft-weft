@@ -87,7 +87,7 @@ pub fn upscaling() -> bool {
 
 static MIP_BIAS: AtomicU32 = AtomicU32::new(0);
 
-/// The texture mip bias for this frame's world (`Scene::upscale.x`): set by the app under an
+/// The texture mip bias for this frame's world (`Scene::dlss.x`): set by the app under an
 /// upscaler to NVIDIA's log2(render / output) - 1 (DLSS's programming guide: textures as sharp as
 /// at the output's size), 0 without. `WEFT_UPSCALE_MIP_BIAS=<levels>` puts another under an upscaler.
 pub fn set_mip_bias(render_width: u32, output_width: u32) {
