@@ -163,12 +163,13 @@ struct ParticleFrag {
 
 // AMD FidelityFX Super Resolution 1's edge-adaptive upscale (EASU), its 32-bit path ported from
 // `ffx_fsr1.h` (GPUOpen-Effects/FidelityFX-FSR, MIT licence: Copyright (c) 2021 Advanced Micro
-// Devices, Inc.; notes/ENGINE_CHANGES.md). The world image `t`, drawn smaller than the screen
+// Devices, Inc.; notes/ENGINE_CHANGES.md). The world image `textures[t]` (an index: a texture
+// passed as an argument broke the Vulkan pipelines), drawn smaller than the screen
 // (`core:render_scale`), read at the screen's `uv`: twelve texels round it, a Lanczos-like kernel
 // stretched along the edge it finds. The light is filtered as x / (1 + x), as the HDR world's goes
 // past 1 and FSR 1 takes a picture in 0..1.
-fn easu_in(t: texture_2d<f32>, p: vec2<i32>, size: vec2<i32>) -> vec3<f32> {
-    let c = max(textureLoad(t, clamp(p, vec2(0), size - 1), 0).rgb, vec3(0.0));
+fn easu_in(t: u32, p: vec2<i32>, size: vec2<i32>) -> vec3<f32> {
+    let c = max(textureLoad(textures[t], clamp(p, vec2(0), size - 1), 0).rgb, vec3(0.0));
     return c / (1.0 + c);
 }
 
@@ -209,8 +210,8 @@ fn easu_tap(acc: ptr<function, vec4<f32>>, off: vec2<f32>, dir: vec2<f32>, len: 
     *acc += vec4(c * w, w);
 }
 
-fn easu(t: texture_2d<f32>, uv: vec2<f32>) -> vec3<f32> {
-    let size = vec2<i32>(textureDimensions(t));
+fn easu(t: u32, uv: vec2<f32>) -> vec3<f32> {
+    let size = vec2<i32>(textureDimensions(textures[t]));
     var pp = uv * vec2<f32>(size) - 0.5;
     let fp = floor(pp);
     pp -= fp;
@@ -282,13 +283,13 @@ fn easu(t: texture_2d<f32>, uv: vec2<f32>) -> vec3<f32> {
 
 // The world's image at the screen's `uv` (`frag` the fragment's position, in pixels): bilinear,
 // or FSR 1's EASU when `core:upscaler` is 1 and the image is smaller than the screen.
-fn world_upscaled(t: texture_2d<f32>, uv: vec2<f32>, frag: vec2<f32>, upscaler: f32) -> vec4<f32> {
-    let bilinear = textureSampleLevel(t, linear_clamp, uv, 0.0);
+fn world_upscaled(t: u32, uv: vec2<f32>, frag: vec2<f32>, upscaler: f32) -> vec4<f32> {
+    let bilinear = textureSampleLevel(textures[t], linear_clamp, uv, 0.0);
     if upscaler < 0.5 {
         return bilinear;
     }
     let screen = frag / max(uv, vec2(1e-6));
-    if f32(textureDimensions(t).x) >= screen.x - 0.5 {
+    if f32(textureDimensions(textures[t]).x) >= screen.x - 0.5 {
         return bilinear;
     }
     return vec4(easu(t, uv), bilinear.a);
