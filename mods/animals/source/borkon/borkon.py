@@ -12,6 +12,7 @@ Units are 1/64 of a block, y up, it faces +z; painted at the house density, 32 t
 It has no coat genes (a boss, one of its kind), so no coat layers.
 """
 
+import itertools
 import json
 import math
 import os
@@ -25,7 +26,7 @@ SKILL = os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "
 sys.path.insert(0, SKILL)
 from paint import EYES, eye_corner, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
 from rig import fit  # noqa: E402
-from ground import lowest  # noqa: E402
+from ground import lowest, pokes  # noqa: E402
 from house import TX  # noqa: E402
 
 OUT = os.environ.get("BORKON_OUT") or os.path.join(HERE, "out")
@@ -618,7 +619,9 @@ def paint_face(e, face, boxes):
 
 # ------------------------------------------------------------------ animation
 
-L = {"lie_front": 80, "lie_hip": -70, "lie_knee": 140, "lie_drop": 30, "crouch_tilt": 0, "crouch_drop": 0}
+L = {"lie_front": 80, "lie_hip": -70, "lie_knee": 140, "lie_drop": 30, "crouch_tilt": 0, "crouch_drop": 0,
+     "kneel_tilt": 20, "death_roll": 84, "death_neck": 40, "death_neck_z": -20, "death_head": 10, "death_head_z": 0,
+     "scrape_lo": -6, "scrape_hi": 22}
 
 
 
@@ -869,15 +872,116 @@ def pose_down(t, P=L):
     return q
 
 
-BLINKS = {"idle": [2.0, 5.9]}
+# ------------------------------------------------------------------ ambient clips (`boss.rs`: Act::Watch, Act::Stare; death)
+# Held clips that move a bone through 0 keep it at 0.01 where it should hold still: the exporter
+# leaves out a bone that is 0 all through, and the idle's own moves would show through.
+
+
+def pose_watch(t):
+    """No challenger near (5 s, held): standing tall, the head raised high and turning in slow
+    sweeps one way and the other, lingering at each side, the horns tipping with it; a deep breath,
+    an ear flick, a flick of the tail. No root bob or body pitch: they would lift the hooves."""
+    p = t / 5.0
+    a = TAU * p
+    yaw = 30 * (S(a) + S(3 * a) / 6)  # flattened at each side: it holds the look a moment
+    br = S(2 * a)
+    fl = max(0.0, S(TAU * (p - 0.58) * 14)) if 0.58 < p < 0.58 + 1 / 14 else 0.0
+    tf = max(0.0, S(TAU * (p - 0.84) * 10)) if 0.84 < p < 0.94 else 0.0
+    return stand({"spine_1": (0.06 * br, 0, 0.01), "neck": (HEAD_UP[0][0] - 12 + 2.5 * br, 0.45 * yaw, 0.01),
+                  "head": (HEAD_UP[1][0] + 4 - 1.5 * br, 0.55 * yaw, -0.12 * yaw), "jaw": (0.01, 0, 0),
+                  "ear_L": (-8, 0, -14 - 0.2 * yaw), "ear_R": (-8 - 18 * fl, 0, 14 - 0.2 * yaw + 16 * fl),
+                  "tail": (-6 - 22 * tf, 0, 0)})
+
+
+# The stare's forehoof scrape: the stroke's phases (0..1): the hoof lifted and reaching forward,
+# struck down, dragged back along the ground (the knee and hoof fitted to keep it there:
+# `fit_poses`, L["scrape"]), lifted off and set back in its place.
+STROKE = [0.0, 0.3, 0.42, 0.84, 0.93, 1.0]
+STARE_SCRAPES = [(0.1, 0.36), (0.36, 0.62)]  # two strokes, as parts of the loop; planted again by 0.62
+
+
+def scrape_leg(s, P=L):
+    """The right foreleg's bend (`with_stance` offsets) at `s` (0..1) through one stroke."""
+    lo, hi = P["scrape_lo"], P["scrape_hi"]
+    a = float(np.interp(s, STROKE, [0, -16, lo, hi, 0.5 * hi, 0]))
+    lift = float(np.interp(s, STROKE, [0, 48, 0, 0, 22, 0]))
+    on = float(np.interp(s, STROKE, [0, 0, 1, 1, 0, 0]))
+    tab = P.get("scrape", [])
+    d = float(np.interp(a, [r[0] for r in tab], [r[1] for r in tab])) if tab else 0.0
+    w = float(np.interp(a, [r[0] for r in tab], [r[2] for r in tab])) if tab else 0.0
+    return {"leg_FR_upper": (a, 0, 0), "leg_FR_lower": (lift + on * d, 0, 0), "leg_FR_paw": (-0.6 * lift + on * w, 0, 0)}
+
+
+def stare_pose(P=L):
+    """Staring down: the head lowered, the horns brought forward at the challenger."""
+    return {"neck": (HEAD_UP[0][0] + 30, 0.01, 0.01), "head": (HEAD_UP[1][0] + 18, 0.01, 0.01)}
+
+
+def pose_stare(t, P=L):
+    """Between attacks, close to its challenger (2.5 s, held): facing them, the head lowered and the
+    horns forward, the right forehoof scraping the ground twice and set back; a snort, the head
+    tossed a little; the other hooves planted."""
+    p = t / 2.5
+    br = S(TAU * p * 2)
+    q = stare_pose(P)
+    legs = {}
+    for a, b in STARE_SCRAPES:
+        if a <= p < b:
+            legs = scrape_leg((p - a) / (b - a), P)
+    sn = max(0.0, S(math.pi * (p - 0.7) / 0.12)) if 0.7 < p < 0.82 else 0.0  # the snort
+    sway = 3 * S(TAU * p)
+    q = stand(with_stance(dict(q, **legs)))
+    q.update({"spine_1": (0.03 * br, 0, 0.01), "neck": (q["neck"][0] + 1.5 * br - 4 * sn, sway, 0.01),
+              "head": (q["head"][0] - 6 * sn, 0.5 * sway, 0.01), "jaw": (6 * sn, 0, 0),
+              "ear_L": (18, 0, -10 + 8 * sn), "ear_R": (18, 0, 10 - 8 * sn), "tail": (-24 - 10 * sn, 0, 0)})
+    return q
+
+
+def pose_death(t, P=L):
+    """Dying (2.4 s, holds its last frame): the forelegs buckle and it drops onto its knees, the
+    head sagging; the hind legs give and it sinks onto its belly; it rolls heavily onto its side, the legs going
+    stiff, the head and horns laid on the ground, the eyes shut. Each frame rests on its lowest
+    point (`build.py`)."""
+    p = t / 2.4
+    kneel = ease(p, 0.0, 0.28)
+    sink = ease(p, 0.26, 0.5)
+    roll = ease(p, 0.5, 0.84)
+    lay = ease(p, 0.66, 0.92)  # the head laid down last, as the body settles
+    q = {"root": (0, 0, 0), "spine_0": (P["kneel_tilt"] * kneel * (1 - sink), 0, P["death_roll"] * roll),
+         "spine_1": (0.01, 0, 0.01), "tail": (-10 * kneel + 22 * roll, 0, 0),
+         "neck": (HEAD_UP[0][0] + 34 * kneel + (P["death_neck"] - 34) * roll, 0.01, P["death_neck_z"] * roll),
+         "head": (HEAD_UP[1][0] + 10 * kneel + (P["death_head"] - 10) * lay, 0.01, P["death_head_z"] * lay),
+         "jaw": (4 * kneel + 6 * roll, 0, 0), "ear_L": (30 * sink, 0, -20 * sink), "ear_R": (30 * sink, 0, 20 * sink),
+         "eyelid_L": (0, 0, 90 * sink), "eyelid_R": (0, 0, -90 * sink)}
+    lie = {"F": (P["lie_front"], -150.0, 110.0 - P["lie_front"]), "B": (P["lie_hip"], P["lie_knee"], -P["lie_hip"] - P["lie_knee"])}
+    for leg in LEGS:
+        st, lo = STANCE[leg[0]], lie[leg[0]]
+        bend = KNEEL if leg[0] == "F" else (0.0, 0.0, 0.0)  # onto its knees first
+        out = (-16.0, 0.0, 0.0) if leg[0] == "F" else (16.0, 0.0, 0.0)  # at the end, out stiff
+        for i, part in enumerate(("upper", "lower", "paw")):
+            folded = st[i] + bend[i] * kneel * (1 - sink) + (lo[i] - st[i]) * sink  # then down on its belly
+            q[f"leg_{leg}_{part}"] = (folded * (1 - roll) + out[i] * roll, 0, 0)
+    return q
+
+
+# Down on its knees: the forearm upright, the cannon folded back under it (the knee on the
+# ground); its body's tilt onto the knees is fitted. Then down on its belly as it lies (`pose_lie`).
+KNEEL = (-6.0, 115.0, -10.0)
+
+
+BLINKS = {"idle": [2.0, 5.9], "watch": [1.4, 3.7], "stare": [1.9]}
 BLINK = 0.12
 ANIMS = {"idle": (pose_idle, 8.0), "walk": (pose_walk, 1.5), "run": (pose_run, 0.55), "lie": (pose_lie, 6.0),
          "rise": (pose_rise, 3.0), "charge_tell": (pose_charge_tell, 1.4), "charge": (pose_charge, 2.5),
          "toss_tell": (pose_toss_tell, 0.9), "toss": (pose_toss, 0.6), "rockfall_tell": (pose_rockfall_tell, 1.6),
          "rockfall": (pose_rockfall, 0.7), "leap_tell": (pose_leap_tell, 1.0), "leap": (pose_leap, 1.2),
-         "stunned": (pose_stunned, 2.0), "down": (pose_down, 4.0)}
-# One-off clips play once (an action that loops would play on: `borkon.rs` asks for each by name).
-LOOPED = ("idle", "walk", "run", "lie", "stunned", "down")
+         "stunned": (pose_stunned, 2.0), "down": (pose_down, 4.0),
+         "watch": (pose_watch, 5.0), "stare": (pose_stare, 2.5), "death": (pose_death, 2.4)}
+# One-off clips play once (an action that loops would play on: `borkon.rs` asks for each by name);
+# the held ones loop (`boss.rs` holds watch and stare); death holds its last frame.
+LOOPED = ("idle", "walk", "run", "lie", "stunned", "down", "watch", "stare")
+LOOPS = {"death": "hold_on_last_frame"}
+BLENDS = {"watch": (0.4, 0.4), "stare": (0.3, 0.3), "death": (0.1, 0.0)}
 CLIPS = [n for n in ANIMS if n not in ("idle", "walk", "run", "lie")]
 
 
@@ -887,7 +991,8 @@ def eyelids(name, t):
 
 
 def frame_times(name, dur):
-    n = {"idle": 96, "lie": 60, "walk": 24, "run": 20, "charge": 100, "down": 60, "stunned": 40, "leap": 36}.get(name, 30)
+    n = {"idle": 96, "lie": 60, "walk": 24, "run": 20, "charge": 100, "down": 60, "stunned": 40, "leap": 36,
+         "watch": 50, "stare": 50, "death": 36}.get(name, 30)
     ts = {round(dur * k / n, 4) for k in range(n + 1)}
     for b in BLINKS.get(name, []):
         ts |= {round(b + d, 4) for d in (-BLINK, -BLINK / 2, 0, BLINK / 2, BLINK)}
@@ -899,15 +1004,20 @@ def animations(bone_names):
     for name, (fn, dur) in ANIMS.items():
         frames = []
         for t in frame_times(name, dur):
-            tt = t % dur if t < dur else 0.0
+            # A loop closes on its first pose; a clip played once ends on its own last pose (death
+            # holds it; the fight's one-offs must not snap back to their start on their last key).
+            tt = t % dur if t < dur else (0.0 if name in LOOPED else dur)
             pose = fn(tt)
-            pose.update(eyelids(name, tt))
+            if name != "death":  # it shuts its eyes itself
+                pose.update(eyelids(name, tt))
             root = list(pose.get("root", (0, 0, 0)))
             if name not in ("lie", "down"):  # standing on bent legs, the hooves on the ground
                 root[1] -= L.get("stance_drop", 0.0)
             frames.append({"t": round(t, 4), "rot": {b: [round(float(v), 4) for v in pose.get(b, (0, 0, 0))] for b in bone_names if b != "root"},
                            "root": [round(float(v), 4) for v in root]})
-        out[name] = {"length": dur, "frames": frames, "loop": name in LOOPED}
+        out[name] = {"length": dur, "frames": frames, "loop": LOOPS.get(name, name in LOOPED)}
+        if name in BLENDS:
+            out[name]["blend"] = BLENDS[name]
     return out
 
 
@@ -945,6 +1055,60 @@ def fit_poses(spec):
     print("crouching, lowest:", {k: round(v, 2) for k, v in lowest(spec, crouch(1.0), GROUPS).items()})
     ll = lowest(spec, pose_lie(0.0), GROUPS)
     print("lying, lowest:", {k: round(v, 2) for k, v in ll.items()})
+    fit_ambient(spec)
+
+
+def fit_ambient(spec):
+    """The ambient clips' fits: the stare's scraping hoof kept on the ground through its drag (the
+    knee and hoof for each swing of the foreleg); dying, the body's tilt onto its knees (the knees
+    and the hind hooves level) and its last pose on its side (the body, the horns and the head
+    resting on the ground)."""
+    def hoof(a, d, w):
+        q = stand(with_stance({"leg_FR_upper": (a, 0, 0), "leg_FR_lower": (d, 0, 0), "leg_FR_paw": (w, 0, 0)}))
+        q["root"] = (0, -L["stance_drop"], 0)
+        return float(lowest(spec, q, {"h": lambda n: n == "leg_FR_paw"})["h"])
+
+    def hoof_cost(a):
+        # A shade over the ground, so the stroke between two fitted swings never dips into it.
+        return lambda P: ((hoof(a, P["d"], P["w"]) - 0.12) ** 2 + 0.0005 * (P["d"] ** 2 + P["w"] ** 2)
+                          + 100 * max(0.0, -hoof(a, P["d"], P["w"])))
+    tab = []
+    for a in range(L["scrape_lo"] - 4, L["scrape_hi"] + 5, 2):
+        c = fit({"d": list(range(-32, 41, 4)), "w": list(range(-48, 25, 6))}, hoof_cost(a))[1]
+        f = fit({"d": [c["d"] + k for k in range(-3, 4)], "w": [c["w"] + k for k in range(-5, 6)]}, hoof_cost(a))[1]
+        tab.append((a, f["d"], f["w"], round(hoof(a, f["d"], f["w"]), 2)))
+    L["scrape"] = [list(r[:3]) for r in tab]
+    print("scraping, hoof (swing, knee, hoof, height):", tab)
+
+    G = {"fleg": lambda n: n.startswith(("leg_FL", "leg_FR", "knee_F")), "back": lambda n: n in ("leg_BL_paw", "leg_BR_paw"),
+         "body": lambda n: n in ("hips", "chest", "belly", "shoulders"), "horns": lambda n: n.startswith("horn"),
+         "head": lambda n: n in ("skull", "muzzle", "nose", "jaw"), "all": lambda n: True}
+
+    def kneel_cost(P):
+        g = lowest(spec, pose_death(0.28 * 2.4, dict(L, **P)), G)
+        return (g["fleg"] - g["back"]) ** 2
+    L.update(fit({"kneel_tilt": [x * 0.5 for x in range(20, 61)]}, kneel_cost)[1])
+
+    def dead_cost(P):
+        g = lowest(spec, pose_death(2.4, dict(L, **P)), G)
+        a = g["all"]
+        return 3 * (g["body"] - a) ** 2 + (g["horns"] - a) ** 2 + 0.3 * (g["head"] - a) ** 2
+    # The best that bends no neck corner out through the skull in any frame (`ground.pokes`, as
+    # `build.py` checks).
+    # The skull ends up propped on its lower horn, which lies along the ground.
+    grid = {"death_roll": [88, 92], "death_neck": list(range(40, 121, 10)), "death_neck_z": list(range(-20, 31, 10)),
+            "death_head": list(range(-10, 41, 10)), "death_head_z": list(range(-40, 21, 10))}
+    names = [b["name"] for b in spec["bones"]]
+    for _, P in sorted(((dead_cost(P), P) for P in (dict(zip(grid, v)) for v in itertools.product(*grid.values()))), key=lambda c: c[0]):
+        qs = [(t, pose_death(t, dict(L, **P))) for t in frame_times("death", 2.4)]
+        clip = {"length": 2.4, "loop": False, "frames": [{"t": t, "rot": {b: list(q.get(b, (0, 0, 0))) for b in names if b != "root"},
+                                                          "root": [0, 0, 0]} for t, q in qs]}
+        if not pokes(dict(spec, animations={"death": clip}), ["neck", "skull", "chest", "hips"]):
+            L.update(P)
+            break
+    g = lowest(spec, pose_death(2.4), G)
+    print("dead, above its lowest:", {k: round(float(v - g["all"]), 2) for k, v in g.items()},
+          {k: L[k] for k in ("kneel_tilt", "death_roll", "death_neck", "death_neck_z", "death_head", "death_head_z")})
 
 
 # ------------------------------------------------------------------ build
