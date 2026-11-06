@@ -1327,6 +1327,9 @@ fn rt_sun(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool) -> vec3<f32> 
 fn rt_cone(l: vec3<f32>, radius: f32, px: vec2<f32>) -> vec3<f32> {
     return l;
 }
+fn rt_sun_soft(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool, radius: f32, px: vec2<f32>) -> vec3<f32> {
+    return vec3(1.0);
+}
 ";
 
 /// `rt_sun(rel, n, l, plant)`: how much of the light coming along `l` (unit, toward the sun or
@@ -1361,6 +1364,12 @@ fn rt_lod_hidden(rel: vec3<f32>) -> bool {
 // anti-aliasing's jitter (`scene.taa.xy`), so its history averages one ray a pixel into the
 // penumbra a light of that size casts (soft shadows from one ray). `l` itself without the jitter.
 fn rt_cone(l: vec3<f32>, radius: f32, px: vec2<f32>) -> vec3<f32> {
+    return rt_cone_at(l, radius, px, 0.0);
+}
+
+// The same, turned by `turn` (0..1 of a circle) and its distance from the middle mirrored for odd
+// halves, for further rays of one pixel spread over the disc (`rt_sun_soft`).
+fn rt_cone_at(l: vec3<f32>, radius: f32, px: vec2<f32>, turn: f32) -> vec3<f32> {
     let j = scene.taa.xy;
     if j.x == 0.0 && j.y == 0.0 {
         return l;
@@ -1368,13 +1377,34 @@ fn rt_cone(l: vec3<f32>, radius: f32, px: vec2<f32>) -> vec3<f32> {
     // Interleaved gradient noise, moved on by the jitter's phase.
     let k = f32(u32(abs(j.x) * 7919.0 + abs(j.y) * 4271.0) % 64u);
     let p = px + vec2(5.588238 * k);
-    let u1 = fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
-    let u2 = fract(52.9829189 * fract(dot(p.yx + vec2(17.0, 31.0), vec2(0.06711056, 0.00583715))));
+    var u1 = fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
+    if fract(turn * 2.0) >= 0.5 {
+        u1 = 1.0 - u1;
+    }
+    let u2 = fract(52.9829189 * fract(dot(p.yx + vec2(17.0, 31.0), vec2(0.06711056, 0.00583715))) + turn);
     let r = radius * sqrt(u1);
     let a = 6.2831853 * u2;
     let t = normalize(cross(l, select(vec3(0.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), abs(l.y) > 0.9)));
     let b = cross(l, t);
     return normalize(l + (t * cos(a) + b * sin(a)) * r);
+}
+
+// `rt_sun` toward a light of disc `radius` (radians), soft-edged: with temporal anti-aliasing's
+// jitter on, two rays to opposite sides of the disc, and where they disagree (a penumbra) two more
+// across it, averaged; the history smooths the rest. Without the jitter one ray to the middle.
+fn rt_sun_soft(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool, radius: f32, px: vec2<f32>) -> vec3<f32> {
+    let j = scene.taa.xy;
+    if j.x == 0.0 && j.y == 0.0 {
+        return rt_sun(rel, n, l, plant);
+    }
+    let a = rt_sun(rel, n, rt_cone_at(l, radius, px, 0.0), plant);
+    let b = rt_sun(rel, n, rt_cone_at(l, radius, px, 0.5), plant);
+    if all(abs(a - b) < vec3(0.05)) {
+        return (a + b) * 0.5;
+    }
+    let c = rt_sun(rel, n, rt_cone_at(l, radius, px, 0.25), plant);
+    let d = rt_sun(rel, n, rt_cone_at(l, radius, px, 0.75), plant);
+    return (a + b + c + d) * 0.25;
 }
 
 struct RtTexel {
