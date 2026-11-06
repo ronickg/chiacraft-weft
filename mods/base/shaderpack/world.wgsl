@@ -1012,14 +1012,16 @@ const FADE_BAND: f32 = 24.0;
 // Whether this pixel, near where the cubes end (`g.extra.y` blocks across from the camera), is
 // left to distant terrain: more of them the nearer the end, in a fine noise over the screen
 // (interleaved gradient noise). A cube's pixel and the distant terrain's at the same place agree,
-// so one of the two always draws it.
+// so one of the two always draws it. The noise moves each frame (`scene.frame.w`, Jimenez's
+// 5.588238 a frame): fixed on the screen, its dots stood still as a stipple over the mid canopy at
+// view 12 (the Look session, 11-06); moving, they blend in time (and in a temporal AA's history).
 fn faded(in: VOut) -> bool {
     let end = f32(g.extra.y);
     if end <= 0.0 {
         return false;
     }
     let f = clamp((length(in.rel.xz) - (end - FADE_BAND)) / FADE_BAND, 0.0, 1.0);
-    let p = floor(in.clip.xy);
+    let p = floor(in.clip.xy) + 5.588238 * scene.frame.w;
     return fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y)) < f;
 }
 
