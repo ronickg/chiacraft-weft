@@ -11,7 +11,7 @@ until screen core:menu within 10
 wait 1
 shot book_hands_open.png
 # The first recipe is the one you can make: oak planks from the log.
-tap_once core:menu class:slot
+tap_once core:menu icon:base:oak_planks
 wait 1
 shot book_hands_picked.png
 tap core:menu text:max (
