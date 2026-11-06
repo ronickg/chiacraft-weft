@@ -45,7 +45,13 @@ impl Server {
             .storage
             .as_ref()
             .and_then(|s| load_player(c, &s.lock(), &key));
-        let spawn = || (c.spawn_dim, self.dims[c.spawn_dim as usize].spawn_point(c));
+        // chiacraft, test only: an imported Minecraft world says where players start
+        // (`chiacraft::mc_import::spawn`).
+        let imported = self
+            .storage
+            .as_ref()
+            .and_then(|s| crate::chiacraft::mc_import::spawn(c, &s.lock().meta.dir));
+        let spawn = || imported.unwrap_or_else(|| (c.spawn_dim, self.dims[c.spawn_dim as usize].spawn_point(c)));
         let (mut dim, mut pos, health, inv, comps, mut look, selected, flying, fire) = match saved {
             // A dimension that is gone (its mod removed), or the void while a real one exists:
             // everything else is kept, the player starts at the spawn.
