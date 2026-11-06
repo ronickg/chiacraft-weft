@@ -124,6 +124,7 @@ block.base.blue_glazed_tiles = Синяя глазурованная плитк�
 block.base.green_glazed_tiles = Зелёная глазурованная плитка
 block.base.red_glazed_tiles = Красная глазурованная плитка
 block.base.copper_block = Медный блок
+block.base.verdigris_copper = Позеленевшая медь
 block.base.bronze_plate = Бронзовая плита
 block.base.steel_plate = Стальная плита
 block.base.bronze_lantern = Бронзовый фонарь

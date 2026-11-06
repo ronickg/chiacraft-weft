@@ -119,6 +119,41 @@ def showcase_glass():
     save(lead, "leaded_glass")
 
 
+def showcase_tiles():
+    """From the generated showcase tiles: checker tiles (polished limestone and slate tiles in 16 px
+    squares with a grout line), verdigris copper (the copper block under a pale green patina,
+    thickest in its hollows, flecks of bare copper left), and the green and red glazed tiles (the
+    blue glaze recoloured, its grout and glints kept)."""
+    lime, slate = tile("polished_limestone"), tile("slate_tiles")
+    check = lime.copy()
+    yy, xx = np.mgrid[0:32, 0:32]
+    dark = ((yy // 16) + (xx // 16)) % 2 == 1
+    check[dark] = slate[dark] * 0.82
+    grout = (yy % 16 == 0) | (xx % 16 == 0)
+    check[grout, :3] = [0x8E, 0x86, 0x78]
+    check[..., 3] = 255
+    save(check, "checker_tiles")
+    copper = tile("copper_block")
+    rng = np.random.default_rng(11)
+    lum = (copper[..., :3] @ [0.3, 0.55, 0.15]) / 255
+    patina = np.clip(1.15 - lum * 1.4 + rng.random((32, 32)) * 0.45, 0, 1)
+    green = np.array([0x5E, 0xA8, 0x8E], float) * (0.75 + 0.5 * lum[..., None])
+    v = copper.copy()
+    k = (patina > 0.42)[..., None]
+    v[..., :3] = np.where(k, green, copper[..., :3] * 0.85)
+    save(v, "verdigris_copper")
+    blue = tile("glazed_tiles_blue")
+    rgb = blue[..., :3]
+    lum = (rgb @ [0.3, 0.55, 0.15]) / 255
+    sat = rgb.max(-1) - rgb.min(-1)
+    glaze = (sat > 40) & (rgb[..., 2] > rgb[..., 0])
+    for name, c in (("green", (0x2E, 0x8A, 0x52)), ("red", (0xA8, 0x30, 0x2A))):
+        a = blue.copy()
+        tint = np.array(c, float) * (0.35 + 1.3 * lum[..., None])
+        a[..., :3] = np.where(glaze[..., None], np.minimum(tint, 255), rgb)
+        save(a, f"glazed_tiles_{name}")
+
+
 def drift(size=32, frames=16, seed=0, top=4):
     """A seamless pattern in [0, 1] that moves one full period over the frames, so it loops."""
     rng = np.random.default_rng(seed)

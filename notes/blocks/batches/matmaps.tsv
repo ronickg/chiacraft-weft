@@ -3,3 +3,21 @@
 iron_block	base	metal=iron tile=0 smooth=0.72 normal=lum:1.5 dark=0.32:smooth=0.35:depth=0.25
 gold_block	base	metal=gold tile=0 smooth=0.86 normal=lum:1.2 dark=0.3:smooth=0.5:depth=0.2
 glass	base	f0=10 smooth=0.92 normal=flat
+# The RTX showcase blocks.
+frosted_glass	base	f0=10 smooth=0.45 normal=flat solid=:f0=10:smooth=0.3
+smoked_glass	base	f0=10 smooth=0.97 normal=flat solid=:f0=10:smooth=0.3
+leaded_glass	base	f0=10 smooth=0.95 normal=flat solid=:metal=lead:smooth=0.35
+polished_limestone	base	f0=10 smooth=0.86 normal=flat
+limestone_tiles	base	f0=10 smooth=0.86 normal=flat dark=0.55:smooth=0.12:porosity=0.8:depth=0.3
+polished_obsidian	base	f0=12 smooth=0.95 normal=flat
+slate_tiles	base	f0=10 smooth=0.35 porosity=0.75 normal=lum:0.5 dark=0.2:smooth=0.1:porosity=1:depth=0.3
+checker_tiles	base	f0=10 smooth=0.86 normal=flat grid=16:smooth=0.12:porosity=0.8:depth=0.3
+glazed_tiles_blue	base	f0=10 smooth=0.92 normal=flat light=0.72:smooth=0.2:porosity=0.6:depth=0.25
+glazed_tiles_green	base	f0=10 smooth=0.92 normal=flat light=0.72:smooth=0.2:porosity=0.6:depth=0.25
+glazed_tiles_red	base	f0=10 smooth=0.92 normal=flat light=0.72:smooth=0.2:porosity=0.6:depth=0.25
+copper_block	base	metal=copper tile=0 smooth=0.78 normal=lum:1.0 dark=0.25:smooth=0.4:depth=0.2
+verdigris_copper	base	metal=copper tile=0 smooth=0.6 normal=lum:1.0 greenish=:f0=10:smooth=0.2:porosity=0.5
+bronze_plate	base	metal=albedo tile=0 smooth=0.65 normal=lum:1.2 dark=0.22:smooth=0.3:depth=0.25
+steel_plate	base	metal=iron tile=0 smooth=0.72 normal=lum:0.6
+bronze_lantern	base	metal=albedo tile=0 smooth=0.6 normal=lum:0.8 emit=0.8 light=0.8:f0=10:smooth=0.5
+bronze_lantern_top	base	metal=albedo tile=0 smooth=0.6 normal=lum:0.8 emit=0.8 light=0.8:f0=10:smooth=0.5

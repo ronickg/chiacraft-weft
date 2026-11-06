@@ -13,6 +13,8 @@ const C: &RecipeKind = &CRAFTING;
 /// The glazed tiles' colours: one per dye.
 const GLAZES: [&str; 3] = ["blue", "green", "red"];
 
+pub static VERDIGRIS_COPPER: Block = Block::named("verdigris_copper");
+
 pub fn register(r: &mut Registry) {
     // ---- glass: see-through, dimming the light passing through a little (frosted), much (smoked),
     // or a little in its colours (leaded; traced shadows take each pane's colour)
@@ -56,6 +58,7 @@ pub fn register(r: &mut Registry) {
             .tab(&crate::tabs::COLORED);
     }
     // ---- metal
+    // Bare copper weathers to verdigris in the open air over a few days (`weather_copper`).
     r.block(Block::generated("copper_block".to_string()))
         .sound_group("stone")
         .hardness(3.0)
@@ -63,6 +66,15 @@ pub fn register(r: &mut Registry) {
         .needs_tool_level(tool_tier::STONE)
         // Packs `ingots/copper` nine to one and back (`recipes.rs`).
         .tag("ore_blocks/copper")
+        .grows(vitals::weathering::VERDIGRIS_SECS, 0)
+        .on_grow(weather_copper)
+        .tab(&crate::tabs::BUILDING);
+    r.block(&VERDIGRIS_COPPER)
+        .sound_group("stone")
+        .hardness(3.0)
+        .mineable("pickaxe")
+        .needs_tool_level(tool_tier::STONE)
+        .drops("copper_block", 1)
         .tab(&crate::tabs::BUILDING);
     for name in ["bronze_plate", "steel_plate"] {
         r.block(Block::generated(name.to_string()))
@@ -96,4 +108,13 @@ pub fn register(r: &mut Registry) {
     r.shaped(C, "bronze_plate", 4, &["bb", "bb"], &[('b', "#ingots/bronze")]);
     r.shaped(C, "steel_plate", 4, &["ss", "ss"], &[('s', "#ingots/steel")]);
     r.shaped(C, "bronze_lantern", 1, &[" b ", "bfb", " g "], &[('b', "#ingots/bronze"), ('f', "frosted_glass"), ('g', "#glowstone")]);
+}
+
+/// A copper block's turn to weather: green with verdigris while air is above it.
+fn weather_copper(e: &mut BlockEvent) {
+    let w = e.world();
+    let p = e.pos();
+    if w.block(p.above()) == 0 {
+        w.set_block(p, VERDIGRIS_COPPER.id());
+    }
 }

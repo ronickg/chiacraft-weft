@@ -14,6 +14,10 @@ A batch row: `name<TAB>mod<TAB>rules`, the rules `key=value` separated by spaces
                     texels darker than 0.3 (luma 0-1: grout, seams, crevices) take these instead,
                     and sit `depth` lower (a groove the normal map shows)
 - `light=0.8:smooth=0.95`  texels brighter than 0.8 take these
+- `solid=:metal=lead:smooth=0.3`  fully opaque texels of a see-through texture (glass's cames, frame)
+- `greenish=:f0=10:smooth=0.2`    texels greener than red (verdigris's patina on copper)
+- `grid=16:smooth=0.1:depth=0.3`  texels on every 16th row or column (a derived tile's grout)
+  (the last of these that matches a texel wins, in the order written)
 - `emit=0.6`        emission for texels with an `_e`-like brightness over 0.85 (alpha), else none
 - `tile=1`          the picture wraps (its normals seam-free across block edges); default 1
 Only opaque texels count (a cutout's holes get the neutral). Writes next to the texture:
@@ -30,23 +34,38 @@ METALS = {"iron": 230, "gold": 231, "aluminium": 232, "chrome": 233, "copper": 2
           "silver": 237, "albedo": 255}
 
 
+SELECTORS = ("dark", "light", "solid", "greenish", "grid")
+
+
 def rules_of(text):
-    base, dark, light = {}, None, None
+    """The base rules, and the overrides in order: (selector, its number or None, rules)."""
+    base, overrides = {}, []
     for part in text.split():
         k, _, v = part.partition("=")
-        if k in ("dark", "light"):
+        if k in SELECTORS:
             bits = v.split(":")
-            over = {"at": float(bits[0])}
+            over = {}
             for b in bits[1:]:
                 kk, _, vv = b.partition("=")
                 over[kk] = vv
-            if k == "dark":
-                dark = over
-            else:
-                light = over
+            overrides.append((k, float(bits[0]) if bits[0] else None, over))
         else:
             base[k] = v
-    return base, dark, light
+    return base, overrides
+
+
+def selects(sel, at, p, l, x, y):
+    if sel == "dark":
+        return l < at
+    if sel == "light":
+        return l > at
+    if sel == "solid":
+        return p[3] == 255
+    if sel == "greenish":
+        return p[1] > p[0]
+    if sel == "grid":
+        return x % int(at) == 0 or y % int(at) == 0
+    return False
 
 
 def green(r):
@@ -70,7 +89,7 @@ def make(name, mod, text):
     img = Image.open(tex).convert("RGBA")
     w, h = img.size
     px = img.load()
-    base, dark, light = rules_of(text)
+    base, overrides = rules_of(text)
     tile = base.get("tile", "1") == "1"
     nmode = base.get("normal", "flat")
     strength = float(nmode.split(":")[1]) if nmode.startswith("lum") else 0.0
@@ -85,11 +104,10 @@ def make(name, mod, text):
             l = luma(p)
             r = dict(base)
             depth = 0.0
-            if dark and l < dark["at"]:
-                r.update({k: v for k, v in dark.items() if k != "at"})
-                depth = float(dark.get("depth", 0.0))
-            elif light and l > light["at"]:
-                r.update({k: v for k, v in light.items() if k != "at"})
+            for sel, at, over in overrides:
+                if selects(sel, at, p, l, x, y):
+                    r.update(over)
+                    depth = float(over.get("depth", 0.0))
             emit = 255
             if "emit" in base and l > 0.85:
                 emit = int(float(base["emit"]) * 254)
@@ -105,7 +123,7 @@ def make(name, mod, text):
             # Sobel: the slope across u (x) and down v (y), as DirectX's y (down the picture).
             dx = (hh(x + 1, y - 1) + 2 * hh(x + 1, y) + hh(x + 1, y + 1)) - (hh(x - 1, y - 1) + 2 * hh(x - 1, y) + hh(x - 1, y + 1))
             dy = (hh(x - 1, y + 1) + 2 * hh(x, y + 1) + hh(x + 1, y + 1)) - (hh(x - 1, y - 1) + 2 * hh(x, y - 1) + hh(x + 1, y - 1))
-            k = max(strength, 1.0 if dark and dark.get("depth") else 0.0)
+            k = max(strength, 1.0 if any(o.get("depth") for _, _, o in overrides) else 0.0)
             nx, ny, nz = -dx * k / 4.0, -dy * k / 4.0, 1.0
             ln = math.sqrt(nx * nx + ny * ny + nz * nz)
             nx, ny = nx / ln, ny / ln

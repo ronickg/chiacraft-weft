@@ -173,6 +173,7 @@ block.base.blue_glazed_tiles = Blue Glazed Tiles
 block.base.green_glazed_tiles = Green Glazed Tiles
 block.base.red_glazed_tiles = Red Glazed Tiles
 block.base.copper_block = Block of Copper
+block.base.verdigris_copper = Verdigris Copper
 block.base.bronze_plate = Bronze Plate
 block.base.steel_plate = Steel Plate
 block.base.bronze_lantern = Bronze Lantern
