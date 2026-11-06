@@ -1865,7 +1865,12 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     // evening the land at 17:00 and 18:00 measured 139-153 of saturation against Bliss's 56-84
     // (mc_forest, gr4), where Bliss's misty mornings run 181.
     let low_sat = mix(0.75, 0.95, smoothstep(0.02, 0.1, scene.weather.z));
-    let sat = 1.2 * look_opt(OPT_SATURATION, 1.0) * select(1.0, mix(low_sat, 0.62, smoothstep(0.3, 0.75, scene.sun.y)), scene.frame.x > 0.5);
+    // In Bliss's own world (imported block for block) the land with the sun 30-55° up came out
+    // grey-green at the cut tuned on the test world (0.62 at noon): land saturation 52 against
+    // Bliss's 72 at 08:00, 61 against 92 at noon, where 17:00 matched (75 against 83). A quarter
+    // more there (the canopy sweep cs1: x1.25 took 08:00 to 67, noon to 78), as it was with the sun
+    // under about 20°.
+    let sat = 1.2 * look_opt(OPT_SATURATION, 1.0) * select(1.0, mix(low_sat, 0.85, smoothstep(0.38, 0.55, scene.sun.y)), scene.frame.x > 0.5);
     t = max(mix(vec3(y), t, mix(1.0, sat, day)), vec3(0.0));
     // A cool floor so the night is never pure black; by day black stays black.
     t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034) * (1.0 - day);
