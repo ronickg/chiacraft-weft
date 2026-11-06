@@ -1002,7 +1002,7 @@ fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
     var banks = 0.3;
     // In the HDR world the banks are walked near what the ray ends on too, for the wisps in the
     // crowns below.
-    let near_floor = scene.frame.x > 0.5 && p.y - floor < 14.0;
+    let near_floor = scene.frame.x > 0.5 && p.y - floor < 14.0 && p.y < SEA_LEVEL + MIST_TOP + 50.0;
     if low * open > 0.02 || near_floor {
         let drift = vec3(wind_now().x, 0.0, wind_now().y) * scene.params.w * mix(0.6, 2.0, s);
         let q = p - drift;
@@ -1038,8 +1038,11 @@ fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
             // tree tops all over, not only in the valleys (try 2 left the forests above the mist
             // line clear, the mist flat pancakes on the rivers). Within a few blocks of what the
             // ray ends on, in the banks' thick parts only; gone by the time the sun is 30° up.
-            let wisp = exp(-max(p.y - floor, 0.0) / 5.0) * smoothstep(0.55, 0.85, smoothstep(0.25, 0.75, banks))
-                * (1.0 - smoothstep(0.2, 0.5, scene.sun.y)) * (1.0 - layer);
+            // Not above about 40 blocks over the mist line: a ray into the sky has its floor at the
+            // eye, and wisps there drew a dark orange band along the horizon (try 3's sheet). Their
+            // edges soft (hard-edged blobs on the crowns, the same sheet).
+            let wisp = exp(-max(p.y - floor, 0.0) / 5.0) * smoothstep(0.4, 0.9, smoothstep(0.25, 0.75, banks))
+                * (1.0 - smoothstep(0.2, 0.5, scene.sun.y)) * (1.0 - layer) * (1.0 - smoothstep(top + 25.0, top + 45.0, p.y));
             return f * open * burn * (layer * mix(2.2, 5.5, b) + wisp * 1.8 + 0.012 * high) * 0.11;
         }
         return f * open * burn * (low * (mix(0.05, 0.7, s) + mix(6.5, 0.6, s) * b) + 0.012 * high) * 0.11;
