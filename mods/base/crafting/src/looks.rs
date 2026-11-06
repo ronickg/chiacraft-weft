@@ -171,7 +171,21 @@ pub fn shift(kind: &str, material: &str) -> [i32; 2] {
 /// and a felling one each have their own): painted, `base:parts/<kind>/<shape>/<art name>`, used
 /// as it is; or a shade map, `base:parts/<kind>/<shape>`, painted with ramps.
 pub fn painted(kind: &str, shape: &str, material: &str) -> String {
-    format!("base:parts/{kind}/{shape}/{}", drawn(kind, material))
+    format!("base:parts/{kind}/{}/{}", drawn_shape(shape), drawn(kind, material))
+}
+
+/// The drawing a shape uses: its own where it's drawn, else the nearest drawn shape of its slot
+/// until its art comes (a bearded axe head as a felling one, a sword's long or short blade as the
+/// straight blade, a long haft as the haft, a barbed spear point as the leaf point). Without this a
+/// tool built with one draws without that part: the engine skips a layer it can't find.
+pub fn drawn_shape(shape: &str) -> &str {
+    match shape {
+        "bearded_axe_head" => "felling_axe_head",
+        "long_blade" | "short_blade" => "straight_blade",
+        "long_haft" => "haft",
+        "barbed_point" => "leaf_point",
+        s => s,
+    }
 }
 
 /// The drawing a working part of `material` uses on `kind`: its own where it's drawn (the kind's
@@ -198,7 +212,7 @@ pub fn drawn<'a>(kind: &str, material: &'a str) -> &'a str {
 }
 
 pub fn map(kind: &str, shape: &str) -> String {
-    format!("base:parts/{kind}/{shape}")
+    format!("base:parts/{kind}/{}", drawn_shape(shape))
 }
 
 pub fn ramp(material: &str) -> String {
@@ -399,6 +413,33 @@ mod tests {
         for m in WORN_SETS {
             for layer in [1, 2] {
                 assert!(std::path::Path::new(&format!("{dir}/{m}_{layer}.png")).exists(), "{m}_{layer}.png");
+            }
+        }
+    }
+
+    #[test]
+    fn every_shape_a_look_draws_has_its_drawing() {
+        // A shape in a layer's region 0 names that layer's drawing: each must be on disk, for every
+        // drawn material where it's painted (a missing one draws the tool without that part).
+        let tex = concat!(env!("CARGO_MANIFEST_DIR"), "/../assets/textures/");
+        let file = |name: &str| format!("{tex}{}.png", name.trim_start_matches("base:"));
+        for l in LOOKS {
+            for layer in l.layers {
+                let slot = layer.regions[0];
+                for shape in crate::kinds::SHAPES
+                    .iter()
+                    .filter(|s| s.kind == l.kind && s.slot == slot)
+                {
+                    if layer.painted {
+                        for (art, _) in l.anchors {
+                            let f = file(&painted(l.kind, shape.id, art));
+                            assert!(std::path::Path::new(&f).exists(), "{} {} in {art}: no {f}", l.kind, shape.id);
+                        }
+                    } else {
+                        let f = file(&map(l.kind, shape.id));
+                        assert!(std::path::Path::new(&f).exists(), "{} {}: no {f}", l.kind, shape.id);
+                    }
+                }
             }
         }
     }
