@@ -2571,7 +2571,9 @@ fn update_game(r: &mut Running, dt: f64, frame_start: Instant) {
         g.client.sky.soft_wanted = r.settings.soft_clouds();
         r.post.use_low = r.settings.post_low();
         r.post.bloom_levels = r.settings.bloom_levels();
-        g.client.sky.froxels_wanted = r.settings.froxels();
+        // The mist volume with the HDR world only, until today's (LDR) look takes it on Ronald's
+        // word (its look was never shown to him there); `core:froxels` 0 turns it off there too.
+        g.client.sky.froxels_wanted = r.settings.froxels() && crate::post::hdr();
         g.client.sky.froxels.cell = r.settings.froxel_cell();
         g.client.sky.cloud_shadow_wanted = crate::post::hdr() && r.settings.cloud_shadows();
         let t = Instant::now();
