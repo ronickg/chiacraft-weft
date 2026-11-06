@@ -20,11 +20,31 @@ const EVERY: u64 = calendar::DAY_TICKS / 4;
 /// broadleaf leaves its Minecraft biome's foliage colour (the colormap at its temperature and
 /// downfall, read off Ronald's own client jar; not muted), spruce-like leaves Minecraft's fixed
 /// spruce colour, birch-like its birch colour, and no seasonal turn (Bliss's seasons are off).
+/// Water too, Minecraft's own colour (`mc_water`): base's is muted toward the sky it mirrors, for
+/// the shader pack, so with no pack it stood grey-blue and flat beside vanilla's saturated blue
+/// (Planner's plain-look sheet in Bliss's world, 11-06).
 pub static MC_LEAF_COLOURS: Config<u32> = Config::named("mc_leaf_colours");
 
 /// Minecraft's fixed leaf colours (`FoliageColor`): spruce's and birch's.
 const MC_SPRUCE: u32 = 0x619961;
 const MC_BIRCH: u32 = 0x80a755;
+
+/// Minecraft's water colours (its biomes' `water_color`): most biomes', the swamp's, a warm ocean's.
+const MC_WATER: u32 = 0x3f76e4;
+const MC_SWAMP_WATER: u32 = 0x617b64;
+const MC_WARM_WATER: u32 = 0x43d5ee;
+
+/// Each base biome's Minecraft water colour (its nearest Minecraft biome's).
+fn mc_water(id: u32) -> u32 {
+    use crate::worldgen::*;
+    if id == SWAMP.id() {
+        MC_SWAMP_WATER
+    } else if id == LAGOON.id() || id == CORAL_REEF.id() {
+        MC_WARM_WATER
+    } else {
+        MC_WATER
+    }
+}
 
 /// Each base biome's nearest Minecraft biome's foliage colour (its colormap at that biome's
 /// temperature and downfall; the swamp's is fixed).
@@ -92,14 +112,17 @@ fn tick(w: &World) {
             tints.push((id, &base_api::trees::EVERGREEN, MC_SPRUCE));
             tints.push((id, &base_api::trees::YELLOW_LEAVES, MC_BIRCH));
         }
+        for &(id, _) in biomes() {
+            tints.push((id, &tints::WATER, mc_water(id)));
+        }
         w.set_biome_tints(&tints);
         return;
     }
     let day = (time / EVERY) as f32 / 4.0 % calendar::YEAR_DAYS as f32;
-    // Leaves as base has them first (after the Minecraft colours were on, they stayed).
+    // Leaves and water as base has them first (after the Minecraft colours were on, they stayed).
     let mut tints: Vec<(u32, &TintKind, u32)> = Vec::new();
     for &(id, _) in biomes() {
-        for kind in leaf_kinds {
+        for kind in leaf_kinds.into_iter().chain([&tints::WATER]) {
             tints.push((id, kind, w.content_tint(id, kind)));
         }
     }

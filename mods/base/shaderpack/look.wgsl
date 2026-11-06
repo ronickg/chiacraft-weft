@@ -984,6 +984,12 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f
     // the light then, and even from all round it made the land flat.
     let hemi = mix(0.75 + 0.25 * n.y, 0.6 + 0.4 * n.y, rain_amount());
     var c = p.ambient * sky * hemi * ao * leaves;
+    // In the HDR world a cloud overhead takes some of the sky's light too, not the sun's alone: with
+    // the sky's full fill a cloud's shadow kept the land at about 0.72 of its lit brightness, where
+    // Bliss's shaded forest falls to 0.4-0.6 (PC shcs_off/shcs_on against Bliss's vista, 11-06).
+    if scene.frame.x > 0.5 && scene.cloud_shadow.x > 0.5 {
+        c *= mix(0.6, 1.0, soft_cloud_shadow(rel));
+    }
     // Under a forest's canopy most of the floor's light is the sun's, come down through the leaves:
     // green and soft (a rainforest's floor gets 1-2 % of the sun, more of it this way than from the
     // sky). Without it the floor of Plants' rainforest sat at luma 12-17 at noon, under the daytime
@@ -1536,6 +1542,11 @@ fn rain_depth(dist: f32) -> f32 {
     return downpour * max(dist - 20.0, 0.0) * smoothstep(10.0, 60.0, dist);
 }
 
+// The HDR world's low evening mist band over the far land (`haze_lit`): its density per block at
+// its floor and its depth (blocks).
+const BAND_HDR: f32 = 0.006;
+const BAND_DEPTH: f32 = 12.0;
+
 fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let c = fog_through(c_in, rel, smoothstep(0.25, 0.75, sky));
     let dist = length(rel);
@@ -1643,6 +1654,28 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let mixed = mix(pale, toward, v);
     let own = mix(pale, toward, v * mix(0.7, 1.0, wet));
     let seen = max(vec3(luma(mixed)) + own - vec3(luma(own)), vec3(0.0));
+    var out = mix(seen, lit, edge);
+    // The HDR world with the sun low: a thin mist lying on the far land at about the sea's height,
+    // a flat white band along the horizon with hills standing out of it, as Bliss's evening (its
+    // 17:00-18:00 vista: rows at 40% of the height 20 brighter than round them, saturation about
+    // 20; none at noon). Only far off (from about 900 blocks), so the near land stays clear, and
+    // as deep as a look runs inside the layer, so it is a band, not a veil.
+    if hdr_air > 0.0 {
+        // (Through 17:00 too, the sun 22° up: from 0.2 it was a third there and barely showed, lk_eb3.)
+        let low = (1.0 - smoothstep(0.32, 0.52, scene.sun.y));
+        // (After the handover to the sky where the terrain ends: before it, the farthest land, where
+        // the band lies, took the sky's colour over it, lk_eb1.)
+        // (From 600 blocks it lay on the nearer hills too, a wide pale wash, not Bliss's thin band
+        // at the far horizon: lk_eb2.)
+        let far_band = smoothstep(1000.0, 2200.0, dist) * low;
+        if far_band > 0.0 {
+            let y = scene.eye.y + rel.y - (SEA_LEVEL + 4.0);
+            let inside = min(min(BAND_DEPTH / max(-dir.y, 0.008), dist), 1500.0);
+            let band = 1.0 - exp(-BAND_HDR * exp(-max(y, 0.0) / BAND_DEPTH) * inside * far_band);
+            let white = vec3(luma(toward)) * vec3(1.04, 1.0, 0.94) * 1.25;
+            out = mix(out, white, band);
+        }
+    }
     // The held light in the air and a bolt before far land: none in a calm scene (`CALM`), and
     // their code left out of its shader (Android port: on the Pixel 10 the size of these rare
     // paths, the fog walk, the dust and the water's cost the vista 34.2 -> 26.0 ms, in a calm
@@ -1651,7 +1684,7 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     if !CALM {
         extra = held_in_fog(rel, sky) + lightning_bolt_over(dir, dist);
     }
-    return mix(seen, lit, edge) + extra;
+    return out + extra;
 }
 
 // ---- light in the fog: torches (Research round 15, 6: Valheim's warm firelight in the mist) ----
@@ -1880,7 +1913,12 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     // evening the land at 17:00 and 18:00 measured 139-153 of saturation against Bliss's 56-84
     // (mc_forest, gr4), where Bliss's misty mornings run 181.
     let low_sat = mix(0.75, 0.95, smoothstep(0.02, 0.1, scene.weather.z));
-    let sat = 1.2 * look_opt(OPT_SATURATION, 1.0) * select(1.0, mix(low_sat, 0.62, smoothstep(0.3, 0.75, scene.sun.y)), scene.frame.x > 0.5);
+    // In Bliss's own world (imported block for block) the land with the sun 30-55° up came out
+    // grey-green at the cut tuned on the test world (0.62 at noon): land saturation 52 against
+    // Bliss's 72 at 08:00, 61 against 92 at noon, where 17:00 matched (75 against 83). A quarter
+    // more there (the canopy sweep cs1: x1.25 took 08:00 to 67, noon to 78), as it was with the sun
+    // under about 20°.
+    let sat = 1.2 * look_opt(OPT_SATURATION, 1.0) * select(1.0, mix(low_sat, 0.85, smoothstep(0.38, 0.55, scene.sun.y)), scene.frame.x > 0.5);
     t = max(mix(vec3(y), t, mix(1.0, sat, day)), vec3(0.0));
     // A cool floor so the night is never pure black; by day black stays black.
     t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034) * (1.0 - day);

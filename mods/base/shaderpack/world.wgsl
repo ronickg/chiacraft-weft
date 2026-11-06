@@ -837,8 +837,11 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     let ndv = max(dot(n, v), 0.02);
     // A near mirror at an ordinary look, as in the reference pictures: most of what it shows is
     // what it reflects (the screen's reflections, `post/reflect.wgsl`, use the same).
-    // (^2: more of a mirror at a slant, toward Bliss's pale sky-mirror lakes; Water 12.)
-    let fresnel = 0.08 + 0.92 * pow(1.0 - ndv, 2.0);
+    // (^2: more of a mirror at a slant, toward Bliss's pale sky-mirror lakes; Water 12.) Now ^4
+    // from 0.04 (`water_fresnel`, as the screen's reflections and far water): in Bliss's own world
+    // its open water reads a muted navy, (91, 111, 134) at far3 at noon, where ours mirrored the
+    // pale sky at (122, 141, 162) (Far view, 11-06).
+    let fresnel = water_fresnel(ndv);
     // Shade on the water from the near shadow map only, fading to sunlit past it: the far map's
     // coarse texels shaded far water wrongly (duller, no sun's path), and the near map's edge, a
     // square seen at a slant, showed as a hard-edged rectangle of bright water (the LOD worker's
@@ -864,7 +867,7 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     // Deep water a murky teal, not near black: the light scattered back from inside it (Bliss's
     // "dirt" scatter) keeps it lit looking down (Tester 2's COL5 shots: deep water at 0.35 mean
     // brightness, a dark navy).
-    let deep = vec3(0.022, 0.072, 0.066);
+    let deep = WATER_DEEP;
     let deepness = 1.0 - exp(-0.35 * depth);
     let scatter_raw = mix(shallow, deep, deepness) * mix(vec3(1.0), tint, mix(0.15, 0.35, deepness)) * pattern * lit;
     // The water's own colour 40 % toward grey: at a slant ours read 0.31 saturation against Bliss's
@@ -877,7 +880,9 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     // The sky toward the horizon more than the ripples' tilt would give: they tipped it up into the
     // darker blue overhead, where Bliss's lakes mirror the pale, hazy low sky (Tester 2's shots:
     // our lake's water 0.45 mean brightness against Bliss's 0.62).
-    let refl = sky_color(normalize(vec3(r.x, max(r.y * 0.5, 0.03), r.z))) * mix(0.15, 1.0, brightness_curve(in.light.x));
+    // (Tipped down by less now, 0.85 of the ripple's lift where it was half: halved, it mirrored the
+    // palest band of the sky everywhere, where Bliss's open water mirrors a deeper blue.)
+    let refl = sky_color(normalize(vec3(r.x, max(r.y * WATER_SKY_LIFT, 0.03), r.z))) * mix(0.15, 1.0, brightness_curve(in.light.x));
     // The sun's glitter: a narrow highlight (GGX) on the waves, so it lies in a path toward the sun.
     let l = light_dir();
     // Never a zero vector (light exactly behind the eye): its normalize would be NaN.
@@ -1231,18 +1236,30 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
 // and Bliss's far seas are (Planner, 11-05: "its far water is a flat dark mirror reflecting the sky").
 // Through `water()` it took the near water's shallow depth and bottom, and read pale and milky.
 // (Before the haze, which `lod_color` adds once for land and water.)
+// Near and far water's share of what they mirror at a look `ndv` (cosine to the normal): a fourth
+// power from 0.04, as the screen's reflections (`post/reflect.wgsl`). Muted navy water as Bliss's
+// in its own world, not a pale mirror (Far view, 11-06).
+fn water_fresnel(ndv: f32) -> f32 {
+    return 0.04 + 0.96 * pow(1.0 - clamp(ndv, 0.0, 1.0), 4.0);
+}
+// Deep water's colour (what its body sends back, times the light), near and far alike: a navy
+// (was a murky teal, (0.022, 0.072, 0.066) near and (0.014, 0.045, 0.045) far).
+const WATER_DEEP: vec3<f32> = vec3(0.018, 0.045, 0.085);
+// How much of a reflected ray's rise the mirrored sky is taken at (lower: nearer the horizon's pale
+// band), near and far alike.
+const WATER_SKY_LIFT: f32 = 0.85;
+
 fn far_water_lit(in: VOut) -> vec3<f32> {
     let v = -normalize(in.rel);
     let n = wave_normal(in.pos, in.dist, v.y);
     let ndv = max(dot(n, v), 0.02);
-    // Schlick's: nearly all mirror at the slants far water is seen at.
-    let fresnel = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
+    let fresnel = water_fresnel(ndv);
     // The clouds' shadow here once (it was asked twice, for the light and the glint).
     let clouds = cloud_shadow(in.rel);
     let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, clouds, 1.0, in.pos, in.rel);
-    let deep = vec3(0.014, 0.045, 0.045) * lit;
+    let deep = WATER_DEEP * lit;
     let r = reflect(-v, n);
-    let refl = sky_color(normalize(vec3(r.x, max(r.y, 0.02), r.z)));
+    let refl = sky_color(normalize(vec3(r.x, max(r.y * WATER_SKY_LIFT, 0.02), r.z)));
     let l = light_dir();
     let hv = normalize(l + v + vec3(0.0, 1e-4, 0.0));
     let nh = max(dot(n, hv), 0.0);
