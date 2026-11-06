@@ -10,8 +10,9 @@
 //! swim (`swim`, by `World::fly`): drifting from point to point under the water, darting off from a
 //! walker, never swimming out of it; stranded on land, one lies on its side flapping (a look of its
 //! own) and suffocates. They breed in their seasons (`court`): in love, one swims to a mate of
-//! its kind near, and met, the female spawns; her fry come after the eggs' time
-//! (`life::carrying`), near her. The spawner tops up what breeding doesn't.
+//! its kind near, and met, the female spawns: her roe lies on the bottom under her, seen
+//! (`eggs::lay_roe`), and hatches into fry after its time in the water. The spawner tops up what
+//! breeding doesn't.
 
 use weft_sdk::ai::Goals;
 use weft_sdk::*;

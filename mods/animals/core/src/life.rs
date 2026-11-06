@@ -33,17 +33,17 @@ pub fn size(s: &Species, growing: u32) -> f32 {
     s.birth_size + (1.0 - s.birth_size) * grown
 }
 
-/// Ticks from mating to the young born, or the eggs laid; a fish's eggs, spawned into the water,
-/// stand for their incubation before the fry come (no egg entity: one would need the water's
-/// temperature, not a nest's).
+/// Ticks from mating to the young born, or the eggs laid. A fish lays too: its roe lies on the
+/// bottom, seen, for its incubation (`roe_develops`), then the fry come (Planner, 11-06, for
+/// Ronald's "eggs you can see per species"; before, the fry simply came after the eggs' time).
 pub fn carrying(s: &Species) -> u32 {
-    if s.gestation() > 0 {
-        s.gestation()
-    } else if s.in_water() {
-        s.incubation()
-    } else {
-        LAYING
-    }
+    if s.gestation() > 0 { s.gestation() } else { LAYING }
+}
+
+/// Whether a fish's roe develops where it lies: in water, whatever its warmth (a species' water
+/// is its habitat's; out of the water it dries and waits).
+pub fn roe_develops(in_water: bool) -> bool {
+    in_water
 }
 
 /// How many young a litter or clutch has, `roll` any random number.
