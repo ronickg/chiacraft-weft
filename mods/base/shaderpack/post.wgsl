@@ -284,6 +284,8 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
         let e = textureLoad(textures[pass_.exposure - 1u], vec2(0, 0), 0).g;
         if e == e && e > 0.0 {
             col *= pow(auto_exposure(e), fantasy_opt(OPT_AUTO_EXPOSURE));
+            // A high sun's land a little brighter (the noon land read 91 against Bliss's 113).
+            col *= mix(1.0, 1.15, smoothstep(0.5, 0.85, scene.sun.y) * (1.0 - rain_amount()));
         }
     }
     return col;
