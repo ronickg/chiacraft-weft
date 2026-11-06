@@ -1378,8 +1378,9 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // far land is warm (red minus blue +27), ours was blue-grey (-15) at the same brightness, and at
     // noon Bliss's is near neutral (saturation 54, -19) where ours was bluer and more saturated (87,
     // -48; the Look session's measures on the forest vista, 11-05). 0.6 of the way to the sun's hue
-    // with it under about 33°, easing to 0.3 by 64°, and the veil's channels evened out, about a third
-    // with the sun low, under half at noon (less of Rayleigh's blue; half took too much of 08:00's
+    // with it under about 33°, easing to 0.3 by 64°, and the veil's channels evened out, about a fifth
+    // with the sun low (at a third the 08:00 far band stayed grey, saturation 37 against
+    // Bliss's 58), under half at noon (less of Rayleigh's blue; half took too much of 08:00's
     // colour, and seven tenths left the noon far land grey where Bliss's is a coloured blue-green:
     // saturation 35 against 54, the Look session's spot C measures, 11-05), and at noon the veil a
     // little darker (its far band luma 168 against Bliss's 148). The HDR path only
@@ -1390,7 +1391,7 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
         let low_sun = mix(0.3, 1.0, 1.0 - noon);
         let sun_tint = p.sun / max(luma(p.sun), 1e-3);
         toward = mix(toward, luma(toward) * sun_tint, 0.6 * low_sun * hdr_air) * (1.0 - 0.15 * noon * hdr_air);
-        v = mix(v, vec3((v.r + v.g + v.b) / 3.0), mix(0.35, 0.45, noon) * hdr_air);
+        v = mix(v, vec3((v.r + v.g + v.b) / 3.0), mix(0.2, 0.45, noon) * hdr_air);
     }
     let mixed = mix(pale, toward, v);
     let own = mix(pale, toward, v * mix(0.7, 1.0, wet));
