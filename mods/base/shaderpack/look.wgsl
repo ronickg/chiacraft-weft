@@ -200,10 +200,33 @@ fn palette_now() -> Palette {
     // And its sunlight a little warmer with the sun high (the warmth on Bliss's noon land is its
     // sun's, the sky and the far haze staying blue: our whole-picture white balance had greyed the
     // noon sky, saturation 19 against 31).
-    if scene.frame.x > 0.5 {
-        p.sun *= mix(vec3(1.0), vec3(1.05, 1.0, 0.86), smoothstep(0.3, 0.7, scene.sun.y));
+    // In the HDR world the sunlight's colour as Bliss makes it: a blackbody's (Ronald's Bliss runs
+    // its sun at 4300 K) through the air along the sun's path, at the palette's brightness. Bliss's
+    // lit canopy tops read yellow (hue 52 at 08:00, 62 at noon), ours green (79, 100) under a
+    // near-white sun (Trees' measures, 11-06). (It replaces the small warming with the sun high.)
+    if scene.frame.x > 0.5 && scene.sun.y > -0.05 {
+        let hue = sun_kelvin_linear() * sky_transmittance(scene.sun.y);
+        let day = smoothstep(-0.05, 0.05, scene.sun.y);
+        p.sun = mix(p.sun, hue * (luma(p.sun) / max(luma(hue), 1e-4)), day);
     }
     return p;
+}
+
+// A 4300 K blackbody in linear light, red 1 (Bliss's `blackbody` at Ronald's Sun_temp, computed in
+// the crew's bliss-source notes: linear 1.0 0.668 0.426).
+fn sun_kelvin_linear() -> vec3<f32> {
+    return vec3(1.0, 0.668, 0.426);
+}
+
+// What of the sun's light gets through the air to the ground with the sun `e` (sin of its height)
+// up: Rayleigh's scattering by wavelength and a little grey Mie, over the air mass along the path
+// (Kasten and Young's), from Bliss's own coefficients (Rayleigh 5.8e-6, 1.35e-5, 3.31e-5 per metre
+// over an 8 km scale height; Mie 3e-6 over 1.2 km). About 0.94 0.87 0.72 at noon (55 degrees up).
+fn sky_transmittance(e: f32) -> vec3<f32> {
+    let h = degrees(asin(clamp(e, 0.0, 1.0)));
+    let air = 1.0 / (sin(radians(h)) + 0.50572 * pow(h + 6.07995, -1.6364));
+    let depth = vec3(0.0464, 0.108, 0.265) + vec3(0.0036);
+    return exp(-depth * air);
 }
 
 fn palette_read() -> Palette {
