@@ -99,7 +99,7 @@ pub const SOURCES: [Source; 76] = [
         "base:spruce_leaves",
         Category::Leaves,
         4,
-        &["base:taiga", "base:snowy_plains", "base:mountains", "base:sequoia_grove"],
+        &["base:taiga", "base:snowy_plains", "base:mountains", "base:sequoia_grove", "base:old_growth_forest"],
         ALL_YEAR,
     ),
     browse("base:acacia_leaves", Category::Leaves, 4, &["base:savanna"], ALL_YEAR),

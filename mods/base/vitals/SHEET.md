@@ -427,7 +427,7 @@ What foraging animals eat of the world's blocks (`vitals::forage`), how much a m
 | base:berry_bush (age 3) | fruit | 8 | back to age 1 | base:berry_bush |
 | base:oak_leaves | leaves | 4 | stays | always there in base:forest, base:old_growth_forest, base:plains, base:swamp (spring, summer, autumn), worth 40% of fresh growth |
 | base:birch_leaves | leaves | 4 | stays | always there in base:forest, base:old_growth_forest, base:birch_forest (spring, summer, autumn), worth 40% of fresh growth |
-| base:spruce_leaves | leaves | 4 | stays | always there in base:taiga, base:snowy_plains, base:mountains, base:sequoia_grove (all year), worth 40% of fresh growth |
+| base:spruce_leaves | leaves | 4 | stays | always there in base:taiga, base:snowy_plains, base:mountains, base:sequoia_grove, base:old_growth_forest (all year), worth 40% of fresh growth |
 | base:acacia_leaves | leaves | 4 | stays | always there in base:savanna (all year), worth 40% of fresh growth |
 | base:cactus | leaves | 3 | stays | always there in base:desert (all year), worth 40% of fresh growth |
 | base:tall_grass | seeds | 3 | stays | always there in base:plains, base:forest, base:old_growth_forest, base:birch_forest, base:taiga, base:savanna, base:swamp, base:mountains, base:sequoia_grove, base:beach (summer, autumn), worth 40% of fresh growth |
