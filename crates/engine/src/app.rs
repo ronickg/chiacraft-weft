@@ -2829,6 +2829,12 @@ fn update_game(r: &mut Running, dt: f64, frame_start: Instant) {
         r.post.use_low = r.settings.post_low();
         r.post.use_taa = r.settings.aa();
         r.post.taa_blend = r.settings.taa_blend();
+        // The path tracer's denoiser: ours, unless Ray Reconstruction denoises the frame.
+        r.post.denoiser.mode = r.settings.pt_denoiser();
+        (r.post.denoiser.phi_color, r.post.denoiser.steps) = r.settings.pt_dn_tuning();
+        r.post.denoiser.debug = r.settings.pt_dn_debug();
+        r.post.denoiser.reconstruct = r.upscale_now.is_some_and(|c| c.reconstruct);
+        crate::denoise::set_test(r.settings.pt_denoise_test());
         r.post.bloom_levels = r.settings.bloom_levels();
         // The mist volume with the HDR world only, until today's (LDR) look takes it on Ronald's
         // word (its look was never shown to him there); `core:froxels` 0 turns it off there too.
