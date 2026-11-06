@@ -275,12 +275,16 @@ impl ClientWorld {
     /// Above the camera a cube not here yet is taken for air: those are the new top of the view
     /// while rising, nearly always sky. Nothing but air all the way down means the same, unless
     /// the land lies under what the view reaches, seen from high up: that is left to distant terrain.
-    pub fn column_shown(&self, col: IVec2, seed: u64) -> bool {
+    /// `ground` (chiacraft, test only): the column's height in an imported world, which our
+    /// generator's (`DimensionDef::column`) knows nothing of.
+    pub fn column_shown(&self, col: IVec2, seed: u64, ground: Option<i32>) -> bool {
         let lo = self.range.0;
         let def = &crate::content::content().dims[self.dim as usize];
-        let land_below = || {
-            def.column(seed, col.x * 16 + 8, col.y * 16 + 8)
-                .is_some_and(|c| c.height >> 4 < lo)
+        let land_below = || match ground {
+            Some(h) => h >> 4 < lo,
+            None => def
+                .column(seed, col.x * 16 + 8, col.y * 16 + 8)
+                .is_some_and(|c| c.height >> 4 < lo),
         };
         // chiacraft: a cube of nothing but liquid and air is seen through, as air is: its ground is
         // further down. Taken for ground, a lake's column handed distant terrain over while the cube

@@ -173,9 +173,9 @@ pub fn made(job: LodJob, mut words: Vec<u32>) {
             take_columns(&job, &mut words);
         }
         let (quads, skip, y) = if job.key.smooth() {
-            mesh_smooth(content(), job.dim, job.seed, job.key, &words)
+            mesh_smooth(content(), job.dim, job.seed, job.key, &words, job.far.as_deref())
         } else {
-            let (quads, y) = mesh(content(), job.dim, job.seed, job.key, &words);
+            let (quads, y) = mesh(content(), job.dim, job.seed, job.key, &words, job.far.as_deref());
             (quads, 0, y)
         };
         crate::diag::LOD_MESHED.add(1);
@@ -408,7 +408,10 @@ const BANDS: i32 = 8;
 /// bands down the wall. Over the ground stand trees' crowns (`crown`): a box per cell from its top
 /// down to its lowest leaves, rounded or tapering over the cells as the trees are, its sides where
 /// the next cell's crown or ground doesn't hide them, and a trunk under it.
-pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (Vec<[u32; 4]>, (i32, i32)) {
+/// `imported` (chiacraft, test only): an imported world's far grid, whose cells' walls are their own
+/// blocks, not the dimension's rock faces (`Faces`: base's sandstone strata by our climate stood as
+/// terracotta and pale stone outcrops on the imported world's grass hills, Far view 11-06).
+pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32], imported: Option<&crate::chiacraft::mc_import::FarTerrain>) -> (Vec<[u32; 4]>, (i32, i32)) {
     let s = 1 << key.level;
     let at = |i: i32, j: i32| ground(words, i, j);
     let canopy = key.level >= CANOPY_LEVEL;
@@ -454,6 +457,9 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
             tops[k] = top;
             // Water, ice and canopies have the same block under: no ground face there.
             let Some(f) = faces.filter(|_| top != under) else { continue };
+            if imported.is_some_and(|m| m.cell(o.x + i * s + s / 2, o.y + j * s + s / 2).is_some()) {
+                continue;
+            }
             let low = [(-1, 0), (1, 0), (0, -1), (0, 1)]
                 .iter()
                 .map(|&(di, dj)| at(i + di, j + dj).0)
@@ -731,7 +737,7 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
 /// (`lod_grid_cell`) in the block most of its corners have on top (bare rock where the ground
 /// falls steeply, `Terrain::faces`), and short skirts under its edges against cracks where a tile
 /// of another level is beside it. The shader morphs its corners into the next level's.
-pub fn mesh_smooth(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (Vec<[u32; 4]>, u32, (i32, i32)) {
+pub fn mesh_smooth(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32], imported: Option<&crate::chiacraft::mc_import::FarTerrain>) -> (Vec<[u32; 4]>, u32, (i32, i32)) {
     use crate::gpu_layout::{lod_face, lod_grid, lod_grid_cell};
     let s = 1 << key.level;
     // Corner (i, j), from -1 to 32: its ground, or a forest's crowns over it as a canopy (its top
@@ -770,10 +776,10 @@ pub fn mesh_smooth(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]
             let low = corners.iter().map(|c| c.0).min().unwrap_or(0);
             let high = corners.iter().map(|c| c.0).max().unwrap_or(0);
             (lo, hi) = (lo.min(low + 1 - 2 * s), hi.max(high + 1));
-            if let Some(f) = faces.filter(|_| top != under) {
+            let (x, z) = (o.x + i * s + s / 2, o.y + j * s + s / 2);
+            if let Some(f) = faces.filter(|_| top != under && !imported.is_some_and(|m| m.cell(x, z).is_some())) {
                 let fall = fall(high - low, s);
                 if fall >= f.fall {
-                    let (x, z) = (o.x + i * s + s / 2, o.y + j * s + s / 2);
                     top = face_block(f, seed, dim, [x, high, z], high, biome, fall, top);
                 }
             }
@@ -1203,6 +1209,9 @@ impl Lod {
         };
         let changed = world.take_changed_columns();
         let inside = |col: IVec2, at: IVec2| (col - at).abs().max_element() <= half;
+        // chiacraft, test only: an imported world's ground height there, not our generator's.
+        let far = self.far.as_ref().filter(|f| f.0 == self.dim).map(|f| f.1.clone());
+        let shown = |col: IVec2| world.column_shown(col, seed, far.as_ref().and_then(|f| f.cell(col.x * 16 + 8, col.y * 16 + 8)).map(|c| c.0));
         if half != self.half || self.mask.is_empty() {
             self.half = half;
             self.mask = vec![0; ((w * w) as usize).div_ceil(32)];
@@ -1210,7 +1219,7 @@ impl Lod {
             for z in -half..=half {
                 for x in -half..=half {
                     let col = center + IVec2::new(x, z);
-                    set(&mut self.mask, col, world.column_shown(col, seed));
+                    set(&mut self.mask, col, shown(col));
                 }
             }
             self.mask_changed = true;
@@ -1221,14 +1230,14 @@ impl Lod {
                 for x in -half..=half {
                     let col = center + IVec2::new(x, z);
                     if !inside(col, old) {
-                        self.mask_changed |= set(&mut self.mask, col, world.column_shown(col, seed));
+                        self.mask_changed |= set(&mut self.mask, col, shown(col));
                     }
                 }
             }
         }
         for col in changed {
             if inside(col, center) {
-                self.mask_changed |= set(&mut self.mask, col, world.column_shown(col, seed));
+                self.mask_changed |= set(&mut self.mask, col, shown(col));
             }
         }
         render.lod_half = half as u32;
