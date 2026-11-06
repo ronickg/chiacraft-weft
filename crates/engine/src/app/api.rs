@@ -579,7 +579,12 @@ pub unsafe extern "C" fn client_ui_rect(c: *mut abi::ClientCtx, query: Str, out:
             ui.nodes
                 .iter()
                 .position(|node| matches!(node.kind, Kind::Custom { tag: crate::client::modui::TAG_CREATIVE, data } if data == n))
-        } else if let Some(n) = q.strip_prefix("icon:").and_then(|n| n.parse::<u64>().ok()) {
+        } else if let Some(n) = q.strip_prefix("icon:").and_then(|n| {
+            // A number, or an item's name (`icon:base:part_haft`): scripts can't know numbers.
+            n.parse::<u64>()
+                .ok()
+                .or_else(|| crate::content::content().item_names.get(n).map(|&i| i as u64))
+        }) {
             ui.nodes.iter().position(|node| match node.kind {
                 Kind::Custom { tag: crate::client::modui::TAG_ICON, data } => data == n,
                 Kind::Item { last, .. } => last.0 as u64 == n,
