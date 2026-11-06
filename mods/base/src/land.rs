@@ -39,23 +39,17 @@ pub fn terrain(r: &mut Registry) {
     finish(t);
 
     r.decoration(rock_faces).dimension(&crate::OVERWORLD);
-    r.decoration(|g| l::with_mc_land(|| rock_faces(g)))
-        .dimension(&crate::MC_FOREST);
+    r.decoration(rock_faces).dimension(&crate::MC_FOREST);
     r.decoration(cave_mouths).dimension(&crate::OVERWORLD);
-    r.decoration(|g| l::with_mc_land(|| cave_mouths(g)))
-        .dimension(&crate::MC_FOREST);
+    r.decoration(cave_mouths).dimension(&crate::MC_FOREST);
     r.decoration(glaciers).dimension(&crate::OVERWORLD);
-    r.decoration(|g| l::with_mc_land(|| glaciers(g)))
-        .dimension(&crate::MC_FOREST);
+    r.decoration(glaciers).dimension(&crate::MC_FOREST);
     r.decoration(tarn_water).dimension(&crate::OVERWORLD);
-    r.decoration(|g| l::with_mc_land(|| tarn_water(g)))
-        .dimension(&crate::MC_FOREST);
+    r.decoration(tarn_water).dimension(&crate::MC_FOREST);
     r.decoration(fray_borders).dimension(&crate::OVERWORLD);
-    r.decoration(|g| l::with_mc_land(|| fray_borders(g)))
-        .dimension(&crate::MC_FOREST);
+    r.decoration(fray_borders).dimension(&crate::MC_FOREST);
     r.decoration(sea_sand).dimension(&crate::OVERWORLD);
-    r.decoration(|g| l::with_mc_land(|| sea_sand(g)))
-        .dimension(&crate::MC_FOREST);
+    r.decoration(sea_sand).dimension(&crate::MC_FOREST);
     r.decoration(coral).dimension(&crate::OVERWORLD);
     r.decoration(landmarks).dimension(&crate::OVERWORLD);
     r.decoration(tropical_water).dimension(&crate::OVERWORLD);
@@ -178,7 +172,7 @@ fn finish(t: TerrainBuilder<'_>) {
 /// coasts and heights, and the rest shared out among Minecraft's temperate forest biomes by the mix
 /// field, each with its river bed (`RIVER_BEDS`).
 pub fn mc_forest_terrain(r: &mut Registry) {
-    let t = land(r.terrain(&crate::MC_FOREST), l::mc_features()).field(l::MC_MIX_FIELD, l::mc_mix_field());
+    let t = land(r.terrain(&crate::MC_FOREST), l::features()).field(l::MC_MIX_FIELD, l::mc_mix_field());
     let mut t = heights(coasts(t));
     let cuts = l::mc_mix_cuts();
     let mut low = f64::NEG_INFINITY;
@@ -219,8 +213,8 @@ pub fn overworld_land(dimension: u32) -> bool {
     dimension == crate::OVERWORLD.id() || dimension == crate::MC_FOREST.id()
 }
 
-/// The dimension whose columns a site in `dimension` stands on (the test world's own: its rivers
-/// differ, `base_api::land::MC_RIVERS`).
+/// The dimension whose columns a site in `dimension` stands on (its own: the test world's land is
+/// the overworld's, its biomes are not).
 fn land_of(dimension: u32) -> &'static Dimension {
     if dimension == crate::MC_FOREST.id() { &crate::MC_FOREST } else { &crate::OVERWORLD }
 }
