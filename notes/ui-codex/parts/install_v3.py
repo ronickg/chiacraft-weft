@@ -41,7 +41,9 @@ from PIL import Image, ImageDraw
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 TEX = os.path.join(ROOT, "mods", "base", "assets", "textures")
-SRC = os.path.expanduser("~/Coding/chiacraft-archive/images/art-redo-v3/tools")
+# Where the drawings are, first found wins: the redrawn heads (tools2/, drawn to today's size and
+# socket) over the first round (tools/).
+SRC = ",".join(os.path.expanduser(f"~/Coding/chiacraft-archive/images/art-redo-v3/{d}") for d in ("tools2", "tools"))
 OUT = os.path.expanduser("~/Coding/chiacraft-archive/images/art-redo-v3/install")
 
 MATS = ["wood", "stone", "flint", "copper", "bronze", "iron", "steel", "gold", "diamond"]
@@ -58,6 +60,15 @@ SHELLS = ["helmet_shell", "chest_shell", "leg_shell", "boot_shell"]
 SHELL_MATS = ["leather", "bone", "iron", "gold", "diamond"]
 # Today's anchors and sockets (crafting::looks::LOOKS), for the previews.
 LOOKS_RS = os.path.join(ROOT, "mods", "base", "crafting", "src", "looks.rs")
+
+
+def drawing(src, name):
+    """The first folder of `src` (comma-separated) that has `name`; the last one's path if none does."""
+    dirs = src.split(",")
+    for d in dirs:
+        if os.path.exists(os.path.join(d, name)):
+            return os.path.join(d, name)
+    return os.path.join(dirs[-1], name)
 
 
 def load(path):
@@ -208,7 +219,7 @@ def main():
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--only", default="")
     ap.add_argument("--parts", default="")
-    ap.add_argument("--src", default=SRC)
+    ap.add_argument("--src", default=SRC, help="folders of drawings, comma-separated, first found wins")
     args = ap.parse_args()
     only = set(filter(None, args.only.split(",")))
     pick = set(filter(None, args.parts.split(",")))
@@ -224,7 +235,7 @@ def main():
         handle_map = load(os.path.join(TEX, "parts", kind, "grip.png" if kind == "sword" else "haft.png"))
         handle = paint(handle_map, [leather, iron, iron] if kind == "sword" else [oak])
         for m in MATS:
-            src = os.path.join(args.src, f"{m}__{part}_px.png")
+            src = drawing(args.src, f"{m}__{part}_px.png")
             if not want(m, part):
                 continue
             if not os.path.exists(src):
@@ -264,7 +275,7 @@ def main():
     for part, (kind, shape) in NEW.items():
         anchors = {}
         for m in MATS:
-            src = os.path.join(args.src, f"{m}__{part}_px.png")
+            src = drawing(args.src, f"{m}__{part}_px.png")
             if not want(m, part):
                 continue
             if not os.path.exists(src):
@@ -290,7 +301,7 @@ def main():
         report["new"][kind] = {m: [round(a[0], 1), round(a[1], 1)] for m, a in anchors.items()}
         handle = paint(hmap, [leather, iron] if kind == "knife" else [oak])
         for m, a in anchors.items():
-            new = load(os.path.join(args.src, f"{m}__{part}_px.png"))
+            new = load(drawing(args.src, f"{m}__{part}_px.png"))
             shift = (int(round(a[0] - sock[0])), int(round(a[1] - sock[1])))
             c = np.zeros((32, 32, 4), np.int32)
             if kind == "knife":
@@ -312,7 +323,7 @@ def main():
     # Armour shells: painted per material where drawn.
     for m in SHELL_MATS:
         for s in SHELLS:
-            src = os.path.join(args.src, f"{m}__{s}_px.png")
+            src = drawing(args.src, f"{m}__{s}_px.png")
             if not want(m, s):
                 continue
             if not os.path.exists(src):
