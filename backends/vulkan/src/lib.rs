@@ -366,6 +366,19 @@ impl VulkanBackend {
             } else if desc.debug {
                 log::warn!("validation layer requested but not installed");
             }
+            // macOS: MoltenVK's own errors in our log (a pipeline Metal would not build says why
+            // only there: `calm world pipelines: ... ERROR_INITIALIZATION_FAILED` came with no
+            // reason, 11-06), through a messenger for errors alone, no validation layer.
+            let mvk_errors = !debug
+                && cfg!(target_os = "macos")
+                && entry
+                    .enumerate_instance_extension_properties(None)
+                    .unwrap_or_default()
+                    .iter()
+                    .any(|e| e.extension_name_as_c_str() == Ok(ext::debug_utils::NAME));
+            if mvk_errors {
+                exts.push(ext::debug_utils::NAME.as_ptr());
+            }
 
             // MoltenVK is a portability driver: the loader hides those unless asked to list them.
             let portability = cfg!(target_os = "macos")
@@ -396,10 +409,15 @@ impl VulkanBackend {
                 )
                 .map_err(err("vkCreateInstance"))?;
 
-            let debug = if debug {
+            let debug = if debug || mvk_errors {
                 let f = ext::debug_utils::Instance::new(&entry, &instance);
+                let severity = if debug {
+                    vk::DebugUtilsMessageSeverityFlagsEXT::ERROR | vk::DebugUtilsMessageSeverityFlagsEXT::WARNING
+                } else {
+                    vk::DebugUtilsMessageSeverityFlagsEXT::ERROR
+                };
                 let info = vk::DebugUtilsMessengerCreateInfoEXT::default()
-                    .message_severity(vk::DebugUtilsMessageSeverityFlagsEXT::ERROR | vk::DebugUtilsMessageSeverityFlagsEXT::WARNING)
+                    .message_severity(severity)
                     .message_type(
                         vk::DebugUtilsMessageTypeFlagsEXT::GENERAL
                             | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION
