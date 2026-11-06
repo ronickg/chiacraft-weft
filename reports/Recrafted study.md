@@ -13,9 +13,9 @@ The detailed notes, module by module, are in [`recrafted-study/`](recrafted-stud
 - [particles, foliage and sounds](recrafted-study/C_particles_foliage_sounds.md)
 - [ImmersiveVFX](recrafted-study/D_immersivevfx.md), added on Ronald's word (11-05, through Planner): "This mod also looks pretty interesting ... interesting things here as well that we can learn from, or even add features". It is ImmersiveVFX 1.5.1 by Shinyflvres (NeoForge, MC 26.3, All Rights Reserved), CurseForge file 9451348. Section [ImmersiveVFX](#immersivevfx) below.
 
-**What was seen in game:** on the PC, Minecraft 26.2 with Fabric, Sodium, Polytone and Recrafted (instance `mc-recrafted`), and Minecraft 26.3 with NeoForge and ImmersiveVFX (instance `mc-ivfx`). Shots are in [In the game](#in-the-game) below. Two things there change the plan. ImmersiveVFX's sandstorm shows how far our dust storm is behind: ours is a flat whiteout, while its storm keeps the near air clear and puts the motion into flying sand (item 2, with a pack-only first step). Recrafted's grass tufts are the best look in his part a (item 5). Falling leaves were missed under the canopy in part a. Part b shoots them from a cleared column, and its sheet will be added here.
+**What was seen in game:** on the PC, Minecraft 26.2 with Fabric, Sodium, Polytone and Recrafted (instance `mc-recrafted`), and Minecraft 26.3 with NeoForge and ImmersiveVFX (instance `mc-ivfx`). Shots are in [In the game](#in-the-game) below. Two things there change the plan. ImmersiveVFX's sandstorm shows how far our dust storm is behind: ours is a flat whiteout, while its storm keeps the near air clear and puts the motion into flying sand (item 2, with a pack-only first step). Recrafted's grass tufts are the best look in his part a (item 5). Falling leaves were missed under the canopy in part a. Part b shot them from a cleared column. In calm, his leaves fall sparsely, one at a time, tumbling in 3D (edge-on in one frame), and lie orange on the forest floor. In 2-3 s of thunder no stream of leaves came off the crowns. So Ronald's "leaves flying around" is a quiet, steady drift plus the litter, and our item 1 can go further in storms. His leaves are also bushy 3D crowns that sway, a look like the grass tufts (item 5).
 
-**Sheets** (in `~/Coding/chiacraft-archive/images/recrafted/2026-11-05/`): `side_by_side_weather.jpg` (ours, Recrafted and ImmersiveVFX side by side), `recrafted_a_sheet.jpg`, `ivfx2_v_sheet.jpg`.
+**Sheets** (in `~/Coding/chiacraft-archive/images/recrafted/2026-11-05/`): `side_by_side_weather.jpg` (ours, Recrafted and ImmersiveVFX side by side), `side_by_side_leaves_water_night.jpg` (leaves, dust, water and night light, same three), `recrafted_a_sheet.jpg`, `recrafted2_b_sheet.jpg`, `recrafted2_b_falling_leaf_crops.png` (four frames of one falling leaf), `ivfx2_v_sheet.jpg`.
 
 **His licence forbids reuse:** none of his textures, models, sounds, shaders or code may go into projects that don't require Recrafted, or be ported to another game. So this report describes techniques only. Everything we build is our own code, art from the game-art skill, and our own (CC0) sounds. His files stay in Ronald's Downloads and on the PC's private `~/recrafted-study`, never in the repository or the archive's shared folders.
 
@@ -128,11 +128,11 @@ Ranked by how much realism each adds for what it costs, with the leaves first be
 
 | # | What | Cost | Owner | Seen |
 |---|---|---|---|---|
-| 1 | Leaves in the wind: falling, blown, settling, tumbling | cheap to moderate (GPU particles; engine wind, tumble, rest) | new **Wind life** session | from code; part b's clearing shots to follow |
+| 1 | Leaves in the wind: falling, blown, settling, tumbling | cheap to moderate (GPU particles; engine wind, tumble, rest) | new **Wind life** session | **yes**: sparse tumbling leaves and floor litter in calm; no storm stream seen |
 | 2 | Dust storms in layers: clear near air, fog far, grains and curtains | 2a cheap (pack only, can start now); 2b cheap once 1's wind exists | 2a **Shader session**; 2b Wind life | **yes**: ImmersiveVFX's sandstorm vs our flat beige whiteout |
 | 3 | The rest of the small life: petals, spindrift, pollen, drips | cheap after 1 | Wind life | petals on the ground seen (cherry); flying ones from code |
 | 4 | Wet ground that lasts, and puddles | cheap | **Shader session** (+ a wetness value in `weather.rs`) | from code; not seen within 20 s of rain |
-| 5 | Fuller grass tufts | moderate (more quads per plant; art) | art (game-art / block-textures) + meshing check | **yes**: Recrafted's strongest look in part a |
+| 5 | Fuller grass tufts and bushy leaf crowns | moderate (more quads per plant and leaf block; art) | art (game-art / block-textures) + meshing check | **yes**: Recrafted's strongest look |
 | 6 | Snow above a line on mountains | cheap | **Shader session** + `vitals` lapse rate | from code |
 | 7 | Grass parts round the player | cheap | **Shader session** | from code |
 | 8 | Ambient sound: leaves, grass, insects | cheap | weather sound owner | (sound; not shot) |
@@ -149,6 +149,7 @@ The Shader session's items, in order: 2a, 4, 6, 7, 9, 10 (relief), 12, 13. Items
 ### 1. Leaves in the wind: falling, blown, settling and tumbling (Ronald's ask)
 
 - **Adds:** the forest comes alive. Leaves drift down all year, more as autumn turns, and in storms they stream off the downwind side of the crowns. They lie on the floor and skitter along it in gusts.
+- **Seen (part b):** in his calm forest, one leaf at a time drifts down, tumbling in 3D, and fallen leaves colour the floor. No storm stream showed in 3 s of thunder. So the calm drift and the litter are what make it feel alive, and they're the first thing to get right. The storm stream is where ours can go further than his (our gusts and storm fronts are real weather).
 - **Build:**
   - **Engine particles get the wind.** `particle_sim.wgsl` reads `scene.weather.xy` and the same gust bands as `world.wgsl`'s `gust()`, moved into the shared prelude so plants and particles agree. A per-kind `wind(coupling)` pulls a particle toward the air's velocity minus its own sink.
   - **Engine 3D tumble.** Particles get an orientation: a flutter phase and a tilt that swings, drawn as a quad turned in 3D rather than facing the camera. A landing rule lays it flat on the face it hit. Both are new particle-kind flags and new `ParticleRule` actions.
@@ -195,12 +196,13 @@ The Shader session's items, in order: 2a, 4, 6, 7, 9, 10 (relief), 12, 13. Items
 - **Driven by:** our rain spells by place, the sun, temperature, humidity.
 - **Owner:** **the Shader session** (it owns the pack's weather look now). The wetness value is a small piece of `weather.rs` and `vitals::air`, the same session or a helper.
 
-### 5. Fuller grass tufts (seen: Recrafted)
+### 5. Fuller grass tufts and bushy leaf crowns (seen: Recrafted)
 
 - **Adds:** a meadow that reads as one field, not a grid of blocks. In Recrafted (`recrafted_a/plains_clear.png`, `flowers_clear.png`) short grass is a tuft of tall, bent blades that spill over the block's edges, and flowers stand in it at the same scale. It's the strongest single look in his part a, and it costs no shader.
 - **Build:** a grass model with more, longer and bent blades that lean past the block edge, with a few variants picked by position hash so neighbours differ. Our wind sway (`world.wgsl` `wind()`) then moves each blade's tip. Compare with ours in the same light first: Tester 2 shoots one of our meadows beside his `plains_clear`.
 - **Art:** through the block-textures and game-art skills, our own blades (his models are his).
 - **Cost:** moderate. More quads per grass plant, which is the most common plant, so measure the mesh size and frame time on the PC bench. An LOD rule (full tufts near, today's beyond 32 blocks) keeps it bounded.
+- **Leaves too:** his leaf blocks are bushy. Leaf cards stick out past the cube, so a crown reads as a rounded mass, not a stack of boxes (`recrafted2_b/leaves_forest_clear.png`), and the whole crown sways (`recrafted2_b_leaf_sway_diff.png`, the difference between two frames 0.4 s apart: every leaf moves). The same build: a few extra cards per leaf block from our leaf textures, culled where two leaf blocks meet, with LOD. Check against our crowns at the old-growth test spot.
 - **Owner:** an art and plants session with the block-textures skill; the Shader session only if the sway needs a per-blade weight.
 
 ### 6. Snow above a line on mountains
@@ -292,6 +294,7 @@ The Shader session's items, in order: 2a, 4, 6, 7, 9, 10 (relief), 12, 13. Items
 - **A cave probe for ambience:** 40 rays round the player, 2 a tick, giving how open, how stony and how big the space is (ImmersiveVFX). It would feed cave or outdoor sound beds. Our `weather_sound` already samples cover in rings for the muffling, so extend that rather than add another (sound owner).
 
 - **Held light fades** when you swap items, an exponential approach in the engine's `hand_light` (cheap; engine).
+- **Rain lit by block light:** at night his rain streaks near lamps and torches catch their light (`recrafted2_b/night_lights_rain.png`), so a lit yard shows the rain. In `weather.wgsl`, add the block light at the streak's position (the light volume is already sampled for the world) (cheap; Shader session).
 - **Lightning bolts drawn** at the strike, procedural and stepped like our pixel style, not an atlas (Shader session; it just added the flashes).
 - **Leaf transmission** in the sun's shadows (light through a crown is green and dim, not black). Check what `fs_shadow`'s dappling already gives (Shader session).
 - **Glass that tints the sun's light** through it: a colour channel in the shadow map (later; engine).
@@ -341,4 +344,24 @@ Sheet: `~/Coding/chiacraft-archive/images/recrafted/2026-11-05/recrafted_a_sheet
 - **Snowy taiga:** snow lies on the ground and the spruce stands dark beside it. The frames don't show frost on the leaves.
 - **Missed: falling leaves.** Standing on the ground under the canopy (`motion_blocking_no_leaves`) put leaves right in front of the camera in the oak, dark-oak and birch forests, so no drifting leaf can be seen against them. In storm the frames only get darker. Part b now begins with two forest scenes in a cleared 11×11 column (oak in calm and in storm, then birch), so falling leaves show against open air and sky.
 
-(Part b and the side-by-side sheets follow.)
+### Recrafted part b, seen (11-06, 00:06-00:14 PC time)
+
+Sheet: `~/Coding/chiacraft-archive/images/recrafted/2026-11-05/recrafted2_b_sheet.jpg`, all frames in `recrafted2_b/` (world `recrafted2`, seed 2). Side by side with ours and ImmersiveVFX: `side_by_side_leaves_water_night.jpg`.
+
+- **Leaves, from a cleared 11×11 column in an oak forest and a birch forest:**
+  - In calm, leaves fall sparsely. In one 8-frame burst a single dark leaf drops past the trunk, turning as it goes: flat in one frame, edge-on as a thin sliver in the next (`recrafted2_b_falling_leaf_crops.png`). That's the 3D tumble from his particle code.
+  - The floor under the crowns has orange-red fallen leaves (litter).
+  - The crowns are bushy and sway all over (`recrafted2_b_leaf_sway_diff.png`).
+  - In the storm burst (10 frames over 3 s) the light dims and shafts move, but no leaves stream off the downwind side. His storm bursts either need a gust front to pass, or happen too rarely to catch in 3 s.
+  - The birch clearing landed at a forest edge over the sea, so the shot shows only distant crowns.
+- **Desert in thunder:** only a grey-beige haze over the far trees. Recrafted has no dust storm, which confirms ImmersiveVFX as the model for item 2.
+- **Water:**
+  - `spreadplayers` won't land on water, so the ocean, warm ocean and river scenes all stayed at the swamp before them. Their shots are the same swamp water.
+  - That water has sharp small waves, sky reflections and a warm sunset glint.
+  - Rain on it is dense, bright streaks, much stronger than his rain on land.
+  - Under water: green murk with light shafts.
+- **Fog:** swamp at dawn shows warm pink clouds over dark water. The morning and rain shots are grey, flat and soft.
+- **Ice:** frozen ocean and ice spikes look plain, mostly vanilla blocks with his light.
+- **Night light:** soul torches throw cyan pools, copper torches green ones, and lanterns and redstone lamps warm ones (his coloured light flood). In rain, the streaks near the lamps light up (item 15, "rain lit by block light").
+- **Ours in the same scenes:** our `rc_ours1` shots were taken for a lake at noon and in rain, but the lake shots face a dirt bank. Use Tester 2's weather sheet (`tester-2/2026-11-05/looks/weather.jpg`) for our rain.
+
