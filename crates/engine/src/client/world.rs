@@ -519,8 +519,11 @@ impl ClientWorld {
             fresh = true;
             Column { biomes: None, cubes: 0 }
         });
-        if fresh || column.biomes.is_none() && cube.biomes.is_some() {
-            column.biomes = column.biomes.take().or_else(|| cube.biomes.clone());
+        // A cube the server sent sets the column's biomes over one this client made (in an
+        // imported world they differ: chiacraft::mc_import; elsewhere both are the generator's).
+        let theirs = around.from_server && cube.biomes.is_some() && column.biomes != cube.biomes;
+        if fresh || theirs || column.biomes.is_none() && cube.biomes.is_some() {
+            column.biomes = if theirs { cube.biomes.clone() } else { column.biomes.take().or_else(|| cube.biomes.clone()) };
             for dz in -1..=1 {
                 for dx in -1..=1 {
                     self.tints_dirty.insert(col + IVec2::new(dx, dz));
