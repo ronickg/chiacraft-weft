@@ -552,7 +552,10 @@ impl WorldRenderer {
                         // beyond any ray's reach (a pack traces from within a few hundred blocks, rays
                         // of 768) it can't either. Both only cost the TLAS and the rays' walk.
                         let inside = lo.x >= c0.x && hi.x <= c1.x && lo.y >= c0.y && hi.y <= c1.y;
-                        let near = (glam::IVec2::new(o.x, o.y) + k.size() / 2 - cxz * 16).as_vec2().length() - k.size() as f32 * 0.71;
+                        let near = (glam::IVec2::new(o.x, o.y) + k.size() / 2 - cxz * 16)
+                            .as_vec2()
+                            .length()
+                            - k.size() as f32 * 0.71;
                         if inside || near > RAY_REACH {
                             continue;
                         }
