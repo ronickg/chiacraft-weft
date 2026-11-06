@@ -84,7 +84,7 @@ pub const PARCHMENT: [u8; 3] = [0xd9, 0xc8, 0x9e];
 pub const PARCHMENT_DARK: [u8; 3] = [0xc6, 0xb2, 0x84];
 /// The map's colour of each overworld biome: the land's own colour (`land_map`), laid on the
 /// parchment so it reads as an old painted chart.
-pub const BIOME_COLOURS: [(&str, [u8; 3]); 15] = [
+pub const BIOME_COLOURS: [(&str, [u8; 3]); 16] = [
     ("ocean", [0x4a, 0x76, 0x96]),
     ("coral_reef", [0x5a, 0x9a, 0xa4]),
     ("lagoon", [0x6a, 0xa6, 0xaa]),
@@ -97,6 +97,7 @@ pub const BIOME_COLOURS: [(&str, [u8; 3]); 15] = [
     ("savanna", [0xb8, 0xa8, 0x5c]),
     ("swamp", [0x6e, 0x78, 0x4e]),
     ("forest", [0x5c, 0x86, 0x48]),
+    ("old_growth_forest", [0x3e, 0x6a, 0x36]),
     ("tropical_forest", [0x3e, 0x7a, 0x4a]),
     ("birch_forest", [0x8a, 0xa6, 0x6a]),
     ("plains", [0x9c, 0xb2, 0x68]),
@@ -112,7 +113,7 @@ pub fn biome_colour(biome: &str) -> [u8; 3] {
     let c = BIOME_COLOURS
         .iter()
         .find(|e| e.0 == b)
-        .map_or(BIOME_COLOURS[14].1, |e| e.1);
+        .map_or(BIOME_COLOURS[15].1, |e| e.1);
     let mix = |a: u8, p: u8| (a as f32 * (1.0 - PARCHMENT_UNDER) + p as f32 * PARCHMENT_UNDER).round() as u8;
     [mix(c[0], PARCHMENT[0]), mix(c[1], PARCHMENT[1]), mix(c[2], PARCHMENT[2])]
 }
@@ -139,7 +140,7 @@ mod tests {
 
     #[test]
     fn every_biome_has_a_map_colour() {
-        for b in ["plains", "ocean", "coral_reef", "lagoon", "sequoia_grove", "tropical_forest"] {
+        for b in ["plains", "ocean", "coral_reef", "lagoon", "sequoia_grove", "tropical_forest", "old_growth_forest"] {
             assert!(BIOME_COLOURS.iter().any(|e| e.0 == b), "{b}");
         }
         assert_ne!(biome_colour("desert"), biome_colour("plains"));

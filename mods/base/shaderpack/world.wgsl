@@ -957,17 +957,80 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     out.pos = vec3<f32>(o.xyz * 16) + local;
     out.normal = corner.normal;
     out.ao = mix(0.85, 0.95, clamp(corner.normal.y, 0.0, 1.0));
+    // A crown's sides go dark toward its bottom, where the canopy shades itself (`fs_lod` takes it
+    // as the crown's own shade, `CROWN_UNDER`).
+    if lod_crown(w0) && dir != 2u && dir != 3u {
+        out.ao = mix(CROWN_UNDER, 1.0, CORNERS[dir * 4u + c].y);
+    }
     // Not traced: it is past the blocks the client keeps. Its tint kind, so far water is drawn as
     // water (and far leaves as leaves).
     let kind = lod_tint(w0);
-    out.kind = vec4(kind, 1u, 0u, 0u);
+    out.kind = vec4(kind, 1u, 0u, select(0u, 1u, lod_crown(w0)));
     var tint = vec3(1.0);
     if kind != 0u {
         tint = unpack_rgb(biomes[corner.biome * g.extra.z + kind - 1u]);
     }
     out.tint = tint;
     out.color = pow(tint, vec3(2.2)) * select(vec3(1.0), foliage_test(), kind == TINT_GRASS || kind == TINT_FOLIAGE);
+    // Shut in by the land round it (`lod_occ`, 0 to 3): valley floors and the ground between crowns
+    // get less of the sky and the low sun, down to 0.46 (Far view, 11-05: far land evenly lit).
+    out.color *= 1.0 - 0.18 * f32(lod_occ(w0));
     return out;
+}
+
+// Far water (distant terrain's): deep, a dark mirror of the sky with the sun's path on it, as Photon's
+// and Bliss's far seas are (Planner, 11-05: "its far water is a flat dark mirror reflecting the sky").
+// Through `water()` it took the near water's shallow depth and bottom, and read pale and milky.
+fn far_water(in: VOut) -> vec3<f32> {
+    let v = -normalize(in.rel);
+    let n = wave_normal(in.pos, in.dist, v.y);
+    let ndv = max(dot(n, v), 0.02);
+    // Schlick's: nearly all mirror at the slants far water is seen at.
+    let fresnel = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
+    let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, cloud_shadow(in.rel), 1.0, in.pos, in.rel);
+    let deep = vec3(0.014, 0.045, 0.045) * lit;
+    let r = reflect(-v, n);
+    let refl = sky_color(normalize(vec3(r.x, max(r.y, 0.02), r.z)));
+    let l = light_dir();
+    let hv = normalize(l + v + vec3(0.0, 1e-4, 0.0));
+    let nh = max(dot(n, hv), 0.0);
+    let a2 = 0.0025;
+    let dd = nh * nh * (a2 - 1.0) + 1.0;
+    let spec = a2 / (3.14159 * dd * dd) * fresnel * 0.25;
+    let glint = palette().sun * light_strength() * min(spec, mix(30.0, 1.5, golden())) * smoothstep(0.0, 0.1, l.y + 0.05) * cloud_shadow(in.rel);
+    let c = refl * fresnel + deep * (1.0 - fresnel) + glint;
+    return display(haze_lit(c, in.rel, in.light.x));
+}
+
+// How dark a far crown's side gets at its bottom (`vs_lod`).
+const CROWN_UNDER: f32 = 0.5;
+// Far canopy (Ronald, 11-05: "in distant horizons is still 100x better"; the Look session's gap
+// sheet: Bliss + Distant Horizons' far forest reads as clumped crowns, lit tops and dark gaps, ours
+// as even green fields): a crown's top is laid with crowns about `CROWN_CELL` blocks across, each a
+// dome lit by the sun on its side and dark in the gaps between, where the far boxes are too coarse to
+// draw single trees. x: how much of a dome is there (1 its top, 0 a gap), yz: which way it slopes.
+const CROWN_CELL: f32 = 4.0;
+// The domes' mean shade (`crown_clumps` over a cell), what a canopy too far for them still takes.
+const CROWN_MEAN: f32 = 0.72;
+fn crown_clumps(xz: vec2<f32>) -> vec3<f32> {
+    let q = xz / CROWN_CELL;
+    let base = vec2<i32>(floor(q));
+    var best = 9.0;
+    var to = vec2(0.0);
+    for (var j = -1; j <= 1; j++) {
+        for (var i = -1; i <= 1; i++) {
+            let cell = base + vec2(i, j);
+            let at = vec2<f32>(cell) + 0.15 + 0.7 * vec2(hash3(vec3(cell.x, 7, cell.y)), hash3(vec3(cell.x, 13, cell.y)));
+            let d = q - at;
+            let l = dot(d, d);
+            if l < best {
+                best = l;
+                to = d;
+            }
+        }
+    }
+    let r = sqrt(best);
+    return vec3(1.0 - smoothstep(0.15, 0.8, r), to / max(r, 1e-4) * smoothstep(0.05, 0.6, r));
 }
 
 // Whether real cubes show this distant tile pixel's column (`Lod::mask`): then they stand there,
@@ -1040,13 +1103,34 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
     // the mask): looking out to sea, their march over every far-water pixel cost too much
     // (reports/performance.md).
     if in.kind.x == TINT_WATER {
-        let w = water(in, avg, false);
-        return vec4(w.rgb, SOLID_ALPHA);
+        return vec4(far_water(in), SOLID_ALPHA);
+    }
+    // A crown's face: its own shade toward its bottom (`vs_lod`) at any distance, and on its top the
+    // clumped crowns (`crown_clumps`), faded in where the far boxes stand for more than a tree and out
+    // where a crown is under a couple of pixels (its domes would only shimmer).
+    var lit_in = in;
+    if in.kind.w != 0u {
+        lit_in.ao = 0.95;
+        albedo = vec4(albedo.rgb * in.ao, albedo.a);
+        if in.normal.y > 0.5 {
+            // Faded by the pixel's smaller side on the ground (seen at a slant its long side runs away
+            // and spans blocks), and toward the domes' mean darkness, not to none: a canopy too far
+            // for its crowns still lies darker than open ground, the shade between the trees in it.
+            let fw = min(length(dpdx(in.pos.xz)), length(dpdy(in.pos.xz))) / CROWN_CELL;
+            let amount = smoothstep(150.0, 260.0, in.dist);
+            let resolved = 1.0 - smoothstep(0.35, 1.0, fw);
+            if amount > 0.0 {
+                let k = crown_clumps(in.pos.xz);
+                let shade = mix(CROWN_MEAN, mix(0.3, 1.12, k.x), resolved);
+                albedo = vec4(albedo.rgb * mix(1.0, shade, amount), albedo.a);
+                lit_in.normal = normalize(vec3(k.y * 1.5 * amount * resolved, 1.0, k.z * 1.5 * amount * resolved));
+            }
+        }
     }
     // From about 500 blocks out, where cells are 8 blocks and more (`lod::SLOPE_LEVEL`), a box's
     // walls lean halfway up as the slopes they stand for (`far_soft`, far look 2). Lit as upright
     // walls they got no sun at midday and a far snow range read stone-grey under thin white lines
     // (Far view, 11-05; the smooth tiles' facets had leaned toward the sun). Nearer, the 2-4 block
     // steps are steps and keep their shade: leaned there too, the land within 500 lost its relief.
-    return vec4(shade_soft(in, albedo, far_soft(in) * smoothstep(450.0, 800.0, in.dist)).rgb, SOLID_ALPHA);
+    return vec4(shade_soft(lit_in, albedo, far_soft(in) * smoothstep(450.0, 800.0, in.dist)).rgb, SOLID_ALPHA);
 }

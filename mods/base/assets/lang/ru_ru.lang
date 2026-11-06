@@ -921,6 +921,7 @@ video.base.moon_size = Размер луны
 video.base.moon_size.what = Насколько большой видна луна
 video.base.glow = Светимость
 video.base.glow.what = Насколько ярко ночью светятся растения, кристаллы и вкрапления руды
+biome.base.old_growth_forest = Вековой лес
 video.base.biome_air = Воздух местности
 video.base.biome_air.what = Туман, дымка и оттенки света по местности и времени года
 video.base.sky_events = Небесные события

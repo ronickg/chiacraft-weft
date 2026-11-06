@@ -79,6 +79,13 @@ shared! {
         CELL_MASK = 63,
         CELL_J_SHIFT = 6,
         LEVEL_SHIFT = 12,
+        /// chiacraft: word 0's top bit: the face is a tree crown's (`client::lod`), for packs that
+        /// shade far canopies apart from the ground.
+        CROWN_SHIFT = 31,
+        /// chiacraft: word 0's bits 29-30: how much the land round shuts the face's sky out, 0 to 3
+        /// (`client::lod`'s `openness`), for packs that darken valleys and the gaps between crowns.
+        OCC_SHIFT = 29,
+        OCC_MASK = 3,
     }
     /// Tint kinds of faces and quads (0 none); mods' kinds follow the engine's.
     tint {
@@ -549,6 +556,8 @@ fn records() -> String {
         "}\n",
         "fn lod_dir(w0: u32) -> u32 {\n    return (w0 >> LOD_FACE_DIR_SHIFT) & FACE_DIR_MASK;\n}\n",
         "fn lod_tint(w0: u32) -> u32 {\n    return (w0 >> LOD_FACE_TINT_SHIFT) & TINT_MASK;\n}\n",
+        "fn lod_crown(w0: u32) -> bool {\n    return (w0 >> LOD_FACE_CROWN_SHIFT) != 0u;\n}\n",
+        "fn lod_occ(w0: u32) -> u32 {\n    return (w0 >> LOD_FACE_OCC_SHIFT) & LOD_FACE_OCC_MASK;\n}\n",
     ));
     s
 }
@@ -733,7 +742,9 @@ gpu_struct! {
         /// The last lightning flash where the player is (a weather with `lightning`, chiacraft):
         /// x seconds since it began (1e4 when none yet; real time, not the shaders' clock, which
         /// tests pin), y a random number 0..1 of its own (for where it strikes), z how hard it
-        /// thunders now (as `weather.w`), w unused. The engine's own flash only brightens the
+        /// thunders now (as `weather.w`), w where the camera faced as it began (radians,
+        /// clockwise from -z, as `atan2(forward.x, -forward.z)`), so a pack can aim strikes into
+        /// view and keep them put while the player turns. The engine's own flash only brightens the
         /// daylight for 0.15 s; packs draw the bolt and the flicker from this.
         pub lightning: [f32; 4],
         /// How this frame is drawn: x 1 when into the HDR world (`post::hdr`: linear light past 1,

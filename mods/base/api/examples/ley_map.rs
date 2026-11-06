@@ -162,6 +162,7 @@ fn colour(biome: &str) -> [u8; 3] {
         "savanna" => [170, 165, 80],
         "swamp" => [90, 105, 60],
         "forest" => [55, 125, 45],
+        "old_growth_forest" => [25, 80, 30],
         "tropical_forest" => [25, 105, 55],
         "birch_forest" => [110, 160, 90],
         _ => [125, 175, 85],

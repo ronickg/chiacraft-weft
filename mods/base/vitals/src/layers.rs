@@ -85,7 +85,7 @@ const fn l(
 /// willow at the edges and juniper; Konza's dogwood and sumac thickets (oak leaves stand in); the
 /// llanos' and the Pantanal's scattered shrubs; Davos' juniper mats; the tundra's dwarf willow;
 /// Sonora's creosote bush.
-pub const LAYERS: [Layers; 11] = [
+pub const LAYERS: [Layers; 12] = [
     Layers { tall_grass: 0.4, ..l("base:plains", "base:coarse_dirt", 0.03, 0.0, 0.06, "base:oak_leaves", 0.0) },
     // Mushrooms round trunks: Białowieża's honey fungus on the oaks' roots and ceps; Moscow's
     // chanterelles under birches; the taiga's chanterelles and ceps under spruce.
@@ -93,6 +93,25 @@ pub const LAYERS: [Layers; 11] = [
         mushrooms: "base:honey_fungus:3 base:porcini:2 base:mushroom_brown:1",
         mushroom_cover: 0.12,
         ..l("base:forest", "base:leaf_litter:3 base:moss_block:1", 0.25, 0.05, 0.2, "base:oak_leaves:3 base:birch_leaves:1", 0.15)
+    },
+    // Białowieża's strict reserve: deep litter and moss on a dark floor, more ferns and fungi on the
+    // dead wood than the managed forest, hazel and hornbeam under the oaks, young oaks and
+    // blossoming dogwoods (white in spring, standing in for the reserve's wild cherry and rowan)
+    // in the clearings, and treefall gaps where old trees came down.
+    Layers {
+        mushrooms: "base:honey_fungus:3 base:porcini:2 base:mushroom_brown:1",
+        mushroom_cover: 0.16,
+        young_kinds: "base:dogwood_log:3 base:oak_log:2 base:birch_log:1",
+        gaps: 0.1,
+        ..l(
+            "base:old_growth_forest",
+            "base:leaf_litter:3 base:moss_block:2 base:podzol:1",
+            0.4,
+            0.1,
+            0.16,
+            "base:oak_leaves:3 base:birch_leaves:1",
+            0.3,
+        )
     },
     Layers {
         mushrooms: "base:chanterelle:3 base:honey_fungus:1 base:mushroom_red:1",

@@ -920,6 +920,7 @@ video.base.moon_size = Moon size
 video.base.moon_size.what = How big the moon looks
 video.base.glow = Glow
 video.base.glow.what = How bright glowing plants, crystals and ore flecks are at night
+biome.base.old_growth_forest = Old-Growth Forest
 video.base.biome_air = Biome air
 video.base.biome_air.what = Fog, haze and light tints by biome and season
 video.base.sky_events = Sky events
