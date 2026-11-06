@@ -9,8 +9,8 @@ use weft_abi::sky_kind;
 use weft_render::*;
 
 use super::cloud_shadow::CloudShadow;
-use super::froxels::Froxels;
 use super::frame_look::FrameLook;
+use super::froxels::Froxels;
 use super::soft_clouds::SoftClouds;
 use super::world_render::Camera;
 use crate::assets::{Assets, decode_png};
@@ -616,8 +616,10 @@ impl Sky {
             list.push(Cmd::Draw { vertices, instances: 1, first_vertex: 0, first_instance });
         }
         let froxels = self.froxels_wanted && self.froxels_possible;
-        self.froxels.frame(gpu, froxels, frame.width, frame.height, buf, scene);
-        self.cloud_shadow.frame(gpu, self.cloud_shadow_wanted, buf, scene, clouds);
+        self.froxels
+            .frame(gpu, froxels, frame.width, frame.height, buf, scene);
+        self.cloud_shadow
+            .frame(gpu, self.cloud_shadow_wanted, buf, scene, clouds);
         self.frame_look.frame(gpu, buf, scene);
         match clouds {
             Some(first_instance) => self.soft.record(buf, scene, first_instance),
