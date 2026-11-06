@@ -231,6 +231,8 @@ fn cs_cache(@builtin(global_invocation_id) id: vec3<u32>) {
 }
 
 const PT_SKY_T: f32 = 65504.0;
+// world.wgsl's TINT_FOLIAGE: the tinted leaves.
+const PT_TINT_FOLIAGE: u32 = 2u;
 
 @compute @workgroup_size(8, 8)
 fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
@@ -297,6 +299,20 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         // Above 0 on every traced pixel: the denoisers read diffuse's a > 0 as "traced".
         diffuse_t = max(b.t, 1e-3);
     }
+    // Leaves as the world's pass lights them (`surface_light`, our grade): more sun on their lit
+    // faces (`base:look_leaf_sun`) and the sun through them from behind (`leaf_through`). Without,
+    // the traced canopy at spot C stood far darker than the world draws it (pte_after, 11-06).
+    var leaf = vec3(0.0);
+    if h.tint == PT_TINT_FOLIAGE && scene.frame.x > 0.5 {
+        let k_sun = look_opt(OPT_LEAF_SUN, 1.0);
+        if k_sun != 1.0 {
+            let c_open = min(canopy(), 1.0);
+            let open = smoothstep(mix(0.5, 0.25, c_open), mix(0.95, 0.55, c_open), h.light.x);
+            leaf += palette().sun * light_strength() * sun_facing(n) * sun * open * (k_sun - 1.0);
+        }
+        leaf += palette().sun * leaf_through(h.rel, sun, h.light.x);
+    }
+    diffuse += leaf;
     // Into the cache: the indirect light found here (one pixel in four a frame).
     if ((id.x + id.y * 3u + u32(scene.rt.y)) & 3u) == 0u {
         let i = pt_cache_find(pt_cell(h.world, ng, dist, pt_noise(px + vec2(7.0, 5.0))), true);
@@ -353,7 +369,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     // past `PT_REACH` follows on without a step: traced, the near land is darker and greener than
     // the world draws it (pt-denoisers' spot C check, 11-06).
     let edge = smoothstep(PT_REACH * 0.75, PT_REACH, dist);
-    diffuse = mix(diffuse, lit, edge);
+    diffuse = mix(diffuse, lit + leaf, edge);
     specular *= 1.0 - edge;
     if pt.debug != 0u && pt.debug != 7u {
         var out = vec3(0.0);
