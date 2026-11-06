@@ -134,6 +134,12 @@ fn taa_far_end(near: vec2<i32>, d: f32, size: vec2<f32>) -> bool {
     if d <= 0.0 || scene.params.y <= 0.0 {
         return false;
     }
+    // In a liquid the end is its fog's (water's a few blocks): nearly everything would lie past
+    // it and moving under water would smear. There the fog starts behind the eye or at a quarter
+    // of its end; in air at 0.6 (Temporal AA's review).
+    if scene.params.x < 0.5 * scene.params.y {
+        return false;
+    }
     let uv = (vec2<f32>(near) + 0.5) / size;
     let h = scene.inv_view_proj * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, d, 1.0);
     return length(h.xyz / h.w) > 0.85 * scene.params.y;
