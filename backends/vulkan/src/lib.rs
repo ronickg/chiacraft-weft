@@ -547,10 +547,14 @@ impl VulkanBackend {
             } else {
                 log::info!("{device_name}: no VK_KHR_push_descriptor, per-draw buffers through descriptor sets");
             }
-            // Android: render targets without the GPU's framebuffer compression (`compression_off`).
+            // Android, `WEFT_NO_COMPRESSION=1`: render targets without the GPU's framebuffer
+            // compression (`compression_off`). Off by default since 11-06: the garbage tiles that
+            // made it needed (11-05) no longer show (scripted shots of sky, water and the edge with
+            // it on), and it saves the Pixel 10 about 1 ms a frame at full resolution (vista 68.2 ->
+            // 67.2 ms, edge 73.5 -> 72.7, forest 61.7 -> 61.2; 0.2 ms at half).
             let mut compression = vk::PhysicalDeviceImageCompressionControlFeaturesEXT::default();
             let no_compression = cfg!(target_os = "android")
-                && std::env::var_os("WEFT_KEEP_COMPRESSION").is_none()
+                && std::env::var_os("WEFT_NO_COMPRESSION").is_some()
                 && has_ext(ext::image_compression_control::NAME)
                 && {
                     let mut f = vk::PhysicalDeviceFeatures2::default().push_next(&mut compression);
