@@ -1000,7 +1000,10 @@ fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
     // much. Well above the low layer, or under the ground, the banks barely count: their mean
     // stands in and no noise is walked.
     var banks = 0.3;
-    if low * open > 0.02 {
+    // In the HDR world the banks are walked near what the ray ends on too, for the wisps in the
+    // crowns below.
+    let near_floor = scene.frame.x > 0.5 && p.y - floor < 14.0;
+    if low * open > 0.02 || near_floor {
         let drift = vec3(wind_now().x, 0.0, wind_now().y) * scene.params.w * mix(0.6, 2.0, s);
         let q = p - drift;
         let broad = noise3(q * vec3(1.0 / 38.0, 1.0 / 12.0, 1.0 / 38.0));
@@ -1028,8 +1031,16 @@ fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
             // crowns break through, not a flat sheet (a level top laid straight stripes along
             // every terrace of a valley's sides: spot A's first layer sheet, 11-06).
             let top = SEA_LEVEL + MIST_TOP + (b - 0.45) * 10.0;
-            let layer = 1.0 - smoothstep(top - 4.0, top + 1.5, p.y);
-            return f * open * burn * (layer * mix(2.2, 5.5, b) + 0.012 * high) * 0.11;
+            // The top a little softer (6 blocks of fade, not 5.5: the pancakes along the river
+            // had cut edges, try 2's sheet).
+            let layer = 1.0 - smoothstep(top - 5.0, top + 2.5, p.y);
+            // Wisps in the crowns above the layer, in patches: Bliss's dawn mist lies among the
+            // tree tops all over, not only in the valleys (try 2 left the forests above the mist
+            // line clear, the mist flat pancakes on the rivers). Within a few blocks of what the
+            // ray ends on, in the banks' thick parts only; gone by the time the sun is 30° up.
+            let wisp = exp(-max(p.y - floor, 0.0) / 5.0) * smoothstep(0.55, 0.85, smoothstep(0.25, 0.75, banks))
+                * (1.0 - smoothstep(0.2, 0.5, scene.sun.y)) * (1.0 - layer);
+            return f * open * burn * (layer * mix(2.2, 5.5, b) + wisp * 1.8 + 0.012 * high) * 0.11;
         }
         return f * open * burn * (low * (mix(0.05, 0.7, s) + mix(6.5, 0.6, s) * b) + 0.012 * high) * 0.11;
     }
