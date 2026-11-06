@@ -133,19 +133,37 @@ pub const SAND_AIR: f32 = 7.0;
 pub const SAND_SINK: f32 = 0.6;
 /// In a dust storm: grains a second put in the air round the player at its thickest, within the
 /// clear air the pack's dust fog leaves round the eye (its `dust_reach`, Shader's: 16 blocks at
-/// 7 m/s, 8 at 11): farther out the fog hides them.
-pub const DUST_STORM: f32 = 120.0;
+/// 7 m/s, 8 at 11): farther out the fog hides them. `DUST_LOW` of them skim the ground (sand
+/// moves mostly in the lowest metre, hopping), the rest fill the air up to 4 blocks; at 120 a
+/// frame held 3 to 5 and the storm didn't look to move sand (pt4_dust).
+pub const DUST_STORM: f32 = 400.0;
+pub const DUST_LOW: f32 = 0.6;
 pub const DUST_CLEAR: [(f32, f32); 2] = [(7.0, 16.0), (11.0, 8.0)];
-/// And thin streaks of sand along the wind, 5 to 40 blocks out (the study's gust streaks), a
-/// second at its thickest; each drawn as long as `STREAK_SECS` of its flight.
-pub const DUST_STREAKS: f32 = 30.0;
-pub const STREAK_REACH: (f32, f32) = (5.0, 40.0);
-pub const STREAK_SECS: f32 = 0.18;
+/// And streaks of sand along the wind, 4 to 24 blocks out (the study's gust streaks), a second at
+/// its thickest, most of them low; each drawn as long as `STREAK_SECS` of its flight (about a
+/// block at 11 m/s: two-block hairlines 40 out drew as dotted lines, pt4_dust).
+pub const DUST_STREAKS: f32 = 60.0;
+pub const STREAK_REACH: (f32, f32) = (4.0, 24.0);
+pub const STREAK_SECS: f32 = 0.08;
 pub const STREAK_LIFE: (f32, f32) = (0.6, 1.4);
-pub const STREAK_SIZE: (f32, f32) = (0.035, 0.06);
-/// What a storm's grains and streaks are coloured by (times the sand's texture): a little darker
-/// than the lit dust round them, which they matched and vanished into (wind_look3b).
-pub const DUST_GRAIN_TINT: u32 = 0xB08A60;
+pub const STREAK_SIZE: (f32, f32) = (0.05, 0.08);
+/// Blown sand's colour from the sand's own shades (`wind_life_colours::SAND`): a little darker
+/// than the lit dust round them, which they matched and vanished into (wind_look3b), and a little
+/// greyed (times the sand's dust texture by a tan they came out saturated orange, pt4_dust).
+pub const GRAIN_SHADE: f32 = 0.8;
+pub const GRAIN_GREY: f32 = 0.2;
+
+/// A blown grain's colour from a sand shade (`GRAIN_SHADE`, `GRAIN_GREY`).
+pub fn grain(shade: u32) -> u32 {
+    let c = [(shade >> 16) & 0xFF, (shade >> 8) & 0xFF, shade & 0xFF].map(|v| v as f32);
+    let grey = (c[0] + c[1] + c[2]) / 3.0;
+    let [r, g, b] = c.map(|v| {
+        ((v + (grey - v) * GRAIN_GREY) * GRAIN_SHADE)
+            .round()
+            .clamp(0.0, 255.0) as u32
+    });
+    r << 16 | g << 8 | b
+}
 
 /// The clear air's radius round the eye in a dust storm at `wind` m/s (`DUST_CLEAR`).
 pub fn dust_clear(wind: f32) -> f32 {
@@ -223,5 +241,16 @@ mod tests {
         assert_eq!(draw(0.3, 0.4), 0);
         assert_eq!(draw(2.5, 0.9), 2);
         assert_eq!(draw(2.5, 0.1), 3);
+    }
+
+    /// A blown grain is darker than its sand and less saturated (it vanished into the lit dust at
+    /// the sand's own colour, and came out orange when tinted, pt4_dust).
+    #[test]
+    fn grains() {
+        let rgb = |c: u32| [(c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF].map(|v| v as f32);
+        let spread = |c: [f32; 3]| c.iter().cloned().fold(0.0, f32::max) - c.iter().cloned().fold(255.0, f32::min);
+        let (sand, grain) = (rgb(0xE7C884), rgb(grain(0xE7C884)));
+        assert!(grain.iter().sum::<f32>() < sand.iter().sum::<f32>() * 0.85);
+        assert!(spread(grain) < spread(sand) * 0.8);
     }
 }

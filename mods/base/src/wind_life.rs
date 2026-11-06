@@ -32,7 +32,7 @@ static LEAVES: [Particle; 6] = [
 static PETALS: [Particle; 4] =
     [Particle::named("petal_0"), Particle::named("petal_1"), Particle::named("petal_2"), Particle::named("petal_3")];
 static POLLEN: Particle = Particle::named("pollen");
-/// Snow and sand grains: pieces of the block they blow off (block dust).
+/// Snow off the block it blows from (block dust); sand grains (`sand_grain`, in the sand's shades).
 static SPINDRIFT: Particle = Particle::named("spindrift");
 static SAND_GRAIN: Particle = Particle::named("sand_grain");
 /// A dust storm's streak of sand, drawn along its flight.
@@ -93,12 +93,16 @@ pub fn register(r: &mut Registry) {
         // wind_look1c).
         .streak(wl::SPINDRIFT_STREAK)
         .on_land(When::any(), Then::die());
+    // A rounded grain of its own, coloured from the sand's shades (the sand block's dust drew hard
+    // squares, pt4_dust).
     r.particle(&SAND_GRAIN)
+        .textures(&["sand_grain"])
         .life(wl::SAND_LIFE.0, wl::SAND_LIFE.1)
         .size(wl::SAND_SIZE.0, wl::SAND_SIZE.1)
         .carried(wl::SAND_AIR, wl::SAND_SINK)
         .on_land(When::any(), Then::die());
     r.particle(&SAND_STREAK)
+        .textures(&["sand_grain"])
         .life(wl::STREAK_LIFE.0, wl::STREAK_LIFE.1)
         .size(wl::STREAK_SIZE.0, wl::STREAK_SIZE.1)
         .carried(wl::SAND_AIR, wl::SAND_SINK * 0.3)
@@ -426,14 +430,13 @@ fn frame(c: &Client) {
                     let height = if snow { snow_top(state) } else { 1.0 };
                     // Off along the ground with the wind, a little up.
                     let v = [wind[0] as f64 * 0.8, 0.3 + life.unit() as f64 * 0.6, wind[1] as f64 * 0.8];
-                    drop(
-                        c.spawn_particles(kind, at(0.5, height + 0.05, 0.5))
-                            .spread_box([0.5, 0.05, 0.5])
-                            .velocity(v)
-                            .speed(0.4)
-                            .count(n)
-                            .block(state),
-                    );
+                    let grains = c
+                        .spawn_particles(kind, at(0.5, height + 0.05, 0.5))
+                        .spread_box([0.5, 0.05, 0.5])
+                        .velocity(v)
+                        .speed(0.4)
+                        .count(n);
+                    drop(if snow { grains.block(state) } else { grains.color(sand_shade(life)) });
                     life.sent[slot] += n;
                 }
             }
@@ -442,34 +445,38 @@ fn frame(c: &Client) {
     // A dust storm fills the clear air round the player with sand, whatever the ground (the fog
     // hides farther), and draws streaks along the wind farther out.
     if dust > 0.0 {
-        let sand = sand_state();
         let v = [wind[0] as f64, 0.0, wind[1] as f64];
         let clear = wl::dust_clear(speed) as f64;
         let n = wl::draw(wl::DUST_STORM * dust * density * dt, life.unit());
-        if n > 0 {
-            // Centred a little upwind, so the wind carries them through.
-            let at = [me[0] - dir[0] as f64 * clear * 0.4, me[1] + 1.5, me[2] - dir[1] as f64 * clear * 0.4];
+        // Centred a little upwind, so the wind carries them through; in a few bursts, each its own
+        // shade and layer (most skim the ground, the rest fill the air to 4 blocks).
+        let up = [me[0] - dir[0] as f64 * clear * 0.4, me[2] - dir[1] as f64 * clear * 0.4];
+        let bursts = n.min(4);
+        for i in 0..bursts {
+            let count = n / bursts + u32::from(i < n % bursts);
+            let low = life.unit() < wl::DUST_LOW;
+            let (y, half) = if low { (0.65, 0.55) } else { (2.6, 1.5) };
             drop(
-                c.spawn_particles(&SAND_GRAIN, at)
-                    .spread_box([clear, 2.5, clear])
+                c.spawn_particles(&SAND_GRAIN, [up[0], me[1] + y, up[1]])
+                    .spread_box([clear, half, clear])
                     .velocity(v)
                     .speed(1.0)
-                    .count(n)
-                    .block(sand)
-                    .color(wl::DUST_GRAIN_TINT),
+                    .count(count)
+                    .color(sand_shade(life)),
             );
-            life.sent[4] += n;
         }
+        life.sent[4] += n;
         for _ in 0..wl::draw(wl::DUST_STREAKS * dust * density * dt, life.unit()) {
             let (a, r) =
                 (life.unit() as f64 * std::f64::consts::TAU, wl::STREAK_REACH.0 + (wl::STREAK_REACH.1 - wl::STREAK_REACH.0) * life.unit());
-            let at = [me[0] + a.cos() * r as f64, me[1] + 0.5 + life.unit() as f64 * 4.0, me[2] + a.sin() * r as f64];
+            // Most along the ground, as the grains.
+            let high = if life.unit() < wl::DUST_LOW { 1.2 } else { 4.0 };
+            let at = [me[0] + a.cos() * r as f64, me[1] + 0.2 + life.unit() as f64 * high, me[2] + a.sin() * r as f64];
             drop(
                 c.spawn_particles(&SAND_STREAK, at)
                     .velocity(v)
                     .speed(1.5)
-                    .block(sand)
-                    .color(wl::DUST_GRAIN_TINT),
+                    .color(sand_shade(life)),
             );
             life.sent[4] += 1;
         }
@@ -502,10 +509,10 @@ fn snow_top(state: u32) -> f64 {
         .map_or(1.0, |l| l / 8.0)
 }
 
-/// The sand a dust storm's grains are pieces of.
-fn sand_state() -> u32 {
-    static SAND: Block = Block::named("base:sand");
-    SAND.id()
+/// One of blown sand's shades, at random (`wind_life_colours::SAND`, `vitals::wind_life::grain`).
+fn sand_shade(life: &mut Life) -> u32 {
+    let shades = &crate::wind_life_colours::SAND;
+    wl::grain(shades[((life.unit() * shades.len() as f32) as usize).min(shades.len() - 1)])
 }
 
 /// Walking through flowers in bloom puffs their petals up.
