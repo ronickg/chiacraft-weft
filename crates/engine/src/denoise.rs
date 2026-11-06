@@ -43,6 +43,11 @@ pub struct PtFrame {
     pub target: TextureId,
     /// Nothing of last frame is to be used (a teleport, a new world).
     pub reset: bool,
+    /// `target` is the path tracer's own light image (Rgba16Float, `WorldRenderer::pt_light`):
+    /// cleared and written with the light alone (0 where nothing was traced), which its finish pass
+    /// then puts into the scene with the air's light and the pack's `display`. Else the light is
+    /// added onto `target` as it is.
+    pub write: bool,
 }
 
 /// `core:pt_denoiser`: 0 the raw light, 1 ours.
@@ -58,6 +63,8 @@ struct Pipes {
     variance: PipelineId,
     atrous: PipelineId,
     composite: PipelineId,
+    /// The same into a cleared Rgba16Float image (`PtFrame::write`).
+    composite_write: PipelineId,
     /// The test's noisy light and normals from today's picture (`run_test`).
     test: PipelineId,
 }
@@ -141,7 +148,7 @@ impl Denoiser {
     /// Its pipelines from `denoise.wgsl` (a pack's, else the engine's).
     pub fn reload(&mut self, gpu: &mut dyn Backend, assets: &Assets) {
         if let Some(p) = self.pipes.take() {
-            for id in [p.temporal, p.moments, p.variance, p.atrous, p.composite, p.test] {
+            for id in [p.temporal, p.moments, p.variance, p.atrous, p.composite, p.test, p.composite_write] {
                 gpu.destroy_pipeline(id);
             }
         }
@@ -172,6 +179,7 @@ impl Denoiser {
                     ("denoise variance", "fs_variance", true, Blend::None, f),
                     ("denoise atrous", "fs_atrous", true, Blend::None, f),
                     ("denoise composite", "fs_composite", false, Blend::Additive, crate::post::world_format()),
+                    ("denoise composite write", "fs_composite", false, Blend::None, f),
                     ("denoise test", "fs_test", true, Blend::None, f),
                 ] {
                     ids.push(make(label, entry, two, blend, color)?);
@@ -180,8 +188,15 @@ impl Denoiser {
             });
         match made {
             Ok(ids) => {
-                self.pipes =
-                    Some(Pipes { temporal: ids[0], moments: ids[1], variance: ids[2], atrous: ids[3], composite: ids[4], test: ids[5] });
+                self.pipes = Some(Pipes {
+                    temporal: ids[0],
+                    moments: ids[1],
+                    variance: ids[2],
+                    atrous: ids[3],
+                    composite: ids[4],
+                    composite_write: ids[5],
+                    test: ids[6],
+                });
             }
             Err(e) => log::error!("path tracing denoiser: {e}"),
         }
@@ -240,7 +255,8 @@ impl Denoiser {
     /// pass; leaves none open.
     pub fn run(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, f: &PtFrame) {
         let Some(p) = &self.pipes else { return };
-        let (temporal, moments_pipe, variance, atrous, composite) = (p.temporal, p.moments, p.variance, p.atrous, p.composite);
+        let (temporal, moments_pipe, variance, atrous) = (p.temporal, p.moments, p.variance, p.atrous);
+        let composite = if f.write { p.composite_write } else { p.composite };
         while self.params.len() < gpu.frames_in_flight() {
             // One more for `run_test`'s own entry.
             let size = (size_of::<DenoisePass>() * (MAX_PASSES + 1)) as u64;
@@ -332,8 +348,9 @@ impl Denoiser {
             list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: k as u32 });
             list.push(Cmd::EndPass);
         }
-        // Onto the scene image as it is (loaded, not cleared).
-        list.push(Cmd::BeginPass { motion: None, color: Some((Target::Texture(f.target), None)), depth: None });
+        // Onto the scene image as it is (loaded), or into the path tracer's light image (cleared).
+        let clear = f.write.then_some([0.0; 4]);
+        list.push(Cmd::BeginPass { motion: None, color: Some((Target::Texture(f.target), clear)), depth: None });
         bind(list, composite);
         list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: comp_entry as u32 });
         list.push(Cmd::EndPass);
@@ -423,6 +440,7 @@ impl Denoiser {
                 specular: zero,
                 target: out,
                 reset: false,
+                write: false,
             },
         );
         self.test_sky = false;
