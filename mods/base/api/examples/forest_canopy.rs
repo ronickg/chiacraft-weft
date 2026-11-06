@@ -153,6 +153,16 @@ fn main() {
         }
     }
     eprintln!("cover {:.2}", cover as f64 / (N * N) as f64);
+    // Leaves at a walker's head (two and three blocks over the ground): a hedge, not a forest floor.
+    let mut head = 0;
+    for z in 0..N {
+        for x in 0..N {
+            if (2..=3).any(|y| (1..=3).contains(&g[at(x, y, z).unwrap()])) {
+                head += 1;
+            }
+        }
+    }
+    eprintln!("leaves at head height {:.2}", head as f64 / (N * N) as f64);
     for (name, height, pitch, dist) in [("near", 30.0, -30.0, 0.0), ("mid", 70.0, -15.0, 0.0), ("far", 105.0, -8.0, 0.0)] {
         let img = render(&g, height, pitch, dist);
         let path = format!("{out}/{mode}_{name}.ppm");
