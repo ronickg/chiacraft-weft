@@ -474,6 +474,36 @@ fn fs_shadow(in: VOut) {
 
 // ---- shading ----
 
+// A leaf cube being shaded (the cutout passes set it: a cutout cube, `kind.z` 0, is leaves) and the
+// sun's reach on it (`surface_light`), for its light through the leaves (`leaf_sss`).
+var<private> LEAF_CUBE: bool = false;
+var<private> LEAF_SHADOW: f32 = 1.0;
+
+// How strong the light through leaves is (HDR), 0 none.
+const LEAF_SSS: f32 = 1.0;
+
+// The sun's light through a leaf of colour `col` (albedo times tint) in the HDR world, after Bliss's
+// subsurface scattering for leaves (composite1.fsh, its SSS type 1; crew notes bliss-techniques.md
+// 6.4): the colours under the leaf's own brightness are absorbed on the way through, so the light
+// comes out a deep yellow-green, the more so the thicker the leaves it went through; a lobe toward
+// the sun makes a crown seen against it glow up to about ten times. Bliss takes the brighter of the
+// sun on the face and this; so does `shade_soft_lit`. Its canopy seen from below reads a saturated
+// green mass with sparkles, where ours read grey (Trees, Bliss's own world, 11-06).
+// Seen from below, its light has gone through the whole leaf block: a quarter of the thin skin's
+// at most, by the sun's reach (as thin, the canopy glowed yellow-lime, luma 160-180 against Bliss's
+// 66-69; a floor of 0.15 for leaves in the crown's shade lit it all, Trees' sss1-sss3). The lobe
+// toward the sun at half Bliss's (x3): at Bliss's x6 the crown over the camera glowed neon at 08:00.
+// At noon its lit leaves 73 against Bliss's 66, hue 100 against 107 (trb_s3_lk4a, with Look's glare
+// meter).
+fn leaf_sss(in: VOut, col: vec3<f32>) -> vec3<f32> {
+    let mu = dot(normalize(in.rel), light_dir());
+    let phase = 1.0 + 3.0 * (exp2(-25.0 * sqrt(max(1.0 - mu, 0.0))) + 0.5 * exp(-10.0 * (1.0 - mu)));
+    let depth = max(LEAF_SHADOW * 0.25, 0.01);
+    let absorb = exp(-max(vec3(luma(col)) - col * vec3(1.0, 1.1, 1.2), vec3(0.0)) * (20.0 - 19.0 * depth));
+    let open = smoothstep(0.4, 0.9, in.light.x);
+    return palette().sun * light_strength() * depth * absorb * phase * open * LEAF_SSS;
+}
+
 // `paint` the tint the light takes (a biome's grass and leaf colour, `in.color`; white under snow).
 fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32> {
     let shadow = sun_shadow(in, n);
@@ -496,6 +526,11 @@ fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32>
             let c_open = min(canopy(), 1.0);
             let open = smoothstep(mix(0.5, 0.25, c_open), mix(0.95, 0.55, c_open), in.light.x);
             light += paint * palette().sun * light_strength() * sun_facing(n) * shadow * open * (k_sun - 1.0);
+        }
+        // A leaf cube's light through it is `leaf_sss`'s (`shade_soft_lit`), from its colour.
+        if LEAF_CUBE && LEAF_SSS > 0.0 {
+            LEAF_SHADOW = shadow;
+            return light;
         }
         // Plants half of it: with all of it tall grass in the sun went pale yellow-white beside black
         // gaps (Tester 2's calm noon, HDR on against off).
@@ -599,6 +634,12 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
             // where noon's lit leaves are about 100 (Tester 2's f0d78419 hours, 11-06). At 0.55 of
             // its red, linear red/green 0.47 goes to about 0.26, hue about 95.
             lit = vec4(lit.r * mix(1.0, 0.55, k), lit.g, lit.b, lit.a);
+        }
+        // Leaves: the brighter of the sun on the face and the sun through the leaf (`leaf_sss`).
+        if LEAF_CUBE && LEAF_SSS > 0.0 && scene.frame.x > 0.5 {
+            let col = albedo.rgb * mix(in.color, vec3(1.0), snow);
+            let direct = palette().sun * light_strength() * sun_facing(n) * LEAF_SHADOW;
+            lit = vec4(lit.rgb + col * max(leaf_sss(in, col) - direct, vec3(0.0)), lit.a);
         }
     } else {
         lit = block_shade(in.slot, BlockPixel(in.uv, albedo, light, in.pos, scene.params.w));
@@ -1201,6 +1242,7 @@ fn fs_opaque(in: VOut) -> WorldOut {
 
 @fragment
 fn fs_cutout(in: VOut) -> WorldOut {
+    LEAF_CUBE = in.kind.z == 0u;
     // Far look 1: small plants thin out from 40 to 96 blocks, so far ground isn't speckled with
     // flowers and tufts a pixel or two across.
     if (far_look() & 1u) != 0u && in.kind.z != 0u {
@@ -1260,6 +1302,7 @@ fn fs_cutout_depth(in: VOut) {
 
 @fragment
 fn fs_cutout_shade(in: VOut) -> WorldOut {
+    LEAF_CUBE = in.kind.z == 0u;
     var albedo = cutout_albedo(in);
     if in.kind.z == 0u {
         albedo = far_flat(in, albedo);
@@ -1315,6 +1358,7 @@ fn fs_opaque_fade(in: VOut) -> WorldOut {
 
 @fragment
 fn fs_cutout_fade(in: VOut) -> WorldOut {
+    LEAF_CUBE = in.kind.z == 0u;
     if faded(in) {
         discard;
     }
