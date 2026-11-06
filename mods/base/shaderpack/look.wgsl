@@ -217,7 +217,12 @@ fn palette_made() -> Palette {
     } else if e > -0.02 {
         p = blend(sunset, golden, smoothstep(-0.02, 0.08, e));
     } else if e > -0.14 {
-        p = blend(dusk, sunset, smoothstep(-0.14, -0.02, e));
+        // The blue hour before sunrise and after sunset: dusk's deep blue with a pink-violet band
+        // until about 3.5° under the horizon, the sunset's gold only as the sun nears it (the MC
+        // comparison's spring 8 sheets, 11-05: at 05:00, sun.y -0.06 on vanilla's eased path,
+        // ours was already sunrise-gold and bright where Bliss was still blue pre-dawn).
+        // (It was smoothstep(-0.14, -0.02): three quarters of the sunset's light at 05:00.)
+        p = blend(dusk, sunset, smoothstep(-0.08, -0.02, e));
     } else {
         p = blend(night, dusk, smoothstep(-0.3, -0.14, e));
     }
