@@ -1677,7 +1677,7 @@ fn lottes(x: vec3<f32>) -> vec3<f32> {
 }
 
 // The light under Hejl's toe kept at this share of itself (`finish_picture`).
-const HEJL_TOE: f32 = 0.15;
+const HEJL_TOE: f32 = 0.25;
 
 fn hejl(c: vec3<f32>, white: f32) -> vec3<f32> {
     let v = vec4(c, white);
@@ -1768,7 +1768,8 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
         // A floor under Hejl's toe, which takes everything under about 1% to black: there the
         // light at `HEJL_TOE` of itself, so deep shade keeps its colour (Bliss's near shade is a
         // dark blue, sRGB 19 39 65; ours went to 0 0 0 on Tester 2's calm noon, more fill light
-        // didn't lift it, sh1b). Above about 0.1 the curve is Hejl's own.
+        // didn't lift it, sh1b; at 0.15 the grass spot's darkest tenth was 17, at 0.25 24, today's
+        // LDR 30, the land's middle and brights the same). Above about 0.1 the curve is Hejl's own.
         let x = max(c, vec3(0.0)) * exposure() * look_opt(OPT_EXPOSURE, 1.0);
         day_t = max(hejl(x, 3.5), x * HEJL_TOE);
     }
