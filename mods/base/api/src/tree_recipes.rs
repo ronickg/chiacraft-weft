@@ -688,8 +688,9 @@ pub fn tiered(r: &Recipe, tier: vitals::canopy::Tier) -> Recipe {
 }
 
 /// `c` grown into `tier` of its stand: under the canopy a small crown on a short trunk, over it a
-/// taller bare trunk under the same crown; a canopy tree's crown a little narrower than grown
-/// alone, so neighbours keep gaps between them (`vitals::canopy`). A giant (`trunk_from`) keeps
+/// taller bare trunk under the same crown; a canopy tree's crown narrower than grown alone, so
+/// neighbours keep gaps between them (at 0.85 the branched old growth was still one mat, the PC
+/// look 11-06) (`vitals::canopy`). A giant (`trunk_from`) keeps
 /// its form.
 pub fn tiered_colonized(c: &crate::colonize::Colonize, tier: vitals::canopy::Tier) -> crate::colonize::Colonize {
     use vitals::canopy::Tier;
@@ -706,7 +707,7 @@ pub fn tiered_colonized(c: &crate::colonize::Colonize, tier: vitals::canopy::Tie
             min_trunk: c.min_trunk * 0.7,
             ..*c
         },
-        Tier::Canopy => crate::colonize::Colonize { crown_r: c.crown_r * 0.85, ..*c },
+        Tier::Canopy => crate::colonize::Colonize { crown_r: c.crown_r * 0.7, points: (c.points as f32 * 0.75) as u32, ..*c },
         Tier::Emergent => {
             let f = vitals::canopy::branched_height(tier);
             let trunk = (c.trunk + (c.trunk + c.crown_h) * (f - 1.0)).min(max_h as f32 - c.crown_h * 1.1 - 1.0);
@@ -717,6 +718,27 @@ pub fn tiered_colonized(c: &crate::colonize::Colonize, tier: vitals::canopy::Tie
 
 /// A tree's block with its wood's width (0 for leaves): `colonize::blocks`, `grown_widths`.
 pub type WideBlock = (i32, i32, i32, crate::branchy::Part, f32);
+
+/// `b` with a leaf over every piece of wood in its crown that has nothing over it (from the
+/// crown's lowest leaves up): seen from above a branched crown showed bare limbs and log ends
+/// through its leaves (the PC look of the branched style, 11-06: 13 canopy oaks in 40, most
+/// emergents), Minecraft's and Bliss's crowns none.
+pub fn capped(b: &[WideBlock]) -> Vec<WideBlock> {
+    use crate::branchy::Part;
+    let Some(low) = b.iter().filter(|e| matches!(e.3, Part::Leaves)).map(|e| e.1).min() else { return b.to_vec() };
+    let mut over = std::collections::HashMap::<(i32, i32), i32>::new();
+    for e in b {
+        let t = over.entry((e.0, e.2)).or_insert(i32::MIN);
+        *t = (*t).max(e.1);
+    }
+    let mut out = b.to_vec();
+    for e in b {
+        if matches!(e.3, Part::Log { .. }) && e.1 >= low && over[&(e.0, e.2)] == e.1 {
+            out.push((e.0, e.1 + 1, e.2, Part::Leaves, 0.0));
+        }
+    }
+    out
+}
 
 /// A grown tree of `log` with each wood block's width (`colonize::blocks`, `branchy::wood_widths`).
 pub fn grown_widths(log: &str, seed: u64) -> Option<Vec<WideBlock>> {
