@@ -65,6 +65,9 @@ pub(super) fn frame_of(s: &SkyDef, turn: f64) -> Mat3 {
 
 /// Its path's lean: none under the test flag `--mc-days` (`app::api::mc_days`).
 fn tilt_of(s: &SkyDef) -> f32 {
+    if let Some(t) = crate::app::api::sun_tilt() {
+        return t;
+    }
     if crate::app::api::mc_days() { 0.0 } else { s.tilt }
 }
 
