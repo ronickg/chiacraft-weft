@@ -1,7 +1,8 @@
-//! A place to walk along one of the long rivers (`base_api::land`'s `line_rivers`): the nearest
-//! river water to (`x`, `z`) that is a wide channel and not a lake, the way the channel runs there,
-//! and a dry spot on its bank a few blocks from the water, as testkit lines: stand on the bank
-//! facing downstream along it, and the yaw to face across it.
+//! Stations along one of the long rivers (`base_api::land`'s `line_rivers`): the nearest river water
+//! to (`x`, `z`) that is a wide channel and not a lake, the way the channel runs there, and camera
+//! stations at eye height (spectator: a walking player stuck in the bank's trees, river_walk1): on
+//! each bank at the water's edge, looking along and across, and in the middle at the water's
+//! surface, as testkit lines.
 //!
 //!     cargo run -p base_api --example river_walk -- <seed> <x> <z>
 
@@ -39,16 +40,17 @@ fn main() {
             if len < 60 || !(12..=60).contains(&width) {
                 continue;
             }
-            // The bank: out across from the water's edge, 4 blocks onto dry land.
-            let edge = run(x, z, across.0, across.1);
-            let (bx, bz) = (x + across.0 * (edge + 5), z + across.1 * (edge + 5));
-            let ground = h(bx, bz);
+            // The water's edges either side, and the ground just past each.
+            let (near, far) = (run(x, z, across.0, across.1), run(x, z, -across.0, -across.1));
+            let (ax, az) = (x + across.0 * (near + 1), z + across.1 * (near + 1));
+            let (fx, fz) = (x - across.0 * (far + 1), z - across.1 * (far + 1));
             // Ours: yaw 0 faces -z, -90 faces +x.
             let yaw = |dx: i32, dz: i32| (-(dx as f64)).atan2(-(dz as f64)).to_degrees().round();
+            let eye = |gx: i32, gz: i32| h(gx, gz).max(SEA) as f64 + 1.6;
             println!("# river at {x} {z}: {width} blocks across, water runs {len} along ({}, {})", along.0, along.1);
-            println!("chat /tp {bx} {} {bz}", ground + 1);
-            println!("look {} -15   # along the bank", yaw(along.0, along.1));
-            println!("look {} -20   # across the river", yaw(-across.0, -across.1));
+            println!("near_bank: /tp {ax} {:.1} {az}  along {}  across {}", eye(ax, az), yaw(along.0, along.1), yaw(-across.0, -across.1));
+            println!("middle:    /tp {x} {:.1} {z}  along {}", SEA as f64 + 0.6, yaw(along.0, along.1));
+            println!("far_bank:  /tp {fx} {:.1} {fz}  along {}  across {}", eye(fx, fz), yaw(-along.0, -along.1), yaw(across.0, across.1));
             return;
         }
     }
