@@ -843,15 +843,89 @@ def pose_down(t, P=L):
     return q
 
 
+def pose_watch(t):
+    """No challenger near (5 s, held): standing tall, the neck raised, the head turning slowly one
+    way, holding, then the other, the antlers sweeping with it; a deep breath, the ears turning
+    each way, a tail flick. Its spine stays still (the forelegs hang from it: a pitch lifts them)."""
+    p = t / 5.0
+    yaw = 30 * math.tanh(2.2 * S(TAU * p)) / math.tanh(2.2)  # turning, then holding at each side
+    br = S(TAU * p * 2)
+    tf = max(0.0, S(TAU * (p - 0.55) * 10)) if 0.55 < p < 0.6 else 0.0
+    return stand({"root": (0, 0.12 * br, 0), "neck": (HEAD_UP[0][0] - 6 + 1.5 * br, 0.6 * yaw, 0),
+                  "head": (HEAD_UP[1][0] + 4 - 1.5 * br, 0.4 * yaw, -0.1 * yaw),
+                  "ear_L": (-8, 0, -12 - 0.4 * yaw), "ear_R": (-8, 0, 12 - 0.4 * yaw), "jaw": (1.5 * max(0.0, br), 0, 0),
+                  "tail": (-6 - 20 * tf, 0, 0)})
+
+
+def pose_stare(t):
+    """Staring a challenger down between attacks (2.5 s, held): facing it, the head lowered a
+    little so the antlers point forward, a slow heavy breath, the ears laid back, a snort that
+    jerks the head, and one stamp of the right forehoof; the other three hooves planted."""
+    p = t / 2.5
+    br = S(TAU * p)
+    snort = math.exp(-((p - 0.25) / 0.04) ** 2)
+    stamp = max(0.0, S(TAU * (p - 0.6) / 0.3)) if 0.6 < p < 0.75 else 0.0
+    return stand({"root": (0, 0.12 * br, 0), "neck": (HEAD_UP[0][0] + 24 + 2 * br, 0, 0),
+                  "head": (HEAD_UP[1][0] + 12 - 1.5 * br - 6 * snort, 0, 0), "jaw": (2 + 5 * snort, 0, 0),
+                  "ear_L": (12, 0, 14), "ear_R": (12, 0, -14), "tail": (-10, 0, 0),
+                  "leg_FR_upper": (STANCE["F"][0] - 25 * stamp, 0, 0), "leg_FR_lower": (STANCE["F"][1] + 45 * stamp, 0, 0),
+                  "leg_FR_paw": (STANCE["F"][2] - 20 * stamp, 0, 0),
+                  **{f"leg_{lg}_{pt}": (a, 0, 0) for lg in ("FL", "BL", "BR") for pt, a in zip(("upper", "lower", "paw"), STANCE[lg[0]])}})
+
+
+def pose_death(t, P=L):
+    """Dying (2.4 s, holds its last frame): the forelegs buckle at the knees, it drops onto them,
+    then the hind legs give, it rolls onto its side, the legs slackening out, the neck and head
+    down until the antlers lie on the ground, the eyes shut. Each frame is set on its lowest point
+    by the build (`grounded`)."""
+    p = t / 2.4
+    kf = ease(p, 0.0, 0.3)  # the front knees
+    kb = ease(p, 0.22, 0.5)  # the hind legs
+    roll = ease(p, 0.42, 0.85)
+    slack = ease(p, 0.6, 1.0)
+    head = ease(p, 0.3, 0.95)
+    q = {"spine_0": (8 * kf * (1 - kb) + P["death_pitch"] * roll, 0, P["death_roll"] * roll),
+         "spine_1": (4 * kf, 0, 0), "neck": (HEAD_UP[0][0] + (P["death_neck"] - HEAD_UP[0][0]) * head, -P["death_yaw"] * roll, P["death_neck_roll"] * roll),
+         "head": (HEAD_UP[1][0] + (P["death_head"] - HEAD_UP[1][0]) * head, 0, P["death_head_roll"] * roll),
+         "jaw": (8 * slack, 0, 0), "ear_L": (25 * head, 0, 0), "ear_R": (25 * head, 0, 0), "tail": (-10 * (1 - slack), 0, 0),
+         "eyelid_L": (0, 0, 90 * ease(p, 0.55, 0.9)), "eyelid_R": (0, 0, -90 * ease(p, 0.55, 0.9))}
+    fold_f = kf * (1 - 0.75 * slack)
+    fold_b = kb * (1 - 0.75 * slack)
+    for leg in ("FL", "FR"):
+        up, lo, pw = STANCE["F"]
+        q[f"leg_{leg}_upper"] = (up + (70 - up) * fold_f - 8 * kb * (1 - slack) + 12 * slack, 0, 0)
+        q[f"leg_{leg}_lower"] = (lo + (-140 - lo) * fold_f, 0, 0)
+        q[f"leg_{leg}_paw"] = (pw + (40 - pw) * fold_f, 0, 0)
+    for leg, s in (("BL", 1), ("BR", -1)):
+        up, lo, pw = STANCE["B"]
+        q[f"leg_{leg}_upper"] = (up + (-60 - up) * fold_b - 8 * kf * (1 - kb) - 14 * slack, 0, s * 4 * kb)
+        q[f"leg_{leg}_lower"] = (lo + (130 - lo) * fold_b, 0, 0)
+        q[f"leg_{leg}_paw"] = (pw + (-60 - pw) * fold_b, 0, 0)
+    return q
+
+
+# Its last pose, fitted once by a search over these (forward kinematics, `ground.lowest`, no neck
+# through the skull): on its side, the moss cape, the lower antler and the nose on the ground, the
+# shoulders 2 units over it, the legs out clear of it.
+L.update({"death_pitch": 0, "death_roll": 92, "death_neck": 15, "death_yaw": 10, "death_head": 20, "death_head_roll": -10,
+          "death_neck_roll": -30})
+
+
 BLINKS = {"idle": [2.0, 5.9]}
+BLINKS.update({"watch": [1.4, 3.7], "stare": [1.6]})
 BLINK = 0.12
 ANIMS = {"idle": (pose_idle, 8.0), "walk": (pose_walk, 1.5), "run": (pose_run, 0.55), "lie": (pose_lie, 6.0),
          "rise": (pose_rise, 3.0), "charge_tell": (pose_charge_tell, 1.2), "charge": (pose_charge, 2.5),
          "sweep_tell": (pose_sweep_tell, 0.8), "sweep": (pose_sweep, 0.75), "stomp_tell": (pose_stomp_tell, 0.9),
          "stomp": (pose_stomp, 0.6), "roots_tell": (pose_roots_tell, 1.4), "roots": (pose_roots, 0.8),
-         "stunned": (pose_stunned, 2.0), "down": (pose_down, 4.0)}
+         "stunned": (pose_stunned, 2.0), "down": (pose_down, 4.0),
+         "watch": (pose_watch, 5.0), "stare": (pose_stare, 2.5), "death": (pose_death, 2.4)}
 # One-off clips play once (an action that loops would play on: `drenkaun.rs` asks for each by name).
-LOOPED = ("idle", "walk", "run", "lie", "stunned", "down")
+LOOPED = ("idle", "walk", "run", "lie", "stunned", "down", "watch", "stare")
+# The ambient clips (`boss.rs`: watch with no player near, stare between attacks; the engine's
+# death) blend as the deer's do; death holds its last frame. The fight's clips keep the default.
+HOLD = ("death",)
+BLENDS = {"watch": (0.4, 0.4), "stare": (0.3, 0.3), "death": (0.1, 0.0)}
 CLIPS = [n for n in ANIMS if n not in ("idle", "walk", "run", "lie")]
 
 
@@ -861,7 +935,7 @@ def eyelids(name, t):
 
 
 def frame_times(name, dur):
-    n = {"idle": 96, "lie": 60, "walk": 24, "run": 20, "charge": 100, "down": 60, "stunned": 40}.get(name, 30)
+    n = {"idle": 96, "lie": 60, "walk": 24, "run": 20, "charge": 100, "down": 60, "stunned": 40, "watch": 50, "death": 36}.get(name, 30)
     ts = {round(dur * k / n, 4) for k in range(n + 1)}
     for b in BLINKS.get(name, []):
         ts |= {round(b + d, 4) for d in (-BLINK, -BLINK / 2, 0, BLINK / 2, BLINK)}
@@ -873,15 +947,18 @@ def animations(bone_names):
     for name, (fn, dur) in ANIMS.items():
         frames = []
         for t in frame_times(name, dur):
-            tt = t % dur if t < dur else 0.0
+            tt = t % dur if t < dur else (dur if name in HOLD else 0.0)
             pose = fn(tt)
-            pose.update(eyelids(name, tt))
+            if name not in HOLD:  # dying, it shuts its eyes
+                pose.update(eyelids(name, tt))
             root = list(pose.get("root", (0, 0, 0)))
-            if name not in ("lie", "down"):  # standing on bent legs, the hooves on the ground
+            if name not in ("lie", "down", "death"):  # standing on bent legs, the hooves on the ground
                 root[1] -= L.get("stance_drop", 0.0)
             frames.append({"t": round(t, 4), "rot": {b: [round(float(v), 4) for v in pose.get(b, (0, 0, 0))] for b in bone_names if b != "root"},
                            "root": [round(float(v), 4) for v in root]})
-        out[name] = {"length": dur, "frames": frames, "loop": name in LOOPED}
+        out[name] = {"length": dur, "frames": frames, "loop": "hold_on_last_frame" if name in HOLD else name in LOOPED}
+        if name in BLENDS:
+            out[name]["blend"] = BLENDS[name]
     return out
 
 
