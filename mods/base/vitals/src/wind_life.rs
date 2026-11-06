@@ -135,8 +135,9 @@ pub const SAND_SINK: f32 = 0.6;
 /// clear air the pack's dust fog leaves round the eye (its `dust_reach`, Shader's: 16 blocks at
 /// 7 m/s, 8 at 11): farther out the fog hides them. `DUST_LOW` of them skim the ground (sand
 /// moves mostly in the lowest metre, hopping), the rest fill the air up to 4 blocks; at 120 a
-/// frame held 3 to 5 and the storm didn't look to move sand (pt4_dust).
-pub const DUST_STORM: f32 = 400.0;
+/// frame held 3 to 5 and the storm didn't look to move sand (pt4_dust), at 400 about 6 on the
+/// default setting (some 800 alive; ultra's 5,000 read as blown sand, wind_dust).
+pub const DUST_STORM: f32 = 1000.0;
 pub const DUST_LOW: f32 = 0.6;
 pub const DUST_CLEAR: [(f32, f32); 2] = [(7.0, 16.0), (11.0, 8.0)];
 /// And streaks of sand along the wind, 4 to 24 blocks out (the study's gust streaks), a second at
