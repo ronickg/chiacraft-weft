@@ -54,7 +54,7 @@ pub struct PtFrame {
 pub const RAW: u32 = 0;
 pub const SVGF: u32 = 1;
 
-/// The à-trous steps (1, 2, 4, 8, 16 texels apart): 5 as SVGF's paper.
+/// The most à-trous steps (1, 2, 4, 8, 16 texels apart), as SVGF's paper; 4 by default (`steps`).
 const STEPS: u32 = 5;
 
 struct Pipes {
@@ -138,8 +138,9 @@ impl Denoiser {
             params: Vec::new(),
             mode: SVGF,
             reconstruct: false,
-            phi_color: 4.0,
-            steps: STEPS,
+            // Chosen at the PC (ptd_rrt5, 11-06): the hill's block shadows kept best without noise.
+            phi_color: 1.0,
+            steps: 4,
             debug: 0,
             test: None,
             test_frame: 0,
