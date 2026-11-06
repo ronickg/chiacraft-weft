@@ -110,6 +110,8 @@ pub fn terrain(r: &mut Registry) {
     t.cave_biome("deep_caves", 24, 96.0, 0.25)
         .caves(Caves::new("lava", i32::MIN, 11))
         // Distant terrain runs no decorations: it asks this what its steep faces show.
+        // Far crowns' leaves by the season (a bloom over out of its months).
+        .far_leaves(crate::blocks::far_leaves)
         .faces(l::SNOW_FALL, |f| {
             let [x, _, z] = f.pos();
             // A steep cell is asked once for its top and once per wall band down, the same column
