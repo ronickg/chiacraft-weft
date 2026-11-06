@@ -299,6 +299,19 @@ fn palette_made() -> Palette {
             let zn = vec3(0.30, 0.48, 1.0) * (luma(p.zenith) / luma(vec3(0.30, 0.48, 1.0)));
             p.zenith = mix(p.zenith, zn, evening * 0.6);
         }
+        // And the evening's twilight, the sun from about 2 degrees up to 8 under: Bliss's sky stays
+        // blue (19:00 warmth -35) and its land a lit blue-grey (luma 86, 75 87 103), where ours went a
+        // pink-lavender sky over near-black land (46) in the dusk key; at the same sun depth in the
+        // morning Bliss's land is a dark deep blue (55, -85), which the blue hour keeps (PC sheb4
+        // against Bliss's vista, 11-06; our 19:00 sun 2.9 degrees down, Minecraft's 3.5).
+        let twilight = smoothstep(0.05, -0.05, scene.sun.x) * smoothstep(-0.16, -0.08, e) * (1.0 - smoothstep(0.0, 0.04, e));
+        if twilight > 0.0 {
+            let hb = vec3(0.75, 0.95, 1.3);
+            p.horizon = mix(p.horizon, hb * (luma(p.horizon) / luma(hb)), twilight * 0.8);
+            let zb = vec3(0.32, 0.5, 1.0);
+            p.zenith = mix(p.zenith, zb * (luma(p.zenith) / luma(zb)), twilight * 0.7);
+            p.ambient = mix(p.ambient, vec3(0.15, 0.19, 0.27), twilight * 0.8);
+        }
     }
     // A new moon's night is darker than a full moon's.
     // The night follows the moon (Ronald, 11-04: "if the moon is light, then it can be lighter, and
