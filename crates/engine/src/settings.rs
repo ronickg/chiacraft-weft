@@ -17,6 +17,12 @@ pub struct Settings {
 /// The 3D world's share of the window's pixels each way: the setting, or on auto (0) two
 /// thirds on a high-density screen (`density`, physical pixels per point, 2 on Retina), where
 /// shading every pixel cost several times what it bought, and all of them elsewhere.
+/// How a world drawn smaller than the window is scaled up (`core:upscaler`): 0 bilinear, 1 FSR 1's
+/// EASU, 2 Snapdragon GSR 1. For the shaders as `scene.upscale.x`.
+pub fn upscaler() -> u32 {
+    number("core:upscaler") as u32
+}
+
 pub fn render_scale(density: f64) -> f32 {
     let set = number("core:render_scale") as f32;
     if set > 0.0 {

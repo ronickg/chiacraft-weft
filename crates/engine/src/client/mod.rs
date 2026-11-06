@@ -2916,6 +2916,7 @@ impl Client {
             frame_look: [0.0; 4],
             lightning: [self.lightning_seen.0, self.lightning_seen.1, self.thunder(), self.lightning_seen.2],
             froxels: [0.0; 4],
+            upscale: [crate::settings::upscaler() as f32, 0.0, 0.0, 0.0],
             // Filled in by `render` (`taa_frame`).
             taa: [0.0; 4],
             taa_prev: [[0.0; 4]; 4],

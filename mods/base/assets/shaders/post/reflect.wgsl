@@ -74,10 +74,11 @@ fn reflect_swell(p: vec2<f32>, t: f32, dist: f32, glance: f32) -> vec3<f32> {
     return normalize(vec3(-gx * k, 1.0, -gz * k));
 }
 
-// How much of what it shows water mirrors at the angle it is seen at (the pack's `water` uses the
-// same): a near mirror at an ordinary look across it, as in the reference pictures.
+// How much of what it shows water mirrors at the angle it is seen at (the pack's `water_fresnel`,
+// the same): a fourth power from 0.04, muted navy water as Bliss's in its own world (Far view,
+// 11-06; it was a near mirror at an ordinary look, ^2 from 0.08).
 fn reflect_fresnel(ndv: f32) -> f32 {
-    return 0.08 + 0.92 * pow(1.0 - clamp(ndv, 0.0, 1.0), 2.0);
+    return 0.04 + 0.96 * pow(1.0 - clamp(ndv, 0.0, 1.0), 4.0);
 }
 
 // Where `rel` (camera relative) lands on the screen, and its depth there.
