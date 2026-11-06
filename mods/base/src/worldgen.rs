@@ -894,7 +894,10 @@ fn tree_of(s: &mut Site, log: u32) {
         }
         return;
     }
-    let Some(t) = wild_tree_at(log, x, y, z, h >> 32) else { return };
+    // Its layer of the stand (`vitals::canopy`): under the canopy, in it, or over it.
+    let roll = (hash(h, 0x71E2, 0, 0) >> 40) as f32 / (1u64 << 24) as f32;
+    let tier = vitals::canopy::tier(name_of(abi::entry_kind::BIOME, s.biome()), roll);
+    let Some(t) = wild_tree_at(log, x, y, z, h >> 32).map(|t| t.with_tier(tier)) else { return };
     let mut crown = Vec::new();
     let climbers = LIANAS.on_biome(s.biome()).is_some();
     tree_blocks(&t, |x, y, z, state, force| {

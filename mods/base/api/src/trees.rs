@@ -6,6 +6,7 @@
 //! live world (`grow_tree`), whichever mod's log it is.
 
 use crate::branchy;
+use vitals::canopy::{self, Kind, Tier};
 use weft_sdk::noise::hash;
 use weft_sdk::*;
 
@@ -66,8 +67,8 @@ static TALL_GRASS: Block = Block::named("base:tall_grass");
 static BRACKET_FUNGUS: Block = Block::named("base:bracket_fungus");
 
 /// A tree's crown, by its log's tag.
-#[derive(Clone, Copy, PartialEq)]
-enum Crown {
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum Crown {
     Round,
     Cone,
     Flat,
@@ -98,10 +99,37 @@ pub struct TreeAt {
     crown: Crown,
     form: Form,
     height: i32,
+    /// The layer of its stand it grows into (`vitals::canopy`): under the canopy, in it, or over it.
+    tier: Tier,
     /// The way a crooked trunk bends, a twin stands, a fallen one lies.
     lean: (i32, i32),
     /// Its seed, for a tree grown from branches (`branchy`).
     seed: u64,
+}
+
+impl TreeAt {
+    /// The same tree grown into `tier` of its stand (`vitals::canopy::tier`, rolled by its site):
+    /// its height and crown by the tier. A sapling's and a lone tree's are canopy trees.
+    pub fn with_tier(mut self, tier: Tier) -> Self {
+        self.tier = tier;
+        self.height = height_of(self.crown, self.form, tier, self.seed);
+        self
+    }
+
+    /// Whether it stands with a crown (not fallen, a stump or a bare snag).
+    pub fn has_crown(&self) -> bool {
+        !matches!(self.form, Form::Fallen | Form::Stump | Form::Snag)
+    }
+
+    /// Its height to the crown's top, above its foot.
+    pub fn height(&self) -> i32 {
+        self.height
+    }
+
+    /// Where its foot stands.
+    pub fn pos(&self) -> [i32; 3] {
+        [self.x, self.y, self.z]
+    }
 }
 
 const LEANS: [(i32, i32); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
@@ -130,6 +158,13 @@ fn shaped(log: u32, x: i32, y: i32, z: i32, h: u64, wild: bool) -> Option<TreeAt
     } else {
         Crown::Round
     };
+    Some(simple_at(crown, log, leaves, x, y, z, h, wild))
+}
+
+/// A tree of crown `crown` growing from `log` under `leaves` (no lookups: the canopy sheet's
+/// `forest_canopy` example grows these off the game), a canopy tree until `with_tier`.
+#[allow(clippy::too_many_arguments)]
+pub fn simple_at(crown: Crown, log: u32, leaves: u32, x: i32, y: i32, z: i32, h: u64, wild: bool) -> TreeAt {
     let roll = (h >> 8) % 100;
     let forest = matches!(crown, Crown::Round | Crown::Cone | Crown::Slim);
     let form = match roll {
@@ -141,17 +176,33 @@ fn shaped(log: u32, x: i32, y: i32, z: i32, h: u64, wild: bool) -> Option<TreeAt
         34..42 if crown == Crown::Round => Form::Twin,
         _ => Form::Standing,
     };
-    let big = (form == Form::Big) as i32;
-    let height = match crown {
-        // Spruces stand tall and narrow, the big ones half again as tall.
-        Crown::Cone => 6 + (h % 4) as i32 + 3 * big,
-        Crown::Palm => 7 + (h % 3) as i32,
-        Crown::Flat => 5 + (h % 2) as i32 + big,
-        Crown::Round => 5 + (h % 3) as i32 + 2 * big,
-        Crown::Slim => 6 + (h % 3) as i32 + 2 * big,
-    };
+    let height = height_of(crown, form, Tier::Canopy, h);
     let lean = LEANS[(h >> 20) as usize % 4];
-    Some(TreeAt { x, y, z, log, leaves, crown, form, height, lean, seed: h })
+    TreeAt { x, y, z, log, leaves, crown, form, height, tier: Tier::Canopy, lean, seed: h }
+}
+
+/// The stand-structure kind of a crown (`vitals::canopy`): palms and flat crowns stand alone.
+fn kind_of(crown: Crown) -> Option<Kind> {
+    match crown {
+        Crown::Round => Some(Kind::Round),
+        Crown::Cone => Some(Kind::Cone),
+        Crown::Slim => Some(Kind::Slim),
+        Crown::Flat | Crown::Palm => None,
+    }
+}
+
+/// How high a tree grows to its crown's top: by its crown and tier (`vitals::canopy::crown`), a
+/// big one a block more.
+fn height_of(crown: Crown, form: Form, tier: Tier, h: u64) -> i32 {
+    let big = (form == Form::Big) as i32;
+    match kind_of(crown) {
+        Some(k) => {
+            let c = canopy::crown(k, tier);
+            c.low + (h % c.spread.max(1) as u64) as i32 + big
+        }
+        None if crown == Crown::Palm => 7 + (h % 3) as i32,
+        None => 5 + (h % 2) as i32 + big,
+    }
 }
 
 /// Calls `put(x, y, z, state, force)` for every block of the tree.
@@ -217,7 +268,7 @@ pub fn tree_blocks(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
     };
     if let Some(c) = crate::tree_recipes::colonized(name)
         .filter(|_| !giant_young && !simple)
-        .map(|c| crate::tree_recipes::varied_colonized(c, variant))
+        .map(|c| crate::tree_recipes::tiered_colonized(&crate::tree_recipes::varied_colonized(c, variant), t.tier))
     {
         let c = &c;
         if let Some(branch) = TREE_BRANCH.on_block(log).map(|b| b.0) {
@@ -240,7 +291,7 @@ pub fn tree_blocks(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
     }
     let recipe = crate::tree_recipes::sapling_of(name)
         .filter(|_| !simple)
-        .map(|r| crate::tree_recipes::varied(r, variant));
+        .map(|r| crate::tree_recipes::tiered(&crate::tree_recipes::varied(r, variant), t.tier));
     let recipe = recipe.as_ref();
     if let (Some(recipe), Some(branch)) = (recipe, TREE_BRANCH.on_block(log).map(|b| b.0)) {
         grow_with_branches(recipe, log, t.leaves, branch, t.x, t.y, t.z, t.seed, &mut put);
@@ -258,6 +309,14 @@ pub fn tree_blocks(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
         put(t.x, t.y - 1, t.z, DIRT.id(), true);
         return;
     }
+    simple_standing(t, &mut put);
+    put(t.x, t.y - 1, t.z, DIRT.id(), true);
+}
+
+/// A standing tree's trunk and crown by its crown shape (simple trees, and every species without
+/// a recipe): no lookups, so the canopy sheet (`forest_canopy`) grows the same trees off the game.
+pub fn simple_standing(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
+    let log = t.log;
     let top = t.y + t.height;
     // A crooked trunk steps aside once, two or three blocks under its top, and its crown with it.
     let bend = if t.form == Form::Crooked { top - 2 - t.height % 2 } else { i32::MAX };
@@ -276,7 +335,6 @@ pub fn tree_blocks(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
             put(sx, y, sz, log, true);
         }
     }
-    put(t.x, t.y - 1, t.z, DIRT.id(), true);
 }
 
 /// The leaves of a crown whose trunk tops out at `top`, over (`cx`, `cz`).
@@ -314,49 +372,87 @@ fn crown(t: &TreeAt, cx: i32, cz: i32, top: i32, put: &mut impl FnMut(i32, i32, 
             }
         }
         Crown::Cone => {
-            // Narrow rings stepping in toward a spire, from two blocks up the trunk.
-            for dy in 2..=t.height + 1 {
-                let y = t.y + dy;
-                let r = if dy == t.height + 1 { 0 } else { 1 + ((t.height + 1 - dy) % 3).min(2) };
-                for dz in -r..=r {
-                    for dx in -r..=r {
-                        if dx * dx + dz * dz <= r * r + 1 {
-                            put(cx + dx, y, cz + dz, leaves, false);
-                        }
-                    }
+            // Rings stepping in toward a spire from where the needles start (a third of the way
+            // up, two fifths on an emergent), every other ring pulled in: a ruffled spire whose
+            // ledges catch the sun, like Minecraft's spruces, sized by its tier.
+            let c = canopy::crown(Kind::Cone, t.tier);
+            let bare = ((t.height as f32 * if t.tier == Tier::Emergent { 0.4 } else { 0.3 }).round() as i32).max(1);
+            let base = c.radius + if t.form == Form::Big { 0.4 } else { 0.0 } + jitter(t.seed, 1) * 0.3;
+            let len = (t.height + 1 - bare).max(1);
+            for dy in bare..=t.height {
+                let k = t.height - dy;
+                let mut r = base * (k as f32 + 0.6) / len as f32;
+                if k % 2 == 1 && k > 1 {
+                    r -= 0.7;
                 }
+                ring(cx, t.y + dy, cz, r, 0.3, t.seed, leaves, put);
+            }
+            put(cx, t.y + t.height + 1, cz, leaves, false);
+        }
+        Crown::Round | Crown::Slim => {
+            // A dome (`dome`), narrower at its top, its rim ragged; a birch's taller and slimmer.
+            // Some canopy crowns and every emergent carry side lobes at their shoulders, as an old
+            // oak's big limbs each hold a clump: lumpy outlines that shade each other, so a stand
+            // reads as crowns, not one mat (`vitals::canopy`).
+            let kind = if t.crown == Crown::Slim { Kind::Slim } else { Kind::Round };
+            let c = canopy::crown(kind, t.tier);
+            let big = t.form == Form::Big;
+            let r = c.radius + if big { 0.4 } else { 0.0 } + jitter(t.seed, 2) * 0.3;
+            let depth = c.depth + big as i32;
+            let mid = if kind == Kind::Slim { 0.5 } else { 0.6 };
+            dome(cx, top, cz, r, depth, mid, t.seed, leaves, put);
+            let lobes = match t.tier {
+                Tier::Emergent => c.lobes,
+                Tier::Canopy if c.lobes > 0 && unit(t.seed, 3) < canopy::CANOPY_LOBE => 1,
+                _ => 0,
+            };
+            let turn = unit(t.seed, 4) * std::f32::consts::TAU;
+            for i in 0..lobes {
+                let a = turn + i as f32 * std::f32::consts::TAU / lobes as f32 + jitter(t.seed, 10 + i as u64) * 0.6;
+                let out = r * 0.8 + unit(t.seed, 20 + i as u64) * 0.6;
+                let (lx, lz) = (cx + (a.cos() * out).round() as i32, cz + (a.sin() * out).round() as i32);
+                let ly = top - 2 + (hash(t.seed, i as i64, 7, 0) % 4) as i32;
+                let lr = r * 0.62 + unit(t.seed, 30 + i as u64) * 0.4;
+                dome(lx, ly, lz, lr, 4, mid, t.seed ^ (i as u64 + 1) * 0x9E37, leaves, put);
             }
         }
-        Crown::Slim => {
-            // A narrow crown down the top half of the trunk, widest in its middle.
-            for y in top - 4..=top {
-                let r: i32 = if y == top || y == top - 4 { 1 } else { 2 };
-                for dz in -r..=r {
-                    for dx in -r..=r {
-                        if dx.abs() == r && dz.abs() == r {
-                            continue;
-                        }
-                        put(cx + dx, y, cz + dz, leaves, false);
-                    }
-                }
-            }
-        }
-        Crown::Round => {
-            // Wide layers under two narrower ones, corners ragged: a broadleaf's crown about seven
-            // blocks across, a big one nine and a layer deeper (real mature crowns are 6-12 m).
-            let wide = if t.form == Form::Big { 4 } else { 3 };
-            let depth = 3 + (t.form == Form::Big) as i32;
-            for y in top - depth..=top {
-                let r: i32 = if y >= top - 1 { wide - 1 } else { wide };
-                for dz in -r..=r {
-                    for dx in -r..=r {
-                        let corner = dx.abs() == r && dz.abs() == r;
-                        if corner && (y == top || hash(0, (cx + dx) as i64, y as i64, (cz + dz) as i64) & 1 == 0) {
-                            continue;
-                        }
-                        put(cx + dx, y, cz + dz, leaves, false);
-                    }
-                }
+    }
+}
+
+/// -1..1 from `seed`, its `k`th draw.
+fn jitter(seed: u64, k: u64) -> f32 {
+    unit(seed, k) * 2.0 - 1.0
+}
+
+/// 0..1 from `seed`, its `k`th draw.
+fn unit(seed: u64, k: u64) -> f32 {
+    (hash(seed, k as i64, 0x7E3, 0) >> 40) as f32 / (1u64 << 24) as f32
+}
+
+/// A dome of leaves `depth` layers deep from `top` down over (`cx`, `cz`), `r` wide at its widest
+/// (at `mid`, a share of its depth from the top), its sides steep and its top and foot drawn in a
+/// little (a rounded box, as Minecraft's oaks: the steep sides are what shade), its rim ragged
+/// (`ring`).
+#[allow(clippy::too_many_arguments)]
+fn dome(cx: i32, top: i32, cz: i32, r: f32, depth: i32, mid: f32, seed: u64, leaves: u32, put: &mut impl FnMut(i32, i32, i32, u32, bool)) {
+    for k in 0..depth.max(1) {
+        let t = (k as f32 + 0.5) / depth.max(1) as f32;
+        let f = 1.0 - ((t - mid).abs() / 0.65).powi(3);
+        ring(cx, top - k, cz, r * f.max(0.0).cbrt(), 0.9, seed, leaves, put);
+    }
+}
+
+/// A layer of leaves round (`cx`, `cz`) out to `r`, each column's edge moved by up to `ragged`
+/// either way so the rim is ragged; its middle always.
+#[allow(clippy::too_many_arguments)]
+fn ring(cx: i32, y: i32, cz: i32, r: f32, ragged: f32, seed: u64, leaves: u32, put: &mut impl FnMut(i32, i32, i32, u32, bool)) {
+    let reach = (r + ragged).ceil().max(0.0) as i32;
+    for dz in -reach..=reach {
+        for dx in -reach..=reach {
+            let (x, z) = (cx + dx, cz + dz);
+            let edge = r + ragged * ((hash(seed ^ 0xC0, x as i64, y as i64, z as i64) & 0xFF) as f32 / 255.0 - 0.55);
+            if dx == 0 && dz == 0 || ((dx * dx + dz * dz) as f32) <= edge.max(0.0).powi(2) {
+                put(x, y, z, leaves, false);
             }
         }
     }
@@ -366,11 +462,12 @@ fn crown(t: &TreeAt, cx: i32, cz: i32, top: i32, put: &mut impl FnMut(i32, i32, 
 /// a scatter of its own: nothing for a log without a recipe. Calls `put(x, y, z, state, force)`.
 pub fn giant_tree_blocks(log: u32, x: i32, y: i32, z: i32, h: u64, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
     let Some(leaves) = TREE_LEAVES.on_block(log).map(|l| l.0) else { return };
-    // Simple trees (`TREE_STYLE`): a big one of its crown shape, twice a big tree's height.
+    // Simple trees (`TREE_STYLE`): a big emergent of its crown shape, half again as tall.
     if simple_trees() {
         if let Some(mut t) = shaped(log, x, y, z, h, false) {
             t.form = Form::Big;
-            t.height *= 2;
+            let mut t = t.with_tier(Tier::Emergent);
+            t.height = t.height * 3 / 2;
             tree_blocks(&t, put);
         }
         return;
