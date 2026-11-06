@@ -508,14 +508,18 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     var c = mix(p.horizon, p.zenith, pow(h, 0.4));
     let mu = dot(dir, scene.sun.xyz);
     let low = 1.0 - smoothstep(0.0, 0.2, abs(scene.sun.y));
-    // Away from the sun the sunset sky goes rose and violet.
-    // Most of it once the sun is down (the blue hour); with the sun up a little only (it tinted the
-    // whole sunrise sky lavender).
-    let away = (0.5 - 0.5 * mu) * (1.0 - h) * low * mix(0.35, 1.0, smoothstep(0.03, -0.05, scene.sun.y));
-    c = mix(c, c * vec3(0.97, 0.80, 1.06) + vec3(0.03, 0.0, 0.03), away * 0.4);
-    // Toward it, a warmer band low on the horizon.
-    let toward = pow(max(mu, 0.0), 2.0) * pow(1.0 - h, 3.0) * low;
-    c += vec3(0.55, 0.22, 0.05) * toward;
+    // (This and the moon's and the rain's parts below are skipped for the whole frame where they
+    // add nothing: the same colour, fewer powers per pixel; Android port, 11-06.)
+    if low > 0.0 {
+        // Away from the sun the sunset sky goes rose and violet.
+        // Most of it once the sun is down (the blue hour); with the sun up a little only (it tinted
+        // the whole sunrise sky lavender).
+        let away = (0.5 - 0.5 * mu) * (1.0 - h) * low * mix(0.35, 1.0, smoothstep(0.03, -0.05, scene.sun.y));
+        c = mix(c, c * vec3(0.97, 0.80, 1.06) + vec3(0.03, 0.0, 0.03), away * 0.4);
+        // Toward it, a warmer band low on the horizon.
+        let toward = pow(max(mu, 0.0), 2.0) * pow(1.0 - h, 3.0) * low;
+        c += vec3(0.55, 0.22, 0.05) * toward;
+    }
     c += sun_glow(dir, p);
     // In the HDR world the air round the sun glows as bright as it really is (Mie scattering's
     // forward peak, a wide lobe and a tight one in the sun's own colour, strongest low), which the
@@ -528,15 +532,19 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     }
     // The glow about the moon where it stands, as bright as its light (`scene.moon.w`): on a new
     // moon there is none, and a glow alone read as a dark-blue ring (the world playtester's nights).
-    let moon = pow(max(dot(dir, scene.moon.xyz), 0.0), 24.0) * smoothstep(-0.05, -0.25, scene.sun.y) * scene.moon.w;
-    // On a blood moon its glow goes copper, then red.
-    c += vec3(0.05, 0.07, 0.12) * mix(vec3(1.0), blood_tint() * vec3(2.0, 1.4, 1.0), smoothstep(0.0, 0.4, blood_moon())) * moon;
+    if scene.sun.y < -0.05 && scene.moon.w > 0.0 {
+        let moon = pow(max(dot(dir, scene.moon.xyz), 0.0), 24.0) * smoothstep(-0.05, -0.25, scene.sun.y) * scene.moon.w;
+        // On a blood moon its glow goes copper, then red.
+        c += vec3(0.05, 0.07, 0.12) * mix(vec3(1.0), blood_tint() * vec3(2.0, 1.4, 1.0), smoothstep(0.0, 0.4, blood_moon())) * moon;
+    }
     // Rain's sky low down, and the mist over the land that takes this colour (`haze_lit`), a darker
     // slate, darker in a storm: the deck fades into it at the horizon and the land's mist meets it
     // there, one colour (a brighter band of sky lay between a storm's deck and the land, and the
     // deck's edge drew a hard line along it: Tester 2's rain and thunder shots, 11-05).
-    let wet = rain_amount() * (1.0 - smoothstep(0.0, 0.35, dir.y));
-    c *= mix(vec3(1.0), vec3(0.76, 0.8, 0.86) - vec3(0.12) * scene.weather.w, wet);
+    if rain_amount() > 0.0 {
+        let wet = rain_amount() * (1.0 - smoothstep(0.0, 0.35, dir.y));
+        c *= mix(vec3(1.0), vec3(0.76, 0.8, 0.86) - vec3(0.12) * scene.weather.w, wet);
+    }
     if dir.y < 0.0 {
         // Below the horizon it darkens a little toward the ground the haze stands on.
         c = mix(c, p.horizon * 0.6 + p.ambient * 0.2, smoothstep(0.0, 0.4, -dir.y));
