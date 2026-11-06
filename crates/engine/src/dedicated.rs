@@ -48,7 +48,7 @@ pub fn run(opts: Options) -> Result<(), String> {
     let identity =
         std::sync::Arc::new(crate::world_address::for_world(&mut meta).map_err(|e| format!("'{name}' has no address of its own: {e}"))?);
     // chiacraft, test only: `--import-mc` loads a Minecraft world into a new world first.
-    crate::chiacraft::mc_import::maybe_import(&meta, content());
+    crate::chiacraft::mc_import::maybe_import(&mut meta, content());
     let storage = saves::Storage::open(meta.clone(), content());
     let whitelist = crate::paths::config(&opts.run_dir).join("whitelist.txt");
     let mut server = server::spawn(
