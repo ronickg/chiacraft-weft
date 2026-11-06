@@ -228,6 +228,9 @@ const SOFT_THICK: f32 = 120.0;
 const SOFT_STORM_THICK: f32 = 190.0;
 // How far a look is followed (blocks): beyond, the clouds fade into the sky.
 const SOFT_REACH: f32 = 4000.0;
+// The HDR world's sunlight and skylight on the soft clouds, against today's (`soft_march`).
+const CLOUD_SUN_HDR: f32 = 1.0;
+const CLOUD_SKY_HDR: f32 = 1.0;
 
 // One slice `z` (0..63) of the noise volume at `xy` (texels, 0..64).
 fn soft_slice(z: u32, xy: vec2<f32>) -> vec4<f32> {
@@ -357,7 +360,10 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
     if scene.frame.x > 0.5 && scene.sun.y > -0.1 {
         strength = max(strength, smoothstep(-0.08, 0.03, scene.sun.y));
     }
-    let sun = p.sun * strength * (1.0 - s.axes[0].y * 0.55) * cloud_sun_tint();
+    // In the HDR world the sun lights them less: they stood on the curve's shoulder, brighter than
+    // Bliss's at every hour and harder lit (mc_forest cloud luma noon 228 against 201, 17:00 208
+    // against 176; their spread 20 against 15, 19 against 7). Bliss's read as soft cream masses.
+    let sun = p.sun * strength * (1.0 - s.axes[0].y * 0.55) * cloud_sun_tint() * select(1.0, CLOUD_SUN_HDR, scene.frame.x > 0.5);
     // Rain darkens the clouds' albedo and keeps their shapes (Photon: ×0.66); a storm's more.
     let albedo = mix(1.0, 0.66, s.axes[0].x) * mix(1.0, 0.6, storm);
     var through = 1.0;
@@ -398,7 +404,7 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
         let powder = mix(1.0 - exp(-sigma * 14.0), 1.0, 0.5 * (mu * 0.5 + 0.5) * (mu * 0.5 + 0.5) + 0.3);
         // The sky's light from above, brighter on the tops; under a storm the bellies darker.
         // Grey-blue shaded bases, bright tops: evenly lit, a clear day's read as flat white cut-outs.
-        let ambient = mix(p.horizon * 0.3 + p.ambient * 0.25, p.ambient * 1.2 + p.horizon * 0.2, smoothstep(0.0, 0.8, a)) * mix(1.0, 0.55, s.axes[0].y * (1.0 - a)) * mix(1.0, 0.72, cloud_low_sun());
+        let ambient = mix(p.horizon * 0.3 + p.ambient * 0.25, p.ambient * 1.2 + p.horizon * 0.2, smoothstep(0.0, 0.8, a)) * mix(1.0, 0.55, s.axes[0].y * (1.0 - a)) * mix(1.0, 0.72, cloud_low_sun()) * select(1.0, CLOUD_SKY_HDR, scene.frame.x > 0.5);
         var c = (sun * direct * powder * 0.9 + ambient) * albedo;
         // In the HDR world a silver rim: the thin edges of a cloud before the sun, where the light
         // has crossed little of it, glow white-gold toward the eye (Bliss's and Photon's bright rims, a wide lobe: at g 0.9 and a
