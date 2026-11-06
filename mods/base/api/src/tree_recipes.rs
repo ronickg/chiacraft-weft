@@ -289,6 +289,29 @@ pub const RECIPES: &[Recipe] = &[
         twig: 0.32,
         ..Recipe::BASE
     },
+    // A wild cherry (Prunus avium; Ronald, 11-05: "Yes, add wild cherry"): in a wood a tall straight
+    // trunk up into the crown, its branches in whorls of three held up at 45° and shorter up the
+    // tree, rounded clusters along them: a tall egg-shaped crown, a little over the oaks so its
+    // spring blossom shows over the canopy (Bliss's pink groves).
+    Recipe {
+        log: "base:cherry_log",
+        height: 9.5,
+        size_var: 0.2,
+        width: 1.15,
+        width_loss: 0.07,
+        drift: 3.0,
+        branch_start: 0.4,
+        branch_every: 0.9,
+        branch_count: 3,
+        branch_angle: 45.0,
+        branch_width: 0.55,
+        branch_len: 0.5,
+        taper: 0.5,
+        leaf_r: 2.3,
+        leaf_ry: 2.0,
+        ragged: 0.4,
+        ..Recipe::BASE
+    },
     // A giant sequoia (Sequoiadendron giganteum, `vitals::wild` for where): the real ones 80-95 m
     // tall on trunks 6-11 m across, here about 60 blocks on a round trunk 4 to 7 wide, flaring
     // into buttresses at the foot; bare for its lower half, then short branches all round,

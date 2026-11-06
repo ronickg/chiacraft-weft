@@ -369,6 +369,18 @@ pub const FOODS: &[Food] = &[
         poison: 0.0,
         category: Category::Fruit,
     },
+    // Wild cherries off the wild cherry (Prunus avium; USDA's sweet cherries, the wild ones smaller
+    // and tarter), a handful: three days fresh.
+    Food {
+        name: "base:cherry",
+        grams: 100.0,
+        per100: per(82.3, 1.1, 13.9, 0.2, 2.1, 7.0),
+        meal: Meal::Cooling,
+        raw: false,
+        keeps: (3.0, 3.0),
+        poison: 0.0,
+        category: Category::Fruit,
+    },
     // Brambles' raspberries (USDA), soft: two days fresh.
     Food {
         name: "base:raspberries",
