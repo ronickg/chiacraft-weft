@@ -844,6 +844,7 @@ item.base.fur_robe.tooltip = Носится поверх одежды и дос�
 video.base.open = Графика и качество
 video.base.title = Графика и качество
 video.base.quality = Качество
+video.base.preset.phone = Телефон
 video.base.preset.low = Низкое
 video.base.preset.medium = Среднее
 video.base.preset.high = Высокое

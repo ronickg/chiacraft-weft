@@ -843,6 +843,7 @@ item.base.fur_robe.tooltip = Worn over clothes and armor: the warmest cloak, too
 video.base.open = Video and Quality
 video.base.title = Video and Quality
 video.base.quality = Quality
+video.base.preset.phone = Phone
 video.base.preset.low = Low
 video.base.preset.medium = Medium
 video.base.preset.high = High
