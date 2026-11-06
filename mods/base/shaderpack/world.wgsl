@@ -360,7 +360,7 @@ fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
         let t = rt_sun(in.rel, n, light_dir(), in.kind.z != 0u);
         let c = min(canopy(), 1.0);
         let cover = smoothstep(mix(0.3, 0.15, c), mix(0.8, 0.5, c), in.light.x);
-        return min(dot(t, vec3(1.0 / 3.0)), cover) * cloud_shadow(in.rel);
+        return min(dot(t, vec3(1.0 / 3.0)), cover) * models_shadow(in.rel, n) * cloud_shadow(in.rel);
     }
     // A plant's blade asks the map from most of a block toward the sun: the blades round it, as
     // thin as a few of the map's texels, shaded each other in fine crossing stripes, pale and
@@ -797,7 +797,8 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     var near_map = shadow_in(scene.shadow_view_proj, scene.shadow, 80.0, 400.0, in.rel, vec3(0.0, 1.0, 0.0), false);
     // Traced (`core:rt_shadows`): the water's surface everywhere, as the land.
     if scene.rt.x > 0.5 {
-        near_map = vec2(dot(rt_sun(in.rel, vec3(0.0, 1.0, 0.0), light_dir(), false), vec3(1.0 / 3.0)), 1.0);
+        let up = vec3(0.0, 1.0, 0.0);
+        near_map = vec2(dot(rt_sun(in.rel, up, light_dir(), false), vec3(1.0 / 3.0)) * models_shadow(in.rel, up), 1.0);
     }
     let shadow = mix(1.0, min(near_map.x, smoothstep(0.3, 0.8, in.light.x)), near_map.y) * smoothstep(0.75, 1.0, max(in.light.x, near_map.y)) * cloud_shadow(in.rel);
     let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, shadow, 1.0, in.pos, in.rel);

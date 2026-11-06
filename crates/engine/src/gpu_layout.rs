@@ -767,7 +767,8 @@ gpu_struct! {
         /// the view; 32 slices deep, eight to a row of the image.
         pub froxels: [f32; 4],
         /// Ray-traced sun and moon shadows (`core:rt_shadows`, a GPU with ray queries): x 1 when
-        /// the world's shader traces them this frame (its prelude then has `rt_sun`), yzw unused.
+        /// the world's shader traces them this frame (its prelude then has `rt_sun`; the near shadow
+        /// map then holds the models alone, the far one the terrain as before), yzw unused.
         pub rt: [f32; 4],
     }
 }

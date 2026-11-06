@@ -3097,9 +3097,7 @@ impl Client {
             self.shadow_far_drawn = None;
         }
         let cam = self.render_camera();
-        // Traced shadows (`core:rt_shadows`) take the near map's place: the far one stays, for
-        // mobs and models, the mist's light and the water's (they don't trace).
-        self.shadow = (light_box(dir, cam.pos, SHADOW_REACH, SHADOW_DEPTH, size), !self.render.rt_traced());
+        self.shadow = (light_box(dir, cam.pos, SHADOW_REACH, SHADOW_DEPTH, size), true);
         // The far map about a place in the world, not the camera: built about the camera, its box
         // moved by a fraction of a texel every frame the player moved, and it was drawn again each
         // frame (Research round 16, #8: +4,500 draw records a frame walking, about 0.6 ms on the
@@ -3159,8 +3157,12 @@ impl Client {
                     .map(|l| (id, physics::Transform::of(e.pos).origin(), (l.pivot, l.now())))
             })
             .collect();
-        self.render
-            .draw_shadow(gpu, list, frame, cam, light, buf, 0, &leaning);
+        // With traced shadows (`core:rt_shadows`) the terrain casts by its rays: the near map then
+        // holds the models alone (mobs, the player), which the world's rays don't see.
+        if !self.render.rt_traced() {
+            self.render
+                .draw_shadow(gpu, list, frame, cam, light, buf, 0, &leaning);
+        }
         self.entity_render.draw_shadow(gpu, list, frame, buf);
         list.push(weft_render::Cmd::EndPass);
     }

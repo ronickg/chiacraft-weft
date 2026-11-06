@@ -694,6 +694,17 @@ fn shadow_in(m: mat4x4<f32>, info: vec4<f32>, round: f32, depth: f32, rel: vec3<
 // smoothly; x 1 lit to 0 in shadow, y how far to trust it.
 fn shadow_at(rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
     let near = shadow_in(scene.shadow_view_proj, scene.shadow, 80.0, 400.0, rel, n, false);
+    // With traced shadows (`scene.rt`) the near map holds the models alone and the far one the
+    // terrain: what doesn't trace (mobs, the mist) takes the darker of both.
+    if scene.rt.x > 0.5 {
+        let far_reach = max(scene.shadow_far.w * scene.shadow_far.y * 0.5, 1.0);
+        let far = shadow_in(scene.shadow_far_view_proj, scene.shadow_far, far_reach, far_reach * 3.0, rel, n, length(rel) > 250.0);
+        let trust = max(near.y, far.y);
+        if trust <= 0.0 {
+            return vec2(1.0, 0.0);
+        }
+        return vec2(min(mix(1.0, near.x, near.y), mix(1.0, far.x, far.y)), far.y);
+    }
     if near.y >= 0.999 {
         return near;
     }
@@ -706,6 +717,13 @@ fn shadow_at(rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
         return vec2(1.0, 0.0);
     }
     return vec2(mix(far.x, near.x, near.y / trust), trust);
+}
+
+// With traced shadows (`scene.rt`): the shade of the models (mobs, the player) at `rel` facing
+// `n`, from the near map that then holds them alone; 1 out of it.
+fn models_shadow(rel: vec3<f32>, n: vec3<f32>) -> f32 {
+    let m = shadow_in(scene.shadow_view_proj, scene.shadow, 80.0, 400.0, rel, n, false);
+    return mix(1.0, m.x, m.y);
 }
 
 // The sun on a mob or a model at `rel` facing `n` with sky light `sky`: the shadow map where it
