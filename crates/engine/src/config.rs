@@ -695,8 +695,9 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // aside each frame and gathered over frames by where each pixel was, the motion image), 2
         // temporal from the camera alone (no motion image: cheaper on phones' tiled GPUs; leaves and
         // mobs left to the clipping). Read at start, as the world's pipelines then draw the motion
-        // image too (1).
-        ConfigDef::number("core:aa", ck::INT, 0.0, 0.0, 2.0, 1.0),
+        // image too (1). On by default (Ronald, 11-06: "Yes, on by default"): 1, and 2 on a phone,
+        // whose tiled GPU the motion image cost a third of its world pass.
+        ConfigDef::number("core:aa", ck::INT, if cfg!(target_os = "android") { 2.0 } else { 1.0 }, 0.0, 2.0, 1.0),
         // Temporal anti-aliasing: the least share of each new frame (0.1: about ten gathered;
         // less, smoother and slower to follow), live.
         ConfigDef::number("core:taa_blend", ck::FLOAT, 0.1, 0.03, 0.5, 0.01),
