@@ -660,6 +660,9 @@ pub struct Client {
     /// frame; and with it on, what is drawn after the opaque world goes into `late_out` for the app
     /// to put after the copy instead of into the frame's list.
     pub behind: [f32; 4],
+    /// Last frame's projection and view without the jitter, where its camera stood and the
+    /// shaders' clock then, for temporal anti-aliasing's `Scene::taa_prev` and `taa`.
+    taa_last: Option<(glam::Mat4, DVec3, f32)>,
     pub late_out: CommandList,
     /// Seconds until the next dust piece from the block being hit, and until its next knock.
     hit_dust: f32,
@@ -986,6 +989,7 @@ impl Client {
             late: CommandList::default(),
             hand_late: CommandList::default(),
             behind: [0.0; 4],
+            taa_last: None,
             late_out: CommandList::default(),
             hit_dust: 0.0,
             hit_sound: 0.0,
@@ -2798,6 +2802,25 @@ impl Client {
     }
 
     /// The frame as every world pass sees it (`gpu_layout::Scene`).
+    /// Temporal anti-aliasing's fields (`Scene::taa`, `taa_prev`): this frame's jitter, and last
+    /// frame's camera without it, taking this frame's camera-relative positions, with the
+    /// shaders' clock then. A camera that moved more than 32 blocks (a teleport, a respawn) or a
+    /// clock that went back starts it anew, and so does a frame without it (`post::taa_active`):
+    /// `taa.z` 0 then, and the shaders skip their motion.
+    fn taa_frame(&mut self, cam: &Camera, frame: &FrameInfo) -> ([f32; 4], [[f32; 4]; 4]) {
+        let aspect = frame.width as f32 / frame.height.max(1) as f32;
+        let now = cam.proj_plain(aspect) * cam.view();
+        let j = crate::post::jitter();
+        let t = crate::shaders::time();
+        match self.taa_last.replace((now, cam.pos, t)) {
+            Some((last, at, then)) if crate::post::taa_active() && (cam.pos - at).length() < 32.0 && then <= t => {
+                let moved = glam::Mat4::from_translation((cam.pos - at).as_vec3());
+                ([j.x, j.y, 1.0, then], (last * moved).to_cols_array_2d())
+            }
+            _ => ([j.x, j.y, 0.0, t], now.to_cols_array_2d()),
+        }
+    }
+
     fn scene(&self, cam: &Camera, frame: &FrameInfo) -> Scene {
         // Fog ends where the terrain does: the view, or the distant terrain beyond it.
         let view_distance = (self.view_radius * 16).max(lod::Lod::distance()) as f32;
@@ -2842,6 +2865,9 @@ impl Client {
             frame_look: [0.0; 4],
             lightning: [self.lightning_seen.0, self.lightning_seen.1, self.thunder(), self.lightning_seen.2],
             froxels: [0.0; 4],
+            // Filled in by `render` (`taa_frame`).
+            taa: [0.0; 4],
+            taa_prev: [[0.0; 4]; 4],
             cloud_shadow: [0.0; 4],
             prev_view_proj: [[0.0; 4]; 4],
             cloud_moved: [0.0; 4],
@@ -3120,7 +3146,7 @@ impl Client {
         scene.shadow = [0.0; 4];
         let buf = self.shadow_bufs[frame.slot];
         gpu.mapped(buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
-        list.push(weft_render::Cmd::BeginPass { color: None, depth: Some((map, Some(0.0))) });
+        list.push(weft_render::Cmd::BeginPass { motion: None, color: None, depth: Some((map, Some(0.0))) });
         // Leaning structures (chiacraft, a falling tree) cast theirs, turned.
         let leaning: Vec<(u64, DVec3, (Vec3, glam::Quat))> = self
             .entities
@@ -3161,7 +3187,7 @@ impl Client {
         scene.shadow_far = [0.0; 4];
         let far_buf = self.shadow_far_bufs[frame.slot];
         gpu.mapped(far_buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
-        list.push(weft_render::Cmd::BeginPass { color: None, depth: Some((far_map, Some(0.0))) });
+        list.push(weft_render::Cmd::BeginPass { motion: None, color: None, depth: Some((far_map, Some(0.0))) });
         self.render
             .draw_shadow(gpu, list, frame, &cam, far, far_buf, 1, &[]);
         list.push(weft_render::Cmd::EndPass);
@@ -3182,6 +3208,7 @@ impl Client {
         }
         let cam = self.render_camera();
         let mut scene = self.scene(&cam, frame);
+        (scene.taa, scene.taa_prev) = self.taa_frame(&cam, frame);
         // The calm world pipelines (`gpu_layout::CALM_OFF`) while nothing they leave out is on, read
         // from the scene the shaders see: no fog in the air, no thunder, no held light, the eye in
         // no liquid (the fog then starts at 0.6 of its end).

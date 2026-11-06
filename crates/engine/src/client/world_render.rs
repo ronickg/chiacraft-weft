@@ -142,7 +142,23 @@ impl Camera {
         self.bobbing() * glam::camera::rh::view::look_to_mat4(Vec3::ZERO, self.forward(), Vec3::Y)
     }
 
+    /// The projection the world is drawn with: `proj_plain` moved by this frame's jitter
+    /// (`post::jitter`, a fraction of a pixel; none without temporal anti-aliasing).
     pub fn proj(&self, aspect: f32) -> Mat4 {
+        let mut m = self.proj_plain(aspect);
+        let j = crate::post::jitter();
+        if j != glam::Vec2::ZERO {
+            // Clip x and y moved by j times w: the whole image moved by j in NDC.
+            for c in [&mut m.x_axis, &mut m.y_axis, &mut m.z_axis, &mut m.w_axis] {
+                c.x += j.x * c.w;
+                c.y += j.y * c.w;
+            }
+        }
+        m
+    }
+
+    /// The projection without the jitter.
+    pub fn proj_plain(&self, aspect: f32) -> Mat4 {
         // Y-up clip space: naga already flips Y for Vulkan.
         glam::camera::rh::proj::directx::perspective_infinite_reverse(self.fov.to_radians(), aspect, 0.05)
     }
@@ -682,6 +698,7 @@ impl WorldRenderer {
                 blend,
                 cull_back: cull,
                 topology: Topology::Triangles,
+                motion: crate::post::motion(),
             })
             .map_err(|e| e.0)
         };
@@ -717,6 +734,7 @@ impl WorldRenderer {
             blend: Blend::None,
             cull_back: true,
             topology: Topology::Triangles,
+            motion: crate::post::motion(),
         })
         .map_err(|e| log::error!("world shader fs_lod_open: {}", e.0))
         .ok()
@@ -761,6 +779,7 @@ impl WorldRenderer {
                 blend,
                 cull_back: true,
                 topology: Topology::Triangles,
+                motion: crate::post::motion(),
             }) {
                 Ok(p) => made.push(p),
                 Err(e) => {
@@ -812,6 +831,7 @@ impl WorldRenderer {
                 blend,
                 cull_back: true,
                 topology: Topology::Triangles,
+                motion: crate::post::motion(),
             }) {
                 Ok(p) => made.push(p),
                 Err(e) => {
@@ -851,6 +871,7 @@ impl WorldRenderer {
                 blend: Blend::None,
                 cull_back: false,
                 topology: Topology::Triangles,
+                motion: false,
             }) {
                 Ok(p) => made.push(p),
                 Err(e) => {
@@ -881,6 +902,7 @@ impl WorldRenderer {
             blend: Blend::None,
             cull_back: false,
             topology: Topology::Triangles,
+            motion: false,
         })
         .map_err(|e| log::error!("distant terrain shadows: {}", e.0))
         .ok()

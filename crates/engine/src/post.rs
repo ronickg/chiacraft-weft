@@ -2,6 +2,8 @@
 //! one pipeline. With none on, the world is drawn straight to the screen; with some,
 //! it goes into an image the effects read one after another, the last one onto the screen.
 
+use std::sync::atomic::{AtomicU32, Ordering::Relaxed};
+
 use weft_render::*;
 
 use crate::assets::Assets;
@@ -43,6 +45,102 @@ pub fn set_hdr(on: bool) {
 /// in the last pass (`Pass::spare` 1 there, for a pack's tone curve).
 pub fn hdr() -> bool {
     HDR.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+static MOTION: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Temporal anti-aliasing (`core:aa`): set once at start, before any pipeline is made, as every
+/// pipeline drawing into the world must then have the motion image too (`PipelineDesc::motion`).
+pub fn set_motion(on: bool) {
+    MOTION.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Whether the world's pass has a motion image (`weft_render::MOTION_FORMAT`), which shaders
+/// with a `@location(1)` output write: where each pixel's surface was last frame.
+pub fn motion() -> bool {
+    MOTION.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// This frame's jitter in NDC (`jitter`), as bits, and the frame count it is picked by.
+static JITTER: [AtomicU32; 2] = [AtomicU32::new(0), AtomicU32::new(0)];
+static JITTER_FRAME: AtomicU32 = AtomicU32::new(0);
+
+/// How far this frame's world is shifted on the screen, in NDC (`Camera::proj`): a fraction of
+/// one of its pixels with temporal anti-aliasing on, else none.
+pub fn jitter() -> glam::Vec2 {
+    glam::Vec2::new(f32::from_bits(JITTER[0].load(Relaxed)), f32::from_bits(JITTER[1].load(Relaxed)))
+}
+
+static TAA_ACTIVE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Whether this frame is gathered over frames (`next_jitter`'s `on`): the shaders then write
+/// motion (`Scene::taa.z`), and skip it otherwise.
+pub fn taa_active() -> bool {
+    TAA_ACTIVE.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// The jitter sequence's length: Halton's points in bases 2 and 3 spread evenly over any run of
+/// them, and 8 cover a pixel well (Bliss's eight, UE's default); an upscaler may want more
+/// (DLSS asks 8 x its scale squared), `set_jitter_phases`.
+static JITTER_PHASES: AtomicU32 = AtomicU32::new(8);
+
+/// How many points the jitter goes through before it starts again (8; an upscaler's own count).
+pub fn set_jitter_phases(n: u32) {
+    JITTER_PHASES.store(n.clamp(1, 1024), Relaxed);
+}
+
+/// Picks this frame's jitter, before the world is drawn: with `on`, the next point within one of
+/// the world's pixels (`w` x `h`) in Halton's sequence; else none.
+pub fn next_jitter(on: bool, w: u32, h: u32) {
+    TAA_ACTIVE.store(on, std::sync::atomic::Ordering::Relaxed);
+    let j = if on {
+        let n = JITTER_PHASES.load(Relaxed).max(1);
+        let i = JITTER_FRAME.fetch_add(1, Relaxed) % n + 1;
+        let (x, y) = jitter_pixels(i);
+        // Pixels run down the screen, NDC up.
+        glam::Vec2::new(2.0 * x / w.max(1) as f32, -2.0 * y / h.max(1) as f32)
+    } else {
+        glam::Vec2::ZERO
+    };
+    JITTER[0].store(j.x.to_bits(), Relaxed);
+    JITTER[1].store(j.y.to_bits(), Relaxed);
+}
+
+/// The `i`th jitter (from 1) in pixels, -0.5..0.5 each way, x right and y down.
+pub fn jitter_pixels(i: u32) -> (f32, f32) {
+    (halton(i, 2) - 0.5, halton(i, 3) - 0.5)
+}
+
+fn halton(mut i: u32, base: u32) -> f32 {
+    let (mut f, mut r) = (1.0, 0.0);
+    while i > 0 {
+        f /= base as f32;
+        r += f * (i % base) as f32;
+        i /= base;
+    }
+    r
+}
+
+/// What a temporal upscaler (DLSS/DLAA on the PC, Arm ASR on Android) needs of this frame, as the
+/// engine's own temporal anti-aliasing takes it (`Post::temporal_inputs`), all at the world's size:
+/// - `color`: the world as drawn, jittered, linear light (`world_format`), before any screen effect;
+/// - `depth`: its depth, reverse Z (1 near, 0 the sky), infinite far plane;
+/// - `motion`: the whole motion image (`fs_taa_motion`, `Format::Rgba16Float`): xy where each
+///   pixel's surface was last frame minus where it is now, in UV (multiply by the size for pixels;
+///   both without the jitter), z its depth, w 1 where a surface wrote its own motion (entities,
+///   swaying leaves and grass), 0 where it came from the camera;
+/// - `jitter`: this frame's offset in pixels (x right, y down), as `jitter_pixels`;
+/// - `reset`: no last frame to gather from (a teleport, a resize, a new world);
+/// - `view_proj` and `prev_view_proj` (`Scene::taa_prev`) without the jitter.
+/// Its result goes back through `Post::set_upscaled` (instead of the engine's own resolve).
+#[derive(Clone, Copy, Debug)]
+pub struct TemporalInputs {
+    pub color: TextureId,
+    pub depth: TextureId,
+    pub motion: TextureId,
+    pub size: (u32, u32),
+    pub jitter: [f32; 2],
+    pub reset: bool,
 }
 
 static BLOOM: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -107,6 +205,29 @@ pub struct Post {
     pyramid: Option<Pyramid>,
     pub bloom_levels: u32,
     last_frame: Option<std::time::Instant>,
+    /// Temporal anti-aliasing (`taa.wgsl`): its two pipelines (`fs_taa` gathering, `fs_taa_motion`
+    /// the whole motion image for an upscaler); the motion image the world's pass draws into
+    /// (`motion_target`) with its bindless index and size; the two pictures so far (each frame's
+    /// drawn from the other's), which this frame draws, and whether the other holds last
+    /// frame's; and the whole motion image when an upscaler asked for it.
+    taa_pipes: Option<(PipelineId, PipelineId)>,
+    motion_tex: Option<(TextureId, u32, (u32, u32))>,
+    history: Option<([TextureId; 2], [u32; 2], (u32, u32))>,
+    taa_cur: usize,
+    taa_held: bool,
+    full_motion: Option<(TextureId, u32, (u32, u32))>,
+    /// Whether temporal anti-aliasing is wanted (`core:aa`), its least share of a new frame
+    /// (`core:taa_blend`), set by the app each frame, and whether an upscaler wants the whole
+    /// motion image drawn (`temporal_inputs`).
+    pub use_taa: bool,
+    pub taa_blend: f32,
+    pub export_motion: bool,
+    /// This frame's inputs, as `apply` drew them (`temporal_inputs`), and the world's depth image
+    /// (`set_depth`).
+    inputs: Option<TemporalInputs>,
+    depth_tex: Option<TextureId>,
+    /// An upscaler's picture for this frame in place of the engine's resolve (`set_upscaled`).
+    upscaled: Option<u32>,
 }
 
 const MAX_PASSES: usize = 40;
@@ -132,12 +253,69 @@ impl Post {
             pyramid: None,
             bloom_levels: 6,
             last_frame: None,
+            taa_pipes: None,
+            motion_tex: None,
+            history: None,
+            taa_cur: 0,
+            taa_held: false,
+            full_motion: None,
+            use_taa: false,
+            taa_blend: 0.1,
+            export_motion: false,
+            inputs: None,
+            depth_tex: None,
+            upscaled: None,
         };
         p.reload(gpu, assets);
         p
     }
 
+    /// Temporal anti-aliasing's pipelines from `taa.wgsl` (a pack's, else the engine's), made only
+    /// with the motion image (`motion`).
+    fn reload_taa(&mut self, gpu: &mut dyn Backend, assets: &Assets) {
+        if let Some((a, b)) = self.taa_pipes.take() {
+            gpu.destroy_pipeline(a);
+            gpu.destroy_pipeline(b);
+        }
+        self.taa_held = false;
+        if !motion() {
+            return;
+        }
+        let made = crate::packs::shader(assets, "taa.wgsl")
+            .map_err(|e| e.0)
+            .and_then(|s| {
+                let mut make = |label: &str, fragment: &str| {
+                    gpu.create_pipeline(&PipelineDesc {
+                        label,
+                        shader: &s,
+                        vertex: "vs",
+                        fragment: Some(fragment),
+                        color: Some(Format::Rgba16Float),
+                        depth: None,
+                        blend: Blend::None,
+                        cull_back: false,
+                        topology: Topology::Triangles,
+                        motion: false,
+                    })
+                    .map_err(|e| e.0)
+                };
+                let resolve = make("temporal aa", "fs_taa")?;
+                match make("temporal aa motion", "fs_taa_motion") {
+                    Ok(m) => Ok((resolve, m)),
+                    Err(e) => {
+                        gpu.destroy_pipeline(resolve);
+                        Err(e)
+                    }
+                }
+            });
+        match made {
+            Ok(p) => self.taa_pipes = Some(p),
+            Err(e) => log::error!("temporal anti-aliasing: {e}"),
+        }
+    }
+
     pub fn reload(&mut self, gpu: &mut dyn Backend, assets: &Assets) {
+        self.reload_taa(gpu, assets);
         let snippets = crate::shaders::snippets(assets, &HOOK);
         let low_snippets = crate::shaders::snippets(assets, &HOOK_LOW);
         let made = crate::packs::compose(assets, "post.wgsl", &[(&HOOK, &snippets), (&HOOK_LOW, &low_snippets)])
@@ -157,6 +335,7 @@ impl Post {
                             blend: Blend::None,
                             cull_back: false,
                             topology: Topology::Triangles,
+                            motion: false,
                         })
                         .map_err(|e| log::warn!("post: no half-size parts: {}", e.0))
                         .ok()
@@ -173,6 +352,7 @@ impl Post {
                         blend: Blend::None,
                         cull_back: false,
                         topology: Topology::Triangles,
+                        motion: false,
                     })
                     .map_err(|e| e.0)?;
                 // The copy for `copy_behind`; a pack's own post.wgsl may lack it.
@@ -187,6 +367,7 @@ impl Post {
                         blend: Blend::None,
                         cull_back: false,
                         topology: Topology::Triangles,
+                        motion: false,
                     })
                     .map_err(|e| log::warn!("post: no copy of the world for water: {}", e.0))
                     .ok();
@@ -203,6 +384,7 @@ impl Post {
                             blend: Blend::None,
                             cull_back: false,
                             topology: Topology::Triangles,
+                            motion: false,
                         })
                         .map_err(|e| e.0)?,
                     )
@@ -222,6 +404,7 @@ impl Post {
                             blend: Blend::None,
                             cull_back: false,
                             topology: Topology::Triangles,
+                            motion: false,
                         })
                         .map_err(|e| log::info!("post: no bloom pyramid ({fragment}): {}", e.0))
                         .ok()
@@ -286,6 +469,63 @@ impl Post {
         self.pipeline.is_some()
     }
 
+    /// Whether this frame is gathered over frames (`use_taa`, the motion image, and the pipelines):
+    /// the app asks before drawing the world, which is then jittered (`next_jitter`).
+    pub fn taa_on(&self) -> bool {
+        self.use_taa && motion() && self.taa_pipes.is_some() && self.pipeline.is_some()
+    }
+
+    /// The motion image the world's pass draws into, sized to the frame (`Cmd::BeginPass`'s
+    /// `motion`); none without temporal anti-aliasing's pipelines (`set_motion`).
+    pub fn motion_target(&mut self, gpu: &mut dyn Backend, w: u32, h: u32) -> Option<TextureId> {
+        if !motion() {
+            return None;
+        }
+        let (w, h) = (w.max(1), h.max(1));
+        if self.motion_tex.is_none_or(|t| t.2 != (w, h)) {
+            if let Some((old, ..)) = self.motion_tex.take() {
+                gpu.destroy_texture(old);
+            }
+            let t = gpu.create_texture(&TextureDesc { width: w, height: h, mips: 1, format: MOTION_FORMAT, render_target: true }, "motion");
+            self.motion_tex = Some((t, gpu.texture_index(t), (w, h)));
+        }
+        self.motion_tex.map(|t| t.0)
+    }
+
+    /// What a temporal upscaler needs of the frame `apply` last drew (`TemporalInputs`), with
+    /// `export_motion` set (else the motion is not drawn whole); none without temporal
+    /// anti-aliasing.
+    pub fn temporal_inputs(&self) -> Option<TemporalInputs> {
+        self.inputs
+    }
+
+    /// The world's depth image, for `TemporalInputs` (its bindless index goes to `apply`).
+    pub fn set_depth(&mut self, depth: TextureId) {
+        self.depth_tex = Some(depth);
+    }
+
+    /// For this frame, the bindless index of a picture an upscaler made from `temporal_inputs`
+    /// (the world's size, linear light, not jittered): everything after reads it in place of the
+    /// engine's own resolve, which is skipped.
+    pub fn set_upscaled(&mut self, picture: u32) {
+        self.upscaled = Some(picture);
+    }
+
+    /// One of a pair of images sized to the frame, made anew (and their bindless indices) when the
+    /// size changed: whether they were.
+    fn ensure_pair(gpu: &mut dyn Backend, pair: &mut Option<([TextureId; 2], [u32; 2], (u32, u32))>, w: u32, h: u32, label: &str) -> bool {
+        if pair.is_some_and(|t| t.2 == (w, h)) {
+            return false;
+        }
+        if let Some((old, ..)) = pair.take() {
+            old.into_iter().for_each(|t| gpu.destroy_texture(t));
+        }
+        let desc = TextureDesc { width: w.max(1), height: h.max(1), mips: 1, format: Format::Rgba16Float, render_target: true };
+        let t = [gpu.create_texture(&desc, label), gpu.create_texture(&desc, label)];
+        *pair = Some((t, t.map(|t| gpu.texture_index(t)), (w, h)));
+        true
+    }
+
     /// The image the scene is drawn into, sized to the frame.
     pub fn scene_target(&mut self, gpu: &mut dyn Backend, w: u32, h: u32) -> TextureId {
         if self.targets.is_none_or(|t| t.2 != (w, h)) {
@@ -342,7 +582,11 @@ impl Post {
         };
         let buf = self.copy_params[frame.slot];
         gpu.mapped(buf)[..size_of::<Pass>()].copy_from_slice(bytemuck::bytes_of(&pass));
-        list.push(Cmd::BeginPass { color: Some((Target::Texture(behind[0]), Some([0.0; 4]))), depth: Some((behind[1], Some(0.0))) });
+        list.push(Cmd::BeginPass {
+            motion: None,
+            color: Some((Target::Texture(behind[0]), Some([0.0; 4]))),
+            depth: Some((behind[1], Some(0.0))),
+        });
         list.pipeline(pipe);
         list.bind(crate::gpu_layout::bind::post::PASSES, buf);
         list.bind(crate::gpu_layout::bind::post::SCENE, scene);
@@ -422,6 +666,78 @@ impl Post {
                 .push(gpu.create_buffer((size_of::<Pass>() * MAX_PASSES) as u64, usage::STORAGE | usage::HOST, "post passes"));
         }
         let time = crate::shaders::time();
+        // Temporal anti-aliasing first: this frame's world gathered into the picture so far, which
+        // all after it read in the world's place (`src`): the bloom, the half-size parts and the
+        // effects, so their sharpening (chiacraft's `sharpen_delta`) works on the gathered picture,
+        // not on this frame's aliasing. An upscaler's result (`set_upscaled`) takes its place.
+        let mut src = idx[0];
+        let mut taa_entries: Vec<Pass> = Vec::new();
+        // (target, pipeline, entry among `taa_entries`)
+        let mut taa_draws: Vec<(TextureId, PipelineId, usize)> = Vec::new();
+        self.inputs = None;
+        if let Some(up) = self.upscaled.take() {
+            src = up;
+            self.taa_held = false;
+        } else if let (true, Some((resolve, fill)), Some((motion, motion_idx, _))) = (self.taa_on(), self.taa_pipes, self.motion_tex) {
+            if Self::ensure_pair(gpu, &mut self.history, frame.width, frame.height, "temporal aa") {
+                self.taa_held = false;
+            }
+            let (hist, hidx, _) = self.history.unwrap();
+            let (cur, last) = (self.taa_cur, 1 - self.taa_cur);
+            let entry = Pass {
+                scene: idx[0],
+                slot: 0,
+                strength: self.taa_blend,
+                time,
+                size: [frame.width as f32, frame.height as f32],
+                depth,
+                low: if self.taa_held { hidx[last] + 1 } else { 0 },
+                bloom: motion_idx + 1,
+                ..Pass::default()
+            };
+            taa_entries.push(entry);
+            taa_draws.push((hist[cur], resolve, 0));
+            src = hidx[cur];
+            self.taa_cur = last;
+            self.taa_held = true;
+            let mut full = motion;
+            if self.export_motion {
+                if self
+                    .full_motion
+                    .is_none_or(|t| t.2 != (frame.width, frame.height))
+                {
+                    if let Some((old, ..)) = self.full_motion.take() {
+                        gpu.destroy_texture(old);
+                    }
+                    let t = gpu.create_texture(
+                        &TextureDesc {
+                            width: frame.width.max(1),
+                            height: frame.height.max(1),
+                            mips: 1,
+                            format: Format::Rgba16Float,
+                            render_target: true,
+                        },
+                        "full motion",
+                    );
+                    self.full_motion = Some((t, gpu.texture_index(t), (frame.width, frame.height)));
+                }
+                let (t, ..) = self.full_motion.unwrap();
+                taa_entries.push(entry);
+                taa_draws.push((t, fill, 1));
+                full = t;
+            }
+            let j = jitter();
+            self.inputs = Some(TemporalInputs {
+                color: tex[0],
+                depth: self.depth_tex.unwrap_or(TextureId(u32::MAX)),
+                motion: full,
+                size: (frame.width, frame.height),
+                jitter: [j.x * frame.width as f32 * 0.5, -j.y * frame.height as f32 * 0.5],
+                reset: entry.low == 0,
+            });
+        } else {
+            self.taa_held = false;
+        }
         // No effect on: one pass that only draws the scene across the screen (slot 0 returns it).
         let plain = [(String::new(), 1.0)];
         let active = if self.active.is_empty() { &plain[..] } else { &self.active[..] };
@@ -430,7 +746,7 @@ impl Post {
             .iter()
             .enumerate()
             .map(|(i, (name, strength))| Pass {
-                scene: idx[i % 2],
+                scene: if i == 0 { src } else { idx[i % 2] },
                 slot: self.slots.slot(name),
                 strength: *strength,
                 time,
@@ -479,7 +795,7 @@ impl Post {
             .iter()
             .filter(|(name, _)| self.low_pipe.is_some() && self.use_low && self.low_slots.slot(name) != 0)
             .map(|(name, strength)| Pass {
-                scene: idx[0],
+                scene: src,
                 slot: self.low_slots.slot(name),
                 strength: *strength,
                 time,
@@ -545,8 +861,8 @@ impl Post {
             };
             let levels = py.down.len();
             for i in 0..levels {
-                let src = if i == 0 { idx[0] } else { py.down[i - 1].1 };
-                passes.push(entry(src, 0, i, py.down[i].2));
+                let from = if i == 0 { src } else { py.down[i - 1].1 };
+                passes.push(entry(from, 0, i, py.down[i].2));
                 pyramid_draws.push((py.down[i].0, pipes[0], (passes.len() - 1) as u32));
             }
             // Back up: each level below blended with the wider one over it (the narrowest is its
@@ -568,15 +884,26 @@ impl Post {
                 p.exposure = now_idx + 1;
             }
         }
-        passes.truncate(MAX_PASSES);
+        // Temporal anti-aliasing's entries last, kept whatever else is cut.
+        passes.truncate(MAX_PASSES - taa_entries.len());
+        let first_taa = passes.len();
+        passes.extend(taa_entries);
         gpu.mapped(buf)[..passes.len() * size_of::<Pass>()].copy_from_slice(bytemuck::cast_slice(&passes));
+        for (target, pipe, k) in taa_draws {
+            list.push(Cmd::BeginPass { motion: None, color: Some((Target::Texture(target), Some([0.0; 4]))), depth: None });
+            list.pipeline(pipe);
+            list.bind(crate::gpu_layout::bind::post::PASSES, buf);
+            list.bind(crate::gpu_layout::bind::post::SCENE, scene);
+            list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: (first_taa + k) as u32 });
+            list.push(Cmd::EndPass);
+        }
         if let Some(low_pipe) = self.low_pipe {
             for (k, target) in lows.iter().enumerate() {
                 let entry = first_low + k;
                 if entry >= passes.len() {
                     break;
                 }
-                list.push(Cmd::BeginPass { color: Some((Target::Texture(*target), Some([0.0; 4]))), depth: None });
+                list.push(Cmd::BeginPass { motion: None, color: Some((Target::Texture(*target), Some([0.0; 4]))), depth: None });
                 list.pipeline(low_pipe);
                 list.bind(crate::gpu_layout::bind::post::PASSES, buf);
                 list.bind(crate::gpu_layout::bind::post::SCENE, scene);
@@ -588,7 +915,7 @@ impl Post {
             if entry as usize >= passes.len() {
                 break;
             }
-            list.push(Cmd::BeginPass { color: Some((Target::Texture(target), Some([0.0; 4]))), depth: None });
+            list.push(Cmd::BeginPass { motion: None, color: Some((Target::Texture(target), Some([0.0; 4]))), depth: None });
             list.pipeline(pipe);
             list.bind(crate::gpu_layout::bind::post::PASSES, buf);
             list.bind(crate::gpu_layout::bind::post::SCENE, scene);
@@ -598,7 +925,7 @@ impl Post {
         let n = draws.len();
         for (i, entry) in draws.into_iter().enumerate() {
             let target = if i + 1 == n { Target::Surface } else { Target::Texture(tex[(i + 1) % 2]) };
-            list.push(Cmd::BeginPass { color: Some((target, Some([0.0; 4]))), depth: None });
+            list.push(Cmd::BeginPass { motion: None, color: Some((target, Some([0.0; 4]))), depth: None });
             // Onto the screen from the HDR world: the pipeline of the screen's format.
             list.pipeline(if i + 1 == n { self.final_pipe.unwrap_or(pipe) } else { pipe });
             list.bind(crate::gpu_layout::bind::post::PASSES, buf);

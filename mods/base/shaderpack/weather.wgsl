@@ -53,8 +53,17 @@ fn fall_hash(seed: u32, cell: vec2<i32>) -> f32 {
 // pixel far off go fainter rather than wider, so a column far away is a soft veil, not a bar.
 // Which is which by the precipitation's density (the engine's rain 0.1, snow 0.5; a mod's own
 // picture, like ash, as flakes).
+// Rain and snow over the world, and how much of the pixel they cover in the motion image's w
+// (temporal anti-aliasing's reactive share: their streaks change every frame and would wash out
+// gathered over frames; `taa.wgsl` takes that much more of this frame there). Its xy and depth say
+// the camera's motion, which is what lies behind.
+struct WeatherOut {
+    @location(0) color: vec4<f32>,
+    @location(1) motion: vec4<f32>,
+}
+
 @fragment
-fn fs(in: VOut) -> @location(0) vec4<f32> {
+fn fs(in: VOut) -> WeatherOut {
     // Across the strip (0..1 block, with snow's drift) and down it (blocks, falling with time).
     let x = fract(in.uv.x * 4.0);
     let y = in.uv.y * 4.0;
@@ -117,5 +126,6 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
     let near = smoothstep(select(1.5, 1.0, snow), select(6.0, 3.0, snow), length(in.rel));
     // (Rain at 0.6 drew bright white lines over a storm's dark deck.)
     let strength = select(0.42, 0.95, snow);
-    return vec4(display(haze(tint * light * select(1.0, 1.15, snow), in.rel)), min(cover * in.alpha * strength * near, 1.0));
+    let a = min(cover * in.alpha * strength * near, 1.0);
+    return WeatherOut(vec4(display(haze(tint * light * select(1.0, 1.15, snow), in.rel)), a), vec4(0.0, 0.0, -1.0, min(a * 2.5, 1.0)));
 }
