@@ -4,16 +4,27 @@ What the best Minecraft shader packs do that chiacraft's look doesn't, how they 
 Ronald (11-05): "find some of the best shaders from Minecraft and do some screenshots ... comparisons ... especially ones
 with Voxy or Horizon". Shot on the PC (RTX 5090), 11-05, by the MC shaders session.
 
-**Status: draft.** Bliss is complete (all scenes and the far-view set). The other packs are being shot one held PC window
-at a time; their rows fill in as they land. The technique study of all seven packs is done:
-[mc-shader-techniques.md](mc-shader-techniques.md).
+**Status (11-05, 23:40): draft.**
+- Shot and compared: Bliss (with the far-view set), Complementary Unbound, Photon and Complementary Reimagined.
+- Solas is shooting now. BSL, Mellow and the Voxy far view for the six Voxy packs are armed for 00:41–02:10.
+- Our side is reshot on current dev at the equinox (spring 8), once with dev's default look and once with the HDR match set.
+  That shows what today's work fixed: see [Ours today](#ours-today-dev-default-vs-the-hdr-match-set).
+- The technique study of all seven packs is done: [mc-shader-techniques.md](mc-shader-techniques.md).
 
 ## How it was shot
 
 - **Minecraft:** 26.3 with Fabric 0.20.1, Sodium 0.9.2, Iris 1.11.7, and either Distant Horizons 3.3.4 or Voxy 0.2.20 (two
   Prism instances). All from Modrinth, sha512-checked. The world is seed 1, created in creative.
-- **Our side:** Tester 2's shots of dev, using the same scene names. looks4 (dev 0ced682e, after shader fixes 1–5) for hours,
-  night and clouds; looks3 for rain and lightning; looks2 for mist, LOD and shadows.
+- **Our side**, in two rounds:
+  - **First sheets** (`sheets/<pack>/`): Tester 2's shots of dev with the same scene names. looks4 (dev 0ced682e, after
+    shader fixes 1–5) for hours, night and clouds; looks3 for rain and lightning; looks2 for mist, LOD and shadows.
+  - **Current sheets** (`sheets3_sp8/<Pack>/`, three columns: dev default | HDR match set | pack): Tester 2's scene scripts
+    re-run on dev at spring 8, 1920x1080, view 24.
+    - Vista and forest are on dev 8237a251; clouds, mist and the rain ramp on 309f38c5.
+    - The HDR column uses `--config core:hdr_world=1,core:froxels=1`.
+    - Spring 8 is the equinox, so the same clock hour means the same sun height as in Minecraft. At summer 5 our sun rose at
+      about 03:30, which put our late morning beside Minecraft's sunrise.
+    - Shadows and the far view keep the summer 5 shots from dev 7f1c48de (`sheets3/`).
 - **Scenes** (103 per pack, 1920x1080, FOV 70 unless named fov30). Time and weather are held still for each shot.
   - Every 2 hours from a vista 200 blocks up and from inside a dark-oak and birch forest, plus 05, 07, 17 and 19, and dawn and
     dusk facing the sun.
@@ -95,9 +106,56 @@ Sheets: `sheets/lod_bliss_dh/` (distances, FOV 30 targets, full-res crops, verdi
 - **Render distance:** it barely matters under Bliss, because the haze covers the seam. With shaders off, DH at 64 chunks
   shows a fog wall about 1 km out.
 
+## Ours today: dev default vs the HDR match set
+
+Sheets: `sheets3_sp8/<Pack>/<Pack>_vs_ours3_*.jpg`. Today's dev work, as it reads beside the packs at matched hours:
+
+- **Fixed, with the HDR world** (43b742ec Look match set, 597401c7 colour, 2aa3fa77 low-sun cloud glow, b656e475 far
+  shading):
+  - **Dawn and dusk:** the land now takes the sun's colour. At 06:00 and 18:00 the HDR column is as warm and bright as Bliss,
+    with the sun in the same place (`sun` sheet).
+  - **Spot C forest:** at 06:00 and 18:00 the forest sits in golden haze like every pack (`sheets/cross/all_forest_above.jpg`).
+  - **Shadows:** they deepen at low sun.
+  - **Clouds:** undersides turn warm at low sun.
+- **Overshoots:** at 06:00 the HDR land goes saturated orange-gold, sand and desert most of all. Bliss gets its warmth
+  through haze rather than through the ground colour. At 05:00 ours is already sunrise-coloured while Bliss is still blue
+  before dawn, so our dawn starts a little early or bright.
+- **Still to judge:** dawn mist. Dev now has mist on every calm clear morning, fading out in dry air (1e5659bc, 28671a47).
+  - The first mist shots were invalid: the script's `/air 0 0 0 mist` held fog at zero for ten minutes.
+  - The sc vista stands over desert, where there is no dawn mist by design.
+  - Mist is being reshot on damp spots only (spot C, the Look forest vista A, the snow lake) on dev 28671a47: jobs `damp_*`
+    and `nat2_mist_*`.
+- **Still open:** the rest of the ranked list below. In particular:
+  - cloud rims toward the sun
+  - god rays through the rain deck
+  - lightning as a local light
+  - wet ground
+  - the smaller held-torch pool
+  - the far view's block language and shore curtains
+
 ## The other packs
 
 (Filled in as each pack's window lands: Solas, BSL, Mellow, then the Voxy far view for the six Voxy packs.)
+
+### Take from each pack, ranked
+
+- **Bliss:**
+  1. dawn haze and mist with light shafts
+  2. cloud undersides lit by the low sun, with silver rims
+  3. lightning as a local light
+  4. the small held-torch pool
+  5. blue, readable night (Purkinje)
+- **Photon:**
+  1. golden-hour volumetric haze over the whole land, including far LOD (`lod_fog`)
+  2. warm cloud rims and bloom around the sun
+  3. soft contact-correct shadows
+  4. far water as a flat dark mirror
+- **Unbound:**
+  1. wet ground in rain (the only pack with it)
+  2. rain that keeps the land green and readable under the deck
+  3. sun specks under the forest canopy
+- **Reimagined:** nothing beyond Unbound (the same code). Its block-slab clouds confirm that our soft cumulus is the better
+  choice.
 
 ### Forest from above: all packs vs our old-growth spot C
 
@@ -166,6 +224,20 @@ Sheets: `sheets/photon/Photon_vs_ours_*.jpg`, crops in `crops/photon/`.
 ## What we should take, ranked
 
 Each item names the shot that shows it and the technique; costs are from [mc-shader-techniques.md](mc-shader-techniques.md).
+Where today's dev stands on each, at 11-05 23:40, with the HDR world:
+
+| # | Item | Dev today (HDR world) |
+|---|---|---|
+| 1 | Sun-tinted aerial haze | **Largely done** (warm HDR haze, colour retune); tone down the orange land at 06:00 |
+| 2 | Morning and valley mist | **In dev** (every calm clear morning, dry-air fade); being judged on damp spots |
+| 3 | Cloud lighting toward the sun | **Partly done** (warm undersides); silver rims still missing |
+| 4 | Cloud shadows in god rays and rain | **Partly done** (cloud shadows on land); not yet inside the rays or the rain deck |
+| 5 | Lightning as a local light | Open (the bolt is now pinned at the strike, 10c0c7fa) |
+| 6 | Wet ground in rain | Open |
+| 7 | Smaller held-torch pool | Open |
+| 8 | Far view block language, shore curtains | **Partly done** (far crowns lit tops and gaps, dark mirror far water, b656e475); faceted peaks and curtains open |
+| 9 | Purkinje night shift | Open |
+| 10 | Mip-chain bloom | Open |
 
 1. **Sun-tinted aerial haze over the land, with bloom into the fog.** Bliss's dawn and dusk vista, and its far view.
    Light the haze with a forward Mie lobe toward a low sun (Bliss `overworld_fog.glsl`), and mix toward the bloom image
