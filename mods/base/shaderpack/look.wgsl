@@ -658,7 +658,14 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         // A clear blue, not a grey (H2: grey-tinted it reached Bliss's brightness, 160-172 against
         // 154-173, but stayed pale and from 16:00 warm, saturation 5-48 against 39-83; PC shhb1).
         let blue = vec3(luma(c)) * vec3(0.74, 0.92, 1.2);
-        c = mix(c, blue, k * 0.6) * (1.0 - 0.4 * k);
+        // On mornings with the sun low, looking away from it, lighter and bluer: at spot C 08:00
+        // (facing away) the band read 172 / warmth -13 where Bliss's is 183 / -31, and the far lake,
+        // nearly all a mirror of it, went flat grey (Far view's find). Toward the sun as it was (the
+        // forest vista stays warm, Bliss's +27 there).
+        let away = smoothstep(0.2, -0.4, mu);
+        let low_morning = smoothstep(-0.05, 0.05, scene.sun.x) * (1.0 - smoothstep(0.45, 0.7, scene.sun.y));
+        let aw = away * low_morning;
+        c = mix(c, blue, k * mix(0.6, 0.85, aw)) * (1.0 - mix(0.4, 0.15, aw) * k);
     }
     c += sun_glow(dir, p);
     // In the HDR world the air round the sun glows as bright as it really is (Mie scattering's
