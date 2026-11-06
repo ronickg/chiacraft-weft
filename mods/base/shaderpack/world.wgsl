@@ -424,6 +424,13 @@ fn shade(in: VOut, albedo_in: vec4<f32>) -> vec4<f32> {
 
 // `shade` with the cubes' shading softened by `soft` (distant terrain's boxes too, `fs_lod`).
 fn shade_soft(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
+    let lit = shade_soft_lit(in, albedo_in, soft);
+    return vec4(display(haze_lit(lit.rgb, in.rel, in.light.x)), lit.a);
+}
+
+// `shade_soft` before the haze: the light on the surface and the placed lights' glow in the air
+// before it (distant terrain hazes it once for land and water alike, `lod_color`).
+fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     let ao = mix(in.ao, 1.0, soft);
     let n = normalize(mix(normalize(in.normal), vec3(0.0, 1.0, 0.0), soft * 0.5));
     var albedo = albedo_in;
@@ -478,7 +485,7 @@ fn shade_soft(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     }
     // The air before it glows with the placed lights' light (the held one is in `haze_lit`).
     let glow = placed_in_fog(in.light.yzw, in.rel, in.pos, in.light.x);
-    return vec4(display(haze_lit(lit.rgb + glow, in.rel, in.light.x)), lit.a);
+    return vec4(lit.rgb + glow, lit.a);
 }
 
 // ---- water ----
@@ -1063,6 +1070,11 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
 // and Bliss's far seas are (Planner, 11-05: "its far water is a flat dark mirror reflecting the sky").
 // Through `water()` it took the near water's shallow depth and bottom, and read pale and milky.
 fn far_water(in: VOut) -> vec3<f32> {
+    return display(haze_lit(far_water_lit(in), in.rel, in.light.x));
+}
+
+// `far_water` before the haze.
+fn far_water_lit(in: VOut) -> vec3<f32> {
     let v = -normalize(in.rel);
     let n = wave_normal(in.pos, in.dist, v.y);
     let ndv = max(dot(n, v), 0.02);
@@ -1082,7 +1094,7 @@ fn far_water(in: VOut) -> vec3<f32> {
     let spec = a2 / (3.14159 * dd * dd) * fresnel * 0.25;
     let glint = palette().sun * light_strength() * min(spec, mix(30.0, 1.5, golden())) * smoothstep(0.0, 0.1, l.y + 0.05) * clouds;
     let c = refl * fresnel + deep * (1.0 - fresnel) + glint;
-    return display(haze_lit(c, in.rel, in.light.x));
+    return c;
 }
 
 // How dark a far crown's side gets at its bottom (`vs_lod`).
@@ -1207,42 +1219,48 @@ fn lod_color(in: VOut) -> vec4<f32> {
     // seam at the edge of the render distance. It is left out of the screen's reflections (solid in
     // the mask): looking out to sea, their march over every far-water pixel cost too much
     // (reports/performance.md).
+    // Land and water each lit, then one haze for both: with a haze in each path the shader held two
+    // copies of it and, on the Pixel 10, ran fewer pixels at once (far water without its own haze
+    // was 6.9 ms of the vista's 44; Android port, 11-06). The same colours.
+    var pre: vec3<f32>;
     if in.kind.x == TINT_WATER {
-        return vec4(far_water(in), SOLID_ALPHA);
-    }
-    // A crown's face: its own shade toward its bottom (`vs_lod`) at any distance, and on its top the
-    // clumped crowns (`crown_clumps`), faded in where the far boxes stand for more than a tree and out
-    // where a crown is under a couple of pixels (its domes would only shimmer).
-    var lit_in = in;
-    if in.kind.w != 0u {
-        lit_in.ao = 0.95;
-        albedo = vec4(albedo.rgb * in.ao, albedo.a);
-        // The side of a crown turned from the sun is dark, the sky's light cut hard: Distant Horizons
-        // + Bliss's far crowns are yellow-green where the sun falls and near black on their shaded
-        // side and in the gaps, ours sat mid-green with the shade lifted by the sky (spot C sheet,
-        // 11-05). Down to 0.4 of the albedo as a face turns away (`crown_shade`).
-        albedo = vec4(albedo.rgb * crown_shade(in.normal), albedo.a);
-        if in.normal.y > 0.5 {
-            // Faded by the pixel's smaller side on the ground (seen at a slant its long side runs away
-            // and spans blocks), and toward the domes' mean darkness, not to none: a canopy too far
-            // for its crowns still lies darker than open ground, the shade between the trees in it.
-            let fw = min(length(dpdx(in.pos.xz)), length(dpdy(in.pos.xz))) / CROWN_CELL;
-            let amount = smoothstep(150.0, 260.0, in.dist);
-            let resolved = 1.0 - smoothstep(0.35, 1.0, fw);
-            if amount > 0.0 {
-                let k = crown_clumps(in.pos.xz);
-                let shade = mix(CROWN_MEAN, mix(0.12, 1.15, k.x), resolved);
-                albedo = vec4(albedo.rgb * mix(1.0, shade, amount), albedo.a);
-                lit_in.normal = normalize(vec3(k.y * 1.5 * amount * resolved, 1.0, k.z * 1.5 * amount * resolved));
-                // The dome's own slope turned from the sun is shaded too (its top's `crown_shade` was flat).
-                albedo = vec4(albedo.rgb * crown_shade(lit_in.normal) / crown_shade(in.normal), albedo.a);
+        pre = far_water_lit(in);
+    } else {
+        // A crown's face: its own shade toward its bottom (`vs_lod`) at any distance, and on its top the
+        // clumped crowns (`crown_clumps`), faded in where the far boxes stand for more than a tree and out
+        // where a crown is under a couple of pixels (its domes would only shimmer).
+        var lit_in = in;
+        if in.kind.w != 0u {
+            lit_in.ao = 0.95;
+            albedo = vec4(albedo.rgb * in.ao, albedo.a);
+            // The side of a crown turned from the sun is dark, the sky's light cut hard: Distant Horizons
+            // + Bliss's far crowns are yellow-green where the sun falls and near black on their shaded
+            // side and in the gaps, ours sat mid-green with the shade lifted by the sky (spot C sheet,
+            // 11-05). Down to 0.4 of the albedo as a face turns away (`crown_shade`).
+            albedo = vec4(albedo.rgb * crown_shade(in.normal), albedo.a);
+            if in.normal.y > 0.5 {
+                // Faded by the pixel's smaller side on the ground (seen at a slant its long side runs away
+                // and spans blocks), and toward the domes' mean darkness, not to none: a canopy too far
+                // for its crowns still lies darker than open ground, the shade between the trees in it.
+                let fw = min(length(dpdx(in.pos.xz)), length(dpdy(in.pos.xz))) / CROWN_CELL;
+                let amount = smoothstep(150.0, 260.0, in.dist);
+                let resolved = 1.0 - smoothstep(0.35, 1.0, fw);
+                if amount > 0.0 {
+                    let k = crown_clumps(in.pos.xz);
+                    let shade = mix(CROWN_MEAN, mix(0.12, 1.15, k.x), resolved);
+                    albedo = vec4(albedo.rgb * mix(1.0, shade, amount), albedo.a);
+                    lit_in.normal = normalize(vec3(k.y * 1.5 * amount * resolved, 1.0, k.z * 1.5 * amount * resolved));
+                    // The dome's own slope turned from the sun is shaded too (its top's `crown_shade` was flat).
+                    albedo = vec4(albedo.rgb * crown_shade(lit_in.normal) / crown_shade(in.normal), albedo.a);
+                }
             }
         }
+        // From about 500 blocks out, where cells are 8 blocks and more (`lod::SLOPE_LEVEL`), a box's
+        // walls lean halfway up as the slopes they stand for (`far_soft`, far look 2). Lit as upright
+        // walls they got no sun at midday and a far snow range read stone-grey under thin white lines
+        // (Far view, 11-05; the smooth tiles' facets had leaned toward the sun). Nearer, the 2-4 block
+        // steps are steps and keep their shade: leaned there too, the land within 500 lost its relief.
+        pre = shade_soft_lit(lit_in, albedo, far_soft(in) * smoothstep(450.0, 800.0, in.dist)).rgb;
     }
-    // From about 500 blocks out, where cells are 8 blocks and more (`lod::SLOPE_LEVEL`), a box's
-    // walls lean halfway up as the slopes they stand for (`far_soft`, far look 2). Lit as upright
-    // walls they got no sun at midday and a far snow range read stone-grey under thin white lines
-    // (Far view, 11-05; the smooth tiles' facets had leaned toward the sun). Nearer, the 2-4 block
-    // steps are steps and keep their shade: leaned there too, the land within 500 lost its relief.
-    return vec4(shade_soft(lit_in, albedo, far_soft(in) * smoothstep(450.0, 800.0, in.dist)).rgb, SOLID_ALPHA);
+    return vec4(display(haze_lit(pre, in.rel, in.light.x)), SOLID_ALPHA);
 }
