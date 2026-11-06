@@ -45,9 +45,10 @@ from PIL import Image, ImageDraw
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 TEX = os.path.join(ROOT, "mods", "base", "assets", "textures")
-# Where the drawings are, first found wins: the redrawn heads (tools2/, drawn to today's size and
-# socket) over the first round (tools/).
-SRC = ",".join(os.path.expanduser(f"~/Coding/chiacraft-archive/images/art-redo-v3/{d}") for d in ("tools2", "tools"))
+# Where the drawings are, first found wins: the redrawn heads with today's haft top and wrap pasted back
+# by the art session (tools2b/, the last redraws stubbed into it too), the redrawn heads (tools2/, drawn
+# to today's size and socket), the first round (tools/).
+SRC = ",".join(os.path.expanduser(f"~/Coding/chiacraft-archive/images/art-redo-v3/{d}") for d in ("tools2b", "tools2", "tools"))
 OUT = os.path.expanduser("~/Coding/chiacraft-archive/images/art-redo-v3/install")
 
 MATS = ["wood", "stone", "flint", "copper", "bronze", "iron", "steel", "gold", "diamond"]
@@ -292,12 +293,16 @@ def main():
                 continue
             if f"{kind}/{m}" in skip:
                 # Today's stays; its loose icon is today's head, centred.
-                today = os.path.join(TEX, "parts", kind, shape, f"{m}.png")
+                today = os.path.join(OUT, "replaced", "parts", kind, shape, f"{m}.png")
+                today = today if os.path.exists(today) else os.path.join(TEX, "parts", kind, shape, f"{m}.png")
                 if os.path.exists(today):
                     write(centred(load(today)), f"parts/loose/{shape}/{m}.png", args.apply)
                 continue
             new = load(src)
-            old_p = os.path.join(TEX, "parts", kind, shape, f"{m}.png")
+            # Today's drawing: the one the first --apply kept, if it ran already.
+            rel = os.path.join("parts", kind, shape, f"{m}.png")
+            old_p = os.path.join(OUT, "replaced", rel)
+            old_p = old_p if os.path.exists(old_p) else os.path.join(TEX, rel)
             old = load(old_p) if os.path.exists(old_p) else None
             a = anchors.get(m)
             shift = (int(round(a[0] - socket[0])), int(round(a[1] - socket[1]))) if a else (0, 0)
