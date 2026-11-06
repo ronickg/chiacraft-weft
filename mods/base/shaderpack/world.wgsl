@@ -1283,6 +1283,61 @@ fn fs_cutout(in: VOut) -> WorldOut {
     return world_out(in, vec4(shade(in, albedo).rgb, SOLID_ALPHA));
 }
 
+// ---- the path tracer's G-buffer (`core:path_traced`, the engine's `draw_gbuffer`) ----
+// The opaque and cutout terrain drawn again where the world's pass left its depth (Equal), into
+// what the path tracer and its denoisers read (reports/Path tracing plan.md; the denoisers'
+// interface v1): the diffuse albedo (linear, none for a metal; a: metal), the shading normal
+// (camera-relative world axes; w: perceptual roughness) and the specular colour (F0; a: the
+// subsurface share).
+struct GbOut {
+    @location(0) albedo: vec4<f32>,
+    @location(1) normal: vec4<f32>,
+    @location(2) spec: vec4<f32>,
+}
+
+fn gbuffer(in: VOut, albedo: vec4<f32>) -> GbOut {
+    let paint = albedo.rgb * in.color;
+    let m = shade_mat(in, albedo.rgb);
+    let n = mat_normal(m, normalize(in.normal), in.rel, fract(in.uv));
+    let metal = m.metal > 0.5;
+    // No maps, no shine (as the world's pass, which adds `mat_shine` only with them): F0 0.
+    let f0 = select(select(m.f0, paint, metal), vec3(0.0), !m.has);
+    // A metal keeps half its diffuse light, as the world's pass draws it (`lit * (1 - 0.5 * metal)`,
+    // our grade): with none, the storeroom's iron and gold blocks traced near black, mirroring
+    // only the dark room (pt1_rtxd_m2).
+    return GbOut(vec4(paint * (1.0 - 0.5 * m.metal), m.metal), vec4(n, 1.0 - m.smoothness), vec4(f0, m.sss));
+}
+
+@fragment
+fn fs_gb_opaque(in: VOut) -> GbOut {
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
+    let nuv = nearest_uv(in.size, in.uv, du, dv);
+    return gbuffer(in, far_flat(in, with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv)));
+}
+
+// Cut as `fs_cutout` cuts, so it lands where the world's pass drew.
+@fragment
+fn fs_gb_cutout(in: VOut) -> GbOut {
+    if cutout_thinned(in) {
+        discard;
+    }
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
+    let nuv = nearest_uv(in.size, in.uv, du, dv);
+    var albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
+    if albedo.a <= cutout_edge(in, nuv, du, dv) {
+        if in.kind.w != 2u {
+            discard;
+        }
+        albedo = backed_hole(in, nuv);
+    }
+    if in.kind.z == 0u {
+        albedo = far_flat(in, albedo);
+    }
+    return gbuffer(in, albedo);
+}
+
 // Cutout blocks in two passes (the engine's `cutout_split`, on tiled GPUs): `fs_cutout`'s depth,
 // its discards alone and no colour, then `fs_cutout_shade` where the depth is theirs, with no
 // discard, so the GPU keeps hidden-surface removal for the shading (the same picture).

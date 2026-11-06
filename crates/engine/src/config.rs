@@ -613,6 +613,11 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // Reflections traced through the scene on smooth surfaces (water, glass, polished stone,
         // metals: their LabPBR maps), in place of the screen's; same GPUs.
         ConfigDef::number("core:rt_reflections", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // Path traced lighting over the traced scene (reports/Path tracing plan.md; M0: the sun and
+        // one bounce on the terrain, with a shader pack that has `pathtrace.wgsl`); its debug views
+        // (0 the picture, 1 albedo, 2 normals, 3 direct light, 4 the bounce, 5 the specular light, 6 the radiance cache, 7 the picture with a line where tracing ends).
+        ConfigDef::number("core:path_traced", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        ConfigDef::number("core:pt_debug", ck::INT, 0.0, 0.0, 7.0, 1.0),
         // How the path tracer's light is denoised (`denoise::Denoiser`) where Ray Reconstruction
         // doesn't do it: 0 not at all (raw, for checks), 1 ours (SVGF-like), live.
         ConfigDef::number("core:pt_denoiser", ck::INT, 1.0, 0.0, 1.0, 1.0),
