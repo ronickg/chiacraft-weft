@@ -199,6 +199,8 @@ fn region_of(key: MeshKey) -> (u64, IVec3) {
 
 /// A structure's lean (chiacraft): its pivot (own coordinates) and rotation.
 type Lean = (Vec3, glam::Quat);
+/// Where each moving structure was drawn last frame (world position) and how it leaned, by id.
+type StructuresBefore = FxHashMap<u64, (DVec3, Option<Lean>)>;
 
 /// The draws of one visible mesh (its corner `lo` relative to the camera, `k` its structure or
 /// 0), returning the faces drawn. A face direction can be seen only from the side its normal
@@ -352,6 +354,8 @@ struct ColorPipes {
 }
 
 pub struct WorldRenderer {
+    /// Moving structures as drawn last frame, for their motion (the offsets' second part).
+    structures_before: StructuresBefore,
     /// Depth only, from the sun, for `sun_shadows` packs: faces solid, faces cutout, quads solid,
     /// quads cutout. Solid blocks have no fragment shader (nothing to leave out, and a pass without
     /// `discard` keeps Apple GPUs' hidden-surface removal on); cutout ones the pack's `fs_shadow`.
@@ -606,6 +610,7 @@ impl WorldRenderer {
             table: CubeTable::new(gpu),
             parts: Vec::new(),
             offsets: Vec::new(),
+            structures_before: StructuresBefore::default(),
             globals,
             shadow_globals,
             origins: Vec::new(),
@@ -1658,10 +1663,11 @@ impl WorldRenderer {
         // full sky until it is known.
         // And how it leans (chiacraft): its pivot and rotation, upright for most.
         let lean_of = |k: usize| leans.get(&frames[k].0).copied();
-        let mut picks: Vec<(Vec3, u32, Option<Lean>)> = frame_offsets
+        // (Its frame's index too, for where it was last frame: `structures_before`.)
+        let mut picks: Vec<(Vec3, u32, Option<Lean>, usize)> = frame_offsets
             .iter()
             .enumerate()
-            .map(|(k, o)| (*o, crate::world::light::SKY_FULL as u32, lean_of(k)))
+            .map(|(k, o)| (*o, crate::world::light::SKY_FULL as u32, lean_of(k), k))
             .collect();
         let mut cube_pick: FxHashMap<MeshKey, i32> = FxHashMap::default();
         for (&key, &light) in lights {
@@ -1669,7 +1675,7 @@ impl WorldRenderer {
                 // A leaning one's cubes are elsewhere than where the world's light on them was
                 // sampled (a falling trunk's lowest cube is centred in the ground): its own light.
                 let light = if lean_of(k).is_some() { crate::world::light::SKY_FULL as u32 } else { light };
-                picks.push((frame_offsets[k], light, lean_of(k)));
+                picks.push((frame_offsets[k], light, lean_of(k), k));
                 cube_pick.insert(key, picks.len() as i32);
             }
         }
@@ -1848,11 +1854,14 @@ impl WorldRenderer {
         let mut runs = std::mem::take(&mut self.runs);
         runs.clear();
         let obuf = crate::gpu_layout::frame_buffer(gpu, &mut self.origins, frame.slot, n, 16, usage::STORAGE, "origins");
+        // Then, for temporal anti-aliasing's motion, two vec4 a structure after them all: where it
+        // was last frame (camera relative as now) and how it was turned; their count in entry 0's
+        // last slot, which the world's own cubes never read.
         let fbuf = crate::gpu_layout::frame_buffer(
             gpu,
             &mut self.offsets,
             frame.slot,
-            (picks.len() as u32 + 1) * 3,
+            (picks.len() as u32 + 1) * 5,
             16,
             usage::STORAGE,
             "frame offsets",
@@ -1872,9 +1881,32 @@ impl WorldRenderer {
             offs[at + 44..at + 48].copy_from_slice(&leaning.to_le_bytes());
         };
         put(offs, 0, Vec3::ZERO, 0, None);
-        for (k, &(o, light, lean)) in picks.iter().enumerate() {
+        for (k, &(o, light, lean, _)) in picks.iter().enumerate() {
             put(offs, k + 1, o, light, lean);
         }
+        offs[44..48].copy_from_slice(&(picks.len() as f32).to_le_bytes());
+        let base = (picks.len() + 1) * 48;
+        offs[base..base + 32].copy_from_slice(bytemuck::cast_slice(&[0.0f32, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]));
+        let origin = (cam_cube * 16).as_dvec3();
+        for (k, &(o, _, lean, f)) in picks.iter().enumerate() {
+            let (was, was_lean) = self
+                .structures_before
+                .get(&frames[f].0)
+                .copied()
+                .unwrap_or((frames[f].1, lean));
+            let o = if self.structures_before.contains_key(&frames[f].0) { (was - origin).as_vec3() } else { o };
+            let rot = was_lean.map_or(glam::Quat::IDENTITY, |l| l.1);
+            let at = base + (k + 1) * 32;
+            offs[at..at + 16].copy_from_slice(bytemuck::cast_slice(&o.extend(0.0).to_array()));
+            offs[at + 16..at + 32].copy_from_slice(bytemuck::cast_slice(&rot.to_array()));
+        }
+        self.structures_before.clear();
+        self.structures_before.extend(
+            frames
+                .iter()
+                .enumerate()
+                .map(|(k, f)| (f.0, (f.1, lean_of(k)))),
+        );
         let ibuf =
             crate::gpu_layout::frame_buffer(gpu, &mut self.indirect, frame.slot, n, 20, usage::INDIRECT | usage::STORAGE, "indirect");
         let origins = Mapped(gpu.mapped(obuf)[..n as usize * 16].as_mut_ptr());

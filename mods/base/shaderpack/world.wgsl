@@ -55,9 +55,10 @@ fn world_out(in: VOut, c: vec4<f32>) -> WorldOut {
     return WorldOut(c, motion_texel(in.motion, in.clip.z));
 }
 
-// Whether this frame writes motion: temporal anti-aliasing on, with a last frame to come from.
+// Whether this frame writes motion: temporal anti-aliasing on with the motion image (`core:aa` 1),
+// with a last frame to come from.
 fn taa_moving() -> bool {
-    return scene.taa.z > 0.5;
+    return scene.taa.z > 0.5 && scene.taa_frame.y > 0.5;
 }
 
 fn shader_of(tex: u32) -> u32 {
@@ -175,6 +176,21 @@ fn finish(local: vec3<f32>, origin: vec4<i32>) -> vec4<f32> {
     return vec4(pos, 1.0);
 }
 
+// Where `finish` put this vertex last frame, camera relative as now (temporal anti-aliasing's
+// motion): a moving structure's place and turn then, after the table's three vec4 a structure
+// (`offsets[2].w` structures, then two vec4 each: offset, rotation). The world's own cubes stay.
+fn finish_prev(local: vec3<f32>, origin: vec4<i32>) -> vec3<f32> {
+    let k = origin.w;
+    var at = vec3<f32>(origin.xyz) * 16.0 + local;
+    if k == 0 {
+        return at - g.cam_frac.xyz;
+    }
+    let base = (i32(offsets[2].w) + 1) * 3;
+    let pivot = offsets[k * 3 + 2].xyz;
+    at = quat_turn(offsets[base + k * 2 + 1], at - pivot) + pivot;
+    return at - g.cam_frac.xyz + offsets[base + k * 2].xyz;
+}
+
 fn body_normal(n: vec3<f32>, k: i32) -> vec3<f32> {
     if k == 0 {
         return n;
@@ -261,6 +277,10 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
         }
     }
     out.clip = scene.view_proj * pos;
+    // A moving structure's blocks (a boat, a falling tree): where they were last frame.
+    if origins[ii].w != 0 && taa_moving() {
+        out.motion = vec3(screen_motion(out.clip, scene.taa_prev * vec4(finish_prev(local, origins[ii]), 1.0), scene.taa.xy), 1.0);
+    }
     out.dist = length(pos.xyz);
     out.rel = pos.xyz;
     // A face's texture turned in quarters (Weft 26.11.2's block faces with a rotation).
@@ -339,6 +359,9 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
         }
     }
     out.clip = scene.view_proj * pos;
+    if origins[ii].w != 0 && taa_moving() {
+        out.motion = vec3(screen_motion(out.clip, scene.taa_prev * vec4(finish_prev(local, origins[ii]), 1.0), scene.taa.xy), 1.0);
+    }
     out.dist = length(pos.xyz);
     out.rel = pos.xyz;
     out.uv = uvs[c];

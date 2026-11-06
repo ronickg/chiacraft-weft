@@ -167,12 +167,15 @@ fn dlss5_rows(ui: &mut Ui) {
 
 pub fn register(r: &mut Registry) {
     r.screen(&SCREEN, |ui| {
-        let tabs: [crate::window::Tab; 2] = [
+        let tabs: [crate::window::Tab; 3] = [
             ("video.base.title", |c| {
                 c.client().screen_open(&crate::video::SCREEN);
             }),
             ("video.base.fantasy.title", |c| {
                 c.client().screen_open(&crate::video::FANTASY_SCREEN);
+            }),
+            ("video.base.extra.title", |c| {
+                c.client().screen_open(&crate::video::EXTRA_SCREEN);
             }),
         ];
         crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.dlss.title", &tabs, |ui| {

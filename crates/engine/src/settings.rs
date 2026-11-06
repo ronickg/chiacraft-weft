@@ -286,9 +286,15 @@ impl Settings {
         number("core:hdr_world") != 0.0
     }
 
-    /// Temporal anti-aliasing (`core:aa` 1, `post::set_motion`), read once at start.
+    /// Temporal anti-aliasing (`core:aa` 1 or 2, `post::set_taa`), read once at start.
     pub fn aa(&self) -> bool {
         number("core:aa") >= 1.0
+    }
+
+    /// Whether the world's pass draws the motion image too (`core:aa` 1; 2 is from the camera
+    /// alone, `post::set_motion`), read once at start.
+    pub fn aa_motion(&self) -> bool {
+        (number("core:aa") as i32) == 1
     }
 
     /// DLSS, the backend's temporal upscaler (`core:dlss`, `weft_render::UpscaleMode`), live; off

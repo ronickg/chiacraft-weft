@@ -568,9 +568,11 @@ impl App {
         // The HDR world's format, before any pipeline drawing into the world is made.
         crate::post::set_hdr(settings.hdr_world());
         // And whether they draw the motion image too, for temporal anti-aliasing.
-        // An upscaler (DLSS) reads it too: with one, the world always draws it, so `core:dlss`
-        // can be switched on while playing.
-        crate::post::set_motion(settings.aa() || gpu.upscaler().modes != 0);
+        // The world draws the motion image for temporal anti-aliasing with it (`core:aa` 1, not 2,
+        // from the camera alone) and for an upscaler (DLSS): with one, always, so `core:dlss` can be
+        // switched on while playing.
+        crate::post::set_motion(settings.aa_motion() || gpu.upscaler().modes != 0);
+        crate::post::set_taa(settings.aa());
         let post = crate::post::Post::new(&mut *gpu, &assets);
         let mut input = Input::default();
         for (action, key) in &content().game.keys {
@@ -3381,6 +3383,8 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
     let mut world = std::mem::take(&mut r.world_list);
     world.clear();
     if let Some(g) = &mut r.game {
+        // Where this frame's gathering writes its count and motion, for the effects' sharpening.
+        g.client.taa_out = r.post.taa_out(world_info.width, world_info.height);
         let s = crate::diag::span("client render");
         g.client
             .render(&mut *r.gpu, &mut world, &mut r.list, world_info, &r.textures);
