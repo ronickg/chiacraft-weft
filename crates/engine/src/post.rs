@@ -48,6 +48,20 @@ pub fn hdr() -> bool {
 }
 
 static MOTION: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static TAA: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Temporal anti-aliasing at all (`core:aa` 1 or 2), set once at start: its pipelines are made.
+pub fn set_taa(on: bool) {
+    TAA.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Whether temporal anti-aliasing's pipelines are made (`set_taa`): with the motion image
+/// (`motion`), or from the camera alone (`core:aa` 2: what moves by itself is left to the
+/// neighbourhood's clipping; no second image in the world's pass, which cost a phone's tiled GPU
+/// a third of its world pass).
+pub fn taa() -> bool {
+    TAA.load(std::sync::atomic::Ordering::Relaxed)
+}
 
 /// Temporal anti-aliasing (`core:aa`): set once at start, before any pipeline is made, as every
 /// pipeline drawing into the world must then have the motion image too (`PipelineDesc::motion`).
@@ -128,7 +142,9 @@ fn halton(mut i: u32, base: u32) -> f32 {
 /// - `motion`: the whole motion image (`fs_taa_motion`, `Format::Rgba16Float`): xy where each
 ///   pixel's surface was last frame minus where it is now, in UV (multiply by the size for pixels;
 ///   both without the jitter), z its depth, w 1 where a surface wrote its own motion (entities,
-///   swaying leaves and grass), 0 where it came from the camera;
+///   swaying leaves and grass), 0 where it came from the camera. With `core:aa` 2 (no motion
+///   image) all of it comes from the camera, and only with `export_motion` is there an image at
+///   all (`TextureId(u32::MAX)` otherwise);
 /// - `jitter`: this frame's offset in pixels (x right, y down), as `jitter_pixels`;
 /// - `reset`: no last frame to gather from (a teleport, a resize, a new world);
 /// - `view_proj` and `prev_view_proj` (`Scene::taa_prev`) without the jitter.
@@ -281,7 +297,7 @@ impl Post {
             gpu.destroy_pipeline(b);
         }
         self.taa_held = false;
-        if !motion() {
+        if !taa() {
             return;
         }
         let made = crate::packs::shader(assets, "taa.wgsl")
@@ -476,7 +492,7 @@ impl Post {
     /// Whether this frame is gathered over frames (`use_taa`, the motion image, and the pipelines):
     /// the app asks before drawing the world, which is then jittered (`next_jitter`).
     pub fn taa_on(&self) -> bool {
-        self.use_taa && motion() && self.taa_pipes.is_some() && self.pipeline.is_some()
+        self.use_taa && taa() && self.taa_pipes.is_some() && self.pipeline.is_some()
     }
 
     /// The motion image the world's pass draws into, sized to the frame (`Cmd::BeginPass`'s
@@ -692,7 +708,11 @@ impl Post {
         if let Some(up) = self.upscaled.take() {
             src = up;
             self.taa_held = false;
-        } else if let (true, Some((resolve, fill)), Some((motion, motion_idx, _))) = (self.taa_on(), self.taa_pipes, self.motion_tex) {
+        } else if let (true, Some((resolve, fill))) = (self.taa_on(), self.taa_pipes) {
+            // Without the motion image (`core:aa` 2): all from the depth (`bloom` 0).
+            let (motion, motion_idx) = self
+                .motion_tex
+                .map_or((TextureId(u32::MAX), u32::MAX), |m| (m.0, m.1));
             let anew = Self::ensure_pair(gpu, &mut self.history, frame.width, frame.height, "temporal aa");
             if Self::ensure_pair(gpu, &mut self.counts, frame.width, frame.height, "temporal aa count") || anew {
                 self.taa_held = false;
@@ -708,7 +728,7 @@ impl Post {
                 size: [frame.width as f32, frame.height as f32],
                 depth,
                 low: if self.taa_held { hidx[last] + 1 } else { 0 },
-                bloom: motion_idx + 1,
+                bloom: motion_idx.wrapping_add(1),
                 exposure: if self.taa_held { cidx[last] + 1 } else { 0 },
                 ..Pass::default()
             };

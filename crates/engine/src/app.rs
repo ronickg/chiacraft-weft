@@ -546,7 +546,8 @@ impl App {
         // The HDR world's format, before any pipeline drawing into the world is made.
         crate::post::set_hdr(settings.hdr_world());
         // And whether they draw the motion image too, for temporal anti-aliasing.
-        crate::post::set_motion(settings.aa());
+        crate::post::set_motion(settings.aa_motion());
+        crate::post::set_taa(settings.aa());
         let post = crate::post::Post::new(&mut *gpu, &assets);
         let mut input = Input::default();
         for (action, key) in &content().game.keys {

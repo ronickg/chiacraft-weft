@@ -781,7 +781,8 @@ gpu_struct! {
         /// What temporal anti-aliasing writes this frame, for the screen effects after it: x the
         /// bindless index + 1 of its count image (r the frames gathered in each pixel, g how far
         /// the pixel moved this frame in pixels: a gathered picture is softer where it moves, and
-        /// a pack may sharpen it more there); 0 without. yzw unused.
+        /// a pack may sharpen it more there); 0 without. y 1 when the world's pass has the motion
+        /// image (`core:aa` 1): shaders skip their motion's work without it. zw unused.
         pub taa_frame: [f32; 4],
     }
 }

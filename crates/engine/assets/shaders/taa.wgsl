@@ -85,7 +85,7 @@ fn taa_camera_motion(at: vec2<i32>, d: f32, size: vec2<f32>) -> vec2<f32> {
 fn taa_motion(motion: u32, depth: u32, at: vec2<i32>, size: vec2<i32>) -> vec2<f32> {
     let p = clamp(at, vec2(0), size - 1);
     let d = textureLoad(textures[depth], p, 0).r;
-    if motion != 0u {
+    if motion != 0u && motion != 0xffffffffu {
         let m = textureLoad(textures[motion - 1u], p, 0);
         if m.z > 0.0 && abs(m.z - d) <= max(d * 4.0e-3, 1.0e-7) {
             return m.xy;

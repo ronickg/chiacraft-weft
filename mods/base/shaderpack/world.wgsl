@@ -55,9 +55,10 @@ fn world_out(in: VOut, c: vec4<f32>) -> WorldOut {
     return WorldOut(c, motion_texel(in.motion, in.clip.z));
 }
 
-// Whether this frame writes motion: temporal anti-aliasing on, with a last frame to come from.
+// Whether this frame writes motion: temporal anti-aliasing on with the motion image (`core:aa` 1),
+// with a last frame to come from.
 fn taa_moving() -> bool {
-    return scene.taa.z > 0.5;
+    return scene.taa.z > 0.5 && scene.taa_frame.y > 0.5;
 }
 
 fn shader_of(tex: u32) -> u32 {
