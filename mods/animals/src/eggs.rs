@@ -54,7 +54,9 @@ value! {
 pub(crate) static EGG: Component<Egg> = Component::named("egg_young");
 /// The size an egg is drawn at (0: not since it loaded).
 static EGG_SCALED: Component<f32> = Component::named("egg_scaled");
-pub static EGG_ENTITY: EntityKind = EntityKind::named("egg");
+/// Each egg look's entity kind (`animals_core::eggs::LOOKS`: a raptor's, a crocodile's, roe...),
+/// by the look's name (made once).
+static KINDS: OnceLock<Vec<(&'static str, &'static EntityKind)>> = OnceLock::new();
 pub static NEST: EntityKind = EntityKind::named("nest");
 static NEST_ITEM: Item = Item::named("nest");
 static AIR: Block = Block::named("core:air");
@@ -65,9 +67,13 @@ static CRAFTING: RecipeKind = RecipeKind::named("base:crafting");
 /// Each laying species' egg item, by its row in `SPECIES` (made once).
 static ITEMS: OnceLock<Vec<(usize, &'static Item)>> = OnceLock::new();
 
-/// How egg size follows body size: a species twice as tall lays eggs about half again as long
-/// (eggs grow more slowly than bodies).
-const EGG_GROWTH: f32 = 0.6;
+/// The egg a plain nest is made for: its box's width, blocks (a little under a Velociraptor's
+/// drawn egg; a wider egg's nest is as much bigger, so a ring of seven doesn't overlap), and the
+/// ring a nest's eggs lie on round the middle one, blocks at the plain nest's size.
+const NEST_EGG_W: f32 = 0.2;
+const NEST_RING: f64 = 0.25;
+/// The egg an egg's mass is given at, real cm (`hunt::EGG_KG`).
+const MASS_EGG_CM: f32 = 15.0;
 /// A wild female builds a nest about every two days, while her kind isn't crowded.
 const NESTING: u32 = 48_000;
 const CROWDED: usize = 8;
@@ -77,26 +83,34 @@ const GUARD_RANGE: f64 = 24.0;
 pub fn init(r: &mut Registry) {
     r.entity_component(&EGG, Egg::default(), component_flags::SAVE);
     r.entity_component(&EGG_SCALED, 0.0f32, 0);
-    // An egg: a Velociraptor's, built from `source/egg` (elongated, standing on its pointed end,
-    // blue-green with brown blotches like its relative Deinonychus's); a bigger species' scaled up.
-    r.entity(&EGG_ENTITY)
-        .no_egg()
-        .size(animals_core::bodies::of("egg").0, animals_core::bodies::of("egg").1)
-        .max_health(4.0)
-        .walk_speed(0.0)
-        .passive()
-        .unpushable()
-        .model_file("egg")
-        .texture("egg/egg")
-        .attach(&EGG)
-        .attach(&EGG_SCALED)
-        .attach(&OWNER)
-        .on_interact(|e| {
-            let (w, id, player) = (e.world(), e.entity(), e.other());
-            take(&w, id, player);
-            false
-        })
-        .goals(Goals::new().then(incubate));
+    // Eggs: one kind per look (`animals_core::eggs`, built from `source/egg`): a raptor's long
+    // blue-green speckled egg stood on end, a Citipati's ridged teal one, a caiman's banded
+    // capsule, roe, the wyvern's scaled stone... each species' own drawn at its egg's length.
+    let mut kinds = Vec::new();
+    for look in animals_core::eggs::LOOKS {
+        let kind = EntityKind::generated(format!("egg_{}", look.name));
+        let (bw, bh) = animals_core::bodies::of(look.model);
+        r.entity(kind)
+            .no_egg()
+            .size(bw, bh)
+            .max_health(4.0)
+            .walk_speed(0.0)
+            .passive()
+            .unpushable()
+            .model_file(look.model)
+            .texture(&format!("egg/{}", look.name))
+            .attach(&EGG)
+            .attach(&EGG_SCALED)
+            .attach(&OWNER)
+            .on_interact(|e| {
+                let (w, id, player) = (e.world(), e.entity(), e.other());
+                take(&w, id, player);
+                false
+            })
+            .goals(Goals::new().then(incubate));
+        kinds.push((look.name, kind));
+    }
+    let _ = KINDS.set(kinds);
     // A nest: an earthen scrape in a raised rim with dry grass, built from `source/nest`; a prop,
     // placed with its item, broken back into it. Right clicked, it gives up an egg, or takes the
     // egg in hand.
@@ -135,14 +149,29 @@ pub fn init(r: &mut Registry) {
         .filter(|(_, s)| s.gestation() == 0)
     {
         let item = Item::generated(format!("{}_egg", s.kind_name()));
+        let look = animals_core::eggs::of(s.name).map_or("dromaeosaur", |(l, _)| l.name);
         r.item(item)
             .max_stack(1)
-            .texture("raptor_egg")
+            .texture(&format!("egg_{look}"))
             .tab(&TOOLS)
             .on_use(place);
         items.push((i, item));
     }
     let _ = ITEMS.set(items);
+}
+
+/// Species `index`'s egg kind (its look's).
+fn kind_of(index: usize) -> Option<&'static EntityKind> {
+    let (look, _) = animals_core::eggs::of(SPECIES[index].name)?;
+    KINDS.get()?.iter().find(|(n, _)| *n == look.name).map(|(_, k)| *k)
+}
+
+/// The eggs within `r` of `at`, any species'.
+fn eggs_near(w: &World, at: [f64; 3], r: f64) -> Vec<u64> {
+    w.entities_near(at, r, None)
+        .into_iter()
+        .filter(|&id| w.component(id, &EGG).is_some_and(|e| e.species != 0))
+        .collect()
 }
 
 fn item_of(index: usize) -> Option<&'static Item> {
@@ -170,32 +199,48 @@ fn nest_spot(w: &World, n: [f64; 3]) -> [f64; 3] {
     let k = nest_scale(w, n);
     let spots = std::iter::once((0.0, 0.0)).chain((0..7).map(|i| {
         let a = i as f64 / 7.0 * std::f64::consts::TAU;
-        (a.cos() * 0.2 * k, a.sin() * 0.2 * k)
+        (a.cos() * NEST_RING * k, a.sin() * NEST_RING * k)
     }));
     let mut first = None;
     for (dx, dz) in spots {
         let at = [n[0] + dx, n[1] + NEST_FLOOR * k, n[2] + dz];
         first.get_or_insert(at);
-        if w.entities_near(at, 0.1 * k, Some(&EGG_ENTITY)).is_empty() {
+        if eggs_near(w, at, 0.1 * k).is_empty() {
             return at;
         }
     }
     first.unwrap_or(n)
 }
 
-/// An egg of species `index`'s size against the Velociraptor's (eggs grow more slowly than
-/// bodies).
-pub(crate) fn egg_size(index: usize) -> f32 {
-    (SPECIES[index].height.0 / SPECIES[crate::species::of(&crate::raptor::RAPTOR)].height.0).powf(EGG_GROWTH)
+/// The scale species `index`'s egg is drawn at: its egg's drawn length against its look's built
+/// one (`animals_core::eggs`: within 15%).
+fn egg_size(index: usize) -> f32 {
+    animals_core::eggs::of(SPECIES[index].name).map_or(1.0, |(_, s)| s)
+}
+
+/// Species `index`'s egg's width as drawn (its box's, blocks): a nest and a clutch grow with it.
+fn egg_width(index: usize) -> f32 {
+    animals_core::eggs::of(SPECIES[index].name).map_or(NEST_EGG_W, |(l, s)| animals_core::bodies::of(l.model).0 * s)
+}
+
+/// Species `index`'s real egg length against a 15 cm egg (`hunt`: an egg's mass goes with its
+/// cube).
+pub(crate) fn egg_length(index: usize) -> f32 {
+    animals_core::eggs::real_cm(SPECIES[index].name).unwrap_or(MASS_EGG_CM) / MASS_EGG_CM
+}
+
+/// Whether entity kind `kind` (an id) is an egg's.
+pub(crate) fn is_egg_kind(kind: u32) -> bool {
+    KINDS.get().is_some_and(|k| k.iter().any(|(_, e)| e.id() == kind))
 }
 
 /// A nest's width (its box, `animals_core::bodies`).
 fn nest_width() -> f32 {
     animals_core::bodies::of("nest").0
 }
-/// A bigger species' nest is its eggs' size bigger (a wyvern's, about 3 m across).
+/// A species with wider eggs gets a bigger nest (a wyvern's, about 3 blocks across).
 fn nest_size(index: usize) -> f32 {
-    egg_size(index).max(1.0)
+    (egg_width(index) / NEST_EGG_W).max(1.0)
 }
 
 /// How much bigger than the plain one the nest at `at` is (1 for none).
@@ -236,11 +281,7 @@ fn nest_clicked(w: &World, id: u64, player: u64) {
         w.inventory(player).set(slot, StackData::shrink(held, 1));
         return;
     }
-    if let Some(egg) = w
-        .entities_near(st.pos, 0.6, Some(&EGG_ENTITY))
-        .into_iter()
-        .next()
-    {
+    if let Some(egg) = eggs_near(w, st.pos.to_array(), 0.6).into_iter().next() {
         take(w, egg, player);
     }
 }
@@ -267,7 +308,7 @@ pub fn lay(w: &World, at: [f64; 3], young: &[Young], owner: Option<[u8; 64]>) {
         let spot = match nest {
             Some(p) => nest_spot(w, p),
             None => {
-                let r = 0.25 * egg_size(y.index) as f64;
+                let r = 0.6 * egg_width(y.index) as f64;
                 [at[0] + a.cos() * r, at[1], at[2] + a.sin() * r]
             }
         };
@@ -399,7 +440,8 @@ fn ground_under(w: &World, at: [f64; 3]) -> [f64; 3] {
 /// An egg put down at `at`: resting on the ground (`egg_rest`), leaning (its model leans forward)
 /// with its top toward the nest's middle, or any way outside a nest.
 fn spawn_egg(w: &World, at: [f64; 3], egg: &Egg, owner: Option<[u8; 64]>) -> u64 {
-    let id = w.spawn(&EGG_ENTITY, egg_rest(at));
+    let Some(kind) = (egg.species as usize).checked_sub(1).and_then(kind_of) else { return 0 };
+    let id = w.spawn(kind, egg_rest(at));
     if id == 0 {
         return 0;
     }
@@ -588,7 +630,7 @@ fn place(u: &mut ItemUse) -> bool {
 pub fn hurry(w: &World, at: [f64; 3]) {
     // Nothing left: it hatches at its next step whatever the air (with a little left, an egg in
     // air too cool to develop never did, B7's playtest).
-    for id in w.entities_near(at, 16.0, Some(&EGG_ENTITY)) {
+    for id in eggs_near(w, at, 16.0) {
         if let Some(e) = w.component_mut(id, &EGG) {
             e.left = 0;
         }
