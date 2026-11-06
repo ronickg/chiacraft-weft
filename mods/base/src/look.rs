@@ -32,12 +32,16 @@ pub static LOOK_FOLIAGE_TEST: Config<f32> = Config::named("look_foliage_test");
 /// The HDR world's white balance by day: 0 neutral, + warmer and less blue (1.6 by default: the gap
 /// sheets, our land bluer than Bliss's at every hour).
 pub static LOOK_WHITE: Config<f32> = Config::named("look_white");
+/// A test for the tree diagnosis: 1 takes the corner shade (AO) away, 0 as made.
+pub static LOOK_AO_TEST: Config<f32> = Config::named("look_ao_test");
+/// The HDR world's contrast-adaptive sharpening, 0 none to 1 (0.4: Bliss runs 0.35-0.4).
+pub static LOOK_SHARPEN: Config<f32> = Config::named("look_sharpen");
 
 /// The pack's `options` line: the settings in the order `look.wgsl` reads them.
 pub const OPTIONS: &str = "base:look_exposure, base:look_sun, base:look_sun_warmth, base:look_fill, base:look_fill_cool, \
 base:look_contrast, base:look_saturation, base:look_shade, base:look_haze, base:look_fog, base:night_light, base:night_moon, \
 base:look_canopy, base:look_shafts, core:view_distance, base:look_storybook, base:fx_night_sky, base:fx_shooting_stars, \
-base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle, base:look_curve, base:look_bloom, base:look_auto_exposure, base:look_sky_light, base:look_foliage_test, base:look_white";
+base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle, base:look_curve, base:look_bloom, base:look_auto_exposure, base:look_sky_light, base:look_foliage_test, base:look_white, base:look_ao_test, base:look_sharpen";
 
 pub fn register(r: &mut Registry) {
     // By day: how bright the picture is taken, the sun's strength and warmth (-1 whiter, +1 toward
@@ -72,4 +76,6 @@ pub fn register(r: &mut Registry) {
     r.config(&LOOK_SKY_LIGHT).float(1.0, 0.2, 1.5);
     r.config(&LOOK_FOLIAGE_TEST).float(0.0, 0.0, 1.0);
     r.config(&LOOK_WHITE).float(1.6, -1.0, 2.5);
+    r.config(&LOOK_AO_TEST).float(0.0, 0.0, 1.0);
+    r.config(&LOOK_SHARPEN).float(0.4, 0.0, 1.0);
 }
