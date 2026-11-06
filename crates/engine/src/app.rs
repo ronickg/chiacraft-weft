@@ -2832,6 +2832,7 @@ fn update_game(r: &mut Running, dt: f64, frame_start: Instant) {
         // The path tracer's denoiser: ours, unless Ray Reconstruction denoises the frame.
         r.post.denoiser.mode = r.settings.pt_denoiser();
         (r.post.denoiser.phi_color, r.post.denoiser.steps) = r.settings.pt_dn_tuning();
+        r.post.denoiser.debug = r.settings.pt_dn_debug();
         r.post.denoiser.reconstruct = r.upscale_now.is_some_and(|c| c.reconstruct);
         crate::denoise::set_test(r.settings.pt_denoise_test());
         r.post.bloom_levels = r.settings.bloom_levels();

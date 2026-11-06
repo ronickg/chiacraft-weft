@@ -1176,6 +1176,12 @@ gpu_struct! {
         /// The à-trous light test (standard deviations) and normal test (power).
         pub phi_color: f32,
         pub phi_normal: f32,
+        /// The composite's debug view (`core:pt_dn_debug`, 0 none) and, for it, this frame's
+        /// gathered light (temporal) + 1 and the path tracer's raw light + 1.
+        pub debug: u32,
+        pub gathered: u32,
+        pub raw: u32,
+        pub pad: u32,
     }
 }
 

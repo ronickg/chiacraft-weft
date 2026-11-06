@@ -101,6 +101,9 @@ pub struct Denoiser {
     /// its noise) and how many steps run (1-5, each twice as wide): `core:pt_dn_phi`, `core:pt_dn_steps`.
     pub phi_color: f32,
     pub steps: u32,
+    /// `core:pt_dn_debug` (checks only): what the composite shows instead of the light (1 frames
+    /// gathered, 2 the raw diffuse light, 3 gathered, 4 filtered, 5 its noise, 6 what was lit).
+    pub debug: u32,
     /// The test's images (`run_test`): noisy light, normals, zero specular and F0, the result.
     test: Option<((u32, u32), [TextureId; 4])>,
     test_frame: u32,
@@ -137,6 +140,7 @@ impl Denoiser {
             reconstruct: false,
             phi_color: 4.0,
             steps: STEPS,
+            debug: 0,
             test: None,
             test_frame: 0,
             test_sky: false,
@@ -285,6 +289,7 @@ impl Denoiser {
         let mut light = (raw_d, raw_s);
         // This frame's guide + 1 for the composite (what was lit), 0: from the raw light.
         let mut guide = 0;
+        let mut gathered = 0;
         if self.mode == SVGF && !self.reconstruct {
             self.ensure_images(gpu, f.size);
             let im = self.images.as_ref().unwrap();
@@ -324,13 +329,23 @@ impl Denoiser {
             }
             light = src;
             guide = im.guide[cur].1 + 1;
+            gathered = im.diffuse[cur].1 + 1;
             self.cur = last;
             self.held = true;
         } else {
             self.held = false;
         }
         // `step` 1 in the composite: the test's sky from the picture (the albedo there).
-        entries.push(DenoisePass { diffuse: light.0, specular: light.1, step: self.test_sky as u32, prev_guide: guide, ..base });
+        entries.push(DenoisePass {
+            diffuse: light.0,
+            specular: light.1,
+            step: self.test_sky as u32,
+            prev_guide: guide,
+            debug: self.debug,
+            gathered,
+            raw: raw_d + 1,
+            ..base
+        });
         let comp_entry = entries.len() - 1;
         gpu.mapped(buf)[..entries.len() * size_of::<DenoisePass>()].copy_from_slice(bytemuck::cast_slice(&entries));
         let bind = |list: &mut CommandList, pipe: PipelineId| {

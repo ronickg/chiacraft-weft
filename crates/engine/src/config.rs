@@ -620,6 +620,8 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // (standard deviations) and its à-trous steps, live.
         ConfigDef::number("core:pt_dn_phi", ck::FLOAT, 4.0, 0.25, 16.0, 0.25),
         ConfigDef::number("core:pt_dn_steps", ck::INT, 5.0, 1.0, 5.0, 1.0),
+        // Its debug views (checks only): 0 none, 1-6 (`denoise.wgsl` `dn_debug_view`).
+        ConfigDef::number("core:pt_dn_debug", ck::INT, 0.0, 0.0, 6.0, 1.0),
         // The soft clouds' shadow on the land (with the HDR world; `client::cloud_shadow`).
         ConfigDef::number("core:cloud_shadows", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         // Vanilla's: in GUI pixels, and percent of the dark behind the text.

@@ -416,6 +416,43 @@ fn dn_slope(a: f32, c: f32, b: f32) -> f32 {
     return select(0.0, m, m < 1e8);
 }
 
+// What `core:pt_dn_debug` shows: 1 the frames gathered (white 32), 2 the path tracer's raw diffuse
+// light, 3 that gathered over frames, 4 after the à-trous steps (all without the albedo, mapped
+// x/(1+x)), 5 the filtered light's noise (its standard deviation), 6 what counts as lit (green
+// yes, red the G-buffer drew it but it isn't lit).
+fn dn_debug_view(d: DenoisePass, at: vec2<i32>, isize: vec2<i32>) -> vec4<f32> {
+    let lit = dn_marked(d, at);
+    var c = vec3(0.0);
+    switch d.debug {
+        case 1u: {
+            if d.gathered != 0u {
+                c = vec3(textureLoad(textures[d.gathered - 1u], at, 0).a / 32.0);
+            }
+        }
+        case 2u: {
+            c = dn_light(d.raw - 1u, at, isize).rgb;
+            c = c / (1.0 + c);
+        }
+        case 3u: {
+            if d.gathered != 0u {
+                c = dn_light(d.gathered - 1u, at, isize).rgb;
+                c = c / (1.0 + c);
+            }
+        }
+        case 4u: {
+            c = dn_light(d.diffuse, at, isize).rgb;
+            c = c / (1.0 + c);
+        }
+        case 5u: {
+            c = vec3(sqrt(max(dn_light(d.diffuse, at, isize).a, 0.0)) * 4.0);
+        }
+        default: {
+            c = select(vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), lit);
+        }
+    }
+    return vec4(c, 1.0);
+}
+
 // The light with the albedo back in, added onto the scene image (emission and the sky are there):
 // drawn with `Blend::Additive`, which scales by this alpha and keeps the image's own (the water mask).
 @fragment
@@ -427,6 +464,10 @@ fn fs_composite(in: VOut) -> @location(0) vec4<f32> {
     if dep <= 0.0 {
         // The sky is in the scene image already; in the check (`step` 1) it comes from the picture.
         return select(vec4(0.0), vec4(textureLoad(textures[d.albedo], at, 0).rgb, 1.0), d.step == 1u);
+    }
+    // The debug views (`core:pt_dn_debug`, checks only), over everything the G-buffer holds.
+    if d.debug != 0u {
+        return dn_debug_view(d, at, isize);
     }
     // Not traced (mobs, distant tiles, water: the G-buffer holds terrain only): its own light stays.
     if !dn_marked(d, at) {
