@@ -70,14 +70,19 @@ fn varint(b: &[u8], i: &mut usize) -> Option<u64> {
     None
 }
 
-/// DH's `minecraft:water_STATE_{level:0}` as ours `minecraft:water[level=0]` (properties sorted).
+/// DH's `minecraft:oak_log_STATE_{axis:y}{...}` (each property in its own braces) as ours
+/// `minecraft:oak_log[axis=y,...]` (properties sorted).
 fn state(dh: &str) -> String {
     let Some((name, props)) = dh.split_once("_STATE_") else { return dh.to_string() };
     let inner = props.trim_start_matches('{').trim_end_matches('}');
     if inner.is_empty() {
         return name.to_string();
     }
-    let mut kv: Vec<String> = inner.split(',').map(|p| p.replacen(':', "=", 1)).collect();
+    let mut kv: Vec<String> = inner
+        .split("}{")
+        .flat_map(|p| p.split(','))
+        .map(|p| p.replacen(':', "=", 1))
+        .collect();
     kv.sort();
     format!("{name}[{}]", kv.join(","))
 }
@@ -167,4 +172,14 @@ pub fn for_each_section(path: &Path, min_y: i32, each: impl Fn(Section) + Sync) 
         }
     });
     Ok(n)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn states_read_as_ours() {
+        assert_eq!(super::state("minecraft:dirt_STATE_"), "minecraft:dirt");
+        assert_eq!(super::state("minecraft:water_STATE_{level:0}"), "minecraft:water[level=0]");
+        assert_eq!(super::state("minecraft:oak_stairs_STATE_{half:bottom}{facing:east}"), "minecraft:oak_stairs[facing=east,half=bottom]");
+    }
 }

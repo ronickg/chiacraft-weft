@@ -187,7 +187,8 @@ pub fn block(mc: &str) -> (Vec<String>, bool) {
             (vec![format!("base:wild_sunflower[half={half}]"), if half == "lower" { "base:dandelion".into() } else { AIR.into() }], false)
         }
         "pink_petals" | "wildflowers" => near(&["base:clover", AIR]),
-        "leaf_litter" => near(&["base:leaf_litter", AIR]),
+        // A thin layer on the floor in Minecraft; ours is a whole block.
+        "leaf_litter" => (vec![AIR.into()], false),
         "bush" | "firefly_bush" | "azalea" | "flowering_azalea" | "sweet_berry_bush" => near(&["base:hazel_bush", "base:tall_grass"]),
         "lily_pad" => one("base:lily_pad"),
         "seagrass" | "tall_seagrass" => near(&["base:seagrass", "base:water"]),

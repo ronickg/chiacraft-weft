@@ -52,7 +52,7 @@ impl<'c> Resolver<'c> {
         let (s, exact) = chosen.unwrap_or((AIR, false));
         if !exact {
             let name = self.c.state_name(s);
-            log::info!("mc import: {mc} stands in as {name} (we have no {})", candidates[0]);
+            log::debug!("mc import: {mc} stands in as {name} (no exact match)");
             self.stand_ins
                 .lock()
                 .unwrap()
