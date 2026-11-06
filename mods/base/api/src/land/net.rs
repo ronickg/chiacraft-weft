@@ -26,7 +26,7 @@ use weft_sdk::noise::fixed::{self, Fields, ONE, div_floor, q4, q12, ramp, shape}
 use super::{
     CONTINENTS, HIGHLANDS, HIGHLANDS_AREA, HILLS, HILLS_AREA, Here, LAKE_DEPTH, LAKE_MAX_RISE, LAKE_STRETCH, Lake, MOUNTAINS_AREA,
     RIVER_BANKS, RIVER_MOUNTAINS, RIVER_NODE, RIVER_RAIN, RIVER_REACH,
-    RIVER_REGION, RIVER_ROUTE_HILLS, RIVER_ROUTE_MOUNTAINS, RIVER_SINK_FLOW, RIVER_SINK_RADIUS, RIVER_TERRACE, RIVER_TERRACE_RISER,
+    RIVER_REGION, RIVER_ROUTE_HILLS, RIVER_ROUTE_MOUNTAINS, RIVER_SINK_RADIUS, RIVER_TERRACE, RIVER_TERRACE_RISER,
     RIVER_VALLEY_PER_BLOCK, RIVER_VALLEY_RISE, RIVER_WARP_SCALE, Rivers, ground_at, rivers_style, lake_reach_most, masked, mesa_at, salt,
 };
 use crate::SEA;
@@ -255,7 +255,7 @@ impl Region {
         for j in lo..side - lo {
             for i in lo..side - lo {
                 let k = at(i, j);
-                if down[k] != NONE || height[k] < sea || flow[k] < q12(RIVER_SINK_FLOW) {
+                if down[k] != NONE || height[k] < sea || flow[k] < q12(rivers_style().sink_flow) {
                     continue;
                 }
                 let p = pos[k];
@@ -266,7 +266,7 @@ impl Region {
                 }
                 let h = fixed::hash(fixed::seed32(f.seed, salt::RIVER_NODES), p[0], 1, p[1]);
                 let h2 = fixed::fmix(h);
-                let size = ramp(flow[k], q12(RIVER_SINK_FLOW), q12(rivers_style().flow.2));
+                let size = ramp(flow[k], q12(rivers_style().sink_flow), q12(rivers_style().flow.2));
                 let lake = Lake {
                     x: p[0],
                     z: p[1],
