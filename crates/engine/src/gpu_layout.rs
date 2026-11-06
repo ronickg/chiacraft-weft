@@ -573,6 +573,8 @@ fn records() -> String {
         "fn lod_crown(w0: u32) -> bool {\n    return (w0 >> LOD_FACE_CROWN_SHIFT) != 0u;\n}\n",
         "fn lod_occ(w0: u32) -> u32 {\n    return (w0 >> LOD_FACE_OCC_SHIFT) & LOD_FACE_OCC_MASK;\n}\n",
         "fn lod_ao(w3: u32) -> vec4<u32> {\n    let a = ((w3 >> LOD_FACE_AO_LO_SHIFT) & 15u) | (((w3 >> LOD_FACE_AO_HI_SHIFT) & 15u) << 4u);\n    return vec4<u32>(3u) - vec4<u32>(a & 3u, (a >> 2u) & 3u, (a >> 4u) & 3u, (a >> 6u) & 3u);\n}\n",
+        // chiacraft: a water top's depth over the floor in the same bits (`lod::mesh`), 0 not known.
+        "fn lod_water_depth(w3: u32) -> u32 {\n    return ((w3 >> LOD_FACE_AO_LO_SHIFT) & 15u) | (((w3 >> LOD_FACE_AO_HI_SHIFT) & 15u) << 4u);\n}\n",
     ));
     s
 }

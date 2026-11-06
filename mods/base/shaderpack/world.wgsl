@@ -1513,7 +1513,8 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     // Vanilla's corner shade on the ground's box faces (`lod_ao`; after upstream Weft f69243fd),
     // the quad split along its lighter diagonal, as the cubes'.
     var a = vec4<u32>(3u);
-    if lod_dir(w0) != LOD_FACE_GRID {
+    // (A water top's bits hold its depth, `lod_water_depth`, not a corner shade.)
+    if lod_dir(w0) != LOD_FACE_GRID && lod_tint(w0) != TINT_WATER {
         a = lod_ao(records[f * 4u + 3u]);
     }
     var c = vi % 4u;
