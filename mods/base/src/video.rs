@@ -28,9 +28,6 @@ pub static FX_CONTACT: Config<i32> = Config::named("fx_contact");
 pub static FX_VOLUME: Config<i32> = Config::named("fx_volume");
 pub static FX_SHAFTS: Config<i32> = Config::named("fx_shafts");
 pub static FX_BLOOM: Config<i32> = Config::named("fx_bloom");
-/// Far relief (`post/relief.wgsl`, Far view): the land 200-2000 blocks out shaded by its own
-/// shapes, ambient occlusion and a shadow toward the sun from the depth. An Extra row; not in Max yet.
-pub static FX_RELIEF: Config<i32> = Config::named("fx_relief");
 
 static RENDER_SCALE: Config<f32> = Config::named("core:render_scale");
 /// How the world drawn at a render scale under 1 is scaled up: 0 bilinear, 1 FSR 1, 2 Snapdragon GSR 1.
@@ -252,8 +249,6 @@ fn max_extras() {
     SHADOW_FAR.set(0);
     POST_LOW.set(false);
     crate::look::LOOK_LEAF_HOLES.set(1.0);
-    // (Far relief stays out of Max until its look is right: its first version darkened flat ground
-    // and banded, Far view's A/B fv_relb, 11-06.)
     // Ultra (soft edges from more rays, with TAA) where the GPU traces rays.
     RT_SHADOWS.set(if GPU_RAY_QUERY.get() && !on_phone() { 2 } else { 0 });
     RT_REFLECTIONS.set(GPU_RAY_QUERY.get() && !on_phone());
@@ -611,7 +606,7 @@ fn row_ui(ui: &mut Ui, rows: &'static [Row], i: usize, step: fn(usize, i32)) {
 /// The Extra quality tab's rows (`EXTRA_SCREEN`): the newer features, each a setting of its own,
 /// outside Low to Ultra so no preset changes the look by them; Max sets them all (`max_extras`).
 /// Traced shadows and reflections only where the GPU can trace rays (the last rows, from `RT_ROW`).
-const EXTRA_ROWS: [Row; 12] = [
+const EXTRA_ROWS: [Row; 11] = [
     Row { key: "hdr", values: &[0.0, 1.0], get: || HDR_WORLD.get() as u8 as f64, set: |v| HDR_WORLD.set(v > 0.0), shown: off_on },
     Row {
         key: "aa",
@@ -663,7 +658,6 @@ const EXTRA_ROWS: [Row; 12] = [
         set: |v| crate::look::LOOK_LEAF_HOLES.set(if v > 0.0 { 1.0 } else { 0.0 }),
         shown: off_on,
     },
-    Row { key: "relief", values: &[0.0, 1.0, 2.0], get: || FX_RELIEF.get() as f64, set: |v| FX_RELIEF.set(v as i32), shown: off_low_on },
     // The light through leaves (Trees, 11-06): its own setting, off by default and not in Max for
     // now (Planner: Max's turn on it is a later call), as Ronald's Bliss has none.
     Row {
@@ -691,7 +685,7 @@ const EXTRA_ROWS: [Row; 12] = [
     },
 ];
 /// The first of the rows only a GPU that traces rays shows (traced shadows, then reflections).
-const RT_ROW: usize = 10;
+const RT_ROW: usize = 9;
 
 /// An extra row a step on: Max becomes Custom (the Low to Ultra presets leave these rows as they are).
 fn step_extra(i: usize, dir: i32) {
@@ -778,7 +772,6 @@ pub(crate) fn measured_rows(tab: crate::video_costs::Tab) -> Vec<crate::video_co
                 ("effect_detail", 0.4),
                 ("leaf_holes", 0.4),
                 ("leaf_light", 0.4),
-                ("relief", 0.4),
             ];
             if GPU_RAY_QUERY.get() {
                 // A new world shader each change, and its scene.
@@ -838,8 +831,6 @@ pub fn register(r: &mut Registry) {
     r.config(&FX_REFLECT).int(2, 0, 2);
     // Off by default, low shafts (Ronald, 11-05: "Off by default", "Default to Low").
     r.config(&FX_CONTACT).int(0, 0, 2);
-    // Off until its cost is measured on the Mac and the phone; Max turns it on.
-    r.config(&FX_RELIEF).int(0, 0, 2);
     // Cheap (Tester 2's PC bench, 11-04: +0.04 ms of effects at 1280x720): low until a preset
     // says otherwise; off on the Low preset until the Mac's Retina numbers are in.
     r.config(&FX_VOLUME).int(1, 0, 2);
