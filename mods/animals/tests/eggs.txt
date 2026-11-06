@@ -1,0 +1,124 @@
+# Eggs by species (source/egg, animals_core::eggs): every egg look on a stone platform in the air,
+# ticks frozen, close up in groups (yaw 180 faces +z, where they lie); a nest with a raptor clutch and the wyvern's on its nest;
+# then the egg items held and in the inventory. Shots: eggs_*.png.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /weather clear 99999
+chat /time set 6000
+chat /tk mode creative
+chat /tp 300 104 300
+wait 4
+loaded
+wait 2
+chat /tk fill 296 100 296 306 100 308 stone
+chat /tk mode spectator
+# dinosaurs, a row along x (0.6 apart)
+chat /tk spawn animals:egg_dromaeosaur 300.3 101 300.5
+chat /tk spawn animals:egg_oviraptorid 300.9 101 300.5
+chat /tk spawn animals:egg_ceratopsian 301.5 101 300.5
+chat /tk spawn animals:egg_ankylosaur 302.1 101 300.5
+chat /tk spawn animals:egg_ornithopod 302.7 101 300.5
+chat /tk spawn animals:egg_sauropod 303.3 101 300.5
+# reptiles and fish
+chat /tk spawn animals:egg_crocodilian 300.3 101 302
+chat /tk spawn animals:egg_lizard 300.9 101 302
+chat /tk spawn animals:egg_roe_trout 301.5 101 302
+chat /tk spawn animals:egg_roe_pacu 302.1 101 302
+chat /tk spawn animals:egg_roe_lycoptera 302.7 101 302
+chat /tk spawn animals:egg_roe_lungfish 303.3 101 302
+# birds
+chat /tk spawn animals:egg_bird_owl 300.3 101 303.5
+chat /tk spawn animals:egg_bird_sparrow 300.9 101 303.5
+chat /tk spawn animals:egg_bird_bunting 301.5 101 303.5
+chat /tk spawn animals:egg_bird_raven 302.1 101 303.5
+chat /tk spawn animals:egg_bird_gull 302.7 101 303.5
+chat /tk spawn animals:egg_bird_eagle 303.3 101 303.5
+chat /tk spawn animals:egg_bird_hawk 303.9 101 303.5
+chat /tk spawn animals:egg_bird_vulture 304.5 101 303.5
+chat /tk spawn animals:egg_bird_mesozoic 305.1 101 303.5
+# a nest with a raptor clutch, the wyvern's egg on its nest
+chat /tk spawn animals:nest 298.5 101 298.5
+chat /tk spawn animals:egg_dromaeosaur 298.5 101.02 298.5
+chat /tk spawn animals:egg_dromaeosaur 298.7 101.02 298.5
+chat /tk spawn animals:egg_dromaeosaur 298.3 101.02 298.5
+chat /tk spawn animals:egg_dromaeosaur 298.5 101.02 298.7
+chat /tk spawn animals:nest 304.5 101 306.5
+chat /tk spawn animals:egg_wyvern 304.5 101.02 306.5
+wait 2
+chat /tick freeze
+wait 1
+# dinosaurs, from the front and above
+chat /tp 301.8 101.55 299.3
+look 180 -35
+wait 1
+shot eggs_dinos.png
+chat /tp 301.8 101.35 299.8
+look 180 -20
+wait 1
+shot eggs_dinos_low.png
+# reptiles and fish
+chat /tp 301.8 101.5 300.9
+look 180 -40
+wait 1
+shot eggs_reptiles_fish.png
+# birds
+chat /tp 302.7 101.5 302.3
+look 180 -40
+wait 1
+shot eggs_birds.png
+# the raptor nest and the wyvern's
+chat /tp 298.5 101.8 297.6
+look 180 -45
+wait 1
+shot eggs_raptor_nest.png
+chat /tp 304.5 102.4 305
+look 180 -40
+wait 1
+shot eggs_wyvern_nest.png
+# everything from further off
+chat /tp 302 103 297
+look 180 -35
+wait 1
+shot eggs_all.png
+# the items: held, and in the inventory
+chat /tick unfreeze
+chat /tk mode survival
+chat /tp 300 101 296.5
+wait 1
+chat /tk give animals:raptor_egg 1
+chat /tk give animals:citipati_egg 1
+chat /tk give animals:protoceratops_egg 1
+chat /tk give animals:gastonia_egg 1
+chat /tk give animals:iguanodont_egg 1
+chat /tk give animals:cedarosaurus_egg 1
+chat /tk give animals:yacare_caiman_egg 1
+chat /tk give animals:priscagama_egg 1
+chat /tk give animals:wyvern_egg 1
+chat /tk give animals:brown_trout_egg 1
+chat /tk give animals:pacu_egg 1
+chat /tk give animals:lycoptera_egg 1
+chat /tk give animals:lungfish_egg 1
+chat /tk give animals:great_horned_owl_egg 1
+chat /tk give animals:house_sparrow_egg 1
+chat /tk give animals:snow_bunting_egg 1
+chat /tk give animals:raven_egg 1
+chat /tk give animals:herring_gull_egg 1
+chat /tk give animals:golden_eagle_egg 1
+chat /tk give animals:savanna_hawk_egg 1
+chat /tk give animals:turkey_vulture_egg 1
+chat /tk give animals:confuciusornis_egg 1
+wait 2
+look 180 -10
+key 1
+wait 1
+shot eggs_held_raptor.png
+key 9
+wait 1
+shot eggs_held_wyvern.png
+press core:inventory
+wait 1
+shot eggs_inventory.png
+leave
+wait 2
+quit

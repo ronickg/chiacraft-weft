@@ -32,6 +32,11 @@ shared! {
         /// Quarter turns of the picture.
         TURN_SHIFT = 28,
         TURN_MASK = 3,
+        /// Word 0: a see-through face with another of the same block behind it (its own back
+        /// face not drawn, `CULL_SAME`): what shows through its holes is that block's leaves, not
+        /// what lies past the crown, so packs and the built-in shader fill them (Minecraft's fancy
+        /// leaves draw those faces).
+        BACKED = 0x8000,
         TEX_MASK = 0xFFFF,
         BIOME_SHIFT = 16,
         /// Corner light: a channel per 4 bits, a corner per 16.
@@ -768,6 +773,13 @@ gpu_struct! {
         /// from the eye (0: none this frame), y the index of each cell's own, zw the cells across
         /// the view; 32 slices deep, eight to a row of the image.
         pub froxels: [f32; 4],
+        /// How a world drawn smaller than the screen is scaled up: x `core:upscaler` (0 bilinear, 1
+        /// FSR 1's EASU, 2 Snapdragon GSR 1; `world_upscaled` in common.wgsl), yzw unused.
+        pub upscale: [f32; 4],
+        /// Ray-traced sun and moon shadows (`core:rt_shadows`, a GPU with ray queries): x 1 when
+        /// the world's shader traces them this frame (its prelude then has `rt_sun`; the near shadow
+        /// map then holds the models alone, the far one the terrain as before), yzw unused.
+        pub rt: [f32; 4],
         /// Temporal anti-aliasing (`post::Temporal`, `core:aa`): xy this frame's jitter in NDC
         /// (`view_proj` has it, `taa_prev` not; a clip position's `xy / w - taa.xy` is where it
         /// would be without), z 1 when `taa_prev` holds last frame's camera (0: start anew), w
@@ -1389,6 +1401,7 @@ pub fn prelude(shader: &str, common: &str) -> String {
         s.push_str(SOLID_AT);
         s.push_str(LOD_CORNER);
         s.push_str(MAT_AT);
+        s.push_str(if RT_PRELUDE.load(std::sync::atomic::Ordering::Relaxed) { RT_SUN } else { RT_SUN_OFF });
     }
     s.push_str(CALM_OFF);
     s.push_str(common);
@@ -1396,6 +1409,154 @@ pub fn prelude(shader: &str, common: &str) -> String {
     s
 }
 
+static RT_PRELUDE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Whether the world shader composed next traces its sun shadows (`core:rt_shadows` on a GPU
+/// with ray queries): its prelude then has the scene's bindings and `rt_sun` traces; without, the
+/// same function says the light is open, and nothing in the shader needs ray queries.
+pub fn set_rt_prelude(on: bool) {
+    RT_PRELUDE.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// The world shader's group 1 bindings of ray tracing's scene (`client::world_render::rt`): the
+/// TLAS, the frame's instance table, the see-through records' copies.
+/// Kept well past the world's own (`bindings!`, numbered in order), so new ones there never meet
+/// them.
+pub mod rt_bind {
+    pub const TLAS: u32 = 30;
+    pub const INSTANCES: u32 = 31;
+    pub const RECORDS: u32 = 32;
+}
+
+const RT_SUN_OFF: &str = "
+fn rt_sun(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool) -> vec3<f32> {
+    return vec3(1.0);
+}
+";
+
+/// `rt_sun(rel, n, l, plant)`: how much of the light coming along `l` (unit, toward the sun or
+/// the moon) reaches the surface at `rel` (camera relative) facing `n`, rgb, 0 blocked to 1 open:
+/// one ray through the scene's cubes and distant terrain. A leaf's or a plant's see-through texels
+/// let it by, a stained pane colours it, and water (and any tinted see-through block) lets it
+/// through whole, as the shadow maps did. From a plant (`plant`) the free quads (other plants)
+/// don't shade it, or a meadow would shade itself in specks.
+const RT_SUN: &str = "
+enable wgpu_ray_query;
+const RT_ALPHA_MIP: f32 = 2.0;
+@group(1) @binding(30) var rt_scene: acceleration_structure;
+@group(1) @binding(31) var<storage, read> rt_inst: array<vec4<u32>>;
+@group(1) @binding(32) var<storage, read> rt_records: array<u32>;
+
+// Whether real cubes stand in the column of the distant terrain's hit at `rel` (`Lod::mask`):
+// then the tile isn't there.
+fn rt_lod_hidden(rel: vec3<f32>) -> bool {
+    let half = i32(g.extra.w & 0xFFFFFFu);
+    let d = vec2<i32>(floor((rel.xz + g.cam_frac.xz) / 16.0));
+    if abs(d.x) <= half && abs(d.y) <= half {
+        let col = d + g.cam_cube.xz;
+        let w = 2 * half + 1;
+        let i = u32(((col.y % w) + w) % w * w + ((col.x % w) + w) % w);
+        return ((lod_mask[i / 32u] >> (i % 32u)) & 1u) != 0u;
+    }
+    return false;
+}
+
+struct RtTexel {
+    c: vec4<f32>,
+    // The block's texture is tinted (water, a leaf's biome colour).
+    tinted: bool,
+}
+
+// The texel a see-through record shows where a ray met it: record `rec` of the copy at word
+// `base`, kind 0 a face, 1 a free quad, its triangle `tri` (0: corners 0 1 2, 1: 0 2 3) at
+// barycentrics `b`. Its alpha from a smaller mip (a few texels wide): a leaf's single-texel holes,
+// lined up through a crown's faces, let the light by in pixel-wide specks; the coverage round the
+// point gives the soft dapple a filtered shadow map shows.
+fn rt_texel(base: u32, kind: u32, rec: u32, tri: u32, b: vec2<f32>) -> RtTexel {
+    var uv: array<vec2<f32>, 4>;
+    var tex: u32;
+    var tinted: bool;
+    if kind == 0u {
+        let w0 = rt_records[base + rec * 4u];
+        tex = rt_records[base + rec * 4u + 1u] & FACE_TEX_MASK;
+        tinted = ((w0 >> FACE_TINT_SHIFT) & TINT_MASK) != 0u;
+        let turn = (w0 >> FACE_TURN_SHIFT) & FACE_TURN_MASK;
+        for (var k = 0u; k < 4u; k++) {
+            uv[k] = UVS[(k + turn) % 4u];
+        }
+    } else {
+        let at = base + rec * 8u;
+        tex = rt_records[at + 4u] & FACE_TEX_MASK;
+        let w5 = rt_records[at + 5u];
+        tinted = ((w5 >> QUAD_TINT_SHIFT) & TINT_MASK) != 0u;
+        let q = quad_uv_fine(w5, rt_records[at], rt_records[at + 1u], rt_records[at + 2u], rt_records[at + 3u]);
+        uv = array<vec2<f32>, 4>(vec2(q.x, q.w), vec2(q.z, q.w), vec2(q.z, q.y), vec2(q.x, q.y));
+    }
+    let k1 = select(1u, 2u, tri == 1u);
+    let k2 = select(2u, 3u, tri == 1u);
+    let at = uv[0] * (1.0 - b.x - b.y) + uv[k1] * b.x + uv[k2] * b.y;
+    let t = textures[tex_info[tex * 4u]];
+    let c = textureSampleLevel(t, nearest_clamp, at, 0.0);
+    return RtTexel(vec4(c.rgb, textureSampleLevel(t, linear_mipped, at, RT_ALPHA_MIP).a), tinted);
+}
+
+fn rt_sun(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool) -> vec3<f32> {
+    // Off the surface so it never meets itself: out along its normal (not a plant's blade, which
+    // faces either way and isn't in the plants' rays), then a hair toward the light.
+    let lift = select(n * 0.004, vec3(0.0), plant) + l * 0.002;
+    let mask = select(0xFFu, 0xFFu & ~2u, plant);
+    var rq: ray_query;
+    // The TLAS is in the space of the camera's cube (`world_render::rt`), the camera at `g.cam_frac`.
+    rayQueryInitialize(&rq, rt_scene, RayDesc(RAY_FLAG_TERMINATE_ON_FIRST_HIT, mask, 0.0, 16384.0, rel + lift + g.cam_frac.xyz, l));
+    var through = vec3(1.0);
+    while rayQueryProceed(&rq) {
+        let h = rayQueryGetCandidateIntersection(&rq);
+        let row = rt_inst[h.instance_custom_data];
+        if row.z == 2u {
+            if !rt_lod_hidden(rel + lift + l * h.t) {
+                rayQueryConfirmIntersection(&rq);
+            }
+            continue;
+        }
+        let rec = h.primitive_index / 2u;
+        let texel = rt_texel(row.x, row.z, rec, h.primitive_index % 2u, h.barycentrics);
+        if rec >= row.y {
+            // Translucent: water and tinted panes let it through; stained glass colours it.
+            if !texel.tinted {
+                through *= mix(vec3(1.0), texel.c.rgb, texel.c.a);
+                if max(through.r, max(through.g, through.b)) < 0.02 {
+                    rayQueryConfirmIntersection(&rq);
+                }
+            }
+        } else {
+            // Cutout: as much gets by as the texture's coverage there leaves open.
+            through *= clamp(1.0 - texel.c.a, 0.0, 1.0);
+            if max(through.r, max(through.g, through.b)) < 0.02 {
+                rayQueryConfirmIntersection(&rq);
+            }
+        }
+    }
+    if rayQueryGetCommittedIntersection(&rq).kind != RAY_QUERY_INTERSECTION_NONE {
+        return vec3(0.0);
+    }
+    return through;
+}
+";
+
+/// What goes in front of `rt_expand.wgsl` (ray tracing's scene, `world_render::rt`): the
+/// constants and record decoders, the job, what it reads and writes.
+pub fn rt_expand_prelude() -> String {
+    let mut s = wgsl();
+    s.push_str(&records());
+    s.push_str(concat!(
+        "struct RtJob {\n    src: u32,\n    count: u32,\n    dst: u32,\n    kind: u32,\n    copy: u32,\n    copy_from: u32,\n    pad: vec2<u32>,\n}\n",
+        "var<immediate> job: RtJob;\n",
+        "@group(1) @binding(0) var<storage, read> records: array<u32>;\n",
+        "@group(1) @binding(1) var<storage, read_write> positions: array<f32>;\n",
+        "@group(1) @binding(2) var<storage, read_write> rt_records: array<u32>;\n",
+    ));
+    s
+}
 /// `CALM` in every shader: false, but true in the world's calm pipelines (`WorldRenderer::set_calm`),
 /// used while the scene has no fog in the air (`scene.weather.z` 0), no thunder (`scene.lightning.z`
 /// under 0.05), no held light (`scene.hand_light` 0) and the eye is in no liquid. A pack leaves

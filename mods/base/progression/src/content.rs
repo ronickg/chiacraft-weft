@@ -350,7 +350,14 @@ pub const RULES: &[Rule] = &[
     r(&["base:steel_plate"], 2, Tech, Building, Made),
     r(&["base:polished_obsidian"], 3, Tech, Building, Made),
     r(&["base:bronze_lantern"], 1, Tech, Light, Made),
-    n(&["base:verdigris_copper"], 1, Tech, Building, Not, "a copper block weathered in the open air (`vitals::weathering`); breaks into the copper block"),
+    n(
+        &["base:verdigris_copper"],
+        1,
+        Tech,
+        Building,
+        Not,
+        "a copper block weathered in the open air (`vitals::weathering`); breaks into the copper block",
+    ),
     // ---- machines (redstone: the Age of Steam's first machines)
     n(
         &[

@@ -575,7 +575,8 @@ def allow_for(geo_path):
     exported model the box names are its bones' (`egg1_tilt#0`), so prefixes fit best."""
     mod = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(geo_path))))
     name = os.path.basename(geo_path).replace(".geo.json", "")
-    for base in (name, name.replace("_pup", "").replace("_fly", "")):
+    # A family of models from one source (`egg_<look>` from `source/egg`): its first word's.
+    for base in (name, name.replace("_pup", "").replace("_fly", ""), name.split("_")[0]):
         f = os.path.join(mod, "source", base, "linecheck_allow.txt")
         if os.path.exists(f):
             return tuple(l.split("#")[0].strip() for l in open(f) if l.split("#")[0].strip())
@@ -594,7 +595,10 @@ def texture_for(geo_path, repo):
         hits = glob.glob(os.path.join(mod, "textures", "entity", "**", f"{base}.png"), recursive=True)
         if hits:
             return hits[0]
-    return None
+    # A family's models (`egg_<look>`): textures/entity/<family>/<look>.png.
+    family, _, rest = name.partition("_")
+    p = os.path.join(mod, "textures", "entity", family, f"{rest}.png")
+    return p if rest and os.path.exists(p) else None
 
 
 if __name__ == "__main__":

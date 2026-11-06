@@ -25,7 +25,7 @@ Power grows Ã—1.6 an age: `g(L) = 1.6^(L/10)` over area and item level L (tier Ã
 
 | tier | age | hours | EM | g at start | reference: hit / health / armour | things tagged | made | kit EM | of budget | everything once |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 504 | 151 | 52 | 36 % | 221 EM |
+| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 513 | 151 | 52 | 36 % | 221 EM |
 | 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 52 | 35 | 150 | 52 % | 143 EM |
 | 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 31 | 25 | 60 | 16 % | 266 EM |
 | 3 | Age of Steam | 18 | 1080 | 4.10 | 31.1 / 104 / 130 | 27 | 25 | 94 | 22 % | 281 EM |
@@ -284,7 +284,7 @@ Moving to the next age takes a key, one thing from each gate (materials and tool
 
 Every named item and block, by its tag (`content::RULES`). EM is the cheapest way to have one; "-" not had as an item.
 
-### Stone Age (504)
+### Stone Age (513)
 
 **tech** (45)
 
@@ -302,10 +302,10 @@ Every named item and block, by its tag (`content::RULES`). EM is the cheapest wa
 - sky: eclipse_ash (40)
 - technical: waystone (-)
 
-**beasts** (34)
+**beasts** (43)
 
 - ground: animals:amber_ore (-), animals:termite_mound (0.30)
-- beast: animals:amber (2.0), animals:amber_block (8.1), animals:brown_trout_egg (4.0), animals:carcass (4.0), animals:cedarosaurus_egg (4.0), animals:citipati_egg (4.0), animals:club (0.40), animals:confuciusornis_egg (4.0), animals:crocodyliform_egg (4.0), animals:gastonia_egg (4.0), animals:gobipteryx_egg (4.0), animals:iguanodont_egg (4.0), animals:kibble (0.62), animals:lungfish_egg (4.0), animals:lycoptera_egg (4.0), animals:nest (0.45), animals:pacu_egg (4.0), animals:pinacosaurus_egg (4.0), animals:priscagama_egg (4.0), animals:protoceratops_egg (4.0), animals:psittacosaurus_egg (4.0), animals:raptor_egg (4.0), animals:sedative (1.2), animals:spectacled_caiman_egg (4.0), animals:tranquilizer_dart (1.0), animals:utahraptor_egg (4.0), animals:utahraptor_saddle (7.7), animals:velociraptor_osmolskae_egg (4.0), animals:wyvern_egg (4.0), animals:yacare_caiman_egg (4.0)
+- beast: animals:amber (2.0), animals:amber_block (8.1), animals:brown_trout_egg (4.0), animals:carcass (4.0), animals:cedarosaurus_egg (4.0), animals:citipati_egg (4.0), animals:club (0.40), animals:confuciusornis_egg (4.0), animals:crocodyliform_egg (4.0), animals:gastonia_egg (4.0), animals:gobipteryx_egg (4.0), animals:golden_eagle_egg (4.0), animals:great_horned_owl_egg (4.0), animals:herring_gull_egg (4.0), animals:house_sparrow_egg (4.0), animals:iguanodont_egg (4.0), animals:kibble (0.62), animals:lungfish_egg (4.0), animals:lycoptera_egg (4.0), animals:nest (0.45), animals:pacu_egg (4.0), animals:pinacosaurus_egg (4.0), animals:priscagama_egg (4.0), animals:protoceratops_egg (4.0), animals:psittacosaurus_egg (4.0), animals:raptor_egg (4.0), animals:raven_egg (4.0), animals:savanna_hawk_egg (4.0), animals:sedative (1.2), animals:snow_bunting_egg (4.0), animals:snowy_owl_egg (4.0), animals:spectacled_caiman_egg (4.0), animals:tranquilizer_dart (1.0), animals:turkey_vulture_egg (4.0), animals:utahraptor_egg (4.0), animals:utahraptor_saddle (7.7), animals:velociraptor_osmolskae_egg (4.0), animals:wyvern_egg (4.0), animals:yacare_caiman_egg (4.0)
 - technical: animals:gateway (-), animals:termite_mound_upper (-)
 
 **shared** (421)

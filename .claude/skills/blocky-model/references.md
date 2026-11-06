@@ -58,3 +58,58 @@ Comparing our cut-out planes (antlers, crests, fins) with these: `scripts/render
 - `untamed-wilds/untamedwilds_sunfish_modrinth_port.png`: a tall flat body, speckles painted.
 
 The sheet shown to Ronald: `~/Coding/chiacraft-archive/images/model-skill/2026-11-05/model_refs_sheet.png`.
+
+
+# Eggs (2026-11-06)
+
+Saved 2026-11-06 (Ronald approved, official pages only: minecraft.wiki, the mods' Modrinth/CurseForge
+and GitHub pages) to `~/Coding/chiacraft-archive/references/eggs/<source>/`, each with a
+`CREDITS.md`; `FINDINGS.md` there; the study behind them `reports/Eggs in Minecraft mods.md`.
+16 px a block: double their numbers for our 32. Used by "Eggs" in SKILL.md.
+
+- `eggs/vanilla/vanilla_turtle_egg_block_texture.png`: 4 eggs' UV patches at 1:1, cream with single-texel teal speckles.
+- `eggs/vanilla/vanilla_egg_item.png`: the 10 x 11, 6-colour reference icon, outline in a darkened hue.
+- `eggs/vanilla/vanilla_turtle_egg_item.png`: a speckled icon, 12 x 13, two-tone outline, 2 x 2 highlight.
+- `eggs/vanilla/vanilla_sniffer_egg_item.png`: a huge egg fills the slot (16 x 16), tilted.
+- `eggs/vanilla/vanilla_sniffer_egg_north_texture.png`: bold two-hue patches on a big egg; each face of the one box has its own texture.
+- `eggs/vanilla/vanilla_dragon_egg_texture.png`: 3-colour noise; the stepped boxes carry the shape.
+- `eggs/vanilla/vanilla_turtle_egg_4_render.png`: one box per egg (4 x 7 down to 3 x 4 MC px), about 5-10x life; the texture does the rounding.
+- `eggs/vanilla/vanilla_sniffer_egg_render.png`: one 14 x 16 x 12 box, nearly a whole block, for a huge fantasy egg.
+- `eggs/vanilla/vanilla_dragon_egg_render.png`: the showpiece exception: 6 stepped boxes make a round egg; 1 px steps.
+- `eggs/alexs-mobs/alexsmobs_crocodile_egg_block.png`: the dark ground band on the bottom rows.
+- `eggs/alexs-mobs/alexsmobs_terrapin_egg_block.png`: a 32 px atlas used at 16 texels a block; brown speckles.
+- `eggs/alexs-mobs/alexsmobs_emu_egg_item.png`: a big real egg gets a 14 x 16 icon.
+- `eggs/alexs-caves/alexscaves_vallumraptor_egg.png`: a 4-egg clutch atlas, two-hue single-texel speckles.
+- `eggs/alexs-caves/alexscaves_atlatitan_egg_side.png`: light top to dark base on a full-block egg.
+- `eggs/prehistoric-fauna/prehistoricfauna_allosaurus_egg.png`: banding instead of spots, 8 colours.
+- `eggs/fossils/fossils_egg_triceratops.png`: 64-colour low-contrast noise (what not to do).
+- `eggs/jurassicraft/jurassicraft_velociraptor_egg.png`: 128 x 64 at 32 texels a block, airbrushed (what not to do beside 16 px blocks).
+- `eggs/unusual-prehistory/unusualprehistory_small_egg_base.png`: a 4-grey tintable base (the spawn-egg method).
+- `eggs/naturalist/naturalist_alligator_egg_block.png`: the vanilla turtle-egg layout, plain cream (reuses vanilla's turtle egg templates).
+
+# 3D plants (2026-11-06)
+
+Saved the same way to `~/Coding/chiacraft-archive/references/plants/<source>/`; the survey
+`reports/3D plants in block games.md`. Used by "3D plants" in SKILL.md.
+
+- `plants/fresh-flowers-and-plants/ffp_cherry_grove.webp`: pink petals and sapling as 3D models next to vanilla terrain.
+- `plants/fresh-flowers-and-plants/ffp_birch_forest.webp`: wildflower ground cover, a dense field look.
+- `plants/fresh-flowers-and-plants/ffp_lush_cave.webp`: flowering azalea as a bush model.
+- `plants/fresh-flowers-and-plants/ffp_savanna.webp`: tall grass as a 3D model, biome tinted.
+- `plants/fresh-flowers-and-plants/ffp_desert.webp`: dry grass and dead bush, sparse 3D plants.
+- `plants/3d-crops-revamped/3dcrops_field.webp`: box-model crops in a farm.
+- `plants/vanilla-plus-crops/vpcrops_1.webp`: bushy 4-6 plane crops, tilted planes.
+- `plants/vanilla-plus-crops/vpcrops_2.jpeg`: same bushy tilted-plane crops, another view.
+- `plants/vanilla-plus-crops/vpcrops_3_tall_wheat.jpeg`: tall mature wheat past the block top (32 x 32 textures).
+- `plants/better-foliage/betterfoliage_extra_leaves.jpg`: 45-degree leaf bits breaking the cube outline.
+- `plants/better-foliage/betterfoliage_short_grass.jpg`: grass tufts added on grass blocks: a field from extra quads.
+- `plants/better-foliage/betterfoliage_reeds.jpg`: reeds in shallow water.
+- `plants/better-foliage/betterfoliage_lilypads.jpg`: lily pad with roots and flower: layered planes.
+- `plants/better-foliage/betterfoliage_cactus.jpg`: rounded cactus core with arms: boxes.
+- `plants/better-leaves/betterleaves_performance.png`: the bushy leaf look: plane layers sticking out of a leaf cube (the report calls this the v9 performance banner).
+- `plants/vanilla-3d-extension/v3dext_overview.png`: subtle vanilla-style 3D on blocks (the report expected plants too; this image shows only blocks).
+- `plants/vanilla/vanilla_spore_blossom_render.png`: 1 flat base plus 4 petal planes tilted 22.5 deg out from the block edges (10 quads); the base sits 0.2 px from the petals to avoid z-fighting.
+- `plants/vanilla/vanilla_azalea_render.png`: template_azalea: a cut-out cube shell (walls 0.01 px thick, pulled 0.01 px in) around a cross (14 quads); the bush-shell technique.
+- `plants/vanilla/vanilla_flowering_azalea_render.png`: the same template_azalea shell, only the texture differs.
+- `plants/vanilla/vanilla_pink_petals_4_render.png`: flowerbed: per segment a flat 8 x 8 px card near the ground plus 2 tiny crossed stems (6 quads a segment, 24 full).
+- `plants/vanilla/vanilla_big_dripleaf_render.png`: a top plate at y 15, thin 0.002 px walls and 2 crossed stem planes at +-45 deg (12 quads).

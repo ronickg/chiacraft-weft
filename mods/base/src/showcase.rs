@@ -97,7 +97,13 @@ pub fn register(r: &mut Registry) {
     r.shapeless(C, "frosted_glass", 1, &["#glass", "#sand"], 0);
     r.shapeless(C, "smoked_glass", 1, &["#glass", "#gems/coal"], 0);
     // One pane of each colour set in tin cames.
-    r.shaped(C, "leaded_glass", 3, &["rg", "tb"], &[('r', "#stained_glass/red"), ('g', "#stained_glass/green"), ('b', "#stained_glass/blue"), ('t', "#ingots/tin")]);
+    r.shaped(
+        C,
+        "leaded_glass",
+        3,
+        &["rg", "tb"],
+        &[('r', "#stained_glass/red"), ('g', "#stained_glass/green"), ('b', "#stained_glass/blue"), ('t', "#ingots/tin")],
+    );
     // Sand polishes the stone.
     r.shaped(C, "polished_limestone", 4, &["ll", "ls", "l "], &[('l', "limestone"), ('s', "#sand")]);
     r.shaped(C, "limestone_tiles", 4, &["pp", "pp"], &[('p', "polished_limestone")]);
