@@ -306,12 +306,7 @@ fn cloud_sun_tint() -> vec3<f32> {
 
 // The soft clouds along `dir` from the camera, up to `far` (blocks): rgb the light they send toward
 // the eye (linear), a how much of what is behind still shows.
-// How far over the blocky clouds' height the soft layer's underside stands (blocks), less as rain
-// comes (a storm's deck hangs low): cumulus three hundred blocks across at the blocky clouds'
-// height, 150 blocks over a forest floor, filled every gap in the canopy with one flat grey base,
-// looking up from under the trees (Tester 2's looks4, 11-05); higher, they stand in the sky as
-// clouds with blue between them, as Bliss's do.
-const SOFT_LIFT: f32 = 220.0;
+// (`SOFT_LIFT` is in look.wgsl: the lightning's bolt starts at the soft deck too.)
 
 fn soft_low(s: Sky) -> f32 {
     return s.extra.z + SOFT_LIFT * (1.0 - 0.7 * max(s.axes[0].x, s.axes[0].z));

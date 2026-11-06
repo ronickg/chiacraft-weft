@@ -47,6 +47,7 @@ pub mod stamina;
 pub mod stats;
 pub mod stomach;
 pub mod temperature;
+pub mod waystones;
 pub mod weather_sound;
 pub mod web;
 pub mod web_layout;
