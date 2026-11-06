@@ -343,6 +343,7 @@ impl UiRenderer {
                 blend: Blend::Alpha,
                 cull_back: false,
                 topology: Topology::Triangles,
+                motion: false,
             })
             .map_err(|e| e.0)?;
         Ok((p, fx, gui))

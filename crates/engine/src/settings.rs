@@ -280,6 +280,16 @@ impl Settings {
         number("core:hdr_world") != 0.0
     }
 
+    /// Temporal anti-aliasing (`core:aa` 1, `post::set_motion`), read once at start.
+    pub fn aa(&self) -> bool {
+        number("core:aa") >= 1.0
+    }
+
+    /// Temporal anti-aliasing's least share of each new frame (`core:taa_blend`), live.
+    pub fn taa_blend(&self) -> f32 {
+        (number("core:taa_blend") as f32).clamp(0.03, 0.5)
+    }
+
     /// The mist as a volume for packs that have one (`client::froxels`), live.
     pub fn froxels(&self) -> bool {
         number("core:froxels") != 0.0
