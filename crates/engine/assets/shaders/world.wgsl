@@ -251,7 +251,7 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
 
 fn shade(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
     let lit = shade_unfogged(in, albedo);
-    return vec4(mix(lit.rgb, scene.fog_color.rgb, plain_fog(in.dist)), lit.a);
+    return vec4(fogged(lit.rgb, plain_fog(in.dist)), lit.a);
 }
 
 fn shade_unfogged(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
@@ -278,23 +278,31 @@ fn shade_unfogged(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
 }
 
 // How far the fog has closed in at `dist`: vanilla's from 0.6 of the terrain's end, and (chiacraft)
-// with distant terrain, a far fog from half the cubes' reach out to its end that closes in toward
-// it, as Distant Horizons fogs the land under the horizon. With the fog only from 0.6 of a 4096-block far end, the far land
-// stood clear and dark under a pale horizon (Far view, 11-06: the imported Bliss world with
-// shaders off, the strip under the horizon luma 83 against Minecraft + DH's 112). In a liquid
-// (fog start not 0.6 of its end) only the liquid's.
+// with distant terrain Distant Horizons' instead. With vanilla's only, from 0.6 of a 4096-block far
+// end, the far land stood clear and dark under a pale horizon (Far view, 11-06: the imported Bliss
+// world with shaders off, the strip under the horizon luma 83 against Minecraft + DH's 112). In a
+// liquid (fog start not 0.6 of its end) only the liquid's.
 fn plain_fog(dist: f32) -> f32 {
     let fog = fog_amount(dist, scene.params.x, scene.params.y);
     let near = f32(g.extra.w & 0xFFFFFFu) * 16.0;
     if abs(scene.params.x - 0.6 * scene.params.y) > 0.5 || near <= 0.0 || scene.params.y <= near {
         return fog;
     }
-    // Closing in only over the far half, toward the end (a square): linear from half the cubes'
-    // reach, the land 400-800 blocks out took half its fog and went pale where Minecraft + DH's is
-    // clear (luma 130-145 against 65); as a cube from there, the strip under the horizon still took
-    // a sixth of the sky's blue where theirs stays green (blue 70 against 40, the vista at noon).
-    let t = clamp((dist - 0.5 * scene.params.y) / (0.5 * scene.params.y), 0.0, 1.0);
-    return max(fog, t * t);
+    // Distant Horizons' far fog at its defaults (3.3.4, `GlDhFogShader`, Ronald's own config: start
+    // 0.4 and end 1.0 of its reach, exponential squared at density 2.5), with vanilla's fog off as DH
+    // turns it off: none to 0.4 of the far end, half at 0.6, nearly all at 0.8. (Ours was a square
+    // over the far half: 4% at 0.6, a third at 0.8.)
+    let k = 2.5 * clamp((dist / scene.params.y - 0.4) / 0.6, 0.0, 1.0);
+    return 1.0 - exp(-k * k);
+}
+
+// `c` taken toward the fog by `f`, in gamma as vanilla's screen and Distant Horizons mix it (in linear
+// light the fog's brightness took more than its share).
+fn fogged(c: vec3<f32>, f: f32) -> vec3<f32> {
+    if f <= 0.0 {
+        return c;
+    }
+    return pow(mix(to_gamma(c), to_gamma(scene.fog_color.rgb), f), vec3(2.2));
 }
 
 // Nearest texels with antialiased borders (vanilla 26.1's sampleNearest): up close each texel
@@ -507,7 +515,7 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
         let lit = shade_unfogged(in, vec4(albedo.rgb, 1.0)).rgb;
         let bed = FAR_BED * to_gamma(shade_unfogged(in, vec4(1.0)).rgb / max(in.tint, vec3(0.01)));
         let water = pow(mix(bed, to_gamma(lit), albedo.a), vec3(2.2));
-        return vec4(mix(water, scene.fog_color.rgb, plain_fog(in.dist)), 1.0);
+        return vec4(fogged(water, plain_fog(in.dist)), 1.0);
     }
     // A cutout's clear texels (leaves' gaps) show its colour, not the unset texel's: white under a
     // tint, as the tint then colours it.
