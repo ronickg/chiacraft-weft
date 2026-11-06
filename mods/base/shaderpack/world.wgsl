@@ -692,10 +692,11 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     // A water face seen from inside the water that is not its surface: one the mesher draws where
     // the water meets a cube not loaded yet (at a chunk edge). Water inside water is not there; it
     // showed as flat dark-cyan boxes standing in the sea (Plants' reef, coral_under_w).
-    if in_water() && abs(in.normal.y) <= 0.5 {
+    // (Never with the eye out of liquid: a calm scene's shader has neither, `CALM`.)
+    if !CALM && in_water() && abs(in.normal.y) <= 0.5 {
         discard;
     }
-    if in_water() && abs(in.normal.y) > 0.5 && v.y < 0.0 {
+    if !CALM && in_water() && abs(in.normal.y) > 0.5 && v.y < 0.0 {
         let window = smoothstep(0.55, 0.85, -v.y);
         let sky = mix(0.6, 2.4, window) * mix(0.15, 1.0, brightness_curve(in.light.x));
         return WaterLit(underwater_color() * sky, vec3(0.0), 1.0);
