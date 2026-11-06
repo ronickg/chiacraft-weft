@@ -463,8 +463,9 @@ pub fn register(r: &mut Registry) {
         .reach(8)
         .ground("#plant_soil")
         .density(&TREES)
-        // A forest's clearings keep one tree in four.
-        .thin_in(&STAND_TREES, stand_over(-CLEARING).not(), 4)
+        // A forest's clearings and its cherry groves keep one tree in four (the groves' own trees,
+        // `CHERRY_SITES`, fill them; among a full forest's crowns theirs only showed one or two).
+        .thin_in(&STAND_TREES, stand_over(-CLEARING).and(cherry_grove().not()).not(), 4)
         .shape(tree);
     r.scatter(&GIANT_SITES)
         .cell(24)
@@ -479,7 +480,7 @@ pub fn register(r: &mut Registry) {
         .reach(8)
         .ground("#plant_soil")
         .density(&STAND_TREES)
-        .thin(stand_over(STAND + 1).not(), 0)
+        .thin(stand_over(STAND + 1).and(cherry_grove().not()).not(), 0)
         .shape(tree);
     // Wild cherries in groves (`CHERRY_TREES`): a site per 4 x 4 cell only in the grove patches (a
     // noise some 140 blocks across), among the forest's trees; a little taller than the oaks, so
@@ -489,12 +490,7 @@ pub fn register(r: &mut Registry) {
         .reach(8)
         .ground("#plant_soil")
         .density(&CHERRY_TREES)
-        .thin(
-            Expr::fbm(0xC4E77, vitals::wild::CHERRY_GROVE_SIZE, 1)
-                .ramp(vitals::wild::CHERRY_GROVE_FROM, vitals::wild::CHERRY_GROVE_FROM)
-                .not(),
-            0,
-        )
+        .thin(cherry_grove().not(), 0)
         .shape(cherry);
     // Boulders where a biome has them (`BOULDERS`): a heap of stone two to five blocks across, half
     // sunk in the ground, mossy in the woods and the wet.
@@ -861,6 +857,13 @@ fn tree(s: &mut Site) {
         .and_then(|l| l.pick(s.random() >> 40))
         .unwrap_or(OAK_LOG.id());
     tree_of(s, log);
+}
+
+/// Where the wild cherry groves stand (`vitals::wild::CHERRY_GROVE_*`), as a mask: on in a grove
+/// patch, in any biome (only those with `CHERRY_TREES` grow cherries there; the forests' own trees
+/// thin there, so it's also a small glade in the other woods).
+fn cherry_grove() -> Expr {
+    Expr::fbm(0xC4E77, vitals::wild::CHERRY_GROVE_SIZE, 1).ramp(vitals::wild::CHERRY_GROVE_FROM, vitals::wild::CHERRY_GROVE_FROM)
 }
 
 /// A wild cherry at a grove's site (`CHERRY_SITES`).
