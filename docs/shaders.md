@@ -156,6 +156,8 @@ With `core:aa` 1 the world is drawn a fraction of a pixel aside each frame and g
 ### Sun shadows
 A pack that wants shadows gets the two things it needs from the world shader's prelude: `scene.sun` (xyz points toward the sun, w is how high it stands, 0 at night and in dimensions without sky) and `solid_at(p: vec3<i32>) -> bool`, which says whether the block at `p` casts a shadow (anything that dims sky light, liquids aside). It knows the blocks about 112 blocks around the camera and answers false beyond them, so march from the pixel toward `scene.sun.xyz` through block cells and stop at the first solid one. The engine only keeps these blocks on the GPU while the chosen pack's `world.wgsl` calls `solid_at`, so packs without shadows pay nothing.
 
+Materials (chiacraft): a world shader may call `mat_at(layer, uv, albedo) -> Mat`, the material of a block's texel from its texture's LabPBR maps (`_s`, `_n`; the [textures guide](textures.md#materials)): `smoothness`, `rough` ((1 - smoothness)²), `f0` (rgb, a metal's colour), `metal` (0 or 1), `porosity`, `sss`, `n` (the normal in the texture's frame: x along u, y down v, z out), `ao`, `height`, and `has` (false: the texture has no maps, and the rest is rough stone at 4%, flat). `layer` is the texel's bindless index (`VOut.layer`), `uv` within the texture. `mat_normal(m, n, rel, uv)` tilts a face's normal `n` by it, its frame from the screen's derivatives, so fragment shaders only. The table behind it is `mat_map` (two words per bindless index: the specular map's and the normal map's, all ones none).
+
 Textures and models stay with resource packs, see the [resource packs guide](resourcepacks.md).
 
 ### Tuning chiacraft's look

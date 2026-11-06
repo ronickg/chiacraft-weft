@@ -488,8 +488,14 @@ fn shade_soft(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
 // `shade_soft` before the haze: the light on the surface and the placed lights' glow in the air
 // before it (distant terrain hazes it once for land and water alike, `lod_color`).
 fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
-    let ao = mix(in.ao, 1.0, soft);
-    let n = normalize(mix(normalize(in.normal), vec3(0.0, 1.0, 0.0), soft * 0.5));
+    let n0 = normalize(mix(normalize(in.normal), vec3(0.0, 1.0, 0.0), soft * 0.5));
+    // A texture's material maps (LabPBR `_s`/`_n`, the showcase blocks': polished stone, glazed
+    // tiles, metals, glass; `mat_at` in the prelude): its normal tilts the face's, and below a
+    // metal loses its own diffuse light to the sun's highlight and the sky's reflection. Textures
+    // without maps are as before.
+    let mat = shade_mat(in, albedo_in.rgb);
+    let n = mat_normal(mat, n0, in.rel, fract(in.uv));
+    let ao = mix(in.ao, 1.0, soft) * mat.ao;
     var albedo = albedo_in;
     // Snow lying on the tops of blocks and leaves (not on plants, which it buries). The biome's
     // tint goes onto the light (`in.color`), so the snow takes it off there too: tinted with the
@@ -508,6 +514,9 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     var lit: vec4<f32>;
     if in.slot == 0u {
         lit = vec4(albedo.rgb * light, albedo.a);
+        if mat.has {
+            lit = vec4(lit.rgb * (1.0 - 0.8 * mat.metal) + mat_shine(in, mat, n, albedo.rgb), lit.a);
+        }
         // A low sun full on a bright, saturated yellow-green (the birch's untinted leaves, whose
         // own picture is that green, so `surface_light` never sees them as leaves): some of its
         // colour and brightness held back while the sun is under about 45°. A leaf by the eye at
@@ -580,6 +589,64 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     // The air before it glows with the placed lights' light (the held one is in `haze_lit`).
     let glow = placed_in_fog(in.light.yzw, in.rel, in.pos, in.light.x);
     return vec4(lit.rgb + glow, lit.a);
+}
+
+// The material at this pixel: none for distant terrain, plants, models and far off (from 96 blocks).
+fn shade_mat(in: VOut, albedo: vec3<f32>) -> Mat {
+    if in.dist > 96.0 || in.kind.y != 0u || in.kind.z != 0u || in.slot != 0u {
+        return mat_none();
+    }
+    return mat_at(in.layer, fract(in.uv), albedo);
+}
+
+// Schlick's Fresnel for reflectance `f0` at `cos_v`.
+fn mat_fresnel(f0: vec3<f32>, cos_v: f32) -> vec3<f32> {
+    return f0 + (vec3(1.0) - f0) * pow(1.0 - clamp(cos_v, 0.0, 1.0), 5.0);
+}
+
+// What a material adds on its own (`mat_at`): the sun's highlight (GGX, Smith's visibility),
+// through the same shadow as the rest of the light, and the sky mirrored by Fresnel, blurred toward
+// the zenith's colour the rougher it is and only as far as the sky is open above it (the screen's
+// reflections, `post/reflect.wgsl`, mirror what's nearby on top, `mirror_alpha`).
+fn mat_shine(in: VOut, m: Mat, n: vec3<f32>, albedo: vec3<f32>) -> vec3<f32> {
+    let v = -normalize(in.rel);
+    let l = light_dir();
+    let h = normalize(v + l);
+    let ndl = max(dot(n, l), 0.0);
+    let ndv = max(dot(n, v), 1e-4);
+    let ndh = max(dot(n, h), 0.0);
+    let a = max(m.rough, 0.03);
+    let a2 = a * a;
+    let dd = ndh * ndh * (a2 - 1.0) + 1.0;
+    let d = a2 / (3.14159265 * dd * dd);
+    let vis = 0.5 / max(ndl * sqrt(ndv * ndv * (1.0 - a2) + a2) + ndv * sqrt(ndl * ndl * (1.0 - a2) + a2), 1e-4);
+    let f = mat_fresnel(m.f0, max(dot(v, h), 0.0));
+    var out = vec3(0.0);
+    if ndl > 0.0 && scene.sun.w > 0.0 {
+        let sun = palette().sun * light_strength() * sun_shadow(in, n);
+        out = min(d * vis, 60.0) * f * ndl * sun;
+    }
+    let r = reflect(-v, n);
+    let sky = mix(sky_color(r), sky_color(vec3(0.0, 1.0, 0.0)), clamp(m.rough * 2.0, 0.0, 1.0));
+    let open = smoothstep(0.3, 0.95, in.light.x);
+    // A rough surface mirrors little (its lobe is spread over the whole sky's dimmer average).
+    let gloss = 1.0 - clamp(m.rough * 1.6, 0.0, 0.85);
+    out += mat_fresnel(m.f0, ndv) * sky * open * gloss;
+    return out;
+}
+
+// The world image's alpha for an opaque pixel: SOLID_ALPHA, or for a smooth material (a polished
+// floor, a metal, a glazed tile) minus how much it mirrors, which the screen's reflections then
+// trace (`post/reflect.wgsl`; water writes its own positive share). Only with the HDR world, whose
+// image keeps a negative alpha.
+fn mirror_alpha(in: VOut, albedo: vec3<f32>) -> f32 {
+    let m = shade_mat(in, albedo);
+    if !m.has || scene.frame.x < 0.5 {
+        return SOLID_ALPHA;
+    }
+    let ndv = max(dot(normalize(in.normal), -normalize(in.rel)), 0.0);
+    let f = mat_fresnel(m.f0, ndv);
+    return -luma(f) * smoothstep(0.55, 0.9, m.smoothness);
 }
 
 // 0..1 for puddle cell `c` and key `k`: a sine hash (the pack's `hash3` picked far too few cells,
@@ -951,7 +1018,7 @@ fn opaque(in: VOut) -> vec4<f32> {
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     let albedo = far_flat(in, with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv));
-    return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
+    return vec4(shade(in, albedo).rgb, mirror_alpha(in, albedo.rgb));
 }
 
 fn sample_cutout(in: VOut, nuv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec4<f32> {

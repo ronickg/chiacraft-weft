@@ -1159,6 +1159,9 @@ bindings! {
         // Which blocks around the camera cast shadows, for shader packs that call `solid_at`
         // (`client::world_render::Solid`); a single word otherwise.
         SOLID "solid": "array<u32>",
+        // Material maps per bindless color index (chiacraft): two words each, its LabPBR
+        // specular map's index and its normal map's, all ones: none. `mat_at` reads them.
+        MAT_MAP "mat_map": "array<u32>",
     }
     // `item_boxes`: item models in their own space, kept between frames
     // (`EntityRenderer::item_model`); an item instance is a box in `boxes` whose rows place
@@ -1252,6 +1255,102 @@ fn solid_at(p: vec3<i32>) -> bool {
 }
 ";
 
+/// `mat_at(layer, uv, albedo)`: the material of a block texel (chiacraft), decoded from its
+/// texture's LabPBR 1.3 maps (`mat_map`, `assets::MatMaps`); a texture without maps is rough
+/// stone (F0 0.04, a flat normal), so a pack calling it changes nothing for those. `mat_normal`
+/// tilts a face's normal by the map, from the screen's derivatives (fragment shaders only).
+const MAT_AT: &str = "
+struct Mat {
+    // LabPBR's perceptual smoothness, and roughness = (1 - smoothness)^2.
+    smoothness: f32,
+    rough: f32,
+    // Reflectance at normal incidence, rgb (a metal's colour, or 0.04 for most stone and glass).
+    f0: vec3<f32>,
+    // 1 for a metal (no diffuse light of its own), 0 otherwise.
+    metal: f32,
+    // 0-1: how much water darkens and glosses it in rain; and its subsurface share.
+    porosity: f32,
+    sss: f32,
+    // The normal in the texture's frame: x along u, y along v (down the picture), z out.
+    n: vec3<f32>,
+    ao: f32,
+    height: f32,
+    // Whether the texture has maps at all.
+    has: bool,
+}
+
+fn mat_none() -> Mat {
+    return Mat(0.0, 1.0, vec3(0.04), 0.0, 0.0, 0.0, vec3(0.0, 0.0, 1.0), 1.0, 1.0, false);
+}
+
+// LabPBR's metals 230-237 as F0: iron, gold, aluminium, chrome, copper, lead, platinum, silver.
+fn mat_metal_f0(id: u32, albedo: vec3<f32>) -> vec3<f32> {
+    switch id {
+        case 230u: { return vec3(0.56, 0.57, 0.58); }
+        case 231u: { return vec3(1.00, 0.71, 0.29); }
+        case 232u: { return vec3(0.91, 0.92, 0.92); }
+        case 233u: { return vec3(0.55, 0.56, 0.55); }
+        case 234u: { return vec3(0.95, 0.64, 0.54); }
+        case 235u: { return vec3(0.63, 0.63, 0.63); }
+        case 236u: { return vec3(0.67, 0.64, 0.58); }
+        case 237u: { return vec3(0.95, 0.93, 0.88); }
+        default: { return albedo; }
+    }
+}
+
+fn mat_at(layer: u32, uv: vec2<f32>, albedo: vec3<f32>) -> Mat {
+    var m = mat_none();
+    if layer * 2u + 1u >= arrayLength(&mat_map) {
+        return m;
+    }
+    let si = mat_map[layer * 2u];
+    let ni = mat_map[layer * 2u + 1u];
+    if si == 0xffffffffu {
+        return m;
+    }
+    m.has = true;
+    let sp = textureSampleLevel(textures[si], nearest_clamp, uv, 0.0);
+    m.smoothness = sp.r;
+    m.rough = (1.0 - sp.r) * (1.0 - sp.r);
+    let g = u32(round(sp.g * 255.0));
+    if g >= 230u {
+        m.metal = 1.0;
+        m.f0 = mat_metal_f0(g, albedo);
+    } else {
+        m.f0 = vec3(sp.g);
+    }
+    let b = sp.b * 255.0;
+    m.porosity = select(0.0, b / 64.0, b <= 64.5);
+    m.sss = select(0.0, (b - 65.0) / 190.0, b > 64.5);
+    if ni != 0xffffffffu {
+        let nt = textureSampleLevel(textures[ni], nearest_clamp, uv, 0.0);
+        let xy = nt.rg * 2.0 - 1.0;
+        m.n = vec3(xy, sqrt(max(1.0 - dot(xy, xy), 0.0)));
+        m.ao = nt.b;
+        m.height = nt.a;
+    }
+    return m;
+}
+
+// The face's normal `n` tilted by the material's, at camera-relative `rel` and texture `uv`
+// (the frame from the screen's derivatives: fragment shaders only).
+fn mat_normal(m: Mat, n: vec3<f32>, rel: vec3<f32>, uv: vec2<f32>) -> vec3<f32> {
+    let dp1 = dpdx(rel);
+    let dp2 = dpdy(rel);
+    let du1 = dpdx(uv);
+    let du2 = dpdy(uv);
+    if m.n.z > 0.9999 {
+        return n;
+    }
+    let p2 = cross(dp2, n);
+    let p1 = cross(n, dp1);
+    let t = p2 * du1.x + p1 * du2.x;
+    let b = p2 * du1.y + p1 * du2.y;
+    let k = inverseSqrt(max(max(dot(t, t), dot(b, b)), 1e-12));
+    return normalize(t * k * m.n.x + b * k * m.n.y + n * m.n.z);
+}
+";
+
 /// Every GPU struct as WGSL.
 fn structs() -> String {
     [
@@ -1289,6 +1388,7 @@ pub fn prelude(shader: &str, common: &str) -> String {
     if shader == "world.wgsl" {
         s.push_str(SOLID_AT);
         s.push_str(LOD_CORNER);
+        s.push_str(MAT_AT);
     }
     s.push_str(CALM_OFF);
     s.push_str(common);

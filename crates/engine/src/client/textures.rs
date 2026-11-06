@@ -30,6 +30,8 @@ struct Entry {
     /// Bindless index per frame and of its glow mask (`u32::MAX` none); empty until loaded.
     frames: Vec<u32>,
     glow: Vec<u32>,
+    /// Per frame the bindless indexes of its material maps (specular, normal), `u32::MAX` none.
+    mat: Vec<[u32; 2]>,
     anim: Option<Anim>,
     images: Vec<TextureId>,
     stamp: u64,
@@ -50,6 +52,11 @@ struct Inner {
     glow_buffer: BufferId,
     glow_capacity: usize,
     glow_dirty: bool,
+    /// Material maps per bindless color index (chiacraft): two words each, the specular map's
+    /// index and the normal map's (`u32::MAX` none), on the GPU too.
+    mat_map: Vec<u32>,
+    mat_buffer: BufferId,
+    mat_capacity: usize,
     generation: u64,
     assets: Assets,
     /// Texture id per look text, made at runtime after the fixed ones.
@@ -106,6 +113,7 @@ impl GameTextures {
                     source,
                     frames: Vec::new(),
                     glow: Vec::new(),
+                    mat: Vec::new(),
                     anim: None,
                     images: Vec::new(),
                     stamp: 0,
@@ -135,6 +143,7 @@ impl GameTextures {
         gpu.write_texture(blank, 0, &[0, 0, 0, 0]);
         let blank = (blank, gpu.texture_index(blank));
         let glow_buffer = gpu.create_buffer(4096 * 4, usage::STORAGE, "glow map");
+        let mat_buffer = gpu.create_buffer(8192 * 4, usage::STORAGE, "material map");
         log::info!("textures: {} known ({} of the content), loaded when first used", entries.len(), c.textures.len());
         let t = GameTextures {
             inner: RefCell::new(Inner {
@@ -145,6 +154,9 @@ impl GameTextures {
                 glow_buffer,
                 glow_capacity: 4096,
                 glow_dirty: true,
+                mat_map: Vec::new(),
+                mat_buffer,
+                mat_capacity: 8192,
                 generation: next_generation(),
                 assets: assets.clone(),
                 looks: FxHashMap::default(),
@@ -195,6 +207,7 @@ impl GameTextures {
             source: Source::Layers(parts),
             frames: Vec::new(),
             glow: Vec::new(),
+            mat: Vec::new(),
             anim: None,
             images: Vec::new(),
             stamp: 0,
@@ -251,6 +264,7 @@ impl GameTextures {
             source: Source::Look,
             frames: Vec::new(),
             glow: Vec::new(),
+            mat: Vec::new(),
             anim: None,
             images: Vec::new(),
             stamp: 0,
@@ -281,6 +295,12 @@ impl GameTextures {
     /// The glow map on the GPU, indexed by bindless color index.
     pub fn glow_buffer(&self) -> BufferId {
         self.inner.borrow().glow_buffer
+    }
+
+    /// The material map on the GPU (chiacraft): per bindless color index two words, its
+    /// specular and normal maps' indexes, `u32::MAX` none.
+    pub fn mat_buffer(&self) -> BufferId {
+        self.inner.borrow().mat_buffer
     }
 
     /// Changes whenever textures were loaded, so tables built from them can be redone.
@@ -365,6 +385,15 @@ impl GameTextures {
         let mut words = i.glow_map.clone();
         words.resize(i.glow_capacity, u32::MAX);
         gpu.write_buffer(i.glow_buffer, 0, bytemuck::cast_slice(&words));
+        let need = i.mat_map.len().max(2);
+        if need > i.mat_capacity {
+            gpu.destroy_buffer(i.mat_buffer);
+            i.mat_capacity = need.next_power_of_two();
+            i.mat_buffer = gpu.create_buffer(i.mat_capacity as u64 * 4, usage::STORAGE, "material map");
+        }
+        let mut words = i.mat_map.clone();
+        words.resize(i.mat_capacity, u32::MAX);
+        gpu.write_buffer(i.mat_buffer, 0, bytemuck::cast_slice(&words));
     }
 
     /// The world shader's tables, per texture id. `info`: four words, nothing read past them or
@@ -441,9 +470,10 @@ impl GameTextures {
                 let Some(&o) = loaded.get(&n.entries[k].name) else { continue };
                 if same[k] {
                     let (oe, ne) = (&mut old.entries[o as usize], &mut n.entries[k]);
-                    (ne.frames, ne.glow, ne.images, ne.anim, ne.stamp, ne.size) = (
+                    (ne.frames, ne.glow, ne.mat, ne.images, ne.anim, ne.stamp, ne.size) = (
                         std::mem::take(&mut oe.frames),
                         std::mem::take(&mut oe.glow),
+                        std::mem::take(&mut oe.mat),
                         std::mem::take(&mut oe.images),
                         oe.anim.take(),
                         oe.stamp,
@@ -455,8 +485,17 @@ impl GameTextures {
                         .copied()
                         .zip(ne.glow.iter().copied())
                         .collect();
+                    let mats: Vec<(u32, [u32; 2])> = ne
+                        .frames
+                        .iter()
+                        .copied()
+                        .zip(ne.mat.iter().copied())
+                        .collect();
                     for (f, g) in pairs {
                         set_glow(&mut n.glow_map, f, g);
+                    }
+                    for (f, m) in mats {
+                        set_mat(&mut n.mat_map, f, m);
                     }
                     kept += 1;
                 } else {
@@ -473,6 +512,7 @@ impl GameTextures {
             }
         }
         gpu.destroy_buffer(old.glow_buffer);
+        gpu.destroy_buffer(old.mat_buffer);
         gpu.destroy_texture(blank);
         self.load_requested(gpu);
         self.flush_glow(gpu);
@@ -496,6 +536,14 @@ pub fn layered(assets: &Assets, parts: &[(String, u32)]) -> assets::LoadedTextur
         .collect();
     let refs: Vec<(&assets::LoadedTexture, u32)> = loaded.iter().zip(parts).map(|(l, p)| (l, p.1)).collect();
     assets::layered_texture(&refs)
+}
+
+fn set_mat(map: &mut Vec<u32>, color: u32, mat: [u32; 2]) {
+    let at = color as usize * 2;
+    if at + 2 > map.len() {
+        map.resize(at + 2, u32::MAX);
+    }
+    map[at..at + 2].copy_from_slice(&mat);
 }
 
 fn set_glow(map: &mut Vec<u32>, color: u32, glow: u32) {
@@ -545,7 +593,8 @@ fn upload(gpu: &mut dyn Backend, i: &mut Inner, l: Loaded) {
     let mut images = Vec::new();
     let mut frames = Vec::new();
     let mut glows = Vec::new();
-    for (mips, glow) in l.tex.frames.iter().zip(&l.tex.glow) {
+    let mut mats = Vec::new();
+    for (k, (mips, glow)) in l.tex.frames.iter().zip(&l.tex.glow).enumerate() {
         let t = gpu.create_texture(
             &TextureDesc { width: size, height: size, mips: mips.len() as u32, format: Format::Rgba8Srgb, render_target: false },
             label,
@@ -563,12 +612,32 @@ fn upload(gpu: &mut dyn Backend, i: &mut Inner, l: Loaded) {
             gpu.texture_index(g)
         });
         set_glow(&mut i.glow_map, index, g);
+        // Material maps: linear, one level (read texel by texel, as the glow masks).
+        let m = l
+            .tex
+            .mat
+            .get(k)
+            .and_then(Option::as_ref)
+            .map_or([u32::MAX; 2], |m| {
+                [&m.spec, &m.normal].map(|rgba| {
+                    let t = gpu.create_texture(
+                        &TextureDesc { width: size, height: size, mips: 1, format: Format::Rgba8Unorm, render_target: false },
+                        label,
+                    );
+                    gpu.write_texture(t, 0, rgba);
+                    images.push(t);
+                    gpu.texture_index(t)
+                })
+            });
+        set_mat(&mut i.mat_map, index, m);
         frames.push(index);
         glows.push(g);
+        mats.push(m);
     }
     let en = &mut i.entries[l.entry as usize];
     for t in std::mem::replace(&mut en.images, images) {
         gpu.destroy_texture(t);
     }
-    (en.frames, en.glow, en.anim, en.stamp, en.requested, en.size, en.pixels) = (frames, glows, l.tex.anim, l.stamp, false, size, l.pixels);
+    (en.frames, en.glow, en.mat, en.anim, en.stamp, en.requested, en.size, en.pixels) =
+        (frames, glows, mats, l.tex.anim, l.stamp, false, size, l.pixels);
 }
