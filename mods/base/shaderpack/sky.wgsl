@@ -263,7 +263,10 @@ fn soft_cover(s: Sky, at: vec2<f32>) -> f32 {
     // where the slow field peaks (over 0.6) the billows all passed and a clear day stood under a
     // flat grey deck that never moved off, a birch forest's sky through its gaps grey at every
     // hour (Tester 2's looks4, 11-05, once soft clouds were the default).
-    return clamp(mix(0.46, 0.8, wet) + (field - 0.5) * mix(0.35, 0.5, wet), 0.0, 1.0);
+    // Clear days from 0.40 (0.46 before): about 70 % of the mc_forest sky was cloud, large merged
+    // masses, where Bliss's vista is 59-70 % with more blue between them (Look's clouds.py split,
+    // 11-06).
+    return clamp(mix(0.40, 0.8, wet) + (field - 0.5) * mix(0.35, 0.5, wet), 0.0, 1.0);
 }
 
 // The cloud's density at `at` (its frame, blocks) and `a` (0 at the layer's underside, 1 at its
@@ -277,8 +280,10 @@ fn soft_density(s: Sky, at: vec2<f32>, a: f32, cover: f32, fine: bool) -> f32 {
     // Billows about three hundred blocks across (at half that a clear day's were small wisps
     // beside Photon's cumulus, the soft-clouds sheet, 11-05), leaning a little with height, mixed
     // with the slow field so masses group.
-    let billow = soft_noise(vec3(at.x / 1536.0 + a * 0.04, a * 0.3 + t * 0.0003, at.y / 1536.0)).r;
-    let mass = soft_slice(41u, fract(at / 3072.0) * 64.0).r;
+    // (Two thirds of that, 1024, so a clear day's puffs come apart: Bliss's vista has smaller,
+    // separate ones where ours merged into masses, Look's split at mc_forest, 11-06.)
+    let billow = soft_noise(vec3(at.x / 1024.0 + a * 0.04, a * 0.3 + t * 0.0003, at.y / 1024.0)).r;
+    let mass = soft_slice(41u, fract(at / 2048.0) * 64.0).r;
     // A smaller billow on them, so the puffs are cauliflowers, not smooth marshmallows (11-05).
     let small = soft_noise(vec3(at.x / 384.0 + 0.37, a * 0.8 + t * 0.001, at.y / 384.0)).r;
     let shape = billow * 0.55 + mass * 0.25 + small * 0.2;
