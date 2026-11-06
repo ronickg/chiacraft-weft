@@ -1988,7 +1988,11 @@ fn display(c: vec3<f32>) -> vec3<f32> {
             // (N3: at 0.18 0.5 1.6 all the way the trees went a uniform snow-blue, Bliss's keep a
             // dark green in the blue: a little green kept, 0.85 of the way; PC shnt2.)
             let blue = vec3(0.24, 0.56, 1.4);
-            return max(mix(c, blue * (luma(c) / luma(blue)), night * 0.85), vec3(0.0));
+            // Less of it in the morning's blue hour, whose dim land the dawn lift (`finish_picture`)
+            // brings up to Bliss's 05:00 brightness: all the way, its trees went a flat pale blue
+            // where Bliss's keep their green in the blue (PC shprJ2).
+            let morning = smoothstep(-0.05, 0.05, scene.sun.x) * smoothstep(-0.3, -0.14, scene.sun.y);
+            return max(mix(c, blue * (luma(c) / luma(blue)), night * mix(0.85, 0.6, morning)), vec3(0.0));
         }
         return max(c, vec3(0.0));
     }
