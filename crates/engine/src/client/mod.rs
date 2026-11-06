@@ -2697,6 +2697,22 @@ impl Client {
         self.gpu_terrain.destroy(gpu);
     }
 
+    /// The daylight the lightmap is given (`Scene.params.z`). chiacraft, test only: with
+    /// `--mc-days`, vanilla's own (`getSkyDarken`: the sun's height doubled plus 0.2, then 0.8 of
+    /// it over a floor of 0.2), which the lightmap (`common.wgsl`, 26.1's) was made for. Ours
+    /// (`daylight`) adds 0.5, vanilla's curve for whole sky-light levels, so by 06:00 and 18:00
+    /// vanilla's land had dimmed to 0.73 of noon and ours to 0.95 (Bliss's world, shaders off).
+    fn lightmap_day(&self) -> f32 {
+        let dim = &content().dims[self.world.dim as usize];
+        if !crate::app::api::mc_days() || !dim.sky_light || !dim.daylight.is_empty() {
+            return self.daylight();
+        }
+        let turn = dim.day_turn(self.world.time as f64);
+        let g = ((turn * std::f64::consts::TAU).sin() * 2.0 + 0.2).clamp(0.0, 1.0) as f32;
+        let day = (g * 0.8 + 0.2) * (1.0 - self.look.darkness);
+        if self.lightning > 0.0 { (day + 0.5).min(1.0) } else { day }
+    }
+
     /// Fraction of full daylight for the current dimension and time.
     pub fn daylight(&self) -> f32 {
         // Rain takes away a third of the day, a lightning brings it back for a moment.
@@ -2900,7 +2916,7 @@ impl Client {
             right: inv.transform_vector3(Vec3::X).extend(0.0).to_array(),
             up: inv.transform_vector3(Vec3::Y).extend(0.0).to_array(),
             fog_color: self.fog_color(),
-            params: [fog_start, fog_end, self.daylight(), crate::shaders::time()],
+            params: [fog_start, fog_end, self.lightmap_day(), crate::shaders::time()],
             light: [content().dims[self.world.dim as usize].ambient as f32 / 15.0, self.brightness, ticks, 0.0],
             sun: self.sun(),
             weather: [self.wind.x, self.wind.y, self.fog, self.thunder()],
@@ -3567,10 +3583,10 @@ const FAR_TERRAIN_WAIT: u32 = 10;
 const FAR_DEPTH: f32 = 1200.0;
 
 /// The values of the settings the shader pack reads (`Scene::options`).
-fn pack_options() -> [[f32; 4]; 8] {
-    let mut out = [[0.0; 4]; 8];
+fn pack_options() -> [[f32; 4]; 12] {
+    let mut out = [[0.0; 4]; 12];
     let names = &content().game.config_names;
-    for (i, name) in crate::packs::pack_options().iter().enumerate().take(32) {
+    for (i, name) in crate::packs::pack_options().iter().enumerate().take(48) {
         if let Some(&id) = names.get(name.as_str()) {
             out[i / 4][i % 4] = crate::config::get(id) as f32;
         }

@@ -65,6 +65,9 @@ pub(super) fn frame_of(s: &SkyDef, turn: f64) -> Mat3 {
 
 /// Its path's lean: none under the test flag `--mc-days` (`app::api::mc_days`).
 fn tilt_of(s: &SkyDef) -> f32 {
+    if let Some(t) = crate::app::api::sun_tilt() {
+        return t;
+    }
     if crate::app::api::mc_days() { 0.0 } else { s.tilt }
 }
 
@@ -496,10 +499,18 @@ impl Sky {
                         .map_or(0.0, |&id| crate::config::get(id))
                 };
                 // Past all the terrain there is, distant terrain too; the cost doesn't depend on it.
-                let reach = (setting("core:view_distance") * 16.0)
-                    .max(super::lod::Lod::distance() as f64)
-                    .max(1365.0)
-                    * 1.5;
+                // chiacraft, test only: `--mc-clouds` ends them as vanilla's do, a little past the
+                // view distance where its fog closes (Bliss's instance at 32 chunks: they stop about
+                // 600 blocks out and leave a clear pale band over the horizon, where ours ran on to
+                // it as slivers; Shader and the MC import session, 11-06).
+                let reach = if crate::app::api::launch_options().contains_key("mc-clouds") {
+                    setting("core:view_distance") * 16.0 * 1.2
+                } else {
+                    (setting("core:view_distance") * 16.0)
+                        .max(super::lod::Lod::distance() as f64)
+                        .max(1365.0)
+                        * 1.5
+                };
                 let lifted = s.height as f64 + setting("core:cloud_height");
                 let (x, z) = ((cam.pos.x + time * s.drift as f64 - self.cloud_drift.x) / CELL, (cam.pos.z - self.cloud_drift.y) / CELL);
                 // Vanilla's: rain grays them, the time of day colors them, thunder darkens the rest.

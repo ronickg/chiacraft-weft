@@ -42,12 +42,16 @@ pub static LOOK_SHARPEN: Config<f32> = Config::named("look_sharpen");
 /// distance (1 on, 0 off).
 pub static LOOK_LEAF_SUN: Config<f32> = Config::named("look_leaf_sun");
 pub static LOOK_LEAF_HOLES: Config<f32> = Config::named("look_leaf_holes");
+/// The light through leaves (HDR; Trees, 11-06): 1 a leaf takes the brighter of the sun on its face
+/// and the sun through it (Bliss's leaf subsurface scattering, its SSS types 1-2), 0 none. Off by
+/// default and in the Bliss comparisons: Ronald's Bliss (SSS type 3, no LabPBR pack) has none.
+pub static LOOK_LEAF_LIGHT: Config<f32> = Config::named("look_leaf_light");
 
 /// The pack's `options` line: the settings in the order `look.wgsl` reads them.
 pub const OPTIONS: &str = "base:look_exposure, base:look_sun, base:look_sun_warmth, base:look_fill, base:look_fill_cool, \
 base:look_contrast, base:look_saturation, base:look_shade, base:look_haze, base:look_fog, base:night_light, base:night_moon, \
 base:look_canopy, base:look_shafts, core:view_distance, base:look_storybook, base:fx_night_sky, base:fx_shooting_stars, \
-base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle, base:look_curve, base:look_bloom, base:look_auto_exposure, base:look_sky_light, base:look_foliage_test, base:look_white, base:look_ao_test, base:look_sharpen, base:look_leaf_sun, base:look_leaf_holes";
+base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle, base:look_curve, base:look_bloom, base:look_auto_exposure, base:look_sky_light, base:look_foliage_test, base:look_white, base:look_ao_test, base:look_sharpen, base:look_leaf_sun, base:look_leaf_holes, base:look_leaf_light";
 
 pub fn register(r: &mut Registry) {
     // By day: how bright the picture is taken, the sun's strength and warmth (-1 whiter, +1 toward
@@ -86,4 +90,5 @@ pub fn register(r: &mut Registry) {
     r.config(&LOOK_SHARPEN).float(0.4, 0.0, 1.0);
     r.config(&LOOK_LEAF_SUN).float(1.0, 0.5, 4.0);
     r.config(&LOOK_LEAF_HOLES).float(1.0, 0.0, 1.0);
+    r.config(&LOOK_LEAF_LIGHT).float(0.0, 0.0, 1.0);
 }

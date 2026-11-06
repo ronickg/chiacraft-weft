@@ -414,8 +414,20 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
     // its shade is blue at every distance (sRGB 27 47 69 at noon), where ours went to 0 0 0 in the
     // curve's toe (Tester 2's calm noon: the shaded block sides; more fill light didn't lift them,
     // sh1b). Not at night or in rain.
+    // As much as the view is bright (the exposure's mean against an average sunlit view's), as a
+    // lens's glare is: at a fixed share of the sky's light, a dark forest's shade went a neutral
+    // blue-grey (shaded leaves' hue 172-180°, saturation 0.17-0.20) where Bliss's is green and
+    // near black (69-107°, 0.92-1.0); without the glare ours went green again (Trees' runs
+    // trb_s2, Bliss's world, mc_world_forest). Open land keeps it.
+    var lens = 1.0;
+    if pass_.exposure != 0u {
+        let m = textureLoad(textures[pass_.exposure - 1u], vec2(0, 0), 0).g;
+        if m == m && m > 0.0 {
+            lens = clamp(m / EXPOSURE_REF, 0.0, 1.5);
+        }
+    }
     let p = palette();
-    col += (p.zenith * 0.4 + p.horizon * 0.6) * GLARE_HDR * smoothstep(-0.05, 0.2, scene.sun.y) * (1.0 - rain_amount());
+    col += (p.zenith * 0.4 + p.horizon * 0.6) * GLARE_HDR * lens * smoothstep(-0.05, 0.2, scene.sun.y) * (1.0 - rain_amount());
     if pass_.exposure != 0u {
         let e = textureLoad(textures[pass_.exposure - 1u], vec2(0, 0), 0).g;
         if e == e && e > 0.0 {
