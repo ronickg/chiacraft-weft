@@ -654,13 +654,7 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         let away = smoothstep(0.2, -0.4, mu);
         let low_morning = smoothstep(-0.05, 0.05, scene.sun.x) * (1.0 - smoothstep(0.45, 0.7, scene.sun.y));
         let aw = away * low_morning;
-        // The darkening only from about 1 degree up, none at the horizon itself: full down to it,
-        // the band dipped into a grey strip darker than the sky 2-3 degrees above, right over the
-        // far land (spot C 08:00 161 167 174 under 174 180 188; Bliss's horizon as bright as the sky
-        // above it, 177 188 206; Look's measures, 11-06), and the far hills stood against it as a
-        // flat wall.
-        let lift = smoothstep(0.0, 0.035, dir.y);
-        c = mix(c, blue, k * mix(0.6, 0.85, aw)) * (1.0 - mix(0.4, 0.15, aw) * k * lift);
+        c = mix(c, blue, k * mix(0.6, 0.85, aw)) * (1.0 - mix(0.4, 0.15, aw) * k);
     }
     c += sun_glow(dir, p);
     // In the HDR world the air round the sun glows as bright as it really is (Mie scattering's
