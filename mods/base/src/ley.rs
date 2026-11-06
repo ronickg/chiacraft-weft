@@ -94,10 +94,16 @@ pub fn register(r: &mut Registry) {
         let (x, z) = (st.pos.x, st.pos.z);
         let seed = w.seed();
         let r = ley::read(seed, x, z);
-        let line = r
-            .line
-            .map_or((-1, 0, 0), |l| (l.dist.round() as i64, l.at[0].round() as i64, l.at[1].round() as i64));
-        let node = ley::nodes_near(seed, x as i32, z as i32, 2 * ley::CELL)
+        // The nearest line as far out as the nearest node is looked for (`read` only sees the
+        // lines within the rod's `LINE_REACH`, and past it this printed "-1 blocks, at 0 0":
+        // Tester 2's playtest, 11-06).
+        let line = ley::lines_near(seed, x as i32, z as i32, LOOK)
+            .iter()
+            .map(|l| l.nearest(x, z))
+            .filter(|&(_, d)| d < LOOK as f64)
+            .min_by(|a, b| a.1.total_cmp(&b.1))
+            .map(|(at, d)| (d.round() as i64, at[0].round() as i64, at[1].round() as i64));
+        let node = ley::nodes_near(seed, x as i32, z as i32, LOOK)
             .into_iter()
             .min_by_key(|n| dist2(n, x, z));
         let stone = ley::waystones_near(seed, x as i32, z as i32, 4 * ley::CELL)
@@ -108,8 +114,13 @@ pub fn register(r: &mut Registry) {
         };
         let (nx, nz, nl, nd) = at(node);
         let (sx, sz, _, sd) = at(stone);
+        // No line within `LOOK` (none seen on seed 1, but the text says so rather than -1).
+        let (key, line) = match line {
+            Some(l) => ("command.base.ley", l),
+            None => ("command.base.ley_no_line", (LOOK as i64, 0, 0)),
+        };
         cmd.reply(
-            "command.base.ley",
+            key,
             &[
                 Arg::Float(r.strength as f64, 2),
                 Arg::Key(&format!("ley.base.feel.{}", Feel::of(&r).name())),
@@ -127,6 +138,9 @@ pub fn register(r: &mut Registry) {
         );
     });
 }
+
+/// How far `/ley` looks for the nearest line and node (blocks): two cells of the network.
+const LOOK: i32 = 2 * ley::CELL;
 
 fn dist2(n: &Node, x: f64, z: f64) -> i64 {
     let (dx, dz) = (n.x as i64 - x.floor() as i64, n.z as i64 - z.floor() as i64);
