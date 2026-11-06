@@ -88,6 +88,8 @@ const OPT_SHARPEN: u32 = 29u;
 // a distance (`base:look_leaf_holes`, read raw: 1 on, 0 off).
 const OPT_LEAF_SUN: u32 = 30u;
 const OPT_LEAF_HOLES: u32 = 31u;
+// The light through leaves (`base:look_leaf_light`, read raw: 0 none, 1 on).
+const OPT_LEAF_LIGHT: u32 = 32u;
 
 // The colour a grass or leaf tint is multiplied by for the foliage test: 1 as made.
 fn foliage_test() -> vec3<f32> {
@@ -116,6 +118,15 @@ fn canopy() -> f32 {
 // light level, 0..1) and how closed the canopy is. Other cover (rock, a roof) cuts the sky too, but
 // only in a forest is it leaves; the canopy number tells which.
 const LEAF_LIGHT: vec3<f32> = vec3(0.6, 1.0, 0.5);
+
+// The tint of that light on what stands under the leaves (`light_on`): neutral in the HDR world, as
+// Bliss's (its sky light under a canopy is the sky's own colour, dimmed by the lightmap: crew notes
+// bliss-leaves.md). Tinted, its birch trunks read green, sRGB 69 83 68 at noon against Bliss's
+// 145 142 140, and the floor's grass a cyan-green, hue 98 against 91 (Trees' trb_s3_lk5: neutral
+// 83 83 81 and 82). The fog's light through leaves keeps its green.
+fn under_tint() -> vec3<f32> {
+    return select(LEAF_LIGHT, vec3(1.0), scene.frame.x > 0.5);
+}
 
 fn under_leaves(sky_light: f32) -> f32 {
     // Not in deep cover (a cave in the forest): the leaves' light is from what the sky reaches.
@@ -1021,7 +1032,7 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f
     let steep = look_opt(OPT_SHADE, 1.0);
     let sky = (pow(light.x, 15.0 * steep) * 2.0 + pow(light.x, 2.5 * steep)) / 3.0;
     let under = under_leaves(light.x);
-    let leaves = mix(vec3(1.0), LEAF_LIGHT, under * 0.5);
+    let leaves = mix(vec3(1.0), under_tint(), under * 0.5);
     // More of the sky's light comes from above than from the sides, and less from below: tops 1,
     // sides 0.75, bottoms 0.5 (Complementary's), so shade still shows form.
     // Under rain's overcast more so (tops 1, sides 0.6, bottoms 0.2): the sky's light is nearly all
@@ -1038,7 +1049,7 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f
     // green and soft (a rainforest's floor gets 1-2 % of the sun, more of it this way than from the
     // sky). Without it the floor of Plants' rainforest sat at luma 12-17 at noon, under the daytime
     // targets' 15-60 for deep forest shade (Lighting's canopy check, 11-04).
-    c += p.sun * light_strength() * 0.045 * LEAF_LIGHT * under * hemi * ao;
+    c += p.sun * light_strength() * 0.045 * under_tint() * under * hemi * ao;
     // At golden hour the sky round the low sun glows: a warm fill from its side of the sky, on
     // the faces turned that way; those turned away keep the sky's cool light (Valheim's warm light,
     // blue shade).
