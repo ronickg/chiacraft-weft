@@ -685,9 +685,10 @@ static DEFAULTS: Config<i32> = Config::named("video_defaults");
 /// Saved settings take the new defaults once (the engine saves every setting, so a changed
 /// default alone reaches no one who has played): on a preset, its values for the rows whose
 /// defaults changed; on Custom, a row still at its old default takes the new one, a row the
-/// player changed stays. 1: contact shadows off, light shafts low (11-05).
+/// player changed stays. 1: contact shadows off, light shafts low (11-05). 2: temporal
+/// anti-aliasing on (11-06), from the camera alone on a phone, where it is still off.
 fn new_defaults() {
-    if DEFAULTS.get() >= 1 || QUALITY.get() < 0 {
+    if DEFAULTS.get() >= 2 || QUALITY.get() < 0 {
         return;
     }
     // A script's or benchmark's `--config` values are meant as given.
@@ -695,6 +696,17 @@ fn new_defaults() {
         .iter()
         .any(|o| weft_sdk::client::launch_option(o).is_some())
     {
+        return;
+    }
+    if DEFAULTS.get() >= 1 {
+        // Ronald, 11-06: "Yes, on by default". Saved settings kept the old default (off); a player
+        // who chose a mode keeps it. Applied at the next start (it is read there).
+        if AA.get() == 0 {
+            let aa = if on_phone() { 2 } else { 1 };
+            weft_sdk::info!("video: new defaults, anti-aliasing 0 -> {aa}");
+            AA.set(aa);
+        }
+        DEFAULTS.set(2);
         return;
     }
     let q = QUALITY.get();
@@ -706,6 +718,8 @@ fn new_defaults() {
     FX_CONTACT.set(contact);
     FX_SHAFTS.set(shafts);
     DEFAULTS.set(1);
+    // And the next step at once (`DEFAULTS` 2).
+    new_defaults();
 }
 
 pub fn register(r: &mut Registry) {
