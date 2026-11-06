@@ -31,6 +31,7 @@ pub fn markdown() -> String {
     plant_table(&mut w);
     crop_table(&mut w);
     wild_table(&mut w);
+    canopy_table(&mut w);
     forage_table(&mut w);
     soil_table(&mut w);
     difficulties(&mut w);
@@ -523,6 +524,30 @@ fn wild_table(w: &mut String) {
             .join(", ");
         let _ =
             writeln!(w, "| {} | {:?} | {:?} | {} | {:.1}% | {found} |", p.block, p.form, p.ground, p.gives.unwrap_or("-"), p.cover * 100.0);
+    }
+    let _ = writeln!(w);
+}
+
+fn canopy_table(w: &mut String) {
+    use crate::canopy::{self, Kind, Tier};
+    let _ = writeln!(
+        w,
+        "## Stands of trees\n\nA forest's layers (`vitals::canopy`): each wild tree's site grows under the canopy, in it or over it by its biome's shares; a simple tree's height (to its crown's top) and crown by its kind and layer, a big one a block taller and wider. A canopy tree carries a side lobe {:.0}% of the time. Branched trees grow x{} as tall under the canopy and x{} over it.\n\n| crown | layer | height | crown radius | depth | lobes |\n|---|---|---|---|---|---|",
+        canopy::CANOPY_LOBE * 100.0,
+        canopy::branched_height(Tier::Under),
+        canopy::branched_height(Tier::Emergent)
+    );
+    for kind in [Kind::Round, Kind::Cone, Kind::Slim] {
+        for tier in [Tier::Under, Tier::Canopy, Tier::Emergent] {
+            let c = canopy::crown(kind, tier);
+            let depth = if c.depth == 0 { "a spire".to_string() } else { c.depth.to_string() };
+            let _ = writeln!(w, "| {kind:?} | {tier:?} | {}-{} | {} | {depth} | {} |", c.low, c.low + c.spread - 1, c.radius, c.lobes);
+        }
+    }
+    let _ = writeln!(w, "\n| biome | under | emergent |\n|---|---|---|");
+    for s in canopy::STANDS.iter().chain([&canopy::STAND_ELSE]) {
+        let name = if s.biome.is_empty() { "elsewhere" } else { s.biome };
+        let _ = writeln!(w, "| {name} | {:.0}% | {:.0}% |", s.under * 100.0, s.emergent * 100.0);
     }
     let _ = writeln!(w);
 }

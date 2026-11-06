@@ -58,6 +58,7 @@ Ronald, 11-05: no more PRs to Weft. Engine bugs that are Weft's own are marked *
 | Paths for bodies wider than a block: room across the whole footprint, at the entity's own size and scale (`server/path.rs` `footprint`, `find(.., width)`; a899c90e) | The A* gave every walker a one-cell body, so wide mobs were led between trunks they can't pass and jammed (our big animals, 2-4.5 wide, barely moved in forests) | Yes, a bug fix: vanilla's pathing sizes nodes by the mob's width. With a unit test (`a_wide_body_goes_round_a_gap_it_cannot_pass`) |
 | clippy allows for `mut_from_ref` (0d111b9a, d7ff2255) | A newer clippy made them errors | Trivial |
 | Client: water drips (a solid block under water, air under that) read the block under with `get`: a cube not arrived yet is `u32::MAX` (`client/mod.rs`) | It indexed past the block states and crashed the client a second after arriving by a tarn (water above the sea's level, near the top of what had arrived) | Yes: a plain bug fix |
+| Testkit: the `icon:` UI query takes an item's name as well as its number (`icon:base:part_haft`; `app/api.rs`) | A script can't know an item's number, and the book's recipe slots have no other handle: `crafting_parts.txt` picked parts by the first slot and broke when more than one part could be made | Yes: small, test-only |
 
 ## 2. Rendering, for our shader pack (Bliss-like look)
 

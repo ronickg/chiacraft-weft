@@ -1017,9 +1017,9 @@ const CROWN_UNDER: f32 = 0.5;
 // as even green fields): a crown's top is laid with crowns about `CROWN_CELL` blocks across, each a
 // dome lit by the sun on its side and dark in the gaps between, where the far boxes are too coarse to
 // draw single trees. x: how much of a dome is there (1 its top, 0 a gap), yz: which way it slopes.
-const CROWN_CELL: f32 = 4.0;
+const CROWN_CELL: f32 = 2.5;
 // The domes' mean shade (`crown_clumps` over a cell), what a canopy too far for them still takes.
-const CROWN_MEAN: f32 = 0.72;
+const CROWN_MEAN: f32 = 0.6;
 fn crown_clumps(xz: vec2<f32>) -> vec3<f32> {
     let q = xz / CROWN_CELL;
     let base = vec2<i32>(floor(q));
@@ -1038,7 +1038,12 @@ fn crown_clumps(xz: vec2<f32>) -> vec3<f32> {
         }
     }
     let r = sqrt(best);
-    return vec3(1.0 - smoothstep(0.15, 0.8, r), to / max(r, 1e-4) * smoothstep(0.05, 0.6, r));
+    return vec3(1.0 - smoothstep(0.35, 0.62, r), to / max(r, 1e-4) * smoothstep(0.05, 0.6, r));
+}
+
+// How much of a far crown's colour a face facing `n` keeps: all of it toward the sun, 0.4 turned away.
+fn crown_shade(n: vec3<f32>) -> f32 {
+    return mix(0.4, 1.0, smoothstep(-0.1, 0.5, dot(normalize(n), light_dir())));
 }
 
 // Whether real cubes show this distant tile pixel's column (`Lod::mask`): then they stand there,
@@ -1120,6 +1125,11 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
     if in.kind.w != 0u {
         lit_in.ao = 0.95;
         albedo = vec4(albedo.rgb * in.ao, albedo.a);
+        // The side of a crown turned from the sun is dark, the sky's light cut hard: Distant Horizons
+        // + Bliss's far crowns are yellow-green where the sun falls and near black on their shaded
+        // side and in the gaps, ours sat mid-green with the shade lifted by the sky (spot C sheet,
+        // 11-05). Down to 0.4 of the albedo as a face turns away (`crown_shade`).
+        albedo = vec4(albedo.rgb * crown_shade(in.normal), albedo.a);
         if in.normal.y > 0.5 {
             // Faded by the pixel's smaller side on the ground (seen at a slant its long side runs away
             // and spans blocks), and toward the domes' mean darkness, not to none: a canopy too far
@@ -1129,9 +1139,11 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
             let resolved = 1.0 - smoothstep(0.35, 1.0, fw);
             if amount > 0.0 {
                 let k = crown_clumps(in.pos.xz);
-                let shade = mix(CROWN_MEAN, mix(0.3, 1.12, k.x), resolved);
+                let shade = mix(CROWN_MEAN, mix(0.12, 1.15, k.x), resolved);
                 albedo = vec4(albedo.rgb * mix(1.0, shade, amount), albedo.a);
                 lit_in.normal = normalize(vec3(k.y * 1.5 * amount * resolved, 1.0, k.z * 1.5 * amount * resolved));
+                // The dome's own slope turned from the sun is shaded too (its top's `crown_shade` was flat).
+                albedo = vec4(albedo.rgb * crown_shade(lit_in.normal) / crown_shade(in.normal), albedo.a);
             }
         }
     }

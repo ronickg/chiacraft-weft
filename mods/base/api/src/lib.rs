@@ -749,6 +749,10 @@ pub static CLOAK: EquipmentSlot = EquipmentSlot::named("base:cloak");
 
 pub static OVERWORLD: Dimension = Dimension::named("base:overworld");
 pub static FLATLANDS: Dimension = Dimension::named("base:flatlands");
+/// The Minecraft forest test world (`land::MC_MIX`): the overworld's land on the same seed under
+/// Minecraft's temperate forest mix, for like-for-like comparisons with the Minecraft shader shots.
+/// Reached with `/dim base:mc_forest`; no normal world goes there.
+pub static MC_FOREST: Dimension = Dimension::named("base:mc_forest");
 
 /// What is in the sky of the game's dimensions. Any of them can be changed or taken out by a mod:
 /// `r.sky_body(&OVERWORLD, &MOON).size(40.0)`, `r.sky_remove(&OVERWORLD, &STARS)`.
