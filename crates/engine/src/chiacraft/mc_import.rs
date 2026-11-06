@@ -381,6 +381,12 @@ impl FarTerrain {
     }
 
     /// Column (x, z)'s top height, top block, block under it and biome.
+    /// Water's depth at column (x, z), in blocks down to the bed (deep water counts its
+    /// whole depth); 0 where the top isn't water, `None` outside the grid.
+    pub fn depth(&self, x: i32, z: i32) -> Option<u32> {
+        Some(self.grid.sample(x, z)?.depth as u32)
+    }
+
     pub fn cell(&self, x: i32, z: i32) -> Option<(i32, u32, u32, u32)> {
         let cell = self.grid.sample(x, z)?;
         let st = |i: u16| self.states.get(i as usize).copied().unwrap_or(AIR);
