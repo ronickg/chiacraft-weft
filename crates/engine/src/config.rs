@@ -702,13 +702,15 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // 3 Balanced, 4 Performance, 5 Ultra Performance. Live; only where the renderer has it (the
         // `streamline` build on Windows with NVIDIA's files; `core:gpu_dlss*` say what runs), else off.
         ConfigDef::number("core:dlss", ck::INT, 0.0, 0.0, 5.0, 1.0),
-        // Its model for each mode (the upscaler's own numbers, `UpscalerInfo::models`; DLSS: 0 its
-        // default, 5-6 E-F the CNN models, 10-13 J-M the transformer ones), live.
-        ConfigDef::number("core:dlss_model_dlaa", ck::INT, 0.0, 0.0, 31.0, 1.0),
-        ConfigDef::number("core:dlss_model_quality", ck::INT, 0.0, 0.0, 31.0, 1.0),
-        ConfigDef::number("core:dlss_model_balanced", ck::INT, 0.0, 0.0, 31.0, 1.0),
-        ConfigDef::number("core:dlss_model_performance", ck::INT, 0.0, 0.0, 31.0, 1.0),
-        ConfigDef::number("core:dlss_model_ultra_performance", ck::INT, 0.0, 0.0, 31.0, 1.0),
+        // Its model for each mode (the upscaler's own numbers, `UpscalerInfo::models`; DLSS: 0
+        // NVIDIA's pick, 5-6 E-F the CNN models, 10-13 J-M the transformer ones), live. 13 (M, the
+        // newest transformer) by default (Ronald via Planner, 11-06: M clean where E dithered the
+        // leaves); an upscaler without it uses its own default.
+        ConfigDef::number("core:dlss_model_dlaa", ck::INT, 13.0, 0.0, 31.0, 1.0),
+        ConfigDef::number("core:dlss_model_quality", ck::INT, 13.0, 0.0, 31.0, 1.0),
+        ConfigDef::number("core:dlss_model_balanced", ck::INT, 13.0, 0.0, 31.0, 1.0),
+        ConfigDef::number("core:dlss_model_performance", ck::INT, 13.0, 0.0, 31.0, 1.0),
+        ConfigDef::number("core:dlss_model_ultra_performance", ck::INT, 13.0, 0.0, 31.0, 1.0),
         // Ray Reconstruction (denoising with the upscaling, at the mode's sizes) and its model
         // (DLSS: 0 default, 4-6 D-F), live.
         ConfigDef::number("core:dlss_rr", ck::BOOL, 0.0, 0.0, 1.0, 0.0),

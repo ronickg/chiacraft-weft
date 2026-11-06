@@ -36,8 +36,8 @@ static DLSS5: Config<bool> = Config::named("core:dlss5");
 static DLSS5_INTENSITY: Config<f32> = Config::named("core:dlss5_intensity");
 
 const MODE_NAMES: [&str; 6] = ["off", "dlaa", "quality", "balanced", "performance", "ultra_performance"];
-/// DLSS's model numbers and their words (`video.base.value.model_<key>`): 0 NVIDIA's default for
-/// the mode, E and F the older CNN models, J and K the first transformer, L and M the second
+/// DLSS's model numbers and their words (`video.base.value.model_<key>`), M (13) the engine's
+/// default for every mode: 0 NVIDIA's pick for the mode, E and F the older CNN models, J and K the first transformer, L and M the second
 /// (NVIDIA's DLSS Programming Guide 3.12); the upscaler says which it has.
 const MODEL_KEYS: [(i32, &str); 7] = [(0, "default"), (5, "e"), (6, "f"), (10, "j"), (11, "k"), (12, "l"), (13, "m")];
 /// Ray Reconstruction's: D, E and F (F the latest, its default).
