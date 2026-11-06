@@ -373,16 +373,42 @@ fn fs_translucent(in: VOut) -> @location(0) vec4<f32> {
     return shade(in, albedo);
 }
 
-// Distant terrain (`client::lod`): a record is the `dir` face of a box in its tile, drawn in the
-// average color of its texture (the smallest mip), full sky light. Its pixels in columns whose
-// cubes show their ground are dropped (`lod_mask`); it sits a little lower so the cubes win
-// along the edges.
+// Distant terrain (`client::lod`): a record is the `dir` face of a box in its tile, drawn with its
+// block's texture laid block by block (its mips far off), its overlay and tint, and vanilla's
+// corner shade (chiacraft, after upstream Weft f69243fd, PR #107; it was the texture's average
+// colour, flat), full sky light. Its pixels in columns whose cubes show their ground are dropped
+// (`lod_mask`); it sits a little lower so the cubes win along the edges.
+fn lod_uv(dir: u32, p: vec3<f32>) -> vec2<f32> {
+    if dir == 2u || dir == 3u {
+        return p.xz;
+    }
+    if dir == 0u {
+        return vec2(p.z, -p.y);
+    }
+    if dir == 1u {
+        return vec2(-p.z, -p.y);
+    }
+    if dir == 4u {
+        return vec2(-p.x, -p.y);
+    }
+    return vec2(p.x, -p.y);
+}
+
 @vertex
 fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut {
     let f = vi / 4u;
-    let c = vi % 4u;
     let w0 = records[f * 4u];
     let w1 = records[f * 4u + 1u];
+    // The corner shade (a smooth cell has none); the quad split along its lighter diagonal, as the
+    // cubes' faces.
+    var a = vec4<u32>(3u);
+    if lod_dir(w0) != LOD_FACE_GRID {
+        a = lod_ao(records[f * 4u + 3u]);
+    }
+    var c = vi % 4u;
+    if a.x + a.z < a.y + a.w {
+        c = (c + 1u) % 4u;
+    }
     // A box's face, or a far tile's smooth cell (`lod_corner`, in the prelude).
     let corner = lod_corner(f, c, finish(vec3(0.0), origins[ii]).xyz);
     let dir = corner.dir;
@@ -391,25 +417,34 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     var out: VOut;
     out.clip = scene.view_proj * pos;
     out.dist = length(pos.xyz);
-    out.uv = pos.xz;
-    let fr = texture_frame(w1 & FACE_TEX_MASK);
+    let o = origins[ii] + g.cam_cube;
+    out.pos = vec3<f32>(o.xyz * 16) + local;
+    out.uv = lod_uv(dir, out.pos + vec3(0.0, 0.125, 0.0));
+    let tex_id = w1 & FACE_TEX_MASK;
+    let fr = texture_frame(tex_id);
     out.size = fr.size;
     out.layer = fr.a;
     out.layer2 = fr.b;
     out.blend = fr.blend;
     out.glow = 0xffffffffu;
     out.slot = 0u;
-    out.overlay = 0u;
     out.light = vec4(1.0, 0.0, 0.0, 0.0);
-    let o = origins[ii] + g.cam_cube;
-    out.pos = vec3<f32>(o.xyz * 16) + local;
     let kind = lod_tint(w0);
     var tint = vec3(1.0);
     if kind != 0u {
         tint = unpack_rgb(biomes[corner.biome * g.extra.z + kind - 1u]);
     }
     out.tint = tint;
-    out.color = tint * SHADE[dir];
+    let shade = SHADE[dir] * AO[a[c]];
+    // With an overlay the overlay takes the tint, the base none (as the cubes' faces).
+    let ov = frames[g.extra.x + tex_id];
+    if ov != 0u {
+        out.overlay = texture_frame(ov - 1u).a + 1u;
+        out.color = vec3(shade);
+    } else {
+        out.overlay = 0u;
+        out.color = tint * shade;
+    }
     return out;
 }
 
@@ -425,9 +460,14 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
             discard;
         }
     }
-    var albedo = textureSampleLevel(textures[in.layer], linear_mipped, vec2(0.5), 16.0);
-    if in.blend > 0.0 {
-        albedo = mix(albedo, textureSampleLevel(textures[in.layer2], linear_mipped, vec2(0.5), 16.0), in.blend);
-    }
+    let du = dpdx(in.uv);
+    let dv = dpdy(in.uv);
+    let nuv = nearest_uv(in.size, fract(in.uv), du, dv);
+    var albedo = with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv);
+    // A cutout's clear texels (leaves' gaps) show its colour, not the unset texel's: white under a
+    // tint, as the tint then colours it.
+    let cover = smoothstep(0.1, 0.6, albedo.a);
+    let tinted = any(in.tint != vec3(1.0));
+    albedo = vec4(mix(select(albedo.rgb, vec3(1.0), tinted), albedo.rgb, cover), 1.0);
     return vec4(shade(in, albedo).rgb, 1.0);
 }

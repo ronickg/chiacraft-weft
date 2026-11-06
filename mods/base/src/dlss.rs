@@ -77,6 +77,11 @@ fn model_word(keys: &[(i32, &'static str)], id: i32) -> (String, i64) {
 /// A row: its name, its value (a word, or a number with an empty word), the arrows step it and
 /// with `rebuild` open the tab again (rows that come and go with it), and what it does.
 fn row(ui: &mut Ui, key: &'static str, shown: fn() -> (String, i64), step: fn(i32), rebuild: bool) {
+    row_costed(ui, key, shown, step, rebuild, None);
+}
+
+/// `row`, with what its value costs here (`video_costs`) from `value` (the setting as a number).
+fn row_costed(ui: &mut Ui, key: &'static str, shown: fn() -> (String, i64), step: fn(i32), rebuild: bool, value: Option<fn() -> f64>) {
     ui.row(S::row().gap(3.0).center(), move |ui| {
         ui.text_styled(S::default().w(84.0).no_wrap(), &format!("video.base.{key}"), &[]);
         ui.button("video.base.less", S::default().size(12.0, 12.0).pad(0.5), move |c| {
@@ -101,18 +106,52 @@ fn row(ui: &mut Ui, key: &'static str, shown: fn() -> (String, i64), step: fn(i3
                 c.client().screen_open(&SCREEN);
             }
         });
+        match value {
+            Some(get) => crate::video_costs::cost_cell(ui, key, get),
+            None => ui.row(S::row().w(40.0), |_| {}),
+        }
         ui.text_styled(S::default().class("dim").max_w(150.0), &format!("video.base.{key}.what"), &[]);
     });
 }
 
 fn mode_row(ui: &mut Ui) {
-    row(
+    row_costed(
         ui,
         "dlss",
         || (MODE_NAMES[mode() as usize].to_string(), 0),
         |dir| MODE.set(cycle(&[0, 1, 2, 3, 4, 5], mode(), dir, |m| m == 0 || bit(MODES.get(), m))),
         true,
+        Some(|| mode() as f64),
     );
+}
+
+/// The rows the DLSS tab's measuring steps through (`video_costs`): the modes the upscaler offers,
+/// and Ray Reconstruction where it runs; none without an upscaler.
+pub(crate) fn measured_rows() -> Vec<crate::video_costs::Measured> {
+    if !available() {
+        return Vec::new();
+    }
+    let mut rows = vec![crate::video_costs::Measured {
+        key: "dlss",
+        values: (0..6)
+            .filter(|&m| m == 0 || bit(MODES.get(), m))
+            .map(|m| m as f64)
+            .collect(),
+        get: || mode() as f64,
+        set: |v| MODE.set(v as i32),
+        // A new render size for the world each change.
+        settle: 1.0,
+    }];
+    if RR_OK.get() {
+        rows.push(crate::video_costs::Measured {
+            key: "dlss_rr",
+            values: vec![0.0, 1.0],
+            get: || RR.get() as u8 as f64,
+            set: |v| RR.set(v > 0.0),
+            settle: 1.0,
+        });
+    }
+    rows
 }
 
 fn model_row(ui: &mut Ui) {
@@ -130,7 +169,14 @@ fn model_row(ui: &mut Ui) {
 }
 
 fn rr_row(ui: &mut Ui) {
-    row(ui, "dlss_rr", || (if RR.get() { "on" } else { "off" }.into(), 0), |_| RR.set(!RR.get()), true);
+    row_costed(
+        ui,
+        "dlss_rr",
+        || (if RR.get() { "on" } else { "off" }.into(), 0),
+        |_| RR.set(!RR.get()),
+        true,
+        Some(|| RR.get() as u8 as f64),
+    );
 }
 
 fn rr_model_row(ui: &mut Ui) {
@@ -179,6 +225,7 @@ pub fn register(r: &mut Registry) {
             }),
         ];
         crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.dlss.title", &tabs, |ui| {
+            crate::video_costs::top_line(ui, &SCREEN, measured_rows, |_| None);
             ui.row(S::row().gap(3.0), |ui| {
                 ui.row(S::row().w(84.0), |_| {});
                 ui.text_bind_styled(S::default().class("dim").max_w(260.0), |_, t| {
