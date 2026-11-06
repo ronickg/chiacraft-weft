@@ -1056,7 +1056,10 @@ fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
     // much. Well above the low layer, or under the ground, the banks barely count: their mean
     // stands in and no noise is walked.
     var banks = 0.3;
-    if low * open > 0.02 {
+    // In the HDR world the banks are walked near what the ray ends on too, for the wisps in the
+    // crowns below.
+    let near_floor = scene.frame.x > 0.5 && p.y - floor < 14.0 && p.y < SEA_LEVEL + MIST_TOP + 50.0;
+    if low * open > 0.02 || near_floor {
         let drift = vec3(wind_now().x, 0.0, wind_now().y) * scene.params.w * mix(0.6, 2.0, s);
         let q = p - drift;
         let broad = noise3(q * vec3(1.0 / 38.0, 1.0 / 12.0, 1.0 / 38.0));
@@ -1074,8 +1077,30 @@ fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
         // As the sun climbs the banks lift and dissolve into a thin even haze (they burned off as
         // grey smudges on the forest by 08:00, the checkpoint sheet).
         let b = mix(smoothstep(0.25, 0.75, banks), 0.3, smoothstep(0.15, 0.45, scene.sun.y));
-        // Lying in the valleys only, the dawn mist's amount read thin (the mist-height sheet): the
-        // low layer two and a half times as dense there, none higher up.
+        // A dense layer up to a sharp top at the mist line (sea level + MIST_TOP), as Bliss's,
+        // Photon's and Unbound's valley mist: it fills the low land to an edge that crowns and
+        // ridges stand out of, the banks only varying it inside (a soft fall with height read as a
+        // thin even veil with no top: the MC comparison's natural-mist sheets, 11-05). Storms' dust
+        // and snow keep the old shape.
+        if s < 0.5 {
+            // The top heaves with the banks, up to 5 blocks either way, so it is a lumpy sea that
+            // crowns break through, not a flat sheet (a level top laid straight stripes along
+            // every terrace of a valley's sides: spot A's first layer sheet, 11-06).
+            let top = SEA_LEVEL + MIST_TOP + (b - 0.45) * 10.0;
+            // The top a little softer (6 blocks of fade, not 5.5: the pancakes along the river
+            // had cut edges, try 2's sheet).
+            let layer = 1.0 - smoothstep(top - 5.0, top + 2.5, p.y);
+            // Wisps in the crowns above the layer, in patches: Bliss's dawn mist lies among the
+            // tree tops all over, not only in the valleys (try 2 left the forests above the mist
+            // line clear, the mist flat pancakes on the rivers). Within a few blocks of what the
+            // ray ends on, in the banks' thick parts only; gone by the time the sun is 30° up.
+            // Not above about 40 blocks over the mist line: a ray into the sky has its floor at the
+            // eye, and wisps there drew a dark orange band along the horizon (try 3's sheet). Their
+            // edges soft (hard-edged blobs on the crowns, the same sheet).
+            let wisp = exp(-max(p.y - floor, 0.0) / 5.0) * smoothstep(0.4, 0.9, smoothstep(0.25, 0.75, banks))
+                * (1.0 - smoothstep(0.2, 0.5, scene.sun.y)) * (1.0 - layer) * (1.0 - smoothstep(top + 25.0, top + 45.0, p.y));
+            return f * open * burn * (layer * mix(2.2, 5.5, b) + wisp * 1.8 + 0.012 * high) * 0.11;
+        }
         return f * open * burn * (low * (mix(0.05, 0.7, s) + mix(6.5, 0.6, s) * b) + 0.012 * high) * 0.11;
     }
     return f * open * burn * (low * (mix(0.05, 0.7, s) + mix(1.7, 0.6, s) * banks) + 0.06 * high) * 0.11;
@@ -1299,7 +1324,23 @@ fn froxel_cell(dir: vec3<f32>, at: f32, floor: f32) -> vec4<f32> {
     if scene.frame.z > 0.5 && scene.frame.z < 6.0 {
         lit = lit * 0.5 + (sun_reaches(dir * (at - span * 0.4)) + sun_reaches(dir * (at - span * 0.1)) + sun_reaches(dir * (at + span * 0.4))) / 6.0;
     }
-    return vec4(mix(shaded_sky, light.sky, lit) + light.sun * lit + lightning_glow_at(dir * at) * 0.6, d);
+    return vec4(mix(shaded_sky, light.sky, lit) + light.sun * lit + mist_bounce(d, lit) + lightning_glow_at(dir * at) * 0.6, d);
+}
+
+// Sunlight scattered many times in a dense mist (the HDR world): a thick bank glows all round like
+// a white surface in the sun, not only toward it, and light creeps into its shaded parts. Single
+// scattering alone (forward-peaked) left the valley mist across the sun a dim brown-orange sheet
+// under green hills, where Bliss's is a bright gold sea (spot A's layer sheet, 11-06). Only where
+// the mist is dense (the valley layer, about 0.03 a block), so the thin haze up high stays clear.
+fn mist_bounce(d: f32, lit: f32) -> vec3<f32> {
+    if scene.frame.x < 0.5 {
+        return vec3(0.0);
+    }
+    let p = palette();
+    let warm = 1.0 - smoothstep(0.1, 0.65, scene.sun.y);
+    let thick = smoothstep(0.003, 0.03, d);
+    let tint = mix(vec3(1.0), vec3(1.0, 0.78, 0.5), warm);
+    return p.sun * tint * light_strength() * mix(lit, 1.0, 0.45) * thick * 0.16 * look_opt(OPT_FOG, 1.0);
 }
 
 // How much snow lies on a surface with normal `n` at `pos` (world) with `sky` light: on what
