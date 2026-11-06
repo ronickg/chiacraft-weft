@@ -3231,6 +3231,13 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         let s = crate::diag::span("shadows");
         g.client
             .render_shadows(&mut *r.gpu, &mut r.list, world_info);
+        // `core:rt_shadows` changed: the world shader composed again, tracing or not (the next
+        // frame draws with it).
+        if g.client.render.rt_reload {
+            g.client
+                .render
+                .reload_shaders(&mut *r.gpu, &r.textures, &r.assets);
+        }
         // The mist's volume, which reads the shadow maps, before the world that reads it.
         r.list.append(&mut g.client.sky.froxels.passes);
         drop(s);

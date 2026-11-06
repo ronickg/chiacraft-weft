@@ -592,6 +592,9 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // measurable cost, more far hills and crowns shadowed: Far view, 11-05) and 400 without
         // (today's look as made); a number sets it (`client::prepare_shadows`).
         ConfigDef::number("core:shadow_far", ck::INT, 0.0, 0.0, 2400.0, 100.0),
+        // Sun and moon shadows traced through the scene instead of the shadow maps, on a GPU with
+        // ray queries (Vulkan's; not the Mac or phones): ultra, off unless chosen.
+        ConfigDef::number("core:rt_shadows", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         // The soft clouds' shadow on the land (with the HDR world; `client::cloud_shadow`).
         ConfigDef::number("core:cloud_shadows", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         // Vanilla's: in GUI pixels, and percent of the dark behind the text.
