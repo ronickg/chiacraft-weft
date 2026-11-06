@@ -18,9 +18,75 @@ pub const HOOK: Hook = Hook {
     fallback: "return p.color;",
 };
 
+/// An effect's half-size part (chiacraft): `shaders/post_low/<name>.wgsl`, `fn low(p: PostPixel) ->
+/// vec4<f32>`, drawn before the effects into an image of its own a quarter the pixels, which the
+/// effect of the same name reads (`p.low`, `post_low_upsampled`).
+pub const HOOK_LOW: Hook = Hook {
+    kind: "post_low",
+    entry: "low",
+    dispatch: "post_low",
+    params: "p: PostPixel",
+    args: "p",
+    ret: "vec4<f32>",
+    fallback: "return vec4(0.0);",
+};
+
+static HDR: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// The HDR world (chiacraft, `core:hdr_world`): set once at start, before any pipeline is made, as
+/// every pipeline drawing into the world must have its image's format.
+pub fn set_hdr(on: bool) {
+    HDR.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Whether the world is drawn in 16-bit float, the screen effects after it and the picture finished
+/// in the last pass (`Pass::spare` 1 there, for a pack's tone curve).
+pub fn hdr() -> bool {
+    HDR.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+static BLOOM: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Whether the last frame drew the HDR world's bloom pyramid (`Pass::bloom`): a pack's own bloom
+/// effect then leaves the glow to its last pass (`Scene::frame` y).
+pub fn bloom() -> bool {
+    BLOOM.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// The HDR world's bloom pyramid and exposure (chiacraft): the images the pack's `fs_bloom_down`
+/// draws, each half the one before, from half the world's size; those `fs_bloom_up` draws back up,
+/// each the level below it blended with the wider one over it; and two 1x1 exposure texels
+/// (`fs_exposure`), this frame's from last frame's.
+struct Pyramid {
+    size: (u32, u32),
+    down: Vec<(TextureId, u32, (u32, u32))>,
+    up: Vec<(TextureId, u32, (u32, u32))>,
+    exposure: [(TextureId, u32); 2],
+    /// Which exposure texel this frame writes.
+    flip: usize,
+    /// The levels asked for (fewer are made for a small world), and whether the exposure has no
+    /// last frame yet (its pass is told, `spare` 1, and starts from this frame's alone).
+    levels: usize,
+    fresh: bool,
+}
+
+/// The format of the image the world is drawn into: the screen's, or 16-bit float.
+pub fn world_format() -> Format {
+    if hdr() { Format::Rgba16Float } else { Format::Surface }
+}
+
 pub struct Post {
     pipeline: Option<PipelineId>,
+    /// With the HDR world: the same shader drawing the last pass onto the screen (its format).
+    final_pipe: Option<PipelineId>,
     slots: Slots,
+    /// The half-size parts' pipeline and slots (`HOOK_LOW`), and each effect's image for it:
+    /// (name, texture, bindless index, size).
+    low_pipe: Option<PipelineId>,
+    low_slots: Slots,
+    low_targets: Vec<(String, TextureId, u32, (u32, u32))>,
+    /// Whether the half-size parts run (`core:post_low`); off, the effects do their full work.
+    pub use_low: bool,
     /// Effects on, in the order they were turned on: (name, strength).
     pub active: Vec<(String, f32)>,
     /// Two images the size of the screen (scene and the one after each pass), with their
@@ -34,15 +100,27 @@ pub struct Post {
     copy_pipe: Option<PipelineId>,
     behind: Option<([TextureId; 2], [u32; 2], (u32, u32))>,
     copy_params: Vec<BufferId>,
+    /// The HDR world's bloom pyramid and exposure: the pack's three passes (down, up, exposure),
+    /// their images, how many levels to draw (`core:bloom`: 0 none, 4 or 6) and when the last
+    /// frame was, for the exposure's easing.
+    bloom_pipes: Option<[PipelineId; 3]>,
+    pyramid: Option<Pyramid>,
+    pub bloom_levels: u32,
+    last_frame: Option<std::time::Instant>,
 }
 
-const MAX_PASSES: usize = 16;
+const MAX_PASSES: usize = 40;
 
 impl Post {
     pub fn new(gpu: &mut dyn Backend, assets: &Assets) -> Post {
         let mut p = Post {
             pipeline: None,
+            final_pipe: None,
             slots: Slots::default(),
+            low_pipe: None,
+            low_slots: Slots::default(),
+            low_targets: Vec::new(),
+            use_low: true,
             active: Vec::new(),
             targets: None,
             params: Vec::new(),
@@ -50,6 +128,10 @@ impl Post {
             copy_pipe: None,
             behind: None,
             copy_params: Vec::new(),
+            bloom_pipes: None,
+            pyramid: None,
+            bloom_levels: 6,
+            last_frame: None,
         };
         p.reload(gpu, assets);
         p
@@ -57,16 +139,36 @@ impl Post {
 
     pub fn reload(&mut self, gpu: &mut dyn Backend, assets: &Assets) {
         let snippets = crate::shaders::snippets(assets, &HOOK);
-        let made = crate::packs::compose(assets, "post.wgsl", &[(&HOOK, &snippets)])
+        let low_snippets = crate::shaders::snippets(assets, &HOOK_LOW);
+        let made = crate::packs::compose(assets, "post.wgsl", &[(&HOOK, &snippets), (&HOOK_LOW, &low_snippets)])
             .map_err(|e| e.0)
             .and_then(|(s, mut slots)| {
+                // The half-size parts' pipeline (`fs_low`), when there are any.
+                let low_slots = slots.pop().unwrap_or_default();
+                let low = (!low_slots.names.is_empty())
+                    .then(|| {
+                        gpu.create_pipeline(&PipelineDesc {
+                            label: "post low",
+                            shader: &s,
+                            vertex: "vs",
+                            fragment: Some("fs_low"),
+                            color: Some(Format::Rgba16Float),
+                            depth: None,
+                            blend: Blend::None,
+                            cull_back: false,
+                            topology: Topology::Triangles,
+                        })
+                        .map_err(|e| log::warn!("post: no half-size parts: {}", e.0))
+                        .ok()
+                    })
+                    .flatten();
                 let p = gpu
                     .create_pipeline(&PipelineDesc {
                         label: "post",
                         shader: &s,
                         vertex: "vs",
                         fragment: Some("fs"),
-                        color: Some(Format::Surface),
+                        color: Some(world_format()),
                         depth: None,
                         blend: Blend::None,
                         cull_back: false,
@@ -80,7 +182,7 @@ impl Post {
                         shader: &s,
                         vertex: "vs",
                         fragment: Some("fs_copy_behind"),
-                        color: Some(Format::Surface),
+                        color: Some(world_format()),
                         depth: Some(DepthState { write: true, compare: Compare::Always }),
                         blend: Blend::None,
                         cull_back: false,
@@ -88,10 +190,69 @@ impl Post {
                     })
                     .map_err(|e| log::warn!("post: no copy of the world for water: {}", e.0))
                     .ok();
-                Ok((p, copy, slots.pop().unwrap_or_default()))
+                // The last pass onto the screen, from the HDR world.
+                let last = if hdr() {
+                    Some(
+                        gpu.create_pipeline(&PipelineDesc {
+                            label: "post last",
+                            shader: &s,
+                            vertex: "vs",
+                            fragment: Some("fs"),
+                            color: Some(Format::Surface),
+                            depth: None,
+                            blend: Blend::None,
+                            cull_back: false,
+                            topology: Topology::Triangles,
+                        })
+                        .map_err(|e| e.0)?,
+                    )
+                } else {
+                    None
+                };
+                // The HDR world's bloom pyramid and exposure, when the pack's post.wgsl has them.
+                let bloom = if hdr() {
+                    let mut make = |label: &'static str, fragment: &'static str| {
+                        gpu.create_pipeline(&PipelineDesc {
+                            label,
+                            shader: &s,
+                            vertex: "vs",
+                            fragment: Some(fragment),
+                            color: Some(Format::Rgba16Float),
+                            depth: None,
+                            blend: Blend::None,
+                            cull_back: false,
+                            topology: Topology::Triangles,
+                        })
+                        .map_err(|e| log::info!("post: no bloom pyramid ({fragment}): {}", e.0))
+                        .ok()
+                    };
+                    match (make("bloom down", "fs_bloom_down"), make("bloom up", "fs_bloom_up"), make("exposure", "fs_exposure")) {
+                        (Some(d), Some(u), Some(e)) => Some([d, u, e]),
+                        (d, u, e) => {
+                            [d, u, e]
+                                .into_iter()
+                                .flatten()
+                                .for_each(|p| gpu.destroy_pipeline(p));
+                            None
+                        }
+                    }
+                } else {
+                    None
+                };
+                Ok((p, copy, slots.pop().unwrap_or_default(), low, low_slots, last, bloom))
             });
         match made {
-            Ok((p, copy, slots)) => {
+            Ok((p, copy, slots, low, low_slots, last, bloom)) => {
+                if let Some(old) = std::mem::replace(&mut self.bloom_pipes, bloom) {
+                    old.into_iter().for_each(|p| gpu.destroy_pipeline(p));
+                }
+                if let Some(old) = std::mem::replace(&mut self.final_pipe, last) {
+                    gpu.destroy_pipeline(old);
+                }
+                if let Some(old) = std::mem::replace(&mut self.low_pipe, low) {
+                    gpu.destroy_pipeline(old);
+                }
+                self.low_slots = low_slots;
                 if let Some(old) = self.pipeline.replace(p) {
                     gpu.destroy_pipeline(old);
                 }
@@ -131,7 +292,7 @@ impl Post {
             if let Some((old, ..)) = self.targets.take() {
                 old.into_iter().for_each(|t| gpu.destroy_texture(t));
             }
-            let desc = TextureDesc { width: w.max(1), height: h.max(1), mips: 1, format: Format::Surface, render_target: true };
+            let desc = TextureDesc { width: w.max(1), height: h.max(1), mips: 1, format: world_format(), render_target: true };
             let t = [gpu.create_texture(&desc, "post a"), gpu.create_texture(&desc, "post b")];
             self.targets = Some((t, t.map(|t| gpu.texture_index(t)), (w, h)));
         }
@@ -147,10 +308,8 @@ impl Post {
                 old.into_iter().for_each(|t| gpu.destroy_texture(t));
             }
             let (w, h) = (w.max(1), h.max(1));
-            let color = gpu.create_texture(
-                &TextureDesc { width: w, height: h, mips: 1, format: Format::Surface, render_target: true },
-                "behind color",
-            );
+            let color = gpu
+                .create_texture(&TextureDesc { width: w, height: h, mips: 1, format: world_format(), render_target: true }, "behind color");
             let depth = gpu.create_texture(
                 &TextureDesc { width: w, height: h, mips: 1, format: Format::Depth32, render_target: true },
                 "behind depth",
@@ -177,6 +336,9 @@ impl Post {
             size: [frame.width as f32, frame.height as f32],
             depth,
             pad: 0,
+            low: 0,
+            spare: 0,
+            ..Pass::default()
         };
         let buf = self.copy_params[frame.slot];
         gpu.mapped(buf)[..size_of::<Pass>()].copy_from_slice(bytemuck::bytes_of(&pass));
@@ -186,6 +348,49 @@ impl Post {
         list.bind(crate::gpu_layout::bind::post::SCENE, scene);
         list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: 0 });
         list.push(Cmd::EndPass);
+    }
+
+    /// The bloom pyramid's images for a world of `w` x `h` with `levels` levels down (each half the
+    /// one before, from half the world's size, none under 2 pixels), made again when either changes;
+    /// the exposure texels with them.
+    fn ensure_pyramid(&mut self, gpu: &mut dyn Backend, w: u32, h: u32, levels: usize) {
+        if self
+            .pyramid
+            .as_ref()
+            .is_some_and(|p| p.size == (w, h) && p.levels == levels)
+        {
+            return;
+        }
+        if let Some(old) = self.pyramid.take() {
+            old.down
+                .iter()
+                .chain(old.up.iter())
+                .for_each(|t| gpu.destroy_texture(t.0));
+            old.exposure.iter().for_each(|t| gpu.destroy_texture(t.0));
+        }
+        let mut make = |size: (u32, u32), label: &str| {
+            let t = gpu.create_texture(
+                &TextureDesc { width: size.0, height: size.1, mips: 1, format: Format::Rgba16Float, render_target: true },
+                label,
+            );
+            (t, gpu.texture_index(t), size)
+        };
+        let mut down = Vec::new();
+        let mut size = (w.div_ceil(2).max(1), h.div_ceil(2).max(1));
+        while down.len() < levels.max(1) {
+            down.push(make(size, "bloom down"));
+            if size.0.min(size.1) < 4 {
+                break;
+            }
+            size = (size.0.div_ceil(2), size.1.div_ceil(2));
+        }
+        let up = down[..down.len() - 1]
+            .iter()
+            .map(|d| make(d.2, "bloom up"))
+            .collect();
+        let e = [make((1, 1), "exposure a"), make((1, 1), "exposure b")];
+        self.pyramid = Some(Pyramid { size: (w, h), down, up, exposure: e.map(|t| (t.0, t.1)), flip: 0, levels, fresh: true });
+        self.last_frame = None;
     }
 
     /// Runs the effects over the scene; the last one draws onto the screen and leaves that pass
@@ -232,35 +437,173 @@ impl Post {
                 size: [frame.width as f32, frame.height as f32],
                 depth,
                 pad: 0,
+                low: 0,
+                spare: 0,
+                ..Pass::default()
             })
             .collect();
         let mut passes = passes;
-        // Merged (`packs::merge_effects`): one pass runs them all, the first's `pad` their count.
-        let mut n = if n > 1 && crate::packs::merge_effects() {
+        // The half-size parts first: each into its effect's own image, which that effect reads.
+        let mut lows: Vec<TextureId> = Vec::new();
+        if self.low_pipe.is_some() && self.use_low {
+            let (w, h) = (frame.width.div_ceil(2).max(1), frame.height.div_ceil(2).max(1));
+            for (i, (name, _)) in active[..n].iter().enumerate() {
+                let slot = self.low_slots.slot(name);
+                if slot == 0 {
+                    continue;
+                }
+                let at = match self.low_targets.iter().position(|t| t.0 == *name) {
+                    Some(at) => at,
+                    None => {
+                        self.low_targets
+                            .push((name.clone(), TextureId(u32::MAX), 0, (0, 0)));
+                        self.low_targets.len() - 1
+                    }
+                };
+                if self.low_targets[at].3 != (w, h) {
+                    // The GPU frees the old image once no frame in flight still draws with it.
+                    if self.low_targets[at].1 != TextureId(u32::MAX) {
+                        gpu.destroy_texture(self.low_targets[at].1);
+                    }
+                    let t = gpu.create_texture(
+                        &TextureDesc { width: w, height: h, mips: 1, format: Format::Rgba16Float, render_target: true },
+                        "post low",
+                    );
+                    self.low_targets[at] = (name.clone(), t, gpu.texture_index(t), (w, h));
+                }
+                passes[i].low = self.low_targets[at].2 + 1;
+                lows.push(self.low_targets[at].1);
+            }
+        }
+        let low_entries: Vec<Pass> = active[..n]
+            .iter()
+            .filter(|(name, _)| self.low_pipe.is_some() && self.use_low && self.low_slots.slot(name) != 0)
+            .map(|(name, strength)| Pass {
+                scene: idx[0],
+                slot: self.low_slots.slot(name),
+                strength: *strength,
+                time,
+                size: [frame.width as f32, frame.height as f32],
+                depth,
+                pad: 0,
+                low: 0,
+                spare: 0,
+                ..Pass::default()
+            })
+            .collect();
+        // Merged (`packs::merge_effects`): one pass runs them all, the first's `pad` their count,
+        // reading the entries after it. `draws`: the entry each pass starts from.
+        let mut draws: Vec<u32> = if n > 1 && crate::packs::merge_effects() {
             passes[0].pad = n as u32;
-            1
+            vec![0]
         } else {
-            n
+            (0..n as u32).collect()
         };
         // With the world drawn smaller than the screen, the effects stay at the world's size and a
         // plain pass (slot 0) scales the last one's image up. As the last pass, an effect drew
         // straight onto the screen and ran per screen pixel: with the effects merged into one, all
         // of them, 2.25 times the work at a 0.67 render scale (the Mac's effects after a flight over
-        // water took 6-7.8 ms, Planner 11-04).
-        if scaled && !self.active.is_empty() && n < MAX_PASSES {
-            passes.truncate(n);
-            passes.push(Pass { scene: idx[n % 2], slot: 0, strength: 1.0, pad: 0, ..passes[0] });
-            n += 1;
+        // water took 6-7.8 ms, Planner 11-04). Its entry goes after all the effects': in the place
+        // of the second (Perf 7), the merged pass read it and the half-size parts' entries as its
+        // other effects, so under a render scale (the Mac) only the first effect ran as itself.
+        if scaled && !self.active.is_empty() && passes.len() < MAX_PASSES {
+            passes.push(Pass { scene: idx[draws.len() % 2], slot: 0, strength: 1.0, pad: 0, low: 0, ..passes[0] });
+            draws.push((passes.len() - 1) as u32);
         }
         let buf = self.params[frame.slot];
+        // The main passes, then the half-size parts' entries after them (`lows` holds their index).
+        // The last pass finishes the picture in the HDR world (a pack's tone curve, `spare` 1).
+        if hdr() && n > 0 {
+            passes[n - 1].spare = 1;
+        }
+        let first_low = passes.len();
+        passes.extend(low_entries);
+        // The HDR world's bloom pyramid and exposure, after the half-size parts' entries: their
+        // images, pipelines and entries (`pyramid_draws`), and the effects told where to find them.
+        let mut pyramid_draws: Vec<(TextureId, PipelineId, u32)> = Vec::new();
+        let pipes = self.bloom_pipes.filter(|_| hdr() && self.bloom_levels > 0);
+        BLOOM.store(pipes.is_some(), std::sync::atomic::Ordering::Relaxed);
+        if let Some(pipes) = pipes {
+            self.ensure_pyramid(gpu, frame.width, frame.height, self.bloom_levels as usize);
+            let now = std::time::Instant::now();
+            let dt = self
+                .last_frame
+                .map_or(0.0, |t| (now - t).as_secs_f32().min(0.5));
+            self.last_frame = Some(now);
+            let py = self.pyramid.as_mut().unwrap();
+            py.flip ^= 1;
+            let entry = |scene: u32, low: u32, level: usize, size: (u32, u32)| Pass {
+                scene,
+                slot: 0,
+                strength: dt,
+                time,
+                size: [size.0 as f32, size.1 as f32],
+                depth,
+                pad: level as u32,
+                low,
+                ..Pass::default()
+            };
+            let levels = py.down.len();
+            for i in 0..levels {
+                let src = if i == 0 { idx[0] } else { py.down[i - 1].1 };
+                passes.push(entry(src, 0, i, py.down[i].2));
+                pyramid_draws.push((py.down[i].0, pipes[0], (passes.len() - 1) as u32));
+            }
+            // Back up: each level below blended with the wider one over it (the narrowest is its
+            // own), so the widest holds every scale.
+            for i in (0..py.up.len()).rev() {
+                let wider = if i + 1 == py.up.len() { py.down[i + 1].1 } else { py.up[i + 1].1 };
+                passes.push(entry(py.down[i].1, wider + 1, i, py.up[i].2));
+                pyramid_draws.push((py.up[i].0, pipes[1], (passes.len() - 1) as u32));
+            }
+            // The exposure from the narrowest level and last frame's texel.
+            let (now_tex, now_idx) = py.exposure[py.flip];
+            let before = py.exposure[1 - py.flip].1;
+            passes.push(Pass { spare: py.fresh as u32, ..entry(py.down[levels - 1].1, before + 1, levels - 1, (1, 1)) });
+            py.fresh = false;
+            pyramid_draws.push((now_tex, pipes[2], (passes.len() - 1) as u32));
+            let bloom = py.up.first().map_or(py.down[0].1, |u| u.1) + 1;
+            for p in &mut passes[..n] {
+                p.bloom = bloom;
+                p.exposure = now_idx + 1;
+            }
+        }
+        passes.truncate(MAX_PASSES);
         gpu.mapped(buf)[..passes.len() * size_of::<Pass>()].copy_from_slice(bytemuck::cast_slice(&passes));
-        for i in 0..n {
-            let target = if i + 1 == n { Target::Surface } else { Target::Texture(tex[(i + 1) % 2]) };
-            list.push(Cmd::BeginPass { color: Some((target, Some([0.0; 4]))), depth: None });
+        if let Some(low_pipe) = self.low_pipe {
+            for (k, target) in lows.iter().enumerate() {
+                let entry = first_low + k;
+                if entry >= passes.len() {
+                    break;
+                }
+                list.push(Cmd::BeginPass { color: Some((Target::Texture(*target), Some([0.0; 4]))), depth: None });
+                list.pipeline(low_pipe);
+                list.bind(crate::gpu_layout::bind::post::PASSES, buf);
+                list.bind(crate::gpu_layout::bind::post::SCENE, scene);
+                list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: entry as u32 });
+                list.push(Cmd::EndPass);
+            }
+        }
+        for (target, pipe, entry) in pyramid_draws {
+            if entry as usize >= passes.len() {
+                break;
+            }
+            list.push(Cmd::BeginPass { color: Some((Target::Texture(target), Some([0.0; 4]))), depth: None });
             list.pipeline(pipe);
             list.bind(crate::gpu_layout::bind::post::PASSES, buf);
             list.bind(crate::gpu_layout::bind::post::SCENE, scene);
-            list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: i as u32 });
+            list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: entry });
+            list.push(Cmd::EndPass);
+        }
+        let n = draws.len();
+        for (i, entry) in draws.into_iter().enumerate() {
+            let target = if i + 1 == n { Target::Surface } else { Target::Texture(tex[(i + 1) % 2]) };
+            list.push(Cmd::BeginPass { color: Some((target, Some([0.0; 4]))), depth: None });
+            // Onto the screen from the HDR world: the pipeline of the screen's format.
+            list.pipeline(if i + 1 == n { self.final_pipe.unwrap_or(pipe) } else { pipe });
+            list.bind(crate::gpu_layout::bind::post::PASSES, buf);
+            list.bind(crate::gpu_layout::bind::post::SCENE, scene);
+            list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: entry });
             if i + 1 < n {
                 list.push(Cmd::EndPass);
             }

@@ -46,6 +46,12 @@ pub struct DimSet {
     pub air: Arc<(Vec<(u32, f32, f32, f32, u32)>, f32)>,
     /// Changed: players hear at once.
     pub air_moved: bool,
+    /// What happens in its sky (`weft_abi::sky_event`) and how strongly (chiacraft), and whether
+    /// players have yet to hear of it.
+    pub sky_event: (u32, f32),
+    pub sky_event_moved: bool,
+    /// What lands this tick, to send to its players: where, and in how many seconds.
+    pub landings: Vec<(glam::DVec3, f32)>,
     /// Every biome's tint colors as a mod set them (`set_biome_tints`), empty for the content's.
     pub tints: Arc<Vec<u32>>,
     /// Changed: players hear at once.
@@ -82,6 +88,9 @@ impl DimSet {
             weather_moved: false,
             air: Arc::default(),
             air_moved: false,
+            sky_event: (0, 0.0),
+            sky_event_moved: false,
+            landings: Vec::new(),
             tints: Arc::default(),
             tints_moved: false,
             seed,
@@ -422,6 +431,17 @@ impl DimSet {
             r.weather = self.weather;
             r.rain_in = only.clone();
         }
+    }
+
+    /// What happens in its sky from now on; players hear only of a change (the strength in 64ths,
+    /// so a mod may set it every tick).
+    pub fn set_sky_event(&mut self, kind: u32, strength: f32) {
+        let q = |s: f32| (s * 64.0).round();
+        if self.sky_event.0 == kind && q(self.sky_event.1) == q(strength) {
+            return;
+        }
+        self.sky_event = (kind, strength);
+        self.sky_event_moved = true;
     }
 
     /// The air in its biomes from now on (`air`); players hear only of a change.

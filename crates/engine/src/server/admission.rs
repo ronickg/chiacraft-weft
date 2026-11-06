@@ -43,6 +43,11 @@ pub(super) fn gate(cfg: &ServerConfig, dir: Option<std::path::PathBuf>) -> Gate 
     Gate::new(dir)
 }
 
+/// What a world does with a DID the chain can't be asked about, as the rule shows it.
+pub(crate) fn unchecked_arg(guest: bool) -> Arg {
+    Arg::Key(if guest { "admission.did_unchecked.guest" } else { "admission.did_unchecked.refuse" }.into())
+}
+
 fn yes_no(on: bool) -> Arg {
     Arg::Key(if on { "admission.yes" } else { "admission.no" }.into())
 }
@@ -65,6 +70,7 @@ impl Player {
             identity: self.identity.clone(),
             did: self.did.clone(),
             did_days: self.did_days,
+            did_unchecked: self.did_unchecked,
             achievements: self.achievements.clone(),
         }
     }
@@ -75,15 +81,32 @@ pub(super) struct DidChecked {
     /// The player's login key.
     key: String,
     did: String,
-    /// The key that signed still holds the DID.
-    held: bool,
-    days: Option<u32>,
-    /// The chain answered from its cache, or not at all.
-    why: Option<String>,
+    answer: DidAnswer,
+}
+
+/// What the chain said about a player's DID.
+pub(super) enum DidAnswer {
+    /// The key that signed holds it: its age in days, and whether it was read live (else from
+    /// this game's cache of the chain, while no peer answered).
+    Held { days: Option<u32>, live: bool },
+    /// The chain answered: it isn't held by the key that signed.
+    NotHeld,
+    /// No answer: no chain peer reached in time, and the DID isn't cached. Why.
+    Unchecked(String),
 }
 
 /// How long a join waits for its DID check before the rules decide without it.
 const DID_WAIT: std::time::Duration = std::time::Duration::from_secs(25);
+
+/// How long the check itself keeps trying: waiting for a chain peer when none is connected yet
+/// (the reader starts on the first check, and its peers take a few seconds), then asking again
+/// after a failed read. Under `DID_WAIT`, so a waiting join hears the answer.
+const DID_TRYING: std::time::Duration = std::time::Duration::from_secs(20);
+
+/// A DID that couldn't be checked is asked about again this often while its player is here, this
+/// many times.
+const DID_RECHECK: std::time::Duration = std::time::Duration::from_secs(60);
+const DID_RECHECKS: u32 = 5;
 
 /// What probation may keep a player from doing.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -230,25 +253,15 @@ impl Server {
         std::thread::Builder::new()
             .name("did check".into())
             .spawn(move || {
-                let answer = crate::chiacraft::chain::get().and_then(|reader| {
-                    let (record, live) = crate::chiacraft::chain::did(&reader, &did)?;
-                    let peak = reader.status().peak.unwrap_or(0).max(record.checked_height);
-                    let days = record
-                        .launched()
-                        .map(|h| peak.saturating_sub(h) / crate::chiacraft::chain::BLOCKS_A_DAY);
-                    Ok((record.owned_by(owner.into()), days, live))
-                });
-                let checked = match answer {
-                    Ok((held, days, live)) => DidChecked { key, did, held, days, why: (!live).then(|| "from the cache".into()) },
-                    Err(e) => DidChecked { key, did, held: false, days: None, why: Some(e) },
-                };
-                let _ = tx.send(checked);
+                let answer = ask_chain(&did, owner);
+                let _ = tx.send(DidChecked { key, did, answer });
             })
             .is_ok()
     }
 
     /// DID checks that came back: the player's DID is known (or not), a waiting join goes on,
     /// and a joined player whose DID is banned leaves. Joins that waited too long go on without.
+    /// A DID that couldn't be checked is asked about again while its player is here.
     pub(super) fn did_answers(&mut self, c: &'static Content) {
         let mut banned_check = false;
         while let Ok(d) = self.did_checks.1.try_recv() {
@@ -259,28 +272,80 @@ impl Server {
             else {
                 continue;
             };
+            let short = crate::chiacraft::did::short_did(&d.did);
             let p = &mut self.players[pi];
-            if d.held {
-                log::info!(
-                    "player {} proved {} ({} days old){}",
-                    d.key,
-                    d.did,
-                    d.days.map_or("?".into(), |x| x.to_string()),
-                    d.why.as_deref().map_or(String::new(), |w| format!(", {w}"))
-                );
-                p.did = Some(d.did);
-                p.did_days = d.days;
+            let was_unchecked = p.did_unchecked;
+            let note = match d.answer {
+                DidAnswer::Held { days, live } => {
+                    log::info!(
+                        "player {} proved {} ({} days old){}",
+                        d.key,
+                        d.did,
+                        days.map_or("?".into(), |x| x.to_string()),
+                        if live { "" } else { ", from the cache" }
+                    );
+                    p.did = Some(d.did.clone());
+                    p.did_days = days;
+                    p.did_unchecked = false;
+                    p.did_recheck = None;
+                    let days = Arg::Int(days.unwrap_or(0) as i64);
+                    match (was_unchecked, live) {
+                        (true, _) => Msg::new("admission.did.checked_later", vec![Arg::Text(short), days]),
+                        (false, true) => Msg::new("admission.did.checked", vec![Arg::Text(short), days]),
+                        (false, false) => Msg::new("admission.did.cached", vec![Arg::Text(short), days]),
+                    }
+                }
+                DidAnswer::NotHeld => {
+                    log::info!("player {}: {} isn't theirs on chain", d.key, d.did);
+                    p.did = None;
+                    p.did_unchecked = false;
+                    p.did_recheck = None;
+                    Msg::new("admission.did.not_held", vec![Arg::Text(short)])
+                }
+                DidAnswer::Unchecked(why) => {
+                    // Never counted as theirs: the rules decide (guest or not), and it is asked
+                    // about again while they are here.
+                    let tries = p.did_recheck.map_or(DID_RECHECKS, |r| r.1);
+                    log::info!(
+                        "player {}: {} couldn't be checked ({why}); {}",
+                        d.key,
+                        d.did,
+                        if tries > 0 { "asking again later" } else { "giving up for this visit" }
+                    );
+                    p.did = None;
+                    p.did_unchecked = true;
+                    p.did_recheck = (tries > 0).then(|| (Instant::now() + DID_RECHECK, tries));
+                    Msg::new("admission.did.unchecked", vec![Arg::Text(short)])
+                }
+            };
+            // A rechecked answer that says the same as before needn't be told again.
+            let repeat = was_unchecked && p.did_unchecked;
+            if p.joined {
+                if !repeat {
+                    p.conn.send(ToClient::Show(crate::net::Shown::chat(note)));
+                }
             } else {
-                log::info!(
-                    "player {}: {} isn't theirs on chain{}",
-                    d.key,
-                    d.did,
-                    d.why
-                        .as_deref()
-                        .map_or(String::new(), |w| format!(" ({w})"))
-                );
+                p.did_note = Some(note);
             }
             p.did_pending = false;
+            // A guest let in while their DID couldn't be checked, now answered: the world's DID
+            // rules apply to them as to anyone coming in (a DID that isn't theirs, or too young
+            // for the world, and they leave).
+            if was_unchecked && !p.did_unchecked && p.joined {
+                let key = p.key.clone();
+                let trusted = self.trusted(pi, &key);
+                let who = self.players[pi].who();
+                let mut rules = self.gate.rules.clone();
+                rules.only_listed = false;
+                if let adm::Verdict::Refuse(why) =
+                    adm::verdict(&rules, &self.gate.bans, &self.gate.lists, &who, trusted, crate::saves::now_secs())
+                {
+                    log::info!("{} is sent away now that their DID is answered: {}", who.name, why.key);
+                    self.leave(c, pi, ToClient::Refused(why));
+                    continue;
+                }
+            }
+            let p = &mut self.players[pi];
             if p.waiting.is_none() {
                 banned_check = true;
             } else if !p.proofs_pending
@@ -297,9 +362,37 @@ impl Server {
                 && let Some((name, key, _)) = self.players[pi].waiting.take()
             {
                 log::info!("{name}: no answer about their DID or achievements in time; the rules decide without them");
-                self.players[pi].did_pending = false;
-                self.players[pi].proofs_pending = false;
+                let p = &mut self.players[pi];
+                // A DID still being checked is not theirs yet: an unchecked one, for the rules.
+                if p.did_pending && p.did.is_none() {
+                    p.did_unchecked = true;
+                    p.did_recheck = Some((Instant::now() + DID_RECHECK, DID_RECHECKS));
+                    p.did_note = Some(Msg::new(
+                        "admission.did.unchecked",
+                        vec![Arg::Text(crate::chiacraft::did::short_did(&did_of_proof(&p.did_proof, p.identity.as_deref())))],
+                    ));
+                }
+                p.did_pending = false;
+                p.proofs_pending = false;
                 self.join(c, pi, name, key);
+            }
+        }
+        // Ask again about DIDs that couldn't be checked, for players here.
+        for pi in 0..self.players.len() {
+            let due = self.players[pi]
+                .did_recheck
+                .is_some_and(|(at, _)| self.players[pi].joined && Instant::now() >= at);
+            if !due {
+                continue;
+            }
+            let (key, proof) = (self.players[pi].key.clone(), self.players[pi].did_proof.clone());
+            // Spent one try; the answer sets the next (or none).
+            let tries = self.players[pi]
+                .did_recheck
+                .map_or(0, |r| r.1.saturating_sub(1));
+            self.players[pi].did_recheck = Some((Instant::now() + DID_WAIT * 4, tries));
+            if !self.check_did(pi, &key, &proof) {
+                self.players[pi].did_recheck = None;
             }
         }
         if banned_check {
@@ -326,6 +419,55 @@ impl Server {
             }
         }
     }
+}
+
+/// Asks the chain whether `owner` holds `did`, waiting for a chain peer and asking again while
+/// `DID_TRYING` lasts: a fresh reader has no peer for its first seconds, and its first answer
+/// was "no chain peer reachable" (the join test, 11-05), which let a player in unverified.
+fn ask_chain(did: &str, owner: [u8; 32]) -> DidAnswer {
+    let until = std::time::Instant::now() + DID_TRYING;
+    loop {
+        let reader = match crate::chiacraft::chain::get() {
+            Ok(r) => r,
+            Err(e) => return DidAnswer::Unchecked(e),
+        };
+        let now = std::time::Instant::now();
+        // No peer yet: wait for one rather than settle for the cache or "unknown".
+        if reader.status().peers.is_empty() && now < until {
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            continue;
+        }
+        // A peer (or the time is up: the cache answers if it can).
+        match crate::chiacraft::chain::did(&reader, did) {
+            Ok((record, live)) => return held(&reader, &record, owner, live),
+            Err(e) if std::time::Instant::now() >= until => return DidAnswer::Unchecked(e),
+            Err(_) => std::thread::sleep(std::time::Duration::from_secs(2)),
+        }
+    }
+}
+
+fn held(
+    reader: &chiacraft_wallet::chain::ChainReader,
+    record: &chiacraft_wallet::chain::DidRecord,
+    owner: [u8; 32],
+    live: bool,
+) -> DidAnswer {
+    if !record.owned_by(owner.into()) {
+        return DidAnswer::NotHeld;
+    }
+    let peak = reader.status().peak.unwrap_or(0).max(record.checked_height);
+    let days = record
+        .launched()
+        .map(|h| peak.saturating_sub(h) / crate::chiacraft::chain::BLOCKS_A_DAY);
+    DidAnswer::Held { days, live }
+}
+
+/// The DID a proof names, for telling the player (empty if it doesn't check out).
+fn did_of_proof(proof: &str, identity: Option<&str>) -> String {
+    identity
+        .and_then(|i| chiacraft_account::check_did_proof(proof, i))
+        .and_then(|(launcher, _)| chiacraft_wallet::keys::encode_did(&launcher))
+        .unwrap_or_default()
 }
 
 fn say(key: &str, args: Vec<Arg>) -> Vec<Msg> {
@@ -644,8 +786,9 @@ pub(super) fn banlist(s: &mut Server, x: &Ctx) -> Vec<Msg> {
         .collect()
 }
 
-/// `/didrule show | required <on|off> | age <days>`: whether players must prove a DID, and how
-/// old it must be (phase 4, slice 6).
+/// `/didrule show | required <on|off> | age <days> | unchecked <guest|refuse>`: whether players
+/// must prove a DID, how old it must be (phase 4, slice 6), and what happens when the chain can't
+/// be asked about one: let in as an unverified guest, or refused until it can.
 pub(super) fn didrule(s: &mut Server, x: &Ctx) -> Vec<Msg> {
     let a = x.a;
     let changed = if a.get("required").is_some() {
@@ -656,6 +799,9 @@ pub(super) fn didrule(s: &mut Server, x: &Ctx) -> Vec<Msg> {
             s.gate
                 .edit_rules(|r| r.did_min_days = days.clamp(0, 36_500) as u32),
         )
+    } else if let Some(how) = a.text("as") {
+        let guest = how == "guest";
+        Some(s.gate.edit_rules(|r| r.did_unchecked_guest = guest))
     } else {
         None
     };
@@ -664,7 +810,7 @@ pub(super) fn didrule(s: &mut Server, x: &Ctx) -> Vec<Msg> {
     }
     s.gate.refresh(true);
     let r = &s.gate.rules;
-    say("did_rule_show", vec![yes_no(r.needs_did()), Arg::Int(r.did_min_days as i64)])
+    say("did_rule_show", vec![yes_no(r.needs_did()), Arg::Int(r.did_min_days as i64), unchecked_arg(r.did_unchecked_guest)])
 }
 
 /// `/achievementrule <id> [issuer keys…] | off | show`: only players who earned achievement `id`

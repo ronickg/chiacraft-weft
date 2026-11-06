@@ -38,3 +38,12 @@ Painted finer (Ronald, 2026-11-03): at the house density its head was 2.4 units 
 tall, the eye a black side of the head, so it is painted `house.FINE` (4) texels a unit, 256 a
 block: an agama's eye (a dark pupil in a gold-brown ring, a catchlight), eyelids that blink (a
 slow blink basking), faint nostrils and the lips' line. Boxes, export scale and size unchanged.
+
+Behaviour clips (2026-11-05, `mods/animals/src/anim.rs`): stare, watch (up on straightened front legs,
+the head turning in jerks), graze (a snap at an insect), drink, sleep (flat as basking, eyes shut; in
+the basking file too), approach, alarm (two push-ups, the front feet planted), sniff, look, scratch
+(a hind foot to the flank), stretch, play, groom (the snout wiped on the ground), flinch and death
+(over onto its back). Not a hunter (no stalk or pounce), too small to stand its ground (no rear or
+charge), and no nuzzle: an agama leaves its buried eggs. No jaw, dewlap or tongue: the gape and the
+tongue's flick are the head's moves. `build.py` checks each foot within 0.3 of the ground in every
+keyframe, the approach's gait, only held clips and the gait looping, and the death on its lowest point.

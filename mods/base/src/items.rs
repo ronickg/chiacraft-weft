@@ -10,24 +10,8 @@ pub static WHEAT: Item = Item::named("wheat");
 pub static BUCKET: Item = Item::named("bucket");
 
 pub use base_api::{ARMOR, Armor, FLAMMABLE, FOOD, FUEL, Food};
-/// Tags of armor pieces, head to feet; `<tag>/<material>` picks the recipe (see recipes.rs).
+/// Tags of armor pieces, head to feet (every armour kind's items).
 pub const ARMOR_SLOTS: [&str; 4] = ["armor_head", "armor_chest", "armor_legs", "armor_feet"];
-
-struct Material {
-    name: &'static str,
-    level: u32,
-    speed: f32,
-    durability: u32,
-    damage: f32,
-}
-
-const MATERIALS: [Material; 5] = [
-    Material { name: "wood", level: tool_tier::WOOD, speed: 2.0, durability: 59, damage: 0.0 },
-    Material { name: "stone", level: tool_tier::STONE, speed: 4.0, durability: 131, damage: 1.0 },
-    Material { name: "iron", level: tool_tier::IRON, speed: 6.0, durability: 250, damage: 2.0 },
-    Material { name: "gold", level: tool_tier::WOOD, speed: 12.0, durability: 32, damage: 0.0 },
-    Material { name: "diamond", level: tool_tier::DIAMOND, speed: 8.0, durability: 1561, damage: 3.0 },
-];
 
 pub fn register(r: &mut Registry) {
     r.item(&STICK)
@@ -147,73 +131,5 @@ pub fn register(r: &mut Registry) {
             .tag(name)
             .tab(&crate::tabs::INGREDIENTS);
     }
-
-    for m in &MATERIALS {
-        // `.tool(kind)` tags it `tools/<kind>`; `<kind>s/<material>` picks its recipe.
-        let tool = |r: &mut Registry, kind: &str, damage: f32, speed: f32| {
-            let b = r
-                .item(Item::generated(format!("{}_{kind}", m.name)))
-                .tool(kind)
-                .tool_level(m.level)
-                .mining_speed(m.speed)
-                .durability(m.durability)
-                .attack_damage(damage)
-                .attack_speed(speed)
-                .tag(&format!("{kind}s/{}", m.name))
-                // Vanilla: weapons wear by one per hit, tools (made for blocks) by two.
-                .set(&WEAR_PER_HIT, if kind == "sword" { 1 } else { 2 })
-                .tab(if kind == "sword" { &crate::tabs::COMBAT } else { &crate::tabs::TOOLS });
-            if kind == "sword" {
-                b.sweeps().no_creative_break();
-            } else if kind == "hoe" {
-                // Tills grass and dirt into farmland (`farming.rs`).
-                b.on_use(crate::farming::till);
-            }
-        };
-        tool(r, "pickaxe", 2.0 + m.damage, 1.2);
-        tool(r, "shovel", 2.5 + m.damage, 1.0);
-        tool(r, "sword", 4.0 + m.damage, 1.6);
-        // Modern's: slow and strong axes, hoes barely hit but swing fast with the material.
-        let (axe_damage, axe_speed, hoe_speed) = match m.name {
-            "wood" => (7.0, 0.8, 1.0),
-            "stone" => (9.0, 0.8, 2.0),
-            "iron" => (9.0, 0.9, 3.0),
-            "diamond" => (9.0, 1.0, 4.0),
-            _ => (7.0, 1.0, 1.0),
-        };
-        tool(r, "axe", axe_damage, axe_speed);
-        tool(r, "hoe", 1.0, hoe_speed);
-    }
-
-    // Points per piece, head to feet, as in modern.
-    for (mat, points, toughness, durability) in [
-        ("leather", [1u32, 3, 2, 1], 0.0f32, 5u32),
-        ("iron", [2, 6, 5, 2], 0.0, 15),
-        ("gold", [2, 5, 3, 1], 0.0, 7),
-        ("diamond", [3, 8, 6, 3], 2.0, 33),
-    ] {
-        for (slot, piece, dur) in [(0, "helmet", 11), (1, "chestplate", 16), (2, "leggings", 15), (3, "boots", 13)] {
-            let points = points[slot];
-            let tag = ARMOR_SLOTS[slot];
-            // Leggings are the inner layer, drawn closer to the body.
-            let (inflate, layer) = if slot == 2 { (0.5, 2) } else { (1.0, 1) };
-            // Its warmth line too (leather is hide; metal is cold in snow and hot in the sun).
-            let mut worn = vitals::clothing::Worn::default();
-            worn.armor(mat, slot as usize);
-            let warmth = base_api::Warmth {
-                cold: worn.cold.round().max(0.0) as u32,
-                heat: worn.heat.round() as i32,
-                wet: if worn.cold > 0.0 { (worn.cold_wet / worn.cold * 100.0).round() as u32 } else { 0 },
-                wind: (worn.windproof * 100.0).round() as u32,
-            };
-            r.item(Item::generated(format!("{mat}_{piece}")))
-                .durability(durability * dur)
-                .set(&ARMOR, Armor { points, toughness })
-                .set(&base_api::WARMTH, warmth)
-                .tag(tag)
-                .tag(&format!("{tag}/{mat}"))
-                .wearable(crate::player::EQUIPMENT[slot as usize], inflate, &format!("armor/{mat}_{layer}"))
-                .tab(&crate::tabs::COMBAT);
-        }
-    }
+    // Tools, weapons and armour are built from parts (`parts.rs`; Ronald, 11-05: no whole ones).
 }

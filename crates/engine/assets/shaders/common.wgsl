@@ -124,6 +124,10 @@ struct PostPixel {
     scene: u32,
     // The world's depth image (`post_depth`, `post_position`).
     depth: u32,
+    // Bindless index + 1 of the effect's own half-size image (`post_low_at`, `post_low_upsampled`),
+    // drawn before the effects by its `shaders/post_low/<name>.wgsl` (`fn low(p: PostPixel) ->
+    // vec4<f32>`); 0 when it has none.
+    low: u32,
 }
 
 // What a sky shader (`shaders/sky/<name>.wgsl`, `fn shade(p: SkyPixel) -> vec4<f32>`) gets; it

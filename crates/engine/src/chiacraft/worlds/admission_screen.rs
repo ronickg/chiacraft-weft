@@ -99,6 +99,13 @@ impl Screen for Admission {
                             run(c, format!("/didrule required {}", if required { "off" } else { "on" }))
                         });
                         ui.set_id(id, "did_required");
+                        // A DID the chain can't be asked about just now: guest or not yet.
+                        let guest = rules.did_unchecked_guest;
+                        let shown = Arg::Key(if guest { "admission.did_unchecked.guest" } else { "admission.did_unchecked.refuse" }.into());
+                        let id = button(ui, cx, "admission.screen.did_unchecked", &[shown], 260.0, move |c| {
+                            run(c, format!("/didrule unchecked {}", if guest { "refuse" } else { "guest" }))
+                        });
+                        ui.set_id(id, "did_unchecked");
                         ui.container(Style::row().gap(4.0), |ui| {
                             label(ui, cx, "admission.screen.did_days", &[Arg::Int(days as i64)], "default");
                             let less = DAYS.iter().rev().find(|d| **d < days).copied().unwrap_or(0);

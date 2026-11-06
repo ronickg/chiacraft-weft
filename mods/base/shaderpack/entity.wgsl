@@ -199,12 +199,21 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         discard;
     }
     var light = in.color.rgb;
+    var lit = albedo.rgb;
     if (in.mode == BOX_MODE_FACES || in.mode == BOX_MODE_TEXEL) && in.glow != 0xffffffffu {
-        let e = textureSampleLevel(textures[in.glow], nearest_clamp, in.uv, 0.0).r;
-        light = max(light, in.tint * pow(e, 2.2));
+        let mask = textureSampleLevel(textures[in.glow], nearest_clamp, in.uv, 0.0);
+        light = max(light, in.tint * pow(mask.r, 2.2));
+        lit = albedo.rgb * light;
+        // On a blood moon the monsters' eyes burn red: their glow masks' green channel (Art's
+        // `entity/<skin>_e.png`, red 0 so no glow on other nights), brighter in totality. Deep red that stays red through the night's curve (at 2.4 0.2 0.05 it
+        // clipped to orange, the eyes check, 11-05).
+        let g = mask.g * blood_moon();
+        lit = mix(lit, vec3(1.15, 0.03, 0.01), g);
+    } else {
+        lit = albedo.rgb * light;
     }
     // In the world, solid (the reflections' mask); on a screen, opaque.
-    return vec4(fog(in, albedo.rgb * light), select(1.0, SOLID_ALPHA, in.graded != 0u));
+    return vec4(fog(in, lit), select(1.0, SOLID_ALPHA, in.graded != 0u));
 }
 
 // How much a crack darkens the face under it (0 none, 1 black).

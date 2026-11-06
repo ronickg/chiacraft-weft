@@ -23,6 +23,12 @@ pub type Columns = FxHashMap<IVec2, (i32, u32, u32)>;
 use crate::content::{Content, content};
 use crate::gpu_layout::face;
 
+/// chiacraft: the client world's day time, for far crowns' leaves by the season
+/// (`Terrain::far_leaves`), and the leaf states far crowns were drawn from, asked again now and
+/// then (`Lod::update`): when an answer changes the tiles are made again.
+static FAR_TIME: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static FAR_LEAF_STATES: std::sync::Mutex<Vec<u32>> = std::sync::Mutex::new(Vec::new());
+
 /// Cells a tile side.
 pub const CELLS: i32 = 32;
 /// Columns a tile is made from: its cells and one around them (for the walls at its edges).
@@ -32,9 +38,19 @@ const SIDE: i32 = crate::gpu_layout::terrain::lod::SIDE as i32;
 const WORDS: usize = crate::gpu_layout::terrain::lod::WORDS as usize;
 pub const LOD_WORDS_PER_TILE: usize = SAMPLES * WORDS;
 pub const MAX_LEVEL: u32 = 5;
-/// From this level on tiles are smooth ground, morphing into the next level with distance: at
-/// 8-block cells and more (from about 1000 blocks away), boxes only drew stairs.
-pub const SMOOTH_LEVEL: u32 = 3;
+/// From this level on tiles are smooth ground, morphing into the next level with distance
+/// (`mesh_smooth`). chiacraft: past `MAX_LEVEL`, so every level is boxes. Far land keeps the block
+/// steps the near land has, as Distant Horizons' does: the smooth facets from about 500 blocks out
+/// read as another game, faceted snow peaks and curtains along far shores (Ronald, 11-05, after the
+/// Distant Horizons + Bliss comparison: "I want to be better").
+pub const SMOOTH_LEVEL: u32 = MAX_LEVEL + 1;
+/// From this level on (8-block cells, about 500 blocks out) a crown is drawn down to the ground, a
+/// forest's canopy as one block over the land as from afar it is: a trunk a cell's eighth wide or
+/// less is under a pixel there, and without it the crown hung in the air.
+const CANOPY_LEVEL: u32 = 3;
+/// From this level on (8-block cells) a cell's walls are drawn as the slope it stands for: its top
+/// block (bare rock where the dimension's faces say), steepness its mean drop per block.
+const SLOPE_LEVEL: u32 = 3;
 /// A tile splits into the level below while nearer than this many of its widths: a cell stays
 /// about the same size on screen (a 32-block cell at 4096 blocks).
 const SPLIT: f64 = 4.0;
@@ -101,6 +117,8 @@ pub struct LodJob {
     pub live: Arc<AtomicBool>,
     /// What the server said of columns, taken over the terrain's where the tile samples them.
     pub columns: Arc<Columns>,
+    /// chiacraft, test only: an imported world's far terrain, taken where no column is.
+    pub far: Option<Arc<crate::chiacraft::mc_import::FarTerrain>>,
     /// When it was asked for (`diag::LOD_AGE_NS`).
     pub asked: std::time::Instant,
 }
@@ -151,7 +169,7 @@ pub fn made(job: LodJob, mut words: Vec<u32>) {
             return;
         }
         let start = std::time::Instant::now();
-        if !job.columns.is_empty() {
+        if !job.columns.is_empty() || job.far.is_some() {
             take_columns(&job, &mut words);
         }
         let (quads, skip, y) = if job.key.smooth() {
@@ -180,6 +198,14 @@ fn take_columns(job: &LodJob, words: &mut [u32]) {
             let w = k * WORDS;
             words[w] = (y as u32 & 0xFFFF) | (top << 16);
             words[w + 1] = (words[w + 1] & 0xFFFF) | (under << 16);
+            words[w + 2] = 0;
+            words[w + 3] = 0;
+        } else if let Some((y, top, under, biome)) = job.far.as_ref().and_then(|f| f.cell(col.x, col.y)) {
+            // chiacraft, test only: the imported world's ground, its biome, and no crown (its
+            // leaves are the top where trees stand).
+            let w = k * WORDS;
+            words[w] = (y as u32 & 0xFFFF) | (top << 16);
+            words[w + 1] = (biome & 0xFFFF) | (under << 16);
             words[w + 2] = 0;
             words[w + 3] = 0;
         }
@@ -262,13 +288,47 @@ fn quad(dir: u32, x: i32, y: i32, z: i32, size: (i32, i32, i32), tex: u32, tint:
     crate::gpu_layout::lod_record(dir, [x, y, z], [size.0, size.1, size.2], tex, tint, biome)
 }
 
+/// chiacraft: marks a record as a tree crown's face (`lod_face::CROWN_SHIFT`): packs shade far
+/// canopies as crowns, lit on top and dark in the gaps and under them.
+fn crowned(mut r: [u32; 4]) -> [u32; 4] {
+    r[0] |= 1 << crate::gpu_layout::lod_face::CROWN_SHIFT;
+    r
+}
+
+/// chiacraft: sets how much the land round shuts a record's face's sky out (`lod_face::OCC_SHIFT`, 0-3).
+fn occluded(mut r: [u32; 4], occ: u32) -> [u32; 4] {
+    r[0] |= occ.min(crate::gpu_layout::lod_face::OCC_MASK) << crate::gpu_layout::lod_face::OCC_SHIFT;
+    r
+}
+
+/// chiacraft: how much of the sky the land round a point `h` high in sample (i, j) of a tile of
+/// `s`-block cells hides, 0 (open) to 3, from `high` (its samples' ground or crowns, the highest):
+/// the mean over eight ways of the steepest rise within three cells. Valley floors and the ground in
+/// a forest's gaps go dark, ridges and canopy tops stay open (Ronald, 11-05, comparing with Distant
+/// Horizons + Bliss: far land evenly lit; Planner: "a cheap far shadow or horizon-occlusion term").
+fn openness(high: &dyn Fn(i32, i32) -> i32, i: i32, j: i32, h: i32, s: i32) -> u32 {
+    const WAYS: [(i32, i32); 8] = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)];
+    let mut shut = 0.0f32;
+    for (dx, dz) in WAYS {
+        let step = ((dx * dx + dz * dz) as f32).sqrt() * s as f32;
+        let mut most = 0.0f32;
+        for d in 1..=3 {
+            let rise = (high((i + dx * d).clamp(-1, CELLS), (j + dz * d).clamp(-1, CELLS)) - h) as f32;
+            if rise > 0.0 {
+                let run = step * d as f32;
+                most = most.max(rise / (rise * rise + run * run).sqrt());
+            }
+        }
+        shut += most;
+    }
+    ((shut / 8.0 / 0.15).round() as u32).min(3)
+}
+
 /// The texture (its average color) and tint kind a distant face of `state` in direction `dir`
 /// is drawn in. A box model's faces are its boxes' own (its block's textures may be unset, and
 /// came out as the missing texture's magenta): its largest box's. A plant's is its picture.
-fn face_of(c: &Content, looks: &super::looks::Looks, state: u32, dir: usize) -> (u32, u32) {
+fn face_of(c: &Content, looks: &super::looks::Looks, ctm: &super::ctm::Ctm, state: u32, dir: usize) -> (u32, u32) {
     let info = &c.states[state as usize];
-    // No overlays out there.
-    let tint = if crate::content::face_paint(info, dir, false).base_tinted { info.tint as u32 } else { 0 };
     let drawn = looks.drawn(state, info);
     let volume = |b: &crate::content::ModelBox| (0..3).map(|a| (b.max[a] - b.min[a]).abs()).product::<f32>();
     let tex = match drawn.model {
@@ -280,6 +340,12 @@ fn face_of(c: &Content, looks: &super::looks::Looks, state: u32, dir: usize) -> 
         weft_abi::BlockModel::Cross | weft_abi::BlockModel::Wire => drawn.textures[0],
         _ => drawn.textures[dir],
     };
+    // No overlays out there, but a face with one keeps its base untinted, as near: the overlay takes
+    // the tint. Tinted whole, a cherry's pink blossom (its young leaves a tinted overlay) came out
+    // brown-red far off in spring, round patches across the forests (Planner, 11-06: the test
+    // world's shots).
+    let overlay = ctm.has_overlay(tex & face::TEX_MASK);
+    let tint = if crate::content::face_paint(info, dir, overlay).base_tinted { info.tint as u32 } else { 0 };
     (tex & face::TEX_MASK, tint)
 }
 
@@ -306,10 +372,34 @@ const BANDS: i32 = 8;
 pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (Vec<[u32; 4]>, (i32, i32)) {
     let s = 1 << key.level;
     let at = |i: i32, j: i32| ground(words, i, j);
-    let crown_at = |i: i32, j: i32| crown(words, i, j);
+    let canopy = key.level >= CANOPY_LEVEL;
+    let slope = key.level >= SLOPE_LEVEL;
+    let crown_at = |i: i32, j: i32| {
+        crown(words, i, j).map(|c| if canopy { Crown { bottom: c.bottom.min(at(i, j).0 + 1), trunk: None, ..c } } else { c })
+    };
     let looks = super::looks::current();
-    let face_of = |state: u32, dir: usize| face_of(c, &looks, state, dir);
+    let ctm = super::ctm::current();
+    let face_of = |state: u32, dir: usize| face_of(c, &looks, &ctm, state, dir);
     let terrain = c.dims.get(dim as usize).and_then(|d| d.terrain.as_ref());
+    // Crowns' leaves as the dimension draws them at this time of year (`far_leaves`).
+    let far_leaves = terrain.and_then(|t| t.far_leaves);
+    let time = FAR_TIME.load(Ordering::Relaxed);
+    let memo = std::cell::RefCell::new(Vec::<(u32, u32)>::new());
+    let leaves_now = |state: u32| {
+        let Some(f) = far_leaves else { return state };
+        if let Some(&(_, now)) = memo.borrow().iter().find(|m| m.0 == state) {
+            return now;
+        }
+        {
+            let mut seen = FAR_LEAF_STATES.lock().unwrap();
+            if !seen.contains(&state) {
+                seen.push(state);
+            }
+        }
+        let now = f.state(time, state);
+        memo.borrow_mut().push((state, now));
+        now
+    };
     let faces = terrain.and_then(|t| t.faces);
     let stone = terrain.map_or(0, |t| t.stone);
     let o = key.origin();
@@ -330,7 +420,10 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                 .map(|&(di, dj)| at(i + di, j + dj).0)
                 .min()
                 .unwrap_or(y);
-            let fall = fall(y - low, s);
+            // chiacraft: from 8-block cells (`SLOPE_LEVEL`) the mean drop per block: a cell that wide
+            // stands for a slope, and the stepped fall's half again (`fall`) made whole mountainsides
+            // cliffs, far snow ranges bare rock.
+            let fall = if slope { (y - low).max(0) / s } else { fall(y - low, s) };
             if fall < f.fall {
                 continue;
             }
@@ -343,7 +436,16 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
             let mut bands: Vec<(i32, u32)> = Vec::new();
             let mut wy = y - 1;
             while wy > bottom && step > 0 {
-                let before = if y - wy <= FILLER { under } else { stone };
+                // A coarse cell's wall is the slope's face, not a cut through the ground: its top
+                // block, bare where the face says (far snow ranges were stone walls under thin
+                // white lines).
+                let before = if slope {
+                    top
+                } else if y - wy <= FILLER {
+                    under
+                } else {
+                    stone
+                };
                 let block = shown(wy, before);
                 let lo = (wy - step + 1).max(bottom + 1);
                 match bands.last_mut() {
@@ -358,6 +460,15 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
     let mut out = Vec::new();
     let (mut lo, mut hi) = (i32::MAX, i32::MIN);
     let top_at = |i: i32, j: i32| tops[(j * CELLS + i) as usize];
+    // Per sample its highest point, ground or crown, and per cell how shut in its ground is.
+    let high = |i: i32, j: i32| {
+        let g = at(i, j).0;
+        crown_at(i, j).map_or(g, |c| c.top.max(g))
+    };
+    let ground_occ: Vec<u32> = (0..CELLS * CELLS)
+        .map(|k| openness(&high, k % CELLS, k / CELLS, at(k % CELLS, k / CELLS).0 + 1, s))
+        .collect();
+    let occ_at = |i: i32, j: i32| ground_occ[(j * CELLS + i) as usize];
     // A crown sitting right on the ground hides its top.
     let covered = |i: i32, j: i32| crown_at(i, j).is_some_and(|c| c.bottom <= at(i, j).0 + 1);
     for j in 0..CELLS {
@@ -367,17 +478,25 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
             let top = top_at(i, j);
             let hidden = covered(i, j);
             let mut end = i + 1;
-            while end < CELLS && at(end, j).0 == y && top_at(end, j) == top && at(end, j).2 == biome && covered(end, j) == hidden {
+            let occ = occ_at(i, j);
+            while end < CELLS
+                && at(end, j).0 == y
+                && top_at(end, j) == top
+                && at(end, j).2 == biome
+                && covered(end, j) == hidden
+                && occ_at(end, j) == occ
+            {
                 end += 1;
             }
             if !hidden {
                 let (tex, tint) = face_of(top, 3);
-                out.push(quad(3, i * s, y, j * s, ((end - i) * s, 1, s), tex, tint, biome));
+                out.push(occluded(quad(3, i * s, y, j * s, ((end - i) * s, 1, s), tex, tint, biome), occ));
             }
             (lo, hi) = (lo.min(y), hi.max(y + 1));
             i = end;
         }
     }
+    let n_tops = out.len();
     for j in 0..CELLS {
         for i in 0..CELLS {
             let (y, _, biome, under) = at(i, j);
@@ -389,6 +508,18 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                 // where this one's sample says: the wall goes on down below it (a skirt), or
                 // the sky shows through the crack.
                 if !(0..CELLS).contains(&(i + di)) || !(0..CELLS).contains(&(j + dj)) {
+                    // Not under water beside water, which lies at the sea's height at every level:
+                    // there is no crack to close, and a sheet of water hung down the tile's edge
+                    // showed as a curtain along far shores (Far view, 11-05).
+                    // (Water by its block: a top like the block under it was sand on sand and stone
+                    // on stone too, whose edges then had no skirt.)
+                    let water = c
+                        .states
+                        .get(top as usize)
+                        .is_some_and(|st| st.liquid.is_some());
+                    if water && ny >= y {
+                        continue;
+                    }
                     ny = ny.min(y - 1) - 2 * s;
                 }
                 if ny >= y {
@@ -397,9 +528,16 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                 // The top block's own color down the step, a cell's height at most: a gentle slope's
                 // steps read as its grass from afar, not as rows of dirt dashes (bare faces keep
                 // their bands under a block of it).
-                let band = if walls[k].is_some() { 1 } else { s.min(y - ny) };
+                // (A coarse cell's whole wall: it stands for a slope of its top.)
+                let band = if walls[k].is_some() {
+                    1
+                } else if slope {
+                    y - ny
+                } else {
+                    s.min(y - ny)
+                };
                 let (tex, tint) = face_of(top, 3);
-                out.push(quad(dir as u32, i * s, y + 1 - band, j * s, (s, band, s), tex, tint, biome));
+                out.push(occluded(quad(dir as u32, i * s, y + 1 - band, j * s, (s, band, s), tex, tint, biome), occ_at(i, j)));
                 lo = lo.min(ny + 1);
                 if y - band <= ny {
                     continue;
@@ -413,18 +551,19 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                                 break;
                             }
                             let (tex, tint) = face_of(block, dir);
-                            out.push(quad(dir as u32, i * s, b, j * s, (s, from + 1 - b, s), tex, tint, biome));
+                            out.push(occluded(quad(dir as u32, i * s, b, j * s, (s, from + 1 - b, s), tex, tint, biome), occ_at(i, j)));
                             from = b - 1;
                         }
                     }
                     None => {
                         let (tex, tint) = face_of(under, dir);
-                        out.push(quad(dir as u32, i * s, ny + 1, j * s, (s, y - band - ny, s), tex, tint, biome));
+                        out.push(occluded(quad(dir as u32, i * s, ny + 1, j * s, (s, y - band - ny, s), tex, tint, biome), occ_at(i, j)));
                     }
                 }
             }
         }
     }
+    let n_walls = out.len() - n_tops;
     let side = CELLS * s;
     // Crowns: tops and undersides in runs along x, as the ground's tops.
     for (dir, face_y) in [(3u32, true), (2, false)] {
@@ -438,27 +577,30 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                 let biome = at(i, j).2;
                 let y = if face_y { c.top } else { c.bottom };
                 let shows = face_y || c.bottom > at(i, j).0 + 1;
+                let crown_occ = |e: i32| if face_y { openness(&high, e, j, y + 1, s) } else { 0 };
+                let occ = crown_occ(i);
                 let same = |e: i32| {
                     crown_at(e, j).is_some_and(|d| {
                         d.leaves == c.leaves
                             && at(e, j).2 == biome
                             && (if face_y { d.top } else { d.bottom }) == y
                             && (face_y || d.bottom > at(e, j).0 + 1) == shows
-                    })
+                    }) && crown_occ(e) == occ
                 };
                 let mut end = i + 1;
                 while end < CELLS && same(end) {
                     end += 1;
                 }
                 if shows {
-                    let (tex, tint) = face_of(c.leaves, dir as usize);
-                    out.push(quad(dir, i * s, y, j * s, ((end - i) * s, 1, s), tex, tint, biome));
+                    let (tex, tint) = face_of(leaves_now(c.leaves), dir as usize);
+                    out.push(occluded(crowned(quad(dir, i * s, y, j * s, ((end - i) * s, 1, s), tex, tint, biome)), occ));
                 }
                 (lo, hi) = (lo.min(c.bottom), hi.max(c.top + 1));
                 i = end;
             }
         }
     }
+    let n_flat = out.len() - n_tops - n_walls;
     for j in 0..CELLS {
         for i in 0..CELLS {
             let Some(c) = crown_at(i, j) else { continue };
@@ -469,9 +611,9 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                 let inside = (0..CELLS).contains(&(i + di)) && (0..CELLS).contains(&(j + dj));
                 let (ny, filled) =
                     if inside { (at(i + di, j + dj).0, crown_at(i + di, j + dj).map(|n| (n.bottom, n.top))) } else { (y, None) };
-                let (tex, tint) = face_of(c.leaves, dir);
+                let (tex, tint) = face_of(leaves_now(c.leaves), dir);
                 for (a, b) in open_spans(c.bottom, c.top, ny, filled) {
-                    out.push(quad(dir as u32, i * s, a, j * s, (s, b + 1 - a, s), tex, tint, biome));
+                    out.push(crowned(quad(dir as u32, i * s, a, j * s, (s, b + 1 - a, s), tex, tint, biome)));
                 }
             }
             // Its trunk, from the ground to the crown, in the tile.
@@ -488,6 +630,7 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
             }
         }
     }
+    crate::diag::lod_box_quads([n_tops, n_walls, n_flat, out.len() - n_tops - n_walls - n_flat]);
     (out, (lo, hi))
 }
 
@@ -506,7 +649,8 @@ pub fn mesh_smooth(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]
         crown(words, i, j).map_or(g, |c| (c.top, c.leaves, g.2, c.leaves))
     };
     let looks = super::looks::current();
-    let face_of = |state: u32, dir: usize| face_of(c, &looks, state, dir);
+    let ctm = super::ctm::current();
+    let face_of = |state: u32, dir: usize| face_of(c, &looks, &ctm, state, dir);
     let faces = c
         .dims
         .get(dim as usize)
@@ -569,6 +713,10 @@ pub fn mesh_smooth(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]
 
 /// The client's distant terrain: which tiles to show, asking for missing ones, taking made ones.
 pub struct Lod {
+    /// chiacraft: what the far crowns' leaves were drawn as (`FAR_LEAF_STATES`, `far_leaves`), and
+    /// the day time they were last asked at.
+    leaf_answers: Vec<(u32, u32)>,
+    leaves_asked: u64,
     /// The land's height at the camera's column, kept while it stays in it.
     ground: Option<((u32, IVec2), i32)>,
     jobs: Sender<LodJob>,
@@ -578,6 +726,9 @@ pub struct Lod {
     /// Indices of the dimension's features whose heights run mods' code (`terrain_gpu`);
     /// `None`: no distant terrain here.
     custom: Option<Arc<Vec<usize>>>,
+    /// Tiles whose features' heights are being worked out (`request` keeps it under
+    /// `heights_in_flight`).
+    heights: Arc<std::sync::atomic::AtomicUsize>,
     ready: FxHashSet<TileKey>,
     /// Asked for, and their jobs' flags (cleared to call them off).
     pending: FxHashMap<TileKey, Arc<AtomicBool>>,
@@ -599,6 +750,8 @@ pub struct Lod {
     /// What the server said of columns of `columns_dim`.
     columns: Arc<Columns>,
     columns_dim: u32,
+    /// chiacraft, test only: an imported world's far terrain, and its dimension.
+    far: Option<(u32, Arc<crate::chiacraft::mc_import::FarTerrain>)>,
     /// Made tiles to make again for columns that changed, shown as they are till then.
     stale: FxHashSet<TileKey>,
     /// Since when some wanted tiles are not made, and the most missing since (`diag`).
@@ -611,12 +764,15 @@ const MASK_MARGIN: i32 = 3;
 impl Lod {
     pub fn new(jobs: Sender<LodJob>) -> Lod {
         Lod {
+            leaf_answers: Vec::new(),
+            leaves_asked: 0,
             ground: None,
             jobs,
             done: unbounded(),
             dim: u32::MAX,
             seed: 0,
             custom: None,
+            heights: Arc::default(),
             ready: FxHashSet::default(),
             pending: FxHashMap::default(),
             cached: FxHashSet::default(),
@@ -630,8 +786,18 @@ impl Lod {
             mask_changed: false,
             columns: Arc::default(),
             columns_dim: u32::MAX,
+            far: None,
             stale: FxHashSet::default(),
             missing_since: None,
+        }
+    }
+
+    /// chiacraft, test only: `ToClient::LodFar`, an imported world's far terrain (empty: none);
+    /// every made tile is made again.
+    pub fn set_far(&mut self, dim: u32, grid: &[u8]) {
+        self.far = crate::chiacraft::mc_import::FarTerrain::read(content(), grid).map(|f| (dim, Arc::new(f)));
+        if grid.is_empty() || self.far.is_some() {
+            self.stale.extend(self.ready.iter().copied());
         }
     }
 
@@ -704,6 +870,8 @@ impl Lod {
     ) {
         let c = content();
         let dim = world.dim;
+        FAR_TIME.store(world.time, Ordering::Relaxed);
+        self.check_leaves(c, dim, world.time);
         self.update_mask(gpu, render, world, seed, cam, view);
         let reach = Self::distance();
         if (dim, seed) != (self.dim, self.seed) || reach == 0 {
@@ -722,6 +890,10 @@ impl Lod {
         if (dim, seed) != (self.dim, self.seed) {
             (self.dim, self.seed) = (dim, seed);
             self.custom = super::terrain_gpu::describe(c, dim, seed).map(|(_, custom)| Arc::new(custom));
+            // Its description runs mods' shapes for a while: started now, ahead of the tiles.
+            if self.custom.is_some() {
+                let _ = super::terrain_gpu::lod_desc(dim, seed);
+            }
         }
         // Tiles stand in for cubes not shown yet; the inner half of the view is shown long
         // before the edge, where flying outruns the cubes.
@@ -845,6 +1017,33 @@ impl Lod {
             on
         });
         self.request();
+    }
+
+    /// chiacraft: about every half a minute of game time asks the dimension again what the far
+    /// crowns' leaves seen so far are drawn as (`Terrain::far_leaves`); when an answer changed (a
+    /// bloom over with the season), every made tile is made again.
+    fn check_leaves(&mut self, c: &Content, dim: u32, time: u64) {
+        if time.abs_diff(self.leaves_asked) < 600 {
+            return;
+        }
+        self.leaves_asked = time;
+        let Some(f) = c
+            .dims
+            .get(dim as usize)
+            .and_then(|d| d.terrain.as_ref())
+            .and_then(|t| t.far_leaves)
+        else {
+            return;
+        };
+        let seen = FAR_LEAF_STATES.lock().unwrap().clone();
+        let answers: Vec<(u32, u32)> = seen.iter().map(|&s| (s, f.state(time, s))).collect();
+        let changed = answers
+            .iter()
+            .any(|a| self.leaf_answers.iter().any(|b| b.0 == a.0 && b.1 != a.1));
+        self.leaf_answers = answers;
+        if changed {
+            self.stale.extend(self.ready.iter().copied());
+        }
     }
 
     /// Keeps `diag`'s gauges, and says how long it took until every wanted tile was made again.
@@ -989,6 +1188,11 @@ impl Lod {
         let c = content();
         let custom = self.custom.clone().unwrap();
         let columns = if self.columns_dim == self.dim { self.columns.clone() } else { Arc::default() };
+        let far = self
+            .far
+            .as_ref()
+            .filter(|f| f.0 == self.dim)
+            .map(|f| f.1.clone());
         let p = self.wanted_at.map_or(glam::DVec2::ZERO, |w| w.0);
         let widths = |k: TileKey| k.distance(p).0 / k.size() as f64;
         let mut order: Vec<(f64, TileKey)> = Vec::new();
@@ -1010,8 +1214,15 @@ impl Lod {
             }
         }
         order.sort_by(|a, b| a.0.total_cmp(&b.0).then(b.1.level.cmp(&a.1.level)));
+        let busy = self.heights.load(Ordering::Relaxed);
+        let mut started = 0;
         for (_, key) in order {
             if self.pending.len() >= IN_FLIGHT {
+                break;
+            }
+            // A few tiles' heights at a time: meshes and the description share the pool's queue,
+            // and behind 256 heights jobs the first tiles came 3 s after a join.
+            if !custom.is_empty() && busy + started >= heights_in_flight() {
                 break;
             }
             let again = self.stale.remove(&key);
@@ -1020,15 +1231,26 @@ impl Lod {
             }
             let live = Arc::new(AtomicBool::new(true));
             self.pending.insert(key, live.clone());
-            let (dim, seed, done, jobs, columns) = (self.dim, self.seed, self.done.0.clone(), self.jobs.clone(), columns.clone());
+            let (dim, seed, done, jobs, columns, far) =
+                (self.dim, self.seed, self.done.0.clone(), self.jobs.clone(), columns.clone(), far.clone());
             let asked = std::time::Instant::now();
             if custom.is_empty() {
-                let _ = jobs.send(LodJob { dim, seed, key, custom: Vec::new(), done, live, columns, asked });
+                let _ = jobs.send(LodJob { dim, seed, key, custom: Vec::new(), done, live, columns, far, asked });
                 continue;
             }
             let custom = custom.clone();
+            started += 1;
+            let heights = self.heights.clone();
+            heights.fetch_add(1, Ordering::Relaxed);
             // Mods' features run their code: on LOD's own threads.
             pool().spawn(move || {
+                struct Done(Arc<std::sync::atomic::AtomicUsize>);
+                impl Drop for Done {
+                    fn drop(&mut self) {
+                        self.0.fetch_sub(1, Ordering::Relaxed);
+                    }
+                }
+                let _done = Done(heights);
                 if !live.load(Ordering::Relaxed) {
                     return;
                 }
@@ -1036,11 +1258,19 @@ impl Lod {
                 let heights = custom_heights(c, dim, seed, key, &custom);
                 crate::diag::LOD_HEIGHTS.add(1);
                 crate::diag::LOD_HEIGHTS_NS.add(start.elapsed().as_nanos() as u64);
-                let _ = jobs.send(LodJob { dim, seed, key, custom: heights, done, live, columns, asked });
+                let _ = jobs.send(LodJob { dim, seed, key, custom: heights, done, live, columns, far, asked });
             });
         }
         self.stale.retain(|k| self.ready.contains(k));
     }
+}
+
+/// Tiles' heights worked out at once at most: eight per LOD thread, about a fifth of a second of
+/// them ahead of a made tile's meshing. Three per thread starved a fast flight (PC, 11-05: 100
+/// tiles a second, 340 missing, against 120-300 and 250 with no cap); 256 kept the first tiles
+/// back 1.5 s.
+fn heights_in_flight() -> usize {
+    pool().current_num_threads() * 8
 }
 
 /// Heights of the mod features `custom` at the tile's columns, for its job.

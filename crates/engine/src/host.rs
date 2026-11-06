@@ -142,6 +142,7 @@ pub static HOST: Host = Host {
     client_action_current: crate::app::api::client_entity_action,
     client_clip_length: crate::app::api::client_clip_length,
     client_held_item: crate::app::api::client_entity_held,
+    client_image_set: crate::app::api::client_image_set,
     client_engine_effects: crate::app::api::client_entity_defaults,
     reg_packet,
     reg_key,
@@ -215,6 +216,8 @@ pub static HOST: Host = Host {
     raining_at,
     set_air,
     air_at,
+    set_sky_event,
+    sky_landing,
     set_biome_tints,
     content_tint,
     entity_effect,
@@ -582,24 +585,48 @@ pub fn stats(m: ModId) -> &'static ModStats {
     &STATS[(m.0 as usize).min(MAX_MODS - 1)]
 }
 
-/// Callback nanoseconds and calls of a mod since start; readers diff two looks.
+/// Server-side callback nanoseconds (its own, not counting the mod calls inside) and calls of a
+/// mod since start; readers diff two looks.
 pub fn mod_totals(m: ModId) -> (u64, u64) {
     let s = stats(m);
     (s.nanos.load(Ordering::Relaxed), s.calls.load(Ordering::Relaxed))
 }
+
+/// A server mod call taking this long of its own (50 ms, a whole tick) is logged.
+const SLOW_CALL_NS: u64 = 50_000_000;
 
 /// Calls a mod callback. Time is charged to `owner`; a failing callback is logged with the mod's
 /// name and the engine carries on.
 pub fn invoke<A>(owner: ModId, cb: Callback, args: &mut A) -> bool {
     let Some(f) = cb.func else { return true };
     let start = Instant::now();
+    let saved = crate::diag::inner_start();
     let prev = crate::diag::enter_mod(owner);
     let r = unsafe { f(cb.data, args as *mut A as *mut c_void) };
     crate::diag::leave_mod(prev);
+    // Its own time: less what other calls it made took (they are charged to their own mods).
+    let own = crate::diag::inner_end(saved, start.elapsed().as_nanos() as u64);
     let s = stats(owner);
-    s.nanos
-        .fetch_add(start.elapsed().as_nanos() as u64, Ordering::Relaxed);
-    s.calls.fetch_add(1, Ordering::Relaxed);
+    // Only the server's calls count toward a mod's time per tick (`mod_totals`): the client's
+    // (drawing an animal's look every frame) ran at the frame rate and were counted as if each
+    // were a server tick's.
+    if crate::diag::on_server() {
+        s.nanos.fetch_add(own, Ordering::Relaxed);
+        s.calls.fetch_add(1, Ordering::Relaxed);
+        // A hitch players feel: say whose, and what kind of call (its own time, without the
+        // calls it made).
+        if own >= SLOW_CALL_NS {
+            let name = try_content().map_or("?".to_string(), |c| c.mod_name(owner).to_string());
+            log::warn!(
+                "slow mod call: {name} took {:.0} ms of its own in a {} call",
+                own as f64 / 1e6,
+                std::any::type_name::<A>()
+                    .rsplit("::")
+                    .next()
+                    .unwrap_or("?")
+            );
+        }
+    }
     if r != 0 {
         let n = s.faults.fetch_add(1, Ordering::Relaxed);
         if n < 10 {
@@ -933,6 +960,9 @@ unsafe extern "C" fn entity_set(w: *mut abi::WorldCtx, id: u64, set: u32, s: *co
         };
         if player {
             d.entities.told.extend(told.into_iter().map(|t| (id, t)));
+        }
+        if teleport && !player {
+            d.entities.moved_to(c, id);
         }
         if teleport && player {
             d.events
@@ -1535,9 +1565,20 @@ unsafe extern "C" fn energy_move(w: *mut abi::WorldCtx, h: *const abi::Holder, a
 
 unsafe extern "C" fn component_get(w: *mut abi::WorldCtx, h: *const abi::Holder, comp: u32, out: *mut u8, cap: u32) -> u32 {
     unsafe {
-        let Some(v) = held(w, h).and_then(|at| crate::server::holder::component(dim(w), at, comp)) else { return 0 };
-        std::ptr::copy_nonoverlapping(v.as_ptr(), out, v.len().min(cap as usize));
-        v.len() as u32
+        let copy = |v: &[u8]| {
+            std::ptr::copy_nonoverlapping(v.as_ptr(), out, v.len().min(cap as usize));
+            v.len() as u32
+        };
+        match held(w, h) {
+            // An entity's straight from where it lives: mob AI reads several a mob a tick.
+            Some(crate::server::holder::At::Entity(id)) => dim(w)
+                .entities
+                .comps
+                .get(&(id, comp))
+                .map_or(0, |v| copy(v)),
+            Some(at) => crate::server::holder::component(dim(w), at, comp).map_or(0, |v| copy(&v)),
+            None => 0,
+        }
     }
 }
 
@@ -2785,6 +2826,23 @@ unsafe extern "C" fn set_rain(w: *mut abi::WorldCtx, biomes: *const u32, len: u3
         let biomes = if len == 0 { Vec::new() } else { std::slice::from_raw_parts(biomes, len as usize).to_vec() };
         d.events
             .push(crate::server::DimEvent::SetRain { dim: d.id, biomes, weather: weather as u16 });
+    }
+}
+
+unsafe extern "C" fn set_sky_event(w: *mut abi::WorldCtx, kind: u32, strength: f32) {
+    unsafe {
+        let d = dim(w);
+        d.events
+            .push(crate::server::DimEvent::SetSkyEvent { dim: d.id, kind, strength: strength.clamp(0.0, 1.0) });
+    }
+}
+
+unsafe extern "C" fn sky_landing(w: *mut abi::WorldCtx, pos: *const [f64; 3], seconds: f32) {
+    unsafe {
+        let d = dim(w);
+        let pos = glam::DVec3::from_array(*pos);
+        d.events
+            .push(crate::server::DimEvent::SkyLanding { dim: d.id, pos, seconds: seconds.max(0.0) });
     }
 }
 

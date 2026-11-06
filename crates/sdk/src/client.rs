@@ -141,6 +141,14 @@ impl Client {
         (unsafe { (host().client_bone_position)(self.raw, entity, abi_str(bone), &mut out) } != 0).then_some(out)
     }
 
+    /// Sets GUI image `name` (it must start with `dyn:`, e.g. `dyn:mymod:map`) to `w` x `h` RGBA
+    /// pixels: `ui.image(name, ..)` draws it from the next frame. Set it again to change it; only
+    /// a set uploads, so a picture that stays the same costs nothing. False if refused (no `dyn:`,
+    /// a side of 0 or over 2048, too few bytes).
+    pub fn set_image(&self, name: &str, w: u32, h: u32, rgba: &[u8]) -> bool {
+        unsafe { (host().client_image_set)(self.raw, abi_str(name), w, h, rgba.as_ptr(), rgba.len()) != 0 }
+    }
+
     pub fn input_release_all(&self) {
         self.input(abi::client_input::RELEASE_ALL, "", 0.0, 0.0);
     }
@@ -412,7 +420,14 @@ impl Client {
         unsafe { (host().client_screen_text)(self.raw, x, y, size, color, abi_str(key), Slice::new(&raw)) }
     }
 
-    /// `screen_text` wrapped to at most `width` GUI pixels, its lines centered (0: one line).
+    /// `screen_text_wrapped` on the HUD's plate (`hud_plate`): a hint that should read as one.
+    #[allow(clippy::too_many_arguments)]
+    pub fn screen_text_plated(&self, x: f32, y: f32, key: &str, args: &[crate::Arg], color: u32, size: f32, width: f32) {
+        self.screen_text_wrapped(x, y, key, args, color, size, -width.abs().max(1.0));
+    }
+
+    /// `screen_text` wrapped to at most `width` GUI pixels, its lines centered (0: one line; less
+    /// than 0: on the HUD's plate, `screen_text_plated`).
     #[allow(clippy::too_many_arguments)]
     pub fn screen_text_wrapped(&self, x: f32, y: f32, key: &str, args: &[crate::Arg], color: u32, size: f32, width: f32) {
         let raw = crate::ui::raw_args(args);

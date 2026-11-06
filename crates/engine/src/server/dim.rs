@@ -51,6 +51,18 @@ pub enum DimEvent {
         biomes: Vec<u32>,
         weather: u16,
     },
+    /// What happens in its sky from now on (`Host::set_sky_event`).
+    SetSkyEvent {
+        dim: u32,
+        kind: u32,
+        strength: f32,
+    },
+    /// Something lands at `pos` in `seconds` (`Host::sky_landing`).
+    SkyLanding {
+        dim: u32,
+        pos: glam::DVec3,
+        seconds: f32,
+    },
     /// The air in its biomes from now on (`DimSet::set_air`).
     SetAir {
         dim: u32,
@@ -729,7 +741,7 @@ impl Dim {
     /// Writes the fields clients show (`registry::HEALTH` ...) into their synced components when
     /// they differ, so they travel like mods' components. Absent ones stay absent while default.
     pub fn mirror_fields(&mut self, c: &Content) {
-        let [health, burning, worn, shape, held, off_held, using, .., riding, held_look] = c.game.field_comps;
+        let [health, burning, worn, shape, held, off_held, using, .., riding, held_look, worn_looks] = c.game.field_comps;
         let maxes: Vec<(u64, f32)> = self
             .entities
             .list
@@ -782,6 +794,17 @@ impl Dim {
                 put(comps, held, &item.to_le_bytes());
                 let look = if main.is_empty() { "" } else { crate::stack::layers(&main).unwrap_or("") };
                 put(comps, held_look, look.as_bytes());
+                // What it wears drawn by its own looks, in `WORN`'s order (`worn_of`).
+                let w = &c.game.player_layout.worn;
+                let looks: Vec<&str> = inv
+                    .get(w.start as usize..w.end as usize)
+                    .unwrap_or_default()
+                    .iter()
+                    .filter(|s| !s.is_empty() && c.worn(s.item).is_some())
+                    .map(|s| crate::stack::worn_look(s).unwrap_or(""))
+                    .collect();
+                let looks = if looks.iter().all(|l| l.is_empty()) { String::new() } else { looks.join("\n") };
+                put(comps, worn_looks, looks.as_bytes());
                 let off = crate::content::in_off_hand(c, inv);
                 let off = if off.is_empty() { 0 } else { off.item };
                 put(comps, off_held, &off.to_le_bytes());
@@ -1726,6 +1749,13 @@ impl Dim {
             .get(source)
             .filter(|_| !recovering && !def.has(df::NO_KNOCKBACK))
             .map(|s| s.pos);
+        // What of the knock it shrugs off (`attribute::KNOCKBACK_RESISTANCE`: big creatures).
+        let resist = if knock.is_some() {
+            self.attribute(c, id, super::extend::KNOCKBACK_RESISTANCE, false)
+                .clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
         // A death mods may refuse (a totem): it lives on with one health.
         let dying = self
             .entities
@@ -1750,8 +1780,9 @@ impl Dim {
                 .unwrap_or(DVec3::X);
             if e.player {
                 knocked = Some(away.as_vec3().to_array());
-            } else {
-                e.vel = crate::physics::knock(e.vel * crate::world::TICK, away, e.on_ground) * crate::world::TPS as f64;
+            } else if resist < 1.0 {
+                let knocked = crate::physics::knock(e.vel * crate::world::TICK, away, e.on_ground) * crate::world::TPS as f64;
+                e.vel = e.vel + (knocked - e.vel) * (1.0 - resist);
             }
         }
         let (health, player, pos, kind, on_fire, height) = (e.health, e.player, e.pos, e.kind, e.fire > 0, e.height(c));
@@ -2340,6 +2371,9 @@ impl Dim {
         }
         let mut kinds: Vec<(u64, u32)> = by_kind.keys().copied().collect();
         kinds.sort();
+        // Nothing moves them while mods run but mods' own teleports: their queries look by
+        // column (`Entities::index_cells`) until physics.
+        self.entities.index_cells(true);
         for (frame, kind) in kinds {
             let ids = &by_kind[&(frame, kind)];
             for &(owner, cb) in &c.game.entities[kind as usize].on_tick {
@@ -2366,6 +2400,7 @@ impl Dim {
             self.call(owner, cb, |w| abi::WorldTickArgs { world: w });
         }
         self.fire_timers(c);
+        self.entities.index_cells(false);
         self.navigation(c);
         self.steer_mounts(c);
 

@@ -9,22 +9,23 @@ use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
 use crate::ModelFile;
+use crate::choose::{Band, Need, Stops, WithBand};
+use crate::prof::Timed;
 
 /// One simple creature's body, for every species on its model.
 pub struct Body {
     /// Its model and animation files (`<model>.geo.json`, `<model>.animation.json`), and texture.
     pub model: &'static str,
     pub texture: &'static str,
-    /// Its health (its box is its model's: `animals_core::bodies`).
-    pub health: f32,
     /// Its full speed (fleeing), and the share of it it wanders at.
     pub speed: f32,
     pub wander: f32,
     /// Its resting pose: the look kind's name (`<model>_<pose>`, its own animation file) and its
     /// box.
     pub rest: (&'static str, (f32, f32)),
-    /// What its bite does (a hunter's; 0: it never fights).
-    pub damage: f32,
+    /// Whether it bites (a hunter's); how hard, and its health, come from its species' size, role
+    /// and level (`animals_core::danger::body`; its box is its model's, `animals_core::bodies`).
+    pub bites: bool,
 }
 
 value! {
@@ -35,6 +36,8 @@ value! {
         pub rest: u32,
         /// Whether the resting look is on.
         pub resting: bool,
+        /// Ticks rested so far.
+        pub rested: u32,
     }
 }
 
@@ -60,9 +63,9 @@ pub fn register(r: &mut Registry, kinds: &[&'static EntityKind], body: &'static 
         let index = crate::species::of(kind);
         r.entity(kind)
             .size(bw, bh)
-            .max_health(body.health)
+            .max_health(crate::animal::health(index))
             .walk_speed(body.speed)
-            .attack_damage(body.damage)
+            .attack_damage(if body.bites { crate::animal::hit(index) } else { 0.0 })
             .passive()
             .model_file(body.model)
             .animations(body.model)
@@ -75,19 +78,31 @@ pub fn register(r: &mut Registry, kinds: &[&'static EntityKind], body: &'static 
             })
             .goals(
                 Goals::new()
-                    .then(crate::animal::upkeep(index))
-                    .then(startle)
-                    .then(crate::taming::behave(index))
-                    .then(|w: &World, id: u64, st: &EntityState| crate::hunt::wary(w, id, st) && woken(w, id))
-                    .then(|w: &World, id: u64, st: &EntityState| crate::hunt::hunt(w, id, st) && woken(w, id))
-                    .then(crate::breeding::behave(index))
-                    .then(move |w: &World, id: u64, st: &EntityState| settle(w, id, st, look))
-                    .then(crate::comfort::seek)
-                    .then(crate::forage::forage)
-                    .then(ai::wander(body.wander, 8.0)),
+                    .timed("upkeep", crate::animal::upkeep(index))
+                    .timed("startle", startle)
+                    .timed("taming", crate::taming::behave(index))
+                    .timed("wary", |w: &World, id: u64, st: &EntityState| crate::hunt::wary(w, id, st) && woken(w, id))
+                    .timed("huddle", |w: &World, id: u64, st: &EntityState| crate::hunt::huddle(w, id, st) && woken(w, id))
+                    .timed("hunt", |w: &World, id: u64, st: &EntityState| crate::hunt::hunt(w, id, st) && woken(w, id))
+                    // What it does when nothing is after it, the most pressing first (`choose.rs`).
+                    .band(
+                        "needs",
+                        Band::new()
+                            .with(Need::Love, crate::breeding::behave(index))
+                            .with(
+                                Need::Rest,
+                                Stops { goal: move |w: &World, id: u64, st: &EntityState| settle(w, id, st, look), stop: wake },
+                            )
+                            .with(Need::Watch, crate::senses::watch_goal)
+                            .with(Need::Investigate, crate::senses::investigate)
+                            .with(Need::Comfort, crate::comfort::seek)
+                            .with(Need::Drink, crate::drink::drink)
+                            .with(Need::Eat, crate::forage::eat)
+                            .with(Need::Wander, ai::wander(body.wander, 8.0)),
+                    ),
             )
             .on_hurt(|w, h| {
-                crate::taming::hurt(w, h.entity);
+                crate::taming::hurt(w, h.entity, h.source);
                 wake(w, h.entity);
             });
     }
@@ -106,21 +121,43 @@ fn startle(w: &World, id: u64, _: &EntityState) -> bool {
 /// Every tick: now and then rest for a while, showing the resting look.
 fn settle(w: &World, id: u64, st: &EntityState, look: &str) -> bool {
     let Some(c) = w.component_mut(id, &STATE) else { return false };
-    if c.rest == 0 && !w.navigating(id) && !crate::forage::busy(w, id) && w.random_below(400) == 0 {
+    let chance = crate::routines::rest_chance(400, crate::routines::activity_of(w, id));
+    if c.rest == 0 && !w.navigating(id) && !crate::forage::busy(w, id) && w.random_below(chance) == 0 {
         c.rest = 600 + w.random_below(1800);
     }
     let resting = c.rest > 0;
     if resting {
-        c.rest = c.rest.saturating_sub(w.tick_elapsed(id) as _);
+        let e = w.tick_elapsed(id);
+        c.rest = c.rest.saturating_sub(e as _);
+        c.rested = c.rested.saturating_add(e);
     }
+    let rested = c.rested;
     if c.resting != resting {
         c.resting = resting;
+        c.rested = 0;
         w.set_appearance(id, resting.then(|| format!("animals:{look}")).as_deref());
+        if !resting {
+            // Rested enough: up, and a stretch.
+            crate::anim::clear(w, id);
+            crate::anim::act(w, id, crate::anim::Act::Stretch);
+        }
     }
     if resting && w.navigating(id) {
         w.navigate(id, st.pos, 0.0);
     }
+    if resting && animals_core::routines::asleep(crate::routines::activity_of(w, id), rested) {
+        crate::anim::hold(w, id, crate::anim::Act::Sleep);
+    }
     resting
+}
+
+/// The alarm as it bolts (`hunt::wary`, `taming::behave`), unless it is still in its resting look:
+/// those looks are other kinds with no alarm clip, and the look comes off later than a clip goes
+/// out (the PC log: "no clip for action alarm on animals:deer_lie"). Up at once instead.
+pub fn alarm(w: &World, id: u64) {
+    if !w.component(id, &STATE).is_some_and(|c| c.resting) {
+        crate::anim::act(w, id, crate::anim::Act::Alarm);
+    }
 }
 
 /// Up and running from a hunter (`hunt::wary`): out of its rest.
@@ -137,5 +174,7 @@ pub fn wake(w: &World, id: u64) {
         c.rest = 0;
         c.resting = false;
         w.set_appearance(id, None);
+        // Up at once (scared, hurt): no stretch, and not asleep standing.
+        crate::anim::clear(w, id);
     }
 }

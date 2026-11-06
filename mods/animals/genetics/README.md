@@ -17,9 +17,11 @@ shared crate `core/src/coats.rs` (`animals_core`), which the game uses and the w
 WASM (`web/`, `web/build.sh`): one copy of the rules. They
 paint on the layers each creature's build writes (`layers.py`), copied here into
 `layers/<model>/` and embedded in the mod: what is coat and what is fixed, its light, its
-position, where white, points, a mask and patterns show. Every file ends with `Sz`, the size
+position, where white, points, a mask and patterns show. Every file has `Sz`, the size
 gene (quantitative: small to big for its kind, `coats::size` with the species' sex difference
-and spread in `src/species.rs`).
+and spread in `src/species.rs`), and ends with `Cu` and `Fi`, curiosity and fierceness, which
+with the core's temperament (`Tp`) make its personality (`coats::personality`, genome version 3:
+an older genome draws them at its next upkeep).
 
 **The core** (`core.json`): traits every species carries after its own loci, in genes 16-31
 (`Genome::core`): size, shade, warmth, how far white reaches, the marks' size, density,

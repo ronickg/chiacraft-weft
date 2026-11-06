@@ -160,6 +160,9 @@ struct Sprite {
 pub struct EntityRenderer {
     /// What the head's move in an action does to the camera: offset in view space, roll, pitch.
     pub camera_kick: (Vec3, f32, f32),
+    /// An entity kind a UI preview shows alone (`Ui::kind_model`): its skin is loaded although
+    /// none of it is in the world (the Field Journal's picture was empty).
+    pub preview_kind: Option<u32>,
     pipeline: PipelineId,
     overlay: PipelineId,
     /// Model pipelines for the screen and for the inventory figure's image.
@@ -340,6 +343,7 @@ impl EntityRenderer {
             preview,
             preview_pipe,
             preview_target: None,
+            preview_kind: None,
             skins: FxHashMap::default(),
             player_skins: FxHashMap::default(),
             skin_pending: Vec::new(),
@@ -369,7 +373,7 @@ impl EntityRenderer {
                 shader: &s,
                 vertex,
                 fragment: Some("fs"),
-                color: Some(Format::Surface),
+                color: Some(crate::post::world_format()),
                 depth: Some(DepthState { write: true, compare: Compare::GreaterEqual }),
                 blend: Blend::None,
                 cull_back: true,
@@ -388,7 +392,7 @@ impl EntityRenderer {
                 shader: &s,
                 vertex: "vs",
                 fragment: Some("fs"),
-                color: Some(Format::Surface),
+                color: Some(crate::post::world_format()),
                 depth: Some(DepthState { write: true, compare: Compare::GreaterEqual }),
                 blend: Blend::None,
                 cull_back: true,
@@ -401,7 +405,7 @@ impl EntityRenderer {
                 shader: &s,
                 vertex: "vs",
                 fragment: Some("fs_overlay"),
-                color: Some(Format::Surface),
+                color: Some(crate::post::world_format()),
                 depth: Some(DepthState { write: false, compare: Compare::GreaterEqual }),
                 blend: Blend::Alpha,
                 cull_back: true,
@@ -463,9 +467,10 @@ impl EntityRenderer {
             })
             .map_err(|e| e.0)
         };
-        let (world, preview) = (make("models", "vs", Format::Surface)?, make("entity preview", "vs", Format::Rgba8Srgb)?);
+        let (world, preview) = (make("models", "vs", crate::post::world_format())?, make("entity preview", "vs", Format::Rgba8Srgb)?);
         // A shader pack's older copy of the file has no `vs_hand`.
-        let hand = make("model hand", "vs_hand", Format::Surface).or_else(|_| make("model hand", "vs", Format::Surface))?;
+        let hand = make("model hand", "vs_hand", crate::post::world_format())
+            .or_else(|_| make("model hand", "vs", crate::post::world_format()))?;
         // Depth only, both sides (a model's thin parts are open boxes), its see-through texels left out.
         let shadow = crate::packs::sun_shadows()
             .then(|| {
@@ -675,6 +680,7 @@ impl EntityRenderer {
         entities: &FxHashMap<u64, ClientEntity>,
         comps: &FxHashMap<(u64, u32), Vec<u8>>,
         worn: &[u32],
+        worn_looks: &[String],
         held: [ItemStack; 2],
     ) {
         let c = content();
@@ -747,8 +753,8 @@ impl EntityRenderer {
             if !std::mem::replace(&mut seen[e.look() as usize], true) {
                 self.load(gpu, assets, &c.game.entities[e.look() as usize].texture);
             }
-            for &i in &e.worn {
-                if let Some((_, t)) = c.worn(i) {
+            for (k, &i) in e.worn.iter().enumerate() {
+                if let Some((_, t)) = worn_texture(c, i, k, &e.worn_looks) {
                     self.load(gpu, assets, t);
                 }
             }
@@ -762,8 +768,14 @@ impl EntityRenderer {
         self.seen_kinds = seen;
         self.seen_items = seen_items;
         self.load(gpu, assets, &c.game.entities[c.game.player_kind as usize].texture);
-        for &i in worn {
-            if let Some((_, t)) = c.worn(i) {
+        if let Some(k) = self
+            .preview_kind
+            .filter(|&k| (k as usize) < c.game.entities.len())
+        {
+            self.load(gpu, assets, &c.game.entities[k as usize].texture);
+        }
+        for (k, &i) in worn.iter().enumerate() {
+            if let Some((_, t)) = worn_texture(c, i, k, worn_looks) {
                 self.load(gpu, assets, t);
             }
         }
@@ -941,6 +953,9 @@ impl EntityRenderer {
         }
         // Its own pictures one over the other, as its icon shows them.
         let img = match crate::stack::layers(stack) {
+            // Chiacraft's look: its layers composed as its icon is.
+            Some(spec) if crate::stack::is_look(spec) => super::stack_look::compose(spec, |n| crate::assets::read_image(assets, n))
+                .map(|(size, rgba)| crate::assets::Image { width: size, height: size, rgba }),
             Some(spec) => {
                 let parts: Vec<(String, u32)> = crate::stack::parse_layers(spec)
                     .into_iter()
@@ -1083,23 +1098,30 @@ impl EntityRenderer {
         if name.is_empty() || self.skins.contains_key(name) {
             return;
         }
-        let loaded = assets
-            .read(name, "textures", "png")
-            .and_then(|b| decode_png(&b))
-            .map(|img| {
-                let t = gpu.create_texture(
-                    &TextureDesc { width: img.width, height: img.height, mips: 1, format: Format::Rgba8Srgb, render_target: false },
-                    name,
-                );
-                gpu.write_texture(t, 0, &img.rgba);
-                (t, gpu.texture_index(t), [img.width, img.height])
-            });
+        // A worn look (`abi::comp::WORN_LOOK`) is composed from its layers, the rest read.
+        let image = if crate::stack::is_look(name) {
+            super::stack_look::compose_rect(name, |n| crate::assets::read_image(assets, n))
+                .map(|(width, height, rgba)| crate::assets::Image { width, height, rgba })
+        } else {
+            assets
+                .read(name, "textures", "png")
+                .and_then(|b| decode_png(&b))
+        };
+        let loaded = image.map(|img| {
+            let t = gpu.create_texture(
+                &TextureDesc { width: img.width, height: img.height, mips: 1, format: Format::Rgba8Srgb, render_target: false },
+                name,
+            );
+            gpu.write_texture(t, 0, &img.rgba);
+            (t, gpu.texture_index(t), [img.width, img.height])
+        });
         if loaded.is_none() {
             log::warn!("missing entity texture {name}");
         }
-        if let Some(mask) = crate::assets::emission_mask(assets, name) {
+        // Two channels (`emission_mask_rg`): r the glow, g a pack's own (the blood moon's eyes).
+        if let Some(mask) = crate::assets::emission_mask_rg(assets, name) {
             let t = gpu.create_texture(
-                &TextureDesc { width: mask.width, height: mask.height, mips: 1, format: Format::R8Unorm, render_target: false },
+                &TextureDesc { width: mask.width, height: mask.height, mips: 1, format: Format::Rgba8Unorm, render_target: false },
                 name,
             );
             gpu.write_texture(t, 0, &mask.rgba);
@@ -1111,7 +1133,15 @@ impl EntityRenderer {
 
     /// Model instances of `entity`, of `kind`: its skin (a player's own if they sent one) and what
     /// it wears (how many in `.1`).
-    fn layers(&self, kind: u32, entity: u64, worn: &[u32], light: u32, effect: (u32, f32)) -> ([Instance; MAX_LAYERS], usize) {
+    fn layers(
+        &self,
+        kind: u32,
+        entity: u64,
+        worn: &[u32],
+        worn_looks: &[String],
+        light: u32,
+        effect: (u32, f32),
+    ) -> ([Instance; MAX_LAYERS], usize) {
         let c = content();
         let k = &c.game.entities[kind as usize];
         let mut out = ([Instance::default(); MAX_LAYERS], 0);
@@ -1163,8 +1193,8 @@ impl EntityRenderer {
         }
         out.0[0] = base;
         out.1 = 1;
-        for &i in worn {
-            if let Some((w, t)) = c.worn(i) {
+        for (k, &i) in worn.iter().enumerate() {
+            if let Some((w, t)) = worn_texture(c, i, k, worn_looks) {
                 if let Some(Some((_, idx, size))) = self.skins.get(t).filter(|_| out.1 < MAX_LAYERS) {
                     let names = c.worn_bones(i);
                     let bone_mask = self.models.kinds.get(kind as usize).map_or(0, |m| {
@@ -1336,6 +1366,7 @@ impl EntityRenderer {
         size: [u32; 2],
         look: glam::Vec2,
         worn: &[u32],
+        worn_looks: &[String],
         subject: Option<(u64, u32)>,
     ) -> Option<u32> {
         let c = content();
@@ -1348,6 +1379,7 @@ impl EntityRenderer {
         let def = c.game.entities.get(look_kind as usize)?;
         let player = subject.is_none();
         let worn: &[u32] = if player { worn } else { &[] };
+        let worn_looks: &[String] = if player { worn_looks } else { &[] };
         if self.preview_target.is_none_or(|t| t.2 != size) {
             if let Some((col, dep, ..)) = self.preview_target.take() {
                 gpu.destroy_texture(col);
@@ -1380,7 +1412,7 @@ impl EntityRenderer {
             Vec4::new(0.0, 0.0, 0.1, 0.0),
             Vec4::new(2.0 * cx / sw - 1.0, 1.0 - 2.0 * feet / sh, 0.5, 1.0),
         );
-        let layers = self.layers(look_kind, entity, worn, FULL_LIGHT, (0, 0.0));
+        let layers = self.layers(look_kind, entity, worn, worn_looks, FULL_LIGHT, (0, 0.0));
         self.models.begin();
         let root = Mat4::from_rotation_y(yaw) * Mat4::from_scale(Vec3::splat(1.0 / 16.0));
         let kind = self
@@ -1531,7 +1563,7 @@ impl EntityRenderer {
             let body = own_view && hand.as_ref().is_some_and(|h| h.body);
             let in_view = own_view && !body;
             let effect = if own_view { (0, 0.0) } else { effect };
-            let (mut layers, mut layer_count) = self.layers(look, id, &e.worn, lit, effect);
+            let (mut layers, mut layer_count) = self.layers(look, id, &e.worn, &e.worn_looks, lit, effect);
             if layer_count == 0 {
                 continue;
             }
@@ -1754,6 +1786,9 @@ impl EntityRenderer {
             });
         }
         if let Some(own) = own_hand {
+            if gpu.hand_own_pass() {
+                list.push(Cmd::PassBreak);
+            }
             self.draw_own_hand(gpu, list, frame, cam, scene, own, own_first, own_items, &hand_items, boxes.len(), buf, glow);
         }
         self.instances = instances;
@@ -1943,12 +1978,16 @@ impl EntityRenderer {
                 one.unwrap_or_else(|| swapped(item, hold_of(c, m, item)))
             };
             let held_how = Play { looping: true, aim: true, hand: true, ..how };
-            if e.held != 0 {
+            // Hands on a wall or a glider's bar: the pose's clip has the arms, not what is held.
+            let hands_busy = pose.when & (weft_abi::pose_when::CLIMBING | weft_abi::pose_when::GLIDING | weft_abi::pose_when::ROPE) != 0;
+            if hands_busy {
+                // Nothing of the hands: the item rides along on the raised arm.
+            } else if e.held != 0 {
                 m.play(&mut clips, m.action_seen(e.held, hold_in(e.held, e.off_held != 0), in_view), &held_how);
             } else if in_view {
                 m.play(&mut clips, m.action_seen(0, "hold_empty", true), &held_how);
             }
-            if e.off_held != 0 {
+            if e.off_held != 0 && !hands_busy {
                 m.play(&mut clips, m.action_seen(e.off_held, hold_in(e.off_held, true), in_view), &Play { mirror: true, ..held_how });
             }
             let progress = Play { drive: Drive::Progress, aim: in_view, hand: true, ..how };
@@ -2533,4 +2572,18 @@ mod worn_tests {
         // No layout known: the layer's own size.
         assert_eq!(worn_tex_size([0, 0], [128, 64]), [128.0, 64.0]);
     }
+}
+
+/// The texture worn item `i`, the `k`th thing worn, is drawn with: its own look
+/// (`abi::comp::WORN_LOOK`, composed by `load`) if it has one, else its item's.
+fn worn_texture<'a>(c: &'a crate::content::Content, i: u32, k: usize, looks: &'a [String]) -> Option<(weft_abi::Worn, &'a str)> {
+    let (w, t) = c.worn(i)?;
+    Some((
+        w,
+        looks
+            .get(k)
+            .map(String::as_str)
+            .filter(|l| !l.is_empty())
+            .unwrap_or(t),
+    ))
 }

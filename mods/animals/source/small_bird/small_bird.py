@@ -165,23 +165,31 @@ def layout():
          el("tail_fan", "tail", (-1.25, 3.55, -6.2), (1.25, 3.55, -2.5), quad="up", cut="tail")]
     for s, n in ((1, "L"), (-1, "R")):
         k = n.lower()
-        B += [(f"wingf_{n}", "spine_1", (s * 1.55, 3.6, 1.2)), (f"wing_{n}", "spine_1", (s * 1.1, 3.6, 1.3)),
+        # The folded wing hinged at its shoulder (its top inner front corner), so it opens away from the body.
+        B += [(f"wingf_{n}", "spine_1", (s * 1.6, 4.25, 2.0)), (f"wing_{n}", "spine_1", (s * 1.1, 3.6, 1.3)),
               (f"hand_{n}", f"wing_{n}", (s * 4.8, 3.6, 1.3)), (f"leg_{n}_thigh", "spine_0", (s * 0.45, 3.0, -0.45)),
               (f"leg_{n}_shin", f"leg_{n}_thigh", (s * 0.45, 1.8, -0.45)), (f"leg_{n}_toes", f"leg_{n}_shin", (s * 0.45, 0.5, -0.45))]
         X = lambda a, b: sorted((s * a, s * b))  # noqa: E731
-        (x0, x1) = X(1.2, 1.95)
-        E.append(el(f"wingf_{k}", f"wingf_{n}", (x0, 2.55, -1.8), (x1, 3.85, 2.0)))
-        E.append(el(f"primariesf_{k}", f"wingf_{n}", (s * 1.6, 2.5, -4.4), (s * 1.6, 3.6, -1.0), quad="east" if s > 0 else "west", cut="folded"))
+        # On the chest's side and two texels thick, its top just under the chest's (from 1.2 to 1.95 and up
+        # to 3.85 it stood 1.4 texels out of the hips and showed its top and back as lines beside the
+        # chest and the hips; linecheck).
+        (x0, x1) = X(1.6, 2.6)
+        E.append(el(f"wingf_{k}", f"wingf_{n}", (x0, 2.55, -1.8), (x1, 4.25, 2.0)))
+        E.append(el(f"primariesf_{k}", f"wingf_{n}", (s * 2.1, 2.5, -4.4), (s * 2.1, 3.6, -1.0), quad="east" if s > 0 else "west", cut="folded"))  # mid-wing
         (x0, x1) = X(1.0, 5.0)
-        E.append(el(f"wing_{k}", f"wing_{n}", (x0, 2.85, 0.4), (x1, 4.26, 2.0)))
+        # Round the thicker hand with a flush step, its top a flush step under the chest's (was 2.85 to 4.26).
+        E.append(el(f"wing_{k}", f"wing_{n}", (x0, 2.55, 0.4), (x1, 4.25, 2.0)))
         (x0, x1) = X(4.6, 6.8)
-        E.append(el(f"hand_{k}", f"hand_{n}", (x0, 3.25, 0.75), (x1, 3.95, 1.65)))
+        # Two texels thick (at 0.7 its front and back read as lines beside the arm; linecheck).
+        E.append(el(f"hand_{k}", f"hand_{n}", (x0, 2.9, 0.75), (x1, 3.9, 1.65)))
         (x0, x1) = X(1.1, 4.6)
         E.append(el(f"flight_{k}", f"wing_{n}", (x0, 3.6, -2.4), (x1, 3.6, 0.6), quad="down", cut="secondaries"))
         (x0, x1) = X(4.7, 7.4)
         E.append(el(f"primaries_{k}", f"hand_{n}", (x0, 3.6, -2.2), (x1, 3.6, 0.7), quad="down", cut="primaries"))
         (x0, x1) = X(0.0, 0.9)
-        E.append(el(f"thigh_{k}", f"leg_{n}_thigh", (x0, 1.6, -0.9), (x1, 3.2, 0.0)))  # feathered
+        # Feathered. Its bottom a flush step under the chest's, its back two texels behind the chest's (from 1.6
+        # and -0.9, 1.2 and 1.4 texels of it showed as lines beside the chest and the hips; linecheck).
+        E.append(el(f"thigh_{k}", f"leg_{n}_thigh", (x0, 1.7, -1.3), (x1, 3.2, 0.0)))
         (x0, x1) = X(0.3, 0.6)
         E.append(el(f"shin_{k}", f"leg_{n}_shin", (x0, 0.35, -0.57), (x1, 1.95, -0.33)))
         (x0, x1) = X(0.0, 0.9)

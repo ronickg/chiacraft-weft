@@ -26,10 +26,12 @@ pub fn markdown() -> String {
     waiting(&mut w);
     felling_table(&mut w);
     effects_table(&mut w);
+    climbing_gliding(&mut w);
     climates(&mut w);
     plant_table(&mut w);
     crop_table(&mut w);
     wild_table(&mut w);
+    canopy_table(&mut w);
     forage_table(&mut w);
     soil_table(&mut w);
     difficulties(&mut w);
@@ -276,6 +278,71 @@ fn clothes(w: &mut String) {
     let _ = writeln!(w);
 }
 
+fn climbing_gliding(w: &mut String) {
+    use crate::{climb, glide};
+    // The grappling hook's row follows the glider's.
+    let _ = writeln!(
+        w,
+        "## Climbing and gliding\n\nAny wall, pushing into it in the air: {} blocks a second at grip 1, {} stamina a second climbing and {:.1} hanging still (sneaking; sneaking into it climbs down). Grip: rough rock and logs {}, dressed stone and planks {}, loose ground {}, ice and glass {}. Run out and the hands let go until {} is back.\n\n| on the climber | pace | stamina |\n|---|---|---|",
+        climb::SPEED,
+        crate::stamina::CLIMB,
+        climb::cost(false, climb::FREE),
+        climb::GRIP_ROUGH,
+        climb::GRIP_SMOOTH,
+        climb::GRIP_LOOSE,
+        climb::GRIP_NONE,
+        climb::AGAIN
+    );
+    for (e, b) in climb::BURDENS {
+        let _ = writeln!(w, "| {} | x{} | x{} |", e.name(), b.pace, b.cost);
+    }
+    let _ = writeln!(
+        w,
+        "\n| glider | airspeed | sink | glide ratio | from 40 up: still air | 4 m/s behind | 4 m/s against | seconds aloft |\n|---|---|---|---|---|---|---|---|"
+    );
+    for g in glide::WINGS {
+        let wind = 4.0 * glide::WIND_SHARE;
+        let _ = writeln!(
+            w,
+            "| `{}` | {} | {} | {:.1} | {:.0} | {:.0} | {:.0} | {} |",
+            g.name,
+            g.speed,
+            g.sink,
+            g.ratio(),
+            g.range(40.0, 0.0),
+            g.range(40.0, wind),
+            g.range(40.0, -wind),
+            g.durability()
+        );
+    }
+    let _ = writeln!(
+        w,
+        "\nThe wind carries a glider at {} of the surface wind. Rising air: thermals up to {} blocks a second at 14:00 over bare ground (half over grass) in {} of {}-block cells, none in rain; wind up a slope lifts by its rise over {} blocks downwind, x{}; at most {} together.\n",
+        glide::WIND_SHARE,
+        glide::THERMAL,
+        glide::THERMAL_SHARE,
+        glide::THERMAL_CELL,
+        glide::RIDGE_LOOK,
+        glide::RIDGE_SHARE,
+        glide::LIFT_MAX
+    );
+    let _ = writeln!(w, "| grappling hook | reach | pulled in | let out | throws | stamina on the rope |\n|---|---|---|---|---|---|");
+    for h in crate::grapple::HOOKS {
+        let _ = writeln!(
+            w,
+            "| `{}` | {} | {} a second | {:.1} a second | {} | climbing's: {} a second pulling, {:.1} hanging |",
+            h.name,
+            h.reach,
+            h.reel,
+            h.reel * crate::grapple::LET_OUT_SHARE,
+            h.durability(),
+            crate::stamina::CLIMB,
+            climb::cost(false, climb::FREE)
+        );
+    }
+    let _ = writeln!(w);
+}
+
 fn effects_table(w: &mut String) {
     let _ = writeln!(w, "## Effects\n\n| effect | group | changes |\n|---|---|---|");
     for e in effects::ALL {
@@ -426,9 +493,10 @@ fn plant_table(w: &mut String) {
 fn crop_table(w: &mut String) {
     let _ = writeln!(
         w,
-        "## Crops\n\nWhat each crop is sown from and gives ripe (`vitals::crops`; how it grows is its plants row): picked unripe it gives back what sowed it, ripe its harvest and, with a seed of its own, up to {} more seed. Its ripe harvest tires or feeds the farmland under it. Broken tall grass in the biomes listed gives one of their crops' seed a time in {:.0}.\n\n| crop | sown from | ripe gives | stages | soil | wild seed in |\n|---|---|---|---|---|---|",
+        "## Crops\n\nWhat each crop is sown from and gives ripe (`vitals::crops`; how it grows is its plants row): picked unripe it gives back what sowed it, ripe its harvest and, with a seed of its own, up to {} more seed. Its ripe harvest tires or feeds the farmland under it. Broken tall grass in the biomes listed gives one of their crops' seed a time in {:.0}, and anywhere a wheat seed a time in {:.0}.\n\n| crop | sown from | ripe gives | stages | soil | wild seed in |\n|---|---|---|---|---|---|",
         crate::crops::EXTRA_SEEDS,
-        1.0 / crate::crops::WILD_SEED_CHANCE
+        1.0 / crate::crops::WILD_SEED_CHANCE,
+        1.0 / crate::crops::WHEAT_SEED_CHANCE
     );
     for c in &crate::crops::CROPS {
         let wild = if c.wild.is_empty() { "tall grass anywhere".to_string() } else { c.wild.join(", ") };
@@ -456,6 +524,35 @@ fn wild_table(w: &mut String) {
             .join(", ");
         let _ =
             writeln!(w, "| {} | {:?} | {:?} | {} | {:.1}% | {found} |", p.block, p.form, p.ground, p.gives.unwrap_or("-"), p.cover * 100.0);
+    }
+    let _ = writeln!(w);
+}
+
+fn canopy_table(w: &mut String) {
+    use crate::canopy::{self, Kind, Tier};
+    let _ = writeln!(
+        w,
+        "## Stands of trees\n\nA forest's layers (`vitals::canopy`): each wild tree's site grows under the canopy, in it or over it by its biome's shares; a simple tree's height (to its crown's top) and crown by its kind and layer, a big one a block taller and wider. A canopy tree carries a side lobe {:.0}% of the time; a round or slim crown hangs its depth down from the top, so the trunk stands clear under it (height - depth), and a cone's needles start at {:.0}% / {:.0}% / {:.0}% of its height (under / canopy / emergent). Branched trees grow x{} as tall under the canopy and x{} over it, broadleaves on at least {} / {} blocks of clear trunk in and over the canopy.\n\n| crown | layer | height | crown radius | depth | lobes |\n|---|---|---|---|---|---|",
+        canopy::CANOPY_LOBE * 100.0,
+        canopy::cone_bare(Tier::Under) * 100.0,
+        canopy::cone_bare(Tier::Canopy) * 100.0,
+        canopy::cone_bare(Tier::Emergent) * 100.0,
+        canopy::branched_height(Tier::Under),
+        canopy::branched_height(Tier::Emergent),
+        canopy::clear_trunk(Tier::Canopy),
+        canopy::clear_trunk(Tier::Emergent)
+    );
+    for kind in [Kind::Round, Kind::Cone, Kind::Slim] {
+        for tier in [Tier::Under, Tier::Canopy, Tier::Emergent] {
+            let c = canopy::crown(kind, tier);
+            let depth = if c.depth == 0 { "a spire".to_string() } else { c.depth.to_string() };
+            let _ = writeln!(w, "| {kind:?} | {tier:?} | {}-{} | {} | {depth} | {} |", c.low, c.low + c.spread - 1, c.radius, c.lobes);
+        }
+    }
+    let _ = writeln!(w, "\n| biome | under | emergent |\n|---|---|---|");
+    for s in canopy::STANDS.iter().chain([&canopy::STAND_ELSE]) {
+        let name = if s.biome.is_empty() { "elsewhere" } else { s.biome };
+        let _ = writeln!(w, "| {name} | {:.0}% | {:.0}% |", s.under * 100.0, s.emergent * 100.0);
     }
     let _ = writeln!(w);
 }
@@ -530,6 +627,27 @@ fn soil_table(w: &mut String) {
         soil::SPOILED,
         soil::compost_secs() / 60.0
     );
+    let _ = writeln!(
+        w,
+        "Dung pats: a grazer drops one every {} mouthfuls where it stands on the ground, never within {} blocks of another; it rots by warmth and soil water into a tuft of fresh grass (at most {} game days, frozen or dry), and while it lies grazed grass within {} blocks grows back x{}. How long one lies, in game minutes (a game day is {:.0}):\n\n| biome | spring | summer | autumn | winter |\n|---|---|---|---|---|",
+        soil::MOUTHFULS_A_PAT,
+        soil::PAT_SPACING,
+        soil::PAT_MOST_DAYS,
+        soil::PAT_REACH,
+        soil::PAT_GROWTH,
+        crate::DAY_SECS / 60.0
+    );
+    for c in crate::climate::BIOMES
+        .iter()
+        .filter(|c| !c.underground && crate::forage::grass_grows(c.biome) > 0.0)
+    {
+        let lies = (0..4)
+            .map(|s| format!("{:.0}", soil::pat_season_secs(c.celsius, c.seasons, c.rain, s) / 60.0))
+            .collect::<Vec<_>>()
+            .join(" | ");
+        let _ = writeln!(w, "| {} | {lies} |", c.biome);
+    }
+    let _ = writeln!(w);
 }
 
 /// The crops that leave the soil so, by name.

@@ -176,6 +176,12 @@ impl GameTextures {
     /// The texture id of a stack's `layers` text, made the first time it is asked for; loaded like
     /// any texture once drawn.
     pub fn layered(&self, spec: &str) -> u32 {
+        // Chiacraft's look (shade maps and ramps) composes on its own.
+        if crate::stack::is_look(spec)
+            && let Some(id) = self.look(spec)
+        {
+            return id;
+        }
         let mut i = self.inner.borrow_mut();
         if let Some(&id) = i.layered.get(spec) {
             return id;
@@ -280,6 +286,29 @@ impl GameTextures {
     /// Changes whenever textures were loaded, so tables built from them can be redone.
     pub fn generation(&self) -> u64 {
         self.inner.borrow().generation
+    }
+
+    /// Every texture not loaded yet (blocks, their overlays and connected tiles, items, entities,
+    /// particles, the GUI), loaded now; how many. Joining does this once: loaded when first
+    /// shown, they were decoded inside a mesh upload with the frame waiting, and drawn blank until
+    /// then (perf review #9).
+    pub fn load_all(&self, gpu: &mut dyn Backend) -> usize {
+        let n = {
+            let mut i = self.inner.borrow_mut();
+            let todo: Vec<u32> = (0..i.entries.len() as u32)
+                .filter(|&e| {
+                    let en = &i.entries[e as usize];
+                    en.frames.is_empty() && !en.requested
+                })
+                .collect();
+            for &e in &todo {
+                i.entries[e as usize].requested = true;
+            }
+            i.requests.extend(&todo);
+            todo.len()
+        };
+        self.load_requested(gpu);
+        n
     }
 
     /// Block textures `ids` (and their overlays) loaded now: a mesh about to be drawn uses them.

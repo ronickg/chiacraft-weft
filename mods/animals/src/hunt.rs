@@ -10,7 +10,9 @@
 //! arrives as fed as its prey are (`animal::arrive`), and a full one leaves them be.
 //!
 //! Prey keep watch (`wary`): a wild animal that sees a hunter able to take it runs off. In fog
-//! both see less far (`base_api::sight`).
+//! both see less far (`base_api::sight`). In a blood moon's totality (`animals_core::sky`) they
+//! watch half again as far, and a herd animal strayed from its herd walks back to its middle
+//! (`huddle`).
 
 use weft_sdk::*;
 
@@ -25,10 +27,14 @@ use crate::species::{self, OTHER_PREY, SPECIES, Species};
 static HUNT: Component<[u64; 4]> = Component::named("animal_hunt");
 /// Until when it runs from a hunter (not saved).
 static WARY: Component<u64> = Component::named("animal_wary");
+/// When an ambusher broke cover to charge (0: still stalking; not saved).
+static CHARGING: Component<u64> = Component::named("animal_charging");
+/// When it last stood its ground (`stands_ground`; not saved): a stand that begins is shown by a rear.
+static STOOD: Component<u64> = Component::named("animal_stood");
 
 /// Blocks a hunter looks for prey and prey watches for hunters, in clear air: fog, a blizzard or
 /// a dust storm close both in (`base_api::sight`).
-const LOOK: f64 = 16.0;
+pub(crate) const LOOK: f64 = 16.0;
 const WATCH: f64 = 10.0;
 /// It hunts under this share of its food, until this full (as foraging, `needs`).
 use animals_core::needs::{FULL, HUNGRY};
@@ -36,13 +42,19 @@ use animals_core::needs::{FULL, HUNGRY};
 const GIVE_UP: u64 = 600;
 const LOOK_EVERY: u64 = 60;
 const RUN: u64 = 80;
+/// Ticks a herd animal walks back to its herd before it looks again (`huddle`).
+const HUDDLE_WALK: u64 = 40;
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&HUNT, [0u64; 4], 0);
     r.entity_component(&WARY, 0u64, 0);
+    r.entity_component(&CHARGING, 0u64, 0);
+    r.entity_component(&STOOD, 0u64, 0);
     for s in &SPECIES {
         r.attach(s.kind, &HUNT);
         r.attach(s.kind, &WARY);
+        r.attach(s.kind, &CHARGING);
+        r.attach(s.kind, &STOOD);
     }
     // A kill feeds the hunter that made it, by the prey's mass against its own.
     r.on(&actions::DIE, |b| {
@@ -88,7 +100,7 @@ pub fn prey_lush(w: &World, s: &Species, pos: [i32; 3]) -> Option<f32> {
 const EGG_KG: f32 = 0.2;
 
 /// The species `index` an egg `id` holds, if it is one.
-fn egg_of(w: &World, id: u64) -> Option<usize> {
+pub(crate) fn egg_of(w: &World, id: u64) -> Option<usize> {
     let e = w.component(id, &crate::eggs::EGG)?;
     (e.species as usize)
         .checked_sub(1)
@@ -96,7 +108,7 @@ fn egg_of(w: &World, id: u64) -> Option<usize> {
 }
 
 /// A player's egg (its nest's, or one laid by a tame): the wild's egg eaters leave those alone.
-fn owned_egg(w: &World, id: u64) -> bool {
+pub(crate) fn owned_egg(w: &World, id: u64) -> bool {
     egg_of(w, id).is_some() && w.component(id, &animal::OWNER).is_some_and(|o| o[0] != 0)
 }
 
@@ -130,31 +142,25 @@ pub(crate) fn mass(w: &World, id: u64) -> Option<f32> {
     kind_mass(e.kind, size)
 }
 
-/// The family of `id`, if it's one of the species: by its animal record, or by its kind before it
-/// has one (one spawned this tick, which a packmate otherwise took for prey).
-fn family(w: &World, id: u64) -> Option<&'static str> {
-    w.component(id, &ANIMAL)
-        .and_then(|a| a.species())
-        .map(|s| s.family.name)
-        .or_else(|| {
-            let kind = w.entity(id)?.kind;
-            SPECIES
-                .iter()
-                .find(|s| s.kind.id() == kind)
-                .map(|s| s.family.name)
-        })
-        // An egg is its species' family's: a hunter leaves its own kind's eggs.
-        .or_else(|| egg_of(w, id).map(|i| SPECIES[i].family.name))
+/// A goal for wild hunters: hungry, it goes after the nearest prey it can take; it takes the turn
+/// while it chases (a knock-out kind fights through its anger, `knockout::behave`, after stalking
+/// first if it ambushes: `stalks_first`).
+pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
+    let t = crate::prof::stamp();
+    let r = hunt_(w, id, st);
+    crate::prof::slow(t, || format!("hunt of {id}"));
+    r
 }
 
-/// A goal for wild hunters: hungry, it goes after the nearest prey it can take; it takes the turn
-/// while it chases (a knock-out kind fights through its anger, `knockout::behave`).
-pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
+fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
     let Some(a) = w.component(id, &ANIMAL) else { return false };
     let Some(s) = a.species().filter(|s| s.hunts()) else { return false };
     let Some(mut h) = w.component(id, &HUNT) else { return false };
     let full = a.food as f32 / a.stat(species::FOOD).max(1.0);
-    if animal::tamed(w, id) || full >= FULL || (h[0] == 0 && full >= HUNGRY) {
+    // A fierce one hunts sooner (`roles::FIERCE_HUNGER`), a timid one later.
+    let fierce = crate::senses::facts(w, id).map_or(0.0, |f| animals_core::roles::lean(f.persona()[2]));
+    let hungry = (HUNGRY + animals_core::roles::FIERCE_HUNGER * fierce).min(FULL - 0.05);
+    if animal::tamed(w, id) || full >= FULL || (h[0] == 0 && full >= hungry) {
         if h[0] != 0 {
             w.component_mut(id, &HUNT).map(|h| *h = [0; 4]);
         }
@@ -169,8 +175,13 @@ pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
         // A pack runs its prey down: they take turns at the front, faster than one alone could
         // keep up, and keep at it twice as long (a wolf pack's chase of an elk lasts minutes).
         let pack = h[3] == 1;
-        if alive && now < h[1] + if pack { 2 * GIVE_UP } else { GIVE_UP } {
+        // A fierce one keeps at it longer (`roles::FIERCE_CHASE`).
+        let give_up = ((if pack { 2 * GIVE_UP } else { GIVE_UP }) as f32 * (1.0 + animals_core::roles::FIERCE_CHASE * fierce)) as u64;
+        if alive && now < h[1] + give_up {
             if knockout {
+                if stalks_first(w, id, st, s, h[0], pack, now) {
+                    return true;
+                }
                 // Its anger does the chasing; kept up while the chase lasts.
                 if w.component(id, &crate::knockout::KNOCKOUT)
                     .is_some_and(|k| k.angry == 0 && k.out == 0)
@@ -179,17 +190,24 @@ pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
                 }
                 return false;
             }
-            crate::commands::fight_at(w, id, st, h[0], if pack { PACK_SPEED } else { 1.4 });
+            let (aim, speed) = chase(w, id, st, s, h[0], pack, now);
+            crate::commands::fight_aiming(w, id, st, h[0], speed, aim);
             return true;
         }
         weft_sdk::info!("{} {id} gives up on {} ({})", s.name, h[0], if alive { "too long" } else { "gone" });
         h = [0, 0, now + LOOK_EVERY, 0];
+        w.component_mut(id, &CHARGING).map(|c| *c = 0);
     }
     if now < h[2] {
         w.component_mut(id, &HUNT).map(|c| *c = h);
         return false;
     }
     h[2] = now + LOOK_EVERY;
+    // Out of its hours it rests rather than hunts, unless hunger presses (`routines::HUNTS_FROM`).
+    if crate::routines::activity(w, s.index()) < animals_core::routines::HUNTS_FROM && full >= animals_core::routines::HUNTS_ANYWAY {
+        w.component_mut(id, &HUNT).map(|c| *c = h);
+        return false;
+    }
     // Food lying near (a carcass, dropped meat) is a meal without a chase: it eats that first
     // (`forage.rs`).
     if crate::forage::ground_food(w, s, st.pos.to_array(), crate::forage::ITEM_LOOK).is_some() {
@@ -197,17 +215,26 @@ pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
         return false;
     }
     let own = mass(w, id).unwrap_or(s.bio.mass);
-    // A pack's kind with others of it near hunts together: bigger prey (`Species::takes_with`).
-    let pack = if s.pack_prey().is_some() { pack_near(w, id, st) } else { 1 };
-    let prey = w
-        .targets_near(st.pos, LOOK * base_api::sight(w, st.pos.to_array()) as f64, None)
-        .into_iter()
-        .filter(|&t| t != id && family(w, t) != Some(s.family.name) && !owned_egg(w, t))
-        .filter_map(|t| Some((t, w.entity(t)?, mass(w, t)?)))
-        .filter(|(_, e, kg)| e.health > 0.0 && s.takes_with(own, *kg, pack))
-        .min_by(|a, b| dist2(a.1.pos, st.pos).total_cmp(&dist2(b.1.pos, st.pos)));
-    let Some((t, _, kg)) = prey else {
+    // Its prey and its pack from its last look round (`senses`): a pack's kind with others of it
+    // near hunts together, bigger prey (`Species::takes_with`).
+    let seen = crate::senses::sense(w, id, st, |sight| watch(w, sight));
+    let pack = if s.pack_prey().is_some() { seen.kin as u32 } else { 1 };
+    let prey = (seen.prey != 0)
+        .then_some((seen.prey, seen.prey_kg))
+        .filter(|&(t, _)| {
+            w.entity(t)
+                .is_some_and(|e| e.health > 0.0 && dist2(e.pos, st.pos) < (LOOK * 1.5).powi(2))
+        });
+    let Some((t, kg)) = prey else {
         w.component_mut(id, &HUNT).map(|c| *c = h);
+        // No prey in sight: it goes where kills were (`memory::haunt`), where prey come and die.
+        if let Some(site) = crate::memory::haunt(w, st.pos.to_array())
+            && dist2(site, st.pos) > 16.0
+            && !w.navigating(id)
+        {
+            weft_sdk::info!("{} {id} goes to a kill site at {:.0} {:.0}", s.name, site[0], site[2]);
+            w.navigate(id, site, 1.0);
+        }
         return false;
     };
     weft_sdk::info!("{} {id} hunts {} ({kg:.1} kg, a pack of {pack})", s.name, t);
@@ -217,6 +244,9 @@ pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
     h = [t, now, now + LOOK_EVERY, (pack >= species::PACK) as u64];
     w.component_mut(id, &HUNT).map(|c| *c = h);
     if knockout {
+        if stalks_first(w, id, st, s, t, pack >= species::PACK, now) {
+            return true;
+        }
         crate::knockout::anger(w, id, t);
         return false;
     }
@@ -224,21 +254,31 @@ pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
     true
 }
 
+/// A knock-out kind that ambushes (a jaguar) stalks to its burst range as any ambusher does
+/// (`chase`); its anger takes over as it breaks cover with the pounce. False once it has broken
+/// cover (or isn't an ambusher alone): its anger does the rest.
+fn stalks_first(w: &World, id: u64, st: &EntityState, s: &Species, prey: u64, pack: bool, now: u64) -> bool {
+    if pack || !animals_core::roles::ambushes(s.family.name) || w.component(id, &CHARGING).unwrap_or(0) != 0 {
+        return false;
+    }
+    let (aim, speed) = chase(w, id, st, s, prey, pack, now);
+    if w.component(id, &CHARGING).unwrap_or(0) != 0 {
+        return false;
+    }
+    crate::commands::fight_aiming(w, id, st, prey, speed, aim);
+    true
+}
+
+/// While it stands its ground and doesn't charge, it rears once in this many of its looks
+/// (`senses::EVERY` ticks each): every 4 seconds.
+const REAR_EVERY: u64 = 8;
+
 /// Its kind's speed a pack chases at (one alone: 1.4, `commands::fight`): a wolf 5.5 blocks a
 /// second, at this nearly 10, past a fleeing deer's 8.
 const PACK_SPEED: f32 = 1.75;
 
-/// Blocks within which a pack's kind hunt together.
-const PACK_RANGE: f64 = 16.0;
-
-/// How many wild ones of `id`'s kind are near it, itself among them.
-fn pack_near(w: &World, id: u64, st: &EntityState) -> u32 {
-    let kind = w.entity(id).map(|e| e.kind);
-    w.entities_near(st.pos, PACK_RANGE, None)
-        .into_iter()
-        .filter(|&o| o == id || (w.entity(o).map(|e| e.kind) == kind && !animal::tamed(w, o)))
-        .count() as u32
-}
+/// Blocks within which a pack's kind hunt together (and count each other, `senses::KIN`).
+const PACK_RANGE: f64 = crate::senses::KIN;
 
 /// Big prey only a pack takes: the others of the pack near that aren't hunting already go after it
 /// too, so it isn't one wolf against a red deer.
@@ -259,32 +299,216 @@ fn rally(w: &World, id: u64, st: &EntityState, target: u64, now: u64) {
 
 /// A goal for wild animals: a hunter near that could take it, and it runs the other way.
 pub fn wary(w: &World, id: u64, st: &EntityState) -> bool {
-    if animal::tamed(w, id) {
-        return false;
-    }
     let now = w.game_time();
+    // Running already; else it looks round once in `senses::EVERY` ticks (a tame never does: it
+    // trusts its owner to keep it safe).
     if w.component(id, &WARY).is_some_and(|until| now < until) {
         return true;
     }
-    if (now + id) % 10 != 0 {
+    if !(now + id).is_multiple_of(crate::senses::EVERY) || animal::tamed(w, id) {
         return false;
     }
-    let Some(me) = mass(w, id) else { return false };
-    let mine = family(w, id);
-    let hunter = w
-        .targets_near(st.pos, WATCH * base_api::sight(w, st.pos.to_array()) as f64, None)
-        .into_iter()
-        .filter(|&t| t != id && family(w, t) != mine && !animal::tamed(w, t))
-        .filter_map(|t| {
-            let s = w.component(t, &ANIMAL)?.species()?;
-            let e = w.entity(t)?;
-            s.takes_at_most(mass(w, t)?, me).then_some(e) // a pack's kind with its pack's reach
-        })
-        .min_by(|a, b| dist2(a.pos, st.pos).total_cmp(&dist2(b.pos, st.pos)));
-    let Some(h) = hunter else { return false };
-    let (x, z) = (st.pos.x - h.pos.x, st.pos.z - h.pos.z);
-    let n = (x * x + z * z).sqrt().max(0.01);
-    w.navigate(id, [st.pos.x + x / n * 10.0, st.pos.y, st.pos.z + z / n * 10.0], 1.6);
-    w.component_mut(id, &WARY).map(|u| *u = now + RUN);
+    // What it has noticed of hunters (`senses`: seen, heard, smelled, a fight near): half aware
+    // it stops and stares that way, aware it runs, over ground it can run on.
+    let seen = crate::senses::sense(w, id, st, |sight| watch(w, sight));
+    let h = seen.threat_pos.map(f64::from);
+    if seen.aware >= animals_core::perception::NOTICED && (seen.threat != 0 || h != [0.0; 3]) {
+        // A big plant eater faces a lone hunter, a mother stays between it and her young.
+        if seen.threat != 0 && stands_ground(w, id, st, seen.threat) {
+            w.component_mut(id, &WARY)
+                .map(|u| *u = now + crate::senses::EVERY);
+            return true;
+        }
+        // It calls: its herd or pack near know at once and run with it.
+        let heard = crate::senses::alarm(w, id, st, seen.threat, seen.threat_pos);
+        if heard > 0 {
+            weft_sdk::info!("animal {id} calls the alarm: {heard} of its kind near run too");
+        }
+        let to = crate::senses::escape(w, st, h, 10.0, crate::senses::herd_mid(w, id));
+        weft_sdk::debug!("animal {id} runs from {} (awareness {:.2}) to {to:?}", seen.threat, seen.aware);
+        w.navigate(id, to, 1.6);
+        // The alarm as it bolts: a snort, the tail flagged, a bark (whatever its kind's is).
+        crate::wild::alarm(w, id);
+        w.component_mut(id, &WARY).map(|u| *u = now + RUN);
+        crate::senses::ran(w, id, false);
+        return true;
+    }
+    if seen.aware >= animals_core::perception::STARE && seen.threat != 0 {
+        crate::senses::stare(w, id, st, seen.threat_pos);
+        // Held till its next look.
+        w.component_mut(id, &WARY)
+            .map(|u| *u = now + crate::senses::EVERY);
+        return true;
+    }
+    false
+}
+
+/// Blocks it watches for hunters: `WATCH` by the weather's `sight`, half again in a blood moon.
+pub(crate) fn watch(w: &World, sight: f32) -> f64 {
+    let blood = animals_core::sky::totality(w.seed(), w.day_time());
+    WATCH * sight as f64 * if blood { animals_core::sky::BLOOD_MOON_WATCH as f64 } else { 1.0 }
+}
+
+/// A goal for wild herd animals on the ground (not birds: a flock's `wary` takes off): in a blood
+/// moon's totality, one more than `HUDDLE` from the middle of its herd near walks back to it (held,
+/// as a flight from a hunter, for `HUDDLE_WALK` ticks).
+pub fn huddle(w: &World, id: u64, st: &EntityState) -> bool {
+    use animals_core::sky::HUDDLE;
+    let now = w.game_time();
+    if !(now + id).is_multiple_of(20) || animal::tamed(w, id) || !animals_core::sky::totality(w.seed(), w.day_time()) {
+        return false;
+    }
+    let herd = w
+        .component(id, &ANIMAL)
+        .and_then(|a| a.species())
+        .is_some_and(|s| s.bio.social == animals_core::biology::Social::Herd);
+    if !herd {
+        return false;
+    }
+    // Its herd within `HUDDLE_LOOK` from its last look round (`senses`: a herd's counts its kin
+    // that far in a blood moon), itself taken out of the middle.
+    let seen = crate::senses::sense(w, id, st, |sight| watch(w, sight));
+    let n = seen.kin as f64 - 1.0;
+    if n <= 0.0 {
+        return false;
+    }
+    let p = [st.pos.x, st.pos.y, st.pos.z];
+    let mid: [f64; 3] = std::array::from_fn(|i| (seen.kin_mid[i] as f64 * seen.kin as f64 - p[i]) / n);
+    if dist2(mid, st.pos) <= (HUDDLE * HUDDLE) as f64 {
+        return false;
+    }
+    w.navigate(id, mid, 1.2);
+    weft_sdk::info!("animal {id} huddles back to its herd ({:.1} blocks out)", dist2(mid, st.pos).sqrt());
+    if let Some(u) = w.component_mut(id, &WARY) {
+        *u = now + HUDDLE_WALK;
+    }
     true
+}
+
+/// Whether `id` stands its ground against hunter `threat` instead of running
+/// (`animals_core::roles`): a big plant eater against a lone hunter, or a mother big enough with
+/// her young near. It faces the hunter, and charges one that comes within `CHARGE` blocks.
+fn stands_ground(w: &World, id: u64, st: &EntityState, threat: u64) -> bool {
+    use animals_core::roles;
+    let Some(me) = crate::senses::facts(w, id) else { return false };
+    let Some(s) = me.species() else { return false };
+    if s.hunts() || me.young != 0 || me.tamed != 0 {
+        return false;
+    }
+    let Some(t) = w.entity(threat) else { return false };
+    // A fierce one stands from a smaller size (`roles::FIERCE_STAND`).
+    let stands_kg = roles::STANDS_KG * (1.0 - (1.0 - roles::FIERCE_STAND) * roles::lean(me.persona()[2]).max(0.0));
+    let big_alone = me.mass >= stands_kg && {
+        // Lone: no other of its kind near it.
+        w.targets_near(t.pos, roles::LONE, None)
+            .into_iter()
+            .filter(|&o| o != threat && w.entity(o).is_some_and(|e| e.kind == t.kind))
+            .count()
+            == 0
+    };
+    let mother = me.mass >= roles::GUARDS_KG
+        && w.component(id, &ANIMAL).is_some_and(|a| a.female != 0)
+        && w.entities_near(st.pos, roles::YOUNG_NEAR, Some(s.kind))
+            .into_iter()
+            .any(|o| {
+                o != id
+                    && w.component(o, &crate::breeding::BREEDING)
+                        .is_some_and(|b| b.mother == id && b.growing > 0)
+            });
+    if !(big_alone || mother) {
+        return false;
+    }
+    crate::senses::face(w, id, st, [t.pos.x as f32, t.pos.y as f32, t.pos.z as f32]);
+    let d2 = dist2(t.pos, st.pos);
+    {
+        use crate::anim::{self, Act};
+        if d2 <= roles::CHARGE * roles::CHARGE * 4.0 {
+            anim::hold(w, id, Act::Charge);
+        } else {
+            // It rears as a stand begins (it didn't stand at its last look; staring before isn't
+            // the start: the PC look's deer stared first and never reared) and every few seconds
+            // after (not over a rear still on), staring it down.
+            let now = w.game_time();
+            let began = w
+                .component(id, &STOOD)
+                .is_none_or(|t| now > t + 3 * crate::senses::EVERY);
+            let again = !anim::busy(w, id) && ((now + id) / crate::senses::EVERY).is_multiple_of(REAR_EVERY);
+            if began || again {
+                anim::act(w, id, Act::Rear);
+            }
+            anim::hold(w, id, Act::Stare);
+        }
+    }
+    if let Some(c) = w.component_mut(id, &STOOD) {
+        *c = w.game_time();
+    }
+    if d2 <= roles::CHARGE * roles::CHARGE * 4.0 {
+        w.navigate(id, t.pos, roles::CHARGE_SPEED);
+    }
+    if d2 <= roles::CHARGE * roles::CHARGE {
+        w.damage(threat, t.max_health * roles::CHARGE_HIT, id, damage_cause::ATTACK);
+        weft_sdk::info!("{} {id} charges {} ({})", s.name, threat, if mother { "guarding its young" } else { "a lone hunter" });
+    } else if (w.game_time() + id).is_multiple_of(40) {
+        weft_sdk::info!(
+            "{} {id} stands its ground against {} ({})",
+            s.name,
+            threat,
+            if mother { "guarding its young" } else { "a lone hunter" }
+        );
+    }
+    true
+}
+
+/// Where a chasing hunter runs and how fast (`animals_core::roles`): at where its prey will be
+/// (`LEAD_SECS` ahead at most); in a pack, all but the driver wide at its flanks while it is
+/// farther than `FLANK_FROM`; an ambusher stalks slowly to `BURST` blocks, then charges (giving
+/// up a charge after `BURST_TICKS`).
+fn chase(w: &World, id: u64, st: &EntityState, s: &Species, prey: u64, pack: bool, now: u64) -> (Option<[f64; 3]>, f32) {
+    use animals_core::roles;
+    let Some(e) = w.entity(prey) else { return (None, 1.4) };
+    let (dx, dz) = (e.pos.x - st.pos.x, e.pos.z - st.pos.z);
+    let d = (dx * dx + dz * dz).sqrt();
+    // Where it will be: its velocity (blocks a second) over the time to close in, at most a second.
+    let lead = (d / 8.0).min(roles::LEAD_SECS);
+    let mut aim = [e.pos.x + e.vel.x * lead, e.pos.y, e.pos.z + e.vel.z * lead];
+    let speed = if pack { PACK_SPEED } else { 1.4 };
+    if pack && d > roles::FLANK_FROM {
+        // The driver straight in; the others to its sides, a little ahead.
+        let side = match id % 3 {
+            1 => 1.0,
+            2 => -1.0,
+            _ => 0.0,
+        };
+        let (hx, hz) = {
+            let v = (e.vel.x * e.vel.x + e.vel.z * e.vel.z).sqrt();
+            if v > 0.5 { (e.vel.x / v, e.vel.z / v) } else { (dx / d.max(0.01), dz / d.max(0.01)) }
+        };
+        aim = [
+            aim[0] + (-hz * side + hx * 0.5 * side.abs()) * roles::FLANK,
+            aim[1],
+            aim[2] + (hx * side + hz * 0.5 * side.abs()) * roles::FLANK,
+        ];
+    }
+    if !pack && roles::ambushes(s.family.name) {
+        let started = w.component(id, &CHARGING).unwrap_or(0);
+        if d > roles::BURST && started == 0 {
+            // Creeping in, crouched low.
+            crate::anim::hold(w, id, crate::anim::Act::Stalk);
+            return (Some(aim), roles::STALK);
+        }
+        if started == 0 {
+            w.component_mut(id, &CHARGING).map(|c| *c = now.max(1));
+            weft_sdk::info!("{} {id} breaks cover and charges {prey} ({d:.1} blocks)", s.name);
+            crate::anim::clear(w, id);
+            crate::anim::act(w, id, crate::anim::Act::Pounce);
+        } else if now > started + roles::BURST_TICKS {
+            // A charge that failed: it gives up and stalks again later.
+            w.component_mut(id, &CHARGING).map(|c| *c = 0);
+            w.component_mut(id, &HUNT)
+                .map(|h| *h = [0, 0, now + LOOK_EVERY, 0]);
+            return (None, 0.0);
+        }
+        return (Some(aim), 1.6);
+    }
+    (Some(aim), speed)
 }

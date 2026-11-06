@@ -48,6 +48,50 @@ pub const COMPOSTS: [(&str, u8); 9] = [
     ("base:wheat", 1),
 ];
 
+/// Dung pats (`notes/ECOLOGY.md`, part 8): a grazer drops one every `MOUTHFULS_A_PAT` mouthfuls
+/// where it stands on the ground (`mods/animals/src/forage.rs`), never within `PAT_SPACING`
+/// blocks of another. It rots by the plant rule (`plants::PLANTS`, `base:dung_pat`), and lies at
+/// most `PAT_MOST_DAYS` (frozen or dried out, frost and hooves break it up), then leaves a tuft of
+/// fresh grass; while it lies, grazed grass within `PAT_REACH` grows back `PAT_GROWTH` times as
+/// fast (a pat's ring of lush grass). Broken, it gives the dung item (`FEEDS`, `COMPOSTS`).
+///
+/// A block is far bigger than a pat (a cow's is about 0.07 m²), so pats are rarer than real
+/// droppings: one every 100 mouthfuls (a tuft feeds 2 now, `forage::SOURCES`; it was 20 at 10,
+/// the same dung for the food) keeps them to under 1% of a herd's ground at once, as in a grazed
+/// pasture, in every season (`animals_core::web`'s check).
+pub const MOUTHFULS_A_PAT: u32 = 100;
+pub const PAT_SPACING: i32 = 2;
+pub const PAT_REACH: i32 = 2;
+pub const PAT_GROWTH: u32 = 2;
+pub const PAT_MOST_DAYS: f32 = 3.0;
+
+/// The chance a pat's growth step breaks it up though it didn't rot (`PAT_MOST_DAYS`).
+pub fn pat_break_chance() -> f32 {
+    crate::plants::of("base:dung_pat")
+        .and_then(|p| crate::plants::step_secs(p, 1))
+        .map_or(0.0, |step| (step / (PAT_MOST_DAYS * DAY_SECS)).min(1.0))
+}
+
+/// Game seconds a pat lies, on average, at a rot rate `rate` (`plants::rate`).
+fn pat_lies(rate: f32) -> f32 {
+    let step = crate::plants::of("base:dung_pat")
+        .and_then(|p| crate::plants::step_secs(p, 1))
+        .unwrap_or(0.0);
+    step / (rate + pat_break_chance() * (1.0 - rate)).max(1e-6)
+}
+
+/// Game seconds a pat lies, on average, in the day's mean air `air` (°C) and soil water `soil`
+/// (0 to 1).
+pub fn pat_rot_secs(air: f32, soil: f32) -> f32 {
+    pat_lies(crate::plants::of("base:dung_pat").map_or(0.0, |p| crate::plants::rate(p, air, soil)))
+}
+
+/// Game seconds a pat lies, on average, through season `season` (0 spring) of a climate of that
+/// mean, seasons and rain (`plants::season_rate_in`).
+pub fn pat_season_secs(celsius: f32, seasons: f32, rain: [f32; 4], season: usize) -> f32 {
+    pat_lies(crate::plants::of("base:dung_pat").map_or(0.0, |p| crate::plants::season_rate_in(p, celsius, seasons, rain, season)))
+}
+
 /// Steps spoiled food fills a bin by, whatever the food.
 pub const SPOILED: u8 = 2;
 
@@ -78,5 +122,26 @@ mod tests {
         assert_eq!(growth(MAX), 1.0);
         assert!((growth(0) - 0.2).abs() < 1e-6);
         assert!(compost_secs() > 600.0 && compost_secs() < 3600.0);
+    }
+
+    /// Pats rot within two game days in a grass biome's best season, lie longer in a dry season
+    /// (the llanos' winter: dried out) and in the cold, and never past `PAT_MOST_DAYS`.
+    #[test]
+    fn pats_rot_by_warmth_and_rain() {
+        let lies = |c: &crate::climate::Climate, s: usize| pat_season_secs(c.celsius, c.seasons, c.rain, s);
+        for c in crate::climate::BIOMES
+            .iter()
+            .filter(|c| !c.underground && crate::forage::grass_grows(c.biome) > 0.0)
+        {
+            let best = (0..4).map(|s| lies(c, s)).fold(f32::MAX, f32::min);
+            assert!(best <= 2.0 * DAY_SECS, "{}: a pat lies {:.1} game days in its best season", c.biome, best / DAY_SECS);
+            for s in 0..4 {
+                assert!(lies(c, s) <= PAT_MOST_DAYS * DAY_SECS * 1.01, "{}: a pat lies past PAT_MOST_DAYS in season {s}", c.biome);
+            }
+        }
+        let savanna = crate::climate::of("base:savanna").unwrap();
+        assert!(lies(savanna, 3) >= 2.0 * lies(savanna, 1), "the savanna's dry winter should keep pats twice as long as its rains");
+        let plains = crate::climate::of("base:plains").unwrap();
+        assert!(lies(plains, 3) >= 2.0 * lies(plains, 1), "a cold winter should keep pats twice as long as summer");
     }
 }

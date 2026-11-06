@@ -750,6 +750,15 @@ impl TerrainBuilder<'_> {
         let face = callback(move |a: &mut abi::FaceArgs| f(Face::wrap(a)));
         self.send(Op { level: fall, face, ..Op::new(op::FACES) })
     }
+
+    /// chiacraft: the state far trees' crowns are drawn in at a time of year: `f(time, state)`
+    /// gives it for leaves of `state` at the world's day time `time`. Distant terrain makes its
+    /// crowns from sample trees once, so leaves that change with the seasons (a bloom) answer here,
+    /// and the far tiles are made again when an answer changes. Pure, called from many threads.
+    pub fn far_leaves(self, f: impl Fn(u64, u32) -> u32 + Send + Sync + 'static) -> Self {
+        let face = callback(move |a: &mut abi::FarLeavesArgs| a.state = f(a.time, a.state));
+        self.send(Op { face, ..Op::new(op::FAR_LEAVES) })
+    }
 }
 
 impl Dimension {

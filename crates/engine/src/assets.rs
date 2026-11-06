@@ -263,6 +263,32 @@ pub fn glow_mask(rgba: &[u8]) -> Vec<u8> {
         .collect()
 }
 
+/// An entity's emission mask with a second channel (chiacraft): r its glow as `emission_mask`'s
+/// (red × alpha of `<name>_e.png`, or a `_s` map's), g the `_e` picture's green × alpha, which a
+/// pack may light on its own terms (the blood moon's eyes). Four bytes a texel (b 0, a 255).
+pub fn emission_mask_rg(assets: &Assets, name: &str) -> Option<Image> {
+    let e = assets
+        .beside(name, "textures", "png", "_e")
+        .and_then(|p| std::fs::read(p).ok())
+        .and_then(|b| decode_png(&b));
+    if let Some(mut img) = e {
+        img.rgba = img
+            .rgba
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .flat_map(|p| {
+                let a = p[3] as u32;
+                [(p[0] as u32 * a / 255) as u8, (p[1] as u32 * a / 255) as u8, 0, 255]
+            })
+            .collect();
+        return Some(img);
+    }
+    let mut img = emission_mask(assets, name)?;
+    img.rgba = img.rgba.iter().flat_map(|&r| [r, 0, 0, 255]).collect();
+    Some(img)
+}
+
 /// Emission like LabPBR, only that part of it: `<name>_s.png` (a LabPBR specular map) glows by
 /// its alpha, 0..254 from none to full and 255 for none; or our own `<name>_e.png`, glowing by
 /// its red channel times alpha. Same size and frames as the texture, and from the same pack or

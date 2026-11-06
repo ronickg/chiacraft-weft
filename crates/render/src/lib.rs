@@ -81,6 +81,8 @@ pub enum Blend {
     Alpha,
     Premultiplied,
     Additive,
+    /// The color attachment left as it is (write mask 0): a depth pass inside a pass with color.
+    NoColor,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -90,6 +92,8 @@ pub enum Compare {
     GreaterEqual,
     Less,
     LessEqual,
+    /// Only where the depth is already this fragment's (a second pass over a depth pre-pass).
+    Equal,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -173,6 +177,8 @@ pub enum Cmd {
         count: u32,
     },
     /// Up to `max` [`DrawIndexedArgs`] records, how many a shader wrote at `count_offset`.
+    /// Without [`Backend::indirect_count`] all `max` are drawn, so records past the count must
+    /// draw nothing (zeroed with [`Cmd::FillBuffer`] before the shader writes them).
     DrawIndexedIndirectCount {
         buffer: BufferId,
         offset: u64,
@@ -194,6 +200,17 @@ pub enum Cmd {
     },
     /// Makes shader writes visible to later commands. Only needed between compute and its consumers.
     Barrier,
+    /// Sets `size` bytes of `buffer` from `offset` to the 32-bit `value`, on the GPU. Outside a
+    /// pass; offset and size multiples of 4. Ordered with later commands by a [`Cmd::Barrier`].
+    FillBuffer {
+        buffer: BufferId,
+        offset: u64,
+        size: u64,
+        value: u32,
+    },
+    /// Ends the pass in progress and begins it again on the same images, keeping what it drew:
+    /// what follows is drawn in a pass of its own. See `Backend::hand_own_pass`.
+    PassBreak,
     /// Copies a depth texture to the start of a buffer, 32-bit floats row by row. Outside a pass.
     CopyDepthToBuffer {
         depth: TextureId,
@@ -319,8 +336,36 @@ pub trait Backend: Send {
     fn device_name(&self) -> &str {
         ""
     }
+    /// What kind of GPU it is: 0 not known, 1 integrated, 2 discrete, 3 another (virtual, CPU).
+    /// The base game picks its first quality preset by it (Research round 19, 7).
+    fn device_class(&self) -> u32 {
+        0
+    }
+    /// Its own memory (the largest device-local heap), MB; 0 not known.
+    fn device_memory_mb(&self) -> u64 {
+        0
+    }
     fn frames_in_flight(&self) -> usize;
+    /// Whether the `*IndirectCount` draws take their count from the GPU (Vulkan 1.2's
+    /// `drawIndirectCount`). Without it (MoltenVK) they draw all `max` records.
+    fn indirect_count(&self) -> bool {
+        true
+    }
+    /// Whether the first-person hand goes in a render pass of its own (`Cmd::PassBreak`). On
+    /// Imagination's GPUs (the Pixel 10) the hand, which writes depth and discards the texels of
+    /// the body parts it hides, wiped out blended water drawn before it in the same pass in whole
+    /// 32-pixel tiles: squares at the bottom of the screen where the sand under the water showed.
+    fn hand_own_pass(&self) -> bool {
+        false
+    }
     fn surface_size(&self) -> (u32, u32);
+    /// The window's surface is going away (Android sends the app to the background): drop it and
+    /// its swapchain, keeping everything else. No frames until `surface_restored`.
+    fn surface_lost(&mut self) {}
+    /// The window has a surface again (Android brought the app back): make one for it.
+    fn surface_restored(&mut self, _window: &dyn Window) -> Result<(), Error> {
+        Ok(())
+    }
     fn resize(&mut self, width: u32, height: u32);
     fn set_vsync(&mut self, vsync: bool);
 

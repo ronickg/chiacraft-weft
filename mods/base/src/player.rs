@@ -16,12 +16,23 @@ static HUD_ATTACK: HudElement = HudElement::named("attack_indicator");
 /// Head to feet.
 pub const EQUIPMENT: [&EquipmentSlot; 4] = [&HEAD, &base_api::CHEST, &LEGS, &FEET];
 
-/// Armor points and toughness of what `entity` wears.
-fn armor_of(w: &World, entity: u64) -> (u32, f32) {
-    let Some(worn) = w.inventory(entity).find_group(EQUIPMENT_GROUP) else { return (0, 0.0) };
+/// Armor and the health it adds (engine points) of what `entity` wears, from the curve by each
+/// piece's shell and slot (`vitals::gear::armour`), carried by each piece built from parts
+/// (`parts::ARMOUR_OF`). A worn-out piece stops nothing.
+pub fn armor_of(w: &World, entity: u64) -> (f32, f32) {
+    let Some(worn) = w.inventory(entity).find_group(EQUIPMENT_GROUP) else { return (0.0, 0.0) };
     (0..worn.len())
-        .filter_map(|i| ARMOR.on_item(worn.get(i).item))
-        .fold((0, 0.0), |t, a| (t.0 + a.points, t.1 + a.toughness))
+        .filter_map(|i| {
+            let s = worn.get(i);
+            ARMOR.on_item(s.item)?;
+            if crate::parts::broken(&s) {
+                return None;
+            }
+            crate::parts::ARMOUR_OF
+                .on_stack_own(&s)
+                .map(|a| (a.armour, a.health))
+        })
+        .fold((0.0, 0.0), |t, a| (t.0 + a.0, t.1 + a.1))
 }
 
 /// How much bigger held items are in the player's own first-person hand than Weft draws them
@@ -66,18 +77,16 @@ pub fn register(r: &mut Registry) {
     }
     // Upstream's off-hand: a second item to hold (a shield, a torch).
     r.equipment_slot(&OFF_HAND, &[], "slot_offhand");
-    // Armor is a step of the damage chain (modern's CombatRules: big hits go through more of it,
-    // unless it is tough), and wears when the hit actually lands, a quarter of the damage per
-    // piece (at least 1) like vanilla.
+    // Armor is a step of the damage chain (`vitals::combat`: armour / (armour + 5 × hit), at most
+    // 80 %: big hits go through more of it), and wears when the hit actually lands, a quarter of
+    // the damage per piece (at least 1) like vanilla.
     r.modify(&chain::DAMAGE, stage::MULTIPLY, |m| {
         let q = *m.query();
         if !armor_applies(q.cause) {
             return;
         }
-        let (points, toughness) = armor_of(&m.world(), q.entity);
-        let points = points as f64;
-        let through = m.value / (2.0 + toughness as f64 / 4.0);
-        m.value *= 1.0 - (points - through).clamp(points * 0.2, 20.0) / 25.0;
+        let (armour, _) = armor_of(&m.world(), q.entity);
+        m.value *= 1.0 - vitals::combat::armour_cut(armour, m.value as f32) as f64;
     });
     r.on(&actions::HURT, |b| {
         let w = b.world();
@@ -108,11 +117,12 @@ pub fn register(r: &mut Registry) {
     // them (creative).
     r.hud_element(&HUD_ARMOR, hud_anchor::TOP_LEFT, 6, |ui| {
         ui.icons("armor", 10, |c| {
-            // From what the client knows of its own inventory, like the server's damage chain.
+            // From what the client knows of its own inventory, like the server's damage chain: a
+            // built piece's own points (`parts::ARMOUR_PER_POINT`).
             let points: u32 = c
                 .inventory_group(EQUIPMENT_GROUP)
                 .iter()
-                .filter_map(|s| ARMOR.on_item(s.item))
+                .filter_map(|s| ARMOR.on_stack(s))
                 .map(|a| a.points)
                 .sum();
             if points > 0 && !c.outside_survival() { points as f32 } else { -1.0 }
@@ -157,7 +167,7 @@ pub fn register(r: &mut Registry) {
             ];
             // The recipe book beside it, hand recipes only (`book.rs`).
             ui.row(S::row().gap(4.0), |ui| {
-                crate::window::window(ui, S::column().pad(7.0).gap(5.0), &tabs, |ui| {
+                crate::window::family_window(ui, S::column().pad(7.0).gap(5.0), None, &tabs, |ui| {
                     ui.row(S::row().gap(1.0), |ui| {
                         // Armor, and the clothes worn under it beside, the cloak under them.
                         ui.column(S::column(), |ui| {
@@ -259,7 +269,7 @@ pub fn register(r: &mut Registry) {
     r.player_menu(&INVENTORY);
 }
 
-fn armor_applies(cause: u32) -> bool {
+pub fn armor_applies(cause: u32) -> bool {
     DamageCause::flags_of(cause) & damage_flags::BYPASSES_ARMOR == 0
 }
 
@@ -297,6 +307,7 @@ fn consume_grid(m: &MenuCtx) {
         }
     }
     base_api::give_xp(&m.world(), m.player(), vitals::levels::xp::craft(used));
+    crate::skills::made(&m.world(), m.player(), &made, used);
 }
 
 /// What the air bar shows: whole bubbles like vanilla's, hidden with a full breath.

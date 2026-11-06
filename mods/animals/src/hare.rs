@@ -13,11 +13,10 @@ pub(crate) static MOUNTAIN_HARE: EntityKind = EntityKind::named("mountain_hare")
 static BODY: Body = Body {
     model: "hare",
     texture: "hare/hare",
-    health: 5.0,
     // Lolloping about slowly, flat out when it bolts: faster than a running player.
     speed: 4.0,
     wander: 0.3,
-    damage: 0.0,
+    bites: false,
     rest: ("hare_lie", (0.4, 0.3)),
 };
 

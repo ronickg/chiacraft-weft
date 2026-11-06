@@ -5,27 +5,68 @@
 // The prelude (`gpu_layout::occlusion_prelude`) declares the bindings and `args`.
 
 // The depth buffer has 1 at the near plane and 0 at infinity: farther is less.
-@compute @workgroup_size(32, 32)
-fn down(@builtin(global_invocation_id) id: vec3<u32>) {
-    let s = args.size;
-    let d = (s + vec2<u32>(1u)) / 2u;
-    if id.x >= d.x || id.y >= d.y {
-        return;
+
+// Levels of the pyramid under the depth, each texel the farthest of the 2 x 2 under it (the edge
+// texel repeated where a size is odd). `depths` holds levels 1 and on (half size first): level 0
+// is the depth texture itself, read here and never copied. A dispatch makes up to `args.count`
+// levels from one (`args.size`): the first from `depths` at `args.src`, or from the depth texture
+// `textures[args.pad - 1]` when `pad` isn't 0, written from `args.dst` on, one after the other;
+// each next level from the last in workgroup memory, a 32 x 32 tile halving each time.
+var<workgroup> tile: array<f32, 1024>;
+
+fn source(x: u32, y: u32, s: vec2<u32>) -> f32 {
+    if args.pad != 0u {
+        return textureLoad(textures[args.pad - 1u], vec2<i32>(i32(x), i32(y)), 0).r;
     }
-    let lo = id.xy * 2u;
-    let hi = min(lo + vec2<u32>(1u), s - vec2<u32>(1u));
-    let far = min(
-        min(depths[args.src + lo.y * s.x + lo.x], depths[args.src + lo.y * s.x + hi.x]),
-        min(depths[args.src + hi.y * s.x + lo.x], depths[args.src + hi.y * s.x + hi.x]),
-    );
-    depths[args.dst + id.y * d.x + id.x] = far;
+    return depths[args.src + y * s.x + x];
 }
 
-// Where `level` starts in `depths`, and how big it is.
+@compute @workgroup_size(32, 32)
+fn down(@builtin(global_invocation_id) id: vec3<u32>, @builtin(local_invocation_id) local: vec3<u32>, @builtin(workgroup_id) group: vec3<u32>) {
+    var s = args.size;
+    var d = (s + vec2<u32>(1u)) / 2u;
+    // Out of the level is nearest of all, which a farthest-of never picks: as the edge repeated.
+    var v = 1.0;
+    if id.x < d.x && id.y < d.y {
+        let lo = id.xy * 2u;
+        let hi = min(lo + vec2<u32>(1u), s - vec2<u32>(1u));
+        v = min(min(source(lo.x, lo.y, s), source(hi.x, lo.y, s)), min(source(lo.x, hi.y, s), source(hi.x, hi.y, s)));
+        depths[args.dst + id.y * d.x + id.x] = v;
+    }
+    tile[local.y * 32u + local.x] = v;
+    var dst = args.dst + d.x * d.y;
+    var n = 32u;
+    var origin = group.xy * 32u;
+    s = d;
+    for (var l = 1u; l < args.count; l++) {
+        workgroupBarrier();
+        d = (s + vec2<u32>(1u)) / 2u;
+        n = n / 2u;
+        origin = origin / 2u;
+        let inside = local.x < n && local.y < n;
+        var r = 1.0;
+        if inside {
+            let at = local.y * 64u + local.x * 2u;
+            r = min(min(tile[at], tile[at + 1u]), min(tile[at + 32u], tile[at + 33u]));
+        }
+        workgroupBarrier();
+        if inside {
+            tile[local.y * 32u + local.x] = r;
+            let g = origin + local.xy;
+            if g.x < d.x && g.y < d.y {
+                depths[dst + g.y * d.x + g.x] = r;
+            }
+        }
+        dst += d.x * d.y;
+        s = d;
+    }
+}
+
+// Where `level` (1 and on) starts in `depths`, and how big it is.
 fn level_of(level: u32) -> vec3<u32> {
-    var s = view.size;
+    var s = (view.size + vec2<u32>(1u)) / 2u;
     var at = 0u;
-    for (var l = 0u; l < level; l++) {
+    for (var l = 1u; l < level; l++) {
         at += s.x * s.y;
         s = (s + vec2<u32>(1u)) / 2u;
     }
@@ -66,7 +107,8 @@ fn hidden(cube_lo: vec3<f32>, cube_hi: vec3<f32>) -> bool {
     let screen = vec2<f32>(view.size);
     let a = vec2<f32>(small.x + 1.0, 1.0 - large.y) * 0.5 * screen;
     let b = vec2<f32>(large.x + 1.0, 1.0 - small.y) * 0.5 * screen;
-    let level = min(u32(ceil(log2(max(max(b.x - a.x, b.y - a.y), 1.0)))), view.levels - 1u);
+    // Level 0, the depth itself, isn't kept: a box under 2 texels goes by level 1, a little farther.
+    let level = clamp(u32(ceil(log2(max(max(b.x - a.x, b.y - a.y), 1.0)))), 1u, max(view.levels - 1u, 1u));
     let info = level_of(level);
     let top = vec2<u32>(screen) - vec2<u32>(1u);
     let from_ = min(vec2<u32>(a), top) >> vec2<u32>(level);

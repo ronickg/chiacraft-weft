@@ -94,7 +94,8 @@ fn kind_of(w: &World, id: u64) -> Option<(Settle, &'static [String])> {
 pub fn settle(w: &World, id: u64, st: &EntityState) -> bool {
     let Some((how, looks)) = kind_of(w, id) else { return false };
     let Some(c) = w.component_mut(id, &REST) else { return false };
-    if c.rest == 0 && !w.navigating(id) && !crate::forage::busy(w, id) && w.random_below(how.chance) == 0 {
+    let chance = crate::routines::rest_chance(how.chance, crate::routines::activity_of(w, id));
+    if c.rest == 0 && !w.navigating(id) && !crate::forage::busy(w, id) && w.random_below(chance) == 0 {
         c.rest = how.ticks.0 + w.random_below(how.ticks.1);
         c.rested = 0;
     }
@@ -110,9 +111,19 @@ pub fn settle(w: &World, id: u64, st: &EntityState) -> bool {
         (true, false) => 1,
         (true, true) => 2,
     };
+    let (was, rested) = (c.look, c.rested);
     show(w, id, c, pose, looks);
+    if pose == 0 && was > 1 {
+        // Rested enough: up, and a stretch.
+        crate::anim::clear(w, id);
+        crate::anim::act(w, id, crate::anim::Act::Stretch);
+    }
     if resting && w.navigating(id) {
         w.navigate(id, st.pos, 0.0);
+    }
+    // Lying (its last pose), it falls asleep.
+    if pose as usize == looks.len() && pose > 0 && animals_core::routines::asleep(crate::routines::activity_of(w, id), rested) {
+        crate::anim::hold(w, id, crate::anim::Act::Sleep);
     }
     resting
 }
@@ -133,6 +144,8 @@ pub fn wake(w: &World, id: u64) {
         c.rest = 0;
         c.look = 1;
         w.set_appearance(id, None);
+        // Up at once (called, hurt): no stretch, and not asleep standing.
+        crate::anim::clear(w, id);
     }
 }
 

@@ -491,6 +491,9 @@ pub mod comp {
     pub const FRICTION: &str = "friction";
     /// Block: movement speed multiplier inside it (`f32`, 1 by default; cobweb, liquids).
     pub const DRAG: &str = "drag";
+    /// Block: how well a climber holds on to its sides (`f32`, 1 by default; 0 can't be climbed:
+    /// ice, glass), times `attribute::CLIMB_SPEED`.
+    pub const GRIP: &str = "grip";
     /// Block: emitted light per color channel (`[u8;3]`). 15 is a full-strength source (torch
     /// 14); higher values reach further.
     pub const LIGHT: &str = "light";
@@ -523,6 +526,10 @@ pub mod comp {
     /// region's ramp (an 8 x 1 texture, one colour per step). `+dx,dy` after a layer moves it that
     /// many pixels (a handle meeting its head's anchor). Without it the item's icon shows.
     pub const LOOK: &str = "core:look";
+    /// chiacraft: how a worn stack is drawn on its wearer instead of its item's `WORN_TEXTURE`, as
+    /// `LOOK` is written (layers in the wearer's skin layout, shade maps painted with ramps, `+dx,dy`
+    /// moves); armour built from parts paints its shell, fastening and lining and sets its gems.
+    pub const WORN_LOOK: &str = "core:worn_look";
     /// Blocks connecting energy networks.
     pub const CONDUCTOR: &str = "conductor";
     /// Entity or stack component, layout `Energy`.
@@ -624,17 +631,38 @@ pub mod tool_tier {
 
 // ---------------------------------------------------------------- content descriptors
 
+/// What happens in a dimension's sky (`Host::set_sky_event`), for shader packs (chiacraft's sky
+/// events: `vitals::events`).
+pub mod sky_event {
+    pub const NONE: u32 = 0;
+    /// The moon reddens, the night darkens; strength 1 in totality.
+    pub const BLOOD_MOON: u32 = 1;
+    /// A meteor shower; strength its rate (1 at the peak).
+    pub const METEORS: u32 = 2;
+    /// A fireball or a big impact on its way (with `Host::sky_landing`), by day too.
+    pub const FIREBALL: u32 = 3;
+    /// An aurora storm: brighter, further south, other colours.
+    pub const AURORA_STORM: u32 = 4;
+}
+
 /// What falls and blows in a biome's air (`Host::set_air`).
 pub mod air_flags {
     /// What falls is snow, not rain.
     pub const SNOWING: u32 = 1;
     /// Dust or sand blows (the fog is dust).
     pub const DUST: u32 = 2;
+    /// Bits 2 to 7: where rain turns to snow up a mountain, for shader packs (`Scene::canopy.w`):
+    /// 0 none (rain however high), else 1 + its height above the sea in 4-block steps (up to 248).
+    pub const SNOWLINE_SHIFT: u32 = 2;
     /// Bits 8 to 15: how strong an aurora is on clear nights there, 0 to 255.
     pub const AURORA_SHIFT: u32 = 8;
     /// Bits 16 to 23: how closed a forest's canopy is there, 0 (open sky) to 255 (a rainforest's),
     /// for shader packs' light under the leaves.
     pub const CANOPY_SHIFT: u32 = 16;
+    /// Bits 24 to 31: how fast wet ground dries there once the rain stops, 0 (the engine's own
+    /// pace, about two minutes) or 1 (hardly: cold, damp, still air, about an hour) to 255 (hot,
+    /// dry, windy air, half a minute), for shader packs' wet look (`Scene::canopy.y`).
+    pub const DRYING_SHIFT: u32 = 24;
 }
 
 pub mod block_flags {
@@ -2104,6 +2132,12 @@ pub mod pose_when {
     pub const NOT_FLYING: u32 = 2;
     /// Sprinting: the sprint action held while moving forward, with the food for it.
     pub const SPRINTING: u32 = 4;
+    /// Holding on to a wall it climbs (`attribute::CLIMB_SPEED`), not a ladder.
+    pub const CLIMBING: u32 = 8;
+    /// Gliding (`attribute::GLIDE_SPEED`) in the air.
+    pub const GLIDING: u32 = 16;
+    /// Hanging on a rope (`attribute::ROPE_LENGTH`), off the ground.
+    pub const ROPE: u32 = 32;
 }
 
 /// A pose (`Host::reg_pose`). Of the poses whose conditions hold the one with the highest
@@ -3174,6 +3208,10 @@ pub struct Host {
     pub client_clip_length: unsafe extern "C" fn(c: *mut ClientCtx, entity: u64, name: Str) -> f32,
     /// The item in `entity`'s `hand`; 0 for none.
     pub client_held_item: unsafe extern "C" fn(c: *mut ClientCtx, entity: u64, hand: u32) -> u32,
+    /// Sets GUI image `name` (it must start with `dyn:`) to `w` x `h` RGBA pixels (`len` bytes, 4
+    /// a pixel): the UI's `image` parts of that name draw it from the next frame, uploaded again
+    /// only when it is set again. 0 if refused (no `dyn:`, a size of 0 or over 2048, `len` short).
+    pub client_image_set: unsafe extern "C" fn(c: *mut ClientCtx, name: Str, w: u32, h: u32, rgba: *const u8, len: usize) -> u32,
     /// Where a bone of what `entity` is or has on was, the last frame. 0 if there is none.
     pub client_bone_position: unsafe extern "C" fn(c: *mut ClientCtx, entity: u64, bone: Str, out: *mut Vec3) -> u32,
     /// The engine's own cosmetics for this entity, what a kind without a tick gets.
@@ -3612,6 +3650,13 @@ pub struct Host {
     /// How fast this dimension's time of day runs: 1 the usual, 0.5 a day twice as long, 0 the
     /// sky still. Players' clocks run at the same pace; what waits on ticks keeps its own.
     pub set_day_rate: unsafe extern "C" fn(world: *mut WorldCtx, rate: f32),
+    /// chiacraft: what happens in this dimension's sky now (`sky_event`, `NONE` for nothing) and how
+    /// strongly (0 to 1), until the next call: for the players' shader packs (`scene.sky_event`).
+    /// Players hear only of a change.
+    pub set_sky_event: unsafe extern "C" fn(world: *mut WorldCtx, kind: u32, strength: f32),
+    /// chiacraft: something falls from the sky to land at `pos` (blocks) in `seconds`, for the
+    /// players' shader packs (`scene.sky_landing`): a meteorite's streak heading there.
+    pub sky_landing: unsafe extern "C" fn(world: *mut WorldCtx, pos: *const [f64; 3], seconds: f32),
 }
 
 /// Natural spawning around players (`Host::reg_spawn`). Every two seconds the engine tries a few
@@ -3968,6 +4013,11 @@ pub mod particle_flags {
     pub const TRANSLUCENT: u32 = 4;
     /// Shrinks to nothing over its life.
     pub const SHRINK: u32 = 8;
+    /// Floats on a liquid, drifting with the wind (a leaf on a pond); needs `ParticleDesc::air`.
+    pub const FLOATS: u32 = 16;
+    /// Colored like the burst's block where its biome tints it, as block dust is (a leaf of the
+    /// tree it fell from, in its season's color), though it has frames of its own.
+    pub const BLOCK_TINT: u32 = 32;
 }
 
 /// What happens to a particle that a `ParticleRule` answers.
@@ -4053,6 +4103,21 @@ pub struct ParticleDesc {
     /// Fragment shader `shaders/particle/<name>.wgsl`, empty for the plain texture.
     pub shader: Str,
     pub rules: Slice<ParticleRule>,
+    /// Carried by the wind: how fast (per second) it takes on the air's speed where it is, its
+    /// gusts and shelter (sky light) included; 0, the air leaves it alone. A carried one has no
+    /// `gravity` or `drag`: it falls at `sink` through still air instead.
+    pub air: f32,
+    /// Blocks a second it falls through still air while carried (a leaf about 1.2).
+    pub sink: f32,
+    /// 0..1: how much it flutters side to side and tumbles as it falls. Above 0 it is drawn as a
+    /// flat card that turns in 3D and lies flat where it lands, not facing the camera.
+    pub flutter: f32,
+    /// After landing, the wind (m/s, gusts included) that blows it on along the ground or up again
+    /// (litter in a gust); 0, it stays where it lies.
+    pub lift: f32,
+    /// Drawn stretched along its motion over this many seconds of it (a streak of blown sand), a
+    /// card `size` wide facing the camera as it can; 0, a plain square.
+    pub streak: f32,
 }
 defaults!(ParticleDesc {
     name: Str::EMPTY,
@@ -4069,6 +4134,11 @@ defaults!(ParticleDesc {
     flags: 0,
     shader: Str::EMPTY,
     rules: Slice::EMPTY,
+    air: 0.0,
+    sink: 0.0,
+    flutter: 0.0,
+    lift: 0.0,
+    streak: 0.0,
 });
 
 /// How much a player may do, for commands and anything else that asks: modern's levels. A player
@@ -4542,6 +4612,30 @@ pub mod attribute {
     /// Multiplier on a player's field of view (1), on top of the setting and of flying and
     /// sprinting: a zoom, a speed rush.
     pub const FOV: &str = "core:fov";
+    /// Blocks a second it climbs up any wall it pushes into, times the wall's `comp::GRIP` (0:
+    /// only ladders). It holds on while sneaking and slides down slowly otherwise.
+    pub const CLIMB_SPEED: &str = "core:climb_speed";
+    /// Over 0: it glides while in the air, at this airspeed in blocks a second where it looks,
+    /// sinking `GLIDE_SINK` a second through the air, carried by the wind (`WIND_X`, `WIND_Z`)
+    /// and lifted by rising air (`LIFT`). No fall is counted while gliding.
+    pub const GLIDE_SPEED: &str = "core:glide_speed";
+    pub const GLIDE_SINK: &str = "core:glide_sink";
+    /// The air's movement where it is, blocks a second toward +X and +Z: a glider drifts with it.
+    pub const WIND_X: &str = "core:wind_x";
+    pub const WIND_Z: &str = "core:wind_z";
+    /// Rising air under it, blocks a second (a thermal, a ridge's updraft).
+    pub const LIFT: &str = "core:lift";
+    /// Over 0: it hangs on a rope from (`ROPE_X`, `ROPE_Y`, `ROPE_Z`) at most this many blocks
+    /// long, its hands kept within it (a grappling hook). Jump pulls it in and sneak lets it out
+    /// at `ROPE_REEL` blocks a second (0: neither); swinging is gravity on the rope.
+    pub const ROPE_LENGTH: &str = "core:rope_length";
+    pub const ROPE_X: &str = "core:rope_x";
+    pub const ROPE_Y: &str = "core:rope_y";
+    pub const ROPE_Z: &str = "core:rope_z";
+    pub const ROPE_REEL: &str = "core:rope_reel";
+    /// How much of a hit's knockback it shrugs off, 0 (all of it moves it) to 1 (none): big
+    /// creatures stand their ground. Mobs only (a player's knockback is its client's).
+    pub const KNOCKBACK_RESISTANCE: &str = "core:knockback_resistance";
 }
 
 /// How an attribute modifier applies, like vanilla: ADD amounts sum onto the base, then times
@@ -5353,6 +5447,20 @@ pub mod terrain_op {
     /// when not given). Larger makes bigger land masses and seas; every mask and rule on
     /// continentalness follows it.
     pub const CONTINENT_SCALE: u32 = 17;
+    /// chiacraft: the state far trees' crowns are drawn in at a time of year: `face`
+    /// (`FarLeavesArgs`). Distant terrain takes its crowns' leaves from sample trees made once,
+    /// so leaves that change with the seasons (a bloom) ask here, and the tiles are made again
+    /// when an answer changes.
+    pub const FAR_LEAVES: u32 = 18;
+}
+
+/// A far crown's leaves at a time (`terrain_op::FAR_LEAVES`).
+#[repr(C)]
+pub struct FarLeavesArgs {
+    /// The world's day time (ticks since it began).
+    pub time: u64,
+    /// The leaves' state; output: the state to draw.
+    pub state: u32,
 }
 
 /// A steep column's top as distant terrain sees it (`terrain_op::FACES`).
@@ -5391,7 +5499,7 @@ pub struct TerrainDesc {
     pub rule: BiomeRuleDesc,
     /// `terrain_op::FIELD`.
     pub field: Slice<ExprStep>,
-    /// `FACES`: `FaceArgs`.
+    /// `FACES`: `FaceArgs`; `FAR_LEAVES`: `FarLeavesArgs`.
     pub face: Callback,
 }
 defaults!(TerrainDesc {
@@ -5558,6 +5666,9 @@ pub struct CommandArgs {
 
 /// Places for HUD elements. `HOTBAR_LEFT`/`HOTBAR_RIGHT` stack upwards above the hotbar's halves.
 pub mod hud_anchor {
+    /// Across the top of the screen, the whole width, under the rest of the HUD: an overlay (the
+    /// frame of a glider overhead).
+    pub const TOP: &str = "top";
     pub const TOP_LEFT: &str = "top_left";
     pub const TOP_RIGHT: &str = "top_right";
     pub const BOTTOM_LEFT: &str = "bottom_left";

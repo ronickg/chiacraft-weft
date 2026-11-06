@@ -1,0 +1,28 @@
+# A bitten animal runs from what bit it, not from the nearest player (reports/Creature AI.md,
+# part 3, step 2). The player stands still (no fright of its own) with a hare 8 blocks north and
+# a red fox 5 blocks beyond it; the fox bites the hare (/animalprof bite). Before the fix the hare
+# ran away from the player, north into the fox; now it runs south, away from the fox. Read the
+# "flees from what hurt it at" lines: the hare's flight goes away from the fox's position. Shots
+# before and after (looking north, down a little).
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode spectator
+chat /tk time 6000
+chat /tk fill ~-12 ~-1 ~-24 ~12 ~-1 ~4 base:grass
+chat /tk fill ~-12 ~ ~-24 ~12 ~4 ~4 core:air
+wait 2
+chat /tk spawn animals:hare ~0 ~ ~-8
+chat /tk spawn animals:red_fox ~0 ~ ~-13
+wait 1
+look 0 -15
+wait 1
+shot flee_before.png
+wait 1
+chat /animalprof bite
+wait 3
+look 0 -15
+wait 1
+shot flee_after.png
+chat /tk near ~ ~ ~ 30
+quit

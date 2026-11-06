@@ -595,6 +595,16 @@ impl Ui {
         Icons { ui: self, node: Some(n), effects: Vec::new() }
     }
 
+    /// An image shown while `f` is above 0, that much opaque (up to 1): an overlay that comes and
+    /// goes (a glider's frame overhead while gliding). `s` sizes it; in `hud_anchor::TOP`,
+    /// `S::default().h(..)` spans the screen's width.
+    pub fn image_bind(&mut self, texture: &str, s: S, f: impl Fn(&ClientView) -> f32 + Send + Sync + 'static) {
+        let mut n = node(k::IMAGE, s);
+        n.text = Str::new(texture);
+        n.bind = bind_cb(f);
+        self.leaf(n)
+    }
+
     pub fn image(&mut self, texture: &str, w: f32, h: f32) {
         let mut n = node(k::IMAGE, S::default().size(w, h));
         n.text = Str::new(texture);
@@ -611,6 +621,18 @@ impl Ui {
     pub fn entity_model(&mut self, w: f32, h: f32) {
         let mut n = node(k::PLAYER_MODEL, S::default().size(w, h));
         n.text = Str::new("menu");
+        self.leaf(n)
+    }
+
+    /// Entity kind `kind` (`animals:grey_wolf`) as its model shows with no entity behind it (its
+    /// kind's own texture, no painted coat), turning with the mouse like the others: an entry in a
+    /// field guide. One 3D preview shows per screen.
+    pub fn kind_model(&mut self, kind: &str, w: f32, h: f32) {
+        // Alive until the node is handed over (a temporary's pointer was read freed: the
+        // preview showed the player).
+        let text = format!("kind:{kind}");
+        let mut n = node(k::PLAYER_MODEL, S::default().size(w, h));
+        n.text = Str::new(&text);
         self.leaf(n)
     }
 

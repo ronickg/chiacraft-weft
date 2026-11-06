@@ -26,19 +26,25 @@ def profile(x, asym=0.0, blunt=2.0):
 MIN_STEP = 0.65  # units neighbors differ in width at least: 0.325 a side (boxcheck flags faces under 0.3 apart)
 
 
-def layers(L, W, asym=0.0, blunt=2.0, n=None, ov=0.25, step=None):
+def layers(L, W, asym=0.0, blunt=2.0, n=None, ov=0.25, step=None, tip=0.0):
     """[(width, y0, y1)] bottom to top: `n` slices, each as wide as the profile at its middle,
     snapped to `step`; neighbors overlap by `ov`, and slices within MIN_STEP of the one below
     merge with it (the wider), so no two boxes have faces close enough to flicker."""
     step = step or (1.0 if W >= 4 else 0.75)
     n = n or int(np.clip(round(L / 0.9), 3, 18))
     h = L / n
-    ov = max(0.05, min(ov, 0.3 * h, h - 0.35))  # tiny eggs: bottoms 0.35 apart
+    # The end slices show at least `tip` units of side beyond their neighbours (a narrower strip
+    # reads as a thin line, linecheck): longer ends, the rest shared evenly.
+    e = min(max(h, tip + 0.06), L / 3)
+    cuts = [0.0] + list(np.linspace(e, L - e, n - 1)) + [L] if n > 2 else list(np.linspace(0, L, n + 1))
+    ov = max(0.05, min(ov, 0.3 * min(np.diff(cuts)), min(np.diff(cuts)) - 0.35))  # tiny eggs: bottoms 0.35 apart
     out = []
     for i in range(n):
-        mid = -1 + (2 * i + 1) / n
+        c0, c1 = cuts[i], cuts[i + 1]
+        mid = -1 + (c0 + c1) / L
         w = max(step, round(W * float(profile(mid, asym, blunt)) / step) * step)
-        y0, y1 = max(0.0, i * h - ov), min(L, (i + 1) * h + ov)
+        y0 = max(0.0, c0 - (ov if i > 1 else 0.06 if i == 1 else 0))
+        y1 = min(L, c1 + (ov if i < n - 2 else 0.06 if i == n - 2 else 0))
         if out and abs(out[-1][0] - w) < MIN_STEP - 1e-6:
             out[-1] = (max(w, out[-1][0]), out[-1][1], y1)
         else:
@@ -46,11 +52,11 @@ def layers(L, W, asym=0.0, blunt=2.0, n=None, ov=0.25, step=None):
     return out
 
 
-def egg_elements(name, L, W, asym=0.0, blunt=2.0, tilt=0.0, yaw=0.0, at=(0.0, 0.0, 0.0), n=None, sink=0.0, step=None):
+def egg_elements(name, L, W, asym=0.0, blunt=2.0, tilt=0.0, yaw=0.0, at=(0.0, 0.0, 0.0), n=None, sink=0.0, step=None, tip=0.0):
     """One egg's boxes, standing on its pointed end and tilted by `tilt` degrees (its top toward
     +z, 90: lying), turned by `yaw`, centered over `at`; lifted so its lowest corner touches the
     ground (`sink`: units pushed into it). Each element remembers its egg (for painting)."""
-    ls = layers(L, W, asym, blunt, n, step=step)
+    ls = layers(L, W, asym, blunt, n, step=step, tip=tip)
     R = rotm((tilt, yaw, 0))
     # Lowest corner after the tilt: lift by it so the egg rests on y = at.y.
     pts = np.array([R @ np.array([sx * w / 2, y, sz * w / 2]) for w, y0, y1 in ls for y in (y0, y1)

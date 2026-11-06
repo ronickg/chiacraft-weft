@@ -167,47 +167,76 @@ fn unhex64(s: &str) -> Option<[u8; 64]> {
     Some(out)
 }
 
-/// Where player `key` arrives in the world in `dir`, if they came through a portal just now: the
-/// spot beside the world's portal for that link.
-pub fn arrival(dir: &Path, key: &str) -> Option<[f64; 3]> {
+/// Where a player arriving through a portal stands: the spot beside the world's portal for that
+/// link, the portal's dimension (by name; `None` in spots saved before it was kept: the spawn's),
+/// and the way to face (yaw in radians), away from the portal.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Arrival {
+    pub pos: [f64; 3],
+    pub dim: Option<String>,
+    pub yaw: Option<f32>,
+}
+
+/// Where player `key` arrives in the world in `dir`, if they came through a portal just now.
+pub fn arrival(dir: &Path, key: &str) -> Option<Arrival> {
     let (link, when) = ARRIVING.lock().as_mut()?.remove(key)?;
     if when.elapsed() > Duration::from_secs(120) {
         return None;
     }
-    let spot = spots(dir)
-        .into_iter()
-        .find(|(l, _)| *l == link)
-        .map(|(_, p)| p);
+    let spot = spots(dir).into_iter().find(|s| s.link == link);
     if spot.is_none() {
         log::info!("{key} came through a portal, but this world has no portal for that link: placed as usual");
     }
-    spot.map(|p| [p[0] as f64 + 0.5, p[1] as f64, p[2] as f64 + 0.5])
+    spot.map(|s| Arrival { pos: [s.pos[0] as f64 + 0.5, s.pos[1] as f64, s.pos[2] as f64 + 0.5], dim: s.dim, yaw: s.yaw })
 }
 
-fn spots(dir: &Path) -> Vec<(String, [i32; 3])> {
+/// A portal's arrival spot as `portals.txt` keeps it, a line each:
+/// `link x y z [dimension yaw]` (the last two since 11-05; older lines have neither).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Spot {
+    pub link: String,
+    pub pos: [i32; 3],
+    pub dim: Option<String>,
+    pub yaw: Option<f32>,
+}
+
+fn spots(dir: &Path) -> Vec<Spot> {
     std::fs::read_to_string(dir.join("portals.txt"))
         .unwrap_or_default()
         .lines()
-        .filter_map(|l| {
-            let mut f = l.split_whitespace();
-            let link = f.next()?.to_string();
-            let p: Vec<i32> = f.filter_map(|n| n.parse().ok()).collect();
-            let [x, y, z] = p[..] else { return None };
-            Some((link, [x, y, z]))
-        })
+        .filter_map(parse_spot)
         .collect()
 }
 
+fn parse_spot(line: &str) -> Option<Spot> {
+    let mut f = line.split_whitespace();
+    let link = f.next()?.to_string();
+    let p: Vec<i32> = f.by_ref().take(3).filter_map(|n| n.parse().ok()).collect();
+    let [x, y, z] = p[..] else { return None };
+    let dim = f.next().map(str::to_string);
+    let yaw = f
+        .next()
+        .and_then(|v| v.parse::<f32>().ok())
+        .filter(|v| v.is_finite());
+    Some(Spot { link, pos: [x, y, z], dim, yaw })
+}
+
 /// Sets (or, with `None`, forgets) where arrivals through `link` stand in the world in `dir`.
-pub fn set_spot(dir: &Path, link: &str, pos: Option<[i32; 3]>) {
+pub fn set_spot(dir: &Path, link: &str, spot: Option<([i32; 3], Option<String>, Option<f32>)>) {
     let mut all = spots(dir);
-    all.retain(|(l, _)| l != link);
-    if let Some(p) = pos {
-        all.push((link.to_string(), p));
+    all.retain(|s| s.link != link);
+    if let Some((pos, dim, yaw)) = spot {
+        all.push(Spot { link: link.to_string(), pos, dim, yaw });
     }
     let text: String = all
         .iter()
-        .map(|(l, p)| format!("{l} {} {} {}\n", p[0], p[1], p[2]))
+        .map(|s| {
+            let mut l = format!("{} {} {} {}", s.link, s.pos[0], s.pos[1], s.pos[2]);
+            if let Some(d) = &s.dim {
+                l.push_str(&format!(" {d} {:.4}", s.yaw.unwrap_or(0.0)));
+            }
+            l + "\n"
+        })
         .collect();
     if let Err(e) = std::fs::write(dir.join("portals.txt"), text) {
         log::warn!("saving portal spots: {e}");
@@ -250,11 +279,24 @@ mod tests {
     fn spots_are_kept_per_link() {
         let dir = std::env::temp_dir().join(format!("chiacraft-spots-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        set_spot(&dir, "a", Some([1, 2, 3]));
-        set_spot(&dir, "b", Some([4, 5, 6]));
-        set_spot(&dir, "a", Some([7, 8, 9]));
+        set_spot(&dir, "a", Some(([1, 2, 3], None, None)));
+        set_spot(&dir, "b", Some(([4, 5, 6], Some("base:overworld".into()), Some(1.5))));
+        set_spot(&dir, "a", Some(([7, 8, 9], Some("base:nether".into()), Some(-1.5708))));
+        assert_eq!(
+            spots(&dir),
+            vec![
+                Spot { link: "b".into(), pos: [4, 5, 6], dim: Some("base:overworld".into()), yaw: Some(1.5) },
+                Spot { link: "a".into(), pos: [7, 8, 9], dim: Some("base:nether".into()), yaw: Some(-1.5708) },
+            ]
+        );
         set_spot(&dir, "b", None);
-        assert_eq!(spots(&dir), vec![("a".to_string(), [7, 8, 9])]);
+        assert_eq!(spots(&dir).len(), 1);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn old_spot_lines_still_read() {
+        assert_eq!(parse_spot("l 1 2 3"), Some(Spot { link: "l".into(), pos: [1, 2, 3], dim: None, yaw: None }));
+        assert_eq!(parse_spot("l 1 2"), None);
     }
 }

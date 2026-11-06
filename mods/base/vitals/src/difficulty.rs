@@ -18,14 +18,52 @@ pub struct Difficulty {
     /// A new world's first nights with no monsters appearing by themselves (gentle's grace: the
     /// first-hour report, so a beginner learns fire and clothes before the first zombie).
     pub grace_nights: u32,
+    /// A blood moon's monsters (`events`): whether they come at all (gentle: the look only), their
+    /// cap within 64 blocks on top of the hostile 8, and their max health.
+    pub blood_moon_gameplay: bool,
+    pub blood_moon_cap: u32,
+    pub blood_moon_health: f32,
 }
 
-pub const GENTLE: Difficulty =
-    Difficulty { name: "gentle", digest: 0.75, keep: 1.5, harm: 0.5, deadly: false, death_xp: 0.1, stamina_cost: 0.8, grace_nights: 3 };
-pub const NORMAL: Difficulty =
-    Difficulty { name: "normal", digest: 1.0, keep: 1.0, harm: 1.0, deadly: true, death_xp: 0.25, stamina_cost: 1.0, grace_nights: 0 };
-pub const HARSH: Difficulty =
-    Difficulty { name: "harsh", digest: 1.25, keep: 0.6, harm: 1.5, deadly: true, death_xp: 0.5, stamina_cost: 1.15, grace_nights: 0 };
+pub const GENTLE: Difficulty = Difficulty {
+    name: "gentle",
+    digest: 0.75,
+    keep: 1.5,
+    harm: 0.5,
+    deadly: false,
+    death_xp: 0.1,
+    stamina_cost: 0.8,
+    grace_nights: 3,
+    blood_moon_gameplay: false,
+    blood_moon_cap: 0,
+    blood_moon_health: 1.0,
+};
+pub const NORMAL: Difficulty = Difficulty {
+    name: "normal",
+    digest: 1.0,
+    keep: 1.0,
+    harm: 1.0,
+    deadly: true,
+    death_xp: 0.25,
+    stamina_cost: 1.0,
+    grace_nights: 0,
+    blood_moon_gameplay: true,
+    blood_moon_cap: crate::events::BLOOD_MOON_CAP,
+    blood_moon_health: crate::events::BLOOD_MOON_HEALTH,
+};
+pub const HARSH: Difficulty = Difficulty {
+    name: "harsh",
+    digest: 1.25,
+    keep: 0.6,
+    harm: 1.5,
+    deadly: true,
+    death_xp: 0.5,
+    stamina_cost: 1.15,
+    grace_nights: 0,
+    blood_moon_gameplay: true,
+    blood_moon_cap: 8,
+    blood_moon_health: 1.35,
+};
 
 pub const ALL: [Difficulty; 3] = [GENTLE, NORMAL, HARSH];
 

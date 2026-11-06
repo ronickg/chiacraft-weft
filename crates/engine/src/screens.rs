@@ -98,6 +98,7 @@ pub fn named(name: &str) -> Option<Box<dyn Screen>> {
     }
     Some(match name.as_str() {
         "core:title" => Box::new(Title),
+        "core:loading" => Box::new(Loading),
         "core:pause" => Box::new(Pause),
         "core:settings" => Box::new(SettingsScreen),
         "core:language" => Box::new(LanguageScreen),
@@ -1212,6 +1213,27 @@ fn bind_cell(ui: &mut Ui, cx: &BuildCx, action: &str, slot: usize, binding: Opti
     tip.extend(cx.t("controls.cell_help", &[]));
     ui.nodes[cell].tooltip = Some(tip);
     ui.set_id(cell, &format!("bind:{action}:{slot}"));
+}
+
+/// What shows while a world opens: the title screen's picture and "Loading world...". The app
+/// draws one frame of it before it starts the world (`Running::pending_world`), and that frame
+/// stays on the screen while the start keeps the frame thread busy (a phone compiling the shader
+/// pack's pipelines took 38 s: black, 11-05).
+pub struct Loading;
+
+impl Screen for Loading {
+    fn name(&self) -> &str {
+        "core:loading"
+    }
+
+    fn build(&mut self, ui: &mut Ui, _cx: &BuildCx) {
+        ui.root_style(Style::default().stretch());
+        ui.panel("background", Style::default().grow().center().pad(12.0), |ui| {
+            ui.panel("panel", Style::default().pad(10.0), |ui| {
+                label(ui, _cx, "world.loading", &[], "title");
+            });
+        });
+    }
 }
 
 /// Shows a message with a back button (disconnects, errors).

@@ -570,15 +570,30 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::number("core:view_distance", ck::INT, 12.0, 2.0, 64.0, 1.0),
         // Distant terrain beyond the view (`client::lod`), in cubes; 0 off.
         ConfigDef::number("core:lod_distance", ck::INT, 256.0, 0.0, 2048.0, 16.0),
+        // chiacraft: the far ground's look for shader packs (`Globals.extra.w`'s top byte), bits:
+        // 1 small plants thin out, 2 block-scale shading softens, 4 textures give way to their
+        // average colour, all with distance (Ronald, 11-06: all three).
+        ConfigDef::number("core:far_look", ck::INT, 7.0, 0.0, 255.0, 1.0),
         // The 3D world's share of the window's pixels each way (`app::world_frame`), the UI
         // always whole; 0 picks it by the screen (fewer on high-density ones).
         ConfigDef::number("core:render_scale", ck::FLOAT, 0.0, 0.0, 1.0, 0.05),
+        // The GPU, as the renderer found it (`Backend::device_*`), for mods to read: put at start,
+        // never saved by a player (the base game's first quality preset, Research round 19, 7).
+        ConfigDef::text("core:gpu_name", ""),
+        ConfigDef::number("core:gpu_class", ck::INT, 0.0, 0.0, 3.0, 1.0),
+        ConfigDef::number("core:gpu_memory_mb", ck::INT, 0.0, 0.0, 1.0e7, 1.0),
         // Blocks clouds float above where their dimension puts them.
         ConfigDef::number("core:cloud_height", ck::INT, 0.0, 0.0, 512.0, 8.0),
         // Sun shadows, for shader packs that draw them: 0 off, 1 the near map only (80 blocks
         // about the player), 2 near and far (400). The maps' size in texels: 1024, 2048 or 4096.
         ConfigDef::number("core:shadows", ck::INT, 2.0, 0.0, 2.0, 1.0),
         ConfigDef::number("core:shadow_size", ck::INT, 2048.0, 1024.0, 4096.0, 1024.0),
+        // The far shadow map's reach to each side (blocks): 0 auto, 2000 with the HDR world (at no
+        // measurable cost, more far hills and crowns shadowed: Far view, 11-05) and 400 without
+        // (today's look as made); a number sets it (`client::prepare_shadows`).
+        ConfigDef::number("core:shadow_far", ck::INT, 0.0, 0.0, 2400.0, 100.0),
+        // The soft clouds' shadow on the land (with the HDR world; `client::cloud_shadow`).
+        ConfigDef::number("core:cloud_shadows", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         // Vanilla's: in GUI pixels, and percent of the dark behind the text.
         ConfigDef::number("core:chat_width", ck::INT, 320.0, 40.0, 1000.0, 10.0),
         ConfigDef::number("core:chat_height", ck::INT, 180.0, 20.0, 1000.0, 10.0),
@@ -615,6 +630,11 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // chiacraft (phase 5): what listing a world locks, in mojos (0.0001 TXCH; the game spends
         // only on testnet11). Taken back by delisting.
         ConfigDef::number("core:listing_deposit", ck::INT, 100_000_000.0, 1.0, 1e15, 1.0),
+        // chiacraft (phase 5): a fee a listing may pay, in mojos, for a busy testnet11 to take it
+        // in sooner; the game spends only on testnet11. None by default: a wallet holding only
+        // a sponsor's small gift has no coin for the deposit and a fee of 0.00005 TXCH, and
+        // couldn't list at all (Tester 2, 11-05); with none a listing took 17 blocks (207 s).
+        ConfigDef::number("core:listing_fee", ck::INT, 0.0, 0.0, 1e12, 1.0),
         // Where others reach this game by address; forward it, TCP and UDP.
         ConfigDef::number("core:server_port", ck::INT, 27182.0, 1.0, 65535.0, 1.0),
         // A test setting, on no screen (Ronald, 11-04: "Yes, relay-only test"): every connection goes
@@ -643,6 +663,22 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::number("core:first_person_model", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         ConfigDef::number("core:show_avatars", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         ConfigDef::number("core:occlusion_culling", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
+        // Soft volumetric clouds traced at a quarter of the pixels and blended over frames, for a
+        // pack that draws them (chiacraft's); off, the pack's own (blocky) clouds. On by default
+        // (Tester 2 and the shader look sheets, 11-05: real cumulus where the blocky ones are flat
+        // slabs, at the same GPU time).
+        ConfigDef::number("core:soft_clouds", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
+        // Screen effects' half-size parts (`post_low`); off, every effect at full size, as before.
+        ConfigDef::number("core:post_low", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
+        // The world drawn in 16-bit float (linear light past 1) with the screen effects after it and
+        // the picture finished in one last pass (chiacraft, the HDR world); read at start.
+        ConfigDef::number("core:hdr_world", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // The HDR world's bloom (chiacraft): 0 none, 1 a pyramid of 4 levels, 2 of 6 (wider glow);
+        // live. Without the HDR world the pack's own bloom effect glows as before.
+        ConfigDef::number("core:bloom", ck::INT, 2.0, 0.0, 2.0, 1.0),
+        // The mist as a volume read by every surface (`client::froxels`); off, each walks it. 2 (ultra,
+        // not held to the Mac's budget): cells a quarter of the pixels each way instead of an eighth.
+        ConfigDef::number("core:froxels", ck::INT, 1.0, 0.0, 2.0, 1.0),
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:allow_avatars", ck::BOOL, 1.0, 0.0, 1.0, 0.0) },
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:keep_inventory", ck::BOOL, 0.0, 0.0, 1.0, 0.0) },
     ];

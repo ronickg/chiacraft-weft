@@ -92,6 +92,7 @@ const COMMANDS: &[&str] = &[
     "set_config",
     "shot",
     "bench",
+    "bench_bg",
     "host",
     "join",
     "open",
@@ -486,11 +487,23 @@ async fn run_lines(t: T, src: String) -> R {
             }
             // `set_config base:fx_reflect 0`: changes a setting mid-run, so one run benches each
             // effect on and off over the same loaded world (Research round 16).
+            // A value that isn't a number sets a text setting (`set_config core:resource_packs mcpack`):
+            // read as a number it was 0, and the pack never loaded (the Look and Far view test packs, 11-05).
             "set_config" => {
                 let (name, value) = rest.split_once(' ').unwrap_or((rest, "0"));
-                let cfg = weft_sdk::Config::<f64>::named(Box::leak(name.trim().to_string().into_boxed_str()));
-                cfg.set(value.trim().parse().unwrap_or(0.0));
-                weft_sdk::info!("set_config {} = {}", name.trim(), cfg.get());
+                let name: &'static str = Box::leak(name.trim().to_string().into_boxed_str());
+                match value.trim().parse::<f64>() {
+                    Ok(v) => {
+                        let cfg = weft_sdk::Config::<f64>::named(name);
+                        cfg.set(v);
+                        weft_sdk::info!("set_config {} = {}", name, cfg.get());
+                    }
+                    Err(_) => {
+                        let cfg = weft_sdk::TextConfig::named(name);
+                        cfg.set(value.trim());
+                        weft_sdk::info!("set_config {} = {}", name, cfg.get());
+                    }
+                }
             }
             "shot" => {
                 let path = match launch_option("shot-dir") {

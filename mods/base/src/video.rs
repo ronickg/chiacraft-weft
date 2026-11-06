@@ -18,7 +18,7 @@
 
 use weft_sdk::*;
 
-/// The quality chosen: 0 low .. 3 ultra, 4 custom, -1 not chosen yet (picked from the machine).
+/// The quality chosen: 0 low .. 3 ultra, 4 custom, 5 phone, -1 not chosen yet (picked from the machine).
 pub static QUALITY: Config<i32> = Config::named("quality");
 /// The pack's screen effects: 0 off, 1 low (fewer steps), 2 on. Bloom has no low.
 pub static FX_REFLECT: Config<i32> = Config::named("fx_reflect");
@@ -86,6 +86,75 @@ fn take_waiting(c: &Client) {
 
 pub static SCREEN: Screen = Screen::named("video");
 
+/// The GPU as the engine found it (`core:gpu_*`): its name, its kind (0 not known, 1 integrated,
+/// 2 discrete, 3 another), its own memory in MB.
+static GPU_NAME: TextConfig = TextConfig::named("core:gpu_name");
+static GPU_CLASS: Config<i32> = Config::named("core:gpu_class");
+static GPU_MEMORY: Config<i32> = Config::named("core:gpu_memory_mb");
+/// What the detection chose (Research round 19, 7: "quality chosen by the GPU at first start"):
+/// the preset (-1 none yet), and whether the render scale went to half with it.
+static DETECTED: Config<i32> = Config::named("gpu_preset");
+static DETECTED_HALF: Config<bool> = Config::named("gpu_preset_half");
+
+/// The GPU's kind, or the one a run pretends to have (`--fake-gpu integrated|discrete|other`).
+fn gpu_class() -> i32 {
+    match weft_sdk::client::launch_option("fake-gpu").as_deref() {
+        Some("integrated") => 1,
+        Some("discrete") => 2,
+        Some("other") => 3,
+        _ => GPU_CLASS.get(),
+    }
+}
+
+/// A phone (Android), or a run pretending to be one (`--fake-gpu phone`): the Phone preset is
+/// offered. Never chosen for the player: it trades some of the look for speed (Ronald, via
+/// Planner, 11-06: graphics are optimised, not tuned down, unless he chooses it).
+fn on_phone() -> bool {
+    cfg!(target_os = "android") || weft_sdk::client::launch_option("fake-gpu").as_deref() == Some("phone")
+}
+
+/// The preset for this machine, and whether the world is drawn at half its pixels: an
+/// integrated GPU (Intel, an AMD APU, the Steam Deck: fill-bound) Medium at half scale (its
+/// effects low, shadows 1024: Research round 19); a discrete one High, Medium with under 3 GB of
+/// its own; Apple's M chips by their class (Pro, Max and Ultra High, the others Medium, the
+/// screen's density choosing the scale as before); a CPU or virtual GPU Low; one not known by
+/// the window, as before (a high-density one draws many more pixels).
+fn detect(window: [u32; 2]) -> (usize, bool) {
+    let name = GPU_NAME.get().to_lowercase();
+    let pixels = window[0] as u64 * window[1] as u64;
+    if name.contains("apple") {
+        let big = ["pro", "max", "ultra"].iter().any(|w| name.contains(w));
+        return (if big { 2 } else { 1 }, false);
+    }
+    match gpu_class() {
+        1 => (1, true),
+        2 if GPU_MEMORY.get() > 0 && GPU_MEMORY.get() < 3000 => (1, false),
+        2 => (2, false),
+        3 => (0, false),
+        _ => (if pixels >= 5_000_000 { 1 } else { 2 }, false),
+    }
+}
+
+/// Chooses the preset from the GPU (`detect`) and says so on the Video screen.
+fn apply_detected(window: [u32; 2]) {
+    let (p, half) = detect(window);
+    weft_sdk::info!(
+        "video: {} ({}, {} MB): the {} preset{}",
+        GPU_NAME.get(),
+        gpu_class(),
+        GPU_MEMORY.get(),
+        preset_name(p as i32).unwrap_or("?"),
+        if half { ", half render scale" } else { "" }
+    );
+    apply(p);
+    if half {
+        RENDER_SCALE_NEXT.set(0.5);
+        QUALITY.set(4);
+    }
+    DETECTED.set(p as i32);
+    DETECTED_HALF.set(half);
+}
+
 /// A setting's row: its name (`video.base.<key>`), the values it steps through, and how each is
 /// shown (`video.base.value.<shown>` or a number).
 struct Row {
@@ -102,11 +171,34 @@ struct Row {
 const PRESETS: [[f64; 12]; 4] = [
     // scale shadows size  reflect contact volume shafts bloom view lod   vsync cap
     [0.5, 0.0, 1024.0, 0.0, 0.0, 0.0, 0.0, 0.0, 6.0, 64.0, 1.0, 60.0],
-    [0.67, 1.0, 1024.0, 1.0, 0.0, 1.0, 1.0, 0.0, 8.0, 128.0, 1.0, 60.0],
+    [0.67, 1.0, 1024.0, 1.0, 0.0, 1.0, 1.0, 1.0, 8.0, 128.0, 1.0, 60.0],
     [0.0, 2.0, 2048.0, 2.0, 0.0, 2.0, 1.0, 1.0, 12.0, 192.0, 1.0, 0.0],
     [1.0, 2.0, 4096.0, 2.0, 2.0, 2.0, 2.0, 1.0, 16.0, 256.0, 1.0, 0.0],
 ];
 const PRESET_NAMES: [&str; 4] = ["low", "medium", "high", "ultra"];
+
+/// The Phone preset (`QUALITY` 5; Ronald, 11-06: "Yes, make the preset"), offered on a phone and
+/// chosen only by the player, from his Pixel 10's sweep (notes/ANDROID.md): Low's view, distant
+/// terrain and no sun shadows (the vista 17 -> 23 fps, the forest 18 -> 27 against Medium at half
+/// scale), with Medium's screen effects kept: on the phone they cost about 2 ms.
+const PHONE: usize = 5;
+const PHONE_PRESET: [f64; 12] = [0.5, 0.0, 1024.0, 1.0, 0.0, 1.0, 1.0, 1.0, 6.0, 64.0, 1.0, 60.0];
+
+/// Preset `q`'s values, Low to Ultra and Phone.
+fn preset(q: usize) -> Option<&'static [f64; 12]> {
+    if q == PHONE { Some(&PHONE_PRESET) } else { PRESETS.get(q) }
+}
+
+/// Preset `q`'s name (`video.base.preset.<name>`); None for Custom and not chosen.
+fn preset_name(q: i32) -> Option<&'static str> {
+    if q == PHONE as i32 {
+        Some("phone")
+    } else {
+        usize::try_from(q)
+            .ok()
+            .and_then(|q| PRESET_NAMES.get(q).copied())
+    }
+}
 
 fn word(k: &str) -> (String, i64) {
     (k.to_string(), 0)
@@ -139,10 +231,11 @@ const ROWS: [Row; 12] = [
     Row { key: "shafts", values: &[0.0, 1.0, 2.0], get: || FX_SHAFTS.get() as f64, set: |v| FX_SHAFTS.set(v as i32), shown: off_low_on },
     Row {
         key: "bloom",
-        values: &[0.0, 1.0],
+        // Soft, or dreamy (Storybook's): halos and bloomy fog (Research round 17).
+        values: &[0.0, 1.0, 2.0],
         get: || FX_BLOOM.get() as f64,
         set: |v| FX_BLOOM.set(v as i32),
-        shown: |v| word(if v > 0.0 { "on" } else { "off" }),
+        shown: |v| word(["off", "soft", "dreamy"][(v as usize).min(2)]),
     },
     Row {
         key: "view",
@@ -178,17 +271,24 @@ fn off_low_on(v: f64) -> (String, i64) {
     word(["off", "low", "on"][(v as usize).min(2)])
 }
 
-/// Sets every row to preset `p` (0 low .. 3 ultra).
+/// Sets every row to preset `p` (0 low .. 3 ultra), and the fantasy rows that cost to what it
+/// allows (`fantasy_caps`).
 fn apply(p: usize) {
-    for (row, &v) in ROWS.iter().zip(PRESETS[p].iter()) {
+    let Some(values) = preset(p) else { return };
+    for (row, &v) in ROWS.iter().zip(values.iter()) {
         (row.set)(v);
     }
     QUALITY.set(p as i32);
+    fantasy_caps(p, true);
 }
 
 /// One row a step on (`dir` 1) or back (-1) through its values; the quality becomes Custom.
 fn step(i: usize, dir: i32) {
-    let row = &ROWS[i];
+    step_row(&ROWS[i], dir);
+    QUALITY.set(4);
+}
+
+fn step_row(row: &Row, dir: i32) {
     let now = (row.get)();
     let at = row
         .values
@@ -202,7 +302,210 @@ fn step(i: usize, dir: i32) {
         });
     let next = (at as i32 + dir).rem_euclid(row.values.len() as i32) as usize;
     (row.set)(row.values[next]);
-    QUALITY.set(4);
+}
+
+// ---------------------------------------------------------------- fantasy
+
+/// The Fantasy screen (Research round 17, "the option to turn on off parts"): a master that sets
+/// the taste rows (Off, Subtle the default, Storybook; Custom once a row is changed), and the
+/// rows. The quality presets touch only what costs (`fantasy_caps`). The pack reads the look
+/// rows through its options (Lighting's `look.rs`); fireflies, motes and sky events are the base
+/// mod's own.
+pub static FANTASY_SCREEN: Screen = Screen::named("video_fantasy");
+/// 0 off, 1 subtle, 2 storybook, 3 custom.
+pub static FANTASY: Config<i32> = Config::named("fantasy");
+pub static FX_FIREFLIES: Config<i32> = Config::named("fx_fireflies");
+/// Leaves, petals, pollen, spindrift and sand in the wind (`wind_life.rs`): 0 off, 1 few, 2 many,
+/// 3 ultra (`vitals::wind_life::DENSITY`).
+pub static FX_WIND_LIFE: Config<i32> = Config::named("fx_wind_life");
+pub static FX_MOTES: Config<i32> = Config::named("fx_motes");
+pub static LOOK_STORYBOOK: Config<f32> = Config::named("look_storybook");
+pub static FX_NIGHT_SKY: Config<i32> = Config::named("fx_night_sky");
+pub static FX_SHOOTING_STARS: Config<i32> = Config::named("fx_shooting_stars");
+/// The moon's size as a factor (the pack scales it in `sky.wgsl`).
+pub static MOON_SIZE: Config<f32> = Config::named("moon_size");
+pub static FX_GLOW: Config<f32> = Config::named("fx_glow");
+pub static FX_BIOME_AIR: Config<f32> = Config::named("fx_biome_air");
+/// 0 off, 1 looks only (no gameplay), 2 on.
+pub static FX_SKY_EVENTS: Config<i32> = Config::named("fx_sky_events");
+pub static FX_SPARKLE: Config<i32> = Config::named("fx_sparkle");
+/// The sky's clouds: blocky (off) or soft volumetric ones (Lighting's; Ronald: "Both, a setting",
+/// blocky by default). The engine's, at once, no restart.
+static SOFT_CLOUDS: Config<bool> = Config::named("core:soft_clouds");
+
+const FANTASY_NAMES: [&str; 3] = ["off", "subtle", "storybook"];
+
+fn percent(v: f64) -> (String, i64) {
+    ("percent".into(), (v * 100.0).round() as i64)
+}
+
+const FANTASY_ROWS: [Row; 12] = [
+    Row {
+        key: "fireflies",
+        values: &[0.0, 1.0, 2.0],
+        get: || FX_FIREFLIES.get() as f64,
+        set: |v| FX_FIREFLIES.set(v as i32),
+        shown: |v| word(["off", "few", "many"][(v as usize).min(2)]),
+    },
+    Row { key: "motes", values: &[0.0, 1.0], get: || FX_MOTES.get() as f64, set: |v| FX_MOTES.set(v as i32), shown: off_on },
+    Row {
+        key: "wind_life",
+        values: &[0.0, 1.0, 2.0, 3.0],
+        get: || FX_WIND_LIFE.get() as f64,
+        set: |v| FX_WIND_LIFE.set(v as i32),
+        shown: |v| word(["off", "few", "many", "ultra"][(v as usize).min(3)]),
+    },
+    Row {
+        key: "storybook",
+        values: &[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+        get: || LOOK_STORYBOOK.get() as f64,
+        set: |v| LOOK_STORYBOOK.set(v as f32),
+        shown: percent,
+    },
+    Row {
+        key: "night_sky",
+        values: &[0.0, 1.0, 2.0],
+        get: || FX_NIGHT_SKY.get() as f64,
+        set: |v| FX_NIGHT_SKY.set(v as i32),
+        shown: |v| word(["off", "subtle", "vivid"][(v as usize).min(2)]),
+    },
+    Row {
+        key: "shooting_stars",
+        values: &[0.0, 1.0],
+        get: || FX_SHOOTING_STARS.get() as f64,
+        set: |v| FX_SHOOTING_STARS.set(v as i32),
+        shown: off_on,
+    },
+    Row {
+        key: "moon_size",
+        values: &[1.0, 1.5, 2.0],
+        get: || MOON_SIZE.get() as f64,
+        set: |v| MOON_SIZE.set(v as f32),
+        shown: |v| {
+            word(if v >= 1.75 {
+                "moon_2"
+            } else if v >= 1.25 {
+                "moon_15"
+            } else {
+                "moon_1"
+            })
+        },
+    },
+    Row { key: "glow", values: &[0.0, 0.5, 1.0, 1.25, 1.5], get: || FX_GLOW.get() as f64, set: |v| FX_GLOW.set(v as f32), shown: percent },
+    Row {
+        key: "biome_air",
+        values: &[0.0, 0.3, 0.6, 0.8, 1.0],
+        get: || FX_BIOME_AIR.get() as f64,
+        set: |v| FX_BIOME_AIR.set(v as f32),
+        shown: percent,
+    },
+    Row {
+        key: "sky_events",
+        values: &[0.0, 1.0, 2.0],
+        get: || FX_SKY_EVENTS.get() as f64,
+        set: |v| FX_SKY_EVENTS.set(v as i32),
+        shown: |v| word(["off", "looks_only", "on"][(v as usize).min(2)]),
+    },
+    Row { key: "sparkle", values: &[0.0, 1.0], get: || FX_SPARKLE.get() as f64, set: |v| FX_SPARKLE.set(v as i32), shown: off_on },
+    Row {
+        key: "clouds",
+        values: &[0.0, 1.0],
+        get: || SOFT_CLOUDS.get() as u8 as f64,
+        set: |v| SOFT_CLOUDS.set(v > 0.0),
+        shown: |v| word(if v > 0.0 { "clouds_soft" } else { "blocky" }),
+    },
+];
+
+/// What the master sets, Off, Subtle and Storybook, per row (in `FANTASY_ROWS` order); NaN leaves
+/// a row as it is: sky events carry gameplay (Ronald: "Gameplay too"), so a look's master
+/// doesn't take them away. Then bloom: soft, soft, dreamy.
+const FANTASY_PRESETS: [[f64; 11]; 3] = [
+    // fireflies motes storybook night shooting moon glow  air  events    sparkle clouds
+    [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, f64::NAN, 0.0, 0.0],
+    [1.0, 1.0, 0.4, 1.0, 1.0, 1.0, 1.0, 0.6, f64::NAN, 1.0, 0.0],
+    [2.0, 1.0, 1.0, 2.0, 1.0, 1.5, 1.5, 1.0, f64::NAN, 1.0, 1.0],
+];
+const FANTASY_BLOOM: [i32; 3] = [1, 1, 2];
+
+fn off_on(v: f64) -> (String, i64) {
+    word(if v > 0.0 { "on" } else { "off" })
+}
+
+/// Sets the fantasy rows to master `f` (0 off .. 2 storybook), within what the quality allows.
+fn apply_fantasy(f: usize) {
+    for (row, &v) in FANTASY_ROWS.iter().zip(FANTASY_PRESETS[f].iter()) {
+        if !v.is_nan() {
+            (row.set)(v);
+        }
+    }
+    FX_BLOOM.set(FANTASY_BLOOM[f]);
+    FANTASY.set(f as i32);
+    if let Ok(q) = usize::try_from(QUALITY.get()) {
+        fantasy_caps(q, false);
+    }
+}
+
+/// What quality preset `q` allows of the rows that cost (Research round 17's table): Low few
+/// fireflies, no motes, a subtle night sky, no sparkle, no bloom; Medium soft bloom. Soft clouds
+/// cost no more than blocky (Lighting, on the PC and the Mac), so they follow the master alone. With
+/// `bloom_up`, High and Ultra take the master's bloom (a quality preset just chosen).
+fn fantasy_caps(q: usize, bloom_up: bool) {
+    // Phone: as Low, its bloom as Medium's.
+    if q == PHONE {
+        FX_FIREFLIES.set(FX_FIREFLIES.get().min(1));
+        FX_MOTES.set(0);
+        FX_NIGHT_SKY.set(FX_NIGHT_SKY.get().min(1));
+        FX_SPARKLE.set(0);
+        FX_BLOOM.set(FX_BLOOM.get().min(1));
+    } else if q == 0 {
+        FX_FIREFLIES.set(FX_FIREFLIES.get().min(1));
+        FX_WIND_LIFE.set(FX_WIND_LIFE.get().min(1));
+        FX_MOTES.set(0);
+        FX_NIGHT_SKY.set(FX_NIGHT_SKY.get().min(1));
+        FX_SPARKLE.set(0);
+        FX_BLOOM.set(0);
+    } else if q == 1 {
+        FX_BLOOM.set(FX_BLOOM.get().min(1));
+    } else if bloom_up && q <= 3 {
+        if let Some(&b) = FANTASY_BLOOM.get(FANTASY.get() as usize) {
+            FX_BLOOM.set(b);
+        }
+    }
+}
+
+/// A row's line on a settings screen: its name, ‹ value ›, and what it does (or that it waits
+/// for a restart).
+fn row_ui(ui: &mut Ui, rows: &'static [Row], i: usize, step: fn(usize, i32)) {
+    let row = &rows[i];
+    ui.row(S::row().gap(3.0).center(), move |ui| {
+        ui.text_styled(S::default().w(84.0).no_wrap(), &format!("video.base.{}", row.key), &[]);
+        ui.button("video.base.less", S::default().size(12.0, 12.0).pad(0.5), move |_| step(i, -1));
+        ui.row(S::row().w(96.0).center(), move |ui| {
+            ui.text_bind_styled(S::default().no_wrap(), move |_, t| {
+                let (k, n) = (rows[i].shown)((rows[i].get)());
+                if k.is_empty() {
+                    t.set("video.base.value.number", &[Arg::Int(n)]);
+                } else {
+                    t.set(&format!("video.base.value.{k}"), &[Arg::Int(n)]);
+                }
+            });
+        });
+        ui.button("video.base.more", S::default().size(12.0, 12.0).pad(0.5), move |_| step(i, 1));
+        // A value waiting for the next start says so in place of what the row does.
+        let key = row.key;
+        ui.text_bind_styled(S::default().class("dim").max_w(150.0), move |_, t| {
+            if waiting(key) {
+                t.set("video.base.after_restart", &[]);
+            } else {
+                t.set(&format!("video.base.{key}.what"), &[]);
+            }
+        });
+    });
+}
+
+fn step_fantasy(i: usize, dir: i32) {
+    step_row(&FANTASY_ROWS[i], dir);
+    FANTASY.set(3);
 }
 
 /// Which defaults the saved settings have caught up with (`new_defaults`).
@@ -224,7 +527,7 @@ fn new_defaults() {
         return;
     }
     let q = QUALITY.get();
-    let (contact, shafts) = match PRESETS.get(q as usize) {
+    let (contact, shafts) = match usize::try_from(q).ok().and_then(preset) {
         Some(p) => (p[4] as i32, p[6] as i32),
         None => (if FX_CONTACT.get() == 2 { 0 } else { FX_CONTACT.get() }, if FX_SHAFTS.get() == 2 { 1 } else { FX_SHAFTS.get() }),
     };
@@ -235,7 +538,7 @@ fn new_defaults() {
 }
 
 pub fn register(r: &mut Registry) {
-    r.config(&QUALITY).int(-1, -1, 4);
+    r.config(&QUALITY).int(-1, -1, 5);
     r.config(&FX_REFLECT).int(2, 0, 2);
     // Off by default, low shafts (Ronald, 11-05: "Off by default", "Default to Low").
     r.config(&FX_CONTACT).int(0, 0, 2);
@@ -244,7 +547,22 @@ pub fn register(r: &mut Registry) {
     r.config(&FX_VOLUME).int(1, 0, 2);
     r.config(&FX_SHAFTS).int(1, 0, 2);
     r.config(&DEFAULTS).int(0, 0, 9);
-    r.config(&FX_BLOOM).int(1, 0, 1);
+    r.config(&FX_BLOOM).int(1, 0, 2);
+    // Fantasy: Subtle's values by default (Research round 17; the master defaults to Subtle).
+    r.config(&FANTASY).int(1, 0, 3);
+    r.config(&FX_FIREFLIES).int(1, 0, 2);
+    r.config(&FX_WIND_LIFE).int(1, 0, 3);
+    r.config(&FX_MOTES).int(1, 0, 1);
+    r.config(&LOOK_STORYBOOK).float(0.4, 0.0, 1.0);
+    r.config(&FX_NIGHT_SKY).int(1, 0, 2);
+    r.config(&FX_SHOOTING_STARS).int(1, 0, 1);
+    r.config(&MOON_SIZE).float(1.0, 1.0, 2.0);
+    r.config(&FX_GLOW).float(1.0, 0.0, 1.5);
+    r.config(&FX_BIOME_AIR).float(0.6, 0.0, 1.0);
+    r.config(&FX_SKY_EVENTS).int(2, 0, 2);
+    r.config(&FX_SPARKLE).int(1, 0, 1);
+    r.config(&DETECTED).int(-1, -1, 5);
+    r.config(&DETECTED_HALF).bool(false);
     r.config(&RENDER_SCALE_NEXT).float(-1.0, -1.0, 1.0);
     r.config(&SHADOW_SIZE_NEXT).int(0, 0, 4096);
     r.client_frame(|_| new_defaults());
@@ -253,10 +571,13 @@ pub fn register(r: &mut Registry) {
         if QUALITY.get() >= 0 {
             return;
         }
-        // Scripts, tests and benchmarks keep their own settings (`--config` sets them per run).
-        if ["script", "test", "config"]
-            .iter()
-            .any(|o| weft_sdk::client::launch_option(o).is_some())
+        // Scripts, tests and benchmarks keep their own settings (`--config` sets them per run),
+        // unless one pretends a GPU to check this (`--fake-gpu`).
+        let fake = weft_sdk::client::launch_option("fake-gpu").is_some();
+        if !fake
+            && ["script", "test", "config"]
+                .iter()
+                .any(|o| weft_sdk::client::launch_option(o).is_some())
         {
             return;
         }
@@ -264,17 +585,20 @@ pub fn register(r: &mut Registry) {
         if w == 0 || h == 0 {
             return;
         }
-        let pixels = w as u64 * h as u64;
-        let p = if pixels >= 5_000_000 { 1 } else { 2 };
-        weft_sdk::info!("video: first run, {w}x{h}: the {} preset", PRESET_NAMES[p]);
-        apply(p);
+        apply_detected([w, h]);
     });
     r.client_frame(take_waiting);
     r.screen(&SCREEN, |ui| {
-        crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.title", &[], |ui| {
+        let tabs: [crate::window::Tab; 1] = [("video.base.fantasy.title", |c| {
+            c.client().screen_open(&FANTASY_SCREEN);
+        })];
+        crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.title", &tabs, |ui| {
             // The presets, and which one the settings are now.
             ui.row(S::row().gap(3.0).center(), |ui| {
                 ui.text_styled(S::default().w(84.0).no_wrap(), "video.base.quality", &[]);
+                if on_phone() {
+                    ui.button("video.base.preset.phone", S::default().w(52.0), move |_| apply(PHONE));
+                }
                 for (p, name) in PRESET_NAMES.iter().enumerate() {
                     ui.button(&format!("video.base.preset.{name}"), S::default().w(52.0), move |_| apply(p));
                 }
@@ -282,36 +606,63 @@ pub fn register(r: &mut Registry) {
             ui.row(S::row().gap(3.0), |ui| {
                 ui.row(S::row().w(84.0), |_| {});
                 ui.text_bind_styled(S::default().class("dim").no_wrap(), |_, t| {
-                    let q = QUALITY.get();
-                    let name = PRESET_NAMES.get(q as usize).copied().unwrap_or("custom");
+                    let name = preset_name(QUALITY.get()).unwrap_or("custom");
                     t.set("video.base.now", &[Arg::Key(&format!("video.base.preset.{name}"))]);
                 });
             });
-            for (i, row) in ROWS.iter().enumerate() {
-                ui.row(S::row().gap(3.0).center(), move |ui| {
-                    ui.text_styled(S::default().w(84.0).no_wrap(), &format!("video.base.{}", row.key), &[]);
-                    ui.button("video.base.less", S::default().size(12.0, 12.0).pad(0.5), move |_| step(i, -1));
-                    ui.row(S::row().w(96.0).center(), move |ui| {
-                        ui.text_bind_styled(S::default().no_wrap(), move |_, t| {
-                            let (k, n) = (ROWS[i].shown)((ROWS[i].get)());
-                            if k.is_empty() {
-                                t.set("video.base.value.number", &[Arg::Int(n)]);
-                            } else {
-                                t.set(&format!("video.base.value.{k}"), &[Arg::Int(n)]);
-                            }
-                        });
-                    });
-                    ui.button("video.base.more", S::default().size(12.0, 12.0).pad(0.5), move |_| step(i, 1));
-                    // A value waiting for the next start says so in place of what the row does.
-                    let key = row.key;
-                    ui.text_bind_styled(S::default().class("dim").max_w(150.0), move |_, t| {
-                        if waiting(key) {
-                            t.set("video.base.after_restart", &[]);
-                        } else {
-                            t.set(&format!("video.base.{key}.what"), &[]);
+            // What the GPU is, what it chose, and choosing again (Research round 19, 7).
+            ui.row(S::row().gap(3.0).center(), |ui| {
+                ui.row(S::row().w(84.0), |_| {});
+                ui.text_bind_styled(S::default().class("dim").max_w(260.0), |_, t| {
+                    let name = GPU_NAME.get();
+                    let class = ["unknown", "integrated", "discrete", "other"][gpu_class().clamp(0, 3) as usize];
+                    let shown = if name.is_empty() { "?".to_string() } else { name };
+                    match preset_name(DETECTED.get()) {
+                        Some(p) => {
+                            let key = if DETECTED_HALF.get() { "video.base.detected.half" } else { "video.base.detected.preset" };
+                            t.set(
+                                key,
+                                &[
+                                    Arg::Text(&shown),
+                                    Arg::Key(&format!("video.base.gpu.{class}")),
+                                    Arg::Key(&format!("video.base.preset.{p}")),
+                                ],
+                            );
                         }
-                    });
+                        None => t.set("video.base.detected.gpu", &[Arg::Text(&shown), Arg::Key(&format!("video.base.gpu.{class}"))]),
+                    }
                 });
+                ui.button("video.base.detect", S::default().h(12.0).pad(2.0), |c| apply_detected(c.client().state().window));
+            });
+            for i in 0..ROWS.len() {
+                row_ui(ui, &ROWS, i, step);
+            }
+        });
+    });
+    r.screen(&FANTASY_SCREEN, |ui| {
+        let tabs: [crate::window::Tab; 1] = [("video.base.title", |c| {
+            c.client().screen_open(&SCREEN);
+        })];
+        crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.fantasy.title", &tabs, |ui| {
+            // The master, and which of its looks the rows are now.
+            ui.row(S::row().gap(3.0).center(), |ui| {
+                ui.text_styled(S::default().w(84.0).no_wrap(), "video.base.fantasy", &[]);
+                for (f, name) in FANTASY_NAMES.iter().enumerate() {
+                    ui.button(&format!("video.base.fantasy.{name}"), S::default().w(70.0), move |_| apply_fantasy(f));
+                }
+            });
+            ui.row(S::row().gap(3.0), |ui| {
+                ui.row(S::row().w(84.0), |_| {});
+                ui.text_bind_styled(S::default().class("dim").no_wrap(), |_, t| {
+                    let name = FANTASY_NAMES
+                        .get(FANTASY.get() as usize)
+                        .copied()
+                        .unwrap_or("custom");
+                    t.set("video.base.now", &[Arg::Key(&format!("video.base.fantasy.{name}"))]);
+                });
+            });
+            for i in 0..FANTASY_ROWS.len() {
+                row_ui(ui, &FANTASY_ROWS, i, step_fantasy);
             }
         });
     });

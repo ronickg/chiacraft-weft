@@ -1,7 +1,8 @@
 # Crafting
 
 Status: decided 2026-11-04. Slice 1 is built and waiting for a game run; the rest follows the
-slices at the end.
+slices at the end. Since 11-05 every tool, weapon and piece of armour comes only from parts
+("Parts only", below).
 
 **Ronald's decision:** "Yes, 1A 2A 3A 4B". So:
 - the grid with a book that fills it
@@ -153,6 +154,59 @@ with a socket. An iron head is forged with an eye and held by a wedge.
     numbers: insulation in clo, how much it keeps when wet, blunt padding.
   - So the same mail coat takes a fur lining for a taiga winter and a linen one for the desert.
 
+### Parts only (11-05)
+
+Ronald, 11-05: "I actually don't want to have like diamond sword or something, because it doesn't
+really make sense. I want ... more modular approach where you build a sort of different pieces, but
+like only, let's say, the blade can be of diamond and the hilt, but not like the handle out of
+diamond ... I kind of wanted to be a bit more realistic, but not completely". So:
+
+- **No whole tools or armour.** `wood_pickaxe` ... `diamond_sword` and the leather, iron, gold
+  and diamond armour have no recipe, no creative tab and no place in any list. Every tool and
+  weapon is a kind item (`base:axe`, `base:sword` ...) assembled from parts; armour is a helmet,
+  chestplate, leggings or boots assembled from a shell, a fastening and a lining.
+- **Old saves:** none of their logic (Ronald, 11-05: "I don't need to convert old saves ... we
+  don't need any logic for old saves at the moment because we're still building the game"). The
+  old items are simply gone: an old world loses them.
+- **`/gear <kind> <materials...> [grade=N] [slot=N]`** builds one for checks and scripts (game
+  masters): the working part's material first, then its slots' in order, the usual ones for the
+  rest (an oak haft, a leather grip on a bow, cordage on stone and wrought iron on metal, leather
+  straps and a wool lining on armour). `/gear part <shape> <material>` gives one part, to assemble
+  by hand at the table.
+- **Worn armour is drawn from its parts** (11-05, Ronald: "Worn armour art"; after a try of painted
+  skins against box models, "A for all"): each shell material has its own worn set
+  (`base:entity/armor/worn/<material>_1`, `_2` in the skin layout, `looks::WORN_SETS`), painted
+  through game-art from that material's part icons, so a piece looks like its icon: leather a hood
+  and buttoned jerkin, rawhide the same laced with sinew, bone and antler a corded lamellar, the
+  metals plate with a visored helm (copper, bronze, wrought iron, meteoric iron, steel, star steel,
+  each its own colours, copper and bronze muted toward their ingots), diamond painted like the rest
+  with its quilted lattice on the plates. The piece's gems sit at their spots (`looks::worn_look`,
+  `WORN_GEM_SPOTS`; a helmet shows one, on the brow), over an under-layer where the painting rounds the helmet's
+  and pauldrons' corners (no skin shows there): a mail coif and sleeves for a metal fastening,
+  always iron-dark (steel's dark steps; Ronald: "Always iron-dark"), padding for leather, sinew and
+  cord in the fastening's own dark steps (`entity/armor/parts/under_*`), carried on the stack as `core:worn_look` (an engine
+  addition, `notes/ENGINE_CHANGES.md`). A new shell material wears steel's set until it has its own
+  (a check names it). The four look families (`parts::ARMOUR_LOOKS`: `_mail`, `_scale`, `_gem`)
+  stay as items, their own worn sets the fallback, and the pieces' icons.
+
+### What each material can be
+
+Checked once against the real things (`crafting::materials::Works` and `fits`):
+
+| Material | Working part (head, blade, point, shell) | Holding (haft, grip, shaft) | Fitting | Guard, pommel | Lining |
+|---|---|---|---|---|---|
+| Flint, chert, obsidian, tektite | every edge and head; a sword only as a macuahuitl's inset blade; no armour | - | - | - | - |
+| Ground stone | axe, pick, shovel and hoe heads; nothing that cuts | - | - | - | - |
+| Bone, antler | antler picks, scapula shovels, hoes, axes, knives, points; bone-slat armour; no sword | yes | - | yes | - |
+| Woods | a wooden spade, a hoe, a fire-hardened point, a bow stave (springy woods only); no axe, pick, sword or armour | yes | - | yes | - |
+| Copper, bronze, the irons, steel, star steel | everything but a bow; scales, mail, plate | - | rivets, wedges, collars | yes | - |
+| Diamond | every edge and head; armour of scales sewn on a backing (the one fantasy kept) | no | no | no | - |
+| Gold | never (soft, heavy) | - | rivets, collars, inlay | yes | - |
+| Leather, rawhide | armour shells only (cuir bouilli, rawhide lamellar) | a grip wrap only, no haft | lacing, lashings, straps | - | leather as a hide lining |
+| Cordage, sinew | - | - | lashings, lacing | - | - |
+| Birch tar | - | - | glue on a head; no armour | - | - |
+| Linen, wool, fur | - | - | - | - | yes |
+
 ### Making parts
 
 The first time you make a part shape, you make it by hand. After that it's in your book.
@@ -191,6 +245,19 @@ One rule, shown in the tooltip, so nothing is hidden:
 - **The working part sets the numbers** (head, blade, point, stave, shell): what it harvests, its
   speed or damage or protection, and its own wear. The material and the shape set them; the grade
   multiplies them.
+  - **From the curve** (11-05, `vitals::gear`): its material's item level `L` (tier × 10 + depth)
+    sets a Sound part's uses, `53 × g(L)^1.5` (flint 75, wrought iron 270, diamond 630), its mining
+    speed, `2.5 × g(L)^0.75` (flint 3.0, wrought iron 5.6, diamond 8.6), its harvest level,
+    `100 + 10 × (L − 5)` (flint 100, bronze 210, wrought iron 280, steel 320, diamond 400), and a
+    weapon's damage and swings by its kind (`gear::weapon`). Each material may tweak uses or speed
+    by ×0.75-1.25 with its reason (`materials.rs`).
+  - **The item level travels on the stack** (`base:item_level`), so the over-tier caps and rate
+    floors (`animals::armour`) read a part-built weapon's.
+  - **Armour:** a shell's piece is its slot's share of a same-age set from the curve
+    (`gear::armour`: armour points and the health it adds), × the shell's grade; it lasts the
+    shell's uses × the slot's share (a coat the most), and the fastening wears first. Warmth is the
+    shell's insulation by the set it looks like plus the lining's clothing at half a piece
+    (`vitals::clothing::LINING_SHARE`).
 - **The holding part multiplies them** (haft, grip, shaft): a material and shape bonus, such as
   +10% durability for oak, or +5% speed for birch.
   - It sums with the other holding parts like Tinkers' handles: total = working part ×
@@ -295,6 +362,37 @@ trait can depend on the part it's in. Proposed:
   - At set counts a part earns one improvement: a haft "worn in" (+handling), an edge "honed" at
     the whetstone (+keenness, which needs re-honing as it wears), armour "fitted" to its wearer.
   - Each part has its own few steps, capped.
+
+### Gem sockets (11-05)
+
+Ronald, 11-05: "pieces and items should also get like gem slots because that will make it even
+cooler". The modifier slots above become real gem sockets (`crafting::gems`, `mods/base/src/gems.rs`):
+- **How many:** the working part's grade's slots (0 up to Plain, 1 from Sound, 2 from Superior,
+  3 at Masterwork and Legendary), at most what its material can hold: a gem glued into knapped
+  stone, bone or wood 1, sewn onto leather or set into diamond 2, a metal setting 3. The tooltip
+  shows "Gems: n of m sockets".
+- **Gems** are cut at a crafting table (the book's Parts tab) from found stones: diamond, peridot
+  (a pallasite's), tektite, amber (the animals mod's, tagged `gem_stones/amber`); a new gem is a
+  row and a `gem_stones/<id>` tag. Each rolls 1-3 boosts with Perk web's roll
+  (`vitals::sockets::roll_among` over `GEAR_FAMILIES`: melee, ranged, defence, health, mining,
+  gathering) inside its stone's item level's band, 3-5 units (+6-10%) in all. A gem keeps its roll
+  in the web's `StoneData`, on its own component (`base:gem`): never a web stone.
+- **Boosts count only where they fit:** melee damage on a blade, a spear or a tool's hit, ranged on
+  a bow, defence and health on armour, mining on a pick or shovel, gathering on an axe or hoe. So
+  which gem goes where is a choice.
+- **The ceiling:** grade and gems together at most x1.6 a plain item (`curve::GRADE_CEILING`,
+  PROGRESSION.md "Endless gear": "grade plus marks add at most +60%"); a progression check holds it
+  for every kind and grade with the best rolls.
+- **Setting and taking out** at the table's assembly row: a built item and gems make the item with
+  them set (if it has the sockets free); the item alone there makes it bare, and its gems come back
+  to the bag. Taking an item apart gives its gems back too. **The cost:** a cheap gem (item level
+  under 20: tektite, amber) cracks one time in four coming out; diamond and peridot never do.
+  Repairs keep the gems set.
+- **The look:** each gem shows on the icon and in hand at its socket's spot (`looks::GEM_SPOTS`:
+  on an axe's or pick's head, a sword's guard and pommel, an armour shell's chest), a 5 px setting
+  (`base:parts/gem/set`) painted with the gem's ramp, made from its cut icon. A knife and a spear,
+  with no part art yet, show their gems over their plain icon; the bow on its grip.
+- **For scripts:** `/gear gem <id> [slot=N]` gives a cut gem.
 
 ### Wear and repair, per part
 
@@ -440,6 +538,24 @@ As Tinkers' Construct 3 does it, which our prototype already proved at 32 px:
     Ronald approved drawn heads per material.
   - **Handles:** both painted (leather-wrapped with gold fittings, plain wood) and as maps, so
     oak, birch and antler are ramp materials.
+  - **A shape without its own drawing** (a bearded axe head, a sword's long or short blade, a
+    long haft, a barbed point) uses its slot's nearest drawn shape (`looks::drawn_shape`) until
+    its art comes; a check fails if any shape a look draws has no file (the engine skips a missing
+    layer, so the tool would show without that part).
+  - **New part art** (the version 3 redo) goes in with `notes/ui-codex/parts/install_v3.py`: a
+    dry run (the default) lays each drawing where today's sits, scores it, flags heads that float
+    off their haft, get clipped or miss a gem spot, and writes a sheet and a report to the
+    archive; `--apply --only <materials> --parts <parts>` installs Ronald's picks, keeping what
+    it replaces. Heads must be drawn to today's size and socket (the haft ends where the head
+    covers it), not as loose parts with a mid-head eye.
+  - **Installed 11-06** (Ronald: "Install all of it"): the v3 heads and blades of every material
+    (redrawn in today's place and size, today's binding pasted back; today's steel hoe kept: its
+    redraw came out a cleaver), the knife's blades and the spear's points with their own looks
+    (the knife on the sword's hilt map, the spear on a shaft map drawn in code), a flint sword
+    blade, each head and blade as its loose part's icon in its material (`parts/loose/`), and
+    armour shells drawn for leather, bone, iron and diamond (`looks::SHELLS_DRAWN`; gold's are
+    drawn but gold makes no shell; rawhide, antler and the other metals keep their family's map
+    in their ramp). Every replaced file is kept in the archive (`art-redo-v3/install/replaced/`).
   - **Every layer** has its `.json`.
   - **The first materials:** wood, stone, flint, copper, bronze, iron, steel, gold, diamond (the
     sword without flint).
@@ -479,8 +595,13 @@ How it was built:
 - **SDK:** `with_look`, `stack_look`.
 - **Base:** writes a tool's look when it's assembled (`parts::look_text`). Placeholder axe layers
   stand in for Chiacraft's.
-- **Not yet:** looks in rich-text item icons (they have only an item id), and a look on loose
-  part items.
+- **Armour's parts** (11-05, Ronald's yes to the six icons: "Install all six"): a shell, straps
+  and a lining are drawn from one shade map each (`base:parts/armour/<shape>`, made from the
+  approved icons) painted with their material's ramp, as a loose part and, a shell, as the built
+  piece's icon (`crafting::looks::part_look`): a bronze chestplate is bronze, a bone one bone. New
+  ramps from approved art: diamond, wool, linen, fur. The worn piece still shows its look set.
+- **Not yet:** looks in rich-text item icons (they have only an item id), and looks on loose tool
+  parts (they show their plain icon).
 
 ### Fewer pieces in the picture
 
@@ -690,6 +811,11 @@ are rows.
    5. **Signed history through portals**, with Phase 4's world DIDs.
 11. **Slow crafts** as machines (the tanning frame first), then **smithing and casting** with
    Content's copper, bronze and iron.
+12. **Parts only** (built 11-05, waiting for PC looks): the whole tools and armour gone (old
+    worlds lose them; no old-save logic, Ronald), armour from shell, fastening and lining, the roles checked
+    against the real things, the numbers from the curve, `/gear`. Not yet: part art for armour
+    (it wears today's four sets), copper, bronze and steel in the world (their parts exist, nothing
+    to make them from).
 
 ## Who does what
 

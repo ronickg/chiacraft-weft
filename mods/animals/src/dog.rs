@@ -18,6 +18,7 @@
 //! layout, so the same picture fits. A pose is the look's animation file, whose
 //! `idle` holds it (sitting, lying down), so every player sees it whenever they come by.
 
+use crate::choose::{Band, Need, WithBand};
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
@@ -114,9 +115,9 @@ pub fn init(r: &mut Registry) {
     }
     r.entity(&CHIHUAHUA)
         .size(animals_core::bodies::of("chihuahua").0, animals_core::bodies::of("chihuahua").1)
-        .max_health(8.0)
+        .max_health(crate::animal::health(species::of(&CHIHUAHUA)))
         .walk_speed(2.8)
-        .attack_damage(2.0)
+        .attack_damage(crate::animal::hit(species::of(&CHIHUAHUA)))
         .passive()
         .model_file("chihuahua")
         .animations("chihuahua")
@@ -129,7 +130,7 @@ pub fn init(r: &mut Registry) {
             false
         })
         .on_hurt(|w, h| {
-            taming::hurt(w, h.entity);
+            taming::hurt(w, h.entity, h.source);
             if let Some(d) = w.component_mut(h.entity, &DOG)
                 && d.tamed == 0
             {
@@ -162,11 +163,17 @@ fn goals() -> Goals {
             }
             true
         })
-        .then(crate::breeding::behave(index))
-        .then(commands::hold)
-        .then(crate::comfort::seek)
-        .then(crate::forage::forage)
-        .then(ai::wander(0.45, 6.0))
+        // What it does when nothing is after it or ordered, the most pressing first (`choose.rs`).
+        .band(
+            "needs",
+            Band::new()
+                .with(Need::Love, crate::breeding::behave(index))
+                .with(Need::Hold, crate::commands::hold)
+                .with(Need::Comfort, crate::comfort::seek)
+                .with(Need::Drink, crate::drink::drink)
+                .with(Need::Eat, crate::forage::eat)
+                .with(Need::Wander, ai::wander(0.45, 6.0)),
+        )
 }
 
 /// Every tick, after its level and growing up (`animal::upkeep`): its look applied, time passing.

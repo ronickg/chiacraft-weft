@@ -1,9 +1,23 @@
 ---
 name: game-art
-description: Generate any art for the game from Ronald's style guides — item icons, block textures (cubes, plants, ores, crops, liquids, glass, workstations), animal and monster looks, UI parts, effects, sky — with ChatGPT through the Codex command line, then check it, cut it to exact pixels, show it on a page and put it in the game. Use whenever Ronald says "generate/make/draw/redo <anything visual>", asks for new or redone icons, textures, sprites, UI parts or an icon set, wants to see how art looks in the inventory or the world, sends generated images to put in the game, or wants a style guide changed. Box models themselves (creatures, props) are built by blocky-model; this skill gives them their colors.
+description: Generate any art for the game from Ronald's style guides — item icons, block textures (cubes, plants, ores, crops, liquids, glass, workstations), animal and monster looks, UI parts, effects, sky — with ChatGPT through the Codex command line, then check it, cut it to exact pixels, show it on a page and put it in the game. Also the game's whole 32 px block set and its batches (notes/blocks: new trees, plants, crops and bushes with their stages, "the block prompt", a block that looks off next to the others, blocks seen in a test world). Use whenever Ronald says "generate/make/draw/redo <anything visual>", asks for new or redone icons, textures, sprites, UI parts or an icon set, wants to see how art looks in the inventory or the world, sends generated images to put in the game, or wants a style guide changed. Box models themselves (creatures, props) are built by blocky-model; this skill gives them their colors.
 ---
 
 # Game art: generate anything from the style guides
+
+**Changes**
+- 2026-11-05 (later): Ronald's guides 3, added the same way: new family notes for raw ores and
+  ingots (a stamped bar on the diagonal, matte fuel), gems (each gem its own form), seeds (scattered
+  grains), grass and moss (a fringe over the dirt's top edge), crop stages, thin blocks, wool and
+  big animals. The reference sheets are unchanged. Every guide set is archived in
+  `~/Coding/chiacraft-archive/references/style-guides/guides-<N>/`; `blocks.py` batches attach the
+  block sheets too.
+- 2026-11-05: Ronald's guides 2 are in (`~/Downloads/Game Art Style Guides 2`): every guide gains
+  "How each family looks" with a "Make it yours" line per family, the item guide gains set sheets
+  13-26, and the monster guide armour worn on the body. Our own additions (lessons, our facts, Part 4)
+  are kept. `art.py` now attaches the guide's reference sheet for the kind (items by what is drawn,
+  blocks by type, `--ref` to choose, `--no-ref` for the old way) after our key, and pastes that
+  family's notes into the prompt. Before: no sheet attached, only our key.
 
 One way for every kind of art. Ronald says what he wants ("generate a copper pickaxe", "redo the
 dirt texture", "make the wyvern's look"); Claude works out the kind, picks the guide, the type
@@ -21,18 +35,24 @@ patching a prompt in a script: every script reads the guides.
 |---|---|
 | `guides/0 Making it.md` | read first: which guide for what, facts about our game, how to prompt, check, cut and show |
 | `guides/1 Items/` | item icons, 32 × 32: master prompt (section A), material sheet (B), the reference image per kind of item, recipes for tricky objects (D) |
-| `guides/2 Blocks/` | block textures: how Minecraft-style textures work, the master prompt with one type line per texture kind, ramps, the full-pack checklist |
+| `guides/2 Blocks/` | block textures (and `Full set.md`: the whole 32 px set's pipeline in `notes/blocks/`, batches, cutting, the style key, the test world): how Minecraft-style textures work, the master prompt with one type line per texture kind, ramps, the full-pack checklist |
 | `guides/3 Model Blocks/` | blocks with their own shape (torch, lantern, door) |
 | `guides/4 Animals/` | animal looks; Part 4: our animals are box models, what carries over |
 | `guides/5 Monsters and Characters/` | as animals |
 | `guides/6 UI/` | UI parts (the kit below follows it) |
 | `guides/7 Effects/`, `guides/8 Sky/` | particles and effects; sun, moon, clouds |
 
-**Never attach other games' or texture packs' art to a generation, and keep "Minecraft" out of the
-prompt** (Ronald's rule; he finds Faithful too clean and wants our own style). The guides'
-reference images are cut from a resource pack: read them, don't attach them. `art.py` attaches
-our own style key, `Our key.png` in the guide's folder (approved sets of ours), and warns when a
-kind has none yet.
+**Attach our key first, then the guide's sheet for the kind, and make it ours** (Ronald's guides 2,
+11-05, replacing "never attach other packs' art"). `art.py` attaches our own style key, `Our key.png`
+in the guide's folder (approved sets of ours; it warns when a kind has none yet), then the guide's
+reference sheet for that kind (`--ref 01,13` by number, or picked from what is drawn or the block
+type), and puts the family's "How each family looks" notes with their "Make it yours" line into the
+prompt: the sheet shows how such things are built, our key decides the look, and no design is copied.
+Keep "Minecraft" out of the prompt (he finds Faithful too clean and wants our own style). The sheets
+are cut from a resource pack, so they stay out of git. Every guide set Ronald sends is kept whole
+in `~/Coding/chiacraft-archive/references/style-guides/guides-<N>/` (1, 2, 3 so far; copy a new one
+there before using it, Downloads gets cleaned), and a checkout without the sheets reads the set this
+skill holds from there (`art.py`'s `GUIDES_VERSION`; `GUIDE_REFS` overrides).
 
 **Never throw away a generated image** (Ronald, 2026-11-04: "never throw away generated images pls
 so I can also check back"). Every try, every candidate, every review sheet and every old texture an
@@ -87,7 +107,7 @@ red-brown line, a seam), not whether it is the thing asked for.
 | Kind | Made by | Into the game |
 |---|---|---|
 | Item icon | `art.py item` | `install item NAME --mod base|animals` (32 × 32, `mods/<mod>/assets/textures/item/`); a new item also needs its item definition and a lang key |
-| Block face | `art.py block` | `install block NAME` (32 × 32, decided 2026-11-03; the game's whole 32 px set and its batches are the `block-textures` skill's, `notes/blocks/`) |
+| Block face | `art.py block` | `install block NAME` (32 × 32, decided 2026-11-03; the game's whole 32 px set and its batches: `guides/2 Blocks/Full set.md`, `notes/blocks/`) |
 | Animal, monster | `art.py animal` (a concept sprite) | its colors, coat and face go to the box model (`blocky-model`: coat data, `house.MATERIALS`); never a sprite in the game |
 | UI part | the UI kit flow below | `mods/base/source/ui/` cutters, `install.py` |
 | Effect, sky | the guide's prompt by hand with `codex exec` | as the guide says |

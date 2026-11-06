@@ -8,6 +8,7 @@
 //! item's tooltip is one of these steps.
 
 pub mod combine;
+pub mod gems;
 pub mod grades;
 pub mod kinds;
 pub mod looks;

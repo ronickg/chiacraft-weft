@@ -97,7 +97,7 @@ pub fn merge_effects() -> bool {
 /// The `pack.cfg` the options were read from, when it was written, and the names in it.
 type OptionsRead = Option<(PathBuf, Option<std::time::SystemTime>, Vec<String>)>;
 
-/// The settings the chosen pack reads (`options = a, b, ...` in its `pack.cfg`, at most 16):
+/// The settings the chosen pack reads (`options = a, b, ...` in its `pack.cfg`, at most 32):
 /// their values reach every pack shader as `scene.options` (`Client::scene`), in that order, so a
 /// pack's look can be tuned in the game's settings and swept with `--config` without editing
 /// shaders. Read again when the file changes.
@@ -123,7 +123,7 @@ pub fn pack_options() -> Vec<String> {
                 .collect::<Vec<_>>()
         })
         .filter(|n| !n.is_empty())
-        .take(16)
+        .take(32)
         .collect();
     *CACHE.write().unwrap() = Some((dir, stamp, names.clone()));
     names
@@ -204,6 +204,20 @@ pub fn compose(
         }
     }
     crate::shaders::compose(name, &with_common(assets, name, &engine_source(assets, name)), parts)
+}
+
+/// `compose` with `CALM` true (`gpu_layout::CALM_ON`), when the pack's `name` uses it; None otherwise
+/// or when it fails (the plain pipelines then serve).
+pub fn compose_calm(assets: &Assets, name: &str, parts: &[(&crate::shaders::Hook, &[(String, String)])]) -> Option<Shader> {
+    let src = pack_source(name).filter(|s| s.contains("CALM"))?;
+    let calm = with_common(assets, name, &src).replacen(crate::gpu_layout::CALM_OFF, crate::gpu_layout::CALM_ON, 1);
+    match crate::shaders::compose(name, &calm, parts) {
+        Ok((s, _)) => Some(s),
+        Err(e) => {
+            log::error!("shader pack {name} (calm): {}", e.0);
+            None
+        }
+    }
 }
 
 pub(crate) fn open_folder(dir: &Path) {

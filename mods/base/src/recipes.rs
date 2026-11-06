@@ -60,23 +60,8 @@ pub fn register(r: &mut Registry) {
     r.shapeless(S, "#cooked_meat/{m}", 1, &["#raw_meat/{m}"], 200);
     r.shapeless(S, "#ingots/{m}", 1, &["#raw_ores/{m}"], 200);
 
-    // A `pickaxes/<m>` or `armor_chest/<m>` item is made from `materials/<m>`.
-    for (tool, pattern) in [
-        ("pickaxes", &["XXX", " # ", " # "][..]),
-        ("axes", &["XX", "X#", " #"]),
-        ("shovels", &["X", "#", "#"]),
-        ("hoes", &["XX", " #", " #"]),
-        ("swords", &["X", "X", "#"]),
-    ] {
-        r.shaped(C, &format!("#{tool}/{{m}}"), 1, pattern, &[('X', "#materials/{m}"), ('#', "#stick")]);
-    }
-    for (slot, pattern) in
-        crate::items::ARMOR_SLOTS
-            .iter()
-            .zip([&["XXX", "X X"][..], &["X X", "XXX", "XXX"], &["XXX", "X X", "X X"], &["X X", "X X"]])
-    {
-        r.shaped(C, &format!("#{slot}/{{m}}"), 1, pattern, &[('X', "#materials/{m}")]);
-    }
+    // Tools, weapons and armour have no recipe of their own: they're assembled from parts at the
+    // crafting table (`parts.rs`, Ronald 11-05: "a more modular approach").
 
     for (input, output, ticks) in
         [("#sand", "glass", 200), ("#cobblestone", "stone", 200), ("#logs", "coal", 200), ("#clay", "bricks", 200)]

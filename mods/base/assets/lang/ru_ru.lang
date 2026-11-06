@@ -17,6 +17,8 @@ block.base.grass = Дёрн
 block.base.snowy_grass = Заснеженный дёрн
 block.base.sand = Песок
 block.base.gravel = Гравий
+block.base.impact_glass = Импактное стекло
+block.base.suevite = Зювит
 block.base.clay = Глина
 block.base.bookshelf = Книжная полка
 block.base.hay_bale = Тюк сена
@@ -68,6 +70,15 @@ block.base.granite_iron_ore = Магнетит
 block.base.diamond_ore = Алмазная руда
 block.base.oak_log = Дубовое бревно
 block.base.stripped_oak_log = Окорённое дубовое бревно
+block.base.oak_branch = Дубовая ветка
+block.base.birch_branch = Берёзовая ветка
+block.base.acacia_branch = Акациевая ветка
+block.base.mesquite_branch = Ветка мескитового дерева
+block.base.dogwood_branch = Ветка кизила
+block.base.ipe_branch = Ветка ипе
+block.base.andiroba_branch = Ветка андиробы
+block.base.matamata_branch = Ветка матаматы
+block.base.brazil_nut_branch = Ветка бертоллеции
 block.base.stripped_birch_log = Окорённое берёзовое бревно
 block.base.birch_log = Берёзовое бревно
 block.base.stripped_spruce_log = Окорённое еловое бревно
@@ -82,6 +93,10 @@ block.base.water = Вода
 block.base.lava = Лава
 block.base.tall_grass = Трава
 block.base.grazed_grass = Объеденная трава
+block.base.dung_pat = Лепёшка навоза
+block.base.foxfire = Гнилушка
+block.base.glow_mycena = Светящаяся мицена
+block.base.goblins_gold = Светящийся мох
 block.base.compost_bin = Компостный ящик
 item.base.compost = Компост
 item.base.dung = Навоз
@@ -150,47 +165,6 @@ item.base.cooked_egg = Яичница
 item.base.apple_pie = Яблочный пирог
 item.base.berries = Ягоды
 item.base.book = Книга
-item.base.wood_pickaxe = Деревянная кирка
-item.base.wood_axe = Деревянный топор
-item.base.wood_shovel = Деревянная лопата
-item.base.wood_hoe = Деревянная мотыга
-item.base.wood_sword = Деревянный меч
-item.base.stone_pickaxe = Каменная кирка
-item.base.stone_axe = Каменный топор
-item.base.stone_shovel = Каменная лопата
-item.base.stone_hoe = Каменная мотыга
-item.base.stone_sword = Каменный меч
-item.base.iron_pickaxe = Железная кирка
-item.base.iron_axe = Железный топор
-item.base.iron_shovel = Железная лопата
-item.base.iron_hoe = Железная мотыга
-item.base.iron_sword = Железный меч
-item.base.gold_pickaxe = Золотая кирка
-item.base.gold_axe = Золотой топор
-item.base.gold_shovel = Золотая лопата
-item.base.gold_hoe = Золотая мотыга
-item.base.gold_sword = Золотой меч
-item.base.diamond_pickaxe = Алмазная кирка
-item.base.diamond_axe = Алмазный топор
-item.base.diamond_shovel = Алмазная лопата
-item.base.diamond_hoe = Алмазная мотыга
-item.base.diamond_sword = Алмазный меч
-item.base.leather_helmet = Кожаный шлем
-item.base.leather_chestplate = Кожаная кираса
-item.base.leather_leggings = Кожаные поножи
-item.base.leather_boots = Кожаные ботинки
-item.base.iron_helmet = Железный шлем
-item.base.iron_chestplate = Железная кираса
-item.base.iron_leggings = Железные поножи
-item.base.iron_boots = Железные ботинки
-item.base.gold_helmet = Золотой шлем
-item.base.gold_chestplate = Золотая кираса
-item.base.gold_leggings = Золотые поножи
-item.base.gold_boots = Золотые ботинки
-item.base.diamond_helmet = Алмазный шлем
-item.base.diamond_chestplate = Алмазная кираса
-item.base.diamond_leggings = Алмазные поножи
-item.base.diamond_boots = Алмазные ботинки
 item.base.arrow = Стрела
 item.base.chicken = Сырая курица
 item.base.cooked_chicken = Жареная курица
@@ -223,6 +197,9 @@ command.base.season = сейчас день {1}: {0}
 command.base.rain.today = дождь здесь сегодня с {0}:00 до {1}:00; здесь дождь идёт в {2}% дней этого сезона
 command.base.growth = здесь сегодня в среднем {0} °C, почва влажная на {1}%: пшеница растёт на {2}% от лучшего
 command.base.growth_farmland = здесь сегодня в среднем {0} °C, почва влажная на {1}%; плодородие пашни {3} из {4}: пшеница растёт на {2}% от лучшего
+command.base.litter = на земле в пределах {0} блоков: {1}
+command.base.fireflies = светлячков здесь сейчас: {0}% от числа в настройке ({1}; воздух {2} °C, средняя за день {3} °C, почва влажная на {4}%; {5} ч, закат в {6} ч) — у вас {7}%
+command.base.windleaf = над вами сорвался лист
 command.base.rain.dry = сегодня здесь без дождя; здесь дождь идёт в {0}% дней этого сезона
 command.base.air.now = воздух здесь {4} °C, туман {0}%, ветер {1} м/с дует на {2}°; туман здесь в {3}% дней этого сезона
 command.base.air.set = туман {0}% и ветер {1} м/с везде на десять минут
@@ -456,6 +433,12 @@ block.base.stripped_ipe_log = Окорённое бревно ипе
 block.base.ipe_planks = Доски ипе
 block.base.ipe_leaves = Листва ипе
 block.base.ipe_sapling = Саженец ипе
+block.base.cherry_branch = Ветка черешни
+block.base.cherry_sapling = Саженец черешни
+block.base.cherry_leaves = Листва черешни
+block.base.cherry_planks = Доски черешни
+block.base.stripped_cherry_log = Окорённое бревно черешни
+block.base.cherry_log = Бревно черешни
 block.base.brazil_nut_buttress = Корень-подпорка бертоллеции
 block.base.bromeliad = Бромелия
 block.base.deep_leaf_litter = Толстая лесная подстилка
@@ -494,6 +477,7 @@ item.base.bananas = Бананы
 item.base.andiroba_seed = Семя андиробы
 item.base.matamata_fruit = Плод матаматы
 item.base.ipe_seed = Семя ипе
+item.base.cherry = Дикая черешня
 item.base.acuri_nut = Орех акури
 item.base.moriche_fruit = Плод морише
 
@@ -563,6 +547,8 @@ hud.element.base.effects = Эффекты
 hud.base.resting = {#c2ac88}Отдых у огня: {0} с{/}
 hud.base.comfort = {#c2ac88}Комфорт {0}{/}
 hud.element.base.temperature = Температура
+hud.element.base.climb_stamina = Выносливость при лазании
+hud.element.base.glider_frame = Планер над головой
 hud.base.outside = {#c6a383}воздух{/} {0}°C
 hud.base.feels.freezing = {img:base:temp_freezing 12x12}
 hud.base.feels.cold = {img:base:temp_cold 12x12}
@@ -694,6 +680,14 @@ advancement.base.preserved = Про запас
 advancement.base.preserved.desc = Заготовьте еду впрок
 advancement.base.tame = Друг
 advancement.base.tame.desc = Приручите животное
+advancement.base.red_night = Красная ночь
+advancement.base.red_night.desc = Переживите кровавую луну до конца, ни разу не погибнув
+advancement.base.starfall = Звездопад
+advancement.base.starfall.desc = Держите в руках железо упавшей звезды
+advancement.base.wish_upon = Загадай желание
+advancement.base.wish_upon.desc = Будьте под открытым небом в пик звездопада
+advancement.base.sky_on_fire = Небо в огне
+advancement.base.sky_on_fire.desc = Увидьте полярную бурю под открытым небом
 
 # Откуда что берётся (подсказки к предметам)
 menu.base.campfire = Костёр
@@ -841,18 +835,31 @@ item.base.wool_cloak = Шерстяной плащ
 item.base.fur_robe = Меховая накидка
 item.base.rain_cape = Кожаная накидка от дождя
 item.base.rain_cape.tooltip = Под ней дождь вас не мочит.
+item.base.glider = Кожаный планер
+item.base.glider.tooltip = Прыгните в падении, чтобы раскрыть, и ещё раз, чтобы сложить. По ветру летит дальше.
+item.base.grappling_hook = Кошка
+item.base.grappling_hook.tooltip = Бросьте её действием: она цепляется за твёрдый блок. Прыжок подтягивает по верёвке, присед спускает, повторное действие отпускает.
 death.base.dropped = Надгробию негде было встать: ваши вещи упали там, где вы погибли.
 item.base.wool_cloak.tooltip = Носится поверх одежды и доспехов. Мокрым почти не теряет тепла.
 item.base.fur_robe.tooltip = Носится поверх одежды и доспехов: самая тёплая накидка, летом в ней жарко.
 video.base.open = Графика и качество
 video.base.title = Графика и качество
 video.base.quality = Качество
+video.base.preset.phone = Телефон
 video.base.preset.low = Низкое
 video.base.preset.medium = Среднее
 video.base.preset.high = Высокое
 video.base.preset.ultra = Ультра
 video.base.preset.custom = Своё
 video.base.now = {#c6a383}Сейчас:{/} {0}
+video.base.detected.preset = {#c6a383}Определено:{/} {0} ({1}): качество «{2}»
+video.base.detected.half = {#c6a383}Определено:{/} {0} ({1}): качество «{2}», масштаб рендера 50%
+video.base.detected.gpu = {#c6a383}Видеокарта:{/} {0} ({1})
+video.base.gpu.unknown = тип неизвестен
+video.base.gpu.integrated = встроенная
+video.base.gpu.discrete = дискретная
+video.base.gpu.other = виртуальная или процессор
+video.base.detect = Выбрать по видеокарте
 video.base.less = ‹
 video.base.more = ›
 video.base.value.number = {0}
@@ -883,7 +890,7 @@ video.base.volume.what = Солнечные лучи и дымка, освещё
 video.base.shafts = Лучи света
 video.base.shafts.what = Солнечные лучи сквозь деревья и дымку
 video.base.bloom = Свечение
-video.base.bloom.what = Мягкий ореол вокруг яркого света
+video.base.bloom.what = Ореол вокруг яркого света: мягкий или сказочный (сияние и дымка)
 video.base.view = Дальность прорисовки
 video.base.view.what = Кубы мира, нарисованные полностью: самое дорогое после масштаба
 video.base.lod = Дальний ландшафт
@@ -893,6 +900,50 @@ video.base.vsync.what = Кадры в такт экрану: без разрыв
 video.base.fps_cap = Предел кадров
 video.base.fps_cap.what = Не больше кадров в секунду: тише и прохладнее
 video.base.value.auto = Авто
+video.base.fantasy.title = Фэнтези
+video.base.fantasy = Фэнтези
+video.base.fantasy.off = Выкл.
+video.base.fantasy.subtle = Слегка
+video.base.fantasy.storybook = Сказка
+video.base.fantasy.custom = Своё
+video.base.value.soft = Мягкое
+video.base.value.dreamy = Сказочное
+video.base.value.few = Немного
+video.base.value.many = Много
+video.base.value.ultra = Ультра
+video.base.value.subtle = Слегка
+video.base.value.vivid = Ярко
+video.base.value.looks_only = Только вид
+video.base.value.moon_1 = 1×
+video.base.value.moon_15 = 1,5×
+video.base.value.moon_2 = 2×
+video.base.fireflies = Светлячки
+video.base.fireflies.what = Светлячки летними ночами
+video.base.motes = Пылинки
+video.base.motes.what = Пылинки и пыльца в солнечных лучах
+video.base.wind_life = Жизнь ветра
+video.base.wind_life.what = Листья, лепестки, пыльца, снег и песок, несомые ветром
+video.base.storybook = Сказочный свет
+video.base.storybook.what = Лиловые сумерки, синий час, серебряная луна
+video.base.night_sky = Ночное небо
+video.base.night_sky.what = Цвет туманностей и сколько звёзд
+video.base.shooting_stars = Падающие звёзды
+video.base.shooting_stars.what = Звёзды, падающие ночью
+video.base.moon_size = Размер луны
+video.base.moon_size.what = Насколько большой видна луна
+video.base.glow = Светимость
+video.base.glow.what = Насколько ярко ночью светятся растения, кристаллы и вкрапления руды
+biome.base.old_growth_forest = Вековой лес
+video.base.biome_air = Воздух местности
+video.base.biome_air.what = Туман, дымка и оттенки света по местности и времени года
+video.base.sky_events = Небесные события
+video.base.sky_events.what = Звездопады, кровавые луны, полярные бури; «только вид» — без их действия в игре
+video.base.sparkle = Блеск
+video.base.sparkle.what = Блики на снегу, песке и воде
+video.base.clouds = Облака
+video.base.clouds.what = Облака блоками или мягкие, клубящиеся
+video.base.value.blocky = Блоками
+video.base.value.clouds_soft = Мягкие
 
 # Ремёсла, которые ждут (crafts.rs, vitals::crafts)
 block.base.tanning_frame = Рама для выделки
@@ -904,6 +955,20 @@ menu.base.tanning_pit = Дубильная яма
 block.base.charcoal_clamp = Угольная куча
 block.base.charcoal_clamp.tooltip = Брёвна под землёй минут за пять обугливаются в уголь, без топлива.
 menu.base.charcoal_clamp = Угольная куча
+block.base.crucible = Тигель
+block.base.crucible.tooltip = Здесь медь сплавляется с оловом в бронзу: слиток бронзы за каждый слиток меди и олова, примерно за полминуты.
+menu.base.crucible = Тигель
+block.base.forge = Кузнечный горн
+block.base.forge.tooltip = Железо, прокалённое в угле, становится сталью: уголь на каждый слиток железа, меньше чем за минуту.
+menu.base.forge = Кузнечный горн
+block.base.copper_ore = Медная руда
+block.base.tin_ore = Оловянная руда
+item.base.raw_copper = Сырая медь
+item.base.raw_tin = Сырое олово
+item.base.copper_ingot = Медный слиток
+item.base.tin_ingot = Оловянный слиток
+item.base.bronze_ingot = Бронзовый слиток
+item.base.steel_ingot = Стальной слиток
 item.base.hide = Сырая шкура
 item.base.hide.tooltip = С коров, оленей и капибар. Выделайте её на раме или в дубильной яме.
 item.base.sole_leather = Подошвенная кожа
@@ -1027,6 +1092,10 @@ material.base.diamond = Алмаз
 material.base.copper = Медь
 material.base.bronze = Бронза
 material.base.wrought_iron = Кричное железо
+material.base.meteoric_iron = Метеоритное железо
+material.base.star_steel = Звёздная сталь
+material.base.tektite = Тектит
+trait.base.patterned = Узорчатая
 material.base.steel = Сталь
 material.base.gold = Золото
 material.base.oak = Дуб
@@ -1036,6 +1105,7 @@ material.base.cacao = Какао
 material.base.andiroba = Андироба
 material.base.matamata = Матамата
 material.base.ipe = Ипе
+material.base.cherry = Черешня
 material.base.birch = Берёза
 material.base.spruce = Ель
 material.base.plant_cordage = Растительная верёвка
@@ -1069,6 +1139,46 @@ command.base.inspect.part = {0}: {1}, {2}, сделано в день {3}, чи�
 command.base.inspect.tool = {0}: {1}, собрано из {2} деталей
 command.base.inspect.tool_part =   {0}: {1}, {2}, сделано в день {3}, чинилось {4}×
 command.base.inspect.plain = Не собрано из деталей
+command.base.inspect.gems =   Камни: {0} из {1} гнёзд
+command.base.inspect.gem =     {0}, уровень предмета {1}: +{2}% всего
+item.base.part_helmet_shell = Основа шлема
+item.base.part_chest_shell = Основа нагрудника
+item.base.part_leg_shell = Основа поножей
+item.base.part_boot_shell = Основа сапог
+item.base.part_straps = Ремни и заклёпки
+item.base.part_lining = Подклад
+item.base.helmet = Шлем
+item.base.helmet_mail = Шлем
+item.base.helmet_scale = Шлем
+item.base.helmet_gem = Шлем
+item.base.chestplate = Нагрудник
+item.base.chestplate_mail = Нагрудник
+item.base.chestplate_scale = Нагрудник
+item.base.chestplate_gem = Нагрудник
+item.base.leggings = Поножи
+item.base.leggings_mail = Поножи
+item.base.leggings_scale = Поножи
+item.base.leggings_gem = Поножи
+item.base.boots = Сапоги
+item.base.boots_mail = Сапоги
+item.base.boots_scale = Сапоги
+item.base.boots_gem = Сапоги
+material.base.linen = Лён
+material.base.wool = Шерсть
+material.base.fur = Мех
+command.base.gear.made = Собрано: {0}
+command.base.gear.cant = Эти детали не собираются в {0}: сначала назовите материал рабочей детали, затем остальные по порядку слотов (материал, который не может быть этой деталью, ничего не даёт)
+tagged.base.gem = {#c6a383}Уровень предмета {value.level}{/}{if:value.f0==0}\n{#9ad7ff}+{value.p0} % урон в ближнем бою{/}{/if}{if:value.f0==1}\n{#9ad7ff}+{value.p0} % урон издалека{/}{/if}{if:value.f0==3}\n{#9ad7ff}+{value.p0} % защита{/}{/if}{if:value.f0==4}\n{#9ad7ff}+{value.p0} % здоровье{/}{/if}{if:value.f0==8}\n{#9ad7ff}+{value.p0} % скорость сбора{/}{/if}{if:value.f0==9}\n{#9ad7ff}+{value.p0} % скорость добычи{/}{/if}{if:value.f1==0}\n{#9ad7ff}+{value.p1} % урон в ближнем бою{/}{/if}{if:value.f1==1}\n{#9ad7ff}+{value.p1} % урон издалека{/}{/if}{if:value.f1==3}\n{#9ad7ff}+{value.p1} % защита{/}{/if}{if:value.f1==4}\n{#9ad7ff}+{value.p1} % здоровье{/}{/if}{if:value.f1==8}\n{#9ad7ff}+{value.p1} % скорость сбора{/}{/if}{if:value.f1==9}\n{#9ad7ff}+{value.p1} % скорость добычи{/}{/if}{if:value.f2==0}\n{#9ad7ff}+{value.p2} % урон в ближнем бою{/}{/if}{if:value.f2==1}\n{#9ad7ff}+{value.p2} % урон издалека{/}{/if}{if:value.f2==3}\n{#9ad7ff}+{value.p2} % защита{/}{/if}{if:value.f2==4}\n{#9ad7ff}+{value.p2} % здоровье{/}{/if}{if:value.f2==8}\n{#9ad7ff}+{value.p2} % скорость сбора{/}{/if}{if:value.f2==9}\n{#9ad7ff}+{value.p2} % скорость добычи{/}{/if}
+tagged.base.gems = {if:value.sockets>0}{#9ad7ff}Камни: {value.n} из {value.sockets} гнёзд{/}{/if}
+item.base.gem_diamond = Огранённый алмаз
+item.base.gem_peridot = Огранённый перидот
+item.base.gem_tektite = Огранённый тектит
+item.base.gem_amber = Янтарный кабошон
+gem.base.diamond = Алмаз
+gem.base.peridot = Перидот
+gem.base.tektite = Тектит
+gem.base.amber = Янтарь
+gem.base.cracked = Камень треснул при извлечении: {0}
 command.base.skills.line = {0}: уровень {1} (опыт {2})
 grade.base.crude = Грубое
 grade.base.rough = Неровное
@@ -1083,10 +1193,29 @@ grade.base.legendary = Легендарное
 
 # The first hours (first.rs, notes/FIRST_HOURS.md)
 block.base.loose_rock = Лежащая галька
+block.base.meteorite = Метеорит
+block.base.star_steel_ore = Руда звёздной стали
+block.base.pallasite = Палласит
+block.base.loose_tektite = Россыпь тектита
+block.base.star_lantern = Звёздный фонарь
 block.base.loose_flint = Желвак кремня
 block.base.fallen_branch = Упавшая ветка
 item.base.rock = Галька
 item.base.rock.tooltip = Лежит на земле. Отбойник: ударьте им по кремню на земле, чтобы отбить острый отщеп.
+item.base.meteoric_iron = Метеоритное железо
+item.base.meteoric_iron.tooltip = Железо с никелем из упавшей звезды. Его куют холодным в насадки не хуже железных ещё до плавки.
+item.base.eclipse_ash = Пепел затмения
+item.base.eclipse_ash.tooltip = Остаётся там, где пало чудовище кровавой луны. Красно-чёрная краска.
+item.base.star_steel_lump = Кусок звёздной стали
+item.base.star_steel_lump.tooltip = Железо с никелем из ядра упавшей звезды. Переплавьте в слитки.
+item.base.star_steel_ingot = Слиток звёздной стали
+item.base.star_steel_ingot.tooltip = В нём видны травлёные пластины. Орудия из него — между сталью и алмазом.
+item.base.peridot = Перидот
+item.base.peridot.tooltip = Оливково-зелёный самоцвет из палласита.
+item.base.tektite = Тектит
+item.base.tektite.tooltip = Земля, расплавленная упавшей звездой и выброшенная прочь. Острая как бритва кромка.
+item.base.starheart = Звёздное сердце
+item.base.starheart.tooltip = Осколок звёздного ядра, что никогда не остывает. Его свет холоден: он ничего не греет.
 item.base.flint = Желвак кремня
 item.base.flint.tooltip = Лежит на земле, чаще на гравии и склонах. Положите его и бейте галькой — отщепы, а крадучись — оббивка насадки.
 item.base.sharp_flake = Острый отщеп
@@ -1095,6 +1224,32 @@ material.base.branch = Ветка
 hint.base.knap = Положите кремень и ударьте по нему галькой ({key:core:use}) — получится острый отщеп. Крадучись можно оббить насадку.
 hint.base.flake = Острым отщепом срезают траву на волокно. Из двух волокон скручивается нить.
 hint.base.lash = Привяжите насадку к палке двумя нитями в сетке инвентаря ({key:core:inventory}). Отщеп на палке с одной нитью — нож.
+hint.base.tree = Топор валит дерево: рубите ствол (что ниже зарубки, остаётся пнём), а упавший ствол разрубите там, где он лежит. Ближайшее дерево: x {0}, z {1}.
+hint.base.tree_far = Топор валит дерево: рубите ствол (что ниже зарубки, остаётся пнём), а упавший ствол разрубите там, где он лежит. Рядом деревьев нет — ищите лес.
+hint.base.knapping_book = Оббиваете по памяти: {0} с на насадку. Держите кремень в сумке.
+hint.base.blood_moon = Сегодня полная луна взойдёт тёмно-красной. Под ней чудовища смелеют: держитесь у огня.
+hint.base.blood_moon_gentle = Сегодня полная луна взойдёт тёмно-красной: затмение, стоит не ложиться.
+hint.base.meteor_shower = Небо сегодня неспокойно: после полуночи будут падать звёзды.
+hint.base.aurora_storm = Сегодня север светится.
+config.base.sky_impacts = Падения больших метеоритов
+config.base.sky_impacts.tooltip = Примерно трижды за игровой год звезда падает вдали от всех и от всего построенного: кратер с редкими находками. «Только вид»: след и грохот, без кратера.
+config.base.sky_impacts.off = Выкл.
+config.base.sky_impacts.looks = Только вид
+config.base.sky_impacts.on = Вкл.
+hint.base.star_fell = Упала звезда, {0} {1}.
+hint.base.star_sea = Звезда упала в море, далеко отсюда.
+hud.base.fallen_star = {#c6a383}Упавшая звезда:{/} {0} м, {1}
+events.base.band.near = недалеко
+events.base.band.far = далеко
+events.base.band.very_far = очень далеко
+events.base.dir.north = на севере
+events.base.dir.north_east = на северо-востоке
+events.base.dir.east = на востоке
+events.base.dir.south_east = на юго-востоке
+events.base.dir.south = на юге
+events.base.dir.south_west = на юго-западе
+events.base.dir.west = на западе
+events.base.dir.north_west = на северо-западе
 knapping.base.title = Оббивка
 knapping.base.how = Отбейте кремень за контуром насадки. Удар внутри контура раскалывает желвак.
 knapping.base.keep_tip = Часть насадки: удар здесь расколет желвак
@@ -1109,3 +1264,349 @@ item.base.hand_drill.tooltip = Две палки, вращаемые ладон�
 block.base.campfire_laid = Сложенный костёр
 block.base.campfire_laid.tooltip = Два бревна и две палки, ещё не зажжён. Держите на нём лучковое или ручное сверло, чтобы добыть уголёк.
 command.base.knap.no_room = Здесь нет места для желвака: встаньте на открытое место.
+command.base.impact.started = Падает метеорит: кратер радиусом {0} у {1} {2}, {3} столбцов за {4} тиков
+command.base.impact.no_ground = Нет загруженной земли для удара у {0} {1}
+
+# Навыки и сеть умений (skills.rs, web.rs; vitals::skills, vitals::perks)
+key.base.web = Навыки
+web.base.title = Навыки
+web.base.tab = Навыки
+web.base.keys = {#c6a383}WASD{/} сдвиг · {#c6a383}Z X{/} масштаб · {#c6a383}C{/} центр
+web.base.zoom_out = -
+web.base.zoom_out_tip = Отдалить (Z)
+web.base.zoom_in = +
+web.base.zoom_in_tip = Приблизить (X)
+web.base.centre = Центр
+web.base.centre_tip = Назад к началу (C)
+web.base.points = Очков умений: {0}
+web.base.refund_on = Забывание: осталось {0}
+web.base.refund_off = Забыть (осталось {0})
+web.base.refund_tip = Нажмите на взятый узел, чтобы вернуть его.
+    Только тот, на котором не держатся другие.
+web.base.skill_tip = {color:title}{0}{/}
+    {color:dim}Растёт: {1}.{/}
+    {color:dim}Нажмите, чтобы увидеть область.{/}
+web.base.level = {0}
+web.base.by.later = пока ничем: придёт с заклинаниями, машинами или торговцами
+web.base.state.taken = {#7fdc6a}Взято{/}
+web.base.state.open = {#ffbe45}Нажмите, чтобы взять (1 очко){/}
+web.base.state.waiting = {#c6a383}Не хватает очков умений: каждый уровень даёт одно{/}
+web.base.state.far = {#6b6f86}Сначала возьмите соседний узел{/}
+web.base.state.locked = {#e8907a}Навык слишком низок{/}
+web.base.tip.start = {color:title}Начало{/}
+    {color:dim}Все начинают здесь.{/}
+    {color:dim}Растите к навыкам,{/}
+    {color:dim}которыми пользуетесь.{/}
+web.base.tip.1 = {color:title}{0}{/}
+    {1} {2}
+    {3}
+web.base.tip.2 = {color:title}{0}{/}
+    {1} {2}
+    {3} {4}
+    {5}
+web.base.tip.1n = {color:title}{0}{/}
+    {1} {2}
+    {color:dim}Нужно: {3} {4} (у вас {5}){/}
+    {6}
+web.base.tip.2n = {color:title}{0}{/}
+    {1} {2}
+    {3} {4}
+    {color:dim}Нужно: {5} {6} (у вас {7}){/}
+    {8}
+web.base.tip.1b = {color:title}{0}{/}
+    {1} {2}
+    {color:dim}Нужно: {3} и {4} {5} (у вас {6}){/}
+    {7}
+web.base.tip.2b = {color:title}{0}{/}
+    {1} {2}
+    {3} {4}
+    {color:dim}Нужно: {5} и {6} {7} (у вас {8}){/}
+    {9}
+web.base.tip.1s = {color:title}{0}{/}
+    {1} {2}
+    {3}
+    {4}
+web.base.tip.1sn = {color:title}{0}{/}
+    {1} {2}
+    {3}
+    {color:dim}Нужно: {4} {5} (у вас {6}){/}
+    {7}
+web.base.unlearn = Можно забыть узлов: {0}. Откройте навыки ({key:base:web})
+web.base.no_points = Нет очков умений: следующий уровень даст одно
+web.base.too_low = Навык слишком низок для этого узла
+web.base.not_next = Сначала возьмите соседний узел
+web.base.no_refunds = Сначала используйте камень забвения
+web.base.holds_others = На этом узле держатся другие
+web.base.skill_up = {0}: уровень {1}
+command.base.skill = {0}; очков умений {1}, возвратов {2}
+command.base.skill.unknown = Нет навыка {0}
+item.base.unlearning_stone = Камень забвения
+item.base.unlearning_stone.tooltip = Используйте, чтобы вернуть до 3 узлов сети навыков.
+perk.base.special.ley_sight = {#9ad7ff}Показывает лей-линии без лозы{/}
+web.base.skill.melee = Ближний бой
+web.base.by.melee = удары по существам вблизи
+web.base.skill.archery = Стрельба и метание
+web.base.by.archery = попадания издалека
+web.base.skill.defence = Защита
+web.base.by.defence = удары от существ
+web.base.skill.smithing = Кузнечество и мастерство
+web.base.by.smithing = изготовление инструментов, оружия, брони и деталей; плавка
+web.base.skill.engineering = Инженерия
+web.base.skill.mining = Горное дело
+web.base.by.mining = добыча камня и руды
+web.base.skill.building = Стройка и земледелие
+web.base.by.building = установка блоков; посев и сбор урожая
+web.base.skill.alchemy = Алхимия и готовка
+web.base.by.alchemy = готовка на костре или в котле
+web.base.skill.runecraft = Руны и зачарование
+web.base.skill.destruction = Разрушение
+web.base.skill.restoration = Восстановление
+web.base.skill.conjuring = Призыв и обереги
+web.base.skill.taming = Приручение и езда
+web.base.by.taming = приручение и езда на животных
+web.base.skill.survival = Выживание
+web.base.by.survival = рубка деревьев; изготовление обычных вещей
+web.base.skill.exploring = Исследование и картография
+web.base.by.exploring = открытие новых биомов и измерений
+web.base.skill.trading = Торговля
+perk.base.family.melee_damage = урон в ближнем бою
+perk.base.family.ranged_damage = урон издалека
+perk.base.family.spell_damage = урон заклинаний
+perk.base.family.defence = защита
+perk.base.family.health = здоровье
+perk.base.family.tame_damage = урон прирученных
+perk.base.family.taming_speed = скорость приручения
+perk.base.family.craft_grade = качество ремесла
+perk.base.family.gather_speed = скорость сбора
+perk.base.family.mine_speed = скорость добычи
+perk.base.family.move_speed = скорость движения
+perk.base.family.mana_cost = расход маны
+perk.base.family.stamina = выносливость
+perk.base.family.hunger = медленный голод
+perk.base.family.cooking = готовка
+perk.base.family.harvest = урожай
+perk.base.family.ride_speed = скорость езды
+perk.base.family.trade = торговля
+perk.base.family.smelting = скорость плавки
+perk.base.family.machine_speed = скорость машин
+perk.base.melee.heavy_blows = Тяжёлые удары
+perk.base.melee.second_wind = Второе дыхание
+perk.base.melee.executioner = Палач
+perk.base.melee.battle_rhythm = Ритм боя
+perk.base.melee.berserker = Берсерк
+perk.base.bridge.weapon_master = Мастер оружия
+perk.base.archery.steady_aim = Твёрдая рука
+perk.base.archery.light_feet = Лёгкий шаг
+perk.base.archery.piercing_shot = Пронзающий выстрел
+perk.base.archery.skirmisher = Застрельщик
+perk.base.archery.glass_arrow = Стеклянная стрела
+perk.base.bridge.shield_archer = Лучник со щитом
+perk.base.defence.thick_hide = Толстая шкура
+perk.base.defence.hardy = Выносливый
+perk.base.defence.shield_wall = Стена щитов
+perk.base.defence.unbroken = Несломленный
+perk.base.defence.iron_wall = Железная стена
+perk.base.bridge.armourer = Бронник
+perk.base.smithing.keen_eye = Зоркий глаз
+perk.base.smithing.bellows = Мехи
+perk.base.smithing.masters_touch = Рука мастера
+perk.base.smithing.hot_forge = Жаркий горн
+perk.base.smithing.forge_bound = Прикованный к горну
+perk.base.bridge.machine_forged = Машинная ковка
+perk.base.engineering.gearwright = Шестерёнщик
+perk.base.engineering.steady_fire = Ровный огонь
+perk.base.engineering.clockwork = Часовой механизм
+perk.base.engineering.pressure = Давление
+perk.base.engineering.overclock = Разгон
+perk.base.bridge.steam_drill = Паровой бур
+perk.base.mining.stonecutter = Камнерез
+perk.base.mining.strong_back = Крепкая спина
+perk.base.mining.vein_sense = Чутьё жилы
+perk.base.mining.tireless = Неутомимый
+perk.base.mining.tunnel_rat = Туннельная крыса
+perk.base.bridge.quarry_master = Хозяин каменоломни
+perk.base.building.green_thumb = Зелёные руки
+perk.base.building.quick_hands = Ловкие руки
+perk.base.building.bountiful = Щедрый урожай
+perk.base.building.builders_eye = Глаз строителя
+perk.base.building.homesteader = Поселенец
+perk.base.bridge.kitchen_garden = Огород
+perk.base.alchemy.hearty_meals = Сытная еда
+perk.base.alchemy.iron_stomach = Железный желудок
+perk.base.alchemy.fine_cook = Искусный повар
+perk.base.alchemy.lean_living = Скромная жизнь
+perk.base.alchemy.feaster = Пирующий
+perk.base.bridge.infuser = Настойщик
+perk.base.runecraft.ley_sight = Лей-зрение
+perk.base.runecraft.rune_carver = Резчик рун
+perk.base.runecraft.deep_runes = Глубокие руны
+perk.base.runecraft.glyph_weaver = Ткач глифов
+perk.base.runecraft.rune_bound = Связанный рунами
+perk.base.bridge.charged_runes = Заряженные руны
+perk.base.destruction.kindling = Растопка
+perk.base.destruction.focus = Сосредоточение
+perk.base.destruction.storm_call = Зов бури
+perk.base.destruction.overflow = Переполнение
+perk.base.destruction.ley_burn = Лей-ожог
+perk.base.bridge.balance = Равновесие
+perk.base.restoration.mending = Исцеление
+perk.base.restoration.calm_mind = Спокойный ум
+perk.base.restoration.renewal = Обновление
+perk.base.restoration.wellspring = Источник
+perk.base.restoration.lifeblood = Кровь жизни
+perk.base.bridge.warding_light = Оберегающий свет
+perk.base.conjuring.bound_spirit = Связанный дух
+perk.base.conjuring.ward = Оберег
+perk.base.conjuring.greater_summons = Великий призыв
+perk.base.conjuring.bastion = Бастион
+perk.base.conjuring.warden = Страж
+perk.base.bridge.rune_collars = Рунные ошейники
+perk.base.taming.gentle_hand = Мягкая рука
+perk.base.taming.saddle_sense = Чувство седла
+perk.base.taming.pack_leader = Вожак стаи
+perk.base.taming.swift_mount = Быстрый скакун
+perk.base.taming.beastmaster = Повелитель зверей
+perk.base.bridge.tracker = Следопыт
+perk.base.survival.woodsman = Лесоруб
+perk.base.survival.weathered = Закалённый
+perk.base.survival.forager = Собиратель
+perk.base.survival.hard_to_kill = Живучий
+perk.base.survival.wild_born = Рождённый в глуши
+perk.base.bridge.pathfinder = Первопроходец
+perk.base.exploring.long_stride = Широкий шаг
+perk.base.exploring.wayfarer = Странник
+perk.base.exploring.pathless = Бездорожье
+perk.base.exploring.far_walker = Дальноход
+perk.base.exploring.wanderer = Скиталец
+perk.base.bridge.caravan = Караван
+perk.base.trading.haggler = Торгаш
+perk.base.trading.pack_train = Вьючный обоз
+perk.base.trading.merchant_prince = Князь купцов
+perk.base.trading.caravaneer = Караванщик
+perk.base.trading.silver_tongue = Серебряный язык
+perk.base.bridge.sellsword = Наёмник
+
+# Гнёзда сети и камни (vitals::sockets; skills.rs, web.rs)
+item.base.maunduk = Маундук (камень разума)
+item.base.maunduk.tooltip = Камень древних. Вставьте его в гнездо сети навыков ({key:base:web}).
+item.base.aruduk = Арудук (камень потока)
+item.base.aruduk.tooltip = Камень древних: действует на малые узлы вокруг своего гнезда в сети навыков ({key:base:web}).
+item.base.remaru = Ремару, Страж потока
+item.base.remaru.tooltip = Реликвия древних. В сети навыков ({key:base:web}) показывает лей-линии и бережёт ману.
+item.base.emakaun = Эмакаун, Хранитель жизни
+item.base.emakaun.tooltip = Реликвия древних. В сети навыков ({key:base:web}) каждый взятый рядом узел даёт здоровье.
+tagged.base.stone = {#c6a383}Уровень предмета {value.level}{/}{if:value.f0==0}\n{#9ad7ff}+{value.p0} % урон в ближнем бою{/}{/if}{if:value.f0==1}\n{#9ad7ff}+{value.p0} % урон издалека{/}{/if}{if:value.f0==2}\n{#9ad7ff}+{value.p0} % урон заклинаний{/}{/if}{if:value.f0==3}\n{#9ad7ff}+{value.p0} % защита{/}{/if}{if:value.f0==4}\n{#9ad7ff}+{value.p0} % здоровье{/}{/if}{if:value.f0==5}\n{#9ad7ff}+{value.p0} % урон прирученных{/}{/if}{if:value.f0==6}\n{#9ad7ff}+{value.p0} % скорость приручения{/}{/if}{if:value.f0==7}\n{#9ad7ff}+{value.p0} % качество ремесла{/}{/if}{if:value.f0==8}\n{#9ad7ff}+{value.p0} % скорость сбора{/}{/if}{if:value.f0==9}\n{#9ad7ff}+{value.p0} % скорость добычи{/}{/if}{if:value.f0==10}\n{#9ad7ff}+{value.p0} % скорость движения{/}{/if}{if:value.f0==11}\n{#9ad7ff}+{value.p0} % расход маны{/}{/if}{if:value.f0==12}\n{#9ad7ff}+{value.p0} % выносливость{/}{/if}{if:value.f0==13}\n{#9ad7ff}+{value.p0} % медленный голод{/}{/if}{if:value.f0==14}\n{#9ad7ff}+{value.p0} % готовка{/}{/if}{if:value.f0==15}\n{#9ad7ff}+{value.p0} % урожай{/}{/if}{if:value.f0==16}\n{#9ad7ff}+{value.p0} % скорость езды{/}{/if}{if:value.f0==17}\n{#9ad7ff}+{value.p0} % торговля{/}{/if}{if:value.f0==18}\n{#9ad7ff}+{value.p0} % скорость плавки{/}{/if}{if:value.f0==19}\n{#9ad7ff}+{value.p0} % скорость машин{/}{/if}{if:value.f1==0}\n{#9ad7ff}+{value.p1} % урон в ближнем бою{/}{/if}{if:value.f1==1}\n{#9ad7ff}+{value.p1} % урон издалека{/}{/if}{if:value.f1==2}\n{#9ad7ff}+{value.p1} % урон заклинаний{/}{/if}{if:value.f1==3}\n{#9ad7ff}+{value.p1} % защита{/}{/if}{if:value.f1==4}\n{#9ad7ff}+{value.p1} % здоровье{/}{/if}{if:value.f1==5}\n{#9ad7ff}+{value.p1} % урон прирученных{/}{/if}{if:value.f1==6}\n{#9ad7ff}+{value.p1} % скорость приручения{/}{/if}{if:value.f1==7}\n{#9ad7ff}+{value.p1} % качество ремесла{/}{/if}{if:value.f1==8}\n{#9ad7ff}+{value.p1} % скорость сбора{/}{/if}{if:value.f1==9}\n{#9ad7ff}+{value.p1} % скорость добычи{/}{/if}{if:value.f1==10}\n{#9ad7ff}+{value.p1} % скорость движения{/}{/if}{if:value.f1==11}\n{#9ad7ff}+{value.p1} % расход маны{/}{/if}{if:value.f1==12}\n{#9ad7ff}+{value.p1} % выносливость{/}{/if}{if:value.f1==13}\n{#9ad7ff}+{value.p1} % медленный голод{/}{/if}{if:value.f1==14}\n{#9ad7ff}+{value.p1} % готовка{/}{/if}{if:value.f1==15}\n{#9ad7ff}+{value.p1} % урожай{/}{/if}{if:value.f1==16}\n{#9ad7ff}+{value.p1} % скорость езды{/}{/if}{if:value.f1==17}\n{#9ad7ff}+{value.p1} % торговля{/}{/if}{if:value.f1==18}\n{#9ad7ff}+{value.p1} % скорость плавки{/}{/if}{if:value.f1==19}\n{#9ad7ff}+{value.p1} % скорость машин{/}{/if}{if:value.f2==0}\n{#9ad7ff}+{value.p2} % урон в ближнем бою{/}{/if}{if:value.f2==1}\n{#9ad7ff}+{value.p2} % урон издалека{/}{/if}{if:value.f2==2}\n{#9ad7ff}+{value.p2} % урон заклинаний{/}{/if}{if:value.f2==3}\n{#9ad7ff}+{value.p2} % защита{/}{/if}{if:value.f2==4}\n{#9ad7ff}+{value.p2} % здоровье{/}{/if}{if:value.f2==5}\n{#9ad7ff}+{value.p2} % урон прирученных{/}{/if}{if:value.f2==6}\n{#9ad7ff}+{value.p2} % скорость приручения{/}{/if}{if:value.f2==7}\n{#9ad7ff}+{value.p2} % качество ремесла{/}{/if}{if:value.f2==8}\n{#9ad7ff}+{value.p2} % скорость сбора{/}{/if}{if:value.f2==9}\n{#9ad7ff}+{value.p2} % скорость добычи{/}{/if}{if:value.f2==10}\n{#9ad7ff}+{value.p2} % скорость движения{/}{/if}{if:value.f2==11}\n{#9ad7ff}+{value.p2} % расход маны{/}{/if}{if:value.f2==12}\n{#9ad7ff}+{value.p2} % выносливость{/}{/if}{if:value.f2==13}\n{#9ad7ff}+{value.p2} % медленный голод{/}{/if}{if:value.f2==14}\n{#9ad7ff}+{value.p2} % готовка{/}{/if}{if:value.f2==15}\n{#9ad7ff}+{value.p2} % урожай{/}{/if}{if:value.f2==16}\n{#9ad7ff}+{value.p2} % скорость езды{/}{/if}{if:value.f2==17}\n{#9ad7ff}+{value.p2} % торговля{/}{/if}{if:value.f2==18}\n{#9ad7ff}+{value.p2} % скорость плавки{/}{/if}{if:value.f2==19}\n{#9ad7ff}+{value.p2} % скорость машин{/}{/if}{if:value.flow==1}\n{#9ad7ff}+{value.sp} % к каждому малому узлу рядом с гнездом{/}{/if}{if:value.turn==0}\n{#9ad7ff}Малые узлы рядом с гнездом дают урон в ближнем бою{/}{/if}{if:value.turn==1}\n{#9ad7ff}Малые узлы рядом с гнездом дают урон издалека{/}{/if}{if:value.turn==2}\n{#9ad7ff}Малые узлы рядом с гнездом дают урон заклинаний{/}{/if}{if:value.turn==3}\n{#9ad7ff}Малые узлы рядом с гнездом дают защита{/}{/if}{if:value.turn==4}\n{#9ad7ff}Малые узлы рядом с гнездом дают здоровье{/}{/if}{if:value.turn==5}\n{#9ad7ff}Малые узлы рядом с гнездом дают урон прирученных{/}{/if}{if:value.turn==6}\n{#9ad7ff}Малые узлы рядом с гнездом дают скорость приручения{/}{/if}{if:value.turn==7}\n{#9ad7ff}Малые узлы рядом с гнездом дают качество ремесла{/}{/if}{if:value.turn==8}\n{#9ad7ff}Малые узлы рядом с гнездом дают скорость сбора{/}{/if}{if:value.turn==9}\n{#9ad7ff}Малые узлы рядом с гнездом дают скорость добычи{/}{/if}{if:value.turn==10}\n{#9ad7ff}Малые узлы рядом с гнездом дают скорость движения{/}{/if}{if:value.turn==11}\n{#9ad7ff}Малые узлы рядом с гнездом дают расход маны{/}{/if}{if:value.turn==12}\n{#9ad7ff}Малые узлы рядом с гнездом дают выносливость{/}{/if}{if:value.turn==13}\n{#9ad7ff}Малые узлы рядом с гнездом дают медленный голод{/}{/if}{if:value.turn==14}\n{#9ad7ff}Малые узлы рядом с гнездом дают готовка{/}{/if}{if:value.turn==15}\n{#9ad7ff}Малые узлы рядом с гнездом дают урожай{/}{/if}{if:value.turn==16}\n{#9ad7ff}Малые узлы рядом с гнездом дают скорость езды{/}{/if}{if:value.turn==17}\n{#9ad7ff}Малые узлы рядом с гнездом дают торговля{/}{/if}{if:value.turn==18}\n{#9ad7ff}Малые узлы рядом с гнездом дают скорость плавки{/}{/if}{if:value.turn==19}\n{#9ad7ff}Малые узлы рядом с гнездом дают скорость машин{/}{/if}
+web.base.tip.socket = {color:title}Гнездо{/}
+    {color:dim}Держит камень, найденный в мире:{/}
+    {color:dim}руины, боссы, лей-узлы,{/}
+    {color:dim}редкие звери, упавшие звёзды.{/}
+    {color:dim}Стоит {0} очка. Камни вынимаются{/}
+    {color:dim}и вставляются свободно.{/}
+    {1}
+web.base.tip.stone0 = {color:title}{0}{/} {color:dim}(уровень предмета {1}){/}
+    {color:dim}Нажмите, чтобы вынуть.{/}
+web.base.tip.stone1 = {color:title}{0}{/} {color:dim}(уровень предмета {1}){/}
+    {2} {3}
+    {color:dim}Нажмите, чтобы вынуть.{/}
+web.base.tip.stone2 = {color:title}{0}{/} {color:dim}(уровень предмета {1}){/}
+    {2} {3}
+    {4} {5}
+    {color:dim}Нажмите, чтобы вынуть.{/}
+web.base.tip.stone3 = {color:title}{0}{/} {color:dim}(уровень предмета {1}){/}
+    {2} {3}
+    {4} {5}
+    {6} {7}
+    {color:dim}Нажмите, чтобы вынуть.{/}
+web.base.stone.amplify = к каждому малому узлу рядом
+web.base.stone.remaru = {#9ad7ff}Показывает лей-линии без лозы{/}
+web.base.stone.emakaun = здоровья за каждый взятый рядом узел
+web.base.pick = Вставить камень:
+web.base.pick_none = Камней нет: их находят в руинах, у боссов,
+    в лей-узлах, у редких зверей и в упавших звёздах.
+web.base.pick_cancel = Отмена
+command.base.stone = {0}, уровень предмета {1}
+command.base.perk_show = сеть даёт: {0}
+item.base.dowsing_rod = Лоза лозоходца
+item.base.dowsing_rod.tooltip = Раздвоенная ветка с тектитом на конце. В руке она клонится к лей-линиям и слабо показывает их течение.
+block.base.ley_stone = Лей-камень
+block.base.ley_stone.tooltip = Вытесан звёздными древними, проложившими лей-линии.
+block.base.waystone = Спящий путевой камень
+block.base.waystone.tooltip = Древний камень на большом перекрёстке лей-линий. Он спит.
+hint.base.ley.still = Лоза висит неподвижно.
+hint.base.ley.faint = Лоза слабо шевелится {0}.
+hint.base.ley.pull = Лозу тянет {0}.
+hint.base.ley.strong = Лозу сильно тянет {0}.
+hint.base.ley.on_line = Лоза дрожит: здесь проходит лей-линия.
+hint.base.ley.at_node = Лоза вертится: здесь сходятся лей-линии.
+hint.base.ley.at_waystone = Лоза вертится: большой перекрёсток лей-линий и его спящий путевой камень.
+ley.base.dir.ahead = вперёд
+ley.base.dir.behind = назад
+ley.base.dir.left = влево
+ley.base.dir.right = вправо
+ley.base.feel.still = тихо
+ley.base.feel.faint = слабо
+ley.base.feel.pull = тянет
+ley.base.feel.strong = сильно тянет
+ley.base.feel.on_line = на линии
+ley.base.feel.at_node = в узле
+command.base.ley = лей здесь {0} ({1})
+command.base.ley.line = ближайшая линия в {0} блоках, у {1} {2}
+command.base.ley.no_line = ни одной линии в пределах {0} блоков
+command.base.ley.node = ближайший узел {0} {1} ({2} линий), в {3} блоках
+command.base.ley.no_node = ни одного узла в пределах {0} блоков
+command.base.ley.waystone = ближайший путевой камень {0} {1}, в {2} блоках
+command.base.ley.no_waystone = ни одного путевого камня в пределах {0} блоков
+# Путевые камни и карта (waystones.rs, map.rs; vitals::waystones)
+key.base.map = Карта
+map.base.title = Карта
+map.base.keys = {#c6a383}WASD{/} сдвиг · {#c6a383}Z X{/} масштаб · {#c6a383}C{/} центр · {#c6a383}M{/} закрыть
+map.base.zoom_out = -
+map.base.zoom_out_tip = Отдалить (Z)
+map.base.zoom_in = +
+map.base.zoom_in_tip = Приблизить (X)
+map.base.centre = Центр
+map.base.centre_tip = Туда, где вы стоите (C)
+map.base.here = {0} {1}
+map.base.known = Пройдено или увидено: {0} га. Пробуждённых камней: {1}.
+map.base.waystone_tip = Пробуждённый вами путевой камень у {0} {1}: в {2} блоках
+map.base.travel_tip = Отправиться к камню у {0} {1}: {2} блоков
+map.base.travel_title = Отправиться
+map.base.travel_to = {0} {1} · {2} блоков
+map.base.travel_none = Пробудите ещё один камень, чтобы отправиться к нему.
+map.base.travel_how = Используйте пробуждённый камень, чтобы отправиться от него к другому.
+hint.base.map.not_here = Карта показывает только верхний мир.
+hint.base.waystone.sleeps = Путевой камень спит. Держите у него лозу с подношением, чтобы пробудить.
+hint.base.waystone.offering = Камень ждёт подношения: {0} {1}.
+hint.base.waystone.already = Этот камень для вас уже пробуждён.
+hint.base.waystone.woke = Путевой камень пробуждается. Теперь он на вашей карте.
+hint.base.waystone.stone = Из сердца камня что-то выпадает.
+hint.base.waystone.not_at_one = Встаньте у пробуждённого вами камня, чтобы отправиться.
+hint.base.waystone.channel = Не двигайтесь: {0} с, {1} блоков по лей-линии.
+hint.base.waystone.cancel_moved = Вы сдвинулись: лей отпускает.
+hint.base.waystone.cancel_hurt = Вас ранили: лей отпускает.
+hint.base.waystone.arrived = Вы выходите из лей-линии в {0} блоках отсюда. Путь вызывает лёгкий голод.
+command.base.waystone.none_near = Здесь нет путевого камня.
+command.base.waystone.goto = к путевому камню у {0} {1} ({2} линий), с юга
+command.base.waystone.list = пробуждённых камней: {0} ({1}); карта: {2} тайлов, {3} байт
+hud.element.base.minimap = Мини-карта
+config.base.minimap = Мини-карта
+config.base.minimap.tooltip = Маленькая карта в правом верхнем углу: где вы прошли, ваши путевые камни и лей-линии, пока в руке лоза. N меняет масштаб
+key.base.minimap_zoom = Масштаб мини-карты
+map.base.north = С
+map.base.east = В
+map.base.south = Ю
+map.base.west = З
+web.base.tip.pick0 = {color:title}{0}{/} {color:dim}(уровень предмета {1}){/}
+    {color:dim}Нажмите, чтобы вставить.{/}
+web.base.tip.pick1 = {color:title}{0}{/} {color:dim}(уровень предмета {1}){/}
+    {2} {3}
+    {color:dim}Нажмите, чтобы вставить.{/}
+web.base.tip.pick2 = {color:title}{0}{/} {color:dim}(уровень предмета {1}){/}
+    {2} {3}
+    {4} {5}
+    {color:dim}Нажмите, чтобы вставить.{/}
+web.base.tip.pick3 = {color:title}{0}{/} {color:dim}(уровень предмета {1}){/}
+    {2} {3}
+    {4} {5}
+    {6} {7}
+    {color:dim}Нажмите, чтобы вставить.{/}

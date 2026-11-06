@@ -62,7 +62,7 @@ const SPRING: u8 = 1;
 const SUMMER: u8 = 2;
 const SUMMER_AUTUMN: u8 = 2 | 4;
 
-pub const PLANTS: [Plant; 53] = [
+pub const PLANTS: [Plant; 58] = [
     // Frost (`reports/ecology/Plants and crops.md`, A1): spring wheat is sensitive (a hard frost,
     // about -2 °C, kills it; winter wheat, hardy, comes later); a blueberry's dormant bush is
     // hardy but its flowers and fruit die at -2; sugar cane takes none (the stalk dies, the base
@@ -101,6 +101,10 @@ pub const PLANTS: [Plant; 53] = [
     p("base:sapling", "oak", (5.0, 18.0, 28.0, 38.0), Water::Moderate, 0.0, ANY, HARDY),
     // Grazed grass growing back to tall grass: 15-21 days in spring (`vitals::forage`).
     p("base:grazed_grass", "prairie grass", (5.0, 15.0, 30.0, 40.0), Water::Moderate, 18.0, ANY, HARDY),
+    // A dung pat rotting into the grass (`vitals::soil`, the pats): dung beetles bury it and fungi
+    // and rain break it down, a cow pat in about 45 days of a warm wet summer; dried out, or in the
+    // cold, it lies for months (pasture studies: one to three months, a year in a drought).
+    p("base:dung_pat", "a cow pat (dung beetles, fungi)", (5.0, 20.0, 30.0, 42.0), Water::Moderate, 45.0, ANY, HARDY),
     // The wild plants (`vitals::wild`; the research's estimates where it has no source). A tuft
     // or a mat grazed down grows back in `days`: sedges and cottongrass as grass, white clover in
     // 20-40 days, reindeer lichen in about ten years (it grows millimetres a year and takes
@@ -151,6 +155,13 @@ pub const PLANTS: [Plant; 53] = [
     p("base:mushroom_brown", "forest mushrooms", (5.0, 10.0, 20.0, 30.0), Water::Moderate, 8.0, SUMMER_AUTUMN, -2.0),
     p("base:mushroom_red", "fly agaric", (5.0, 10.0, 20.0, 30.0), Water::Moderate, 8.0, SUMMER_AUTUMN, -2.0),
     p("base:water_hyacinth", "water hyacinth", (12.0, 25.0, 30.0, 38.0), Water::Wet, 10.0, ANY, -1.0),
+    // Plants that glow in the dark (`wild::GLOW`, `notes/NIGHT_GLOW.md`). Foxfire is honey
+    // fungus and bitter oyster mycelium creeping through the litter (growth 5-30 °C, best 20-25),
+    // a mycelium that frost doesn't kill; glow mycena (Mycena chlorophos) a tropical toadstool
+    // that fruits in warm wet weather and dies at a frost; goblin's gold a cool-loving moss.
+    p("base:foxfire", "honey fungus and bitter oyster mycelium", (5.0, 20.0, 25.0, 30.0), Water::Moderate, 30.0, ANY, HARDY),
+    p("base:glow_mycena", "Mycena chlorophos", (18.0, 24.0, 28.0, 32.0), Water::Wet, 8.0, ANY, -1.0),
+    p("base:goblins_gold", "goblin's gold moss (Schistostega pennata)", (0.0, 10.0, 18.0, 25.0), Water::Moderate, 60.0, ANY, HARDY),
     // Our trees' saplings, at the game's time as the oak's: mesquite, a desert legume that a
     // frost below about -15 kills; the tropical palms, killed by any frost.
     p("base:mesquite_sapling", "mesquite", (12.0, 25.0, 38.0, 48.0), Water::Dry, 0.0, ANY, -15.0),
@@ -162,6 +173,9 @@ pub const PLANTS: [Plant; 53] = [
     // The canopy's: andiroba and matamatá of the terra firme, the golden ipê; none takes a frost.
     p("base:andiroba_sapling", "andiroba (Carapa guianensis)", (18.0, 24.0, 32.0, 38.0), Water::Moderate, 0.0, ANY, 0.0),
     p("base:matamata_sapling", "matamatá (Eschweilera coriacea)", (18.0, 24.0, 32.0, 38.0), Water::Moderate, 0.0, ANY, 0.0),
+    // The wild cherry: Europe's temperate woods, growing from about 5 degrees, best in a warm
+    // summer, hardy to about -30 in winter (its buds), on moist deep soil.
+    p("base:cherry_sapling", "wild cherry (Prunus avium)", (5.0, 16.0, 24.0, 32.0), Water::Moderate, 0.0, ANY, -30.0),
     p("base:ipe_sapling", "golden ipê (Handroanthus serratifolius)", (15.0, 22.0, 32.0, 40.0), Water::Dry, 0.0, ANY, -1.0),
     p("base:acuri_palm_sapling", "acuri palm (Attalea phalerata)", (15.0, 24.0, 32.0, 40.0), Water::Moderate, 0.0, ANY, 0.0),
     // The giant sequoia: the Sierra Nevada's western slopes at 1,400-2,000 m, growing from about

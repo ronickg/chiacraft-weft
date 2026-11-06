@@ -119,3 +119,10 @@ ffmpeg), from nothing but synthesis and CC0 files already here:
 | `tree/creak1-2` | synthesized stick-slip creak through wood resonances; the crack at its end is Kenney's Impact Sounds `impactWood_light_001-002` | ours + CC0 |
 | `tree/fall1-2` | swept noise (synthesized) with base's own `dig/leaves1-3` (Kenney, Impact Sounds) scattered through | ours + CC0 |
 | `tree/thud1-2` | Kenney's Impact Sounds `impactWood_heavy_001-002` an octave down, a synthesized low thump, `dig/leaves1-3` | CC0 + ours |
+
+## Made here
+
+| files | how | licence |
+|---|---|---|
+| `random/ley_twitch.wav` (the dowsing rod's tick, `ley.rs`) | synthesised: bell-like partials over a short decay, `mods/base/source/sounds/ley_twitch.py` | CC0 |
+| `random/ley_wake.wav` (a waystone waking, `waystones.rs`) | synthesised: a low swell rising into a bell chime, `mods/base/source/sounds/ley_wake.py` | CC0 |

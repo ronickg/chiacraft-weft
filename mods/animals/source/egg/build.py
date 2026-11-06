@@ -331,7 +331,8 @@ def roe_spots(n, d, spread=None, seed=1):
 
 def egg_of(look, name="egg", at=(0.0, 0.0, 0.0), yaw=0.0):
     return es.egg_elements(name, look["L"], look["W"], look.get("asym", 0.0), look.get("blunt", 2.0), look["tilt"],
-                           yaw=yaw, at=at, sink=look.get("sink", 0.0), n=look.get("n"), step=look.get("step"))
+                           yaw=yaw, at=at, sink=look.get("sink", 0.0), n=look.get("n"), step=look.get("step"),
+                           tip=2.6 / texels_a_unit(look["W"], look.get("across", ACROSS)))
 
 
 def elements(look):
@@ -341,7 +342,8 @@ def elements(look):
         for i, (x, y, z) in enumerate(roe_spots(r["n"], r["d"], r.get("spread"))):
             # Each bead its own size a little and turned its own way, so no two share a face.
             d = r["d"]
-            egg = es.egg_elements(f"egg{i}_", d, d, tilt=0, yaw=17 * i + 5, at=(x, y + 0.013 * i, z), n=3)
+            egg = es.egg_elements(f"egg{i}_", d, d, tilt=0, yaw=17 * i + 5, at=(x, y + 0.013 * i, z), n=3,
+                                  tip=2.6 / texels_a_unit(d))
             g = egg[0]["egg"]
             g["dot"] = r.get("dot")
             # The side facing out of the heap (the first bead: toward the viewer's side, +x +z).
@@ -391,7 +393,24 @@ def build(name, look, out, mats=None, E=None):
                        capture_output=True, text=True)
     if r.returncode:
         sys.exit(f"{name}: boxcheck failed\n{r.stdout}")
+    no_thin_lines(spec, sheet, E, name)
     return spec, tx
+
+
+def no_thin_lines(spec, sheet, E, name=""):
+    """No thin lines (Ronald, 11-05): no strip of a box under two texels showing beside another.
+    Meant (the planner's ruling, 11-05, `linecheck_allow.txt`): an egg's round taper, each layer
+    narrower than the next toward both ends, so the middle layers' sides show a narrow band above
+    or below their neighbours; squaring them off would square the egg. Each egg's tips stay
+    checked."""
+    from linecheck import boxes_from_spec, lines  # noqa: E402
+
+    eggs = {}
+    for e in E:
+        eggs.setdefault(id(e["egg"]), []).append(e["name"])
+    allow = [n for names in eggs.values() for n in names[1:-1]]
+    thin = [h for h in lines(boxes_from_spec(spec), sheet, density=E[0]["egg"]["tx"], allow=allow) if h["kind"] == "line"]
+    assert not thin, f"{name}: thin lines: {[(h['box'], h['face'], h['cover'], h['width']) for h in thin]}"
 
 
 def model_of(name):

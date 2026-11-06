@@ -41,7 +41,8 @@ const NEAR: i32 = 24;
 const SEA: i32 = 63;
 
 pub fn init(r: &mut Registry) {
-    r.item(&AMBER).tab(&INGREDIENTS);
+    // Cut into a gem for gear's sockets at a crafting table (base's `gems.rs`).
+    r.item(&AMBER).tag("gem_stones/amber").tab(&INGREDIENTS);
     r.block(&AMBER_ORE)
         .sound_group("base:block.stone")
         .hardness(3.0)

@@ -32,8 +32,15 @@ use crate::species::{self, SPECIES, Species};
 static FORAGE: Component<[f64; 4]> = Component::named("animal_forage");
 /// The dropped item it is going to eat (0: a block, or nothing; not saved).
 static ITEM: Component<u64> = Component::named("animal_forage_item");
+/// The last place it found food growing (x, y, z, and 1 where there is one): a hungry animal
+/// looks round there first, where more of it likely grows (`reports/Creature AI.md`, step 1).
+/// Not saved.
+static PATCH: Component<[i32; 4]> = Component::named("animal_forage_patch");
 static GRAZED_GRASS: Block = Block::named("base:grazed_grass");
 static DUNG: Item = Item::named("base:dung");
+static DUNG_PAT: Block = Block::named("base:dung_pat");
+static TALL_GRASS: Block = Block::named("base:tall_grass");
+static PLANT_SOIL: Tag = Tag::named("plant_soil");
 
 /// Blocks it looks round, and up and down.
 const LOOK: i32 = 8;
@@ -46,16 +53,15 @@ use animals_core::needs::{FULL, HUNGRY};
 const CHEW: f64 = 30.0;
 const WALK: f64 = 160.0;
 const NOTHING: f64 = 300.0;
-/// A grazer leaves dung after about this many mouthfuls (`vitals::soil`: it feeds farmland and
-/// compost).
-const MOUTHFULS_A_DUNG: u32 = 6;
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&FORAGE, [0.0; 4], 0);
     r.entity_component(&ITEM, 0u64, 0);
+    r.entity_component(&PATCH, [0i32; 4], 0);
     for s in &SPECIES {
         r.attach(s.kind, &FORAGE);
         r.attach(s.kind, &ITEM);
+        r.attach(s.kind, &PATCH);
     }
     // A place holds as many as it feeds (`notes/ECOLOGY.md`, part 7): plant eaters come as often
     // as their food grows there now, so fewer in a drought or a winter.
@@ -69,8 +75,9 @@ pub fn init(r: &mut Registry) {
         let w = q.world();
         let coming = q.query().amount.max(1.0) as u32;
         let near = kind_near(&w, s, q.pos().to_array());
-        if !animals_core::life::room_for(near, coming, s.crowd()) {
-            weft_sdk::info!("no room for {coming} {} at {:?}: {near:.1} near, room for {}", s.name, q.pos(), s.crowd());
+        let crowd = crate::species::crowd_at(&w, s, q.pos());
+        if !animals_core::life::room_for(near, coming, crowd) {
+            weft_sdk::info!("no room for {coming} {} at {:?}: {near:.1} near, room for {crowd}", s.name, q.pos());
             return Verdict::Deny;
         }
         if !s.forages_wild() {
@@ -168,24 +175,52 @@ fn season(w: &World) -> Option<usize> {
     crate::breeding::season_bit(w).map(|bit| bit.trailing_zeros() as usize)
 }
 
-/// The nearest food of its diet within `LOOK` blocks it can reach from the ground; the ground's
-/// own roots, insects and lichen only when nothing richer is in sight (`Source::fallback`).
-fn nearest(w: &World, s: &Species, pos: [f64; 3]) -> Option<[i32; 3]> {
+/// Blocks round the patch it last found food in that it looks first, and how far it goes back to
+/// one.
+const PATCH_LOOK: i32 = 3;
+const RECALL: i32 = 2 * LOOK;
+
+/// Food of its diet: round the patch it last found some in, if that is within `RECALL` blocks and
+/// still has some, else the nearest within `LOOK` blocks; remembered as its patch.
+fn find_food(w: &World, id: u64, s: &Species, pos: [f64; 3], driven: bool) -> Option<[i32; 3]> {
     let p = pos.map(|v| v.floor() as i32);
+    let patch = w
+        .component(id, &PATCH)
+        .filter(|k| k[3] != 0 && (k[0] - p[0]).pow(2) + (k[2] - p[2]).pow(2) <= RECALL * RECALL);
+    let found = patch
+        .and_then(|k| nearest(w, s, [k[0], k[1], k[2]], PATCH_LOOK, p, false))
+        .or_else(|| nearest(w, s, p, LOOK, p, true))?;
+    // Ground that frightened its kind (a kill there, `memory`) it keeps off unless hunger drives it.
+    let at = [found[0] as f64 + 0.5, found[1] as f64, found[2] as f64 + 0.5];
+    if !driven && crate::memory::fear_at(w, at) >= animals_core::memory::AVOID {
+        weft_sdk::debug!("animal {id} keeps off feared ground to eat at {found:?}");
+        return None;
+    }
+    if let Some(c) = w.component_mut(id, &PATCH) {
+        *c = [found[0], found[1], found[2], 1];
+    }
+    Some(found)
+}
+
+/// The nearest food of its diet to `p` within `r` blocks of `center` it can reach from the
+/// ground; the ground's own roots, insects and lichen only when nothing richer is in sight
+/// (`Source::fallback`), and only with `ground`.
+fn nearest(w: &World, s: &Species, center: [i32; 3], r: i32, p: [i32; 3], ground_too: bool) -> Option<[i32; 3]> {
     let now = season(w);
     let mut best: Option<([i32; 3], i32)> = None;
     let mut ground: Option<([i32; 3], i32)> = None;
-    for dx in -LOOK..=LOOK {
-        for dz in -LOOK..=LOOK {
+    for dx in -r..=r {
+        for dz in -r..=r {
             for dy in -2..=LOOK_UP {
-                let at = [p[0] + dx, p[1] + dy, p[2] + dz];
-                let d = dx * dx + dz * dz + dy * dy * 4;
+                let at = [center[0] + dx, center[1] + dy, center[2] + dz];
+                let (ox, oy, oz) = (at[0] - p[0], at[1] - p[1], at[2] - p[2]);
+                let d = ox * ox + oz * oz + oy * oy * 4;
                 if best.is_some_and(|(_, b)| d >= b) {
                     continue;
                 }
                 match food(s, w.block(at), now) {
                     Some(src) if !src.fallback() => best = Some((at, d)),
-                    Some(_) if ground.is_none_or(|(_, b)| d < b) => ground = Some((at, d)),
+                    Some(_) if ground_too && ground.is_none_or(|(_, b)| d < b) => ground = Some((at, d)),
                     _ => {}
                 }
             }
@@ -204,7 +239,10 @@ fn edible(w: &World, s: &animals_core::species::Species, id: u64) -> Option<f32>
     let food = vitals::food::FOODS.iter().find(|f| f.name == name);
     // A poisonous one (a fly agaric, a spider's eye) it leaves where it lies, and salted meat,
     // too salty for an animal; dried and smoked meat a meat eater takes as it raids a camp (C6).
-    if food.is_some_and(|f| f.poison > 0.0) || name == "base:salted_meat" {
+    // A scavenger's stomach takes rotten flesh (a vulture's acid kills what's in it).
+    if food.is_some_and(|f| f.poison > 0.0 && !(s.scavenges() && f.category == vitals::food::Category::Carrion))
+        || name == "base:salted_meat"
+    {
         return None;
     }
     let spoiled = food.is_some_and(|f| {
@@ -212,6 +250,8 @@ fn edible(w: &World, s: &animals_core::species::Species, id: u64) -> Option<f32>
         vitals::food::freshness(f, age, base_api::difficulty().keep) == vitals::food::Freshness::Spoiled
     });
     let (c, grams) = vitals::forage::dropped(name, spoiled)?;
+    // To a scavenger a kill's meat lying there is carrion.
+    let c = if s.scavenges() && c == vitals::food::Category::Meat { vitals::food::Category::Carrion } else { c };
     // Kibble is every species' (`taming.rs`), though the food table files it as meat (C6); a
     // carcass gone off is the insects' as well, its beetles and grubs an insect eater's (the
     // Djadokhta's bones are bored by them), a share of it.
@@ -254,16 +294,16 @@ fn eat_item(w: &World, id: u64, a: &animal::Animal, item: u64, grams: f32) {
         name_of(abi::entry_kind::ITEM, stack.item),
         a.food.saturating_add(points).min(max as u16)
     );
+    if a.species().is_some_and(|s| s.scavenges()) {
+        weft_sdk::info!("scavenger {id} eats {} ({grams} g)", name_of(abi::entry_kind::ITEM, stack.item));
+    }
 }
 
-/// A goal: thirsty, it drinks first (`drink::drink`); hungry, it goes to the nearest food of its
-/// diet (on the ground first, then growing) and eats there; it takes the turn while it does. With nothing near it lets the next goal
-/// (wandering) take it elsewhere.
-pub fn forage(w: &World, id: u64, st: &EntityState) -> bool {
-    // Thirst first: water is the more urgent (`drink.rs`).
-    if crate::drink::drink(w, id, st) {
-        return true;
-    }
+/// A goal: hungry, it goes to the nearest food of its diet (on the ground first, then growing) and
+/// eats there; it takes the turn while it does. With nothing near it lets the next goal
+/// (wandering) take it elsewhere. Thirst is weighed against it by the needs band (`choose.rs`,
+/// `drink::drink`).
+pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
     let Some(a) = w.component(id, &ANIMAL) else { return false };
     let Some(s) = a.species() else { return false };
     let Some(mut f) = w.component(id, &FORAGE) else { return false };
@@ -271,8 +311,9 @@ pub fn forage(w: &World, id: u64, st: &EntityState) -> bool {
     // Only an animal that gets hungry, and whose food the world grows or drops.
     let grows = s.eats.iter().any(|&(c, _)| vitals::forage::grows(c));
     let drops = s.eats.iter().any(|&(c, _)| vitals::forage::dropped_kind(c));
-    let hungry = (s.hungry_in_the_wild() || animal::tamed(w, id)) && (grows || drops);
-    if !hungry || full >= FULL || (f[3] == 0.0 && full >= HUNGRY) {
+    // The cheap reasons first: most animals most of the time aren't hungry.
+    let fed = full >= FULL || (f[3] == 0.0 && full >= HUNGRY);
+    if fed || !((s.hungry_in_the_wild() || animal::tamed(w, id)) && (grows || drops)) {
         if f[3] != 0.0 {
             w.component_mut(id, &FORAGE).map(|f| *f = [0.0; 4]);
             w.component_mut(id, &ITEM).map(|i| *i = 0);
@@ -286,9 +327,11 @@ pub fn forage(w: &World, id: u64, st: &EntityState) -> bool {
         if let (Some(e), Some(grams)) = (w.entity(item), edible(w, s, item)) {
             if reach(e.pos.to_array(), st.pos.to_array()) {
                 if now < f[3] {
+                    crate::anim::hold(w, id, crate::anim::Act::Graze);
                     return true; // chewing
                 }
                 eat_item(w, id, &a, item, grams);
+                crate::anim::hold(w, id, crate::anim::Act::Graze);
                 f[3] = now + CHEW;
                 w.component_mut(id, &FORAGE).map(|c| *c = f);
                 return true;
@@ -309,6 +352,7 @@ pub fn forage(w: &World, id: u64, st: &EntityState) -> bool {
     });
     if close && let Some(t) = target {
         if now < f[3] {
+            crate::anim::hold(w, id, crate::anim::Act::Graze);
             return true; // chewing
         }
         let at = t.map(|v| v as i32);
@@ -334,9 +378,10 @@ pub fn forage(w: &World, id: u64, st: &EntityState) -> bool {
                 }
                 Eaten::Stays => {}
             }
-            if w.random_below(MOUTHFULS_A_DUNG) == 0 {
-                w.spawn_item(st.pos, ItemStack::new(DUNG.id(), 1));
+            if w.random_below(vitals::soil::MOUTHFULS_A_PAT) == 0 {
+                drop_pat(w, st.pos);
             }
+            crate::anim::hold(w, id, crate::anim::Act::Graze);
             f[3] = now + CHEW;
             w.component_mut(id, &FORAGE).map(|c| *c = f);
             return true;
@@ -352,7 +397,10 @@ pub fn forage(w: &World, id: u64, st: &EntityState) -> bool {
             .map(|c| *c = [p[0], p[1], p[2], now + WALK]);
         return true;
     }
-    match grows.then(|| nearest(w, s, st.pos.to_array())).flatten() {
+    match grows
+        .then(|| find_food(w, id, s, st.pos.to_array(), animals_core::needs::hunger_score(full, true) >= animals_core::memory::DRIVEN))
+        .flatten()
+    {
         Some(p) => {
             w.navigate(id, [p[0] as f64 + 0.5, p[1] as f64, p[2] as f64 + 0.5], 1.0);
             f = [p[0] as f64, p[1] as f64, p[2] as f64, now + WALK];
@@ -368,5 +416,22 @@ fn becomes(name: &str) -> Option<u32> {
     match name {
         "base:grazed_grass" => Some(GRAZED_GRASS.id()),
         _ => None,
+    }
+}
+
+/// A grazer's dung (`vitals::soil`): a pat where it stands on the ground (on the soil, in the air
+/// or the grass there), none within `PAT_SPACING` of another; off the soil, the dung as an item.
+fn drop_pat(w: &World, pos: Vec3) {
+    let [x, y, z] = pos.block().to_array();
+    let feet = w.block([x, y, z]);
+    let open = feet == 0 || TALL_GRASS.is(feet) || GRAZED_GRASS.is(feet);
+    if !(open && PLANT_SOIL.on_block(w.block([x, y - 1, z]))) {
+        w.spawn_item(pos, ItemStack::new(DUNG.id(), 1));
+        return;
+    }
+    let r = vitals::soil::PAT_SPACING;
+    let crowded = (-1..=1).any(|dy| (-r..=r).any(|dz| (-r..=r).any(|dx| DUNG_PAT.is(w.block([x + dx, y + dy, z + dz])))));
+    if !crowded {
+        w.set_block([x, y, z], DUNG_PAT.id());
     }
 }

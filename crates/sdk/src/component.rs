@@ -572,6 +572,17 @@ pub fn with_look(stack: ItemStack, look: Option<&str>) -> ItemStack {
 
 static LOOK: Tag = Tag::named(abi::comp::LOOK);
 
+/// The stack drawn on its wearer from layers instead of its item's worn texture (`None` or empty:
+/// the item's again), written as `with_look`'s, in the wearer's skin layout. See
+/// `abi::comp::WORN_LOOK`.
+pub fn with_worn_look(stack: ItemStack, look: Option<&str>) -> ItemStack {
+    let b = look.filter(|l| !l.is_empty()).map(str::as_bytes);
+    let data = unsafe { (host().stack_with)(stack.data, WORN_LOOK.id(), b.map_or(abi::Slice::EMPTY, abi::Slice::new), b.is_none() as u32) };
+    ItemStack { data, ..stack }
+}
+
+static WORN_LOOK: Tag = Tag::named(abi::comp::WORN_LOOK);
+
 pub trait StackData: Sized {
     /// This stack with its own value of `c` set.
     fn with<T: Value>(self, c: &Component<T>, v: T) -> Self;
@@ -717,6 +728,7 @@ pub static LOOT_ROLLS: Component<u32> = Component::named(abi::comp::LOOT_ROLLS);
 pub static HARDNESS: Component<f32> = Component::named(abi::comp::HARDNESS);
 pub static FRICTION: Component<f32> = Component::named(abi::comp::FRICTION);
 pub static DRAG: Component<f32> = Component::named(abi::comp::DRAG);
+pub static GRIP: Component<f32> = Component::named(abi::comp::GRIP);
 pub static LIGHT: Component<[u8; 3]> = Component::named(abi::comp::LIGHT);
 pub static TINT: Component<TintRef> = Component::named(abi::comp::TINT);
 pub static TINT_FACES: Component<u8> = Component::named(abi::comp::TINT_FACES);

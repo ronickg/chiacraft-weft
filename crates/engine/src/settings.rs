@@ -42,8 +42,13 @@ pub const GUI_MIN: (u32, u32) = (400, 320);
 /// (Playtest B9: the animal screen at GUI scale 1, its buttons' labels over each other; Researcher,
 /// round 13; Minecraft keeps to even scales for the same reason with its half-size font).
 pub fn max_gui_scale(window: (u32, u32)) -> u32 {
-    even_scale((window.0 / GUI_MIN.0).min(window.1 / GUI_MIN.1)).max(2)
+    let min = if crate::touch::enabled() { GUI_MIN_TOUCH } else { GUI_MIN };
+    even_scale((window.0 / min.0).min(window.1 / min.1)).max(2)
 }
+
+/// `GUI_MIN` on a touch screen: a phone held sideways (2400 x 1080) gets scale 4, whose GUI
+/// pixels a finger can hit, rather than 2; screens taller than its 270 GUI pixels scroll.
+pub const GUI_MIN_TOUCH: (u32, u32) = (400, 240);
 
 /// `s` rounded down to a scale the UI pixel sits whole on: 2, 4, 6... (1 below 2).
 pub fn even_scale(s: u32) -> u32 {
@@ -230,6 +235,11 @@ impl Settings {
     pub fn listing_deposit(&self) -> u64 {
         number("core:listing_deposit").max(1.0) as u64
     }
+
+    /// The fee a listing pays, in mojos (`core:listing_fee`).
+    pub fn listing_fee(&self) -> u64 {
+        number("core:listing_fee").max(0.0) as u64
+    }
     /// DID sponsors' addresses (iroh endpoint ids), tried in order.
     pub fn sponsors(&self) -> Vec<String> {
         list("core:sponsors")
@@ -244,6 +254,45 @@ impl Settings {
 
     pub fn occlusion_culling(&self) -> bool {
         number("core:occlusion_culling") != 0.0
+    }
+
+    /// Screen effects' half-size parts (`post::HOOK_LOW`), live.
+    pub fn post_low(&self) -> bool {
+        number("core:post_low") != 0.0
+    }
+
+    /// Levels of the HDR world's bloom pyramid (`core:bloom`: 0 none, 1 four, 2 six), live.
+    pub fn bloom_levels(&self) -> u32 {
+        match number("core:bloom") as i32 {
+            i32::MIN..=0 => 0,
+            1 => 4,
+            _ => 6,
+        }
+    }
+
+    /// The soft clouds' shadow on the land with the HDR world (`client::cloud_shadow`), live.
+    pub fn cloud_shadows(&self) -> bool {
+        number("core:cloud_shadows") != 0.0
+    }
+
+    /// The HDR world (`post::world_format`), read once at start.
+    pub fn hdr_world(&self) -> bool {
+        number("core:hdr_world") != 0.0
+    }
+
+    /// The mist as a volume for packs that have one (`client::froxels`), live.
+    pub fn froxels(&self) -> bool {
+        number("core:froxels") != 0.0
+    }
+
+    /// Pixels a mist volume cell covers each way: 8 (`core:froxels` 1), 4 (2, ultra).
+    pub fn froxel_cell(&self) -> u32 {
+        if number("core:froxels") >= 2.0 { 4 } else { 8 }
+    }
+
+    /// Soft clouds for packs that draw them (`client::soft_clouds`).
+    pub fn soft_clouds(&self) -> bool {
+        number("core:soft_clouds") != 0.0
     }
 
     pub fn show_avatars(&self) -> bool {

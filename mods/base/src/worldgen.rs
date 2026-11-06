@@ -55,6 +55,9 @@ pub static FLOOR_COVER: Component<f32> = Component::named("floor_cover");
 pub static FERNS: Component<f32> = Component::named("ferns");
 pub static SHRUBS: Component<f32> = Component::named("shrubs");
 pub static SHRUB_KINDS: Component<BlockList> = Component::named("shrub_kinds");
+/// Wild cherries in their groves (`vitals::wild::CHERRY_GROVES`): the chance per 4 x 4 cell in a
+/// grove patch.
+pub static CHERRY_TREES: Component<f32> = Component::named("cherry_trees");
 /// Young trees of the biome's `YOUNG_KINDS` (else its `TREE_KINDS`), the chance per 5 x 5 cell,
 /// out of the thick stands.
 pub static YOUNG_TREES: Component<f32> = Component::named("young_trees");
@@ -74,7 +77,7 @@ pub static TALL_GRASS_SHARE: Component<f32> = Component::named("tall_grass_share
 pub static BIG_LEAVES: Component<f32> = Component::named("big_leaves");
 pub static BIG_LEAF_KINDS: Component<BlockList> = Component::named("big_leaf_kinds");
 // The trees' vocabulary and shapes are `base_api::trees`, so any mod's saplings grow them.
-pub use base_api::trees::{TREE_LEAVES, grow_tree};
+pub use base_api::trees::{TREE_BRANCH, TREE_LEAVES, grow_tree};
 use base_api::trees::{tree_blocks, wild_tree_at};
 static FROZEN: Tag = Tag::named("frozen");
 static DRY: Tag = Tag::named("dry");
@@ -91,6 +94,9 @@ pub static SWAMP: Biome = Biome::named("swamp");
 pub static TROPICAL_FOREST: Biome = Biome::named("tropical_forest");
 pub static MOUNTAINS: Biome = Biome::named("mountains");
 pub static SEQUOIA_GROVE: Biome = Biome::named("sequoia_grove");
+/// Old-growth forest (`base_api::land::OLD_GROWTH_AREA`): the closed canopy of old oaks in
+/// Bliss's comparison shots, rivers and lakes through it.
+pub static OLD_GROWTH_FOREST: Biome = Biome::named("old_growth_forest");
 pub static OCEAN: Biome = Biome::named("ocean");
 /// Warm shallow seas (`base_api::land::REEF_*`): the lagoon along the shore, the reef farther out.
 pub static LAGOON: Biome = Biome::named("lagoon");
@@ -99,6 +105,11 @@ pub static BEACH: Biome = Biome::named("beach");
 pub static DEEP_CAVES: Biome = Biome::named("deep_caves");
 
 pub fn register(r: &mut Registry) {
+    // Simple trees for now (`base_api::trees::TREE_STYLE`; Ronald, 11-05); Minecraft's own for
+    // like-for-like looks.
+    r.config(&base_api::trees::TREE_STYLE)
+        .choice(0, &["simple", "branched", "minecraft"])
+        .world();
     // Tags say what a biome is (spawning, decoration and mods ask these, not names).
     let (grass, foliage, water) = (&tints::GRASS, &tints::FOLIAGE, &tints::WATER);
     r.biome(&PLAINS)
@@ -126,7 +137,10 @@ pub fn register(r: &mut Registry) {
         .tint(&base_api::trees::YELLOW_LEAVES, muted(0x59ae30))
         .tag("forest")
         .tag("animals")
-        .set(&TREES, 0.4)
+        // A site in a 5 x 5 cell at 0.55 (220 a hectare, Research round 7's 170-244) and more in
+        // the stands: the stand's layers' crowns (`vitals::canopy`) are Minecraft-sized, and at 0.4
+        // the forest stood two fifths open (forest_canopy, 11-06).
+        .set(&TREES, 0.55)
         .set(&STAND_TREES, 0.12)
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:forest").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set_text(&TREE_KINDS, "base:birch_log:1 base:oak_log:4");
@@ -143,7 +157,7 @@ pub fn register(r: &mut Registry) {
         .tint(&base_api::trees::YELLOW_LEAVES, muted(0x6ba941))
         .tag("forest")
         .tag("animals")
-        .set(&TREES, 0.45)
+        .set(&TREES, 0.55)
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:birch_forest").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set(&STAND_TREES, 0.15)
         .set_text(&TREE_KINDS, "base:birch_log");
@@ -160,7 +174,7 @@ pub fn register(r: &mut Registry) {
         .tag("forest")
         .tag("cold")
         .tag("animals")
-        .set(&TREES, 0.45)
+        .set(&TREES, 0.55)
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:taiga").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set(&STAND_TREES, 0.12)
         .set_text(&TREE_KINDS, "base:spruce_log");
@@ -307,6 +321,32 @@ pub fn register(r: &mut Registry) {
         .set_text(&GIANT_KINDS, "base:sequoia_log")
         // Lupine in its sunny gaps and meadows.
         .set_text(&FLOWERS, "base:lupine");
+    // Old-growth forest (Ronald, 11-05: "a biome looking similar to the one shown in bliss ... with
+    // all those trees"): Białowieża's strict reserve, old oaks with Norway spruce and a few
+    // birches, the canopy closed over rolling hills to the horizon, rivers and lakes through it
+    // with sandy beds. Nearly twice the forest's trees: a site in four 5 x 5 cells in five and more
+    // in the stands, so the crowns touch, each its own (from branches), the spruces' dark spires
+    // and the birches over the oaks' domes so the canopy has a skyline of crowns with shade between,
+    // not a flat carpet (the first PC look, og_a1: at 0.95 + 0.3 of oaks alone it was one lime
+    // mass); only the deepest clearings open, young trees and blossoming dogwoods in them
+    // (`vitals::layers`). Deep greens (Bliss's forest, darker than the forest's), which the spring's
+    // fresh green still lightens. Its own patches of the temperate wet land, not a climate range
+    // (`land.rs`).
+    r.biome(&OLD_GROWTH_FOREST)
+        .tint(water, WATER_TINT)
+        .set(&CLIMATE, base_api::climate("base:old_growth_forest"))
+        .set(&BOULDERS, 0.06)
+        .surface("grass", "dirt", 4)
+        .tint(grass, muted(0x5a9440))
+        .tint(foliage, muted(0x346e1e))
+        .tint(&base_api::trees::EVERGREEN, muted(0x2c5a22))
+        .tint(&base_api::trees::YELLOW_LEAVES, muted(0x4a8a28))
+        .tag("forest")
+        .tag("animals")
+        .set(&TREES, 0.8)
+        .set(&STAND_TREES, 0.15)
+        .set(&GRASS_COVER, vitals::forage::grass_cover("base:old_growth_forest").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
+        .set_text(&TREE_KINDS, "base:oak_log:6 base:spruce_log:2 base:birch_log:1");
     r.biome(&OCEAN)
         .tint(grass, muted(ENGINE_GRASS))
         .tint(foliage, muted(ENGINE_FOLIAGE))
@@ -367,6 +407,9 @@ pub fn register(r: &mut Registry) {
             .exposed(exposed);
     }
 
+    // Copper and tin by rock and biome (`metals.rs`).
+    crate::metals::ores(r);
+
     // The layers under the trees, each biome's (`vitals::layers`).
     for l in vitals::layers::LAYERS
         .iter()
@@ -410,8 +453,14 @@ pub fn register(r: &mut Registry) {
         }
     }
 
+    // Wild cherry groves (`vitals::wild::CHERRY_GROVES`).
+    for (biome, chance) in vitals::wild::CHERRY_GROVES {
+        r.set_on(Target::Biome(biome), &CHERRY_TREES, chance);
+    }
+
     // The overworld's shape, its snow and its bare rock (`land.rs`), before the plants below.
     crate::land::terrain(r);
+    crate::land::mc_forest_terrain(r);
 
     // Trees wherever a biome asks for them, in any dimension.
     // Trees wherever a biome asks for them, in any dimension: a site per 5 x 5 cell, left open in
@@ -423,8 +472,9 @@ pub fn register(r: &mut Registry) {
         .reach(8)
         .ground("#plant_soil")
         .density(&TREES)
-        // A forest's clearings keep one tree in four.
-        .thin_in(&STAND_TREES, stand_over(-CLEARING).not(), 4)
+        // A forest's clearings and its cherry groves keep one tree in four (the groves' own trees,
+        // `CHERRY_SITES`, fill them; among a full forest's crowns theirs only showed one or two).
+        .thin_in(&STAND_TREES, stand_over(-CLEARING).and(cherry_grove().not()).not(), 4)
         .shape(tree);
     r.scatter(&GIANT_SITES)
         .cell(24)
@@ -439,8 +489,18 @@ pub fn register(r: &mut Registry) {
         .reach(8)
         .ground("#plant_soil")
         .density(&STAND_TREES)
-        .thin(stand_over(STAND + 1).not(), 0)
+        .thin(stand_over(STAND + 1).and(cherry_grove().not()).not(), 0)
         .shape(tree);
+    // Wild cherries in groves (`CHERRY_TREES`): a site per 4 x 4 cell only in the grove patches (a
+    // noise some 320 blocks across, about 1.8% of the ground), among the forest's trees; a little taller than the oaks, so
+    // their spring blossom shows over the canopy.
+    r.scatter(&CHERRY_SITES)
+        .cell(4)
+        .reach(8)
+        .ground("#plant_soil")
+        .density(&CHERRY_TREES)
+        .thin(cherry_grove().not(), 0)
+        .shape(cherry);
     // Boulders where a biome has them (`BOULDERS`): a heap of stone two to five blocks across, half
     // sunk in the ground, mossy in the woods and the wet.
     r.scatter(&BOULDER_SITES)
@@ -561,6 +621,7 @@ fn boulder(s: &mut Site) {
 }
 
 static TREE_SITES: Scatter = Scatter::named("trees");
+static CHERRY_SITES: Scatter = Scatter::named("cherry_trees");
 static STAND_SITES: Scatter = Scatter::named("stand_trees");
 static GIANT_SITES: Scatter = Scatter::named("giant_trees");
 
@@ -800,14 +861,48 @@ const CLEARING: i32 = 1600;
 /// A tree of the biome's kinds (`TREE_KINDS`) at a scatter's site; none on a bare rock face
 /// (`land::site_on_rock`).
 fn tree(s: &mut Site) {
-    if !site_open(s) {
-        return;
-    }
-    let [x, y, z] = s.pos().to_array();
     let log = TREE_KINDS
         .on_biome(s.biome())
         .and_then(|l| l.pick(s.random() >> 40))
         .unwrap_or(OAK_LOG.id());
+    let log = mc_forest_kind(s, log);
+    tree_of(s, log);
+}
+
+/// In the Minecraft forest test world (`MC_FOREST`) the old growth stands as Minecraft's forest:
+/// oaks and birches, no spruces (Planner, 11-06, for like-for-like looks against Bliss's forest).
+/// A spruce becomes an oak, or two in five a birch, so the old growth's oak 6 : spruce 2 : birch 1
+/// comes to Minecraft's 4 : 1.
+fn mc_forest_kind(s: &mut Site, log: u32) -> u32 {
+    if s.dimension() != crate::MC_FOREST.id()
+        || name_of(abi::entry_kind::BIOME, s.biome()) != "base:old_growth_forest"
+        || log != crate::blocks::SPRUCE_LOG.id()
+    {
+        return log;
+    }
+    if s.random() % 5 < 2 { crate::blocks::BIRCH_LOG.id() } else { OAK_LOG.id() }
+}
+
+/// Where the wild cherry groves stand (`vitals::wild::CHERRY_GROVE_*`), as a mask: on in a grove
+/// patch, in any biome (only those with `CHERRY_TREES` grow cherries there; the forests' own trees
+/// thin there, so it's also a small glade in the other woods).
+fn cherry_grove() -> Expr {
+    Expr::fbm(0xC4E77, vitals::wild::CHERRY_GROVE_SIZE, 1).ramp(vitals::wild::CHERRY_GROVE_FROM, vitals::wild::CHERRY_GROVE_FROM)
+}
+
+/// A wild cherry at a grove's site (`CHERRY_SITES`).
+fn cherry(s: &mut Site) {
+    if let Some(log) = Block::lookup("base:cherry_log") {
+        tree_of(s, log);
+    }
+}
+
+/// A tree of `log` at a scatter's site; none on a bare rock face.
+fn tree_of(s: &mut Site, log: u32) {
+    if !site_open(s) {
+        return;
+    }
+    let [x, y, z] = s.pos().to_array();
     let h = s.random();
     // In a treefall gap no canopy tree stands: one lies fallen, or young growth comes up.
     if let Some(inside) = TREEFALL
@@ -819,7 +914,10 @@ fn tree(s: &mut Site) {
         }
         return;
     }
-    let Some(t) = wild_tree_at(log, x, y, z, h >> 32) else { return };
+    // Its layer of the stand (`vitals::canopy`): under the canopy, in it, or over it.
+    let roll = (hash(h, 0x71E2, 0, 0) >> 40) as f32 / (1u64 << 24) as f32;
+    let tier = vitals::canopy::tier(name_of(abi::entry_kind::BIOME, s.biome()), roll);
+    let Some(t) = wild_tree_at(log, x, y, z, h >> 32).map(|t| t.with_tier(tier)) else { return };
     let mut crown = Vec::new();
     let climbers = LIANAS.on_biome(s.biome()).is_some();
     tree_blocks(&t, |x, y, z, state, force| {

@@ -881,7 +881,7 @@ pub async fn persistence(t: T) -> R {
         .await?;
     let skiff = skiff.trim().trim_start_matches('#').to_string();
     t.op(&format!("sblock {skiff} 0 1 0 base:glass")).await?;
-    t.op("put me 0 iron_sword 1").await?;
+    t.cmd("/gear sword wrought_iron slot=0").await?;
     // A machine's contents are kept, and its entity can't be made without the block.
     let chest = add(p, [-3, 0, 0]);
     t.set(chest, "chest").await?;
@@ -937,7 +937,7 @@ pub async fn persistence(t: T) -> R {
     t.check_eq(t.block(p).await?, "base:gold_block".into(), "placed block after reload");
     t.check_eq(t.slot("me", 3).await?, ("base:diamond".into(), 5, 0), "inventory after reload");
     t.check_eq(t.op(&format!("sblock {skiff} 0 1 0")).await?, "base:glass".to_string(), "the structure and its added block after reload");
-    t.check_eq(t.slot("me", 0).await?.0, "base:iron_sword".into(), "the sword was saved");
+    t.check_eq(t.slot("me", 0).await?.0, "base:sword".into(), "the sword was saved");
     t.check_eq(
         t.op(&format!("inv {} {} {}", chest[0], chest[1], chest[2]))
             .await?,

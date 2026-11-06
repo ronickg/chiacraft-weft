@@ -79,6 +79,13 @@ shared! {
         CELL_MASK = 63,
         CELL_J_SHIFT = 6,
         LEVEL_SHIFT = 12,
+        /// chiacraft: word 0's top bit: the face is a tree crown's (`client::lod`), for packs that
+        /// shade far canopies apart from the ground.
+        CROWN_SHIFT = 31,
+        /// chiacraft: word 0's bits 29-30: how much the land round shuts the face's sky out, 0 to 3
+        /// (`client::lod`'s `openness`), for packs that darken valleys and the gaps between crowns.
+        OCC_SHIFT = 29,
+        OCC_MASK = 3,
     }
     /// Tint kinds of faces and quads (0 none); mods' kinds follow the engine's.
     tint {
@@ -549,6 +556,8 @@ fn records() -> String {
         "}\n",
         "fn lod_dir(w0: u32) -> u32 {\n    return (w0 >> LOD_FACE_DIR_SHIFT) & FACE_DIR_MASK;\n}\n",
         "fn lod_tint(w0: u32) -> u32 {\n    return (w0 >> LOD_FACE_TINT_SHIFT) & TINT_MASK;\n}\n",
+        "fn lod_crown(w0: u32) -> bool {\n    return (w0 >> LOD_FACE_CROWN_SHIFT) != 0u;\n}\n",
+        "fn lod_occ(w0: u32) -> u32 {\n    return (w0 >> LOD_FACE_OCC_SHIFT) & LOD_FACE_OCC_MASK;\n}\n",
     ));
     s
 }
@@ -590,7 +599,7 @@ wgsl_types! {
     f32 => "f32", 4, 4, u32 => "u32", 4, 4, i32 => "i32", 4, 4,
     [f32; 2] => "vec2<f32>", 8, 8, [f32; 3] => "vec3<f32>", 16, 12, [f32; 4] => "vec4<f32>", 16, 16,
     [u32; 4] => "vec4<u32>", 16, 16, [i32; 4] => "vec4<i32>", 16, 16,
-    [[f32; 4]; 3] => "array<vec4<f32>, 3>", 16, 48, [[f32; 4]; 4] => "mat4x4<f32>", 16, 64, [[f32; 4]; 6] => "array<vec4<f32>, 6>", 16, 96,
+    [[f32; 4]; 3] => "array<vec4<f32>, 3>", 16, 48, [[f32; 4]; 4] => "mat4x4<f32>", 16, 64, [[f32; 4]; 6] => "array<vec4<f32>, 6>", 16, 96, [[f32; 4]; 8] => "array<vec4<f32>, 8>", 16, 128,
 }
 
 /// Declares a GPU buffer struct: the Rust type and, from the same fields, its WGSL text
@@ -689,9 +698,10 @@ gpu_struct! {
         /// when full, only by day when new), w the light it gives: its phase times how high it
         /// stands, 0 below the horizon. For packs' night light and moon shadows.
         pub moon: [f32; 4],
-        /// The values of the settings the pack names in its `pack.cfg` (`options = a, b, ...`), 16
-        /// at most, four to a row in that order (`packs::pack_options`); 0 for one not found.
-        pub options: [[f32; 4]; 4],
+        /// The values of the settings the pack names in its `pack.cfg` (`options = a, b, ...`), 32
+        /// at most (16 before chiacraft's fantasy settings), four to a row in that order
+        /// (`packs::pack_options`); 0 for one not found.
+        pub options: [[f32; 4]; 8],
         /// The light the player holds (a torch, a lantern), for packs' dynamic light: xyz where it
         /// is (camera relative, by the hand), w unused.
         pub hand: [f32; 4],
@@ -699,8 +709,65 @@ gpu_struct! {
         /// when what is held gives none. It falls off like block light, a level a block.
         pub hand_light: [f32; 4],
         /// Where the player is: x how closed a forest's canopy is (0 open sky to 1 a rainforest's;
-        /// a mod's air, `air_flags::CANOPY_SHIFT`), for packs' light under the leaves; yzw unused.
+        /// a mod's air, `air_flags::CANOPY_SHIFT`), for packs' light under the leaves; y how wet
+        /// the ground is, 0..1: it follows what falls up and dries over minutes after (a mod's air
+        /// says how fast, `air_flags::DRYING_SHIFT`); z how far puddles have grown, 0..1: over
+        /// about ten minutes of rain, drying three times slower than the ground after; w where rain
+        /// turns to snow up a mountain, blocks above the sea (a mod's air,
+        /// `air_flags::SNOWLINE_SHIFT`; 400 for none).
         pub canopy: [f32; 4],
+        /// Soft clouds (`core:soft_clouds`, with a pack whose sky has `fs_cloud_trace` and
+        /// `fs_cloud_resolve`; chiacraft): x the bindless index + 1 of this frame's clouds, traced
+        /// at a quarter of the pixels each way and blended over frames, which `fs_clouds` draws
+        /// from (0: off, the blocky clouds); y the index + 1 of last frame's, the history
+        /// `fs_cloud_resolve` blends into; z the bindless index of the noise volume
+        /// (`soft_clouds::noise_atlas`: 64 slices of 64², eight to a row, each in a 66² cell with
+        /// a wrapped border, so a linear sample within a cell tiles); w how many frames the history
+        /// holds (0: none yet, take this frame's alone).
+        pub soft_clouds: [f32; 4],
+        /// Last frame's `view_proj` (camera relative then), for reprojecting the clouds.
+        pub prev_view_proj: [[f32; 4]; 4],
+        /// xyz: where last frame's camera stands from this one's, less how far the wind carried
+        /// the clouds since (blocks): a cloud at camera-relative `p` now stood at `p + xyz` from
+        /// last frame's camera. w: the frame's number (for the trace's jitter).
+        pub cloud_moved: [f32; 4],
+        /// What happens in the sky (chiacraft, a mod's `set_sky_event`): x the kind
+        /// (`weft_abi::sky_event`: 0 none, 1 blood moon, 2 meteors, 3 fireball, 4 aurora storm),
+        /// y how strongly (0..1), z seconds since it began, w unused.
+        pub sky_event: [f32; 4],
+        /// What falls from the sky (a mod's `sky_landing`): xyz where it lands (camera relative),
+        /// w seconds until it does (negative after; -1e6 when nothing falls).
+        pub sky_landing: [f32; 4],
+        /// What the pack's look works out once a frame (`client::frame_look`, a pack whose sky
+        /// has `fs_frame_look`; chiacraft): x the bindless index + 1 of its row of texels (0:
+        /// none this frame, each shader works them out itself), yzw unused.
+        pub frame_look: [f32; 4],
+        /// The last lightning flash where the player is (a weather with `lightning`, chiacraft):
+        /// x seconds since it began (1e4 when none yet; real time, not the shaders' clock, which
+        /// tests pin), y a random number 0..1 of its own (for where it strikes), z how hard it
+        /// thunders now (as `weather.w`), w where the camera faced as it began (radians,
+        /// clockwise from -z, as `atan2(forward.x, -forward.z)`), so a pack can aim strikes into
+        /// view and keep them put while the player turns. The engine's own flash only brightens the
+        /// daylight for 0.15 s; packs draw the bolt and the flicker from this.
+        pub lightning: [f32; 4],
+        /// How this frame is drawn: x 1 when into the HDR world (`post::hdr`: linear light past 1,
+        /// the picture finished in the effects' last pass, so a pack's surfaces leave its tone
+        /// curve to that pass); 0 into the screen or a preview. y 1 when the last frame drew the
+        /// HDR world's bloom pyramid (`post::bloom`), which the last pass adds, so a pack's own
+        /// bloom effect leaves its glow out. z the pixels a mist volume cell covers each way
+        /// (`client::froxels`: 8, or 4 at ultra), for a pack that spends more on finer cells. w,
+        /// chiacraft: the frame's number, 0 to 63 and round again, for dithers that change each
+        /// frame (a temporal blend's history averages them out; without one they shimmer finely).
+        pub frame: [f32; 4],
+        /// The soft clouds' shadow on the land (`client::cloud_shadow`, with the HDR world; a pack
+        /// whose sky has `fs_cloud_shadow`): x the map's bindless index + 1 (0: none this frame), y
+        /// its texels each way, zw unused.
+        pub cloud_shadow: [f32; 4],
+        /// The mist's volume (`client::froxels`, `core:froxels`, with a pack whose sky has
+        /// `fs_froxel_light` and `fs_froxel_sum`; chiacraft): x the bindless index + 1 of the sums
+        /// from the eye (0: none this frame), y the index of each cell's own, zw the cells across
+        /// the view; 32 slices deep, eight to a row of the image.
+        pub froxels: [f32; 4],
     }
 }
 
@@ -734,7 +801,8 @@ gpu_struct! {
         pub cam_cube: [i32; 4],
         /// x start of the overlay table in `frames` (per texture: overlay texture + 1, or 0),
         /// y how far across from the camera the cubes end, fading into distant terrain before it
-        /// (`WorldRenderer::lod_fade`, 0: no fade), z tint kinds, w half the width of `lod_mask`.
+        /// (`WorldRenderer::lod_fade`, 0: no fade), z tint kinds, w half the width of `lod_mask` in the
+        /// low 24 bits and `core:far_look` in the top 8 (chiacraft).
         pub extra: [u32; 4],
     }
 }
@@ -843,7 +911,8 @@ gpu_struct! {
 gpu_struct! {
     /// What `particle_sim.wgsl` needs of a kind, for this frame's step.
     pub struct GpuParticleKind as "ParticleKind" {
-        /// x gravity, y speed kept this step, z speed kept on the ground this step.
+        /// x gravity, y speed kept this step, z speed kept on the ground this step, w the seconds
+        /// of its motion it is drawn stretched over (0: a square).
         pub motion: [f32; 4],
         /// x color, y color at the end, z `abi::particle_flags`, w shader slot.
         pub data: [u32; 4],
@@ -851,6 +920,10 @@ gpu_struct! {
         pub frames: [u32; 4],
         /// What one turning into it starts with: life and size, each from and to.
         pub start: [f32; 4],
+        /// How the wind carries it (`registry::ParticleDef`): x the rate it takes the air's speed
+        /// (0: not carried), y its sink through still air, z its flutter, w the wind that lifts it
+        /// once landed.
+        pub air: [f32; 4],
     }
 }
 
@@ -925,6 +998,9 @@ pub struct ParticleSimArgs {
     pub origin: [i32; 4],
     /// The cube in the middle of `cells`.
     pub center: [i32; 4],
+    /// The wind where the player is (m/s along x and z, the way it blows; `Scene::weather`), z
+    /// how hard it rains (0..1), w the shaders' seconds (`Scene::params.w`) the gusts move by.
+    pub wind: [f32; 4],
 }
 
 gpu_struct! {
@@ -958,7 +1034,11 @@ gpu_struct! {
         /// bytes (u0 v0 u1 v1, /255), w light: sky, red, green, blue bytes (0..15), all ones =
         /// unlit.
         pub data: [u32; 4],
-        /// x life fraction 0..1.
+        /// x life fraction 0..1; y 1 for a card that turns in 3D (a fluttering kind,
+        /// `ParticleDef::flutter`), 0 one facing the camera, 2 + its length (blocks) for a streak
+        /// along its motion (`ParticleDef::streak`); z the card's heading and w how far it is
+        /// tipped about it (radians; 0 lying flat), or for a streak the motion's heading and
+        /// climb.
         pub extra: [f32; 4],
     }
 }
@@ -1005,6 +1085,16 @@ gpu_struct! {
         /// Bindless index of the world's depth (reverse Z: 0 is the far plane, the sky).
         pub depth: u32,
         pub pad: u32,
+        /// Bindless index + 1 of this effect's own image at half the size each way, which its
+        /// `shaders/post_low/<name>.wgsl` drew before the effects (0: none; chiacraft).
+        pub low: u32,
+        pub spare: u32,
+        /// With the HDR world (chiacraft): bindless index + 1 of its bloom, the widest level of the
+        /// pyramid the pack's `fs_bloom_down`/`fs_bloom_up` drew from the world this frame, and of
+        /// this frame's exposure texel (`fs_exposure`); 0 without. In the pyramid's own passes `low`
+        /// is the second image they read and `strength` the seconds since the last frame.
+        pub bloom: u32,
+        pub exposure: u32,
     }
 }
 
@@ -1181,10 +1271,19 @@ pub fn prelude(shader: &str, common: &str) -> String {
         s.push_str(SOLID_AT);
         s.push_str(LOD_CORNER);
     }
+    s.push_str(CALM_OFF);
     s.push_str(common);
     s.push('\n');
     s
 }
+
+/// `CALM` in every shader: false, but true in the world's calm pipelines (`WorldRenderer::set_calm`),
+/// used while the scene has no fog in the air (`scene.weather.z` 0), no thunder (`scene.lightning.z`
+/// under 0.05), no held light (`scene.hand_light` 0) and the eye is in no liquid. A pack leaves
+/// out what does nothing then behind `if !CALM`: a smaller shader for the same picture (Android
+/// port: on the Pixel 10 the rare paths' size alone cost the vista a fifth of its world pass).
+pub const CALM_OFF: &str = "const CALM: bool = false;\n";
+pub const CALM_ON: &str = "const CALM: bool = true;\n";
 
 /// What goes in front of `occlusion.wgsl`.
 pub fn occlusion_prelude() -> String {
@@ -1208,8 +1307,8 @@ pub fn particle_sim_prelude(window_reach: i32) -> String {
     }
     use weft_abi::{particle_event as pe, particle_flags as pf, particle_then as pt, particle_when as pw};
     s.push_str(&format!(
-        "struct SimArgs {{\n    first: u32,\n    count: u32,\n    dt: f32,\n    pad: f32,\n    shift: vec4<f32>,\n    rel: vec4<f32>,\n    origin: vec4<i32>,\n    center: vec4<i32>,\n}}\nvar<immediate> args: SimArgs;\nconst WINDOW_REACH: i32 = {window_reach};\nconst PARTICLE_FLAG_COLLIDE: u32 = {}u;\nconst PARTICLE_FLAG_FULLBRIGHT: u32 = {}u;\nconst PARTICLE_FLAG_SHRINK: u32 = {}u;\n",
-        pf::COLLIDE, pf::FULLBRIGHT, pf::SHRINK
+        "struct SimArgs {{\n    first: u32,\n    count: u32,\n    dt: f32,\n    pad: f32,\n    shift: vec4<f32>,\n    rel: vec4<f32>,\n    origin: vec4<i32>,\n    center: vec4<i32>,\n    wind: vec4<f32>,\n}}\nvar<immediate> args: SimArgs;\nconst WINDOW_REACH: i32 = {window_reach};\nconst PARTICLE_FLAG_COLLIDE: u32 = {}u;\nconst PARTICLE_FLAG_FULLBRIGHT: u32 = {}u;\nconst PARTICLE_FLAG_SHRINK: u32 = {}u;\nconst PARTICLE_FLAG_FLOATS: u32 = {}u;\n",
+        pf::COLLIDE, pf::FULLBRIGHT, pf::SHRINK, pf::FLOATS
     ));
     let consts = [
         ("EVENT_LAND", pe::LAND),
