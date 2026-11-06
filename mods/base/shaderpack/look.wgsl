@@ -2136,13 +2136,15 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     t *= mix(shade, mix(vec3(1.0), vec3(1.12, 1.0, 0.82), golden()), lights);
     // The HDR world by day: sunlit foliage and grass toward a leaf-top yellow, as Bliss's grade
     // (its lit leaf tops olive-yellow, red about equal to green, where ours were green at red 0.4 of
-    // green: the vista from above, 11-06). Only what is green or yellow (water, haze and grey bark
+    // green: the vista from above, 11-06). Only what is green (water, haze, grey bark, sand and stone
     // keep their colour; on all the land it cast sepia over lakes and sand), and a green pixel stays
     // green, its red at most 0.95 of its green (grass between the crowns went straw-tan).
     if scene.frame.x > 0.5 {
         let l = luma(t);
         let k = day * (1.0 - rain_amount());
-        let leafy_px = smoothstep(0.0, 0.08, (t.g - t.b) / max(l, 1e-4) * 0.5);
+        // Green leading red as well: terracotta, sand and cream stone have more green than blue too,
+        // and went pale yellow (our mesa's red bands, the nave's orange floor).
+        let leafy_px = smoothstep(0.0, 0.08, (t.g - t.b) / max(l, 1e-4) * 0.5) * smoothstep(0.0, 0.04, (t.g - t.r) / max(l, 1e-4));
         let hi = smoothstep(0.06, 0.3, l) * k * SPLIT_WARM * LAND_PIXEL * leafy_px;
         let was_green = t.g > t.r;
         var warm = mix(t, vec3(l) * vec3(1.35, 1.08, 0.45), hi);
