@@ -1003,6 +1003,13 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
 
 // ---- texture sampling (the engine's) ----
 
+// The texture footprint's scale for the mip level: 1, or under DLSS 2^(its mip bias)
+// (`Scene::dlss.x`, NVIDIA's log2(render / output) - 1: the textures as sharp as at the
+// screen's size, which the upscaler then keeps from aliasing).
+fn mip_scale() -> f32 {
+    return exp2(scene.dlss.x);
+}
+
 fn nearest_uv(size: f32, uv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec2<f32> {
     let inv_s = 1.0 / size;
     let t = uv * size;
@@ -1048,8 +1055,8 @@ fn far_flat(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
 }
 
 fn opaque(in: VOut) -> vec4<f32> {
-    let du = dpdx(in.uv);
-    let dv = dpdy(in.uv);
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     let albedo = far_flat(in, with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv));
     return vec4(shade(in, albedo).rgb, mirror_alpha(in, albedo.rgb));
@@ -1092,8 +1099,8 @@ fn fs_cutout(in: VOut) -> WorldOut {
             discard;
         }
     }
-    let du = dpdx(in.uv);
-    let dv = dpdy(in.uv);
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     var albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
     if albedo.a <= cutout_edge(in, nuv, du, dv) {
@@ -1121,8 +1128,8 @@ fn cutout_thinned(in: VOut) -> bool {
 }
 
 fn cutout_albedo(in: VOut) -> vec4<f32> {
-    let du = dpdx(in.uv);
-    let dv = dpdy(in.uv);
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     return with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
 }
@@ -1130,8 +1137,8 @@ fn cutout_albedo(in: VOut) -> vec4<f32> {
 // Cut as `fs_cutout` cuts (`cutout_edge`), so the shading finds its depth wherever it drew.
 @fragment
 fn fs_cutout_depth(in: VOut) {
-    let du = dpdx(in.uv);
-    let dv = dpdy(in.uv);
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     let a = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv).a;
     let edge = cutout_edge(in, nuv, du, dv);
@@ -1200,8 +1207,8 @@ fn fs_cutout_fade(in: VOut) -> WorldOut {
     if faded(in) {
         discard;
     }
-    let du = dpdx(in.uv);
-    let dv = dpdy(in.uv);
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     var albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
     if albedo.a <= cutout_edge(in, nuv, du, dv) {
@@ -1214,8 +1221,8 @@ fn fs_cutout_fade(in: VOut) -> WorldOut {
 }
 
 fn translucent(in: VOut) -> vec4<f32> {
-    let du = dpdx(in.uv);
-    let dv = dpdy(in.uv);
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     let albedo = with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv);
     // Water and glass each lit, then one haze for both (one copy of it in the shader, as for distant

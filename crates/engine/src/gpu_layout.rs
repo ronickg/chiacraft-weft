@@ -790,6 +790,10 @@ gpu_struct! {
         /// (`@location(1)`, `weft_render::MOTION_FORMAT`) puts a point's position last frame
         /// through it.
         pub taa_prev: [[f32; 4]; 4],
+        /// Under the backend's upscaler (DLSS, `post::set_upscaling`): x the texture mip bias, in
+        /// levels (NVIDIA's log2(render / output) - 1; 0 without), which a pack's world shader adds
+        /// to its block textures' level; yzw unused.
+        pub dlss: [f32; 4],
     }
 }
 
@@ -1243,6 +1247,10 @@ bindings! {
     // Temporal anti-aliasing (`post::Post`): the same as the screen effects', so their pass
     // entries serve.
     taa "taa.wgsl" {
+        PASSES "passes": "array<Pass>",
+        SCENE "scene": "Scene",
+    }
+    upscale_guides "upscale_guides.wgsl" {
         PASSES "passes": "array<Pass>",
         SCENE "scene": "Scene",
     }

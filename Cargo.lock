@@ -8516,7 +8516,9 @@ version = "26.11.2"
 dependencies = [
  "ash",
  "ash-window",
+ "bytemuck",
  "gpu-allocator",
+ "libloading 0.9.0",
  "log",
  "naga",
  "raw-window-handle",

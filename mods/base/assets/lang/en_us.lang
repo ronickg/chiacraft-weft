@@ -1631,3 +1631,34 @@ web.base.tip.pick3 = {color:title}{0}{/} {color:dim}(item level {1}){/}
     {4} {5}
     {6} {7}
     {color:dim}Click to set it in.{/}
+
+# The upscaler's tab (DLSS: mods/base/src/dlss.rs)
+video.base.dlss.title = DLSS
+video.base.dlss.name = Upscaler: {0}
+video.base.dlss = Mode
+video.base.dlss.what = Drawn at a share of the screen and rebuilt by DLSS: DLAA keeps the full size, Quality to Ultra Performance draw fewer pixels for more frames
+video.base.dlss_model = Model
+video.base.dlss_model.what = DLSS's network for this mode (M, the newest, unless changed): NVIDIA's pick lets NVIDIA choose; CNN the older models, transformer the newer (sharper, steadier, a little slower)
+video.base.dlss_rr = Ray Reconstruction
+video.base.dlss_rr.what = DLSS cleans the lighting as it rebuilds the picture, at the mode's size
+video.base.dlss_rr_model = RR model
+video.base.dlss_rr_model.what = Ray Reconstruction's network: NVIDIA's pick is F, the newest
+video.base.dlss5 = DLSS 5
+video.base.dlss5.what = NVIDIA's neural rendering over the finished picture
+video.base.dlss5_intensity = DLSS 5 strength
+video.base.dlss5_intensity.what = How much of DLSS 5's picture is mixed in
+video.base.value.dlaa = DLAA
+video.base.value.quality = Quality
+video.base.value.balanced = Balanced
+video.base.value.performance = Performance
+video.base.value.ultra_performance = Ultra Performance
+video.base.value.model_default = NVIDIA's pick
+video.base.value.model_e = E (CNN)
+video.base.value.model_f = F (CNN)
+video.base.value.model_j = J (transformer)
+video.base.value.model_k = K (transformer)
+video.base.value.model_l = L (transformer 2)
+video.base.value.model_m = M (transformer 2)
+video.base.value.model_rr_d = D (transformer)
+video.base.value.model_rr_e = E (transformer)
+video.base.value.model_rr_f = F (latest)
