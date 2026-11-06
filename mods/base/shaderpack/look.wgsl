@@ -1390,7 +1390,11 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
         let noon = smoothstep(0.55, 0.9, scene.sun.y);
         let low_sun = mix(0.3, 1.0, 1.0 - noon);
         let sun_tint = p.sun / max(luma(p.sun), 1e-3);
-        toward = mix(toward, luma(toward) * sun_tint, 0.6 * low_sun * hdr_air) * (1.0 - 0.25 * noon * hdr_air);
+        // Nine tenths with the sun about 20-40° up (the 08:00 far band stayed grey at six: saturation
+        // 36 and warmth +17 against Bliss's 58 and +27, the land under it already at Bliss's), easing
+        // back to six by 45° so noon holds.
+        let morning = smoothstep(0.2, 0.34, scene.sun.y) * (1.0 - smoothstep(0.6, 0.7, scene.sun.y));
+        toward = mix(toward, luma(toward) * sun_tint, mix(0.6, 0.9, morning) * low_sun * hdr_air) * (1.0 - 0.25 * noon * hdr_air);
         v = mix(v, vec3((v.r + v.g + v.b) / 3.0), mix(0.35, 0.3, noon) * hdr_air);
     }
     let mixed = mix(pale, toward, v);
