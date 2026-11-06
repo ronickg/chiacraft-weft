@@ -88,6 +88,8 @@ const OPT_SHARPEN: u32 = 29u;
 // a distance (`base:look_leaf_holes`, read raw: 1 on, 0 off).
 const OPT_LEAF_SUN: u32 = 30u;
 const OPT_LEAF_HOLES: u32 = 31u;
+// The light through leaves (`base:look_leaf_light`, read raw: 0 none, 1 on).
+const OPT_LEAF_LIGHT: u32 = 32u;
 
 // The colour a grass or leaf tint is multiplied by for the foliage test: 1 as made.
 fn foliage_test() -> vec3<f32> {

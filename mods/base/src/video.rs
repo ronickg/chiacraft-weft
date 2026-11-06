@@ -606,7 +606,7 @@ fn row_ui(ui: &mut Ui, rows: &'static [Row], i: usize, step: fn(usize, i32)) {
 /// The Extra quality tab's rows (`EXTRA_SCREEN`): the newer features, each a setting of its own,
 /// outside Low to Ultra so no preset changes the look by them; Max sets them all (`max_extras`).
 /// Traced shadows and reflections only where the GPU can trace rays (the last rows, from `RT_ROW`).
-const EXTRA_ROWS: [Row; 10] = [
+const EXTRA_ROWS: [Row; 11] = [
     Row { key: "hdr", values: &[0.0, 1.0], get: || HDR_WORLD.get() as u8 as f64, set: |v| HDR_WORLD.set(v > 0.0), shown: off_on },
     Row {
         key: "aa",
@@ -658,6 +658,15 @@ const EXTRA_ROWS: [Row; 10] = [
         set: |v| crate::look::LOOK_LEAF_HOLES.set(if v > 0.0 { 1.0 } else { 0.0 }),
         shown: off_on,
     },
+    // The light through leaves (Trees, 11-06): its own setting, off by default and not in Max for
+    // now (Planner: Max's turn on it is a later call), as Ronald's Bliss has none.
+    Row {
+        key: "leaf_light",
+        values: &[0.0, 1.0],
+        get: || (crate::look::LOOK_LEAF_LIGHT.get() > 0.5) as u8 as f64,
+        set: |v| crate::look::LOOK_LEAF_LIGHT.set(if v > 0.0 { 1.0 } else { 0.0 }),
+        shown: off_on,
+    },
     Row {
         key: "rt_shadows",
         // Ultra: soft edges from more rays a pixel (with TAA), about three times the cost.
@@ -676,7 +685,7 @@ const EXTRA_ROWS: [Row; 10] = [
     },
 ];
 /// The first of the rows only a GPU that traces rays shows (traced shadows, then reflections).
-const RT_ROW: usize = 8;
+const RT_ROW: usize = 9;
 
 /// An extra row a step on: Max becomes Custom (the Low to Ultra presets leave these rows as they are).
 fn step_extra(i: usize, dir: i32) {
@@ -757,7 +766,14 @@ pub(crate) fn measured_rows(tab: crate::video_costs::Tab) -> Vec<crate::video_co
         }
         Tab::Extra => {
             let mut keys =
-                vec![("mist_volume", 0.6), ("cloud_shadows", 0.6), ("bloom_levels", 0.4), ("effect_detail", 0.4), ("leaf_holes", 0.4)];
+                vec![
+                ("mist_volume", 0.6),
+                ("cloud_shadows", 0.6),
+                ("bloom_levels", 0.4),
+                ("effect_detail", 0.4),
+                ("leaf_holes", 0.4),
+                ("leaf_light", 0.4),
+            ];
             if GPU_RAY_QUERY.get() {
                 // A new world shader each change, and its scene.
                 keys.push(("rt_shadows", 2.0));

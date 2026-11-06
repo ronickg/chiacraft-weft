@@ -479,8 +479,10 @@ fn fs_shadow(in: VOut) {
 var<private> LEAF_CUBE: bool = false;
 var<private> LEAF_SHADOW: f32 = 1.0;
 
-// How strong the light through leaves is (HDR), 0 none.
-const LEAF_SSS: f32 = 1.0;
+// How strong the light through leaves is (HDR, `base:look_leaf_light`), 0 none.
+fn leaf_light() -> f32 {
+    return fantasy_opt(OPT_LEAF_LIGHT);
+}
 
 // The sun's light through a leaf of colour `col` (albedo times tint) in the HDR world, after Bliss's
 // subsurface scattering for leaves (composite1.fsh, its SSS type 1; crew notes bliss-techniques.md
@@ -489,6 +491,9 @@ const LEAF_SSS: f32 = 1.0;
 // the sun makes a crown seen against it glow up to about ten times. Bliss takes the brighter of the
 // sun on the face and this; so does `shade_soft_lit`. Its canopy seen from below reads a saturated
 // green mass with sparkles, where ours read grey (Trees, Bliss's own world, 11-06).
+// The method after X0nk's Bliss (a Chocapic13' Shaders edit), written anew here; no code taken.
+// A setting of its own, off by default: Ronald's Bliss (SSS type 3 and no LabPBR pack) has none,
+// so the Bliss comparisons run without it (crew notes bliss-leaves.md).
 // Seen from below, its light has gone through the whole leaf block: a quarter of the thin skin's
 // at most, by the sun's reach (as thin, the canopy glowed yellow-lime, luma 160-180 against Bliss's
 // 66-69; a floor of 0.15 for leaves in the crown's shade lit it all, Trees' sss1-sss3). The lobe
@@ -501,7 +506,7 @@ fn leaf_sss(in: VOut, col: vec3<f32>) -> vec3<f32> {
     let depth = max(LEAF_SHADOW * 0.25, 0.01);
     let absorb = exp(-max(vec3(luma(col)) - col * vec3(1.0, 1.1, 1.2), vec3(0.0)) * (20.0 - 19.0 * depth));
     let open = smoothstep(0.4, 0.9, in.light.x);
-    return palette().sun * light_strength() * depth * absorb * phase * open * LEAF_SSS;
+    return palette().sun * light_strength() * depth * absorb * phase * open * leaf_light();
 }
 
 // `paint` the tint the light takes (a biome's grass and leaf colour, `in.color`; white under snow).
@@ -528,7 +533,7 @@ fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32>
             light += paint * palette().sun * light_strength() * sun_facing(n) * shadow * open * (k_sun - 1.0);
         }
         // A leaf cube's light through it is `leaf_sss`'s (`shade_soft_lit`), from its colour.
-        if LEAF_CUBE && LEAF_SSS > 0.0 {
+        if LEAF_CUBE && leaf_light() > 0.0 {
             LEAF_SHADOW = shadow;
             return light;
         }
@@ -636,7 +641,7 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
             lit = vec4(lit.r * mix(1.0, 0.55, k), lit.g, lit.b, lit.a);
         }
         // Leaves: the brighter of the sun on the face and the sun through the leaf (`leaf_sss`).
-        if LEAF_CUBE && LEAF_SSS > 0.0 && scene.frame.x > 0.5 {
+        if LEAF_CUBE && leaf_light() > 0.0 && scene.frame.x > 0.5 {
             let col = albedo.rgb * mix(in.color, vec3(1.0), snow);
             let direct = palette().sun * light_strength() * sun_facing(n) * LEAF_SHADOW;
             lit = vec4(lit.rgb + col * max(leaf_sss(in, col) - direct, vec3(0.0)), lit.a);
