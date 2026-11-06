@@ -263,6 +263,7 @@ pub(crate) struct Running {
     /// (mode, screen, world).
     upscaler: weft_render::UpscalerInfo,
     upscale_now: Option<UpscaleChoice>,
+    upscale_logged: Option<UpscaleChoice>,
     upscale_size: Option<UpscaleSize>,
     window: Arc<Window>,
     depth: (TextureId, u32, u32),
@@ -619,6 +620,7 @@ impl App {
         let mut r = Running {
             upscaler,
             upscale_now: None,
+            upscale_logged: None,
             upscale_size: None,
             gpu,
             window,
@@ -800,8 +802,10 @@ fn upscale_frame(r: &mut Running, info: &weft_render::FrameInfo) -> Option<weft_
             w
         }
     };
-    if r.upscale_now != Some(choice) {
+    // Logged when it changes (`upscale_now` is cleared each frame, so the last one is kept apart).
+    if r.upscale_logged != Some(choice) {
         log::debug!("upscaler: {choice:?}");
+        r.upscale_logged = Some(choice);
     }
     r.upscale_now = Some(choice);
     // DLSS's advice: 8 jitter points times the scale squared.
