@@ -109,6 +109,23 @@ the phone on USB, `ANDROID_HOME=~/Library/Android/sdk tools/release/android-run.
   picture is the same (fresh-world shots, old build and new: mean difference 0.04-0.15 of 255):
   world pass 50.9 ms, the frame 77 -> 59 ms, 13 -> 17 fps. (On a world saved by killed runs, and
   in both builds, near chunks showed as holes in a steep look down: test worlds want fresh names.)
+- **Same-picture speed-ups (11-06)**, the bench's vista and forest (`bench_two.txt`, Medium at half
+  scale, a fresh world each; side-by-sides in the crew gallery), fps vista / forest:
+  - start (after the discard fix above): 17 / 18;
+  - the palette read once per pixel (`look.wgsl`, 7858c9e1): 19 / 21, world 52.2 -> 45.1 and
+    42.7 -> 37.3 ms;
+  - small trims (far water's cloud shadow once, no far texture past 520 blocks, the haze's and
+    the sky's parts with no weight skipped): world 45.1 -> 44.0 ms at the vista;
+  - leaves in two passes on Android (e870c0bc: depth with the alpha test, then shaded with no
+    discard where the depth is theirs): 19 / 25, forest world 37.5 -> 29.6 ms (25.5 with leaves
+    drawn solid, the bound).
+  Tried and dropped: haze per vertex (slower). Left: half precision (no `shaderFloat16` path in
+  the engine yet), the far land's crowns and cloud shadow.
+- **Settings on the phone** (`sweep.sh`, the same bench): sun shadows cost the forest 4 ms and
+  the vista nothing; the screen effects about 2 ms; distant terrain 64 instead of 128 gives 20 / 20;
+  the Low preset 23 / 27. The **Phone** preset (`video.rs`, 9b46a8c5: Low's distances, no sun
+  shadows, Medium's effects) is offered on phones and chosen only by the player: the default stays
+  the full look (Ronald: optimise, don't tune down).
 - **Debugging on the phone:** `VALIDATION_LAYERS=<Khronos android-binaries folder>
   tools/release/android.sh` packs the validation layer; `--gpu-debug` in args.txt turns it on;
   `adb shell setprop debug.vulkan.khronos_validation.validate_sync true` adds sync checks. It
