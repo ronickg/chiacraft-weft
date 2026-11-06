@@ -229,7 +229,7 @@ const SOFT_STORM_THICK: f32 = 190.0;
 // How far a look is followed (blocks): beyond, the clouds fade into the sky.
 const SOFT_REACH: f32 = 4000.0;
 // The HDR world's sunlight and skylight on the soft clouds, against today's (`soft_march`).
-const CLOUD_SUN_HDR: f32 = 0.65;
+const CLOUD_SUN_HDR: f32 = 1.0;
 const CLOUD_SKY_HDR: f32 = 1.0;
 
 // One slice `z` (0..63) of the noise volume at `xy` (texels, 0..64).

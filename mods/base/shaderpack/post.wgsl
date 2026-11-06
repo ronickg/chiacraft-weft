@@ -302,6 +302,22 @@ fn mist_over(uv: vec2<f32>, pass_: Pass) -> f32 {
     return clamp(1.0 - v.a, 0.0, 1.0);
 }
 
+// Whether the pixel at `uv` with depth `d` is the sky's: nothing drawn (depth 0), or a cloud (the
+// clouds write their depth too). Land, never that high, is the rest. With the clouds counted as
+// land, the sky's boost and dimming stopped at their faint edges (where they stop drawing), cut
+// hard edges round the blue between them and a flat band under the deck's far end, and the clouds
+// took the land's brightening instead (mc_forest noon cloud 228 against Bliss's 201, gr5).
+fn sky_or_cloud(uv: vec2<f32>, d: f32) -> bool {
+    if d <= 0.0 {
+        return true;
+    }
+    let w = scene.inv_view_proj * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, d, 1.0);
+    // The soft deck's underside (as the lightning's, `look.wgsl`), less a margin; the blocky
+    // clouds' slab without soft ones.
+    let lift = select(0.0, SOFT_LIFT * (1.0 - 0.7 * max(min(rain_amount() * 0.75 + scene.weather.w * 0.25, 1.0), scene.weather.w)), scene.soft_clouds.x > 0.5);
+    return w.y / w.w > scene.clouds.z + lift - 20.0;
+}
+
 // The HDR world's light before the tone curve: the bloom mixed in and the exposure applied.
 fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
     var col = max(c, vec3(0.0));
@@ -310,7 +326,7 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
     // overhead and gold toward a low sun (08:00, saturation 26 against 43). Not in rain.
     let size = vec2<i32>(pass_.size);
     let px = clamp(vec2<i32>(uv * pass_.size), vec2(0), size - vec2(1));
-    let sky_px = textureLoad(textures[pass_.depth], px, 0).r <= 0.0;
+    let sky_px = sky_or_cloud(uv, textureLoad(textures[pass_.depth], px, 0).r);
     if sky_px {
         let y = luma(col);
         // More as the sun climbs, where the land's saturation is taken down most (0.62 of it with a
