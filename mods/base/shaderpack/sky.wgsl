@@ -393,6 +393,12 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
         // (0.2: at 0.4 they still stood brighter than the sky, Bliss's darker than it; PC shnt2.)
         sun *= mix(1.0, 0.2, smoothstep(-0.12, -0.3, scene.sun.y));
     }
+    // In the HDR world half its colour on the clouds: they stood gold-orange toward the 08:00 sun
+    // where Bliss's are cream-white with silver edges (PC shcl1).
+    if scene.frame.x > 0.5 {
+        // (Not at sunrise and sunset, where Bliss's are gold too: from the sun 6 to 17 degrees up.)
+        sun = mix(sun, mix(vec3(luma(sun)), sun, 0.5), smoothstep(0.1, 0.3, scene.sun.y));
+    }
     // In the HDR world, clouds seen away from a low sun take its light pale cream, not orange: Bliss's
     // clouds at 17:00-18:00 with the sun behind the camera are cream with grey bellies where ours
     // went strong orange; toward the sun they keep its gold (its 06:00 clouds, facing the sun).
@@ -442,10 +448,15 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
         // The sky's light from above, brighter on the tops; under a storm the bellies darker.
         // Grey-blue shaded bases, bright tops: evenly lit, a clear day's read as flat white cut-outs.
         let ambient = mix(p.horizon * 0.3 + p.ambient * 0.25, p.ambient * 1.2 + p.horizon * 0.2, smoothstep(0.0, 0.8, a)) * mix(1.0, 0.55, s.axes[0].y * (1.0 - a)) * mix(1.0, 0.72, cloud_low_sun()) * select(1.0, CLOUD_SKY_HDR, scene.frame.x > 0.5);
-        // In the HDR world the bellies darker where the cloud is dense and low in it (Bliss: the sky's
-        // light on a sample by its height in the layer and its density): ours were evenly lit.
-        let belly = select(1.0, mix(1.0, 0.55, sqrt(d) * (1.0 - smoothstep(0.0, 0.7, a))), scene.frame.x > 0.5);
-        var c = (sun * direct * powder * 0.9 + ambient * belly) * albedo;
+        var c = (sun * direct * powder * 0.9 + ambient) * albedo;
+        if scene.frame.x > 0.5 {
+            // In the HDR world bright undersides, as Bliss's: the light scattered many times inside
+            // (its slow lobe, falling off a third as fast) and more of the sky's from below. Seen
+            // from under them, ours went steel grey and purple with darker bellies (PC shcl1, the
+            // first pass), where Bliss's are cream.
+            let deep = exp(-od * 0.12) * (1.0 - exp(-sigma * 8.0) * 0.5);
+            c += (sun * deep * 0.35 + (p.horizon * 0.25 + p.ambient * 0.45) * (1.0 - smoothstep(0.0, 0.6, a))) * albedo;
+        }
         // In the HDR world a silver rim: the thin edges of a cloud before the sun, where the light
         // has crossed little of it, glow white-gold toward the eye (Bliss's and Photon's bright rims, a wide lobe: at g 0.9 and a
         // tenth of this it moved the sky 0.3/255;
