@@ -771,7 +771,8 @@ gpu_struct! {
         /// Ray-traced sun and moon shadows (`core:rt_shadows`, a GPU with ray queries): x 1 when
         /// the world's shader traces them this frame (its prelude then has `rt_sun`; the near shadow
         /// map then holds the models alone, the far one the terrain as before), y a frame count
-        /// (to 2^24, for noise that moves every frame), zw unused.
+        /// (to 2^24, for noise that moves every frame), z 1 for soft edges from more rays a pixel
+        /// (`core:rt_shadows` 2: `rt_sun_soft`'s `fine`), w unused.
         pub rt: [f32; 4],
         /// Temporal anti-aliasing (`post::Temporal`, `core:aa`): xy this frame's jitter in NDC
         /// (`view_proj` has it, `taa_prev` not; a clip position's `xy / w - taa.xy` is where it
