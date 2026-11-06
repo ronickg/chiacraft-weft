@@ -165,6 +165,9 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     out.dist = length(pos.xyz);
     out.uv = UVS[(c + ((w0 >> FACE_TURN_SHIFT) & FACE_TURN_MASK)) % 4u];
     out.backed = select(0u, 1u, (w0 & FACE_BACKED) != 0u);
+    if ((w0 >> FACE_TINT_SHIFT) & TINT_MASK) == WATER_TINT {
+        out.backed |= 2u;
+    }
     let tex_id = w1 & FACE_TEX_MASK;
     let fr = texture_frame(tex_id);
     out.size = fr.size;
@@ -229,6 +232,7 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     out.slot = shader_of(tex_id);
     out.pos = vec3<f32>(o.xyz * 16) + local;
     let tint_kind = (uvw >> QUAD_TINT_SHIFT) & TINT_MASK;
+    out.backed = select(0u, 2u, tint_kind == WATER_TINT);
     var tint = vec3(1.0);
     if tint_kind != 0u {
         tint = tint_color(tint_kind, w4 >> FACE_BIOME_SHIFT, o.x * 16 + i32(round(local.x)), o.z * 16 + i32(round(local.z)));
@@ -246,6 +250,11 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
 }
 
 fn shade(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
+    let lit = shade_unfogged(in, albedo);
+    return vec4(fogged(lit.rgb, plain_fog(in.dist)), lit.a);
+}
+
+fn shade_unfogged(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
     var light = in.color * lightmap(in.light, scene.params.z, scene.light.x, scene.light.y);
     // Glowing texels are lifted towards full brightness by their mask: lit = albedo * max(light,
     // emission), so they stay their own (tinted, unshaded) color in the dark.
@@ -265,26 +274,35 @@ fn shade(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
     } else {
         lit = block_shade(in.slot, BlockPixel(in.uv, albedo, linear_light, in.pos, scene.params.w));
     }
-    return vec4(mix(lit.rgb, scene.fog_color.rgb, plain_fog(in.dist)), lit.a);
+    return lit;
 }
 
 // How far the fog has closed in at `dist`: vanilla's from 0.6 of the terrain's end, and (chiacraft)
-// with distant terrain, a far fog from half the cubes' reach out to its end that closes in toward
-// it, as Distant Horizons fogs the land under the horizon. With the fog only from 0.6 of a 4096-block far end, the far land
-// stood clear and dark under a pale horizon (Far view, 11-06: the imported Bliss world with
-// shaders off, the strip under the horizon luma 83 against Minecraft + DH's 112). In a liquid
-// (fog start not 0.6 of its end) only the liquid's.
+// with distant terrain Distant Horizons' instead. With vanilla's only, from 0.6 of a 4096-block far
+// end, the far land stood clear and dark under a pale horizon (Far view, 11-06: the imported Bliss
+// world with shaders off, the strip under the horizon luma 83 against Minecraft + DH's 112). In a
+// liquid (fog start not 0.6 of its end) only the liquid's.
 fn plain_fog(dist: f32) -> f32 {
     let fog = fog_amount(dist, scene.params.x, scene.params.y);
     let near = f32(g.extra.w & 0xFFFFFFu) * 16.0;
     if abs(scene.params.x - 0.6 * scene.params.y) > 0.5 || near <= 0.0 || scene.params.y <= near {
         return fog;
     }
-    // Closing in near the end (a cube): linear, the land 400-800 blocks out took half its fog and
-    // went pale where Minecraft + DH's is clear (luma 130-145 against 65; it only fogs the strip
-    // under the horizon).
-    let t = clamp((dist - 0.5 * near) / (scene.params.y - 0.5 * near), 0.0, 1.0);
-    return max(fog, t * t * t);
+    // Distant Horizons' far fog at its defaults (3.3.4, `GlDhFogShader`, Ronald's own config: start
+    // 0.4 and end 1.0 of its reach, exponential squared at density 2.5), with vanilla's fog off as DH
+    // turns it off: none to 0.4 of the far end, half at 0.6, nearly all at 0.8. (Ours was a square
+    // over the far half: 4% at 0.6, a third at 0.8.)
+    let k = 2.5 * clamp((dist / scene.params.y - 0.4) / 0.6, 0.0, 1.0);
+    return 1.0 - exp(-k * k);
+}
+
+// `c` taken toward the fog by `f`, in gamma as vanilla's screen and Distant Horizons mix it (in linear
+// light the fog's brightness took more than its share).
+fn fogged(c: vec3<f32>, f: f32) -> vec3<f32> {
+    if f <= 0.0 {
+        return c;
+    }
+    return pow(mix(to_gamma(c), to_gamma(scene.fog_color.rgb), f), vec3(2.2));
 }
 
 // Nearest texels with antialiased borders (vanilla 26.1's sampleNearest): up close each texel
@@ -356,12 +374,23 @@ fn fs_cutout(in: VOut) -> @location(0) vec4<f32> {
     var albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
     // Vanilla's alpha test (GL_GREATER 0.1).
     if albedo.a <= 0.1 {
-        if in.backed == 0u {
+        if (in.backed & 1u) == 0u {
             discard;
         }
         albedo = backed_hole(in, nuv);
     }
     return vec4(shade(in, albedo).rgb, 1.0);
+}
+
+// The water's tint kind (`content`: core:grass, core:foliage, core:water come first). Its faces
+// carry bit 2 of `backed`.
+const WATER_TINT: u32 = 3u;
+// The far sea floor's shade in gamma under the light that falls on the water (`fs_lod`): a bed some
+// ten blocks down, sky light 5 of 15 (vanilla's curve 0.11) on sand, gravel and dirt.
+const FAR_BED: f32 = 0.15;
+
+fn to_gamma(c: vec3<f32>) -> vec3<f32> {
+    return pow(max(c, vec3(0.0)), vec3(1.0 / 2.2));
 }
 
 @fragment
@@ -370,7 +399,35 @@ fn fs_translucent(in: VOut) -> @location(0) vec4<f32> {
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     let albedo = with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv);
-    return shade(in, albedo);
+    let lit = shade(in, albedo);
+    // Water over the world as it was before it (`scene.behind`), mixed as vanilla's 8-bit screen
+    // mixes it, in gamma (chiacraft, stage 1 against vanilla + Distant Horizons): blended in linear
+    // light the deep bed added next to nothing and the lakes stood flat and bright, (45, 86, 168)
+    // where vanilla's are (47, 72, 122) with the bed and its seagrass showing. Written whole, so a
+    // second water face behind it (a fall before a lake) is lost under it; glass blends as before.
+    if (in.backed & 2u) != 0u && scene.behind.z > 0.5 {
+        let px = vec2<i32>(in.clip.xy);
+        // Nothing drawn under it (the sky's depth): over the dark sea floor far water lies on, as
+        // Distant Horizons' own floor shows under vanilla's water there. At the cubes' edge their
+        // water was drawn but no bed under it, and the far tile was left out: a pale ring of near
+        // water over the sky's colour across every lake (stage 1, the bay at 400-530 blocks).
+        if textureLoad(textures[u32(scene.behind.y)], px, 0).r <= 0.0 {
+            return vec4(far_water(in, albedo), 1.0);
+        }
+        let under = textureLoad(textures[u32(scene.behind.x)], px, 0).rgb;
+        let mixed = mix(to_gamma(under), to_gamma(lit.rgb), lit.a);
+        return vec4(pow(mixed, vec3(2.2)), 1.0);
+    }
+    return lit;
+}
+
+// Water at `albedo`'s alpha over a dark sea floor, mixed in gamma, then fogged (`fs_lod`'s far water).
+fn far_water(in: VOut, albedo: vec4<f32>) -> vec3<f32> {
+    let lit = shade_unfogged(in, vec4(albedo.rgb, 1.0)).rgb;
+    // The light alone: the tint taken out in linear light, as `shade_unfogged` put it in.
+    let bed = FAR_BED * to_gamma(shade_unfogged(in, vec4(1.0)).rgb / max(pow(in.tint, vec3(2.2)), vec3(1e-4)));
+    let water = pow(mix(bed, to_gamma(lit), albedo.a), vec3(2.2));
+    return fogged(water, plain_fog(in.dist));
 }
 
 // Distant terrain (`client::lod`): a record is the `dir` face of a box in its tile, drawn with its
@@ -430,6 +487,7 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     out.slot = 0u;
     out.light = vec4(1.0, 0.0, 0.0, 0.0);
     let kind = lod_tint(w0);
+    out.backed = select(0u, 2u, kind == WATER_TINT);
     var tint = vec3(1.0);
     if kind != 0u {
         tint = unpack_rgb(biomes[corner.biome * g.extra.z + kind - 1u]);
@@ -464,6 +522,15 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, fract(in.uv), du, dv);
     var albedo = with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv);
+    // Far water as Distant Horizons draws it (its `ColumnBox` keeps the sea floor's top under
+    // water, drawn first; the water over it at the texture's alpha, mixed in gamma as vanilla's
+    // screen mixes): over a bed that the water above has darkened (a block of sky light taken per
+    // block of water, `DhLightingEngine`: lakes ten and more deep near black). Our far tiles have no
+    // bed under their water, so it is that dark bed, lit as the water is. Drawn whole and lighter,
+    // it was (44, 88, 169) against vanilla + DH's (43, 71, 126) (stage 1, the vista at noon).
+    if (in.backed & 2u) != 0u {
+        return vec4(far_water(in, albedo), 1.0);
+    }
     // A cutout's clear texels (leaves' gaps) show its colour, not the unset texel's: white under a
     // tint, as the tint then colours it.
     let cover = smoothstep(0.1, 0.6, albedo.a);
