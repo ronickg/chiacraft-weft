@@ -30,8 +30,10 @@ pub const LOOKS_PER_SEC: f32 = 6000.0;
 /// turn (`wild::Turn`): broadleaves, and evergreens' needles and scales far fewer.
 /// (Recrafted's is about 0.005, but its display ticks also reach 32 blocks; at that our calm forest
 /// showed none in a shot, wl_look1a.)
-pub const LEAF_RATE: f32 = 0.012;
-pub const NEEDLE_RATE: f32 = 0.003;
+/// At 0.012 with autumn at 4x the birch forest put 140-500 leaves a second about, 16,000 alive
+/// (the particles' cap; wind_look1b), though only some tens were in view.
+pub const LEAF_RATE: f32 = 0.008;
+pub const NEEDLE_RATE: f32 = 0.002;
 /// In the windiest part of the day more come off: the rate times `1 + LEAF_WIND * wind / 10 m/s`.
 pub const LEAF_WIND: f32 = 0.8;
 /// A gust passing (`gust` over `GUST_FROM`) blows up to this many times the calm rate off the
@@ -42,7 +44,7 @@ pub const GUST_FROM: (f32, f32) = (1.15, 1.5);
 pub const RAIN_MORE: f32 = 1.0;
 /// Seconds a leaf lives, shortest and longest: its fall and then lying as litter (Recrafted's
 /// complete preset: 4 minutes).
-pub const LEAF_LIFE: (f32, f32) = (90.0, 200.0);
+pub const LEAF_LIFE: (f32, f32) = (45.0, 110.0);
 /// A leaf's size (blocks): 5 to 7 of the world's 32 texels.
 pub const LEAF_SIZE: (f32, f32) = (0.16, 0.22);
 /// How fast a leaf takes the air's speed (per second), and how fast it falls through still air
@@ -55,7 +57,7 @@ pub const LEAF_LIFT: f32 = 7.0;
 
 /// How many more leaves fall in autumn, at its peak, where the year's seasons are strongest
 /// (`foliage::strength`); in spring's fresh green fewer.
-pub const AUTUMN_FALL: f32 = 4.0;
+pub const AUTUMN_FALL: f32 = 2.5;
 pub const SPRING_FALL: f32 = 0.6;
 
 /// The share of the calm rate deciduous trees shed on `day` of the year (0 at spring's start), where
@@ -106,7 +108,9 @@ pub const POLLEN_HOURS: (f32, f32) = (6.0, 19.0);
 /// Wind (m/s) from which snow lying in the open blows (spindrift), and at which it blows most;
 /// grains a second off a snow surface at the most.
 pub const SPINDRIFT: (f32, f32) = (6.0, 14.0);
-pub const SPINDRIFT_RATE: f32 = 0.6;
+pub const SPINDRIFT_RATE: f32 = 1.5;
+/// Seconds of its flight a blown snow grain is drawn stretched over.
+pub const SPINDRIFT_STREAK: f32 = 0.06;
 pub const SPINDRIFT_LIFE: (f32, f32) = (1.5, 3.5);
 pub const SPINDRIFT_SIZE: (f32, f32) = (0.04, 0.08);
 pub const SPINDRIFT_AIR: f32 = 6.0;
@@ -186,7 +190,7 @@ mod tests {
     fn the_year() {
         let q = calendar::YEAR_DAYS as f32 / 4.0;
         let at = |s: f32| fall(s * q, 1.0);
-        assert!(at(2.85) > 3.5, "late autumn {}", at(2.85));
+        assert!(at(2.85) > AUTUMN_FALL - 0.5, "late autumn {}", at(2.85));
         assert!(at(0.3) < 0.7, "spring {}", at(0.3));
         assert!((at(1.5) - 1.0).abs() < 1e-3, "summer {}", at(1.5));
         for d in 0..calendar::YEAR_DAYS * 4 {

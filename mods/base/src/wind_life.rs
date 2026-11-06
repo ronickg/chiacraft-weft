@@ -89,6 +89,9 @@ pub fn register(r: &mut Registry) {
         .life(wl::SPINDRIFT_LIFE.0, wl::SPINDRIFT_LIFE.1)
         .size(wl::SPINDRIFT_SIZE.0, wl::SPINDRIFT_SIZE.1)
         .carried(wl::SPINDRIFT_AIR, wl::SPINDRIFT_SINK)
+        // Snow streaming low over the ground: drawn along its flight (specks alone barely showed,
+        // wind_look1c).
+        .streak(wl::SPINDRIFT_STREAK)
         .on_land(When::any(), Then::die());
     r.particle(&SAND_GRAIN)
         .life(wl::SAND_LIFE.0, wl::SAND_LIFE.1)
@@ -396,8 +399,12 @@ fn frame(c: &Client) {
                 if blows <= 0.0 && storm <= 0.0 {
                     continue;
                 }
-                // Only off a surface open to the sky: the block over it is air.
-                if c.block([p[0], p[1] + 1, p[2]]) != Some(0) {
+                // Only off a surface open to the sky: nothing solid over it (air, or grass and
+                // flowers standing in it: on the dunes and the taiga most sand and snow has some).
+                let open = c
+                    .block([p[0], p[1] + 1, p[2]])
+                    .is_some_and(|b| b == 0 || state_flags(b) & abi::block_flags::SOLID == 0 && liquid_of(b).is_none());
+                if !open {
                     continue;
                 }
                 let top = c.light([p[0], p[1] + 1, p[2]]).map_or(0, |l| l & 0xFF);
@@ -409,7 +416,8 @@ fn frame(c: &Client) {
                 if n > 0 {
                     let (kind, slot) = if snow { (&SPINDRIFT, 3) } else { (&SAND_GRAIN, 4) };
                     let height = if snow { snow_top(state) } else { 1.0 };
-                    let v = [wind[0] as f64 * 0.6, 0.8 + life.unit() as f64, wind[1] as f64 * 0.6];
+                    // Off along the ground with the wind, a little up.
+                    let v = [wind[0] as f64 * 0.8, 0.3 + life.unit() as f64 * 0.6, wind[1] as f64 * 0.8];
                     drop(
                         c.spawn_particles(kind, at(0.5, height + 0.05, 0.5))
                             .spread_box([0.5, 0.05, 0.5])
