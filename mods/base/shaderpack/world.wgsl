@@ -1103,6 +1103,10 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
         if open_sky() {
             let d = length(in.rel);
             below *= (vec3(1.0) - haze_veil(in.rel, d)) * (1.0 - smoothstep(scene.params.y * 0.84, scene.params.y, d));
+            // And the mist (`mist_kept`): veiled by the haze alone, rivers and lakes under a dawn
+            // mist were bright cream ribbons with crisp edges, brighter than the mist round them
+            // (Planner on Mist's m5 sheet, 11-06).
+            below *= mist_kept(in.rel, smoothstep(0.25, 0.75, in.light.x));
         }
         return WaterLit(surface, below, 1.0);
     }

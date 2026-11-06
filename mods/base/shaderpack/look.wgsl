@@ -1421,6 +1421,21 @@ fn froxel_fog(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     return c * through + v.rgb * (1.0 - through) / max(1.0 - v.a, 1e-4);
 }
 
+// How much of what lies `rel` away (camera relative) the mist lets through, 0..1, with `sky` (0..1)
+// the sky light there as `fog_through` takes it: for what is added after the haze (the bottom seen
+// through water, `world.wgsl`'s `water`). From the volume; 1 without it.
+fn mist_kept(rel: vec3<f32>, sky: f32) -> f32 {
+    if CALM || scene.weather.z < 0.005 || in_liquid() || !open_sky() || sky <= 0.0 || scene.froxels.x < 0.5 {
+        return 1.0;
+    }
+    let clip = scene.view_proj * vec4(rel, 1.0);
+    let uv = clamp(vec2(clip.x, -clip.y) / max(clip.w, 1e-4) * 0.5 + 0.5, vec2(0.0), vec2(1.0));
+    let f = froxel_slice(min(length(rel), FROXEL_FAR));
+    let k = i32(trunc(f));
+    let v = mix(froxel_at(uv, k - 1), froxel_at(uv, min(k, i32(FROXEL_SLICES) - 1)), fract(f));
+    return pow(max(v.a, 1e-6), sky);
+}
+
 // One cell's own mist and light for the volume (`fs_froxel_light`): toward `dir`, `at` blocks out,
 // with the mist's floor `floor` (`fog_floor` of what lies behind it): rgb the light the mist sends
 // toward the eye there (as `fog_through` lights each step: the sky's, and the sun's where it
