@@ -544,8 +544,11 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
             let hidden = covered(i, j);
             let mut end = i + 1;
             let occ = occ_at(i, j);
-            let ao = if wet(top) || leafy(top) { 0xFF } else { ground_ao(i, j, 3, y) };
-            let ao_at = |e: i32| if wet(top) || leafy(top) { 0xFF } else { ground_ao(e, j, 3, y) };
+            // Tops keep none: shaded, their runs split on every slope and the far tiles' faces (and
+            // the shadow pass's) grew, about 5% of the GPU's frame (lb_aft against lb_dev); the
+            // walls carry the shade at the steps, where it shows.
+            let ao = 0xFF;
+            let ao_at = |_: i32| 0xFF;
             while end < CELLS
                 && at(end, j).0 == y
                 && top_at(end, j) == top
