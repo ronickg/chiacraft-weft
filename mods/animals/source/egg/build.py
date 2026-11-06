@@ -305,13 +305,13 @@ LOOKS = {
     # Fish: a clutch of a few beads (each 3 px, a lungfish's jelly ball 5: no egg under 2 x 3
     # px, `reports/Eggs in Minecraft mods.md`); the four tell apart by color and how they lie
     # (a heap in gravel, a loose scatter, jelly balls).
-    "roe_trout": dict(roe=dict(n=4, d=1.5, px=3, dot="eyes"), area=bead, model="egg_roe",
+    "roe_trout": dict(roe=dict(n=4, d=1.5, px=3, dot="eyes"), area=bead,
                       mats=[shell((232, 124, 50)), shell((250, 172, 104)), material("shell", (40, 30, 36))]),
-    "roe_pacu": dict(roe=dict(n=4, d=1.25, px=3, dot="yolk", spread=2.6), area=bead, model="egg_roe_loose",
+    "roe_pacu": dict(roe=dict(n=4, d=1.25, px=3, dot="yolk", spread=2.6), area=bead,
                      mats=[shell((202, 214, 196)), shell((232, 240, 230)), shell((228, 196, 80))]),
-    "roe_lycoptera": dict(roe=dict(n=4, d=1.25, px=3, spread=2.6), area=bead, model="egg_roe_loose",
+    "roe_lycoptera": dict(roe=dict(n=4, d=1.25, px=3, spread=2.6), area=bead,
                           mats=[shell((222, 200, 136)), shell((242, 228, 182)), shell((150, 130, 80))]),
-    "roe_lungfish": dict(roe=dict(n=2, d=2.4, px=5, dot="yolk", spread=1.9), area=bead, model="egg_jelly",
+    "roe_lungfish": dict(roe=dict(n=2, d=2.4, px=5, dot="yolk", spread=1.9), area=bead,
                          mats=[shell((186, 208, 210)), shell((222, 236, 236)), material("shell", (50, 78, 46))]),
     # Birds (`reports/Eggs by species.md`, Birds): shapes by group, a texture per species; all
     # lie on their side in the nest's cup. Owls: plain white, nearly round, glossy.
@@ -320,10 +320,10 @@ LOOKS = {
     # Songbirds (at the smallest an egg is drawn, 5 px): the house sparrow greyish
     # white, densely speckled grey-brown; the snow bunting bluish white with red-brown and lilac
     # spots and scrawls gathered at the blunt end.
-    "bird_sparrow": dict(L=2.2 * CM, W=1.6 * CM, asym=0.22, tilt=80, area=bird, model="egg_bird_small",
+    "bird_sparrow": dict(L=2.2 * CM, W=1.6 * CM, asym=0.22, tilt=80, area=bird,
                          marks=dict(speck=0.4, two=True, blotch=3, size=(0.2, 0.3), gather=0.5),
                          mats=[shell((214, 214, 204)), shell((168, 164, 160)), material("shell", (112, 98, 84)), shell((150, 146, 138))]),
-    "bird_bunting": dict(L=2.2 * CM, W=1.6 * CM, asym=0.22, tilt=80, area=bird, model="egg_bird_small",
+    "bird_bunting": dict(L=2.2 * CM, W=1.6 * CM, asym=0.22, tilt=80, area=bird,
                          marks=dict(deep=4, deep_size=(0.2, 0.3), blotch=7, size=(0.15, 0.25), gather=0.75, speck=0.06),
                          mats=[shell((220, 230, 226)), shell((176, 160, 184)), material("shell", (132, 70, 50)), shell((132, 70, 50))]),
     # The raven: green (kept off blue, so it doesn't read as a raptor's), blotched and streaked
@@ -519,7 +519,7 @@ def no_thin_lines(spec, sheet, E, name=""):
 
 
 def model_of(name):
-    return LOOKS[name].get("model", f"egg_{name}")
+    return f"egg_{name}"  # each look its own model (linecheck finds `source/egg` and its texture by the name)
 
 
 def box_of(spec):

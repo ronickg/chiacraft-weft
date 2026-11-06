@@ -13,7 +13,7 @@
 /// One look: a family's egg, and the length its model is built at (px).
 pub struct Look {
     pub name: &'static str,
-    /// The model (`assets/models/<it>.geo.json`): its own, or one shared with the same shape.
+    /// The model (`assets/models/<it>.geo.json`, `egg_<name>`).
     pub model: &'static str,
     /// The egg's length as built, px (a roe clutch: one bead).
     pub px: f32,
@@ -52,18 +52,18 @@ pub const LOOKS: &[Look] = &[
     // Tiny, white, matt, dented.
     Look { name: "lizard", model: "egg_lizard", px: 5.0 },
     // Fish: a clutch of a few 3 px beads (a lungfish's jelly balls 5 px), told apart by color and lay.
-    Look { name: "roe_trout", model: "egg_roe", px: 3.0 },
-    Look { name: "roe_pacu", model: "egg_roe_loose", px: 3.0 },
-    Look { name: "roe_lycoptera", model: "egg_roe_loose", px: 3.0 },
-    Look { name: "roe_lungfish", model: "egg_jelly", px: 5.0 },
+    Look { name: "roe_trout", model: "egg_roe_trout", px: 3.0 },
+    Look { name: "roe_pacu", model: "egg_roe_pacu", px: 3.0 },
+    Look { name: "roe_lycoptera", model: "egg_roe_lycoptera", px: 3.0 },
+    Look { name: "roe_lungfish", model: "egg_roe_lungfish", px: 5.0 },
     // Fantasy: the biggest, stone-heavy, in metal-rimmed jewel scales; our own design.
     Look { name: "wyvern", model: "egg_wyvern", px: 28.0 },
     // Birds, lying in the nest's cup, each its own colors. Owls: plain white, nearly round.
     Look { name: "bird_owl", model: "egg_bird_owl", px: 9.0 },
     // Songbirds: grey-white densely speckled, and bluish white with red-brown spots at the
     // blunt end.
-    Look { name: "bird_sparrow", model: "egg_bird_small", px: 5.0 },
-    Look { name: "bird_bunting", model: "egg_bird_small", px: 5.0 },
+    Look { name: "bird_sparrow", model: "egg_bird_sparrow", px: 5.0 },
+    Look { name: "bird_bunting", model: "egg_bird_bunting", px: 5.0 },
     // Blotched ovals: the raven's green, the gull's olive-brown, the eagle's red-brown on white,
     // the hawk's bluish white, the vulture's cream wreathed dark brown at the blunt end.
     Look { name: "bird_raven", model: "egg_bird_raven", px: 8.0 },
