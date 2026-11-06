@@ -1182,6 +1182,15 @@ fn translucent(in: VOut) -> vec4<f32> {
         let l = shade_soft_lit(in, albedo, far_soft(in));
         pre = l.rgb;
         a = l.a;
+        // Glass with a material (the showcase's): what it mirrors isn't let through, so its share
+        // of the pixel grows by its Fresnel, the more the glossier (a clear pane mirrors the sky
+        // at a glancing look instead of fading with its alpha).
+        let m = shade_mat(in, albedo.rgb);
+        if m.has {
+            let ndv = max(dot(normalize(in.normal), -normalize(in.rel)), 0.0);
+            let f = luma(mat_fresnel(m.f0, ndv)) * (1.0 - clamp(m.rough * 1.6, 0.0, 0.85));
+            a = a + (1.0 - a) * f;
+        }
     }
     return vec4(below + display(haze_lit(pre, in.rel, in.light.x)), a);
 }
