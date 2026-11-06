@@ -10,6 +10,8 @@ use gpu_allocator::vulkan::{Allocation, AllocationCreateDesc, AllocationScheme, 
 use weft_render::*;
 
 mod rt;
+#[cfg(feature = "ngx")]
+mod ngx;
 #[cfg(feature = "streamline")]
 mod streamline;
 mod upscale;
@@ -336,7 +338,7 @@ impl VulkanBackend {
 
     unsafe fn create(desc: &BackendDesc) -> Result<VulkanBackend, Error> {
         unsafe {
-            let early = upscale::early();
+            let mut early = upscale::early();
             let entry = load_vulkan(&early)?;
             let display = desc
                 .window
@@ -389,6 +391,12 @@ impl VulkanBackend {
                     .any(|e| e.extension_name_as_c_str() == Ok(khr::portability_enumeration::NAME));
             if portability {
                 exts.push(khr::portability_enumeration::NAME.as_ptr());
+            }
+            // What the upscaler asks for (NGX), of what the loader has.
+            for e in early.instance_extensions(&entry.enumerate_instance_extension_properties(None).unwrap_or_default()) {
+                if !exts.iter().any(|x| std::ffi::CStr::from_ptr(*x) == std::ffi::CStr::from_ptr(e)) {
+                    exts.push(e);
+                }
             }
             let app = vk::ApplicationInfo::default()
                 .application_name(c"Weft")
@@ -637,6 +645,9 @@ impl VulkanBackend {
             if has_ext(khr::portability_subset::NAME) {
                 dev_exts.push(khr::portability_subset::NAME.as_ptr());
             }
+            // What the upscaler asks for (NGX), of what the GPU has.
+            let more = early.device_extensions(&instance, pdev, &dev_exts);
+            dev_exts.extend(more);
             let prio = [1.0];
             let qinfo = [vk::DeviceQueueCreateInfo::default()
                 .queue_family_index(queue_family)
@@ -817,6 +828,7 @@ impl VulkanBackend {
             let pipeline_cache = device
                 .create_pipeline_cache(&vk::PipelineCacheCreateInfo::default(), None)
                 .map_err(err("pipeline cache"))?;
+            let upscaler = upscale::ready(early, &upscale::Made { entry: &entry, instance: &instance, pdev, device: &device }, desc.upscale_standin);
             let mut backend = VulkanBackend {
                 _entry: entry,
                 instance,
@@ -867,7 +879,7 @@ impl VulkanBackend {
                 ts_period: props.limits.timestamp_period,
                 gpu_times: Vec::new(),
                 submit_split: SubmitSplit::default(),
-                upscaler: upscale::ready(early, pdev, desc.upscale_standin),
+                upscaler,
                 rt: None,
             };
             if ray_query {
