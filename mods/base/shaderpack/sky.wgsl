@@ -401,11 +401,12 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
         let ambient = mix(p.horizon * 0.3 + p.ambient * 0.25, p.ambient * 1.2 + p.horizon * 0.2, smoothstep(0.0, 0.8, a)) * mix(1.0, 0.55, s.axes[0].y * (1.0 - a)) * mix(1.0, 0.72, cloud_low_sun());
         var c = (sun * direct * powder * 0.9 + ambient) * albedo;
         // In the HDR world a silver rim: the thin edges of a cloud before the sun, where the light
-        // has crossed little of it, glow white-gold toward the eye (Bliss's and Photon's bright rims;
+        // has crossed little of it, glow white-gold toward the eye (Bliss's and Photon's bright rims, a wide lobe: at g 0.9 and a
+        // tenth of this it moved the sky 0.3/255;
         // with the powder term and the fine erosion our edges went dim right where they should shine).
         if scene.frame.x > 0.5 {
             let thin = (1.0 - d) * (1.0 - d);
-            c += sun * cloud_hg(mu, 0.9) * 12.566 * 0.06 * thin * exp(-od * 0.35) * albedo;
+            c += sun * cloud_hg(mu, 0.75) * 12.566 * 0.5 * thin * exp(-od * 0.2) * albedo;
         }
         let kept = exp(-sigma * step);
         light += through * (1.0 - kept) * c;
