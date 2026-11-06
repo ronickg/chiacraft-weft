@@ -11,7 +11,9 @@ What it does, per drawing `<material>__<part>_px.png` (32 x 32, cut by art.py):
   look at when it floats off its haft (`gap`, texels from the haft's end to the head), pixels fell off
   the canvas, or a gem spot (`GEM_SPOTS`) misses the icon. A flagged drawing wants redrawing to today's
   size and socket, not moving: a loose head's eye sits mid-head, while today's hafts stop where the old
-  heads covered them.
+  heads covered them. Today's binding (the haft's top and its lashing, wrap or collar, cut as the
+  joint band when today's files were made) is pasted back over each redrawn head (`--no-binding` keeps
+  the drawing's own).
 - **Parts the game draws by a plain icon today** (the knife's blade, art `short_blade`, and the spear's
   leaf point): written as `parts/knife/knife_blade/<art>.png` and `parts/spear/leaf_point/<art>.png` with
   their anchor (the tang's or socket's end, the corner toward the bottom left), and a Rust snippet for
@@ -69,6 +71,38 @@ def drawing(src, name):
         if os.path.exists(os.path.join(d, name)):
             return os.path.join(d, name)
     return os.path.join(dirs[-1], name)
+
+
+def binding(kind, m):
+    """Today's joint band of a head (the haft's top and its binding: lashing, wrap or collar) as a
+    mask on the head's canvas, from the cut that made today's files (`export2.py`, `toolfix.regions`);
+    None where there's no such drawing."""
+    try:
+        sys.path.insert(0, HERE)
+        import export2
+        import toolfix as tf
+    except Exception:
+        return None
+    if kind not in export2.TOOLS:
+        return None
+    a = tf.drawn(export2.TOOLS[kind](m))
+    if a is None:
+        return None
+    lab, _ = tf.regions(a, "axe")
+    return lab == tf.JOINT
+
+
+COOL = {"stone", "flint", "iron", "steel", "diamond"}
+
+
+def warm_mask(a):
+    """Pixels coloured like wood or a wrap: warm hue (red to yellow), saturated, on."""
+    import colorsys
+    out = np.zeros(a.shape[:2], bool)
+    for y, x in zip(*np.nonzero(a[..., 3] > 0)):
+        h, l, sat = colorsys.rgb_to_hls(*(a[y, x, :3] / 255.0))
+        out[y, x] = (h < 0.14 or h > 0.95) and sat > 0.35 and 0.12 < l < 0.85
+    return out
 
 
 def load(path):
@@ -219,6 +253,7 @@ def main():
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--only", default="")
     ap.add_argument("--parts", default="")
+    ap.add_argument("--no-binding", action="store_true", help="keep the drawing's own haft top, not today's binding")
     ap.add_argument("--src", default=SRC, help="folders of drawings, comma-separated, first found wins")
     args = ap.parse_args()
     only = set(filter(None, args.only.split(",")))
@@ -252,9 +287,21 @@ def main():
             else:
                 score, dx, dy = (place_tip if how == "tip" else place_overlap)(new, old)
             placed = moved(new, dx, dy)
+            # Today's binding back over a redrawn head (drawn in head material where it was the haft's
+            # top and its wrap), unless --no-binding.
+            joint = binding(kind, m) if (old is not None and not args.no_binding) else None
+            if joint is not None:
+                placed[joint] = old[joint]
+            if old is not None and not args.no_binding and m in COOL:
+                # On a cool head the haft's top and its wrap are the warm pixels (wood, red and gold
+                # cord): today's warm pixels go back where the redraw drew head there.
+                warm = warm_mask(old) & ~warm_mask(placed)
+                placed[warm] = old[warm]
             write(placed, f"parts/{kind}/{shape}/{m}.png", args.apply)
             full = icon(kind, placed, shift, handle)
-            misses = gem_misses(full, spots.get(kind, []))
+            # Only spots today's head doesn't miss too (some of today's already sit half off it).
+            before = gem_misses(icon(kind, old, shift, handle), spots.get(kind, [])) if old is not None else []
+            misses = [g for g in gem_misses(full, spots.get(kind, [])) if g not in before]
             cl = clipped(new, dx, dy)
             # How far the head floats off its haft: from the haft's end to the nearest head pixel.
             gap = 0.0
