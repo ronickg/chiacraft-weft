@@ -178,4 +178,7 @@ chiacraft's pack reads these settings (`mods/base/src/look.rs`; Mod Settings in 
 | `base:look_curve` | 1, 0-2 | with the HDR world (without it Lottes's always): the day's tone curve, 0 Lottes's (as made), 1 Hejl's 2015 (a deeper toe, Ronald's pick), 2 AgX (Bliss's current default) |
 | `base:look_bloom` | 1, 0-3 | with the HDR world: how much of the bloom pyramid's glow is mixed in (1: a tenth, more in fog and rain) |
 | `base:look_auto_exposure` | 1, 0-2 | with the HDR world: how much the exposure follows how bright the view is (0 fixed) |
+| `base:look_white` | 1.6, -1..2.5 | with the HDR world: the white balance by day after the curve, 0 neutral, more warmer and less blue |
+| `base:look_sky_light` | 1, 0.2-1.5 | the sky's light in the shade, scaled (with the HDR world 0.6 of it as made, times this) |
+| `base:look_foliage_test` | 0, 0-1 | a test: grass and leaf tints darker and less yellow (1: 30% darker) |
 

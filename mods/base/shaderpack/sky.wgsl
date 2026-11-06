@@ -293,6 +293,19 @@ fn soft_density(s: Sky, at: vec2<f32>, a: f32, cover: f32, fine: bool) -> f32 {
     return clamp(d, 0.0, 1.0);
 }
 
+// How low the sun is for the clouds' light, 0 (high, or down) to 1 (just above the horizon).
+// With the HDR world only (Shader's 2fb0c270, carried for the cloud light, step d): without it the
+// clouds stay as today's approved look.
+fn cloud_low_sun() -> f32 {
+    let e = scene.sun.y;
+    return (1.0 - smoothstep(0.06, 0.4, e)) * smoothstep(-0.04, 0.03, e) * (1.0 - rain_amount()) * select(0.0, 1.0, scene.frame.x > 0.5);
+}
+
+// The sunlight on the clouds against the palette's: an orange that deepens as the sun gets low.
+fn cloud_sun_tint() -> vec3<f32> {
+    return mix(vec3(1.0), vec3(1.05, 0.66, 0.38), cloud_low_sun() * 0.85);
+}
+
 // The soft clouds along `dir` from the camera, up to `far` (blocks): rgb the light they send toward
 // the eye (linear), a how much of what is behind still shows.
 // (`SOFT_LIFT` is in look.wgsl: the lightning's bolt starts at the soft deck too.)
@@ -326,8 +339,25 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
     let l = light_dir();
     let mu = dot(dir, l);
     // Two lobes, forward (the silver lining toward the sun) and a little back.
-    let phase = min(0.75 * cloud_hg(mu, 0.75) + 0.25 * cloud_hg(mu, -0.2), 0.6) * 12.566;
-    let sun = p.sun * light_strength() * (1.0 - s.axes[0].y * 0.55);
+    var phase = min(0.75 * cloud_hg(mu, 0.75) + 0.25 * cloud_hg(mu, -0.2), 0.6) * 12.566;
+    // In the HDR world the forward peak is kept (about 21 times the light across the sun, where 7.5
+    // was the cap for the screen's range): a bright silver lining round clouds before the sun, the
+    // curve and the bloom taking it, as Bliss's clouds have.
+    if scene.frame.x > 0.5 {
+        phase = (0.75 * cloud_hg(mu, 0.75) + 0.25 * cloud_hg(mu, -0.2)) * 12.566;
+    }
+    // With the sun low the light reaching the clouds is deeper orange and a little dimmer, so their
+    // lit sides glow orange against darker bellies (Bliss's sunsets); at its full strength it went
+    // white through the curve and the clouds stayed white at sunrise and sunset (the Bliss
+    // comparison, 11-05).
+    // Clouds hundreds of blocks up still see the sun a little after it has set on the ground (and
+    // before it rises): in the HDR world they keep its light down to about 4° under the horizon, so
+    // the dawn's clouds are lit gold from below while the land is still in shade (Bliss's 06:00).
+    var strength = light_strength();
+    if scene.frame.x > 0.5 && scene.sun.y > -0.1 {
+        strength = max(strength, smoothstep(-0.08, 0.03, scene.sun.y));
+    }
+    let sun = p.sun * strength * (1.0 - s.axes[0].y * 0.55) * cloud_sun_tint();
     // Rain darkens the clouds' albedo and keeps their shapes (Photon: ×0.66); a storm's more.
     let albedo = mix(1.0, 0.66, s.axes[0].x) * mix(1.0, 0.6, storm);
     var through = 1.0;
@@ -368,7 +398,7 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
         let powder = mix(1.0 - exp(-sigma * 14.0), 1.0, 0.5 * (mu * 0.5 + 0.5) * (mu * 0.5 + 0.5) + 0.3);
         // The sky's light from above, brighter on the tops; under a storm the bellies darker.
         // Grey-blue shaded bases, bright tops: evenly lit, a clear day's read as flat white cut-outs.
-        let ambient = mix(p.horizon * 0.3 + p.ambient * 0.25, p.ambient * 1.2 + p.horizon * 0.2, smoothstep(0.0, 0.8, a)) * mix(1.0, 0.55, s.axes[0].y * (1.0 - a));
+        let ambient = mix(p.horizon * 0.3 + p.ambient * 0.25, p.ambient * 1.2 + p.horizon * 0.2, smoothstep(0.0, 0.8, a)) * mix(1.0, 0.55, s.axes[0].y * (1.0 - a)) * mix(1.0, 0.72, cloud_low_sun());
         let c = (sun * direct * powder * 0.9 + ambient) * albedo;
         let kept = exp(-sigma * step);
         light += through * (1.0 - kept) * c;
@@ -603,7 +633,7 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
                 albedo = mix(1.0, deep, storm) * mix(1.0, sweep, wet);
             }
             let below = mix(p.horizon * 0.9 + p.ambient * 0.6, p.ambient * 1.6, h) * mix(1.0, 0.4, dark * (1.0 - h)) * albedo;
-            c = below + p.sun * light_strength() * scatter * mix(0.6, 1.0, powder) * 0.55 * (1.0 - dark * 0.6) * albedo;
+            c = below * mix(1.0, 0.72, cloud_low_sun()) + p.sun * cloud_sun_tint() * light_strength() * scatter * mix(0.6, 1.0, powder) * 0.55 * (1.0 - dark * 0.6) * albedo;
             c += p.glow * (pow(mu, 3.0) * 0.5 + pow(mu, 12.0) * 0.8) * light_strength() * (0.4 + 0.6 * h);
         } else {
             c = vec3(mix(0.7, 1.0, h));
@@ -1085,7 +1115,11 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
             let disc = 1.0 - smoothstep(0.12, 0.15, r);
             let halo = exp(-r * 6.0) * (1.0 - smoothstep(0.55, 0.95, r)) * 0.7;
             let g = golden();
-            rgb = mix(vec3(1.0, 0.96, 0.86), vec3(1.0, 0.52, 0.2), g) * (disc * mix(3.0, 1.5, g) + halo);
+            // In the HDR world the disc is as bright as the sun is against the sky (about 16 times
+            // what the screen's white could hold here), so the bloom spreads a wide glare round it
+            // as Bliss's low sun has, and the curve keeps the disc itself white-gold.
+            let hot = select(1.0, 16.0, scene.frame.x > 0.5);
+            rgb = mix(vec3(1.0, 0.96, 0.86), vec3(1.0, 0.52, 0.2), g) * (disc * mix(3.0, 1.5, g) * hot + halo);
             shape = smoothstep(0.0, 0.004, disc + halo);
         }
         // A blood moon: copper, then a deep red disc, dimmer in totality.
@@ -1105,6 +1139,57 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
     return vec4(rgb * a, select(a, 0.0, s.ids.w != 0u));
 }
 
+// The mist's volume (`client::froxels`, `look.wgsl`'s `froxel_fog`), filled before the world is
+// drawn: its image holds the 32 slices eight to a row, each the cells across the view.
+// The cell this pixel of the image is: x and y across the view, z the slice.
+fn froxel_cell_of(px: vec2<f32>) -> vec3<i32> {
+    let grid = vec2<i32>(scene.froxels.zw);
+    let p = vec2<i32>(px);
+    let tile = p / grid;
+    return vec3(p - tile * grid, tile.x + tile.y * 8);
+}
+
+// The cells' own mist and light: toward the cell's middle, halfway through its slice. The mist's
+// floor is that of what lay behind the cell last frame (the world's copy for water, `behind`):
+// `fog_through` takes it from the surface it ends at.
+@fragment
+fn fs_froxel_light(in: CloudOut) -> @location(0) vec4<f32> {
+    let c = froxel_cell_of(in.clip.xy);
+    let uv = (vec2<f32>(c.xy) + 0.5) / scene.froxels.zw;
+    let ndc = vec2(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
+    let far = scene.inv_view_proj * vec4(ndc, 1e-6, 1.0);
+    let dir = normalize(far.xyz / far.w);
+    var end = dir * 220.0;
+    if scene.behind.z > 0.5 {
+        let depth = textures[u32(scene.behind.y)];
+        let d = textureLoad(depth, vec2<i32>(uv * vec2<f32>(textureDimensions(depth))), 0).r;
+        if d > 0.0 {
+            let w = scene.inv_view_proj * vec4(ndc, d, 1.0);
+            end = w.xyz / w.w;
+        }
+    }
+    let k = f32(c.z);
+    return froxel_cell(dir, 0.5 * (froxel_end(k - 1.0) + froxel_end(k)), fog_floor(end));
+}
+
+// The sums from the eye to each cell's far end, slice by slice as `fog_through` walks its steps:
+// rgb the light gathered, a how much gets through.
+@fragment
+fn fs_froxel_sum(in: CloudOut) -> @location(0) vec4<f32> {
+    let c = froxel_cell_of(in.clip.xy);
+    let grid = vec2<i32>(scene.froxels.zw);
+    let cells = textures[u32(scene.froxels.y)];
+    var through = 1.0;
+    var gained = vec3(0.0);
+    for (var j = 0; j <= c.z; j++) {
+        let v = textureLoad(cells, c.xy + vec2(j % 8, j / 8) * grid, 0);
+        let kept = exp(-v.a * (froxel_end(f32(j)) - froxel_end(f32(j) - 1.0)));
+        gained += through * (1.0 - kept) * v.rgb;
+        through *= kept;
+    }
+    return vec4(gained, through);
+}
+
 // What the look works out once a frame (`client::frame_look`), drawn before the world: the palette,
 // a member a texel (`look.wgsl`'s `palette`).
 @fragment
@@ -1120,3 +1205,32 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
     }
 }
 
+
+// The soft clouds' shadow map (`client::cloud_shadow`, with the HDR world), drawn with the clouds'
+// own entry: for each place on the plane through the layer's middle (`CLOUD_SHADOW_SPAN` blocks
+// across about the camera), how much of the sun gets through the layer along the light, six steps
+// through it; g that plane's height over the camera, for the surfaces' lookup.
+@fragment
+fn fs_cloud_shadow(in: CloudOut) -> @location(0) vec4<f32> {
+    let s = sky[in.index];
+    let storm = s.axes[0].z;
+    let thick = mix(SOFT_THICK, SOFT_STORM_THICK, storm);
+    let low = soft_low(s);
+    let mid = low + thick * 0.5;
+    let l = light_dir();
+    if !open_sky() || l.y < 0.03 {
+        return vec4(1.0, mid, 0.0, 1.0);
+    }
+    let q = (in.clip.xy / scene.cloud_shadow.y - 0.5) * CLOUD_SHADOW_SPAN;
+    let cover = soft_cover(s, soft_at(s, vec3(q.x, mid, q.y)));
+    var od = 0.0;
+    for (var k = 0; k < 6; k++) {
+        let h = low + thick * (f32(k) + 0.5) / 6.0;
+        let p = vec3(q.x, h, q.y) + vec3(l.x, 0.0, l.z) * (h - mid) / l.y;
+        od += soft_density(s, soft_at(s, p), (h - low) / thick, cover, false) * 0.55 * (thick / 6.0) / l.y;
+    }
+    // Light scattered on through the cloud keeps a cloud's shadow from going black (thin ones pass
+    // much, thick ones a fifth or so): Beer's law and a slower tail.
+    let through = max(exp(-od), 0.22 * exp(-od * 0.08));
+    return vec4(through, mid, 0.0, 1.0);
+}
