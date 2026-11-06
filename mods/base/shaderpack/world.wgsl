@@ -353,6 +353,10 @@ fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
     // as the land goes; still never deep under cover. Its colour through stained glass is kept for
     // later (`rt_sun`'s rgb); here its brightness.
     if scene.rt.x > 0.5 {
+        // A solid face turned from the light is in its own shade (leaves and plants let it through).
+        if dot(n, light_dir()) <= 0.0 && in.kind.z == 0u && in.kind.x != TINT_FOLIAGE {
+            return 0.0;
+        }
         let t = rt_sun(in.rel, n, light_dir(), in.kind.z != 0u);
         let c = min(canopy(), 1.0);
         let cover = smoothstep(mix(0.3, 0.15, c), mix(0.8, 0.5, c), in.light.x);

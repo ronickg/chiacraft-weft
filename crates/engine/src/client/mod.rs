@@ -3019,6 +3019,14 @@ impl Client {
         self.shadow_index
     }
 
+    /// `core:rt_shadows` turned on or off: the scene made (or let go), and whether the world shader
+    /// has to be composed again (the app does it before anything of the frame draws with it).
+    pub fn rt_switch(&mut self, gpu: &mut dyn Backend) -> bool {
+        self.render
+            .set_rt(gpu, shadow_setting("core:rt_shadows", 0.0) > 0.5);
+        self.render.rt_reload
+    }
+
     /// Sun shadows (`sun_shadows` packs), first their light, before the world is drawn (its scene
     /// samples the map with it): from the sun, or the moon once it has set, an orthographic box
     /// `SHADOW_REACH` blocks to each side of the camera along the light, moved in whole texels so
@@ -3107,12 +3115,6 @@ impl Client {
     /// The sun's shadow map, after `render` posed this frame's models (the pass is put before the
     /// world's in the frame's list): the terrain and the models, the player's own body too.
     pub fn render_shadows(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, frame: &FrameInfo) {
-        // Ray tracing's scene (`core:rt_shadows`, a GPU with ray queries): its builds for this
-        // frame, ahead of what traces through it.
-        self.render
-            .set_rt(gpu, shadow_setting("core:rt_shadows", 0.0) > 0.5);
-        self.render
-            .rt_frame(gpu, list, frame.slot, &self.render_camera());
         let (Some(map), Some(far_map)) = (self.shadow_map, self.shadow_far_map) else { return };
         let cam = self.render_camera();
         while self.shadow_bufs.len() < gpu.frames_in_flight() {
@@ -3218,6 +3220,9 @@ impl Client {
             self.entity_render.set_skin(gpu, entity, &png);
         }
         let cam = self.render_camera();
+        // Ray tracing's scene (`core:rt_shadows`): this frame's builds and its TLAS, before the
+        // world's draws that bind it (`app` switched the world shader before this, `rt_switch`).
+        self.render.rt_frame(gpu, early, frame.slot, &cam);
         let mut scene = self.scene(&cam, frame);
         while self.scene_bufs.len() < gpu.frames_in_flight() {
             self.scene_bufs.push(gpu.create_buffer(

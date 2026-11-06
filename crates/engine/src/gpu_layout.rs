@@ -1363,9 +1363,9 @@ fn rt_texel(base: u32, kind: u32, rec: u32, tri: u32, b: vec2<f32>) -> RtTexel {
 }
 
 fn rt_sun(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool) -> vec3<f32> {
-    // Off the surface so it never meets itself: along its normal (both ways for a plant's blade,
-    // which faces either), then a hair toward the light.
-    let lift = select(n * 0.004 * sign(dot(n, l) + 1e-4), vec3(0.0), plant) + l * 0.002;
+    // Off the surface so it never meets itself: out along its normal (not a plant's blade, which
+    // faces either way and isn't in the plants' rays), then a hair toward the light.
+    let lift = select(n * 0.004, vec3(0.0), plant) + l * 0.002;
     let mask = select(0xFFu, 0xFFu & ~2u, plant);
     var rq: ray_query;
     rayQueryInitialize(&rq, rt_scene, RayDesc(RAY_FLAG_TERMINATE_ON_FIRST_HIT, mask, 0.0, 16384.0, rel + lift, l));
