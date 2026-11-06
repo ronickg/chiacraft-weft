@@ -427,13 +427,17 @@ fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32>
         // beside Bliss's (light-range sweep lr1, 11-06: x2 took the canopy's roughness at 150
         // blocks 7.6/11.7 to 8.9/13.8; x3 no further, the curve rolls it off; darker shaded faces
         // took it down, not up).
+        // Leaves only, not plants (`in.kind.z`): on tall grass it bleached the sunlit blades pale
+        // yellow-white beside black gaps (Tester 2's calm noon, -470 520, HDR on against off).
         let k_sun = look_opt(OPT_LEAF_SUN, 1.0);
-        if k_sun != 1.0 {
+        if k_sun != 1.0 && in.kind.z == 0u {
             let c_open = min(canopy(), 1.0);
             let open = smoothstep(mix(0.5, 0.25, c_open), mix(0.95, 0.55, c_open), in.light.x);
             light += paint * palette().sun * light_strength() * sun_facing(n) * shadow * open * (k_sun - 1.0);
         }
-        return light + paint * palette().sun * leaf_through(in.rel, shadow, in.light.x);
+        // Plants half of it: with all of it tall grass in the sun went pale yellow-white beside black
+        // gaps (Tester 2's calm noon, HDR on against off).
+        return light + paint * palette().sun * leaf_through(in.rel, shadow, in.light.x) * select(1.0, 0.5, in.kind.z != 0u);
     }
     if in.kind.x == TINT_FOLIAGE || in.kind.z != 0u {
         // A low morning or evening sun full on a crown's side: light about as strong as on the tops
@@ -518,6 +522,11 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
             // lime by its colour alone; from 0.25 it hardly counted, 3 % of the frame left, PC sh6b.)
             let k = smoothstep(0.06, 0.22, luma(c)) * smoothstep(0.55, 0.85, sat) * smoothstep(0.25, 0.45, c.r / c.g) * low;
             lit = vec4(mix(c, vec3(luma(c)) * vec3(0.92, 1.05, 0.88), k * 0.175) * (1.0 - 0.18 * k), lit.a);
+            // And its red pulled down, so it turns green rather than grey (Ronald: "a bit greener"):
+            // the crown by the eye still read yellow-lime at 17:00-18:00, sRGB 88 125 3, hue 82
+            // where noon's lit leaves are about 100 (Tester 2's f0d78419 hours, 11-06). At 0.55 of
+            // its red, linear red/green 0.47 goes to about 0.26, hue about 95.
+            lit = vec4(lit.r * mix(1.0, 0.55, k), lit.g, lit.b, lit.a);
         }
     } else {
         lit = block_shade(in.slot, BlockPixel(in.uv, albedo, light, in.pos, scene.params.w));

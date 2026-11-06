@@ -327,6 +327,9 @@ fn sky_or_cloud(uv: vec2<f32>, d: f32) -> bool {
     return w.y / w.w > scene.clouds.z + lift - 20.0;
 }
 
+// How much of the sky's light the HDR world's veiling glare lays over the picture (`hdr_light`).
+const GLARE_HDR: f32 = 0.02;
+
 // The HDR world's light before the tone curve: the bloom mixed in and the exposure applied.
 fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
     var col = max(c, vec3(0.0));
@@ -374,15 +377,17 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
         let fog = mist_over(uv, pass_) * (1.0 - 0.85 * rain_amount());
         col = mix(col, glow, clamp((BLOOM_MIX * (1.0 + air * (1.0 - rain_amount())) + fog * 0.6) * fantasy_opt(OPT_BLOOM), 0.0, 0.8));
     }
+    // Veiling glare: a little of the sky's light over the whole picture, as a lens and the eye
+    // scatter it, so the darkest shade is a dim sky blue, not black. In Bliss's own world (imported)
+    // its shade is blue at every distance (sRGB 27 47 69 at noon), where ours went to 0 0 0 in the
+    // curve's toe (Tester 2's calm noon: the shaded block sides; more fill light didn't lift them,
+    // sh1b). Not at night or in rain.
+    let p = palette();
+    col += (p.zenith * 0.4 + p.horizon * 0.6) * GLARE_HDR * smoothstep(-0.05, 0.2, scene.sun.y) * (1.0 - rain_amount());
     if pass_.exposure != 0u {
         let e = textureLoad(textures[pass_.exposure - 1u], vec2(0, 0), 0).g;
         if e == e && e > 0.0 {
             col *= pow(auto_exposure(e), fantasy_opt(OPT_AUTO_EXPOSURE));
-            // A high sun's land a little brighter (the noon land read 91-93 against Bliss's 113),
-            // from a sun about 12° up (at the like-for-like mc_forest vista the land read dark
-            // through the day: 08:00 78 against Bliss's 89, 17:00 81 against 113).
-            // The land only: the sky has its own (dimmer, above).
-            col *= mix(1.0, 1.25, smoothstep(0.2, 0.6, scene.sun.y) * (1.0 - rain_amount()) * select(1.0, 0.0, sky_px));
         }
     }
     return col;
