@@ -272,6 +272,42 @@ fn quad(dir: u32, x: i32, y: i32, z: i32, size: (i32, i32, i32), tex: u32, tint:
     crate::gpu_layout::lod_record(dir, [x, y, z], [size.0, size.1, size.2], tex, tint, biome)
 }
 
+/// chiacraft: marks a record as a tree crown's face (`lod_face::CROWN_SHIFT`): packs shade far
+/// canopies as crowns, lit on top and dark in the gaps and under them.
+fn crowned(mut r: [u32; 4]) -> [u32; 4] {
+    r[0] |= 1 << crate::gpu_layout::lod_face::CROWN_SHIFT;
+    r
+}
+
+/// chiacraft: sets how much the land round shuts a record's face's sky out (`lod_face::OCC_SHIFT`, 0-3).
+fn occluded(mut r: [u32; 4], occ: u32) -> [u32; 4] {
+    r[0] |= occ.min(crate::gpu_layout::lod_face::OCC_MASK) << crate::gpu_layout::lod_face::OCC_SHIFT;
+    r
+}
+
+/// chiacraft: how much of the sky the land round a point `h` high in sample (i, j) of a tile of
+/// `s`-block cells hides, 0 (open) to 3, from `high` (its samples' ground or crowns, the highest):
+/// the mean over eight ways of the steepest rise within three cells. Valley floors and the ground in
+/// a forest's gaps go dark, ridges and canopy tops stay open (Ronald, 11-05, comparing with Distant
+/// Horizons + Bliss: far land evenly lit; Planner: "a cheap far shadow or horizon-occlusion term").
+fn openness(high: &dyn Fn(i32, i32) -> i32, i: i32, j: i32, h: i32, s: i32) -> u32 {
+    const WAYS: [(i32, i32); 8] = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)];
+    let mut shut = 0.0f32;
+    for (dx, dz) in WAYS {
+        let step = ((dx * dx + dz * dz) as f32).sqrt() * s as f32;
+        let mut most = 0.0f32;
+        for d in 1..=3 {
+            let rise = (high((i + dx * d).clamp(-1, CELLS), (j + dz * d).clamp(-1, CELLS)) - h) as f32;
+            if rise > 0.0 {
+                let run = step * d as f32;
+                most = most.max(rise / (rise * rise + run * run).sqrt());
+            }
+        }
+        shut += most;
+    }
+    ((shut / 8.0 / 0.15).round() as u32).min(3)
+}
+
 /// The texture (its average color) and tint kind a distant face of `state` in direction `dir`
 /// is drawn in. A box model's faces are its boxes' own (its block's textures may be unset, and
 /// came out as the missing texture's magenta): its largest box's. A plant's is its picture.
@@ -384,6 +420,15 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
     let mut out = Vec::new();
     let (mut lo, mut hi) = (i32::MAX, i32::MIN);
     let top_at = |i: i32, j: i32| tops[(j * CELLS + i) as usize];
+    // Per sample its highest point, ground or crown, and per cell how shut in its ground is.
+    let high = |i: i32, j: i32| {
+        let g = at(i, j).0;
+        crown_at(i, j).map_or(g, |c| c.top.max(g))
+    };
+    let ground_occ: Vec<u32> = (0..CELLS * CELLS)
+        .map(|k| openness(&high, k % CELLS, k / CELLS, at(k % CELLS, k / CELLS).0 + 1, s))
+        .collect();
+    let occ_at = |i: i32, j: i32| ground_occ[(j * CELLS + i) as usize];
     // A crown sitting right on the ground hides its top.
     let covered = |i: i32, j: i32| crown_at(i, j).is_some_and(|c| c.bottom <= at(i, j).0 + 1);
     for j in 0..CELLS {
@@ -393,12 +438,19 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
             let top = top_at(i, j);
             let hidden = covered(i, j);
             let mut end = i + 1;
-            while end < CELLS && at(end, j).0 == y && top_at(end, j) == top && at(end, j).2 == biome && covered(end, j) == hidden {
+            let occ = occ_at(i, j);
+            while end < CELLS
+                && at(end, j).0 == y
+                && top_at(end, j) == top
+                && at(end, j).2 == biome
+                && covered(end, j) == hidden
+                && occ_at(end, j) == occ
+            {
                 end += 1;
             }
             if !hidden {
                 let (tex, tint) = face_of(top, 3);
-                out.push(quad(3, i * s, y, j * s, ((end - i) * s, 1, s), tex, tint, biome));
+                out.push(occluded(quad(3, i * s, y, j * s, ((end - i) * s, 1, s), tex, tint, biome), occ));
             }
             (lo, hi) = (lo.min(y), hi.max(y + 1));
             i = end;
@@ -439,7 +491,7 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                     s.min(y - ny)
                 };
                 let (tex, tint) = face_of(top, 3);
-                out.push(quad(dir as u32, i * s, y + 1 - band, j * s, (s, band, s), tex, tint, biome));
+                out.push(occluded(quad(dir as u32, i * s, y + 1 - band, j * s, (s, band, s), tex, tint, biome), occ_at(i, j)));
                 lo = lo.min(ny + 1);
                 if y - band <= ny {
                     continue;
@@ -453,13 +505,13 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                                 break;
                             }
                             let (tex, tint) = face_of(block, dir);
-                            out.push(quad(dir as u32, i * s, b, j * s, (s, from + 1 - b, s), tex, tint, biome));
+                            out.push(occluded(quad(dir as u32, i * s, b, j * s, (s, from + 1 - b, s), tex, tint, biome), occ_at(i, j)));
                             from = b - 1;
                         }
                     }
                     None => {
                         let (tex, tint) = face_of(under, dir);
-                        out.push(quad(dir as u32, i * s, ny + 1, j * s, (s, y - band - ny, s), tex, tint, biome));
+                        out.push(occluded(quad(dir as u32, i * s, ny + 1, j * s, (s, y - band - ny, s), tex, tint, biome), occ_at(i, j)));
                     }
                 }
             }
@@ -479,13 +531,15 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                 let biome = at(i, j).2;
                 let y = if face_y { c.top } else { c.bottom };
                 let shows = face_y || c.bottom > at(i, j).0 + 1;
+                let crown_occ = |e: i32| if face_y { openness(&high, e, j, y + 1, s) } else { 0 };
+                let occ = crown_occ(i);
                 let same = |e: i32| {
                     crown_at(e, j).is_some_and(|d| {
                         d.leaves == c.leaves
                             && at(e, j).2 == biome
                             && (if face_y { d.top } else { d.bottom }) == y
                             && (face_y || d.bottom > at(e, j).0 + 1) == shows
-                    })
+                    }) && crown_occ(e) == occ
                 };
                 let mut end = i + 1;
                 while end < CELLS && same(end) {
@@ -493,7 +547,7 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                 }
                 if shows {
                     let (tex, tint) = face_of(c.leaves, dir as usize);
-                    out.push(quad(dir, i * s, y, j * s, ((end - i) * s, 1, s), tex, tint, biome));
+                    out.push(occluded(crowned(quad(dir, i * s, y, j * s, ((end - i) * s, 1, s), tex, tint, biome)), occ));
                 }
                 (lo, hi) = (lo.min(c.bottom), hi.max(c.top + 1));
                 i = end;
@@ -513,7 +567,7 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                     if inside { (at(i + di, j + dj).0, crown_at(i + di, j + dj).map(|n| (n.bottom, n.top))) } else { (y, None) };
                 let (tex, tint) = face_of(c.leaves, dir);
                 for (a, b) in open_spans(c.bottom, c.top, ny, filled) {
-                    out.push(quad(dir as u32, i * s, a, j * s, (s, b + 1 - a, s), tex, tint, biome));
+                    out.push(crowned(quad(dir as u32, i * s, a, j * s, (s, b + 1 - a, s), tex, tint, biome)));
                 }
             }
             // Its trunk, from the ground to the crown, in the tile.
