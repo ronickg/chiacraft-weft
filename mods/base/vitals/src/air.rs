@@ -153,6 +153,26 @@ pub const MIST_TOP: f32 = 18.0;
 /// Below this air (°C, out in the open, the rain's cooling counted) what falls is snow.
 pub const SNOWS_BELOW: f32 = 1.0;
 
+/// How much colder the air is per block up from the sea, °C: game-scaled, 6.5 °C per 150 blocks
+/// (the real lapse is 6.5 °C per km; with a block a metre, a peak 250 blocks up was only 1.6 °C
+/// colder and a snow line would hardly ever show). Ronald's pick (A) via Planner, 11-06 (the
+/// Recrafted study, item 6). The snow line reads it; body warmth on peaks and the snow lying on
+/// the ground should read it too (later: `notes/SYSTEMS.md`).
+pub const LAPSE: f32 = 6.5 / 150.0;
+
+/// Where what falls turns from rain to snow, blocks above the sea, in air of `sea_air` °C at sea
+/// level (`Place::air`): 0 where it snows at the sea already.
+pub fn snow_line(sea_air: f32) -> f32 {
+    ((sea_air - SNOWS_BELOW) / LAPSE).max(0.0)
+}
+
+/// The snow line for the air's flags (`air_flags::SNOWLINE_SHIFT`, 6 bits): 0 none (over about 250
+/// blocks up: rain to the top of any mountain), else 1 + its height above the sea in 4-block steps.
+pub fn snow_line_bits(sea_air: f32) -> u32 {
+    let h = snow_line(sea_air);
+    if h >= 246.0 { 0 } else { 1 + (h / 4.0).round() as u32 }
+}
+
 /// Snow lying, 0 bare to 1 deep: a day of snow adds `SNOWFALL`, and each day's mean above
 /// freezing melts `MELT` a degree (a degree-day factor: about 4 mm of water, 1.2 cm of fresh
 /// snow, a degree a day). Counted over the last `SNOW_DAYS` days.
@@ -418,6 +438,18 @@ mod tests {
         assert_eq!(drying_secs(-5.0, 0.6, 0.0), DRYING.1);
         assert_eq!(drying_byte(DRYING.1), 1);
         assert_eq!(drying_byte(DRYING.0), 255);
+    }
+
+    /// The snow line: at the sea where it snows there, 150 blocks up for 6.5 °C more, none in warm
+    /// air; its bits stay in 6 and 0 is none.
+    #[test]
+    fn snow_line_by_air() {
+        assert_eq!(snow_line(SNOWS_BELOW - 2.0), 0.0);
+        assert!((snow_line(SNOWS_BELOW + 6.5) - 150.0).abs() < 0.01);
+        assert_eq!(snow_line_bits(SNOWS_BELOW - 2.0), 1);
+        assert_eq!(snow_line_bits(SNOWS_BELOW + 6.5), 1 + 38);
+        assert_eq!(snow_line_bits(30.0), 0);
+        assert!((0..400).all(|i| snow_line_bits(i as f32 * 0.1 - 5.0) < 64));
     }
 
     /// Dawn mist: every calm clear morning, a veil in dry air and the most in damp air; none in

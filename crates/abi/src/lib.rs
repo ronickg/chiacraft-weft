@@ -651,6 +651,9 @@ pub mod air_flags {
     pub const SNOWING: u32 = 1;
     /// Dust or sand blows (the fog is dust).
     pub const DUST: u32 = 2;
+    /// Bits 2 to 7: where rain turns to snow up a mountain, for shader packs (`Scene::canopy.w`):
+    /// 0 none (rain however high), else 1 + its height above the sea in 4-block steps (up to 248).
+    pub const SNOWLINE_SHIFT: u32 = 2;
     /// Bits 8 to 15: how strong an aurora is on clear nights there, 0 to 255.
     pub const AURORA_SHIFT: u32 = 8;
     /// Bits 16 to 23: how closed a forest's canopy is there, 0 (open sky) to 255 (a rainforest's),
@@ -4010,6 +4013,11 @@ pub mod particle_flags {
     pub const TRANSLUCENT: u32 = 4;
     /// Shrinks to nothing over its life.
     pub const SHRINK: u32 = 8;
+    /// Floats on a liquid, drifting with the wind (a leaf on a pond); needs `ParticleDesc::air`.
+    pub const FLOATS: u32 = 16;
+    /// Colored like the burst's block where its biome tints it, as block dust is (a leaf of the
+    /// tree it fell from, in its season's color), though it has frames of its own.
+    pub const BLOCK_TINT: u32 = 32;
 }
 
 /// What happens to a particle that a `ParticleRule` answers.
@@ -4095,6 +4103,21 @@ pub struct ParticleDesc {
     /// Fragment shader `shaders/particle/<name>.wgsl`, empty for the plain texture.
     pub shader: Str,
     pub rules: Slice<ParticleRule>,
+    /// Carried by the wind: how fast (per second) it takes on the air's speed where it is, its
+    /// gusts and shelter (sky light) included; 0, the air leaves it alone. A carried one has no
+    /// `gravity` or `drag`: it falls at `sink` through still air instead.
+    pub air: f32,
+    /// Blocks a second it falls through still air while carried (a leaf about 1.2).
+    pub sink: f32,
+    /// 0..1: how much it flutters side to side and tumbles as it falls. Above 0 it is drawn as a
+    /// flat card that turns in 3D and lies flat where it lands, not facing the camera.
+    pub flutter: f32,
+    /// After landing, the wind (m/s, gusts included) that blows it on along the ground or up again
+    /// (litter in a gust); 0, it stays where it lies.
+    pub lift: f32,
+    /// Drawn stretched along its motion over this many seconds of it (a streak of blown sand), a
+    /// card `size` wide facing the camera as it can; 0, a plain square.
+    pub streak: f32,
 }
 defaults!(ParticleDesc {
     name: Str::EMPTY,
@@ -4111,6 +4134,11 @@ defaults!(ParticleDesc {
     flags: 0,
     shader: Str::EMPTY,
     rules: Slice::EMPTY,
+    air: 0.0,
+    sink: 0.0,
+    flutter: 0.0,
+    lift: 0.0,
+    streak: 0.0,
 });
 
 /// How much a player may do, for commands and anything else that asks: modern's levels. A player

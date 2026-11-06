@@ -42,6 +42,9 @@ use textures::GameTextures;
 use world::ClientWorld;
 use world_render::{Camera, WorldRenderer};
 
+/// The snow line when there is none (`snow_line`): blocks above the sea, over any mountain.
+const SNOW_LINE_NONE: f32 = 400.0;
+
 pub struct LocalPlayer {
     pub pos: DVec3,
     pub vel: DVec3,
@@ -684,6 +687,12 @@ pub struct Client {
     canopy: f32,
     /// How wet the ground is where the player is, 0..1 (`weather_effects`, `Scene::canopy.y`).
     wet: f32,
+    /// How far puddles have grown where the player is, 0..1 (`weather_effects`, `Scene::canopy.z`):
+    /// over minutes of rain, drying slower than the ground after.
+    puddles: f32,
+    /// Where rain turns to snow up a mountain where the player is, blocks above the sea (a mod's
+    /// air, `air_flags::SNOWLINE_SHIFT`; `SNOW_LINE_NONE` for none), eased (`Scene::canopy.w`).
+    snow_line: f32,
     /// What happens in the sky (`weft_abi::sky_event`, chiacraft), how strongly, and when it began
     /// (`shaders::time`).
     sky_event: (u32, f32, f32),
@@ -1023,6 +1032,8 @@ impl Client {
             aurora: 0.0,
             canopy: 0.0,
             wet: 0.0,
+            puddles: 0.0,
+            snow_line: SNOW_LINE_NONE,
             sky_event: (0, 0.0, 0.0),
             sky_landing: None,
             weather_id: 0,
@@ -2699,6 +2710,19 @@ impl Client {
             let secs = if drying == 0 { 120.0 } else { 3600.0 * (30.0f32 / 3600.0).powf((drying - 1) as f32 / 254.0) };
             self.wet = (self.wet - dt / secs).max(falling);
         }
+        // Puddles grow over about ten minutes of steady rain (a shower leaves a few) and dry a third
+        // as fast as the ground after it, the last of the wet to go (at half its pace they were gone
+        // three minutes after a five-minute rain, the ground still dark: PC shpd7).
+        if falling > 0.0 {
+            self.puddles = (self.puddles + falling * dt / 600.0).min(1.0);
+        } else {
+            let drying = (flags >> weft_abi::air_flags::DRYING_SHIFT) & 255;
+            let secs = if drying == 0 { 120.0 } else { 3600.0 * (30.0f32 / 3600.0).powf((drying - 1) as f32 / 254.0) };
+            self.puddles = (self.puddles - dt / (secs * 3.0)).max(0.0);
+        }
+        let line = (flags >> weft_abi::air_flags::SNOWLINE_SHIFT) & 63;
+        let line = if line == 0 { SNOW_LINE_NONE } else { (line - 1) as f32 * 4.0 };
+        self.snow_line += (line - self.snow_line).clamp(-dt * 40.0, dt * 40.0);
         let heading = self.world.air.1.to_radians();
         let wind = Vec2::new(heading.sin(), -heading.cos()) * speed;
         self.wind += (wind - self.wind) * (1.0 - (-dt / 4.0).exp());
@@ -2720,6 +2744,13 @@ impl Client {
                     .push(crate::audio::Play { sound, pos: None, volume, pitch: 0.0 });
             }
         }
+    }
+
+    /// What the wind carries particles by (`gpu_layout::ParticleSimArgs::wind`): the wind where
+    /// the player is, how hard it rains, and the shaders' seconds its gusts move by, as the
+    /// plants' sway has them.
+    pub fn particle_wind(&self) -> [f32; 4] {
+        [self.wind.x, self.wind.y, self.rain(), crate::shaders::time()]
     }
 
     /// The weather where the player is, as drawn (`ClientState::rain` and on, for mods' sound).
@@ -2804,7 +2835,7 @@ impl Client {
             options: pack_options(),
             hand: hand.0,
             hand_light: hand.1,
-            canopy: [self.canopy, self.wet, 0.0, 0.0],
+            canopy: [self.canopy, self.wet, self.puddles, self.snow_line],
             // Filled in once the sky has readied them (`render`).
             soft_clouds: [0.0; 4],
             // Filled in once the sky has readied it (`render`).

@@ -315,6 +315,9 @@ pub static FANTASY_SCREEN: Screen = Screen::named("video_fantasy");
 /// 0 off, 1 subtle, 2 storybook, 3 custom.
 pub static FANTASY: Config<i32> = Config::named("fantasy");
 pub static FX_FIREFLIES: Config<i32> = Config::named("fx_fireflies");
+/// Leaves, petals, pollen, spindrift and sand in the wind (`wind_life.rs`): 0 off, 1 few, 2 many,
+/// 3 ultra (`vitals::wind_life::DENSITY`).
+pub static FX_WIND_LIFE: Config<i32> = Config::named("fx_wind_life");
 pub static FX_MOTES: Config<i32> = Config::named("fx_motes");
 pub static LOOK_STORYBOOK: Config<f32> = Config::named("look_storybook");
 pub static FX_NIGHT_SKY: Config<i32> = Config::named("fx_night_sky");
@@ -336,7 +339,7 @@ fn percent(v: f64) -> (String, i64) {
     ("percent".into(), (v * 100.0).round() as i64)
 }
 
-const FANTASY_ROWS: [Row; 11] = [
+const FANTASY_ROWS: [Row; 12] = [
     Row {
         key: "fireflies",
         values: &[0.0, 1.0, 2.0],
@@ -345,6 +348,13 @@ const FANTASY_ROWS: [Row; 11] = [
         shown: |v| word(["off", "few", "many"][(v as usize).min(2)]),
     },
     Row { key: "motes", values: &[0.0, 1.0], get: || FX_MOTES.get() as f64, set: |v| FX_MOTES.set(v as i32), shown: off_on },
+    Row {
+        key: "wind_life",
+        values: &[0.0, 1.0, 2.0, 3.0],
+        get: || FX_WIND_LIFE.get() as f64,
+        set: |v| FX_WIND_LIFE.set(v as i32),
+        shown: |v| word(["off", "few", "many", "ultra"][(v as usize).min(3)]),
+    },
     Row {
         key: "storybook",
         values: &[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
@@ -449,6 +459,7 @@ fn fantasy_caps(q: usize, bloom_up: bool) {
         FX_BLOOM.set(FX_BLOOM.get().min(1));
     } else if q == 0 {
         FX_FIREFLIES.set(FX_FIREFLIES.get().min(1));
+        FX_WIND_LIFE.set(FX_WIND_LIFE.get().min(1));
         FX_MOTES.set(0);
         FX_NIGHT_SKY.set(FX_NIGHT_SKY.get().min(1));
         FX_SPARKLE.set(0);
@@ -540,6 +551,7 @@ pub fn register(r: &mut Registry) {
     // Fantasy: Subtle's values by default (Research round 17; the master defaults to Subtle).
     r.config(&FANTASY).int(1, 0, 3);
     r.config(&FX_FIREFLIES).int(1, 0, 2);
+    r.config(&FX_WIND_LIFE).int(1, 0, 3);
     r.config(&FX_MOTES).int(1, 0, 1);
     r.config(&LOOK_STORYBOOK).float(0.4, 0.0, 1.0);
     r.config(&FX_NIGHT_SKY).int(1, 0, 2);

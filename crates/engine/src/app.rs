@@ -3191,9 +3191,10 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         drop(s);
         let s = crate::diag::span("particles");
         let cam = g.client.render_camera();
+        let wind = g.client.particle_wind();
         g.client
             .particles
-            .simulate(&mut *r.gpu, &mut r.list, info.slot, &r.textures, &g.client.world, &cam);
+            .simulate(&mut *r.gpu, &mut r.list, info.slot, &r.textures, &g.client.world, &cam, wind);
         drop(s);
         let s = crate::diag::span("wires and sun");
         g.client.update_wires(&mut *r.gpu, &r.textures);

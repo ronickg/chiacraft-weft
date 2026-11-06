@@ -501,7 +501,13 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                     // Not under water beside water, which lies at the sea's height at every level:
                     // there is no crack to close, and a sheet of water hung down the tile's edge
                     // showed as a curtain along far shores (Far view, 11-05).
-                    if under == top && ny >= y {
+                    // (Water by its block: a top like the block under it was sand on sand and stone
+                    // on stone too, whose edges then had no skirt.)
+                    let water = c
+                        .states
+                        .get(top as usize)
+                        .is_some_and(|st| st.liquid.is_some());
+                    if water && ny >= y {
                         continue;
                     }
                     ny = ny.min(y - 1) - 2 * s;

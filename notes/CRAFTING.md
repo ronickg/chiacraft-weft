@@ -548,6 +548,14 @@ As Tinkers' Construct 3 does it, which our prototype already proved at 32 px:
     archive; `--apply --only <materials> --parts <parts>` installs Ronald's picks, keeping what
     it replaces. Heads must be drawn to today's size and socket (the haft ends where the head
     covers it), not as loose parts with a mid-head eye.
+  - **Installed 11-06** (Ronald: "Install all of it"): the v3 heads and blades of every material
+    (redrawn in today's place and size, today's binding pasted back; today's steel hoe kept: its
+    redraw came out a cleaver), the knife's blades and the spear's points with their own looks
+    (the knife on the sword's hilt map, the spear on a shaft map drawn in code), a flint sword
+    blade, each head and blade as its loose part's icon in its material (`parts/loose/`), and
+    armour shells drawn for leather, bone, iron and diamond (`looks::SHELLS_DRAWN`; gold's are
+    drawn but gold makes no shell; rawhide, antler and the other metals keep their family's map
+    in their ramp). Every replaced file is kept in the archive (`art-redo-v3/install/replaced/`).
   - **Every layer** has its `.json`.
   - **The first materials:** wood, stone, flint, copper, bronze, iron, steel, gold, diamond (the
     sword without flint).
