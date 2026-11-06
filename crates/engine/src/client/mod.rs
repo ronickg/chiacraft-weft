@@ -697,7 +697,7 @@ pub struct Client {
     lightnings: u32,
     /// The last flash for packs (`Scene::lightning`): seconds since it began (real time, so tests'
     /// pinned shader clock still shows it), and a random number of its own (where it strikes).
-    lightning_seen: (f32, f32),
+    lightning_seen: (f32, f32, f32),
     /// Holding the use button on an item that takes time: ticks left, ticks in all.
     using: Option<(f32, f32)>,
     /// Who else is mining what, and how far along.
@@ -1025,7 +1025,7 @@ impl Client {
             gloom: 0.0,
             lightning: 0.0,
             lightnings: 0,
-            lightning_seen: (1.0e4, 0.0),
+            lightning_seen: (1.0e4, 0.0, 0.0),
             using: None,
             others_mining: Vec::new(),
             told_mining: None,
@@ -2700,7 +2700,10 @@ impl Client {
         if here && self.gloom > 0.9 && weather.lightning() && self.chance() < dt / 12.0 {
             self.lightning = 0.15;
             self.lightnings = self.lightnings.wrapping_add(1);
-            self.lightning_seen = (0.0, self.chance());
+            // Where the camera faced as it began (radians, clockwise from -z): the pack aims most
+            // strikes near it, and the bolt stays put while the player turns.
+            let f = self.camera().forward();
+            self.lightning_seen = (0.0, self.chance(), f.x.atan2(-f.z));
         }
         if let Some(sound) = weather
             .sound
@@ -2801,7 +2804,7 @@ impl Client {
             soft_clouds: [0.0; 4],
             // Filled in once the sky has readied it (`render`).
             frame_look: [0.0; 4],
-            lightning: [self.lightning_seen.0, self.lightning_seen.1, self.thunder(), 0.0],
+            lightning: [self.lightning_seen.0, self.lightning_seen.1, self.thunder(), self.lightning_seen.2],
             prev_view_proj: [[0.0; 4]; 4],
             cloud_moved: [0.0; 4],
             // On the real clock (`shaders::clock`): tests pin the shaders' time, and a fireball's
