@@ -376,7 +376,8 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
     // In the HDR world moonlit clouds a dim grey, not white: Bliss's night clouds are dark grey
     // against its blue sky, ours stood bright white over the dark land (PC shnt0, 11-06).
     if scene.frame.x > 0.5 {
-        sun *= mix(1.0, 0.4, smoothstep(-0.12, -0.3, scene.sun.y));
+        // (0.2: at 0.4 they still stood brighter than the sky, Bliss's darker than it; PC shnt2.)
+        sun *= mix(1.0, 0.2, smoothstep(-0.12, -0.3, scene.sun.y));
     }
     // In the HDR world, clouds seen away from a low sun take its light pale cream, not orange: Bliss's
     // clouds at 17:00-18:00 with the sun behind the camera are cream with grey bellies where ours
