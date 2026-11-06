@@ -704,6 +704,10 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // image too (1). On by default (Ronald, 11-06: "Yes, on by default"): 1, and 2 on a phone,
         // whose tiled GPU the motion image cost a third of its world pass.
         ConfigDef::number("core:aa", ck::INT, if cfg!(target_os = "android") { 2.0 } else { 1.0 }, 0.0, 2.0, 1.0),
+        // chiacraft, test only (the Minecraft comparison): leaves drawn as Minecraft's fancy
+        // leaves, every face between two of them and their shade on what is beside them (AO),
+        // instead of a crown's outer shell (`client::mesher`). Read when cubes are meshed.
+        ConfigDef::number("core:mc_leaves", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         // Temporal anti-aliasing: the least share of each new frame (0.1: about ten gathered;
         // less, smoother and slower to follow), live.
         ConfigDef::number("core:taa_blend", ck::FLOAT, 0.1, 0.03, 0.5, 0.01),
