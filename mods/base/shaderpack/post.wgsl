@@ -360,7 +360,7 @@ fn sky_or_cloud(uv: vec2<f32>, d: f32) -> bool {
 // How much of the sky's light the HDR world's veiling glare lays over the picture (`hdr_light`).
 const GLARE_HDR: f32 = 0.02;
 // The land's lift in the evening twilight (`hdr_light`).
-const TWILIGHT_LAND_HDR: f32 = 1.7;
+const TWILIGHT_LAND_HDR: f32 = 1.55;
 
 // The HDR world's light before the tone curve: the bloom mixed in and the exposure applied.
 fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
