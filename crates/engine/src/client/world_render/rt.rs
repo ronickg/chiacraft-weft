@@ -487,7 +487,7 @@ impl WorldRenderer {
             self.pt_images = Some((make(gpu, "path traced diffuse"), make(gpu, "path traced specular"), size));
         }
         let (diffuse, specular, _) = self.pt_images.unwrap();
-        use crate::gpu_layout::{pt_bind, PT_CACHE, PT_CACHE_BYTES};
+        use crate::gpu_layout::{PT_CACHE, PT_CACHE_BYTES, pt_bind};
         let cache = match self.pt_cache {
             Some(c) => c,
             None => {

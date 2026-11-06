@@ -2153,7 +2153,8 @@ impl WorldRenderer {
             if counted {
                 let (kind, layer, page, ..) = groups[i];
                 if layer < 2 && matches!(kind, 0 | 1 | 4 | 5) {
-                    self.gb_draws.push((kind as u8, layer as u8, page as u32, id as u32, base as u32, draws as u32));
+                    self.gb_draws
+                        .push((kind as u8, layer as u8, page as u32, id as u32, base as u32, draws as u32));
                 }
             }
             if counted {
