@@ -355,6 +355,12 @@ impl Particles {
             .get(b.block as usize)
             .filter(|_| k.frames.is_empty());
         let layer = dust.map_or(0, side);
+        // A kind with pictures of its own colored like its block (a leaf off its tree) takes the
+        // block's tint on whichever face it has it.
+        let tinted_like = c
+            .states
+            .get(b.block as usize)
+            .filter(|s| k.flags & pf::BLOCK_TINT != 0 && !k.frames.is_empty() && s.tint != 0);
         // Only if the side it shows is a tinted one: grass blocks' sides are dirt with a tinted
         // overlay, and their dust stays brown like vanilla's. Wire's picture is gray, its red
         // comes from its power when drawn: dust takes vanilla's wire at middling power.
@@ -362,6 +368,7 @@ impl Particles {
             0xC8_1414
         } else {
             dust.filter(|s| s.tint != 0 && s.tint_faces & 2 != 0)
+                .or(tinted_like)
                 .map_or(0xFF_FFFF, |s| {
                     let p = pos.floor().as_ivec3();
                     let biome = world
@@ -469,7 +476,10 @@ impl Particles {
         }
     }
 
-    /// Before the frame's passes: new particles go up, and all of them take a step.
+    /// Before the frame's passes: new particles go up, and all of them take a step. `wind`: the
+    /// wind where the player is (m/s along x and z), how hard it rains and the shaders' seconds
+    /// (`gpu_layout::ParticleSimArgs::wind`), for the kinds it carries.
+    #[allow(clippy::too_many_arguments)]
     pub fn simulate(
         &mut self,
         gpu: &mut dyn Backend,
@@ -478,6 +488,7 @@ impl Particles {
         textures: &GameTextures,
         world: &ClientWorld,
         cam: &Camera,
+        wind: [f32; 4],
     ) {
         let center = cam.pos.floor().as_ivec3() >> 4i32;
         self.update_cells(gpu, world, center);
@@ -545,6 +556,7 @@ impl Particles {
                         data: [k.color, k.color_end, k.flags, self.kind_slots.get(i).copied().unwrap_or(0)],
                         frames: [at, k.frames.len() as u32, first_rule, k.rules.len() as u32],
                         start: [k.life_min, k.life_max, k.size_min, k.size_max],
+                        air: [k.air, k.sink, k.flutter, k.lift],
                     }
                 })
                 .collect();
@@ -597,6 +609,7 @@ impl Particles {
                 rel: rel.extend(0.0).to_array(),
                 origin: self.origin.extend(0).to_array(),
                 center: center.extend(0).to_array(),
+                wind,
             });
             list.push(Cmd::Dispatch { x: count.div_ceil(256), y: 1, z: 1 });
         }

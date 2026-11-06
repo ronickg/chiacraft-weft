@@ -59,6 +59,8 @@ mod weather;
 mod weather_sound;
 mod web;
 mod wild;
+mod wind_life;
+mod wind_life_colours;
 mod window;
 mod worldgen;
 
@@ -146,6 +148,7 @@ fn init(r: &mut Registry) {
     growth::register(r);
     farming::register(r);
     fireflies::register(r);
+    wind_life::register(r);
     ley::register(r);
     waystones::register(r);
     map::register(r);

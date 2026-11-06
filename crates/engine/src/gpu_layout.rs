@@ -914,6 +914,10 @@ gpu_struct! {
         pub frames: [u32; 4],
         /// What one turning into it starts with: life and size, each from and to.
         pub start: [f32; 4],
+        /// How the wind carries it (`registry::ParticleDef`): x the rate it takes the air's speed
+        /// (0: not carried), y its sink through still air, z its flutter, w the wind that lifts it
+        /// once landed.
+        pub air: [f32; 4],
     }
 }
 
@@ -988,6 +992,9 @@ pub struct ParticleSimArgs {
     pub origin: [i32; 4],
     /// The cube in the middle of `cells`.
     pub center: [i32; 4],
+    /// The wind where the player is (m/s along x and z, the way it blows; `Scene::weather`), z
+    /// how hard it rains (0..1), w the shaders' seconds (`Scene::params.w`) the gusts move by.
+    pub wind: [f32; 4],
 }
 
 gpu_struct! {
@@ -1021,7 +1028,9 @@ gpu_struct! {
         /// bytes (u0 v0 u1 v1, /255), w light: sky, red, green, blue bytes (0..15), all ones =
         /// unlit.
         pub data: [u32; 4],
-        /// x life fraction 0..1.
+        /// x life fraction 0..1; y 1 for a card that turns in 3D (a fluttering kind,
+        /// `ParticleDef::flutter`), 0 one facing the camera; z the card's heading and w how far it
+        /// is tipped about it (radians; 0 lying flat).
         pub extra: [f32; 4],
     }
 }
@@ -1281,8 +1290,8 @@ pub fn particle_sim_prelude(window_reach: i32) -> String {
     }
     use weft_abi::{particle_event as pe, particle_flags as pf, particle_then as pt, particle_when as pw};
     s.push_str(&format!(
-        "struct SimArgs {{\n    first: u32,\n    count: u32,\n    dt: f32,\n    pad: f32,\n    shift: vec4<f32>,\n    rel: vec4<f32>,\n    origin: vec4<i32>,\n    center: vec4<i32>,\n}}\nvar<immediate> args: SimArgs;\nconst WINDOW_REACH: i32 = {window_reach};\nconst PARTICLE_FLAG_COLLIDE: u32 = {}u;\nconst PARTICLE_FLAG_FULLBRIGHT: u32 = {}u;\nconst PARTICLE_FLAG_SHRINK: u32 = {}u;\n",
-        pf::COLLIDE, pf::FULLBRIGHT, pf::SHRINK
+        "struct SimArgs {{\n    first: u32,\n    count: u32,\n    dt: f32,\n    pad: f32,\n    shift: vec4<f32>,\n    rel: vec4<f32>,\n    origin: vec4<i32>,\n    center: vec4<i32>,\n    wind: vec4<f32>,\n}}\nvar<immediate> args: SimArgs;\nconst WINDOW_REACH: i32 = {window_reach};\nconst PARTICLE_FLAG_COLLIDE: u32 = {}u;\nconst PARTICLE_FLAG_FULLBRIGHT: u32 = {}u;\nconst PARTICLE_FLAG_SHRINK: u32 = {}u;\nconst PARTICLE_FLAG_FLOATS: u32 = {}u;\n",
+        pf::COLLIDE, pf::FULLBRIGHT, pf::SHRINK, pf::FLOATS
     ));
     let consts = [
         ("EVENT_LAND", pe::LAND),

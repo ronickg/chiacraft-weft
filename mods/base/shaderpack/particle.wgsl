@@ -19,7 +19,16 @@ struct VOut {
 fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut {
     let p = particles[ii];
     let c = CORNER[vi % 6u];
-    let world = p.pos_size.xyz + (scene.right.xyz * (c.x - 0.5) + scene.up.xyz * (0.5 - c.y)) * p.pos_size.w;
+    var across = scene.right.xyz;
+    var down = -scene.up.xyz;
+    if p.extra.y > 0.5 {
+        // A card that turns in 3D (a falling leaf): flat, then tipped by `extra.w` about the line
+        // its heading `extra.z` gives.
+        let h = vec2(cos(p.extra.z), sin(p.extra.z));
+        across = vec3(h.x, 0.0, h.y);
+        down = vec3(-h.y, 0.0, h.x) * cos(p.extra.w) + vec3(0.0, sin(p.extra.w), 0.0);
+    }
+    let world = p.pos_size.xyz + (across * (c.x - 0.5) + down * (c.y - 0.5)) * p.pos_size.w;
     var out: VOut;
     out.clip = scene.view_proj * vec4(world, 1.0);
     let r = vec4<f32>(f32(p.data.z & 255u), f32((p.data.z >> 8u) & 255u), f32((p.data.z >> 16u) & 255u), f32(p.data.z >> 24u)) / 255.0;

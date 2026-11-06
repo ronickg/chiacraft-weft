@@ -530,6 +530,12 @@ pub struct ParticleDef {
     pub rules: Vec<ParticleRule>,
     /// Seconds one may live at most, the kinds it turns into included.
     pub longest: f32,
+    /// How the wind carries it (`abi::ParticleDesc`): the rate it takes the air's speed, its sink
+    /// through still air, its flutter and the wind that lifts it once landed.
+    pub air: f32,
+    pub sink: f32,
+    pub flutter: f32,
+    pub lift: f32,
 }
 
 /// `abi::ParticleRule` with what it names as numbers.
@@ -2938,6 +2944,10 @@ fn freeze_particles(g: &mut Game, raws: Vec<RawParticle>, errors: &mut Vec<Strin
             shader: p.shader,
             rules,
             longest: 0.0,
+            air: d.air.max(0.0),
+            sink: d.sink,
+            flutter: d.flutter.clamp(0.0, 1.0),
+            lift: d.lift.max(0.0),
         });
     }
     let translucent = |k: &ParticleDef| k.flags & abi::particle_flags::TRANSLUCENT != 0;
