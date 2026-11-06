@@ -62,7 +62,7 @@ const SPRING: u8 = 1;
 const SUMMER: u8 = 2;
 const SUMMER_AUTUMN: u8 = 2 | 4;
 
-pub const PLANTS: [Plant; 57] = [
+pub const PLANTS: [Plant; 58] = [
     // Frost (`reports/ecology/Plants and crops.md`, A1): spring wheat is sensitive (a hard frost,
     // about -2 °C, kills it; winter wheat, hardy, comes later); a blueberry's dormant bush is
     // hardy but its flowers and fruit die at -2; sugar cane takes none (the stalk dies, the base
@@ -173,6 +173,9 @@ pub const PLANTS: [Plant; 57] = [
     // The canopy's: andiroba and matamatá of the terra firme, the golden ipê; none takes a frost.
     p("base:andiroba_sapling", "andiroba (Carapa guianensis)", (18.0, 24.0, 32.0, 38.0), Water::Moderate, 0.0, ANY, 0.0),
     p("base:matamata_sapling", "matamatá (Eschweilera coriacea)", (18.0, 24.0, 32.0, 38.0), Water::Moderate, 0.0, ANY, 0.0),
+    // The wild cherry: Europe's temperate woods, growing from about 5 degrees, best in a warm
+    // summer, hardy to about -30 in winter (its buds), on moist deep soil.
+    p("base:cherry_sapling", "wild cherry (Prunus avium)", (5.0, 16.0, 24.0, 32.0), Water::Moderate, 0.0, ANY, -30.0),
     p("base:ipe_sapling", "golden ipê (Handroanthus serratifolius)", (15.0, 22.0, 32.0, 40.0), Water::Dry, 0.0, ANY, -1.0),
     p("base:acuri_palm_sapling", "acuri palm (Attalea phalerata)", (15.0, 24.0, 32.0, 40.0), Water::Moderate, 0.0, ANY, 0.0),
     // The giant sequoia: the Sierra Nevada's western slopes at 1,400-2,000 m, growing from about

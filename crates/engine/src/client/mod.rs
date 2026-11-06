@@ -1,7 +1,9 @@
 pub mod camera;
+pub mod cloud_shadow;
 pub mod ctm;
 pub mod entity_render;
 pub mod frame_look;
+pub mod froxels;
 pub mod gizmo;
 pub mod lod;
 pub mod looks;
@@ -11,8 +13,6 @@ pub mod modui;
 pub mod particles;
 mod receive;
 pub mod sky;
-pub mod cloud_shadow;
-pub mod froxels;
 pub mod soft_clouds;
 pub mod stack_look;
 pub mod terrain;

@@ -127,11 +127,13 @@ impl Froxels {
         let t = self.targets.as_ref().unwrap();
         self.scene = [t.index[1] as f32 + 1.0, t.index[0] as f32, cells.0 as f32, cells.1 as f32];
         for (target, pipe) in [(t.light, light_pipe), (t.sum, sum_pipe)] {
-            self.passes.push(Cmd::BeginPass { color: Some((Target::Texture(target), Some([0.0, 0.0, 0.0, 1.0]))), depth: None });
+            self.passes
+                .push(Cmd::BeginPass { color: Some((Target::Texture(target), Some([0.0, 0.0, 0.0, 1.0]))), depth: None });
             self.passes.pipeline(pipe);
             self.passes.bind(bind::sky::OBJECTS, objects);
             self.passes.bind(bind::sky::SCENE, scene);
-            self.passes.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: 0 });
+            self.passes
+                .push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: 0 });
             self.passes.push(Cmd::EndPass);
         }
     }

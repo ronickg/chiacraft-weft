@@ -30,7 +30,12 @@ impl CloudShadow {
         if let Some(p) = self.pipe.take() {
             gpu.destroy_pipeline(p);
         }
-        if !shader.module.entry_points.iter().any(|e| e.name == "fs_cloud_shadow") {
+        if !shader
+            .module
+            .entry_points
+            .iter()
+            .any(|e| e.name == "fs_cloud_shadow")
+        {
             return;
         }
         match gpu.create_pipeline(&PipelineDesc {
@@ -75,11 +80,13 @@ impl CloudShadow {
             (t, gpu.texture_index(t))
         });
         self.scene = [index as f32 + 1.0, SIZE as f32, 0.0, 0.0];
-        self.passes.push(Cmd::BeginPass { color: Some((Target::Texture(t), Some([1.0, 1.0, 1.0, 0.0]))), depth: None });
+        self.passes
+            .push(Cmd::BeginPass { color: Some((Target::Texture(t), Some([1.0, 1.0, 1.0, 0.0]))), depth: None });
         self.passes.pipeline(pipe);
         self.passes.bind(bind::sky::OBJECTS, objects);
         self.passes.bind(bind::sky::SCENE, scene);
-        self.passes.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: clouds });
+        self.passes
+            .push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: clouds });
         self.passes.push(Cmd::EndPass);
     }
 }
