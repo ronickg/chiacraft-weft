@@ -29,7 +29,7 @@ pub static FX_VOLUME: Config<i32> = Config::named("fx_volume");
 pub static FX_SHAFTS: Config<i32> = Config::named("fx_shafts");
 pub static FX_BLOOM: Config<i32> = Config::named("fx_bloom");
 /// Far relief (`post/relief.wgsl`, Far view): the land 200-2000 blocks out shaded by its own
-/// shapes, ambient occlusion and a shadow toward the sun from the depth. An Extra row; on in Max.
+/// shapes, ambient occlusion and a shadow toward the sun from the depth. An Extra row; not in Max yet.
 pub static FX_RELIEF: Config<i32> = Config::named("fx_relief");
 
 static RENDER_SCALE: Config<f32> = Config::named("core:render_scale");
@@ -252,7 +252,8 @@ fn max_extras() {
     SHADOW_FAR.set(0);
     POST_LOW.set(false);
     crate::look::LOOK_LEAF_HOLES.set(1.0);
-    FX_RELIEF.set(2);
+    // (Far relief stays out of Max until its look is right: its first version darkened flat ground
+    // and banded, Far view's A/B fv_relb, 11-06.)
     // Ultra (soft edges from more rays, with TAA) where the GPU traces rays.
     RT_SHADOWS.set(if GPU_RAY_QUERY.get() && !on_phone() { 2 } else { 0 });
     RT_REFLECTIONS.set(GPU_RAY_QUERY.get() && !on_phone());
