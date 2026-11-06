@@ -25,9 +25,9 @@ use weft_sdk::noise::fixed::{self, Fields, ONE, div_floor, q4, q12, ramp, shape}
 
 use super::{
     CONTINENTS, HIGHLANDS, HIGHLANDS_AREA, HILLS, HILLS_AREA, Here, LAKE_DEPTH, LAKE_MAX_RISE, LAKE_STRETCH, Lake, MOUNTAINS_AREA,
-    RIVER_BANKS, RIVER_DEPTH, RIVER_FLOODPLAIN, RIVER_FLOW, RIVER_HALF_WIDTH, RIVER_MOUNTAINS, RIVER_NODE, RIVER_RAIN, RIVER_REACH,
+    RIVER_BANKS, RIVER_MOUNTAINS, RIVER_NODE, RIVER_RAIN, RIVER_REACH,
     RIVER_REGION, RIVER_ROUTE_HILLS, RIVER_ROUTE_MOUNTAINS, RIVER_SINK_FLOW, RIVER_SINK_RADIUS, RIVER_TERRACE, RIVER_TERRACE_RISER,
-    RIVER_VALLEY_PER_BLOCK, RIVER_VALLEY_RISE, RIVER_WARP, RIVER_WARP_SCALE, ground_at, lake_reach_most, masked, mesa_at, salt,
+    RIVER_VALLEY_PER_BLOCK, RIVER_VALLEY_RISE, RIVER_WARP_SCALE, Rivers, ground_at, rivers_style, lake_reach_most, masked, mesa_at, salt,
 };
 use crate::SEA;
 
@@ -60,7 +60,8 @@ pub(super) struct Region {
 /// How far a river's valley can reach from its middle line (blocks) with its sides climbing
 /// `rise` blocks: the widest channel and floodplain, the sides, and the meander.
 pub(super) fn valley_reach(rise: i32) -> i32 {
-    RIVER_HALF_WIDTH.1 + RIVER_FLOODPLAIN.1 + RIVER_BANKS + ((RIVER_VALLEY_PER_BLOCK * rise) >> 4) + RIVER_WARP_REACH
+    let r = rivers_style();
+    r.half_width.1 + r.floodplain.1 + RIVER_BANKS + ((RIVER_VALLEY_PER_BLOCK * rise) >> 4) + warp_reach(r)
 }
 
 /// A stretch's valley sides climb at most this much more than its ends' big shape (blocks): the
@@ -68,7 +69,9 @@ pub(super) fn valley_reach(rise: i32) -> i32 {
 const RIVER_RISE_SPARE: i32 = 24;
 
 /// The meander's furthest push (blocks): the warp noise stays well inside ±0.5.
-const RIVER_WARP_REACH: i32 = (RIVER_WARP * 0.6) as i32;
+fn warp_reach(r: &Rivers) -> i32 {
+    (r.warp * 0.6) as i32
+}
 
 /// A node's place (blocks): its cell's corner plus a jitter in the middle half of the cell.
 fn node_pos(seed: u64, i: i32, j: i32) -> [i32; 2] {
@@ -221,7 +224,7 @@ impl Region {
         for j in lo..side - lo {
             for i in lo..side - lo {
                 let k = at(i, j);
-                if down[k] == NONE || flow[k] < q12(RIVER_FLOW.0) {
+                if down[k] == NONE || flow[k] < q12(rivers_style().flow.0) {
                     continue;
                 }
                 let d = down[k] as usize;
@@ -263,7 +266,7 @@ impl Region {
                 }
                 let h = fixed::hash(fixed::seed32(f.seed, salt::RIVER_NODES), p[0], 1, p[1]);
                 let h2 = fixed::fmix(h);
-                let size = ramp(flow[k], q12(RIVER_SINK_FLOW), q12(RIVER_FLOW.2));
+                let size = ramp(flow[k], q12(RIVER_SINK_FLOW), q12(rivers_style().flow.2));
                 let lake = Lake {
                     x: p[0],
                     z: p[1],
@@ -418,7 +421,7 @@ fn tile_at(f: &Fields, ti: i32, tj: i32) -> Arc<Tile> {
 /// The region holding block (`bx`, `bz`), worked out once for every thread.
 pub(super) fn region_at(f: &Fields, bx: i32, bz: i32) -> Arc<Region> {
     let r = RIVER_REGION * RIVER_NODE;
-    let key = (f.seed, div_floor(bx, r).0, div_floor(bz, r).0);
+    let key = (super::cache_seed(f.seed), div_floor(bx, r).0, div_floor(bz, r).0);
     if let Some(hit) = AT.with(|a| {
         let mut a = a.borrow_mut();
         let i = a.iter().position(|(k, _)| *k == key)?;
@@ -446,7 +449,7 @@ pub(super) fn region_at(f: &Fields, bx: i32, bz: i32) -> Arc<Region> {
 
 /// The meandered point a column measures its distance to the rivers from (Q4).
 pub(super) fn meander(f: &Fields, x: i32, z: i32) -> [i64; 2] {
-    let (warp, ws) = (q4(RIVER_WARP), q4(RIVER_WARP_SCALE));
+    let (warp, ws) = (q4(rivers_style().warp), q4(RIVER_WARP_SCALE));
     [
         (x + ((f.fbm(salt::RIVER_WARP_X, x, z, ws, 2) * warp) >> 12)) as i64,
         (z + ((f.fbm(salt::RIVER_WARP_Z, x, z, ws, 2) * warp) >> 12)) as i64,
@@ -482,13 +485,14 @@ pub(super) fn mountains(h: &Here) -> i32 {
 }
 
 pub(super) fn shape(flow: i32, mountains: i32) -> Shape {
-    let size = ramp(flow, q12(RIVER_FLOW.1), q12(RIVER_FLOW.2));
+    let r = rivers_style();
+    let size = ramp(flow, q12(r.flow.1), q12(r.flow.2));
     let lerp = |(a, b): (i32, i32)| q4(a as f64) + (((q4(b as f64) - q4(a as f64)) * size) >> 12);
-    let strength = ramp(flow, q12(RIVER_FLOW.0), q12(RIVER_FLOW.1));
+    let strength = ramp(flow, q12(r.flow.0), q12(r.flow.1));
     Shape {
-        half: lerp(RIVER_HALF_WIDTH).max(16),
-        depth: lerp(RIVER_DEPTH),
-        floodplain: lerp(RIVER_FLOODPLAIN),
+        half: lerp(r.half_width).max(16),
+        depth: lerp(r.depth),
+        floodplain: lerp(r.floodplain),
         strength: (strength * mountains) >> 12,
     }
 }

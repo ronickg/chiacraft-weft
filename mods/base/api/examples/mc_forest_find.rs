@@ -31,6 +31,10 @@ const BANDS: [(f64, f64, [f64; 4]); 3] = [
 type View = (f64, i32, i32, Vec<[f64; 4]>, bool);
 
 fn main() {
+    l::with_mc_land(find);
+}
+
+fn find() {
     let a: Vec<String> = std::env::args().skip(1).collect();
     let arg = |i: usize, d: i64| a.get(i).and_then(|s| s.parse().ok()).unwrap_or(d);
     let seed = arg(0, 1) as u64;

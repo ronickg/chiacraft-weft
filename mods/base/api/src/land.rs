@@ -616,6 +616,74 @@ pub const RIVER_MOUNTAINS: (f64, f64) = (0.1, 0.45);
 pub const RIVER_WARP: f64 = 110.0;
 pub const RIVER_WARP_SCALE: f64 = 75.0;
 
+/// How the rivers and basin lakes come out on a terrain on this land: the overworld's (`RIVERS`,
+/// from the numbers above) or the Minecraft forest test world's (`MC_RIVERS`). The land code reads
+/// the one in force on its thread (`rivers_style`), the overworld's unless `with_mc_land` runs it.
+#[derive(Clone, Copy, Debug)]
+pub struct Rivers {
+    /// A basin lake's chance per `LAKE_CELL` (before its climate's share).
+    pub lake_chance: f64,
+    /// `RIVER_FLOW`: a gully from `.0`, water at `.1`, full size at `.2`.
+    pub flow: (f64, f64, f64),
+    pub half_width: (i32, i32),
+    pub depth: (i32, i32),
+    pub floodplain: (i32, i32),
+    /// `RIVER_WARP`: the meander's push.
+    pub warp: f64,
+    /// Told apart in the caches (0 for the overworld's, so its keys are the seed as before).
+    pub tag: u64,
+}
+
+pub const RIVERS: Rivers = Rivers {
+    lake_chance: LAKE_CHANCE,
+    flow: RIVER_FLOW,
+    half_width: RIVER_HALF_WIDTH,
+    depth: RIVER_DEPTH,
+    floodplain: RIVER_FLOODPLAIN,
+    warp: RIVER_WARP,
+    tag: 0,
+};
+
+/// The test world's rivers (Planner, 11-05: "wide winding rivers through forest like Bliss's scene
+/// (ours show mostly lakes)"). Seed 1's land has a basin lake every half kilometre (four cells in
+/// five keep one) and its rivers mostly short (half its stretches under 7 wet nodes of flow, a tenth
+/// over 35): water 1.4% rivers, 2.8% lakes. Minecraft's scene is long rivers, 8-30 blocks across,
+/// winding through the woods to the sea. So here: a basin lake in one cell in seven, water from a
+/// smaller flow and full width at half the overworld's (wide rivers are common, not the rare
+/// trunk), the channel up to 44 blocks across, and the meander half again as strong.
+pub const MC_RIVERS: Rivers = Rivers {
+    lake_chance: 0.15,
+    flow: (3.0, 6.0, 55.0),
+    half_width: (4, 22),
+    depth: (3, 7),
+    floodplain: (2, 10),
+    warp: 165.0,
+    tag: 0x3C3F_0000_0000_0000,
+};
+
+thread_local! {
+    static MC_LAND: Cell<bool> = const { Cell::new(false) };
+}
+
+/// The rivers' style in force on this thread.
+pub fn rivers_style() -> &'static Rivers {
+    if MC_LAND.with(Cell::get) { &MC_RIVERS } else { &RIVERS }
+}
+
+/// Runs `f` with the land as the Minecraft forest test world has it (`MC_RIVERS`): its terrain's
+/// own feature and decorations, and any tool that asks about that world.
+pub fn with_mc_land<R>(f: impl FnOnce() -> R) -> R {
+    let was = MC_LAND.with(|c| c.replace(true));
+    let r = f();
+    MC_LAND.with(|c| c.set(was));
+    r
+}
+
+/// A seed as the land's caches key it: told apart by the rivers' style.
+pub(crate) fn cache_seed(seed: u64) -> u64 {
+    seed ^ rivers_style().tag
+}
+
 /// Lakes in basins (Lithosphere's "big lakes anywhere, with islands"): a site per `LAKE_CELL`
 /// blocks square, kept with `LAKE_CHANCE` times its climate's share (`LAKE_WET`: the dry land a
 /// quarter of it, the wet all; `LAKE_COLD` more in the cold, as glacial country is full of lakes).
@@ -773,6 +841,15 @@ pub fn features() -> Vec<Feature> {
         // callback, so a column's ground under them is worked out once (`customs`).
         Feature::custom(customs).named("land"),
     ]
+}
+
+/// `features` for the Minecraft forest test world: the same, its rivers and basin lakes as
+/// `MC_RIVERS` has them.
+pub fn mc_features() -> Vec<Feature> {
+    let mut all = features();
+    all.pop();
+    all.push(Feature::custom(|f, x, z| with_mc_land(|| customs(f, x, z))).named("land"));
+    all
 }
 
 /// The fields biome rules ask for (`TerrainBuilder::field`, declared before the rules): where the
@@ -979,7 +1056,7 @@ fn lake_middle(seed: u64, cx: i32, cz: i32) -> (u32, u32, [i32; 2]) {
 
 /// The lake of cell (`cx`, `cz`), if it has one (`LAKE_CELL`).
 pub fn lake_site(f: &Fields, cx: i32, cz: i32) -> Option<Lake> {
-    if let Some(hit) = LAKE_SITES.with(|c| c.borrow().get(&(f.seed, cx, cz)).copied()) {
+    if let Some(hit) = LAKE_SITES.with(|c| c.borrow().get(&(cache_seed(f.seed), cx, cz)).copied()) {
         return hit;
     }
     let site = (|| {
@@ -987,7 +1064,7 @@ pub fn lake_site(f: &Fields, cx: i32, cz: i32) -> Option<Lake> {
         let here = Here::new(f, x * 16, z * 16);
         let wet = q12(0.25) + ((q12(0.75) * ramp(here.humidity(), q12(LAKE_WET.0), q12(LAKE_WET.1))) >> 12);
         let cold = ONE + ((q12(LAKE_COLD_MORE) * ramp(here.temperature(), q12(LAKE_COLD.0), q12(LAKE_COLD.1))) >> 12);
-        let chance = (((q12(LAKE_CHANCE) * wet) >> 12) * cold) >> 12;
+        let chance = (((q12(rivers_style().lake_chance) * wet) >> 12) * cold) >> 12;
         if (h & 4095) as i32 >= chance {
             return None;
         }
@@ -1014,7 +1091,7 @@ pub fn lake_site(f: &Fields, cx: i32, cz: i32) -> Option<Lake> {
         if c.len() > 4096 {
             c.clear();
         }
-        c.insert((f.seed, cx, cz), site);
+        c.insert((cache_seed(f.seed), cx, cz), site);
     });
     site
 }
@@ -1914,7 +1991,7 @@ pub fn mc_mix_cuts() -> &'static [f64; MC_MIX.len()] {
 /// The test world's biome at (`x`, `z`) (Q4), as its rules pick it (the overworld's coasts and
 /// mountains first, then the mix): for its checks and finding spots.
 pub fn mc_forest_biome(f: &Fields, x: i32, z: i32) -> &'static str {
-    let h = height(f, x, z) >> 4;
+    let h = with_mc_land(|| height(f, x, z)) >> 4;
     let here = Here::new(f, x, z);
     let (t, c) = (here.temperature(), here.continent());
     if let Some(top) = reefs::part(&here, h) {

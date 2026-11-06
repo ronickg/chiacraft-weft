@@ -12,7 +12,7 @@ use crate::worldgen::SEA;
 
 /// The overworld's terrain.
 pub fn terrain(r: &mut Registry) {
-    let t = land(r.terrain(&crate::OVERWORLD));
+    let t = land(r.terrain(&crate::OVERWORLD), l::features());
     let t = coasts(t);
     let mut t = heights(t);
     // Giant sequoia groves, on the mountains' front slopes (`base_api::land::SEQUOIA_AREA`).
@@ -39,17 +39,17 @@ pub fn terrain(r: &mut Registry) {
     finish(t);
 
     r.decoration(rock_faces).dimension(&crate::OVERWORLD);
-    r.decoration(rock_faces).dimension(&crate::MC_FOREST);
+    r.decoration(|g| l::with_mc_land(|| rock_faces(g))).dimension(&crate::MC_FOREST);
     r.decoration(cave_mouths).dimension(&crate::OVERWORLD);
-    r.decoration(cave_mouths).dimension(&crate::MC_FOREST);
+    r.decoration(|g| l::with_mc_land(|| cave_mouths(g))).dimension(&crate::MC_FOREST);
     r.decoration(glaciers).dimension(&crate::OVERWORLD);
-    r.decoration(glaciers).dimension(&crate::MC_FOREST);
+    r.decoration(|g| l::with_mc_land(|| glaciers(g))).dimension(&crate::MC_FOREST);
     r.decoration(tarn_water).dimension(&crate::OVERWORLD);
-    r.decoration(tarn_water).dimension(&crate::MC_FOREST);
+    r.decoration(|g| l::with_mc_land(|| tarn_water(g))).dimension(&crate::MC_FOREST);
     r.decoration(fray_borders).dimension(&crate::OVERWORLD);
-    r.decoration(fray_borders).dimension(&crate::MC_FOREST);
+    r.decoration(|g| l::with_mc_land(|| fray_borders(g))).dimension(&crate::MC_FOREST);
     r.decoration(sea_sand).dimension(&crate::OVERWORLD);
-    r.decoration(sea_sand).dimension(&crate::MC_FOREST);
+    r.decoration(|g| l::with_mc_land(|| sea_sand(g))).dimension(&crate::MC_FOREST);
     r.decoration(coral).dimension(&crate::OVERWORLD);
     r.decoration(landmarks).dimension(&crate::OVERWORLD);
     r.decoration(tropical_water).dimension(&crate::OVERWORLD);
@@ -60,12 +60,12 @@ pub fn terrain(r: &mut Registry) {
 /// drifts), then the features. Biomes shape the land through their climate, not their borders, so
 /// nothing seams: the cold flattens hills into tundra, deserts get dunes and mesas, rivers run
 /// where it's wet enough.
-fn land(t: TerrainBuilder<'_>) -> TerrainBuilder<'_> {
+fn land(t: TerrainBuilder<'_>, features: Vec<Feature>) -> TerrainBuilder<'_> {
     let mut t = t.stone("stone").base_height(SEA as f64).continent_scale(l::CONTINENT_SCALE).sea(SEA, "water");
     for (name, field) in l::rule_fields() {
         t = t.field(name, field);
     }
-    for f in l::features() {
+    for f in features {
         t = t.feature(f);
     }
     t
@@ -169,7 +169,7 @@ fn finish(t: TerrainBuilder<'_>) {
 /// coasts and heights, and the rest shared out among Minecraft's temperate forest biomes by the mix
 /// field, each with its river bed (`RIVER_BEDS`).
 pub fn mc_forest_terrain(r: &mut Registry) {
-    let t = land(r.terrain(&crate::MC_FOREST)).field(l::MC_MIX_FIELD, l::mc_mix_field());
+    let t = land(r.terrain(&crate::MC_FOREST), l::mc_features()).field(l::MC_MIX_FIELD, l::mc_mix_field());
     let mut t = heights(coasts(t));
     let cuts = l::mc_mix_cuts();
     let mut low = f64::NEG_INFINITY;
@@ -205,6 +205,12 @@ pub fn overworld_land(dimension: u32) -> bool {
     dimension == crate::OVERWORLD.id() || dimension == crate::MC_FOREST.id()
 }
 
+/// The dimension whose columns a site in `dimension` stands on (the test world's own: its rivers
+/// differ, `base_api::land::MC_RIVERS`).
+fn land_of(dimension: u32) -> &'static Dimension {
+    if dimension == crate::MC_FOREST.id() { &crate::MC_FOREST } else { &crate::OVERWORLD }
+}
+
 /// Whether a scatter's site (`Site::pos`, the block above the ground) in the overworld stands on a
 /// bare rock face, for trees and boulders to skip: a site can't see the cube, so this asks the
 /// terrain for the neighbouring columns.
@@ -212,10 +218,11 @@ pub fn site_on_rock(seed: u64, dimension: u32, [x, _, z]: [i32; 3]) -> bool {
     if !overworld_land(dimension) {
         return false;
     }
-    let h = crate::OVERWORLD.column(seed, x, z).height;
+    let dim = land_of(dimension);
+    let h = dim.column(seed, x, z).height;
     let fall = [(1, 0), (-1, 0), (0, 1), (0, -1)]
         .iter()
-        .map(|&(dx, dz)| h - crate::OVERWORLD.column(seed, x + dx, z + dz).height)
+        .map(|&(dx, dz)| h - dim.column(seed, x + dx, z + dz).height)
         .max()
         .unwrap_or(0);
     rock_face(fall)
@@ -230,8 +237,9 @@ pub fn site_under_wall(seed: u64, dimension: u32, [x, _, z]: [i32; 3]) -> bool {
     if !overworld_land(dimension) {
         return false;
     }
-    let h = crate::OVERWORLD.column(seed, x, z).height;
-    let high = |dx: i32, dz: i32| crate::OVERWORLD.column(seed, x + dx, z + dz).height - h >= WALL_RISE;
+    let dim = land_of(dimension);
+    let h = dim.column(seed, x, z).height;
+    let high = |dx: i32, dz: i32| dim.column(seed, x + dx, z + dz).height - h >= WALL_RISE;
     const DIRS: [(i32, i32); 8] = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)];
     DIRS[..4].iter().any(|&(dx, dz)| high(dx, dz))
         || [WALL_REACH / 2, WALL_REACH]

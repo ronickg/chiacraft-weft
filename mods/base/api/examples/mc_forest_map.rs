@@ -1,6 +1,6 @@
 //! The Minecraft forest test world's biomes (`base_api::land::MC_MIX`, dimension `base:mc_forest`)
 //! beside the overworld's on the same land: a map of each, lit by the ground's height, with the
-//! water, and the test world's biome shares in the frame. For finding its test spots.
+//! water (each its own rivers and lakes), and the test world's biome and water shares in the frame. For finding its test spots.
 //!
 //!     cargo run -p base_api --example mc_forest_map -- <seed> <x> <z> <blocks across> <blocks a pixel> <out.ppm>
 
@@ -18,17 +18,23 @@ fn main() {
     let f = l::fields(seed);
     let n = (across / step) as usize;
     let (x0, z0) = (cx - across / 2, cz - across / 2);
-    let mut hs = vec![0i32; (n + 1) * (n + 1)];
-    for j in 0..=n {
-        for i in 0..=n {
-            hs[j * (n + 1) + i] = l::height(&f, (x0 + i as i32 * step) * 16, (z0 + j as i32 * step) * 16) >> 4;
+    // Each side's own heights: the test world's rivers and lakes are its own (`l::MC_RIVERS`).
+    let heights = |mc: bool| {
+        let mut hs = vec![0i32; (n + 1) * (n + 1)];
+        for j in 0..=n {
+            for i in 0..=n {
+                let (x, z) = ((x0 + i as i32 * step) * 16, (z0 + j as i32 * step) * 16);
+                hs[j * (n + 1) + i] = if mc { l::with_mc_land(|| l::height(&f, x, z)) } else { l::height(&f, x, z) } >> 4;
+            }
         }
-    }
+        hs
+    };
+    let sides = [heights(false), heights(true)];
     let w = 2 * n + 8;
     let mut img = vec![20u8; w * n * 3];
     let mut shares: Vec<(&str, usize)> = Vec::new();
     let mut land = 0usize;
-    for side in 0..2 {
+    for (side, hs) in sides.iter().enumerate() {
         for j in 0..n {
             for i in 0..n {
                 let (x, z) = ((x0 + i as i32 * step) * 16, (z0 + j as i32 * step) * 16);
