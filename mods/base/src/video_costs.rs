@@ -75,6 +75,10 @@ const TABLE: &[(&str, f64, f64, f64)] = &[
     // The light through leaves (Trees, 11-06): an estimate, not yet measured. A few ALU ops and an
     // exp per leaf pixel, no texture or shadow lookup (it reuses the face's sun reach).
     ("leaf_light", 1.0, 0.02, f64::NAN),
+    // Our path tracing denoiser over its raw light (pt-denoisers, PC ptd_rrt3, 11-06: +0.4-0.6 ms
+    // at 1280x720, scaled by the pixels). Only while path tracing runs; nothing without it, which a
+    // player's own measuring shows.
+    ("pt_denoiser", 1.0, 1.1, f64::NAN),
 ];
 
 /// The 5090 at 1920x1080 against this machine: the pixels the world is drawn at, and how much

@@ -618,6 +618,15 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // (0 the picture, 1 albedo, 2 normals, 3 direct light, 4 the bounce, 5 the specular light, 6 the radiance cache, 7 the picture with a line where tracing ends).
         ConfigDef::number("core:path_traced", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         ConfigDef::number("core:pt_debug", ck::INT, 0.0, 0.0, 7.0, 1.0),
+        // How the path tracer's light is denoised (`denoise::Denoiser`) where Ray Reconstruction
+        // doesn't do it: 0 not at all (raw, for checks), 1 ours (SVGF-like), live.
+        ConfigDef::number("core:pt_denoiser", ck::INT, 1.0, 0.0, 1.0, 1.0),
+        // Its tuning (checks only, no menu row): how far light may differ between joined texels
+        // (standard deviations) and its à-trous steps, live.
+        ConfigDef::number("core:pt_dn_phi", ck::FLOAT, 1.0, 0.25, 16.0, 0.25),
+        ConfigDef::number("core:pt_dn_steps", ck::INT, 4.0, 1.0, 5.0, 1.0),
+        // Its debug views (checks only): 0 none, 1-6 (`denoise.wgsl` `dn_debug_view`).
+        ConfigDef::number("core:pt_dn_debug", ck::INT, 0.0, 0.0, 6.0, 1.0),
         // The soft clouds' shadow on the land (with the HDR world; `client::cloud_shadow`).
         ConfigDef::number("core:cloud_shadows", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         // Vanilla's: in GUI pixels, and percent of the dark behind the text.
@@ -736,6 +745,9 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // A stand-in upscaler that only scales the picture up, for checking the upscaler's path
         // where the renderer has none (the Linux PC); read at start.
         ConfigDef::number("core:upscale_standin", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // A check of the path tracer's denoiser on today's frame, before the path tracer exists
+        // (`denoise::test_on`; checks only, no menu row): today's picture as the albedo, a noisy light.
+        ConfigDef::number("core:pt_denoise_test", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         // DLSS 5's strength (its intensity control), live.
         ConfigDef::number("core:dlss5_intensity", ck::FLOAT, 0.5, 0.0, 1.0, 0.05),
         // The HDR world's bloom (chiacraft): 0 none, 1 a pyramid of 4 levels, 2 of 6 (wider glow);

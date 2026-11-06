@@ -301,6 +301,8 @@ pub enum Cmd {
         albedo: TextureId,
         /// The specular albedo, linear.
         specular: TextureId,
+        /// How far the specular rays went (blocks, in r): the path tracer's, else `NO_TEXTURE`.
+        hit_distance: TextureId,
         /// An [`UpscaleParams`] at this offset in [`CommandList::data`].
         start: u32,
     },

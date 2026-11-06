@@ -390,3 +390,17 @@ fn motion_texel(m: vec3<f32>, depth: f32) -> vec4<f32> {
     }
     return vec4(0.0, 0.0, -1.0, 0.0);
 }
+
+// The share of light a surface reflects specularly, over all directions of view-dependent
+// reflection (Karis's fit of the split-sum's environment BRDF, "Physically Based Shading on
+// Mobile", 2014): F0 `f0`, perceptual roughness `rough` (1 - LabPBR smoothness), `n_dot_v` the
+// cosine to the eye. The path tracer divides its specular light by it and the denoisers and DLSS
+// Ray Reconstruction's guides multiply it back (`reports/Path tracing plan.md`, pt-denoisers).
+fn pt_spec_albedo(f0: vec3<f32>, rough: f32, n_dot_v: f32) -> vec3<f32> {
+    let c0 = vec4(-1.0, -0.0275, -0.572, 0.022);
+    let c1 = vec4(1.0, 0.0425, 1.04, -0.04);
+    let r = clamp(rough, 0.0, 1.0) * c0 + c1;
+    let a004 = min(r.x * r.x, exp2(-9.28 * clamp(n_dot_v, 0.0, 1.0))) * r.x + r.y;
+    let ab = vec2(-1.04, 1.04) * a004 + r.zw;
+    return f0 * ab.x + ab.y;
+}

@@ -62,12 +62,20 @@ fn pt_cosine(n: vec3<f32>, u: vec2<f32>) -> vec3<f32> {
 }
 
 // Two numbers 0..1 for pixel `px`, moving every frame (`scene.rt.y`), apart from `rt_cone`'s.
+// A hash of the pixel and the frame (Jarzynski and Olano 2020's pcg3d): its two numbers don't go
+// together. Interleaved gradient noise's did, and steered the bounce and reflection rays alike
+// along a diagonal: the faces showed diagonal hatching where they should show plain grain for
+// temporal anti-aliasing and the denoisers to settle (NVIDIA's storeroom, pt1_hatching_crop).
 fn pt_noise(px: vec2<f32>) -> vec2<f32> {
-    let k = f32(u32(scene.rt.y) % 64u);
-    let p = px + vec2(5.588238 * k) + vec2(41.0, 7.0);
-    let a = fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
-    let b = fract(52.9829189 * fract(dot(p.yx + vec2(13.0, 3.0), vec2(0.06711056, 0.00583715))));
-    return vec2(a, b);
+    var v = vec3<u32>(vec2<u32>(max(floor(px), vec2(0.0))), u32(scene.rt.y));
+    v = v * 1664525u + 1013904223u;
+    v.x += v.y * v.z;
+    v.y += v.z * v.x;
+    v.z += v.x * v.y;
+    v = v ^ (v >> vec3(16u));
+    v.x += v.y * v.z;
+    v.y += v.z * v.x;
+    return vec2<f32>(v.xy >> vec2(8u)) / 16777216.0;
 }
 
 // The specular albedo: how much of the light round it a surface of reflectance `f0` and perceptual
@@ -274,14 +282,23 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     let gb_n = textureLoad(textures[pt.normal], ip, 0);
     let gb_s = textureLoad(textures[pt.spec], ip, 0);
     let albedo = textureLoad(textures[pt.albedo], ip, 0).rgb;
+    // Only where the G-buffer drew (the cubes' opaque and cutout faces): a distant tile inside the
+    // reach met there has no G-buffer, and traced with no albedo a far peak came out black
+    // (pt1_dark_peak_crop); it keeps the world's pixel, as the denoisers skip it.
+    if dot(gb_n.xyz, gb_n.xyz) < 0.25 {
+        return;
+    }
     let ng = h.n;
-    let n = select(ng, normalize(gb_n.xyz), dot(gb_n.xyz, gb_n.xyz) > 0.25);
+    let n = normalize(gb_n.xyz);
+    // Rays leave a little off the face, more with the distance: the hit point comes from the
+    // primary ray's length, less exact than the world's own points.
+    let lift = ng * (0.01 + dist * 3e-4);
     let rough_p = gb_n.w;
     let f0 = gb_s.rgb;
     let l = light_dir();
     var sun = 0.0;
     if dot(ng, l) > 0.0 && light_strength() > 0.0 {
-        sun = dot(rt_sun_soft(h.rel, ng, l, false, PT_SUN_CONE, px, false), vec3(1.0 / 3.0));
+        sun = dot(rt_sun_soft(h.rel + lift, ng, l, false, PT_SUN_CONE, px, false), vec3(1.0 / 3.0));
     }
     // Diffuse. The world's light (its sky light from the lightmap); the sky's share of it, as the
     // lightmap gives it (already lowered under cover) and as the open sky would give it.
@@ -293,7 +310,13 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     // gets out gives the open sky's: the rays themselves say how much of the sky is hidden. (With
     // the lightmap's lowered share there, cover counted twice and a roofless ruin's walls came out
     // a quarter darker than the world draws them, NVIDIA's cathedral, pt1_rtxd_d3.)
-    let b = rt_hit(h.rel + ng * 0.01, pt_cosine(n, pt_noise(px)), 96.0, 2.0);
+    // About the normal-mapped normal, mirrored back over the face where that sends it in: a bumpy
+    // texture's rays went into its own block and darkened it in patches (the storeroom's gold).
+    var bdir = pt_cosine(n, pt_noise(px));
+    if dot(bdir, ng) < 0.0 {
+        bdir -= 2.0 * dot(bdir, ng) * ng;
+    }
+    let b = rt_hit(h.rel + lift, bdir, 96.0, 2.0);
     var bounce = vec3(0.0);
     var diffuse_t = PT_SKY_T;
     if b.hit {
@@ -343,7 +366,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
             if dot(dir, ng) <= 0.0 {
                 dir = r;
             }
-            let m = rt_hit(h.rel + ng * 0.01, dir, 384.0, a * 6.0);
+            let m = rt_hit(h.rel + lift, dir, 384.0, a * 6.0);
             var seen = sky_color(dir);
             specular_t = PT_SKY_T;
             if m.hit {

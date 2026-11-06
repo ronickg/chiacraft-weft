@@ -310,6 +310,7 @@ const TAG_ALBEDO: u32 = 7;
 const TAG_SPECULAR_ALBEDO: u32 = 8;
 const TAG_SPECULAR_MOTION: u32 = 10;
 const TAG_NORMAL_ROUGHNESS: u32 = 14;
+const TAG_SPECULAR_HIT_DISTANCE: u32 = 42;
 
 /// `sl::ResourceLifecycle::eValidUntilEvaluate`: tagged for the one evaluate call.
 const VALID_UNTIL_EVALUATE: u32 = 2;
@@ -786,6 +787,9 @@ impl Upscaler for Dlss {
             res.push((resource(s), TAG_SPECULAR_ALBEDO, render));
             // No mirror-like surfaces of their own yet: reflections move as the surfaces do.
             res.push((resource(&inputs.motion), TAG_SPECULAR_MOTION, render));
+            if let Some(h) = &inputs.hit_distance {
+                res.push((resource(h), TAG_SPECULAR_HIT_DISTANCE, render));
+            }
         }
         let tags: Vec<ResourceTag> = res
             .iter_mut()
