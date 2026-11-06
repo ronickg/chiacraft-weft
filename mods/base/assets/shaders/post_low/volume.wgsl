@@ -156,7 +156,13 @@ fn vol_glow(p: PostPixel) -> vec3<f32> {
     // most of the view's air is lit (the open water by a forest's edge) it is not: at `leafy` alone
     // the flooded forest's misty river went a white glare (luma p50 185 -> 201).
     let beams = max(lit * (1.0 - lit) * 4.0, leafy * (1.0 - lit));
-    let glow = color * mix(lit * 0.35, lit, beams) * air * phase * day * select(min(p.strength, 1.0), 1.0, cheap) * mix(0.6, 1.0, canopy * (1.0 - lit));
+    // In clear air only the beams, the difference the shadow maps make: the even glow of all the lit
+    // air over a sunny landscape (0.35 of it) lay as a grey-green veil on every dark pixel 100-300
+    // blocks off, where Bliss's clear air adds its blue haze only and its shade stays deep navy (the
+    // vista from above, 08:00: shade 44 45 39 with it, 27 31 25 without, Bliss's 26 41 47; Trees'
+    // trb_s9_vol0). In mist, fog or rain the air glows as before.
+    let even = 0.35 * smoothstep(0.0, 0.06, scene.weather.z + rain);
+    let glow = color * mix(lit * even, lit, beams) * air * phase * day * select(min(p.strength, 1.0), 1.0, cheap) * mix(0.6, 1.0, canopy * (1.0 - lit));
     return glow;
 }
 
