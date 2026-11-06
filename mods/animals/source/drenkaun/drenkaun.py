@@ -947,7 +947,8 @@ def animations(bone_names):
     for name, (fn, dur) in ANIMS.items():
         frames = []
         for t in frame_times(name, dur):
-            tt = t % dur if t < dur else (dur if name in HOLD else 0.0)
+            # A loop's last frame is its first; a clip played once ends on its own last pose.
+            tt = t % dur if t < dur else (0.0 if name in LOOPED else dur)
             pose = fn(tt)
             if name not in HOLD:  # dying, it shuts its eyes
                 pose.update(eyelids(name, tt))
