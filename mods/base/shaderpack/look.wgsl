@@ -2105,7 +2105,18 @@ fn display(c: vec3<f32>) -> vec3<f32> {
 }
 
 // The picture finished: exposure, the tone curve and the grade, from linear light to the screen.
-fn finish_picture(c: vec3<f32>) -> vec3<f32> {
+fn finish_picture(c_in: vec3<f32>) -> vec3<f32> {
+    // The HDR world's morning twilight (the sun 0-7° under, in the east): dim land brought up after
+    // the exposure, as Bliss's eye lifts its dim twilight land after its own (up to about 3x), where
+    // ours took back a brighter twilight in the meter's square root (05:00 land luma 35 against
+    // Bliss's 66 with Shader's pre-dawn blue; its runs shpr0/A/B, 11-06). Up to 2.35x: at 2.2 the
+    // land came to 61 (Shader's shprJ6). 04:00 stays dark.
+    var c = c_in;
+    if scene.frame.x > 0.5 {
+        let dawn = smoothstep(-0.13, -0.04, scene.sun.y) * (1.0 - smoothstep(0.0, 0.08, scene.sun.y)) * smoothstep(-0.2, 0.2, scene.sun.x);
+        let dim = 1.0 - smoothstep(0.02, 0.15, luma(c));
+        c *= 1.0 + 1.35 * dawn * dim * LAND_PIXEL;
+    }
     // By day Timothy Lottes's curve (his published formula, GDC 2016; Complementary's settings:
     // contrast 1.05, mid-grey 0.25 in and out, peak 8) at exposure 1.3: black stays black (no toe
     // lift, which raised the black point and halved saturation: Colour 4-7) and the darks keep their
