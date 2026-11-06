@@ -53,9 +53,25 @@ static RENDER_SCALE: Config<f32> = Config::named("core:render_scale");
 /// Pixel 10 at the Phone preset (ms, Android's numbers; NaN: not measured there, scaled from the PC).
 /// Rows read at start come from paired runs.
 const TABLE: &[(&str, f64, f64, f64)] = &[
-    // key, value, PC ms, Pixel ms
+    // key, value, PC ms, Pixel ms. The PC's from the sweep at mc_forest noon, view 32, the rest of
+    // Max around it (tester-tools/temporal-aa/costs_sweep4.txt, 11-06: ±0.02 ms a value); rows it
+    // found nothing for there (mist, fireflies by night, contact shadows under trees) cost where
+    // they show, which a player's own measuring finds.
+    ("shadows", 1.0, 0.28, f64::NAN),
+    ("shadows", 2.0, 0.49, f64::NAN),
+    ("reflect", 1.0, 0.07, f64::NAN),
+    ("reflect", 2.0, 0.06, f64::NAN),
+    ("volume", 1.0, 0.07, f64::NAN),
+    ("volume", 2.0, 0.20, f64::NAN),
+    ("rt_shadows", 1.0, 4.08, f64::NAN),
+    ("rt_shadows", 2.0, 10.98, f64::NAN),
+    ("fireflies", 1.0, 0.07, f64::NAN),
+    ("clouds", 1.0, 0.07, f64::NAN),
+    // From paired benches (11-06): TAA +0.07-0.10 ms on the PC; on the Pixel the motion image cost
+    // its world pass 9 ms and the resolve 2.4 (Android).
     ("aa", 1.0, 0.09, 11.4),
     ("aa", 2.0, 0.07, 2.4),
+    // Look's HDR numbers (+0.1-0.24 ms at 3456 wide), an estimate at 1080p.
     ("hdr", 1.0, 0.15, f64::NAN),
 ];
 
