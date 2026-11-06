@@ -1014,7 +1014,10 @@ fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
         // thin even veil with no top: the MC comparison's natural-mist sheets, 11-05). Storms' dust
         // and snow keep the old shape.
         if s < 0.5 {
-            let top = SEA_LEVEL + MIST_TOP;
+            // The top heaves with the banks, up to 5 blocks either way, so it is a lumpy sea that
+            // crowns break through, not a flat sheet (a level top laid straight stripes along
+            // every terrace of a valley's sides: spot A's first layer sheet, 11-06).
+            let top = SEA_LEVEL + MIST_TOP + (b - 0.45) * 10.0;
             let layer = 1.0 - smoothstep(top - 4.0, top + 1.5, p.y);
             return f * open * burn * (layer * mix(2.2, 5.5, b) + 0.012 * high) * 0.11;
         }
@@ -1241,7 +1244,23 @@ fn froxel_cell(dir: vec3<f32>, at: f32, floor: f32) -> vec4<f32> {
     if scene.frame.z > 0.5 && scene.frame.z < 6.0 {
         lit = lit * 0.5 + (sun_reaches(dir * (at - span * 0.4)) + sun_reaches(dir * (at - span * 0.1)) + sun_reaches(dir * (at + span * 0.4))) / 6.0;
     }
-    return vec4(mix(shaded_sky, light.sky, lit) + light.sun * lit + lightning_glow_at(dir * at) * 0.6, d);
+    return vec4(mix(shaded_sky, light.sky, lit) + light.sun * lit + mist_bounce(d, lit) + lightning_glow_at(dir * at) * 0.6, d);
+}
+
+// Sunlight scattered many times in a dense mist (the HDR world): a thick bank glows all round like
+// a white surface in the sun, not only toward it, and light creeps into its shaded parts. Single
+// scattering alone (forward-peaked) left the valley mist across the sun a dim brown-orange sheet
+// under green hills, where Bliss's is a bright gold sea (spot A's layer sheet, 11-06). Only where
+// the mist is dense (the valley layer, about 0.03 a block), so the thin haze up high stays clear.
+fn mist_bounce(d: f32, lit: f32) -> vec3<f32> {
+    if scene.frame.x < 0.5 {
+        return vec3(0.0);
+    }
+    let p = palette();
+    let warm = 1.0 - smoothstep(0.1, 0.65, scene.sun.y);
+    let thick = smoothstep(0.003, 0.03, d);
+    let tint = mix(vec3(1.0), vec3(1.0, 0.78, 0.5), warm);
+    return p.sun * tint * light_strength() * mix(lit, 1.0, 0.45) * thick * 0.16 * look_opt(OPT_FOG, 1.0);
 }
 
 // How much snow lies on a surface with normal `n` at `pos` (world) with `sky` light: on what
