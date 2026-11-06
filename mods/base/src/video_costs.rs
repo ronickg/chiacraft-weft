@@ -8,7 +8,7 @@
 //!   change waiting for a restart will cost.
 //! - On each row, what its value costs over the cheapest: measured on this GPU (plain), or estimated
 //!   from the table (`≈`); amber past 1 ms or a tenth of the frame.
-//! - Measuring (`Measure costs`, or `/videocosts measure` for a script): with the world behind the
+//! - Measuring (`Measure costs`, or `/videocosts all` for a script): with the world behind the
 //!   menu, each row that applies at once steps through its values, settles, and the GPU time is
 //!   averaged; then it goes back. The costs are kept per GPU, picture size and view distance
 //!   (`video_costs`), so another machine or window measures again. Rows read at start (the HDR
@@ -60,7 +60,7 @@ const TABLE: &[(&str, f64, f64, f64)] = &[
 ];
 
 /// The 5090 at 1920x1080 against this machine: the pixels the world is drawn at, and how much
-/// slower the GPU is likely to be (a rough guess by its kind: the estimates say `≈`).
+/// slower the GPU is likely to be (a rough guess by its kind: the estimates say `~`).
 fn scale(window: [u32; 2]) -> f64 {
     let s = RENDER_SCALE.get();
     let s = if s > 0.0 { s as f64 } else { 1.0 };
@@ -160,6 +160,13 @@ pub fn cost(window: [u32; 2], key: &str, value: f64) -> Cost {
 /// The frame as it goes, smoothed over about a second: GPU ms, whole frame ms, fps.
 static LIVE: Mutex<[f32; 3]> = Mutex::new([0.0; 3]);
 
+/// The window's size as the last frame had it (a screen's bindings see none).
+static WINDOW: Mutex<[u32; 2]> = Mutex::new([0, 0]);
+
+fn window() -> [u32; 2] {
+    *WINDOW.lock().unwrap()
+}
+
 /// The GPU's ms a frame now, smoothed.
 pub fn live_gpu() -> f64 {
     LIVE.lock().unwrap()[0] as f64
@@ -221,6 +228,7 @@ pub fn progress() -> Option<(usize, usize)> {
 /// Each frame: the live numbers, and a sweep's next bit.
 fn frame(c: &Client) {
     let st = c.state();
+    *WINDOW.lock().unwrap() = st.window;
     let dt = st.dt.clamp(0.0, 0.5);
     {
         let mut l = LIVE.lock().unwrap();
@@ -303,8 +311,8 @@ fn finish(s: &mut Sweep) {
 
 /// A row's cost, between its value and what it does.
 pub fn cost_cell(ui: &mut Ui, key: &'static str, get: fn() -> f64) {
-    ui.text_bind_styled(S::default().w(40.0).no_wrap(), move |v, t| {
-        let window = v.client().state().window;
+    ui.text_bind_styled(S::default().w(40.0).no_wrap(), move |_, t| {
+        let window = window();
         let frame = LIVE.lock().unwrap()[0].max(0.1) as f64;
         let (ms, measured) = match cost(window, key, get()) {
             Cost::Measured(ms) => (ms, true),
@@ -340,12 +348,12 @@ pub fn cost_cell(ui: &mut Ui, key: &'static str, get: fn() -> f64) {
 /// estimate), the Measure button for `rows`, and once, in a world, the offer to measure.
 pub fn top_line(ui: &mut Ui, screen: &'static Screen, rows: fn() -> Vec<Measured>, after: fn([u32; 2]) -> Option<f64>) {
     ui.row(S::row().gap(3.0).center(), move |ui| {
-        ui.text_bind_styled(S::default().max_w(250.0), move |v, t| {
+        ui.text_bind_styled(S::default().max_w(250.0), move |_, t| {
             let l = *LIVE.lock().unwrap();
             let gpu = format!("{:.2}", l[0]);
             let fps = format!("{:.0}", l[2]);
             let frame = format!("{:.1}", l[1]);
-            match after(v.client().state().window) {
+            match after(window()) {
                 Some(d) if d.abs() >= 0.01 => {
                     let then = format!("{:.2}", (l[0] as f64 + d).max(0.0));
                     t.set("video.base.cost.now_after", &[Arg::Text(&gpu), Arg::Text(&fps), Arg::Text(&frame), Arg::Text(&then)]);
@@ -353,8 +361,8 @@ pub fn top_line(ui: &mut Ui, screen: &'static Screen, rows: fn() -> Vec<Measured
                 _ => t.set("video.base.cost.now", &[Arg::Text(&gpu), Arg::Text(&fps), Arg::Text(&frame)]),
             }
         });
-        ui.button("video.base.cost.measure", S::default().h(12.0).pad(2.0), move |c| {
-            start(rows(), c.client().state().window);
+        ui.button("video.base.cost.measure", S::default().h(12.0).pad(2.0), move |_| {
+            start(rows(), window());
         });
         ui.text_bind_styled(S::default().class("dim").max_w(120.0), move |_, t| match progress() {
             Some((at, n)) => t.set("video.base.cost.measuring", &[Arg::Int(at as i64 + 1), Arg::Int(n as i64)]),
@@ -369,7 +377,7 @@ pub fn top_line(ui: &mut Ui, screen: &'static Screen, rows: fn() -> Vec<Measured
         ui.row(S::row().gap(3.0).center(), move |ui| {
             ui.text_styled(S::default().class("dim").max_w(250.0), "video.base.cost.offer", &[]);
             ui.button("video.base.cost.measure_now", S::default().h(12.0).pad(2.0), move |c| {
-                start(rows(), c.client().state().window);
+                start(rows(), window());
                 c.client().screen_open(screen);
             });
             ui.button("video.base.cost.not_now", S::default().h(12.0).pad(2.0), move |c| {
@@ -384,7 +392,7 @@ pub fn register(r: &mut Registry, all: fn(Tab) -> Vec<Measured>) {
     r.text_config(&COSTS, "");
     r.config(&OFFERED).bool(false);
     r.client_frame(frame);
-    // For a script or a curious player: `/videocosts measure video|extra|fantasy|dlss|all`, the
+    // For a script or a curious player: `/videocosts video|extra|fantasy|dlss|all`, the
     // costs in the log (`video cost: <key> <value> <ms>`).
     static ALL: std::sync::OnceLock<fn(Tab) -> Vec<Measured>> = std::sync::OnceLock::new();
     let _ = ALL.set(all);
@@ -401,7 +409,7 @@ pub fn register(r: &mut Registry, all: fn(Tab) -> Vec<Measured>) {
                 .collect(),
         };
         let secs = sweep_secs(&rows).ceil() as i64;
-        start(rows, cmd.client().state().window);
+        start(rows, window());
         cmd.reply("video.base.cost.started", &[Arg::Int(secs)]);
     });
 }
