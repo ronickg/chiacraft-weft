@@ -269,6 +269,16 @@ fn mist_over(uv: vec2<f32>, pass_: Pass) -> f32 {
 // The HDR world's light before the tone curve: the bloom mixed in and the exposure applied.
 fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
     var col = max(c, vec3(0.0));
+    // The sky a third more saturated by day (where nothing was drawn, depth 0): the curve's
+    // shoulder takes colour out of a bright sky, and ours read grey-white where Bliss's is blue
+    // overhead and gold toward a low sun (08:00, saturation 26 against 43). Not in rain.
+    let size = vec2<i32>(pass_.size);
+    let px = clamp(vec2<i32>(uv * pass_.size), vec2(0), size - vec2(1));
+    if textureLoad(textures[pass_.depth], px, 0).r <= 0.0 {
+        let y = luma(col);
+        let k = 1.0 + 0.3 * smoothstep(0.0, 0.15, scene.sun.y) * (1.0 - rain_amount());
+        col = max(vec3(y) + (col - vec3(y)) * k, vec3(0.0));
+    }
     if pass_.bloom != 0u {
         let glow = bloom_tap(pass_.bloom - 1u, uv);
         let air = clamp(max(rain_amount(), scene.weather.z), 0.0, 1.0);
