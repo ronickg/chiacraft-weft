@@ -94,7 +94,7 @@ pub fn prey_lush(w: &World, s: &Species, pos: [i32; 3]) -> Option<f32> {
         .reduce(f32::max)
 }
 
-/// An egg's mass, kg, at 15 cm long (about a goose egg's; `eggs::egg_length` scales the
+/// An egg's mass, kg, at 15 cm long real (about a goose egg's; `eggs::egg_length` scales the
 /// others by their length): eggs lying in a nest are food for the egg eaters of their sizes (the report's tier
 /// 3: "eggs are real food and nests are built already"), Citipati, the raptors, the foxes.
 const EGG_KG: f32 = 0.2;

@@ -67,8 +67,13 @@ static CRAFTING: RecipeKind = RecipeKind::named("base:crafting");
 /// Each laying species' egg item, by its row in `SPECIES` (made once).
 static ITEMS: OnceLock<Vec<(usize, &'static Item)>> = OnceLock::new();
 
-/// The egg a plain nest is made for, cm (a bigger species' nest is its egg's size bigger).
-const NEST_EGG_CM: f32 = 15.0;
+/// The egg a plain nest is made for: its box's width, blocks (a little under a Velociraptor's
+/// drawn egg; a wider egg's nest is as much bigger, so a ring of seven doesn't overlap), and the
+/// ring a nest's eggs lie on round the middle one, blocks at the plain nest's size.
+const NEST_EGG_W: f32 = 0.2;
+const NEST_RING: f64 = 0.25;
+/// The egg an egg's mass is given at, real cm (`hunt::EGG_KG`).
+const MASS_EGG_CM: f32 = 15.0;
 /// A wild female builds a nest about every two days, while her kind isn't crowded.
 const NESTING: u32 = 48_000;
 const CROWDED: usize = 8;
@@ -194,7 +199,7 @@ fn nest_spot(w: &World, n: [f64; 3]) -> [f64; 3] {
     let k = nest_scale(w, n);
     let spots = std::iter::once((0.0, 0.0)).chain((0..7).map(|i| {
         let a = i as f64 / 7.0 * std::f64::consts::TAU;
-        (a.cos() * 0.2 * k, a.sin() * 0.2 * k)
+        (a.cos() * NEST_RING * k, a.sin() * NEST_RING * k)
     }));
     let mut first = None;
     for (dx, dz) in spots {
@@ -207,20 +212,21 @@ fn nest_spot(w: &World, n: [f64; 3]) -> [f64; 3] {
     first.unwrap_or(n)
 }
 
-/// The scale species `index`'s egg is drawn at: its egg's length against its look's built one
-/// (`animals_core::eggs`: a Utahraptor's twice a Velociraptor's).
+/// The scale species `index`'s egg is drawn at: its egg's drawn length against its look's built
+/// one (`animals_core::eggs`: within 15%).
 fn egg_size(index: usize) -> f32 {
     animals_core::eggs::of(SPECIES[index].name).map_or(1.0, |(_, s)| s)
 }
 
-/// Species `index`'s egg length in cm (a roe clutch: 1).
-fn egg_cm(index: usize) -> f32 {
-    animals_core::eggs::of(SPECIES[index].name).map_or(NEST_EGG_CM, |(l, s)| l.built_cm * s)
+/// Species `index`'s egg's width as drawn (its box's, blocks): a nest and a clutch grow with it.
+fn egg_width(index: usize) -> f32 {
+    animals_core::eggs::of(SPECIES[index].name).map_or(NEST_EGG_W, |(l, s)| animals_core::bodies::of(l.model).0 * s)
 }
 
-/// Species `index`'s egg length against a 15 cm egg (`hunt`: an egg's mass goes with its cube).
+/// Species `index`'s real egg length against a 15 cm egg (`hunt`: an egg's mass goes with its
+/// cube).
 pub(crate) fn egg_length(index: usize) -> f32 {
-    egg_cm(index) / NEST_EGG_CM
+    animals_core::eggs::real_cm(SPECIES[index].name).unwrap_or(MASS_EGG_CM) / MASS_EGG_CM
 }
 
 /// Whether entity kind `kind` (an id) is an egg's.
@@ -232,9 +238,9 @@ pub(crate) fn is_egg_kind(kind: u32) -> bool {
 fn nest_width() -> f32 {
     animals_core::bodies::of("nest").0
 }
-/// A bigger species' nest is its eggs' size bigger (a wyvern's, about 3 m across).
+/// A species with wider eggs gets a bigger nest (a wyvern's, about 3 blocks across).
 fn nest_size(index: usize) -> f32 {
-    (egg_cm(index) / NEST_EGG_CM).max(1.0)
+    (egg_width(index) / NEST_EGG_W).max(1.0)
 }
 
 /// How much bigger than the plain one the nest at `at` is (1 for none).
@@ -302,7 +308,7 @@ pub fn lay(w: &World, at: [f64; 3], young: &[Young], owner: Option<[u8; 64]>) {
         let spot = match nest {
             Some(p) => nest_spot(w, p),
             None => {
-                let r = 0.25 * (egg_cm(y.index) / NEST_EGG_CM).max(0.4) as f64;
+                let r = 0.6 * egg_width(y.index) as f64;
                 [at[0] + a.cos() * r, at[1], at[2] + a.sin() * r]
             }
         };

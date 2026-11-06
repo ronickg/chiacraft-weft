@@ -42,7 +42,8 @@ def layers(L, W, asym=0.0, blunt=2.0, n=None, ov=0.25, step=None, tip=0.0):
     for i in range(n):
         c0, c1 = cuts[i], cuts[i + 1]
         mid = -1 + (c0 + c1) / L
-        w = max(step, round(W * float(profile(mid, asym, blunt)) / step) * step)
+        # Stepped down from the full width (whole steps, so an odd width stays centred on its pixels).
+        w = max(W - step * math.floor((W - step) / step), W - step * round((W - W * float(profile(mid, asym, blunt))) / step))
         y0 = max(0.0, c0 - (ov if i > 1 else 0.06 if i == 1 else 0))
         y1 = min(L, c1 + (ov if i < n - 2 else 0.06 if i == n - 2 else 0))
         if out and abs(out[-1][0] - w) < MIN_STEP - 1e-6:

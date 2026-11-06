@@ -21,9 +21,9 @@ from render import render  # noqa: E402
 from build import CM, LOOKS  # noqa: E402
 
 LABELS = {
-    "dromaeosaur": ("Raptors", "Velociraptor, V. osmolskae, Utahraptor"),
+    "dromaeosaur": ("Raptors", "Velociraptor, V. osmolskae"),
     "oviraptorid": ("Oviraptorid", "Citipati"),
-    "ceratopsian": ("Soft-shelled", "Protoceratops, Psittacosaurus"),
+    "ceratopsian": ("Soft-shelled", "Protoceratops"),
     "ankylosaur": ("Ankylosaurs", "Gastonia, Pinacosaurus"),
     "ornithopod": ("Ornithopod", "Iguanacolossus"),
     "sauropod": ("Sauropod", "Cedarosaurus"),
@@ -43,6 +43,8 @@ LABELS = {
     "bird_hawk": ("Savanna hawk", "savanna hawk"),
     "bird_vulture": ("Turkey vulture", "turkey vulture"),
     "bird_mesozoic": ("Cretaceous birds", "Confuciusornis, Gobipteryx"),
+    "dromaeosaur_large": ("Utahraptor", "the raptors' egg, bigger"),
+    "ceratopsian_small": ("Psittacosaurus", "the soft egg, smaller"),
 }
 BG = (40, 30, 24, 255)
 CARD = (58, 44, 34, 255)
@@ -100,14 +102,14 @@ def card(d, name, icons=None, W=300, H=470):
         dr.text((12, y0), "as it lies", font=font(12), fill=DIM)
         c.alpha_composite(im, (12 + (150 - im.width) // 2, y0 + 18 + (110 - im.height) // 2))
     y1 = y0 + 136
-    img = render(spec, tex, yaw=60, pitch=25, ppu=2.0 / spec.get("mult", 1), pad=2)
+    img = render(spec, tex, yaw=60, pitch=25, ppu=1.0, pad=2)
     im = Image.fromarray(img, "RGBA")
-    dr.text((12, y1), "real size", font=font(12), fill=DIM)
+    dr.text((12, y1), "in the game", font=font(12), fill=DIM)
     c.alpha_composite(im, (20, y1 + 16 + max(0, 66 - im.height)))
-    dr.rectangle((20 + im.width + 8, y1 + 80, 20 + im.width + 8 + int(10 * CM * 2), y1 + 82), fill=DIM)
-    dr.text((20 + im.width + 8, y1 + 64), "10 cm", font=font(11), fill=DIM)
+    dr.rectangle((20 + im.width + 8, y1 + 60, 20 + im.width + 8 + 16, y1 + 62), fill=DIM)  # a quarter block
     if "L" in look:
-        dr.text((12, H - 22), f"{look['L'] / CM:.0f} x {look['W'] / CM:.0f} cm", font=font(12), fill=DIM)
+        from build import px_of
+        dr.text((12, H - 22), f"real {look['L'] / CM:.0f} x {look['W'] / CM:.0f} cm, drawn {px_of(look)} px", font=font(12), fill=DIM)
     # The icon in a slot.
     icon = icons and os.path.join(icons, f"{name}.png")
     sx, sy = W - 12 - 104, y0 + 4
