@@ -2125,6 +2125,10 @@ impl Backend for VulkanBackend {
         self.rt.as_ref().map_or(0, |rt| rt.memory)
     }
 
+    fn accel_generation(&self) -> u64 {
+        self.rt.as_ref().map_or(0, |rt| rt.generation)
+    }
+
     fn begin_frame(&mut self) -> Option<FrameInfo> {
         // Between `surface_lost` and `surface_restored` (the app in the background on Android).
         if self.surface == vk::SurfaceKHR::null() {

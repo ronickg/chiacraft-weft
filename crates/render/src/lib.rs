@@ -79,6 +79,8 @@ pub struct TlasInstance {
     pub custom: u32,
     /// A ray skips it unless its cull mask shares a bit with this.
     pub mask: u8,
+    /// Every hit on it counts, its see-through geometry's too, without asking the shader.
+    pub opaque: bool,
     pub blas: AccelId,
 }
 
@@ -478,6 +480,11 @@ pub trait Backend: Send {
     fn destroy_accel(&mut self, _accel: AccelId) {}
     /// Memory held by acceleration structures, bytes (diagnostics).
     fn accel_memory(&self) -> u64 {
+        0
+    }
+    /// Goes up whenever a BLAS moves in memory (compaction): a TLAS built before must be built
+    /// again before it is used once more.
+    fn accel_generation(&self) -> u64 {
         0
     }
     fn wait_idle(&mut self);

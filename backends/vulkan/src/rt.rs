@@ -46,6 +46,8 @@ pub(crate) struct Rt {
     serial: u64,
     pub accels: Slab<Accel>,
     pub memory: u64,
+    /// `Backend::accel_generation`.
+    pub generation: u64,
     /// Since the last log line: BLASes built, their triangles, bytes saved by compaction.
     built: (u32, u64, u64),
     logged: Option<std::time::Instant>,
@@ -104,6 +106,7 @@ impl Rt {
                 serial: 0,
                 accels: Slab::new(),
                 memory: 0,
+                generation: 0,
                 built: (0, 0, 0),
                 logged: None,
             })
@@ -349,6 +352,7 @@ impl VulkanBackend {
                         );
                     }
                     rt.built.2 += mem.size - new.size;
+                    rt.generation += 1;
                     old_mems.push(std::mem::replace(mem, new));
                 }
                 _ => dead.push(new),
@@ -492,7 +496,10 @@ impl VulkanBackend {
                 }
                 bytes.extend_from_slice(&((inst.custom & 0xff_ffff) | (inst.mask as u32) << 24).to_le_bytes());
                 // Both sides of every triangle: a shadow ray leaves the far side of a leaf too.
-                let flags = vk::GeometryInstanceFlagsKHR::TRIANGLE_FACING_CULL_DISABLE.as_raw();
+                let mut flags = vk::GeometryInstanceFlagsKHR::TRIANGLE_FACING_CULL_DISABLE.as_raw();
+                if inst.opaque {
+                    flags |= vk::GeometryInstanceFlagsKHR::FORCE_OPAQUE.as_raw();
+                }
                 bytes.extend_from_slice(&(flags << 24).to_le_bytes());
                 bytes.extend_from_slice(&mem.address.to_le_bytes());
                 count += 1;

@@ -86,6 +86,14 @@ pub(super) struct RtScene {
     slot: usize,
     /// Since the last log line (every 5 s while anything was built): BLASes built, records.
     since: (Option<std::time::Instant>, u32, u64),
+    /// The TLAS is made again only when what it holds changed (`version`): a BLAS built or
+    /// dropped, the camera into another cube (its space is the camera's cube's, the shader adding
+    /// the camera's place in it), the distant tiles drawn or the cubes' mask, a BLAS moved by
+    /// compaction. Each frame slot's TLAS and table are made again once per version.
+    dirty: bool,
+    seen: Option<(IVec3, Vec<super::super::lod::TileKey>, u32, u64)>,
+    version: u64,
+    slot_version: Vec<u64>,
 }
 
 /// `core:rt_shadows`, or off where the engine's configs are not loaded.
@@ -135,6 +143,10 @@ impl RtScene {
             last: (0, 0, 0),
             slot: 0,
             since: (None, 0, 0),
+            dirty: true,
+            seen: None,
+            version: 0,
+            slot_version: Vec::new(),
         }
     }
 
@@ -187,6 +199,7 @@ impl RtScene {
 
     fn drop_item(&mut self, gpu: &mut dyn Backend, item: Item) {
         if let Some(b) = self.built.remove(&item) {
+            self.dirty = true;
             gpu.destroy_accel(b.accel);
             if let Some((start, len)) = b.copy {
                 self.later.push((self.frame_no, start, len));
@@ -476,6 +489,7 @@ impl WorldRenderer {
                 // The old one goes once this one is in (the frames in flight still hold it).
                 rt.drop_item(gpu, p.item);
                 rt.built.insert(p.item, Built { accel, copy, info });
+                rt.dirty = true;
             }
             list.push(Cmd::Barrier);
             for a in builds {
@@ -484,39 +498,57 @@ impl WorldRenderer {
         }
         rt.last = (plans.len() as u32, records, 0);
 
-        // The TLAS, about the camera: whole cubes and the distant tiles drawn now.
-        let cam_block = cam.pos.floor();
-        let cam_cube: IVec3 = cam_block.as_ivec3() >> 4i32;
-        let cam_frac = (cam.pos - (cam_cube * 16).as_dvec3()).as_vec3();
-        let lod_draw: FxHashSet<super::super::lod::TileKey> = self.lod_draw.iter().copied().collect();
-        rt.instances.clear();
-        rt.rows.clear();
-        for (item, b) in &rt.built {
-            let (origin, mask) = match *item {
-                Item::Faces(p) => (((p - cam_cube) * 16).as_vec3() - cam_frac, MASK_FACES),
-                Item::Quads(p) => (((p - cam_cube) * 16).as_vec3() - cam_frac, MASK_QUADS),
-                Item::Lod(k) => {
-                    if !lod_draw.contains(&k) {
-                        continue;
+        // The TLAS, in the space of the camera's cube (the shader adds the camera's place in it):
+        // whole cubes and the distant tiles drawn now, made again only when something changed.
+        let cam_cube: IVec3 = cam.pos.floor().as_ivec3() >> 4i32;
+        let seen = (cam_cube, self.lod_draw.clone(), self.lod_half, gpu.accel_generation());
+        if rt.dirty || rt.seen.as_ref() != Some(&seen) {
+            rt.dirty = false;
+            rt.version += 1;
+            let lod_draw: FxHashSet<super::super::lod::TileKey> = self.lod_draw.iter().copied().collect();
+            let half = self.lod_half as i32;
+            rt.instances.clear();
+            rt.rows.clear();
+            for (item, b) in &rt.built {
+                let (origin, mask, opaque) = match *item {
+                    Item::Faces(p) => ((p - cam_cube) * 16, MASK_FACES, false),
+                    Item::Quads(p) => ((p - cam_cube) * 16, MASK_QUADS, false),
+                    Item::Lod(k) => {
+                        if !lod_draw.contains(&k) {
+                            continue;
+                        }
+                        let o = k.origin();
+                        // Wholly outside the cubes' mask (`Lod::mask`), no column of it is left to
+                        // cubes: every hit counts, without asking the shader.
+                        let (lo, hi) = (o.div_euclid(glam::IVec2::splat(16)), (o + k.size() - 1).div_euclid(glam::IVec2::splat(16)));
+                        let cxz = glam::IVec2::new(cam_cube.x, cam_cube.z);
+                        let (c0, c1) = (cxz - half, cxz + half);
+                        let outside = hi.x < c0.x || lo.x > c1.x || hi.y < c0.y || lo.y > c1.y;
+                        (IVec3::new(o.x, 0, o.y) - cam_cube * 16, MASK_LOD, outside)
                     }
-                    let o = k.origin();
-                    (IVec3::new(o.x, 0, o.y).as_vec3() - (cam_cube * 16).as_vec3() - cam_frac, MASK_LOD)
-                }
-            };
-            let custom = rt.rows.len() as u32;
-            rt.rows.push(b.info);
-            rt.instances.push(TlasInstance {
-                transform: [[1.0, 0.0, 0.0, origin.x], [0.0, 1.0, 0.0, origin.y], [0.0, 0.0, 1.0, origin.z]],
-                custom,
-                mask,
-                blas: b.accel,
-            });
+                };
+                let origin = origin.as_vec3();
+                let custom = rt.rows.len() as u32;
+                rt.rows.push(b.info);
+                rt.instances.push(TlasInstance {
+                    transform: [[1.0, 0.0, 0.0, origin.x], [0.0, 1.0, 0.0, origin.y], [0.0, 0.0, 1.0, origin.z]],
+                    custom,
+                    mask,
+                    opaque,
+                    blas: b.accel,
+                });
+            }
+            rt.seen = Some(seen);
         }
-        let n = rt.rows.len().max(1) as u32;
-        let table = crate::gpu_layout::frame_buffer(gpu, &mut rt.table, slot, n, 16, usage::STORAGE, "rt instances");
-        gpu.mapped(table)[..rt.rows.len() * 16].copy_from_slice(bytemuck::cast_slice(&rt.rows));
-        gpu.set_tlas_instances(rt.tlas, &rt.instances);
-        list.push(Cmd::BuildTlas(rt.tlas));
+        rt.slot_version.resize(gpu.frames_in_flight(), 0);
+        if rt.slot_version[slot] != rt.version {
+            rt.slot_version[slot] = rt.version;
+            let n = rt.rows.len().max(1) as u32;
+            let table = crate::gpu_layout::frame_buffer(gpu, &mut rt.table, slot, n, 16, usage::STORAGE, "rt instances");
+            gpu.mapped(table)[..rt.rows.len() * 16].copy_from_slice(bytemuck::cast_slice(&rt.rows));
+            gpu.set_tlas_instances(rt.tlas, &rt.instances);
+            list.push(Cmd::BuildTlas(rt.tlas));
+        }
         rt.last.2 = rt.instances.len() as u32;
         rt.since.1 += rt.last.0;
         rt.since.2 += rt.last.1 as u64;
