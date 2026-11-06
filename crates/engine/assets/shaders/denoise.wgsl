@@ -164,6 +164,12 @@ fn dn_reproject(d: DenoisePass, at: vec2<i32>) -> Reprojected {
     let p = dn_position(at, dep, d.size);
     let z_then = (scene.taa_prev * vec4(p, 1.0)).w;
     let n = dn_normal(d.normal, at, isize).xyz;
+    // How far one texel spans along the view here (the gentler neighbour each way): last frame's
+    // texel may be up to about that far off and still be this surface. A share of the distance
+    // instead (3 %, 4.5 blocks at 150) took a lit step's light into the shadowed step beside it
+    // (same facing, a block apart): the hill's block shadows faded (ptd_rrt5/6, 11-06).
+    let z_now = (scene.view_proj * vec4(p, 1.0)).w;
+    let span = max(dn_view_span(d, at, z_now), 0.002 * z_now);
     let bil = vec4((1.0 - f.x) * (1.0 - f.y), f.x * (1.0 - f.y), (1.0 - f.x) * f.y, f.x * f.y);
     var w = vec4(0.0);
     for (var k = 0; k < 4; k++) {
@@ -175,7 +181,7 @@ fn dn_reproject(d: DenoisePass, at: vec2<i32>) -> Reprojected {
         if g.z <= 0.0 {
             continue;
         }
-        let same_depth = abs(g.z - z_then) <= 0.03 * z_then + 0.05;
+        let same_depth = abs(g.z - z_then) <= 2.0 * span + 0.01;
         let same_facing = dot(dn_unoct(g.xy), n) > 0.85;
         if same_depth && same_facing {
             w[k] = bil[k];
@@ -300,7 +306,7 @@ fn fs_variance(in: VOut) -> Pair {
                 if gq.z <= 0.0 {
                     continue;
                 }
-                let w = exp(-abs(gq.z - gc.z) / (0.02 * gc.z + 0.02)) * pow(max(dot(nc, dn_unoct(gq.xy)), 0.0), 64.0);
+                let w = exp(-abs(gq.z - gc.z) / (0.004 * gc.z + 0.02)) * pow(max(dot(nc, dn_unoct(gq.xy)), 0.0), 64.0);
                 let lq = vec2(dn_luma(dn_light(d.diffuse, q, isize).rgb), dn_luma(dn_light(d.specular, q, isize).rgb));
                 sum += vec4(lq.x, lq.x * lq.x, lq.y, lq.y * lq.y) * w;
                 wsum += w;
@@ -375,7 +381,7 @@ fn fs_atrous(in: VOut) -> Pair {
             if gq.z <= 0.0 {
                 continue;
             }
-            let tol = abs(dot(grad, vec2<f32>(off))) * 1.5 + 0.01 * zc + 1e-3;
+            let tol = abs(dot(grad, vec2<f32>(off))) * 1.5 + 0.002 * zc + 1e-3;
             let w_z = exp(-abs(gq.z - zc) / tol);
             let w_n = pow(max(dot(nc, dn_unoct(gq.xy)), 0.0), d.phi_normal);
             let geo = w_z * w_n * h[x + 2] * h[y + 2];
@@ -409,6 +415,25 @@ fn dn_guide(d: DenoisePass, at: vec2<i32>) -> vec4<f32> {
 
 // The view distance's change a texel, from the side nearer `c` (a neighbour that wasn't lit, z 0,
 // doesn't count).
+// The view distance's change a texel at `at` (view distance `z`), the gentler side each way, from the
+// depth (its neighbours' points through this frame's camera).
+fn dn_view_span(d: DenoisePass, at: vec2<i32>, z: f32) -> f32 {
+    let isize = vec2<i32>(d.size);
+    var zs = array<f32, 4>(0.0, 0.0, 0.0, 0.0);
+    let offs = array<vec2<i32>, 4>(vec2(-1, 0), vec2(1, 0), vec2(0, -1), vec2(0, 1));
+    for (var k = 0; k < 4; k++) {
+        let q = at + offs[k];
+        if any(q < vec2(0)) || any(q >= isize) {
+            continue;
+        }
+        let dq = dn_depth(d.depth, q, isize);
+        if dq > 0.0 {
+            zs[k] = (scene.view_proj * vec4(dn_position(q, dq, d.size), 1.0)).w;
+        }
+    }
+    return max(dn_slope(zs[0], z, zs[1]), dn_slope(zs[2], z, zs[3]));
+}
+
 fn dn_slope(a: f32, c: f32, b: f32) -> f32 {
     let da = select(1e9, abs(c - a), a > 0.0);
     let db = select(1e9, abs(b - c), b > 0.0);
