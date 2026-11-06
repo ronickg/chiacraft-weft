@@ -14,6 +14,7 @@ pub mod conditions;
 pub mod config;
 pub mod content;
 pub mod dedicated;
+pub mod denoise;
 pub mod diag;
 pub mod game_screens;
 pub mod host;

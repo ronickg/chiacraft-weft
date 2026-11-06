@@ -85,6 +85,19 @@ Each one ends in a gallery sheet against NVIDIA's demo shots. The showcase sessi
 5. **M4: DLSS RR on the path-traced output.** Guides from the G-buffer (Linux NGX and Windows Streamline); sheets RR against our own denoiser.
 6. **M5: light through leaves and ice, ReSTIR GI if the cache lags, a speed pass.** "Path traced" goes into the Max preset.
 
+## M2 design: block and emissive lights (11-06)
+
+Today a traced pixel gets its block light from the lightmap (`light_on`'s yzw), unshadowed and flat; glowing textures (`in.glow`) lose their glow when traced. M2 lights them by tracing:
+
+1. **The light list.** When a cube is meshed, the client gathers its emitting blocks: each block state's emission is in `content::Tight::light` (rgb, 0-15). One entry per emitter: position in the cube (12 bits), rgb emission, and later the face mask a glowing texture shows. It is uploaded with the cube's BLAS into a light buffer, and the cube's TLAS row gets the range (start, count). A world grid finds the cubes round a point: a GPU hash from cube coordinate to row, filled when the TLAS is made.
+2. **Candidates (RIS).** Per pixel, a few candidates (4-8) from the lights of the 27 cubes round the surface, weighted by emission × 1/d² × the cosine; keep one.
+3. **Reuse (ReSTIR, Bitterli et al. 2020; our own code).** The kept sample's reservoir goes into a per-pixel buffer. Next frame it is reused through TAA's motion (temporal, M cap 20) and from a few neighbours (spatial, with depth and normal tests).
+4. **One shadow ray** to the chosen light (`rt_hit` to its block, the block itself let through), then the light's emission × the reservoir's weight.
+5. **Into the picture.** The traced block light replaces the lightmap's block share (yzw) in `lit`, as the bounce replaced the sky's. The lightmap's share stays in the cache for bounce hits, so block light bounces too. Glowing textures add their emission in the composite (the G-buffer gets an emission channel: spec.a is free once sss moves).
+6. **Checks.** NVIDIA's storeroom (lanterns, amethyst) and nave (fires), the showcase hall's lamps. Against the raster: block light by the lightmap should come close in open rooms, sharper with shadows behind pillars.
+
+Costs to watch: the candidate search and the shadow ray, about one ray a pixel. Reservoirs are 16 bytes a pixel.
+
 ## Split
 
 To go faster, a second session takes **the denoiser track**. It is independent once M0 fixes the G-buffer layout:
