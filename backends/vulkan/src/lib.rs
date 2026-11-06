@@ -2067,6 +2067,157 @@ impl VulkanBackend {
     }
 }
 
+impl VulkanBackend {
+    /// `create_pipeline`, with `extra` color images after the motion image (`create_pipeline_mrt`).
+    fn create_pipeline_with(&mut self, desc: &PipelineDesc, extra: &[Format]) -> Result<PipelineId, Error> {
+        let vs = self.spirv(desc.shader, naga::ShaderStage::Vertex, desc.vertex)?;
+        let fs = match desc.fragment {
+            Some(f) => Some(self.spirv(desc.shader, naga::ShaderStage::Fragment, f)?),
+            None => None,
+        };
+        let (layout, set_layout, buffers) = self.layout_for(desc.shader)?;
+        let vs_name = CString::new(desc.vertex).unwrap();
+        let fs_name = CString::new(desc.fragment.unwrap_or("main")).unwrap();
+        let mut stages = vec![
+            vk::PipelineShaderStageCreateInfo::default()
+                .stage(vk::ShaderStageFlags::VERTEX)
+                .module(vs)
+                .name(&vs_name),
+        ];
+        if let Some(fs) = fs {
+            stages.push(
+                vk::PipelineShaderStageCreateInfo::default()
+                    .stage(vk::ShaderStageFlags::FRAGMENT)
+                    .module(fs)
+                    .name(&fs_name),
+            );
+        }
+        let vertex_input = vk::PipelineVertexInputStateCreateInfo::default();
+        let assembly = vk::PipelineInputAssemblyStateCreateInfo::default().topology(match desc.topology {
+            Topology::Triangles => vk::PrimitiveTopology::TRIANGLE_LIST,
+            Topology::Lines => vk::PrimitiveTopology::LINE_LIST,
+        });
+        let viewport = vk::PipelineViewportStateCreateInfo::default()
+            .viewport_count(1)
+            .scissor_count(1);
+        let raster = vk::PipelineRasterizationStateCreateInfo::default()
+            .polygon_mode(vk::PolygonMode::FILL)
+            .cull_mode(if desc.cull_back { vk::CullModeFlags::BACK } else { vk::CullModeFlags::NONE })
+            .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
+            .line_width(1.0);
+        let multisample = vk::PipelineMultisampleStateCreateInfo::default().rasterization_samples(vk::SampleCountFlags::TYPE_1);
+        let depth = match desc.depth {
+            Some(d) => vk::PipelineDepthStencilStateCreateInfo::default()
+                .depth_test_enable(true)
+                .depth_write_enable(d.write)
+                .depth_compare_op(compare_op(d.compare)),
+            None => vk::PipelineDepthStencilStateCreateInfo::default(),
+        };
+        let blend_attachment = {
+            let a = vk::PipelineColorBlendAttachmentState::default().color_write_mask(vk::ColorComponentFlags::RGBA);
+            match desc.blend {
+                Blend::None => a,
+                Blend::Alpha => a
+                    .blend_enable(true)
+                    .src_color_blend_factor(vk::BlendFactor::SRC_ALPHA)
+                    .dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
+                    .color_blend_op(vk::BlendOp::ADD)
+                    .src_alpha_blend_factor(vk::BlendFactor::ONE)
+                    .dst_alpha_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
+                    .alpha_blend_op(vk::BlendOp::ADD),
+                Blend::Premultiplied => a
+                    .blend_enable(true)
+                    .src_color_blend_factor(vk::BlendFactor::ONE)
+                    .dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
+                    .color_blend_op(vk::BlendOp::ADD)
+                    .src_alpha_blend_factor(vk::BlendFactor::ONE)
+                    .dst_alpha_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
+                    .alpha_blend_op(vk::BlendOp::ADD),
+                Blend::Additive => a
+                    .blend_enable(true)
+                    .src_color_blend_factor(vk::BlendFactor::SRC_ALPHA)
+                    .dst_color_blend_factor(vk::BlendFactor::ONE)
+                    .color_blend_op(vk::BlendOp::ADD)
+                    .src_alpha_blend_factor(vk::BlendFactor::ZERO)
+                    .dst_alpha_blend_factor(vk::BlendFactor::ONE)
+                    .alpha_blend_op(vk::BlendOp::ADD),
+                Blend::NoColor => a.color_write_mask(vk::ColorComponentFlags::empty()),
+            }
+        };
+        // The motion image (`PipelineDesc::motion`): written, never blended, by a fragment entry
+        // with a `@location(1)` output; left as it is by the rest.
+        let motion_attachment = vk::PipelineColorBlendAttachmentState::default().color_write_mask(
+            if desc
+                .fragment
+                .is_some_and(|f| writes_location(desc.shader, f, 1))
+            {
+                vk::ColorComponentFlags::RGBA
+            } else {
+                vk::ColorComponentFlags::empty()
+            },
+        );
+        // The extra color images (`create_pipeline_mrt`) after the motion image, at location 2 on:
+        // written by a fragment entry with that output, never blended.
+        let mut attachments = vec![blend_attachment, motion_attachment];
+        for i in 0..extra.len() {
+            let writes = desc
+                .fragment
+                .is_some_and(|f| writes_location(desc.shader, f, 2 + i as u32));
+            attachments.push(vk::PipelineColorBlendAttachmentState::default().color_write_mask(if writes {
+                vk::ColorComponentFlags::RGBA
+            } else {
+                vk::ColorComponentFlags::empty()
+            }));
+        }
+        let count = match (desc.color.is_some(), desc.motion) {
+            (false, _) => 0,
+            (true, false) => 1,
+            (true, true) => 2 + extra.len(),
+        };
+        let blend = vk::PipelineColorBlendStateCreateInfo::default().attachments(&attachments[..count]);
+        let dynamic = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
+        let dynamic = vk::PipelineDynamicStateCreateInfo::default().dynamic_states(&dynamic);
+        let color_formats: Vec<vk::Format> = desc
+            .color
+            .map(|f| self.vk_format(f))
+            .into_iter()
+            .chain(desc.motion.then(|| self.vk_format(MOTION_FORMAT)))
+            .chain(extra.iter().map(|&f| self.vk_format(f)))
+            .take(count)
+            .collect();
+        let mut rendering = vk::PipelineRenderingCreateInfo::default()
+            .color_attachment_formats(&color_formats)
+            .depth_attachment_format(if desc.depth.is_some() { DEPTH_FORMAT } else { vk::Format::UNDEFINED });
+        let info = vk::GraphicsPipelineCreateInfo::default()
+            .stages(&stages)
+            .vertex_input_state(&vertex_input)
+            .input_assembly_state(&assembly)
+            .viewport_state(&viewport)
+            .rasterization_state(&raster)
+            .multisample_state(&multisample)
+            .depth_stencil_state(&depth)
+            .color_blend_state(&blend)
+            .dynamic_state(&dynamic)
+            .layout(layout)
+            .push_next(&mut rendering);
+        let result = unsafe {
+            self.device
+                .create_graphics_pipelines(self.pipeline_cache, &[info], None)
+        };
+        unsafe {
+            self.device.destroy_shader_module(vs, None);
+            if let Some(fs) = fs {
+                self.device.destroy_shader_module(fs, None);
+            }
+        }
+        let raw = result.map_err(|(_, e)| Error(format!("pipeline {}: {e:?}", desc.label)))?[0];
+        Ok(PipelineId(
+            self.pipelines
+                .insert(Pipeline { raw, layout, set_layout, bind_point: vk::PipelineBindPoint::GRAPHICS, buffers }),
+        ))
+    }
+}
+
 impl Backend for VulkanBackend {
     fn name(&self) -> &str {
         "vulkan"
@@ -2270,138 +2421,11 @@ impl Backend for VulkanBackend {
     }
 
     fn create_pipeline(&mut self, desc: &PipelineDesc) -> Result<PipelineId, Error> {
-        let vs = self.spirv(desc.shader, naga::ShaderStage::Vertex, desc.vertex)?;
-        let fs = match desc.fragment {
-            Some(f) => Some(self.spirv(desc.shader, naga::ShaderStage::Fragment, f)?),
-            None => None,
-        };
-        let (layout, set_layout, buffers) = self.layout_for(desc.shader)?;
-        let vs_name = CString::new(desc.vertex).unwrap();
-        let fs_name = CString::new(desc.fragment.unwrap_or("main")).unwrap();
-        let mut stages = vec![
-            vk::PipelineShaderStageCreateInfo::default()
-                .stage(vk::ShaderStageFlags::VERTEX)
-                .module(vs)
-                .name(&vs_name),
-        ];
-        if let Some(fs) = fs {
-            stages.push(
-                vk::PipelineShaderStageCreateInfo::default()
-                    .stage(vk::ShaderStageFlags::FRAGMENT)
-                    .module(fs)
-                    .name(&fs_name),
-            );
-        }
-        let vertex_input = vk::PipelineVertexInputStateCreateInfo::default();
-        let assembly = vk::PipelineInputAssemblyStateCreateInfo::default().topology(match desc.topology {
-            Topology::Triangles => vk::PrimitiveTopology::TRIANGLE_LIST,
-            Topology::Lines => vk::PrimitiveTopology::LINE_LIST,
-        });
-        let viewport = vk::PipelineViewportStateCreateInfo::default()
-            .viewport_count(1)
-            .scissor_count(1);
-        let raster = vk::PipelineRasterizationStateCreateInfo::default()
-            .polygon_mode(vk::PolygonMode::FILL)
-            .cull_mode(if desc.cull_back { vk::CullModeFlags::BACK } else { vk::CullModeFlags::NONE })
-            .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
-            .line_width(1.0);
-        let multisample = vk::PipelineMultisampleStateCreateInfo::default().rasterization_samples(vk::SampleCountFlags::TYPE_1);
-        let depth = match desc.depth {
-            Some(d) => vk::PipelineDepthStencilStateCreateInfo::default()
-                .depth_test_enable(true)
-                .depth_write_enable(d.write)
-                .depth_compare_op(compare_op(d.compare)),
-            None => vk::PipelineDepthStencilStateCreateInfo::default(),
-        };
-        let blend_attachment = {
-            let a = vk::PipelineColorBlendAttachmentState::default().color_write_mask(vk::ColorComponentFlags::RGBA);
-            match desc.blend {
-                Blend::None => a,
-                Blend::Alpha => a
-                    .blend_enable(true)
-                    .src_color_blend_factor(vk::BlendFactor::SRC_ALPHA)
-                    .dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
-                    .color_blend_op(vk::BlendOp::ADD)
-                    .src_alpha_blend_factor(vk::BlendFactor::ONE)
-                    .dst_alpha_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
-                    .alpha_blend_op(vk::BlendOp::ADD),
-                Blend::Premultiplied => a
-                    .blend_enable(true)
-                    .src_color_blend_factor(vk::BlendFactor::ONE)
-                    .dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
-                    .color_blend_op(vk::BlendOp::ADD)
-                    .src_alpha_blend_factor(vk::BlendFactor::ONE)
-                    .dst_alpha_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
-                    .alpha_blend_op(vk::BlendOp::ADD),
-                Blend::Additive => a
-                    .blend_enable(true)
-                    .src_color_blend_factor(vk::BlendFactor::SRC_ALPHA)
-                    .dst_color_blend_factor(vk::BlendFactor::ONE)
-                    .color_blend_op(vk::BlendOp::ADD)
-                    .src_alpha_blend_factor(vk::BlendFactor::ZERO)
-                    .dst_alpha_blend_factor(vk::BlendFactor::ONE)
-                    .alpha_blend_op(vk::BlendOp::ADD),
-                Blend::NoColor => a.color_write_mask(vk::ColorComponentFlags::empty()),
-            }
-        };
-        // The motion image (`PipelineDesc::motion`): written, never blended, by a fragment entry
-        // with a `@location(1)` output; left as it is by the rest.
-        let motion_attachment = vk::PipelineColorBlendAttachmentState::default().color_write_mask(
-            if desc
-                .fragment
-                .is_some_and(|f| writes_location(desc.shader, f, 1))
-            {
-                vk::ColorComponentFlags::RGBA
-            } else {
-                vk::ColorComponentFlags::empty()
-            },
-        );
-        let attachments = [blend_attachment, motion_attachment];
-        let count = match (desc.color.is_some(), desc.motion) {
-            (false, _) => 0,
-            (true, false) => 1,
-            (true, true) => 2,
-        };
-        let blend = vk::PipelineColorBlendStateCreateInfo::default().attachments(&attachments[..count]);
-        let dynamic = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
-        let dynamic = vk::PipelineDynamicStateCreateInfo::default().dynamic_states(&dynamic);
-        let color_formats: Vec<vk::Format> = desc
-            .color
-            .map(|f| self.vk_format(f))
-            .into_iter()
-            .chain(desc.motion.then(|| self.vk_format(MOTION_FORMAT)))
-            .take(count)
-            .collect();
-        let mut rendering = vk::PipelineRenderingCreateInfo::default()
-            .color_attachment_formats(&color_formats)
-            .depth_attachment_format(if desc.depth.is_some() { DEPTH_FORMAT } else { vk::Format::UNDEFINED });
-        let info = vk::GraphicsPipelineCreateInfo::default()
-            .stages(&stages)
-            .vertex_input_state(&vertex_input)
-            .input_assembly_state(&assembly)
-            .viewport_state(&viewport)
-            .rasterization_state(&raster)
-            .multisample_state(&multisample)
-            .depth_stencil_state(&depth)
-            .color_blend_state(&blend)
-            .dynamic_state(&dynamic)
-            .layout(layout)
-            .push_next(&mut rendering);
-        let result = unsafe {
-            self.device
-                .create_graphics_pipelines(self.pipeline_cache, &[info], None)
-        };
-        unsafe {
-            self.device.destroy_shader_module(vs, None);
-            if let Some(fs) = fs {
-                self.device.destroy_shader_module(fs, None);
-            }
-        }
-        let raw = result.map_err(|(_, e)| Error(format!("pipeline {}: {e:?}", desc.label)))?[0];
-        Ok(PipelineId(
-            self.pipelines
-                .insert(Pipeline { raw, layout, set_layout, bind_point: vk::PipelineBindPoint::GRAPHICS, buffers }),
-        ))
+        self.create_pipeline_with(desc, &[])
+    }
+
+    fn create_pipeline_mrt(&mut self, desc: &PipelineDesc, extra: &[Format]) -> Result<PipelineId, Error> {
+        self.create_pipeline_with(desc, extra)
     }
 
     fn create_compute(&mut self, desc: &ComputeDesc) -> Result<PipelineId, Error> {
@@ -2547,9 +2571,16 @@ impl Backend for VulkanBackend {
             let cmds: &[Cmd] = if list.cmds.iter().any(|c| matches!(c, Cmd::PassBreak)) {
                 let mut out = Vec::with_capacity(list.cmds.len() + 8);
                 let mut open: Option<Cmd> = None;
+                let mut open_extras: Option<Cmd> = None;
+                let mut extras: Option<Cmd> = None;
                 for c in &list.cmds {
                     match *c {
+                        Cmd::PassExtras(e) => {
+                            extras = Some(Cmd::PassExtras(e.map(|x| x.map(|(t, _)| (t, None)))));
+                            out.push(*c);
+                        }
                         Cmd::BeginPass { color, depth, motion } => {
+                            open_extras = extras.take();
                             open = Some(Cmd::BeginPass {
                                 color: color.map(|(t, _)| (t, None)),
                                 depth: depth.map(|(t, _)| (t, None)),
@@ -2564,6 +2595,7 @@ impl Backend for VulkanBackend {
                         Cmd::PassBreak => {
                             if let Some(again) = open {
                                 out.push(Cmd::EndPass);
+                                out.extend(open_extras);
                                 out.push(again);
                             }
                         }
@@ -2577,6 +2609,8 @@ impl Backend for VulkanBackend {
             };
             // Consecutive BLAS builds, recorded as one batch (`rt_build_blases`).
             let mut blas_batch: Vec<u32> = Vec::new();
+            // `Cmd::PassExtras`: the color images the next pass adds after its motion image.
+            let mut pass_extras: [Option<(TextureId, Option<[f32; 4]>)>; 3] = [None; 3];
             for cmd_item in cmds {
                 if let Cmd::BuildBlas(a) = *cmd_item {
                     blas_batch.push(a.0);
@@ -2587,8 +2621,27 @@ impl Backend for VulkanBackend {
                     blas_batch.clear();
                 }
                 match *cmd_item {
+                    Cmd::PassExtras(e) => pass_extras = e,
                     Cmd::BeginPass { color, depth, motion } => {
                         let mut extent = sc_extent;
+                        // Its extra color images (`Cmd::PassExtras`), after the motion image.
+                        let mut extra_atts: Vec<vk::RenderingAttachmentInfo> = Vec::new();
+                        for (t, clear) in std::mem::take(&mut pass_extras).into_iter().flatten() {
+                            let tex = self.textures.get_mut(t.0);
+                            let old = if clear.is_some() { vk::ImageLayout::UNDEFINED } else { tex.layout };
+                            tex.layout = vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL;
+                            let (image, view) = (tex.image, tex.view);
+                            in_pass_targets.push(t.0);
+                            self.barrier_image(cmd, image, color_range(1), old, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
+                            extra_atts.push(
+                                vk::RenderingAttachmentInfo::default()
+                                    .image_view(view)
+                                    .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                                    .load_op(if clear.is_some() { vk::AttachmentLoadOp::CLEAR } else { vk::AttachmentLoadOp::LOAD })
+                                    .store_op(vk::AttachmentStoreOp::STORE)
+                                    .clear_value(vk::ClearValue { color: vk::ClearColorValue { float32: clear.unwrap_or_default() } }),
+                            );
+                        }
                         let mut color_att = None;
                         // The motion image, a second color attachment (`Cmd::BeginPass::motion`).
                         let motion_att = motion.map(|(t, clear)| {
@@ -2672,7 +2725,11 @@ impl Backend for VulkanBackend {
                                     depth_stencil: vk::ClearDepthStencilValue { depth: clear.unwrap_or(0.0), stencil: 0 },
                                 })
                         });
-                        let colors: Vec<_> = color_att.into_iter().chain(motion_att).collect();
+                        let colors: Vec<_> = color_att
+                            .into_iter()
+                            .chain(motion_att)
+                            .chain(extra_atts)
+                            .collect();
                         let mut info = vk::RenderingInfo::default()
                             .render_area(vk::Rect2D { offset: Default::default(), extent })
                             .layer_count(1)
