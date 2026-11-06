@@ -263,42 +263,18 @@ def cut(e, p):
 
 # ------------------------------------------------------------------ build
 
-def egg_module():
-    import importlib.util
-
-    spec = importlib.util.spec_from_file_location("egg_build", os.path.join(HERE, "..", "egg", "build.py"))
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-
-def with_eggs(E, egg):
-    """Four eggs in the dish as the game lays them (`eggs.rs`): the middle and round it, a quarter
-    sunk, leaning in toward the middle; for looking at the nest as it is used."""
-    spots = [(0.0, 0.0)] + [(12.8 * math.cos(a), 12.8 * math.sin(a)) for a in (0.4, 2.5, 4.4)]
-    for k, (x, z) in enumerate(spots):
-        yaw = math.degrees(math.atan2(-x, -z)) if k else 30.0
-        E += egg.elements(yaw=yaw, at=(x, FLOOR - 2.5, z), name=f"egg_{k}_")
-    return E
-
-
-def build(variant, out, eggs=False):
+def build(variant, out):
+    """One nest variant into `out`. Clutches in it are shown by `../egg/sheet.py` (each family's
+    eggs, as a nest holds them) and the game's look script (`tests/eggs.txt`)."""
     os.makedirs(out, exist_ok=True)
     E = elements(variant)
-    egg = egg_module() if eggs else None
-    if eggs:
-        E = with_eggs(E, egg)
     # The rim's steps lit as one sloped mound: light falls off from its crest to the ground.
     def down(e, face, p):
-        if e.get("part") == "egg":
-            return np.clip((e["at"][1] + 10 - p[..., 1]) / 10, 0, 1)
         return np.clip((8.5 - p[..., 1]) / 8.5, 0, 1) if e.get("part") in ("rim", "floor") else None
 
-    mats = MATERIALS + (egg.materials(egg.CHOSEN) if eggs else [])
+    mats = MATERIALS
 
     def paint_area(e, f, p, uu, vv, h):
-        if e.get("part") == "egg":
-            return egg.area(p, egg.CHOSEN, origin=e["at"], yaw=e["yaw"]) + len(MATERIALS)
         return area(e, f, p, uu, vv, h, variant)
 
     sheet, uv = paint(E, paint_area, mats, coat=SOFT, cut=cut, width=256, seed=3, down=down, smooth=1, tx=TX)
@@ -327,7 +303,6 @@ if __name__ == "__main__":
     if "--variants" in sys.argv:
         for v in VARIANTS:
             build(v, os.path.join(OUT, v))
-            build(v, os.path.join(OUT, f"{v}_eggs"), eggs=True)
             print("built", v)
     else:
         spec = build(CHOSEN, OUT)

@@ -281,7 +281,9 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     }
     out.normal = body_normal(NORMAL[dir], origins[ii].w);
     out.ao = AO[a[c]];
-    out.kind = vec4(tint_kind, select(0u, 1u, origins[ii].w != 0), 0u, 0u);
+    // w: 2 on a see-through face with the same block behind it (`FACE_BACKED`), its holes filled
+    // (distant terrain's crown flag is 1).
+    out.kind = vec4(tint_kind, select(0u, 1u, origins[ii].w != 0), 0u, select(0u, 2u, (w0 & FACE_BACKED) != 0u));
     var tint = vec3(1.0);
     if tint_kind != 0u {
         tint = tint_color(tint_kind, w1 >> FACE_BIOME_SHIFT, o.x * 16 + i32(local.x), o.z * 16 + i32(local.z));
@@ -385,6 +387,20 @@ const PLANT_SHADOW_LIFT: f32 = 0.7;
 
 fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
     let sky = smoothstep(0.75, 1.0, in.light.x);
+    // Traced (`core:rt_shadows`, a GPU with ray queries): one ray toward the light through the
+    // cubes and the distant terrain, by the leaves' holes, so no texels, no acne and shadows as far
+    // as the land goes; still never deep under cover. Its colour through stained glass is kept for
+    // later (`rt_sun`'s rgb); here its brightness.
+    if scene.rt.x > 0.5 {
+        // A solid face turned from the light is in its own shade (leaves and plants let it through).
+        if dot(n, light_dir()) <= 0.0 && in.kind.z == 0u && in.kind.x != TINT_FOLIAGE {
+            return 0.0;
+        }
+        let t = rt_sun(in.rel, n, light_dir(), in.kind.z != 0u);
+        let c = min(canopy(), 1.0);
+        let cover = smoothstep(mix(0.3, 0.15, c), mix(0.8, 0.5, c), in.light.x);
+        return min(dot(t, vec3(1.0 / 3.0)), cover) * models_shadow(in.rel, n) * cloud_shadow(in.rel);
+    }
     // A plant's blade asks the map from most of a block toward the sun: the blades round it, as
     // thin as a few of the map's texels, shaded each other in fine crossing stripes, pale and
     // banded tall grass up close at 3456 px (Ronald's Mac, 11-06; gone with shadows off). Trees,
@@ -421,7 +437,7 @@ fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32>
     // (the screen's hold-back below was for today's look).
     // Far crowns too, whatever their tint (distant terrain's crown flag, `in.kind.w`: spruce, birch
     // and tropical leaves keep their own colours), so near and far tops light alike (Far view).
-    let crown = in.kind.y == 1u && in.kind.w != 0u;
+    let crown = in.kind.y == 1u && in.kind.w == 1u;
     if (in.kind.x == TINT_FOLIAGE || in.kind.z != 0u || crown) && scene.frame.x > 0.5 {
         // More sun on the leaves' lit faces (`base:look_leaf_sun`, 2): our crowns' tops sat dull
         // beside Bliss's (light-range sweep lr1, 11-06: x2 took the canopy's roughness at 150
@@ -830,7 +846,12 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     // coarse texels shaded far water wrongly (duller, no sun's path), and the near map's edge, a
     // square seen at a slant, showed as a hard-edged rectangle of bright water (the LOD worker's
     // sea views, very likely Ronald's lake; it went with shadows off, 11-05).
-    let near_map = shadow_in(scene.shadow_view_proj, scene.shadow, 80.0, 400.0, in.rel, vec3(0.0, 1.0, 0.0), false);
+    var near_map = shadow_in(scene.shadow_view_proj, scene.shadow, 80.0, 400.0, in.rel, vec3(0.0, 1.0, 0.0), false);
+    // Traced (`core:rt_shadows`): the water's surface everywhere, as the land.
+    if scene.rt.x > 0.5 {
+        let up = vec3(0.0, 1.0, 0.0);
+        near_map = vec2(dot(rt_sun(in.rel, up, light_dir(), false), vec3(1.0 / 3.0)) * models_shadow(in.rel, up), 1.0);
+    }
     let shadow = mix(1.0, min(near_map.x, smoothstep(0.3, 0.8, in.light.x)), near_map.y) * smoothstep(0.75, 1.0, max(in.light.x, near_map.y)) * cloud_shadow(in.rel);
     let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, shadow, 1.0, in.pos, in.rel);
     // What the light in the water sends back up: a muted teal-green, light in the shallows and dark
@@ -959,6 +980,16 @@ fn opaque(in: VOut) -> vec4<f32> {
     return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
 }
 
+// What a hole in a face with the same block behind it shows (`FACE_BACKED`): that block's leaves
+// deeper in, its texture's own colour (the smallest mip, opaque texels only) in their shade, as
+// Minecraft's fancy leaves draw the faces between leaves. The crown's outer shell opened on the sky
+// (faces between leaves aren't drawn, `cull_same`): under a canopy 11-20% sky where Minecraft and
+// Bliss show 0.5% (Bliss's own world, mc_world_forest noon).
+fn backed_hole(in: VOut, nuv: vec2<f32>) -> vec4<f32> {
+    let avg = textureSampleLevel(textures[in.layer], linear_mipped, nuv, 16.0);
+    return vec4(avg.rgb * 0.35, 1.0);
+}
+
 fn sample_cutout(in: VOut, nuv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec4<f32> {
     let size = in.size;
     let lod = max(log2(max(min(length(du * size), length(dv * size)), 1e-6)), 0.0);
@@ -991,7 +1022,10 @@ fn fs_cutout(in: VOut) -> WorldOut {
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     var albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
     if albedo.a <= cutout_edge(in, nuv, du, dv) {
-        discard;
+        if in.kind.w != 2u {
+            discard;
+        }
+        albedo = backed_hole(in, nuv);
     }
     if in.kind.z == 0u {
         albedo = far_flat(in, albedo);
@@ -1026,7 +1060,7 @@ fn fs_cutout_depth(in: VOut) {
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     let a = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv).a;
     let edge = cutout_edge(in, nuv, du, dv);
-    if cutout_thinned(in) || a <= edge {
+    if cutout_thinned(in) || (a <= edge && in.kind.w != 2u) {
         discard;
     }
 }
@@ -1094,9 +1128,12 @@ fn fs_cutout_fade(in: VOut) -> WorldOut {
     let du = dpdx(in.uv);
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
-    let albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
+    var albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
     if albedo.a <= cutout_edge(in, nuv, du, dv) {
-        discard;
+        if in.kind.w != 2u {
+            discard;
+        }
+        albedo = backed_hole(in, nuv);
     }
     return world_out(in, vec4(shade(in, albedo).rgb, SOLID_ALPHA));
 }
