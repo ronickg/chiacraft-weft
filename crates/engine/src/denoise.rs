@@ -93,6 +93,8 @@ pub struct Denoiser {
     /// The test's images (`run_test`): noisy light, normals, zero specular and F0, the result.
     test: Option<((u32, u32), [TextureId; 4])>,
     test_frame: u32,
+    /// `run_test` is running: the sky (depth 0) comes through from the picture.
+    test_sky: bool,
 }
 
 static TEST: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -124,6 +126,7 @@ impl Denoiser {
             reconstruct: false,
             test: None,
             test_frame: 0,
+            test_sky: false,
         };
         d.reload(gpu, assets);
         d
@@ -299,7 +302,8 @@ impl Denoiser {
         } else {
             self.held = false;
         }
-        entries.push(DenoisePass { diffuse: light.0, specular: light.1, ..base });
+        // `step` 1 in the composite: the test's sky from the picture (the albedo there).
+        entries.push(DenoisePass { diffuse: light.0, specular: light.1, step: self.test_sky as u32, ..base });
         let comp_entry = entries.len() - 1;
         gpu.mapped(buf)[..entries.len() * size_of::<DenoisePass>()].copy_from_slice(bytemuck::cast_slice(&entries));
         let bind = |list: &mut CommandList, pipe: PipelineId| {
@@ -391,6 +395,7 @@ impl Denoiser {
             list.push(Cmd::BeginPass { motion: None, color: Some((Target::Texture(t), Some([0.0; 4]))), depth: None });
             list.push(Cmd::EndPass);
         }
+        self.test_sky = true;
         self.run(
             gpu,
             list,
@@ -409,6 +414,7 @@ impl Denoiser {
                 reset: false,
             },
         );
+        self.test_sky = false;
         Some(out)
     }
 }

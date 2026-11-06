@@ -375,7 +375,8 @@ fn fs_composite(in: VOut) -> @location(0) vec4<f32> {
     let at = vec2<i32>(in.clip.xy);
     let dep = dn_depth(d.depth, at, isize);
     if dep <= 0.0 {
-        return vec4(0.0);
+        // The sky is in the scene image already; in the check (`step` 1) it comes from the picture.
+        return select(vec4(0.0), vec4(textureLoad(textures[d.albedo], at, 0).rgb, 1.0), d.step == 1u);
     }
     let nr = dn_normal(d.normal, at, isize);
     let v = -normalize(dn_position(at, dep, d.size));
