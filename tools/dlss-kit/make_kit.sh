@@ -37,13 +37,22 @@ spec.loader.exec_module(cp)
 build, game = Path(sys.argv[1]), Path(sys.argv[2])
 print(cp.pack(Path("mods/testkit"), cp.library(build, "weft.exe", "testkit"), game / "run" / "mods"))
 EOF
-# mingw's runtime DLLs, if the build links them dynamically (it should not: checked here).
-for dll in libgcc_s_seh-1.dll libstdc++-6.dll libwinpthread-1.dll; do
-	if x86_64-w64-mingw32-objdump -p "$game/weft.exe" | grep -qi "DLL Name: $dll"; then
-		src=$(x86_64-w64-mingw32-gcc -print-file-name="$dll")
-		cp "$src" "$game/"
-		echo "copied $dll"
-	fi
+# mingw's runtime DLLs the build imports (libstdc++ and what it needs), found in mingw's own
+# folder and followed through their own imports.
+mingw_bin=$(dirname "$(x86_64-w64-mingw32-gcc -print-file-name=libstdc++-6.dll)")
+[ -f "$mingw_bin/libstdc++-6.dll" ] || mingw_bin=/usr/x86_64-w64-mingw32/bin
+imports() { x86_64-w64-mingw32-objdump -p "$1" | sed -n 's/^\s*DLL Name: //p'; }
+todo=("$game/weft.exe" "$build"/*.dll)
+while [ ${#todo[@]} -gt 0 ]; do
+	f=${todo[0]}
+	todo=("${todo[@]:1}")
+	for dll in $(imports "$f"); do
+		if [ -f "$mingw_bin/$dll" ] && [ ! -f "$game/$dll" ]; then
+			cp "$mingw_bin/$dll" "$game/"
+			echo "copied $dll"
+			todo+=("$game/$dll")
+		fi
+	done
 done
 echo "weft.exe imports:"; x86_64-w64-mingw32-objdump -p "$game/weft.exe" | grep "DLL Name" | sed 's/^/  /'
 
