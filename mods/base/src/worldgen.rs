@@ -105,9 +105,10 @@ pub static BEACH: Biome = Biome::named("beach");
 pub static DEEP_CAVES: Biome = Biome::named("deep_caves");
 
 pub fn register(r: &mut Registry) {
-    // Simple, Minecraft-style trees for now (`base_api::trees::TREE_STYLE`; Ronald, 11-05).
+    // Simple trees for now (`base_api::trees::TREE_STYLE`; Ronald, 11-05); Minecraft's own for
+    // like-for-like looks.
     r.config(&base_api::trees::TREE_STYLE)
-        .choice(0, &["simple", "branched"])
+        .choice(0, &["simple", "branched", "minecraft"])
         .world();
     // Tags say what a biome is (spawning, decoration and mods ask these, not names).
     let (grass, foliage, water) = (&tints::GRASS, &tints::FOLIAGE, &tints::WATER);
