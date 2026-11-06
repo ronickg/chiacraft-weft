@@ -307,14 +307,15 @@ fn simulate(@builtin(global_invocation_id) id: vec3<u32>) {
             }
         }
         if (kind.data.z & PARTICLE_FLAG_FLOATS) != 0u {
-            // On a liquid: held at its surface (a source's is some 0.85 up its block), drifting
+            // On a liquid: held just over its surface (a source's is drawn 8/9 up its block, and
+            // cutout particles are drawn before the water: under it they look sunk), drifting
             // with a little of the wind; under it, rising to the top.
-            let b = vec3<i32>(floor(position + vec3(0.0, 0.15, 0.0)));
+            let b = vec3<i32>(floor(position + vec3(0.0, 0.08, 0.0)));
             var level = -1e9;
             if liquid_at(b) {
-                level = f32(b.y) + select(0.85, 1.85, liquid_at(b + vec3(0, 1, 0)));
-            } else if liquid_at(b - vec3(0, 1, 0)) && fract(position.y + 0.15) < 0.45 {
-                level = f32(b.y - 1) + 0.85;
+                level = f32(b.y) + select(0.92, 1.92, liquid_at(b + vec3(0, 1, 0)));
+            } else if liquid_at(b - vec3(0, 1, 0)) && fract(position.y + 0.08) < 0.45 {
+                level = f32(b.y - 1) + 0.92;
             }
             if level > -1e8 {
                 afloat = true;
