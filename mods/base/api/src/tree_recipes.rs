@@ -725,7 +725,14 @@ pub type WideBlock = (i32, i32, i32, crate::branchy::Part, f32);
 /// emergents), Minecraft's and Bliss's crowns none.
 pub fn capped(b: &[WideBlock]) -> Vec<WideBlock> {
     use crate::branchy::Part;
-    let Some(low) = b.iter().filter(|e| matches!(e.3, Part::Leaves)).map(|e| e.1).min() else { return b.to_vec() };
+    let Some(low) = b
+        .iter()
+        .filter(|e| matches!(e.3, Part::Leaves))
+        .map(|e| e.1)
+        .min()
+    else {
+        return b.to_vec();
+    };
     let mut over = std::collections::HashMap::<(i32, i32), i32>::new();
     for e in b {
         let t = over.entry((e.0, e.2)).or_insert(i32::MIN);
