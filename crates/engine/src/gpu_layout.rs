@@ -793,6 +793,16 @@ gpu_struct! {
         /// (`@location(1)`, `weft_render::MOTION_FORMAT`) puts a point's position last frame
         /// through it.
         pub taa_prev: [[f32; 4]; 4],
+        /// What temporal anti-aliasing writes this frame, for the screen effects after it: x the
+        /// bindless index + 1 of its count image (r the frames gathered in each pixel, g how far
+        /// the pixel moved this frame in pixels: a gathered picture is softer where it moves, and
+        /// a pack may sharpen it more there); 0 without. y 1 when the world's pass has the motion
+        /// image (`core:aa` 1): shaders skip their motion's work without it. zw unused.
+        pub taa_frame: [f32; 4],
+        /// Under the backend's upscaler (DLSS, `post::set_upscaling`): x the texture mip bias, in
+        /// levels (NVIDIA's log2(render / output) - 1; 0 without), which a pack's world shader adds
+        /// to its block textures' level; yzw unused.
+        pub dlss: [f32; 4],
     }
 }
 
@@ -1249,6 +1259,10 @@ bindings! {
         PASSES "passes": "array<Pass>",
         SCENE "scene": "Scene",
     }
+    upscale_guides "upscale_guides.wgsl" {
+        PASSES "passes": "array<Pass>",
+        SCENE "scene": "Scene",
+    }
 }
 
 /// Whether the block at `p` (block coordinates) casts a shadow, as far as the client has it
@@ -1407,6 +1421,7 @@ pub fn prelude(shader: &str, common: &str) -> String {
         s.push_str(if RT_PRELUDE.load(std::sync::atomic::Ordering::Relaxed) { RT_SUN } else { RT_SUN_OFF });
     }
     s.push_str(CALM_OFF);
+    s.push_str(DRY_OFF);
     s.push_str(common);
     s.push('\n');
     s
@@ -1772,6 +1787,13 @@ pub fn rt_expand_prelude() -> String {
 /// port: on the Pixel 10 the rare paths' size alone cost the vista a fifth of its world pass).
 pub const CALM_OFF: &str = "const CALM: bool = false;\n";
 pub const CALM_ON: &str = "const CALM: bool = true;\n";
+/// `DRY` in every shader: false, but true in the world's calm-and-dry pipelines (level 2 of
+/// `WorldRenderer::set_calm`), used while the scene is calm and also has no rain
+/// (`scene.fog_color.w` 0), dry ground (`scene.canopy.y` 0), no puddles (`scene.canopy.z` 0) and no
+/// snow lying where the player is (`scene.ground.x` 0). A pack leaves out what those draw behind
+/// `if !DRY` (Android port: 1.8 ms of the Pixel 10's vista).
+pub const DRY_OFF: &str = "const DRY: bool = false;\n";
+pub const DRY_ON: &str = "const DRY: bool = true;\n";
 
 /// What goes in front of `occlusion.wgsl`.
 pub fn occlusion_prelude() -> String {

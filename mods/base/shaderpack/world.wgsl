@@ -55,9 +55,10 @@ fn world_out(in: VOut, c: vec4<f32>) -> WorldOut {
     return WorldOut(c, motion_texel(in.motion, in.clip.z));
 }
 
-// Whether this frame writes motion: temporal anti-aliasing on, with a last frame to come from.
+// Whether this frame writes motion: temporal anti-aliasing on with the motion image (`core:aa` 1),
+// with a last frame to come from.
 fn taa_moving() -> bool {
-    return scene.taa.z > 0.5;
+    return scene.taa.z > 0.5 && scene.taa_frame.y > 0.5;
 }
 
 fn shader_of(tex: u32) -> u32 {
@@ -175,6 +176,21 @@ fn finish(local: vec3<f32>, origin: vec4<i32>) -> vec4<f32> {
     return vec4(pos, 1.0);
 }
 
+// Where `finish` put this vertex last frame, camera relative as now (temporal anti-aliasing's
+// motion): a moving structure's place and turn then, after the table's three vec4 a structure
+// (`offsets[2].w` structures, then two vec4 each: offset, rotation). The world's own cubes stay.
+fn finish_prev(local: vec3<f32>, origin: vec4<i32>) -> vec3<f32> {
+    let k = origin.w;
+    var at = vec3<f32>(origin.xyz) * 16.0 + local;
+    if k == 0 {
+        return at - g.cam_frac.xyz;
+    }
+    let base = (i32(offsets[2].w) + 1) * 3;
+    let pivot = offsets[k * 3 + 2].xyz;
+    at = quat_turn(offsets[base + k * 2 + 1], at - pivot) + pivot;
+    return at - g.cam_frac.xyz + offsets[base + k * 2].xyz;
+}
+
 fn body_normal(n: vec3<f32>, k: i32) -> vec3<f32> {
     if k == 0 {
         return n;
@@ -261,6 +277,10 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
         }
     }
     out.clip = scene.view_proj * pos;
+    // A moving structure's blocks (a boat, a falling tree): where they were last frame.
+    if origins[ii].w != 0 && taa_moving() {
+        out.motion = vec3(screen_motion(out.clip, scene.taa_prev * vec4(finish_prev(local, origins[ii]), 1.0), scene.taa.xy), 1.0);
+    }
     out.dist = length(pos.xyz);
     out.rel = pos.xyz;
     // A face's texture turned in quarters (Weft 26.11.2's block faces with a rotation).
@@ -339,6 +359,9 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
         }
     }
     out.clip = scene.view_proj * pos;
+    if origins[ii].w != 0 && taa_moving() {
+        out.motion = vec3(screen_motion(out.clip, scene.taa_prev * vec4(finish_prev(local, origins[ii]), 1.0), scene.taa.xy), 1.0);
+    }
     out.dist = length(pos.xyz);
     out.rel = pos.xyz;
     out.uv = uvs[c];
@@ -579,7 +602,8 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     // small ones, a long rain many and wide. A film of water: the ground under it dark, the sky
     // mirrored by Fresnel, and rings where the rain still falls on it.
     let puddles = clamp(scene.canopy.z, 0.0, 1.0) * open_top;
-    if puddles > 0.01 && !leafy && n.y > 0.95 {
+    // (None in the calm-and-dry pipelines, `DRY`.)
+    if !DRY && puddles > 0.01 && !leafy && n.y > 0.95 {
         // In cells three blocks across, some hold a puddle (one hash each against a share that grows
         // with the rain: a shower a few, a long rain most), a round pool about a jittered middle
         // that widens as it fills, edged in the blocks' own pixels.
@@ -1054,6 +1078,13 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
 
 // ---- texture sampling (the engine's) ----
 
+// The texture footprint's scale for the mip level: 1, or under DLSS 2^(its mip bias)
+// (`Scene::dlss.x`, NVIDIA's log2(render / output) - 1: the textures as sharp as at the
+// screen's size, which the upscaler then keeps from aliasing).
+fn mip_scale() -> f32 {
+    return exp2(scene.dlss.x);
+}
+
 fn nearest_uv(size: f32, uv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec2<f32> {
     let inv_s = 1.0 / size;
     let t = uv * size;
@@ -1099,8 +1130,8 @@ fn far_flat(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
 }
 
 fn opaque(in: VOut) -> vec4<f32> {
-    let du = dpdx(in.uv);
-    let dv = dpdy(in.uv);
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     let albedo = far_flat(in, with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv));
     return vec4(shade(in, albedo).rgb, mirror_alpha(in, albedo.rgb));
@@ -1143,8 +1174,8 @@ fn fs_cutout(in: VOut) -> WorldOut {
             discard;
         }
     }
-    let du = dpdx(in.uv);
-    let dv = dpdy(in.uv);
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     var albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
     if albedo.a <= cutout_edge(in, nuv, du, dv) {
@@ -1172,8 +1203,8 @@ fn cutout_thinned(in: VOut) -> bool {
 }
 
 fn cutout_albedo(in: VOut) -> vec4<f32> {
-    let du = dpdx(in.uv);
-    let dv = dpdy(in.uv);
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     return with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
 }
@@ -1181,8 +1212,8 @@ fn cutout_albedo(in: VOut) -> vec4<f32> {
 // Cut as `fs_cutout` cuts (`cutout_edge`), so the shading finds its depth wherever it drew.
 @fragment
 fn fs_cutout_depth(in: VOut) {
-    let du = dpdx(in.uv);
-    let dv = dpdy(in.uv);
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     let a = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv).a;
     let edge = cutout_edge(in, nuv, du, dv);
@@ -1251,8 +1282,8 @@ fn fs_cutout_fade(in: VOut) -> WorldOut {
     if faded(in) {
         discard;
     }
-    let du = dpdx(in.uv);
-    let dv = dpdy(in.uv);
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     var albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
     if albedo.a <= cutout_edge(in, nuv, du, dv) {
@@ -1265,8 +1296,8 @@ fn fs_cutout_fade(in: VOut) -> WorldOut {
 }
 
 fn translucent(in: VOut) -> vec4<f32> {
-    let du = dpdx(in.uv);
-    let dv = dpdy(in.uv);
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     let albedo = with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv);
     // Water and glass each lit, then one haze for both (one copy of it in the shader, as for distant

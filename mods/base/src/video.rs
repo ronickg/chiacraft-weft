@@ -18,7 +18,7 @@
 
 use weft_sdk::*;
 
-/// The quality chosen: 0 low .. 3 ultra, 4 custom, 5 phone, -1 not chosen yet (picked from the machine).
+/// The quality chosen: 0 low .. 3 ultra, 4 custom, 5 phone, 6 max, -1 not chosen yet (picked from the machine).
 pub static QUALITY: Config<i32> = Config::named("quality");
 /// The pack's screen effects: 0 off, 1 low (fewer steps), 2 on. Bloom has no low.
 pub static FX_REFLECT: Config<i32> = Config::named("fx_reflect");
@@ -53,9 +53,15 @@ fn shadow_size() -> f64 {
     if next > 0 { next as f64 } else { SHADOW_SIZE.get() as f64 }
 }
 
+/// The HDR world and anti-aliasing as the game started with them (they are read at start).
+static AT_START: std::sync::OnceLock<(bool, i32)> = std::sync::OnceLock::new();
+
 /// A row whose value waits for the next start, and whether it waits now.
 fn waiting(key: &str) -> bool {
+    let start = AT_START.get().copied();
     match key {
+        "hdr" => start.is_some_and(|s| s.0 != HDR_WORLD.get()),
+        "aa" => start.is_some_and(|s| s.1 != AA.get()),
         "render_scale" => (render_scale() - RENDER_SCALE.get() as f64).abs() > 1e-3,
         "shadow_size" => (shadow_size() - SHADOW_SIZE.get() as f64).abs() > 0.5,
         _ => false,
@@ -97,6 +103,25 @@ static GPU_MEMORY: Config<i32> = Config::named("core:gpu_memory_mb");
 static GPU_RAY_QUERY: Config<bool> = Config::named("core:gpu_ray_query");
 static RT_SHADOWS: Config<i32> = Config::named("core:rt_shadows");
 static RT_REFLECTIONS: Config<bool> = Config::named("core:rt_reflections");
+/// The newer quality settings, each a row on the Extra quality tab (`EXTRA_ROWS`) and all at their
+/// most in the Max preset: the HDR world and temporal anti-aliasing (read at start), the mist as a
+/// volume, the soft clouds' shadow, the bloom's levels, the far shadow map's reach, the screen
+/// effects' half-size parts (off: every effect at full size), the leaves' see-through holes.
+static HDR_WORLD: Config<bool> = Config::named("core:hdr_world");
+static AA: Config<i32> = Config::named("core:aa");
+static FROXELS: Config<i32> = Config::named("core:froxels");
+static CLOUD_SHADOWS: Config<bool> = Config::named("core:cloud_shadows");
+static BLOOM_LEVELS: Config<i32> = Config::named("core:bloom");
+static SHADOW_FAR: Config<i32> = Config::named("core:shadow_far");
+static POST_LOW: Config<bool> = Config::named("core:post_low");
+/// DLSS where the renderer has it (windows-dlss5's `dlss.rs`, its own tab): the modes it offers
+/// (bit 1 DLAA; 0 none, also before that branch is in), whether Ray Reconstruction runs, the mode
+/// (0 off, 1 DLAA), DLAA's model and Ray Reconstruction on.
+static GPU_DLSS_MODES: Config<i32> = Config::named("core:gpu_dlss_modes");
+static GPU_DLSS_RR: Config<bool> = Config::named("core:gpu_dlss_rr");
+static DLSS: Config<i32> = Config::named("core:dlss");
+static DLSS_MODEL_DLAA: Config<i32> = Config::named("core:dlss_model_dlaa");
+static DLSS_RR: Config<bool> = Config::named("core:dlss_rr");
 /// What the detection chose (Research round 19, 7: "quality chosen by the GPU at first start"):
 /// the preset (-1 none yet), and whether the render scale went to half with it.
 static DETECTED: Config<i32> = Config::named("gpu_preset");
@@ -190,15 +215,61 @@ const PRESET_NAMES: [&str; 4] = ["low", "medium", "high", "ultra"];
 const PHONE: usize = 5;
 const PHONE_PRESET: [f64; 12] = [0.5, 0.0, 1024.0, 1.0, 0.0, 1.0, 1.0, 1.0, 6.0, 64.0, 1.0, 60.0];
 
-/// Preset `q`'s values, Low to Ultra and Phone.
+/// The Max preset (`QUALITY` 6; Ronald, 11-06: "I want to test with always sort of the maximum
+/// settings on because that's sort of our benchmark"): every row at its most (Ultra's, a view of
+/// 32 chunks, Bliss's, and distant terrain to 512), then every extra row too (`max_extras`), as far
+/// as the GPU can: traced shadows only where it traces rays, temporal anti-aliasing from the
+/// camera alone on a phone. Never picked for the player. The PC queue's `--preset max`
+/// (tester-tools/t2/t2q.py `PRESETS`) is the same list: change both together.
+const MAX: usize = 6;
+const MAX_PRESET: [f64; 12] = [1.0, 2.0, 4096.0, 2.0, 2.0, 2.0, 2.0, 1.0, 32.0, 512.0, 1.0, 0.0];
+
+/// Preset `q`'s values, Low to Ultra, Phone and Max.
 fn preset(q: usize) -> Option<&'static [f64; 12]> {
-    if q == PHONE { Some(&PHONE_PRESET) } else { PRESETS.get(q) }
+    match q {
+        PHONE => Some(&PHONE_PRESET),
+        MAX => Some(&MAX_PRESET),
+        _ => PRESETS.get(q),
+    }
+}
+
+/// The extra rows at their most, as far as this GPU goes (`MAX`), and the fantasy rows that cost
+/// (wind life ultra, soft clouds).
+fn max_extras() {
+    HDR_WORLD.set(true);
+    // Temporal anti-aliasing with the motion image; from the camera alone on a phone, whose tiled
+    // GPU the motion image cost a third of its world pass (Android, Pixel 10, 11-06). (DLAA in its
+    // place where DLSS is, once it lands.)
+    AA.set(if on_phone() { 2 } else { 1 });
+    FROXELS.set(2);
+    CLOUD_SHADOWS.set(true);
+    BLOOM_LEVELS.set(2);
+    // Auto: 2000 blocks with the HDR world (Far view's, at no measurable cost); further only
+    // spreads the far map's texels thinner.
+    SHADOW_FAR.set(0);
+    POST_LOW.set(false);
+    crate::look::LOOK_LEAF_HOLES.set(1.0);
+    // Ultra (soft edges from more rays, with TAA) where the GPU traces rays.
+    RT_SHADOWS.set(if GPU_RAY_QUERY.get() && !on_phone() { 2 } else { 0 });
+    RT_REFLECTIONS.set(GPU_RAY_QUERY.get() && !on_phone());
+    FX_WIND_LIFE.set(3);
+    SOFT_CLOUDS.set(true);
+    // DLAA (DLSS at the screen's own size) where the renderer has it, with its newest model (M,
+    // 13) and Ray Reconstruction where that runs (windows-dlss5, 11-06): the engine then skips its
+    // own gathering for the frame. Elsewhere TAA as above.
+    if GPU_DLSS_MODES.get() & (1 << 1) != 0 {
+        DLSS.set(1);
+        DLSS_MODEL_DLAA.set(13);
+        DLSS_RR.set(GPU_DLSS_RR.get());
+    }
 }
 
 /// Preset `q`'s name (`video.base.preset.<name>`); None for Custom and not chosen.
 fn preset_name(q: i32) -> Option<&'static str> {
     if q == PHONE as i32 {
         Some("phone")
+    } else if q == MAX as i32 {
+        Some("max")
     } else {
         usize::try_from(q)
             .ok()
@@ -297,6 +368,12 @@ fn apply(p: usize) {
         (row.set)(v);
     }
     QUALITY.set(p as i32);
+    if p == MAX {
+        max_extras();
+    } else if GPU_DLSS_MODES.get() != 0 {
+        // DLSS is live: off again with any other preset, as Max is the one that turns it on.
+        DLSS.set(0);
+    }
     fantasy_caps(p, true);
 }
 
@@ -486,7 +563,7 @@ fn fantasy_caps(q: usize, bloom_up: bool) {
         FX_BLOOM.set(0);
     } else if q == 1 {
         FX_BLOOM.set(FX_BLOOM.get().min(1));
-    } else if bloom_up && q <= 3 {
+    } else if bloom_up && (q <= 3 || q == MAX) {
         if let Some(&b) = FANTASY_BLOOM.get(FANTASY.get() as usize) {
             FX_BLOOM.set(b);
         }
@@ -523,9 +600,61 @@ fn row_ui(ui: &mut Ui, rows: &'static [Row], i: usize, step: fn(usize, i32)) {
     });
 }
 
-/// Traced sun and moon shadows (`core:rt_shadows`), only where the GPU can trace rays: outside the
-/// presets, so no preset changes the look by it (an ultra choice the player makes).
-const RT_ROWS: [Row; 2] = [
+/// The Extra quality tab's rows (`EXTRA_SCREEN`): the newer features, each a setting of its own,
+/// outside Low to Ultra so no preset changes the look by them; Max sets them all (`max_extras`).
+/// Traced shadows and reflections only where the GPU can trace rays (the last rows, from `RT_ROW`).
+const EXTRA_ROWS: [Row; 10] = [
+    Row { key: "hdr", values: &[0.0, 1.0], get: || HDR_WORLD.get() as u8 as f64, set: |v| HDR_WORLD.set(v > 0.0), shown: off_on },
+    Row {
+        key: "aa",
+        values: &[0.0, 1.0, 2.0],
+        get: || AA.get() as f64,
+        set: |v| AA.set(v as i32),
+        shown: |v| word(["off", "taa", "taa_camera"][(v as usize).min(2)]),
+    },
+    Row {
+        key: "mist_volume",
+        values: &[0.0, 1.0, 2.0],
+        get: || FROXELS.get() as f64,
+        set: |v| FROXELS.set(v as i32),
+        shown: |v| word(["off", "on", "ultra"][(v as usize).min(2)]),
+    },
+    Row {
+        key: "cloud_shadows",
+        values: &[0.0, 1.0],
+        get: || CLOUD_SHADOWS.get() as u8 as f64,
+        set: |v| CLOUD_SHADOWS.set(v > 0.0),
+        shown: off_on,
+    },
+    Row {
+        key: "bloom_levels",
+        values: &[0.0, 1.0, 2.0],
+        get: || BLOOM_LEVELS.get() as f64,
+        set: |v| BLOOM_LEVELS.set(v as i32),
+        shown: |v| word(["off", "narrow", "wide"][(v as usize).min(2)]),
+    },
+    Row {
+        key: "shadow_far",
+        values: &[0.0, 400.0, 1000.0, 2000.0, 2400.0],
+        get: || SHADOW_FAR.get() as f64,
+        set: |v| SHADOW_FAR.set(v as i32),
+        shown: |v| if v == 0.0 { word("auto") } else { ("blocks".into(), v as i64) },
+    },
+    Row {
+        key: "effect_detail",
+        // The half-size parts on (1) or every effect at full size (0).
+        values: &[1.0, 0.0],
+        get: || POST_LOW.get() as u8 as f64,
+        set: |v| POST_LOW.set(v > 0.0),
+        shown: |v| word(if v > 0.0 { "half" } else { "full" }),
+    },
+    Row {
+        key: "leaf_holes",
+        values: &[0.0, 1.0],
+        get: || (crate::look::LOOK_LEAF_HOLES.get() > 0.5) as u8 as f64,
+        set: |v| crate::look::LOOK_LEAF_HOLES.set(if v > 0.0 { 1.0 } else { 0.0 }),
+        shown: off_on,
+    },
     Row {
         key: "rt_shadows",
         // Ultra: soft edges from more rays a pixel (with TAA), about three times the cost.
@@ -540,13 +669,21 @@ const RT_ROWS: [Row; 2] = [
         values: &[0.0, 1.0],
         get: || RT_REFLECTIONS.get() as u8 as f64,
         set: |v| RT_REFLECTIONS.set(v > 0.0),
-        shown: |v| word(if v > 0.0 { "on" } else { "off" }),
+        shown: off_on,
     },
 ];
+/// The first of the rows only a GPU that traces rays shows (traced shadows, then reflections).
+const RT_ROW: usize = 8;
 
-fn step_rt(i: usize, dir: i32) {
-    step_row(&RT_ROWS[i], dir);
+/// An extra row a step on: Max becomes Custom (the Low to Ultra presets leave these rows as they are).
+fn step_extra(i: usize, dir: i32) {
+    step_row(&EXTRA_ROWS[i], dir);
+    if QUALITY.get() == MAX as i32 {
+        QUALITY.set(4);
+    }
 }
+
+pub static EXTRA_SCREEN: Screen = Screen::named("video_extra");
 
 fn step_fantasy(i: usize, dir: i32) {
     step_row(&FANTASY_ROWS[i], dir);
@@ -559,9 +696,10 @@ static DEFAULTS: Config<i32> = Config::named("video_defaults");
 /// Saved settings take the new defaults once (the engine saves every setting, so a changed
 /// default alone reaches no one who has played): on a preset, its values for the rows whose
 /// defaults changed; on Custom, a row still at its old default takes the new one, a row the
-/// player changed stays. 1: contact shadows off, light shafts low (11-05).
+/// player changed stays. 1: contact shadows off, light shafts low (11-05). 2: temporal
+/// anti-aliasing on (11-06), from the camera alone on a phone, where it is still off.
 fn new_defaults() {
-    if DEFAULTS.get() >= 1 || QUALITY.get() < 0 {
+    if DEFAULTS.get() >= 2 || QUALITY.get() < 0 {
         return;
     }
     // A script's or benchmark's `--config` values are meant as given.
@@ -569,6 +707,17 @@ fn new_defaults() {
         .iter()
         .any(|o| weft_sdk::client::launch_option(o).is_some())
     {
+        return;
+    }
+    if DEFAULTS.get() >= 1 {
+        // Ronald, 11-06: "Yes, on by default". Saved settings kept the old default (off); a player
+        // who chose a mode keeps it. Applied at the next start (it is read there).
+        if AA.get() == 0 {
+            let aa = if on_phone() { 2 } else { 1 };
+            weft_sdk::info!("video: new defaults, anti-aliasing 0 -> {aa}");
+            AA.set(aa);
+        }
+        DEFAULTS.set(2);
         return;
     }
     let q = QUALITY.get();
@@ -580,10 +729,12 @@ fn new_defaults() {
     FX_CONTACT.set(contact);
     FX_SHAFTS.set(shafts);
     DEFAULTS.set(1);
+    // And the next step at once (`DEFAULTS` 2).
+    new_defaults();
 }
 
 pub fn register(r: &mut Registry) {
-    r.config(&QUALITY).int(-1, -1, 5);
+    r.config(&QUALITY).int(-1, -1, 6);
     r.config(&FX_REFLECT).int(2, 0, 2);
     // Off by default, low shafts (Ronald, 11-05: "Off by default", "Default to Low").
     r.config(&FX_CONTACT).int(0, 0, 2);
@@ -633,10 +784,25 @@ pub fn register(r: &mut Registry) {
         apply_detected([w, h]);
     });
     r.client_frame(take_waiting);
+    // What the HDR world and anti-aliasing started as: their rows say when a change waits.
+    r.client_frame(|_| {
+        AT_START.get_or_init(|| (HDR_WORLD.get(), AA.get()));
+    });
     r.screen(&SCREEN, |ui| {
-        let tabs: [crate::window::Tab; 1] = [("video.base.fantasy.title", |c| {
-            c.client().screen_open(&FANTASY_SCREEN);
-        })];
+        let mut tabs: Vec<crate::window::Tab> = vec![
+            ("video.base.fantasy.title", |c| {
+                c.client().screen_open(&FANTASY_SCREEN);
+            }),
+            ("video.base.extra.title", |c| {
+                c.client().screen_open(&EXTRA_SCREEN);
+            }),
+        ];
+        // DLSS's tab, where the renderer has it.
+        if crate::dlss::available() {
+            tabs.push(("video.base.dlss.title", |c| {
+                c.client().screen_open(&crate::dlss::SCREEN);
+            }));
+        }
         crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.title", &tabs, |ui| {
             // The presets, and which one the settings are now.
             ui.row(S::row().gap(3.0).center(), |ui| {
@@ -647,6 +813,7 @@ pub fn register(r: &mut Registry) {
                 for (p, name) in PRESET_NAMES.iter().enumerate() {
                     ui.button(&format!("video.base.preset.{name}"), S::default().w(52.0), move |_| apply(p));
                 }
+                ui.button("video.base.preset.max", S::default().w(52.0), move |_| apply(MAX));
             });
             ui.row(S::row().gap(3.0), |ui| {
                 ui.row(S::row().w(84.0), |_| {});
@@ -682,17 +849,46 @@ pub fn register(r: &mut Registry) {
             for i in 0..ROWS.len() {
                 row_ui(ui, &ROWS, i, step);
             }
-            if GPU_RAY_QUERY.get() {
-                for i in 0..RT_ROWS.len() {
-                    row_ui(ui, &RT_ROWS, i, step_rt);
+        });
+    });
+    r.screen(&EXTRA_SCREEN, |ui| {
+        let mut tabs: Vec<crate::window::Tab> = vec![
+            ("video.base.title", |c| {
+                c.client().screen_open(&SCREEN);
+            }),
+            ("video.base.fantasy.title", |c| {
+                c.client().screen_open(&FANTASY_SCREEN);
+            }),
+        ];
+        if crate::dlss::available() {
+            tabs.push(("video.base.dlss.title", |c| {
+                c.client().screen_open(&crate::dlss::SCREEN);
+            }));
+        }
+        crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.extra.title", &tabs, |ui| {
+            for i in 0..EXTRA_ROWS.len() {
+                // Traced shadows only where the GPU traces rays.
+                if i >= RT_ROW && !GPU_RAY_QUERY.get() {
+                    continue;
                 }
+                row_ui(ui, &EXTRA_ROWS, i, step_extra);
             }
         });
     });
     r.screen(&FANTASY_SCREEN, |ui| {
-        let tabs: [crate::window::Tab; 1] = [("video.base.title", |c| {
-            c.client().screen_open(&SCREEN);
-        })];
+        let mut tabs: Vec<crate::window::Tab> = vec![
+            ("video.base.title", |c| {
+                c.client().screen_open(&SCREEN);
+            }),
+            ("video.base.extra.title", |c| {
+                c.client().screen_open(&EXTRA_SCREEN);
+            }),
+        ];
+        if crate::dlss::available() {
+            tabs.push(("video.base.dlss.title", |c| {
+                c.client().screen_open(&crate::dlss::SCREEN);
+            }));
+        }
         crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.fantasy.title", &tabs, |ui| {
             // The master, and which of its looks the rows are now.
             ui.row(S::row().gap(3.0).center(), |ui| {

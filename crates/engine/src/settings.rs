@@ -286,9 +286,51 @@ impl Settings {
         number("core:hdr_world") != 0.0
     }
 
-    /// Temporal anti-aliasing (`core:aa` 1, `post::set_motion`), read once at start.
+    /// Temporal anti-aliasing (`core:aa` 1 or 2, `post::set_taa`), read once at start.
     pub fn aa(&self) -> bool {
         number("core:aa") >= 1.0
+    }
+
+    /// Whether the world's pass draws the motion image too (`core:aa` 1; 2 is from the camera
+    /// alone, `post::set_motion`), read once at start.
+    pub fn aa_motion(&self) -> bool {
+        (number("core:aa") as i32) == 1
+    }
+
+    /// DLSS, the backend's temporal upscaler (`core:dlss`, `weft_render::UpscaleMode`), live; off
+    /// unless the backend has one (the `streamline` build on Windows).
+    pub fn dlss(&self) -> weft_render::UpscaleMode {
+        weft_render::UpscaleMode::from_number(number("core:dlss").max(0.0) as u32)
+    }
+
+    /// The stand-in upscaler for checks (`core:upscale_standin`), read at start.
+    pub fn upscale_standin(&self) -> bool {
+        number("core:upscale_standin") != 0.0
+    }
+
+    /// Ray Reconstruction with DLSS (`core:dlss_rr`), live.
+    pub fn dlss_rr(&self) -> bool {
+        number("core:dlss_rr") != 0.0
+    }
+
+    /// DLSS's model for `mode` (`core:dlss_model_<mode>`, 0 its default), live.
+    pub fn dlss_model(&self, mode: weft_render::UpscaleMode) -> u32 {
+        number(&format!("core:dlss_model_{}", mode.name())).max(0.0) as u32
+    }
+
+    /// Ray Reconstruction's model (`core:dlss_rr_model`), live.
+    pub fn dlss_rr_model(&self) -> u32 {
+        number("core:dlss_rr_model").max(0.0) as u32
+    }
+
+    /// DLSS 5 over the upscaled picture (`core:dlss5`), live.
+    pub fn dlss5(&self) -> bool {
+        number("core:dlss5") != 0.0
+    }
+
+    /// DLSS 5's strength (`core:dlss5_intensity`), live.
+    pub fn dlss5_intensity(&self) -> f32 {
+        (number("core:dlss5_intensity") as f32).clamp(0.0, 1.0)
     }
 
     /// Temporal anti-aliasing's least share of each new frame (`core:taa_blend`), live.

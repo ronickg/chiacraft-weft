@@ -17,12 +17,19 @@ fn in_liquid() -> bool {
 
 // How hard it rains, 0..1 (the engine puts it beside the fog's color).
 fn rain_amount() -> f32 {
+    // None in the calm-and-dry pipelines (`DRY`: the engine draws with them only when it is 0).
+    if DRY {
+        return 0.0;
+    }
     return clamp(scene.fog_color.w, 0.0, 1.0);
 }
 
 // How wet the ground is where the player is, 0..1: it wets as rain falls and dries over minutes
 // after (`scene.canopy.y`, the engine's, at the pace the base mod's air gives).
 fn ground_wet() -> f32 {
+    if DRY {
+        return 0.0;
+    }
     return clamp(scene.canopy.y, 0.0, 1.0);
 }
 
@@ -298,6 +305,21 @@ fn palette_made() -> Palette {
             p.horizon = mix(p.horizon, hz, evening * 0.7);
             let zn = vec3(0.30, 0.48, 1.0) * (luma(p.zenith) / luma(vec3(0.30, 0.48, 1.0)));
             p.zenith = mix(p.zenith, zn, evening * 0.6);
+        }
+        // And the evening's twilight, the sun from about 2 degrees up to 8 under: Bliss's sky stays
+        // blue (19:00 warmth -35) and its land a lit blue-grey (luma 86, 75 87 103), where ours went a
+        // pink-lavender sky over near-black land (46) in the dusk key; at the same sun depth in the
+        // morning Bliss's land is a dark deep blue (55, -85), which the blue hour keeps (PC sheb4
+        // against Bliss's vista, 11-06; our 19:00 sun 2.9 degrees down, Minecraft's 3.5).
+        let twilight = smoothstep(0.05, -0.05, scene.sun.x) * smoothstep(-0.16, -0.08, e) * (1.0 - smoothstep(0.0, 0.04, e));
+        if twilight > 0.0 {
+            let hb = vec3(0.75, 0.95, 1.3);
+            p.horizon = mix(p.horizon, hb * (luma(p.horizon) / luma(hb)), twilight * 0.8);
+            let zb = vec3(0.32, 0.5, 1.0);
+            p.zenith = mix(p.zenith, zb * (luma(p.zenith) / luma(zb)), twilight * 0.7);
+            // (0.42 0.52 0.72, about three times: at 0.15 0.19 0.27 the 19:00 land came only from 46 to
+            // 51 in its colour, Bliss's 86; PC shtw1.)
+            p.ambient = mix(p.ambient, vec3(0.42, 0.52, 0.72), twilight * 0.8);
         }
     }
     // A new moon's night is darker than a full moon's.
@@ -1442,7 +1464,7 @@ fn mist_bounce(d: f32, lit: f32) -> vec3<f32> {
 // faces up under the open sky, in patches that join up as it deepens.
 fn snow_on(n: vec3<f32>, pos: vec3<f32>, sky: f32) -> f32 {
     let deep = scene.ground.x;
-    if deep <= 0.0 {
+    if DRY || deep <= 0.0 {
         return 0.0;
     }
     let q = vec3<i32>(floor(pos * 16.0));
@@ -1663,7 +1685,11 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
         // against 72; the Look session, 11-06).
         let morning = smoothstep(0.2, 0.34, scene.sun.y) * (1.0 - smoothstep(0.6, 0.7, scene.sun.y));
         let far_off = smoothstep(250.0, 800.0, dist);
-        toward = mix(toward, luma(toward) * sun_tint, mix(0.6, 0.9, morning * far_off) * low_sun * hdr_air) * (1.0 - 0.05 * noon * hdr_air);
+        // In the evening with the sun low in the west (it rises at +x), a third of it by about 10° up:
+        // Bliss's far land at 18:00 is near neutral (warmth +0 to +9 by the horizon) where ours
+        // took the sun's gold (+43), and its mornings stay warm (07:00 +72), so not then (lk_ebc).
+        let dusk = smoothstep(0.05, -0.05, scene.sun.x) * (1.0 - smoothstep(0.15, 0.3, scene.sun.y));
+        toward = mix(toward, luma(toward) * sun_tint, mix(0.6, 0.9, morning * far_off) * low_sun * hdr_air * mix(1.0, 0.35, dusk)) * (1.0 - 0.05 * noon * hdr_air);
         v = mix(v, vec3((v.r + v.g + v.b) / 3.0), mix(0.35, 0.5, noon) * hdr_air);
     }
     let mixed = mix(pale, toward, v);
@@ -1687,7 +1713,10 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
             let y = scene.eye.y + rel.y - (SEA_LEVEL + 4.0);
             let inside = min(min(BAND_DEPTH / max(-dir.y, 0.008), dist), 1500.0);
             let band = 1.0 - exp(-BAND_HDR * exp(-max(y, 0.0) / BAND_DEPTH) * inside * far_band);
-            let white = vec3(luma(toward)) * vec3(1.04, 1.0, 0.94) * 1.25;
+            // A cool white, a little brighter than the haze round it: at 1.25 and warm it read
+            // 188-190 / saturation 49-52 / warmth +40 at 18:00 against Bliss's 172-174 / 19-22 / +3
+            // (on the blue horizon band, lk_ebh2).
+            let white = vec3(luma(toward)) * vec3(0.96, 1.0, 1.06) * 1.12;
             out = mix(out, white, band);
         }
     }
