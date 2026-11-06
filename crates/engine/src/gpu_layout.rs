@@ -1269,10 +1269,19 @@ pub fn prelude(shader: &str, common: &str) -> String {
         s.push_str(SOLID_AT);
         s.push_str(LOD_CORNER);
     }
+    s.push_str(CALM_OFF);
     s.push_str(common);
     s.push('\n');
     s
 }
+
+/// `CALM` in every shader: false, but true in the world's calm pipelines (`WorldRenderer::set_calm`),
+/// used while the scene has no fog in the air (`scene.weather.z` 0), no thunder (`scene.lightning.z`
+/// under 0.05), no held light (`scene.hand_light` 0) and the eye is in no liquid. A pack leaves
+/// out what does nothing then behind `if !CALM`: a smaller shader for the same picture (Android
+/// port: on the Pixel 10 the rare paths' size alone cost the vista a fifth of its world pass).
+pub const CALM_OFF: &str = "const CALM: bool = false;\n";
+pub const CALM_ON: &str = "const CALM: bool = true;\n";
 
 /// What goes in front of `occlusion.wgsl`.
 pub fn occlusion_prelude() -> String {

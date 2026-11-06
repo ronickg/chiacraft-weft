@@ -206,6 +206,20 @@ pub fn compose(
     crate::shaders::compose(name, &with_common(assets, name, &engine_source(assets, name)), parts)
 }
 
+/// `compose` with `CALM` true (`gpu_layout::CALM_ON`), when the pack's `name` uses it; None otherwise
+/// or when it fails (the plain pipelines then serve).
+pub fn compose_calm(assets: &Assets, name: &str, parts: &[(&crate::shaders::Hook, &[(String, String)])]) -> Option<Shader> {
+    let src = pack_source(name).filter(|s| s.contains("CALM"))?;
+    let calm = with_common(assets, name, &src).replacen(crate::gpu_layout::CALM_OFF, crate::gpu_layout::CALM_ON, 1);
+    match crate::shaders::compose(name, &calm, parts) {
+        Ok((s, _)) => Some(s),
+        Err(e) => {
+            log::error!("shader pack {name} (calm): {}", e.0);
+            None
+        }
+    }
+}
+
 pub(crate) fn open_folder(dir: &Path) {
     let _ = std::fs::create_dir_all(dir);
     open_path(dir);
