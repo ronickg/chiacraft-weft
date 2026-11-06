@@ -515,7 +515,7 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     if in.slot == 0u {
         lit = vec4(albedo.rgb * light, albedo.a);
         if mat.has {
-            lit = vec4(lit.rgb * (1.0 - 0.8 * mat.metal) + mat_shine(in, mat, n, albedo.rgb), lit.a);
+            lit = vec4(lit.rgb * (1.0 - 0.5 * mat.metal) + mat_shine(in, mat, n, albedo.rgb, light), lit.a);
         }
         // A low sun full on a bright, saturated yellow-green (the birch's untinted leaves, whose
         // own picture is that green, so `surface_light` never sees them as leaves): some of its
@@ -605,10 +605,17 @@ fn mat_fresnel(f0: vec3<f32>, cos_v: f32) -> vec3<f32> {
 }
 
 // What a material adds on its own (`mat_at`): the sun's highlight (GGX, Smith's visibility),
-// through the same shadow as the rest of the light, and the sky mirrored by Fresnel, blurred toward
-// the zenith's colour the rougher it is and only as far as the sky is open above it (the screen's
-// reflections, `post/reflect.wgsl`, mirror what's nearby on top, `mirror_alpha`).
-fn mat_shine(in: VOut, m: Mat, n: vec3<f32>, albedo: vec3<f32>) -> vec3<f32> {
+// through the same shadow as the rest of the light, and what's round it mirrored by Fresnel: the
+// sky, blurred toward the zenith's colour the rougher it is, where the sky is open above it; under a
+// roof the room's own light (`light`, what falls on the surface) instead. The screen's reflections
+// (`post/reflect.wgsl`) mirror what's nearby on top (`mirror_alpha`). A metal reflects in its own
+// colour (its albedo as F0, as NVIDIA's RTX mod does): with LabPBR's copper F0 and a bright sky,
+// the hall's copper columns came out pale lavender like glass (PC rsb_hall_rt0, 11-06).
+fn mat_shine(in: VOut, m_in: Mat, n: vec3<f32>, albedo: vec3<f32>, light: vec3<f32>) -> vec3<f32> {
+    var m = m_in;
+    if m.metal > 0.5 {
+        m.f0 = albedo;
+    }
     let v = -normalize(in.rel);
     let l = light_dir();
     let h = normalize(v + l);
@@ -627,11 +634,12 @@ fn mat_shine(in: VOut, m: Mat, n: vec3<f32>, albedo: vec3<f32>) -> vec3<f32> {
         out = min(d * vis, 60.0) * f * ndl * sun;
     }
     let r = reflect(-v, n);
-    let sky = mix(sky_color(r), sky_color(vec3(0.0, 1.0, 0.0)), clamp(m.rough * 2.0, 0.0, 1.0));
-    let open = smoothstep(0.3, 0.95, in.light.x);
+    let sky_seen = mix(sky_color(r), sky_color(vec3(0.0, 1.0, 0.0)), clamp(m.rough * 2.0, 0.0, 1.0));
+    let open = smoothstep(0.8, 1.0, in.light.x);
+    let sky = mix(light * 0.5, sky_seen, open * open);
     // A rough surface mirrors little (its lobe is spread over the whole sky's dimmer average).
     let gloss = 1.0 - clamp(m.rough * 1.6, 0.0, 0.85);
-    out += mat_fresnel(m.f0, ndv) * sky * open * gloss;
+    out += mat_fresnel(m.f0, ndv) * sky * gloss;
     return out;
 }
 
@@ -645,7 +653,7 @@ fn mirror_alpha(in: VOut, albedo: vec3<f32>) -> f32 {
         return SOLID_ALPHA;
     }
     let ndv = max(dot(normalize(in.normal), -normalize(in.rel)), 0.0);
-    let f = mat_fresnel(m.f0, ndv);
+    let f = mat_fresnel(select(m.f0, albedo, m.metal > 0.5), ndv);
     return -luma(f) * smoothstep(0.55, 0.9, m.smoothness);
 }
 
