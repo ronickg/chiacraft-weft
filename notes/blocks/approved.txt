@@ -48,3 +48,6 @@ crucible_top
 crucible_side
 forge_top
 forge_side
+log_cherry
+leaves_cherry_bloom
+planks_cherry
