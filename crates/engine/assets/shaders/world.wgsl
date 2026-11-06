@@ -165,6 +165,9 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     out.dist = length(pos.xyz);
     out.uv = UVS[(c + ((w0 >> FACE_TURN_SHIFT) & FACE_TURN_MASK)) % 4u];
     out.backed = select(0u, 1u, (w0 & FACE_BACKED) != 0u);
+    if ((w0 >> FACE_TINT_SHIFT) & TINT_MASK) == WATER_TINT {
+        out.backed |= 2u;
+    }
     let tex_id = w1 & FACE_TEX_MASK;
     let fr = texture_frame(tex_id);
     out.size = fr.size;
@@ -229,6 +232,7 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     out.slot = shader_of(tex_id);
     out.pos = vec3<f32>(o.xyz * 16) + local;
     let tint_kind = (uvw >> QUAD_TINT_SHIFT) & TINT_MASK;
+    out.backed = select(0u, 2u, tint_kind == WATER_TINT);
     var tint = vec3(1.0);
     if tint_kind != 0u {
         tint = tint_color(tint_kind, w4 >> FACE_BIOME_SHIFT, o.x * 16 + i32(round(local.x)), o.z * 16 + i32(round(local.z)));
@@ -357,12 +361,20 @@ fn fs_cutout(in: VOut) -> @location(0) vec4<f32> {
     var albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
     // Vanilla's alpha test (GL_GREATER 0.1).
     if albedo.a <= 0.1 {
-        if in.backed == 0u {
+        if (in.backed & 1u) == 0u {
             discard;
         }
         albedo = backed_hole(in, nuv);
     }
     return vec4(shade(in, albedo).rgb, 1.0);
+}
+
+// The water's tint kind (`content`: core:grass, core:foliage, core:water come first). Its faces
+// carry bit 2 of `backed`.
+const WATER_TINT: u32 = 3u;
+
+fn to_gamma(c: vec3<f32>) -> vec3<f32> {
+    return pow(max(c, vec3(0.0)), vec3(1.0 / 2.2));
 }
 
 @fragment
@@ -371,7 +383,18 @@ fn fs_translucent(in: VOut) -> @location(0) vec4<f32> {
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     let albedo = with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv);
-    return shade(in, albedo);
+    let lit = shade(in, albedo);
+    // Water over the world as it was before it (`scene.behind`), mixed as vanilla's 8-bit screen
+    // mixes it, in gamma (chiacraft, stage 1 against vanilla + Distant Horizons): blended in linear
+    // light the deep bed added next to nothing and the lakes stood flat and bright, (45, 86, 168)
+    // where vanilla's are (47, 72, 122) with the bed and its seagrass showing. Written whole, so a
+    // second water face behind it (a fall before a lake) is lost under it; glass blends as before.
+    if (in.backed & 2u) != 0u && scene.behind.z > 0.5 {
+        let under = textureLoad(textures[u32(scene.behind.x)], vec2<i32>(in.clip.xy), 0).rgb;
+        let mixed = mix(to_gamma(under), to_gamma(lit.rgb), lit.a);
+        return vec4(pow(mixed, vec3(2.2)), 1.0);
+    }
+    return lit;
 }
 
 // Distant terrain (`client::lod`): a record is the `dir` face of a box in its tile, drawn with its
