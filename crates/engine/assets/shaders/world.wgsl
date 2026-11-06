@@ -280,11 +280,12 @@ fn plain_fog(dist: f32) -> f32 {
     if abs(scene.params.x - 0.6 * scene.params.y) > 0.5 || near <= 0.0 || scene.params.y <= near {
         return fog;
     }
-    // Closing in near the end (a cube): linear, the land 400-800 blocks out took half its fog and
-    // went pale where Minecraft + DH's is clear (luma 130-145 against 65; it only fogs the strip
-    // under the horizon).
-    let t = clamp((dist - 0.5 * near) / (scene.params.y - 0.5 * near), 0.0, 1.0);
-    return max(fog, t * t * t);
+    // Closing in only over the far half, toward the end (a square): linear from half the cubes'
+    // reach, the land 400-800 blocks out took half its fog and went pale where Minecraft + DH's is
+    // clear (luma 130-145 against 65); as a cube from there, the strip under the horizon still took
+    // a sixth of the sky's blue where theirs stays green (blue 70 against 40, the vista at noon).
+    let t = clamp((dist - 0.5 * scene.params.y) / (0.5 * scene.params.y), 0.0, 1.0);
+    return max(fog, t * t);
 }
 
 // Nearest texels with antialiased borders (vanilla 26.1's sampleNearest): up close each texel
@@ -435,7 +436,13 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
         tint = unpack_rgb(biomes[corner.biome * g.extra.z + kind - 1u]);
     }
     out.tint = tint;
-    let shade = SHADE[dir] * AO[a[c]];
+    var shade = SHADE[dir] * AO[a[c]];
+    // Far water drawn whole is lighter and bluer than the near's, which is seen over its bed
+    // through the texture's alpha (stage 1, vanilla + DH: far water (44, 80, 151) against the
+    // near's (42, 70, 131) and vanilla's (43, 71, 126)).
+    if lod_tint(w0) == 3u {
+        shade *= 0.85;
+    }
     // With an overlay the overlay takes the tint, the base none (as the cubes' faces).
     let ov = frames[g.extra.x + tex_id];
     if ov != 0u {
