@@ -26,6 +26,27 @@ repository or game. We learn how it's built, then write our own.
   `_sss` subsurface maps) and the *RTX Remix Showcase World* by BlockWorks, which the renderer
   was tuned for. Both are on CurseForge and inside the release zip.
 
+### What the release really ships (checked 11-05)
+
+- The release zip (1.03 GB, sha256 `0a4b84fc…01fa`) holds only the installer and the mod jar.
+  The materials pack (0.58.0) and the showcase world (v0.11.1) are separate downloads on
+  CurseForge.
+- The jar's 312 classes match the source at the release commit `170197a` (main has 4 classes
+  more since). Inside it, `native/remix-sdk-win64` and `-arm64` carry the runtime:
+  `d3d9.dll` (309 MB, the shaders built in), `nvngx_dlssd.dll` (Ray Reconstruction),
+  `nvngx_dlss.dll`, `nvngx_dlssg.dll` (frame generation), `nvngx_dlssnr.dll` (266 MB, DLSS 5's
+  neural rendering), `NRD.dll`, `NRC_Vulkan.dll`, `libxess.dll`, NVRTC and USD libraries, and
+  `remixbridge.dll` (the JNI bridge).
+- **The runtime is not the public dxvk-remix.** It reports `remix-main+71a581da`, built from
+  NVIDIA's internal tree; that commit isn't in the public repository. Its C API is version 0.16,
+  the public header's is 0.6. Retained scene instances (`SceneInstanceAdd`), the GL interop
+  (`dxvk_GetInteropInfo`), config layers and texture updates are only in the private build, and
+  so are ten of the options the mod sets: `gpuResidentScene`,
+  `materials.enableUvBoundsLooping` (block textures in an atlas), `neuralRadianceCache.
+  wrapPositionsToSceneBounds`, `sparseRendering.enableRtxdiReuseForInactivePixels` and others
+  (their names are in the shipped `d3d9.dll`, not in the public source). So the public source
+  shows the path tracer's passes, but not the Minecraft-specific runtime work.
+
 ## The big picture
 
 Minecraft keeps running as usual: its game logic, its chunk meshing workers, its OpenGL UI. The
@@ -175,6 +196,9 @@ uses ray tracing yet.
   (opaque, cutout and translucent as separate geometries), built when the section is meshed and
   kept until it changes, is exactly the scheme Remix ended up with (`minimizeBlasMerging`).
   The TLAS (a few thousand instances) is rebuilt every frame and costs little.
+  Remix builds every BLAS with `PREFER_FAST_BUILD | ALLOW_UPDATE` (`rtx_accel_manager.cpp`),
+  because the D3D9 games it was made for stream geometry each frame. Our sections change
+  rarely, so ours should be `PREFER_FAST_TRACE | ALLOW_COMPACTION`, compacted after the build.
 - We already have far terrain, which Remix doesn't. LOD tiles can get coarse BLASes of their own,
   so far hills cast shadows and show in reflections.
 
