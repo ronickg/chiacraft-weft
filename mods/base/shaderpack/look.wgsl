@@ -196,7 +196,9 @@ fn palette_made() -> Palette {
     // The blue hour deep blue, as Bliss's (its land at 05:00 warmth -88, ours violet, about 0: the
     // MC comparison's spring 8 sheets, 11-05), a pink band left low on the horizon.
     // (Before: zenith 0.045 0.05 0.16, horizon 0.30 0.15 0.27, ambient 0.10 0.09 0.17.)
-    let dusk = key(vec3(0.025, 0.05, 0.19), vec3(0.22, 0.15, 0.30), vec3(0.45, 0.20, 0.25), vec3(0.0, 0.0, 0.0), vec3(0.05, 0.08, 0.20));
+    // (v4: the shade light a deeper, more saturated blue, 0.03 0.07 0.25: at 0.05 0.08 0.20 the land
+    // read grey-violet, saturation 81-102 against Bliss's 189-254, Look's measures.)
+    let dusk = key(vec3(0.02, 0.05, 0.20), vec3(0.22, 0.15, 0.30), vec3(0.45, 0.20, 0.25), vec3(0.0, 0.0, 0.0), vec3(0.03, 0.07, 0.25));
     // Night is dark and blue, a little lighter than vanilla's, so lanterns carry the scene.
     // Night is dark and blue, so firelight's orange stands out against it. (A blue-teal shade, as
     // Valheim's, mixed with the orange of a fire into olive on the ground: Tester 2's campfire.)
@@ -217,16 +219,19 @@ fn palette_made() -> Palette {
         p = blend(warm, day, smoothstep(0.4, 0.78, e));
     } else if e > 0.08 {
         p = blend(golden, warm, smoothstep(0.08, 0.34, min(e, 0.34)));
-    } else if e > -0.02 {
-        p = blend(sunset, golden, smoothstep(-0.02, 0.08, e));
+    } else if e > 0.01 {
+        p = blend(sunset, golden, smoothstep(0.01, 0.08, e));
     } else if e > -0.14 {
-        // The blue hour before sunrise and after sunset: dusk's deep blue with a pink-violet band
-        // until about 3.5° under the horizon, the sunset's gold only as the sun nears it (the MC
-        // comparison's spring 8 sheets, 11-05: at 05:00, sun.y -0.06 on vanilla's eased path,
-        // ours was already sunrise-gold and bright where Bliss was still blue pre-dawn).
-        // (It was smoothstep(-0.14, -0.02): three quarters of the sunset's light at 05:00; at
-        // -0.08..-0.02 still most of it a few minutes later, PC shbh_aft.)
-        p = blend(dusk, sunset, smoothstep(-0.05, -0.02, e));
+        // The blue hour before sunrise and after sunset: the land in dusk's deep blue until the sun
+        // is about at the horizon, the sky's horizon band and glow going gold a little earlier, as
+        // the sun nears it (the MC comparison's spring 8 sheets and the Look session's measures,
+        // 11-06: Bliss lets warm light onto the land only once the sun is up, its land at -3° warmth
+        // -88; ours at 05:00 was sunrise-gold, +68).
+        // (It was one blend over -0.14..-0.02, then -0.08..-0.02, then -0.05..-0.02: v1-v3.)
+        p = blend(dusk, sunset, smoothstep(-0.02, 0.01, e));
+        let band = blend(dusk, sunset, smoothstep(-0.08, -0.01, e));
+        p.horizon = band.horizon;
+        p.glow = band.glow;
     } else {
         p = blend(night, dusk, smoothstep(-0.3, -0.14, e));
     }
