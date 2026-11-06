@@ -285,6 +285,21 @@ fn palette_made() -> Palette {
     } else {
         p = blend(night, dusk, smoothstep(-0.3, -0.14, e));
     }
+    // In the HDR world an evening sun still up (about 3-20 degrees) leaves the sky blue, as Bliss's
+    // 18:00 (warmth -30), not the golden key's gold horizon, which ours stood in (+49 over the
+    // horizon, +37 with the cream clouds; the 18:00 sun is 10-11 degrees up, as Minecraft's). Mornings
+    // keep their gold (the dawn pick), the sunset itself its colours (under about 3 degrees). The sky's
+    // own colours only, at their brightness: the sun and the land's light stay golden.
+    if scene.frame.x > 0.5 {
+        let evening = smoothstep(0.05, -0.05, scene.sun.x) * smoothstep(0.03, 0.1, e) * (1.0 - smoothstep(0.3, 0.42, e));
+        if evening > 0.0 {
+            let sky_blue = vec3(0.72, 0.86, 1.1);
+            let hz = sky_blue * (luma(p.horizon) / luma(sky_blue));
+            p.horizon = mix(p.horizon, hz, evening * 0.7);
+            let zn = vec3(0.30, 0.48, 1.0) * (luma(p.zenith) / luma(vec3(0.30, 0.48, 1.0)));
+            p.zenith = mix(p.zenith, zn, evening * 0.6);
+        }
+    }
     // A new moon's night is darker than a full moon's.
     // The night follows the moon (Ronald, 11-04: "if the moon is light, then it can be lighter, and
     // if there's no moon, it should be darker"): under a full moon high up a dim cool light to

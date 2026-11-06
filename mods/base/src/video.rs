@@ -756,7 +756,7 @@ pub fn register(r: &mut Registry) {
         AT_START.get_or_init(|| (HDR_WORLD.get(), AA.get()));
     });
     r.screen(&SCREEN, |ui| {
-        let tabs: [crate::window::Tab; 2] = [
+        let mut tabs: Vec<crate::window::Tab> = vec![
             ("video.base.fantasy.title", |c| {
                 c.client().screen_open(&FANTASY_SCREEN);
             }),
@@ -764,6 +764,12 @@ pub fn register(r: &mut Registry) {
                 c.client().screen_open(&EXTRA_SCREEN);
             }),
         ];
+        // DLSS's tab, where the renderer has it.
+        if crate::dlss::available() {
+            tabs.push(("video.base.dlss.title", |c| {
+                c.client().screen_open(&crate::dlss::SCREEN);
+            }));
+        }
         crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.title", &tabs, |ui| {
             // The presets, and which one the settings are now.
             ui.row(S::row().gap(3.0).center(), |ui| {
@@ -813,7 +819,7 @@ pub fn register(r: &mut Registry) {
         });
     });
     r.screen(&EXTRA_SCREEN, |ui| {
-        let tabs: [crate::window::Tab; 2] = [
+        let mut tabs: Vec<crate::window::Tab> = vec![
             ("video.base.title", |c| {
                 c.client().screen_open(&SCREEN);
             }),
@@ -821,6 +827,11 @@ pub fn register(r: &mut Registry) {
                 c.client().screen_open(&FANTASY_SCREEN);
             }),
         ];
+        if crate::dlss::available() {
+            tabs.push(("video.base.dlss.title", |c| {
+                c.client().screen_open(&crate::dlss::SCREEN);
+            }));
+        }
         crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.extra.title", &tabs, |ui| {
             for i in 0..EXTRA_ROWS.len() {
                 // Traced shadows only where the GPU traces rays.
@@ -832,7 +843,7 @@ pub fn register(r: &mut Registry) {
         });
     });
     r.screen(&FANTASY_SCREEN, |ui| {
-        let tabs: [crate::window::Tab; 2] = [
+        let mut tabs: Vec<crate::window::Tab> = vec![
             ("video.base.title", |c| {
                 c.client().screen_open(&SCREEN);
             }),
@@ -840,6 +851,11 @@ pub fn register(r: &mut Registry) {
                 c.client().screen_open(&EXTRA_SCREEN);
             }),
         ];
+        if crate::dlss::available() {
+            tabs.push(("video.base.dlss.title", |c| {
+                c.client().screen_open(&crate::dlss::SCREEN);
+            }));
+        }
         crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.fantasy.title", &tabs, |ui| {
             // The master, and which of its looks the rows are now.
             ui.row(S::row().gap(3.0).center(), |ui| {

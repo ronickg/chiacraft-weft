@@ -41,7 +41,16 @@ impl<'c> Resolver<'c> {
         if let Some(&s) = self.states.lock().unwrap().get(mc) {
             return s;
         }
-        let (candidates, exact) = map::block(mc);
+        let (mut candidates, mut exact) = map::block(mc);
+        // A data package with the id `mc` may define Minecraft's own blocks by their names (a test
+        // environment: the RTX showcase world with its own textures and material maps,
+        // `notes/RTX_SHOWCASE.md`); such a block comes before our nearest one. Without that
+        // package nothing changes.
+        let own = format!("mc:{}", map::State::parse(mc).name);
+        if self.c.state_by_name(&own).is_some() {
+            candidates.insert(0, own);
+            exact = true;
+        }
         let mut chosen = None;
         for (i, name) in candidates.iter().enumerate() {
             if let Some(s) = self.c.state_by_name(name) {

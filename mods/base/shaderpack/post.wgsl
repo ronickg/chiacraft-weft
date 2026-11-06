@@ -47,8 +47,10 @@ fn scene_at(p: PostPixel, uv: vec2<f32>) -> vec4<f32> {
 // The world's depth at `uv` (reverse Z: 0 where nothing was drawn, the sky). Read texel by texel,
 // as not every GPU filters depth.
 fn post_depth(p: PostPixel, uv: vec2<f32>) -> f32 {
-    let size = vec2<i32>(p.size);
-    let at = clamp(vec2<i32>(uv * p.size), vec2(0), size - vec2(1));
+    // By the depth's own size: under an upscaler the effects run at the screen's, the depth at
+    // the world's (`Post::set_upscale`).
+    let size = vec2<i32>(textureDimensions(textures[p.depth]));
+    let at = clamp(vec2<i32>(uv * vec2<f32>(size)), vec2(0), size - vec2(1));
     return textureLoad(textures[p.depth], at, 0).r;
 }
 
@@ -319,8 +321,8 @@ fn mist_over(uv: vec2<f32>, pass_: Pass) -> f32 {
     if scene.froxels.x < 0.5 {
         return 0.0;
     }
-    let size = vec2<i32>(pass_.size);
-    let at = clamp(vec2<i32>(uv * pass_.size), vec2(0), size - vec2(1));
+    let size = vec2<i32>(textureDimensions(textures[pass_.depth]));
+    let at = clamp(vec2<i32>(uv * vec2<f32>(size)), vec2(0), size - vec2(1));
     let d = max(textureLoad(textures[pass_.depth], at, 0).r, 1e-7);
     let w = scene.inv_view_proj * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, d, 1.0);
     let dist = min(length(w.xyz / w.w), FROXEL_FAR);
@@ -364,8 +366,8 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
     // The sky a third more saturated by day (where nothing was drawn, depth 0): the curve's
     // shoulder takes colour out of a bright sky, and ours read grey-white where Bliss's is blue
     // overhead and gold toward a low sun (08:00, saturation 26 against 43). Not in rain.
-    let size = vec2<i32>(pass_.size);
-    let px = clamp(vec2<i32>(uv * pass_.size), vec2(0), size - vec2(1));
+    let size = vec2<i32>(textureDimensions(textures[pass_.depth]));
+    let px = clamp(vec2<i32>(uv * vec2<f32>(size)), vec2(0), size - vec2(1));
     let sky_px = sky_or_cloud(uv, textureLoad(textures[pass_.depth], px, 0).r);
     if sky_px {
         let y = luma(col);

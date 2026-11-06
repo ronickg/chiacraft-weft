@@ -453,6 +453,8 @@ pub struct WorldRenderer {
     tex_shader: BufferId,
     /// `GameTextures::glow_buffer`, bound as it is.
     glow: BufferId,
+    /// `GameTextures::mat_buffer`, the same.
+    mat: BufferId,
     /// `GameTextures::generation` the tables were built from.
     tex_generation: u64,
     /// (0 1 2)(0 2 3) for as many quads as one draw can hold; every face and quad draw shares it
@@ -627,6 +629,7 @@ impl WorldRenderer {
             anim,
             overlays,
             glow: textures.glow_buffer(),
+            mat: textures.mat_buffer(),
             tex_shader,
             tex_generation: textures.generation(),
             quad_index,
@@ -721,6 +724,7 @@ impl WorldRenderer {
     /// block texture).
     pub fn set_textures(&mut self, gpu: &mut dyn Backend, textures: &GameTextures) {
         self.glow = textures.glow_buffer();
+        self.mat = textures.mat_buffer();
         if self.tex_generation == textures.generation() {
             return;
         }
@@ -1149,6 +1153,7 @@ impl WorldRenderer {
             list.bind(b::SCENE, scene);
             list.bind(b::LOD_MASK, self.lod_mask.0);
             list.bind(b::SOLID, self.solid.buf);
+            list.bind(b::MAT_MAP, self.mat);
             list.push(Cmd::DrawIndexedIndirect { buffer: ibuf, offset: start as u64 * 20, count: (end - start) as u32 });
             start = end;
         }
@@ -2127,6 +2132,7 @@ impl WorldRenderer {
         list.bind(b::SCENE, scene);
         list.bind(b::LOD_MASK, self.lod_mask.0);
         list.bind(b::SOLID, self.solid.buf);
+        list.bind(b::MAT_MAP, self.mat);
         if self.rt_compiled
             && let Some(rt) = &self.rt
         {

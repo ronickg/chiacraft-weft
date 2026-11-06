@@ -242,8 +242,29 @@ pub(crate) const CLIENT_COMMANDS: &[(&str, &str, fn(&mut Running, &crate::comman
     }),
 ];
 
+/// The sizes last asked of the upscaler: mode, Ray Reconstruction, screen, world.
+type UpscaleSize = (weft_render::UpscaleMode, bool, (u32, u32), (u32, u32));
+
+/// What goes to the backend's upscaler this frame (`upscale_frame`): the settings, less what the
+/// upscaler doesn't run.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct UpscaleChoice {
+    mode: weft_render::UpscaleMode,
+    reconstruct: bool,
+    model: u32,
+    rr_model: u32,
+    neural: bool,
+}
+
 pub(crate) struct Running {
     gpu: Box<dyn Backend>,
+    /// The backend's temporal upscaler (DLSS through Streamline on Windows), as it said at start;
+    /// the mode this frame goes to it with (`core:dlss`), and the sizes last asked of it
+    /// (mode, screen, world).
+    upscaler: weft_render::UpscalerInfo,
+    upscale_now: Option<UpscaleChoice>,
+    upscale_logged: Option<UpscaleChoice>,
+    upscale_size: Option<UpscaleSize>,
     window: Arc<Window>,
     depth: (TextureId, u32, u32),
     list: CommandList,
@@ -511,6 +532,7 @@ impl App {
             height: size.height,
             vsync: settings.vsync(),
             debug: self.opts.gpu_debug,
+            upscale_standin: settings.upscale_standin(),
         })
         .map_err(|e| e.to_string())?;
         // The pipelines the driver compiled last time, before any is made (saved at exit).
@@ -546,7 +568,10 @@ impl App {
         // The HDR world's format, before any pipeline drawing into the world is made.
         crate::post::set_hdr(settings.hdr_world());
         // And whether they draw the motion image too, for temporal anti-aliasing.
-        crate::post::set_motion(settings.aa_motion());
+        // The world draws the motion image for temporal anti-aliasing with it (`core:aa` 1, not 2,
+        // from the camera alone) and for an upscaler (DLSS): with one, always, so `core:dlss` can be
+        // switched on while playing.
+        crate::post::set_motion(settings.aa_motion() || gpu.upscaler().modes != 0);
         crate::post::set_taa(settings.aa());
         let post = crate::post::Post::new(&mut *gpu, &assets);
         let mut input = Input::default();
@@ -574,7 +599,31 @@ impl App {
         if let Some(id) = crate::config::by_name("core:gpu_name") {
             crate::config::put_text(id, &gpu_name);
         }
+        let upscaler = gpu.upscaler();
+        // What it runs, for the Video menu's DLSS tab (`core:gpu_dlss*`), as found.
+        for (name, v) in [
+            ("core:gpu_dlss_modes", upscaler.modes as f64),
+            ("core:gpu_dlss_models", weft_render::UpscalerInfo::model_bits(&upscaler.models) as f64),
+            ("core:gpu_dlss_rr", upscaler.reconstruct as u8 as f64),
+            ("core:gpu_dlss_rr_models", weft_render::UpscalerInfo::model_bits(&upscaler.rr_models) as f64),
+            ("core:gpu_dlss5", upscaler.neural as u8 as f64),
+            ("core:gpu_frame_gen", upscaler.frame_gen as f64),
+        ] {
+            if let Some(id) = crate::config::by_name(name) {
+                crate::config::put(id, v);
+            }
+        }
+        if let Some(id) = crate::config::by_name("core:gpu_dlss") {
+            crate::config::put_text(id, &upscaler.name);
+        }
+        if !upscaler.name.is_empty() {
+            log::info!("upscaler: {} (core:dlss picks the mode)", upscaler.name);
+        }
         let mut r = Running {
+            upscaler,
+            upscale_now: None,
+            upscale_logged: None,
+            upscale_size: None,
             gpu,
             window,
             depth,
@@ -688,6 +737,83 @@ fn world_frame(r: &Running, info: &weft_render::FrameInfo) -> weft_render::Frame
     }
     let scaled = |v: u32| ((v as f32 * s).round() as u32).max(1);
     weft_render::FrameInfo { width: scaled(info.width), height: scaled(info.height), slot: info.slot }
+}
+
+/// With DLSS on (`core:dlss`, a mode the backend runs): the size it wants
+/// the world drawn at, and this frame goes to it (`Running::upscale_now`, with Ray Reconstruction,
+/// the models and DLSS 5 as set, where it runs them). None: the world as always.
+fn upscale_frame(r: &mut Running, info: &weft_render::FrameInfo) -> Option<weft_render::FrameInfo> {
+    use weft_render::UpscaleMode;
+    r.upscale_now = None;
+    let mode = r.settings.dlss();
+    if mode == UpscaleMode::Off || r.game.is_none() || !r.post.can_upscale() {
+        return None;
+    }
+    // Each thing asked for that doesn't run here, said once.
+    let say = |what: &str, why: &str| {
+        static SAID: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+        let mut said = SAID.lock().unwrap();
+        if !said.iter().any(|s| s == what) {
+            log::warn!("{what} is off: {why}");
+            said.push(what.to_string());
+        }
+    };
+    if !r.upscaler.has(mode) {
+        say(
+            &format!("core:dlss {} ({})", mode as u32, mode.name()),
+            "the renderer has no upscaler for it (DLSS: the streamline build on Windows, with its files)",
+        );
+        return None;
+    }
+    let reconstruct = r.settings.dlss_rr() && {
+        if !r.upscaler.reconstruct {
+            say("core:dlss_rr", "the upscaler has no Ray Reconstruction here");
+        }
+        r.upscaler.reconstruct
+    };
+    let neural = r.settings.dlss5() && {
+        if !r.upscaler.neural {
+            say("core:dlss5", "DLSS 5 needs NVIDIA's neural rendering plugin, not in the public Streamline SDK");
+        }
+        r.upscaler.neural
+    };
+    // A model the upscaler doesn't list is its default.
+    let known = |id: u32, list: &[weft_render::UpscaleModel]| if list.iter().any(|m| m.id == id) { id } else { 0 };
+    let choice = UpscaleChoice {
+        mode,
+        reconstruct,
+        model: known(r.settings.dlss_model(mode), &r.upscaler.models),
+        rr_model: known(r.settings.dlss_rr_model(), &r.upscaler.rr_models),
+        neural,
+    };
+    let screen = (info.width, info.height);
+    let render = match r.upscale_size {
+        Some((m, rr, s, w)) if m == mode && rr == reconstruct && s == screen => w,
+        _ => {
+            let w = r.gpu.upscale_render_size(mode, reconstruct, screen);
+            log::info!(
+                "upscaler {}{}: world {}x{} for the screen's {}x{}",
+                mode.name(),
+                if reconstruct { " with ray reconstruction" } else { "" },
+                w.0,
+                w.1,
+                screen.0,
+                screen.1
+            );
+            r.upscale_size = Some((mode, reconstruct, screen, w));
+            w
+        }
+    };
+    // Logged when it changes (`upscale_now` is cleared each frame, so the last one is kept apart).
+    if r.upscale_logged != Some(choice) {
+        log::debug!("upscaler: {choice:?}");
+        r.upscale_logged = Some(choice);
+    }
+    r.upscale_now = Some(choice);
+    // DLSS's advice: 8 jitter points times the scale squared.
+    let ratio = (screen.0 as f32 / render.0.max(1) as f32).max(1.0);
+    crate::post::set_jitter_phases((8.0 * ratio * ratio).round() as u32);
+    Some(weft_render::FrameInfo { width: render.0, height: render.1, slot: info.slot })
 }
 
 fn make_depth(gpu: &mut dyn Backend, w: u32, h: u32) -> (TextureId, u32, u32) {
@@ -2461,7 +2587,10 @@ fn frame(r: &mut Running, opts: &Options) -> bool {
     let Some(info) = r.gpu.begin_frame() else { return false };
     let t2 = Instant::now();
     r.prof[2] = t2.duration_since(t).as_secs_f32() * 1000.0;
-    let world = world_frame(r, &info);
+    let world = match upscale_frame(r, &info) {
+        Some(w) => w,
+        None => world_frame(r, &info),
+    };
     if (r.depth.1, r.depth.2) != (world.width, world.height) {
         log::info!(
             "world drawn at {}x{} of the window's {}x{} (render scale {:.2}, density {:.1})",
@@ -3185,10 +3314,16 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
     // than the screen (`render_scale`), which their last pass scales up.
     let scaled = (world_info.width, world_info.height) != (info.width, info.height);
     // The HDR world always ends in the effects' last pass, which finishes the picture.
-    let post = (r.post.on() || scaled || crate::post::hdr() || r.post.taa_on()) && r.game.is_some();
+    let upscaling = r.upscale_now.is_some();
+    crate::post::set_upscaling(upscaling);
+    crate::post::set_mip_bias(world_info.width, info.width);
+    let post = (r.post.on() || scaled || crate::post::hdr() || r.post.taa_on() || upscaling) && r.game.is_some();
     // Gathered over frames (temporal anti-aliasing), the world is drawn a fraction of a pixel
     // aside each frame, and its pass draws the motion image too (whenever the pipelines have it).
-    crate::post::next_jitter(post && r.post.taa_on(), world_info.width, world_info.height);
+    crate::post::next_jitter(post && (r.post.taa_on() || upscaling), world_info.width, world_info.height);
+    if !upscaling {
+        crate::post::set_jitter_phases(8);
+    }
     let motion = r
         .game
         .is_some()
@@ -3310,6 +3445,23 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
             .and_then(|g| g.client.scene_buffer(info.slot));
         let depth = r.gpu.texture_index(r.depth.0);
         r.post.set_depth(r.depth.0);
+        // The backend's upscaler in the engine's anti-aliasing's place, with the camera the world
+        // was drawn with.
+        if let (Some(c), Some(cam)) = (r.upscale_now, r.game.as_ref().and_then(|g| g.client.frame_camera)) {
+            r.post.set_upscale(crate::post::UpscaleFrame {
+                mode: c.mode,
+                reconstruct: c.reconstruct || c.neural,
+                output: (info.width, info.height),
+                params: weft_render::UpscaleParams {
+                    intensity: r.settings.dlss5_intensity(),
+                    reconstruct: c.reconstruct as u32,
+                    model: c.model,
+                    rr_model: c.rr_model,
+                    neural: c.neural as u32,
+                    ..cam.upscale_params()
+                },
+            });
+        }
         let _s = crate::diag::span("effects");
         r.post
             .apply(&mut *r.gpu, &mut r.list, world_info, scene, depth, scaled);
