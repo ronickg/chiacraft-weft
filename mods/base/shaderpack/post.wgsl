@@ -92,7 +92,7 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         // entry, as merged (`pad`) the last effect is not the first entry, which alone was read
         // before, so a merged pass never finished the picture.
         if pass_.spare == 1u && scene.frame.x > 0.5 {
-            color = vec4(finish_picture(hdr_light(color.rgb, in.uv, pass_)), 1.0);
+            color = vec4(finish_picture(hdr_light(color.rgb + sharpen_delta(first.scene, in.uv), in.uv, pass_)), 1.0);
         }
     }
     return color;
@@ -242,12 +242,48 @@ fn auto_exposure(mean: f32) -> f32 {
     // Under rain the view is darker and stays so (a storm's mood; brought up, its mist went milky):
     // no brighter than as made, in a storm a little darker.
     let wet = rain_amount() * select(1.0, 0.0, !open_sky());
-    return clamp(k, 0.6, mix(mix(2.0, 1.2, night), 1.0 - 0.1 * scene.weather.w, wet));
+    // Before sunrise (the sun below, coming up in the east: `scene.sun.x` above 0) the night is
+    // brought up less, 0.7 at most, so 04:00 stays dark as Bliss's (land luma 40 against 16 with
+    // blue hour v4, 11-06); after sunset it keeps 1.2 (Bliss's 20:00 is brighter than ours).
+    let ceiling = mix(1.2, 0.7, smoothstep(-0.2, 0.2, scene.sun.x));
+    return clamp(k, 0.6, mix(mix(2.0, ceiling, night), 1.0 - 0.1 * scene.weather.w, wet));
 }
 
 // How strong the bloom is: a share of the glow mixed in (it keeps the light's sum), more in rain
 // and fog, where the air itself scatters.
 const BLOOM_MIX: f32 = 0.1;
+
+// Contrast-adaptive sharpening (AMD's CAS, its published method; Bliss runs it at 0.35-0.4) for the
+// HDR world's last pass, `base:look_sharpen`: what it would add at `uv` from the world's own picture
+// (`scene`, before the effects), added to the finished light, so the effects between stay as
+// they are. The bloom's share of a blur and the curve's toe softened the canopy's fine detail
+// (roughness 5.2 against today's 9.9 at spot C's noon).
+fn sharpen_delta(scene_tex: u32, uv: vec2<f32>) -> vec3<f32> {
+    let k = clamp(fantasy_opt(OPT_SHARPEN), 0.0, 1.0);
+    if k <= 0.0 || scene.frame.x < 0.5 {
+        return vec3(0.0);
+    }
+    let t = textures[scene_tex];
+    let size = vec2<i32>(textureDimensions(t));
+    let px = clamp(vec2<i32>(uv * vec2<f32>(size)), vec2(1), size - vec2(2));
+    let c = textureLoad(t, px, 0).rgb;
+    let n = textureLoad(t, px + vec2(0, -1), 0).rgb;
+    let s = textureLoad(t, px + vec2(0, 1), 0).rgb;
+    let e = textureLoad(t, px + vec2(1, 0), 0).rgb;
+    let w = textureLoad(t, px + vec2(-1, 0), 0).rgb;
+    // On the light's log, so a bright sky and a dark forest are sharpened alike.
+    let lc = log2(1.0 + luma(c));
+    let ln = log2(1.0 + luma(n));
+    let ls = log2(1.0 + luma(s));
+    let le = log2(1.0 + luma(e));
+    let lw = log2(1.0 + luma(w));
+    let mn = min(lc, min(min(ln, ls), min(le, lw)));
+    let mx = max(lc, max(max(ln, ls), max(le, lw)));
+    let amp = sqrt(clamp(min(mn, 2.0 - mx) / max(mx, 1e-4), 0.0, 1.0));
+    let wt = -amp * mix(1.0 / 8.0, 1.0 / 5.0, k);
+    let sharp = (c + (n + s + e + w) * wt) / (1.0 + 4.0 * wt);
+    return max(sharp, vec3(0.0)) - c;
+}
 
 // How much of the view at `uv` the mist covers (0 none to 1), from the mist volume (`froxels`) at
 // the world's depth there; 0 without the volume.
@@ -269,6 +305,16 @@ fn mist_over(uv: vec2<f32>, pass_: Pass) -> f32 {
 // The HDR world's light before the tone curve: the bloom mixed in and the exposure applied.
 fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
     var col = max(c, vec3(0.0));
+    // The sky a third more saturated by day (where nothing was drawn, depth 0): the curve's
+    // shoulder takes colour out of a bright sky, and ours read grey-white where Bliss's is blue
+    // overhead and gold toward a low sun (08:00, saturation 26 against 43). Not in rain.
+    let size = vec2<i32>(pass_.size);
+    let px = clamp(vec2<i32>(uv * pass_.size), vec2(0), size - vec2(1));
+    if textureLoad(textures[pass_.depth], px, 0).r <= 0.0 {
+        let y = luma(col);
+        let k = 1.0 + 0.3 * smoothstep(0.0, 0.15, scene.sun.y) * (1.0 - rain_amount());
+        col = max(vec3(y) + (col - vec3(y)) * k, vec3(0.0));
+    }
     if pass_.bloom != 0u {
         let glow = bloom_tap(pass_.bloom - 1u, uv);
         let air = clamp(max(rain_amount(), scene.weather.z), 0.0, 1.0);

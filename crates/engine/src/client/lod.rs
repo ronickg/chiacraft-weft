@@ -317,10 +317,8 @@ fn openness(high: &dyn Fn(i32, i32) -> i32, i: i32, j: i32, h: i32, s: i32) -> u
 /// The texture (its average color) and tint kind a distant face of `state` in direction `dir`
 /// is drawn in. A box model's faces are its boxes' own (its block's textures may be unset, and
 /// came out as the missing texture's magenta): its largest box's. A plant's is its picture.
-fn face_of(c: &Content, looks: &super::looks::Looks, state: u32, dir: usize) -> (u32, u32) {
+fn face_of(c: &Content, looks: &super::looks::Looks, ctm: &super::ctm::Ctm, state: u32, dir: usize) -> (u32, u32) {
     let info = &c.states[state as usize];
-    // No overlays out there.
-    let tint = if crate::content::face_paint(info, dir, false).base_tinted { info.tint as u32 } else { 0 };
     let drawn = looks.drawn(state, info);
     let volume = |b: &crate::content::ModelBox| (0..3).map(|a| (b.max[a] - b.min[a]).abs()).product::<f32>();
     let tex = match drawn.model {
@@ -332,6 +330,12 @@ fn face_of(c: &Content, looks: &super::looks::Looks, state: u32, dir: usize) -> 
         weft_abi::BlockModel::Cross | weft_abi::BlockModel::Wire => drawn.textures[0],
         _ => drawn.textures[dir],
     };
+    // No overlays out there, but a face with one keeps its base untinted, as near: the overlay takes
+    // the tint. Tinted whole, a cherry's pink blossom (its young leaves a tinted overlay) came out
+    // brown-red far off in spring, round patches across the forests (Planner, 11-06: the test
+    // world's shots).
+    let overlay = ctm.has_overlay(tex & face::TEX_MASK);
+    let tint = if crate::content::face_paint(info, dir, overlay).base_tinted { info.tint as u32 } else { 0 };
     (tex & face::TEX_MASK, tint)
 }
 
@@ -364,7 +368,8 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
         crown(words, i, j).map(|c| if canopy { Crown { bottom: c.bottom.min(at(i, j).0 + 1), trunk: None, ..c } } else { c })
     };
     let looks = super::looks::current();
-    let face_of = |state: u32, dir: usize| face_of(c, &looks, state, dir);
+    let ctm = super::ctm::current();
+    let face_of = |state: u32, dir: usize| face_of(c, &looks, &ctm, state, dir);
     let terrain = c.dims.get(dim as usize).and_then(|d| d.terrain.as_ref());
     // Crowns' leaves as the dimension draws them at this time of year (`far_leaves`).
     let far_leaves = terrain.and_then(|t| t.far_leaves);
@@ -628,7 +633,8 @@ pub fn mesh_smooth(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]
         crown(words, i, j).map_or(g, |c| (c.top, c.leaves, g.2, c.leaves))
     };
     let looks = super::looks::current();
-    let face_of = |state: u32, dir: usize| face_of(c, &looks, state, dir);
+    let ctm = super::ctm::current();
+    let face_of = |state: u32, dir: usize| face_of(c, &looks, &ctm, state, dir);
     let faces = c
         .dims
         .get(dim as usize)

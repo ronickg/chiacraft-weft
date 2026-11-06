@@ -105,6 +105,10 @@ pub static BEACH: Biome = Biome::named("beach");
 pub static DEEP_CAVES: Biome = Biome::named("deep_caves");
 
 pub fn register(r: &mut Registry) {
+    // Simple, Minecraft-style trees for now (`base_api::trees::TREE_STYLE`; Ronald, 11-05).
+    r.config(&base_api::trees::TREE_STYLE)
+        .choice(0, &["simple", "branched"])
+        .world();
     // Tags say what a biome is (spawning, decoration and mods ask these, not names).
     let (grass, foliage, water) = (&tints::GRASS, &tints::FOLIAGE, &tints::WATER);
     r.biome(&PLAINS)
@@ -132,7 +136,10 @@ pub fn register(r: &mut Registry) {
         .tint(&base_api::trees::YELLOW_LEAVES, muted(0x59ae30))
         .tag("forest")
         .tag("animals")
-        .set(&TREES, 0.4)
+        // A site in a 5 x 5 cell at 0.55 (220 a hectare, Research round 7's 170-244) and more in
+        // the stands: the stand's layers' crowns (`vitals::canopy`) are Minecraft-sized, and at 0.4
+        // the forest stood two fifths open (forest_canopy, 11-06).
+        .set(&TREES, 0.55)
         .set(&STAND_TREES, 0.12)
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:forest").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set_text(&TREE_KINDS, "base:birch_log:1 base:oak_log:4");
@@ -149,7 +156,7 @@ pub fn register(r: &mut Registry) {
         .tint(&base_api::trees::YELLOW_LEAVES, muted(0x6ba941))
         .tag("forest")
         .tag("animals")
-        .set(&TREES, 0.45)
+        .set(&TREES, 0.55)
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:birch_forest").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set(&STAND_TREES, 0.15)
         .set_text(&TREE_KINDS, "base:birch_log");
@@ -166,7 +173,7 @@ pub fn register(r: &mut Registry) {
         .tag("forest")
         .tag("cold")
         .tag("animals")
-        .set(&TREES, 0.45)
+        .set(&TREES, 0.55)
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:taiga").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set(&STAND_TREES, 0.12)
         .set_text(&TREE_KINDS, "base:spruce_log");
@@ -452,6 +459,7 @@ pub fn register(r: &mut Registry) {
 
     // The overworld's shape, its snow and its bare rock (`land.rs`), before the plants below.
     crate::land::terrain(r);
+    crate::land::mc_forest_terrain(r);
 
     // Trees wherever a biome asks for them, in any dimension.
     // Trees wherever a biome asks for them, in any dimension: a site per 5 x 5 cell, left open in
@@ -890,7 +898,10 @@ fn tree_of(s: &mut Site, log: u32) {
         }
         return;
     }
-    let Some(t) = wild_tree_at(log, x, y, z, h >> 32) else { return };
+    // Its layer of the stand (`vitals::canopy`): under the canopy, in it, or over it.
+    let roll = (hash(h, 0x71E2, 0, 0) >> 40) as f32 / (1u64 << 24) as f32;
+    let tier = vitals::canopy::tier(name_of(abi::entry_kind::BIOME, s.biome()), roll);
+    let Some(t) = wild_tree_at(log, x, y, z, h >> 32).map(|t| t.with_tier(tier)) else { return };
     let mut crown = Vec::new();
     let climbers = LIANAS.on_biome(s.biome()).is_some();
     tree_blocks(&t, |x, y, z, state, force| {
