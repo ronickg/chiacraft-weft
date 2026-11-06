@@ -289,16 +289,16 @@ LOOKS = {
     "ankylosaur": dict(L=12 * CM, W=10.5 * CM, asym=0.05, tilt=30, area=mottled, sink=0.3,
                        mats=[shell((136, 138, 112)), shell((114, 110, 86)), shell((152, 154, 128)), material("soil", (126, 106, 78))]),
     # Iguanacolossus: big, near round, warm ivory, a fine net of bumps.
-    "ornithopod": dict(L=16 * CM, W=14 * CM, asym=0.05, tilt=20, area=netted,
+    "ornithopod": dict(L=16 * CM, W=14 * CM, asym=0.05, tilt=20, area=netted, across=12,
                        mats=[shell((228, 212, 176)), shell((244, 234, 208)), shell((180, 160, 124))]),
     # Cedarosaurus: a ball, chalk white, coarse knobs, half sunk in its pit.
     "sauropod": dict(L=13 * CM, W=13 * CM, tilt=0, area=knobbed, sink=0.6, across=16,
                      mats=[stony((222, 220, 210)), stony((242, 240, 232)), stony((168, 162, 152))]),
     # Caimans and the neosuchian: small, smooth, both ends alike, a chalky band, lying.
-    "crocodilian": dict(L=6.8 * CM, W=4.3 * CM, blunt=2.0, tilt=90, area=banded, step=0.65, n=7,
+    "crocodilian": dict(L=6.8 * CM, W=4.3 * CM, blunt=2.0, tilt=90, area=banded,
                         mats=[shell((212, 194, 164)), shell((248, 246, 238)), material("soil", (140, 102, 70))]),
     # Priscagama: tiny, white, matt, dented, lying (drawn about twice its real 1.6 cm to be seen).
-    "lizard": dict(L=3 * CM, W=1.9 * CM, tilt=90, area=plain, sink=0.1, step=0.65, n=5,
+    "lizard": dict(L=3 * CM, W=1.9 * CM, tilt=90, area=plain, sink=0.1,
                    mats=[shell((236, 230, 214)), shell((196, 188, 168))]),
     # Fish: a clutch of beads, each about three times its real few millimetres; the four tell
     # apart by color and how they lie (a heap in gravel, a loose scatter, jelly balls).
@@ -312,41 +312,42 @@ LOOKS = {
                          mats=[shell((186, 208, 210)), shell((222, 236, 236)), material("shell", (50, 78, 46))]),
     # Birds (`reports/Eggs by species.md`, Birds): shapes by group, a texture per species; all
     # lie on their side in the nest's cup. Owls: plain white, nearly round, glossy.
-    "bird_owl": dict(L=5.6 * CM, W=4.7 * CM, asym=0.08, tilt=80, step=0.65, n=7, area=bird, model="egg_bird_round", marks={},
+    "bird_owl": dict(L=5.6 * CM, W=4.7 * CM, asym=0.08, tilt=80, area=bird, model="egg_bird_round", marks={},
                      mats=[shell((238, 236, 228)), shell((214, 210, 200)), shell((200, 196, 186)), shell((200, 196, 186))]),
     # Songbirds, drawn about one and a half times their real 2.2 cm: the house sparrow greyish
     # white, densely speckled grey-brown; the snow bunting bluish white with red-brown and lilac
     # spots and scrawls gathered at the blunt end.
-    "bird_sparrow": dict(L=3.3 * CM, W=2.4 * CM, asym=0.22, tilt=80, step=0.65, n=7, area=bird, model="egg_bird_small",
+    "bird_sparrow": dict(L=3.3 * CM, W=2.4 * CM, asym=0.22, tilt=80, area=bird, model="egg_bird_small",
                          marks=dict(speck=0.4, two=True, blotch=3, size=(0.2, 0.3), gather=0.5),
                          mats=[shell((214, 214, 204)), shell((168, 164, 160)), material("shell", (112, 98, 84)), shell((150, 146, 138))]),
-    "bird_bunting": dict(L=3.3 * CM, W=2.4 * CM, asym=0.22, tilt=80, step=0.65, n=7, area=bird, model="egg_bird_small",
+    "bird_bunting": dict(L=3.3 * CM, W=2.4 * CM, asym=0.22, tilt=80, area=bird, model="egg_bird_small",
                          marks=dict(deep=4, deep_size=(0.2, 0.3), blotch=7, size=(0.15, 0.25), gather=0.75, speck=0.06),
                          mats=[shell((220, 230, 226)), shell((176, 160, 184)), material("shell", (132, 70, 50)), shell((132, 70, 50))]),
-    # The raven: blue-green, blotched and streaked olive-brown, more at the blunt end.
-    "bird_raven": dict(L=5 * CM, W=3.4 * CM, asym=0.22, tilt=80, step=0.65, n=7, area=bird, model="egg_bird",
+    # The raven: green (kept off blue, so it doesn't read as a raptor's), blotched and streaked
+    # olive-brown, more at the blunt end.
+    "bird_raven": dict(L=5 * CM, W=3.4 * CM, asym=0.22, tilt=80, area=bird, model="egg_bird",
                        marks=dict(deep=5, blotch=10, size=(0.3, 0.5), gather=0.4, speck=0.08),
-                       mats=[shell((150, 190, 172)), shell((130, 140, 128)), material("shell", (92, 80, 52)), shell((92, 80, 52))]),
+                       mats=[shell((138, 170, 122)), shell((130, 140, 128)), material("shell", (92, 80, 52)), shell((92, 80, 52))]),
     # The herring gull: olive-brown, boldly blotched dark brown-black.
-    "bird_gull": dict(L=5 * CM, W=3.4 * CM, asym=0.22, tilt=80, step=0.65, n=7, area=bird, model="egg_bird",
+    "bird_gull": dict(L=5 * CM, W=3.4 * CM, asym=0.22, tilt=80, area=bird, model="egg_bird",
                       marks=dict(deep=4, blotch=9, size=(0.35, 0.6), gather=0.35, speck=0.05),
                       mats=[shell((164, 150, 108)), shell((136, 120, 98)), material("shell", (58, 44, 36)), shell((58, 44, 36))]),
     # The golden eagle: whitish, blotched and washed red-brown.
-    "bird_eagle": dict(L=5 * CM, W=3.4 * CM, asym=0.22, tilt=80, step=0.65, n=7, area=bird, model="egg_bird",
+    "bird_eagle": dict(L=5 * CM, W=3.4 * CM, asym=0.22, tilt=80, area=bird, model="egg_bird",
                        marks=dict(deep=6, blotch=8, size=(0.4, 0.7), gather=0.3, speck=0.06),
                        mats=[shell((232, 224, 208)), shell((190, 160, 150)), material("shell", (150, 76, 46)), shell((150, 76, 46))]),
     # The savanna hawk: bluish white, a few faint pale brown spots.
-    "bird_hawk": dict(L=5 * CM, W=3.4 * CM, asym=0.22, tilt=80, step=0.65, n=7, area=bird, model="egg_bird",
+    "bird_hawk": dict(L=5 * CM, W=3.4 * CM, asym=0.22, tilt=80, area=bird, model="egg_bird",
                       marks=dict(blotch=4, size=(0.2, 0.35), gather=0.3),
                       mats=[shell((226, 234, 234)), shell((206, 200, 190)), shell((196, 168, 132)), shell((196, 168, 132))]),
     # The turkey vulture: creamy white, heavy dark brown and lavender blotches wreathing the
     # blunt end.
-    "bird_vulture": dict(L=5 * CM, W=3.4 * CM, asym=0.22, tilt=80, step=0.65, n=7, area=bird, model="egg_bird",
+    "bird_vulture": dict(L=5 * CM, W=3.4 * CM, asym=0.22, tilt=80, area=bird, model="egg_bird",
                          marks=dict(deep=6, blotch=10, size=(0.35, 0.6), gather=0.75, cap=0.45),
                          mats=[shell((236, 228, 210)), shell((170, 156, 180)), material("shell", (92, 56, 40)), shell((92, 56, 40))]),
-    # The Cretaceous birds (enantiornithine Gobipteryx's eggs, Gobioolithus; Confuciusornis's by
-    # inference): long, ends nearly alike, plain pale; drawn larger than their real 2.5 cm.
-    "bird_mesozoic": dict(L=3.6 * CM, W=2 * CM, asym=0.06, tilt=85, step=0.65, n=7, area=bird, model="egg_bird_long",
+    # The Cretaceous birds (Gobioolithus, the eggs once taken for Gobipteryx's; Confuciusornis's by
+    # inference): long, slim, plain pale, each stood upright and half buried, as those were found.
+    "bird_mesozoic": dict(L=3.6 * CM, W=2 * CM, asym=0.06, tilt=8, sink=0.45 * 3.6 * CM, area=bird, model="egg_bird_long",
                           marks=dict(deep=3, deep_size=(0.2, 0.35), gather=0.0),
                           mats=[shell((226, 220, 204)), shell((204, 196, 178)), shell((204, 196, 178)), shell((204, 196, 178))]),
     # The wyvern (fantasy): big, heavy, stone-like, scaled, metal-rimmed; one, on bare rock.
@@ -361,16 +362,19 @@ WYVERN = {
     "amethyst_copper": [stony((86, 52, 112)), stony((214, 132, 82)), stony((32, 20, 44)), stony((60, 140, 130)), stony((72, 42, 96))],
     "charcoal_rust": [stony((50, 46, 54)), stony((190, 110, 66)), stony((24, 20, 26)), stony((176, 50, 40)), stony((40, 36, 44))],
 }
-WYVERN_CHOSEN = "teal_silver"  # until Ronald picks
+WYVERN_CHOSEN = "teal_silver"  # Ronald, 2026-11-06: "Teal-silver"
 LOOKS["wyvern"]["mats"] = WYVERN[WYVERN_CHOSEN]
 
 
 def texels_a_unit(W, across=ACROSS):
-    """The least power-of-two multiple of the house density that puts `across` texels across an
-    egg `W` units wide (at most 256 a block)."""
-    k = 1
+    """Texels a layout unit putting `across` to twice that across an egg `W` units wide: a power of
+    two times the house density (a small egg laid out on a finer grid, `mult`, paints fewer texels
+    a unit, so it stays about ten texels across)."""
+    k = 1.0
     while TX * k * W < across - 1e-6 and k < 8:
         k *= 2
+    while TX * k * W >= 2 * across:
+        k /= 2
     return TX * k
 
 
@@ -395,21 +399,40 @@ def roe_spots(n, d, spread=None, seed=1):
     return spots
 
 
+def mult(look):
+    """Layout units a real one for this look: a small egg is laid out larger (and exported
+    smaller, the same size in the game) so its taper gets enough steps to read round within
+    boxcheck's spacing; at least 24 units across."""
+    W = look["roe"]["d"] if "roe" in look else look["W"]
+    m = 1
+    while W * m < 24 and m < 16:
+        m *= 2
+    return m
+
+
+def tx_of(look):
+    """Texels a layout unit (the look's own, `mult`)."""
+    W = look["roe"]["d"] if "roe" in look else look["W"]
+    return texels_a_unit(W * mult(look), look.get("across", ACROSS))
+
+
 def egg_of(look, name="egg", at=(0.0, 0.0, 0.0), yaw=0.0):
-    return es.egg_elements(name, look["L"], look["W"], look.get("asym", 0.0), look.get("blunt", 2.0), look["tilt"],
-                           yaw=yaw, at=at, sink=look.get("sink", 0.0), n=look.get("n"), step=look.get("step"),
-                           tip=2.6 / texels_a_unit(look["W"], look.get("across", ACROSS)))
+    m, tx = mult(look), tx_of(look)
+    return es.egg_elements(name, look["L"] * m, look["W"] * m, look.get("asym", 0.0), look.get("blunt", 2.0), look["tilt"],
+                           yaw=yaw, at=at, sink=look.get("sink", 0.0) * m, n=look.get("n"), step=look.get("step"),
+                           tip=2.6 / tx, chamfer=2.1 / tx, m=m)
 
 
 def elements(look):
     if "roe" in look:
         r = look["roe"]
+        m, tx = mult(look), tx_of(look)
         E = []
         for i, (x, y, z) in enumerate(roe_spots(r["n"], r["d"], r.get("spread"))):
-            # Each bead its own size a little and turned its own way, so no two share a face.
-            d = r["d"]
-            egg = es.egg_elements(f"egg{i}_", d, d, tilt=0, yaw=17 * i + 5, at=(x, y + 0.013 * i, z), n=3,
-                                  tip=2.6 / texels_a_unit(d))
+            d = r["d"] * m
+            # Each bead turned its own way, so no two share a face.
+            egg = es.egg_elements(f"egg{i}_", d, d, tilt=0, yaw=17 * i + 5, at=(x * m, (y + 0.013 * i) * m, z * m),
+                                  tip=2.6 / tx, chamfer=2.1 / tx, m=m)
             g = egg[0]["egg"]
             g["dot"] = r.get("dot")
             # The side facing out of the heap (the first bead: toward the viewer's side, +x +z).
@@ -423,12 +446,13 @@ def elements(look):
 def clutch(look, n=5):
     """For review: `n` eggs as a nest holds them (`eggs.rs`: one in the middle, the rest in a
     ring), each leaning its top toward the middle."""
+    m = mult(look)
     E = egg_of(look, "c0_")
-    r = max(0.55 * look["L"], 0.75 * look["W"]) + 0.6
+    r = (max(0.55 * look["L"], 0.75 * look["W"]) + 0.6) * m
     for k in range(1, n):
         a = (k - 1) / (n - 1) * 2 * math.pi + 0.3
         yaw = math.degrees(math.atan2(-math.cos(a), -math.sin(a))) + 0.7 * k
-        E += egg_of(look, f"c{k}_", at=(math.cos(a) * r, 0.011 * k, math.sin(a) * r), yaw=yaw)
+        E += egg_of(look, f"c{k}_", at=(math.cos(a) * r, 0.011 * k * m, math.sin(a) * r), yaw=yaw)
     return E
 
 
@@ -436,11 +460,10 @@ def build(name, look, out, mats=None, E=None):
     """Lays out, paints and checks one look into `out` (spec.json, texture.png)."""
     os.makedirs(out, exist_ok=True)
     E = E or elements(look)
+    m, tx = mult(look), tx_of(look)
     W = look["roe"]["d"] if "roe" in look else look["W"]
-    tx = texels_a_unit(W, look.get("across", ACROSS))
     for e in E:
-        e["egg"]["tx"] = tx
-
+        e["egg"]["tx"] = tx * m  # texels a real unit (the marks are laid out in real units)
     for e in E:
         e["egg"]["marks"] = look.get("marks", {})
 
@@ -452,10 +475,11 @@ def build(name, look, out, mats=None, E=None):
         u, v, th, x, z = es.local(e, p)
         return np.clip((e["egg"]["L"] - v) / e["egg"]["L"], 0, 1)
 
-    width = 64 if tx * W < 24 and len(E) < 12 else 128
+    width = 64 if tx * W * m < 24 and len(E) < 12 else 128
     sheet, uv = paint(E, area, mats or look["mats"], ground=False, width=width, down=down, tx=tx)
     Image.fromarray(sheet, "RGBA").save(os.path.join(out, "texture.png"))
     spec = entity_spec(E, uv, sheet, name)
+    spec["mult"] = m
     with open(os.path.join(out, "spec.json"), "w") as f:
         json.dump(spec, f)
     r = subprocess.run([sys.executable, os.path.join(SKILL, "boxcheck.py"), os.path.join(out, "spec.json")],
@@ -477,8 +501,14 @@ def no_thin_lines(spec, sheet, E, name=""):
     eggs = {}
     for e in E:
         eggs.setdefault(id(e["egg"]), []).append(e["name"])
+    # The tips' inner ends (under the next slice) show a sliver at the octagon's corners: meant too.
     allow = [n for names in eggs.values() for n in names[1:-1]]
-    thin = [h for h in lines(boxes_from_spec(spec), sheet, density=E[0]["egg"]["tx"], allow=allow) if h["kind"] == "line"]
+    allow += [f"{names[0]}.up" for names in eggs.values()] + [f"{names[-1]}.down" for names in eggs.values()]
+    # An octagonal tip's pulled-in sides show a sliver where its crossing box stops short: meant.
+    tips = [t for names in eggs.values() for t in {names[0], names[-1]}]
+    allow += [f"{t}.{f}" for t in tips if f"{t}x" in sum(eggs.values(), []) for f in ("north", "south")]
+    allow += [f"{t[:-1]}.{f}" for t in tips if t.endswith("x") for f in ("north", "south")]
+    thin = [h for h in lines(boxes_from_spec(spec), sheet, density=E[0]["egg"]["tx"] / E[0]["egg"]["m"], allow=allow) if h["kind"] == "line"]
     assert not thin, f"{name}: thin lines: {[(h['box'], h['face'], h['cover'], h['width']) for h in thin]}"
 
 
@@ -498,7 +528,7 @@ def box_of(spec):
         R = rotm(e["rot"]) if e.get("rot") else np.eye(3)
         o = np.array(e["origin"]) if e.get("rot") else np.zeros(3)
         pts += [(np.array([hi[i] if k >> i & 1 else lo[i] for i in range(3)]) - o) @ R.T + o for k in range(8)]
-    p = np.array(pts) / 64
+    p = np.array(pts) / 64 / spec.get("mult", 1)
     mean, top = math.sqrt(np.ptp(p[:, 0]) * np.ptp(p[:, 2])), p[:, 1].max()
     return round(float(mean + 0.06 if mean < 0.15 else mean), 2), round(float(top + 0.04 if top < 0.15 else top), 2)
 
@@ -519,7 +549,7 @@ if __name__ == "__main__":
             continue
         d = os.path.join(out or OUT, name)
         spec, tx = build(name, look, d)
-        print(f"{name}: {len(spec['elements'])} boxes, {tx * 64:.0f} texels a block, texture {spec['texture']}")
+        print(f"{name}: {len(spec["elements"])} boxes, {tx * 64 * mult(look):.0f} texels a block, texture {spec["texture"]}")
         if out:
             if "roe" not in look:
                 build(name, look, os.path.join(out, "clutch", name), E=clutch(look))
@@ -529,4 +559,4 @@ if __name__ == "__main__":
         else:
             from to_bedrock import export  # noqa: E402
 
-            export(spec, os.path.join(d, "texture.png"), ASSETS, model_of(name), SCALE, f"egg/{name}", pose_files={"": {}})
+            export(spec, os.path.join(d, "texture.png"), ASSETS, model_of(name), SCALE / mult(look), f"egg/{name}", pose_files={"": {}})

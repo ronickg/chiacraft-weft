@@ -30,8 +30,8 @@ def layers(L, W, asym=0.0, blunt=2.0, n=None, ov=0.25, step=None, tip=0.0):
     """[(width, y0, y1)] bottom to top: `n` slices, each as wide as the profile at its middle,
     snapped to `step`; neighbors overlap by `ov`, and slices within MIN_STEP of the one below
     merge with it (the wider), so no two boxes have faces close enough to flicker."""
-    step = step or (1.0 if W >= 4 else 0.75)
-    n = n or int(np.clip(round(L / 0.9), 3, 18))
+    step = step or (GRID if W >= 8 else 1.0 if W >= 4 else 0.75)
+    n = n or int(np.clip(round(L / 1.6), 3, 14))
     h = L / n
     # The end slices show at least `tip` units of side beyond their neighbours (a narrower strip
     # reads as a thin line, linecheck): longer ends, the rest shared evenly.
@@ -52,10 +52,22 @@ def layers(L, W, asym=0.0, blunt=2.0, n=None, ov=0.25, step=None, tip=0.0):
     return out
 
 
-def egg_elements(name, L, W, asym=0.0, blunt=2.0, tilt=0.0, yaw=0.0, at=(0.0, 0.0, 0.0), n=None, sink=0.0, step=None, tip=0.0):
+GRID = 1.4  # width steps (a side moves 0.7); chamfers sit half a side step (0.35) off that grid: no two faces under 0.35 apart
+
+
+def egg_elements(name, L, W, asym=0.0, blunt=2.0, tilt=0.0, yaw=0.0, at=(0.0, 0.0, 0.0), n=None, sink=0.0, step=None,
+                 tip=0.0, chamfer=0.0, m=1):
     """One egg's boxes, standing on its pointed end and tilted by `tilt` degrees (its top toward
     +z, 90: lying), turned by `yaw`, centered over `at`; lifted so its lowest corner touches the
-    ground (`sink`: units pushed into it). Each element remembers its egg (for painting)."""
+    ground (`sink`: units pushed into it). Each element remembers its egg (for painting).
+
+    With `chamfer` (units, at least), each slice wide enough is an octagon, not a square: a box
+    with its z sides pulled in by the chamfer and a crossing one with its x sides pulled in, a
+    little shorter at both ends (so their tops don't share a plane, nor reach the next slice's):
+    the egg reads round from every side, not as a cross or a block.
+
+    `m`: layout units a real one (a small egg laid out larger, on a finer grid, and exported
+    smaller: `build.py`'s `mult`); the egg remembers its real size for painting."""
     ls = layers(L, W, asym, blunt, n, step=step, tip=tip)
     R = rotm((tilt, yaw, 0))
     # Lowest corner after the tilt: lift by it so the egg rests on y = at.y.
@@ -66,10 +78,23 @@ def egg_elements(name, L, W, asym=0.0, blunt=2.0, tilt=0.0, yaw=0.0, at=(0.0, 0.
     cx, cz = (pts[:, 0].min() + pts[:, 0].max()) / 2, (pts[:, 2].min() + pts[:, 2].max()) / 2
     x, y, z = at
     o = (x - cx, y - lo_y - sink, z - cz)
-    egg = {"L": L, "W": W, "asym": asym, "blunt": blunt, "tilt": tilt, "yaw": yaw, "o": o, "name": name}
-    return [el(f"{name}{k}", (o[0] - w / 2, o[1] + y0, o[2] - w / 2), (o[0] + w / 2, o[1] + y1, o[2] + w / 2),
-               rot=(tilt, yaw, 0) if tilt or yaw else None, origin=o, egg=egg, layer=w)
-            for k, (w, y0, y1) in enumerate(ls)]
+    egg = {"L": L / m, "W": W / m, "asym": asym, "blunt": blunt, "tilt": tilt, "yaw": yaw, "o": o, "name": name, "m": m}
+    rot = (tilt, yaw, 0) if tilt or yaw else None
+    c = 0.0
+    if chamfer:  # half a grid step off the sides' grid
+        c = (math.ceil((chamfer - GRID / 4) / (GRID / 2)) + 0.5) * (GRID / 2)
+    out = []
+    for k, (w, y0, y1) in enumerate(ls):
+        ov = 0.25
+        d = 2 * ov + 0.12
+        octo = c and w - 2 * c >= 0.4 * w and (y1 - y0) - 2 * d >= 0.5
+        cz_ = c if octo else 0.0
+        out.append(el(f"{name}{k}", (o[0] - w / 2, o[1] + y0, o[2] - w / 2 + cz_), (o[0] + w / 2, o[1] + y1, o[2] + w / 2 - cz_),
+                      rot=rot, origin=o, egg=egg, layer=w))
+        if octo:
+            out.append(el(f"{name}{k}x", (o[0] - w / 2 + c, o[1] + y0 + d, o[2] - w / 2), (o[0] + w / 2 - c, o[1] + y1 - d, o[2] + w / 2),
+                          rot=rot, origin=o, egg=egg, layer=w))
+    return out
 
 
 def local(e, p):
@@ -78,7 +103,7 @@ def local(e, p):
     face, whatever the layer's width), x and z across it."""
     g = e["egg"]
     R = rotm((g["tilt"], g["yaw"], 0))
-    q = (p - np.array(g["o"], float)) @ R  # undo the tilt (R is orthonormal: p @ R = R^T p)
+    q = (p - np.array(g["o"], float)) @ R / g.get("m", 1)  # undo the tilt (R orthonormal: p @ R = R^T p), in real units
     x, z = q[..., 0], q[..., 2]
     th = np.arctan2(z, x)
     # Round the square layers by their faces, evenly along each (an angle bunches texels at the

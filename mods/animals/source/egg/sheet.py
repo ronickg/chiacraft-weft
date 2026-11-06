@@ -100,7 +100,7 @@ def card(d, name, icons=None, W=300, H=470):
         dr.text((12, y0), "as it lies", font=font(12), fill=DIM)
         c.alpha_composite(im, (12 + (150 - im.width) // 2, y0 + 18 + (110 - im.height) // 2))
     y1 = y0 + 136
-    img = render(spec, tex, yaw=60, pitch=25, ppu=2.0, pad=2)
+    img = render(spec, tex, yaw=60, pitch=25, ppu=2.0 / spec.get("mult", 1), pad=2)
     im = Image.fromarray(img, "RGBA")
     dr.text((12, y1), "real size", font=font(12), fill=DIM)
     c.alpha_composite(im, (20, y1 + 16 + max(0, 66 - im.height)))
