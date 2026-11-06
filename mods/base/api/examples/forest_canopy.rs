@@ -107,6 +107,8 @@ fn main() {
             continue;
         }
         let t = if old || branched { t } else { t.with_tier(tier) };
+        // Minecraft's own trees (`base:tree_style` minecraft).
+        let t = if mode == "mc" { t.minecraft() } else { t };
         count[tier as usize] += 1;
         let mut put = |x: i32, y: i32, z: i32, s: u32, force: bool| {
             if let Some(i) = at(x, y, z) {
