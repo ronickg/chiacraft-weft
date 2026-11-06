@@ -1231,6 +1231,10 @@ bindings! {
         PASSES "passes": "array<Pass>",
         SCENE "scene": "Scene",
     }
+    upscale_guides "upscale_guides.wgsl" {
+        PASSES "passes": "array<Pass>",
+        SCENE "scene": "Scene",
+    }
 }
 
 /// Whether the block at `p` (block coordinates) casts a shadow, as far as the client has it

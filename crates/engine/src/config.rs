@@ -680,6 +680,16 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // Temporal anti-aliasing: the least share of each new frame (0.1: about ten gathered;
         // less, smoother and slower to follow), live.
         ConfigDef::number("core:taa_blend", ck::FLOAT, 0.1, 0.03, 0.5, 0.01),
+        // The renderer's temporal upscaler, in anti-aliasing's place (`weft_render::UpscaleMode`):
+        // 0 off, 1 DLAA, 2-4 DLSS Super Resolution Quality, Balanced, Performance, 5-6 Ray
+        // Reconstruction at the screen's size and from Quality's, 7 DLSS 5. Live; only where the
+        // renderer has one (DLSS: the `streamline` build on Windows with NVIDIA's files), else off.
+        ConfigDef::number("core:upscaler", ck::INT, 0.0, 0.0, 7.0, 1.0),
+        // A stand-in upscaler that only scales the picture up, for checking the upscaler's path
+        // where the renderer has none (the Linux PC); read at start.
+        ConfigDef::number("core:upscale_standin", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // DLSS 5's strength (its intensity control), live.
+        ConfigDef::number("core:dlss5_intensity", ck::FLOAT, 0.5, 0.0, 1.0, 0.05),
         // The HDR world's bloom (chiacraft): 0 none, 1 a pyramid of 4 levels, 2 of 6 (wider glow);
         // live. Without the HDR world the pack's own bloom effect glows as before.
         ConfigDef::number("core:bloom", ck::INT, 2.0, 0.0, 2.0, 1.0),

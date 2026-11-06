@@ -133,6 +133,16 @@ fn halton(mut i: u32, base: u32) -> f32 {
 /// - `reset`: no last frame to gather from (a teleport, a resize, a new world);
 /// - `view_proj` and `prev_view_proj` (`Scene::taa_prev`) without the jitter.
 /// Its result goes back through `Post::set_upscaled` (instead of the engine's own resolve).
+/// A frame drawn for the backend's temporal upscaler (`Backend::upscaler`, DLSS on Windows):
+/// what the app hands `Post::set_upscale`. `params` carries the camera (the rest `apply` fills).
+#[derive(Clone, Copy, Debug)]
+pub struct UpscaleFrame {
+    pub mode: UpscaleMode,
+    /// The output's size: the screen's.
+    pub output: (u32, u32),
+    pub params: UpscaleParams,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct TemporalInputs {
     pub color: TextureId,
@@ -230,6 +240,16 @@ pub struct Post {
     depth_tex: Option<TextureId>,
     /// An upscaler's picture for this frame in place of the engine's resolve (`set_upscaled`).
     upscaled: Option<u32>,
+    /// The backend's upscaler for this frame (`set_upscale`), in the resolve's place: its output
+    /// at the screen's size, the effects' two images at that size, Ray Reconstruction's guides
+    /// (`upscale_guides.wgsl`: pipelines and images, normals + roughness, albedo, specular) and
+    /// what the last upscaled frame was (mode, world size, output size), else it starts anew.
+    upscale: Option<UpscaleFrame>,
+    up_out: Option<(TextureId, u32, (u32, u32))>,
+    up_targets: Option<([TextureId; 2], [u32; 2], (u32, u32))>,
+    guide_pipes: Option<(PipelineId, PipelineId)>,
+    guides: Option<([TextureId; 3], (u32, u32))>,
+    up_held: Option<(UpscaleMode, (u32, u32), (u32, u32))>,
 }
 
 const MAX_PASSES: usize = 40;
@@ -268,6 +288,12 @@ impl Post {
             inputs: None,
             depth_tex: None,
             upscaled: None,
+            upscale: None,
+            up_out: None,
+            up_targets: None,
+            guide_pipes: None,
+            guides: None,
+            up_held: None,
         };
         p.reload(gpu, assets);
         p
@@ -316,6 +342,69 @@ impl Post {
             Ok(p) => self.taa_pipes = Some(p),
             Err(e) => log::error!("temporal anti-aliasing: {e}"),
         }
+        self.reload_guides(gpu, assets);
+    }
+
+    /// Ray Reconstruction's guides (`upscale_guides.wgsl`), made with the motion image too: only
+    /// for a backend with an upscaler that takes them.
+    fn reload_guides(&mut self, gpu: &mut dyn Backend, assets: &Assets) {
+        if let Some((a, b)) = self.guide_pipes.take() {
+            gpu.destroy_pipeline(a);
+            gpu.destroy_pipeline(b);
+        }
+        let info = gpu.upscaler();
+        if !motion()
+            || ![UpscaleMode::Reconstruct, UpscaleMode::ReconstructQuality, UpscaleMode::Neural]
+                .iter()
+                .any(|m| info.has(*m))
+        {
+            return;
+        }
+        let made = crate::packs::shader(assets, "upscale_guides.wgsl")
+            .map_err(|e| e.0)
+            .and_then(|s| {
+                let mut make = |label: &str, fragment: &str, motion: bool| {
+                    gpu.create_pipeline(&PipelineDesc {
+                        label,
+                        shader: &s,
+                        vertex: "vs",
+                        fragment: Some(fragment),
+                        color: Some(Format::Rgba16Float),
+                        depth: None,
+                        blend: Blend::None,
+                        cull_back: false,
+                        topology: Topology::Triangles,
+                        motion,
+                    })
+                    .map_err(|e| e.0)
+                };
+                // Normals and roughness, with the albedo beside them (the second image).
+                let guides = make("upscale guides", "fs_guides", true)?;
+                match make("upscale specular", "fs_specular", false) {
+                    Ok(sp) => Ok((guides, sp)),
+                    Err(e) => {
+                        gpu.destroy_pipeline(guides);
+                        Err(e)
+                    }
+                }
+            });
+        match made {
+            Ok(p) => self.guide_pipes = Some(p),
+            Err(e) => log::error!("upscaler guides: {e}"),
+        }
+    }
+
+    /// Whether a frame can go to the backend's upscaler (`set_upscale`): the world's pass draws
+    /// the motion image and the pipelines that finish it are there.
+    pub fn can_upscale(&self) -> bool {
+        motion() && self.taa_pipes.is_some() && self.pipeline.is_some()
+    }
+
+    /// This frame goes to the backend's upscaler (`Cmd::Upscale`) in the place of the engine's
+    /// temporal anti-aliasing, drawn jittered at the size it asked for; the effects then run at
+    /// `frame.output`, the screen's size.
+    pub fn set_upscale(&mut self, frame: UpscaleFrame) {
+        self.upscale = Some(frame);
     }
 
     pub fn reload(&mut self, gpu: &mut dyn Backend, assets: &Assets) {
@@ -679,7 +768,98 @@ impl Post {
         // (target, pipeline, entry among `taa_entries`)
         let mut taa_draws: Vec<(TextureId, Option<TextureId>, PipelineId, usize)> = Vec::new();
         self.inputs = None;
-        if let Some(up) = self.upscaled.take() {
+        // The size the effects run at (the screen's after an upscaler), whether they still scale
+        // the world up, and their two images.
+        let mut fx = *frame;
+        let mut scaled = scaled;
+        let (mut tex, mut idx) = (tex, idx);
+        let mut up_cmd: Option<Cmd> = None;
+        let motion_now = self
+            .motion_tex
+            .filter(|m| m.2 == (frame.width, frame.height));
+        if let (Some(u), Some((_, fill)), Some((_, motion_idx, _)), Some(depth_tex)) =
+            (self.upscale.take(), self.taa_pipes, motion_now, self.depth_tex)
+        {
+            self.upscaled = None;
+            self.taa_held = false;
+            let (w, h) = (frame.width.max(1), frame.height.max(1));
+            let rt = |gpu: &mut dyn Backend, w: u32, h: u32, label: &str| {
+                gpu.create_texture(&TextureDesc { width: w, height: h, mips: 1, format: Format::Rgba16Float, render_target: true }, label)
+            };
+            // The whole motion image at the world's size (`fs_taa_motion`), as DLSS reads it.
+            if self.full_motion.is_none_or(|t| t.2 != (w, h)) {
+                if let Some((old, ..)) = self.full_motion.take() {
+                    gpu.destroy_texture(old);
+                }
+                let t = rt(gpu, w, h, "full motion");
+                self.full_motion = Some((t, gpu.texture_index(t), (w, h)));
+            }
+            let (full, ..) = self.full_motion.unwrap();
+            let entry = Pass { scene: idx[0], slot: 0, time, size: [w as f32, h as f32], depth, bloom: motion_idx + 1, ..Pass::default() };
+            taa_entries.push(entry);
+            taa_draws.push((full, None, fill, taa_entries.len() - 1));
+            // Ray Reconstruction's guides, from the world's picture and depth.
+            let mut g = [NO_TEXTURE; 3];
+            if let (true, Some((guide_pipe, spec_pipe))) = (u.mode.guides(), self.guide_pipes) {
+                if self.guides.is_none_or(|t| t.1 != (w, h)) {
+                    if let Some((old, _)) = self.guides.take() {
+                        old.into_iter().for_each(|t| gpu.destroy_texture(t));
+                    }
+                    let t = [rt(gpu, w, h, "guide normals"), rt(gpu, w, h, "guide albedo"), rt(gpu, w, h, "guide specular")];
+                    self.guides = Some((t, (w, h)));
+                }
+                g = self.guides.unwrap().0;
+                taa_draws.push((g[0], Some(g[1]), guide_pipe, taa_entries.len() - 1));
+                taa_draws.push((g[2], None, spec_pipe, taa_entries.len() - 1));
+            }
+            let (ow, oh) = (u.output.0.max(1), u.output.1.max(1));
+            if self.up_out.is_none_or(|t| t.2 != (ow, oh)) {
+                if let Some((old, ..)) = self.up_out.take() {
+                    gpu.destroy_texture(old);
+                }
+                let t = gpu.create_upscale_target(ow, oh, "upscaled");
+                self.up_out = Some((t, gpu.texture_index(t), (ow, oh)));
+            }
+            let (out, out_idx, _) = self.up_out.unwrap();
+            if self.up_targets.is_none_or(|t| t.2 != (ow, oh)) {
+                if let Some((old, ..)) = self.up_targets.take() {
+                    old.into_iter().for_each(|t| gpu.destroy_texture(t));
+                }
+                let desc = TextureDesc { width: ow, height: oh, mips: 1, format: world_format(), render_target: true };
+                let t = [gpu.create_texture(&desc, "post up a"), gpu.create_texture(&desc, "post up b")];
+                self.up_targets = Some((t, t.map(|t| gpu.texture_index(t)), (ow, oh)));
+            }
+            let held = (u.mode, (w, h), (ow, oh));
+            let fresh = self.up_held != Some(held);
+            self.up_held = Some(held);
+            let j = jitter();
+            let mut params = u.params;
+            params.mode = u.mode as u32;
+            params.reset = (params.reset != 0 || fresh) as u32;
+            params.hdr = hdr() as u32;
+            params.render = [w, h];
+            params.output = [ow, oh];
+            params.jitter = [j.x * w as f32 * 0.5, -j.y * h as f32 * 0.5];
+            params.mv_scale = [1.0, 1.0];
+            let start = list.data.len() as u32;
+            list.data.extend_from_slice(bytemuck::bytes_of(&params));
+            up_cmd = Some(Cmd::Upscale {
+                color: tex[0],
+                depth: depth_tex,
+                motion: full,
+                output: out,
+                normals: g[0],
+                albedo: g[1],
+                specular: g[2],
+                start,
+            });
+            src = out_idx;
+            fx = FrameInfo { width: ow, height: oh, slot: frame.slot };
+            scaled = false;
+            let t = self.up_targets.unwrap();
+            (tex, idx) = (t.0, t.1);
+        } else if let Some(up) = self.upscaled.take() {
+            self.up_held = None;
             src = up;
             self.taa_held = false;
         } else if let (true, Some((resolve, fill)), Some((motion, motion_idx, _))) = (self.taa_on(), self.taa_pipes, self.motion_tex) {
@@ -744,6 +924,7 @@ impl Post {
             });
         } else {
             self.taa_held = false;
+            self.up_held = None;
         }
         // No effect on: one pass that only draws the scene across the screen (slot 0 returns it).
         let plain = [(String::new(), 1.0)];
@@ -757,7 +938,7 @@ impl Post {
                 slot: self.slots.slot(name),
                 strength: *strength,
                 time,
-                size: [frame.width as f32, frame.height as f32],
+                size: [fx.width as f32, fx.height as f32],
                 depth,
                 pad: 0,
                 low: 0,
@@ -769,7 +950,7 @@ impl Post {
         // The half-size parts first: each into its effect's own image, which that effect reads.
         let mut lows: Vec<TextureId> = Vec::new();
         if self.low_pipe.is_some() && self.use_low {
-            let (w, h) = (frame.width.div_ceil(2).max(1), frame.height.div_ceil(2).max(1));
+            let (w, h) = (fx.width.div_ceil(2).max(1), fx.height.div_ceil(2).max(1));
             for (i, (name, _)) in active[..n].iter().enumerate() {
                 let slot = self.low_slots.slot(name);
                 if slot == 0 {
@@ -806,7 +987,7 @@ impl Post {
                 slot: self.low_slots.slot(name),
                 strength: *strength,
                 time,
-                size: [frame.width as f32, frame.height as f32],
+                size: [fx.width as f32, fx.height as f32],
                 depth,
                 pad: 0,
                 low: 0,
@@ -847,7 +1028,7 @@ impl Post {
         let pipes = self.bloom_pipes.filter(|_| hdr() && self.bloom_levels > 0);
         BLOOM.store(pipes.is_some(), std::sync::atomic::Ordering::Relaxed);
         if let Some(pipes) = pipes {
-            self.ensure_pyramid(gpu, frame.width, frame.height, self.bloom_levels as usize);
+            self.ensure_pyramid(gpu, fx.width, fx.height, self.bloom_levels as usize);
             let now = std::time::Instant::now();
             let dt = self
                 .last_frame
@@ -907,6 +1088,10 @@ impl Post {
             list.bind(crate::gpu_layout::bind::post::SCENE, scene);
             list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: (first_taa + k) as u32 });
             list.push(Cmd::EndPass);
+        }
+        // The upscaler, once its motion image and guides are drawn.
+        if let Some(c) = up_cmd {
+            list.push(c);
         }
         if let Some(low_pipe) = self.low_pipe {
             for (k, target) in lows.iter().enumerate() {

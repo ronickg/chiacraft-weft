@@ -467,6 +467,54 @@ impl ClientEntity {
     }
 }
 
+/// The camera a frame was drawn with, without the jitter (`Client::frame_camera`): what the
+/// backend's upscaler is told (`weft_render::UpscaleParams`).
+#[derive(Clone, Copy, Debug)]
+pub struct FrameCamera {
+    /// Camera-relative world to view (the camera at the origin), and view to clip.
+    pub view: glam::Mat4,
+    pub proj: glam::Mat4,
+    /// Takes this frame's camera-relative positions to last frame's clip space (`Scene::taa_prev`).
+    pub prev: glam::Mat4,
+    /// No last frame to go from.
+    pub fresh: bool,
+    pub fov_y: f32,
+    pub aspect: f32,
+}
+
+impl FrameCamera {
+    /// `weft_render::UpscaleParams`'s camera part; `Post::apply` fills in the rest.
+    pub fn upscale_params(&self) -> weft_render::UpscaleParams {
+        let view_proj = self.proj * self.view;
+        let clip_to_prev = self.prev * view_proj.inverse();
+        let to_world = self.view.inverse();
+        let axis = |v: glam::Vec3| {
+            to_world
+                .transform_vector3(v)
+                .normalize_or_zero()
+                .extend(0.0)
+                .to_array()
+        };
+        weft_render::UpscaleParams {
+            reset: self.fresh as u32,
+            fov_y: self.fov_y,
+            aspect: self.aspect,
+            near: 0.05,
+            view_to_clip: self.proj.to_cols_array(),
+            clip_to_view: self.proj.inverse().to_cols_array(),
+            clip_to_prev_clip: clip_to_prev.to_cols_array(),
+            prev_clip_to_clip: clip_to_prev.inverse().to_cols_array(),
+            world_to_view: self.view.to_cols_array(),
+            view_to_world: to_world.to_cols_array(),
+            right: axis(glam::Vec3::X),
+            up: axis(glam::Vec3::Y),
+            // The camera looks down its -z.
+            forward: axis(-glam::Vec3::Z),
+            ..Default::default()
+        }
+    }
+}
+
 pub struct ClientMenu {
     pub kind: u32,
     pub window: u32,
@@ -663,6 +711,8 @@ pub struct Client {
     /// Last frame's projection and view without the jitter, where its camera stood and the
     /// shaders' clock then, for temporal anti-aliasing's `Scene::taa_prev` and `taa`.
     taa_last: Option<(glam::Mat4, DVec3, f32)>,
+    /// The camera the last frame was drawn with, for the backend's upscaler (`upscale_camera`).
+    pub frame_camera: Option<FrameCamera>,
     pub late_out: CommandList,
     /// Seconds until the next dust piece from the block being hit, and until its next knock.
     hit_dust: f32,
@@ -990,6 +1040,7 @@ impl Client {
             hand_late: CommandList::default(),
             behind: [0.0; 4],
             taa_last: None,
+            frame_camera: None,
             late_out: CommandList::default(),
             hit_dust: 0.0,
             hit_sound: 0.0,
@@ -3214,6 +3265,15 @@ impl Client {
         let cam = self.render_camera();
         let mut scene = self.scene(&cam, frame);
         (scene.taa, scene.taa_prev) = self.taa_frame(&cam, frame);
+        let aspect = frame.width as f32 / frame.height.max(1) as f32;
+        self.frame_camera = Some(FrameCamera {
+            view: cam.view(),
+            proj: cam.proj_plain(aspect),
+            prev: glam::Mat4::from_cols_array_2d(&scene.taa_prev),
+            fresh: scene.taa[2] == 0.0,
+            fov_y: cam.fov.to_radians(),
+            aspect,
+        });
         // The calm world pipelines (`gpu_layout::CALM_OFF`) while nothing they leave out is on, read
         // from the scene the shaders see: no fog in the air, no thunder, no held light, the eye in
         // no liquid (the fog then starts at 0.6 of its end).

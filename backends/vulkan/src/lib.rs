@@ -9,6 +9,10 @@ use gpu_allocator::MemoryLocation;
 use gpu_allocator::vulkan::{Allocation, AllocationCreateDesc, AllocationScheme, Allocator, AllocatorCreateDesc};
 use weft_render::*;
 
+#[cfg(feature = "streamline")]
+mod streamline;
+mod upscale;
+
 const FRAMES: usize = 2;
 /// Timestamp queries per frame: start, after uploads, marks, end.
 const MAX_MARKS: u32 = 16;
@@ -65,6 +69,8 @@ struct Texture {
     layout: vk::ImageLayout,
     /// Index into the matching bindless array (depth too: screen effects read it).
     index: u32,
+    /// What it was made for (an upscaler is told: `upscale`).
+    usage: vk::ImageUsageFlags,
 }
 
 struct Pipeline {
@@ -191,6 +197,8 @@ pub struct VulkanBackend {
     /// recording, `vkQueueSubmit2`, `vkQueuePresentKHR`), logged each second (`log_submit`):
     /// whether the frame waits for the GPU, for the display or works.
     submit_split: SubmitSplit,
+    /// What `Cmd::Upscale` runs (`upscale.rs`); none without one (the game's own TAA then).
+    upscaler: Option<Box<dyn upscale::Upscaler>>,
 }
 
 #[derive(Default)]
@@ -235,7 +243,17 @@ fn err<E: std::fmt::Debug>(what: &str) -> impl FnOnce(E) -> Error + '_ {
 /// game, which stands in for the loader and goes first, since a loader found without a driver
 /// fails only later. Built from source, the loader is also looked for by path, as Homebrew's
 /// prefix is not searched.
-unsafe fn load_vulkan() -> Result<ash::Entry, Error> {
+/// With Streamline (the `streamline` feature and its files present), its interposer stands in for
+/// the loader, so it can add what DLSS needs to the instance and device (`streamline.rs`).
+unsafe fn load_vulkan(early: &upscale::Early) -> Result<ash::Entry, Error> {
+    #[cfg(feature = "streamline")]
+    if let upscale::Early::Streamline(sl) = early {
+        match unsafe { ash::Entry::load_from(&sl.interposer) } {
+            Ok(entry) => return Ok(entry),
+            Err(e) => log::warn!("streamline: Vulkan from {}: {e:?}", sl.interposer.display()),
+        }
+    }
+    let _ = early;
     if cfg!(target_os = "macos") {
         let beside = std::env::current_exe()
             .ok()
@@ -271,7 +289,8 @@ impl VulkanBackend {
 
     unsafe fn create(desc: &BackendDesc) -> Result<VulkanBackend, Error> {
         unsafe {
-            let entry = load_vulkan()?;
+            let early = upscale::early();
+            let entry = load_vulkan(&early)?;
             let display = desc
                 .window
                 .display_handle()
@@ -748,6 +767,7 @@ impl VulkanBackend {
                 ts_period: props.limits.timestamp_period,
                 gpu_times: Vec::new(),
                 submit_split: SubmitSplit::default(),
+                upscaler: upscale::ready(early, pdev, desc.upscale_standin),
             };
             backend.recreate_swapchain()?;
             Ok(backend)
@@ -1601,6 +1621,207 @@ fn compare_op(c: Compare) -> vk::CompareOp {
 }
 
 impl VulkanBackend {
+    /// `Cmd::Upscale`: the inputs made shader-readable, the output `GENERAL` (DLSS writes it as a
+    /// storage image), the upscaler run, or the colour scaled up plainly if it could not, and the
+    /// output left shader-readable for the effects.
+    unsafe fn record_upscale(&mut self, cmd: vk::CommandBuffer, images: [TextureId; 4], guides: [TextureId; 3], params: &UpscaleParams) {
+        let readable = |b: &mut Self, t: TextureId| {
+            let tex = b.textures.get(t.0);
+            let (image, was, depth) = (tex.image, tex.layout, tex.desc.format == Format::Depth32);
+            if was != vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL {
+                let range = if depth { depth_range() } else { color_range(1) };
+                unsafe { b.barrier_image(cmd, image, range, was, vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL) };
+                b.textures.get_mut(t.0).layout = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
+            }
+        };
+        let [color, depth, motion, output] = images;
+        for t in [color, depth, motion]
+            .into_iter()
+            .chain(guides.into_iter().filter(|g| *g != NO_TEXTURE))
+        {
+            readable(self, t);
+        }
+        let out = self.textures.get(output.0);
+        let (out_image, out_was) = (out.image, out.layout);
+        // The whole output is written: what was in it doesn't matter.
+        unsafe { self.barrier_image(cmd, out_image, color_range(1), vk::ImageLayout::UNDEFINED, vk::ImageLayout::GENERAL) };
+        let _ = out_was;
+        self.textures.get_mut(output.0).layout = vk::ImageLayout::GENERAL;
+        let describe = |b: &Self, t: TextureId| {
+            let tex = b.textures.get(t.0);
+            upscale::Image {
+                image: tex.image,
+                view: tex.view,
+                memory: unsafe { tex.alloc.memory() },
+                layout: tex.layout,
+                format: b.vk_format(tex.desc.format),
+                width: tex.desc.width,
+                height: tex.desc.height,
+                usage: tex.usage,
+            }
+        };
+        let guide = |b: &Self, t: TextureId| (t != NO_TEXTURE).then(|| describe(b, t));
+        let inputs = upscale::Inputs {
+            color: describe(self, color),
+            depth: describe(self, depth),
+            motion: describe(self, motion),
+            output: describe(self, output),
+            normals: guide(self, guides[0]),
+            albedo: guide(self, guides[1]),
+            specular: guide(self, guides[2]),
+        };
+        let done = match self.upscaler.as_mut() {
+            Some(u) => unsafe { u.record(cmd, &inputs, params) },
+            None => false,
+        };
+        if !done {
+            // The colour scaled up to the output, filtered: the frame still has its picture.
+            let (src, sw, sh) = (inputs.color.image, inputs.color.width, inputs.color.height);
+            let (dw, dh) = (inputs.output.width, inputs.output.height);
+            unsafe {
+                self.barrier_image(
+                    cmd,
+                    src,
+                    color_range(1),
+                    vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                    vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                );
+                self.barrier_image(cmd, out_image, color_range(1), vk::ImageLayout::GENERAL, vk::ImageLayout::TRANSFER_DST_OPTIMAL);
+                let layers = vk::ImageSubresourceLayers {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    mip_level: 0,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                };
+                let region = vk::ImageBlit {
+                    src_subresource: layers,
+                    src_offsets: [vk::Offset3D::default(), vk::Offset3D { x: sw as i32, y: sh as i32, z: 1 }],
+                    dst_subresource: layers,
+                    dst_offsets: [vk::Offset3D::default(), vk::Offset3D { x: dw as i32, y: dh as i32, z: 1 }],
+                };
+                self.device.cmd_blit_image(
+                    cmd,
+                    src,
+                    vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                    out_image,
+                    vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                    &[region],
+                    vk::Filter::LINEAR,
+                );
+                self.barrier_image(
+                    cmd,
+                    src,
+                    color_range(1),
+                    vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                    vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                );
+                self.barrier_image(
+                    cmd,
+                    out_image,
+                    color_range(1),
+                    vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                    vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                );
+            }
+        } else {
+            // DLSS's compute writes, then the effects sample it.
+            unsafe {
+                self.barrier_image(cmd, out_image, color_range(1), vk::ImageLayout::GENERAL, vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+            };
+        }
+        self.textures.get_mut(output.0).layout = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
+    }
+
+    fn make_texture(&mut self, desc: &TextureDesc, label: &str, extra: vk::ImageUsageFlags) -> TextureId {
+        let format = self.vk_format(desc.format);
+        let depth = desc.format == Format::Depth32;
+        // Depth is also sampled: screen effects read how far each pixel is (it stays bindless,
+        // read in SHADER_READ_ONLY_OPTIMAL between the passes that draw into it).
+        let usage = if depth {
+            vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT
+                | vk::ImageUsageFlags::SAMPLED
+                | vk::ImageUsageFlags::TRANSFER_SRC
+                | vk::ImageUsageFlags::TRANSFER_DST
+        } else {
+            let mut u = vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST;
+            if desc.render_target {
+                u |= vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC;
+            }
+            u | extra
+        };
+        // The Pixel 10's PowerVR: a target cleared by its pass and then read as a texture came back
+        // as garbage in every tile only the clear had touched (black and random-coloured squares
+        // where the sky was, the water's copy of what is behind it); uncompressed, it reads right.
+        let mut compression_off = vk::ImageCompressionControlEXT::default().flags(vk::ImageCompressionFlagsEXT::DISABLED);
+        let mut info = vk::ImageCreateInfo::default()
+            .image_type(vk::ImageType::TYPE_2D)
+            .format(format)
+            .extent(vk::Extent3D { width: desc.width, height: desc.height, depth: 1 })
+            .mip_levels(desc.mips)
+            .array_layers(1)
+            .samples(vk::SampleCountFlags::TYPE_1)
+            .tiling(vk::ImageTiling::OPTIMAL)
+            .usage(usage);
+        if self.no_compression && (desc.render_target || depth) {
+            info = info.push_next(&mut compression_off);
+        }
+        unsafe {
+            let image = self
+                .device
+                .create_image(&info, None)
+                .expect("vkCreateImage");
+            let requirements = self.device.get_image_memory_requirements(image);
+            let alloc_desc = AllocationCreateDesc {
+                name: label,
+                requirements,
+                location: MemoryLocation::GpuOnly,
+                linear: false,
+                allocation_scheme: AllocationScheme::GpuAllocatorManaged,
+            };
+            let alloc =
+                allocate(&mut self.allocator, &alloc_desc, self.spill).unwrap_or_else(|e| panic!("allocating texture {label}: {e}"));
+            self.device
+                .bind_image_memory(image, alloc.memory(), alloc.offset())
+                .expect("bind image memory");
+            let range = if depth { depth_range() } else { color_range(desc.mips) };
+            let view = self
+                .device
+                .create_image_view(
+                    &vk::ImageViewCreateInfo::default()
+                        .image(image)
+                        .view_type(vk::ImageViewType::TYPE_2D)
+                        .format(format)
+                        .subresource_range(range),
+                    None,
+                )
+                .expect("vkCreateImageView");
+
+            let index = {
+                let index = self.free_tex.pop().unwrap_or_else(|| {
+                    self.next_tex += 1;
+                    self.next_tex - 1
+                });
+                assert!(index < MAX_TEXTURES, "more than {MAX_TEXTURES} textures");
+                let info = [vk::DescriptorImageInfo::default()
+                    .image_view(view)
+                    .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)];
+                let write = vk::WriteDescriptorSet::default()
+                    .dst_set(self.global_set)
+                    .dst_binding(0)
+                    .dst_array_element(index)
+                    .descriptor_type(vk::DescriptorType::SAMPLED_IMAGE)
+                    .image_info(&info);
+                self.device.update_descriptor_sets(&[write], &[]);
+                index
+            };
+            let id =
+                self.textures
+                    .insert(Texture { image, view, alloc, desc: desc.clone(), layout: vk::ImageLayout::UNDEFINED, index, usage });
+            self.uploads.push(Upload::InitTexture(id));
+            TextureId(id)
+        }
+    }
+
     fn spirv(&self, shader: &Shader, stage: naga::ShaderStage, entry: &str) -> Result<vk::ShaderModule, Error> {
         let mut options = naga::back::spv::Options::default();
         options.lang_version = (1, 3);
@@ -1816,93 +2037,32 @@ impl Backend for VulkanBackend {
     }
 
     fn create_texture(&mut self, desc: &TextureDesc, label: &str) -> TextureId {
-        let format = self.vk_format(desc.format);
-        let depth = desc.format == Format::Depth32;
-        // Depth is also sampled: screen effects read how far each pixel is (it stays bindless,
-        // read in SHADER_READ_ONLY_OPTIMAL between the passes that draw into it).
-        let usage = if depth {
-            vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT
-                | vk::ImageUsageFlags::SAMPLED
-                | vk::ImageUsageFlags::TRANSFER_SRC
-                | vk::ImageUsageFlags::TRANSFER_DST
-        } else {
-            let mut u = vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST;
-            if desc.render_target {
-                u |= vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC;
-            }
-            u
-        };
-        // The Pixel 10's PowerVR: a target cleared by its pass and then read as a texture came back
-        // as garbage in every tile only the clear had touched (black and random-coloured squares
-        // where the sky was, the water's copy of what is behind it); uncompressed, it reads right.
-        let mut compression_off = vk::ImageCompressionControlEXT::default().flags(vk::ImageCompressionFlagsEXT::DISABLED);
-        let mut info = vk::ImageCreateInfo::default()
-            .image_type(vk::ImageType::TYPE_2D)
-            .format(format)
-            .extent(vk::Extent3D { width: desc.width, height: desc.height, depth: 1 })
-            .mip_levels(desc.mips)
-            .array_layers(1)
-            .samples(vk::SampleCountFlags::TYPE_1)
-            .tiling(vk::ImageTiling::OPTIMAL)
-            .usage(usage);
-        if self.no_compression && (desc.render_target || depth) {
-            info = info.push_next(&mut compression_off);
-        }
-        unsafe {
-            let image = self
-                .device
-                .create_image(&info, None)
-                .expect("vkCreateImage");
-            let requirements = self.device.get_image_memory_requirements(image);
-            let alloc_desc = AllocationCreateDesc {
-                name: label,
-                requirements,
-                location: MemoryLocation::GpuOnly,
-                linear: false,
-                allocation_scheme: AllocationScheme::GpuAllocatorManaged,
-            };
-            let alloc =
-                allocate(&mut self.allocator, &alloc_desc, self.spill).unwrap_or_else(|e| panic!("allocating texture {label}: {e}"));
-            self.device
-                .bind_image_memory(image, alloc.memory(), alloc.offset())
-                .expect("bind image memory");
-            let range = if depth { depth_range() } else { color_range(desc.mips) };
-            let view = self
-                .device
-                .create_image_view(
-                    &vk::ImageViewCreateInfo::default()
-                        .image(image)
-                        .view_type(vk::ImageViewType::TYPE_2D)
-                        .format(format)
-                        .subresource_range(range),
-                    None,
-                )
-                .expect("vkCreateImageView");
+        self.make_texture(desc, label, vk::ImageUsageFlags::empty())
+    }
 
-            let index = {
-                let index = self.free_tex.pop().unwrap_or_else(|| {
-                    self.next_tex += 1;
-                    self.next_tex - 1
-                });
-                assert!(index < MAX_TEXTURES, "more than {MAX_TEXTURES} textures");
-                let info = [vk::DescriptorImageInfo::default()
-                    .image_view(view)
-                    .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)];
-                let write = vk::WriteDescriptorSet::default()
-                    .dst_set(self.global_set)
-                    .dst_binding(0)
-                    .dst_array_element(index)
-                    .descriptor_type(vk::DescriptorType::SAMPLED_IMAGE)
-                    .image_info(&info);
-                self.device.update_descriptor_sets(&[write], &[]);
-                index
-            };
-            let id = self
-                .textures
-                .insert(Texture { image, view, alloc, desc: desc.clone(), layout: vk::ImageLayout::UNDEFINED, index });
-            self.uploads.push(Upload::InitTexture(id));
-            TextureId(id)
+    fn upscaler(&self) -> UpscalerInfo {
+        self.upscaler
+            .as_ref()
+            .map_or_else(UpscalerInfo::default, |u| u.info())
+    }
+
+    fn upscale_render_size(&mut self, mode: UpscaleMode, output: (u32, u32)) -> (u32, u32) {
+        let s = mode.scale();
+        let fallback = (((output.0 as f32 * s).round() as u32).max(1), ((output.1 as f32 * s).round() as u32).max(1));
+        match &mut self.upscaler {
+            Some(u) => u.render_size(mode, output).unwrap_or(fallback),
+            None => fallback,
         }
+    }
+
+    /// Written by the upscaler's compute shaders (DLSS writes its output as a storage image).
+    fn create_upscale_target(&mut self, width: u32, height: u32, label: &str) -> TextureId {
+        let desc = TextureDesc { width, height, mips: 1, format: Format::Rgba16Float, render_target: true };
+        self.make_texture(&desc, label, vk::ImageUsageFlags::STORAGE)
+    }
+
+    fn texture_index(&self, texture: TextureId) -> u32 {
+        self.textures.get(texture.0).index
     }
 
     fn write_texture(&mut self, texture: TextureId, mip: u32, data: &[u8]) {
@@ -1914,10 +2074,6 @@ impl Backend for VulkanBackend {
         let src = self.stage(data);
         self.uploads
             .push(Upload::Texture { src, dst: texture.0, mip });
-    }
-
-    fn texture_index(&self, texture: TextureId) -> u32 {
-        self.textures.get(texture.0).index
     }
 
     fn destroy_texture(&mut self, texture: TextureId) {
@@ -2458,6 +2614,14 @@ impl Backend for VulkanBackend {
                         self.barrier_image(cmd, image, depth_range(), vk::ImageLayout::TRANSFER_SRC_OPTIMAL, back);
                         self.textures.get_mut(depth.0).layout = back;
                     }
+                    Cmd::Upscale { color, depth, motion, output, normals, albedo, specular, start } => {
+                        let size = size_of::<UpscaleParams>();
+                        let params: UpscaleParams = bytemuck::pod_read_unaligned(&list.data[start as usize..start as usize + size]);
+                        self.record_upscale(cmd, [color, depth, motion, output], [normals, albedo, specular], &params);
+                        // An upscaler leaves its own pipeline and bindings behind.
+                        current = None;
+                        bound.clear();
+                    }
                     // Expanded into an end and a begin above.
                     Cmd::PassBreak => {}
                     Cmd::Mark => {
@@ -2616,6 +2780,8 @@ impl Drop for VulkanBackend {
     fn drop(&mut self) {
         unsafe {
             self.device.device_wait_idle().ok();
+            // Streamline frees its own before the device goes.
+            self.upscaler = None;
             for i in 0..self.frames.len() {
                 let deferred = std::mem::take(&mut self.frames[i].deferred);
                 for d in deferred {

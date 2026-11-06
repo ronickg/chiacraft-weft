@@ -230,6 +230,152 @@ pub enum Cmd {
     },
     /// GPU timestamp, see [`Backend::gpu_times`].
     Mark,
+    /// The backend's temporal upscaler ([`Backend::upscaler`]: DLSS through NVIDIA's Streamline
+    /// on Windows) makes `output` from this frame's jittered world. Outside a pass. Inputs are
+    /// read as textures; `output` comes from [`Backend::create_upscale_target`]. The guides
+    /// (Ray Reconstruction's) are `NO_TEXTURE` when not given. Pipelines and bindings are gone
+    /// after it: set them again.
+    Upscale {
+        color: TextureId,
+        depth: TextureId,
+        motion: TextureId,
+        output: TextureId,
+        /// xyz the surface's normal (camera space), w its roughness.
+        normals: TextureId,
+        /// The diffuse albedo, linear.
+        albedo: TextureId,
+        /// The specular albedo, linear.
+        specular: TextureId,
+        /// An [`UpscaleParams`] at this offset in [`CommandList::data`].
+        start: u32,
+    },
+}
+
+/// A texture that is not there (an [`Cmd::Upscale`] guide not given).
+pub const NO_TEXTURE: TextureId = TextureId(u32::MAX);
+
+/// What a temporal upscaler makes of the world ([`Cmd::Upscale`]). The numbers are the
+/// `core:upscaler` setting's.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum UpscaleMode {
+    Off = 0,
+    /// Anti-aliasing at the screen's size (DLAA).
+    Native = 1,
+    /// Super Resolution from about 2/3 of the screen each way.
+    Quality = 2,
+    /// From about 0.58.
+    Balanced = 3,
+    /// From half.
+    Performance = 4,
+    /// Ray Reconstruction at the screen's size (with the guides).
+    Reconstruct = 5,
+    /// Ray Reconstruction from about 2/3.
+    ReconstructQuality = 6,
+    /// DLSS 5's neural rendering (3D-guided), at the screen's size, `UpscaleParams::intensity`.
+    Neural = 7,
+}
+
+impl UpscaleMode {
+    pub const ALL: [UpscaleMode; 8] = [
+        UpscaleMode::Off,
+        UpscaleMode::Native,
+        UpscaleMode::Quality,
+        UpscaleMode::Balanced,
+        UpscaleMode::Performance,
+        UpscaleMode::Reconstruct,
+        UpscaleMode::ReconstructQuality,
+        UpscaleMode::Neural,
+    ];
+
+    pub fn from_number(n: u32) -> UpscaleMode {
+        Self::ALL
+            .get(n as usize)
+            .copied()
+            .unwrap_or(UpscaleMode::Off)
+    }
+
+    /// The share of the screen each way the world is drawn at, NVIDIA's numbers; a backend that
+    /// knows better says so in [`Backend::upscale_render_size`].
+    pub fn scale(self) -> f32 {
+        match self {
+            UpscaleMode::Quality | UpscaleMode::ReconstructQuality => 2.0 / 3.0,
+            UpscaleMode::Balanced => 0.58,
+            UpscaleMode::Performance => 0.5,
+            _ => 1.0,
+        }
+    }
+
+    /// Whether it wants Ray Reconstruction's guides (normals, roughness, albedos).
+    pub fn guides(self) -> bool {
+        matches!(self, UpscaleMode::Reconstruct | UpscaleMode::ReconstructQuality | UpscaleMode::Neural)
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            UpscaleMode::Off => "off",
+            UpscaleMode::Native => "dlaa",
+            UpscaleMode::Quality => "sr-quality",
+            UpscaleMode::Balanced => "sr-balanced",
+            UpscaleMode::Performance => "sr-performance",
+            UpscaleMode::Reconstruct => "rr-dlaa",
+            UpscaleMode::ReconstructQuality => "rr-quality",
+            UpscaleMode::Neural => "dlss5",
+        }
+    }
+}
+
+/// What [`Cmd::Upscale`] needs besides the images, in [`CommandList::data`]. Matrices are glam's
+/// (column-major, column vectors), camera-relative (the camera at the origin), without the jitter.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct UpscaleParams {
+    /// [`UpscaleMode`] as its number.
+    pub mode: u32,
+    /// 1: no last frame to gather from (a teleport, a resize, a new world).
+    pub reset: u32,
+    /// 1: the colour is linear HDR (`core:hdr_world`), 0 linear 0..1.
+    pub hdr: u32,
+    pub pad: u32,
+    /// The world's size (the inputs') and the output's.
+    pub render: [u32; 2],
+    pub output: [u32; 2],
+    /// This frame's jitter in pixels of the world, x right, y down.
+    pub jitter: [f32; 2],
+    /// What turns the motion image's xy into -1..1 (1, 1 for ours, which are in UV).
+    pub mv_scale: [f32; 2],
+    /// DLSS 5's strength, 0..1.
+    pub intensity: f32,
+    /// Vertical field of view (radians), width over height, the near plane (blocks); the far
+    /// plane is infinitely far (reverse Z).
+    pub fov_y: f32,
+    pub aspect: f32,
+    pub near: f32,
+    pub view_to_clip: [f32; 16],
+    pub clip_to_view: [f32; 16],
+    pub clip_to_prev_clip: [f32; 16],
+    pub prev_clip_to_clip: [f32; 16],
+    pub world_to_view: [f32; 16],
+    pub view_to_world: [f32; 16],
+    /// The camera's right, up and forward in the world, w unused.
+    pub right: [f32; 4],
+    pub up: [f32; 4],
+    pub forward: [f32; 4],
+}
+
+/// The temporal upscaler a backend has ([`Backend::upscaler`]).
+#[derive(Clone, Debug, Default)]
+pub struct UpscalerInfo {
+    /// For logs and the debug screen, e.g. "DLSS 310.4 (Streamline 2.14.16)"; empty with none.
+    pub name: String,
+    /// Which [`UpscaleMode`]s it runs, a bit per mode number.
+    pub modes: u32,
+}
+
+impl UpscalerInfo {
+    pub fn has(&self, mode: UpscaleMode) -> bool {
+        mode != UpscaleMode::Off && self.modes & (1 << mode as u32) != 0
+    }
 }
 
 /// Layout of one indexed indirect draw, matches every API we care about.
@@ -340,6 +486,9 @@ pub struct BackendDesc<'a> {
     pub height: u32,
     pub vsync: bool,
     pub debug: bool,
+    /// A stand-in upscaler that only scales the picture up (`Backend::upscaler`), for checking
+    /// everything around one where there is none (`core:upscale_standin`).
+    pub upscale_standin: bool,
 }
 
 pub trait Backend: Send {
@@ -419,5 +568,19 @@ pub trait Backend: Send {
     /// What an earlier `pipeline_cache_data` gave, before any pipeline is made. Data from another
     /// driver or device is ignored.
     fn load_pipeline_cache(&mut self, _data: &[u8]) {}
+    /// The temporal upscaler [`Cmd::Upscale`] runs, if any (none by default: the engine's own
+    /// temporal anti-aliasing then).
+    fn upscaler(&self) -> UpscalerInfo {
+        UpscalerInfo::default()
+    }
+    /// The size to draw the world at for `mode` with the screen at `output`.
+    fn upscale_render_size(&mut self, mode: UpscaleMode, output: (u32, u32)) -> (u32, u32) {
+        let s = mode.scale();
+        (((output.0 as f32 * s).round() as u32).max(1), ((output.1 as f32 * s).round() as u32).max(1))
+    }
+    /// An image [`Cmd::Upscale`] can write its result to (Rgba16Float, read as a texture after).
+    fn create_upscale_target(&mut self, width: u32, height: u32, label: &str) -> TextureId {
+        self.create_texture(&TextureDesc { width, height, mips: 1, format: Format::Rgba16Float, render_target: true }, label)
+    }
     fn wait_idle(&mut self);
 }

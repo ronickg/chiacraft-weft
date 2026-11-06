@@ -285,6 +285,22 @@ impl Settings {
         number("core:aa") >= 1.0
     }
 
+    /// The backend's temporal upscaler (`core:upscaler`, `weft_render::UpscaleMode`), live; off
+    /// unless the backend has one (DLSS: the `streamline` build on Windows).
+    pub fn upscaler(&self) -> weft_render::UpscaleMode {
+        weft_render::UpscaleMode::from_number(number("core:upscaler").max(0.0) as u32)
+    }
+
+    /// The stand-in upscaler for checks (`core:upscale_standin`), read at start.
+    pub fn upscale_standin(&self) -> bool {
+        number("core:upscale_standin") != 0.0
+    }
+
+    /// DLSS 5's strength (`core:dlss5_intensity`), live.
+    pub fn dlss5_intensity(&self) -> f32 {
+        (number("core:dlss5_intensity") as f32).clamp(0.0, 1.0)
+    }
+
     /// Temporal anti-aliasing's least share of each new frame (`core:taa_blend`), live.
     pub fn taa_blend(&self) -> f32 {
         (number("core:taa_blend") as f32).clamp(0.03, 0.5)
