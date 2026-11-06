@@ -1648,7 +1648,11 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
         // against 72; the Look session, 11-06).
         let morning = smoothstep(0.2, 0.34, scene.sun.y) * (1.0 - smoothstep(0.6, 0.7, scene.sun.y));
         let far_off = smoothstep(250.0, 800.0, dist);
-        toward = mix(toward, luma(toward) * sun_tint, mix(0.6, 0.9, morning * far_off) * low_sun * hdr_air) * (1.0 - 0.05 * noon * hdr_air);
+        // In the evening with the sun low in the west (it rises at +x), a third of it by about 10° up:
+        // Bliss's far land at 18:00 is near neutral (warmth +0 to +9 by the horizon) where ours
+        // took the sun's gold (+43), and its mornings stay warm (07:00 +72), so not then (lk_ebc).
+        let dusk = smoothstep(0.05, -0.05, scene.sun.x) * (1.0 - smoothstep(0.15, 0.3, scene.sun.y));
+        toward = mix(toward, luma(toward) * sun_tint, mix(0.6, 0.9, morning * far_off) * low_sun * hdr_air * mix(1.0, 0.35, dusk)) * (1.0 - 0.05 * noon * hdr_air);
         v = mix(v, vec3((v.r + v.g + v.b) / 3.0), mix(0.35, 0.5, noon) * hdr_air);
     }
     let mixed = mix(pale, toward, v);
