@@ -13,9 +13,9 @@
 //! stand's layers. `old` grows the crowns as they were before the stand tiers (b34890b3: every crown a canopy
 //! tree's, the round ones seven across), for the before half of the sheet.
 
-use base_api::trees::{Crown, simple_at, simple_standing};
 use base_api::branchy::Part;
 use base_api::tree_recipes::{Variant, colonized, of, tiered, tiered_colonized, varied, varied_colonized};
+use base_api::trees::{Crown, simple_at, simple_standing};
 use vitals::canopy::{self, Tier};
 use weft_sdk::noise::hash;
 
@@ -248,11 +248,7 @@ fn render(g: &Grid, height: f64, pitch: f64, _dist: f64) -> Vec<u8> {
         for i in 0..w {
             let u = (2.0 * (i as f64 + 0.5) / w as f64 - 1.0) * tanf * w as f64 / hgt as f64;
             let v = (1.0 - 2.0 * (j as f64 + 0.5) / hgt as f64) * tanf;
-            let d = norm([
-                fwd[0] + u * right[0] + v * up[0],
-                fwd[1] + u * right[1] + v * up[1],
-                fwd[2] + u * right[2] + v * up[2],
-            ]);
+            let d = norm([fwd[0] + u * right[0] + v * up[0], fwd[1] + u * right[1] + v * up[1], fwd[2] + u * right[2] + v * up[2]]);
             let sky = [0.62, 0.74, 0.92];
             let col = match march(g, eye, d, 1400.0) {
                 None => sky,
@@ -309,7 +305,13 @@ fn march(g: &Grid, o: [f64; 3], d: [f64; 3], max: f64) -> Option<(u8, [f64; 3], 
                 return Some((b, p, n, t));
             }
         }
-        let k = if next[0] < next[1] && next[0] < next[2] { 0 } else if next[1] < next[2] { 1 } else { 2 };
+        let k = if next[0] < next[1] && next[0] < next[2] {
+            0
+        } else if next[1] < next[2] {
+            1
+        } else {
+            2
+        };
         t = next[k];
         next[k] += delta[k];
         cell[k] += step[k];

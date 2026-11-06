@@ -102,7 +102,10 @@ pub const STAND_ELSE: Stand = Stand { biome: "", under: 0.2, emergent: 0.06 };
 
 /// A biome's stand.
 pub fn stand(biome: &str) -> &'static Stand {
-    STANDS.iter().find(|s| s.biome == biome).unwrap_or(&STAND_ELSE)
+    STANDS
+        .iter()
+        .find(|s| s.biome == biome)
+        .unwrap_or(&STAND_ELSE)
 }
 
 /// The tier a tree at a site of `biome` grows into, `roll` (0..1) its site's own.

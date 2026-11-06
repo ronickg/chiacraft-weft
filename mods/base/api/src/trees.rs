@@ -684,7 +684,11 @@ mod tests {
         for crown in [Crown::Round, Crown::Cone, Crown::Slim] {
             let top = |tier: Tier| {
                 (0..200u64)
-                    .map(|s| simple_at(crown, 1, 2, 0, 0, 0, hash(s, 1, 1, 1) >> 32, false).with_tier(tier).height())
+                    .map(|s| {
+                        simple_at(crown, 1, 2, 0, 0, 0, hash(s, 1, 1, 1) >> 32, false)
+                            .with_tier(tier)
+                            .height()
+                    })
                     .fold((i32::MAX, i32::MIN), |(lo, hi), v| (lo.min(v), hi.max(v)))
             };
             let (u, c, e) = (top(Tier::Under), top(Tier::Canopy), top(Tier::Emergent));
