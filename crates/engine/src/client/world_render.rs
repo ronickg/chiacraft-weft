@@ -392,10 +392,11 @@ pub struct WorldRenderer {
     /// terrain taking the pixels they leave (Distant Horizons' fade), so the edge isn't a line.
     /// Only those meshes, so the rest keep early depth (no `discard`).
     fade_pipes: Option<[PipelineId; 6]>,
-    /// The colour pipelines not in use: the calm ones (`calm_pipes`) while `calm_on` is false,
-    /// the plain ones while it is true. None when the pack doesn't use `CALM`.
-    calm_alt: Option<ColorPipes>,
-    calm_on: bool,
+    /// The calm colour pipelines (`calm_pipes`): calm, then calm and dry. None where the pack
+    /// doesn't use `CALM` (or `DRY`). The set of level `calm_level` (`set_calm`) is in use, and its
+    /// place here holds the plain ones meanwhile.
+    calm_sets: [Option<ColorPipes>; 2],
+    calm_level: u8,
     /// How far from the camera (blocks, across) the cubes end while distant terrain is shown; 0:
     /// no fade. Cubes past it aren't drawn.
     pub lod_fade: u32,
@@ -645,17 +646,18 @@ impl WorldRenderer {
             rt_wanted: rt_expand.is_some() && rt::rt_setting(),
             rt_pack,
             rt_reload: false,
-            calm_alt: Self::calm_pipes(gpu, assets),
-            calm_on: false,
+            calm_sets: [Self::calm_pipes(gpu, assets, false), Self::calm_pipes(gpu, assets, true)],
+            calm_level: 0,
         })
     }
 
     /// The colour pipelines from the world shader with `CALM` true (`packs::compose_calm`), when
     /// the pack uses it: the same draws, the shader without the paths that do nothing in a calm
     /// scene. Shadows and depth-only passes keep the plain ones.
-    fn calm_pipes(gpu: &mut dyn Backend, assets: &crate::assets::Assets) -> Option<ColorPipes> {
+    /// `dry`: with `DRY` true as well (`gpu_layout::DRY_OFF`).
+    fn calm_pipes(gpu: &mut dyn Backend, assets: &crate::assets::Assets, dry: bool) -> Option<ColorPipes> {
         let snippets = crate::shaders::snippets(assets, &HOOK);
-        let s = crate::packs::compose_calm(assets, "world.wgsl", &[(&HOOK, &snippets)])?;
+        let s = crate::packs::compose_calm(assets, "world.wgsl", &[(&HOOK, &snippets)], dry)?;
         let (face, quad, lod) = Self::pipelines(gpu, &s)
             .map_err(|e| log::error!("calm world pipelines: {e}"))
             .ok()?;
@@ -679,23 +681,37 @@ impl WorldRenderer {
         std::mem::swap(&mut self.fade_pipes, &mut set.fade);
     }
 
-    /// Draws with the calm pipelines (`gpu_layout::CALM_OFF`) while `calm`, when the pack has
-    /// them; the plain ones otherwise. Call before the frame's draws.
-    pub fn set_calm(&mut self, calm: bool) {
-        if calm == self.calm_on {
+    /// Draws with the calm pipelines (`gpu_layout::CALM_OFF`) at `level` 1, the calm-and-dry ones
+    /// (`DRY_OFF`) at 2, the plain ones at 0; a level the pack has no set for takes the one below.
+    /// Call before the frame's draws.
+    pub fn set_calm(&mut self, level: u8) {
+        let want = (1..=level.min(2))
+            .rev()
+            .find(|&l| self.calm_sets[l as usize - 1].is_some())
+            .unwrap_or(0);
+        if want == self.calm_level {
             return;
         }
-        if let Some(mut alt) = self.calm_alt.take() {
-            self.swap_pipes(&mut alt);
-            self.calm_alt = Some(alt);
-            self.calm_on = calm;
+        for l in [self.calm_level, want] {
+            if l > 0
+                && let Some(mut set) = self.calm_sets[l as usize - 1].take()
+            {
+                self.swap_pipes(&mut set);
+                self.calm_sets[l as usize - 1] = Some(set);
+            }
         }
+        self.calm_level = want;
     }
 
     /// Puts the plain pipelines back in use and destroys the calm ones (before a reload or drop).
     fn drop_calm(&mut self, gpu: &mut dyn Backend) {
-        self.set_calm(false);
-        if let Some(set) = self.calm_alt.take() {
+        self.set_calm(0);
+        for set in self
+            .calm_sets
+            .iter_mut()
+            .filter_map(Option::take)
+            .collect::<Vec<_>>()
+        {
             for p in set
                 .face
                 .into_iter()
@@ -1209,7 +1225,7 @@ impl WorldRenderer {
                 self.tex_shader = shader_table(gpu, crate::content::content(), textures, &slots);
                 self.solid
                     .set_on(gpu, crate::packs::pack_uses("world.wgsl", "solid_at"));
-                self.calm_alt = Self::calm_pipes(gpu, assets);
+                self.calm_sets = [Self::calm_pipes(gpu, assets, false), Self::calm_pipes(gpu, assets, true)];
                 log::info!("world shader reloaded");
             }
             Err(e) => log::error!("world shader: {e}"),

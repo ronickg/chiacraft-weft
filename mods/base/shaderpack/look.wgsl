@@ -17,12 +17,19 @@ fn in_liquid() -> bool {
 
 // How hard it rains, 0..1 (the engine puts it beside the fog's color).
 fn rain_amount() -> f32 {
+    // None in the calm-and-dry pipelines (`DRY`: the engine draws with them only when it is 0).
+    if DRY {
+        return 0.0;
+    }
     return clamp(scene.fog_color.w, 0.0, 1.0);
 }
 
 // How wet the ground is where the player is, 0..1: it wets as rain falls and dries over minutes
 // after (`scene.canopy.y`, the engine's, at the pace the base mod's air gives).
 fn ground_wet() -> f32 {
+    if DRY {
+        return 0.0;
+    }
     return clamp(scene.canopy.y, 0.0, 1.0);
 }
 
@@ -1457,7 +1464,7 @@ fn mist_bounce(d: f32, lit: f32) -> vec3<f32> {
 // faces up under the open sky, in patches that join up as it deepens.
 fn snow_on(n: vec3<f32>, pos: vec3<f32>, sky: f32) -> f32 {
     let deep = scene.ground.x;
-    if deep <= 0.0 {
+    if DRY || deep <= 0.0 {
         return 0.0;
     }
     let q = vec3<i32>(floor(pos * 16.0));

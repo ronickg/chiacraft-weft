@@ -3335,12 +3335,13 @@ impl Client {
         // from the scene the shaders see: no fog in the air, no thunder, no held light, the eye in
         // no liquid (the fog then starts at 0.6 of its end).
         let hand = scene.hand_light;
-        self.render.set_calm(
-            scene.weather[2] <= 0.0
-                && scene.lightning[2] < 0.05
-                && hand[0].max(hand[1]).max(hand[2]) <= 0.0
-                && (scene.params[0] - 0.6 * scene.params[1]).abs() <= 0.5,
-        );
+        let calm = scene.weather[2] <= 0.0
+            && scene.lightning[2] < 0.05
+            && hand[0].max(hand[1]).max(hand[2]) <= 0.0
+            && (scene.params[0] - 0.6 * scene.params[1]).abs() <= 0.5;
+        // And dry (`gpu_layout::DRY_OFF`): no rain, the ground dry, no puddles, no snow lying here.
+        let dry = scene.fog_color[3] <= 0.0 && scene.canopy[1] <= 0.0 && scene.canopy[2] <= 0.0 && scene.ground[0] <= 0.0;
+        self.render.set_calm(if calm { 1 + dry as u8 } else { 0 });
         while self.scene_bufs.len() < gpu.frames_in_flight() {
             self.scene_bufs.push(gpu.create_buffer(
                 size_of::<Scene>() as u64,
