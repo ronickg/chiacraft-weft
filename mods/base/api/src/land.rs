@@ -2082,7 +2082,11 @@ pub fn mc_forest_biome(f: &Fields, x: i32, z: i32) -> &'static str {
         "mountains"
     } else {
         let v = f.fbm(salt::MC_MIX, x, z, q4(MC_MIX_SIZE), 3) as f64 / ONE as f64;
-        MC_MIX[mc_mix_cuts().iter().position(|&c| v < c).unwrap_or(MC_MIX.len() - 1)].0
+        MC_MIX[mc_mix_cuts()
+            .iter()
+            .position(|&c| v < c)
+            .unwrap_or(MC_MIX.len() - 1)]
+        .0
     }
 }
 
@@ -2098,7 +2102,10 @@ mod tests {
         for z in (-120..120).step_by(3) {
             for x in (-120..120).step_by(3) {
                 let v = f.fbm(salt::MC_MIX, x * 61 * 16, z * 61 * 16, q4(MC_MIX_SIZE), 3) as f64 / ONE as f64;
-                let i = mc_mix_cuts().iter().position(|&c| v < c).unwrap_or(MC_MIX.len() - 1);
+                let i = mc_mix_cuts()
+                    .iter()
+                    .position(|&c| v < c)
+                    .unwrap_or(MC_MIX.len() - 1);
                 n[i] += 1;
                 all += 1;
             }

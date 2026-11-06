@@ -25,9 +25,9 @@ use weft_sdk::noise::fixed::{self, Fields, ONE, div_floor, q4, q12, ramp, shape}
 
 use super::{
     CONTINENTS, HIGHLANDS, HIGHLANDS_AREA, HILLS, HILLS_AREA, Here, LAKE_DEPTH, LAKE_MAX_RISE, LAKE_STRETCH, Lake, MOUNTAINS_AREA,
-    RIVER_BANKS, RIVER_MOUNTAINS, RIVER_NODE, RIVER_RAIN, RIVER_REACH,
-    RIVER_REGION, RIVER_ROUTE_HILLS, RIVER_ROUTE_MOUNTAINS, RIVER_SINK_RADIUS, RIVER_TERRACE, RIVER_TERRACE_RISER,
-    RIVER_VALLEY_PER_BLOCK, RIVER_VALLEY_RISE, RIVER_WARP_SCALE, Rivers, ground_at, rivers_style, lake_reach_most, masked, mesa_at, salt,
+    RIVER_BANKS, RIVER_MOUNTAINS, RIVER_NODE, RIVER_RAIN, RIVER_REACH, RIVER_REGION, RIVER_ROUTE_HILLS, RIVER_ROUTE_MOUNTAINS,
+    RIVER_SINK_RADIUS, RIVER_TERRACE, RIVER_TERRACE_RISER, RIVER_VALLEY_PER_BLOCK, RIVER_VALLEY_RISE, RIVER_WARP_SCALE, Rivers, ground_at,
+    lake_reach_most, masked, mesa_at, rivers_style, salt,
 };
 use crate::SEA;
 
@@ -489,12 +489,7 @@ pub(super) fn shape(flow: i32, mountains: i32) -> Shape {
     let size = ramp(flow, q12(r.flow.1), q12(r.flow.2));
     let lerp = |(a, b): (i32, i32)| q4(a as f64) + (((q4(b as f64) - q4(a as f64)) * size) >> 12);
     let strength = ramp(flow, q12(r.flow.0), q12(r.flow.1));
-    Shape {
-        half: lerp(r.half_width).max(16),
-        depth: lerp(r.depth),
-        floodplain: lerp(r.floodplain),
-        strength: (strength * mountains) >> 12,
-    }
+    Shape { half: lerp(r.half_width).max(16), depth: lerp(r.depth), floodplain: lerp(r.floodplain), strength: (strength * mountains) >> 12 }
 }
 
 /// A valley side's rise (Q4) in benches: flat for all but the last `RIVER_TERRACE_RISER` of each

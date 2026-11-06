@@ -28,11 +28,8 @@ const YAW: f64 = -120.0;
 /// Half the field of view across (FOV 70 at 16:9).
 const HALF_FOV: f64 = 51.0;
 /// The bands: (from, to blocks, wanted shares of woods, plains, water, mountains).
-const BANDS: [(f64, f64, [f64; 4]); 3] = [
-    (90.0, 500.0, [0.67, 0.20, 0.13, 0.0]),
-    (500.0, 1500.0, [0.35, 0.50, 0.10, 0.05]),
-    (1500.0, 4000.0, [0.40, 0.40, 0.10, 0.10]),
-];
+const BANDS: [(f64, f64, [f64; 4]); 3] =
+    [(90.0, 500.0, [0.67, 0.20, 0.13, 0.0]), (500.0, 1500.0, [0.35, 0.50, 0.10, 0.05]), (1500.0, 4000.0, [0.40, 0.40, 0.10, 0.10])];
 
 /// A candidate: its score (lower is nearer), where, each band's shares, a cherry grove in view.
 type View = (f64, i32, i32, Vec<[f64; 4]>, bool);
@@ -41,7 +38,10 @@ fn main() {
     let a: Vec<String> = std::env::args().skip(1).collect();
     if a.get(1).map(String::as_str) == Some("floor") {
         let arg = |i: usize| a.get(i).and_then(|s| s.parse::<i32>().ok()).unwrap_or(0);
-        let biome = a.get(4).cloned().unwrap_or_else(|| "old_growth_forest".into());
+        let biome = a
+            .get(4)
+            .cloned()
+            .unwrap_or_else(|| "old_growth_forest".into());
         l::with_mc_land(|| floor(a[0].parse().unwrap_or(1), arg(2), arg(3), &biome));
     } else {
         l::with_mc_land(find);
@@ -124,7 +124,10 @@ fn find() {
                         all += 1.0;
                         if bi < 2
                             && ph >= SEA
-                            && !matches!(l::overworld_biome(&f, px * 16, pz * 16), "forest" | "birch_forest" | "plains" | "old_growth_forest" | "mountains" | "beach" | "swamp")
+                            && !matches!(
+                                l::overworld_biome(&f, px * 16, pz * 16),
+                                "forest" | "birch_forest" | "plains" | "old_growth_forest" | "mountains" | "beach" | "swamp"
+                            )
                         {
                             other += 1.0;
                         }
@@ -136,7 +139,11 @@ fn find() {
                 }
                 let shares = n.map(|v| v / all);
                 let w = if bi == 0 { 3.0 } else { 1.0 };
-                score += w * shares.iter().zip(want).map(|(g, t)| (g - t) * (g - t)).sum::<f64>();
+                score += w * shares
+                    .iter()
+                    .zip(want)
+                    .map(|(g, t)| (g - t) * (g - t))
+                    .sum::<f64>();
                 got.push(shares);
             }
             if !cherry {

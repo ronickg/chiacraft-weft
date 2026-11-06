@@ -39,17 +39,23 @@ pub fn terrain(r: &mut Registry) {
     finish(t);
 
     r.decoration(rock_faces).dimension(&crate::OVERWORLD);
-    r.decoration(|g| l::with_mc_land(|| rock_faces(g))).dimension(&crate::MC_FOREST);
+    r.decoration(|g| l::with_mc_land(|| rock_faces(g)))
+        .dimension(&crate::MC_FOREST);
     r.decoration(cave_mouths).dimension(&crate::OVERWORLD);
-    r.decoration(|g| l::with_mc_land(|| cave_mouths(g))).dimension(&crate::MC_FOREST);
+    r.decoration(|g| l::with_mc_land(|| cave_mouths(g)))
+        .dimension(&crate::MC_FOREST);
     r.decoration(glaciers).dimension(&crate::OVERWORLD);
-    r.decoration(|g| l::with_mc_land(|| glaciers(g))).dimension(&crate::MC_FOREST);
+    r.decoration(|g| l::with_mc_land(|| glaciers(g)))
+        .dimension(&crate::MC_FOREST);
     r.decoration(tarn_water).dimension(&crate::OVERWORLD);
-    r.decoration(|g| l::with_mc_land(|| tarn_water(g))).dimension(&crate::MC_FOREST);
+    r.decoration(|g| l::with_mc_land(|| tarn_water(g)))
+        .dimension(&crate::MC_FOREST);
     r.decoration(fray_borders).dimension(&crate::OVERWORLD);
-    r.decoration(|g| l::with_mc_land(|| fray_borders(g))).dimension(&crate::MC_FOREST);
+    r.decoration(|g| l::with_mc_land(|| fray_borders(g)))
+        .dimension(&crate::MC_FOREST);
     r.decoration(sea_sand).dimension(&crate::OVERWORLD);
-    r.decoration(|g| l::with_mc_land(|| sea_sand(g))).dimension(&crate::MC_FOREST);
+    r.decoration(|g| l::with_mc_land(|| sea_sand(g)))
+        .dimension(&crate::MC_FOREST);
     r.decoration(coral).dimension(&crate::OVERWORLD);
     r.decoration(landmarks).dimension(&crate::OVERWORLD);
     r.decoration(tropical_water).dimension(&crate::OVERWORLD);
@@ -61,7 +67,11 @@ pub fn terrain(r: &mut Registry) {
 /// nothing seams: the cold flattens hills into tundra, deserts get dunes and mesas, rivers run
 /// where it's wet enough.
 fn land(t: TerrainBuilder<'_>, features: Vec<Feature>) -> TerrainBuilder<'_> {
-    let mut t = t.stone("stone").base_height(SEA as f64).continent_scale(l::CONTINENT_SCALE).sea(SEA, "water");
+    let mut t = t
+        .stone("stone")
+        .base_height(SEA as f64)
+        .continent_scale(l::CONTINENT_SCALE)
+        .sea(SEA, "water");
     for (name, field) in l::rule_fields() {
         t = t.field(name, field);
     }
@@ -79,35 +89,34 @@ fn coasts(t: TerrainBuilder<'_>) -> TerrainBuilder<'_> {
     // and lies on its own bed (`RIVER_BEDS`).
     // Warm shallow seas first (`base_api::land::reef_part`): the reef's top 2 under the surface,
     // the lagoon's floor 3-5 under, in warm water near the coasts.
-    t
-        .biome(
-            BiomeRule::new("coral_reef")
-                .height(SEA - 2..=SEA - 2)
-                .temperature(l::REEF_WARM_RULE..)
-                .continent(..l::REEF_COAST),
-        )
-        .biome(
-            BiomeRule::new("lagoon")
-                .height(SEA - l::REEF_LAGOON.1..=SEA - l::REEF_LAGOON.0)
-                .temperature(l::REEF_WARM_RULE..)
-                .continent(..l::REEF_COAST),
-        )
-        .biome(
-            BiomeRule::new("ocean")
-                .height(..=SEA - 2)
-                .continent(..l::OCEAN_CONTINENT),
-        )
-        .biome(
-            BiomeRule::new("snowy_plains")
-                .named("snowy_coast")
-                .height(..=SEA + 1)
-                .continent(..l::BEACH_CONTINENT),
-        )
-        .biome(
-            BiomeRule::new("beach")
-                .height(..=SEA + 1)
-                .continent(..l::BEACH_CONTINENT),
-        )
+    t.biome(
+        BiomeRule::new("coral_reef")
+            .height(SEA - 2..=SEA - 2)
+            .temperature(l::REEF_WARM_RULE..)
+            .continent(..l::REEF_COAST),
+    )
+    .biome(
+        BiomeRule::new("lagoon")
+            .height(SEA - l::REEF_LAGOON.1..=SEA - l::REEF_LAGOON.0)
+            .temperature(l::REEF_WARM_RULE..)
+            .continent(..l::REEF_COAST),
+    )
+    .biome(
+        BiomeRule::new("ocean")
+            .height(..=SEA - 2)
+            .continent(..l::OCEAN_CONTINENT),
+    )
+    .biome(
+        BiomeRule::new("snowy_plains")
+            .named("snowy_coast")
+            .height(..=SEA + 1)
+            .continent(..l::BEACH_CONTINENT),
+    )
+    .biome(
+        BiomeRule::new("beach")
+            .height(..=SEA + 1)
+            .continent(..l::BEACH_CONTINENT),
+    )
 }
 
 /// The heights' rules: snow over its line, the mountains' own ground.
@@ -174,8 +183,13 @@ pub fn mc_forest_terrain(r: &mut Registry) {
     let cuts = l::mc_mix_cuts();
     let mut low = f64::NEG_INFINITY;
     for (i, &(biome, _)) in l::MC_MIX.iter().enumerate() {
-        let bed = l::RIVER_BEDS.iter().find(|e| e.0 == biome).map_or("sand", |e| e.1);
-        let rule = BiomeRule::new(biome).named(&format!("mc_{biome}")).deep_top(bed, SEA);
+        let bed = l::RIVER_BEDS
+            .iter()
+            .find(|e| e.0 == biome)
+            .map_or("sand", |e| e.1);
+        let rule = BiomeRule::new(biome)
+            .named(&format!("mc_{biome}"))
+            .deep_top(bed, SEA);
         t = t.biome(if i + 1 < l::MC_MIX.len() { rule.field(l::MC_MIX_FIELD, low..cuts[i]) } else { rule });
         low = cuts[i];
     }

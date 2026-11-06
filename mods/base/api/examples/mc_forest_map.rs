@@ -14,7 +14,10 @@ fn main() {
     let (cx, cz) = (arg(2, 0) as i32, arg(3, 0) as i32);
     let across = arg(4, 3072) as i32;
     let step = arg(5, 4).max(1) as i32;
-    let out = a.get(6).cloned().unwrap_or_else(|| "mc_forest_map.ppm".into());
+    let out = a
+        .get(6)
+        .cloned()
+        .unwrap_or_else(|| "mc_forest_map.ppm".into());
     let f = l::fields(seed);
     let n = (across / step) as usize;
     let (x0, z0) = (cx - across / 2, cz - across / 2);
