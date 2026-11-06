@@ -1461,7 +1461,7 @@ fn froxel_cell(dir: vec3<f32>, at: f32, floor: f32) -> vec4<f32> {
     let shaded_sky = light.sky * mix(vec3(1.0), LEAF_LIGHT * 0.2, leafy * 0.85) + light.leaf * leafy;
     let k = froxel_slice(at);
     let span = froxel_end(k) - froxel_end(k - 1.0);
-    // The mist through the cell's whole depth: the banks' noise once at its middle, the height's
+    // The mist through the cell's whole depth: the banks' noise at its two ends, the height's
     // shape (the layer's top, its fall) at eight places spread through it. Taken at the middle
     // alone, a low layer was all in a slice where the middle fell in it and none where it didn't,
     // so the land under a mist wore rings round the eye at the slices' distances, 50-120 blocks
@@ -1470,10 +1470,16 @@ fn froxel_cell(dir: vec3<f32>, at: f32, floor: f32) -> vec4<f32> {
     let slice = trunc(froxel_slice(at));
     let a0 = froxel_end(slice - 1.0);
     let a1 = froxel_end(slice);
-    let banks = fog_banks_at(scene.eye.xyz + dir * at, floor);
+    // The noise at the cell's two ends, blended between them through it: a slice's end is the next
+    // one's start, so the banks run on unbroken from slice to slice. Taken once at a cell's middle,
+    // each slice had its own (and the layer's top with it), and faint bands stayed round the eye
+    // where the slices meet (the ring fix's second run, 11-06).
+    let banks0 = fog_banks_at(scene.eye.xyz + dir * a0, floor);
+    let banks1 = fog_banks_at(scene.eye.xyz + dir * a1, floor);
     var d = 0.0;
     for (var i = 0; i < 8; i++) {
-        d += fog_density_with(scene.eye.xyz + dir * mix(a0, a1, (f32(i) + 0.5) / 8.0), floor, banks);
+        let t = (f32(i) + 0.5) / 8.0;
+        d += fog_density_with(scene.eye.xyz + dir * mix(a0, a1, t), floor, mix(banks0, banks1, t));
     }
     d /= 8.0;
     if d <= 0.0 {
