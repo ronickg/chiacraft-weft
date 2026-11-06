@@ -987,7 +987,9 @@ fn far_water(in: VOut) -> vec3<f32> {
     let ndv = max(dot(n, v), 0.02);
     // Schlick's: nearly all mirror at the slants far water is seen at.
     let fresnel = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
-    let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, cloud_shadow(in.rel), 1.0, in.pos, in.rel);
+    // The clouds' shadow here once (it was asked twice, for the light and the glint).
+    let clouds = cloud_shadow(in.rel);
+    let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, clouds, 1.0, in.pos, in.rel);
     let deep = vec3(0.014, 0.045, 0.045) * lit;
     let r = reflect(-v, n);
     let refl = sky_color(normalize(vec3(r.x, max(r.y, 0.02), r.z)));
@@ -997,7 +999,7 @@ fn far_water(in: VOut) -> vec3<f32> {
     let a2 = 0.0025;
     let dd = nh * nh * (a2 - 1.0) + 1.0;
     let spec = a2 / (3.14159 * dd * dd) * fresnel * 0.25;
-    let glint = palette().sun * light_strength() * min(spec, mix(30.0, 1.5, golden())) * smoothstep(0.0, 0.1, l.y + 0.05) * cloud_shadow(in.rel);
+    let glint = palette().sun * light_strength() * min(spec, mix(30.0, 1.5, golden())) * smoothstep(0.0, 0.1, l.y + 0.05) * clouds;
     let c = refl * fresnel + deep * (1.0 - fresnel) + glint;
     return display(haze_lit(c, in.rel, in.light.x));
 }
