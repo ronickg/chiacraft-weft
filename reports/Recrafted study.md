@@ -274,4 +274,32 @@ Ranked by how much realism each adds for what it costs, with the leaves first be
 - **How the worlds and shots were made:** each world was made headless by Mojang's own server for its version, its biomes found with `/locate`. Scenes come from `~/Coding/chiacraft-archive/tester-tools/recrafted/scenes.py` through the comparison session's `run_pack.sh`, each in a 15-minute queue hold.
 - **Ours:** dev 958111da through the PC queue (look `rc_ours1`, `ours_scenes.txt`): an autumn birch forest in wind and storm, a desert dust storm, a lake at noon and in rain, a snowy taiga in winter.
 
-(Shots and the side-by-side sheets follow when the runs are done.)
+### ImmersiveVFX, seen (11-05, 21:38-21:45 PC time)
+
+Sheet: `~/Coding/chiacraft-archive/images/recrafted/2026-11-05/ivfx2_v_sheet.jpg`, all frames in `ivfx2_v/` next to it. All 15 scenes ran, and the log shows no errors from the mod.
+
+- **Desert, rain turned into sand wind, and thunder into a sandstorm:** this is the shot that sells it, and it's what our dust storm should copy in shape. Three layers do the work.
+  - Tumbling sand clumps in several sizes, close to the camera, with a few big flakes.
+  - A cloud of fine grains further out, with thin fast streaks.
+  - A yellow fog that takes the far trees down to silhouettes and turns the sky the same yellow.
+  No rain falls. The step from sand wind to sandstorm is a denser cloud and a thicker fog, nothing new. Our `/air ... dust` today is fog and tint only (see `ours/`), with no flying grains near the camera, and those grains are what give it depth.
+- **Savanna in thunder:** an orange haze sky over dark-tinted fog, so the storm reads as dry dust, not rain.
+- **Forest at dawn, in rain, in thunder:** the dawn fog phase gives a pink-violet band low on the horizon. In rain and thunder the grey fog thickens with distance and the light drops. Its fog table (biome × time phase) is easy to see working.
+- **Swamp in the morning:** small yellow glows in the grass. These may be the mod's or vanilla 26.x firefly bushes; I can't tell from the shot. We already have fireflies.
+- **Night fire:** the campfire smoke rises in a soft column, and fire and campfire light the bricks warmly. That's close to ours today.
+- **Missed:**
+  - The beach scene landed over open ocean, so no shore foam is in shot.
+  - The snowy-plains camera faced a cliff, so the blizzard's flurry and the night sky can't be read, and no aurora came out (it only shows on some clear cold nights).
+  - Shore foam and the aurora are still known from the code only (see the ImmersiveVFX section).
+
+### Recrafted part a, seen (11-05, 22:52-22:59 PC time)
+
+Sheet: `~/Coding/chiacraft-archive/images/recrafted/2026-11-05/recrafted_a_sheet.jpg`, all frames in `recrafted_a/`. This is the third try, the first with Improved Transparency on (the Fabulous preset) and every command allowed. The earlier tries are kept as `recrafted_a_try2_nocommands/` and `recrafted_a_try3_notransparency/`. The log's only complaints are Polytone's own `Missing texture references` warnings for its marker models (`translucent_marker/*`, `colored_light/*`), which are expected because those models are invisible tags.
+
+- **Grass and flowers:** this is the strongest look in part a. Short grass is a tuft of tall, bent blades that covers the block edges, so a meadow reads as one field and not a grid. Flowers stand in it at the same scale. In the cherry grove, fallen petals cover the ground under the crowns.
+- **Light under trees:** soft shade and a mild, desaturated grade, natural and not vivid. Our default is vivid like Bliss, by Ronald's choice, so take this grade only as one option among the looks.
+- **Rain:** soft and faint, with thin pale streaks against the sky. There are no splashes in the frames and no visible darkening of the ground within 20 s. The puddles need flat open ground and time to build up (`puddle_wet` rises slowly), and this plain is hilly. Thunder mostly darkens the light.
+- **Snowy taiga:** snow lies on the ground and the spruce stands dark beside it. The frames don't show frost on the leaves.
+- **Missed: falling leaves.** Standing on the ground under the canopy (`motion_blocking_no_leaves`) put leaves right in front of the camera in the oak, dark-oak and birch forests, so no drifting leaf can be seen against them. In storm the frames only get darker. Part b now begins with two forest scenes in a cleared 11×11 column (oak in calm and in storm, then birch), so falling leaves show against open air and sky.
+
+(Part b and the side-by-side sheets follow.)
