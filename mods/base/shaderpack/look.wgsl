@@ -1401,7 +1401,15 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // Distant Horizons comparison, 11-05). It hands over to the horizon's colour where the terrain
     // ends, so the last ridges still meet the sky without a line, standing a little bluer than it.
     let blue = sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 0.1, dir.z)));
-    let color = mix(blue, horizon, smoothstep(end * 0.55, end, dist));
+    var color = mix(blue, horizon, smoothstep(end * 0.55, end, dist));
+    // In a dust storm the far land goes into the dust, as the sky does (it is fogged over 220
+    // blocks): veiled toward the clear sky's colour, far ridges stood blue-lavender against a
+    // sand-coloured sky (the dust-layers sheet, 11-06). The fog's own light at full depth.
+    let dust = clamp(scene.ground.z, 0.0, 1.0) * smoothstep(0.0, 0.3, scene.weather.z);
+    if dust > 0.0 {
+        let fl = fog_light(dir);
+        color = mix(color, fl.sky + fl.sun, dust);
+    }
     let rain = rain_amount();
     // Thinner looking up at what is high, so hills stand out against a hazy valley (`haze_veil`).
     let veil = haze_veil(rel, dist);
