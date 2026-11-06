@@ -96,6 +96,7 @@ static GPU_MEMORY: Config<i32> = Config::named("core:gpu_memory_mb");
 /// The GPU can trace rays (`core:gpu_ray_query`): the traced shadows' row is shown.
 static GPU_RAY_QUERY: Config<bool> = Config::named("core:gpu_ray_query");
 static RT_SHADOWS: Config<i32> = Config::named("core:rt_shadows");
+static RT_REFLECTIONS: Config<bool> = Config::named("core:rt_reflections");
 /// What the detection chose (Research round 19, 7: "quality chosen by the GPU at first start"):
 /// the preset (-1 none yet), and whether the render scale went to half with it.
 static DETECTED: Config<i32> = Config::named("gpu_preset");
@@ -524,14 +525,24 @@ fn row_ui(ui: &mut Ui, rows: &'static [Row], i: usize, step: fn(usize, i32)) {
 
 /// Traced sun and moon shadows (`core:rt_shadows`), only where the GPU can trace rays: outside the
 /// presets, so no preset changes the look by it (an ultra choice the player makes).
-const RT_ROWS: [Row; 1] = [Row {
-    key: "rt_shadows",
-    // Ultra: soft edges from more rays a pixel (with TAA), about three times the cost.
-    values: &[0.0, 1.0, 2.0],
-    get: || RT_SHADOWS.get() as f64,
-    set: |v| RT_SHADOWS.set(v as i32),
-    shown: |v| word(["off", "on", "ultra"][(v as usize).min(2)]),
-}];
+const RT_ROWS: [Row; 2] = [
+    Row {
+        key: "rt_shadows",
+        // Ultra: soft edges from more rays a pixel (with TAA), about three times the cost.
+        values: &[0.0, 1.0, 2.0],
+        get: || RT_SHADOWS.get() as f64,
+        set: |v| RT_SHADOWS.set(v as i32),
+        shown: |v| word(["off", "on", "ultra"][(v as usize).min(2)]),
+    },
+    // Reflections traced on water, glass, polished stone and metal, in place of the screen's.
+    Row {
+        key: "rt_reflections",
+        values: &[0.0, 1.0],
+        get: || RT_REFLECTIONS.get() as u8 as f64,
+        set: |v| RT_REFLECTIONS.set(v > 0.0),
+        shown: |v| word(if v > 0.0 { "on" } else { "off" }),
+    },
+];
 
 fn step_rt(i: usize, dir: i32) {
     step_row(&RT_ROWS[i], dir);
@@ -672,7 +683,9 @@ pub fn register(r: &mut Registry) {
                 row_ui(ui, &ROWS, i, step);
             }
             if GPU_RAY_QUERY.get() {
-                row_ui(ui, &RT_ROWS, 0, step_rt);
+                for i in 0..RT_ROWS.len() {
+                    row_ui(ui, &RT_ROWS, i, step_rt);
+                }
             }
         });
     });

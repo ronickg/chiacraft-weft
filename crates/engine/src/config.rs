@@ -601,6 +601,9 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // ray queries (Vulkan's; not the Mac or phones): ultra, off unless chosen.
         // 2: their soft edges from more rays a pixel (with TAA; about three times the cost).
         ConfigDef::number("core:rt_shadows", ck::INT, 0.0, 0.0, 2.0, 1.0),
+        // Reflections traced through the scene on smooth surfaces (water, glass, polished stone,
+        // metals: their LabPBR maps), in place of the screen's; same GPUs.
+        ConfigDef::number("core:rt_reflections", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         // The soft clouds' shadow on the land (with the HDR world; `client::cloud_shadow`).
         ConfigDef::number("core:cloud_shadows", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         // Vanilla's: in GUI pixels, and percent of the dark behind the text.

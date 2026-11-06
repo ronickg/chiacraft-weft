@@ -5,10 +5,12 @@
 //! all, made again each frame about the camera.
 //!
 //! Each BLAS has up to two geometries: the opaque records, and the see-through ones (cutout, then
-//! translucent), whose records are also copied into `records` so a ray's hit there can look up
-//! its texel (a leaf's holes, a pane's colour). A TLAS instance's custom index picks its row of
-//! the frame's instance table: x the copy's first word (`u32::MAX`: none), y the record where the
-//! translucent ones start in it, z the kind (0 faces, 1 quads, 2 distant terrain).
+//! translucent). All its records are also copied into `records`, so a ray's hit can look up its
+//! texel (a leaf's holes, a pane's colour), light and facing (a reflection's hit). A TLAS
+//! instance's custom index picks its row of the frame's instance table: x the copy's first word
+//! (`u32::MAX`: none), y the record where the translucent ones start, z the kind (0 faces, 1 quads,
+//! 2 distant terrain), w the records before the see-through geometry's (its primitive `p` is record
+//! `w + p / 2`).
 
 use super::*;
 use rustc_hash::FxHashSet;
@@ -18,8 +20,9 @@ use std::collections::VecDeque;
 /// frames (a frame of a full load at 32 chunks would otherwise build thousands at once).
 const FRAME_RECORDS: u32 = 1 << 19;
 const FRAME_BUILDS: usize = 384;
-/// Bytes for the see-through records' copies (16-byte units): about 16 million faces' worth.
-const RECORDS_BYTES: u64 = 256 << 20;
+/// Bytes for the records' copies (16-byte units): about 32 million faces' worth (spot C at view 32
+/// held about 7 million records).
+const RECORDS_BYTES: u64 = 512 << 20;
 const UNIT: u64 = 16;
 const NONE: u32 = u32::MAX;
 /// TLAS instance masks: a cube's faces, its free quads (plants, models), distant terrain.
@@ -98,11 +101,14 @@ pub(super) struct RtScene {
 
 /// `core:rt_shadows`, or off where the engine's configs are not loaded.
 pub fn rt_setting() -> bool {
-    crate::content::content()
-        .game
-        .config_names
-        .get("core:rt_shadows")
-        .is_some_and(|&id| crate::config::get(id) > 0.5)
+    let on = |name: &str| {
+        crate::content::content()
+            .game
+            .config_names
+            .get(name)
+            .is_some_and(|&id| crate::config::get(id) > 0.5)
+    };
+    on("core:rt_shadows") || on("core:rt_reflections")
 }
 
 impl RtScene {
@@ -326,7 +332,17 @@ impl WorldRenderer {
     /// the scene, and a shader pack whose `world.wgsl` calls `rt_sun`. Then the near shadow map
     /// isn't drawn.
     pub fn rt_traced(&self) -> bool {
-        self.rt_compiled && self.rt.is_some()
+        self.rt_compiled && self.rt.is_some() && self.rt_modes.0
+    }
+
+    /// Whether the world's shader traces its reflections this frame (`Scene::rt.w`).
+    pub fn rt_reflects(&self) -> bool {
+        self.rt_compiled && self.rt.is_some() && self.rt_modes.1
+    }
+
+    /// What the scene is for (`core:rt_shadows`, `core:rt_reflections`): shadows, reflections.
+    pub fn set_rt_modes(&mut self, shadows: bool, reflections: bool) {
+        self.rt_modes = (shadows, reflections);
     }
 
     /// Of the last frame: BLASes built, records expanded, TLAS instances (diagnostics).
@@ -441,15 +457,15 @@ impl WorldRenderer {
             let mut builds = Vec::with_capacity(plans.len());
             for p in &plans {
                 let words = if p.kind == KIND_QUADS { 8 } else { 4 };
-                // The see-through records' copy, but distant terrain's (its hits need only where
-                // they are). Out of room, they cast as if solid.
+                // The records' copy, for the hits' lookups. Out of room, see-through ones cast as
+                // if solid and reflections see nothing there.
                 let mut copy = None;
-                if p.clear > 0 && p.kind != KIND_LOD {
-                    let units = p.clear * words / 4;
+                {
+                    let units = (p.opaque + p.clear) * words / 4;
                     copy = rt.alloc_copy(units).map(|s| (s, units));
                     if copy.is_none() && !rt.full_warned {
                         rt.full_warned = true;
-                        log::warn!("see-through records full ({} MB): more leaves and glass cast as solid", RECORDS_BYTES >> 20);
+                        log::warn!("ray-traced records full ({} MB): more leaves and glass cast as solid", RECORDS_BYTES >> 20);
                     }
                 }
                 let job = Job {
@@ -458,7 +474,7 @@ impl WorldRenderer {
                     dst: at * 4,
                     kind: p.kind,
                     copy: copy.map_or(NONE, |c| c.0 * 4),
-                    copy_from: p.opaque,
+                    copy_from: 0,
                     pad: [0; 2],
                 };
                 list.pipeline(rt.expand);
@@ -490,7 +506,7 @@ impl WorldRenderer {
                 let accel = gpu.create_blas(&geometries, "BLAS");
                 builds.push(accel);
                 at += p.opaque + p.clear;
-                let info = [copy.map_or(NONE, |c| c.0 * 4), p.translucent, p.kind, 0];
+                let info = [copy.map_or(NONE, |c| c.0 * 4), p.opaque + p.translucent, p.kind, p.opaque];
                 // The old one goes once this one is in (the frames in flight still hold it).
                 rt.drop_item(gpu, p.item);
                 rt.built.insert(p.item, Built { accel, copy, info });

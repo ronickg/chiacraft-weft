@@ -619,6 +619,28 @@ fn shade_mat(in: VOut, albedo: vec3<f32>) -> Mat {
     return mat_at(in.layer, fract(in.uv), albedo);
 }
 
+// What a mirror at `rel` (camera relative) shows along `r` (unit) with traced reflections
+// (`core:rt_reflections`, `scene.rt.w`): the first surface the ray meets (`rt_hit`), in its texel and
+// tint, lit as the world lights it (its sky and block light, its sun through one more ray where
+// shadows are traced, the sky light standing in otherwise), veiled by the air over the whole way
+// from the eye; else the sky that way.
+fn traced_view(rel: vec3<f32>, r: vec3<f32>) -> vec3<f32> {
+    let h = rt_hit(rel, r, 384.0);
+    if !h.hit {
+        return sky_color(r);
+    }
+    var albedo = h.albedo.rgb;
+    if h.tint != 0u {
+        albedo *= pow(tint_color(h.tint, h.biome, i32(floor(h.world.x)), i32(floor(h.world.z))), vec3(2.2));
+    }
+    var sun = smoothstep(0.75, 1.0, h.light.x);
+    if scene.rt.x > 0.5 && dot(h.n, light_dir()) > 0.0 {
+        sun = min(sun, dot(rt_sun(h.rel, h.n, light_dir(), false), vec3(1.0 / 3.0)));
+    }
+    let lit = albedo * light_on(h.n, h.light, sun, 1.0, h.world, h.rel);
+    return haze_lit(lit, normalize(rel) * (length(rel) + h.t), h.light.x);
+}
+
 // Schlick's Fresnel for reflectance `f0` at `cos_v`.
 fn mat_fresnel(f0: vec3<f32>, cos_v: f32) -> vec3<f32> {
     return f0 + (vec3(1.0) - f0) * pow(1.0 - clamp(cos_v, 0.0, 1.0), 5.0);
@@ -656,7 +678,12 @@ fn mat_shine(in: VOut, m_in: Mat, n: vec3<f32>, albedo: vec3<f32>, light: vec3<f
     let r = reflect(-v, n);
     let sky_seen = mix(sky_color(r), sky_color(vec3(0.0, 1.0, 0.0)), clamp(m.rough * 2.0, 0.0, 1.0));
     let open = smoothstep(0.8, 1.0, in.light.x);
-    let sky = mix(light * 0.5, sky_seen, open * open);
+    var sky = mix(light * 0.5, sky_seen, open * open);
+    // Traced (`scene.rt.w`): what really lies that way, the room or the hills, off the screen too;
+    // the rougher, the more it gives way to the blurred guess above.
+    if scene.rt.w > 0.5 && m.rough < 0.5 {
+        sky = mix(traced_view(in.rel + n * 0.01, r), sky, smoothstep(0.1, 0.5, m.rough));
+    }
     // A rough surface mirrors little (its lobe is spread over the whole sky's dimmer average).
     let gloss = 1.0 - clamp(m.rough * 1.6, 0.0, 0.85);
     out += mat_fresnel(m.f0, ndv) * sky * gloss;
@@ -961,7 +988,13 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     // our lake's water 0.45 mean brightness against Bliss's 0.62).
     // (Tipped down by less now, 0.85 of the ripple's lift where it was half: halved, it mirrored the
     // palest band of the sky everywhere, where Bliss's open water mirrors a deeper blue.)
-    let refl = sky_color(normalize(vec3(r.x, max(r.y * WATER_SKY_LIFT, 0.03), r.z))) * mix(0.15, 1.0, brightness_curve(in.light.x));
+    var refl = sky_color(normalize(vec3(r.x, max(r.y * WATER_SKY_LIFT, 0.03), r.z))) * mix(0.15, 1.0, brightness_curve(in.light.x));
+    // Traced (`scene.rt.w`): the shore, the trees and what is under a roof, off the screen too, out to
+    // the near land; the far water keeps the sky's guess.
+    if scene.rt.w > 0.5 && in.dist < 256.0 {
+        let traced = traced_view(in.rel + vec3(0.0, 0.02, 0.0), normalize(vec3(r.x, max(r.y, 0.02), r.z)));
+        refl = mix(traced, refl, smoothstep(160.0, 256.0, in.dist));
+    }
     // The sun's glitter: a narrow highlight (GGX) on the waves, so it lies in a path toward the sun.
     let l = light_dir();
     // Never a zero vector (light exactly behind the eye): its normalize would be NaN.

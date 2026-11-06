@@ -2900,7 +2900,7 @@ impl Client {
                 self.render.rt_traced() as u32 as f32,
                 (self.render.rt_frame_no() % (1 << 24)) as f32,
                 (shadow_setting("core:rt_shadows", 0.0) > 1.5) as u32 as f32,
-                0.0,
+                self.render.rt_reflects() as u32 as f32,
             ],
             shadow: match self.shadow_map {
                 Some(t) if self.shadow.1 => {
@@ -3059,8 +3059,10 @@ impl Client {
     /// `core:rt_shadows` turned on or off: the scene made (or let go), and whether the world shader
     /// has to be composed again (the app does it before anything of the frame draws with it).
     pub fn rt_switch(&mut self, gpu: &mut dyn Backend) -> bool {
-        self.render
-            .set_rt(gpu, shadow_setting("core:rt_shadows", 0.0) > 0.5);
+        let shadows = shadow_setting("core:rt_shadows", 0.0) > 0.5;
+        let reflections = shadow_setting("core:rt_reflections", 0.0) > 0.5;
+        self.render.set_rt_modes(shadows, reflections);
+        self.render.set_rt(gpu, shadows || reflections);
         self.render.rt_reload
     }
 
