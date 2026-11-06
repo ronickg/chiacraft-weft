@@ -71,27 +71,50 @@ fn light16(l: u32) -> u32 {
     crate::gpu_layout::corner_light([l & 0xFF, (l >> 8) & 0xFF, (l >> 16) & 0xFF, l >> 24])
 }
 
+/// chiacraft, test only: `core:mc_leaves`, leaves as Minecraft's fancy leaves.
+fn mc_leaves() -> bool {
+    static ID: std::sync::OnceLock<Option<u32>> = std::sync::OnceLock::new();
+    ID.get_or_init(|| crate::config::by_name("core:mc_leaves"))
+        .is_some_and(|id| crate::config::get(id) != 0.0)
+}
+
+/// Whether a state is drawn with holes and hides its own kind's faces (leaves).
+fn culls_same(info: &crate::content::StateInfo) -> bool {
+    info.layer == RenderLayer::Cutout && info.flags & bf::CULL_SAME != 0
+}
+
 pub fn build(c: &Content, n: &Neighborhood, ctm: &super::ctm::Ctm) -> Mesh {
     let mut mesh = Mesh::default();
+    let mc_leaves = mc_leaves();
     let states = &n.states;
     let looks = super::looks::current();
     // Rows along x of the padded volume (bit x + 1): blocks, and opaque ones. A block with an
     // opaque block on every side shows nothing, and underground that is nearly all of them.
     let mut filled = [0u32; PAD * PAD];
     let mut solid = [0u32; PAD * PAD];
-    for (row, (f, o)) in filled.iter_mut().zip(solid.iter_mut()).enumerate() {
+    // What shades corners (AO): the solid blocks, and with `core:mc_leaves` leaves too.
+    let mut shades = [0u32; PAD * PAD];
+    for (row, ((f, o), sh)) in filled
+        .iter_mut()
+        .zip(solid.iter_mut())
+        .zip(shades.iter_mut())
+        .enumerate()
+    {
         for (x, &s) in states[row * PAD..(row + 1) * PAD].iter().enumerate() {
             if s != 0 {
                 *f |= 1 << x;
                 if ctm.hides(c.tight[s as usize].flags, s) {
                     *o |= 1 << x;
+                    *sh |= 1 << x;
+                } else if mc_leaves && culls_same(&c.states[s as usize]) {
+                    *sh |= 1 << x;
                 }
             }
         }
     }
     let row = |y: i32, z: i32| ((y + 1) as usize) * PAD + (z + 1) as usize;
     // Padded index to its bit in `solid`.
-    let opaque = |i: usize| solid[i / PAD] >> (i % PAD) & 1 != 0;
+    let opaque = |i: usize| shades[i / PAD] >> (i % PAD) & 1 != 0;
 
     for y in 0..16i32 {
         for z in 0..16i32 {
@@ -160,7 +183,11 @@ fn draw_block(
                 if ctm.hides(ninfo.flags, ns) {
                     continue;
                 }
-                if ninfo.block == info.block && info.layer != RenderLayer::Opaque && info.flags & bf::CULL_SAME != 0 {
+                if ninfo.block == info.block
+                    && info.layer != RenderLayer::Opaque
+                    && info.flags & bf::CULL_SAME != 0
+                    && !(mc_leaves() && culls_same(info))
+                {
                     continue;
                 }
                 let (ao, light) = corner_data(c, n, ctm, opaque, x, y, z, dir);

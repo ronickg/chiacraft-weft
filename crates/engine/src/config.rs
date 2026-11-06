@@ -677,6 +677,10 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // aside each frame and gathered over frames by where each pixel was, the motion image).
         // Read at start, as the world's pipelines then draw the motion image too.
         ConfigDef::number("core:aa", ck::INT, 0.0, 0.0, 1.0, 1.0),
+        // chiacraft, test only (the Minecraft comparison): leaves drawn as Minecraft's fancy
+        // leaves, every face between two of them and their shade on what is beside them (AO),
+        // instead of a crown's outer shell (`client::mesher`). Read when cubes are meshed.
+        ConfigDef::number("core:mc_leaves", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         // Temporal anti-aliasing: the least share of each new frame (0.1: about ten gathered;
         // less, smoother and slower to follow), live.
         ConfigDef::number("core:taa_blend", ck::FLOAT, 0.1, 0.03, 0.5, 0.01),
