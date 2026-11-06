@@ -778,6 +778,10 @@ gpu_struct! {
         /// (`@location(1)`, `weft_render::MOTION_FORMAT`) puts a point's position last frame
         /// through it.
         pub taa_prev: [[f32; 4]; 4],
+        /// Under the backend's upscaler (DLSS, `post::set_upscaling`): x the texture mip bias, in
+        /// levels (NVIDIA's log2(render / output) - 1; 0 without), which a pack's world shader adds
+        /// to its block textures' level; yzw unused.
+        pub upscale: [f32; 4],
     }
 }
 

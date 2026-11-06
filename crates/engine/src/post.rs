@@ -85,6 +85,31 @@ pub fn upscaling() -> bool {
     UPSCALING.load(std::sync::atomic::Ordering::Relaxed)
 }
 
+static MIP_BIAS: AtomicU32 = AtomicU32::new(0);
+
+/// The texture mip bias for this frame's world (`Scene::upscale.x`): set by the app under an
+/// upscaler to NVIDIA's log2(render / output) - 1 (DLSS's programming guide: textures as sharp as
+/// at the output's size), 0 without. `WEFT_UPSCALE_MIP_BIAS=<levels>` puts another under an upscaler.
+pub fn set_mip_bias(render_width: u32, output_width: u32) {
+    let bias = if upscaling() {
+        static OVERRIDE: std::sync::OnceLock<Option<f32>> = std::sync::OnceLock::new();
+        OVERRIDE
+            .get_or_init(|| {
+                std::env::var("WEFT_UPSCALE_MIP_BIAS")
+                    .ok()
+                    .and_then(|v| v.trim().parse().ok())
+            })
+            .unwrap_or_else(|| (render_width.max(1) as f32 / output_width.max(1) as f32).log2() - 1.0)
+    } else {
+        0.0
+    };
+    MIP_BIAS.store(bias.to_bits(), Relaxed);
+}
+
+pub fn mip_bias() -> f32 {
+    f32::from_bits(MIP_BIAS.load(Relaxed))
+}
+
 /// Whether per-frame dithers move this frame (all but under an upscaler, see `set_upscaling`).
 pub fn dither_moves() -> bool {
     static MOVING: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
