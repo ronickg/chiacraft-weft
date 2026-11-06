@@ -20,7 +20,7 @@ wait 1
 shot discovery_log.png
 # Make planks; what takes planks and something held shows, the rest a "?".
 tap_once core:menu class:slot
-tap core:menu text:all (
+tap core:menu text:max (
 wait 3
 key Escape
 until screen none within 10

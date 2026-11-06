@@ -14,7 +14,7 @@ shot book_hands_open.png
 tap_once core:menu class:slot
 wait 1
 shot book_hands_picked.png
-tap core:menu text:all (
+tap core:menu text:max (
 wait 1
 chat /tk inv me
 until chat base:oak_bark within 5

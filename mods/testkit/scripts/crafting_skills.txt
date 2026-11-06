@@ -18,11 +18,11 @@ wait 1
 tap core:menu text:parts
 wait 1
 # With only logs, the first part the book can make is the haft; its line shows carving's level.
-tap_once core:menu class:slot
+tap_once core:menu icon:base:part_haft
 wait 1
 tap_once core:menu text:carving, level 0
 shot skills_haft_picked.png
-tap core:menu text:all (
+tap core:menu text:max (
 wait 1
 key Escape
 until screen none within 10
