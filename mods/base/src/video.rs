@@ -30,6 +30,8 @@ pub static FX_SHAFTS: Config<i32> = Config::named("fx_shafts");
 pub static FX_BLOOM: Config<i32> = Config::named("fx_bloom");
 
 static RENDER_SCALE: Config<f32> = Config::named("core:render_scale");
+/// How the world drawn at a render scale under 1 is scaled up: 0 bilinear, 1 FSR 1, 2 Snapdragon GSR 1.
+static UPSCALER: Config<i32> = Config::named("core:upscaler");
 static SHADOWS: Config<i32> = Config::named("core:shadows");
 static SHADOW_SIZE: Config<i32> = Config::named("core:shadow_size");
 static VIEW: Config<i32> = Config::named("core:view_distance");
@@ -208,7 +210,12 @@ fn number(v: f64) -> (String, i64) {
     (String::new(), v.round() as i64)
 }
 
-const ROWS: [Row; 12] = [
+/// The rows the presets set (`PRESETS`, `PHONE_PRESET`): the first 12 of `ROWS`. The upscaler after
+/// them is the player's own choice, opt-in (Ronald, 11-06), so no preset changes it and it never
+/// makes the quality Custom.
+const PRESET_ROWS: usize = 12;
+
+const ROWS: [Row; 13] = [
     Row {
         key: "render_scale",
         // 0 is Auto (Distant terrain's render pass: 0.67 on a high-density screen, 1 elsewhere).
@@ -265,6 +272,13 @@ const ROWS: [Row; 12] = [
         set: |v| FPS_CAP.set(v as i32),
         shown: |v| if v == 0.0 { word("unlimited") } else { number(v) },
     },
+    Row {
+        key: "upscaler",
+        values: &[0.0, 1.0, 2.0],
+        get: || UPSCALER.get() as f64,
+        set: |v| UPSCALER.set(v as i32),
+        shown: |v| word(["smooth", "fsr1", "gsr1"][(v as usize).min(2)]),
+    },
 ];
 
 fn off_low_on(v: f64) -> (String, i64) {
@@ -285,7 +299,9 @@ fn apply(p: usize) {
 /// One row a step on (`dir` 1) or back (-1) through its values; the quality becomes Custom.
 fn step(i: usize, dir: i32) {
     step_row(&ROWS[i], dir);
-    QUALITY.set(4);
+    if i < PRESET_ROWS {
+        QUALITY.set(4);
+    }
 }
 
 fn step_row(row: &Row, dir: i32) {

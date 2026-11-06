@@ -281,8 +281,76 @@ fn easu(t: u32, uv: vec2<f32>) -> vec3<f32> {
     return s / max(1.0 - s, vec3(1e-4));
 }
 
-// The world's image at the screen's `uv` (`frag` the fragment's position, in pixels): bilinear,
-// or FSR 1's EASU when `core:upscaler` is 1 and the image is smaller than the screen.
+// Snapdragon Game Super Resolution 1 (`core:upscaler` 2), its mobile shader ported from
+// `sgsr1_shader_mobile.frag` (SnapdragonStudios/snapdragon-gsr, BSD-3-Clause: Copyright (c) 2023-2025,
+// Qualcomm Innovation Center, Inc. All rights reserved. Redistribution and use in source and binary
+// forms, with or without modification, are permitted provided that the conditions of the BSD-3-Clause
+// licence are met; notes/ENGINE_CHANGES.md). Cheaper than EASU on a phone (on the Pixel 10 at 67 %,
+// 1.1 ms over bilinear, EASU 2.7): one channel (green) in four gathers, and only where the
+// 2 x 2 round the pixel has an edge; a Lanczos-like kernel there, sharpened, added to the bilinear
+// colour. As in `easu`, the light as x / (1 + x); and the change taken as a ratio of green's, not
+// the same step on every channel, which paled dark colours along edges.
+fn gsr_in(v: vec4<f32>) -> vec4<f32> {
+    let m = max(v, vec4(0.0));
+    return m / (1.0 + m);
+}
+
+fn gsr_weight(dx: f32, dy: f32, c: f32, spread: f32) -> vec2<f32> {
+    let x = (dx * dx + dy * dy) * 0.55 + clamp(abs(c) * spread, 0.0, 1.0);
+    var wa = x - 4.0;
+    let wb = x * wa - wa;
+    wa *= wa;
+    let w = wb * wa;
+    return vec2(w, w * c);
+}
+
+fn gsr(t: u32, uv: vec2<f32>, bilinear: vec3<f32>) -> vec3<f32> {
+    let size = vec2<f32>(textureDimensions(textures[t]));
+    let inv = 1.0 / size;
+    let b = max(bilinear, vec3(0.0));
+    var cc = b / (1.0 + b);
+    let img = uv * size + vec2(-0.5, 0.5);
+    let ip = floor(img);
+    var coord = ip * inv;
+    let pl = img - ip;
+    var left = gsr_in(textureGather(1, textures[t], linear_clamp, coord));
+    let edge = abs(left.z - left.y) + abs(cc.g - left.y) + abs(cc.g - left.z);
+    if edge <= 8.0 / 255.0 {
+        return bilinear;
+    }
+    coord.x += inv.x;
+    var right = gsr_in(textureGather(1, textures[t], linear_clamp, coord + vec2(inv.x, 0.0)));
+    let up = gsr_in(textureGather(1, textures[t], linear_clamp, coord + vec2(0.0, -inv.y)));
+    let down = gsr_in(textureGather(1, textures[t], linear_clamp, coord + vec2(0.0, inv.y)));
+    let mean = (left.y + left.z + right.x + right.w) * 0.25;
+    left -= vec4(mean);
+    right -= vec4(mean);
+    let ud = vec4(up.w, up.z, down.y, down.x) - vec4(mean);
+    let cw = cc.g - mean;
+    let sum = dot(abs(left), vec4(1.0)) + dot(abs(right), vec4(1.0)) + dot(abs(ud), vec4(1.0));
+    let spread = 2.181818 / max(sum, 1e-6);
+    var a = gsr_weight(pl.x, pl.y + 1.0, ud.x, spread);
+    a += gsr_weight(pl.x - 1.0, pl.y + 1.0, ud.y, spread);
+    a += gsr_weight(pl.x - 1.0, pl.y - 2.0, ud.z, spread);
+    a += gsr_weight(pl.x, pl.y - 2.0, ud.w, spread);
+    a += gsr_weight(pl.x + 1.0, pl.y - 1.0, left.x, spread);
+    a += gsr_weight(pl.x, pl.y - 1.0, left.y, spread);
+    a += gsr_weight(pl.x, pl.y, left.z, spread);
+    a += gsr_weight(pl.x + 1.0, pl.y, left.w, spread);
+    a += gsr_weight(pl.x - 1.0, pl.y - 1.0, right.x, spread);
+    a += gsr_weight(pl.x - 2.0, pl.y - 1.0, right.y, spread);
+    a += gsr_weight(pl.x - 2.0, pl.y, right.z, spread);
+    a += gsr_weight(pl.x - 1.0, pl.y, right.w, spread);
+    let mx = max(max(left.y, left.z), max(right.x, right.w));
+    let mn = min(min(left.y, left.z), min(right.x, right.w));
+    let fy = clamp(2.0 * a.y / a.x, mn, mx);
+    let d = clamp(fy - cw, -23.0 / 255.0, 23.0 / 255.0);
+    cc = clamp(cc * ((cc.g + d) / max(cc.g, 1e-4)), vec3(0.0), vec3(0.9999));
+    return cc / (1.0 - cc);
+}
+
+// The world's image at the screen's `uv` (`frag` the fragment's position, in pixels): bilinear, or
+// when it is smaller than the screen FSR 1's EASU (`core:upscaler` 1) or Snapdragon GSR 1 (2).
 fn world_upscaled(t: u32, uv: vec2<f32>, frag: vec2<f32>, upscaler: f32) -> vec4<f32> {
     let bilinear = textureSampleLevel(textures[t], linear_clamp, uv, 0.0);
     if upscaler < 0.5 {
@@ -291,6 +359,9 @@ fn world_upscaled(t: u32, uv: vec2<f32>, frag: vec2<f32>, upscaler: f32) -> vec4
     let screen = frag / max(uv, vec2(1e-6));
     if f32(textureDimensions(textures[t]).x) >= screen.x - 0.5 {
         return bilinear;
+    }
+    if upscaler >= 1.5 {
+        return vec4(gsr(t, uv, bilinear.rgb), bilinear.a);
     }
     return vec4(easu(t, uv), bilinear.a);
 }
