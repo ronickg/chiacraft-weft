@@ -152,6 +152,47 @@ pub(super) fn pt_pipelines(gpu: &mut dyn Backend, assets: &crate::assets::Assets
     }
 }
 
+/// The path tracer's G-buffer pipelines from the world shader (its `fs_gb_opaque`, `fs_gb_cutout`):
+/// faces opaque, faces cutout, quads opaque, quads cutout, each drawing where the world's depth is
+/// its own (Equal, no write) into the albedo (Rgba8), normal (Rgba16F, the motion slot) and spec
+/// (Rgba8) images. None without those entries.
+pub(super) fn gb_pipelines(gpu: &mut dyn Backend, shader: &Shader) -> Option<[PipelineId; 4]> {
+    if !crate::packs::pack_uses("world.wgsl", "fs_gb_opaque") {
+        return None;
+    }
+    let mut made = Vec::with_capacity(4);
+    for (label, vs, fs) in [
+        ("faces G-buffer", "vs_face", "fs_gb_opaque"),
+        ("faces cutout G-buffer", "vs_face", "fs_gb_cutout"),
+        ("quads G-buffer", "vs_quad", "fs_gb_opaque"),
+        ("quads cutout G-buffer", "vs_quad", "fs_gb_cutout"),
+    ] {
+        let desc = PipelineDesc {
+            label,
+            shader,
+            vertex: vs,
+            fragment: Some(fs),
+            color: Some(Format::Rgba8Unorm),
+            depth: Some(DepthState { write: false, compare: Compare::Equal }),
+            blend: Blend::None,
+            cull_back: true,
+            topology: Topology::Triangles,
+            motion: true,
+        };
+        match gpu.create_pipeline_mrt(&desc, &[Format::Rgba8Unorm]) {
+            Ok(p) => made.push(p),
+            Err(e) => {
+                log::error!("path tracer G-buffer: {}", e.0);
+                for p in made {
+                    gpu.destroy_pipeline(p);
+                }
+                return None;
+            }
+        }
+    }
+    Some([made[0], made[1], made[2], made[3]])
+}
+
 impl RtScene {
     /// The expansion's pipeline (`expand_pipeline`), made with the world's other pipelines.
     pub(super) fn expand_pipeline(gpu: &mut dyn Backend, assets: &crate::assets::Assets) -> Option<PipelineId> {
@@ -415,6 +456,71 @@ impl WorldRenderer {
         list.push(Cmd::EndPass);
     }
 
+    /// The path tracer's G-buffer (`core:path_traced`): after the world's pass, its opaque and cutout
+    /// terrain drawn again where its depth (`depth`, the world's size `size`) is theirs, into the
+    /// albedo, normal and spec images (`gb_images`, made at that size). Nothing without the traced
+    /// world shader's G-buffer pipelines.
+    pub fn gbuffer_pass(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, depth: TextureId, size: (u32, u32)) {
+        let Some(pipes) = self.gb_pipes else { return };
+        if self.buffers.is_none() || self.gb_draws.is_empty() && self.gb_firsts == 0 {
+            return;
+        }
+        if self.gb_images.is_none_or(|g| g.3 != size) {
+            if let Some((a, b, c, _)) = self.gb_images.take() {
+                for t in [a, b, c] {
+                    gpu.destroy_texture(t);
+                }
+            }
+            let make = |gpu: &mut dyn Backend, format, label| {
+                gpu.create_texture(&TextureDesc { width: size.0, height: size.1, mips: 1, format, render_target: true }, label)
+            };
+            self.gb_images = Some((
+                make(gpu, Format::Rgba8Unorm, "G-buffer albedo"),
+                make(gpu, Format::Rgba16Float, "G-buffer normal"),
+                make(gpu, Format::Rgba8Unorm, "G-buffer spec"),
+                size,
+            ));
+        }
+        let (albedo, normal, spec, _) = self.gb_images.unwrap();
+        let none = [0.0; 4];
+        list.push(Cmd::PassExtras([Some((spec, Some(none))), None, None]));
+        list.push(Cmd::BeginPass {
+            color: Some((Target::Texture(albedo), Some(none))),
+            depth: Some((depth, None)),
+            motion: Some((normal, Some(none))),
+        });
+        let pipe = |kind: u8, layer: u8| {
+            let quads = matches!(kind, 1 | 5);
+            pipes[usize::from(quads) * 2 + usize::from(layer == 1)]
+        };
+        let Some((_, obuf, ibuf, _, _)) = self.buffers else { return };
+        // The table's draws, as `draw` made them this frame.
+        if let Some(o) = self.table.out.as_ref() {
+            let (draws, origins, slot) = (o.draws, o.origins, self.gb_draws_slot);
+            for &(kind, layer, page, id, base, n) in &self.gb_draws {
+                let buf = if matches!(kind, 1 | 5) { self.quads.pages[page as usize].0 } else { self.faces.pages[page as usize].0 };
+                self.bind_run(list, pipe(kind, layer), buf, origins);
+                list.push(Cmd::DrawIndexedIndirectCount {
+                    buffer: draws,
+                    offset: base as u64 * 20,
+                    count_buffer: self.table.buckets[slot].0,
+                    count_offset: id as u64 * 8,
+                    max: n,
+                });
+            }
+        }
+        // The runs the CPU made (structures, the nearest cubes).
+        for &(kind, layer, page, start, count) in &self.runs[..self.gb_firsts.min(self.runs.len())] {
+            if layer >= 2 || !matches!(kind, 0 | 1 | 4 | 5) {
+                continue;
+            }
+            let buf = if matches!(kind, 1 | 5) { self.quads.pages[page as usize].0 } else { self.faces.pages[page as usize].0 };
+            self.bind_run(list, pipe(kind, layer), buf, obuf);
+            list.push(Cmd::DrawIndexedIndirect { buffer: ibuf, offset: start as u64 * 20, count });
+        }
+        list.push(Cmd::EndPass);
+    }
+
     /// Frames the ray-traced scene has been kept (`Scene::rt.y`, for noise that moves every frame).
     pub fn rt_frame_no(&self) -> u64 {
         self.rt.as_ref().map_or(0, |r| r.frame_no)
@@ -551,14 +657,11 @@ impl WorldRenderer {
                 let words = if p.kind == KIND_QUADS { 8 } else { 4 };
                 // The records' copy, for the hits' lookups. Out of room, see-through ones cast as
                 // if solid and reflections see nothing there.
-                let mut copy = None;
-                {
-                    let units = (p.opaque + p.clear) * words / 4;
-                    copy = rt.alloc_copy(units).map(|s| (s, units));
-                    if copy.is_none() && !rt.full_warned {
-                        rt.full_warned = true;
-                        log::warn!("ray-traced records full ({} MB): more leaves and glass cast as solid", RECORDS_BYTES >> 20);
-                    }
+                let units = (p.opaque + p.clear) * words / 4;
+                let copy = rt.alloc_copy(units).map(|s| (s, units));
+                if copy.is_none() && !rt.full_warned {
+                    rt.full_warned = true;
+                    log::warn!("ray-traced records full ({} MB): more leaves and glass cast as solid", RECORDS_BYTES >> 20);
                 }
                 let job = Job {
                     src: p.src,

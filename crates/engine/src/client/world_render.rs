@@ -480,6 +480,15 @@ pub struct WorldRenderer {
     /// composite, made with the traced world shader; its output per frame slot.
     pt_pipes: Option<(PipelineId, PipelineId)>,
     pt_out: Vec<(BufferId, u32)>,
+    /// The path tracer's G-buffer (`rt.rs` `draw_gbuffer`): its pipelines (faces opaque, faces
+    /// cutout, quads opaque, quads cutout), the last `draw`'s opaque and cutout table draws (kind,
+    /// layer, page, group, first, draws) with its frame slot and CPU-made runs before `gb_firsts`,
+    /// and its images (albedo, normal, spec) at the world's size.
+    gb_pipes: Option<[PipelineId; 4]>,
+    gb_draws: Vec<(u8, u8, u32, u32, u32, u32)>,
+    gb_draws_slot: usize,
+    gb_firsts: usize,
+    pub gb_images: Option<(TextureId, TextureId, TextureId, (u32, u32))>,
     /// The setting changed: the app composes the world shader again (`reload_shaders`).
     pub rt_reload: bool,
 }
@@ -654,6 +663,11 @@ impl WorldRenderer {
             rt_modes: (false, false),
             pt_pipes: if rt_compiled { rt::pt_pipelines(gpu, assets) } else { None },
             pt_out: Vec::new(),
+            gb_pipes: if rt_compiled { rt::gb_pipelines(gpu, &shader) } else { None },
+            gb_draws: Vec::new(),
+            gb_draws_slot: 0,
+            gb_firsts: 0,
+            gb_images: None,
             rt_reload: false,
             calm_sets: [Self::calm_pipes(gpu, assets, false), Self::calm_pipes(gpu, assets, true)],
             calm_level: 0,
@@ -1213,8 +1227,14 @@ impl WorldRenderer {
                 for p in self.pt_pipes.take().into_iter().flat_map(|(a, b)| [a, b]) {
                     gpu.destroy_pipeline(p);
                 }
+                for p in self.gb_pipes.take().into_iter().flatten() {
+                    gpu.destroy_pipeline(p);
+                }
                 if rt {
                     self.pt_pipes = rt::pt_pipelines(gpu, assets);
+                    if let Ok((s, _)) = world_shader(assets) {
+                        self.gb_pipes = rt::gb_pipelines(gpu, &s);
+                    }
                 }
                 for p in self
                     .shadow_pipes
@@ -1321,6 +1341,14 @@ impl WorldRenderer {
         }
         for (b, _) in self.pt_out.drain(..) {
             gpu.destroy_buffer(b);
+        }
+        for p in self.gb_pipes.take().into_iter().flatten() {
+            gpu.destroy_pipeline(p);
+        }
+        if let Some((a, b, c, _)) = self.gb_images.take() {
+            for t in [a, b, c] {
+                gpu.destroy_texture(t);
+            }
         }
         self.drop_calm(gpu);
         self.meshes.clear();
@@ -2081,6 +2109,10 @@ impl WorldRenderer {
                 None => steps.push((pipe, buf, i, true)),
             }
         }
+        // The path tracer's G-buffer replays the opaque and cutout terrain's draws (`draw_gbuffer`).
+        self.gb_draws.clear();
+        self.gb_draws_slot = frame.slot;
+        self.gb_firsts = firsts;
         for (pipe, buf, i, counted) in steps {
             let (_, layer, _, id, base, max) = groups[i];
             if layer > 0 && !cpu_opaque_drawn {
@@ -2097,6 +2129,12 @@ impl WorldRenderer {
                 .flatten()
                 .map(|n| n.max(self.table.peak.get(id as usize).copied().unwrap_or(0)));
             let draws = if capped { capped_draws(seen, max) } else { max };
+            if counted {
+                let (kind, layer, page, ..) = groups[i];
+                if layer < 2 && matches!(kind, 0 | 1 | 4 | 5) {
+                    self.gb_draws.push((kind as u8, layer as u8, page as u32, id as u32, base as u32, draws as u32));
+                }
+            }
             if counted {
                 issued = (issued.0 + draws as u64, issued.1 + max as u64);
             }

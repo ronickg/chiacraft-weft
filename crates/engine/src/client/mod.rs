@@ -3126,7 +3126,8 @@ impl Client {
     }
 
     /// Path traced lighting (`core:path_traced`, `WorldRenderer::path_trace`), after the world's
-    /// pass into `target` (the world's image, its size `size`) and before the effects.
+    /// pass into `target` (the world's image, its size `size`) and before the effects: first the
+    /// G-buffer pass (`WorldRenderer::gbuffer_pass`), then the traced light.
     pub fn path_trace(
         &mut self,
         gpu: &mut dyn Backend,
@@ -3138,6 +3139,8 @@ impl Client {
     ) {
         if shadow_setting("core:path_traced", 0.0) > 0.5 {
             let debug = shadow_setting("core:pt_debug", 0.0) as u32;
+            // The G-buffer (albedo, normal and roughness, spec) the denoisers read: `render.gb_images`.
+            self.render.gbuffer_pass(gpu, list, depth, size);
             self.render
                 .path_trace(gpu, list, slot, depth, target, size, debug);
         }
