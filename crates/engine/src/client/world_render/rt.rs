@@ -29,6 +29,9 @@ const NONE: u32 = u32::MAX;
 pub const MASK_FACES: u8 = 1;
 pub const MASK_QUADS: u8 = 2;
 pub const MASK_LOD: u8 = 4;
+/// Blocks from the eye past which no traced ray reaches (packs trace within a few hundred blocks,
+/// `rt_sun`'s rays end at 768): distant tiles further off stay out of the TLAS.
+const RAY_REACH: f32 = 1100.0;
 const KIND_FACES: u32 = 0;
 const KIND_QUADS: u32 = 1;
 const KIND_LOD: u32 = 2;
@@ -634,6 +637,14 @@ impl WorldRenderer {
                         let cxz = glam::IVec2::new(cam_cube.x, cam_cube.z);
                         let (c0, c1) = (cxz - half, cxz + half);
                         let outside = hi.x < c0.x || lo.x > c1.x || hi.y < c0.y || lo.y > c1.y;
+                        // Wholly inside the mask, where cubes stand in every column, it never casts;
+                        // beyond any ray's reach (a pack traces from within a few hundred blocks, rays
+                        // of 768) it can't either. Both only cost the TLAS and the rays' walk.
+                        let inside = lo.x >= c0.x && hi.x <= c1.x && lo.y >= c0.y && hi.y <= c1.y;
+                        let near = (glam::IVec2::new(o.x, o.y) + k.size() / 2 - cxz * 16).as_vec2().length() - k.size() as f32 * 0.71;
+                        if inside || near > RAY_REACH {
+                            continue;
+                        }
                         (IVec3::new(o.x, 0, o.y) - cam_cube * 16, MASK_LOD, outside)
                     }
                 };

@@ -1735,7 +1735,9 @@ fn rt_sun(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool) -> vec3<f32> 
     let mask = select(0xFFu, 0xFFu & ~2u, plant);
     var rq: ray_query;
     // The TLAS is in the space of the camera's cube (`world_render::rt`), the camera at `g.cam_frac`.
-    rayQueryInitialize(&rq, rt_scene, RayDesc(RAY_FLAG_TERMINATE_ON_FIRST_HIT, mask, 0.0, 16384.0, rel + lift + g.cam_frac.xyz, l));
+    // 768 blocks: packs trace from within a few hundred of the eye, and a lit pixel's ray walks its
+    // whole length through the distant tiles (a view of 32's far land cost the most).
+    rayQueryInitialize(&rq, rt_scene, RayDesc(RAY_FLAG_TERMINATE_ON_FIRST_HIT, mask, 0.0, 768.0, rel + lift + g.cam_frac.xyz, l));
     var through = vec3(1.0);
     while rayQueryProceed(&rq) {
         let h = rayQueryGetCandidateIntersection(&rq);
