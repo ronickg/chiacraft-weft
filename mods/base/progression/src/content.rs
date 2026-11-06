@@ -328,6 +328,28 @@ pub const RULES: &[Rule] = &[
     n(&["base:furnace"], 0, Tech, Station, Made, "the Stone Age key's infrastructure: what it makes is the Bronze Age's"),
     r(&["base:glass", "base:*_stained_glass", "base:bricks", "base:stone", "base:stone_bricks"], 1, Tech, Building, Made),
     r(&["base:glowstone", "base:red_lamp", "base:green_lamp", "base:blue_lamp"], 1, Tech, Light, Made),
+    // The RTX showcase blocks (`showcase.rs`): of their materials' ages.
+    r(
+        &[
+            "base:frosted_glass",
+            "base:smoked_glass",
+            "base:leaded_glass",
+            "base:polished_limestone",
+            "base:limestone_tiles",
+            "base:checker_tiles",
+            "base:*_glazed_tiles",
+            "base:copper_block",
+            "base:bronze_plate",
+        ],
+        1,
+        Tech,
+        Building,
+        Made,
+    ),
+    r(&["base:slate_tiles"], 0, Tech, Building, Made),
+    r(&["base:steel_plate"], 2, Tech, Building, Made),
+    r(&["base:polished_obsidian"], 3, Tech, Building, Made),
+    r(&["base:bronze_lantern"], 1, Tech, Light, Made),
     // ---- machines (redstone: the Age of Steam's first machines)
     n(
         &[

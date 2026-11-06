@@ -71,6 +71,54 @@ def stained_glass():
         save(a, f"glass_{name}")
 
 
+def showcase_glass():
+    """The RTX showcase's glass (notes/RTX_SHOWCASE.md), from the approved glass: frosted (a milky
+    pane with frost crystals), smoked (a dark tinted pane, its glare grey) in the same frame, and
+    leaded glass (no wooden frame: panes of the dye colours and amber between tin cames)."""
+    glass = tile("glass")
+    solid = glass[..., 3] > 0
+    inside = np.zeros(glass.shape[:2], bool)
+    inside[3:-3, 3:-3] = True
+    rng = np.random.default_rng(7)
+    frost = glass.copy()
+    n = rng.random(glass.shape[:2])
+    crystals = (n > 0.82) & inside
+    pane = ~solid | (solid & inside)
+    frost[pane, :3] = [0xE4, 0xEC, 0xF0]
+    frost[pane, 3] = 170
+    frost[crystals, :3] = [0xF6, 0xFA, 0xFC]
+    frost[crystals, 3] = 205
+    save(frost, "frosted_glass")
+    smoke = glass.copy()
+    glare = solid & inside
+    smoke[~solid, :3] = [0x2A, 0x2C, 0x33]
+    smoke[~solid, 3] = 165
+    smoke[glare, :3] = [0x6A, 0x6E, 0x78]
+    smoke[glare, 3] = 200
+    save(smoke, "smoked_glass")
+    cols = [(0xC0, 0x30, 0x30), (0x3E, 0x9A, 0x40), (0x34, 0x5E, 0xC0), (0xE0, 0x9A, 0x30)]
+    tin = np.array([[0x3A, 0x3E, 0x46], [0x5A, 0x60, 0x6A], [0x9A, 0xA4, 0xB0]], float)
+    lead = np.zeros((32, 32, 4))
+    rows = [0, 8, 16, 24]
+    for r, y0 in enumerate(rows):
+        xs = [0, 11, 21] if r % 2 == 0 else [0, 6, 16, 27]
+        for k, x0 in enumerate(xs):
+            x1 = xs[k + 1] if k + 1 < len(xs) else 32
+            c = np.array(cols[(r * 3 + k * 2 + r // 2) % len(cols)], float) * rng.uniform(0.8, 1.0)
+            lead[y0:y0 + 8, x0:x1, :3] = c
+            lead[y0:y0 + 8, x0:x1, 3] = 165
+            lead[y0:y0 + 8, x0, :3] = tin[1]
+            lead[y0:y0 + 8, x0, 3] = 255
+            # A soft lighter streak across each pane.
+            yy = y0 + 2 + rng.integers(4)
+            lead[yy, x0 + 1:x1, :3] = np.minimum(c * 1.35 + 40, 255)
+        lead[y0, :, :3] = tin[1]
+        lead[y0, :, 3] = 255
+        # The came's light top edge.
+        lead[y0, ::3, :3] = tin[2]
+    save(lead, "leaded_glass")
+
+
 def drift(size=32, frames=16, seed=0, top=4):
     """A seamless pattern in [0, 1] that moves one full period over the frames, so it loops."""
     rng = np.random.default_rng(seed)
