@@ -127,6 +127,18 @@ struct TaaOut {
     @location(1) count: vec4<f32>,
 }
 
+// (chiacraft) Whether the nearest surface round this pixel (`near`, depth `d`) lies past 0.85 of the
+// terrain's end (`scene.params.y`, the far end with distant terrain), where the pack's far land
+// fades out with a moving dither (`world_render::END_FADE`). The sky (depth 0) is not.
+fn taa_far_end(near: vec2<i32>, d: f32, size: vec2<f32>) -> bool {
+    if d <= 0.0 || scene.params.y <= 0.0 {
+        return false;
+    }
+    let uv = (vec2<f32>(near) + 0.5) / size;
+    let h = scene.inv_view_proj * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, d, 1.0);
+    return length(h.xyz / h.w) > 0.85 * scene.params.y;
+}
+
 // The history moved toward the box round this frame's neighbourhood (`lo`..`hi`, about `mid`) until
 // it is inside: what was there last frame but is no longer (disoccluded, lit anew, moved off) gives
 // way, what still is stays (Karis's clipping, in YCoCg as Salvi's).
@@ -186,8 +198,17 @@ fn fs_taa(in: VOut) -> TaaOut {
     let mean = m1 / 9.0;
     let sigma = sqrt(max(m2 / 9.0 - mean * mean, vec3(0.0)));
     // The variance box, inside the min-max one: tighter where the neighbourhood is mostly alike.
-    let box_lo = max(lo, mean - sigma * 1.25);
-    let box_hi = min(hi, mean + sigma * 1.25);
+    // (chiacraft) Not where distant terrain ends (`taa_far_end`): the pack fades the land there
+    // with a dither that moves each frame (`fs_lod_end`), and a pixel turning from land to sky
+    // and back had its history clipped every frame, so the raw dots stayed (Far view, 11-06).
+    // The min-max box keeps both, so the frames average into the fade.
+    let far_end = taa_far_end(near, near_d, pass_.size);
+    var box_lo = max(lo, mean - sigma * 1.25);
+    var box_hi = min(hi, mean + sigma * 1.25);
+    if far_end {
+        box_lo = lo;
+        box_hi = hi;
+    }
     let fresh = TaaOut(vec4(taa_untone(taa_rgb(here)), here_a), vec4(1.0, 0.0, 0.0, 0.0));
     if pass_.low == 0u || scene.taa.z < 0.5 {
         return fresh;
@@ -210,7 +231,7 @@ fn fs_taa(in: VOut) -> TaaOut {
     // way (it was something else), at most 1 / `strength`.
     let gave = length(clipped - h) / max(length(box_hi - box_lo), 1e-4);
     var n = min(counted, 1.0 / max(pass_.strength, 0.02));
-    n = mix(n, 1.0, clamp(gave * 2.0, 0.0, 1.0));
+    n = mix(n, 1.0, clamp(gave * 2.0, 0.0, 1.0) * select(1.0, 0.0, far_end));
     // Fast motion: a little more of this frame, so moving land doesn't smear (each frame's history
     // is filtered once more where it is read between texels).
     let px = length(motion * pass_.size);
