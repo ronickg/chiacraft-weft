@@ -1179,9 +1179,18 @@ const LOD_DETAIL: vec2<f32> = vec2(220.0, 520.0);
 @vertex
 fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut {
     let f = vi / 4u;
-    let c = vi % 4u;
     let w0 = records[f * 4u];
     let w1 = records[f * 4u + 1u];
+    // Vanilla's corner shade on the ground's box faces (`lod_ao`; after upstream Weft f69243fd),
+    // the quad split along its lighter diagonal, as the cubes'.
+    var a = vec4<u32>(3u);
+    if lod_dir(w0) != LOD_FACE_GRID {
+        a = lod_ao(records[f * 4u + 3u]);
+    }
+    var c = vi % 4u;
+    if a.x + a.z < a.y + a.w {
+        c = (c + 1u) % 4u;
+    }
     // A box's face, or a far tile's smooth cell (`lod_corner`, in the prelude).
     let corner = lod_corner(f, c, finish(vec3(0.0), origins[ii]).xyz);
     let dir = corner.dir;
@@ -1205,7 +1214,7 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     let o = origins[ii] + g.cam_cube;
     out.pos = vec3<f32>(o.xyz * 16) + local;
     out.normal = corner.normal;
-    out.ao = mix(0.85, 0.95, clamp(corner.normal.y, 0.0, 1.0));
+    out.ao = mix(0.85, 0.95, clamp(corner.normal.y, 0.0, 1.0)) * mix(0.55, 1.0, f32(a[c]) / 3.0);
     // A crown's sides go dark toward its bottom, where the canopy shades itself (`fs_lod` takes it
     // as the crown's own shade, `CROWN_UNDER`).
     if lod_crown(w0) && dir != 2u && dir != 3u {
@@ -1216,7 +1225,9 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     let kind = lod_tint(w0);
     out.kind = vec4(kind, 1u, 0u, select(0u, 1u, lod_crown(w0)));
     var tint = vec3(1.0);
-    if kind != 0u {
+    // Not with an overlay: then the tint is the overlay's, and far off only the base is drawn (a
+    // cherry's pink blossom tinted whole came out brown-red).
+    if kind != 0u && frames[g.extra.x + (w1 & FACE_TEX_MASK)] == 0u {
         tint = unpack_rgb(biomes[corner.biome * g.extra.z + kind - 1u]);
     }
     out.tint = tint;
