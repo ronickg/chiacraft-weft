@@ -265,6 +265,7 @@ These are the biggest changes. They live mostly in our crates, but each needed h
 - Everything else is ours to keep in the fork unless Ronald decides to offer it.
 
 - **Backed leaf faces off under `core:mc_leaves`** (Trees, branch `claude/trees-bliss-canopy-1d047c`, 11-06): `client::mesher` sets `face::BACKED` only when the test switch `core:mc_leaves` is off. *Why:* `mc_leaves` draws the faces between leaves as Minecraft's fancy leaves do, and the backed fill's dark average covered them in the holes. The plain look's shaded leaves measured luma 16 against vanilla's 23 (Bliss's own world, mc_world_forest 08:00). Test switch only; the default look is unchanged. *Upstream?* No (our test switch).
+- **Pack options 48** (Trees, branch `claude/trees-bliss-canopy-1d047c`, 11-06): `Scene::options` grows from 8 rows of four to 12 (`gpu_layout`, `client::pack_options`, `packs::pack_options` reads 48 names). *Why:* chiacraft's pack had used all 32 slots, and the leaf-light setting (`base:look_leaf_light`) needed one more. 64 bytes more in the scene buffer; nothing else reads its size. *Upstream?* Maybe, as a bigger options limit for packs.
 ## Our own crates (additions, not core changes)
 
 `sandbox` (wasmtime mod host), `packages` (data packages), `account`, `bridge`, `bots` (`weft-bots`, headless load-test players).
