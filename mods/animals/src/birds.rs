@@ -171,7 +171,9 @@ fn fly(w: &World, id: u64, st: &EntityState, wings: &Wings) -> bool {
     if !f.flying {
         // A nestling stays in the nest: it neither flies nor flees until it is past a baby
         // (Tester 2, 11-06: raven chicks hatched and flew off at once, the nest left empty).
-        if w.component(id, &crate::animal::ANIMAL).is_some_and(|a| a.stage == crate::animal::BABY) {
+        if w.component(id, &crate::animal::ANIMAL)
+            .is_some_and(|a| a.stage == crate::animal::BABY)
+        {
             return false;
         }
         if let Some(at) = smelled {

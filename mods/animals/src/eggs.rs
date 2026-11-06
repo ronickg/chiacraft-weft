@@ -283,7 +283,10 @@ fn nests_near(w: &World, at: [f64; 3], r: f64) -> Vec<(u64, [f64; 3], f64)> {
     let mut all: Vec<(u64, [f64; 3], f64)> = [&NEST, &NEST_CUP]
         .into_iter()
         .flat_map(|k| w.entities_near(at, r, Some(k)))
-        .filter_map(|n| w.entity(n).map(|e| (n, e.pos.to_array(), e.size.width as f64)))
+        .filter_map(|n| {
+            w.entity(n)
+                .map(|e| (n, e.pos.to_array(), e.size.width as f64))
+        })
         .collect();
     all.sort_by(|a, b| crate::dist2(a.1, at).total_cmp(&crate::dist2(b.1, at)));
     all
