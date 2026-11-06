@@ -98,7 +98,7 @@ fn with_layers(n: u8) -> u32 {
 }
 
 fn tick(w: &World) {
-    if w.dimension() != crate::OVERWORLD.id() {
+    if !crate::land::overworld_land(w.dimension()) {
         return;
     }
     for player in w.players() {
