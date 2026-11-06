@@ -12,7 +12,7 @@ Examples to copy from are in `mods/base/assets/textures/block/`:\
 `water_still.anim`,`furnace_front_lit_e.png`, `grass_side_overlay.png`.
 
 ## Quick links
-[animation](#animation) | [emission](#emission) | [overlays](#overlays) | [debugging](#debugging)
+[animation](#animation) | [emission](#emission) | [materials](#materials) | [overlays](#overlays) | [debugging](#debugging)
 
 ## Animation
 A texture is animated when its picture is a vertical strip of square frames: a 16x16 texture with
@@ -72,6 +72,27 @@ uses alpha channel, `0` - `254` is glow strength, `255` means no emission at all
 
 If both files exist, `_e` overrides `_s`.\
 Glow works for blocks and for entity skins (`_e` next to the skin png).
+
+## Materials
+How shiny, metallic and bumpy a block's texels are (chiacraft), in LabPBR 1.3's two maps, so packs' maps work as
+they are. Both sit beside the texture, the same size or any square size (scaled to the texture's), the same number
+of frames, and are read as linear values (not sRGB):
+
+### `<texture>_s.png`
+- red: smoothness, 0 rough to 255 a mirror (roughness = (1 - red/255)²)
+- green: 0-229 the reflectance looking straight at it, /255 (stone and glass about 10, so 4%); 230-237 a metal
+  (iron, gold, aluminium, chrome, copper, lead, platinum, silver); 255 a metal of the texture's own colour
+- blue: 0-64 porosity (how much rain darkens it), 65-255 subsurface light
+- alpha: emission, as above (255 none)
+
+### `<texture>_n.png`
+- red, green: the normal's x and y (DirectX's y: 0 up the picture, 255 down; 128 128 is flat)
+- blue: ambient occlusion (255 none)
+- alpha: height (255 the surface)
+
+A texture with either map has both (the missing one is neutral: rough, 4%, flat). Shaders read them through
+`mat_at` (see the [shaders guide](shaders.md)); the engine's own shaders don't, so they change the look only with a
+shader pack that uses them (chiacraft's does: highlights, the sky and the screen mirrored on smooth blocks).
 
 ## Overlays
 If `<texture>.png` has a `<texture>_overlay.png` next to it, the overlay is drawn over the face

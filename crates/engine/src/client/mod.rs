@@ -467,6 +467,54 @@ impl ClientEntity {
     }
 }
 
+/// The camera a frame was drawn with, without the jitter (`Client::frame_camera`): what the
+/// backend's upscaler is told (`weft_render::UpscaleParams`).
+#[derive(Clone, Copy, Debug)]
+pub struct FrameCamera {
+    /// Camera-relative world to view (the camera at the origin), and view to clip.
+    pub view: glam::Mat4,
+    pub proj: glam::Mat4,
+    /// Takes this frame's camera-relative positions to last frame's clip space (`Scene::taa_prev`).
+    pub prev: glam::Mat4,
+    /// No last frame to go from.
+    pub fresh: bool,
+    pub fov_y: f32,
+    pub aspect: f32,
+}
+
+impl FrameCamera {
+    /// `weft_render::UpscaleParams`'s camera part; `Post::apply` fills in the rest.
+    pub fn upscale_params(&self) -> weft_render::UpscaleParams {
+        let view_proj = self.proj * self.view;
+        let clip_to_prev = self.prev * view_proj.inverse();
+        let to_world = self.view.inverse();
+        let axis = |v: glam::Vec3| {
+            to_world
+                .transform_vector3(v)
+                .normalize_or_zero()
+                .extend(0.0)
+                .to_array()
+        };
+        weft_render::UpscaleParams {
+            reset: self.fresh as u32,
+            fov_y: self.fov_y,
+            aspect: self.aspect,
+            near: 0.05,
+            view_to_clip: self.proj.to_cols_array(),
+            clip_to_view: self.proj.inverse().to_cols_array(),
+            clip_to_prev_clip: clip_to_prev.to_cols_array(),
+            prev_clip_to_clip: clip_to_prev.inverse().to_cols_array(),
+            world_to_view: self.view.to_cols_array(),
+            view_to_world: to_world.to_cols_array(),
+            right: axis(glam::Vec3::X),
+            up: axis(glam::Vec3::Y),
+            // The camera looks down its -z.
+            forward: axis(-glam::Vec3::Z),
+            ..Default::default()
+        }
+    }
+}
+
 pub struct ClientMenu {
     pub kind: u32,
     pub window: u32,
@@ -663,6 +711,11 @@ pub struct Client {
     /// Last frame's projection and view without the jitter, where its camera stood and the
     /// shaders' clock then, for temporal anti-aliasing's `Scene::taa_prev` and `taa`.
     taa_last: Option<(glam::Mat4, DVec3, f32)>,
+    /// Temporal anti-aliasing's count image this frame, bindless index + 1 (`Scene::taa_frame`),
+    /// set by the app before `render` (`post::Post::taa_out`).
+    pub taa_out: u32,
+    /// The camera the last frame was drawn with, for the backend's upscaler (`upscale_camera`).
+    pub frame_camera: Option<FrameCamera>,
     pub late_out: CommandList,
     /// Seconds until the next dust piece from the block being hit, and until its next knock.
     hit_dust: f32,
@@ -990,6 +1043,8 @@ impl Client {
             hand_late: CommandList::default(),
             behind: [0.0; 4],
             taa_last: None,
+            taa_out: 0,
+            frame_camera: None,
             late_out: CommandList::default(),
             hit_dust: 0.0,
             hit_sound: 0.0,
@@ -2869,6 +2924,8 @@ impl Client {
             // Filled in by `render` (`taa_frame`).
             taa: [0.0; 4],
             taa_prev: [[0.0; 4]; 4],
+            taa_frame: [self.taa_out as f32, crate::post::motion() as u32 as f32, 0.0, 0.0],
+            dlss: [crate::post::mip_bias(), 0.0, 0.0, 0.0],
             cloud_shadow: [0.0; 4],
             prev_view_proj: [[0.0; 4]; 4],
             cloud_moved: [0.0; 4],
@@ -2885,8 +2942,9 @@ impl Client {
             frame: [crate::post::hdr() as u32 as f32, crate::post::bloom() as u32 as f32, self.sky.froxels.cell as f32, {
                 // chiacraft: a count of the frames drawn, 0 to 63 and round again, for dithers that
                 // change each frame (Far view, 11-06: the cubes' fade into distant terrain).
+                // Held under an upscaler (`post::dither_moves`).
                 static FRAME: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
-                (FRAME.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % 64) as f32
+                if crate::post::dither_moves() { (FRAME.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % 64) as f32 } else { 0.0 }
             }],
             shadow_view_proj: self.shadow.0.to_cols_array_2d(),
             shadow_far_view_proj: self.shadow_far.0.to_cols_array_2d(),
@@ -2896,7 +2954,12 @@ impl Client {
                 }
                 _ => [0.0; 4],
             },
-            rt: [self.render.rt_traced() as u32 as f32, 0.0, 0.0, 0.0],
+            rt: [
+                self.render.rt_traced() as u32 as f32,
+                (self.render.rt_frame_no() % (1 << 24)) as f32,
+                (shadow_setting("core:rt_shadows", 0.0) > 1.5) as u32 as f32,
+                0.0,
+            ],
             shadow: match self.shadow_map {
                 Some(t) if self.shadow.1 => {
                     [self.shadow_index(t) as f32, self.shadow_size as f32, 1.0, 2.0 * SHADOW_REACH / self.shadow_size as f32]
@@ -3259,6 +3322,15 @@ impl Client {
         self.render.rt_frame(gpu, early, frame.slot, &cam);
         let mut scene = self.scene(&cam, frame);
         (scene.taa, scene.taa_prev) = self.taa_frame(&cam, frame);
+        let aspect = frame.width as f32 / frame.height.max(1) as f32;
+        self.frame_camera = Some(FrameCamera {
+            view: cam.view(),
+            proj: cam.proj_plain(aspect),
+            prev: glam::Mat4::from_cols_array_2d(&scene.taa_prev),
+            fresh: scene.taa[2] == 0.0,
+            fov_y: cam.fov.to_radians(),
+            aspect,
+        });
         // The calm world pipelines (`gpu_layout::CALM_OFF`) while nothing they leave out is on, read
         // from the scene the shaders see: no fog in the air, no thunder, no held light, the eye in
         // no liquid (the fog then starts at 0.6 of its end).
