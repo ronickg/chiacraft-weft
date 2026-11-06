@@ -321,10 +321,12 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
         // and the curve's shoulder, noon 22 still, gr2.)
         let k = 1.0 + (0.3 + 1.2 * smoothstep(0.3, 0.75, scene.sun.y)) * open;
         col = max(vec3(y) + (col - vec3(y)) * k, vec3(0.0));
-        // And 15% dimmer by day: ours read brighter than Bliss's at every hour (mc_forest 08:00
+        // And dimmer by day: ours read brighter than Bliss's at every hour (mc_forest 08:00
         // 216 against 208, noon 217 against 192, 17:00 193 against 171). The day's brightening
         // below leaves it out (on it too, the 08:00 sky went to 224, gr2).
-        col *= 1.0 - 0.15 * open;
+        // (30%: at 15% the sky, mostly bright cloud on the curve's shoulder, barely moved, noon 216
+        // to 213, gr3.)
+        col *= 1.0 - 0.3 * open;
     }
     if pass_.bloom != 0u {
         let glow = bloom_tap(pass_.bloom - 1u, uv);
@@ -344,7 +346,7 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
             // A high sun's land a little brighter (the noon land read 91-93 against Bliss's 113),
             // from a sun about 12° up (at the like-for-like mc_forest vista the land read dark
             // through the day: 08:00 78 against Bliss's 89, 17:00 81 against 113).
-            // The land only: the sky has its own (15% dimmer, above).
+            // The land only: the sky has its own (dimmer, above).
             col *= mix(1.0, 1.25, smoothstep(0.2, 0.6, scene.sun.y) * (1.0 - rain_amount()) * select(1.0, 0.0, sky_px));
         }
     }

@@ -1738,7 +1738,11 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     // With a high sun 0.62 (the like-for-like scene, Ley lines' mc_forest vista: at 0.78 the land
     // measured 97-101 against Bliss's 72-75 at 08:00 and noon, with Minecraft's own textures and
     // leaf colours as much: the grade's, not the art's; the sweep gr1 put 0.8 of it on Bliss's).
-    let sat = 1.2 * look_opt(OPT_SATURATION, 1.0) * select(1.0, mix(0.95, 0.62, smoothstep(0.3, 0.75, scene.sun.y)), scene.frame.x > 0.5);
+    // With a low sun 0.95 in mist (a gold dawn mist's colour) but 0.75 in clear air: on a clear
+    // evening the land at 17:00 and 18:00 measured 139-153 of saturation against Bliss's 56-84
+    // (mc_forest, gr4), where Bliss's misty mornings run 181.
+    let low_sat = mix(0.75, 0.95, smoothstep(0.02, 0.1, scene.weather.z));
+    let sat = 1.2 * look_opt(OPT_SATURATION, 1.0) * select(1.0, mix(low_sat, 0.62, smoothstep(0.3, 0.75, scene.sun.y)), scene.frame.x > 0.5);
     t = max(mix(vec3(y), t, mix(1.0, sat, day)), vec3(0.0));
     // A cool floor so the night is never pure black; by day black stays black.
     t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034) * (1.0 - day);
