@@ -39,6 +39,25 @@ struct VOut {
     @location(15) ao: f32,
     // x tint kind, y 1 for a moving structure's blocks (not traced), z 1 for plants lit from above.
     @location(16) @interpolate(flat) kind: vec4<u32>,
+    // Temporal anti-aliasing (`core:aa`): xy how far this vertex moved on the screen since last
+    // frame (`screen_motion`), z 1 where that is its own (swaying), 0 for the camera's.
+    @location(17) motion: vec3<f32>,
+}
+
+// The world's opaque and cutout surfaces: their color and their motion (`motion_texel`), which the
+// engine keeps where the world's pass has a motion image and drops elsewhere.
+struct WorldOut {
+    @location(0) color: vec4<f32>,
+    @location(1) motion: vec4<f32>,
+}
+
+fn world_out(in: VOut, c: vec4<f32>) -> WorldOut {
+    return WorldOut(c, motion_texel(in.motion, in.clip.z));
+}
+
+// Whether this frame writes motion: temporal anti-aliasing on, with a last frame to come from.
+fn taa_moving() -> bool {
+    return scene.taa.z > 0.5;
 }
 
 fn shader_of(tex: u32) -> u32 {
@@ -170,16 +189,20 @@ fn body_normal(n: vec3<f32>, k: i32) -> vec3<f32> {
 // How far the wind moves what sways at `p`: a lean the way it blows, stronger in its gusts, and a
 // flutter that quickens with it. Calm air keeps a little life in the leaves.
 fn wind(p_world: vec3<f32>) -> vec3<f32> {
+    return wind_at(p_world, scene.params.w);
+}
+
+// `wind` at the shaders' clock `t` (`scene.taa.w`: last frame's, for the motion image).
+fn wind_at(p_world: vec3<f32>, t: f32) -> vec3<f32> {
     // Far from spawn the sines would get huge arguments and lose their place (foliage jumps on
     // fast-math backends): positions are taken within 4096 blocks, a seam once every 4096.
     let p = vec3(p_world.x - floor(p_world.x / 4096.0) * 4096.0, p_world.y, p_world.z - floor(p_world.z / 4096.0) * 4096.0);
-    let t = scene.params.w;
     let w = wind_now();
     let speed = length(w);
     let dir = select(vec2(1.0, 0.0), w / max(speed, 1e-4), speed > 0.01);
     // A fresh breeze (9 m/s) bends things as far as they go, a gale a little further.
     let s = clamp(speed / 9.0, 0.0, 1.6);
-    let g = gust(p);
+    let g = gust_at(p, t);
     let q = t * (1.0 + 0.8 * s);
     let a = sin(q * 1.7 + p.x * 0.63 + p.z * 0.41 + p.y * 0.2) * 0.6 + sin(q * 2.9 + p.x * 1.21 - p.z * 0.83) * 0.25;
     let b = sin(q * 1.3 + p.z * 0.71 - p.x * 0.37) * 0.5 + sin(q * 3.4 + p.z * 1.4 + p.x * 0.6) * 0.2;
@@ -227,10 +250,16 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     let world = vec3<f32>(o.xyz * 16) + local;
     let tint_kind = (w0 >> FACE_TINT_SHIFT) & TINT_MASK;
     // Leaves sway a little.
-    if tint_kind == TINT_FOLIAGE && origins[ii].w == 0 {
-        pos = vec4(pos.xyz + wind(world) * 0.035, 1.0);
-    }
     var out: VOut;
+    if tint_kind == TINT_FOLIAGE && origins[ii].w == 0 {
+        let rest = pos.xyz;
+        pos = vec4(rest + wind(world) * 0.035, 1.0);
+        out.clip = scene.view_proj * pos;
+        if taa_moving() {
+            let was = rest + wind_at(world, scene.taa.w) * 0.035;
+            out.motion = vec3(screen_motion(out.clip, scene.taa_prev * vec4(was, 1.0), scene.taa.xy), 1.0);
+        }
+    }
     out.clip = scene.view_proj * pos;
     out.dist = length(pos.xyz);
     out.rel = pos.xyz;
@@ -291,14 +320,22 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     var pos = finish(local, origins[ii]);
     let o = origins[ii] + g.cam_cube;
     let world = vec3<f32>(o.xyz * 16) + local;
+    var out: VOut;
     // Grass and flowers bend at the top and stay rooted.
     if (tint_kind == TINT_GRASS || tint_kind == TINT_FOLIAGE || flat_) && tint_kind != TINT_WATER && origins[ii].w == 0 {
         let lo = min(min(p0.y, p1.y), min(p2.y, p3.y));
         let hi = max(max(p0.y, p1.y), max(p2.y, p3.y));
         let up = clamp((local.y - lo) / max(hi - lo, 0.001), 0.0, 1.0) * step(0.2, hi - lo);
-        pos = vec4(pos.xyz + wind(floor(world) + vec3(0.5)) * 0.11 * up + parted(pos.xyz, world) * up, 1.0);
+        let rest = pos.xyz;
+        let part = parted(rest, world) * up;
+        pos = vec4(rest + wind(floor(world) + vec3(0.5)) * 0.11 * up + part, 1.0);
+        out.clip = scene.view_proj * pos;
+        // (The parting follows the player, who moved too; taken as it is now.)
+        if taa_moving() && up > 0.0 {
+            let was = rest + wind_at(floor(world) + vec3(0.5), scene.taa.w) * 0.11 * up + part;
+            out.motion = vec3(screen_motion(out.clip, scene.taa_prev * vec4(was, 1.0), scene.taa.xy), 1.0);
+        }
     }
-    var out: VOut;
     out.clip = scene.view_proj * pos;
     out.dist = length(pos.xyz);
     out.rel = pos.xyz;
@@ -929,12 +966,12 @@ fn sample_cutout(in: VOut, nuv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec4
 }
 
 @fragment
-fn fs_opaque(in: VOut) -> @location(0) vec4<f32> {
-    return opaque(in);
+fn fs_opaque(in: VOut) -> WorldOut {
+    return world_out(in, opaque(in));
 }
 
 @fragment
-fn fs_cutout(in: VOut) -> @location(0) vec4<f32> {
+fn fs_cutout(in: VOut) -> WorldOut {
     // Far look 1: small plants thin out from 40 to 96 blocks, so far ground isn't speckled with
     // flowers and tufts a pixel or two across.
     if (far_look() & 1u) != 0u && in.kind.z != 0u {
@@ -954,7 +991,7 @@ fn fs_cutout(in: VOut) -> @location(0) vec4<f32> {
     if in.kind.z == 0u {
         albedo = far_flat(in, albedo);
     }
-    return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
+    return world_out(in, vec4(shade(in, albedo).rgb, SOLID_ALPHA));
 }
 
 // Cutout blocks in two passes (the engine's `cutout_split`, on tiled GPUs): `fs_cutout`'s depth,
@@ -990,12 +1027,12 @@ fn fs_cutout_depth(in: VOut) {
 }
 
 @fragment
-fn fs_cutout_shade(in: VOut) -> @location(0) vec4<f32> {
+fn fs_cutout_shade(in: VOut) -> WorldOut {
     var albedo = cutout_albedo(in);
     if in.kind.z == 0u {
         albedo = far_flat(in, albedo);
     }
-    return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
+    return world_out(in, vec4(shade(in, albedo).rgb, SOLID_ALPHA));
 }
 
 // Where a cutout's texel is cut: at alpha 0.1, but in the HDR world a leaf cube (a cutout cube:
@@ -1037,15 +1074,15 @@ fn faded(in: VOut) -> bool {
 // The cubes near where they end (the engine draws only those meshes with these, so the rest keep
 // early depth).
 @fragment
-fn fs_opaque_fade(in: VOut) -> @location(0) vec4<f32> {
+fn fs_opaque_fade(in: VOut) -> WorldOut {
     if faded(in) {
         discard;
     }
-    return opaque(in);
+    return world_out(in, opaque(in));
 }
 
 @fragment
-fn fs_cutout_fade(in: VOut) -> @location(0) vec4<f32> {
+fn fs_cutout_fade(in: VOut) -> WorldOut {
     if faded(in) {
         discard;
     }
@@ -1056,7 +1093,7 @@ fn fs_cutout_fade(in: VOut) -> @location(0) vec4<f32> {
     if albedo.a <= cutout_edge(in, nuv, du, dv) {
         discard;
     }
-    return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
+    return world_out(in, vec4(shade(in, albedo).rgb, SOLID_ALPHA));
 }
 
 fn translucent(in: VOut) -> vec4<f32> {

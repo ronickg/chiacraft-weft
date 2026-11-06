@@ -394,6 +394,9 @@ fn blood_tint() -> vec3<f32> {
 // looking up from under the trees (Tester 2's looks4, 11-05); higher, they stand in the sky as
 // clouds with blue between them, as Bliss's do.
 const SOFT_LIFT: f32 = 220.0;
+// How far a look into the soft clouds is followed (blocks): beyond, they fade into the sky. Their
+// depth is held there, so what stands at this distance is cloud, never land (`sky_or_cloud`).
+const SOFT_REACH: f32 = 4000.0;
 
 // ---- lightning (`scene.lightning`, the engine's flash where the player is) ----
 // Ronald, 11-05: "add lightning flashes" (Tester 2's four storm shots showed none: the engine's
@@ -1002,10 +1005,14 @@ fn wind_now() -> vec2<f32> {
 // How hard the wind pushes at `p` now, about 1 for its mean: gusts are bands of stronger wind that
 // sweep across the land the way it blows, so a field bends in waves.
 fn gust(p: vec3<f32>) -> f32 {
+    return gust_at(p, scene.params.w);
+}
+
+// `gust` at the shaders' clock `t` (last frame's for the motion image, `scene.taa.w`).
+fn gust_at(p: vec3<f32>, t: f32) -> f32 {
     let w = wind_now();
     let speed = length(w);
     let dir = select(vec2(1.0, 0.0), w / max(speed, 1e-4), speed > 0.01);
-    let t = scene.params.w;
     let along = dot(p.xz, dir) - t * max(speed, 1.0) * 0.9;
     let band = noise3(vec3(along / 14.0, t * 0.05, dot(p.xz, vec2(-dir.y, dir.x)) / 30.0));
     return 0.55 + 1.1 * smoothstep(0.35, 0.85, band);

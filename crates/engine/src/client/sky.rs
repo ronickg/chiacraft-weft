@@ -245,6 +245,7 @@ impl Sky {
                         blend: Blend::Premultiplied,
                         cull_back: false,
                         topology: Topology::Triangles,
+                        motion: crate::post::motion(),
                     })
                     .map_err(|e| e.0)?;
                 // Clouds are things in the world: they hide what is behind them, and the shader says
@@ -260,6 +261,7 @@ impl Sky {
                         blend: Blend::Premultiplied,
                         cull_back: false,
                         topology: Topology::Triangles,
+                        motion: crate::post::motion(),
                     })
                     .map_err(|e| e.0)?;
                 Ok((pipe, clouds, slots.pop().unwrap_or_default(), shader))

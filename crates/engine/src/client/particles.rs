@@ -247,6 +247,7 @@ impl Particles {
                     blend,
                     cull_back: false,
                     topology: Topology::Triangles,
+                    motion: crate::post::motion(),
                 })
                 .map_err(|e| e.0)
             };
