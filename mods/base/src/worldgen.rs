@@ -105,9 +105,10 @@ pub static BEACH: Biome = Biome::named("beach");
 pub static DEEP_CAVES: Biome = Biome::named("deep_caves");
 
 pub fn register(r: &mut Registry) {
-    // Simple, Minecraft-style trees for now (`base_api::trees::TREE_STYLE`; Ronald, 11-05).
+    // Simple trees for now (`base_api::trees::TREE_STYLE`; Ronald, 11-05); Minecraft's own for
+    // like-for-like looks.
     r.config(&base_api::trees::TREE_STYLE)
-        .choice(0, &["simple", "branched"])
+        .choice(0, &["simple", "branched", "minecraft"])
         .world();
     // Tags say what a biome is (spawning, decoration and mods ask these, not names).
     let (grass, foliage, water) = (&tints::GRASS, &tints::FOLIAGE, &tints::WATER);
@@ -864,7 +865,22 @@ fn tree(s: &mut Site) {
         .on_biome(s.biome())
         .and_then(|l| l.pick(s.random() >> 40))
         .unwrap_or(OAK_LOG.id());
+    let log = mc_forest_kind(s, log);
     tree_of(s, log);
+}
+
+/// In the Minecraft forest test world (`MC_FOREST`) the old growth stands as Minecraft's forest:
+/// oaks and birches, no spruces (Planner, 11-06, for like-for-like looks against Bliss's forest).
+/// A spruce becomes an oak, or two in five a birch, so the old growth's oak 6 : spruce 2 : birch 1
+/// comes to Minecraft's 4 : 1.
+fn mc_forest_kind(s: &mut Site, log: u32) -> u32 {
+    if s.dimension() != crate::MC_FOREST.id()
+        || name_of(abi::entry_kind::BIOME, s.biome()) != "base:old_growth_forest"
+        || log != crate::blocks::SPRUCE_LOG.id()
+    {
+        return log;
+    }
+    if s.random() % 5 < 2 { crate::blocks::BIRCH_LOG.id() } else { OAK_LOG.id() }
 }
 
 /// Where the wild cherry groves stand (`vitals::wild::CHERRY_GROVE_*`), as a mask: on in a grove
