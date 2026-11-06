@@ -139,6 +139,10 @@ pub const SAND_SINK: f32 = 0.6;
 /// default setting (some 800 alive; ultra's 5,000 read as blown sand, wind_dust).
 pub const DUST_STORM: f32 = 1000.0;
 pub const DUST_LOW: f32 = 0.6;
+/// The grains stay within this many blocks of the eye even where the clear air reaches farther:
+/// grains farther out are a pixel or less, and spread over 7 m/s's 15-block bubble a frame held
+/// almost none (wind_dust2); the streaks fill farther out.
+pub const DUST_NEAR: f32 = 9.0;
 pub const DUST_CLEAR: [(f32, f32); 2] = [(7.0, 16.0), (11.0, 8.0)];
 /// And streaks of sand along the wind, 4 to 24 blocks out (the study's gust streaks), a second at
 /// its thickest, most of them low; each drawn as long as `STREAK_SECS` of its flight (about a

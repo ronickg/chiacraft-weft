@@ -446,7 +446,7 @@ fn frame(c: &Client) {
     // hides farther), and draws streaks along the wind farther out.
     if dust > 0.0 {
         let v = [wind[0] as f64, 0.0, wind[1] as f64];
-        let clear = wl::dust_clear(speed) as f64;
+        let clear = wl::dust_clear(speed).min(wl::DUST_NEAR) as f64;
         let n = wl::draw(wl::DUST_STORM * dust * density * dt, life.unit());
         // Centred a little upwind, so the wind carries them through; in a few bursts, each its own
         // shade and layer (most skim the ground, the rest fill the air to 4 blocks).
