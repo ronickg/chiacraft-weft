@@ -969,6 +969,12 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f
     // the light then, and even from all round it made the land flat.
     let hemi = mix(0.75 + 0.25 * n.y, 0.6 + 0.4 * n.y, rain_amount());
     var c = p.ambient * sky * hemi * ao * leaves;
+    // In the HDR world a cloud overhead takes some of the sky's light too, not the sun's alone: with
+    // the sky's full fill a cloud's shadow kept the land at about 0.72 of its lit brightness, where
+    // Bliss's shaded forest falls to 0.4-0.6 (PC shcs_off/shcs_on against Bliss's vista, 11-06).
+    if scene.frame.x > 0.5 && scene.cloud_shadow.x > 0.5 {
+        c *= mix(0.6, 1.0, soft_cloud_shadow(rel));
+    }
     // Under a forest's canopy most of the floor's light is the sun's, come down through the leaves:
     // green and soft (a rainforest's floor gets 1-2 % of the sun, more of it this way than from the
     // sky). Without it the floor of Plants' rainforest sat at luma 12-17 at noon, under the daytime
