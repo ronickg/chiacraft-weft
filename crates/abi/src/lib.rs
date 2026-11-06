@@ -5419,6 +5419,20 @@ pub mod terrain_op {
     /// when not given). Larger makes bigger land masses and seas; every mask and rule on
     /// continentalness follows it.
     pub const CONTINENT_SCALE: u32 = 17;
+    /// chiacraft: the state far trees' crowns are drawn in at a time of year: `face`
+    /// (`FarLeavesArgs`). Distant terrain takes its crowns' leaves from sample trees made once,
+    /// so leaves that change with the seasons (a bloom) ask here, and the tiles are made again
+    /// when an answer changes.
+    pub const FAR_LEAVES: u32 = 18;
+}
+
+/// A far crown's leaves at a time (`terrain_op::FAR_LEAVES`).
+#[repr(C)]
+pub struct FarLeavesArgs {
+    /// The world's day time (ticks since it began).
+    pub time: u64,
+    /// The leaves' state; output: the state to draw.
+    pub state: u32,
 }
 
 /// A steep column's top as distant terrain sees it (`terrain_op::FACES`).
@@ -5457,7 +5471,7 @@ pub struct TerrainDesc {
     pub rule: BiomeRuleDesc,
     /// `terrain_op::FIELD`.
     pub field: Slice<ExprStep>,
-    /// `FACES`: `FaceArgs`.
+    /// `FACES`: `FaceArgs`; `FAR_LEAVES`: `FarLeavesArgs`.
     pub face: Callback,
 }
 defaults!(TerrainDesc {

@@ -23,6 +23,12 @@ pub type Columns = FxHashMap<IVec2, (i32, u32, u32)>;
 use crate::content::{Content, content};
 use crate::gpu_layout::face;
 
+/// chiacraft: the client world's day time, for far crowns' leaves by the season
+/// (`Terrain::far_leaves`), and the leaf states far crowns were drawn from, asked again now and
+/// then (`Lod::update`): when an answer changes the tiles are made again.
+static FAR_TIME: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static FAR_LEAF_STATES: std::sync::Mutex<Vec<u32>> = std::sync::Mutex::new(Vec::new());
+
 /// Cells a tile side.
 pub const CELLS: i32 = 32;
 /// Columns a tile is made from: its cells and one around them (for the walls at its edges).
@@ -360,6 +366,25 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
     let looks = super::looks::current();
     let face_of = |state: u32, dir: usize| face_of(c, &looks, state, dir);
     let terrain = c.dims.get(dim as usize).and_then(|d| d.terrain.as_ref());
+    // Crowns' leaves as the dimension draws them at this time of year (`far_leaves`).
+    let far_leaves = terrain.and_then(|t| t.far_leaves);
+    let time = FAR_TIME.load(Ordering::Relaxed);
+    let memo = std::cell::RefCell::new(Vec::<(u32, u32)>::new());
+    let leaves_now = |state: u32| {
+        let Some(f) = far_leaves else { return state };
+        if let Some(&(_, now)) = memo.borrow().iter().find(|m| m.0 == state) {
+            return now;
+        }
+        {
+            let mut seen = FAR_LEAF_STATES.lock().unwrap();
+            if !seen.contains(&state) {
+                seen.push(state);
+            }
+        }
+        let now = f.state(time, state);
+        memo.borrow_mut().push((state, now));
+        now
+    };
     let faces = terrain.and_then(|t| t.faces);
     let stone = terrain.map_or(0, |t| t.stone);
     let o = key.origin();
@@ -546,7 +571,7 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                     end += 1;
                 }
                 if shows {
-                    let (tex, tint) = face_of(c.leaves, dir as usize);
+                    let (tex, tint) = face_of(leaves_now(c.leaves), dir as usize);
                     out.push(occluded(crowned(quad(dir, i * s, y, j * s, ((end - i) * s, 1, s), tex, tint, biome)), occ));
                 }
                 (lo, hi) = (lo.min(c.bottom), hi.max(c.top + 1));
@@ -565,7 +590,7 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                 let inside = (0..CELLS).contains(&(i + di)) && (0..CELLS).contains(&(j + dj));
                 let (ny, filled) =
                     if inside { (at(i + di, j + dj).0, crown_at(i + di, j + dj).map(|n| (n.bottom, n.top))) } else { (y, None) };
-                let (tex, tint) = face_of(c.leaves, dir);
+                let (tex, tint) = face_of(leaves_now(c.leaves), dir);
                 for (a, b) in open_spans(c.bottom, c.top, ny, filled) {
                     out.push(crowned(quad(dir as u32, i * s, a, j * s, (s, b + 1 - a, s), tex, tint, biome)));
                 }
@@ -666,6 +691,10 @@ pub fn mesh_smooth(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]
 
 /// The client's distant terrain: which tiles to show, asking for missing ones, taking made ones.
 pub struct Lod {
+    /// chiacraft: what the far crowns' leaves were drawn as (`FAR_LEAF_STATES`, `far_leaves`), and
+    /// the day time they were last asked at.
+    leaf_answers: Vec<(u32, u32)>,
+    leaves_asked: u64,
     /// The land's height at the camera's column, kept while it stays in it.
     ground: Option<((u32, IVec2), i32)>,
     jobs: Sender<LodJob>,
@@ -711,6 +740,8 @@ const MASK_MARGIN: i32 = 3;
 impl Lod {
     pub fn new(jobs: Sender<LodJob>) -> Lod {
         Lod {
+            leaf_answers: Vec::new(),
+            leaves_asked: 0,
             ground: None,
             jobs,
             done: unbounded(),
@@ -805,6 +836,8 @@ impl Lod {
     ) {
         let c = content();
         let dim = world.dim;
+        FAR_TIME.store(world.time, Ordering::Relaxed);
+        self.check_leaves(c, dim, world.time);
         self.update_mask(gpu, render, world, seed, cam, view);
         let reach = Self::distance();
         if (dim, seed) != (self.dim, self.seed) || reach == 0 {
@@ -950,6 +983,33 @@ impl Lod {
             on
         });
         self.request();
+    }
+
+    /// chiacraft: about every half a minute of game time asks the dimension again what the far
+    /// crowns' leaves seen so far are drawn as (`Terrain::far_leaves`); when an answer changed (a
+    /// bloom over with the season), every made tile is made again.
+    fn check_leaves(&mut self, c: &Content, dim: u32, time: u64) {
+        if time.abs_diff(self.leaves_asked) < 600 {
+            return;
+        }
+        self.leaves_asked = time;
+        let Some(f) = c
+            .dims
+            .get(dim as usize)
+            .and_then(|d| d.terrain.as_ref())
+            .and_then(|t| t.far_leaves)
+        else {
+            return;
+        };
+        let seen = FAR_LEAF_STATES.lock().unwrap().clone();
+        let answers: Vec<(u32, u32)> = seen.iter().map(|&s| (s, f.state(time, s))).collect();
+        let changed = answers
+            .iter()
+            .any(|a| self.leaf_answers.iter().any(|b| b.0 == a.0 && b.1 != a.1));
+        self.leaf_answers = answers;
+        if changed {
+            self.stale.extend(self.ready.iter().copied());
+        }
     }
 
     /// Keeps `diag`'s gauges, and says how long it took until every wanted tile was made again.
