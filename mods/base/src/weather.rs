@@ -193,7 +193,9 @@ fn air_of(w: &World, id: u32, c: &Climate) -> BiomeAir {
     }
     // How fast the ground dries here after rain (the engine's wet ground, `Scene::canopy.y`).
     let drying = air::drying_byte(air::drying_secs(place.air(day, hour, raining), c.humidity, wind));
-    BiomeAir { biome: id, fog, wind, snow, flags: flags | aurora | drying << air_flags::DRYING_SHIFT }
+    // Where rain turns to snow up a mountain (`air::LAPSE`), for the pack's rain.
+    let line = air::snow_line_bits(place.air(day, hour, raining));
+    BiomeAir { biome: id, fog, wind, snow, flags: flags | aurora | drying << air_flags::DRYING_SHIFT | line << air_flags::SNOWLINE_SHIFT }
 }
 
 /// Biome `id`'s share in a per-biome list (`air::AURORA`, `air::CANOPY`) as 0 to 255, 0 for one
