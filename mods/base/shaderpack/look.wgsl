@@ -582,7 +582,9 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         // Its own window, full with the sun up to about 9 degrees and gone by about 20 (the sunset
         // band's `low` is nearly 0 by Bliss's 06:00 sun at 10 degrees, so this did nothing, PC
         // shdawnB2).
-        let morning = (1.0 - smoothstep(0.15, 0.35, scene.sun.y)) * smoothstep(-0.03, 0.02, scene.sun.y);
+        // Mornings only (the sun rises at +x): at 18:00, facing the setting sun, it warmed the band
+        // over the horizon where Bliss's evening is a blue-grey (Look's measures, 11-06).
+        let morning = (1.0 - smoothstep(0.15, 0.35, scene.sun.y)) * smoothstep(-0.03, 0.02, scene.sun.y) * smoothstep(-0.05, 0.05, scene.sun.x);
         if morning > 0.0 {
             // (That orange, 231 172 68 against Bliss's 201 172 108 at 06:00, was the dawn mist,
             // which the script left free and which came and went between runs: with it pinned off
@@ -596,6 +598,19 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
             let dawn = pow(wide, 1.5) * morning * (1.0 - rain_amount());
             c = mix(c, cream * (luma(c) / luma(cream)), dawn * 0.7);
         }
+    }
+    // In the HDR world by day the band just over the horizon darker and a blue-grey, not the sky's
+    // brightest part: in Bliss's own world 2-6 degrees up reads 164-177 at noon and 152-158 at 17-18,
+    // ours 187-208, a flat warm cream at 17-18, and the far land fogged into it as bright (Look's
+    // measures, mist off, 11-06). Here, so the land's haze that reads this colour comes down with it.
+    if scene.frame.x > 0.5 {
+        let band = 1.0 - smoothstep(0.0, 0.13, dir.y);
+        let day = smoothstep(0.0, 0.1, scene.sun.y) * (1.0 - rain_amount());
+        let k = band * day;
+        // A clear blue, not a grey (H2: grey-tinted it reached Bliss's brightness, 160-172 against
+        // 154-173, but stayed pale and from 16:00 warm, saturation 5-48 against 39-83; PC shhb1).
+        let blue = vec3(luma(c)) * vec3(0.74, 0.92, 1.2);
+        c = mix(c, blue, k * 0.6) * (1.0 - 0.4 * k);
     }
     c += sun_glow(dir, p);
     // In the HDR world the air round the sun glows as bright as it really is (Mie scattering's
