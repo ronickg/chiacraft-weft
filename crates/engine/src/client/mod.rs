@@ -684,6 +684,9 @@ pub struct Client {
     canopy: f32,
     /// How wet the ground is where the player is, 0..1 (`weather_effects`, `Scene::canopy.y`).
     wet: f32,
+    /// How far puddles have grown where the player is, 0..1 (`weather_effects`, `Scene::canopy.z`):
+    /// over minutes of rain, drying slower than the ground after.
+    puddles: f32,
     /// What happens in the sky (`weft_abi::sky_event`, chiacraft), how strongly, and when it began
     /// (`shaders::time`).
     sky_event: (u32, f32, f32),
@@ -1023,6 +1026,7 @@ impl Client {
             aurora: 0.0,
             canopy: 0.0,
             wet: 0.0,
+            puddles: 0.0,
             sky_event: (0, 0.0, 0.0),
             sky_landing: None,
             weather_id: 0,
@@ -2699,6 +2703,15 @@ impl Client {
             let secs = if drying == 0 { 120.0 } else { 3600.0 * (30.0f32 / 3600.0).powf((drying - 1) as f32 / 254.0) };
             self.wet = (self.wet - dt / secs).max(falling);
         }
+        // Puddles grow over about ten minutes of steady rain (a shower leaves a few) and dry half
+        // as fast again as the ground after it, the last of the wet to go.
+        if falling > 0.0 {
+            self.puddles = (self.puddles + falling * dt / 600.0).min(1.0);
+        } else {
+            let drying = (flags >> weft_abi::air_flags::DRYING_SHIFT) & 255;
+            let secs = if drying == 0 { 120.0 } else { 3600.0 * (30.0f32 / 3600.0).powf((drying - 1) as f32 / 254.0) };
+            self.puddles = (self.puddles - dt / (secs * 1.5)).max(0.0);
+        }
         let heading = self.world.air.1.to_radians();
         let wind = Vec2::new(heading.sin(), -heading.cos()) * speed;
         self.wind += (wind - self.wind) * (1.0 - (-dt / 4.0).exp());
@@ -2804,7 +2817,7 @@ impl Client {
             options: pack_options(),
             hand: hand.0,
             hand_light: hand.1,
-            canopy: [self.canopy, self.wet, 0.0, 0.0],
+            canopy: [self.canopy, self.wet, self.puddles, 0.0],
             // Filled in once the sky has readied them (`render`).
             soft_clouds: [0.0; 4],
             // Filled in once the sky has readied it (`render`).

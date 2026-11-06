@@ -464,6 +464,26 @@ fn shade_soft(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
         let sheen = (0.04 + pow(1.0 - max(dot(n, v), 0.0), 4.0) * 0.3) * select(1.0, 0.35, leafy);
         lit = vec4(lit.rgb * mix(1.0, select(0.58, 0.8, leafy), wet) + sky_color(reflect(-v, n)) * sheen * wet, lit.a);
     }
+    // Puddles on flat open ground (the Recrafted study, item 4): they grow over minutes of rain
+    // (`scene.canopy.z`, the engine's) and dry slower than the ground after. Patches of two
+    // octaves of noise in the blocks' own pixels, the lowest first, so a shower leaves a few small
+    // ones and a long rain joins them up. A film of water: the ground under it dark, the sky
+    // mirrored by Fresnel, and rings where the rain still falls on it.
+    let puddles = clamp(scene.canopy.z, 0.0, 1.0) * open_top;
+    if puddles > 0.01 && !leafy && n.y > 0.95 {
+        let q = floor(in.pos.xz * 16.0) / 16.0;
+        let m = noise3(vec3(q / 4.5, 3.7)) * 0.68 + noise3(vec3(q / 1.3, 9.1)) * 0.32;
+        let pool = smoothstep(0.0, 0.035, m - mix(0.74, 0.47, puddles));
+        if pool > 0.0 {
+            let v = -normalize(in.rel);
+            let slope = rain_rings(in.pos.xz) * rain_amount();
+            let pn = normalize(vec3(-slope.x, 1.0, -slope.y));
+            let cos_v = max(dot(pn, v), 0.0);
+            let fresnel = 0.02 + 0.98 * pow(1.0 - cos_v, 5.0);
+            let film = lit.rgb * 0.45 + sky_color(reflect(-v, pn)) * mix(0.08, 1.0, fresnel);
+            lit = vec4(mix(lit.rgb, film, pool), lit.a);
+        }
+    }
     // The air before it glows with the placed lights' light (the held one is in `haze_lit`).
     let glow = placed_in_fog(in.light.yzw, in.rel, in.pos, in.light.x);
     return vec4(display(haze_lit(lit.rgb + glow, in.rel, in.light.x)), lit.a);
