@@ -10,13 +10,20 @@ use base_api::SEA;
 use base_api::land as l;
 
 fn main() {
-    let a: Vec<i64> = std::env::args().skip(1).filter_map(|s| s.parse().ok()).collect();
+    let a: Vec<i64> = std::env::args()
+        .skip(1)
+        .filter_map(|s| s.parse().ok())
+        .collect();
     let seed = a.first().copied().unwrap_or(1) as u64;
     let (cx, cz) = (a.get(1).copied().unwrap_or(0) as i32, a.get(2).copied().unwrap_or(0) as i32);
     let f = l::fields(seed);
     let h = |x: i32, z: i32| l::height(&f, x * 16, z * 16) >> 4;
     let wet = |x: i32, z: i32| h(x, z) < SEA;
-    let run = |x: i32, z: i32, dx: i32, dz: i32| (1..120).take_while(|&k| wet(x + dx * k, z + dz * k)).count() as i32;
+    let run = |x: i32, z: i32, dx: i32, dz: i32| {
+        (1..120)
+            .take_while(|&k| wet(x + dx * k, z + dz * k))
+            .count() as i32
+    };
     for r in (0..3000).step_by(8) {
         for k in 0..(r / 8).max(1) * 6 {
             let t = k as f64 / ((r / 8).max(1) * 6) as f64 * std::f64::consts::TAU;
