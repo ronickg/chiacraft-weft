@@ -145,3 +145,8 @@ v2, the same day (`nvidia_vs_ours_v2.jpg`; HUD hidden, NVIDIA-like times):
 - Our summer 19:00 is still full day, so the nave needs a later hour to match NVIDIA's dusk.
 - NVIDIA's ice tunnel is still not found. The water-under-ice spots by the ship were under the sea ice,
   not a tunnel.
+- Ice tunnel row dropped (11-06). Searches of the whole ice field (x 256-640, z -128..384) found no
+  water-floored tunnel under ice, only shafts and small pockets, and the eastern strip has no ice at all.
+  NVIDIA's shot may be from another build of the world.
+- Next: the nave at dusk with Shader's `--mc-days` (Minecraft's sun clock); then this sheet again at
+  each path tracing milestone (the RT session's M0 first).
