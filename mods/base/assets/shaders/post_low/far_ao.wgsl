@@ -13,7 +13,7 @@ const FAR_AO_SAMPLES: i32 = 7;
 // The ring's radius, a share of the screen's height.
 const FAR_AO_RADIUS: f32 = 0.022;
 // How dark a fully closed-in point goes (0..1 of its light kept at the most closed).
-const FAR_AO_STRENGTH: f32 = 1.4;
+const FAR_AO_STRENGTH: f32 = 0.6;
 
 // The surface's normal at `uv` from its neighbours' depth, the neighbour on the same surface on
 // each axis (the contact shadows' way), or none on a thin edge (a leaf's, a blade's).
@@ -122,9 +122,14 @@ fn far_ao(p: PostPixel, turn_in: f32) -> f32 {
         if d2 > ring * ring {
             continue;
         }
-        // What rises above the surface inside the ring closes it in, nearer the more.
-        let up = max(dot(n, to * inverseSqrt(max(d2, 1e-6))) - 0.1, 0.0);
-        closed += up * (1.0 - d2 / (ring * ring));
+        // What stands above this point, by the world's height, closes it in, nearer the more: the
+        // ground between far crowns, with crowns round it; not a crown's own top, whose bumps and
+        // leaf holes read concave by the depth's normal and took full shade at twilight (crowns
+        // 53 -> 27 at 19:00 against Bliss's 55, Trees' crowngap read of the first try).
+        if to.y > 1.0 {
+            let rise = to.y * inverseSqrt(max(d2, 1e-6));
+            closed += smoothstep(0.2, 0.8, rise) * (1.0 - d2 / (ring * ring));
+        }
     }
     var ao = 1.0 - clamp(closed / f32(FAR_AO_SAMPLES) * FAR_AO_STRENGTH, 0.0, 0.8);
     // The sky's light only: a face the sun reaches keeps most of its light (the sun's), by day.
