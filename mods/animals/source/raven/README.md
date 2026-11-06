@@ -16,7 +16,10 @@ house's 32, as its head's side (the eye's face) would be 2.5 texels at 32 (`hous
 `raven.py` lays out, paints and animates two models on one texture into `out/` (not committed):
 standing with the wings folded along its sides (`raven`: idle, walk, run), and flying with them
 open (`raven_fly`: flap, the look `raven.rs` puts on while it flies), so no wing has to fold
-through the body. `build.py` checks flicker, joints, pokes and gait on both and exports
+through the body. Its behaviour clips (stare, graze, drink, sleep, watch, approach, alarm, sniff, look, scratch,
+stretch, play, groom, nuzzle, flinch, death) are the birds' (`../bird/bird.py`, `behaviour`), fitted
+to the raven and added to the standing file. `build.py` checks flicker, joints, pokes, gait and the
+clips (`bird.check_clips`) on both and exports
 `models/raven[_fly].geo.json`, `animations/raven[_fly].animation.json` and
 `textures/entity/raven/raven.png` into `../../assets`, and the coat layers into
 `../../genetics/layers/raven`.

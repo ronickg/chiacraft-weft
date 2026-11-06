@@ -73,6 +73,10 @@ const OPT_SKY_LIGHT: u32 = 25u;
 const OPT_FOLIAGE_TEST: u32 = 26u;
 // The HDR world's white balance after the curve (`base:look_white`, 0 neutral as made, + warmer).
 const OPT_WHITE: u32 = 27u;
+// A test (the tree diagnosis, 11-05): 1 takes the corner shade (AO) away, 0 as made.
+const OPT_AO_TEST: u32 = 28u;
+// The HDR world's sharpening (`base:look_sharpen`, 0 none to 1; 0.4 by default, Bliss's).
+const OPT_SHARPEN: u32 = 29u;
 
 // The colour a grass or leaf tint is multiplied by for the foliage test: 1 as made.
 fn foliage_test() -> vec3<f32> {
@@ -155,11 +159,28 @@ fn palette() -> Palette {
 fn palette_now() -> Palette {
     var p = palette_read();
     // The sky's light test (`base:look_sky_light`): its light in the shade scaled, the sun's kept.
-    // In the HDR world 0.45 of it as made (the gap sheets: our shade never went dark against
-    // Bliss's, the near forest at 08:00 luma 93 against 58; agreed with Shader, 11-05, so today's
-    // approved look keeps its keys).
+    // In the HDR world 0.45 of it as made in the morning (0.55 under a forest's canopy), 0.65 with
+    // the sun high (the gap sheets:
+    // our shade never went dark against Bliss's, the near forest at 08:00 luma 93 against 58; at
+    // noon the greens then read dark, 41 against 50; agreed with Shader, 11-05, so today's approved
+    // look keeps its keys).
     let k = fantasy_opt(OPT_SKY_LIGHT);
-    p.ambient *= select(1.0, k, k > 0.0) * select(1.0, 0.45, scene.frame.x > 0.5);
+    let hdr_scale = mix(mix(0.45, 0.55, min(canopy(), 1.0)), 0.65, smoothstep(0.5, 0.85, scene.sun.y));
+    p.ambient *= select(1.0, k, k > 0.0) * select(1.0, hdr_scale, scene.frame.x > 0.5);
+    // A lightning flash isn't the sky's light in the shade: in the HDR world it comes back after
+    // that scaling, and twice as strong (the HDR world has the range for a real flash): scaled
+    // with it, a storm's flashes lifted the land by 2 where they had lifted it by 46 (PC st2_e
+    // against st_e, 11-05).
+    if scene.frame.x > 0.5 {
+        let night = smoothstep(-0.05, -0.25, scene.sun.y);
+        p.ambient += vec3(0.5, 0.55, 0.7) * lightning_flash() * mix(1.0, 0.5, night) * (2.0 - hdr_scale);
+    }
+    // And its sunlight a little warmer with the sun high (the warmth on Bliss's noon land is its
+    // sun's, the sky and the far haze staying blue: our whole-picture white balance had greyed the
+    // noon sky, saturation 19 against 31).
+    if scene.frame.x > 0.5 {
+        p.sun *= mix(vec3(1.0), vec3(1.05, 1.0, 0.86), smoothstep(0.3, 0.7, scene.sun.y));
+    }
     return p;
 }
 
@@ -226,7 +247,17 @@ fn palette_made() -> Palette {
     let warm = key(vec3(0.13, 0.27, 0.66), vec3(0.54, 0.53, 0.62), vec3(1.0, 0.68, 0.38), vec3(1.0, 0.68, 0.38) * 2.0 * look_opt(OPT_SUN, 1.0), mix(fill_hue, vec3(1.0, 0.9, 0.85), 0.25) * 0.3 * look_opt(OPT_FILL, 1.0));
     var p: Palette;
     if e > 0.4 {
-        p = blend(warm, day, smoothstep(0.4, 0.78, e));
+        // A gentle warmth through mid-morning and mid-afternoon, clear only about noon (the MC
+        // comparison's spring 8 sheets, 11-05: Bliss's land stays warmer than its noon to 10:00,
+        // ours was full day by 10:00). On the equinox's leaned path sun.y is 0.55 at 08:00, 0.76 at
+        // 10:00, 0.82 at noon: a little warm left at 10:00 and 14:00, none at noon.
+        // (It was smoothstep(0.4, 0.78): all day from about 09:30.)
+        p = blend(warm, day, smoothstep(0.4, 0.86, e));
+        // And the sun itself a little warmer still until near noon (variant B: the blend alone
+        // moved the land's warmth by under 0.01, PC run wh_aft): blue about 10% down at 10:00 and
+        // 14:00 on the equinox, none at noon.
+        let morning = 1.0 - smoothstep(0.6, 0.86, e);
+        p.sun *= mix(vec3(1.0), vec3(1.0, 0.88, 0.72), morning);
     } else if e > 0.08 {
         p = blend(golden, warm, smoothstep(0.08, 0.34, min(e, 0.34)));
     } else if e > -0.02 {
@@ -528,7 +559,11 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     if scene.frame.x > 0.5 {
         let m = max(mu, 0.0);
         let mie = (pow(m, 8.0) * 0.45 + pow(m, 64.0) * 2.2) * (0.35 + 0.65 * low) * (1.0 - rain_amount());
-        c += p.sun * mie * 0.5;
+        // In a gold of the sun's own brightness (Mie scattering keeps the low sun's colour), and a
+        // third weaker: in the sun's pale mid-morning colour the glow went cream-white through the
+        // curve's shoulder (08:00 sky saturation 23 against Bliss's 43, warmth +15 against +36).
+        let gold = vec3(1.0, 0.72, 0.4) * luma(p.sun) * 1.4;
+        c += mix(p.sun, gold, 0.6 * (1.0 - smoothstep(0.6, 0.9, scene.sun.y))) * mie * 0.34;
     }
     // The glow about the moon where it stands, as bright as its light (`scene.moon.w`): on a new
     // moon there is none, and a glow alone read as a dark-blue ring (the world playtester's nights).
@@ -840,7 +875,22 @@ fn block_by_day(sky: f32) -> f32 {
     return 1.0 - 0.75 * smoothstep(0.5, 1.0, sky) * smoothstep(0.0, 0.25, scene.sun.y);
 }
 
-fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
+// The sun's light through leaves in the HDR world, as a share of the sun's (times the leaf's paint):
+// looking toward the sun a crown glows (Bliss's leaves up to about ten times brighter that way, never
+// black), a little all round as light passes through the thin leaves; `shadow` the sun's reach there,
+// `sky` the sky light level (none deep in the dark of a canopy), `rel` camera relative. 0 without
+// the HDR world. Far crowns (`fs_lod`) call it too, so near and far tops light alike.
+fn leaf_through(rel: vec3<f32>, shadow: f32, sky: f32) -> f32 {
+    if scene.frame.x < 0.5 {
+        return 0.0;
+    }
+    let back = max(-dot(normalize(rel), light_dir()), 0.0);
+    let open = smoothstep(0.4, 0.9, sky);
+    return (pow(back, 4.0) * 1.6 + 0.12) * light_strength() * mix(0.25, 1.0, shadow) * open;
+}
+
+fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
+    let ao = mix(ao_in, 1.0, clamp(fantasy_opt(OPT_AO_TEST), 0.0, 1.0));
     let p = palette();
     // The sky's light falls off steeply under cover (Bliss's lightmap, (L^15 x 2 + L^2.5) / 3: 1 in the
     // open, 0.39 a step under, 0.21 two): a forest floor sits a few times below open shade, the open
@@ -1412,13 +1462,25 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // noon Bliss's is near neutral (saturation 54, -19) where ours was bluer and more saturated (87,
     // -48; the Look session's measures on the forest vista, 11-05). 0.6 of the way to the sun's hue
     // with it under about 33°, easing to 0.3 by 64°, and the veil's channels evened out, about a third
-    // with the sun low, seven tenths at noon (less of Rayleigh's blue; half took too much of 08:00's colour). The HDR path only (`scene.frame.x`), so today's look stays as it is.
+    // with the sun low, three tenths at noon (less of Rayleigh's blue; half took too much of 08:00's
+    // colour, and seven tenths left the noon far land grey where Bliss's is a coloured blue-green:
+    // saturation 35 against 54, the Look session's spot C measures, 11-05; at 0.45 still 41), and at
+    // noon the veil a quarter darker (its far band luma 168 against Bliss's 148; 161 at 15%). Less
+    // evening with the sun low left 08:00 greyer, not more coloured (saturation 36 to 33). The HDR path only
+    // (`scene.frame.x`), so today's look stays as it is.
     let hdr_air = select(0.0, 1.0, scene.frame.x > 0.5) * (1.0 - wet) * smoothstep(-0.02, 0.06, scene.sun.y);
     if hdr_air > 0.0 {
-        let low_sun = mix(0.3, 1.0, 1.0 - smoothstep(0.55, 0.9, scene.sun.y));
+        let noon = smoothstep(0.55, 0.9, scene.sun.y);
+        let low_sun = mix(0.3, 1.0, 1.0 - noon);
         let sun_tint = p.sun / max(luma(p.sun), 1e-3);
-        toward = mix(toward, luma(toward) * sun_tint, 0.6 * low_sun * hdr_air);
-        v = mix(v, vec3((v.r + v.g + v.b) / 3.0), mix(0.35, 0.7, smoothstep(0.55, 0.9, scene.sun.y)) * hdr_air);
+        // With the sun about 20-40° up, nine tenths far off, from 250 blocks to 800, easing back to six
+        // by 45° so noon holds: the 08:00 far band stayed grey at six (saturation 36 and warmth +17
+        // against Bliss's 58 and +27), and at nine everywhere the land nearer went past Bliss's (99
+        // against 72; the Look session, 11-06).
+        let morning = smoothstep(0.2, 0.34, scene.sun.y) * (1.0 - smoothstep(0.6, 0.7, scene.sun.y));
+        let far_off = smoothstep(250.0, 800.0, dist);
+        toward = mix(toward, luma(toward) * sun_tint, mix(0.6, 0.9, morning * far_off) * low_sun * hdr_air) * (1.0 - 0.25 * noon * hdr_air);
+        v = mix(v, vec3((v.r + v.g + v.b) / 3.0), mix(0.35, 0.3, noon) * hdr_air);
     }
     let mixed = mix(pale, toward, v);
     let own = mix(pale, toward, v * mix(0.7, 1.0, wet));
@@ -1602,7 +1664,11 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     // much bluer than Bliss's at every hour, red less blue -37 against -10 at noon: the gap sheet).
     if scene.frame.x > 0.5 {
         // Warmer still at golden hour (Bliss's dawn land: warmth +106 against our +47).
-        let w = fantasy_opt(OPT_WHITE) * day * (1.0 + 1.3 * golden());
+        // Mostly at a low sun: at noon a quarter (the sky and the far haze stay blue, as Bliss's).
+        // At golden hour 0.6 more, not 1.3: the ground itself went orange-gold (sand and desert
+        // most), where Bliss's low sun tints through the haze and the mist (the MC comparison's
+        // spring 8 sheets, 11-05).
+        let w = fantasy_opt(OPT_WHITE) * day * (mix(1.0, 0.25, smoothstep(0.4, 0.75, scene.sun.y)) + 0.6 * golden());
         t *= vec3(1.0 + 0.08 * w, 1.0, 1.0 - 0.14 * w);
     }
     // Only true darks go cool (most daylit ground is mid-tone and keeps its color).

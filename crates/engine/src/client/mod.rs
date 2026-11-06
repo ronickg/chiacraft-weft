@@ -3047,8 +3047,11 @@ impl Client {
             self.shadow_far_map = Some(t);
             self.shadow_far_drawn = None;
         }
-        // The far map's reach (`core:shadow_far`, 400 as made; ultra to 2400): drawn again when it changes.
-        let reach = (shadow_setting("core:shadow_far", FAR_REACH as f64) as f32).clamp(200.0, 2400.0);
+        // The far map's reach (`core:shadow_far`: auto 2000 with the HDR world, 400 without; to 2400):
+        // drawn again when it changes.
+        let set = shadow_setting("core:shadow_far", 0.0) as f32;
+        let auto = if crate::post::hdr() { 2000.0 } else { FAR_REACH };
+        let reach = if set <= 0.0 { auto } else { set.clamp(200.0, 2400.0) };
         if reach != self.shadow_far_reach {
             self.shadow_far_reach = reach;
             self.shadow_far_drawn = None;

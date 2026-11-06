@@ -419,6 +419,8 @@ pub struct Terrain {
     pub cave_biomes: Vec<CaveBiome>,
     /// chiacraft: what steep faces show (`terrain_op::FACES`): from what fall, whose callback.
     pub faces: Option<Faces>,
+    /// chiacraft: far crowns' leaves by the time of year (`terrain_op::FAR_LEAVES`), whose callback.
+    pub far_leaves: Option<FarLeaves>,
     /// chiacraft: the continent noise's scale (Q4, `terrain_op::CONTINENT_SCALE`; the
     /// `continent` field follows it).
     pub continent_scale: i32,
@@ -440,6 +442,7 @@ struct Draft {
     rules: Vec<RawRule>,
     cave_biomes: Vec<(String, i32, f64, f64)>,
     faces: Option<Faces>,
+    far_leaves: Option<FarLeaves>,
     /// Blocks.
     continent_scale: f64,
 }
@@ -460,6 +463,22 @@ impl Faces {
         let mut a = abi::FaceArgs { seed, dim, pos, height, biome, fall, block };
         crate::host::invoke(self.owner, self.face, &mut a);
         a.block
+    }
+}
+
+/// chiacraft: far crowns' leaves by the time of year (`terrain_op::FAR_LEAVES`).
+#[derive(Clone, Copy)]
+pub struct FarLeaves {
+    pub owner: ModId,
+    pub call: Callback,
+}
+
+impl FarLeaves {
+    /// The state crowns of `state` leaves are drawn in at day time `time`.
+    pub fn state(&self, time: u64, state: u32) -> u32 {
+        let mut a = abi::FarLeavesArgs { time, state };
+        crate::host::invoke(self.owner, self.call, &mut a);
+        a.state
     }
 }
 
@@ -521,6 +540,7 @@ pub fn build(
         rules: Vec::new(),
         cave_biomes: Vec::new(),
         faces: None,
+        far_leaves: None,
         continent_scale: weft_noise::fixed::CONTINENT_SCALE as f64 / 16.0,
     };
     let rule_name = |r: &RawRule| if r.name.is_empty() { r.biome.clone() } else { r.name.clone() };
@@ -606,6 +626,7 @@ pub fn build(
                 None => missing("cave biome"),
             },
             op::FACES => d.faces = Some(Faces { fall: o.level, owner: o.owner, face: o.face }),
+            op::FAR_LEAVES => d.far_leaves = Some(FarLeaves { owner: o.owner, call: o.face }),
             op::CONTINENT_SCALE if o.value >= 1.0 => {
                 d.continent_scale = o.value;
                 // The continent field at that scale, unless the terrain declared its own.
@@ -754,6 +775,7 @@ pub fn build(
     }
     let mut t = Terrain::new(stone, q4(d.base), sea, fields, features, rules, caves, cave_biomes);
     t.faces = d.faces;
+    t.far_leaves = d.far_leaves;
     t.continent_scale = q4(d.continent_scale).min(1 << 24);
     t
 }
@@ -797,6 +819,7 @@ impl Terrain {
             caves,
             cave_biomes,
             faces: None,
+            far_leaves: None,
             continent_scale: weft_noise::fixed::CONTINENT_SCALE,
             cache: ColumnCache::new(32768),
             corners: ColumnCache::new(32768),
