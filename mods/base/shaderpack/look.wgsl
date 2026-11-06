@@ -1535,7 +1535,11 @@ fn exposure() -> f32 {
     // darker than Bliss's (mean brightness 0.55 against about 0.6, shallows dark navy). Golden hour
     // keeps 1.7, its palette made for it.
     let day = mix(1.7, 2.2, smoothstep(0.1, 0.35, scene.sun.y));
-    return mix(day, 4.0, smoothstep(0.0, -0.2, scene.sun.y));
+    // The night's 4.0 only once the sun is well down: rising from the horizon, it showed the dusk
+    // palette (made for about 1.7) twice as bright, a light lavender sky at 04:00 and 19:30 where
+    // Bliss's blue hour is deep blue (the MC comparison's spring 8 sheets, 11-05). Night unchanged.
+    // (It was smoothstep(0.0, -0.2).)
+    return mix(day, 4.0, smoothstep(-0.1, -0.3, scene.sun.y));
 }
 
 // What a surface writes: into the HDR world (`scene.frame.x`, the engine's `core:hdr_world`) its light
