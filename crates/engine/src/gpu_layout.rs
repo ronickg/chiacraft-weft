@@ -32,6 +32,11 @@ shared! {
         /// Quarter turns of the picture.
         TURN_SHIFT = 28,
         TURN_MASK = 3,
+        /// Word 0: a see-through face with another of the same block behind it (its own back
+        /// face not drawn, `CULL_SAME`): what shows through its holes is that block's leaves, not
+        /// what lies past the crown, so packs and the built-in shader fill them (Minecraft's fancy
+        /// leaves draw those faces).
+        BACKED = 0x8000,
         TEX_MASK = 0xFFFF,
         BIOME_SHIFT = 16,
         /// Corner light: a channel per 4 bits, a corner per 16.
