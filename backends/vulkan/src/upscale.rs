@@ -32,8 +32,9 @@ pub(crate) struct Inputs {
 
 pub(crate) trait Upscaler: Send {
     fn info(&self) -> UpscalerInfo;
-    /// The size it wants the world drawn at for `mode` (None: `UpscaleMode::scale`'s).
-    fn render_size(&mut self, mode: UpscaleMode, output: (u32, u32)) -> Option<(u32, u32)>;
+    /// The size it wants the world drawn at for `mode`, with Ray Reconstruction or not (None:
+    /// `UpscaleMode::scale`'s).
+    fn render_size(&mut self, mode: UpscaleMode, reconstruct: bool, output: (u32, u32)) -> Option<(u32, u32)>;
     /// Records the upscale into `cmd`. False when it could not: the backend then scales the
     /// colour up plainly, so the frame still has a picture.
     ///
@@ -42,19 +43,20 @@ pub(crate) trait Upscaler: Send {
     unsafe fn record(&mut self, cmd: vk::CommandBuffer, inputs: &Inputs, params: &UpscaleParams) -> bool;
 }
 
-/// Scales the picture up and nothing else (the backend's plain blit), in every mode but DLSS 5.
+/// Scales the picture up and nothing else (the backend's plain blit), in every mode, Ray
+/// Reconstruction too (its guides are drawn); no models, no DLSS 5.
 pub(crate) struct Standin;
 
 impl Upscaler for Standin {
     fn info(&self) -> UpscalerInfo {
         let modes = UpscaleMode::ALL
             .iter()
-            .filter(|m| !matches!(m, UpscaleMode::Off | UpscaleMode::Neural))
+            .filter(|m| **m != UpscaleMode::Off)
             .fold(0, |bits, m| bits | 1 << *m as u32);
-        UpscalerInfo { name: "stand-in (plain scaling, WEFT_UPSCALE_STANDIN)".into(), modes }
+        UpscalerInfo { name: "stand-in (plain scaling, core:upscale_standin)".into(), modes, reconstruct: true, ..Default::default() }
     }
 
-    fn render_size(&mut self, _mode: UpscaleMode, _output: (u32, u32)) -> Option<(u32, u32)> {
+    fn render_size(&mut self, _mode: UpscaleMode, _reconstruct: bool, _output: (u32, u32)) -> Option<(u32, u32)> {
         None
     }
 

@@ -22,21 +22,26 @@ $Summary = Join-Path $Out "summary.txt"
 $Sl = if ($Dev) { Join-Path $GameDir "streamline-dev" } else { Join-Path $GameDir "streamline" }
 $env:WEFT_STREAMLINE_DIR = $Sl
 
-# core:upscaler: 0 off, 1 DLAA, 2 SR Quality, 3 SR Balanced, 4 SR Performance, 5 RR (screen size), 6 RR from Quality, 7 DLSS 5.
+# core:upscaler: 0 off, 1 DLAA, 2 Quality, 3 Balanced, 4 Performance, 5 Ultra Performance;
+# core:upscaler_rr 1 Ray Reconstruction; core:upscaler_model_<mode> the model (0 NVIDIA's default,
+# 5 E the older CNN, 10-13 J-M transformer); core:dlss5 1 DLSS 5. All live, also in the Video menu's
+# DLSS tab. Spot: a run at one spot only (checks that don't need both).
 $Modes = @(
     # The game as players get it: Streamline not loaded at all (DLAA asked for, so the log says it is off).
-    @{ Name = "no-streamline"; Cfg = "core:upscaler=1"; Env = @{ WEFT_NO_STREAMLINE = "1" } },
+    @{ Name = "no-streamline"; Cfg = "core:upscaler=1"; Env = @{ WEFT_NO_STREAMLINE = "1" }; Spot = "spotc" },
     @{ Name = "off";         Cfg = "core:upscaler=0" },
     @{ Name = "dlaa";        Cfg = "core:upscaler=1" },
     @{ Name = "sr-quality";  Cfg = "core:upscaler=2" },
-    @{ Name = "rr";          Cfg = "core:upscaler=6" },
+    # The model choice: Quality with the older CNN model (E) in place of NVIDIA's default (K).
+    @{ Name = "sr-quality-cnn"; Cfg = "core:upscaler=2,core:upscaler_model_quality=5" },
+    @{ Name = "rr";          Cfg = "core:upscaler=2,core:upscaler_rr=1" },
     # The jitter's sign is the usual trap: SR Quality again with the old, flipped sign. Under Proton
     # (11-06) the flipped one speckled the canopy; it should look worse here too.
-    @{ Name = "sr-jitterflip"; Cfg = "core:upscaler=2"; Env = @{ WEFT_DLSS_JITTER = "-1,-1" } },
+    @{ Name = "sr-jitterflip"; Cfg = "core:upscaler=2"; Env = @{ WEFT_DLSS_JITTER = "-1,-1" }; Spot = "spotc" },
     # DLSS 5 needs NVIDIA's neural rendering plugin (sl.dlss_nr.dll), not in the public SDK: skipped
     # until it is in streamline\ and the game binds it.
-    @{ Name = "dlss5-0.5";   Cfg = "core:upscaler=7,core:dlss5_intensity=0.5"; Needs = "sl.dlss_nr.dll" },
-    @{ Name = "dlss5-1.0";   Cfg = "core:upscaler=7,core:dlss5_intensity=1.0"; Needs = "sl.dlss_nr.dll" }
+    @{ Name = "dlss5-0.5";   Cfg = "core:upscaler=1,core:dlss5=1,core:dlss5_intensity=0.5"; Needs = "sl.dlss_nr.dll" },
+    @{ Name = "dlss5-1.0";   Cfg = "core:upscaler=1,core:dlss5=1,core:dlss5_intensity=1.0"; Needs = "sl.dlss_nr.dll" }
 )
 $Spots = @(
     @{ Name = "mcworld"; Script = "kit_mcworld.txt"; Args = @("--import-mc", (Join-Path $Kit "mc-world")) },
@@ -61,6 +66,7 @@ function Quote([string]$a) { if ($a -match '[\s"]') { '"' + $a.Replace('"', '\"'
 foreach ($spot in $Spots) {
     foreach ($mode in $Modes) {
         $name = "$($spot.Name)_$($mode.Name)"
+        if ($mode.Spot -and $mode.Spot -ne $spot.Name) { continue }
         if ($mode.Needs -and -not (Test-Path (Join-Path $Sl $mode.Needs))) {
             "$name : skipped, needs $($mode.Needs) (DLSS 5 is not in the public Streamline SDK)" | Add-Content $Summary
             continue

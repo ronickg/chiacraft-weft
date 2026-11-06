@@ -242,8 +242,19 @@ pub(crate) const CLIENT_COMMANDS: &[(&str, &str, fn(&mut Running, &crate::comman
     }),
 ];
 
-/// The sizes last asked of the upscaler: mode, screen, world.
-type UpscaleSize = (weft_render::UpscaleMode, (u32, u32), (u32, u32));
+/// The sizes last asked of the upscaler: mode, Ray Reconstruction, screen, world.
+type UpscaleSize = (weft_render::UpscaleMode, bool, (u32, u32), (u32, u32));
+
+/// What goes to the backend's upscaler this frame (`upscale_frame`): the settings, less what the
+/// upscaler doesn't run.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct UpscaleChoice {
+    mode: weft_render::UpscaleMode,
+    reconstruct: bool,
+    model: u32,
+    rr_model: u32,
+    neural: bool,
+}
 
 pub(crate) struct Running {
     gpu: Box<dyn Backend>,
@@ -251,7 +262,7 @@ pub(crate) struct Running {
     /// the mode this frame goes to it with (`core:upscaler`), and the sizes last asked of it
     /// (mode, screen, world).
     upscaler: weft_render::UpscalerInfo,
-    upscale_now: Option<weft_render::UpscaleMode>,
+    upscale_now: Option<UpscaleChoice>,
     upscale_size: Option<UpscaleSize>,
     window: Arc<Window>,
     depth: (TextureId, u32, u32),
@@ -586,6 +597,22 @@ impl App {
             crate::config::put_text(id, &gpu_name);
         }
         let upscaler = gpu.upscaler();
+        // What it runs, for the Video menu (`core:gpu_upscaler*`), as found.
+        for (name, v) in [
+            ("core:gpu_upscaler_modes", upscaler.modes as f64),
+            ("core:gpu_upscaler_models", weft_render::UpscalerInfo::model_bits(&upscaler.models) as f64),
+            ("core:gpu_upscaler_rr", upscaler.reconstruct as u8 as f64),
+            ("core:gpu_upscaler_rr_models", weft_render::UpscalerInfo::model_bits(&upscaler.rr_models) as f64),
+            ("core:gpu_upscaler_dlss5", upscaler.neural as u8 as f64),
+            ("core:gpu_frame_gen", upscaler.frame_gen as f64),
+        ] {
+            if let Some(id) = crate::config::by_name(name) {
+                crate::config::put(id, v);
+            }
+        }
+        if let Some(id) = crate::config::by_name("core:gpu_upscaler") {
+            crate::config::put_text(id, &upscaler.name);
+        }
         if !upscaler.name.is_empty() {
             log::info!("upscaler: {} (core:upscaler picks the mode)", upscaler.name);
         }
@@ -708,8 +735,9 @@ fn world_frame(r: &Running, info: &weft_render::FrameInfo) -> weft_render::Frame
     weft_render::FrameInfo { width: scaled(info.width), height: scaled(info.height), slot: info.slot }
 }
 
-/// With the backend's upscaler on (`core:upscaler`, one the backend has): the size it wants the
-/// world drawn at, and this frame goes to it (`Running::upscale_now`). None: the world as always.
+/// With the backend's upscaler on (`core:upscaler`, a mode the backend runs): the size it wants
+/// the world drawn at, and this frame goes to it (`Running::upscale_now`, with Ray Reconstruction,
+/// the models and DLSS 5 as set, where it runs them). None: the world as always.
 fn upscale_frame(r: &mut Running, info: &weft_render::FrameInfo) -> Option<weft_render::FrameInfo> {
     use weft_render::UpscaleMode;
     r.upscale_now = None;
@@ -717,29 +745,65 @@ fn upscale_frame(r: &mut Running, info: &weft_render::FrameInfo) -> Option<weft_
     if mode == UpscaleMode::Off || r.game.is_none() || !r.post.can_upscale() {
         return None;
     }
-    if !r.upscaler.has(mode) {
-        static SAID: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(u32::MAX);
-        if SAID.swap(mode as u32, std::sync::atomic::Ordering::Relaxed) != mode as u32 {
-            let why = if mode == UpscaleMode::Neural {
-                "DLSS 5 needs NVIDIA's neural rendering plugin, not in the public Streamline SDK"
-            } else {
-                "the renderer has no upscaler for it (DLSS: the streamline build on Windows, with its files)"
-            };
-            log::warn!("core:upscaler {} ({}) is off: {why}", mode as u32, mode.name());
+    // Each thing asked for that doesn't run here, said once.
+    let say = |what: &str, why: &str| {
+        static SAID: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+        let mut said = SAID.lock().unwrap();
+        if !said.iter().any(|s| s == what) {
+            log::warn!("{what} is off: {why}");
+            said.push(what.to_string());
         }
+    };
+    if !r.upscaler.has(mode) {
+        say(
+            &format!("core:upscaler {} ({})", mode as u32, mode.name()),
+            "the renderer has no upscaler for it (DLSS: the streamline build on Windows, with its files)",
+        );
         return None;
     }
+    let reconstruct = r.settings.upscaler_rr() && {
+        if !r.upscaler.reconstruct {
+            say("core:upscaler_rr", "the upscaler has no Ray Reconstruction here");
+        }
+        r.upscaler.reconstruct
+    };
+    let neural = r.settings.dlss5() && {
+        if !r.upscaler.neural {
+            say("core:dlss5", "DLSS 5 needs NVIDIA's neural rendering plugin, not in the public Streamline SDK");
+        }
+        r.upscaler.neural
+    };
+    // A model the upscaler doesn't list is its default.
+    let known = |id: u32, list: &[weft_render::UpscaleModel]| if list.iter().any(|m| m.id == id) { id } else { 0 };
+    let choice = UpscaleChoice {
+        mode,
+        reconstruct,
+        model: known(r.settings.upscaler_model(mode), &r.upscaler.models),
+        rr_model: known(r.settings.upscaler_rr_model(), &r.upscaler.rr_models),
+        neural,
+    };
     let screen = (info.width, info.height);
     let render = match r.upscale_size {
-        Some((m, s, w)) if m == mode && s == screen => w,
+        Some((m, rr, s, w)) if m == mode && rr == reconstruct && s == screen => w,
         _ => {
-            let w = r.gpu.upscale_render_size(mode, screen);
-            log::info!("upscaler {}: world {}x{} for the screen's {}x{}", mode.name(), w.0, w.1, screen.0, screen.1);
-            r.upscale_size = Some((mode, screen, w));
+            let w = r.gpu.upscale_render_size(mode, reconstruct, screen);
+            log::info!(
+                "upscaler {}{}: world {}x{} for the screen's {}x{}",
+                mode.name(),
+                if reconstruct { " with ray reconstruction" } else { "" },
+                w.0,
+                w.1,
+                screen.0,
+                screen.1
+            );
+            r.upscale_size = Some((mode, reconstruct, screen, w));
             w
         }
     };
-    r.upscale_now = Some(mode);
+    if r.upscale_now != Some(choice) {
+        log::debug!("upscaler: {choice:?}");
+    }
+    r.upscale_now = Some(choice);
     // DLSS's advice: 8 jitter points times the scale squared.
     let ratio = (screen.0 as f32 / render.0.max(1) as f32).max(1.0);
     crate::post::set_jitter_phases((8.0 * ratio * ratio).round() as u32);
@@ -3375,11 +3439,19 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         r.post.set_depth(r.depth.0);
         // The backend's upscaler in the engine's anti-aliasing's place, with the camera the world
         // was drawn with.
-        if let (Some(mode), Some(cam)) = (r.upscale_now, r.game.as_ref().and_then(|g| g.client.frame_camera)) {
+        if let (Some(c), Some(cam)) = (r.upscale_now, r.game.as_ref().and_then(|g| g.client.frame_camera)) {
             r.post.set_upscale(crate::post::UpscaleFrame {
-                mode,
+                mode: c.mode,
+                reconstruct: c.reconstruct || c.neural,
                 output: (info.width, info.height),
-                params: weft_render::UpscaleParams { intensity: r.settings.dlss5_intensity(), ..cam.upscale_params() },
+                params: weft_render::UpscaleParams {
+                    intensity: r.settings.dlss5_intensity(),
+                    reconstruct: c.reconstruct as u32,
+                    model: c.model,
+                    rr_model: c.rr_model,
+                    neural: c.neural as u32,
+                    ..cam.upscale_params()
+                },
             });
         }
         let _s = crate::diag::span("effects");

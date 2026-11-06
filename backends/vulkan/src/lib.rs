@@ -2089,11 +2089,11 @@ impl Backend for VulkanBackend {
             .map_or_else(UpscalerInfo::default, |u| u.info())
     }
 
-    fn upscale_render_size(&mut self, mode: UpscaleMode, output: (u32, u32)) -> (u32, u32) {
+    fn upscale_render_size(&mut self, mode: UpscaleMode, reconstruct: bool, output: (u32, u32)) -> (u32, u32) {
         let s = mode.scale();
         let fallback = (((output.0 as f32 * s).round() as u32).max(1), ((output.1 as f32 * s).round() as u32).max(1));
         match &mut self.upscaler {
-            Some(u) => u.render_size(mode, output).unwrap_or(fallback),
+            Some(u) => u.render_size(mode, reconstruct, output).unwrap_or(fallback),
             None => fallback,
         }
     }

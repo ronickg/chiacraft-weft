@@ -305,38 +305,33 @@ pub enum Cmd {
 /// A texture that is not there (an [`Cmd::Upscale`] guide not given).
 pub const NO_TEXTURE: TextureId = TextureId(u32::MAX);
 
-/// What a temporal upscaler makes of the world ([`Cmd::Upscale`]). The numbers are the
-/// `core:upscaler` setting's.
+/// How much of the screen a temporal upscaler draws the world at ([`Cmd::Upscale`]). The numbers
+/// are the `core:upscaler` setting's. Ray Reconstruction is a flag beside it
+/// ([`UpscaleParams::reconstruct`]), at the same sizes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum UpscaleMode {
     Off = 0,
     /// Anti-aliasing at the screen's size (DLAA).
     Native = 1,
-    /// Super Resolution from about 2/3 of the screen each way.
+    /// From about 2/3 of the screen each way.
     Quality = 2,
     /// From about 0.58.
     Balanced = 3,
     /// From half.
     Performance = 4,
-    /// Ray Reconstruction at the screen's size (with the guides).
-    Reconstruct = 5,
-    /// Ray Reconstruction from about 2/3.
-    ReconstructQuality = 6,
-    /// DLSS 5's neural rendering (3D-guided), at the screen's size, `UpscaleParams::intensity`.
-    Neural = 7,
+    /// From a third.
+    UltraPerformance = 5,
 }
 
 impl UpscaleMode {
-    pub const ALL: [UpscaleMode; 8] = [
+    pub const ALL: [UpscaleMode; 6] = [
         UpscaleMode::Off,
         UpscaleMode::Native,
         UpscaleMode::Quality,
         UpscaleMode::Balanced,
         UpscaleMode::Performance,
-        UpscaleMode::Reconstruct,
-        UpscaleMode::ReconstructQuality,
-        UpscaleMode::Neural,
+        UpscaleMode::UltraPerformance,
     ];
 
     pub fn from_number(n: u32) -> UpscaleMode {
@@ -350,30 +345,33 @@ impl UpscaleMode {
     /// knows better says so in [`Backend::upscale_render_size`].
     pub fn scale(self) -> f32 {
         match self {
-            UpscaleMode::Quality | UpscaleMode::ReconstructQuality => 2.0 / 3.0,
+            UpscaleMode::Quality => 2.0 / 3.0,
             UpscaleMode::Balanced => 0.58,
             UpscaleMode::Performance => 0.5,
+            UpscaleMode::UltraPerformance => 1.0 / 3.0,
             _ => 1.0,
         }
     }
 
-    /// Whether it wants Ray Reconstruction's guides (normals, roughness, albedos).
-    pub fn guides(self) -> bool {
-        matches!(self, UpscaleMode::Reconstruct | UpscaleMode::ReconstructQuality | UpscaleMode::Neural)
-    }
-
+    /// For logs, config key suffixes (`core:upscaler_model_<name>`) and the Video menu's words.
     pub fn name(self) -> &'static str {
         match self {
             UpscaleMode::Off => "off",
             UpscaleMode::Native => "dlaa",
-            UpscaleMode::Quality => "sr-quality",
-            UpscaleMode::Balanced => "sr-balanced",
-            UpscaleMode::Performance => "sr-performance",
-            UpscaleMode::Reconstruct => "rr-dlaa",
-            UpscaleMode::ReconstructQuality => "rr-quality",
-            UpscaleMode::Neural => "dlss5",
+            UpscaleMode::Quality => "quality",
+            UpscaleMode::Balanced => "balanced",
+            UpscaleMode::Performance => "performance",
+            UpscaleMode::UltraPerformance => "ultra_performance",
         }
     }
+}
+
+/// One of the upscaler's own models ([`UpscalerInfo::models`]): its number as the upscaler takes
+/// it (0 its default) and a short key for the Video menu's words (`video.base.value.model_<key>`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct UpscaleModel {
+    pub id: u32,
+    pub key: &'static str,
 }
 
 /// What [`Cmd::Upscale`] needs besides the images, in [`CommandList::data`]. Matrices are glam's
@@ -387,7 +385,8 @@ pub struct UpscaleParams {
     pub reset: u32,
     /// 1: the colour is linear HDR (`core:hdr_world`), 0 linear 0..1.
     pub hdr: u32,
-    pub pad: u32,
+    /// 1: Ray Reconstruction (with the guides), at `mode`'s sizes.
+    pub reconstruct: u32,
     /// The world's size (the inputs') and the output's.
     pub render: [u32; 2],
     pub output: [u32; 2],
@@ -412,20 +411,43 @@ pub struct UpscaleParams {
     pub right: [f32; 4],
     pub up: [f32; 4],
     pub forward: [f32; 4],
+    /// The model for this mode ([`UpscaleModel::id`], 0 the upscaler's default), and Ray
+    /// Reconstruction's.
+    pub model: u32,
+    pub rr_model: u32,
+    /// 1: DLSS 5's neural rendering over the result, at `intensity`.
+    pub neural: u32,
+    /// Generated frames between drawn ones (frame generation, later): 0 none.
+    pub frame_gen: u32,
 }
 
-/// The temporal upscaler a backend has ([`Backend::upscaler`]).
+/// The temporal upscaler a backend has ([`Backend::upscaler`]), and what of it runs here: the
+/// Video menu shows only that.
 #[derive(Clone, Debug, Default)]
 pub struct UpscalerInfo {
     /// For logs and the debug screen, e.g. "DLSS 310.4 (Streamline 2.14.16)"; empty with none.
     pub name: String,
     /// Which [`UpscaleMode`]s it runs, a bit per mode number.
     pub modes: u32,
+    /// Ray Reconstruction.
+    pub reconstruct: bool,
+    /// DLSS 5's neural rendering.
+    pub neural: bool,
+    /// The most frames it generates between drawn ones (frame generation): 0 none.
+    pub frame_gen: u32,
+    /// Its models for the modes, and Ray Reconstruction's, the default first.
+    pub models: Vec<UpscaleModel>,
+    pub rr_models: Vec<UpscaleModel>,
 }
 
 impl UpscalerInfo {
     pub fn has(&self, mode: UpscaleMode) -> bool {
         mode != UpscaleMode::Off && self.modes & (1 << mode as u32) != 0
+    }
+
+    /// The model numbers as bits (`core:gpu_upscaler_models`).
+    pub fn model_bits(models: &[UpscaleModel]) -> u32 {
+        models.iter().fold(0, |b, m| b | 1 << m.id.min(31))
     }
 }
 
@@ -624,8 +646,10 @@ pub trait Backend: Send {
     fn upscaler(&self) -> UpscalerInfo {
         UpscalerInfo::default()
     }
-    /// The size to draw the world at for `mode` with the screen at `output`.
-    fn upscale_render_size(&mut self, mode: UpscaleMode, output: (u32, u32)) -> (u32, u32) {
+    /// The size to draw the world at for `mode` (with Ray Reconstruction: `reconstruct`) with the
+    /// screen at `output`.
+    fn upscale_render_size(&mut self, mode: UpscaleMode, reconstruct: bool, output: (u32, u32)) -> (u32, u32) {
+        let _ = reconstruct;
         let s = mode.scale();
         (((output.0 as f32 * s).round() as u32).max(1), ((output.1 as f32 * s).round() as u32).max(1))
     }

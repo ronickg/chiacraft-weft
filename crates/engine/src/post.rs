@@ -171,6 +171,8 @@ fn halton(mut i: u32, base: u32) -> f32 {
 #[derive(Clone, Copy, Debug)]
 pub struct UpscaleFrame {
     pub mode: UpscaleMode,
+    /// Ray Reconstruction (and DLSS 5, which reads the same guides): the guides are drawn.
+    pub reconstruct: bool,
     /// The output's size: the screen's.
     pub output: (u32, u32),
     pub params: UpscaleParams,
@@ -294,7 +296,7 @@ pub struct Post {
     up_targets: Option<([TextureId; 2], [u32; 2], (u32, u32))>,
     guide_pipes: Option<(PipelineId, PipelineId)>,
     guides: Option<([TextureId; 3], (u32, u32))>,
-    up_held: Option<(UpscaleMode, (u32, u32), (u32, u32))>,
+    up_held: Option<(UpscaleMode, bool, (u32, u32), (u32, u32))>,
 }
 
 const MAX_PASSES: usize = 40;
@@ -398,11 +400,7 @@ impl Post {
             gpu.destroy_pipeline(b);
         }
         let info = gpu.upscaler();
-        if !motion()
-            || ![UpscaleMode::Reconstruct, UpscaleMode::ReconstructQuality, UpscaleMode::Neural]
-                .iter()
-                .any(|m| info.has(*m))
-        {
+        if !motion() || !(info.reconstruct || info.neural) {
             return;
         }
         let made = crate::packs::shader(assets, "upscale_guides.wgsl")
@@ -845,7 +843,7 @@ impl Post {
             taa_draws.push((full, None, fill, taa_entries.len() - 1));
             // Ray Reconstruction's guides, from the world's picture and depth.
             let mut g = [NO_TEXTURE; 3];
-            if let (true, Some((guide_pipe, spec_pipe))) = (u.mode.guides(), self.guide_pipes) {
+            if let (true, Some((guide_pipe, spec_pipe))) = (u.reconstruct, self.guide_pipes) {
                 if self.guides.is_none_or(|t| t.1 != (w, h)) {
                     if let Some((old, _)) = self.guides.take() {
                         old.into_iter().for_each(|t| gpu.destroy_texture(t));
@@ -874,7 +872,7 @@ impl Post {
                 let t = [gpu.create_texture(&desc, "post up a"), gpu.create_texture(&desc, "post up b")];
                 self.up_targets = Some((t, t.map(|t| gpu.texture_index(t)), (ow, oh)));
             }
-            let held = (u.mode, (w, h), (ow, oh));
+            let held = (u.mode, u.reconstruct, (w, h), (ow, oh));
             let fresh = self.up_held != Some(held);
             self.up_held = Some(held);
             let j = jitter();

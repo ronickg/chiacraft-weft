@@ -1612,3 +1612,34 @@ web.base.tip.pick3 = {color:title}{0}{/} {color:dim}(уровень предме
     {4} {5}
     {6} {7}
     {color:dim}Нажмите, чтобы вставить.{/}
+
+# Вкладка апскейлера (DLSS: mods/base/src/upscaler.rs)
+video.base.upscaler.title = DLSS
+video.base.upscaler.name = Апскейлер: {0}
+video.base.upscaler = Режим
+video.base.upscaler.what = Мир рисуется в части разрешения и восстанавливается DLSS: DLAA — в полном размере, от «Качества» до «Ультрапроизводительности» — меньше пикселей ради кадров
+video.base.upscaler_model = Модель
+video.base.upscaler_model.what = Нейросеть DLSS для этого режима: «По умолчанию» — выбор NVIDIA; CNN — старые модели, трансформер — новые (чётче и стабильнее, чуть медленнее)
+video.base.upscaler_rr = Реконструкция лучей
+video.base.upscaler_rr.what = DLSS очищает освещение, восстанавливая картинку, в размере режима
+video.base.upscaler_rr_model = Модель RR
+video.base.upscaler_rr_model.what = Нейросеть реконструкции лучей: «По умолчанию» — выбор NVIDIA
+video.base.dlss5 = DLSS 5
+video.base.dlss5.what = Нейронный рендеринг NVIDIA поверх готовой картинки
+video.base.dlss5_intensity = Сила DLSS 5
+video.base.dlss5_intensity.what = Насколько картинка DLSS 5 подмешивается
+video.base.value.dlaa = DLAA
+video.base.value.quality = Качество
+video.base.value.balanced = Баланс
+video.base.value.performance = Производительность
+video.base.value.ultra_performance = Ультрапроизводительность
+video.base.value.model_default = По умолчанию
+video.base.value.model_e = E (CNN)
+video.base.value.model_f = F (CNN)
+video.base.value.model_j = J (трансформер)
+video.base.value.model_k = K (трансформер)
+video.base.value.model_l = L (трансформер 2)
+video.base.value.model_m = M (трансформер 2)
+video.base.value.model_rr_d = D (трансформер)
+video.base.value.model_rr_e = E (трансформер)
+video.base.value.model_rr_f = F (новейшая)

@@ -296,6 +296,26 @@ impl Settings {
         number("core:upscale_standin") != 0.0
     }
 
+    /// Ray Reconstruction with the upscaler (`core:upscaler_rr`), live.
+    pub fn upscaler_rr(&self) -> bool {
+        number("core:upscaler_rr") != 0.0
+    }
+
+    /// The upscaler's model for `mode` (`core:upscaler_model_<mode>`, 0 its default), live.
+    pub fn upscaler_model(&self, mode: weft_render::UpscaleMode) -> u32 {
+        number(&format!("core:upscaler_model_{}", mode.name())).max(0.0) as u32
+    }
+
+    /// Ray Reconstruction's model (`core:upscaler_rr_model`), live.
+    pub fn upscaler_rr_model(&self) -> u32 {
+        number("core:upscaler_rr_model").max(0.0) as u32
+    }
+
+    /// DLSS 5 over the upscaled picture (`core:dlss5`), live.
+    pub fn dlss5(&self) -> bool {
+        number("core:dlss5") != 0.0
+    }
+
     /// DLSS 5's strength (`core:dlss5_intensity`), live.
     pub fn dlss5_intensity(&self) -> f32 {
         (number("core:dlss5_intensity") as f32).clamp(0.0, 1.0)

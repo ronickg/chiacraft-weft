@@ -14,8 +14,15 @@
 //! Reconstruction) on the frame's command buffer, with its images tagged for that call only.
 //!
 //! DLSS 5 (`kFeatureDLSS_NR` = 1004) is reserved in the public header but has no plugin, header or
-//! guide in the public SDK (11-06): `UpscaleMode::Neural` is never offered until NVIDIA gives
-//! Ronald access and its options are bound here.
+//! guide in the public SDK (11-06): `UpscalerInfo::neural` stays false until NVIDIA gives Ronald
+//! access and its options are bound here.
+//!
+//! The models offered (`UpscalerInfo::models`), from `sl_dlss.h` and NVIDIA's DLSS Programming
+//! Guide (2026-07, 3.12): E and F the older CNN models (deprecated), J and K the first transformer
+//! model (K NVIDIA's default for DLAA, Quality and Balanced), L and M the second (L the default
+//! for Ultra Performance, M for Performance); G, H, I, N and O are left out (they fall back to the
+//! default). Ray Reconstruction (`sl_dlss_d.h`): D, E and F, transformer models, F the latest and
+//! default.
 
 use std::ffi::{CStr, c_char, c_void};
 use std::path::{Path, PathBuf};
@@ -23,7 +30,7 @@ use std::ptr::{null, null_mut};
 
 use ash::vk;
 use ash::vk::Handle;
-use weft_render::{UpscaleMode, UpscaleParams, UpscalerInfo};
+use weft_render::{UpscaleMode, UpscaleModel, UpscaleParams, UpscalerInfo};
 
 use crate::upscale::{Image, Inputs, Upscaler};
 
@@ -270,7 +277,25 @@ const _: () = {
     assert!(size_of::<FeatureVersion>() == 56);
 };
 
+/// The models offered for Super Resolution and DLAA, and for Ray Reconstruction (see the top).
+const MODELS: [UpscaleModel; 7] = [
+    UpscaleModel { id: 0, key: "default" },
+    UpscaleModel { id: 5, key: "e" },
+    UpscaleModel { id: 6, key: "f" },
+    UpscaleModel { id: 10, key: "j" },
+    UpscaleModel { id: 11, key: "k" },
+    UpscaleModel { id: 12, key: "l" },
+    UpscaleModel { id: 13, key: "m" },
+];
+const RR_MODELS: [UpscaleModel; 4] = [
+    UpscaleModel { id: 0, key: "default" },
+    UpscaleModel { id: 4, key: "rr_d" },
+    UpscaleModel { id: 5, key: "rr_e" },
+    UpscaleModel { id: 6, key: "rr_f" },
+];
+
 // `sl::DLSSMode`.
+const DLSS_ULTRA_PERFORMANCE: u32 = 4;
 const DLSS_MAX_PERFORMANCE: u32 = 1;
 const DLSS_BALANCED: u32 = 2;
 const DLSS_MAX_QUALITY: u32 = 3;
@@ -475,16 +500,24 @@ impl Streamline {
             }
             p
         };
-        let mut up =
-            Dlss { dlss_optimal: None, dlss_options: None, rr_optimal: None, rr_options: None, name: String::new(), modes: 0, sl: self };
+        let mut up = Dlss {
+            dlss_optimal: None,
+            dlss_options: None,
+            rr_optimal: None,
+            rr_options: None,
+            name: String::new(),
+            modes: 0,
+            rr: false,
+            sl: self,
+        };
         unsafe {
             if dlss {
                 let (o, s) = (function(FEATURE_DLSS, c"slDLSSGetOptimalSettings"), function(FEATURE_DLSS, c"slDLSSSetOptions"));
                 if !o.is_null() && !s.is_null() {
                     up.dlss_optimal = Some(std::mem::transmute::<*mut c_void, FnDlssOptimal>(o));
                     up.dlss_options = Some(std::mem::transmute::<*mut c_void, FnDlssSetOptions>(s));
-                    for m in [UpscaleMode::Native, UpscaleMode::Quality, UpscaleMode::Balanced, UpscaleMode::Performance] {
-                        up.modes |= 1 << m as u32;
+                    for m in &UpscaleMode::ALL[1..] {
+                        up.modes |= 1 << *m as u32;
                     }
                 }
             }
@@ -493,14 +526,12 @@ impl Streamline {
                 if !o.is_null() && !s.is_null() {
                     up.rr_optimal = Some(std::mem::transmute::<*mut c_void, FnDlssdOptimal>(o));
                     up.rr_options = Some(std::mem::transmute::<*mut c_void, FnDlssdSetOptions>(s));
-                    for m in [UpscaleMode::Reconstruct, UpscaleMode::ReconstructQuality] {
-                        up.modes |= 1 << m as u32;
-                    }
+                    up.rr = true;
                 }
             }
         }
         if up.modes == 0 {
-            log::warn!("streamline: neither DLSS nor Ray Reconstruction runs here");
+            log::warn!("streamline: DLSS doesn't run here (Ray Reconstruction needs it too)");
             return None;
         }
         let version = |f: u32| {
@@ -526,14 +557,16 @@ struct Dlss {
     rr_options: Option<FnDlssdSetOptions>,
     name: String,
     modes: u32,
+    rr: bool,
 }
 
 /// `sl::DLSSMode` for ours.
 fn dlss_mode(mode: UpscaleMode) -> u32 {
     match mode {
-        UpscaleMode::Quality | UpscaleMode::ReconstructQuality => DLSS_MAX_QUALITY,
+        UpscaleMode::Quality => DLSS_MAX_QUALITY,
         UpscaleMode::Balanced => DLSS_BALANCED,
         UpscaleMode::Performance => DLSS_MAX_PERFORMANCE,
+        UpscaleMode::UltraPerformance => DLSS_ULTRA_PERFORMANCE,
         _ => DLSS_DLAA,
     }
 }
@@ -555,7 +588,8 @@ fn optimal() -> OptimalSettings {
     }
 }
 
-fn dlss_options(mode: UpscaleMode, output: (u32, u32), hdr: bool) -> DlssOptions {
+/// `model` (a `sl::DLSSPreset`) goes in every mode's slot: only `mode`'s is read.
+fn dlss_options(mode: UpscaleMode, output: (u32, u32), hdr: bool, model: u32) -> DlssOptions {
     DlssOptions {
         base: Base::new(T_DLSS_OPTIONS, 3),
         mode: dlss_mode(mode),
@@ -567,12 +601,12 @@ fn dlss_options(mode: UpscaleMode, output: (u32, u32), hdr: bool) -> DlssOptions
         color_buffers_hdr: hdr as u8,
         indicator_invert_x: 0,
         indicator_invert_y: 0,
-        dlaa_preset: 0,
-        quality_preset: 0,
-        balanced_preset: 0,
-        performance_preset: 0,
-        ultra_performance_preset: 0,
-        ultra_quality_preset: 0,
+        dlaa_preset: model,
+        quality_preset: model,
+        balanced_preset: model,
+        performance_preset: model,
+        ultra_performance_preset: model,
+        ultra_quality_preset: model,
         // No exposure image of ours is in the form DLSS reads: it works the exposure out.
         use_auto_exposure: 1,
         alpha_upscaling_enabled: 0,
@@ -596,12 +630,12 @@ fn rr_options(mode: UpscaleMode, output: (u32, u32), hdr: bool, p: &UpscaleParam
         world_to_camera_view: p.world_to_view,
         camera_view_to_world: p.view_to_world,
         alpha_upscaling_enabled: 0,
-        dlaa_preset: 0,
-        quality_preset: 0,
-        balanced_preset: 0,
-        performance_preset: 0,
-        ultra_performance_preset: 0,
-        ultra_quality_preset: 0,
+        dlaa_preset: p.rr_model,
+        quality_preset: p.rr_model,
+        balanced_preset: p.rr_model,
+        performance_preset: p.rr_model,
+        ultra_performance_preset: p.rr_model,
+        ultra_quality_preset: p.rr_model,
     }
 }
 
@@ -645,20 +679,29 @@ fn jitter_sign() -> [f32; 2] {
 
 impl Upscaler for Dlss {
     fn info(&self) -> UpscalerInfo {
-        UpscalerInfo { name: self.name.clone(), modes: self.modes }
+        UpscalerInfo {
+            name: self.name.clone(),
+            modes: self.modes,
+            reconstruct: self.rr,
+            neural: false,
+            frame_gen: 0,
+            models: MODELS.to_vec(),
+            rr_models: if self.rr { RR_MODELS.to_vec() } else { Vec::new() },
+        }
     }
 
-    fn render_size(&mut self, mode: UpscaleMode, output: (u32, u32)) -> Option<(u32, u32)> {
+    fn render_size(&mut self, mode: UpscaleMode, reconstruct: bool, output: (u32, u32)) -> Option<(u32, u32)> {
+        if mode == UpscaleMode::Off {
+            return None;
+        }
         let mut s = optimal();
         let r = unsafe {
-            match mode {
-                UpscaleMode::Reconstruct | UpscaleMode::ReconstructQuality => {
-                    s.base = Base::new(T_DLSSD_OPTIMAL, 1);
-                    let opts = rr_options(mode, output, true, &UpscaleParams::default());
-                    (self.rr_optimal?)(&opts, &mut s)
-                }
-                UpscaleMode::Off | UpscaleMode::Neural => return None,
-                _ => (self.dlss_optimal?)(&dlss_options(mode, output, true), &mut s),
+            if reconstruct {
+                s.base = Base::new(T_DLSSD_OPTIMAL, 1);
+                let opts = rr_options(mode, output, true, &UpscaleParams::default());
+                (self.rr_optimal?)(&opts, &mut s)
+            } else {
+                (self.dlss_optimal?)(&dlss_options(mode, output, true, 0), &mut s)
             }
         };
         (r == OK && s.optimal_render_width > 0 && s.optimal_render_height > 0).then_some((s.optimal_render_width, s.optimal_render_height))
@@ -666,9 +709,9 @@ impl Upscaler for Dlss {
 
     unsafe fn record(&mut self, cmd: vk::CommandBuffer, inputs: &Inputs, p: &UpscaleParams) -> bool {
         let mode = UpscaleMode::from_number(p.mode);
-        let rr = matches!(mode, UpscaleMode::Reconstruct | UpscaleMode::ReconstructQuality);
+        let rr = p.reconstruct != 0;
         let feature = if rr { FEATURE_DLSS_RR } else { FEATURE_DLSS };
-        if !self.info().has(mode) {
+        if mode == UpscaleMode::Off || self.modes & (1 << mode as u32) == 0 || (rr && !self.rr) {
             return false;
         }
         let vp = viewport();
@@ -718,7 +761,7 @@ impl Upscaler for Dlss {
             let r = if rr {
                 (self.rr_options.unwrap())(&vp, &rr_options(mode, output, hdr, p))
             } else {
-                (self.dlss_options.unwrap())(&vp, &dlss_options(mode, output, hdr))
+                (self.dlss_options.unwrap())(&vp, &dlss_options(mode, output, hdr, p.model))
             };
             if r != OK {
                 log::warn!("streamline: setting options failed ({r})");

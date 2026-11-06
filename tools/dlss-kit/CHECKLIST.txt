@@ -21,7 +21,8 @@ ON WINDOWS
   6. Full run (~25 minutes, you can leave it):
         powershell -ExecutionPolicy Bypass -File .\run_kit.ps1
   7. Look, 2 minutes: in results\<newest>\ compare  spotc_off\vistac_h08.png  with  spotc_dlaa,
-     spotc_sr-quality  and  spotc_rr  (same file), and the  *_moving.png  shots (taken mid-strafe).
+     spotc_sr-quality,  spotc_sr-quality-cnn  (the older model)  and  spotc_rr  (same file), and the
+     *_moving.png  shots (taken mid-strafe).
      Note in a few words: sharper or softer than off? shimmer? ghost trails behind leaves? black or
      broken frames? Which looks best?
      And one word: is  sr-jitterflip  worse (speckled canopy) than  sr-quality?  (yes / no / same)
@@ -33,6 +34,8 @@ AFTER, back on CachyOS
 GOOD TO KNOW
   - DLSS 5 rows are skipped: NVIDIA has not published its plugin (sl.dlss_nr) in the public SDK.
     To get it, sign in at developer.nvidia.com and ask for DLSS 5 / Neural Rendering access.
-  - Ray Reconstruction gets approximate inputs for now (normals from depth, the picture as albedo).
+  - Ray Reconstruction gets approximate inputs for now (normals from depth, albedo from the picture).
+  - In the game: Options > Video and Quality > the DLSS tab: mode, model per mode, Ray Reconstruction
+    and its model, all live.
   - Nothing here changes Windows or the driver. The game writes only inside this folder
     (chiacraft\run, results\). A run that hangs is stopped after 5 minutes.

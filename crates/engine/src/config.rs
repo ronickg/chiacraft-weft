@@ -584,6 +584,15 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::number("core:gpu_memory_mb", ck::INT, 0.0, 0.0, 1.0e7, 1.0),
         // 1 when the GPU can trace rays (`Backend::ray_query`): `core:rt_shadows` then works.
         ConfigDef::number("core:gpu_ray_query", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // The renderer's upscaler (`Backend::upscaler`), put at start like the GPU's: its name, its
+        // modes and models as bits (`UpscalerInfo`), Ray Reconstruction, DLSS 5, frame generation.
+        ConfigDef::text("core:gpu_upscaler", ""),
+        ConfigDef::number("core:gpu_upscaler_modes", ck::INT, 0.0, 0.0, 1.0e9, 1.0),
+        ConfigDef::number("core:gpu_upscaler_models", ck::INT, 0.0, 0.0, 4.3e9, 1.0),
+        ConfigDef::number("core:gpu_upscaler_rr", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        ConfigDef::number("core:gpu_upscaler_rr_models", ck::INT, 0.0, 0.0, 4.3e9, 1.0),
+        ConfigDef::number("core:gpu_upscaler_dlss5", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        ConfigDef::number("core:gpu_frame_gen", ck::INT, 0.0, 0.0, 8.0, 1.0),
         // Blocks clouds float above where their dimension puts them.
         ConfigDef::number("core:cloud_height", ck::INT, 0.0, 0.0, 512.0, 8.0),
         // Sun shadows, for shader packs that draw them: 0 off, 1 the near map only (80 blocks
@@ -686,10 +695,23 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // less, smoother and slower to follow), live.
         ConfigDef::number("core:taa_blend", ck::FLOAT, 0.1, 0.03, 0.5, 0.01),
         // The renderer's temporal upscaler, in anti-aliasing's place (`weft_render::UpscaleMode`):
-        // 0 off, 1 DLAA, 2-4 DLSS Super Resolution Quality, Balanced, Performance, 5-6 Ray
-        // Reconstruction at the screen's size and from Quality's, 7 DLSS 5. Live; only where the
-        // renderer has one (DLSS: the `streamline` build on Windows with NVIDIA's files), else off.
-        ConfigDef::number("core:upscaler", ck::INT, 0.0, 0.0, 7.0, 1.0),
+        // 0 off, 1 DLAA, 2 Quality, 3 Balanced, 4 Performance, 5 Ultra Performance. Live; only
+        // where the renderer has one (DLSS: the `streamline` build on Windows with NVIDIA's files;
+        // `core:gpu_upscaler*` say what it runs), else off.
+        ConfigDef::number("core:upscaler", ck::INT, 0.0, 0.0, 5.0, 1.0),
+        // Its model for each mode (the upscaler's own numbers, `UpscalerInfo::models`; DLSS: 0 its
+        // default, 5-6 E-F the CNN models, 10-13 J-M the transformer ones), live.
+        ConfigDef::number("core:upscaler_model_dlaa", ck::INT, 0.0, 0.0, 31.0, 1.0),
+        ConfigDef::number("core:upscaler_model_quality", ck::INT, 0.0, 0.0, 31.0, 1.0),
+        ConfigDef::number("core:upscaler_model_balanced", ck::INT, 0.0, 0.0, 31.0, 1.0),
+        ConfigDef::number("core:upscaler_model_performance", ck::INT, 0.0, 0.0, 31.0, 1.0),
+        ConfigDef::number("core:upscaler_model_ultra_performance", ck::INT, 0.0, 0.0, 31.0, 1.0),
+        // Ray Reconstruction (denoising with the upscaling, at the mode's sizes) and its model
+        // (DLSS: 0 default, 4-6 D-F), live.
+        ConfigDef::number("core:upscaler_rr", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        ConfigDef::number("core:upscaler_rr_model", ck::INT, 0.0, 0.0, 31.0, 1.0),
+        // DLSS 5's neural rendering over the upscaled picture (not public yet: never runs), live.
+        ConfigDef::number("core:dlss5", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         // A stand-in upscaler that only scales the picture up, for checking the upscaler's path
         // where the renderer has none (the Linux PC); read at start.
         ConfigDef::number("core:upscale_standin", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
