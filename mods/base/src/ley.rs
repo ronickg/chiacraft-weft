@@ -113,19 +113,14 @@ pub fn register(r: &mut Registry) {
         // One line each: the reading here, then the nearest line, node and waystone, each saying
         // so when there's none within its reach (it printed "-1 blocks, at 0 0": Tester 2's
         // playtest, 11-06).
-        cmd.reply(
-            "command.base.ley",
-            &[Arg::Float(r.strength as f64, 2), Arg::Key(&format!("ley.base.feel.{}", Feel::of(&r).name()))],
-        );
+        cmd.reply("command.base.ley", &[Arg::Float(r.strength as f64, 2), Arg::Key(&format!("ley.base.feel.{}", Feel::of(&r).name()))]);
         match line {
             Some((d, lx, lz)) => cmd.reply("command.base.ley.line", &[Arg::Int(d), Arg::Int(lx), Arg::Int(lz)]),
             None => cmd.reply("command.base.ley.no_line", &[Arg::Int(LOOK as i64)]),
         }
         match node {
-            Some(n) => cmd.reply(
-                "command.base.ley.node",
-                &[Arg::Int(n.x as i64), Arg::Int(n.z as i64), Arg::Int(n.lines as i64), Arg::Int(far(&n))],
-            ),
+            Some(n) => cmd
+                .reply("command.base.ley.node", &[Arg::Int(n.x as i64), Arg::Int(n.z as i64), Arg::Int(n.lines as i64), Arg::Int(far(&n))]),
             None => cmd.reply("command.base.ley.no_node", &[Arg::Int(LOOK as i64)]),
         }
         match stone {
