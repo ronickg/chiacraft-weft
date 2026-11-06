@@ -2895,7 +2895,7 @@ impl Client {
                 }
                 _ => [0.0; 4],
             },
-            rt: [self.render.rt_traced() as u32 as f32, 0.0, 0.0, 0.0],
+            rt: [self.render.rt_traced() as u32 as f32, (self.render.rt_frame_no() % (1 << 24)) as f32, 0.0, 0.0],
             shadow: match self.shadow_map {
                 Some(t) if self.shadow.1 => {
                     [self.shadow_index(t) as f32, self.shadow_size as f32, 1.0, 2.0 * SHADOW_REACH / self.shadow_size as f32]

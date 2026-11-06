@@ -770,7 +770,8 @@ gpu_struct! {
         pub froxels: [f32; 4],
         /// Ray-traced sun and moon shadows (`core:rt_shadows`, a GPU with ray queries): x 1 when
         /// the world's shader traces them this frame (its prelude then has `rt_sun`; the near shadow
-        /// map then holds the models alone, the far one the terrain as before), yzw unused.
+        /// map then holds the models alone, the far one the terrain as before), y a frame count
+        /// (to 2^24, for noise that moves every frame), zw unused.
         pub rt: [f32; 4],
         /// Temporal anti-aliasing (`post::Temporal`, `core:aa`): xy this frame's jitter in NDC
         /// (`view_proj` has it, `taa_prev` not; a clip position's `xy / w - taa.xy` is where it
@@ -1327,7 +1328,7 @@ fn rt_sun(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool) -> vec3<f32> 
 fn rt_cone(l: vec3<f32>, radius: f32, px: vec2<f32>) -> vec3<f32> {
     return l;
 }
-fn rt_sun_soft(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool, radius: f32, px: vec2<f32>) -> vec3<f32> {
+fn rt_sun_soft(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool, radius: f32, px: vec2<f32>, fine: bool) -> vec3<f32> {
     return vec3(1.0);
 }
 ";
@@ -1374,8 +1375,9 @@ fn rt_cone_at(l: vec3<f32>, radius: f32, px: vec2<f32>, turn: f32) -> vec3<f32> 
     if j.x == 0.0 && j.y == 0.0 {
         return l;
     }
-    // Interleaved gradient noise, moved on by the jitter's phase.
-    let k = f32(u32(abs(j.x) * 7919.0 + abs(j.y) * 4271.0) % 64u);
+    // Interleaved gradient noise, moved on every frame (`scene.rt.y`, a frame count: TAA's jitter
+    // has only a few phases, and a pattern repeating every 8 frames left a grain its history kept).
+    let k = f32(u32(scene.rt.y) % 64u);
     let p = px + vec2(5.588238 * k);
     var u1 = fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
     if fract(turn * 2.0) >= 0.5 {
@@ -1390,14 +1392,19 @@ fn rt_cone_at(l: vec3<f32>, radius: f32, px: vec2<f32>, turn: f32) -> vec3<f32> 
 }
 
 // `rt_sun` toward a light of disc `radius` (radians), soft-edged: with temporal anti-aliasing's
-// jitter on, two rays to opposite sides of the disc, and where they disagree (a penumbra) two more
-// across it, averaged; the history smooths the rest. Without the jitter one ray to the middle.
-fn rt_sun_soft(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool, radius: f32, px: vec2<f32>) -> vec3<f32> {
+// jitter on, one ray to a point of the disc that moves every frame, the history averaging them into
+// the penumbra. `fine`: two rays to opposite sides of the disc, and where they disagree (a penumbra)
+// two more across it, smooth within the frame but about three times the cost (PC, 11-06: +0.7-2.5
+// ms at 1440p against +0.2-0.7). Without the jitter one ray to the middle.
+fn rt_sun_soft(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool, radius: f32, px: vec2<f32>, fine: bool) -> vec3<f32> {
     let j = scene.taa.xy;
     if j.x == 0.0 && j.y == 0.0 {
         return rt_sun(rel, n, l, plant);
     }
     let a = rt_sun(rel, n, rt_cone_at(l, radius, px, 0.0), plant);
+    if !fine {
+        return a;
+    }
     let b = rt_sun(rel, n, rt_cone_at(l, radius, px, 0.5), plant);
     if all(abs(a - b) < vec3(0.05)) {
         return (a + b) * 0.5;

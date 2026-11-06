@@ -398,7 +398,7 @@ fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
         if dot(n, light_dir()) <= 0.0 && in.kind.z == 0u && in.kind.x != TINT_FOLIAGE {
             return 0.0;
         }
-        let t = rt_sun_soft(in.rel, n, light_dir(), in.kind.z != 0u, SUN_CONE, in.clip.xy);
+        let t = rt_sun_soft(in.rel, n, light_dir(), in.kind.z != 0u, SUN_CONE, in.clip.xy, false);
         let c = min(canopy(), 1.0);
         let cover = smoothstep(mix(0.3, 0.15, c), mix(0.8, 0.5, c), in.light.x);
         return min(dot(t, vec3(1.0 / 3.0)), cover) * models_shadow(in.rel, n) * cloud_shadow(in.rel);
@@ -849,7 +849,7 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     // Traced (`core:rt_shadows`): the water's surface everywhere, as the land.
     if scene.rt.x > 0.5 {
         let up = vec3(0.0, 1.0, 0.0);
-        near_map = vec2(dot(rt_sun_soft(in.rel, up, light_dir(), false, SUN_CONE, in.clip.xy), vec3(1.0 / 3.0)) * models_shadow(in.rel, up), 1.0);
+        near_map = vec2(dot(rt_sun_soft(in.rel, up, light_dir(), false, SUN_CONE, in.clip.xy, false), vec3(1.0 / 3.0)) * models_shadow(in.rel, up), 1.0);
     }
     let shadow = mix(1.0, min(near_map.x, smoothstep(0.3, 0.8, in.light.x)), near_map.y) * smoothstep(0.75, 1.0, max(in.light.x, near_map.y)) * cloud_shadow(in.rel);
     let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, shadow, 1.0, in.pos, in.rel);
