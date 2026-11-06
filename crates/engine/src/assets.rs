@@ -480,7 +480,10 @@ pub fn load_texture(assets: &Assets, name: &str) -> LoadedTexture {
     let (img_width, img_height) = (img.width, img.height);
     let frame_bytes = (img.width * img.width * 4) as usize;
     let frames: Vec<Vec<Vec<u8>>> = (0..count as usize)
-        .map(|f| mip_chain(scale_nearest(&img.rgba[f * frame_bytes..(f + 1) * frame_bytes], img.width, size), size))
+        .map(|f| {
+            let frame = scale_nearest(&img.rgba[f * frame_bytes..(f + 1) * frame_bytes], img.width, size);
+            if dark_leaf_mips(name) { mip_chain_dark(frame, size) } else { mip_chain(frame, size) }
+        })
         .collect();
     let mask = emission_mask(assets, name).filter(|m| m.width > 0);
     let glow = (0..count)
@@ -610,6 +613,56 @@ fn mip_chain(mut rgba: Vec<u8>, size: u32) -> Vec<Vec<u8>> {
         bleed(&mut rgba, s);
         let next = (s > 1).then(|| downsample(&rgba, s));
         out.push(rgba);
+        match next {
+            Some(n) => (rgba, s) = (n, s / 2),
+            None => return out,
+        }
+    }
+}
+
+/// chiacraft, test only (`core:mc_leaves`, the Minecraft comparison): leaves' smaller mips as
+/// Minecraft's darken them. Its leaves average a texel's colour with the holes beside it as
+/// black, so far and grazing leaves go darker and duller; ours keep their full colour (Trees'
+/// measure in Bliss's world, shaders off: the vista's mid and shaded leaves G +8 over vanilla's,
+/// lit tops the same, close up the same).
+fn dark_leaf_mips(name: &str) -> bool {
+    name.contains("leaves") && crate::config::by_name("core:mc_leaves").is_some_and(|id| crate::config::get(id) != 0.0)
+}
+
+/// `mip_chain` with the colour of each smaller texel the gamma-correct sum of its opaque ones
+/// over all four (`dark_leaf_mips`); its alpha as ours, so the crown is as dense far off.
+fn mip_chain_dark(mut rgba: Vec<u8>, size: u32) -> Vec<Vec<u8>> {
+    let lin = |v: u8| (v as f32 / 255.0).powf(2.2);
+    let mut out = Vec::with_capacity(size.trailing_zeros() as usize + 1);
+    let mut s = size;
+    loop {
+        let next = (s > 1).then(|| {
+            let half = s / 2;
+            let mut o = downsample(&rgba, s);
+            for y in 0..half {
+                for x in 0..half {
+                    let mut sum = [0f32; 3];
+                    for (dx, dy) in [(0, 0), (1, 0), (0, 1), (1, 1)] {
+                        let i = (((y * 2 + dy) * s + x * 2 + dx) * 4) as usize;
+                        if rgba[i + 3] != 0 {
+                            for c in 0..3 {
+                                sum[c] += lin(rgba[i + c]);
+                            }
+                        }
+                    }
+                    let d = ((y * half + x) * 4) as usize;
+                    for c in 0..3 {
+                        o[d + c] = ((sum[c] / 4.0).powf(1.0 / 2.2) * 255.0)
+                            .round()
+                            .clamp(0.0, 255.0) as u8;
+                    }
+                }
+            }
+            o
+        });
+        let mut shown = rgba;
+        bleed(&mut shown, s);
+        out.push(shown);
         match next {
             Some(n) => (rgba, s) = (n, s / 2),
             None => return out,
