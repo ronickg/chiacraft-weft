@@ -979,8 +979,23 @@ fn storm() -> f32 {
     return clamp(max(scene.ground.y * smoothstep(5.0, 9.0, length(wind_now())), scene.ground.z), 0.0, 1.0);
 }
 
+// A dust storm's air by distance from the eye, 0..1 of its fog: clear near (a bubble of 16 blocks in
+// a moderate wind, 8 in the strongest), thickening outward, so the ground about the player stays
+// readable and the storm closes only some 90 blocks out, the sky in the same dust (it is fogged
+// over 220). The fog filling the air from the eye turned the whole view a flat beige a few blocks
+// off (the Recrafted study, item 2a; ImmersiveVFX's sandstorm closes at about 96).
+fn dust_reach(p: vec3<f32>) -> f32 {
+    let dust = clamp(scene.ground.z, 0.0, 1.0);
+    if dust <= 0.0 {
+        return 1.0;
+    }
+    let bubble = mix(16.0, 8.0, smoothstep(7.0, 11.0, length(wind_now())));
+    let near = mix(0.12, 1.0, smoothstep(bubble * 0.5, bubble * 3.0, length(p - scene.eye.xyz)));
+    return mix(1.0, near * 0.6, dust);
+}
+
 fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
-    let f = scene.weather.z;
+    let f = scene.weather.z * dust_reach(p);
     let s = storm();
     // The mist (not a storm's dust or snow) lies below a height of its own, `MIST_TOP` over the
     // sea (`vitals::air`), as Bliss's does: rivers, lakes and valleys fill, and ridges and forests higher up stand
@@ -1386,7 +1401,15 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // Distant Horizons comparison, 11-05). It hands over to the horizon's colour where the terrain
     // ends, so the last ridges still meet the sky without a line, standing a little bluer than it.
     let blue = sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 0.1, dir.z)));
-    let color = mix(blue, horizon, smoothstep(end * 0.55, end, dist));
+    var color = mix(blue, horizon, smoothstep(end * 0.55, end, dist));
+    // In a dust storm the far land goes into the dust, as the sky does (it is fogged over 220
+    // blocks): veiled toward the clear sky's colour, far ridges stood blue-lavender against a
+    // sand-coloured sky (the dust-layers sheet, 11-06). The fog's own light at full depth.
+    let dust = clamp(scene.ground.z, 0.0, 1.0) * smoothstep(0.0, 0.3, scene.weather.z);
+    if dust > 0.0 {
+        let fl = fog_light(dir);
+        color = mix(color, fl.sky + fl.sun, dust);
+    }
     let rain = rain_amount();
     // Thinner looking up at what is high, so hills stand out against a hazy valley (`haze_veil`).
     let veil = haze_veil(rel, dist);
