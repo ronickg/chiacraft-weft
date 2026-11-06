@@ -550,7 +550,10 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                     s.min(y - ny)
                 };
                 let (tex, tint) = face_of(top, 3);
-                out.push(as_ground(occluded(quad(dir as u32, i * s, y + 1 - band, j * s, (s, band, s), tex, tint, biome), occ_at(i, j)), top));
+                out.push(as_ground(
+                    occluded(quad(dir as u32, i * s, y + 1 - band, j * s, (s, band, s), tex, tint, biome), occ_at(i, j)),
+                    top,
+                ));
                 lo = lo.min(ny + 1);
                 if y - band <= ny {
                     continue;
