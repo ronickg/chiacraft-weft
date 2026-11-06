@@ -2722,6 +2722,13 @@ impl Client {
         }
     }
 
+    /// What the wind carries particles by (`gpu_layout::ParticleSimArgs::wind`): the wind where
+    /// the player is, how hard it rains, and the shaders' seconds its gusts move by, as the
+    /// plants' sway has them.
+    pub fn particle_wind(&self) -> [f32; 4] {
+        [self.wind.x, self.wind.y, self.rain(), crate::shaders::time()]
+    }
+
     /// The weather where the player is, as drawn (`ClientState::rain` and on, for mods' sound).
     pub fn weather_now(&self) -> (f32, f32, [f32; 2], f32, u32) {
         (self.rain(), self.thunder(), self.wind.to_array(), self.snowing, self.lightnings)

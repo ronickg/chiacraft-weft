@@ -54,6 +54,7 @@ pub mod web;
 pub mod web_layout;
 pub mod web_sheet;
 pub mod wild;
+pub mod wind_life;
 
 /// Ticks a second, as the game's.
 pub const TICKS: u32 = 20;
