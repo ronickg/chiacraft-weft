@@ -388,6 +388,13 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
         let e = textureLoad(textures[pass_.exposure - 1u], vec2(0, 0), 0).g;
         if e == e && e > 0.0 {
             col *= pow(auto_exposure(e), fantasy_opt(OPT_AUTO_EXPOSURE));
+            // The land a little dimmer against the sky with the sun 30-55° up: in Bliss's own world
+            // the sky matched at every hour (08:00 204 against 208, noon 189 against 192), the land
+            // was over it (113 against 89 at 08:00, 132 against 113 at noon; 17:00 115 against 113).
+            // Not the sky (its own dim is above), not in rain.
+            let morning = smoothstep(0.38, 0.52, scene.sun.y);
+            let land = 1.0 - 0.2 * morning + 0.06 * smoothstep(0.6, 0.82, scene.sun.y);
+            col *= mix(1.0, land, (1.0 - rain_amount()) * select(1.0, 0.0, sky_px));
         }
     }
     return col;
