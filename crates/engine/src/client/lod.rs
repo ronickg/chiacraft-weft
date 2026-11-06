@@ -203,9 +203,11 @@ fn take_columns(job: &LodJob, words: &mut [u32]) {
         } else if let Some((y, top, under, biome)) = job.far.as_ref().and_then(|f| f.cell(col.x, col.y)) {
             // chiacraft, test only: the imported world's ground, its biome, and no crown (its
             // leaves are the top where trees stand).
+            // Its water's depth too (0 where its top isn't water), for the floor under far water.
+            let depth = job.far.as_ref().and_then(|f| f.depth(col.x, col.y)).unwrap_or(0).min(31);
             let w = k * WORDS;
             words[w] = (y as u32 & 0xFFFF) | (top << 16);
-            words[w + 1] = (biome & BIOME_BITS) | (under << 16);
+            words[w + 1] = (biome & BIOME_BITS) | (depth << 11) | (under << 16);
             words[w + 2] = 0;
             words[w + 3] = 0;
         }
