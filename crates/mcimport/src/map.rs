@@ -200,7 +200,15 @@ pub fn block(mc: &str) -> (Vec<String>, bool) {
             (vec![format!("base:wild_sunflower[half={half}]"), if half == "lower" { "base:dandelion".into() } else { AIR.into() }], false)
         }
         // 26.3's wildflowers are mostly yellow patches on the forest floor.
-        "wildflowers" => near(&["base:dandelion", "base:clover", AIR]),
+        // Flat little clusters in Minecraft; our dandelion stands up, so only full patches (4)
+        // get one, or the floor reads as a meadow of them.
+        "wildflowers" => {
+            if s.prop("flower_amount") == Some("4") {
+                near(&["base:dandelion", AIR])
+            } else {
+                (vec![AIR.into()], false)
+            }
+        }
         "pink_petals" => near(&["base:clover", AIR]),
         // A thin layer on the floor in Minecraft; ours is a whole block.
         "leaf_litter" => (vec![AIR.into()], false),
