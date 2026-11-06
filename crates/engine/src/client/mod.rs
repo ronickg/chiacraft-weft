@@ -3142,7 +3142,7 @@ impl Client {
             // The G-buffer (albedo, normal and roughness, spec) the denoisers read: `render.gb_images`.
             self.render.gbuffer_pass(gpu, list, depth, size);
             self.render
-                .path_trace(gpu, list, slot, depth, target, size, debug);
+                .path_trace(gpu, list, slot, depth, target, size, debug, false);
         }
     }
 

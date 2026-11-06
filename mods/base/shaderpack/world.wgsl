@@ -1243,7 +1243,9 @@ fn gbuffer(in: VOut, albedo: vec4<f32>) -> GbOut {
     let m = shade_mat(in, albedo.rgb);
     let n = mat_normal(m, normalize(in.normal), in.rel, fract(in.uv));
     let metal = m.metal > 0.5;
-    return GbOut(vec4(select(paint, vec3(0.0), metal), m.metal), vec4(n, 1.0 - m.smoothness), vec4(select(m.f0, paint, metal), m.sss));
+    // No maps, no shine (as the world's pass, which adds `mat_shine` only with them): F0 0.
+    let f0 = select(select(m.f0, paint, metal), vec3(0.0), !m.has);
+    return GbOut(vec4(select(paint, vec3(0.0), metal), m.metal), vec4(n, 1.0 - m.smoothness), vec4(f0, m.sss));
 }
 
 @fragment

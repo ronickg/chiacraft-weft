@@ -128,19 +128,23 @@ pub(super) fn pt_pipelines(gpu: &mut dyn Backend, assets: &crate::assets::Assets
         .create_compute(&ComputeDesc { label: "path trace", shader: &shader, entry: "cs_trace" })
         .map_err(|e| log::error!("path tracer: {}", e.0))
         .ok()?;
+    // The world's image, then the light for the denoisers: diffuse (the motion slot), specular.
     let fs = gpu
-        .create_pipeline(&PipelineDesc {
-            label: "path trace composite",
-            shader: &shader,
-            vertex: "vs_pt",
-            fragment: Some("fs_pt"),
-            color: Some(crate::post::world_format()),
-            depth: None,
-            blend: Blend::None,
-            cull_back: false,
-            topology: Topology::Triangles,
-            motion: false,
-        })
+        .create_pipeline_mrt(
+            &PipelineDesc {
+                label: "path trace composite",
+                shader: &shader,
+                vertex: "vs_pt",
+                fragment: Some("fs_pt"),
+                color: Some(crate::post::world_format()),
+                depth: None,
+                blend: Blend::None,
+                cull_back: false,
+                topology: Topology::Triangles,
+                motion: true,
+            },
+            &[Format::Rgba16Float],
+        )
         .map_err(|e| log::error!("path tracer composite: {}", e.0))
         .ok();
     match fs {
@@ -154,8 +158,8 @@ pub(super) fn pt_pipelines(gpu: &mut dyn Backend, assets: &crate::assets::Assets
 
 /// The path tracer's G-buffer pipelines from the world shader (its `fs_gb_opaque`, `fs_gb_cutout`):
 /// faces opaque, faces cutout, quads opaque, quads cutout, each drawing where the world's depth is
-/// its own (Equal, no write) into the albedo (Rgba8), normal (Rgba16F, the motion slot) and spec
-/// (Rgba8) images. None without those entries.
+/// its own (Equal, no write) into the albedo (Rgba8 sRGB), normal (Rgba16F, the motion slot) and
+/// spec (Rgba8 sRGB) images. None without those entries.
 pub(super) fn gb_pipelines(gpu: &mut dyn Backend, shader: &Shader) -> Option<[PipelineId; 4]> {
     if !crate::packs::pack_uses("world.wgsl", "fs_gb_opaque") {
         return None;
@@ -172,14 +176,14 @@ pub(super) fn gb_pipelines(gpu: &mut dyn Backend, shader: &Shader) -> Option<[Pi
             shader,
             vertex: vs,
             fragment: Some(fs),
-            color: Some(Format::Rgba8Unorm),
+            color: Some(Format::Rgba8Srgb),
             depth: Some(DepthState { write: false, compare: Compare::Equal }),
             blend: Blend::None,
             cull_back: true,
             topology: Topology::Triangles,
             motion: true,
         };
-        match gpu.create_pipeline_mrt(&desc, &[Format::Rgba8Unorm]) {
+        match gpu.create_pipeline_mrt(&desc, &[Format::Rgba8Srgb]) {
             Ok(p) => made.push(p),
             Err(e) => {
                 log::error!("path tracer G-buffer: {}", e.0);
@@ -405,11 +409,14 @@ impl WorldRenderer {
         self.rt = Some(rt);
     }
 
-    /// Path traced lighting (`core:path_traced`): after the world's pass, before the effects, the
-    /// path tracer lights each terrain pixel again (`pathtrace.wgsl`) into a buffer, and its
-    /// composite draws them over the world's image `target` (the world's size `size`, its depth
-    /// `depth`). Nothing without the traced scene and the pack's path tracer. `debug`: 0 the picture,
-    /// 1 albedo, 2 normals, 3 direct light, 4 the bounce.
+    /// Path traced lighting (`core:path_traced`): after the world's pass and its G-buffer
+    /// (`gbuffer_pass`), before the effects, the path tracer lights each terrain pixel again
+    /// (`pathtrace.wgsl`) into a buffer, and its composite draws them over the world's image `target`
+    /// (the world's size `size`, its depth `depth`) and writes their light into `pt_images` for the
+    /// denoisers. With `denoised` the composite leaves the light out of `target` (what lies under it,
+    /// the air's share, is written): a denoiser adds it. Nothing without the traced scene, the pack's
+    /// path tracer and the G-buffer. `debug`: 0 the picture, 1 albedo, 2 normals, 3 direct light,
+    /// 4 the bounce, 5 the specular light.
     #[allow(clippy::too_many_arguments)]
     pub fn path_trace(
         &mut self,
@@ -420,27 +427,54 @@ impl WorldRenderer {
         target: Target,
         size: (u32, u32),
         debug: u32,
+        denoised: bool,
     ) {
-        let (Some((cs, fs)), true, Some(page)) =
-            (self.pt_pipes, self.rt_traced() || self.rt_reflects() || self.rt.is_some(), self.faces.pages.first().map(|p| p.0))
-        else {
+        let (Some((cs, fs)), true, Some(page), Some((albedo, normal, spec, gb_size))) = (
+            self.pt_pipes,
+            self.rt_traced() || self.rt_reflects() || self.rt.is_some(),
+            self.faces.pages.first().map(|p| p.0),
+            self.gb_images,
+        ) else {
             return;
         };
-        if !self.rt_compiled || self.buffers.is_none() {
+        if !self.rt_compiled || self.buffers.is_none() || gb_size != size {
             return;
         }
         let n = size.0 * size.1;
-        // On the GPU only, one a frame slot, grown to the world's size.
+        // On the GPU only, one a frame slot, grown to the world's size: three texels a pixel.
+        const STRIDE: u64 = 48;
         while self.pt_out.len() < gpu.frames_in_flight() {
             self.pt_out
-                .push((gpu.create_buffer(16, usage::STORAGE, "path traced"), 1));
+                .push((gpu.create_buffer(STRIDE, usage::STORAGE, "path traced"), 1));
         }
         if self.pt_out[slot].1 < n {
             gpu.destroy_buffer(self.pt_out[slot].0);
-            self.pt_out[slot] = (gpu.create_buffer(n as u64 * 16, usage::STORAGE, "path traced"), n);
+            self.pt_out[slot] = (gpu.create_buffer(n as u64 * STRIDE, usage::STORAGE, "path traced"), n);
         }
+        if self.pt_images.is_none_or(|p| p.2 != size) {
+            if let Some((a, b, _)) = self.pt_images.take() {
+                gpu.destroy_texture(a);
+                gpu.destroy_texture(b);
+            }
+            let make = |gpu: &mut dyn Backend, label| {
+                gpu.create_texture(
+                    &TextureDesc { width: size.0, height: size.1, mips: 1, format: Format::Rgba16Float, render_target: true },
+                    label,
+                )
+            };
+            self.pt_images = Some((make(gpu, "path traced diffuse"), make(gpu, "path traced specular"), size));
+        }
+        let (diffuse, specular, _) = self.pt_images.unwrap();
         let out = self.pt_out[slot].0;
-        let args = crate::gpu_layout::PtArgs { size: [size.0, size.1], depth: gpu.texture_index(depth), debug };
+        let args = crate::gpu_layout::PtArgs {
+            size: [size.0, size.1],
+            depth: gpu.texture_index(depth),
+            debug,
+            albedo: gpu.texture_index(albedo),
+            normal: gpu.texture_index(normal),
+            spec: gpu.texture_index(spec),
+            mode: u32::from(denoised && debug == 0),
+        };
         let origins = page;
         use crate::gpu_layout::pt_bind;
         self.bind_run(list, cs, page, origins);
@@ -448,7 +482,9 @@ impl WorldRenderer {
         list.push_constants(&args);
         list.push(Cmd::Dispatch { x: size.0.div_ceil(8), y: size.1.div_ceil(8), z: 1 });
         list.push(Cmd::Barrier);
-        list.push(Cmd::BeginPass { color: Some((target, None)), depth: None, motion: None });
+        let none = [0.0; 4];
+        list.push(Cmd::PassExtras([Some((specular, Some(none))), None, None]));
+        list.push(Cmd::BeginPass { color: Some((target, None)), depth: None, motion: Some((diffuse, Some(none))) });
         self.bind_run(list, fs, page, origins);
         list.bind(pt_bind::IN, out);
         list.push_constants(&args);
@@ -475,9 +511,9 @@ impl WorldRenderer {
                 gpu.create_texture(&TextureDesc { width: size.0, height: size.1, mips: 1, format, render_target: true }, label)
             };
             self.gb_images = Some((
-                make(gpu, Format::Rgba8Unorm, "G-buffer albedo"),
+                make(gpu, Format::Rgba8Srgb, "G-buffer albedo"),
                 make(gpu, Format::Rgba16Float, "G-buffer normal"),
-                make(gpu, Format::Rgba8Unorm, "G-buffer spec"),
+                make(gpu, Format::Rgba8Srgb, "G-buffer spec"),
                 size,
             ));
         }

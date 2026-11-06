@@ -489,6 +489,10 @@ pub struct WorldRenderer {
     gb_draws_slot: usize,
     gb_firsts: usize,
     pub gb_images: Option<(TextureId, TextureId, TextureId, (u32, u32))>,
+    /// The path tracer's light (`path_trace`), at the world's size, Rgba16F: diffuse (rgb divided
+    /// by the albedo; a the bounce's distance) and specular (rgb divided by `pt_spec_albedo`; a the
+    /// reflection's distance, 65504 the sky), for the denoisers.
+    pub pt_images: Option<(TextureId, TextureId, (u32, u32))>,
     /// The setting changed: the app composes the world shader again (`reload_shaders`).
     pub rt_reload: bool,
 }
@@ -668,6 +672,7 @@ impl WorldRenderer {
             gb_draws_slot: 0,
             gb_firsts: 0,
             gb_images: None,
+            pt_images: None,
             rt_reload: false,
             calm_sets: [Self::calm_pipes(gpu, assets, false), Self::calm_pipes(gpu, assets, true)],
             calm_level: 0,
@@ -1349,6 +1354,10 @@ impl WorldRenderer {
             for t in [a, b, c] {
                 gpu.destroy_texture(t);
             }
+        }
+        if let Some((a, b, _)) = self.pt_images.take() {
+            gpu.destroy_texture(a);
+            gpu.destroy_texture(b);
         }
         self.drop_calm(gpu);
         self.meshes.clear();
