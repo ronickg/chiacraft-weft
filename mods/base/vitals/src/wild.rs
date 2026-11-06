@@ -256,8 +256,8 @@ pub const OWN_COLOURS: [&str; 4] = ["base:andiroba_leaves", "base:matamata_leave
 /// rich soil in the broadleaf woods and at their edges, in clumps from its suckers and the
 /// birds' dropped stones; in the old growth's gaps most.
 pub const CHERRY_GROVES: [(&str, f32); 3] = [("base:old_growth_forest", 0.7), ("base:forest", 0.6), ("base:birch_forest", 0.35)];
-pub const CHERRY_GROVE_SIZE: f64 = 140.0;
-pub const CHERRY_GROVE_FROM: f64 = 0.38;
+pub const CHERRY_GROVE_SIZE: f64 = 320.0;
+pub const CHERRY_GROVE_FROM: f64 = 0.42;
 
 /// The seasons `leaves` bloom in (`BLOOMS`), if they do.
 pub fn blooms(leaves: &str) -> Option<u8> {

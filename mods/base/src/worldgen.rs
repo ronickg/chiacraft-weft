@@ -483,7 +483,7 @@ pub fn register(r: &mut Registry) {
         .thin(stand_over(STAND + 1).and(cherry_grove().not()).not(), 0)
         .shape(tree);
     // Wild cherries in groves (`CHERRY_TREES`): a site per 4 x 4 cell only in the grove patches (a
-    // noise some 140 blocks across), among the forest's trees; a little taller than the oaks, so
+    // noise some 320 blocks across, about 1.8% of the ground), among the forest's trees; a little taller than the oaks, so
     // their spring blossom shows over the canopy.
     r.scatter(&CHERRY_SITES)
         .cell(4)
