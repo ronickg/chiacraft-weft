@@ -1749,12 +1749,19 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     // The HDR world's white balance by day (`base:look_white`): warmer, less blue (our land read
     // much bluer than Bliss's at every hour, red less blue -37 against -10 at noon: the gap sheet).
     if scene.frame.x > 0.5 {
-        // Warmer still at golden hour (Bliss's dawn land: warmth +106 against our +47).
-        // Mostly at a low sun: at noon a quarter (the sky and the far haze stay blue, as Bliss's).
-        // At golden hour 0.6 more, not 1.3: the ground itself went orange-gold (sand and desert
-        // most), where Bliss's low sun tints through the haze and the mist (the MC comparison's
-        // spring 8 sheets, 11-05).
-        let w = fantasy_opt(OPT_WHITE) * day * (mix(1.0, 0.25, smoothstep(0.4, 0.75, scene.sun.y)) + 0.6 * golden());
+        // Mostly with the sun part way up: at noon a quarter (the sky and the far haze stay blue,
+        // as Bliss's).
+        // At golden hour none of the extra, and less of the rest: it was a cast over the whole
+        // view, land and sky alike, on top of the palette's own gold, and at the like-for-like
+        // mc_forest vista the HDR picture's 18:00 came out warmth +63 on the land and +99 on the
+        // sky where today's picture from the same palette had +17 and +33, Bliss's +14 and -21
+        // (Shader's evening sheet, 11-06). A low sun's gold is the palette's, the haze's and the
+        // mist's to give.
+        // In mist the gold kept, more of it (Bliss's misty dawn is all gold, 181 of saturation and
+        // +106 warmth; with the cut, ours fell from 174/+101 to 151/+88, gr5m): the low sun's gold
+        // is the mist's light.
+        let misty = smoothstep(0.02, 0.1, scene.weather.z) * (1.0 - rain_amount());
+        let w = fantasy_opt(OPT_WHITE) * day * mix(1.0, 0.25, smoothstep(0.4, 0.75, scene.sun.y)) * mix(1.0 - 0.7 * golden(), 1.0 + 0.6 * golden(), misty);
         t *= vec3(1.0 + 0.08 * w, 1.0, 1.0 - 0.14 * w);
     }
     // Only true darks go cool (most daylit ground is mid-tone and keeps its color).
@@ -1773,7 +1780,14 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     // In the HDR world it follows the sun: 0.95 of it with the sun under about 17° (with the far
     // haze's gold, 1.12 overshot dawn: 222 against Bliss's 181), 0.78 of
     // it from about 48° (the match checkpoints: 08:00 100 and noon 89 against Bliss's 72 and 75).
-    let sat = 1.2 * look_opt(OPT_SATURATION, 1.0) * select(1.0, mix(0.95, 0.78, smoothstep(0.3, 0.75, scene.sun.y)), scene.frame.x > 0.5);
+    // With a high sun 0.62 (the like-for-like scene, Ley lines' mc_forest vista: at 0.78 the land
+    // measured 97-101 against Bliss's 72-75 at 08:00 and noon, with Minecraft's own textures and
+    // leaf colours as much: the grade's, not the art's; the sweep gr1 put 0.8 of it on Bliss's).
+    // With a low sun 0.95 in mist (a gold dawn mist's colour) but 0.75 in clear air: on a clear
+    // evening the land at 17:00 and 18:00 measured 139-153 of saturation against Bliss's 56-84
+    // (mc_forest, gr4), where Bliss's misty mornings run 181.
+    let low_sat = mix(0.75, 0.95, smoothstep(0.02, 0.1, scene.weather.z));
+    let sat = 1.2 * look_opt(OPT_SATURATION, 1.0) * select(1.0, mix(low_sat, 0.62, smoothstep(0.3, 0.75, scene.sun.y)), scene.frame.x > 0.5);
     t = max(mix(vec3(y), t, mix(1.0, sat, day)), vec3(0.0));
     // A cool floor so the night is never pure black; by day black stays black.
     t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034) * (1.0 - day);
