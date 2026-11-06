@@ -64,7 +64,7 @@ mod worldgen;
 
 use weft_sdk::*;
 
-pub use base_api::{CLOUDS, FLATLANDS, MOON, OVERWORLD, STARS, SUN, tabs};
+pub use base_api::{CLOUDS, FLATLANDS, MC_FOREST, MOON, OVERWORLD, STARS, SUN, tabs};
 
 declare_mod!(deps: [], init: init);
 
@@ -177,6 +177,15 @@ fn init(r: &mut Registry) {
         .seasons(vitals::calendar::YEAR_DAYS, base_api::calendars::FOUR_SWING)
         .set(&base_api::SEASONS, base_api::calendars::FOUR)
         .weathers(&[&weathers::RAIN, &weathers::THUNDER]);
+    // The Minecraft forest test world (`base_api::land::MC_MIX`): the overworld's land, sky, days
+    // and seasons, so a shot there at an hour and a day matches the overworld's.
+    r.dimension(&MC_FOREST)
+        .spawn_point(|seed| fair_spawn(seed).into())
+        .sky_above(16)
+        .day_length(24000)
+        .seasons(vitals::calendar::YEAR_DAYS, base_api::calendars::FOUR_SWING)
+        .set(&base_api::SEASONS, base_api::calendars::FOUR)
+        .weathers(&[&weathers::RAIN, &weathers::THUNDER]);
     // Second dimension on purpose: nothing in the engine may assume there is only one world.
     r.dimension(&FLATLANDS)
         .generator(worldgen::flat)
@@ -187,7 +196,7 @@ fn init(r: &mut Registry) {
         .fixed_time(6000)
         .gravity(20.0)
         .sky_color(0xb0c8ff, 0xe0e8ff);
-    for dim in [&OVERWORLD, &FLATLANDS] {
+    for dim in [&OVERWORLD, &MC_FOREST, &FLATLANDS] {
         r.sky_stars(dim, &STARS).count(1500);
         r.sky_clouds(dim, &CLOUDS).texture("clouds");
         r.sky_body(dim, &SUN)

@@ -80,6 +80,8 @@ pub mod salt {
     pub const CANYON_AREA: u64 = 0xCA2;
     pub const CANYON_WARP: u64 = 0xCA3;
     pub const OLD_GROWTH: u64 = 0x01D6;
+    pub const MC_MIX: u64 = 0x3C3F;
+    pub const MC_RIVERS: u64 = 0x3C40;
 }
 
 /// One factor of where a feature applies: 0 at `from`, 1 at `to` (Q12 after `q12`).
@@ -615,6 +617,79 @@ pub const RIVER_MOUNTAINS: (f64, f64) = (0.1, 0.45);
 pub const RIVER_WARP: f64 = 110.0;
 pub const RIVER_WARP_SCALE: f64 = 75.0;
 
+/// How the rivers and basin lakes come out on a terrain on this land: the overworld's (`RIVERS`,
+/// from the numbers above) or the Minecraft forest test world's (`MC_RIVERS`). The land code reads
+/// the one in force on its thread (`rivers_style`), the overworld's unless `with_mc_land` runs it.
+#[derive(Clone, Copy, Debug)]
+pub struct Rivers {
+    /// A basin lake's chance per `LAKE_CELL` (before its climate's share).
+    pub lake_chance: f64,
+    /// `RIVER_SINK_FLOW`: a river ending inland with this flow fills a lake.
+    pub sink_flow: f64,
+    /// `RIVER_FLOW`: a gully from `.0`, water at `.1`, full size at `.2`.
+    pub flow: (f64, f64, f64),
+    pub half_width: (i32, i32),
+    pub depth: (i32, i32),
+    pub floodplain: (i32, i32),
+    /// `RIVER_WARP`: the meander's push.
+    pub warp: f64,
+    /// Told apart in the caches (0 for the overworld's, so its keys are the seed as before).
+    pub tag: u64,
+}
+
+pub const RIVERS: Rivers = Rivers {
+    lake_chance: LAKE_CHANCE,
+    sink_flow: RIVER_SINK_FLOW,
+    flow: RIVER_FLOW,
+    half_width: RIVER_HALF_WIDTH,
+    depth: RIVER_DEPTH,
+    floodplain: RIVER_FLOODPLAIN,
+    warp: RIVER_WARP,
+    tag: 0,
+};
+
+/// The test world's rivers (Planner, 11-05: "wide winding rivers through forest like Bliss's scene
+/// (ours show mostly lakes)"). Seed 1's land has a basin lake every half kilometre (four cells in
+/// five keep one) and its rivers mostly short, ending in their pits' lakes (half its stretches under
+/// 7 wet nodes of flow, a tenth over 35): water 1.4% rivers, 2.8% lakes. Minecraft's scene is long
+/// rivers winding through the woods. So here: a basin lake in one cell in seven, a pit's lake only
+/// where a big flow ends (`sink_flow`), and Minecraft's own rivers along a noise's lines over the
+/// drainage ones (`mc_rivers`), which keep the overworld's shape (wider or more winding they only
+/// frayed into lace: the first map, 11-05).
+pub const MC_RIVERS: Rivers = Rivers {
+    lake_chance: 0.15,
+    sink_flow: 20.0,
+    flow: RIVER_FLOW,
+    half_width: RIVER_HALF_WIDTH,
+    depth: RIVER_DEPTH,
+    floodplain: RIVER_FLOODPLAIN,
+    warp: RIVER_WARP,
+    tag: 0x3C3F_0000_0000_0000,
+};
+
+thread_local! {
+    static MC_LAND: Cell<bool> = const { Cell::new(false) };
+}
+
+/// The rivers' style in force on this thread.
+pub fn rivers_style() -> &'static Rivers {
+    if MC_LAND.with(Cell::get) { &MC_RIVERS } else { &RIVERS }
+}
+
+/// Runs `f` with the land as the Minecraft forest test world has it (`MC_RIVERS`): its terrain's
+/// own feature and decorations, and any tool that asks about that world.
+pub fn with_mc_land<R>(f: impl FnOnce() -> R) -> R {
+    let was = MC_LAND.with(|c| c.replace(true));
+    let r = f();
+    MC_LAND.with(|c| c.set(was));
+    r
+}
+
+/// A seed as the land's caches key it: told apart by the rivers' style.
+pub(crate) fn cache_seed(seed: u64) -> u64 {
+    seed ^ rivers_style().tag
+}
+
 /// Lakes in basins (Lithosphere's "big lakes anywhere, with islands"): a site per `LAKE_CELL`
 /// blocks square, kept with `LAKE_CHANCE` times its climate's share (`LAKE_WET`: the dry land a
 /// quarter of it, the wet all; `LAKE_COLD` more in the cold, as glacial country is full of lakes).
@@ -772,6 +847,15 @@ pub fn features() -> Vec<Feature> {
         // callback, so a column's ground under them is worked out once (`customs`).
         Feature::custom(customs).named("land"),
     ]
+}
+
+/// `features` for the Minecraft forest test world: the same, its rivers and basin lakes as
+/// `MC_RIVERS` has them.
+pub fn mc_features() -> Vec<Feature> {
+    let mut all = features();
+    all.pop();
+    all.push(Feature::custom(|f, x, z| with_mc_land(|| customs(f, x, z))).named("land"));
+    all
 }
 
 /// The fields biome rules ask for (`TerrainBuilder::field`, declared before the rules): where the
@@ -978,7 +1062,7 @@ fn lake_middle(seed: u64, cx: i32, cz: i32) -> (u32, u32, [i32; 2]) {
 
 /// The lake of cell (`cx`, `cz`), if it has one (`LAKE_CELL`).
 pub fn lake_site(f: &Fields, cx: i32, cz: i32) -> Option<Lake> {
-    if let Some(hit) = LAKE_SITES.with(|c| c.borrow().get(&(f.seed, cx, cz)).copied()) {
+    if let Some(hit) = LAKE_SITES.with(|c| c.borrow().get(&(cache_seed(f.seed), cx, cz)).copied()) {
         return hit;
     }
     let site = (|| {
@@ -986,7 +1070,7 @@ pub fn lake_site(f: &Fields, cx: i32, cz: i32) -> Option<Lake> {
         let here = Here::new(f, x * 16, z * 16);
         let wet = q12(0.25) + ((q12(0.75) * ramp(here.humidity(), q12(LAKE_WET.0), q12(LAKE_WET.1))) >> 12);
         let cold = ONE + ((q12(LAKE_COLD_MORE) * ramp(here.temperature(), q12(LAKE_COLD.0), q12(LAKE_COLD.1))) >> 12);
-        let chance = (((q12(LAKE_CHANCE) * wet) >> 12) * cold) >> 12;
+        let chance = (((q12(rivers_style().lake_chance) * wet) >> 12) * cold) >> 12;
         if (h & 4095) as i32 >= chance {
             return None;
         }
@@ -1013,7 +1097,7 @@ pub fn lake_site(f: &Fields, cx: i32, cz: i32) -> Option<Lake> {
         if c.len() > 4096 {
             c.clear();
         }
-        c.insert((f.seed, cx, cz), site);
+        c.insert((cache_seed(f.seed), cx, cz), site);
     });
     site
 }
@@ -1133,8 +1217,15 @@ pub fn rivers(f: &Fields, x: i32, z: i32) -> i32 {
     rivers_on(&here, &|| land_height_at(&here))
 }
 
-/// `rivers` at `here`, the land under them (`land_height`) from `land`, asked only near a river.
+/// `rivers` at `here`, the land under them (`land_height`) from `land`, asked only near a river:
+/// the drainage rivers, and on the test world's land Minecraft's own as well (`mc_rivers`).
 fn rivers_on(here: &Here, land: &dyn Fn() -> i32) -> i32 {
+    let drain = drain_rivers_on(here, land);
+    if rivers_style().tag == MC_RIVERS.tag { drain.min(mc_rivers(here, land)) } else { drain }
+}
+
+/// The drainage rivers' cut at `here` (`net`).
+fn drain_rivers_on(here: &Here, land: &dyn Fn() -> i32) -> i32 {
     let (f, x, z) = (here.f, here.x, here.z);
     let (bx, bz) = (x >> 4, z >> 4);
     let region = net::region_at(f, bx, bz);
@@ -1192,6 +1283,71 @@ fn rivers_on(here: &Here, land: &dyn Fn() -> i32) -> i32 {
         cut = cut.min((((target - h0).min(0)) * deep) >> 12);
     }
     cut
+}
+
+/// Minecraft's rivers, on the test world's land (`MC_RIVERS`): not where the rain gathers but along
+/// the zero lines of a noise (`MC_RIVER_SCALE` blocks across, two octaves), as Minecraft lays its
+/// river biome, so they run on for kilometres, meet and wind, and cross the hills in valleys. A
+/// column's distance to the line is the noise over its slope (blocks); the channel's half width
+/// swings between `MC_RIVER_HALF_WIDTH`'s ends by a second noise, `MC_RIVER_DEPTH` deep in the
+/// middle, a `MC_RIVER_FLOODPLAIN` strip level with the water, then the valley's sides as the
+/// drainage rivers' (`RIVER_BANKS` and `RIVER_VALLEY_PER_BLOCK`). Not in the mountains
+/// (`RIVER_MOUNTAINS`), nor under the sea.
+pub const MC_RIVER_SCALE: f64 = 1100.0;
+pub const MC_RIVER_HALF_WIDTH: (i32, i32) = (10, 26);
+pub const MC_RIVER_WIDTH_SIZE: f64 = 500.0;
+pub const MC_RIVER_DEPTH: i32 = 5;
+pub const MC_RIVER_FLOODPLAIN: i32 = 4;
+
+fn mc_rivers(here: &Here, land: &dyn Fn() -> i32) -> i32 {
+    let (f, x, z) = (here.f, here.x, here.z);
+    let scale = q4(MC_RIVER_SCALE);
+    let n = f.fbm(salt::MC_RIVERS, x, z, scale, 2);
+    // Far from any line (a third of the noise's range): nothing to work out.
+    if n.abs() > q12(0.3) {
+        return 0;
+    }
+    let mountains = net::mountains(here);
+    if mountains == 0 {
+        return 0;
+    }
+    // The noise's slope over `SLOPE_SPAN` blocks, centred on the column (over one block it changes
+    // only some five of its units, and the distance came out in steps: ridges along the valleys on
+    // the first map).
+    const SLOPE_SPAN: i32 = 8;
+    let at = |dx: i32, dz: i32| f.fbm(salt::MC_RIVERS, x + dx * 8, z + dz * 8, scale, 2) as i64;
+    let (gx, gz) = (at(SLOPE_SPAN, 0) - at(-SLOPE_SPAN, 0), at(0, SLOPE_SPAN) - at(0, -SLOPE_SPAN));
+    let slope = ((gx * gx + gz * gz) as u64).isqrt().max(1) as i64;
+    // Distance to the line, Q4 blocks: the noise over its slope per block.
+    let d = ((n.abs() as i64 * 16 * SLOPE_SPAN as i64) / slope).min(i32::MAX as i64) as i32;
+    let size = ramp(f.fbm(salt::MC_RIVERS ^ 1, x, z, q4(MC_RIVER_WIDTH_SIZE), 2), q12(-0.3), q12(0.3));
+    let half = q4(MC_RIVER_HALF_WIDTH.0 as f64) + (((q4(MC_RIVER_HALF_WIDTH.1 as f64) - q4(MC_RIVER_HALF_WIDTH.0 as f64)) * size) >> 12);
+    let flat = half + q4(MC_RIVER_FLOODPLAIN as f64);
+    let sea = q4(SEA as f64);
+    if d >= flat + q4(RIVER_BANKS as f64) + RIVER_VALLEY_PER_BLOCK * RIVER_VALLEY_RISE {
+        return 0;
+    }
+    let h0 = land();
+    let rise = (h0 - sea) >> 4;
+    if rise < 0 {
+        return 0;
+    }
+    let banks = q4(RIVER_BANKS as f64) + RIVER_VALLEY_PER_BLOCK * rise.min(RIVER_VALLEY_RISE);
+    if d >= flat + banks {
+        return 0;
+    }
+    let target = if d < half {
+        let t = d * ONE / half.max(1);
+        let bowl = ONE - ((t * t) >> 12);
+        sea - 16 - (((q4(MC_RIVER_DEPTH as f64) - 16) * bowl) >> 12)
+    } else if d < flat {
+        sea
+    } else {
+        let t = (d - flat) * ONE / banks.max(1);
+        let smooth = (((t * t) >> 12) * (3 * ONE - 2 * t)) >> 12;
+        sea + (((h0 - sea) * smooth) >> 12)
+    };
+    (((target - h0).min(0)) * mountains) >> 12
 }
 
 /// The river network's region holding block (`bx`, `bz`): its nodes, the pits that spilled over
@@ -1866,9 +2022,99 @@ pub fn biome_shares(seed: u64, radius: i32, step: usize) -> Vec<(&'static str, f
         .collect()
 }
 
+/// The Minecraft forest test world (`base:mc_forest`, Ronald, 11-05: "lets also make our biome kinda
+/// match the one from mc/bliss too to help with testing"): the overworld's land from the same seed
+/// (continents, hills, mountains, rivers, lakes: every feature here) under Minecraft's temperate
+/// forest mix instead of the climate's biomes, so a shot there is like for like with the Minecraft
+/// scene of the Bliss and Distant Horizons comparisons. Off the overworld: nothing in a normal world
+/// changes. The coasts, the mountains and their snow keep the overworld's rules; the rest of the land
+/// is shared out by a patch noise (`MC_MIX_FIELD`, patches some `MC_MIX_SIZE` blocks across) in the
+/// shares of `MC_MIX`, plains to the densest woods along the noise so each meets its neighbours as
+/// in Minecraft. The Minecraft scene (seed 1, the comparison vista, read from its region files):
+/// forest 67% and plains 20% within 500 blocks, plains 40% and forest a tenth from 500 to 1,500,
+/// the forest's dense round dark crowns, a cherry grove. Our old growth (oaks, closed canopy) is
+/// the nearest to that forest's look, so it takes the biggest share, our lighter forest and birch
+/// wood the rest of the woods; the forests' cherry groves come with them
+/// (`vitals::wild::CHERRY_GROVES`).
+pub const MC_MIX_FIELD: &str = "base:mc_mix";
+pub const MC_MIX_SIZE: f64 = 700.0;
+pub const MC_MIX: [(&str, f64); 4] = [("plains", 0.35), ("birch_forest", 0.05), ("forest", 0.25), ("old_growth_forest", 0.35)];
+
+/// The mix field: the patch noise itself, about -1 to 1.
+pub fn mc_mix_field() -> Expr {
+    Expr::fbm(salt::MC_MIX, MC_MIX_SIZE, 3)
+}
+
+/// The mix noise's value where each of `MC_MIX` ends (its last runs to the top): the noise's own
+/// quantiles, measured on a grid (its spread is the same for every seed), so each biome takes its
+/// share of the land and not a guess at the noise's deviation.
+pub fn mc_mix_cuts() -> &'static [f64; MC_MIX.len()] {
+    static CUTS: std::sync::OnceLock<[f64; MC_MIX.len()]> = std::sync::OnceLock::new();
+    CUTS.get_or_init(|| {
+        let f = fields(1);
+        let mut v: Vec<i32> = (0..160 * 160)
+            .map(|i| f.fbm(salt::MC_MIX, (i % 160) * 97 * 16, (i / 160) * 97 * 16, q4(MC_MIX_SIZE), 3))
+            .collect();
+        v.sort_unstable();
+        let mut cuts = [f64::INFINITY; MC_MIX.len()];
+        let mut sum = 0.0;
+        for (i, &(_, share)) in MC_MIX.iter().enumerate().take(MC_MIX.len() - 1) {
+            sum += share;
+            cuts[i] = v[((v.len() as f64 * sum) as usize).min(v.len() - 1)] as f64 / ONE as f64;
+        }
+        cuts
+    })
+}
+
+/// The test world's biome at (`x`, `z`) (Q4), as its rules pick it (the overworld's coasts and
+/// mountains first, then the mix): for its checks and finding spots.
+pub fn mc_forest_biome(f: &Fields, x: i32, z: i32) -> &'static str {
+    let h = with_mc_land(|| height(f, x, z)) >> 4;
+    let here = Here::new(f, x, z);
+    let (t, c) = (here.temperature(), here.continent());
+    if let Some(top) = reefs::part(&here, h) {
+        if top { "coral_reef" } else { "lagoon" }
+    } else if h <= SEA - 2 && c < q12(OCEAN_CONTINENT) {
+        "ocean"
+    } else if h <= SEA + 1 && c < q12(BEACH_CONTINENT) {
+        if t < q12(SNOWY_BELOW) { "snowy_plains" } else { "beach" }
+    } else if MOUNTAINS_AREA.at(&here) >= q12(MOUNTAIN_BIOME) || snowy(f, x, z, h) {
+        "mountains"
+    } else {
+        let v = f.fbm(salt::MC_MIX, x, z, q4(MC_MIX_SIZE), 3) as f64 / ONE as f64;
+        MC_MIX[mc_mix_cuts()
+            .iter()
+            .position(|&c| v < c)
+            .unwrap_or(MC_MIX.len() - 1)]
+        .0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_mc_forest_mix_takes_its_shares() {
+        let f = fields(3);
+        let mut n = [0usize; MC_MIX.len()];
+        let mut all = 0;
+        for z in (-120..120).step_by(3) {
+            for x in (-120..120).step_by(3) {
+                let v = f.fbm(salt::MC_MIX, x * 61 * 16, z * 61 * 16, q4(MC_MIX_SIZE), 3) as f64 / ONE as f64;
+                let i = mc_mix_cuts()
+                    .iter()
+                    .position(|&c| v < c)
+                    .unwrap_or(MC_MIX.len() - 1);
+                n[i] += 1;
+                all += 1;
+            }
+        }
+        for (i, &(b, share)) in MC_MIX.iter().enumerate() {
+            let got = n[i] as f64 / all as f64;
+            assert!((got - share).abs() < 0.05, "{b}: {got:.3} of the land, {share} wanted");
+        }
+    }
 
     #[test]
     fn rivers_only_cut_and_reach_under_the_sea() {

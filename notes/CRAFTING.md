@@ -538,6 +538,16 @@ As Tinkers' Construct 3 does it, which our prototype already proved at 32 px:
     Ronald approved drawn heads per material.
   - **Handles:** both painted (leather-wrapped with gold fittings, plain wood) and as maps, so
     oak, birch and antler are ramp materials.
+  - **A shape without its own drawing** (a bearded axe head, a sword's long or short blade, a
+    long haft, a barbed point) uses its slot's nearest drawn shape (`looks::drawn_shape`) until
+    its art comes; a check fails if any shape a look draws has no file (the engine skips a missing
+    layer, so the tool would show without that part).
+  - **New part art** (the version 3 redo) goes in with `notes/ui-codex/parts/install_v3.py`: a
+    dry run (the default) lays each drawing where today's sits, scores it, flags heads that float
+    off their haft, get clipped or miss a gem spot, and writes a sheet and a report to the
+    archive; `--apply --only <materials> --parts <parts>` installs Ronald's picks, keeping what
+    it replaces. Heads must be drawn to today's size and socket (the haft ends where the head
+    covers it), not as loose parts with a mid-head eye.
   - **Every layer** has its `.json`.
   - **The first materials:** wood, stone, flint, copper, bronze, iron, steel, gold, diamond (the
     sword without flint).
