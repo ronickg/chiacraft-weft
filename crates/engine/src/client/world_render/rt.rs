@@ -84,6 +84,8 @@ pub(super) struct RtScene {
     pub last: (u32, u32, u32),
     /// The frame slot of the last `rt_frame`, whose instance table the draws bind.
     slot: usize,
+    /// Since the last log line (every 5 s while anything was built): BLASes built, records.
+    since: (Option<std::time::Instant>, u32, u64),
 }
 
 /// `core:rt_shadows`, or off where the engine's configs are not loaded.
@@ -132,6 +134,7 @@ impl RtScene {
             rows: Vec::new(),
             last: (0, 0, 0),
             slot: 0,
+            since: (None, 0, 0),
         }
     }
 
@@ -279,7 +282,7 @@ impl WorldRenderer {
                 && let Some(rt) = self.rt.take()
             {
                 rt.destroy(gpu);
-                log::info!(target: "rt", "ray-traced scene off");
+                log::info!("ray-traced scene off");
             }
             return;
         }
@@ -297,7 +300,7 @@ impl WorldRenderer {
         for &k in self.lod.keys() {
             rt.lod_changed(k);
         }
-        log::info!(target: "rt", "ray-traced scene on");
+        log::info!("ray-traced scene on");
         self.rt = Some(rt);
     }
 
@@ -431,7 +434,7 @@ impl WorldRenderer {
                     copy = rt.alloc_copy(units).map(|s| (s, units));
                     if copy.is_none() && !rt.full_warned {
                         rt.full_warned = true;
-                        log::warn!(target: "rt", "see-through records full ({} MB): more leaves and glass cast as solid", RECORDS_BYTES >> 20);
+                        log::warn!("see-through records full ({} MB): more leaves and glass cast as solid", RECORDS_BYTES >> 20);
                     }
                 }
                 let job = Job {
@@ -518,6 +521,25 @@ impl WorldRenderer {
         gpu.set_tlas_instances(rt.tlas, &rt.instances);
         list.push(Cmd::BuildTlas(rt.tlas));
         rt.last.2 = rt.instances.len() as u32;
+        rt.since.1 += rt.last.0;
+        rt.since.2 += rt.last.1 as u64;
+        let now = std::time::Instant::now();
+        let since = *rt.since.0.get_or_insert(now);
+        if now - since >= std::time::Duration::from_secs(5) {
+            if rt.since.1 > 0 {
+                log::info!(
+                    "ray-traced scene: {} BLAS ({} built, {} records in {:.1} s), {} queued, {} TLAS instances, {:.0} MB",
+                    rt.built.len(),
+                    rt.since.1,
+                    rt.since.2,
+                    (now - since).as_secs_f32(),
+                    rt.urgent.len() + rt.queue.len(),
+                    rt.last.2,
+                    gpu.accel_memory() as f64 / 1048576.0
+                );
+            }
+            rt.since = (Some(now), 0, 0);
+        }
         self.rt = Some(rt);
     }
 }

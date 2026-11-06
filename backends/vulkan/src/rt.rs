@@ -550,7 +550,7 @@ impl VulkanBackend {
             return;
         }
         log::info!(
-            target: "rt",
+            target: "vulkan",
             "BLAS: {} built ({} triangles) in {:.1} s, compaction saved {:.1} MB, acceleration structures {:.1} MB",
             rt.built.0,
             rt.built.1,

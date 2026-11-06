@@ -1310,6 +1310,7 @@ fn rt_sun(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool) -> vec3<f32> 
 /// don't shade it, or a meadow would shade itself in specks.
 const RT_SUN: &str = "
 enable wgpu_ray_query;
+const RT_ALPHA_MIP: f32 = 2.0;
 @group(1) @binding(12) var rt_scene: acceleration_structure;
 @group(1) @binding(13) var<storage, read> rt_inst: array<vec4<u32>>;
 @group(1) @binding(14) var<storage, read> rt_records: array<u32>;
@@ -1336,7 +1337,9 @@ struct RtTexel {
 
 // The texel a see-through record shows where a ray met it: record `rec` of the copy at word
 // `base`, kind 0 a face, 1 a free quad, its triangle `tri` (0: corners 0 1 2, 1: 0 2 3) at
-// barycentrics `b`.
+// barycentrics `b`. Its alpha from a smaller mip (a few texels wide): a leaf's single-texel holes,
+// lined up through a crown's faces, let the light by in pixel-wide specks; the coverage round the
+// point gives the soft dapple a filtered shadow map shows.
 fn rt_texel(base: u32, kind: u32, rec: u32, tri: u32, b: vec2<f32>) -> RtTexel {
     var uv: array<vec2<f32>, 4>;
     var tex: u32;
@@ -1360,7 +1363,9 @@ fn rt_texel(base: u32, kind: u32, rec: u32, tri: u32, b: vec2<f32>) -> RtTexel {
     let k1 = select(1u, 2u, tri == 1u);
     let k2 = select(2u, 3u, tri == 1u);
     let at = uv[0] * (1.0 - b.x - b.y) + uv[k1] * b.x + uv[k2] * b.y;
-    return RtTexel(textureSampleLevel(textures[tex_info[tex * 4u]], nearest_clamp, at, 0.0), tinted);
+    let t = textures[tex_info[tex * 4u]];
+    let c = textureSampleLevel(t, nearest_clamp, at, 0.0);
+    return RtTexel(vec4(c.rgb, textureSampleLevel(t, linear_mipped, at, RT_ALPHA_MIP).a), tinted);
 }
 
 fn rt_sun(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool) -> vec3<f32> {
@@ -1390,9 +1395,12 @@ fn rt_sun(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool) -> vec3<f32> 
                     rayQueryConfirmIntersection(&rq);
                 }
             }
-        } else if texel.c.a >= 0.5 {
-            // Cutout: its holes let the light by.
-            rayQueryConfirmIntersection(&rq);
+        } else {
+            // Cutout: as much gets by as the texture's coverage there leaves open.
+            through *= clamp(1.0 - texel.c.a, 0.0, 1.0);
+            if max(through.r, max(through.g, through.b)) < 0.02 {
+                rayQueryConfirmIntersection(&rq);
+            }
         }
     }
     if rayQueryGetCommittedIntersection(&rq).kind != RAY_QUERY_INTERSECTION_NONE {
