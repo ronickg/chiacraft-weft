@@ -476,6 +476,10 @@ pub struct WorldRenderer {
     rt_pack: bool,
     /// What the scene is traced for: sun shadows, reflections (`set_rt_modes`).
     rt_modes: (bool, bool),
+    /// The path tracer (`rt.rs` `path_trace`, the pack's `pathtrace.wgsl`): its compute and its
+    /// composite, made with the traced world shader; its output per frame slot.
+    pt_pipes: Option<(PipelineId, PipelineId)>,
+    pt_out: Vec<(BufferId, u32)>,
     /// The setting changed: the app composes the world shader again (`reload_shaders`).
     pub rt_reload: bool,
 }
@@ -648,6 +652,8 @@ impl WorldRenderer {
             rt_wanted: rt_expand.is_some() && rt::rt_setting(),
             rt_pack,
             rt_modes: (false, false),
+            pt_pipes: if rt_compiled { rt::pt_pipelines(gpu, assets) } else { None },
+            pt_out: Vec::new(),
             rt_reload: false,
             calm_sets: [Self::calm_pipes(gpu, assets, false), Self::calm_pipes(gpu, assets, true)],
             calm_level: 0,
@@ -1204,6 +1210,12 @@ impl WorldRenderer {
                 self.quad_pipes = q;
                 self.lod_pipe = l;
                 self.rt_compiled = rt;
+                for p in self.pt_pipes.take().into_iter().flat_map(|(a, b)| [a, b]) {
+                    gpu.destroy_pipeline(p);
+                }
+                if rt {
+                    self.pt_pipes = rt::pt_pipelines(gpu, assets);
+                }
                 for p in self
                     .shadow_pipes
                     .take()
@@ -1303,6 +1315,12 @@ impl WorldRenderer {
         }
         if let Some(p) = self.rt_expand.take() {
             gpu.destroy_pipeline(p);
+        }
+        for p in self.pt_pipes.take().into_iter().flat_map(|(a, b)| [a, b]) {
+            gpu.destroy_pipeline(p);
+        }
+        for (b, _) in self.pt_out.drain(..) {
+            gpu.destroy_buffer(b);
         }
         self.drop_calm(gpu);
         self.meshes.clear();

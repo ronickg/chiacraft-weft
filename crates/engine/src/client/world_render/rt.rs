@@ -108,7 +108,45 @@ pub fn rt_setting() -> bool {
             .get(name)
             .is_some_and(|&id| crate::config::get(id) > 0.5)
     };
-    on("core:rt_shadows") || on("core:rt_reflections")
+    on("core:rt_shadows") || on("core:rt_reflections") || on("core:path_traced")
+}
+
+/// The path tracer's pipelines (`pathtrace.wgsl` in the shader pack, with the world's traced
+/// prelude): its compute, and the composite drawing its pixels over the world's image.
+pub(super) fn pt_pipelines(gpu: &mut dyn Backend, assets: &crate::assets::Assets) -> Option<(PipelineId, PipelineId)> {
+    let shader = match crate::packs::world_side_shader(assets, "pathtrace.wgsl", crate::gpu_layout::PT_DECLS)? {
+        Ok(s) => s,
+        Err(e) => {
+            log::error!("path tracer: {}", e.0);
+            return None;
+        }
+    };
+    let cs = gpu
+        .create_compute(&ComputeDesc { label: "path trace", shader: &shader, entry: "cs_trace" })
+        .map_err(|e| log::error!("path tracer: {}", e.0))
+        .ok()?;
+    let fs = gpu
+        .create_pipeline(&PipelineDesc {
+            label: "path trace composite",
+            shader: &shader,
+            vertex: "vs_pt",
+            fragment: Some("fs_pt"),
+            color: Some(crate::post::world_format()),
+            depth: None,
+            blend: Blend::None,
+            cull_back: false,
+            topology: Topology::Triangles,
+            motion: false,
+        })
+        .map_err(|e| log::error!("path tracer composite: {}", e.0))
+        .ok();
+    match fs {
+        Some(fs) => Some((cs, fs)),
+        None => {
+            gpu.destroy_pipeline(cs);
+            None
+        }
+    }
 }
 
 impl RtScene {
@@ -321,6 +359,57 @@ impl WorldRenderer {
         }
         log::info!("ray-traced scene on");
         self.rt = Some(rt);
+    }
+
+    /// Path traced lighting (`core:path_traced`): after the world's pass, before the effects, the
+    /// path tracer lights each terrain pixel again (`pathtrace.wgsl`) into a buffer, and its
+    /// composite draws them over the world's image `target` (the world's size `size`, its depth
+    /// `depth`). Nothing without the traced scene and the pack's path tracer. `debug`: 0 the picture,
+    /// 1 albedo, 2 normals, 3 direct light, 4 the bounce.
+    #[allow(clippy::too_many_arguments)]
+    pub fn path_trace(
+        &mut self,
+        gpu: &mut dyn Backend,
+        list: &mut CommandList,
+        slot: usize,
+        depth: TextureId,
+        target: Target,
+        size: (u32, u32),
+        debug: u32,
+    ) {
+        let (Some((cs, fs)), true, Some(page)) =
+            (self.pt_pipes, self.rt_traced() || self.rt_reflects() || self.rt.is_some(), self.faces.pages.first().map(|p| p.0))
+        else {
+            return;
+        };
+        if !self.rt_compiled || self.buffers.is_none() {
+            return;
+        }
+        let n = size.0 * size.1;
+        // On the GPU only, one a frame slot, grown to the world's size.
+        while self.pt_out.len() < gpu.frames_in_flight() {
+            self.pt_out
+                .push((gpu.create_buffer(16, usage::STORAGE, "path traced"), 1));
+        }
+        if self.pt_out[slot].1 < n {
+            gpu.destroy_buffer(self.pt_out[slot].0);
+            self.pt_out[slot] = (gpu.create_buffer(n as u64 * 16, usage::STORAGE, "path traced"), n);
+        }
+        let out = self.pt_out[slot].0;
+        let args = crate::gpu_layout::PtArgs { size: [size.0, size.1], depth: gpu.texture_index(depth), debug };
+        let origins = page;
+        use crate::gpu_layout::pt_bind;
+        self.bind_run(list, cs, page, origins);
+        list.bind(pt_bind::OUT, out);
+        list.push_constants(&args);
+        list.push(Cmd::Dispatch { x: size.0.div_ceil(8), y: size.1.div_ceil(8), z: 1 });
+        list.push(Cmd::Barrier);
+        list.push(Cmd::BeginPass { color: Some((target, None)), depth: None, motion: None });
+        self.bind_run(list, fs, page, origins);
+        list.bind(pt_bind::IN, out);
+        list.push_constants(&args);
+        list.draw(3, 1);
+        list.push(Cmd::EndPass);
     }
 
     /// Frames the ray-traced scene has been kept (`Scene::rt.y`, for noise that moves every frame).

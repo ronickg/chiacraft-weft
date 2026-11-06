@@ -1462,10 +1462,12 @@ struct RtHit {
     tint: u32,
     biome: u32,
     lod: bool,
+    // A translucent record (water, glass).
+    clear: bool,
 }
 
 fn rt_miss() -> RtHit {
-    return RtHit(false, 0.0, vec3(0.0), vec3(0.0), vec3(0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), 0u, 0u, false);
+    return RtHit(false, 0.0, vec3(0.0), vec3(0.0), vec3(0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), 0u, 0u, false, false);
 }
 fn rt_hit(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, blur: f32) -> RtHit {
     return rt_miss();
@@ -1622,10 +1624,12 @@ struct RtHit {
     tint: u32,
     biome: u32,
     lod: bool,
+    // A translucent record (water, glass).
+    clear: bool,
 }
 
 fn rt_miss() -> RtHit {
-    return RtHit(false, 0.0, vec3(0.0), vec3(0.0), vec3(0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), 0u, 0u, false);
+    return RtHit(false, 0.0, vec3(0.0), vec3(0.0), vec3(0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), 0u, 0u, false, false);
 }
 
 // The first surface along `dir` (unit) from `rel` (camera relative), out to `t_max` blocks: through
@@ -1674,6 +1678,7 @@ fn rt_hit(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, blur: f32) -> RtHit {
     }
     let clear = row.w == 0u || c.geometry_index == 1u;
     let rec = select(0u, row.w, clear) + c.primitive_index / 2u;
+    out.clear = row.z != 2u && rec >= row.y;
     let tri = c.primitive_index % 2u;
     let b = c.barycentrics;
     // A 32-texel block's mip by how far the reflected way runs (a pixel about 1/700 across).
@@ -1765,6 +1770,34 @@ fn rt_sun(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool) -> vec3<f32> 
     return through;
 }
 ";
+
+/// The path tracer's own declarations (`pathtrace.wgsl`, composed after the world shader's prelude):
+/// its push constants and the per-pixel output it writes (`pt_out`) and its composite reads (`pt_in`).
+pub const PT_DECLS: &str = "
+struct PtArgs {
+    size: vec2<u32>,
+    depth: u32,
+    debug: u32,
+}
+var<immediate> pt: PtArgs;
+@group(1) @binding(34) var<storage, read_write> pt_out: array<vec4<f32>>;
+@group(1) @binding(35) var<storage, read> pt_in: array<vec4<f32>>;
+";
+
+/// `pathtrace.wgsl`'s bindings: what it writes, what the composite reads.
+pub mod pt_bind {
+    pub const OUT: u32 = 34;
+    pub const IN: u32 = 35;
+}
+
+/// The path tracer's push constants (`PT_DECLS`).
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct PtArgs {
+    pub size: [u32; 2],
+    pub depth: u32,
+    pub debug: u32,
+}
 
 /// What goes in front of `rt_expand.wgsl` (ray tracing's scene, `world_render::rt`): the
 /// constants and record decoders, the job, what it reads and writes.

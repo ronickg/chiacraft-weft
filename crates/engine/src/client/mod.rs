@@ -3119,9 +3119,28 @@ impl Client {
     pub fn rt_switch(&mut self, gpu: &mut dyn Backend) -> bool {
         let shadows = shadow_setting("core:rt_shadows", 0.0) > 0.5;
         let reflections = shadow_setting("core:rt_reflections", 0.0) > 0.5;
+        let traced = shadow_setting("core:path_traced", 0.0) > 0.5;
         self.render.set_rt_modes(shadows, reflections);
-        self.render.set_rt(gpu, shadows || reflections);
+        self.render.set_rt(gpu, shadows || reflections || traced);
         self.render.rt_reload
+    }
+
+    /// Path traced lighting (`core:path_traced`, `WorldRenderer::path_trace`), after the world's
+    /// pass into `target` (the world's image, its size `size`) and before the effects.
+    pub fn path_trace(
+        &mut self,
+        gpu: &mut dyn Backend,
+        list: &mut CommandList,
+        slot: usize,
+        depth: weft_render::TextureId,
+        target: weft_render::Target,
+        size: (u32, u32),
+    ) {
+        if shadow_setting("core:path_traced", 0.0) > 0.5 {
+            let debug = shadow_setting("core:pt_debug", 0.0) as u32;
+            self.render
+                .path_trace(gpu, list, slot, depth, target, size, debug);
+        }
     }
 
     /// Sun shadows (`sun_shadows` packs), first their light, before the world is drawn (its scene
