@@ -209,8 +209,22 @@ fn palette_now() -> Palette {
         let day = smoothstep(-0.05, 0.05, scene.sun.y);
         p.sun = mix(p.sun, hue * (luma(p.sun) / max(luma(hue), 1e-4)), day);
     }
+    // In the HDR world the twilight's light grows as the sun nears the horizon, as real twilight's
+    // does (about tenfold over its last few degrees): the dusk key held one level from 8 degrees
+    // under to 1, so 05:00 was as dark as 04:00 (land sRGB 25 24 30 where Bliss's is 32 70 125,
+    // its 04:00 dark; Mist's m11 sheet, 11-06). Dimmer at the night's end, brighter at the sun's.
+    if scene.frame.x > 0.5 {
+        // Mornings only: the evening's twilight has its own lift (the palette's evening light and
+        // the post's), and this on top took the 19:00 land to a bright teal-green (PC shprA).
+        let morning = smoothstep(-0.05, 0.05, scene.sun.x);
+        let twilight = smoothstep(-0.3, -0.14, scene.sun.y) * (1.0 - smoothstep(-0.02, 0.06, scene.sun.y)) * morning;
+        p.ambient *= mix(1.0, mix(0.7, TWILIGHT_RISE, smoothstep(-0.16, -0.02, scene.sun.y)), twilight);
+    }
     return p;
 }
+
+// How much brighter the twilight's sky light is just before the sun is up than as the dusk key made it.
+const TWILIGHT_RISE: f32 = 2.6;
 
 // A 4300 K blackbody in linear light, red 1 (Bliss's `blackbody` at Ronald's Sun_temp, computed in
 // the crew's bliss-source notes: linear 1.0 0.668 0.426).
@@ -2062,7 +2076,21 @@ fn display(c: vec3<f32>) -> vec3<f32> {
         // stays as dark as made.
         // Only the sky's and moon's share of a surface's light (`NIGHT_SKY_SHARE`): a lamp's keeps
         // its warmth in a dark room as outdoors.
-        let night = smoothstep(-0.12, -0.3, scene.sun.y) * (1.0 - smoothstep(0.04, 0.3, luma(c))) * NIGHT_SKY_SHARE;
+        // By how dim the world's light is, not by the hour, as Bliss's rods (its Purkinje: strong
+        // when the view is dark, on its dim pixels): the night and the blue hour before sunrise and
+        // after sunset alike, gone as the sun's light comes. Bliss's 05:00 land is a deep blue (sRGB
+        // 32 70 125, warmth -93), ours stood grey-violet (25 24 30) with the sun 3 degrees under, past
+        // this blue's old gate at 7 (sun.y -0.12; Mist's m11 sheet, 11-06). And how dim a pixel is
+        // as seen, at the exposure it is taken at (at night's 4.0 as before).
+        let p = palette();
+        // Full in the night and the morning's blue hour (that light about 0.08-0.11), about two
+        // thirds in the evening's brighter twilight (about 0.19), as Bliss's 19:00 keeps its greens
+        // and the cherry trees' pink in the blue where its 05:00 doesn't; gone by the sunset's 0.5.
+        // (0.15 to 0.5 took 19:00 a uniform blue, the trees' green gone, PC shprC; 0.08 to 0.3 with
+        // the morning's rise in the evening too kept hardly any, warmth -17 against -61, shprA.)
+        let world = 1.0 - smoothstep(0.12, 0.3, luma(p.ambient) + 0.5 * luma(p.sun));
+        let seen = luma(c) * exposure() / 4.0;
+        let night = world * (1.0 - smoothstep(0.04, 0.3, seen)) * NIGHT_SKY_SHARE;
         if night > 0.0 {
             // (N2: deeper and all the way: at 0.3 0.6 1.3 and three quarters the land's saturation rose
             // only from about 100 to 140, the curve taking some back; Bliss's is 200-250, PC shnt1.)
@@ -2077,7 +2105,18 @@ fn display(c: vec3<f32>) -> vec3<f32> {
 }
 
 // The picture finished: exposure, the tone curve and the grade, from linear light to the screen.
-fn finish_picture(c: vec3<f32>) -> vec3<f32> {
+fn finish_picture(c_in: vec3<f32>) -> vec3<f32> {
+    // The HDR world's morning twilight (the sun 0-7° under, in the east): dim land brought up after
+    // the exposure, as Bliss's eye lifts its dim twilight land after its own (up to about 3x), where
+    // ours took back a brighter twilight in the meter's square root (05:00 land luma 35 against
+    // Bliss's 66 with Shader's pre-dawn blue; its runs shpr0/A/B, 11-06). Up to 2.35x: at 2.2 the
+    // land came to 61 (Shader's shprJ6). 04:00 stays dark.
+    var c = c_in;
+    if scene.frame.x > 0.5 {
+        let dawn = smoothstep(-0.13, -0.04, scene.sun.y) * (1.0 - smoothstep(0.0, 0.08, scene.sun.y)) * smoothstep(-0.2, 0.2, scene.sun.x);
+        let dim = 1.0 - smoothstep(0.02, 0.15, luma(c));
+        c *= 1.0 + 1.35 * dawn * dim * LAND_PIXEL;
+    }
     // By day Timothy Lottes's curve (his published formula, GDC 2016; Complementary's settings:
     // contrast 1.05, mid-grey 0.25 in and out, peak 8) at exposure 1.3: black stays black (no toe
     // lift, which raised the black point and halved saturation: Colour 4-7) and the darks keep their

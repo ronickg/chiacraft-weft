@@ -6,10 +6,10 @@
 //! Distant Horizons draws leaves too, and our tiles have no crowns for it), the block under it
 //! and the biome.
 //!
-//! Saved as `CCFAR002` and an LZ4 body (lengths and numbers little-endian): x0, z0, cells across
+//! Saved as `CCFAR003` and an LZ4 body (lengths and numbers little-endian): x0, z0, cells across
 //! and deep, the state and biome names (u16 count, u16-length strings), then the mid cells and
-//! the corner cells (rows of z), each y (i16, `NONE` for nothing), top, under and biome (u16
-//! indices into the names).
+//! the corner cells (rows of z), each y (i16, `NONE` for nothing), top and under (u16 indices
+//! into the names), biome (u8 index) and, for water, its depth down to the bed (u8, blocks).
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -22,12 +22,15 @@ pub struct Cell {
     pub y: i16,
     pub top: u16,
     pub under: u16,
-    pub biome: u16,
+    pub biome: u8,
+    /// Water: blocks from its surface down to the bed (seagrass and kelp count as water); 0
+    /// otherwise.
+    pub depth: u8,
 }
 
 impl Default for Cell {
     fn default() -> Self {
-        Cell { y: NONE, top: 0, under: 0, biome: 0 }
+        Cell { y: NONE, top: 0, under: 0, biome: 0, depth: 0 }
     }
 }
 
@@ -78,15 +81,16 @@ impl FarGrid {
             b.extend_from_slice(&c.y.to_le_bytes());
             b.extend_from_slice(&c.top.to_le_bytes());
             b.extend_from_slice(&c.under.to_le_bytes());
-            b.extend_from_slice(&c.biome.to_le_bytes());
+            b.push(c.biome);
+            b.push(c.depth);
         }
-        let mut out = b"CCFAR002".to_vec();
+        let mut out = b"CCFAR003".to_vec();
         out.extend_from_slice(&lz4_flex::compress_prepend_size(&b));
         out
     }
 
     pub fn read(data: &[u8]) -> Option<FarGrid> {
-        if data.get(..8) != Some(b"CCFAR002") {
+        if data.get(..8) != Some(b"CCFAR003") {
             return None;
         }
         let b = lz4_flex::decompress_size_prepended(&data[8..]).ok()?;
@@ -119,7 +123,8 @@ impl FarGrid {
                         y: i16::from_le_bytes([c[0], c[1]]),
                         top: u16::from_le_bytes([c[2], c[3]]),
                         under: u16::from_le_bytes([c[4], c[5]]),
-                        biome: u16::from_le_bytes([c[6], c[7]]),
+                        biome: c[6],
+                        depth: c[7],
                     })
                     .collect(),
             )
@@ -172,8 +177,17 @@ pub fn from_dh(
     type Part = (i32, i32, Vec<Cell>, Vec<Cell>);
     let parts: Mutex<Vec<Part>> = Mutex::new(Vec::new());
     crate::dh::for_each_section(path, min_y, |s| {
-        // Per mapping entry: our state, whether it shows, and the biome.
-        let entries: Vec<(u16, Shows, u16)> = {
+        // Per mapping entry: our state, whether it shows, the biome, and whether it is water.
+        let wet: Vec<bool> = s
+            .entries
+            .iter()
+            .map(|(_, st)| {
+                ["minecraft:water", "minecraft:bubble_column", "minecraft:seagrass", "minecraft:tall_seagrass", "minecraft:kelp"]
+                    .iter()
+                    .any(|w| st.starts_with(w))
+            })
+            .collect();
+        let entries: Vec<(u16, Shows, u8)> = {
             let resolved: Vec<(String, Shows, String)> = s
                 .entries
                 .iter()
@@ -185,7 +199,7 @@ pub fn from_dh(
             let mut n = names.lock().unwrap();
             resolved
                 .iter()
-                .map(|(name, shows, b)| (n.0.get(name), *shows, n.1.get(b)))
+                .map(|(name, shows, b)| (n.0.get(name), *shows, n.1.get(b).min(u8::MAX as u16) as u8))
                 .collect()
         };
         let cell = |x: i32, z: i32| -> Cell {
@@ -200,7 +214,16 @@ pub fn from_dh(
                     .and_then(|u| entries.get(u.id as usize))
                     .filter(|u| u.1 == Shows::Top)
                     .map_or(top, |u| u.0);
-                return Cell { y: r.top().clamp(i16::MIN as i32 + 1, i16::MAX as i32) as i16, top, under, biome };
+                // Water's depth: down past every water run to the first block that isn't.
+                let depth = if wet.get(r.id as usize).copied().unwrap_or(false) {
+                    let bed = runs[k..]
+                        .iter()
+                        .find(|b| !wet.get(b.id as usize).copied().unwrap_or(false));
+                    bed.map_or(0, |b| (r.top() - b.top()).clamp(0, u8::MAX as i32)) as u8
+                } else {
+                    0
+                };
+                return Cell { y: r.top().clamp(i16::MIN as i32 + 1, i16::MAX as i32) as i16, top, under, biome, depth };
             }
             Cell::default()
         };
@@ -262,10 +285,10 @@ mod tests {
             mid: vec![Cell::default(); 256],
             corner: vec![Cell::default(); 256],
         };
-        g.mid[16 + 1] = Cell { y: 70, top: 0, under: 1, biome: 0 };
-        g.corner[2 * 16 + 2] = Cell { y: 71, top: 0, under: 1, biome: 0 };
+        g.mid[16 + 1] = Cell { y: 70, top: 0, under: 1, biome: 0, depth: 3 };
+        g.corner[2 * 16 + 2] = Cell { y: 71, top: 0, under: 1, biome: 0, depth: 0 };
         let back = FarGrid::read(&g.write()).unwrap();
-        assert_eq!(back.sample(-64 + 6, 6).map(|c| c.y), Some(70));
+        assert_eq!(back.sample(-64 + 6, 6).map(|c| (c.y, c.depth)), Some((70, 3)));
         assert_eq!(back.sample(-64 + 8, 8).map(|c| c.y), Some(71));
         assert_eq!(back.sample(-64 + 9, 7).map(|c| c.y), Some(71));
         assert_eq!(back.sample(-67, 0), None);

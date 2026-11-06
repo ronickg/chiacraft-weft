@@ -1513,7 +1513,8 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     // Vanilla's corner shade on the ground's box faces (`lod_ao`; after upstream Weft f69243fd),
     // the quad split along its lighter diagonal, as the cubes'.
     var a = vec4<u32>(3u);
-    if lod_dir(w0) != LOD_FACE_GRID {
+    // (A water top's bits hold its depth, `lod_water_depth`, not a corner shade.)
+    if lod_dir(w0) != LOD_FACE_GRID && lod_tint(w0) != TINT_WATER {
         a = lod_ao(records[f * 4u + 3u]);
     }
     var c = vi % 4u;
@@ -1680,6 +1681,32 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
 // land: on the Pixel 10 (PowerVR) the discard alone cost a third of the world pass at the vista.
 @fragment
 fn fs_lod_open(in: VOut) -> @location(0) vec4<f32> {
+    return lod_color(in);
+}
+
+// The tiles reaching toward where distant terrain ends (the engine's `lod_end_pipe`, past
+// `END_FADE` of its reach): faded out over the last of it with a dither that moves each frame
+// (`scene.frame.w`; temporal anti-aliasing averages it into a blend), so what is drawn behind shows
+// through: the sky, or the cloud layer seen edge on. Distant Horizons fades its far edge into what
+// lies behind the same way (`dh_fade`). Handed over to a colour worked out here instead, the last
+// ridges stood about 20 brighter than the clouds behind them, flat cut-outs, whatever the colour
+// (Far view, the forest vista 06-12, 11-06). Desktop only: on a phone's tiled GPU a `discard`
+// costs the whole pass (Android keeps `fs_lod_open` there; measure on the Pixel first).
+const END_FADE_FROM: f32 = 0.85;
+
+@fragment
+fn fs_lod_end(in: VOut) -> @location(0) vec4<f32> {
+    let end = scene.params.y;
+    let f = smoothstep(END_FADE_FROM * end, end, length(in.rel.xz));
+    // Each pixel's threshold steps by the golden ratio a frame from its own place in the pattern,
+    // so the few frames temporal anti-aliasing keeps cover the thresholds evenly and average to `f`.
+    // (Thresholds drawn afresh each frame left about a tenth of noise in that average, which a
+    // scripted run, the same frames each time, showed as fixed dots at the fringe: Far view, 11-06.)
+    let p = floor(in.clip.xy);
+    let t = fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y) + 0.618034 * scene.frame.w);
+    if t < f {
+        discard;
+    }
     return lod_color(in);
 }
 

@@ -585,8 +585,14 @@ fn soft_pixel(in: CloudOut, s: Sky, dir: vec3<f32>) -> CloudPixel {
     return CloudPixel(vec4(color * alpha, alpha), clip.z / clip.w);
 }
 
+// How much of the dim world's blue (`display`, the eye's night sight) the sky and its clouds take: all
+// of it went past Bliss's at 05:00, a saturated blue sky with blue clouds (saturation 0.38 against
+// 0.23, PC shprA); the land takes it all.
+const SKY_ROD_SHARE: f32 = 0.7;
+
 @fragment
 fn fs_clouds(in: CloudOut) -> CloudPixel {
+    NIGHT_SKY_SHARE = SKY_ROD_SHARE;
     let s = sky[in.index];
     let dir = normalize(mat(sky[0]) * in.at);
     if scene.soft_clouds.x > 0.5 {
@@ -1126,6 +1132,7 @@ fn moon_body(s: Sky, local: vec3<f32>) -> vec4<f32> {
 
 @fragment
 fn fs(in: VOut) -> @location(0) vec4<f32> {
+    NIGHT_SKY_SHARE = SKY_ROD_SHARE;
     let s = sky[in.index];
     if s.ids.y == SKY_OVERLAY {
         // Vanilla's: four tiles across the screen, sliding with the look. A texture with
