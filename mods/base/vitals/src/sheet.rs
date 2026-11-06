@@ -532,10 +532,15 @@ fn canopy_table(w: &mut String) {
     use crate::canopy::{self, Kind, Tier};
     let _ = writeln!(
         w,
-        "## Stands of trees\n\nA forest's layers (`vitals::canopy`): each wild tree's site grows under the canopy, in it or over it by its biome's shares; a simple tree's height (to its crown's top) and crown by its kind and layer, a big one a block taller and wider. A canopy tree carries a side lobe {:.0}% of the time. Branched trees grow x{} as tall under the canopy and x{} over it.\n\n| crown | layer | height | crown radius | depth | lobes |\n|---|---|---|---|---|---|",
+        "## Stands of trees\n\nA forest's layers (`vitals::canopy`): each wild tree's site grows under the canopy, in it or over it by its biome's shares; a simple tree's height (to its crown's top) and crown by its kind and layer, a big one a block taller and wider. A canopy tree carries a side lobe {:.0}% of the time; a round or slim crown hangs its depth down from the top, so the trunk stands clear under it (height - depth), and a cone's needles start at {:.0}% / {:.0}% / {:.0}% of its height (under / canopy / emergent). Branched trees grow x{} as tall under the canopy and x{} over it, broadleaves on at least {} / {} blocks of clear trunk in and over the canopy.\n\n| crown | layer | height | crown radius | depth | lobes |\n|---|---|---|---|---|---|",
         canopy::CANOPY_LOBE * 100.0,
+        canopy::cone_bare(Tier::Under) * 100.0,
+        canopy::cone_bare(Tier::Canopy) * 100.0,
+        canopy::cone_bare(Tier::Emergent) * 100.0,
         canopy::branched_height(Tier::Under),
-        canopy::branched_height(Tier::Emergent)
+        canopy::branched_height(Tier::Emergent),
+        canopy::clear_trunk(Tier::Canopy),
+        canopy::clear_trunk(Tier::Emergent)
     );
     for kind in [Kind::Round, Kind::Cone, Kind::Slim] {
         for tier in [Tier::Under, Tier::Canopy, Tier::Emergent] {
