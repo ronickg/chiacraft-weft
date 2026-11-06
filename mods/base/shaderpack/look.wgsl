@@ -1056,7 +1056,10 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f
     // In the HDR world halved, not a third (Bliss's own curve: 1.5 in the open): a forest floor
     // under a canopy sits at sky light 13-14 of 15, where a third gave it a third of Bliss's
     // ambient (floor 44-51 against Bliss's 127-149; Trees' /tk light grid, 11-06).
-    let sky = (pow(light.x, 15.0 * steep) * 2.0 + pow(light.x, 2.5 * steep)) / select(3.0, 2.0, scene.frame.x > 0.5);
+    // By day only, eased out through dusk and dawn: at night the moon's sky light took it too and
+    // the night land came out 60 % brighter (22:00 land luma 23 against 14; Shader's shprJ, 11-06).
+    let bliss_sky = select(0.0, smoothstep(-0.1, 0.02, scene.sun.y), scene.frame.x > 0.5);
+    let sky = (pow(light.x, 15.0 * steep) * 2.0 + pow(light.x, 2.5 * steep)) / mix(3.0, 2.0, bliss_sky);
     let under = under_leaves(light.x);
     let leaves = mix(vec3(1.0), under_tint(), under * 0.5);
     // More of the sky's light comes from above than from the sides, and less from below: tops 1,
@@ -1068,9 +1071,9 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f
     // (with the curve above, a top in the shade takes 3.75x what it did): crowns lit from above
     // with dark sides and gaps, and a forest floor as bright as Bliss's (the vista from above and
     // Trees' forest, k6 runs, 11-06).
-    if scene.frame.x > 0.5 {
+    if bliss_sky > 0.0 {
         let facing = select(mix(0.93, 0.2, -n.y), mix(0.93, 2.5, n.y), n.y >= 0.0);
-        hemi = mix(facing, hemi, rain_amount());
+        hemi = mix(hemi, mix(facing, hemi, rain_amount()), bliss_sky);
     }
     var c = p.ambient * sky * hemi * ao * leaves;
     // In the HDR world a cloud overhead takes some of the sky's light too, not the sun's alone: with
