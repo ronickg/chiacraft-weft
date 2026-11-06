@@ -713,7 +713,11 @@ pub fn tiered_colonized(c: &crate::colonize::Colonize, tier: vitals::canopy::Tie
         },
         // Over a clear trunk (`canopy::clear_trunk`), within the tree's height.
         Tier::Canopy => crate::colonize::Colonize {
-            trunk: c.trunk.max(vitals::canopy::clear_trunk(tier)).min(max_h as f32 - c.crown_h - 1.0).max(c.trunk),
+            trunk: c
+                .trunk
+                .max(vitals::canopy::clear_trunk(tier))
+                .min(max_h as f32 - c.crown_h - 1.0)
+                .max(c.trunk),
             crown_r: c.crown_r * 0.7,
             points: (c.points as f32 * 0.75) as u32,
             ..*c
@@ -721,7 +725,11 @@ pub fn tiered_colonized(c: &crate::colonize::Colonize, tier: vitals::canopy::Tie
         Tier::Emergent => {
             let f = vitals::canopy::branched_height(tier);
             let trunk = (c.trunk + (c.trunk + c.crown_h) * (f - 1.0)).max(vitals::canopy::clear_trunk(tier));
-            crate::colonize::Colonize { trunk: trunk.min(max_h as f32 - c.crown_h * 1.1 - 1.0).max(c.trunk), crown_h: c.crown_h * 1.1, ..*c }
+            crate::colonize::Colonize {
+                trunk: trunk.min(max_h as f32 - c.crown_h * 1.1 - 1.0).max(c.trunk),
+                crown_h: c.crown_h * 1.1,
+                ..*c
+            }
         }
     }
 }

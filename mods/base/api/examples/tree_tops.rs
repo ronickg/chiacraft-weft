@@ -95,7 +95,12 @@ fn main() {
                     .unwrap_or(0);
                 width += w as f64;
                 height += top as f64;
-                clear += b.iter().filter(|e| matches!(e.3, Part::Leaves)).map(|e| e.1).min().unwrap_or(0) as f64;
+                clear += b
+                    .iter()
+                    .filter(|e| matches!(e.3, Part::Leaves))
+                    .map(|e| e.1)
+                    .min()
+                    .unwrap_or(0) as f64;
             }
             println!(
                 "branched {:16} {:9} bare-topped {:3}/{count}  crown half-width {:.1}  height {:.1}  clear trunk {:.1}",
