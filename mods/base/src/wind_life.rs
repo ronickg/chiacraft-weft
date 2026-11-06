@@ -284,6 +284,9 @@ fn frame(c: &Client) {
     let view = c.view();
     let fall = view.component(&FALL).unwrap_or(1.0);
     let dust = view.component(&DUST).unwrap_or(0.0);
+    // A dust storm needs its wind (`air::DUST`): the server's share goes stale round a spectator
+    // (hidden from the world's players), and grains blew in calm air by the lake.
+    let dust = dust * wl::blows(st.wind[0].hypot(st.wind[1]), (vitals::air::DUST.0 - 2.0, vitals::air::DUST.0));
     let t = now.duration_since(life.start).as_secs_f32();
     let wind = st.wind;
     let speed = wind[0].hypot(wind[1]);
@@ -452,7 +455,8 @@ fn frame(c: &Client) {
                     .velocity(v)
                     .speed(1.0)
                     .count(n)
-                    .block(sand),
+                    .block(sand)
+                    .color(wl::DUST_GRAIN_TINT),
             );
             life.sent[4] += n;
         }
@@ -464,7 +468,8 @@ fn frame(c: &Client) {
                 c.spawn_particles(&SAND_STREAK, at)
                     .velocity(v)
                     .speed(1.5)
-                    .block(sand),
+                    .block(sand)
+                    .color(wl::DUST_GRAIN_TINT),
             );
             life.sent[4] += 1;
         }
