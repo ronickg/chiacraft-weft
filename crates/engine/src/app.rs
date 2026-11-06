@@ -1104,6 +1104,8 @@ impl Running {
                 None
             }
         };
+        // chiacraft, test only: `--import-mc` loads a Minecraft world into a new world first.
+        crate::chiacraft::mc_import::maybe_import(&meta, content());
         let storage = saves::Storage::open(meta.clone(), content());
         let server = server::spawn(
             ServerConfig {
