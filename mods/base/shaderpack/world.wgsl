@@ -473,7 +473,10 @@ fn shade_soft(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     if puddles > 0.01 && !leafy && n.y > 0.95 {
         let q = floor(in.pos.xz * 16.0) / 16.0;
         let m = noise3(vec3(q / 4.5, 3.7)) * 0.68 + noise3(vec3(q / 1.3, 9.1)) * 0.32;
-        let pool = smoothstep(0.0, 0.035, m - mix(0.74, 0.47, puddles));
+        // (Two octaves of value noise gather about 0.5, spread about 0.12: over 0.68 about 1 % of the
+        // ground, 0.6 a tenth, 0.53 some 40 %. From 0.74 down to 0.47 none showed after 5 minutes
+        // of rain, PC shpd3.)
+        let pool = smoothstep(0.0, 0.03, m - mix(0.68, 0.53, puddles));
         if pool > 0.0 {
             let v = -normalize(in.rel);
             let slope = rain_rings(in.pos.xz) * rain_amount();
