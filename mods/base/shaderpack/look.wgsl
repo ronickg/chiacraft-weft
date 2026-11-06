@@ -1724,7 +1724,12 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
         // Bliss's far land at 18:00 is near neutral (warmth +0 to +9 by the horizon) where ours
         // took the sun's gold (+43), and its mornings stay warm (07:00 +72), so not then (lk_ebc).
         let dusk = smoothstep(0.05, -0.05, scene.sun.x) * (1.0 - smoothstep(0.15, 0.3, scene.sun.y));
-        toward = mix(toward, luma(toward) * sun_tint, mix(0.6, 0.9, morning * far_off) * low_sun * hdr_air * mix(1.0, 0.35, dusk)) * (1.0 - 0.05 * noon * hdr_air);
+        // Toward the sun the haze takes its colour, away from it far less (a quarter): looking away
+        // from a low sun Bliss's far land is cool under a blue-grey band (its spot C at 08:00:
+        // land warmth -19, ours +46, a warm strip under the band's grey; toward it, at the forest
+        // vista, warm, +27). Taking it alike every way gave that seam (rt-sun-shadows, Shader).
+        let toward_sun = mix(0.25, 1.0, smoothstep(-0.3, 0.6, mu));
+        toward = mix(toward, luma(toward) * sun_tint, mix(0.6, 0.9, morning * far_off) * low_sun * hdr_air * mix(1.0, 0.35, dusk) * toward_sun) * (1.0 - 0.05 * noon * hdr_air);
         v = mix(v, vec3((v.r + v.g + v.b) / 3.0), mix(0.35, 0.5, noon) * hdr_air);
     }
     let mixed = mix(pale, toward, v);
