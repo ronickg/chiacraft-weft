@@ -265,7 +265,9 @@ fn soft_cover(s: Sky, at: vec2<f32>) -> f32 {
     // Clear days from 0.40 (0.46 before): about 70 % of the mc_forest sky was cloud, large merged
     // masses, where Bliss's vista is 59-70 % with more blue between them (Look's clouds.py split,
     // 11-06).
-    return clamp(mix(0.40, 0.8, wet) + (field - 0.5) * mix(0.35, 0.5, wet), 0.0, 1.0);
+    // Clear days from 0.32 (0.40 before, cover B): in Bliss's own world at noon its sky is mostly open
+    // blue with a few masses, ours still a dense even layer (Planner's d1 sheet, 11-06).
+    return clamp(mix(0.32, 0.8, wet) + (field - 0.5) * mix(0.35, 0.5, wet), 0.0, 1.0);
 }
 
 // The cloud's density at `at` (its frame, blocks) and `a` (0 at the layer's underside, 1 at its
