@@ -159,6 +159,213 @@ struct ParticleFrag {
     time: f32,
 }
 
+// ---- upscaling (`core:upscaler`, `scene.upscale.x`) ----
+
+// AMD FidelityFX Super Resolution 1's edge-adaptive upscale (EASU), its 32-bit path ported from
+// `ffx_fsr1.h` (GPUOpen-Effects/FidelityFX-FSR, MIT licence: Copyright (c) 2021 Advanced Micro
+// Devices, Inc.; notes/ENGINE_CHANGES.md). The world image `textures[t]` (an index: a texture
+// passed as an argument broke the Vulkan pipelines), drawn smaller than the screen
+// (`core:render_scale`), read at the screen's `uv`: twelve texels round it, a Lanczos-like kernel
+// stretched along the edge it finds. The light is filtered as x / (1 + x), as the HDR world's goes
+// past 1 and FSR 1 takes a picture in 0..1.
+fn easu_in(t: u32, p: vec2<i32>, size: vec2<i32>) -> vec3<f32> {
+    let c = max(textureLoad(textures[t], clamp(p, vec2(0), size - 1), 0).rgb, vec3(0.0));
+    return c / (1.0 + c);
+}
+
+fn easu_luma(c: vec3<f32>) -> f32 {
+    return c.b * 0.5 + (c.r * 0.5 + c.g);
+}
+
+// One of the four bilinear corners' direction and length (`FsrEasuSetF`): `w` its bilinear weight,
+// a, b, c, d, e the '+' round it (c in the middle).
+fn easu_set(dir: ptr<function, vec2<f32>>, len: ptr<function, f32>, w: f32, la: f32, lb: f32, lc: f32, ld: f32, le: f32) {
+    let dc = ld - lc;
+    let cb = lc - lb;
+    var len_x = 1.0 / max(max(abs(dc), abs(cb)), 1e-8);
+    let dir_x = ld - lb;
+    len_x = clamp(abs(dir_x) * len_x, 0.0, 1.0);
+    len_x *= len_x;
+    let ec = le - lc;
+    let ca = lc - la;
+    var len_y = 1.0 / max(max(abs(ec), abs(ca)), 1e-8);
+    let dir_y = le - la;
+    len_y = clamp(abs(dir_y) * len_y, 0.0, 1.0);
+    len_y *= len_y;
+    *dir += vec2(dir_x, dir_y) * w;
+    *len += (len_x + len_y) * w;
+}
+
+// One tap of the kernel (`FsrEasuTapF`).
+fn easu_tap(acc: ptr<function, vec4<f32>>, off: vec2<f32>, dir: vec2<f32>, len: vec2<f32>, lob: f32, clp: f32, c: vec3<f32>) {
+    var v = vec2(off.x * dir.x + off.y * dir.y, off.x * -dir.y + off.y * dir.x);
+    v *= len;
+    let d2 = min(dot(v, v), clp);
+    var wb = 2.0 / 5.0 * d2 - 1.0;
+    var wa = lob * d2 - 1.0;
+    wb *= wb;
+    wa *= wa;
+    wb = 25.0 / 16.0 * wb - (25.0 / 16.0 - 1.0);
+    let w = wb * wa;
+    *acc += vec4(c * w, w);
+}
+
+fn easu(t: u32, uv: vec2<f32>) -> vec3<f32> {
+    let size = vec2<i32>(textureDimensions(textures[t]));
+    var pp = uv * vec2<f32>(size) - 0.5;
+    let fp = floor(pp);
+    pp -= fp;
+    let f0 = vec2<i32>(fp);
+    //    b c
+    //  e f g h
+    //  i j k l
+    //    n o
+    let b = easu_in(t, f0 + vec2(0, -1), size);
+    let c = easu_in(t, f0 + vec2(1, -1), size);
+    let e = easu_in(t, f0 + vec2(-1, 0), size);
+    let f = easu_in(t, f0, size);
+    let g = easu_in(t, f0 + vec2(1, 0), size);
+    let h = easu_in(t, f0 + vec2(2, 0), size);
+    let i = easu_in(t, f0 + vec2(-1, 1), size);
+    let j = easu_in(t, f0 + vec2(0, 1), size);
+    let k = easu_in(t, f0 + vec2(1, 1), size);
+    let l = easu_in(t, f0 + vec2(2, 1), size);
+    let n = easu_in(t, f0 + vec2(0, 2), size);
+    let o = easu_in(t, f0 + vec2(1, 2), size);
+    let bl = easu_luma(b);
+    let cl = easu_luma(c);
+    let el = easu_luma(e);
+    let fl = easu_luma(f);
+    let gl = easu_luma(g);
+    let hl = easu_luma(h);
+    let il = easu_luma(i);
+    let jl = easu_luma(j);
+    let kl = easu_luma(k);
+    let ll = easu_luma(l);
+    let nl = easu_luma(n);
+    let ol = easu_luma(o);
+    var dir = vec2(0.0);
+    var len = 0.0;
+    easu_set(&dir, &len, (1.0 - pp.x) * (1.0 - pp.y), bl, el, fl, gl, jl);
+    easu_set(&dir, &len, pp.x * (1.0 - pp.y), cl, fl, gl, hl, kl);
+    easu_set(&dir, &len, (1.0 - pp.x) * pp.y, fl, il, jl, kl, nl);
+    easu_set(&dir, &len, pp.x * pp.y, gl, jl, kl, ll, ol);
+    let dir2 = dir * dir;
+    var dir_r = dir2.x + dir2.y;
+    let zero = dir_r < 1.0 / 32768.0;
+    dir_r = select(inverseSqrt(max(dir_r, 1e-12)), 1.0, zero);
+    dir.x = select(dir.x, 1.0, zero);
+    dir *= dir_r;
+    len = len * 0.5;
+    len *= len;
+    let stretch = dot(dir, dir) / max(abs(dir.x), abs(dir.y));
+    let len2 = vec2(1.0 + (stretch - 1.0) * len, 1.0 - 0.5 * len);
+    let lob = 0.5 + ((1.0 / 4.0 - 0.04) - 0.5) * len;
+    let clp = 1.0 / lob;
+    let mn = min(min(f, g), min(j, k));
+    let mx = max(max(f, g), max(j, k));
+    var acc = vec4(0.0);
+    easu_tap(&acc, vec2(0.0, -1.0) - pp, dir, len2, lob, clp, b);
+    easu_tap(&acc, vec2(1.0, -1.0) - pp, dir, len2, lob, clp, c);
+    easu_tap(&acc, vec2(-1.0, 1.0) - pp, dir, len2, lob, clp, i);
+    easu_tap(&acc, vec2(0.0, 1.0) - pp, dir, len2, lob, clp, j);
+    easu_tap(&acc, vec2(0.0, 0.0) - pp, dir, len2, lob, clp, f);
+    easu_tap(&acc, vec2(-1.0, 0.0) - pp, dir, len2, lob, clp, e);
+    easu_tap(&acc, vec2(1.0, 1.0) - pp, dir, len2, lob, clp, k);
+    easu_tap(&acc, vec2(2.0, 1.0) - pp, dir, len2, lob, clp, l);
+    easu_tap(&acc, vec2(2.0, 0.0) - pp, dir, len2, lob, clp, h);
+    easu_tap(&acc, vec2(1.0, 0.0) - pp, dir, len2, lob, clp, g);
+    easu_tap(&acc, vec2(1.0, 2.0) - pp, dir, len2, lob, clp, o);
+    easu_tap(&acc, vec2(0.0, 2.0) - pp, dir, len2, lob, clp, n);
+    let s = min(mx, max(mn, acc.rgb / acc.w));
+    return s / max(1.0 - s, vec3(1e-4));
+}
+
+// Snapdragon Game Super Resolution 1 (`core:upscaler` 2), its mobile shader ported from
+// `sgsr1_shader_mobile.frag` (SnapdragonStudios/snapdragon-gsr, BSD-3-Clause: Copyright (c) 2023-2025,
+// Qualcomm Innovation Center, Inc. All rights reserved. Redistribution and use in source and binary
+// forms, with or without modification, are permitted provided that the conditions of the BSD-3-Clause
+// licence are met; notes/ENGINE_CHANGES.md). Cheaper than EASU on a phone (on the Pixel 10 at 67 %,
+// 1.1 ms over bilinear, EASU 2.7): one channel (green) in four gathers, and only where the
+// 2 x 2 round the pixel has an edge; a Lanczos-like kernel there, sharpened, added to the bilinear
+// colour. As in `easu`, the light as x / (1 + x); and the change taken as a ratio of green's, not
+// the same step on every channel, which paled dark colours along edges.
+fn gsr_in(v: vec4<f32>) -> vec4<f32> {
+    let m = max(v, vec4(0.0));
+    return m / (1.0 + m);
+}
+
+fn gsr_weight(dx: f32, dy: f32, c: f32, spread: f32) -> vec2<f32> {
+    let x = (dx * dx + dy * dy) * 0.55 + clamp(abs(c) * spread, 0.0, 1.0);
+    var wa = x - 4.0;
+    let wb = x * wa - wa;
+    wa *= wa;
+    let w = wb * wa;
+    return vec2(w, w * c);
+}
+
+fn gsr(t: u32, uv: vec2<f32>, bilinear: vec3<f32>) -> vec3<f32> {
+    let size = vec2<f32>(textureDimensions(textures[t]));
+    let inv = 1.0 / size;
+    let b = max(bilinear, vec3(0.0));
+    var cc = b / (1.0 + b);
+    let img = uv * size + vec2(-0.5, 0.5);
+    let ip = floor(img);
+    var coord = ip * inv;
+    let pl = img - ip;
+    var left = gsr_in(textureGather(1, textures[t], linear_clamp, coord));
+    let edge = abs(left.z - left.y) + abs(cc.g - left.y) + abs(cc.g - left.z);
+    if edge <= 8.0 / 255.0 {
+        return bilinear;
+    }
+    coord.x += inv.x;
+    var right = gsr_in(textureGather(1, textures[t], linear_clamp, coord + vec2(inv.x, 0.0)));
+    let up = gsr_in(textureGather(1, textures[t], linear_clamp, coord + vec2(0.0, -inv.y)));
+    let down = gsr_in(textureGather(1, textures[t], linear_clamp, coord + vec2(0.0, inv.y)));
+    let mean = (left.y + left.z + right.x + right.w) * 0.25;
+    left -= vec4(mean);
+    right -= vec4(mean);
+    let ud = vec4(up.w, up.z, down.y, down.x) - vec4(mean);
+    let cw = cc.g - mean;
+    let sum = dot(abs(left), vec4(1.0)) + dot(abs(right), vec4(1.0)) + dot(abs(ud), vec4(1.0));
+    let spread = 2.181818 / max(sum, 1e-6);
+    var a = gsr_weight(pl.x, pl.y + 1.0, ud.x, spread);
+    a += gsr_weight(pl.x - 1.0, pl.y + 1.0, ud.y, spread);
+    a += gsr_weight(pl.x - 1.0, pl.y - 2.0, ud.z, spread);
+    a += gsr_weight(pl.x, pl.y - 2.0, ud.w, spread);
+    a += gsr_weight(pl.x + 1.0, pl.y - 1.0, left.x, spread);
+    a += gsr_weight(pl.x, pl.y - 1.0, left.y, spread);
+    a += gsr_weight(pl.x, pl.y, left.z, spread);
+    a += gsr_weight(pl.x + 1.0, pl.y, left.w, spread);
+    a += gsr_weight(pl.x - 1.0, pl.y - 1.0, right.x, spread);
+    a += gsr_weight(pl.x - 2.0, pl.y - 1.0, right.y, spread);
+    a += gsr_weight(pl.x - 2.0, pl.y, right.z, spread);
+    a += gsr_weight(pl.x - 1.0, pl.y, right.w, spread);
+    let mx = max(max(left.y, left.z), max(right.x, right.w));
+    let mn = min(min(left.y, left.z), min(right.x, right.w));
+    let fy = clamp(2.0 * a.y / a.x, mn, mx);
+    let d = clamp(fy - cw, -23.0 / 255.0, 23.0 / 255.0);
+    cc = clamp(cc * ((cc.g + d) / max(cc.g, 1e-4)), vec3(0.0), vec3(0.9999));
+    return cc / (1.0 - cc);
+}
+
+// The world's image at the screen's `uv` (`frag` the fragment's position, in pixels): bilinear, or
+// when it is smaller than the screen FSR 1's EASU (`core:upscaler` 1) or Snapdragon GSR 1 (2).
+fn world_upscaled(t: u32, uv: vec2<f32>, frag: vec2<f32>, upscaler: f32) -> vec4<f32> {
+    let bilinear = textureSampleLevel(textures[t], linear_clamp, uv, 0.0);
+    if upscaler < 0.5 {
+        return bilinear;
+    }
+    let screen = frag / max(uv, vec2(1e-6));
+    if f32(textureDimensions(textures[t]).x) >= screen.x - 0.5 {
+        return bilinear;
+    }
+    if upscaler >= 1.5 {
+        return vec4(gsr(t, uv, bilinear.rgb), bilinear.a);
+    }
+    return vec4(easu(t, uv), bilinear.a);
+}
+
 // ---- temporal anti-aliasing's motion (`post::Post`, `weft_render::MOTION_FORMAT`) ----
 
 // How far a point drawn at `clip` (this frame's `view_proj`, jittered) moved on the screen since

@@ -285,6 +285,21 @@ fn palette_made() -> Palette {
     } else {
         p = blend(night, dusk, smoothstep(-0.3, -0.14, e));
     }
+    // In the HDR world an evening sun still up (about 3-20 degrees) leaves the sky blue, as Bliss's
+    // 18:00 (warmth -30), not the golden key's gold horizon, which ours stood in (+49 over the
+    // horizon, +37 with the cream clouds; the 18:00 sun is 10-11 degrees up, as Minecraft's). Mornings
+    // keep their gold (the dawn pick), the sunset itself its colours (under about 3 degrees). The sky's
+    // own colours only, at their brightness: the sun and the land's light stay golden.
+    if scene.frame.x > 0.5 {
+        let evening = smoothstep(0.05, -0.05, scene.sun.x) * smoothstep(0.03, 0.1, e) * (1.0 - smoothstep(0.3, 0.42, e));
+        if evening > 0.0 {
+            let sky_blue = vec3(0.72, 0.86, 1.1);
+            let hz = sky_blue * (luma(p.horizon) / luma(sky_blue));
+            p.horizon = mix(p.horizon, hz, evening * 0.7);
+            let zn = vec3(0.30, 0.48, 1.0) * (luma(p.zenith) / luma(vec3(0.30, 0.48, 1.0)));
+            p.zenith = mix(p.zenith, zn, evening * 0.6);
+        }
+    }
     // A new moon's night is darker than a full moon's.
     // The night follows the moon (Ronald, 11-04: "if the moon is light, then it can be lighter, and
     // if there's no moon, it should be darker"): under a full moon high up a dim cool light to
@@ -582,7 +597,9 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         // Its own window, full with the sun up to about 9 degrees and gone by about 20 (the sunset
         // band's `low` is nearly 0 by Bliss's 06:00 sun at 10 degrees, so this did nothing, PC
         // shdawnB2).
-        let morning = (1.0 - smoothstep(0.15, 0.35, scene.sun.y)) * smoothstep(-0.03, 0.02, scene.sun.y);
+        // Mornings only (the sun rises at +x): at 18:00, facing the setting sun, it warmed the band
+        // over the horizon where Bliss's evening is a blue-grey (Look's measures, 11-06).
+        let morning = (1.0 - smoothstep(0.15, 0.35, scene.sun.y)) * smoothstep(-0.03, 0.02, scene.sun.y) * smoothstep(-0.05, 0.05, scene.sun.x);
         if morning > 0.0 {
             // (That orange, 231 172 68 against Bliss's 201 172 108 at 06:00, was the dawn mist,
             // which the script left free and which came and went between runs: with it pinned off
@@ -596,6 +613,19 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
             let dawn = pow(wide, 1.5) * morning * (1.0 - rain_amount());
             c = mix(c, cream * (luma(c) / luma(cream)), dawn * 0.7);
         }
+    }
+    // In the HDR world by day the band just over the horizon darker and a blue-grey, not the sky's
+    // brightest part: in Bliss's own world 2-6 degrees up reads 164-177 at noon and 152-158 at 17-18,
+    // ours 187-208, a flat warm cream at 17-18, and the far land fogged into it as bright (Look's
+    // measures, mist off, 11-06). Here, so the land's haze that reads this colour comes down with it.
+    if scene.frame.x > 0.5 {
+        let band = 1.0 - smoothstep(0.0, 0.13, dir.y);
+        let day = smoothstep(0.0, 0.1, scene.sun.y) * (1.0 - rain_amount());
+        let k = band * day;
+        // A clear blue, not a grey (H2: grey-tinted it reached Bliss's brightness, 160-172 against
+        // 154-173, but stayed pale and from 16:00 warm, saturation 5-48 against 39-83; PC shhb1).
+        let blue = vec3(luma(c)) * vec3(0.74, 0.92, 1.2);
+        c = mix(c, blue, k * 0.6) * (1.0 - 0.4 * k);
     }
     c += sun_glow(dir, p);
     // In the HDR world the air round the sun glows as bright as it really is (Mie scattering's
@@ -969,6 +999,12 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f
     // the light then, and even from all round it made the land flat.
     let hemi = mix(0.75 + 0.25 * n.y, 0.6 + 0.4 * n.y, rain_amount());
     var c = p.ambient * sky * hemi * ao * leaves;
+    // In the HDR world a cloud overhead takes some of the sky's light too, not the sun's alone: with
+    // the sky's full fill a cloud's shadow kept the land at about 0.72 of its lit brightness, where
+    // Bliss's shaded forest falls to 0.4-0.6 (PC shcs_off/shcs_on against Bliss's vista, 11-06).
+    if scene.frame.x > 0.5 && scene.cloud_shadow.x > 0.5 {
+        c *= mix(0.6, 1.0, soft_cloud_shadow(rel));
+    }
     // Under a forest's canopy most of the floor's light is the sun's, come down through the leaves:
     // green and soft (a rainforest's floor gets 1-2 % of the sun, more of it this way than from the
     // sky). Without it the floor of Plants' rainforest sat at luma 12-17 at noon, under the daytime
@@ -1521,6 +1557,11 @@ fn rain_depth(dist: f32) -> f32 {
     return downpour * max(dist - 20.0, 0.0) * smoothstep(10.0, 60.0, dist);
 }
 
+// The HDR world's low evening mist band over the far land (`haze_lit`): its density per block at
+// its floor and its depth (blocks).
+const BAND_HDR: f32 = 0.006;
+const BAND_DEPTH: f32 = 12.0;
+
 fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let c = fog_through(c_in, rel, smoothstep(0.25, 0.75, sky));
     let dist = length(rel);
@@ -1628,6 +1669,28 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let mixed = mix(pale, toward, v);
     let own = mix(pale, toward, v * mix(0.7, 1.0, wet));
     let seen = max(vec3(luma(mixed)) + own - vec3(luma(own)), vec3(0.0));
+    var out = mix(seen, lit, edge);
+    // The HDR world with the sun low: a thin mist lying on the far land at about the sea's height,
+    // a flat white band along the horizon with hills standing out of it, as Bliss's evening (its
+    // 17:00-18:00 vista: rows at 40% of the height 20 brighter than round them, saturation about
+    // 20; none at noon). Only far off (from about 900 blocks), so the near land stays clear, and
+    // as deep as a look runs inside the layer, so it is a band, not a veil.
+    if hdr_air > 0.0 {
+        // (Through 17:00 too, the sun 22° up: from 0.2 it was a third there and barely showed, lk_eb3.)
+        let low = (1.0 - smoothstep(0.32, 0.52, scene.sun.y));
+        // (After the handover to the sky where the terrain ends: before it, the farthest land, where
+        // the band lies, took the sky's colour over it, lk_eb1.)
+        // (From 600 blocks it lay on the nearer hills too, a wide pale wash, not Bliss's thin band
+        // at the far horizon: lk_eb2.)
+        let far_band = smoothstep(1000.0, 2200.0, dist) * low;
+        if far_band > 0.0 {
+            let y = scene.eye.y + rel.y - (SEA_LEVEL + 4.0);
+            let inside = min(min(BAND_DEPTH / max(-dir.y, 0.008), dist), 1500.0);
+            let band = 1.0 - exp(-BAND_HDR * exp(-max(y, 0.0) / BAND_DEPTH) * inside * far_band);
+            let white = vec3(luma(toward)) * vec3(1.04, 1.0, 0.94) * 1.25;
+            out = mix(out, white, band);
+        }
+    }
     // The held light in the air and a bolt before far land: none in a calm scene (`CALM`), and
     // their code left out of its shader (Android port: on the Pixel 10 the size of these rare
     // paths, the fog walk, the dust and the water's cost the vista 34.2 -> 26.0 ms, in a calm
@@ -1636,7 +1699,7 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     if !CALM {
         extra = held_in_fog(rel, sky) + lightning_bolt_over(dir, dist);
     }
-    return mix(seen, lit, edge) + extra;
+    return out + extra;
 }
 
 // ---- light in the fog: torches (Research round 15, 6: Valheim's warm firelight in the mist) ----
@@ -1865,7 +1928,12 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     // evening the land at 17:00 and 18:00 measured 139-153 of saturation against Bliss's 56-84
     // (mc_forest, gr4), where Bliss's misty mornings run 181.
     let low_sat = mix(0.75, 0.95, smoothstep(0.02, 0.1, scene.weather.z));
-    let sat = 1.2 * look_opt(OPT_SATURATION, 1.0) * select(1.0, mix(low_sat, 0.62, smoothstep(0.3, 0.75, scene.sun.y)), scene.frame.x > 0.5);
+    // In Bliss's own world (imported block for block) the land with the sun 30-55° up came out
+    // grey-green at the cut tuned on the test world (0.62 at noon): land saturation 52 against
+    // Bliss's 72 at 08:00, 61 against 92 at noon, where 17:00 matched (75 against 83). A quarter
+    // more there (the canopy sweep cs1: x1.25 took 08:00 to 67, noon to 78), as it was with the sun
+    // under about 20°.
+    let sat = 1.2 * look_opt(OPT_SATURATION, 1.0) * select(1.0, mix(low_sat, 0.85, smoothstep(0.38, 0.55, scene.sun.y)), scene.frame.x > 0.5);
     t = max(mix(vec3(y), t, mix(1.0, sat, day)), vec3(0.0));
     // A cool floor so the night is never pure black; by day black stays black.
     t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034) * (1.0 - day);

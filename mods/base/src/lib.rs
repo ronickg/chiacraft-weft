@@ -48,6 +48,7 @@ mod recipes;
 mod redstone;
 mod seasons;
 mod shaderpack;
+mod showcase;
 mod skills;
 mod snow;
 mod sounds;
@@ -127,6 +128,7 @@ fn init(r: &mut Registry) {
     cooking::register(r);
     crafts::register(r);
     recipes::register(r);
+    showcase::register(r);
     book::register(r);
     discovery::register(r);
     metals::register(r);

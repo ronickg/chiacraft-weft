@@ -22,6 +22,8 @@ struct VOut {
     @location(10) @interpolate(flat) slot: u32,
     @location(11) pos: vec3<f32>,
     @location(12) @interpolate(flat) size: f32,
+    // 1 on a see-through face with the same block behind it (`FACE_BACKED`): its holes are filled.
+    @location(13) @interpolate(flat) backed: u32,
 }
 
 fn shader_of(tex: u32) -> u32 {
@@ -162,6 +164,7 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     out.clip = scene.view_proj * pos;
     out.dist = length(pos.xyz);
     out.uv = UVS[(c + ((w0 >> FACE_TURN_SHIFT) & FACE_TURN_MASK)) % 4u];
+    out.backed = select(0u, 1u, (w0 & FACE_BACKED) != 0u);
     let tex_id = w1 & FACE_TEX_MASK;
     let fr = texture_frame(tex_id);
     out.size = fr.size;
@@ -336,15 +339,27 @@ fn sample_cutout(in: VOut, nuv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec4
     return mix(a, b, in.blend);
 }
 
+// What a hole in a face with the same block behind it shows (`FACE_BACKED`): that block's leaves
+// deeper in, its texture's own colour (the smallest mip, opaque texels only) in their shade, as
+// Minecraft's fancy leaves draw the faces between leaves. Holes of the crown's outer shell opened
+// on the sky: under a canopy, 11-20% sky where Minecraft and Bliss show 0.5% (Bliss's own world).
+fn backed_hole(in: VOut, nuv: vec2<f32>) -> vec4<f32> {
+    let avg = textureSampleLevel(textures[in.layer], linear_mipped, nuv, 16.0);
+    return vec4(avg.rgb * 0.35, 1.0);
+}
+
 @fragment
 fn fs_cutout(in: VOut) -> @location(0) vec4<f32> {
     let du = dpdx(in.uv);
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
-    let albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
+    var albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
     // Vanilla's alpha test (GL_GREATER 0.1).
     if albedo.a <= 0.1 {
-        discard;
+        if in.backed == 0u {
+            discard;
+        }
+        albedo = backed_hole(in, nuv);
     }
     return vec4(shade(in, albedo).rgb, 1.0);
 }
