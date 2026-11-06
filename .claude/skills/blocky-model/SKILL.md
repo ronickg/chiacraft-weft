@@ -562,17 +562,81 @@ that and came out looking like a wooden crate with polka dots. What fixed it:
 - **Lay materials as the real thing has them**: stems running round a dish (as an animal turns
   while lining it), an egg's marks gathered at its blunt end, darker marks over paler deeper
   ones, bark along a twig; things kicked out of a scrape land outside its rim.
-- **Small props** (an egg is 10 units, 5 texels at 32 a block): taper both ends a unit a layer so it reads
-  round, keep marks one or two texels (hairlines don't read at this size), and review it scaled
-  up six times in a copy of the spec (Blockbench frames tiny models too small to see). The one
-  allowed exception to "No thin lines" (Planner, 11-05): the half-texel steps of such a stacked
-  taper are its round outline, so name the layers in `linecheck_allow.txt` beside its source
-  (`egg*`) or in the build's `allow`. Only on small round props; a body steps by two texels.
+- **Small props**: taper both ends a step a layer so they read round, keep marks one or two
+  texels (hairlines don't read at this size), and review them scaled up in a copy of the spec
+  (Blockbench frames tiny models too small to see). The one allowed exception to "No thin lines"
+  (Planner, 11-05): the one-texel steps of a stacked taper are its round outline, so name the
+  layers in `linecheck_allow.txt` beside its source (`egg*`) or in the build's `allow`. Only on
+  small round props; a body steps by two texels. Eggs: see "Eggs" below.
 - **Show a prop as it is used** (a nest with eggs in it, half sunk and leaning as they are laid).
 
 Worked examples: `mods/animals/source/nest` (`build.py --variants`: a bare, lined and grassy
-scrape, each also with eggs) and `mods/animals/source/egg` (`build.py --variants`: four markings
-on one layout).
+scrape) and `mods/animals/source/egg` (every species' egg, next section).
+
+## Eggs
+
+Every laying species' egg reads as its own at a glance (Ronald, 2026-11-06: "I don't want them to
+all look the same... I've got to easily see, okay, well, this is like a raptor egg"), and every egg
+sits with Minecraft-style blocks and items the way vanilla's and the animal mods' eggs do (Ronald,
+on a finer-painted try: "it looks a bit too different"). Built in `mods/animals/source/egg`:
+`build.py` (the looks), `eggshape.py` (shapes, where a texel sits on the egg, marks), `sheet.py`
+(the review sheet); the numbers in `animals_core::eggs` (each look's model and drawn length, each
+species' look, real cm and drawn px); one entity kind `egg_<look>`, model `egg_<look>`, texture
+`entity/egg/<look>`, icon `item/egg_<look>` per look (`game-art`). The approved set, v3:
+`~/Coding/chiacraft-archive/images/eggs/2026-11-06/eggs_by_species_v3.png`.
+
+1. **Research the real egg first** into `reports/Eggs by species.md`: size, shape (elongation, one
+   end pointed or both alike, round), shell (hard or soft; smooth, ridged, knobbed, pitted,
+   leathery), colour and marks (pigment evidence, else say inference or guess), clutch and how it
+   lies (upright, paired rings, buried, mound, gravel). Fossil eggs by oogenus (Elongatoolithidae
+   for oviraptorids, Megaloolithus for titanosaurs, Spheroolithus for hadrosaurs, Krokolithes for
+   crocodiles); colour from Wiemann et al. 2017-18 (only maniraptorans had pigment; sauropod and
+   ornithischian eggs were white); soft shells from Norell et al. 2020. Where nothing is known, pick
+   a look that keeps the family apart and label it a guess (the ankylosaurs' olive leathery egg).
+2. **Pick the signature that reads**, one or two things you'd name it by, shared with no other
+   look: raptors pale sky blue-green, brown blotches at the blunt end, stood on end; Citipati the
+   longest, dark teal, lengthwise ridges, lying inclined; ceratopsians soft pale buff, dented;
+   ankylosaurs olive-grey mottled; the ornithopod warm ivory with a net of bumps; the sauropod a
+   chalk-white ball of knobs; crocodilians a capsule with a chalk band round the middle; the
+   lizard tiny, white, dented; roe as a few beads (trout orange with a dark eye texel in a heap,
+   pacu glassy with a yellow yolk, Lycoptera straw, scattered, the lungfish's jelly balls); birds
+   by their field-guide colours (owls plain white and round, the raven green, kept off the raptors'
+   blue); the wyvern teal-silver metal-rimmed scales (Ronald's pick). Colour alone made the white
+   round eggs one look: shape, marks and how it lies count too.
+3. **Size and density like Minecraft's** (`reports/Eggs in Minecraft mods.md`, measured from the
+   mods' model files): painted at the blocks' **32 texels a block**, never finer (JurassiCraft's
+   and Fossils' finer eggs are the ones that look off; our v2 at 128-512 did too); drawn about
+   **5x life**: 1.6 px a real cm, **5 to 28 px** long (the turtle egg is ~10x, dinosaur eggs 3-7x);
+   no egg under 2 x 3 px (fish eggs as a few 3 px beads). A species is drawn at its family's look
+   scaled by at most 15%: further off gets the look at its own size (`dromaeosaur_large` for
+   Utahraptor, `ceratopsian_small` for Psittacosaurus); the test `eggs_keep_the_house_density`.
+4. **Few boxes** (`build.slices`): 1-2 for eggs up to 9 px, 3 layers up to 14, 4 up to 20, 6 for
+   the biggest; each layer a pixel narrower a side than the next, whole pixels (an odd width stays
+   centred), the tips at least 2 px, nothing under 2 px thick. The stepped round layers are the
+   dragon egg's way; small eggs are one box as the turtle egg is, and the texture rounds them.
+5. **Paint** with the house light (`prop.paint`), marks laid out in real units on the egg
+   (`eggshape.local`: u round it, even along each face; v along it): blotches (`stamp`), 1-2 px
+   speckles (`hashed`), ridges and knobs on texel grids (the lit texel with its shadow *under* it:
+   rows count up the egg), scales as overlapping discs (`scaled`: the highest row wins, a metal rim
+   on the lower edge, a shadow under the row above). 6-12 colours; never contrasty camouflage
+   mottling. Birds: `bird` with a look's `marks` (blotch, deep, speck, cap).
+6. **Review** with `sheet.py` (`build.py --out DIR` first): close-ups, the clutch as a nest holds
+   it, the egg in the game beside a quarter block, the icon in a slot at 4x and 1x. Two that read
+   alike: change one. Then the game's look script `mods/animals/tests/eggs.txt` (PC queue).
+7. **Icons** (`game-art`, `art.py item egg_<look>`): **one egg per icon**, never a cluster (Ronald:
+   "it should always be one image of the egg... then it looks like a seed"), roe too; a smaller
+   egg for a smaller species; colours as hex; `--pale` for white eggs, `--green` for purple.
+8. **Into the game**: `build.py` writes the models and textures; `build.py --boxes DIR` prints each
+   model's box for `animals_core::bodies::BOXES`; a new look gets a row in `eggs::LOOKS`, a new
+   laying species a row in `EGGS` (`every_layer_has_its_egg`), and `entity.animals.egg_<look>`
+   in en and ru. Nests grow with the egg's width (`eggs.rs` `nest_size`).
+9. **Fantasy eggs**: take the qualities that are liked (Game of Thrones' eggs: scaled, stone-like,
+   petrified, jewel colours, a metal sheen), never a show's design or prop; offer colourings as
+   texture variants (`WYVERN`) for Ronald to pick.
+
+References (local, `~/Coding/chiacraft-archive/references/eggs/`, list in `references.md`): the
+turtle, sniffer and dragon eggs (vanilla), Alex's Mobs and Caves, Prehistoric Fauna, Naturalist
+(the good ones), Fossils and JurassiCraft (what not to do: finer than the blocks).
 
 ## Items from icons (held models)
 
@@ -670,6 +734,9 @@ Vintage Story, Veloren; image links in its last section). What carries over:
 
 Build plant models with this skill's prop tools (`scripts/prop.py`: boxes and quads with `cut`),
 lit and painted like everything else, and check them in a dense field shot, not alone.
+References (local, `~/Coding/chiacraft-archive/references/plants/`, list in `references.md`):
+vanilla's spore blossom, azalea, pink petals and big dripleaf; Fresh Flowers and Plants, 3D Crops
+Revamped, Vanilla Plus Crops, Better Foliage.
 
 ## Scripts
 
