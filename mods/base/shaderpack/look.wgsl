@@ -1974,9 +1974,12 @@ fn display(c: vec3<f32>) -> vec3<f32> {
         // this blue's old gate at 7 (sun.y -0.12; Mist's m11 sheet, 11-06). And how dim a pixel is
         // as seen, at the exposure it is taken at (at night's 4.0 as before).
         let p = palette();
-        // (From 0.15 to 0.5 of that light: from 0.08 to 0.3 the evening's twilight, its sky light
-        // lifted, kept hardly any, 19:00's land warmth -17 against Bliss's -61, PC shprA.)
-        let world = 1.0 - smoothstep(0.15, 0.5, luma(p.ambient) + 0.5 * luma(p.sun));
+        // Full in the night and the morning's blue hour (that light about 0.08-0.11), about two
+        // thirds in the evening's brighter twilight (about 0.19), as Bliss's 19:00 keeps its greens
+        // and the cherry trees' pink in the blue where its 05:00 doesn't; gone by the sunset's 0.5.
+        // (0.15 to 0.5 took 19:00 a uniform blue, the trees' green gone, PC shprC; 0.08 to 0.3 with
+        // the morning's rise in the evening too kept hardly any, warmth -17 against -61, shprA.)
+        let world = 1.0 - smoothstep(0.12, 0.3, luma(p.ambient) + 0.5 * luma(p.sun));
         let seen = luma(c) * exposure() / 4.0;
         let night = world * (1.0 - smoothstep(0.04, 0.3, seen)) * NIGHT_SKY_SHARE;
         if night > 0.0 {
