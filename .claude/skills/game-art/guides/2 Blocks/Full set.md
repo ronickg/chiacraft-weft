@@ -237,5 +237,9 @@ toward the UI's own colours (`notes/STYLE.md`).
   over bottom right) and say both continue across the line; check the joining rows meet.
 - **Ores**: the base must be the same stone as `stone.png`; generate the ore in the same image
   as stone, or say "exactly the same stone base as the stone texture".
+- **Flowering leaves** (a tree's bloom state): draw separate flowers, 4-6 px, packed close (gaps
+  15-20%), not soft puffs of colour (Ronald, 11-05, the wild cherry: "b: separate flowers"), and
+  keep the bloom about as dense as the same tree's plain leaves, or its crown thins when the
+  season switches (the dogwood's and the cherry's first blooms came out 40% open).
 - **Families drift between images**: keep a tree, a crop's stages or a colour set in one image,
   and recolour a set (wool, glass) from one approved base in code rather than prompting each.
