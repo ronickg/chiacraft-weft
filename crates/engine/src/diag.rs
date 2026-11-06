@@ -180,7 +180,7 @@ pub fn memory() -> u64 {
 }
 
 /// A `<key> <value> kB` line of a `/proc` file, in bytes (0 where it is missing).
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn proc_kb(path: &str, key: &str) -> u64 {
     let Ok(src) = std::fs::read_to_string(path) else { return 0 };
     let kb = src
@@ -192,12 +192,12 @@ fn proc_kb(path: &str, key: &str) -> u64 {
     kb * 1024
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn memory() -> u64 {
     proc_kb("/proc/self/status", "VmRSS:")
 }
 
-#[cfg(all(not(windows), not(target_os = "linux")))]
+#[cfg(all(not(windows), not(target_os = "linux"), not(target_os = "android")))]
 pub fn memory() -> u64 {
     0
 }
@@ -234,12 +234,12 @@ pub fn total_memory() -> u64 {
     if unsafe { GlobalMemoryStatusEx(&mut s) } != 0 { s.total_phys } else { 0 }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn total_memory() -> u64 {
     proc_kb("/proc/meminfo", "MemTotal:")
 }
 
-#[cfg(all(not(windows), not(target_os = "linux")))]
+#[cfg(all(not(windows), not(target_os = "linux"), not(target_os = "android")))]
 pub fn total_memory() -> u64 {
     0
 }

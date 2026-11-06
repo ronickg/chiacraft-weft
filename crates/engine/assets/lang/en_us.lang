@@ -737,3 +737,13 @@ world.default_name = New World
 chat.screenshot = Screenshot saved: {0}, {1}
 chat.screenshot.picture = open picture
 chat.screenshot.folder = open folder
+
+# On-screen controls of a touch screen (touch.rs): short, they sit on small buttons.
+touch.jump = Jump
+touch.sneak = Sneak
+touch.attack = Hit
+touch.use = Use
+touch.inventory = Inv
+touch.drop = Drop
+touch.chat = Chat
+touch.pause = II

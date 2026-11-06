@@ -192,6 +192,8 @@ pub struct Shared {
     /// Players in the world (chiacraft): entity and key, for mods asking who a player is.
     pub players: parking_lot::RwLock<Vec<(u64, String)>>,
     pub paused: AtomicBool,
+    /// Save everything at the next turn of the loop (`ServerHandle::save_now`).
+    pub save_now: AtomicBool,
     pub hosting: AtomicBool,
     pub tick_us: AtomicU64,
     pub regions: AtomicU64,
@@ -293,6 +295,12 @@ impl ServerHandle {
 
     pub fn set_paused(&self, p: bool) {
         self.shared.paused.store(p, Ordering::Relaxed);
+    }
+
+    /// Saves the world and its players soon, paused or not (Android may end an app in the
+    /// background without a word).
+    pub fn save_now(&self) {
+        self.shared.save_now.store(true, Ordering::Relaxed);
     }
 
     pub fn is_hosting(&self) -> bool {
@@ -453,6 +461,9 @@ fn run(
         }
         while let Ok(line) = console_rx.try_recv() {
             server.console(&line);
+        }
+        if server.shared.save_now.swap(false, Ordering::Relaxed) {
+            server.save_all(true);
         }
         if server.shared.paused.load(Ordering::Relaxed) {
             server.idle();
