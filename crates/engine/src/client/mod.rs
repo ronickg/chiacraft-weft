@@ -663,6 +663,9 @@ pub struct Client {
     /// Last frame's projection and view without the jitter, where its camera stood and the
     /// shaders' clock then, for temporal anti-aliasing's `Scene::taa_prev` and `taa`.
     taa_last: Option<(glam::Mat4, DVec3, f32)>,
+    /// Temporal anti-aliasing's count image this frame, bindless index + 1 (`Scene::taa_frame`),
+    /// set by the app before `render` (`post::Post::taa_out`).
+    pub taa_out: u32,
     pub late_out: CommandList,
     /// Seconds until the next dust piece from the block being hit, and until its next knock.
     hit_dust: f32,
@@ -990,6 +993,7 @@ impl Client {
             hand_late: CommandList::default(),
             behind: [0.0; 4],
             taa_last: None,
+            taa_out: 0,
             late_out: CommandList::default(),
             hit_dust: 0.0,
             hit_sound: 0.0,
@@ -2868,6 +2872,7 @@ impl Client {
             // Filled in by `render` (`taa_frame`).
             taa: [0.0; 4],
             taa_prev: [[0.0; 4]; 4],
+            taa_frame: [self.taa_out as f32, 0.0, 0.0, 0.0],
             cloud_shadow: [0.0; 4],
             prev_view_proj: [[0.0; 4]; 4],
             cloud_moved: [0.0; 4],

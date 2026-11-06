@@ -496,6 +496,16 @@ impl Post {
         self.motion_tex.map(|t| t.0)
     }
 
+    /// The count image this frame's gathering will write (bindless index + 1, `Scene::taa_frame`),
+    /// asked before the world is drawn: 0 without temporal anti-aliasing, or on a frame whose size
+    /// differs from the images' (they are made anew in `apply`).
+    pub fn taa_out(&self, w: u32, h: u32) -> u32 {
+        match self.counts {
+            Some((_, idx, size)) if self.taa_on() && size == (w, h) && self.upscaled.is_none() => idx[self.taa_cur] + 1,
+            _ => 0,
+        }
+    }
+
     /// What a temporal upscaler needs of the frame `apply` last drew (`TemporalInputs`), with
     /// `export_motion` set (else the motion is not drawn whole); none without temporal
     /// anti-aliasing.

@@ -121,7 +121,8 @@ fn taa_history(tex: u32, uv: vec2<f32>) -> vec4<f32> {
 
 struct TaaOut {
     @location(0) color: vec4<f32>,
-    // The frames gathered here (r), read next frame as `exposure`.
+    // The frames gathered here (r), read next frame as `exposure`, and how far this pixel moved this
+    // frame in pixels (g), for a pack's sharpening in motion (`Scene::taa_frame`).
     @location(1) count: vec4<f32>,
 }
 
@@ -222,7 +223,7 @@ fn fs_taa(in: VOut) -> TaaOut {
     let out = taa_untone(taa_rgb(mix(clipped, here, w)));
     // The alpha (the water mask) gathered as the color, held to this frame's neighbourhood.
     let a = mix(clamp(hist.a, lo_a, hi_a), here_a, w);
-    return TaaOut(vec4(max(out, vec3(0.0)), a), vec4(mix(n + 1.0, 1.0, reactive), 0.0, 0.0, 0.0));
+    return TaaOut(vec4(max(out, vec3(0.0)), a), vec4(mix(n + 1.0, 1.0, reactive), px, 0.0, 0.0));
 }
 
 // The whole motion image for an upscaler (DLSS, Arm ASR: `post::TemporalInputs`): xy the motion

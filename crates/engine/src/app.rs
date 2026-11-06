@@ -3236,6 +3236,8 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
     let mut world = std::mem::take(&mut r.world_list);
     world.clear();
     if let Some(g) = &mut r.game {
+        // Where this frame's gathering writes its count and motion, for the effects' sharpening.
+        g.client.taa_out = r.post.taa_out(world_info.width, world_info.height);
         let s = crate::diag::span("client render");
         g.client
             .render(&mut *r.gpu, &mut world, &mut r.list, world_info, &r.textures);

@@ -280,9 +280,36 @@ fn sharpen_delta(scene_tex: u32, uv: vec2<f32>) -> vec3<f32> {
     let mn = min(lc, min(min(ln, ls), min(le, lw)));
     let mx = max(lc, max(max(ln, ls), max(le, lw)));
     let amp = sqrt(clamp(min(mn, 2.0 - mx) / max(mx, 1e-4), 0.0, 1.0));
-    let wt = -amp * mix(1.0 / 8.0, 1.0 / 5.0, k);
+    // Where the picture moves under temporal anti-aliasing (`scene.taa_frame`: how far each pixel
+    // moved this frame), more: a gathered picture is read between its texels every frame it moves
+    // and comes out softer while the camera turns (mc_forest mid-turn grain 7.3 against 10.4 still).
+    // Up to the full CAS lobe and twice its push by 6 px a frame, held inside the neighbourhood so
+    // edges don't ring. Only here, on the way to the screen: in the gathered picture itself it would
+    // build up frame on frame.
+    let moving = taa_motion_px(px, size);
+    let m = smoothstep(0.75, 6.0, moving);
+    let wt = -amp * mix(1.0 / 8.0, 1.0 / 5.0, clamp(k + m, 0.0, 1.0));
     let sharp = (c + (n + s + e + w) * wt) / (1.0 + 4.0 * wt);
-    return max(sharp, vec3(0.0)) - c;
+    let pushed = c + (sharp - c) * (1.0 + m);
+    if m <= 0.0 {
+        // Still, or without the gathering: CAS as it was.
+        return max(sharp, vec3(0.0)) - c;
+    }
+    let lo = min(c, min(min(n, s), min(e, w)));
+    let hi = max(c, max(max(n, s), max(e, w)));
+    return clamp(max(pushed, vec3(0.0)), lo, hi) - c;
+}
+
+// How far the pixel at `px` of an image `size` moved this frame, in pixels, from temporal
+// anti-aliasing's count image (`scene.taa_frame`, g); 0 without it.
+fn taa_motion_px(px: vec2<i32>, size: vec2<i32>) -> f32 {
+    if scene.taa_frame.x < 0.5 {
+        return 0.0;
+    }
+    let t = textures[u32(scene.taa_frame.x) - 1u];
+    let dims = vec2<i32>(textureDimensions(t));
+    let at = clamp(px * dims / max(size, vec2(1)), vec2(0), dims - 1);
+    return textureLoad(t, at, 0).g;
 }
 
 // How much of the view at `uv` the mist covers (0 none to 1), from the mist volume (`froxels`) at
