@@ -751,8 +751,18 @@ gpu_struct! {
         /// the picture finished in the effects' last pass, so a pack's surfaces leave its tone
         /// curve to that pass); 0 into the screen or a preview. y 1 when the last frame drew the
         /// HDR world's bloom pyramid (`post::bloom`), which the last pass adds, so a pack's own
-        /// bloom effect leaves its glow out. zw unused.
+        /// bloom effect leaves its glow out. z the pixels a mist volume cell covers each way
+        /// (`client::froxels`: 8, or 4 at ultra), for a pack that spends more on finer cells. w unused.
         pub frame: [f32; 4],
+        /// The soft clouds' shadow on the land (`client::cloud_shadow`, with the HDR world; a pack
+        /// whose sky has `fs_cloud_shadow`): x the map's bindless index + 1 (0: none this frame), y
+        /// its texels each way, zw unused.
+        pub cloud_shadow: [f32; 4],
+        /// The mist's volume (`client::froxels`, `core:froxels`, with a pack whose sky has
+        /// `fs_froxel_light` and `fs_froxel_sum`; chiacraft): x the bindless index + 1 of the sums
+        /// from the eye (0: none this frame), y the index of each cell's own, zw the cells across
+        /// the view; 32 slices deep, eight to a row of the image.
+        pub froxels: [f32; 4],
     }
 }
 
