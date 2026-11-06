@@ -988,6 +988,7 @@ impl Post {
                     depth,
                     low: gpu.texture_index(ga[0]) + 1,
                     bloom: pt.specular.map_or(0, |s| gpu.texture_index(s) + 1),
+                    exposure: gpu.texture_index(pt.normal) + 1,
                     ..Pass::default()
                 };
                 taa_entries.push(pt_entry);

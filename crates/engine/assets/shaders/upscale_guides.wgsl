@@ -154,10 +154,12 @@ fn fs_pt_guides_a(in: VOut) -> GuideOut {
     return guides_estimated(in);
 }
 
-// Second pass: the specular albedo by the surface's own F0
-// and roughness (the same `pt_spec_albedo` the path tracer divided by), and the specular hit
-// distance in r. Entry: `scene` the F0 image, `low` the normals + roughness + 1, `bloom` the path
-// tracer's specular light + 1 (its alpha the hit distance), `depth`, `size`.
+// Second pass: the specular albedo by the surface's own F0 and roughness (the same
+// `pt_spec_albedo` the path tracer divided by; a dielectric's 4 % where the G-buffer drew nothing;
+// where it drew, an F0 of 0 is a texture without LabPBR maps: no shine), and the specular hit
+// distance in r (65504 the sky, 0 none traced). Entry: `scene` the F0 image, `low` the first pass's
+// normals + roughness + 1, `bloom` the path tracer's specular light + 1 (its alpha the hit
+// distance; 0: none yet), `exposure` the G-buffer's own normals + 1, `depth`, `size`.
 @fragment
 fn fs_pt_guides(in: VOut) -> PtGuideOut {
     let pass_ = passes[in.pass_index];
@@ -171,7 +173,8 @@ fn fs_pt_guides(in: VOut) -> PtGuideOut {
     }
     let nr = textureLoad(textures[pass_.low - 1u], at, 0);
     var f0 = textureLoad(textures[pass_.scene], at, 0).rgb;
-    if max(f0.r, max(f0.g, f0.b)) <= 0.0 {
+    let drew = pass_.exposure != 0u && length(textureLoad(textures[pass_.exposure - 1u], at, 0).xyz) > 0.5;
+    if !drew {
         f0 = vec3(0.04);
     }
     let v = -normalize(guide_position(pass_.depth, at, size));

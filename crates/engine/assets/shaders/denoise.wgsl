@@ -78,6 +78,14 @@ fn dn_position(at: vec2<i32>, d: f32, size: vec2<f32>) -> vec3<f32> {
     return h.xyz / h.w;
 }
 
+// Whether the path tracer lit the surface at `at`: something drawn (depth) that the G-buffer holds
+// (its normal not 0; it is cleared where mobs, distant tiles and what is seen through stand). The
+// rest keeps its own light, and no filter takes from it or gives to it.
+fn dn_traced(normal: u32, depth: u32, at: vec2<i32>, size: vec2<i32>) -> bool {
+    let p = clamp(at, vec2(0), size - 1);
+    return textureLoad(textures[depth], p, 0).r > 0.0 && length(textureLoad(textures[normal], p, 0).xyz) > 0.5;
+}
+
 fn dn_normal(normal: u32, at: vec2<i32>, size: vec2<i32>) -> vec4<f32> {
     let t = textureLoad(textures[normal], clamp(at, vec2(0), size - 1), 0);
     return vec4(normalize(t.xyz + vec3(0.0, 0.0, 1e-6)), clamp(t.w, 0.0, 1.0));
@@ -125,7 +133,7 @@ fn dn_reproject(d: DenoisePass, at: vec2<i32>) -> Reprojected {
     r.ok = false;
     let isize = vec2<i32>(d.size);
     let dep = dn_depth(d.depth, at, isize);
-    if dep <= 0.0 || d.prev_guide == 0u || d.reset != 0u {
+    if !dn_traced(d.normal, d.depth, at, isize) || d.prev_guide == 0u || d.reset != 0u {
         return r;
     }
     let m = dn_motion(d.motion, d.depth, at, isize);
@@ -184,7 +192,7 @@ fn fs_temporal(in: VOut) -> Pair {
     let isize = vec2<i32>(d.size);
     let at = vec2<i32>(in.clip.xy);
     var out: Pair;
-    if dn_depth(d.depth, at, isize) <= 0.0 {
+    if !dn_traced(d.normal, d.depth, at, isize) {
         out.diffuse = vec4(0.0);
         out.specular = vec4(0.0);
         return out;
@@ -222,7 +230,7 @@ fn fs_moments(in: VOut) -> MomentsOut {
     let at = vec2<i32>(in.clip.xy);
     var out: MomentsOut;
     let dep = dn_depth(d.depth, at, isize);
-    if dep <= 0.0 {
+    if dep <= 0.0 || !dn_traced(d.normal, d.depth, at, isize) {
         out.moments = vec4(0.0);
         out.guide = vec4(0.0);
         return out;
@@ -257,7 +265,7 @@ fn fs_variance(in: VOut) -> Pair {
     let dep = dn_depth(d.depth, at, isize);
     let hd = dn_light(d.diffuse, at, isize);
     let hs = dn_light(d.specular, at, isize);
-    if dep <= 0.0 {
+    if dep <= 0.0 || !dn_traced(d.normal, d.depth, at, isize) {
         out.diffuse = vec4(0.0);
         out.specular = vec4(0.0);
         return out;
@@ -276,7 +284,7 @@ fn fs_variance(in: VOut) -> Pair {
             for (var x = -3; x <= 3; x++) {
                 let q = at + vec2(x, y);
                 let dq = dn_depth(d.depth, q, isize);
-                if dq <= 0.0 {
+                if dq <= 0.0 || !dn_traced(d.normal, d.depth, q, isize) {
                     continue;
                 }
                 let w = dn_edge(nc, pc, zc, dn_normal(d.normal, q, isize).xyz, dn_position(clamp(q, vec2(0), isize - 1), dq, d.size), 64.0);
@@ -314,7 +322,7 @@ fn fs_atrous(in: VOut) -> Pair {
     let dep = dn_depth(d.depth, at, isize);
     let cd = dn_light(d.diffuse, at, isize);
     let cs = dn_light(d.specular, at, isize);
-    if dep <= 0.0 {
+    if dep <= 0.0 || !dn_traced(d.normal, d.depth, at, isize) {
         out.diffuse = cd;
         out.specular = cs;
         return out;
@@ -342,7 +350,7 @@ fn fs_atrous(in: VOut) -> Pair {
                 continue;
             }
             let dq = dn_depth(d.depth, q, isize);
-            if dq <= 0.0 {
+            if dq <= 0.0 || !dn_traced(d.normal, d.depth, q, isize) {
                 continue;
             }
             let nqr = dn_normal(d.normal, q, isize);
@@ -377,6 +385,10 @@ fn fs_composite(in: VOut) -> @location(0) vec4<f32> {
     if dep <= 0.0 {
         // The sky is in the scene image already; in the check (`step` 1) it comes from the picture.
         return select(vec4(0.0), vec4(textureLoad(textures[d.albedo], at, 0).rgb, 1.0), d.step == 1u);
+    }
+    // Not traced (mobs, distant tiles, water: the G-buffer holds terrain only): its own light stays.
+    if !dn_traced(d.normal, d.depth, at, isize) {
+        return vec4(0.0);
     }
     let nr = dn_normal(d.normal, at, isize);
     let v = -normalize(dn_position(at, dep, d.size));
