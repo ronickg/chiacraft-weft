@@ -140,12 +140,13 @@ fn blend(a: Palette, b: Palette, t: f32) -> Palette {
 fn palette() -> Palette {
     var p = palette_read();
     // The sky's light test (`base:look_sky_light`): its light in the shade scaled, the sun's kept.
-    // In the HDR world 0.45 of it as made in the morning, 0.65 with the sun high (the gap sheets:
+    // In the HDR world 0.45 of it as made in the morning (0.55 under a forest's canopy), 0.65 with
+    // the sun high (the gap sheets:
     // our shade never went dark against Bliss's, the near forest at 08:00 luma 93 against 58; at
     // noon the greens then read dark, 41 against 50; agreed with Shader, 11-05, so today's approved
     // look keeps its keys).
     let k = fantasy_opt(OPT_SKY_LIGHT);
-    p.ambient *= select(1.0, k, k > 0.0) * select(1.0, mix(0.45, 0.65, smoothstep(0.5, 0.85, scene.sun.y)), scene.frame.x > 0.5);
+    p.ambient *= select(1.0, k, k > 0.0) * select(1.0, mix(mix(0.45, 0.55, min(canopy(), 1.0)), 0.65, smoothstep(0.5, 0.85, scene.sun.y)), scene.frame.x > 0.5);
     // And its sunlight a little warmer with the sun high (the warmth on Bliss's noon land is its
     // sun's, the sky and the far haze staying blue: our whole-picture white balance had greyed the
     // noon sky, saturation 19 against 31).
@@ -822,6 +823,20 @@ fn block_by_day(sky: f32) -> f32 {
     // By the sun's height, not the daylight value: that stays above zero at night, and a torch
     // at midnight lost some of its warmth.
     return 1.0 - 0.75 * smoothstep(0.5, 1.0, sky) * smoothstep(0.0, 0.25, scene.sun.y);
+}
+
+// The sun's light through leaves in the HDR world, as a share of the sun's (times the leaf's paint):
+// looking toward the sun a crown glows (Bliss's leaves up to about ten times brighter that way, never
+// black), a little all round as light passes through the thin leaves; `shadow` the sun's reach there,
+// `sky` the sky light level (none deep in the dark of a canopy), `rel` camera relative. 0 without
+// the HDR world. Far crowns (`fs_lod`) call it too, so near and far tops light alike.
+fn leaf_through(rel: vec3<f32>, shadow: f32, sky: f32) -> f32 {
+    if scene.frame.x < 0.5 {
+        return 0.0;
+    }
+    let back = max(-dot(normalize(rel), light_dir()), 0.0);
+    let open = smoothstep(0.4, 0.9, sky);
+    return (pow(back, 4.0) * 1.6 + 0.12) * light_strength() * mix(0.25, 1.0, shadow) * open;
 }
 
 fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
