@@ -171,6 +171,10 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
     if side == 0u {
         shade = select(1.0, 0.7, dir.y > 0.0);
     }
+    // Vanilla's shades are of the picture's sRGB colour; this light is linear (chiacraft: applied
+    // as they were, the 0.7 underside read about 0.85 and the clouds stood brighter than vanilla's,
+    // luma 212-218 against 190-197 in Bliss's world; Shader, 11-06).
+    shade = pow(shade, 2.2);
     let rel = dir * t;
     let dist = length(rel.xz) / reach;
     let color = mix(s.color.rgb * shade, scene.fog_color.rgb, smoothstep(0.5, 1.0, dist));
@@ -190,7 +194,11 @@ fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
         let dark = s.uv.x * smoothstep(0.0, 0.08, -dir.y);
         return vec4(scene.fog_color.rgb * (1.0 - dark), 1.0);
     }
-    return vec4(mix(s.color.rgb, scene.fog_color.rgb, clamp(0.0625 / dir.y, 0.0, 1.0)), 1.0);
+    // Mixed as vanilla mixes them, in sRGB (chiacraft: mixed in linear light the fog's bright colour
+    // took over too early, the low sky about 10-15 brighter than vanilla's; Shader, 11-06).
+    let g = clamp(0.0625 / dir.y, 0.0, 1.0);
+    let srgb = mix(pow(s.color.rgb, vec3(1.0 / 2.2)), pow(scene.fog_color.rgb, vec3(1.0 / 2.2)), g);
+    return vec4(pow(srgb, vec3(2.2)), 1.0);
 }
 
 // Vanilla's sunset fan: an oval lying on the horizon on the side of the body.
