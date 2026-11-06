@@ -712,7 +712,7 @@ gpu_struct! {
         /// a mod's air, `air_flags::CANOPY_SHIFT`), for packs' light under the leaves; y how wet
         /// the ground is, 0..1: it follows what falls up and dries over minutes after (a mod's air
         /// says how fast, `air_flags::DRYING_SHIFT`); z how far puddles have grown, 0..1: over
-        /// about ten minutes of rain, drying slower than the ground after; w unused.
+        /// about ten minutes of rain, drying three times slower than the ground after; w unused.
         pub canopy: [f32; 4],
         /// Soft clouds (`core:soft_clouds`, with a pack whose sky has `fs_cloud_trace` and
         /// `fs_cloud_resolve`; chiacraft): x the bindless index + 1 of this frame's clouds, traced

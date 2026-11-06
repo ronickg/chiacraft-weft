@@ -2703,14 +2703,15 @@ impl Client {
             let secs = if drying == 0 { 120.0 } else { 3600.0 * (30.0f32 / 3600.0).powf((drying - 1) as f32 / 254.0) };
             self.wet = (self.wet - dt / secs).max(falling);
         }
-        // Puddles grow over about ten minutes of steady rain (a shower leaves a few) and dry half
-        // as fast again as the ground after it, the last of the wet to go.
+        // Puddles grow over about ten minutes of steady rain (a shower leaves a few) and dry a third
+        // as fast as the ground after it, the last of the wet to go (at half its pace they were gone
+        // three minutes after a five-minute rain, the ground still dark: PC shpd7).
         if falling > 0.0 {
             self.puddles = (self.puddles + falling * dt / 600.0).min(1.0);
         } else {
             let drying = (flags >> weft_abi::air_flags::DRYING_SHIFT) & 255;
             let secs = if drying == 0 { 120.0 } else { 3600.0 * (30.0f32 / 3600.0).powf((drying - 1) as f32 / 254.0) };
-            self.puddles = (self.puddles - dt / (secs * 1.5)).max(0.0);
+            self.puddles = (self.puddles - dt / (secs * 3.0)).max(0.0);
         }
         let heading = self.world.air.1.to_radians();
         let wind = Vec2::new(heading.sin(), -heading.cos()) * speed;
