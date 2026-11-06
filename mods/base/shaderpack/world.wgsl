@@ -474,12 +474,13 @@ fn shade_soft(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
         // with the rain: a shower a few, a long rain most), a round pool about a jittered middle
         // that widens as it fills, edged in the blocks' own pixels.
         // (A threshold on two octaves of value noise left none: in the shader the noise stayed
-        // near its middle, PC debug runs shpdd-shpdd3.)
+        // near its middle, PC debug runs shpdd-shpdd3; with `hash3` picking the cells, one or two
+        // in the whole field where a fifth were due, shpd6. `puddle_hash` is a sine hash.)
         let q = floor(in.pos.xz * 16.0) / 16.0;
         let cell = vec2<i32>(floor(q / 3.0));
-        let pick = hash3(vec3(cell.x, 41, cell.y));
-        let middle = (vec2<f32>(cell) + 0.3 + 0.4 * vec2(hash3(vec3(cell.x, 43, cell.y)), hash3(vec3(cell.x, 47, cell.y)))) * 3.0;
-        let reach = mix(0.6, 1.5, puddles) * mix(0.7, 1.0, hash3(vec3(cell.x, 53, cell.y)));
+        let pick = puddle_hash(cell, 1.0);
+        let middle = (vec2<f32>(cell) + 0.3 + 0.4 * vec2(puddle_hash(cell, 2.0), puddle_hash(cell, 3.0))) * 3.0;
+        let reach = mix(0.6, 1.5, puddles) * mix(0.7, 1.0, puddle_hash(cell, 4.0));
         let wobble = (noise3(vec3(q * 0.9, 5.3)) - 0.5) * 0.5;
         let pool = select(0.0, 1.0, pick < mix(0.12, 0.6, puddles)) * smoothstep(reach, reach - 0.12, length(q - middle) + wobble);
         if pool > 0.0 {
@@ -498,6 +499,12 @@ fn shade_soft(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     // The air before it glows with the placed lights' light (the held one is in `haze_lit`).
     let glow = placed_in_fog(in.light.yzw, in.rel, in.pos, in.light.x);
     return vec4(display(haze_lit(lit.rgb + glow, in.rel, in.light.x)), lit.a);
+}
+
+// 0..1 for puddle cell `c` and key `k`: a sine hash (the pack's `hash3` picked far too few cells,
+// PC shpd6).
+fn puddle_hash(c: vec2<i32>, k: f32) -> f32 {
+    return fract(sin(dot(vec2<f32>(c), vec2(12.9898, 78.233)) + k * 37.719) * 43758.5453);
 }
 
 // ---- water ----
