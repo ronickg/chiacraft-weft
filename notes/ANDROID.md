@@ -95,6 +95,20 @@ the phone on USB, `ANDROID_HOME=~/Library/Android/sdk tools/release/android-run.
   `ANDROID_TESTKIT=1 tools/release/android.sh`, `~/Coding/chiacraft-archive/tester-tools/android/
   phone_script.sh`): spectator clean, survival glitched, the hand alone off clean. Screen
   recordings before and after: `pixel10_video/`, `pixel10_video_fixed/`.
+- **Where the GPU time goes (11-05, night):** the bench's vista (`bench_vista.txt`: the PC bench's
+  vista, view 8, distant terrain 128, one 1024 shadow map, render scale 0.5) ran at 13 fps, world
+  pass 68.7 ms. Copies of the pack with one part of `fs_lod` off at a time (`pack_variant.py`): far
+  land drawn flat 5.3 ms, its texture alone 9.1, no haze 36.3, no far water 47.3, no sun shadow map
+  53.4, no crowns / sky colour / cloud shadow about 60, snow and the mist march nothing; no
+  distant terrain at all 87 fps. So it's the far land's per-pixel light, not its geometry. Its
+  haze per vertex instead was slower (87.6 ms: the tiles have more vertices than the screen has
+  pixels at 0.5).
+- **Far land without `discard` (810403c2):** `fs_lod`'s discard (columns the cubes show) turned off
+  PowerVR's hidden-surface removal for every far tile; with none at all the world pass was 45.7 ms.
+  Tiles wholly outside the cubes' mask now draw with `fs_lod_open`, the same without it, so the
+  picture is the same (fresh-world shots, old build and new: mean difference 0.04-0.15 of 255):
+  world pass 50.9 ms, the frame 77 -> 59 ms, 13 -> 17 fps. (On a world saved by killed runs, and
+  in both builds, near chunks showed as holes in a steep look down: test worlds want fresh names.)
 - **Debugging on the phone:** `VALIDATION_LAYERS=<Khronos android-binaries folder>
   tools/release/android.sh` packs the validation layer; `--gpu-debug` in args.txt turns it on;
   `adb shell setprop debug.vulkan.khronos_validation.validate_sync true` adds sync checks. It
