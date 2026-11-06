@@ -1152,6 +1152,37 @@ fn dust_reach(p: vec3<f32>) -> f32 {
 }
 
 fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
+    return fog_density_with(p, floor, fog_banks_at(p, floor));
+}
+
+// The banks' noise at `p` (`fog_density`): walked only where the banks count, their mean (0.3)
+// elsewhere.
+fn fog_banks_at(p: vec3<f32>, floor: f32) -> f32 {
+    let s = storm();
+    let h = p.y - mix(min(floor, SEA_LEVEL + MIST_TOP), floor, s);
+    let low = exp(-max(h - 3.0, 0.0) / mix(7.0 + 12.0 * min(canopy(), 1.0), 40.0, s));
+    let open = smoothstep(-24.0, -10.0, h);
+    let near_floor = scene.frame.x > 0.5 && p.y - floor < 14.0 && p.y < SEA_LEVEL + MIST_TOP + 50.0;
+    if low * open > 0.02 || near_floor {
+        return fog_banks(p);
+    }
+    return 0.3;
+}
+
+// Banks: a broad octave, and a fine one that both shapes and eats them, rising slowly (one octave
+// fewer than before: three noises a step were most of the mist's cost, +3.4 ms on the PC at 3456
+// px, Research round 15). Its weight keeps the mix's spread, so the banks cover as much.
+fn fog_banks(p: vec3<f32>) -> f32 {
+    let drift = vec3(wind_now().x, 0.0, wind_now().y) * scene.params.w * mix(0.6, 2.0, storm());
+    let q = p - drift;
+    let broad = noise3(q * vec3(1.0 / 38.0, 1.0 / 12.0, 1.0 / 38.0));
+    let fine = noise3(q * vec3(1.0 / 9.0, 1.0 / 5.5, 1.0 / 9.0) + vec3(0.0, scene.params.w * 0.03, 0.0));
+    return smoothstep(0.45, 0.66, broad * 0.7 + fine * 0.39 - 0.05);
+}
+
+// `fog_density` with the banks' noise `banks` given (`fog_banks`): the mist volume takes it once a
+// cell and the height's shape at several places through it (`froxel_cell`).
+fn fog_density_with(p: vec3<f32>, floor: f32, banks: f32) -> f32 {
     let f = scene.weather.z * dust_reach(p);
     let s = storm();
     // The mist (not a storm's dust or snow) lies below a height of its own, `MIST_TOP` over the
@@ -1166,22 +1197,6 @@ fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
     let high = exp(-max(h, 0.0) / 45.0);
     // Deep under it, in the ground, there is none.
     let open = smoothstep(-24.0, -10.0, h);
-    // Banks: a broad octave, and a fine one that both shapes and eats them, rising slowly (one
-    // octave fewer than before: three noises a step were most of the mist's cost, +3.4 ms on the
-    // PC at 3456 px, Research round 15). Its weight keeps the mix's spread, so the banks cover as
-    // much. Well above the low layer, or under the ground, the banks barely count: their mean
-    // stands in and no noise is walked.
-    var banks = 0.3;
-    // In the HDR world the banks are walked near what the ray ends on too, for the wisps in the
-    // crowns below.
-    let near_floor = scene.frame.x > 0.5 && p.y - floor < 14.0 && p.y < SEA_LEVEL + MIST_TOP + 50.0;
-    if low * open > 0.02 || near_floor {
-        let drift = vec3(wind_now().x, 0.0, wind_now().y) * scene.params.w * mix(0.6, 2.0, s);
-        let q = p - drift;
-        let broad = noise3(q * vec3(1.0 / 38.0, 1.0 / 12.0, 1.0 / 38.0));
-        let fine = noise3(q * vec3(1.0 / 9.0, 1.0 / 5.5, 1.0 / 9.0) + vec3(0.0, scene.params.w * 0.03, 0.0));
-        banks = smoothstep(0.45, 0.66, broad * 0.7 + fine * 0.39 - 0.05);
-    }
     // The sun thins the banks by day to a third (mornings and evenings keep them); a storm's
     // blowing snow or dust it leaves.
     let burn = mix(1.0, mix(0.35, 1.0, s), smoothstep(0.25, 0.65, scene.sun.y));
@@ -1446,20 +1461,21 @@ fn froxel_cell(dir: vec3<f32>, at: f32, floor: f32) -> vec4<f32> {
     let shaded_sky = light.sky * mix(vec3(1.0), LEAF_LIGHT * 0.2, leafy * 0.85) + light.leaf * leafy;
     let k = froxel_slice(at);
     let span = froxel_end(k) - froxel_end(k - 1.0);
-    // The mist two taps through the cell's depth, each in its half at a place that moves every
-    // frame (temporal anti-aliasing blends them): taken at the cell's middle alone, a low layer
-    // was all in a slice where the middle fell in it and none where it didn't, so the land under a
-    // dawn mist wore rings round the eye at the slices' distances, 50-120 blocks deep out there
-    // (Ronald, 11-06, pt_compare_v2 "low over the river": "what is this weird, like a ripple thing").
-    // Where in its half each tap falls: interleaved gradient noise over the cells, moved on every
-    // frame, which temporal anti-aliasing averages evenly (a random hash a cell left speckle at the
-    // mist's edges, the first ring-fix run, 11-06).
-    let clip = scene.view_proj * vec4(dir, 1.0);
-    let cell = trunc((vec2(clip.x, -clip.y) / max(clip.w, 1e-4) * 0.5 + 0.5) * scene.froxels.zw);
-    let frame = trunc(scene.params.w * 60.0) % 64.0;
-    let j = fract(52.9829189 * fract(dot(cell + vec2(5.588238 * frame + 7.0 * k, 0.0), vec2(0.06711056, 0.00583715))));
-    let d = 0.5 * (fog_density(scene.eye.xyz + dir * (at + span * (j - 1.0) * 0.5), floor)
-        + fog_density(scene.eye.xyz + dir * (at + span * j * 0.5), floor));
+    // The mist through the cell's whole depth: the banks' noise once at its middle, the height's
+    // shape (the layer's top, its fall) at eight places spread through it. Taken at the middle
+    // alone, a low layer was all in a slice where the middle fell in it and none where it didn't,
+    // so the land under a mist wore rings round the eye at the slices' distances, 50-120 blocks
+    // deep out there (Ronald, 11-06, pt_compare_v2 "low over the river": "what is this weird, like
+    // a ripple thing"). Jittered taps blended by temporal anti-aliasing left a dot pattern instead.
+    let slice = trunc(froxel_slice(at));
+    let a0 = froxel_end(slice - 1.0);
+    let a1 = froxel_end(slice);
+    let banks = fog_banks_at(scene.eye.xyz + dir * at, floor);
+    var d = 0.0;
+    for (var i = 0; i < 8; i++) {
+        d += fog_density_with(scene.eye.xyz + dir * mix(a0, a1, (f32(i) + 0.5) / 8.0), floor, banks);
+    }
+    d /= 8.0;
     if d <= 0.0 {
         return vec4(0.0);
     }
