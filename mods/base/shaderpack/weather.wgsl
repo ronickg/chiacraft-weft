@@ -13,6 +13,8 @@ struct VOut {
     @location(2) alpha: f32,
     @location(3) dist: f32,
     @location(4) rel: vec3<f32>,
+    // How far the strip's picture has fallen (its own offset, in its texture's units).
+    @location(5) @interpolate(flat) fall: f32,
 }
 
 @vertex
@@ -30,6 +32,7 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
     out.alpha = w.uv.w;
     out.dist = length(world);
     out.rel = world;
+    out.fall = w.uv.y;
     return out;
 }
 
@@ -68,7 +71,10 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
     var cover = 0.0;
     if snow {
         // Cells a quarter block each way; a flake in some of them, somewhere in the cell.
-        let q = vec2(x * 4.0, select(y, y * 0.2, above) * 4.0);
+        // Above the line on a rain strip: the flakes' places along it in the strip's own blocks, and
+        // only their fall slowed (scaling the whole of it stretched each flake five times tall).
+        let slow = (in.uv.y - in.fall) * 4.0 + in.fall * 4.0 * 0.2;
+        let q = vec2(x * 4.0, select(y, slow, above) * 4.0);
         let cell = vec2<i32>(floor(q));
         let h = fall_hash(seed, cell);
         if h < 0.45 {
