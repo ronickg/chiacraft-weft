@@ -199,6 +199,10 @@ pub fn init(r: &mut Registry) {
     for s in &SPECIES {
         r.attach(s.kind, &HELD);
     }
+    // The bosses (`boss.rs`) hold watch and stare too; their own AI plays the rest (`expire`).
+    for k in [&crate::drenkaun::DRENKAUN, &crate::borkon::BORKON] {
+        r.attach(k, &HELD);
+    }
     r.command("anim", "<clip:word> [mode:word(hold,once,clear,loop)]", command)
         .permission(permission::GAME_MASTER);
     // A flinch when hit, unless the blow kills it (the engine plays `death`).
@@ -326,7 +330,20 @@ fn edit(w: &World, id: u64, f: impl FnOnce(&mut [u64; 4])) {
 /// Every tick, from `animal::upkeep`: a held state no longer asked for ends, one that waited
 /// under a clip played once comes back on, and idle life (`idle_life`).
 pub fn tick(w: &World, id: u64) {
-    let Some(h) = w.component(id, &HELD) else { return };
+    if let Some(h) = expire_(w, id) {
+        idle_life(w, id, h);
+    }
+}
+
+/// `tick` without idle life: for a creature whose own AI plays its other clips (a boss, which
+/// calls `clear` before each of them).
+pub fn expire(w: &World, id: u64) {
+    expire_(w, id);
+}
+
+/// Ends a state no longer asked for and puts one back that waited; its held state if it holds none.
+fn expire_(w: &World, id: u64) -> Option<[u64; 4]> {
+    let h = w.component(id, &HELD)?;
     if h[STATE] != 0 {
         let now = w.game_time();
         let skipped = w.tick_elapsed(id) as u64;
@@ -339,9 +356,9 @@ pub fn tick(w: &World, id: u64) {
             }
             edit(w, id, |c| c[STATE] |= APPLIED);
         }
-        return;
+        return None;
     }
-    idle_life(w, id, h);
+    Some(h)
 }
 
 /// Idle life: standing with nothing held, nothing playing and going nowhere, now and then it looks
