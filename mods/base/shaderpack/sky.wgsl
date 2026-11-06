@@ -1252,6 +1252,7 @@ fn fs_cloud_shadow(in: CloudOut) -> @location(0) vec4<f32> {
     }
     // Light scattered on through the cloud keeps a cloud's shadow from going black (thin ones pass
     // much, thick ones a fifth or so): Beer's law and a slower tail.
-    let through = max(exp(-od), 0.22 * exp(-od * 0.08));
+    // (0.12, not 0.22: a thick cloud's shade too pale beside Bliss's, PC shcs_on, 11-06.)
+    let through = max(exp(-od), 0.12 * exp(-od * 0.08));
     return vec4(through, mid, 0.0, 1.0);
 }
