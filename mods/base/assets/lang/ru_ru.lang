@@ -1544,8 +1544,13 @@ ley.base.feel.pull = тянет
 ley.base.feel.strong = сильно тянет
 ley.base.feel.on_line = на линии
 ley.base.feel.at_node = в узле
-command.base.ley = лей здесь {0} ({1}); ближайшая линия в {2} блоках, у {3} {4}; ближайший узел {5} {6} ({7} линий), в {8} блоках; ближайший путевой камень {9} {10}, в {11} блоках
-command.base.ley_no_line = лей здесь {0} ({1}); ни одной линии в пределах {2} блоков; ближайший узел {5} {6} ({7} линий), в {8} блоках; ближайший путевой камень {9} {10}, в {11} блоках
+command.base.ley = лей здесь {0} ({1})
+command.base.ley.line = ближайшая линия в {0} блоках, у {1} {2}
+command.base.ley.no_line = ни одной линии в пределах {0} блоков
+command.base.ley.node = ближайший узел {0} {1} ({2} линий), в {3} блоках
+command.base.ley.no_node = ни одного узла в пределах {0} блоков
+command.base.ley.waystone = ближайший путевой камень {0} {1}, в {2} блоках
+command.base.ley.no_waystone = ни одного путевого камня в пределах {0} блоков
 # Путевые камни и карта (waystones.rs, map.rs; vitals::waystones)
 key.base.map = Карта
 map.base.title = Карта
