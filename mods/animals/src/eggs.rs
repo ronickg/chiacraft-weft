@@ -72,6 +72,8 @@ static ITEMS: OnceLock<Vec<(usize, &'static Item)>> = OnceLock::new();
 /// ring a nest's eggs lie on round the middle one, blocks at the plain nest's size.
 const NEST_EGG_W: f32 = 0.2;
 const NEST_RING: f64 = 0.25;
+/// How far out round a full nest more eggs are laid, rings of the dish (on the ground beside it).
+const NEST_BESIDE: f64 = 2.6;
 /// The egg an egg's mass is given at, real cm (`hunt::EGG_KG`).
 const MASS_EGG_CM: f32 = 15.0;
 /// A wild female builds a nest about every two days, while her kind isn't crowded.
@@ -198,22 +200,25 @@ fn egg_rest(at: [f64; 3]) -> [f64; 3] {
     at
 }
 
-/// A free spot in the nest at `n`: the middle, else round it.
+/// A free spot in the nest at `n`: the middle, else round it; a full nest's next eggs go on the
+/// ground round it.
 fn nest_spot(w: &World, n: [f64; 3]) -> [f64; 3] {
     let k = nest_scale(w, n);
-    let spots = std::iter::once((0.0, 0.0)).chain((0..7).map(|i| {
-        let a = i as f64 / 7.0 * std::f64::consts::TAU;
-        (a.cos() * NEST_RING * k, a.sin() * NEST_RING * k)
-    }));
-    let mut first = None;
-    for (dx, dz) in spots {
-        let at = [n[0] + dx, n[1] + NEST_FLOOR * k, n[2] + dz];
-        first.get_or_insert(at);
-        if eggs_near(w, at, 0.1 * k).is_empty() {
-            return at;
-        }
-    }
-    first.unwrap_or(n)
+    let free = |r: f64, y: f64| {
+        std::iter::once((0.0, 0.0))
+            .filter(move |_| r == NEST_RING)
+            .chain((0..7).map(move |i| {
+                let a = (i as f64 + if r == NEST_RING { 0.0 } else { 0.5 }) / 7.0 * std::f64::consts::TAU;
+                (a.cos() * r * k, a.sin() * r * k)
+            }))
+            .map(move |(dx, dz)| [n[0] + dx, n[1] + y, n[2] + dz])
+            .find(|&at| eggs_near(w, at, 0.1 * k).is_empty())
+    };
+    // In the dish, else round the nest on the ground (a full nest's eggs piled on each other in
+    // one dish: Tester 2's eggs playtest, 11-06), else the middle.
+    free(NEST_RING, NEST_FLOOR * k)
+        .or_else(|| free(NEST_RING * NEST_BESIDE, 0.0))
+        .unwrap_or([n[0], n[1] + NEST_FLOOR * k, n[2]])
 }
 
 /// The scale species `index`'s egg is drawn at: its egg's drawn length against its look's built
