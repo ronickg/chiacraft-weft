@@ -28,8 +28,10 @@ pub const LOOKS_PER_SEC: f32 = 6000.0;
 
 /// A leaf block with open air under it: leaves a second it drops in calm air, by how its leaves
 /// turn (`wild::Turn`): broadleaves, and evergreens' needles and scales far fewer.
-pub const LEAF_RATE: f32 = 0.005;
-pub const NEEDLE_RATE: f32 = 0.0012;
+/// (Recrafted's is about 0.005, but its display ticks also reach 32 blocks; at that our calm forest
+/// showed none in a shot, wl_look1a.)
+pub const LEAF_RATE: f32 = 0.012;
+pub const NEEDLE_RATE: f32 = 0.003;
 /// In the windiest part of the day more come off: the rate times `1 + LEAF_WIND * wind / 10 m/s`.
 pub const LEAF_WIND: f32 = 0.8;
 /// A gust passing (`gust` over `GUST_FROM`) blows up to this many times the calm rate off the
@@ -76,10 +78,11 @@ pub fn fall_at(day: f32, seasons: f32) -> f32 {
 
 /// A flower in bloom: petals a second in calm air, and the most a gust blows off (Recrafted's
 /// flowers: 0.8 of the leaves' rate, gusts twice).
-pub const PETAL_RATE: f32 = 0.004;
+pub const PETAL_RATE: f32 = 0.006;
 pub const PETAL_GUST: f32 = 2.0;
-/// A tree in blossom (cherry, dogwood): its blooming leaves shed petals instead of leaves, more.
-pub const BLOSSOM_RATE: f32 = 0.008;
+/// A tree in blossom (cherry, dogwood): its blooming leaves shed petals instead of leaves, many
+/// more (a cherry in full bloom snows petals; at 0.008 one petal showed under a grove, wl_look1a).
+pub const BLOSSOM_RATE: f32 = 0.04;
 pub const PETAL_LIFE: (f32, f32) = (40.0, 90.0);
 pub const PETAL_SIZE: (f32, f32) = (0.09, 0.12);
 pub const PETAL_AIR: f32 = 4.0;
@@ -191,12 +194,12 @@ mod tests {
         }
     }
 
-    /// In a forest of some 1,000 open leaf undersides in reach a few leaves a second come off in
+    /// In a forest of some 1,000 open leaf undersides in reach some leaves a second come off in
     /// calm air on the default setting; a gust's burst many more.
     #[test]
     fn the_rates() {
         let calm = 1000.0 * LEAF_RATE * weather(2.0, 0.0) * DENSITY[1];
-        assert!((2.0..10.0).contains(&calm), "calm {calm}");
+        assert!((5.0..20.0).contains(&calm), "calm {calm}");
         assert!(burst(1.0) == 1.0 && (burst(2.0) - GUST_BURST).abs() < 1e-6);
     }
 

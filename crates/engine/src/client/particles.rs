@@ -374,10 +374,10 @@ impl Particles {
                     let biome = world
                         .cube(p >> 4i32)
                         .map_or(0, |cube| cube.biome((p.x & 15) as usize, (p.z & 15) as usize));
-                    c.biomes
-                        .get(biome as usize)
-                        .and_then(|b| b.tints.get(s.tint as usize - 1))
-                        .copied()
+                    // The biome's tint now (a mod's, `set_biome_tints`: the season's leaves),
+                    // as its blocks are drawn.
+                    world
+                        .biome_tint(biome as u32, s.tint as u32 - 1)
                         .unwrap_or_else(|| crate::content::item_tint(s.tint))
                 })
         };

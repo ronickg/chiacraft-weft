@@ -717,6 +717,20 @@ impl ClientWorld {
         }
     }
 
+    /// Biome `biome`'s color of tint kind `kind` now: the mod's (`set_tints`) or the content's.
+    pub fn biome_tint(&self, biome: u32, kind: u32) -> Option<u32> {
+        let c = content();
+        let kinds = c.tint_kinds.len();
+        match &self.tints {
+            Some(t) => t.get(biome as usize * kinds + kind as usize).copied(),
+            None => c
+                .biomes
+                .get(biome as usize)
+                .and_then(|b| b.tints.get(kind as usize))
+                .copied(),
+        }
+    }
+
     pub fn retint_all(&mut self) {
         self.tints_dirty.extend(self.columns.keys().copied());
     }

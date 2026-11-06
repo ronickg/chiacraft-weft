@@ -292,7 +292,8 @@ fn simulate(@builtin(global_invocation_id) id: vec3<u32>) {
             var go = s.y <= s.x && ((below >> LIQUID_BIT) & 1u) == 0u;
             var push = vec3(0.0);
             if kind.air.w > 0.0 {
-                let a = air_at(at, sky);
+                // Down on the ground the wind is weaker (it drops toward the ground).
+                let a = air_at(at, sky) * 0.6;
                 let need = kind.air.w * (0.75 + 0.5 * seed);
                 let w = length(a.xz);
                 if w > need && random01(i, l.age) < dt * 1.5 * (w / need - 0.9) {
