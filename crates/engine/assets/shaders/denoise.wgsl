@@ -15,7 +15,8 @@
 // - `fs_moments` (the light's luminance moments, and this frame's guide for the next): as above,
 //   `prev_moments` last frame's;
 // - `fs_variance` (diffuse, specular with their variance in alpha): `diffuse`/`specular` the gathered,
-//   `moments` this frame's;
+//   `moments` this frame's, `prev_guide` + 1 THIS frame's guide (in this and the passes below: what
+//   was lit);
 // - `fs_atrous` (one à-trous step): `diffuse`/`specular` the last step's, `step` the tap spacing,
 //   `phi_color` how far light may differ (in standard deviations), `phi_normal` the normal's power;
 // - `fs_composite` (added onto the scene image): `diffuse`/`specular` the light, `albedo`, `spec`
@@ -86,6 +87,25 @@ fn dn_traced(normal: u32, depth: u32, at: vec2<i32>, size: vec2<i32>) -> bool {
     return textureLoad(textures[depth], p, 0).r > 0.0 && length(textureLoad(textures[normal], p, 0).xyz) > 0.5;
 }
 
+// What the path tracer lit at `at`, from the entry's raw light (`fs_temporal`, `fs_moments`, and the
+// composite of the raw light): the G-buffer drew it and the diffuse light's alpha (its bounce's
+// distance, 65504 the sky) is set; terrain it drew but didn't trace (past 384 blocks, a failed depth
+// match) has 0 there.
+fn dn_lit(d: DenoisePass, at: vec2<i32>) -> bool {
+    let isize = vec2<i32>(d.size);
+    return dn_traced(d.normal, d.depth, at, isize) && dn_light(d.diffuse, at, isize).a > 0.0;
+}
+
+// The same, from this frame's guide (`prev_guide` + 1 in the later passes: `fs_moments` wrote z 0
+// where nothing was lit), or from the raw light without one.
+fn dn_marked(d: DenoisePass, at: vec2<i32>) -> bool {
+    if d.prev_guide == 0u {
+        return dn_lit(d, at);
+    }
+    let isize = vec2<i32>(d.size);
+    return textureLoad(textures[d.prev_guide - 1u], clamp(at, vec2(0), isize - 1), 0).z > 0.0;
+}
+
 fn dn_normal(normal: u32, at: vec2<i32>, size: vec2<i32>) -> vec4<f32> {
     let t = textureLoad(textures[normal], clamp(at, vec2(0), size - 1), 0);
     return vec4(normalize(t.xyz + vec3(0.0, 0.0, 1e-6)), clamp(t.w, 0.0, 1.0));
@@ -133,7 +153,7 @@ fn dn_reproject(d: DenoisePass, at: vec2<i32>) -> Reprojected {
     r.ok = false;
     let isize = vec2<i32>(d.size);
     let dep = dn_depth(d.depth, at, isize);
-    if !dn_traced(d.normal, d.depth, at, isize) || d.prev_guide == 0u || d.reset != 0u {
+    if !dn_lit(d, at) || d.prev_guide == 0u || d.reset != 0u {
         return r;
     }
     let m = dn_motion(d.motion, d.depth, at, isize);
@@ -192,7 +212,7 @@ fn fs_temporal(in: VOut) -> Pair {
     let isize = vec2<i32>(d.size);
     let at = vec2<i32>(in.clip.xy);
     var out: Pair;
-    if !dn_traced(d.normal, d.depth, at, isize) {
+    if !dn_lit(d, at) {
         out.diffuse = vec4(0.0);
         out.specular = vec4(0.0);
         return out;
@@ -230,7 +250,7 @@ fn fs_moments(in: VOut) -> MomentsOut {
     let at = vec2<i32>(in.clip.xy);
     var out: MomentsOut;
     let dep = dn_depth(d.depth, at, isize);
-    if dep <= 0.0 || !dn_traced(d.normal, d.depth, at, isize) {
+    if dep <= 0.0 || !dn_lit(d, at) {
         out.moments = vec4(0.0);
         out.guide = vec4(0.0);
         return out;
@@ -265,7 +285,7 @@ fn fs_variance(in: VOut) -> Pair {
     let dep = dn_depth(d.depth, at, isize);
     let hd = dn_light(d.diffuse, at, isize);
     let hs = dn_light(d.specular, at, isize);
-    if dep <= 0.0 || !dn_traced(d.normal, d.depth, at, isize) {
+    if dep <= 0.0 || !dn_marked(d, at) {
         out.diffuse = vec4(0.0);
         out.specular = vec4(0.0);
         return out;
@@ -284,7 +304,7 @@ fn fs_variance(in: VOut) -> Pair {
             for (var x = -3; x <= 3; x++) {
                 let q = at + vec2(x, y);
                 let dq = dn_depth(d.depth, q, isize);
-                if dq <= 0.0 || !dn_traced(d.normal, d.depth, q, isize) {
+                if dq <= 0.0 || !dn_marked(d, q) {
                     continue;
                 }
                 let w = dn_edge(nc, pc, zc, dn_normal(d.normal, q, isize).xyz, dn_position(clamp(q, vec2(0), isize - 1), dq, d.size), 64.0);
@@ -322,7 +342,7 @@ fn fs_atrous(in: VOut) -> Pair {
     let dep = dn_depth(d.depth, at, isize);
     let cd = dn_light(d.diffuse, at, isize);
     let cs = dn_light(d.specular, at, isize);
-    if dep <= 0.0 || !dn_traced(d.normal, d.depth, at, isize) {
+    if dep <= 0.0 || !dn_marked(d, at) {
         out.diffuse = cd;
         out.specular = cs;
         return out;
@@ -350,7 +370,7 @@ fn fs_atrous(in: VOut) -> Pair {
                 continue;
             }
             let dq = dn_depth(d.depth, q, isize);
-            if dq <= 0.0 || !dn_traced(d.normal, d.depth, q, isize) {
+            if dq <= 0.0 || !dn_marked(d, q) {
                 continue;
             }
             let nqr = dn_normal(d.normal, q, isize);
@@ -387,7 +407,7 @@ fn fs_composite(in: VOut) -> @location(0) vec4<f32> {
         return select(vec4(0.0), vec4(textureLoad(textures[d.albedo], at, 0).rgb, 1.0), d.step == 1u);
     }
     // Not traced (mobs, distant tiles, water: the G-buffer holds terrain only): its own light stays.
-    if !dn_traced(d.normal, d.depth, at, isize) {
+    if !dn_marked(d, at) {
         return vec4(0.0);
     }
     let nr = dn_normal(d.normal, at, isize);
@@ -423,7 +443,7 @@ fn fs_test(in: VOut) -> Pair {
     }
     let u = f32(dn_hash(u32(at.x) + dn_hash(u32(at.y) + dn_hash(d.step))) >> 8u) / 16777216.0;
     let l = min(-log(max(1.0 - u, 1e-6)), 12.0);
-    out.diffuse = vec4(vec3(l), 0.0);
+    out.diffuse = vec4(vec3(l), 1.0);
     let c = dn_position(at, dep, d.size);
     let l_ = dn_position(clamp(at - vec2(1, 0), vec2(0), isize - 1), dn_depth(d.depth, at - vec2(1, 0), isize), d.size);
     let r_ = dn_position(clamp(at + vec2(1, 0), vec2(0), isize - 1), dn_depth(d.depth, at + vec2(1, 0), isize), d.size);

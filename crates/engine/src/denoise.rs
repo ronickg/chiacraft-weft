@@ -261,6 +261,8 @@ impl Denoiser {
         let mut draws: Vec<(TextureId, Option<TextureId>, PipelineId, usize)> = Vec::new();
         let mut entries: Vec<DenoisePass> = Vec::new();
         let mut light = (raw_d, raw_s);
+        // This frame's guide + 1 for the composite (what was lit), 0: from the raw light.
+        let mut guide = 0;
         if self.mode == SVGF && !self.reconstruct {
             self.ensure_images(gpu, f.size);
             let im = self.images.as_ref().unwrap();
@@ -280,7 +282,9 @@ impl Denoiser {
             draws.push((im.diffuse[cur].0, Some(im.specular[cur].0), temporal, entries.len() - 1));
             entries.push(DenoisePass { diffuse: raw_d, specular: raw_s, ..prev });
             draws.push((im.moments[cur].0, Some(im.guide[cur].0), moments_pipe, entries.len() - 1));
-            entries.push(DenoisePass { diffuse: im.diffuse[cur].1, specular: im.specular[cur].1, moments: im.moments[cur].1, ..base });
+            // From here on `prev_guide` is this frame's guide: what the path tracer lit.
+            let lit = DenoisePass { prev_guide: im.guide[cur].1 + 1, ..base };
+            entries.push(DenoisePass { diffuse: im.diffuse[cur].1, specular: im.specular[cur].1, moments: im.moments[cur].1, ..lit });
             draws.push((im.step_diffuse[0].0, Some(im.step_specular[0].0), variance, entries.len() - 1));
             // The first step into this frame's feedback pair (next frame's history), the rest in turn
             // between the step pair.
@@ -289,7 +293,7 @@ impl Denoiser {
             for k in 0..STEPS {
                 let (td, ts) =
                     if k == 0 { (im.feed_diffuse[cur], im.feed_specular[cur]) } else { (im.step_diffuse[next], im.step_specular[next]) };
-                entries.push(DenoisePass { diffuse: src.0, specular: src.1, step: 1 << k, ..base });
+                entries.push(DenoisePass { diffuse: src.0, specular: src.1, step: 1 << k, ..lit });
                 draws.push((td.0, Some(ts.0), atrous, entries.len() - 1));
                 src = (td.1, ts.1);
                 if k > 0 {
@@ -297,13 +301,14 @@ impl Denoiser {
                 }
             }
             light = src;
+            guide = im.guide[cur].1 + 1;
             self.cur = last;
             self.held = true;
         } else {
             self.held = false;
         }
         // `step` 1 in the composite: the test's sky from the picture (the albedo there).
-        entries.push(DenoisePass { diffuse: light.0, specular: light.1, step: self.test_sky as u32, ..base });
+        entries.push(DenoisePass { diffuse: light.0, specular: light.1, step: self.test_sky as u32, prev_guide: guide, ..base });
         let comp_entry = entries.len() - 1;
         gpu.mapped(buf)[..entries.len() * size_of::<DenoisePass>()].copy_from_slice(bytemuck::cast_slice(&entries));
         let bind = |list: &mut CommandList, pipe: PipelineId| {
