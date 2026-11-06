@@ -26,7 +26,7 @@ SKILL = os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "
 sys.path.insert(0, SKILL)
 from paint import EYES, eye_corner, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
 from rig import fit  # noqa: E402
-from ground import lowest, pokes  # noqa: E402
+from ground import corners, grounded, lowest, pokes, world  # noqa: E402
 from house import TX  # noqa: E402
 
 OUT = os.environ.get("BORKON_OUT") or os.path.join(HERE, "out")
@@ -619,7 +619,7 @@ def paint_face(e, face, boxes):
 
 # ------------------------------------------------------------------ animation
 
-L = {"lie_front": 80, "lie_hip": -70, "lie_knee": 140, "lie_drop": 30, "crouch_tilt": 0, "crouch_drop": 0,
+L = {"lie_front": 80, "lie_hip": -70, "lie_knee": 140, "lie_drop": 30, "lie_chest": 0, "crouch_tilt": 0, "crouch_drop": 0,
      "kneel_tilt": 20, "death_roll": 84, "death_neck": 40, "death_neck_z": -20, "death_head": 10, "death_head_z": 0,
      "scrape_lo": -6, "scrape_hi": 22}
 
@@ -709,10 +709,11 @@ def pose_run(t):
 
 
 def pose_lie(t, P=L):
-    """Lying down, the legs folded under, the head up and chewing the cud (6 s)."""
+    """Lying down, the legs folded under, the chest held up on them (its hair hangs to the ground:
+    `lie_chest`, fitted), the head up and chewing the cud (6 s)."""
     p = t / 6.0
     br = S(TAU * p * 2)
-    q = {"root": (0, -P["lie_drop"] + 0.15 * br, 0), "spine_1": (0.5 * br, 0, 0), "head": (0, 8 * S(TAU * p), 0)}
+    q = {"root": (0, -P["lie_drop"] + 0.15 * br, 0), "spine_1": (P["lie_chest"] + 0.5 * br, 0, 0), "head": (0, 8 * S(TAU * p), 0)}
     for leg in ("FL", "FR"):
         q[f"leg_{leg}_upper"] = (P["lie_front"], 0, 0)
         q[f"leg_{leg}_lower"] = (-150, 0, 0)
@@ -746,9 +747,10 @@ def pose_charge_tell(t):
     p = t / 1.4
     d = ease(p, 0.0, 0.3)
     scrape = S(TAU * p * 2) if p < 0.9 else 0.0
-    return stand({"neck": (HEAD_UP[0][0] + 45 * d, 0, 0), "head": (HEAD_UP[1][0] + 28 * d, 0, 0), "spine_1": (4 * d, 0, 0),
-                  "leg_FR_upper": (-23 * max(0.0, scrape), 0, 0), "leg_FR_lower": (30 * max(0.0, scrape), 0, 0),
-                  "tail": (-30 * d, 0, 0)})
+    # The scrape on top of the standing bend (without it all four legs stood straight, 9 into the ground).
+    return stand(with_stance({"neck": (HEAD_UP[0][0] + 45 * d, 0, 0), "head": (HEAD_UP[1][0] + 28 * d, 0, 0), "spine_1": (4 * d, 0, 0),
+                              "leg_FR_upper": (-23 * max(0.0, scrape), 0, 0), "leg_FR_lower": (30 * max(0.0, scrape), 0, 0),
+                              "tail": (-30 * d, 0, 0)}))
 
 
 def pose_charge(t):
@@ -776,12 +778,14 @@ def pose_toss(t):
                   "spine_1": (3 * low - 4 * up, 0, 0), "spine_0": (-3 * up, 0, 0)})
 
 
-def front_up(r):
-    """The front legs drawn up while it rears by `r` (0..1)."""
-    q = {}
+def front_up(r, q):
+    """`q` with the front legs drawn up while it rears by `r` (0..1), from the bend they have (they
+    were set straight, the hoof still tipped: at rest it stood a forehoof 3 into the ground)."""
+    q = dict(q)
     for leg in ("FL", "FR"):
-        q[f"leg_{leg}_upper"] = (-55 * r, 0, 0)
-        q[f"leg_{leg}_lower"] = (95 * r, 0, 0)
+        for part, a in (("upper", -55), ("lower", 95)):
+            x, y, z = q[f"leg_{leg}_{part}"]
+            q[f"leg_{leg}_{part}"] = (x + a * r, y, z)
     return q
 
 
@@ -791,7 +795,7 @@ def pose_rockfall_tell(t):
     r = ease(t / 1.6, 0.0, 0.6)
     q = stand({"spine_0": (-28 * r, 0, 0), "neck": (HEAD_UP[0][0] - 10 * r, 0, 0), "head": (HEAD_UP[1][0] - 6 * r, 0, 0),
                "tail": (-20 * r, 0, 0)})
-    q.update(front_up(r))
+    q = front_up(r, q)
     for leg in ("BL", "BR"):  # the hind legs stay planted as the body tips back over them
         q[f"leg_{leg}_upper"] = (STANCE["B"][0] + 28 * r, 0, 0)
     return q
@@ -805,7 +809,7 @@ def pose_rockfall(t):
     hit = (1 - r) * (1 - ease(p, 0.6, 1.0))
     q = stand({"spine_0": (-28 * r, 0, 0), "neck": (HEAD_UP[0][0] + 30 * hit, 0, 0), "head": (HEAD_UP[1][0] + 12 * hit, 0, 0),
                "root": (0, -2.0 * K * (1 - r) * (1 - ease(p, 0.4, 1.0)), 0)})
-    q.update(front_up(r))
+    q = front_up(r, q)
     for leg in ("BL", "BR"):
         q[f"leg_{leg}_upper"] = (STANCE["B"][0] + 28 * r, 0, 0)
     return q
@@ -817,10 +821,21 @@ def pose_rockfall(t):
 CROUCH = (-52.0, 98.0, -46.0)
 
 
+def crouch_fit(c, P=L):
+    """The body's tilt and drop crouched by `c`: fitted at steps of `c` (`fit_poses`; taken in
+    proportion they sank the hind hooves 13 on the way down), else in proportion to the full crouch's."""
+    tab = P.get("crouch_tab")
+    if not tab:
+        return P["crouch_tilt"] * c, P["crouch_drop"] * c
+    cs = [r[0] for r in tab]
+    return float(np.interp(c, cs, [r[1] for r in tab])), float(np.interp(c, cs, [r[2] for r in tab]))
+
+
 def crouch(c, P=L):
     """Crouched by `c` (0..1), the head raised toward where it will land."""
-    q = stand({"spine_0": (P["crouch_tilt"] * c, 0, 0), "neck": (HEAD_UP[0][0] - 12 * c, 0, 0), "head": (HEAD_UP[1][0] + 4 * c, 0, 0),
-               "root": (0, P["crouch_drop"] * c, 0)})
+    tilt, drop = crouch_fit(c, P)
+    q = stand({"spine_0": (tilt, 0, 0), "neck": (HEAD_UP[0][0] - 12 * c, 0, 0), "head": (HEAD_UP[1][0] + 4 * c, 0, 0),
+               "root": (0, drop, 0)})
     for leg in ("BL", "BR"):
         for part, a, st in zip(("upper", "lower", "paw"), CROUCH, STANCE["B"]):
             q[f"leg_{leg}_{part}"] = (st + a * c, 0, 0)
@@ -843,14 +858,14 @@ def pose_leap(t):
     off = 1 - ease(p, 0.0, 0.15)
     fly = ease(p, 0.05, 0.25) * (1 - ease(p, 0.7, 0.95))
     q = crouch(off)
-    q.update(front_up(fly))
+    q = front_up(fly, q)
     for leg in ("BL", "BR"):
         st = STANCE["B"]
         q[f"leg_{leg}_upper"] = (st[0] + CROUCH[0] * off + 48 * fly, 0, 0)
         q[f"leg_{leg}_lower"] = (st[1] + CROUCH[1] * off - 10 * fly, 0, 0)
         q[f"leg_{leg}_paw"] = (st[2] + CROUCH[2] * off + 25 * fly, 0, 0)
     q["neck"] = (HEAD_UP[0][0] - 12 * off - 6 * fly, 0, 0)
-    q["spine_0"] = (L["crouch_tilt"] * off - 6 * fly, 0, 0)
+    q["spine_0"] = (crouch_fit(off)[0] - 6 * fly, 0, 0)
     q["tail"] = (-35 * fly, 0, 0)
     return q
 
@@ -868,7 +883,7 @@ def pose_down(t, P=L):
     """Knocked down (4 s, looped): on its belly, the legs folded, the head low, heaving."""
     q = pose_lie(t * 1.5 % 6.0, P)
     br = S(TAU * t / 2.0)
-    q.update({"neck": (20 + 2 * br, 0, 0), "head": (10, 0, 0), "spine_1": (1.5 * br, 0, 0), "jaw": (6, 0, 0)})
+    q.update({"neck": (20 + 2 * br, 0, 0), "head": (10, 0, 0), "spine_1": (P["lie_chest"] + 1.5 * br, 0, 0), "jaw": (6, 0, 0)})
     return q
 
 
@@ -1037,14 +1052,24 @@ def fit_poses(spec):
     L["stance_drop"] = round(float(min(g["front paws"], g["back paws"])), 2)
     print("standing, lowest:", {k: round(v, 2) for k, v in g.items()})
 
+    # Lying: the belly down, the folded legs under it, and nothing lower than them: the chest's
+    # hanging hair (`fringe_chest`) went 27 into the ground when the chest lay level, so the chest
+    # is held up on the forelegs (`lie_chest`) and the drop is to its lowest point of all.
+    LIE = dict(GROUPS, all=lambda n: True)
+
     def lie_cost(P):
-        g = lowest(spec, pose_lie(0.0, dict(L, **P, lie_drop=0)), GROUPS)
-        f = min(v for k, v in g.items() if k != "mane")
+        g = lowest(spec, pose_lie(0.0, dict(L, **P, lie_drop=0)), LIE)
+        f = g["all"]
         return (g["body"] - f - 0.8) ** 2 + 0.3 * (g["front paws"] - f) ** 2 + 0.3 * (g["back paws"] - f) ** 2
     grid = {"lie_front": list(range(60, 101, 5)), "lie_hip": list(range(-100, -49, 5)), "lie_knee": list(range(115, 166, 5))}
-    best = fit(grid, lie_cost)[1]
-    g = lowest(spec, pose_lie(0.0, dict(L, **best, lie_drop=0)), GROUPS)
-    L.update(best, lie_drop=round(float(min(g.values())), 2))
+    best = None
+    for c in range(0, -21, -2):  # the least raise of the chest that rests it low
+        b = fit(grid, lambda P: lie_cost(dict(P, lie_chest=c)))
+        if best is None or b[0] < best[0] - 0.5:
+            best = (b[0], dict(b[1], lie_chest=c))
+    best = best[1]
+    g = lowest(spec, pose_lie(0.0, dict(L, **best, lie_drop=0)), LIE)
+    L.update(best, lie_drop=round(float(g["all"]), 2))
 
     def crouch_cost(P):
         g = lowest(spec, crouch(1.0, dict(L, **P, crouch_drop=0)), GROUPS)
@@ -1052,6 +1077,17 @@ def fit_poses(spec):
     best = fit({"crouch_tilt": [x * 0.5 for x in range(-40, 21)]}, crouch_cost)[1]
     g = lowest(spec, crouch(1.0, dict(L, **best, crouch_drop=0)), GROUPS)
     L.update(best, crouch_drop=round(float(L["stance_drop"] - min(g["front paws"], g["back paws"])), 2))
+    # And on the way down: the tilt and drop at each step of the crouch, all four hooves level.
+    tab = [[0.0, 0.0, 0.0]]
+    for c in [k / 8 for k in range(1, 9)]:
+        def cost(P, c=c):
+            g = lowest(spec, crouch(c, dict(L, crouch_tab=None, crouch_tilt=P["t"] / c, crouch_drop=0)), GROUPS)
+            return (g["front paws"] - g["back paws"]) ** 2
+        t = fit({"t": [x * 0.25 for x in range(-80, 41)]}, cost)[1]["t"]
+        g = lowest(spec, crouch(c, dict(L, crouch_tab=None, crouch_tilt=t / c, crouch_drop=0)), GROUPS)
+        tab.append([c, t, round(float(L["stance_drop"] - min(g["front paws"], g["back paws"])), 2)])
+    L["crouch_tab"] = tab
+    print("crouch steps (c, tilt, drop):", tab)
     print("crouching, lowest:", {k: round(v, 2) for k, v in lowest(spec, crouch(1.0), GROUPS).items()})
     ll = lowest(spec, pose_lie(0.0), GROUPS)
     print("lying, lowest:", {k: round(v, 2) for k, v in ll.items()})
@@ -1114,6 +1150,84 @@ def fit_ambient(spec):
 # ------------------------------------------------------------------ build
 
 
+# ------------------------------------------------------------------ standing on the ground, frame by frame
+
+# Which hooves each standing clip stands on at time `t` (the rest the move lifts). A body pitched
+# over them (rearing, the head thrown down) or a root dip sank them up to 13 into the ground:
+# `plant` sets the root on the planted hooves and bends a leg whose hoof still sinks.
+FORE, HIND = ("FL", "FR"), ("BL", "BR")
+
+
+def planted(name, t):
+    if name == "charge_tell":
+        p = t / 1.4
+        return ("FL",) + HIND if p < 0.9 and S(TAU * p * 2) > 0 else LEGS
+    if name in ("rockfall_tell", "rockfall"):  # rearing on the hind hooves, the forefeet down when it lands
+        r = ease(t / 1.6, 0.0, 0.6) if name == "rockfall_tell" else 1 - ease(t / 0.7, 0.0, 0.3)
+        return HIND + (FORE if r < 1e-3 else ())
+    if name == "toss":  # flinging the head up it comes off its forefeet a little
+        p = t / 0.6
+        up = ease(p, 0.0, 0.3) - ease(p, 0.6, 1.0)
+        return LEGS if up < 0.05 else HIND
+    if name == "leap":  # off the ground from pushing off until it lands
+        p = t / 1.2
+        return LEGS if p < 0.05 or p >= 0.95 else ()
+    return LEGS
+
+
+# A clip whose root dips on purpose (the rockfall's landing, the stunned sway) keeps it: the legs bend under it.
+KEEP_ROOT = ("rockfall", "stunned")
+PLANTED = ("idle", "toss_tell", "toss", "charge_tell", "rockfall_tell", "rockfall", "leap_tell", "leap", "stunned")
+SHORTEN = {"F": (-1.0, 2.0, -1.0), "B": (1.0, -2.0, 1.0)}  # a leg drawn up a little at the knee or hock, the hoof kept level
+
+
+def plant(spec, anim, name):
+    """`anim` stood on its planted hooves in every frame: the root raised or lowered so the highest
+    planted hoof touches the ground, then each hoof still below it drawn up at the knee or hock
+    until it touches; in the air (no hoof planted) only lifted out of the ground."""
+    els = {e["name"]: e for e in spec["elements"]}
+    piv = {b["name"]: np.array(b["pivot"], float) for b in spec["bones"]}
+
+    def low(rot, root, leg):
+        e = els[f"leg_{leg}_paw"]
+        R, t = world(spec["bones"], dict(rot, root=root))[e["bone"]]
+        return float(((corners(e) - piv[e["bone"]]) @ R.T + t)[:, 1].min())
+
+    frames = []
+    for fr in anim["frames"]:
+        rot = {k: list(v) for k, v in fr["rot"].items()}
+        root = list(fr["root"])
+        on = planted(name, fr["t"] if fr["t"] < anim["length"] or not anim["loop"] else 0.0)
+        lows = {leg: low(rot, root, leg) for leg in LEGS}
+        if not on:
+            root[1] -= min(0.0, min(lows.values()))
+        else:  # a dip of its own (its root under the standing height) kept, the legs bending under it
+            dip = min(0.0, fr["root"][1] + L["stance_drop"]) if name in KEEP_ROOT else 0.0
+            root[1] -= max(lows[g] for g in on) - dip
+        for leg in LEGS:
+            if low(rot, root, leg) >= -0.05:
+                continue
+            base = {part: list(rot[f"leg_{leg}_{part}"]) for part in ("upper", "lower", "paw")}
+
+            def bent(a):
+                r = dict(rot)
+                for part, k in zip(("upper", "lower", "paw"), SHORTEN[leg[0]]):
+                    r[f"leg_{leg}_{part}"] = [base[part][0] + k * a] + base[part][1:]
+                return r
+            # Bent the way that raises the hoof (closing; a crouched hind leg rises as it opens), by
+            # the least that brings it up to the ground, then exact by halving.
+            sign = 1 if low(bent(0.5), root, leg) >= low(bent(-0.5), root, leg) else -1
+            step = next((sign * k * 0.5 for k in range(1, 81) if low(bent(sign * k * 0.5), root, leg) >= 0.0), None)
+            assert step is not None, f"{name}: no bend of its {leg} leg brings the hoof up at {fr['t']}"
+            lo, hi = step - sign * 0.5, step
+            for _ in range(24):
+                mid = (lo + hi) / 2
+                lo, hi = (lo, mid) if low(bent(mid), root, leg) >= 0.0 else (mid, hi)
+            rot = bent(hi)
+        frames.append({**fr, "rot": {k: [round(float(x), 4) for x in v] for k, v in rot.items()}, "root": [round(float(x), 4) for x in root]})
+    return {**anim, "frames": frames}
+
+
 def build():
     B = bones()
     E = elements()
@@ -1130,6 +1244,14 @@ def build():
             "bones": [{"name": n, "parent": p, "pivot": [float(v) for v in pv]} for n, p, pv in B], "elements": E}
     fit_poses(spec)
     spec["animations"] = animations([n for n, _, _ in B])
+    A = spec["animations"]
+    for name in PLANTED:
+        A[name] = plant(spec, A[name], name)
+    everything = [e["name"] for e in E]
+    for name, bounds in (("walk", False), ("run", True), ("charge", True)):  # the gaits on their feet (a run's bounce kept)
+        A[name] = grounded(spec, A[name], [f"leg_{g}_paw" for g in LEGS], bounds)
+    for name in ("lie", "down"):  # lying, heaving: each frame on its lowest point
+        A[name] = grounded(spec, A[name], everything)
     spec["fitted"] = dict(L)
     return spec, sheet
 

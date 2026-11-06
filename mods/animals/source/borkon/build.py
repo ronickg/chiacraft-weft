@@ -73,6 +73,26 @@ if __name__ == "__main__":
     A["death"] = grounded(spec, A["death"], everything)
     low = feet_low(spec, A["death"], everything)
     assert min(low) > -0.3 and max(low) < 0.3, f"dying, its lowest point from {min(low):.2f} to {max(low):.2f}"
+    # The standing fight clips (and the idle) on their planted hooves in every keyframe (`plant` in
+    # borkon.py; the hooves a move lifts may only not go into the ground).
+    from borkon import LEGS, PLANTED, planted  # noqa: E402
+    for c in PLANTED:
+        a = A[c]
+        for g in LEGS:
+            for fr, y in zip(a["frames"], feet_low(spec, a, [f"leg_{g}_paw"])):
+                t = fr["t"] if fr["t"] < a["length"] or a["loop"] is not True else 0.0
+                if g in planted(c, t):
+                    assert abs(y) < 0.3, f"{c}'s {g} hoof at {y:.2f}, not on the ground, at {fr['t']}"
+                else:
+                    assert y > -0.3, f"{c}'s lifted {g} hoof at {y:.2f}, in the ground, at {fr['t']}"
+    for c in ("walk", "run", "charge"):
+        low = min(feet_low(spec, A[c], FEET))
+        assert abs(low) < 0.3, f"{c}'s feet at {low:.2f}, not on the ground"
+    # Nothing goes into the ground in any clip, but `rise`, which climbs out of it.
+    for c, a in A.items():
+        if c != "rise":
+            low = min(feet_low(spec, a, everything))
+            assert low > -0.3, f"{c} goes {low:.2f} into the ground"
     poses = {"": {"idle": "idle", "walk": "walk", "run": "run", **{c: c for c in CLIPS}}}
     made = export(spec, os.path.join(OUT, "texture.png"), ASSETS, "borkon", SCALE, "borkon/borkon", pose_files=poses)
     print("wrote", made, "into", os.path.normpath(ASSETS))

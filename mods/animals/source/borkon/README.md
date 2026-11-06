@@ -52,4 +52,8 @@ stretched, then reaching down), `stunned` and `down` (on its belly, heaving); wi
 held: head low, horns forward, a forehoof scraping twice, its knee and hoof fitted to the ground,
 a snort) and `death` (2.4 s, holding its last frame: onto its knees, onto its belly, rolled onto its
 side, the head propped on its horn; each frame grounded). One-off clips don't loop and end on their
-own last pose.
+own last pose. Every standing clip stands on its planted hooves in every keyframe (`plant`: the
+root on the planted hooves, a sinking leg drawn up at the knee or hock; the rockfall's landing and
+the stun's sway keep their dip in the legs); the crouch is fitted at each step, the lie holds its
+chest up on the forelegs so its hanging hair stays out of the ground. `build.py` asserts it, and
+that nothing but `rise` goes below the ground.
