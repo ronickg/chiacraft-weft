@@ -1874,11 +1874,16 @@ pub fn biome_shares(seed: u64, radius: i32, step: usize) -> Vec<(&'static str, f
 /// scene of the Bliss and Distant Horizons comparisons. Off the overworld: nothing in a normal world
 /// changes. The coasts, the mountains and their snow keep the overworld's rules; the rest of the land
 /// is shared out by a patch noise (`MC_MIX_FIELD`, patches some `MC_MIX_SIZE` blocks across) in the
-/// shares of `MC_MIX` (old growth standing for Minecraft's dark forest, then forest, birch forest
-/// and plains; the forests' cherry groves come with them, `vitals::wild::CHERRY_GROVES`).
+/// shares of `MC_MIX`, plains to the densest woods along the noise so each meets its neighbours as
+/// in Minecraft. The Minecraft scene (seed 1, the comparison vista, read from its region files):
+/// forest 67% and plains 20% within 500 blocks, plains 40% and forest a tenth from 500 to 1,500,
+/// the forest's dense round dark crowns, a cherry grove. Our old growth (oaks, closed canopy) is
+/// the nearest to that forest's look, so it takes the biggest share, our lighter forest and birch
+/// wood the rest of the woods; the forests' cherry groves come with them
+/// (`vitals::wild::CHERRY_GROVES`).
 pub const MC_MIX_FIELD: &str = "base:mc_mix";
 pub const MC_MIX_SIZE: f64 = 700.0;
-pub const MC_MIX: [(&str, f64); 4] = [("old_growth_forest", 0.45), ("forest", 0.3), ("birch_forest", 0.1), ("plains", 0.15)];
+pub const MC_MIX: [(&str, f64); 4] = [("plains", 0.35), ("birch_forest", 0.05), ("forest", 0.25), ("old_growth_forest", 0.35)];
 
 /// The mix field: the patch noise itself, about -1 to 1.
 pub fn mc_mix_field() -> Expr {
