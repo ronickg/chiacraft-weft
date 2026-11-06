@@ -582,6 +582,14 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         // curve's shoulder (08:00 sky saturation 23 against Bliss's 43, warmth +15 against +36).
         let gold = vec3(1.0, 0.72, 0.4) * luma(p.sun) * 1.4;
         c += mix(p.sun, gold, 0.6 * (1.0 - smoothstep(0.6, 0.9, scene.sun.y))) * mie * 0.34;
+        // With the sun low, the whole of its half of the sky goes gold-cream at its own brightness,
+        // as Bliss's dawn: ours stayed lavender-blue there round a gold glare (Bliss's own world at
+        // 06:00, sky band saturation 105 and warmth +85 against Bliss's 122 and +94; Look, 11-06).
+        if low > 0.0 {
+            let cream = vec3(1.0, 0.82, 0.55);
+            let dawn = pow(m, 1.5) * low * (1.0 - rain_amount()) * smoothstep(-0.03, 0.02, scene.sun.y);
+            c = mix(c, cream * (luma(c) / luma(cream)), dawn * 0.55);
+        }
     }
     // The glow about the moon where it stands, as bright as its light (`scene.moon.w`): on a new
     // moon there is none, and a glow alone read as a dark-blue ring (the world playtester's nights).
