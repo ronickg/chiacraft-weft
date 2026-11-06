@@ -4,8 +4,10 @@
 // A shader pack may replace this file; it keeps the entry points.
 //
 // `fs_taa`'s entry: `scene` this frame's world, `depth` its depth, `low` the picture so far + 1
-// (0: none, start anew), `bloom` the motion image + 1 (0: none, all from depth), `size` the
-// world's size, `strength` the least share of this frame (0.1: about ten frames gathered).
+// (0: none, start anew), `bloom` the motion image + 1 (0: none, all from depth), `exposure` the
+// frames gathered so far + 1 (their count, in r), `size` the world's size, `strength` the least
+// share of this frame (0.1: about ten frames gathered). It writes the picture (its alpha the
+// world's, gathered too: the water mask chiacraft's reflections read) and the count beside it.
 // `fs_taa_motion`'s: the same, writing the whole motion image for an upscaler (DLSS, Arm ASR).
 
 struct VOut {
@@ -114,9 +116,13 @@ fn taa_history(tex: u32, uv: vec2<f32>) -> vec4<f32> {
     s += textureSampleLevel(t, linear_clamp, vec2(t3.x, t12.y), 0.0) * (w3.x * w12.y);
     s += textureSampleLevel(t, linear_clamp, vec2(t12.x, t3.y), 0.0) * (w12.x * w3.y);
     let w = w12.x * w0.y + w0.x * w12.y + w12.x * w12.y + w3.x * w12.y + w12.x * w3.y;
-    // Its gathered count straight, not filtered (the ringing of the lobes would make it up).
-    let n = textureSampleLevel(t, nearest_clamp, uv, 0.0).a;
-    return vec4(max(s.rgb / w, vec3(0.0)), n);
+    return vec4(max(s.rgb / w, vec3(0.0)), clamp(s.a / w, 0.0, 1.0));
+}
+
+struct TaaOut {
+    @location(0) color: vec4<f32>,
+    // The frames gathered here (r), read next frame as `exposure`.
+    @location(1) count: vec4<f32>,
 }
 
 // The history moved toward the box round this frame's neighbourhood (`lo`..`hi`, about `mid`) until
@@ -135,7 +141,7 @@ fn taa_clip(h: vec3<f32>, mid: vec3<f32>, lo: vec3<f32>, hi: vec3<f32>) -> vec3<
 }
 
 @fragment
-fn fs_taa(in: VOut) -> @location(0) vec4<f32> {
+fn fs_taa(in: VOut) -> TaaOut {
     let pass_ = passes[in.pass_index];
     let isize = vec2<i32>(pass_.size);
     let at = vec2<i32>(in.clip.xy);
@@ -147,14 +153,21 @@ fn fs_taa(in: VOut) -> @location(0) vec4<f32> {
     var lo = vec3(1e9);
     var hi = vec3(-1e9);
     var here = vec3(0.0);
+    var here_a = 0.0;
+    var lo_a = 1.0;
+    var hi_a = 0.0;
     var near = at;
     var near_d = -1.0;
     for (var j = -1; j <= 1; j++) {
         for (var i = -1; i <= 1; i++) {
             let p = at + vec2(i, j);
             let c = taa_ycocg(taa_tone(taa_texel(pass_.scene, p, isize)));
+            let a = clamp(textureLoad(textures[pass_.scene], clamp(p, vec2(0), isize - 1), 0).a, 0.0, 1.0);
+            lo_a = min(lo_a, a);
+            hi_a = max(hi_a, a);
             if i == 0 && j == 0 {
                 here = c;
+                here_a = a;
             }
             m1 += c;
             m2 += c * c;
@@ -172,21 +185,28 @@ fn fs_taa(in: VOut) -> @location(0) vec4<f32> {
     // The variance box, inside the min-max one: tighter where the neighbourhood is mostly alike.
     let box_lo = max(lo, mean - sigma * 1.25);
     let box_hi = min(hi, mean + sigma * 1.25);
+    let fresh = TaaOut(vec4(taa_untone(taa_rgb(here)), here_a), vec4(1.0, 0.0, 0.0, 0.0));
     if pass_.low == 0u || scene.taa.z < 0.5 {
-        return vec4(taa_untone(taa_rgb(here)), 1.0);
+        return fresh;
     }
     let motion = taa_motion(pass_.bloom, pass_.depth, near, isize);
     let back = uv + motion;
     if any(back < vec2(0.0)) || any(back > vec2(1.0)) {
-        return vec4(taa_untone(taa_rgb(here)), 1.0);
+        return fresh;
     }
     let hist = taa_history(pass_.low - 1u, back);
+    // Its gathered count straight, not filtered (the ringing of the lobes would make it up); the
+    // most frames without one.
+    var counted = 1.0 / max(pass_.strength, 0.02);
+    if pass_.exposure != 0u {
+        counted = textureSampleLevel(textures[pass_.exposure - 1u], nearest_clamp, back, 0.0).r;
+    }
     let h = taa_ycocg(taa_tone(hist.rgb));
     let clipped = taa_clip(h, mean, box_lo, box_hi);
     // How many frames are gathered here: one more each frame, fewer where the history had to give
     // way (it was something else), at most 1 / `strength`.
     let gave = length(clipped - h) / max(length(box_hi - box_lo), 1e-4);
-    var n = min(hist.a, 1.0 / max(pass_.strength, 0.02));
+    var n = min(counted, 1.0 / max(pass_.strength, 0.02));
     n = mix(n, 1.0, clamp(gave * 2.0, 0.0, 1.0));
     // Fast motion: a little more of this frame, so moving land doesn't smear (each frame's history
     // is filtered once more where it is read between texels).
@@ -200,7 +220,9 @@ fn fs_taa(in: VOut) -> @location(0) vec4<f32> {
     }
     let w = max(1.0 / (n + 1.0), reactive * 0.8);
     let out = taa_untone(taa_rgb(mix(clipped, here, w)));
-    return vec4(max(out, vec3(0.0)), mix(n + 1.0, 1.0, reactive));
+    // The alpha (the water mask) gathered as the color, held to this frame's neighbourhood.
+    let a = mix(clamp(hist.a, lo_a, hi_a), here_a, w);
+    return TaaOut(vec4(max(out, vec3(0.0)), a), vec4(mix(n + 1.0, 1.0, reactive), 0.0, 0.0, 0.0));
 }
 
 // The whole motion image for an upscaler (DLSS, Arm ASR: `post::TemporalInputs`): xy the motion

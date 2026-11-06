@@ -213,6 +213,8 @@ pub struct Post {
     taa_pipes: Option<(PipelineId, PipelineId)>,
     motion_tex: Option<(TextureId, u32, (u32, u32))>,
     history: Option<([TextureId; 2], [u32; 2], (u32, u32))>,
+    /// Beside each picture so far, the frames gathered in each pixel (`fs_taa`'s second output).
+    counts: Option<([TextureId; 2], [u32; 2], (u32, u32))>,
     taa_cur: usize,
     taa_held: bool,
     full_motion: Option<(TextureId, u32, (u32, u32))>,
@@ -256,6 +258,7 @@ impl Post {
             taa_pipes: None,
             motion_tex: None,
             history: None,
+            counts: None,
             taa_cur: 0,
             taa_held: false,
             full_motion: None,
@@ -284,7 +287,8 @@ impl Post {
         let made = crate::packs::shader(assets, "taa.wgsl")
             .map_err(|e| e.0)
             .and_then(|s| {
-                let mut make = |label: &str, fragment: &str| {
+                // The gathering writes its count beside the picture (`motion`: a second image).
+                let mut make = |label: &str, fragment: &str, motion: bool| {
                     gpu.create_pipeline(&PipelineDesc {
                         label,
                         shader: &s,
@@ -295,12 +299,12 @@ impl Post {
                         blend: Blend::None,
                         cull_back: false,
                         topology: Topology::Triangles,
-                        motion: false,
+                        motion,
                     })
                     .map_err(|e| e.0)
                 };
-                let resolve = make("temporal aa", "fs_taa")?;
-                match make("temporal aa motion", "fs_taa_motion") {
+                let resolve = make("temporal aa", "fs_taa", true)?;
+                match make("temporal aa motion", "fs_taa_motion", false) {
                     Ok(m) => Ok((resolve, m)),
                     Err(e) => {
                         gpu.destroy_pipeline(resolve);
@@ -673,16 +677,18 @@ impl Post {
         let mut src = idx[0];
         let mut taa_entries: Vec<Pass> = Vec::new();
         // (target, pipeline, entry among `taa_entries`)
-        let mut taa_draws: Vec<(TextureId, PipelineId, usize)> = Vec::new();
+        let mut taa_draws: Vec<(TextureId, Option<TextureId>, PipelineId, usize)> = Vec::new();
         self.inputs = None;
         if let Some(up) = self.upscaled.take() {
             src = up;
             self.taa_held = false;
         } else if let (true, Some((resolve, fill)), Some((motion, motion_idx, _))) = (self.taa_on(), self.taa_pipes, self.motion_tex) {
-            if Self::ensure_pair(gpu, &mut self.history, frame.width, frame.height, "temporal aa") {
+            let anew = Self::ensure_pair(gpu, &mut self.history, frame.width, frame.height, "temporal aa");
+            if Self::ensure_pair(gpu, &mut self.counts, frame.width, frame.height, "temporal aa count") || anew {
                 self.taa_held = false;
             }
             let (hist, hidx, _) = self.history.unwrap();
+            let (counts, cidx, _) = self.counts.unwrap();
             let (cur, last) = (self.taa_cur, 1 - self.taa_cur);
             let entry = Pass {
                 scene: idx[0],
@@ -693,10 +699,11 @@ impl Post {
                 depth,
                 low: if self.taa_held { hidx[last] + 1 } else { 0 },
                 bloom: motion_idx + 1,
+                exposure: if self.taa_held { cidx[last] + 1 } else { 0 },
                 ..Pass::default()
             };
             taa_entries.push(entry);
-            taa_draws.push((hist[cur], resolve, 0));
+            taa_draws.push((hist[cur], Some(counts[cur]), resolve, 0));
             src = hidx[cur];
             self.taa_cur = last;
             self.taa_held = true;
@@ -723,7 +730,7 @@ impl Post {
                 }
                 let (t, ..) = self.full_motion.unwrap();
                 taa_entries.push(entry);
-                taa_draws.push((t, fill, 1));
+                taa_draws.push((t, None, fill, 1));
                 full = t;
             }
             let j = jitter();
@@ -889,8 +896,12 @@ impl Post {
         let first_taa = passes.len();
         passes.extend(taa_entries);
         gpu.mapped(buf)[..passes.len() * size_of::<Pass>()].copy_from_slice(bytemuck::cast_slice(&passes));
-        for (target, pipe, k) in taa_draws {
-            list.push(Cmd::BeginPass { motion: None, color: Some((Target::Texture(target), Some([0.0; 4]))), depth: None });
+        for (target, beside, pipe, k) in taa_draws {
+            list.push(Cmd::BeginPass {
+                motion: beside.map(|t| (t, Some([0.0; 4]))),
+                color: Some((Target::Texture(target), Some([0.0; 4]))),
+                depth: None,
+            });
             list.pipeline(pipe);
             list.bind(crate::gpu_layout::bind::post::PASSES, buf);
             list.bind(crate::gpu_layout::bind::post::SCENE, scene);
