@@ -68,6 +68,11 @@ if __name__ == "__main__":
                 if v is not None and v <= 0}
         assert not back, f"{anim} goes backwards: {back}"
 
+    # The stand (the idle's first frame, the pose every standing clip starts from) rests on all four:
+    # each hind foot and each wrist within 0.3 of the ground (the fitted fold had the wrists 1.9 in it).
+    for foot, names in SIDE_FEET.items():
+        low = feet_low(spec, {"frames": spec["animations"]["idle"]["frames"][:1]}, names)[0]
+        assert abs(low) < 0.3, f"standing, the {foot} foot at {low:.2f}, not on the ground"
     # The behaviour clips. Only the held ones and the gait loop (the engine loops a clip whose file
     # says so, whatever the game asks); the strikes and one-offs play once, the death holds its last frame.
     A = spec["animations"]

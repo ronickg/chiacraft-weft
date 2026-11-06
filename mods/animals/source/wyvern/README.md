@@ -50,7 +50,8 @@ folded wing, the lying pose; `--refit` or `--refit-rest` to redo them after movi
   Standing on its wrists, every frame sets them back where they stand (`plant`), so moving the chest
   never sinks them; the reaches are fitted once (`fit_clips`, kept in `fit.json` "clips", `--refit-clips`).
   The idle's breath sank the wrists 4.5 and the bite's lean 12: both keep them where the stand has
-  them now (the fitted fold itself still has them 1.9 in the ground). `build.py` asserts the loops,
+  them now. The fitted fold had the wrists 1.9 in the ground: it is lifted onto it (`ground_fold`, the
+  hand's turn kept, the arm turned under 1 degree), and the build asserts the stand on all four. `build.py` asserts the loops,
   each foot within 0.3 of the ground in every standing clip's keyframes (the wrists off it only in the
   stretch and the hop), nothing below -0.3 (membranes by their cut outlines, scaled), sleep and death on
   their lowest point, no wing part in the body or the other wing, and no angle jumping between keys.

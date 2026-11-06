@@ -1204,8 +1204,8 @@ PLANT = {}  # where a wrist stands: the stand's left hand (its turn and place), 
 
 
 def hand_target(lifted=True):
-    """The stand's left hand: its turn and place, `lifted` onto the ground (the fitted fold has it 1.9
-    in it) or as it stands."""
+    """The stand's left hand: its turn and place, `lifted` onto the ground (0.05 over it) or as it
+    stands (the same, since `ground_fold`)."""
     if not PLANT:
         R, t = chain_world({k: v for k, v in stand().items() if k != "scale"}, ARM_CHAIN)["hand_L"]
         piv = next(np.array(b["pivot"], float) for b in SKELETON if b["name"] == "hand_L")
@@ -1215,6 +1215,22 @@ def hand_target(lifted=True):
 
 
 WING_CHAIN = ("arm", "forearm", "hand")
+
+
+def ground_fold():
+    """The folded wing's fit left the wrist's hand 1.9 into the ground (`fit_wing` can't reach both its
+    targets): the arm, forearm and hand turned just enough to lift it onto the ground, its turn kept
+    (the sail on it unchanged), so the stand rests on its wrists and hind feet together. Kept in
+    `fit.json` ("wing", "wing_lift": how far it was lifted)."""
+    PLANT.clear()
+    lift = float(hand_target(True)["t"][1] - hand_target(False)["t"][1])
+    q = plant({k: v for k, v in stand().items() if k != "scale"}, sides=("L",))
+    FIT["wing"] = {f"{b}_L": [round(float(v), 4) for v in q[f"{b}_L"]] for b in WING_CHAIN}
+    FIT["wing_lift"] = round(lift, 2)
+    PLANT.clear()
+    with open(FIT_FILE, "w") as f:
+        json.dump(FIT, f, indent=1)
+    print("the folded wing's hand lifted", round(lift, 2), "onto the ground:", FIT["wing"])
 
 
 def plant(q, sides=("L", "R"), lifted=True, move=None):
@@ -2076,6 +2092,8 @@ def build():
     global HAND_LOW
     hand = next(e for e in spec["elements"] if e["name"] == "hand_L")
     HAND_LOW = [(x, y, z) for x in (hand["lo"][0], hand["hi"][0]) for y in (hand["lo"][1], hand["hi"][1]) for z in (hand["lo"][2], hand["hi"][2])]
+    if "wing_lift" not in FIT or "--refit" in sys.argv:
+        ground_fold()
     if "clips" in FIT and "--refit-clips" not in sys.argv:
         CF.update(FIT["clips"])
     else:
