@@ -302,6 +302,11 @@ fn frame(c: &Client) {
     let looks = life.owed as u32;
     life.owed -= looks as f32;
     let calm = wl::weather(speed, st.rain) * density;
+    // Over the setting's most alive, none more this frame (`ALIVE_MAX`).
+    let setting = crate::video::FX_WIND_LIFE.get().clamp(0, 3) as usize;
+    if st.particles >= wl::ALIVE_MAX[setting] {
+        return;
+    }
     let base = [me[0].floor() as i32, me[1].floor() as i32, me[2].floor() as i32];
     for _ in 0..looks {
         let p = [

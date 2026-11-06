@@ -17,6 +17,11 @@ use crate::{calendar, foliage};
 /// ultra (a beefy GPU). How many of everything, as a factor of the rates below.
 pub const DENSITY: [f32; 4] = [0.0, 1.0, 2.5, 6.0];
 
+/// The most particles alive on the client (all kinds, a mod's too) for each setting, over which
+/// wind life puts no more: a guard on the cost wherever the rates add up (an autumn forest in a
+/// gale), as the engine's own cap (262,144) is far above what a Mac or a phone wants drawn.
+pub const ALIVE_MAX: [u32; 4] = [0, 6000, 15000, 40000];
+
 /// How far round the player things are put (blocks), across and up; and down.
 pub const REACH: i32 = 20;
 pub const REACH_DOWN: i32 = 6;
@@ -108,7 +113,8 @@ pub const POLLEN_HOURS: (f32, f32) = (6.0, 19.0);
 /// Wind (m/s) from which snow lying in the open blows (spindrift), and at which it blows most;
 /// grains a second off a snow surface at the most.
 pub const SPINDRIFT: (f32, f32) = (6.0, 14.0);
-pub const SPINDRIFT_RATE: f32 = 1.5;
+/// (At 1.5 a snowy forest in a 9 m/s wind blew 400-800 grains a second, wind_look3.)
+pub const SPINDRIFT_RATE: f32 = 0.15;
 /// Seconds of its flight a blown snow grain is drawn stretched over.
 pub const SPINDRIFT_STREAK: f32 = 0.06;
 pub const SPINDRIFT_LIFE: (f32, f32) = (1.5, 3.5);
@@ -120,7 +126,7 @@ pub const SPINDRIFT_SINK: f32 = 0.35;
 /// fresh breeze), and grains a second off a sand surface at the most; a dust storm
 /// (`air::dust`) fills the air with them wherever it blows.
 pub const SAND: (f32, f32) = (7.0, 13.0);
-pub const SAND_RATE: f32 = 0.5;
+pub const SAND_RATE: f32 = 0.12;
 pub const SAND_LIFE: (f32, f32) = (1.0, 2.5);
 pub const SAND_SIZE: (f32, f32) = (0.03, 0.06);
 pub const SAND_AIR: f32 = 7.0;
