@@ -711,7 +711,8 @@ gpu_struct! {
         /// Where the player is: x how closed a forest's canopy is (0 open sky to 1 a rainforest's;
         /// a mod's air, `air_flags::CANOPY_SHIFT`), for packs' light under the leaves; y how wet
         /// the ground is, 0..1: it follows what falls up and dries over minutes after (a mod's air
-        /// says how fast, `air_flags::DRYING_SHIFT`); zw unused.
+        /// says how fast, `air_flags::DRYING_SHIFT`); z unused; w where rain turns to snow up a
+        /// mountain, blocks above the sea (a mod's air, `air_flags::SNOWLINE_SHIFT`; 400 for none).
         pub canopy: [f32; 4],
         /// Soft clouds (`core:soft_clouds`, with a pack whose sky has `fs_cloud_trace` and
         /// `fs_cloud_resolve`; chiacraft): x the bindless index + 1 of this frame's clouds, traced

@@ -651,6 +651,9 @@ pub mod air_flags {
     pub const SNOWING: u32 = 1;
     /// Dust or sand blows (the fog is dust).
     pub const DUST: u32 = 2;
+    /// Bits 2 to 7: where rain turns to snow up a mountain, for shader packs (`Scene::canopy.w`):
+    /// 0 none (rain however high), else 1 + its height above the sea in 4-block steps (up to 248).
+    pub const SNOWLINE_SHIFT: u32 = 2;
     /// Bits 8 to 15: how strong an aurora is on clear nights there, 0 to 255.
     pub const AURORA_SHIFT: u32 = 8;
     /// Bits 16 to 23: how closed a forest's canopy is there, 0 (open sky) to 255 (a rainforest's),

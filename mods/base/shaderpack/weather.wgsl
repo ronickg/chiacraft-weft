@@ -57,18 +57,24 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
     let y = in.uv.y * 4.0;
     // Blocks a pixel covers across the strip (before any branch: derivatives need every pixel).
     let px = max(fwidth(in.uv.x * 4.0), 1e-4);
-    let snow = in.data.w >= 64u;
     let seed = in.data.z;
+    // Up a mountain rain turns to snow above the snow line (`scene.canopy.w`, blocks above the sea:
+    // the air's lapse, `vitals::air::LAPSE`), over a band about twelve blocks deep where both fall
+    // (the Recrafted study, item 6). Its flakes come down at a fifth of the rain's pace.
+    let height = scene.eye.y + in.rel.y - (SEA_LEVEL + scene.canopy.w);
+    let mixed = fall_hash(seed + 53u, vec2<i32>(floor(vec2(x * 4.0, y))));
+    let above = in.data.w < 64u && height > (mixed - 0.5) * 12.0;
+    let snow = in.data.w >= 64u || above;
     var cover = 0.0;
     if snow {
         // Cells a quarter block each way; a flake in some of them, somewhere in the cell.
-        let q = vec2(x * 4.0, y * 4.0);
+        let q = vec2(x * 4.0, select(y, y * 0.2, above) * 4.0);
         let cell = vec2<i32>(floor(q));
         let h = fall_hash(seed, cell);
         if h < 0.45 {
             let h2 = fall_hash(seed + 17u, cell);
             let h3 = fall_hash(seed + 31u, cell);
-            let sway = sin(y * 2.3 + h * 40.0) * 0.12;
+            let sway = sin(q.y * 0.575 + h * 40.0) * 0.12;
             let at = vec2(0.25 + 0.5 * h2 + sway, 0.25 + 0.5 * h3);
             let r = mix(0.025, 0.05, h * 2.0) * 4.0;
             let d = length((fract(q) - at) * vec2(1.0, 1.0));
