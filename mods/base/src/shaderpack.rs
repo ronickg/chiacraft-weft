@@ -20,7 +20,10 @@ pub const ID: &str = "chiacraft";
 /// a shader change can be tried on a PC run without a build of its own (Trees, 11-06). Only
 /// `chiacraft` itself is written and kept up to date by the game.
 fn is_ours(pack: &str) -> bool {
-    pack == ID || pack.strip_prefix(ID).is_some_and(|rest| rest.starts_with('_'))
+    pack == ID
+        || pack
+            .strip_prefix(ID)
+            .is_some_and(|rest| rest.starts_with('_'))
 }
 
 const LOOK: &str = include_str!("../shaderpack/look.wgsl");
