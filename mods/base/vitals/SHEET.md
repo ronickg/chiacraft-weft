@@ -420,6 +420,33 @@ What the world grows besides grass and trees (`vitals::wild`): how each grows, t
 | base:sea_rod | Still | Bed | - | 4.0% | coral_reef, lagoon |
 | base:turtle_grass | Still | Bed | - | 20.0% | lagoon |
 
+## Stands of trees
+
+A forest's layers (`vitals::canopy`): each wild tree's site grows under the canopy, in it or over it by its biome's shares; a simple tree's height (to its crown's top) and crown by its kind and layer, a big one a block taller and wider. A canopy tree carries a side lobe 40% of the time. Branched trees grow x0.65 as tall under the canopy and x1.4 over it.
+
+| crown | layer | height | crown radius | depth | lobes |
+|---|---|---|---|---|---|
+| Round | Under | 3-4 | 1.8 | 3 | 0 |
+| Round | Canopy | 5-9 | 3 | 5 | 1 |
+| Round | Emergent | 11-15 | 3.6 | 6 | 3 |
+| Cone | Under | 4-6 | 1.6 | a spire | 0 |
+| Cone | Canopy | 7-11 | 2.4 | a spire | 0 |
+| Cone | Emergent | 13-17 | 3 | a spire | 0 |
+| Slim | Under | 4-5 | 1.4 | 3 | 0 |
+| Slim | Canopy | 6-9 | 2 | 5 | 0 |
+| Slim | Emergent | 11-14 | 2.5 | 6 | 1 |
+
+| biome | under | emergent |
+|---|---|---|
+| base:old_growth_forest | 25% | 22% |
+| base:forest | 25% | 12% |
+| base:birch_forest | 22% | 8% |
+| base:taiga | 30% | 8% |
+| base:tropical_forest | 25% | 12% |
+| base:swamp | 30% | 5% |
+| base:sequoia_grove | 30% | 5% |
+| elsewhere | 20% | 6% |
+
 ## Food in the world
 
 What foraging animals eat of the world's blocks (`vitals::forage`), how much a mouthful feeds (a capybara holds 200), what eating it leaves, and what brings it back.

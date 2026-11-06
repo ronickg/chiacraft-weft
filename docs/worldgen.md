@@ -216,6 +216,8 @@ r.scatter(&TREE_SITES).cell(5).reach(3).density(&TREES).shape(|s| {
 
 Base's real trees are in `mods/base/src/worldgen.rs`; how many grow where and which kinds are the biome components `trees` and `tree_kinds` (a `BlockList` of logs, `"birch_log:1 oak_log:4"`), and a log's leaves its `tree_leaves` (a `BlockRef`; logs tagged `cone_tree` grow spruce-like), so another mod can give a biome trees without touching code.
 
+A forest isn't one height. Each wild tree's site rolls its layer of the stand from its biome's shares (`vitals::canopy`: under the canopy, in it, or over it as an emergent), and the crown follows: short and small under, deep and steep-sided in the canopy, tall with a lumpy, lobed crown over it, simple and branched trees alike (`base_api::trees::with_tier`, `tree_recipes::tiered`). That is what makes a canopy read as separate crowns with shade between them instead of one flat mat, near and in distant terrain (which samples the same shapes). `cargo run --release -p base_api --example forest_canopy -- <dir>` grows a stand off the game and draws it.
+
 ## Decorations
 Grass, flowers and anything else that is decided column by column go in `r.decoration(f)`, which runs for every generated cube after the terrain and the scatters, in every dimension (`.dimension(&D)` to limit it). `g.columns()` has the surface `height` and `biome` of each of the cube's columns, indexed `z * 16 + x`. Base does grass, flowers and cacti like this:
 
