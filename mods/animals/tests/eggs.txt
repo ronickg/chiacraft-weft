@@ -1,5 +1,5 @@
 # Eggs by species (source/egg, animals_core::eggs): every egg look on a stone platform in the air,
-# ticks frozen, close up in groups; a nest with a raptor clutch and the wyvern's on its nest;
+# ticks frozen, close up in groups (yaw 180 faces +z, where they lie); a nest with a raptor clutch and the wyvern's on its nest;
 # then the egg items held and in the inventory. Shots: eggs_*.png.
 loaded
 idle
@@ -50,35 +50,35 @@ chat /tick freeze
 wait 1
 # dinosaurs, from the front and above
 chat /tp 301.8 101.55 299.3
-look 0 -35
+look 180 -35
 wait 1
 shot eggs_dinos.png
 chat /tp 301.8 101.35 299.8
-look 0 -20
+look 180 -20
 wait 1
 shot eggs_dinos_low.png
 # reptiles and fish
 chat /tp 301.8 101.5 300.9
-look 0 -40
+look 180 -40
 wait 1
 shot eggs_reptiles_fish.png
 # birds
 chat /tp 302.7 101.5 302.3
-look 0 -40
+look 180 -40
 wait 1
 shot eggs_birds.png
 # the raptor nest and the wyvern's
 chat /tp 298.5 101.8 297.6
-look 0 -45
+look 180 -45
 wait 1
 shot eggs_raptor_nest.png
 chat /tp 304.5 102.4 305
-look 0 -40
+look 180 -40
 wait 1
 shot eggs_wyvern_nest.png
 # everything from further off
 chat /tp 302 103 297
-look 0 -35
+look 180 -35
 wait 1
 shot eggs_all.png
 # the items: held, and in the inventory
@@ -109,7 +109,7 @@ chat /tk give animals:savanna_hawk_egg 1
 chat /tk give animals:turkey_vulture_egg 1
 chat /tk give animals:confuciusornis_egg 1
 wait 2
-look 0 -10
+look 180 -10
 key 1
 wait 1
 shot eggs_held_raptor.png
