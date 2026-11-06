@@ -282,7 +282,8 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     if b.hit {
         bounce = pt_lit(b, l);
         diffuse = lit - sky_part + bounce;
-        diffuse_t = b.t;
+        // Above 0 on every traced pixel: the denoisers read diffuse's a > 0 as "traced".
+        diffuse_t = max(b.t, 1e-3);
     }
     // Into the cache: the indirect light found here (one pixel in four a frame).
     if ((id.x + id.y * 3u + u32(scene.rt.y)) & 3u) == 0u {
