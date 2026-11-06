@@ -1,5 +1,7 @@
 # Rivers like Bliss's scene
 
+**Done for the overworld (11-06, Ronald: "Yes, both kinds"):** way 1 below, built on branch claude/overworld-rivers: the long rivers (`line_rivers`) over the drainage streams, a lake cell in seven, a pit's lake only for a big flow, the long rivers kept off waystones. Seed 1 within 6 km: rivers 1.44% to 3.65% of the ground, lakes 2.79% to 1.33%, median river 13 to 36 blocks wide. The river style that kept the test world apart is gone: both worlds have these rivers.
+
 Planner, 11-05: "wide winding rivers through forest like Bliss's scene (ours show mostly lakes)". It's
 built in the Minecraft forest test world (`base:mc_forest`, branch claude/mc-forest-test), and not in
 the overworld. This note covers what the overworld would need, for when Ronald wants it there.

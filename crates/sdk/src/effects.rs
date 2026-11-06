@@ -165,6 +165,42 @@ impl ParticleBuilder<'_> {
         self.desc.flags |= pf::SHRINK;
         self
     }
+    /// Carried by the wind (its gusts, sheltered where the sky is hidden): takes on the air's speed
+    /// at `rate` a second and falls at `sink` blocks a second through still air, in place of
+    /// `gravity` and `drag`. A leaf: `carried(3.0, 1.2)`; blown snow: `carried(6.0, 0.3)`.
+    pub fn carried(mut self, rate: f32, sink: f32) -> Self {
+        (self.desc.air, self.desc.sink) = (rate, sink);
+        self
+    }
+    /// Flutters side to side and tumbles as it falls, `amount` 0..1, drawn as a flat card turning
+    /// in 3D that lies flat where it lands (a leaf, a petal); for `carried` kinds.
+    pub fn flutter(mut self, amount: f32) -> Self {
+        self.desc.flutter = amount;
+        self
+    }
+    /// Once landed (`on_land(.., Then::stop())`), a wind of `wind` m/s (gusts included) blows it on
+    /// along the ground or up again; for `carried` kinds.
+    pub fn lifts_at(mut self, wind: f32) -> Self {
+        self.desc.lift = wind;
+        self
+    }
+    /// Drawn as a streak along its motion, as long as `seconds` of it (blown sand in a storm), `size`
+    /// wide.
+    pub fn streak(mut self, seconds: f32) -> Self {
+        self.desc.streak = seconds;
+        self
+    }
+    /// Floats on liquids, drifting with the wind; for `carried` kinds.
+    pub fn floats(mut self) -> Self {
+        self.desc.flags |= pf::FLOATS;
+        self
+    }
+    /// Colored like the burst's block (`Burst::block`) where its biome tints it, as block dust
+    /// is: a leaf in its tree's season color.
+    pub fn block_tinted(mut self) -> Self {
+        self.desc.flags |= pf::BLOCK_TINT;
+        self
+    }
     /// Colors it with `shaders/particle/<name>.wgsl` (`fn shade(p: ParticleFrag) -> vec4<f32>`).
     pub fn shader(mut self, name: &str) -> Self {
         self.shader = crate::asset("", name);
@@ -497,7 +533,8 @@ impl Burst {
         self.burst.outward = 1;
         self
     }
-    /// Block state the textureless kinds (block dust) take their texture from.
+    /// Block state the textureless kinds (block dust) take their texture from, and
+    /// `block_tinted` kinds their biome's color.
     pub fn block(mut self, state: u32) -> Self {
         self.burst.block = state;
         self

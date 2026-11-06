@@ -50,25 +50,49 @@ const fn c(low: i32, spread: i32, radius: f32, depth: i32, lobes: u32) -> Crown 
     Crown { low, spread, radius, depth, lobes }
 }
 
-/// Each kind's crown in each tier. The canopy's sizes are about Minecraft's own trees (an oak 5-8
-/// high, its crown five to seven across), so a stand at Minecraft's density (about one tree in 25
+/// Each kind's crown in each tier. The crowns are about Minecraft's own trees' size (five to seven
+/// across), lifted on clear trunks (Tester 2's walk at spot C, 11-06: the canopy came down to three
+/// blocks over the floor, a walk was inside the leaves; Bliss's floor has clear trunks under a high
+/// canopy, and a closed stand's oaks self-prune to a long clear bole): a canopy tree 11-14 high with
+/// some 7-9 blocks bare, so a stand at Minecraft's density (about one tree in 25
 /// square blocks, the forests' `TREES` and `STAND_TREES` together) closes most of the sky but
 /// leaves pits between crowns; the crowns deep with steep sides (Bliss's shots: tall clumps whose
 /// shaded walls and the pits between them go near black, lit tops at many heights), the emergents
 /// half again to twice as high (the PC look, 11-06: one in five old-growth trees over the canopy
 /// gave its skyline, fewer read flat). Cones (`depth` 0): `radius` at the base of the
-/// needles, which start a quarter of the way up (three tenths on an emergent).
+/// needles, which start at `cone_bare` of the height.
 pub fn crown(kind: Kind, tier: Tier) -> Crown {
     match (kind, tier) {
-        (Kind::Round, Tier::Under) => c(3, 2, 1.8, 3, 0),
-        (Kind::Round, Tier::Canopy) => c(5, 5, 3.0, 5, 1),
-        (Kind::Round, Tier::Emergent) => c(11, 5, 3.6, 6, 3),
-        (Kind::Cone, Tier::Under) => c(4, 3, 1.6, 0, 0),
-        (Kind::Cone, Tier::Canopy) => c(7, 5, 2.4, 0, 0),
-        (Kind::Cone, Tier::Emergent) => c(13, 5, 3.0, 0, 0),
-        (Kind::Slim, Tier::Under) => c(4, 2, 1.4, 3, 0),
-        (Kind::Slim, Tier::Canopy) => c(6, 4, 2.0, 5, 0),
-        (Kind::Slim, Tier::Emergent) => c(11, 4, 2.5, 6, 1),
+        (Kind::Round, Tier::Under) => c(4, 2, 1.8, 3, 0),
+        (Kind::Round, Tier::Canopy) => c(11, 4, 3.0, 5, 1),
+        (Kind::Round, Tier::Emergent) => c(16, 4, 3.6, 6, 3),
+        (Kind::Cone, Tier::Under) => c(5, 3, 1.6, 0, 0),
+        (Kind::Cone, Tier::Canopy) => c(11, 4, 2.4, 0, 0),
+        (Kind::Cone, Tier::Emergent) => c(17, 4, 3.0, 0, 0),
+        (Kind::Slim, Tier::Under) => c(5, 2, 1.4, 3, 0),
+        (Kind::Slim, Tier::Canopy) => c(11, 3, 2.0, 5, 0),
+        (Kind::Slim, Tier::Emergent) => c(15, 3, 2.5, 6, 1),
+    }
+}
+
+/// The share of a cone tree's height bare under its needles, by layer: a young spruce keeps its
+/// skirt to the ground, a closed stand's spruces lose their lower whorls (a third and more), the
+/// tall old ones half.
+pub fn cone_bare(tier: Tier) -> f32 {
+    match tier {
+        Tier::Under => 0.2,
+        Tier::Canopy => 0.38,
+        Tier::Emergent => 0.45,
+    }
+}
+
+/// How much trunk a branched broadleaf keeps clear under its crown, by layer, at least (blocks):
+/// the canopy's and emergents' grow up to the light and shed their lower limbs.
+pub fn clear_trunk(tier: Tier) -> f32 {
+    match tier {
+        Tier::Under => 0.0,
+        Tier::Canopy => 7.0,
+        Tier::Emergent => 10.0,
     }
 }
 
@@ -142,6 +166,10 @@ mod tests {
             assert!(u.low + u.spread - 1 < c.low, "{kind:?}");
             assert!(c.low + c.spread - 1 + 2 <= e.low, "{kind:?}: emergents stand clear of the canopy");
             assert!(u.radius < c.radius && c.radius <= e.radius, "{kind:?}");
+            // A walk under the canopy is under its leaves, not in them.
+            if c.depth > 0 {
+                assert!(c.low - c.depth >= 6, "{kind:?}: the canopy's trunks clear");
+            }
         }
     }
 

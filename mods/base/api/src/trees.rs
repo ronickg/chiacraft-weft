@@ -372,12 +372,12 @@ fn crown(t: &TreeAt, cx: i32, cz: i32, top: i32, put: &mut impl FnMut(i32, i32, 
             }
         }
         Crown::Cone => {
-            // Rings stepping in toward a spire from where the needles start (a quarter of the way
-            // up, three tenths on an emergent: barer trunks stood as poles, the PC look 11-06),
-            // every other ring pulled in: a ruffled spire whose ledges catch the sun, like
+            // Rings stepping in toward a spire from where the needles start (`canopy::cone_bare`:
+            // a skirt to the ground on a young one, a clear trunk under a stand's), every other
+            // ring pulled in: a ruffled spire whose ledges catch the sun, like
             // Minecraft's spruces, sized by its tier.
             let c = canopy::crown(Kind::Cone, t.tier);
-            let bare = ((t.height as f32 * if t.tier == Tier::Emergent { 0.3 } else { 0.25 }).round() as i32).max(1);
+            let bare = ((t.height as f32 * canopy::cone_bare(t.tier)).round() as i32).max(1);
             let base = c.radius + if t.form == Form::Big { 0.4 } else { 0.0 } + jitter(t.seed, 1) * 0.3;
             let len = (t.height + 1 - bare).max(1);
             for dy in bare..=t.height {
@@ -621,6 +621,8 @@ fn put_with_branches(
     z: i32,
     put: &mut impl FnMut(i32, i32, i32, u32, bool),
 ) {
+    // No bare wood on the crown's top (`tree_recipes::capped`).
+    let b = &crate::tree_recipes::capped(b);
     let wood: std::collections::HashSet<_> = b
         .iter()
         .filter(|e| matches!(e.3, branchy::Part::Log { .. }))

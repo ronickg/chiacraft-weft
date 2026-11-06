@@ -443,7 +443,7 @@ fn tool_stack(kind: &Kind, parts: &[(Part, PartOf)], stats: &ToolStats, gems: &[
     // Drawn from its parts (the engine's `core:look`), its gems set on it.
     let plain: Vec<Part> = parts.iter().map(|p| p.0).collect();
     let look = look_text(kind.id, &plain);
-    // Its gems over it; a kind with no layered art yet (a knife, a spear) is its plain icon under
+    // Its gems over it; a kind with no layered art yet is its plain icon under
     // them, or with none set its plain icon alone.
     let look = match (look.is_empty(), set.is_empty()) {
         (false, _) => look + &gem_layers(kind.id, &set),

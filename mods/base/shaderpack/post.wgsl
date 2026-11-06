@@ -242,7 +242,11 @@ fn auto_exposure(mean: f32) -> f32 {
     // Under rain the view is darker and stays so (a storm's mood; brought up, its mist went milky):
     // no brighter than as made, in a storm a little darker.
     let wet = rain_amount() * select(1.0, 0.0, !open_sky());
-    return clamp(k, 0.6, mix(mix(2.0, 1.2, night), 1.0 - 0.1 * scene.weather.w, wet));
+    // Before sunrise (the sun below, coming up in the east: `scene.sun.x` above 0) the night is
+    // brought up less, 0.7 at most, so 04:00 stays dark as Bliss's (land luma 40 against 16 with
+    // blue hour v4, 11-06); after sunset it keeps 1.2 (Bliss's 20:00 is brighter than ours).
+    let ceiling = mix(1.2, 0.7, smoothstep(-0.2, 0.2, scene.sun.x));
+    return clamp(k, 0.6, mix(mix(2.0, ceiling, night), 1.0 - 0.1 * scene.weather.w, wet));
 }
 
 // How strong the bloom is: a share of the glow mixed in (it keeps the light's sum), more in rain
@@ -306,10 +310,23 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
     // overhead and gold toward a low sun (08:00, saturation 26 against 43). Not in rain.
     let size = vec2<i32>(pass_.size);
     let px = clamp(vec2<i32>(uv * pass_.size), vec2(0), size - vec2(1));
-    if textureLoad(textures[pass_.depth], px, 0).r <= 0.0 {
+    let sky_px = textureLoad(textures[pass_.depth], px, 0).r <= 0.0;
+    if sky_px {
         let y = luma(col);
-        let k = 1.0 + 0.3 * smoothstep(0.0, 0.15, scene.sun.y) * (1.0 - rain_amount());
+        // More as the sun climbs, where the land's saturation is taken down most (0.62 of it with a
+        // high sun, `finish_picture`): the sky kept its blue, which already read paler than Bliss's
+        // (mc_forest noon 22 against 31, 08:00 27 against 43).
+        let open = smoothstep(0.0, 0.15, scene.sun.y) * (1.0 - rain_amount());
+        // (Twice the first try's rise: 0.6 more was all taken back by the land's lower saturation
+        // and the curve's shoulder, noon 22 still, gr2.)
+        let k = 1.0 + (0.3 + 1.2 * smoothstep(0.3, 0.75, scene.sun.y)) * open;
         col = max(vec3(y) + (col - vec3(y)) * k, vec3(0.0));
+        // And dimmer by day: ours read brighter than Bliss's at every hour (mc_forest 08:00
+        // 216 against 208, noon 217 against 192, 17:00 193 against 171). The day's brightening
+        // below leaves it out (on it too, the 08:00 sky went to 224, gr2).
+        // (30%: at 15% the sky, mostly bright cloud on the curve's shoulder, barely moved, noon 216
+        // to 213, gr3.)
+        col *= 1.0 - 0.3 * open;
     }
     if pass_.bloom != 0u {
         let glow = bloom_tap(pass_.bloom - 1u, uv);
@@ -326,8 +343,11 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
         let e = textureLoad(textures[pass_.exposure - 1u], vec2(0, 0), 0).g;
         if e == e && e > 0.0 {
             col *= pow(auto_exposure(e), fantasy_opt(OPT_AUTO_EXPOSURE));
-            // A high sun's land a little brighter (the noon land read 91-93 against Bliss's 113).
-            col *= mix(1.0, 1.25, smoothstep(0.5, 0.85, scene.sun.y) * (1.0 - rain_amount()));
+            // A high sun's land a little brighter (the noon land read 91-93 against Bliss's 113),
+            // from a sun about 12° up (at the like-for-like mc_forest vista the land read dark
+            // through the day: 08:00 78 against Bliss's 89, 17:00 81 against 113).
+            // The land only: the sky has its own (dimmer, above).
+            col *= mix(1.0, 1.25, smoothstep(0.2, 0.6, scene.sun.y) * (1.0 - rain_amount()) * select(1.0, 0.0, sky_px));
         }
     }
     return col;

@@ -81,6 +81,8 @@ pub enum Blend {
     Alpha,
     Premultiplied,
     Additive,
+    /// The color attachment left as it is (write mask 0): a depth pass inside a pass with color.
+    NoColor,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -90,6 +92,8 @@ pub enum Compare {
     GreaterEqual,
     Less,
     LessEqual,
+    /// Only where the depth is already this fragment's (a second pass over a depth pre-pass).
+    Equal,
 }
 
 #[derive(Clone, Copy, Debug)]
