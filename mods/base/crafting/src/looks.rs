@@ -117,6 +117,8 @@ pub const LOOKS: &[KindLook] = &[
         socket: [10.8, 20.6],
         anchors: &[
             ("wood", [9.8, 21.7]),
+            // v3's flint blade runs to the corner as the wooden one does: its anchor.
+            ("flint", [9.8, 21.7]),
             ("stone", [10.8, 20.5]),
             ("copper", [11.8, 19.4]),
             ("bronze", [10.8, 20.5]),
@@ -128,6 +130,48 @@ pub const LOOKS: &[KindLook] = &[
         layers: &[
             Layer { name: "blade", regions: &["blade"], area: [6, 0, 31, 26], moves: false, painted: true },
             Layer { name: "hilt", regions: &["grip", "guard", "pommel"], area: [0, 17, 15, 31], moves: true, painted: false },
+        ],
+    },
+    // A knife: its blade drawn per material (art redo v3, Ronald 11-06: "Install all of it"), the
+    // sword's hilt map moved to the iron blade (grip, and the fitting as its guard).
+    KindLook {
+        kind: "knife",
+        socket: [9.0, 23.0],
+        anchors: &[
+            ("wood", [7.0, 23.0]),
+            ("stone", [9.0, 23.0]),
+            ("flint", [6.0, 25.0]),
+            ("copper", [8.0, 23.0]),
+            ("bronze", [7.0, 24.0]),
+            ("iron", [9.0, 23.0]),
+            ("steel", [7.0, 24.0]),
+            ("gold", [8.0, 24.0]),
+            ("diamond", [7.0, 24.0]),
+        ],
+        layers: &[
+            Layer { name: "blade", regions: &["blade"], area: [0, 0, 31, 31], moves: false, painted: true },
+            Layer { name: "hilt", regions: &["grip", "fitting"], area: [0, 0, 31, 31], moves: true, painted: false },
+        ],
+    },
+    // A spear: its point drawn per material (v3), a shaft map drawn in code from the haft's shading
+    // to the iron point's socket.
+    KindLook {
+        kind: "spear",
+        socket: [9.0, 23.0],
+        anchors: &[
+            ("wood", [9.0, 22.0]),
+            ("stone", [9.0, 22.0]),
+            ("flint", [9.0, 22.0]),
+            ("copper", [7.0, 22.0]),
+            ("bronze", [11.0, 21.0]),
+            ("iron", [9.0, 23.0]),
+            ("steel", [8.0, 22.0]),
+            ("gold", [10.0, 21.0]),
+            ("diamond", [9.0, 21.0]),
+        ],
+        layers: &[
+            Layer { name: "shaft", regions: &["shaft"], area: [0, 0, 31, 31], moves: true, painted: false },
+            Layer { name: "point", regions: &["point", "fitting"], area: [0, 0, 31, 31], moves: false, painted: true },
         ],
     },
     // A bow drawn from corner to corner, the string behind the stave and the grip a region of it.
@@ -190,8 +234,7 @@ pub fn drawn_shape(shape: &str) -> &str {
 
 /// The drawing a working part of `material` uses on `kind`: its own where it's drawn (the kind's
 /// anchors list the drawn ones), else the nearest drawn one until its art comes (meteoric iron as
-/// iron, star steel as steel, chert, obsidian and tektite as flint, bone and antler, and flint on a
-/// sword, as stone).
+/// iron, star steel as steel, chert, obsidian and tektite as flint, bone and antler as stone).
 pub fn drawn<'a>(kind: &str, material: &'a str) -> &'a str {
     let Some(l) = look(kind) else { return art_name(material) };
     let has = |a: &str| l.anchors.is_empty() || l.anchors.iter().any(|(m, _)| *m == a);
@@ -227,8 +270,7 @@ pub const GEM_SPOTS: &[(&str, [[i32; 2]; 3])] = &[
     ("shovel", [[23, 8], [25, 5], [21, 11]]),
     ("hoe", [[18, 9], [21, 6], [15, 12]]),
     ("sword", [[9, 22], [4, 27], [12, 19]]),
-    // Kinds drawn by their plain icon until their parts have art: the knife's bolster, the
-    // spear's socket under its point, the bow's grip.
+    // The knife's guard, the spear's socket under its point (v3's drawings); the bow's grip.
     ("knife", [[12, 20], [8, 24], [16, 16]]),
     ("spear", [[22, 11], [19, 14], [16, 17]]),
     ("bow", [[7, 12], [5, 16], [10, 8]]),
@@ -313,11 +355,26 @@ pub fn gem_look(kind: &str, i: usize, gem: &str) -> Option<String> {
 /// (a shell) as the built piece (`base:parts/armour/<shape>`, made from the approved icons): armour's
 /// shells, straps (their buckles a second region: the straps' own metal, else wrought iron) and
 /// linings. Ronald, 11-05: a shell's icon shows its material.
+/// The materials whose armour shells are drawn (art redo v3, `parts/armour/<shell>/<art name>`):
+/// wrought iron's are "iron". Gold's are drawn too, but gold makes no shell. The rest (rawhide,
+/// antler, copper, bronze, steel, meteoric iron, star steel) are their family's map in their ramp.
+pub const SHELLS_DRAWN: [&str; 5] = ["leather", "bone", "iron", "gold", "diamond"];
+
 pub const PART_MAPS: [&str; 6] = ["helmet_shell", "chest_shell", "leg_shell", "boot_shell", "straps", "lining"];
 
-/// The look of a part of `shape` made of `material` (the engine's `core:look`), if it's drawn
-/// from a map.
+/// The look of a part of `shape` made of `material` (the engine's `core:look`): a loose head or
+/// blade's own drawing, a drawn shell, or a map painted with its ramp; None for a part drawn by its
+/// plain icon.
 pub fn part_look(shape: &str, material: &str) -> Option<String> {
+    // A loose head or blade: its drawing in its material, centred (`parts/loose/`, art redo v3).
+    if let Some(sh) = crate::kinds::SHAPES.iter().find(|s| s.id == shape)
+        && let Some(l) = look(sh.kind)
+        && l.layers
+            .iter()
+            .any(|x| x.painted && x.regions.first() == Some(&sh.slot))
+    {
+        return Some(format!("base:parts/loose/{}/{}", drawn_shape(shape), drawn(sh.kind, material)));
+    }
     if !PART_MAPS.contains(&shape) {
         return None;
     }
@@ -329,7 +386,11 @@ pub fn part_look(shape: &str, material: &str) -> Option<String> {
     } else {
         format!(",{}", ramp("wrought_iron"))
     };
-    // A shell is drawn as its family is built: a leather cap, bone slats.
+    // A shell drawn for its material (art redo v3) is used as it is.
+    if shape.ends_with("_shell") && SHELLS_DRAWN.contains(&art_name(material)) {
+        return Some(format!("base:parts/armour/{shape}/{}", art_name(material)));
+    }
+    // Else as its family is built, painted with its ramp: a leather cap, bone slats, plate.
     let drawn = match (shell_family(material), shape) {
         ("leather", "helmet_shell") => "cap_shell".to_string(),
         ("bone", s) if s.ends_with("_shell") => format!("bone_{s}"),
@@ -375,13 +436,18 @@ mod tests {
         assert_eq!(painted("axe", "felling_axe_head", "oak"), "base:parts/axe/felling_axe_head/wood");
         // Until their art comes, undrawn heads use the nearest drawn one.
         assert_eq!(painted("pickaxe", "pick_head", "meteoric_iron"), "base:parts/pickaxe/pick_head/iron");
-        assert_eq!(painted("sword", "straight_blade", "flint"), "base:parts/sword/straight_blade/stone");
+        assert_eq!(painted("sword", "straight_blade", "obsidian"), "base:parts/sword/straight_blade/flint");
+        assert_eq!(painted("sword", "straight_blade", "bone"), "base:parts/sword/straight_blade/stone");
         assert_eq!(painted("axe", "felling_axe_head", "obsidian"), "base:parts/axe/felling_axe_head/flint");
         assert_eq!(part_look("chest_shell", "bronze").unwrap(), "base:parts/armour/chest_shell@base:ramps/bronze");
         assert_eq!(part_look("straps", "leather").unwrap(), "base:parts/armour/straps@base:ramps/leather,base:ramps/wrought_iron");
         assert!(part_look("haft", "oak").is_none());
-        assert_eq!(part_look("helmet_shell", "leather").unwrap(), "base:parts/armour/cap_shell@base:ramps/leather");
-        assert_eq!(part_look("leg_shell", "bone").unwrap(), "base:parts/armour/bone_leg_shell@base:ramps/bone");
+        assert_eq!(part_look("pick_head", "wrought_iron").unwrap(), "base:parts/loose/pick_head/iron");
+        assert_eq!(part_look("long_blade", "chert").unwrap(), "base:parts/loose/straight_blade/flint");
+        assert_eq!(part_look("helmet_shell", "leather").unwrap(), "base:parts/armour/helmet_shell/leather");
+        assert_eq!(part_look("helmet_shell", "rawhide").unwrap(), "base:parts/armour/cap_shell@base:ramps/rawhide");
+        assert_eq!(part_look("leg_shell", "antler").unwrap(), "base:parts/armour/bone_leg_shell@base:ramps/antler");
+        assert_eq!(part_look("chest_shell", "wrought_iron").unwrap(), "base:parts/armour/chest_shell/iron");
         assert_eq!(worn_look(2, "diamond", "wrought_iron", &[]), "base:entity/armor/worn/diamond_2");
         assert_eq!(
             worn_look(0, "unobtainium", "leather", &[]),
@@ -418,6 +484,16 @@ mod tests {
     }
 
     #[test]
+    fn every_drawn_shell_has_its_drawing() {
+        let tex = concat!(env!("CARGO_MANIFEST_DIR"), "/../assets/textures/parts/armour");
+        for art in SHELLS_DRAWN {
+            for shell in ["helmet_shell", "chest_shell", "leg_shell", "boot_shell"] {
+                assert!(std::path::Path::new(&format!("{tex}/{shell}/{art}.png")).exists(), "{shell} {art}");
+            }
+        }
+    }
+
+    #[test]
     fn every_shape_a_look_draws_has_its_drawing() {
         // A shape in a layer's region 0 names that layer's drawing: each must be on disk, for every
         // drawn material where it's painted (a missing one draws the tool without that part).
@@ -434,6 +510,9 @@ mod tests {
                         for (art, _) in l.anchors {
                             let f = file(&painted(l.kind, shape.id, art));
                             assert!(std::path::Path::new(&f).exists(), "{} {} in {art}: no {f}", l.kind, shape.id);
+                            // And its loose part's icon.
+                            let f = file(&part_look(shape.id, art).unwrap());
+                            assert!(std::path::Path::new(&f).exists(), "loose {} in {art}: no {f}", shape.id);
                         }
                     } else {
                         let f = file(&map(l.kind, shape.id));
