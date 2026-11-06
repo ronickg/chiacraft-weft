@@ -211,7 +211,7 @@ fn fs_taa(in: VOut) -> TaaOut {
     // Fast motion: a little more of this frame, so moving land doesn't smear (each frame's history
     // is filtered once more where it is read between texels).
     let px = length(motion * pass_.size);
-    n = min(n, mix(1.0 / max(pass_.strength, 0.02), 4.0, clamp(px / 16.0, 0.0, 1.0)));
+    n = min(n, mix(1.0 / max(pass_.strength, 0.02), 4.0, clamp(px / 8.0, 0.0, 1.0)));
     // Where rain or snow lies over it (the motion image's w, the weather's cover): that much more of
     // this frame, so their streaks don't wash out.
     var reactive = 0.0;

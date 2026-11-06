@@ -312,6 +312,15 @@ fn sky_or_cloud(uv: vec2<f32>, d: f32) -> bool {
         return true;
     }
     let w = scene.inv_view_proj * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, d, 1.0);
+    // The soft deck's far end: low over the horizon its looks reach the layer past `SOFT_REACH`,
+    // and its depth is held at that distance, under the deck's height there, so the height test
+    // below took a band of it for land (a dashed line at the deck's end that temporal
+    // anti-aliasing, gathering the deck's faint edge, made a solid pale band: mc_forest noon, 11-06).
+    // Only at that distance: distant terrain reaches past it (256 chunks), and its far land
+    // stays land.
+    if scene.soft_clouds.x > 0.5 && abs(length(w.xyz / w.w) - SOFT_REACH) < 4.0 {
+        return true;
+    }
     // The soft deck's underside (as the lightning's, `look.wgsl`), less a margin; the blocky
     // clouds' slab without soft ones.
     let lift = select(0.0, SOFT_LIFT * (1.0 - 0.7 * max(min(rain_amount() * 0.75 + scene.weather.w * 0.25, 1.0), scene.weather.w)), scene.soft_clouds.x > 0.5);

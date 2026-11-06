@@ -394,6 +394,9 @@ fn blood_tint() -> vec3<f32> {
 // looking up from under the trees (Tester 2's looks4, 11-05); higher, they stand in the sky as
 // clouds with blue between them, as Bliss's do.
 const SOFT_LIFT: f32 = 220.0;
+// How far a look into the soft clouds is followed (blocks): beyond, they fade into the sky. Their
+// depth is held there, so what stands at this distance is cloud, never land (`sky_or_cloud`).
+const SOFT_REACH: f32 = 4000.0;
 
 // ---- lightning (`scene.lightning`, the engine's flash where the player is) ----
 // Ronald, 11-05: "add lightning flashes" (Tester 2's four storm shots showed none: the engine's
