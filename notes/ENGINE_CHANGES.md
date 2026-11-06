@@ -273,3 +273,4 @@ These are the biggest changes. They live mostly in our crates, but each needed h
 ## Our own crates (additions, not core changes)
 
 `sandbox` (wasmtime mod host), `packages` (data packages), `account`, `bridge`, `bots` (`weft-bots`, headless load-test players).
+- **Far water knows its depth** (branch claude/far-bed; `terrain.wgsl` `lod`, `lod::water_depth`, `lod_water_depth`, plain `world.wgsl` `far_water`). The far tiles' samples keep how deep their water stands (1-31 blocks, bits 11-15 of the second word beside the biome, now 11 bits), water tops carry it in their AO bits (water has no corner shade), and the plain shader lights the floor under far water by the sky light the water leaves it, a level a block, from a sand-gravel colour; unknown depth keeps the dark floor. *Why:* past the cubes far lakes were one flat navy where vanilla + Distant Horizons show shallows by the shore and depth (Planner's stage 1 check, 11-06).
