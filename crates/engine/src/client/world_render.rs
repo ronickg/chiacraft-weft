@@ -484,14 +484,13 @@ pub struct WorldRenderer {
     /// The radiance cache (`pathtrace.wgsl`'s `pt_cache`, `gpu_layout::PT_CACHE` cells), made zeroed
     /// with the first traced frame.
     pt_cache: Option<BufferId>,
-    /// The path tracer's G-buffer (`rt.rs` `draw_gbuffer`): its pipelines (faces opaque, faces
+    /// The path tracer's G-buffer (`rt.rs` `gbuffer_pass`): its pipelines (faces opaque, faces
     /// cutout, quads opaque, quads cutout), the last `draw`'s opaque and cutout table draws (kind,
-    /// layer, page, group, first, draws) with its frame slot and CPU-made runs before `gb_firsts`,
-    /// and its images (albedo, normal, spec) at the world's size.
+    /// layer, page, group, first, draws) with its frame slot (the CPU-made runs before
+    /// `translucent` are drawn again too), and its images (albedo, normal, spec) at the world's size.
     gb_pipes: Option<[PipelineId; 4]>,
     gb_draws: Vec<(u8, u8, u32, u32, u32, u32)>,
     gb_draws_slot: usize,
-    gb_firsts: usize,
     pub gb_images: Option<(TextureId, TextureId, TextureId, (u32, u32))>,
     /// The path tracer's light (`path_trace`), at the world's size, Rgba16F: diffuse (rgb divided
     /// by the albedo; a the bounce's distance) and specular (rgb divided by `pt_spec_albedo`; a the
@@ -675,7 +674,6 @@ impl WorldRenderer {
             gb_pipes: if rt_compiled { rt::gb_pipelines(gpu, &shader) } else { None },
             gb_draws: Vec::new(),
             gb_draws_slot: 0,
-            gb_firsts: 0,
             gb_images: None,
             pt_images: None,
             rt_reload: false,
@@ -2129,7 +2127,6 @@ impl WorldRenderer {
         // The path tracer's G-buffer replays the opaque and cutout terrain's draws (`draw_gbuffer`).
         self.gb_draws.clear();
         self.gb_draws_slot = frame.slot;
-        self.gb_firsts = firsts;
         for (pipe, buf, i, counted) in steps {
             let (_, layer, _, id, base, max) = groups[i];
             if layer > 0 && !cpu_opaque_drawn {

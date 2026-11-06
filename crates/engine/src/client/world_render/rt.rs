@@ -521,7 +521,7 @@ impl WorldRenderer {
     /// world shader's G-buffer pipelines.
     pub fn gbuffer_pass(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, depth: TextureId, size: (u32, u32)) {
         let Some(pipes) = self.gb_pipes else { return };
-        if self.buffers.is_none() || self.gb_draws.is_empty() && self.gb_firsts == 0 {
+        if self.buffers.is_none() || self.gb_draws.is_empty() && self.translucent == 0 {
             return;
         }
         if self.gb_images.is_none_or(|g| g.3 != size) {
@@ -568,8 +568,10 @@ impl WorldRenderer {
                 });
             }
         }
-        // The runs the CPU made (structures, the nearest cubes).
-        for &(kind, layer, page, start, count) in &self.runs[..self.gb_firsts.min(self.runs.len())] {
+        // Every opaque and cutout run the CPU made (structures, the nearest cubes): the plain ones
+        // `draw` puts first and the rest before the translucent ones. With only the first, the
+        // storeroom's gold and birch blocks had no G-buffer and came out black (pt1_rtxd_pt).
+        for &(kind, layer, page, start, count) in &self.runs[..self.translucent.min(self.runs.len())] {
             if layer >= 2 || !matches!(kind, 0 | 1 | 4 | 5) {
                 continue;
             }

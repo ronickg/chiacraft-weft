@@ -316,7 +316,11 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         let sky_seen = mix(sky_color(r), sky_color(vec3(0.0, 1.0, 0.0)), clamp(a * 2.0, 0.0, 1.0));
         let open = smoothstep(0.8, 1.0, h.light.x);
         var env = mix(diffuse * 0.5, sky_seen, open * open);
-        if a < 0.5 {
+        // The face's own horizon: a normal map tilts some texels (mortar joints, bevels) until they
+        // mirror along the face or into it, where the groove and the block itself hide the sky. The
+        // stone bricks' joints lit up as blue lines from the sky (pt1_rtxd_pt, the cathedral).
+        let horizon = smoothstep(-0.05, 0.3, dot(r, ng));
+        if a < 0.5 && horizon > 0.0 {
             var dir = rt_cone(r, 0.01 + a * 0.5, px + vec2(17.0, 29.0));
             if dot(dir, ng) <= 0.0 {
                 dir = r;
@@ -331,7 +335,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
             env = mix(seen, env, smoothstep(0.1, 0.5, a));
         }
         let gloss = 1.0 - clamp(a * 1.6, 0.0, 0.85);
-        specular = (pt_schlick(f0, nv) * env * gloss + shine) / max(s_alb, vec3(1e-3));
+        specular = (pt_schlick(f0, nv) * env * gloss * horizon + shine) / max(s_alb, vec3(1e-3));
     }
     if pt.debug != 0u {
         var out = vec3(0.0);
