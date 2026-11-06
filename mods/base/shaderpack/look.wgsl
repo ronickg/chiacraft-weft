@@ -88,6 +88,8 @@ const OPT_SHARPEN: u32 = 29u;
 // a distance (`base:look_leaf_holes`, read raw: 1 on, 0 off).
 const OPT_LEAF_SUN: u32 = 30u;
 const OPT_LEAF_HOLES: u32 = 31u;
+// The light through leaves (`base:look_leaf_light`, read raw: 0 none, 1 on).
+const OPT_LEAF_LIGHT: u32 = 32u;
 
 // The colour a grass or leaf tint is multiplied by for the foliage test: 1 as made.
 fn foliage_test() -> vec3<f32> {
@@ -116,6 +118,15 @@ fn canopy() -> f32 {
 // light level, 0..1) and how closed the canopy is. Other cover (rock, a roof) cuts the sky too, but
 // only in a forest is it leaves; the canopy number tells which.
 const LEAF_LIGHT: vec3<f32> = vec3(0.6, 1.0, 0.5);
+
+// The tint of that light on what stands under the leaves (`light_on`): neutral in the HDR world, as
+// Bliss's (its sky light under a canopy is the sky's own colour, dimmed by the lightmap: crew notes
+// bliss-leaves.md). Tinted, its birch trunks read green, sRGB 69 83 68 at noon against Bliss's
+// 145 142 140, and the floor's grass a cyan-green, hue 98 against 91 (Trees' trb_s3_lk5: neutral
+// 83 83 81 and 82). The fog's light through leaves keeps its green.
+fn under_tint() -> vec3<f32> {
+    return select(LEAF_LIGHT, vec3(1.0), scene.frame.x > 0.5);
+}
 
 fn under_leaves(sky_light: f32) -> f32 {
     // Not in deep cover (a cave in the forest): the leaves' light is from what the sky reaches.
@@ -189,10 +200,33 @@ fn palette_now() -> Palette {
     // And its sunlight a little warmer with the sun high (the warmth on Bliss's noon land is its
     // sun's, the sky and the far haze staying blue: our whole-picture white balance had greyed the
     // noon sky, saturation 19 against 31).
-    if scene.frame.x > 0.5 {
-        p.sun *= mix(vec3(1.0), vec3(1.05, 1.0, 0.86), smoothstep(0.3, 0.7, scene.sun.y));
+    // In the HDR world the sunlight's colour as Bliss makes it: a blackbody's (Ronald's Bliss runs
+    // its sun at 4300 K) through the air along the sun's path, at the palette's brightness. Bliss's
+    // lit canopy tops read yellow (hue 52 at 08:00, 62 at noon), ours green (79, 100) under a
+    // near-white sun (Trees' measures, 11-06). (It replaces the small warming with the sun high.)
+    if scene.frame.x > 0.5 && scene.sun.y > -0.05 {
+        let hue = sun_kelvin_linear() * sky_transmittance(scene.sun.y);
+        let day = smoothstep(-0.05, 0.05, scene.sun.y);
+        p.sun = mix(p.sun, hue * (luma(p.sun) / max(luma(hue), 1e-4)), day);
     }
     return p;
+}
+
+// A 4300 K blackbody in linear light, red 1 (Bliss's `blackbody` at Ronald's Sun_temp, computed in
+// the crew's bliss-source notes: linear 1.0 0.668 0.426).
+fn sun_kelvin_linear() -> vec3<f32> {
+    return vec3(1.0, 0.668, 0.426);
+}
+
+// What of the sun's light gets through the air to the ground with the sun `e` (sin of its height)
+// up: Rayleigh's scattering by wavelength and a little grey Mie, over the air mass along the path
+// (Kasten and Young's), from Bliss's own coefficients (Rayleigh 5.8e-6, 1.35e-5, 3.31e-5 per metre
+// over an 8 km scale height; Mie 3e-6 over 1.2 km). About 0.94 0.87 0.72 at noon (55 degrees up).
+fn sky_transmittance(e: f32) -> vec3<f32> {
+    let h = degrees(asin(clamp(e, 0.0, 1.0)));
+    let air = 1.0 / (sin(radians(h)) + 0.50572 * pow(h + 6.07995, -1.6364));
+    let depth = vec3(0.0464, 0.108, 0.265) + vec3(0.0036);
+    return exp(-depth * air);
 }
 
 fn palette_read() -> Palette {
@@ -647,7 +681,14 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         // A clear blue, not a grey (H2: grey-tinted it reached Bliss's brightness, 160-172 against
         // 154-173, but stayed pale and from 16:00 warm, saturation 5-48 against 39-83; PC shhb1).
         let blue = vec3(luma(c)) * vec3(0.74, 0.92, 1.2);
-        c = mix(c, blue, k * 0.6) * (1.0 - 0.4 * k);
+        // On mornings with the sun low, looking away from it, lighter and bluer: at spot C 08:00
+        // (facing away) the band read 172 / warmth -13 where Bliss's is 183 / -31, and the far lake,
+        // nearly all a mirror of it, went flat grey (Far view's find). Toward the sun as it was (the
+        // forest vista stays warm, Bliss's +27 there).
+        let away = smoothstep(0.2, -0.4, mu);
+        let low_morning = smoothstep(-0.05, 0.05, scene.sun.x) * (1.0 - smoothstep(0.45, 0.7, scene.sun.y));
+        let aw = away * low_morning;
+        c = mix(c, blue, k * mix(0.6, 0.85, aw)) * (1.0 - mix(0.4, 0.15, aw) * k);
     }
     c += sun_glow(dir, p);
     // In the HDR world the air round the sun glows as bright as it really is (Mie scattering's
@@ -1014,7 +1055,7 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f
     let steep = look_opt(OPT_SHADE, 1.0);
     let sky = (pow(light.x, 15.0 * steep) * 2.0 + pow(light.x, 2.5 * steep)) / 3.0;
     let under = under_leaves(light.x);
-    let leaves = mix(vec3(1.0), LEAF_LIGHT, under * 0.5);
+    let leaves = mix(vec3(1.0), under_tint(), under * 0.5);
     // More of the sky's light comes from above than from the sides, and less from below: tops 1,
     // sides 0.75, bottoms 0.5 (Complementary's), so shade still shows form.
     // Under rain's overcast more so (tops 1, sides 0.6, bottoms 0.2): the sky's light is nearly all
@@ -1031,7 +1072,7 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f
     // green and soft (a rainforest's floor gets 1-2 % of the sun, more of it this way than from the
     // sky). Without it the floor of Plants' rainforest sat at luma 12-17 at noon, under the daytime
     // targets' 15-60 for deep forest shade (Lighting's canopy check, 11-04).
-    c += p.sun * light_strength() * 0.045 * LEAF_LIGHT * under * hemi * ao;
+    c += p.sun * light_strength() * 0.045 * under_tint() * under * hemi * ao;
     // At golden hour the sky round the low sun glows: a warm fill from its side of the sky, on
     // the faces turned that way; those turned away keep the sky's cool light (Valheim's warm light,
     // blue shade).
@@ -1053,11 +1094,26 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f
         c += lightning_glow_at(rel) * sky * hemi * ao;
         held = held_light(rel, n);
     }
-    c += block_light(max(light.yzw, held), pos) * mix(0.5, 1.0, ao) * block_by_day(light.x);
+    let blocks = block_light(max(light.yzw, held), pos) * mix(0.5, 1.0, ao) * block_by_day(light.x);
+    NIGHT_SKY_SHARE = night_sky_share(c, blocks);
+    c += blocks;
     // A floor so caves are never quite black: the dimension's own and the Brightness setting.
     let floor_light = max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y));
     c += vec3(floor_light) * vec3(0.85, 0.9, 1.0) * ao;
     return c;
+}
+
+// What share of a surface's light is the sky's and the moon's, not a lamp's, for the night's blue
+// (`display`): set by `light_on` and `light_round` for the pixel they light; 1 for what they don't
+// (the sky, clouds). Keyed on where the light comes from, not how bright it is: by brightness, a
+// lantern-lit room at midnight went blue-violet too, its light small before the night's exposure
+// lifts it (NVIDIA's storeroom, rt-sun-shadows' find, 11-06).
+var<private> NIGHT_SKY_SHARE: f32 = 1.0;
+
+fn night_sky_share(sky_part: vec3<f32>, lamp_part: vec3<f32>) -> f32 {
+    let s = luma(sky_part);
+    let l = luma(lamp_part);
+    return clamp(s / max(s + 3.0 * l, 1e-6), 0.0, 1.0);
 }
 
 // For what has no normal to speak of (particles, rain, the hand): half the direct light.
@@ -1070,7 +1126,9 @@ fn light_round(light: vec4<f32>, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     if !CALM {
         held = held_light(rel, vec3(0.0));
     }
-    c += block_light(max(light.yzw, held), pos) * block_by_day(light.x);
+    let blocks = block_light(max(light.yzw, held), pos) * block_by_day(light.x);
+    NIGHT_SKY_SHARE = night_sky_share(c, blocks);
+    c += blocks;
     c += vec3(max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y)));
     return c;
 }
@@ -1152,6 +1210,37 @@ fn dust_reach(p: vec3<f32>) -> f32 {
 }
 
 fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
+    return fog_density_with(p, floor, fog_banks_at(p, floor));
+}
+
+// The banks' noise at `p` (`fog_density`): walked only where the banks count, their mean (0.3)
+// elsewhere.
+fn fog_banks_at(p: vec3<f32>, floor: f32) -> f32 {
+    let s = storm();
+    let h = p.y - mix(min(floor, SEA_LEVEL + MIST_TOP), floor, s);
+    let low = exp(-max(h - 3.0, 0.0) / mix(7.0 + 12.0 * min(canopy(), 1.0), 40.0, s));
+    let open = smoothstep(-24.0, -10.0, h);
+    let near_floor = scene.frame.x > 0.5 && p.y - floor < 14.0 && p.y < SEA_LEVEL + MIST_TOP + 50.0;
+    if low * open > 0.02 || near_floor {
+        return fog_banks(p);
+    }
+    return 0.3;
+}
+
+// Banks: a broad octave, and a fine one that both shapes and eats them, rising slowly (one octave
+// fewer than before: three noises a step were most of the mist's cost, +3.4 ms on the PC at 3456
+// px, Research round 15). Its weight keeps the mix's spread, so the banks cover as much.
+fn fog_banks(p: vec3<f32>) -> f32 {
+    let drift = vec3(wind_now().x, 0.0, wind_now().y) * scene.params.w * mix(0.6, 2.0, storm());
+    let q = p - drift;
+    let broad = noise3(q * vec3(1.0 / 38.0, 1.0 / 12.0, 1.0 / 38.0));
+    let fine = noise3(q * vec3(1.0 / 9.0, 1.0 / 5.5, 1.0 / 9.0) + vec3(0.0, scene.params.w * 0.03, 0.0));
+    return smoothstep(0.45, 0.66, broad * 0.7 + fine * 0.39 - 0.05);
+}
+
+// `fog_density` with the banks' noise `banks` given (`fog_banks`): the mist volume takes it once a
+// cell and the height's shape at several places through it (`froxel_cell`).
+fn fog_density_with(p: vec3<f32>, floor: f32, banks: f32) -> f32 {
     let f = scene.weather.z * dust_reach(p);
     let s = storm();
     // The mist (not a storm's dust or snow) lies below a height of its own, `MIST_TOP` over the
@@ -1166,22 +1255,6 @@ fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
     let high = exp(-max(h, 0.0) / 45.0);
     // Deep under it, in the ground, there is none.
     let open = smoothstep(-24.0, -10.0, h);
-    // Banks: a broad octave, and a fine one that both shapes and eats them, rising slowly (one
-    // octave fewer than before: three noises a step were most of the mist's cost, +3.4 ms on the
-    // PC at 3456 px, Research round 15). Its weight keeps the mix's spread, so the banks cover as
-    // much. Well above the low layer, or under the ground, the banks barely count: their mean
-    // stands in and no noise is walked.
-    var banks = 0.3;
-    // In the HDR world the banks are walked near what the ray ends on too, for the wisps in the
-    // crowns below.
-    let near_floor = scene.frame.x > 0.5 && p.y - floor < 14.0 && p.y < SEA_LEVEL + MIST_TOP + 50.0;
-    if low * open > 0.02 || near_floor {
-        let drift = vec3(wind_now().x, 0.0, wind_now().y) * scene.params.w * mix(0.6, 2.0, s);
-        let q = p - drift;
-        let broad = noise3(q * vec3(1.0 / 38.0, 1.0 / 12.0, 1.0 / 38.0));
-        let fine = noise3(q * vec3(1.0 / 9.0, 1.0 / 5.5, 1.0 / 9.0) + vec3(0.0, scene.params.w * 0.03, 0.0));
-        banks = smoothstep(0.45, 0.66, broad * 0.7 + fine * 0.39 - 0.05);
-    }
     // The sun thins the banks by day to a third (mornings and evenings keep them); a storm's
     // blowing snow or dust it leaves.
     let burn = mix(1.0, mix(0.35, 1.0, s), smoothstep(0.25, 0.65, scene.sun.y));
@@ -1296,7 +1369,13 @@ fn sun_reaches(rel: vec3<f32>) -> f32 {
         if abs(ndc.x) < 0.98 && abs(ndc.y) < 0.98 && ndc.z > 0.0 && ndc.z < 1.0 {
             let at = vec2<i32>(vec2(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5) * scene.shadow.y);
             lit = select(0.0, 1.0, textureLoad(textures[u32(scene.shadow.x)], at, 0).r <= ndc.z + 0.0005);
-            return mix(1.0, lit, smoothstep(0.02, 0.06, light_dir().y));
+            // With traced shadows (`scene.rt`) the near map holds the models alone, the terrain is
+            // in the far one: the darker of both, as surfaces take (`shadow_at`). Returning the near
+            // map's alone, the mist within 80 blocks at Max was lit through hills and canopies: a
+            // forest's dawn mist glowed orange under the leaves (Mist's forest-floor shots, 11-06).
+            if scene.rt.x < 0.5 {
+                return mix(1.0, lit, smoothstep(0.02, 0.06, light_dir().y));
+            }
         }
     }
     if scene.shadow_far.z > 0.5 {
@@ -1304,7 +1383,7 @@ fn sun_reaches(rel: vec3<f32>) -> f32 {
         let ndc = c.xyz / c.w;
         if abs(ndc.x) < 0.98 && abs(ndc.y) < 0.98 && ndc.z > 0.0 && ndc.z < 1.0 {
             let at = vec2<i32>(vec2(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5) * scene.shadow_far.y);
-            lit = select(0.0, 1.0, textureLoad(textures[u32(scene.shadow_far.x)], at, 0).r <= ndc.z + 0.0004);
+            lit = min(lit, select(0.0, 1.0, textureLoad(textures[u32(scene.shadow_far.x)], at, 0).r <= ndc.z + 0.0004));
         }
     }
     return mix(1.0, lit, smoothstep(0.02, 0.06, light_dir().y));
@@ -1340,7 +1419,12 @@ fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // Plants' rainforest, 11-04).
     let shaded_sky = light.sky * mix(vec3(1.0), LEAF_LIGHT * 0.2, leafy * 0.85) + light.leaf * leafy;
     // Jittered along the view per pixel, so the shafts' edges don't band.
-    let jitter = fract(sin(dot(rel, vec3(12.9898, 78.233, 37.719))) * 43758.547) - 0.5;
+    // Interleaved gradient noise over the screen (a fixed grid of it), moved on each frame (`scene.frame.w`, which counts
+    // frames even while the clock is frozen): temporal anti-aliasing averages it. A hash of the
+    // point stood still, a fixed grain on everything in the mist with the volume off.
+    let clip = scene.view_proj * vec4(rel, 1.0);
+    let px = trunc((vec2(clip.x, -clip.y) / max(clip.w, 1e-4) * 0.5 + 0.5) * vec2(2048.0, 1152.0)) + 5.588238 * scene.frame.w;
+    let jitter = fract(52.9829189 * fract(dot(px, vec2(0.06711056, 0.00583715)))) - 0.5;
     // 8 steps (12 before), and the shadow map asked once for each pair of them, between the two:
     // the jitter blends the coarser shafts (Research round 15: the mist's cost, the shadow taps
     // about 3 ms of it on the Mac).
@@ -1408,11 +1492,54 @@ fn froxel_at(uv: vec2<f32>, k: i32) -> vec4<f32> {
 fn froxel_fog(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let clip = scene.view_proj * vec4(rel, 1.0);
     let uv = clamp(vec2(clip.x, -clip.y) / max(clip.w, 1e-4) * 0.5 + 0.5, vec2(0.0), vec2(1.0));
+    let dist = min(length(rel), FROXEL_FAR);
+    let k = i32(trunc(froxel_slice(dist)));
+    // The volume's sums up to where the last slice starts, then the rest of the way to the point
+    // walked here, for this pixel: four taps of the mist from the slice's start to the point, lit
+    // with the slice's own light. Read off the volume by how far into its slice the point lay (as
+    // if the slice's mist were even through it), a mist lying on the land, all at the far end of
+    // the slice where the ground is, came in by where the ground fell in its slice: rings round
+    // the eye again, one a slice (the ring fix's third run, 11-06). And the mist where it lies on
+    // the land is at the pixel's own detail, not the volume's cells.
+    let before = froxel_at(uv, k - 1);
+    let a0 = froxel_end(f32(k) - 1.0);
+    let dir = rel / max(length(rel), 1e-4);
+    let flo = fog_floor(rel);
+    let banks = fog_banks_at(scene.eye.xyz + dir * (0.5 * (a0 + dist)), flo);
+    var depth = 0.0;
+    for (var i = 0; i < 4; i++) {
+        depth += fog_density_with(scene.eye.xyz + dir * mix(a0, dist, (f32(i) + 0.5) / 4.0), flo, banks);
+    }
+    let kept = exp(-depth * max(dist - a0, 0.0) / 4.0);
+    let left = before.a * kept;
+    let gained = before.rgb + before.a * (1.0 - kept) * froxel_light_at(uv, min(k, i32(FROXEL_SLICES) - 1));
+    let through = pow(max(left, 1e-6), sky);
+    return c * through + gained * (1.0 - through) / max(1.0 - left, 1e-4);
+}
+
+// Slice `k`'s own light at screen `uv` (`fs_froxel_light`'s rgb: what its mist sends toward the eye
+// where it is thick), for the last stretch `froxel_fog` walks itself.
+fn froxel_light_at(uv: vec2<f32>, k: i32) -> vec3<f32> {
+    let grid = scene.froxels.zw;
+    let cell = clamp(uv * grid, vec2(0.5), grid - 0.5);
+    let tile = vec2(f32(max(k, 0) % 8), f32(max(k, 0) / 8));
+    let at = (tile * grid + cell) / (grid * vec2(8.0, FROXEL_SLICES / 8.0));
+    return textureSampleLevel(textures[u32(scene.froxels.y)], linear_clamp, at, 0.0).rgb;
+}
+
+// How much of what lies `rel` away (camera relative) the mist lets through, 0..1, with `sky` (0..1)
+// the sky light there as `fog_through` takes it: for what is added after the haze (the bottom seen
+// through water, `world.wgsl`'s `water`). From the volume; 1 without it.
+fn mist_kept(rel: vec3<f32>, sky: f32) -> f32 {
+    if CALM || scene.weather.z < 0.005 || in_liquid() || !open_sky() || sky <= 0.0 || scene.froxels.x < 0.5 {
+        return 1.0;
+    }
+    let clip = scene.view_proj * vec4(rel, 1.0);
+    let uv = clamp(vec2(clip.x, -clip.y) / max(clip.w, 1e-4) * 0.5 + 0.5, vec2(0.0), vec2(1.0));
     let f = froxel_slice(min(length(rel), FROXEL_FAR));
-    let k = i32(floor(f));
+    let k = i32(trunc(f));
     let v = mix(froxel_at(uv, k - 1), froxel_at(uv, min(k, i32(FROXEL_SLICES) - 1)), fract(f));
-    let through = pow(max(v.a, 1e-6), sky);
-    return c * through + v.rgb * (1.0 - through) / max(1.0 - v.a, 1e-4);
+    return pow(max(v.a, 1e-6), sky);
 }
 
 // One cell's own mist and light for the volume (`fs_froxel_light`): toward `dir`, `at` blocks out,
@@ -1423,14 +1550,34 @@ fn froxel_cell(dir: vec3<f32>, at: f32, floor: f32) -> vec4<f32> {
     let light = fog_light(dir);
     let leafy = min(canopy(), 1.0);
     let shaded_sky = light.sky * mix(vec3(1.0), LEAF_LIGHT * 0.2, leafy * 0.85) + light.leaf * leafy;
-    let d = fog_density(scene.eye.xyz + dir * at, floor);
+    let k = froxel_slice(at);
+    let span = froxel_end(k) - froxel_end(k - 1.0);
+    // The mist through the cell's whole depth: the banks' noise at its two ends, the height's
+    // shape (the layer's top, its fall) at eight places spread through it. Taken at the middle
+    // alone, a low layer was all in a slice where the middle fell in it and none where it didn't,
+    // so the land under a mist wore rings round the eye at the slices' distances, 50-120 blocks
+    // deep out there (Ronald, 11-06, pt_compare_v2 "low over the river": "what is this weird, like
+    // a ripple thing"). Jittered taps blended by temporal anti-aliasing left a dot pattern instead.
+    let slice = trunc(froxel_slice(at));
+    let a0 = froxel_end(slice - 1.0);
+    let a1 = froxel_end(slice);
+    // The noise at the cell's two ends, blended between them through it: a slice's end is the next
+    // one's start, so the banks run on unbroken from slice to slice. Taken once at a cell's middle,
+    // each slice had its own (and the layer's top with it), and faint bands stayed round the eye
+    // where the slices meet (the ring fix's second run, 11-06).
+    let banks0 = fog_banks_at(scene.eye.xyz + dir * a0, floor);
+    let banks1 = fog_banks_at(scene.eye.xyz + dir * a1, floor);
+    var d = 0.0;
+    for (var i = 0; i < 8; i++) {
+        let t = (f32(i) + 0.5) / 8.0;
+        d += fog_density_with(scene.eye.xyz + dir * mix(a0, a1, t), floor, mix(banks0, banks1, t));
+    }
+    d /= 8.0;
     if d <= 0.0 {
         return vec4(0.0);
     }
     // Three taps of the shadow map through the cell's depth (a quarter, a half and three quarters
     // between `at`'s neighbours' ends), so a shaft narrower than a cell is part-lit, not all or none.
-    let k = froxel_slice(at);
-    let span = froxel_end(k) - froxel_end(k - 1.0);
     var lit = (sun_reaches(dir * (at - span * 0.25)) + sun_reaches(dir * at) + sun_reaches(dir * (at + span * 0.25))) / 3.0;
     // The clouds' shadow in the air too (the HDR world): beams of sun through their gaps, the mist
     // under a cloud dim.
@@ -1689,7 +1836,12 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
         // Bliss's far land at 18:00 is near neutral (warmth +0 to +9 by the horizon) where ours
         // took the sun's gold (+43), and its mornings stay warm (07:00 +72), so not then (lk_ebc).
         let dusk = smoothstep(0.05, -0.05, scene.sun.x) * (1.0 - smoothstep(0.15, 0.3, scene.sun.y));
-        toward = mix(toward, luma(toward) * sun_tint, mix(0.6, 0.9, morning * far_off) * low_sun * hdr_air * mix(1.0, 0.35, dusk)) * (1.0 - 0.05 * noon * hdr_air);
+        // Toward the sun the haze takes its colour, away from it far less (a quarter): looking away
+        // from a low sun Bliss's far land is cool under a blue-grey band (its spot C at 08:00:
+        // land warmth -19, ours +46, a warm strip under the band's grey; toward it, at the forest
+        // vista, warm, +27). Taking it alike every way gave that seam (rt-sun-shadows, Shader).
+        let toward_sun = mix(0.25, 1.0, smoothstep(-0.3, 0.6, mu));
+        toward = mix(toward, luma(toward) * sun_tint, mix(0.6, 0.9, morning * far_off) * low_sun * hdr_air * mix(1.0, 0.35, dusk) * toward_sun) * (1.0 - 0.05 * noon * hdr_air);
         v = mix(v, vec3((v.r + v.g + v.b) / 3.0), mix(0.35, 0.5, noon) * hdr_air);
     }
     let mixed = mix(pale, toward, v);
@@ -1888,7 +2040,9 @@ fn display(c: vec3<f32>) -> vec3<f32> {
         // stood a neutral green-black (18 27 26, about 100), its sky a grey-blue (Bliss's world, mist
         // off, PC shnt0, 11-06). Only the dim: a torch's light keeps its warmth, and the night
         // stays as dark as made.
-        let night = smoothstep(-0.12, -0.3, scene.sun.y) * (1.0 - smoothstep(0.04, 0.3, luma(c)));
+        // Only the sky's and moon's share of a surface's light (`NIGHT_SKY_SHARE`): a lamp's keeps
+        // its warmth in a dark room as outdoors.
+        let night = smoothstep(-0.12, -0.3, scene.sun.y) * (1.0 - smoothstep(0.04, 0.3, luma(c))) * NIGHT_SKY_SHARE;
         if night > 0.0 {
             // (N2: deeper and all the way: at 0.3 0.6 1.3 and three quarters the land's saturation rose
             // only from about 100 to 140, the curve taking some back; Bliss's is 200-250, PC shnt1.)

@@ -269,6 +269,10 @@ pub enum Cmd {
     },
     /// GPU timestamp, see [`Backend::gpu_times`].
     Mark,
+    /// Up to three more color images for the [`Cmd::BeginPass`] that follows at once, at
+    /// `@location(2)` on, after its motion image (each with its clear, as `motion`); their
+    /// pipelines are made by [`Backend::create_pipeline_mrt`]. The path tracer's G-buffer.
+    PassExtras([Option<(TextureId, Option<[f32; 4]>)>; 3]),
     /// Builds a BLAS made by [`Backend::create_blas`] from its inputs as they are now (written
     /// before, ordered by a [`Cmd::Barrier`] when a shader wrote them). Outside a pass. What reads
     /// it after (a TLAS build, a shader) waits for it.
@@ -297,6 +301,8 @@ pub enum Cmd {
         albedo: TextureId,
         /// The specular albedo, linear.
         specular: TextureId,
+        /// How far the specular rays went (blocks, in r): the path tracer's, else `NO_TEXTURE`.
+        hit_distance: TextureId,
         /// An [`UpscaleParams`] at this offset in [`CommandList::data`].
         start: u32,
     },
@@ -618,6 +624,13 @@ pub trait Backend: Send {
     fn destroy_texture(&mut self, texture: TextureId);
 
     fn create_pipeline(&mut self, desc: &PipelineDesc) -> Result<PipelineId, Error>;
+    /// A pipeline drawing into `extra` color images as well, at `@location(2)` on (after the
+    /// motion image, which it must have: `desc.motion`), in a pass begun after a
+    /// [`Cmd::PassExtras`] naming them. Without such targets (the default), `create_pipeline`.
+    fn create_pipeline_mrt(&mut self, desc: &PipelineDesc, extra: &[Format]) -> Result<PipelineId, Error> {
+        let _ = extra;
+        self.create_pipeline(desc)
+    }
     fn create_compute(&mut self, desc: &ComputeDesc) -> Result<PipelineId, Error>;
     fn destroy_pipeline(&mut self, pipeline: PipelineId);
 

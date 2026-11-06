@@ -3135,9 +3135,31 @@ impl Client {
     pub fn rt_switch(&mut self, gpu: &mut dyn Backend) -> bool {
         let shadows = shadow_setting("core:rt_shadows", 0.0) > 0.5;
         let reflections = shadow_setting("core:rt_reflections", 0.0) > 0.5;
+        let traced = shadow_setting("core:path_traced", 0.0) > 0.5;
         self.render.set_rt_modes(shadows, reflections);
-        self.render.set_rt(gpu, shadows || reflections);
+        self.render.set_rt(gpu, shadows || reflections || traced);
         self.render.rt_reload
+    }
+
+    /// Path traced lighting (`core:path_traced`, `WorldRenderer::path_trace`), after the world's
+    /// pass into `target` (the world's image, its size `size`) and before the effects: first the
+    /// G-buffer pass (`WorldRenderer::gbuffer_pass`), then the traced light.
+    pub fn path_trace(
+        &mut self,
+        gpu: &mut dyn Backend,
+        list: &mut CommandList,
+        slot: usize,
+        depth: weft_render::TextureId,
+        target: weft_render::Target,
+        size: (u32, u32),
+    ) {
+        if shadow_setting("core:path_traced", 0.0) > 0.5 {
+            let debug = shadow_setting("core:pt_debug", 0.0) as u32;
+            // The G-buffer (albedo, normal and roughness, spec) the denoisers read: `render.gb_images`.
+            self.render.gbuffer_pass(gpu, list, depth, size);
+            self.render
+                .path_trace(gpu, list, slot, depth, target, size, debug, false);
+        }
     }
 
     /// Sun shadows (`sun_shadows` packs), first their light, before the world is drawn (its scene
@@ -3561,10 +3583,10 @@ const FAR_TERRAIN_WAIT: u32 = 10;
 const FAR_DEPTH: f32 = 1200.0;
 
 /// The values of the settings the shader pack reads (`Scene::options`).
-fn pack_options() -> [[f32; 4]; 8] {
-    let mut out = [[0.0; 4]; 8];
+fn pack_options() -> [[f32; 4]; 12] {
+    let mut out = [[0.0; 4]; 12];
     let names = &content().game.config_names;
-    for (i, name) in crate::packs::pack_options().iter().enumerate().take(32) {
+    for (i, name) in crate::packs::pack_options().iter().enumerate().take(48) {
         if let Some(&id) = names.get(name.as_str()) {
             out[i / 4][i % 4] = crate::config::get(id) as f32;
         }

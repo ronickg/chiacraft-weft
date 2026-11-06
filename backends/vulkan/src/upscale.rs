@@ -1,5 +1,6 @@
 //! Temporal upscalers behind `Cmd::Upscale`: NVIDIA's DLSS through Streamline (`streamline.rs`,
-//! the `streamline` feature, Windows), or a stand-in that only scales the picture up
+//! the `streamline` feature, Windows), through NGX directly (`ngx.rs`, the `ngx` feature, Linux),
+//! or a stand-in that only scales the picture up
 //! (`WEFT_UPSCALE_STANDIN=1`), for checking everything around it on any GPU.
 
 use ash::vk;
@@ -19,7 +20,7 @@ pub(crate) struct Image {
     pub usage: vk::ImageUsageFlags,
 }
 
-#[cfg_attr(not(feature = "streamline"), allow(dead_code))]
+#[cfg_attr(not(any(feature = "streamline", feature = "ngx")), allow(dead_code))]
 pub(crate) struct Inputs {
     pub color: Image,
     pub depth: Image,
@@ -28,6 +29,8 @@ pub(crate) struct Inputs {
     pub normals: Option<Image>,
     pub albedo: Option<Image>,
     pub specular: Option<Image>,
+    /// How far the specular rays went (blocks, in r), from the path tracer.
+    pub hit_distance: Option<Image>,
 }
 
 pub(crate) trait Upscaler: Send {
@@ -67,10 +70,13 @@ impl Upscaler for Standin {
 
 /// Before the Vulkan instance: Streamline (which then also stands in for Vulkan's loader), if
 /// built with it and its files are there.
+/// Or NGX (which only adds extensions to the instance and device the backend makes).
 pub(crate) enum Early {
     None,
     #[cfg(feature = "streamline")]
     Streamline(crate::streamline::Streamline),
+    #[cfg(feature = "ngx")]
+    Ngx(crate::ngx::Early),
 }
 
 pub(crate) fn early() -> Early {
@@ -78,15 +84,59 @@ pub(crate) fn early() -> Early {
     if let Some(sl) = crate::streamline::Streamline::load() {
         return Early::Streamline(sl);
     }
+    #[cfg(feature = "ngx")]
+    if let Some(ngx) = crate::ngx::Early::load() {
+        return Early::Ngx(ngx);
+    }
     Early::None
 }
 
+impl Early {
+    /// Instance extensions the upscaler needs, of those the loader has (`available`).
+    pub fn instance_extensions(&self, available: &[vk::ExtensionProperties]) -> Vec<*const std::ffi::c_char> {
+        let _ = available;
+        match self {
+            #[cfg(feature = "ngx")]
+            Early::Ngx(n) => n.instance_extensions(available),
+            _ => Vec::new(),
+        }
+    }
+
+    /// Device extensions it needs on `pdev`, of those it has and `already` doesn't hold.
+    ///
+    /// # Safety
+    /// `instance` and `pdev` are live.
+    pub unsafe fn device_extensions(
+        &mut self,
+        instance: &ash::Instance,
+        pdev: vk::PhysicalDevice,
+        already: &[*const std::ffi::c_char],
+    ) -> Vec<*const std::ffi::c_char> {
+        let _ = (instance, pdev, already);
+        match self {
+            #[cfg(feature = "ngx")]
+            Early::Ngx(n) => unsafe { n.device_extensions(instance, pdev, already) },
+            _ => Vec::new(),
+        }
+    }
+}
+
+/// The Vulkan objects an upscaler is started on.
+pub(crate) struct Made<'a> {
+    pub entry: &'a ash::Entry,
+    pub instance: &'a ash::Instance,
+    pub pdev: vk::PhysicalDevice,
+    pub device: &'a ash::Device,
+}
+
 /// Once the device is made: the upscaler the game gets, if any.
-pub(crate) fn ready(early: Early, pdev: vk::PhysicalDevice, standin: bool) -> Option<Box<dyn Upscaler>> {
-    let _ = pdev;
+pub(crate) fn ready(early: Early, made: &Made, standin: bool) -> Option<Box<dyn Upscaler>> {
+    let _ = made;
     let up: Option<Box<dyn Upscaler>> = match early {
         #[cfg(feature = "streamline")]
-        Early::Streamline(sl) => sl.ready(pdev),
+        Early::Streamline(sl) => sl.ready(made.pdev),
+        #[cfg(feature = "ngx")]
+        Early::Ngx(n) => n.ready(made.entry, made.instance, made.pdev, made.device),
         Early::None => None,
     };
     if up.is_none() && (standin || std::env::var_os("WEFT_UPSCALE_STANDIN").is_some()) {

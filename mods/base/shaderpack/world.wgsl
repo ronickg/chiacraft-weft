@@ -474,6 +474,41 @@ fn fs_shadow(in: VOut) {
 
 // ---- shading ----
 
+// A leaf cube being shaded (the cutout passes set it: a cutout cube, `kind.z` 0, is leaves) and the
+// sun's reach on it (`surface_light`), for its light through the leaves (`leaf_sss`).
+var<private> LEAF_CUBE: bool = false;
+var<private> LEAF_SHADOW: f32 = 1.0;
+
+// How strong the light through leaves is (HDR, `base:look_leaf_light`), 0 none.
+fn leaf_light() -> f32 {
+    return fantasy_opt(OPT_LEAF_LIGHT);
+}
+
+// The sun's light through a leaf of colour `col` (albedo times tint) in the HDR world, after Bliss's
+// subsurface scattering for leaves (composite1.fsh, its SSS type 1; crew notes bliss-techniques.md
+// 6.4): the colours under the leaf's own brightness are absorbed on the way through, so the light
+// comes out a deep yellow-green, the more so the thicker the leaves it went through; a lobe toward
+// the sun makes a crown seen against it glow up to about ten times. Bliss takes the brighter of the
+// sun on the face and this; so does `shade_soft_lit`. Its canopy seen from below reads a saturated
+// green mass with sparkles, where ours read grey (Trees, Bliss's own world, 11-06).
+// The method after X0nk's Bliss (a Chocapic13' Shaders edit), written anew here; no code taken.
+// A setting of its own, off by default: Ronald's Bliss (SSS type 3 and no LabPBR pack) has none,
+// so the Bliss comparisons run without it (crew notes bliss-leaves.md).
+// Seen from below, its light has gone through the whole leaf block: a quarter of the thin skin's
+// at most, by the sun's reach (as thin, the canopy glowed yellow-lime, luma 160-180 against Bliss's
+// 66-69; a floor of 0.15 for leaves in the crown's shade lit it all, Trees' sss1-sss3). The lobe
+// toward the sun at half Bliss's (x3): at Bliss's x6 the crown over the camera glowed neon at 08:00.
+// At noon its lit leaves 73 against Bliss's 66, hue 100 against 107 (trb_s3_lk4a, with Look's glare
+// meter).
+fn leaf_sss(in: VOut, col: vec3<f32>) -> vec3<f32> {
+    let mu = dot(normalize(in.rel), light_dir());
+    let phase = 1.0 + 3.0 * (exp2(-25.0 * sqrt(max(1.0 - mu, 0.0))) + 0.5 * exp(-10.0 * (1.0 - mu)));
+    let depth = max(LEAF_SHADOW * 0.25, 0.01);
+    let absorb = exp(-max(vec3(luma(col)) - col * vec3(1.0, 1.1, 1.2), vec3(0.0)) * (20.0 - 19.0 * depth));
+    let open = smoothstep(0.4, 0.9, in.light.x);
+    return palette().sun * light_strength() * depth * absorb * phase * open * leaf_light();
+}
+
 // `paint` the tint the light takes (a biome's grass and leaf colour, `in.color`; white under snow).
 fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32> {
     let shadow = sun_shadow(in, n);
@@ -496,6 +531,15 @@ fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32>
             let c_open = min(canopy(), 1.0);
             let open = smoothstep(mix(0.5, 0.25, c_open), mix(0.95, 0.55, c_open), in.light.x);
             light += paint * palette().sun * light_strength() * sun_facing(n) * shadow * open * (k_sun - 1.0);
+        }
+        // A leaf cube's light through it is `leaf_sss`'s (`shade_soft_lit`), from its colour, and
+        // only with the leaf light on; off, none, as Ronald's Bliss (no SSS). With `leaf_through`'s
+        // glow on every face, a crown's shaded sides took green sun light and the canopy from above
+        // read an even green carpet: its shade 48 63 46 at noon against Bliss's 30 53 78; without it
+        // 42 49 44, roughness 8.7 -> 10.2 (Bliss's world vista, trb_s7_lk10_v).
+        if LEAF_CUBE {
+            LEAF_SHADOW = shadow;
+            return light;
         }
         // Plants half of it: with all of it tall grass in the sun went pale yellow-white beside black
         // gaps (Tester 2's calm noon, HDR on against off).
@@ -531,7 +575,8 @@ fn far_look() -> u32 {
 // How far a cube's shading has softened (far look 2): from 48 to 160 blocks its corner shade goes
 // and its faces' normals lean halfway up, so one-block steps don't each draw a dark line.
 fn far_soft(in: VOut) -> f32 {
-    if (far_look() & 2u) == 0u {
+    // Not leaves (`LEAF_CUBE`): see `far_flat`.
+    if (far_look() & 2u) == 0u || LEAF_CUBE {
         return 0.0;
     }
     return smoothstep(48.0, 160.0, in.dist);
@@ -599,6 +644,12 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
             // where noon's lit leaves are about 100 (Tester 2's f0d78419 hours, 11-06). At 0.55 of
             // its red, linear red/green 0.47 goes to about 0.26, hue about 95.
             lit = vec4(lit.r * mix(1.0, 0.55, k), lit.g, lit.b, lit.a);
+        }
+        // Leaves: the brighter of the sun on the face and the sun through the leaf (`leaf_sss`).
+        if LEAF_CUBE && leaf_light() > 0.0 && scene.frame.x > 0.5 {
+            let col = albedo.rgb * mix(in.color, vec3(1.0), snow);
+            let direct = palette().sun * light_strength() * sun_facing(n) * LEAF_SHADOW;
+            lit = vec4(lit.rgb + col * max(leaf_sss(in, col) - direct, vec3(0.0)), lit.a);
         }
     } else {
         lit = block_shade(in.slot, BlockPixel(in.uv, albedo, light, in.pos, scene.params.w));
@@ -1108,6 +1159,10 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
         if open_sky() {
             let d = length(in.rel);
             below *= (vec3(1.0) - haze_veil(in.rel, d)) * (1.0 - smoothstep(scene.params.y * 0.84, scene.params.y, d));
+            // And the mist (`mist_kept`): veiled by the haze alone, rivers and lakes under a dawn
+            // mist were bright cream ribbons with crisp edges, brighter than the mist round them
+            // (Planner on Mist's m5 sheet, 11-06).
+            below *= mist_kept(in.rel, smoothstep(0.25, 0.75, in.light.x));
         }
         return WaterLit(surface, below, 1.0);
     }
@@ -1155,8 +1210,12 @@ fn with_overlay(in: VOut, albedo: vec4<f32>, nuv: vec2<f32>, du: vec2<f32>, dv: 
 // Far look 4: from 64 to 192 blocks a block's texture gives way to its average colour (its
 // smallest mip), as Distant Horizons' far blocks are one colour and Voxy's mips converge on it, so
 // far grass, sand and leaves aren't grainy.
+// Not leaves (`LEAF_CUBE`): a crown's texture and its faces' shading are what a forest shows from
+// 60 to 200 blocks; flattened, crowns there were untextured light-green discs on dark gaps, "paper
+// cut-outs" (rt-sun-shadows' spot C, 11-06), and Bliss's world vista's canopy smooth lime blobs where
+// Bliss's keeps each crown's light and shade (Ronald, 08:00).
 fn far_flat(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
-    if (far_look() & 4u) == 0u {
+    if (far_look() & 4u) == 0u || LEAF_CUBE {
         return albedo;
     }
     let f = smoothstep(64.0, 192.0, in.dist);
@@ -1206,6 +1265,7 @@ fn fs_opaque(in: VOut) -> WorldOut {
 
 @fragment
 fn fs_cutout(in: VOut) -> WorldOut {
+    LEAF_CUBE = in.kind.z == 0u;
     // Far look 1: small plants thin out from 40 to 96 blocks, so far ground isn't speckled with
     // flowers and tufts a pixel or two across.
     if (far_look() & 1u) != 0u && in.kind.z != 0u {
@@ -1229,6 +1289,61 @@ fn fs_cutout(in: VOut) -> WorldOut {
         albedo = far_flat(in, albedo);
     }
     return world_out(in, vec4(shade(in, albedo).rgb, SOLID_ALPHA));
+}
+
+// ---- the path tracer's G-buffer (`core:path_traced`, the engine's `draw_gbuffer`) ----
+// The opaque and cutout terrain drawn again where the world's pass left its depth (Equal), into
+// what the path tracer and its denoisers read (reports/Path tracing plan.md; the denoisers'
+// interface v1): the diffuse albedo (linear, none for a metal; a: metal), the shading normal
+// (camera-relative world axes; w: perceptual roughness) and the specular colour (F0; a: the
+// subsurface share).
+struct GbOut {
+    @location(0) albedo: vec4<f32>,
+    @location(1) normal: vec4<f32>,
+    @location(2) spec: vec4<f32>,
+}
+
+fn gbuffer(in: VOut, albedo: vec4<f32>) -> GbOut {
+    let paint = albedo.rgb * in.color;
+    let m = shade_mat(in, albedo.rgb);
+    let n = mat_normal(m, normalize(in.normal), in.rel, fract(in.uv));
+    let metal = m.metal > 0.5;
+    // No maps, no shine (as the world's pass, which adds `mat_shine` only with them): F0 0.
+    let f0 = select(select(m.f0, paint, metal), vec3(0.0), !m.has);
+    // A metal keeps half its diffuse light, as the world's pass draws it (`lit * (1 - 0.5 * metal)`,
+    // our grade): with none, the storeroom's iron and gold blocks traced near black, mirroring
+    // only the dark room (pt1_rtxd_m2).
+    return GbOut(vec4(paint * (1.0 - 0.5 * m.metal), m.metal), vec4(n, 1.0 - m.smoothness), vec4(f0, m.sss));
+}
+
+@fragment
+fn fs_gb_opaque(in: VOut) -> GbOut {
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
+    let nuv = nearest_uv(in.size, in.uv, du, dv);
+    return gbuffer(in, far_flat(in, with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv)));
+}
+
+// Cut as `fs_cutout` cuts, so it lands where the world's pass drew.
+@fragment
+fn fs_gb_cutout(in: VOut) -> GbOut {
+    if cutout_thinned(in) {
+        discard;
+    }
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
+    let nuv = nearest_uv(in.size, in.uv, du, dv);
+    var albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
+    if albedo.a <= cutout_edge(in, nuv, du, dv) {
+        if in.kind.w != 2u {
+            discard;
+        }
+        albedo = backed_hole(in, nuv);
+    }
+    if in.kind.z == 0u {
+        albedo = far_flat(in, albedo);
+    }
+    return gbuffer(in, albedo);
 }
 
 // Cutout blocks in two passes (the engine's `cutout_split`, on tiled GPUs): `fs_cutout`'s depth,
@@ -1265,6 +1380,7 @@ fn fs_cutout_depth(in: VOut) {
 
 @fragment
 fn fs_cutout_shade(in: VOut) -> WorldOut {
+    LEAF_CUBE = in.kind.z == 0u;
     var albedo = cutout_albedo(in);
     if in.kind.z == 0u {
         albedo = far_flat(in, albedo);
@@ -1320,6 +1436,7 @@ fn fs_opaque_fade(in: VOut) -> WorldOut {
 
 @fragment
 fn fs_cutout_fade(in: VOut) -> WorldOut {
+    LEAF_CUBE = in.kind.z == 0u;
     if faded(in) {
         discard;
     }

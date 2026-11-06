@@ -34,7 +34,7 @@ fn shared_numbers() -> String {
     format!("// From vitals::air (mods/base/src/shaderpack.rs).\nconst MIST_TOP: f32 = {:.1};\n", vitals::air::MIST_TOP)
 }
 
-const FILES: [(&str, &str); 7] = [
+const FILES: [(&str, &str); 8] = [
     ("world.wgsl", include_str!("../shaderpack/world.wgsl")),
     ("sky.wgsl", include_str!("../shaderpack/sky.wgsl")),
     ("model.wgsl", include_str!("../shaderpack/model.wgsl")),
@@ -42,6 +42,8 @@ const FILES: [(&str, &str); 7] = [
     ("particle.wgsl", include_str!("../shaderpack/particle.wgsl")),
     ("weather.wgsl", include_str!("../shaderpack/weather.wgsl")),
     ("post.wgsl", include_str!("../shaderpack/post.wgsl")),
+    // Path traced lighting (`core:path_traced`), composed by the engine with the world's prelude.
+    ("pathtrace.wgsl", include_str!("../shaderpack/pathtrace.wgsl")),
 ];
 
 // Water writes depth, so the reflections effect finds its surface.

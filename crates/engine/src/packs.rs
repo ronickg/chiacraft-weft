@@ -97,7 +97,7 @@ pub fn merge_effects() -> bool {
 /// The `pack.cfg` the options were read from, when it was written, and the names in it.
 type OptionsRead = Option<(PathBuf, Option<std::time::SystemTime>, Vec<String>)>;
 
-/// The settings the chosen pack reads (`options = a, b, ...` in its `pack.cfg`, at most 32):
+/// The settings the chosen pack reads (`options = a, b, ...` in its `pack.cfg`, at most 48):
 /// their values reach every pack shader as `scene.options` (`Client::scene`), in that order, so a
 /// pack's look can be tuned in the game's settings and swept with `--config` without editing
 /// shaders. Read again when the file changes.
@@ -123,7 +123,7 @@ pub fn pack_options() -> Vec<String> {
                 .collect::<Vec<_>>()
         })
         .filter(|n| !n.is_empty())
-        .take(32)
+        .take(48)
         .collect();
     *CACHE.write().unwrap() = Some((dir, stamp, names.clone()));
     names
@@ -189,6 +189,14 @@ pub fn shader(assets: &Assets, name: &str) -> Result<Shader, ShaderError> {
         }
     }
     Shader::from_wgsl(name, &with_common(assets, name, &engine_source(assets, name)))
+}
+
+/// A shader pack's file composed with the world shader's prelude and the engine's `extra` after it
+/// (the path tracer, `pathtrace.wgsl`); None when the pack has no such file.
+pub fn world_side_shader(assets: &Assets, name: &str, extra: &str) -> Option<Result<Shader, ShaderError>> {
+    let src = pack_source(name)?;
+    let prelude = crate::gpu_layout::prelude("world.wgsl", &engine_source(assets, "common.wgsl"));
+    Some(Shader::from_wgsl(name, &format!("{prelude}{extra}{src}")))
 }
 
 /// `shader` for engine shaders that take mod snippets (`shaders::compose`).
