@@ -19,9 +19,17 @@ use weft_sdk::*;
 
 use crate::wind_life_colours as colours;
 
-/// Leaves of three shapes; a leaf takes its tree's colour and its season's tint.
-static LEAVES: [Particle; 3] = [Particle::named("leaf_0"), Particle::named("leaf_1"), Particle::named("leaf_2")];
-static PETALS: [Particle; 2] = [Particle::named("petal_0"), Particle::named("petal_1")];
+/// Leaves of six shapes (Art's, game-art's effects guide, 11-06); a leaf takes its tree's colour
+/// and its season's tint.
+static LEAVES: [Particle; 6] = [
+    Particle::named("leaf_0"),
+    Particle::named("leaf_1"),
+    Particle::named("leaf_2"),
+    Particle::named("leaf_3"),
+    Particle::named("leaf_4"),
+    Particle::named("leaf_5"),
+];
+static PETALS: [Particle; 4] = [Particle::named("petal_0"), Particle::named("petal_1"), Particle::named("petal_2"), Particle::named("petal_3")];
 static POLLEN: Particle = Particle::named("pollen");
 /// Snow and sand grains: pieces of the block they blow off (block dust).
 static SPINDRIFT: Particle = Particle::named("spindrift");
@@ -330,11 +338,11 @@ fn frame(c: &Client) {
                 for f in from {
                     let v = [wind[0] as f64 * 0.3, 0.0, wind[1] as f64 * 0.3];
                     if blossom {
-                        let k = &PETALS[(life.unit() * 2.0) as usize % 2];
+                        let k = &PETALS[(life.unit() * 4.0) as usize % 4];
                         drop(c.spawn_particles(k, f).velocity(v).color(colour));
                         life.sent[1] += 1;
                     } else {
-                        let k = &LEAVES[(life.unit() * 3.0) as usize % 3];
+                        let k = &LEAVES[(life.unit() * 6.0) as usize % 6];
                         drop(c.spawn_particles(k, f).velocity(v).color(colour).block(state));
                         life.sent[0] += 1;
                     }
@@ -349,7 +357,7 @@ fn frame(c: &Client) {
                 let g = gust(at(0.5, 0.5, 0.5), wind, t);
                 let petals = wl::PETAL_RATE * calm * (1.0 + (wl::PETAL_GUST - 1.0) * smooth(wl::GUST_FROM.0, wl::GUST_FROM.1, g));
                 for _ in 0..wl::draw(petals * per_look, life.unit()) {
-                    let k = &PETALS[(life.unit() * 2.0) as usize % 2];
+                    let k = &PETALS[(life.unit() * 4.0) as usize % 4];
                     let v = [wind[0] as f64 * 0.2, 0.25, wind[1] as f64 * 0.2];
                     drop(c.spawn_particles(k, at(0.5, 0.6, 0.5)).spread(0.2).velocity(v).color(colour));
                     life.sent[1] += 1;
@@ -457,7 +465,7 @@ fn stir(c: &Client, life: &mut Life, st: &abi::ClientState, density: f32) {
     let n = lo + (life.unit() * (hi - lo + 1) as f32) as u32;
     let v = [vel[0] * 0.5, 0.8 + life.unit() as f64 * 0.6, vel[1] * 0.5];
     for _ in 0..n {
-        let k = &PETALS[(life.unit() * 2.0) as usize % 2];
+        let k = &PETALS[(life.unit() * 4.0) as usize % 4];
         drop(c.spawn_particles(k, [st.pos.x, st.pos.y + 0.3, st.pos.z]).spread(0.3).velocity(v).speed(0.6).color(colour));
     }
     life.sent[1] += n;

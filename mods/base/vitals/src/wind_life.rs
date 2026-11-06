@@ -81,7 +81,7 @@ pub const PETAL_GUST: f32 = 2.0;
 /// A tree in blossom (cherry, dogwood): its blooming leaves shed petals instead of leaves, more.
 pub const BLOSSOM_RATE: f32 = 0.008;
 pub const PETAL_LIFE: (f32, f32) = (40.0, 90.0);
-pub const PETAL_SIZE: (f32, f32) = (0.07, 0.1);
+pub const PETAL_SIZE: (f32, f32) = (0.09, 0.12);
 pub const PETAL_AIR: f32 = 4.0;
 pub const PETAL_SINK: f32 = 0.55;
 pub const PETAL_LIFT: f32 = 5.0;

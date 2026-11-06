@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Wind life's first particle sprites, drawn as pixel maps: three leaves, two petals, a pollen
-mote. Near white, so a leaf takes its tree's colour (`wind_life_colours.rs`) and season tint.
-Writes mods/base/assets/textures/particle/{leaf_0..2,petal_0..1,pollen}.png."""
+"""Wind life's pollen mote, drawn as a pixel map (the leaves and petals are Art's, generated with
+the game-art skill on 11-06: ~/Coding/chiacraft-archive/images/wind-life/2026-11-06/art/; these
+maps were their first placeholders). Writes mods/base/assets/textures/particle/pollen.png."""
 import os
 from PIL import Image
 
@@ -80,10 +80,6 @@ def draw(rows, name):
 
 def main():
     os.makedirs(OUT, exist_ok=True)
-    for i, rows in enumerate(LEAVES):
-        draw(rows, f"leaf_{i}")
-    for i, rows in enumerate(PETALS):
-        draw(rows, f"petal_{i}")
     draw(POLLEN, "pollen")
 
 
