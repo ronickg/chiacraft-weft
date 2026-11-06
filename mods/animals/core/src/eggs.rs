@@ -124,7 +124,16 @@ pub fn look(name: &str) -> Option<&'static Look> {
 pub fn drawn(name: &str) -> Option<(&'static Look, f32)> {
     let &(_, l, cm, px) = EGGS.iter().find(|e| e.0 == name)?;
     let look = look(l)?;
-    Some((look, if l.starts_with("roe_") { look.px } else if px > 0.0 { px } else { drawn_px(cm) }))
+    Some((
+        look,
+        if l.starts_with("roe_") {
+            look.px
+        } else if px > 0.0 {
+            px
+        } else {
+            drawn_px(cm)
+        },
+    ))
 }
 
 /// Species `name`'s egg: its look and the scale its model is drawn at (its drawn length against

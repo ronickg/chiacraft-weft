@@ -163,7 +163,11 @@ pub fn init(r: &mut Registry) {
 /// Species `index`'s egg kind (its look's).
 fn kind_of(index: usize) -> Option<&'static EntityKind> {
     let (look, _) = animals_core::eggs::of(SPECIES[index].name)?;
-    KINDS.get()?.iter().find(|(n, _)| *n == look.name).map(|(_, k)| *k)
+    KINDS
+        .get()?
+        .iter()
+        .find(|(n, _)| *n == look.name)
+        .map(|(_, k)| *k)
 }
 
 /// The eggs within `r` of `at`, any species'.
@@ -231,7 +235,9 @@ pub(crate) fn egg_length(index: usize) -> f32 {
 
 /// Whether entity kind `kind` (an id) is an egg's.
 pub(crate) fn is_egg_kind(kind: u32) -> bool {
-    KINDS.get().is_some_and(|k| k.iter().any(|(_, e)| e.id() == kind))
+    KINDS
+        .get()
+        .is_some_and(|k| k.iter().any(|(_, e)| e.id() == kind))
 }
 
 /// A nest's width (its box, `animals_core::bodies`).
