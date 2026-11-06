@@ -1559,6 +1559,12 @@ struct RtTexel {
 // lined up through a crown's faces, let the light by in pixel-wide specks; the coverage round the
 // point gives the soft dapple a filtered shadow map shows.
 fn rt_texel(base: u32, kind: u32, rec: u32, tri: u32, b: vec2<f32>) -> RtTexel {
+    return rt_texel_at(base, kind, rec, tri, b, 0.0);
+}
+
+// The same with its colour from mip `lod` (a reflection's far hit: the full texture there
+// shimmered into a mosaic).
+fn rt_texel_at(base: u32, kind: u32, rec: u32, tri: u32, b: vec2<f32>, lod: f32) -> RtTexel {
     var uv: array<vec2<f32>, 4>;
     var tex: u32;
     var tinted: bool;
@@ -1582,7 +1588,7 @@ fn rt_texel(base: u32, kind: u32, rec: u32, tri: u32, b: vec2<f32>) -> RtTexel {
     let k2 = select(2u, 3u, tri == 1u);
     let at = uv[0] * (1.0 - b.x - b.y) + uv[k1] * b.x + uv[k2] * b.y;
     let t = textures[tex_info[tex * 4u]];
-    let c = textureSampleLevel(t, nearest_clamp, at, 0.0);
+    let c = textureSampleLevel(t, nearest_mipped, at, lod);
     return RtTexel(vec4(c.rgb, textureSampleLevel(t, linear_mipped, at, RT_ALPHA_MIP).a), tinted);
 }
 
@@ -1628,7 +1634,8 @@ fn rt_hit(rel: vec3<f32>, dir: vec3<f32>, t_max: f32) -> RtHit {
         }
         let rec = row.w + h.primitive_index / 2u;
         let texel = rt_texel(row.x, row.z, rec, h.primitive_index % 2u, h.barycentrics);
-        if rec >= row.y || texel.c.a >= 0.5 {
+        // A clear pane is seen through (a skylight shows the sky), its frame and water are hit.
+        if texel.c.a >= 0.5 || (rec >= row.y && texel.tinted) {
             rayQueryConfirmIntersection(&rq);
         }
     }
@@ -1653,6 +1660,8 @@ fn rt_hit(rel: vec3<f32>, dir: vec3<f32>, t_max: f32) -> RtHit {
     let rec = select(0u, row.w, clear) + c.primitive_index / 2u;
     let tri = c.primitive_index % 2u;
     let b = c.barycentrics;
+    // A 32-texel block's mip by how far the reflected way runs (a pixel about 1/700 across).
+    let lod = clamp(log2(max((length(rel) + c.t) * 0.045, 1.0)), 0.0, 4.0);
     let w = vec3(1.0 - b.x - b.y, b.x, b.y);
     let k1 = select(1u, 2u, tri == 1u);
     let k2 = select(2u, 3u, tri == 1u);
@@ -1665,7 +1674,7 @@ fn rt_hit(rel: vec3<f32>, dir: vec3<f32>, t_max: f32) -> RtHit {
         let lo = rt_records[at + 2u];
         let hi = rt_records[at + 3u];
         out.light = corner_light(lo, hi, 0u) * w.x + corner_light(lo, hi, k1) * w.y + corner_light(lo, hi, k2) * w.z;
-        out.albedo = rt_texel(row.x, 0u, rec, tri, b).c;
+        out.albedo = rt_texel_at(row.x, 0u, rec, tri, b, lod).c;
     } else if row.z == 1u {
         let at = row.x + rec * 8u;
         let p0 = quad_pos(rt_records[at]);
@@ -1680,7 +1689,7 @@ fn rt_hit(rel: vec3<f32>, dir: vec3<f32>, t_max: f32) -> RtHit {
         let lo = rt_records[at + 6u];
         let hi = rt_records[at + 7u];
         out.light = corner_light(lo, hi, 0u) * w.x + corner_light(lo, hi, k1) * w.y + corner_light(lo, hi, k2) * w.z;
-        out.albedo = rt_texel(row.x, 1u, rec, tri, b).c;
+        out.albedo = rt_texel_at(row.x, 1u, rec, tri, b, lod).c;
     } else {
         let at = row.x + rec * 4u;
         let w0 = rt_records[at];
@@ -1693,7 +1702,7 @@ fn rt_hit(rel: vec3<f32>, dir: vec3<f32>, t_max: f32) -> RtHit {
         let a = abs(out.n);
         let uv = fract(select(select(p.xy, p.xz, a.y > 0.5), p.zy, a.x > 0.5));
         let tex = w1 & FACE_TEX_MASK;
-        out.albedo = textureSampleLevel(textures[tex_info[tex * 4u]], nearest_mipped, vec2(uv.x, 1.0 - uv.y), 2.0);
+        out.albedo = textureSampleLevel(textures[tex_info[tex * 4u]], nearest_mipped, vec2(uv.x, 1.0 - uv.y), max(lod, 2.0));
     }
     return out;
 }

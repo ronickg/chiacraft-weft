@@ -993,7 +993,10 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     // the near land; the far water keeps the sky's guess.
     if scene.rt.w > 0.5 && in.dist < 256.0 {
         let traced = traced_view(in.rel + vec3(0.0, 0.02, 0.0), normalize(vec3(r.x, max(r.y, 0.02), r.z)));
-        refl = mix(traced, refl, smoothstep(160.0, 256.0, in.dist));
+        // As much as the screen's reflections gave it: Fresnel's share and a little more, the body
+        // below being dark (`post/reflect.wgsl`'s amount), less looking steeply down.
+        let amount = min(fresnel + 0.15 * (1.0 - smoothstep(0.5, 0.9, ndv)), 0.97);
+        refl = mix(traced * amount / max(fresnel, 1e-3), refl, smoothstep(160.0, 256.0, in.dist));
     }
     // The sun's glitter: a narrow highlight (GGX) on the waves, so it lies in a path toward the sun.
     let l = light_dir();
