@@ -24,7 +24,7 @@ ON WINDOWS
      spotc_sr-quality  and  spotc_rr  (same file), and the  *_moving.png  shots (taken mid-strafe).
      Note in a few words: sharper or softer than off? shimmer? ghost trails behind leaves? black or
      broken frames? Which looks best?
-     And one word: is  dlaa-jitterflip  sharper and steadier than  dlaa?  (yes / no / same)
+     And one word: is  sr-jitterflip  worse (speckled canopy) than  sr-quality?  (yes / no / same)
 
 AFTER, back on CachyOS
   8. Terminal:  ~/win/chiacraft-dlss-kit/fetch-results.sh   then tell Planner "DLSS results in"

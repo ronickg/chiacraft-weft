@@ -30,9 +30,9 @@ $Modes = @(
     @{ Name = "dlaa";        Cfg = "core:upscaler=1" },
     @{ Name = "sr-quality";  Cfg = "core:upscaler=2" },
     @{ Name = "rr";          Cfg = "core:upscaler=6" },
-    # The jitter's sign is the usual trap: DLAA again with it flipped. If this one is sharper and
-    # steadier than "dlaa", say so (the default flips).
-    @{ Name = "dlaa-jitterflip"; Cfg = "core:upscaler=1"; Env = @{ WEFT_DLSS_JITTER = "1,1" } },
+    # The jitter's sign is the usual trap: SR Quality again with the old, flipped sign. Under Proton
+    # (11-06) the flipped one speckled the canopy; it should look worse here too.
+    @{ Name = "sr-jitterflip"; Cfg = "core:upscaler=2"; Env = @{ WEFT_DLSS_JITTER = "-1,-1" } },
     # DLSS 5 needs NVIDIA's neural rendering plugin (sl.dlss_nr.dll), not in the public SDK: skipped
     # until it is in streamline\ and the game binds it.
     @{ Name = "dlss5-0.5";   Cfg = "core:upscaler=7,core:dlss5_intensity=0.5"; Needs = "sl.dlss_nr.dll" },

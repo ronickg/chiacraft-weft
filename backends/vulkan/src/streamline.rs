@@ -627,8 +627,9 @@ fn resource(i: &Image) -> Resource {
 }
 
 /// `WEFT_DLSS_JITTER=<x>,<y>`: what the jitter is multiplied by before DLSS gets it (the sign
-/// convention is the usual trap; default -1, -1: DLSS takes where the sample lies in its pixel,
-/// the opposite of how far our projection moved the picture).
+/// convention is the usual trap). Default 1, 1: DLSS takes our jitter as it is (`post::jitter_pixels`,
+/// how far the projection moved the picture, x right, y down). Measured under Proton (11-06):
+/// with -1, -1 SR Quality speckled the canopy and DLAA the shaded leaves; with 1, 1 both were clean.
 fn jitter_sign() -> [f32; 2] {
     static SIGN: std::sync::OnceLock<[f32; 2]> = std::sync::OnceLock::new();
     *SIGN.get_or_init(|| {
@@ -638,7 +639,7 @@ fn jitter_sign() -> [f32; 2] {
                 let mut it = v.split(',').map(|s| s.trim().parse::<f32>().ok());
                 Some([it.next()??, it.next()??])
             })
-            .unwrap_or([-1.0, -1.0])
+            .unwrap_or([1.0, 1.0])
     })
 }
 
