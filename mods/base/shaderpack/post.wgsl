@@ -371,6 +371,7 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
     let size = vec2<i32>(textureDimensions(textures[pass_.depth]));
     let px = clamp(vec2<i32>(uv * vec2<f32>(size)), vec2(0), size - vec2(1));
     let sky_px = sky_or_cloud(uv, textureLoad(textures[pass_.depth], px, 0).r);
+    LAND_PIXEL = select(1.0, 0.0, sky_px);
     if sky_px {
         let y = luma(col);
         // More as the sun climbs, where the land's saturation is taken down most (0.62 of it with a

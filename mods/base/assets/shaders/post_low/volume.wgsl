@@ -98,13 +98,22 @@ fn vol_glow(p: PostPixel) -> vec3<f32> {
         let far = scene.inv_view_proj * vec4(p.uv.x * 2.0 - 1.0, 1.0 - p.uv.y * 2.0, 1e-6, 1.0);
         dir = normalize(far.xyz / far.w);
     }
-    let px = vec2<u32>(p.uv * p.size);
-    var h = px.x * 7919u + px.y * 104729u + 31337u;
-    h = (h ^ (h >> 15u)) * 0x2c1b3c6du;
-    h = (h ^ (h >> 12u)) * 0x297a2d39u;
-    let jitter = f32((h ^ (h >> 15u)) & 1023u) / 1024.0;
-    // Strength under 0.75 (the Video screen's Low): as strong, in half the steps.
+    // Where each texel's march starts along its step: a 4 x 4 ordered (Bayer) pattern over this
+    // half-size image (`p.size` is the screen's, so half of it), the same every frame. The effect's
+    // full-size part (`post/volume.wgsl`) averages each 4 x 4 block by depth, so all sixteen offsets
+    // meet in every pixel and no grain is left; a random hash per texel left a fine speckle wherever
+    // the air was thick (Trees' forest at Max, rtx-showcase's nave), and this pass runs after the
+    // temporal AA, so moving it each frame would only have made it flicker.
+    // Strength under 0.75 (the Video screen's Low): as strong, in half the steps, and a 2 x 2
+    // pattern, as its full-size part averages 2 x 2 blocks.
     let cheap = p.strength < 0.75;
+    let px = vec2<u32>(p.uv * p.size * 0.5);
+    let bayer = array<u32, 16>(0u, 8u, 2u, 10u, 12u, 4u, 14u, 6u, 3u, 11u, 1u, 9u, 15u, 7u, 13u, 5u);
+    let bayer2 = array<u32, 4>(0u, 2u, 3u, 1u);
+    var jitter = (f32(bayer[(px.y & 3u) * 4u + (px.x & 3u)]) + 0.5) / 16.0;
+    if cheap {
+        jitter = (f32(bayer2[(px.y & 1u) * 2u + (px.x & 1u)]) + 0.5) / 4.0;
+    }
     let steps = select(VOL_STEPS, VOL_STEPS / 2, cheap) + select(0, 8, leafy > 0.25);
     let rain = clamp(scene.fog_color.w, 0.0, 1.0);
     var lit = 0.0;
@@ -132,7 +141,14 @@ fn vol_glow(p: PostPixel) -> vec3<f32> {
     let canopy = min(scene.canopy.x, 1.0) * select(k, 1.0, k == 0.0);
     // At 0.004 + 0.02 x fog the beams under Plants' rainforest were faint (Lighting's dawn checks,
     // 11-04); Planner: make the shafts the canopy's signature.
-    let density = (0.0012 + 0.002 * low + 0.03 * scene.weather.z + canopy * (0.018 + 0.04 * scene.weather.z)) * (1.0 - 0.6 * rain) + 0.004 * rain;
+    // (Under a canopy 0.010 by clear air, not 0.018, boost 1.3 not 1.6: with clear air showing beams
+    // only, 0.004 lost the shafts through a nave's openings (Planner's full-size pass), 0.018 brought
+    // soft panes back between a forest's trunks; 0.010 keeps the shafts with faint panes.)
+    // (Before that, 0.004 by clear air, not 0.018: thick air there glowed in hard-edged patches
+    // behind the near trunks, each the shape of the far surface a look ends on, where Bliss's air in
+    // the same forest is clear; box region at 08:00 luma 80 against 35 without the light in the air,
+    // Trees' runs, traced shadows on or off alike. Its morning mist part stays.)
+    let density = (0.0012 + 0.002 * low + 0.03 * scene.weather.z + canopy * (0.010 + 0.04 * scene.weather.z)) * (1.0 - 0.6 * rain) + 0.004 * rain;
     let air = 1.0 - exp(-density * end);
     // Gold while the sun is under about 30° (the fog's MIST_GOLD in look.wgsl), white toward noon.
     let color = mix(vec3(1.0, 0.62, 0.3), vec3(1.0, 0.95, 0.85), smoothstep(0.1, 0.65, sun.y));
@@ -143,7 +159,13 @@ fn vol_glow(p: PostPixel) -> vec3<f32> {
     // most of the view's air is lit (the open water by a forest's edge) it is not: at `leafy` alone
     // the flooded forest's misty river went a white glare (luma p50 185 -> 201).
     let beams = max(lit * (1.0 - lit) * 4.0, leafy * (1.0 - lit));
-    let glow = color * mix(lit * 0.35, lit, beams) * air * phase * day * select(min(p.strength, 1.0), 1.0, cheap) * mix(0.6, 1.6, canopy * (1.0 - lit));
+    // In clear air only the beams, the difference the shadow maps make: the even glow of all the lit
+    // air over a sunny landscape (0.35 of it) lay as a grey-green veil on every dark pixel 100-300
+    // blocks off, where Bliss's clear air adds its blue haze only and its shade stays deep navy (the
+    // vista from above, 08:00: shade 44 45 39 with it, 27 31 25 without, Bliss's 26 41 47; Trees'
+    // trb_s9_vol0). In mist, fog or rain the air glows as before.
+    let even = 0.35 * smoothstep(0.0, 0.06, scene.weather.z + rain);
+    let glow = color * mix(lit * even, lit, beams) * air * phase * day * select(min(p.strength, 1.0), 1.0, cheap) * mix(0.6, 1.3, canopy * (1.0 - lit));
     return glow;
 }
 

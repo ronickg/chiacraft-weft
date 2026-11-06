@@ -51,6 +51,9 @@ pub struct Around {
     pub hidden: u32,
     /// Over a column whose ground came first: empty sky for now.
     pub sky: u32,
+    /// The server sent it (saved, or changed): its biomes are the column's, over any this
+    /// client made itself (chiacraft: an imported world's cubes, `chiacraft::mc_import`).
+    pub from_server: bool,
 }
 
 pub enum Out {
@@ -1010,8 +1013,9 @@ impl Terrain {
         Some(around)
     }
 
-    fn hand_over(&mut self, pos: IVec3, around: Around) {
+    fn hand_over(&mut self, pos: IVec3, mut around: Around) {
         self.held.remove(&pos);
+        around.from_server = self.server.contains(&pos);
         self.out
             .push(Out::Cube { pos, cube: self.cubes[&pos].clone(), around });
     }

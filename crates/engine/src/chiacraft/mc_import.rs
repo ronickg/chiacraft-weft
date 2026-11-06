@@ -163,7 +163,11 @@ fn chunk_cubes(c: &Content, r: &Resolver, dim: usize, chunk: &anvil::Chunk, lo: 
     for y in lo..=hi {
         let pos = IVec3::new(chunk.x, y, chunk.z);
         let Some(sec) = chunk.sections.iter().find(|s| s.y == y) else {
-            out.push((pos, Cube::uniform(AIR, 0)));
+            // A section Minecraft left out: air, with the column's biomes like the rest.
+            let mut cube = Cube::uniform(AIR, 0);
+            cube.biomes = Some(Box::new(surface));
+            crate::world::light::prelight(c, &mut cube, sky);
+            out.push((pos, cube));
             continue;
         };
         let ids: Vec<u32> = sec.palette.iter().map(|p| r.state(p)).collect();
@@ -194,6 +198,10 @@ fn chunk_cubes(c: &Content, r: &Resolver, dim: usize, chunk: &anvil::Chunk, lo: 
     }
     out
 }
+
+/// Minecraft's overworld in cubes: y -64 to 319.
+const MC_LOW: i32 = -4;
+const MC_HIGH: i32 = 19;
 
 /// The column new players start on: the vista of the Bliss + DH shots (x, z).
 const SPAWN: [i32; 2] = [165, 168];
@@ -254,8 +262,9 @@ pub fn maybe_import(meta: &mut WorldMeta, c: &Content) {
     meta.save();
     let start = Instant::now();
     let def = &c.dims[dim];
-    // Minecraft's overworld is y -64 to 319: cubes -4 to 19.
-    let (lo, hi) = (def.min_cube_y.max(-4), def.max_cube_y.min(19));
+    // Minecraft's overworld: y -64 to 319, cubes -4 to 19. (Cubes the client makes beyond them
+    // don't set a column's biome: the server's do, `client::world::insert`.)
+    let (lo, hi) = (def.min_cube_y.max(MC_LOW), def.max_cube_y.min(MC_HIGH));
     let r = Resolver::new(c);
     let storage = Mutex::new(Storage::open(meta.clone(), c));
     let regions = anvil::regions(&region_dir);
@@ -372,6 +381,12 @@ impl FarTerrain {
     }
 
     /// Column (x, z)'s top height, top block, block under it and biome.
+    /// Water's depth at column (x, z), in blocks down to the bed (deep water counts its
+    /// whole depth); 0 where the top isn't water, `None` outside the grid.
+    pub fn depth(&self, x: i32, z: i32) -> Option<u32> {
+        Some(self.grid.sample(x, z)?.depth as u32)
+    }
+
     pub fn cell(&self, x: i32, z: i32) -> Option<(i32, u32, u32, u32)> {
         let cell = self.grid.sample(x, z)?;
         let st = |i: u16| self.states.get(i as usize).copied().unwrap_or(AIR);

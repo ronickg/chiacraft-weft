@@ -157,7 +157,8 @@ pub fn block(mc: &str) -> (Vec<String>, bool) {
         "ice" | "frosted_ice" => one("base:ice"),
         "packed_ice" | "blue_ice" => near(&["base:glacier_ice", "base:ice"]),
         "obsidian" | "crying_obsidian" => one("base:obsidian"),
-        "magma_block" => near(&["base:stone"]),
+        // Ruined portals' red: netherrack and magma as red sandstone.
+        "netherrack" | "magma_block" => near(&["base:red_sandstone", "animals:red_sandstone", "base:stone"]),
         "coal_ore" | "deepslate_coal_ore" => one("base:coal_ore"),
         "iron_ore" | "deepslate_iron_ore" => one("base:iron_ore"),
         "copper_ore" | "deepslate_copper_ore" => near(&["base:copper_ore", "base:iron_ore"]),
@@ -199,7 +200,15 @@ pub fn block(mc: &str) -> (Vec<String>, bool) {
             (vec![format!("base:wild_sunflower[half={half}]"), if half == "lower" { "base:dandelion".into() } else { AIR.into() }], false)
         }
         // 26.3's wildflowers are mostly yellow patches on the forest floor.
-        "wildflowers" => near(&["base:dandelion", "base:clover", AIR]),
+        // Flat little clusters in Minecraft; our dandelion stands up, so only full patches (4)
+        // get one, or the floor reads as a meadow of them.
+        "wildflowers" => {
+            if s.prop("flower_amount") == Some("4") {
+                near(&["base:dandelion", AIR])
+            } else {
+                (vec![AIR.into()], false)
+            }
+        }
         "pink_petals" => near(&["base:clover", AIR]),
         // A thin layer on the floor in Minecraft; ours is a whole block.
         "leaf_litter" => (vec![AIR.into()], false),
@@ -321,7 +330,9 @@ pub fn biome(mc: &str) -> Vec<&'static str> {
         "swamp" | "mangrove_swamp" => vec!["base:swamp"],
         "beach" => vec!["base:beach"],
         "river" | "frozen_river" => vec!["base:river", "base:ocean"],
-        "warm_ocean" | "lukewarm_ocean" | "deep_lukewarm_ocean" => vec!["base:lagoon", "base:ocean"],
+        // Not our lagoon: its tropical tint has no Minecraft colour under base:mc_leaf_colours and
+        // bled teal into the shores' trees and grass.
+        "warm_ocean" | "lukewarm_ocean" | "deep_lukewarm_ocean" => vec!["base:ocean"],
         n if n.contains("ocean") => vec!["base:ocean"],
         "dripstone_caves" | "lush_caves" | "deep_dark" | "sulfur_caves" => vec!["base:deep_caves", "base:plains"],
         _ => vec!["base:plains"],
