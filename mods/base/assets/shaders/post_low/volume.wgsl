@@ -148,7 +148,12 @@ fn vol_glow(p: PostPixel) -> vec3<f32> {
     // behind the near trunks, each the shape of the far surface a look ends on, where Bliss's air in
     // the same forest is clear; box region at 08:00 luma 80 against 35 without the light in the air,
     // Trees' runs, traced shadows on or off alike. Its morning mist part stays.)
-    let density = (0.0012 + 0.002 * low + 0.03 * scene.weather.z + canopy * (0.010 + 0.04 * scene.weather.z)) * (1.0 - 0.6 * rain) + 0.004 * rain;
+    // The fog's part only through dawn mist's range: past it (a fog day, weather.z over about 0.12)
+    // the mist's own volume fills the air (Mist's fog days), and this glow on top of it, lit gold by
+    // the low sun, turned a whole fog-day frame olive-yellow, sky included (Mist's m16 at lb_bench's
+    // spot, 11-06).
+    let fog_part = scene.weather.z * (1.0 - smoothstep(0.08, 0.2, scene.weather.z));
+    let density = (0.0012 + 0.002 * low + 0.03 * fog_part + canopy * (0.010 + 0.04 * fog_part)) * (1.0 - 0.6 * rain) + 0.004 * rain;
     let air = 1.0 - exp(-density * end);
     // Gold while the sun is under about 30° (the fog's MIST_GOLD in look.wgsl), white toward noon.
     let color = mix(vec3(1.0, 0.62, 0.3), vec3(1.0, 0.95, 0.85), smoothstep(0.1, 0.65, sun.y));
@@ -164,7 +169,7 @@ fn vol_glow(p: PostPixel) -> vec3<f32> {
     // blocks off, where Bliss's clear air adds its blue haze only and its shade stays deep navy (the
     // vista from above, 08:00: shade 44 45 39 with it, 27 31 25 without, Bliss's 26 41 47; Trees'
     // trb_s9_vol0). In mist, fog or rain the air glows as before.
-    let even = 0.35 * smoothstep(0.0, 0.06, scene.weather.z + rain);
+    let even = 0.35 * smoothstep(0.0, 0.06, fog_part + rain);
     let glow = color * mix(lit * even, lit, beams) * air * phase * day * select(min(p.strength, 1.0), 1.0, cheap) * mix(0.6, 1.3, canopy * (1.0 - lit));
     return glow;
 }
