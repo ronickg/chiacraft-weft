@@ -1107,10 +1107,15 @@ fn lod_color(in: VOut) -> vec4<f32> {
     // A mip and a half coarser than the pixels ask, and only the nearer tiles' texture: farther
     // out the terraces' rows of top and wall texels beat into dashes, so it gives way to the
     // average between `LOD_DETAIL` blocks.
-    let t = sample(in, fract(at), d.xy * 2.8, d.zw * 2.8);
     let detail = 1.0 - smoothstep(LOD_DETAIL.x, LOD_DETAIL.y, in.dist);
     // A cutout's clear texels (leaves' gaps) show the average, not their unset color.
-    var albedo = vec4(mix(avg.rgb, t.rgb, t.a * detail), avg.a);
+    var albedo = avg;
+    // Past `LOD_DETAIL.y` the texture counts for nothing: not sampled there (gradients given, so
+    // the branch is safe), the same colour for less (Android port, 11-06).
+    if detail > 0.0 {
+        let t = sample(in, fract(at), d.xy * 2.8, d.zw * 2.8);
+        albedo = vec4(mix(avg.rgb, t.rgb, t.a * detail), avg.a);
+    }
     // Far water is the same water as near: deep there (no blocks are kept that far), with its
     // Fresnel, the sky and the sun's path. Otherwise it would be a flat grey-blue lit like land, a
     // seam at the edge of the render distance. It is left out of the screen's reflections (solid in
