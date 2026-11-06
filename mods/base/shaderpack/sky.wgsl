@@ -310,7 +310,10 @@ fn cloud_low_sun() -> f32 {
 
 // The sunlight on the clouds against the palette's: an orange that deepens as the sun gets low.
 fn cloud_sun_tint() -> vec3<f32> {
-    return mix(vec3(1.0), vec3(1.05, 0.66, 0.38), cloud_low_sun() * 0.85);
+    // Gold, not orange (0.66 0.38 in green and blue before): in Bliss's own world at 06:00 its
+    // clouds are gold against a gold-cream sky, ours went strong orange against lavender-blue,
+    // much warmer than the land's own gold (Look's and Tester 2's sheets, 11-06).
+    return mix(vec3(1.0), vec3(1.05, 0.8, 0.5), cloud_low_sun() * 0.85);
 }
 
 // The soft clouds along `dir` from the camera, up to `far` (blocks): rgb the light they send toward

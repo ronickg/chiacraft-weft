@@ -25,9 +25,10 @@ as well."
 - **The catch:** the dinosaurs already live behind the amber gateway. So cloning gives what the
   gateway can't: species alive nowhere (the ice age first, with real DNA), animals designed from
   the alleles you found, animals tame from birth in your base, and a museum and journal.
-- **The fiction (recommended):** honest about real bone (no dinosaur DNA survives; ice-age DNA
-  does), then the ley lines: fossils that lay in the flow kept a pattern. Fossils near ley lines
-  are worth more, which gives the dowsing rod a job.
+- **The fiction (Ronald, 11-06: "Jurassic Park style"):** DNA survives in fossils and in amber,
+  and the gaps are filled from a living relative. Amber is a main source: blood-fed insects in
+  amber are the richest dinosaur find, and the amber players already mine for the gateway can
+  hold them.
 - **Against grind:** the vial is never used up, failed eggs cost only materials, the rock names
   the species, half your finds go to your target species, 50% in about a dozen finds, a hatch is
   certain at 100%, three core stations.
@@ -35,7 +36,9 @@ as well."
   Age, where `notes/PROGRESSION.md` already puts "Genetics machines".
 - **First build:** fossils in the world with a brush and a display (phase 1), then the plain lab
   end to end for species already in the game (phase 2).
-- Nine questions for Ronald, each with a recommendation, at the end.
+- **Decided** (Ronald, 11-06, section 11): Jurassic Park fiction; the ice age first (dire wolf,
+  Irish elk), T. rex as the late capstone; clones under 75% can't breed; every other
+  recommendation taken. Phase 1's build brief: `notes/briefs/Fossils phase 1.md`.
 
 ## 1. How other games do it
 
@@ -378,36 +381,33 @@ it is the only way; here it isn't. It has to give things the gateway doesn't:
 
 The recommended design leans on all four, with 1 and 2 as the heart.
 
-## 4. The fiction: how honest to be
+## 4. The fiction: Jurassic Park style (decided)
 
-Real science draws a hard line (section 2): ice-age remains can keep DNA, dinosaur bones can't.
-What dinosaur finds really give is shape, scraps of collagen and the colour of feathers and skin.
-And real de-extinction doesn't bring back the lost animal. It edits a living relative toward it
-and uses a surrogate mother. Colossal's "dire wolves" are grey wolves with about 20 edits.
+Ronald chose it on 11-06 ("Jurassic Park style"), over an honest-only version and a ley-line
+explanation. So in the game:
 
-Three ways the game can tell it:
-
-| | What it says | Good | Bad |
-|---|---|---|---|
-| A. Honest only | Ice-age animals can be cloned. Dinosaurs can't. | True. Teaches. | Ronald wants "cool things with dinosaurs". Loses the dinosaurs, the heart of the mod. |
-| B. Jurassic Park | DNA from amber mosquitoes and bones, gaps filled with frog DNA. | Everyone knows it. | Debunked (amber holds no DNA). Copies a film's idea. Clashes with a mod built on real facts. |
-| **C. Honest, then the ley lines (recommended)** | The journal says plainly what real bone holds. Ice-age finds give real DNA. Dinosaur finds give evidence: shape, protein, colour. The lab builds a dinosaur the way real labs would try: by editing a living relative's genome toward the evidence. The ley lines are why it works here: bone that lay in the flow kept a pattern of what it was. The ancients' work, not chemistry. | Honest about the real world, and the fantasy is named as fantasy. Uses lore that already exists (ley lines, the ancients). Gives the dowsing rod and ley sight a job for fossil hunters. | One more rule to learn: fossils near ley lines are better. |
-
-With C, the numbers follow the science where they can:
-- **Ice-age finds** carry real DNA. Cold keeps it: frozen ground gives the best yield, as real
-  permafrost mummies do.
-- **Dinosaur finds** carry evidence, and a ley pattern whose strength depends on how close to a
-  ley line they lay (`vitals::ley::strength`). Off the lines, a dinosaur bone still identifies the
-  species, fills the journal and goes on display, but gives little genome.
-- **Amber** keeps shape, not DNA. A feather in amber shows real colour (the 99-million-year-old
-  tail in Burmese amber). An insect in amber gives a journal page that says why Jurassic Park's
-  trick fails. No mosquito blood.
-- **Every clone is labelled for what it is**: "reconstructed from 72% evidence, gaps from a
-  caiman". The animal's screen shows it.
+- **DNA survives** in fossil bone, teeth, eggs and above all in amber. How much a find gives
+  depends on what it is and how well it was kept (its quality), not on real chemistry.
+- **Amber is the richest source** for dinosaurs, as in Operation Genesis (a rare jackpot). A
+  biting insect that fed on a dinosaur and was caught in resin holds that animal's blood. Amber
+  already exists (ore in the rock, the gateway's blocks), so players who mine it for the gateway
+  start finding inclusions long before the lab.
+- **Gaps are filled from a living relative**, as section 5.5 describes: birds and crocodilians for
+  dinosaurs (not frogs: the game has closer relatives, and the choice is part of the play), wolves
+  and deer for the ice-age mammals.
+- **Ice-age finds** are the easy case: frozen remains give a lot of DNA, as real permafrost
+  mummies do. They come first among the new species.
+- **The real science (section 2) stays as flavour**: journal pages, item descriptions and names
+  can use it (the Djadokhta's buried dunes, Big Mamma on her nest, real melanosome colours), but it
+  doesn't set the rules.
+- **No ley lines in the explanation.** They play no part in DNA. The wyvern's dragon bones still
+  lie at ley nodes (the wyvern is the one fantasy animal), as a place, not a mechanic.
+- **Clones are labelled** on their screen: "Cloned: 72% genome, gaps from a spectacled caiman",
+  "True-bred", or "Copy of Ash".
 
 ## 5. The recommended loop, step by step
 
-Working names throughout. Names for anything invented (the lab's machines, the ley-kept fossils)
+Working names throughout. Names for anything invented (the lab's machines)
 go through `tools/names/names.py` and `mods/base/lore/lexicon.toml` before they reach the game.
 
 ### 5.1 Finding
@@ -423,7 +423,8 @@ and so which species can be in it. The species' rows already name their formatio
 | banded clay (the strata's clay layers) | Cedar Mountain, Utah: floodplain mudstone | Utahraptor, Gastonia, Iguanacolossus, Cedarosaurus, the neosuchian, Ceratodus (teeth) |
 | limestone (low cliffs, river banks) | Yixian, China: fine lake beds (shale and ash in reality) | Psittacosaurus, Confuciusornis, Lycoptera; feather and skin impressions |
 | permafrost (new: frozen ground a few blocks under the tundra and snowy plains, showing in river banks there) | Yukon and Siberian permafrost, where thawing banks expose mummies | ice-age species, once they exist (phase 5) |
-| amber ore (exists) | Burmese and Baltic amber | inclusions: insects, plants, feathers |
+| amber ore (exists: seams below y 64 in the overworld, more in the Cretaceous) | Burmese and Baltic amber | inclusions: blood-fed insects (a dinosaur's DNA), feathers, plain insects, plants |
+| amber nodules (new, phase 4): lumps in the banded clay's coal seams (real: amber turns up with lignite and coal) | resin from ancient conifer forests | the same inclusions, more often |
 
 Granite, slate and the karst towers hold none. Igneous rock never holds fossils, and the game's
 slate is the cold's rock, not a lake bed. That rule is something a player can learn and use.
@@ -447,8 +448,8 @@ Protoceratops' soft eggs buried together).
    dune beds").
 2. A rock hammer (Stone Age): tapping a face shows fossil blocks within a few blocks behind it as
    a faint outline for a few seconds. Cheap, slow, short reach.
-3. A survey staff (tier 3, steam or ley): shows buried fossils within 16 blocks, like the dowsing
-   rod's feel. With ley sight, the staff also shows how strong the pattern is.
+3. A survey staff (tier 3, steam): shows buried fossils and amber within 16 blocks, like the
+   dowsing rod's feel.
 
 ### 5.2 Digging
 
@@ -488,8 +489,7 @@ Protoceratops' soft eggs buried together).
 
 ### 5.4 Extracting: from fossil to genome
 
-- **The sequencer** (Electric, tier 4, the "Genetics machines" of the beasts path). A ley reader
-  is the magic path's version (Steam, tier 3, runs on a ley tap) that reads only the ley pattern.
+- **The sequencer** (Electric, tier 4, the "Genetics machines" of the beasts path).
 - In: a prepared fossil (consumed). Out: its share added to a **genome vial** for its species.
 - **The genome vial** is an item, not a hidden counter. It holds its species, its completeness
   (0-100%) and the alleles it has seen (section 5.5). Two vials of a species merge at the
@@ -509,15 +509,21 @@ Protoceratops' soft eggs buried together).
 | fossil egg | 10% | 1 allele; the egg's look for synthesis |
 | nest (a clutch) | 15% | 2 alleles |
 | skin or feather impression | 0% | 2 colour alleles (real: melanosomes show colour) |
-| feather in amber | 0% | 3 colour alleles |
+| blood-fed insect in amber | 15% of one species | 2 alleles; the richest dinosaur find |
+| feather in amber | 4% | 3 colour alleles |
+| plain insect or plant in amber | 0% | journal and display only |
 | ice-age hair | 6% | 2 colour alleles |
 | ice-age bone or tusk | 8% | 1 allele |
 | frozen body (a mummy) | 30% | 4 alleles; the jackpot, as Lyuba and Yuka were |
 
-Share added = the find's share × its quality (0-1) × its place factor:
-- **Dinosaur finds:** the ley factor at the spot where it was found: 0.4 far from any line, up to
-  1.0 on a line, 1.5 at a node (from `vitals::ley::strength`, stored on the find when dug).
-- **Ice-age finds:** the cold factor: 1.0 in permafrost, 0.5 thawed (a river bank in summer).
+Share added = the find's share × its quality (0-1), and for ice-age finds × the cold factor:
+1.0 in permafrost, 0.5 thawed (a river bank in summer). Amber's quality is high (70-100): resin
+seals what it holds.
+
+**Whose blood an insect holds.** Amber found in the Cretaceous holds a species living in that
+biome. Amber in the overworld holds a species of the formations, weighted by the target rule
+below. The species shows when the amber is cut (phase 1: at once; later at the preparation
+bench).
 
 Shares add straight up to 100%. No diminishing returns: a player can count how far they are.
 
@@ -525,7 +531,7 @@ Shares add straight up to 100%. No diminishing returns: a player can count how f
 a player mark one species as their target, and half of all finds in its formation are that
 species. So the player who wants a Utahraptor isn't buried in Gastonia bones.
 
-**How long it takes.** An average find is about 6% × 0.7 quality × 1.0 ley = about 4%. So:
+**How long it takes.** An average find is about 6% × 0.7 quality = about 4%. So:
 - 50% (the first egg) takes about 10-12 finds, a few good digging trips;
 - 100% takes about 22-25 finds;
 - a skeleton bed or a nest near a node can jump 15-20% at once.
@@ -653,11 +659,10 @@ the dinosaurs, 5.5 for the wyvern).
 - **Few founders.** Clones from one vial are close kin. A real conservation problem; worth a
   mild inbreeding cost later (lower health in the young of close kin) so finds from many places
   matter. Not in the first phases.
-- **Hybrids.** Not in the plan. Mixing species breaks the honest frame and the genome's design
-  (each species has its own loci). If Ronald wants them later, a ley ritual is the place, not the
-  lab.
-- **The wyvern.** Fantasy, so no fossils in the strata. A fitting late capstone: "dragon bones"
-  that lie only at ley nodes in the crags, read only by the ley reader. A question for Ronald.
+- **Hybrids.** Not in the plan (Ronald took the recommendation). Mixing species breaks the
+  genome's design: each species has its own loci.
+- **The wyvern.** Fantasy, so no fossils in the strata. A late capstone (taken): "dragon bones"
+  that lie only at ley nodes in the crags, read by the sequencer like any find.
 
 ## 6. Blocks, items, stations and tools
 
@@ -675,9 +680,8 @@ the dinosaurs, 5.5 for the wyvern).
 | prepared fossil | item | 1 | the bench | display, journal, the sequencer |
 | fossil stand, display case, mounted skeleton | blocks | 1 | wood, glass, a species' full set | the museum |
 | air scribe | bench add-on | 3 | steam age | faster, better prep |
-| survey staff | tool | 3 | steam or ley | finds buried fossils |
+| survey staff | tool | 3 | steam | finds buried fossils and amber |
 | incubator | machine | 3 | steam; electric version at 4 | holds 37 °C |
-| ley reader | machine | 3 | magic path, ley tap | reads dinosaur finds' ley pattern |
 | sample kit | tool | 3 | glass, iron needle | samples from living animals |
 | sequencer | machine | 4 | electric | fossils into genome vials |
 | genome vial | item | 4 | the sequencer | a species' genome record |
@@ -691,7 +695,7 @@ mod, checked by tests, shown on a sheet.
 
 - **`animals_core::fossils`** (new): the formations and their species; the find kinds with
   shares, alleles and jacket needs; quality ranges (exposed 30-70, buried 60-100, pick cap 20,
-  chisel −10, air scribe +10); the ley and cold factors; the thresholds (50, 75, 100); the family
+  chisel −10, air scribe +10; amber 70-100); the cold factor; amber's inclusion odds; the thresholds (50, 75, 100); the family
   tree and the relatives table (effect strength, hatch chance); the filler effects; the clone's
   level (10-40); timings (brush 4-8 s, prep 60-120 s, synthesis one day).
 - **The share of fossils in a face**: also in `animals_core::fossils`, placed by the animals
@@ -719,7 +723,7 @@ late.
 | 0 Stone | Spot fossils on faces. Brush them out or break them for fragments and bone meal. Rock hammer. |
 | 1 Bronze | Chisel, plaster jackets, preparation bench. Identify species, fill the journal, build displays and a museum. |
 | 2 Iron | Bigger digs: skeleton beds, nests (they need jackets and patience). Mounted skeletons. Breeding lines of living animals (already planned). |
-| 3 Steam | Air scribe, survey staff, incubator, sample kit. The ley reader on the magic path: first genome shares from dinosaur finds near ley lines. |
+| 3 Steam | Air scribe, survey staff, incubator, sample kit. |
 | 4 Electric | Sequencer, genome vials, synthesizer. First clones at 50%. The lab screen. |
 | 5 Future | Artificial womb (the mammoth). Faster synthesis. |
 | 6 Star | The wyvern's dragon bones, if Ronald wants it. |
@@ -762,10 +766,11 @@ From the games in section 1 and their players:
 
 Each phase is playable alone and adds one thing.
 
-1. **Fossils in the world.** Fossil blocks in red sandstone, banded clay and limestone faces, by
-   formation. Brush and pick. A find drops a fossil item with its species (preparation comes
-   later), a journal page on the first one, and a fossil stand. No DNA. Art: four block textures,
-   a few icons. Checks: shares in faces, every species reachable.
+1. **Fossils and amber finds in the world.** Fossil blocks in the strata's sandstones, banded clay
+   and limestone faces, by formation. Brush and pick. A brushed find drops a fossil item with its
+   species; amber ore now and then holds an inclusion (a blood-fed insect names its species). The
+   journal notes each species' first find. Placing a find puts it on display. No DNA yet.
+   Brief: `notes/briefs/Fossils phase 1.md`.
 2. **The lab, plain.** Sequencer, genome vial, synthesizer, incubator, for species already in the
    game (no new models). No lab screen yet: the egg takes the plain wild form. Gap fillers from the
    family tree, with stat shifts. Thresholds 50/75/100. This is the Zoo Tycoon loop, playable end
@@ -773,39 +778,35 @@ Each phase is playable alone and adds one thing.
 3. **Design.** Alleles seen, the lab screen, impressions and amber feathers for colour, copying a
    living tame with the sample kit.
 4. **Digging deeper.** Quality, preparation bench and air scribe, plaster jackets, rock hammer
-   and survey staff, skeleton beds and nests, mounted skeletons, the ley factor and the ley reader.
-5. **The ice age.** Permafrost, mummies, real DNA, surrogate mothers. First species: the dire
-   wolf (grey wolf surrogate) and the Irish elk (red deer surrogate), each a new model, gene file
-   and species row. The mammoth with the artificial womb after.
-6. **Lost dinosaurs and the capstone.** Species no world has alive, from formations the
-   Cretaceous doesn't have. The wyvern's dragon bones.
+   and survey staff, skeleton beds and nests, mounted skeletons, amber nodules in the coal seams.
+5. **The ice age** (Ronald: "Ice age first"). Permafrost, mummies, surrogate mothers. First
+   species: the dire wolf (grey wolf surrogate) and the Irish elk (red deer surrogate), each a new
+   model, gene file and species row. The mammoth with the artificial womb after.
+6. **The capstones.** T. rex (Ronald: "T. rex as the late capstone"), with Triceratops beside it
+   if wanted: Hell Creek's river sandstones and mudstones as a new, rarer bed deep in the strata,
+   skeleton beds only, alive nowhere. The wyvern's dragon bones at ley nodes in the crags.
 
 Phase 1 is small and early-game; phases 2-3 are the late-game heart Ronald asked for. Doing 1 then
 2 first gets the whole loop in hand quickly; 4 makes it feel deep.
 
-## 11. Open questions for Ronald
+## 11. Decisions
 
-Each with a recommendation.
+Ronald answered on 11-06 (relayed by Planner):
 
-1. **How honest should the fiction be?** Honest only (no cloned dinosaurs) / Jurassic Park style
-   / honest, then the ley lines. *Recommend the ley lines (section 4): honest about real bone,
-   fantasy named as fantasy, and the dowsing rod gets a job.*
-2. **What does cloning give when the dinosaurs already live behind the gateway?** *Recommend all
-   four of section 3: species alive nowhere, designed animals, tame from birth, the journal and
-   museum. The first two are the heart.*
-3. **Which lost species come first?** Ice-age animals (dire wolf, Irish elk, then the mammoth) or
-   dinosaurs from other formations (Hell Creek's Triceratops and T. rex as the late capstone)?
-   *Recommend the ice-age pair first: real DNA, surrogates the game already has, and the cold
-   biomes get a reason to dig. T. rex after, as the big late goal.*
-4. **Sterile below 75%?** Or Operation Genesis' way: a shorter life below 100%. *Recommend
-   sterile below 75%: it gives the last digging trips a reason, has real roots, the first egg
-   still comes at 50%, and a short-lived tame you've raised feels worse than one that can't breed.*
-5. **Copying a living tame?** *Recommend yes, from your own tames only, cost by level. Players
-   want a backup of a prized animal.*
-6. **Hybrids?** *Recommend no. If ever, a ley ritual, not the lab.*
-7. **Fossils early, DNA late?** *Recommend yes: digging and the museum from the Stone and Bronze
-   Ages, the lab in the Electric Age, so finds made early pay off later.*
-8. **The wyvern's dragon bones as a capstone?** *Recommend yes, later: only at ley nodes in the
-   crags, read only by the ley reader.*
-9. **Clone levels 10-40, designed but not strong?** *Recommend yes, so the wild 150s stay worth
-   taming and breeding lines matter.*
+| # | Question | Answer |
+|---|---|---|
+| 1 | How the fiction works | "Jurassic Park style": DNA survives in amber and fossils, gaps filled from a living relative. Not the ley-line explanation (section 4). Amber gets a bigger role. |
+| 2 | What cloning gives when the dinosaurs live behind the gateway | Taken: species alive nowhere and designed animals as the heart, plus tame from birth and a museum. |
+| 3 | Which lost species first | "Ice age first": dire wolf and Irish elk first, T. rex as the late capstone. |
+| 4 | Clones under 75% | "Can't breed". |
+| 5 | Copying a living tame | Taken: own tames only, cost by level. |
+| 6 | Hybrids | Taken: none. |
+| 7 | Fossils early, DNA late | Taken: digging and display from the Stone and Bronze Ages, the lab in the Electric Age. |
+| 8 | The wyvern's dragon bones | Taken: a late capstone, at ley nodes in the crags. |
+| 9 | Clone levels | Taken: 10 at 50% up to 40 at 100%; a copy keeps its animal's level. |
+
+Left for Planner or the worker to decide, with a lead:
+- **Insects in amber:** which insect. A biting midge or a mosquito both fit (both are known from
+  Cretaceous amber); the name and look go through the art and names tools.
+- **Ceratodus teeth and the fish** (lungfish, Lycoptera): fossils of them can wait for phase 2;
+  phase 1 may skip fish.
