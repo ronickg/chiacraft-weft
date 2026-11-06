@@ -1521,6 +1521,11 @@ fn rain_depth(dist: f32) -> f32 {
     return downpour * max(dist - 20.0, 0.0) * smoothstep(10.0, 60.0, dist);
 }
 
+// The HDR world's low evening mist band over the far land (`haze_lit`): its density per block at
+// its floor and its depth (blocks).
+const BAND_HDR: f32 = 0.006;
+const BAND_DEPTH: f32 = 12.0;
+
 fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let c = fog_through(c_in, rel, smoothstep(0.25, 0.75, sky));
     let dist = length(rel);
@@ -1628,6 +1633,28 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let mixed = mix(pale, toward, v);
     let own = mix(pale, toward, v * mix(0.7, 1.0, wet));
     let seen = max(vec3(luma(mixed)) + own - vec3(luma(own)), vec3(0.0));
+    var out = mix(seen, lit, edge);
+    // The HDR world with the sun low: a thin mist lying on the far land at about the sea's height,
+    // a flat white band along the horizon with hills standing out of it, as Bliss's evening (its
+    // 17:00-18:00 vista: rows at 40% of the height 20 brighter than round them, saturation about
+    // 20; none at noon). Only far off (from about 900 blocks), so the near land stays clear, and
+    // as deep as a look runs inside the layer, so it is a band, not a veil.
+    if hdr_air > 0.0 {
+        // (Through 17:00 too, the sun 22° up: from 0.2 it was a third there and barely showed, lk_eb3.)
+        let low = (1.0 - smoothstep(0.32, 0.52, scene.sun.y));
+        // (After the handover to the sky where the terrain ends: before it, the farthest land, where
+        // the band lies, took the sky's colour over it, lk_eb1.)
+        // (From 600 blocks it lay on the nearer hills too, a wide pale wash, not Bliss's thin band
+        // at the far horizon: lk_eb2.)
+        let far_band = smoothstep(1000.0, 2200.0, dist) * low;
+        if far_band > 0.0 {
+            let y = scene.eye.y + rel.y - (SEA_LEVEL + 4.0);
+            let inside = min(min(BAND_DEPTH / max(-dir.y, 0.008), dist), 1500.0);
+            let band = 1.0 - exp(-BAND_HDR * exp(-max(y, 0.0) / BAND_DEPTH) * inside * far_band);
+            let white = vec3(luma(toward)) * vec3(1.04, 1.0, 0.94) * 1.25;
+            out = mix(out, white, band);
+        }
+    }
     // The held light in the air and a bolt before far land: none in a calm scene (`CALM`), and
     // their code left out of its shader (Android port: on the Pixel 10 the size of these rare
     // paths, the fog walk, the dust and the water's cost the vista 34.2 -> 26.0 ms, in a calm
@@ -1636,7 +1663,7 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     if !CALM {
         extra = held_in_fog(rel, sky) + lightning_bolt_over(dir, dist);
     }
-    return mix(seen, lit, edge) + extra;
+    return out + extra;
 }
 
 // ---- light in the fog: torches (Research round 15, 6: Valheim's warm firelight in the mist) ----
