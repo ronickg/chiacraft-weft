@@ -140,11 +140,18 @@ fn blend(a: Palette, b: Palette, t: f32) -> Palette {
 fn palette() -> Palette {
     var p = palette_read();
     // The sky's light test (`base:look_sky_light`): its light in the shade scaled, the sun's kept.
-    // In the HDR world 0.45 of it as made (the gap sheets: our shade never went dark against
-    // Bliss's, the near forest at 08:00 luma 93 against 58; agreed with Shader, 11-05, so today's
-    // approved look keeps its keys).
+    // In the HDR world 0.45 of it as made in the morning, 0.65 with the sun high (the gap sheets:
+    // our shade never went dark against Bliss's, the near forest at 08:00 luma 93 against 58; at
+    // noon the greens then read dark, 41 against 50; agreed with Shader, 11-05, so today's approved
+    // look keeps its keys).
     let k = fantasy_opt(OPT_SKY_LIGHT);
-    p.ambient *= select(1.0, k, k > 0.0) * select(1.0, 0.45, scene.frame.x > 0.5);
+    p.ambient *= select(1.0, k, k > 0.0) * select(1.0, mix(0.45, 0.65, smoothstep(0.5, 0.85, scene.sun.y)), scene.frame.x > 0.5);
+    // And its sunlight a little warmer with the sun high (the warmth on Bliss's noon land is its
+    // sun's, the sky and the far haze staying blue: our whole-picture white balance had greyed the
+    // noon sky, saturation 19 against 31).
+    if scene.frame.x > 0.5 {
+        p.sun *= mix(vec3(1.0), vec3(1.05, 1.0, 0.86), smoothstep(0.3, 0.7, scene.sun.y));
+    }
     return p;
 }
 
@@ -1569,7 +1576,8 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     // much bluer than Bliss's at every hour, red less blue -37 against -10 at noon: the gap sheet).
     if scene.frame.x > 0.5 {
         // Warmer still at golden hour (Bliss's dawn land: warmth +106 against our +47).
-        let w = fantasy_opt(OPT_WHITE) * day * (1.0 + 1.3 * golden());
+        // Mostly at a low sun: at noon a quarter (the sky and the far haze stay blue, as Bliss's).
+        let w = fantasy_opt(OPT_WHITE) * day * (mix(1.0, 0.25, smoothstep(0.4, 0.75, scene.sun.y)) + 1.3 * golden());
         t *= vec3(1.0 + 0.08 * w, 1.0, 1.0 - 0.14 * w);
     }
     // Only true darks go cool (most daylit ground is mid-tone and keeps its color).
