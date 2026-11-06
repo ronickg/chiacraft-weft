@@ -141,6 +141,9 @@ Sheets: `sheets3_sp8/<Pack>/<Pack>_vs_ours3_*.jpg`. Today's dev work, as it read
 
 ## The other packs
 
+All seven packs side by side, ours (HDR match set) first, one sheet per scene group: `sheets/cross_all/all_<group>.jpg`
+(mist_damp, weather, hours_vista, hours_forest, night, clouds, sun, mist, shadows, forest_above, lod).
+
 ### Take from each pack, ranked
 
 - **Bliss:**
