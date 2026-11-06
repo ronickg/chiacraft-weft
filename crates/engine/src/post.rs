@@ -333,6 +333,8 @@ pub struct Post {
     pt_pipe: Option<PipelineId>,
     pt_targets: Option<([TextureId; 2], (u32, u32))>,
     up_held: Option<(UpscaleMode, bool, (u32, u32), (u32, u32))>,
+    /// The path tracer's denoiser (`denoise.rs`), which the path tracer runs after its pass.
+    pub denoiser: crate::denoise::Denoiser,
 }
 
 const MAX_PASSES: usize = 40;
@@ -372,6 +374,7 @@ impl Post {
             depth_tex: None,
             upscaled: None,
             upscale: None,
+            denoiser: crate::denoise::Denoiser::new(gpu, assets),
             pt_guides: None,
             pt_pipe: None,
             pt_targets: None,
@@ -506,6 +509,7 @@ impl Post {
 
     pub fn reload(&mut self, gpu: &mut dyn Backend, assets: &Assets) {
         self.reload_taa(gpu, assets);
+        self.denoiser.reload(gpu, assets);
         let snippets = crate::shaders::snippets(assets, &HOOK);
         let low_snippets = crate::shaders::snippets(assets, &HOOK_LOW);
         let made = crate::packs::compose(assets, "post.wgsl", &[(&HOOK, &snippets), (&HOOK_LOW, &low_snippets)])

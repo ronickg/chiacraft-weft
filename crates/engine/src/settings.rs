@@ -333,6 +333,11 @@ impl Settings {
         (number("core:dlss5_intensity") as f32).clamp(0.0, 1.0)
     }
 
+    /// How the path tracer's light is denoised (`core:pt_denoiser`: 0 raw, 1 ours), live.
+    pub fn pt_denoiser(&self) -> u32 {
+        (number("core:pt_denoiser") as u32).min(crate::denoise::SVGF)
+    }
+
     /// Temporal anti-aliasing's least share of each new frame (`core:taa_blend`), live.
     pub fn taa_blend(&self) -> f32 {
         (number("core:taa_blend") as f32).clamp(0.03, 0.5)

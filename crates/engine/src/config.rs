@@ -610,6 +610,9 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // ray queries (Vulkan's; not the Mac or phones): ultra, off unless chosen.
         // 2: their soft edges from more rays a pixel (with TAA; about three times the cost).
         ConfigDef::number("core:rt_shadows", ck::INT, 0.0, 0.0, 2.0, 1.0),
+        // How the path tracer's light is denoised (`denoise::Denoiser`) where Ray Reconstruction
+        // doesn't do it: 0 not at all (raw, for checks), 1 ours (SVGF-like), live.
+        ConfigDef::number("core:pt_denoiser", ck::INT, 1.0, 0.0, 1.0, 1.0),
         // The soft clouds' shadow on the land (with the HDR world; `client::cloud_shadow`).
         ConfigDef::number("core:cloud_shadows", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         // Vanilla's: in GUI pixels, and percent of the dark behind the text.

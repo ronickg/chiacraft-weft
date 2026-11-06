@@ -102,6 +102,8 @@ static GPU_MEMORY: Config<i32> = Config::named("core:gpu_memory_mb");
 /// The GPU can trace rays (`core:gpu_ray_query`): the traced shadows' row is shown.
 static GPU_RAY_QUERY: Config<bool> = Config::named("core:gpu_ray_query");
 static RT_SHADOWS: Config<i32> = Config::named("core:rt_shadows");
+/// The path tracer's denoiser (`core:pt_denoiser`): 0 raw, 1 ours.
+static PT_DENOISER: Config<i32> = Config::named("core:pt_denoiser");
 /// The newer quality settings, each a row on the Extra quality tab (`EXTRA_ROWS`) and all at their
 /// most in the Max preset: the HDR world and temporal anti-aliasing (read at start), the mist as a
 /// volume, the soft clouds' shadow, the bloom's levels, the far shadow map's reach, the screen
@@ -250,6 +252,8 @@ fn max_extras() {
     crate::look::LOOK_LEAF_HOLES.set(1.0);
     // Ultra (soft edges from more rays, with TAA) where the GPU traces rays.
     RT_SHADOWS.set(if GPU_RAY_QUERY.get() && !on_phone() { 2 } else { 0 });
+    // Ours wherever DLSS Ray Reconstruction doesn't denoise the path tracer's light.
+    PT_DENOISER.set(1);
     FX_WIND_LIFE.set(3);
     SOFT_CLOUDS.set(true);
     // DLAA (DLSS at the screen's own size) where the renderer has it, with its newest model (M,
@@ -601,7 +605,7 @@ fn row_ui(ui: &mut Ui, rows: &'static [Row], i: usize, step: fn(usize, i32)) {
 /// The Extra quality tab's rows (`EXTRA_SCREEN`): the newer features, each a setting of its own,
 /// outside Low to Ultra so no preset changes the look by them; Max sets them all (`max_extras`).
 /// Traced sun and moon shadows only where the GPU can trace rays (the last row, `RT_ROW`).
-const EXTRA_ROWS: [Row; 9] = [
+const EXTRA_ROWS: [Row; 10] = [
     Row { key: "hdr", values: &[0.0, 1.0], get: || HDR_WORLD.get() as u8 as f64, set: |v| HDR_WORLD.set(v > 0.0), shown: off_on },
     Row {
         key: "aa",
@@ -661,8 +665,18 @@ const EXTRA_ROWS: [Row; 9] = [
         set: |v| RT_SHADOWS.set(v as i32),
         shown: |v| word(["off", "on", "ultra"][(v as usize).min(2)]),
     },
+    Row {
+        key: "pt_denoiser",
+        // Off shows the path tracer's raw light (checks only).
+        values: &[0.0, 1.0],
+        get: || PT_DENOISER.get() as f64,
+        set: |v| PT_DENOISER.set(v as i32),
+        shown: |v| word(if v > 0.0 { "pt_denoiser_svgf" } else { "pt_denoiser_raw" }),
+    },
 ];
 const RT_ROW: usize = 8;
+/// The path tracer's denoiser, also only where the GPU traces rays.
+const PT_DENOISER_ROW: usize = 9;
 
 /// An extra row a step on: Max becomes Custom (the Low to Ultra presets leave these rows as they are).
 fn step_extra(i: usize, dir: i32) {
@@ -857,7 +871,7 @@ pub fn register(r: &mut Registry) {
         crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.extra.title", &tabs, |ui| {
             for i in 0..EXTRA_ROWS.len() {
                 // Traced shadows only where the GPU traces rays.
-                if i == RT_ROW && !GPU_RAY_QUERY.get() {
+                if (i == RT_ROW || i == PT_DENOISER_ROW) && !GPU_RAY_QUERY.get() {
                     continue;
                 }
                 row_ui(ui, &EXTRA_ROWS, i, step_extra);

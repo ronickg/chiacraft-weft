@@ -1132,6 +1132,40 @@ gpu_struct! {
     }
 }
 
+gpu_struct! {
+    /// One pass of the path tracer's denoiser (`denoise.wgsl`, `denoise::Denoiser`): bindless
+    /// indices of what it reads (their meaning by pass is in the shader's header), + 1 where 0 means
+    /// none.
+    pub struct DenoisePass as "DenoisePass" {
+        pub diffuse: u32,
+        pub specular: u32,
+        pub albedo: u32,
+        pub normal: u32,
+        /// The G-buffer's F0.
+        pub spec: u32,
+        pub depth: u32,
+        /// The motion image + 1.
+        pub motion: u32,
+        pub prev_diffuse: u32,
+        pub prev_specular: u32,
+        pub prev_moments: u32,
+        /// Last frame's guide + 1 (0: no last frame, start anew).
+        pub prev_guide: u32,
+        pub moments: u32,
+        /// The à-trous step's tap spacing, in texels.
+        pub step: u32,
+        /// 1: nothing of last frame is used (a teleport, a new world).
+        pub reset: u32,
+        pub size: [f32; 2],
+        /// The least share of a new frame, and the most frames gathered.
+        pub alpha: f32,
+        pub max_len: f32,
+        /// The à-trous light test (standard deviations) and normal test (power).
+        pub phi_color: f32,
+        pub phi_normal: f32,
+    }
+}
+
 /// Group 1 of each engine shader, in order: a constant per binding (`bind::world::RECORDS`),
 /// the WGSL name and type the prelude declares.
 macro_rules! bindings {
@@ -1260,6 +1294,11 @@ bindings! {
     }
     upscale_guides "upscale_guides.wgsl" {
         PASSES "passes": "array<Pass>",
+        SCENE "scene": "Scene",
+    }
+    // The path tracer's denoiser (`denoise::Denoiser`).
+    denoise "denoise.wgsl" {
+        PASSES "dn": "array<DenoisePass>",
         SCENE "scene": "Scene",
     }
 }
@@ -1399,6 +1438,7 @@ fn structs() -> String {
         Quad::wgsl(),
         Screen::wgsl(),
         Pass::wgsl(),
+        DenoisePass::wgsl(),
     ]
     .concat()
 }
