@@ -587,6 +587,15 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::number("core:gpu_memory_mb", ck::INT, 0.0, 0.0, 1.0e7, 1.0),
         // 1 when the GPU can trace rays (`Backend::ray_query`): `core:rt_shadows` then works.
         ConfigDef::number("core:gpu_ray_query", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // The renderer's upscaler (`Backend::upscaler`), put at start like the GPU's: its name, its
+        // modes and models as bits (`UpscalerInfo`), Ray Reconstruction, DLSS 5, frame generation.
+        ConfigDef::text("core:gpu_dlss", ""),
+        ConfigDef::number("core:gpu_dlss_modes", ck::INT, 0.0, 0.0, 1.0e9, 1.0),
+        ConfigDef::number("core:gpu_dlss_models", ck::INT, 0.0, 0.0, 4.3e9, 1.0),
+        ConfigDef::number("core:gpu_dlss_rr", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        ConfigDef::number("core:gpu_dlss_rr_models", ck::INT, 0.0, 0.0, 4.3e9, 1.0),
+        ConfigDef::number("core:gpu_dlss5", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        ConfigDef::number("core:gpu_frame_gen", ck::INT, 0.0, 0.0, 8.0, 1.0),
         // Blocks clouds float above where their dimension puts them.
         ConfigDef::number("core:cloud_height", ck::INT, 0.0, 0.0, 512.0, 8.0),
         // Sun shadows, for shader packs that draw them: 0 off, 1 the near map only (80 blocks
@@ -599,7 +608,8 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::number("core:shadow_far", ck::INT, 0.0, 0.0, 2400.0, 100.0),
         // Sun and moon shadows traced through the scene instead of the shadow maps, on a GPU with
         // ray queries (Vulkan's; not the Mac or phones): ultra, off unless chosen.
-        ConfigDef::number("core:rt_shadows", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // 2: their soft edges from more rays a pixel (with TAA; about three times the cost).
+        ConfigDef::number("core:rt_shadows", ck::INT, 0.0, 0.0, 2.0, 1.0),
         // The soft clouds' shadow on the land (with the HDR world; `client::cloud_shadow`).
         ConfigDef::number("core:cloud_shadows", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         // Vanilla's: in GUI pixels, and percent of the dark behind the text.
@@ -682,12 +692,40 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // the picture finished in one last pass (chiacraft, the HDR world); read at start.
         ConfigDef::number("core:hdr_world", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         // Anti-aliasing: 0 off, 1 temporal (`post::Post`: the world drawn a fraction of a pixel
-        // aside each frame and gathered over frames by where each pixel was, the motion image).
-        // Read at start, as the world's pipelines then draw the motion image too.
-        ConfigDef::number("core:aa", ck::INT, 0.0, 0.0, 1.0, 1.0),
+        // aside each frame and gathered over frames by where each pixel was, the motion image), 2
+        // temporal from the camera alone (no motion image: cheaper on phones' tiled GPUs; leaves and
+        // mobs left to the clipping). Read at start, as the world's pipelines then draw the motion
+        // image too (1). On by default (Ronald, 11-06: "Yes, on by default"): 1, and 2 on a phone,
+        // whose tiled GPU the motion image cost a third of its world pass.
+        ConfigDef::number("core:aa", ck::INT, if cfg!(target_os = "android") { 2.0 } else { 1.0 }, 0.0, 2.0, 1.0),
         // Temporal anti-aliasing: the least share of each new frame (0.1: about ten gathered;
         // less, smoother and slower to follow), live.
         ConfigDef::number("core:taa_blend", ck::FLOAT, 0.1, 0.03, 0.5, 0.01),
+        // DLSS, the renderer's temporal upscaler, in anti-aliasing's place (`weft_render::UpscaleMode`;
+        // not `core:upscaler`, the spatial filter under a render scale): 0 off, 1 DLAA, 2 Quality,
+        // 3 Balanced, 4 Performance, 5 Ultra Performance. Live; only where the renderer has it (the
+        // `streamline` build on Windows with NVIDIA's files; `core:gpu_dlss*` say what runs), else off.
+        ConfigDef::number("core:dlss", ck::INT, 0.0, 0.0, 5.0, 1.0),
+        // Its model for each mode (the upscaler's own numbers, `UpscalerInfo::models`; DLSS: 0
+        // NVIDIA's pick, 5-6 E-F the CNN models, 10-13 J-M the transformer ones), live. 13 (M, the
+        // newest transformer) by default (Ronald via Planner, 11-06: M clean where E dithered the
+        // leaves); an upscaler without it uses its own default.
+        ConfigDef::number("core:dlss_model_dlaa", ck::INT, 13.0, 0.0, 31.0, 1.0),
+        ConfigDef::number("core:dlss_model_quality", ck::INT, 13.0, 0.0, 31.0, 1.0),
+        ConfigDef::number("core:dlss_model_balanced", ck::INT, 13.0, 0.0, 31.0, 1.0),
+        ConfigDef::number("core:dlss_model_performance", ck::INT, 13.0, 0.0, 31.0, 1.0),
+        ConfigDef::number("core:dlss_model_ultra_performance", ck::INT, 13.0, 0.0, 31.0, 1.0),
+        // Ray Reconstruction (denoising with the upscaling, at the mode's sizes) and its model
+        // (DLSS: 0 default, 4-6 D-F), live.
+        ConfigDef::number("core:dlss_rr", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        ConfigDef::number("core:dlss_rr_model", ck::INT, 0.0, 0.0, 31.0, 1.0),
+        // DLSS 5's neural rendering over the upscaled picture (not public yet: never runs), live.
+        ConfigDef::number("core:dlss5", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // A stand-in upscaler that only scales the picture up, for checking the upscaler's path
+        // where the renderer has none (the Linux PC); read at start.
+        ConfigDef::number("core:upscale_standin", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // DLSS 5's strength (its intensity control), live.
+        ConfigDef::number("core:dlss5_intensity", ck::FLOAT, 0.5, 0.0, 1.0, 0.05),
         // The HDR world's bloom (chiacraft): 0 none, 1 a pyramid of 4 levels, 2 of 6 (wider glow);
         // live. Without the HDR world the pack's own bloom effect glows as before.
         ConfigDef::number("core:bloom", ck::INT, 2.0, 0.0, 2.0, 1.0),

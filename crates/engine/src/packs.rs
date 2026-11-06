@@ -144,7 +144,7 @@ pub fn pack_uses(name: &str, what: &str) -> bool {
     pack_source(name).is_some_and(|s| s.contains(what))
 }
 
-fn pack_source(name: &str) -> Option<String> {
+pub(crate) fn pack_source(name: &str) -> Option<String> {
     let path = SHADER_PACK.read().unwrap().as_ref().map(|d| d.join(name))?;
     std::fs::read_to_string(path)
         .ok()

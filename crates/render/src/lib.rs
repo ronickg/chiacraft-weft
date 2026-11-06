@@ -281,6 +281,174 @@ pub enum Cmd {
         binding: u32,
         accel: AccelId,
     },
+    /// The backend's temporal upscaler ([`Backend::upscaler`]: DLSS through NVIDIA's Streamline
+    /// on Windows) makes `output` from this frame's jittered world. Outside a pass. Inputs are
+    /// read as textures; `output` comes from [`Backend::create_upscale_target`]. The guides
+    /// (Ray Reconstruction's) are `NO_TEXTURE` when not given. Pipelines and bindings are gone
+    /// after it: set them again.
+    Upscale {
+        color: TextureId,
+        depth: TextureId,
+        motion: TextureId,
+        output: TextureId,
+        /// xyz the surface's normal (camera space), w its roughness.
+        normals: TextureId,
+        /// The diffuse albedo, linear.
+        albedo: TextureId,
+        /// The specular albedo, linear.
+        specular: TextureId,
+        /// An [`UpscaleParams`] at this offset in [`CommandList::data`].
+        start: u32,
+    },
+}
+
+/// A texture that is not there (an [`Cmd::Upscale`] guide not given).
+pub const NO_TEXTURE: TextureId = TextureId(u32::MAX);
+
+/// How much of the screen a temporal upscaler draws the world at ([`Cmd::Upscale`]). The numbers
+/// are the `core:dlss` setting's. Ray Reconstruction is a flag beside it
+/// ([`UpscaleParams::reconstruct`]), at the same sizes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum UpscaleMode {
+    Off = 0,
+    /// Anti-aliasing at the screen's size (DLAA).
+    Native = 1,
+    /// From about 2/3 of the screen each way.
+    Quality = 2,
+    /// From about 0.58.
+    Balanced = 3,
+    /// From half.
+    Performance = 4,
+    /// From a third.
+    UltraPerformance = 5,
+}
+
+impl UpscaleMode {
+    pub const ALL: [UpscaleMode; 6] = [
+        UpscaleMode::Off,
+        UpscaleMode::Native,
+        UpscaleMode::Quality,
+        UpscaleMode::Balanced,
+        UpscaleMode::Performance,
+        UpscaleMode::UltraPerformance,
+    ];
+
+    pub fn from_number(n: u32) -> UpscaleMode {
+        Self::ALL
+            .get(n as usize)
+            .copied()
+            .unwrap_or(UpscaleMode::Off)
+    }
+
+    /// The share of the screen each way the world is drawn at, NVIDIA's numbers; a backend that
+    /// knows better says so in [`Backend::upscale_render_size`].
+    pub fn scale(self) -> f32 {
+        match self {
+            UpscaleMode::Quality => 2.0 / 3.0,
+            UpscaleMode::Balanced => 0.58,
+            UpscaleMode::Performance => 0.5,
+            UpscaleMode::UltraPerformance => 1.0 / 3.0,
+            _ => 1.0,
+        }
+    }
+
+    /// For logs, config key suffixes (`core:dlss_model_<name>`) and the Video menu's words.
+    pub fn name(self) -> &'static str {
+        match self {
+            UpscaleMode::Off => "off",
+            UpscaleMode::Native => "dlaa",
+            UpscaleMode::Quality => "quality",
+            UpscaleMode::Balanced => "balanced",
+            UpscaleMode::Performance => "performance",
+            UpscaleMode::UltraPerformance => "ultra_performance",
+        }
+    }
+}
+
+/// One of the upscaler's own models ([`UpscalerInfo::models`]): its number as the upscaler takes
+/// it (0 its default) and a short key for the Video menu's words (`video.base.value.model_<key>`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct UpscaleModel {
+    pub id: u32,
+    pub key: &'static str,
+}
+
+/// What [`Cmd::Upscale`] needs besides the images, in [`CommandList::data`]. Matrices are glam's
+/// (column-major, column vectors), camera-relative (the camera at the origin), without the jitter.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct UpscaleParams {
+    /// [`UpscaleMode`] as its number.
+    pub mode: u32,
+    /// 1: no last frame to gather from (a teleport, a resize, a new world).
+    pub reset: u32,
+    /// 1: the colour is linear HDR (`core:hdr_world`), 0 linear 0..1.
+    pub hdr: u32,
+    /// 1: Ray Reconstruction (with the guides), at `mode`'s sizes.
+    pub reconstruct: u32,
+    /// The world's size (the inputs') and the output's.
+    pub render: [u32; 2],
+    pub output: [u32; 2],
+    /// This frame's jitter in pixels of the world, x right, y down.
+    pub jitter: [f32; 2],
+    /// What turns the motion image's xy into -1..1 (1, 1 for ours, which are in UV).
+    pub mv_scale: [f32; 2],
+    /// DLSS 5's strength, 0..1.
+    pub intensity: f32,
+    /// Vertical field of view (radians), width over height, the near plane (blocks); the far
+    /// plane is infinitely far (reverse Z).
+    pub fov_y: f32,
+    pub aspect: f32,
+    pub near: f32,
+    pub view_to_clip: [f32; 16],
+    pub clip_to_view: [f32; 16],
+    pub clip_to_prev_clip: [f32; 16],
+    pub prev_clip_to_clip: [f32; 16],
+    pub world_to_view: [f32; 16],
+    pub view_to_world: [f32; 16],
+    /// The camera's right, up and forward in the world, w unused.
+    pub right: [f32; 4],
+    pub up: [f32; 4],
+    pub forward: [f32; 4],
+    /// The model for this mode ([`UpscaleModel::id`], 0 the upscaler's default), and Ray
+    /// Reconstruction's.
+    pub model: u32,
+    pub rr_model: u32,
+    /// 1: DLSS 5's neural rendering over the result, at `intensity`.
+    pub neural: u32,
+    /// Generated frames between drawn ones (frame generation, later): 0 none.
+    pub frame_gen: u32,
+}
+
+/// The temporal upscaler a backend has ([`Backend::upscaler`]), and what of it runs here: the
+/// Video menu shows only that.
+#[derive(Clone, Debug, Default)]
+pub struct UpscalerInfo {
+    /// For logs and the debug screen, e.g. "DLSS 310.4 (Streamline 2.14.16)"; empty with none.
+    pub name: String,
+    /// Which [`UpscaleMode`]s it runs, a bit per mode number.
+    pub modes: u32,
+    /// Ray Reconstruction.
+    pub reconstruct: bool,
+    /// DLSS 5's neural rendering.
+    pub neural: bool,
+    /// The most frames it generates between drawn ones (frame generation): 0 none.
+    pub frame_gen: u32,
+    /// Its models for the modes, and Ray Reconstruction's, the default first.
+    pub models: Vec<UpscaleModel>,
+    pub rr_models: Vec<UpscaleModel>,
+}
+
+impl UpscalerInfo {
+    pub fn has(&self, mode: UpscaleMode) -> bool {
+        mode != UpscaleMode::Off && self.modes & (1 << mode as u32) != 0
+    }
+
+    /// The model numbers as bits (`core:gpu_dlss_models`).
+    pub fn model_bits(models: &[UpscaleModel]) -> u32 {
+        models.iter().fold(0, |b, m| b | 1 << m.id.min(31))
+    }
 }
 
 /// Layout of one indexed indirect draw, matches every API we care about.
@@ -391,6 +559,9 @@ pub struct BackendDesc<'a> {
     pub height: u32,
     pub vsync: bool,
     pub debug: bool,
+    /// A stand-in upscaler that only scales the picture up (`Backend::upscaler`), for checking
+    /// everything around one where there is none (`core:upscale_standin`).
+    pub upscale_standin: bool,
 }
 
 pub trait Backend: Send {
@@ -470,6 +641,22 @@ pub trait Backend: Send {
     /// What an earlier `pipeline_cache_data` gave, before any pipeline is made. Data from another
     /// driver or device is ignored.
     fn load_pipeline_cache(&mut self, _data: &[u8]) {}
+    /// The temporal upscaler [`Cmd::Upscale`] runs, if any (none by default: the engine's own
+    /// temporal anti-aliasing then).
+    fn upscaler(&self) -> UpscalerInfo {
+        UpscalerInfo::default()
+    }
+    /// The size to draw the world at for `mode` (with Ray Reconstruction: `reconstruct`) with the
+    /// screen at `output`.
+    fn upscale_render_size(&mut self, mode: UpscaleMode, reconstruct: bool, output: (u32, u32)) -> (u32, u32) {
+        let _ = reconstruct;
+        let s = mode.scale();
+        (((output.0 as f32 * s).round() as u32).max(1), ((output.1 as f32 * s).round() as u32).max(1))
+    }
+    /// An image [`Cmd::Upscale`] can write its result to (Rgba16Float, read as a texture after).
+    fn create_upscale_target(&mut self, width: u32, height: u32, label: &str) -> TextureId {
+        self.create_texture(&TextureDesc { width, height, mips: 1, format: Format::Rgba16Float, render_target: true }, label)
+    }
 
     /// Whether shaders can trace rays (`enable wgpu_ray_query;`) through acceleration structures:
     /// a desktop GPU with Vulkan's ray queries. Without it the calls below must not be made.

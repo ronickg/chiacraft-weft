@@ -12,3 +12,12 @@ gpu-allocator.workspace = true
 naga.workspace = true
 raw-window-handle.workspace = true
 log.workspace = true
+bytemuck.workspace = true
+# NVIDIA's Streamline (DLSS), loaded at run time from a folder: `streamline` feature.
+libloading = { workspace = true, optional = true }
+
+[features]
+# DLSS through NVIDIA's Streamline on Windows (`src/streamline.rs`). Off by default; the game
+# then needs Streamline's DLLs in `streamline/` beside it (or WEFT_STREAMLINE_DIR) to use it,
+# and starts as always without them.
+streamline = ["dep:libloading"]
