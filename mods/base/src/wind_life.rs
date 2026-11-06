@@ -29,7 +29,8 @@ static LEAVES: [Particle; 6] = [
     Particle::named("leaf_4"),
     Particle::named("leaf_5"),
 ];
-static PETALS: [Particle; 4] = [Particle::named("petal_0"), Particle::named("petal_1"), Particle::named("petal_2"), Particle::named("petal_3")];
+static PETALS: [Particle; 4] =
+    [Particle::named("petal_0"), Particle::named("petal_1"), Particle::named("petal_2"), Particle::named("petal_3")];
 static POLLEN: Particle = Particle::named("pollen");
 /// Snow and sand grains: pieces of the block they blow off (block dust).
 static SPINDRIFT: Particle = Particle::named("spindrift");
@@ -150,7 +151,10 @@ fn tell(w: &World) {
 enum Source {
     Nothing,
     /// Leaves: their colour, and whether they are needles or scales (fewer fall).
-    Leaves { colour: u32, needles: bool },
+    Leaves {
+        colour: u32,
+        needles: bool,
+    },
     /// A tree in blossom: its petals' colour.
     Blossom(u32),
     /// A flower in bloom: its petals' colour.
@@ -343,13 +347,21 @@ fn frame(c: &Client) {
                         life.sent[1] += 1;
                     } else {
                         let k = &LEAVES[(life.unit() * 6.0) as usize % 6];
-                        drop(c.spawn_particles(k, f).velocity(v).color(colour).block(state));
+                        drop(
+                            c.spawn_particles(k, f)
+                                .velocity(v)
+                                .color(colour)
+                                .block(state),
+                        );
                         life.sent[0] += 1;
                     }
                 }
                 // Drips off the leaves in rain and a while after.
                 if drips && open_below && wl::draw(wl::DRIP_RATE * per_look * density, life.unit()) > 0 {
-                    drop(c.spawn_particles(&DRIP, at(0.5, -0.05, 0.5)).spread_box([0.4, 0.0, 0.4]));
+                    drop(
+                        c.spawn_particles(&DRIP, at(0.5, -0.05, 0.5))
+                            .spread_box([0.4, 0.0, 0.4]),
+                    );
                     life.sent[5] += 1;
                 }
             }
@@ -359,11 +371,20 @@ fn frame(c: &Client) {
                 for _ in 0..wl::draw(petals * per_look, life.unit()) {
                     let k = &PETALS[(life.unit() * 4.0) as usize % 4];
                     let v = [wind[0] as f64 * 0.2, 0.25, wind[1] as f64 * 0.2];
-                    drop(c.spawn_particles(k, at(0.5, 0.6, 0.5)).spread(0.2).velocity(v).color(colour));
+                    drop(
+                        c.spawn_particles(k, at(0.5, 0.6, 0.5))
+                            .spread(0.2)
+                            .velocity(v)
+                            .color(colour),
+                    );
                     life.sent[1] += 1;
                 }
                 if pollen_time && wl::draw(wl::POLLEN_RATE * density * per_look, life.unit()) > 0 {
-                    drop(c.spawn_particles(&POLLEN, at(0.5, 0.7, 0.5)).spread(0.3).velocity([0.0, 0.15, 0.0]));
+                    drop(
+                        c.spawn_particles(&POLLEN, at(0.5, 0.7, 0.5))
+                            .spread(0.3)
+                            .velocity([0.0, 0.15, 0.0]),
+                    );
                     life.sent[2] += 1;
                 }
             }
@@ -389,7 +410,14 @@ fn frame(c: &Client) {
                     let (kind, slot) = if snow { (&SPINDRIFT, 3) } else { (&SAND_GRAIN, 4) };
                     let height = if snow { snow_top(state) } else { 1.0 };
                     let v = [wind[0] as f64 * 0.6, 0.8 + life.unit() as f64, wind[1] as f64 * 0.6];
-                    drop(c.spawn_particles(kind, at(0.5, height + 0.05, 0.5)).spread_box([0.5, 0.05, 0.5]).velocity(v).speed(0.4).count(n).block(state));
+                    drop(
+                        c.spawn_particles(kind, at(0.5, height + 0.05, 0.5))
+                            .spread_box([0.5, 0.05, 0.5])
+                            .velocity(v)
+                            .speed(0.4)
+                            .count(n)
+                            .block(state),
+                    );
                     life.sent[slot] += n;
                 }
             }
@@ -405,18 +433,34 @@ fn frame(c: &Client) {
         if n > 0 {
             // Centred a little upwind, so the wind carries them through.
             let at = [me[0] - dir[0] as f64 * clear * 0.4, me[1] + 1.5, me[2] - dir[1] as f64 * clear * 0.4];
-            drop(c.spawn_particles(&SAND_GRAIN, at).spread_box([clear, 2.5, clear]).velocity(v).speed(1.0).count(n).block(sand));
+            drop(
+                c.spawn_particles(&SAND_GRAIN, at)
+                    .spread_box([clear, 2.5, clear])
+                    .velocity(v)
+                    .speed(1.0)
+                    .count(n)
+                    .block(sand),
+            );
             life.sent[4] += n;
         }
         for _ in 0..wl::draw(wl::DUST_STREAKS * dust * density * dt, life.unit()) {
-            let (a, r) = (life.unit() as f64 * std::f64::consts::TAU, wl::STREAK_REACH.0 + (wl::STREAK_REACH.1 - wl::STREAK_REACH.0) * life.unit());
+            let (a, r) =
+                (life.unit() as f64 * std::f64::consts::TAU, wl::STREAK_REACH.0 + (wl::STREAK_REACH.1 - wl::STREAK_REACH.0) * life.unit());
             let at = [me[0] + a.cos() * r as f64, me[1] + 0.5 + life.unit() as f64 * 4.0, me[2] + a.sin() * r as f64];
-            drop(c.spawn_particles(&SAND_STREAK, at).velocity(v).speed(1.5).block(sand));
+            drop(
+                c.spawn_particles(&SAND_STREAK, at)
+                    .velocity(v)
+                    .speed(1.5)
+                    .block(sand),
+            );
             life.sent[4] += 1;
         }
     }
     stir(c, life, &st, density);
-    if life.logged.is_none_or(|l| now.duration_since(l).as_secs_f32() >= 5.0) {
+    if life
+        .logged
+        .is_none_or(|l| now.duration_since(l).as_secs_f32() >= 5.0)
+    {
         weft_sdk::debug!(
             "wind life: wind {speed:.1} m/s, rain {:.2}, fall {fall:.2}, dust {dust:.2}, density {density}: sent leaves {}, petals {}, pollen {}, snow {}, sand {}, drips {} in 5 s; {} alive",
             st.rain,
@@ -466,7 +510,13 @@ fn stir(c: &Client, life: &mut Life, st: &abi::ClientState, density: f32) {
     let v = [vel[0] * 0.5, 0.8 + life.unit() as f64 * 0.6, vel[1] * 0.5];
     for _ in 0..n {
         let k = &PETALS[(life.unit() * 4.0) as usize % 4];
-        drop(c.spawn_particles(k, [st.pos.x, st.pos.y + 0.3, st.pos.z]).spread(0.3).velocity(v).speed(0.6).color(colour));
+        drop(
+            c.spawn_particles(k, [st.pos.x, st.pos.y + 0.3, st.pos.z])
+                .spread(0.3)
+                .velocity(v)
+                .speed(0.6)
+                .color(colour),
+        );
     }
     life.sent[1] += n;
 }
