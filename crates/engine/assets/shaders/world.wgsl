@@ -406,11 +406,27 @@ fn fs_translucent(in: VOut) -> @location(0) vec4<f32> {
     // where vanilla's are (47, 72, 122) with the bed and its seagrass showing. Written whole, so a
     // second water face behind it (a fall before a lake) is lost under it; glass blends as before.
     if (in.backed & 2u) != 0u && scene.behind.z > 0.5 {
-        let under = textureLoad(textures[u32(scene.behind.x)], vec2<i32>(in.clip.xy), 0).rgb;
+        let px = vec2<i32>(in.clip.xy);
+        // Nothing drawn under it (the sky's depth): over the dark sea floor far water lies on, as
+        // Distant Horizons' own floor shows under vanilla's water there. At the cubes' edge their
+        // water was drawn but no bed under it, and the far tile was left out: a pale ring of near
+        // water over the sky's colour across every lake (stage 1, the bay at 400-530 blocks).
+        if textureLoad(textures[u32(scene.behind.y)], px, 0).r <= 0.0 {
+            return vec4(far_water(in, albedo), 1.0);
+        }
+        let under = textureLoad(textures[u32(scene.behind.x)], px, 0).rgb;
         let mixed = mix(to_gamma(under), to_gamma(lit.rgb), lit.a);
         return vec4(pow(mixed, vec3(2.2)), 1.0);
     }
     return lit;
+}
+
+// Water at `albedo`'s alpha over a dark sea floor, mixed in gamma, then fogged (`fs_lod`'s far water).
+fn far_water(in: VOut, albedo: vec4<f32>) -> vec3<f32> {
+    let lit = shade_unfogged(in, vec4(albedo.rgb, 1.0)).rgb;
+    let bed = FAR_BED * to_gamma(shade_unfogged(in, vec4(1.0)).rgb / max(in.tint, vec3(0.01)));
+    let water = pow(mix(bed, to_gamma(lit), albedo.a), vec3(2.2));
+    return fogged(water, plain_fog(in.dist));
 }
 
 // Distant terrain (`client::lod`): a record is the `dir` face of a box in its tile, drawn with its
@@ -512,10 +528,7 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
     // bed under their water, so it is that dark bed, lit as the water is. Drawn whole and lighter,
     // it was (44, 88, 169) against vanilla + DH's (43, 71, 126) (stage 1, the vista at noon).
     if (in.backed & 2u) != 0u {
-        let lit = shade_unfogged(in, vec4(albedo.rgb, 1.0)).rgb;
-        let bed = FAR_BED * to_gamma(shade_unfogged(in, vec4(1.0)).rgb / max(in.tint, vec3(0.01)));
-        let water = pow(mix(bed, to_gamma(lit), albedo.a), vec3(2.2));
-        return vec4(fogged(water, plain_fog(in.dist)), 1.0);
+        return vec4(far_water(in, albedo), 1.0);
     }
     // A cutout's clear texels (leaves' gaps) show its colour, not the unset texel's: white under a
     // tint, as the tint then colours it.
