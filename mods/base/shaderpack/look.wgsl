@@ -1595,7 +1595,10 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     if scene.frame.x > 0.5 {
         // Warmer still at golden hour (Bliss's dawn land: warmth +106 against our +47).
         // Mostly at a low sun: at noon a quarter (the sky and the far haze stay blue, as Bliss's).
-        let w = fantasy_opt(OPT_WHITE) * day * (mix(1.0, 0.25, smoothstep(0.4, 0.75, scene.sun.y)) + 1.3 * golden());
+        // At golden hour 0.6 more, not 1.3: the ground itself went orange-gold (sand and desert
+        // most), where Bliss's low sun tints through the haze and the mist (the MC comparison's
+        // spring 8 sheets, 11-05).
+        let w = fantasy_opt(OPT_WHITE) * day * (mix(1.0, 0.25, smoothstep(0.4, 0.75, scene.sun.y)) + 0.6 * golden());
         t *= vec3(1.0 + 0.08 * w, 1.0, 1.0 - 0.14 * w);
     }
     // Only true darks go cool (most daylit ground is mid-tone and keeps its color).
