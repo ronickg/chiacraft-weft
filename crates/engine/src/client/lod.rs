@@ -203,9 +203,16 @@ fn take_columns(job: &LodJob, words: &mut [u32]) {
         } else if let Some((y, top, under, biome)) = job.far.as_ref().and_then(|f| f.cell(col.x, col.y)) {
             // chiacraft, test only: the imported world's ground, its biome, and no crown (its
             // leaves are the top where trees stand).
+            // Its water's depth too (0 where its top isn't water), for the floor under far water.
+            let depth = job
+                .far
+                .as_ref()
+                .and_then(|f| f.depth(col.x, col.y))
+                .unwrap_or(0)
+                .min(31);
             let w = k * WORDS;
             words[w] = (y as u32 & 0xFFFF) | (top << 16);
-            words[w + 1] = (biome & 0xFFFF) | (under << 16);
+            words[w + 1] = (biome & BIOME_BITS) | (depth << 11) | (under << 16);
             words[w + 2] = 0;
             words[w + 3] = 0;
         }
@@ -227,7 +234,17 @@ fn face_block(f: crate::server::terrain::Faces, seed: u64, dim: u32, pos: [i32; 
 fn ground(words: &[u32], i: i32, j: i32) -> (i32, u32, u32, u32) {
     let k = ((j + 1) * SIDE + i + 1) as usize * WORDS;
     let (a, b) = (words[k], words[k + 1]);
-    ((a & 0xFFFF) as u16 as i16 as i32, a >> 16, b & 0xFFFF, b >> 16)
+    ((a & 0xFFFF) as u16 as i16 as i32, a >> 16, b & BIOME_BITS, b >> 16)
+}
+
+/// The biome's bits in a sample's second word; above them (chiacraft) how deep its water stands
+/// over the floor, 1 to 31 blocks (0 none or not known), as the terrain compute leaves it.
+const BIOME_BITS: u32 = 0x7FF;
+
+/// Sample (i, j)'s water depth (`BIOME_BITS`), 0 none or not known.
+fn water_depth(words: &[u32], i: i32, j: i32) -> u32 {
+    let k = ((j + 1) * SIDE + i + 1) as usize * WORDS;
+    (words[k + 1] >> 11) & 31
 }
 
 /// Trees' crowns over a sample, from its top block down to `bottom`, and the trunk standing in
@@ -564,15 +581,19 @@ pub fn mesh(
             // Tops keep none: shaded, their runs split on every slope and the far tiles' faces (and
             // the shadow pass's) grew, about 5% of the GPU's frame (lb_aft against lb_dev); the
             // walls carry the shade at the steps, where it shows.
-            let ao = 0xFF;
-            let ao_at = |_: i32| 0xFF;
+            // Water's tops carry its depth there instead (chiacraft, `water_depth`; the shaders
+            // light the floor under it by it, as Distant Horizons' floors lose a light level a block):
+            // a run ends where the depth changes.
+            let depth_at = |i: i32| if wet(top) { water_depth(words, i, j) } else { 0 };
+            let depth = depth_at(i);
+            let ao = if depth > 0 { !depth & 0xFF } else { 0xFF };
             while end < CELLS
                 && at(end, j).0 == y
                 && top_at(end, j) == top
                 && at(end, j).2 == biome
                 && covered(end, j) == hidden
                 && occ_at(end, j) == occ
-                && ao_at(end) == ao
+                && depth_at(end) == depth
             {
                 end += 1;
             }

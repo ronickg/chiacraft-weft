@@ -388,6 +388,10 @@ const WATER_TINT: u32 = 3u;
 // The far sea floor's shade in gamma under the light that falls on the water (`fs_lod`): a bed some
 // ten blocks down, sky light 5 of 15 (vanilla's curve 0.11) on sand, gravel and dirt.
 const FAR_BED: f32 = 0.15;
+// The far sea floor's own colour in gamma where its depth is known (`fs_lod`, `backed` >> 8): sand,
+// gravel and dirt between, lit by the sky light the water above leaves it, a level a block, as
+// vanilla's and Distant Horizons' floors (the shallows by a shore light, a deep lake near black).
+const FAR_BED_ALBEDO: vec3<f32> = vec3(0.66, 0.6, 0.47);
 
 fn to_gamma(c: vec3<f32>) -> vec3<f32> {
     return pow(max(c, vec3(0.0)), vec3(1.0 / 2.2));
@@ -425,7 +429,12 @@ fn fs_translucent(in: VOut) -> @location(0) vec4<f32> {
 fn far_water(in: VOut, albedo: vec4<f32>) -> vec3<f32> {
     let lit = shade_unfogged(in, vec4(albedo.rgb, 1.0)).rgb;
     // The light alone: the tint taken out in linear light, as `shade_unfogged` put it in.
-    let bed = FAR_BED * to_gamma(shade_unfogged(in, vec4(1.0)).rgb / max(pow(in.tint, vec3(2.2)), vec3(1e-4)));
+    var bed = FAR_BED * to_gamma(shade_unfogged(in, vec4(1.0)).rgb / max(pow(in.tint, vec3(2.2)), vec3(1e-4)));
+    let depth = in.backed >> 8u;
+    if depth > 0u {
+        let left = vec4(max(15.0 - f32(depth), 0.0) / 15.0, 0.0, 0.0, 0.0);
+        bed = FAR_BED_ALBEDO * lightmap(left, scene.params.z, scene.light.x, scene.light.y);
+    }
     let water = pow(mix(bed, to_gamma(lit), albedo.a), vec3(2.2));
     return fogged(water, plain_fog(in.dist));
 }
@@ -459,7 +468,10 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     // The corner shade (a smooth cell has none); the quad split along its lighter diagonal, as the
     // cubes' faces.
     var a = vec4<u32>(3u);
-    if lod_dir(w0) != LOD_FACE_GRID {
+    // A water top's bits hold its depth (`lod_water_depth`), not a corner shade.
+    let grid = lod_dir(w0) == LOD_FACE_GRID;
+    let water = lod_tint(w0) == WATER_TINT;
+    if !grid && !water {
         a = lod_ao(records[f * 4u + 3u]);
     }
     var c = vi % 4u;
@@ -488,6 +500,9 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     out.light = vec4(1.0, 0.0, 0.0, 0.0);
     let kind = lod_tint(w0);
     out.backed = select(0u, 2u, kind == WATER_TINT);
+    if water && !grid {
+        out.backed |= lod_water_depth(records[f * 4u + 3u]) << 8u;
+    }
     var tint = vec3(1.0);
     if kind != 0u {
         tint = unpack_rgb(biomes[corner.biome * g.extra.z + kind - 1u]);
