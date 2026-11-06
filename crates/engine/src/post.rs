@@ -166,6 +166,16 @@ fn halton(mut i: u32, base: u32) -> f32 {
     r
 }
 
+/// A frame drawn for the backend's temporal upscaler (`Backend::upscaler`, DLSS on Windows):
+/// what the app hands `Post::set_upscale`. `params` carries the camera (the rest `apply` fills).
+#[derive(Clone, Copy, Debug)]
+pub struct UpscaleFrame {
+    pub mode: UpscaleMode,
+    /// The output's size: the screen's.
+    pub output: (u32, u32),
+    pub params: UpscaleParams,
+}
+
 /// What a temporal upscaler (DLSS/DLAA on the PC, Arm ASR on Android) needs of this frame, as the
 /// engine's own temporal anti-aliasing takes it (`Post::temporal_inputs`), all at the world's size:
 /// - `color`: the world as drawn, jittered, linear light (`world_format`), before any screen effect;
@@ -178,16 +188,6 @@ fn halton(mut i: u32, base: u32) -> f32 {
 /// - `reset`: no last frame to gather from (a teleport, a resize, a new world);
 /// - `view_proj` and `prev_view_proj` (`Scene::taa_prev`) without the jitter.
 /// Its result goes back through `Post::set_upscaled` (instead of the engine's own resolve).
-/// A frame drawn for the backend's temporal upscaler (`Backend::upscaler`, DLSS on Windows):
-/// what the app hands `Post::set_upscale`. `params` carries the camera (the rest `apply` fills).
-#[derive(Clone, Copy, Debug)]
-pub struct UpscaleFrame {
-    pub mode: UpscaleMode,
-    /// The output's size: the screen's.
-    pub output: (u32, u32),
-    pub params: UpscaleParams,
-}
-
 #[derive(Clone, Copy, Debug)]
 pub struct TemporalInputs {
     pub color: TextureId,

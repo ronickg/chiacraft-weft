@@ -242,6 +242,9 @@ pub(crate) const CLIENT_COMMANDS: &[(&str, &str, fn(&mut Running, &crate::comman
     }),
 ];
 
+/// The sizes last asked of the upscaler: mode, screen, world.
+type UpscaleSize = (weft_render::UpscaleMode, (u32, u32), (u32, u32));
+
 pub(crate) struct Running {
     gpu: Box<dyn Backend>,
     /// The backend's temporal upscaler (DLSS through Streamline on Windows), as it said at start;
@@ -249,7 +252,7 @@ pub(crate) struct Running {
     /// (mode, screen, world).
     upscaler: weft_render::UpscalerInfo,
     upscale_now: Option<weft_render::UpscaleMode>,
-    upscale_size: Option<(weft_render::UpscaleMode, (u32, u32), (u32, u32))>,
+    upscale_size: Option<UpscaleSize>,
     window: Arc<Window>,
     depth: (TextureId, u32, u32),
     list: CommandList,
