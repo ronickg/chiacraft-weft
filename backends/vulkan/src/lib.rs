@@ -1049,7 +1049,7 @@ impl VulkanBackend {
             self.dirty_swapchain = false;
             if let Some(q) = quarter {
                 if self.turn_pipe.is_none() {
-                    let made = Shader::from_wgsl("turn", &format!("{PRELUDE}\n{TURN_WGSL}"))
+                    let made = Shader::from_wgsl("turn", TURN_WGSL)
                         .map_err(|e| Error(e.0))
                         .and_then(|shader| {
                             self.create_pipeline(&PipelineDesc {
