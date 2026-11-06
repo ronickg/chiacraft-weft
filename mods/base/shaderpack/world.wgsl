@@ -12,7 +12,9 @@ const TINT_FOLIAGE: u32 = 2u;
 const TINT_WATER: u32 = 3u;
 
 struct VOut {
-    @builtin(position) clip: vec4<f32>,
+    // Invariant: cutout blocks' shading (`fs_cutout_shade`) draws where the depth equals what their
+    // depth pass laid with the same vertex shader, which needs bit-identical positions.
+    @builtin(position) @invariant clip: vec4<f32>,
     @location(0) uv: vec2<f32>,
     // Textures (bindless indices) of this frame and the next.
     @location(1) @interpolate(flat) layer: u32,
@@ -847,6 +849,42 @@ fn fs_cutout(in: VOut) -> @location(0) vec4<f32> {
     if albedo.a <= 0.1 {
         discard;
     }
+    if in.kind.z == 0u {
+        albedo = far_flat(in, albedo);
+    }
+    return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
+}
+
+// Cutout blocks in two passes (the engine's `cutout_split`, on tiled GPUs): `fs_cutout`'s depth,
+// its discards alone and no colour, then `fs_cutout_shade` where the depth is theirs, with no
+// discard, so the GPU keeps hidden-surface removal for the shading (the same picture).
+fn cutout_thinned(in: VOut) -> bool {
+    if (far_look() & 1u) != 0u && in.kind.z != 0u {
+        let f = smoothstep(40.0, 96.0, in.dist);
+        let p = floor(in.clip.xy);
+        return fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y)) < f;
+    }
+    return false;
+}
+
+fn cutout_albedo(in: VOut) -> vec4<f32> {
+    let du = dpdx(in.uv);
+    let dv = dpdy(in.uv);
+    let nuv = nearest_uv(in.size, in.uv, du, dv);
+    return with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
+}
+
+@fragment
+fn fs_cutout_depth(in: VOut) {
+    let a = cutout_albedo(in).a;
+    if cutout_thinned(in) || a <= 0.1 {
+        discard;
+    }
+}
+
+@fragment
+fn fs_cutout_shade(in: VOut) -> @location(0) vec4<f32> {
+    var albedo = cutout_albedo(in);
     if in.kind.z == 0u {
         albedo = far_flat(in, albedo);
     }
