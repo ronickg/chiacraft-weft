@@ -1708,12 +1708,15 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     // The HDR world's white balance by day (`base:look_white`): warmer, less blue (our land read
     // much bluer than Bliss's at every hour, red less blue -37 against -10 at noon: the gap sheet).
     if scene.frame.x > 0.5 {
-        // Warmer still at golden hour (Bliss's dawn land: warmth +106 against our +47).
-        // Mostly at a low sun: at noon a quarter (the sky and the far haze stay blue, as Bliss's).
-        // At golden hour 0.6 more, not 1.3: the ground itself went orange-gold (sand and desert
-        // most), where Bliss's low sun tints through the haze and the mist (the MC comparison's
-        // spring 8 sheets, 11-05).
-        let w = fantasy_opt(OPT_WHITE) * day * (mix(1.0, 0.25, smoothstep(0.4, 0.75, scene.sun.y)) + 0.6 * golden());
+        // Mostly with the sun part way up: at noon a quarter (the sky and the far haze stay blue,
+        // as Bliss's).
+        // At golden hour none of the extra, and less of the rest: it was a cast over the whole
+        // view, land and sky alike, on top of the palette's own gold, and at the like-for-like
+        // mc_forest vista the HDR picture's 18:00 came out warmth +63 on the land and +99 on the
+        // sky where today's picture from the same palette had +17 and +33, Bliss's +14 and -21
+        // (Shader's evening sheet, 11-06). A low sun's gold is the palette's, the haze's and the
+        // mist's to give.
+        let w = fantasy_opt(OPT_WHITE) * day * mix(1.0, 0.25, smoothstep(0.4, 0.75, scene.sun.y)) * (1.0 - 0.7 * golden());
         t *= vec3(1.0 + 0.08 * w, 1.0, 1.0 - 0.14 * w);
     }
     // Only true darks go cool (most daylit ground is mid-tone and keeps its color).
