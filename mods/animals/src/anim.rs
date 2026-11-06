@@ -390,10 +390,14 @@ fn idle_life(w: &World, id: u64, h: [u64; 4]) {
 fn idle_act(w: &World, id: u64) -> Act {
     use animals_core::biology::Social;
     use animals_core::roles;
-    let s = w.component(id, &crate::animal::ANIMAL).and_then(|a| a.species());
+    let s = w
+        .component(id, &crate::animal::ANIMAL)
+        .and_then(|a| a.species());
     let group = s.is_some_and(|s| s.bio.social != Social::Solitary);
     let roll = w.random_below(100);
-    let young = w.component(id, &crate::breeding::BREEDING).is_some_and(|b| b.growing > 0);
+    let young = w
+        .component(id, &crate::breeding::BREEDING)
+        .is_some_and(|b| b.growing > 0);
     if young {
         if roll < if group { roles::PLAY_GROUP } else { roles::PLAY_ALONE } {
             return Act::Play;
@@ -404,7 +408,9 @@ fn idle_act(w: &World, id: u64) -> Act {
             .entities_near(st.pos, roles::NUZZLE_NEAR, Some(s.kind))
             .into_iter()
             .find(|&o| {
-                o != id && w.component(o, &crate::breeding::BREEDING).is_some_and(|b| b.mother == id && b.growing > 0)
+                o != id
+                    && w.component(o, &crate::breeding::BREEDING)
+                        .is_some_and(|b| b.mother == id && b.growing > 0)
             })
             .and_then(|o| w.entity(o))
     {
