@@ -559,7 +559,11 @@ impl App {
         let depth = make_depth(&mut *gpu, size.width, size.height);
         let gpu_name = gpu.device_name().to_string();
         // What the GPU is, for mods (`core:gpu_*`): as found, whatever a file says.
-        for (name, v) in [("core:gpu_class", gpu.device_class() as f64), ("core:gpu_memory_mb", gpu.device_memory_mb() as f64)] {
+        for (name, v) in [
+            ("core:gpu_class", gpu.device_class() as f64),
+            ("core:gpu_memory_mb", gpu.device_memory_mb() as f64),
+            ("core:gpu_ray_query", gpu.ray_query() as u8 as f64),
+        ] {
             if let Some(id) = crate::config::by_name(name) {
                 crate::config::put(id, v);
             }

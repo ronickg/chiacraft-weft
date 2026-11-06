@@ -582,6 +582,8 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::text("core:gpu_name", ""),
         ConfigDef::number("core:gpu_class", ck::INT, 0.0, 0.0, 3.0, 1.0),
         ConfigDef::number("core:gpu_memory_mb", ck::INT, 0.0, 0.0, 1.0e7, 1.0),
+        // 1 when the GPU can trace rays (`Backend::ray_query`): `core:rt_shadows` then works.
+        ConfigDef::number("core:gpu_ray_query", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         // Blocks clouds float above where their dimension puts them.
         ConfigDef::number("core:cloud_height", ck::INT, 0.0, 0.0, 512.0, 8.0),
         // Sun shadows, for shader packs that draw them: 0 off, 1 the near map only (80 blocks
