@@ -452,6 +452,7 @@ pub fn register(r: &mut Registry) {
 
     // The overworld's shape, its snow and its bare rock (`land.rs`), before the plants below.
     crate::land::terrain(r);
+    crate::land::mc_forest_terrain(r);
 
     // Trees wherever a biome asks for them, in any dimension.
     // Trees wherever a biome asks for them, in any dimension: a site per 5 x 5 cell, left open in

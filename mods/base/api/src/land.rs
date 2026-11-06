@@ -80,6 +80,7 @@ pub mod salt {
     pub const CANYON_AREA: u64 = 0xCA2;
     pub const CANYON_WARP: u64 = 0xCA3;
     pub const OLD_GROWTH: u64 = 0x01D6;
+    pub const MC_MIX: u64 = 0x3C3F;
 }
 
 /// One factor of where a feature applies: 0 at `from`, 1 at `to` (Q12 after `q12`).
@@ -1866,9 +1867,87 @@ pub fn biome_shares(seed: u64, radius: i32, step: usize) -> Vec<(&'static str, f
         .collect()
 }
 
+/// The Minecraft forest test world (`base:mc_forest`, Ronald, 11-05: "lets also make our biome kinda
+/// match the one from mc/bliss too to help with testing"): the overworld's land from the same seed
+/// (continents, hills, mountains, rivers, lakes: every feature here) under Minecraft's temperate
+/// forest mix instead of the climate's biomes, so a shot there is like for like with the Minecraft
+/// scene of the Bliss and Distant Horizons comparisons. Off the overworld: nothing in a normal world
+/// changes. The coasts, the mountains and their snow keep the overworld's rules; the rest of the land
+/// is shared out by a patch noise (`MC_MIX_FIELD`, patches some `MC_MIX_SIZE` blocks across) in the
+/// shares of `MC_MIX` (old growth standing for Minecraft's dark forest, then forest, birch forest
+/// and plains; the forests' cherry groves come with them, `vitals::wild::CHERRY_GROVES`).
+pub const MC_MIX_FIELD: &str = "base:mc_mix";
+pub const MC_MIX_SIZE: f64 = 700.0;
+pub const MC_MIX: [(&str, f64); 4] = [("old_growth_forest", 0.45), ("forest", 0.3), ("birch_forest", 0.1), ("plains", 0.15)];
+
+/// The mix field: the patch noise itself, about -1 to 1.
+pub fn mc_mix_field() -> Expr {
+    Expr::fbm(salt::MC_MIX, MC_MIX_SIZE, 3)
+}
+
+/// The mix noise's value where each of `MC_MIX` ends (its last runs to the top): the noise's own
+/// quantiles, measured on a grid (its spread is the same for every seed), so each biome takes its
+/// share of the land and not a guess at the noise's deviation.
+pub fn mc_mix_cuts() -> &'static [f64; MC_MIX.len()] {
+    static CUTS: std::sync::OnceLock<[f64; MC_MIX.len()]> = std::sync::OnceLock::new();
+    CUTS.get_or_init(|| {
+        let f = fields(1);
+        let mut v: Vec<i32> = (0..160 * 160)
+            .map(|i| f.fbm(salt::MC_MIX, (i % 160) * 97 * 16, (i / 160) * 97 * 16, q4(MC_MIX_SIZE), 3))
+            .collect();
+        v.sort_unstable();
+        let mut cuts = [f64::INFINITY; MC_MIX.len()];
+        let mut sum = 0.0;
+        for (i, &(_, share)) in MC_MIX.iter().enumerate().take(MC_MIX.len() - 1) {
+            sum += share;
+            cuts[i] = v[((v.len() as f64 * sum) as usize).min(v.len() - 1)] as f64 / ONE as f64;
+        }
+        cuts
+    })
+}
+
+/// The test world's biome at (`x`, `z`) (Q4), as its rules pick it (the overworld's coasts and
+/// mountains first, then the mix): for its checks and finding spots.
+pub fn mc_forest_biome(f: &Fields, x: i32, z: i32) -> &'static str {
+    let h = height(f, x, z) >> 4;
+    let here = Here::new(f, x, z);
+    let (t, c) = (here.temperature(), here.continent());
+    if let Some(top) = reefs::part(&here, h) {
+        if top { "coral_reef" } else { "lagoon" }
+    } else if h <= SEA - 2 && c < q12(OCEAN_CONTINENT) {
+        "ocean"
+    } else if h <= SEA + 1 && c < q12(BEACH_CONTINENT) {
+        if t < q12(SNOWY_BELOW) { "snowy_plains" } else { "beach" }
+    } else if MOUNTAINS_AREA.at(&here) >= q12(MOUNTAIN_BIOME) || snowy(f, x, z, h) {
+        "mountains"
+    } else {
+        let v = f.fbm(salt::MC_MIX, x, z, q4(MC_MIX_SIZE), 3) as f64 / ONE as f64;
+        MC_MIX[mc_mix_cuts().iter().position(|&c| v < c).unwrap_or(MC_MIX.len() - 1)].0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_mc_forest_mix_takes_its_shares() {
+        let f = fields(3);
+        let mut n = [0usize; MC_MIX.len()];
+        let mut all = 0;
+        for z in (-120..120).step_by(3) {
+            for x in (-120..120).step_by(3) {
+                let v = f.fbm(salt::MC_MIX, x * 61 * 16, z * 61 * 16, q4(MC_MIX_SIZE), 3) as f64 / ONE as f64;
+                let i = mc_mix_cuts().iter().position(|&c| v < c).unwrap_or(MC_MIX.len() - 1);
+                n[i] += 1;
+                all += 1;
+            }
+        }
+        for (i, &(b, share)) in MC_MIX.iter().enumerate() {
+            let got = n[i] as f64 / all as f64;
+            assert!((got - share).abs() < 0.05, "{b}: {got:.3} of the land, {share} wanted");
+        }
+    }
 
     #[test]
     fn rivers_only_cut_and_reach_under_the_sea() {
