@@ -44,8 +44,10 @@ fn scene_at(p: PostPixel, uv: vec2<f32>) -> vec4<f32> {
 // The world's depth at `uv` (reverse Z: 0 where nothing was drawn, the sky). Read texel by texel,
 // as not every GPU filters depth.
 fn post_depth(p: PostPixel, uv: vec2<f32>) -> f32 {
-    let size = vec2<i32>(p.size);
-    let at = clamp(vec2<i32>(uv * p.size), vec2(0), size - vec2(1));
+    // By the depth's own size: under an upscaler the effects run at the screen's, the depth at
+    // the world's (`Post::set_upscale`).
+    let size = vec2<i32>(textureDimensions(textures[p.depth]));
+    let at = clamp(vec2<i32>(uv * vec2<f32>(size)), vec2(0), size - vec2(1));
     return textureLoad(textures[p.depth], at, 0).r;
 }
 
@@ -78,7 +80,7 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
 @fragment
 fn fs(in: VOut) -> @location(0) vec4<f32> {
     let first = passes[in.pass_index];
-    var color = textureSampleLevel(textures[first.scene], linear_clamp, in.uv, 0.0);
+    var color = world_upscaled(first.scene, in.uv, in.clip.xy, scene.upscale.x);
     let count = max(first.pad, 1u);
     for (var k = 0u; k < count; k++) {
         let pass_ = passes[in.pass_index + k];

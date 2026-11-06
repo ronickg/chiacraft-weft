@@ -13,6 +13,7 @@ mod crafts;
 mod crops;
 mod death;
 mod discovery;
+mod dlss;
 mod events;
 mod fall;
 mod farming;
@@ -48,12 +49,14 @@ mod recipes;
 mod redstone;
 mod seasons;
 mod shaderpack;
+mod showcase;
 mod skills;
 mod snow;
 mod sounds;
 mod stars;
 mod survival;
 mod video;
+mod video_costs;
 mod waystones;
 mod weather;
 mod weather_sound;
@@ -127,6 +130,7 @@ fn init(r: &mut Registry) {
     cooking::register(r);
     crafts::register(r);
     recipes::register(r);
+    showcase::register(r);
     book::register(r);
     discovery::register(r);
     metals::register(r);
@@ -168,6 +172,8 @@ fn init(r: &mut Registry) {
     shaderpack::register_for_scripts(r);
     shaderpack::register_shafts(r);
     video::register(r);
+    video_costs::register(r, video::measured_rows);
+    dlss::register(r);
     // Its terrain is described in `worldgen`.
     // A year of four 14-day seasons (notes/SURVIVAL.md): sixteen hours of daylight at midsummer,
     // eight at midwinter.

@@ -9,6 +9,11 @@ use gpu_allocator::MemoryLocation;
 use gpu_allocator::vulkan::{Allocation, AllocationCreateDesc, AllocationScheme, Allocator, AllocatorCreateDesc};
 use weft_render::*;
 
+mod rt;
+#[cfg(feature = "streamline")]
+mod streamline;
+mod upscale;
+
 const FRAMES: usize = 2;
 /// Timestamp queries per frame: start, after uploads, marks, end.
 const MAX_MARKS: u32 = 16;
@@ -65,6 +70,8 @@ struct Texture {
     layout: vk::ImageLayout,
     /// Index into the matching bindless array (depth too: screen effects read it).
     index: u32,
+    /// What it was made for (an upscaler is told: `upscale`).
+    usage: vk::ImageUsageFlags,
 }
 
 struct Pipeline {
@@ -79,6 +86,7 @@ enum Deferred {
     Buffer(vk::Buffer, Allocation),
     Texture(vk::Image, vk::ImageView, Allocation, u32),
     Pipeline(vk::Pipeline, vk::PipelineLayout, vk::DescriptorSetLayout),
+    Accel(vk::AccelerationStructureKHR, vk::Buffer, Allocation),
 }
 
 /// Upload memory of one frame slot: a list of chunks filled in order. When a chunk is full the
@@ -125,8 +133,47 @@ struct Swapchain {
     rendered: Vec<vk::Semaphore>,
     layouts: Vec<vk::ImageLayout>,
     format: vk::Format,
+    /// The images' own size (turned: the display's natural orientation).
     extent: vk::Extent2D,
+    /// The size the game draws at (`FrameInfo`): `extent`, or it turned a quarter.
+    logical: vk::Extent2D,
+    transform: vk::SurfaceTransformFlagsKHR,
+    /// Pre-rotation (Android, a display turned a quarter): the image the game's passes for the
+    /// screen draw into, at `logical`, and the quarter turns (1 or 3) the last pass gives it on its
+    /// way into the swapchain image (`TURN_WGSL`), so the display shows it as it is.
+    turn: Option<(TextureId, u32)>,
 }
+
+/// Pre-rotation's last pass: the game's picture, drawn upright into its own image, copied texel
+/// for texel into the swapchain image turned a quarter (`Swapchain::turn`). The instance is the
+/// picture's bindless index; vertices 0-2 turn it for `ROTATE_90`, 3-5 for `ROTATE_270`.
+const TURN_WGSL: &str = r#"
+struct TurnOut {
+    @builtin(position) clip: vec4<f32>,
+    @location(0) @interpolate(flat) info: vec2<u32>,
+}
+
+@vertex
+fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> TurnOut {
+    let k = vi % 3u;
+    let p = vec2<f32>(f32((k << 1u) & 2u), f32(k & 2u));
+    var out: TurnOut;
+    out.clip = vec4(p * 2.0 - 1.0, 0.0, 1.0);
+    out.info = vec2(ii, vi / 3u);
+    return out;
+}
+
+@fragment
+fn fs(in: TurnOut) -> @location(0) vec4<f32> {
+    let size = vec2<i32>(textureDimensions(textures[in.info.x]));
+    let p = vec2<i32>(in.clip.xy);
+    var at = vec2(p.y, size.y - 1 - p.x);
+    if in.info.y != 0u {
+        at = vec2(size.x - 1 - p.y, p.x);
+    }
+    return textureLoad(textures[in.info.x], at, 0);
+}
+"#;
 
 pub struct VulkanBackend {
     _entry: ash::Entry,
@@ -175,6 +222,10 @@ pub struct VulkanBackend {
     next_tex: u32,
     capture_requested: bool,
     capture: Option<(vk::Buffer, Allocation, u32, u32, vk::Format)>,
+    /// Pre-rotation's pipeline (`TURN_WGSL`), made with the first turned swapchain; and whether it
+    /// failed, so the swapchain is then left to the compositor to turn (IDENTITY).
+    turn_pipe: Option<PipelineId>,
+    turn_failed: bool,
     device_name: String,
     /// `Backend::device_class` and `device_memory_mb`.
     device_class: u32,
@@ -191,6 +242,10 @@ pub struct VulkanBackend {
     /// recording, `vkQueueSubmit2`, `vkQueuePresentKHR`), logged each second (`log_submit`):
     /// whether the frame waits for the GPU, for the display or works.
     submit_split: SubmitSplit,
+    /// What `Cmd::Upscale` runs (`upscale.rs`); none without one (the game's own TAA then).
+    upscaler: Option<Box<dyn upscale::Upscaler>>,
+    /// Ray queries and acceleration structures, where the device has them (`rt::wanted`).
+    rt: Option<rt::Rt>,
 }
 
 #[derive(Default)]
@@ -235,7 +290,17 @@ fn err<E: std::fmt::Debug>(what: &str) -> impl FnOnce(E) -> Error + '_ {
 /// game, which stands in for the loader and goes first, since a loader found without a driver
 /// fails only later. Built from source, the loader is also looked for by path, as Homebrew's
 /// prefix is not searched.
-unsafe fn load_vulkan() -> Result<ash::Entry, Error> {
+/// With Streamline (the `streamline` feature and its files present), its interposer stands in for
+/// the loader, so it can add what DLSS needs to the instance and device (`streamline.rs`).
+unsafe fn load_vulkan(early: &upscale::Early) -> Result<ash::Entry, Error> {
+    #[cfg(feature = "streamline")]
+    if let upscale::Early::Streamline(sl) = early {
+        match unsafe { ash::Entry::load_from(&sl.interposer) } {
+            Ok(entry) => return Ok(entry),
+            Err(e) => log::warn!("streamline: Vulkan from {}: {e:?}", sl.interposer.display()),
+        }
+    }
+    let _ = early;
     if cfg!(target_os = "macos") {
         let beside = std::env::current_exe()
             .ok()
@@ -271,7 +336,8 @@ impl VulkanBackend {
 
     unsafe fn create(desc: &BackendDesc) -> Result<VulkanBackend, Error> {
         unsafe {
-            let entry = load_vulkan()?;
+            let early = upscale::early();
+            let entry = load_vulkan(&early)?;
             let display = desc
                 .window
                 .display_handle()
@@ -299,6 +365,19 @@ impl VulkanBackend {
                 exts.push(ext::debug_utils::NAME.as_ptr());
             } else if desc.debug {
                 log::warn!("validation layer requested but not installed");
+            }
+            // macOS: MoltenVK's own errors in our log (a pipeline Metal would not build says why
+            // only there: `calm world pipelines: ... ERROR_INITIALIZATION_FAILED` came with no
+            // reason, 11-06), through a messenger for errors alone, no validation layer.
+            let mvk_errors = !debug
+                && cfg!(target_os = "macos")
+                && entry
+                    .enumerate_instance_extension_properties(None)
+                    .unwrap_or_default()
+                    .iter()
+                    .any(|e| e.extension_name_as_c_str() == Ok(ext::debug_utils::NAME));
+            if mvk_errors {
+                exts.push(ext::debug_utils::NAME.as_ptr());
             }
 
             // MoltenVK is a portability driver: the loader hides those unless asked to list them.
@@ -330,10 +409,15 @@ impl VulkanBackend {
                 )
                 .map_err(err("vkCreateInstance"))?;
 
-            let debug = if debug {
+            let debug = if debug || mvk_errors {
                 let f = ext::debug_utils::Instance::new(&entry, &instance);
+                let severity = if debug {
+                    vk::DebugUtilsMessageSeverityFlagsEXT::ERROR | vk::DebugUtilsMessageSeverityFlagsEXT::WARNING
+                } else {
+                    vk::DebugUtilsMessageSeverityFlagsEXT::ERROR
+                };
                 let info = vk::DebugUtilsMessengerCreateInfoEXT::default()
-                    .message_severity(vk::DebugUtilsMessageSeverityFlagsEXT::ERROR | vk::DebugUtilsMessageSeverityFlagsEXT::WARNING)
+                    .message_severity(severity)
                     .message_type(
                         vk::DebugUtilsMessageTypeFlagsEXT::GENERAL
                             | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION
@@ -433,6 +517,7 @@ impl VulkanBackend {
                 .push_next(&mut has13);
             instance.get_physical_device_features2(pdev, &mut has);
             let base = has.features;
+            let has_bda = has12.buffer_device_address != vk::FALSE;
             let missing: Vec<&str> = [
                 ("multiDrawIndirect", base.multi_draw_indirect),
                 ("drawIndirectFirstInstance", base.draw_indirect_first_instance),
@@ -483,11 +568,6 @@ impl VulkanBackend {
             let mut f13 = vk::PhysicalDeviceVulkan13Features::default()
                 .dynamic_rendering(true)
                 .synchronization2(true);
-            let mut f2 = vk::PhysicalDeviceFeatures2::default()
-                .features(features)
-                .push_next(&mut f11)
-                .push_next(&mut f12)
-                .push_next(&mut f13);
             let has_ext = |name: &std::ffi::CStr| {
                 instance
                     .enumerate_device_extension_properties(pdev)
@@ -503,10 +583,14 @@ impl VulkanBackend {
             } else {
                 log::info!("{device_name}: no VK_KHR_push_descriptor, per-draw buffers through descriptor sets");
             }
-            // Android: render targets without the GPU's framebuffer compression (`compression_off`).
+            // Android, `WEFT_NO_COMPRESSION=1`: render targets without the GPU's framebuffer
+            // compression (`compression_off`). Off by default since 11-06: the garbage tiles that
+            // made it needed (11-05) no longer show (scripted shots of sky, water and the edge with
+            // it on), and it saves the Pixel 10 about 1 ms a frame at full resolution (vista 68.2 ->
+            // 67.2 ms, edge 73.5 -> 72.7, forest 61.7 -> 61.2; 0.2 ms at half).
             let mut compression = vk::PhysicalDeviceImageCompressionControlFeaturesEXT::default();
             let no_compression = cfg!(target_os = "android")
-                && std::env::var_os("WEFT_KEEP_COMPRESSION").is_none()
+                && std::env::var_os("WEFT_NO_COMPRESSION").is_some()
                 && has_ext(ext::image_compression_control::NAME)
                 && {
                     let mut f = vk::PhysicalDeviceFeatures2::default().push_next(&mut compression);
@@ -518,6 +602,37 @@ impl VulkanBackend {
                 log::info!("{device_name}: render targets without framebuffer compression");
             }
             let mut compression = vk::PhysicalDeviceImageCompressionControlFeaturesEXT::default().image_compression_control(no_compression);
+            // Ray queries (`rt.rs`): with push descriptors (the TLAS is pushed like the buffers),
+            // device addresses and both extensions, on the platforms `rt::wanted` allows.
+            let mut has_accel = vk::PhysicalDeviceAccelerationStructureFeaturesKHR::default();
+            let mut has_query = vk::PhysicalDeviceRayQueryFeaturesKHR::default();
+            let ray_query = rt::wanted()
+                && push
+                && has_bda
+                && has_ext(khr::acceleration_structure::NAME)
+                && has_ext(khr::ray_query::NAME)
+                && has_ext(khr::deferred_host_operations::NAME)
+                && {
+                    let mut f = vk::PhysicalDeviceFeatures2::default()
+                        .push_next(&mut has_accel)
+                        .push_next(&mut has_query);
+                    instance.get_physical_device_features2(pdev, &mut f);
+                    has_accel.acceleration_structure != vk::FALSE && has_query.ray_query != vk::FALSE
+                };
+            let mut accel_features = vk::PhysicalDeviceAccelerationStructureFeaturesKHR::default().acceleration_structure(true);
+            let mut query_features = vk::PhysicalDeviceRayQueryFeaturesKHR::default().ray_query(true);
+            if ray_query {
+                dev_exts.push(khr::acceleration_structure::NAME.as_ptr());
+                dev_exts.push(khr::ray_query::NAME.as_ptr());
+                dev_exts.push(khr::deferred_host_operations::NAME.as_ptr());
+                f12 = f12.buffer_device_address(true);
+                log::info!("{device_name}: ray queries");
+            }
+            let mut f2 = vk::PhysicalDeviceFeatures2::default()
+                .features(features)
+                .push_next(&mut f11)
+                .push_next(&mut f12)
+                .push_next(&mut f13);
             // A driver that has this extension requires it to be enabled.
             if has_ext(khr::portability_subset::NAME) {
                 dev_exts.push(khr::portability_subset::NAME.as_ptr());
@@ -526,16 +641,18 @@ impl VulkanBackend {
             let qinfo = [vk::DeviceQueueCreateInfo::default()
                 .queue_family_index(queue_family)
                 .queue_priorities(&prio)];
+            let mut device_info = vk::DeviceCreateInfo::default()
+                .queue_create_infos(&qinfo)
+                .enabled_extension_names(&dev_exts)
+                .push_next(&mut f2)
+                .push_next(&mut compression);
+            if ray_query {
+                device_info = device_info
+                    .push_next(&mut accel_features)
+                    .push_next(&mut query_features);
+            }
             let device = instance
-                .create_device(
-                    pdev,
-                    &vk::DeviceCreateInfo::default()
-                        .queue_create_infos(&qinfo)
-                        .enabled_extension_names(&dev_exts)
-                        .push_next(&mut f2)
-                        .push_next(&mut compression),
-                    None,
-                )
+                .create_device(pdev, &device_info, None)
                 .map_err(err("vkCreateDevice"))?;
             let queue = device.get_device_queue(queue_family, 0);
 
@@ -544,7 +661,7 @@ impl VulkanBackend {
                 device: device.clone(),
                 physical_device: pdev,
                 debug_settings: Default::default(),
-                buffer_device_address: false,
+                buffer_device_address: ray_query,
                 allocation_sizes: Default::default(),
             })
             .map_err(err("GPU allocator"))?;
@@ -738,6 +855,8 @@ impl VulkanBackend {
                 free_tex: Vec::new(),
                 next_tex: 0,
                 capture_requested: false,
+                turn_pipe: None,
+                turn_failed: false,
                 capture: None,
                 device_name,
                 device_class,
@@ -748,7 +867,12 @@ impl VulkanBackend {
                 ts_period: props.limits.timestamp_period,
                 gpu_times: Vec::new(),
                 submit_split: SubmitSplit::default(),
+                upscaler: upscale::ready(early, pdev, desc.upscale_standin),
+                rt: None,
             };
+            if ray_query {
+                backend.rt = Some(rt::Rt::new(&backend.instance, &backend.device, backend.pdev)?);
+            }
             backend.recreate_swapchain()?;
             Ok(backend)
         }
@@ -853,10 +977,25 @@ impl VulkanBackend {
             if caps.max_image_count > 0 {
                 count = count.min(caps.max_image_count);
             }
-            // Android: the compositor turns the picture for a rotated display, so the game draws
-            // upright (the device's own turn would have it draw rotated). Android also often has
+            // Android, a display turned a quarter (a phone held sideways): the swapchain takes the
+            // display's own turn and its natural size, the game draws upright into an image of its
+            // own, and the last pass turns that into the swapchain image (`Swapchain::turn`), so the
+            // display shows it as it is. Left to the compositor (IDENTITY), Android turned every
+            // frame on the GPU itself (SurfaceFlinger's client composition: 1.95 ms a frame on the
+            // Pixel 10, Android port, 11-06). `WEFT_NO_PRETURN=1` leaves it to the compositor.
+            // Otherwise the game draws upright and the compositor turns it. Android also often has
             // only INHERIT for alpha.
-            let transform = if cfg!(target_os = "android")
+            let quarter = if cfg!(target_os = "android") && !self.turn_failed && std::env::var_os("WEFT_NO_PRETURN").is_none() {
+                [(vk::SurfaceTransformFlagsKHR::ROTATE_90, 1), (vk::SurfaceTransformFlagsKHR::ROTATE_270, 3)]
+                    .into_iter()
+                    .find(|(t, _)| caps.current_transform == *t && caps.supported_transforms.contains(*t))
+                    .map(|(_, q)| q)
+            } else {
+                None
+            };
+            let transform = if quarter.is_some() {
+                caps.current_transform
+            } else if cfg!(target_os = "android")
                 && caps
                     .supported_transforms
                     .contains(vk::SurfaceTransformFlagsKHR::IDENTITY)
@@ -865,6 +1004,9 @@ impl VulkanBackend {
             } else {
                 caps.current_transform
             };
+            // The game's size stays the surface's as it is held; the images are the display's own.
+            let logical = extent;
+            let extent = if quarter.is_some() { vk::Extent2D { width: extent.height, height: extent.width } } else { extent };
             let alpha = [vk::CompositeAlphaFlagsKHR::OPAQUE, vk::CompositeAlphaFlagsKHR::INHERIT]
                 .into_iter()
                 .find(|a| caps.supported_composite_alpha.contains(*a))
@@ -891,7 +1033,13 @@ impl VulkanBackend {
                 )
                 .map_err(err("vkCreateSwapchainKHR"))?;
             if self.submit_split.mode != mode.as_raw() || old.is_none() {
-                log::info!("swapchain: {}x{}, {count} images, present mode {mode:?} (vsync {})", extent.width, extent.height, self.vsync);
+                log::info!(
+                    "swapchain: {}x{}, {count} images, present mode {mode:?} (vsync {}){}",
+                    logical.width,
+                    logical.height,
+                    self.vsync,
+                    if quarter.is_some() { ", turned by the game (pre-rotation)" } else { "" }
+                );
             }
             self.submit_split.mode = mode.as_raw();
             if let Some(old) = old {
@@ -931,8 +1079,48 @@ impl VulkanBackend {
                 rendered,
                 format: format.format,
                 extent,
+                logical,
+                transform,
+                turn: None,
             });
             self.dirty_swapchain = false;
+            if let Some(q) = quarter {
+                if self.turn_pipe.is_none() {
+                    let made = Shader::from_wgsl("turn", TURN_WGSL)
+                        .map_err(|e| Error(e.0))
+                        .and_then(|shader| {
+                            self.create_pipeline(&PipelineDesc {
+                                label: "pre-rotation",
+                                shader: &shader,
+                                vertex: "vs",
+                                fragment: Some("fs"),
+                                color: Some(Format::Surface),
+                                depth: None,
+                                blend: Blend::None,
+                                cull_back: false,
+                                topology: Topology::Triangles,
+                                motion: false,
+                            })
+                        });
+                    match made {
+                        Ok(pipe) => self.turn_pipe = Some(pipe),
+                        Err(e) => {
+                            // Made again the plain way, the compositor turning it.
+                            log::error!("pre-rotation: {}", e.0);
+                            self.turn_failed = true;
+                            self.dirty_swapchain = true;
+                            return Ok(());
+                        }
+                    }
+                }
+                let picture = self.create_texture(
+                    &TextureDesc { width: logical.width, height: logical.height, mips: 1, format: Format::Surface, render_target: true },
+                    "turned screen",
+                );
+                if let Some(sc) = self.swapchain.as_mut() {
+                    sc.turn = Some((picture, q));
+                }
+            }
             Ok(())
         }
     }
@@ -948,7 +1136,8 @@ impl VulkanBackend {
                     .get_physical_device_surface_capabilities(self.pdev, self.surface)
             };
             if let (Ok(caps), Some(sc)) = (caps, self.swapchain.as_ref())
-                && caps.current_extent == sc.extent
+                && caps.current_extent == sc.logical
+                && (sc.turn.is_none() || caps.current_transform == sc.transform)
             {
                 return;
             }
@@ -957,6 +1146,9 @@ impl VulkanBackend {
     }
 
     unsafe fn destroy_swapchain(&mut self, sc: Swapchain) {
+        if let Some((picture, _)) = sc.turn {
+            self.destroy_texture(picture);
+        }
         unsafe {
             for v in sc.views {
                 self.device.destroy_image_view(v, None);
@@ -1104,6 +1296,7 @@ impl VulkanBackend {
         for d in deferred {
             self.destroy_now(d);
         }
+        self.rt_slot_ready();
     }
 
     /// Frees `d` once the GPU is done with it: after the next wait on this slot's fence. That wait
@@ -1136,6 +1329,7 @@ impl VulkanBackend {
                     self.device.destroy_pipeline_layout(l, None);
                     self.device.destroy_descriptor_set_layout(s, None);
                 }
+                Deferred::Accel(raw, buffer, alloc) => self.destroy_accel_now(raw, buffer, alloc),
             }
         }
     }
@@ -1601,6 +1795,207 @@ fn compare_op(c: Compare) -> vk::CompareOp {
 }
 
 impl VulkanBackend {
+    /// `Cmd::Upscale`: the inputs made shader-readable, the output `GENERAL` (DLSS writes it as a
+    /// storage image), the upscaler run, or the colour scaled up plainly if it could not, and the
+    /// output left shader-readable for the effects.
+    unsafe fn record_upscale(&mut self, cmd: vk::CommandBuffer, images: [TextureId; 4], guides: [TextureId; 3], params: &UpscaleParams) {
+        let readable = |b: &mut Self, t: TextureId| {
+            let tex = b.textures.get(t.0);
+            let (image, was, depth) = (tex.image, tex.layout, tex.desc.format == Format::Depth32);
+            if was != vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL {
+                let range = if depth { depth_range() } else { color_range(1) };
+                unsafe { b.barrier_image(cmd, image, range, was, vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL) };
+                b.textures.get_mut(t.0).layout = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
+            }
+        };
+        let [color, depth, motion, output] = images;
+        for t in [color, depth, motion]
+            .into_iter()
+            .chain(guides.into_iter().filter(|g| *g != NO_TEXTURE))
+        {
+            readable(self, t);
+        }
+        let out = self.textures.get(output.0);
+        let (out_image, out_was) = (out.image, out.layout);
+        // The whole output is written: what was in it doesn't matter.
+        unsafe { self.barrier_image(cmd, out_image, color_range(1), vk::ImageLayout::UNDEFINED, vk::ImageLayout::GENERAL) };
+        let _ = out_was;
+        self.textures.get_mut(output.0).layout = vk::ImageLayout::GENERAL;
+        let describe = |b: &Self, t: TextureId| {
+            let tex = b.textures.get(t.0);
+            upscale::Image {
+                image: tex.image,
+                view: tex.view,
+                memory: unsafe { tex.alloc.memory() },
+                layout: tex.layout,
+                format: b.vk_format(tex.desc.format),
+                width: tex.desc.width,
+                height: tex.desc.height,
+                usage: tex.usage,
+            }
+        };
+        let guide = |b: &Self, t: TextureId| (t != NO_TEXTURE).then(|| describe(b, t));
+        let inputs = upscale::Inputs {
+            color: describe(self, color),
+            depth: describe(self, depth),
+            motion: describe(self, motion),
+            output: describe(self, output),
+            normals: guide(self, guides[0]),
+            albedo: guide(self, guides[1]),
+            specular: guide(self, guides[2]),
+        };
+        let done = match self.upscaler.as_mut() {
+            Some(u) => unsafe { u.record(cmd, &inputs, params) },
+            None => false,
+        };
+        if !done {
+            // The colour scaled up to the output, filtered: the frame still has its picture.
+            let (src, sw, sh) = (inputs.color.image, inputs.color.width, inputs.color.height);
+            let (dw, dh) = (inputs.output.width, inputs.output.height);
+            unsafe {
+                self.barrier_image(
+                    cmd,
+                    src,
+                    color_range(1),
+                    vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                    vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                );
+                self.barrier_image(cmd, out_image, color_range(1), vk::ImageLayout::GENERAL, vk::ImageLayout::TRANSFER_DST_OPTIMAL);
+                let layers = vk::ImageSubresourceLayers {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    mip_level: 0,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                };
+                let region = vk::ImageBlit {
+                    src_subresource: layers,
+                    src_offsets: [vk::Offset3D::default(), vk::Offset3D { x: sw as i32, y: sh as i32, z: 1 }],
+                    dst_subresource: layers,
+                    dst_offsets: [vk::Offset3D::default(), vk::Offset3D { x: dw as i32, y: dh as i32, z: 1 }],
+                };
+                self.device.cmd_blit_image(
+                    cmd,
+                    src,
+                    vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                    out_image,
+                    vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                    &[region],
+                    vk::Filter::LINEAR,
+                );
+                self.barrier_image(
+                    cmd,
+                    src,
+                    color_range(1),
+                    vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                    vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                );
+                self.barrier_image(
+                    cmd,
+                    out_image,
+                    color_range(1),
+                    vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                    vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                );
+            }
+        } else {
+            // DLSS's compute writes, then the effects sample it.
+            unsafe {
+                self.barrier_image(cmd, out_image, color_range(1), vk::ImageLayout::GENERAL, vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+            };
+        }
+        self.textures.get_mut(output.0).layout = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
+    }
+
+    fn make_texture(&mut self, desc: &TextureDesc, label: &str, extra: vk::ImageUsageFlags) -> TextureId {
+        let format = self.vk_format(desc.format);
+        let depth = desc.format == Format::Depth32;
+        // Depth is also sampled: screen effects read how far each pixel is (it stays bindless,
+        // read in SHADER_READ_ONLY_OPTIMAL between the passes that draw into it).
+        let usage = if depth {
+            vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT
+                | vk::ImageUsageFlags::SAMPLED
+                | vk::ImageUsageFlags::TRANSFER_SRC
+                | vk::ImageUsageFlags::TRANSFER_DST
+        } else {
+            let mut u = vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST;
+            if desc.render_target {
+                u |= vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC;
+            }
+            u | extra
+        };
+        // The Pixel 10's PowerVR: a target cleared by its pass and then read as a texture came back
+        // as garbage in every tile only the clear had touched (black and random-coloured squares
+        // where the sky was, the water's copy of what is behind it); uncompressed, it reads right.
+        let mut compression_off = vk::ImageCompressionControlEXT::default().flags(vk::ImageCompressionFlagsEXT::DISABLED);
+        let mut info = vk::ImageCreateInfo::default()
+            .image_type(vk::ImageType::TYPE_2D)
+            .format(format)
+            .extent(vk::Extent3D { width: desc.width, height: desc.height, depth: 1 })
+            .mip_levels(desc.mips)
+            .array_layers(1)
+            .samples(vk::SampleCountFlags::TYPE_1)
+            .tiling(vk::ImageTiling::OPTIMAL)
+            .usage(usage);
+        if self.no_compression && (desc.render_target || depth) {
+            info = info.push_next(&mut compression_off);
+        }
+        unsafe {
+            let image = self
+                .device
+                .create_image(&info, None)
+                .expect("vkCreateImage");
+            let requirements = self.device.get_image_memory_requirements(image);
+            let alloc_desc = AllocationCreateDesc {
+                name: label,
+                requirements,
+                location: MemoryLocation::GpuOnly,
+                linear: false,
+                allocation_scheme: AllocationScheme::GpuAllocatorManaged,
+            };
+            let alloc =
+                allocate(&mut self.allocator, &alloc_desc, self.spill).unwrap_or_else(|e| panic!("allocating texture {label}: {e}"));
+            self.device
+                .bind_image_memory(image, alloc.memory(), alloc.offset())
+                .expect("bind image memory");
+            let range = if depth { depth_range() } else { color_range(desc.mips) };
+            let view = self
+                .device
+                .create_image_view(
+                    &vk::ImageViewCreateInfo::default()
+                        .image(image)
+                        .view_type(vk::ImageViewType::TYPE_2D)
+                        .format(format)
+                        .subresource_range(range),
+                    None,
+                )
+                .expect("vkCreateImageView");
+
+            let index = {
+                let index = self.free_tex.pop().unwrap_or_else(|| {
+                    self.next_tex += 1;
+                    self.next_tex - 1
+                });
+                assert!(index < MAX_TEXTURES, "more than {MAX_TEXTURES} textures");
+                let info = [vk::DescriptorImageInfo::default()
+                    .image_view(view)
+                    .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)];
+                let write = vk::WriteDescriptorSet::default()
+                    .dst_set(self.global_set)
+                    .dst_binding(0)
+                    .dst_array_element(index)
+                    .descriptor_type(vk::DescriptorType::SAMPLED_IMAGE)
+                    .image_info(&info);
+                self.device.update_descriptor_sets(&[write], &[]);
+                index
+            };
+            let id =
+                self.textures
+                    .insert(Texture { image, view, alloc, desc: desc.clone(), layout: vk::ImageLayout::UNDEFINED, index, usage });
+            self.uploads.push(Upload::InitTexture(id));
+            TextureId(id)
+        }
+    }
+
     fn spirv(&self, shader: &Shader, stage: naga::ShaderStage, entry: &str) -> Result<vk::ShaderModule, Error> {
         let mut options = naga::back::spv::Options::default();
         options.lang_version = (1, 3);
@@ -1627,6 +2022,7 @@ impl VulkanBackend {
             .map(|&(b, kind)| {
                 let ty = match kind {
                     BufferKind::Uniform => vk::DescriptorType::UNIFORM_BUFFER,
+                    BufferKind::Accel => vk::DescriptorType::ACCELERATION_STRUCTURE_KHR,
                     _ => vk::DescriptorType::STORAGE_BUFFER,
                 };
                 (b, ty)
@@ -1768,6 +2164,9 @@ impl Backend for VulkanBackend {
         if usage & usage::UNIFORM != 0 {
             flags |= vk::BufferUsageFlags::UNIFORM_BUFFER;
         }
+        if usage & usage::ACCEL_INPUT != 0 && self.rt.is_some() {
+            flags |= vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS;
+        }
         let location = if usage & usage::READBACK != 0 {
             MemoryLocation::GpuToCpu
         } else if usage & usage::HOST != 0 {
@@ -1816,93 +2215,32 @@ impl Backend for VulkanBackend {
     }
 
     fn create_texture(&mut self, desc: &TextureDesc, label: &str) -> TextureId {
-        let format = self.vk_format(desc.format);
-        let depth = desc.format == Format::Depth32;
-        // Depth is also sampled: screen effects read how far each pixel is (it stays bindless,
-        // read in SHADER_READ_ONLY_OPTIMAL between the passes that draw into it).
-        let usage = if depth {
-            vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT
-                | vk::ImageUsageFlags::SAMPLED
-                | vk::ImageUsageFlags::TRANSFER_SRC
-                | vk::ImageUsageFlags::TRANSFER_DST
-        } else {
-            let mut u = vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST;
-            if desc.render_target {
-                u |= vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC;
-            }
-            u
-        };
-        // The Pixel 10's PowerVR: a target cleared by its pass and then read as a texture came back
-        // as garbage in every tile only the clear had touched (black and random-coloured squares
-        // where the sky was, the water's copy of what is behind it); uncompressed, it reads right.
-        let mut compression_off = vk::ImageCompressionControlEXT::default().flags(vk::ImageCompressionFlagsEXT::DISABLED);
-        let mut info = vk::ImageCreateInfo::default()
-            .image_type(vk::ImageType::TYPE_2D)
-            .format(format)
-            .extent(vk::Extent3D { width: desc.width, height: desc.height, depth: 1 })
-            .mip_levels(desc.mips)
-            .array_layers(1)
-            .samples(vk::SampleCountFlags::TYPE_1)
-            .tiling(vk::ImageTiling::OPTIMAL)
-            .usage(usage);
-        if self.no_compression && (desc.render_target || depth) {
-            info = info.push_next(&mut compression_off);
-        }
-        unsafe {
-            let image = self
-                .device
-                .create_image(&info, None)
-                .expect("vkCreateImage");
-            let requirements = self.device.get_image_memory_requirements(image);
-            let alloc_desc = AllocationCreateDesc {
-                name: label,
-                requirements,
-                location: MemoryLocation::GpuOnly,
-                linear: false,
-                allocation_scheme: AllocationScheme::GpuAllocatorManaged,
-            };
-            let alloc =
-                allocate(&mut self.allocator, &alloc_desc, self.spill).unwrap_or_else(|e| panic!("allocating texture {label}: {e}"));
-            self.device
-                .bind_image_memory(image, alloc.memory(), alloc.offset())
-                .expect("bind image memory");
-            let range = if depth { depth_range() } else { color_range(desc.mips) };
-            let view = self
-                .device
-                .create_image_view(
-                    &vk::ImageViewCreateInfo::default()
-                        .image(image)
-                        .view_type(vk::ImageViewType::TYPE_2D)
-                        .format(format)
-                        .subresource_range(range),
-                    None,
-                )
-                .expect("vkCreateImageView");
+        self.make_texture(desc, label, vk::ImageUsageFlags::empty())
+    }
 
-            let index = {
-                let index = self.free_tex.pop().unwrap_or_else(|| {
-                    self.next_tex += 1;
-                    self.next_tex - 1
-                });
-                assert!(index < MAX_TEXTURES, "more than {MAX_TEXTURES} textures");
-                let info = [vk::DescriptorImageInfo::default()
-                    .image_view(view)
-                    .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)];
-                let write = vk::WriteDescriptorSet::default()
-                    .dst_set(self.global_set)
-                    .dst_binding(0)
-                    .dst_array_element(index)
-                    .descriptor_type(vk::DescriptorType::SAMPLED_IMAGE)
-                    .image_info(&info);
-                self.device.update_descriptor_sets(&[write], &[]);
-                index
-            };
-            let id = self
-                .textures
-                .insert(Texture { image, view, alloc, desc: desc.clone(), layout: vk::ImageLayout::UNDEFINED, index });
-            self.uploads.push(Upload::InitTexture(id));
-            TextureId(id)
+    fn upscaler(&self) -> UpscalerInfo {
+        self.upscaler
+            .as_ref()
+            .map_or_else(UpscalerInfo::default, |u| u.info())
+    }
+
+    fn upscale_render_size(&mut self, mode: UpscaleMode, reconstruct: bool, output: (u32, u32)) -> (u32, u32) {
+        let s = mode.scale();
+        let fallback = (((output.0 as f32 * s).round() as u32).max(1), ((output.1 as f32 * s).round() as u32).max(1));
+        match &mut self.upscaler {
+            Some(u) => u.render_size(mode, reconstruct, output).unwrap_or(fallback),
+            None => fallback,
         }
+    }
+
+    /// Written by the upscaler's compute shaders (DLSS writes its output as a storage image).
+    fn create_upscale_target(&mut self, width: u32, height: u32, label: &str) -> TextureId {
+        let desc = TextureDesc { width, height, mips: 1, format: Format::Rgba16Float, render_target: true };
+        self.make_texture(&desc, label, vk::ImageUsageFlags::STORAGE)
+    }
+
+    fn texture_index(&self, texture: TextureId) -> u32 {
+        self.textures.get(texture.0).index
     }
 
     fn write_texture(&mut self, texture: TextureId, mip: u32, data: &[u8]) {
@@ -1914,10 +2252,6 @@ impl Backend for VulkanBackend {
         let src = self.stage(data);
         self.uploads
             .push(Upload::Texture { src, dst: texture.0, mip });
-    }
-
-    fn texture_index(&self, texture: TextureId) -> u32 {
-        self.textures.get(texture.0).index
     }
 
     fn destroy_texture(&mut self, texture: TextureId) {
@@ -2099,6 +2433,36 @@ impl Backend for VulkanBackend {
         }
     }
 
+    fn ray_query(&self) -> bool {
+        self.rt.is_some()
+    }
+
+    fn create_blas(&mut self, geometries: &[BlasGeometry], label: &str) -> AccelId {
+        self.rt_create_blas(geometries, label)
+    }
+
+    fn create_tlas(&mut self, max_instances: u32, label: &str) -> AccelId {
+        self.rt_create_tlas(max_instances, label)
+    }
+
+    fn set_tlas_instances(&mut self, tlas: AccelId, instances: &[TlasInstance]) {
+        self.rt_set_instances(tlas, instances);
+    }
+
+    fn destroy_accel(&mut self, accel: AccelId) {
+        if self.rt.is_some() {
+            self.rt_destroy(accel);
+        }
+    }
+
+    fn accel_memory(&self) -> u64 {
+        self.rt.as_ref().map_or(0, |rt| rt.memory)
+    }
+
+    fn accel_generation(&self) -> u64 {
+        self.rt.as_ref().map_or(0, |rt| rt.generation)
+    }
+
     fn begin_frame(&mut self) -> Option<FrameInfo> {
         // Between `surface_lost` and `surface_restored` (the app in the background on Android).
         if self.surface == vk::SurfaceKHR::null() {
@@ -2122,7 +2486,7 @@ impl Backend for VulkanBackend {
         self.submit_split.begun = [t1 - t0, t1.elapsed()].map(|d| d.as_secs_f32() * 1000.0);
         match result {
             Ok((index, suboptimal)) => {
-                let extent = sc.extent;
+                let extent = sc.logical;
                 if suboptimal {
                     self.suboptimal();
                 }
@@ -2162,6 +2526,7 @@ impl Backend for VulkanBackend {
             self.device
                 .cmd_write_timestamp2(cmd, vk::PipelineStageFlags2::TOP_OF_PIPE, self.queries, first_query);
             self.record_uploads(cmd);
+            self.rt_record_start(cmd);
             self.device
                 .cmd_write_timestamp2(cmd, vk::PipelineStageFlags2::ALL_COMMANDS, self.queries, first_query + 1);
             let mut marks = 2;
@@ -2172,9 +2537,10 @@ impl Backend for VulkanBackend {
             let mut bound: Vec<(u32, vk::DescriptorType, vk::DescriptorBufferInfo)> = Vec::new();
             let mut in_pass_targets: Vec<u32> = Vec::new();
             let mut in_pass_depth: Option<u32> = None;
-            let (sc_image, sc_view, sc_extent) = {
+            // The game's passes for the screen see `logical`; turned, they draw into `turn`'s image.
+            let (sc_image, sc_view, sc_extent, turn, sc_size) = {
                 let sc = self.swapchain.as_ref().unwrap();
-                (sc.images[image_index as usize], sc.views[image_index as usize], sc.extent)
+                (sc.images[image_index as usize], sc.views[image_index as usize], sc.logical, sc.turn, sc.extent)
             };
             // `Cmd::PassBreak`: the pass in progress ended and begun again, loading what it drew.
             let broken;
@@ -2209,7 +2575,17 @@ impl Backend for VulkanBackend {
             } else {
                 &list.cmds
             };
+            // Consecutive BLAS builds, recorded as one batch (`rt_build_blases`).
+            let mut blas_batch: Vec<u32> = Vec::new();
             for cmd_item in cmds {
+                if let Cmd::BuildBlas(a) = *cmd_item {
+                    blas_batch.push(a.0);
+                    continue;
+                }
+                if !blas_batch.is_empty() {
+                    self.rt_build_blases(cmd, &blas_batch);
+                    blas_batch.clear();
+                }
                 match *cmd_item {
                     Cmd::BeginPass { color, depth, motion } => {
                         let mut extent = sc_extent;
@@ -2231,12 +2607,21 @@ impl Backend for VulkanBackend {
                         });
                         if let Some((target, clear)) = color {
                             let (image, view, old) = match target {
-                                Target::Surface => {
-                                    let sc = self.swapchain.as_mut().unwrap();
-                                    let old = sc.layouts[image_index as usize];
-                                    sc.layouts[image_index as usize] = vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL;
-                                    (sc_image, sc_view, old)
-                                }
+                                Target::Surface => match turn {
+                                    Some((picture, _)) => {
+                                        let tex = self.textures.get_mut(picture.0);
+                                        let old = tex.layout;
+                                        tex.layout = vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL;
+                                        in_pass_targets.push(picture.0);
+                                        (tex.image, tex.view, old)
+                                    }
+                                    None => {
+                                        let sc = self.swapchain.as_mut().unwrap();
+                                        let old = sc.layouts[image_index as usize];
+                                        sc.layouts[image_index as usize] = vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL;
+                                        (sc_image, sc_view, old)
+                                    }
+                                },
                                 Target::Texture(t) => {
                                     let tex = self.textures.get_mut(t.0);
                                     extent = vk::Extent2D { width: tex.desc.width, height: tex.desc.height };
@@ -2458,8 +2843,35 @@ impl Backend for VulkanBackend {
                         self.barrier_image(cmd, image, depth_range(), vk::ImageLayout::TRANSFER_SRC_OPTIMAL, back);
                         self.textures.get_mut(depth.0).layout = back;
                     }
+                    Cmd::Upscale { color, depth, motion, output, normals, albedo, specular, start } => {
+                        let size = size_of::<UpscaleParams>();
+                        let params: UpscaleParams = bytemuck::pod_read_unaligned(&list.data[start as usize..start as usize + size]);
+                        self.record_upscale(cmd, [color, depth, motion, output], [normals, albedo, specular], &params);
+                        // An upscaler leaves its own pipeline and bindings behind.
+                        current = None;
+                        bound.clear();
+                    }
                     // Expanded into an end and a begin above.
                     Cmd::PassBreak => {}
+                    // Batched above.
+                    Cmd::BuildBlas(_) => {}
+                    Cmd::BuildTlas(a) => self.rt_build_tlas(cmd, a.0),
+                    Cmd::BindAccel { binding, accel } => {
+                        let (Some(p), Some(push_fn)) = (current, &self.push_fn) else { continue };
+                        let pl = self.pipelines.get(p);
+                        if !pl.buffers.iter().any(|b| b.0 == binding) {
+                            continue;
+                        }
+                        let Some(raw) = self.rt_tlas_raw(accel.0) else { continue };
+                        let raws = [raw];
+                        let mut accel_write = vk::WriteDescriptorSetAccelerationStructureKHR::default().acceleration_structures(&raws);
+                        let write = vk::WriteDescriptorSet::default()
+                            .dst_binding(binding)
+                            .descriptor_type(vk::DescriptorType::ACCELERATION_STRUCTURE_KHR)
+                            .descriptor_count(1)
+                            .push_next(&mut accel_write);
+                        push_fn.cmd_push_descriptor_set(cmd, pl.bind_point, pl.layout, 1, &[write]);
+                    }
                     Cmd::Mark => {
                         if marks < MAX_MARKS - 1 {
                             self.device
@@ -2470,10 +2882,65 @@ impl Backend for VulkanBackend {
                 }
             }
 
+            if !blas_batch.is_empty() {
+                self.rt_build_blases(cmd, &blas_batch);
+            }
+            // Pre-rotation: the game's picture into the swapchain image, turned (`TURN_WGSL`).
+            if let (Some((picture, quarter)), Some(pipe)) = (turn, self.turn_pipe) {
+                let (pic_image, pic_layout, pic_index) = {
+                    let t = self.textures.get(picture.0);
+                    (t.image, t.layout, t.index)
+                };
+                if pic_layout != vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL {
+                    self.barrier_image(cmd, pic_image, color_range(1), pic_layout, vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
+                    self.textures.get_mut(picture.0).layout = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
+                }
+                self.barrier_image(cmd, sc_image, color_range(1), vk::ImageLayout::UNDEFINED, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
+                let colors = [vk::RenderingAttachmentInfo::default()
+                    .image_view(sc_view)
+                    .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                    .load_op(vk::AttachmentLoadOp::DONT_CARE)
+                    .store_op(vk::AttachmentStoreOp::STORE)];
+                let info = vk::RenderingInfo::default()
+                    .render_area(vk::Rect2D { offset: Default::default(), extent: sc_size })
+                    .layer_count(1)
+                    .color_attachments(&colors);
+                self.device.cmd_begin_rendering(cmd, &info);
+                self.device.cmd_set_viewport(
+                    cmd,
+                    0,
+                    &[vk::Viewport {
+                        x: 0.0,
+                        y: 0.0,
+                        width: sc_size.width as f32,
+                        height: sc_size.height as f32,
+                        min_depth: 0.0,
+                        max_depth: 1.0,
+                    }],
+                );
+                self.device
+                    .cmd_set_scissor(cmd, 0, &[vk::Rect2D { offset: Default::default(), extent: sc_size }]);
+                let pl = self.pipelines.get(pipe.0);
+                self.device.cmd_bind_pipeline(cmd, pl.bind_point, pl.raw);
+                self.device
+                    .cmd_bind_descriptor_sets(cmd, pl.bind_point, pl.layout, 0, &sets, &[]);
+                self.device
+                    .cmd_draw(cmd, 3, 1, if quarter == 1 { 0 } else { 3 }, pic_index);
+                self.device.cmd_end_rendering(cmd);
+                self.swapchain.as_mut().unwrap().layouts[image_index as usize] = vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL;
+            }
             let old = self.swapchain.as_ref().unwrap().layouts[image_index as usize];
             if self.capture_requested {
                 self.capture_requested = false;
                 let (w, h) = (sc_extent.width, sc_extent.height);
+                // Turned: the picture as the game drew it, upright.
+                let (cap_image, cap_old) = match turn {
+                    Some((picture, _)) => {
+                        let t = self.textures.get(picture.0);
+                        (t.image, t.layout)
+                    }
+                    None => (sc_image, old),
+                };
                 let (buf, alloc) = raw_buffer(
                     &self.device,
                     &mut self.allocator,
@@ -2483,7 +2950,7 @@ impl Backend for VulkanBackend {
                     MemoryLocation::GpuToCpu,
                     "capture",
                 );
-                self.barrier_image(cmd, sc_image, color_range(1), old, vk::ImageLayout::TRANSFER_SRC_OPTIMAL);
+                self.barrier_image(cmd, cap_image, color_range(1), cap_old, vk::ImageLayout::TRANSFER_SRC_OPTIMAL);
                 let region = [vk::BufferImageCopy::default()
                     .image_subresource(vk::ImageSubresourceLayers {
                         aspect_mask: vk::ImageAspectFlags::COLOR,
@@ -2493,8 +2960,19 @@ impl Backend for VulkanBackend {
                     })
                     .image_extent(vk::Extent3D { width: w, height: h, depth: 1 })];
                 self.device
-                    .cmd_copy_image_to_buffer(cmd, sc_image, vk::ImageLayout::TRANSFER_SRC_OPTIMAL, buf, &region);
-                self.barrier_image(cmd, sc_image, color_range(1), vk::ImageLayout::TRANSFER_SRC_OPTIMAL, vk::ImageLayout::PRESENT_SRC_KHR);
+                    .cmd_copy_image_to_buffer(cmd, cap_image, vk::ImageLayout::TRANSFER_SRC_OPTIMAL, buf, &region);
+                if turn.is_some() {
+                    self.barrier_image(cmd, cap_image, color_range(1), vk::ImageLayout::TRANSFER_SRC_OPTIMAL, cap_old);
+                    self.barrier_image(cmd, sc_image, color_range(1), old, vk::ImageLayout::PRESENT_SRC_KHR);
+                } else {
+                    self.barrier_image(
+                        cmd,
+                        sc_image,
+                        color_range(1),
+                        vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                        vk::ImageLayout::PRESENT_SRC_KHR,
+                    );
+                }
                 let fmt = self.swapchain.as_ref().unwrap().format;
                 self.capture = Some((buf, alloc, w, h, fmt));
             } else {
@@ -2616,6 +3094,8 @@ impl Drop for VulkanBackend {
     fn drop(&mut self) {
         unsafe {
             self.device.device_wait_idle().ok();
+            // Streamline frees its own before the device goes.
+            self.upscaler = None;
             for i in 0..self.frames.len() {
                 let deferred = std::mem::take(&mut self.frames[i].deferred);
                 for d in deferred {
@@ -2633,6 +3113,7 @@ impl Drop for VulkanBackend {
                 self.device.destroy_semaphore(f.acquired, None);
                 self.device.destroy_fence(f.fence, None);
             }
+            self.rt_drop();
             self.device.destroy_query_pool(self.queries, None);
             self.device
                 .destroy_pipeline_cache(self.pipeline_cache, None);

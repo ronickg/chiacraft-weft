@@ -10,5 +10,9 @@ weft_vulkan.workspace = true
 weft_render.workspace = true
 log.workspace = true
 
+[features]
+# DLSS through NVIDIA's Streamline (Windows), see backends/vulkan/src/streamline.rs.
+streamline = ["weft_vulkan/streamline"]
+
 [build-dependencies]
 winresource = "0.1"

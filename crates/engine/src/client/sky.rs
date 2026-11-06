@@ -42,7 +42,13 @@ pub fn rgb(c: u32) -> Vec3 {
 
 /// Where on its orbit it is, in turns.
 pub(super) fn turn_of(s: &SkyDef, d: &DimensionDef, time: f64) -> f64 {
-    let moved = if s.orbit.is_infinite() {
+    // chiacraft, test only: `--mc-moon` keeps a body on its own orbit (base's moon, a turn every
+    // 8/7 days) turning with the day instead, at its phase: the moon opposite the sun all month, as
+    // Minecraft's, so like-for-like shots of an evening aren't skewed by our gibbous moon high in
+    // the sky (Planner, 11-06).
+    static MC_MOON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    let mc_moon = *MC_MOON.get_or_init(|| crate::app::api::launch_options().contains_key("mc-moon"));
+    let moved = if s.orbit.is_infinite() || (mc_moon && s.orbit > 0.0) {
         d.day_turn(time)
     } else if s.orbit == 0.0 {
         0.0
@@ -54,7 +60,12 @@ pub(super) fn turn_of(s: &SkyDef, d: &DimensionDef, time: f64) -> f64 {
 
 /// Its frame in the world at `turn`: x toward it, y along its way, z out of the orbit's plane.
 pub(super) fn frame_of(s: &SkyDef, turn: f64) -> Mat3 {
-    Mat3::from_rotation_y(s.heading) * Mat3::from_rotation_x(s.tilt) * Mat3::from_rotation_z((turn * std::f64::consts::TAU) as f32)
+    Mat3::from_rotation_y(s.heading) * Mat3::from_rotation_x(tilt_of(s)) * Mat3::from_rotation_z((turn * std::f64::consts::TAU) as f32)
+}
+
+/// Its path's lean: none under the test flag `--mc-days` (`app::api::mc_days`).
+fn tilt_of(s: &SkyDef) -> f32 {
+    if crate::app::api::mc_days() { 0.0 } else { s.tilt }
 }
 
 /// How far around the sunset of a body is at `height` (the sine of its elevation): how much it
@@ -541,7 +552,7 @@ impl Sky {
             // horizon: leaned with the path, the moon's square stood as a diamond (the world
             // playtester's "white rotated square"). Its picture's up toward the world's up; right
             // at the zenith the path's own frame.
-            if s.kind == sky_kind::BODY && s.tilt != 0.0 && s.spin == 0.0 {
+            if s.kind == sky_kind::BODY && tilt_of(s) != 0.0 && s.spin == 0.0 {
                 let toward = m.x_axis;
                 let right = toward.cross(Vec3::Y);
                 if right.length() > 0.05 {

@@ -11,6 +11,7 @@ pub mod bodies;
 pub mod bosses;
 pub mod coats;
 pub mod danger;
+pub mod eggs;
 pub mod evolution;
 pub mod hides;
 pub mod journal;

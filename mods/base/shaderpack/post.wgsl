@@ -47,8 +47,10 @@ fn scene_at(p: PostPixel, uv: vec2<f32>) -> vec4<f32> {
 // The world's depth at `uv` (reverse Z: 0 where nothing was drawn, the sky). Read texel by texel,
 // as not every GPU filters depth.
 fn post_depth(p: PostPixel, uv: vec2<f32>) -> f32 {
-    let size = vec2<i32>(p.size);
-    let at = clamp(vec2<i32>(uv * p.size), vec2(0), size - vec2(1));
+    // By the depth's own size: under an upscaler the effects run at the screen's, the depth at
+    // the world's (`Post::set_upscale`).
+    let size = vec2<i32>(textureDimensions(textures[p.depth]));
+    let at = clamp(vec2<i32>(uv * vec2<f32>(size)), vec2(0), size - vec2(1));
     return textureLoad(textures[p.depth], at, 0).r;
 }
 
@@ -81,7 +83,8 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
 @fragment
 fn fs(in: VOut) -> @location(0) vec4<f32> {
     let first = passes[in.pass_index];
-    var color = textureSampleLevel(textures[first.scene], linear_clamp, in.uv, 0.0);
+    // Scaled up by `core:upscaler`'s filter when the world is drawn smaller (`world_upscaled`).
+    var color = world_upscaled(first.scene, in.uv, in.clip.xy, scene.upscale.x);
     let count = max(first.pad, 1u);
     for (var k = 0u; k < count; k++) {
         let pass_ = passes[in.pass_index + k];
@@ -280,9 +283,36 @@ fn sharpen_delta(scene_tex: u32, uv: vec2<f32>) -> vec3<f32> {
     let mn = min(lc, min(min(ln, ls), min(le, lw)));
     let mx = max(lc, max(max(ln, ls), max(le, lw)));
     let amp = sqrt(clamp(min(mn, 2.0 - mx) / max(mx, 1e-4), 0.0, 1.0));
-    let wt = -amp * mix(1.0 / 8.0, 1.0 / 5.0, k);
+    // Where the picture moves under temporal anti-aliasing (`scene.taa_frame`: how far each pixel
+    // moved this frame), more: a gathered picture is read between its texels every frame it moves
+    // and comes out softer while the camera turns (mc_forest mid-turn grain 7.3 against 10.4 still).
+    // Up to the full CAS lobe and twice its push by 6 px a frame, held inside the neighbourhood so
+    // edges don't ring. Only here, on the way to the screen: in the gathered picture itself it would
+    // build up frame on frame.
+    let moving = taa_motion_px(px, size);
+    let m = smoothstep(0.75, 6.0, moving);
+    let wt = -amp * mix(1.0 / 8.0, 1.0 / 5.0, clamp(k + m, 0.0, 1.0));
     let sharp = (c + (n + s + e + w) * wt) / (1.0 + 4.0 * wt);
-    return max(sharp, vec3(0.0)) - c;
+    let pushed = c + (sharp - c) * (1.0 + m);
+    if m <= 0.0 {
+        // Still, or without the gathering: CAS as it was.
+        return max(sharp, vec3(0.0)) - c;
+    }
+    let lo = min(c, min(min(n, s), min(e, w)));
+    let hi = max(c, max(max(n, s), max(e, w)));
+    return clamp(max(pushed, vec3(0.0)), lo, hi) - c;
+}
+
+// How far the pixel at `px` of an image `size` moved this frame, in pixels, from temporal
+// anti-aliasing's count image (`scene.taa_frame`, g); 0 without it.
+fn taa_motion_px(px: vec2<i32>, size: vec2<i32>) -> f32 {
+    if scene.taa_frame.x < 0.5 {
+        return 0.0;
+    }
+    let t = textures[u32(scene.taa_frame.x) - 1u];
+    let dims = vec2<i32>(textureDimensions(t));
+    let at = clamp(px * dims / max(size, vec2(1)), vec2(0), dims - 1);
+    return textureLoad(t, at, 0).g;
 }
 
 // How much of the view at `uv` the mist covers (0 none to 1), from the mist volume (`froxels`) at
@@ -291,8 +321,8 @@ fn mist_over(uv: vec2<f32>, pass_: Pass) -> f32 {
     if scene.froxels.x < 0.5 {
         return 0.0;
     }
-    let size = vec2<i32>(pass_.size);
-    let at = clamp(vec2<i32>(uv * pass_.size), vec2(0), size - vec2(1));
+    let size = vec2<i32>(textureDimensions(textures[pass_.depth]));
+    let at = clamp(vec2<i32>(uv * vec2<f32>(size)), vec2(0), size - vec2(1));
     let d = max(textureLoad(textures[pass_.depth], at, 0).r, 1e-7);
     let w = scene.inv_view_proj * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, d, 1.0);
     let dist = min(length(w.xyz / w.w), FROXEL_FAR);
@@ -329,6 +359,8 @@ fn sky_or_cloud(uv: vec2<f32>, d: f32) -> bool {
 
 // How much of the sky's light the HDR world's veiling glare lays over the picture (`hdr_light`).
 const GLARE_HDR: f32 = 0.02;
+// The land's lift in the evening twilight (`hdr_light`).
+const TWILIGHT_LAND_HDR: f32 = 1.55;
 
 // The HDR world's light before the tone curve: the bloom mixed in and the exposure applied.
 fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
@@ -336,8 +368,8 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
     // The sky a third more saturated by day (where nothing was drawn, depth 0): the curve's
     // shoulder takes colour out of a bright sky, and ours read grey-white where Bliss's is blue
     // overhead and gold toward a low sun (08:00, saturation 26 against 43). Not in rain.
-    let size = vec2<i32>(pass_.size);
-    let px = clamp(vec2<i32>(uv * pass_.size), vec2(0), size - vec2(1));
+    let size = vec2<i32>(textureDimensions(textures[pass_.depth]));
+    let px = clamp(vec2<i32>(uv * vec2<f32>(size)), vec2(0), size - vec2(1));
     let sky_px = sky_or_cloud(uv, textureLoad(textures[pass_.depth], px, 0).r);
     if sky_px {
         let y = luma(col);
@@ -388,6 +420,26 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
         let e = textureLoad(textures[pass_.exposure - 1u], vec2(0, 0), 0).g;
         if e == e && e > 0.0 {
             col *= pow(auto_exposure(e), fantasy_opt(OPT_AUTO_EXPOSURE));
+            // The land a little dimmer against the sky with the sun 30-55° up: in Bliss's own world
+            // the sky matched at every hour (08:00 204 against 208, noon 189 against 192), the land
+            // was over it (113 against 89 at 08:00, 132 against 113 at noon; 17:00 115 against 113).
+            // Not the sky (its own dim is above), not in rain.
+            let morning = smoothstep(0.38, 0.52, scene.sun.y);
+            let land = 1.0 - 0.2 * morning + 0.06 * smoothstep(0.6, 0.82, scene.sun.y);
+            // The near land only, fading out from 300 to 900 blocks: on the far band too it took
+            // mc_forest's noon far land from 135 to 109 (Bliss's 148, Far view's measure).
+            let d = max(textureLoad(textures[pass_.depth], px, 0).r, 1e-7);
+            let wp = scene.inv_view_proj * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, d, 1.0);
+            let near = 1.0 - smoothstep(300.0, 900.0, length(wp.xyz / wp.w));
+            col *= mix(1.0, land, (1.0 - rain_amount()) * select(1.0, 0.0, sky_px) * near);
+            // Evening twilight, the sun just under the horizon in the west: the land lit up against the
+            // sky, as Bliss's evening (its own world at 19:00: land 86 against a sky of 138, ours 60
+            // against 162; a stronger exposure lifted both, tw1). Its morning at the same depth stays
+            // a dark blue, as ours. Not out to the far ridges, which meet the sky's own colour, and
+            // not into the night (dark by design).
+            let dusk = smoothstep(0.05, -0.05, scene.sun.x) * smoothstep(0.03, -0.02, scene.sun.y) * smoothstep(-0.16, -0.08, scene.sun.y);
+            let near_dusk = 1.0 - smoothstep(600.0, 1500.0, length(wp.xyz / wp.w));
+            col *= mix(1.0, TWILIGHT_LAND_HDR, dusk * (1.0 - rain_amount()) * select(1.0, 0.0, sky_px) * near_dusk);
         }
     }
     return col;

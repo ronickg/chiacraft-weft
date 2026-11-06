@@ -51,8 +51,35 @@ pub const BOXES: &[(&str, (f32, f32))] = &[
     ("gull", (0.4, 0.4)),
     ("early_bird", (0.35, 0.35)),
     ("fish", (0.3, 0.2)),
-    ("egg", (0.1, 0.14)),
+    // Eggs, one model per look (`eggs.rs`, `source/egg`), at their built size; a species'
+    // own egg is drawn scaled from it, its box with it. The small ones get a few cm more to click.
+    ("egg_dromaeosaur", (0.25, 0.46)),
+    ("egg_oviraptorid", (0.52, 0.54)),
+    ("egg_ceratopsian", (0.38, 0.27)),
+    ("egg_ankylosaur", (0.57, 0.66)),
+    ("egg_ornithopod", (0.75, 0.9)),
+    ("egg_sauropod", (0.66, 0.61)),
+    ("egg_crocodilian", (0.27, 0.22)),
+    ("egg_lizard", (0.18, 0.12)),
+    ("egg_roe_trout", (0.24, 0.14)),
+    ("egg_roe_pacu", (0.37, 0.14)),
+    ("egg_roe_lycoptera", (0.37, 0.14)),
+    ("egg_roe_lungfish", (0.25, 0.16)),
+    ("egg_bird_owl", (0.28, 0.27)),
+    ("egg_bird_sparrow", (0.21, 0.15)),
+    ("egg_bird_bunting", (0.21, 0.15)),
+    ("egg_bird_raven", (0.2, 0.18)),
+    ("egg_bird_gull", (0.3, 0.27)),
+    ("egg_bird_eagle", (0.34, 0.3)),
+    ("egg_bird_hawk", (0.26, 0.24)),
+    ("egg_bird_vulture", (0.3, 0.27)),
+    ("egg_bird_mesozoic", (0.17, 0.15)),
+    ("egg_wyvern", (0.6, 0.93)),
+    ("egg_dromaeosaur_large", (0.4, 0.77)),
+    ("egg_ceratopsian_small", (0.26, 0.17)),
     ("nest", (0.9, 0.15)),
+    // A bird's cup nest (`source/nest/cup.py`), scaled up for bigger birds' eggs.
+    ("nest_cup", (0.44, 0.17)),
 ];
 
 /// Boxes the height rule doesn't hold to, and why.

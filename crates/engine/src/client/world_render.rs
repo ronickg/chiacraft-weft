@@ -12,6 +12,8 @@ use weft_render::*;
 use super::mesher::Mesh;
 use super::textures::GameTextures;
 use crate::content::Content;
+
+mod rt;
 pub use crate::gpu_layout::Globals;
 
 const FACE_WORDS: u32 = 4;
@@ -197,6 +199,8 @@ fn region_of(key: MeshKey) -> (u64, IVec3) {
 
 /// A structure's lean (chiacraft): its pivot (own coordinates) and rotation.
 type Lean = (Vec3, glam::Quat);
+/// Where each moving structure was drawn last frame (world position) and how it leaned, by id.
+type StructuresBefore = FxHashMap<u64, (DVec3, Option<Lean>)>;
 
 /// The draws of one visible mesh (its corner `lo` relative to the camera, `k` its structure or
 /// 0), returning the faces drawn. A face direction can be seen only from the side its normal
@@ -350,6 +354,8 @@ struct ColorPipes {
 }
 
 pub struct WorldRenderer {
+    /// Moving structures as drawn last frame, for their motion (the offsets' second part).
+    structures_before: StructuresBefore,
     /// Depth only, from the sun, for `sun_shadows` packs: faces solid, faces cutout, quads solid,
     /// quads cutout. Solid blocks have no fragment shader (nothing to leave out, and a pass without
     /// `discard` keeps Apple GPUs' hidden-surface removal on); cutout ones the pack's `fs_shadow`.
@@ -386,10 +392,11 @@ pub struct WorldRenderer {
     /// terrain taking the pixels they leave (Distant Horizons' fade), so the edge isn't a line.
     /// Only those meshes, so the rest keep early depth (no `discard`).
     fade_pipes: Option<[PipelineId; 6]>,
-    /// The colour pipelines not in use: the calm ones (`calm_pipes`) while `calm_on` is false,
-    /// the plain ones while it is true. None when the pack doesn't use `CALM`.
-    calm_alt: Option<ColorPipes>,
-    calm_on: bool,
+    /// The calm colour pipelines (`calm_pipes`): calm, then calm and dry. None where the pack
+    /// doesn't use `CALM` (or `DRY`). The set of level `calm_level` (`set_calm`) is in use, and its
+    /// place here holds the plain ones meanwhile.
+    calm_sets: [Option<ColorPipes>; 2],
+    calm_level: u8,
     /// How far from the camera (blocks, across) the cubes end while distant terrain is shown; 0:
     /// no fade. Cubes past it aren't drawn.
     pub lod_fade: u32,
@@ -447,6 +454,8 @@ pub struct WorldRenderer {
     tex_shader: BufferId,
     /// `GameTextures::glow_buffer`, bound as it is.
     glow: BufferId,
+    /// `GameTextures::mat_buffer`, the same.
+    mat: BufferId,
     /// `GameTextures::generation` the tables were built from.
     tex_generation: u64,
     /// (0 1 2)(0 2 3) for as many quads as one draw can hold; every face and quad draw shares it
@@ -455,6 +464,18 @@ pub struct WorldRenderer {
     solid: Solid,
     pub drawn: u32,
     pub faces_drawn: u64,
+    /// Ray tracing's scene (`rt.rs`, `core:rt_shadows`), and its compute pipeline where the GPU
+    /// has ray queries.
+    rt: Option<rt::RtScene>,
+    rt_expand: Option<PipelineId>,
+    /// The world shader traces (`gpu_layout::set_rt_prelude`; the shader pack's `world.wgsl` calls
+    /// `rt_sun`): every draw then binds the scene, which is kept while it does.
+    rt_compiled: bool,
+    rt_wanted: bool,
+    /// The shader pack's `world.wgsl` calls `rt_sun` (as of the last composing).
+    rt_pack: bool,
+    /// The setting changed: the app composes the world shader again (`reload_shaders`).
+    pub rt_reload: bool,
 }
 
 /// Block shaders: `fn shade(p: BlockPixel) -> vec4<f32>` in `shaders/block/<name>.wgsl`, for
@@ -509,8 +530,27 @@ impl WorldRenderer {
         textures: &GameTextures,
         assets: &crate::assets::Assets,
     ) -> Result<WorldRenderer, String> {
-        let (shader, slots) = world_shader(assets).map_err(|e| e.0)?;
-        let (face_pipes, quad_pipes, lod_pipe) = Self::pipelines(gpu, &shader)?;
+        // Traced sun shadows (`core:rt_shadows` where the GPU has ray queries): the world shader
+        // with the scene's bindings; should that fail, the shader without (`rt.rs`).
+        let rt_expand = rt::RtScene::expand_pipeline(gpu, assets);
+        let rt_pack = crate::packs::pack_uses("world.wgsl", "rt_sun");
+        let mut rt_compiled = rt_expand.is_some() && rt::rt_setting() && rt_pack;
+        crate::gpu_layout::set_rt_prelude(rt_compiled);
+        let made = world_shader(assets)
+            .map_err(|e| e.0)
+            .and_then(|(s, slots)| Ok((Self::pipelines(gpu, &s)?, s, slots)));
+        let made = match made {
+            Err(e) if rt_compiled => {
+                log::error!("world shader with traced shadows: {e}; without them");
+                rt_compiled = false;
+                crate::gpu_layout::set_rt_prelude(false);
+                world_shader(assets)
+                    .map_err(|e| e.0)
+                    .and_then(|(s, slots)| Ok((Self::pipelines(gpu, &s)?, s, slots)))
+            }
+            m => m,
+        };
+        let ((face_pipes, quad_pipes, lod_pipe), shader, slots) = made?;
         let fade_pipes = Self::fade_pipelines(gpu, &shader);
         let lod_open_pipe = Self::lod_open_pipeline(gpu, &shader);
         let cutout_split = Self::cutout_split_pipelines(gpu, &shader);
@@ -571,6 +611,7 @@ impl WorldRenderer {
             table: CubeTable::new(gpu),
             parts: Vec::new(),
             offsets: Vec::new(),
+            structures_before: StructuresBefore::default(),
             globals,
             shadow_globals,
             origins: Vec::new(),
@@ -589,23 +630,34 @@ impl WorldRenderer {
             anim,
             overlays,
             glow: textures.glow_buffer(),
+            mat: textures.mat_buffer(),
             tex_shader,
             tex_generation: textures.generation(),
             quad_index,
             solid: Solid::new(gpu, c),
             drawn: 0,
             faces_drawn: 0,
-            calm_alt: Self::calm_pipes(gpu, assets),
-            calm_on: false,
+            rt: match (rt_expand, rt::rt_setting()) {
+                (Some(p), true) => Some(rt::RtScene::new(gpu, p)),
+                _ => None,
+            },
+            rt_expand,
+            rt_compiled,
+            rt_wanted: rt_expand.is_some() && rt::rt_setting(),
+            rt_pack,
+            rt_reload: false,
+            calm_sets: [Self::calm_pipes(gpu, assets, false), Self::calm_pipes(gpu, assets, true)],
+            calm_level: 0,
         })
     }
 
     /// The colour pipelines from the world shader with `CALM` true (`packs::compose_calm`), when
     /// the pack uses it: the same draws, the shader without the paths that do nothing in a calm
     /// scene. Shadows and depth-only passes keep the plain ones.
-    fn calm_pipes(gpu: &mut dyn Backend, assets: &crate::assets::Assets) -> Option<ColorPipes> {
+    /// `dry`: with `DRY` true as well (`gpu_layout::DRY_OFF`).
+    fn calm_pipes(gpu: &mut dyn Backend, assets: &crate::assets::Assets, dry: bool) -> Option<ColorPipes> {
         let snippets = crate::shaders::snippets(assets, &HOOK);
-        let s = crate::packs::compose_calm(assets, "world.wgsl", &[(&HOOK, &snippets)])?;
+        let s = crate::packs::compose_calm(assets, "world.wgsl", &[(&HOOK, &snippets)], dry)?;
         let (face, quad, lod) = Self::pipelines(gpu, &s)
             .map_err(|e| log::error!("calm world pipelines: {e}"))
             .ok()?;
@@ -629,23 +681,37 @@ impl WorldRenderer {
         std::mem::swap(&mut self.fade_pipes, &mut set.fade);
     }
 
-    /// Draws with the calm pipelines (`gpu_layout::CALM_OFF`) while `calm`, when the pack has
-    /// them; the plain ones otherwise. Call before the frame's draws.
-    pub fn set_calm(&mut self, calm: bool) {
-        if calm == self.calm_on {
+    /// Draws with the calm pipelines (`gpu_layout::CALM_OFF`) at `level` 1, the calm-and-dry ones
+    /// (`DRY_OFF`) at 2, the plain ones at 0; a level the pack has no set for takes the one below.
+    /// Call before the frame's draws.
+    pub fn set_calm(&mut self, level: u8) {
+        let want = (1..=level.min(2))
+            .rev()
+            .find(|&l| self.calm_sets[l as usize - 1].is_some())
+            .unwrap_or(0);
+        if want == self.calm_level {
             return;
         }
-        if let Some(mut alt) = self.calm_alt.take() {
-            self.swap_pipes(&mut alt);
-            self.calm_alt = Some(alt);
-            self.calm_on = calm;
+        for l in [self.calm_level, want] {
+            if l > 0
+                && let Some(mut set) = self.calm_sets[l as usize - 1].take()
+            {
+                self.swap_pipes(&mut set);
+                self.calm_sets[l as usize - 1] = Some(set);
+            }
         }
+        self.calm_level = want;
     }
 
     /// Puts the plain pipelines back in use and destroys the calm ones (before a reload or drop).
     fn drop_calm(&mut self, gpu: &mut dyn Backend) {
-        self.set_calm(false);
-        if let Some(set) = self.calm_alt.take() {
+        self.set_calm(0);
+        for set in self
+            .calm_sets
+            .iter_mut()
+            .filter_map(Option::take)
+            .collect::<Vec<_>>()
+        {
             for p in set
                 .face
                 .into_iter()
@@ -674,6 +740,7 @@ impl WorldRenderer {
     /// block texture).
     pub fn set_textures(&mut self, gpu: &mut dyn Backend, textures: &GameTextures) {
         self.glow = textures.glow_buffer();
+        self.mat = textures.mat_buffer();
         if self.tex_generation == textures.generation() {
             return;
         }
@@ -1102,6 +1169,7 @@ impl WorldRenderer {
             list.bind(b::SCENE, scene);
             list.bind(b::LOD_MASK, self.lod_mask.0);
             list.bind(b::SOLID, self.solid.buf);
+            list.bind(b::MAT_MAP, self.mat);
             list.push(Cmd::DrawIndexedIndirect { buffer: ibuf, offset: start as u64 * 20, count: (end - start) as u32 });
             start = end;
         }
@@ -1110,6 +1178,11 @@ impl WorldRenderer {
     /// Recompiles the world shader; keeps the old pipelines when the new source has errors.
     pub fn reload_shaders(&mut self, gpu: &mut dyn Backend, textures: &GameTextures, assets: &crate::assets::Assets) {
         self.occlusion.reload(gpu, assets);
+        // Traced only with the scene there to bind (`set_rt` makes it first).
+        self.rt_pack = crate::packs::pack_uses("world.wgsl", "rt_sun");
+        let rt = self.rt_wanted && self.rt.is_some() && self.rt_pack;
+        crate::gpu_layout::set_rt_prelude(rt);
+        self.rt_reload = false;
         match world_shader(assets)
             .map_err(|e| e.0)
             .and_then(|(s, slots)| Ok((Self::pipelines(gpu, &s)?, slots)))
@@ -1127,6 +1200,7 @@ impl WorldRenderer {
                 self.face_pipes = f;
                 self.quad_pipes = q;
                 self.lod_pipe = l;
+                self.rt_compiled = rt;
                 for p in self
                     .shadow_pipes
                     .take()
@@ -1151,7 +1225,7 @@ impl WorldRenderer {
                 self.tex_shader = shader_table(gpu, crate::content::content(), textures, &slots);
                 self.solid
                     .set_on(gpu, crate::packs::pack_uses("world.wgsl", "solid_at"));
-                self.calm_alt = Self::calm_pipes(gpu, assets);
+                self.calm_sets = [Self::calm_pipes(gpu, assets, false), Self::calm_pipes(gpu, assets, true)];
                 log::info!("world shader reloaded");
             }
             Err(e) => log::error!("world shader: {e}"),
@@ -1192,6 +1266,9 @@ impl WorldRenderer {
 
     pub fn remove(&mut self, key: MeshKey) {
         self.terrain_epoch += 1;
+        if let Some(rt) = &mut self.rt {
+            rt.mesh_changed(key);
+        }
         let m = if let Some(m) = self.table_only.remove(&key) {
             m
         } else {
@@ -1218,6 +1295,12 @@ impl WorldRenderer {
     }
 
     pub fn destroy(&mut self, gpu: &mut dyn Backend) {
+        if let Some(rt) = self.rt.take() {
+            rt.destroy(gpu);
+        }
+        if let Some(p) = self.rt_expand.take() {
+            gpu.destroy_pipeline(p);
+        }
         self.drop_calm(gpu);
         self.meshes.clear();
         self.regions.clear();
@@ -1354,6 +1437,9 @@ impl WorldRenderer {
         gpu.write_buffer(self.faces.pages[a.page as usize].0, a.offset as u64 * 16, bytemuck::cast_slice(quads));
         self.lod.insert(key, (a, quads.len() as u32, y, skip));
         self.terrain_epoch += 1;
+        if let Some(rt) = &mut self.rt {
+            rt.lod_changed(key);
+        }
     }
 
     /// The columns shown by cubes (`Lod::mask`).
@@ -1374,6 +1460,9 @@ impl WorldRenderer {
         if let Some((a, ..)) = self.lod.remove(&key) {
             self.faces.free(a);
             self.terrain_epoch += 1;
+            if let Some(rt) = &mut self.rt {
+                rt.lod_changed(key);
+            }
         }
     }
 
@@ -1590,10 +1679,11 @@ impl WorldRenderer {
         // full sky until it is known.
         // And how it leans (chiacraft): its pivot and rotation, upright for most.
         let lean_of = |k: usize| leans.get(&frames[k].0).copied();
-        let mut picks: Vec<(Vec3, u32, Option<Lean>)> = frame_offsets
+        // (Its frame's index too, for where it was last frame: `structures_before`.)
+        let mut picks: Vec<(Vec3, u32, Option<Lean>, usize)> = frame_offsets
             .iter()
             .enumerate()
-            .map(|(k, o)| (*o, crate::world::light::SKY_FULL as u32, lean_of(k)))
+            .map(|(k, o)| (*o, crate::world::light::SKY_FULL as u32, lean_of(k), k))
             .collect();
         let mut cube_pick: FxHashMap<MeshKey, i32> = FxHashMap::default();
         for (&key, &light) in lights {
@@ -1601,7 +1691,7 @@ impl WorldRenderer {
                 // A leaning one's cubes are elsewhere than where the world's light on them was
                 // sampled (a falling trunk's lowest cube is centred in the ground): its own light.
                 let light = if lean_of(k).is_some() { crate::world::light::SKY_FULL as u32 } else { light };
-                picks.push((frame_offsets[k], light, lean_of(k)));
+                picks.push((frame_offsets[k], light, lean_of(k), k));
                 cube_pick.insert(key, picks.len() as i32);
             }
         }
@@ -1780,11 +1870,14 @@ impl WorldRenderer {
         let mut runs = std::mem::take(&mut self.runs);
         runs.clear();
         let obuf = crate::gpu_layout::frame_buffer(gpu, &mut self.origins, frame.slot, n, 16, usage::STORAGE, "origins");
+        // Then, for temporal anti-aliasing's motion, two vec4 a structure after them all: where it
+        // was last frame (camera relative as now) and how it was turned; their count in entry 0's
+        // last slot, which the world's own cubes never read.
         let fbuf = crate::gpu_layout::frame_buffer(
             gpu,
             &mut self.offsets,
             frame.slot,
-            (picks.len() as u32 + 1) * 3,
+            (picks.len() as u32 + 1) * 5,
             16,
             usage::STORAGE,
             "frame offsets",
@@ -1804,9 +1897,32 @@ impl WorldRenderer {
             offs[at + 44..at + 48].copy_from_slice(&leaning.to_le_bytes());
         };
         put(offs, 0, Vec3::ZERO, 0, None);
-        for (k, &(o, light, lean)) in picks.iter().enumerate() {
+        for (k, &(o, light, lean, _)) in picks.iter().enumerate() {
             put(offs, k + 1, o, light, lean);
         }
+        offs[44..48].copy_from_slice(&(picks.len() as f32).to_le_bytes());
+        let base = (picks.len() + 1) * 48;
+        offs[base..base + 32].copy_from_slice(bytemuck::cast_slice(&[0.0f32, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]));
+        let origin = (cam_cube * 16).as_dvec3();
+        for (k, &(o, _, lean, f)) in picks.iter().enumerate() {
+            let (was, was_lean) = self
+                .structures_before
+                .get(&frames[f].0)
+                .copied()
+                .unwrap_or((frames[f].1, lean));
+            let o = if self.structures_before.contains_key(&frames[f].0) { (was - origin).as_vec3() } else { o };
+            let rot = was_lean.map_or(glam::Quat::IDENTITY, |l| l.1);
+            let at = base + (k + 1) * 32;
+            offs[at..at + 16].copy_from_slice(bytemuck::cast_slice(&o.extend(0.0).to_array()));
+            offs[at + 16..at + 32].copy_from_slice(bytemuck::cast_slice(&rot.to_array()));
+        }
+        self.structures_before.clear();
+        self.structures_before.extend(
+            frames
+                .iter()
+                .enumerate()
+                .map(|(k, f)| (f.0, (f.1, lean_of(k)))),
+        );
         let ibuf =
             crate::gpu_layout::frame_buffer(gpu, &mut self.indirect, frame.slot, n, 20, usage::INDIRECT | usage::STORAGE, "indirect");
         let origins = Mapped(gpu.mapped(obuf)[..n as usize * 16].as_mut_ptr());
@@ -2032,6 +2148,17 @@ impl WorldRenderer {
         list.bind(b::SCENE, scene);
         list.bind(b::LOD_MASK, self.lod_mask.0);
         list.bind(b::SOLID, self.solid.buf);
+        list.bind(b::MAT_MAP, self.mat);
+        if self.rt_compiled
+            && let Some(rt) = &self.rt
+        {
+            use crate::gpu_layout::rt_bind as r;
+            list.push(Cmd::BindAccel { binding: r::TLAS, accel: rt.tlas() });
+            if let Some((records, table)) = rt.tables() {
+                list.bind(r::INSTANCES, table);
+                list.bind(r::RECORDS, records);
+            }
+        }
     }
 }
 

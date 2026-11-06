@@ -11,15 +11,22 @@ const VOL_STEPS: i32 = 16;
 const VOL_REACH: f32 = 160.0;
 
 // 1 where the sun reaches camera-relative `rel` (the near shadow map, else the far one), 1 also out
-// of both maps' reach.
+// of both maps' reach. With traced shadows (`scene.rt`) the near map holds the models alone, so the
+// far one (the terrain) is asked as well, and the darker counts: else the air in a valley's shade
+// within the near map's reach was lit (a bright haze over a shaded river at 07:00, rts2_l_rt1).
 fn vol_lit(rel: vec3<f32>) -> f32 {
+    let traced = scene.rt.x > 0.5;
+    var lit = 1.0;
     if scene.shadow.z > 0.5 {
         let c = scene.shadow_view_proj * vec4(rel, 1.0);
         let ndc = c.xyz / c.w;
         if abs(ndc.x) < 0.98 && abs(ndc.y) < 0.98 && ndc.z > 0.0 && ndc.z < 1.0 {
             let at = vec2<i32>(vec2(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5) * scene.shadow.y);
             let d = textureLoad(textures[u32(scene.shadow.x)], at, 0).r;
-            return select(0.0, 1.0, d <= ndc.z + 0.0005);
+            lit = select(0.0, 1.0, d <= ndc.z + 0.0005);
+            if !traced || lit < 0.5 {
+                return lit;
+            }
         }
     }
     if scene.shadow_far.z > 0.5 {
@@ -28,10 +35,10 @@ fn vol_lit(rel: vec3<f32>) -> f32 {
         if abs(ndc.x) < 0.98 && abs(ndc.y) < 0.98 && ndc.z > 0.0 && ndc.z < 1.0 {
             let at = vec2<i32>(vec2(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5) * scene.shadow_far.y);
             let d = textureLoad(textures[u32(scene.shadow_far.x)], at, 0).r;
-            return select(0.0, 1.0, d <= ndc.z + 0.0004);
+            return min(lit, select(0.0, 1.0, d <= ndc.z + 0.0004));
         }
     }
-    return 1.0;
+    return lit;
 }
 
 // The rain's cloud deck as the sky draws it (`look.wgsl` `deck_field`, which this pass has no copy

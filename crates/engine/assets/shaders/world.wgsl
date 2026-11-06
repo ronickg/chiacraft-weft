@@ -22,6 +22,8 @@ struct VOut {
     @location(10) @interpolate(flat) slot: u32,
     @location(11) pos: vec3<f32>,
     @location(12) @interpolate(flat) size: f32,
+    // 1 on a see-through face with the same block behind it (`FACE_BACKED`): its holes are filled.
+    @location(13) @interpolate(flat) backed: u32,
 }
 
 fn shader_of(tex: u32) -> u32 {
@@ -162,6 +164,7 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     out.clip = scene.view_proj * pos;
     out.dist = length(pos.xyz);
     out.uv = UVS[(c + ((w0 >> FACE_TURN_SHIFT) & FACE_TURN_MASK)) % 4u];
+    out.backed = select(0u, 1u, (w0 & FACE_BACKED) != 0u);
     let tex_id = w1 & FACE_TEX_MASK;
     let fr = texture_frame(tex_id);
     out.size = fr.size;
@@ -262,8 +265,26 @@ fn shade(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
     } else {
         lit = block_shade(in.slot, BlockPixel(in.uv, albedo, linear_light, in.pos, scene.params.w));
     }
-    let fog = fog_amount(in.dist, scene.params.x, scene.params.y);
-    return vec4(mix(lit.rgb, scene.fog_color.rgb, fog), lit.a);
+    return vec4(mix(lit.rgb, scene.fog_color.rgb, plain_fog(in.dist)), lit.a);
+}
+
+// How far the fog has closed in at `dist`: vanilla's from 0.6 of the terrain's end, and (chiacraft)
+// with distant terrain, a far fog from half the cubes' reach out to its end that closes in toward
+// it, as Distant Horizons fogs the land under the horizon. With the fog only from 0.6 of a 4096-block far end, the far land
+// stood clear and dark under a pale horizon (Far view, 11-06: the imported Bliss world with
+// shaders off, the strip under the horizon luma 83 against Minecraft + DH's 112). In a liquid
+// (fog start not 0.6 of its end) only the liquid's.
+fn plain_fog(dist: f32) -> f32 {
+    let fog = fog_amount(dist, scene.params.x, scene.params.y);
+    let near = f32(g.extra.w & 0xFFFFFFu) * 16.0;
+    if abs(scene.params.x - 0.6 * scene.params.y) > 0.5 || near <= 0.0 || scene.params.y <= near {
+        return fog;
+    }
+    // Closing in near the end (a cube): linear, the land 400-800 blocks out took half its fog and
+    // went pale where Minecraft + DH's is clear (luma 130-145 against 65; it only fogs the strip
+    // under the horizon).
+    let t = clamp((dist - 0.5 * near) / (scene.params.y - 0.5 * near), 0.0, 1.0);
+    return max(fog, t * t * t);
 }
 
 // Nearest texels with antialiased borders (vanilla 26.1's sampleNearest): up close each texel
@@ -318,15 +339,27 @@ fn sample_cutout(in: VOut, nuv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec4
     return mix(a, b, in.blend);
 }
 
+// What a hole in a face with the same block behind it shows (`FACE_BACKED`): that block's leaves
+// deeper in, its texture's own colour (the smallest mip, opaque texels only) in their shade, as
+// Minecraft's fancy leaves draw the faces between leaves. Holes of the crown's outer shell opened
+// on the sky: under a canopy, 11-20% sky where Minecraft and Bliss show 0.5% (Bliss's own world).
+fn backed_hole(in: VOut, nuv: vec2<f32>) -> vec4<f32> {
+    let avg = textureSampleLevel(textures[in.layer], linear_mipped, nuv, 16.0);
+    return vec4(avg.rgb * 0.35, 1.0);
+}
+
 @fragment
 fn fs_cutout(in: VOut) -> @location(0) vec4<f32> {
     let du = dpdx(in.uv);
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
-    let albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
+    var albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
     // Vanilla's alpha test (GL_GREATER 0.1).
     if albedo.a <= 0.1 {
-        discard;
+        if in.backed == 0u {
+            discard;
+        }
+        albedo = backed_hole(in, nuv);
     }
     return vec4(shade(in, albedo).rgb, 1.0);
 }
@@ -340,16 +373,42 @@ fn fs_translucent(in: VOut) -> @location(0) vec4<f32> {
     return shade(in, albedo);
 }
 
-// Distant terrain (`client::lod`): a record is the `dir` face of a box in its tile, drawn in the
-// average color of its texture (the smallest mip), full sky light. Its pixels in columns whose
-// cubes show their ground are dropped (`lod_mask`); it sits a little lower so the cubes win
-// along the edges.
+// Distant terrain (`client::lod`): a record is the `dir` face of a box in its tile, drawn with its
+// block's texture laid block by block (its mips far off), its overlay and tint, and vanilla's
+// corner shade (chiacraft, after upstream Weft f69243fd, PR #107; it was the texture's average
+// colour, flat), full sky light. Its pixels in columns whose cubes show their ground are dropped
+// (`lod_mask`); it sits a little lower so the cubes win along the edges.
+fn lod_uv(dir: u32, p: vec3<f32>) -> vec2<f32> {
+    if dir == 2u || dir == 3u {
+        return p.xz;
+    }
+    if dir == 0u {
+        return vec2(p.z, -p.y);
+    }
+    if dir == 1u {
+        return vec2(-p.z, -p.y);
+    }
+    if dir == 4u {
+        return vec2(-p.x, -p.y);
+    }
+    return vec2(p.x, -p.y);
+}
+
 @vertex
 fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut {
     let f = vi / 4u;
-    let c = vi % 4u;
     let w0 = records[f * 4u];
     let w1 = records[f * 4u + 1u];
+    // The corner shade (a smooth cell has none); the quad split along its lighter diagonal, as the
+    // cubes' faces.
+    var a = vec4<u32>(3u);
+    if lod_dir(w0) != LOD_FACE_GRID {
+        a = lod_ao(records[f * 4u + 3u]);
+    }
+    var c = vi % 4u;
+    if a.x + a.z < a.y + a.w {
+        c = (c + 1u) % 4u;
+    }
     // A box's face, or a far tile's smooth cell (`lod_corner`, in the prelude).
     let corner = lod_corner(f, c, finish(vec3(0.0), origins[ii]).xyz);
     let dir = corner.dir;
@@ -358,25 +417,34 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     var out: VOut;
     out.clip = scene.view_proj * pos;
     out.dist = length(pos.xyz);
-    out.uv = pos.xz;
-    let fr = texture_frame(w1 & FACE_TEX_MASK);
+    let o = origins[ii] + g.cam_cube;
+    out.pos = vec3<f32>(o.xyz * 16) + local;
+    out.uv = lod_uv(dir, out.pos + vec3(0.0, 0.125, 0.0));
+    let tex_id = w1 & FACE_TEX_MASK;
+    let fr = texture_frame(tex_id);
     out.size = fr.size;
     out.layer = fr.a;
     out.layer2 = fr.b;
     out.blend = fr.blend;
     out.glow = 0xffffffffu;
     out.slot = 0u;
-    out.overlay = 0u;
     out.light = vec4(1.0, 0.0, 0.0, 0.0);
-    let o = origins[ii] + g.cam_cube;
-    out.pos = vec3<f32>(o.xyz * 16) + local;
     let kind = lod_tint(w0);
     var tint = vec3(1.0);
     if kind != 0u {
         tint = unpack_rgb(biomes[corner.biome * g.extra.z + kind - 1u]);
     }
     out.tint = tint;
-    out.color = tint * SHADE[dir];
+    let shade = SHADE[dir] * AO[a[c]];
+    // With an overlay the overlay takes the tint, the base none (as the cubes' faces).
+    let ov = frames[g.extra.x + tex_id];
+    if ov != 0u {
+        out.overlay = texture_frame(ov - 1u).a + 1u;
+        out.color = vec3(shade);
+    } else {
+        out.overlay = 0u;
+        out.color = tint * shade;
+    }
     return out;
 }
 
@@ -392,9 +460,14 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
             discard;
         }
     }
-    var albedo = textureSampleLevel(textures[in.layer], linear_mipped, vec2(0.5), 16.0);
-    if in.blend > 0.0 {
-        albedo = mix(albedo, textureSampleLevel(textures[in.layer2], linear_mipped, vec2(0.5), 16.0), in.blend);
-    }
+    let du = dpdx(in.uv);
+    let dv = dpdy(in.uv);
+    let nuv = nearest_uv(in.size, fract(in.uv), du, dv);
+    var albedo = with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv);
+    // A cutout's clear texels (leaves' gaps) show its colour, not the unset texel's: white under a
+    // tint, as the tint then colours it.
+    let cover = smoothstep(0.1, 0.6, albedo.a);
+    let tinted = any(in.tint != vec3(1.0));
+    albedo = vec4(mix(select(albedo.rgb, vec3(1.0), tinted), albedo.rgb, cover), 1.0);
     return vec4(shade(in, albedo).rgb, 1.0);
 }

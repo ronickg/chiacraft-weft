@@ -253,7 +253,52 @@ pub struct LoadedTexture {
     pub size: u32,
     pub frames: Vec<Vec<Vec<u8>>>,
     pub glow: Vec<Option<Vec<u8>>>,
+    /// Per frame its material maps (`MatMaps`), when the texture has any.
+    pub mat: Vec<Option<MatMaps>>,
     pub anim: Option<Anim>,
+}
+
+/// A frame's material (chiacraft), as LabPBR 1.3 has it: `<name>_s.png` (r smoothness, g F0 or a
+/// metal, b porosity or subsurface, a emission) and `<name>_n.png` (rg the normal, DirectX's y,
+/// b ambient occlusion, a height). Both RGBA at the texture's size, linear; the one a texture
+/// lacks is the format's neutral (`SPEC_NONE`, `NORMAL_NONE`).
+#[derive(Clone)]
+pub struct MatMaps {
+    pub spec: Vec<u8>,
+    pub normal: Vec<u8>,
+}
+
+/// LabPBR's "no material": rough, F0 0.04, no porosity, no emission.
+pub const SPEC_NONE: [u8; 4] = [0, 10, 0, 255];
+/// A flat normal, no occlusion, the surface's own height.
+pub const NORMAL_NONE: [u8; 4] = [128, 128, 255, 255];
+
+/// The material maps of texture `name`, per frame at `size` (nearest, as the texture's frames),
+/// or `None` with neither `_s.png` nor `_n.png` beside it.
+fn material_maps(assets: &Assets, name: &str, count: u32, size: u32) -> Vec<Option<MatMaps>> {
+    let read = |suffix: &str| {
+        assets
+            .beside(name, "textures", "png", suffix)
+            .and_then(|p| std::fs::read(p).ok())
+            .and_then(|b| decode_png(&b))
+            .filter(|m| m.width > 0 && m.height >= m.width)
+    };
+    let (spec, normal) = (read("_s"), read("_n"));
+    if spec.is_none() && normal.is_none() {
+        return vec![None; count as usize];
+    }
+    let frame = |img: &Option<Image>, f: u32, none: [u8; 4]| match img {
+        Some(m) => {
+            let frames = (m.height / m.width).max(1);
+            let bytes = (m.width * m.width * 4) as usize;
+            let at = (f % frames) as usize * bytes;
+            scale_nearest(&m.rgba[at..at + bytes], m.width, size)
+        }
+        None => none.repeat((size * size) as usize),
+    };
+    (0..count)
+        .map(|f| Some(MatMaps { spec: frame(&spec, f, SPEC_NONE), normal: frame(&normal, f, NORMAL_NONE) }))
+        .collect()
 }
 
 /// A picture of the `_e.png` kind as a mask: it glows by its red channel times alpha.
@@ -452,7 +497,8 @@ pub fn load_texture(assets: &Assets, name: &str) -> LoadedTexture {
         log::warn!("texture {name}: frames of block and item textures are square, frame_height is for GUI pictures");
         parse_anim("", [img_width, img_height], 0)
     });
-    LoadedTexture { size, frames, glow, anim }
+    let mat = material_maps(assets, name, count, size);
+    LoadedTexture { size, frames, glow, mat, anim }
 }
 
 /// A texture's width and pixels by name, as the file has them (no frames, no scaling).
@@ -464,28 +510,43 @@ pub fn read_image(assets: &Assets, name: &str) -> Option<(u32, Vec<u8>)> {
 /// One square still image made in the game (a stack's composed look), ready like a file's.
 pub fn image_texture(size: u32, rgba: Vec<u8>) -> LoadedTexture {
     let to = size.max(1).next_power_of_two();
-    LoadedTexture { size: to, frames: vec![mip_chain(scale_nearest(&rgba, size, to), to)], glow: vec![None], anim: None }
+    LoadedTexture { size: to, frames: vec![mip_chain(scale_nearest(&rgba, size, to), to)], glow: vec![None], mat: vec![None], anim: None }
 }
 
 pub fn missing_texture() -> LoadedTexture {
-    LoadedTexture { size: 16, frames: vec![mip_chain(missing(16), 16)], glow: vec![None], anim: None }
+    LoadedTexture { size: 16, frames: vec![mip_chain(missing(16), 16)], glow: vec![None], mat: vec![None], anim: None }
 }
+
+/// What `composite_texture` takes of each part: a picture and its size.
+type Pick = dyn Fn(&LoadedTexture) -> Option<(Vec<u8>, u32)>;
 
 /// A texture made of the top-left, top-right, bottom-left and bottom-right quarters of the first
 /// frames of four others (connected textures' compact form), at the largest of their sizes.
 pub fn composite_texture(parts: [&LoadedTexture; 4]) -> LoadedTexture {
     let size = parts.iter().map(|p| p.size).max().unwrap_or(16);
     let half = (size / 2) as usize;
-    let mut out = vec![0u8; (size * size * 4) as usize];
-    for (q, p) in parts.iter().enumerate() {
-        let from = scale_nearest(&p.frames[0][0], p.size, size);
-        let (qx, qy) = ((q % 2) * half, (q / 2) * half);
-        for y in qy..qy + half {
-            let row = (y * size as usize + qx) * 4;
-            out[row..row + half * 4].copy_from_slice(&from[row..row + half * 4]);
+    // The quarters of `pick`'s picture of each part (its neutral where a part has none).
+    let quarters = |pick: &Pick, none: [u8; 4]| {
+        let mut out = vec![0u8; (size * size * 4) as usize];
+        for (q, p) in parts.iter().enumerate() {
+            let from = pick(p).map_or_else(|| none.repeat((size * size) as usize), |(rgba, s)| scale_nearest(&rgba, s, size));
+            let (qx, qy) = ((q % 2) * half, (q / 2) * half);
+            for y in qy..qy + half {
+                let row = (y * size as usize + qx) * 4;
+                out[row..row + half * 4].copy_from_slice(&from[row..row + half * 4]);
+            }
         }
-    }
-    LoadedTexture { size, frames: vec![mip_chain(out, size)], glow: vec![None], anim: None }
+        out
+    };
+    let out = quarters(&|p| Some((p.frames[0][0].clone(), p.size)), [0; 4]);
+    let mat = parts
+        .iter()
+        .any(|p| p.mat.first().is_some_and(Option::is_some))
+        .then(|| MatMaps {
+            spec: quarters(&|p| p.mat.first().cloned().flatten().map(|m| (m.spec, p.size)), SPEC_NONE),
+            normal: quarters(&|p| p.mat.first().cloned().flatten().map(|m| (m.normal, p.size)), NORMAL_NONE),
+        });
+    LoadedTexture { size, frames: vec![mip_chain(out, size)], glow: vec![None], mat: vec![mat], anim: None }
 }
 
 /// Pictures one over the other, the first at the bottom, each multiplied by its tint
@@ -506,14 +567,20 @@ pub fn layered_texture(parts: &[(&LoadedTexture, u32)]) -> LoadedTexture {
             o[3] = (a + o[3] as u32 * (255 - a) / 255) as u8;
         }
     }
-    LoadedTexture { size, frames: vec![mip_chain(out, size)], glow: vec![None], anim: None }
+    LoadedTexture { size, frames: vec![mip_chain(out, size)], glow: vec![None], mat: vec![None], anim: None }
 }
 
 /// Fingerprint of the files a texture is made of (image, `.anim`, glow masks): changes when any of
 /// them is edited, added or removed, so a reload reads only what changed.
 pub fn texture_stamp(assets: &Assets, name: &str) -> u64 {
     let mut h = weft_noise::FNV;
-    for (n, ext) in [(name.to_string(), "png"), (name.to_string(), "anim"), (format!("{name}_e"), "png"), (format!("{name}_s"), "png")] {
+    for (n, ext) in [
+        (name.to_string(), "png"),
+        (name.to_string(), "anim"),
+        (format!("{name}_e"), "png"),
+        (format!("{name}_s"), "png"),
+        (format!("{name}_n"), "png"),
+    ] {
         let meta = assets
             .path(&n, "textures", ext)
             .and_then(|p| std::fs::metadata(p).ok());
@@ -643,7 +710,7 @@ mod layer_tests {
 
     fn one(size: u32, px: [u8; 4]) -> LoadedTexture {
         let rgba = px.repeat((size * size) as usize);
-        LoadedTexture { size, frames: vec![vec![rgba]], glow: vec![None], anim: None }
+        LoadedTexture { size, frames: vec![vec![rgba]], glow: vec![None], mat: vec![None], anim: None }
     }
 
     #[test]
