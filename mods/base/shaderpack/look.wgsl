@@ -75,6 +75,8 @@ const OPT_FOLIAGE_TEST: u32 = 26u;
 const OPT_WHITE: u32 = 27u;
 // A test (the tree diagnosis, 11-05): 1 takes the corner shade (AO) away, 0 as made.
 const OPT_AO_TEST: u32 = 28u;
+// The HDR world's sharpening (`base:look_sharpen`, 0 none to 1; 0.4 by default, Bliss's).
+const OPT_SHARPEN: u32 = 29u;
 
 // The colour a grass or leaf tint is multiplied by for the foliage test: 1 as made.
 fn foliage_test() -> vec3<f32> {

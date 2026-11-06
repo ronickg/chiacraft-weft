@@ -181,4 +181,6 @@ chiacraft's pack reads these settings (`mods/base/src/look.rs`; Mod Settings in 
 | `base:look_white` | 1.6, -1..2.5 | with the HDR world: the white balance by day after the curve, 0 neutral, more warmer and less blue |
 | `base:look_sky_light` | 1, 0.2-1.5 | the sky's light in the shade, scaled (with the HDR world 0.6 of it as made, times this) |
 | `base:look_foliage_test` | 0, 0-1 | a test: grass and leaf tints darker and less yellow (1: 30% darker) |
+| `base:look_ao_test` | 0, 0-1 | a test: takes the corner shade (AO) away |
+| `base:look_sharpen` | 0.4, 0-1 | with the HDR world: contrast-adaptive sharpening in the last pass (Bliss runs 0.35-0.4) |
 
