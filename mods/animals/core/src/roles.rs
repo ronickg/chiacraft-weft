@@ -47,6 +47,16 @@ pub const CHARGE: f64 = 3.5;
 pub const CHARGE_HIT: f32 = 0.15;
 pub const CHARGE_SPEED: f32 = 1.5;
 
+/// Social moments in an animal's idle life (`anim`, every 15-40 s while it stands idle), by its
+/// kind's `biology::Social`: a young one's moment is play, in percent, more often in a pack or
+/// herd (pups, foals and kids play with each other; a lone kind's young less); a mother's is
+/// nuzzling one of her young when one is within `NUZZLE_NEAR` blocks; otherwise it looks round,
+/// sniffs, scratches or grooms, and a pack's or herd's grooming comes up twice as often.
+pub const PLAY_GROUP: u32 = 60;
+pub const PLAY_ALONE: u32 = 35;
+pub const NUZZLE: u32 = 50;
+pub const NUZZLE_NEAR: f64 = 4.0;
+
 /// How far a young or hurt prey counts as from a pack's hunter, times its distance: the young at
 /// `YOUNG`, the hurt by how hurt (half at no health left).
 pub const YOUNG: f32 = 0.5;

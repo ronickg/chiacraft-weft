@@ -97,6 +97,10 @@ struct Frame {
     fence: vk::Fence,
     staging: Staging,
     deferred: Vec<Deferred>,
+    /// Without push descriptors: the pools this frame's buffer sets come from, reset when the
+    /// slot is ready again, and the one in use.
+    set_pools: Vec<vk::DescriptorPool>,
+    set_pool: usize,
     waited: bool,
     /// Timestamps written by the frame now in flight in this slot.
     marks: u32,
@@ -134,7 +138,14 @@ pub struct VulkanBackend {
     device: ash::Device,
     queue: vk::Queue,
     swapchain_fn: khr::swapchain::Device,
-    push_fn: khr::push_descriptor::Device,
+    /// None where the device has no `VK_KHR_push_descriptor` (the Android emulator): per-draw
+    /// buffers then go through descriptor sets from each frame's pools (`bind_buffer_set`).
+    push_fn: Option<khr::push_descriptor::Device>,
+    /// Android with `VK_EXT_image_compression_control`: render targets are made uncompressed
+    /// (`create_texture`). See `compression_off`.
+    no_compression: bool,
+    /// `Backend::hand_own_pass`: on Imagination's driver (`WEFT_HAND_PASS=0/1` to compare).
+    hand_own_pass: bool,
     allocator: ManuallyDrop<Allocator>,
     /// The memory types outside the GPU's own heaps (system memory), where a GPU-only allocation goes
     /// when the GPU's memory is full (`allocate`). None on a GPU that shares the system's memory.
@@ -272,10 +283,10 @@ impl VulkanBackend {
                 .map_err(err("window handle"))?
                 .as_raw();
 
-            let mut exts: Vec<*const i8> = ash_window::enumerate_required_extensions(display)
+            let mut exts: Vec<*const std::ffi::c_char> = ash_window::enumerate_required_extensions(display)
                 .map_err(err("surface extensions"))?
                 .to_vec();
-            let mut layers: Vec<*const i8> = Vec::new();
+            let mut layers: Vec<*const std::ffi::c_char> = Vec::new();
             let validation = c"VK_LAYER_KHRONOS_validation";
             let debug = desc.debug
                 && entry
@@ -447,6 +458,7 @@ impl VulkanBackend {
             }
             // Optional: without it the count draws draw all their records (MoltenVK has none).
             // `WEFT_NO_INDIRECT_COUNT=1` does without it on any GPU, to check that path.
+            let imagination = driver.driver_id == vk::DriverId::IMAGINATION_PROPRIETARY;
             let indirect_count = has12.draw_indirect_count != vk::FALSE && std::env::var_os("WEFT_NO_INDIRECT_COUNT").is_none();
             if !indirect_count {
                 log::info!("{device_name}: no drawIndirectCount, indirect count draws draw every record");
@@ -476,14 +488,38 @@ impl VulkanBackend {
                 .push_next(&mut f11)
                 .push_next(&mut f12)
                 .push_next(&mut f13);
-            let mut dev_exts = vec![khr::swapchain::NAME.as_ptr(), khr::push_descriptor::NAME.as_ptr()];
+            let has_ext = |name: &std::ffi::CStr| {
+                instance
+                    .enumerate_device_extension_properties(pdev)
+                    .unwrap_or_default()
+                    .iter()
+                    .any(|e| e.extension_name_as_c_str() == Ok(name))
+            };
+            let mut dev_exts = vec![khr::swapchain::NAME.as_ptr()];
+            // Optional: the Android emulator's Vulkan has none (descriptor sets instead).
+            let push = has_ext(khr::push_descriptor::NAME);
+            if push {
+                dev_exts.push(khr::push_descriptor::NAME.as_ptr());
+            } else {
+                log::info!("{device_name}: no VK_KHR_push_descriptor, per-draw buffers through descriptor sets");
+            }
+            // Android: render targets without the GPU's framebuffer compression (`compression_off`).
+            let mut compression = vk::PhysicalDeviceImageCompressionControlFeaturesEXT::default();
+            let no_compression = cfg!(target_os = "android")
+                && std::env::var_os("WEFT_KEEP_COMPRESSION").is_none()
+                && has_ext(ext::image_compression_control::NAME)
+                && {
+                    let mut f = vk::PhysicalDeviceFeatures2::default().push_next(&mut compression);
+                    instance.get_physical_device_features2(pdev, &mut f);
+                    compression.image_compression_control != vk::FALSE
+                };
+            if no_compression {
+                dev_exts.push(ext::image_compression_control::NAME.as_ptr());
+                log::info!("{device_name}: render targets without framebuffer compression");
+            }
+            let mut compression = vk::PhysicalDeviceImageCompressionControlFeaturesEXT::default().image_compression_control(no_compression);
             // A driver that has this extension requires it to be enabled.
-            if instance
-                .enumerate_device_extension_properties(pdev)
-                .unwrap_or_default()
-                .iter()
-                .any(|e| e.extension_name_as_c_str() == Ok(khr::portability_subset::NAME))
-            {
+            if has_ext(khr::portability_subset::NAME) {
                 dev_exts.push(khr::portability_subset::NAME.as_ptr());
             }
             let prio = [1.0];
@@ -496,7 +532,8 @@ impl VulkanBackend {
                     &vk::DeviceCreateInfo::default()
                         .queue_create_infos(&qinfo)
                         .enabled_extension_names(&dev_exts)
-                        .push_next(&mut f2),
+                        .push_next(&mut f2)
+                        .push_next(&mut compression),
                     None,
                 )
                 .map_err(err("vkCreateDevice"))?;
@@ -514,7 +551,7 @@ impl VulkanBackend {
             let spill = spill_types(&instance.get_physical_device_memory_properties(pdev));
 
             let swapchain_fn = khr::swapchain::Device::new(&instance, &device);
-            let push_fn = khr::push_descriptor::Device::new(&instance, &device);
+            let push_fn = push.then(|| khr::push_descriptor::Device::new(&instance, &device));
 
             let mut frames = Vec::new();
             for _ in 0..FRAMES {
@@ -544,6 +581,8 @@ impl VulkanBackend {
                         .map_err(err("fence"))?,
                     staging: Staging { chunks: Vec::new(), current: 0, used: 0 },
                     deferred: Vec::new(),
+                    set_pools: Vec::new(),
+                    set_pool: 0,
                     waited: false,
                     marks: 0,
                 });
@@ -672,6 +711,12 @@ impl VulkanBackend {
                 queue,
                 swapchain_fn,
                 push_fn,
+                no_compression,
+                hand_own_pass: match std::env::var("WEFT_HAND_PASS").as_deref() {
+                    Ok("0") => false,
+                    Ok(_) => true,
+                    Err(_) => imagination,
+                },
                 allocator: ManuallyDrop::new(allocator),
                 spill,
                 swapchain: None,
@@ -808,6 +853,22 @@ impl VulkanBackend {
             if caps.max_image_count > 0 {
                 count = count.min(caps.max_image_count);
             }
+            // Android: the compositor turns the picture for a rotated display, so the game draws
+            // upright (the device's own turn would have it draw rotated). Android also often has
+            // only INHERIT for alpha.
+            let transform = if cfg!(target_os = "android")
+                && caps
+                    .supported_transforms
+                    .contains(vk::SurfaceTransformFlagsKHR::IDENTITY)
+            {
+                vk::SurfaceTransformFlagsKHR::IDENTITY
+            } else {
+                caps.current_transform
+            };
+            let alpha = [vk::CompositeAlphaFlagsKHR::OPAQUE, vk::CompositeAlphaFlagsKHR::INHERIT]
+                .into_iter()
+                .find(|a| caps.supported_composite_alpha.contains(*a))
+                .unwrap_or(vk::CompositeAlphaFlagsKHR::OPAQUE);
             let old = self.swapchain.take();
             let raw = self
                 .swapchain_fn
@@ -821,8 +882,8 @@ impl VulkanBackend {
                         .image_array_layers(1)
                         .image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC)
                         .image_sharing_mode(vk::SharingMode::EXCLUSIVE)
-                        .pre_transform(caps.current_transform)
-                        .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
+                        .pre_transform(transform)
+                        .composite_alpha(alpha)
                         .present_mode(mode)
                         .clipped(true)
                         .old_swapchain(old.as_ref().map_or(vk::SwapchainKHR::null(), |s| s.raw)),
@@ -876,6 +937,25 @@ impl VulkanBackend {
         }
     }
 
+    /// The swapchain still works but no longer fits the surface exactly: made again. On Android a
+    /// phone held sideways says so on every present, as the game leaves the turning to the
+    /// compositor (IDENTITY, `recreate_swapchain`): there only a new size counts. Made again each
+    /// time, the Pixel 10 rebuilt its swapchain (and waited for the GPU) every few frames.
+    fn suboptimal(&mut self) {
+        if cfg!(target_os = "android") {
+            let caps = unsafe {
+                self.surface_fn
+                    .get_physical_device_surface_capabilities(self.pdev, self.surface)
+            };
+            if let (Ok(caps), Some(sc)) = (caps, self.swapchain.as_ref())
+                && caps.current_extent == sc.extent
+            {
+                return;
+            }
+        }
+        self.dirty_swapchain = true;
+    }
+
     unsafe fn destroy_swapchain(&mut self, sc: Swapchain) {
         unsafe {
             for v in sc.views {
@@ -885,6 +965,77 @@ impl VulkanBackend {
                 self.device.destroy_semaphore(s, None);
             }
             self.swapchain_fn.destroy_swapchain(sc.raw, None);
+        }
+    }
+
+    /// Without push descriptors: a set for `set_layout` from this frame's pools with every buffer
+    /// in `bound` the pipeline reads (`wanted`), bound as set 1.
+    unsafe fn bind_buffer_set(
+        &mut self,
+        cmd: vk::CommandBuffer,
+        layout: vk::PipelineLayout,
+        set_layout: vk::DescriptorSetLayout,
+        bind_point: vk::PipelineBindPoint,
+        wanted: &[(u32, vk::DescriptorType)],
+        bound: &[(u32, vk::DescriptorType, vk::DescriptorBufferInfo)],
+    ) {
+        unsafe {
+            let layouts = [set_layout];
+            let set = loop {
+                let frame = &mut self.frames[self.slot];
+                let fresh = frame.set_pool == frame.set_pools.len();
+                if fresh {
+                    let sizes = [
+                        vk::DescriptorPoolSize { ty: vk::DescriptorType::STORAGE_BUFFER, descriptor_count: 8192 },
+                        vk::DescriptorPoolSize { ty: vk::DescriptorType::UNIFORM_BUFFER, descriptor_count: 2048 },
+                    ];
+                    match self.device.create_descriptor_pool(
+                        &vk::DescriptorPoolCreateInfo::default()
+                            .max_sets(2048)
+                            .pool_sizes(&sizes),
+                        None,
+                    ) {
+                        Ok(p) => frame.set_pools.push(p),
+                        Err(e) => {
+                            log::error!("descriptor pool: {e:?}");
+                            return;
+                        }
+                    }
+                }
+                let pool = frame.set_pools[frame.set_pool];
+                match self.device.allocate_descriptor_sets(
+                    &vk::DescriptorSetAllocateInfo::default()
+                        .descriptor_pool(pool)
+                        .set_layouts(&layouts),
+                ) {
+                    Ok(sets) => break sets[0],
+                    Err(e) if fresh => {
+                        log::error!("descriptor set: {e:?}");
+                        return;
+                    }
+                    // Full: the next pool (made when there is none).
+                    Err(_) => frame.set_pool += 1,
+                }
+            };
+            let infos: Vec<[vk::DescriptorBufferInfo; 1]> = wanted
+                .iter()
+                .filter_map(|&(b, ty)| bound.iter().find(|x| x.0 == b && x.1 == ty).map(|x| [x.2]))
+                .collect();
+            let writes: Vec<vk::WriteDescriptorSet> = wanted
+                .iter()
+                .filter(|&&(b, ty)| bound.iter().any(|x| x.0 == b && x.1 == ty))
+                .zip(&infos)
+                .map(|(&(b, ty), info)| {
+                    vk::WriteDescriptorSet::default()
+                        .dst_set(set)
+                        .dst_binding(b)
+                        .descriptor_type(ty)
+                        .buffer_info(info)
+                })
+                .collect();
+            self.device.update_descriptor_sets(&writes, &[]);
+            self.device
+                .cmd_bind_descriptor_sets(cmd, bind_point, layout, 1, &[set], &[]);
         }
     }
 
@@ -915,6 +1066,14 @@ impl VulkanBackend {
                 .ok();
         }
         frame.waited = true;
+        for &pool in &frame.set_pools {
+            unsafe {
+                self.device
+                    .reset_descriptor_pool(pool, vk::DescriptorPoolResetFlags::empty())
+                    .ok();
+            }
+        }
+        frame.set_pool = 0;
         frame.staging.current = 0;
         frame.staging.used = 0;
         for (to, data) in std::mem::take(&mut self.early) {
@@ -1151,7 +1310,30 @@ impl VulkanBackend {
                             (color_range(t.desc.mips), vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
                         };
                         let image = t.image;
-                        self.barrier_image(cmd, image, range, vk::ImageLayout::UNDEFINED, new);
+                        // Cleared to zeros, not left as the memory was: a desktop driver's new
+                        // memory happened to be zeros, a phone's (the Pixel 10's PowerVR) held
+                        // leftovers and NaNs, which screen effects reading a target before it was
+                        // first written (histories, half-size targets) showed as black blocks
+                        // with coloured specks.
+                        self.barrier_image(cmd, image, range, vk::ImageLayout::UNDEFINED, vk::ImageLayout::TRANSFER_DST_OPTIMAL);
+                        if depth {
+                            self.device.cmd_clear_depth_stencil_image(
+                                cmd,
+                                image,
+                                vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                                &vk::ClearDepthStencilValue { depth: 0.0, stencil: 0 },
+                                &[range],
+                            );
+                        } else {
+                            self.device.cmd_clear_color_image(
+                                cmd,
+                                image,
+                                vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                                &vk::ClearColorValue { float32: [0.0; 4] },
+                                &[range],
+                            );
+                        }
+                        self.barrier_image(cmd, image, range, vk::ImageLayout::TRANSFER_DST_OPTIMAL, new);
                         self.textures.get_mut(id).layout = new;
                     }
                 }
@@ -1159,6 +1341,149 @@ impl VulkanBackend {
             self.memory_barrier(cmd);
         }
     }
+}
+
+/// **(Weft bug, naga 30)** naga marks a texture loaded from the bindless array with a
+/// non-uniform index `NonUniform`, but not the `OpSampledImage` made from it, which is the operand
+/// the sample reads and which Vulkan requires marked (VUID-RuntimeSpirv-NonUniform-06274). NVIDIA
+/// samples right without it; the Pixel 10's PowerVR sampled one texture for a whole group of
+/// pixels where two textures met (black blocks with coloured specks at plants' edges and water).
+/// So each `OpSampledImage` of a `NonUniform` image gets the decoration too.
+fn non_uniform_sampled_images(words: Vec<u32>) -> Vec<u32> {
+    const OP_DECORATE: u32 = 71;
+    const OP_SAMPLED_IMAGE: u32 = 86;
+    const NON_UNIFORM: u32 = 5300;
+    if words.len() < 5 {
+        return words;
+    }
+    // Instructions after the five-word header: (where it starts, opcode, length).
+    let mut at = 5;
+    let mut ops = Vec::new();
+    while at < words.len() {
+        let (len, op) = ((words[at] >> 16) as usize, words[at] & 0xffff);
+        if len == 0 || at + len > words.len() {
+            return words;
+        }
+        ops.push((at, op, len));
+        at += len;
+    }
+    let mut marked: std::collections::HashSet<u32> = std::collections::HashSet::new();
+    let mut last_decorate = None;
+    for &(at, op, len) in &ops {
+        if op == OP_DECORATE {
+            last_decorate = Some(at + len);
+            if len >= 3 && words[at + 2] == NON_UNIFORM {
+                marked.insert(words[at + 1]);
+            }
+        }
+    }
+    let add: Vec<u32> = ops
+        .iter()
+        .filter(|&&(at, op, len)| op == OP_SAMPLED_IMAGE && len >= 5 && marked.contains(&words[at + 3]) && !marked.contains(&words[at + 2]))
+        .map(|&(at, ..)| words[at + 2])
+        .collect();
+    let Some(insert) = last_decorate.filter(|_| !add.is_empty()) else { return words };
+    let mut out = Vec::with_capacity(words.len() + add.len() * 3);
+    out.extend_from_slice(&words[..insert]);
+    for id in add {
+        out.extend_from_slice(&[(3 << 16) | OP_DECORATE, id, NON_UNIFORM]);
+    }
+    out.extend_from_slice(&words[insert..]);
+    out
+}
+
+/// **(Weft bug, naga 30)** naga gives arrays in workgroup memory an `ArrayStride`, which Vulkan
+/// forbids there (VUID-StandaloneSpirv-None-10684; the validation layer names three of the
+/// engine's compute shaders). NVIDIA ignores it; on the Pixel 10's PowerVR the terrain those
+/// shaders build came out wrong (pieces of ground floating in the air, faces from under the ground
+/// showing through it). The decoration is dropped from arrays only workgroup memory uses.
+fn workgroup_arrays_without_stride(words: Vec<u32>) -> Vec<u32> {
+    use std::collections::{HashMap, HashSet};
+    const OP_TYPE_ARRAY: u32 = 28;
+    const OP_TYPE_RUNTIME_ARRAY: u32 = 29;
+    const OP_TYPE_STRUCT: u32 = 30;
+    const OP_TYPE_POINTER: u32 = 32;
+    const OP_VARIABLE: u32 = 59;
+    const OP_DECORATE: u32 = 71;
+    const ARRAY_STRIDE: u32 = 6;
+    const WORKGROUP: u32 = 4;
+    // Storage classes whose memory has an explicit layout: a type also used there keeps it.
+    const LAID_OUT: [u32; 4] = [2, 9, 12, 5349];
+    if words.len() < 5 {
+        return words;
+    }
+    let mut at = 5;
+    let mut ops = Vec::new();
+    while at < words.len() {
+        let (len, op) = ((words[at] >> 16) as usize, words[at] & 0xffff);
+        if len == 0 || at + len > words.len() {
+            return words;
+        }
+        ops.push((at, op, len));
+        at += len;
+    }
+    // What each array or struct type is made of, and each pointer type's class and pointee.
+    let mut parts: HashMap<u32, Vec<u32>> = HashMap::new();
+    let mut arrays: HashSet<u32> = HashSet::new();
+    let mut pointers: HashMap<u32, (u32, u32)> = HashMap::new();
+    let mut workgroup_vars: Vec<u32> = Vec::new();
+    for &(at, op, len) in &ops {
+        let w = &words[at..at + len];
+        match op {
+            OP_TYPE_ARRAY | OP_TYPE_RUNTIME_ARRAY if len >= 3 => {
+                arrays.insert(w[1]);
+                parts.insert(w[1], vec![w[2]]);
+            }
+            OP_TYPE_STRUCT if len >= 2 => {
+                parts.insert(w[1], w[2..].to_vec());
+            }
+            OP_TYPE_POINTER if len >= 4 => {
+                pointers.insert(w[1], (w[2], w[3]));
+            }
+            OP_VARIABLE if len >= 4 && w[3] == WORKGROUP => workgroup_vars.push(w[1]),
+            _ => {}
+        }
+    }
+    let reach = |from: u32| {
+        let mut seen = HashSet::new();
+        let mut todo = vec![from];
+        while let Some(t) = todo.pop() {
+            if seen.insert(t) {
+                todo.extend(parts.get(&t).into_iter().flatten().copied());
+            }
+        }
+        seen
+    };
+    let mut shared: HashSet<u32> = HashSet::new();
+    let mut laid_out: HashSet<u32> = HashSet::new();
+    for &(class, pointee) in pointers.values() {
+        if class == WORKGROUP {
+            shared.extend(reach(pointee));
+        } else if LAID_OUT.contains(&class) {
+            laid_out.extend(reach(pointee));
+        }
+    }
+    if workgroup_vars.is_empty() {
+        return words;
+    }
+    let drop: HashSet<u32> = shared
+        .iter()
+        .copied()
+        .filter(|t| arrays.contains(t) && !laid_out.contains(t))
+        .collect();
+    if drop.is_empty() {
+        return words;
+    }
+    let mut out = Vec::with_capacity(words.len());
+    out.extend_from_slice(&words[..5]);
+    for &(at, op, len) in &ops {
+        let w = &words[at..at + len];
+        if op == OP_DECORATE && len >= 4 && w[2] == ARRAY_STRIDE && drop.contains(&w[1]) {
+            continue;
+        }
+        out.extend_from_slice(w);
+    }
+    out
 }
 
 fn color_range(mips: u32) -> vk::ImageSubresourceRange {
@@ -1265,6 +1590,7 @@ impl VulkanBackend {
             Some(&naga::back::spv::PipelineOptions { shader_stage: stage, entry_point: entry.to_string() }),
         )
         .map_err(|e| Error(format!("SPIR-V for {entry}: {e}")))?;
+        let words = workgroup_arrays_without_stride(non_uniform_sampled_images(words));
         unsafe {
             self.device
                 .create_shader_module(&vk::ShaderModuleCreateInfo::default().code(&words), None)
@@ -1300,7 +1626,11 @@ impl VulkanBackend {
                 .create_descriptor_set_layout(
                     &vk::DescriptorSetLayoutCreateInfo::default()
                         .bindings(&bindings)
-                        .flags(vk::DescriptorSetLayoutCreateFlags::PUSH_DESCRIPTOR_KHR),
+                        .flags(if self.push_fn.is_some() {
+                            vk::DescriptorSetLayoutCreateFlags::PUSH_DESCRIPTOR_KHR
+                        } else {
+                            vk::DescriptorSetLayoutCreateFlags::empty()
+                        }),
                     None,
                 )
                 .map_err(err("push descriptor layout"))?;
@@ -1344,10 +1674,48 @@ impl Backend for VulkanBackend {
         self.indirect_count
     }
 
+    fn hand_own_pass(&self) -> bool {
+        self.hand_own_pass
+    }
+
     fn surface_size(&self) -> (u32, u32) {
         self.swapchain
             .as_ref()
             .map_or(self.want_size, |s| (s.extent.width, s.extent.height))
+    }
+
+    fn surface_lost(&mut self) {
+        unsafe {
+            self.device.device_wait_idle().ok();
+            if let Some(sc) = self.swapchain.take() {
+                self.destroy_swapchain(sc);
+            }
+            if self.surface != vk::SurfaceKHR::null() {
+                self.surface_fn.destroy_surface(self.surface, None);
+                self.surface = vk::SurfaceKHR::null();
+            }
+        }
+        self.image_index = None;
+        log::info!("surface lost: swapchain and surface dropped");
+    }
+
+    fn surface_restored(&mut self, window: &dyn Window) -> Result<(), Error> {
+        if self.surface != vk::SurfaceKHR::null() {
+            return Ok(());
+        }
+        let display = window
+            .display_handle()
+            .map_err(err("display handle"))?
+            .as_raw();
+        let raw = window
+            .window_handle()
+            .map_err(err("window handle"))?
+            .as_raw();
+        self.surface =
+            unsafe { ash_window::create_surface(&self._entry, &self.instance, display, raw, None) }.map_err(err("creating surface"))?;
+        self.dirty_swapchain = true;
+        log::info!("surface restored");
+        Ok(())
     }
 
     fn resize(&mut self, width: u32, height: u32) {
@@ -1431,7 +1799,10 @@ impl Backend for VulkanBackend {
         // Depth is also sampled: screen effects read how far each pixel is (it stays bindless,
         // read in SHADER_READ_ONLY_OPTIMAL between the passes that draw into it).
         let usage = if depth {
-            vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT | vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_SRC
+            vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT
+                | vk::ImageUsageFlags::SAMPLED
+                | vk::ImageUsageFlags::TRANSFER_SRC
+                | vk::ImageUsageFlags::TRANSFER_DST
         } else {
             let mut u = vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST;
             if desc.render_target {
@@ -1439,21 +1810,26 @@ impl Backend for VulkanBackend {
             }
             u
         };
+        // The Pixel 10's PowerVR: a target cleared by its pass and then read as a texture came back
+        // as garbage in every tile only the clear had touched (black and random-coloured squares
+        // where the sky was, the water's copy of what is behind it); uncompressed, it reads right.
+        let mut compression_off = vk::ImageCompressionControlEXT::default().flags(vk::ImageCompressionFlagsEXT::DISABLED);
+        let mut info = vk::ImageCreateInfo::default()
+            .image_type(vk::ImageType::TYPE_2D)
+            .format(format)
+            .extent(vk::Extent3D { width: desc.width, height: desc.height, depth: 1 })
+            .mip_levels(desc.mips)
+            .array_layers(1)
+            .samples(vk::SampleCountFlags::TYPE_1)
+            .tiling(vk::ImageTiling::OPTIMAL)
+            .usage(usage);
+        if self.no_compression && (desc.render_target || depth) {
+            info = info.push_next(&mut compression_off);
+        }
         unsafe {
             let image = self
                 .device
-                .create_image(
-                    &vk::ImageCreateInfo::default()
-                        .image_type(vk::ImageType::TYPE_2D)
-                        .format(format)
-                        .extent(vk::Extent3D { width: desc.width, height: desc.height, depth: 1 })
-                        .mip_levels(desc.mips)
-                        .array_layers(1)
-                        .samples(vk::SampleCountFlags::TYPE_1)
-                        .tiling(vk::ImageTiling::OPTIMAL)
-                        .usage(usage),
-                    None,
-                )
+                .create_image(&info, None)
                 .expect("vkCreateImage");
             let requirements = self.device.get_image_memory_requirements(image);
             let alloc_desc = AllocationCreateDesc {
@@ -1678,6 +2054,10 @@ impl Backend for VulkanBackend {
     }
 
     fn begin_frame(&mut self) -> Option<FrameInfo> {
+        // Between `surface_lost` and `surface_restored` (the app in the background on Android).
+        if self.surface == vk::SurfaceKHR::null() {
+            return None;
+        }
         let t0 = std::time::Instant::now();
         self.ensure_slot_ready();
         let t1 = std::time::Instant::now();
@@ -1696,11 +2076,12 @@ impl Backend for VulkanBackend {
         self.submit_split.begun = [t1 - t0, t1.elapsed()].map(|d| d.as_secs_f32() * 1000.0);
         match result {
             Ok((index, suboptimal)) => {
+                let extent = sc.extent;
                 if suboptimal {
-                    self.dirty_swapchain = true;
+                    self.suboptimal();
                 }
                 self.image_index = Some(index);
-                Some(FrameInfo { width: sc.extent.width, height: sc.extent.height, slot: self.slot })
+                Some(FrameInfo { width: extent.width, height: extent.height, slot: self.slot })
             }
             Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
                 self.dirty_swapchain = true;
@@ -1740,13 +2121,45 @@ impl Backend for VulkanBackend {
             let mut marks = 2;
             let sets = [self.global_set];
             let mut current: Option<u32> = None;
+            // Without push descriptors: the buffers bound so far (binding, type, buffer), which
+            // each new set carries, as a push keeps the bindings it doesn't write.
+            let mut bound: Vec<(u32, vk::DescriptorType, vk::DescriptorBufferInfo)> = Vec::new();
             let mut in_pass_targets: Vec<u32> = Vec::new();
             let mut in_pass_depth: Option<u32> = None;
             let (sc_image, sc_view, sc_extent) = {
                 let sc = self.swapchain.as_ref().unwrap();
                 (sc.images[image_index as usize], sc.views[image_index as usize], sc.extent)
             };
-            for cmd_item in &list.cmds {
+            // `Cmd::PassBreak`: the pass in progress ended and begun again, loading what it drew.
+            let broken;
+            let cmds: &[Cmd] = if list.cmds.iter().any(|c| matches!(c, Cmd::PassBreak)) {
+                let mut out = Vec::with_capacity(list.cmds.len() + 8);
+                let mut open: Option<Cmd> = None;
+                for c in &list.cmds {
+                    match *c {
+                        Cmd::BeginPass { color, depth } => {
+                            open = Some(Cmd::BeginPass { color: color.map(|(t, _)| (t, None)), depth: depth.map(|(t, _)| (t, None)) });
+                            out.push(*c);
+                        }
+                        Cmd::EndPass => {
+                            open = None;
+                            out.push(*c);
+                        }
+                        Cmd::PassBreak => {
+                            if let Some(again) = open {
+                                out.push(Cmd::EndPass);
+                                out.push(again);
+                            }
+                        }
+                        _ => out.push(*c),
+                    }
+                }
+                broken = out;
+                &broken
+            } else {
+                &list.cmds
+            };
+            for cmd_item in cmds {
                 match *cmd_item {
                     Cmd::BeginPass { color, depth } => {
                         let mut extent = sc_extent;
@@ -1875,12 +2288,19 @@ impl Backend for VulkanBackend {
                         let b = self.buffers.get(buffer.0);
                         let range = if size == u64::MAX { vk::WHOLE_SIZE } else { size };
                         let info = [vk::DescriptorBufferInfo { buffer: b.raw, offset, range }];
-                        let write = vk::WriteDescriptorSet::default()
-                            .dst_binding(binding)
-                            .descriptor_type(ty)
-                            .buffer_info(&info);
-                        self.push_fn
-                            .cmd_push_descriptor_set(cmd, pl.bind_point, pl.layout, 1, &[write]);
+                        if let Some(push_fn) = &self.push_fn {
+                            let write = vk::WriteDescriptorSet::default()
+                                .dst_binding(binding)
+                                .descriptor_type(ty)
+                                .buffer_info(&info);
+                            push_fn.cmd_push_descriptor_set(cmd, pl.bind_point, pl.layout, 1, &[write]);
+                        } else {
+                            bound.retain(|b| b.0 != binding);
+                            bound.push((binding, ty, info[0]));
+                            let (layout, set_layout, bind_point) = (pl.layout, pl.set_layout, pl.bind_point);
+                            let wanted: Vec<(u32, vk::DescriptorType)> = pl.buffers.clone();
+                            self.bind_buffer_set(cmd, layout, set_layout, bind_point, &wanted, &bound);
+                        }
                     }
                     Cmd::PushConstants { start, len } => {
                         let Some(p) = current else { continue };
@@ -1973,6 +2393,8 @@ impl Backend for VulkanBackend {
                         self.barrier_image(cmd, image, depth_range(), vk::ImageLayout::TRANSFER_SRC_OPTIMAL, back);
                         self.textures.get_mut(depth.0).layout = back;
                     }
+                    // Expanded into an end and a begin above.
+                    Cmd::PassBreak => {}
                     Cmd::Mark => {
                         if marks < MAX_MARKS - 1 {
                             self.device
@@ -2056,7 +2478,8 @@ impl Backend for VulkanBackend {
                 .image_indices(&indices);
             match self.swapchain_fn.queue_present(self.queue, &present) {
                 Ok(false) => {}
-                Ok(true) | Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => self.dirty_swapchain = true,
+                Ok(true) => self.suboptimal(),
+                Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => self.dirty_swapchain = true,
                 Err(e) => log::error!("vkQueuePresentKHR: {e:?}"),
             }
         }
@@ -2139,6 +2562,9 @@ impl Drop for VulkanBackend {
                 }
                 let f = &self.frames[i];
                 self.device.destroy_command_pool(f.pool, None);
+                for &pool in &f.set_pools {
+                    self.device.destroy_descriptor_pool(pool, None);
+                }
                 self.device.destroy_semaphore(f.acquired, None);
                 self.device.destroy_fence(f.fence, None);
             }
@@ -2193,6 +2619,78 @@ impl Drop for VulkanBackend {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A texture from the bindless array by a per-pixel index, sampled in a helper function: the
+    /// `OpSampledImage` gets `NonUniform` like the image it is made from (naga 30 leaves it off).
+    #[test]
+    fn sampled_images_of_non_uniform_textures_are_marked() {
+        let src = r#"enable wgpu_binding_array;
+@group(0) @binding(0) var textures: binding_array<texture_2d<f32>>;
+@group(0) @binding(1) var samp: sampler;
+struct VOut { @builtin(position) pos: vec4<f32>, @location(0) @interpolate(flat) layer: u32, @location(1) uv: vec2<f32> };
+fn sample(in: VOut) -> vec4<f32> { return textureSample(textures[in.layer], samp, in.uv); }
+@fragment fn fs(in: VOut) -> @location(0) vec4<f32> { return sample(in); }
+"#;
+        let module = naga::front::wgsl::parse_str(src).unwrap();
+        let info = naga::valid::Validator::new(naga::valid::ValidationFlags::all(), naga::valid::Capabilities::all())
+            .validate(&module)
+            .unwrap();
+        let words = naga::back::spv::write_vec(&module, &info, &Default::default(), None).unwrap();
+        let fixed = non_uniform_sampled_images(words.clone());
+        assert_eq!(fixed.len(), words.len() + 3, "one decoration added");
+        // The added decoration names the OpSampledImage's result.
+        let mut at = 5;
+        let mut sampled = None;
+        while at < fixed.len() {
+            let (len, op) = ((fixed[at] >> 16) as usize, fixed[at] & 0xffff);
+            if op == 86 {
+                sampled = Some(fixed[at + 2]);
+            }
+            at += len;
+        }
+        let sampled = sampled.unwrap();
+        assert!(
+            fixed
+                .windows(3)
+                .any(|w| w == [(3 << 16) | 71, sampled, 5300])
+        );
+        // Again changes nothing.
+        assert_eq!(non_uniform_sampled_images(fixed.clone()), fixed);
+    }
+
+    /// A workgroup array loses its `ArrayStride`; one also in a storage buffer keeps it.
+    #[test]
+    fn workgroup_arrays_lose_their_stride() {
+        let src = r#"
+var<workgroup> tile: array<f32, 64>;
+@group(0) @binding(0) var<storage, read_write> out: array<u32, 16>;
+@compute @workgroup_size(64) fn cs(@builtin(local_invocation_index) i: u32) {
+    tile[i] = f32(i);
+    workgroupBarrier();
+    if i < 16u { out[i] = u32(tile[63u - i]); }
+}
+"#;
+        let module = naga::front::wgsl::parse_str(src).unwrap();
+        let info = naga::valid::Validator::new(naga::valid::ValidationFlags::all(), naga::valid::Capabilities::all())
+            .validate(&module)
+            .unwrap();
+        let words = naga::back::spv::write_vec(&module, &info, &Default::default(), None).unwrap();
+        let strides = |w: &[u32]| {
+            let mut at = 5;
+            let mut n = 0;
+            while at < w.len() {
+                let (len, op) = ((w[at] >> 16) as usize, w[at] & 0xffff);
+                if op == 71 && w[at + 2] == 6 {
+                    n += 1;
+                }
+                at += len;
+            }
+            n
+        };
+        let fixed = workgroup_arrays_without_stride(words.clone());
+        assert_eq!(strides(&fixed), strides(&words) - 1, "only the workgroup array's stride goes");
+        assert_eq!(workgroup_arrays_without_stride(fixed.clone()), fixed);
+    }
 
     fn memory(heaps: &[vk::MemoryHeapFlags], types: &[(vk::MemoryPropertyFlags, u32)]) -> vk::PhysicalDeviceMemoryProperties {
         let mut mem = vk::PhysicalDeviceMemoryProperties {

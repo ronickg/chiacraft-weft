@@ -1,0 +1,21 @@
+[package]
+name = "chiacraft-android"
+version.workspace = true
+edition.workspace = true
+license = "MIT"
+description = "chiacraft on Android: the activity's native library (android_main), built into an APK by tools/release/android.sh"
+
+# The NativeActivity loads lib<name>.so, named in the APK's manifest (`android.app.lib_name`).
+[lib]
+name = "chiacraft"
+crate-type = ["cdylib"]
+
+# Empty on every other system (the crate is a workspace member, so `cargo check --workspace`
+# builds it on a desktop too).
+[target.'cfg(target_os = "android")'.dependencies]
+weft_engine.workspace = true
+weft_vulkan.workspace = true
+weft_render.workspace = true
+log.workspace = true
+zip.workspace = true
+libc.workspace = true

@@ -716,3 +716,13 @@ world.default_name = Новый мир
 chat.screenshot = Скриншот сохранён: {0}, {1}
 chat.screenshot.picture = открыть картинку
 chat.screenshot.folder = открыть папку
+
+# Экранные кнопки сенсорного экрана (touch.rs).
+touch.jump = Прыг
+touch.sneak = Присед
+touch.attack = Удар
+touch.use = Исп
+touch.inventory = Инв
+touch.drop = Выбр
+touch.chat = Чат
+touch.pause = II
