@@ -3432,6 +3432,11 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
     r.list.append(&mut world);
     r.world_list = world;
     r.list.push(Cmd::EndPass);
+    // Path traced lighting over the world's image (`core:path_traced`), before the effects read it.
+    if let (Some(g), Target::Texture(_)) = (&mut r.game, world_target) {
+        g.client
+            .path_trace(&mut *r.gpu, &mut r.list, info.slot, r.depth.0, world_target, (world_info.width, world_info.height));
+    }
     if let Some(g) = &mut r.game {
         g.client
             .render
