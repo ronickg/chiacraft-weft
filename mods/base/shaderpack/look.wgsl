@@ -214,7 +214,10 @@ fn palette_now() -> Palette {
     // under to 1, so 05:00 was as dark as 04:00 (land sRGB 25 24 30 where Bliss's is 32 70 125,
     // its 04:00 dark; Mist's m11 sheet, 11-06). Dimmer at the night's end, brighter at the sun's.
     if scene.frame.x > 0.5 {
-        let twilight = smoothstep(-0.3, -0.14, scene.sun.y) * (1.0 - smoothstep(-0.02, 0.06, scene.sun.y));
+        // Mornings only: the evening's twilight has its own lift (the palette's evening light and
+        // the post's), and this on top took the 19:00 land to a bright teal-green (PC shprA).
+        let morning = smoothstep(-0.05, 0.05, scene.sun.x);
+        let twilight = smoothstep(-0.3, -0.14, scene.sun.y) * (1.0 - smoothstep(-0.02, 0.06, scene.sun.y)) * morning;
         p.ambient *= mix(1.0, mix(0.7, TWILIGHT_RISE, smoothstep(-0.16, -0.02, scene.sun.y)), twilight);
     }
     return p;
@@ -1971,7 +1974,9 @@ fn display(c: vec3<f32>) -> vec3<f32> {
         // this blue's old gate at 7 (sun.y -0.12; Mist's m11 sheet, 11-06). And how dim a pixel is
         // as seen, at the exposure it is taken at (at night's 4.0 as before).
         let p = palette();
-        let world = 1.0 - smoothstep(0.08, 0.3, luma(p.ambient) + 0.5 * luma(p.sun));
+        // (From 0.15 to 0.5 of that light: from 0.08 to 0.3 the evening's twilight, its sky light
+        // lifted, kept hardly any, 19:00's land warmth -17 against Bliss's -61, PC shprA.)
+        let world = 1.0 - smoothstep(0.15, 0.5, luma(p.ambient) + 0.5 * luma(p.sun));
         let seen = luma(c) * exposure() / 4.0;
         let night = world * (1.0 - smoothstep(0.04, 0.3, seen)) * NIGHT_SKY_SHARE;
         if night > 0.0 {
