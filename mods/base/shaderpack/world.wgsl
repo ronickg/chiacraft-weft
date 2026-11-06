@@ -189,6 +189,22 @@ fn wind(p_world: vec3<f32>) -> vec3<f32> {
     return flutter + lean;
 }
 
+// How far a plant's top at camera-relative `rel` (world `world`) is pushed aside by the player
+// walking through it (the Recrafted study, item 7): away from the feet (the eye less 1.6) within
+// about a block, flattened within half of one, out and down; only plants about the feet, so flying
+// over a field parts nothing. (They spring back at once: a slow return needs a trail of where the
+// player was, which the engine doesn't send.)
+fn parted(rel: vec3<f32>, world: vec3<f32>) -> vec3<f32> {
+    let base = rel + floor(world) + vec3(0.5, 0.0, 0.5) - world + vec3(0.0, 1.6, 0.0);
+    let d = length(base.xz);
+    let near = (1.0 - smoothstep(0.45, 1.1, d)) * (1.0 - smoothstep(1.2, 2.0, abs(base.y)));
+    if near <= 0.0 {
+        return vec3(0.0);
+    }
+    let away = select(vec2(1.0, 0.0), base.xz / max(d, 1e-4), d > 0.05);
+    return vec3(away.x * 0.42, -0.3, away.y * 0.42) * near;
+}
+
 @vertex
 fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut {
     let f = vi / 4u;
@@ -278,7 +294,7 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
         let lo = min(min(p0.y, p1.y), min(p2.y, p3.y));
         let hi = max(max(p0.y, p1.y), max(p2.y, p3.y));
         let up = clamp((local.y - lo) / max(hi - lo, 0.001), 0.0, 1.0) * step(0.2, hi - lo);
-        pos = vec4(pos.xyz + wind(floor(world) + vec3(0.5)) * 0.11 * up, 1.0);
+        pos = vec4(pos.xyz + wind(floor(world) + vec3(0.5)) * 0.11 * up + parted(pos.xyz, world) * up, 1.0);
     }
     var out: VOut;
     out.clip = scene.view_proj * pos;
