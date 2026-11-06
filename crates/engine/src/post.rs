@@ -71,6 +71,26 @@ pub fn jitter() -> glam::Vec2 {
     glam::Vec2::new(f32::from_bits(JITTER[0].load(Relaxed)), f32::from_bits(JITTER[1].load(Relaxed)))
 }
 
+static UPSCALING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Whether this frame goes to the backend's upscaler (`Post::set_upscale`), set by the app before
+/// the world is drawn: per-frame dithers then hold still (`Scene::frame.w`), as DLSS takes a
+/// pattern that changes every frame for noise and can't settle it (speckled canopy in the fade
+/// band, SR Quality under Proton, 11-06). `WEFT_UPSCALE_MOVING_DITHER=1` keeps them moving.
+pub fn set_upscaling(on: bool) {
+    UPSCALING.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+pub fn upscaling() -> bool {
+    UPSCALING.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Whether per-frame dithers move this frame (all but under an upscaler, see `set_upscaling`).
+pub fn dither_moves() -> bool {
+    static MOVING: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    !upscaling() || *MOVING.get_or_init(|| std::env::var_os("WEFT_UPSCALE_MOVING_DITHER").is_some())
+}
+
 static TAA_ACTIVE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// Whether this frame is gathered over frames (`next_jitter`'s `on`): the shaders then write

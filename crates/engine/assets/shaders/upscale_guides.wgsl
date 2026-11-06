@@ -3,8 +3,11 @@
 // material outputs of its own, so
 // - the normal comes from the depth (exact on block faces, the neighbour on the nearer side
 //   across an edge), in world axes (camera-relative), w the roughness (0.85 everywhere);
-// - the diffuse albedo is the picture itself, tone-mapped into 0..1: Ray Reconstruction then keeps
-//   every texel's detail as surface, not as light to smooth;
+// - the diffuse albedo is the picture over twice its local light (the 5x5 mean luminance round it),
+//   so what RR takes for light (colour / albedo) is that smooth local level, and every texel's
+//   detail stays surface. The first try, the picture tone-mapped (c / (1 + c)), left the light
+//   as uneven as the picture: RR smoothed it and lifted the dark gaps between leaves (washed out,
+//   Proton run 11-06);
 // - the specular albedo follows from a dielectric's 4 % (Karis's approximation) at that roughness.
 // Entry: `scene` the world's picture, `depth` its depth, `size` the world's size.
 
@@ -25,6 +28,22 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
 }
 
 const GUIDE_ROUGHNESS: f32 = 0.85;
+
+fn guide_luma(c: vec3<f32>) -> f32 {
+    return dot(c, vec3(0.2126, 0.7152, 0.0722));
+}
+
+// The picture's mean luminance over the 5x5 texels round `at`: the local light level.
+fn guide_light(scene_tex: u32, at: vec2<i32>, size: vec2<i32>) -> f32 {
+    var sum = 0.0;
+    for (var y = -2; y <= 2; y++) {
+        for (var x = -2; x <= 2; x++) {
+            let p = clamp(at + vec2(x, y), vec2(0), size - 1);
+            sum += guide_luma(max(textureLoad(textures[scene_tex], p, 0).rgb, vec3(0.0)));
+        }
+    }
+    return sum / 25.0;
+}
 
 // Where the surface at texel `at` is, camera-relative (blocks); the sky (depth 0) far that way.
 fn guide_position(depth: u32, at: vec2<i32>, size: vec2<i32>) -> vec3<f32> {
@@ -71,7 +90,10 @@ fn fs_guides(in: VOut) -> GuideOut {
     } else {
         out.normal_roughness = vec4(guide_normal(pass_.depth, at, size), GUIDE_ROUGHNESS);
     }
-    out.albedo = vec4(c / (1.0 + c), 1.0);
+    // Twice the local light: a texel as bright as its surroundings is mid-grey surface; one over
+    // twice as bright keeps the rest as light (a glint).
+    let light = max(guide_light(pass_.scene, at, size), 1e-4);
+    out.albedo = vec4(clamp(c / (2.0 * light), vec3(0.0), vec3(1.0)), 1.0);
     return out;
 }
 

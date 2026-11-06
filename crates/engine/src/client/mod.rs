@@ -2935,8 +2935,9 @@ impl Client {
             frame: [crate::post::hdr() as u32 as f32, crate::post::bloom() as u32 as f32, self.sky.froxels.cell as f32, {
                 // chiacraft: a count of the frames drawn, 0 to 63 and round again, for dithers that
                 // change each frame (Far view, 11-06: the cubes' fade into distant terrain).
+                // Held under an upscaler (`post::dither_moves`).
                 static FRAME: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
-                (FRAME.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % 64) as f32
+                if crate::post::dither_moves() { (FRAME.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % 64) as f32 } else { 0.0 }
             }],
             shadow_view_proj: self.shadow.0.to_cols_array_2d(),
             shadow_far_view_proj: self.shadow_far.0.to_cols_array_2d(),

@@ -3238,6 +3238,7 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
     let scaled = (world_info.width, world_info.height) != (info.width, info.height);
     // The HDR world always ends in the effects' last pass, which finishes the picture.
     let upscaling = r.upscale_now.is_some();
+    crate::post::set_upscaling(upscaling);
     let post = (r.post.on() || scaled || crate::post::hdr() || r.post.taa_on() || upscaling) && r.game.is_some();
     // Gathered over frames (temporal anti-aliasing), the world is drawn a fraction of a pixel
     // aside each frame, and its pass draws the motion image too (whenever the pipelines have it).
