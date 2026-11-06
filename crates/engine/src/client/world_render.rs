@@ -2239,7 +2239,12 @@ impl WorldRenderer {
             (0, _) => (self.face_pipes[layer as usize], self.faces.pages[page as usize].0),
             (3, _) => (self.lod_pipe, self.faces.pages[page as usize].0),
             (6, _) => (self.lod_open_pipe.unwrap_or(self.lod_pipe), self.faces.pages[page as usize].0),
-            (7, _) => (self.lod_end_pipe.or(self.lod_open_pipe).unwrap_or(self.lod_pipe), self.faces.pages[page as usize].0),
+            (7, _) => (
+                self.lod_end_pipe
+                    .or(self.lod_open_pipe)
+                    .unwrap_or(self.lod_pipe),
+                self.faces.pages[page as usize].0,
+            ),
             (4, Some(f)) => (f[layer as usize], self.faces.pages[page as usize].0),
             (5, Some(f)) => (f[3 + layer as usize], self.quads.pages[page as usize].0),
             (4, None) => (self.face_pipes[layer as usize], self.faces.pages[page as usize].0),
