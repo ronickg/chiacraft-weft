@@ -9,11 +9,14 @@
 //!
 //!     cargo run -p base_api --example forest_canopy -- ground <seed> <x> <z>   (the ground's height)
 //!
-//! `old` grows the crowns as they were before the stand tiers (b34890b3: every crown a canopy
+//! `branched` / `branched_old` grow the branched style (`base:tree_style` 1) with and without the
+//! stand's layers. `old` grows the crowns as they were before the stand tiers (b34890b3: every crown a canopy
 //! tree's, the round ones seven across), for the before half of the sheet.
 
 use base_api::trees::{Crown, simple_at, simple_standing};
-use vitals::canopy;
+use base_api::branchy::Part;
+use base_api::tree_recipes::{Variant, colonized, of, tiered, tiered_colonized, varied, varied_colonized};
+use vitals::canopy::{self, Tier};
 use weft_sdk::noise::hash;
 
 const N: i32 = 256;
@@ -58,7 +61,9 @@ fn main() {
         return;
     }
     let out = a.first().cloned().unwrap_or_else(|| ".".into());
-    let old = a.get(1).is_some_and(|m| m == "old");
+    let mode = a.get(1).map_or("new", |m| m.as_str());
+    let old = mode.ends_with("old");
+    let branched = mode.starts_with("branched");
     let trees: f64 = a.get(2).and_then(|s| s.parse().ok()).unwrap_or(0.8);
     let stand: f64 = a.get(3).and_then(|s| s.parse().ok()).unwrap_or(0.15);
     let mut g: Grid = vec![0; (N * N * H) as usize];
@@ -101,7 +106,7 @@ fn main() {
         if !t.has_crown() {
             continue;
         }
-        let t = if old { t } else { t.with_tier(tier) };
+        let t = if old || branched { t } else { t.with_tier(tier) };
         count[tier as usize] += 1;
         let mut put = |x: i32, y: i32, z: i32, s: u32, force: bool| {
             if let Some(i) = at(x, y, z) {
@@ -110,7 +115,26 @@ fn main() {
                 }
             }
         };
-        if old {
+        if branched {
+            // The branched style (`base:tree_style` 1): colonized or grown from its recipe, tiered
+            // (`branched` new) or not (`branched_old`).
+            let log = ["base:oak_log", "base:spruce_log", "base:birch_log"][sp as usize];
+            let tier = if old { Tier::Canopy } else { tier };
+            let v = if (h >> 40) % 100 < 14 { Variant::Big } else { Variant::Standing };
+            let b: Vec<(i32, i32, i32, Part)> = match colonized(log) {
+                Some(c) => base_api::colonize::blocks(&tiered_colonized(&varied_colonized(c, v), tier), h >> 32)
+                    .into_iter()
+                    .map(|(x, y, z, p, _)| (x, y, z, p))
+                    .collect(),
+                None => base_api::branchy::blocks(&tiered(&varied(of(log).unwrap(), v), tier), h >> 32),
+            };
+            for (dx, dy, dz, part) in b {
+                match part {
+                    Part::Leaves => put(x + dx, 1 + dy, z + dz, 1 + sp as u32, false),
+                    Part::Log { .. } => put(x + dx, 1 + dy, z + dz, 4 + sp as u32, true),
+                }
+            }
+        } else if old {
             legacy(crown, &t, h >> 32, &mut put);
         } else {
             simple_standing(&t, &mut put);
@@ -129,7 +153,7 @@ fn main() {
     eprintln!("cover {:.2}", cover as f64 / (N * N) as f64);
     for (name, height, pitch, dist) in [("near", 30.0, -30.0, 0.0), ("mid", 70.0, -15.0, 0.0), ("far", 105.0, -8.0, 0.0)] {
         let img = render(&g, height, pitch, dist);
-        let path = format!("{out}/{}_{name}.ppm", if old { "old" } else { "new" });
+        let path = format!("{out}/{mode}_{name}.ppm");
         std::fs::write(&path, img).unwrap();
         eprintln!("{path}");
     }

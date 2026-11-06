@@ -651,3 +651,43 @@ fn put_with_branches(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Every simple crown in every layer of its stand stays inside the tree scatters' reach (8
+    /// sideways, `worldgen.rs`) and under their 32 up, or a cube's edge would cut it off.
+    #[test]
+    fn simple_crowns_within_reach() {
+        for crown in [Crown::Round, Crown::Cone, Crown::Slim, Crown::Flat, Crown::Palm] {
+            for tier in [Tier::Under, Tier::Canopy, Tier::Emergent] {
+                for seed in 0..400u64 {
+                    let h = hash(seed, 3, 5, 7) >> 32;
+                    let t = simple_at(crown, 1, 2, 0, 0, 0, h, false).with_tier(tier);
+                    let mut leaves = 0;
+                    simple_standing(&t, |x, y, z, s, _| {
+                        assert!(x.abs() <= 8 && z.abs() <= 8 && (0..32).contains(&y), "{crown:?} {tier:?} {seed}: {x} {y} {z}");
+                        leaves += (s == 2) as u32;
+                    });
+                    assert!(leaves > 0, "{crown:?} {tier:?}: a crown");
+                }
+            }
+        }
+    }
+
+    /// The layers stand apart: an emergent's top over every canopy tree's of its kind, an
+    /// under-storey tree's under them.
+    #[test]
+    fn layers_stand_apart() {
+        for crown in [Crown::Round, Crown::Cone, Crown::Slim] {
+            let top = |tier: Tier| {
+                (0..200u64)
+                    .map(|s| simple_at(crown, 1, 2, 0, 0, 0, hash(s, 1, 1, 1) >> 32, false).with_tier(tier).height())
+                    .fold((i32::MAX, i32::MIN), |(lo, hi), v| (lo.min(v), hi.max(v)))
+            };
+            let (u, c, e) = (top(Tier::Under), top(Tier::Canopy), top(Tier::Emergent));
+            assert!(u.1 < c.1 && c.1 <= e.0, "{crown:?}: under {u:?} canopy {c:?} emergent {e:?}");
+        }
+    }
+}
