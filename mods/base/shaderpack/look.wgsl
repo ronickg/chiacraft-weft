@@ -569,19 +569,10 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         let toward = pow(max(mu, 0.0), 2.0) * pow(1.0 - h, 3.0) * low;
         c += vec3(0.55, 0.22, 0.05) * toward;
     }
-    c += sun_glow(dir, p);
-    // In the HDR world the air round the sun glows as bright as it really is (Mie scattering's
-    // forward peak, a wide lobe and a tight one in the sun's own colour, strongest low), which the
-    // curve rolls off and the bloom spreads: Bliss's low sun stands in a great gold glare. The
-    // haze over the land toward the sun takes it too (it reads this colour).
+    // (B5: on the sky's own colour, before the sun's glow and glare are added: on top of them it
+    // turned the glare gold, and the dawn mist that reads it went flat orange over the land, PC
+    // shdawnB3/B4.)
     if scene.frame.x > 0.5 {
-        let m = max(mu, 0.0);
-        let mie = (pow(m, 8.0) * 0.45 + pow(m, 64.0) * 2.2) * (0.35 + 0.65 * low) * (1.0 - rain_amount());
-        // In a gold of the sun's own brightness (Mie scattering keeps the low sun's colour), and a
-        // third weaker: in the sun's pale mid-morning colour the glow went cream-white through the
-        // curve's shoulder (08:00 sky saturation 23 against Bliss's 43, warmth +15 against +36).
-        let gold = vec3(1.0, 0.72, 0.4) * luma(p.sun) * 1.4;
-        c += mix(p.sun, gold, 0.6 * (1.0 - smoothstep(0.6, 0.9, scene.sun.y))) * mie * 0.34;
         // With the sun low, the whole of its half of the sky goes gold-cream at its own brightness,
         // as Bliss's dawn: ours stayed lavender-blue there round a gold glare (Bliss's own world at
         // 06:00, sky band saturation 105 and warmth +85 against Bliss's 122 and +94; Look, 11-06).
@@ -600,6 +591,20 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
             let dawn = wide * wide * morning * (1.0 - rain_amount());
             c = mix(c, cream * (luma(c) / luma(cream)), dawn * 0.35);
         }
+    }
+    c += sun_glow(dir, p);
+    // In the HDR world the air round the sun glows as bright as it really is (Mie scattering's
+    // forward peak, a wide lobe and a tight one in the sun's own colour, strongest low), which the
+    // curve rolls off and the bloom spreads: Bliss's low sun stands in a great gold glare. The
+    // haze over the land toward the sun takes it too (it reads this colour).
+    if scene.frame.x > 0.5 {
+        let m = max(mu, 0.0);
+        let mie = (pow(m, 8.0) * 0.45 + pow(m, 64.0) * 2.2) * (0.35 + 0.65 * low) * (1.0 - rain_amount());
+        // In a gold of the sun's own brightness (Mie scattering keeps the low sun's colour), and a
+        // third weaker: in the sun's pale mid-morning colour the glow went cream-white through the
+        // curve's shoulder (08:00 sky saturation 23 against Bliss's 43, warmth +15 against +36).
+        let gold = vec3(1.0, 0.72, 0.4) * luma(p.sun) * 1.4;
+        c += mix(p.sun, gold, 0.6 * (1.0 - smoothstep(0.6, 0.9, scene.sun.y))) * mie * 0.34;
     }
     // The glow about the moon where it stands, as bright as its light (`scene.moon.w`): on a new
     // moon there is none, and a glow alone read as a dark-blue ring (the world playtester's nights).
