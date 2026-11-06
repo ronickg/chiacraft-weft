@@ -1,8 +1,9 @@
 # NVIDIA's RTX mod for Minecraft: how it works, and how we'd do the same
 
 Study for chiacraft's ultra look on the PC (RTX 5090). Started 2026-11-05 from the mod's and the
-runtime's public source, read on GitHub. The first PC try (2026-11-06, under Wine) failed to start
-the renderer; shots and frame times need native Windows: see [The PC test](#the-pc-test). Study only: none of its code, shaders, configs or art go into our
+runtime's public source, read on GitHub. The one PC try (2026-11-06, under Wine) didn't start the
+renderer, and Ronald chose to skip a live test on Windows, so there are no shots or frame times of
+our own: see [The PC test](#the-pc-test). What we take from it, ranked: [What we take](#what-we-take-ranked-by-look-gain-per-cost). Study only: none of its code, shaders, configs or art go into our
 repository or game. We learn how it's built, then write our own.
 
 ## What it is
@@ -172,9 +173,10 @@ frame generation.
   windowed against 52 fps full screen at the same size on one machine.
 - The CPU side is a large part of the work: much of the mod is pacing, budgets and
   allocation-free rewrites to keep Java from stalling the renderer.
-- Our own measurements on the RTX 5090: see [The PC test](#the-pc-test).
+- We have no measurements of our own: the Wine try didn't render, and the live test was skipped
+  (11-06).
 
-## What looks best (from the source; to confirm in the shots)
+## What looks best (from the source; not seen in a run)
 
 - Coloured light through glass and water, and coloured shadows from them (`enableDirect/Indirect
   TranslucentShadows`).
@@ -279,6 +281,37 @@ We don't copy Remix's full path tracer. A hybrid (rasterised first hit, rays for
 reflections and bounce light) fits our look and our shader packs, costs far less than a full
 path tracer, and lets the Mac keep the same picture without the rays.
 
+## What we take, ranked by look gain per cost
+
+Steps 1 and 2 (ray tracing in the backend, scene upload) come first and show nothing on their own;
+everything below needs them. Then, best gain for the cost first:
+
+1. **Ray-traced sun and moon shadows** (step 3). One ray a pixel and a small denoiser. It gives
+   sharp-near, soft-far shadows with no shadow-map texels, acne or swimming, reaching as far as the
+   LOD tiles. With the see-through loop (multiplying through glass, leaves and water) it also gives
+   coloured shadows. It replaces a pass we already pay for, so the net cost is small.
+2. **Reflections on water and glass** (step 4). One ray, only on reflective pixels, so it's cheap
+   on land and big on lakes and windows. Things off screen and behind the camera show, which no
+   screen-space trick does. The cost is shading at the hit: reuse our world shading with a cheaper
+   light model.
+3. **Bounce light** (step 5). The biggest change of picture (coloured light off walls, dark caves
+   without ambient tricks), and the costliest: a ray a pixel or less, our own hash-grid radiance
+   cache, and a temporal and spatial denoiser. Most of the risk is in the denoiser, so it gets its
+   own branch and many looks.
+4. **Shadowed block lights, ReSTIR** (step 6). Every torch casts shadows. It's high in both cost and
+   work, and only worth it once 1 to 3 look right; nights stay dark (our rule), so it shows mostly
+   in caves and builds.
+5. **DLSS-RR** (step 7). It needs Ronald's licence decision, NVIDIA cards only. Our own denoisers
+   come first.
+
+Ideas worth trying without rays, for every GPU:
+- **Coloured shadows through stained glass** in today's shadow map: a second, coloured map of
+  translucent casters, as Minecraft packs do.
+- **Fade far terrain into the sky** where the world ends; Remix fades from 70 to 80% of its view
+  distance. We have LOD instead, but the same fade fits the LOD's far edge.
+- **A tilted sun path**, as in Remix's sky and the BSL and Complementary packs: lower noon light and
+  longer shadows. That's a look choice for Ronald.
+
 ## The PC test
 
 **First try, 2026-11-06, plain Wine: the renderer does not start.** Windows Prism Launcher 11.1.1
@@ -298,9 +331,10 @@ materials pack on, on a rootful Xwayland at 2560×1440. The jar loads, the Remix
 Logs: `chiacraft-archive/references/rtx-mod/run-logs/2026-11-06/` (`latest.log`,
 `remix-dxvk.log`); shot: `chiacraft-archive/images/rtx-mod-study/2026-11-06/fail1.png`.
 
-**What's left**: the picture and the frame times need native Windows on the PC (it dual-boots), with
-Ronald at it, or Proton plus a third-party fix mixin, which this study doesn't run (downloads only from
-the mod's official source). The scene script is ready in
+**Skipped** (Ronald, 11-06: "Skip the live test"). Seeing it render would need native Windows on the
+PC (it dual-boots), with Ronald at it, or Proton plus a third-party fix mixin, which this study
+doesn't run (downloads only from the mod's official source). If it's ever wanted, the scene script is
+in
 `chiacraft-archive/tester-tools/rtx-mod/rtx_scenes.txt`:
 - the MC comparison's vista, forest, water and snow places, with `/rtx off` A/B pairs;
 - close-ups of a pool and metal blocks, coloured glass, wall and overhang shadows, and a white room
