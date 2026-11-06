@@ -109,10 +109,16 @@ fn pt_hash(x: u32) -> u32 {
 }
 
 // The cell for a surface at `world` facing `n`, `dist` from the eye: its slot's hash and its key
-// (never 0, the empty slot's).
-fn pt_cell(world: vec3<f32>, n: vec3<f32>, dist: f32) -> vec2<u32> {
+// (never 0, the empty slot's). `u` (two numbers 0..1, different each pixel and frame) moves the
+// point up to a cell's width along the face first, so neighbouring cells blend under temporal
+// anti-aliasing instead of showing as squares of light (the cathedral's pillar, pt1_rtxd_m2c).
+fn pt_cell(world: vec3<f32>, n: vec3<f32>, dist: f32, u: vec2<f32>) -> vec2<u32> {
     let level = u32(clamp(floor(log2(max(dist, 24.0) / 24.0)), 0.0, 6.0));
-    let c = vec3<i32>(floor((world + n * 0.01) / f32(1u << level)));
+    let size = f32(1u << level);
+    let t = normalize(cross(n, select(vec3(0.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), abs(n.y) > 0.9)));
+    let b = cross(n, t);
+    let at = world + (t * (u.x - 0.5) + b * (u.y - 0.5)) * size;
+    let c = vec3<i32>(floor((at + n * 0.01) / size));
     let a = abs(n);
     var axis = select(select(4u, 2u, a.y >= a.z), 0u, a.x >= a.y && a.x >= a.z);
     if dot(n, vec3(f32(axis == 0u), f32(axis == 2u), f32(axis == 4u))) < 0.0 {
@@ -164,8 +170,8 @@ fn pt_cache_get(i: u32) -> vec4<f32> {
 }
 
 // The indirect light the cache holds for a surface (rgb; a: 1 found, 0 none yet).
-fn pt_cached(world: vec3<f32>, n: vec3<f32>, dist: f32) -> vec4<f32> {
-    let i = pt_cache_find(pt_cell(world, n, dist), false);
+fn pt_cached(world: vec3<f32>, n: vec3<f32>, dist: f32, u: vec2<f32>) -> vec4<f32> {
+    let i = pt_cache_find(pt_cell(world, n, dist, u), false);
     if i < 0 {
         return vec4(0.0);
     }
@@ -175,12 +181,12 @@ fn pt_cached(world: vec3<f32>, n: vec3<f32>, dist: f32) -> vec4<f32> {
 
 // A surface met by a ray, lit as the world lights it: its block light, the sun through one more
 // ray, and its indirect light from the cache (the lightmap's sky light until the cache has it).
-fn pt_lit(b: RtHit, l: vec3<f32>) -> vec3<f32> {
+fn pt_lit(b: RtHit, l: vec3<f32>, u: vec2<f32>) -> vec3<f32> {
     var s = 0.0;
     if dot(b.n, l) > 0.0 && light_strength() > 0.0 {
         s = dot(rt_sun(b.rel, b.n, l, false), vec3(1.0 / 3.0));
     }
-    let c = pt_cached(b.world, b.n, length(b.rel));
+    let c = pt_cached(b.world, b.n, length(b.rel), u);
     if c.a > 0.5 {
         return pt_albedo(b) * (light_on(b.n, vec4(0.0, b.light.yzw), s, 1.0, b.world, b.rel) + c.rgb);
     }
@@ -286,14 +292,14 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     var diffuse = lit;
     var diffuse_t = PT_SKY_T;
     if b.hit {
-        bounce = pt_lit(b, l);
+        bounce = pt_lit(b, l, pt_noise(px + vec2(3.0, 11.0)));
         diffuse = lit - sky_part + bounce;
         // Above 0 on every traced pixel: the denoisers read diffuse's a > 0 as "traced".
         diffuse_t = max(b.t, 1e-3);
     }
     // Into the cache: the indirect light found here (one pixel in four a frame).
     if ((id.x + id.y * 3u + u32(scene.rt.y)) & 3u) == 0u {
-        let i = pt_cache_find(pt_cell(h.world, ng, dist), true);
+        let i = pt_cache_find(pt_cell(h.world, ng, dist, pt_noise(px + vec2(7.0, 5.0))), true);
         if i >= 0 {
             pt_cache_add(u32(i), select(sky_part, bounce, b.hit));
         }
@@ -335,7 +341,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
             var seen = sky_color(dir);
             specular_t = PT_SKY_T;
             if m.hit {
-                seen = haze_lit(pt_lit(m, l), dir * m.t, m.light.x);
+                seen = haze_lit(pt_lit(m, l, pt_noise(px + vec2(13.0, 2.0))), dir * m.t, m.light.x);
                 specular_t = m.t;
             }
             env = mix(seen, env, smoothstep(0.1, 0.5, a));
@@ -357,7 +363,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
             case 3u: { out = albedo * (lit - sky_part); }
             case 4u: { out = bounce; }
             case 5u: { out = specular * s_alb; }
-            case 6u: { out = albedo * pt_cached(h.world, ng, dist).rgb; }
+            case 6u: { out = albedo * pt_cached(h.world, ng, dist, pt_noise(px + vec2(3.0, 11.0))).rgb; }
             default: {}
         }
         pt_out[at] = vec4(out, 0.0);
