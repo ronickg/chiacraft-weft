@@ -1296,7 +1296,13 @@ fn sun_reaches(rel: vec3<f32>) -> f32 {
         if abs(ndc.x) < 0.98 && abs(ndc.y) < 0.98 && ndc.z > 0.0 && ndc.z < 1.0 {
             let at = vec2<i32>(vec2(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5) * scene.shadow.y);
             lit = select(0.0, 1.0, textureLoad(textures[u32(scene.shadow.x)], at, 0).r <= ndc.z + 0.0005);
-            return mix(1.0, lit, smoothstep(0.02, 0.06, light_dir().y));
+            // With traced shadows (`scene.rt`) the near map holds the models alone, the terrain is
+            // in the far one: the darker of both, as surfaces take (`shadow_at`). Returning the near
+            // map's alone, the mist within 80 blocks at Max was lit through hills and canopies: a
+            // forest's dawn mist glowed orange under the leaves (Mist's forest-floor shots, 11-06).
+            if scene.rt.x < 0.5 {
+                return mix(1.0, lit, smoothstep(0.02, 0.06, light_dir().y));
+            }
         }
     }
     if scene.shadow_far.z > 0.5 {
@@ -1304,7 +1310,7 @@ fn sun_reaches(rel: vec3<f32>) -> f32 {
         let ndc = c.xyz / c.w;
         if abs(ndc.x) < 0.98 && abs(ndc.y) < 0.98 && ndc.z > 0.0 && ndc.z < 1.0 {
             let at = vec2<i32>(vec2(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5) * scene.shadow_far.y);
-            lit = select(0.0, 1.0, textureLoad(textures[u32(scene.shadow_far.x)], at, 0).r <= ndc.z + 0.0004);
+            lit = min(lit, select(0.0, 1.0, textureLoad(textures[u32(scene.shadow_far.x)], at, 0).r <= ndc.z + 0.0004));
         }
     }
     return mix(1.0, lit, smoothstep(0.02, 0.06, light_dir().y));
