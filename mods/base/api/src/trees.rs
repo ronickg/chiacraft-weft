@@ -372,11 +372,12 @@ fn crown(t: &TreeAt, cx: i32, cz: i32, top: i32, put: &mut impl FnMut(i32, i32, 
             }
         }
         Crown::Cone => {
-            // Rings stepping in toward a spire from where the needles start (a third of the way
-            // up, two fifths on an emergent), every other ring pulled in: a ruffled spire whose
-            // ledges catch the sun, like Minecraft's spruces, sized by its tier.
+            // Rings stepping in toward a spire from where the needles start (a quarter of the way
+            // up, three tenths on an emergent: barer trunks stood as poles, the PC look 11-06),
+            // every other ring pulled in: a ruffled spire whose ledges catch the sun, like
+            // Minecraft's spruces, sized by its tier.
             let c = canopy::crown(Kind::Cone, t.tier);
-            let bare = ((t.height as f32 * if t.tier == Tier::Emergent { 0.4 } else { 0.3 }).round() as i32).max(1);
+            let bare = ((t.height as f32 * if t.tier == Tier::Emergent { 0.3 } else { 0.25 }).round() as i32).max(1);
             let base = c.radius + if t.form == Form::Big { 0.4 } else { 0.0 } + jitter(t.seed, 1) * 0.3;
             let len = (t.height + 1 - bare).max(1);
             for dy in bare..=t.height {

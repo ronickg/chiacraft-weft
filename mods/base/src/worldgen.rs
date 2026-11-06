@@ -136,7 +136,10 @@ pub fn register(r: &mut Registry) {
         .tint(&base_api::trees::YELLOW_LEAVES, muted(0x59ae30))
         .tag("forest")
         .tag("animals")
-        .set(&TREES, 0.4)
+        // A site in a 5 x 5 cell at 0.55 (220 a hectare, Research round 7's 170-244) and more in
+        // the stands: the stand's layers' crowns (`vitals::canopy`) are Minecraft-sized, and at 0.4
+        // the forest stood two fifths open (forest_canopy, 11-06).
+        .set(&TREES, 0.55)
         .set(&STAND_TREES, 0.12)
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:forest").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set_text(&TREE_KINDS, "base:birch_log:1 base:oak_log:4");
@@ -153,7 +156,7 @@ pub fn register(r: &mut Registry) {
         .tint(&base_api::trees::YELLOW_LEAVES, muted(0x6ba941))
         .tag("forest")
         .tag("animals")
-        .set(&TREES, 0.45)
+        .set(&TREES, 0.55)
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:birch_forest").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set(&STAND_TREES, 0.15)
         .set_text(&TREE_KINDS, "base:birch_log");
@@ -170,7 +173,7 @@ pub fn register(r: &mut Registry) {
         .tag("forest")
         .tag("cold")
         .tag("animals")
-        .set(&TREES, 0.45)
+        .set(&TREES, 0.55)
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:taiga").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set(&STAND_TREES, 0.12)
         .set_text(&TREE_KINDS, "base:spruce_log");

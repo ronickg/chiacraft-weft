@@ -55,19 +55,20 @@ const fn c(low: i32, spread: i32, radius: f32, depth: i32, lobes: u32) -> Crown 
 /// square blocks, the forests' `TREES` and `STAND_TREES` together) closes most of the sky but
 /// leaves pits between crowns; the crowns deep with steep sides (Bliss's shots: tall clumps whose
 /// shaded walls and the pits between them go near black, lit tops at many heights), the emergents
-/// half again to twice as high. Cones (`depth` 0): `radius` at the base of the
-/// needles, which start a third of the way up (two fifths on an emergent, whose lower trunk is bare).
+/// half again to twice as high (the PC look, 11-06: one in five old-growth trees over the canopy
+/// gave its skyline, fewer read flat). Cones (`depth` 0): `radius` at the base of the
+/// needles, which start a quarter of the way up (three tenths on an emergent).
 pub fn crown(kind: Kind, tier: Tier) -> Crown {
     match (kind, tier) {
         (Kind::Round, Tier::Under) => c(3, 2, 1.8, 3, 0),
-        (Kind::Round, Tier::Canopy) => c(5, 4, 3.0, 5, 1),
-        (Kind::Round, Tier::Emergent) => c(10, 5, 3.6, 6, 3),
+        (Kind::Round, Tier::Canopy) => c(5, 5, 3.0, 5, 1),
+        (Kind::Round, Tier::Emergent) => c(11, 5, 3.6, 6, 3),
         (Kind::Cone, Tier::Under) => c(4, 3, 1.6, 0, 0),
-        (Kind::Cone, Tier::Canopy) => c(7, 4, 2.4, 0, 0),
-        (Kind::Cone, Tier::Emergent) => c(12, 5, 3.0, 0, 0),
+        (Kind::Cone, Tier::Canopy) => c(7, 5, 2.4, 0, 0),
+        (Kind::Cone, Tier::Emergent) => c(13, 5, 3.0, 0, 0),
         (Kind::Slim, Tier::Under) => c(4, 2, 1.4, 3, 0),
         (Kind::Slim, Tier::Canopy) => c(6, 4, 2.0, 5, 0),
-        (Kind::Slim, Tier::Emergent) => c(11, 3, 2.5, 6, 1),
+        (Kind::Slim, Tier::Emergent) => c(11, 4, 2.5, 6, 1),
     }
 }
 
@@ -87,8 +88,8 @@ pub struct Stand {
 /// and oaks through the canopy); the managed forests fewer old ones; the taiga's spruces in the
 /// even ranks of a stand regrown after fire, few towering.
 pub const STANDS: &[Stand] = &[
-    Stand { biome: "base:old_growth_forest", under: 0.25, emergent: 0.16 },
-    Stand { biome: "base:forest", under: 0.25, emergent: 0.1 },
+    Stand { biome: "base:old_growth_forest", under: 0.25, emergent: 0.22 },
+    Stand { biome: "base:forest", under: 0.25, emergent: 0.12 },
     Stand { biome: "base:birch_forest", under: 0.22, emergent: 0.08 },
     Stand { biome: "base:taiga", under: 0.3, emergent: 0.08 },
     Stand { biome: "base:tropical_forest", under: 0.25, emergent: 0.12 },

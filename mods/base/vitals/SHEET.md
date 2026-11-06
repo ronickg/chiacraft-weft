@@ -427,19 +427,19 @@ A forest's layers (`vitals::canopy`): each wild tree's site grows under the cano
 | crown | layer | height | crown radius | depth | lobes |
 |---|---|---|---|---|---|
 | Round | Under | 3-4 | 1.8 | 3 | 0 |
-| Round | Canopy | 5-8 | 3 | 5 | 1 |
-| Round | Emergent | 10-14 | 3.6 | 6 | 3 |
+| Round | Canopy | 5-9 | 3 | 5 | 1 |
+| Round | Emergent | 11-15 | 3.6 | 6 | 3 |
 | Cone | Under | 4-6 | 1.6 | a spire | 0 |
-| Cone | Canopy | 7-10 | 2.4 | a spire | 0 |
-| Cone | Emergent | 12-16 | 3 | a spire | 0 |
+| Cone | Canopy | 7-11 | 2.4 | a spire | 0 |
+| Cone | Emergent | 13-17 | 3 | a spire | 0 |
 | Slim | Under | 4-5 | 1.4 | 3 | 0 |
 | Slim | Canopy | 6-9 | 2 | 5 | 0 |
-| Slim | Emergent | 11-13 | 2.5 | 6 | 1 |
+| Slim | Emergent | 11-14 | 2.5 | 6 | 1 |
 
 | biome | under | emergent |
 |---|---|---|
-| base:old_growth_forest | 25% | 16% |
-| base:forest | 25% | 10% |
+| base:old_growth_forest | 25% | 22% |
+| base:forest | 25% | 12% |
 | base:birch_forest | 22% | 8% |
 | base:taiga | 30% | 8% |
 | base:tropical_forest | 25% | 12% |
