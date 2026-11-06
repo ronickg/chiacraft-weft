@@ -217,6 +217,11 @@ fn palette_made() -> Palette {
         // 10:00, 0.82 at noon: a little warm left at 10:00 and 14:00, none at noon.
         // (It was smoothstep(0.4, 0.78): all day from about 09:30.)
         p = blend(warm, day, smoothstep(0.4, 0.86, e));
+        // And the sun itself a little warmer still until near noon (variant B: the blend alone
+        // moved the land's warmth by under 0.01, PC run wh_aft): blue about 10% down at 10:00 and
+        // 14:00 on the equinox, none at noon.
+        let morning = 1.0 - smoothstep(0.6, 0.86, e);
+        p.sun *= mix(vec3(1.0), vec3(1.0, 0.88, 0.72), morning);
     } else if e > 0.08 {
         p = blend(golden, warm, smoothstep(0.08, 0.34, min(e, 0.34)));
     } else if e > -0.02 {
