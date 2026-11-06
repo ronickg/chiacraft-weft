@@ -1245,6 +1245,8 @@ Birds now lay eggs in nests. Before this, their young came out as fledglings aft
 
 When she lays (`eggs::lay_in_nest`), she looks 12 blocks around her for the highest open leaves or ledge, and uses the ground under her if there's none. A bird's nest is brooded (`life::egg_air_of`): its eggs are held at a sitting parent's 37 °C whatever the air, so a snowy owl's clutch hatches in the tundra. Before, a nest only pulled the air 60% of the way toward 37 °C. The young hatch in the nest.
 
+Since 2026-11-06 (Tester 2's eggs playtest): a bird builds its own small **cup nest** of twigs lined with grass and down (`NEST_CUP`, `source/nest/cup.py`), sized for its eggs (an eagle's an eyrie of a block or more), not the raptors' earthen dish; nests keep `nests::APART` (4 blocks) from each other, the ground fallback included (a raven had built two 2 blocks apart); a nest with eggs in it takes no new clutch, for birds and the rest alike (raptor mothers had laid again into the same dish, 6+ eggs piled), so she uses an empty nest near, builds on open ground further off, or lays round her; and a nestling stays in the nest (`birds.rs`: a baby neither flies nor flees; raven chicks had hatched and flown off at once).
+
 Not yet: a parent seen sitting on the nest, and egg eaters raiding wild nests.
 
 ## Fish breed (2026-11-05)
@@ -1256,7 +1258,7 @@ Fish now breed in their seasons; before, only the spawner made more. The seasons
 
 A fish in love swims to a mate of its kind within 24 blocks (`fish::court`, steering its swim; walking pathfinding doesn't work in water). When they meet, the female spawns.
 
-No egg entity is used. An egg only develops in 25-40 °C air, which suits a nest, not a trout stream. Instead the female carries her eggs' time (`life::carrying`), then her fry come out beside her. Lycoptera's eggs' time is paced up to 0.46 d so a line still takes ten days to four generations. The spawner still tops up what breeding doesn't fill.
+Fish lay visible roe (2026-11-06, Planner for Ronald's "eggs you can see per species"; before, no egg entity was used and the fry simply came after the eggs' time). Five minutes after spawning (`life::LAYING`, as every egg-layer) the female's clutch lies on the bottom under her (`eggs::lay_roe`): one clump of beads per young, each species' own look (trout orange with a dark eye texel in a heap, pacu glassy with a yellow yolk, Lycoptera straw, the lungfish's jelly balls; `animals_core::eggs`). Roe develops in water whatever its warmth (`life::roe_develops`; air eggs need 25-40 °C, a nest or a fire) and dries and waits out of it; after its incubation the fry hatch there. Lycoptera's eggs' time is paced up to 0.46 d so a line still takes ten days to four generations. Like any egg it can be taken (its egg item) and is food for egg eaters. The spawner still tops up what breeding doesn't fill.
 
 ## Carcasses for the vulture (2026-11-05)
 

@@ -85,7 +85,8 @@ the phone on USB, `ANDROID_HOME=~/Library/Android/sdk tools/release/android-run.
 - **Start:** the first start after an install compiles the pack's pipelines, about 38 s, behind the
   loading screen. After that the saved pipeline cache opens a world in 0.4 s.
 - **Fixed for it:** render targets without framebuffer compression (tiles only cleared read back
-  as garbage: black and random-coloured squares over the sky); `NonUniform` on sampled images
+  as garbage: black and random-coloured squares over the sky; since 11-06 compression is back on, the
+  squares gone, `WEFT_NO_COMPRESSION=1` to compare); `NonUniform` on sampled images
   (naga 30 leaves it off); new textures cleared; the swapchain kept on "suboptimal".
 - **The water glitch (fixed, 11-05 evening):** squares at the bottom of the screen over water, the
   sand under it showing. The first-person hand, drawn in the same render pass after the water,
@@ -136,6 +137,15 @@ the phone on USB, `ANDROID_HOME=~/Library/Android/sdk tools/release/android-run.
     rain and with a torch at night, `an_look_calm.txt`) and faster (vista 1815 -> 1935 fps).
   Tried and dropped: haze per vertex (slower). Left: half precision (no `shaderFloat16` path in
   the engine yet), the far land's crowns and cloud shadow.
+- **Upscaling (11-06, opt-in):** on auto, `core:render_scale` is already 0.67 on the Pixel (any
+  high-density screen), scaled up bilinearly in the effects' last pass. `core:upscaler` (Video:
+  Upscaling, not set by any preset) picks the filter: Smooth (bilinear, the default), FSR 1 (AMD's
+  EASU) or Snapdragon GSR (GSR 1). Pixel at Medium, fps vista / edge / forest: 100 % 15 / 14 / 16,
+  67 % bilinear 24 / 21 / 24, 67 % EASU 21 / 18 / 21 (EASU +2.7 ms), 50 % bilinear 29 / 26 / 30.
+  GSR 1 costs about 1.1 ms over bilinear (the effects off, `var` pack), is the sharpest at 67 %, and
+  at 50 % gives far forest a rounded, painted look. Crops: `up_*_crops.png`, `gsr*_crops.png` in
+  chiacraft-archive/images/android-port/2026-11-06. Next: a temporal upscaler (GSR 2's two-pass
+  fragment version or Arm ASR) on the Temporal AA session's jitter and motion vectors.
 - **Settings on the phone** (`sweep.sh`, the same bench): sun shadows cost the forest 4 ms and
   the vista nothing; the screen effects about 2 ms; distant terrain 64 instead of 128 gives 20 / 20;
   the Low preset 23 / 27. The **Phone** preset (`video.rs`, 9b46a8c5: Low's distances, no sun

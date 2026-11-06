@@ -79,7 +79,7 @@ fn vertex(vi: u32, ii: u32) -> VOut {
         let grow = cub.inflate + inst.inflate;
         let local = cub.origin - vec3(grow) + CORNERS[face * 4u + c] * (cub.size + vec3(2.0 * grow));
         world = place(inst.bones + cub.bone, local);
-        if scene.taa.z > 0.5 {
+        if scene.taa.z > 0.5 && scene.taa_frame.y > 0.5 {
             was = place_prev(inst.bones + cub.bone, local);
         }
         // Constant indices: SPIRV-Cross cannot copy a runtime-indexed array out of a storage buffer to Metal.
@@ -103,7 +103,7 @@ fn vertex(vi: u32, ii: u32) -> VOut {
             return out;
         }
         world = place(inst.bones + v.bone, v.pos);
-        if scene.taa.z > 0.5 {
+        if scene.taa.z > 0.5 && scene.taa_frame.y > 0.5 {
             was = place_prev(inst.bones + v.bone, v.pos);
         }
         out.uv = v.uv / inst.tex_size;
@@ -117,7 +117,7 @@ fn vertex(vi: u32, ii: u32) -> VOut {
         normal = n;
     }
     out.clip = scene.view_proj * vec4(world, 1.0);
-    if scene.taa.z > 0.5 {
+    if scene.taa.z > 0.5 && scene.taa_frame.y > 0.5 {
         out.motion = vec3(screen_motion(out.clip, scene.taa_prev * vec4(was, 1.0), scene.taa.xy), 1.0);
     }
     out.dist = length(world);

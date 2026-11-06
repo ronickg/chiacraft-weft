@@ -781,9 +781,14 @@ gpu_struct! {
         /// from the eye (0: none this frame), y the index of each cell's own, zw the cells across
         /// the view; 32 slices deep, eight to a row of the image.
         pub froxels: [f32; 4],
+        /// How a world drawn smaller than the screen is scaled up: x `core:upscaler` (0 bilinear, 1
+        /// FSR 1's EASU, 2 Snapdragon GSR 1; `world_upscaled` in common.wgsl), yzw unused.
+        pub upscale: [f32; 4],
         /// Ray-traced sun and moon shadows (`core:rt_shadows`, a GPU with ray queries): x 1 when
         /// the world's shader traces them this frame (its prelude then has `rt_sun`; the near shadow
-        /// map then holds the models alone, the far one the terrain as before), yzw unused.
+        /// map then holds the models alone, the far one the terrain as before), y a frame count
+        /// (to 2^24, for noise that moves every frame), z 1 for soft edges from more rays a pixel
+        /// (`core:rt_shadows` 2: `rt_sun_soft`'s `fine`), w unused.
         pub rt: [f32; 4],
         /// Temporal anti-aliasing (`post::Temporal`, `core:aa`): xy this frame's jitter in NDC
         /// (`view_proj` has it, `taa_prev` not; a clip position's `xy / w - taa.xy` is where it
@@ -795,6 +800,16 @@ gpu_struct! {
         /// (`@location(1)`, `weft_render::MOTION_FORMAT`) puts a point's position last frame
         /// through it.
         pub taa_prev: [[f32; 4]; 4],
+        /// What temporal anti-aliasing writes this frame, for the screen effects after it: x the
+        /// bindless index + 1 of its count image (r the frames gathered in each pixel, g how far
+        /// the pixel moved this frame in pixels: a gathered picture is softer where it moves, and
+        /// a pack may sharpen it more there); 0 without. y 1 when the world's pass has the motion
+        /// image (`core:aa` 1): shaders skip their motion's work without it. zw unused.
+        pub taa_frame: [f32; 4],
+        /// Under the backend's upscaler (DLSS, `post::set_upscaling`): x the texture mip bias, in
+        /// levels (NVIDIA's log2(render / output) - 1; 0 without), which a pack's world shader adds
+        /// to its block textures' level; yzw unused.
+        pub dlss: [f32; 4],
     }
 }
 
@@ -1176,6 +1191,9 @@ bindings! {
         // Which blocks around the camera cast shadows, for shader packs that call `solid_at`
         // (`client::world_render::Solid`); a single word otherwise.
         SOLID "solid": "array<u32>",
+        // Material maps per bindless color index (chiacraft): two words each, its LabPBR
+        // specular map's index and its normal map's, all ones: none. `mat_at` reads them.
+        MAT_MAP "mat_map": "array<u32>",
     }
     // `item_boxes`: item models in their own space, kept between frames
     // (`EntityRenderer::item_model`); an item instance is a box in `boxes` whose rows place
@@ -1248,6 +1266,10 @@ bindings! {
         PASSES "passes": "array<Pass>",
         SCENE "scene": "Scene",
     }
+    upscale_guides "upscale_guides.wgsl" {
+        PASSES "passes": "array<Pass>",
+        SCENE "scene": "Scene",
+    }
 }
 
 /// Whether the block at `p` (block coordinates) casts a shadow, as far as the client has it
@@ -1266,6 +1288,102 @@ fn solid_at(p: vec3<i32>) -> bool {
     let l = p & vec3(15);
     let i = u32((l.y * 16 + l.z) * 16 + l.x);
     return ((solid[4096u * 4u + s * 128u + i / 32u] >> (i % 32u)) & 1u) != 0u;
+}
+";
+
+/// `mat_at(layer, uv, albedo)`: the material of a block texel (chiacraft), decoded from its
+/// texture's LabPBR 1.3 maps (`mat_map`, `assets::MatMaps`); a texture without maps is rough
+/// stone (F0 0.04, a flat normal), so a pack calling it changes nothing for those. `mat_normal`
+/// tilts a face's normal by the map, from the screen's derivatives (fragment shaders only).
+const MAT_AT: &str = "
+struct Mat {
+    // LabPBR's perceptual smoothness, and roughness = (1 - smoothness)^2.
+    smoothness: f32,
+    rough: f32,
+    // Reflectance at normal incidence, rgb (a metal's colour, or 0.04 for most stone and glass).
+    f0: vec3<f32>,
+    // 1 for a metal (no diffuse light of its own), 0 otherwise.
+    metal: f32,
+    // 0-1: how much water darkens and glosses it in rain; and its subsurface share.
+    porosity: f32,
+    sss: f32,
+    // The normal in the texture's frame: x along u, y along v (down the picture), z out.
+    n: vec3<f32>,
+    ao: f32,
+    height: f32,
+    // Whether the texture has maps at all.
+    has: bool,
+}
+
+fn mat_none() -> Mat {
+    return Mat(0.0, 1.0, vec3(0.04), 0.0, 0.0, 0.0, vec3(0.0, 0.0, 1.0), 1.0, 1.0, false);
+}
+
+// LabPBR's metals 230-237 as F0: iron, gold, aluminium, chrome, copper, lead, platinum, silver.
+fn mat_metal_f0(id: u32, albedo: vec3<f32>) -> vec3<f32> {
+    switch id {
+        case 230u: { return vec3(0.56, 0.57, 0.58); }
+        case 231u: { return vec3(1.00, 0.71, 0.29); }
+        case 232u: { return vec3(0.91, 0.92, 0.92); }
+        case 233u: { return vec3(0.55, 0.56, 0.55); }
+        case 234u: { return vec3(0.95, 0.64, 0.54); }
+        case 235u: { return vec3(0.63, 0.63, 0.63); }
+        case 236u: { return vec3(0.67, 0.64, 0.58); }
+        case 237u: { return vec3(0.95, 0.93, 0.88); }
+        default: { return albedo; }
+    }
+}
+
+fn mat_at(layer: u32, uv: vec2<f32>, albedo: vec3<f32>) -> Mat {
+    var m = mat_none();
+    if layer * 2u + 1u >= arrayLength(&mat_map) {
+        return m;
+    }
+    let si = mat_map[layer * 2u];
+    let ni = mat_map[layer * 2u + 1u];
+    if si == 0xffffffffu {
+        return m;
+    }
+    m.has = true;
+    let sp = textureSampleLevel(textures[si], nearest_clamp, uv, 0.0);
+    m.smoothness = sp.r;
+    m.rough = (1.0 - sp.r) * (1.0 - sp.r);
+    let g = u32(round(sp.g * 255.0));
+    if g >= 230u {
+        m.metal = 1.0;
+        m.f0 = mat_metal_f0(g, albedo);
+    } else {
+        m.f0 = vec3(sp.g);
+    }
+    let b = sp.b * 255.0;
+    m.porosity = select(0.0, b / 64.0, b <= 64.5);
+    m.sss = select(0.0, (b - 65.0) / 190.0, b > 64.5);
+    if ni != 0xffffffffu {
+        let nt = textureSampleLevel(textures[ni], nearest_clamp, uv, 0.0);
+        let xy = nt.rg * 2.0 - 1.0;
+        m.n = vec3(xy, sqrt(max(1.0 - dot(xy, xy), 0.0)));
+        m.ao = nt.b;
+        m.height = nt.a;
+    }
+    return m;
+}
+
+// The face's normal `n` tilted by the material's, at camera-relative `rel` and texture `uv`
+// (the frame from the screen's derivatives: fragment shaders only).
+fn mat_normal(m: Mat, n: vec3<f32>, rel: vec3<f32>, uv: vec2<f32>) -> vec3<f32> {
+    let dp1 = dpdx(rel);
+    let dp2 = dpdy(rel);
+    let du1 = dpdx(uv);
+    let du2 = dpdy(uv);
+    if m.n.z > 0.9999 {
+        return n;
+    }
+    let p2 = cross(dp2, n);
+    let p1 = cross(n, dp1);
+    let t = p2 * du1.x + p1 * du2.x;
+    let b = p2 * du1.y + p1 * du2.y;
+    let k = inverseSqrt(max(max(dot(t, t), dot(b, b)), 1e-12));
+    return normalize(t * k * m.n.x + b * k * m.n.y + n * m.n.z);
 }
 ";
 
@@ -1306,9 +1424,11 @@ pub fn prelude(shader: &str, common: &str) -> String {
     if shader == "world.wgsl" {
         s.push_str(SOLID_AT);
         s.push_str(LOD_CORNER);
+        s.push_str(MAT_AT);
         s.push_str(if RT_PRELUDE.load(std::sync::atomic::Ordering::Relaxed) { RT_SUN } else { RT_SUN_OFF });
     }
     s.push_str(CALM_OFF);
+    s.push_str(DRY_OFF);
     s.push_str(common);
     s.push('\n');
     s
@@ -1335,6 +1455,12 @@ pub mod rt_bind {
 
 const RT_SUN_OFF: &str = "
 fn rt_sun(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool) -> vec3<f32> {
+    return vec3(1.0);
+}
+fn rt_cone(l: vec3<f32>, radius: f32, px: vec2<f32>) -> vec3<f32> {
+    return l;
+}
+fn rt_sun_soft(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool, radius: f32, px: vec2<f32>, fine: bool) -> vec3<f32> {
     return vec3(1.0);
 }
 ";
@@ -1364,6 +1490,60 @@ fn rt_lod_hidden(rel: vec3<f32>) -> bool {
         return ((lod_mask[i / 32u] >> (i % 32u)) & 1u) != 0u;
     }
     return false;
+}
+
+// A direction toward a point of the light's disc round `l` (unit), `radius` radians across from its
+// middle, for the pixel at `px` (`@builtin(position)`): a different point each frame of temporal
+// anti-aliasing's jitter (`scene.taa.xy`), so its history averages one ray a pixel into the
+// penumbra a light of that size casts (soft shadows from one ray). `l` itself without the jitter.
+fn rt_cone(l: vec3<f32>, radius: f32, px: vec2<f32>) -> vec3<f32> {
+    return rt_cone_at(l, radius, px, 0.0);
+}
+
+// The same, turned by `turn` (0..1 of a circle) and its distance from the middle mirrored for odd
+// halves, for further rays of one pixel spread over the disc (`rt_sun_soft`).
+fn rt_cone_at(l: vec3<f32>, radius: f32, px: vec2<f32>, turn: f32) -> vec3<f32> {
+    let j = scene.taa.xy;
+    if j.x == 0.0 && j.y == 0.0 {
+        return l;
+    }
+    // Interleaved gradient noise, moved on every frame (`scene.rt.y`, a frame count: TAA's jitter
+    // has only a few phases, and a pattern repeating every 8 frames left a grain its history kept).
+    let k = f32(u32(scene.rt.y) % 64u);
+    let p = px + vec2(5.588238 * k);
+    var u1 = fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
+    if fract(turn * 2.0) >= 0.5 {
+        u1 = 1.0 - u1;
+    }
+    let u2 = fract(52.9829189 * fract(dot(p.yx + vec2(17.0, 31.0), vec2(0.06711056, 0.00583715))) + turn);
+    let r = radius * sqrt(u1);
+    let a = 6.2831853 * u2;
+    let t = normalize(cross(l, select(vec3(0.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), abs(l.y) > 0.9)));
+    let b = cross(l, t);
+    return normalize(l + (t * cos(a) + b * sin(a)) * r);
+}
+
+// `rt_sun` toward a light of disc `radius` (radians), soft-edged: with temporal anti-aliasing's
+// jitter on, one ray to a point of the disc that moves every frame, the history averaging them into
+// the penumbra. `fine`: two rays to opposite sides of the disc, and where they disagree (a penumbra)
+// two more across it, smooth within the frame but about three times the cost (PC, 11-06: +0.7-2.5
+// ms at 1440p against +0.2-0.7). Without the jitter one ray to the middle.
+fn rt_sun_soft(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool, radius: f32, px: vec2<f32>, fine: bool) -> vec3<f32> {
+    let j = scene.taa.xy;
+    if j.x == 0.0 && j.y == 0.0 {
+        return rt_sun(rel, n, l, plant);
+    }
+    let a = rt_sun(rel, n, rt_cone_at(l, radius, px, 0.0), plant);
+    if !fine {
+        return a;
+    }
+    let b = rt_sun(rel, n, rt_cone_at(l, radius, px, 0.5), plant);
+    if all(abs(a - b) < vec3(0.05)) {
+        return (a + b) * 0.5;
+    }
+    let c = rt_sun(rel, n, rt_cone_at(l, radius, px, 0.25), plant);
+    let d = rt_sun(rel, n, rt_cone_at(l, radius, px, 0.75), plant);
+    return (a + b + c + d) * 0.25;
 }
 
 struct RtTexel {
@@ -1469,6 +1649,13 @@ pub fn rt_expand_prelude() -> String {
 /// port: on the Pixel 10 the rare paths' size alone cost the vista a fifth of its world pass).
 pub const CALM_OFF: &str = "const CALM: bool = false;\n";
 pub const CALM_ON: &str = "const CALM: bool = true;\n";
+/// `DRY` in every shader: false, but true in the world's calm-and-dry pipelines (level 2 of
+/// `WorldRenderer::set_calm`), used while the scene is calm and also has no rain
+/// (`scene.fog_color.w` 0), dry ground (`scene.canopy.y` 0), no puddles (`scene.canopy.z` 0) and no
+/// snow lying where the player is (`scene.ground.x` 0). A pack leaves out what those draw behind
+/// `if !DRY` (Android port: 1.8 ms of the Pixel 10's vista).
+pub const DRY_OFF: &str = "const DRY: bool = false;\n";
+pub const DRY_ON: &str = "const DRY: bool = true;\n";
 
 /// What goes in front of `occlusion.wgsl`.
 pub fn occlusion_prelude() -> String {

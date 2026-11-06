@@ -50,6 +50,7 @@ pub mod stomach;
 pub mod temperature;
 pub mod waystones;
 pub mod weather_sound;
+pub mod weathering;
 pub mod web;
 pub mod web_layout;
 pub mod web_sheet;

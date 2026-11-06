@@ -144,7 +144,7 @@ pub fn pack_uses(name: &str, what: &str) -> bool {
     pack_source(name).is_some_and(|s| s.contains(what))
 }
 
-fn pack_source(name: &str) -> Option<String> {
+pub(crate) fn pack_source(name: &str) -> Option<String> {
     let path = SHADER_PACK.read().unwrap().as_ref().map(|d| d.join(name))?;
     std::fs::read_to_string(path)
         .ok()
@@ -206,11 +206,14 @@ pub fn compose(
     crate::shaders::compose(name, &with_common(assets, name, &engine_source(assets, name)), parts)
 }
 
-/// `compose` with `CALM` true (`gpu_layout::CALM_ON`), when the pack's `name` uses it; None otherwise
-/// or when it fails (the plain pipelines then serve).
-pub fn compose_calm(assets: &Assets, name: &str, parts: &[(&crate::shaders::Hook, &[(String, String)])]) -> Option<Shader> {
-    let src = pack_source(name).filter(|s| s.contains("CALM"))?;
-    let calm = with_common(assets, name, &src).replacen(crate::gpu_layout::CALM_OFF, crate::gpu_layout::CALM_ON, 1);
+/// `compose` with `CALM` true (`gpu_layout::CALM_ON`), and with `dry` `DRY` too, when the pack's
+/// `name` uses them; None otherwise or when it fails (the plainer pipelines then serve).
+pub fn compose_calm(assets: &Assets, name: &str, parts: &[(&crate::shaders::Hook, &[(String, String)])], dry: bool) -> Option<Shader> {
+    let src = pack_source(name).filter(|s| s.contains("CALM") && (!dry || s.contains("DRY")))?;
+    let mut calm = with_common(assets, name, &src).replacen(crate::gpu_layout::CALM_OFF, crate::gpu_layout::CALM_ON, 1);
+    if dry {
+        calm = calm.replacen(crate::gpu_layout::DRY_OFF, crate::gpu_layout::DRY_ON, 1);
+    }
     match crate::shaders::compose(name, &calm, parts) {
         Ok((s, _)) => Some(s),
         Err(e) => {

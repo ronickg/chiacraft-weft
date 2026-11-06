@@ -481,14 +481,16 @@ fn deliver(w: &World, id: u64, index: usize, b: &Breeding) {
         };
         let angle = k as f64 / n as f64 * std::f64::consts::TAU;
         let at = [st.pos.x + angle.cos() * 0.6, st.pos.y, st.pos.z + angle.sin() * 0.6];
-        // A fish's eggs lie in the water for their time (`life::carrying`), then the fry come.
-        if s.gestation() > 0 || s.in_water() {
+        if s.gestation() > 0 {
             born(w, at, &y, owner);
         } else {
             clutch.push(y);
         }
     }
-    if animals_core::nests::site(s.name).is_some() {
+    if s.in_water() {
+        // A fish's roe, on the bottom under her; its fry hatch from it (`eggs::lay_roe`).
+        crate::eggs::lay_roe(w, st.pos.to_array(), &clutch, owner);
+    } else if animals_core::nests::site(s.name).is_some() {
         crate::eggs::lay_in_nest(w, index, id, st.pos.to_array(), &clutch, owner);
     } else {
         crate::eggs::lay(w, st.pos.to_array(), &clutch, owner);
@@ -497,7 +499,7 @@ fn deliver(w: &World, id: u64, index: usize, b: &Breeding) {
     let what = if s.gestation() > 0 {
         "young born"
     } else if s.in_water() {
-        "fry hatched"
+        "roe laid"
     } else {
         "eggs laid"
     };

@@ -642,7 +642,7 @@ async fn run_lines(t: T, src: String) -> R {
             "until" => {
                 let (text, secs) = split_within(rest);
                 let cond = Cond::parse(text)?;
-                let waited = Instant::now();
+                let waited = crate::runner::script_clock();
                 let deadline = waited + Duration::from_secs_f32(secs);
                 loop {
                     let (ok, seen) = cond.check(&t).await?;
@@ -650,12 +650,12 @@ async fn run_lines(t: T, src: String) -> R {
                         weft_sdk::info!(
                             "script: line {} until {text}: met after {:.1} s ({:.1} s into the script)",
                             n + 1,
-                            waited.elapsed().as_secs_f32(),
+                            (crate::runner::script_clock() - waited).as_secs_f32(),
                             started.elapsed().as_secs_f32()
                         );
                         break;
                     }
-                    if Instant::now() > deadline {
+                    if crate::runner::script_clock() > deadline {
                         return Err(format!("until {text}: not within {secs} s ({seen})"));
                     }
                     t.secs(0.25).await?;
