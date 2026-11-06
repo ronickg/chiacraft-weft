@@ -1053,11 +1053,26 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f
         c += lightning_glow_at(rel) * sky * hemi * ao;
         held = held_light(rel, n);
     }
-    c += block_light(max(light.yzw, held), pos) * mix(0.5, 1.0, ao) * block_by_day(light.x);
+    let blocks = block_light(max(light.yzw, held), pos) * mix(0.5, 1.0, ao) * block_by_day(light.x);
+    NIGHT_SKY_SHARE = night_sky_share(c, blocks);
+    c += blocks;
     // A floor so caves are never quite black: the dimension's own and the Brightness setting.
     let floor_light = max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y));
     c += vec3(floor_light) * vec3(0.85, 0.9, 1.0) * ao;
     return c;
+}
+
+// What share of a surface's light is the sky's and the moon's, not a lamp's, for the night's blue
+// (`display`): set by `light_on` and `light_round` for the pixel they light; 1 for what they don't
+// (the sky, clouds). Keyed on where the light comes from, not how bright it is: by brightness, a
+// lantern-lit room at midnight went blue-violet too, its light small before the night's exposure
+// lifts it (NVIDIA's storeroom, rt-sun-shadows' find, 11-06).
+var<private> NIGHT_SKY_SHARE: f32 = 1.0;
+
+fn night_sky_share(sky_part: vec3<f32>, lamp_part: vec3<f32>) -> f32 {
+    let s = luma(sky_part);
+    let l = luma(lamp_part);
+    return clamp(s / max(s + 3.0 * l, 1e-6), 0.0, 1.0);
 }
 
 // For what has no normal to speak of (particles, rain, the hand): half the direct light.
@@ -1070,7 +1085,9 @@ fn light_round(light: vec4<f32>, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     if !CALM {
         held = held_light(rel, vec3(0.0));
     }
-    c += block_light(max(light.yzw, held), pos) * block_by_day(light.x);
+    let blocks = block_light(max(light.yzw, held), pos) * block_by_day(light.x);
+    NIGHT_SKY_SHARE = night_sky_share(c, blocks);
+    c += blocks;
     c += vec3(max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y)));
     return c;
 }
@@ -1888,7 +1905,9 @@ fn display(c: vec3<f32>) -> vec3<f32> {
         // stood a neutral green-black (18 27 26, about 100), its sky a grey-blue (Bliss's world, mist
         // off, PC shnt0, 11-06). Only the dim: a torch's light keeps its warmth, and the night
         // stays as dark as made.
-        let night = smoothstep(-0.12, -0.3, scene.sun.y) * (1.0 - smoothstep(0.04, 0.3, luma(c)));
+        // Only the sky's and moon's share of a surface's light (`NIGHT_SKY_SHARE`): a lamp's keeps
+        // its warmth in a dark room as outdoors.
+        let night = smoothstep(-0.12, -0.3, scene.sun.y) * (1.0 - smoothstep(0.04, 0.3, luma(c))) * NIGHT_SKY_SHARE;
         if night > 0.0 {
             // (N2: deeper and all the way: at 0.3 0.6 1.3 and three quarters the land's saturation rose
             // only from about 100 to 140, the curve taking some back; Bliss's is 200-250, PC shnt1.)
