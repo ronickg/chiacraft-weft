@@ -4,7 +4,10 @@
 //! and the view's land in the same shares, read from its region files (MC shaders session, 11-05):
 //! within 500 blocks woods two thirds, plains a fifth, the rest water; 500-1,500 mostly plains with
 //! woods and a river; peaks on the horizon; a cherry grove ahead on the right. Each candidate's
-//! view is sampled in three bands across the field of view and scored against those shares.
+//! view is sampled in three bands across the field of view and scored against those shares. The
+//! test world keeps the overworld's land, shaped by its climate (dunes and mesas in the hot dry
+//! land, the cold's flat tundra), so a view over the overworld's temperate land is preferred: the
+//! share of its near and middle bands that the overworld gives another climate costs it.
 //!
 //!     cargo run -p base_api --example mc_forest_find -- <seed> [reach] [step] [count]
 
@@ -48,6 +51,7 @@ fn main() {
             let mut score = 0.0;
             let mut got = Vec::new();
             let mut cherry = false;
+            let mut other = 0.0;
             for (bi, &(from, to, want)) in BANDS.iter().enumerate() {
                 let mut n = [0.0f64; 4];
                 let mut all = 0.0;
@@ -70,6 +74,12 @@ fn main() {
                         };
                         n[k] += 1.0;
                         all += 1.0;
+                        if bi < 2
+                            && ph >= SEA
+                            && !matches!(l::overworld_biome(&f, px * 16, pz * 16), "forest" | "birch_forest" | "plains" | "old_growth_forest" | "mountains" | "beach" | "swamp")
+                        {
+                            other += 1.0;
+                        }
                         // A grove ahead on the right, in woods that grow one.
                         if bi < 2 && ai > 4 && k == 0 && biome != "mountains" && grove(px, pz) {
                             cherry = true;
@@ -84,6 +94,8 @@ fn main() {
             if !cherry {
                 score += 0.15;
             }
+            // Land the overworld's other climates shaped, of the near and middle bands' samples.
+            score += 0.6 * other / 108.0;
             found.push((score, x, z, got, cherry));
         }
     }
