@@ -39,6 +39,25 @@ struct VOut {
     @location(15) ao: f32,
     // x tint kind, y 1 for a moving structure's blocks (not traced), z 1 for plants lit from above.
     @location(16) @interpolate(flat) kind: vec4<u32>,
+    // Temporal anti-aliasing (`core:aa`): xy how far this vertex moved on the screen since last
+    // frame (`screen_motion`), z 1 where that is its own (swaying), 0 for the camera's.
+    @location(17) motion: vec3<f32>,
+}
+
+// The world's opaque and cutout surfaces: their color and their motion (`motion_texel`), which the
+// engine keeps where the world's pass has a motion image and drops elsewhere.
+struct WorldOut {
+    @location(0) color: vec4<f32>,
+    @location(1) motion: vec4<f32>,
+}
+
+fn world_out(in: VOut, c: vec4<f32>) -> WorldOut {
+    return WorldOut(c, motion_texel(in.motion, in.clip.z));
+}
+
+// Whether this frame writes motion: temporal anti-aliasing on, with a last frame to come from.
+fn taa_moving() -> bool {
+    return scene.taa.z > 0.5;
 }
 
 fn shader_of(tex: u32) -> u32 {
@@ -170,16 +189,20 @@ fn body_normal(n: vec3<f32>, k: i32) -> vec3<f32> {
 // How far the wind moves what sways at `p`: a lean the way it blows, stronger in its gusts, and a
 // flutter that quickens with it. Calm air keeps a little life in the leaves.
 fn wind(p_world: vec3<f32>) -> vec3<f32> {
+    return wind_at(p_world, scene.params.w);
+}
+
+// `wind` at the shaders' clock `t` (`scene.taa.w`: last frame's, for the motion image).
+fn wind_at(p_world: vec3<f32>, t: f32) -> vec3<f32> {
     // Far from spawn the sines would get huge arguments and lose their place (foliage jumps on
     // fast-math backends): positions are taken within 4096 blocks, a seam once every 4096.
     let p = vec3(p_world.x - floor(p_world.x / 4096.0) * 4096.0, p_world.y, p_world.z - floor(p_world.z / 4096.0) * 4096.0);
-    let t = scene.params.w;
     let w = wind_now();
     let speed = length(w);
     let dir = select(vec2(1.0, 0.0), w / max(speed, 1e-4), speed > 0.01);
     // A fresh breeze (9 m/s) bends things as far as they go, a gale a little further.
     let s = clamp(speed / 9.0, 0.0, 1.6);
-    let g = gust(p);
+    let g = gust_at(p, t);
     let q = t * (1.0 + 0.8 * s);
     let a = sin(q * 1.7 + p.x * 0.63 + p.z * 0.41 + p.y * 0.2) * 0.6 + sin(q * 2.9 + p.x * 1.21 - p.z * 0.83) * 0.25;
     let b = sin(q * 1.3 + p.z * 0.71 - p.x * 0.37) * 0.5 + sin(q * 3.4 + p.z * 1.4 + p.x * 0.6) * 0.2;
@@ -189,6 +212,22 @@ fn wind(p_world: vec3<f32>) -> vec3<f32> {
     let flutter = vec3(a, 0.0, b) * (0.35 + 0.65 * s) * g * beaten;
     let lean = vec3(dir.x, 0.0, dir.y) * s * g * 1.3;
     return flutter + lean;
+}
+
+// How far a plant's top at camera-relative `rel` (world `world`) is pushed aside by the player
+// walking through it (the Recrafted study, item 7): away from the feet (the eye less 1.6) within
+// about a block, flattened within half of one, out and down; only plants about the feet, so flying
+// over a field parts nothing. (They spring back at once: a slow return needs a trail of where the
+// player was, which the engine doesn't send.)
+fn parted(rel: vec3<f32>, world: vec3<f32>) -> vec3<f32> {
+    let base = rel + floor(world) + vec3(0.5, 0.0, 0.5) - world + vec3(0.0, 1.6, 0.0);
+    let d = length(base.xz);
+    let near = (1.0 - smoothstep(0.45, 1.1, d)) * (1.0 - smoothstep(1.2, 2.0, abs(base.y)));
+    if near <= 0.0 {
+        return vec3(0.0);
+    }
+    let away = select(vec2(1.0, 0.0), base.xz / max(d, 1e-4), d > 0.05);
+    return vec3(away.x * 0.42, -0.3, away.y * 0.42) * near;
 }
 
 @vertex
@@ -211,10 +250,16 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     let world = vec3<f32>(o.xyz * 16) + local;
     let tint_kind = (w0 >> FACE_TINT_SHIFT) & TINT_MASK;
     // Leaves sway a little.
-    if tint_kind == TINT_FOLIAGE && origins[ii].w == 0 {
-        pos = vec4(pos.xyz + wind(world) * 0.035, 1.0);
-    }
     var out: VOut;
+    if tint_kind == TINT_FOLIAGE && origins[ii].w == 0 {
+        let rest = pos.xyz;
+        pos = vec4(rest + wind(world) * 0.035, 1.0);
+        out.clip = scene.view_proj * pos;
+        if taa_moving() {
+            let was = rest + wind_at(world, scene.taa.w) * 0.035;
+            out.motion = vec3(screen_motion(out.clip, scene.taa_prev * vec4(was, 1.0), scene.taa.xy), 1.0);
+        }
+    }
     out.clip = scene.view_proj * pos;
     out.dist = length(pos.xyz);
     out.rel = pos.xyz;
@@ -275,14 +320,22 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     var pos = finish(local, origins[ii]);
     let o = origins[ii] + g.cam_cube;
     let world = vec3<f32>(o.xyz * 16) + local;
+    var out: VOut;
     // Grass and flowers bend at the top and stay rooted.
     if (tint_kind == TINT_GRASS || tint_kind == TINT_FOLIAGE || flat_) && tint_kind != TINT_WATER && origins[ii].w == 0 {
         let lo = min(min(p0.y, p1.y), min(p2.y, p3.y));
         let hi = max(max(p0.y, p1.y), max(p2.y, p3.y));
         let up = clamp((local.y - lo) / max(hi - lo, 0.001), 0.0, 1.0) * step(0.2, hi - lo);
-        pos = vec4(pos.xyz + wind(floor(world) + vec3(0.5)) * 0.11 * up, 1.0);
+        let rest = pos.xyz;
+        let part = parted(rest, world) * up;
+        pos = vec4(rest + wind(floor(world) + vec3(0.5)) * 0.11 * up + part, 1.0);
+        out.clip = scene.view_proj * pos;
+        // (The parting follows the player, who moved too; taken as it is now.)
+        if taa_moving() && up > 0.0 {
+            let was = rest + wind_at(floor(world) + vec3(0.5), scene.taa.w) * 0.11 * up + part;
+            out.motion = vec3(screen_motion(out.clip, scene.taa_prev * vec4(was, 1.0), scene.taa.xy), 1.0);
+        }
     }
-    var out: VOut;
     out.clip = scene.view_proj * pos;
     out.dist = length(pos.xyz);
     out.rel = pos.xyz;
@@ -374,13 +427,17 @@ fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32>
         // beside Bliss's (light-range sweep lr1, 11-06: x2 took the canopy's roughness at 150
         // blocks 7.6/11.7 to 8.9/13.8; x3 no further, the curve rolls it off; darker shaded faces
         // took it down, not up).
+        // Leaves only, not plants (`in.kind.z`): on tall grass it bleached the sunlit blades pale
+        // yellow-white beside black gaps (Tester 2's calm noon, -470 520, HDR on against off).
         let k_sun = look_opt(OPT_LEAF_SUN, 1.0);
-        if k_sun != 1.0 {
+        if k_sun != 1.0 && in.kind.z == 0u {
             let c_open = min(canopy(), 1.0);
             let open = smoothstep(mix(0.5, 0.25, c_open), mix(0.95, 0.55, c_open), in.light.x);
             light += paint * palette().sun * light_strength() * sun_facing(n) * shadow * open * (k_sun - 1.0);
         }
-        return light + paint * palette().sun * leaf_through(in.rel, shadow, in.light.x);
+        // Plants half of it: with all of it tall grass in the sun went pale yellow-white beside black
+        // gaps (Tester 2's calm noon, HDR on against off).
+        return light + paint * palette().sun * leaf_through(in.rel, shadow, in.light.x) * select(1.0, 0.5, in.kind.z != 0u);
     }
     if in.kind.x == TINT_FOLIAGE || in.kind.z != 0u {
         // A low morning or evening sun full on a crown's side: light about as strong as on the tops
@@ -465,6 +522,11 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
             // lime by its colour alone; from 0.25 it hardly counted, 3 % of the frame left, PC sh6b.)
             let k = smoothstep(0.06, 0.22, luma(c)) * smoothstep(0.55, 0.85, sat) * smoothstep(0.25, 0.45, c.r / c.g) * low;
             lit = vec4(mix(c, vec3(luma(c)) * vec3(0.92, 1.05, 0.88), k * 0.175) * (1.0 - 0.18 * k), lit.a);
+            // And its red pulled down, so it turns green rather than grey (Ronald: "a bit greener"):
+            // the crown by the eye still read yellow-lime at 17:00-18:00, sRGB 88 125 3, hue 82
+            // where noon's lit leaves are about 100 (Tester 2's f0d78419 hours, 11-06). At 0.55 of
+            // its red, linear red/green 0.47 goes to about 0.26, hue about 95.
+            lit = vec4(lit.r * mix(1.0, 0.55, k), lit.g, lit.b, lit.a);
         }
     } else {
         lit = block_shade(in.slot, BlockPixel(in.uv, albedo, light, in.pos, scene.params.w));
@@ -483,9 +545,47 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
         let sheen = (0.04 + pow(1.0 - max(dot(n, v), 0.0), 4.0) * 0.3) * select(1.0, 0.35, leafy);
         lit = vec4(lit.rgb * mix(1.0, select(0.58, 0.8, leafy), wet) + sky_color(reflect(-v, n)) * sheen * wet, lit.a);
     }
+    // Puddles on flat open ground (the Recrafted study, item 4): they grow over minutes of rain
+    // (`scene.canopy.z`, the engine's) and dry slower than the ground after: a shower leaves a few
+    // small ones, a long rain many and wide. A film of water: the ground under it dark, the sky
+    // mirrored by Fresnel, and rings where the rain still falls on it.
+    let puddles = clamp(scene.canopy.z, 0.0, 1.0) * open_top;
+    if puddles > 0.01 && !leafy && n.y > 0.95 {
+        // In cells three blocks across, some hold a puddle (one hash each against a share that grows
+        // with the rain: a shower a few, a long rain most), a round pool about a jittered middle
+        // that widens as it fills, edged in the blocks' own pixels.
+        // (A threshold on two octaves of value noise left none: in the shader the noise stayed
+        // near its middle, PC debug runs shpdd-shpdd3; with `hash3` picking the cells, one or two
+        // in the whole field where a fifth were due, shpd6. `puddle_hash` is a sine hash.)
+        let q = floor(in.pos.xz * 16.0) / 16.0;
+        let cell = vec2<i32>(floor(q / 3.0));
+        let pick = puddle_hash(cell, 1.0);
+        let middle = (vec2<f32>(cell) + 0.3 + 0.4 * vec2(puddle_hash(cell, 2.0), puddle_hash(cell, 3.0))) * 3.0;
+        let reach = mix(0.6, 1.5, puddles) * mix(0.7, 1.0, puddle_hash(cell, 4.0));
+        let wobble = (noise3(vec3(q * 0.9, 5.3)) - 0.5) * 0.5;
+        let pool = select(0.0, 1.0, pick < mix(0.12, 0.6, puddles)) * smoothstep(reach, reach - 0.12, length(q - middle) + wobble);
+        if pool > 0.0 {
+            let v = -normalize(in.rel);
+            let slope = rain_rings(in.pos.xz) * rain_amount();
+            let pn = normalize(vec3(-slope.x, 1.0, -slope.y));
+            let cos_v = max(dot(pn, v), 0.0);
+            let fresnel = 0.02 + 0.98 * pow(1.0 - cos_v, 5.0);
+            // A still mirror over darker ground: at Fresnel's few percent from eye height the film
+            // read as the wet ground round it (PC shpd4: puddles over a quarter of the field and
+            // none seen); a puddle shows by the sky in it.
+            let film = lit.rgb * 0.3 + sky_color(reflect(-v, pn)) * mix(0.3, 1.0, fresnel);
+            lit = vec4(mix(lit.rgb, film, pool), lit.a);
+        }
+    }
     // The air before it glows with the placed lights' light (the held one is in `haze_lit`).
     let glow = placed_in_fog(in.light.yzw, in.rel, in.pos, in.light.x);
     return vec4(lit.rgb + glow, lit.a);
+}
+
+// 0..1 for puddle cell `c` and key `k`: a sine hash (the pack's `hash3` picked far too few cells,
+// PC shpd6).
+fn puddle_hash(c: vec2<i32>, k: f32) -> f32 {
+    return fract(sin(dot(vec2<f32>(c), vec2(12.9898, 78.233)) + k * 37.719) * 43758.5453);
 }
 
 // ---- water ----
@@ -692,10 +792,11 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     // A water face seen from inside the water that is not its surface: one the mesher draws where
     // the water meets a cube not loaded yet (at a chunk edge). Water inside water is not there; it
     // showed as flat dark-cyan boxes standing in the sea (Plants' reef, coral_under_w).
-    if in_water() && abs(in.normal.y) <= 0.5 {
+    // (Never with the eye out of liquid: a calm scene's shader has neither, `CALM`.)
+    if !CALM && in_water() && abs(in.normal.y) <= 0.5 {
         discard;
     }
-    if in_water() && abs(in.normal.y) > 0.5 && v.y < 0.0 {
+    if !CALM && in_water() && abs(in.normal.y) > 0.5 && v.y < 0.0 {
         let window = smoothstep(0.55, 0.85, -v.y);
         let sky = mix(0.6, 2.4, window) * mix(0.15, 1.0, brightness_curve(in.light.x));
         return WaterLit(underwater_color() * sky, vec3(0.0), 1.0);
@@ -865,12 +966,12 @@ fn sample_cutout(in: VOut, nuv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec4
 }
 
 @fragment
-fn fs_opaque(in: VOut) -> @location(0) vec4<f32> {
-    return opaque(in);
+fn fs_opaque(in: VOut) -> WorldOut {
+    return world_out(in, opaque(in));
 }
 
 @fragment
-fn fs_cutout(in: VOut) -> @location(0) vec4<f32> {
+fn fs_cutout(in: VOut) -> WorldOut {
     // Far look 1: small plants thin out from 40 to 96 blocks, so far ground isn't speckled with
     // flowers and tufts a pixel or two across.
     if (far_look() & 1u) != 0u && in.kind.z != 0u {
@@ -890,7 +991,7 @@ fn fs_cutout(in: VOut) -> @location(0) vec4<f32> {
     if in.kind.z == 0u {
         albedo = far_flat(in, albedo);
     }
-    return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
+    return world_out(in, vec4(shade(in, albedo).rgb, SOLID_ALPHA));
 }
 
 // Cutout blocks in two passes (the engine's `cutout_split`, on tiled GPUs): `fs_cutout`'s depth,
@@ -926,12 +1027,12 @@ fn fs_cutout_depth(in: VOut) {
 }
 
 @fragment
-fn fs_cutout_shade(in: VOut) -> @location(0) vec4<f32> {
+fn fs_cutout_shade(in: VOut) -> WorldOut {
     var albedo = cutout_albedo(in);
     if in.kind.z == 0u {
         albedo = far_flat(in, albedo);
     }
-    return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
+    return world_out(in, vec4(shade(in, albedo).rgb, SOLID_ALPHA));
 }
 
 // Where a cutout's texel is cut: at alpha 0.1, but in the HDR world a leaf cube (a cutout cube:
@@ -957,29 +1058,31 @@ const FADE_BAND: f32 = 24.0;
 // Whether this pixel, near where the cubes end (`g.extra.y` blocks across from the camera), is
 // left to distant terrain: more of them the nearer the end, in a fine noise over the screen
 // (interleaved gradient noise). A cube's pixel and the distant terrain's at the same place agree,
-// so one of the two always draws it.
+// so one of the two always draws it. The noise moves each frame (`scene.frame.w`, Jimenez's
+// 5.588238 a frame): fixed on the screen, its dots stood still as a stipple over the mid canopy at
+// view 12 (the Look session, 11-06); moving, they blend in time (and in a temporal AA's history).
 fn faded(in: VOut) -> bool {
     let end = f32(g.extra.y);
     if end <= 0.0 {
         return false;
     }
     let f = clamp((length(in.rel.xz) - (end - FADE_BAND)) / FADE_BAND, 0.0, 1.0);
-    let p = floor(in.clip.xy);
+    let p = floor(in.clip.xy) + 5.588238 * scene.frame.w;
     return fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y)) < f;
 }
 
 // The cubes near where they end (the engine draws only those meshes with these, so the rest keep
 // early depth).
 @fragment
-fn fs_opaque_fade(in: VOut) -> @location(0) vec4<f32> {
+fn fs_opaque_fade(in: VOut) -> WorldOut {
     if faded(in) {
         discard;
     }
-    return opaque(in);
+    return world_out(in, opaque(in));
 }
 
 @fragment
-fn fs_cutout_fade(in: VOut) -> @location(0) vec4<f32> {
+fn fs_cutout_fade(in: VOut) -> WorldOut {
     if faded(in) {
         discard;
     }
@@ -990,7 +1093,7 @@ fn fs_cutout_fade(in: VOut) -> @location(0) vec4<f32> {
     if albedo.a <= cutout_edge(in, nuv, du, dv) {
         discard;
     }
-    return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
+    return world_out(in, vec4(shade(in, albedo).rgb, SOLID_ALPHA));
 }
 
 fn translucent(in: VOut) -> vec4<f32> {

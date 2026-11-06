@@ -471,6 +471,9 @@ pub struct Storage {
     last_written: FxHashMap<(u32, IVec3), u64>,
     /// Per dimension, what distant terrain needs of the saved cubes (`lod_tops`).
     pub lod: Vec<crate::server::lod_tops::DimTops>,
+    /// chiacraft, test only: per dimension, an imported world's far terrain (`far.bin`,
+    /// `chiacraft_mcimport::far`), sent to clients as it is (`ToClient::LodFar`).
+    pub far: Vec<Option<std::sync::Arc<Vec<u8>>>>,
 }
 
 fn region_of(cube: IVec3) -> (IVec3, usize) {
@@ -542,6 +545,14 @@ impl Storage {
                 crate::server::lod_tops::DimTops::read(&dir.join("lod.bin"), c, dim as u32, meta.seed, &mut |w| ids.runtime_id(w))
             })
             .collect();
+        let far = dim_dirs
+            .iter()
+            .map(|dir| {
+                std::fs::read(dir.join("far.bin"))
+                    .ok()
+                    .map(std::sync::Arc::new)
+            })
+            .collect();
         Storage {
             meta,
             ids,
@@ -552,7 +563,13 @@ impl Storage {
             unknown: FxHashMap::default(),
             last_written: FxHashMap::default(),
             lod,
+            far,
         }
+    }
+
+    /// chiacraft, test only: the folder of dimension `dim`'s files (`far.bin` goes there).
+    pub fn dim_dir(&self, dim: u32) -> &Path {
+        &self.dim_dirs[dim as usize]
     }
 
     fn region(&mut self, dim: u32, r: IVec3) -> Option<&mut Region> {
@@ -614,6 +631,17 @@ impl Storage {
     }
 
     pub fn save(&mut self, c: &Content, dim: u32, pos: IVec3, cube: &Cube, entities: &[u8]) {
+        self.save_cube(c, dim, pos, cube, entities, true);
+    }
+
+    /// chiacraft, test only: a cube of an imported world (`chiacraft::mc_import`). Like `save`,
+    /// but its tops are left out of `lod_tops`: the import's far grid (`far`) covers distant
+    /// terrain, and millions of columns there would swamp it.
+    pub fn save_imported(&mut self, c: &Content, dim: u32, pos: IVec3, cube: &Cube) {
+        self.save_cube(c, dim, pos, cube, &[], false);
+    }
+
+    fn save_cube(&mut self, c: &Content, dim: u32, pos: IVec3, cube: &Cube, entities: &[u8], tops: bool) {
         if !c.dims[dim as usize].saved {
             return;
         }
@@ -670,8 +698,10 @@ impl Storage {
             }
         }
         self.saved[dim as usize].insert(pos);
-        let seed = self.meta.seed;
-        self.lod[dim as usize].saved(c, dim, seed, pos, &cube);
+        if tops {
+            let seed = self.meta.seed;
+            self.lod[dim as usize].saved(c, dim, seed, pos, &cube);
+        }
     }
 
     pub fn flush(&mut self) {

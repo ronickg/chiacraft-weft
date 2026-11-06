@@ -46,8 +46,9 @@ pub fn terrain(r: &mut Registry) {
     r.decoration(glaciers).dimension(&crate::MC_FOREST);
     r.decoration(tarn_water).dimension(&crate::OVERWORLD);
     r.decoration(tarn_water).dimension(&crate::MC_FOREST);
+    // Not in the test world: its biomes are the mix's, not the overworld's climate, and the fray
+    // put the overworld's taiga and snowy plains ground (snowy grass, podzol) in its old growth.
     r.decoration(fray_borders).dimension(&crate::OVERWORLD);
-    r.decoration(fray_borders).dimension(&crate::MC_FOREST);
     r.decoration(sea_sand).dimension(&crate::OVERWORLD);
     r.decoration(sea_sand).dimension(&crate::MC_FOREST);
     r.decoration(coral).dimension(&crate::OVERWORLD);
@@ -330,8 +331,9 @@ pub fn surface_block(g: &Gen, wx: i32, wz: i32) -> u32 {
     {
         return face;
     }
-    // Then the border's fray (`fray_borders`), on soil.
-    if SOIL.contains(&top)
+    // Then the border's fray (`fray_borders`), on soil (the overworld's: the test world has none).
+    if g.dimension() == crate::OVERWORLD.id()
+        && SOIL.contains(&top)
         && let Some((frayed, _)) = l::fray(&l::fields(g.seed()), wx * 16, wz * 16, c.height)
     {
         return rock(frayed);

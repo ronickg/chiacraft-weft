@@ -117,6 +117,8 @@ pub struct LodJob {
     pub live: Arc<AtomicBool>,
     /// What the server said of columns, taken over the terrain's where the tile samples them.
     pub columns: Arc<Columns>,
+    /// chiacraft, test only: an imported world's far terrain, taken where no column is.
+    pub far: Option<Arc<crate::chiacraft::mc_import::FarTerrain>>,
     /// When it was asked for (`diag::LOD_AGE_NS`).
     pub asked: std::time::Instant,
 }
@@ -167,7 +169,7 @@ pub fn made(job: LodJob, mut words: Vec<u32>) {
             return;
         }
         let start = std::time::Instant::now();
-        if !job.columns.is_empty() {
+        if !job.columns.is_empty() || job.far.is_some() {
             take_columns(&job, &mut words);
         }
         let (quads, skip, y) = if job.key.smooth() {
@@ -196,6 +198,14 @@ fn take_columns(job: &LodJob, words: &mut [u32]) {
             let w = k * WORDS;
             words[w] = (y as u32 & 0xFFFF) | (top << 16);
             words[w + 1] = (words[w + 1] & 0xFFFF) | (under << 16);
+            words[w + 2] = 0;
+            words[w + 3] = 0;
+        } else if let Some((y, top, under, biome)) = job.far.as_ref().and_then(|f| f.cell(col.x, col.y)) {
+            // chiacraft, test only: the imported world's ground, its biome, and no crown (its
+            // leaves are the top where trees stand).
+            let w = k * WORDS;
+            words[w] = (y as u32 & 0xFFFF) | (top << 16);
+            words[w + 1] = (biome & 0xFFFF) | (under << 16);
             words[w + 2] = 0;
             words[w + 3] = 0;
         }
@@ -459,6 +469,19 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
         .map(|k| openness(&high, k % CELLS, k / CELLS, at(k % CELLS, k / CELLS).0 + 1, s))
         .collect();
     let occ_at = |i: i32, j: i32| ground_occ[(j * CELLS + i) as usize];
+    // chiacraft: ground whose top block is leaves (the far data of an imported world, saved
+    // columns where trees stand) is drawn as a crown's (`crowned`), so packs shade it as a canopy:
+    // as ground, the imported Bliss world's far forests took none of it (mc-world-import, 11-06).
+    let leaf_memo = std::cell::RefCell::new(Vec::<(u32, bool)>::new());
+    let leafy = |state: u32| {
+        if let Some(&(_, l)) = leaf_memo.borrow().iter().find(|m| m.0 == state) {
+            return l;
+        }
+        let l = c.state_name(state).contains("leaves");
+        leaf_memo.borrow_mut().push((state, l));
+        l
+    };
+    let as_ground = |r: [u32; 4], state: u32| if leafy(state) { crowned(r) } else { r };
     // A crown sitting right on the ground hides its top.
     let covered = |i: i32, j: i32| crown_at(i, j).is_some_and(|c| c.bottom <= at(i, j).0 + 1);
     for j in 0..CELLS {
@@ -480,7 +503,7 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
             }
             if !hidden {
                 let (tex, tint) = face_of(top, 3);
-                out.push(occluded(quad(3, i * s, y, j * s, ((end - i) * s, 1, s), tex, tint, biome), occ));
+                out.push(as_ground(occluded(quad(3, i * s, y, j * s, ((end - i) * s, 1, s), tex, tint, biome), occ), top));
             }
             (lo, hi) = (lo.min(y), hi.max(y + 1));
             i = end;
@@ -527,7 +550,10 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                     s.min(y - ny)
                 };
                 let (tex, tint) = face_of(top, 3);
-                out.push(occluded(quad(dir as u32, i * s, y + 1 - band, j * s, (s, band, s), tex, tint, biome), occ_at(i, j)));
+                out.push(as_ground(
+                    occluded(quad(dir as u32, i * s, y + 1 - band, j * s, (s, band, s), tex, tint, biome), occ_at(i, j)),
+                    top,
+                ));
                 lo = lo.min(ny + 1);
                 if y - band <= ny {
                     continue;
@@ -740,6 +766,8 @@ pub struct Lod {
     /// What the server said of columns of `columns_dim`.
     columns: Arc<Columns>,
     columns_dim: u32,
+    /// chiacraft, test only: an imported world's far terrain, and its dimension.
+    far: Option<(u32, Arc<crate::chiacraft::mc_import::FarTerrain>)>,
     /// Made tiles to make again for columns that changed, shown as they are till then.
     stale: FxHashSet<TileKey>,
     /// Since when some wanted tiles are not made, and the most missing since (`diag`).
@@ -774,8 +802,18 @@ impl Lod {
             mask_changed: false,
             columns: Arc::default(),
             columns_dim: u32::MAX,
+            far: None,
             stale: FxHashSet::default(),
             missing_since: None,
+        }
+    }
+
+    /// chiacraft, test only: `ToClient::LodFar`, an imported world's far terrain (empty: none);
+    /// every made tile is made again.
+    pub fn set_far(&mut self, dim: u32, grid: &[u8]) {
+        self.far = crate::chiacraft::mc_import::FarTerrain::read(content(), grid).map(|f| (dim, Arc::new(f)));
+        if grid.is_empty() || self.far.is_some() {
+            self.stale.extend(self.ready.iter().copied());
         }
     }
 
@@ -1166,6 +1204,11 @@ impl Lod {
         let c = content();
         let custom = self.custom.clone().unwrap();
         let columns = if self.columns_dim == self.dim { self.columns.clone() } else { Arc::default() };
+        let far = self
+            .far
+            .as_ref()
+            .filter(|f| f.0 == self.dim)
+            .map(|f| f.1.clone());
         let p = self.wanted_at.map_or(glam::DVec2::ZERO, |w| w.0);
         let widths = |k: TileKey| k.distance(p).0 / k.size() as f64;
         let mut order: Vec<(f64, TileKey)> = Vec::new();
@@ -1204,10 +1247,11 @@ impl Lod {
             }
             let live = Arc::new(AtomicBool::new(true));
             self.pending.insert(key, live.clone());
-            let (dim, seed, done, jobs, columns) = (self.dim, self.seed, self.done.0.clone(), self.jobs.clone(), columns.clone());
+            let (dim, seed, done, jobs, columns, far) =
+                (self.dim, self.seed, self.done.0.clone(), self.jobs.clone(), columns.clone(), far.clone());
             let asked = std::time::Instant::now();
             if custom.is_empty() {
-                let _ = jobs.send(LodJob { dim, seed, key, custom: Vec::new(), done, live, columns, asked });
+                let _ = jobs.send(LodJob { dim, seed, key, custom: Vec::new(), done, live, columns, far, asked });
                 continue;
             }
             let custom = custom.clone();
@@ -1230,7 +1274,7 @@ impl Lod {
                 let heights = custom_heights(c, dim, seed, key, &custom);
                 crate::diag::LOD_HEIGHTS.add(1);
                 crate::diag::LOD_HEIGHTS_NS.add(start.elapsed().as_nanos() as u64);
-                let _ = jobs.send(LodJob { dim, seed, key, custom: heights, done, live, columns, asked });
+                let _ = jobs.send(LodJob { dim, seed, key, custom: heights, done, live, columns, far, asked });
             });
         }
         self.stale.retain(|k| self.ready.contains(k));

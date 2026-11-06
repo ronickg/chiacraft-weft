@@ -142,7 +142,23 @@ impl Camera {
         self.bobbing() * glam::camera::rh::view::look_to_mat4(Vec3::ZERO, self.forward(), Vec3::Y)
     }
 
+    /// The projection the world is drawn with: `proj_plain` moved by this frame's jitter
+    /// (`post::jitter`, a fraction of a pixel; none without temporal anti-aliasing).
     pub fn proj(&self, aspect: f32) -> Mat4 {
+        let mut m = self.proj_plain(aspect);
+        let j = crate::post::jitter();
+        if j != glam::Vec2::ZERO {
+            // Clip x and y moved by j times w: the whole image moved by j in NDC.
+            for c in [&mut m.x_axis, &mut m.y_axis, &mut m.z_axis, &mut m.w_axis] {
+                c.x += j.x * c.w;
+                c.y += j.y * c.w;
+            }
+        }
+        m
+    }
+
+    /// The projection without the jitter.
+    pub fn proj_plain(&self, aspect: f32) -> Mat4 {
         // Y-up clip space: naga already flips Y for Vulkan.
         glam::camera::rh::proj::directx::perspective_infinite_reverse(self.fov.to_radians(), aspect, 0.05)
     }
@@ -322,6 +338,17 @@ impl Solid {
     }
 }
 
+/// The world's colour pipelines from one shader: faces and quads (opaque, cutout, translucent),
+/// distant terrain, and when the pack has them its open tiles, split cutouts and fading cubes.
+struct ColorPipes {
+    face: [PipelineId; 3],
+    quad: [PipelineId; 3],
+    lod: PipelineId,
+    lod_open: Option<PipelineId>,
+    cutout_split: Option<[PipelineId; 4]>,
+    fade: Option<[PipelineId; 6]>,
+}
+
 pub struct WorldRenderer {
     /// Depth only, from the sun, for `sun_shadows` packs: faces solid, faces cutout, quads solid,
     /// quads cutout. Solid blocks have no fragment shader (nothing to leave out, and a pass without
@@ -359,6 +386,10 @@ pub struct WorldRenderer {
     /// terrain taking the pixels they leave (Distant Horizons' fade), so the edge isn't a line.
     /// Only those meshes, so the rest keep early depth (no `discard`).
     fade_pipes: Option<[PipelineId; 6]>,
+    /// The colour pipelines not in use: the calm ones (`calm_pipes`) while `calm_on` is false,
+    /// the plain ones while it is true. None when the pack doesn't use `CALM`.
+    calm_alt: Option<ColorPipes>,
+    calm_on: bool,
     /// How far from the camera (blocks, across) the cubes end while distant terrain is shown; 0:
     /// no fade. Cubes past it aren't drawn.
     pub lod_fade: u32,
@@ -564,7 +595,69 @@ impl WorldRenderer {
             solid: Solid::new(gpu, c),
             drawn: 0,
             faces_drawn: 0,
+            calm_alt: Self::calm_pipes(gpu, assets),
+            calm_on: false,
         })
+    }
+
+    /// The colour pipelines from the world shader with `CALM` true (`packs::compose_calm`), when
+    /// the pack uses it: the same draws, the shader without the paths that do nothing in a calm
+    /// scene. Shadows and depth-only passes keep the plain ones.
+    fn calm_pipes(gpu: &mut dyn Backend, assets: &crate::assets::Assets) -> Option<ColorPipes> {
+        let snippets = crate::shaders::snippets(assets, &HOOK);
+        let s = crate::packs::compose_calm(assets, "world.wgsl", &[(&HOOK, &snippets)])?;
+        let (face, quad, lod) = Self::pipelines(gpu, &s)
+            .map_err(|e| log::error!("calm world pipelines: {e}"))
+            .ok()?;
+        Some(ColorPipes {
+            face,
+            quad,
+            lod,
+            lod_open: Self::lod_open_pipeline(gpu, &s),
+            cutout_split: Self::cutout_split_pipelines(gpu, &s),
+            fade: Self::fade_pipelines(gpu, &s),
+        })
+    }
+
+    /// Trades the colour pipelines in use with `set`'s.
+    fn swap_pipes(&mut self, set: &mut ColorPipes) {
+        std::mem::swap(&mut self.face_pipes, &mut set.face);
+        std::mem::swap(&mut self.quad_pipes, &mut set.quad);
+        std::mem::swap(&mut self.lod_pipe, &mut set.lod);
+        std::mem::swap(&mut self.lod_open_pipe, &mut set.lod_open);
+        std::mem::swap(&mut self.cutout_split, &mut set.cutout_split);
+        std::mem::swap(&mut self.fade_pipes, &mut set.fade);
+    }
+
+    /// Draws with the calm pipelines (`gpu_layout::CALM_OFF`) while `calm`, when the pack has
+    /// them; the plain ones otherwise. Call before the frame's draws.
+    pub fn set_calm(&mut self, calm: bool) {
+        if calm == self.calm_on {
+            return;
+        }
+        if let Some(mut alt) = self.calm_alt.take() {
+            self.swap_pipes(&mut alt);
+            self.calm_alt = Some(alt);
+            self.calm_on = calm;
+        }
+    }
+
+    /// Puts the plain pipelines back in use and destroys the calm ones (before a reload or drop).
+    fn drop_calm(&mut self, gpu: &mut dyn Backend) {
+        self.set_calm(false);
+        if let Some(set) = self.calm_alt.take() {
+            for p in set
+                .face
+                .into_iter()
+                .chain(set.quad)
+                .chain([set.lod])
+                .chain(set.lod_open)
+                .chain(set.cutout_split.into_iter().flatten())
+                .chain(set.fade.into_iter().flatten())
+            {
+                gpu.destroy_pipeline(p);
+            }
+        }
     }
 
     /// The block texture tables (`GameTextures::world_tables`) on the GPU.
@@ -605,6 +698,7 @@ impl WorldRenderer {
                 blend,
                 cull_back: cull,
                 topology: Topology::Triangles,
+                motion: crate::post::motion(),
             })
             .map_err(|e| e.0)
         };
@@ -640,6 +734,7 @@ impl WorldRenderer {
             blend: Blend::None,
             cull_back: true,
             topology: Topology::Triangles,
+            motion: crate::post::motion(),
         })
         .map_err(|e| log::error!("world shader fs_lod_open: {}", e.0))
         .ok()
@@ -684,6 +779,7 @@ impl WorldRenderer {
                 blend,
                 cull_back: true,
                 topology: Topology::Triangles,
+                motion: crate::post::motion(),
             }) {
                 Ok(p) => made.push(p),
                 Err(e) => {
@@ -735,6 +831,7 @@ impl WorldRenderer {
                 blend,
                 cull_back: true,
                 topology: Topology::Triangles,
+                motion: crate::post::motion(),
             }) {
                 Ok(p) => made.push(p),
                 Err(e) => {
@@ -774,6 +871,7 @@ impl WorldRenderer {
                 blend: Blend::None,
                 cull_back: false,
                 topology: Topology::Triangles,
+                motion: false,
             }) {
                 Ok(p) => made.push(p),
                 Err(e) => {
@@ -804,6 +902,7 @@ impl WorldRenderer {
             blend: Blend::None,
             cull_back: false,
             topology: Topology::Triangles,
+            motion: false,
         })
         .map_err(|e| log::error!("distant terrain shadows: {}", e.0))
         .ok()
@@ -1016,6 +1115,7 @@ impl WorldRenderer {
             .and_then(|(s, slots)| Ok((Self::pipelines(gpu, &s)?, slots)))
         {
             Ok(((f, q, l), slots)) => {
+                self.drop_calm(gpu);
                 for p in self
                     .face_pipes
                     .into_iter()
@@ -1051,6 +1151,7 @@ impl WorldRenderer {
                 self.tex_shader = shader_table(gpu, crate::content::content(), textures, &slots);
                 self.solid
                     .set_on(gpu, crate::packs::pack_uses("world.wgsl", "solid_at"));
+                self.calm_alt = Self::calm_pipes(gpu, assets);
                 log::info!("world shader reloaded");
             }
             Err(e) => log::error!("world shader: {e}"),
@@ -1117,6 +1218,7 @@ impl WorldRenderer {
     }
 
     pub fn destroy(&mut self, gpu: &mut dyn Backend) {
+        self.drop_calm(gpu);
         self.meshes.clear();
         self.regions.clear();
         self.table_only.clear();

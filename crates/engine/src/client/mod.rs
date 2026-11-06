@@ -42,6 +42,9 @@ use textures::GameTextures;
 use world::ClientWorld;
 use world_render::{Camera, WorldRenderer};
 
+/// The snow line when there is none (`snow_line`): blocks above the sea, over any mountain.
+const SNOW_LINE_NONE: f32 = 400.0;
+
 pub struct LocalPlayer {
     pub pos: DVec3,
     pub vel: DVec3,
@@ -657,6 +660,9 @@ pub struct Client {
     /// frame; and with it on, what is drawn after the opaque world goes into `late_out` for the app
     /// to put after the copy instead of into the frame's list.
     pub behind: [f32; 4],
+    /// Last frame's projection and view without the jitter, where its camera stood and the
+    /// shaders' clock then, for temporal anti-aliasing's `Scene::taa_prev` and `taa`.
+    taa_last: Option<(glam::Mat4, DVec3, f32)>,
     pub late_out: CommandList,
     /// Seconds until the next dust piece from the block being hit, and until its next knock.
     hit_dust: f32,
@@ -684,6 +690,12 @@ pub struct Client {
     canopy: f32,
     /// How wet the ground is where the player is, 0..1 (`weather_effects`, `Scene::canopy.y`).
     wet: f32,
+    /// How far puddles have grown where the player is, 0..1 (`weather_effects`, `Scene::canopy.z`):
+    /// over minutes of rain, drying slower than the ground after.
+    puddles: f32,
+    /// Where rain turns to snow up a mountain where the player is, blocks above the sea (a mod's
+    /// air, `air_flags::SNOWLINE_SHIFT`; `SNOW_LINE_NONE` for none), eased (`Scene::canopy.w`).
+    snow_line: f32,
     /// What happens in the sky (`weft_abi::sky_event`, chiacraft), how strongly, and when it began
     /// (`shaders::time`).
     sky_event: (u32, f32, f32),
@@ -977,6 +989,7 @@ impl Client {
             late: CommandList::default(),
             hand_late: CommandList::default(),
             behind: [0.0; 4],
+            taa_last: None,
             late_out: CommandList::default(),
             hit_dust: 0.0,
             hit_sound: 0.0,
@@ -1023,6 +1036,8 @@ impl Client {
             aurora: 0.0,
             canopy: 0.0,
             wet: 0.0,
+            puddles: 0.0,
+            snow_line: SNOW_LINE_NONE,
             sky_event: (0, 0.0, 0.0),
             sky_landing: None,
             weather_id: 0,
@@ -2699,6 +2714,19 @@ impl Client {
             let secs = if drying == 0 { 120.0 } else { 3600.0 * (30.0f32 / 3600.0).powf((drying - 1) as f32 / 254.0) };
             self.wet = (self.wet - dt / secs).max(falling);
         }
+        // Puddles grow over about ten minutes of steady rain (a shower leaves a few) and dry a third
+        // as fast as the ground after it, the last of the wet to go (at half its pace they were gone
+        // three minutes after a five-minute rain, the ground still dark: PC shpd7).
+        if falling > 0.0 {
+            self.puddles = (self.puddles + falling * dt / 600.0).min(1.0);
+        } else {
+            let drying = (flags >> weft_abi::air_flags::DRYING_SHIFT) & 255;
+            let secs = if drying == 0 { 120.0 } else { 3600.0 * (30.0f32 / 3600.0).powf((drying - 1) as f32 / 254.0) };
+            self.puddles = (self.puddles - dt / (secs * 3.0)).max(0.0);
+        }
+        let line = (flags >> weft_abi::air_flags::SNOWLINE_SHIFT) & 63;
+        let line = if line == 0 { SNOW_LINE_NONE } else { (line - 1) as f32 * 4.0 };
+        self.snow_line += (line - self.snow_line).clamp(-dt * 40.0, dt * 40.0);
         let heading = self.world.air.1.to_radians();
         let wind = Vec2::new(heading.sin(), -heading.cos()) * speed;
         self.wind += (wind - self.wind) * (1.0 - (-dt / 4.0).exp());
@@ -2774,6 +2802,25 @@ impl Client {
     }
 
     /// The frame as every world pass sees it (`gpu_layout::Scene`).
+    /// Temporal anti-aliasing's fields (`Scene::taa`, `taa_prev`): this frame's jitter, and last
+    /// frame's camera without it, taking this frame's camera-relative positions, with the
+    /// shaders' clock then. A camera that moved more than 32 blocks (a teleport, a respawn) or a
+    /// clock that went back starts it anew, and so does a frame without it (`post::taa_active`):
+    /// `taa.z` 0 then, and the shaders skip their motion.
+    fn taa_frame(&mut self, cam: &Camera, frame: &FrameInfo) -> ([f32; 4], [[f32; 4]; 4]) {
+        let aspect = frame.width as f32 / frame.height.max(1) as f32;
+        let now = cam.proj_plain(aspect) * cam.view();
+        let j = crate::post::jitter();
+        let t = crate::shaders::time();
+        match self.taa_last.replace((now, cam.pos, t)) {
+            Some((last, at, then)) if crate::post::taa_active() && (cam.pos - at).length() < 32.0 && then <= t => {
+                let moved = glam::Mat4::from_translation((cam.pos - at).as_vec3());
+                ([j.x, j.y, 1.0, then], (last * moved).to_cols_array_2d())
+            }
+            _ => ([j.x, j.y, 0.0, t], now.to_cols_array_2d()),
+        }
+    }
+
     fn scene(&self, cam: &Camera, frame: &FrameInfo) -> Scene {
         // Fog ends where the terrain does: the view, or the distant terrain beyond it.
         let view_distance = (self.view_radius * 16).max(lod::Lod::distance()) as f32;
@@ -2811,13 +2858,16 @@ impl Client {
             options: pack_options(),
             hand: hand.0,
             hand_light: hand.1,
-            canopy: [self.canopy, self.wet, 0.0, 0.0],
+            canopy: [self.canopy, self.wet, self.puddles, self.snow_line],
             // Filled in once the sky has readied them (`render`).
             soft_clouds: [0.0; 4],
             // Filled in once the sky has readied it (`render`).
             frame_look: [0.0; 4],
             lightning: [self.lightning_seen.0, self.lightning_seen.1, self.thunder(), self.lightning_seen.2],
             froxels: [0.0; 4],
+            // Filled in by `render` (`taa_frame`).
+            taa: [0.0; 4],
+            taa_prev: [[0.0; 4]; 4],
             cloud_shadow: [0.0; 4],
             prev_view_proj: [[0.0; 4]; 4],
             cloud_moved: [0.0; 4],
@@ -2831,7 +2881,12 @@ impl Client {
                     .to_array(),
                 None => [0.0, 0.0, 0.0, -1e6],
             },
-            frame: [crate::post::hdr() as u32 as f32, crate::post::bloom() as u32 as f32, self.sky.froxels.cell as f32, 0.0],
+            frame: [crate::post::hdr() as u32 as f32, crate::post::bloom() as u32 as f32, self.sky.froxels.cell as f32, {
+                // chiacraft: a count of the frames drawn, 0 to 63 and round again, for dithers that
+                // change each frame (Far view, 11-06: the cubes' fade into distant terrain).
+                static FRAME: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+                (FRAME.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % 64) as f32
+            }],
             shadow_view_proj: self.shadow.0.to_cols_array_2d(),
             shadow_far_view_proj: self.shadow_far.0.to_cols_array_2d(),
             shadow_far: match self.shadow_far_map {
@@ -3096,7 +3151,7 @@ impl Client {
         scene.shadow = [0.0; 4];
         let buf = self.shadow_bufs[frame.slot];
         gpu.mapped(buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
-        list.push(weft_render::Cmd::BeginPass { color: None, depth: Some((map, Some(0.0))) });
+        list.push(weft_render::Cmd::BeginPass { motion: None, color: None, depth: Some((map, Some(0.0))) });
         // Leaning structures (chiacraft, a falling tree) cast theirs, turned.
         let leaning: Vec<(u64, DVec3, (Vec3, glam::Quat))> = self
             .entities
@@ -3137,7 +3192,7 @@ impl Client {
         scene.shadow_far = [0.0; 4];
         let far_buf = self.shadow_far_bufs[frame.slot];
         gpu.mapped(far_buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
-        list.push(weft_render::Cmd::BeginPass { color: None, depth: Some((far_map, Some(0.0))) });
+        list.push(weft_render::Cmd::BeginPass { motion: None, color: None, depth: Some((far_map, Some(0.0))) });
         self.render
             .draw_shadow(gpu, list, frame, &cam, far, far_buf, 1, &[]);
         list.push(weft_render::Cmd::EndPass);
@@ -3158,6 +3213,17 @@ impl Client {
         }
         let cam = self.render_camera();
         let mut scene = self.scene(&cam, frame);
+        (scene.taa, scene.taa_prev) = self.taa_frame(&cam, frame);
+        // The calm world pipelines (`gpu_layout::CALM_OFF`) while nothing they leave out is on, read
+        // from the scene the shaders see: no fog in the air, no thunder, no held light, the eye in
+        // no liquid (the fog then starts at 0.6 of its end).
+        let hand = scene.hand_light;
+        self.render.set_calm(
+            scene.weather[2] <= 0.0
+                && scene.lightning[2] < 0.05
+                && hand[0].max(hand[1]).max(hand[2]) <= 0.0
+                && (scene.params[0] - 0.6 * scene.params[1]).abs() <= 0.5,
+        );
         while self.scene_bufs.len() < gpu.frames_in_flight() {
             self.scene_bufs.push(gpu.create_buffer(
                 size_of::<Scene>() as u64,

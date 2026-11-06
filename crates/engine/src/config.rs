@@ -673,6 +673,13 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // The world drawn in 16-bit float (linear light past 1) with the screen effects after it and
         // the picture finished in one last pass (chiacraft, the HDR world); read at start.
         ConfigDef::number("core:hdr_world", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // Anti-aliasing: 0 off, 1 temporal (`post::Post`: the world drawn a fraction of a pixel
+        // aside each frame and gathered over frames by where each pixel was, the motion image).
+        // Read at start, as the world's pipelines then draw the motion image too.
+        ConfigDef::number("core:aa", ck::INT, 0.0, 0.0, 1.0, 1.0),
+        // Temporal anti-aliasing: the least share of each new frame (0.1: about ten gathered;
+        // less, smoother and slower to follow), live.
+        ConfigDef::number("core:taa_blend", ck::FLOAT, 0.1, 0.03, 0.5, 0.01),
         // The HDR world's bloom (chiacraft): 0 none, 1 a pyramid of 4 levels, 2 of 6 (wider glow);
         // live. Without the HDR world the pack's own bloom effect glows as before.
         ConfigDef::number("core:bloom", ck::INT, 2.0, 0.0, 2.0, 1.0),
