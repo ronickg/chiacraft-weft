@@ -86,6 +86,16 @@ pub fn register(r: &mut Registry) {
         .on_land(When::any(), Then::die());
     r.world_tick(tell);
     r.client_frame(frame);
+    // One oak leaf a little ahead of you and above, to watch it fall (the frame strip; tuning).
+    r.command("windleaf", "", |cmd| {
+        let w = cmd.world();
+        let Some(st) = w.entity(cmd.player()) else { return };
+        let (sin, cos) = (st.yaw as f64).sin_cos();
+        let at = [st.pos.x - sin * 2.5, st.pos.y + 3.2, st.pos.z - cos * 2.5];
+        let oak = crate::blocks::OAK_LEAVES.id();
+        drop(w.spawn_particles(&LEAVES[0], at).color(0xAEAEAE).block(oak));
+        cmd.reply("command.base.windleaf", &[]);
+    });
 }
 
 /// Every `REFRESH_SECS`, each player's season's leaf fall and dust storm.
@@ -151,7 +161,7 @@ fn source(state: u32) -> Source {
     if bloom && let Some(&(_, c)) = colours::FLOWERS.iter().find(|(n, _)| *n == name) {
         return Source::Flower(c);
     }
-    if name.ends_with("snow_layer") || name == "base:snow" || name == "base:snow_block" {
+    if name.ends_with("snow_layer") || name == "base:snow" || name == "base:snowy_grass" {
         return Source::Snow;
     }
     if SAND_TAG.on_block(state) {
