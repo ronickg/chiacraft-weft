@@ -343,18 +343,16 @@ fn lightning_near() -> f32 {
 }
 
 // Toward the strike along the horizon (a unit vector, x and z). Two strikes in three come down
-// within about 40° of where the camera looks (`scene.inv_view_proj`'s middle ray): anywhere round
+// within about 40° of where the camera looked as the flash began: anywhere round
 // the compass, a quarter of them were in view and a burst of 400 shots caught flashes but no bolt
 // (Tester 2's looks3, 11-05). The rest anywhere, so storms still flash all round.
 fn lightning_toward() -> vec2<f32> {
     let r = scene.lightning.y;
     var a = r * 6.2831853;
+    // Where the camera faced as the flash began (`scene.lightning.w`, the engine's), so the bolt
+    // stays put while the player turns (Ronald, 11-05: it followed the camera).
     if fract(r * 61.3) < 0.67 {
-        let near = scene.inv_view_proj * vec4(0.0, 0.0, 1.0, 1.0);
-        let far = scene.inv_view_proj * vec4(0.0, 0.0, 0.1, 1.0);
-        let fwd = far.xyz / far.w - near.xyz / near.w;
-        let look = atan2(fwd.x, -fwd.z);
-        a = select(a, look + (fract(r * 23.1) - 0.5) * 1.4, abs(fwd.x) + abs(fwd.z) > 1e-4);
+        a = scene.lightning.w + (fract(r * 23.1) - 0.5) * 1.4;
     }
     return vec2(sin(a), -cos(a));
 }

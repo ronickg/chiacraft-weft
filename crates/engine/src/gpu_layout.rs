@@ -733,7 +733,9 @@ gpu_struct! {
         /// The last lightning flash where the player is (a weather with `lightning`, chiacraft):
         /// x seconds since it began (1e4 when none yet; real time, not the shaders' clock, which
         /// tests pin), y a random number 0..1 of its own (for where it strikes), z how hard it
-        /// thunders now (as `weather.w`), w unused. The engine's own flash only brightens the
+        /// thunders now (as `weather.w`), w where the camera faced as it began (radians,
+        /// clockwise from -z, as `atan2(forward.x, -forward.z)`), so a pack can aim strikes into
+        /// view and keep them put while the player turns. The engine's own flash only brightens the
         /// daylight for 0.15 s; packs draw the bolt and the flicker from this.
         pub lightning: [f32; 4],
         /// How this frame is drawn: x 1 when into the HDR world (`post::hdr`: linear light past 1,
