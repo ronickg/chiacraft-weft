@@ -102,6 +102,7 @@ static GPU_MEMORY: Config<i32> = Config::named("core:gpu_memory_mb");
 /// The GPU can trace rays (`core:gpu_ray_query`): the traced shadows' row is shown.
 static GPU_RAY_QUERY: Config<bool> = Config::named("core:gpu_ray_query");
 static RT_SHADOWS: Config<i32> = Config::named("core:rt_shadows");
+static RT_REFLECTIONS: Config<bool> = Config::named("core:rt_reflections");
 /// The newer quality settings, each a row on the Extra quality tab (`EXTRA_ROWS`) and all at their
 /// most in the Max preset: the HDR world and temporal anti-aliasing (read at start), the mist as a
 /// volume, the soft clouds' shadow, the bloom's levels, the far shadow map's reach, the screen
@@ -250,6 +251,7 @@ fn max_extras() {
     crate::look::LOOK_LEAF_HOLES.set(1.0);
     // Ultra (soft edges from more rays, with TAA) where the GPU traces rays.
     RT_SHADOWS.set(if GPU_RAY_QUERY.get() && !on_phone() { 2 } else { 0 });
+    RT_REFLECTIONS.set(GPU_RAY_QUERY.get() && !on_phone());
     FX_WIND_LIFE.set(3);
     SOFT_CLOUDS.set(true);
     // DLAA (DLSS at the screen's own size) where the renderer has it, with its newest model (M,
@@ -561,10 +563,11 @@ fn fantasy_caps(q: usize, bloom_up: bool) {
         FX_BLOOM.set(0);
     } else if q == 1 {
         FX_BLOOM.set(FX_BLOOM.get().min(1));
-    } else if bloom_up && (q <= 3 || q == MAX) {
-        if let Some(&b) = FANTASY_BLOOM.get(FANTASY.get() as usize) {
-            FX_BLOOM.set(b);
-        }
+    } else if bloom_up
+        && (q <= 3 || q == MAX)
+        && let Some(&b) = FANTASY_BLOOM.get(FANTASY.get() as usize)
+    {
+        FX_BLOOM.set(b);
     }
 }
 
@@ -586,6 +589,8 @@ fn row_ui(ui: &mut Ui, rows: &'static [Row], i: usize, step: fn(usize, i32)) {
             });
         });
         ui.button("video.base.more", S::default().size(12.0, 12.0).pad(0.5), move |_| step(i, 1));
+        // What its value costs here (`video_costs`).
+        crate::video_costs::cost_cell(ui, row.key, row.get);
         // A value waiting for the next start says so in place of what the row does.
         let key = row.key;
         ui.text_bind_styled(S::default().class("dim").max_w(150.0), move |_, t| {
@@ -600,8 +605,8 @@ fn row_ui(ui: &mut Ui, rows: &'static [Row], i: usize, step: fn(usize, i32)) {
 
 /// The Extra quality tab's rows (`EXTRA_SCREEN`): the newer features, each a setting of its own,
 /// outside Low to Ultra so no preset changes the look by them; Max sets them all (`max_extras`).
-/// Traced sun and moon shadows only where the GPU can trace rays (the last row, `RT_ROW`).
-const EXTRA_ROWS: [Row; 9] = [
+/// Traced shadows and reflections only where the GPU can trace rays (the last rows, from `RT_ROW`).
+const EXTRA_ROWS: [Row; 10] = [
     Row { key: "hdr", values: &[0.0, 1.0], get: || HDR_WORLD.get() as u8 as f64, set: |v| HDR_WORLD.set(v > 0.0), shown: off_on },
     Row {
         key: "aa",
@@ -661,7 +666,16 @@ const EXTRA_ROWS: [Row; 9] = [
         set: |v| RT_SHADOWS.set(v as i32),
         shown: |v| word(["off", "on", "ultra"][(v as usize).min(2)]),
     },
+    // Reflections traced on water, glass, polished stone and metal, in place of the screen's.
+    Row {
+        key: "rt_reflections",
+        values: &[0.0, 1.0],
+        get: || RT_REFLECTIONS.get() as u8 as f64,
+        set: |v| RT_REFLECTIONS.set(v > 0.0),
+        shown: off_on,
+    },
 ];
+/// The first of the rows only a GPU that traces rays shows (traced shadows, then reflections).
 const RT_ROW: usize = 8;
 
 /// An extra row a step on: Max becomes Custom (the Low to Ultra presets leave these rows as they are).
@@ -720,6 +734,80 @@ fn new_defaults() {
     DEFAULTS.set(1);
     // And the next step at once (`DEFAULTS` 2).
     new_defaults();
+}
+
+/// The rows a tab's measuring steps through (`video_costs`): those that apply at once and cost GPU
+/// time. Not render scale, shadow detail, the HDR world or anti-aliasing (read at start), the view
+/// and distant terrain (their land loads for long after), vsync and the frame cap (not costs), nor
+/// the far shadows' reach (its map is drawn again only when the light moves) or the looks that cost
+/// nothing (storybook, moon, glow, sky events).
+pub(crate) fn measured_rows(tab: crate::video_costs::Tab) -> Vec<crate::video_costs::Measured> {
+    use crate::video_costs::{Measured, Tab};
+    let pick = |rows: &'static [Row], keys: &[(&str, f32)]| -> Vec<Measured> {
+        rows.iter()
+            .filter_map(|r| {
+                let settle = keys.iter().find(|k| k.0 == r.key)?.1;
+                Some(Measured { key: r.key, values: r.values.to_vec(), get: r.get, set: r.set, settle })
+            })
+            .collect()
+    };
+    match tab {
+        Tab::Video => {
+            pick(&ROWS, &[("shadows", 0.6), ("reflect", 0.4), ("contact", 0.4), ("volume", 0.4), ("shafts", 0.4), ("bloom", 0.4)])
+        }
+        Tab::Extra => {
+            let mut keys =
+                vec![("mist_volume", 0.6), ("cloud_shadows", 0.6), ("bloom_levels", 0.4), ("effect_detail", 0.4), ("leaf_holes", 0.4)];
+            if GPU_RAY_QUERY.get() {
+                // A new world shader each change, and its scene.
+                keys.push(("rt_shadows", 2.0));
+            }
+            pick(&EXTRA_ROWS, &keys)
+        }
+        Tab::Fantasy => pick(
+            &FANTASY_ROWS,
+            &[
+                ("fireflies", 1.5),
+                ("motes", 1.5),
+                ("wind_life", 1.5),
+                ("night_sky", 0.4),
+                ("shooting_stars", 0.4),
+                ("biome_air", 0.4),
+                ("sparkle", 0.4),
+                ("clouds", 1.0),
+            ],
+        ),
+        Tab::Dlss => crate::dlss::measured_rows(),
+    }
+}
+
+/// How many GPU ms a frame will take more (or less) once the changes waiting for a restart apply:
+/// the HDR world and anti-aliasing by their costs, render scale by the pixels (an estimate).
+fn after_restart(window: [u32; 2]) -> Option<f64> {
+    use crate::video_costs::{Cost, cost};
+    let ms = |c: Cost| match c {
+        Cost::Measured(m) | Cost::Estimate(m) => m,
+        Cost::None => 0.0,
+    };
+    let start = AT_START.get().copied()?;
+    let mut d = 0.0;
+    let mut any = false;
+    if start.0 != HDR_WORLD.get() {
+        d += ms(cost(window, "hdr", HDR_WORLD.get() as u8 as f64)) - ms(cost(window, "hdr", start.0 as u8 as f64));
+        any = true;
+    }
+    if start.1 != AA.get() {
+        d += ms(cost(window, "aa", AA.get() as f64)) - ms(cost(window, "aa", start.1 as f64));
+        any = true;
+    }
+    if waiting("render_scale") {
+        let now = RENDER_SCALE.get() as f64;
+        let next = render_scale();
+        let (now, next) = (if now > 0.0 { now } else { 1.0 }, if next > 0.0 { next } else { 1.0 });
+        d += crate::video_costs::live_gpu() * ((next * next) / (now * now) - 1.0);
+        any = true;
+    }
+    any.then_some(d)
 }
 
 pub fn register(r: &mut Registry) {
@@ -793,6 +881,7 @@ pub fn register(r: &mut Registry) {
             }));
         }
         crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.title", &tabs, |ui| {
+            crate::video_costs::top_line(ui, &SCREEN, || measured_rows(crate::video_costs::Tab::Video), after_restart);
             // The presets, and which one the settings are now.
             ui.row(S::row().gap(3.0).center(), |ui| {
                 ui.text_styled(S::default().w(84.0).no_wrap(), "video.base.quality", &[]);
@@ -855,9 +944,10 @@ pub fn register(r: &mut Registry) {
             }));
         }
         crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.extra.title", &tabs, |ui| {
+            crate::video_costs::top_line(ui, &EXTRA_SCREEN, || measured_rows(crate::video_costs::Tab::Extra), after_restart);
             for i in 0..EXTRA_ROWS.len() {
                 // Traced shadows only where the GPU traces rays.
-                if i == RT_ROW && !GPU_RAY_QUERY.get() {
+                if i >= RT_ROW && !GPU_RAY_QUERY.get() {
                     continue;
                 }
                 row_ui(ui, &EXTRA_ROWS, i, step_extra);
@@ -879,6 +969,7 @@ pub fn register(r: &mut Registry) {
             }));
         }
         crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.fantasy.title", &tabs, |ui| {
+            crate::video_costs::top_line(ui, &FANTASY_SCREEN, || measured_rows(crate::video_costs::Tab::Fantasy), after_restart);
             // The master, and which of its looks the rows are now.
             ui.row(S::row().gap(3.0).center(), |ui| {
                 ui.text_styled(S::default().w(84.0).no_wrap(), "video.base.fantasy", &[]);

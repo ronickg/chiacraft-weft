@@ -474,6 +474,8 @@ pub struct WorldRenderer {
     rt_wanted: bool,
     /// The shader pack's `world.wgsl` calls `rt_sun` (as of the last composing).
     rt_pack: bool,
+    /// What the scene is traced for: sun shadows, reflections (`set_rt_modes`).
+    rt_modes: (bool, bool),
     /// The setting changed: the app composes the world shader again (`reload_shaders`).
     pub rt_reload: bool,
 }
@@ -645,6 +647,7 @@ impl WorldRenderer {
             rt_compiled,
             rt_wanted: rt_expand.is_some() && rt::rt_setting(),
             rt_pack,
+            rt_modes: (false, false),
             rt_reload: false,
             calm_sets: [Self::calm_pipes(gpu, assets, false), Self::calm_pipes(gpu, assets, true)],
             calm_level: 0,

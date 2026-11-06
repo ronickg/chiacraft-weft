@@ -107,3 +107,41 @@ A testkit script builds a glass-and-tile hall on open ground:
 - bronze and copper trims, and lanterns on the walls
 
 It's shot by day, at sunset and at night, with shadow maps and with `core:rt_shadows` on, through the PC queue.
+
+## NVIDIA's showcase world, one to one (11-06)
+
+Ronald, 11-06: "compare images one to one". NVIDIA's showcase world (BlockWorks, CC BY 4.0) is imported
+with `--import-mc`. A local-only data package `mc` holds 216 of its full-cube blocks, with the RTX Remix
+Materials pack's textures and LabPBR maps (`tester-tools/rtx-demo/build_package.py`). The importer takes
+`mc:<name>` first when that package is loaded. None of NVIDIA's files are in this repository.
+
+The cameras of NVIDIA's 5 gallery shots were found from block counts and scouting runs (`tester-tools/rtx-demo`,
+`rtxd_final.txt`):
+- the cherry tree, south-east of it
+- the jungle cathedral, from the north at 07:00
+- the cathedral's nave floor, facing east at 17:48
+- the storeroom, in the frozen ship's hold
+- an ice cave north of the ice field; NVIDIA's own ice tunnel isn't found yet
+
+Sheet: `images/rtx-showcase-blocks/2026-11-06/nvidia_vs_ours_v1.jpg` (NVIDIA | our shadow maps | our traced shadows).
+
+What it shows, biggest gap first:
+1. **Interiors.** NVIDIA's storeroom and nave are lit by bounce light and many small lights that cast
+   shadows (lanterns, fires, amethyst). Ours are lit flat, with no light bouncing off walls. This is RT
+   steps 5 and 6 (bounce light, ReSTIR-style many lights).
+2. **Light through blue ice.** Their tunnel glows deep blue (transmission and subsurface; the pack ships
+   `_sss` maps). Ours is grey-blue. This needs see-through ice and an SSS term, the `_s` blue channel above 64.
+3. **Lanterns and amethyst are missing** in our storeroom: they aren't full cubes, so the package leaves
+   them to our nearest blocks. Model blocks are a follow-up.
+4. **Exteriors at a distance** (the cherry tree, the cathedral) are already close. Here our traced sun
+   shadows differ little from the shadow maps; their reflections and soft sky light show more.
+
+v2, the same day (`nvidia_vs_ours_v2.jpg`; HUD hidden, NVIDIA-like times):
+- The `mc` package now has model blocks with their light: lanterns, fires, campfires, amethyst, torches,
+  end rods, candles, chains.
+- In our storeroom at night the lanterns flood the room with even orange light. NVIDIA's make pools of
+  light with shadow between, which is the many shadowed lights of RT step 6.
+- The pack's light through subsurface materials (`mat_through`) makes blue ice glow deep blue.
+- Our summer 19:00 is still full day, so the nave needs a later hour to match NVIDIA's dusk.
+- NVIDIA's ice tunnel is still not found. The water-under-ice spots by the ship were under the sea ice,
+  not a tunnel.

@@ -29,6 +29,15 @@ pub fn launch_options() -> &'static FxHashMap<String, String> {
     LAUNCH.get_or_init(FxHashMap::default)
 }
 
+/// chiacraft, test only: `--mc-days`, Minecraft's sun for like-for-like shots: no day swing over
+/// the year (`DimensionDef::daylight_clock`) and no leaned path (`client::sky::frame_of`), so an
+/// hour's sun stands where Minecraft's does (ours was at the horizon at 05:00 on spring 8 where
+/// Minecraft's is 3.5 degrees under; Shader, 11-06).
+pub fn mc_days() -> bool {
+    static ON: OnceLock<bool> = OnceLock::new();
+    *ON.get_or_init(|| launch_options().contains_key("mc-days"))
+}
+
 /// Exit code a mod asked for with `client_op::QUIT`.
 pub fn exit_code() -> i32 {
     EXIT_CODE.load(Ordering::Relaxed)

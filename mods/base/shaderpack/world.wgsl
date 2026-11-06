@@ -412,22 +412,41 @@ const PLANT_SHADOW_LIFT: f32 = 0.7;
 // them. The real sun's is 0.0047; a little more, as shader packs' suns, reads as softer light.
 const SUN_CONE: f32 = 0.012;
 
+// Traced shadows reach this far from the eye (blocks); the far shadow map (the terrain alone while
+// tracing) takes over past it, over the last fifth. At view 32 the far land is most of the frame,
+// and its long rays through thousands of distant tiles cost the most (Planner's sweep, 11-06: +4 ms
+// On, +11 ms Ultra at 1080p).
+const RT_REACH: f32 = 256.0;
+
 fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
-    let sky = smoothstep(0.75, 1.0, in.light.x);
     // Traced (`core:rt_shadows`, a GPU with ray queries): one ray toward the light through the
-    // cubes and the distant terrain, by the leaves' holes, so no texels, no acne and shadows as far
-    // as the land goes; still never deep under cover. Its colour through stained glass is kept for
-    // later (`rt_sun`'s rgb); here its brightness.
-    if scene.rt.x > 0.5 {
-        // A solid face turned from the light is in its own shade (leaves and plants let it through).
-        if dot(n, light_dir()) <= 0.0 && in.kind.z == 0u && in.kind.x != TINT_FOLIAGE {
-            return 0.0;
-        }
-        let t = rt_sun_soft(in.rel, n, light_dir(), in.kind.z != 0u, SUN_CONE, in.clip.xy, scene.rt.z > 0.5);
-        let c = min(canopy(), 1.0);
-        let cover = smoothstep(mix(0.3, 0.15, c), mix(0.8, 0.5, c), in.light.x);
-        return min(dot(t, vec3(1.0 / 3.0)), cover) * models_shadow(in.rel, n) * cloud_shadow(in.rel);
+    // cubes and the distant terrain, by the leaves' holes, so no texels and no acne; still never
+    // deep under cover. Its colour through stained glass is kept for later (`rt_sun`'s rgb); here
+    // its brightness.
+    if scene.rt.x < 0.5 || in.dist >= RT_REACH {
+        return sun_shadow_mapped(in, n);
     }
+    // A solid face turned from the light is in its own shade (leaves and plants let it through).
+    if dot(n, light_dir()) <= 0.0 && in.kind.z == 0u && in.kind.x != TINT_FOLIAGE {
+        return 0.0;
+    }
+    let c = min(canopy(), 1.0);
+    let cover = smoothstep(mix(0.3, 0.15, c), mix(0.8, 0.5, c), in.light.x);
+    // Deep under cover (a cave, a room): no sun to trace.
+    if cover <= 0.0 {
+        return 0.0;
+    }
+    let t = rt_sun_soft(in.rel, n, light_dir(), in.kind.z != 0u, SUN_CONE, in.clip.xy, scene.rt.z > 0.5);
+    let traced = min(dot(t, vec3(1.0 / 3.0)), cover) * models_shadow(in.rel, n) * cloud_shadow(in.rel);
+    let fade = smoothstep(RT_REACH * 0.8, RT_REACH, in.dist);
+    if fade <= 0.0 {
+        return traced;
+    }
+    return mix(traced, sun_shadow_mapped(in, n), fade);
+}
+
+fn sun_shadow_mapped(in: VOut, n: vec3<f32>) -> f32 {
+    let sky = smoothstep(0.75, 1.0, in.light.x);
     // A plant's blade asks the map from most of a block toward the sun: the blades round it, as
     // thin as a few of the map's texels, shaded each other in fine crossing stripes, pale and
     // banded tall grass up close at 3456 px (Ronald's Mac, 11-06; gone with shadows off). Trees,
@@ -559,6 +578,7 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
         lit = vec4(albedo.rgb * light, albedo.a);
         if mat.has {
             lit = vec4(lit.rgb * (1.0 - 0.5 * mat.metal) + mat_shine(in, mat, n, albedo.rgb, light), lit.a);
+            lit = vec4(lit.rgb + mat_through(in, mat, albedo.rgb), lit.a);
         }
         // A low sun full on a bright, saturated yellow-green (the birch's untinted leaves, whose
         // own picture is that green, so `surface_light` never sees them as leaves): some of its
@@ -643,6 +663,35 @@ fn shade_mat(in: VOut, albedo: vec3<f32>) -> Mat {
     return mat_at(in.layer, fract(in.uv), albedo);
 }
 
+// What a mirror at `rel` (camera relative) shows along `r` (unit) with traced reflections
+// (`core:rt_reflections`, `scene.rt.w`): the first surface the ray meets (`rt_hit`), in its texel and
+// tint, lit as the world lights it (its sky and block light, its sun through one more ray where
+// shadows are traced, the sky light standing in otherwise), veiled by the air over the whole way
+// from the eye; else the sky that way.
+// `cone`: the ray spread over a cone this wide (radians), a different way each frame for temporal
+// anti-aliasing to average (`rt_cone`, at pixel `px`): a rippled or rough mirror's blur, where one
+// sharp ray drew a skylight's grid as a hard zigzag across the pool (rtr3_rt).
+fn traced_view(rel: vec3<f32>, r_in: vec3<f32>, blur: f32, cone: f32, px: vec2<f32>) -> vec3<f32> {
+    var r = rt_cone(r_in, cone, px);
+    if r.y < 0.0 && r_in.y >= 0.0 {
+        r = r_in;
+    }
+    let h = rt_hit(rel, r, 384.0, blur);
+    if !h.hit {
+        return sky_color(r);
+    }
+    var albedo = h.albedo.rgb;
+    if h.tint != 0u {
+        albedo *= pow(tint_color(h.tint, h.biome, i32(floor(h.world.x)), i32(floor(h.world.z))), vec3(2.2));
+    }
+    var sun = smoothstep(0.75, 1.0, h.light.x);
+    if scene.rt.x > 0.5 && dot(h.n, light_dir()) > 0.0 {
+        sun = min(sun, dot(rt_sun(h.rel, h.n, light_dir(), false), vec3(1.0 / 3.0)));
+    }
+    let lit = albedo * light_on(h.n, h.light, sun, 1.0, h.world, h.rel);
+    return haze_lit(lit, normalize(rel) * (length(rel) + h.t), h.light.x);
+}
+
 // Schlick's Fresnel for reflectance `f0` at `cos_v`.
 fn mat_fresnel(f0: vec3<f32>, cos_v: f32) -> vec3<f32> {
     return f0 + (vec3(1.0) - f0) * pow(1.0 - clamp(cos_v, 0.0, 1.0), 5.0);
@@ -680,11 +729,31 @@ fn mat_shine(in: VOut, m_in: Mat, n: vec3<f32>, albedo: vec3<f32>, light: vec3<f
     let r = reflect(-v, n);
     let sky_seen = mix(sky_color(r), sky_color(vec3(0.0, 1.0, 0.0)), clamp(m.rough * 2.0, 0.0, 1.0));
     let open = smoothstep(0.8, 1.0, in.light.x);
-    let sky = mix(light * 0.5, sky_seen, open * open);
+    var sky = mix(light * 0.5, sky_seen, open * open);
+    // Traced (`scene.rt.w`): what really lies that way, the room or the hills, off the screen too;
+    // the rougher, the more it gives way to the blurred guess above.
+    if scene.rt.w > 0.5 && m.rough < 0.5 {
+        sky = mix(traced_view(in.rel + n * 0.01, r, m.rough * 6.0, 0.01 + m.rough * 0.5, in.clip.xy), sky, smoothstep(0.1, 0.5, m.rough));
+    }
     // A rough surface mirrors little (its lobe is spread over the whole sky's dimmer average).
     let gloss = 1.0 - clamp(m.rough * 1.6, 0.0, 0.85);
     out += mat_fresnel(m.f0, ndv) * sky * gloss;
     return out;
+}
+
+// Light that comes through a subsurface material (LabPBR `_s` blue over 64: blue ice, wax, the
+// leaves of packs that set it): the day's sky and sun, scattered on its way through, in the
+// material's own colour squared (deep blue for blue ice), the more the less sky reaches the face
+// directly, so a tunnel through ice glows and its outside barely changes. A guess at thickness, not a
+// trace: NVIDIA's showcase ice tunnel glowed deep blue where ours was grey (`notes/RTX_SHOWCASE.md`).
+fn mat_through(in: VOut, m: Mat, albedo: vec3<f32>) -> vec3<f32> {
+    if m.sss <= 0.0 {
+        return vec3(0.0);
+    }
+    let day = smoothstep(-0.05, 0.25, scene.sun.w);
+    let outside = sky_color(vec3(0.0, 1.0, 0.0)) * 0.6 + palette().sun * light_strength() * 0.25 * day;
+    let hidden = 1.0 - 0.75 * smoothstep(0.3, 1.0, in.light.x);
+    return albedo * albedo * m.sss * outside * hidden;
 }
 
 // The world image's alpha for an opaque pixel: SOLID_ALPHA, or for a smooth material (a polished
@@ -951,9 +1020,10 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     // sea views, very likely Ronald's lake; it went with shadows off, 11-05).
     var near_map = shadow_in(scene.shadow_view_proj, scene.shadow, 80.0, 400.0, in.rel, vec3(0.0, 1.0, 0.0), false);
     // Traced (`core:rt_shadows`): the water's surface everywhere, as the land.
-    if scene.rt.x > 0.5 {
+    if scene.rt.x > 0.5 && in.dist < RT_REACH {
         let up = vec3(0.0, 1.0, 0.0);
-        near_map = vec2(dot(rt_sun_soft(in.rel, up, light_dir(), false, SUN_CONE, in.clip.xy, scene.rt.z > 0.5), vec3(1.0 / 3.0)) * models_shadow(in.rel, up), 1.0);
+        let traced = vec2(dot(rt_sun_soft(in.rel, up, light_dir(), false, SUN_CONE, in.clip.xy, scene.rt.z > 0.5), vec3(1.0 / 3.0)) * models_shadow(in.rel, up), 1.0);
+        near_map = mix(traced, near_map, smoothstep(RT_REACH * 0.8, RT_REACH, in.dist));
     }
     let shadow = mix(1.0, min(near_map.x, smoothstep(0.3, 0.8, in.light.x)), near_map.y) * smoothstep(0.75, 1.0, max(in.light.x, near_map.y)) * cloud_shadow(in.rel);
     let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, shadow, 1.0, in.pos, in.rel);
@@ -985,7 +1055,20 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     // our lake's water 0.45 mean brightness against Bliss's 0.62).
     // (Tipped down by less now, 0.85 of the ripple's lift where it was half: halved, it mirrored the
     // palest band of the sky everywhere, where Bliss's open water mirrors a deeper blue.)
-    let refl = sky_color(normalize(vec3(r.x, max(r.y * WATER_SKY_LIFT, 0.03), r.z))) * mix(0.15, 1.0, brightness_curve(in.light.x));
+    var refl = sky_color(normalize(vec3(r.x, max(r.y * WATER_SKY_LIFT, 0.03), r.z))) * mix(0.15, 1.0, brightness_curve(in.light.x));
+    // Traced (`scene.rt.w`): the shore, the trees and what is under a roof, off the screen too, out to
+    // the near land; the far water keeps the sky's guess.
+    if scene.rt.w > 0.5 && in.dist < 256.0 {
+        // The ripples' tilt a third as strong for the ray, and what it meets a little blurred: at
+        // full tilt a sharp stained window broke into a loud mosaic across the pool (rtr2_rt).
+        let rn = normalize(mix(n, vec3(0.0, 1.0, 0.0), 0.65));
+        let rr = reflect(-v, rn);
+        let traced = traced_view(in.rel + vec3(0.0, 0.02, 0.0), normalize(vec3(rr.x, max(rr.y, 0.02), rr.z)), 1.5, 0.04, in.clip.xy);
+        // As much as the screen's reflections gave it: Fresnel's share and a little more, the body
+        // below being dark (`post/reflect.wgsl`'s amount), less looking steeply down.
+        let amount = min(fresnel + 0.15 * (1.0 - smoothstep(0.5, 0.9, ndv)), 0.97);
+        refl = mix(traced * amount / max(fresnel, 1e-3), refl, smoothstep(160.0, 256.0, in.dist));
+    }
     // The sun's glitter: a narrow highlight (GGX) on the waves, so it lies in a path toward the sun.
     let l = light_dir();
     // Never a zero vector (light exactly behind the eye): its normalize would be NaN.
@@ -1303,9 +1386,18 @@ const LOD_DETAIL: vec2<f32> = vec2(220.0, 520.0);
 @vertex
 fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut {
     let f = vi / 4u;
-    let c = vi % 4u;
     let w0 = records[f * 4u];
     let w1 = records[f * 4u + 1u];
+    // Vanilla's corner shade on the ground's box faces (`lod_ao`; after upstream Weft f69243fd),
+    // the quad split along its lighter diagonal, as the cubes'.
+    var a = vec4<u32>(3u);
+    if lod_dir(w0) != LOD_FACE_GRID {
+        a = lod_ao(records[f * 4u + 3u]);
+    }
+    var c = vi % 4u;
+    if a.x + a.z < a.y + a.w {
+        c = (c + 1u) % 4u;
+    }
     // A box's face, or a far tile's smooth cell (`lod_corner`, in the prelude).
     let corner = lod_corner(f, c, finish(vec3(0.0), origins[ii]).xyz);
     let dir = corner.dir;
@@ -1329,7 +1421,7 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     let o = origins[ii] + g.cam_cube;
     out.pos = vec3<f32>(o.xyz * 16) + local;
     out.normal = corner.normal;
-    out.ao = mix(0.85, 0.95, clamp(corner.normal.y, 0.0, 1.0));
+    out.ao = mix(0.85, 0.95, clamp(corner.normal.y, 0.0, 1.0)) * mix(0.55, 1.0, f32(a[c]) / 3.0);
     // A crown's sides go dark toward its bottom, where the canopy shades itself (`fs_lod` takes it
     // as the crown's own shade, `CROWN_UNDER`).
     if lod_crown(w0) && dir != 2u && dir != 3u {
@@ -1340,7 +1432,9 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     let kind = lod_tint(w0);
     out.kind = vec4(kind, 1u, 0u, select(0u, 1u, lod_crown(w0)));
     var tint = vec3(1.0);
-    if kind != 0u {
+    // Not with an overlay: then the tint is the overlay's, and far off only the base is drawn (a
+    // cherry's pink blossom tinted whole came out brown-red).
+    if kind != 0u && frames[g.extra.x + (w1 & FACE_TEX_MASK)] == 0u {
         tint = unpack_rgb(biomes[corner.biome * g.extra.z + kind - 1u]);
     }
     out.tint = tint;
