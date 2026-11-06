@@ -604,7 +604,12 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                 // steps read as its grass from afar, not as rows of dirt dashes (bare faces keep
                 // their bands under a block of it).
                 // (A coarse cell's whole wall: it stands for a slope of its top.)
-                let band = if walls[k].is_some() {
+                // (Ground with leaves on top, an imported world's trees: its whole wall the leaves, as
+                // a crown's side; under one band of them the block under the leaves showed, a
+                // birch's white log, standing out of far canopies as pale pillars. Stage 1, 11-06.)
+                let band = if leafy(top) {
+                    y - ny
+                } else if walls[k].is_some() {
                     1
                 } else if slope {
                     y - ny
