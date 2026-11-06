@@ -37,6 +37,23 @@ folded wing, the lying pose; `--refit` or `--refit-rest` to redo them after movi
   (`genetics/wyvern.json`) and the accent comes with it.
 - **Face**: amber reptile eyes with a slit pupil on the sides of the head under a heavy brow, a
   crown of swept-back horns, teeth along both jaws, nostrils as slits on top of the nose.
+- **Behaviour clips** (11-05, `src/anim.rs`): stare (the neck lowered and stretched out, the head
+  level and aimed), watch (the neck drawn up, the head turning slowly), drink (the snout down at the
+  water, lapping), sleep (lying, the head laid on the left wing's forearm; also in the rest file) and
+  approach (a slower, lower-stepping walk, the neck out low, looking about) loop; alarm (a roar, the
+  fans of the folded wings flared open beside it, the wrists down), sniff, look, scratch (the cheek
+  rubbed on the left thumb's claw), stretch (both wings lifted off the ground and spread wide and up,
+  the skin let out, then folded and set down), play (a bow and a bounce of the forequarters, the tail
+  swishing), groom (the snout run along the left forearm), nuzzle and flinch play once; death (rolled
+  onto its right side, the neck, tail and wings sprawled on the ground) holds. A hunter that doesn't
+  ambush: no graze, rear, charge, stalk or pounce. No lids, so the eyes stay open asleep and dead.
+  Standing on its wrists, every frame sets them back where they stand (`plant`), so moving the chest
+  never sinks them; the reaches are fitted once (`fit_clips`, kept in `fit.json` "clips", `--refit-clips`).
+  The idle's breath sank the wrists 4.5 and the bite's lean 12: both keep them where the stand has
+  them now (the fitted fold itself still has them 1.9 in the ground). `build.py` asserts the loops,
+  each foot within 0.3 of the ground in every standing clip's keyframes (the wrists off it only in the
+  stretch and the hop), nothing below -0.3 (membranes by their cut outlines, scaled), sleep and death on
+  their lowest point, no wing part in the body or the other wing, and no angle jumping between keys.
 
 ## Sources
 
