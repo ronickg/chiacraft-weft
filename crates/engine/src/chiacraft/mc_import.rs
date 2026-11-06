@@ -117,10 +117,48 @@ fn shows(c: &Content, s: u32) -> far::Shows {
     if s != AIR && (solid || st.liquid.is_some() || c.state_name(s).contains("leaves")) { far::Shows::Top } else { far::Shows::Through }
 }
 
+/// Each column's biome at its surface: the 4x4x4 cell of its highest block that isn't air (the
+/// top section's for an empty column).
+fn surface_biomes(r: &Resolver, chunk: &anvil::Chunk) -> [u16; 256] {
+    let air = |name: &str| matches!(name, "minecraft:air" | "minecraft:cave_air" | "minecraft:void_air");
+    let mut out = [u16::MAX; 256];
+    for sec in chunk.sections.iter().rev() {
+        let ids: Vec<u16> = sec.biome_palette.iter().map(|b| r.biome(b).0).collect();
+        let cell = |x: usize, y: usize, z: usize| {
+            ids.get(sec.biomes[(y / 4 * 4 + z / 4) * 4 + x / 4] as usize)
+                .copied()
+                .unwrap_or(0)
+        };
+        for z in 0..16 {
+            for x in 0..16 {
+                let o = &mut out[z * 16 + x];
+                if *o != u16::MAX {
+                    continue;
+                }
+                if let Some(y) = (0..16)
+                    .rev()
+                    .find(|&y| !air(&sec.palette[sec.index(x, y, z)]))
+                {
+                    *o = cell(x, y, z);
+                }
+            }
+        }
+    }
+    let top = chunk.sections.last();
+    for (i, o) in out.iter_mut().enumerate().filter(|(_, o)| **o == u16::MAX) {
+        *o = top.map_or(0, |sec| {
+            let id = sec.biomes[(3 * 4 + i / 16 / 4) * 4 + i % 16 / 4] as usize;
+            sec.biome_palette.get(id).map_or(0, |b| r.biome(b).0)
+        });
+    }
+    out
+}
+
 /// The chunk's cubes from `lo` to `hi` (cube heights; missing sections are air, so generation
 /// never fills them), lit as generation lights them.
 fn chunk_cubes(c: &Content, r: &Resolver, dim: usize, chunk: &anvil::Chunk, lo: i32, hi: i32) -> Vec<(IVec3, Cube)> {
     let sky = c.dims[dim].sky_light;
+    let surface = surface_biomes(r, chunk);
     let mut out = Vec::with_capacity((hi - lo + 1).max(0) as usize);
     for y in lo..=hi {
         let pos = IVec3::new(chunk.x, y, chunk.z);
@@ -146,17 +184,10 @@ fn chunk_cubes(c: &Content, r: &Resolver, dim: usize, chunk: &anvil::Chunk, lo: 
             }
         }
         let mut cube = Cube::from_states(&states);
-        // A cube's columns take the biome of their 4x4 cell halfway up it.
-        let mut biomes = Box::new([0u16; 256]);
-        let ids: Vec<u16> = sec.biome_palette.iter().map(|b| r.biome(b).0).collect();
-        for z in 0..16 {
-            for x in 0..16 {
-                biomes[z * 16 + x] = ids
-                    .get(sec.biomes[(2 * 4 + z / 4) * 4 + x / 4] as usize)
-                    .copied()
-                    .unwrap_or(0);
-            }
-        }
+        // Our biomes are per column (the client tints a column by the first of its cubes to
+        // arrive): every cube takes the biome at its column's surface, not Minecraft's 3D one,
+        // whose caves turned an island's grass and leaves teal.
+        let biomes = Box::new(surface);
         cube.biomes = Some(biomes);
         crate::world::light::prelight(c, &mut cube, sky);
         out.push((pos, cube));
@@ -304,7 +335,7 @@ pub fn maybe_import(meta: &mut WorldMeta, c: &Content) {
         None => report += "spawn: none (no ground under the vista)\n",
     }
     let mut stand_ins: Vec<(String, (String, u64))> = r.stand_ins.into_inner().unwrap().into_iter().collect();
-    stand_ins.sort_by(|a, b| b.1.1.cmp(&a.1.1));
+    stand_ins.sort_by_key(|e| std::cmp::Reverse(e.1.1));
     report += "stand-ins (minecraft state -> ours, blocks):\n";
     for (mc, (ours, n)) in &stand_ins {
         report += &format!("  {mc} -> {ours} {n}\n");

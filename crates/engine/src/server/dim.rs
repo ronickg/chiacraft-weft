@@ -1393,6 +1393,15 @@ impl Dim {
         if self.get(p).is_none_or(|s| s == AIR) {
             return 0;
         }
+        // chiacraft: not onto land not loaded (to a falling block it is solid, as to liquids): the
+        // block was lifted only to land again where it stood, its neighbours changed, and two ticks
+        // on it fell again, for ever. Sand on the bottom layer of a cube over one not loaded did it
+        // by the hundred, every tick, each fall relighting and resending its cubes: 160-280 meshes a
+        // second on the clients and the server's region tick up to 500 ms (Far view, 11-06, the
+        // "churn" Tester 2 found at the far bench's spot).
+        if self.get(p - IVec3::Y).is_none() {
+            return 0;
+        }
         let block = super::structure::Lifted { from: p, local: IVec3::ZERO, to: p, part: None };
         self.lift(c, c.game.falling_kind, p.as_dvec3() + DVec3::new(0.5, 0.0, 0.5), [block], &[], super::structure::Liveness::Free)
             .0
