@@ -624,7 +624,14 @@ fn shade_mat(in: VOut, albedo: vec3<f32>) -> Mat {
 // tint, lit as the world lights it (its sky and block light, its sun through one more ray where
 // shadows are traced, the sky light standing in otherwise), veiled by the air over the whole way
 // from the eye; else the sky that way.
-fn traced_view(rel: vec3<f32>, r: vec3<f32>, blur: f32) -> vec3<f32> {
+// `cone`: the ray spread over a cone this wide (radians), a different way each frame for temporal
+// anti-aliasing to average (`rt_cone`, at pixel `px`): a rippled or rough mirror's blur, where one
+// sharp ray drew a skylight's grid as a hard zigzag across the pool (rtr3_rt).
+fn traced_view(rel: vec3<f32>, r_in: vec3<f32>, blur: f32, cone: f32, px: vec2<f32>) -> vec3<f32> {
+    var r = rt_cone(r_in, cone, px);
+    if r.y < 0.0 && r_in.y >= 0.0 {
+        r = r_in;
+    }
     let h = rt_hit(rel, r, 384.0, blur);
     if !h.hit {
         return sky_color(r);
@@ -682,7 +689,7 @@ fn mat_shine(in: VOut, m_in: Mat, n: vec3<f32>, albedo: vec3<f32>, light: vec3<f
     // Traced (`scene.rt.w`): what really lies that way, the room or the hills, off the screen too;
     // the rougher, the more it gives way to the blurred guess above.
     if scene.rt.w > 0.5 && m.rough < 0.5 {
-        sky = mix(traced_view(in.rel + n * 0.01, r, m.rough * 6.0), sky, smoothstep(0.1, 0.5, m.rough));
+        sky = mix(traced_view(in.rel + n * 0.01, r, m.rough * 6.0, 0.01 + m.rough * 0.5, in.clip.xy), sky, smoothstep(0.1, 0.5, m.rough));
     }
     // A rough surface mirrors little (its lobe is spread over the whole sky's dimmer average).
     let gloss = 1.0 - clamp(m.rough * 1.6, 0.0, 0.85);
@@ -996,7 +1003,7 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
         // full tilt a sharp stained window broke into a loud mosaic across the pool (rtr2_rt).
         let rn = normalize(mix(n, vec3(0.0, 1.0, 0.0), 0.65));
         let rr = reflect(-v, rn);
-        let traced = traced_view(in.rel + vec3(0.0, 0.02, 0.0), normalize(vec3(rr.x, max(rr.y, 0.02), rr.z)), 1.5);
+        let traced = traced_view(in.rel + vec3(0.0, 0.02, 0.0), normalize(vec3(rr.x, max(rr.y, 0.02), rr.z)), 1.5, 0.04, in.clip.xy);
         // As much as the screen's reflections gave it: Fresnel's share and a little more, the body
         // below being dark (`post/reflect.wgsl`'s amount), less looking steeply down.
         let amount = min(fresnel + 0.15 * (1.0 - smoothstep(0.5, 0.9, ndv)), 0.97);
