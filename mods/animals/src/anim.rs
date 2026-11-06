@@ -190,7 +190,9 @@ const GRACE: u64 = 30;
 /// Ticks between idle life's clips: at least, and as much again at random.
 const IDLE_EVERY: u64 = 300;
 /// The idle extras (a species without one of these clips goes on idling).
-const IDLE_LIFE: [Act; 3] = [Act::Look, Act::Sniff, Act::Scratch];
+const IDLE_LIFE: [Act; 4] = [Act::Look, Act::Sniff, Act::Scratch, Act::Groom];
+/// A pack's or herd's idle life: grooming twice as often.
+const IDLE_LIFE_GROUP: [Act; 5] = [Act::Look, Act::Sniff, Act::Scratch, Act::Groom, Act::Groom];
 /// Seconds a clip played once by name lasts when it isn't an `Act` (a species' own attack).
 const CLIP_SECS: f32 = 0.8;
 
@@ -362,12 +364,13 @@ fn expire_(w: &World, id: u64) -> Option<[u64; 4]> {
 }
 
 /// Idle life: standing with nothing held, nothing playing and going nowhere, now and then it looks
-/// round, sniffs the ground or scratches (whichever clips its species has).
+/// round, sniffs the ground, scratches or grooms, a young one plays and a mother nuzzles her young
+/// (`idle_act`; whichever clips its species has).
 fn idle_life(w: &World, id: u64, h: [u64; 4]) {
     let now = w.game_time();
-    if !(now + id).is_multiple_of(20) {
-        return;
-    }
+    // No `(now + id) % 20` gate: under the AI's level of detail its upkeep skips ticks in a
+    // rhythm, and some animals never met that tick (a PC look: one idle moment in five minutes
+    // among seven deer). `IDLE_NEXT` spaces them out by itself.
     if h[IDLE_NEXT] == 0 {
         // Not yet timed: its first in a while, so a herd met together doesn't move as one.
         edit(w, id, |c| c[IDLE_NEXT] = now + IDLE_EVERY + w.random_below(IDLE_EVERY as u32) as u64);
@@ -376,9 +379,40 @@ fn idle_life(w: &World, id: u64, h: [u64; 4]) {
     if now < h[IDLE_NEXT] || now < h[BUSY] || w.navigating(id) {
         return;
     }
-    let a = IDLE_LIFE[w.random_below(IDLE_LIFE.len() as u32) as usize];
+    let a = idle_act(w, id);
     act(w, id, a);
     edit(w, id, |c| c[IDLE_NEXT] = now + IDLE_EVERY + w.random_below(IDLE_EVERY as u32) as u64);
+}
+
+/// Its idle moment's clip, by who it is (`animals_core::roles::PLAY_GROUP`...): a young one
+/// plays, a mother with her young near nuzzles one (turned to it), and anyone else looks round,
+/// sniffs, scratches or grooms.
+fn idle_act(w: &World, id: u64) -> Act {
+    use animals_core::biology::Social;
+    use animals_core::roles;
+    let s = w.component(id, &crate::animal::ANIMAL).and_then(|a| a.species());
+    let group = s.is_some_and(|s| s.bio.social != Social::Solitary);
+    let roll = w.random_below(100);
+    let young = w.component(id, &crate::breeding::BREEDING).is_some_and(|b| b.growing > 0);
+    if young {
+        if roll < if group { roles::PLAY_GROUP } else { roles::PLAY_ALONE } {
+            return Act::Play;
+        }
+    } else if roll < roles::NUZZLE
+        && let (Some(s), Some(st)) = (s, w.entity(id))
+        && let Some(y) = w
+            .entities_near(st.pos, roles::NUZZLE_NEAR, Some(s.kind))
+            .into_iter()
+            .find(|&o| {
+                o != id && w.component(o, &crate::breeding::BREEDING).is_some_and(|b| b.mother == id && b.growing > 0)
+            })
+            .and_then(|o| w.entity(o))
+    {
+        crate::senses::face(w, id, &st, [y.pos.x as f32, y.pos.y as f32, y.pos.z as f32]);
+        return Act::Nuzzle;
+    }
+    let pool: &[Act] = if group { &IDLE_LIFE_GROUP } else { &IDLE_LIFE };
+    pool[w.random_below(pool.len() as u32) as usize]
 }
 
 /// Ticks `/anim <clip> hold` pins a state for: ten minutes, for looks.
