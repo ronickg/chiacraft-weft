@@ -765,8 +765,7 @@ pub(crate) fn measured_rows(tab: crate::video_costs::Tab) -> Vec<crate::video_co
             pick(&ROWS, &[("shadows", 0.6), ("reflect", 0.4), ("contact", 0.4), ("volume", 0.4), ("shafts", 0.4), ("bloom", 0.4)])
         }
         Tab::Extra => {
-            let mut keys =
-                vec![
+            let mut keys = vec![
                 ("mist_volume", 0.6),
                 ("cloud_shadows", 0.6),
                 ("bloom_levels", 0.4),

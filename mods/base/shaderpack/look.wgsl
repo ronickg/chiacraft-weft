@@ -200,10 +200,33 @@ fn palette_now() -> Palette {
     // And its sunlight a little warmer with the sun high (the warmth on Bliss's noon land is its
     // sun's, the sky and the far haze staying blue: our whole-picture white balance had greyed the
     // noon sky, saturation 19 against 31).
-    if scene.frame.x > 0.5 {
-        p.sun *= mix(vec3(1.0), vec3(1.05, 1.0, 0.86), smoothstep(0.3, 0.7, scene.sun.y));
+    // In the HDR world the sunlight's colour as Bliss makes it: a blackbody's (Ronald's Bliss runs
+    // its sun at 4300 K) through the air along the sun's path, at the palette's brightness. Bliss's
+    // lit canopy tops read yellow (hue 52 at 08:00, 62 at noon), ours green (79, 100) under a
+    // near-white sun (Trees' measures, 11-06). (It replaces the small warming with the sun high.)
+    if scene.frame.x > 0.5 && scene.sun.y > -0.05 {
+        let hue = sun_kelvin_linear() * sky_transmittance(scene.sun.y);
+        let day = smoothstep(-0.05, 0.05, scene.sun.y);
+        p.sun = mix(p.sun, hue * (luma(p.sun) / max(luma(hue), 1e-4)), day);
     }
     return p;
+}
+
+// A 4300 K blackbody in linear light, red 1 (Bliss's `blackbody` at Ronald's Sun_temp, computed in
+// the crew's bliss-source notes: linear 1.0 0.668 0.426).
+fn sun_kelvin_linear() -> vec3<f32> {
+    return vec3(1.0, 0.668, 0.426);
+}
+
+// What of the sun's light gets through the air to the ground with the sun `e` (sin of its height)
+// up: Rayleigh's scattering by wavelength and a little grey Mie, over the air mass along the path
+// (Kasten and Young's), from Bliss's own coefficients (Rayleigh 5.8e-6, 1.35e-5, 3.31e-5 per metre
+// over an 8 km scale height; Mie 3e-6 over 1.2 km). About 0.94 0.87 0.72 at noon (55 degrees up).
+fn sky_transmittance(e: f32) -> vec3<f32> {
+    let h = degrees(asin(clamp(e, 0.0, 1.0)));
+    let air = 1.0 / (sin(radians(h)) + 0.50572 * pow(h + 6.07995, -1.6364));
+    let depth = vec3(0.0464, 0.108, 0.265) + vec3(0.0036);
+    return exp(-depth * air);
 }
 
 fn palette_read() -> Palette {
@@ -658,7 +681,14 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         // A clear blue, not a grey (H2: grey-tinted it reached Bliss's brightness, 160-172 against
         // 154-173, but stayed pale and from 16:00 warm, saturation 5-48 against 39-83; PC shhb1).
         let blue = vec3(luma(c)) * vec3(0.74, 0.92, 1.2);
-        c = mix(c, blue, k * 0.6) * (1.0 - 0.4 * k);
+        // On mornings with the sun low, looking away from it, lighter and bluer: at spot C 08:00
+        // (facing away) the band read 172 / warmth -13 where Bliss's is 183 / -31, and the far lake,
+        // nearly all a mirror of it, went flat grey (Far view's find). Toward the sun as it was (the
+        // forest vista stays warm, Bliss's +27 there).
+        let away = smoothstep(0.2, -0.4, mu);
+        let low_morning = smoothstep(-0.05, 0.05, scene.sun.x) * (1.0 - smoothstep(0.45, 0.7, scene.sun.y));
+        let aw = away * low_morning;
+        c = mix(c, blue, k * mix(0.6, 0.85, aw)) * (1.0 - mix(0.4, 0.15, aw) * k);
     }
     c += sun_glow(dir, p);
     // In the HDR world the air round the sun glows as bright as it really is (Mie scattering's
@@ -1064,11 +1094,26 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f
         c += lightning_glow_at(rel) * sky * hemi * ao;
         held = held_light(rel, n);
     }
-    c += block_light(max(light.yzw, held), pos) * mix(0.5, 1.0, ao) * block_by_day(light.x);
+    let blocks = block_light(max(light.yzw, held), pos) * mix(0.5, 1.0, ao) * block_by_day(light.x);
+    NIGHT_SKY_SHARE = night_sky_share(c, blocks);
+    c += blocks;
     // A floor so caves are never quite black: the dimension's own and the Brightness setting.
     let floor_light = max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y));
     c += vec3(floor_light) * vec3(0.85, 0.9, 1.0) * ao;
     return c;
+}
+
+// What share of a surface's light is the sky's and the moon's, not a lamp's, for the night's blue
+// (`display`): set by `light_on` and `light_round` for the pixel they light; 1 for what they don't
+// (the sky, clouds). Keyed on where the light comes from, not how bright it is: by brightness, a
+// lantern-lit room at midnight went blue-violet too, its light small before the night's exposure
+// lifts it (NVIDIA's storeroom, rt-sun-shadows' find, 11-06).
+var<private> NIGHT_SKY_SHARE: f32 = 1.0;
+
+fn night_sky_share(sky_part: vec3<f32>, lamp_part: vec3<f32>) -> f32 {
+    let s = luma(sky_part);
+    let l = luma(lamp_part);
+    return clamp(s / max(s + 3.0 * l, 1e-6), 0.0, 1.0);
 }
 
 // For what has no normal to speak of (particles, rain, the hand): half the direct light.
@@ -1081,7 +1126,9 @@ fn light_round(light: vec4<f32>, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     if !CALM {
         held = held_light(rel, vec3(0.0));
     }
-    c += block_light(max(light.yzw, held), pos) * block_by_day(light.x);
+    let blocks = block_light(max(light.yzw, held), pos) * block_by_day(light.x);
+    NIGHT_SKY_SHARE = night_sky_share(c, blocks);
+    c += blocks;
     c += vec3(max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y)));
     return c;
 }
@@ -1700,7 +1747,12 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
         // Bliss's far land at 18:00 is near neutral (warmth +0 to +9 by the horizon) where ours
         // took the sun's gold (+43), and its mornings stay warm (07:00 +72), so not then (lk_ebc).
         let dusk = smoothstep(0.05, -0.05, scene.sun.x) * (1.0 - smoothstep(0.15, 0.3, scene.sun.y));
-        toward = mix(toward, luma(toward) * sun_tint, mix(0.6, 0.9, morning * far_off) * low_sun * hdr_air * mix(1.0, 0.35, dusk)) * (1.0 - 0.05 * noon * hdr_air);
+        // Toward the sun the haze takes its colour, away from it far less (a quarter): looking away
+        // from a low sun Bliss's far land is cool under a blue-grey band (its spot C at 08:00:
+        // land warmth -19, ours +46, a warm strip under the band's grey; toward it, at the forest
+        // vista, warm, +27). Taking it alike every way gave that seam (rt-sun-shadows, Shader).
+        let toward_sun = mix(0.25, 1.0, smoothstep(-0.3, 0.6, mu));
+        toward = mix(toward, luma(toward) * sun_tint, mix(0.6, 0.9, morning * far_off) * low_sun * hdr_air * mix(1.0, 0.35, dusk) * toward_sun) * (1.0 - 0.05 * noon * hdr_air);
         v = mix(v, vec3((v.r + v.g + v.b) / 3.0), mix(0.35, 0.5, noon) * hdr_air);
     }
     let mixed = mix(pale, toward, v);
@@ -1899,7 +1951,9 @@ fn display(c: vec3<f32>) -> vec3<f32> {
         // stood a neutral green-black (18 27 26, about 100), its sky a grey-blue (Bliss's world, mist
         // off, PC shnt0, 11-06). Only the dim: a torch's light keeps its warmth, and the night
         // stays as dark as made.
-        let night = smoothstep(-0.12, -0.3, scene.sun.y) * (1.0 - smoothstep(0.04, 0.3, luma(c)));
+        // Only the sky's and moon's share of a surface's light (`NIGHT_SKY_SHARE`): a lamp's keeps
+        // its warmth in a dark room as outdoors.
+        let night = smoothstep(-0.12, -0.3, scene.sun.y) * (1.0 - smoothstep(0.04, 0.3, luma(c))) * NIGHT_SKY_SHARE;
         if night > 0.0 {
             // (N2: deeper and all the way: at 0.3 0.6 1.3 and three quarters the land's saturation rose
             // only from about 100 to 140, the curve taking some back; Bliss's is 200-250, PC shnt1.)
