@@ -116,7 +116,7 @@ pub fn rt_setting() -> bool {
 
 /// The path tracer's pipelines (`pathtrace.wgsl` in the shader pack, with the world's traced
 /// prelude): its compute, and the composite drawing its pixels over the world's image.
-pub(super) fn pt_pipelines(gpu: &mut dyn Backend, assets: &crate::assets::Assets) -> Option<(PipelineId, PipelineId)> {
+pub(super) fn pt_pipelines(gpu: &mut dyn Backend, assets: &crate::assets::Assets) -> Option<[PipelineId; 3]> {
     let shader = match crate::packs::world_side_shader(assets, "pathtrace.wgsl", crate::gpu_layout::PT_DECLS)? {
         Ok(s) => s,
         Err(e) => {
@@ -147,10 +147,16 @@ pub(super) fn pt_pipelines(gpu: &mut dyn Backend, assets: &crate::assets::Assets
         )
         .map_err(|e| log::error!("path tracer composite: {}", e.0))
         .ok();
-    match fs {
-        Some(fs) => Some((cs, fs)),
-        None => {
-            gpu.destroy_pipeline(cs);
+    let resolve = gpu
+        .create_compute(&ComputeDesc { label: "radiance cache", shader: &shader, entry: "cs_cache" })
+        .map_err(|e| log::error!("path tracer cache: {}", e.0))
+        .ok();
+    match (fs, resolve) {
+        (Some(fs), Some(resolve)) => Some([cs, fs, resolve]),
+        (fs, resolve) => {
+            for p in [Some(cs), fs, resolve].into_iter().flatten() {
+                gpu.destroy_pipeline(p);
+            }
             None
         }
     }
@@ -416,7 +422,7 @@ impl WorldRenderer {
     /// denoisers. With `denoised` the composite leaves the light out of `target` (what lies under it,
     /// the air's share, is written): a denoiser adds it. Nothing without the traced scene, the pack's
     /// path tracer and the G-buffer. `debug`: 0 the picture, 1 albedo, 2 normals, 3 direct light,
-    /// 4 the bounce, 5 the specular light.
+    /// 4 the bounce, 5 the specular light, 6 the radiance cache.
     #[allow(clippy::too_many_arguments)]
     pub fn path_trace(
         &mut self,
@@ -429,7 +435,7 @@ impl WorldRenderer {
         debug: u32,
         denoised: bool,
     ) {
-        let (Some((cs, fs)), true, Some(page), Some((albedo, normal, spec, gb_size))) = (
+        let (Some([cs, fs, resolve]), true, Some(page), Some((albedo, normal, spec, gb_size))) = (
             self.pt_pipes,
             self.rt_traced() || self.rt_reflects() || self.rt.is_some(),
             self.faces.pages.first().map(|p| p.0),
@@ -465,6 +471,17 @@ impl WorldRenderer {
             self.pt_images = Some((make(gpu, "path traced diffuse"), make(gpu, "path traced specular"), size));
         }
         let (diffuse, specular, _) = self.pt_images.unwrap();
+        use crate::gpu_layout::{pt_bind, PT_CACHE, PT_CACHE_BYTES};
+        let cache = match self.pt_cache {
+            Some(c) => c,
+            None => {
+                let c = gpu.create_buffer(PT_CACHE_BYTES, usage::STORAGE, "radiance cache");
+                list.push(Cmd::FillBuffer { buffer: c, offset: 0, size: PT_CACHE_BYTES, value: 0 });
+                list.push(Cmd::Barrier);
+                self.pt_cache = Some(c);
+                c
+            }
+        };
         let out = self.pt_out[slot].0;
         let args = crate::gpu_layout::PtArgs {
             size: [size.0, size.1],
@@ -476,11 +493,17 @@ impl WorldRenderer {
             mode: u32::from(denoised && debug == 0),
         };
         let origins = page;
-        use crate::gpu_layout::pt_bind;
         self.bind_run(list, cs, page, origins);
         list.bind(pt_bind::OUT, out);
+        list.bind(pt_bind::CACHE, cache);
         list.push_constants(&args);
         list.push(Cmd::Dispatch { x: size.0.div_ceil(8), y: size.1.div_ceil(8), z: 1 });
+        list.push(Cmd::Barrier);
+        // The cache takes in what the paths left in it (read by the next frame's).
+        self.bind_run(list, resolve, page, origins);
+        list.bind(pt_bind::CACHE, cache);
+        list.push_constants(&args);
+        list.push(Cmd::Dispatch { x: PT_CACHE / 64, y: 1, z: 1 });
         list.push(Cmd::Barrier);
         let none = [0.0; 4];
         list.push(Cmd::PassExtras([Some((specular, Some(none))), None, None]));

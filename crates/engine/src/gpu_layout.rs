@@ -1796,12 +1796,19 @@ struct PtArgs {
 var<immediate> pt: PtArgs;
 @group(1) @binding(34) var<storage, read_write> pt_out: array<vec4<f32>>;
 @group(1) @binding(35) var<storage, read> pt_in: array<vec4<f32>>;
+const PT_CACHE: u32 = 1048576u;
+@group(1) @binding(36) var<storage, read_write> pt_cache: array<atomic<u32>>;
 ";
+
+/// The radiance cache's cells (`PT_CACHE` in `PT_DECLS`: change both), ten words each.
+pub const PT_CACHE: u32 = 1 << 20;
+pub const PT_CACHE_BYTES: u64 = PT_CACHE as u64 * 40;
 
 /// `pathtrace.wgsl`'s bindings: what it writes, what the composite reads.
 pub mod pt_bind {
     pub const OUT: u32 = 34;
     pub const IN: u32 = 35;
+    pub const CACHE: u32 = 36;
 }
 
 /// The path tracer's push constants (`PT_DECLS`).

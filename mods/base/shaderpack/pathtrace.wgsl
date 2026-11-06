@@ -87,14 +87,141 @@ fn pt_schlick(f0: vec3<f32>, c: f32) -> vec3<f32> {
     return f0 + (vec3(1.0) - f0) * pow(1.0 - clamp(c, 0.0, 1.0), 5.0);
 }
 
-// A surface met by a ray, lit as the world lights it: its sky and block light, the sun through one
-// more ray.
+// ---- the radiance cache (M1; NVIDIA's SHaRC idea, our own code) ----
+//
+// World-space cells, a block wide near the eye and twice as wide each doubling of the distance past
+// 24 blocks, one per face direction, in a hash table of `PT_CACHE` cells (`pt_cache`, ten words a
+// cell: [0, N) keys, [N, 5N) this frame's sums r g b and count, [5N, 9N) the resolved light r g b
+// and its history as f32 bits, [9N, 10N) frames since last touched). Each traced pixel (one in four
+// a frame) adds the indirect light it found (what its bounce ray brought, or the sky's share where
+// the ray left) to its cell; `cs_cache` folds the sums into the resolved light. A bounce ray that
+// meets a surface then takes that surface's indirect light from its cell instead of the lightmap's
+// sky: light that has bounced any number of times, a few frames late.
+
+const PT_PROBES: u32 = 8u;
+const PT_MIN_HISTORY: f32 = 4.0;
+const PT_EVICT: u32 = 240u;
+
+fn pt_hash(x: u32) -> u32 {
+    let s = x * 747796405u + 2891336453u;
+    let w = ((s >> ((s >> 28u) + 4u)) ^ s) * 277803737u;
+    return (w >> 22u) ^ w;
+}
+
+// The cell for a surface at `world` facing `n`, `dist` from the eye: its slot's hash and its key
+// (never 0, the empty slot's).
+fn pt_cell(world: vec3<f32>, n: vec3<f32>, dist: f32) -> vec2<u32> {
+    let level = u32(clamp(floor(log2(max(dist, 24.0) / 24.0)), 0.0, 6.0));
+    let c = vec3<i32>(floor((world + n * 0.01) / f32(1u << level)));
+    let a = abs(n);
+    var axis = select(select(4u, 2u, a.y >= a.z), 0u, a.x >= a.y && a.x >= a.z);
+    if dot(n, vec3(f32(axis == 0u), f32(axis == 2u), f32(axis == 4u))) < 0.0 {
+        axis += 1u;
+    }
+    let h = pt_hash(bitcast<u32>(c.x) ^ pt_hash(bitcast<u32>(c.y) ^ pt_hash(bitcast<u32>(c.z) ^ pt_hash(axis | (level << 3u)))));
+    return vec2(h, pt_hash(h ^ 0x9e3779b9u) | 1u);
+}
+
+// The cell's slot, -1 if it has none (and `insert` false, or the probes are full).
+fn pt_cache_find(cell: vec2<u32>, insert: bool) -> i32 {
+    for (var p = 0u; p < PT_PROBES; p++) {
+        let i = (cell.x + p) % PT_CACHE;
+        let k = atomicLoad(&pt_cache[i]);
+        if k == cell.y {
+            return i32(i);
+        }
+        if k == 0u {
+            if !insert {
+                return -1;
+            }
+            let r = atomicCompareExchangeWeak(&pt_cache[i], 0u, cell.y);
+            if r.exchanged || r.old_value == cell.y {
+                return i32(i);
+            }
+        }
+    }
+    return -1;
+}
+
+fn pt_cache_add(i: u32, light: vec3<f32>) {
+    let q = vec3<u32>(clamp(light, vec3(0.0), vec3(64.0)) * 256.0);
+    let a = PT_CACHE + i * 4u;
+    atomicAdd(&pt_cache[a], q.r);
+    atomicAdd(&pt_cache[a + 1u], q.g);
+    atomicAdd(&pt_cache[a + 2u], q.b);
+    atomicAdd(&pt_cache[a + 3u], 1u);
+}
+
+// The resolved light of slot `i` (rgb) and how many samples it has (a).
+fn pt_cache_get(i: u32) -> vec4<f32> {
+    let r = PT_CACHE * 5u + i * 4u;
+    return vec4(
+        bitcast<f32>(atomicLoad(&pt_cache[r])),
+        bitcast<f32>(atomicLoad(&pt_cache[r + 1u])),
+        bitcast<f32>(atomicLoad(&pt_cache[r + 2u])),
+        bitcast<f32>(atomicLoad(&pt_cache[r + 3u])),
+    );
+}
+
+// The indirect light the cache holds for a surface (rgb; a: 1 found, 0 none yet).
+fn pt_cached(world: vec3<f32>, n: vec3<f32>, dist: f32) -> vec4<f32> {
+    let i = pt_cache_find(pt_cell(world, n, dist), false);
+    if i < 0 {
+        return vec4(0.0);
+    }
+    let c = pt_cache_get(u32(i));
+    return select(vec4(0.0), vec4(c.rgb, 1.0), c.a >= PT_MIN_HISTORY);
+}
+
+// A surface met by a ray, lit as the world lights it: its block light, the sun through one more
+// ray, and its indirect light from the cache (the lightmap's sky light until the cache has it).
 fn pt_lit(b: RtHit, l: vec3<f32>) -> vec3<f32> {
     var s = 0.0;
     if dot(b.n, l) > 0.0 && light_strength() > 0.0 {
         s = dot(rt_sun(b.rel, b.n, l, false), vec3(1.0 / 3.0));
     }
+    let c = pt_cached(b.world, b.n, length(b.rel));
+    if c.a > 0.5 {
+        return pt_albedo(b) * (light_on(b.n, vec4(0.0, b.light.yzw), s, 1.0, b.world, b.rel) + c.rgb);
+    }
     return pt_albedo(b) * light_on(b.n, b.light, s, 1.0, b.world, b.rel);
+}
+
+// Folds each cell's sums into its light (more samples this frame, a bigger step; never under 1/24,
+// so it follows changes within a second), and frees the cells no path has touched for `PT_EVICT`
+// frames.
+@compute @workgroup_size(64)
+fn cs_cache(@builtin(global_invocation_id) id: vec3<u32>) {
+    let i = id.x;
+    if i >= PT_CACHE || atomicLoad(&pt_cache[i]) == 0u {
+        return;
+    }
+    let a = PT_CACHE + i * 4u;
+    let r = PT_CACHE * 5u + i * 4u;
+    let age = PT_CACHE * 9u + i;
+    let count = atomicLoad(&pt_cache[a + 3u]);
+    if count == 0u {
+        let old = atomicAdd(&pt_cache[age], 1u);
+        if old + 1u > PT_EVICT {
+            atomicStore(&pt_cache[i], 0u);
+            atomicStore(&pt_cache[r + 3u], 0u);
+            atomicStore(&pt_cache[age], 0u);
+        }
+        return;
+    }
+    let n = f32(count);
+    let sum = vec3(f32(atomicLoad(&pt_cache[a])), f32(atomicLoad(&pt_cache[a + 1u])), f32(atomicLoad(&pt_cache[a + 2u]))) / 256.0;
+    let c = pt_cache_get(i);
+    let w = max(n / (c.a + n), 1.0 / 24.0);
+    let light = mix(c.rgb, sum / n, w);
+    atomicStore(&pt_cache[r], bitcast<u32>(light.r));
+    atomicStore(&pt_cache[r + 1u], bitcast<u32>(light.g));
+    atomicStore(&pt_cache[r + 2u], bitcast<u32>(light.b));
+    atomicStore(&pt_cache[r + 3u], bitcast<u32>(min(c.a + n, 256.0)));
+    for (var k = 0u; k < 4u; k++) {
+        atomicStore(&pt_cache[a + k], 0u);
+    }
+    atomicStore(&pt_cache[age], 0u);
 }
 
 const PT_SKY_T: f32 = 65504.0;
@@ -157,6 +284,13 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         diffuse = lit - sky_part + bounce;
         diffuse_t = b.t;
     }
+    // Into the cache: the indirect light found here (one pixel in four a frame).
+    if ((id.x + id.y * 3u + u32(scene.rt.y)) & 3u) == 0u {
+        let i = pt_cache_find(pt_cell(h.world, ng, dist), true);
+        if i >= 0 {
+            pt_cache_add(u32(i), select(sky_part, bounce, b.hit));
+        }
+    }
     // Specular, where the texture has maps (F0 above 0), as the world's `mat_shine`: the sun's
     // highlight (GGX, Smith's visibility) and what lies the mirrored way, traced where smooth, the
     // sky or the room's light where rough.
@@ -206,6 +340,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
             case 3u: { out = albedo * (lit - sky_part); }
             case 4u: { out = bounce; }
             case 5u: { out = specular * s_alb; }
+            case 6u: { out = albedo * pt_cached(h.world, ng, dist).rgb; }
             default: {}
         }
         pt_out[at] = vec4(out, 0.0);

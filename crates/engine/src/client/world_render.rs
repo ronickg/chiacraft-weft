@@ -478,8 +478,12 @@ pub struct WorldRenderer {
     rt_modes: (bool, bool),
     /// The path tracer (`rt.rs` `path_trace`, the pack's `pathtrace.wgsl`): its compute and its
     /// composite, made with the traced world shader; its output per frame slot.
-    pt_pipes: Option<(PipelineId, PipelineId)>,
+    /// The path tracer's pipelines: the trace, the composite, the radiance cache's resolve.
+    pt_pipes: Option<[PipelineId; 3]>,
     pt_out: Vec<(BufferId, u32)>,
+    /// The radiance cache (`pathtrace.wgsl`'s `pt_cache`, `gpu_layout::PT_CACHE` cells), made zeroed
+    /// with the first traced frame.
+    pt_cache: Option<BufferId>,
     /// The path tracer's G-buffer (`rt.rs` `draw_gbuffer`): its pipelines (faces opaque, faces
     /// cutout, quads opaque, quads cutout), the last `draw`'s opaque and cutout table draws (kind,
     /// layer, page, group, first, draws) with its frame slot and CPU-made runs before `gb_firsts`,
@@ -667,6 +671,7 @@ impl WorldRenderer {
             rt_modes: (false, false),
             pt_pipes: if rt_compiled { rt::pt_pipelines(gpu, assets) } else { None },
             pt_out: Vec::new(),
+            pt_cache: None,
             gb_pipes: if rt_compiled { rt::gb_pipelines(gpu, &shader) } else { None },
             gb_draws: Vec::new(),
             gb_draws_slot: 0,
@@ -1229,7 +1234,7 @@ impl WorldRenderer {
                 self.quad_pipes = q;
                 self.lod_pipe = l;
                 self.rt_compiled = rt;
-                for p in self.pt_pipes.take().into_iter().flat_map(|(a, b)| [a, b]) {
+                for p in self.pt_pipes.take().into_iter().flatten() {
                     gpu.destroy_pipeline(p);
                 }
                 for p in self.gb_pipes.take().into_iter().flatten() {
@@ -1341,10 +1346,13 @@ impl WorldRenderer {
         if let Some(p) = self.rt_expand.take() {
             gpu.destroy_pipeline(p);
         }
-        for p in self.pt_pipes.take().into_iter().flat_map(|(a, b)| [a, b]) {
+        for p in self.pt_pipes.take().into_iter().flatten() {
             gpu.destroy_pipeline(p);
         }
         for (b, _) in self.pt_out.drain(..) {
+            gpu.destroy_buffer(b);
+        }
+        if let Some(b) = self.pt_cache.take() {
             gpu.destroy_buffer(b);
         }
         for p in self.gb_pipes.take().into_iter().flatten() {
