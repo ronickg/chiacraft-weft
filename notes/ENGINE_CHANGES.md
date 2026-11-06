@@ -264,6 +264,7 @@ These are the biggest changes. They live mostly in our crates, but each needed h
 - The bug fixes in section 1 are the natural PRs. Upstream already has its own versions of #83 and #84. The clean branches for #96 to #98 and `/rule` are in `notes/crew/upstream/for-ronald.md`.
 - Everything else is ours to keep in the fork unless Ronald decides to offer it.
 
+- **Backed leaf faces off under `core:mc_leaves`** (Trees, branch `claude/trees-bliss-canopy-1d047c`, 11-06): `client::mesher` sets `face::BACKED` only when the test switch `core:mc_leaves` is off. *Why:* `mc_leaves` draws the faces between leaves as Minecraft's fancy leaves do, and the backed fill's dark average covered them in the holes. The plain look's shaded leaves measured luma 16 against vanilla's 23 (Bliss's own world, mc_world_forest 08:00). Test switch only; the default look is unchanged. *Upstream?* No (our test switch).
 ## Our own crates (additions, not core changes)
 
 `sandbox` (wasmtime mod host), `packages` (data packages), `account`, `bridge`, `bots` (`weft-bots`, headless load-test players).
