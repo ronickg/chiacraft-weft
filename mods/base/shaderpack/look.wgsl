@@ -73,6 +73,8 @@ const OPT_SKY_LIGHT: u32 = 25u;
 const OPT_FOLIAGE_TEST: u32 = 26u;
 // The HDR world's white balance after the curve (`base:look_white`, 0 neutral as made, + warmer).
 const OPT_WHITE: u32 = 27u;
+// A test (the tree diagnosis, 11-05): 1 takes the corner shade (AO) away, 0 as made.
+const OPT_AO_TEST: u32 = 28u;
 
 // The colour a grass or leaf tint is multiplied by for the foliage test: 1 as made.
 fn foliage_test() -> vec3<f32> {
@@ -839,7 +841,8 @@ fn leaf_through(rel: vec3<f32>, shadow: f32, sky: f32) -> f32 {
     return (pow(back, 4.0) * 1.6 + 0.12) * light_strength() * mix(0.25, 1.0, shadow) * open;
 }
 
-fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
+fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
+    let ao = mix(ao_in, 1.0, clamp(fantasy_opt(OPT_AO_TEST), 0.0, 1.0));
     let p = palette();
     // The sky's light falls off steeply under cover (Bliss's lightmap, (L^15 x 2 + L^2.5) / 3: 1 in the
     // open, 0.39 a step under, 0.21 two): a forest floor sits a few times below open shade, the open
