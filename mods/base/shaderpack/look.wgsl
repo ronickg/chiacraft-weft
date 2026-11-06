@@ -150,7 +150,16 @@ fn palette() -> Palette {
     // noon the greens then read dark, 41 against 50; agreed with Shader, 11-05, so today's approved
     // look keeps its keys).
     let k = fantasy_opt(OPT_SKY_LIGHT);
-    p.ambient *= select(1.0, k, k > 0.0) * select(1.0, mix(mix(0.45, 0.55, min(canopy(), 1.0)), 0.65, smoothstep(0.5, 0.85, scene.sun.y)), scene.frame.x > 0.5);
+    let hdr_scale = mix(mix(0.45, 0.55, min(canopy(), 1.0)), 0.65, smoothstep(0.5, 0.85, scene.sun.y));
+    p.ambient *= select(1.0, k, k > 0.0) * select(1.0, hdr_scale, scene.frame.x > 0.5);
+    // A lightning flash isn't the sky's light in the shade: in the HDR world it comes back after
+    // that scaling, and twice as strong (the HDR world has the range for a real flash): scaled
+    // with it, a storm's flashes lifted the land by 2 where they had lifted it by 46 (PC st2_e
+    // against st_e, 11-05).
+    if scene.frame.x > 0.5 {
+        let night = smoothstep(-0.05, -0.25, scene.sun.y);
+        p.ambient += vec3(0.5, 0.55, 0.7) * lightning_flash() * mix(1.0, 0.5, night) * (2.0 - hdr_scale);
+    }
     // And its sunlight a little warmer with the sun high (the warmth on Bliss's noon land is its
     // sun's, the sky and the far haze staying blue: our whole-picture white balance had greyed the
     // noon sky, saturation 19 against 31).
