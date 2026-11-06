@@ -559,6 +559,7 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
         lit = vec4(albedo.rgb * light, albedo.a);
         if mat.has {
             lit = vec4(lit.rgb * (1.0 - 0.5 * mat.metal) + mat_shine(in, mat, n, albedo.rgb, light), lit.a);
+            lit = vec4(lit.rgb + mat_through(in, mat, albedo.rgb), lit.a);
         }
         // A low sun full on a bright, saturated yellow-green (the birch's untinted leaves, whose
         // own picture is that green, so `surface_light` never sees them as leaves): some of its
@@ -685,6 +686,21 @@ fn mat_shine(in: VOut, m_in: Mat, n: vec3<f32>, albedo: vec3<f32>, light: vec3<f
     let gloss = 1.0 - clamp(m.rough * 1.6, 0.0, 0.85);
     out += mat_fresnel(m.f0, ndv) * sky * gloss;
     return out;
+}
+
+// Light that comes through a subsurface material (LabPBR `_s` blue over 64: blue ice, wax, the
+// leaves of packs that set it): the day's sky and sun, scattered on its way through, in the
+// material's own colour squared (deep blue for blue ice), the more the less sky reaches the face
+// directly, so a tunnel through ice glows and its outside barely changes. A guess at thickness, not a
+// trace: NVIDIA's showcase ice tunnel glowed deep blue where ours was grey (`notes/RTX_SHOWCASE.md`).
+fn mat_through(in: VOut, m: Mat, albedo: vec3<f32>) -> vec3<f32> {
+    if m.sss <= 0.0 {
+        return vec3(0.0);
+    }
+    let day = smoothstep(-0.05, 0.25, scene.sun.w);
+    let outside = sky_color(vec3(0.0, 1.0, 0.0)) * 0.6 + palette().sun * light_strength() * 0.25 * day;
+    let hidden = 1.0 - 0.75 * smoothstep(0.3, 1.0, in.light.x);
+    return albedo * albedo * m.sss * outside * hidden;
 }
 
 // The world image's alpha for an opaque pixel: SOLID_ALPHA, or for a smooth material (a polished
