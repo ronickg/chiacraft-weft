@@ -424,7 +424,12 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
             // Not the sky (its own dim is above), not in rain.
             let morning = smoothstep(0.38, 0.52, scene.sun.y);
             let land = 1.0 - 0.2 * morning + 0.06 * smoothstep(0.6, 0.82, scene.sun.y);
-            col *= mix(1.0, land, (1.0 - rain_amount()) * select(1.0, 0.0, sky_px));
+            // The near land only, fading out from 300 to 900 blocks: on the far band too it took
+            // mc_forest's noon far land from 135 to 109 (Bliss's 148, Far view's measure).
+            let d = max(textureLoad(textures[pass_.depth], px, 0).r, 1e-7);
+            let wp = scene.inv_view_proj * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, d, 1.0);
+            let near = 1.0 - smoothstep(300.0, 900.0, length(wp.xyz / wp.w));
+            col *= mix(1.0, land, (1.0 - rain_amount()) * select(1.0, 0.0, sky_px) * near);
         }
     }
     return col;
