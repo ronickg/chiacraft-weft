@@ -51,7 +51,12 @@ pub fn bliss_sun() -> bool {
 /// its own (radians here).
 pub fn sun_tilt() -> Option<f32> {
     static ON: OnceLock<Option<f32>> = OnceLock::new();
-    *ON.get_or_init(|| launch_options().get("sun-tilt").and_then(|v| v.parse::<f32>().ok()).map(f32::to_radians))
+    *ON.get_or_init(|| {
+        launch_options()
+            .get("sun-tilt")
+            .and_then(|v| v.parse::<f32>().ok())
+            .map(f32::to_radians)
+    })
 }
 
 /// Exit code a mod asked for with `client_op::QUIT`.
