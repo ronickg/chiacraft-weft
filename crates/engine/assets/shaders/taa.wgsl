@@ -44,10 +44,11 @@ fn taa_rgb(c: vec3<f32>) -> vec3<f32> {
 
 // This frame's color at a texel, finite, and weighed down where it is bright (Karis): one sun
 // glint or a lit leaf's edge then can't flicker the whole gathered pixel.
-fn taa_texel(tex: u32, at: vec2<i32>, size: vec2<i32>) -> vec3<f32> {
-    let c = textureLoad(textures[tex], clamp(at, vec2(0), size - 1), 0).rgb;
-    let f = select(vec3(0.0), min(c, vec3(6.0e4)), c == c);
-    return max(f, vec3(0.0));
+// Its alpha (the world image's, chiacraft's water mask) as it is, in w: one load for both.
+fn taa_texel(tex: u32, at: vec2<i32>, size: vec2<i32>) -> vec4<f32> {
+    let t = textureLoad(textures[tex], clamp(at, vec2(0), size - 1), 0);
+    let f = select(vec3(0.0), min(t.rgb, vec3(6.0e4)), t.rgb == t.rgb);
+    return vec4(max(f, vec3(0.0)), t.a);
 }
 
 fn taa_tone(c: vec3<f32>) -> vec3<f32> {
@@ -162,8 +163,9 @@ fn fs_taa(in: VOut) -> TaaOut {
     for (var j = -1; j <= 1; j++) {
         for (var i = -1; i <= 1; i++) {
             let p = at + vec2(i, j);
-            let c = taa_ycocg(taa_tone(taa_texel(pass_.scene, p, isize)));
-            let a = clamp(textureLoad(textures[pass_.scene], clamp(p, vec2(0), isize - 1), 0).a, 0.0, 1.0);
+            let texel = taa_texel(pass_.scene, p, isize);
+            let c = taa_ycocg(taa_tone(texel.rgb));
+            let a = clamp(texel.a, 0.0, 1.0);
             lo_a = min(lo_a, a);
             hi_a = max(hi_a, a);
             if i == 0 && j == 0 {
