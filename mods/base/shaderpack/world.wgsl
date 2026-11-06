@@ -566,7 +566,8 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     // small ones, a long rain many and wide. A film of water: the ground under it dark, the sky
     // mirrored by Fresnel, and rings where the rain still falls on it.
     let puddles = clamp(scene.canopy.z, 0.0, 1.0) * open_top;
-    if puddles > 0.01 && !leafy && n.y > 0.95 {
+    // (None in the calm-and-dry pipelines, `DRY`.)
+    if !DRY && puddles > 0.01 && !leafy && n.y > 0.95 {
         // In cells three blocks across, some hold a puddle (one hash each against a share that grows
         // with the rain: a shower a few, a long rain most), a round pool about a jittered middle
         // that widens as it fills, edged in the blocks' own pixels.

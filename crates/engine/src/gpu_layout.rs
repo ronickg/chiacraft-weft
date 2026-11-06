@@ -1304,6 +1304,7 @@ pub fn prelude(shader: &str, common: &str) -> String {
         s.push_str(if RT_PRELUDE.load(std::sync::atomic::Ordering::Relaxed) { RT_SUN } else { RT_SUN_OFF });
     }
     s.push_str(CALM_OFF);
+    s.push_str(DRY_OFF);
     s.push_str(common);
     s.push('\n');
     s
@@ -1464,6 +1465,13 @@ pub fn rt_expand_prelude() -> String {
 /// port: on the Pixel 10 the rare paths' size alone cost the vista a fifth of its world pass).
 pub const CALM_OFF: &str = "const CALM: bool = false;\n";
 pub const CALM_ON: &str = "const CALM: bool = true;\n";
+/// `DRY` in every shader: false, but true in the world's calm-and-dry pipelines (level 2 of
+/// `WorldRenderer::set_calm`), used while the scene is calm and also has no rain
+/// (`scene.fog_color.w` 0), dry ground (`scene.canopy.y` 0), no puddles (`scene.canopy.z` 0) and no
+/// snow lying where the player is (`scene.ground.x` 0). A pack leaves out what those draw behind
+/// `if !DRY` (Android port: 1.8 ms of the Pixel 10's vista).
+pub const DRY_OFF: &str = "const DRY: bool = false;\n";
+pub const DRY_ON: &str = "const DRY: bool = true;\n";
 
 /// What goes in front of `occlusion.wgsl`.
 pub fn occlusion_prelude() -> String {
