@@ -120,11 +120,16 @@ Sheets: `sheets3_sp8/<Pack>/<Pack>_vs_ours3_*.jpg`. Today's dev work, as it read
 - **Overshoots:** at 06:00 the HDR land goes saturated orange-gold, sand and desert most of all. Bliss gets its warmth
   through haze rather than through the ground colour. At 05:00 ours is already sunrise-coloured while Bliss is still blue
   before dawn, so our dawn starts a little early or bright.
-- **Still to judge:** dawn mist. Dev now has mist on every calm clear morning, fading out in dry air (1e5659bc, 28671a47).
-  - The first mist shots were invalid: the script's `/air 0 0 0 mist` held fog at zero for ten minutes.
-  - The sc vista stands over desert, where there is no dawn mist by design.
-  - Mist is being reshot on damp spots only (spot C, the Look forest vista A, the snow lake) on dev 28671a47: jobs `damp_*`
-    and `nat2_mist_*`.
+- **Dawn mist, present but without shape:** dev now has mist on every calm clear morning, fading out in dry air
+  (1e5659bc, 28671a47). Sheets: `sheets3_sp8/<Pack>/<Pack>_vs_ours3_mist_damp.jpg` and `..._mist.jpg`.
+  - It was judged on damp spots only. The first mist shots were invalid (the script's `/air 0 0 0 mist` held fog at zero
+    for ten minutes), and the sc vista stands over desert, where there is no dawn mist by design.
+  - **Forest vista A at 06:00:** real dense mist toward the sun. The land fades into a glowing layer, white-gold on dev and
+    deep gold with HDR.
+  - **Spot C:** a light even veil with the canopy readable, about Photon's 07:00. **Forest and lake:** a thin veil.
+  - **Missing:** the packs' shape. Their mist lies in the valleys with a top edge, and crowns and ridges poke through it,
+    crossed by sun shafts. Ours is a uniform volume. Next: a height falloff so the mist sits low, and shafts through the
+    froxel volume.
 - **Still open:** the rest of the ranked list below. In particular:
   - cloud rims toward the sun
   - god rays through the rain deck
@@ -243,7 +248,7 @@ Where today's dev stands on each, at 11-05 23:40, with the HDR world:
 | # | Item | Dev today (HDR world) |
 |---|---|---|
 | 1 | Sun-tinted aerial haze | **Largely done** (warm HDR haze, colour retune); tone down the orange land at 06:00 |
-| 2 | Morning and valley mist | **In dev** (every calm clear morning, dry-air fade); being judged on damp spots |
+| 2 | Morning and valley mist | **Present** (every calm clear morning, dense at forest vista A); needs a low top edge and shafts |
 | 3 | Cloud lighting toward the sun | **Partly done** (warm undersides); silver rims still missing |
 | 4 | Cloud shadows in god rays and rain | **Partly done** (cloud shadows on land); not yet inside the rays or the rain deck |
 | 5 | Lightning as a local light | Open (the bolt is now pinned at the strike, 10c0c7fa) |
