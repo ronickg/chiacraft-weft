@@ -319,6 +319,10 @@ messages! {
         /// Columns of dimension `dim` whose top isn't the terrain's, for distant terrain: (x, z,
         /// height, top, under), `top` `u32::MAX` for one that is again; `all`: every one there is.
         LodColumns { dim: u32, all: bool, cols: Vec<(i32, i32, i32, u32, u32)> },
+        /// chiacraft, test only: an imported world's far terrain for dimension `dim` (`far.bin`,
+        /// `chiacraft_mcimport::far`), which distant tiles show instead of the terrain formula;
+        /// empty: none.
+        LodFar { dim: u32, grid: Vec<u8> },
         /// Of the world, or of body `frame`.
         /// `extras`: what else is in cells, after `changes` (which take it away).
         Blocks { dim: u32, frame: u64, changes: Vec<(IVec3, u32)>, extras: Vec<(IVec3, Vec<u32>)> },
