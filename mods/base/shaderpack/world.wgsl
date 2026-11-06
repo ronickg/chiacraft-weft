@@ -465,18 +465,23 @@ fn shade_soft(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
         lit = vec4(lit.rgb * mix(1.0, select(0.58, 0.8, leafy), wet) + sky_color(reflect(-v, n)) * sheen * wet, lit.a);
     }
     // Puddles on flat open ground (the Recrafted study, item 4): they grow over minutes of rain
-    // (`scene.canopy.z`, the engine's) and dry slower than the ground after. Patches of two
-    // octaves of noise in the blocks' own pixels, the lowest first, so a shower leaves a few small
-    // ones and a long rain joins them up. A film of water: the ground under it dark, the sky
+    // (`scene.canopy.z`, the engine's) and dry slower than the ground after: a shower leaves a few
+    // small ones, a long rain many and wide. A film of water: the ground under it dark, the sky
     // mirrored by Fresnel, and rings where the rain still falls on it.
     let puddles = clamp(scene.canopy.z, 0.0, 1.0) * open_top;
     if puddles > 0.01 && !leafy && n.y > 0.95 {
+        // In cells three blocks across, some hold a puddle (one hash each against a share that grows
+        // with the rain: a shower a few, a long rain most), a round pool about a jittered middle
+        // that widens as it fills, edged in the blocks' own pixels.
+        // (A threshold on two octaves of value noise left none: in the shader the noise stayed
+        // near its middle, PC debug runs shpdd-shpdd3.)
         let q = floor(in.pos.xz * 16.0) / 16.0;
-        let m = noise3(vec3(q / 4.5, 3.7)) * 0.68 + noise3(vec3(q / 1.3, 9.1)) * 0.32;
-        // (Two octaves of value noise gather about 0.5, spread about 0.12: over 0.68 about 1 % of the
-        // ground, 0.6 a tenth, 0.53 some 40 %. From 0.74 down to 0.47 none showed after 5 minutes
-        // of rain, PC shpd3.)
-        let pool = smoothstep(0.0, 0.03, m - mix(0.68, 0.53, puddles));
+        let cell = vec2<i32>(floor(q / 3.0));
+        let pick = hash3(vec3(cell.x, 41, cell.y));
+        let middle = (vec2<f32>(cell) + 0.3 + 0.4 * vec2(hash3(vec3(cell.x, 43, cell.y)), hash3(vec3(cell.x, 47, cell.y)))) * 3.0;
+        let reach = mix(0.6, 1.5, puddles) * mix(0.7, 1.0, hash3(vec3(cell.x, 53, cell.y)));
+        let wobble = (noise3(vec3(q * 0.9, 5.3)) - 0.5) * 0.5;
+        let pool = select(0.0, 1.0, pick < mix(0.12, 0.6, puddles)) * smoothstep(reach, reach - 0.12, length(q - middle) + wobble);
         if pool > 0.0 {
             let v = -normalize(in.rel);
             let slope = rain_rings(in.pos.xz) * rain_amount();
