@@ -1008,8 +1008,16 @@ fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
         // As the sun climbs the banks lift and dissolve into a thin even haze (they burned off as
         // grey smudges on the forest by 08:00, the checkpoint sheet).
         let b = mix(smoothstep(0.25, 0.75, banks), 0.3, smoothstep(0.15, 0.45, scene.sun.y));
-        // Lying in the valleys only, the dawn mist's amount read thin (the mist-height sheet): the
-        // low layer two and a half times as dense there, none higher up.
+        // A dense layer up to a sharp top at the mist line (sea level + MIST_TOP), as Bliss's,
+        // Photon's and Unbound's valley mist: it fills the low land to an edge that crowns and
+        // ridges stand out of, the banks only varying it inside (a soft fall with height read as a
+        // thin even veil with no top: the MC comparison's natural-mist sheets, 11-05). Storms' dust
+        // and snow keep the old shape.
+        if s < 0.5 {
+            let top = SEA_LEVEL + MIST_TOP;
+            let layer = 1.0 - smoothstep(top - 4.0, top + 1.5, p.y);
+            return f * open * burn * (layer * mix(2.2, 5.5, b) + 0.012 * high) * 0.11;
+        }
         return f * open * burn * (low * (mix(0.05, 0.7, s) + mix(6.5, 0.6, s) * b) + 0.012 * high) * 0.11;
     }
     return f * open * burn * (low * (mix(0.05, 0.7, s) + mix(1.7, 0.6, s) * banks) + 0.06 * high) * 0.11;
