@@ -98,11 +98,15 @@ fn vol_glow(p: PostPixel) -> vec3<f32> {
         let far = scene.inv_view_proj * vec4(p.uv.x * 2.0 - 1.0, 1.0 - p.uv.y * 2.0, 1e-6, 1.0);
         dir = normalize(far.xyz / far.w);
     }
-    let px = vec2<u32>(p.uv * p.size);
-    var h = px.x * 7919u + px.y * 104729u + 31337u;
-    h = (h ^ (h >> 15u)) * 0x2c1b3c6du;
-    h = (h ^ (h >> 12u)) * 0x297a2d39u;
-    let jitter = f32((h ^ (h >> 15u)) & 1023u) / 1024.0;
+    // Where each texel's march starts along its step: a 4 x 4 ordered (Bayer) pattern over this
+    // half-size image (`p.size` is the screen's, so half of it), the same every frame. The effect's
+    // full-size part (`post/volume.wgsl`) averages each 4 x 4 block by depth, so all sixteen offsets
+    // meet in every pixel and no grain is left; a random hash per texel left a fine speckle wherever
+    // the air was thick (Trees' forest at Max, rtx-showcase's nave), and this pass runs after the
+    // temporal AA, so moving it each frame would only have made it flicker.
+    let px = vec2<u32>(p.uv * p.size * 0.5);
+    let bayer = array<u32, 16>(0u, 8u, 2u, 10u, 12u, 4u, 14u, 6u, 3u, 11u, 1u, 9u, 15u, 7u, 13u, 5u);
+    let jitter = (f32(bayer[(px.y & 3u) * 4u + (px.x & 3u)]) + 0.5) / 16.0;
     // Strength under 0.75 (the Video screen's Low): as strong, in half the steps.
     let cheap = p.strength < 0.75;
     let steps = select(VOL_STEPS, VOL_STEPS / 2, cheap) + select(0, 8, leafy > 0.25);
