@@ -439,7 +439,8 @@ impl Early {
             let info = FeatureDiscoveryInfo { feature_info: &common, ..info };
             let mut count = 0u32;
             let mut props: *mut vk::ExtensionProperties = null_mut();
-            let r = unsafe { NVSDK_NGX_VULKAN_GetFeatureDeviceExtensionRequirements(instance.handle(), pdev, &info, &mut count, &mut props) };
+            let r =
+                unsafe { NVSDK_NGX_VULKAN_GetFeatureDeviceExtensionRequirements(instance.handle(), pdev, &info, &mut count, &mut props) };
             if failed(r) {
                 log::info!("ngx: feature {f}: no device extensions known ({})", describe(r));
                 continue;
@@ -470,7 +471,13 @@ impl Early {
     }
 
     /// Once the device is made: NGX started on it, and what of DLSS runs here.
-    pub fn ready(self, entry: &ash::Entry, instance: &ash::Instance, pdev: vk::PhysicalDevice, device: &ash::Device) -> Option<Box<dyn Upscaler>> {
+    pub fn ready(
+        self,
+        entry: &ash::Entry,
+        instance: &ash::Instance,
+        pdev: vk::PhysicalDevice,
+        device: &ash::Device,
+    ) -> Option<Box<dyn Upscaler>> {
         let common = self.common();
         let r = unsafe {
             NVSDK_NGX_VULKAN_Init_with_ProjectID(
@@ -750,15 +757,7 @@ impl Upscaler for Ngx {
         if mode == UpscaleMode::Off || self.modes & (1 << mode as u32) == 0 || (rr && !self.rr) {
             return false;
         }
-        let key = Key {
-            mode,
-            rr,
-            render: p.render,
-            output: p.output,
-            hdr: p.hdr != 0,
-            model: p.model,
-            rr_model: p.rr_model,
-        };
+        let key = Key { mode, rr, render: p.render, output: p.output, hdr: p.hdr != 0, model: p.model, rr_model: p.rr_model };
         let Some((handle, params)) = self.feature(cmd, key) else { return false };
         let color = resource(&inputs.color, false);
         let output = resource(&inputs.output, true);
@@ -786,20 +785,37 @@ impl Upscaler for Ngx {
                 log::warn!("ngx: Ray Reconstruction without its guides");
                 return false;
             };
-            guides = [resource(n, false), resource(a, false), resource(s, false)];
+            let hit = inputs.hit_distance.as_ref().unwrap_or(s);
+            guides = [resource(n, false), resource(a, false), resource(s, false), resource(hit, false)];
             Self::set_ptr(params, "GBuffer.Normals", &guides[0]);
             Self::set_ptr(params, "DLSS.Input.DiffuseAlbedo", &guides[1]);
             Self::set_ptr(params, "DLSS.Input.SpecularAlbedo", &guides[2]);
             // No mirror-like surfaces of their own yet: reflections move as the surfaces do
             // (as under Streamline).
             Self::set_ptr(params, "GBuffer.SpecularMvec", &motion);
+            // The path tracer's specular hit distance (r), when there is one.
+            if inputs.hit_distance.is_some() {
+                Self::set_ptr(params, "DLSSD.SpecularHitDistance", &guides[3]);
+            }
             // The same matrices, in the same layout, Streamline is given.
             Self::set_ptr(params, "WorldToViewMatrix", p.world_to_view.as_ptr());
             Self::set_ptr(params, "ViewToClipMatrix", p.view_to_clip.as_ptr());
         }
         let r = unsafe { NVSDK_NGX_VULKAN_EvaluateFeature_C(cmd, handle, params, None) };
         // What NGX was pointed at lives only for this call.
-        for k in ["Color", "Output", "Depth", "MotionVectors", "GBuffer.Normals", "DLSS.Input.DiffuseAlbedo", "DLSS.Input.SpecularAlbedo", "GBuffer.SpecularMvec", "WorldToViewMatrix", "ViewToClipMatrix"] {
+        for k in [
+            "Color",
+            "Output",
+            "Depth",
+            "MotionVectors",
+            "GBuffer.Normals",
+            "DLSS.Input.DiffuseAlbedo",
+            "DLSS.Input.SpecularAlbedo",
+            "GBuffer.SpecularMvec",
+            "DLSSD.SpecularHitDistance",
+            "WorldToViewMatrix",
+            "ViewToClipMatrix",
+        ] {
             Self::set_ptr::<c_void>(params, k, null());
         }
         if failed(r) {

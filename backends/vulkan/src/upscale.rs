@@ -29,6 +29,8 @@ pub(crate) struct Inputs {
     pub normals: Option<Image>,
     pub albedo: Option<Image>,
     pub specular: Option<Image>,
+    /// How far the specular rays went (blocks, in r), from the path tracer.
+    pub hit_distance: Option<Image>,
 }
 
 pub(crate) trait Upscaler: Send {

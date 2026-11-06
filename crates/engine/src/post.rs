@@ -216,6 +216,21 @@ pub struct TemporalInputs {
     pub reset: bool,
 }
 
+/// The path tracer's G-buffer and specular light (`Post::set_pt_guides`), all at the world's size:
+/// Ray Reconstruction's guides come from them instead of `upscale_guides.wgsl`'s estimates from
+/// the picture and depth (the layout agreed with the RT session, `notes/` "pt-denoisers").
+#[derive(Clone, Copy, Debug)]
+pub struct PtGuides {
+    /// xyz the shading normal (world axes, camera-relative), w its perceptual roughness.
+    pub normal: TextureId,
+    /// rgb the diffuse albedo, linear (metals 0).
+    pub albedo: TextureId,
+    /// rgb the reflectance at normal incidence (F0).
+    pub spec: TextureId,
+    /// The path tracer's specular light; a how far its ray went (blocks).
+    pub specular: TextureId,
+}
+
 static BLOOM: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// Whether the last frame drew the HDR world's bloom pyramid (`Pass::bloom`): a pack's own bloom
@@ -312,6 +327,11 @@ pub struct Post {
     up_targets: Option<([TextureId; 2], [u32; 2], (u32, u32))>,
     guide_pipes: Option<(PipelineId, PipelineId)>,
     guides: Option<([TextureId; 3], (u32, u32))>,
+    /// From the path tracer's G-buffer (`set_pt_guides`): this frame's, the pipeline drawing the
+    /// specular albedo and hit distance from it (`fs_pt_guides`), and those two images.
+    pt_guides: Option<PtGuides>,
+    pt_pipe: Option<PipelineId>,
+    pt_targets: Option<([TextureId; 2], (u32, u32))>,
     up_held: Option<(UpscaleMode, bool, (u32, u32), (u32, u32))>,
 }
 
@@ -352,6 +372,9 @@ impl Post {
             depth_tex: None,
             upscaled: None,
             upscale: None,
+            pt_guides: None,
+            pt_pipe: None,
+            pt_targets: None,
             up_out: None,
             up_targets: None,
             guide_pipes: None,
@@ -415,6 +438,9 @@ impl Post {
             gpu.destroy_pipeline(a);
             gpu.destroy_pipeline(b);
         }
+        if let Some(p) = self.pt_pipe.take() {
+            gpu.destroy_pipeline(p);
+        }
         let info = gpu.upscaler();
         if !motion() || !(info.reconstruct || info.neural) {
             return;
@@ -440,7 +466,7 @@ impl Post {
                 // Normals and roughness, with the albedo beside them (the second image).
                 let guides = make("upscale guides", "fs_guides", true)?;
                 match make("upscale specular", "fs_specular", false) {
-                    Ok(sp) => Ok((guides, sp)),
+                    Ok(sp) => Ok((guides, sp, make("upscale pt guides", "fs_pt_guides", true))),
                     Err(e) => {
                         gpu.destroy_pipeline(guides);
                         Err(e)
@@ -448,7 +474,13 @@ impl Post {
                 }
             });
         match made {
-            Ok(p) => self.guide_pipes = Some(p),
+            Ok((g, sp, pt)) => {
+                self.guide_pipes = Some((g, sp));
+                match pt {
+                    Ok(p) => self.pt_pipe = Some(p),
+                    Err(e) => log::error!("upscaler guides from the G-buffer: {e}"),
+                }
+            }
             Err(e) => log::error!("upscaler guides: {e}"),
         }
     }
@@ -464,6 +496,12 @@ impl Post {
     /// `frame.output`, the screen's size.
     pub fn set_upscale(&mut self, frame: UpscaleFrame) {
         self.upscale = Some(frame);
+    }
+
+    /// This frame was path traced: Ray Reconstruction's guides come from its G-buffer
+    /// (`PtGuides`), with its specular hit distance. Set each frame, before `apply`.
+    pub fn set_pt_guides(&mut self, guides: PtGuides) {
+        self.pt_guides = Some(guides);
     }
 
     pub fn reload(&mut self, gpu: &mut dyn Backend, assets: &Assets) {
@@ -874,9 +912,33 @@ impl Post {
             let entry = Pass { scene: idx[0], slot: 0, time, size: [w as f32, h as f32], depth, bloom: motion_idx + 1, ..Pass::default() };
             taa_entries.push(entry);
             taa_draws.push((full, None, fill, taa_entries.len() - 1));
-            // Ray Reconstruction's guides, from the world's picture and depth.
+            // Ray Reconstruction's guides: from the path tracer's G-buffer when it drew this frame
+            // (the normals and albedo as they are, the specular albedo and hit distance drawn
+            // from it), else estimated from the world's picture and depth.
             let mut g = [NO_TEXTURE; 3];
-            if let (true, Some((guide_pipe, spec_pipe))) = (u.reconstruct, self.guide_pipes) {
+            let mut hit = NO_TEXTURE;
+            let pt = self.pt_guides.take();
+            if let (true, Some(pt), Some(pt_pipe)) = (u.reconstruct, pt, self.pt_pipe) {
+                if self.pt_targets.is_none_or(|t| t.1 != (w, h)) {
+                    if let Some((old, _)) = self.pt_targets.take() {
+                        old.into_iter().for_each(|t| gpu.destroy_texture(t));
+                    }
+                    self.pt_targets = Some(([rt(gpu, w, h, "guide pt specular"), rt(gpu, w, h, "guide pt hit distance")], (w, h)));
+                }
+                let t = self.pt_targets.unwrap().0;
+                let pt_entry = Pass {
+                    scene: gpu.texture_index(pt.spec),
+                    size: [w as f32, h as f32],
+                    depth,
+                    low: gpu.texture_index(pt.normal) + 1,
+                    bloom: gpu.texture_index(pt.specular) + 1,
+                    ..Pass::default()
+                };
+                taa_entries.push(pt_entry);
+                taa_draws.push((t[0], Some(t[1]), pt_pipe, taa_entries.len() - 1));
+                g = [pt.normal, pt.albedo, t[0]];
+                hit = t[1];
+            } else if let (true, Some((guide_pipe, spec_pipe))) = (u.reconstruct, self.guide_pipes) {
                 if self.guides.is_none_or(|t| t.1 != (w, h)) {
                     if let Some((old, _)) = self.guides.take() {
                         old.into_iter().for_each(|t| gpu.destroy_texture(t));
@@ -927,6 +989,7 @@ impl Post {
                 normals: g[0],
                 albedo: g[1],
                 specular: g[2],
+                hit_distance: hit,
                 start,
             });
             src = out_idx;

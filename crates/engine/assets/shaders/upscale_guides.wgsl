@@ -10,6 +10,7 @@
 //   Proton run 11-06);
 // - the specular albedo follows from a dielectric's 4 % (Karis's approximation) at that roughness.
 // Entry: `scene` the world's picture, `depth` its depth, `size` the world's size.
+// When the frame was path traced, `fs_pt_guides` draws exact ones from its G-buffer instead.
 
 struct VOut {
     @builtin(position) clip: vec4<f32>,
@@ -109,11 +110,34 @@ fn fs_specular(in: VOut) -> @location(0) vec4<f32> {
     let n = guide_normal(pass_.depth, at, size);
     let v = -normalize(guide_position(pass_.depth, at, size));
     let nov = abs(dot(n, v));
-    let c0 = vec4(-1.0, -0.0275, -0.572, 0.022);
-    let c1 = vec4(1.0, 0.0425, 1.04, -0.04);
-    let r = GUIDE_ROUGHNESS * c0 + c1;
-    let a004 = min(r.x * r.x, exp2(-9.28 * nov)) * r.x + r.y;
-    let ab = vec2(-1.04, 1.04) * a004 + r.zw;
-    let s = 0.04 * ab.x + ab.y;
-    return vec4(vec3(s), 1.0);
+    return vec4(pt_spec_albedo(vec3(0.04), GUIDE_ROUGHNESS, nov), 1.0);
+}
+
+struct PtGuideOut {
+    @location(0) specular: vec4<f32>,
+    @location(1) hit_distance: vec4<f32>,
+}
+
+// From the path tracer's G-buffer (`post::PtGuides`): the specular albedo by the surface's own F0
+// and roughness (the same `pt_spec_albedo` the path tracer divided by), and the specular hit
+// distance in r. Entry: `scene` the F0 image, `low` the normals + roughness + 1, `bloom` the path
+// tracer's specular light + 1 (its alpha the hit distance), `depth`, `size`.
+@fragment
+fn fs_pt_guides(in: VOut) -> PtGuideOut {
+    let pass_ = passes[in.pass_index];
+    let size = vec2<i32>(pass_.size);
+    let at = vec2<i32>(in.clip.xy);
+    var out: PtGuideOut;
+    if textureLoad(textures[pass_.depth], at, 0).r <= 0.0 || pass_.low == 0u || pass_.bloom == 0u {
+        out.specular = vec4(0.0);
+        out.hit_distance = vec4(0.0);
+        return out;
+    }
+    let nr = textureLoad(textures[pass_.low - 1u], at, 0);
+    let f0 = textureLoad(textures[pass_.scene], at, 0).rgb;
+    let v = -normalize(guide_position(pass_.depth, at, size));
+    let n = normalize(nr.xyz + vec3(0.0, 0.0, 1e-6));
+    out.specular = vec4(pt_spec_albedo(f0, nr.w, abs(dot(n, v))), 1.0);
+    out.hit_distance = vec4(max(textureLoad(textures[pass_.bloom - 1u], at, 0).a, 0.0), 0.0, 0.0, 1.0);
+    return out;
 }
