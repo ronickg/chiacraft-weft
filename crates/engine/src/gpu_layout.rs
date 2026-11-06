@@ -755,7 +755,9 @@ gpu_struct! {
         /// curve to that pass); 0 into the screen or a preview. y 1 when the last frame drew the
         /// HDR world's bloom pyramid (`post::bloom`), which the last pass adds, so a pack's own
         /// bloom effect leaves its glow out. z the pixels a mist volume cell covers each way
-        /// (`client::froxels`: 8, or 4 at ultra), for a pack that spends more on finer cells. w unused.
+        /// (`client::froxels`: 8, or 4 at ultra), for a pack that spends more on finer cells. w,
+        /// chiacraft: the frame's number, 0 to 63 and round again, for dithers that change each
+        /// frame (a temporal blend's history averages them out; without one they shimmer finely).
         pub frame: [f32; 4],
         /// The soft clouds' shadow on the land (`client::cloud_shadow`, with the HDR world; a pack
         /// whose sky has `fs_cloud_shadow`): x the map's bindless index + 1 (0: none this frame), y
@@ -766,6 +768,16 @@ gpu_struct! {
         /// from the eye (0: none this frame), y the index of each cell's own, zw the cells across
         /// the view; 32 slices deep, eight to a row of the image.
         pub froxels: [f32; 4],
+        /// Temporal anti-aliasing (`post::Temporal`, `core:aa`): xy this frame's jitter in NDC
+        /// (`view_proj` has it, `taa_prev` not; a clip position's `xy / w - taa.xy` is where it
+        /// would be without), z 1 when `taa_prev` holds last frame's camera (0: start anew), w
+        /// the shaders' clock (`params.w`) last frame, for what moves by time (the wind).
+        pub taa: [f32; 4],
+        /// Last frame's `view_proj` without its jitter, taking this frame's camera-relative
+        /// positions: where a still point stood on last frame's screen. A shader writing motion
+        /// (`@location(1)`, `weft_render::MOTION_FORMAT`) puts a point's position last frame
+        /// through it.
+        pub taa_prev: [[f32; 4]; 4],
     }
 }
 
@@ -1163,6 +1175,9 @@ bindings! {
         CUBOIDS "cuboids": "array<Cuboid>",
         CORNERS "corners": "array<Corner>",
         BONES "bones": "array<Bone>",
+        // The same bones last frame, at the same indices, taking this frame's camera-relative
+        // positions (this frame's where an entity is new), for the motion image.
+        PREV_BONES "prev_bones": "array<Bone>",
     }
     particle "particle.wgsl" {
         PARTICLES "particles": "array<Particle>",
@@ -1208,6 +1223,12 @@ bindings! {
         PASSES "passes": "array<Pass>",
         // The frame the world was drawn with (all zero without one): where the sun is on the
         // screen, the weather, for effects such as light shafts.
+        SCENE "scene": "Scene",
+    }
+    // Temporal anti-aliasing (`post::Post`): the same as the screen effects', so their pass
+    // entries serve.
+    taa "taa.wgsl" {
+        PASSES "passes": "array<Pass>",
         SCENE "scene": "Scene",
     }
 }

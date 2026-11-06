@@ -394,6 +394,9 @@ fn blood_tint() -> vec3<f32> {
 // looking up from under the trees (Tester 2's looks4, 11-05); higher, they stand in the sky as
 // clouds with blue between them, as Bliss's do.
 const SOFT_LIFT: f32 = 220.0;
+// How far a look into the soft clouds is followed (blocks): beyond, they fade into the sky. Their
+// depth is held there, so what stands at this distance is cloud, never land (`sky_or_cloud`).
+const SOFT_REACH: f32 = 4000.0;
 
 // ---- lightning (`scene.lightning`, the engine's flash where the player is) ----
 // Ronald, 11-05: "add lightning flashes" (Tester 2's four storm shots showed none: the engine's
@@ -568,6 +571,31 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         // Toward it, a warmer band low on the horizon.
         let toward = pow(max(mu, 0.0), 2.0) * pow(1.0 - h, 3.0) * low;
         c += vec3(0.55, 0.22, 0.05) * toward;
+    }
+    // (B5: on the sky's own colour, before the sun's glow and glare are added: on top of them it
+    // turned the glare gold, and the dawn mist that reads it went flat orange over the land, PC
+    // shdawnB3/B4.)
+    if scene.frame.x > 0.5 {
+        // With the sun low, the whole of its half of the sky goes gold-cream at its own brightness,
+        // as Bliss's dawn: ours stayed lavender-blue there round a gold glare (Bliss's own world at
+        // 06:00, sky band saturation 105 and warmth +85 against Bliss's 122 and +94; Look, 11-06).
+        // Its own window, full with the sun up to about 9 degrees and gone by about 20 (the sunset
+        // band's `low` is nearly 0 by Bliss's 06:00 sun at 10 degrees, so this did nothing, PC
+        // shdawnB2).
+        let morning = (1.0 - smoothstep(0.15, 0.35, scene.sun.y)) * smoothstep(-0.03, 0.02, scene.sun.y);
+        if morning > 0.0 {
+            // (That orange, 231 172 68 against Bliss's 201 172 108 at 06:00, was the dawn mist,
+            // which the script left free and which came and went between runs: with it pinned off
+            // a third at 1.0 0.87 0.66 only halved the lavender gaps, 6.7 % to 3.3 %; PC shdawnm0,
+            // shdawnm5.)
+            let cream = vec3(1.0, 0.84, 0.58);
+            // Over the sun's whole half, overhead too (about a third there): a lobe about the sun
+            // alone left the gaps between the clouds lavender (7 % of the 06:00 sky band, Bliss's
+            // none; PC shdawn0).
+            let wide = 0.5 + 0.5 * mu;
+            let dawn = pow(wide, 1.5) * morning * (1.0 - rain_amount());
+            c = mix(c, cream * (luma(c) / luma(cream)), dawn * 0.7);
+        }
     }
     c += sun_glow(dir, p);
     // In the HDR world the air round the sun glows as bright as it really is (Mie scattering's
@@ -1002,10 +1030,14 @@ fn wind_now() -> vec2<f32> {
 // How hard the wind pushes at `p` now, about 1 for its mean: gusts are bands of stronger wind that
 // sweep across the land the way it blows, so a field bends in waves.
 fn gust(p: vec3<f32>) -> f32 {
+    return gust_at(p, scene.params.w);
+}
+
+// `gust` at the shaders' clock `t` (last frame's for the motion image, `scene.taa.w`).
+fn gust_at(p: vec3<f32>, t: f32) -> f32 {
     let w = wind_now();
     let speed = length(w);
     let dir = select(vec2(1.0, 0.0), w / max(speed, 1e-4), speed > 0.01);
-    let t = scene.params.w;
     let along = dot(p.xz, dir) - t * max(speed, 1.0) * 0.9;
     let band = noise3(vec3(along / 14.0, t * 0.05, dot(p.xz, vec2(-dir.y, dir.x)) / 30.0));
     return 0.55 + 1.1 * smoothstep(0.35, 0.85, band);
@@ -1676,6 +1708,9 @@ fn lottes(x: vec3<f32>) -> vec3<f32> {
     return xa / (pow(max(x, vec3(1e-6)), vec3(ad)) * b + vec3(c));
 }
 
+// The light under Hejl's toe kept at this share of itself (`finish_picture`).
+const HEJL_TOE: f32 = 0.25;
+
 fn hejl(c: vec3<f32>, white: f32) -> vec3<f32> {
     let v = vec4(c, white);
     let a = 1.425 * v + vec4(0.05);
@@ -1762,7 +1797,13 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     if curve > 1.5 {
         day_t = agx(max(c, vec3(0.0)) * 0.55 * exposure() * look_opt(OPT_EXPOSURE, 1.0));
     } else if curve > 0.5 {
-        day_t = hejl(max(c, vec3(0.0)) * exposure() * look_opt(OPT_EXPOSURE, 1.0), 3.5);
+        // A floor under Hejl's toe, which takes everything under about 1% to black: there the
+        // light at `HEJL_TOE` of itself, so deep shade keeps its colour (Bliss's near shade is a
+        // dark blue, sRGB 19 39 65; ours went to 0 0 0 on Tester 2's calm noon, more fill light
+        // didn't lift it, sh1b; at 0.15 the grass spot's darkest tenth was 17, at 0.25 24, today's
+        // LDR 30, the land's middle and brights the same). Above about 0.1 the curve is Hejl's own.
+        let x = max(c, vec3(0.0)) * exposure() * look_opt(OPT_EXPOSURE, 1.0);
+        day_t = max(hejl(x, 3.5), x * HEJL_TOE);
     }
     var t = mix(night_t, day_t, day);
     // The HDR world's white balance by day (`base:look_white`): warmer, less blue (our land read
