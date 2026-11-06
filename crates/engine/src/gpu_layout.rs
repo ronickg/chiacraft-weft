@@ -778,7 +778,9 @@ gpu_struct! {
         pub upscale: [f32; 4],
         /// Ray-traced sun and moon shadows (`core:rt_shadows`, a GPU with ray queries): x 1 when
         /// the world's shader traces them this frame (its prelude then has `rt_sun`; the near shadow
-        /// map then holds the models alone, the far one the terrain as before), yzw unused.
+        /// map then holds the models alone, the far one the terrain as before), y a frame count
+        /// (to 2^24, for noise that moves every frame), z 1 for soft edges from more rays a pixel
+        /// (`core:rt_shadows` 2: `rt_sun_soft`'s `fine`), w unused.
         pub rt: [f32; 4],
         /// Temporal anti-aliasing (`post::Temporal`, `core:aa`): xy this frame's jitter in NDC
         /// (`view_proj` has it, `taa_prev` not; a clip position's `xy / w - taa.xy` is where it
@@ -1440,6 +1442,12 @@ const RT_SUN_OFF: &str = "
 fn rt_sun(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool) -> vec3<f32> {
     return vec3(1.0);
 }
+fn rt_cone(l: vec3<f32>, radius: f32, px: vec2<f32>) -> vec3<f32> {
+    return l;
+}
+fn rt_sun_soft(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool, radius: f32, px: vec2<f32>, fine: bool) -> vec3<f32> {
+    return vec3(1.0);
+}
 ";
 
 /// `rt_sun(rel, n, l, plant)`: how much of the light coming along `l` (unit, toward the sun or
@@ -1467,6 +1475,60 @@ fn rt_lod_hidden(rel: vec3<f32>) -> bool {
         return ((lod_mask[i / 32u] >> (i % 32u)) & 1u) != 0u;
     }
     return false;
+}
+
+// A direction toward a point of the light's disc round `l` (unit), `radius` radians across from its
+// middle, for the pixel at `px` (`@builtin(position)`): a different point each frame of temporal
+// anti-aliasing's jitter (`scene.taa.xy`), so its history averages one ray a pixel into the
+// penumbra a light of that size casts (soft shadows from one ray). `l` itself without the jitter.
+fn rt_cone(l: vec3<f32>, radius: f32, px: vec2<f32>) -> vec3<f32> {
+    return rt_cone_at(l, radius, px, 0.0);
+}
+
+// The same, turned by `turn` (0..1 of a circle) and its distance from the middle mirrored for odd
+// halves, for further rays of one pixel spread over the disc (`rt_sun_soft`).
+fn rt_cone_at(l: vec3<f32>, radius: f32, px: vec2<f32>, turn: f32) -> vec3<f32> {
+    let j = scene.taa.xy;
+    if j.x == 0.0 && j.y == 0.0 {
+        return l;
+    }
+    // Interleaved gradient noise, moved on every frame (`scene.rt.y`, a frame count: TAA's jitter
+    // has only a few phases, and a pattern repeating every 8 frames left a grain its history kept).
+    let k = f32(u32(scene.rt.y) % 64u);
+    let p = px + vec2(5.588238 * k);
+    var u1 = fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
+    if fract(turn * 2.0) >= 0.5 {
+        u1 = 1.0 - u1;
+    }
+    let u2 = fract(52.9829189 * fract(dot(p.yx + vec2(17.0, 31.0), vec2(0.06711056, 0.00583715))) + turn);
+    let r = radius * sqrt(u1);
+    let a = 6.2831853 * u2;
+    let t = normalize(cross(l, select(vec3(0.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), abs(l.y) > 0.9)));
+    let b = cross(l, t);
+    return normalize(l + (t * cos(a) + b * sin(a)) * r);
+}
+
+// `rt_sun` toward a light of disc `radius` (radians), soft-edged: with temporal anti-aliasing's
+// jitter on, one ray to a point of the disc that moves every frame, the history averaging them into
+// the penumbra. `fine`: two rays to opposite sides of the disc, and where they disagree (a penumbra)
+// two more across it, smooth within the frame but about three times the cost (PC, 11-06: +0.7-2.5
+// ms at 1440p against +0.2-0.7). Without the jitter one ray to the middle.
+fn rt_sun_soft(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool, radius: f32, px: vec2<f32>, fine: bool) -> vec3<f32> {
+    let j = scene.taa.xy;
+    if j.x == 0.0 && j.y == 0.0 {
+        return rt_sun(rel, n, l, plant);
+    }
+    let a = rt_sun(rel, n, rt_cone_at(l, radius, px, 0.0), plant);
+    if !fine {
+        return a;
+    }
+    let b = rt_sun(rel, n, rt_cone_at(l, radius, px, 0.5), plant);
+    if all(abs(a - b) < vec3(0.05)) {
+        return (a + b) * 0.5;
+    }
+    let c = rt_sun(rel, n, rt_cone_at(l, radius, px, 0.25), plant);
+    let d = rt_sun(rel, n, rt_cone_at(l, radius, px, 0.75), plant);
+    return (a + b + c + d) * 0.25;
 }
 
 struct RtTexel {

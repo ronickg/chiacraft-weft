@@ -317,6 +317,11 @@ impl WorldRenderer {
         self.rt = Some(rt);
     }
 
+    /// Frames the ray-traced scene has been kept (`Scene::rt.y`, for noise that moves every frame).
+    pub fn rt_frame_no(&self) -> u64 {
+        self.rt.as_ref().map_or(0, |r| r.frame_no)
+    }
+
     /// Whether the world's shader traces its sun shadows this frame (`Scene::rt`): composed with
     /// the scene, and a shader pack whose `world.wgsl` calls `rt_sun`. Then the near shadow map
     /// isn't drawn.

@@ -384,6 +384,10 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
 // file must not name the engine's block lookup: its name anywhere in it makes the engine upload
 // the blocks around the camera every frame.
 const PLANT_SHADOW_LIFT: f32 = 0.7;
+// Traced shadows: the radius of the sun's (and moon's) disc the rays aim into (radians), with
+// temporal anti-aliasing on (`rt_sun_soft`): soft edges that widen with the distance to what casts
+// them. The real sun's is 0.0047; a little more, as shader packs' suns, reads as softer light.
+const SUN_CONE: f32 = 0.012;
 
 fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
     let sky = smoothstep(0.75, 1.0, in.light.x);
@@ -396,7 +400,7 @@ fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
         if dot(n, light_dir()) <= 0.0 && in.kind.z == 0u && in.kind.x != TINT_FOLIAGE {
             return 0.0;
         }
-        let t = rt_sun(in.rel, n, light_dir(), in.kind.z != 0u);
+        let t = rt_sun_soft(in.rel, n, light_dir(), in.kind.z != 0u, SUN_CONE, in.clip.xy, scene.rt.z > 0.5);
         let c = min(canopy(), 1.0);
         let cover = smoothstep(mix(0.3, 0.15, c), mix(0.8, 0.5, c), in.light.x);
         return min(dot(t, vec3(1.0 / 3.0)), cover) * models_shadow(in.rel, n) * cloud_shadow(in.rel);
@@ -925,7 +929,7 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     // Traced (`core:rt_shadows`): the water's surface everywhere, as the land.
     if scene.rt.x > 0.5 {
         let up = vec3(0.0, 1.0, 0.0);
-        near_map = vec2(dot(rt_sun(in.rel, up, light_dir(), false), vec3(1.0 / 3.0)) * models_shadow(in.rel, up), 1.0);
+        near_map = vec2(dot(rt_sun_soft(in.rel, up, light_dir(), false, SUN_CONE, in.clip.xy, scene.rt.z > 0.5), vec3(1.0 / 3.0)) * models_shadow(in.rel, up), 1.0);
     }
     let shadow = mix(1.0, min(near_map.x, smoothstep(0.3, 0.8, in.light.x)), near_map.y) * smoothstep(0.75, 1.0, max(in.light.x, near_map.y)) * cloud_shadow(in.rel);
     let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, shadow, 1.0, in.pos, in.rel);
