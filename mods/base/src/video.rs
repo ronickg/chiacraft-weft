@@ -101,7 +101,7 @@ static GPU_CLASS: Config<i32> = Config::named("core:gpu_class");
 static GPU_MEMORY: Config<i32> = Config::named("core:gpu_memory_mb");
 /// The GPU can trace rays (`core:gpu_ray_query`): the traced shadows' row is shown.
 static GPU_RAY_QUERY: Config<bool> = Config::named("core:gpu_ray_query");
-static RT_SHADOWS: Config<bool> = Config::named("core:rt_shadows");
+static RT_SHADOWS: Config<i32> = Config::named("core:rt_shadows");
 /// The newer quality settings, each a row on the Extra quality tab (`EXTRA_ROWS`) and all at their
 /// most in the Max preset: the HDR world and temporal anti-aliasing (read at start), the mist as a
 /// volume, the soft clouds' shadow, the bloom's levels, the far shadow map's reach, the screen
@@ -248,7 +248,8 @@ fn max_extras() {
     SHADOW_FAR.set(0);
     POST_LOW.set(false);
     crate::look::LOOK_LEAF_HOLES.set(1.0);
-    RT_SHADOWS.set(GPU_RAY_QUERY.get() && !on_phone());
+    // Ultra (soft edges from more rays, with TAA) where the GPU traces rays.
+    RT_SHADOWS.set(if GPU_RAY_QUERY.get() && !on_phone() { 2 } else { 0 });
     FX_WIND_LIFE.set(3);
     SOFT_CLOUDS.set(true);
     // DLAA (DLSS at the screen's own size) where the renderer has it, with its newest model (M,
@@ -652,7 +653,14 @@ const EXTRA_ROWS: [Row; 9] = [
         set: |v| crate::look::LOOK_LEAF_HOLES.set(if v > 0.0 { 1.0 } else { 0.0 }),
         shown: off_on,
     },
-    Row { key: "rt_shadows", values: &[0.0, 1.0], get: || RT_SHADOWS.get() as u8 as f64, set: |v| RT_SHADOWS.set(v > 0.0), shown: off_on },
+    Row {
+        key: "rt_shadows",
+        // Ultra: soft edges from more rays a pixel (with TAA), about three times the cost.
+        values: &[0.0, 1.0, 2.0],
+        get: || RT_SHADOWS.get() as f64,
+        set: |v| RT_SHADOWS.set(v as i32),
+        shown: |v| word(["off", "on", "ultra"][(v as usize).min(2)]),
+    },
 ];
 const RT_ROW: usize = 8;
 
