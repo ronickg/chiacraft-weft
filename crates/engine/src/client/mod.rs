@@ -1,7 +1,9 @@
 pub mod camera;
+pub mod cloud_shadow;
 pub mod ctm;
 pub mod entity_render;
 pub mod frame_look;
+pub mod froxels;
 pub mod gizmo;
 pub mod lod;
 pub mod looks;
@@ -551,6 +553,8 @@ pub struct Client {
     shadow_far_age: u32,
     /// The maps' size in texels (`core:shadow_size`), as they were made.
     shadow_size: u32,
+    /// The far shadow map's reach to each side (blocks, `core:shadow_far`; 400 as made).
+    shadow_far_reach: f32,
     pub target: Option<Hit>,
     pub target_entity: Option<u64>,
     pub selected: usize,
@@ -940,6 +944,7 @@ impl Client {
             shadow_far_anchored: glam::Mat4::IDENTITY,
             shadow_far_age: 0,
             shadow_size: 2048,
+            shadow_far_reach: FAR_REACH,
             target: None,
             target_entity: None,
             selected: 0,
@@ -2805,6 +2810,8 @@ impl Client {
             // Filled in once the sky has readied it (`render`).
             frame_look: [0.0; 4],
             lightning: [self.lightning_seen.0, self.lightning_seen.1, self.thunder(), self.lightning_seen.2],
+            froxels: [0.0; 4],
+            cloud_shadow: [0.0; 4],
             prev_view_proj: [[0.0; 4]; 4],
             cloud_moved: [0.0; 4],
             // On the real clock (`shaders::clock`): tests pin the shaders' time, and a fireball's
@@ -2817,12 +2824,12 @@ impl Client {
                     .to_array(),
                 None => [0.0, 0.0, 0.0, -1e6],
             },
-            frame: [crate::post::hdr() as u32 as f32, crate::post::bloom() as u32 as f32, 0.0, 0.0],
+            frame: [crate::post::hdr() as u32 as f32, crate::post::bloom() as u32 as f32, self.sky.froxels.cell as f32, 0.0],
             shadow_view_proj: self.shadow.0.to_cols_array_2d(),
             shadow_far_view_proj: self.shadow_far.0.to_cols_array_2d(),
             shadow_far: match self.shadow_far_map {
                 Some(_) if self.shadow_far.1 => {
-                    [self.shadow_far_index as f32, self.shadow_size as f32, 1.0, 2.0 * FAR_REACH / self.shadow_size as f32]
+                    [self.shadow_far_index as f32, self.shadow_size as f32, 1.0, 2.0 * self.shadow_far_reach / self.shadow_size as f32]
                 }
                 _ => [0.0; 4],
             },
@@ -3040,6 +3047,12 @@ impl Client {
             self.shadow_far_map = Some(t);
             self.shadow_far_drawn = None;
         }
+        // The far map's reach (`core:shadow_far`, 400 as made; ultra to 2400): drawn again when it changes.
+        let reach = (shadow_setting("core:shadow_far", FAR_REACH as f64) as f32).clamp(200.0, 2400.0);
+        if reach != self.shadow_far_reach {
+            self.shadow_far_reach = reach;
+            self.shadow_far_drawn = None;
+        }
         let cam = self.render_camera();
         self.shadow = (light_box(dir, cam.pos, SHADOW_REACH, SHADOW_DEPTH, size), true);
         // The far map about a place in the world, not the camera: built about the camera, its box
@@ -3048,7 +3061,7 @@ impl Client {
         // Mac). Snapped to `FAR_ANCHOR` blocks, it stays put until the player crosses into
         // another cell; seen from the camera it is the same box, moved by camera less anchor.
         let anchor = ((cam.pos / FAR_ANCHOR).floor() + 0.5) * FAR_ANCHOR;
-        let anchored = light_box(dir, anchor, FAR_REACH, FAR_DEPTH, size);
+        let anchored = light_box(dir, anchor, reach, reach * FAR_DEPTH / FAR_REACH, size);
         self.shadow_far_anchored = anchored;
         let from_cam = glam::Mat4::from_translation((cam.pos - anchor).as_vec3());
         self.shadow_far = (anchored * from_cam, level >= 2);
@@ -3191,6 +3204,8 @@ impl Client {
         let s = crate::diag::span("render/sky");
         // Soft clouds trace against the copy of the world (`behind`), made after this.
         self.sky.soft_possible = self.behind[2] > 0.5;
+        // The mist's volume, when there is mist and the eye is out of liquids (`fog_through`).
+        self.sky.froxels_possible = self.fog >= 0.005 && self.eye_liquid().is_none();
         self.sky.draw(
             gpu,
             &mut late,
@@ -3210,6 +3225,8 @@ impl Client {
         // The sky readied this frame's soft clouds: their fields in the scene.
         (scene.soft_clouds, scene.prev_view_proj, scene.cloud_moved) = self.sky.soft.scene;
         scene.frame_look = self.sky.frame_look.scene;
+        scene.froxels = self.sky.froxels.scene;
+        scene.cloud_shadow = self.sky.cloud_shadow.scene;
         gpu.mapped(scene_buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
         self.render.draw_translucent(&mut late);
         let alive = !self.dead && !self.mode.has(weft_abi::game_mode_flags::NO_INTERACT);

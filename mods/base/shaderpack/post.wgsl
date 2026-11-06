@@ -137,7 +137,7 @@ fn fs_copy_behind(in: VOut) -> BehindOut {
 fn bloom_tap(tex: u32, uv: vec2<f32>) -> vec3<f32> {
     let c = textureSampleLevel(textures[tex], linear_clamp, uv, 0.0).rgb;
     let ok = all(c == c) && all(c < vec3(1e6));
-    return select(vec3(0.0), min(max(c, vec3(0.0)), vec3(48.0)), ok);
+    return select(vec3(0.0), min(max(c, vec3(0.0)), vec3(256.0)), ok);
 }
 
 // Four taps' average, weighed down where it is bright (Karis's average): on the first level only,
@@ -180,8 +180,9 @@ fn fs_bloom_down(in: VOut) -> @location(0) vec4<f32> {
 }
 
 // How much of the wider levels each level keeps on the way up: 1 weighs each level about as Bliss
-// does its seven (1, 1/2, 1/3 ... of a normalised blur).
-const BLOOM_SPREAD: f32 = 1.0;
+// does its seven (1, 1/2, 1/3 ... of a normalised blur); 1.3 a little wider, for the glare round a
+// low sun.
+const BLOOM_SPREAD: f32 = 1.3;
 
 // One level up: this level (`scene`) and the wider one over it (`low` - 1), filtered by a 3x3 tent.
 @fragment
@@ -238,12 +239,32 @@ fn auto_exposure(mean: f32) -> f32 {
     let ref_at = 0.18 / log2(2.5 * EXPOSURE_REF + 1.045);
     let k = pow(target_at / ref_at, 0.5);
     let night = smoothstep(0.0, -0.15, scene.sun.y) * select(1.0, 0.0, !open_sky());
-    return clamp(k, 0.6, mix(2.0, 1.2, night));
+    // Under rain the view is darker and stays so (a storm's mood; brought up, its mist went milky):
+    // no brighter than as made, in a storm a little darker.
+    let wet = rain_amount() * select(1.0, 0.0, !open_sky());
+    return clamp(k, 0.6, mix(mix(2.0, 1.2, night), 1.0 - 0.1 * scene.weather.w, wet));
 }
 
 // How strong the bloom is: a share of the glow mixed in (it keeps the light's sum), more in rain
 // and fog, where the air itself scatters.
 const BLOOM_MIX: f32 = 0.1;
+
+// How much of the view at `uv` the mist covers (0 none to 1), from the mist volume (`froxels`) at
+// the world's depth there; 0 without the volume.
+fn mist_over(uv: vec2<f32>, pass_: Pass) -> f32 {
+    if scene.froxels.x < 0.5 {
+        return 0.0;
+    }
+    let size = vec2<i32>(pass_.size);
+    let at = clamp(vec2<i32>(uv * pass_.size), vec2(0), size - vec2(1));
+    let d = max(textureLoad(textures[pass_.depth], at, 0).r, 1e-7);
+    let w = scene.inv_view_proj * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, d, 1.0);
+    let dist = min(length(w.xyz / w.w), FROXEL_FAR);
+    let f = froxel_slice(dist);
+    let k = i32(floor(f));
+    let v = mix(froxel_at(uv, k - 1), froxel_at(uv, min(k, i32(FROXEL_SLICES) - 1)), fract(f));
+    return clamp(1.0 - v.a, 0.0, 1.0);
+}
 
 // The HDR world's light before the tone curve: the bloom mixed in and the exposure applied.
 fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
@@ -251,12 +272,20 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
     if pass_.bloom != 0u {
         let glow = bloom_tap(pass_.bloom - 1u, uv);
         let air = clamp(max(rain_amount(), scene.weather.z), 0.0, 1.0);
-        col = mix(col, glow, clamp(BLOOM_MIX * (1.0 + air) * fantasy_opt(OPT_BLOOM), 0.0, 0.6));
+        // Bloomy fog (Bliss's): where mist covers the view (the mist volume's own opacity there,
+        // `froxels`), it takes much more of the glow, so thick mist reads as soft light rather than
+        // a grey wall, and its banks' noise melts.
+        // Not in rain: its mist taking the glow too turned a storm's land to milk (the storm sheet,
+        // 11-05), where Bliss's stays dark and readable.
+        let fog = mist_over(uv, pass_) * (1.0 - 0.85 * rain_amount());
+        col = mix(col, glow, clamp((BLOOM_MIX * (1.0 + air * (1.0 - rain_amount())) + fog * 0.6) * fantasy_opt(OPT_BLOOM), 0.0, 0.8));
     }
     if pass_.exposure != 0u {
         let e = textureLoad(textures[pass_.exposure - 1u], vec2(0, 0), 0).g;
         if e == e && e > 0.0 {
             col *= pow(auto_exposure(e), fantasy_opt(OPT_AUTO_EXPOSURE));
+            // A high sun's land a little brighter (the noon land read 91-93 against Bliss's 113).
+            col *= mix(1.0, 1.25, smoothstep(0.5, 0.85, scene.sun.y) * (1.0 - rain_amount()));
         }
     }
     return col;

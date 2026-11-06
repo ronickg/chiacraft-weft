@@ -2571,6 +2571,11 @@ fn update_game(r: &mut Running, dt: f64, frame_start: Instant) {
         g.client.sky.soft_wanted = r.settings.soft_clouds();
         r.post.use_low = r.settings.post_low();
         r.post.bloom_levels = r.settings.bloom_levels();
+        // The mist volume with the HDR world only, until today's (LDR) look takes it on Ronald's
+        // word (its look was never shown to him there); `core:froxels` 0 turns it off there too.
+        g.client.sky.froxels_wanted = r.settings.froxels() && crate::post::hdr();
+        g.client.sky.froxels.cell = r.settings.froxel_cell();
+        g.client.sky.cloud_shadow_wanted = crate::post::hdr() && r.settings.cloud_shadows();
         let t = Instant::now();
         if world_input {
             g.client.update(&mut *r.gpu, &r.textures, &mut r.input, dt);
@@ -3088,10 +3093,14 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         drop(s);
         // What the pack's look works out once a frame, before anything that reads it.
         r.list.append(&mut g.client.sky.frame_look.passes);
+        // The soft clouds' shadow on the land, before the world that reads it.
+        r.list.append(&mut g.client.sky.cloud_shadow.passes);
         // The shadow map once the models are posed, ahead of the world's pass that samples it.
         let s = crate::diag::span("shadows");
         g.client
             .render_shadows(&mut *r.gpu, &mut r.list, world_info);
+        // The mist's volume, which reads the shadow maps, before the world that reads it.
+        r.list.append(&mut g.client.sky.froxels.passes);
         drop(s);
         // The opaque world copied, then what is seen through it drawn over it, reading the copy.
         if g.client.behind[2] > 0.5 {
