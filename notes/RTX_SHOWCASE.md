@@ -135,3 +135,13 @@ What it shows, biggest gap first:
    them to our nearest blocks. Model blocks are a follow-up.
 4. **Exteriors at a distance** (the cherry tree, the cathedral) are already close. Here our traced sun
    shadows differ little from the shadow maps; their reflections and soft sky light show more.
+
+v2, the same day (`nvidia_vs_ours_v2.jpg`; HUD hidden, NVIDIA-like times):
+- The `mc` package now has model blocks with their light: lanterns, fires, campfires, amethyst, torches,
+  end rods, candles, chains.
+- In our storeroom at night the lanterns flood the room with even orange light. NVIDIA's make pools of
+  light with shadow between, which is the many shadowed lights of RT step 6.
+- The pack's light through subsurface materials (`mat_through`) makes blue ice glow deep blue.
+- Our summer 19:00 is still full day, so the nave needs a later hour to match NVIDIA's dusk.
+- NVIDIA's ice tunnel is still not found. The water-under-ice spots by the ship were under the sea ice,
+  not a tunnel.
