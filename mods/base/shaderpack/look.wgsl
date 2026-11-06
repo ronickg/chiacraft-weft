@@ -1423,14 +1423,21 @@ fn froxel_cell(dir: vec3<f32>, at: f32, floor: f32) -> vec4<f32> {
     let light = fog_light(dir);
     let leafy = min(canopy(), 1.0);
     let shaded_sky = light.sky * mix(vec3(1.0), LEAF_LIGHT * 0.2, leafy * 0.85) + light.leaf * leafy;
-    let d = fog_density(scene.eye.xyz + dir * at, floor);
+    let k = froxel_slice(at);
+    let span = froxel_end(k) - froxel_end(k - 1.0);
+    // The mist two taps through the cell's depth, each in its half at a place that moves every
+    // frame (temporal anti-aliasing blends them): taken at the cell's middle alone, a low layer
+    // was all in a slice where the middle fell in it and none where it didn't, so the land under a
+    // dawn mist wore rings round the eye at the slices' distances, 50-120 blocks deep out there
+    // (Ronald, 11-06, pt_compare_v2 "low over the river": "what is this weird, like a ripple thing").
+    let j = fract(fract(sin(dot(dir, vec3(12.9898, 78.233, 37.719))) * 43758.547) + scene.params.w * 47.37);
+    let d = 0.5 * (fog_density(scene.eye.xyz + dir * (at + span * (j - 1.0) * 0.5), floor)
+        + fog_density(scene.eye.xyz + dir * (at + span * j * 0.5), floor));
     if d <= 0.0 {
         return vec4(0.0);
     }
     // Three taps of the shadow map through the cell's depth (a quarter, a half and three quarters
     // between `at`'s neighbours' ends), so a shaft narrower than a cell is part-lit, not all or none.
-    let k = froxel_slice(at);
-    let span = froxel_end(k) - froxel_end(k - 1.0);
     var lit = (sun_reaches(dir * (at - span * 0.25)) + sun_reaches(dir * at) + sun_reaches(dir * (at + span * 0.25))) / 3.0;
     // The clouds' shadow in the air too (the HDR world): beams of sun through their gaps, the mist
     // under a cloud dim.
