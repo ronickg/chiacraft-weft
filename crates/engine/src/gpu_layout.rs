@@ -1293,10 +1293,12 @@ pub fn set_rt_prelude(on: bool) {
 
 /// The world shader's group 1 bindings of ray tracing's scene (`client::world_render::rt`): the
 /// TLAS, the frame's instance table, the see-through records' copies.
+/// Kept well past the world's own (`bindings!`, numbered in order), so new ones there never meet
+/// them.
 pub mod rt_bind {
-    pub const TLAS: u32 = 12;
-    pub const INSTANCES: u32 = 13;
-    pub const RECORDS: u32 = 14;
+    pub const TLAS: u32 = 30;
+    pub const INSTANCES: u32 = 31;
+    pub const RECORDS: u32 = 32;
 }
 
 const RT_SUN_OFF: &str = "
@@ -1314,9 +1316,9 @@ fn rt_sun(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool) -> vec3<f32> 
 const RT_SUN: &str = "
 enable wgpu_ray_query;
 const RT_ALPHA_MIP: f32 = 2.0;
-@group(1) @binding(12) var rt_scene: acceleration_structure;
-@group(1) @binding(13) var<storage, read> rt_inst: array<vec4<u32>>;
-@group(1) @binding(14) var<storage, read> rt_records: array<u32>;
+@group(1) @binding(30) var rt_scene: acceleration_structure;
+@group(1) @binding(31) var<storage, read> rt_inst: array<vec4<u32>>;
+@group(1) @binding(32) var<storage, read> rt_records: array<u32>;
 
 // Whether real cubes stand in the column of the distant terrain's hit at `rel` (`Lod::mask`):
 // then the tile isn't there.
