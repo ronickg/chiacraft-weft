@@ -204,7 +204,11 @@ fn draw_block(
                         crate::gpu_layout::face_record([x, y, z], dir as u32, ao, tint as u32, info.turns[dir] as u32, tex, biome, light);
                     // Its back face hidden by the same block behind it (leaves in a crown): its
                     // holes would show past the crown, the sky from under a canopy.
-                    if info.layer == RenderLayer::Cutout && info.flags & bf::CULL_SAME != 0 {
+                    // Not with `core:mc_leaves`, which draws the faces between leaves as
+                    // Minecraft's fancy leaves do: the holes show those, lit, and the fill's dark
+                    // average covered them (the plain look's shaded leaves luma 16 against
+                    // vanilla's 23, Trees, 11-06).
+                    if info.layer == RenderLayer::Cutout && info.flags & bf::CULL_SAME != 0 && !mc_leaves() {
                         let [bx, by, bz] = NORMALS[dir ^ 1];
                         if c.states[n.states[pidx(x + bx, y + by, z + bz)] as usize].block == info.block {
                             rec[0] |= crate::gpu_layout::face::BACKED;
