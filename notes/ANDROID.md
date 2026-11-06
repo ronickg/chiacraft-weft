@@ -119,6 +119,11 @@ the phone on USB, `ANDROID_HOME=~/Library/Android/sdk tools/release/android-run.
   - leaves in two passes on Android (e870c0bc: depth with the alpha test, then shaded with no
     discard where the depth is theirs): 19 / 25, forest world 37.5 -> 29.6 ms (25.5 with leaves
     drawn solid, the bound).
+  - after the dev merge (simpler trees, leaf holes; 589df211: 17 / 26, vista world 49.9 ms), far
+    land and far water hazed by one call instead of a copy in each path (26a4d810): 20 / 26, vista
+    world 40.1 ms. Removing single parts of the haze (its veil, its sun lobe) made the shader
+    slower, not faster: what cost was the second copy of the whole haze in one shader (fewer pixels
+    in flight). Near water and glass the same way (74006387): no change, the same picture.
   Tried and dropped: haze per vertex (slower). Left: half precision (no `shaderFloat16` path in
   the engine yet), the far land's crowns and cloud shadow.
 - **Settings on the phone** (`sweep.sh`, the same bench): sun shadows cost the forest 4 ms and
