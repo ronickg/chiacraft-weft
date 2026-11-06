@@ -1543,6 +1543,7 @@ ley.base.feel.strong = a strong pull
 ley.base.feel.on_line = on a line
 ley.base.feel.at_node = at a node
 command.base.ley = ley here {0} ({1}); nearest line {2} blocks, at {3} {4}; nearest node {5} {6} ({7} lines), {8} blocks; nearest waystone {9} {10}, {11} blocks
+command.base.ley_no_line = ley here {0} ({1}); no line within {2} blocks; nearest node {5} {6} ({7} lines), {8} blocks; nearest waystone {9} {10}, {11} blocks
 # Waystones and the map (waystones.rs, map.rs; vitals::waystones)
 key.base.map = Map
 map.base.title = Map
