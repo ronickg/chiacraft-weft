@@ -81,6 +81,10 @@ pub fn block(mc: &str) -> (Vec<String>, bool) {
             // Our block of the very same name first (`base:yellow_poplar_leaves`), if we have it.
             let kinds = std::iter::once(kind).chain(wood(kind).iter().copied().filter(|k| *k != kind));
             for k in kinds {
+                // Minecraft's cherry is pink all year; ours only in its spring bloom.
+                if of == "leaves" && k == "cherry" {
+                    v.push("base:cherry_leaves[bloom=1]".into());
+                }
                 v.push(format!("base:{stripped}{k}_{of}{props}"));
                 v.push(format!("base:{stripped}{k}_{of}"));
             }
@@ -324,7 +328,7 @@ mod tests {
         assert!(exact);
         assert_eq!(v[0], "base:spruce_log[axis=x]");
         let (v, _) = block("minecraft:cherry_leaves[distance=1,persistent=false,waterlogged=false]");
-        assert_eq!(v[0], "base:cherry_leaves");
+        assert_eq!(v[0], "base:cherry_leaves[bloom=1]");
         assert!(v.contains(&"base:oak_leaves".to_string()));
         let (v, _) = block("minecraft:stripped_birch_log[axis=y]");
         assert_eq!(v[0], "base:stripped_birch_log[axis=y]");
