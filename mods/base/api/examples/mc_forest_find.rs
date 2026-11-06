@@ -42,9 +42,9 @@ fn main() {
             .get(4)
             .cloned()
             .unwrap_or_else(|| "old_growth_forest".into());
-        l::with_mc_land(|| floor(a[0].parse().unwrap_or(1), arg(2), arg(3), &biome));
+        floor(a[0].parse().unwrap_or(1), arg(2), arg(3), &biome);
     } else {
-        l::with_mc_land(find);
+        find();
     }
 }
 

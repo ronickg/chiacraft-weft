@@ -422,19 +422,19 @@ What the world grows besides grass and trees (`vitals::wild`): how each grows, t
 
 ## Stands of trees
 
-A forest's layers (`vitals::canopy`): each wild tree's site grows under the canopy, in it or over it by its biome's shares; a simple tree's height (to its crown's top) and crown by its kind and layer, a big one a block taller and wider. A canopy tree carries a side lobe 40% of the time. Branched trees grow x0.65 as tall under the canopy and x1.4 over it.
+A forest's layers (`vitals::canopy`): each wild tree's site grows under the canopy, in it or over it by its biome's shares; a simple tree's height (to its crown's top) and crown by its kind and layer, a big one a block taller and wider. A canopy tree carries a side lobe 40% of the time; a round or slim crown hangs its depth down from the top, so the trunk stands clear under it (height - depth), and a cone's needles start at 20% / 38% / 45% of its height (under / canopy / emergent). Branched trees grow x0.65 as tall under the canopy and x1.4 over it, broadleaves on at least 7 / 10 blocks of clear trunk in and over the canopy.
 
 | crown | layer | height | crown radius | depth | lobes |
 |---|---|---|---|---|---|
-| Round | Under | 3-4 | 1.8 | 3 | 0 |
-| Round | Canopy | 5-9 | 3 | 5 | 1 |
-| Round | Emergent | 11-15 | 3.6 | 6 | 3 |
-| Cone | Under | 4-6 | 1.6 | a spire | 0 |
-| Cone | Canopy | 7-11 | 2.4 | a spire | 0 |
-| Cone | Emergent | 13-17 | 3 | a spire | 0 |
-| Slim | Under | 4-5 | 1.4 | 3 | 0 |
-| Slim | Canopy | 6-9 | 2 | 5 | 0 |
-| Slim | Emergent | 11-14 | 2.5 | 6 | 1 |
+| Round | Under | 4-5 | 1.8 | 3 | 0 |
+| Round | Canopy | 11-14 | 3 | 5 | 1 |
+| Round | Emergent | 16-19 | 3.6 | 6 | 3 |
+| Cone | Under | 5-7 | 1.6 | a spire | 0 |
+| Cone | Canopy | 11-14 | 2.4 | a spire | 0 |
+| Cone | Emergent | 17-20 | 3 | a spire | 0 |
+| Slim | Under | 5-6 | 1.4 | 3 | 0 |
+| Slim | Canopy | 11-13 | 2 | 5 | 0 |
+| Slim | Emergent | 15-17 | 2.5 | 6 | 1 |
 
 | biome | under | emergent |
 |---|---|---|
