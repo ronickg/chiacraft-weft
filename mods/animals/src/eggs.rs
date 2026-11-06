@@ -58,6 +58,10 @@ static EGG_SCALED: Component<f32> = Component::named("egg_scaled");
 /// by the look's name (made once).
 static KINDS: OnceLock<Vec<(&'static str, &'static EntityKind)>> = OnceLock::new();
 pub static NEST: EntityKind = EntityKind::named("nest");
+/// A bird's nest: a small cup of twigs lined with grass and down (`source/nest/cup.py`), on a
+/// treetop, a ledge or the ground, sized for its eggs; the birds build it, it breaks into sticks.
+pub static NEST_CUP: EntityKind = EntityKind::named("nest_cup");
+static STICK: Item = Item::named("base:stick");
 static NEST_ITEM: Item = Item::named("nest");
 static AIR: Block = Block::named("core:air");
 static LEAVES: Tag = Tag::named("leaves");
@@ -69,9 +73,13 @@ static ITEMS: OnceLock<Vec<(usize, &'static Item)>> = OnceLock::new();
 
 /// The egg a plain nest is made for: its box's width, blocks (a little under a Velociraptor's
 /// drawn egg; a wider egg's nest is as much bigger, so a ring of seven doesn't overlap), and the
-/// ring a nest's eggs lie on round the middle one, blocks at the plain nest's size.
+/// ring a nest's eggs lie on round the middle one, as a share of the nest's width; a bird's cup
+/// is made for an egg as wide as `CUP_EGG_W`.
 const NEST_EGG_W: f32 = 0.2;
-const NEST_RING: f64 = 0.25;
+const NEST_RING: f64 = 0.28;
+const CUP_EGG_W: f32 = 0.12;
+/// How far out round a full nest more eggs are laid, rings of the dish (on the ground beside it).
+const NEST_BESIDE: f64 = 2.6;
 /// The egg an egg's mass is given at, real cm (`hunt::EGG_KG`).
 const MASS_EGG_CM: f32 = 15.0;
 /// A wild female builds a nest about every two days, while her kind isn't crowded.
@@ -130,6 +138,23 @@ pub fn init(r: &mut Registry) {
         })
         .on_died(|w, d| {
             w.spawn_item([d.pos.x, d.pos.y + 0.2, d.pos.z], ItemStack::new(NEST_ITEM.id(), 1));
+        });
+    r.entity(&NEST_CUP)
+        .no_egg()
+        .size(animals_core::bodies::of("nest_cup").0, animals_core::bodies::of("nest_cup").1)
+        .max_health(3.0)
+        .walk_speed(0.0)
+        .passive()
+        .unpushable()
+        .model_file("nest_cup")
+        .texture("nest/cup")
+        .on_interact(|e| {
+            let (w, id, player) = (e.world(), e.entity(), e.other());
+            nest_clicked(&w, id, player);
+            false
+        })
+        .on_died(|w, d| {
+            w.spawn_item([d.pos.x, d.pos.y + 0.2, d.pos.z], ItemStack::new(STICK.id(), 2));
         });
     r.item(&NEST_ITEM).tab(&TOOLS).on_use(|u| {
         let Some((p, face)) = u.target_block().map(|(p, f)| (p.to_array(), f)) else { return false };
@@ -198,22 +223,26 @@ fn egg_rest(at: [f64; 3]) -> [f64; 3] {
     at
 }
 
-/// A free spot in the nest at `n`: the middle, else round it.
+/// A free spot in the nest at `n`: the middle, else round it; a full nest's next eggs go on the
+/// ground round it.
 fn nest_spot(w: &World, n: [f64; 3]) -> [f64; 3] {
-    let k = nest_scale(w, n);
-    let spots = std::iter::once((0.0, 0.0)).chain((0..7).map(|i| {
-        let a = i as f64 / 7.0 * std::f64::consts::TAU;
-        (a.cos() * NEST_RING * k, a.sin() * NEST_RING * k)
-    }));
-    let mut first = None;
-    for (dx, dz) in spots {
-        let at = [n[0] + dx, n[1] + NEST_FLOOR * k, n[2] + dz];
-        first.get_or_insert(at);
-        if eggs_near(w, at, 0.1 * k).is_empty() {
-            return at;
-        }
-    }
-    first.unwrap_or(n)
+    let width = nest_width_at(w, n);
+    let k = width / animals_core::bodies::of("nest").0 as f64;
+    let free = |r: f64, y: f64| {
+        std::iter::once((0.0, 0.0))
+            .filter(move |_| r == NEST_RING)
+            .chain((0..7).map(move |i| {
+                let a = (i as f64 + if r == NEST_RING { 0.0 } else { 0.5 }) / 7.0 * std::f64::consts::TAU;
+                (a.cos() * r * width, a.sin() * r * width)
+            }))
+            .map(move |(dx, dz)| [n[0] + dx, n[1] + y, n[2] + dz])
+            .find(|&at| eggs_near(w, at, 0.11 * width).is_empty())
+    };
+    // In the dish, else round the nest on the ground (a full nest's eggs piled on each other in
+    // one dish: Tester 2's eggs playtest, 11-06), else the middle.
+    free(NEST_RING, NEST_FLOOR * k)
+        .or_else(|| free(NEST_RING * NEST_BESIDE, 0.0))
+        .unwrap_or([n[0], n[1] + NEST_FLOOR * k, n[2]])
 }
 
 /// The scale species `index`'s egg is drawn at: its egg's drawn length against its look's built
@@ -240,36 +269,49 @@ pub(crate) fn is_egg_kind(kind: u32) -> bool {
         .is_some_and(|k| k.iter().any(|(_, e)| e.id() == kind))
 }
 
-/// A nest's width (its box, `animals_core::bodies`).
-fn nest_width() -> f32 {
-    animals_core::bodies::of("nest").0
-}
-/// A species with wider eggs gets a bigger nest (a wyvern's, about 3 blocks across).
+/// A species with wider eggs gets a bigger nest (a wyvern's, about 3 blocks across); a bird's
+/// cup is sized for its eggs from `CUP_EGG_W`.
 fn nest_size(index: usize) -> f32 {
     (egg_width(index) / NEST_EGG_W).max(1.0)
 }
+fn cup_size(index: usize) -> f32 {
+    (egg_width(index) / CUP_EGG_W).max(1.0)
+}
 
-/// How much bigger than the plain one the nest at `at` is (1 for none).
-fn nest_scale(w: &World, at: [f64; 3]) -> f64 {
-    nest_near(w, at, 0.1)
-        .and_then(|(n, _)| w.entity(n))
-        .map_or(1.0, |e| (e.size.width / nest_width()) as f64)
+/// The nests (scrapes and cups) within `r` blocks of `at`, nearest first: id, position, width.
+fn nests_near(w: &World, at: [f64; 3], r: f64) -> Vec<(u64, [f64; 3], f64)> {
+    let mut all: Vec<(u64, [f64; 3], f64)> = [&NEST, &NEST_CUP]
+        .into_iter()
+        .flat_map(|k| w.entities_near(at, r, Some(k)))
+        .filter_map(|n| w.entity(n).map(|e| (n, e.pos.to_array(), e.size.width as f64)))
+        .collect();
+    all.sort_by(|a, b| crate::dist2(a.1, at).total_cmp(&crate::dist2(b.1, at)));
+    all
 }
 
 /// The nest within `r` blocks of `at`, if any: its id and position.
 fn nest_near(w: &World, at: [f64; 3], r: f64) -> Option<(u64, [f64; 3])> {
-    w.entities_near(at, r, Some(&NEST))
-        .into_iter()
-        .find_map(|n| Some((n, w.entity(n)?.pos.to_array())))
+    nests_near(w, at, r).first().map(|&(n, p, _)| (n, p))
+}
+
+/// The width of the nest at `at` (a plain nest's for none): its eggs' ring follows it.
+fn nest_width_at(w: &World, at: [f64; 3]) -> f64 {
+    nests_near(w, at, 0.1)
+        .first()
+        .map_or(animals_core::bodies::of("nest").0 as f64, |n| n.2)
+}
+
+/// Whether no egg lies in the nest at `n` `width` wide: a nest with eggs in it takes no new
+/// clutch (Tester 2's eggs playtest, 11-06: mothers laid again into the same dish, 6+ eggs piled).
+fn nest_free(w: &World, n: [f64; 3], width: f64) -> bool {
+    eggs_near(w, n, 0.55 * width).is_empty()
 }
 
 /// Whether `at` is in a nest.
 fn in_nest(w: &World, at: [f64; 3]) -> bool {
-    w.entities_near(at, 2.5, Some(&NEST)).into_iter().any(|n| {
-        w.entity(n).is_some_and(|e| {
-            let r = 0.6 * (e.size.width / nest_width()) as f64;
-            (e.pos.x - at[0]).powi(2) + (e.pos.z - at[2]).powi(2) < r * r
-        })
+    nests_near(w, at, 2.5).into_iter().any(|(_, p, width)| {
+        let r = 0.55 * width;
+        (p[0] - at[0]).powi(2) + (p[2] - at[2]).powi(2) < r * r
     })
 }
 
@@ -304,10 +346,13 @@ fn owner_of(player: u64) -> Option<[u8; 64]> {
 
 // ------------------------------------------------------------------ laying
 
-/// A clutch (`young`) is laid by mother `mother` at `at`: into a nest within eight blocks if
-/// there is one, else around her.
+/// A clutch (`young`) is laid by mother `mother` at `at`: into the nearest empty nest within
+/// eight blocks if there is one (a nest with eggs in it takes no more), else around her.
 pub fn lay(w: &World, at: [f64; 3], young: &[Young], owner: Option<[u8; 64]>) {
-    let nest = nest_near(w, at, 8.0).map(|n| n.1);
+    let nest = nests_near(w, at, 8.0)
+        .into_iter()
+        .find(|&(_, p, width)| nest_free(w, p, width))
+        .map(|n| n.1);
     let n = young.len().max(1) as f64;
     for (k, y) in young.iter().enumerate() {
         let a = k as f64 / n * std::f64::consts::TAU;
@@ -318,23 +363,48 @@ pub fn lay(w: &World, at: [f64; 3], young: &[Young], owner: Option<[u8; 64]>) {
                 [at[0] + a.cos() * r, at[1], at[2] + a.sin() * r]
             }
         };
-        let ((genes, genes_more), (dam, dam_more), (sire, sire_more)) =
-            (breeding::pack(&y.genome), breeding::pack(&y.dam), breeding::pack(&y.sire));
-        let egg = Egg {
-            species: y.index as u32 + 1,
-            left: SPECIES[y.index].incubation(),
-            generation: y.generation,
-            mother: y.mother,
-            father: y.father,
-            genes,
-            dam,
-            sire,
-            wild: y.wild,
-            genes_more,
-            dam_more,
-            sire_more,
-        };
-        spawn_egg(w, spot, &egg, owner);
+        spawn_egg(w, spot, &egg_of(y), owner);
+    }
+}
+
+/// A fish's clutch (`young`) is spawned at `at`: its roe lies on the bottom under her, a little
+/// spread, one clump of beads a young (`animals_core::eggs`' roe looks), hatching into fry after
+/// its time in the water (`incubate`).
+pub fn lay_roe(w: &World, at: [f64; 3], young: &[Young], owner: Option<[u8; 64]>) {
+    for (k, y) in young.iter().enumerate() {
+        let a = k as f64 * 2.4;
+        let r = 0.25 + 0.12 * k as f64;
+        let x = [at[0] + a.cos() * r, at[1], at[2] + a.sin() * r];
+        // Down through the water to the bottom (at most 16 blocks).
+        let mut b = x.map(|v| v.floor() as i32);
+        for _ in 0..16 {
+            let below = [b[0], b[1] - 1, b[2]];
+            if !w.in_liquid([below[0] as f64 + 0.5, below[1] as f64 + 0.5, below[2] as f64 + 0.5]) {
+                break;
+            }
+            b = below;
+        }
+        spawn_egg(w, [x[0], b[1] as f64, x[2]], &egg_of(y), owner);
+    }
+}
+
+/// The egg holding young `y`, its time to hatch its species' incubation.
+fn egg_of(y: &Young) -> Egg {
+    let ((genes, genes_more), (dam, dam_more), (sire, sire_more)) =
+        (breeding::pack(&y.genome), breeding::pack(&y.dam), breeding::pack(&y.sire));
+    Egg {
+        species: y.index as u32 + 1,
+        left: SPECIES[y.index].incubation(),
+        generation: y.generation,
+        mother: y.mother,
+        father: y.father,
+        genes,
+        dam,
+        sire,
+        wild: y.wild,
+        genes_more,
+        dam_more,
+        sire_more,
     }
 }
 
@@ -346,12 +416,30 @@ pub fn lay_in_nest(w: &World, index: usize, mother: u64, at: [f64; 3], young: &[
     let site = animals_core::nests::site(s.name);
     let ground = ground_under(w, at);
     let found = site.and_then(|k| nest_site(w, k, at, ground));
-    let spot = found.unwrap_or(ground);
-    if nest_near(w, spot, 1.0).is_none() {
-        let nest = w.spawn(&NEST, spot);
-        if nest_size(index) > 1.0 {
-            w.set_scale(nest, nest_size(index));
+    let mut spot = found.unwrap_or(ground);
+    // Nests keep `APART` from each other (a raven built two 2 blocks apart, Tester 2, 11-06): an
+    // empty one this near is used; one with eggs in it sends her to open ground further off.
+    let apart = animals_core::nests::APART;
+    let near = nests_near(w, spot, apart);
+    match near.first() {
+        Some(&(_, p, width)) if nest_free(w, p, width) => spot = p,
+        Some(_) => {
+            let open = (0..8)
+                .map(|i| {
+                    let a = i as f64 / 8.0 * std::f64::consts::TAU;
+                    ground_under(w, [spot[0] + a.cos() * (apart + 0.5), ground[1] + 2.0, spot[2] + a.sin() * (apart + 0.5)])
+                })
+                .find(|&p| (p[1] - ground[1]).abs() <= 2.0 && nests_near(w, p, apart).is_empty());
+            match open {
+                Some(p) => {
+                    spot = p;
+                    spawn_cup(w, index, spot);
+                }
+                // Nowhere: around her, no nest.
+                None => spot = ground,
+            }
         }
+        None => spawn_cup(w, index, spot),
     }
     lay(w, spot, young, owner);
     let at = spot.map(|v| v.floor() as i32);
@@ -361,6 +449,14 @@ pub fn lay_in_nest(w: &World, index: usize, mother: u64, at: [f64; 3], young: &[
         _ => "on the ground, no site near",
     };
     weft_sdk::info!("{} {mother} nested at {at:?} {place} ({site:?}, ground {}): {} eggs", s.kind_name(), ground[1], young.len());
+}
+
+/// A bird's cup nest at `at`, sized for species `index`'s eggs.
+fn spawn_cup(w: &World, index: usize, at: [f64; 3]) {
+    let nest = w.spawn(&NEST_CUP, at);
+    if cup_size(index) > 1.0 {
+        w.set_scale(nest, cup_size(index));
+    }
 }
 
 /// Where a nest of `site` goes near `at` (`ground` under it, the search's middle): the highest
@@ -373,10 +469,9 @@ fn nest_site(w: &World, site: animals_core::nests::Site, at: [f64; 3], ground: [
     let feet = [at[0].floor() as i32, ground[1] as i32, at[2].floor() as i32];
     let floor = ground[1] as i32;
     // Nests already built near: a site this close to one is taken.
-    let built: Vec<[f64; 3]> = w
-        .entities_near(ground, LOOK as f64 + APART + LOOK_UP as f64, Some(&NEST))
+    let built: Vec<[f64; 3]> = nests_near(w, ground, LOOK as f64 + APART + LOOK_UP as f64)
         .into_iter()
-        .filter_map(|n| Some(w.entity(n)?.pos.to_array()))
+        .map(|n| n.1)
         .collect();
     let taken = |p: [i32; 3]| {
         let c = [p[0] as f64 + 0.5, p[1] as f64, p[2] as f64 + 0.5];
@@ -498,9 +593,15 @@ pub fn wild_clutch(w: &World, id: u64, index: usize, st: &EntityState) -> bool {
         return false;
     }
     let at = [feet[0] as f64 + 0.5, feet[1] as f64, feet[2] as f64 + 0.5];
-    let nest = w.spawn(&NEST, at);
-    if nest_size(index) > 1.0 {
-        w.set_scale(nest, nest_size(index));
+    // A bird builds its cup; the others an earthen scrape (Tester 2's second run, 11-06: a wild
+    // raven nested in the raptors' dish).
+    if animals_core::nests::site(s.name).is_some() {
+        spawn_cup(w, index, at);
+    } else {
+        let nest = w.spawn(&NEST, at);
+        if nest_size(index) > 1.0 {
+            w.set_scale(nest, nest_size(index));
+        }
     }
     let mut r = coats::world_rng(w);
     let Some(pool) = crate::evolution::pool_at(w, index, st.pos.to_array()) else { return false };
@@ -551,9 +652,15 @@ fn incubate(w: &World, id: u64, st: &EntityState) -> bool {
     let nest = in_nest(w, st.pos.to_array());
     // The air itself: wind chill is what a body loses, and an egg never falls below the air (B5).
     let air = base_api::air_at(w, st.pos.to_array(), 0.3, st.in_liquid != 0, vitals::temperature::FIRE_REACH, |_| {}).still;
-    // A bird's nest is brooded: held at a sitting parent's warmth.
+    // A bird's nest is brooded: held at a sitting parent's warmth. A fish's roe develops in the
+    // water, whatever its warmth.
     let brooded = animals_core::nests::site(SPECIES[index].name).is_some();
-    let step = match life::develops(life::egg_air_of(air, nest, brooded)) {
+    let develops = if SPECIES[index].in_water() {
+        life::roe_develops(st.in_liquid != 0)
+    } else {
+        life::develops(life::egg_air_of(air, nest, brooded))
+    };
+    let step = match develops {
         false => 0,
         true if nest => 40,
         true => 20,

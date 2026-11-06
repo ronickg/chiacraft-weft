@@ -169,6 +169,11 @@ fn fly(w: &World, id: u64, st: &EntityState, wings: &Wings) -> bool {
     let Some(mut f) = w.component(id, &STATE) else { return false };
     let smelled = scent(w, id, st);
     if !f.flying {
+        // A nestling stays in the nest: it neither flies nor flees until it is past a baby
+        // (Tester 2, 11-06: raven chicks hatched and flew off at once, the nest left empty).
+        if w.component(id, &crate::animal::ANIMAL).is_some_and(|a| a.stage == crate::animal::BABY) {
+            return false;
+        }
         if let Some(at) = smelled {
             weft_sdk::info!("bird {id} smells carrion {:.0} blocks off", dist2(at, st.pos).sqrt());
             return lift(w, id, st, wings, at);
