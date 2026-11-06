@@ -1683,6 +1683,32 @@ fn fs_lod_open(in: VOut) -> @location(0) vec4<f32> {
     return lod_color(in);
 }
 
+// The tiles reaching toward where distant terrain ends (the engine's `lod_end_pipe`, past
+// `END_FADE` of its reach): faded out over the last of it with a dither that moves each frame
+// (`scene.frame.w`; temporal anti-aliasing averages it into a blend), so what is drawn behind shows
+// through: the sky, or the cloud layer seen edge on. Distant Horizons fades its far edge into what
+// lies behind the same way (`dh_fade`). Handed over to a colour worked out here instead, the last
+// ridges stood about 20 brighter than the clouds behind them, flat cut-outs, whatever the colour
+// (Far view, the forest vista 06-12, 11-06). Desktop only: on a phone's tiled GPU a `discard`
+// costs the whole pass (Android keeps `fs_lod_open` there; measure on the Pixel first).
+const END_FADE_FROM: f32 = 0.85;
+
+@fragment
+fn fs_lod_end(in: VOut) -> @location(0) vec4<f32> {
+    let end = scene.params.y;
+    let f = smoothstep(END_FADE_FROM * end, end, length(in.rel.xz));
+    // Each pixel's threshold steps by the golden ratio a frame from its own place in the pattern,
+    // so the few frames temporal anti-aliasing keeps cover the thresholds evenly and average to `f`.
+    // (Thresholds drawn afresh each frame left about a tenth of noise in that average, which a
+    // scripted run, the same frames each time, showed as fixed dots at the fringe: Far view, 11-06.)
+    let p = floor(in.clip.xy);
+    let t = fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y) + 0.618034 * scene.frame.w);
+    if t < f {
+        discard;
+    }
+    return lod_color(in);
+}
+
 fn lod_color(in_lod: VOut) -> vec4<f32> {
     // What `vs_lod` always sets, set here again as constants: the compiler then drops the lighting
     // paths they rule out (block shaders, glow textures, placed lights, plants), which it cannot see
