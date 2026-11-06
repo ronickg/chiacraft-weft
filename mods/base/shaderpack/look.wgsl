@@ -1343,15 +1343,25 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let end = scene.params.y;
     // Straight down there is no level direction left: never a zero vector (its normalize is NaN,
     // and the Mac's fast math has no safety net).
-    let air = vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z);
-    let horizon = sky_color(normalize(air));
     // Aerial perspective: the air's own blue, the sky's a little above the horizon (about 6°, a
     // third of the way to the zenith's colour), not the horizon's pale band: veiled toward that, far
     // land went milky white and lost its contrast, where Bliss's goes a deep sky blue (Far view, the
     // Distant Horizons comparison, 11-05). It hands over to the horizon's colour where the terrain
     // ends, so the last ridges still meet the sky without a line, standing a little bluer than it.
-    let blue = sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 0.1, dir.z)));
-    let color = mix(blue, horizon, smoothstep(end * 0.55, end, dist));
+    // Each sky colour only where it counts: nearer than the handover (most of the land) the
+    // horizon's has no weight, and at the end the blue none, so neither is worked out there (the
+    // same colour; each is a dozen powers, Android port, 11-06).
+    let to_horizon = smoothstep(end * 0.55, end, dist);
+    let air = vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z);
+    var color: vec3<f32>;
+    if to_horizon <= 0.0 {
+        color = sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 0.1, dir.z)));
+    } else if to_horizon >= 1.0 {
+        color = sky_color(normalize(air));
+    } else {
+        let blue = sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 0.1, dir.z)));
+        color = mix(blue, sky_color(normalize(air)), to_horizon);
+    }
     let rain = rain_amount();
     // Thinner looking up at what is high, so hills stand out against a hazy valley (`haze_veil`).
     let veil = haze_veil(rel, dist);
