@@ -1449,10 +1449,13 @@ fn haze_veil(rel: vec3<f32>, dist: f32) -> vec3<f32> {
     // with the conditions: rain, the weather's fog, a forest's damp air, and a little always.
     let k = look_opt(OPT_HAZE, 1.6) * mix(0.45, 1.0, thin);
     // A third thicker than it was (Far view, 11-05: Bliss's far land is about two thirds sky-blue
-    // at 2000 blocks, ours was under 0.6): far land reads as far, the near stays as clear.
-    let rayleigh = vec3(0.35, 0.6, 1.0) * 3.4e-4 * k;
+    // at 2000 blocks, ours was under 0.6): far land reads as far, the near stays as clear. Back to
+    // as it was, and from further out (Far view, 11-06): in Bliss's own world its land and sea keep
+    // their green and blue far off under a thin blue line at the horizon, where ours went grey-white
+    // from mid distance (far band saturation 39 against 54) and its sea silver.
+    let rayleigh = vec3(0.35, 0.6, 1.0) * 2.55e-4 * k;
     let mie = (0.4e-4 + 2.0e-4 * scene.weather.z + 0.8e-4 * min(canopy(), 1.0)) * k;
-    let far = dist * smoothstep(90.0, 450.0, dist);
+    let far = dist * smoothstep(150.0, 700.0, dist);
     // Rain's own mist starts at the eye (Ronald, 11-05: "when raining shouldn't it be more
     // misty??"): rain alone a soft veil (a third gone at 100 blocks), a thunderstorm down to about
     // 150 (at twice that, a thunderstorm went white).
