@@ -312,8 +312,16 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
     let px = clamp(vec2<i32>(uv * pass_.size), vec2(0), size - vec2(1));
     if textureLoad(textures[pass_.depth], px, 0).r <= 0.0 {
         let y = luma(col);
-        let k = 1.0 + 0.3 * smoothstep(0.0, 0.15, scene.sun.y) * (1.0 - rain_amount());
+        // More as the sun climbs, where the land's saturation is taken down most (0.62 of it with a
+        // high sun, `finish_picture`): the sky kept its blue, which already read paler than Bliss's
+        // (mc_forest noon 22 against 31, 08:00 27 against 43).
+        let open = smoothstep(0.0, 0.15, scene.sun.y) * (1.0 - rain_amount());
+        let k = 1.0 + (0.3 + 0.6 * smoothstep(0.3, 0.75, scene.sun.y)) * open;
         col = max(vec3(y) + (col - vec3(y)) * k, vec3(0.0));
+        // And 15% dimmer by day: ours read brighter than Bliss's at every hour (mc_forest 08:00
+        // 216 against 208, noon 217 against 192, 17:00 193 against 171), more so with the day's
+        // brightening below.
+        col *= 1.0 - 0.15 * open;
     }
     if pass_.bloom != 0u {
         let glow = bloom_tap(pass_.bloom - 1u, uv);
@@ -330,8 +338,10 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
         let e = textureLoad(textures[pass_.exposure - 1u], vec2(0, 0), 0).g;
         if e == e && e > 0.0 {
             col *= pow(auto_exposure(e), fantasy_opt(OPT_AUTO_EXPOSURE));
-            // A high sun's land a little brighter (the noon land read 91-93 against Bliss's 113).
-            col *= mix(1.0, 1.25, smoothstep(0.5, 0.85, scene.sun.y) * (1.0 - rain_amount()));
+            // A high sun's land a little brighter (the noon land read 91-93 against Bliss's 113),
+            // from a sun about 12° up (at the like-for-like mc_forest vista the land read dark
+            // through the day: 08:00 78 against Bliss's 89, 17:00 81 against 113).
+            col *= mix(1.0, 1.25, smoothstep(0.2, 0.6, scene.sun.y) * (1.0 - rain_amount()));
         }
     }
     return col;

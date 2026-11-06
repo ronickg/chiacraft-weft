@@ -1732,7 +1732,10 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     // In the HDR world it follows the sun: 0.95 of it with the sun under about 17° (with the far
     // haze's gold, 1.12 overshot dawn: 222 against Bliss's 181), 0.78 of
     // it from about 48° (the match checkpoints: 08:00 100 and noon 89 against Bliss's 72 and 75).
-    let sat = 1.2 * look_opt(OPT_SATURATION, 1.0) * select(1.0, mix(0.95, 0.78, smoothstep(0.3, 0.75, scene.sun.y)), scene.frame.x > 0.5);
+    // With a high sun 0.62 (the like-for-like scene, Ley lines' mc_forest vista: at 0.78 the land
+    // measured 97-101 against Bliss's 72-75 at 08:00 and noon, with Minecraft's own textures and
+    // leaf colours as much: the grade's, not the art's; the sweep gr1 put 0.8 of it on Bliss's).
+    let sat = 1.2 * look_opt(OPT_SATURATION, 1.0) * select(1.0, mix(0.95, 0.62, smoothstep(0.3, 0.75, scene.sun.y)), scene.frame.x > 0.5);
     t = max(mix(vec3(y), t, mix(1.0, sat, day)), vec3(0.0));
     // A cool floor so the night is never pure black; by day black stays black.
     t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034) * (1.0 - day);
