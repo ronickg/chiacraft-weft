@@ -9,6 +9,7 @@ use gpu_allocator::MemoryLocation;
 use gpu_allocator::vulkan::{Allocation, AllocationCreateDesc, AllocationScheme, Allocator, AllocatorCreateDesc};
 use weft_render::*;
 
+mod rt;
 #[cfg(feature = "streamline")]
 mod streamline;
 mod upscale;
@@ -85,6 +86,7 @@ enum Deferred {
     Buffer(vk::Buffer, Allocation),
     Texture(vk::Image, vk::ImageView, Allocation, u32),
     Pipeline(vk::Pipeline, vk::PipelineLayout, vk::DescriptorSetLayout),
+    Accel(vk::AccelerationStructureKHR, vk::Buffer, Allocation),
 }
 
 /// Upload memory of one frame slot: a list of chunks filled in order. When a chunk is full the
@@ -199,6 +201,8 @@ pub struct VulkanBackend {
     submit_split: SubmitSplit,
     /// What `Cmd::Upscale` runs (`upscale.rs`); none without one (the game's own TAA then).
     upscaler: Option<Box<dyn upscale::Upscaler>>,
+    /// Ray queries and acceleration structures, where the device has them (`rt::wanted`).
+    rt: Option<rt::Rt>,
 }
 
 #[derive(Default)]
@@ -452,6 +456,7 @@ impl VulkanBackend {
                 .push_next(&mut has13);
             instance.get_physical_device_features2(pdev, &mut has);
             let base = has.features;
+            let has_bda = has12.buffer_device_address != vk::FALSE;
             let missing: Vec<&str> = [
                 ("multiDrawIndirect", base.multi_draw_indirect),
                 ("drawIndirectFirstInstance", base.draw_indirect_first_instance),
@@ -502,11 +507,6 @@ impl VulkanBackend {
             let mut f13 = vk::PhysicalDeviceVulkan13Features::default()
                 .dynamic_rendering(true)
                 .synchronization2(true);
-            let mut f2 = vk::PhysicalDeviceFeatures2::default()
-                .features(features)
-                .push_next(&mut f11)
-                .push_next(&mut f12)
-                .push_next(&mut f13);
             let has_ext = |name: &std::ffi::CStr| {
                 instance
                     .enumerate_device_extension_properties(pdev)
@@ -537,6 +537,37 @@ impl VulkanBackend {
                 log::info!("{device_name}: render targets without framebuffer compression");
             }
             let mut compression = vk::PhysicalDeviceImageCompressionControlFeaturesEXT::default().image_compression_control(no_compression);
+            // Ray queries (`rt.rs`): with push descriptors (the TLAS is pushed like the buffers),
+            // device addresses and both extensions, on the platforms `rt::wanted` allows.
+            let mut has_accel = vk::PhysicalDeviceAccelerationStructureFeaturesKHR::default();
+            let mut has_query = vk::PhysicalDeviceRayQueryFeaturesKHR::default();
+            let ray_query = rt::wanted()
+                && push
+                && has_bda
+                && has_ext(khr::acceleration_structure::NAME)
+                && has_ext(khr::ray_query::NAME)
+                && has_ext(khr::deferred_host_operations::NAME)
+                && {
+                    let mut f = vk::PhysicalDeviceFeatures2::default()
+                        .push_next(&mut has_accel)
+                        .push_next(&mut has_query);
+                    instance.get_physical_device_features2(pdev, &mut f);
+                    has_accel.acceleration_structure != vk::FALSE && has_query.ray_query != vk::FALSE
+                };
+            let mut accel_features = vk::PhysicalDeviceAccelerationStructureFeaturesKHR::default().acceleration_structure(true);
+            let mut query_features = vk::PhysicalDeviceRayQueryFeaturesKHR::default().ray_query(true);
+            if ray_query {
+                dev_exts.push(khr::acceleration_structure::NAME.as_ptr());
+                dev_exts.push(khr::ray_query::NAME.as_ptr());
+                dev_exts.push(khr::deferred_host_operations::NAME.as_ptr());
+                f12 = f12.buffer_device_address(true);
+                log::info!("{device_name}: ray queries");
+            }
+            let mut f2 = vk::PhysicalDeviceFeatures2::default()
+                .features(features)
+                .push_next(&mut f11)
+                .push_next(&mut f12)
+                .push_next(&mut f13);
             // A driver that has this extension requires it to be enabled.
             if has_ext(khr::portability_subset::NAME) {
                 dev_exts.push(khr::portability_subset::NAME.as_ptr());
@@ -545,16 +576,18 @@ impl VulkanBackend {
             let qinfo = [vk::DeviceQueueCreateInfo::default()
                 .queue_family_index(queue_family)
                 .queue_priorities(&prio)];
+            let mut device_info = vk::DeviceCreateInfo::default()
+                .queue_create_infos(&qinfo)
+                .enabled_extension_names(&dev_exts)
+                .push_next(&mut f2)
+                .push_next(&mut compression);
+            if ray_query {
+                device_info = device_info
+                    .push_next(&mut accel_features)
+                    .push_next(&mut query_features);
+            }
             let device = instance
-                .create_device(
-                    pdev,
-                    &vk::DeviceCreateInfo::default()
-                        .queue_create_infos(&qinfo)
-                        .enabled_extension_names(&dev_exts)
-                        .push_next(&mut f2)
-                        .push_next(&mut compression),
-                    None,
-                )
+                .create_device(pdev, &device_info, None)
                 .map_err(err("vkCreateDevice"))?;
             let queue = device.get_device_queue(queue_family, 0);
 
@@ -563,7 +596,7 @@ impl VulkanBackend {
                 device: device.clone(),
                 physical_device: pdev,
                 debug_settings: Default::default(),
-                buffer_device_address: false,
+                buffer_device_address: ray_query,
                 allocation_sizes: Default::default(),
             })
             .map_err(err("GPU allocator"))?;
@@ -768,7 +801,11 @@ impl VulkanBackend {
                 gpu_times: Vec::new(),
                 submit_split: SubmitSplit::default(),
                 upscaler: upscale::ready(early, pdev, desc.upscale_standin),
+                rt: None,
             };
+            if ray_query {
+                backend.rt = Some(rt::Rt::new(&backend.instance, &backend.device, backend.pdev)?);
+            }
             backend.recreate_swapchain()?;
             Ok(backend)
         }
@@ -1124,6 +1161,7 @@ impl VulkanBackend {
         for d in deferred {
             self.destroy_now(d);
         }
+        self.rt_slot_ready();
     }
 
     /// Frees `d` once the GPU is done with it: after the next wait on this slot's fence. That wait
@@ -1156,6 +1194,7 @@ impl VulkanBackend {
                     self.device.destroy_pipeline_layout(l, None);
                     self.device.destroy_descriptor_set_layout(s, None);
                 }
+                Deferred::Accel(raw, buffer, alloc) => self.destroy_accel_now(raw, buffer, alloc),
             }
         }
     }
@@ -1848,6 +1887,7 @@ impl VulkanBackend {
             .map(|&(b, kind)| {
                 let ty = match kind {
                     BufferKind::Uniform => vk::DescriptorType::UNIFORM_BUFFER,
+                    BufferKind::Accel => vk::DescriptorType::ACCELERATION_STRUCTURE_KHR,
                     _ => vk::DescriptorType::STORAGE_BUFFER,
                 };
                 (b, ty)
@@ -1988,6 +2028,9 @@ impl Backend for VulkanBackend {
         }
         if usage & usage::UNIFORM != 0 {
             flags |= vk::BufferUsageFlags::UNIFORM_BUFFER;
+        }
+        if usage & usage::ACCEL_INPUT != 0 && self.rt.is_some() {
+            flags |= vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS;
         }
         let location = if usage & usage::READBACK != 0 {
             MemoryLocation::GpuToCpu
@@ -2255,6 +2298,36 @@ impl Backend for VulkanBackend {
         }
     }
 
+    fn ray_query(&self) -> bool {
+        self.rt.is_some()
+    }
+
+    fn create_blas(&mut self, geometries: &[BlasGeometry], label: &str) -> AccelId {
+        self.rt_create_blas(geometries, label)
+    }
+
+    fn create_tlas(&mut self, max_instances: u32, label: &str) -> AccelId {
+        self.rt_create_tlas(max_instances, label)
+    }
+
+    fn set_tlas_instances(&mut self, tlas: AccelId, instances: &[TlasInstance]) {
+        self.rt_set_instances(tlas, instances);
+    }
+
+    fn destroy_accel(&mut self, accel: AccelId) {
+        if self.rt.is_some() {
+            self.rt_destroy(accel);
+        }
+    }
+
+    fn accel_memory(&self) -> u64 {
+        self.rt.as_ref().map_or(0, |rt| rt.memory)
+    }
+
+    fn accel_generation(&self) -> u64 {
+        self.rt.as_ref().map_or(0, |rt| rt.generation)
+    }
+
     fn begin_frame(&mut self) -> Option<FrameInfo> {
         // Between `surface_lost` and `surface_restored` (the app in the background on Android).
         if self.surface == vk::SurfaceKHR::null() {
@@ -2318,6 +2391,7 @@ impl Backend for VulkanBackend {
             self.device
                 .cmd_write_timestamp2(cmd, vk::PipelineStageFlags2::TOP_OF_PIPE, self.queries, first_query);
             self.record_uploads(cmd);
+            self.rt_record_start(cmd);
             self.device
                 .cmd_write_timestamp2(cmd, vk::PipelineStageFlags2::ALL_COMMANDS, self.queries, first_query + 1);
             let mut marks = 2;
@@ -2365,7 +2439,17 @@ impl Backend for VulkanBackend {
             } else {
                 &list.cmds
             };
+            // Consecutive BLAS builds, recorded as one batch (`rt_build_blases`).
+            let mut blas_batch: Vec<u32> = Vec::new();
             for cmd_item in cmds {
+                if let Cmd::BuildBlas(a) = *cmd_item {
+                    blas_batch.push(a.0);
+                    continue;
+                }
+                if !blas_batch.is_empty() {
+                    self.rt_build_blases(cmd, &blas_batch);
+                    blas_batch.clear();
+                }
                 match *cmd_item {
                     Cmd::BeginPass { color, depth, motion } => {
                         let mut extent = sc_extent;
@@ -2624,6 +2708,25 @@ impl Backend for VulkanBackend {
                     }
                     // Expanded into an end and a begin above.
                     Cmd::PassBreak => {}
+                    // Batched above.
+                    Cmd::BuildBlas(_) => {}
+                    Cmd::BuildTlas(a) => self.rt_build_tlas(cmd, a.0),
+                    Cmd::BindAccel { binding, accel } => {
+                        let (Some(p), Some(push_fn)) = (current, &self.push_fn) else { continue };
+                        let pl = self.pipelines.get(p);
+                        if !pl.buffers.iter().any(|b| b.0 == binding) {
+                            continue;
+                        }
+                        let Some(raw) = self.rt_tlas_raw(accel.0) else { continue };
+                        let raws = [raw];
+                        let mut accel_write = vk::WriteDescriptorSetAccelerationStructureKHR::default().acceleration_structures(&raws);
+                        let write = vk::WriteDescriptorSet::default()
+                            .dst_binding(binding)
+                            .descriptor_type(vk::DescriptorType::ACCELERATION_STRUCTURE_KHR)
+                            .descriptor_count(1)
+                            .push_next(&mut accel_write);
+                        push_fn.cmd_push_descriptor_set(cmd, pl.bind_point, pl.layout, 1, &[write]);
+                    }
                     Cmd::Mark => {
                         if marks < MAX_MARKS - 1 {
                             self.device
@@ -2634,6 +2737,9 @@ impl Backend for VulkanBackend {
                 }
             }
 
+            if !blas_batch.is_empty() {
+                self.rt_build_blases(cmd, &blas_batch);
+            }
             let old = self.swapchain.as_ref().unwrap().layouts[image_index as usize];
             if self.capture_requested {
                 self.capture_requested = false;
@@ -2799,6 +2905,7 @@ impl Drop for VulkanBackend {
                 self.device.destroy_semaphore(f.acquired, None);
                 self.device.destroy_fence(f.fence, None);
             }
+            self.rt_drop();
             self.device.destroy_query_pool(self.queries, None);
             self.device
                 .destroy_pipeline_cache(self.pipeline_cache, None);

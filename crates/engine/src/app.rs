@@ -573,7 +573,11 @@ impl App {
         let depth = make_depth(&mut *gpu, size.width, size.height);
         let gpu_name = gpu.device_name().to_string();
         // What the GPU is, for mods (`core:gpu_*`): as found, whatever a file says.
-        for (name, v) in [("core:gpu_class", gpu.device_class() as f64), ("core:gpu_memory_mb", gpu.device_memory_mb() as f64)] {
+        for (name, v) in [
+            ("core:gpu_class", gpu.device_class() as f64),
+            ("core:gpu_memory_mb", gpu.device_memory_mb() as f64),
+            ("core:gpu_ray_query", gpu.ray_query() as u8 as f64),
+        ] {
             if let Some(id) = crate::config::by_name(name) {
                 crate::config::put(id, v);
             }
@@ -3281,6 +3285,13 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         drop(s);
         let s = crate::diag::span("wires and sun");
         g.client.update_wires(&mut *r.gpu, &r.textures);
+        // `core:rt_shadows` changed: the world shader composed again, tracing or not, before
+        // anything of this frame is drawn with it.
+        if g.client.rt_switch(&mut *r.gpu) {
+            g.client
+                .render
+                .reload_shaders(&mut *r.gpu, &r.textures, &r.assets);
+        }
         // The sun's light for shadow maps (packs that use them), which the world's scene samples.
         g.client.prepare_shadows(&mut *r.gpu);
         // A copy of the world for what is seen through it (`water_behind` packs, with post on).
@@ -3314,6 +3325,7 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         let s = crate::diag::span("shadows");
         g.client
             .render_shadows(&mut *r.gpu, &mut r.list, world_info);
+
         // The mist's volume, which reads the shadow maps, before the world that reads it.
         r.list.append(&mut g.client.sky.froxels.passes);
         drop(s);
