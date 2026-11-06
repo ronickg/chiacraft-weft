@@ -341,14 +341,18 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
         // edge along the far land's outline showed (mc_forest noon, gr5).
         let wv = scene.inv_view_proj * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, 1.0, 1.0);
         let up = smoothstep(0.03, 0.3, normalize(wv.xyz / wv.w).y);
-        let k = 1.0 + (0.3 + 0.8 * smoothstep(0.3, 0.75, scene.sun.y)) * open * up;
+        // Most in the morning, less at noon: with the clouds counted as sky the noon blue between
+        // them went to saturation 75 against Bliss's 48 and the clouds' shaded bellies steel blue,
+        // while 08:00's stayed 35 against 45 (skf).
+        let k = 1.0 + (1.3 - 0.9 * smoothstep(0.45, 0.8, scene.sun.y)) * open * up;
         col = max(vec3(y) + (col - vec3(y)) * k, vec3(0.0));
         // And dimmer by day: ours read brighter than Bliss's at every hour (mc_forest 08:00
         // 216 against 208, noon 217 against 192, 17:00 193 against 171). The day's brightening
         // below leaves it out (on it too, the 08:00 sky went to 224, gr2).
         // (30%: at 15% the sky, mostly bright cloud on the curve's shoulder, barely moved, noon 216
         // to 213, gr3.)
-        col *= 1.0 - 0.3 * open;
+        // (25%: with the clouds dimmed too, 30% took the blue between them to 155 against 172, skf.)
+        col *= 1.0 - 0.25 * open;
     }
     if pass_.bloom != 0u {
         let glow = bloom_tap(pass_.bloom - 1u, uv);
