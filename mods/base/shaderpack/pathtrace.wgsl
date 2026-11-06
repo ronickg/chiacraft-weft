@@ -247,6 +247,12 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     let dist = length(rel);
     // The far land keeps the world's own light (traced shadows hand it to the far map from 256
     // blocks too): its rays are the dearest and its detail the least.
+    // Debug 7: the picture, with a line where the traced land ends.
+    if pt.debug == 7u && abs(dist - PT_REACH) < 1.5 {
+        pt_out[at] = vec4(1.0, 0.0, 1.0, 0.0);
+        pt_out[at + 2u] = vec4(0.0, 0.0, 0.0, 2.0);
+        return;
+    }
     if dist > PT_REACH {
         return;
     }
@@ -337,7 +343,13 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         let gloss = 1.0 - clamp(a * 1.6, 0.0, 0.85);
         specular = (pt_schlick(f0, nv) * env * gloss * horizon + shine) / max(s_alb, vec3(1e-3));
     }
-    if pt.debug != 0u {
+    // Toward the edge, the world's own light (the lightmap's sky, no bounce) takes over, so the land
+    // past `PT_REACH` follows on without a step: traced, the near land is darker and greener than
+    // the world draws it (pt-denoisers' spot C check, 11-06).
+    let edge = smoothstep(PT_REACH * 0.75, PT_REACH, dist);
+    diffuse = mix(diffuse, lit, edge);
+    specular *= 1.0 - edge;
+    if pt.debug != 0u && pt.debug != 7u {
         var out = vec3(0.0);
         switch pt.debug {
             case 1u: { out = albedo; }

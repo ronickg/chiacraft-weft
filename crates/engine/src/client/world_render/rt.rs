@@ -422,7 +422,8 @@ impl WorldRenderer {
     /// denoisers. With `denoised` the composite leaves the light out of `target` (what lies under it,
     /// the air's share, is written): a denoiser adds it. Nothing without the traced scene, the pack's
     /// path tracer and the G-buffer. `debug`: 0 the picture, 1 albedo, 2 normals, 3 direct light,
-    /// 4 the bounce, 5 the specular light, 6 the radiance cache.
+    /// 4 the bounce, 5 the specular light, 6 the radiance cache, 7 the picture with a line where
+    /// tracing ends.
     #[allow(clippy::too_many_arguments)]
     pub fn path_trace(
         &mut self,
