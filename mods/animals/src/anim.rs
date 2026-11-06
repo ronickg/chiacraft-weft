@@ -368,9 +368,9 @@ fn expire_(w: &World, id: u64) -> Option<[u64; 4]> {
 /// (`idle_act`; whichever clips its species has).
 fn idle_life(w: &World, id: u64, h: [u64; 4]) {
     let now = w.game_time();
-    if !(now + id).is_multiple_of(20) {
-        return;
-    }
+    // No `(now + id) % 20` gate: under the AI's level of detail its upkeep skips ticks in a
+    // rhythm, and some animals never met that tick (a PC look: one idle moment in five minutes
+    // among seven deer). `IDLE_NEXT` spaces them out by itself.
     if h[IDLE_NEXT] == 0 {
         // Not yet timed: its first in a while, so a herd met together doesn't move as one.
         edit(w, id, |c| c[IDLE_NEXT] = now + IDLE_EVERY + w.random_below(IDLE_EVERY as u32) as u64);
