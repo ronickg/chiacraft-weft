@@ -373,6 +373,11 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
     // Bliss's at every hour and harder lit (mc_forest cloud luma noon 228 against 201, 17:00 208
     // against 176; their spread 20 against 15, 19 against 7). Bliss's read as soft cream masses.
     var sun = p.sun * strength * (1.0 - s.axes[0].y * 0.55) * cloud_sun_tint() * select(1.0, CLOUD_SUN_HDR, scene.frame.x > 0.5);
+    // In the HDR world moonlit clouds a dim grey, not white: Bliss's night clouds are dark grey
+    // against its blue sky, ours stood bright white over the dark land (PC shnt0, 11-06).
+    if scene.frame.x > 0.5 {
+        sun *= mix(1.0, 0.4, smoothstep(-0.12, -0.3, scene.sun.y));
+    }
     // In the HDR world, clouds seen away from a low sun take its light pale cream, not orange: Bliss's
     // clouds at 17:00-18:00 with the sun behind the camera are cream with grey bellies where ours
     // went strong orange; toward the sun they keep its gold (its 06:00 clouds, facing the sun).

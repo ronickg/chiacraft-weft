@@ -1883,6 +1883,16 @@ fn exposure() -> f32 {
 // finishes (`finish_picture`, in this pack's post.wgsl); into the screen, finished here as always.
 fn display(c: vec3<f32>) -> vec3<f32> {
     if scene.frame.x > 0.5 {
+        // At night the dim world seen blue, at its own brightness (the eye's night sight): Bliss's
+        // moonlit land is a deep blue (22:00 sRGB 31 63 134, saturation about 200-250) where ours
+        // stood a neutral green-black (18 27 26, about 100), its sky a grey-blue (Bliss's world, mist
+        // off, PC shnt0, 11-06). Only the dim: a torch's light keeps its warmth, and the night
+        // stays as dark as made.
+        let night = smoothstep(-0.12, -0.3, scene.sun.y) * (1.0 - smoothstep(0.04, 0.3, luma(c)));
+        if night > 0.0 {
+            let blue = vec3(0.3, 0.6, 1.3);
+            return max(mix(c, blue * (luma(c) / luma(blue)), night * 0.75), vec3(0.0));
+        }
         return max(c, vec3(0.0));
     }
     return finish_picture(c);
