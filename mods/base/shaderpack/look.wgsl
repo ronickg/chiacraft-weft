@@ -211,7 +211,12 @@ fn palette_made() -> Palette {
     let warm = key(vec3(0.13, 0.27, 0.66), vec3(0.54, 0.53, 0.62), vec3(1.0, 0.68, 0.38), vec3(1.0, 0.68, 0.38) * 2.0 * look_opt(OPT_SUN, 1.0), mix(fill_hue, vec3(1.0, 0.9, 0.85), 0.25) * 0.3 * look_opt(OPT_FILL, 1.0));
     var p: Palette;
     if e > 0.4 {
-        p = blend(warm, day, smoothstep(0.4, 0.78, e));
+        // A gentle warmth through mid-morning and mid-afternoon, clear only about noon (the MC
+        // comparison's spring 8 sheets, 11-05: Bliss's land stays warmer than its noon to 10:00,
+        // ours was full day by 10:00). On the equinox's leaned path sun.y is 0.55 at 08:00, 0.76 at
+        // 10:00, 0.82 at noon: a little warm left at 10:00 and 14:00, none at noon.
+        // (It was smoothstep(0.4, 0.78): all day from about 09:30.)
+        p = blend(warm, day, smoothstep(0.4, 0.86, e));
     } else if e > 0.08 {
         p = blend(golden, warm, smoothstep(0.08, 0.34, min(e, 0.34)));
     } else if e > -0.02 {
