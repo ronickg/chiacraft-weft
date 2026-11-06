@@ -368,6 +368,16 @@ fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32>
     // and tropical leaves keep their own colours), so near and far tops light alike (Far view).
     let crown = in.kind.y == 1u && in.kind.w != 0u;
     if (in.kind.x == TINT_FOLIAGE || in.kind.z != 0u || crown) && scene.frame.x > 0.5 {
+        // More sun on the leaves' lit faces (`base:look_leaf_sun`, 2): our crowns' tops sat dull
+        // beside Bliss's (light-range sweep lr1, 11-06: x2 took the canopy's roughness at 150
+        // blocks 7.6/11.7 to 8.9/13.8; x3 no further, the curve rolls it off; darker shaded faces
+        // took it down, not up).
+        let k_sun = look_opt(OPT_LEAF_SUN, 1.0);
+        if k_sun != 1.0 {
+            let c_open = min(canopy(), 1.0);
+            let open = smoothstep(mix(0.5, 0.25, c_open), mix(0.95, 0.55, c_open), in.light.x);
+            light += paint * palette().sun * light_strength() * sun_facing(n) * shadow * open * (k_sun - 1.0);
+        }
         return light + paint * palette().sun * leaf_through(in.rel, shadow, in.light.x);
     }
     if in.kind.x == TINT_FOLIAGE || in.kind.z != 0u {
@@ -852,13 +862,29 @@ fn fs_cutout(in: VOut) -> @location(0) vec4<f32> {
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     var albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
-    if albedo.a <= 0.1 {
+    if albedo.a <= cutout_edge(in, nuv, du, dv) {
         discard;
     }
     if in.kind.z == 0u {
         albedo = far_flat(in, albedo);
     }
     return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
+}
+
+// Where a cutout's texel is cut: at alpha 0.1, but in the HDR world a leaf cube (a cutout cube:
+// leaves, `kind.z` 0) keeps its see-through holes at a distance, as Minecraft's 16 px leaves do
+// under its 0.5 test (`cutout_mipped`): its alpha one mip sharper, cut at 0.5. Our 32 px leaves'
+// mips average the holes away a level sooner, and at the 0.1 test from about 50 blocks every crown
+// was a solid mat, where Bliss's stay speckled through to the dark inside (Trees' roughness gap,
+// 11-06). `base:look_leaf_holes` 0 the old cut.
+fn cutout_edge(in: VOut, nuv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> f32 {
+    if scene.frame.x < 0.5 || in.kind.z != 0u || fantasy_opt(OPT_LEAF_HOLES) < 0.5 {
+        return 0.1;
+    }
+    let lod = max(log2(max(min(length(du * in.size), length(dv * in.size)), 1e-6)), 0.0);
+    let a = textureSampleLevel(textures[in.layer], linear_mipped, nuv, max(lod - 1.0, 0.0)).a;
+    // The cut moved instead of the alpha: the same test, the sharper mip's alpha against 0.5.
+    return select(1.0, -1.0, a > 0.5);
 }
 
 // Where the cubes end, they fade into distant terrain over this many blocks (as the engine's
@@ -898,7 +924,7 @@ fn fs_cutout_fade(in: VOut) -> @location(0) vec4<f32> {
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     let albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
-    if albedo.a <= 0.1 {
+    if albedo.a <= cutout_edge(in, nuv, du, dv) {
         discard;
     }
     return vec4(shade(in, albedo).rgb, SOLID_ALPHA);

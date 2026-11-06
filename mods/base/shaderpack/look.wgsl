@@ -77,6 +77,10 @@ const OPT_WHITE: u32 = 27u;
 const OPT_AO_TEST: u32 = 28u;
 // The HDR world's sharpening (`base:look_sharpen`, 0 none to 1; 0.4 by default, Bliss's).
 const OPT_SHARPEN: u32 = 29u;
+// The canopy (HDR): the sun on leaves' lit faces (`base:look_leaf_sun`, 2) and their holes kept at
+// a distance (`base:look_leaf_holes`, read raw: 1 on, 0 off).
+const OPT_LEAF_SUN: u32 = 30u;
+const OPT_LEAF_HOLES: u32 = 31u;
 
 // The colour a grass or leaf tint is multiplied by for the foliage test: 1 as made.
 fn foliage_test() -> vec3<f32> {
