@@ -1063,6 +1063,18 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
     if lod_hidden(in) && !faded(in) {
         discard;
     }
+    return lod_color(in);
+}
+
+// The tiles wholly outside the cubes' mask (the engine's `lod_open_pipe`): `fs_lod` without its
+// discard, which never happens there. A tiled GPU then keeps hidden-surface removal for the far
+// land: on the Pixel 10 (PowerVR) the discard alone cost a third of the world pass at the vista.
+@fragment
+fn fs_lod_open(in: VOut) -> @location(0) vec4<f32> {
+    return lod_color(in);
+}
+
+fn lod_color(in: VOut) -> vec4<f32> {
     // A texture per block, laid from the world position on the face's plane (top
     // faces and gentle slopes by x and z, walls by their side and height, up the right way), its
     // gradients from that unbroken position so block borders don't jump to a coarse mip. Far off

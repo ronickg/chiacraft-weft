@@ -4,7 +4,7 @@
 //! by its pose (an offset per structure, `origin.w` in the shader): a block placed on one
 //! remeshes only its cube.
 
-use glam::{DVec3, IVec3, Mat4, Vec3, Vec4};
+use glam::{DVec3, IVec2, IVec3, Mat4, Vec3, Vec4};
 use rayon::prelude::*;
 use rustc_hash::FxHashMap;
 use weft_render::*;
@@ -342,6 +342,11 @@ pub struct WorldRenderer {
     face_pipes: [PipelineId; 3],
     quad_pipes: [PipelineId; 3],
     lod_pipe: PipelineId,
+    /// Distant terrain's tiles that lie wholly outside the cubes' mask (`lod_half`), when the pack's
+    /// `world.wgsl` has `fs_lod_open`: no `discard`, which can't happen there anyway, so a tiled GPU
+    /// keeps its hidden-surface removal for them (Android port: on the Pixel 10's PowerVR the
+    /// discard alone cost a third of the world pass at the vista).
+    lod_open_pipe: Option<PipelineId>,
     /// Faces opaque, cutout, translucent, then quads the same, for the cubes near where they end,
     /// when the pack's `world.wgsl` has `fs_opaque_fade`: dithered away toward `lod_fade`, distant
     /// terrain taking the pixels they leave (Distant Horizons' fade), so the edge isn't a line.
@@ -469,6 +474,7 @@ impl WorldRenderer {
         let (shader, slots) = world_shader(assets).map_err(|e| e.0)?;
         let (face_pipes, quad_pipes, lod_pipe) = Self::pipelines(gpu, &shader)?;
         let fade_pipes = Self::fade_pipelines(gpu, &shader);
+        let lod_open_pipe = Self::lod_open_pipeline(gpu, &shader);
         let shadow_pipes = Self::shadow_pipelines(gpu, &shader);
         let lod_shadow_pipe = Self::lod_shadow_pipeline(gpu, &shader, shadow_pipes.is_some());
         let tex_shader = shader_table(gpu, c, textures, &slots);
@@ -510,6 +516,7 @@ impl WorldRenderer {
             face_pipes,
             quad_pipes,
             lod_pipe,
+            lod_open_pipe,
             fade_pipes,
             lod_fade: 0,
             lod: FxHashMap::default(),
@@ -607,6 +614,26 @@ impl WorldRenderer {
         ];
         let lod = make("distant terrain", "vs_lod", "fs_lod", depth_write, Blend::None, true)?;
         Ok((faces, quads, lod))
+    }
+
+    /// `lod_open_pipe`: None when the pack lacks `fs_lod_open`, or it fails.
+    fn lod_open_pipeline(gpu: &mut dyn Backend, shader: &Shader) -> Option<PipelineId> {
+        if !crate::packs::pack_uses("world.wgsl", "fs_lod_open") {
+            return None;
+        }
+        gpu.create_pipeline(&PipelineDesc {
+            label: "distant terrain open",
+            shader,
+            vertex: "vs_lod",
+            fragment: Some("fs_lod_open"),
+            color: Some(crate::post::world_format()),
+            depth: Some(DepthState { write: true, compare: Compare::GreaterEqual }),
+            blend: Blend::None,
+            cull_back: true,
+            topology: Topology::Triangles,
+        })
+        .map_err(|e| log::error!("world shader fs_lod_open: {}", e.0))
+        .ok()
     }
 
     /// `fade_pipes`: None when the pack lacks `fs_opaque_fade`, `fs_cutout_fade` or
@@ -937,12 +964,14 @@ impl WorldRenderer {
                     .into_iter()
                     .flatten()
                     .chain(self.lod_shadow_pipe.take())
+                    .chain(self.lod_open_pipe.take())
                     .chain(self.fade_pipes.take().into_iter().flatten())
                 {
                     gpu.destroy_pipeline(p);
                 }
                 if let Ok((s, _)) = world_shader(assets) {
                     self.fade_pipes = Self::fade_pipelines(gpu, &s);
+                    self.lod_open_pipe = Self::lod_open_pipeline(gpu, &s);
                     self.shadow_pipes = Self::shadow_pipelines(gpu, &s);
                     self.lod_shadow_pipe = Self::lod_shadow_pipeline(gpu, &s, self.shadow_pipes.is_some());
                     self.terrain_epoch += 1;
@@ -1056,6 +1085,7 @@ impl WorldRenderer {
             .chain([self.lod_pipe])
             .chain(self.shadow_pipes.take().into_iter().flatten())
             .chain(self.lod_shadow_pipe.take())
+            .chain(self.lod_open_pipe.take())
             .chain(self.fade_pipes.take().into_iter().flatten())
         {
             gpu.destroy_pipeline(p);
@@ -1532,7 +1562,13 @@ impl WorldRenderer {
         // `sort_translucent` has seen to it.
         trans.par_sort_unstable_by_key(|d| std::cmp::Reverse(d.5.length_squared().to_bits()));
 
-        // Distant terrain after the cubes (nearer, they hide most of it), a run per page.
+        // Distant terrain after the cubes (nearer, they hide most of it), a run per page: the tiles
+        // that reach into the cubes' mask first (kind 3), then the rest without its discard (kind 6,
+        // `lod_open_pipe`). A column a tile's edge walls stand on may be the next one: a column's
+        // margin.
+        let open = self.lod_open_pipe.is_some();
+        let mask_half = self.lod_half as i32 + 1;
+        let cam_col = IVec2::new(cam_cube.x, cam_cube.z);
         let mut lod: Vec<DrawRecord> = self
             .lod_draw
             .iter()
@@ -1554,10 +1590,16 @@ impl WorldRenderer {
                     vertex_offset: ((a.offset + skip) * 4) as i32,
                     first_instance: 0,
                 };
-                Some((3, 0, a.page, args, [o.x / 16 - cam_cube.x, -cam_cube.y, o.y / 16 - cam_cube.z, 0], center))
+                let cols = (
+                    o.div_euclid(IVec2::splat(16)) - cam_col,
+                    (o + IVec2::splat(key.size() - 1)).div_euclid(IVec2::splat(16)) - cam_col,
+                );
+                let masked = cols.0.x <= mask_half && cols.1.x >= -mask_half && cols.0.y <= mask_half && cols.1.y >= -mask_half;
+                let kind = if open && !masked { 6 } else { 3 };
+                Some((kind, 0, a.page, args, [o.x / 16 - cam_cube.x, -cam_cube.y, o.y / 16 - cam_cube.z, 0], center))
             })
             .collect();
-        lod.sort_by_key(|d| (d.2, d.5.length_squared().to_bits()));
+        lod.sort_by_key(|d| (d.0, d.2, d.5.length_squared().to_bits()));
         let lods = lod.len() as u32;
         let n = opaque + lods + trans.len() as u32;
         let (gpu_draws, gpu_faces) = self.table.drawn_last(gpu, frame.slot);
@@ -1636,8 +1678,8 @@ impl WorldRenderer {
         }
         for (j, d) in lod.iter().enumerate() {
             match runs.last_mut() {
-                Some(r) if r.0 == 3 && r.2 == d.2 => r.4 += 1,
-                _ => runs.push((3, 0, d.2, opaque + j as u32, 1)),
+                Some(r) if r.0 == d.0 && r.2 == d.2 => r.4 += 1,
+                _ => runs.push((d.0, 0, d.2, opaque + j as u32, 1)),
             }
         }
         self.translucent = runs.len();
@@ -1765,6 +1807,7 @@ impl WorldRenderer {
         match (kind, self.fade_pipes) {
             (0, _) => (self.face_pipes[layer as usize], self.faces.pages[page as usize].0),
             (3, _) => (self.lod_pipe, self.faces.pages[page as usize].0),
+            (6, _) => (self.lod_open_pipe.unwrap_or(self.lod_pipe), self.faces.pages[page as usize].0),
             (4, Some(f)) => (f[layer as usize], self.faces.pages[page as usize].0),
             (5, Some(f)) => (f[3 + layer as usize], self.quads.pages[page as usize].0),
             (4, None) => (self.face_pipes[layer as usize], self.faces.pages[page as usize].0),
