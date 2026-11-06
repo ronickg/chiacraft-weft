@@ -209,8 +209,19 @@ fn palette_now() -> Palette {
         let day = smoothstep(-0.05, 0.05, scene.sun.y);
         p.sun = mix(p.sun, hue * (luma(p.sun) / max(luma(hue), 1e-4)), day);
     }
+    // In the HDR world the twilight's light grows as the sun nears the horizon, as real twilight's
+    // does (about tenfold over its last few degrees): the dusk key held one level from 8 degrees
+    // under to 1, so 05:00 was as dark as 04:00 (land sRGB 25 24 30 where Bliss's is 32 70 125,
+    // its 04:00 dark; Mist's m11 sheet, 11-06). Dimmer at the night's end, brighter at the sun's.
+    if scene.frame.x > 0.5 {
+        let twilight = smoothstep(-0.3, -0.14, scene.sun.y) * (1.0 - smoothstep(-0.02, 0.06, scene.sun.y));
+        p.ambient *= mix(1.0, mix(0.7, TWILIGHT_RISE, smoothstep(-0.16, -0.02, scene.sun.y)), twilight);
+    }
     return p;
 }
+
+// How much brighter the twilight's sky light is just before the sun is up than as the dusk key made it.
+const TWILIGHT_RISE: f32 = 2.6;
 
 // A 4300 K blackbody in linear light, red 1 (Bliss's `blackbody` at Ronald's Sun_temp, computed in
 // the crew's bliss-source notes: linear 1.0 0.668 0.426).
@@ -1953,7 +1964,16 @@ fn display(c: vec3<f32>) -> vec3<f32> {
         // stays as dark as made.
         // Only the sky's and moon's share of a surface's light (`NIGHT_SKY_SHARE`): a lamp's keeps
         // its warmth in a dark room as outdoors.
-        let night = smoothstep(-0.12, -0.3, scene.sun.y) * (1.0 - smoothstep(0.04, 0.3, luma(c))) * NIGHT_SKY_SHARE;
+        // By how dim the world's light is, not by the hour, as Bliss's rods (its Purkinje: strong
+        // when the view is dark, on its dim pixels): the night and the blue hour before sunrise and
+        // after sunset alike, gone as the sun's light comes. Bliss's 05:00 land is a deep blue (sRGB
+        // 32 70 125, warmth -93), ours stood grey-violet (25 24 30) with the sun 3 degrees under, past
+        // this blue's old gate at 7 (sun.y -0.12; Mist's m11 sheet, 11-06). And how dim a pixel is
+        // as seen, at the exposure it is taken at (at night's 4.0 as before).
+        let p = palette();
+        let world = 1.0 - smoothstep(0.08, 0.3, luma(p.ambient) + 0.5 * luma(p.sun));
+        let seen = luma(c) * exposure() / 4.0;
+        let night = world * (1.0 - smoothstep(0.04, 0.3, seen)) * NIGHT_SKY_SHARE;
         if night > 0.0 {
             // (N2: deeper and all the way: at 0.3 0.6 1.3 and three quarters the land's saturation rose
             // only from about 100 to 140, the curve taking some back; Bliss's is 200-250, PC shnt1.)
