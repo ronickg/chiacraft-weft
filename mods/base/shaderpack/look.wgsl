@@ -722,6 +722,17 @@ fn shadow_in(m: mat4x4<f32>, info: vec4<f32>, round: f32, depth: f32, rel: vec3<
 // smoothly; x 1 lit to 0 in shadow, y how far to trust it.
 fn shadow_at(rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
     let near = shadow_in(scene.shadow_view_proj, scene.shadow, 80.0, 400.0, rel, n, false);
+    // With traced shadows (`scene.rt`) the near map holds the models alone and the far one the
+    // terrain: what doesn't trace (mobs, the mist) takes the darker of both.
+    if scene.rt.x > 0.5 {
+        let far_reach = max(scene.shadow_far.w * scene.shadow_far.y * 0.5, 1.0);
+        let far = shadow_in(scene.shadow_far_view_proj, scene.shadow_far, far_reach, far_reach * 3.0, rel, n, length(rel) > 250.0);
+        let trust = max(near.y, far.y);
+        if trust <= 0.0 {
+            return vec2(1.0, 0.0);
+        }
+        return vec2(min(mix(1.0, near.x, near.y), mix(1.0, far.x, far.y)), far.y);
+    }
     if near.y >= 0.999 {
         return near;
     }
@@ -734,6 +745,13 @@ fn shadow_at(rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
         return vec2(1.0, 0.0);
     }
     return vec2(mix(far.x, near.x, near.y / trust), trust);
+}
+
+// With traced shadows (`scene.rt`): the shade of the models (mobs, the player) at `rel` facing
+// `n`, from the near map that then holds them alone; 1 out of it.
+fn models_shadow(rel: vec3<f32>, n: vec3<f32>) -> f32 {
+    let m = shadow_in(scene.shadow_view_proj, scene.shadow, 80.0, 400.0, rel, n, false);
+    return mix(1.0, m.x, m.y);
 }
 
 // The sun on a mob or a model at `rel` facing `n` with sky light `sky`: the shadow map where it
@@ -1874,7 +1892,12 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     // evening the land at 17:00 and 18:00 measured 139-153 of saturation against Bliss's 56-84
     // (mc_forest, gr4), where Bliss's misty mornings run 181.
     let low_sat = mix(0.75, 0.95, smoothstep(0.02, 0.1, scene.weather.z));
-    let sat = 1.2 * look_opt(OPT_SATURATION, 1.0) * select(1.0, mix(low_sat, 0.62, smoothstep(0.3, 0.75, scene.sun.y)), scene.frame.x > 0.5);
+    // In Bliss's own world (imported block for block) the land with the sun 30-55° up came out
+    // grey-green at the cut tuned on the test world (0.62 at noon): land saturation 52 against
+    // Bliss's 72 at 08:00, 61 against 92 at noon, where 17:00 matched (75 against 83). A quarter
+    // more there (the canopy sweep cs1: x1.25 took 08:00 to 67, noon to 78), as it was with the sun
+    // under about 20°.
+    let sat = 1.2 * look_opt(OPT_SATURATION, 1.0) * select(1.0, mix(low_sat, 0.85, smoothstep(0.38, 0.55, scene.sun.y)), scene.frame.x > 0.5);
     t = max(mix(vec3(y), t, mix(1.0, sat, day)), vec3(0.0));
     // A cool floor so the night is never pure black; by day black stays black.
     t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034) * (1.0 - day);

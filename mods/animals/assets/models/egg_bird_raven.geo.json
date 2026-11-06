@@ -1,0 +1,95 @@
+{
+ "format_version": "1.12.0",
+ "minecraft:geometry": [
+  {
+   "description": {
+    "identifier": "geometry.egg_bird_raven",
+    "texture_width": 64,
+    "texture_height": 32
+   },
+   "bones": [
+    {
+     "name": "body",
+     "pivot": [-0.0, 0.0, -0.0],
+     "cubes": []
+    },
+    {
+     "name": "egg0_tilt",
+     "parent": "body",
+     "pivot": [-0.0, 0.8863, 2.013],
+     "rotation": [80.0, 0.0, 0.0],
+     "cubes": [
+      {
+       "origin": [-0.75, 0.8863, 1.263],
+       "size": [1.5, 2.015, 1.5],
+       "uv": {
+        "south": {
+         "uv": [43.0, 1.0],
+         "uv_size": [3.0, 4.0]
+        },
+        "north": {
+         "uv": [48.0, 1.0],
+         "uv_size": [3.0, 4.0]
+        },
+        "west": {
+         "uv": [53.0, 1.0],
+         "uv_size": [3.0, 4.0]
+        },
+        "east": {
+         "uv": [58.0, 1.0],
+         "uv_size": [3.0, 4.0]
+        },
+        "down": {
+         "uv": [4.0, 8.0],
+         "uv_size": [-3.0, 3.0]
+        },
+        "up": {
+         "uv": [9.0, 11.0],
+         "uv_size": [-3.0, -3.0]
+        }
+       }
+      }
+     ]
+    },
+    {
+     "name": "egg1_tilt",
+     "parent": "body",
+     "pivot": [-0.0, 0.8863, 2.013],
+     "rotation": [80.0, 0.0, 0.0],
+     "cubes": [
+      {
+       "origin": [-1.25, 2.8713, 0.763],
+       "size": [2.5, 2.015, 2.5],
+       "uv": {
+        "south": {
+         "uv": [15.0, 1.0],
+         "uv_size": [5.0, 4.0]
+        },
+        "north": {
+         "uv": [22.0, 1.0],
+         "uv_size": [5.0, 4.0]
+        },
+        "west": {
+         "uv": [29.0, 1.0],
+         "uv_size": [5.0, 4.0]
+        },
+        "east": {
+         "uv": [36.0, 1.0],
+         "uv_size": [5.0, 4.0]
+        },
+        "down": {
+         "uv": [6.0, 1.0],
+         "uv_size": [-5.0, 5.0]
+        },
+        "up": {
+         "uv": [13.0, 6.0],
+         "uv_size": [-5.0, -5.0]
+        }
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

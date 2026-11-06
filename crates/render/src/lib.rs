@@ -16,6 +16,11 @@ pub struct BufferId(pub u32);
 pub struct TextureId(pub u32);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PipelineId(pub u32);
+/// A ray-tracing acceleration structure ([`Backend::ray_query`]): a bottom-level one over
+/// triangles ([`Backend::create_blas`]) or a top-level one over instances of those
+/// ([`Backend::create_tlas`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct AccelId(pub u32);
 
 /// Global WGSL declarations every shader can use. Texture handles index into these arrays.
 /// The `mipped` samplers clamp too: textures are never tiled, and wrapping would blend the edge
@@ -43,6 +48,40 @@ pub mod usage {
     /// Written by the GPU and read by the CPU through `mapped`, once the frame that wrote it is
     /// done (the next time its frame slot comes round).
     pub const READBACK: u32 = 32;
+    /// Read by acceleration structure builds ([`BlasGeometry`]). Only with [`Backend::ray_query`].
+    pub const ACCEL_INPUT: u32 = 64;
+}
+
+/// One set of triangles of a bottom-level acceleration structure.
+#[derive(Clone, Copy, Debug)]
+pub struct BlasGeometry {
+    /// Positions, three `f32` each, `vertex_stride` bytes apart from `vertex_offset`
+    /// (a buffer made with [`usage::ACCEL_INPUT`]); `vertices` of them.
+    pub vertices: BufferId,
+    pub vertex_offset: u64,
+    pub vertex_stride: u32,
+    pub vertex_count: u32,
+    /// 32-bit indices, three a triangle, into those positions, from `index_offset`.
+    pub indices: BufferId,
+    pub index_offset: u64,
+    pub triangles: u32,
+    /// false: a ray query hands each hit to the shader as a candidate, to accept or pass through
+    /// (see-through texels); true: every hit counts.
+    pub opaque: bool,
+}
+
+/// One instance of a bottom-level acceleration structure in a top-level one.
+#[derive(Clone, Copy, Debug)]
+pub struct TlasInstance {
+    /// Row-major 3x4, from the BLAS's space to the TLAS's.
+    pub transform: [[f32; 4]; 3],
+    /// What a hit reports as `instance_custom_data` (24 bits).
+    pub custom: u32,
+    /// A ray skips it unless its cull mask shares a bit with this.
+    pub mask: u8,
+    /// Every hit on it counts, its see-through geometry's too, without asking the shader.
+    pub opaque: bool,
+    pub blas: AccelId,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -230,6 +269,18 @@ pub enum Cmd {
     },
     /// GPU timestamp, see [`Backend::gpu_times`].
     Mark,
+    /// Builds a BLAS made by [`Backend::create_blas`] from its inputs as they are now (written
+    /// before, ordered by a [`Cmd::Barrier`] when a shader wrote them). Outside a pass. What reads
+    /// it after (a TLAS build, a shader) waits for it.
+    BuildBlas(AccelId),
+    /// Builds a TLAS from the instances [`Backend::set_tlas_instances`] gave it this frame.
+    /// Outside a pass, after the builds of the BLASes it holds; shaders after it see it.
+    BuildTlas(AccelId),
+    /// A TLAS for the current pipeline's group 1 `binding` (a `var x: acceleration_structure`).
+    BindAccel {
+        binding: u32,
+        accel: AccelId,
+    },
 }
 
 /// Layout of one indexed indirect draw, matches every API we care about.
@@ -419,5 +470,34 @@ pub trait Backend: Send {
     /// What an earlier `pipeline_cache_data` gave, before any pipeline is made. Data from another
     /// driver or device is ignored.
     fn load_pipeline_cache(&mut self, _data: &[u8]) {}
+
+    /// Whether shaders can trace rays (`enable wgpu_ray_query;`) through acceleration structures:
+    /// a desktop GPU with Vulkan's ray queries. Without it the calls below must not be made.
+    fn ray_query(&self) -> bool {
+        false
+    }
+    /// A bottom-level acceleration structure over `geometries`, built by the next
+    /// [`Cmd::BuildBlas`] naming it (its inputs must hold until that frame is done), then compacted
+    /// on its own. Built once: to change it, make another.
+    fn create_blas(&mut self, _geometries: &[BlasGeometry], _label: &str) -> AccelId {
+        panic!("no ray tracing on this backend")
+    }
+    /// A top-level acceleration structure for up to `max_instances` (it grows past them).
+    fn create_tlas(&mut self, _max_instances: u32, _label: &str) -> AccelId {
+        panic!("no ray tracing on this backend")
+    }
+    /// This frame's instances of `tlas`, built by its [`Cmd::BuildTlas`].
+    fn set_tlas_instances(&mut self, _tlas: AccelId, _instances: &[TlasInstance]) {}
+    /// Once the GPU is done with it.
+    fn destroy_accel(&mut self, _accel: AccelId) {}
+    /// Memory held by acceleration structures, bytes (diagnostics).
+    fn accel_memory(&self) -> u64 {
+        0
+    }
+    /// Goes up whenever a BLAS moves in memory (compaction): a TLAS built before must be built
+    /// again before it is used once more.
+    fn accel_generation(&self) -> u64 {
+        0
+    }
     fn wait_idle(&mut self);
 }
