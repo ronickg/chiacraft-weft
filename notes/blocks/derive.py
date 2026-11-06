@@ -71,6 +71,153 @@ def stained_glass():
         save(a, f"glass_{name}")
 
 
+def showcase_glass():
+    """The RTX showcase's glass (notes/RTX_SHOWCASE.md), from the approved glass: frosted (a milky
+    pane with frost crystals), smoked (a dark tinted pane, its glare grey) in the same frame, and
+    leaded glass (no wooden frame: panes of the dye colours and amber between tin cames)."""
+    glass = tile("glass")
+    solid = glass[..., 3] > 0
+    inside = np.zeros(glass.shape[:2], bool)
+    inside[3:-3, 3:-3] = True
+    rng = np.random.default_rng(7)
+    frost = glass.copy()
+    n = rng.random(glass.shape[:2])
+    crystals = (n > 0.82) & inside
+    pane = ~solid | (solid & inside)
+    frost[pane, :3] = [0xE4, 0xEC, 0xF0]
+    frost[pane, 3] = 170
+    frost[crystals, :3] = [0xF6, 0xFA, 0xFC]
+    frost[crystals, 3] = 205
+    save(frost, "frosted_glass")
+    smoke = glass.copy()
+    glare = solid & inside
+    smoke[~solid, :3] = [0x2A, 0x2C, 0x33]
+    smoke[~solid, 3] = 165
+    smoke[glare, :3] = [0x6A, 0x6E, 0x78]
+    smoke[glare, 3] = 200
+    save(smoke, "smoked_glass")
+    leaded_glass()
+
+
+def leaded_glass():
+    """Leaded glass (Ronald, 11-06, redo: "glass panes in lead ... not a patchwork of opaque blocks"):
+    diamond quarries 16 px across between thin dark lead cames (1 px, diagonal), each pane see-through
+    and lightly tinted (mostly clear and pale amber, every few a deep red or blue), a short glint
+    near each pane's top; seamless, as the lattice repeats every 16 px."""
+    yy, xx = np.mgrid[0:32, 0:32]
+    u, v = (xx + yy) % 16, (xx - yy) % 16
+    came = (u == 0) | (v == 0)
+    cu, cv = (xx + yy) // 16, ((xx - yy) % 32) // 16
+    tints = {
+        "clear": ((0xDC, 0xEC, 0xF2), 70),
+        "amber": ((0xF0, 0xD0, 0x80), 105),
+        "green": ((0xB8, 0xE0, 0xB0), 90),
+        "red": ((0xC0, 0x2C, 0x2C), 150),
+        "blue": ((0x2E, 0x58, 0xC0), 150),
+    }
+    pattern = [["clear", "amber"], ["green", "clear"], ["amber", "red"], ["clear", "blue"]]
+    lead = np.zeros((32, 32, 4))
+    for y in range(32):
+        for x in range(32):
+            if came[y, x]:
+                continue
+            name = pattern[(cu[y, x] + cv[y, x]) % 4][(cu[y, x]) % 2]
+            c, a = tints[name]
+            lead[y, x, :3] = c
+            lead[y, x, 3] = a
+            # A glint: near the pane's upper corner, a short light streak.
+            if 2 <= u[y, x] <= 4 and 5 <= v[y, x] <= 7:
+                lead[y, x, :3] = np.minimum(np.array(c, float) * 0.5 + 150, 255)
+                lead[y, x, 3] = min(a + 70, 220)
+    lead[came, :3] = [0x3A, 0x3E, 0x46]
+    lead[came, 3] = 255
+    # The cames' light edge: the row beside each came, on its upper side, a little lit.
+    lit = (u == 15) | (v == 1)
+    lead[lit, :3] = np.minimum(lead[lit, :3] * 0.8 + 50, 255)
+    lead[lit, 3] = np.minimum(lead[lit, 3] + 40, 230)
+    save(lead, "leaded_glass")
+
+
+def showcase_tiles():
+    """From the generated showcase tiles: checker tiles (polished limestone and slate tiles in 16 px
+    squares with a grout line), verdigris copper (`verdigris`), and the green and red glazed tiles (the
+    blue glaze recoloured, its grout and glints kept)."""
+    lime = tile("polished_limestone")
+    regrid("rsb_stone", 3, 4, [0x26, 0x2A, 0x2E], "slate_tiles", edge=0.08)
+    slate = tile("slate_tiles")
+    check = lime.copy()
+    yy, xx = np.mgrid[0:32, 0:32]
+    dark = ((yy // 16) + (xx // 16)) % 2 == 1
+    check[dark] = slate[dark] * 0.82
+    grout = (yy % 16 == 0) | (xx % 16 == 0)
+    check[grout, :3] = [0x8E, 0x86, 0x78]
+    check[..., 3] = 255
+    save(check, "checker_tiles")
+    verdigris()
+    regrid("rsb_metal", 3, 4, [0xD8, 0xCF, 0xBA], "glazed_tiles_blue")
+    blue = tile("glazed_tiles_blue")
+    rgb = blue[..., :3]
+    lum = (rgb @ [0.3, 0.55, 0.15]) / 255
+    sat = rgb.max(-1) - rgb.min(-1)
+    glaze = (sat > 40) & (rgb[..., 2] > rgb[..., 0])
+    for name, c in (("green", (0x2E, 0x8A, 0x52)), ("red", (0xA8, 0x30, 0x2A))):
+        a = blue.copy()
+        tint = np.array(c, float) * (0.35 + 1.3 * lum[..., None])
+        a[..., :3] = np.where(glaze[..., None], np.minimum(tint, 255), rgb)
+        save(a, f"glazed_tiles_{name}")
+
+
+def verdigris():
+    """Verdigris copper (Ronald, 11-06, redo: "a finer, even patina, mostly blue-green with small
+    bare-copper flecks at edges and rivets, and seamless across 2x2"): the copper block's own shading
+    (its bevel, rivets) under a fine two-tone blue-green mottle, a little darker in its hollows;
+    bare copper only on the brightest texels near the edge (rivet heads, the frame's lit top) and a
+    few single flecks along the frame."""
+    copper = tile("copper_block")
+    rng = np.random.default_rng(23)
+    lum = (copper[..., :3] @ [0.3, 0.55, 0.15]) / 255
+    shade = np.clip(0.55 + 1.6 * (lum - lum.mean()), 0, 1)
+    ramp = np.array([[0x2E, 0x6C, 0x60], [0x3E, 0x88, 0x78], [0x52, 0xA0, 0x8E], [0x6C, 0xB8, 0xA4]], float)
+    pick = np.clip((rng.random((32, 32)) * 0.35 + shade * 0.85) * 3.2, 0, 3).astype(int)
+    v = copper.copy()
+    v[..., :3] = ramp[pick] * (0.75 + 0.5 * shade[..., None])
+    yy, xx = np.mgrid[0:32, 0:32]
+    edge = np.minimum(np.minimum(xx, 31 - xx), np.minimum(yy, 31 - yy))
+    # Bare copper: the rivet heads (the brightest texels in each corner) and a few flecks on the rim.
+    corner = (np.minimum(xx, 31 - xx) <= 6) & (np.minimum(yy, 31 - yy) <= 6)
+    hot = corner & (lum > np.quantile(lum[corner], 0.85))
+    bare = hot | ((edge <= 1) & (rng.random((32, 32)) < 0.06))
+    v[bare, :3] = copper[bare, :3]
+    v[..., :3] = np.clip(v[..., :3], 0, 255)
+    v[..., 3] = 255
+    save(v, "verdigris_copper")
+
+
+def regrid(image, quadrant, n, grout, out, edge=0.12):
+    """A tile set of n x n square tiles from a generated image's quadrant (0 top left .. 3 bottom
+    right), redrawn on an exact grid: each cell's middle averaged down to (32/n - 1) px, a 1-px grout
+    line below and right of it, its top and left rows a little lighter (the bevel). Cutting the whole
+    square to 32 px left the tiles and grout uneven (11-06, glazed and slate tiles)."""
+    g = np.asarray(Image.open(os.path.join(HERE, "gen", image + ".png")).convert("RGB")).astype(float)
+    h = g.shape[0] // 2
+    q = g[(quadrant // 2) * h:(quadrant // 2 + 1) * h, (quadrant % 2) * h:(quadrant % 2 + 1) * h]
+    step = 32 // n
+    inner = step - 1
+    a = np.zeros((32, 32, 4))
+    a[..., :3] = grout
+    a[..., 3] = 255
+    span = q.shape[0] / n
+    for cy in range(n):
+        for cx in range(n):
+            m = int(span * 0.1)
+            cell = q[int(cy * span) + m:int((cy + 1) * span) - m, int(cx * span) + m:int((cx + 1) * span) - m]
+            small = np.asarray(Image.fromarray(cell.astype(np.uint8)).resize((inner, inner), Image.BOX)).astype(float)
+            small[0, :] = np.minimum(small[0, :] * (1 + edge) + 6, 255)
+            small[:, 0] = np.minimum(small[:, 0] * (1 + edge) + 6, 255)
+            a[cy * step:cy * step + inner, cx * step:cx * step + inner, :3] = small
+    save(a, out)
+
+
 def drift(size=32, frames=16, seed=0, top=4):
     """A seamless pattern in [0, 1] that moves one full period over the frames, so it loops."""
     rng = np.random.default_rng(seed)
