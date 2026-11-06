@@ -270,12 +270,6 @@ fn fs_moments(in: VOut) -> MomentsOut {
     return out;
 }
 
-// How alike two surfaces are for a filter: by distance off this one's plane, and by facing.
-fn dn_edge(nc: vec3<f32>, pc: vec3<f32>, zc: f32, nq: vec3<f32>, pq: vec3<f32>, phi_normal: f32) -> f32 {
-    let plane = abs(dot(nc, pq - pc)) / (0.02 * zc + 0.02);
-    return exp(-plane) * pow(max(dot(nc, nq), 0.0), phi_normal);
-}
-
 @fragment
 fn fs_variance(in: VOut) -> Pair {
     let d = dn[in.pass_index];
@@ -295,19 +289,18 @@ fn fs_variance(in: VOut) -> Pair {
     if hd.a < 4.0 {
         // Too few frames gathered: the moments of the 7x7 alike texels round it instead, made
         // larger while the history is this short.
-        let nc = dn_normal(d.normal, at, isize).xyz;
-        let pc = dn_position(at, dep, d.size);
-        let zc = length(pc);
+        let gc = dn_guide(d, at);
+        let nc = dn_unoct(gc.xy);
         var sum = vec4(0.0);
         var wsum = 0.0;
         for (var y = -3; y <= 3; y++) {
             for (var x = -3; x <= 3; x++) {
                 let q = at + vec2(x, y);
-                let dq = dn_depth(d.depth, q, isize);
-                if dq <= 0.0 || !dn_marked(d, q) {
+                let gq = dn_guide(d, q);
+                if gq.z <= 0.0 {
                     continue;
                 }
-                let w = dn_edge(nc, pc, zc, dn_normal(d.normal, q, isize).xyz, dn_position(clamp(q, vec2(0), isize - 1), dq, d.size), 64.0);
+                let w = exp(-abs(gq.z - gc.z) / (0.02 * gc.z + 0.02)) * pow(max(dot(nc, dn_unoct(gq.xy)), 0.0), 64.0);
                 let lq = vec2(dn_luma(dn_light(d.diffuse, q, isize).rgb), dn_luma(dn_light(d.specular, q, isize).rgb));
                 sum += vec4(lq.x, lq.x * lq.x, lq.y, lq.y * lq.y) * w;
                 wsum += w;
@@ -339,18 +332,26 @@ fn fs_atrous(in: VOut) -> Pair {
     let isize = vec2<i32>(d.size);
     let at = vec2<i32>(in.clip.xy);
     var out: Pair;
-    let dep = dn_depth(d.depth, at, isize);
     let cd = dn_light(d.diffuse, at, isize);
     let cs = dn_light(d.specular, at, isize);
-    if dep <= 0.0 || !dn_marked(d, at) {
+    // This frame's guide (`prev_guide` + 1 here): the normal, the distance along the view (0 where
+    // nothing was lit) and the roughness, one read a tap instead of depth, normal and position.
+    let gc = dn_guide(d, at);
+    if gc.z <= 0.0 {
         out.diffuse = cd;
         out.specular = cs;
         return out;
     }
-    let ncr = dn_normal(d.normal, at, isize);
-    let nc = ncr.xyz;
-    let pc = dn_position(at, dep, d.size);
-    let zc = length(pc);
+    let nc = dn_unoct(gc.xy);
+    let zc = gc.z;
+    // How fast the view distance changes across the screen here (each way the gentler side, so an
+    // edge doesn't widen what counts as the same surface): taps further than that away are other
+    // surfaces.
+    let zl = dn_guide(d, at - vec2(1, 0)).z;
+    let zr = dn_guide(d, at + vec2(1, 0)).z;
+    let zu = dn_guide(d, at - vec2(0, 1)).z;
+    let zd = dn_guide(d, at + vec2(0, 1)).z;
+    let grad = vec2(dn_slope(zl, zc, zr), dn_slope(zu, zc, zd));
     let lc = vec2(dn_luma(cd.rgb), dn_luma(cs.rgb));
     let sigma = sqrt(max(vec2(dn_variance_blur(d.diffuse, at, isize), dn_variance_blur(d.specular, at, isize)), vec2(0.0)));
     let phi = d.phi_color * sigma + vec2(1e-4);
@@ -365,22 +366,25 @@ fn fs_atrous(in: VOut) -> Pair {
     let step = i32(d.step);
     for (var y = -2; y <= 2; y++) {
         for (var x = -2; x <= 2; x++) {
-            let q = at + vec2(x, y) * step;
+            let off = vec2(x, y) * step;
+            let q = at + off;
             if any(q < vec2(0)) || any(q >= isize) {
                 continue;
             }
-            let dq = dn_depth(d.depth, q, isize);
-            if dq <= 0.0 || !dn_marked(d, q) {
+            let gq = textureLoad(textures[d.prev_guide - 1u], q, 0);
+            if gq.z <= 0.0 {
                 continue;
             }
-            let nqr = dn_normal(d.normal, q, isize);
-            let geo = dn_edge(nc, pc, zc, nqr.xyz, dn_position(q, dq, d.size), d.phi_normal) * h[x + 2] * h[y + 2];
+            let tol = abs(dot(grad, vec2<f32>(off))) * 1.5 + 0.01 * zc + 1e-3;
+            let w_z = exp(-abs(gq.z - zc) / tol);
+            let w_n = pow(max(dot(nc, dn_unoct(gq.xy)), 0.0), d.phi_normal);
+            let geo = w_z * w_n * h[x + 2] * h[y + 2];
             let qd = dn_light(d.diffuse, q, isize);
             let qs = dn_light(d.specular, q, isize);
             let w1 = geo * exp(-abs(dn_luma(qd.rgb) - lc.x) / phi.x);
             // Specular light also only between alike roughness: a mirror next to rough stone
             // keeps its own reflection.
-            let w2 = geo * exp(-abs(dn_luma(qs.rgb) - lc.y) / phi.y) * exp(-abs(nqr.w - ncr.w) * 8.0);
+            let w2 = geo * exp(-abs(dn_luma(qs.rgb) - lc.y) / phi.y) * exp(-abs(gq.w - gc.w) * 8.0);
             sd += qd.rgb * w1;
             vd += qd.a * w1 * w1;
             wd += w1;
@@ -392,6 +396,24 @@ fn fs_atrous(in: VOut) -> Pair {
     out.diffuse = vec4(sd / max(wd, 1e-6), vd / max(wd * wd, 1e-12));
     out.specular = vec4(ss / max(ws, 1e-6), vs / max(ws * ws, 1e-12));
     return out;
+}
+
+// This frame's guide at `at` (the later passes' `prev_guide` + 1), zero outside the picture.
+fn dn_guide(d: DenoisePass, at: vec2<i32>) -> vec4<f32> {
+    let isize = vec2<i32>(d.size);
+    if d.prev_guide == 0u || any(at < vec2(0)) || any(at >= isize) {
+        return vec4(0.0);
+    }
+    return textureLoad(textures[d.prev_guide - 1u], at, 0);
+}
+
+// The view distance's change a texel, from the side nearer `c` (a neighbour that wasn't lit, z 0,
+// doesn't count).
+fn dn_slope(a: f32, c: f32, b: f32) -> f32 {
+    let da = select(1e9, abs(c - a), a > 0.0);
+    let db = select(1e9, abs(b - c), b > 0.0);
+    let m = min(da, db);
+    return select(0.0, m, m < 1e8);
 }
 
 // The light with the albedo back in, added onto the scene image (emission and the sky are there):
