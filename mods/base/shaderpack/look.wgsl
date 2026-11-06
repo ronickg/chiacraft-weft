@@ -310,7 +310,9 @@ fn palette_made() -> Palette {
             p.horizon = mix(p.horizon, hb * (luma(p.horizon) / luma(hb)), twilight * 0.8);
             let zb = vec3(0.32, 0.5, 1.0);
             p.zenith = mix(p.zenith, zb * (luma(p.zenith) / luma(zb)), twilight * 0.7);
-            p.ambient = mix(p.ambient, vec3(0.15, 0.19, 0.27), twilight * 0.8);
+            // (0.42 0.52 0.72, about three times: at 0.15 0.19 0.27 the 19:00 land came only from 46 to
+            // 51 in its colour, Bliss's 86; PC shtw1.)
+            p.ambient = mix(p.ambient, vec3(0.42, 0.52, 0.72), twilight * 0.8);
         }
     }
     // A new moon's night is darker than a full moon's.
