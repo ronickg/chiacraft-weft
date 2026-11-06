@@ -1697,8 +1697,13 @@ const END_FADE_FROM: f32 = 0.85;
 fn fs_lod_end(in: VOut) -> @location(0) vec4<f32> {
     let end = scene.params.y;
     let f = smoothstep(END_FADE_FROM * end, end, length(in.rel.xz));
-    let p = floor(in.clip.xy) + 5.588238 * scene.frame.w;
-    if fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y)) < f {
+    // Each pixel's threshold steps by the golden ratio a frame from its own place in the pattern,
+    // so the few frames temporal anti-aliasing keeps cover the thresholds evenly and average to `f`.
+    // (Thresholds drawn afresh each frame left about a tenth of noise in that average, which a
+    // scripted run, the same frames each time, showed as fixed dots at the fringe: Far view, 11-06.)
+    let p = floor(in.clip.xy);
+    let t = fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y) + 0.618034 * scene.frame.w);
+    if t < f {
         discard;
     }
     return lod_color(in);
