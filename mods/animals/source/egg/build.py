@@ -242,6 +242,33 @@ def scaled(e, u, v, th, x, z):
     return np.where((v < 0.05 * L) | (v > 0.96 * L), 2, a)
 
 
+def bird(e, u, v, th, x, z):
+    """A bird's egg, by its look's `marks`: `blotch` (count, size in units, how much they gather
+    at the blunt end 0..1), `deep` (paler lilac-grey marks under them), `speck` (the share of
+    texels speckled), `cap` (a wreath of marks round the blunt end). Materials: shell, deep
+    marks, marks, a second mark color."""
+    g = e["egg"]
+    L, W, m = g["L"], g["W"], g["marks"]
+    rng = np.random.default_rng(m.get("seed", 5))
+    a = np.zeros(u.shape, int)
+    c, r = grid(e, u, v)
+
+    def spots(n, size, gather):
+        lo = 0.05 + 0.6 * gather
+        return es.blobs(rng, n, (lo * L, 0.97 * L), size, W, rough=0.45)
+
+    if m.get("deep"):
+        a = es.stamp(a, u, v, W, spots(m["deep"], m.get("deep_size", (0.35, 0.6)), m.get("gather", 0.3)), 1)
+    if m.get("blotch"):
+        a = es.stamp(a, u, v, W, spots(m["blotch"], m.get("size", (0.3, 0.55)), m.get("gather", 0.3)), 2)
+    if m.get("cap"):
+        ring = (v > 0.72 * L) & (v < 0.9 * L) & (noise(c, r, 17) > 1 - m["cap"])
+        a = np.where(ring, 2, a)
+    if m.get("speck"):
+        a = np.where(noise(c, r, 19) > 1 - m["speck"], np.where(noise(c, r, 23) > 0.5, 2, 3 if m.get("two") else 2), a)
+    return a
+
+
 # ------------------------------------------------------------------ the looks
 
 LOOKS = {
@@ -283,6 +310,45 @@ LOOKS = {
                           mats=[shell((222, 200, 136)), shell((242, 228, 182)), shell((150, 130, 80))]),
     "roe_lungfish": dict(roe=dict(n=2, d=2.4, dot="yolk", spread=1.8), area=bead, model="egg_jelly",
                          mats=[shell((186, 208, 210)), shell((222, 236, 236)), material("shell", (50, 78, 46))]),
+    # Birds (`reports/Eggs by species.md`, Birds): shapes by group, a texture per species; all
+    # lie on their side in the nest's cup. Owls: plain white, nearly round, glossy.
+    "bird_owl": dict(L=5.6 * CM, W=4.7 * CM, asym=0.08, tilt=80, step=0.65, n=7, area=bird, model="egg_bird_round", marks={},
+                     mats=[shell((238, 236, 228)), shell((214, 210, 200)), shell((200, 196, 186)), shell((200, 196, 186))]),
+    # Songbirds, drawn about one and a half times their real 2.2 cm: the house sparrow greyish
+    # white, densely speckled grey-brown; the snow bunting bluish white with red-brown and lilac
+    # spots and scrawls gathered at the blunt end.
+    "bird_sparrow": dict(L=3.3 * CM, W=2.4 * CM, asym=0.22, tilt=80, step=0.65, n=7, area=bird, model="egg_bird_small",
+                         marks=dict(speck=0.4, two=True, blotch=3, size=(0.2, 0.3), gather=0.5),
+                         mats=[shell((214, 214, 204)), shell((168, 164, 160)), material("shell", (112, 98, 84)), shell((150, 146, 138))]),
+    "bird_bunting": dict(L=3.3 * CM, W=2.4 * CM, asym=0.22, tilt=80, step=0.65, n=7, area=bird, model="egg_bird_small",
+                         marks=dict(deep=4, deep_size=(0.2, 0.3), blotch=7, size=(0.15, 0.25), gather=0.75, speck=0.06),
+                         mats=[shell((220, 230, 226)), shell((176, 160, 184)), material("shell", (132, 70, 50)), shell((132, 70, 50))]),
+    # The raven: blue-green, blotched and streaked olive-brown, more at the blunt end.
+    "bird_raven": dict(L=5 * CM, W=3.4 * CM, asym=0.22, tilt=80, step=0.65, n=7, area=bird, model="egg_bird",
+                       marks=dict(deep=5, blotch=10, size=(0.3, 0.5), gather=0.4, speck=0.08),
+                       mats=[shell((150, 190, 172)), shell((130, 140, 128)), material("shell", (92, 80, 52)), shell((92, 80, 52))]),
+    # The herring gull: olive-brown, boldly blotched dark brown-black.
+    "bird_gull": dict(L=5 * CM, W=3.4 * CM, asym=0.22, tilt=80, step=0.65, n=7, area=bird, model="egg_bird",
+                      marks=dict(deep=4, blotch=9, size=(0.35, 0.6), gather=0.35, speck=0.05),
+                      mats=[shell((164, 150, 108)), shell((136, 120, 98)), material("shell", (58, 44, 36)), shell((58, 44, 36))]),
+    # The golden eagle: whitish, blotched and washed red-brown.
+    "bird_eagle": dict(L=5 * CM, W=3.4 * CM, asym=0.22, tilt=80, step=0.65, n=7, area=bird, model="egg_bird",
+                       marks=dict(deep=6, blotch=8, size=(0.4, 0.7), gather=0.3, speck=0.06),
+                       mats=[shell((232, 224, 208)), shell((190, 160, 150)), material("shell", (150, 76, 46)), shell((150, 76, 46))]),
+    # The savanna hawk: bluish white, a few faint pale brown spots.
+    "bird_hawk": dict(L=5 * CM, W=3.4 * CM, asym=0.22, tilt=80, step=0.65, n=7, area=bird, model="egg_bird",
+                      marks=dict(blotch=4, size=(0.2, 0.35), gather=0.3),
+                      mats=[shell((226, 234, 234)), shell((206, 200, 190)), shell((196, 168, 132)), shell((196, 168, 132))]),
+    # The turkey vulture: creamy white, heavy dark brown and lavender blotches wreathing the
+    # blunt end.
+    "bird_vulture": dict(L=5 * CM, W=3.4 * CM, asym=0.22, tilt=80, step=0.65, n=7, area=bird, model="egg_bird",
+                         marks=dict(deep=6, blotch=10, size=(0.35, 0.6), gather=0.75, cap=0.45),
+                         mats=[shell((236, 228, 210)), shell((170, 156, 180)), material("shell", (92, 56, 40)), shell((92, 56, 40))]),
+    # The Cretaceous birds (enantiornithine Gobipteryx's eggs, Gobioolithus; Confuciusornis's by
+    # inference): long, ends nearly alike, plain pale; drawn larger than their real 2.5 cm.
+    "bird_mesozoic": dict(L=3.6 * CM, W=2 * CM, asym=0.06, tilt=85, step=0.65, n=7, area=bird, model="egg_bird_long",
+                          marks=dict(deep=3, deep_size=(0.2, 0.35), gather=0.0),
+                          mats=[shell((226, 220, 204)), shell((204, 196, 178)), shell((204, 196, 178)), shell((204, 196, 178))]),
     # The wyvern (fantasy): big, heavy, stone-like, scaled, metal-rimmed; one, on bare rock.
     "wyvern": dict(L=50 * CM, W=34 * CM, asym=0.25, tilt=12, area=scaled, across=20,
                    mats=None),
@@ -375,6 +441,9 @@ def build(name, look, out, mats=None, E=None):
     for e in E:
         e["egg"]["tx"] = tx
 
+    for e in E:
+        e["egg"]["marks"] = look.get("marks", {})
+
     def area(e, face, p, uu, vv, h):
         u, v, th, x, z = es.local(e, p)
         return look["area"](e, u, v, th, x, z)
@@ -417,7 +486,32 @@ def model_of(name):
     return LOOKS[name].get("model", f"egg_{name}")
 
 
+def box_of(spec):
+    """The hitbox for `animals_core::bodies::BOXES` (blocks): as wide as the geometric mean of
+    the model's width and length, as high as its top, the small ones a few cm more to click (the
+    rules `core/tests/boxes.rs` checks)."""
+    from prop import rotm
+
+    pts = []
+    for e in spec["elements"]:
+        lo, hi = np.array(e["lo"]), np.array(e["hi"])
+        R = rotm(e["rot"]) if e.get("rot") else np.eye(3)
+        o = np.array(e["origin"]) if e.get("rot") else np.zeros(3)
+        pts += [(np.array([hi[i] if k >> i & 1 else lo[i] for i in range(3)]) - o) @ R.T + o for k in range(8)]
+    p = np.array(pts) / 64
+    mean, top = math.sqrt(np.ptp(p[:, 0]) * np.ptp(p[:, 2])), p[:, 1].max()
+    return round(float(mean + 0.06 if mean < 0.15 else mean), 2), round(float(top + 0.04 if top < 0.15 else top), 2)
+
+
 if __name__ == "__main__":
+    if "--boxes" in sys.argv:  # each model's box, from a review build (`--out DIR` first)
+        d = sys.argv[sys.argv.index("--boxes") + 1]
+        done = set()
+        for name in LOOKS:
+            if model_of(name) not in done and os.path.exists(os.path.join(d, name, "spec.json")):
+                done.add(model_of(name))
+                print(f'    ("{model_of(name)}", {box_of(json.load(open(os.path.join(d, name, "spec.json"))))}),')
+        sys.exit()
     out = sys.argv[sys.argv.index("--out") + 1] if "--out" in sys.argv else None
     only = [a for a in sys.argv[1:] if a in LOOKS]
     for name, look in LOOKS.items():

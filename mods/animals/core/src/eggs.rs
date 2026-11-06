@@ -39,6 +39,22 @@ pub const LOOKS: &[Look] = &[
     Look { name: "roe_lungfish", model: "egg_jelly", built_cm: 1.0 },
     // Fantasy: big, stone-heavy, in metal-rimmed jewel scales; our own design.
     Look { name: "wyvern", model: "egg_wyvern", built_cm: 50.0 },
+    // Birds, lying in the nest's cup: a shape per group, a coloring per species.
+    // Owls: plain white, nearly round.
+    Look { name: "bird_owl", model: "egg_bird_round", built_cm: 5.6 },
+    // Songbirds (drawn half again their real 2.2 cm): grey-white densely speckled, and bluish
+    // white with red-brown spots gathered at the blunt end.
+    Look { name: "bird_sparrow", model: "egg_bird_small", built_cm: 3.3 },
+    Look { name: "bird_bunting", model: "egg_bird_small", built_cm: 3.3 },
+    // Blotched ovals: the raven's blue-green, the gull's olive-brown, the eagle's red-brown on
+    // white, the hawk's bluish white, the vulture's cream wreathed dark brown at the blunt end.
+    Look { name: "bird_raven", model: "egg_bird", built_cm: 5.0 },
+    Look { name: "bird_gull", model: "egg_bird", built_cm: 5.0 },
+    Look { name: "bird_eagle", model: "egg_bird", built_cm: 5.0 },
+    Look { name: "bird_hawk", model: "egg_bird", built_cm: 5.0 },
+    Look { name: "bird_vulture", model: "egg_bird", built_cm: 5.0 },
+    // The Cretaceous birds: long, ends nearly alike, plain pale (Gobipteryx's Gobioolithus).
+    Look { name: "bird_mesozoic", model: "egg_bird_long", built_cm: 3.6 },
 ];
 
 /// Each laying species (`species::SPECIES` name): its egg's look and length in cm (a roe clutch:
@@ -65,6 +81,17 @@ pub const EGGS: &[(&str, &str, f32)] = &[
     ("lycoptera", "roe_lycoptera", 1.0),
     ("lungfish", "roe_lungfish", 1.0),
     ("wyvern", "wyvern", 50.0),
+    ("great_horned_owl", "bird_owl", 5.6),
+    ("snowy_owl", "bird_owl", 5.7),
+    ("house_sparrow", "bird_sparrow", 3.3),
+    ("snow_bunting", "bird_bunting", 3.3),
+    ("raven", "bird_raven", 5.0),
+    ("herring_gull", "bird_gull", 7.1),
+    ("golden_eagle", "bird_eagle", 7.5),
+    ("savanna_hawk", "bird_hawk", 5.8),
+    ("turkey_vulture", "bird_vulture", 7.1),
+    ("confuciusornis", "bird_mesozoic", 3.6),
+    ("gobipteryx", "bird_mesozoic", 3.0),
 ];
 
 /// The look named `name`.

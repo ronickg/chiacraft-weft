@@ -34,6 +34,15 @@ LABELS = {
     "roe_lycoptera": ("Lycoptera roe", "Lycoptera"),
     "roe_lungfish": ("Lungfish eggs", "Ceratodus"),
     "wyvern": ("Wyvern", "fantasy"),
+    "bird_owl": ("Owls", "great horned owl, snowy owl"),
+    "bird_sparrow": ("House sparrow", "house sparrow"),
+    "bird_bunting": ("Snow bunting", "snow bunting"),
+    "bird_raven": ("Raven", "raven"),
+    "bird_gull": ("Herring gull", "herring gull"),
+    "bird_eagle": ("Golden eagle", "golden eagle"),
+    "bird_hawk": ("Savanna hawk", "savanna hawk"),
+    "bird_vulture": ("Turkey vulture", "turkey vulture"),
+    "bird_mesozoic": ("Cretaceous birds", "Confuciusornis, Gobipteryx"),
 }
 BG = (40, 30, 24, 255)
 CARD = (58, 44, 34, 255)
@@ -68,7 +77,9 @@ def card(d, name, icons=None, W=300, H=470):
     dr.text((12, 8), title, font=font(20), fill=INK)
     dr.text((12, 32), who, font=font(13), fill=DIM)
     # Close-ups: three-quarters from above, and from the side.
-    for k, (yaw, pitch) in enumerate(((90, 25), (30, 15))):
+    # The side that shows its length (a lying egg end-on reads as a cube), then a turned view.
+    side = max((0, 90), key=lambda y: (lambda im: im.shape[1] / im.shape[0])(render(spec, tex, yaw=y, pitch=10, ppu=8.0, pad=0)))
+    for k, (yaw, pitch) in enumerate(((side + 20, 15), (side + 70, 35))):
         img = render(spec, tex, yaw=yaw, pitch=pitch, ppu=24.0, pad=4)
         im = fit(img, 136, 170)
         c.alpha_composite(im, (12 + k * 142 + (136 - im.width) // 2, 56 + (170 - im.height) // 2))
