@@ -1672,7 +1672,10 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
             let y = scene.eye.y + rel.y - (SEA_LEVEL + 4.0);
             let inside = min(min(BAND_DEPTH / max(-dir.y, 0.008), dist), 1500.0);
             let band = 1.0 - exp(-BAND_HDR * exp(-max(y, 0.0) / BAND_DEPTH) * inside * far_band);
-            let white = vec3(luma(toward)) * vec3(1.04, 1.0, 0.94) * 1.25;
+            // A cool white, a little brighter than the haze round it: at 1.25 and warm it read
+            // 188-190 / saturation 49-52 / warmth +40 at 18:00 against Bliss's 172-174 / 19-22 / +3
+            // (on the blue horizon band, lk_ebh2).
+            let white = vec3(luma(toward)) * vec3(0.96, 1.0, 1.06) * 1.12;
             out = mix(out, white, band);
         }
     }
