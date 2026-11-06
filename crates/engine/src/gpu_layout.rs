@@ -91,6 +91,13 @@ shared! {
         /// (`client::lod`'s `openness`), for packs that darken valleys and the gaps between crowns.
         OCC_SHIFT = 29,
         OCC_MASK = 3,
+        /// chiacraft, after upstream Weft f69243fd (PR #107): word 3's spare bits (the sizes take 11
+        /// of each 16) hold a box face's corner shade, 2 bits per corner (`CORNERS` order), stored
+        /// as 3 minus vanilla's AO (0: none, so faces without it read open): corners 0-1 from bit
+        /// 12, 2-3 from bit 28 (`client::lod`, WGSL `lod_ao`).
+        AO_LO_SHIFT = 12,
+        AO_HI_SHIFT = 28,
+        SIZE_MASK = 2047,
     }
     /// Tint kinds of faces and quads (0 none); mods' kinds follow the engine's.
     tint {
@@ -557,12 +564,13 @@ fn records() -> String {
         "    return vec3<f32>(f32(w0 & LOD_FACE_POS_MASK), f32(bitcast<i32>(w2 << LOD_FACE_HALF_SHIFT) >> LOD_FACE_HALF_SHIFT), f32((w0 >> LOD_FACE_Z_SHIFT) & LOD_FACE_POS_MASK));\n",
         "}\n",
         "fn lod_size(w2: u32, w3: u32) -> vec3<f32> {\n",
-        "    return vec3<f32>(f32(w3 & LOD_FACE_HALF_MASK), f32(w2 >> LOD_FACE_HALF_SHIFT), f32(w3 >> LOD_FACE_HALF_SHIFT));\n",
+        "    return vec3<f32>(f32(w3 & LOD_FACE_SIZE_MASK), f32(w2 >> LOD_FACE_HALF_SHIFT), f32((w3 >> LOD_FACE_HALF_SHIFT) & LOD_FACE_SIZE_MASK));\n",
         "}\n",
         "fn lod_dir(w0: u32) -> u32 {\n    return (w0 >> LOD_FACE_DIR_SHIFT) & FACE_DIR_MASK;\n}\n",
         "fn lod_tint(w0: u32) -> u32 {\n    return (w0 >> LOD_FACE_TINT_SHIFT) & TINT_MASK;\n}\n",
         "fn lod_crown(w0: u32) -> bool {\n    return (w0 >> LOD_FACE_CROWN_SHIFT) != 0u;\n}\n",
         "fn lod_occ(w0: u32) -> u32 {\n    return (w0 >> LOD_FACE_OCC_SHIFT) & LOD_FACE_OCC_MASK;\n}\n",
+        "fn lod_ao(w3: u32) -> vec4<u32> {\n    let a = ((w3 >> LOD_FACE_AO_LO_SHIFT) & 15u) | (((w3 >> LOD_FACE_AO_HI_SHIFT) & 15u) << 4u);\n    return vec4<u32>(3u) - vec4<u32>(a & 3u, (a >> 2u) & 3u, (a >> 4u) & 3u, (a >> 6u) & 3u);\n}\n",
     ));
     s
 }
@@ -780,7 +788,8 @@ gpu_struct! {
         /// the world's shader traces them this frame (its prelude then has `rt_sun`; the near shadow
         /// map then holds the models alone, the far one the terrain as before), y a frame count
         /// (to 2^24, for noise that moves every frame), z 1 for soft edges from more rays a pixel
-        /// (`core:rt_shadows` 2: `rt_sun_soft`'s `fine`), w unused.
+        /// (`core:rt_shadows` 2: `rt_sun_soft`'s `fine`), w 1 when it traces reflections
+        /// (`core:rt_reflections`: `rt_hit`; the screen's reflections then step aside).
         pub rt: [f32; 4],
         /// Temporal anti-aliasing (`post::Temporal`, `core:aa`): xy this frame's jitter in NDC
         /// (`view_proj` has it, `taa_prev` not; a clip position's `xy / w - taa.xy` is where it
@@ -1490,6 +1499,29 @@ pub mod rt_bind {
 }
 
 const RT_SUN_OFF: &str = "
+// What a ray met (`rt_hit`): `hit` false for nothing (the sky), else how far, where (camera
+// relative and in the world), the surface's facing, its texel (linear, before any tint), its light
+// as the world stores it (x the sky's, yzw the blocks' rgb, 0..1; distant terrain open sky), its
+// tint kind and biome, and whether it is distant terrain.
+struct RtHit {
+    hit: bool,
+    t: f32,
+    rel: vec3<f32>,
+    world: vec3<f32>,
+    n: vec3<f32>,
+    albedo: vec4<f32>,
+    light: vec4<f32>,
+    tint: u32,
+    biome: u32,
+    lod: bool,
+}
+
+fn rt_miss() -> RtHit {
+    return RtHit(false, 0.0, vec3(0.0), vec3(0.0), vec3(0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), 0u, 0u, false);
+}
+fn rt_hit(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, blur: f32) -> RtHit {
+    return rt_miss();
+}
 fn rt_sun(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool) -> vec3<f32> {
     return vec3(1.0);
 }
@@ -1594,6 +1626,12 @@ struct RtTexel {
 // lined up through a crown's faces, let the light by in pixel-wide specks; the coverage round the
 // point gives the soft dapple a filtered shadow map shows.
 fn rt_texel(base: u32, kind: u32, rec: u32, tri: u32, b: vec2<f32>) -> RtTexel {
+    return rt_texel_at(base, kind, rec, tri, b, 0.0);
+}
+
+// The same with its colour from mip `lod` (a reflection's far hit: the full texture there
+// shimmered into a mosaic).
+fn rt_texel_at(base: u32, kind: u32, rec: u32, tri: u32, b: vec2<f32>, lod: f32) -> RtTexel {
     var uv: array<vec2<f32>, 4>;
     var tex: u32;
     var tinted: bool;
@@ -1617,8 +1655,124 @@ fn rt_texel(base: u32, kind: u32, rec: u32, tri: u32, b: vec2<f32>) -> RtTexel {
     let k2 = select(2u, 3u, tri == 1u);
     let at = uv[0] * (1.0 - b.x - b.y) + uv[k1] * b.x + uv[k2] * b.y;
     let t = textures[tex_info[tex * 4u]];
-    let c = textureSampleLevel(t, nearest_clamp, at, 0.0);
+    let c = textureSampleLevel(t, nearest_mipped, at, lod);
     return RtTexel(vec4(c.rgb, textureSampleLevel(t, linear_mipped, at, RT_ALPHA_MIP).a), tinted);
+}
+
+// What a ray met (`rt_hit`): `hit` false for nothing (the sky), else how far, where (camera
+// relative and in the world), the surface's facing, its texel (linear, before any tint), its light
+// as the world stores it (x the sky's, yzw the blocks' rgb, 0..1; distant terrain open sky), its
+// tint kind and biome, and whether it is distant terrain.
+struct RtHit {
+    hit: bool,
+    t: f32,
+    rel: vec3<f32>,
+    world: vec3<f32>,
+    n: vec3<f32>,
+    albedo: vec4<f32>,
+    light: vec4<f32>,
+    tint: u32,
+    biome: u32,
+    lod: bool,
+}
+
+fn rt_miss() -> RtHit {
+    return RtHit(false, 0.0, vec3(0.0), vec3(0.0), vec3(0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), 0u, 0u, false);
+}
+
+// The first surface along `dir` (unit) from `rel` (camera relative), out to `t_max` blocks: through
+// the leaves' and plants' holes, as `rt_sun`, but water and glass are surfaces here. For a
+// reflection: the pack shades what comes back as it shades the world.
+// `blur`: mips more for the hit's colour (a rippled or rough mirror softens what it shows).
+fn rt_hit(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, blur: f32) -> RtHit {
+    var rq: ray_query;
+    rayQueryInitialize(&rq, rt_scene, RayDesc(RAY_FLAG_NONE, 0xFFu, 0.0, t_max, rel + g.cam_frac.xyz, dir));
+    while rayQueryProceed(&rq) {
+        let h = rayQueryGetCandidateIntersection(&rq);
+        let row = rt_inst[h.instance_custom_data];
+        if row.z == 2u {
+            if !rt_lod_hidden(rel + dir * h.t) {
+                rayQueryConfirmIntersection(&rq);
+            }
+            continue;
+        }
+        if row.x == 0xFFFFFFFFu {
+            rayQueryConfirmIntersection(&rq);
+            continue;
+        }
+        let rec = row.w + h.primitive_index / 2u;
+        let texel = rt_texel(row.x, row.z, rec, h.primitive_index % 2u, h.barycentrics);
+        // A clear pane is seen through (a skylight shows the sky), its frame and water are hit.
+        if texel.c.a >= 0.5 || (rec >= row.y && texel.tinted) {
+            rayQueryConfirmIntersection(&rq);
+        }
+    }
+    let c = rayQueryGetCommittedIntersection(&rq);
+    if c.kind == RAY_QUERY_INTERSECTION_NONE {
+        return rt_miss();
+    }
+    let row = rt_inst[c.instance_custom_data];
+    var out: RtHit;
+    out.hit = true;
+    out.t = c.t;
+    out.rel = rel + dir * c.t;
+    out.world = out.rel + vec3<f32>(g.cam_cube.xyz * 16) + g.cam_frac.xyz;
+    out.lod = row.z == 2u;
+    out.albedo = vec4(0.5, 0.5, 0.5, 1.0);
+    out.light = vec4(1.0, 0.0, 0.0, 0.0);
+    out.n = -dir;
+    if row.x == 0xFFFFFFFFu {
+        return out;
+    }
+    let clear = row.w == 0u || c.geometry_index == 1u;
+    let rec = select(0u, row.w, clear) + c.primitive_index / 2u;
+    let tri = c.primitive_index % 2u;
+    let b = c.barycentrics;
+    // A 32-texel block's mip by how far the reflected way runs (a pixel about 1/700 across).
+    let lod = clamp(log2(max((length(rel) + c.t) * 0.045, 1.0)) + blur, 0.0, 5.0);
+    let w = vec3(1.0 - b.x - b.y, b.x, b.y);
+    let k1 = select(1u, 2u, tri == 1u);
+    let k2 = select(2u, 3u, tri == 1u);
+    if row.z == 0u {
+        let at = row.x + rec * 4u;
+        let w0 = rt_records[at];
+        out.n = FACE_DIRS[face_dir(w0)];
+        out.tint = (w0 >> FACE_TINT_SHIFT) & TINT_MASK;
+        out.biome = rt_records[at + 1u] >> FACE_BIOME_SHIFT;
+        let lo = rt_records[at + 2u];
+        let hi = rt_records[at + 3u];
+        out.light = corner_light(lo, hi, 0u) * w.x + corner_light(lo, hi, k1) * w.y + corner_light(lo, hi, k2) * w.z;
+        out.albedo = rt_texel_at(row.x, 0u, rec, tri, b, lod).c;
+    } else if row.z == 1u {
+        let at = row.x + rec * 8u;
+        let p0 = quad_pos(rt_records[at]);
+        let p1 = quad_pos(rt_records[at + 1u]);
+        let p2 = quad_pos(rt_records[at + 2u]);
+        out.n = normalize(cross(p1 - p0, p2 - p1));
+        if dot(out.n, dir) > 0.0 {
+            out.n = -out.n;
+        }
+        out.tint = (rt_records[at + 5u] >> QUAD_TINT_SHIFT) & TINT_MASK;
+        out.biome = rt_records[at + 4u] >> FACE_BIOME_SHIFT;
+        let lo = rt_records[at + 6u];
+        let hi = rt_records[at + 7u];
+        out.light = corner_light(lo, hi, 0u) * w.x + corner_light(lo, hi, k1) * w.y + corner_light(lo, hi, k2) * w.z;
+        out.albedo = rt_texel_at(row.x, 1u, rec, tri, b, lod).c;
+    } else {
+        let at = row.x + rec * 4u;
+        let w0 = rt_records[at];
+        let w1 = rt_records[at + 1u];
+        out.n = lod_box_normal(lod_dir(w0));
+        out.tint = lod_tint(w0);
+        out.biome = w1 >> FACE_BIOME_SHIFT;
+        // Its texture a block to a tile, across the face's own two axes.
+        let p = out.world;
+        let a = abs(out.n);
+        let uv = fract(select(select(p.xy, p.xz, a.y > 0.5), p.zy, a.x > 0.5));
+        let tex = w1 & FACE_TEX_MASK;
+        out.albedo = textureSampleLevel(textures[tex_info[tex * 4u]], nearest_mipped, vec2(uv.x, 1.0 - uv.y), max(lod, 2.0));
+    }
+    return out;
 }
 
 fn rt_sun(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool) -> vec3<f32> {
@@ -1628,7 +1782,9 @@ fn rt_sun(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool) -> vec3<f32> 
     let mask = select(0xFFu, 0xFFu & ~2u, plant);
     var rq: ray_query;
     // The TLAS is in the space of the camera's cube (`world_render::rt`), the camera at `g.cam_frac`.
-    rayQueryInitialize(&rq, rt_scene, RayDesc(RAY_FLAG_TERMINATE_ON_FIRST_HIT, mask, 0.0, 16384.0, rel + lift + g.cam_frac.xyz, l));
+    // 768 blocks: packs trace from within a few hundred of the eye, and a lit pixel's ray walks its
+    // whole length through the distant tiles (a view of 32's far land cost the most).
+    rayQueryInitialize(&rq, rt_scene, RayDesc(RAY_FLAG_TERMINATE_ON_FIRST_HIT, mask, 0.0, 768.0, rel + lift + g.cam_frac.xyz, l));
     var through = vec3(1.0);
     while rayQueryProceed(&rq) {
         let h = rayQueryGetCandidateIntersection(&rq);
@@ -1639,7 +1795,7 @@ fn rt_sun(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool) -> vec3<f32> 
             }
             continue;
         }
-        let rec = h.primitive_index / 2u;
+        let rec = row.w + h.primitive_index / 2u;
         let texel = rt_texel(row.x, row.z, rec, h.primitive_index % 2u, h.barycentrics);
         if rec >= row.y {
             // Translucent: water and tinted panes let it through; stained glass colours it.
