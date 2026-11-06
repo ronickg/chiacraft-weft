@@ -3182,6 +3182,16 @@ impl Client {
         }
         let cam = self.render_camera();
         let mut scene = self.scene(&cam, frame);
+        // The calm world pipelines (`gpu_layout::CALM_OFF`) while nothing they leave out is on, read
+        // from the scene the shaders see: no fog in the air, no thunder, no held light, the eye in
+        // no liquid (the fog then starts at 0.6 of its end).
+        let hand = scene.hand_light;
+        self.render.set_calm(
+            scene.weather[2] <= 0.0
+                && scene.lightning[2] < 0.05
+                && hand[0].max(hand[1]).max(hand[2]) <= 0.0
+                && (scene.params[0] - 0.6 * scene.params[1]).abs() <= 0.5,
+        );
         while self.scene_bufs.len() < gpu.frames_in_flight() {
             self.scene_bufs.push(gpu.create_buffer(
                 size_of::<Scene>() as u64,
