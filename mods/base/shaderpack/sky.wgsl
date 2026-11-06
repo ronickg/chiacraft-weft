@@ -294,9 +294,11 @@ fn soft_density(s: Sky, at: vec2<f32>, a: f32, cover: f32, fine: bool) -> f32 {
 }
 
 // How low the sun is for the clouds' light, 0 (high, or down) to 1 (just above the horizon).
+// With the HDR world only (Shader's 2fb0c270, carried for the cloud light, step d): without it the
+// clouds stay as today's approved look.
 fn cloud_low_sun() -> f32 {
     let e = scene.sun.y;
-    return (1.0 - smoothstep(0.06, 0.4, e)) * smoothstep(-0.04, 0.03, e) * (1.0 - rain_amount());
+    return (1.0 - smoothstep(0.06, 0.4, e)) * smoothstep(-0.04, 0.03, e) * (1.0 - rain_amount()) * select(0.0, 1.0, scene.frame.x > 0.5);
 }
 
 // The sunlight on the clouds against the palette's: an orange that deepens as the sun gets low.
