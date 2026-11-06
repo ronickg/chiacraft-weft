@@ -372,7 +372,10 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     pt_out[at] = vec4(dif, diffuse_t);
     pt_out[at + 1u] = vec4(spe, specular_t);
     // The picture's own (mode 0), or what the denoiser adds onto (1).
-    let under = select(air + dif * albedo + spe * s_alb, air, pt.mode == 1u);
+    // The picture as the world's pass finishes it (`display`: the night's blue, or the LDR tone
+    // curve); under a denoiser that adds the light later, the air alone (its night shift is then
+    // the composite's to make).
+    let under = select(display(air + dif * albedo + spe * s_alb), air, pt.mode == 1u);
     pt_out[at + 2u] = vec4(under, 1.0);
 }
 
