@@ -477,6 +477,24 @@ const OPS: &[(&str, &str, Run)] = &[
         if missed > 0 { Err(format!("{missed} blocks not loaded")) } else { Ok(volume.to_string()) }
     }),
     ("get", "<pos:pos>", |w, cmd, _, _| Ok(block_name(w.block(pos(cmd, "pos")?)).to_string())),
+    // The highest block of column (x, z) that isn't air, and the three under it: "x z y top under under under"
+    // (Far view, 11-05: which surface the cubes at the view's edge have, against those further in).
+    ("top", "<x:int> <z:int>", |w, cmd, _, _| {
+        let (x, z): (i32, i32) = (int(cmd, "x")?, int(cmd, "z")?);
+        let air = |n: &str| n.ends_with(":air") || n == "air" || n.ends_with("cave_air");
+        for y in (-64..=320).rev() {
+            let n = block_name(w.block([x, y, z]));
+            if !air(n) {
+                let under: Vec<&str> = (1..=3)
+                    .map(|d| block_name(w.block([x, y - d, z])))
+                    .collect();
+                let line = format!("{x} {z} {y} {n} {}", under.join(" "));
+                weft_sdk::info!("tk top {line}");
+                return Ok(line);
+            }
+        }
+        Ok(format!("{x} {z} none"))
+    }),
     ("parts", "<pos:pos>", |w, cmd, _, _| {
         Ok(w.parts(pos(cmd, "pos")?)
             .into_iter()

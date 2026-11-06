@@ -86,7 +86,7 @@ const fn f(block: &'static str, found: &'static [&'static str], ground: Ground, 
     Flower { block, found, ground, blooms }
 }
 const PLAINS: &[&str] = &["base:plains"];
-const FOREST: &[&str] = &["base:forest"];
+const FOREST: &[&str] = &["base:forest", "base:old_growth_forest"];
 const BIRCH: &[&str] = &["base:birch_forest"];
 const TAIGA: &[&str] = &["base:taiga"];
 const SNOWY: &[&str] = &["base:snowy_plains"];
@@ -195,7 +195,7 @@ impl Turn {
 /// Every tree's leaves and how they turn: the conifers, palms and the tree fern stay green;
 /// birches and ginkgos go gold; oaks, acacias, mesquite and the swamp cypress (a deciduous conifer)
 /// go russet.
-pub const LEAVES: [(&str, Turn); 22] = [
+pub const LEAVES: [(&str, Turn); 23] = [
     ("base:oak_leaves", Turn::Orange),
     ("base:birch_leaves", Turn::Yellow),
     ("base:spruce_leaves", Turn::Evergreen),
@@ -210,6 +210,9 @@ pub const LEAVES: [(&str, Turn); 22] = [
     ("base:andiroba_leaves", Turn::Evergreen),
     ("base:matamata_leaves", Turn::Evergreen),
     ("base:ipe_leaves", Turn::Evergreen),
+    // The wild cherry's go orange-red in autumn (tinted, as the oak's; its spring blossom is drawn in
+    // its own colours under a tinted overlay of its young leaves, `notes/blocks/cherry_tint.py`).
+    ("base:cherry_leaves", Turn::Orange),
     // Drawn in its own colours (white bracts), so its tint isn't used (`blocks.rs`, `grove`).
     ("base:dogwood_leaves", Turn::Orange),
     // The shrubs', in their own colours too (`blocks.rs`).
@@ -230,7 +233,7 @@ pub const LEAVES: [(&str, Turn); 22] = [
 /// white bracts (April-May); the umbrella thorn's cream puffballs, as its rains begin; honey
 /// mesquite's yellow catkins (April-June); the creosote bush's small yellow flowers (February-April);
 /// the willow's catkins (March-April, with the first leaves).
-pub const BLOOMS: [(&str, u8); 6] = [
+pub const BLOOMS: [(&str, u8); 7] = [
     ("base:dogwood_leaves", SP),
     ("base:acacia_leaves", SP),
     ("base:mesquite_leaves", SP),
@@ -239,11 +242,23 @@ pub const BLOOMS: [(&str, u8); 6] = [
     // The golden ipê (Handroanthus serratifolius) flowers leafless at the dry season's end
     // (August-September at Manaus: the game's spring, its months six on), its whole crown yellow.
     ("base:ipe_leaves", SP),
+    // The wild cherry blossoms in April-May, before and with its first leaves: its crown pink
+    // (Ronald, 11-05, for Bliss's pink groves; the wild tree's are white flushed pink).
+    ("base:cherry_leaves", SP),
 ];
 
 /// Leaves drawn in their own colours, not tinted by the biome: the tropical canopy's, each crown a
 /// different green (Manaus's canopy from above is a patchwork, research's reference 05).
 pub const OWN_COLOURS: [&str; 3] = ["base:andiroba_leaves", "base:matamata_leaves", "base:ipe_leaves"];
+
+/// Wild cherry groves (Ronald, 11-05: "Yes, add wild cherry", for Bliss's pink groves): where the
+/// grove noise (patches some `CHERRY_GROVE_SIZE` blocks across) is over `CHERRY_GROVE_FROM`, a
+/// cherry per 4 x 4 cell by these chances, among the forest's own trees. Prunus avium grows on
+/// rich soil in the broadleaf woods and at their edges, in clumps from its suckers and the
+/// birds' dropped stones; in the old growth's gaps most.
+pub const CHERRY_GROVES: [(&str, f32); 3] = [("base:old_growth_forest", 0.7), ("base:forest", 0.6), ("base:birch_forest", 0.35)];
+pub const CHERRY_GROVE_SIZE: f64 = 320.0;
+pub const CHERRY_GROVE_FROM: f64 = 0.42;
 
 /// The seasons `leaves` bloom in (`BLOOMS`), if they do.
 pub fn blooms(leaves: &str) -> Option<u8> {
@@ -307,15 +322,23 @@ pub const BOREAL: &[&str] = &["base:taiga", "base:birch_forest", "base:mountains
 pub const SEDGE_LANDS: &[&str] = &["base:snowy_plains", "base:taiga", "base:swamp"];
 pub const MEADOWS: &[&str] = &["base:plains", "base:forest", "base:birch_forest", "base:mountains"];
 pub const WOODS: &[&str] = &["base:forest", "base:birch_forest", "base:plains"];
-pub const BRAMBLES: &[&str] = &["base:forest", "base:birch_forest", "base:plains", "base:taiga", "base:mountains"];
-pub const FOREST_FLOOR: &[&str] = &["base:forest", "base:birch_forest", "base:taiga", "base:mountains"];
-pub const AGARICS: &[&str] = &["base:forest", "base:birch_forest", "base:taiga"];
+pub const BRAMBLES: &[&str] =
+    &["base:forest", "base:old_growth_forest", "base:birch_forest", "base:plains", "base:taiga", "base:mountains"];
+pub const FOREST_FLOOR: &[&str] = &["base:forest", "base:old_growth_forest", "base:birch_forest", "base:taiga", "base:mountains"];
+pub const AGARICS: &[&str] = &["base:forest", "base:old_growth_forest", "base:birch_forest", "base:taiga"];
 /// Where the berry bush (blueberries) grows: the forests' floor.
-pub const FORESTS: &[&str] = &["base:forest", "base:birch_forest", "base:taiga"];
+pub const FORESTS: &[&str] = &["base:forest", "base:old_growth_forest", "base:birch_forest", "base:taiga"];
 pub const WETLANDS: &[&str] = &["base:swamp", "base:savanna"];
 /// Foxfire: the damp forests, where wood rots on the floor.
-pub const FOXFIRE_WOODS: &[&str] =
-    &["base:forest", "base:birch_forest", "base:taiga", "base:swamp", "base:tropical_forest", "base:sequoia_grove"];
+pub const FOXFIRE_WOODS: &[&str] = &[
+    "base:forest",
+    "base:old_growth_forest",
+    "base:birch_forest",
+    "base:taiga",
+    "base:swamp",
+    "base:tropical_forest",
+    "base:sequoia_grove",
+];
 /// Glow mycena: the warm wet forests.
 pub const MYCENA_WOODS: &[&str] = &["base:tropical_forest", "base:swamp"];
 pub const MARSHES: &[&str] = &["base:swamp", "base:plains", "base:forest", "base:taiga", "base:savanna"];
@@ -329,10 +352,11 @@ pub const PONDS: &[&str] = &["animals:floodplain", "animals:red_dunes"];
 /// Still fresh water in the temperate and boreal lands: white water lilies' (Nymphaea alba, and
 /// N. tetragona into the taiga).
 /// Water lilies on still water; the llanos' and the Pantanal's lagoons have theirs too.
-pub const LAKES: &[&str] = &["base:plains", "base:forest", "base:birch_forest", "base:swamp", "base:taiga", "base:savanna"];
+pub const LAKES: &[&str] =
+    &["base:plains", "base:forest", "base:old_growth_forest", "base:birch_forest", "base:swamp", "base:taiga", "base:savanna"];
 /// Common reed (Phragmites australis) rings the temperate and boreal lakes; the swamp's and the
 /// llanos' shores are mostly the cattails' and the wild rice's, with a few reeds (`COVER_IN`).
-pub const REEDBEDS: &[&str] = &["base:plains", "base:forest", "base:birch_forest", "base:taiga", "base:swamp"];
+pub const REEDBEDS: &[&str] = &["base:plains", "base:forest", "base:old_growth_forest", "base:birch_forest", "base:taiga", "base:swamp"];
 /// Sheltered sea floor: eelgrass meadows (Zostera) off the beaches.
 pub const SEA_MEADOWS: &[&str] = &["base:ocean", "base:beach"];
 /// Kelp forests: the open sea's rocky and sandy floor.

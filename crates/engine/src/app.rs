@@ -513,6 +513,8 @@ impl App {
         let look = Look::new(&assets, &mod_ids(), &lang);
         let textures = GameTextures::new(&mut *gpu, content(), &assets);
         let ui = UiRenderer::new(&mut *gpu, &assets)?;
+        // The HDR world's format, before any pipeline drawing into the world is made.
+        crate::post::set_hdr(settings.hdr_world());
         let post = crate::post::Post::new(&mut *gpu, &assets);
         let mut input = Input::default();
         for (action, key) in &content().game.keys {
@@ -2568,6 +2570,12 @@ fn update_game(r: &mut Running, dt: f64, frame_start: Instant) {
         g.client.render.occlusion.on = r.settings.occlusion_culling();
         g.client.sky.soft_wanted = r.settings.soft_clouds();
         r.post.use_low = r.settings.post_low();
+        r.post.bloom_levels = r.settings.bloom_levels();
+        // The mist volume with the HDR world only, until today's (LDR) look takes it on Ronald's
+        // word (its look was never shown to him there); `core:froxels` 0 turns it off there too.
+        g.client.sky.froxels_wanted = r.settings.froxels() && crate::post::hdr();
+        g.client.sky.froxels.cell = r.settings.froxel_cell();
+        g.client.sky.cloud_shadow_wanted = crate::post::hdr() && r.settings.cloud_shadows();
         let t = Instant::now();
         if world_input {
             g.client.update(&mut *r.gpu, &r.textures, &mut r.input, dt);
@@ -3034,7 +3042,8 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
     // Screen effects need the world in an image they can read, and so does a world drawn smaller
     // than the screen (`render_scale`), which their last pass scales up.
     let scaled = (world_info.width, world_info.height) != (info.width, info.height);
-    let post = (r.post.on() || scaled) && r.game.is_some();
+    // The HDR world always ends in the effects' last pass, which finishes the picture.
+    let post = (r.post.on() || scaled || crate::post::hdr()) && r.game.is_some();
     let world_target = if post {
         Target::Texture(
             r.post
@@ -3084,10 +3093,14 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         drop(s);
         // What the pack's look works out once a frame, before anything that reads it.
         r.list.append(&mut g.client.sky.frame_look.passes);
+        // The soft clouds' shadow on the land, before the world that reads it.
+        r.list.append(&mut g.client.sky.cloud_shadow.passes);
         // The shadow map once the models are posed, ahead of the world's pass that samples it.
         let s = crate::diag::span("shadows");
         g.client
             .render_shadows(&mut *r.gpu, &mut r.list, world_info);
+        // The mist's volume, which reads the shadow maps, before the world that reads it.
+        r.list.append(&mut g.client.sky.froxels.passes);
         drop(s);
         // The opaque world copied, then what is seen through it drawn over it, reading the copy.
         if g.client.behind[2] > 0.5 {

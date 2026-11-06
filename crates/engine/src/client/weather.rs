@@ -60,7 +60,7 @@ impl Weather {
                     shader: &shader,
                     vertex: "vs",
                     fragment: Some("fs"),
-                    color: Some(Format::Surface),
+                    color: Some(crate::post::world_format()),
                     depth: Some(DepthState { write: false, compare: Compare::GreaterEqual }),
                     blend: Blend::Alpha,
                     cull_back: false,

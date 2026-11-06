@@ -125,3 +125,4 @@ ffmpeg), from nothing but synthesis and CC0 files already here:
 | files | how | licence |
 |---|---|---|
 | `random/ley_twitch.wav` (the dowsing rod's tick, `ley.rs`) | synthesised: bell-like partials over a short decay, `mods/base/source/sounds/ley_twitch.py` | CC0 |
+| `random/ley_wake.wav` (a waystone waking, `waystones.rs`) | synthesised: a low swell rising into a bell chime, `mods/base/source/sounds/ley_wake.py` | CC0 |

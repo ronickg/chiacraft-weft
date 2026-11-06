@@ -142,6 +142,13 @@ pub fn dawn_mist(humidity: f32, sunrise: f32, hour: f32, wind: f32, raining: boo
     DAWN_MIST * damp * hours * (1.0 - blown)
 }
 
+/// How high over sea level the mist lies at most (blocks): under it valleys, rivers and lakes fill,
+/// above it ridges and forests stand out of it. The shader pack reads it (`MIST_TOP` in its
+/// shaders, written by `mods/base/src/shaderpack.rs`), today's look and the HDR path alike. 18, as
+/// the Look session found: our land stands higher than Minecraft's, and at 8 a hilly forest got
+/// mist only along its rivers (11-05).
+pub const MIST_TOP: f32 = 18.0;
+
 // ---- snow, blizzards and dust ----
 
 /// Below this air (°C, out in the open, the rain's cooling counted) what falls is snow.
@@ -591,8 +598,10 @@ pub const AURORA: [(&str, f32); 3] = [("base:taiga", 1.0), ("base:snowy_plains",
 /// a temperate broadleaf wood in leaf 3-10 %, a conifer or birch wood more, and an open grove or a
 /// swamp's scattered trees more again (Lighting's estimates from those shares). Biomes not listed
 /// have open sky.
-pub const CANOPY: [(&str, f32); 6] = [
+pub const CANOPY: [(&str, f32); 7] = [
     ("base:tropical_forest", 1.0),
+    // Białowieża's old oaks and hornbeams in leaf: a closed temperate canopy, 2-5 % of the sun.
+    ("base:old_growth_forest", 0.75),
     ("base:sequoia_grove", 0.6),
     ("base:forest", 0.5),
     ("base:taiga", 0.4),

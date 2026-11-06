@@ -267,7 +267,12 @@ fn crown_of(blocks: &[weft_abi::ScatterBlock]) -> Option<(i32, [u32; 2])> {
         }
         n.into_iter().max_by_key(|e| (e.1, e.0)).map(|e| e.0)
     };
-    let leaves = commonest(false, &|_| true).or_else(|| commonest(true, &|_| true))?;
+    // chiacraft: counted in the run's upper half, where a crown is: over the whole run a tall tree's
+    // logs (a 2x2 trunk 30 high is 120 of them) outnumbered its leaves, and far off it stood as a
+    // crown of logs from the ground up, a bare pillar (Far view, 11-05: the far forests' pillars).
+    let high = blocks.iter().map(|b| b.offset.y).max()?;
+    let upper = |b: &weft_abi::ScatterBlock| 2 * b.offset.y >= high;
+    let leaves = commonest(false, &upper).or_else(|| commonest(true, &|_| true))?;
     let crown: Vec<_> = blocks.iter().filter(|b| b.state == leaves).collect();
     let top = crown.iter().map(|b| b.offset.y).max()?;
     let bottom = crown.iter().map(|b| b.offset.y).min()?.clamp(0, top);
