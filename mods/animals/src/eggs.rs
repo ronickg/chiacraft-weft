@@ -593,9 +593,15 @@ pub fn wild_clutch(w: &World, id: u64, index: usize, st: &EntityState) -> bool {
         return false;
     }
     let at = [feet[0] as f64 + 0.5, feet[1] as f64, feet[2] as f64 + 0.5];
-    let nest = w.spawn(&NEST, at);
-    if nest_size(index) > 1.0 {
-        w.set_scale(nest, nest_size(index));
+    // A bird builds its cup; the others an earthen scrape (Tester 2's second run, 11-06: a wild
+    // raven nested in the raptors' dish).
+    if animals_core::nests::site(s.name).is_some() {
+        spawn_cup(w, index, at);
+    } else {
+        let nest = w.spawn(&NEST, at);
+        if nest_size(index) > 1.0 {
+            w.set_scale(nest, nest_size(index));
+        }
     }
     let mut r = coats::world_rng(w);
     let Some(pool) = crate::evolution::pool_at(w, index, st.pos.to_array()) else { return false };
