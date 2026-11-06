@@ -193,7 +193,10 @@ fn palette_made() -> Palette {
     // (A first pass, sunset horizon 1.05 0.58 0.30, hardly showed on the forest vista: PC shv_gold.)
     let golden = key(vec3(0.11, 0.25, 0.78), vec3(1.0, 0.78, 0.38), vec3(1.0, 0.70, 0.24), vec3(1.55, 0.88, 0.36), vec3(0.26, 0.25, 0.30));
     let sunset = key(vec3(0.08, 0.10, 0.38), vec3(1.08, 0.66, 0.26), vec3(1.0, 0.64, 0.20), vec3(1.50, 0.82, 0.34), vec3(0.30, 0.25, 0.27));
-    let dusk = key(vec3(0.045, 0.05, 0.16), vec3(0.30, 0.15, 0.27), vec3(0.45, 0.20, 0.25), vec3(0.0, 0.0, 0.0), vec3(0.10, 0.09, 0.17));
+    // The blue hour deep blue, as Bliss's (its land at 05:00 warmth -88, ours violet, about 0: the
+    // MC comparison's spring 8 sheets, 11-05), a pink band left low on the horizon.
+    // (Before: zenith 0.045 0.05 0.16, horizon 0.30 0.15 0.27, ambient 0.10 0.09 0.17.)
+    let dusk = key(vec3(0.025, 0.05, 0.19), vec3(0.22, 0.15, 0.30), vec3(0.45, 0.20, 0.25), vec3(0.0, 0.0, 0.0), vec3(0.05, 0.08, 0.20));
     // Night is dark and blue, a little lighter than vanilla's, so lanterns carry the scene.
     // Night is dark and blue, so firelight's orange stands out against it. (A blue-teal shade, as
     // Valheim's, mixed with the orange of a fire into olive on the ground: Tester 2's campfire.)
@@ -221,8 +224,9 @@ fn palette_made() -> Palette {
         // until about 3.5° under the horizon, the sunset's gold only as the sun nears it (the MC
         // comparison's spring 8 sheets, 11-05: at 05:00, sun.y -0.06 on vanilla's eased path,
         // ours was already sunrise-gold and bright where Bliss was still blue pre-dawn).
-        // (It was smoothstep(-0.14, -0.02): three quarters of the sunset's light at 05:00.)
-        p = blend(dusk, sunset, smoothstep(-0.08, -0.02, e));
+        // (It was smoothstep(-0.14, -0.02): three quarters of the sunset's light at 05:00; at
+        // -0.08..-0.02 still most of it a few minutes later, PC shbh_aft.)
+        p = blend(dusk, sunset, smoothstep(-0.05, -0.02, e));
     } else {
         p = blend(night, dusk, smoothstep(-0.3, -0.14, e));
     }
