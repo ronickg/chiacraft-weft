@@ -199,7 +199,9 @@ fn log(r: &mut Registry, handle: &'static Block, wood: &str, leaves: &str, shape
 /// own colours (`vitals::wild::OWN_COLOURS`): andiroba's dark glossy crown, matamatá's olive one
 /// (the commonest tree there), ipê's light green that turns all golden yellow in its spring bloom.
 /// The wild cherry (Prunus avium) of the old-growth and temperate forests, in groves, pink with
-/// blossom in spring (its leaves in their own colours), its cherries a summer fruit.
+/// blossom in spring (the blossom in its own colours over its young leaves, tinted), green in
+/// summer and russet in autumn as the forest's tint and season make it, its cherries a summer
+/// fruit.
 const WOODS: [(&str, Option<&str>, &str); 10] = [
     ("mesquite", Some("flat_tree"), "mesquite_pod"),
     ("acuri_palm", Some("palm_tree"), "acuri_nut"),

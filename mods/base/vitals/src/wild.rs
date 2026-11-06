@@ -210,7 +210,8 @@ pub const LEAVES: [(&str, Turn); 23] = [
     ("base:andiroba_leaves", Turn::Evergreen),
     ("base:matamata_leaves", Turn::Evergreen),
     ("base:ipe_leaves", Turn::Evergreen),
-    // The wild cherry's go orange-red in autumn; drawn in their own colours (`OWN_COLOURS`).
+    // The wild cherry's go orange-red in autumn (tinted, as the oak's; its spring blossom is drawn in
+    // its own colours under a tinted overlay of its young leaves, `notes/blocks/cherry_tint.py`).
     ("base:cherry_leaves", Turn::Orange),
     // Drawn in its own colours (white bracts), so its tint isn't used (`blocks.rs`, `grove`).
     ("base:dogwood_leaves", Turn::Orange),
@@ -248,7 +249,7 @@ pub const BLOOMS: [(&str, u8); 7] = [
 
 /// Leaves drawn in their own colours, not tinted by the biome: the tropical canopy's, each crown a
 /// different green (Manaus's canopy from above is a patchwork, research's reference 05).
-pub const OWN_COLOURS: [&str; 4] = ["base:andiroba_leaves", "base:matamata_leaves", "base:ipe_leaves", "base:cherry_leaves"];
+pub const OWN_COLOURS: [&str; 3] = ["base:andiroba_leaves", "base:matamata_leaves", "base:ipe_leaves"];
 
 /// Wild cherry groves (Ronald, 11-05: "Yes, add wild cherry", for Bliss's pink groves): where the
 /// grove noise (patches some `CHERRY_GROVE_SIZE` blocks across) is over `CHERRY_GROVE_FROM`, a
