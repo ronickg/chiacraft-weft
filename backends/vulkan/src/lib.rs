@@ -9,6 +9,8 @@ use gpu_allocator::MemoryLocation;
 use gpu_allocator::vulkan::{Allocation, AllocationCreateDesc, AllocationScheme, Allocator, AllocatorCreateDesc};
 use weft_render::*;
 
+#[cfg(feature = "ngx")]
+mod ngx;
 mod rt;
 #[cfg(feature = "streamline")]
 mod streamline;
@@ -336,7 +338,7 @@ impl VulkanBackend {
 
     unsafe fn create(desc: &BackendDesc) -> Result<VulkanBackend, Error> {
         unsafe {
-            let early = upscale::early();
+            let mut early = upscale::early();
             let entry = load_vulkan(&early)?;
             let display = desc
                 .window
@@ -389,6 +391,19 @@ impl VulkanBackend {
                     .any(|e| e.extension_name_as_c_str() == Ok(khr::portability_enumeration::NAME));
             if portability {
                 exts.push(khr::portability_enumeration::NAME.as_ptr());
+            }
+            // What the upscaler asks for (NGX), of what the loader has.
+            for e in early.instance_extensions(
+                &entry
+                    .enumerate_instance_extension_properties(None)
+                    .unwrap_or_default(),
+            ) {
+                if !exts
+                    .iter()
+                    .any(|x| std::ffi::CStr::from_ptr(*x) == std::ffi::CStr::from_ptr(e))
+                {
+                    exts.push(e);
+                }
             }
             let app = vk::ApplicationInfo::default()
                 .application_name(c"Weft")
@@ -637,6 +652,9 @@ impl VulkanBackend {
             if has_ext(khr::portability_subset::NAME) {
                 dev_exts.push(khr::portability_subset::NAME.as_ptr());
             }
+            // What the upscaler asks for (NGX), of what the GPU has.
+            let more = early.device_extensions(&instance, pdev, &dev_exts);
+            dev_exts.extend(more);
             let prio = [1.0];
             let qinfo = [vk::DeviceQueueCreateInfo::default()
                 .queue_family_index(queue_family)
@@ -817,6 +835,8 @@ impl VulkanBackend {
             let pipeline_cache = device
                 .create_pipeline_cache(&vk::PipelineCacheCreateInfo::default(), None)
                 .map_err(err("pipeline cache"))?;
+            let upscaler =
+                upscale::ready(early, &upscale::Made { entry: &entry, instance: &instance, pdev, device: &device }, desc.upscale_standin);
             let mut backend = VulkanBackend {
                 _entry: entry,
                 instance,
@@ -867,7 +887,7 @@ impl VulkanBackend {
                 ts_period: props.limits.timestamp_period,
                 gpu_times: Vec::new(),
                 submit_split: SubmitSplit::default(),
-                upscaler: upscale::ready(early, pdev, desc.upscale_standin),
+                upscaler,
                 rt: None,
             };
             if ray_query {
@@ -1798,7 +1818,7 @@ impl VulkanBackend {
     /// `Cmd::Upscale`: the inputs made shader-readable, the output `GENERAL` (DLSS writes it as a
     /// storage image), the upscaler run, or the colour scaled up plainly if it could not, and the
     /// output left shader-readable for the effects.
-    unsafe fn record_upscale(&mut self, cmd: vk::CommandBuffer, images: [TextureId; 4], guides: [TextureId; 3], params: &UpscaleParams) {
+    unsafe fn record_upscale(&mut self, cmd: vk::CommandBuffer, images: [TextureId; 4], guides: [TextureId; 4], params: &UpscaleParams) {
         let readable = |b: &mut Self, t: TextureId| {
             let tex = b.textures.get(t.0);
             let (image, was, depth) = (tex.image, tex.layout, tex.desc.format == Format::Depth32);
@@ -1843,6 +1863,7 @@ impl VulkanBackend {
             normals: guide(self, guides[0]),
             albedo: guide(self, guides[1]),
             specular: guide(self, guides[2]),
+            hit_distance: guide(self, guides[3]),
         };
         let done = match self.upscaler.as_mut() {
             Some(u) => unsafe { u.record(cmd, &inputs, params) },
@@ -2900,10 +2921,10 @@ impl Backend for VulkanBackend {
                         self.barrier_image(cmd, image, depth_range(), vk::ImageLayout::TRANSFER_SRC_OPTIMAL, back);
                         self.textures.get_mut(depth.0).layout = back;
                     }
-                    Cmd::Upscale { color, depth, motion, output, normals, albedo, specular, start } => {
+                    Cmd::Upscale { color, depth, motion, output, normals, albedo, specular, hit_distance, start } => {
                         let size = size_of::<UpscaleParams>();
                         let params: UpscaleParams = bytemuck::pod_read_unaligned(&list.data[start as usize..start as usize + size]);
-                        self.record_upscale(cmd, [color, depth, motion, output], [normals, albedo, specular], &params);
+                        self.record_upscale(cmd, [color, depth, motion, output], [normals, albedo, specular, hit_distance], &params);
                         // An upscaler leaves its own pipeline and bindings behind.
                         current = None;
                         bound.clear();

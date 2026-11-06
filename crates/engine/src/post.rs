@@ -216,6 +216,22 @@ pub struct TemporalInputs {
     pub reset: bool,
 }
 
+/// The path tracer's G-buffer and specular light (`Post::set_pt_guides`), all at the world's size:
+/// Ray Reconstruction's guides come from them instead of `upscale_guides.wgsl`'s estimates from
+/// the picture and depth (the layout agreed with the RT session, `notes/` "pt-denoisers").
+#[derive(Clone, Copy, Debug)]
+pub struct PtGuides {
+    /// xyz the shading normal (world axes, camera-relative), w its perceptual roughness.
+    pub normal: TextureId,
+    /// rgb the diffuse albedo, linear (metals 0).
+    pub albedo: TextureId,
+    /// rgb the reflectance at normal incidence (F0).
+    pub spec: TextureId,
+    /// The path tracer's specular light; a how far its ray went (blocks). None before it has one:
+    /// no hit distance then.
+    pub specular: Option<TextureId>,
+}
+
 static BLOOM: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// Whether the last frame drew the HDR world's bloom pyramid (`Pass::bloom`): a pack's own bloom
@@ -312,7 +328,17 @@ pub struct Post {
     up_targets: Option<([TextureId; 2], [u32; 2], (u32, u32))>,
     guide_pipes: Option<(PipelineId, PipelineId)>,
     guides: Option<([TextureId; 3], (u32, u32))>,
+    /// From the path tracer's G-buffer (`set_pt_guides`): this frame's, the pipeline drawing the
+    /// specular albedo and hit distance from it (`fs_pt_guides`), and those two images.
+    pt_guides: Option<PtGuides>,
+    /// `fs_pt_guides_a` (normals + roughness and albedo from the G-buffer, estimated where it is
+    /// empty) and `fs_pt_guides` (specular albedo and hit distance).
+    pt_pipe_a: Option<PipelineId>,
+    pt_pipe: Option<PipelineId>,
+    pt_targets: Option<([TextureId; 2], (u32, u32))>,
     up_held: Option<(UpscaleMode, bool, (u32, u32), (u32, u32))>,
+    /// The path tracer's denoiser (`denoise.rs`), which the path tracer runs after its pass.
+    pub denoiser: crate::denoise::Denoiser,
 }
 
 const MAX_PASSES: usize = 40;
@@ -352,6 +378,11 @@ impl Post {
             depth_tex: None,
             upscaled: None,
             upscale: None,
+            denoiser: crate::denoise::Denoiser::new(gpu, assets),
+            pt_guides: None,
+            pt_pipe_a: None,
+            pt_pipe: None,
+            pt_targets: None,
             up_out: None,
             up_targets: None,
             guide_pipes: None,
@@ -415,6 +446,12 @@ impl Post {
             gpu.destroy_pipeline(a);
             gpu.destroy_pipeline(b);
         }
+        for p in [self.pt_pipe.take(), self.pt_pipe_a.take()]
+            .into_iter()
+            .flatten()
+        {
+            gpu.destroy_pipeline(p);
+        }
         let info = gpu.upscaler();
         if !motion() || !(info.reconstruct || info.neural) {
             return;
@@ -440,7 +477,12 @@ impl Post {
                 // Normals and roughness, with the albedo beside them (the second image).
                 let guides = make("upscale guides", "fs_guides", true)?;
                 match make("upscale specular", "fs_specular", false) {
-                    Ok(sp) => Ok((guides, sp)),
+                    Ok(sp) => Ok((
+                        guides,
+                        sp,
+                        make("upscale pt guides", "fs_pt_guides", true)
+                            .and_then(|b| make("upscale pt guides a", "fs_pt_guides_a", true).map(|a| (a, b))),
+                    )),
                     Err(e) => {
                         gpu.destroy_pipeline(guides);
                         Err(e)
@@ -448,7 +490,16 @@ impl Post {
                 }
             });
         match made {
-            Ok(p) => self.guide_pipes = Some(p),
+            Ok((g, sp, pt)) => {
+                self.guide_pipes = Some((g, sp));
+                match pt {
+                    Ok((a, b)) => {
+                        self.pt_pipe_a = Some(a);
+                        self.pt_pipe = Some(b);
+                    }
+                    Err(e) => log::error!("upscaler guides from the G-buffer: {e}"),
+                }
+            }
             Err(e) => log::error!("upscaler guides: {e}"),
         }
     }
@@ -466,8 +517,15 @@ impl Post {
         self.upscale = Some(frame);
     }
 
+    /// This frame was path traced: Ray Reconstruction's guides come from its G-buffer
+    /// (`PtGuides`), with its specular hit distance. Set each frame, before `apply`.
+    pub fn set_pt_guides(&mut self, guides: PtGuides) {
+        self.pt_guides = Some(guides);
+    }
+
     pub fn reload(&mut self, gpu: &mut dyn Backend, assets: &Assets) {
         self.reload_taa(gpu, assets);
+        self.denoiser.reload(gpu, assets);
         let snippets = crate::shaders::snippets(assets, &HOOK);
         let low_snippets = crate::shaders::snippets(assets, &HOOK_LOW);
         let made = crate::packs::compose(assets, "post.wgsl", &[(&HOOK, &snippets), (&HOOK_LOW, &low_snippets)])
@@ -835,11 +893,28 @@ impl Post {
                 .push(gpu.create_buffer((size_of::<Pass>() * MAX_PASSES) as u64, usage::STORAGE | usage::HOST, "post passes"));
         }
         let time = crate::shaders::time();
+        // The denoiser's check before the path tracer exists (`denoise::test_on`): its result is
+        // this frame's world from here on.
+        let (mut world_tex, mut world_idx) = (tex[0], idx[0]);
+        if crate::denoise::test_on() && self.denoiser.ready() {
+            if let Some(d) = self.depth_tex {
+                let motion = self
+                    .motion_tex
+                    .filter(|m| m.2 == (frame.width, frame.height))
+                    .map(|m| m.0);
+                if let Some(out) = self
+                    .denoiser
+                    .run_test(gpu, list, frame.slot, scene, tex[0], d, motion, (frame.width, frame.height))
+                {
+                    (world_tex, world_idx) = (out, gpu.texture_index(out));
+                }
+            }
+        }
         // Temporal anti-aliasing first: this frame's world gathered into the picture so far, which
         // all after it read in the world's place (`src`): the bloom, the half-size parts and the
         // effects, so their sharpening (chiacraft's `sharpen_delta`) works on the gathered picture,
         // not on this frame's aliasing. An upscaler's result (`set_upscaled`) takes its place.
-        let mut src = idx[0];
+        let mut src = world_idx;
         let mut taa_entries: Vec<Pass> = Vec::new();
         // (target, pipeline, entry among `taa_entries`)
         let mut taa_draws: Vec<(TextureId, Option<TextureId>, PipelineId, usize)> = Vec::new();
@@ -871,12 +946,56 @@ impl Post {
                 self.full_motion = Some((t, gpu.texture_index(t), (w, h)));
             }
             let (full, ..) = self.full_motion.unwrap();
-            let entry = Pass { scene: idx[0], slot: 0, time, size: [w as f32, h as f32], depth, bloom: motion_idx + 1, ..Pass::default() };
+            let entry =
+                Pass { scene: world_idx, slot: 0, time, size: [w as f32, h as f32], depth, bloom: motion_idx + 1, ..Pass::default() };
             taa_entries.push(entry);
             taa_draws.push((full, None, fill, taa_entries.len() - 1));
-            // Ray Reconstruction's guides, from the world's picture and depth.
+            // Ray Reconstruction's guides: from the path tracer's G-buffer when it drew this frame
+            // (the normals and albedo as they are, the specular albedo and hit distance drawn
+            // from it), else estimated from the world's picture and depth.
             let mut g = [NO_TEXTURE; 3];
-            if let (true, Some((guide_pipe, spec_pipe))) = (u.reconstruct, self.guide_pipes) {
+            let mut hit = NO_TEXTURE;
+            let pt = self.pt_guides.take();
+            if let (true, Some(pt), Some(pt_pipe), Some(pt_pipe_a)) = (u.reconstruct, pt, self.pt_pipe, self.pt_pipe_a) {
+                if self.guides.is_none_or(|t| t.1 != (w, h)) {
+                    if let Some((old, _)) = self.guides.take() {
+                        old.into_iter().for_each(|t| gpu.destroy_texture(t));
+                    }
+                    let t = [rt(gpu, w, h, "guide normals"), rt(gpu, w, h, "guide albedo"), rt(gpu, w, h, "guide specular")];
+                    self.guides = Some((t, (w, h)));
+                }
+                let ga = self.guides.unwrap().0;
+                // Normals and albedo: the G-buffer's, estimated from the picture where it drew nothing.
+                taa_entries.push(Pass {
+                    scene: idx[0],
+                    size: [w as f32, h as f32],
+                    depth,
+                    low: gpu.texture_index(pt.normal) + 1,
+                    bloom: gpu.texture_index(pt.albedo) + 1,
+                    ..Pass::default()
+                });
+                taa_draws.push((ga[0], Some(ga[1]), pt_pipe_a, taa_entries.len() - 1));
+                if self.pt_targets.is_none_or(|t| t.1 != (w, h)) {
+                    if let Some((old, _)) = self.pt_targets.take() {
+                        old.into_iter().for_each(|t| gpu.destroy_texture(t));
+                    }
+                    self.pt_targets = Some(([rt(gpu, w, h, "guide pt specular"), rt(gpu, w, h, "guide pt hit distance")], (w, h)));
+                }
+                let t = self.pt_targets.unwrap().0;
+                let pt_entry = Pass {
+                    scene: gpu.texture_index(pt.spec),
+                    size: [w as f32, h as f32],
+                    depth,
+                    low: gpu.texture_index(ga[0]) + 1,
+                    bloom: pt.specular.map_or(0, |s| gpu.texture_index(s) + 1),
+                    exposure: gpu.texture_index(pt.normal) + 1,
+                    ..Pass::default()
+                };
+                taa_entries.push(pt_entry);
+                taa_draws.push((t[0], Some(t[1]), pt_pipe, taa_entries.len() - 1));
+                g = [ga[0], ga[1], t[0]];
+                hit = if pt.specular.is_some() { t[1] } else { NO_TEXTURE };
+            } else if let (true, Some((guide_pipe, spec_pipe))) = (u.reconstruct, self.guide_pipes) {
                 if self.guides.is_none_or(|t| t.1 != (w, h)) {
                     if let Some((old, _)) = self.guides.take() {
                         old.into_iter().for_each(|t| gpu.destroy_texture(t));
@@ -920,13 +1039,14 @@ impl Post {
             let start = list.data.len() as u32;
             list.data.extend_from_slice(bytemuck::bytes_of(&params));
             up_cmd = Some(Cmd::Upscale {
-                color: tex[0],
+                color: world_tex,
                 depth: depth_tex,
                 motion: full,
                 output: out,
                 normals: g[0],
                 albedo: g[1],
                 specular: g[2],
+                hit_distance: hit,
                 start,
             });
             src = out_idx;
@@ -951,7 +1071,7 @@ impl Post {
             let (counts, cidx, _) = self.counts.unwrap();
             let (cur, last) = (self.taa_cur, 1 - self.taa_cur);
             let entry = Pass {
-                scene: idx[0],
+                scene: world_idx,
                 slot: 0,
                 strength: self.taa_blend,
                 time,
@@ -995,7 +1115,7 @@ impl Post {
             }
             let j = jitter();
             self.inputs = Some(TemporalInputs {
-                color: tex[0],
+                color: world_tex,
                 depth: self.depth_tex.unwrap_or(TextureId(u32::MAX)),
                 motion: full,
                 size: (frame.width, frame.height),

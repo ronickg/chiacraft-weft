@@ -13,6 +13,8 @@ log.workspace = true
 [features]
 # DLSS through NVIDIA's Streamline (Windows), see backends/vulkan/src/streamline.rs.
 streamline = ["weft_vulkan/streamline"]
+# DLSS through NVIDIA's NGX on Linux (needs NGX_SDK_DIR), see backends/vulkan/src/ngx.rs.
+ngx = ["weft_vulkan/ngx"]
 
 [build-dependencies]
 winresource = "0.1"
