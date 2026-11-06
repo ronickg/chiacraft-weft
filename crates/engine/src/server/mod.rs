@@ -1096,6 +1096,8 @@ impl Server {
             self.players[pi]
                 .conn
                 .send(ToClient::LodColumns { dim, all: true, cols });
+            let far = s.lock().far[dim as usize].clone();
+            self.players[pi].conn.send(lod_far(dim, far));
         }
     }
 
@@ -1292,6 +1294,8 @@ impl Server {
             players[pi]
                 .conn
                 .send(ToClient::LodColumns { dim: to, all: true, cols });
+            let far = s.lock().far[to as usize].clone();
+            players[pi].conn.send(lod_far(to, far));
         }
         let p = &mut players[pi];
         p.conn
@@ -1679,6 +1683,11 @@ fn death_message(c: &Content, cause: u32, killer: Option<u32>, name: String) -> 
 
 fn void_note(c: &Content) -> Msg {
     Msg::new(if c.spawn_dim == c.void_dim { "void.no_dimension" } else { "void.here" }, Vec::new())
+}
+
+/// chiacraft, test only: an imported world's far terrain for dimension `dim`, or none (`ToClient::LodFar`).
+fn lod_far(dim: u32, far: Option<std::sync::Arc<Vec<u8>>>) -> ToClient {
+    ToClient::LodFar { dim, grid: far.map(|f| (*f).clone()).unwrap_or_default() }
 }
 
 fn lod_columns<'a>(cols: impl Iterator<Item = &'a lod_tops::LodColumn>) -> Vec<(i32, i32, i32, u32, u32)> {

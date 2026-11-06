@@ -495,6 +495,11 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
             // lime by its colour alone; from 0.25 it hardly counted, 3 % of the frame left, PC sh6b.)
             let k = smoothstep(0.06, 0.22, luma(c)) * smoothstep(0.55, 0.85, sat) * smoothstep(0.25, 0.45, c.r / c.g) * low;
             lit = vec4(mix(c, vec3(luma(c)) * vec3(0.92, 1.05, 0.88), k * 0.175) * (1.0 - 0.18 * k), lit.a);
+            // And its red pulled down, so it turns green rather than grey (Ronald: "a bit greener"):
+            // the crown by the eye still read yellow-lime at 17:00-18:00, sRGB 88 125 3, hue 82
+            // where noon's lit leaves are about 100 (Tester 2's f0d78419 hours, 11-06). At 0.55 of
+            // its red, linear red/green 0.47 goes to about 0.26, hue about 95.
+            lit = vec4(lit.r * mix(1.0, 0.55, k), lit.g, lit.b, lit.a);
         }
     } else {
         lit = block_shade(in.slot, BlockPixel(in.uv, albedo, light, in.pos, scene.params.w));
@@ -760,10 +765,11 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     // A water face seen from inside the water that is not its surface: one the mesher draws where
     // the water meets a cube not loaded yet (at a chunk edge). Water inside water is not there; it
     // showed as flat dark-cyan boxes standing in the sea (Plants' reef, coral_under_w).
-    if in_water() && abs(in.normal.y) <= 0.5 {
+    // (Never with the eye out of liquid: a calm scene's shader has neither, `CALM`.)
+    if !CALM && in_water() && abs(in.normal.y) <= 0.5 {
         discard;
     }
-    if in_water() && abs(in.normal.y) > 0.5 && v.y < 0.0 {
+    if !CALM && in_water() && abs(in.normal.y) > 0.5 && v.y < 0.0 {
         let window = smoothstep(0.55, 0.85, -v.y);
         let sky = mix(0.6, 2.4, window) * mix(0.15, 1.0, brightness_curve(in.light.x));
         return WaterLit(underwater_color() * sky, vec3(0.0), 1.0);
@@ -1030,14 +1036,16 @@ const FADE_BAND: f32 = 24.0;
 // Whether this pixel, near where the cubes end (`g.extra.y` blocks across from the camera), is
 // left to distant terrain: more of them the nearer the end, in a fine noise over the screen
 // (interleaved gradient noise). A cube's pixel and the distant terrain's at the same place agree,
-// so one of the two always draws it.
+// so one of the two always draws it. The noise moves each frame (`scene.frame.w`, Jimenez's
+// 5.588238 a frame): fixed on the screen, its dots stood still as a stipple over the mid canopy at
+// view 12 (the Look session, 11-06); moving, they blend in time (and in a temporal AA's history).
 fn faded(in: VOut) -> bool {
     let end = f32(g.extra.y);
     if end <= 0.0 {
         return false;
     }
     let f = clamp((length(in.rel.xz) - (end - FADE_BAND)) / FADE_BAND, 0.0, 1.0);
-    let p = floor(in.clip.xy);
+    let p = floor(in.clip.xy) + 5.588238 * scene.frame.w;
     return fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y)) < f;
 }
 

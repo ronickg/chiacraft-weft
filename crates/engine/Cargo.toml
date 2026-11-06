@@ -7,6 +7,8 @@ license.workspace = true
 [dependencies]
 weft_abi.workspace = true
 chiacraft-packages = { path = "../packages" }
+# Test only: loads a Minecraft world block for block (`chiacraft::mc_import`).
+chiacraft-mcimport = { path = "../mcimport" }
 weft_noise.workspace = true
 weft_render.workspace = true
 winit.workspace = true

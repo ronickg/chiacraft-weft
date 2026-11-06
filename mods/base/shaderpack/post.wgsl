@@ -302,6 +302,22 @@ fn mist_over(uv: vec2<f32>, pass_: Pass) -> f32 {
     return clamp(1.0 - v.a, 0.0, 1.0);
 }
 
+// Whether the pixel at `uv` with depth `d` is the sky's: nothing drawn (depth 0), or a cloud (the
+// clouds write their depth too). Land, never that high, is the rest. With the clouds counted as
+// land, the sky's boost and dimming stopped at their faint edges (where they stop drawing), cut
+// hard edges round the blue between them and a flat band under the deck's far end, and the clouds
+// took the land's brightening instead (mc_forest noon cloud 228 against Bliss's 201, gr5).
+fn sky_or_cloud(uv: vec2<f32>, d: f32) -> bool {
+    if d <= 0.0 {
+        return true;
+    }
+    let w = scene.inv_view_proj * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, d, 1.0);
+    // The soft deck's underside (as the lightning's, `look.wgsl`), less a margin; the blocky
+    // clouds' slab without soft ones.
+    let lift = select(0.0, SOFT_LIFT * (1.0 - 0.7 * max(min(rain_amount() * 0.75 + scene.weather.w * 0.25, 1.0), scene.weather.w)), scene.soft_clouds.x > 0.5);
+    return w.y / w.w > scene.clouds.z + lift - 20.0;
+}
+
 // The HDR world's light before the tone curve: the bloom mixed in and the exposure applied.
 fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
     var col = max(c, vec3(0.0));
@@ -310,7 +326,7 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
     // overhead and gold toward a low sun (08:00, saturation 26 against 43). Not in rain.
     let size = vec2<i32>(pass_.size);
     let px = clamp(vec2<i32>(uv * pass_.size), vec2(0), size - vec2(1));
-    let sky_px = textureLoad(textures[pass_.depth], px, 0).r <= 0.0;
+    let sky_px = sky_or_cloud(uv, textureLoad(textures[pass_.depth], px, 0).r);
     if sky_px {
         let y = luma(col);
         // More as the sun climbs, where the land's saturation is taken down most (0.62 of it with a
@@ -318,15 +334,25 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
         // (mc_forest noon 22 against 31, 08:00 27 against 43).
         let open = smoothstep(0.0, 0.15, scene.sun.y) * (1.0 - rain_amount());
         // (Twice the first try's rise: 0.6 more was all taken back by the land's lower saturation
-        // and the curve's shoulder, noon 22 still, gr2.)
-        let k = 1.0 + (0.3 + 1.2 * smoothstep(0.3, 0.75, scene.sun.y)) * open;
+        // and the curve's shoulder, noon 22 still, gr2. At 1.2 the blue between the clouds went
+        // past Bliss's, noon 67 against 48 (dev 33): 0.8.)
+        // Only up the sky, not low over the horizon, where Bliss's stays pale haze: boosted there
+        // the band between the clouds' far end and the land went deep blue, and the clouds' cut
+        // edge along the far land's outline showed (mc_forest noon, gr5).
+        let wv = scene.inv_view_proj * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, 1.0, 1.0);
+        let up = smoothstep(0.03, 0.3, normalize(wv.xyz / wv.w).y);
+        // Most in the morning, less at noon: with the clouds counted as sky the noon blue between
+        // them went to saturation 75 against Bliss's 48 and the clouds' shaded bellies steel blue,
+        // while 08:00's stayed 35 against 45 (skf).
+        let k = 1.0 + (1.3 - 0.9 * smoothstep(0.45, 0.8, scene.sun.y)) * open * up;
         col = max(vec3(y) + (col - vec3(y)) * k, vec3(0.0));
         // And dimmer by day: ours read brighter than Bliss's at every hour (mc_forest 08:00
         // 216 against 208, noon 217 against 192, 17:00 193 against 171). The day's brightening
         // below leaves it out (on it too, the 08:00 sky went to 224, gr2).
         // (30%: at 15% the sky, mostly bright cloud on the curve's shoulder, barely moved, noon 216
         // to 213, gr3.)
-        col *= 1.0 - 0.3 * open;
+        // (25%: with the clouds dimmed too, 30% took the blue between them to 155 against 172, skf.)
+        col *= 1.0 - 0.25 * open;
     }
     if pass_.bloom != 0u {
         let glow = bloom_tap(pass_.bloom - 1u, uv);

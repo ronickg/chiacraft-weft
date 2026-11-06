@@ -89,3 +89,6 @@ pub const FLOWERS: [(&str, u32); 47] = [
     ("base:wood_anemone", 0xEAE3CF),
     ("base:wood_cranesbill", 0xA865BF),
 ];
+
+/// Blown sand's shades, darkest first: the sand texture's pixels in four bands of brightness.
+pub const SAND: [u32; 4] = [0xE7C884, 0xEBCF8D, 0xEFD596, 0xF3DCA2];

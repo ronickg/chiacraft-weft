@@ -960,10 +960,14 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f
     let c_open = min(canopy(), 1.0);
     let open = smoothstep(mix(0.5, 0.25, c_open), mix(0.95, 0.55, c_open), light.x);
     c += p.sun * light_strength() * sun_facing(n) * shadow * open * mix(0.75, 1.0, ao);
-    // The ground round a lightning strike, lit by it (the HDR world).
-    c += lightning_glow_at(rel) * sky * hemi * ao;
-    // A held torch's light where it is brighter than the placed lights there (no doubling).
-    c += block_light(max(light.yzw, held_light(rel, n)), pos) * mix(0.5, 1.0, ao) * block_by_day(light.x);
+    // The ground round a lightning strike, lit by it (the HDR world). A held torch's light where it
+    // is brighter than the placed lights there (no doubling). Neither in a calm scene (`CALM`).
+    var held = vec3(0.0);
+    if !CALM {
+        c += lightning_glow_at(rel) * sky * hemi * ao;
+        held = held_light(rel, n);
+    }
+    c += block_light(max(light.yzw, held), pos) * mix(0.5, 1.0, ao) * block_by_day(light.x);
     // A floor so caves are never quite black: the dimension's own and the Brightness setting.
     let floor_light = max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y));
     c += vec3(floor_light) * vec3(0.85, 0.9, 1.0) * ao;
@@ -976,7 +980,11 @@ fn light_round(light: vec4<f32>, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let sky = brightness_curve(light.x);
     var c = p.ambient * sky * 0.85;
     c += p.sun * light_strength() * 0.5 * smoothstep(0.5, 0.95, light.x);
-    c += block_light(max(light.yzw, held_light(rel, vec3(0.0))), pos) * block_by_day(light.x);
+    var held = vec3(0.0);
+    if !CALM {
+        held = held_light(rel, vec3(0.0));
+    }
+    c += block_light(max(light.yzw, held), pos) * block_by_day(light.x);
     c += vec3(max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y)));
     return c;
 }
@@ -1219,7 +1227,8 @@ fn sun_reaches(rel: vec3<f32>) -> f32 {
 // the sun reaches its glow, so light shafts show where it comes through. Lit as if all in the open,
 // a rainforest's morning mist was a white wall between the trunks (Lighting's canopy checks, 11-04).
 fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
-    if scene.weather.z < 0.005 || in_liquid() || !open_sky() || sky <= 0.0 {
+    // No fog in a calm scene's air (`CALM`: `scene.weather.z` 0).
+    if CALM || scene.weather.z < 0.005 || in_liquid() || !open_sky() || sky <= 0.0 {
         return c;
     }
     if scene.froxels.x > 0.5 {
@@ -1483,7 +1492,7 @@ fn rain_depth(dist: f32) -> f32 {
 fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let c = fog_through(c_in, rel, smoothstep(0.25, 0.75, sky));
     let dist = length(rel);
-    if in_water() {
+    if !CALM && in_water() {
         return under_water(c, rel);
     }
     if in_liquid() || !open_sky() {
@@ -1516,7 +1525,7 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // blocks): veiled toward the clear sky's colour, far ridges stood blue-lavender against a
     // sand-coloured sky (the dust-layers sheet, 11-06). The fog's own light at full depth.
     let dust = clamp(scene.ground.z, 0.0, 1.0) * smoothstep(0.0, 0.3, scene.weather.z);
-    if dust > 0.0 {
+    if !CALM && dust > 0.0 {
         let fl = fog_light(dir);
         color = mix(color, fl.sky + fl.sun, dust);
     }
@@ -1587,7 +1596,15 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let mixed = mix(pale, toward, v);
     let own = mix(pale, toward, v * mix(0.7, 1.0, wet));
     let seen = max(vec3(luma(mixed)) + own - vec3(luma(own)), vec3(0.0));
-    return mix(seen, lit, edge) + held_in_fog(rel, sky) + lightning_bolt_over(dir, dist);
+    // The held light in the air and a bolt before far land: none in a calm scene (`CALM`), and
+    // their code left out of its shader (Android port: on the Pixel 10 the size of these rare
+    // paths, the fog walk, the dust and the water's cost the vista 34.2 -> 26.0 ms, in a calm
+    // scene drawing nothing).
+    var extra = vec3(0.0);
+    if !CALM {
+        extra = held_in_fog(rel, sky) + lightning_bolt_over(dir, dist);
+    }
+    return mix(seen, lit, edge) + extra;
 }
 
 // ---- light in the fog: torches (Research round 15, 6: Valheim's warm firelight in the mist) ----

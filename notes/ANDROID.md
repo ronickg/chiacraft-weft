@@ -128,6 +128,12 @@ the phone on USB, `ANDROID_HOME=~/Library/Android/sdk tools/release/android-run.
     texture, block shader slot 0, no placed light, not a plant, so the compiler drops those paths,
     which it cannot see through the interpolants): vista world 39.8 -> 34.2 ms, 22 -> 25 fps in the
     `var_sweep.sh` vista bench (two runs each, within 0.1 ms).
+  - a calm world shader (1ee44aa6, engine + pack: `CALM`, notes/ENGINE_CHANGES.md): the world's
+    colour pipelines built a second time without the paths that draw nothing in clear air with no
+    torch in hand and the eye out of water (the fog walk, dust, under water, held light, lightning),
+    swapped in while the scene is so. Their size alone cost: vista world 35.1 -> 26.2 ms, forest
+    26.2 -> 21.7 ms (`var_sweep2.sh`, two runs each), 24 / 30 -> 31 / 34 fps. Desktop equal (also in
+    rain and with a torch at night, `an_look_calm.txt`) and faster (vista 1815 -> 1935 fps).
   Tried and dropped: haze per vertex (slower). Left: half precision (no `shaderFloat16` path in
   the engine yet), the far land's crowns and cloud shadow.
 - **Settings on the phone** (`sweep.sh`, the same bench): sun shadows cost the forest 4 ms and

@@ -2855,7 +2855,12 @@ impl Client {
                     .to_array(),
                 None => [0.0, 0.0, 0.0, -1e6],
             },
-            frame: [crate::post::hdr() as u32 as f32, crate::post::bloom() as u32 as f32, self.sky.froxels.cell as f32, 0.0],
+            frame: [crate::post::hdr() as u32 as f32, crate::post::bloom() as u32 as f32, self.sky.froxels.cell as f32, {
+                // chiacraft: a count of the frames drawn, 0 to 63 and round again, for dithers that
+                // change each frame (Far view, 11-06: the cubes' fade into distant terrain).
+                static FRAME: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+                (FRAME.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % 64) as f32
+            }],
             shadow_view_proj: self.shadow.0.to_cols_array_2d(),
             shadow_far_view_proj: self.shadow_far.0.to_cols_array_2d(),
             shadow_far: match self.shadow_far_map {
@@ -3226,6 +3231,16 @@ impl Client {
         // world's draws that bind it (`app` switched the world shader before this, `rt_switch`).
         self.render.rt_frame(gpu, early, frame.slot, &cam);
         let mut scene = self.scene(&cam, frame);
+        // The calm world pipelines (`gpu_layout::CALM_OFF`) while nothing they leave out is on, read
+        // from the scene the shaders see: no fog in the air, no thunder, no held light, the eye in
+        // no liquid (the fog then starts at 0.6 of its end).
+        let hand = scene.hand_light;
+        self.render.set_calm(
+            scene.weather[2] <= 0.0
+                && scene.lightning[2] < 0.05
+                && hand[0].max(hand[1]).max(hand[2]) <= 0.0
+                && (scene.params[0] - 0.6 * scene.params[1]).abs() <= 0.5,
+        );
         while self.scene_bufs.len() < gpu.frames_in_flight() {
             self.scene_bufs.push(gpu.create_buffer(
                 size_of::<Scene>() as u64,

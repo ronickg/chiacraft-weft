@@ -755,7 +755,9 @@ gpu_struct! {
         /// curve to that pass); 0 into the screen or a preview. y 1 when the last frame drew the
         /// HDR world's bloom pyramid (`post::bloom`), which the last pass adds, so a pack's own
         /// bloom effect leaves its glow out. z the pixels a mist volume cell covers each way
-        /// (`client::froxels`: 8, or 4 at ultra), for a pack that spends more on finer cells. w unused.
+        /// (`client::froxels`: 8, or 4 at ultra), for a pack that spends more on finer cells. w,
+        /// chiacraft: the frame's number, 0 to 63 and round again, for dithers that change each
+        /// frame (a temporal blend's history averages them out; without one they shimmer finely).
         pub frame: [f32; 4],
         /// The soft clouds' shadow on the land (`client::cloud_shadow`, with the HDR world; a pack
         /// whose sky has `fs_cloud_shadow`): x the map's bindless index + 1 (0: none this frame), y
@@ -1274,6 +1276,7 @@ pub fn prelude(shader: &str, common: &str) -> String {
         s.push_str(LOD_CORNER);
         s.push_str(if RT_PRELUDE.load(std::sync::atomic::Ordering::Relaxed) { RT_SUN } else { RT_SUN_OFF });
     }
+    s.push_str(CALM_OFF);
     s.push_str(common);
     s.push('\n');
     s
@@ -1424,6 +1427,13 @@ pub fn rt_expand_prelude() -> String {
     ));
     s
 }
+/// `CALM` in every shader: false, but true in the world's calm pipelines (`WorldRenderer::set_calm`),
+/// used while the scene has no fog in the air (`scene.weather.z` 0), no thunder (`scene.lightning.z`
+/// under 0.05), no held light (`scene.hand_light` 0) and the eye is in no liquid. A pack leaves
+/// out what does nothing then behind `if !CALM`: a smaller shader for the same picture (Android
+/// port: on the Pixel 10 the rare paths' size alone cost the vista a fifth of its world pass).
+pub const CALM_OFF: &str = "const CALM: bool = false;\n";
+pub const CALM_ON: &str = "const CALM: bool = true;\n";
 
 /// What goes in front of `occlusion.wgsl`.
 pub fn occlusion_prelude() -> String {
