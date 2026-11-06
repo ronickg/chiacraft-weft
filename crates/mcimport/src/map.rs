@@ -43,6 +43,8 @@ fn wood(kind: &str) -> &'static [&'static str] {
         "pale_oak" => &["pale_oak", "birch"],
         "jungle" => &["jungle", "cacao", "oak"],
         "mangrove" => &["mangrove", "matamata", "oak"],
+        // 26.3's poplars (the dappled forest): pale trunks like birch's, autumn-coloured leaves.
+        "poplar" | "orange_poplar" | "red_poplar" | "yellow_poplar" => &["poplar", "birch"],
         "azalea" | "flowering_azalea" => &["oak"],
         _ => &["oak"],
     }
@@ -76,7 +78,9 @@ pub fn block(mc: &str) -> (Vec<String>, bool) {
             }
             let props = if of == "log" { axis(&s) } else { String::new() };
             let mut v: Vec<String> = Vec::new();
-            for k in wood(kind) {
+            // Our block of the very same name first (`base:yellow_poplar_leaves`), if we have it.
+            let kinds = std::iter::once(kind).chain(wood(kind).iter().copied().filter(|k| *k != kind));
+            for k in kinds {
                 v.push(format!("base:{stripped}{k}_{of}{props}"));
                 v.push(format!("base:{stripped}{k}_{of}"));
             }
@@ -253,6 +257,16 @@ pub fn block(mc: &str) -> (Vec<String>, bool) {
                 "rod",
                 "string",
                 "cake",
+                "shrub",
+                "spike",
+                "cocoa",
+                "wheat",
+                "potatoes",
+                "carrots",
+                "bell",
+                "cauldron",
+                "stand",
+                "nest",
             ];
             if small.iter().any(|k| n.contains(k)) {
                 if s.prop("waterlogged") == Some("true") {
@@ -273,6 +287,7 @@ pub fn biome(mc: &str) -> Vec<&'static str> {
     match n {
         "plains" | "sunflower_plains" | "meadow" => vec!["base:plains"],
         "forest" | "flower_forest" => vec!["base:forest"],
+        "dappled_forest" => vec!["base:dappled_forest", "base:birch_forest", "base:forest"],
         "cherry_grove" => vec!["base:cherry_grove", "base:forest"],
         "birch_forest" | "old_growth_birch_forest" => vec!["base:birch_forest", "base:forest"],
         "dark_forest" | "pale_garden" => vec!["base:old_growth_forest", "base:forest"],
@@ -293,7 +308,7 @@ pub fn biome(mc: &str) -> Vec<&'static str> {
         "river" | "frozen_river" => vec!["base:river", "base:ocean"],
         "warm_ocean" | "lukewarm_ocean" | "deep_lukewarm_ocean" => vec!["base:lagoon", "base:ocean"],
         n if n.contains("ocean") => vec!["base:ocean"],
-        "dripstone_caves" | "lush_caves" | "deep_dark" => vec!["base:deep_caves", "base:plains"],
+        "dripstone_caves" | "lush_caves" | "deep_dark" | "sulfur_caves" => vec!["base:deep_caves", "base:plains"],
         _ => vec!["base:plains"],
     }
 }
