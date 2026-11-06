@@ -156,6 +156,20 @@ Sheets: `sheets3_sp8/<Pack>/<Pack>_vs_ours3_*.jpg`. Today's dev work, as it read
   3. sun specks under the forest canopy
 - **Reimagined:** nothing beyond Unbound (the same code). Its block-slab clouds confirm that our soft cumulus is the better
   choice.
+- **Solas:**
+  1. rain that keeps the land bright and readable under a pale deck
+  2. a pastel pink-lavender dawn and dusk with cirrus, a softer alternative to gold
+
+### Solas 3.9 (with DH)
+
+Sheets: `sheets3_sp8/Solas/` (dev | HDR | Solas), `sheets/solas/`, crops in `crops/solas/`. Pastel and airy, the opposite of
+Bliss's gold.
+- **Dawn and dusk:** a pink-lavender sky with streaky cirrus, a soft pink haze over water, and land that stays cool. Our HDR
+  at 06:00 and 18:00 is much more golden, closer to Bliss and Photon.
+- **Rain:** the land stays bright green and fully readable under a pale white deck, with almost no darkening. That makes three
+  packs out of four. Ours goes grey and milky, and the HDR thunderstorm adds a dark band at the top of the frame.
+- **Night:** very dark and cool. The held torch lights nothing (no handheld light), as in Photon. Ours is far brighter at
+  night, and our held torch still floods the forest at 00:00 on both looks.
 
 ### Forest from above: all packs vs our old-growth spot C
 
