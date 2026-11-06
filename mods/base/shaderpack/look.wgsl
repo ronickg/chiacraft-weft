@@ -1067,14 +1067,28 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f
     // open, 0.39 a step under, 0.21 two): a forest floor sits a few times below open shade, the open
     // stays as it was.
     let steep = look_opt(OPT_SHADE, 1.0);
-    let sky = (pow(light.x, 15.0 * steep) * 2.0 + pow(light.x, 2.5 * steep)) / 3.0;
+    // In the HDR world halved, not a third (Bliss's own curve: 1.5 in the open): a forest floor
+    // under a canopy sits at sky light 13-14 of 15, where a third gave it a third of Bliss's
+    // ambient (floor 44-51 against Bliss's 127-149; Trees' /tk light grid, 11-06).
+    // By day only, eased out through dusk and dawn: at night the moon's sky light took it too and
+    // the night land came out 60 % brighter (22:00 land luma 23 against 14; Shader's shprJ, 11-06).
+    let bliss_sky = select(0.0, smoothstep(-0.1, 0.02, scene.sun.y), scene.frame.x > 0.5);
+    let sky = (pow(light.x, 15.0 * steep) * 2.0 + pow(light.x, 2.5 * steep)) / mix(3.0, 2.0, bliss_sky);
     let under = under_leaves(light.x);
     let leaves = mix(vec3(1.0), under_tint(), under * 0.5);
     // More of the sky's light comes from above than from the sides, and less from below: tops 1,
     // sides 0.75, bottoms 0.5 (Complementary's), so shade still shows form.
     // Under rain's overcast more so (tops 1, sides 0.6, bottoms 0.2): the sky's light is nearly all
     // the light then, and even from all round it made the land flat.
-    let hemi = mix(0.75 + 0.25 * n.y, 0.6 + 0.4 * n.y, rain_amount());
+    var hemi = mix(0.75 + 0.25 * n.y, 0.6 + 0.4 * n.y, rain_amount());
+    // In the HDR world by clear sky Bliss's split by facing: tops 2.5, sides 0.93, bottoms 0.2
+    // (with the curve above, a top in the shade takes 3.75x what it did): crowns lit from above
+    // with dark sides and gaps, and a forest floor as bright as Bliss's (the vista from above and
+    // Trees' forest, k6 runs, 11-06).
+    if bliss_sky > 0.0 {
+        let facing = select(mix(0.93, 0.2, -n.y), mix(0.93, 2.5, n.y), n.y >= 0.0);
+        hemi = mix(hemi, mix(facing, hemi, rain_amount()), bliss_sky);
+    }
     var c = p.ambient * sky * hemi * ao * leaves;
     // In the HDR world a cloud overhead takes some of the sky's light too, not the sun's alone: with
     // the sky's full fill a cloud's shadow kept the land at about 0.72 of its lit brightness, where
@@ -1987,6 +2001,12 @@ fn lottes(x: vec3<f32>) -> vec3<f32> {
 // The light under Hejl's toe kept at this share of itself (`finish_picture`).
 const HEJL_TOE: f32 = 0.25;
 
+// The HDR world's daytime warmth on sunlit foliage (`finish_picture`): how far it goes toward a
+// leaf-top yellow.
+const SPLIT_WARM: f32 = 0.7;
+// 1 where the picture's pixel is land, 0 sky or cloud (set by `hdr_light` before `finish_picture`).
+var<private> LAND_PIXEL: f32 = 1.0;
+
 fn hejl(c: vec3<f32>, white: f32) -> vec3<f32> {
     let v = vec4(c, white);
     let a = 1.425 * v + vec4(0.05);
@@ -2109,7 +2129,15 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
         // didn't lift it, sh1b; at 0.15 the grass spot's darkest tenth was 17, at 0.25 24, today's
         // LDR 30, the land's middle and brights the same). Above about 0.1 the curve is Hejl's own.
         let x = max(c, vec3(0.0)) * exposure() * look_opt(OPT_EXPOSURE, 1.0);
-        day_t = max(hejl(x, 3.5), x * HEJL_TOE);
+        // Bliss's chain (its Hejl 2015 fit: 0.85 in, 1.75, white 3), its output taken as the
+        // light itself with no gamma undone, at 0.389 of the light so mid-grey stays where it was:
+        // deeper darks, steeper mids, a gentler shoulder that keeps bright leaf tops' colour (ours
+        // undid the fit's baked-in gamma, so its darks sat on the toe floor and its brights went
+        // pale; Look's reading of Bliss's source, 11-06).
+        let vb = vec4(x * 0.389 * 0.85, 3.0);
+        let ab = 1.75 * vb + vec4(0.05);
+        let fb = (vb * ab + vec4(0.004)) / (vb * (ab + vec4(0.55)) + vec4(0.0491)) - vec4(0.0821 - 0.000633604888);
+        day_t = max(fb.rgb / fb.w, vec3(0.0));
     }
     var t = mix(night_t, day_t, day);
     // The HDR world's white balance by day (`base:look_white`): warmer, less blue (our land read
@@ -2128,12 +2156,34 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
         // is the mist's light.
         let misty = smoothstep(0.02, 0.1, scene.weather.z) * (1.0 - rain_amount());
         let w = fantasy_opt(OPT_WHITE) * day * mix(1.0, 0.25, smoothstep(0.4, 0.75, scene.sun.y)) * mix(1.0 - 0.7 * golden(), 1.0 + 0.6 * golden(), misty);
-        t *= vec3(1.0 + 0.08 * w, 1.0, 1.0 - 0.14 * w);
+        // On the land only: on the sky it took the blue out of the horizon band at 08:00
+        // (Shader's spot C rows, 11-06).
+        let wl = w * LAND_PIXEL;
+        t *= vec3(1.0 + 0.08 * wl, 1.0, 1.0 - 0.14 * wl);
     }
     // Only true darks go cool (most daylit ground is mid-tone and keeps its color).
     let lights = smoothstep(0.02, 0.22, luma(t));
     let shade = mix(vec3(0.975, 0.99, 1.03), vec3(0.92, 0.96, 1.10), golden());
     t *= mix(shade, mix(vec3(1.0), vec3(1.12, 1.0, 0.82), golden()), lights);
+    // The HDR world by day: sunlit foliage and grass toward a leaf-top yellow, as Bliss's grade
+    // (its lit leaf tops olive-yellow, red about equal to green, where ours were green at red 0.4 of
+    // green: the vista from above, 11-06). Only what is green (water, haze, grey bark, sand and stone
+    // keep their colour; on all the land it cast sepia over lakes and sand), and a green pixel stays
+    // green, its red at most 0.95 of its green (grass between the crowns went straw-tan).
+    if scene.frame.x > 0.5 {
+        let l = luma(t);
+        let k = day * (1.0 - rain_amount());
+        // Green leading red as well: terracotta, sand and cream stone have more green than blue too,
+        // and went pale yellow (our mesa's red bands, the nave's orange floor).
+        let leafy_px = smoothstep(0.0, 0.08, (t.g - t.b) / max(l, 1e-4) * 0.5) * smoothstep(0.0, 0.04, (t.g - t.r) / max(l, 1e-4));
+        let hi = smoothstep(0.06, 0.3, l) * k * SPLIT_WARM * LAND_PIXEL * leafy_px;
+        let was_green = t.g > t.r;
+        var warm = mix(t, vec3(l) * vec3(1.35, 1.08, 0.45), hi);
+        if was_green {
+            warm.r = min(warm.r, max(t.r, warm.g * 0.95));
+        }
+        t = warm;
+    }
     // The near-black loses some colour: at night 60 % of it (a dim light's hue was pushed to a
     // saturated blue), by day a quarter below a tenth of luminance (Complementary's).
     let dim = luma(t);
@@ -2159,7 +2209,14 @@ fn finish_picture(c: vec3<f32>) -> vec3<f32> {
     // more there (the canopy sweep cs1: x1.25 took 08:00 to 67, noon to 78), as it was with the sun
     // under about 20°.
     let sat = 1.2 * look_opt(OPT_SATURATION, 1.0) * select(1.0, mix(low_sat, 0.85, smoothstep(0.38, 0.55, scene.sun.y)), scene.frame.x > 0.5);
-    t = max(mix(vec3(y), t, mix(1.0, sat, day)), vec3(0.0));
+    if scene.frame.x > 0.5 && curve > 0.5 && curve < 1.5 {
+        // With Bliss's chain, its +30 % of colour in display space by day, in place of ours.
+        let g = pow(max(t, vec3(0.0)), vec3(1.0 / 2.2));
+        let gy = dot(g, vec3(0.299, 0.587, 0.114));
+        t = pow(max(g + (g - vec3(gy)) * 0.3 * day, vec3(0.0)), vec3(2.2));
+    } else {
+        t = max(mix(vec3(y), t, mix(1.0, sat, day)), vec3(0.0));
+    }
     // A cool floor so the night is never pure black; by day black stays black.
     t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034) * (1.0 - day);
     // A storybook night (`base:look_storybook`): dim colours slide toward a blue-grey, as the eye's
