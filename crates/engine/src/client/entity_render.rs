@@ -1785,6 +1785,9 @@ impl EntityRenderer {
             });
         }
         if let Some(own) = own_hand {
+            if gpu.hand_own_pass() {
+                list.push(Cmd::PassBreak);
+            }
             self.draw_own_hand(gpu, list, frame, cam, scene, own, own_first, own_items, &hand_items, boxes.len(), buf, glow);
         }
         self.instances = instances;

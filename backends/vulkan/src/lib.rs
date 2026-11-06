@@ -144,8 +144,8 @@ pub struct VulkanBackend {
     /// Android with `VK_EXT_image_compression_control`: render targets are made uncompressed
     /// (`create_texture`). See `compression_off`.
     no_compression: bool,
-    /// `Backend::cap_draws`: not on Imagination's driver.
-    cap_draws: bool,
+    /// `Backend::hand_own_pass`: on Imagination's driver (`WEFT_HAND_PASS=0/1` to compare).
+    hand_own_pass: bool,
     allocator: ManuallyDrop<Allocator>,
     /// The memory types outside the GPU's own heaps (system memory), where a GPU-only allocation goes
     /// when the GPU's memory is full (`allocate`). None on a GPU that shares the system's memory.
@@ -458,12 +458,8 @@ impl VulkanBackend {
             }
             // Optional: without it the count draws draw all their records (MoltenVK has none).
             // `WEFT_NO_INDIRECT_COUNT=1` does without it on any GPU, to check that path.
-            // Imagination's driver (the Pixel 10's PowerVR) lost some count draws: in tile-shaped
-            // patches the terrain was missing (seen through water: holes in the sea floor). There
-            // every record is drawn instead, uncapped (`cap_draws`).
             let imagination = driver.driver_id == vk::DriverId::IMAGINATION_PROPRIETARY;
-            let indirect_count =
-                has12.draw_indirect_count != vk::FALSE && std::env::var_os("WEFT_NO_INDIRECT_COUNT").is_none() && !imagination;
+            let indirect_count = has12.draw_indirect_count != vk::FALSE && std::env::var_os("WEFT_NO_INDIRECT_COUNT").is_none();
             if !indirect_count {
                 log::info!("{device_name}: no drawIndirectCount, indirect count draws draw every record");
             }
@@ -716,7 +712,11 @@ impl VulkanBackend {
                 swapchain_fn,
                 push_fn,
                 no_compression,
-                cap_draws: !imagination,
+                hand_own_pass: match std::env::var("WEFT_HAND_PASS").as_deref() {
+                    Ok("0") => false,
+                    Ok(_) => true,
+                    Err(_) => imagination,
+                },
                 allocator: ManuallyDrop::new(allocator),
                 spill,
                 swapchain: None,
@@ -1674,8 +1674,8 @@ impl Backend for VulkanBackend {
         self.indirect_count
     }
 
-    fn cap_draws(&self) -> bool {
-        self.cap_draws
+    fn hand_own_pass(&self) -> bool {
+        self.hand_own_pass
     }
 
     fn surface_size(&self) -> (u32, u32) {
@@ -2130,7 +2130,36 @@ impl Backend for VulkanBackend {
                 let sc = self.swapchain.as_ref().unwrap();
                 (sc.images[image_index as usize], sc.views[image_index as usize], sc.extent)
             };
-            for cmd_item in &list.cmds {
+            // `Cmd::PassBreak`: the pass in progress ended and begun again, loading what it drew.
+            let broken;
+            let cmds: &[Cmd] = if list.cmds.iter().any(|c| matches!(c, Cmd::PassBreak)) {
+                let mut out = Vec::with_capacity(list.cmds.len() + 8);
+                let mut open: Option<Cmd> = None;
+                for c in &list.cmds {
+                    match *c {
+                        Cmd::BeginPass { color, depth } => {
+                            open = Some(Cmd::BeginPass { color: color.map(|(t, _)| (t, None)), depth: depth.map(|(t, _)| (t, None)) });
+                            out.push(*c);
+                        }
+                        Cmd::EndPass => {
+                            open = None;
+                            out.push(*c);
+                        }
+                        Cmd::PassBreak => {
+                            if let Some(again) = open {
+                                out.push(Cmd::EndPass);
+                                out.push(again);
+                            }
+                        }
+                        _ => out.push(*c),
+                    }
+                }
+                broken = out;
+                &broken
+            } else {
+                &list.cmds
+            };
+            for cmd_item in cmds {
                 match *cmd_item {
                     Cmd::BeginPass { color, depth } => {
                         let mut extent = sc_extent;
@@ -2364,6 +2393,8 @@ impl Backend for VulkanBackend {
                         self.barrier_image(cmd, image, depth_range(), vk::ImageLayout::TRANSFER_SRC_OPTIMAL, back);
                         self.textures.get_mut(depth.0).layout = back;
                     }
+                    // Expanded into an end and a begin above.
+                    Cmd::PassBreak => {}
                     Cmd::Mark => {
                         if marks < MAX_MARKS - 1 {
                             self.device

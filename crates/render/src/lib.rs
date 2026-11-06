@@ -204,6 +204,9 @@ pub enum Cmd {
         size: u64,
         value: u32,
     },
+    /// Ends the pass in progress and begins it again on the same images, keeping what it drew:
+    /// what follows is drawn in a pass of its own. See `Backend::hand_own_pass`.
+    PassBreak,
     /// Copies a depth texture to the start of a buffer, 32-bit floats row by row. Outside a pass.
     CopyDepthToBuffer {
         depth: TextureId,
@@ -344,10 +347,12 @@ pub trait Backend: Send {
     fn indirect_count(&self) -> bool {
         true
     }
-    /// Without `indirect_count`, whether count draws may draw only about as many records as the
-    /// GPU wrote last time (the engine's cap, for Metal's sake) rather than all of them.
-    fn cap_draws(&self) -> bool {
-        true
+    /// Whether the first-person hand goes in a render pass of its own (`Cmd::PassBreak`). On
+    /// Imagination's GPUs (the Pixel 10) the hand, which writes depth and discards the texels of
+    /// the body parts it hides, wiped out blended water drawn before it in the same pass in whole
+    /// 32-pixel tiles: squares at the bottom of the screen where the sand under the water showed.
+    fn hand_own_pass(&self) -> bool {
+        false
     }
     fn surface_size(&self) -> (u32, u32);
     /// The window's surface is going away (Android sends the app to the background): drop it and

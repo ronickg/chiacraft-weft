@@ -1691,7 +1691,7 @@ impl WorldRenderer {
         let now = (cam.forward(), cam.pos);
         let turned = self.table.looks[1].is_some_and(|(f, p)| f.dot(now.0) < 0.985 || p.distance(now.1) > 4.0);
         self.table.looks = [Some(now), self.table.looks[0]];
-        let capped = !gpu.indirect_count() && gpu.cap_draws() && cap_draws() && !turned;
+        let capped = !gpu.indirect_count() && cap_draws() && !turned;
         let mut issued = (0u64, 0u64);
         // Everything opaque that never discards first, then all that may (cutout, the fade band,
         // distant terrain): a discarding fragment can't hide what is drawn after it, so Apple's

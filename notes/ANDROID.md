@@ -87,15 +87,14 @@ the phone on USB, `ANDROID_HOME=~/Library/Android/sdk tools/release/android-run.
 - **Fixed for it:** render targets without framebuffer compression (tiles only cleared read back
   as garbage: black and random-coloured squares over the sky); `NonUniform` on sampled images
   (naga 30 leaves it off); new textures cleared; the swapchain kept on "suboptimal".
-- **Still glitching (11-05 evening):** a few tile-shaped squares by the water at the bottom of the
-  screen; at render scale 1.0 uncompressed targets streak across the whole picture. Several other
-  projects report the same family of problems on this GPU under Vulkan (black streaks, horizontal
-  artifacts, garbage geometry), and an open thread on Imagination's forum describes corruption on
-  the DXT-48 with Android 17 when GPU memory is reused, which barriers and fence waits don't stop
-  (https://forums.imgtec.com/t/4303); no driver fix yet. Our workarounds so far: uncompressed
-  render targets, no `drawIndirectCount`, the SPIR-V fixes. Next: test on an Adreno or Mali
-  phone to separate the driver from the game; try never reusing GPU memory (the forum's only
-  clean setup); or an OpenGL ES path (some apps switched to it for the Pixel 10).
+- **The water glitch (fixed, 11-05 evening):** squares at the bottom of the screen over water, the
+  sand under it showing. The first-person hand, drawn in the same render pass after the water,
+  writes depth and discards the texels of the body parts it hides; Imagination's driver then
+  lost the water in every 32-pixel tile that geometry touched. The hand now gets a render pass of
+  its own there (`Cmd::PassBreak`). Found by scripted runs on the phone (testkit APK,
+  `ANDROID_TESTKIT=1 tools/release/android.sh`, `~/Coding/chiacraft-archive/tester-tools/android/
+  phone_script.sh`): spectator clean, survival glitched, the hand alone off clean. Screen
+  recordings before and after: `pixel10_video/`, `pixel10_video_fixed/`.
 - **Debugging on the phone:** `VALIDATION_LAYERS=<Khronos android-binaries folder>
   tools/release/android.sh` packs the validation layer; `--gpu-debug` in args.txt turns it on;
   `adb shell setprop debug.vulkan.khronos_validation.validate_sync true` adds sync checks. It

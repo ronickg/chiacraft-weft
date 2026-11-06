@@ -15,6 +15,7 @@ libchiacraft.so, and the game looks there (crates/android, `paths::set_library_d
 game.zip serves every CPU. Run it from the repository root.
 """
 
+import os
 import shutil
 import sys
 import zipfile
@@ -26,7 +27,13 @@ def dist_mods(root: Path) -> list[Path]:
         toml = mod / "Cargo.toml"
         return toml.is_file() and any(line.replace(" ", "") == "dist=false" for line in toml.read_text().splitlines())
 
-    return [m for m in sorted((root / "mods").iterdir()) if m.is_dir() and (m / "Cargo.toml").is_file() and not marked_dev(m)]
+    # ANDROID_TESTKIT=1: the test kit too, for scripted runs on a phone (`--script`).
+    extra = {"testkit"} if os.environ.get("ANDROID_TESTKIT") == "1" else set()
+    return [
+        m
+        for m in sorted((root / "mods").iterdir())
+        if m.is_dir() and (m / "Cargo.toml").is_file() and (not marked_dev(m) or m.name in extra)
+    ]
 
 
 def add_tree(z: zipfile.ZipFile, src: Path, prefix: str) -> int:
