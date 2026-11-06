@@ -483,7 +483,10 @@ fn shade_soft(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
             let pn = normalize(vec3(-slope.x, 1.0, -slope.y));
             let cos_v = max(dot(pn, v), 0.0);
             let fresnel = 0.02 + 0.98 * pow(1.0 - cos_v, 5.0);
-            let film = lit.rgb * 0.45 + sky_color(reflect(-v, pn)) * mix(0.08, 1.0, fresnel);
+            // A still mirror over darker ground: at Fresnel's few percent from eye height the film
+            // read as the wet ground round it (PC shpd4: puddles over a quarter of the field and
+            // none seen); a puddle shows by the sky in it.
+            let film = lit.rgb * 0.3 + sky_color(reflect(-v, pn)) * mix(0.3, 1.0, fresnel);
             lit = vec4(mix(lit.rgb, film, pool), lit.a);
         }
     }
