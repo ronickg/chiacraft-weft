@@ -145,7 +145,22 @@ fn blend(a: Palette, b: Palette, t: f32) -> Palette {
 // member), or worked out here without that (previews, a pack reload's first frame). Worked out
 // here it was some 150 instructions in up to ten places of every pixel, and the Mac's world pass
 // spilled registers (Tester's trace, 11-05).
+// Read once per invocation and kept (`PAL`): each call read five texels of the frame's row again,
+// and the far land's pixel calls it some ten times (the haze's two sky colours, the light, the
+// water); on the Pixel 10 the world pass went 52.3 -> 45.0 ms at the vista, 42.0 -> 37.0 in the
+// forest, the same values (Android port, 11-06).
+var<private> PAL: Palette;
+var<private> PAL_READ: bool = false;
+
 fn palette() -> Palette {
+    if !PAL_READ {
+        PAL = palette_now();
+        PAL_READ = true;
+    }
+    return PAL;
+}
+
+fn palette_now() -> Palette {
     var p = palette_read();
     // The sky's light test (`base:look_sky_light`): its light in the shade scaled, the sun's kept.
     // In the HDR world 0.45 of it as made in the morning (0.55 under a forest's canopy), 0.65 with
@@ -542,14 +557,18 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     var c = mix(p.horizon, p.zenith, pow(h, 0.4));
     let mu = dot(dir, scene.sun.xyz);
     let low = 1.0 - smoothstep(0.0, 0.2, abs(scene.sun.y));
-    // Away from the sun the sunset sky goes rose and violet.
-    // Most of it once the sun is down (the blue hour); with the sun up a little only (it tinted the
-    // whole sunrise sky lavender).
-    let away = (0.5 - 0.5 * mu) * (1.0 - h) * low * mix(0.35, 1.0, smoothstep(0.03, -0.05, scene.sun.y));
-    c = mix(c, c * vec3(0.97, 0.80, 1.06) + vec3(0.03, 0.0, 0.03), away * 0.4);
-    // Toward it, a warmer band low on the horizon.
-    let toward = pow(max(mu, 0.0), 2.0) * pow(1.0 - h, 3.0) * low;
-    c += vec3(0.55, 0.22, 0.05) * toward;
+    // (This and the moon's and the rain's parts below are skipped for the whole frame where they
+    // add nothing: the same colour, fewer powers per pixel; Android port, 11-06.)
+    if low > 0.0 {
+        // Away from the sun the sunset sky goes rose and violet.
+        // Most of it once the sun is down (the blue hour); with the sun up a little only (it tinted
+        // the whole sunrise sky lavender).
+        let away = (0.5 - 0.5 * mu) * (1.0 - h) * low * mix(0.35, 1.0, smoothstep(0.03, -0.05, scene.sun.y));
+        c = mix(c, c * vec3(0.97, 0.80, 1.06) + vec3(0.03, 0.0, 0.03), away * 0.4);
+        // Toward it, a warmer band low on the horizon.
+        let toward = pow(max(mu, 0.0), 2.0) * pow(1.0 - h, 3.0) * low;
+        c += vec3(0.55, 0.22, 0.05) * toward;
+    }
     c += sun_glow(dir, p);
     // In the HDR world the air round the sun glows as bright as it really is (Mie scattering's
     // forward peak, a wide lobe and a tight one in the sun's own colour, strongest low), which the
@@ -566,15 +585,19 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     }
     // The glow about the moon where it stands, as bright as its light (`scene.moon.w`): on a new
     // moon there is none, and a glow alone read as a dark-blue ring (the world playtester's nights).
-    let moon = pow(max(dot(dir, scene.moon.xyz), 0.0), 24.0) * smoothstep(-0.05, -0.25, scene.sun.y) * scene.moon.w;
-    // On a blood moon its glow goes copper, then red.
-    c += vec3(0.05, 0.07, 0.12) * mix(vec3(1.0), blood_tint() * vec3(2.0, 1.4, 1.0), smoothstep(0.0, 0.4, blood_moon())) * moon;
+    if scene.sun.y < -0.05 && scene.moon.w > 0.0 {
+        let moon = pow(max(dot(dir, scene.moon.xyz), 0.0), 24.0) * smoothstep(-0.05, -0.25, scene.sun.y) * scene.moon.w;
+        // On a blood moon its glow goes copper, then red.
+        c += vec3(0.05, 0.07, 0.12) * mix(vec3(1.0), blood_tint() * vec3(2.0, 1.4, 1.0), smoothstep(0.0, 0.4, blood_moon())) * moon;
+    }
     // Rain's sky low down, and the mist over the land that takes this colour (`haze_lit`), a darker
     // slate, darker in a storm: the deck fades into it at the horizon and the land's mist meets it
     // there, one colour (a brighter band of sky lay between a storm's deck and the land, and the
     // deck's edge drew a hard line along it: Tester 2's rain and thunder shots, 11-05).
-    let wet = rain_amount() * (1.0 - smoothstep(0.0, 0.35, dir.y));
-    c *= mix(vec3(1.0), vec3(0.76, 0.8, 0.86) - vec3(0.12) * scene.weather.w, wet);
+    if rain_amount() > 0.0 {
+        let wet = rain_amount() * (1.0 - smoothstep(0.0, 0.35, dir.y));
+        c *= mix(vec3(1.0), vec3(0.76, 0.8, 0.86) - vec3(0.12) * scene.weather.w, wet);
+    }
     if dir.y < 0.0 {
         // Below the horizon it darkens a little toward the ground the haze stands on.
         c = mix(c, p.horizon * 0.6 + p.ambient * 0.2, smoothstep(0.0, 0.4, -dir.y));
@@ -1411,15 +1434,25 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let end = scene.params.y;
     // Straight down there is no level direction left: never a zero vector (its normalize is NaN,
     // and the Mac's fast math has no safety net).
-    let air = vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z);
-    let horizon = sky_color(normalize(air));
     // Aerial perspective: the air's own blue, the sky's a little above the horizon (about 6°, a
     // third of the way to the zenith's colour), not the horizon's pale band: veiled toward that, far
     // land went milky white and lost its contrast, where Bliss's goes a deep sky blue (Far view, the
     // Distant Horizons comparison, 11-05). It hands over to the horizon's colour where the terrain
     // ends, so the last ridges still meet the sky without a line, standing a little bluer than it.
-    let blue = sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 0.1, dir.z)));
-    var color = mix(blue, horizon, smoothstep(end * 0.55, end, dist));
+    // Each sky colour only where it counts: nearer than the handover (most of the land) the
+    // horizon's has no weight, and at the end the blue none, so neither is worked out there (the
+    // same colour; each is a dozen powers, Android port, 11-06).
+    let to_horizon = smoothstep(end * 0.55, end, dist);
+    let air = vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z);
+    var color: vec3<f32>;
+    if to_horizon <= 0.0 {
+        color = sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 0.1, dir.z)));
+    } else if to_horizon >= 1.0 {
+        color = sky_color(normalize(air));
+    } else {
+        let blue = sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 0.1, dir.z)));
+        color = mix(blue, sky_color(normalize(air)), to_horizon);
+    }
     // In a dust storm the far land goes into the dust, as the sky does (it is fogged over 220
     // blocks): veiled toward the clear sky's colour, far ridges stood blue-lavender against a
     // sand-coloured sky (the dust-layers sheet, 11-06). The fog's own light at full depth.

@@ -12,7 +12,9 @@ const TINT_FOLIAGE: u32 = 2u;
 const TINT_WATER: u32 = 3u;
 
 struct VOut {
-    @builtin(position) clip: vec4<f32>,
+    // Invariant: cutout blocks' shading (`fs_cutout_shade`) draws where the depth equals what their
+    // depth pass laid with the same vertex shader, which needs bit-identical positions.
+    @builtin(position) @invariant clip: vec4<f32>,
     @location(0) uv: vec2<f32>,
     // Textures (bindless indices) of this frame and the next.
     @location(1) @interpolate(flat) layer: u32,
@@ -505,7 +507,11 @@ fn wave_height(p: vec2<f32>, t: f32, detail: f32) -> f32 {
     var h = wave_layer(q, t, 0.0, vec2(6.0, 1.6), 0.10);
     h += wave_layer(q, t, 1.0, vec2(1.6, 6.0), 0.08);
     h += wave_layer(q, t, 2.0, vec2(3.2, 3.2), 0.07);
-    h += wave_layer(q, t * 1.3, 3.0, vec2(0.8, 0.8), 0.022) * detail;
+    // The finest ripples only where they show: past 56 blocks `detail` is 0 and their noise was
+    // worked out for nothing, three times a pixel over all far water (Android port, 11-06).
+    if detail > 0.0 {
+        h += wave_layer(q, t * 1.3, 3.0, vec2(0.8, 0.8), 0.022) * detail;
+    }
     return h * (0.7 + 0.3 * smoothstep(1.0, 8.0, speed));
 }
 
@@ -871,6 +877,47 @@ fn fs_cutout(in: VOut) -> @location(0) vec4<f32> {
     return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
 }
 
+// Cutout blocks in two passes (the engine's `cutout_split`, on tiled GPUs): `fs_cutout`'s depth,
+// its discards alone and no colour, then `fs_cutout_shade` where the depth is theirs, with no
+// discard, so the GPU keeps hidden-surface removal for the shading (the same picture).
+fn cutout_thinned(in: VOut) -> bool {
+    if (far_look() & 1u) != 0u && in.kind.z != 0u {
+        let f = smoothstep(40.0, 96.0, in.dist);
+        let p = floor(in.clip.xy);
+        return fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y)) < f;
+    }
+    return false;
+}
+
+fn cutout_albedo(in: VOut) -> vec4<f32> {
+    let du = dpdx(in.uv);
+    let dv = dpdy(in.uv);
+    let nuv = nearest_uv(in.size, in.uv, du, dv);
+    return with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
+}
+
+// Cut as `fs_cutout` cuts (`cutout_edge`), so the shading finds its depth wherever it drew.
+@fragment
+fn fs_cutout_depth(in: VOut) {
+    let du = dpdx(in.uv);
+    let dv = dpdy(in.uv);
+    let nuv = nearest_uv(in.size, in.uv, du, dv);
+    let a = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv).a;
+    let edge = cutout_edge(in, nuv, du, dv);
+    if cutout_thinned(in) || a <= edge {
+        discard;
+    }
+}
+
+@fragment
+fn fs_cutout_shade(in: VOut) -> @location(0) vec4<f32> {
+    var albedo = cutout_albedo(in);
+    if in.kind.z == 0u {
+        albedo = far_flat(in, albedo);
+    }
+    return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
+}
+
 // Where a cutout's texel is cut: at alpha 0.1, but in the HDR world a leaf cube (a cutout cube:
 // leaves, `kind.z` 0) keeps its see-through holes at a distance, as Minecraft's 16 px leaves do
 // under its 0.5 test (`cutout_mipped`): its alpha one mip sharper, cut at 0.5. Our 32 px leaves'
@@ -1021,7 +1068,9 @@ fn far_water(in: VOut) -> vec3<f32> {
     let ndv = max(dot(n, v), 0.02);
     // Schlick's: nearly all mirror at the slants far water is seen at.
     let fresnel = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
-    let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, cloud_shadow(in.rel), 1.0, in.pos, in.rel);
+    // The clouds' shadow here once (it was asked twice, for the light and the glint).
+    let clouds = cloud_shadow(in.rel);
+    let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, clouds, 1.0, in.pos, in.rel);
     let deep = vec3(0.014, 0.045, 0.045) * lit;
     let r = reflect(-v, n);
     let refl = sky_color(normalize(vec3(r.x, max(r.y, 0.02), r.z)));
@@ -1031,7 +1080,7 @@ fn far_water(in: VOut) -> vec3<f32> {
     let a2 = 0.0025;
     let dd = nh * nh * (a2 - 1.0) + 1.0;
     let spec = a2 / (3.14159 * dd * dd) * fresnel * 0.25;
-    let glint = palette().sun * light_strength() * min(spec, mix(30.0, 1.5, golden())) * smoothstep(0.0, 0.1, l.y + 0.05) * cloud_shadow(in.rel);
+    let glint = palette().sun * light_strength() * min(spec, mix(30.0, 1.5, golden())) * smoothstep(0.0, 0.1, l.y + 0.05) * clouds;
     let c = refl * fresnel + deep * (1.0 - fresnel) + glint;
     return display(haze_lit(c, in.rel, in.light.x));
 }
@@ -1102,6 +1151,18 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
     if lod_hidden(in) && !faded(in) {
         discard;
     }
+    return lod_color(in);
+}
+
+// The tiles wholly outside the cubes' mask (the engine's `lod_open_pipe`): `fs_lod` without its
+// discard, which never happens there. A tiled GPU then keeps hidden-surface removal for the far
+// land: on the Pixel 10 (PowerVR) the discard alone cost a third of the world pass at the vista.
+@fragment
+fn fs_lod_open(in: VOut) -> @location(0) vec4<f32> {
+    return lod_color(in);
+}
+
+fn lod_color(in: VOut) -> vec4<f32> {
     // A texture per block, laid from the world position on the face's plane (top
     // faces and gentle slopes by x and z, walls by their side and height, up the right way), its
     // gradients from that unbroken position so block borders don't jump to a coarse mip. Far off
@@ -1132,10 +1193,15 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
     // A mip and a half coarser than the pixels ask, and only the nearer tiles' texture: farther
     // out the terraces' rows of top and wall texels beat into dashes, so it gives way to the
     // average between `LOD_DETAIL` blocks.
-    let t = sample(in, fract(at), d.xy * 2.8, d.zw * 2.8);
     let detail = 1.0 - smoothstep(LOD_DETAIL.x, LOD_DETAIL.y, in.dist);
     // A cutout's clear texels (leaves' gaps) show the average, not their unset color.
-    var albedo = vec4(mix(avg.rgb, t.rgb, t.a * detail), avg.a);
+    var albedo = avg;
+    // Past `LOD_DETAIL.y` the texture counts for nothing: not sampled there (gradients given, so
+    // the branch is safe), the same colour for less (Android port, 11-06).
+    if detail > 0.0 {
+        let t = sample(in, fract(at), d.xy * 2.8, d.zw * 2.8);
+        albedo = vec4(mix(avg.rgb, t.rgb, t.a * detail), avg.a);
+    }
     // Far water is the same water as near: deep there (no blocks are kept that far), with its
     // Fresnel, the sky and the sun's path. Otherwise it would be a flat grey-blue lit like land, a
     // seam at the edge of the render distance. It is left out of the screen's reflections (solid in
