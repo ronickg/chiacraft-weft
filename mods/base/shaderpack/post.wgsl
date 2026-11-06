@@ -242,7 +242,11 @@ fn auto_exposure(mean: f32) -> f32 {
     // Under rain the view is darker and stays so (a storm's mood; brought up, its mist went milky):
     // no brighter than as made, in a storm a little darker.
     let wet = rain_amount() * select(1.0, 0.0, !open_sky());
-    return clamp(k, 0.6, mix(mix(2.0, 1.2, night), 1.0 - 0.1 * scene.weather.w, wet));
+    // Before sunrise (the sun below, coming up in the east: `scene.sun.x` above 0) the night is
+    // brought up less, 0.7 at most, so 04:00 stays dark as Bliss's (land luma 40 against 16 with
+    // blue hour v4, 11-06); after sunset it keeps 1.2 (Bliss's 20:00 is brighter than ours).
+    let ceiling = mix(1.2, 0.7, smoothstep(-0.2, 0.2, scene.sun.x));
+    return clamp(k, 0.6, mix(mix(2.0, ceiling, night), 1.0 - 0.1 * scene.weather.w, wet));
 }
 
 // How strong the bloom is: a share of the glow mixed in (it keeps the light's sum), more in rain
