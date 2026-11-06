@@ -91,6 +91,13 @@ shared! {
         /// (`client::lod`'s `openness`), for packs that darken valleys and the gaps between crowns.
         OCC_SHIFT = 29,
         OCC_MASK = 3,
+        /// chiacraft, after upstream Weft f69243fd (PR #107): word 3's spare bits (the sizes take 11
+        /// of each 16) hold a box face's corner shade, 2 bits per corner (`CORNERS` order), stored
+        /// as 3 minus vanilla's AO (0: none, so faces without it read open): corners 0-1 from bit
+        /// 12, 2-3 from bit 28 (`client::lod`, WGSL `lod_ao`).
+        AO_LO_SHIFT = 12,
+        AO_HI_SHIFT = 28,
+        SIZE_MASK = 2047,
     }
     /// Tint kinds of faces and quads (0 none); mods' kinds follow the engine's.
     tint {
@@ -557,12 +564,13 @@ fn records() -> String {
         "    return vec3<f32>(f32(w0 & LOD_FACE_POS_MASK), f32(bitcast<i32>(w2 << LOD_FACE_HALF_SHIFT) >> LOD_FACE_HALF_SHIFT), f32((w0 >> LOD_FACE_Z_SHIFT) & LOD_FACE_POS_MASK));\n",
         "}\n",
         "fn lod_size(w2: u32, w3: u32) -> vec3<f32> {\n",
-        "    return vec3<f32>(f32(w3 & LOD_FACE_HALF_MASK), f32(w2 >> LOD_FACE_HALF_SHIFT), f32(w3 >> LOD_FACE_HALF_SHIFT));\n",
+        "    return vec3<f32>(f32(w3 & LOD_FACE_SIZE_MASK), f32(w2 >> LOD_FACE_HALF_SHIFT), f32((w3 >> LOD_FACE_HALF_SHIFT) & LOD_FACE_SIZE_MASK));\n",
         "}\n",
         "fn lod_dir(w0: u32) -> u32 {\n    return (w0 >> LOD_FACE_DIR_SHIFT) & FACE_DIR_MASK;\n}\n",
         "fn lod_tint(w0: u32) -> u32 {\n    return (w0 >> LOD_FACE_TINT_SHIFT) & TINT_MASK;\n}\n",
         "fn lod_crown(w0: u32) -> bool {\n    return (w0 >> LOD_FACE_CROWN_SHIFT) != 0u;\n}\n",
         "fn lod_occ(w0: u32) -> u32 {\n    return (w0 >> LOD_FACE_OCC_SHIFT) & LOD_FACE_OCC_MASK;\n}\n",
+        "fn lod_ao(w3: u32) -> vec4<u32> {\n    let a = ((w3 >> LOD_FACE_AO_LO_SHIFT) & 15u) | (((w3 >> LOD_FACE_AO_HI_SHIFT) & 15u) << 4u);\n    return vec4<u32>(3u) - vec4<u32>(a & 3u, (a >> 2u) & 3u, (a >> 4u) & 3u, (a >> 6u) & 3u);\n}\n",
     ));
     s
 }

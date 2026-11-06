@@ -60,7 +60,12 @@ pub(super) fn turn_of(s: &SkyDef, d: &DimensionDef, time: f64) -> f64 {
 
 /// Its frame in the world at `turn`: x toward it, y along its way, z out of the orbit's plane.
 pub(super) fn frame_of(s: &SkyDef, turn: f64) -> Mat3 {
-    Mat3::from_rotation_y(s.heading) * Mat3::from_rotation_x(s.tilt) * Mat3::from_rotation_z((turn * std::f64::consts::TAU) as f32)
+    Mat3::from_rotation_y(s.heading) * Mat3::from_rotation_x(tilt_of(s)) * Mat3::from_rotation_z((turn * std::f64::consts::TAU) as f32)
+}
+
+/// Its path's lean: none under the test flag `--mc-days` (`app::api::mc_days`).
+fn tilt_of(s: &SkyDef) -> f32 {
+    if crate::app::api::mc_days() { 0.0 } else { s.tilt }
 }
 
 /// How far around the sunset of a body is at `height` (the sine of its elevation): how much it
@@ -547,7 +552,7 @@ impl Sky {
             // horizon: leaned with the path, the moon's square stood as a diamond (the world
             // playtester's "white rotated square"). Its picture's up toward the world's up; right
             // at the zenith the path's own frame.
-            if s.kind == sky_kind::BODY && s.tilt != 0.0 && s.spin == 0.0 {
+            if s.kind == sky_kind::BODY && tilt_of(s) != 0.0 && s.spin == 0.0 {
                 let toward = m.x_axis;
                 let right = toward.cross(Vec3::Y);
                 if right.length() > 0.05 {
