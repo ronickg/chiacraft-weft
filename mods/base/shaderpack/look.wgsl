@@ -590,13 +590,15 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         // shdawnB2).
         let morning = (1.0 - smoothstep(0.15, 0.35, scene.sun.y)) * smoothstep(-0.03, 0.02, scene.sun.y);
         if morning > 0.0 {
-            let cream = vec3(1.0, 0.82, 0.55);
+            // (At 0.6 of 1.0 0.82 0.55 the 06:00 band went orange, 231 172 68 against Bliss's 201
+            // 172 108, the dawn mist on the land with it: PC shdawnB3. Paler and about half.)
+            let cream = vec3(1.0, 0.87, 0.66);
             // Over the sun's whole half, overhead too (about a third there): a lobe about the sun
             // alone left the gaps between the clouds lavender (7 % of the 06:00 sky band, Bliss's
             // none; PC shdawn0).
             let wide = 0.5 + 0.5 * mu;
             let dawn = wide * wide * morning * (1.0 - rain_amount());
-            c = mix(c, cream * (luma(c) / luma(cream)), dawn * 0.6);
+            c = mix(c, cream * (luma(c) / luma(cream)), dawn * 0.35);
         }
     }
     // The glow about the moon where it stands, as bright as its light (`scene.moon.w`): on a new
