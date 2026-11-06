@@ -636,6 +636,41 @@ shades in a short ramp, not noise; a blade brightest toward its point; lit edges
    in the 16x16 square as the sprite lies: the sword turned -45 degrees about its middle, handle
    bottom left (the points, turned +45, come out straight); a long sword's diagonal just fits.
 
+## 3D plants (planes and boxes)
+
+Ronald (2026-11-06) may move from flat crossed-quad plants to more 3D ones: "research sort of mods
+where you have like 3D plants ... include that in the modeling skill". The survey is
+`reports/3D plants in block games.md` (vanilla, 3D-crop and flower packs, Better Foliage, Hytale,
+Vintage Story, Veloren; image links in its last section). What carries over:
+
+- **Most "3D" plants are planes, not boxes.** Vanilla's spore blossom is 10 faces, the azalea 14,
+  the big dripleaf 12, pink petals up to 24; the pitcher plant, torchflower and berry bush are
+  plain crosses with depth painted in. Hash crosses (4-6 planes, some tilted 22.5°) and layered
+  cards read 3D for 2-4x a cross's cost.
+- **Boxes earn their quads close up, on few big plants**: crop ears and stages, sugar cane and
+  bamboo, berry bushes (berries 1-2 px boxes), flower heads with real cups, mushrooms, cactus.
+  Grass as boxes is the worst value (most plants, tiniest, aliases).
+- **Free variety first**: a random offset (up to a third of a block), yaw and height from the
+  position hash breaks the grid of Xs at no quad cost (Vintage Story's `randomizeRotations`).
+- **Density**: one model pixel = two texels, the blocks' 32 a block, as every model here.
+- **No flicker**: no parallel planes closer than one texel; pull walls a hair in from the block
+  faces (Mojang uses 0.002-0.01 px).
+- **Wind by height**: our shader pack bends each quad from its own bottom, so box plants would
+  shear apart, boxes under 0.2 block stay still and untinted crops never move. Weight the bend by
+  height above the plant's base, as Vintage Story's per-vertex wind does (a shader-pack change, no
+  engine change) before any box plant ships.
+- **Cost**: a meadow at 12 chunks is about 69,000 plants, ~9 MB as crosses, ~88 MB as 40-quad box
+  plants (and the shadow pass draws them again). So: box plants only in a near ring (2-4 chunks),
+  plane models beyond (Vintage Story's `lod0Shape`/`lod2Shape`); never per-plant entities for
+  fields (keep entities for plants that act: a snapping flytrap).
+- **Order** (the report's recommendation): random offset, yaw and height plus hash crosses; the
+  wind fix; box plants for crops, cane, bushes and big flowers in the near ring; a PC bench on the
+  meadow and wheat-field spots with the shader pack on; instanced plant models only if that bench
+  says so.
+
+Build plant models with this skill's prop tools (`scripts/prop.py`: boxes and quads with `cut`),
+lit and painted like everything else, and check them in a dense field shot, not alone.
+
 ## Scripts
 
 Run them with `~/.venvs/blocky/bin/python` (Homebrew's Python 3.14 with scipy added; it sees the
