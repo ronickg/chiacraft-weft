@@ -109,6 +109,10 @@ fn reflect_reach(pos: vec3<f32>) -> f32 {
 // What the water mirrors at this pixel, premultiplied by how much (rgb), and how much (a): 0 where
 // it mirrors nothing. Premultiplied, a shore's half-size texels average to less mirror, not to black.
 fn reflect_result(p: PostPixel) -> vec4<f32> {
+    // Traced reflections (`core:rt_reflections`): the world's pass mirrored it already.
+    if scene.rt.w > 0.5 {
+        return vec4(0.0);
+    }
     let water = p.color.a;
     // A smooth solid (a polished floor, a metal, a glazed tile: chiacraft's pack, `mirror_alpha`)
     // writes minus how much it mirrors, its Fresnel already in: traced as a flat mirror facing any
