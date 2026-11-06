@@ -47,7 +47,20 @@ pub const BOXES: &[(&str, (f32, f32))] = &[
     ("gull", (0.4, 0.4)),
     ("early_bird", (0.35, 0.35)),
     ("fish", (0.3, 0.2)),
-    ("egg", (0.1, 0.14)),
+    // Eggs, one model per look (`eggs.rs`, `source/egg`), at their built size; a species'
+    // own egg is drawn scaled from it, its box with it. The small ones get a few cm more to click.
+    ("egg_dromaeosaur", (0.11, 0.13)),
+    ("egg_oviraptorid", (0.16, 0.15)),
+    ("egg_ceratopsian", (0.14, 0.1)),
+    ("egg_ankylosaur", (0.17, 0.16)),
+    ("egg_ornithopod", (0.21, 0.17)),
+    ("egg_sauropod", (0.18, 0.16)),
+    ("egg_crocodilian", (0.11, 0.08)),
+    ("egg_lizard", (0.08, 0.06)),
+    ("egg_roe", (0.13, 0.06)),
+    ("egg_roe_loose", (0.14, 0.06)),
+    ("egg_jelly", (0.12, 0.08)),
+    ("egg_wyvern", (0.35, 0.51)),
     ("nest", (0.9, 0.15)),
 ];
 

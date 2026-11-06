@@ -4,7 +4,7 @@ Written by `notes/overview/build.py` from `notes/overview/pieces.json`; edit tha
 
 **The goal.** Players open their own worlds, find other people's without any central service, link them with portals and walk between them; missing mods download on the way; identity and achievements live on Chia. The game in those worlds: survival in the Valheim spirit with real temperatures and seasons, and animals to tame, breed and raise, from real facts.
 
-■ built and seen working: 73 · ◧ partly built: 38 · □ not built yet: 10 · ◌ planned for later: 6
+■ built and seen working: 73 · ◧ partly built: 39 · □ not built yet: 10 · ◌ planned for later: 6
 
 ## Core next
 
@@ -131,7 +131,7 @@ Code: `mods/base/vitals`, `mods/base/src/survival`, `mods/base/src/levels.rs`, `
 
 ## Animals
 
-Real species (and a wyvern) to tame, command, ride, breed and raise, with genes, seasons and bodies on the survival rules. 11 of 16 parts built.
+Real species (and a wyvern) to tame, command, ride, breed and raise, with genes, seasons and bodies on the survival rules. 11 of 17 parts built.
 
 | | Part | Notes |
 |---|---|---|
@@ -142,6 +142,7 @@ Real species (and a wyvern) to tame, command, ride, breed and raise, with genes,
 | ■ | Signatures | Barking, gifts, calm aura. Code: `mods/animals/src/signatures.rs`. |
 | ■ | Riding | Utahraptor. Code: `mods/animals/src/riding.rs`. |
 | ■ | Breeding, eggs, seasons | Code: `mods/animals/src/breeding.rs`, `mods/animals/src/eggs.rs`, `mods/animals/core/src/life.rs`. |
+| ◧ | Eggs by species | Every laying species' egg reads as its own (Ronald, 11-06: "I've got to easily see, okay, this is like a raptor egg"): 13 looks from the research (reports/Eggs by species.md): raptors' pale blue-green speckled eggs stood on end, Citipati's long ridged teal ones, soft buff ceratopsian eggs, olive ankylosaur eggs (our pick), ivory netted ornithopod and knobbed white sauropod balls, banded crocodilian capsules, a tiny lizard egg, four kinds of roe, and the wyvern's scaled stone egg (fantasy, our own). One entity kind and item icon per look; sizes per species in animals_core::eggs. Waiting on Ronald's look, then in-game looks. Code: `mods/animals/core/src/eggs.rs`, `mods/animals/src/eggs.rs`, `mods/animals/source/egg`. Docs: `reports/Eggs by species.md`. |
 | ■ | Genetics, coats, evolution | Code: `mods/animals/src/coats.rs`, `mods/animals/core/src/coats.rs`, `mods/animals/src/evolution.rs`. |
 | ■ | Hitboxes | Every creature's box (what a sword, an arrow or a click hits, what a rider sits on, what bumps the world) is a row in animals_core::bodies by its model, at about Minecraft's proportions; tests/boxes.rs measures each geo.json at rest and holds each box to it (11-05, Ronald: do the hitboxes work? The big Cretaceous animals' were half their models' size). Base's vanilla mobs keep vanilla's boxes; the wyvern's width is excused (wings). Code: `mods/animals/core/src/bodies.rs`, `mods/animals/core/tests/boxes.rs`, `mods/animals/src/wild.rs`, `mods/animals/src/birds.rs`. Docs: `docs/creatures.md`. |
 | ■ | Habitats and the Cretaceous | Each species spawns only in its own world (Species::cretaceous; the Cretaceous shares base:beach and base:ocean), and the Cretaceous's biomes spawn as often as the overworld's (Species::spawn_chance, CRETACEOUS_FLOW 0.025 a try, each species keeping its share by rarity; 11-05, after the creatures playtest saw hares and gulls there and no utahraptor, wyvern, crocodyliform or fish in 7 minutes). Code: `mods/animals/src/habitats.rs`, `mods/animals/src/fish.rs`, `mods/animals/src/cretaceous.rs`, `mods/animals/src/gateway.rs`, `mods/animals/core/src/species.rs`. |

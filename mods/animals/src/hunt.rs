@@ -82,8 +82,8 @@ pub fn prey_lush(w: &World, s: &Species, pos: [i32; 3]) -> Option<f32> {
         .reduce(f32::max)
 }
 
-/// An egg's mass, kg, at a Velociraptor's egg's size (about a goose egg's; `eggs::egg_size` scales
-/// the others): eggs lying in a nest are food for the egg eaters of their sizes (the report's tier
+/// An egg's mass, kg, at 15 cm long (about a goose egg's; `eggs::egg_length` scales the
+/// others by their length): eggs lying in a nest are food for the egg eaters of their sizes (the report's tier
 /// 3: "eggs are real food and nests are built already"), Citipati, the raptors, the foxes.
 const EGG_KG: f32 = 0.2;
 
@@ -103,7 +103,7 @@ fn owned_egg(w: &World, id: u64) -> bool {
 /// The mass in kg of an entity of `kind`: a species' grown mass (scaled by `size`, its genes and
 /// growth), an egg's, or a farm animal's wild kind's (`OTHER_PREY`). `None`: not prey to anything.
 fn kind_mass(kind: u32, size: Option<f32>) -> Option<f32> {
-    if kind == crate::eggs::EGG_ENTITY.id() {
+    if crate::eggs::is_egg_kind(kind) {
         return Some(EGG_KG * size.unwrap_or(1.0).powi(3));
     }
     if let Some(s) = SPECIES.iter().find(|s| s.kind.id() == kind) {
@@ -120,7 +120,7 @@ fn kind_mass(kind: u32, size: Option<f32>) -> Option<f32> {
 pub(crate) fn mass(w: &World, id: u64) -> Option<f32> {
     let e = w.entity(id)?;
     if let Some(index) = egg_of(w, id) {
-        return kind_mass(e.kind, Some(crate::eggs::egg_size(index)));
+        return kind_mass(e.kind, Some(crate::eggs::egg_length(index)));
     }
     let size = w.component(id, &ANIMAL).and_then(|a| {
         let index = (a.species as usize).checked_sub(1)?;

@@ -132,7 +132,7 @@ built, it gets its row below and its arrows above.
 | Levels, XP | `vitals::levels`, `mods/base/src/levels.rs` | `levels.rs` | blocks, crafting, kills, advancements, taming (`animals xp.rs`), discoveries | stats screen, HUD |
 | Species facts | `animals_core::species`, `biology` | `species.rs` rows | | animals' bodies (comfort), breeding (seasons), habitats (spawning), the species sheet |
 | Animal's body | `mods/animals/src/comfort.rs` | `comfort.rs` constants | air, species comfort, food, difficulty | animal stats (condition, speed), comfort-seeking goal, tames' health and hunger, its screen |
-| Eggs | `mods/animals/src/eggs.rs` | `animals_core::life::EGG_AIR` | air, nests | hatching |
+| Eggs | `mods/animals/src/eggs.rs` | `animals_core::life::EGG_AIR`; each species' egg look and length `animals_core::eggs` (`reports/Eggs by species.md`, models `source/egg`) | air, nests | hatching, egg eaters' food (`hunt.rs`: mass by length) |
 | Breeding | `mods/animals/src/breeding.rs` | `biology.rs` `breeds`, `peak` | calendar, bond, food | eggs, births, XP |
 | Difficulty | `base_api::DIFFICULTY` (a world rule) | `vitals::difficulty` | Create New World, `/rule difficulty` | player's body, eating, tames |
 | Entity ranges (engine) | `server/sync.rs` (`move_every`), `server/dim.rs` (`mark_resting`) | world rules `core:entity_send_distance` 96, `core:entity_activation_distance` 48, `core:inactive_entity_interval` 20 | players' positions | what each player is sent and how often; animals' and mobs' goals and paths far from players (once a second), `World::tick_elapsed` |

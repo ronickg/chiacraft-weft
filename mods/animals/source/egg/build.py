@@ -1,24 +1,19 @@
 #!/usr/bin/env python3
-"""Builds the egg (an entity with no skeleton) with the blocky-model skill's prop tools and the
-game's house style: `../../assets/models/egg.geo.json` and `textures/entity/egg/egg.png`.
+"""Builds every egg look (props with no skeleton) with the blocky-model skill's prop tools: one
+model and texture per family of eggs, so a raptor's egg reads as a raptor's at a glance
+(Ronald, 2026-11-06: "I don't want them to all look the same"). The research behind each look is
+`reports/Eggs by species.md`; which species lays which look, and how long its egg is, are
+`animals_core::eggs` (the game scales a look to each species' egg).
 
-    ../dog/chihuahua/.venv/bin/python build.py              (the chosen markings, into the mod)
-    ../dog/chihuahua/.venv/bin/python build.py --variants   (every marking into out/variants/)
+    ~/.venvs/blocky/bin/python build.py            (every look into the mod: models/egg_<look>.geo.json,
+                                                    textures/entity/egg/<texture>.png)
+    ~/.venvs/blocky/bin/python build.py --out DIR  (only into DIR, for review: spec, texture, renders)
 
-The real thing: Velociraptor's eggs aren't known. Dromaeosaur eggs are elongated, about twice as
-long as wide, with a blunt and a pointed end; their relatives stood them in the nest nearly
-upright, pointed end down, half buried, tilted with the top toward the nest's middle. The eggshell
-of the relative Deinonychus held both pigments birds' eggs have (blue-green biliverdin, red-brown
-protoporphyrin): a colored, marked egg, as suits an open nest. Birds' marks gather toward the blunt
-end, darker marks over paler, greyish ones lying deeper in the shell. A Velociraptor's egg here is
-about 15 cm long (10 units), 8 wide; a bigger species' are scaled up in the game (`eggs.rs`).
-
-Markings (one layout, a texture each, to choose from):
-- blotched: blue-green, dark brown blotches gathered in a ring near the blunt end, pale lilac-grey
-  ones under them, a few small spots lower down;
-- speckled: cream, fine rufous speckles all over, denser at the top;
-- rufous: washed red-brown, heavily marked darker (like a kestrel's);
-- plain: deep green, almost unmarked (like an emu's).
+Each look: the egg's real length and width (units, 1/64 m), its shape (`eggshape.profile`: how
+much wider the blunt end is, how blunt the ends are), how it lies (`tilt`: 0 standing on its
+pointed end, 90 lying), its colors and its shell's marks (`area`), and for roe a clump of eggs.
+Eggs paint finer than the house's 32 a block where 32 would leave them a few texels across
+(`house.fine`'s rule, applied to the egg's width so every egg is about ten texels across).
 """
 
 import json
@@ -34,105 +29,391 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.normpath(os.path.join(HERE, "..", "..", "..", ".."))
 SKILL = os.path.join(REPO, ".claude", "skills", "blocky-model", "scripts")
 sys.path.insert(0, SKILL)
+sys.path.insert(0, HERE)
 from house import SCALE, TX, material  # noqa: E402
-from prop import el, entity_spec, paint  # noqa: E402
+from paint import tones  # noqa: E402
+from prop import entity_spec, paint  # noqa: E402
+
+import eggshape as es  # noqa: E402
 
 ASSETS = os.path.join(HERE, "..", "..", "assets")
 OUT = os.path.join(HERE, "out")
-HEIGHT = 10.0
-TILT = 20  # degrees, the top toward +z (the nest's middle when laid)
-
-# name: (shell, deep marks, surface marks)
-MARKINGS = {
-    "blotched": ((164, 198, 186), (160, 168, 170), (104, 74, 54)),
-    "speckled": ((228, 216, 190), (206, 188, 168), (150, 86, 56)),
-    "rufous": ((206, 160, 122), (176, 120, 88), (120, 62, 42)),
-    "plain": ((70, 104, 80), (84, 118, 92), (58, 86, 66)),
-}
-CHOSEN = "blotched"  # chosen by Ronald, 2026-11-02
-SHELL, DEEP, MARK = range(3)
+CM = 0.64  # units a centimetre
+ACROSS = 8  # texels an egg is at least across (at most 256 a block)
 
 
-def elements(tilt=TILT, yaw=0.0, at=(0.0, 0.0, 0.0), name="egg"):
-    """Seven layers from the pointed end (down) to the blunt end, rounding off at both ends, the
-    widest a little above the middle (toward the blunt end); neighbors differ in width by a unit
-    and reach half a unit into each other, so no faces meet."""
-    layers = [(1.5, 0, 1), (3, 0.5, 2.5), (4, 2, 4.5), (5, 4, 7.5), (4, 7, 8.75), (3, 8.25, 9.5), (2, 9, 10)]
-    x, y, z = at
-    return [el(f"{name}{k}", (x - w / 2, y + y0, z - w / 2), (x + w / 2, y + y1, z + w / 2),
-               rot=(tilt, yaw, 0) if tilt or yaw else None, origin=at, part="egg", at=at, yaw=yaw)
-            for k, (w, y0, y1) in enumerate(layers)]
+def shell(rgb):
+    return material("shell", rgb)
 
 
-def _blobs(rng, n, y_range, size):
-    return [(rng.uniform(0, 2 * math.pi), rng.uniform(*y_range), rng.uniform(*size), rng.uniform(0, 6)) for _ in range(n)]
+def stony(rgb):
+    return tones(rgb, 0.74)
 
 
-def area(p, kind, tilt=TILT, origin=(0, 0, 0), yaw=0.0):
-    """The markings at points `p` on an egg standing at `origin`, by angle round it and height up
-    it (its turn and tilt undone), so they wrap round the corners."""
-    t, r = math.radians(tilt), math.radians(yaw)
-    q = p - np.array(origin, float)
-    q = np.stack([math.cos(r) * q[..., 0] - math.sin(r) * q[..., 2], q[..., 1],
-                  math.sin(r) * q[..., 0] + math.cos(r) * q[..., 2]], axis=-1)
-    y = q[..., 1] * math.cos(t) + q[..., 2] * math.sin(t)  # along the egg
-    z = -q[..., 1] * math.sin(t) + q[..., 2] * math.cos(t)
-    th = np.arctan2(z, q[..., 0])
-    a = np.full(p.shape[:-1], SHELL)
-    rng = np.random.default_rng({"blotched": 3, "speckled": 4, "rufous": 5, "plain": 6}[kind])
+# ------------------------------------------------------------------ the looks' shell marks
+# Each `area(e, u, v, th, x, z)` gives a material per texel (0 the shell), from where it sits on
+# its egg: u round it (units at its widest), v along it from the pointed end, th the angle round,
+# x and z across it.
 
-    def stamp(blobs, mat, rough=0.35):
-        nonlocal a
-        for b_th, b_y, r, ph in blobs:
-            d_th = (th - b_th + math.pi) % (2 * math.pi) - math.pi
-            u, v = d_th * 2.4, y - b_y  # 2.4 units round per radian at the widest
-            ang = np.arctan2(v, u)
-            edge = r * (1 + rough * np.sin(3 * ang + ph))
-            a = np.where(np.hypot(u, v) < edge, mat, a)
 
-    if kind == "blotched":
-        stamp(_blobs(rng, 4, (6.5, 8.8), (0.6, 0.9)), DEEP)
-        stamp(_blobs(rng, 8, (6.8, 9.4), (0.5, 0.9)), MARK)
-        stamp(_blobs(rng, 3, (2.5, 5.5), (0.35, 0.5)), MARK, rough=0.1)
-    elif kind == "speckled":
-        stamp(_blobs(rng, 6, (4.0, 9.0), (0.4, 0.6)), DEEP, rough=0.2)
-        stamp(_blobs(rng, 22, (1.0, 9.8), (0.28, 0.42)), MARK, rough=0.1)
-        stamp(_blobs(rng, 10, (7.5, 9.8), (0.3, 0.45)), MARK, rough=0.1)
-    elif kind == "rufous":
-        stamp(_blobs(rng, 10, (2.0, 9.5), (0.7, 1.1)), DEEP)
-        stamp(_blobs(rng, 12, (3.0, 9.8), (0.4, 0.75)), MARK)
-    else:
-        stamp(_blobs(rng, 5, (2.0, 9.0), (0.6, 1.0)), DEEP, rough=0.5)
+def grid(e, u, v):
+    """The texel's column round the egg and row along it (whole texels)."""
+    tx = e["egg"]["tx"]
+    return np.floor(u * tx).astype(int), np.floor(v * tx).astype(int)
+
+
+def noise(c, r, seed):
+    return np.vectorize(lambda a, b: es.hashed(a, b, seed))(c, r)
+
+
+def speckled(e, u, v, th, x, z):
+    """A dromaeosaur's: pale sky blue-green (Deinonychus's shell held both of birds' egg
+    pigments), a lumpy net of paler bumps, brown blotches gathered toward the blunt end over
+    lilac-grey ones lying deeper, and brown speckles all over."""
+    g = e["egg"]
+    L, W = g["L"], g["W"]
+    rng = np.random.default_rng(3)
+    c, r = grid(e, u, v)
+    a = np.where(noise(c, r, 9) > 0.8, 3, 0)
+    a = es.stamp(a, u, v, W, es.blobs(rng, 4, (0.6 * L, 0.88 * L), (0.32 * W / 4.7 * 2, 0.45 * W / 4.7 * 2), W), 1)
+    a = es.stamp(a, u, v, W, es.blobs(rng, 6, (0.64 * L, 0.95 * L), (0.26 * W / 4.7 * 2, 0.4 * W / 4.7 * 2), W), 2)
+    a = np.where(noise(c, r, 4) > 0.93, 2, a)
     return a
 
 
-def materials(kind):
-    shell, deep, mark = MARKINGS[kind]
-    return [material("shell", shell), material("shell", deep), material("shell", mark)]
+def ridged(e, u, v, th, x, z):
+    """An oviraptorid's (elongatoolithid): fine ridges running along the egg, broken into dashes
+    and nodes (lineartuberculate), lighter crests beside darker grooves; plainer at both ends."""
+    g = e["egg"]
+    L = g["L"]
+    c, r = grid(e, u, v)
+    dash = noise(c, r // 3, 11) > 0.22
+    mid = (v > 0.1 * L) & (v < 0.9 * L)
+    a = np.where((c % 3 == 0) & dash & mid, 1, 0)
+    return np.where((c % 3 == 1) & dash & mid, 2, a)
 
 
-def build(kind, out):
+def leathery(e, u, v, th, x, z):
+    """A soft-shelled egg (Protoceratops, Norell et al. 2020): pale buff and matt, a dent where
+    the thin shell gave (a crescent of shadow with a lit lip), a crease or two, sand stuck to the
+    side it lay on."""
+    g = e["egg"]
+    L, W = g["L"], g["W"]
+    rng = np.random.default_rng(7)
+    a = np.zeros(u.shape, int)
+    a = es.stamp(a, u, v, W, es.blobs(rng, 4, (0.2 * L, 0.8 * L), (0.5, 0.8), W, rough=0.6), 1)
+    # The dent: on the side facing up and out, a crescent.
+    du, dv = es.wrap(u - W * 0.9, 4 * W), v - 0.55 * L
+    d = np.hypot(du / 1.0, dv / 1.6)
+    a = np.where((d < 1.1) & (d > 0.75) & (dv > -0.2), 2, a)
+    a = np.where((d <= 0.75) & (dv > 0.3), 1, a)
+    for _ in range(2):
+        bu, bv, ln, ang = rng.uniform(0, 4 * W), rng.uniform(0.25 * L, 0.75 * L), rng.uniform(0.8, 1.4), rng.uniform(0, math.pi)
+        du, dv = es.wrap(u - bu, 4 * W), v - bv
+        along = du * math.cos(ang) + dv * math.sin(ang)
+        across = -du * math.sin(ang) + dv * math.cos(ang)
+        a = np.where((np.abs(along) < ln) & (np.abs(across) < 0.5 / g["tx"]), 2, a)
+    c, r = grid(e, u, v)
+    low = np.cos(th) < -0.6
+    return np.where(low & (noise(c, r, 5) > 0.4), 3, a)
+
+
+def mottled(e, u, v, th, x, z):
+    """An ankylosaur's (no egg known: our pick, `reports/Eggs by species.md`): round, leathery,
+    dull olive-grey, with dark earth mottling and paler patches, earthier toward the bottom."""
+    g = e["egg"]
+    L, W = g["L"], g["W"]
+    rng = np.random.default_rng(31)
+    a = np.zeros(u.shape, int)
+    a = es.stamp(a, u, v, W, es.blobs(rng, 6, (0.1 * L, 0.95 * L), (0.6, 1.0), W, rough=0.6), 2)
+    a = es.stamp(a, u, v, W, es.blobs(rng, 7, (0.0, 0.85 * L), (0.4, 0.7), W, rough=0.6), 1)
+    c, r = grid(e, u, v)
+    a = np.where((v < 0.3 * L) & (noise(c, r, 6) > 0.55), 3, a)
+    return a
+
+
+def netted(e, u, v, th, x, z):
+    """An ornithopod's (hadrosaur-like, spheroolithid): big, near round, warm ivory, its shell a
+    fine net of small raised bumps, each lit above and shadowed below."""
+    c, r = grid(e, u, v)
+    a = np.zeros(u.shape, int)
+    cc, rr = (c + (r // 2) % 2) % 2, r % 2
+    keep = noise(c // 2, r // 2, 23) > 0.15
+    a = np.where(keep & (cc == 0) & (rr == 1), 1, a)  # the bump, lit
+    return np.where(keep & (cc == 0) & (rr == 0), 2, a)  # its shadow under it
+
+
+def knobbed(e, u, v, th, x, z):
+    """A sauropod's (megaloolithid, Auca Mahuevo): a ball, chalk white, covered in coarse round
+    knobs set close on offset rows: each a lit texel, a shadow under it."""
+    c, r = grid(e, u, v)
+    cell_r = r // 3
+    off = cell_r % 2
+    cell_c = (c + off) // 3
+    cc, rr = (c + off) % 3, r % 3
+    keep = noise(cell_c, cell_r, 21) > 0.06
+    a = np.where(keep & (cc == 1) & (rr == 2), 1, 0)  # the knob
+    a = np.where(keep & (cc == 1) & (rr == 1), 2, a)  # its shadow under it
+    return a
+
+
+def banded(e, u, v, th, x, z):
+    """A crocodilian's: hard, smooth, both ends alike; the chalky white band round its middle
+    that a living egg shows, creamier ends, brown stains from the nest's rotting plants."""
+    g = e["egg"]
+    L, W = g["L"], g["W"]
+    rng = np.random.default_rng(13)
+    a = np.where(np.abs(v - 0.5 * L) < 0.21 * L, 1, 0)
+    stains = [b for b in es.blobs(rng, 6, (0.04 * L, 0.96 * L), (0.18, 0.3), W, rough=0.25) if abs(b[1] - 0.5 * L) > 0.2 * L]
+    return es.stamp(a, u, v, W, stains, 2)
+
+
+def plain(e, u, v, th, x, z):
+    """A lizard's: tiny, white, matt, with one dent."""
+    g = e["egg"]
+    L, W = g["L"], g["W"]
+    du, dv = es.wrap(u - W * 0.9, 4 * W), v - 0.5 * L
+    return np.where(np.hypot(du, dv / 1.4) < 0.35, 1, 0)
+
+
+def bead(e, u, v, th, x, z):
+    """Roe: round and glassy, its top lit; a dot on the side facing out: an eyed trout egg's
+    young's two eyes, a pacu's yellow yolk, a lungfish's dark egg in its jelly."""
+    g = e["egg"]
+    L = g["L"]
+    a = np.where(v > 0.6 * L, 1, 0)
+    dot = g.get("dot")
+    if dot:
+        f = g["face"]
+        along, side = x * math.cos(f) + z * math.sin(f), -x * math.sin(f) + z * math.cos(f)
+        mid = np.abs(v - 0.48 * L) < 0.5 / g["tx"] + 0.01
+        if dot == "eyes":
+            on = mid & (along > 0) & (np.abs(np.abs(side) - 1.0 / g["tx"]) < 0.5 / g["tx"])
+        else:
+            on = (np.abs(v - 0.45 * L) < 0.12 * L + 0.5 / g["tx"]) & (along > 0) & (np.abs(side) < 0.12 * L + 0.5 / g["tx"])
+        a = np.where(on, 2, a)
+    return a
+
+
+def scaled(e, u, v, th, x, z):
+    """The wyvern's (fantasy, our own): a heavy, stone-like egg in overlapping round scales that
+    point to its pointed end, each row lying over the top of the row below and offset by half a
+    scale, like a pine cone's; each scale's lower edge a bright metal rim, a dark shadow under the
+    edge of the scales above, a few scales flecked with a second jewel color; the tip and the crown
+    in dark small scales."""
+    g = e["egg"]
+    L, tx = g["L"], g["tx"]
+    per = 4 * g["W"] * tx  # texels round the egg
+    sw = per / max(4, round(per / 11.0))  # a scale's width: a whole number of them round
+    sh = sw * 0.62  # rows' spacing
+    R = sw * 0.62  # the scale's radius
+    col, row = u * tx, v * tx
+    j = np.floor(row / sh).astype(int)
+    cands = []  # (row, scale id, distance from its middle) of every scale that may cover a texel
+    for dk in (0, 1, 2, -1):
+        k = j - dk
+        off = (k % 2) * 0.5
+        ci = np.round(col / sw - off).astype(int)
+        for dc in (-1, 0, 1):
+            cc = ci + dc
+            dx = es.wrap(col - (cc + off) * sw, per)
+            cands.append((k, cc * 7919 + k, np.hypot(dx, row - (k * sh + R)), row < k * sh + R))
+    # A texel shows the highest row's scale over it (each row lies over the one below).
+    owner = np.full(u.shape, -10**6)
+    dist = np.zeros(u.shape)
+    lower = np.zeros(u.shape, bool)
+    cid = np.zeros(u.shape, int)
+    for k, i, d, lo in cands:
+        take = (d < R) & (k > owner)
+        owner, dist = np.where(take, k, owner), np.where(take, R - d, dist)
+        lower, cid = np.where(take, lo, lower), np.where(take, i, cid)
+    # How close the edge of a scale above is (its shadow falls on this one).
+    above = np.full(u.shape, 99.0)
+    for k, i, d, lo in cands:
+        above = np.where(k > owner, np.minimum(above, d - R), above)
+    a = np.zeros(u.shape, int)
+    rim = (dist < 1.0) & lower
+    a = np.where(rim, 1, a)
+    a = np.where(~rim & (above < 0.9), 2, a)
+    fleck = noise(cid, cid // 3, 41) > 0.9
+    a = np.where(fleck & (a == 0), 3, a)
+    c, r = grid(e, u, v)  # stone grain: a few darker texels in the scales
+    a = np.where((a == 0) & (noise(c, r, 43) > 0.9), 4, a)
+    return np.where((v < 0.05 * L) | (v > 0.96 * L), 2, a)
+
+
+# ------------------------------------------------------------------ the looks
+
+LOOKS = {
+    # Velociraptor (both species) and Utahraptor (scaled up): a long oval, one end a little
+    # narrower, stood nearly upright pointed end down, leaning toward the nest's middle.
+    "dromaeosaur": dict(L=9 * CM, W=4.5 * CM, asym=0.18, tilt=20, area=speckled,
+                        mats=[shell((150, 198, 196)), shell((158, 150, 170)), material("shell", (110, 72, 48)),
+                              shell((176, 214, 210))]),
+    # Citipati: the longest, ends alike, dark teal, ridged; in pairs in a ring, lying inclined,
+    # the top end toward the middle.
+    "oviraptorid": dict(L=18 * CM, W=6.5 * CM, blunt=2.3, tilt=65, area=ridged,
+                        mats=[shell((52, 108, 106)), shell((92, 148, 140)), shell((32, 70, 74))]),
+    # Protoceratops (Psittacosaurus scaled down): soft, slim, pale buff, buried lying in sand.
+    "ceratopsian": dict(L=10.1 * CM, W=5.8 * CM, tilt=88, area=leathery, sink=0.3,
+                        mats=[shell((226, 210, 174)), shell((208, 190, 152)), shell((154, 134, 104)),
+                              material("soil", (200, 172, 124))]),
+    # Gastonia and Pinacosaurus (our pick): near round, leathery, dull olive-grey, mottled.
+    "ankylosaur": dict(L=12 * CM, W=10.5 * CM, asym=0.05, tilt=30, area=mottled, sink=0.3,
+                       mats=[shell((136, 138, 112)), shell((114, 110, 86)), shell((152, 154, 128)), material("soil", (126, 106, 78))]),
+    # Iguanacolossus: big, near round, warm ivory, a fine net of bumps.
+    "ornithopod": dict(L=16 * CM, W=14 * CM, asym=0.05, tilt=20, area=netted,
+                       mats=[shell((228, 212, 176)), shell((244, 234, 208)), shell((180, 160, 124))]),
+    # Cedarosaurus: a ball, chalk white, coarse knobs, half sunk in its pit.
+    "sauropod": dict(L=13 * CM, W=13 * CM, tilt=0, area=knobbed, sink=0.6, across=16,
+                     mats=[stony((222, 220, 210)), stony((242, 240, 232)), stony((168, 162, 152))]),
+    # Caimans and the neosuchian: small, smooth, both ends alike, a chalky band, lying.
+    "crocodilian": dict(L=6.8 * CM, W=4.3 * CM, blunt=2.0, tilt=90, area=banded, step=0.65, n=7,
+                        mats=[shell((212, 194, 164)), shell((248, 246, 238)), material("soil", (140, 102, 70))]),
+    # Priscagama: tiny, white, matt, dented, lying (drawn about twice its real 1.6 cm to be seen).
+    "lizard": dict(L=3 * CM, W=1.9 * CM, tilt=90, area=plain, sink=0.1, step=0.65, n=5,
+                   mats=[shell((236, 230, 214)), shell((196, 188, 168))]),
+    # Fish: a clutch of beads, each about three times its real few millimetres; the four tell
+    # apart by color and how they lie (a heap in gravel, a loose scatter, jelly balls).
+    "roe_trout": dict(roe=dict(n=7, d=1.5, dot="eyes"), area=bead, model="egg_roe",
+                      mats=[shell((232, 124, 50)), shell((250, 172, 104)), material("shell", (40, 30, 36))]),
+    "roe_pacu": dict(roe=dict(n=6, d=1.25, dot="yolk", spread=2.4), area=bead, model="egg_roe_loose",
+                     mats=[shell((202, 214, 196)), shell((232, 240, 230)), shell((228, 196, 80))]),
+    "roe_lycoptera": dict(roe=dict(n=6, d=1.25, spread=2.4), area=bead, model="egg_roe_loose",
+                          mats=[shell((222, 200, 136)), shell((242, 228, 182)), shell((150, 130, 80))]),
+    "roe_lungfish": dict(roe=dict(n=2, d=2.4, dot="yolk", spread=1.8), area=bead, model="egg_jelly",
+                         mats=[shell((186, 208, 210)), shell((222, 236, 236)), material("shell", (50, 78, 46))]),
+    # The wyvern (fantasy): big, heavy, stone-like, scaled, metal-rimmed; one, on bare rock.
+    "wyvern": dict(L=50 * CM, W=34 * CM, asym=0.25, tilt=12, area=scaled, across=20,
+                   mats=None),
+}
+
+# The wyvern egg's colorings to choose from (scale, rim, shadow, fleck, grain): our own jewel tones.
+WYVERN = {
+    "teal_silver": [stony((40, 92, 96)), stony((206, 210, 204)), stony((20, 34, 40)), stony((150, 60, 120)), stony((32, 78, 82))],
+    "garnet_gold": [stony((112, 30, 38)), stony((226, 182, 92)), stony((40, 16, 22)), stony((214, 120, 40)), stony((94, 24, 32))],
+    "amethyst_copper": [stony((86, 52, 112)), stony((214, 132, 82)), stony((32, 20, 44)), stony((60, 140, 130)), stony((72, 42, 96))],
+    "charcoal_rust": [stony((50, 46, 54)), stony((190, 110, 66)), stony((24, 20, 26)), stony((176, 50, 40)), stony((40, 36, 44))],
+}
+WYVERN_CHOSEN = "teal_silver"  # until Ronald picks
+LOOKS["wyvern"]["mats"] = WYVERN[WYVERN_CHOSEN]
+
+
+def texels_a_unit(W, across=ACROSS):
+    """The least power-of-two multiple of the house density that puts `across` texels across an
+    egg `W` units wide (at most 256 a block)."""
+    k = 1
+    while TX * k * W < across - 1e-6 and k < 8:
+        k *= 2
+    return TX * k
+
+
+def roe_spots(n, d, spread=None, seed=1):
+    """Where a clutch's beads lie: a heap (one in the middle, a ring round it touching, any more on
+    top), or with `spread` a loose scatter on the ground."""
+    rng = np.random.default_rng(seed)
+    if spread:
+        spots = []
+        for k in range(n):
+            a = k / n * 2 * math.pi + rng.uniform(-0.3, 0.3)
+            r = spread * (0.45 + 0.55 * ((k * 5) % 3) / 2) if n > 2 else spread / 2
+            spots.append((math.cos(a) * r, 0.0, math.sin(a) * r))
+        return spots
+    spots = [(0.0, 0.0, 0.0)]
+    for k in range(min(n - 1, 6)):
+        a = k / 6 * 2 * math.pi + rng.uniform(-0.2, 0.2)
+        spots.append((math.cos(a) * d * 0.95 + rng.uniform(-0.07, 0.07), 0.0, math.sin(a) * d * 0.95 + rng.uniform(-0.07, 0.07)))
+    for k in range(n - 7):
+        a = (k + 0.5) / max(1, n - 7) * 2 * math.pi
+        spots.append((math.cos(a) * d * 0.5, d * 0.7, math.sin(a) * d * 0.5))
+    return spots
+
+
+def egg_of(look, name="egg", at=(0.0, 0.0, 0.0), yaw=0.0):
+    return es.egg_elements(name, look["L"], look["W"], look.get("asym", 0.0), look.get("blunt", 2.0), look["tilt"],
+                           yaw=yaw, at=at, sink=look.get("sink", 0.0), n=look.get("n"), step=look.get("step"))
+
+
+def elements(look):
+    if "roe" in look:
+        r = look["roe"]
+        E = []
+        for i, (x, y, z) in enumerate(roe_spots(r["n"], r["d"], r.get("spread"))):
+            # Each bead its own size a little and turned its own way, so no two share a face.
+            d = r["d"]
+            egg = es.egg_elements(f"egg{i}_", d, d, tilt=0, yaw=17 * i + 5, at=(x, y + 0.013 * i, z), n=3)
+            g = egg[0]["egg"]
+            g["dot"] = r.get("dot")
+            # The side facing out of the heap (the first bead: toward the viewer's side, +x +z).
+            g["face"] = math.atan2(z, x) if (x or z) else math.pi / 4
+            g["face"] -= math.radians(g["yaw"]) * -1  # into the bead's own (turned) frame
+            E += egg
+        return E
+    return egg_of(look)
+
+
+def clutch(look, n=5):
+    """For review: `n` eggs as a nest holds them (`eggs.rs`: one in the middle, the rest in a
+    ring), each leaning its top toward the middle."""
+    E = egg_of(look, "c0_")
+    r = max(0.55 * look["L"], 0.75 * look["W"]) + 0.6
+    for k in range(1, n):
+        a = (k - 1) / (n - 1) * 2 * math.pi + 0.3
+        yaw = math.degrees(math.atan2(-math.cos(a), -math.sin(a))) + 0.7 * k
+        E += egg_of(look, f"c{k}_", at=(math.cos(a) * r, 0.011 * k, math.sin(a) * r), yaw=yaw)
+    return E
+
+
+def build(name, look, out, mats=None, E=None):
+    """Lays out, paints and checks one look into `out` (spec.json, texture.png)."""
     os.makedirs(out, exist_ok=True)
-    E = elements()
-    down = lambda e, face, p: np.clip((HEIGHT - p[..., 1]) / HEIGHT, 0, 1)  # lit as one piece
-    sheet, uv = paint(E, lambda e, f, p, uu, vv, h: area(p, kind), materials(kind), ground=False, width=32, down=down, tx=TX)
-    return E, sheet, uv
+    E = E or elements(look)
+    W = look["roe"]["d"] if "roe" in look else look["W"]
+    tx = texels_a_unit(W, look.get("across", ACROSS))
+    for e in E:
+        e["egg"]["tx"] = tx
+
+    def area(e, face, p, uu, vv, h):
+        u, v, th, x, z = es.local(e, p)
+        return look["area"](e, u, v, th, x, z)
+
+    def down(e, face, p):
+        u, v, th, x, z = es.local(e, p)
+        return np.clip((e["egg"]["L"] - v) / e["egg"]["L"], 0, 1)
+
+    width = 64 if tx * W < 24 and len(E) < 12 else 128
+    sheet, uv = paint(E, area, mats or look["mats"], ground=False, width=width, down=down, tx=tx)
+    Image.fromarray(sheet, "RGBA").save(os.path.join(out, "texture.png"))
+    spec = entity_spec(E, uv, sheet, name)
+    with open(os.path.join(out, "spec.json"), "w") as f:
+        json.dump(spec, f)
+    r = subprocess.run([sys.executable, os.path.join(SKILL, "boxcheck.py"), os.path.join(out, "spec.json")],
+                       capture_output=True, text=True)
+    if r.returncode:
+        sys.exit(f"{name}: boxcheck failed\n{r.stdout}")
+    return spec, tx
+
+
+def model_of(name):
+    return LOOKS[name].get("model", f"egg_{name}")
 
 
 if __name__ == "__main__":
-    from to_bedrock import export  # noqa: E402
+    out = sys.argv[sys.argv.index("--out") + 1] if "--out" in sys.argv else None
+    only = [a for a in sys.argv[1:] if a in LOOKS]
+    for name, look in LOOKS.items():
+        if only and name not in only:
+            continue
+        d = os.path.join(out or OUT, name)
+        spec, tx = build(name, look, d)
+        print(f"{name}: {len(spec['elements'])} boxes, {tx * 64:.0f} texels a block, texture {spec['texture']}")
+        if out:
+            if "roe" not in look:
+                build(name, look, os.path.join(out, "clutch", name), E=clutch(look))
+            if name == "wyvern":
+                for k, m in WYVERN.items():
+                    build(name, look, os.path.join(out, "wyvern_colors", k), mats=m)
+        else:
+            from to_bedrock import export  # noqa: E402
 
-    if "--variants" in sys.argv:
-        for k in MARKINGS:
-            _, sheet, _ = build(k, os.path.join(OUT, "variants"))
-            Image.fromarray(sheet, "RGBA").save(os.path.join(OUT, "variants", f"{k}.png"))
-            print("built", k)
-    E, sheet, uv = build(CHOSEN, OUT)
-    Image.fromarray(sheet, "RGBA").save(os.path.join(OUT, "texture.png"))
-    spec = entity_spec(E, uv, sheet, "egg")
-    with open(os.path.join(OUT, "spec.json"), "w") as f:
-        json.dump(spec, f)
-    subprocess.run([sys.executable, os.path.join(SKILL, "boxcheck.py"), os.path.join(OUT, "spec.json")], check=True)
-    if "--variants" not in sys.argv:
-        made = export(spec, os.path.join(OUT, "texture.png"), ASSETS, "egg", SCALE, "egg/egg", pose_files={"": {}})
-        print("wrote", made, "(", CHOSEN, ")")
+            export(spec, os.path.join(d, "texture.png"), ASSETS, model_of(name), SCALE, f"egg/{name}", pose_files={"": {}})
