@@ -577,11 +577,16 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // The 3D world's share of the window's pixels each way (`app::world_frame`), the UI
         // always whole; 0 picks it by the screen (fewer on high-density ones).
         ConfigDef::number("core:render_scale", ck::FLOAT, 0.0, 0.0, 1.0, 0.05),
+        // How a world drawn smaller than the window (`core:render_scale`) is scaled up: 0 bilinear,
+        // 1 FSR 1's edge-adaptive upscale (`easu` in common.wgsl), 2 Snapdragon GSR 1 (`gsr`). Live.
+        ConfigDef::number("core:upscaler", ck::INT, 0.0, 0.0, 2.0, 1.0),
         // The GPU, as the renderer found it (`Backend::device_*`), for mods to read: put at start,
         // never saved by a player (the base game's first quality preset, Research round 19, 7).
         ConfigDef::text("core:gpu_name", ""),
         ConfigDef::number("core:gpu_class", ck::INT, 0.0, 0.0, 3.0, 1.0),
         ConfigDef::number("core:gpu_memory_mb", ck::INT, 0.0, 0.0, 1.0e7, 1.0),
+        // 1 when the GPU can trace rays (`Backend::ray_query`): `core:rt_shadows` then works.
+        ConfigDef::number("core:gpu_ray_query", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         // Blocks clouds float above where their dimension puts them.
         ConfigDef::number("core:cloud_height", ck::INT, 0.0, 0.0, 512.0, 8.0),
         // Sun shadows, for shader packs that draw them: 0 off, 1 the near map only (80 blocks
@@ -592,6 +597,9 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // measurable cost, more far hills and crowns shadowed: Far view, 11-05) and 400 without
         // (today's look as made); a number sets it (`client::prepare_shadows`).
         ConfigDef::number("core:shadow_far", ck::INT, 0.0, 0.0, 2400.0, 100.0),
+        // Sun and moon shadows traced through the scene instead of the shadow maps, on a GPU with
+        // ray queries (Vulkan's; not the Mac or phones): ultra, off unless chosen.
+        ConfigDef::number("core:rt_shadows", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         // The soft clouds' shadow on the land (with the HDR world; `client::cloud_shadow`).
         ConfigDef::number("core:cloud_shadows", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         // Vanilla's: in GUI pixels, and percent of the dark behind the text.

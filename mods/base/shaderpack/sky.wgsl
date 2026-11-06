@@ -372,7 +372,15 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
     // In the HDR world the sun lights them less: they stood on the curve's shoulder, brighter than
     // Bliss's at every hour and harder lit (mc_forest cloud luma noon 228 against 201, 17:00 208
     // against 176; their spread 20 against 15, 19 against 7). Bliss's read as soft cream masses.
-    let sun = p.sun * strength * (1.0 - s.axes[0].y * 0.55) * cloud_sun_tint() * select(1.0, CLOUD_SUN_HDR, scene.frame.x > 0.5);
+    var sun = p.sun * strength * (1.0 - s.axes[0].y * 0.55) * cloud_sun_tint() * select(1.0, CLOUD_SUN_HDR, scene.frame.x > 0.5);
+    // In the HDR world, clouds seen away from a low sun take its light pale cream, not orange: Bliss's
+    // clouds at 17:00-18:00 with the sun behind the camera are cream with grey bellies where ours
+    // went strong orange; toward the sun they keep its gold (its 06:00 clouds, facing the sun).
+    if scene.frame.x > 0.5 {
+        let away = 1.0 - smoothstep(-0.2, 0.6, mu);
+        let low_sun = 1.0 - smoothstep(0.2, 0.55, scene.sun.y);
+        sun = mix(sun, vec3(luma(sun)) * vec3(1.06, 0.98, 0.86), away * low_sun * 0.75);
+    }
     // Rain darkens the clouds' albedo and keeps their shapes (Photon: ×0.66); a storm's more.
     let albedo = mix(1.0, 0.66, s.axes[0].x) * mix(1.0, 0.6, storm);
     var through = 1.0;

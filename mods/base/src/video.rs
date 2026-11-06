@@ -30,6 +30,8 @@ pub static FX_SHAFTS: Config<i32> = Config::named("fx_shafts");
 pub static FX_BLOOM: Config<i32> = Config::named("fx_bloom");
 
 static RENDER_SCALE: Config<f32> = Config::named("core:render_scale");
+/// How the world drawn at a render scale under 1 is scaled up: 0 bilinear, 1 FSR 1, 2 Snapdragon GSR 1.
+static UPSCALER: Config<i32> = Config::named("core:upscaler");
 static SHADOWS: Config<i32> = Config::named("core:shadows");
 static SHADOW_SIZE: Config<i32> = Config::named("core:shadow_size");
 static VIEW: Config<i32> = Config::named("core:view_distance");
@@ -91,6 +93,9 @@ pub static SCREEN: Screen = Screen::named("video");
 static GPU_NAME: TextConfig = TextConfig::named("core:gpu_name");
 static GPU_CLASS: Config<i32> = Config::named("core:gpu_class");
 static GPU_MEMORY: Config<i32> = Config::named("core:gpu_memory_mb");
+/// The GPU can trace rays (`core:gpu_ray_query`): the traced shadows' row is shown.
+static GPU_RAY_QUERY: Config<bool> = Config::named("core:gpu_ray_query");
+static RT_SHADOWS: Config<bool> = Config::named("core:rt_shadows");
 /// What the detection chose (Research round 19, 7: "quality chosen by the GPU at first start"):
 /// the preset (-1 none yet), and whether the render scale went to half with it.
 static DETECTED: Config<i32> = Config::named("gpu_preset");
@@ -208,7 +213,12 @@ fn number(v: f64) -> (String, i64) {
     (String::new(), v.round() as i64)
 }
 
-const ROWS: [Row; 12] = [
+/// The rows the presets set (`PRESETS`, `PHONE_PRESET`): the first 12 of `ROWS`. The upscaler after
+/// them is the player's own choice, opt-in (Ronald, 11-06), so no preset changes it and it never
+/// makes the quality Custom.
+const PRESET_ROWS: usize = 12;
+
+const ROWS: [Row; 13] = [
     Row {
         key: "render_scale",
         // 0 is Auto (Distant terrain's render pass: 0.67 on a high-density screen, 1 elsewhere).
@@ -265,6 +275,13 @@ const ROWS: [Row; 12] = [
         set: |v| FPS_CAP.set(v as i32),
         shown: |v| if v == 0.0 { word("unlimited") } else { number(v) },
     },
+    Row {
+        key: "upscaler",
+        values: &[0.0, 1.0, 2.0],
+        get: || UPSCALER.get() as f64,
+        set: |v| UPSCALER.set(v as i32),
+        shown: |v| word(["smooth", "fsr1", "gsr1"][(v as usize).min(2)]),
+    },
 ];
 
 fn off_low_on(v: f64) -> (String, i64) {
@@ -285,7 +302,9 @@ fn apply(p: usize) {
 /// One row a step on (`dir` 1) or back (-1) through its values; the quality becomes Custom.
 fn step(i: usize, dir: i32) {
     step_row(&ROWS[i], dir);
-    QUALITY.set(4);
+    if i < PRESET_ROWS {
+        QUALITY.set(4);
+    }
 }
 
 fn step_row(row: &Row, dir: i32) {
@@ -503,6 +522,20 @@ fn row_ui(ui: &mut Ui, rows: &'static [Row], i: usize, step: fn(usize, i32)) {
     });
 }
 
+/// Traced sun and moon shadows (`core:rt_shadows`), only where the GPU can trace rays: outside the
+/// presets, so no preset changes the look by it (an ultra choice the player makes).
+const RT_ROWS: [Row; 1] = [Row {
+    key: "rt_shadows",
+    values: &[0.0, 1.0],
+    get: || RT_SHADOWS.get() as u8 as f64,
+    set: |v| RT_SHADOWS.set(v > 0.0),
+    shown: |v| word(if v > 0.0 { "on" } else { "off" }),
+}];
+
+fn step_rt(i: usize, dir: i32) {
+    step_row(&RT_ROWS[i], dir);
+}
+
 fn step_fantasy(i: usize, dir: i32) {
     step_row(&FANTASY_ROWS[i], dir);
     FANTASY.set(3);
@@ -636,6 +669,9 @@ pub fn register(r: &mut Registry) {
             });
             for i in 0..ROWS.len() {
                 row_ui(ui, &ROWS, i, step);
+            }
+            if GPU_RAY_QUERY.get() {
+                row_ui(ui, &RT_ROWS, 0, step_rt);
             }
         });
     });
