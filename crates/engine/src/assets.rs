@@ -643,15 +643,6 @@ fn mip_chain_dark(mut rgba: Vec<u8>, size: u32) -> Vec<Vec<u8>> {
         let c = if l <= 0.003_130_8 { l * 12.92 } else { 1.055 * l.powf(1.0 / 2.4) - 0.055 };
         (c * 255.0).round().clamp(0.0, 255.0) as u8
     };
-    const TEST: f32 = 0.1 * 255.0;
-    let covered = |px: &[u8], scale: f32| {
-        let n = px.len() / 4;
-        px.chunks_exact(4)
-            .filter(|p| p[3] as f32 * scale > TEST)
-            .count() as f32
-            / n.max(1) as f32
-    };
-    let coverage = covered(&rgba, 1.0);
     let mut out = Vec::with_capacity(size.trailing_zeros() as usize + 1);
     let mut s = size;
     loop {
