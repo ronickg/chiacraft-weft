@@ -289,7 +289,7 @@ fn shade_unfogged(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
 // liquid (fog start not 0.6 of its end) only the liquid's.
 fn plain_fog(dist: f32) -> f32 {
     let fog = fog_amount(dist, scene.params.x, scene.params.y);
-    let near = f32(g.extra.w & 0xFFFFFFu) * 16.0;
+    let near = f32(g.extra.w & 0x7FFFFFu) * 16.0;
     if abs(scene.params.x - 0.6 * scene.params.y) > 0.5 || near <= 0.0 || scene.params.y <= near {
         return fog;
     }
@@ -543,7 +543,7 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
 
 @fragment
 fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
-    let half = i32(g.extra.w & 0xFFFFFFu);
+    let half = i32(g.extra.w & 0x7FFFFFu);
     let col = vec2<i32>(floor(in.pos.xz / 16.0));
     let d = col - g.cam_cube.xz;
     if abs(d.x) <= half && abs(d.y) <= half {
@@ -557,6 +557,14 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, fract(in.uv), du, dv);
     var albedo = with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv);
+    // Leaves far off as Distant Horizons colours them: the average of their opaque texels (its
+    // `ClientBlockStateColorCache`, holes skipped). With Minecraft's dark leaf mips on (test only,
+    // `core:mc_leaves`, bit 23) a smaller texel sums its opaque ones with the holes as black, so
+    // over the opaque share (its alpha) it is their average again: the far canopy stood -4 -8 0
+    // darker and less green than vanilla + DH's (MC import's pixel diff, 11-06).
+    if ((g.extra.w >> 23u) & 1u) != 0u && any(in.tint != vec3(1.0)) && albedo.a > 0.05 && albedo.a < 0.995 {
+        albedo = vec4(albedo.rgb / albedo.a, albedo.a);
+    }
     // Far water as Distant Horizons draws it (its `ColumnBox` keeps the sea floor's top under
     // water, drawn first; the water over it at the texture's alpha, mixed in gamma as vanilla's
     // screen mixes): over a bed that the water above has darkened (a block of sky light taken per

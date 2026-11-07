@@ -1646,7 +1646,7 @@ fn crown_shade(n: vec3<f32>) -> f32 {
 // Whether real cubes show this distant tile pixel's column (`Lod::mask`): then they stand there,
 // and the tile is left out.
 fn lod_hidden(in: VOut) -> bool {
-    let half = i32(g.extra.w & 0xFFFFFFu);
+    let half = i32(g.extra.w & 0x7FFFFFu);
     let col = vec2<i32>(floor(in.pos.xz / 16.0));
     let d = col - g.cam_cube.xz;
     if abs(d.x) <= half && abs(d.y) <= half {
