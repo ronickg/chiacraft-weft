@@ -185,13 +185,16 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
         tint = tint_color(tint_kind, w1 >> FACE_BIOME_SHIFT, o.x * 16 + i32(local.x), o.z * 16 + i32(local.z));
     }
     out.tint = tint;
+    // A face between leaves (`core:mc_leaves`): Minecraft's AO reads the leaf in front as a
+    // quarter of 0.2, a fifth darker at every corner (chiacraft, Trees, stage 1).
+    let ao = AO[a[c]] - select(0.0, 0.2, (w0 & FACE_INNER) != 0u);
     let ov = frames[g.extra.x + tex_id];
     if ov != 0u {
         out.overlay = texture_frame(ov - 1u).a + 1u;
-        out.color = vec3(SHADE[dir] * AO[a[c]]);
+        out.color = vec3(SHADE[dir] * ao);
     } else {
         out.overlay = 0u;
-        out.color = tint * SHADE[dir] * AO[a[c]];
+        out.color = tint * SHADE[dir] * ao;
     }
     return out;
 }

@@ -37,6 +37,10 @@ shared! {
         /// what lies past the crown, so packs and the built-in shader fill them (Minecraft's fancy
         /// leaves draw those faces).
         BACKED = 0x8000,
+        /// Word 0, chiacraft test switch `core:mc_leaves`: the face looks into a leaf block (a face
+        /// between leaves), which shades every corner as Minecraft's smooth light does: its AO
+        /// reads the cell in front too, 0.2 for a full block, so such a face is at most 0.8.
+        INNER = 0x4000_0000,
         TEX_MASK = 0xFFFF,
         BIOME_SHIFT = 16,
         /// Corner light: a channel per 4 bits, a corner per 16.
