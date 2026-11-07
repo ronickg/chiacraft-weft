@@ -565,11 +565,6 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
     if ((g.extra.w >> 23u) & 1u) != 0u && any(in.tint != vec3(1.0)) && albedo.a > 0.05 && albedo.a < 0.995 {
         albedo = vec4(albedo.rgb / albedo.a, albedo.a);
     }
-    // PROBE: leaves flat in their opaque texels' average, as Distant Horizons' faces.
-    let whole = textureSampleLevel(textures[in.layer], linear_mipped, vec2(0.5), 16.0);
-    if any(in.tint != vec3(1.0)) && whole.a < 0.99 && whole.a > 0.05 && (in.backed & 2u) == 0u {
-        albedo = vec4(select(whole.rgb, whole.rgb / whole.a, ((g.extra.w >> 23u) & 1u) != 0u), 1.0);
-    }
     // Far water as Distant Horizons draws it (its `ColumnBox` keeps the sea floor's top under
     // water, drawn first; the water over it at the texture's alpha, mixed in gamma as vanilla's
     // screen mixes): over a bed that the water above has darkened (a block of sky light taken per
