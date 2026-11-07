@@ -240,7 +240,15 @@ const EXPOSURE_REF: f32 = 0.35;
 fn auto_exposure(mean: f32) -> f32 {
     let target_at = 0.18 / log2(2.5 * max(mean, 1e-5) + 1.045);
     let ref_at = 0.18 / log2(2.5 * EXPOSURE_REF + 1.045);
-    let k = pow(target_at / ref_at, 0.5);
+    // By day all of Bliss's curve, as its eye (dimensions/deferred.vsh:248-254 applies it in full):
+    // a forest seen from below came out 1.4-1.9x darker than Bliss's while its own light, at a
+    // matched vista, was already brighter (Trees, forest-exposure.md, 11-06): Bliss lifts a dark
+    // forest about 4.8x over the open vista, half the curve lifted ours 1.6x. Times 0.83 so the open
+    // vista stays where it was, and up to 4 (below). Trees' e3: forest mean 08/12/18 65/75/81
+    // against Bliss's 71/71/73 (dev 41/49/55); the vista's land 84/97/96 (dev 87/100/100, Bliss
+    // 85/109/98). Only with the sun up: night and the 05:00 blue hour keep half the curve.
+    let day_e = smoothstep(0.0, 0.15, scene.sun.y) * select(0.0, 1.0, open_sky());
+    let k = pow(target_at / ref_at, mix(0.5, 1.0, day_e)) * mix(1.0, 0.83, day_e);
     let night = smoothstep(0.0, -0.15, scene.sun.y) * select(1.0, 0.0, !open_sky());
     // Under rain the view is darker and stays so (a storm's mood; brought up, its mist went milky):
     // no brighter than as made, in a storm a little darker.
@@ -249,7 +257,7 @@ fn auto_exposure(mean: f32) -> f32 {
     // brought up less, 0.7 at most, so 04:00 stays dark as Bliss's (land luma 40 against 16 with
     // blue hour v4, 11-06); after sunset it keeps 1.2 (Bliss's 20:00 is brighter than ours).
     let ceiling = mix(1.2, 0.7, smoothstep(-0.2, 0.2, scene.sun.x));
-    return clamp(k, 0.6, mix(mix(2.0, ceiling, night), 1.0 - 0.1 * scene.weather.w, wet));
+    return clamp(k, 0.6, mix(mix(mix(2.0, 4.0, day_e), ceiling, night), 1.0 - 0.1 * scene.weather.w, wet));
 }
 
 // How strong the bloom is: a share of the glow mixed in (it keeps the light's sum), more in rain
