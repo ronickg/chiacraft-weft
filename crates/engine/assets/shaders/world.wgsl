@@ -185,13 +185,16 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
         tint = tint_color(tint_kind, w1 >> FACE_BIOME_SHIFT, o.x * 16 + i32(local.x), o.z * 16 + i32(local.z));
     }
     out.tint = tint;
+    // A face between leaves (`core:mc_leaves`): Minecraft's AO reads the leaf in front as a
+    // quarter of 0.2, a fifth darker at every corner (chiacraft, Trees, stage 1).
+    let ao = AO[a[c]] - select(0.0, 0.2, (w0 & FACE_INNER) != 0u);
     let ov = frames[g.extra.x + tex_id];
     if ov != 0u {
         out.overlay = texture_frame(ov - 1u).a + 1u;
-        out.color = vec3(SHADE[dir] * AO[a[c]]);
+        out.color = vec3(SHADE[dir] * ao);
     } else {
         out.overlay = 0u;
-        out.color = tint * SHADE[dir] * AO[a[c]];
+        out.color = tint * SHADE[dir] * ao;
     }
     return out;
 }
@@ -262,19 +265,21 @@ fn shade_unfogged(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
         let e = textureSampleLevel(textures[in.glow], nearest_clamp, in.uv, 0.0).r;
         light = max(light, select(in.tint, vec3(1.0), in.overlay != 0u) * e);
     }
+    if in.slot == 0u {
+        // Vanilla multiplies the texel by its light in sRGB values (26.3 terrain.fsh: an RGBA8
+        // atlas and framebuffer, nothing linearised). Linear albedo times light^2.2 matched that
+        // only where sRGB is a 2.2 power; in its dark toe the product's dark channels lost up to
+        // nine tenths, so leaves (red and blue low) came out too saturated and too dark in shade:
+        // oak in shade 20 40 10 against vanilla's 25 42 16 (chiacraft, Trees, stage 1).
+        return vec4(srgb_decode(srgb_encode(albedo.rgb) * light), albedo.a);
+    }
     var linear_light: vec3<f32>;
     if light.r == light.g && light.r == light.b {
         linear_light = vec3(pow(light.r, 2.2));
     } else {
         linear_light = pow(light, vec3(2.2));
     }
-    var lit: vec4<f32>;
-    if in.slot == 0u {
-        lit = vec4(albedo.rgb * linear_light, albedo.a);
-    } else {
-        lit = block_shade(in.slot, BlockPixel(in.uv, albedo, linear_light, in.pos, scene.params.w));
-    }
-    return lit;
+    return block_shade(in.slot, BlockPixel(in.uv, albedo, linear_light, in.pos, scene.params.w));
 }
 
 // How far the fog has closed in at `dist`: vanilla's from 0.6 of the terrain's end, and (chiacraft)
@@ -302,7 +307,20 @@ fn fogged(c: vec3<f32>, f: f32) -> vec3<f32> {
     if f <= 0.0 {
         return c;
     }
-    return pow(mix(to_gamma(c), to_gamma(scene.fog_color.rgb), f), vec3(2.2));
+    // Mixed in sRGB values as vanilla's apply_fog, with the target's exact curve (a 2.2 power
+    // darkened dark fogged pixels as it did the leaves in `shade_unfogged`).
+    return srgb_decode(mix(srgb_encode(c), srgb_encode(scene.fog_color.rgb), f));
+}
+
+// sRGB's exact curves, the ones the sRGB atlas and target apply in hardware.
+fn srgb_encode(l: vec3<f32>) -> vec3<f32> {
+    let c = max(l, vec3(0.0));
+    return select(1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, c * 12.92, c <= vec3(0.0031308));
+}
+
+fn srgb_decode(s: vec3<f32>) -> vec3<f32> {
+    let c = max(s, vec3(0.0));
+    return select(pow((c + 0.055) / 1.055, vec3(2.4)), c / 12.92, c <= vec3(0.04045));
 }
 
 // Nearest texels with antialiased borders (vanilla 26.1's sampleNearest): up close each texel
@@ -331,7 +349,9 @@ fn with_overlay(in: VOut, albedo: vec4<f32>, nuv: vec2<f32>, du: vec2<f32>, dv: 
         return albedo;
     }
     let ov = textureSampleGrad(textures[in.overlay - 1u], linear_mipped, nuv, du, dv);
-    return vec4(mix(albedo.rgb, ov.rgb * pow(in.tint, vec3(2.2)), ov.a), albedo.a);
+    // Tinted and laid over in sRGB values, as vanilla's overlay quad (a 2.2 power darkened its
+    // low channels, as `shade_unfogged`'s did).
+    return vec4(srgb_decode(mix(srgb_encode(albedo.rgb), srgb_encode(ov.rgb) * in.tint, ov.a)), albedo.a);
 }
 
 @fragment

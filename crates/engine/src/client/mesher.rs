@@ -116,6 +116,9 @@ pub fn build(c: &Content, n: &Neighborhood, ctm: &super::ctm::Ctm) -> Mesh {
     let row = |y: i32, z: i32| ((y + 1) as usize) * PAD + (z + 1) as usize;
     // Padded index to its bit in `solid`.
     let opaque = |i: usize| shades[i / PAD] >> (i % PAD) & 1 != 0;
+    // Leaves that shade corners (`core:mc_leaves`): Minecraft never counts them view-blocking, so
+    // a corner between two of them is still read (vanilla's `BlockModelLighter`).
+    let leafy = |i: usize| opaque(i) && solid[i / PAD] >> (i % PAD) & 1 == 0;
 
     for y in 0..16i32 {
         for z in 0..16i32 {
@@ -126,13 +129,13 @@ pub fn build(c: &Content, n: &Neighborhood, ctm: &super::ctm::Ctm) -> Mesh {
                 let x = todo.trailing_zeros() as i32 - 1;
                 todo &= todo - 1;
                 let i = pidx(x, y, z);
-                draw_block(c, n, ctm, &looks, &opaque, &mut mesh, x, y, z, states[i]);
+                draw_block(c, n, ctm, &looks, &opaque, &leafy, &mut mesh, x, y, z, states[i]);
                 // What else is in the cell.
                 if !n.extras.is_empty()
                     && let Some(parts) = n.extras.get(&i)
                 {
                     for &part in parts {
-                        draw_block(c, n, ctm, &looks, &opaque, &mut mesh, x, y, z, part);
+                        draw_block(c, n, ctm, &looks, &opaque, &leafy, &mut mesh, x, y, z, part);
                     }
                 }
             }
@@ -153,6 +156,7 @@ fn draw_block(
     ctm: &super::ctm::Ctm,
     looks: &super::looks::Looks,
     opaque: &impl Fn(usize) -> bool,
+    leafy: &impl Fn(usize) -> bool,
     mesh: &mut Mesh,
     x: i32,
     y: i32,
@@ -191,7 +195,7 @@ fn draw_block(
                 {
                     continue;
                 }
-                let (ao, light) = corner_data(c, n, ctm, opaque, x, y, z, dir);
+                let (ao, light) = corner_data(c, n, ctm, opaque, leafy, x, y, z, dir);
                 let tex = ctm.resolve(c, n, x, y, z, dir, textures[dir] & face::TEX_MASK);
                 let tint = face_tint(info, ctm, dir, tex);
                 // All that is translucent is kept far to near as one list of quads.
@@ -213,6 +217,10 @@ fn draw_block(
                         if c.states[n.states[pidx(x + bx, y + by, z + bz)] as usize].block == info.block {
                             rec[0] |= crate::gpu_layout::face::BACKED;
                         }
+                    }
+                    // A face into leaves (`core:mc_leaves` only: `opaque` holds leaves only then).
+                    if leafy(ni) {
+                        rec[0] |= crate::gpu_layout::face::INNER;
                     }
                     mesh.faces[info.layer as usize].push(rec);
                 }
@@ -301,6 +309,7 @@ fn corner_data(
     n: &Neighborhood,
     ctm: &super::ctm::Ctm,
     opaque: &impl Fn(usize) -> bool,
+    leafy: &impl Fn(usize) -> bool,
     x: i32,
     y: i32,
     z: i32,
@@ -331,7 +340,8 @@ fn corner_data(
         let i2 = pidx(p2[0], p2[1], p2[2]);
         let i3 = pidx(p3[0], p3[1], p3[2]);
         let (s1, s2, s3) = (opaque(i1), opaque(i2), opaque(i3));
-        let ao = if s1 && s2 { 0 } else { 3 - (s1 as u32 + s2 as u32 + s3 as u32) };
+        // Two solid sides hide the corner; with a leaf among them it still counts (`leafy`).
+        let ao = if s1 && s2 && !leafy(i1) && !leafy(i2) { 0 } else { 3 - (s1 as u32 + s2 as u32 + s3 as u32) };
         ao_bits |= ao << (k * 2);
 
         // Only what light could come from into the cell before the face: a slab's closed side
