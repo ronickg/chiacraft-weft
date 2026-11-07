@@ -72,6 +72,8 @@ const TABLE: &[(&str, f64, f64, f64)] = &[
     ("aa", 2.0, 0.07, 2.4),
     // Look's HDR numbers (+0.1-0.24 ms at 3456 wide), an estimate at 1080p.
     ("hdr", 1.0, 0.15, f64::NAN),
+    // Far detail 12 over 4: Far view's bench at the far spot (fdb4/fdb12, 11-06), frame 0.62 → 0.95 ms.
+    ("far_detail", 12.0, 0.33, f64::NAN),
     // The light through leaves (Trees, 11-06): an estimate, not yet measured. A few ALU ops and an
     // exp per leaf pixel, no texture or shadow lookup (it reuses the face's sun reach).
     ("leaf_light", 1.0, 0.02, f64::NAN),

@@ -253,7 +253,7 @@ fn max_extras() {
     SHADOW_FAR.set(0);
     POST_LOW.set(false);
     crate::look::LOOK_LEAF_HOLES.set(1.0);
-    LOD_DETAIL.set(12);
+    // (Far detail stays at 4 in Max: 12 cost +0.33 ms for a small gain, Planner 11-06.)
     // Ultra (soft edges from more rays, with TAA) where the GPU traces rays.
     RT_SHADOWS.set(if GPU_RAY_QUERY.get() && !on_phone() { 2 } else { 0 });
     RT_REFLECTIONS.set(GPU_RAY_QUERY.get() && !on_phone());
