@@ -546,7 +546,11 @@ impl Sky {
                     // `fs_cloud_resolve`.
                     axes: [[cover, (rain * 0.6 + thunder * 0.4).min(1.0), thunder, 0.0], [trace, 0.0, 0.0, 0.0], [0.0; 4]],
                     uv: cells,
-                    color: color.powf(2.2).extend(0.8 + 0.15 * cover).to_array(),
+                    // Vanilla draws every face of a cloud's box at 0.8, so from below its underside
+                    // and the top behind it stack to about 0.96; one face at 0.8 here let the blue sky
+                    // (clouds b-r +10..+23 against vanilla's neutral, Bliss's world) and the sun show
+                    // through (Weft bug; Planner's stage 1 review, MC import's s6 sheet, 11-06).
+                    color: color.powf(2.2).extend(0.96 + 0.04 * cover).to_array(),
                     ids: [index, kind::CLOUDS, w, h],
                     extra: [CELL as f32, 4.0, (lifted - cam.pos.y) as f32, reach as f32],
                 });
