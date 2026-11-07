@@ -79,8 +79,16 @@ pub fn block(mc: &str) -> (Vec<String>, bool) {
             let props = if of == "log" { axis(&s) } else { String::new() };
             let mut v: Vec<String> = Vec::new();
             // Our block of the very same name first (`base:yellow_poplar_leaves`), if we have it.
-            // Dark oak's bark and planks are nearest spruce's (its leaves stay oak's, tinted).
-            let near: &[&str] = if kind == "dark_oak" && of != "leaves" { &["dark_oak", "spruce", "oak"] } else { wood(kind) };
+            // Dark oak's bark: we have no dark oak, so its logs come in as andiroba's, a tropical log
+            // this world never has, which the comparison packs (references/mc-pack) paint with
+            // Minecraft's own dark oak bark; else spruce's, the nearest of ours.
+            let near: &[&str] = if kind == "dark_oak" && of == "log" {
+                &["dark_oak", "andiroba", "spruce", "oak"]
+            } else if kind == "dark_oak" && of == "planks" {
+                &["dark_oak", "spruce", "oak"]
+            } else {
+                wood(kind)
+            };
             let kinds = std::iter::once(kind).chain(near.iter().copied().filter(|k| *k != kind));
             for k in kinds {
                 // Leaves as placed: ours decay farther than 4 or so from a log, Minecraft's only
@@ -199,16 +207,9 @@ pub fn block(mc: &str) -> (Vec<String>, bool) {
             let half = s.prop("half").unwrap_or("lower");
             (vec![format!("base:wild_sunflower[half={half}]"), if half == "lower" { "base:dandelion".into() } else { AIR.into() }], false)
         }
-        // 26.3's wildflowers are mostly yellow patches on the forest floor.
-        // Flat little clusters in Minecraft; our dandelion stands up, so only full patches (4)
-        // get one, or the floor reads as a meadow of them.
-        "wildflowers" => {
-            if s.prop("flower_amount") == Some("4") {
-                near(&["base:dandelion", AIR])
-            } else {
-                (vec![AIR.into()], false)
-            }
-        }
+        // 26.3's wildflowers: flat little clusters on the forest floor. Our dandelion stands up and
+        // showed as a meadow of them, so none (the pixel diff against vanilla is closer without).
+        "wildflowers" => (vec![AIR.into()], false),
         "pink_petals" => near(&["base:clover", AIR]),
         // A thin layer on the floor in Minecraft; ours is a whole block.
         "leaf_litter" => (vec![AIR.into()], false),

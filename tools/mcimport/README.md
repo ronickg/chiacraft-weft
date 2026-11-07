@@ -34,6 +34,8 @@ other way from Minecraft's: ours = 180 - Minecraft's; its pitch down is positive
   plant of ours: we have no thin floor cover block. Waterlogged ones are water.
 - **Blocks we lack** (tuff and deepslate variants, amethyst, sulfur, cinnabar, copper, terracotta
   colours, prismarine) are stone or the nearest of ours; all in `mc_import.txt`.
+- **Dark oak** logs come in as andiroba logs (a tropical log this world never has), which the comparison packs paint with Minecraft's dark oak bark; without those packs they show andiroba's. Its leaves are oak's.
+- **Wildflowers** (flat yellow clusters) are left out: our flowers stand up.
 - **Biomes** are per column, the one at the column's surface (ours have no 3D biomes).
 - **Leaves** come in as placed (no decay), and cherry leaves in bloom (Minecraft's are pink all
   year).

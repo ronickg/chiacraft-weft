@@ -629,10 +629,20 @@ fn dark_leaf_mips(name: &str) -> bool {
     name.contains("leaves") && crate::config::by_name("core:mc_leaves").is_some_and(|id| crate::config::get(id) != 0.0)
 }
 
-/// `mip_chain` with the colour of each smaller texel the gamma-correct sum of its opaque ones
-/// over all four (`dark_leaf_mips`); its alpha as ours, so the crown is as dense far off.
+/// `mip_chain` as Minecraft makes leaves' (`dark_leaf_mips`, its dark cutout): each smaller texel's
+/// colour the sum of its opaque texels in linear light over all four (holes count as black); its
+/// alpha the plain average as ours (scaling it to keep the full-size coverage, as Minecraft's
+/// `scaleAlphaToCoverage` does at its 0.5 test, made far crowns solid and the vista's leaves
+/// brighter than vanilla's: pixel error 8.1 to 16.2, PC mwi_px3).
 fn mip_chain_dark(mut rgba: Vec<u8>, size: u32) -> Vec<Vec<u8>> {
-    let lin = |v: u8| (v as f32 / 255.0).powf(2.2);
+    let lin = |v: u8| {
+        let c = v as f32 / 255.0;
+        if c <= 0.04045 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
+    };
+    let srgb = |l: f32| {
+        let c = if l <= 0.003_130_8 { l * 12.92 } else { 1.055 * l.powf(1.0 / 2.4) - 0.055 };
+        (c * 255.0).round().clamp(0.0, 255.0) as u8
+    };
     let mut out = Vec::with_capacity(size.trailing_zeros() as usize + 1);
     let mut s = size;
     loop {
@@ -652,9 +662,7 @@ fn mip_chain_dark(mut rgba: Vec<u8>, size: u32) -> Vec<Vec<u8>> {
                     }
                     let d = ((y * half + x) * 4) as usize;
                     for c in 0..3 {
-                        o[d + c] = ((sum[c] / 4.0).powf(1.0 / 2.2) * 255.0)
-                            .round()
-                            .clamp(0.0, 255.0) as u8;
+                        o[d + c] = srgb(sum[c] / 4.0);
                     }
                 }
             }
