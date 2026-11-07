@@ -251,6 +251,7 @@ Small fixes and speed-ups taken from upstream Weft after the 11-05 sync, one com
 - **Swapchain not remade at the size it has; the old one destroyed first** (from upstream dc8cd0e25, by hand): `Swapchain::mode`; a resize to the same size, format, present mode and transform returns at once, and the old swapchain is destroyed before the new one is made instead of passed as `old_swapchain`. Merged into our Android pre-rotation (`logical`, `turn`), which stays ours; the "swapchain:" log line now tests `first` for the missing `old`. *Why:* remaking it for nothing crashed Intel Arc's driver at start.
 - **Worker count worked out once** (from upstream 699bcfa8c): `workers()` caches `available_parallelism()` in a `OnceLock`. Ours stays `pub(crate)` (the server's and the terrain's own pools read it). *Why:* it read the cgroup files on every pool lookup, 30-60 ms in a frame starting hundreds of meshing jobs.
 - **Crash reports for native faults on Linux** (from upstream 731c768db): `diag::native` on Linux installs SIGSEGV/SIGBUS/SIGILL/SIGFPE handlers that write the same report as the panic hook, then re-raise. Placed before our slow-frame spans in `diag.rs`. *Why:* a segfault on the PC left only the kernel's message.
+- **Text paste on Wayland** (from upstream 533bf53f1): `arboard` with its `wayland-data-control` feature (workspace `Cargo.toml`; `Cargo.lock` resolved again on ours). *Why:* paste into text fields did nothing under Wayland (the PC's KDE).
 <!-- port-rows -->
 
 ## What this means for syncing with upstream
