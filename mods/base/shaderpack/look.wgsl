@@ -1921,9 +1921,20 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
             let near = vec3(1.0) - exp(-vec3(4.9e-5, 1.0e-4, 3.5e-4) * min(dist, 250.0));
             let blue_sky = sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 0.3, dir.z)));
             var add = blue_sky * near * mix(0.2, 1.0, high);
-            let pink = vec3(1.0, 0.14, 0.45);
+            // With the sun low the air takes the sun's own colour through its phase, as Bliss's
+            // clear air does (overworld_fog.glsl:256-268: sun x shadow x (Rayleigh phase x its
+            // coefficient + Mie phase x its one), plus the averaged sky): gold all round, brightest
+            // toward the sun. A fixed pink here turned water and lit land violet at 18:00 against
+            // Bliss's golden air (lk_na sheets, 11-06), though the shade's numbers matched.
+            let mu = dot(dir, normalize(scene.sun.xyz));
+            // Rayleigh's phase (3/4 (1 + mu^2)) and a forward Mie lobe, weighted 0.8 / 0.2 as
+            // Bliss's coefficients' luma near the sea (Rayleigh x24 x1.25 against Mie), scaled to 1
+            // at right angles to the sun so the side views keep the strength that matched.
+            let mie = min(hg_phase(mu, 0.7) / hg_phase(0.0, 0.7), 6.0);
+            let phase = (0.8 * 0.75 * (1.0 + mu * mu) + 0.2 * mie) / 0.8;
+            let gold = p.sun / max(luma(p.sun), 1e-4);
             let grey = 1.0 - exp(-2.5e-4 * min(dist, 250.0));
-            add += pink * (luma(p.horizon) / luma(pink)) * grey * low * 0.6;
+            add += gold * luma(p.horizon) * phase * grey * low * 0.6;
             out += add * day_air * fade;
         }
     }
