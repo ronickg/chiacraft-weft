@@ -230,6 +230,8 @@ const SOFT_STORM_THICK: f32 = 190.0;
 // The HDR world's sunlight and skylight on the soft clouds, against today's (`soft_march`).
 const CLOUD_SUN_HDR: f32 = 1.0;
 const CLOUD_SKY_HDR: f32 = 1.0;
+// The HDR world's billows across (blocks): Bliss's large cumulus (1024 as made).
+const CLOUD_BILLOW_HDR: f32 = 2048.0;
 
 // One slice `z` (0..63) of the noise volume at `xy` (texels, 0..64).
 fn soft_slice(z: u32, xy: vec2<f32>) -> vec4<f32> {
@@ -283,11 +285,16 @@ fn soft_density(s: Sky, at: vec2<f32>, a: f32, cover: f32, fine: bool) -> f32 {
     // with the slow field so masses group.
     // (Two thirds of that, 1024, so a clear day's puffs come apart: Bliss's vista has smaller,
     // separate ones where ours merged into masses, Look's split at mc_forest, 11-06.)
-    let billow = soft_noise(vec3(at.x / 1024.0 + a * 0.04, a * 0.3 + t * 0.0003, at.y / 1024.0)).r;
-    let mass = soft_slice(41u, fract(at / 2048.0) * 64.0).r;
+    // In the HDR world Bliss's: large soft masses with open sky between, its large cumulus layer's
+    // (billows about twice as wide, the slow masses weighing more, the cauliflower less): ours were
+    // many small even puffs over the whole sky (the stage 2 sheet, Bliss's vista 08/12/18, 11-06).
+    let hdr = scene.frame.x > 0.5;
+    let wide = select(1024.0, CLOUD_BILLOW_HDR, hdr);
+    let billow = soft_noise(vec3(at.x / wide + a * 0.04, a * 0.3 + t * 0.0003, at.y / wide)).r;
+    let mass = soft_slice(41u, fract(at / select(2048.0, 4096.0, hdr)) * 64.0).r;
     // A smaller billow on them, so the puffs are cauliflowers, not smooth marshmallows (11-05).
     let small = soft_noise(vec3(at.x / 384.0 + 0.37, a * 0.8 + t * 0.001, at.y / 384.0)).r;
-    let shape = billow * 0.55 + mass * 0.25 + small * 0.2;
+    let shape = select(billow * 0.55 + mass * 0.25 + small * 0.2, billow * 0.5 + mass * 0.4 + small * 0.1, hdr);
     // Photon's remap: the billows the cover lets through, shaped from the bottom up.
     var d = clamp((shape - (1.0 - cover)) / max(cover, 0.05) * 1.6, 0.0, 1.0);
     // An egg: a flat-ish base, rounded tops; a storm's deck fills more of its height.
@@ -295,9 +302,11 @@ fn soft_density(s: Sky, at: vec2<f32>, a: f32, cover: f32, fine: bool) -> f32 {
     d -= smoothstep(mix(0.35, 0.55, storm), 1.0, a) * mix(0.45, 0.4, storm);
     if fine && d > 0.0 {
         // Detail wears only the edges (Photon: by 1 - density), so the cores stay solid.
-        let w = soft_noise(vec3(at.x / 128.0, a * 1.4 + t * 0.002, at.y / 128.0));
+        // In the HDR world wider and gentler: Bliss's edges are soft, ours crisp cauliflower.
+        let fine_w = select(128.0, 224.0, scene.frame.x > 0.5);
+        let w = soft_noise(vec3(at.x / fine_w, a * 1.4 + t * 0.002, at.y / fine_w));
         let cells = w.g * 0.625 + w.b * 0.25 + w.a * 0.125;
-        d -= (1.0 - cells) * 0.5 * (1.0 - d) * mix(0.6, 1.0, a);
+        d -= (1.0 - cells) * select(0.5, 0.35, scene.frame.x > 0.5) * (1.0 - d) * mix(0.6, 1.0, a);
     }
     return clamp(d, 0.0, 1.0);
 }
@@ -315,6 +324,11 @@ fn cloud_sun_tint() -> vec3<f32> {
     // Gold, not orange (0.66 0.38 in green and blue before): in Bliss's own world at 06:00 its
     // clouds are gold against a gold-cream sky, ours went strong orange against lavender-blue,
     // much warmer than the land's own gold (Look's and Tester 2's sheets, 11-06).
+    // In the HDR world none: the sun's own light is already the air's colour by its height
+    // (`palette_now`, 4300 K through the air), as Bliss lights its clouds.
+    if scene.frame.x > 0.5 {
+        return vec3(1.0);
+    }
     return mix(vec3(1.0), vec3(1.05, 0.8, 0.5), cloud_low_sun() * 0.85);
 }
 
@@ -379,6 +393,12 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
         // (0.2: at 0.4 they still stood brighter than the sky, Bliss's darker than it; PC shnt2.)
         sun *= mix(1.0, 0.2, smoothstep(-0.12, -0.3, scene.sun.y));
     }
+    // In the HDR world half its colour on the clouds: they stood gold-orange toward the 08:00 sun
+    // where Bliss's are cream-white with silver edges (PC shcl1).
+    if scene.frame.x > 0.5 {
+        // (Not at sunrise and sunset, where Bliss's are gold too: from the sun 6 to 17 degrees up.)
+        sun = mix(sun, mix(vec3(luma(sun)), sun, 0.5), smoothstep(0.1, 0.3, scene.sun.y));
+    }
     // In the HDR world, clouds seen away from a low sun take its light pale cream, not orange: Bliss's
     // clouds at 17:00-18:00 with the sun behind the camera are cream with grey bellies where ours
     // went strong orange; toward the sun they keep its gold (its 06:00 clouds, facing the sun).
@@ -429,6 +449,14 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
         // Grey-blue shaded bases, bright tops: evenly lit, a clear day's read as flat white cut-outs.
         let ambient = mix(p.horizon * 0.3 + p.ambient * 0.25, p.ambient * 1.2 + p.horizon * 0.2, smoothstep(0.0, 0.8, a)) * mix(1.0, 0.55, s.axes[0].y * (1.0 - a)) * mix(1.0, 0.72, cloud_low_sun()) * select(1.0, CLOUD_SKY_HDR, scene.frame.x > 0.5);
         var c = (sun * direct * powder * 0.9 + ambient) * albedo;
+        if scene.frame.x > 0.5 {
+            // In the HDR world bright undersides, as Bliss's: the light scattered many times inside
+            // (its slow lobe, falling off a third as fast) and more of the sky's from below. Seen
+            // from under them, ours went steel grey and purple with darker bellies (PC shcl1, the
+            // first pass), where Bliss's are cream.
+            let deep = exp(-od * 0.12) * (1.0 - exp(-sigma * 8.0) * 0.5);
+            c += (sun * deep * 0.35 + (p.horizon * 0.25 + p.ambient * 0.45) * (1.0 - smoothstep(0.0, 0.6, a))) * albedo;
+        }
         // In the HDR world a silver rim: the thin edges of a cloud before the sun, where the light
         // has crossed little of it, glow white-gold toward the eye (Bliss's and Photon's bright rims, a wide lobe: at g 0.9 and a
         // tenth of this it moved the sky 0.3/255;
@@ -549,7 +577,10 @@ fn soft_pixel(in: CloudOut, s: Sky, dir: vec3<f32>) -> CloudPixel {
     let misted = rain_amount() * (1.0 - smoothstep(0.02, 0.22, dir.y));
     color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z))), misted);
     color = display(fog_through(rainbow_on(color, dir), dir * 220.0, 1.0));
-    let alpha = alpha_cloud * (1.0 - smoothstep(0.85, 1.0, dist));
+    // In the HDR world the far ones thin out into the haze from about half the reach: handed over
+    // to the sky's horizon colour at full cover, they stood as a flat grey belt above the horizon
+    // where Bliss's far sky is open haze with a few far clouds (the stage 2 sheet, noon).
+    let alpha = alpha_cloud * (1.0 - smoothstep(select(0.85, 0.5, scene.frame.x > 0.5), 1.0, dist));
     let clip = scene.view_proj * vec4(rel, 1.0);
     return CloudPixel(vec4(color * alpha, alpha), clip.z / clip.w);
 }
@@ -1007,6 +1038,19 @@ fn cirrus(c: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
     // Gone toward the horizon, where the plane's texture crowds into streaks.
     let cover = smoothstep(0.55 - 0.25 * rain, 0.85, n) * smoothstep(0.12, 0.4, dir.y);
     let mu = max(dot(dir, light_dir()), 0.0);
+    if scene.frame.x > 0.5 {
+        // In the HDR world Bliss's altostratus: a high thin sheet in wide soft banks, lit through
+        // from the sun's side (its forward lobe), so it glows bright about a low sun and stays a
+        // pale veil away from it (Bliss's 08:00 vista: the bright bank round the sun).
+        let qa = at / 2400.0;
+        let na = noise3(vec3(qa, t * 0.001)) * 0.7 + noise3(vec3(qa * 3.1 + 7.0, t * 0.002)) * 0.3;
+        let sheet = smoothstep(0.5 - 0.2 * rain, 0.8, na) * smoothstep(0.06, 0.3, dir.y);
+        let fwd = cloud_hg(dot(dir, light_dir()), 0.6) * 12.566;
+        let lit_a = p.horizon * 0.5 + p.ambient * 0.6 + p.sun * light_strength() * (0.25 + 0.35 * fwd);
+        let c2 = mix(c, lit_a, sheet * 0.45);
+        let lit = p.horizon * 0.6 + p.ambient * 0.8 + p.sun * light_strength() * 0.35 + p.glow * pow(mu, 4.0) * light_strength() * 0.8;
+        return mix(c2, lit, cover * 0.35);
+    }
     let lit = p.horizon * 0.6 + p.ambient * 0.8 + p.sun * light_strength() * 0.35 + p.glow * pow(mu, 4.0) * light_strength() * 0.8;
     return mix(c, lit, cover * 0.55);
 }
