@@ -116,6 +116,8 @@ static CLOUD_SHADOWS: Config<bool> = Config::named("core:cloud_shadows");
 static BLOOM_LEVELS: Config<i32> = Config::named("core:bloom");
 static SHADOW_FAR: Config<i32> = Config::named("core:shadow_far");
 static POST_LOW: Config<bool> = Config::named("core:post_low");
+/// Distant terrain's detail (`core:lod_detail`, Far view): 4 as made, 12 Distant Horizons' cells.
+static LOD_DETAIL: Config<i32> = Config::named("core:lod_detail");
 /// DLSS where the renderer has it (windows-dlss5's `dlss.rs`, its own tab): the modes it offers
 /// (bit 1 DLAA; 0 none, also before that branch is in), whether Ray Reconstruction runs, the mode
 /// (0 off, 1 DLAA), DLAA's model and Ray Reconstruction on.
@@ -251,6 +253,7 @@ fn max_extras() {
     SHADOW_FAR.set(0);
     POST_LOW.set(false);
     crate::look::LOOK_LEAF_HOLES.set(1.0);
+    // (Far detail stays at 4 in Max: 12 cost +0.33 ms for a small gain, Planner 11-06.)
     // Ultra (soft edges from more rays, with TAA) where the GPU traces rays.
     RT_SHADOWS.set(if GPU_RAY_QUERY.get() && !on_phone() { 2 } else { 0 });
     RT_REFLECTIONS.set(GPU_RAY_QUERY.get() && !on_phone());
@@ -610,7 +613,7 @@ fn row_ui(ui: &mut Ui, rows: &'static [Row], i: usize, step: fn(usize, i32)) {
 /// The Extra quality tab's rows (`EXTRA_SCREEN`): the newer features, each a setting of its own,
 /// outside Low to Ultra so no preset changes the look by them; Max sets them all (`max_extras`).
 /// Traced shadows, reflections and the path tracing denoiser only where the GPU can trace rays (the last rows, from `RT_ROW`).
-const EXTRA_ROWS: [Row; 12] = [
+const EXTRA_ROWS: [Row; 13] = [
     Row { key: "hdr", values: &[0.0, 1.0], get: || HDR_WORLD.get() as u8 as f64, set: |v| HDR_WORLD.set(v > 0.0), shown: off_on },
     Row {
         key: "aa",
@@ -662,6 +665,7 @@ const EXTRA_ROWS: [Row; 12] = [
         set: |v| crate::look::LOOK_LEAF_HOLES.set(if v > 0.0 { 1.0 } else { 0.0 }),
         shown: off_on,
     },
+    Row { key: "far_detail", values: &[4.0, 8.0, 12.0], get: || LOD_DETAIL.get() as f64, set: |v| LOD_DETAIL.set(v as i32), shown: number },
     // The light through leaves (Trees, 11-06): its own setting, off by default and not in Max for
     // now (Planner: Max's turn on it is a later call), as Ronald's Bliss has none.
     Row {
@@ -698,7 +702,7 @@ const EXTRA_ROWS: [Row; 12] = [
 ];
 /// The first of the rows only a GPU that traces rays shows (traced shadows, reflections, then the
 /// path tracer's denoiser).
-const RT_ROW: usize = 9;
+const RT_ROW: usize = 10;
 
 /// An extra row a step on: Max becomes Custom (the Low to Ultra presets leave these rows as they are).
 fn step_extra(i: usize, dir: i32) {
@@ -784,6 +788,7 @@ pub(crate) fn measured_rows(tab: crate::video_costs::Tab) -> Vec<crate::video_co
                 ("bloom_levels", 0.4),
                 ("effect_detail", 0.4),
                 ("leaf_holes", 0.4),
+                ("far_detail", 0.6),
                 ("leaf_light", 0.4),
             ];
             if GPU_RAY_QUERY.get() {
