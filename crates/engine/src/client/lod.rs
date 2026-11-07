@@ -51,12 +51,21 @@ const CANOPY_LEVEL: u32 = 3;
 /// From this level on (8-block cells) a cell's walls are drawn as the slope it stands for: its top
 /// block (bare rock where the dimension's faces say), steepness its mean drop per block.
 const SLOPE_LEVEL: u32 = 3;
-/// A tile splits into the level below while nearer than this many of its widths: a cell stays
-/// about the same size on screen (a 32-block cell at 4096 blocks).
-const SPLIT: f64 = 4.0;
-/// A split tile joins again only once farther than this many of its widths, so walking to and
-/// fro over the line doesn't swap levels each time.
-const MERGE: f64 = 4.5;
+/// A tile splits into the level below while nearer than this many of its widths
+/// (`core:lod_detail`, 4 as made): a cell stays about the same size on screen (at 4, a 32-block
+/// cell at 4096 blocks). chiacraft: at 12 the cells are Distant Horizons' (MEDIUM: 2 blocks to 768,
+/// 4 to 1536, 8 to 3072), whose far forests stand as single crowns with gaps between them where ours
+/// at 4 merged into flat blocks (Far view's pixel diff against vanilla + DH, 11-06). A split tile
+/// joins again only once farther than an eighth more, so walking to and fro over the line doesn't
+/// swap levels each time.
+fn split_widths() -> f64 {
+    content()
+        .game
+        .config_names
+        .get("core:lod_detail")
+        .map_or(4.0, |&id| crate::config::get(id) as f64)
+        .max(1.0)
+}
 /// Made tiles no longer wanted kept a while (not drawn), for coming back.
 const CACHE: usize = 192;
 /// Blocks under the land from where distant terrain is left out.
@@ -1312,7 +1321,7 @@ impl Lod {
             if near > reach || far < hide {
                 continue;
             }
-            let edge = if self.split.contains(&key) { MERGE } else { SPLIT };
+            let edge = split_widths() * if self.split.contains(&key) { 1.125 } else { 1.0 };
             if key.level > 1 && near < edge * key.size() as f64 {
                 split.insert(key);
                 stack.extend(key.children());
