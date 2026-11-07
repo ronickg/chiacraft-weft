@@ -23,6 +23,8 @@ pub static QUALITY: Config<i32> = Config::named("quality");
 /// The pack's screen effects: 0 off, 1 low (fewer steps), 2 on. Bloom has no low.
 pub static FX_REFLECT: Config<i32> = Config::named("fx_reflect");
 pub static FX_CONTACT: Config<i32> = Config::named("fx_contact");
+/// The far shade from the sky (`far_ao`, an Extra row): 0 off, 1 low, 2 on.
+pub static FX_FAR_AO: Config<i32> = Config::named("fx_far_ao");
 /// Light in the air through the shadow maps (Lighting's `volume`, on `look-air`): until that lands,
 /// the engine logs "no such effect" and the row changes nothing.
 pub static FX_VOLUME: Config<i32> = Config::named("fx_volume");
@@ -259,6 +261,7 @@ fn max_extras() {
     RT_REFLECTIONS.set(GPU_RAY_QUERY.get() && !on_phone());
     // Ours wherever DLSS Ray Reconstruction doesn't denoise the path tracer's light.
     PT_DENOISER.set(1);
+    FX_FAR_AO.set(2);
     FX_WIND_LIFE.set(3);
     SOFT_CLOUDS.set(true);
     // DLAA (DLSS at the screen's own size) where the renderer has it, with its newest model (M,
@@ -699,6 +702,9 @@ const EXTRA_ROWS: [Row; 13] = [
         set: |v| PT_DENOISER.set(v as i32),
         shown: |v| word(if v > 0.0 { "pt_denoiser_svgf" } else { "pt_denoiser_raw" }),
     },
+    // The far shade from the sky in the gaps between far crowns and at the foot of far steps
+    // (Look, 11-06: Bliss's shading with distance, our own code).
+    Row { key: "far_ao", values: &[0.0, 1.0, 2.0], get: || FX_FAR_AO.get() as f64, set: |v| FX_FAR_AO.set(v as i32), shown: off_low_on },
 ];
 /// The first of the rows only a GPU that traces rays shows (traced shadows, reflections, then the
 /// path tracer's denoiser).
@@ -790,6 +796,7 @@ pub(crate) fn measured_rows(tab: crate::video_costs::Tab) -> Vec<crate::video_co
                 ("leaf_holes", 0.4),
                 ("far_detail", 0.6),
                 ("leaf_light", 0.4),
+                ("far_ao", 0.4),
             ];
             if GPU_RAY_QUERY.get() {
                 // A new world shader each change, and its scene.
@@ -850,6 +857,8 @@ pub fn register(r: &mut Registry) {
     r.config(&FX_REFLECT).int(2, 0, 2);
     // Off by default, low shafts (Ronald, 11-05: "Off by default", "Default to Low").
     r.config(&FX_CONTACT).int(0, 0, 2);
+    // Off unless chosen or Max (its cost on the cost table).
+    r.config(&FX_FAR_AO).int(0, 0, 2);
     // Cheap (Tester 2's PC bench, 11-04: +0.04 ms of effects at 1280x720): low until a preset
     // says otherwise; off on the Low preset until the Mac's Retina numbers are in.
     r.config(&FX_VOLUME).int(1, 0, 2);

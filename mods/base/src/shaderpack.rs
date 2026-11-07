@@ -92,17 +92,17 @@ pub fn register_for_scripts(r: &mut Registry) {
 /// The pack's screen effects (`assets/shaders/post/`: packs cannot add passes), at the strengths
 /// the video settings ask (`video.rs`: off, low, on) while chiacraft's pack is the one chosen, off
 /// with any other or none: water reflections first (only the first effect sees the water in the
-/// image's alpha), contact shadows, light in the air (`volume`, Lighting's), the light shafts,
-/// then bloom. `--no-reflect`, `--no-contact`, `--no-volume`, `--no-shafts` and `--no-bloom` leave
+/// image's alpha), contact shadows, the far shade from the sky (`far_ao`), light in the air
+/// (`volume`, Lighting's), the light shafts, then bloom. `--no-reflect`, `--no-contact`, `--no-far-ao`, `--no-volume`, `--no-shafts` and `--no-bloom` leave
 /// one out (a script comparing the look), `--shafts-debug` shows what the shafts see.
 pub fn register_shafts(r: &mut Registry) {
     use std::sync::Mutex;
     // What each effect was last set to (strength), so a change of setting or pack applies once.
-    static APPLIED: Mutex<[f32; 5]> = Mutex::new([-1.0; 5]);
+    static APPLIED: Mutex<[f32; 6]> = Mutex::new([-1.0; 6]);
     r.client_frame(|c| {
         // Out of a world: set again at the next join.
         if c.state().flags & weft_sdk::client::client_flags::JOINED == 0 {
-            *APPLIED.lock().unwrap() = [-1.0; 5];
+            *APPLIED.lock().unwrap() = [-1.0; 6];
             return;
         }
         let pack = is_ours(&SHADER_PACK.get());
@@ -112,6 +112,7 @@ pub fn register_shafts(r: &mut Registry) {
         let want = [
             ("reflect", !option("no-reflect"), level(crate::video::FX_REFLECT.get())),
             ("contact", !option("no-contact"), level(crate::video::FX_CONTACT.get())),
+            ("far_ao", !option("no-far-ao"), level(crate::video::FX_FAR_AO.get())),
             ("volume", !option("no-volume"), level(crate::video::FX_VOLUME.get())),
             ("shafts", !option("no-shafts"), if option("shafts-debug") { 2.0 } else { level(crate::video::FX_SHAFTS.get()) }),
             ("bloom", !option("no-bloom"), if crate::video::FX_BLOOM.get() > 0 { 1.0 } else { 0.0 }),
