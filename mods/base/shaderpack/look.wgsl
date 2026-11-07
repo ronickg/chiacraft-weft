@@ -1904,6 +1904,40 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // their code left out of its shader (Android port: on the Pixel 10 the size of these rare
     // paths, the fog walk, the dust and the water's cost the vista 34.2 -> 26.0 ms, in a calm
     // scene drawing nothing).
+    // The HDR world by day: the near air's own light added over what is seen, as Bliss's clear air
+    // adds it (its overworld_fog.glsl atmosphere haze, purely additive: the land keeps its light),
+    // built over the first 250 blocks and gone by 700, where the far haze above takes over. Its
+    // colour is the sky's of the hour: with the sun high the sky's blue, nearly pure (Bliss's noon
+    // vista adds about +0.10 blue to the shade 100-300 blocks off, linear, green flat: our leaf sides
+    // were green 48 56 44 against its navy 30 54 100); a fifth of it in the morning (08:00 +0.02);
+    // with the sun at the horizon the sunset band's pink (its 18:00 shade gains red 1, green 0.14,
+    // blue 0.45: warm grey 61 59 45 where ours stood a bare green 35 56 30). Trees' bands, 11-06.
+    if scene.frame.x > 0.5 {
+        let day_air = smoothstep(-0.08, 0.02, scene.sun.y) * (1.0 - rain_amount());
+        if day_air > 0.0 {
+            let fade = 1.0 - smoothstep(300.0, 700.0, dist);
+            let high = smoothstep(0.45, 0.8, scene.sun.y);
+            let low = 1.0 - smoothstep(0.03, 0.3, scene.sun.y);
+            let near = vec3(1.0) - exp(-vec3(4.9e-5, 1.0e-4, 3.5e-4) * min(dist, 250.0));
+            let blue_sky = sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 0.3, dir.z)));
+            var add = blue_sky * near * mix(0.2, 1.0, high);
+            // With the sun low the air takes the sun's own colour through its phase, as Bliss's
+            // clear air does (overworld_fog.glsl:256-268: sun x shadow x (Rayleigh phase x its
+            // coefficient + Mie phase x its one), plus the averaged sky): gold all round, brightest
+            // toward the sun. A fixed pink here turned water and lit land violet at 18:00 against
+            // Bliss's golden air (lk_na sheets, 11-06), though the shade's numbers matched.
+            let mu = dot(dir, normalize(scene.sun.xyz));
+            // Rayleigh's phase (3/4 (1 + mu^2)) and a forward Mie lobe, weighted 0.8 / 0.2 as
+            // Bliss's coefficients' luma near the sea (Rayleigh x24 x1.25 against Mie), scaled to 1
+            // at right angles to the sun so the side views keep the strength that matched.
+            let mie = min(hg_phase(mu, 0.7) / hg_phase(0.0, 0.7), 6.0);
+            let phase = (0.8 * 0.75 * (1.0 + mu * mu) + 0.2 * mie) / 0.8;
+            let gold = p.sun / max(luma(p.sun), 1e-4);
+            let grey = 1.0 - exp(-2.5e-4 * min(dist, 250.0));
+            add += gold * luma(p.horizon) * phase * grey * low * 0.6;
+            out += add * day_air * fade;
+        }
+    }
     var extra = vec3(0.0);
     if !CALM {
         extra = held_in_fog(rel, sky) + lightning_bolt_over(dir, dist);
