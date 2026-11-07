@@ -629,10 +629,28 @@ fn dark_leaf_mips(name: &str) -> bool {
     name.contains("leaves") && crate::config::by_name("core:mc_leaves").is_some_and(|id| crate::config::get(id) != 0.0)
 }
 
-/// `mip_chain` with the colour of each smaller texel the gamma-correct sum of its opaque ones
-/// over all four (`dark_leaf_mips`); its alpha as ours, so the crown is as dense far off.
+/// `mip_chain` as Minecraft makes leaves' (`dark_leaf_mips`, its dark cutout): each smaller texel's
+/// colour the sum of its opaque texels in linear light over all four (holes count as black), and
+/// its alpha scaled so as much of the level passes the alpha test as at full size (its
+/// `scaleAlphaToCoverage`, here at our test of 0.1).
 fn mip_chain_dark(mut rgba: Vec<u8>, size: u32) -> Vec<Vec<u8>> {
-    let lin = |v: u8| (v as f32 / 255.0).powf(2.2);
+    let lin = |v: u8| {
+        let c = v as f32 / 255.0;
+        if c <= 0.04045 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
+    };
+    let srgb = |l: f32| {
+        let c = if l <= 0.003_130_8 { l * 12.92 } else { 1.055 * l.powf(1.0 / 2.4) - 0.055 };
+        (c * 255.0).round().clamp(0.0, 255.0) as u8
+    };
+    const TEST: f32 = 0.1 * 255.0;
+    let covered = |px: &[u8], scale: f32| {
+        let n = px.len() / 4;
+        px.chunks_exact(4)
+            .filter(|p| p[3] as f32 * scale > TEST)
+            .count() as f32
+            / n.max(1) as f32
+    };
+    let coverage = covered(&rgba, 1.0);
     let mut out = Vec::with_capacity(size.trailing_zeros() as usize + 1);
     let mut s = size;
     loop {
@@ -652,11 +670,18 @@ fn mip_chain_dark(mut rgba: Vec<u8>, size: u32) -> Vec<Vec<u8>> {
                     }
                     let d = ((y * half + x) * 4) as usize;
                     for c in 0..3 {
-                        o[d + c] = ((sum[c] / 4.0).powf(1.0 / 2.2) * 255.0)
-                            .round()
-                            .clamp(0.0, 255.0) as u8;
+                        o[d + c] = srgb(sum[c] / 4.0);
                     }
                 }
+            }
+            // The alpha scale that keeps the full-size coverage, by bisection.
+            let (mut lo, mut hi) = (0.0f32, 4.0f32);
+            for _ in 0..16 {
+                let mid = (lo + hi) / 2.0;
+                if covered(&o, mid) < coverage { lo = mid } else { hi = mid }
+            }
+            for a in o.iter_mut().skip(3).step_by(4) {
+                *a = (*a as f32 * hi).round().min(255.0) as u8;
             }
             o
         });
