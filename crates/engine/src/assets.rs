@@ -630,9 +630,10 @@ fn dark_leaf_mips(name: &str) -> bool {
 }
 
 /// `mip_chain` as Minecraft makes leaves' (`dark_leaf_mips`, its dark cutout): each smaller texel's
-/// colour the sum of its opaque texels in linear light over all four (holes count as black), and
-/// its alpha scaled so as much of the level passes the alpha test as at full size (its
-/// `scaleAlphaToCoverage`, here at our test of 0.1).
+/// colour the sum of its opaque texels in linear light over all four (holes count as black); its
+/// alpha the plain average as ours (scaling it to keep the full-size coverage, as Minecraft's
+/// `scaleAlphaToCoverage` does at its 0.5 test, made far crowns solid and the vista's leaves
+/// brighter than vanilla's: pixel error 8.1 to 16.2, PC mwi_px3).
 fn mip_chain_dark(mut rgba: Vec<u8>, size: u32) -> Vec<Vec<u8>> {
     let lin = |v: u8| {
         let c = v as f32 / 255.0;
@@ -673,15 +674,6 @@ fn mip_chain_dark(mut rgba: Vec<u8>, size: u32) -> Vec<Vec<u8>> {
                         o[d + c] = srgb(sum[c] / 4.0);
                     }
                 }
-            }
-            // The alpha scale that keeps the full-size coverage, by bisection.
-            let (mut lo, mut hi) = (0.0f32, 4.0f32);
-            for _ in 0..16 {
-                let mid = (lo + hi) / 2.0;
-                if covered(&o, mid) < coverage { lo = mid } else { hi = mid }
-            }
-            for a in o.iter_mut().skip(3).step_by(4) {
-                *a = (*a as f32 * hi).round().min(255.0) as u8;
             }
             o
         });
