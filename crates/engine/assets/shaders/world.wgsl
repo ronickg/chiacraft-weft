@@ -349,7 +349,9 @@ fn with_overlay(in: VOut, albedo: vec4<f32>, nuv: vec2<f32>, du: vec2<f32>, dv: 
         return albedo;
     }
     let ov = textureSampleGrad(textures[in.overlay - 1u], linear_mipped, nuv, du, dv);
-    return vec4(mix(albedo.rgb, ov.rgb * pow(in.tint, vec3(2.2)), ov.a), albedo.a);
+    // Tinted and laid over in sRGB values, as vanilla's overlay quad (a 2.2 power darkened its
+    // low channels, as `shade_unfogged`'s did).
+    return vec4(srgb_decode(mix(srgb_encode(albedo.rgb), srgb_encode(ov.rgb) * in.tint, ov.a)), albedo.a);
 }
 
 @fragment
