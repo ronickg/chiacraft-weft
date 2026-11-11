@@ -1501,6 +1501,7 @@ impl Running {
                 Request::Respawn => {
                     if let Some(g) = &mut self.game {
                         g.client.send(net::ToServer::Respawn);
+                        g.client.dead = false;
                     }
                     self.close_screens(|s| s.closes_on_respawn());
                 }
@@ -2886,11 +2887,14 @@ fn client_events(r: &mut Running) {
                 r.open(Box::new(crate::game_screens::MenuScreen::new(kind)));
             }
             crate::client::ClientEvent::CloseMenu => r.close_screens(|s| s.shows_menu()),
-            crate::client::ClientEvent::Died => {
-                r.screens.clear();
-                r.open(screens::engine("core:death"));
-            }
         }
+    }
+    // Upstream waits for its entering overlay (`r.entering`, which we don't have); ours waits for
+    // the join, after which nothing clears the screens.
+    let dead = r.game.as_ref().is_some_and(|g| g.client.dead && g.client.joined);
+    if dead && !r.screens.iter().any(|(s, _)| s.name() == "core:death") {
+        r.screens.clear();
+        r.open(screens::engine("core:death"));
     }
 }
 

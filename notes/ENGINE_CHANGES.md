@@ -252,6 +252,7 @@ Small fixes and speed-ups taken from upstream Weft after the 11-05 sync, one com
 - **Worker count worked out once** (from upstream 699bcfa8c): `workers()` caches `available_parallelism()` in a `OnceLock`. Ours stays `pub(crate)` (the server's and the terrain's own pools read it). *Why:* it read the cgroup files on every pool lookup, 30-60 ms in a frame starting hundreds of meshing jobs.
 - **Crash reports for native faults on Linux** (from upstream 731c768db): `diag::native` on Linux installs SIGSEGV/SIGBUS/SIGILL/SIGFPE handlers that write the same report as the panic hook, then re-raise. Placed before our slow-frame spans in `diag.rs`. *Why:* a segfault on the PC left only the kernel's message.
 - **Text paste on Wayland** (from upstream 533bf53f1): `arboard` with its `wayland-data-control` feature (workspace `Cargo.toml`; `Cargo.lock` resolved again on ours). *Why:* paste into text fields did nothing under Wayland (the PC's KDE).
+- **Death screen after a relog** (from upstream 37adb086a, by hand): no `ClientEvent::Died`; `client_events` opens `core:death` whenever the client is dead and it isn't open, and Respawn clears `dead` at once. Upstream gates it on its entering overlay (`Running::entering`), which we don't have; ours gates it on `client.joined`. *Why:* a player who left while dead joined again with no death screen and no way to respawn.
 <!-- port-rows -->
 
 ## What this means for syncing with upstream

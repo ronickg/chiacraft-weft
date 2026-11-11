@@ -253,10 +253,7 @@ impl Client {
             ToClient::Flying(on) => self.player.flying = on,
             ToClient::Selected(slot) => self.selected = (slot as usize).min(content().game.player_layout.hotbar.saturating_sub(1) as usize),
             ToClient::TickRate(rate) => self.tick_rate = rate.max(1) as f64,
-            ToClient::Died => {
-                self.dead = true;
-                self.events.push(ClientEvent::Died);
-            }
+            ToClient::Died => self.dead = true,
             ToClient::Show(s) => {
                 let in_chat = s.place == weft_abi::show_place::CHAT;
                 if in_chat {
