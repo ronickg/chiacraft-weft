@@ -144,6 +144,7 @@ struct Swapchain {
     /// screen draw into, at `logical`, and the quarter turns (1 or 3) the last pass gives it on its
     /// way into the swapchain image (`TURN_WGSL`), so the display shows it as it is.
     turn: Option<(TextureId, u32)>,
+    mode: vk::PresentModeKHR,
 }
 
 /// Pre-rotation's last pass: the game's picture, drawn upright into its own image, copied texel
@@ -1031,7 +1032,21 @@ impl VulkanBackend {
                 .into_iter()
                 .find(|a| caps.supported_composite_alpha.contains(*a))
                 .unwrap_or(vk::CompositeAlphaFlagsKHR::OPAQUE);
-            let old = self.swapchain.take();
+            // A resize to the size it already has: remaking it for nothing crashed Intel Arc's driver at start.
+            if let Some(sc) = &self.swapchain
+                && sc.extent == extent
+                && sc.format == format.format
+                && sc.mode == mode
+                && sc.transform == transform
+            {
+                self.dirty_swapchain = false;
+                return Ok(());
+            }
+            // Destroyed before the new one instead of handed over as `old_swapchain`: nothing is in flight after the wait above.
+            let first = self.swapchain.is_none();
+            if let Some(old) = self.swapchain.take() {
+                self.destroy_swapchain(old);
+            }
             let raw = self
                 .swapchain_fn
                 .create_swapchain(
@@ -1047,12 +1062,11 @@ impl VulkanBackend {
                         .pre_transform(transform)
                         .composite_alpha(alpha)
                         .present_mode(mode)
-                        .clipped(true)
-                        .old_swapchain(old.as_ref().map_or(vk::SwapchainKHR::null(), |s| s.raw)),
+                        .clipped(true),
                     None,
                 )
                 .map_err(err("vkCreateSwapchainKHR"))?;
-            if self.submit_split.mode != mode.as_raw() || old.is_none() {
+            if self.submit_split.mode != mode.as_raw() || first {
                 log::info!(
                     "swapchain: {}x{}, {count} images, present mode {mode:?} (vsync {}){}",
                     logical.width,
@@ -1062,9 +1076,6 @@ impl VulkanBackend {
                 );
             }
             self.submit_split.mode = mode.as_raw();
-            if let Some(old) = old {
-                self.destroy_swapchain(old);
-            }
             let images = self
                 .swapchain_fn
                 .get_swapchain_images(raw)
@@ -1102,6 +1113,7 @@ impl VulkanBackend {
                 logical,
                 transform,
                 turn: None,
+                mode,
             });
             self.dirty_swapchain = false;
             if let Some(q) = quarter {

@@ -248,6 +248,7 @@ These are the biggest changes. They live mostly in our crates, but each needed h
 Small fixes and speed-ups taken from upstream Weft after the 11-05 sync, one commit each (`notes/crew/upstream-2026-11-22.md`). A line marked **(from upstream <hash>)** is upstream's code: on the next sync take theirs. Where ours had to differ, the line says how and why.
 
 - **Item slot delay** (from upstream 979a2d8dd): `client_entity` fills `EntityState::selected` with the client's own hotbar slot, so a mod reading it sees the change in the same frame, not after the server's echo.
+- **Swapchain not remade at the size it has; the old one destroyed first** (from upstream dc8cd0e25, by hand): `Swapchain::mode`; a resize to the same size, format, present mode and transform returns at once, and the old swapchain is destroyed before the new one is made instead of passed as `old_swapchain`. Merged into our Android pre-rotation (`logical`, `turn`), which stays ours; the "swapchain:" log line now tests `first` for the missing `old`. *Why:* remaking it for nothing crashed Intel Arc's driver at start.
 <!-- port-rows -->
 
 ## What this means for syncing with upstream
