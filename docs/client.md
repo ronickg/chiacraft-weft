@@ -13,6 +13,18 @@ Mods run on the client too. UI has its own [guide](ui.md); this page is the rest
 
 ## Key bindings
 
+`r.key(&ADJUST, "wheel_up").while_held(&MODE)` uses another action as a modifier.
+It follows that action's current bindings, including toggle bindings. Its held bindings
+are checked like physical chord modifiers; a more specific active binding takes priority
+over the same input without the modifier. Modifier chains are allowed; unknown actions
+and cycles are registration errors. The condition applies to both binding slots.
+
+`c.key(&ADJUST).amount` is the amount activated this client frame: one per button press,
+or accumulated fractional wheel notches. Opposite wheel directions stay separate, and
+reading an action does not consume it. Suppressed actions report zero. This is distinct
+from `held` and `held_ticks`; frame amounts are not sent to the server.
+
+
 - key bindings, one declaration each: `r.key(&DASH, "R").on_client(|c| ..)` on the client (a chord works too: `"ctrl+R"`, `"shift+alt+F6"`, and any other key held as a modifier, `"F3+KeyK"` the way the engine's debug keys are; the wheel is `wheel_up` and `wheel_down`; up to two bindings, each held, `toggle`, a `double` tap or a `tap`, let go with no other key pressed meanwhile, which is how F3 alone opens the overlay: `"ctrl+R, double KeyR"`; the player rebinds them the same way in Controls). Tagged with contexts (`abi::comp::key::MOVEMENT`, `HANDS`, `RIDING`, `DEBUG`, `SCREEN`) a key conflicts only with those where both act, and a camera that takes the moves or the hands mutes those; without any it acts wherever the world has the input. They only act while the world has the input, typing in the chat doesn't trigger them. `c.key_pressed(&DASH)` / `c.key_held(&DASH)` / `c.key(&DASH)` read them in a frame hook; the engine's keys are `keys::*`
 - the server hears every action, yours and the engine's, the mouse buttons' `keys::USE` and `keys::ATTACK` too: `r.on_event(&KEY, ..)` gets each press and release (`k.player`, `k.key`, `k.down`, `k.held_ticks`), `w.key(player, &DASH)` what is held now and for how long, and `.on_server(|w, player| ..)` / `.on_release_server(|w, player, ticks| ..)` on a key are those for one key. A charge, a combo, a cheat code typed before a spell goes off are all built from that
 

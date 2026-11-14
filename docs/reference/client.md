@@ -6,11 +6,17 @@ The client side: input, camera, screen text, packets.
 
 `Registry::camera`: registers when dropped.
 
-- <a id="CameraBuilder-shot"></a>`.shot(shot: Shot)`: How it moves, with the tags that takes. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/camera.rs#L207)
-- <a id="CameraBuilder-in_cycle"></a>`.in_cycle()`: One F5 goes through. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/camera.rs#L215)
-- <a id="CameraBuilder-when"></a>`.when(c: impl Into<crate::Cond>)`: Only where this holds for the player, asked on the server, and the server lets it (`actions::CAMERA`): `.when(Cond::attribute(&attribute::CAN_FLY, 1.0, f64::MAX))`. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/camera.rs#L220)
-- <a id="CameraBuilder-key"></a>`.key(key: &'static Key, default: &str)`: A key that turns it on and back off, `default` as `Registry::key` takes it. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/camera.rs#L224)
-- <a id="CameraBuilder-transition"></a>`.transition(secs: f32, easing: u32)`: The change into it takes `secs`, eased by `easing` (`easing::*`). [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/camera.rs#L229)
+- <a id="CameraBuilder-shot"></a>`.shot(shot: Shot)`: How it moves, with the tags that takes. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/camera.rs#L234)
+- <a id="CameraBuilder-in_cycle"></a>`.in_cycle()`: One F5 goes through. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/camera.rs#L245)
+- <a id="CameraBuilder-when"></a>`.when(c: impl Into<crate::Cond>)`: Only where this holds for the player, asked on the server, and the server lets it (`actions::CAMERA`): `.when(Cond::attribute(&attribute::CAN_FLY, 1.0, f64::MAX))`. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/camera.rs#L250)
+- <a id="CameraBuilder-key"></a>`.key(key: &'static Key, default: &str)`: A key that turns it on and back off, `default` as `Registry::key` takes it. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/camera.rs#L254)
+- <a id="CameraBuilder-transition"></a>`.transition(secs: f32, easing: u32)`: The change into it takes `secs`, eased by `easing` (`easing::*`). [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/camera.rs#L259)
+
+## CameraFrame
+
+A camera callback's pose and input, borrowed for this frame only. Pose fields are the same as `abi::CameraArgs`.
+
+- <a id="CameraFrame-keys"></a>`.keys() -> &crate::client::Keys`: Actions available to this camera, including per-frame amounts. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/camera.rs#L27)
 
 ## Channel
 
@@ -100,14 +106,14 @@ The local client during a client callback. Only valid for the duration of that c
 
 One entity in `Registry::client_entity_frame`.
 
-- <a id="ClientEntity-id"></a>`.id() -> u64` [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L782)
-- <a id="ClientEntity-kind"></a>`.kind() -> u32` [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L785)
-- <a id="ClientEntity-pos"></a>`.pos() -> Vec3` [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L788)
-- <a id="ClientEntity-yaw"></a>`.yaw() -> f32` [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L791)
-- <a id="ClientEntity-walked"></a>`.walked() -> f32`: Distance walked so far; steps go by how it grows. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L795)
-- <a id="ClientEntity-dying"></a>`.dying() -> Option<f32>`: Seconds into its death animation (1: over, the last call), `None` while alive. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L799)
-- <a id="ClientEntity-age"></a>`.age() -> f32`: Seconds since this client first saw it. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L803)
-- <a id="ClientEntity-dt"></a>`.dt() -> f32`: Seconds since the last call. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L807)
+- <a id="ClientEntity-id"></a>`.id() -> u64` [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L788)
+- <a id="ClientEntity-kind"></a>`.kind() -> u32` [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L791)
+- <a id="ClientEntity-pos"></a>`.pos() -> Vec3` [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L794)
+- <a id="ClientEntity-yaw"></a>`.yaw() -> f32` [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L797)
+- <a id="ClientEntity-walked"></a>`.walked() -> f32`: Distance walked so far; steps go by how it grows. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L801)
+- <a id="ClientEntity-dying"></a>`.dying() -> Option<f32>`: Seconds into its death animation (1: over, the last call), `None` while alive. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L805)
+- <a id="ClientEntity-age"></a>`.age() -> f32`: Seconds since this client first saw it. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L809)
+- <a id="ClientEntity-dt"></a>`.dt() -> f32`: Seconds since the last call. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L813)
 
 ## Drawing
 
@@ -118,17 +124,18 @@ Gizmo shapes, drawn when this is dropped (`Output::draw_line` ..).
 
 ## KeyBuilder
 
-- <a id="KeyBuilder-on_client"></a>`.on_client(f: impl Fn(&Client) + Send + Sync + 'static)`: On the client, every time the key goes down. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L643)
-- <a id="KeyBuilder-on_server"></a>`.on_server(f: impl Fn(&crate::World, u64) + Send + Sync + 'static)`: On the server, for the player who pressed it (world, player): `crate::KEY` filtered to this key going down. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L660)
-- <a id="KeyBuilder-on_release_server"></a>`.on_release_server(f: impl Fn(&crate::World, u64, u32) + Send + Sync + 'static)`: On the server, when the player lets it go (world, player, ticks it was held): a charge. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L671)
+- <a id="KeyBuilder-while_held"></a>`.while_held(key: &Key)`: Only while this action's bindings are held (or toggled on), following rebinding. Takes precedence over the same binding without this modifier. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L644)
+- <a id="KeyBuilder-on_client"></a>`.on_client(f: impl Fn(&Client) + Send + Sync + 'static)`: On the client, every time the key goes down. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L649)
+- <a id="KeyBuilder-on_server"></a>`.on_server(f: impl Fn(&crate::World, u64) + Send + Sync + 'static)`: On the server, for the player who pressed it (world, player): `crate::KEY` filtered to this key going down. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L666)
+- <a id="KeyBuilder-on_release_server"></a>`.on_release_server(f: impl Fn(&crate::World, u64, u32) + Send + Sync + 'static)`: On the server, when the player lets it go (world, player, ticks it was held): a charge. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L677)
 
 ## Keys
 
 The keys as a mount's steering or a camera mode reads them, any action by its handle, and where the player looks (radians; a detached camera's own look).
 
-- <a id="Keys-state"></a>`.state(key: &Key) -> abi::KeyState`: Pressed, held and its charge: ticks held, and held before being let go this tick. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L697)
-- <a id="Keys-held"></a>`.held(key: &Key) -> bool` [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L703)
-- <a id="Keys-axis"></a>`.axis(plus: &Key, minus: &Key) -> f32`: -1..1 from `minus` held to `plus` held: `axis(&keys::FORWARD, &keys::BACK)`. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L708)
+- <a id="Keys-state"></a>`.state(key: &Key) -> abi::KeyState`: Pressed, held and its charge: ticks held, and held before being let go this tick. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L703)
+- <a id="Keys-held"></a>`.held(key: &Key) -> bool` [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L709)
+- <a id="Keys-axis"></a>`.axis(plus: &Key, minus: &Key) -> f32`: -1..1 from `minus` held to `plus` held: `axis(&keys::FORWARD, &keys::BACK)`. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/client.rs#L714)
 
 ## Packet
 
@@ -142,7 +149,7 @@ A message on a channel, on the server.
 
 How a camera moves: called each frame on the client with the keys, the player's eyes and last frame's camera (`CameraArgs`), it sets `out`. It brings the tags it needs along (`comp::camera`: a free camera is `DETACHED`), `CameraBuilder::shot` adds them.
 
-- <a id="Shot-new"></a>`.new(tags: &'static [&'static str], f: impl Fn(&mut CameraArgs) + Send + Sync + 'static) -> Shot`: Yours: `|a| a.out.pos = ..`, with these tags (`comp::camera`). [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/camera.rs#L45)
+- <a id="Shot-new"></a>`.new(tags: &'static [&'static str], f: impl Fn(&mut CameraFrame<'_>) + Send + Sync + 'static) -> Shot`: Yours: `|a| a.out.pos = ..`, with these tags (`comp::camera`). [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/camera.rs#L72)
 
 ## Show
 

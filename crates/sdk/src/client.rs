@@ -639,6 +639,12 @@ pub struct KeyBuilder<'a> {
 crate::entry::entry_builder!(Key => KeyBuilder, key_entry;);
 
 impl KeyBuilder<'_> {
+    /// Only while this action's bindings are held (or toggled on), following rebinding.
+    /// Takes precedence over the same binding without this modifier.
+    pub fn while_held(self, key: &Key) -> Self {
+        self.set_text(&crate::comps::key::WHILE_HELD, key.name())
+    }
+
     /// On the client, every time the key goes down.
     pub fn on_client(self, f: impl Fn(&Client) + Send + Sync + 'static) -> Self {
         let key = self.key;

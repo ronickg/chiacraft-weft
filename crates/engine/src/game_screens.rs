@@ -664,11 +664,11 @@ impl Screen for RecipeView {
     }
 
     fn pointer(&mut self, _cursor: glam::Vec2, _ui: &mut Ui, ctx: &mut Ctx, _hud: &mut crate::hud::Hud) -> bool {
-        if ctx.input.scroll == 0.0 {
+        if ctx.input.scroll() == 0.0 {
             return false;
         }
-        let steps = ctx.input.scroll.abs().round().max(1.0) as isize;
-        Self::turn(&self.state, self.pages, -ctx.input.scroll.signum() as isize * steps, ctx);
+        let steps = ctx.input.scroll().abs().round().max(1.0) as isize;
+        Self::turn(&self.state, self.pages, -ctx.input.scroll().signum() as isize * steps, ctx);
         true
     }
 

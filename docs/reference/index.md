@@ -8,7 +8,7 @@ Every public method of every builder in the SDK, with its summary and a link to 
 - [World generation](worldgen.md): Dimensions, biomes, terrain, features, structures and the sky. (222 methods)
 - [World](world.md): What a `World` can do, shapes, directions, conditions. (197 methods)
 - [Registration](registration.md): The registry, components, tags, settings, slots and menus. (218 methods)
-- [Client](client.md): The client side: input, camera, screen text, packets. (107 methods)
+- [Client](client.md): The client side: input, camera, screen text, packets. (109 methods)
 - [UI](ui.md): Screens, HUD parts and the styles they use. (108 methods)
 - [Recipes and loot](recipes.md): Recipe kinds, recipes, loot tables and their pools. (28 methods)
 - [Events and steps](events.md): Events, actions, steps, phases, modifiers and what a callback gets as its argument. (98 methods)

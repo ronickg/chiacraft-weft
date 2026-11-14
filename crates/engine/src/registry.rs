@@ -1585,6 +1585,7 @@ pub fn engine_entries(kind: u32) -> Vec<RawEntry> {
 /// An action players bind keys to (`entry_kind::KEY`).
 pub struct KeyDef {
     pub name: String,
+    pub while_held: Vec<usize>,
     pub default: crate::input::Slots,
     /// `input::context` bits.
     pub contexts: u32,
@@ -2101,14 +2102,21 @@ pub fn freeze(
         |e, errors| bake_sound(e, &g.sound_categories, errors),
     );
     g.sounds = sounds;
+    let mut key_modifiers = Vec::new();
     (g.keys, _) = tables.bake(kind(ek::KEY), ek::KEY, mod_name, errors, |e, errors| {
         let key = e.text(abi::comp::KEY_DEFAULT).unwrap_or_default();
         let slots = crate::input::Binding::parse_slots(key).unwrap_or_else(|| {
             errors.push(format!("key {}: unknown key {key:?}", e.name));
             [None; crate::input::SLOTS]
         });
-        KeyDef { name: e.name.clone(), default: slots, contexts: e.flags(crate::input::context::TAGS) }
+        key_modifiers.push(e.text(abi::comp::key::WHILE_HELD).map(str::to_owned));
+        KeyDef { name: e.name.clone(), default: slots, contexts: e.flags(crate::input::context::TAGS), while_held: Vec::new() }
     });
+    let key_names: Vec<_> = g.keys.iter().map(|k| k.name.as_str()).collect();
+    let modifiers = crate::input::resolve_modifiers(&key_names, &key_modifiers, errors);
+    for (key, modifiers) in g.keys.iter_mut().zip(modifiers) {
+        key.while_held = modifiers;
+    }
     (g.attributes, _) = tables.bake(kind(ek::ATTRIBUTE), ek::ATTRIBUTE, mod_name, errors, |e, _| {
         let [min, max] = e.or(abi::comp::attribute::RANGE, [f64::NEG_INFINITY, f64::INFINITY]);
         let default = e.or(abi::comp::attribute::DEFAULT, 0.0);

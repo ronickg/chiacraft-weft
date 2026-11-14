@@ -480,6 +480,7 @@ impl App {
         let mut input = Input::default();
         for k in &content().game.keys {
             input.register(&k.name, k.default, k.contexts);
+            input.binds.last_mut().unwrap().while_held = k.while_held.clone();
         }
         crate::settings::apply_binds(&mut input);
         settings.read_only = self.opts.automated;
@@ -1054,7 +1055,7 @@ impl Running {
             && ui
                 .hit(cursor)
                 .is_some_and(|h| matches!(ui.nodes[h].kind, Kind::Custom { tag: crate::client::modui::TAG_SLOT, .. }));
-        if self.input.scroll != 0.0 && !over_slot && ui.scroll_at(cursor, self.input.scroll) {
+        if self.input.scroll() != 0.0 && !over_slot && ui.scroll_at(cursor, self.input.scroll()) {
             self.quads_dirty = true;
         }
         // A scroll bar takes the mouse before anything under it.
@@ -1119,9 +1120,9 @@ impl Running {
                 .is_some_and(|f| matches!(ui.nodes[f].kind, Kind::Input { .. }));
             // The wheel over a slot (Mouse Tweaks'): a notch up brings an item in from the other
             // side, down sends one there; with shift a stack.
-            if let Some(s) = slot.filter(|_| self.input.scroll != 0.0) {
-                let button = if self.input.scroll > 0.0 { WHEEL_UP } else { WHEEL_DOWN };
-                for _ in 0..(self.input.scroll.abs().round() as u32).max(1) {
+            if let Some(s) = slot.filter(|_| self.input.scroll() != 0.0) {
+                let button = if self.input.scroll() > 0.0 { WHEEL_UP } else { WHEEL_DOWN };
+                for _ in 0..(self.input.scroll().abs().round() as u32).max(1) {
                     g.client
                         .send(net::ToServer::Click { slot: s, button, shift });
                 }

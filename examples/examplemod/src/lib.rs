@@ -243,6 +243,9 @@ fn client(_r: &mut Registry) {
     // static ABOUT: Menu = Menu::named("about");
     // static MANA: HudElement = HudElement::named("mana");
     // r.key(&DASH, "R").on_server(|w, player| { info!("{player} dashes"); w.game_time(); });
+    // static ADJUST: Key = Key::named("adjust");
+    // r.key(&ADJUST, "wheel_up").while_held(&DASH);
+    // r.client_frame(|c| { let _amount = c.key(&ADJUST).amount; });
     // r.menu(&ABOUT).screen(|ui| ui.panel("background", S::column().pad(8.0), |ui| ui.text("examplemod.about")));
     // r.hud_element(&MANA, hud_anchor::HOTBAR_RIGHT, 2, |ui| ui.text_bind(|c, out| { /* ... */ }));
     // static TARGET_INFO: HudElement = HudElement::named("base:target_info");

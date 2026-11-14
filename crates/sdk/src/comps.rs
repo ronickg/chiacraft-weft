@@ -228,6 +228,7 @@ pub mod key {
     use crate::kind::Key;
     use crate::{Component, Text};
     pub static DEFAULT: Component<Text, Key> = Component::named(crate::abi::comp::KEY_DEFAULT);
+    pub static WHILE_HELD: Component<Text, Key> = Component::named(crate::abi::comp::key::WHILE_HELD);
 }
 
 /// What a particle kind is made of: tags for its flags (`abi::comp::particle`) and these.

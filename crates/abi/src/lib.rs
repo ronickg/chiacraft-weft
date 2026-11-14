@@ -842,6 +842,8 @@ pub mod comp {
     /// (all but `SCREEN`). A camera that takes the moves (`camera::DETACHED`) has `MOVEMENT` and
     /// `RIDING` for itself, one that doesn't interact (`camera::NO_INTERACT`) `HANDS`.
     pub mod key {
+        /// Action whose held bindings act as a modifier for this key (`str`).
+        pub const WHILE_HELD: &str = "key.while_held";
         pub const MOVEMENT: &str = "key.movement";
         pub const HANDS: &str = "key.hands";
         pub const RIDING: &str = "key.riding";
@@ -2685,6 +2687,9 @@ pub mod seat_exit {
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct KeyState {
+    /// Client-frame activations: 1 for a button press, fractional notches for a wheel.
+    /// Zero on the server; repeated reads do not consume it.
+    pub amount: f32,
     /// Set off this frame.
     pub pressed: u32,
     pub held: u32,
