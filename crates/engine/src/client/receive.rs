@@ -247,7 +247,7 @@ impl Client {
                     crate::config::put_from_server(id, v);
                 }
             }
-            ToClient::Skin { entity, png } => self.entity_render.skin_pending.push((entity, png)),
+            ToClient::Skin { entity, skin } => self.entity_render.skin_pending.push((entity, skin)),
             ToClient::Avatar { entity, avatar } => self
                 .entity_render
                 .avatar_pending

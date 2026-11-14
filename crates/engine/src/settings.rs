@@ -162,6 +162,10 @@ pub fn frustum_culling() -> bool {
     number("core:frustum_culling") != 0.0
 }
 
+pub fn slim_skin() -> bool {
+    number("core:skin_model") != 0.0
+}
+
 pub fn show_avatars() -> bool {
     number("core:show_avatars") != 0.0
 }

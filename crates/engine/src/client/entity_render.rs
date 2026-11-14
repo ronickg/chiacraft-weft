@@ -120,6 +120,13 @@ struct ItemModel {
     solid: bool,
 }
 
+struct PlayerSkin {
+    texture: TextureId,
+    index: u32,
+    size: [u32; 2],
+    slim: bool,
+}
+
 pub struct EntityRenderer {
     /// What the head's move in an action does to the camera: offset in view space, roll, pitch.
     pub camera_kick: (Vec3, f32, f32),
@@ -142,10 +149,10 @@ pub struct EntityRenderer {
     preview_target: Option<(TextureId, TextureId, [u32; 2], u32)>,
     /// Texture, bindless index and size, by name; and the glow masks of those that have one.
     skins: FxHashMap<String, Option<(TextureId, u32, [u32; 2])>>,
-    /// Players' own skins by entity, replacing the player kind's texture on them.
-    player_skins: FxHashMap<u64, (TextureId, u32, [u32; 2])>,
+    /// Players' own skins by entity, replacing the player kind's texture on them, and if their arms are slim.
+    player_skins: FxHashMap<u64, PlayerSkin>,
     /// Skins received and not uploaded yet.
-    pub skin_pending: Vec<(u64, Vec<u8>)>,
+    pub skin_pending: Vec<(u64, crate::net::Skin)>,
     /// Players' avatars as they sent them, as uploaded, and received but not looked at yet.
     avatar_sent: FxHashMap<u64, std::sync::Arc<crate::net::AvatarData>>,
     avatars: FxHashMap<u64, AvatarLook>,
@@ -153,7 +160,7 @@ pub struct EntityRenderer {
     /// Players who left, their skins and avatars to go.
     pub gone_pending: Vec<u64>,
     /// The setting: other than the kind's own model, a player's avatar shows.
-    pub show_avatars: bool,
+    show_avatars: bool,
     /// What plays on who coming in and going out, by entity and model: clips are the model's.
     fades: FxHashMap<(u64, u32), Vec<Fade>>,
     /// Actions asked for with no clip on a model, once said so.
@@ -440,20 +447,26 @@ impl EntityRenderer {
         }
     }
 
-    /// Uploads player `entity`'s own skin.
-    pub fn set_skin(&mut self, gpu: &mut dyn Backend, entity: u64, png: &[u8]) {
-        let Some(img) = crate::assets::decode_png(png) else { return };
+    pub fn set_show_avatars(&mut self, show: bool) {
+        if self.show_avatars != show {
+            self.show_avatars = show;
+            self.changed_items.extend(self.avatar_sent.keys().copied());
+        }
+    }
+
+    /// Uploads the player's skin with the model chosen in their profile.
+    pub fn set_skin(&mut self, gpu: &mut dyn Backend, entity: u64, skin: &crate::net::Skin) {
+        let Some(img) = crate::assets::decode_png(&skin.png) else { return };
         let t = gpu.create_texture(
             &TextureDesc { width: img.width, height: img.height, mips: 1, format: Format::Rgba8Srgb, render_target: false },
             "player skin",
         );
         gpu.write_texture(t, 0, &img.rgba);
-        if let Some(old) = self
-            .player_skins
-            .insert(entity, (t, gpu.texture_index(t), [img.width, img.height]))
-        {
-            gpu.destroy_texture(old.0);
+        let skin = PlayerSkin { texture: t, index: gpu.texture_index(t), size: [img.width, img.height], slim: skin.slim };
+        if let Some(old) = self.player_skins.insert(entity, skin) {
+            gpu.destroy_texture(old.texture);
         }
+        self.changed_items.insert(entity);
     }
 
     /// Takes in player `entity`'s avatar: a model made of what it sent, painted with its picture.
@@ -517,8 +530,8 @@ impl EntityRenderer {
     }
 
     pub fn destroy(&mut self, gpu: &mut dyn Backend) {
-        for (t, ..) in self.player_skins.drain().map(|(_, v)| v) {
-            gpu.destroy_texture(t);
+        for skin in self.player_skins.drain().map(|(_, v)| v) {
+            gpu.destroy_texture(skin.texture);
         }
         for a in self.avatars.drain().map(|(_, v)| v) {
             a.destroy(gpu);
@@ -564,8 +577,8 @@ impl EntityRenderer {
             if let Some(a) = self.avatars.remove(&id) {
                 a.destroy(gpu);
             }
-            if let Some((t, ..)) = self.player_skins.remove(&id) {
-                gpu.destroy_texture(t);
+            if let Some(skin) = self.player_skins.remove(&id) {
+                gpu.destroy_texture(skin.texture);
             }
         }
         let mut changed = std::mem::take(&mut self.changed_items);
@@ -588,14 +601,12 @@ impl EntityRenderer {
                     }
                 }
             }
-            let avatar = self.avatars.get(&id).map(|a| a.kind);
+            let drawn = self.model_of(id, e.look());
             for &stack in &e.worn {
                 if let Some((_, texture)) = c.worn(&stack) {
                     self.load(gpu, assets, texture);
                 }
-                for holder in std::iter::once(e.look()).chain(avatar) {
-                    self.models.prepare_worn(assets, holder, stack);
-                }
+                self.models.prepare_worn(assets, drawn, stack);
             }
         }
         changed.clear();
@@ -828,7 +839,7 @@ impl EntityRenderer {
             .player_skins
             .get(&entity)
             .filter(|_| kind == c.game.player_kind);
-        let (skin, size) = own.map_or((skin, size), |o| (&o.1, o.2));
+        let (skin, size) = own.map_or((skin, size), |o| (&o.index, o.size));
         let base = Instance {
             color: [1.0; 3],
             light,
@@ -856,7 +867,7 @@ impl EntityRenderer {
             None => base,
         };
         out.1 = 1;
-        let model = avatar.map_or(kind, |a| a.kind);
+        let model = self.model_of(entity, kind);
         for stack in worn {
             let i = stack.item;
             if let Some((w, t)) = c.worn(stack) {
@@ -906,8 +917,26 @@ impl EntityRenderer {
     }
 
     fn model_kind(&self, id: u64, e: &ClientEntity) -> u32 {
-        let look = e.look();
-        self.avatar_of(id, look).map_or(look, |a| a.kind)
+        self.model_of(id, e.look())
+    }
+
+    /// The model `entity` of `kind` is drawn with: its avatar's,
+    /// else the player's for a skin of 64 x 64, else the kind's own.
+    fn model_of(&self, entity: u64, kind: u32) -> u32 {
+        if kind != content().game.player_kind {
+            return kind;
+        }
+        if let Some(a) = self.avatar_of(entity, kind) {
+            return a.kind;
+        }
+        let skin = self
+            .player_skins
+            .get(&entity)
+            .filter(|s| s.size == [64, 64]);
+        match (skin, self.models.skinned) {
+            (Some(skin), Some(models)) => if skin.slim { models.slim } else { models.classic },
+            _ => kind,
+        }
     }
 
     fn avatar_of(&self, entity: u64, kind: u32) -> Option<&AvatarLook> {
@@ -1056,9 +1085,7 @@ impl EntityRenderer {
         let layers = self.layers(c.game.player_kind, self.local, worn, FULL_LIGHT, (0, 0.0));
         self.models.begin();
         let root = Mat4::from_rotation_y(yaw) * Mat4::from_scale(Vec3::splat(1.0 / 16.0));
-        let kind = self
-            .avatar_of(self.local, c.game.player_kind)
-            .map_or(c.game.player_kind, |a| a.kind);
+        let kind = self.model_of(self.local, c.game.player_kind);
         let clock = crate::shaders::time();
         let idle = |m: &super::models::KindModel, t: f32| {
             let mut clips = Clips::default();

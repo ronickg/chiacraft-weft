@@ -568,17 +568,17 @@ impl Server {
                 let slice = abi::Slice::new(&data);
                 r.call(owner, cb, |w| abi::PacketArgs { world: w, player, data: slice });
             }
-            ToServer::Skin(png) => {
+            ToServer::Skin(skin) => {
                 // Only a skin's size of PNG: everyone else stores and uploads it.
-                let size = crate::assets::png_size(&png).filter(|_| png.len() <= 65536);
+                let size = crate::assets::png_size(&skin.png).filter(|_| skin.png.len() <= 65536);
                 if !matches!(size, Some((64, 64) | (64, 32))) {
                     return;
                 }
-                let png = Arc::new(png);
+                let skin = Arc::new(skin);
                 let entity = self.players[pi].entity;
-                self.players[pi].skin = Some(png.clone());
+                self.players[pi].skin = Some(skin.clone());
                 for p in self.players.iter_mut().filter(|p| p.joined) {
-                    p.conn.send(ToClient::Skin { entity, png: png.to_vec() });
+                    p.conn.send(ToClient::Skin { entity, skin: (*skin).clone() });
                 }
             }
             ToServer::Avatar(avatar) => {

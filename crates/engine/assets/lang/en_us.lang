@@ -641,3 +641,8 @@ chat.screenshot.picture = open picture
 chat.screenshot.folder = open folder
 effect.time = {color:gray}{0}
 effect.infinite = ∞
+
+config.core.skin_model = Skin model
+config.core.skin_model.classic = Classic
+config.core.skin_model.slim = Slim arms
+config.core.skin_model.tooltip = For 64x64 skins. Legacy 64x32 skins use the classic model.

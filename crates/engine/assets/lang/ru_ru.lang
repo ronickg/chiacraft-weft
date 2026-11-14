@@ -590,3 +590,8 @@ chat.screenshot.picture = открыть картинку
 chat.screenshot.folder = открыть папку
 effect.time = {color:gray}{0}
 effect.infinite = ∞
+
+config.core.skin_model = Модель скина
+config.core.skin_model.classic = Обычная
+config.core.skin_model.slim = Тонкие руки
+config.core.skin_model.tooltip = Для скинов 64x64. Старые скины 64x32 используют обычную модель.

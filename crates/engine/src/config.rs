@@ -425,6 +425,8 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         number("core:max_forced_cubes", ck::INT, 4096.0, 0.0, 1048576.0, 1.0).set(c::SCOPE, scope::WORLD),
         number("core:first_person_model", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         number("core:show_avatars", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
+        number("core:skin_model", ck::CHOICE, 0.0, 0.0, 1.0, 0.0)
+            .set(c::CHOICES, ["classic", "slim"].map(String::from).to_vec()),
         number("core:occlusion_culling", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         // Off, what is behind the camera is drawn too: for shaders that bend the world around.
         number("core:frustum_culling", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
@@ -462,7 +464,7 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         ),
         ("core:controls", &["sensitivity", "invert_y", "touch_controls"]),
         ("core:accessibility", &["fov_effects"]),
-        ("core:profile", &["first_person_model", "show_avatars"]),
+        ("core:profile", &["skin_model", "first_person_model", "show_avatars"]),
         ("core:chat_settings", &["chat_width", "chat_height", "chat_height_closed", "chat_opacity", "chat_visibility"]),
     ];
     let percent = ["core:sensitivity", "core:brightness", "core:fov_effects", "core:render_scale"];

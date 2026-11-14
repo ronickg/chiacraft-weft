@@ -531,6 +531,7 @@ const MAX_BUDGET: f64 = 0.005;
 
 pub struct Client {
     conn: ClientConn,
+    skin: Option<crate::net::Skin>,
     pub world: ClientWorld,
     pub render: WorldRenderer,
     pub entity_render: EntityRenderer,
@@ -817,6 +818,13 @@ impl Client {
         }
     }
 
+    pub fn set_skin_model(&mut self, slim: bool) {
+        if let Some(skin) = &mut self.skin && skin.slim != slim {
+            skin.slim = slim;
+            self.conn.send(ToServer::Skin(skin.clone()));
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         gpu: &mut dyn Backend,
@@ -826,7 +834,7 @@ impl Client {
         name: &str,
         key: &str,
         view_radius: i32,
-        skin: Option<Vec<u8>>,
+        skin: Option<crate::net::Skin>,
         avatar: Option<crate::net::AvatarData>,
     ) -> Result<Client, String> {
         let c = content();
@@ -838,8 +846,8 @@ impl Client {
         let sky = sky::Sky::new(gpu, assets);
         conn.send(ToServer::Join { name: name.to_string(), key: key.to_string() });
         conn.send(ToServer::View(view_radius as u32));
-        if let Some(png) = skin {
-            conn.send(ToServer::Skin(png));
+        if let Some(skin) = &skin {
+            conn.send(ToServer::Skin(skin.clone()));
         }
         if let Some(a) = avatar {
             conn.send(ToServer::Avatar(a));
@@ -851,6 +859,7 @@ impl Client {
             weather_render,
             frame_dt: 0.0,
             conn,
+            skin,
             world: ClientWorld::new(0),
             render,
             entity_render,
@@ -2858,8 +2867,8 @@ impl Client {
         textures: &GameTextures,
     ) {
         self.entity_render.local = self.player_id;
-        for (entity, png) in std::mem::take(&mut self.entity_render.skin_pending) {
-            self.entity_render.set_skin(gpu, entity, &png);
+        for (entity, skin) in std::mem::take(&mut self.entity_render.skin_pending) {
+            self.entity_render.set_skin(gpu, entity, &skin);
         }
         let cam = self.render_camera();
         let scene = self.scene(&cam, frame);

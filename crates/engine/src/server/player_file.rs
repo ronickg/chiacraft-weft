@@ -123,16 +123,16 @@ impl Server {
                 .send(ToClient::Show(crate::net::Shown::chat(void_note(c))));
         }
         // The skins of who is here already.
-        let skins: Vec<(u64, Arc<Vec<u8>>)> = self
+        let skins: Vec<(u64, Arc<crate::net::Skin>)> = self
             .players
             .iter()
             .filter(|o| o.joined && o.entity != id)
             .filter_map(|o| o.skin.clone().map(|s| (o.entity, s)))
             .collect();
-        for (entity, png) in skins {
+        for (entity, skin) in skins {
             self.players[pi]
                 .conn
-                .send(ToClient::Skin { entity, png: png.to_vec() });
+                .send(ToClient::Skin { entity, skin: (*skin).clone() });
         }
         let avatars: Vec<(u64, Arc<crate::net::AvatarData>)> = self
             .players

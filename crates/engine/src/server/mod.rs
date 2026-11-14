@@ -104,7 +104,7 @@ pub struct Player {
     title_times: Option<[f32; 3]>,
     pub name: String,
     /// The skin this player sent, passed on to everyone who joins.
-    skin: Option<Arc<Vec<u8>>>,
+    skin: Option<Arc<crate::net::Skin>>,
     /// The same for their own model.
     avatar: Option<Arc<crate::net::AvatarData>>,
     /// Public key: the identity saves are keyed by.

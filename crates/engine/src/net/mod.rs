@@ -95,6 +95,11 @@ wire_struct! {
     pub struct UsingField { pub ticks: u32, pub offhand: bool }
 }
 
+wire_struct! {
+    #[derive(Clone)]
+    pub struct Skin { pub png: Vec<u8>, pub slim: bool }
+}
+
 /// One variant's fields written or read in order.
 macro_rules! wire_variant {
     (put $w:ident $x:ident $m:ident $v:ident) => {{
@@ -429,7 +434,7 @@ messages! {
         /// Keyframe animations started on entities: (entity, name, looping); empty name = none.
         PlayAction(Vec<(u64, String, bool)>),
         /// A player's own skin (PNG), for their entity.
-        Skin { entity: u64, png: Vec<u8> },
+        Skin { entity: u64, skin: Skin },
         /// A player's own model, for their entity.
         Avatar { entity: u64, avatar: AvatarData },
         /// That player left: what they brought can go.
@@ -497,7 +502,7 @@ messages! {
         Gizmos(Vec<String>),
         Packet { channel: u32, data: Vec<u8> },
         /// The player's skin (PNG, 64 x 64 or 64 x 32).
-        Skin(Vec<u8>),
+        Skin(Skin),
         /// The player's own model.
         Avatar(AvatarData),
         /// The client's view distance in cubes: what the server announces edited cubes in.

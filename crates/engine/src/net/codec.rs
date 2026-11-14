@@ -386,6 +386,7 @@ mod tests {
             ToServer::Chat("/give stone 5".into()),
             ToServer::Gizmos(vec!["regions".into(), "mymod:pipes".into()]),
             ToServer::Packet { channel: 3, data: vec![1, 2, 255] },
+            ToServer::Skin(crate::net::Skin { png: vec![1, 2, 3], slim: true }),
             ToServer::Leave,
         ];
         for m in msgs {
@@ -398,6 +399,7 @@ mod tests {
     fn tags_follow_the_message_table() {
         for m in [
             ToClient::Died,
+            ToClient::Skin { entity: 7, skin: crate::net::Skin { png: vec![4, 5, 6], slim: false } },
             ToClient::Show(crate::net::Shown::chat(Msg::new(
                 "chat.message",
                 vec![Arg::Text("me".into()), Arg::Int(-3), Arg::Msg(Msg::new("k", vec![Arg::Float(1.5, 2)]))],

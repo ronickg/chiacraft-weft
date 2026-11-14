@@ -811,7 +811,7 @@ impl Running {
             &crate::settings::name(),
             &key,
             crate::settings::view_distance(),
-            std::fs::read(self.settings.run_dir.join("skins").join("skin.png")).ok(),
+            read_skin(&self.settings.run_dir),
             read_avatar(&self.settings.run_dir),
         ) {
             Ok(mut client) => {
@@ -1013,7 +1013,7 @@ impl Running {
                             &crate::settings::name(),
                             &key,
                             crate::settings::view_distance(),
-                            std::fs::read(self.settings.run_dir.join("skins").join("skin.png")).ok(),
+                            read_skin(&self.settings.run_dir),
                             read_avatar(&self.settings.run_dir),
                         ) {
                             Ok(mut client) => {
@@ -1537,6 +1537,9 @@ impl Running {
             self.look = Look::new(&self.assets, &mod_ids(), &self.lang);
         }
         s::apply_binds(&mut self.input);
+        if let Some(g) = &mut self.game {
+            g.client.set_skin_model(s::slim_skin());
+        }
         if relang || now.gui_scale != self.applied.gui_scale || now.advanced_tooltips != self.applied.advanced_tooltips {
             self.rebuild_all();
         }
@@ -2217,7 +2220,7 @@ fn update_game(r: &mut Running, dt: f64, frame_start: Instant) {
         g.client.fov_effects = crate::settings::fov_effects();
         g.client.brightness = crate::settings::brightness();
         g.client.first_person_model = crate::settings::first_person_model();
-        g.client.entity_render.show_avatars = crate::settings::show_avatars();
+        g.client.entity_render.set_show_avatars(crate::settings::show_avatars());
         g.client.render.occlusion.on = crate::settings::occlusion_culling();
         let t = Instant::now();
         if world_input {
@@ -2580,6 +2583,13 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
         crate::hud::stack_icon(&mut r.ui, &r.textures, rect, cursor, scale, text_unit);
     }
     draw_entering(r, info, scale);
+}
+
+fn read_skin(run_dir: &std::path::Path) -> Option<crate::net::Skin> {
+    Some(crate::net::Skin {
+        png: std::fs::read(run_dir.join("skins/skin.png")).ok()?,
+        slim: crate::settings::slim_skin(),
+    })
 }
 
 /// The player's own model, if `skins/avatar` has one: a Blockbench geometry and its picture, and

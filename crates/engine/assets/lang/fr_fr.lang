@@ -635,3 +635,8 @@ chat.screenshot.picture = ouvrir l'image
 chat.screenshot.folder = ouvrir le dossier
 effect.time = {color:gray}{0}
 effect.infinite = ∞
+
+config.core.skin_model = Modèle du skin
+config.core.skin_model.classic = Classique
+config.core.skin_model.slim = Bras fins
+config.core.skin_model.tooltip = Pour les skins 64x64. Les anciens skins 64x32 utilisent le modèle classique.
