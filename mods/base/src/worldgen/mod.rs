@@ -1,18 +1,18 @@
 //! Base's worldgen as data: biomes, the overworld's terrain, ores, trees (a scatter the engine
 //! places in every dimension whose biomes ask for them) and plants (a decoration).
-pub mod tree_kinds;
-pub mod tree_algorythms;
 pub mod consts;
-pub mod statics;
-mod util;
 mod decor;
+pub mod statics;
+pub mod tree_algorythms;
+pub mod tree_kinds;
+mod util;
 
+use consts::*;
+use decor::*;
+use statics::*;
+use tree_algorythms::register as register_trees;
 use tree_kinds::*;
 use util::gentle;
-use tree_algorythms::register as register_trees;
-use decor::*;
-use consts::*;
-use statics::*;
 
 use weft_sdk::*;
 
@@ -53,8 +53,6 @@ fn snow_bands() -> Vec<(f64, f64, i32)> {
 /// What a biome grows, as data any mod can set on any biome: trees per 5x5 cell (0..1), share of
 /// grass on plantable soil, which trees and flowers (block lists the engine checks), and tags `frozen` (nothing grows, set by
 /// `.frozen(..)`), `dry` (cacti).
-
-
 
 pub fn register(r: &mut Registry) {
     // Tags say what a biome is (spawning, decoration and mods ask these, not names).
@@ -319,11 +317,7 @@ pub fn register(r: &mut Registry) {
                     s.put([x, y, z], state);
                 }
             };
-            place_tree(&mut TreePlaceData {
-                pos: (x, y, z),
-                rng: &mut rng,
-                place: &mut place,
-            });
+            place_tree(&mut TreePlaceData { pos: (x, y, z), rng: &mut rng, place: &mut place });
         });
     r.scatter(&BOULDER_SITES)
         .spacing(5)

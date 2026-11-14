@@ -9,7 +9,6 @@ use crate::blocks::*;
 
 use weft_sdk::noise::*;
 
-
 struct TreeSkeleton {
     height: i32,
     top: (i32, i32, i32),

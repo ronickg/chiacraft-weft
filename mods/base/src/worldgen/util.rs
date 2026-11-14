@@ -1,4 +1,4 @@
-use weft_sdk::{Plan};
+use weft_sdk::Plan;
 
 pub fn sphere(radius: f32) -> impl Iterator<Item = (i32, i32, i32)> {
     let extent = radius.floor() as i32;
