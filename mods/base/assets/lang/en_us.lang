@@ -371,3 +371,7 @@ storage.base.deposit = Put away nearby
 storage.base.trash = Trash
     Hotkey: {key:core:trash}
 item.base.shield = Shield
+
+key.base.zoom = Zoom
+key.base.zoom_in = Zoom in
+key.base.zoom_out = Zoom out

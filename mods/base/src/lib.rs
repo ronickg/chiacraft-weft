@@ -5,6 +5,7 @@ mod advancements;
 mod beds;
 mod block_entities;
 mod blocks;
+mod camera;
 mod commands;
 mod doors;
 mod effects;
@@ -44,6 +45,7 @@ fn init(r: &mut Registry) {
     commands::register(r);
     items::register(r);
     player::register(r);
+    camera::register(r);
     block_entities::register(r);
     recipes::register(r);
     sounds::register(r);
