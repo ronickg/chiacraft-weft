@@ -341,3 +341,7 @@ storage.base.sort = Сортировать
 storage.base.deposit = Сложить рядом: в хранилища вокруг, где уже лежит такое же
 storage.base.trash = Урна: хранит последнее положенное, следующее занимает его место ({key:core:trash} над слотом)
 item.base.shield = Щит
+
+key.base.zoom = Приближение
+key.base.zoom_in = Приблизить
+key.base.zoom_out = Отдалить
