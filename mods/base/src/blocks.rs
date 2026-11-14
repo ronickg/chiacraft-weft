@@ -712,7 +712,6 @@ pub fn register(r: &mut Registry) {
         .texture("toadstool_mushroom")
         .drops("toadstool", 1)
         .tab(&crate::tabs::NATURAL);
-    let uv = [0.1, 0.1, 15.9, 7.9];
     let top_uv = [0.1, 0.1, 15.9, 7.9];
     let bottom_uv = [0.1, 8.1, 15.9, 15.9];
     fn flip_v(uv: [f32; 4]) -> [f32; 4] {
