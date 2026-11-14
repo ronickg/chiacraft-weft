@@ -79,7 +79,13 @@ impl<'a> IntoIterator for &'a TreeKinds {
         self.entries.iter()
     }
 }
-pub type TreePlace = fn((i32, i32, i32), &mut Rng, &mut dyn FnMut(i32, i32, i32, u32, bool));
+pub struct TreePlaceData<'a> {
+    pub pos: (i32, i32, i32),
+    pub rng: &'a mut Rng,
+    pub place: &'a mut dyn FnMut(i32, i32, i32, u32, bool),
+    // pub read: &'a mut dyn FnMut(i32, i32, i32) -> u32,
+}
+pub type TreePlace = fn(&mut TreePlaceData);
 static TREE_DB: LazyLock<RwLock<HashMap<&'static str, TreePlace>>> = LazyLock::new(|| RwLock::new(HashMap::new()));
 pub fn register_tree(name: &'static str, place: TreePlace) {
     TREE_DB

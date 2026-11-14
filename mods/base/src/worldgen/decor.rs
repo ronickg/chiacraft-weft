@@ -1,0 +1,165 @@
+use weft_sdk::*;
+use crate::blocks::*;
+use weft_sdk::noise::*;
+
+use super::consts::*;
+use super::statics::*;
+use super::util::sphere;
+
+static COVERED: Block = Block::named("core:covered");
+/// Plants and Clay after the terrain and trees filled the cube.
+pub fn decorate(g: &mut Gen) {
+    let place_grass = |g: &mut Gen, x, y, z| g.set(x, y, z, TALL_GRASS.id());
+    let place_tall_grass = |g: &mut Gen, x, y, z| {
+        let upper = COVERED.with(&[("to", "down")]);
+        if y + 1 < 16 && g.get(x, y + 1, z) == 0 && upper != u32::MAX {
+            g.set(x, y, z, TALL_TALL_GRASS.id());
+            g.set(x, y + 1, z, upper);
+        } else {
+            g.set(x, y, z, TALL_GRASS.id());
+        }
+    };
+    let Some(&cols) = g.columns() else { return };
+    let seed = g.seed();
+    let BlockPos { x: ox, y: oy, z: oz } = g.origin();
+    let max_h = cols.iter().map(|c| c.height).max().unwrap_or(0);
+    let min_h = cols.iter().map(|c| c.height).min().unwrap_or(0);
+
+    // Surface decoration only near the surface.
+    if oy > max_h + 16 || oy + 15 < min_h - 1 {
+        return;
+    }
+    // Plant decorations
+    for z in 0..16usize {
+        for x in 0..16usize {
+            let col = &cols[z * 16 + x];
+            let y = col.height + 1 - oy;
+            if !(0..16).contains(&y) || col.height < SEA {
+                continue;
+            }
+            let y = y as usize;
+            if g.get(x, y, z) != 0 {
+                continue;
+            }
+            let (wx, wz) = (ox + x as i32, oz + z as i32);
+            let h = hash(seed ^ 0xF10, wx as i64, 0, wz as i64);
+            let roll = unit(h);
+            // Plants go where they could be planted (soil tags); the biome decides how many.
+            let b = col.biome;
+            if FROZEN.on_biome(b) {
+                continue;
+            }
+            let tall_grass_chance = TALL_GRASS_COVER.on_biome(b).unwrap_or(0.0) as f64;
+            let grass_chance = GRASS_COVER.on_biome(b).unwrap_or(0.05) as f64;
+            let flower_chance = FLOWER_COVER.on_biome(b).unwrap_or(0.012) as f64;
+            let fern_chance = FERN_COVER.on_biome(b).unwrap_or(0.0) as f64;
+            let bluegrass_chance = BLUEGRASS_COVER.on_biome(b).unwrap_or(0.0) as f64;
+            // What is under the lowest layer takes a look at the terrain: only if anything would grow.
+            if y == 0 && roll >= grass_chance.max(0.08) && roll >= tall_grass_chance.max(0.08) {
+                continue;
+            }
+            let below = g.read([wx, oy + y as i32 - 1, wz]);
+            if PLANT_SOIL.on_block(below) {
+                // roll ∈ [0; grass_chance)
+                if roll < flower_chance {
+                    let flower = FLOWERS
+                        .on_biome(b)
+                        .map_or_else(|| [DANDELION.id(), ROSE.id()][(h >> 32) as usize % 2], |l| l.pick(h >> 32).unwrap_or(0));
+                    if flower != 0 {
+                        g.set(x, y, z, flower);
+                    }
+                // roll ∈ [grass_chance; fern_chance)
+                } else if roll < fern_chance {
+                    g.set(x, y, z, FERN.id());
+                // roll ∈ [fern_chance; bluegrass_chance)
+                } else if roll < bluegrass_chance {
+                    let wave = fixed::fbm(fixed::seed32(seed, 0x7A11) + 1, wx * 16, wz * 16, 48 * 16, 3);
+                    if wave < 0 {
+                        g.set(x, y, z, BLUEGRASS.id());
+                    }
+                // roll ∈ [bluegrass_chance; tall_grass_chance)
+                } else if roll < tall_grass_chance {
+                    place_tall_grass(g, x, y, z);
+                // roll ∈ [tall_grass_chance; grass_chance)
+                } else if roll < grass_chance {
+                    place_grass(g, x, y, z);
+                }
+            } else if CACTUS_SOIL.on_block(below) && DRY.on_biome(b) && roll < 0.006 && y + 2 < 16 {
+                let n = 1 + (h >> 40) % 3;
+                for k in 0..n as usize {
+                    g.set(x, y + k, z, CACTUS.id());
+                }
+            } else if SUGAR_CANE_SOIL.on_block(below)
+                && col.height == SEA
+                && roll < 0.08
+                && y + 2 < 16
+                && [(1, 0), (-1, 0), (0, 1), (0, -1)]
+                    .iter()
+                    .any(|&(dx, dz)| g.column(wx + dx, wz + dz).height < SEA)
+            {
+                let n = 1 + (h >> 40) % 3;
+                for k in 0..n as usize {
+                    g.set(x, y + k, z, SUGAR_CANE.id());
+                }
+            }
+        }
+    }
+    // Clay patches in shallow water (rivers, lakes, ocean shores), replacing the top blocks in
+    // bodies of water
+    for z in 0..16usize {
+        for x in 0..16usize {
+            let col = &cols[z * 16 + x];
+            // Make sure we only generate clay patches in shallower waters
+            if col.height >= SEA || col.height < SEA - 6 {
+                continue;
+            }
+            let y = col.height - oy;
+            if !(0..16).contains(&y) {
+                continue;
+            }
+            let y = y as usize;
+            let (wx, wz) = (ox + x as i32, oz + z as i32);
+            // Clay patch size based on noise scale
+            let clay = fixed::fbm(fixed::seed32(seed, 0xC1A7), wx * 16, wz * 16, 18 * 16, 3);
+            // Threshold for clay generation
+            if clay > fixed::ONE / 4 {
+                let surface = g.get(x, y, z);
+                if SAND.is(surface) || GRAVEL.is(surface) {
+                    g.set(x, y, z, CLAY.id());
+                }
+            }
+        }
+    }
+}
+pub fn place_boulder(s: &mut Plan, rng: &mut Rng, ox: i32, oy: i32, oz: i32, cells: &mut Vec<[i32; 3]>) {
+    for (dx, dy, dz) in sphere(1.5) {
+        let pos = [ox + dx, oy + dy, oz + dz];
+        let block = if rng.float() < 0.5 { COBBLESTONE.id() } else { MOSSY_COBBLESTONE.id() };
+        s.put(pos, block);
+        cells.push(pos);
+    }
+}
+pub fn place_bush(s: &mut Plan, leaf: impl Fn(&mut Rng) -> u32, stem: u32) {
+    let BlockPos { x, y, z } = s.pos();
+    let mut rng = Rng(s.random());
+    let bush_size = {
+        let mut result = rng.float() + 0.7;
+        if result < 1.0 {
+            result = 1.0;
+        }
+        result
+    };
+    s.put([x, y, z], stem);
+    let mut place_ball = |mut rng: &mut Rng, ox, oy, oz, size| {
+        for (dx, dy, dz) in sphere(size) {
+            s.put([ox + dx, oy + dy, oz + dz], leaf(&mut rng));
+        }
+    };
+    place_ball(&mut rng, x, y, z, bush_size);
+    if bush_size < 1.5 {
+        return;
+    }
+    let dx = x + (rng.float() * 2.0) as i32;
+    let dz = z + (rng.float() * 2.0) as i32;
+    place_ball(&mut rng, dx, y, dz, bush_size - 0.5);
+}
