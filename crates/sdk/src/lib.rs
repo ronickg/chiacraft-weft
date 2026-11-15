@@ -203,6 +203,9 @@ pub fn asset_exists(name: &str, kind: &str, ext: &str) -> bool {
 /// item, `..`, an absolute path) is a load error. Gives `ns:folder/path` (or `ns:path` for an
 /// empty folder).
 pub(crate) fn asset(folder: &str, name: &str) -> String {
+    if matches!(folder, "block" | "item") && name.contains([' ', '#', '@']) {
+        return abi::map_layer_names(name, |layer| asset(folder, layer));
+    }
     // Said of the source by a block made of others, the engine fills it in (`{source.side}`).
     if name.contains("{source") {
         return name.to_string();

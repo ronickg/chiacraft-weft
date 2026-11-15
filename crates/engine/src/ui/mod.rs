@@ -372,6 +372,8 @@ pub struct Ui {
     pub hovered: Option<NodeId>,
     pub pressed: Option<NodeId>,
     pub focused: Option<NodeId>,
+    /// An open popup confines pointer hit testing to its subtree.
+    pub modal: Option<NodeId>,
     /// Selection end in the focused text field, the caret being the other.
     pub anchor: Option<usize>,
     pub dirty: bool,
@@ -400,7 +402,14 @@ impl Kind {
     /// A field of several lines (Enter breaks the line), its text shown through `format` if given
     /// (colors, `mono`; the glyphs' widths must not depend on what comes before them).
     pub fn text_area(value: &str, max: usize, format: Option<Format>) -> Kind {
-        let area = Area { format, scroll: Rc::default(), wrap: true, inset: 0.0 };
+        let area = Area {
+            format,
+            scroll: Rc::default(),
+            wrap: true,
+            inset: 0.0,
+            follow_caret: std::cell::Cell::new(true),
+            max_scroll: std::cell::Cell::new(0.0),
+        };
         Kind::Input { value: value.to_string(), caret: 0, max, on_change: None, area: Some(area) }
     }
 }
@@ -417,6 +426,8 @@ pub struct Area {
     pub wrap: bool,
     /// Room kept free on the right (a button over the field's corner), GUI units.
     pub inset: f32,
+    pub follow_caret: std::cell::Cell<bool>,
+    pub max_scroll: std::cell::Cell<f32>,
 }
 
 /// One row of a field's text as drawn: chars `start..end` of line `line`, `at` the first one's
@@ -549,6 +560,7 @@ impl Ui {
             hovered: None,
             pressed: None,
             focused: None,
+            modal: None,
             anchor: None,
             dirty: true,
             scroll: Default::default(),
@@ -574,12 +586,22 @@ impl Ui {
 
     /// Scrolls the innermost scrolling node under `p` by `lines` wheel steps; true if one moved.
     pub fn scroll_at(&mut self, p: Vec2, lines: f32) -> bool {
-        let Some(id) = (0..self.nodes.len())
-            .rev()
-            .find(|&i| self.nodes[i].style.scroll && self.nodes[i].rect.contains(p) && self.nodes[i].clip.is_none_or(|c| c.contains(p)))
-        else {
+        let Some(id) = (0..self.nodes.len()).rev().find(|&i| {
+            (self.nodes[i].style.scroll || matches!(self.nodes[i].kind, Kind::Input { area: Some(_), .. }))
+                && self.nodes[i].rect.contains(p)
+                && self.nodes[i].clip.is_none_or(|c| c.contains(p))
+                && self.in_modal(i)
+        }) else {
             return false;
         };
+        if let Kind::Input { area: Some(area), .. } = &self.nodes[id].kind {
+            let [x, y] = area.scroll.get();
+            area.scroll
+                .set([x, (y - lines * 20.0).clamp(0.0, area.max_scroll.get())]);
+            area.follow_caret.set(false);
+            self.dirty = true;
+            return true;
+        }
         // Held to its end, a node counts from there: up is further from it.
         let by = if self.nodes[id].style.justify == Justify::End { lines } else { -lines };
         let key = self.scroll_key(id);
@@ -592,9 +614,11 @@ impl Ui {
     /// Mouse pressed at `p`: on a scroll bar it starts dragging (a click on the track jumps
     /// there). True if a bar took the click.
     pub fn bar_press(&mut self, p: Vec2) -> bool {
-        let hit = (0..self.nodes.len())
-            .rev()
-            .find(|&i| self.nodes[i].scrollbar.is_some_and(|b| b.track.contains(p)) && self.nodes[i].clip.is_none_or(|c| c.contains(p)));
+        let hit = (0..self.nodes.len()).rev().find(|&i| {
+            self.nodes[i].scrollbar.is_some_and(|b| b.track.contains(p))
+                && self.nodes[i].clip.is_none_or(|c| c.contains(p))
+                && self.in_modal(i)
+        });
         let Some(id) = hit else { return false };
         self.dragging = Some(id);
         self.bar_drag(p);
@@ -1031,7 +1055,18 @@ impl Ui {
             }
         }
         let mut best = None;
-        walk(self, 0, p, false, &mut best);
+        walk(self, self.modal.unwrap_or(0), p, false, &mut best);
         best
+    }
+
+    fn in_modal(&self, node: NodeId) -> bool {
+        fn contains(ui: &Ui, root: NodeId, node: NodeId) -> bool {
+            root == node
+                || ui.nodes[root]
+                    .children
+                    .iter()
+                    .any(|&child| contains(ui, child, node))
+        }
+        self.modal.is_none_or(|root| contains(self, root, node))
     }
 }

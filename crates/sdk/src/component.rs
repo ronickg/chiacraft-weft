@@ -725,7 +725,7 @@ impl Layers {
     }
     /// One more picture on top (under `item/`, `"other:x"` another mod's).
     pub fn layer(mut self, texture: &str) -> Layers {
-        self.0.push((crate::asset("item", texture), None, None));
+        self.0.extend(Self::parse(&crate::asset("item", texture)).0);
         self
     }
     /// Tints the layer just added `0xRRGGBB` (multiplied: white parts take the color).

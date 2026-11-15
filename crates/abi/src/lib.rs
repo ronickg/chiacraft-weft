@@ -1927,6 +1927,18 @@ pub fn layers_text<'a>(layers: impl IntoIterator<Item = Layer<'a>>) -> alloc::st
     text
 }
 
+/// Changes the asset names of layer text, retaining each layer's tint and tint kind.
+pub fn map_layer_names(text: &str, mut name: impl FnMut(&str) -> alloc::string::String) -> alloc::string::String {
+    let mapped: alloc::vec::Vec<_> = layers(text)
+        .map(|layer| (name(layer.name), layer.tint, layer.kind))
+        .collect();
+    layers_text(
+        mapped
+            .iter()
+            .map(|(name, tint, kind)| Layer { name, tint: *tint, kind: *kind }),
+    )
+}
+
 /// The texels a box between `min` and `max` (texels too) shows on a face when it says nothing, a
 /// box reaching out of its cell going on with the edge of the picture.
 pub fn box_face_uv(face: usize, min: [f32; 3], max: [f32; 3]) -> [f32; 4] {

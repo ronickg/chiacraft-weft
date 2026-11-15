@@ -18,6 +18,8 @@ From a Java model the engine reads `elements` (`from`, `to`, `rotation`, and `fa
 
 In code the same is `.model_box(min, max)` (pixels, 0..16), whose faces show the state's textures. A block's model decides its shape for everyone, collision and selection included (box by box, so a stair is one slab and a quarter, unless `.hitbox(min, max)`, in the same pixels, says otherwise).
 
+Block and item texture arguments, including the six faces of `.model_box_faces(min, max, faces)`, accept the shared layer text syntax. Separate layers with spaces, use `#RRGGBB` for a fixed tint and `@kind` for a biome tint. Each layer's asset name is relative to the setter's texture folder, so `"base:stone base:ore_overlay"` combines two block textures. UV rectangles and face rotations apply to every layer.
+
 For items, `models/item/<name>.json` with `"parent": "item/generated"` and a `layer0` texture is a flat item showing that texture; with `elements` the item is drawn as those boxes in the hand, on the ground and in slots. A face without a texture shows the item's own icon.
 
 A resource pack replaces these files like any other: its `models/block/stone.json` in `base/` redraws stone, and the block's item with it unless the pack has a `models/item/stone.json`. Only the drawing changes; what a block collides with, how it is selected and which neighbors it hides stay what the mod gave every player, since a server knows nothing of packs. A `.ctm` can pick among models by position or neighbors, and let a block stop hiding its neighbors: [models as tiles](ctm.md#models-as-tiles).

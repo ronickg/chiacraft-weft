@@ -76,18 +76,6 @@ impl Thing {
         let t = unquote(self.args_of("texture").next()?.first()?)?;
         picture_name(&t, self.kind.folder())
     }
-
-    /// Its model's boxes, `[min, max]` in 1/16; a whole cube without any.
-    pub fn boxes(&self) -> Vec<[f32; 6]> {
-        let v: Vec<[f32; 6]> = self
-            .args_of("model_box")
-            .filter_map(|a| {
-                let (lo, hi) = (three(a.first()?)?, three(a.get(1)?)?);
-                Some([lo[0], lo[1], lo[2], hi[0], hi[1], hi[2]])
-            })
-            .collect();
-        if v.is_empty() { vec![[0.0, 0.0, 0.0, 16.0, 16.0, 16.0]] } else { v }
-    }
 }
 
 /// The tool tiers `mined_by` names, as `abi::tool_tier::<name>`.
@@ -96,8 +84,15 @@ pub const TIERS: [&str; 5] = ["HAND", "WOOD", "STONE", "IRON", "DIAMOND"];
 /// A builder's picture argument (`base:stone`) as the content names it (`base:block/stone`).
 /// Relative names are the mod's own, which the game running the editor doesn't have.
 pub fn picture_name(arg: &str, folder: &str) -> Option<String> {
-    let (ns, path) = arg.split_once(':')?;
-    Some(format!("{ns}:{folder}/{path}"))
+    let mut valid = true;
+    let name = weft_abi::map_layer_names(arg, |name| {
+        let Some((ns, path)) = name.split_once(':') else {
+            valid = false;
+            return name.into();
+        };
+        if path.starts_with(&format!("{folder}/")) { name.into() } else { format!("{ns}:{folder}/{path}") }
+    });
+    valid.then_some(name)
 }
 
 /// A parameter of a builder method, as the SDK writes it.
@@ -136,6 +131,8 @@ pub fn default_arg(p: &Param) -> String {
         // A box's far corner starts at the block's, so a new box is the whole block.
         "[f32;3]" if p.name == "max" => "[16.0, 16.0, 16.0]".into(),
         "[f32;3]" => "[0.0, 0.0, 0.0]".into(),
+        "[(&str,[f32;4]);6]" => "[(\"\", abi::UV_FROM_BOX); 6]".into(),
+        "[u8;6]" => "[0; 6]".into(),
         t if t.starts_with('[') => "[]".into(),
         t if t.starts_with("&[") => "&[]".into(),
         "&CreativeTab" => "&CreativeTab::named(\"base:building\")".into(),
@@ -145,10 +142,78 @@ pub fn default_arg(p: &Param) -> String {
 }
 
 pub fn unquote(a: &str) -> Option<String> {
-    a.trim()
-        .strip_prefix('"')?
-        .strip_suffix('"')
-        .map(String::from)
+    serde_json::from_str(a.trim()).ok()
+}
+
+/// Comma-separated Rust literals, preserving nested arrays, tuples and strings.
+pub fn parts(s: &str) -> Option<Vec<&str>> {
+    split_top(s, ',')
+}
+
+fn split_top(s: &str, separator: char) -> Option<Vec<&str>> {
+    let mut out = Vec::new();
+    let (mut depth, mut quoted, mut escaped, mut start) = (0i32, false, false, 0);
+    for (i, c) in s.char_indices() {
+        if quoted {
+            if !escaped && c == '"' {
+                quoted = false;
+            }
+            escaped = !escaped && c == '\\';
+            continue;
+        }
+        match c {
+            '"' => quoted = true,
+            '[' | '(' | '{' => depth += 1,
+            ']' | ')' | '}' => {
+                depth -= 1;
+                if depth < 0 {
+                    return None;
+                }
+            }
+            c if c == separator && depth == 0 => {
+                out.push(s[start..i].trim());
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    if depth != 0 || quoted {
+        return None;
+    }
+    if !s[start..].trim().is_empty() {
+        out.push(s[start..].trim());
+    }
+    Some(out)
+}
+
+pub fn array<T, const N: usize>(s: &str, read: impl Fn(&str) -> Option<T>) -> Option<[T; N]> {
+    let inner = s.trim().strip_prefix('[')?.strip_suffix(']')?;
+    let repeated = split_top(inner, ';')?;
+    if repeated.len() == 2 {
+        if repeated[1].parse::<usize>().ok()? != N {
+            return None;
+        }
+        return (0..N)
+            .map(|_| read(repeated[0]))
+            .collect::<Option<Vec<_>>>()?
+            .try_into()
+            .ok();
+    }
+    parts(inner)?
+        .into_iter()
+        .map(read)
+        .collect::<Option<Vec<_>>>()?
+        .try_into()
+        .ok()
+}
+
+pub fn number(s: &str) -> Option<f32> {
+    let s = s.trim().replace('_', "");
+    let s = s
+        .strip_suffix("f32")
+        .or_else(|| s.strip_suffix("f64"))
+        .unwrap_or(&s);
+    s.parse::<f32>().ok().filter(|v| v.is_finite())
 }
 
 pub fn quote(s: &str) -> String {
@@ -163,17 +228,7 @@ pub fn num(v: f32) -> String {
 }
 
 pub fn three(a: &str) -> Option<[f32; 3]> {
-    let inner = a.trim().strip_prefix('[')?.strip_suffix(']')?;
-    if let Some((v, n)) = inner.split_once(';') {
-        return (n.trim() == "3")
-            .then(|| v.trim().parse().ok().map(|v| [v; 3]))
-            .flatten();
-    }
-    let v: Vec<f32> = inner
-        .split(',')
-        .map(|x| x.trim().trim_end_matches("f32").parse().ok())
-        .collect::<Option<_>>()?;
-    (v.len() == 3).then(|| [v[0], v[1], v[2]])
+    array(a, number)
 }
 
 fn handle(t: &Thing) -> String {
@@ -224,6 +279,9 @@ fn strip_comments(src: &str) -> String {
 /// `static X: Block = Block::named("x")`; a mistake says which line.
 pub fn read(src: &str) -> Result<Vec<Thing>, String> {
     let src = strip_comments(src);
+    if src.trim().is_empty() {
+        return Ok(Vec::new());
+    }
     let line_of = |at: usize| src[..at].matches('\n').count() + 1;
     let mut names: Vec<(String, String)> = Vec::new();
     for decl in src.split(';') {
@@ -399,10 +457,11 @@ mod tests {
         b.calls.push(Call::new("falling", &[]));
         b.calls
             .push(Call::new("tab", &["&CreativeTab::named(\"base:building\")"]));
+        assert!(read(&write(&[])).unwrap().is_empty());
         let things = vec![b, Thing::new(What::Item, "ruby")];
         let code = write(&things);
         assert_eq!(read(&code).unwrap(), things, "{code}");
-        assert_eq!(things[0].boxes(), vec![[0.0, 0.0, 0.0, 16.0, 8.0, 16.0]]);
+        assert_eq!(three(&things[0].args_of("model_box").next().unwrap()[1]), Some([16.0, 8.0, 16.0]));
         assert_eq!(things[0].picture().as_deref(), Some("base:block/stone"));
         // Written by hand: comments, other spacing.
         let hand = "pub static X: Block = Block::named(\"x\"); // mine\nr.block(&X).hardness(7.5) .light(15)\n  .tag(\"a, b\");";
@@ -433,5 +492,9 @@ mod tests {
         assert_eq!(num(7.500005), "7.5");
         assert_eq!(num(2.0), "2.0");
         assert_eq!(three("[0.0; 3]"), Some([0.0; 3]));
+        assert_eq!(array::<u8, 6>("[0; 6]", |v| v.parse().ok()), Some([0; 6]));
+        assert_eq!(parts("[0.0; 3], (\"a,b\", [1.0; 4])"), Some(vec!["[0.0; 3]", "(\"a,b\", [1.0; 4])"]));
+        assert_eq!(unquote(&quote("a\\b\"c")), Some("a\\b\"c".into()));
+        assert!(number("NaN").is_none());
     }
 }

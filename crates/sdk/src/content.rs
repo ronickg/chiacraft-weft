@@ -1522,6 +1522,7 @@ macro_rules! state_setters {
         }
         /// Every face shows this picture (relative names are under `block/`; without any:
         /// `block/<name>`), and every face is picked: what `layer`, `tint` and `tint_kind` go on.
+        /// Texture arguments also accept layer text (`name#RRGGBB@kind`, separated by spaces).
         /// The other presets pick some faces the same way, the last one said wins:
         /// `.texture("dirt").top("grass_top").tint_kind(&tints::GRASS).sides("dirt").layer("grass_side_overlay").tint_kind(&tints::GRASS)`.
         pub fn texture(self, t: &str) -> Self {
@@ -1741,6 +1742,7 @@ macro_rules! state_setters {
         /// in -X, +X, -Y, +Y, -Z, +Z order, as a model file's element has; `UV_FROM_BOX` takes it
         /// from where the box is, `UV_NO_FACE` leaves a face out. An empty texture is the block's
         /// own on that side, with its layers and tint.
+        /// Each texture can use the same layer text as `texture`.
         pub fn model_box_faces(self, min: [f32; 3], max: [f32; 3], faces: [(&str, [f32; 4]); 6]) -> Self {
             let textures = std::array::from_fn(|i| if faces[i].0.is_empty() { String::new() } else { crate::asset("block", faces[i].0) });
             self.add_box(min, max, textures, faces.map(|f| f.1))

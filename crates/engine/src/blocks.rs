@@ -597,7 +597,7 @@ fn model_file(
 }
 
 /// Cross is only a registration preset; every consumer receives ordinary boxes.
-fn cross(textures: [u32; 6], tall: bool) -> Vec<ModelBox> {
+pub(crate) fn cross(textures: [u32; 6], tall: bool) -> Vec<ModelBox> {
     let edge = 0.5 - 0.35 * std::f32::consts::SQRT_2;
     [(0.0, textures[0]), (1.0, textures[3])]
         .into_iter()

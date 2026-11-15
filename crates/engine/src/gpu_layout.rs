@@ -111,6 +111,7 @@ shared! {
         ICON = 2,
         FONT = 3,
         GUI = 4,
+        PREMULTIPLIED = 5,
     }
     /// Particle data word y: texture index and shader slot.
     particle {

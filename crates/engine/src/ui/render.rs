@@ -18,6 +18,55 @@ pub use crate::gpu_layout::Quad;
 use crate::model::{Animation, Prop};
 use crate::shaders::{Hook, Slots};
 
+#[derive(Clone, Copy)]
+pub struct ModelView {
+    pub yaw: f32,
+    pub pitch: f32,
+    pub zoom: f32,
+}
+
+impl ModelView {
+    pub fn bounds(boxes: &[crate::content::ModelBox]) -> (glam::Vec3, glam::Vec3) {
+        let (mut min, mut max) = (glam::Vec3::ZERO, glam::Vec3::ONE);
+        for bx in boxes {
+            for face in 0..6 {
+                if let Some((corners, _)) = crate::client::mesher::box_face(bx, face) {
+                    for p in corners {
+                        min = min.min(glam::Vec3::from(p));
+                        max = max.max(glam::Vec3::from(p));
+                    }
+                }
+            }
+        }
+        (min, max)
+    }
+
+    pub fn projection(self, size: [f32; 2], boxes: &[crate::content::ModelBox]) -> glam::Mat4 {
+        let (min, max) = Self::bounds(boxes);
+        let center = (min + max) * 0.5;
+        let right = glam::Vec3::new(self.yaw.cos(), 0.0, -self.yaw.sin());
+        let toward = glam::Vec3::new(self.yaw.sin() * self.pitch.cos(), self.pitch.sin(), self.yaw.cos() * self.pitch.cos());
+        let up = toward.cross(right);
+        // Pixels per block are independent of camera angle and model dimensions.
+        let scale = size[0].min(size[1]) * 0.52 * self.zoom;
+        let x = right * (2.0 * scale / size[0]);
+        let y = up * (2.0 * scale / size[1]);
+        let z = toward * (0.45 / (max - min).length().max(1.0));
+        glam::Mat4::from_cols(
+            glam::Vec4::new(x.x, y.x, z.x, 0.0),
+            glam::Vec4::new(x.y, y.y, z.y, 0.0),
+            glam::Vec4::new(x.z, y.z, z.z, 0.0),
+            glam::Vec4::new(-x.dot(center), -y.dot(center), 0.5 - z.dot(center), 1.0),
+        )
+    }
+}
+
+impl Default for ModelView {
+    fn default() -> Self {
+        Self { yaw: std::f32::consts::FRAC_PI_4, pitch: std::f32::consts::FRAC_PI_6, zoom: 1.0 }
+    }
+}
+
 /// Quads of a node and its children moved by keyframes every frame: `animation = ns:name` in the
 /// `.gui` of a class's texture names `animations/<name>.animation.json`, whose `open` animation
 /// plays once when the screen opens and `idle` loops after. Any bone: position in GUI pixels (y up),
@@ -552,6 +601,14 @@ impl UiRenderer {
     }
 
     pub fn image(&mut self, r: Rect, tex: u32, uv: [f32; 4], color: u32) {
+        self.texture_quad(r, tex, uv, color, ui_mode::TEXTURE, None);
+    }
+
+    pub fn premultiplied_image(&mut self, r: Rect, tex: u32, uv: [f32; 4], color: u32) {
+        self.texture_quad(r, tex, uv, color, ui_mode::PREMULTIPLIED, None);
+    }
+
+    fn texture_quad(&mut self, r: Rect, tex: u32, uv: [f32; 4], color: u32, mode: u32, clip: Option<Rect>) {
         self.quads.push(Quad {
             p0: [r.x, r.y],
             u: [r.w, 0.0],
@@ -559,7 +616,8 @@ impl UiRenderer {
             uv,
             color,
             tex,
-            mode: ui_mode::TEXTURE,
+            mode,
+            clip: clip.map_or([0.0; 4], |r| [r.x, r.y, r.x + r.w, r.y + r.h]),
             ..Default::default()
         });
     }
@@ -738,16 +796,7 @@ impl UiRenderer {
             }
             draw => {
                 for sprite in draw.sprites() {
-                    self.quads.push(Quad {
-                        p0: [x, y],
-                        u: [size, 0.0],
-                        v: [0.0, size],
-                        uv: [0.0, 0.0, 1.0, 1.0],
-                        color: sprite.color << 8 | 0xFF,
-                        tex: tex.texture(sprite.texture(tex)),
-                        mode: ui_mode::ICON,
-                        ..Default::default()
-                    });
+                    self.sprite_quad(tex, Rect { x, y, w: size, h: size }, sprite.texture(tex), sprite.color << 8 | 0xFF, None);
                 }
             }
         }
@@ -761,17 +810,17 @@ impl UiRenderer {
 
     /// Texture `texture` (`Content::textures`) flat over `r`, as an item's picture shows.
     pub fn picture_icon(&mut self, tex: &GameTextures, r: crate::ui::Rect, texture: u32) {
-        let q = Quad {
-            p0: [r.x, r.y],
-            u: [r.w, 0.0],
-            v: [0.0, r.h],
-            uv: [0.0, 0.0, 1.0, 1.0],
-            color: 0xFFFFFFFF,
-            tex: tex.texture(texture),
-            mode: ui_mode::ICON,
-            ..Default::default()
-        };
-        self.quads.push(q);
+        self.sprite_quad(tex, r, texture, 0xFFFFFFFF, None);
+    }
+
+    pub fn picture_layers(&mut self, c: &Content, tex: &GameTextures, r: Rect, clip: Rect, texture: u32) {
+        for layer in crate::client::mesher::face_layers(c, &c.states[0], texture, 0).iter() {
+            self.sprite_quad(tex, r, layer.tex, c.kind_color(layer.tint, self.biome) << 8 | 0xff, Some(clip));
+        }
+    }
+
+    fn sprite_quad(&mut self, tex: &GameTextures, r: Rect, texture: u32, color: u32, clip: Option<Rect>) {
+        self.texture_quad(r, tex.texture(texture), [0.0, 0.0, 1.0, 1.0], color, ui_mode::ICON, clip);
     }
 
     /// Model boxes as a slot shows a block: for what isn't registered yet, drawn the same way as
@@ -781,6 +830,50 @@ impl UiRenderer {
     }
 
     /// The char index in text field `node` nearest to `p` (GUI units), where a click puts the caret.
+    pub fn preview_grid(&mut self, r: Rect, boxes: &[crate::content::ModelBox], view: ModelView, fine: u32, major: u32) {
+        let start = self.quads.len();
+        let (min, max) = ModelView::bounds(boxes);
+        let matrix = view.projection([r.w, r.h], boxes);
+        let at = |p: [f32; 3]| {
+            let p = matrix.project_point3(glam::Vec3::from(p));
+            [r.x + (p.x + 1.0) * r.w * 0.5, r.y + (1.0 - p.y) * r.h * 0.5]
+        };
+        let (x0, x1) = ((min.x.floor() - 0.5).max(-8.0), (max.x.ceil() + 0.5).min(8.0));
+        let (z0, z1) = ((min.z.floor() - 0.5).max(-8.0), (max.z.ceil() + 0.5).min(8.0));
+        for x in (x0 * 16.0) as i32..=(x1 * 16.0) as i32 {
+            self.preview_line(
+                at([x as f32 / 16.0, 0.0, z0]),
+                at([x as f32 / 16.0, 0.0, z1]),
+                if x % 16 == 0 { major } else { fine },
+                if x % 16 == 0 { 1.0 } else { 0.5 },
+            );
+        }
+        for z in (z0 * 16.0) as i32..=(z1 * 16.0) as i32 {
+            self.preview_line(
+                at([x0, 0.0, z as f32 / 16.0]),
+                at([x1, 0.0, z as f32 / 16.0]),
+                if z % 16 == 0 { major } else { fine },
+                if z % 16 == 0 { 1.0 } else { 0.5 },
+            );
+        }
+        for quad in &mut self.quads[start..] {
+            quad.clip = [r.x, r.y, r.x + r.w, r.y + r.h];
+        }
+    }
+
+    fn preview_line(&mut self, a: [f32; 2], b: [f32; 2], color: u32, width: f32) {
+        let delta = glam::Vec2::from(b) - glam::Vec2::from(a);
+        let normal = glam::Vec2::new(-delta.y, delta.x).normalize_or_zero() * width;
+        self.quads.push(Quad {
+            p0: [a[0] - normal.x * 0.5, a[1] - normal.y * 0.5],
+            u: delta.to_array(),
+            v: normal.to_array(),
+            color,
+            mode: ui_mode::SOLID,
+            ..Default::default()
+        });
+    }
+
     pub fn caret_at(&self, ui: &crate::ui::Ui, node: usize, p: glam::Vec2) -> Option<usize> {
         let n = ui.nodes.get(node)?;
         let Kind::Input { value, caret, area, .. } = &n.kind else { return None };
@@ -1233,17 +1326,20 @@ impl UiRenderer {
                 let lh = self.font.line_height * px;
                 let (room_w, room_h) = (r.w - (8.0 + area.inset) * scale, r.h - 8.0 * scale);
                 let rows = area.rows(value, &self.font, Some(room_w / px));
+                let max_scroll = (rows.len() as f32 * lh - room_h).max(0.0);
+                area.max_scroll.set(max_scroll / scale);
                 let ri = super::row_of(&rows, *caret);
                 let caret_x = rows[ri].x(*caret - rows[ri].at) * px;
                 let caret_y = ri as f32 * lh;
                 // Moved only as far as keeps the caret in sight, so the text stays put while it
                 // moves about inside.
                 let [mut sx, mut sy] = area.scroll.get().map(|v| v * scale);
-                if ui.focused == Some(id) {
+                sy = sy.clamp(0.0, max_scroll);
+                if ui.focused == Some(id) && area.follow_caret.replace(false) {
                     sx = if area.wrap { 0.0 } else { sx.min(caret_x).max(caret_x + px - room_w).max(0.0) };
                     sy = sy.min(caret_y).max(caret_y + lh - room_h).max(0.0);
-                    area.scroll.set([sx / scale, sy / scale]);
                 }
+                area.scroll.set([sx / scale, sy / scale]);
                 let (tx, ty) = (r.x + 4.0 * scale - sx, r.y + 4.0 * scale - sy);
                 let start = self.quads.len();
                 if let Some(a) = ui.anchor.filter(|&a| ui.focused == Some(id) && a != *caret) {
@@ -1499,5 +1595,43 @@ mod animation_tests {
             q[0].u,
             q[0].v
         );
+    }
+}
+
+#[cfg(test)]
+mod preview_tests {
+    use super::*;
+
+    #[test]
+    fn orbit_preserves_user_scale() {
+        let mut large = crate::content::ModelBox::whole([0; 6]);
+        large.max = [4.0, 2.0, 1.0];
+        let pixel_scale = |view: ModelView, size: [f32; 2], boxes: &[crate::content::ModelBox]| {
+            let matrix = view.projection(size, boxes);
+            let origin = matrix.project_point3(glam::Vec3::ZERO);
+            let mut scale = glam::Vec2::ZERO;
+            for axis in [glam::Vec3::X, glam::Vec3::Y, glam::Vec3::Z] {
+                let d = matrix.project_point3(axis) - origin;
+                let pixels = glam::Vec2::new(d.x * size[0] * 0.5, d.y * size[1] * 0.5);
+                scale += pixels * pixels;
+            }
+            scale.sqrt()
+        };
+        for size in [[240.0, 160.0], [120.0, 220.0]] {
+            let baseline = pixel_scale(ModelView::default(), size, &[]);
+            for boxes in [&[][..], std::slice::from_ref(&large)] {
+                for yaw in -8..=8 {
+                    for pitch in [-1.3, -0.4, 0.0, 0.7, 1.3] {
+                        for zoom in [0.3, 1.0, 3.0] {
+                            let scale = pixel_scale(ModelView { yaw: yaw as f32 * 0.4, pitch, zoom }, size, boxes);
+                            let error = (scale / (baseline * zoom) - glam::Vec2::ONE)
+                                .abs()
+                                .max_element();
+                            assert!(error < 0.0001, "scale changed with orbit or model size: {scale:?}");
+                        }
+                    }
+                }
+            }
+        }
     }
 }

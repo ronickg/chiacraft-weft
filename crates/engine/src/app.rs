@@ -77,6 +77,7 @@ pub enum Request {
     /// Starts the game anew the way it was started, then leaves: what mods are on takes effect.
     Restart,
     Rebuild,
+    Sound(crate::audio::Play),
     Rebind(String, crate::input::Slots),
     ResetBinds,
     StartWorld(WorldMeta),
@@ -117,6 +118,18 @@ const HUD_FADE: f32 = 0.5;
 /// Seconds the picture takes to fill the window, and to fade into the world.
 const ENTER_GROW: f32 = 0.35;
 const ENTER_FADE: f32 = 0.3;
+
+#[derive(Clone, Copy)]
+enum PreviewKind {
+    Player,
+    Block(u64),
+}
+
+#[derive(Clone, Copy)]
+struct ModelPreview {
+    rect: crate::ui::Rect,
+    kind: PreviewKind,
+}
 
 /// What UI actions and bindings can see and change.
 pub struct Ctx<'a> {
@@ -288,7 +301,7 @@ pub(crate) struct Running {
     ui_cached: Vec<crate::ui::render::Quad>,
     ui_animated: Vec<crate::ui::render::Animated>,
     /// Where UI asked for the player model, physical pixels.
-    previews: Vec<[f32; 4]>,
+    previews: Vec<ModelPreview>,
     /// Texture holding the rendered inventory figure, drawn by the UI.
     preview_tex: Option<u32>,
     menu_entities: Option<crate::client::entity_render::EntityRenderer>,
@@ -925,6 +938,7 @@ impl Running {
                     }
                 }
                 Request::Rebuild => self.rebuild_all(),
+                Request::Sound(play) => self.ui_sounds.push(play),
                 Request::ModCall(owner, cb) => {
                     let mut v = self.frame_view();
                     let mut a = weft_abi::UiArgs { ui: std::ptr::null_mut(), client: v.raw() };
@@ -1313,9 +1327,12 @@ impl Running {
             ui.anchor = None;
             if let Some(f) = ui.focused
                 && let Some(at) = self.ui.caret_at(ui, f, cursor)
-                && let Kind::Input { caret, .. } = &mut ui.nodes[f].kind
+                && let Kind::Input { caret, area, .. } = &mut ui.nodes[f].kind
             {
                 *caret = at;
+                if let Some(area) = area {
+                    area.follow_caret.set(true);
+                }
                 self.quads_dirty = true;
             }
             if let Some(h) = hovered {
@@ -1395,6 +1412,11 @@ impl Running {
                 let lines = area.is_some();
                 let outcome = crate::ui::edit::Field { value, caret, anchor: &mut ui.anchor, max: *max, lines }.handle(&self.input);
                 let (changed, moved) = (outcome.changed, outcome.moved);
+                if changed || moved {
+                    if let Some(area) = area {
+                        area.follow_caret.set(true);
+                    }
+                }
                 if moved {
                     self.quads_dirty = true;
                 }
@@ -2495,11 +2517,23 @@ fn build_ui_quads(r: &mut Running, scale: f32) {
         let textures = &r.textures;
         let mut custom = |ren: &mut UiRenderer, tag: u32, data: u64, rect: crate::ui::Rect, hovered: bool, icon: Option<u32>| {
             crate::hud::draw_custom(ren, look, textures, client, tag, data, rect, hovered, icon, scale);
-            if tag == crate::client::modui::TAG_ENTITY {
-                let inner = crate::ui::Rect { x: rect.x + scale, y: rect.y + scale, w: rect.w - 2.0 * scale, h: rect.h - 2.0 * scale };
-                previews.push([inner.x, inner.y, inner.w, inner.h]);
+            let preview = match tag {
+                crate::client::modui::TAG_ENTITY => Some(ModelPreview {
+                    rect: crate::ui::Rect { x: rect.x + scale, y: rect.y + scale, w: rect.w - 2.0 * scale, h: rect.h - 2.0 * scale },
+                    kind: PreviewKind::Player,
+                }),
+                crate::editor::TAG_PREVIEW if crate::editor::is_block_preview(data) => {
+                    Some(ModelPreview { rect, kind: PreviewKind::Block(data) })
+                }
+                _ => None,
+            };
+            if let Some(preview) = preview {
+                previews.push(preview);
                 if let Some(t) = preview_tex {
-                    ren.image(inner, t, [0.0, 0.0, 1.0, 1.0], 0xFFFFFFFF);
+                    match preview.kind {
+                        PreviewKind::Player => ren.image(preview.rect, t, [0.0, 0.0, 1.0, 1.0], 0xFFFFFFFF),
+                        PreviewKind::Block(_) => ren.premultiplied_image(preview.rect, t, [0.0, 0.0, 1.0, 1.0], 0xFFFFFFFF),
+                    }
                 }
             }
         };
@@ -2653,7 +2687,8 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
         }
     }
     if !r.screens.is_empty() {
-        if let Some(&[x, y, w, h]) = r.previews.first() {
+        if let Some(preview) = r.previews.first().copied() {
+            let crate::ui::Rect { x, y, w, h } = preview.rect;
             if r.game.is_none() && r.menu_entities.is_none() && !r.menu_preview_failed {
                 match crate::client::entity_render::EntityRenderer::new(&mut *r.gpu, &r.assets) {
                     Ok(mut entities) => {
@@ -2671,14 +2706,21 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
                     }
                 }
             }
-            let preview = match (&mut r.game, &mut r.menu_entities) {
+            let renderer = match (&mut r.game, &mut r.menu_entities) {
                 (Some(g), _) => Some((&mut g.client.entity_render, g.client.me.worn.as_slice())),
                 (_, Some(entities)) => Some((entities, &[][..])),
                 _ => None,
             };
-            if let Some((entities, worn)) = preview {
-                let look = r.input.cursor - Vec2::new(x, y);
-                let tex = entities.draw_preview(&mut *r.gpu, &mut r.list, info, [w.round() as u32, h.round() as u32], look, worn);
+            if let Some((entities, worn)) = renderer {
+                let size = [w.round() as u32, h.round() as u32];
+                let tex = match preview.kind {
+                    PreviewKind::Player => {
+                        entities.draw_preview(&mut *r.gpu, &mut r.list, info, size, r.input.cursor - Vec2::new(x, y), worn)
+                    }
+                    PreviewKind::Block(index) => {
+                        crate::editor::render_block_preview(entities, &mut *r.gpu, &mut r.list, info, size, &r.textures, index)
+                    }
+                };
                 if tex != r.preview_tex {
                     r.preview_tex = tex;
                     r.quads_dirty = true;

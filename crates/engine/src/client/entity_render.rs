@@ -137,6 +137,9 @@ pub struct EntityRenderer {
     /// The first person's arms: fixed field of view, depth squeezed so they never sink into walls.
     model_hand_pipe: PipelineId,
     preview_pipe: PipelineId,
+    box_preview_pipe: PipelineId,
+    translucent_preview_pipe: PipelineId,
+    box_preview_buffers: Vec<(BufferId, u32)>,
     pub models: Models,
     buffers: Vec<(BufferId, u32)>,
     /// The held item's projection: a fixed field of view, like vanilla, so it keeps its shape
@@ -235,7 +238,7 @@ fn light_boxes(boxes: &mut [GpuBox], from: usize, light: u32) {
 
 impl EntityRenderer {
     pub fn new(gpu: &mut dyn Backend, assets: &Assets) -> Result<EntityRenderer, String> {
-        let (pipeline, overlay) = Self::pipelines(gpu, assets)?;
+        let (pipeline, overlay, box_preview_pipe, translucent_preview_pipe) = Self::pipelines(gpu, assets)?;
         let ([model_pipe, preview_pipe, model_hand_pipe], kind_shaders, effect_slots) = Self::model_pipelines(gpu, assets)?;
         let models = Models::new(gpu, assets);
         let frames = gpu.frames_in_flight();
@@ -283,6 +286,9 @@ impl EntityRenderer {
             hand_views,
             preview,
             preview_pipe,
+            box_preview_pipe,
+            translucent_preview_pipe,
+            box_preview_buffers: Vec::new(),
             preview_target: None,
             skins: FxHashMap::default(),
             player_skins: FxHashMap::default(),
@@ -316,7 +322,7 @@ impl EntityRenderer {
         Ok((pipe("items", "vs_item")?, pipe("hand item", "vs_hand_item")?))
     }
 
-    fn pipelines(gpu: &mut dyn Backend, assets: &Assets) -> Result<(PipelineId, PipelineId), String> {
+    fn pipelines(gpu: &mut dyn Backend, assets: &Assets) -> Result<(PipelineId, PipelineId, PipelineId, PipelineId), String> {
         let s = crate::packs::shader(assets, "entity.wgsl").map_err(|e| e.0)?;
         let main = gpu
             .create_pipeline(&PipelineDesc {
@@ -344,7 +350,33 @@ impl EntityRenderer {
                 topology: Topology::Triangles,
             })
             .map_err(|e| e.0)?;
-        Ok((main, overlay))
+        let preview = gpu
+            .create_pipeline(&PipelineDesc {
+                label: "block preview",
+                shader: &s,
+                vertex: "vs",
+                fragment: Some("fs"),
+                color: Some(Format::Rgba8Srgb),
+                depth: Some(DepthState { write: true, compare: Compare::GreaterEqual }),
+                blend: Blend::None,
+                cull_back: true,
+                topology: Topology::Triangles,
+            })
+            .map_err(|e| e.0)?;
+        let translucent = gpu
+            .create_pipeline(&PipelineDesc {
+                label: "translucent block preview",
+                shader: &s,
+                vertex: "vs",
+                fragment: Some("fs_overlay"),
+                color: Some(Format::Rgba8Srgb),
+                depth: Some(DepthState { write: false, compare: Compare::GreaterEqual }),
+                blend: Blend::Alpha,
+                cull_back: true,
+                topology: Topology::Triangles,
+            })
+            .map_err(|e| e.0)?;
+        Ok((main, overlay, preview, translucent))
     }
 
     /// The model pipelines (screen, inventory figure image) with every entity shader snippet,
@@ -437,7 +469,11 @@ impl EntityRenderer {
         self.item_models.clear();
         self.item_boxes.clear();
         match Self::pipelines(gpu, assets) {
-            Ok((a, b)) => {
+            Ok((a, b, preview, translucent)) => {
+                gpu.destroy_pipeline(self.box_preview_pipe);
+                gpu.destroy_pipeline(self.translucent_preview_pipe);
+                self.box_preview_pipe = preview;
+                self.translucent_preview_pipe = translucent;
                 gpu.destroy_pipeline(self.pipeline);
                 gpu.destroy_pipeline(self.overlay);
                 self.pipeline = a;
@@ -546,6 +582,11 @@ impl EntityRenderer {
         gpu.destroy_pipeline(self.model_pipe);
         gpu.destroy_pipeline(self.model_hand_pipe);
         gpu.destroy_pipeline(self.preview_pipe);
+        gpu.destroy_pipeline(self.box_preview_pipe);
+        gpu.destroy_pipeline(self.translucent_preview_pipe);
+        for (buffer, _) in self.box_preview_buffers.drain(..) {
+            gpu.destroy_buffer(buffer);
+        }
         if let Some((c, d, ..)) = self.preview_target.take() {
             gpu.destroy_texture(c);
             gpu.destroy_texture(d);
@@ -1075,19 +1116,7 @@ impl EntityRenderer {
         }
     }
 
-    /// Renders the local player's model into a `size` texture (physical pixels), turned towards
-    /// `look` (relative to the texture's top left) like the inventory figure. Returns the
-    /// texture's bindless index for the UI to draw.
-    pub fn draw_preview(
-        &mut self,
-        gpu: &mut dyn Backend,
-        list: &mut CommandList,
-        frame: &FrameInfo,
-        size: [u32; 2],
-        look: glam::Vec2,
-        worn: &[ItemStack],
-    ) -> Option<u32> {
-        let c = content();
+    fn preview_surface(&mut self, gpu: &mut dyn Backend, size: [u32; 2]) -> Option<(TextureId, TextureId, u32)> {
         if size[0] == 0 || size[1] == 0 {
             return None;
         }
@@ -1102,6 +1131,81 @@ impl EntityRenderer {
             self.preview_target = Some((col, dep, size, gpu.texture_index(col)));
         }
         let (col, dep, _, index) = self.preview_target?;
+        Some((col, dep, index))
+    }
+
+    /// Unregistered block boxes use the same depth-tested faces as held block models.
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_box_preview(
+        &mut self,
+        gpu: &mut dyn Backend,
+        list: &mut CommandList,
+        frame: &FrameInfo,
+        size: [u32; 2],
+        textures: &GameTextures,
+        boxes: &[crate::content::ModelBox],
+        view: crate::ui::render::ModelView,
+        translucent: bool,
+    ) -> Option<u32> {
+        let (col, dep, index) = self.preview_surface(gpu, size)?;
+        let mut faces = Vec::new();
+        boxes_shape(&mut faces, textures, Mat4::IDENTITY, boxes, &content().states[0], None, Vec4::new(1.0, 1.0, 1.0, 0.0));
+        light_boxes(&mut faces, 0, FULL_LIGHT);
+        let projection = view.projection([size[0] as f32, size[1] as f32], boxes);
+        if translucent {
+            let depth = |quad: &GpuBox| {
+                let point = |row: [f32; 4]| row[3] + (row[0] + row[1]) * 0.5;
+                projection
+                    .project_point3(Vec3::from(quad.rows.map(point)))
+                    .z
+            };
+            faces.sort_by(|a, b| depth(a).total_cmp(&depth(b)));
+        }
+
+        let scene = Scene {
+            view_proj: projection.to_cols_array_2d(),
+            params: [1e9, 2e9, 1.0, crate::shaders::time()],
+            environment: [1.0, 0.0, 0.0, 0.0],
+            ..Default::default()
+        };
+        let scene_buffer = self.preview[frame.slot];
+        gpu.mapped(scene_buffer)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
+        let buffer = crate::gpu_layout::frame_buffer(
+            gpu,
+            &mut self.box_preview_buffers,
+            frame.slot,
+            faces.len().max(1) as u32,
+            size_of::<GpuBox>() as u64,
+            usage::STORAGE,
+            "preview boxes",
+        );
+        gpu.mapped(buffer)[..faces.len() * size_of::<GpuBox>()].copy_from_slice(bytemuck::cast_slice(&faces));
+        list.push(Cmd::BeginPass { color: Some((Target::Texture(col), Some([0.0; 4]))), depth: Some((dep, Some(0.0))) });
+        if !faces.is_empty() {
+            list.pipeline(if translucent { self.translucent_preview_pipe } else { self.box_preview_pipe });
+            list.bind(crate::gpu_layout::bind::entity::BOXES, buffer);
+            list.bind(crate::gpu_layout::bind::entity::SCENE, scene_buffer);
+            list.bind(crate::gpu_layout::bind::entity::GLOW_MAP, textures.glow_buffer());
+            list.draw(faces.len() as u32 * 36, 1);
+        }
+        list.push(Cmd::EndPass);
+        Some(index)
+    }
+
+    /// Renders the local player's model into a `size` texture (physical pixels), turned towards
+    /// `look` (relative to the texture's top left) like the inventory figure. Returns the
+    /// texture's bindless index for the UI to draw.
+    pub fn draw_preview(
+        &mut self,
+        gpu: &mut dyn Backend,
+        list: &mut CommandList,
+        frame: &FrameInfo,
+        size: [u32; 2],
+        look: glam::Vec2,
+        worn: &[ItemStack],
+    ) -> Option<u32> {
+        let c = content();
+        let (col, dep, index) = self.preview_surface(gpu, size)?;
         let (x, y, w, h) = (0.0, 0.0, size[0] as f32, size[1] as f32);
         let (sw, sh) = (w, h);
         let s = h / 2.4;

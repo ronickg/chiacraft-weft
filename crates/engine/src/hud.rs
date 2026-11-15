@@ -1117,6 +1117,11 @@ pub fn draw_custom(
             }
         }
         crate::editor::TAG_PICTURE => ren.picture_icon(textures, r, data as u32),
+        crate::editor::TAG_PREVIEW => {
+            if let Some(c) = crate::content::try_content() {
+                crate::editor::draw_preview(ren, c, textures, look, r, data);
+            }
+        }
         modui::TAG_ICON => ren.defer_stack(r, ItemStack::new(data as u32, 1)),
         modui::TAG_CREATIVE => {
             slot_background(ren, look, "slot", r, false, scale);
