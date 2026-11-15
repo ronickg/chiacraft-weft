@@ -15,6 +15,7 @@
         android:isGame="true">
         <activity
             android:name="android.app.NativeActivity"
+            android:enableOnBackInvokedCallback="false"
             android:exported="true"
             android:launchMode="singleTask"
             android:windowSoftInputMode="adjustResize"

@@ -11,7 +11,7 @@ use weft_render::{Backend, BackendDesc, Cmd, CommandList, Format, Target, Textur
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, DeviceId, ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
-use winit::keyboard::{KeyCode, PhysicalKey};
+use winit::keyboard::{KeyCode, NamedKey, PhysicalKey};
 use winit::window::{CursorGrabMode, Window, WindowId};
 
 use crate::assets::Assets;
@@ -1881,9 +1881,14 @@ impl ApplicationHandler for App {
             }
             WindowEvent::Touch(t) => r.touch(t),
             WindowEvent::KeyboardInput { event, .. } => {
-                if let PhysicalKey::Code(code) = event.physical_key {
-                    // A phone's back button: what Escape does.
-                    let code = if code == KeyCode::BrowserBack { KeyCode::Escape } else { code };
+                // Android Back arrives as a logical key with no physical code.
+                let code = match event.physical_key {
+                    PhysicalKey::Code(KeyCode::BrowserBack) => Some(KeyCode::Escape),
+                    PhysicalKey::Code(code) => Some(code),
+                    _ if event.logical_key == winit::keyboard::Key::Named(NamedKey::BrowserBack) => Some(KeyCode::Escape),
+                    _ => None,
+                };
+                if let Some(code) = code {
                     match event.state {
                         ElementState::Pressed if event.repeat => r.input.key_repeat(Key::Code(code)),
                         ElementState::Pressed => r.input.key_down(Key::Code(code)),
