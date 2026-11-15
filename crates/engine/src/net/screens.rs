@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use crate::app::{Ctx, Request};
-use crate::screens::{BuildCx, Screen, button, frame, label};
+use crate::screens::{BuildCx, Screen, back_button, button, frame, label};
 use crate::ui::{Kind, Style, Ui};
 
 #[derive(Default)]
@@ -49,7 +49,7 @@ impl Screen for Multiplayer {
                     },
                 );
             });
-            button(ui, cx, "menu.back", &[], 200.0, |c| c.requests.push(Request::Close));
+            back_button(ui, cx, "menu.back", &[], 200.0, |c| c.requests.push(Request::Close));
         });
     }
 }

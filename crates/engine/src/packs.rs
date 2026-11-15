@@ -17,8 +17,7 @@ use crate::assets::Assets;
 use weft_render::{Shader, ShaderError};
 
 use crate::app::{Ctx, Request};
-use crate::screens::{BuildCx, Screen, button, frame, label};
-use crate::ui::text::Arg;
+use crate::screens::{BuildCx, Screen, back_button, button, frame, label};
 use crate::ui::{Justify, Kind, Style, Ui};
 
 pub struct PackInfo {
@@ -297,7 +296,7 @@ impl Screen for ResourcePacks {
             });
             ui.container(Style::row().gap(6.0).justify(Justify::Center), |ui| {
                 button(ui, cx, "packs.open_folder", &[], 140.0, move |_| open_folder(&dir));
-                button(ui, cx, "menu.done", &[], 140.0, |c| c.requests.push(Request::Close));
+                back_button(ui, cx, "menu.done", &[], 140.0, |c| c.requests.push(Request::Close));
             });
         });
         if let Some(id) = dragging {
@@ -366,16 +365,9 @@ impl Screen for ShaderPacks {
                     }
                 },
             );
-            label(
-                ui,
-                cx,
-                "packs.shaders_note",
-                &[Arg::Text("world.wgsl, entity.wgsl, model.wgsl, particle.wgsl, weather.wgsl, sky.wgsl, post.wgsl".into())],
-                "dim",
-            );
             ui.container(Style::row().gap(6.0).justify(Justify::Center), |ui| {
                 button(ui, cx, "packs.open_folder", &[], 140.0, move |_| open_folder(&dir));
-                button(ui, cx, "menu.done", &[], 140.0, |c| c.requests.push(Request::Close));
+                back_button(ui, cx, "menu.done", &[], 140.0, |c| c.requests.push(Request::Close));
             });
         });
     }

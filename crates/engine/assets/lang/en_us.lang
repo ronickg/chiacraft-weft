@@ -315,7 +315,6 @@ packs.all_selected = Everything is selected.
 packs.missing = Folder not found
 packs.open_folder = Open Folder
 packs.shaders_off = Off (built-in shaders)
-packs.shaders_note = A pack replaces any of {0}.
 key.core.perspective = Toggle perspective
 key.core.fullscreen = Toggle fullscreen
 key.core.player_list = List players

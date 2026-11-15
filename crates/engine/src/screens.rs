@@ -83,11 +83,6 @@ pub trait Screen: std::any::Any {
     fn escape_closes(&self) -> bool {
         true
     }
-    /// It puts its X (`close_button`) in a place of its own; others get one in the window's
-    /// corner.
-    fn draws_close(&self) -> bool {
-        false
-    }
     fn closes_on_respawn(&self) -> bool {
         false
     }
@@ -258,7 +253,7 @@ impl Screen for Profile {
                         config_rows(ui, cx, "core:profile", &["core:skin_model", "core:first_person_model", "core:show_avatars"]);
                     });
                     ui.container(Style::row().justify(Justify::End), |ui| {
-                        button(ui, cx, "menu.done", &[], 80.0, |c| c.requests.push(Request::Close));
+                        back_button(ui, cx, "menu.done", &[], 80.0, |c| c.requests.push(Request::Close));
                     });
                 },
             );
@@ -349,15 +344,23 @@ pub fn button(ui: &mut Ui, cx: &BuildCx, key: &str, args: &[Arg], width: f32, ac
     })
 }
 
+/// A Back, Done or Cancel button that replaces the automatic close icon.
+pub fn back_button(ui: &mut Ui, cx: &BuildCx, key: &str, args: &[Arg], width: f32, action: impl Fn(&mut Ctx) + 'static) -> NodeId {
+    ui.has_close = true;
+    button(ui, cx, key, args, width, action)
+}
+
 /// The X that closes a screen as Escape does, its picture `side` GUI pixels.
 pub fn close_button(ui: &mut Ui, side: f32) {
+    ui.has_close = true;
     let style = Style::default()
         .size(side + 2.0, side + 2.0)
         .pad(1.0)
         .center();
-    ui.button("button", style, Rc::new(|c: &mut Ctx| c.requests.push(Request::Close)), |ui| {
+    let b = ui.button("button", style, Rc::new(|c: &mut Ctx| c.requests.push(Request::Close)), |ui| {
         ui.add(Kind::Image { texture: "core:gui/close".into(), color: 0xFFFFFFFF }, Style::default().size(side, side));
     });
+    ui.set_id(b, "screen_close");
 }
 
 /// A menu button with an icon (class `icon`, 9x9 like a glyph and its shadow) at its left edge;
@@ -510,10 +513,9 @@ impl Screen for Pause {
 
     fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
         frame(ui, cx, "menu.paused", |ui| {
-            button(ui, cx, "menu.resume", &[], 200.0, |c| c.requests.push(Request::Close));
+            back_button(ui, cx, "menu.resume", &[], 200.0, |c| c.requests.push(Request::Close));
             button(ui, cx, "menu.multiplayer", &[], 200.0, |c| open(c, "core:multiplayer"));
             button(ui, cx, "menu.settings", &[], 200.0, |c| open(c, "core:settings"));
-            button(ui, cx, "menu.editor", &[], 200.0, |c| open(c, "core:editor"));
             parts(ui, cx, "core:pause", "buttons");
             button(ui, cx, "menu.save_quit", &[], 200.0, |c| c.requests.push(Request::LeaveWorld));
         });
@@ -567,7 +569,7 @@ impl Screen for ModSettings {
                         .push(Request::Open(Box::new(ConfigScreen { shown: Shown::Mod(ns.clone()) })))
                 });
             }
-            button(ui, cx, "menu.done", &[], 200.0, |c| c.requests.push(Request::Close));
+            back_button(ui, cx, "menu.done", &[], 200.0, |c| c.requests.push(Request::Close));
         });
     }
 }
@@ -853,7 +855,7 @@ impl Screen for ConfigScreen {
                 },
             );
             ui.set_id(list, "config");
-            button(ui, cx, "menu.done", &[], 200.0, |c| c.requests.push(Request::Close));
+            back_button(ui, cx, "menu.done", &[], 200.0, |c| c.requests.push(Request::Close));
         });
     }
 }
@@ -902,7 +904,7 @@ impl Screen for LanguageScreen {
                     }
                 }
             });
-            button(ui, cx, "menu.done", &[], 200.0, |c| c.requests.push(Request::Close));
+            back_button(ui, cx, "menu.done", &[], 200.0, |c| c.requests.push(Request::Close));
         });
     }
 }
@@ -1088,7 +1090,7 @@ impl Screen for Controls {
                             .push(Request::Screen("core:touch_buttons".into()))
                     });
                 }
-                button(ui, cx, "menu.done", &[], 120.0, |c| c.requests.push(Request::Close));
+                back_button(ui, cx, "menu.done", &[], 120.0, |c| c.requests.push(Request::Close));
             });
         });
     }
@@ -1165,7 +1167,7 @@ impl Screen for Message {
         ui.panel(if cx.in_game { "overlay" } else { "background" }, Style::default().grow().center().pad(12.0).gap(10.0), |ui| {
             label(ui, cx, &title, &args, "title");
             let in_game = cx.in_game;
-            button(ui, cx, "menu.back", &[], 200.0, move |c| {
+            back_button(ui, cx, "menu.back", &[], 200.0, move |c| {
                 c.requests.push(Request::Close);
                 if !in_game {
                     open(c, "core:title");

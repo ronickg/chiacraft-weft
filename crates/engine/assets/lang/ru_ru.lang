@@ -311,7 +311,6 @@ packs.all_selected = Все паки включены.
 packs.missing = Папка не найдена
 packs.open_folder = Открыть папку
 packs.shaders_off = Выкл. (встроенные шейдеры)
-packs.shaders_note = Пак заменяет любые из {0}.
 key.core.perspective = Сменить вид
 key.core.fullscreen = Полный экран
 key.core.player_list = Список игроков

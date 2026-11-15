@@ -366,6 +366,8 @@ impl Scrollbar {
 
 pub struct Ui {
     pub nodes: Vec<Node>,
+    /// The screen supplies a Back/Done button or a close icon of its own.
+    pub has_close: bool,
     stack: Vec<NodeId>,
     pub hovered: Option<NodeId>,
     pub pressed: Option<NodeId>,
@@ -542,6 +544,7 @@ impl Ui {
         };
         Ui {
             nodes: vec![root],
+            has_close: false,
             stack: vec![0],
             hovered: None,
             pressed: None,

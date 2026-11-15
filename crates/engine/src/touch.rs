@@ -489,7 +489,7 @@ impl crate::screens::Screen for TouchButtons {
     }
 
     fn build(&mut self, ui: &mut crate::ui::Ui, cx: &crate::screens::BuildCx) {
-        use crate::screens::{button, frame};
+        use crate::screens::{back_button, button, frame};
         use crate::ui::{Align, Style, text};
         let choosing = self.choosing;
         let row = |ui: &mut crate::ui::Ui, action: &str| {
@@ -555,11 +555,11 @@ impl crate::screens::Screen for TouchButtons {
             );
             ui.container(Style::row().gap(6.0), |ui| {
                 if choosing {
-                    button(ui, cx, "menu.back", &[], 120.0, |c| Self::choose(c, false));
+                    back_button(ui, cx, "menu.back", &[], 120.0, |c| Self::choose(c, false));
                 } else {
                     button(ui, cx, "touch.add_button", &[], 120.0, |c| Self::choose(c, true));
                     button(ui, cx, "controls.reset", &[], 120.0, |c| Self::change(c, |all| *all = defaults()));
-                    button(ui, cx, "menu.done", &[], 120.0, |c| c.requests.push(crate::app::Request::Close));
+                    back_button(ui, cx, "menu.done", &[], 120.0, |c| c.requests.push(crate::app::Request::Close));
                 }
             });
         });

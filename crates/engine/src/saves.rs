@@ -17,7 +17,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::app::{Ctx, Request};
 use crate::content::{AIR, Content};
-use crate::screens::{BuildCx, Screen, bound_button, button, frame, label, on_off};
+use crate::screens::{BuildCx, Screen, back_button, bound_button, button, frame, label, on_off};
 use crate::ui::text::{self, Arg};
 use crate::ui::{Kind, Style, Ui};
 use crate::world::Cube;
@@ -645,7 +645,7 @@ impl Screen for ConfirmDelete {
                     }
                     c.requests.push(Request::Close);
                 });
-                button(ui, cx, "menu.cancel", &[], 145.0, |c| c.requests.push(Request::Close));
+                back_button(ui, cx, "menu.cancel", &[], 145.0, |c| c.requests.push(Request::Close));
             });
         });
     }
@@ -676,7 +676,7 @@ impl Screen for MissingMods {
                     c.requests.push(Request::StartWorldAnyway(world.clone()))
                 });
                 ui.set_id(go, "continue");
-                button(ui, cx, "menu.cancel", &[], 145.0, |c| c.requests.push(Request::Close));
+                back_button(ui, cx, "menu.cancel", &[], 145.0, |c| c.requests.push(Request::Close));
             });
         });
     }
@@ -753,7 +753,7 @@ impl Screen for WorldSelect {
                 let open = button(ui, cx, "world.folder", &[], 156.0, move |_| crate::packs::open_folder(&dir));
                 ui.set_id(open, "saves_folder");
                 ui.add(Kind::Container { class: None }, Style::default().h(6.0));
-                button(ui, cx, "menu.back", &[], 156.0, |c| c.requests.push(Request::Close));
+                back_button(ui, cx, "menu.back", &[], 156.0, |c| c.requests.push(Request::Close));
             });
             // As many pictures to a row as fit.
             let free = cx.size.x - 180.0 - 2.0 * 12.0;
@@ -971,7 +971,7 @@ impl Screen for CreateWorld {
                     meta.save();
                     c.requests.push(Request::StartWorldAnyway(meta));
                 });
-                button(ui, cx, "menu.cancel", &[], 120.0, |c| c.requests.push(Request::Close));
+                back_button(ui, cx, "menu.cancel", &[], 120.0, |c| c.requests.push(Request::Close));
             });
         });
     }

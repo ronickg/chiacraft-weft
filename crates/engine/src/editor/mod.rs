@@ -370,10 +370,6 @@ impl Screen for Editor {
         true
     }
 
-    fn draws_close(&self) -> bool {
-        true
-    }
-
     fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
         let Some(c) = crate::content::try_content() else { return };
         let s = self.s.clone();

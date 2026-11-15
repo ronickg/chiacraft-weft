@@ -650,11 +650,10 @@ impl Running {
         self.set_capture(false);
     }
 
-    /// A screen's tree, and over it an X closing it as Escape would (`escape`): there is no Escape
-    /// on a phone, and on a computer it is one more way.
+    /// A screen's tree, with a fallback close icon when it has no control to leave it.
     fn build_screen(&self, s: &mut dyn Screen, ui: &mut Ui, depth: usize) {
         s.build(ui, &self.build_cx());
-        if s.escape_closes() && !s.draws_close() && (depth > 1 || self.game.is_some()) {
+        if s.escape_closes() && !ui.has_close && (depth > 1 || self.game.is_some()) {
             ui.container(Style::default().at_from([1.0, 0.0], -4.0, 4.0, [1.0, 0.0]), |ui| screens::close_button(ui, 16.0));
         }
     }

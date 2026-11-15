@@ -277,10 +277,6 @@ impl Screen for DisabledMods {
         "core:disabled_mods"
     }
 
-    fn draws_close(&self) -> bool {
-        true
-    }
-
     fn overlays(&self) -> bool {
         true
     }
@@ -309,7 +305,7 @@ impl Screen for DisabledMods {
                             c.requests.push(Request::Close);
                             c.requests.push(Request::Screen("core:mods".into()));
                         });
-                        crate::screens::button(ui, cx, "menu.done", &[], 120.0, |c| c.requests.push(Request::Close));
+                        crate::screens::back_button(ui, cx, "menu.done", &[], 120.0, |c| c.requests.push(Request::Close));
                     });
                 },
             );
@@ -362,7 +358,7 @@ impl Screen for InstallMods {
                     label(ui, cx, "mods.failed", &[Arg::Text(e.clone())], "warning");
                 }
             }
-            crate::screens::button(ui, cx, "menu.cancel", &[], 120.0, |c| c.requests.push(Request::Close));
+            crate::screens::back_button(ui, cx, "menu.cancel", &[], 120.0, |c| c.requests.push(Request::Close));
         });
     }
 }
@@ -409,10 +405,6 @@ fn short(name: &[Span], most: usize) -> (Vec<Span>, bool) {
 impl Screen for ModsScreen {
     fn name(&self) -> &str {
         "core:mods"
-    }
-
-    fn draws_close(&self) -> bool {
-        true
     }
 
     /// Built again when the background work moves on.

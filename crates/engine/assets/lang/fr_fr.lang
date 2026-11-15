@@ -309,7 +309,6 @@ packs.all_selected = Tout est sélectionner.
 packs.missing = Dossier manquant
 packs.open_folder = Ouvrir le dossier
 packs.shaders_off = Aucun (shaders implémenté)
-packs.shaders_note = Un pack remplace tout de {0}.
 key.core.perspective = Perspective (basculable)
 key.core.fullscreen = Fullscreen (basculable)
 key.core.player_list = Lister les joueur.eus.es
