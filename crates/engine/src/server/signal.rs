@@ -1279,7 +1279,7 @@ impl Dim {
 
     /// A change of a gate's look that nothing around it needs to hear: no lighting, no neighbors.
     fn set_signal_state(&mut self, c: &'static Content, p: IVec3, old: u32, new: u32) {
-        if c.states[old as usize].light != c.states[new as usize].light {
+        if !self.space.extras(p).is_empty() || c.states[old as usize].light != c.states[new as usize].light {
             self.set(c, p, new);
             return;
         }
