@@ -1455,7 +1455,7 @@ impl Models {
                 .filter(|(i, _)| m.worn_on[*i].is_none())
             {
                 // In the bone's pixels the ray goes by the same steps: its own length stays the world's.
-                let back = self.bone(first as usize + i).inverse();
+                let Some(back) = self.bone_inverse(first as usize + i) else { continue };
                 let o = back
                     .transform_point3((from - self.located_from).as_vec3())
                     .as_dvec3();
@@ -1490,7 +1490,7 @@ impl Models {
     /// `kind` last frame, in its pixels.
     pub fn to_bone(&self, entity: u64, kind: u32, part: usize, p: glam::DVec3, d: glam::DVec3) -> Option<(Vec3, Vec3)> {
         let &(.., first) = self.located.iter().find(|l| l.0 == entity && l.1 == kind)?;
-        let back = self.bone(first as usize + part).inverse();
+        let back = self.bone_inverse(first as usize + part)?;
         Some((back.transform_point3((p - self.located_from).as_vec3()), back.transform_vector3(d.as_vec3())))
     }
 
@@ -1585,6 +1585,17 @@ impl Models {
     pub fn bone(&self, at: usize) -> Mat4 {
         let [a, b, c] = self.rows[at];
         Mat4::from_cols_array_2d(&[a, b, c, [0.0, 0.0, 0.0, 1.0]]).transpose()
+    }
+
+    fn bone_inverse(&self, at: usize) -> Option<Mat4> {
+        let bone = self.bone(at);
+        let det = bone.determinant();
+        // Clips can hide geometry by scaling a bone to zero.
+        if det == 0.0 || !det.is_finite() {
+            return None;
+        }
+        let inverse = bone.inverse();
+        inverse.is_finite().then_some(inverse)
     }
 
     /// The clips of model `to` that go with what plays on `holder` for the hand it is in, by
