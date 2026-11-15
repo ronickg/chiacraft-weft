@@ -9,3 +9,8 @@ A camera mode is a value like any other: where the camera is, what goes with it 
 Custom shots receive a `CameraFrame`. `a.keys()` reads the camera's actions, including
 `keys.state(&ACTION).amount` for wheel input. Input is borrowed for the callback only;
 `a.out` starts with the previous frame's pose, so it can also hold a smoothed FOV.
+
+`r.camera_frame(|a| ..)` modifies the active mode's computed pose before collision and
+transitions. These callbacks run in mod order for every built-in and custom camera. Their
+FOV changes apply to the current frame without feeding back into the shot's previous multiplier.
+Base uses this for hold-to-zoom across all camera modes.

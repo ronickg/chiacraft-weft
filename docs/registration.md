@@ -555,7 +555,7 @@ r.edit(&base_api::tabs::FOOD).set_text(&comps::creative_tab::ICON, "base:bread")
 ```
 
 ## Sound and entity category
-A sound category has its own volume slider: `r.sound_category(&C, world)`, tag `abi::comp::SOUND_CATEGORY_WORLD` (heard like block sounds). An entity category caps spawning: `r.entity_category(&C, cap, despawn)` with `.cap_radius`; `comps::entity_category`: `CAP` (`u32`, 0), `DESPAWN` (`f32`, never), `CAP_RADIUS` (`f32`, 64).
+A sound category has its own volume slider, registered with `r.sound_category(&C)`. All categories use the listener's environment acoustics. An entity category caps spawning: `r.entity_category(&C, cap, despawn)` with `.cap_radius`; `comps::entity_category`: `CAP` (`u32`, 0), `DESPAWN` (`f32`, never), `CAP_RADIUS` (`f32`, 64).
 
 ```rust
 r.edit(&entity_categories::HOSTILE).set(&comps::entity_category::CAP, 12);

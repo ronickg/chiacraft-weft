@@ -488,7 +488,7 @@ pub struct SoundBuilder<'a> {
 crate::entry::entry_builder!(
     Sound => SoundBuilder, sound;
     Music => MusicBuilder, music;
-    SoundCategory => SoundCategoryBuilder, sound_category_entry;
+    SoundCategory => SoundCategoryBuilder, sound_category;
 );
 
 impl SoundBuilder<'_> {
@@ -572,13 +572,8 @@ impl Registry {
     }
 
     /// A sound category with its own volume setting (`<ns>:volume_<name>`, in the mod's
-    /// settings); `world`: heard through caves and water like block sounds.
-    pub fn sound_category(&mut self, category: &'static SoundCategory, world: bool) -> SoundCategoryBuilder<'_> {
-        let b = self.sound_category_entry(category);
-        if world { b.tag(abi::comp::SOUND_CATEGORY_WORLD) } else { b }
-    }
-
-    fn sound_category_entry(&mut self, category: &'static SoundCategory) -> SoundCategoryBuilder<'_> {
+    /// settings). All categories use the listener's environment acoustics.
+    pub fn sound_category(&mut self, category: &'static SoundCategory) -> SoundCategoryBuilder<'_> {
         SoundCategoryBuilder { reg: self, e: crate::entry::Entry::of(category) }
     }
 

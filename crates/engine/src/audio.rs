@@ -1,6 +1,6 @@
 //! Sound: events (`registry::SoundDef`) play one of their files, positioned in the world or not;
-//! every category has its own volume (`core:volume_*` settings). World sounds go through one
-//! track whose low-pass filter muffles them under water and whose send feeds a reverb in caves.
+//! every category has its own volume (`core:volume_*` settings). All categories share one
+//! environment track with low-pass filtering, volume gain and a reverb send.
 //! Music streams on its own track after quiet stretches. Without an audio device everything
 //! here does nothing.
 
@@ -35,6 +35,12 @@ pub struct Acoustics {
     pub volume: f32,
 }
 
+impl Default for Acoustics {
+    fn default() -> Self {
+        Self { cutoff: 20_000.0, reverb: 0.0, volume: 1.0 }
+    }
+}
+
 /// Where the listener is, for positions and the environment.
 pub struct Listener {
     pub pos: DVec3,
@@ -50,7 +56,7 @@ pub struct Audio {
     mgr: AudioManager<DefaultBackend>,
     listener: kira::listener::ListenerHandle,
     reverb: SendTrackHandle,
-    world: TrackHandle,
+    environment: TrackHandle,
     lowpass: FilterHandle,
     /// Per category (`sound_category`): its track.
     groups: Vec<TrackHandle>,
@@ -102,30 +108,31 @@ impl Audio {
                         .feedback(0.85),
                 ),
             )?;
-            let mut wb = TrackBuilder::new()
-                .sub_track_capacity(64)
+            let mut track = TrackBuilder::new()
+                .sub_track_capacity(content().game.sound_categories.len())
                 .with_send(&reverb, Decibels::SILENCE);
-            let lowpass = wb.add_effect(FilterBuilder::new().cutoff(20_000.0));
-            let mut world = mgr.add_sub_track(wb)?;
+            let acoustics = Acoustics::default();
+            let lowpass = track.add_effect(FilterBuilder::new().cutoff(acoustics.cutoff as f64));
+            let mut environment = mgr.add_sub_track(track)?;
             let mut groups = Vec::new();
-            for k in &crate::content::content().game.sound_categories {
+            for _ in &crate::content::content().game.sound_categories {
                 let b = TrackBuilder::new()
                     .sub_track_capacity(256)
                     .sound_capacity(256);
-                groups.push(if k.world { world.add_sub_track(b)? } else { mgr.add_sub_track(b)? });
+                groups.push(environment.add_sub_track(b)?);
             }
             Ok(Audio {
                 mgr,
                 listener,
                 reverb,
-                world,
+                environment,
                 lowpass,
                 groups,
                 files: FxHashMap::default(),
                 globs: FxHashMap::default(),
                 music: None,
                 next_music: Instant::now() + Duration::from_secs(20),
-                state: Acoustics { cutoff: 20_000.0, reverb: 0.0, volume: 1.0 },
+                state: acoustics,
                 volumes: Vec::new(),
                 rng: weft_noise::Rng(0x2545_F491_4F6C_DD1D),
                 played: 0,
@@ -202,6 +209,19 @@ impl Audio {
                 .set_volume(db(*volumes.last().unwrap()), Tween::default());
             self.volumes = volumes;
         }
+        let acoustics = l.map_or_else(Acoustics::default, |l| l.acoustics);
+        if acoustics != self.state {
+            self.state = acoustics;
+            self.lowpass.set_cutoff(acoustics.cutoff as f64, QUICK);
+            self.environment
+                .set_volume(db(acoustics.volume as f64), QUICK);
+            if let Err(e) = self
+                .environment
+                .set_send(&self.reverb, db(acoustics.reverb as f64), QUICK)
+            {
+                log::debug!("environment reverb: {e:?}");
+            }
+        }
         let Some(l) = l else {
             if let Some(m) = &mut self.music {
                 m.stop(Tween { duration: Duration::from_secs(2), ..Default::default() });
@@ -213,17 +233,6 @@ impl Audio {
         self.listener
             .set_position(l.pos.as_vec3(), Tween::default());
         self.listener.set_orientation(orientation, Tween::default());
-        if l.acoustics != self.state {
-            self.state = l.acoustics;
-            self.lowpass.set_cutoff(l.acoustics.cutoff as f64, QUICK);
-            self.world.set_volume(db(l.acoustics.volume as f64), QUICK);
-            if let Err(e) = self
-                .world
-                .set_send(&self.reverb, db(l.acoustics.reverb as f64), QUICK)
-            {
-                log::debug!("environment reverb: {e:?}");
-            }
-        }
         self.music(assets, l);
     }
 

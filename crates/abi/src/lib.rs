@@ -836,7 +836,6 @@ pub mod comp {
     /// 0xRRGGBB where the biome sets none and on items, white); a key's `DEFAULT` (`str`, the
     /// key by its settings name, `KeyJ`, `mouse3`).
     pub const CREATIVE_TAB_ICON: &str = "creative_tab.icon";
-    pub const SOUND_CATEGORY_WORLD: &str = "sound_category.world";
     pub const TINT_KIND_DEFAULT: &str = "tint_kind.default";
     pub const KEY_DEFAULT: &str = "key.default";
     /// Attribute modifiers (`[Modifier]`) of a game mode, an item, a pose, an entity kind or
@@ -2838,7 +2837,7 @@ pub struct CameraPose {
 
 defaults!(CameraPose { pos: Vec3 { x: 0.0, y: 0.0, z: 0.0 }, yaw: 0.0, pitch: 0.0, roll: 0.0, fov: 1.0 });
 
-/// A camera mode's frame (`comp::camera::CALL`), on the client.
+/// A camera mode or global camera modifier frame, on the client.
 #[repr(C)]
 pub struct CameraArgs {
     /// The keys, and the look: the camera's own, turned by the mouse, when it's
@@ -2861,7 +2860,7 @@ pub struct CameraArgs {
     pub first: u32,
     /// Where a `comp::camera::CLIP` camera is pulled in towards; the eyes unless changed.
     pub anchor: Vec3,
-    /// Comes in as last frame's, to be changed.
+    /// Previous mode pose for a shot, current computed pose for a global modifier.
     pub out: CameraPose,
 }
 
@@ -4208,6 +4207,7 @@ pub struct Host {
     // ------------------------------------------------ client side and mod channels
     /// `ClientFrameArgs`, every frame on the client before input is handled; may drive the client.
     pub reg_client_frame: unsafe extern "C" fn(reg: *mut Registrar, cb: Callback),
+    pub reg_camera_frame: unsafe extern "C" fn(reg: *mut Registrar, cb: Callback),
     /// Moves a bone of what `entity` is or has on, for the next frame: radians about x, y, z, pixels, scale.
     pub client_pose_bone:
         unsafe extern "C" fn(c: *mut ClientCtx, entity: u64, bone: Str, turn: *const [f32; 3], by: *const [f32; 3], scale: *const [f32; 3]),

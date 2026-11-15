@@ -424,6 +424,8 @@ pub struct Game {
     pub energy: u32,
     /// `Host::reg_client_frame`, in mod order.
     pub client_frames: Vec<(ModId, Callback)>,
+    /// Camera modifiers after the active mode, in mod order.
+    pub camera_frames: Vec<(ModId, Callback)>,
     /// (model, bone, how it moves), from `entry_kind::BONE_MOTION`.
     pub bone_motions: Vec<(String, String, crate::model::BoneMotion)>,
     /// Who says which model a stack of an item shows as (`comp::item::CONDITION`).
@@ -712,7 +714,7 @@ fn engine_components() -> Vec<RawEntry> {
         (abi::comp::NAME, "bytes", cf::SAVE | cf::CARRIED, Vec::new()),
         (abi::comp::PERSISTENT, "bytes", cf::SAVE, Vec::new()),
         (HEALTH, health_schema.as_str(), own, crate::net::HealthField::default().to_bytes()),
-        (BURNING, "u8", shown, vec![0]),
+        (BURNING, "u8", own, vec![0]),
         (abi::comp::LIGHT, "[u8;3]", own, vec![0; 3]),
         (SHOWN, "bytes", shown, Vec::new()),
         (GROUND, "bytes", shown, Vec::new()),
@@ -798,6 +800,7 @@ pub struct RawGame {
     pub client_commands: Vec<(ModId, String, String, Callback)>,
     pub command_extensions: Vec<(ModId, CommandExtension)>,
     pub client_frames: Vec<(ModId, Callback)>,
+    pub camera_frames: Vec<(ModId, Callback)>,
     /// (owner, name, side, callback).
     /// (owner, channel, schema, side, callback).
     pub packets: Vec<(ModId, String, String, u32, Callback)>,
@@ -942,20 +945,19 @@ impl PlayerLayout {
     }
 }
 
-/// A sound category: its volume setting and whether caves and water change it.
+/// A sound category and its volume setting.
 #[derive(Clone, Debug)]
 pub struct SoundCategory {
     pub name: String,
     /// `<ns>:volume_<name>`, none for `core:ui`.
     pub setting: Option<String>,
-    pub world: bool,
 }
 
 impl SoundCategory {
-    pub fn new(name: &str, world: bool) -> SoundCategory {
+    pub fn new(name: &str) -> SoundCategory {
         let (ns, short) = name.split_once(':').unwrap_or(("core", name));
         let setting = (name != "core:ui").then(|| format!("{ns}:volume_{short}"));
-        SoundCategory { name: name.to_string(), setting, world }
+        SoundCategory { name: name.to_string(), setting }
     }
 }
 
@@ -963,10 +965,7 @@ impl SoundCategory {
 fn engine_sound_categories() -> Vec<RawEntry> {
     ["music", "blocks", "creatures", "players", "ambient", "ui"]
         .iter()
-        .map(|n| {
-            let e = RawEntry::engine(abi::entry_kind::SOUND_CATEGORY, &format!("core:{n}"));
-            if *n == "music" || *n == "ui" { e } else { e.tag(abi::comp::SOUND_CATEGORY_WORLD) }
-        })
+        .map(|n| RawEntry::engine(abi::entry_kind::SOUND_CATEGORY, &format!("core:{n}")))
         .collect()
 }
 
@@ -2027,6 +2026,7 @@ pub fn freeze(
         .collect();
     for r in raws {
         g.client_frames.extend(r.client_frames);
+        g.camera_frames.extend(r.camera_frames);
         packets.extend(r.packets);
         event_handlers.extend(r.event_handlers);
         systems.extend(r.systems);
@@ -2041,6 +2041,7 @@ pub fn freeze(
     g.moving_kind = tables.1.ids(ek::ENTITY)[MOVING];
     g.platform_kind = tables.1.ids(ek::ENTITY)[PLATFORM];
     g.client_frames.sort_by_key(|h| order(h.0));
+    g.camera_frames.sort_by_key(|h| order(h.0));
     let configs = take_kind(&mut entries, ek::CONFIG);
     let mut kind = |kind: u32| {
         let mut all = engine_entries(kind);
@@ -2090,9 +2091,8 @@ pub fn freeze(
     for (i, r) in recipes.iter_mut().enumerate() {
         r.entry = i as u32;
     }
-    (g.sound_categories, _) = tables.bake(kind(ek::SOUND_CATEGORY), ek::SOUND_CATEGORY, mod_name, errors, |e, _| {
-        SoundCategory::new(&e.name, e.has(abi::comp::SOUND_CATEGORY_WORLD))
-    });
+    (g.sound_categories, _) =
+        tables.bake(kind(ek::SOUND_CATEGORY), ek::SOUND_CATEGORY, mod_name, errors, |e, _| SoundCategory::new(&e.name));
     let (sounds, sound_names) = tables.bake_by(
         kind(ek::SOUND),
         ek::SOUND,

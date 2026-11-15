@@ -222,6 +222,17 @@ pub struct CameraBuilder<'a> {
 crate::entry::entry_builder!(CameraMode => CameraBuilder, camera;);
 
 impl Registry {
+    /// Modifies every camera mode after its shot, in mod order, before collision and transitions.
+    /// `a.out` contains the computed pose. FOV edits do not feed back into the shot's
+    /// previous multiplier. Use this for effects shared by built-in and custom cameras.
+    pub fn camera_frame(&mut self, f: impl Fn(&mut CameraFrame<'_>) + Send + Sync + 'static) {
+        let cb = callback(move |a: &mut CameraArgs| {
+            let keys = crate::client::Keys::of(a.keys, a.yaw, a.pitch);
+            f(&mut CameraFrame { args: a, keys });
+        });
+        unsafe { (host().reg_camera_frame)(self.raw, cb) }
+    }
+
     /// A camera mode; `r.edit(&cameras::FRONT)` changes one already there (the engine's,
     /// another mod's): flags added and taken away, its shot, key and change replaced.
     pub fn camera(&mut self, mode: &'static CameraMode) -> CameraBuilder<'_> {

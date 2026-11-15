@@ -107,7 +107,7 @@ impl Environment {
             .push(EnvironmentWeight { name: object.name().to_string(), weight: opacity });
         self
     }
-    /// World low-pass cutoff in Hz, linear reverb send and linear volume gain.
+    /// Low-pass cutoff in Hz, linear reverb send and linear volume gain for all sound categories.
     pub fn acoustics(mut self, cutoff_hz: f32, reverb: f32, volume: f32) -> Self {
         self.values.lowpass = cutoff_hz;
         self.values.reverb = reverb;

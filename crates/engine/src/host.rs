@@ -118,6 +118,7 @@ pub static HOST: Host = Host {
     gizmo,
     gizmo_text,
     reg_client_frame,
+    reg_camera_frame,
     client_pose_bone: crate::app::api::client_pose_bone,
     client_bone_position: crate::app::api::client_bone_position,
     client_action_current: crate::app::api::client_entity_action,
@@ -2230,6 +2231,13 @@ unsafe extern "C" fn reg_client_frame(r: *mut abi::Registrar, cb: Callback) {
     unsafe {
         let r = reg(r);
         r.game.client_frames.push((r.owner, cb));
+    }
+}
+
+unsafe extern "C" fn reg_camera_frame(r: *mut abi::Registrar, cb: Callback) {
+    unsafe {
+        let r = reg(r);
+        r.game.camera_frames.push((r.owner, cb));
     }
 }
 

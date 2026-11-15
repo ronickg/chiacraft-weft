@@ -220,7 +220,7 @@ fn init(r: &mut Registry) {
     r.system(&BURNER, tick_generators);
     r.system(&WORK, tick_furnaces);
     // Machines' sounds have their own category (and volume setting `testmod:volume_machines`).
-    r.sound_category(&MACHINES, true);
+    r.sound_category(&MACHINES);
     r.sound(&HUM)
         .files(&["test/thump"])
         .category(&MACHINES)

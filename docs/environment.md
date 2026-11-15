@@ -34,6 +34,8 @@ of this same mechanism. Start and end are explicit block distances. Water's low-
 an independent environment contribution; heat never selects an audio filter.
 `EntityEffectBuilder::screen(&SHADER)` is likewise a post-shader preset. Native dimension,
 weather, cave reverb, inside-block and fire appearances all contribute to the same result.
+Acoustics apply to every sound category, including music and UI sounds. Leaving the world
+resets the filter, reverb send and environment volume gain to neutral values.
 
 ## Control from code
 

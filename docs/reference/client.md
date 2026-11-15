@@ -6,11 +6,11 @@ The client side: input, camera, screen text, packets.
 
 `Registry::camera`: registers when dropped.
 
-- <a id="CameraBuilder-shot"></a>`.shot(shot: Shot)`: How it moves, with the tags that takes. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/camera.rs#L234)
-- <a id="CameraBuilder-in_cycle"></a>`.in_cycle()`: One F5 goes through. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/camera.rs#L245)
-- <a id="CameraBuilder-when"></a>`.when(c: impl Into<crate::Cond>)`: Only where this holds for the player, asked on the server, and the server lets it (`actions::CAMERA`): `.when(Cond::attribute(&attribute::CAN_FLY, 1.0, f64::MAX))`. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/camera.rs#L250)
-- <a id="CameraBuilder-key"></a>`.key(key: &'static Key, default: &str)`: A key that turns it on and back off, `default` as `Registry::key` takes it. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/camera.rs#L254)
-- <a id="CameraBuilder-transition"></a>`.transition(secs: f32, easing: u32)`: The change into it takes `secs`, eased by `easing` (`easing::*`). [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/camera.rs#L259)
+- <a id="CameraBuilder-shot"></a>`.shot(shot: Shot)`: How it moves, with the tags that takes. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/camera.rs#L245)
+- <a id="CameraBuilder-in_cycle"></a>`.in_cycle()`: One F5 goes through. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/camera.rs#L256)
+- <a id="CameraBuilder-when"></a>`.when(c: impl Into<crate::Cond>)`: Only where this holds for the player, asked on the server, and the server lets it (`actions::CAMERA`): `.when(Cond::attribute(&attribute::CAN_FLY, 1.0, f64::MAX))`. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/camera.rs#L261)
+- <a id="CameraBuilder-key"></a>`.key(key: &'static Key, default: &str)`: A key that turns it on and back off, `default` as `Registry::key` takes it. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/camera.rs#L265)
+- <a id="CameraBuilder-transition"></a>`.transition(secs: f32, easing: u32)`: The change into it takes `secs`, eased by `easing` (`easing::*`). [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/camera.rs#L270)
 
 ## CameraFrame
 
