@@ -1,4 +1,6 @@
+pub use std::cell::RefCell;
 use std::collections::HashMap;
+pub use std::rc::Rc;
 use std::sync::{LazyLock, RwLock};
 
 use weft_sdk::noise::Rng;
@@ -81,9 +83,28 @@ impl<'a> IntoIterator for &'a TreeKinds {
 }
 pub struct TreePlaceData<'a> {
     pub pos: (i32, i32, i32),
-    pub rng: &'a mut Rng,
-    pub place: &'a mut dyn FnMut(i32, i32, i32, u32, bool),
-    // pub read: &'a mut dyn FnMut(i32, i32, i32) -> u32,
+    pub rng: Rng,
+    pub place: Box<dyn FnMut(i32, i32, i32, u32, bool) + 'a>,
+    pub read: Box<dyn FnMut(i32, i32, i32) -> u32 + 'a>,
+}
+impl<'a> TreePlaceData<'a> {
+    pub fn new(plan: &'a mut Plan) -> TreePlaceData<'a> {
+        let s = Rc::new(RefCell::new(plan));
+        let BlockPos { x, y, z } = s.borrow().pos();
+        let rng = Rng(s.borrow_mut().random());
+        let s_place = Rc::clone(&s);
+        let place = Box::new(move |x: i32, y: i32, z: i32, state: u32, force: bool| {
+            let mut s = s_place.borrow_mut();
+            if force {
+                s.set([x, y, z], state);
+            } else {
+                s.put([x, y, z], state);
+            }
+        });
+        let s_read = Rc::clone(&s);
+        let read = Box::new(move |x: i32, y: i32, z: i32| -> u32 { s_read.borrow().read([x, y, z]) });
+        TreePlaceData { pos: (x, y, z), rng, place, read }
+    }
 }
 pub type TreePlace = fn(&mut TreePlaceData);
 static TREE_DB: LazyLock<RwLock<HashMap<&'static str, TreePlace>>> = LazyLock::new(|| RwLock::new(HashMap::new()));

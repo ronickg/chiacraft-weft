@@ -44,6 +44,42 @@ const DIRECTIONS: [(i32, i32, &str); 4] = [(1, 0, "east"), (-1, 0, "west"), (0, 
 fn random_direction(rng: &mut Rng) -> (i32, i32, &str) {
     DIRECTIONS[rng.next() as usize % 4usize]
 }
+fn place_roots(d: &mut TreePlaceData, log_block: &Block, wood_block: &Block) {
+    let (x, y, z) = d.pos;
+    let mut grow_root = |dx: i32, dz: i32, tall: bool| {
+        let wood = wood_block.with(&[(
+            "facing",
+            match (dx, dz) {
+                (1, 0) => "east",
+                (-1, 0) => "west",
+                (0, 1) => "south",
+                (0, -1) => "north",
+                _ => return,
+            },
+        )]);
+        let x = x + dx;
+        let z = z + dz;
+        if tall {
+            (d.place)(x, y + 1, z, wood, true);
+        }
+        (d.place)(x, y, z, wood, true);
+        (d.place)(x, y - 1, z, log_block.id(), true);
+    };
+    let root_positions = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+    let mut root_count = 0;
+    for dpos in root_positions {
+        if d.rng.float() < 0.666 {
+            grow_root(dpos.0, dpos.1, d.rng.float() < 0.5);
+            root_count += 1;
+        }
+    }
+    if root_count == 0 {
+        let root_pos = root_positions[d.rng.next() as usize % root_positions.len()];
+        grow_root(root_pos.0, root_pos.1, d.rng.float() < 0.5);
+    }
+    (d.place)(x, y - 1, z, log_block.id(), true);
+    (d.place)(x, y - 2, z, DIRT.id(), true);
+}
 fn place_trunk(
     d: &mut TreePlaceData,
     height: u16,
@@ -84,39 +120,7 @@ fn place_trunk(
         }
     }
     if allow_roots {
-        let mut grow_root = |dx: i32, dz: i32, tall: bool| {
-            let wood = wood_block.with(&[(
-                "facing",
-                match (dx, dz) {
-                    (1, 0) => "east",
-                    (-1, 0) => "west",
-                    (0, 1) => "south",
-                    (0, -1) => "north",
-                    _ => return,
-                },
-            )]);
-            let x = x + dx;
-            let z = z + dz;
-            if tall {
-                (d.place)(x, y + 1, z, wood, true);
-            }
-            (d.place)(x, y, z, wood, true);
-            (d.place)(x, y - 1, z, log, true);
-        };
-        let root_positions = [(1, 0), (-1, 0), (0, 1), (0, -1)];
-        let mut root_count = 0;
-        for dpos in root_positions {
-            if d.rng.float() < 0.666 {
-                grow_root(dpos.0, dpos.1, d.rng.float() < 0.5);
-                root_count += 1;
-            }
-        }
-        if root_count == 0 {
-            let root_pos = root_positions[d.rng.next() as usize % root_positions.len()];
-            grow_root(root_pos.0, root_pos.1, d.rng.float() < 0.5);
-        }
-        (d.place)(x, y - 1, z, log, true);
-        (d.place)(x, y - 2, z, DIRT.id(), true);
+        place_roots(d, log_block, wood_block);
     }
 
     TreeSkeleton { height: top - y, top: (x, top, z), bottom: (x, y, z), branch_tips }
@@ -204,16 +208,37 @@ fn decorate_trunk(skeleton: &TreeSkeleton, d: &mut TreePlaceData) {
         if d.rng.float() >= 0.25 {
             continue;
         }
-        let (dx, dz, facing) = random_direction(d.rng);
+        let (dx, dz, facing) = random_direction(&mut d.rng);
         let bx = skeleton.bottom.0 + dx;
         let bz = skeleton.bottom.2 + dz;
         let state = DRYADS_SADDLE_MUSHROOM.with(&[("facing", facing)]);
         (d.place)(bx, y, bz, state, false);
     }
 }
+fn check_stump(data: &mut TreePlaceData) -> bool {
+    data.rng.float() < 0.1
+}
+fn place_stump(d: &mut TreePlaceData, log_block: &Block, wood_block: &Block, allow_roots: bool) {
+    if allow_roots {
+        place_roots(d, log_block, wood_block);
+    }
+    let (x, y, z) = d.pos;
+    (d.place)(x, y, z, log_block.id(), true);
+    (d.place)(x, y + 1, z, log_block.id(), true);
+    if d.rng.float() > 0.5 {
+        (d.place)(x, y + 2, z, log_block.id(), true);
+    }
+}
 fn place_oak(data: &mut TreePlaceData) {
+    static LOG: &Block = &OAK_LOG;
+    static WOOD: &Block = &OAK_WOOD;
+    static ALLOW_ROOTS: bool = true;
+    if check_stump(data) {
+        place_stump(data, LOG, WOOD, ALLOW_ROOTS);
+        return;
+    }
     let height = 6u16 + (data.rng.next() as u16) % 3u16;
-    let skeleton = place_trunk(data, height, &OAK_LOG, &OAK_WOOD, true, true);
+    let skeleton = place_trunk(data, height, LOG, WOOD, true, ALLOW_ROOTS);
     place_foliage(&skeleton, data, height, OAK_LEAVES.id());
     decorate_trunk(&skeleton, data);
 }

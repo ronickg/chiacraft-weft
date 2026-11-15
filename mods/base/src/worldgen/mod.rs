@@ -299,7 +299,6 @@ pub fn register(r: &mut Registry) {
         .density(&TREES)
         .ground("#plant_soil")
         .plan(|s| {
-            let BlockPos { x, y, z } = s.pos();
             let kinds = TREE_KINDS.on_biome(s.biome());
             let mut rng = Rng(s.random());
             // Biomes that ask for trees without naming kinds grow oaks, as they always did.
@@ -310,14 +309,7 @@ pub fn register(r: &mut Registry) {
             let Some(name) = name else { return };
             let Some(place_tree) = tree_place(name) else { return };
 
-            let mut place = |x: i32, y: i32, z: i32, state: u32, force: bool| {
-                if force {
-                    s.set([x, y, z], state);
-                } else {
-                    s.put([x, y, z], state);
-                }
-            };
-            place_tree(&mut TreePlaceData { pos: (x, y, z), rng: &mut rng, place: &mut place });
+            place_tree(&mut TreePlaceData::new(s));
         });
     r.scatter(&BOULDER_SITES)
         .spacing(5)
