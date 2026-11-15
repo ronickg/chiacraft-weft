@@ -159,17 +159,7 @@ pub fn register(r: &mut Registry) {
             .from_right()
             // Green while something drains it (the hunger effect), as vanilla's.
             .look_while("food_hunger", |c| c.attribute(&crate::effects::EXHAUSTION) as f32)
-            // With no saturation left the food shakes, harder when it is nearly gone.
-            .shaking_by(|c| match c.component(&HUNGER) {
-                Some(h) if h.saturation <= 0.0 => {
-                    if h.food <= 6.0 {
-                        2.0
-                    } else {
-                        1.0
-                    }
-                }
-                _ => 0.0,
-            })
+            .shaking_by(|c| if c.component(&HUNGER).is_some_and(|h| h.food <= 0.0) { 2.0 } else { 0.0 })
             .overlay(|c| c.component(&HUNGER).map_or(0.0, |h| h.saturation.ceil()))
             // What the food in hand would fill, fading in and out.
             .preview(1.6, |c| {
