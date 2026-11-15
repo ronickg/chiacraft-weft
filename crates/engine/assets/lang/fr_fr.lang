@@ -77,6 +77,7 @@ config.core.renderer.wgpu = wgpu
 config.core.sensitivity = Sensibilité de la souris
 config.core.invert_y = Inverser l'axe Y
 config.core.touch_controls = Commandes tactiles
+config.core.auto_jump = Saut automatique
 config.core.fullscreen = Plein écran
 config.core.sensitivity.value = {0}%
 settings.on = Oui

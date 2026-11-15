@@ -841,6 +841,8 @@ pub struct Control {
     pub liquid: f64,
     /// Jump speed when it jumps off the ground, 0 = not jumping.
     pub jump: f64,
+    /// Jump speed to use when a reachable ledge stops this step.
+    pub auto_jump: f64,
     /// Added to the velocity with a jump (a sprinting player's leap).
     pub jump_boost: DVec3,
     /// Holds itself up in liquids (a swimming mob, a player holding jump).
@@ -1000,7 +1002,21 @@ pub fn walk(
         }
     }
     let before = *pos;
-    let r = move_box_with(c, block, bodies, skip, *pos, f.half_width, f.height, *vel, if on_ground { f.moves.step } else { 0.0 });
+    let move_by = |delta, step| move_box_with(c, block, bodies, skip, before, f.half_width, f.height, delta, step);
+    let step = if on_ground { f.moves.step } else { 0.0 };
+    let mut r = move_by(*vel, step);
+    if ctl.auto_jump > 0.0 && on_ground && !jumped && !liquid && !climbing && !ctl.careful && (r.hit[0] || r.hit[2]) {
+        let max_rise = jump_rise(ctl.auto_jump, f.gravity);
+        if max_rise > step {
+            let landing = move_by(*vel, max_rise).pos;
+            if landing.y > before.y + step + 1e-6 && (landing - r.pos).dot(ctl.wish) > 1e-6 {
+                vel.y = ctl.auto_jump;
+                *vel += ctl.jump_boost;
+                r = move_by(*vel, 0.0);
+                jumped = true;
+            }
+        }
+    }
     *pos = r.pos;
     for i in 0..3 {
         if r.hit[i] {
@@ -1027,11 +1043,29 @@ pub fn walk(
         }
     } else {
         let slip = if on_ground { slip_at(before.y) } else { 1.0 };
-        vel.y = (vel.y - f.gravity) * 0.98;
+        vel.y = falling_speed(vel.y, f.gravity);
         vel.x *= slip * 0.91;
         vel.z *= slip * 0.91;
     }
     Walked { hit: r.hit, on_ground: r.on_ground, jumped, started_in }
+}
+
+fn falling_speed(speed: f64, gravity: f64) -> f64 {
+    (speed - gravity) * 0.98
+}
+
+/// Limit the ledge probe to a normal jump's reach, even on worlds with unusual gravity.
+fn jump_rise(mut speed: f64, gravity: f64) -> f64 {
+    const MAX_RISE: f64 = 1.25;
+    let mut rise = 0.0;
+    for _ in 0..crate::world::TPS {
+        if speed <= 0.0 || rise >= MAX_RISE {
+            break;
+        }
+        rise += speed;
+        speed = falling_speed(speed, gravity);
+    }
+    rise.min(MAX_RISE)
 }
 
 /// What flying is told: horizontal `wish` (length up to 1), going up or down, and how fast.

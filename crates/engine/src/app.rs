@@ -1826,6 +1826,9 @@ impl ApplicationHandler for App {
     fn resumed(&mut self, el: &ActiveEventLoop) {
         if let Some(r) = &mut self.run {
             r.gpu.set_surface(Some(&*r.window));
+            if let Some(a) = &mut r.audio {
+                a.set_active(self.opts.automated || r.window.has_focus());
+            }
             return;
         }
         match self.start(el) {
@@ -1840,6 +1843,9 @@ impl ApplicationHandler for App {
     /// An Android app sent to the background: its window has no surface until it comes back.
     fn suspended(&mut self, _el: &ActiveEventLoop) {
         if let Some(r) = &mut self.run {
+            if let Some(a) = &mut r.audio {
+                a.set_active(false);
+            }
             r.input.release_all();
             r.touches = Default::default();
             // At once: `pause` waits for a frame to take the world's picture, and none comes now.
@@ -1867,11 +1873,19 @@ impl ApplicationHandler for App {
                 r.rebuild_all();
             }
             // Windows lets go of a confined cursor while another window has the focus.
-            WindowEvent::Focused(true) if !self.opts.automated && r.input.captured && !r.settings.read_only => {
-                r.center_cursor();
-                r.grab_cursor();
+            WindowEvent::Focused(true) if !self.opts.automated => {
+                if let Some(a) = &mut r.audio {
+                    a.set_active(true);
+                }
+                if r.input.captured && !r.settings.read_only {
+                    r.center_cursor();
+                    r.grab_cursor();
+                }
             }
             WindowEvent::Focused(false) if !self.opts.automated => {
+                if let Some(a) = &mut r.audio {
+                    a.set_active(false);
+                }
                 r.input.release_all();
                 r.touches = Default::default();
                 if r.game.is_some() && r.screens.is_empty() {

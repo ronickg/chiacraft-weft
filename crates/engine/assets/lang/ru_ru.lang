@@ -46,6 +46,7 @@ config.core.renderer.wgpu = wgpu
 config.core.sensitivity = Чувствительность мыши
 config.core.invert_y = Инверсия мыши по Y
 config.core.touch_controls = Сенсорное управление
+config.core.auto_jump = Автопрыжок
 config.core.fullscreen = Полноэкранный режим
 config.core.sensitivity.value = {0}%
 settings.on = Вкл

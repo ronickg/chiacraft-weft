@@ -73,6 +73,7 @@ pub struct Audio {
     pub played: u32,
     /// Automated runs (tests, scripts): everything plays and counts, silently.
     pub muted: bool,
+    active: bool,
     /// Each category's volume setting id, then the master volume's, looked up once.
     volume_ids: Option<Vec<Option<u32>>>,
 }
@@ -137,6 +138,7 @@ impl Audio {
                 rng: weft_noise::Rng(0x2545_F491_4F6C_DD1D),
                 played: 0,
                 muted: false,
+                active: true,
                 volume_ids: None,
             })
         })();
@@ -151,6 +153,28 @@ impl Audio {
 
     fn random(&mut self) -> f32 {
         self.rng.float()
+    }
+
+    pub fn set_active(&mut self, active: bool) {
+        if self.active == active {
+            return;
+        }
+        self.active = active;
+        self.apply_master_volume();
+        if let Some(music) = &mut self.music {
+            if active {
+                music.resume(Tween::default());
+            } else {
+                music.pause(Tween::default());
+            }
+        }
+    }
+
+    fn apply_master_volume(&mut self) {
+        let volume = if self.muted || !self.active { 0.0 } else { self.volumes.last().copied().unwrap_or(1.0) };
+        self.mgr
+            .main_track()
+            .set_volume(db(volume), Tween::default());
     }
 
     /// Forgets decoded files, for packs that changed them (F3+T).
@@ -193,21 +217,16 @@ impl Audio {
             ids
         });
         // UI has no setting of its own: full volume.
-        let mut volumes: Vec<f64> = ids
+        let volumes: Vec<f64> = ids
             .iter()
             .map(|id| id.map_or(1.0, |id| crate::config::get(id) / 100.0))
             .collect();
-        if self.muted {
-            *volumes.last_mut().unwrap() = 0.0;
-        }
         if volumes != self.volumes {
             for (g, v) in self.groups.iter_mut().zip(&volumes) {
                 g.set_volume(db(*v), Tween::default());
             }
-            self.mgr
-                .main_track()
-                .set_volume(db(*volumes.last().unwrap()), Tween::default());
             self.volumes = volumes;
+            self.apply_master_volume();
         }
         let acoustics = l.map_or_else(Acoustics::default, |l| l.acoustics);
         if acoustics != self.state {
@@ -233,7 +252,9 @@ impl Audio {
         self.listener
             .set_position(l.pos.as_vec3(), Tween::default());
         self.listener.set_orientation(orientation, Tween::default());
-        self.music(assets, l);
+        if self.active {
+            self.music(assets, l);
+        }
     }
 
     fn music(&mut self, assets: &Assets, l: &Listener) {
@@ -293,6 +314,9 @@ impl Audio {
     }
 
     pub fn play(&mut self, assets: &Assets, p: Play) {
+        if !self.active {
+            return;
+        }
         let c = content();
         let Some(def) = c.game.sounds.get(p.sound as usize) else { return };
         if def.files.is_empty() {

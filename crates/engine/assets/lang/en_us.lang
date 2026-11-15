@@ -83,6 +83,7 @@ config.core.renderer.wgpu = wgpu
 config.core.sensitivity = Mouse sensitivity
 config.core.invert_y = Invert Mouse Y
 config.core.touch_controls = Touch controls
+config.core.auto_jump = Auto-jump
 config.core.fullscreen = Fullscreen
 config.core.sensitivity.value = {0}%
 settings.on = On

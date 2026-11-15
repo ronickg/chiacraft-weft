@@ -137,6 +137,10 @@ pub fn invert_y() -> bool {
 pub fn touch_controls() -> bool {
     number("core:touch_controls") != 0.0
 }
+
+pub fn auto_jump() -> bool {
+    number("core:auto_jump") != 0.0
+}
 pub fn name() -> String {
     config::text(id("core:name"))
 }

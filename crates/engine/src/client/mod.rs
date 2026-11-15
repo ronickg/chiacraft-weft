@@ -3135,16 +3135,19 @@ fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, 
     }
 
     // Walking is the same step mobs take; the player only brings its input.
+    let auto_jump = crate::settings::auto_jump();
     p.jump_cooldown = p.jump_cooldown.saturating_sub(1);
-    if !jump {
+    if !jump && !auto_jump {
         p.jump_cooldown = 0;
     }
+    let jump_speed = if p.jump_cooldown == 0 { physics::JUMP * p.jump_mul } else { 0.0 };
     let ctl = physics::Control {
         wish,
         ground: if sprint { 0.13 } else { 0.1 } * p.speed_mul,
         air: if sprint { 0.026 } else { 0.02 },
         liquid: physics::SWIM * p.moves.swim,
-        jump: if jump && p.jump_cooldown == 0 { physics::JUMP * p.jump_mul } else { 0.0 },
+        jump: if jump { jump_speed } else { 0.0 },
+        auto_jump: if !jump && auto_jump { jump_speed } else { 0.0 },
         jump_boost: if sprint { forward * 0.2 } else { DVec3::ZERO },
         swim: jump,
         careful: sneak,
