@@ -186,6 +186,24 @@ impl World {
     pub fn despawn(&self, id: u64) {
         unsafe { (host().entity_despawn)(self.raw(), id) }
     }
+    fn player_info(&self, entity: u64) -> Option<abi::PlayerInfo> {
+        let mut info = abi::PlayerInfo { name: Str::EMPTY, key: Str::EMPTY };
+        (unsafe { (host().player_info)(self.raw(), entity, &mut info) } != 0).then_some(info)
+    }
+
+    /// The connected player's display name. Several players may share a name.
+    pub fn player_name(&self, entity: u64) -> Option<String> {
+        self.player_info(entity)
+            .map(|info| unsafe { info.name.as_str() }.to_string())
+    }
+
+    /// The player's persistent public identity, shared with player saves and permissions.
+    /// Store it to identify the same player after reconnecting, respawning or restarting a server.
+    pub fn player_key(&self, entity: u64) -> Option<String> {
+        self.player_info(entity)
+            .map(|info| unsafe { info.key.as_str() }.to_string())
+    }
+
     pub fn entity(&self, id: u64) -> Option<EntityState> {
         let mut s = EntityState::default();
         (unsafe { (host().entity_get)(self.raw(), id, &mut s) } != 0).then_some(s)

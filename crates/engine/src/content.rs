@@ -473,6 +473,8 @@ pub struct ItemDef {
     /// Boxes from its model file (`models/item/<name>.json`) in block units, drawn instead of
     /// the icon in hands, on the ground and in slots; empty: none.
     pub model: Vec<ModelBox>,
+    /// Selected model asset, including inferred files with display transforms.
+    pub model_file: Option<String>,
 }
 
 /// A creative inventory tab: translated as `tab.<ns>.<name>`, or the mod's name for the tab a mod
@@ -539,6 +541,11 @@ pub fn equipped<'a>(c: &Content, kind: u32, inventory: &'a [abi::ItemStack]) -> 
         .unwrap_or_default()
 }
 
+/// Whether an item in the main hand needs the occupied second hand.
+pub fn hand_blocked(c: &Content, kind: u32, inventory: &[weft_abi::ItemStack], item: u32) -> bool {
+    item != 0 && !fits_one_hand(c, item) && !in_off_hand(c, kind, inventory).is_empty()
+}
+
 /// What the main hand really holds: an item that needs both hands does nothing while the other
 /// holds something, and shows as an empty hand. It stays in the hotbar.
 pub fn in_main_hand(c: &Content, kind: u32, inventory: &[weft_abi::ItemStack], selected: u32) -> weft_abi::ItemStack {
@@ -547,7 +554,7 @@ pub fn in_main_hand(c: &Content, kind: u32, inventory: &[weft_abi::ItemStack], s
         .copied()
         .filter(|_| selected < c.game.entities[kind as usize].hand_slots)
         .unwrap_or_default();
-    if !main.is_empty() && !fits_one_hand(c, main.item) && !in_off_hand(c, kind, inventory).is_empty() {
+    if hand_blocked(c, kind, inventory, main.item) {
         return weft_abi::ItemStack::EMPTY;
     }
     main
@@ -1102,6 +1109,15 @@ impl Content {
 
     /// The color (`0xRRGGBB`) of tint kind `kind` (`FaceLayer::tint`, 0 none: white) in biome
     /// `biome`, the kind's default without one: the same for the world, a hand and a slot.
+    pub fn item_model_file(&self, item: u32) -> std::borrow::Cow<'_, str> {
+        let item = &self.items[item as usize];
+        if let Some(file) = &item.model_file {
+            return std::borrow::Cow::Borrowed(file);
+        }
+        let (ns, path) = item.name.split_once(':').unwrap_or(("core", &item.name));
+        std::borrow::Cow::Owned(format!("{ns}:item/{path}"))
+    }
+
     pub fn kind_color(&self, kind: u8, biome: Option<u16>) -> u32 {
         let Some(i) = (kind as usize).checked_sub(1) else { return 0xFF_FFFF };
         biome
@@ -2411,8 +2427,11 @@ fn number_items(
         // Its model file: a flat item of another texture, or boxes (faces it leaves to the item
         // show the icon).
         let mut model = Vec::new();
-        match crate::block_model::load(&format!("{ns}:item/{path}"), &read_model) {
+        let selected_model = e.text(it::MODEL_FILE).unwrap_or(&own);
+        let mut model_file = e.text(it::MODEL_FILE).map(str::to_string);
+        match crate::block_model::load(selected_model, &read_model) {
             Ok(Some(m)) => {
+                model_file = Some(selected_model.to_string());
                 if let Some(t) = m.sprite.filter(|t| !t.is_empty()) {
                     icon = textures.id(&t);
                 }
@@ -2437,6 +2456,7 @@ fn number_items(
             order: order[&e.name],
             equip: None,
             model,
+            model_file,
         };
         (def, (e.owner, e.components("item.")), e.callback(it::CONDITION))
     });

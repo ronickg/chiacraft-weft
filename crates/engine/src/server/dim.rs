@@ -179,6 +179,7 @@ pub struct Dim {
     pub entities: Entities,
     pub events: Vec<DimEvent>,
     pub(super) next_id: Arc<AtomicU64>,
+    pub player_identities: super::PlayerIdentities,
     /// Cubes whose sky light is final: open sky above, or the cube above is settled. Only these
     /// are sent, so clients never see light being filled in afterwards.
     pub settled: FxHashSet<IVec3>,
@@ -497,7 +498,7 @@ impl Dim {
         }
     }
 
-    pub fn new(id: u32, seed: u64, next_id: Arc<AtomicU64>) -> Dim {
+    pub fn new(id: u32, seed: u64, next_id: Arc<AtomicU64>, player_identities: super::PlayerIdentities) -> Dim {
         Dim {
             id,
             seed,
@@ -516,6 +517,7 @@ impl Dim {
             entities: Entities::default(),
             events: Vec::new(),
             next_id,
+            player_identities,
             settled: FxHashSet::default(),
             settled_gen: 0,
             newly_settled: Vec::new(),

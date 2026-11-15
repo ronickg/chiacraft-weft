@@ -9,6 +9,7 @@
 extern crate alloc;
 
 pub mod data;
+pub mod editor;
 pub mod environment;
 
 use core::ffi::c_void;
@@ -16,7 +17,7 @@ use core::sync::atomic::AtomicU32;
 
 /// FNV-1a of this file: any change to it (layouts included) makes mods built before it refuse
 /// to load instead of reading the wrong memory.
-pub const ABI_VERSION: u64 = fnv(concat!(include_str!("lib.rs"), include_str!("data.rs")).as_bytes());
+pub const ABI_VERSION: u64 = fnv(concat!(include_str!("lib.rs"), include_str!("data.rs"), include_str!("editor.rs")).as_bytes());
 /// Symbol every mod library exports: `extern "C" fn() -> *const ModDecl`.
 pub const ENTRY_SYMBOL: &[u8] = b"weft_mod\0";
 
@@ -173,6 +174,14 @@ impl core::ops::Mul<f64> for Vec3 {
     fn mul(self, k: f64) -> Vec3 {
         Vec3 { x: self.x * k, y: self.y * k, z: self.z * k }
     }
+}
+
+/// Identity strings borrowed for the current host call.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct PlayerInfo {
+    pub name: Str,
+    pub key: Str,
 }
 
 #[repr(C)]
@@ -580,6 +589,8 @@ pub struct ItemInfo {
 /// (`*` any text) and states `name[prop=value]` apart by spaces, `!` before one to leave what it
 /// names out; only `!` ones: anything but those.
 pub mod comp {
+    /// RECORD metadata for a mod-defined builder method in the content editor.
+    pub const EDITOR_METHOD: &str = "core:editor_method";
     /// A damage cause's: tags `BYPASSES_ARMOR`, `PIERCES_INVULNERABLE` (outside survival too),
     /// `IGNORES_COOLDOWN`, `BURNING` (cooked drops), `NO_KNOCKBACK`, `SILENT`; `DEATH_MESSAGE` and
     /// `DEATH_MESSAGE_BY` (`str` translation keys, `{0}` the one who died, `{1}` who did it).
@@ -1174,6 +1185,8 @@ pub mod comp {
     /// (`callback`, `ItemModelArgs`: how a stack looks by what is in it, asked once per kind of
     /// stack).
     pub mod item {
+        /// Explicit model asset, including its `item/` folder. Defaults to the item's own name.
+        pub const MODEL_FILE: &str = "item.model_file";
         pub const BLOCK: &str = "item.block";
         pub const ON_USE: &str = "item.on_use";
         pub const ON_RELEASE: &str = "item.on_release";
@@ -4036,6 +4049,7 @@ pub struct Host {
     /// The riders of `mount`, one per seat (0 for an empty one), up to `cap`; returns its seats.
     pub entity_riders: unsafe extern "C" fn(world: *mut WorldCtx, mount: u64, out: *mut u64, cap: u32) -> u32,
     pub entity_get: unsafe extern "C" fn(world: *mut WorldCtx, id: u64, out: *mut EntityState) -> u32,
+    pub player_info: unsafe extern "C" fn(world: *mut WorldCtx, id: u64, out: *mut PlayerInfo) -> u32,
     /// Adds `v` (blocks per second) to the entity's velocity: a mob's here, a player's on its
     /// client, the way a hit's knockback goes.
     pub entity_push: unsafe extern "C" fn(world: *mut WorldCtx, id: u64, v: *const Vec3),

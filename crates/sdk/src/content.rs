@@ -2452,6 +2452,13 @@ impl<'a> BlockBuilder<'a> {
         self.tag(abi::comp::block::NOT_STOOD_ON)
             .signal_props(abi::signal_kind::PISTON_HEAD, 0, false, false)
     }
+    /// A logic gate with configurable input faces, output faces, delay and operation.
+    pub fn logic_gate(self, gate: Gate, logic: GateLogic) -> Self {
+        let inputs = gate.inputs;
+        self.set_text(&crate::Component::<crate::Text>::named("signal_logic"), logic.name())
+            .signal_gate(gate, move |g| logic.output(inputs, g))
+    }
+
     /// A gate with logic of your own, on the clicked face: what comes out of its outputs a
     /// `gate`'s delay after what goes in at its inputs calls for it. Runs only when something
     /// around it changes.
@@ -2675,6 +2682,11 @@ crate::entry::entry_builder!(
 );
 
 impl ItemBuilder<'_> {
+    /// A model asset, including its folder (`mod:item/model`).
+    pub fn model_file(self, model: &str) -> Self {
+        self.set_text(&crate::comps::item::MODEL_FILE, &crate::full_name(model))
+    }
+
     /// An attribute modifier its holder gets while it is in the main hand, or `.worn()` in an equipment slot (`Modifier`).
     pub fn modifier(self, m: crate::Modifier) -> Self {
         self.push(&crate::component::MODIFIERS, m.0)
@@ -3474,6 +3486,59 @@ impl Gate {
 impl Default for Gate {
     fn default() -> Gate {
         Gate::new()
+    }
+}
+
+/// Common gate operations, usable through `BlockBuilder::logic_gate`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum GateLogic {
+    And,
+    Or,
+    Xor,
+    Not,
+    Nand,
+    Nor,
+    Xnor,
+    Max,
+    Min,
+}
+
+impl GateLogic {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::And => "and",
+            Self::Or => "or",
+            Self::Xor => "xor",
+            Self::Not => "not",
+            Self::Nand => "nand",
+            Self::Nor => "nor",
+            Self::Xnor => "xnor",
+            Self::Max => "max",
+            Self::Min => "min",
+        }
+    }
+
+    fn output(self, inputs: u32, g: &GateInputs) -> u8 {
+        let values = [Side::Front, Side::Rear, Side::Left, Side::Right, Side::Top, Side::Bottom]
+            .into_iter()
+            .filter(|s| inputs & (1 << *s as u32) != 0)
+            .map(|s| g.side(s));
+        let count = values.clone().count();
+        if count == 0 {
+            return 0;
+        }
+        let on = values.clone().filter(|&v| v > 0).count();
+        let yes = match self {
+            Self::And => on == count,
+            Self::Or => on > 0,
+            Self::Xor => on % 2 == 1,
+            Self::Not | Self::Nor => on == 0,
+            Self::Nand => on != count,
+            Self::Xnor => on % 2 == 0,
+            Self::Max => return values.max().unwrap_or(0),
+            Self::Min => return values.min().unwrap_or(0),
+        };
+        if yes { 15 } else { 0 }
     }
 }
 

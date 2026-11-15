@@ -50,6 +50,28 @@ value! {
 // The common vocabulary the base game reads; any mod may set these on its own content.
 pub static FOOD: Component<Food> = Component::named("food");
 
+/// Eating behavior for item builders, with the nutrition kept in the shared food component.
+pub trait FoodItem: Sized {
+    fn food(self, nutrition: Food) -> Self;
+}
+
+impl FoodItem for ItemBuilder<'_> {
+    fn food(self, nutrition: Food) -> Self {
+        self.set(&FOOD, nutrition).use_ticks(32).on_use(eat)
+    }
+}
+
+/// Makes the same food builder available through the editor's parameter form.
+pub fn editor_methods(r: &mut Registry) {
+    r.editor_method(editor::Method {
+        on: editor::ITEM,
+        name: "food".into(),
+        doc: "Eating behavior with hunger restoration and saturation.".into(),
+        import: "base_api::FoodItem".into(),
+        params: vec![editor::parameter("nutrition", "base_api::Food", "food", Food { hunger: 4, saturation: 2.4 })],
+    });
+}
+
 /// Eating for `.on_use`: hunger and saturation from its `FOOD`, one item less. With `.use_ticks(32)`
 /// it takes as long as the base game's food.
 pub fn eat(u: &mut ItemUse) -> bool {

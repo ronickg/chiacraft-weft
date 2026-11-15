@@ -1100,8 +1100,8 @@ impl Models {
         self.displays.clear();
         let model_comp = c.components.id(comp::MODEL);
         for (i, d) in c.items.iter().enumerate().skip(1) {
-            let Some((ns, path)) = d.name.split_once(':') else { continue };
-            let default = format!("{ns}:item/{path}");
+            let Some((_, path)) = d.name.split_once(':') else { continue };
+            let default = c.item_model_file(i as u32).into_owned();
             let source = |name: &str| read(assets, name, "models", "json");
             if let Some(display) = block_model::load(&default, &source)
                 .ok()

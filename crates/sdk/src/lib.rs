@@ -15,6 +15,7 @@ mod command;
 pub mod comps;
 mod config;
 mod content;
+pub mod editor;
 mod effects;
 pub mod environment;
 pub use environment::{ENVIRONMENT, Environment, EnvironmentValues};

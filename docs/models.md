@@ -243,3 +243,5 @@ The texture is laid out like vanilla armor's, the 64x32 files in `mods/base/asse
 - **Any other bone** a slot covers is worn on its own boxes, with a texture laid out like the wearer's skin.
 
 Items in the world and in the hand are flat sprites with some thickness, the boxes of a block, or [a model of their own](#blocks-and-items). `F3+T` reloads models and animations along with textures while the game runs.
+
+Items can select a model asset explicitly with `.model_file("mymod:item/tool")`.

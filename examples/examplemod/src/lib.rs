@@ -115,6 +115,10 @@ fn blocks(_r: &mut Registry) {
 /// Your items, texture is `item/<name>.png`, translation is `item.examplemod.<name>`
 /// Gray tooltip with `item.examplemod.<name>.tooltip`, for more tooltip options check `mods/base/assets/lang/en_us.lang`
 fn items(r: &mut Registry) {
+    // Food configures the new item's component and eating callback.
+    // use base_api::{Food, FoodItem};
+    // static SNACK: Item = Item::named("snack");
+    // r.item(&SNACK).food(Food { hunger: 3, saturation: 1.8 });
     r.item(&EXAMPLE_ITEM).tab(&INGREDIENTS).tag("gems/example");
     // Tools, weapons, food, fuel are all components or tags, so other mods can use them:
     // static RUBY_PICKAXE: Item = Item::named("ruby_pickaxe");
@@ -201,6 +205,8 @@ fn entities(_r: &mut Registry) {
 /// to change a number use `r.modify`
 /// For more info check "Hooking into the game" in `docs/modding.md`
 fn events(r: &mut Registry) {
+    // In a player callback, persist w.player_key(entity) to identify the same account later.
+    // w.player_name(entity) is its current display name and may be shared by other players.
     // Players joining get an example item if the setting allows it.
     r.on_event(&PLAYER_JOINED, |batch| {
         if !GIFT_ON_JOIN.get() {

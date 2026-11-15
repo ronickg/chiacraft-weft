@@ -54,6 +54,7 @@ pub static HOST: Host = Host {
     entity_vehicle,
     entity_riders,
     entity_get,
+    player_info,
     entity_push,
     entity_set,
     entity_walk,
@@ -931,6 +932,13 @@ unsafe extern "C" fn entity_use_item(w: *mut abi::WorldCtx, id: u64, off: u32, t
 
 unsafe extern "C" fn entity_release_use(w: *mut abi::WorldCtx, id: u64) {
     unsafe { dim(w).release_use(content(), id) }
+}
+
+unsafe extern "C" fn player_info(w: *mut abi::WorldCtx, id: u64, out: *mut abi::PlayerInfo) -> u32 {
+    let identities = (unsafe { dim(w) }).player_identities.read();
+    let Some(identity) = identities.get(&id) else { return 0 };
+    unsafe { *out = abi::PlayerInfo { name: Str::new(&identity.name), key: Str::new(&identity.key) } };
+    1
 }
 
 unsafe extern "C" fn entity_key(w: *mut abi::WorldCtx, player: u64, key: Str, out: *mut abi::KeyState) {

@@ -268,8 +268,7 @@ pub fn load(assets: &Assets, c: &Content) -> (Looks, Names) {
         }
     }
     for (i, d) in c.items.iter().enumerate().skip(1) {
-        let Some((ns, path)) = d.name.split_once(':') else { continue };
-        let Some(m) = from_pack(&format!("{ns}:item/{path}")) else { continue };
+        let Some(m) = from_pack(&c.item_model_file(i as u32)) else { continue };
         let icon = m.sprite.as_deref().filter(|t| !t.is_empty()).map(&mut id);
         let own = icon.unwrap_or(if d.icon == u32::MAX { 0 } else { d.icon });
         let model = (!m.boxes.is_empty()).then(|| file_boxes(&m, &|_| own, &mut id));

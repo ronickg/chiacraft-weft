@@ -123,7 +123,7 @@ impl Server {
 
     pub(super) fn handle(&mut self, c: &'static Content, pi: usize, msg: ToServer) {
         if !self.allowed(pi, &msg) {
-            log::debug!(target: "net", "refused {} from {}", crate::net::Message::kind(&msg), self.players[pi].name);
+            log::debug!(target: "net", "refused {} from {}", crate::net::Message::kind(&msg), self.players[pi].identity.name);
             return;
         }
         match msg {
@@ -528,7 +528,7 @@ impl Server {
                 }
             }
             ToServer::Chat(text) => {
-                let name = self.players[pi].name.clone();
+                let name = self.players[pi].identity.name.clone();
                 if let Some(cmd) = text.strip_prefix('/') {
                     for line in self.command(c, pi, cmd) {
                         let from = crate::net::Shown::REPLY;
@@ -610,15 +610,15 @@ impl Server {
                 if !self.players[pi].joined {
                     return;
                 }
-                log::info!("{} left", self.players[pi].name);
-                let line = Msg::new("multiplayer.left", vec![Arg::Text(self.players[pi].name.clone())]);
+                log::info!("{} left", self.players[pi].identity.name);
+                let line = Msg::new("multiplayer.left", vec![Arg::Text(self.players[pi].identity.name.clone())]);
                 let entity = self.players[pi].entity;
                 for q in self.players.iter_mut().filter(|q| q.joined) {
                     q.conn
                         .send(ToClient::Show(crate::net::Shown::chat(line.clone())));
                     q.conn.send(ToClient::PlayerGone { entity });
                 }
-                let Server { players, dims, storage, .. } = self;
+                let Server { players, dims, storage, identities, .. } = self;
                 let p = &mut players[pi];
                 if let Some(r) = dims[p.dim as usize].entity_region(p.entity) {
                     if let Some(m) = p.menu.take() {
@@ -639,6 +639,7 @@ impl Server {
                     r.entities.remove(p.entity, abi::removal::LEFT);
                 }
                 p.conn.send(ToClient::Disconnect("bye".into()));
+                identities.write().remove(&p.entity);
                 p.joined = false;
             }
         }

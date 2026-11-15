@@ -1060,6 +1060,15 @@ impl Client {
         if self.camera_has(crate::tag_bits::camera::HAND) { self.hand_stack } else { self.held() }
     }
 
+    pub fn blocked_hand_slot(&self, slot: usize) -> bool {
+        let c = content();
+        slot < c.game.entities[self.me.kind as usize].hand_slots as usize
+            && self
+                .inventory
+                .get(slot)
+                .is_some_and(|s| crate::content::hand_blocked(c, self.me.kind, &self.inventory, s.item))
+    }
+
     pub fn off_held(&self) -> ItemStack {
         crate::content::in_off_hand(content(), self.me.kind, &self.inventory)
     }

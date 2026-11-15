@@ -311,14 +311,15 @@ pub fn build(thing: &Thing, c: &Content, assets: &Assets) -> Preview {
         }
     }
     out.translucent = b.translucent;
-    if thing.kind == What::Item {
-        out.sprite = Some(out.texture(&b.faces[0], c, assets));
-        return out;
-    }
     if let Some(file) = &b.file {
         let read = |name: &str| String::from_utf8(assets.read(name, "models", "json")?).ok();
-        match crate::block_model::load_with(&texture(file, "block").unwrap_or_else(|| file.clone()), &read, &b.replacements) {
+        match crate::block_model::load_with(&texture(file, folder).unwrap_or_else(|| file.clone()), &read, &b.replacements) {
             Ok(Some(model)) => {
+                if thing.kind == What::Item
+                    && let Some(sprite) = model.sprite
+                {
+                    b.faces[0] = sprite;
+                }
                 if let Some(cube) = model.cube {
                     for (i, t) in cube.into_iter().enumerate().filter(|(_, t)| !t.is_empty()) {
                         b.faces[i] = t;
@@ -331,6 +332,10 @@ pub fn build(thing: &Thing, c: &Content, assets: &Assets) -> Preview {
             }
             _ => out.errors.push("model_file".into()),
         }
+    }
+    if thing.kind == What::Item && b.shape != abi::BlockModel::Boxes {
+        out.sprite = Some(out.texture(&b.faces[0], c, assets));
+        return out;
     }
     let mut resolve = |name: &str| out.texture(name, c, assets);
     let faces = std::array::from_fn(|face| {
@@ -362,11 +367,15 @@ pub fn build(thing: &Thing, c: &Content, assets: &Assets) -> Preview {
 }
 
 /// A registered state's geometry becomes ordinary editable SDK calls, without a second set of templates.
-pub fn example(c: &Content, kind: What, index: usize) -> Thing {
+fn appearance(c: &Content, kind: What, index: usize) -> Thing {
     if kind == What::Item {
         let item = &c.items[index];
         let mut t = Thing::new(kind, item.name.rsplit(':').next().unwrap_or("item"));
-        if let Some(tex) = c.textures.get(item.icon as usize) {
+        if let Some(tex) = item
+            .layers
+            .as_deref()
+            .or_else(|| c.textures.get(item.icon as usize).map(String::as_str))
+        {
             t.calls = vec![Call::new("texture", &[&code::quote(&asset_arg(tex, "item"))])];
         }
         return t;
@@ -525,4 +534,90 @@ pub fn example(c: &Content, kind: What, index: usize) -> Thing {
         }
     }
     t
+}
+
+/// Examples are ordinary editable calls, including the behavior's own parameters.
+pub fn example(c: &Content, kind: What, index: usize) -> Thing {
+    let mut thing = appearance(c, kind, index);
+    let (table, entry) =
+        if kind == What::Block { (crate::components::BLOCK, c.blocks[index].first_state) } else { (crate::components::ITEM, index as u32) };
+    for method in code::methods(kind).filter(|m| m.params.iter().any(|p| !p.component.is_empty())) {
+        let mut args = Vec::new();
+        for param in &method.params {
+            let value = if param.component.is_empty() {
+                Some(code::default_arg(param))
+            } else {
+                c.components
+                    .id(&param.component)
+                    .and_then(|id| c.components.bytes(table, entry, id))
+                    .and_then(|bytes| code::literal(&param.ty, &param.schema, bytes))
+            };
+            if let Some(value) = value {
+                args.push(value);
+            } else {
+                break;
+            }
+        }
+        if args.len() == method.params.len() {
+            thing.calls.push(Call { method: method.name.clone(), args });
+        }
+    }
+    // Scalar SDK setters already carry their component's vocabulary name.
+    for method in code::methods(kind).filter(|m| m.params.len() == 1 && m.params[0].component.is_empty()) {
+        if thing.calls.iter().any(|call| call.method == method.name) {
+            continue;
+        }
+        let Some(id) = c.components.id(&method.name) else { continue };
+        let Some(bytes) = c.components.bytes(table, entry, id) else { continue };
+        let schema = &c.components.schemas[id as usize];
+        if let Some(value) = code::literal(&method.params[0].ty, schema, bytes) {
+            thing.calls.push(Call::new(&method.name, &[&value]));
+        }
+    }
+    if kind == What::Item
+        && let Some(file) = &c.items[index].model_file
+    {
+        thing
+            .calls
+            .push(Call::new("model_file", &[&code::quote(file)]));
+    }
+    if kind == What::Block {
+        use abi::signal_kind as sk;
+        let state = &c.states[entry as usize];
+        let turn = state.turn;
+        let inputs = (0..6)
+            .filter(|&side| state.signal.inputs & (1 << turn.face(side)) != 0)
+            .fold(0, |bits, side| bits | 1 << side);
+        let outputs = (0..6)
+            .filter(|&side| state.signal.gives & (1 << turn.face(side)) != 0)
+            .fold(0, |bits, side| bits | 1 << side);
+        if state.signal.kind == sk::GATE {
+            let logic = c
+                .components
+                .id("signal_logic")
+                .and_then(|id| c.components.text(table, entry, id));
+            if let Some(logic) = logic.and_then(|logic| {
+                code::LOGIC_NAMES
+                    .iter()
+                    .find(|name| name.eq_ignore_ascii_case(logic))
+            }) {
+                let gate = code::GateArgs { inputs, outputs, delay: state.signal.delay as u32 / 2 };
+                let name = format!("GateLogic::{logic}");
+                thing
+                    .calls
+                    .push(Call::new("logic_gate", &[&gate.code(), &name]));
+            }
+        } else if let Some(method) = match state.signal.kind {
+            sk::SWITCH => Some(if c.blocks[index].props.iter().any(|p| p.name == "power") { "signal_switch" } else { "signal_constant" }),
+            sk::TORCH => Some("signal_torch"),
+            sk::REPEATER => Some("signal_repeater"),
+            sk::COMPARATOR => Some("signal_comparator"),
+            sk::OBSERVER => Some("signal_observer"),
+            sk::SINK => Some("signal_sink"),
+            _ => None,
+        } {
+            thing.calls.push(Call::new(method, &[]));
+        }
+    }
+    thing
 }

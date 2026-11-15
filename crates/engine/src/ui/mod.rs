@@ -454,6 +454,10 @@ impl Row {
 }
 
 impl Area {
+    pub fn room(&self, width: f32) -> f32 {
+        (width - 8.0 - self.inset - Scrollbar::ROOM).max(1.0)
+    }
+
     pub fn spans(&self, s: &str) -> Vec<Span> {
         self.format
             .as_ref()
@@ -632,10 +636,16 @@ impl Ui {
             self.dragging = None;
             return false;
         };
-        let key = self.scroll_key(id);
         let at = bar.offset_at(p.y);
-        let at = if self.nodes[id].style.justify == Justify::End { bar.max - at } else { at };
-        self.scroll.insert(key, at);
+        if let Kind::Input { area: Some(area), .. } = &self.nodes[id].kind {
+            let [x, _] = area.scroll.get();
+            area.scroll.set([x, at]);
+            area.follow_caret.set(false);
+        } else {
+            let key = self.scroll_key(id);
+            let at = if self.nodes[id].style.justify == Justify::End { bar.max - at } else { at };
+            self.scroll.insert(key, at);
+        }
         self.dirty = true;
         true
     }
@@ -913,6 +923,25 @@ impl Ui {
                 }
             }
             return;
+        }
+        if let Kind::Input { value, area: Some(area), .. } = &self.nodes[id].kind {
+            let room = area.room(rect.w).max(unit);
+            let rows = area.rows(value, font, Some(room / unit));
+            let max = (rows.len() as f32 * font.line_height * unit - (rect.h - 8.0)).max(0.0);
+            area.max_scroll.set(max);
+            let [x, y] = area.scroll.get();
+            let offset = y.clamp(0.0, max);
+            area.scroll.set([x, offset]);
+            self.nodes[id].scrollbar = (max > 0.0).then_some(Scrollbar {
+                track: Rect {
+                    x: rect.x + rect.w - 4.0 - Scrollbar::HANDLE[0],
+                    y: rect.y + 4.0,
+                    w: Scrollbar::HANDLE[0],
+                    h: (rect.h - 8.0).max(0.0),
+                },
+                offset,
+                max,
+            });
         }
         let children = self.nodes[id].children.clone();
         let placed: Vec<NodeId> = children

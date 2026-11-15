@@ -187,15 +187,22 @@ fn main() {
     // states) is the same call.
     methods.sort_by(|a, b| a.name.cmp(&b.name));
     methods.dedup_by(|a, b| a.name == b.name && a.on == b.on);
-    let mut out = String::from("pub static METHODS: &[Method] = &[\n");
+    let mut out = String::from("pub static METHODS: std::sync::LazyLock<Vec<Method>> = std::sync::LazyLock::new(|| vec![\n");
     for m in &methods {
         let params: Vec<String> = m
             .params
             .iter()
-            .map(|(n, t, f)| format!("Param {{ name: {n:?}, ty: {t:?}, picture: {f:?} }}"))
+            .map(|(n, t, f)| format!("Param {{ name: {n:?}.into(), ty: {t:?}.into(), picture: {f:?}.into(), ..Default::default() }}"))
             .collect();
-        let _ = writeln!(out, "    Method {{ on: {}, name: {:?}, params: &[{}], doc: {:?} }},", m.on, m.name, params.join(", "), m.doc);
+        let _ = writeln!(
+            out,
+            "    Method {{ on: {}, name: {:?}.into(), params: vec![{}], doc: {:?}.into(), import: String::new() }},",
+            m.on,
+            m.name,
+            params.join(", "),
+            m.doc
+        );
     }
-    out += "];\n";
+    out += "]);\n";
     std::fs::write(Path::new(&std::env::var("OUT_DIR").unwrap()).join("sdk_methods.rs"), out).unwrap();
 }

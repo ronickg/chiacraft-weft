@@ -1,3 +1,4 @@
+use base_api::FoodItem as _;
 use weft_sdk::*;
 
 pub static STICK: Item = Item::named("stick");
@@ -103,9 +104,7 @@ pub fn register(r: &mut Registry) {
     ] {
         let i = r
             .item(Item::generated(name.into()))
-            .set(&FOOD, Food { hunger, saturation })
-            .use_ticks(32)
-            .on_use(base_api::eat)
+            .food(Food { hunger, saturation })
             .tab(&crate::tabs::FOOD);
         let i = if tag.starts_with("cooked_meat/") { i.tag("cooked_meat") } else { i };
         if !tag.is_empty() {

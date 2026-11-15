@@ -882,7 +882,7 @@ impl UiRenderer {
             // Rows as drawn, the nearest boundary in the row under the click.
             let [sx, sy] = a.scroll.get();
             let lh = self.font.line_height * px;
-            let rows = a.rows(value, &self.font, Some((n.rect.w - 8.0 - a.inset) / px));
+            let rows = a.rows(value, &self.font, Some(a.room(n.rect.w).max(px) / px));
             let ri = (((p.y - n.rect.y - 4.0 + sy) / lh).floor().max(0.0) as usize).min(rows.len() - 1);
             let row = &rows[ri];
             let x = p.x - n.rect.x - 4.0 + sx;
@@ -989,7 +989,6 @@ impl UiRenderer {
         self.overlays.clear();
         let mut icons = Vec::new();
         self.node(gpu, assets, ui, look, 0, scale, &mut icons, custom, None);
-        self.quads.append(&mut self.overlays);
         if let Some((c, t)) = game {
             let clips = std::mem::take(&mut self.icon_clips);
             for (i, (x, y, s, item)) in icons.into_iter().enumerate() {
@@ -1008,6 +1007,7 @@ impl UiRenderer {
                 }
             }
         }
+        self.quads.append(&mut self.overlays);
     }
 
     /// A node's stack, drawn after the screen's backgrounds and with that node's clip.
@@ -1015,7 +1015,7 @@ impl UiRenderer {
         self.stacks.push((r, stack, [0.0; 4]));
     }
 
-    /// Draw above node backgrounds, before item icons.
+    /// Draw above node backgrounds and item icons.
     pub fn defer_overlay(&mut self, draw: impl FnOnce(&mut Self)) {
         let start = self.quads.len();
         draw(self);
@@ -1324,7 +1324,7 @@ impl UiRenderer {
                 background(self, "input", if ui.focused == Some(id) { "focused" } else { "" });
                 let px = scale * ui.text_unit;
                 let lh = self.font.line_height * px;
-                let (room_w, room_h) = (r.w - (8.0 + area.inset) * scale, r.h - 8.0 * scale);
+                let (room_w, room_h) = (area.room(n.rect.w).max(ui.text_unit) * scale, r.h - 8.0 * scale);
                 let rows = area.rows(value, &self.font, Some(room_w / px));
                 let max_scroll = (rows.len() as f32 * lh - room_h).max(0.0);
                 area.max_scroll.set(max_scroll / scale);
@@ -1371,7 +1371,8 @@ impl UiRenderer {
                     let rect = Rect { x: tx + caret_x, y: ty + caret_y, w: px.max(1.0), h: lh };
                     self.class_background(gpu, assets, look, "caret", "", rect, scale);
                 }
-                let field = [r.x + 2.0 * scale, r.y + 2.0 * scale, r.x + r.w - 2.0 * scale, r.y + r.h - 2.0 * scale];
+                let field =
+                    [r.x + 2.0 * scale, r.y + 2.0 * scale, r.x + r.w - (4.0 + super::Scrollbar::ROOM) * scale, r.y + r.h - 2.0 * scale];
                 for q in &mut self.quads[start..] {
                     q.clip = field;
                 }
@@ -1424,7 +1425,7 @@ impl UiRenderer {
             }
             Kind::Custom { tag, data } => {
                 // What engine-drawn nodes use, loaded for `draw_loaded`.
-                for class in ["slot", "hotbar", "hotbar_selected", "slot_highlight", "well", "crosshair", "effect"] {
+                for class in ["slot", "hotbar", "hotbar_selected", "slot_highlight", "well", "crosshair", "effect", "close"] {
                     if let Some(name) = look.texture(class, "") {
                         if let Some(t) = self.texture(gpu, assets, &name) {
                             self.declared_slicing(assets, &name, [t.1 as f32, t.2 as f32]);
@@ -1469,7 +1470,10 @@ impl UiRenderer {
         for &c in &n.children {
             self.node(gpu, assets, ui, look, c, scale, icons, custom, inner_surface);
         }
-        if let Some(bar) = n.scrollbar {
+        if let Some(mut bar) = n.scrollbar {
+            if let Kind::Input { area: Some(area), .. } = &n.kind {
+                bar.offset = area.scroll.get()[1];
+            }
             let start = self.quads.len();
             let px = |r: super::Rect| Rect { x: r.x * scale, y: r.y * scale, w: r.w * scale, h: r.h * scale };
             let track = px(super::Rect { x: bar.track.x + (bar.track.w - 6.0) / 2.0, w: 6.0, ..bar.track });

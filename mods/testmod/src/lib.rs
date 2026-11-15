@@ -115,9 +115,7 @@ fn init(r: &mut Registry) {
     r.block(&AND_GATE)
         .texture("machine_top")
         .model_box([0.0, 0.0, 0.0], [16.0, 2.0, 16.0])
-        .signal_gate(Gate::new().inputs(&[Side::Left, Side::Right]), |g| {
-            if g.side(Side::Left) > 0 && g.side(Side::Right) > 0 { 15 } else { 0 }
-        });
+        .logic_gate(Gate::new().inputs(&[Side::Left, Side::Right]), GateLogic::And);
     // Joins whatever pipe is next to it, any mod's, by the shared tag.
     r.block(&PIPE)
         .tag("pipes")

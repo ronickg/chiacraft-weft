@@ -308,3 +308,12 @@ If you had to work around the engine to do something reasonable, that is an engi
 Tell me about this instead of building a hack, so I can adjust the engine for those cases.
 
 You can contact me on Discord: `@vortex_so`
+
+
+## Content editor methods
+
+The editor emits ordinary builder calls with their own parameters. SDK methods appear from their source signatures. Mods can register extension methods with `r.editor_method(editor::Method { .. })`. `editor::parameter` derives a parameter's schema and initial Rust literal from a typed value. Its component name lets ready examples fill the same form from registered data. The method's `import` names its public extension trait.
+
+Food uses the shared `base_api` crate, through `use base_api::{Food, FoodItem}` and `.food(Food { hunger: 4, saturation: 2.4 })`. This sets the food component and its eating behavior on the new item. Generated snippets include the trait import. Add `base_api` to your mod's dependencies, as in `examples/examplemod`.
+
+Logic gates use `.logic_gate(Gate::new().inputs(&[Side::Left, Side::Right]).outputs(&[Side::Front]).delay(1), GateLogic::And)`. The editor exposes each input and output face, the delay and the operation. Custom logic uses the existing `.signal_gate(gate, |g| ..)` callback API.

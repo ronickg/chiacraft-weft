@@ -37,6 +37,7 @@ const FIELD_H: f32 = 16.0;
 #[derive(Clone, Copy, PartialEq)]
 enum List {
     Method,
+    Logic,
     Example(What),
     Picture(&'static str),
     Sound,
@@ -228,11 +229,16 @@ fn clean(s: &str) -> String {
 /// How a parameter is edited: by its type, with a picker where the game knows the choices.
 fn list_for(kind: What, method: &str, p: &Param) -> Option<List> {
     if !p.picture.is_empty() {
-        return Some(List::Picture(p.picture));
+        return Some(List::Picture(match p.picture.as_str() {
+            "item" => "item",
+            "entity" => "entity",
+            _ => "block",
+        }));
     }
-    match (method, p.name, p.ty) {
+    match (method, p.name.as_str(), p.ty.as_str()) {
         (_, _, "&CreativeTab") => Some(List::Tab),
         ("sound_group", _, _) => Some(List::Sound),
+        (_, _, "GateLogic") => Some(List::Logic),
         ("mined_by", "class", _) => Some(List::Tool),
         ("mined_by", "level", _) => Some(List::Tier),
         ("tag" | "untag", _, _) => Some(List::Tag),
@@ -330,8 +336,12 @@ fn choices(c: &Content, kind: What, list: List, things: &[Thing], cx: &BuildCx) 
             }
             out
         }
+        List::Logic => code::LOGIC_NAMES
+            .iter()
+            .map(|name| plain(&name.to_uppercase(), Icon::None, format!("GateLogic::{name}")))
+            .collect(),
         List::Method => code::methods(kind)
-            .map(|m| Choice { label: m.name.into(), icon: Icon::None, value: m.name.into(), doc: m.doc.into() })
+            .map(|m| Choice { label: m.name.clone(), icon: Icon::None, value: m.name.clone(), doc: m.doc.clone() })
             .collect(),
         List::Picture(folder) => c
             .textures
@@ -880,7 +890,7 @@ impl Editor {
                                 let key = if call.method == "mined_by" {
                                     if ai == 0 { "tool" } else { "tier" }
                                 } else {
-                                    p.map_or("", |p| p.name)
+                                    p.map_or("", |p| p.name.as_str())
                                 };
                                 short_text(ui, &property_name(cx, key), 18, "dim");
                             });
@@ -936,8 +946,7 @@ impl Editor {
                     .h((h - 43.0 - warning_h).max(24.0)),
             );
             ui.set_id(n, "editor_preview");
-            ui.nodes[n].tooltip = Some(cx.t("editor.orbit", &[]));
-            label(ui, cx, "editor.grid", &[], "dim");
+            label(ui, cx, "editor.orbit", &[], "dim");
             if !errors.is_empty() {
                 label(ui, cx, "editor.preview_partial", &[Arg::Text(errors.join(", "))], "warning");
             }
@@ -962,6 +971,83 @@ impl Editor {
         id: &str,
     ) {
         let s = &self.s;
+        if let Some(p) = p {
+            if let Some(values) = code::struct_values(value, p) {
+                ui.container(Style::default().gap(3.0).w(width), |ui| {
+                    for (index, (name, ty, value)) in values.iter().enumerate() {
+                        ui.container(Style::row().gap(3.0).align(Align::Center), |ui| {
+                            short_text(ui, &property_name(cx, name), 18, "dim");
+                            let s2 = s.clone();
+                            let (fields, root_type, quoted) = (values.clone(), p.ty.clone(), ty == "str");
+                            let shown = if quoted { code::unquote(value).unwrap_or_default() } else { value.clone() };
+                            field(ui, &shown, (width * 0.55).max(35.0), &format!("{id}_{index}"), move |ctx, text| {
+                                let mut fields = fields.clone();
+                                fields[index].2 = if quoted { code::quote(text) } else { text.into() };
+                                let mut st = s2.borrow_mut();
+                                st.remember(Some(&format!("arg:{ci}:{ai}:{index}")));
+                                set_arg(&mut st, ci, ai, code::struct_code(&root_type, &fields));
+                                st.changed();
+                                ctx.requests.push(Request::Rebuild);
+                            });
+                        });
+                    }
+                });
+                return;
+            }
+            if p.ty == "Gate"
+                && let Some(gate) = code::GateArgs::read(value)
+            {
+                ui.container(Style::default().gap(3.0).w(width), |ui| {
+                    for outputs in [false, true] {
+                        label(ui, cx, if outputs { "editor.gate_outputs" } else { "editor.gate_inputs" }, &[], "dim");
+                        for row in (0..6).collect::<Vec<_>>().chunks(3) {
+                            ui.container(Style::row().gap(2.0), |ui| {
+                                for &side in row {
+                                    let bit = 1 << side;
+                                    let on = (if outputs { gate.outputs } else { gate.inputs }) & bit != 0;
+                                    let next = gate.clone();
+                                    let b = crate::screens::button(
+                                        ui,
+                                        cx,
+                                        &format!("editor.side_{}", code::SIDES[side].to_lowercase()),
+                                        &[],
+                                        (width - 4.0) / 3.0,
+                                        edit(s, move |st| {
+                                            let mut next = next.clone();
+                                            if outputs {
+                                                next.outputs ^= bit;
+                                                next.inputs &= !next.outputs;
+                                            } else {
+                                                next.inputs ^= bit;
+                                                next.outputs &= !next.inputs;
+                                            }
+                                            set_arg(st, ci, ai, next.code());
+                                        }),
+                                    );
+                                    if let Kind::Button { selected, .. } = &mut ui.nodes[b].kind {
+                                        *selected = on;
+                                    }
+                                }
+                            });
+                        }
+                    }
+                    let s2 = s.clone();
+                    let next = gate.clone();
+                    label(ui, cx, "editor.gate_delay", &[], "dim");
+                    field(ui, &gate.delay.to_string(), width, &format!("{id}_delay"), move |ctx, text| {
+                        let Ok(delay) = text.parse() else { return };
+                        let mut next = next.clone();
+                        next.delay = delay;
+                        let mut st = s2.borrow_mut();
+                        st.remember(Some(&format!("gate:{ci}:{ai}:delay")));
+                        set_arg(&mut st, ci, ai, next.code());
+                        st.changed();
+                        ctx.requests.push(Request::Rebuild);
+                    });
+                });
+                return;
+            }
+        }
         if call.method == "model_box_faces" && ai == 2 {
             if let Some(faces) = model::faces(value) {
                 ui.container(Style::default().gap(4.0).w(width), |ui| {
@@ -1106,7 +1192,7 @@ impl Editor {
             }
             return;
         }
-        let ty = p.map_or("", |p| p.ty);
+        let ty = p.map_or("", |p| p.ty.as_str());
         match ty {
             "bool" => {
                 let on = value.trim() == "true";
@@ -1376,7 +1462,9 @@ impl Editor {
                 let b = icon_button(ui, cx, "button_install", "icon_copy", "editor.copy", &[], move |_| {
                     crate::clipboard::set(&all);
                 });
-                ui.nodes[b].style = ui.nodes[b].style.at_from([1.0, 0.0], -4.0, 4.0, [1.0, 0.0]);
+                ui.nodes[b].style = ui.nodes[b]
+                    .style
+                    .at_from([1.0, 0.0], -4.0 - crate::ui::Scrollbar::ROOM, 4.0, [1.0, 0.0]);
                 ui.set_id(b, "editor_copy");
             });
             if let Some(e) = &error {
@@ -1458,9 +1546,9 @@ pub fn draw_preview(
 pub fn is_block_preview(index: u64) -> bool {
     SESSION.with(|s| {
         s.borrow()
-            .things
+            .models
             .get(index as usize)
-            .is_some_and(|t| t.kind == What::Block)
+            .is_some_and(|m| m.sprite.is_none())
     })
 }
 

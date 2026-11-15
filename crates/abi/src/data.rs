@@ -210,6 +210,55 @@ pub fn fields(inner: &str) -> Option<Vec<(&str, &str)>> {
     Some(out)
 }
 
+/// The schema and byte range of a field addressed by dots; an empty path is the whole value.
+pub fn field<'a>(schema: &'a str, bytes: &[u8], path: &str) -> Option<(&'a str, core::ops::Range<usize>)> {
+    let schema = schema.trim();
+    if path.is_empty() {
+        return Some((schema, 0..value_len(schema, bytes)?));
+    }
+    let (head, tail) = path.split_once('.').unwrap_or((path, ""));
+    let fixed = schema.starts_with('{');
+    let fields = schema
+        .strip_prefix('{')
+        .and_then(|s| s.strip_suffix('}'))
+        .or_else(|| schema.strip_prefix('<').and_then(|s| s.strip_suffix('>')));
+    if let Some(fields) = fields {
+        let mut at = 0usize;
+        for (name, ty) in self::fields(fields)? {
+            if fixed {
+                at = at.next_multiple_of(layout(ty)?.1);
+            }
+            let len = value_len(ty, bytes.get(at..)?)?;
+            if name == head {
+                let (ty, range) = field(ty, bytes.get(at..at + len)?, tail)?;
+                return Some((ty, at + range.start..at + range.end));
+            }
+            at += len;
+        }
+        return None;
+    }
+    let inner = schema.strip_prefix('[')?.strip_suffix(']')?;
+    let (ty, count, mut at) = if let Some(ty) = list_of(schema) {
+        (ty, u32::from_le_bytes(bytes.get(..4)?.try_into().ok()?) as usize, 4)
+    } else {
+        let (ty, count) = inner.rsplit_once(';')?;
+        (ty.trim(), count.trim().parse::<usize>().ok()?, 0)
+    };
+    let index = head.parse::<usize>().ok()?;
+    if index >= count {
+        return None;
+    }
+    for i in 0..=index {
+        let len = value_len(ty, bytes.get(at..)?)?;
+        if i == index {
+            let (ty, range) = field(ty, bytes.get(at..at + len)?, tail)?;
+            return Some((ty, at + range.start..at + range.end));
+        }
+        at += len;
+    }
+    None
+}
+
 /// Schemas written as text: `str` and the references the engine resolves at freeze.
 pub fn is_text(schema: &str) -> bool {
     matches!(schema, "str" | "block" | "blocks" | "item" | "match" | "tint")

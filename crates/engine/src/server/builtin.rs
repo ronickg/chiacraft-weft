@@ -223,7 +223,7 @@ fn title(s: &mut Server, x: &Ctx) -> Vec<Msg> {
 }
 
 fn say_all(s: &mut Server, x: &Ctx) -> Vec<Msg> {
-    let name = s.players[x.pi].name.clone();
+    let name = s.players[x.pi].identity.name.clone();
     let line = Msg::new("chat.say", vec![Arg::Text(name), text(x.a.text("text").unwrap_or(""))]);
     s.show(Who::All, Shown::chat(line));
     Vec::new()
@@ -232,8 +232,15 @@ fn say_all(s: &mut Server, x: &Ctx) -> Vec<Msg> {
 fn whisper(s: &mut Server, x: &Ctx) -> Vec<Msg> {
     let said = text(x.a.text("text").unwrap_or(""));
     let to = x.a.text("who").unwrap_or("");
-    let Some(target) = s.players.iter().find(|p| p.name == to).map(|p| p.entity) else { return Vec::new() };
-    let name = s.players[x.pi].name.clone();
+    let Some(target) = s
+        .players
+        .iter()
+        .find(|p| p.identity.name == to)
+        .map(|p| p.entity)
+    else {
+        return Vec::new();
+    };
+    let name = s.players[x.pi].identity.name.clone();
     let heard = Msg::new("chat.whisper", vec![Arg::Text(name), said.clone()]);
     s.show(Who::Player(target), Shown { from: Shown::PLAYER, ..Shown::chat(heard) });
     vec![Msg::new("chat.whisper_to", vec![text(to), said])]
@@ -485,7 +492,7 @@ fn set_level(s: &mut Server, x: &Ctx, level: u32) -> Vec<Msg> {
     for (_, id) in x.targets(s, "who") {
         if let Some(pi) = s.players.iter().position(|p| p.joined && p.entity == id) {
             s.set_permission(pi, level);
-            lines.extend(say("op.done", vec![text(&s.players[pi].name), int(level)]));
+            lines.extend(say("op.done", vec![text(&s.players[pi].identity.name), int(level)]));
         }
     }
     lines
