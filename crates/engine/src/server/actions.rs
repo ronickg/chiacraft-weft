@@ -578,7 +578,8 @@ impl Server {
                 let entity = self.players[pi].entity;
                 self.players[pi].skin = Some(skin.clone());
                 for p in self.players.iter_mut().filter(|p| p.joined) {
-                    p.conn.send(ToClient::Skin { entity, skin: (*skin).clone() });
+                    p.conn
+                        .send(ToClient::Skin { entity, skin: (*skin).clone() });
                 }
             }
             ToServer::Avatar(avatar) => {

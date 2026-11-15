@@ -291,7 +291,10 @@ pub unsafe extern "C" fn ui_open(u: *mut abi::UiCtx, node: *const abi::UiNode) {
                             .push(crate::app::Request::ModCall(owner, double))
                     }) as crate::ui::Action
                 });
-                b.ui.open(Kind::Button { class: class_or("button"), action: Some(action), on_double, enabled, selected }, style.center())
+                b.ui.open(
+                    Kind::Button { class: class_or("button"), action: Some(action), on_double, enabled, selected, selected_bind: None },
+                    style.center(),
+                )
             }
             uk::TITLE => {
                 let c = crate::content::content();

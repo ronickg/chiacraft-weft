@@ -31,7 +31,7 @@ pub async fn screens(t: T) -> R {
         (&screens::CREATE_WORLD, &["text:World Rules", "text:Create New World"][..]),
         (&screens::WORLD_RULES, &["text:World Rules", "text:Done"][..]),
         (&screens::MODS, &["id:mod:base", "id:mod:testmod", "id:mod_description"][..]),
-        (&screens::PROFILE, &["id:profile_name", "text:Copy Key"][..]),
+        (&screens::PROFILE, &["id:profile_name", "id:change_skin", "entity", "text:Done"][..]),
     ] {
         let name = screen.name();
         t.check(t.c().menu_open(screen), format!("cannot open {name}"));

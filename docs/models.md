@@ -219,11 +219,11 @@ The bones are looked for in the entity's model and in what it holds and has on. 
 `World::action_stop(id)` ends what `action_play` started. `action::WALK`, `action::HOLD` and so on are the engine's action names, if you'd rather a typo didn't compile.
 
 ## A player's own model
-Players can use `skins/skin.png`: a 64x64 skin includes the outer layer, and Profile's Skin Model button selects classic or slim arms. The choice is saved and sent with the skin; switching it in a world updates what everyone sees. Legacy 64x32 skins use classic arms and mirrored limbs.
+Profile's Change Skin button opens the skins folder. Put a PNG there as `skin.png`; it is loaded when joining a world. Arm Width selects classic or slim arms, with changes sent to everyone in the current world. A 64x64 skin includes the outer layer; legacy 64x32 skins use classic arms and mirrored limbs.
 
 Players can bring a model with no mod at all: `skins/avatar/` holds `avatar.geo.json` and `avatar.png`, and if they like `avatar.animation.json`, `avatar.bones` and `avatar_e.png` (a glow mask). Everyone sees it from the next time they join; `examples/avatar` is one to start from. An avatar defines its own geometry and takes precedence over the skin model choice.
 
-It is the same as any model: the bone names above make walking, holding and swinging work with no clips, its own clips go over them by name, items go on `mainItem` and `offItem`. No code comes with it, so it can't do any harm: all of it together stays under 512 KB, with limits on bones, boxes, clips and how far it reaches, and what goes past them shows as the usual player. Armor goes on it as on any model (see below). A player can turn others' models off with Players' Own Models in the settings, and a world with `core:allow_avatars` off doesn't pass them on.
+It is the same as any model: the bone names above make walking, holding and swinging work with no clips, its own clips go over them by name, items go on `mainItem` and `offItem`. No code comes with it, so it can't do any harm: all of it together stays under 512 KB, with limits on bones, boxes, clips and how far it reaches, and what goes past them shows as the usual player. Armor goes on it as on any model (see below). A player can turn others' models off under Model Visibility in Profile, and a world with `core:allow_avatars` off doesn't pass them on.
 
 ## Armor and other worn items
 An item shows up on the wearer when it sits in an equipment slot. The slots are declared once, with the bones what is worn there covers and the silhouette of the empty slot, and an item only names its slot:

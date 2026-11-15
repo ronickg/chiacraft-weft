@@ -819,7 +819,9 @@ impl Client {
     }
 
     pub fn set_skin_model(&mut self, slim: bool) {
-        if let Some(skin) = &mut self.skin && skin.slim != slim {
+        if let Some(skin) = &mut self.skin
+            && skin.slim != slim
+        {
             skin.slim = slim;
             self.conn.send(ToServer::Skin(skin.clone()));
         }

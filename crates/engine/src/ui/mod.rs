@@ -24,6 +24,7 @@ pub type NodeId = usize;
 pub type Action = Rc<dyn Fn(&mut Ctx)>;
 pub type TextBind = Box<dyn Fn(&Ctx) -> (String, Vec<Arg>)>;
 pub type FloatBind = Box<dyn Fn(&Ctx) -> f32>;
+pub type BoolBind = Box<dyn Fn(&Ctx) -> bool>;
 
 /// One of a row of icons' `abi::icon_effect`s, with its value this frame.
 pub struct IconEffect {
@@ -257,6 +258,7 @@ pub enum Kind {
         on_double: Option<Action>,
         enabled: bool,
         selected: bool,
+        selected_bind: Option<BoolBind>,
     },
     Image {
         texture: String,
@@ -728,7 +730,14 @@ impl Ui {
 
     pub fn button(&mut self, class: &str, style: Style, action: Action, f: impl FnOnce(&mut Ui)) -> NodeId {
         self.with(
-            Kind::Button { class: class.to_string(), action: Some(action), on_double: None, enabled: true, selected: false },
+            Kind::Button {
+                class: class.to_string(),
+                action: Some(action),
+                on_double: None,
+                enabled: true,
+                selected: false,
+                selected_bind: None,
+            },
             style.center(),
             f,
         )

@@ -934,13 +934,19 @@ impl EntityRenderer {
             .get(&entity)
             .filter(|s| s.size == [64, 64]);
         match (skin, self.models.skinned) {
-            (Some(skin), Some(models)) => if skin.slim { models.slim } else { models.classic },
+            (Some(skin), Some(models)) => {
+                if skin.slim {
+                    models.slim
+                } else {
+                    models.classic
+                }
+            }
             _ => kind,
         }
     }
 
     fn avatar_of(&self, entity: u64, kind: u32) -> Option<&AvatarLook> {
-        if self.avatars.is_empty() || !self.show_avatars || kind != content().game.player_kind {
+        if self.avatars.is_empty() || (!self.show_avatars && entity != self.local) || kind != content().game.player_kind {
             return None;
         }
         self.avatars.get(&entity)
@@ -1040,6 +1046,33 @@ impl EntityRenderer {
             .draw(gpu, list, frame, super::models::Batch::Icon, self.preview_pipe, vb);
         list.push(Cmd::EndPass);
         true
+    }
+
+    /// Prepares a local appearance without a world, using the inventory figure's renderer.
+    pub fn prepare_preview(
+        &mut self,
+        gpu: &mut dyn Backend,
+        assets: &Assets,
+        skin: Option<&crate::net::Skin>,
+        avatar: Option<crate::net::AvatarData>,
+    ) {
+        self.load(gpu, assets, &content().game.entities[content().game.player_kind as usize].texture);
+        if let Some(skin) = skin {
+            self.set_skin(gpu, self.local, skin);
+        }
+        if let Some(avatar) = avatar {
+            self.set_avatar(gpu, self.local, std::sync::Arc::new(avatar));
+        }
+        for skin in std::mem::take(&mut self.models.new_skins) {
+            self.load(gpu, assets, &skin);
+        }
+        self.models.sync(gpu);
+    }
+
+    pub fn set_preview_model(&mut self, slim: bool) {
+        if let Some(skin) = self.player_skins.get_mut(&self.local) {
+            skin.slim = slim;
+        }
     }
 
     /// Renders the local player's model into a `size` texture (physical pixels), turned towards

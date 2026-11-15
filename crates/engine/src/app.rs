@@ -291,6 +291,8 @@ pub(crate) struct Running {
     previews: Vec<[f32; 4]>,
     /// Texture holding the rendered inventory figure, drawn by the UI.
     preview_tex: Option<u32>,
+    menu_entities: Option<crate::client::entity_render::EntityRenderer>,
+    menu_preview_failed: bool,
     shot_path: Option<PathBuf>,
     /// Image id the pending screenshot is stored under for mods.
     shot_image: Option<u64>,
@@ -557,6 +559,8 @@ impl App {
             ui_animated: Vec::new(),
             previews: Vec::new(),
             preview_tex: None,
+            menu_entities: None,
+            menu_preview_failed: false,
             shot_path: None,
             shot_image: None,
             mod_held: Vec::new(),
@@ -1540,6 +1544,9 @@ impl Running {
         if let Some(g) = &mut self.game {
             g.client.set_skin_model(s::slim_skin());
         }
+        if let Some(entities) = &mut self.menu_entities {
+            entities.set_preview_model(s::slim_skin());
+        }
         if relang || now.gui_scale != self.applied.gui_scale || now.advanced_tooltips != self.applied.advanced_tooltips {
             self.rebuild_all();
         }
@@ -1710,6 +1717,11 @@ impl Running {
                     redraw |= text::refresh(tip, &test);
                 }
                 match &mut n.kind {
+                    Kind::Button { selected, selected_bind: Some(bind), .. } => {
+                        let next = bind(&ctx);
+                        redraw |= *selected != next;
+                        *selected = next;
+                    }
                     Kind::Text(t) => {
                         if let Some(b) = &t.bind {
                             let v = b(&ctx);
@@ -2155,6 +2167,11 @@ fn toggle_keys(r: &mut Running) {
 }
 
 fn reload_assets(r: &mut Running, opts: &Options) {
+    r.menu_preview_failed = false;
+    if let Some(mut entities) = r.menu_entities.take() {
+        entities.destroy(&mut *r.gpu);
+        r.preview_tex = None;
+    }
     r.assets
         .set_packs(crate::packs::enabled(&opts.run_dir, &crate::settings::resource_packs()));
     crate::packs::set_shader_pack(
@@ -2220,7 +2237,9 @@ fn update_game(r: &mut Running, dt: f64, frame_start: Instant) {
         g.client.fov_effects = crate::settings::fov_effects();
         g.client.brightness = crate::settings::brightness();
         g.client.first_person_model = crate::settings::first_person_model();
-        g.client.entity_render.set_show_avatars(crate::settings::show_avatars());
+        g.client
+            .entity_render
+            .set_show_avatars(crate::settings::show_avatars());
         g.client.render.occlusion.on = crate::settings::occlusion_culling();
         let t = Instant::now();
         if world_input {
@@ -2586,10 +2605,7 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
 }
 
 fn read_skin(run_dir: &std::path::Path) -> Option<crate::net::Skin> {
-    Some(crate::net::Skin {
-        png: std::fs::read(run_dir.join("skins/skin.png")).ok()?,
-        slim: crate::settings::slim_skin(),
-    })
+    Some(crate::net::Skin { png: std::fs::read(run_dir.join("skins/skin.png")).ok()?, slim: crate::settings::slim_skin() })
 }
 
 /// The player's own model, if `skins/avatar` has one: a Blockbench geometry and its picture, and
@@ -2616,6 +2632,16 @@ fn read_avatar(run_dir: &std::path::Path) -> Option<crate::net::AvatarData> {
 
 fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
     r.list.clear();
+    if r.previews.is_empty() {
+        r.menu_preview_failed = false;
+    }
+    if (r.game.is_some() || r.previews.is_empty())
+        && let Some(mut entities) = r.menu_entities.take()
+    {
+        entities.destroy(&mut *r.gpu);
+        r.preview_tex = None;
+        r.quads_dirty = true;
+    }
     if let Some(g) = &mut r.game {
         g.client
             .entity_render
@@ -2627,20 +2653,37 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
             r.quads_dirty = true;
         }
     }
-    if let Some(g) = r.game.as_mut().filter(|_| !r.screens.is_empty()) {
+    if !r.screens.is_empty() {
         if let Some(&[x, y, w, h]) = r.previews.first() {
-            let look = r.input.cursor - Vec2::new(x, y);
-            let tex = g.client.entity_render.draw_preview(
-                &mut *r.gpu,
-                &mut r.list,
-                info,
-                [w.round() as u32, h.round() as u32],
-                look,
-                &g.client.me.worn,
-            );
-            if tex != r.preview_tex {
-                r.preview_tex = tex;
-                r.quads_dirty = true;
+            if r.game.is_none() && r.menu_entities.is_none() && !r.menu_preview_failed {
+                match crate::client::entity_render::EntityRenderer::new(&mut *r.gpu, &r.assets) {
+                    Ok(mut entities) => {
+                        entities.prepare_preview(
+                            &mut *r.gpu,
+                            &r.assets,
+                            read_skin(&r.settings.run_dir).as_ref(),
+                            read_avatar(&r.settings.run_dir),
+                        );
+                        r.menu_entities = Some(entities);
+                    }
+                    Err(e) => {
+                        log::error!("player preview: {e}");
+                        r.menu_preview_failed = true;
+                    }
+                }
+            }
+            let preview = match (&mut r.game, &mut r.menu_entities) {
+                (Some(g), _) => Some((&mut g.client.entity_render, g.client.me.worn.as_slice())),
+                (_, Some(entities)) => Some((entities, &[][..])),
+                _ => None,
+            };
+            if let Some((entities, worn)) = preview {
+                let look = r.input.cursor - Vec2::new(x, y);
+                let tex = entities.draw_preview(&mut *r.gpu, &mut r.list, info, [w.round() as u32, h.round() as u32], look, worn);
+                if tex != r.preview_tex {
+                    r.preview_tex = tex;
+                    r.quads_dirty = true;
+                }
             }
         }
     }

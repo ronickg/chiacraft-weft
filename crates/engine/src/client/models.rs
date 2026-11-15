@@ -603,9 +603,11 @@ fn add_worn_geometry(parts: &[Part], worn_on: &[Option<usize>], cuboids: &mut Ve
             }
         } else if let (Some((uv, size)), Some(main)) = (
             model::armor_unwrap(p),
-            p.cuboids
-                .iter()
-                .max_by(|a, b| volume(a).total_cmp(&volume(b)).then_with(|| b.inflate.total_cmp(&a.inflate))),
+            p.cuboids.iter().max_by(|a, b| {
+                volume(a)
+                    .total_cmp(&volume(b))
+                    .then_with(|| b.inflate.total_cmp(&a.inflate))
+            }),
         ) {
             // Limbs at -x have their unwrap mirrored, as vanilla's.
             let mirror = p.pivot[0] + main.origin[0] + main.size[0] / 2.0 < 0.0;

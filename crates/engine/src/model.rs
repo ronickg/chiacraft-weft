@@ -122,8 +122,7 @@ pub fn assign_roles(parts: &mut [Part]) {
 /// The arms of a humanoid with slim skin: 4-pixel boxes become 3 wide, the inner edge stays by the body.
 pub fn slim_arms(parts: &mut [Part]) {
     let wide = |c: &Cuboid| {
-        c.size == [4.0, 12.0, 4.0] && c.faces.is_none()
-            && [[40.0, 16.0], [32.0, 48.0], [40.0, 32.0], [48.0, 48.0]].contains(&c.uv)
+        c.size == [4.0, 12.0, 4.0] && c.faces.is_none() && [[40.0, 16.0], [32.0, 48.0], [40.0, 32.0], [48.0, 48.0]].contains(&c.uv)
     };
     for p in parts
         .iter_mut()
@@ -146,7 +145,11 @@ pub fn slim_arms(parts: &mut [Part]) {
 }
 
 pub fn skin_layers(parts: &mut [Part], modern: bool) {
-    let covered: Vec<_> = parts.iter().flat_map(|p| &p.cuboids).map(|c| (c.uv, c.size)).collect();
+    let covered: Vec<_> = parts
+        .iter()
+        .flat_map(|p| &p.cuboids)
+        .map(|c| (c.uv, c.size))
+        .collect();
     for p in parts.iter_mut() {
         if !modern && p.role != role::HEAD {
             continue;
