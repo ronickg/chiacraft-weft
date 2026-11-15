@@ -58,6 +58,7 @@ config.core.view_distance.value = {0} cubes
 config.core.lod_distance = Terrain lointain
 config.core.lod_distance.value = {0} cubes
 config.core.lod_detail = Détail du relief lointain
+config.core.lod_detail.tooltip = Le détail suit la résolution du rendu et le zoom de la caméra.
 config.core.cloud_height = Élevation des nuages
 config.core.cloud_height.value = {0} blocks
 config.core.cloud_distance = Distance des nuages

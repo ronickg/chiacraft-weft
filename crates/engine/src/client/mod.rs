@@ -2117,11 +2117,6 @@ impl Client {
             self.render.remove_frame(id);
             self.drawn_frames.remove(&id);
         }
-        if self.joined {
-            let cam = self.render_camera().pos;
-            self.lod
-                .update(gpu, &mut self.render, &mut self.world, textures, self.seed, cam, self.view_radius);
-        }
         self.render.set_textures(gpu, textures);
     }
 
@@ -2882,6 +2877,18 @@ impl Client {
             self.entity_render.set_skin(gpu, entity, &skin);
         }
         let cam = self.render_camera();
+        if self.joined {
+            self.lod.update(
+                gpu,
+                &mut self.render,
+                &mut self.world,
+                textures,
+                self.seed,
+                &cam,
+                (frame.width, frame.height),
+                self.view_radius,
+            );
+        }
         let scene = self.scene(&cam, frame);
         while self.scene_bufs.len() < gpu.frames_in_flight() {
             self.scene_bufs.push(gpu.create_buffer(

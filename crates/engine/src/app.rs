@@ -1427,7 +1427,7 @@ impl Running {
                         text_changed = Some((cb.clone(), value.clone()));
                     }
                 }
-            } else if let Kind::Slider { value, on_change, on_release, steps, .. } = &mut ui.nodes[f].kind {
+            } else if let Kind::Slider { value, on_change, on_release, steps, step_value, .. } = &mut ui.nodes[f].kind {
                 let by: f32 = [(KeyCode::ArrowLeft, -1.0), (KeyCode::ArrowRight, 1.0)]
                     .into_iter()
                     .filter(|(k, _)| self.input.pressed_or_repeated(Key::Code(*k)))
@@ -1435,7 +1435,9 @@ impl Running {
                     .sum();
                 if by != 0.0 {
                     let n = (*steps).max(1) as f32;
-                    let v = (((*value * n).round() + by) / n).clamp(0.0, 1.0);
+                    let v = step_value
+                        .as_ref()
+                        .map_or_else(|| (((*value * n).round() + by) / n).clamp(0.0, 1.0), |step| step(*value, by).clamp(0.0, 1.0));
                     *value = v;
                     slider.push((on_change.clone(), v));
                     slider.extend(on_release.clone().map(|f| (f, v)));

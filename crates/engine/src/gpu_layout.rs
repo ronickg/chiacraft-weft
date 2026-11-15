@@ -84,6 +84,14 @@ shared! {
         LIGHT_RG_SHIFT = 26,
         LIGHT_B_SHIFT = 20,
     }
+    /// Per-draw distant terrain metadata, sharing the origin's fourth word.
+    lod_draw {
+        SCALE_SHIFT = 16,
+        SCALE_MASK = 31,
+        FADE_MASK = 65535,
+        /// Largest tile stored in block units before horizontal scaling is needed.
+        PACKED_LEVEL = 5,
+    }
     /// Tint kinds of faces and quads (0 none); mods' kinds follow the engine's.
     tint {
         MASK = 15,
@@ -189,6 +197,8 @@ pub mod terrain {
             SIDE = 34,
             SAMPLES = 34 * 34,
             WORDS = 3,
+            SCATTER_STEP = 32,
+            COVER_SCALE = 65536,
         }
         /// Expression step kinds.
         expr {
@@ -351,12 +361,18 @@ pub fn lod_record(dir: u32, pos: [i32; 3], size: [i32; 3], tex: u32, tint: u32, 
     ]
 }
 
+/// Fade (-1..1, or 2 for solid) and the horizontal scale exponent of a LOD draw.
+pub fn lod_draw_data(level: u32, fade: f32) -> i32 {
+    let fade = (((fade.clamp(-1.0, 2.0) + 1.0) / 3.0) * lod_draw::FADE_MASK as f32).round() as u32;
+    ((level.saturating_sub(lod_draw::PACKED_LEVEL) << lod_draw::SCALE_SHIFT) | fade) as i32
+}
+
 /// `r` (a one-block record) as the part of its block from `min` to `max` in 1/16; `extrude`: up
 /// the whole height it was given.
 #[inline]
 pub fn lod_box(mut r: [u32; 4], min: [u32; 3], max: [u32; 3], extrude: bool) -> [u32; 4] {
     use lod_face as l;
-    r[0] |= 1 << l::PARTIAL_SHIFT | (extrude as u32) << l::EXTRUDE_SHIFT;
+    r[0] = r[0] & !(1 << l::EXTRUDE_SHIFT) | 1 << l::PARTIAL_SHIFT | (extrude as u32) << l::EXTRUDE_SHIFT;
     if !extrude {
         r[2] = r[2] & !(l::HEIGHT_MASK << l::HALF_SHIFT) | (min[1] | max[1] << 5) << l::HALF_SHIFT;
     }

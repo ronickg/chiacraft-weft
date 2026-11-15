@@ -24,6 +24,7 @@ pub struct ConfigDef {
     pub step: f64,
     pub choices: Vec<String>,
     pub flags: u32,
+    pub logarithmic: bool,
     pub scope: u32,
     /// The default of a `TEXT` setting.
     pub text: String,
@@ -65,6 +66,37 @@ impl ConfigDef {
         ((self.max - self.min).abs() / self.step.max(unit))
             .round()
             .clamp(1.0, u32::MAX as f64) as u32
+    }
+
+    pub fn slider_step(&self) -> f64 {
+        if self.step > 0.0 {
+            self.step
+        } else if self.kind == ck::INT {
+            1.0
+        } else {
+            ((self.max - self.min).abs() / 100.0).max(f64::EPSILON)
+        }
+    }
+
+    pub fn slider_value(&self, fraction: f32) -> f64 {
+        let range = self.max - self.min;
+        let value = if self.logarithmic {
+            let unit = self.slider_step();
+            self.min + unit * ((1.0 + range / unit).ln() * fraction as f64).exp_m1()
+        } else {
+            self.min + fraction as f64 * range
+        };
+        self.fit(value)
+    }
+
+    pub fn slider_position(&self, value: f64) -> f32 {
+        let range = (self.max - self.min).max(1e-9);
+        if self.logarithmic {
+            let unit = self.slider_step();
+            (((value - self.min).max(0.0) / unit).ln_1p() / (range / unit).ln_1p()) as f32
+        } else {
+            ((value - self.min) / range) as f32
+        }
     }
 
     fn parse(&self, s: &str) -> Option<f64> {
@@ -382,8 +414,8 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         number("core:render_scale", ck::FLOAT, if phone { 0.6 } else { 1.0 }, 0.25, 1.0, 0.05),
         number("core:view_distance", ck::INT, 12.0, 2.0, 64.0, 1.0),
         // Distant terrain beyond the view (`client::lod`), in cubes; 0 off.
-        number("core:lod_distance", ck::INT, if phone { 32.0 } else { 256.0 }, 0.0, 2048.0, 16.0),
-        // How near distant terrain's tiles split into finer ones, in tile widths (`client::lod`).
+        number("core:lod_distance", ck::INT, if phone { 32.0 } else { 256.0 }, 0.0, 1_048_576.0, 16.0).tag("config.logarithmic"),
+        // Quality maps to a target cell size of 24 / quality render pixels.
         number("core:lod_detail", ck::FLOAT, if phone { 2.0 } else { 4.0 }, 1.0, 4.0, 0.5),
         // Blocks clouds float above where their dimension puts them.
         number("core:cloud_height", ck::INT, 0.0, 0.0, 512.0, 16.0),
@@ -528,6 +560,7 @@ pub fn bake(e: &Entry, errors: &mut Vec<String>) -> ConfigDef {
         text: e.text(c::TEXT).unwrap_or_default().to_string(),
         page: e.text(c::PAGE).unwrap_or_default().to_string(),
         order: e.or(c::ORDER, 0),
+        logarithmic: e.has("config.logarithmic"),
     };
     if d.kind == ck::TEXT && d.scope != scope::CLIENT {
         errors.push(format!("setting {}: text settings are the client's own", d.name));
@@ -550,6 +583,11 @@ mod tests {
         assert_eq!((d.fit(3.2), d.fit(99.0), d.fit(f64::NAN)), (4.0, 10.0, 5.0));
         let c = ConfigDef { kind: ck::CHOICE, choices: vec!["low".into(), "high".into()], ..d.clone() };
         assert_eq!((c.parse("high"), c.parse("mid"), c.show(0.0)), (Some(1.0), None, "low".into()));
+        let logarithmic = ConfigDef { max: 1_048_576.0, step: 16.0, logarithmic: true, ..d.clone() };
+        for value in [0.0, 16.0, 32.0, 256.0, 2048.0, 1_048_576.0] {
+            assert_eq!(logarithmic.slider_value(logarithmic.slider_position(value)), value);
+        }
+        assert!(logarithmic.slider_position(2048.0) < 0.5);
         let b = ConfigDef { kind: ck::BOOL, ..d };
         assert_eq!((b.parse("on"), b.show(1.0)), (Some(1.0), "true".into()));
     }

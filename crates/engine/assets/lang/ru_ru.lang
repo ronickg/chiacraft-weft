@@ -27,6 +27,7 @@ config.core.view_distance.value = {0} кубов
 config.core.lod_distance = Дальний рельеф
 config.core.lod_distance.value = {0} кубов
 config.core.lod_detail = Детализация дальнего рельефа
+config.core.lod_detail.tooltip = Детализация учитывает разрешение рендера и приближение камеры.
 config.core.cloud_height = Подъём облаков
 config.core.cloud_height.value = {0} блоков
 config.core.cloud_distance = Дальность облаков

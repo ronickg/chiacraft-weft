@@ -5,16 +5,17 @@
 //! cubes made a column's top other than the terrain's (a town, a crater), the server says so
 //! (`server::lod_tops`) and that column is taken instead. What stands above the ground is drawn
 //! as its own spans, so a building keeps its roof and its walls.
-//! Tiles are picked by distance, nearer ones split into the four of the level below; one is
+//! Tiles split by projected cell size, using the current camera and render resolution; one is
 //! shown once made, its parent or children standing in until then. Where a column of real cubes
 //! shows its ground the tiles' pixels are dropped (`fs_lod`, `Lod::mask`), so they fill in for
 //! cubes not made or meshed yet (flying fast), and nowhere stand through them.
 
+use std::collections::BinaryHeap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
-use glam::{DVec3, IVec2};
+use glam::{DVec3, IVec2, Mat4};
 use rustc_hash::{FxHashMap, FxHashSet};
 use weft_abi::{BlockModel, FACE_DIRS, entry_kind as ek};
 
@@ -37,7 +38,7 @@ const GRID: usize = (CELLS + 2) as usize;
 /// Words per sample and per tile coming back from the GPU.
 const WORDS: usize = lod_gpu::WORDS as usize;
 pub const LOD_WORDS_PER_TILE: usize = SAMPLES * WORDS;
-pub const MAX_LEVEL: u32 = 5;
+const MAX_LEVEL: u32 = i32::BITS - 2 - CELLS.ilog2();
 /// Blocks under the land from where distant terrain is left out.
 const UNDERGROUND: i32 = 32;
 /// Tiles asked for and not back yet, at most.
@@ -50,7 +51,7 @@ const MAX_MODEL_BOXES: usize = 6;
 const LOD_FADE: Duration = Duration::from_millis(250);
 
 /// A tile: its level and place in the grid of its level's tiles.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct TileKey {
     pub level: u32,
     pub x: i32,
@@ -66,6 +67,12 @@ impl TileKey {
     /// Lowest block corner (x, z).
     pub fn origin(self) -> IVec2 {
         IVec2::new(self.x, self.z) * self.size()
+    }
+
+    fn scale(self) -> i32 {
+        1 << self
+            .level
+            .saturating_sub(crate::gpu_layout::lod_draw::PACKED_LEVEL)
     }
 
     fn parent(self) -> TileKey {
@@ -165,12 +172,41 @@ pub fn made(job: LodJob, mut words: Vec<u32>) {
 /// (sx, sy, sz) blocks, drawn with texture `tex`, tinted for `biome` when `tint`, corners in `ao`,
 /// lit by block light `light` (`lod_tops::Span::light`) with how much of the sky's it lacks in
 /// the top byte.
-fn quad(dir: u32, x: i32, y: i32, z: i32, size: (i32, i32, i32), tex: u32, tint: u32, biome: u32, ao: u32, light: u32) -> [u32; 4] {
+fn quad(
+    dir: u32,
+    x: i32,
+    y: i32,
+    z: i32,
+    size: (i32, i32, i32),
+    tex: u32,
+    tint: u32,
+    biome: u32,
+    ao: u32,
+    light: u32,
+    scale: i32,
+) -> [u32; 4] {
     let rgb = [0, 8, 16].map(|s| (light >> s) as u8);
     let sky = 15u8.saturating_sub((light >> 24) as u8);
-    let mut r = lod_record(dir, [x, y, z], [size.0, size.1, size.2], tex, tint, biome, sky, rgb);
+    let extent = |n: i32| (n + scale - 1) / scale;
+    let mut r = lod_record(dir, [x / scale, y, z / scale], [extent(size.0), size.1, extent(size.2)], tex, tint, biome, sky, rgb);
+    if scale > 1 && (x % scale != 0 || z % scale != 0 || size.0 % scale != 0 || size.2 % scale != 0) {
+        let (min, max) = scaled_edges(x, z, scale, [0; 3], [16; 3]);
+        r = lod_box(r, min, max, true);
+    }
     r[3] |= (ao & 0xFF) << 24;
     r
+}
+
+fn scaled_edges(x: i32, z: i32, scale: i32, mut min: [u32; 3], mut max: [u32; 3]) -> ([u32; 3], [u32; 3]) {
+    for (axis, at) in [(0, x), (2, z)] {
+        let offset = (at % scale) as u32 * 16;
+        let scale = scale as u32;
+        min[axis] = (offset + min[axis]) / scale;
+        max[axis] = ((offset + max[axis] + scale - 1) / scale)
+            .max(min[axis] + 1)
+            .min(16);
+    }
+    (min, max)
 }
 
 fn corner_y(words: &[u32], gi: i32, gj: i32) -> i32 {
@@ -195,6 +231,7 @@ fn sample_y(words: &[u32], gx: f32, gz: f32) -> i32 {
 /// what stands on the ground (`add_structures`). Sorted by part and direction (`Counts`).
 pub fn mesh(c: &Content, key: TileKey, words: &[u32], columns: &Columns) -> (Vec<[u32; 4]>, Counts, (i32, i32)) {
     let s = 1 << key.level;
+    let scale = key.scale();
     let origin = key.origin();
     let at = |i: i32, j: i32| {
         let k = ((j + 1) * SIDE + i + 1) as usize * WORDS;
@@ -306,6 +343,9 @@ pub fn mesh(c: &Content, key: TileKey, words: &[u32], columns: &Columns) -> (Vec
                 }
                 let (tex, tint) = face_of(under, dir as usize);
                 let top_y = if ny < y { y - 1 } else { y };
+                skirt = skirt
+                    .max(top_y - lod_face::HEIGHT_MASK as i32)
+                    .max(i16::MIN as i32);
                 let ao = ao_span(&h, i, j, dir as usize, top_y, (ny + 1).min(top_y));
                 faces.push(Face { dir, at: [i * s, skirt + 1, j * s], size: [s, y - 1 - skirt, s], tex, tint, biome, ao, light, part });
                 lo = lo.min(skirt + 1);
@@ -313,7 +353,7 @@ pub fn mesh(c: &Content, key: TileKey, words: &[u32], columns: &Columns) -> (Vec
         }
     }
     let record =
-        |f: &Face| quad(f.dir, f.at[0], f.at[1], f.at[2], (f.size[0], f.size[1], f.size[2]), f.tex, f.tint, f.biome, f.ao, f.light);
+        |f: &Face| quad(f.dir, f.at[0], f.at[1], f.at[2], (f.size[0], f.size[1], f.size[2]), f.tex, f.tint, f.biome, f.ao, f.light, scale);
     let faces = merged(faces);
     let mut parts: [Vec<[u32; 4]>; PARTS] = std::array::from_fn(|p| faces.iter().filter(|f| f.part == p).map(record).collect());
     add_structures(&mut parts[ALWAYS], &mut lo, &mut hi, c, key, words, columns, &h, &face_of, &ctm);
@@ -366,7 +406,6 @@ fn merged_along(mut faces: Vec<Face>, along: impl Fn(&Face) -> Option<usize>) ->
         (f.dir, f.part, pos, f.size, f.tex, f.tint, f.biome, f.ao, f.light, a.map_or(0, |a| f.at[a]))
     };
     faces.sort_unstable_by_key(key);
-    let most = 1 << crate::gpu_layout::lod_face::SIZE_BITS;
     let mut out: Vec<Face> = Vec::with_capacity(faces.len());
     for f in faces {
         if let Some(last) = out.last_mut()
@@ -377,7 +416,7 @@ fn merged_along(mut faces: Vec<Face>, along: impl Fn(&Face) -> Option<usize>) ->
             let mut a_size = last.size;
             a_size[a] = f.size[a];
             let alike = Face { at: f_pos, ..f } == Face { at: a_pos, size: a_size, ..*last };
-            if alike && last.at[a] + last.size[a] == f.at[a] && last.size[a] + f.size[a] <= most && stretches(f.dir, f.ao, a) {
+            if alike && last.at[a] + last.size[a] == f.at[a] && stretches(f.dir, f.ao, a) {
                 last.size[a] += f.size[a];
                 continue;
             }
@@ -527,6 +566,7 @@ fn add_structures(
     ctm: &super::ctm::Ctm,
 ) {
     let s = 1 << key.level;
+    let scale = key.scale();
     let origin = key.origin();
     let (x0, z0) = (origin.x, origin.y);
     let (x1, z1) = (x0 + CELLS * s, z0 + CELLS * s);
@@ -614,7 +654,9 @@ fn add_structures(
                                 biome,
                                 ao_bits(h, i, j, dir, top),
                                 light,
+                                scale,
                             );
+                            let (mn, mx) = scaled_edges(lx, lz, scale, mn, mx);
                             out.push(lod_box(r, mn, mx, extrude));
                         }
                         if extrude {
@@ -630,7 +672,7 @@ fn add_structures(
                     .any(|s| s.bottom == span_hi + 1 && hides(block, s))
                 {
                     let (tex, tint) = face_of(block, 3);
-                    out.push(quad(3, lx, span_hi, lz, (1, 1, 1), tex, tint, biome, ao_bits(h, i, j, 3, span_hi), light));
+                    out.push(quad(3, lx, span_hi, lz, (1, 1, 1), tex, tint, biome, ao_bits(h, i, j, 3, span_hi), light, scale));
                 }
                 let held = col
                     .spans
@@ -638,7 +680,7 @@ fn add_structures(
                     .any(|s| s.top + 1 == bottom && hides(block, s));
                 if !held && bottom > ground + 1 {
                     let (tex, tint) = face_of(block, 2);
-                    out.push(quad(2, lx, bottom, lz, (1, 1, 1), tex, tint, biome, ao_bits(h, i, j, 2, bottom), light));
+                    out.push(quad(2, lx, bottom, lz, (1, 1, 1), tex, tint, biome, ao_bits(h, i, j, 2, bottom), light, scale));
                 }
                 for (dir, dx, dz) in [(0usize, -1, 0), (1, 1, 0), (4, 0, -1), (5, 0, 1)] {
                     let (tex, tint) = face_of(block, dir);
@@ -651,7 +693,7 @@ fn add_structures(
                     }
                     for (s0, e0) in exposed(bottom, span_hi, &cover) {
                         let ao = ao_span(h, i, j, dir, e0 + 1, s0);
-                        out.push(quad(dir as u32, lx, s0, lz, (1, e0 - s0 + 1, 1), tex, tint, biome, ao, light));
+                        out.push(quad(dir as u32, lx, s0, lz, (1, e0 - s0 + 1, 1), tex, tint, biome, ao, light, scale));
                     }
                 }
             }
@@ -661,6 +703,59 @@ fn add_structures(
                 return;
             }
         }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq)]
+struct LodView {
+    pos: DVec3,
+    projection: Mat4,
+    tiles_per_screen: f64,
+    hide: i32,
+    reach: i32,
+}
+
+impl LodView {
+    fn similar(self, other: Self) -> bool {
+        self.hide == other.hide
+            && self.reach == other.reach
+            && self.pos.distance_squared(other.pos) < 0.25 * 0.25
+            && (self.tiles_per_screen - other.tiles_per_screen).abs() <= self.tiles_per_screen * 0.02
+            && self.projection.abs_diff_eq(other.projection, 0.002)
+    }
+
+    fn area(self, min: glam::Vec3, max: glam::Vec3, planes: &[glam::Vec4; 4]) -> f64 {
+        let center = (min + max) * 0.5;
+        let half = (max - min) * 0.5;
+        if !planes
+            .iter()
+            .all(|plane| plane.dot(center.extend(1.0)) + plane.truncate().abs().dot(half) >= 0.0)
+        {
+            return 0.0;
+        }
+        let (mut low, mut high) = (glam::Vec2::splat(1.0), glam::Vec2::splat(-1.0));
+        let mut behind = false;
+        let mut ahead = false;
+        for corner in 0..8 {
+            let at = glam::Vec3::new([min.x, max.x][corner & 1], [min.y, max.y][(corner >> 1) & 1], [min.z, max.z][corner >> 2]);
+            let clip = self.projection * at.extend(1.0);
+            if clip.w <= 0.05 {
+                behind = true;
+                continue;
+            }
+            ahead = true;
+            let point = glam::Vec2::new(clip.x, clip.y) / clip.w;
+            low = low.min(point);
+            high = high.max(point);
+        }
+        if !ahead {
+            return 0.0;
+        }
+        if behind {
+            return self.tiles_per_screen;
+        }
+        let span = (high.min(glam::Vec2::ONE) - low.max(-glam::Vec2::ONE)).max(glam::Vec2::ZERO);
+        span.x as f64 * span.y as f64 * self.tiles_per_screen * 0.25
     }
 }
 
@@ -675,11 +770,13 @@ pub struct Lod {
     /// Whether the GPU makes this dimension's terrain (`terrain_gpu`); if not, there is no
     /// distant terrain here.
     able: bool,
-    ready: FxHashSet<TileKey>,
+    /// Drawn height bounds guide priorities, never conservative visibility bounds.
+    ready: FxHashMap<TileKey, (i32, i32)>,
     pending: FxHashSet<TileKey>,
-    /// Tiles wanted, nearest first, and where the camera was then.
+    /// Tiles wanted, coarse first then nearest, and the view that selected them.
     wanted: Vec<TileKey>,
-    wanted_at: Option<(glam::DVec2, i32, i32)>,
+    wanted_at: Option<LodView>,
+    max_level: u32,
     /// A bit per cube column around the camera's (`MASK_MARGIN` past the view, addressed
     /// modulo the window's width so it does not move with the camera): its cubes show its
     /// ground. Its half width and center, and whether it changed since uploaded.
@@ -708,10 +805,11 @@ impl Lod {
             dim: u32::MAX,
             seed: 0,
             able: false,
-            ready: FxHashSet::default(),
+            ready: FxHashMap::default(),
             pending: FxHashSet::default(),
             wanted: Vec::new(),
             wanted_at: None,
+            max_level: 1,
             mask: Vec::new(),
             half: 0,
             center: IVec2::ZERO,
@@ -729,7 +827,7 @@ impl Lod {
             self.columns = Arc::default();
             self.columns_dim = dim;
             // One still being made has the columns from before this, so it is made again too.
-            self.stale.extend(self.ready.iter().copied());
+            self.stale.extend(self.ready.keys().copied());
             self.stale.extend(self.pending.iter().copied());
         }
         let map = Arc::make_mut(&mut self.columns);
@@ -743,7 +841,7 @@ impl Lod {
             }
             if !all {
                 // Every level's tile with it, and the ones beside that sample it for their walls.
-                for level in 0..=MAX_LEVEL {
+                for level in 0..=self.max_level {
                     let size = CELLS << level;
                     for dz in -1..=1 {
                         for dx in -1..=1 {
@@ -752,7 +850,7 @@ impl Lod {
                                 x: (x + dx * (size / CELLS)).div_euclid(size),
                                 z: (z + dz * (size / CELLS)).div_euclid(size),
                             };
-                            if self.ready.contains(&key) || self.pending.contains(&key) {
+                            if self.ready.contains_key(&key) || self.pending.contains(&key) {
                                 self.stale.insert(key);
                             }
                         }
@@ -791,15 +889,17 @@ impl Lod {
         world: &mut super::world::ClientWorld,
         textures: &super::textures::GameTextures,
         seed: u64,
-        cam: DVec3,
+        camera: &super::world_render::Camera,
+        viewport: (u32, u32),
         view: i32,
     ) {
+        let cam = camera.pos;
         let c = content();
         let dim = world.dim;
         self.update_mask(gpu, render, world, seed, cam, view);
         let reach = Self::distance();
         if (dim, seed) != (self.dim, self.seed) || reach == 0 {
-            for key in self.ready.drain() {
+            for (key, _) in self.ready.drain() {
                 render.remove_lod(key);
             }
             self.pending.clear();
@@ -827,45 +927,74 @@ impl Lod {
                 continue;
             }
             render.upload_lod(gpu, textures, m.key, &m.quads, m.counts, m.y);
-            self.ready.insert(m.key);
+            self.ready.insert(m.key, m.y);
+            self.wanted_at = None;
         }
         if reach == 0 || !self.able {
             render.lod_draw.clear();
             return;
         }
-        let p = glam::DVec2::new(cam.x, cam.z);
+        let quality = config::by_name("core:lod_detail").map_or(4.0, config::get);
+        let aspect = viewport.0.max(1) as f32 / viewport.1.max(1) as f32;
+        let guard = super::world_render::Camera { fov: (camera.fov * 1.1).min(175.0), ..*camera };
+        let selection = LodView {
+            pos: cam,
+            projection: guard.proj(aspect) * guard.view(),
+            tiles_per_screen: viewport.0.max(1) as f64 * viewport.1.max(1) as f64 / (CELLS as f64 * 24.0 / quality).powi(2),
+            hide,
+            reach,
+        };
         if self
             .wanted_at
-            .is_none_or(|(at, h, r)| (at - p).length() > 16.0 || h != hide || r != reach)
+            .is_none_or(|previous| !selection.similar(previous))
         {
-            self.wanted_at = Some((p, hide, reach));
-            self.pick(p, hide as f64, reach as f64);
+            self.wanted_at = Some(selection);
+            let d = &c.dims[dim as usize];
+            let heights = ((d.min_cube_y as f64 * 16.0).max(i16::MIN as f64), (d.max_cube_y as f64 * 16.0 + 16.0).min(i16::MAX as f64));
+            self.pick(selection, heights);
+            log::debug!(target: "load", "lod fov {:.2}, range {}, tiles {}, levels {}..{}", camera.fov, reach, self.wanted.len(),
+                self.wanted.iter().map(|k| k.level).min().unwrap_or(0), self.max_level);
         }
-        // Find ready parent/children pairs.
-        let wanted: FxHashSet<TileKey> = self.wanted.iter().copied().collect();
+        let needed: FxHashSet<TileKey> = self.wanted.iter().copied().collect();
+        let mut wanted = FxHashSet::default();
+        for &root in self.wanted.iter().filter(|k| k.level == self.max_level) {
+            self.cover(root, &needed, &mut wanted);
+        }
         let mut candidates = FxHashMap::default();
-        for &key in &self.wanted {
+        for &key in &wanted {
             if key.level > 0
-                && self.ready.contains(&key)
+                && self.ready.contains_key(&key)
                 && key
                     .children()
                     .iter()
-                    .all(|child| self.ready.contains(child) && !wanted.contains(child))
+                    .all(|child| self.ready.contains_key(child) && !wanted.contains(child))
             {
                 candidates.insert(key, false);
             }
-            if key.level < MAX_LEVEL {
+            if key.level < self.max_level {
                 let parent = key.parent();
-                if self.ready.contains(&parent)
+                if self.ready.contains_key(&parent)
                     && parent
                         .children()
                         .iter()
-                        .all(|child| wanted.contains(child) && self.ready.contains(child))
+                        .all(|child| wanted.contains(child) && self.ready.contains_key(child))
                 {
                     candidates.insert(parent, true);
                 }
             }
         }
+
+        let candidate_keys: FxHashSet<_> = candidates.keys().copied().collect();
+        candidates.retain(|key, _| {
+            let mut parent = *key;
+            while parent.level < self.max_level {
+                parent = parent.parent();
+                if candidate_keys.contains(&parent) {
+                    return false;
+                }
+            }
+            true
+        });
 
         self.transitions.retain(|key, (to_fine, _)| {
             candidates
@@ -886,7 +1015,7 @@ impl Lod {
         }
 
         let mut shown = FxHashMap::default();
-        let mut keep = FxHashSet::default();
+        let mut keep = needed;
         let mut transitioning = FxHashSet::default();
         for (&parent, &(to_fine, t)) in &active {
             let children = parent.children();
@@ -907,33 +1036,10 @@ impl Lod {
             }
         }
 
-        for &key in &self.wanted {
-            if transitioning.contains(&key) {
-                keep.insert(key);
-                continue;
-            }
+        for &key in &wanted {
             keep.insert(key);
-            if self.ready.contains(&key) {
+            if !transitioning.contains(&key) {
                 shown.insert(key, 2.0);
-                continue;
-            }
-            if key.level > 0 && key.children().iter().all(|k| self.ready.contains(k)) {
-                for child in key.children() {
-                    shown.insert(child, 2.0);
-                    keep.insert(child);
-                }
-                continue;
-            }
-            let mut a = key;
-            while a.level < MAX_LEVEL {
-                a = a.parent();
-                if self.ready.contains(&a) {
-                    if !transitioning.contains(&a) {
-                        shown.insert(a, 2.0);
-                    }
-                    keep.insert(a);
-                    break;
-                }
             }
         }
         render.lod_draw.clear();
@@ -944,7 +1050,7 @@ impl Lod {
         }
         let gone: Vec<TileKey> = self
             .ready
-            .iter()
+            .keys()
             .copied()
             .filter(|k| !keep.contains(k))
             .collect();
@@ -1042,35 +1148,131 @@ impl Lod {
         }
     }
 
-    /// The tiles to show: level 5 tiles within `reach`, split while near, leaving out what
-    /// lies inside `hide` (where the view's cubes are always shown).
-    fn pick(&mut self, p: glam::DVec2, hide: f64, reach: f64) {
-        // A tile splits into the level below while nearer than this many of its widths
-        // (`core:lod_detail`): a cell stays about the same size on screen, at 4 a 32-block cell
-        // at 4096 blocks. Half of it has a fourth of the tiles, what a phone's GPU can draw.
-        let split = config::by_name("core:lod_detail").map_or(4.0, config::get);
-        let top = CELLS << MAX_LEVEL;
+    fn pick(&mut self, view: LodView, heights: (f64, f64)) {
+        self.max_level = (view.reach as u32)
+            .next_power_of_two()
+            .ilog2()
+            .saturating_sub(CELLS.ilog2())
+            .clamp(1, MAX_LEVEL);
+        let top = CELLS << self.max_level;
+        let p = glam::DVec2::new(view.pos.x, view.pos.z);
+        let reach = view.reach as f64;
         let (lo, hi) = (((p - reach) / top as f64).floor().as_ivec2(), ((p + reach) / top as f64).floor().as_ivec2());
-        let mut out = Vec::new();
-        let mut stack: Vec<TileKey> = Vec::new();
+        let planes = super::world_render::projection_planes(view.projection);
+        // Allow overlap from slopes, walls and conservative height envelopes.
+        let budget = (view.tiles_per_screen * 8.0).ceil().max(16.0) as usize;
+        let mut leaves = FxHashSet::default();
+        let mut queue = BinaryHeap::new();
+        let in_range = |key: TileKey| {
+            let (near, far) = key.distance(p);
+            near <= reach && far >= view.hide as f64
+        };
+        let priority = |key: TileKey| {
+            if key.level == 0 || !self.ready.contains_key(&key) {
+                return None;
+            }
+            let origin = key.origin();
+            let bounds = |height: (f64, f64)| {
+                let min = (DVec3::new(origin.x as f64, height.0, origin.y as f64) - view.pos).as_vec3();
+                let max =
+                    (DVec3::new(origin.x as f64 + key.size() as f64, height.1, origin.y as f64 + key.size() as f64) - view.pos).as_vec3();
+                (min, max)
+            };
+            let (min, max) = bounds(heights);
+            let possible = view.area(min, max, &planes);
+            if possible == 0.0 {
+                return None;
+            }
+            let &(low, high) = self.ready.get(&key).unwrap();
+            let (min, max) = bounds((low as f64, high as f64));
+            let sampled = view.area(min, max, &planes);
+            // Drawn bounds prioritize visible geometry. An unsampled peak remains eligible within
+            // the conservative height envelope, below visible geometry that exceeds its budget.
+            if sampled > 1.0 { Some((true, sampled.to_bits(), key)) } else { (possible > 1.0).then_some((false, possible.to_bits(), key)) }
+        };
         for z in lo.y..=hi.y {
             for x in lo.x..=hi.x {
-                stack.push(TileKey { level: MAX_LEVEL, x, z });
+                let key = TileKey { level: self.max_level, x, z };
+                if in_range(key) {
+                    leaves.insert(key);
+                    if let Some(candidate) = priority(key) {
+                        queue.push(candidate);
+                    }
+                }
             }
         }
-        while let Some(key) = stack.pop() {
-            let (near, far) = key.distance(p);
-            if near > reach || far < hide {
+        while let Some((_, _, key)) = queue.pop() {
+            let children = key.children().map(|child| in_range(child).then_some(child));
+            let count = children.iter().flatten().count();
+            if leaves.len() + count - 1 > budget {
                 continue;
             }
-            if key.level > 1 && near < split * key.size() as f64 {
-                stack.extend(key.children());
-            } else {
-                out.push((near, key));
+            leaves.remove(&key);
+            for child in children.into_iter().flatten() {
+                leaves.insert(child);
+                if let Some(candidate) = priority(child) {
+                    queue.push(candidate);
+                }
             }
         }
-        out.sort_by(|a, b| a.0.total_cmp(&b.0));
-        self.wanted = out.into_iter().map(|t| t.1).collect();
+        let mut needed = FxHashSet::default();
+        for key in leaves {
+            let mut ancestor = key;
+            loop {
+                needed.insert(ancestor);
+                if ancestor.level == self.max_level {
+                    break;
+                }
+                ancestor = ancestor.parent();
+            }
+        }
+        if needed
+            .iter()
+            .any(|k| k.level == self.max_level && !self.ready.contains_key(k))
+        {
+            for &key in self.ready.keys().filter(|k| k.level <= self.max_level) {
+                let (near, far) = key.distance(p);
+                if near > reach || far < view.hide as f64 {
+                    continue;
+                }
+                let mut ancestor = key;
+                loop {
+                    needed.insert(ancestor);
+                    if ancestor.level == self.max_level {
+                        break;
+                    }
+                    ancestor = ancestor.parent();
+                }
+            }
+        }
+        self.wanted = needed.into_iter().collect();
+        self.wanted
+            .sort_by_cached_key(|key| (std::cmp::Reverse(key.level), key.distance(p).0.to_bits()));
+    }
+
+    fn cover(&self, key: TileKey, needed: &FxHashSet<TileKey>, shown: &mut FxHashSet<TileKey>) {
+        if key.level == 0 {
+            if self.ready.contains_key(&key) {
+                shown.insert(key);
+            }
+            return;
+        }
+        let children = key.children();
+        let required = children.iter().any(|k| needed.contains(k));
+        let refine = required
+            && children
+                .iter()
+                .filter(|k| needed.contains(k))
+                .all(|k| self.ready.contains_key(k));
+        if self.ready.contains_key(&key) && !refine {
+            shown.insert(key);
+        } else if required {
+            for child in children.into_iter().filter(|k| needed.contains(k)) {
+                self.cover(child, needed, shown);
+            }
+        } else if key.level > 0 && children.iter().all(|k| self.ready.contains_key(k)) {
+            shown.extend(children);
+        }
     }
 
     /// Asks for the nearest wanted tiles not made yet, or made before columns changed.
@@ -1085,7 +1287,7 @@ impl Lod {
                 continue;
             }
             let again = self.stale.remove(&key);
-            if self.ready.contains(&key) && !again {
+            if self.ready.contains_key(&key) && !again {
                 continue;
             }
             self.pending.insert(key);
@@ -1094,6 +1296,124 @@ impl Lod {
                 .send(LodJob { dim: self.dim, seed: self.seed, key, done: self.done.0.clone(), columns: columns.clone() });
         }
         self.stale
-            .retain(|k| self.ready.contains(k) || self.pending.contains(k));
+            .retain(|k| self.ready.contains_key(k) || self.pending.contains(k));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn selection(fov: f32, height: u32, reach: i32) -> LodView {
+        let camera = super::super::world_render::Camera {
+            pos: DVec3::new(0.0, 100.0, 0.0),
+            yaw: 0.0,
+            pitch: 0.0,
+            fov,
+            bob: (glam::Vec3::ZERO, 0.0, 0.0),
+        };
+        LodView {
+            pos: camera.pos,
+            projection: camera.proj(16.0 / 9.0) * camera.view(),
+            tiles_per_screen: height as f64 * height as f64 * (16.0 / 9.0) / (CELLS as f64 * 6.0).powi(2),
+            hide: 64,
+            reach,
+        }
+    }
+
+    fn settle(lod: &mut Lod, view: LodView, heights: (f64, f64)) {
+        for _ in 0..=MAX_LEVEL {
+            lod.pick(view, heights);
+            if lod.wanted.iter().all(|k| lod.ready.contains_key(k)) {
+                return;
+            }
+            lod.ready.extend(
+                lod.wanted
+                    .iter()
+                    .map(|&key| (key, (heights.0 as i32, heights.1 as i32))),
+            );
+        }
+        panic!("selection did not settle");
+    }
+
+    #[test]
+    fn projected_detail_and_range() {
+        let view = selection(70.0, 1080, 4096);
+        let planes = super::super::world_render::projection_planes(view.projection);
+        assert_eq!(view.area(glam::Vec3::new(-32.0, -100.0, -32.0), glam::Vec3::new(32.0, -99.0, 32.0), &planes), 0.0);
+        let mut lod = Lod::new(unbounded().0);
+        let level_at = |lod: &Lod, x: i32, z: i32| {
+            lod.wanted
+                .iter()
+                .filter(|k| {
+                    let o = k.origin();
+                    x >= o.x && x < o.x + k.size() && z >= o.y && z < o.y + k.size()
+                })
+                .map(|k| k.level)
+                .min()
+                .unwrap()
+        };
+        settle(&mut lod, selection(70.0, 1080, 4096), (0.0, 256.0));
+        let normal = lod.wanted.len();
+        let normal_level = level_at(&lod, 0, -2048);
+        settle(&mut lod, selection(70.0, 2160, 4096), (0.0, 256.0));
+        assert!(level_at(&lod, 0, -2048) < normal_level);
+        settle(&mut lod, selection(14.0, 1080, 4096), (0.0, 256.0));
+        assert!(level_at(&lod, 0, -2048) < normal_level);
+        assert!(level_at(&lod, 0, 2048) > normal_level);
+        settle(&mut lod, selection(70.0, 1080, 16 * 1_048_576), (0.0, 256.0));
+        assert!(lod.max_level > 5);
+        assert!(lod.wanted.len() < normal * 8, "{} -> {} tiles", normal, lod.wanted.len());
+        assert!(
+            lod.wanted
+                .windows(2)
+                .all(|pair| pair[0].level >= pair[1].level)
+        );
+        let far = lod.wanted.len();
+        settle(&mut lod, selection(1.4, 1080, 16 * 1_048_576), (0.0, 256.0));
+        assert!(lod.wanted.len() < 8192, "extreme zoom requests {} tiles", lod.wanted.len());
+        eprintln!("adaptive LOD nodes normal={normal}, million-range={far}, 50x={}", lod.wanted.len());
+    }
+
+    #[test]
+    fn coverage_waits_for_complete_children() {
+        let mut lod = Lod::new(unbounded().0);
+        let parent = TileKey { level: 3, x: -1, z: 0 };
+        let children = parent.children();
+        let needed = [parent].into_iter().chain(children).collect();
+        lod.ready
+            .extend([parent, children[0]].into_iter().map(|k| (k, (0, 256))));
+        let mut shown = FxHashSet::default();
+        lod.cover(parent, &needed, &mut shown);
+        assert_eq!(shown, [parent].into_iter().collect());
+        lod.ready
+            .extend(children.into_iter().map(|k| (k, (0, 256))));
+        shown.clear();
+        lod.cover(parent, &needed, &mut shown);
+        assert_eq!(shown, children.into_iter().collect());
+        lod.ready.remove(&parent);
+        shown.clear();
+        lod.cover(parent, &[parent].into_iter().collect(), &mut shown);
+        assert_eq!(shown, children.into_iter().collect());
+    }
+
+    #[test]
+    fn scaled_faces_preserve_sub_block_bounds() {
+        for level in [0, 1, 5, 6, 10, 19, MAX_LEVEL] {
+            let key = TileKey { level, x: -1, z: 1 };
+            let scale = key.scale();
+            let width = key.size();
+            let r = quad(3, 0, 80, 0, (width, 1, width), 9, 3, 2, 255, 0, scale);
+            assert_eq!(r[3] & lod_face::POS_MASK, (width / scale - 1) as u32);
+            let at = width - 1;
+            let r = quad(3, at, 80, at, (1, 1, 1), 9, 3, 2, 255, 0, scale);
+            assert_eq!(r[0] & lod_face::POS_MASK, (at / scale) as u32);
+            assert_eq!((r[0] >> lod_face::DIR_SHIFT) & face::DIR_MASK, 3);
+            let (min, max) = scaled_edges(at, at, scale, [0, 3, 0], [16, 13, 16]);
+            assert!(max[0] > min[0] && max[2] > min[2]);
+            let r = lod_box(r, min, max, false);
+            assert_eq!((r[0] >> lod_face::EXTRUDE_SHIFT) & 1, 0);
+            assert_eq!((r[2] >> lod_face::HALF_SHIFT) & lod_face::EDGE_MASK, 3);
+        }
     }
 }

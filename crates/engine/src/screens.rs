@@ -701,18 +701,24 @@ fn config_row(ui: &mut Ui, cx: &BuildCx, id: u32, d: &crate::config::ConfigDef, 
                 }),
             );
             if !locked {
-                let (min, range) = (d.min, (d.max - d.min).max(1e-9));
+                let range = (d.max - d.min).max(1e-9);
                 let unit = if d.kind == weft_abi::config_kind::INT { 1.0 } else { range / 100.0 };
                 let steps = d.steps(unit);
-                // A slider's place as a value its steps allow.
+                let definition = d.clone();
                 let at = move |f: f32| {
-                    let n = steps.max(1) as f64;
-                    min + (f as f64 * n).round() / n * range
+                    if definition.logarithmic {
+                        definition.slider_value(f)
+                    } else {
+                        let n = steps.max(1) as f64;
+                        definition.min + (f as f64 * n).round() / n * range
+                    }
                 };
-                let set: Rc<dyn Fn(&mut Ctx, f32)> = Rc::new(move |_: &mut Ctx, f: f32| crate::config::set(id, min + f as f64 * range));
+                let apply = d.clone();
+                let set: Rc<dyn Fn(&mut Ctx, f32)> = Rc::new(move |_: &mut Ctx, f: f32| crate::config::set(id, apply.slider_value(f)));
                 let (on_change, on_release) = if d.flags & crate::tag_bits::config::ON_RELEASE != 0 {
                     let (show, done) = (dragged.clone(), dragged.clone());
-                    let shown: Rc<dyn Fn(&mut Ctx, f32)> = Rc::new(move |_: &mut Ctx, f: f32| show.set(Some(at(f))));
+                    let preview = at.clone();
+                    let shown: Rc<dyn Fn(&mut Ctx, f32)> = Rc::new(move |_: &mut Ctx, f: f32| show.set(Some(preview(f))));
                     let apply: Rc<dyn Fn(&mut Ctx, f32)> = Rc::new(move |_: &mut Ctx, f: f32| {
                         done.set(None);
                         crate::config::set(id, at(f));
@@ -721,13 +727,22 @@ fn config_row(ui: &mut Ui, cx: &BuildCx, id: u32, d: &crate::config::ConfigDef, 
                 } else {
                     (set, None)
                 };
+                let step = d.clone();
+                let step_value = d.logarithmic.then(|| {
+                    Box::new(move |fraction: f32, by: f32| {
+                        let value = step.fit(step.slider_value(fraction) + by as f64 * step.slider_step());
+                        step.slider_position(value)
+                    }) as Box<dyn Fn(f32, f32) -> f32>
+                });
+                let definition = d.clone();
                 ui.add(
                     Kind::Slider {
                         value: 0.0,
-                        bind: Box::new(move |_: &Ctx| ((crate::config::get(id) - min) / range) as f32),
+                        bind: Box::new(move |_: &Ctx| definition.slider_position(crate::config::get(id))),
                         on_change,
                         on_release,
                         steps,
+                        step_value,
                     },
                     Style::default().h(20.0).stretch(),
                 );

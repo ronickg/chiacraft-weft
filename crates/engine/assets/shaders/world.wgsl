@@ -331,11 +331,13 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     if a.x + a.z < a.y + a.w {
         c = (c + 1u) % 4u;
     }
-    let local = lod_pos(w0, w2) + lod_corner(w0, w2, w3, CORNERS[dir * 4u + c]) - vec3(0.0, 0.125, 0.0);
+    let data = u32(origins[ii].w);
+    let scale = exp2(f32((data >> LOD_DRAW_SCALE_SHIFT) & LOD_DRAW_SCALE_MASK));
+    let local = (lod_pos(w0, w2) + lod_corner(w0, w2, w3, CORNERS[dir * 4u + c])) * vec3(scale, 1.0, scale) - vec3(0.0, 0.125, 0.0);
     let pos = finish(local, vec4<i32>(origins[ii].xyz, 0));
     var out: VOut;
     out.clip = scene.view_proj * pos;
-    out.lod_fade = bitcast<f32>(origins[ii].w);
+    out.lod_fade = f32(data & LOD_DRAW_FADE_MASK) / f32(LOD_DRAW_FADE_MASK) * 3.0 - 1.0;
     out.dist = length(pos.xyz);
     let o = origins[ii] + g.cam_cube;
     let world = vec3<f32>(o.xyz * 16) + local + vec3(0.0, 0.125, 0.0);

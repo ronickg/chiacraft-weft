@@ -263,7 +263,7 @@ pub unsafe extern "C" fn ui_open(u: *mut abi::UiCtx, node: *const abi::UiNode) {
                 let bind = float_bind(owner, n.bind);
                 let on_change: Rc<dyn Fn(&mut Ctx, f32)> = Rc::new(move |ctx: &mut Ctx, v: f32| on_change(ctx, String::new(), v));
                 let steps = if n.count == 0 { 100 } else { n.count };
-                b.ui.open(Kind::Slider { value: 0.0, bind, on_change, on_release: None, steps }, style)
+                b.ui.open(Kind::Slider { value: 0.0, bind, on_change, on_release: None, steps, step_value: None }, style)
             }
             uk::ITEM => {
                 let (item, count) = (n.data, n.count);

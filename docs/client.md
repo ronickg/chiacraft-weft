@@ -43,3 +43,9 @@ from `held` and `held_ticks`; frame amounts are not sent to the server.
 ## Settings
 
 settings that show up in Mod Settings by themselves (`r.config(&SPARKS).bool(true)`); the player's own by default, `.server()` for the server's value (sent to its players on every change), `.world()` for one saved with the world. The engine's settings are the same kind of thing (`settings::FOV`, `settings::LANGUAGE`, key bindings `core:key.<action>`, all in `config/core.txt`): set one and the client applies it
+
+Numeric settings tagged `config.logarithmic` use a logarithmic slider, with zero supported.
+Keyboard arrows move by the declared numeric step. Distant terrain uses this scale for its
+large distance range. Its detail follows projected surface area, render resolution and the
+active camera, within a pixel-derived tile budget. Coarser parents cover terrain while finer
+tiles load, including during zoom.

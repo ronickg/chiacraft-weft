@@ -305,6 +305,7 @@ pub enum Kind {
         /// GUI scale that would change under the cursor on its way.
         on_release: Option<Rc<dyn Fn(&mut Ctx, f32)>>,
         steps: u32,
+        step_value: Option<Box<dyn Fn(f32, f32) -> f32>>,
     },
     /// Engine-drawn content (slots, 3D previews) identified by a tag.
     Custom {

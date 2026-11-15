@@ -64,6 +64,7 @@ config.core.view_distance.value = {0} cubes
 config.core.lod_distance = Distant terrain
 config.core.lod_distance.value = {0} cubes
 config.core.lod_detail = Distant terrain detail
+config.core.lod_detail.tooltip = Detail adapts to render resolution and camera zoom.
 config.core.cloud_height = Clouds elevation
 config.core.cloud_height.value = {0} blocks
 config.core.cloud_distance = Cloud render distance
