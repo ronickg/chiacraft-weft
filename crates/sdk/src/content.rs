@@ -2519,10 +2519,11 @@ impl BlockBuilder<'_> {
                 .push(element(&bc::PROPS, &p, abi::value_op::PUSH, ""));
         }
         // A part per combination of its own properties' values, from `.states(..)` and its signal.
-        let block_faces = self.faces_now();
         let looks = self.looks.take();
         let (signal, turns) = (self.signal, self.turns);
-        if looks.is_some() || signal.is_some() || turns.is_some() {
+        let generates_states = looks.is_some() || signal.is_some() || turns.is_some();
+        let block_faces = if generates_states || !self.keyed.is_empty() { self.faces_now() } else { Default::default() };
+        if generates_states {
             for p in state_combinations(&self.props) {
                 let mut ops = Vec::new();
                 let mut s = State::new(&mut ops, &block_faces);
