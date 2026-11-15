@@ -51,8 +51,9 @@ pub fn register(r: &mut Registry) {
     r.condition(&HUNGRY, |c| {
         let w = c.world();
         w.is_some_and(|w| {
-            w.component(c.entity(), &HUNGER)
-                .is_some_and(|h| h.food <= 6.0)
+            !w.outside_survival(c.entity())
+                && w.component(c.entity(), &HUNGER)
+                    .is_some_and(|h| h.food <= 6.0)
         })
     });
     r.attribute(&HUNGER_RATE, 1.0, 0.0, 10.0).rule();
