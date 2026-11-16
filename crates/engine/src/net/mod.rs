@@ -17,6 +17,9 @@ pub mod codec;
 pub mod p2p;
 pub mod screens;
 
+/// An attack press handled by the held item without an entity target.
+pub const ITEM_ATTACK: u64 = 0;
+
 /// Ticket others can use to join this host, once hosting is online.
 pub fn current_ticket() -> Option<String> {
     p2p::HOSTING.lock().as_ref().and_then(|h| h.ticket.clone())

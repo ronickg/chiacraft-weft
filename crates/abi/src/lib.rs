@@ -1189,6 +1189,8 @@ pub mod comp {
         pub const BLOCK: &str = "item.block";
         pub const ON_USE: &str = "item.on_use";
         pub const ON_RELEASE: &str = "item.on_release";
+        /// Main-hand item action on an attack press (`ItemUseArgs`).
+        pub const ON_ATTACK: &str = "item.on_attack";
         pub const CONDITION: &str = "item.condition";
     }
 

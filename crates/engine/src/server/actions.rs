@@ -380,6 +380,19 @@ impl Server {
 
             ToServer::Attack(target) => {
                 let Some((r, entity)) = self.region(pi) else { return };
+                let held = r.entities.held(entity);
+                if let Some((owner, callback)) = c
+                    .items
+                    .get(held.item as usize)
+                    .and_then(|item| item.on_attack)
+                {
+                    if target == crate::net::ITEM_ATTACK && r.attack_with_item(entity, held, owner, callback) {
+                        self.players[pi]
+                            .conn
+                            .send(ToClient::Swing { used_item: false, off_hand: false });
+                    }
+                    return;
+                }
                 if !in_reach(c, r, entity, target) {
                     return;
                 }
@@ -826,6 +839,31 @@ impl Dim {
         used
     }
 
+    fn attack_with_item(&mut self, entity: u64, held: ItemStack, owner: abi::ModId, callback: abi::Callback) -> bool {
+        let Some(e) = self.entities.get(entity) else { return false };
+        let slot = e.selected;
+        let a = self.call(owner, callback, |w| abi::ItemUseArgs {
+            world: w,
+            entity,
+            stack: held,
+            slot,
+            pos: [0; 3].into(),
+            face: 0,
+            has_target: 0,
+            handled: 0,
+            held_ticks: 0,
+        });
+        if a.handled == 0 {
+            return false;
+        }
+        if a.stack != held && crate::host::known_item("on_attack", &a.stack) {
+            self.entities.set_slot(entity, slot, a.stack);
+        }
+        self.events
+            .push(DimEvent::EntitySwing { id: entity, off: false });
+        true
+    }
+
     /// One tick of using items: held long enough they take effect; another item in hand ends
     /// their use. `players_only` while the world is frozen: players still act.
     pub fn finish_uses(&mut self, c: &'static Content, players_only: bool) {
@@ -902,6 +940,13 @@ impl Dim {
     /// it may not (`actions::BREAK_BLOCK`), said now so it doesn't mine all that time for nothing.
     pub fn start_mining(&mut self, c: &'static Content, entity: u64, frame: u64, pos: IVec3, part: u32) -> bool {
         let held = self.entities.held(entity).item;
+        if c.items
+            .get(held as usize)
+            .is_some_and(|item| item.on_attack.is_some())
+        {
+            self.stop_mining(entity);
+            return false;
+        }
         let aimed = self.with_space(c, frame, |d, _| {
             let state = d.aimed_part(c, pos, part);
             (d.get(pos).is_none() || d.may_break(c, pos, state, held, entity)).then_some(state)
@@ -976,7 +1021,11 @@ impl Dim {
         let mut refused = false;
         let worn = self.with_space(c, frame, |d, o| {
             let part = d.aimed_part(c, pos, part);
-            let keeps = (creative && c.no_creative_break(held.item)) || no_break;
+            let keeps = (creative && c.no_creative_break(held.item))
+                || no_break
+                || c.items
+                    .get(held.item as usize)
+                    .is_some_and(|item| item.on_attack.is_some());
             let free = c
                 .states
                 .get(part as usize)

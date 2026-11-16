@@ -492,6 +492,7 @@ pub mod item {
     pub static BLOCK: Component<Text, Item> = Component::named(i::BLOCK);
     pub static ON_USE: Component<crate::abi::Callback, Item> = Component::named(i::ON_USE);
     pub static ON_RELEASE: Component<crate::abi::Callback, Item> = Component::named(i::ON_RELEASE);
+    pub static ON_ATTACK: Component<crate::abi::Callback, Item> = Component::named(i::ON_ATTACK);
     pub static CONDITION: Component<crate::abi::Callback, Item> = Component::named(i::CONDITION);
 }
 

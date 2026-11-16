@@ -2827,6 +2827,7 @@ impl ItemBuilder<'_> {
         });
         self.set(&crate::comps::item::ON_RELEASE, cb)
     }
+
     /// What is left of it when it is used up (a potion's bottle, fuel's bucket).
     pub fn remainder(self, item: &crate::Item) -> Self {
         self.set_text(&c::REMAINDER, item.name())
@@ -2901,6 +2902,15 @@ impl ItemBuilder<'_> {
             a.handled = handled as u32;
         });
         self.set(&crate::comps::item::ON_USE, cb)
+    }
+
+    /// Takes over melee and mining while in the main hand. Runs once per attack press.
+    /// Return true to apply stack changes and play the swing.
+    pub fn on_attack(self, f: impl Fn(&mut ItemUse) -> bool + Send + Sync + 'static) -> Self {
+        let cb = callback(move |a: &mut abi::ItemUseArgs| {
+            a.handled = f(ItemUse::wrap(a)) as u32;
+        });
+        self.set(&crate::comps::item::ON_ATTACK, cb)
     }
 }
 

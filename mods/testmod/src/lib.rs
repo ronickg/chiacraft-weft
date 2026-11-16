@@ -19,6 +19,7 @@ mod camera;
 mod looks;
 mod mace;
 mod riding;
+mod scoped_blaster;
 
 use weft_sdk::terrain::*;
 use weft_sdk::*;
@@ -98,6 +99,7 @@ const FURNACE_USE: i64 = 20;
 
 fn init(r: &mut Registry) {
     looks::register(r);
+    scoped_blaster::register(r);
     mace::register(r);
     riding::register(r);
     camera::register(r);

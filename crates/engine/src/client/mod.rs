@@ -1593,7 +1593,17 @@ impl Client {
         let keeps = (self.mode.has(crate::tag_bits::game_mode::INSTANT_BREAK) && c.no_creative_break(self.held().item))
             || self.mode.has(crate::tag_bits::game_mode::NO_BREAK);
         let refused = keeps || self.refused_break.is_some();
-        if input.held("core:attack") {
+        let item_attack = c
+            .items
+            .get(self.held().item as usize)
+            .is_some_and(|item| item.on_attack.is_some());
+        if item_attack {
+            if input.pressed("core:attack") {
+                send_look.send(&mut self.conn);
+                self.conn.send(ToServer::Attack(crate::net::ITEM_ATTACK));
+            }
+            self.breaking = None;
+        } else if input.held("core:attack") {
             if let Some(id) = self.target_entity {
                 // A hit is a press, as often as you like; holding hits nothing. How much it
                 // does depends on how charged the swing was.
@@ -1649,7 +1659,7 @@ impl Client {
             self.breaking = None;
         }
         // Hitting nothing still spends the swing.
-        if input.pressed("core:attack") && self.target_entity.is_none() && self.target.is_none() {
+        if !item_attack && input.pressed("core:attack") && self.target_entity.is_none() && self.target.is_none() {
             self.conn.send(ToServer::Swing);
             self.swing_since = 0.0;
         }

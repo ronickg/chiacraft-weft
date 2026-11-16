@@ -635,6 +635,10 @@ pub unsafe extern "C" fn client_entity(c: *mut abi::ClientCtx, id: u64, out: *mu
                 max_health: cl.max_health,
                 size: cl.player.dims().size(),
                 selected: cl.selected as u32,
+                using: cl
+                    .using
+                    .map_or(0, |_| if cl.using_off { cl.off_held().item } else { cl.held().item }),
+                using_ticks: cl.using.map_or(0, |(ticks, _)| ticks as u32),
                 ..Default::default()
             };
             *out = state;
