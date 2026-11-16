@@ -2,7 +2,7 @@
 
 use crate::worldgen::util::sphere;
 use crate::worldgen::{TreePlaceData, register_tree};
-use crate::blocks::MUSHROOMS;
+use crate::blocks::{MUSHROOMS, DRYADS_SADDLE_MUSHROOM};
 
 use weft_sdk::*;
 
@@ -284,6 +284,22 @@ fn place_log(d: &mut TreePlaceData, log_block: &Block, length: u16) {
         };
         if deco != 0 {
             (d.place)(x, y + 1, z, deco, false);
+        } else if roll < 0.35 {
+            let mut facing = "east";
+            let x = x + if dx == 0 {
+                let mut d = d.rng.next() as i32 % 2;
+                if d == 0 { d = -1 }
+                facing = if d < 0 {"east"} else {"west"};
+                d
+            } else { 0 };
+            let z = z + if dz == 0 {
+                let mut d = d.rng.next() as i32 % 2;
+                if d == 0 { d = -1 }
+                facing = if d < 0 {"north"} else {"south"};
+                d
+            } else { 0 };
+            let block = DRYADS_SADDLE_MUSHROOM.with(&[("facing", facing)]);
+            (d.place)(x, y, z, block, false);
         }
     }
 }
