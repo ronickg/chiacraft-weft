@@ -491,13 +491,14 @@ pub trait Wgsl {
 }
 
 macro_rules! wgsl_types {
-    ($($t:ty => $s:literal, $a:literal, $n:literal),* $(,)?) => { $(impl Wgsl for $t { const TY: &'static str = $s; const LAYOUT: (usize, usize) = ($a, $n); })* };
+    ($($t:ty => $s:literal, $a:literal, $n:expr),* $(,)?) => { $(impl Wgsl for $t { const TY: &'static str = $s; const LAYOUT: (usize, usize) = ($a, $n); })* };
 }
 wgsl_types! {
     f32 => "f32", 4, 4, u32 => "u32", 4, 4, i32 => "i32", 4, 4,
     [f32; 2] => "vec2<f32>", 8, 8, [f32; 3] => "vec3<f32>", 16, 12, [f32; 4] => "vec4<f32>", 16, 16,
     [u32; 4] => "vec4<u32>", 16, 16, [i32; 4] => "vec4<i32>", 16, 16,
     [[f32; 4]; 3] => "array<vec4<f32>, 3>", 16, 48, [[f32; 4]; 4] => "mat4x4<f32>", 16, 64, [[f32; 4]; 6] => "array<vec4<f32>, 6>", 16, 96,
+    GpuSky => "Sky", 16, core::mem::size_of::<GpuSky>(),
 }
 
 /// Declares a GPU buffer struct: the Rust type and, from the same fields, its WGSL text
@@ -557,6 +558,8 @@ gpu_struct! {
         pub sun: [f32; 4],
         /// x solar sky-light multiplier; yz cloud fog start/end in blocks from the camera.
         pub environment: [f32; 4],
+        /// The cloud layer visible this frame, with zero opacity when absent.
+        pub cloud: GpuSky,
     }
 }
 

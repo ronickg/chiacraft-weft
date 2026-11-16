@@ -515,6 +515,16 @@ impl WorldRenderer {
     fn pipelines(gpu: &mut dyn Backend, shader: &Shader) -> Result<([PipelineId; 4], [PipelineId; 4], [PipelineId; 2]), String> {
         let depth_write = Some(DepthState { write: true, compare: Compare::GreaterEqual });
         let depth_read = Some(DepthState { write: false, compare: Compare::GreaterEqual });
+        let layers = if shader
+            .module
+            .entry_points
+            .iter()
+            .any(|entry| entry.name == "fs_layers")
+        {
+            "fs_layers"
+        } else {
+            "fs_translucent"
+        };
         let mut make = |label: &str, vs: &str, fs: &str, depth, blend, cull| {
             gpu.create_pipeline(&PipelineDesc {
                 label,
@@ -534,13 +544,13 @@ impl WorldRenderer {
             make("faces cutout", "vs_face", "fs_cutout", depth_write, Blend::None, true)?,
             make("faces translucent", "vs_face", "fs_translucent", depth_read, Blend::Alpha, true)?,
             // A face's layers over its first, on the very same corners: no depth of their own.
-            make("faces layers", "vs_face", "fs_translucent", depth_read, Blend::Alpha, true)?,
+            make("faces layers", "vs_face", layers, depth_read, Blend::Alpha, true)?,
         ];
         let quads = [
             make("quads opaque", "vs_quad", "fs_opaque", depth_write, Blend::None, true)?,
             make("quads cutout", "vs_quad", "fs_cutout", depth_write, Blend::None, true)?,
             make("quads translucent", "vs_quad", "fs_translucent", depth_read, Blend::Alpha, true)?,
-            make("quads layers", "vs_quad", "fs_translucent", depth_read, Blend::Alpha, true)?,
+            make("quads layers", "vs_quad", layers, depth_read, Blend::Alpha, true)?,
         ];
         let lod = [
             make("distant terrain", "vs_lod", "fs_lod", depth_write, Blend::None, true)?,

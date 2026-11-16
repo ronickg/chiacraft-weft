@@ -21,6 +21,7 @@ struct VOut {
     @location(11) pos: vec3<f32>,
     @location(12) @interpolate(flat) size: f32,
     @location(13) @interpolate(flat) lod_fade: f32,
+    @location(14) rel: vec3<f32>,
 }
 
 fn shader_of(tex: u32) -> u32 {
@@ -142,6 +143,7 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     out.clip = scene.view_proj * pos;
     out.lod_fade = 0.0;
     out.dist = length(pos.xyz);
+    out.rel = pos.xyz;
     out.uv = UVS[(c + ((w0 >> FACE_TURN_SHIFT) & FACE_TURN_MASK)) % 4u];
     let tex_id = w1 & FACE_TEX_MASK;
     let fr = texture_frame(tex_id);
@@ -188,6 +190,7 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     out.clip = scene.view_proj * pos;
     out.lod_fade = 0.0;
     out.dist = length(pos.xyz);
+    out.rel = pos.xyz;
     out.uv = uvs[c];
     let tex_id = w4 & FACE_TEX_MASK;
     let fr = texture_frame(tex_id);
@@ -290,13 +293,22 @@ fn fs_cutout(in: VOut) -> @location(0) vec4<f32> {
     return vec4(shade(in, albedo).rgb, 1.0);
 }
 
-@fragment
-fn fs_translucent(in: VOut) -> @location(0) vec4<f32> {
+fn translucent(in: VOut) -> vec4<f32> {
     let du = dpdx(in.uv);
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     let albedo = sample(in, nuv, du, dv);
     return shade(in, albedo);
+}
+
+@fragment
+fn fs_translucent(in: VOut) -> @location(0) vec4<f32> {
+    return through_cloud(translucent(in), in.rel, scene);
+}
+
+@fragment
+fn fs_layers(in: VOut) -> @location(0) vec4<f32> {
+    return translucent(in);
 }
 
 // Distant terrain (`client::lod`): a record is the `dir` face of a box in its tile, textured and
@@ -339,6 +351,7 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     out.clip = scene.view_proj * pos;
     out.lod_fade = f32(data & LOD_DRAW_FADE_MASK) / f32(LOD_DRAW_FADE_MASK) * 3.0 - 1.0;
     out.dist = length(pos.xyz);
+    out.rel = pos.xyz;
     let o = origins[ii] + g.cam_cube;
     let world = vec3<f32>(o.xyz * 16) + local + vec3(0.0, 0.125, 0.0);
     out.uv = lod_uv(dir, world);
@@ -434,5 +447,5 @@ fn fs_lod_surface(in: VOut) -> @location(0) vec4<f32> {
         discard;
     }
     let nuv = nearest_uv(in.size, fract(in.uv), du, dv);
-    return shade(in, sample(in, nuv, du, dv));
+    return through_cloud(shade(in, sample(in, nuv, du, dv)), in.rel, scene);
 }

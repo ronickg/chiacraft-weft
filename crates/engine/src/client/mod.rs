@@ -2844,6 +2844,7 @@ impl Client {
             light: [environment.ambient, self.brightness, ticks, environment.night_vision],
             environment: [environment.sunlight, environment.cloud_fog_start, environment.cloud_fog_end, 0.0],
             sun: self.sun(),
+            cloud: Default::default(),
         }
     }
 
@@ -2889,7 +2890,7 @@ impl Client {
                 self.view_radius,
             );
         }
-        let scene = self.scene(&cam, frame);
+        let mut scene = self.scene(&cam, frame);
         while self.scene_bufs.len() < gpu.frames_in_flight() {
             self.scene_bufs.push(gpu.create_buffer(
                 size_of::<Scene>() as u64,
@@ -2898,7 +2899,6 @@ impl Client {
             ));
         }
         let scene_buf = self.scene_bufs[frame.slot];
-        gpu.mapped(scene_buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
         // Opaque blocks, then entities and cutout particles, then what is seen through:
         // translucent blocks, cracks and gizmo fills, blended particles, and the hand.
         let frames: Vec<(u64, DVec3)> = self
@@ -2934,7 +2934,7 @@ impl Client {
         late.clear();
         // The sky fills what the opaque world left, and translucent things are seen against it.
         let overlays = self.overlays(textures);
-        self.sky.draw(
+        scene.cloud = self.sky.draw(
             gpu,
             &mut late,
             frame,
@@ -2947,6 +2947,7 @@ impl Client {
             &self.environment.sky,
             &overlays,
         );
+        gpu.mapped(scene_buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
         self.render.draw_translucent(&mut late);
         let alive = !self.dead && !self.mode.has(crate::tag_bits::game_mode::NO_INTERACT);
         let hand = (alive && self.camera_has(crate::tag_bits::camera::HAND) && !self.hide_gui).then(|| entity_render::Hand {
