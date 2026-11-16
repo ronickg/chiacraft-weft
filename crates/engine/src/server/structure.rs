@@ -5,15 +5,16 @@
 //! `Dim::place`, and block entities on it are entities of the region like any.
 
 use glam::{DVec3, IVec3};
+use std::f64::consts::{FRAC_PI_2, TAU};
 
 use weft_abi as abi;
 
 use super::dim::Dim;
-use super::entity::Motion;
+use super::entity::{BodyMount, Motion};
 use super::signal::{Moved, RiderMeets};
 use super::space::Space;
 use crate::content::{AIR, Content};
-use crate::physics::Transform;
+use crate::physics::{Aabb, Transform};
 use crate::world::{cube_of, local_index};
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -29,6 +30,9 @@ const SPEED_PER_LEVEL: f64 = 0.5;
 /// However many floaters, on each axis: it looks one block ahead for each it comes to, so less
 /// than one a tick.
 const MOST_SPEED: f64 = 15.0;
+/// Radians per tick per signal level. Long arms also have a limit on tip travel.
+const TURN_PER_LEVEL: f64 = TAU / (8.0 * crate::world::TPS as f64 * 15.0);
+const TURN_PROBE_TRAVEL: f64 = 0.125;
 
 /// A block out of its place on its way to another: where in the body and where it ends up,
 /// with the entity it has, which stays the same one.
@@ -45,10 +49,12 @@ pub struct FloaterPlan {
     pub floaters: Vec<IVec3>,
     pub cells: FxHashSet<IVec3>,
     pub broken: Vec<IVec3>,
+    mount: Option<(IVec3, u8, Option<Vec<Lifted>>)>,
 }
 
 /// What `Dim::lift` takes: from where, to where in the body and where it is meant to end up, and
 /// what of it (a cell of wire may have pieces that stay), if not all.
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Lifted {
     pub from: IVec3,
     pub local: IVec3,
@@ -60,6 +66,7 @@ pub struct Lifted {
 #[derive(Clone, Copy, PartialEq)]
 pub enum Liveness {
     Free,
+    Assembly,
     OnTheWay,
 }
 
@@ -154,10 +161,23 @@ impl Dim {
                 carried.push(Carried { local: l.local, to: l.to, state: s, entity: None });
                 continue;
             }
+            let mut wet = Vec::new();
             if !self.space.extras(l.from).is_empty() {
-                extras.push((l.local, self.space.extras(l.from).to_vec()));
+                let (water, on_body): (Vec<_>, Vec<_>) = self
+                    .space
+                    .extras(l.from)
+                    .iter()
+                    .copied()
+                    .partition(|&s| live == Liveness::Assembly && c.states[s as usize].liquid.is_some());
+                wet = water;
+                if !on_body.is_empty() {
+                    extras.push((l.local, on_body));
+                }
             }
             let Some((state, entity, signal)) = self.take_block(c, l.from) else { continue };
+            if !wet.is_empty() {
+                self.write_cell(c, l.from, wet.remove(0), Some(wet), false);
+            }
             let state = l.part.unwrap_or(state);
             // Pieces of wire on what stays, stay.
             if let (Some(part), Some(whole)) = (l.part, whole) {
@@ -196,6 +216,7 @@ impl Dim {
         let on = (self.frame != 0).then_some(self.frame);
         if let Some(e) = self.entities.get_mut(body) {
             e.frame = on;
+            e.set_frame_rotation(self.place.rotation());
         }
         for b in &carried {
             if let Some(id) = b.entity {
@@ -226,12 +247,30 @@ impl Dim {
     pub(super) fn floater_plans(&self, c: &Content, floaters: Vec<IVec3>) -> (Vec<FloaterPlan>, Vec<IVec3>) {
         let mut plans: Vec<FloaterPlan> = Vec::new();
         let mut held = Vec::new();
+        let mut mounted = Vec::new();
         for p in floaters {
-            let Some(cells) = self.stuck_to_floater(c, p) else {
+            let Some(info) = self.get(p).map(|s| c.states[s as usize].signal) else { continue };
+            let moving_driver = info.kind != abi::signal_kind::BODY_MOUNT;
+            let bounds = self.assembly_bounds(c, p);
+            let cells = if let Some(bounds) = bounds {
+                self.connected_assembly(c, p, Some(bounds)).ok()
+            } else {
+                self.attached_blocks(c, p, moving_driver)
+            };
+            let Some(cells) = cells.filter(|v| !v.is_empty()) else {
                 held.push(p);
                 continue;
             };
-            let mut plan = FloaterPlan { floaters: vec![p], cells: cells.into_iter().collect(), broken: Vec::new() };
+            if !moving_driver {
+                let center = p + crate::world::DIRS[info.front as usize];
+                let lifted = bounds.map(|b| self.connected_lifted(c, p, center, cells.clone(), Some(b)));
+                let claims = lifted
+                    .as_ref()
+                    .map_or_else(|| cells.into_iter().collect(), |v| v.iter().map(|l| l.from).collect());
+                mounted.push(FloaterPlan { floaters: vec![p], cells: claims, broken: Vec::new(), mount: Some((p, info.front, lifted)) });
+                continue;
+            }
+            let mut plan = FloaterPlan { floaters: vec![p], cells: cells.into_iter().collect(), broken: Vec::new(), mount: None };
             // It and those it shares a block with are one, whichever came first.
             let (joined, others): (Vec<FloaterPlan>, Vec<FloaterPlan>) = plans
                 .into_iter()
@@ -272,6 +311,7 @@ impl Dim {
                 }
             }
         }
+        going.extend(mounted);
         (going, held)
     }
 
@@ -294,6 +334,20 @@ impl Dim {
 
     /// Off with them.
     pub(super) fn run_floater_plan(&mut self, c: &'static Content, plan: FloaterPlan) {
+        if let Some((block, face, lifted)) = plan.mount {
+            let center = block + crate::world::DIRS[face as usize];
+            let live = if lifted.is_some() { Liveness::Assembly } else { Liveness::Free };
+            let cells = lifted.unwrap_or_else(|| self.with_riders(c, center, plan.cells.into_iter().collect()));
+            let (body, _) = self.lift(c, c.game.platform_kind, center.as_dvec3() + Transform::FEET, cells, &[], live);
+            if let Some(e) = self.entities.get_mut(body) {
+                e.mount = Some(Box::new(BodyMount { block, face, speed: 1, angle: 0.0, last_grid: 0.0, stop: None }));
+            }
+            if let Some(space) = self.bodies.get_mut(&body) {
+                space.track_mounted_blocks();
+            }
+            self.floater_shows(c, block, 1);
+            return;
+        }
         self.break_for_body(c, plan.broken);
         let center = plan
             .floaters
@@ -363,6 +417,206 @@ impl Dim {
         }
     }
 
+    pub(super) fn has_mount(&self, at: IVec3) -> bool {
+        self.bodies.keys().any(|&id| {
+            self.entities
+                .get(id)
+                .is_some_and(|e| e.motion != Motion::Parked && e.mount.as_ref().is_some_and(|m| m.block == at))
+        })
+    }
+
+    pub(super) fn advance_mounts(&mut self, c: &Content) -> (FxHashMap<u64, Transform>, Vec<u64>) {
+        let mut before = FxHashMap::default();
+        let mut landing = Vec::new();
+        for &id in self.bodies.keys() {
+            let Some(e) = self.entities.get(id).filter(|e| e.motion != Motion::Parked) else { continue };
+            let Some(mut mount) = e.mount.as_deref().copied() else { continue };
+            if self.turn_body_mount(c, id, e.pos, &mut mount) {
+                landing.push(id);
+            }
+            if Some(mount.angle) != e.mount.as_ref().map(|m| m.angle) {
+                before.insert(id, e.body_place());
+            }
+            if let Some(saved) = self
+                .entities
+                .get_mut(id)
+                .and_then(|e| e.mount.as_deref_mut())
+            {
+                *saved = mount;
+            }
+        }
+        landing.sort_unstable();
+        (before, landing)
+    }
+
+    /// Advance before entity physics so riders see both poses of this tick.
+    fn turn_body_mount(&self, c: &Content, id: u64, pos: DVec3, mount: &mut BodyMount) -> bool {
+        let Some(body) = self.bodies.get(&id) else { return false };
+        if body.bounds.is_none() {
+            return true;
+        }
+        let Some(state) = self.get(mount.block) else { return false };
+        let info = c.states[state as usize].signal;
+        let valid = info.kind == abi::signal_kind::BODY_MOUNT && info.front == mount.face;
+        let power = if valid {
+            let Some(power) = self.space.signals.level_into(mount.block) else { return false };
+            power
+        } else {
+            0
+        };
+        let rotates = valid && info.flags as u32 & abi::signal_flags::ROTATES != 0;
+        let hold = rotates && info.flags as u32 & abi::signal_flags::HOLD != 0 && !body.stopping;
+        if hold {
+            mount.stop = None;
+            if power == 0 {
+                return false;
+            }
+        }
+        let stopping = body.stopping || power == 0;
+        if !rotates && !stopping && mount.stop.is_none() {
+            return false;
+        }
+        let next_grid = mount.last_grid + FRAC_PI_2;
+        if stopping && mount.stop.is_none() {
+            mount.stop = Some(if mount.angle == mount.last_grid { mount.last_grid } else { next_grid });
+        }
+        if power > 0 && mount.stop.is_none() {
+            mount.speed = power;
+        }
+        let goal = mount.stop.unwrap_or(next_grid);
+        let blocks = body.block_snapshot();
+        let initial = *mount;
+        let fits = |turn: f64| {
+            let place = Transform::rotated(pos, initial.rotation_at(turn));
+            self.mount_fits(c, place, &blocks)
+        };
+        let axis = crate::world::DIRS[mount.face as usize].as_dvec3().abs();
+        let radius = body.bounds.map_or(1.0, |(lo, hi)| {
+            let far = lo.abs().max(hi.abs()).as_dvec3() + DVec3::splat(0.5);
+            (far * (DVec3::ONE - axis)).length().max(1.0)
+        });
+        let step = (TURN_PER_LEVEL * mount.speed as f64).min(2.0 * TURN_PROBE_TRAVEL / radius);
+        let diff = goal - mount.angle;
+        let next = if diff.abs() <= step { goal } else { mount.angle + step.copysign(diff) };
+        let clear = |angle| self.mount_clear(c, id, Transform::rotated(pos, initial.rotation_at(angle)), body);
+        if mount.angle == goal && mount.stop.is_some() {
+            return clear(goal) && fits(goal);
+        }
+        if !clear((mount.angle + next) * 0.5) || !clear(next) || next == goal && !fits(goal) {
+            if hold {
+                return false;
+            }
+            mount.stop = Some(mount.last_grid);
+            return mount.angle == mount.last_grid && clear(mount.last_grid) && fits(mount.last_grid);
+        }
+        mount.angle = next;
+        if next != goal {
+            return false;
+        }
+        if mount.stop.is_some() {
+            return true;
+        }
+        mount.last_grid = next % TAU;
+        mount.angle = mount.last_grid;
+        false
+    }
+
+    fn mount_clear(&self, c: &Content, id: u64, place: Transform, body: &Space) -> bool {
+        let colliders = body.colliders(c);
+        let Some(bounds) = colliders.bounds else { return true };
+        let hull = place.box_to_world(bounds);
+        let other_bodies: Vec<_> = self
+            .bodies
+            .iter()
+            .filter_map(|(&other, space)| {
+                let e = self.entities.get(other)?;
+                if other == id || e.frame == Some(id) || e.motion == Motion::Parked {
+                    return None;
+                }
+                let other = e.body_place();
+                let area = other.box_to_world(space.colliders(c).bounds?);
+                hull.intersects(&area)
+                    .then(|| (place.relative_to(other), area, super::space::DeckCells(space)))
+            })
+            .collect();
+        let world = super::space::CubeCells(&self.space.cubes);
+        colliders.groups.iter().all(|group| {
+            let area = place.box_to_world(group.area);
+            if world.may_collide(c, area)
+                && crate::physics::collides(c, &world, area)
+                && group
+                    .boxes
+                    .iter()
+                    .any(|&shape| crate::physics::rotated_collides(c, &world, shape, place))
+            {
+                return false;
+            }
+            other_bodies
+                .iter()
+                .filter(|(_, bounds, _)| bounds.intersects(&area))
+                .all(|(relative, bounds, deck)| {
+                    group.boxes.iter().all(|&shape| {
+                        !bounds.intersects(&place.box_to_world(shape)) || !crate::physics::rotated_collides(c, deck, shape, *relative)
+                    })
+                })
+        })
+    }
+
+    pub(super) fn mount_fits(&self, c: &Content, place: Transform, blocks: &[(IVec3, u32)]) -> bool {
+        let turn = place.turn();
+        let free = |p| {
+            !self.space.signals.reserved(p)
+                && self.get(p).is_some_and(|s| {
+                    (s == AIR || c.states[s as usize].flags & abi::block_flags::REPLACEABLE != 0)
+                        && self
+                            .space
+                            .extras(p)
+                            .iter()
+                            .all(|s| c.states[*s as usize].flags & abi::block_flags::REPLACEABLE != 0)
+                })
+        };
+        blocks.iter().all(|&(p, state)| {
+            let to = place.cell_at(p);
+            let turned = c.turned_state(state, turn);
+            let was = &c.states[state as usize].cells;
+            let now = &c.states[turned as usize].cells;
+            free(to)
+                && was.len() == now.len()
+                && was.iter().all(|&(offset, _)| {
+                    let at = place.cell_at(p + offset);
+                    free(at) && now.iter().any(|&(offset, _)| to + offset == at)
+                })
+        })
+    }
+
+    pub(super) fn land_mount(&mut self, c: &'static Content, id: u64) {
+        self.in_frame(id, |d| d.finish_moving_here(c));
+        let Some(e) = self.entities.get(id) else { return };
+        let Some(m) = e.mount.as_ref() else { return };
+        let Some(space) = self.bodies.get(&id) else { return };
+        if !self.mount_fits(c, e.body_place(), &space.block_snapshot()) || !self.mount_clear(c, id, e.body_place(), space) {
+            if let Some(m) = self
+                .entities
+                .get_mut(id)
+                .and_then(|e| e.mount.as_deref_mut())
+            {
+                m.stop = Some(m.last_grid);
+            }
+            return;
+        }
+        let at = m.block;
+        self.turn_assembly_bounds(c, at, e.body_place());
+        let power = self.space.signals.level_into(at).unwrap_or(0);
+        self.put_down_whole(c, id);
+        if self
+            .get(at)
+            .is_some_and(|s| c.states[s as usize].signal.kind == abi::signal_kind::BODY_MOUNT)
+        {
+            self.floater_shows(c, at, if power == 0 { 0 } else { 2 });
+            self.space.signals.stop_mount(at);
+        }
+    }
+
     /// Platforms: their floaters say how they go. Coming to a stop, they go on to a whole block.
     pub(super) fn drive_bodies(&mut self, c: &'static Content) {
         let bodies = &self.bodies;
@@ -373,6 +627,8 @@ impl Dim {
             .filter(|e| {
                 (e.kind == c.game.platform_kind || bodies.get(&e.id).is_some_and(|b| b.stopping))
                     && !e.removed
+                    && e.mount.is_none()
+                    && e.ship.is_none()
                     && e.motion != Motion::Parked
             })
             .map(|e| e.id)
@@ -528,6 +784,7 @@ impl Dim {
         self.in_frame(id, |d| d.finish_moving_here(c));
         let Some(e) = self.entities.get(id).filter(|e| e.motion != Motion::Parked) else { return };
         let (pos, on) = (e.pos, e.frame);
+        let oriented = (e.mount.is_some() || e.ship.is_some()).then(|| e.body_place());
         let Some(b) = self.bodies.get(&id) else { return };
         let (all, was) = (b.all_blocks(), b.cell);
         let blocks: Vec<(IVec3, u32, Option<u64>)> = all
@@ -542,7 +799,10 @@ impl Dim {
                 id,
                 blocks
                     .into_iter()
-                    .map(|(local, state, entity)| Carried { local, to: local + cell, state, entity })
+                    .map(|(local, state, entity)| {
+                        let to = oriented.map_or(local + cell, |p| p.cell_at(local));
+                        Carried { local, to, state, entity }
+                    })
                     .collect(),
                 Vec::new(),
                 None,
@@ -555,6 +815,11 @@ impl Dim {
     /// its place taken drops as it would broken. `also`: other cells that changed with it, and
     /// what they were.
     pub fn put_down(&mut self, c: &'static Content, body: u64, blocks: Vec<Carried>, also: Vec<(IVec3, u32)>, turns: Option<(IVec3, u32)>) {
+        let turn = self
+            .entities
+            .get(body)
+            .filter(|e| e.mount.is_some() || e.ship.is_some())
+            .map_or(abi::Turn::NONE, |e| e.body_place().turn());
         if let Some(e) = self.entities.get_mut(body) {
             e.motion = Motion::Parked;
             e.vel = DVec3::ZERO;
@@ -572,16 +837,27 @@ impl Dim {
             if let Some(now) = there.filter(|_| c.states[b.state as usize].signal.kind != abi::signal_kind::PISTON_HEAD) {
                 b.state = now;
             }
+            if turn != abi::Turn::NONE {
+                if c.covered_step(b.state).is_some() {
+                    continue;
+                }
+                b.state = c.turned_state(b.state, turn);
+            }
             let was = self.get(b.to);
             let signal = self
                 .bodies
                 .get(&body)
                 .map_or_else(Moved::default, |s| s.signals.carry_out(b.local));
-            let extras = self
+            let mut extras = self
                 .bodies
                 .get(&body)
                 .map_or(Vec::new(), |s| s.extras(b.local).to_vec());
-            self.land_block(c, b.to, b.state, b.entity, signal);
+            if turn != abi::Turn::NONE {
+                extras
+                    .iter_mut()
+                    .for_each(|s| *s = c.turned_state(*s, turn));
+            }
+            self.land_block(c, b.to, b.state, b.entity, if turn == abi::Turn::NONE { signal } else { signal.turned(turn) });
             if self.get(b.to) == Some(b.state) {
                 self.write_cell(c, b.to, b.state, Some(extras), true);
             }
@@ -684,45 +960,64 @@ impl Dim {
         for id in ids {
             let Some(e) = self.entities.get(id).filter(|e| e.motion != Motion::Parked) else { continue };
             let place = Transform::of(e.pos);
+            let pose = (e.mount.is_some() || e.ship.is_some()).then(|| e.body_place());
             let Some(b) = self.bodies.get_mut(&id) else { continue };
             let was = b.cell;
             let now = place.cell(was);
+            let old = std::mem::replace(&mut b.projected_pose, pose);
             let in_touch = std::mem::replace(&mut b.in_touch, true);
-            if in_touch && was == Some(now) {
+            if in_touch && was == Some(now) && old == pose {
                 continue;
             }
             b.cell = Some(now);
-            if was != Some(now) {
-                self.crossed(c, id, was, now);
+            let project = |at: IVec3| pose.map_or(at + now, |place| place.cell_at(at));
+            let previous = |at: IVec3| was.map(|w| old.map_or(at + w, |place| place.cell_at(at)));
+            let moved_cells = was != Some(now)
+                || b.block_snapshot()
+                    .iter()
+                    .any(|(p, _)| previous(*p) != Some(project(*p)));
+            if moved_cells {
+                self.crossed(c, id, previous, project);
             }
-            self.light_from_body(c, id, now);
-            self.see_world_light(id);
+            if !in_touch || moved_cells {
+                self.light_from_body(c, id, now);
+                self.see_world_light(id);
+            }
             self.exchange_signals(c, id);
         }
     }
 
     /// Body `id` came to be `now` from the world's cells (and was `was`).
-    fn crossed(&mut self, c: &'static Content, id: u64, was: Option<IVec3>, now: IVec3) {
+    fn crossed(&mut self, c: &'static Content, id: u64, was: impl Fn(IVec3) -> Option<IVec3>, now: impl Fn(IVec3) -> IVec3) {
         let Some(b) = self.bodies.get(&id) else { return };
         let blocks: Vec<(IVec3, u32)> = b.all_blocks();
         let watched = b.signals.watched();
         for &(at, _) in &blocks {
-            self.space.signals.passing(at + now);
-            if let Some(w) = was {
-                self.space.signals.passing(at + w);
+            let (from, to) = (was(at), now(at));
+            if from == Some(to) {
+                continue;
+            }
+            self.space.signals.passing(to);
+            if let Some(w) = from {
+                self.space.signals.passing(w);
             }
         }
         // Its own observers, looking at what isn't its own: the world moves past them.
-        if let (Some(w), Some(b)) = (was, self.bodies.get_mut(&id)) {
+        if let Some(b) = self.bodies.get_mut(&id) {
             for at in watched {
-                if b.get(at).is_none_or(|s| s == AIR) && self.space.get(at + w) != self.space.get(at + now) {
+                if b.get(at).is_none_or(|s| s == AIR) && was(at).is_some_and(|p| self.space.get(p) != self.space.get(now(at))) {
                     b.signals.passing(at);
                 }
             }
         }
         for (at, state) in blocks {
-            if let Some((owner, cb)) = c.block_of(state).cb.on_carried {
-                let cell = at + now;
+            let cell = now(at);
+            if let Some((owner, cb)) = c
+                .block_of(state)
+                .cb
+                .on_carried
+                .filter(|_| was(at) != Some(cell))
+            {
                 self.call(owner, cb, |w| abi::BlockEventArgs {
                     world: w,
                     pos: cell.to_array().into(),
@@ -740,9 +1035,14 @@ impl Dim {
     fn see_world_light(&mut self, id: u64) {
         let Some(b) = self.bodies.get(&id) else { return };
         let Some(cell) = b.cell else { return };
+        let turned = self
+            .entities
+            .get(id)
+            .filter(|e| e.mount.is_some() || e.ship.is_some())
+            .map(|e| e.body_place());
         let mut lights: FxHashMap<IVec3, u32> = FxHashMap::default();
-        for (at, _) in b.all_blocks() {
-            let w = at + cell;
+        for &(at, _) in b.block_snapshot().iter() {
+            let w = turned.map_or(at + cell, |t| t.cell_at(at));
             let here = self
                 .space
                 .cubes
@@ -772,7 +1072,17 @@ impl Dim {
                 {
                     return false;
                 }
-                let (lo, hi) = (cube_of(lo + cell), cube_of(hi + cell));
+                let (lo, hi) = self
+                    .entities
+                    .get(**id)
+                    .filter(|e| e.mount.is_some() || e.ship.is_some())
+                    .map_or((lo + cell, hi + cell), |e| {
+                        let b = e
+                            .body_place()
+                            .box_to_world(Aabb { min: lo.as_dvec3(), max: (hi + IVec3::ONE).as_dvec3() });
+                        (b.min.floor().as_ivec3(), b.max.floor().as_ivec3())
+                    });
+                let (lo, hi) = (cube_of(lo), cube_of(hi));
                 self.space
                     .light_dirty
                     .iter()
@@ -787,11 +1097,17 @@ impl Dim {
 
     /// The world's light from body `id`, which is `cell` from the world's cells now.
     fn light_from_body(&mut self, c: &'static Content, id: u64, cell: IVec3) {
+        let turned = self
+            .entities
+            .get(id)
+            .filter(|e| e.mount.is_some() || e.ship.is_some())
+            .map(|e| e.body_place());
         let lights: Vec<(IVec3, [u8; 3])> = self.bodies.get(&id).map_or(Vec::new(), |b| {
-            b.all_blocks()
-                .into_iter()
+            b.block_snapshot()
+                .iter()
+                .copied()
                 .filter(|(_, s)| c.states[*s as usize].light != [0; 3])
-                .map(|(at, s)| (at + cell, c.states[s as usize].light))
+                .map(|(at, s)| (turned.map_or(at + cell, |t| t.cell_at(at)), c.states[s as usize].light))
                 .collect()
         });
         self.set_body_lights(c, id, lights);
@@ -876,8 +1192,24 @@ impl Dim {
 
     /// What body `id` and the world give each other, as they are next to each other now.
     pub(super) fn exchange_signals(&mut self, c: &'static Content, id: u64) {
+        let mount = self.entities.get(id).and_then(|e| {
+            let place = e.body_place();
+            if let Some(m) = &e.mount {
+                Some((place, m.angle == m.last_grid))
+            } else {
+                e.ship.as_ref().map(|_| (place, place.grid_aligned()))
+            }
+        });
         let Some(b) = self.bodies.get_mut(&id) else { return };
         let Some(cell) = b.cell else { return };
+        if mount.is_some_and(|(_, aligned)| !aligned) {
+            b.signals.set_outside(0, Default::default());
+            self.space.signals.set_outside(id, Default::default());
+            return;
+        }
+        let place = mount.map(|(place, _)| place);
+        let project = |at: IVec3| place.map_or(at + cell, |t| t.cell_at(at));
+        let turn = place.map_or(abi::Turn::NONE, Transform::turn);
         let (giving, around) = {
             let view = super::signal::View { cubes: &b.cubes, on_body: true };
             let around: FxHashSet<IVec3> = b
@@ -886,13 +1218,13 @@ impl Dim {
                 .flat_map(|p| crate::world::DIRS.map(|d| p + d))
                 .filter(|p| b.get(*p).is_none_or(|s| s == AIR))
                 .collect();
-            (b.signals.giving(c, view, cell), around)
+            (b.signals.giving(c, view, project, turn), around)
         };
         let world = super::signal::View { cubes: &self.space.cubes, on_body: false };
         let got = self
             .space
             .signals
-            .giving_at(c, world, around.into_iter(), cell);
+            .giving_at(c, world, around.into_iter(), project, turn.inverse());
         b.signals.set_outside(0, got);
         self.space.signals.set_outside(id, giving);
     }
@@ -978,14 +1310,15 @@ impl Dim {
 
     /// Where blocks a client saw on body `frame` really are: one that has landed only looks like
     /// it is still there, and its blocks are in what it landed on.
-    pub fn landed_as(&self, frame: u64, pos: IVec3) -> (u64, IVec3) {
+    pub fn landed_as(&self, frame: u64, pos: IVec3) -> (u64, IVec3, abi::Turn) {
         let landed = self
             .entities
             .get(frame)
             .filter(|e| e.motion == Motion::Parked);
         match (landed, self.bodies.get(&frame).and_then(|b| b.cell)) {
-            (Some(e), Some(cell)) if e.frame.is_none() => (0, pos + cell),
-            _ => (frame, pos),
+            (Some(e), _) if e.mount.is_some() || e.ship.is_some() => (0, e.body_place().cell_at(pos), e.body_place().turn()),
+            (Some(e), Some(cell)) if e.frame.is_none() => (0, pos + cell, abi::Turn::NONE),
+            _ => (frame, pos, abi::Turn::NONE),
         }
     }
 

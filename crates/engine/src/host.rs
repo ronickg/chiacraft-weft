@@ -219,6 +219,7 @@ pub static HOST: Host = Host {
     set_entity_appearance,
     entity_kind_size,
     body_from_blocks,
+    assembly_select,
     body_to_blocks,
     body_fall,
     push_blocks,
@@ -604,6 +605,10 @@ unsafe extern "C" fn body_from_blocks(
             .collect();
         dim(w).lift_for_mod(content(), ip(center), &cells)
     }
+}
+
+unsafe extern "C" fn assembly_select(w: *mut abi::WorldCtx, player: u64, cell: *const abi::BlockPos, tool: u8) -> u32 {
+    unsafe { dim(w).assembly_select(content(), player, cell.as_ref().map(|p| IVec3::from_array(p.to_array())), tool != 0) }
 }
 
 unsafe extern "C" fn body_to_blocks(w: *mut abi::WorldCtx, entity: u64) {

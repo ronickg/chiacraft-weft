@@ -62,7 +62,7 @@ pub const COMMANDS: &[(&str, &str, Handler, u32)] = &[
     ("give", "<who:targets> <item:item> [count:int] | <item:item> [count:int]", give, p::GAME_MASTER),
     ("time", "set <time:time> | add <ticks:int> | query", time, p::GAME_MASTER),
     ("summon", "<entity:entity> [pos:pos] [count:int]", summon, p::GAME_MASTER),
-    ("clear", "[who:targets] | [item:item]", clear, p::GAME_MASTER),
+    ("clear", "item <who:targets> [filter:item] | item [filter:item] | entity <who:targets>", clear, p::GAME_MASTER),
     ("setblock", "<pos:pos> <block:block>", set_block, p::GAME_MASTER),
     ("insert", "<pos:pos> <item:item> [count:int]", insert, p::GAME_MASTER),
     ("block", "<pos:pos>", block, p::GAME_MASTER),
@@ -373,12 +373,10 @@ fn summon(s: &mut Server, x: &Ctx) -> Vec<Msg> {
     say("summon.done", vec![int(count), text(&kname)])
 }
 
-/// `/clear <targets>`: kills them. `/clear [item]`: empties the player's own inventory, or only
-/// the stacks of `item`.
 fn clear(s: &mut Server, x: &Ctx) -> Vec<Msg> {
     let c = x.c;
-    if x.a.get("who").is_some() {
-        let who = x.targets(s, "who");
+    let who = x.targets(s, "who");
+    if x.a.get("entity").is_some() {
         for &(d, id) in &who {
             if let Some(r) = s.dims[d as usize].entity_region(id) {
                 r.damage(c, id, &weft_abi::Damage::new(f32::MAX, damage::VOID));
@@ -386,10 +384,10 @@ fn clear(s: &mut Server, x: &Ctx) -> Vec<Msg> {
         }
         return say("clear.killed", vec![int(who.len())]);
     }
-    let (d, id) = x.me;
-    let filter = x.a.id("item");
+    let filter = x.a.id("filter");
     let mut total: u64 = 0;
-    if let Some(r) = s.dims[d as usize].entity_region(id) {
+    for (d, id) in who {
+        let Some(r) = s.dims[d as usize].entity_region(id) else { continue };
         let slots = r.entities.inventories.get(&id).map_or(0, Vec::len) as u32;
         for slot in 0..slots {
             let stack = r.entities.inventory_slot(id, slot);

@@ -8,7 +8,7 @@ use weft_abi as abi;
 use super::dim::Dim;
 use super::entity::{Stuck, StuckIn};
 use crate::content::Content;
-use crate::physics::{Cells, Transform};
+use crate::physics::Cells;
 
 /// At most this many hits refused in one tick before a projectile just flies on.
 const MAX_REFUSED: usize = 4;
@@ -27,7 +27,7 @@ impl Dim {
                 let point = from + dir * h.dist;
                 // On a body's block, where in that body's blocks.
                 let on = match self.entities.get(h.frame).filter(|_| h.frame != 0) {
-                    Some(b) => Transform::of(b.pos).to_local(self.place.to_world(point)),
+                    Some(b) => b.body_place().to_local(self.place.to_world(point)),
                     None => point,
                 };
                 best = Some(abi::RayHit {
@@ -233,7 +233,7 @@ impl Dim {
         let world = self.place.to_world(to);
         let (at, yaw) = match into {
             StuckIn::Block { body, .. } => match self.entities.get(body).filter(|_| body != 0) {
-                Some(b) => (Transform::of(b.pos).to_local(world), yaw),
+                Some(b) => (b.body_place().to_local(world), yaw),
                 None => (to, yaw),
             },
             StuckIn::Entity(id) => match self.entities.get(id) {
@@ -263,7 +263,10 @@ impl Dim {
                     let cells = super::space::DeckCells(d);
                     held(&|b| (cells.main(b), cells.extras(b).to_vec()), block)
                 });
-                let place = self.entities.get(body).map(|b| Transform::of(b.pos));
+                let place = self
+                    .entities
+                    .get(body)
+                    .map(super::entity::Entity::body_place);
                 holds.then(|| (place.map(|t| t.to_world(st.at)), st.yaw))
             }
             StuckIn::Entity(target) => self

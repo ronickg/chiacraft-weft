@@ -22,6 +22,8 @@ pub static DISPENSER_MENU: Menu = Menu::named("dispenser");
 pub static SLIME_BLOCK: Block = Block::named("slime_block");
 pub static ANCHOR: Block = Block::named("anchor");
 pub static FLOATER: Block = Block::named("floater");
+pub static ROTOR: Block = Block::named("rotor");
+pub static ASSEMBLER: Block = Block::named("assembler");
 pub static GOLDEN_LAMP: Block = Block::named("golden_lamp");
 
 const BUTTON_TICKS: u32 = 20;
@@ -312,6 +314,48 @@ pub fn register(r: &mut Registry) {
         .hardness(3.5)
         .mined_by("pickaxe", tool_tier::HAND)
         .tab(&crate::tabs::REDSTONE);
+
+    for (block, rotates, front) in [(&ROTOR, true, "piston_top"), (&ASSEMBLER, false, "anchor_on")] {
+        r.block(block)
+            .facing(Facings::ALL, Toward::Away)
+            .signal_body_mount(rotates)
+            .entity(|e| e)
+            .states(move |p, s| {
+                let side = match p.int("power") {
+                    1 => "floater_back_going",
+                    2 => "floater_side_stuck",
+                    _ => "anchor",
+                };
+                let whole = [0.0, 0.0, 16.0, 16.0];
+                let faces = [(side, whole), (side, whole), (side, whole), (side, whole), (front, whole), (side, whole)];
+                s.model_box_faces([0.0, 0.0, 0.0], [16.0, 16.0, 16.0], faces)
+                    .light_opacity(15)
+                    .immovable()
+            })
+            .signal_read(|w, p| match w.prop(p, "power") {
+                Some("1") => 1,
+                Some("2") => 15,
+                _ => 0,
+            })
+            .sound_group("stone")
+            .hardness(3.5)
+            .mined_by("pickaxe", tool_tier::HAND)
+            .tab(&crate::tabs::REDSTONE)
+            .on_use(move |u| {
+                let (w, p) = (u.world(), u.pos());
+                if crate::assembly::tool_held(w, u.player()) {
+                    return crate::assembly::use_controller(w, u.player(), p, true);
+                }
+                if !rotates {
+                    return false;
+                }
+                if w.prop_cycle(p, "mode") {
+                    let key = if w.prop(p, "mode") == Some("hold") { "rotor.base.hold" } else { "rotor.base.disassemble" };
+                    w.hint(key, &[]).to(u.player());
+                }
+                true
+            });
+    }
 
     // Vanilla's copper bulb: each new pulse flips it, and a comparator reads which way it is.
     r.block(&GOLDEN_LAMP)

@@ -1220,8 +1220,40 @@ impl Content {
                 .filter(|(a, b)| a.1 != b.1)
                 .count()
         };
-        (def.first_state..def.first_state + def.states)
+        let states = def.first_state..def.first_state + def.states;
+        if let Some(exact) = states
+            .clone()
             .filter(|&c| self.states[c as usize].turn == want && self.states[c as usize].sides == sides)
+            .min_by_key(|&c| differ(c))
+        {
+            return exact;
+        }
+        let mut oriented = Vec::new();
+        for property in ["facing", "attach", "front"] {
+            if let Some(face) = self
+                .state_prop(state, property)
+                .and_then(|v| weft_abi::FACE_NAMES.iter().position(|&n| n == v))
+            {
+                oriented.push((property, weft_abi::FACE_NAMES[t.face(face)]));
+            }
+        }
+        let axes = ["x", "y", "z"];
+        if let Some(axis) = self
+            .state_prop(state, "axis")
+            .and_then(|v| axes.iter().position(|&n| n == v))
+        {
+            oriented.push(("axis", axes[t.face(axis * 2) / 2]));
+        }
+        if oriented.is_empty() {
+            return state;
+        }
+        states
+            .filter(|&c| {
+                self.states[c as usize].sides == sides
+                    && oriented
+                        .iter()
+                        .all(|&(property, value)| self.state_prop(c, property) == Some(value))
+            })
             .min_by_key(|&c| differ(c))
             .unwrap_or(state)
     }

@@ -30,6 +30,7 @@ pub const FALLING: &str = "core:falling_block";
 pub const MOVING: &str = "core:moving_blocks";
 /// What a floater carries, and what `World::lift` makes.
 pub const PLATFORM: &str = "core:platform";
+pub const SHIP: &str = "core:ship";
 
 #[derive(Clone, Debug)]
 pub struct Cuboid {
@@ -421,6 +422,7 @@ pub struct Game {
     /// Blocks a piston is moving, an entity while they do.
     pub moving_kind: u32,
     pub platform_kind: u32,
+    pub ship_kind: u32,
     pub energy: u32,
     /// `Host::reg_client_frame`, in mod order.
     pub client_frames: Vec<(ModId, Callback)>,
@@ -711,6 +713,7 @@ fn engine_components() -> Vec<RawEntry> {
         (abi::comp::ENERGY, energy.0, energy.1, energy.2),
         (MODIFIERS, "bytes", cf::SAVE, Vec::new()),
         (TIMERS, "bytes", cf::SAVE, Vec::new()),
+        (crate::server::assembly::BOUNDS, "bytes", cf::SAVE, Vec::new()),
         (abi::comp::NAME, "bytes", cf::SAVE | cf::CARRIED, Vec::new()),
         (abi::comp::PERSISTENT, "bytes", cf::SAVE, Vec::new()),
         (HEALTH, health_schema.as_str(), own, crate::net::HealthField::default().to_bytes()),
@@ -1833,6 +1836,14 @@ fn engine_entities() -> Vec<RawEntry> {
             .tag(k::SOLID)
             .tag(k::KINEMATIC)
             .set(k::CARRY_HEIGHT, 3.0f32),
+        thing(SHIP, 1.0, 1.0)
+            .tag(k::SOLID)
+            .tag(k::KINEMATIC)
+            .set(k::CARRY_HEIGHT, 3.0f32)
+            .set(
+                k::SEATS,
+                vec![abi::Seat { pos: [0.0, 1.0, 0.0].into(), steers: false, exit: abi::seat_exit::STAY, exit_at: abi::Vec3::default() }],
+            ),
     ]
 }
 
@@ -2042,6 +2053,7 @@ pub fn freeze(
     g.falling_kind = tables.1.ids(ek::ENTITY)[FALLING];
     g.moving_kind = tables.1.ids(ek::ENTITY)[MOVING];
     g.platform_kind = tables.1.ids(ek::ENTITY)[PLATFORM];
+    g.ship_kind = tables.1.ids(ek::ENTITY)[SHIP];
     g.client_frames.sort_by_key(|h| order(h.0));
     g.camera_frames.sort_by_key(|h| order(h.0));
     let configs = take_kind(&mut entries, ek::CONFIG);

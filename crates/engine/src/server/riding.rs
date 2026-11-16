@@ -16,6 +16,12 @@ impl Dim {
     pub fn seat_pos(&self, c: &Content, mount: u64, seat: u8) -> Option<DVec3> {
         let m = self.entities.get(mount)?;
         let s = c.game.entities[m.kind as usize].seats.get(seat as usize)?;
+        if m.ship.is_some() {
+            return Some(
+                m.body_place()
+                    .to_world(crate::physics::Transform::FEET + s.pos),
+            );
+        }
         Some(m.pos + crate::world::turned(s.pos, m.yaw))
     }
 
@@ -79,12 +85,16 @@ impl Dim {
 
     /// Takes `rider` off what it rides, asking mods first, and puts it where its seat says.
     pub fn dismount(&mut self, c: &'static Content, rider: u64) -> bool {
+        self.dismount_at(c, rider, None)
+    }
+
+    pub(super) fn dismount_at(&mut self, c: &'static Content, rider: u64, at: Option<DVec3>) -> bool {
         let Some((mount, seat)) = self.entities.get(rider).and_then(|e| e.vehicle) else { return false };
         let mut q = abi::Query { entity: rider, other: mount, amount: seat as f64, ..abi::Query::DEFAULT };
         if !self.ask(c, abi::action::DISMOUNT, &mut q) {
             return false;
         }
-        let at = self.exit_pos(c, rider, mount, seat);
+        let at = at.unwrap_or_else(|| self.exit_pos(c, rider, mount, seat));
         self.leave(c, rider);
         if let Some(e) = self.entities.get_mut(rider) {
             e.pos = at;
@@ -122,7 +132,9 @@ impl Dim {
     pub fn leave(&mut self, c: &Content, rider: u64) {
         let Some((mount, _)) = self.entities.get_mut(rider).and_then(|e| e.vehicle.take()) else { return };
         // What it is saved and moved between regions with says so too, at once.
-        self.entities.comps.remove(&(rider, c.game.fields.riding));
+        self.entities
+            .comps
+            .insert((rider, c.game.fields.riding), Box::default());
         if let Some(m) = self
             .entities
             .get_mut(mount)
@@ -148,7 +160,15 @@ impl Dim {
         };
         match s.exit {
             abi::seat_exit::OFFSET => mpos + crate::world::turned(s.exit_at, myaw),
-            abi::seat_exit::STAY => sat,
+            abi::seat_exit::STAY => {
+                let Some(built) = self.bodies.get(&mount) else { return sat };
+                let Some(r) = self.entities.get(rider) else { return sat };
+                let place = m.body_place();
+                let dims = m.dims(c);
+                let body = crate::physics::Body::of(mount, k, place, (dims.half_width, dims.height), place, Some(&**built));
+                body.and_then(|b| b.deck_height(c, sat, r.dims(c).half_width))
+                    .map_or(sat, |y| sat.with_y(y))
+            }
             abi::seat_exit::CALL => {
                 let first = nearest(self, 2.0);
                 let Some((owner, cb)) = k.dismount else { return first };

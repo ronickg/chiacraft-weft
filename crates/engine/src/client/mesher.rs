@@ -459,6 +459,7 @@ fn liquid(c: &Content, n: &Neighborhood, ctm: &super::ctm::Ctm, mesh: &mut Mesh,
     let ts = info.textures[0];
     let (fx, fy, fz) = (x as f32, y as f32, z as f32);
     let layer = info.layer as usize;
+    let tint = info.tint | crate::gpu_layout::quad::LIQUID as u8;
     // In a block (waterlogged): its sides it covers whole stand where the liquid's would, which
     // would fight them.
     let parts = std::iter::once(n.states[i]).chain(n.extras.get(&i).into_iter().flatten().copied());
@@ -473,9 +474,9 @@ fn liquid(c: &Content, n: &Neighborhood, ctm: &super::ctm::Ctm, mesh: &mut Mesh,
             [fx, fy + hat(0, 0), fz],
         ];
         let lu = light16(n.light[pidx(x, y + 1, z)]).max(l);
-        mesh.quads[layer].push(quad(corners, WHOLE, t, biome, info.tint, [lu; 4]));
+        mesh.quads[layer].push(quad(corners, WHOLE, t, biome, tint, [lu; 4]));
         let back = [corners[1], corners[0], corners[3], corners[2]];
-        mesh.quads[layer].push(quad(back, WHOLE, t, biome, info.tint, [lu; 4]));
+        mesh.quads[layer].push(quad(back, WHOLE, t, biome, tint, [lu; 4]));
     }
     for dir in [0usize, 1, 4, 5] {
         let [dx, _, dz] = NORMALS[dir];
@@ -492,11 +493,11 @@ fn liquid(c: &Content, n: &Neighborhood, ctm: &super::ctm::Ctm, mesh: &mut Mesh,
             [fx + p[0] as f32, fy + top, fz + p[2] as f32]
         });
         let nl = light16(n.light[ni]);
-        mesh.quads[layer].push(quad(corners, WHOLE, ts, biome, info.tint, [nl; 4]));
+        mesh.quads[layer].push(quad(corners, WHOLE, ts, biome, tint, [nl; 4]));
     }
     let below = pidx(x, y - 1, z);
     if !same(x, y - 1, z) && walls & 1 << 2 == 0 && !ctm.hides(c.states[n.states[below] as usize].flags, n.states[below]) {
         let corners = CORNERS[2].map(|p| [fx + p[0] as f32, fy, fz + p[2] as f32]);
-        mesh.quads[layer].push(quad(corners, WHOLE, t, biome, info.tint, [light16(n.light[below]); 4]));
+        mesh.quads[layer].push(quad(corners, WHOLE, t, biome, tint, [light16(n.light[below]); 4]));
     }
 }

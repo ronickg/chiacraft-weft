@@ -1028,7 +1028,7 @@ impl EntityBuilder<'_> {
     pub fn solid(self) -> Self {
         self.tag(abi::comp::entity::SOLID).unpushable()
     }
-    /// Takes no damage (no hurt flash, health stays); `/clear` and the void still remove it.
+    /// Takes no damage (no hurt flash, health stays); `/clear entity` and the void still remove it.
     pub fn invulnerable(self) -> Self {
         self.modifier(crate::Modifier::set(&crate::attribute::INVULNERABLE, 1.0))
     }

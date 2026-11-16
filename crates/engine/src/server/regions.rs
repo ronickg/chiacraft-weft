@@ -259,8 +259,11 @@ impl DimSet {
                 continue;
             }
             if let Some(blocks) = blocks {
-                d.bodies
-                    .insert(id, Box::new(super::space::Space::with_blocks(c, &blocks)));
+                let mut body = super::space::Space::from_saved(c, blocks);
+                if e.mount.is_some() || e.ship.is_some() {
+                    body.track_mounted_blocks();
+                }
+                d.bodies.insert(id, Box::new(body));
                 bodies.push(id);
             }
             d.entities.insert_with(c, e, inv, comps);

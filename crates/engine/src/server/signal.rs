@@ -39,7 +39,7 @@ const FLOATER_IDLE: u8 = 0;
 const FLOATER_GOING: u8 = 1;
 const FLOATER_STUCK: u8 = 2;
 /// More than that stuck to a floater and it doesn't go.
-const BODY_LIMIT: usize = 4096;
+pub(super) const BODY_LIMIT: usize = 4096;
 /// Vanilla's: a piston's blocks take two ticks to get there.
 const MOVE_TICKS: u8 = 2;
 
@@ -64,6 +64,7 @@ struct Device {
     pushed_at: u64,
     flips: VecDeque<u64>,
     burnt_until: u64,
+    stopped_mount: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -84,6 +85,21 @@ pub struct Gives {
     to_wire: [u8; 6],
 }
 
+impl Gives {
+    fn turned(self, turn: abi::Turn) -> Self {
+        if turn == abi::Turn::NONE {
+            return self;
+        }
+        let mut out = Self::default();
+        for from in 0..6 {
+            let to = turn.face(from);
+            out.all[to] = self.all[from];
+            out.to_wire[to] = self.to_wire[from];
+        }
+        out
+    }
+}
+
 /// A device or wire's state on its way with its block to another place, there or in another space.
 #[derive(Clone, Default)]
 pub struct Moved {
@@ -94,6 +110,14 @@ pub struct Moved {
 impl Moved {
     pub(super) fn is_empty(&self) -> bool {
         self.device.is_none() && self.levels == [0; 6]
+    }
+
+    pub(super) fn turned(mut self, turn: abi::Turn) -> Self {
+        let old = self.levels;
+        for (face, level) in old.into_iter().enumerate() {
+            self.levels[turn.face(face)] = level;
+        }
+        self
     }
 }
 
@@ -354,6 +378,19 @@ impl Signals {
             .filter(|i| *i != u8::MAX)
     }
 
+    pub(super) fn recheck_device(&mut self, p: IVec3) {
+        if let Some(d) = self.devices.get_mut(&p) {
+            d.stopped_mount = false;
+            self.dirty_devices.insert(p);
+        }
+    }
+
+    pub(super) fn stop_mount(&mut self, p: IVec3) {
+        if let Some(d) = self.devices.get_mut(&p) {
+            d.stopped_mount = d.input != 0;
+        }
+    }
+
     /// Power coming into `p` from direction `dir`; `None`: that can't be told, it is cut off.
     fn read(&self, c: &Content, cubes: View, p: IVec3, dir: u8) -> Option<u8> {
         let from_outside = self.outside_gives(p + DIRS[dir as usize], dir ^ 1, |g| &g.all);
@@ -438,12 +475,12 @@ impl Signals {
     }
 
     /// What this space gives other spaces, where it is `offset` from them.
-    pub(super) fn giving(&self, c: &Content, cubes: View, offset: IVec3) -> FxHashMap<IVec3, Gives> {
+    pub(super) fn giving(&self, c: &Content, cubes: View, project: impl Fn(IVec3) -> IVec3, turn: abi::Turn) -> FxHashMap<IVec3, Gives> {
         let mut out = FxHashMap::default();
         let mut look = |cell: IVec3| {
             let g = self.gives(c, cubes, cell);
             if g != Gives::default() {
-                out.insert(cell + offset, g);
+                out.insert(project(cell), g.turned(turn));
             }
         };
         for cell in self.cells() {
@@ -457,12 +494,19 @@ impl Signals {
 
     /// What this space gives at `cells`, with `offset` taking them from there to here; the
     /// result is by those.
-    pub(super) fn giving_at(&self, c: &Content, cubes: View, cells: impl Iterator<Item = IVec3>, offset: IVec3) -> FxHashMap<IVec3, Gives> {
+    pub(super) fn giving_at(
+        &self,
+        c: &Content,
+        cubes: View,
+        cells: impl Iterator<Item = IVec3>,
+        project: impl Fn(IVec3) -> IVec3,
+        turn: abi::Turn,
+    ) -> FxHashMap<IVec3, Gives> {
         let mut out = FxHashMap::default();
         for cell in cells {
-            let g = self.gives(c, cubes, cell + offset);
+            let g = self.gives(c, cubes, project(cell));
             if g != Gives::default() {
-                out.insert(cell, g);
+                out.insert(cell, g.turned(turn));
             }
         }
         out
@@ -1199,7 +1243,7 @@ impl Signals {
                     effects.push(Effect::Sink { p, level: most });
                 }
             }
-            sk::FLOATER => {
+            sk::FLOATER | sk::BODY_MOUNT => {
                 self.polled.remove(&p);
                 effects.push(Effect::Floater { p, level: most!(s.inputs) });
             }
@@ -1428,8 +1472,23 @@ impl Dim {
                     }
                 }
                 Effect::Floater { p, level } => {
-                    if let Some(dev) = self.space.signals.devices.get_mut(&p) {
-                        dev.input = level;
+                    let Some(dev) = self.space.signals.devices.get_mut(&p) else { continue };
+                    dev.input = level;
+                    let info = c.states[dev.state as usize].signal;
+                    if info.kind == sk::BODY_MOUNT {
+                        if info.flags as u32 & abi::signal_flags::HELM != 0 {
+                            continue;
+                        }
+                        dev.stopped_mount &= level != 0;
+                        let stopped = dev.stopped_mount;
+                        if self.frame == 0 && !self.has_mount(p) {
+                            if level == 0 {
+                                self.floater_shows(c, p, FLOATER_IDLE);
+                            } else if !stopped {
+                                floaters.push(p);
+                            }
+                        }
+                        continue;
                     }
                     if self.frame != 0 {
                         self.floater_shows(c, p, FLOATER_GOING * (level > 0) as u8);
@@ -1559,10 +1618,10 @@ impl Dim {
     }
 
     /// What a floater shows and a comparator reads of it (`power`: 0 idle, 1 going, 2 stuck).
-    fn floater_shows(&mut self, c: &'static Content, p: IVec3, level: u8) {
+    pub(super) fn floater_shows(&mut self, c: &'static Content, p: IVec3, level: u8) {
         let Some(state) = self.get(p) else { return };
         let info = c.states[state as usize].signal;
-        if info.kind == sk::FLOATER && info.level != level {
+        if matches!(info.kind, sk::FLOATER | sk::BODY_MOUNT) && info.level != level {
             self.set(c, p, with_level(&info, state, level));
         }
     }
@@ -1709,10 +1768,13 @@ impl Dim {
 
     /// What a floater takes along: what is in front of it, and on from that what touches anything
     /// sticky. Nothing else it touches comes into it. `None`: it can't.
-    pub(super) fn stuck_to_floater(&self, c: &Content, p: IVec3) -> Option<Vec<IVec3>> {
+    pub(super) fn attached_blocks(&self, c: &Content, p: IVec3, moving_driver: bool) -> Option<Vec<IVec3>> {
         let info = c.states[self.get(p)? as usize].signal;
         let grip = p + *DIRS.get(info.front as usize)?;
-        let mut moved = vec![p];
+        let mut moved = Vec::new();
+        if moving_driver {
+            moved.push(p);
+        }
         let mut seen: FxHashSet<IVec3> = [p, grip].into_iter().collect();
         let mut todo = Vec::new();
         let held = self.get(grip)?;

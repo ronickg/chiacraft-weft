@@ -22,6 +22,7 @@ struct VOut {
     @location(12) @interpolate(flat) size: f32,
     @location(13) @interpolate(flat) lod_fade: f32,
     @location(14) rel: vec3<f32>,
+    @location(15) @interpolate(flat) world_liquid: u32,
 }
 
 fn shader_of(tex: u32) -> u32 {
@@ -118,7 +119,11 @@ fn on_body(l: vec4<f32>, k: i32) -> vec4<f32> {
 }
 
 fn finish(local: vec3<f32>, origin: vec4<i32>) -> vec4<f32> {
-    let pos = vec3<f32>(origin.xyz) * 16.0 + local - g.cam_frac.xyz + offsets[origin.w].xyz;
+    var p = vec3<f32>(origin.xyz) * 16.0 + local;
+    if origin.w != 0 {
+        p = quat_vector(body_rotations[origin.w], p);
+    }
+    let pos = p - g.cam_frac.xyz + offsets[origin.w].xyz;
     return vec4(pos, 1.0);
 }
 
@@ -144,6 +149,7 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     out.lod_fade = 0.0;
     out.dist = length(pos.xyz);
     out.rel = pos.xyz;
+    out.world_liquid = 0u;
     out.uv = UVS[(c + ((w0 >> FACE_TURN_SHIFT) & FACE_TURN_MASK)) % 4u];
     let tex_id = w1 & FACE_TEX_MASK;
     let fr = texture_frame(tex_id);
@@ -155,14 +161,18 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     out.light = on_body(corner_light(w2, w3, c), origins[ii].w);
     let o = origins[ii] + g.cam_cube;
     out.slot = shader_of(tex_id);
-    out.pos = vec3<f32>(o.xyz * 16) + local;
+    out.pos = pos.xyz + vec3<f32>(g.cam_cube.xyz * 16) + g.cam_frac.xyz;
     let tint_kind = (w0 >> FACE_TINT_SHIFT) & TINT_MASK;
     var tint = vec3(1.0);
     if tint_kind != 0u {
         tint = tint_color(tint_kind, w1 >> FACE_BIOME_SHIFT, o.x * 16 + i32(local.x), o.z * 16 + i32(local.z));
     }
     out.tint = tint;
-    out.color = tint * SHADE[dir] * AO[a[c]];
+    var shade = SHADE[dir];
+    if origins[ii].w != 0 {
+        shade = normal_shade(quat_vector(body_rotations[origins[ii].w], FACE_DIRS[dir]));
+    }
+    out.color = tint * shade * AO[a[c]];
     return out;
 }
 
@@ -179,7 +189,10 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     let uvw = records[base + 5u];
     let uv = quad_uv_fine(uvw, records[base], records[base + 1u], records[base + 2u], records[base + 3u]);
     var uvs = array<vec2<f32>, 4>(vec2(uv.x, uv.w), vec2(uv.z, uv.w), vec2(uv.z, uv.y), vec2(uv.x, uv.y));
-    let n = normalize(cross(p1 - p0, p2 - p1));
+    var n = normalize(cross(p1 - p0, p2 - p1));
+    if origins[ii].w != 0 {
+        n = quat_vector(body_rotations[origins[ii].w], n);
+    }
     // Face shading blended by normal; plants opt out like vanilla's crossed squares.
     var shade = normal_shade(n);
     if ((uvw >> QUAD_TINT_SHIFT) & QUAD_FLAT) != 0u {
@@ -191,6 +204,7 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     out.lod_fade = 0.0;
     out.dist = length(pos.xyz);
     out.rel = pos.xyz;
+    out.world_liquid = select(0u, 1u, origins[ii].w == 0 && ((uvw >> QUAD_TINT_SHIFT) & QUAD_LIQUID) != 0u);
     out.uv = uvs[c];
     let tex_id = w4 & FACE_TEX_MASK;
     let fr = texture_frame(tex_id);
@@ -202,7 +216,7 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     out.light = on_body(corner_light(records[base + 6u], records[base + 7u], c), origins[ii].w);
     let o = origins[ii] + g.cam_cube;
     out.slot = shader_of(tex_id);
-    out.pos = vec3<f32>(o.xyz * 16) + local;
+    out.pos = pos.xyz + vec3<f32>(g.cam_cube.xyz * 16) + g.cam_frac.xyz;
     let tint_kind = (uvw >> QUAD_TINT_SHIFT) & TINT_MASK;
     var tint = vec3(1.0);
     if tint_kind != 0u {
@@ -263,6 +277,7 @@ fn fs_opaque(in: VOut) -> @location(0) vec4<f32> {
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     let albedo = sample(in, nuv, du, dv);
+    clip_dry_liquid(in);
     return vec4(shade(in, albedo).rgb, 1.0);
 }
 
@@ -286,6 +301,7 @@ fn fs_cutout(in: VOut) -> @location(0) vec4<f32> {
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     let albedo = sample_cutout(in, nuv, du, dv);
+    clip_dry_liquid(in);
     // Vanilla's alpha test (GL_GREATER 0.1).
     if albedo.a <= 0.1 {
         discard;
@@ -301,14 +317,42 @@ fn translucent(in: VOut) -> vec4<f32> {
     return shade(in, albedo);
 }
 
+fn in_dry_hull(rel: vec3<f32>) -> bool {
+    let count = u32(dry_volumes[0].origin.x);
+    for (var i = 1u; i <= count; i++) {
+        let hull = dry_volumes[i];
+        let local = quat_vector(hull.inverse, rel - hull.origin.xyz);
+        if any(local < hull.lo.xyz) || any(local >= hull.hi.xyz) {
+            continue;
+        }
+        for (var j = u32(hull.origin.w); j < u32(hull.lo.w); j++) {
+            let bounds = dry_volumes[j];
+            if all(local >= bounds.lo.xyz) && all(local < bounds.hi.xyz) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+fn clip_dry_liquid(in: VOut) {
+    if in.world_liquid != 0u && in_dry_hull(in.rel) {
+        discard;
+    }
+}
+
 @fragment
 fn fs_translucent(in: VOut) -> @location(0) vec4<f32> {
-    return through_cloud(translucent(in), in.rel, scene);
+    let color = translucent(in);
+    clip_dry_liquid(in);
+    return through_cloud(color, in.rel, scene);
 }
 
 @fragment
 fn fs_layers(in: VOut) -> @location(0) vec4<f32> {
-    return translucent(in);
+    let color = translucent(in);
+    clip_dry_liquid(in);
+    return color;
 }
 
 // Distant terrain (`client::lod`): a record is the `dir` face of a box in its tile, textured and
@@ -352,6 +396,7 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     out.lod_fade = f32(data & LOD_DRAW_FADE_MASK) / f32(LOD_DRAW_FADE_MASK) * 3.0 - 1.0;
     out.dist = length(pos.xyz);
     out.rel = pos.xyz;
+    out.world_liquid = 0u;
     let o = origins[ii] + g.cam_cube;
     let world = vec3<f32>(o.xyz * 16) + local + vec3(0.0, 0.125, 0.0);
     out.uv = lod_uv(dir, world);

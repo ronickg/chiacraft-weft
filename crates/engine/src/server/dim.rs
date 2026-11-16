@@ -197,10 +197,15 @@ pub struct Dim {
     pub dim_timers: Vec<DimTimer>,
 }
 
-fn physics_body<'a>(c: &'a Content, e: &Entity, built: Option<&'a Box<Space>>, delta: DVec3) -> Option<crate::physics::Body<'a>> {
+fn physics_body<'a>(
+    c: &'a Content,
+    e: &Entity,
+    built: Option<&'a Box<Space>>,
+    before: crate::physics::Transform,
+) -> Option<crate::physics::Body<'a>> {
     let crate::physics::Dims { half_width: hw, height: h, .. } = e.dims(c);
     let built = built.map(|s| &**s as &dyn crate::physics::Blocks);
-    crate::physics::Body::of(e.id, &c.game.entities[e.kind as usize], e.pos, (hw, h), delta, built)
+    crate::physics::Body::of(e.id, &c.game.entities[e.kind as usize], e.body_place(), (hw, h), before, built)
 }
 
 pub(super) struct Cubes<'a>(pub(super) &'a mut FxHashMap<IVec3, Arc<Cube>>);
@@ -357,7 +362,9 @@ fn hazards_met(c: &Content, block: &impl crate::physics::Cells, e: &super::entit
         }
     }
     if body {
-        look((e.pos + DVec3::Y * e.eye(c)).floor().as_ivec3(), &mut out, &|h, _| h.at == at::HEAD);
+        let eye = e.pos + DVec3::Y * e.eye(c);
+        let liquid = block.liquid_block_at(c, eye);
+        look(eye.floor().as_ivec3(), &mut out, &|h, s| h.at == at::HEAD && (c.states[s as usize].liquid.is_none() || liquid == Some(s)));
         if e.on_ground {
             look((e.pos - DVec3::Y * 0.05).floor().as_ivec3(), &mut out, &|h, _| h.at == at::ON);
         }
@@ -540,7 +547,7 @@ impl Dim {
         if frame == self.frame {
             return Some(f(self));
         }
-        let place = crate::physics::Transform::of(self.entities.get(frame)?.pos);
+        let place = self.entities.get(frame)?.body_place();
         let body = self.bodies.remove(&frame)?;
         let outer = std::mem::replace(&mut self.space, body);
         let (was_frame, was_place) = (self.frame, self.place);
@@ -556,7 +563,7 @@ impl Dim {
     /// False if it isn't a body here.
     pub fn enter_frame(&mut self, frame: u64) -> bool {
         let Some(e) = self.entities.get(frame) else { return false };
-        let place = crate::physics::Transform::of(e.pos);
+        let place = e.body_place();
         let Some(body) = self.bodies.remove(&frame) else { return false };
         let outer = std::mem::replace(&mut self.space, body);
         self.entered.push((frame, outer, self.frame, self.place));
@@ -592,16 +599,27 @@ impl Dim {
     }
 
     /// The solid body right under feet at `pos` (a step at most), and where that body is.
-    pub fn body_under(&self, c: &Content, pos: DVec3, half_width: f64) -> Option<(u64, DVec3)> {
+    pub fn body_under(&self, c: &Content, pos: DVec3, half_width: f64) -> Option<(u64, crate::physics::Transform)> {
         let bodies: Vec<crate::physics::Body> = self
             .entities
             .list
             .iter()
             .filter(|e| !e.removed && !e.player && c.game.entities[e.kind as usize].is(ef::SOLID))
-            .filter_map(|e| physics_body(c, e, self.bodies.get(&e.id), DVec3::ZERO))
+            .filter_map(|e| physics_body(c, e, self.bodies.get(&e.id), e.body_place()))
             .collect();
         let id = crate::physics::body_below(c, pos, half_width, &bodies, 0.6)?;
-        self.entities.get(id).map(|e| (id, e.pos))
+        self.entities.get(id).map(|e| (id, e.body_place()))
+    }
+
+    pub(super) fn dry_volumes(&self) -> Vec<crate::physics::DryVolume<'_>> {
+        self.bodies
+            .iter()
+            .filter(|(_, b)| !b.dry_boxes.is_empty())
+            .filter_map(|(id, b)| {
+                let place = self.entities.get(*id)?.body_place();
+                Some((place, b.dry_boxes.as_slice()))
+            })
+            .collect()
     }
 
     pub fn has(&self, pos: IVec3) -> bool {
@@ -816,6 +834,9 @@ impl Dim {
         cube.set_extras(i, extras.clone());
         // Clients lose what else is in a cell with its block, so it comes again after it.
         if extras != had || (old != state && !extras.is_empty()) {
+            if self.frame != 0 {
+                self.space.geometry_changed();
+            }
             self.extras_changed(c, p, &had, extras.clone());
         }
         if !carried && (old != state || extras != had) {
@@ -1776,7 +1797,12 @@ impl Dim {
         self.tick_effects(c);
         self.source_modifiers(c);
         self.natural_spawns(c);
-        self.tick_entities(c);
+        let (mut before_turn, landing) = self.advance_mounts(c);
+        self.advance_ships(c, &mut before_turn);
+        self.tick_entities(c, &before_turn);
+        for id in landing {
+            self.land_mount(c, id);
+        }
         self.tick_bodies(c);
         self.tick_blocks_after(c);
         self.compact(c);
@@ -1945,7 +1971,7 @@ impl Dim {
         let frame = e.frame.filter(|f| self.bodies.contains_key(f));
         let place = frame
             .and_then(|f| self.entities.get(f))
-            .map(|b| crate::physics::Transform::of(b.pos));
+            .map(Entity::body_place);
         let target = place.map_or(target, |t| t.to_local(target));
         let Some(e) = self.entities.get_mut(id) else { return false };
         if let Some(nav) = e
@@ -1975,7 +2001,7 @@ impl Dim {
             .list
             .iter()
             .filter(|e| bodies.contains_key(&e.id))
-            .map(|e| (e.id, crate::physics::Transform::of(e.pos)))
+            .map(|e| (e.id, e.body_place()))
             .collect();
         let on_body = |e: &Entity| {
             e.nav
@@ -2026,6 +2052,10 @@ impl Dim {
             match super::path::steer(nav, pos, dims, e.blocked) {
                 _ if close || nav.stuck > 40 => e.nav = None,
                 Some((dir, jump)) => {
+                    let dir = place.map_or(dir, |t| {
+                        let v = t.vector_to_world(DVec3::new(dir[0] as f64, 0.0, dir[1] as f64));
+                        [v.x as f32, v.z as f32]
+                    });
                     e.yaw = (-dir[0]).atan2(-dir[1]);
                     e.walk = Some(super::entity::Walk { dir, speed: nav.speed, keys: if jump { abi::walk::JUMP } else { 0 } });
                 }
@@ -2217,7 +2247,7 @@ impl Dim {
         }
     }
 
-    fn tick_entities(&mut self, c: &'static Content) {
+    fn tick_entities(&mut self, c: &'static Content, before_turn: &FxHashMap<u64, crate::physics::Transform>) {
         // Mod logic: one call per kind and callback with every entity of that kind.
         let mut by_kind: FxHashMap<(u64, u32), Vec<u64>> = FxHashMap::default();
         // Copied, mods' calls borrow the region; empty but where only machines are kept.
@@ -2287,11 +2317,22 @@ impl Dim {
             if e.removed || e.player || !k.is(ef::SOLID) {
                 continue;
             }
-            let before = e.pos;
+            let before = before_turn
+                .get(&e.id)
+                .copied()
+                .unwrap_or_else(|| e.body_place());
             step(c, e, gravity, &block, &bodies);
-            bodies.extend(physics_body(c, e, body_blocks.get(&e.id), e.pos - before));
+            bodies.extend(physics_body(c, e, body_blocks.get(&e.id), before));
         }
         let bodies = &bodies;
+        let dry: Vec<_> = bodies
+            .iter()
+            .filter_map(|b| {
+                let boxes = &body_blocks.get(&b.id)?.dry_boxes;
+                (!boxes.is_empty()).then_some((b.blocks?.1, boxes.as_slice()))
+            })
+            .collect();
+        let block = crate::physics::ObservedCells { cells: block, dry: &dry };
         // What belongs to a body's blocks is where those are.
         if !self.bodies.is_empty() {
             let at: FxHashMap<u64, crate::physics::Transform> = bodies
@@ -2353,7 +2394,7 @@ impl Dim {
                 let wet = [e.pos, e.pos + DVec3::Y * crate::physics::body_level(e.height(c))]
                     .iter()
                     .any(|p| {
-                        crate::physics::Cells::liquid(&block, c, p.floor().as_ivec3())
+                        crate::physics::Cells::liquid_block_at(&block, c, *p)
                             .and_then(|s| c.states[s as usize].liquid)
                             .is_some_and(|l| !c.liquids[l as usize].burns())
                     });
@@ -3007,7 +3048,9 @@ impl Dim {
 
     /// The surface of a liquid counts, not only the block it is in.
     pub fn head_in_liquid(&self, c: &Content, e: &super::entity::Entity) -> bool {
-        crate::physics::liquid_at(c, &*self.space, e.pos + DVec3::Y * e.eye(c)).is_some()
+        let dry = self.dry_volumes();
+        let seen = crate::physics::ObservedCells { cells: super::space::CubeCells(&self.space.cubes), dry: &dry };
+        crate::physics::liquid_at(c, &seen, e.pos + DVec3::Y * e.eye(c)).is_some()
     }
 
     /// The share of `part` of the cell at `pos` in `frame` an entity's mining does this tick, by

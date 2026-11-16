@@ -289,6 +289,7 @@ wire_struct! {
         pub body_yaw: f32,
         pub strode: f32,
         pub stride: f32,
+        pub rotation: Option<[f32; 4]>,
     }
 }
 
@@ -310,6 +311,7 @@ wire_struct! {
 }
 
 impl GizmoShape {
+    pub const ASSEMBLY: &'static str = "core:assembly_preview";
     /// Not a `gizmo_kind`: a label.
     pub const TEXT: u8 = u8::MAX;
 
@@ -325,10 +327,19 @@ impl GizmoShape {
 /// Someone's mining as others see it: who, the cell, which of what is in it, how far along (0..1).
 pub type Crack = (u64, IVec3, u32, f32);
 
-/// An entity's move: id, position, yaw, pitch, crouching, and its frame: the solid body it
-/// stands on (0: the world), which clients draw it relative to.
-/// An entity, where it is, its look, pose, whether it sprints, and the body it stands on.
-pub type Move = (u64, DVec3, f32, f32, crate::world::Pose, bool, u64);
+wire_struct! {
+    #[derive(Clone, Copy, Debug)]
+    pub struct Move {
+        pub id: u64,
+        pub pos: DVec3,
+        pub yaw: f32,
+        pub pitch: f32,
+        pub pose: crate::world::Pose,
+        pub sprinting: bool,
+        pub frame: u64,
+        pub rotation: Option<[f32; 4]>,
+    }
+}
 
 /// The longest message a connection takes.
 pub const MAX_MESSAGE: usize = 64 << 20;
@@ -359,6 +370,8 @@ messages! {
         BodyGlow { dim: u32, cells: Vec<(IVec3, [u8; 3])> },
         /// The world's light on body `frame`, by its cubes.
         BodyLight { frame: u64, lights: Vec<(IVec3, u32)> },
+        /// Dry sections of a body's hull, as local half-open box bounds.
+        BodyAir { frame: u64, boxes: Vec<(IVec3, IVec3)> },
         /// Power of pieces of wire: (cell, face, level), of the world or of body `frame`.
         Signals { dim: u32, frame: u64, changes: Vec<(IVec3, u8, u8)> },
         /// The dimension's time of day, the ticks it ran (what entity effects end by, unlike the time

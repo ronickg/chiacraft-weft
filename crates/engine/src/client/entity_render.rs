@@ -24,6 +24,7 @@ use crate::assets::{Assets, decode_png};
 use crate::content::content;
 use crate::gpu_layout::{GpuBox, Scene};
 use crate::physics::Hit;
+use crate::physics::Transform;
 
 /// What the first person view holds: the item (or the bare arm) and how it moves.
 /// Cracks to draw: how far along, on `state`'s shape at `pos`, of what is at `at`.
@@ -31,7 +32,7 @@ use crate::physics::Hit;
 pub struct Crack {
     pub pos: IVec3,
     pub progress: f32,
-    pub at: DVec3,
+    pub place: Transform,
     pub state: u32,
 }
 
@@ -1284,7 +1285,7 @@ impl EntityRenderer {
         biome: &impl Fn(IVec3) -> Option<u16>,
         scene: &Scene,
         scene_buf: BufferId,
-        target: Option<(Hit, DVec3)>,
+        target: Option<(Hit, Transform)>,
         breaking: &[Crack],
         gizmo_lines: &[super::gizmo::Line],
         gizmo_fills: &[super::gizmo::Fill],
@@ -1539,8 +1540,9 @@ impl EntityRenderer {
         self.models
             .draw(gpu, list, frame, super::models::Batch::World, self.model_pipe, vb);
 
-        if let Some((hit, at)) = target {
-            outline_boxes(&mut boxes, c.states[hit.state as usize].outlined(), rel(hit.origin.as_dvec3() + at));
+        if let Some((hit, place)) = target {
+            let root = Mat4::from_rotation_translation(place.rotation().as_quat(), rel(place.to_world(hit.origin.as_dvec3())));
+            outline_boxes(&mut boxes, c.states[hit.state as usize].outlined(), root);
         }
         gizmo_line_boxes(&mut boxes, gizmo_lines, cam.pos);
         let overlay_start = boxes.len();
@@ -2069,11 +2071,11 @@ fn embedded_root(projectile: &weft_abi::EmbeddedProjectile, attached: Mat4) -> O
 }
 
 /// The selection outline at `o`: twelve thin dark boxes along the edges of each selection box.
-fn outline_boxes(out: &mut Vec<GpuBox>, selection: &[[f32; 6]], o: Vec3) {
+fn outline_boxes(out: &mut Vec<GpuBox>, selection: &[[f32; 6]], root: Mat4) {
     for sel in selection {
         let (mn, mx) = (Vec3::new(sel[0], sel[1], sel[2]), Vec3::new(sel[3], sel[4], sel[5]));
         let t = 0.006;
-        let (a, b) = (o + mn - Vec3::splat(t), o + mx + Vec3::splat(t));
+        let (a, b) = (mn - Vec3::splat(t), mx + Vec3::splat(t));
         for axis in 0..3 {
             for corner in 0..4 {
                 let mut lo = a;
@@ -2082,7 +2084,7 @@ fn outline_boxes(out: &mut Vec<GpuBox>, selection: &[[f32; 6]], o: Vec3) {
                 let (u, v) = ((axis + 1) % 3, (axis + 2) % 3);
                 lo[u] = if corner & 1 == 0 { a[u] } else { b[u] - t * 2.0 };
                 lo[v] = if corner & 2 == 0 { a[v] } else { b[v] - t * 2.0 };
-                let m = Mat4::from_translation(lo) * Mat4::from_scale(size);
+                let m = root * Mat4::from_translation(lo) * Mat4::from_scale(size);
                 out.push(GpuBox { rows: rows(m), color: [0.02, 0.02, 0.02, 0.0], ids: [0, box_mode::SOLID, 0, 0], ..Default::default() });
             }
         }
@@ -2131,13 +2133,14 @@ fn gizmo_fill_boxes(out: &mut Vec<GpuBox>, fills: &[super::gizmo::Fill], cam: DV
 /// textured like the block's own faces there.
 fn crack_boxes(out: &mut Vec<GpuBox>, breaking: &[Crack], textures: &GameTextures, cam: DVec3, light: &impl Fn(IVec3) -> u32) {
     let c = content();
-    for &Crack { pos: p, progress, at, state } in breaking {
+    for &Crack { pos: p, progress, place, state } in breaking {
         if progress <= 0.0 {
             continue;
         }
         let stage = ((progress * 10.0) as usize).min(9);
         let l = textures.texture(c.crack_textures[stage]);
-        let lit = light((p.as_dvec3() + at + DVec3::splat(0.5)).floor().as_ivec3());
+        let lit = light(place.cell_at(p));
+        let root = Mat4::from_rotation_translation(place.rotation().as_quat(), (place.to_world(p.as_dvec3()) - cam).as_vec3());
         let shape = c
             .states
             .get(state as usize)
@@ -2145,7 +2148,7 @@ fn crack_boxes(out: &mut Vec<GpuBox>, breaking: &[Crack], textures: &GameTexture
         for b in shape {
             let (mn, mx) = (Vec3::new(b[0], b[1], b[2]), Vec3::new(b[3], b[4], b[5]));
             let (a, b) = (mn - Vec3::splat(0.004), mx + Vec3::splat(0.004));
-            let m = Mat4::from_translation((p.as_dvec3() + at - cam).as_vec3() + a) * Mat4::from_scale(b - a);
+            let m = root * Mat4::from_translation(a) * Mat4::from_scale(b - a);
             out.push(GpuBox {
                 rows: rows(m),
                 dims: mn.extend(1.0).to_array(),

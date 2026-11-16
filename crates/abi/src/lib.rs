@@ -1233,6 +1233,8 @@ pub mod comp {
     /// goes in its component table, per state; its item gets the first state's unless it sets
     /// its own.
     pub mod block {
+        /// Mass per full block relative to a block of water (`f32`).
+        pub const DENSITY: &str = "density";
         pub const ON_SIDES: &str = "on_sides";
         pub const PROPS: &str = "block.props";
         pub const ON_USE: &str = "block.on_use";
@@ -2104,6 +2106,8 @@ pub mod signal_kind {
     /// With power it takes all it is stuck to and carries it along `front`, faster the more power;
     /// without, that lands. `BREAKS` breaks what is in the way, instead of stopping at it.
     pub const FLOATER: u32 = 11;
+    /// Holds the blocks attached to its front in a body while powered.
+    pub const BODY_MOUNT: u32 = 12;
 }
 
 pub mod signal_flags {
@@ -2113,6 +2117,25 @@ pub mod signal_flags {
     pub const STICKY: u32 = 2;
     /// A floater breaks what is in its way.
     pub const BREAKS: u32 = 4;
+    /// A body mount turns around its front axis while powered.
+    pub const ROTATES: u32 = 8;
+    /// A rotor holds its current pose when power cuts out or its path is blocked.
+    pub const HOLD: u32 = 16;
+    /// The controller rides in a freely moving structure and can be piloted from a seat.
+    pub const HELM: u32 = 32;
+}
+
+pub mod assembly_result {
+    pub const UNHANDLED: u32 = 0;
+    pub const FIRST_CORNER: u32 = 1;
+    pub const BOUNDS: u32 = 2;
+    pub const PREVIEW: u32 = 3;
+    pub const CONFIRMED: u32 = 4;
+    pub const TOO_LARGE: u32 = 5;
+    pub const UNAVAILABLE: u32 = 6;
+    pub const CLEARED: u32 = 7;
+    pub const SEATED: u32 = 8;
+    pub const DOCKING: u32 = 9;
 }
 
 crate::data! {
@@ -4471,6 +4494,7 @@ pub struct Host {
     /// Takes blocks of the world out into a new moving body: `center` is its block
     /// (0, 0, 0), they keep their places around that. Returns its entity, 0 if nothing came.
     pub body_from_blocks: unsafe extern "C" fn(world: *mut WorldCtx, center: *const BlockPos, cells: *const BlockPos, count: usize) -> u64,
+    pub assembly_select: unsafe extern "C" fn(world: *mut WorldCtx, player: u64, cell: *const BlockPos, tool: u8) -> u32,
     /// A moving body's blocks go back into the world where it is, at the nearest whole block.
     pub body_to_blocks: unsafe extern "C" fn(world: *mut WorldCtx, entity: u64),
     /// A moving body goes to `pos` in exactly `ticks`, whatever it was doing.

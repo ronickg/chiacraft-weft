@@ -22,6 +22,7 @@ const WHOLE_FROM: usize = 256;
 struct Push {
     origin: [i32; 4],
     frac: [f32; 4],
+    rotation: [f32; 4],
 }
 
 #[derive(Default)]
@@ -179,13 +180,14 @@ impl Wires {
     }
 
     /// `frames`: where bodies' block (0, 0, 0) is drawn; `lit` the world's light where each is.
-    pub fn draw(&self, list: &mut CommandList, cam: &Camera, scene: BufferId, frames: &[(u64, DVec3)], lit: &[u32]) {
+    pub fn draw(&self, list: &mut CommandList, cam: &Camera, scene: BufferId, frames: &[(u64, crate::physics::Transform)], lit: &[u32]) {
         let Some(pipe) = self.pipe else { return };
         for (&frame, set) in &self.sets {
             if frame == 0 {
-                set.draw(list, pipe, cam.pos, scene, None);
+                set.draw(list, pipe, cam.pos, glam::Quat::IDENTITY, scene, None);
             } else if let Some(k) = frames.iter().position(|f| f.0 == frame) {
-                set.draw(list, pipe, cam.pos - frames[k].1, scene, Some(lit[k]));
+                let place = frames[k].1;
+                set.draw(list, pipe, place.to_local(cam.pos), place.rotation().as_quat(), scene, Some(lit[k]));
             }
         }
     }
@@ -321,7 +323,7 @@ impl WireSet {
     }
 
     /// `eye`: the camera in the coordinates of these blocks.
-    fn draw(&self, list: &mut CommandList, pipe: PipelineId, eye: DVec3, scene: BufferId, lit: Option<u32>) {
+    fn draw(&self, list: &mut CommandList, pipe: PipelineId, eye: DVec3, rotation: glam::Quat, scene: BufferId, lit: Option<u32>) {
         let (Some(q), Some(l)) = (self.quads.id, self.levels.id) else { return };
         if self.count == 0 {
             return;
@@ -335,6 +337,7 @@ impl WireSet {
         list.push_constants(&Push {
             origin: [origin.x as i32, origin.y as i32, origin.z as i32, lit.unwrap_or(0) as i32],
             frac: [frac.x as f32, frac.y as f32, frac.z as f32, lit.is_some() as u32 as f32],
+            rotation: rotation.to_array(),
         });
         list.push(Cmd::Draw { vertices: 6, instances: self.count, first_vertex: 0, first_instance: 0 });
     }

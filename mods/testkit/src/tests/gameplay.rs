@@ -389,7 +389,7 @@ pub async fn advancements(t: T) -> R {
     t.c().menu_close();
     t.no_screen().await?;
     // Dying takes none of them.
-    t.cmd("/clear @s").await?;
+    t.cmd("/clear entity @s").await?;
     t.screen("core:death").await?;
     t.c().respawn();
     t.no_screen().await?;
@@ -440,7 +440,7 @@ async fn place_bed(t: &T) -> Result<[i32; 3], String> {
 
 /// Dies and comes back, up to the point the world is seen again.
 async fn die_and_respawn(t: &T) -> R {
-    t.cmd("/clear @s").await?;
+    t.cmd("/clear entity @s").await?;
     t.screen("core:death").await?;
     t.c().respawn();
     t.no_screen().await
@@ -1742,7 +1742,7 @@ pub async fn respawn(t: T) -> R {
             t.op("attr_mod me core:movement_speed testkit:fast core:percent 1 0")
                 .await?;
         }
-        t.cmd("/clear @s").await?;
+        t.cmd("/clear entity @s").await?;
         t.screen("core:death").await?;
         t.c().respawn();
         t.no_screen().await?;
@@ -1893,7 +1893,7 @@ pub async fn replaced_plants_drop(t: T) -> R {
         }
         t.set(flower, "air").await?;
         t.secs(0.5).await?;
-        t.cmd("/clear @e[type=core:item]").await?;
+        t.cmd("/clear entity @e[type=core:item]").await?;
     }
     Ok(())
 }

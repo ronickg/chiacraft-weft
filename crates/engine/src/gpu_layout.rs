@@ -56,6 +56,7 @@ shared! {
         TINT_SHIFT = 24,
         /// Tint flag: no directional shading (plants).
         FLAT = 16,
+        LIQUID = 32,
     }
     /// Distant terrain record (`client::lod`), four words in the faces' pages: x, z in the tile
     /// (10 bits each), direction, tint kind, sky light; texture and biome like a face's; y
@@ -652,6 +653,15 @@ gpu_struct! {
 }
 
 gpu_struct! {
+    pub struct GpuDryVolume as "DryVolume" {
+        pub origin: [f32; 4],
+        pub inverse: [f32; 4],
+        pub lo: [f32; 4],
+        pub hi: [f32; 4],
+    }
+}
+
+gpu_struct! {
     pub struct GpuCuboid as "Cuboid" {
         /// Corner in model pixels and the bone moving it.
         pub origin: [f32; 3],
@@ -919,6 +929,8 @@ bindings! {
         // Which blocks around the camera cast shadows, for shader packs that call `solid_at`
         // (`client::world_render::Solid`); a single word otherwise.
         SOLID "solid": "array<u32>",
+        BODY_ROTATIONS "body_rotations": "array<vec4<f32>>",
+        DRY_VOLUMES "dry_volumes": "array<DryVolume>",
     }
     // `item_boxes`: item models in their own space, kept between frames
     // (`EntityRenderer::item_model`); an item instance is a box in `boxes` whose rows place
@@ -1008,6 +1020,7 @@ fn structs() -> String {
         GpuBox::wgsl(),
         Instance::wgsl(),
         GpuCuboid::wgsl(),
+        GpuDryVolume::wgsl(),
         GpuCorner::wgsl(),
         GpuBone::wgsl(),
         GpuParticle::wgsl(),

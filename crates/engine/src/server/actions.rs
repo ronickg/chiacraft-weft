@@ -1,6 +1,14 @@
 //! What players ask for, one list of what each message takes (`allowed`), then the actions.
 
 use super::*;
+
+fn landed_part(c: &Content, state: u32, turn: abi::Turn) -> u32 {
+    if turn == abi::Turn::NONE || state as usize >= c.states.len() { state } else { c.turned_state(state, turn) }
+}
+
+fn landed_hit(turn: abi::Turn, face: u8, hit: [f32; 3]) -> (u8, [f32; 3]) {
+    if turn == abi::Turn::NONE || face >= 6 { (face, hit) } else { (turn.face(face as usize) as u8, turn.point(hit, 1.0)) }
+}
 use weft_abi::entry_kind as ek;
 
 impl Server {
@@ -52,8 +60,12 @@ impl Server {
             // Items used on a block (buckets) work on the world's blocks only, so far.
             return self.use_in_hand(c, pi, slot, (frame == 0).then_some((pos, face)));
         };
-        let placed = r.with_space(c, frame, |d, _| {
+        let placed = r.with_space(c, frame, |d, o| {
             let hit = hit.map(|v| v.clamp(0.0, 1.0));
+            let look = o
+                .vector_to_local(glam::Vec3::from_array(look).as_dvec3())
+                .as_vec3()
+                .to_array();
             let target = d.place_clicked(c, pos, face, state, look, hit, entity, held.item)?;
             // What the stack carries goes onto the block entity it becomes (a renamed chest).
             if let Some(id) = d.anchored_part(c, target, state) {
@@ -130,12 +142,12 @@ impl Server {
             ToServer::Join { name, key } => self.join(c, pi, name, key),
             ToServer::StartBreak { pos, part, frame } => {
                 let Some((r, entity)) = self.region(pi) else { return };
-                let (frame, pos) = r.landed_as(frame, pos);
+                let request = ToClient::BreakRefused { frame, pos };
+                let (frame, pos, turn) = r.landed_as(frame, pos);
+                let part = landed_part(c, part, turn);
                 // Said now, or it would mine all that time for nothing.
                 if !r.start_mining(c, entity, frame, pos, part) {
-                    self.players[pi]
-                        .conn
-                        .send(ToClient::BreakRefused { frame, pos });
+                    self.players[pi].conn.send(request);
                 }
             }
             ToServer::StopBreak => {
@@ -209,7 +221,7 @@ impl Server {
                 let on = frame.filter(|f| f.1.is_finite()).and_then(|(b, rel)| {
                     dim.entity_region_ref(b)
                         .and_then(|r| r.entities.get(b))
-                        .map(|e| (b, e.pos + rel, rel))
+                        .map(|e| (b, e.body_place().to_world(rel), rel))
                 });
                 let pos = on.map_or(pos, |o| o.1);
                 let place = on.map_or((None, pos), |o| (Some(o.0), o.2));
@@ -233,7 +245,11 @@ impl Server {
                     return;
                 }
                 e.pose = pose;
-                let here = crate::physics::around(c, &*r.space, pos, e.height(c));
+                let height = e.height(c);
+                let dry = r.dry_volumes();
+                let seen = crate::physics::ObservedCells { cells: super::space::CubeCells(&r.space.cubes), dry: &dry };
+                let here = crate::physics::around(c, &seen, pos, height);
+                let Some(e) = r.entities.get_mut(entity) else { return };
                 let splash = entity::splashes(e.in_liquid, here.in_liquid, -walked.y);
                 let fell = entity::track_fall(&mut e.fall, walked.y, on_ground, here.in_liquid || here.climbing);
                 e.sprinting = sprint;
@@ -282,7 +298,10 @@ impl Server {
 
             ToServer::Break { pos, part, face, hit, frame } => {
                 let Some((r, entity)) = self.region(pi) else { return };
-                let (frame, pos) = r.landed_as(frame, pos);
+                let request = ToClient::BreakRefused { frame, pos };
+                let (frame, pos, turn) = r.landed_as(frame, pos);
+                let part = landed_part(c, part, turn);
+                let (face, hit) = landed_hit(turn, face, hit);
                 let mining = r.entities.get_mut(entity).and_then(|e| e.mining.take());
                 let rate = r.mining_rate_of(c, entity, frame, pos, part);
                 let progress = mining
@@ -292,9 +311,7 @@ impl Server {
                 // that it is, and a modified one could say anything.
                 let too_soon = rate < 1.0 && progress + 2.0 * rate < 0.7;
                 if r.break_mined(c, entity, frame, pos, part, face, hit, too_soon) {
-                    self.players[pi]
-                        .conn
-                        .send(ToClient::BreakRefused { frame, pos });
+                    self.players[pi].conn.send(request);
                 }
             }
 
@@ -306,7 +323,9 @@ impl Server {
                         r.resend_cell(p);
                     }
                 }
-                let (frame, pos) = r.landed_as(frame, pos);
+                let (frame, pos, turn) = r.landed_as(frame, pos);
+                let part = landed_part(c, part, turn);
+                let (face, hit) = landed_hit(turn, face, hit);
                 let Some((r, entity)) = self.region(pi) else { return };
                 let Some(e) = r.entities.get(entity) else { return };
                 let eye = e.pos + DVec3::Y * e.eye(c);

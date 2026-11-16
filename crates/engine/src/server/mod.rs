@@ -3,7 +3,9 @@
 
 pub(crate) mod actions;
 pub mod area;
+pub(crate) mod assembly;
 mod builtin;
+pub(crate) mod buoyancy;
 pub mod dim;
 pub mod energy;
 pub mod entity;
@@ -1108,7 +1110,9 @@ impl Server {
             let id = e.id;
             let r = dims[to as usize].ensure_region(c, pos);
             let hw = e.dims(c).half_width;
-            frame = r.body_under(c, pos, hw).map(|(b, at)| (b, pos - at));
+            frame = r
+                .body_under(c, pos, hw)
+                .map(|(b, at)| (b, at.to_local(pos)));
             e.frame = frame.map(|f| f.0);
             r.entities.insert_with(c, e, inv, comps);
             // The client hears its inventory again (component changes are found by comparing).

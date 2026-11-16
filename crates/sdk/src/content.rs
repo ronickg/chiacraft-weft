@@ -2437,6 +2437,27 @@ impl<'a> BlockBuilder<'a> {
         self.signal = Some(SignalBuild { flags, ..SignalBuild::default() });
         self.signal_props(abi::signal_kind::FLOATER, 3, false, false)
     }
+    /// Assembles the blocks attached to its front while powered. If `rotates`, power sets
+    /// the speed around its facing axis. The `mode` is `disassemble` by default, or `hold` to
+    /// keep the contraption assembled at its current angle when it stops.
+    pub fn signal_body_mount(mut self, rotates: bool) -> Self {
+        let flags = if rotates { abi::signal_flags::ROTATES } else { 0 };
+        self.signal = Some(SignalBuild { flags, ..SignalBuild::default() });
+        self = self.signal_props(abi::signal_kind::BODY_MOUNT, 3, false, false);
+        if rotates {
+            self = self.prop("mode", ["disassemble", "hold"]);
+        }
+        self
+    }
+    /// A controller that assembles a free, buoyant body and provides its steering seat.
+    pub fn body_helm(mut self) -> Self {
+        self.signal = Some(SignalBuild { flags: abi::signal_flags::HELM, ..SignalBuild::default() });
+        self.signal_props(abi::signal_kind::BODY_MOUNT, 0, false, false)
+    }
+    /// Mass per cubic block for a freely moving body, in units of water density.
+    pub fn density(self, density: f32) -> Self {
+        self.set(&c::DENSITY, density)
+    }
     /// Pushes blocks at its `facing` with power from any other side (after `facing`). Its `power`
     /// property: `off` in, `moving` while its head is on the way, `on` out, the head being the
     /// state's own cell in front (`.cells`). `head`: what the head looks like on the way, a block
@@ -3360,10 +3381,13 @@ impl SignalBuild {
             }
             k::SINK => sig.inputs = 0x3F,
             // Their front is stuck to what they take along, or is where the head goes.
-            k::PISTON | k::FLOATER | k::PISTON_HEAD => {
+            k::PISTON | k::FLOATER | k::BODY_MOUNT | k::PISTON_HEAD => {
                 let f = turn.own(facing.unwrap_or(crate::Dir::Up)).face();
                 sig.front = f;
-                sig.inputs = if self.kind == k::PISTON_HEAD { 0 } else { 0x3F & !(1 << f) };
+                sig.inputs = if self.kind == k::PISTON_HEAD || sig.flags & abi::signal_flags::HELM != 0 { 0 } else { 0x3F & !(1 << f) };
+                if sig.flags & abi::signal_flags::ROTATES != 0 && p.is("mode", "hold") {
+                    sig.flags |= abi::signal_flags::HOLD;
+                }
             }
             _ => {}
         }

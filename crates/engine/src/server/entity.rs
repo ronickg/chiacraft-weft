@@ -2,7 +2,7 @@
 //! as an engine contract every mod can read and write.
 
 use crate::tag_bits::entity as ef;
-use glam::{DVec3, IVec3};
+use glam::{DQuat, DVec3, IVec3};
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use weft_abi::ItemStack;
@@ -66,6 +66,10 @@ pub struct Entity {
     pub strode: f32,
     pub stride: f32,
     pub motion: Motion,
+    pub mount: Option<Box<BodyMount>>,
+    pub(super) assembly_edit: Option<Box<super::assembly::Edit>>,
+    pub(super) ship: Option<Box<super::buoyancy::Ship>>,
+    pub frame_rotation: Option<Box<DQuat>>,
     /// A body that falls under its weight and is put down as blocks where it lands, whatever
     /// its kind would do otherwise (`World::body_fall`, every falling block).
     pub falls: bool,
@@ -173,6 +177,53 @@ pub enum Motion {
     Parked,
 }
 
+#[derive(Clone, Copy)]
+pub struct BodyMount {
+    pub block: IVec3,
+    pub face: u8,
+    pub angle: f64,
+    pub last_grid: f64,
+    pub speed: u8,
+    pub stop: Option<f64>,
+}
+
+impl BodyMount {
+    pub fn rotation(&self) -> DQuat {
+        self.rotation_at(self.angle)
+    }
+
+    pub fn rotation_at(&self, angle: f64) -> DQuat {
+        if angle == 0.0 { DQuat::IDENTITY } else { DQuat::from_axis_angle(crate::world::DIRS[self.face as usize].as_dvec3(), angle) }
+    }
+}
+
+impl Entity {
+    pub fn body_place(&self) -> physics::Transform {
+        let rotation = self.body_rotation();
+        physics::Transform::rotated(self.pos, rotation.unwrap_or(DQuat::IDENTITY))
+    }
+
+    pub fn wire_rotation(&self) -> Option<[f32; 4]> {
+        let rotation = self.body_rotation()?;
+        (rotation != DQuat::IDENTITY).then(|| rotation.as_quat().to_array())
+    }
+    fn body_rotation(&self) -> Option<DQuat> {
+        self.mount
+            .as_ref()
+            .map(|m| m.rotation())
+            .or_else(|| self.ship.as_ref().map(|s| s.rotation))
+            .or(self.frame_rotation.as_deref().copied())
+    }
+
+    pub fn set_frame_rotation(&mut self, rotation: DQuat) {
+        if let Some(current) = self.frame_rotation.as_deref_mut() {
+            *current = rotation;
+        } else if rotation != DQuat::IDENTITY {
+            self.frame_rotation = Some(Box::new(rotation));
+        }
+    }
+}
+
 impl Entity {
     /// The frame the block it belongs to is in: 0 for the world and what isn't a block's.
     pub fn block_frame(&self) -> u64 {
@@ -225,6 +276,10 @@ impl Entity {
             sent: None,
             frame: None,
             motion: Motion::Free,
+            mount: None,
+            assembly_edit: None,
+            ship: None,
+            frame_rotation: None,
             falls: false,
             size: None,
             look: None,
@@ -730,8 +785,8 @@ impl Entities {
             .filter(|e| {
                 if touching {
                     let b = e.aabb(c);
-                    let (a, z) = (place.to_local(b.min), place.to_local(b.max));
-                    shape.test_box(a.min(z), a.max(z)).1
+                    let b = place.box_to_local(b);
+                    shape.test_box(b.min, b.max).1
                 } else {
                     shape.contains(place.to_local(e.pos))
                 }
@@ -784,16 +839,20 @@ pub fn step(c: &Content, e: &mut Entity, gravity: f64, block: &impl physics::Cel
     if e.anchor.is_some() || e.vehicle.is_some() || e.driver.is_some() {
         return out;
     }
+    if e.mount.is_some() || e.ship.is_some() {
+        return out;
+    }
     if (k.is(ef::KINEMATIC) && !e.falls) || e.motion == Motion::Parked {
         // On another body, it goes with that too (a piston on a platform moving blocks).
-        let carried = e
-            .frame
-            .and_then(|f| bodies.iter().find(|b| b.id == f))
-            .map_or(DVec3::ZERO, |b| b.delta);
+        let frame = e.frame.and_then(|f| bodies.iter().find(|b| b.id == f));
+        let carried = frame.map_or(DVec3::ZERO, |b| b.carry_from(e.pos));
+        if let Some((_, place)) = frame.and_then(|b| b.blocks) {
+            e.set_frame_rotation(place.rotation());
+        }
         e.pos += carried;
         match &mut e.motion {
             Motion::To { to, left } => {
-                *to += carried;
+                *to += frame.map_or(DVec3::ZERO, |b| b.carry_from(*to));
                 let arrived = *left <= 1;
                 let at = *to;
                 e.vel = (at - e.pos) / (*left as f64 * DT);
@@ -883,13 +942,12 @@ pub fn step(c: &Content, e: &mut Entity, gravity: f64, block: &impl physics::Cel
     e.blocked = r.hit[0] || r.hit[2];
     e.on_ground = r.on_ground;
     if r.on_ground {
-        if let Some(b) = physics::standing_on(c, e.pos, hw, bodies, e.id) {
-            e.frame = Some(b);
-        }
+        e.frame = physics::standing_on(c, e.pos, hw, bodies, e.id);
     }
     let dy = e.pos.y - start.y;
     e.moved = ((e.pos.x - start.x).powi(2) + (e.pos.z - start.z).powi(2)).sqrt() as f32;
-    let here = if physics::same_around(start, e.pos, h) { r.started_in } else { physics::around(c, block, e.pos, h) };
+    let here =
+        if !block.masks_liquid() && physics::same_around(start, e.pos, h) { r.started_in } else { physics::around(c, block, e.pos, h) };
     e.in_liquid = here.in_liquid;
     if let Some(land) = track_fall(&mut e.fall, dy, e.on_ground, here.in_liquid || here.climbing) {
         out.land = Some(land);

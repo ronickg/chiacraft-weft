@@ -2,6 +2,7 @@
 //! engine knows about stone, water or zombies.
 
 mod advancements;
+mod assembly;
 mod beds;
 mod block_entities;
 mod blocks;
@@ -57,6 +58,7 @@ fn init(r: &mut Registry) {
     doors::register(r);
     effects::register(r);
     redstone::register(r);
+    assembly::register(r);
     woodcutter::register(r);
     storage::register(r);
     target_info::register(r);
