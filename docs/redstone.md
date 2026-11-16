@@ -49,10 +49,25 @@ Solid blocks carry power by default, lamps and other blocks that only take power
 | `piston`, `sticky_piston` | Pushes up to 12 blocks, powered from any side but its front. Breaks what isn't solid, stops at block entities and `.immovable()` blocks. The blocks move as a body, so whoever stands on them rides along smoothly |
 | `slime_block` | What a piston moves takes what touches it along, for flying machines. `.sticky()` on any block does the same |
 | `floater` | What is fixed to its blocks comes along; what runs into a solid block on the way comes off and drops while it all goes on, so a torch or lever feeding it from the leading face stops it on arrival. Goes the way you look when placing it, any of the six, its green front first. With power from any other side it carries itself, the block in front of it and what is stuck to that through slime, half a block a second per level of power, circuits going on. Nothing else it touches goes along: the floor and what feeds it stay. Without power, with its floaters broken off, or at something solid in the way, it all lands on a whole block. It shows red when it can't go; a comparator reads 1 going, 15 stuck |
+| `rotor` | Stays in place and turns the assembly on its front. Its facing sets the axis and direction. A stronger signal turns it faster. Right-click without the assembly tool to change the stop mode. In Disassemble mode, the rotor finishes the quarter turn when power cuts out or returns to the last clear quarter turn when blocked, then places its blocks on the grid. Cycle power to restart after a blocked disassembly. In Hold mode, it stops at its current angle and continues when it has power and the path is clear. |
+| `assembler` | Stays in place and holds the assembly on its front as a stationary contraption while powered. The blocks return to the grid when power cuts out. |
+| `helm` | Assembles a ship and provides a seat for controlling its motion and heading. The helm's facing sets forward. |
 | `golden_lamp` | Each new pulse flips it. A comparator reads 15 while it is lit. Doesn't carry power |
 | `anchor` | With power it can't be moved: in a row being pushed it stops the push, touching slime it stays behind. On a platform on its way, getting power with more of the platform pushing it stops the platform at the next whole block; with nothing pushing it, it rides on. Without power it moves like any block |
 | `observer` | A 1 redstone tick pulse out of its back, 1 redstone tick after the block it looks at changes (wire's power too), and when a piston moves it |
 | `dispenser` | One item out of the front for each new pulse |
+
+## Connected assemblies
+
+Use the assembly tool on two blocks at opposite corners to limit the assembly to a box. This step is optional. Right-click the controller to preview the selection and right-click again to confirm it. For a rotor or assembler, use the tool on the controller to preview and confirm, then apply redstone power. Existing mounts without a confirmed selection keep using their slime attachments. Right-click into the air with the tool to clear your current selection.
+
+Selection starts at the helm or at the block immediately in front of a fixed mount. It follows movable solid blocks that share a face, and takes supported parts within the selected bounds. Leave an air gap or set the two corners if the build touches a dock or other solid blocks you want to keep in place. The limit is 4,096 carried cells and parts.
+
+After launching a ship, right-click the helm with an empty hand to sit. Use the forward and backward movement keys for thrust and the left and right movement keys to steer. Dismount with Shift by default. Use the assembly tool on an afloat helm to put the ship back on the grid when there is room for its blocks.
+
+World Rules and `/rule` tune ship motion for the current world. `ship_thrust` defaults to `7` blocks/s², `ship_water_drag` to `1.8`, and `ship_max_speed` to `4.5` blocks/s. The limit includes vertical motion. Higher thrust or lower drag lets a ship reach a higher speed within that limit.
+
+Wood usually floats and stone and metal usually sink. A compartment with a floor and watertight sides displaces water even with an open deck. It stays dry below the waterline until water reaches an opening, such as a submerged breach or a low edge of the hull. Blocks placed away from the center of mass can change the ship's trim or roll. A hit away from the center of mass can turn the ship, and turning into an obstacle can push it sideways.
 
 ## Making your own
 
@@ -100,6 +115,11 @@ The rest of the set, each with the properties it needs added for you:
 - `.signal_torch()`, `.signal_repeater()`, `.signal_comparator()`: as in the game.
 - `.signal_read(|w, p| level)`: what a comparator behind the block reads, instead of how full it is. It looks again when the block changes; `w.signal_read_changed(p)` for anything else it depends on.
 - `.signal_floater(breaks)` after `.facing(..)`: a floater; `breaks` makes it break what is in its way. `power` is 0 idle, 1 going, 2 stuck.
+- `.signal_body_mount(rotates)` after `.facing(..)` assembles blocks against a fixed mount. Set `rotates` for a rotor with a `mode` of `disassemble` or `hold`. The `power` state is 0 idle, 1 assembled, or 2 blocked after an attempted disassembly or assembly.
+- `.body_helm()` gives a horizontal block the role of a helm. Use `w.assembly_select(player, Some(pos), tool)` from its interaction callback and use `None` to clear the player's selection. `.density(value)` gives a block a mass per unit of collision volume, in units where water is `1.0` and unspecified blocks are `1.45`.
+- `w.set_ship_controls(id, Some(ShipControls { throttle, steering }))` supplies inputs at the next physics step. Both axes run from `-1.0` to `1.0`. Positive values mean forward and right. Pass `None` to return control to the pilot. The override is kept in memory until cleared or unloaded.
+- `w.ship_flooded_cells(id)` returns the last physics step's flooded cells in the coordinates used by `w.on_body(id)`. A dry ship returns an empty list. The world-space `w.in_liquid(point)` accounts for dry hull volume.
+- `r.on_event(&SHIP_COLLISION, |batch| { .. })` reads the strongest applied impulse for each obstacle a ship hits in its tick. The event has the ship and other body IDs (zero means the terrain), a world-space point and normal, the normal approach speed used by the solver and the normal impulse. Sustained contact can produce events on consecutive ticks.
 - `w.body_from_blocks(center, &cells)` takes blocks out of the world into a moving body, with chests and what is in them, circuits going on. Move it with `w.entity_modify(id).velocity(..)` or `w.body_move_to(id, pos, ticks)`, and `w.body_to_blocks(id)` makes it blocks again, on the nearest whole block. Its blocks are reached the way the world's are, through `w.on_body(id)`: `w.on_body(ship)?.prop_set(pos, "lit", "true")` in the body's own coordinates, with parts, scheduled ticks and signals as in the world. `w.push_blocks(pos, dir)` moves blocks the way a piston does, without one: what would be pushed goes one block that way, slime and all, so a machine can open a drawbridge. `w.body_fall(id)` lets it drop instead, like sand: each block lands where it comes down, or drops if it can't stand there, so a felled tree or a collapsing roof is a lift and a fall.
 - `.signal_observer()` and `.signal_piston(head, sticky)`, `.signal_piston_head()`: after `.facing(..)`.
 

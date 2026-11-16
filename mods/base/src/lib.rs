@@ -2,14 +2,17 @@
 //! engine knows about stone, water or zombies.
 
 mod advancements;
+mod assembly;
 mod beds;
 mod block_entities;
 mod blocks;
+mod camera;
 mod commands;
 mod doors;
 mod effects;
 mod items;
 mod mobs;
+mod music_player;
 mod player;
 mod recipes;
 mod redstone;
@@ -26,6 +29,7 @@ pub use base_api::{CLOUDS, FLATLANDS, MOON, OVERWORLD, STARS, SUN, tabs};
 declare_mod!(deps: [], init: init);
 
 fn init(r: &mut Registry) {
+    base_api::editor_methods(r);
     // Vanilla's creative tabs; blocks and items join them with `.tab(..)`.
     for (tab, icon) in [
         (&tabs::BUILDING, &Item::named("bricks")),
@@ -44,6 +48,7 @@ fn init(r: &mut Registry) {
     commands::register(r);
     items::register(r);
     player::register(r);
+    camera::register(r);
     block_entities::register(r);
     recipes::register(r);
     sounds::register(r);
@@ -54,6 +59,8 @@ fn init(r: &mut Registry) {
     doors::register(r);
     effects::register(r);
     redstone::register(r);
+    assembly::register(r);
+    music_player::register(r);
     woodcutter::register(r);
     storage::register(r);
     target_info::register(r);

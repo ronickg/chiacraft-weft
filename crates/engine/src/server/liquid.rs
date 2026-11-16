@@ -321,7 +321,14 @@ impl Dim {
         let eye = e.pos + DVec3::Y * e.eye(c);
         let from = if self.frame != 0 { self.place.to_local(eye) } else { eye };
         let flags = if liquids { weft_abi::ray::LIQUIDS } else { weft_abi::ray::BLOCKS };
-        self.ray(c, from, crate::physics::look_dir(e.yaw, e.pitch), max, flags)
+        self.ray(
+            c,
+            from,
+            self.place
+                .vector_to_local(crate::physics::look_dir(e.yaw, e.pitch)),
+            max,
+            flags,
+        )
     }
 
     /// The first block along a ray from `from` (in this dimension's frame: a body's blocks when
@@ -337,7 +344,7 @@ impl Dim {
             .filter_map(|(&sid, s)| {
                 self.entities
                     .get(sid)
-                    .map(|b| (sid, crate::physics::Transform::of(b.pos), &**s as &dyn crate::physics::Blocks))
+                    .map(|b| (sid, b.body_place(), &**s as &dyn crate::physics::Blocks))
             })
             .collect();
         crate::physics::pick(c, &*self.space, &structures, from, dir, max, flags)

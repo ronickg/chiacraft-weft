@@ -3,7 +3,9 @@
 
 pub(crate) mod actions;
 pub mod area;
+pub(crate) mod assembly;
 mod builtin;
+pub(crate) mod buoyancy;
 pub mod dim;
 pub mod energy;
 pub mod entity;
@@ -99,16 +101,23 @@ pub struct ServerConfig {
 /// Which opening of a world this is (`World::session`): one more for each server started.
 pub static SESSION: AtomicU64 = AtomicU64::new(0);
 
+#[derive(Default)]
+pub struct PlayerIdentity {
+    pub name: String,
+    /// Public key used by player saves and permissions.
+    pub key: String,
+}
+
+pub type PlayerIdentities = Arc<parking_lot::RwLock<rustc_hash::FxHashMap<u64, Arc<PlayerIdentity>>>>;
+
 pub struct Player {
     /// What `/title times` set for the next ones.
     title_times: Option<[f32; 3]>,
-    pub name: String,
+    pub identity: Arc<PlayerIdentity>,
     /// The skin this player sent, passed on to everyone who joins.
-    skin: Option<Arc<Vec<u8>>>,
+    skin: Option<Arc<crate::net::Skin>>,
     /// The same for their own model.
     avatar: Option<Arc<crate::net::AvatarData>>,
-    /// Public key: the identity saves are keyed by.
-    pub key: String,
     conn: ServerConn,
     pub dim: u32,
     pub entity: u64,
@@ -205,6 +214,7 @@ pub struct Server {
     pub cfg: ServerConfig,
     pub dims: Vec<DimSet>,
     pub players: Vec<Player>,
+    identities: PlayerIdentities,
     pub tick: u64,
     /// `/tick`: ticks per second, the world held still (players still move), ticks left to step
     /// while frozen, and a sprint (ticks left, ticks in all, started) run without waiting.
@@ -344,7 +354,11 @@ impl Server {
         let mut words = line.split_whitespace();
         let command = words.next().unwrap_or("");
         let name = words.next().unwrap_or("");
-        let find = |s: &Self| s.players.iter().position(|p| p.joined && p.name == name);
+        let find = |s: &Self| {
+            s.players
+                .iter()
+                .position(|p| p.joined && p.identity.name == name)
+        };
         match command {
             "" => {}
             "list" => {
@@ -352,7 +366,7 @@ impl Server {
                     .players
                     .iter()
                     .filter(|p| p.joined)
-                    .map(|p| p.name.as_str())
+                    .map(|p| p.identity.name.as_str())
                     .collect();
                 log::info!("{} online: {}", names.len(), names.join(", "));
             }
@@ -399,8 +413,9 @@ impl Server {
         SESSION.fetch_add(1, Ordering::Relaxed);
         let c = content();
         let next_id = Arc::new(AtomicU64::new(storage.as_ref().map_or(1, |s| s.meta.next_entity.max(1))));
+        let identities = PlayerIdentities::default();
         let mut dims: Vec<DimSet> = (0..c.dims.len() as u32)
-            .map(|i| DimSet::new(i, cfg.seed, next_id.clone()))
+            .map(|i| DimSet::new(i, cfg.seed, next_id.clone(), identities.clone()))
             .collect();
         if let Some(s) = &storage {
             for (name, t) in &s.meta.times {
@@ -443,6 +458,7 @@ impl Server {
             cfg,
             dims,
             players: Vec::new(),
+            identities,
             tick: 0,
             gen_tx,
             gen_rx,
@@ -514,8 +530,7 @@ impl Server {
                 title_times: None,
                 skin: None,
                 avatar: None,
-                name: String::new(),
-                key: String::new(),
+                identity: Arc::default(),
                 conn,
                 dim: 0,
                 entity: 0,
@@ -634,12 +649,19 @@ impl Server {
         lap(3, &self.shared);
         self.sync_players(c);
         lap(4, &self.shared);
-        self.players.retain(|p| !p.conn.is_closed());
+        self.players.retain(|p| {
+            if p.conn.is_closed() {
+                self.identities.write().remove(&p.entity);
+                false
+            } else {
+                true
+            }
+        });
         let online: Vec<String> = self
             .players
             .iter()
             .filter(|p| p.joined)
-            .map(|p| p.name.clone())
+            .map(|p| p.identity.name.clone())
             .collect();
         if online != self.online {
             for p in self.players.iter_mut().filter(|p| p.joined) {
@@ -753,14 +775,15 @@ impl Server {
                                 menu::close(m, r, c, entity);
                                 p.conn.send(ToClient::CloseMenu);
                             }
+                            r.entities.comps.remove(&(entity, c.game.fields.trash));
                             if crate::config::get(c.game.keep_inventory) == 0.0 {
                                 r.drop_inventory(c, entity);
                             }
                         }
                         p.deaths += 1;
                         p.conn.send(ToClient::Died);
-                        log::info!("{} died", p.name);
-                        name = Some(p.name.clone());
+                        log::info!("{} died", p.identity.name);
+                        name = Some(p.identity.name.clone());
                     }
                     if let Some(name) = name {
                         let line = death_message(c, cause, killer, name);
@@ -1058,9 +1081,9 @@ impl Server {
         }
         if let Some(st) = storage {
             let mut st = st.lock();
-            st.meta.ops.retain(|o| o.0 != p.key);
+            st.meta.ops.retain(|o| o.0 != p.identity.key);
             if level > 0 {
-                st.meta.ops.push((p.key.clone(), level));
+                st.meta.ops.push((p.identity.key.clone(), level));
             }
         }
     }
@@ -1087,7 +1110,9 @@ impl Server {
             let id = e.id;
             let r = dims[to as usize].ensure_region(c, pos);
             let hw = e.dims(c).half_width;
-            frame = r.body_under(c, pos, hw).map(|(b, at)| (b, pos - at));
+            frame = r
+                .body_under(c, pos, hw)
+                .map(|(b, at)| (b, at.to_local(pos)));
             e.frame = frame.map(|f| f.0);
             r.entities.insert_with(c, e, inv, comps);
             // The client hears its inventory again (component changes are found by comparing).
@@ -1151,7 +1176,7 @@ impl Server {
             .players
             .iter()
             .filter(|p| p.joined)
-            .map(|p| p.name.clone())
+            .map(|p| p.identity.name.clone())
             .collect();
         let (args, handler) = match def.parse(c, &tokens[1..], here, &players) {
             Ok(a) => a,
@@ -1224,7 +1249,7 @@ impl Server {
                     if s.name.as_ref().is_none_or(|n| {
                         self.players
                             .iter()
-                            .any(|p| p.joined && p.entity == e.id && &p.name == n)
+                            .any(|p| p.joined && p.entity == e.id && &p.identity.name == n)
                     }) {
                         consider(me.dim, e);
                     }
@@ -1233,7 +1258,7 @@ impl Server {
         } else {
             for p in self.players.iter().filter(|p| p.joined) {
                 let mine = p.entity == me.entity;
-                if (s.base == 's' && !mine) || s.name.as_ref().is_some_and(|n| &p.name != n) {
+                if (s.base == 's' && !mine) || s.name.as_ref().is_some_and(|n| &p.identity.name != n) {
                     continue;
                 }
                 if let Some(e) = self.dims[p.dim as usize].entity(p.entity) {

@@ -369,7 +369,7 @@ impl Dim {
             .entities
             .list
             .iter()
-            .filter(|e| !e.removed && e.is_body())
+            .filter(|e| e.is_body() || (e.player && !e.removed))
             .map(|e| e.id)
             .collect();
         for id in ids {

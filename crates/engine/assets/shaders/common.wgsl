@@ -22,6 +22,95 @@ fn fog_amount(dist: f32, start: f32, end: f32) -> f32 {
     return (dist - start) / (end - start);
 }
 
+fn cloud_at(s: Sky, cell: vec2<f32>, dims: vec2<f32>) -> bool {
+    let at = fract((cell + s.uv.zw + vec2(0.5)) / dims);
+    return textureSampleLevel(textures[s.ids.x], nearest_clamp, at, 0.0).a >= 0.5;
+}
+
+struct CloudHit {
+    color: vec4<f32>,
+    distance: f32,
+}
+
+// Trace up to the first cloud surface, stopping at the fragment when testing world geometry.
+fn trace_cloud(s: Sky, dir: vec3<f32>, limit: f32, view: Scene) -> CloudHit {
+    let size = s.extra.x;
+    let low = s.extra.z;
+    let reach = view.environment.z;
+    let high = low + s.extra.y;
+    var near = 0.0;
+    var far = min(reach, limit);
+    if abs(dir.y) > 0.00001 {
+        near = max(near, min(low / dir.y, high / dir.y));
+        far = min(far, max(low / dir.y, high / dir.y));
+    } else if low > 0.0 || high < 0.0 {
+        return CloudHit(vec4(0.0), 0.0);
+    }
+    if near >= far {
+        return CloudHit(vec4(0.0), 0.0);
+    }
+    let dims = vec2<f32>(f32(s.ids.z), f32(s.ids.w));
+    let start = s.uv.xy + dir.xz * near / size;
+    var cell = floor(start);
+    let turn = sign(dir.xz);
+    let delta = size / max(abs(dir.xz), vec2(0.000001));
+    var next = near + select(start - cell, cell + vec2(1.0) - start, dir.xz > vec2(0.0)) * delta;
+    var t = near;
+    // 0: came in through a plane, 1 and 2: through a side along x or z.
+    var side = 0u;
+    // From inside a cloud, it isn't what is seen.
+    var within = near == 0.0 && cloud_at(s, cell, dims);
+    var hit = false;
+    let steps = u32(ceil((far - near) / size * (abs(dir.x) + abs(dir.z)))) + 2u;
+    for (var i = 0u; i < steps; i++) {
+        let filled = cloud_at(s, cell, dims);
+        if filled && !within {
+            hit = true;
+            break;
+        }
+        within = within && filled;
+        if next.x < next.y {
+            t = next.x;
+            next.x += delta.x;
+            cell.x += turn.x;
+            side = 1u;
+        } else {
+            t = next.y;
+            next.y += delta.y;
+            cell.y += turn.y;
+            side = 2u;
+        }
+        if t >= far {
+            break;
+        }
+    }
+    if !hit {
+        return CloudHit(vec4(0.0), 0.0);
+    }
+    // Lit from above, like blocks.
+    var shade = select(0.9, 0.8, side == 1u);
+    if side == 0u {
+        shade = select(1.0, 0.7, dir.y > 0.0);
+    }
+    let fog = fog_amount(t, view.environment.y, reach);
+    let color = mix(s.color.rgb * shade, view.fog_color.rgb, smoothstep(0.0, 1.0, fog));
+    let alpha = s.color.a * (1.0 - smoothstep(0.6, 1.0, fog));
+    return CloudHit(vec4(color, alpha), t);
+}
+
+// The cloud has already been blended into the background. Tinting a fragment behind it by the
+// same cloud color and opacity gives the same result as blending the cloud after that fragment.
+fn through_cloud(c: vec4<f32>, rel: vec3<f32>, view: Scene) -> vec4<f32> {
+    let s = view.cloud;
+    let low = s.extra.z;
+    if s.color.a <= 0.0 || max(0.0, rel.y) < low || min(0.0, rel.y) > low + s.extra.y {
+        return c;
+    }
+    let dist = length(rel);
+    let cloud = trace_cloud(s, rel / max(dist, 0.000001), dist, view).color;
+    return vec4(mix(c.rgb, cloud.rgb, cloud.a), c.a);
+}
+
 fn brightness_curve(level: f32) -> f32 {
     return level / (4.0 - 3.0 * level);
 }
@@ -162,4 +251,8 @@ struct ParticleFrag {
     // 0 at birth, 1 at the end of its life.
     life: f32,
     time: f32,
+}
+fn quat_vector(q: vec4<f32>, v: vec3<f32>) -> vec3<f32> {
+    let t = 2.0 * cross(q.xyz, v);
+    return v + q.w * t + cross(q.xyz, t);
 }

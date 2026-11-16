@@ -50,7 +50,7 @@ A named contribution. Public fields are available through Deref for arbitrary mo
 - <a id="Environment-cloud_fog"></a>`.cloud_fog(start: f32, end: f32)`: Cloud fog start/end in blocks from the camera, independent of world fog. Zero end hides clouds. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/environment.rs#L94)
 - <a id="Environment-sky_opacity"></a>`.sky_opacity(opacity: f32)`: Visibility of the complete sky, including clouds. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/environment.rs#L100)
 - <a id="Environment-sky_object"></a>`.sky_object(object: &crate::SkyObject, opacity: f32)`: Visibility of a dimension-qualified object (`DIM.sky(&SUN)`), including sunset glow. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/environment.rs#L105)
-- <a id="Environment-acoustics"></a>`.acoustics(cutoff_hz: f32, reverb: f32, volume: f32)`: World low-pass cutoff in Hz, linear reverb send and linear volume gain. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/environment.rs#L111)
+- <a id="Environment-acoustics"></a>`.acoustics(cutoff_hz: f32, reverb: f32, volume: f32)`: Low-pass cutoff in Hz, linear reverb send and linear volume gain for all sound categories. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/environment.rs#L111)
 - <a id="Environment-overlay"></a>`.overlay(texture: &str, opacity: f32)`: Appends a screen texture; relative paths start at this mod's textures directory, without `.png`. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/environment.rs#L118)
 - <a id="Environment-post"></a>`.post(shader: &crate::Shader, strength: f32)`: Adds a named post shader at this strength. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/environment.rs#L131)
 - <a id="Environment-replace_overlays"></a>`.replace_overlays(mut self)`: Crossfades out preceding overlays, even when this layer adds none. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/environment.rs#L137)
@@ -90,8 +90,8 @@ A particle kind being registered (`Registry::particle`): half a second to a seco
 
 A sound about to play (`Output::play_sound`).
 
-- <a id="PlaySound-to"></a>`.to(who: impl Into<crate::Who>)`: Who hears it, of the players on the server (those in its range unless said). [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/effects.rs#L605)
-- <a id="PlaySound-pitch"></a>`.pitch(pitch: f32)`: Playback speed (1 = as recorded, 2 an octave up) instead of one picked from the sound's range: a note block's `2f32.powf((key - 12) as f32 / 12.0)`. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/effects.rs#L611)
+- <a id="PlaySound-to"></a>`.to(who: impl Into<crate::Who>)`: Who hears it, of the players on the server (those in its range unless said). [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/effects.rs#L600)
+- <a id="PlaySound-pitch"></a>`.pitch(pitch: f32)`: Playback speed (1 = as recorded, 2 an octave up) instead of one picked from the sound's range: a note block's `2f32.powf((key - 12) as f32 / 12.0)`. [source](https://github.com/Weft-Rust/Weft/blob/master/crates/sdk/src/effects.rs#L606)
 
 ## SoundBuilder
 

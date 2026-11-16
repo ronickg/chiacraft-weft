@@ -62,7 +62,7 @@ pub const COMMANDS: &[(&str, &str, Handler, u32)] = &[
     ("give", "<who:targets> <item:item> [count:int] | <item:item> [count:int]", give, p::GAME_MASTER),
     ("time", "set <time:time> | add <ticks:int> | query", time, p::GAME_MASTER),
     ("summon", "<entity:entity> [pos:pos] [count:int]", summon, p::GAME_MASTER),
-    ("clear", "[who:targets] | [item:item]", clear, p::GAME_MASTER),
+    ("clear", "item <who:targets> [filter:item] | item [filter:item] | entity <who:targets>", clear, p::GAME_MASTER),
     ("setblock", "<pos:pos> <block:block>", set_block, p::GAME_MASTER),
     ("insert", "<pos:pos> <item:item> [count:int]", insert, p::GAME_MASTER),
     ("block", "<pos:pos>", block, p::GAME_MASTER),
@@ -223,7 +223,7 @@ fn title(s: &mut Server, x: &Ctx) -> Vec<Msg> {
 }
 
 fn say_all(s: &mut Server, x: &Ctx) -> Vec<Msg> {
-    let name = s.players[x.pi].name.clone();
+    let name = s.players[x.pi].identity.name.clone();
     let line = Msg::new("chat.say", vec![Arg::Text(name), text(x.a.text("text").unwrap_or(""))]);
     s.show(Who::All, Shown::chat(line));
     Vec::new()
@@ -232,8 +232,15 @@ fn say_all(s: &mut Server, x: &Ctx) -> Vec<Msg> {
 fn whisper(s: &mut Server, x: &Ctx) -> Vec<Msg> {
     let said = text(x.a.text("text").unwrap_or(""));
     let to = x.a.text("who").unwrap_or("");
-    let Some(target) = s.players.iter().find(|p| p.name == to).map(|p| p.entity) else { return Vec::new() };
-    let name = s.players[x.pi].name.clone();
+    let Some(target) = s
+        .players
+        .iter()
+        .find(|p| p.identity.name == to)
+        .map(|p| p.entity)
+    else {
+        return Vec::new();
+    };
+    let name = s.players[x.pi].identity.name.clone();
     let heard = Msg::new("chat.whisper", vec![Arg::Text(name), said.clone()]);
     s.show(Who::Player(target), Shown { from: Shown::PLAYER, ..Shown::chat(heard) });
     vec![Msg::new("chat.whisper_to", vec![text(to), said])]
@@ -366,12 +373,10 @@ fn summon(s: &mut Server, x: &Ctx) -> Vec<Msg> {
     say("summon.done", vec![int(count), text(&kname)])
 }
 
-/// `/clear <targets>`: kills them. `/clear [item]`: empties the player's own inventory, or only
-/// the stacks of `item`.
 fn clear(s: &mut Server, x: &Ctx) -> Vec<Msg> {
     let c = x.c;
-    if x.a.get("who").is_some() {
-        let who = x.targets(s, "who");
+    let who = x.targets(s, "who");
+    if x.a.get("entity").is_some() {
         for &(d, id) in &who {
             if let Some(r) = s.dims[d as usize].entity_region(id) {
                 r.damage(c, id, &weft_abi::Damage::new(f32::MAX, damage::VOID));
@@ -379,10 +384,10 @@ fn clear(s: &mut Server, x: &Ctx) -> Vec<Msg> {
         }
         return say("clear.killed", vec![int(who.len())]);
     }
-    let (d, id) = x.me;
-    let filter = x.a.id("item");
+    let filter = x.a.id("filter");
     let mut total: u64 = 0;
-    if let Some(r) = s.dims[d as usize].entity_region(id) {
+    for (d, id) in who {
+        let Some(r) = s.dims[d as usize].entity_region(id) else { continue };
         let slots = r.entities.inventories.get(&id).map_or(0, Vec::len) as u32;
         for slot in 0..slots {
             let stack = r.entities.inventory_slot(id, slot);
@@ -485,7 +490,7 @@ fn set_level(s: &mut Server, x: &Ctx, level: u32) -> Vec<Msg> {
     for (_, id) in x.targets(s, "who") {
         if let Some(pi) = s.players.iter().position(|p| p.joined && p.entity == id) {
             s.set_permission(pi, level);
-            lines.extend(say("op.done", vec![text(&s.players[pi].name), int(level)]));
+            lines.extend(say("op.done", vec![text(&s.players[pi].identity.name), int(level)]));
         }
     }
     lines

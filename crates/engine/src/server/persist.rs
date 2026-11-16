@@ -1,10 +1,10 @@
 //! Entity serialization for saves. Kinds, items and components are stored by name so a save
 //! survives mods being added, removed or reordered.
 
-use glam::{DVec3, IVec3};
+use glam::{DQuat, DVec3, IVec3};
 use weft_abi::{ItemStack, component_flags as cf, entry_kind as ek};
 
-use super::entity::Entity;
+use super::entity::{BodyMount, Entity};
 use crate::content::Content;
 use crate::net::codec::{self, R};
 
@@ -14,6 +14,8 @@ pub type Saved = (Entity, Option<Vec<ItemStack>>, Vec<(u32, Box<[u8]>)>, Option<
 pub type ToSave<'a> = (&'a Entity, Option<&'a Vec<ItemStack>>, Vec<(u32, &'a [u8])>, Option<Vec<(IVec3, String)>>);
 
 const ENTITY_FORMAT: u32 = 0x3254_4E45;
+const MOUNTED_BODY: u8 = 0x80;
+const FLOATING_BODY: u8 = 0x40;
 
 struct W<'a>(&'a mut Vec<u8>);
 
@@ -97,9 +99,11 @@ pub fn write(c: &Content, out: &mut Vec<u8>, list: &[ToSave<'_>], now: u64) {
         w.u64(e.age);
         w.stack(c, e.item);
         // 2: on a body, which it says.
+        let mounted = if e.mount.is_some() { MOUNTED_BODY } else { 0 };
+        let attachment = mounted | if e.ship.is_some() { FLOATING_BODY } else { 0 };
         match (e.anchor, e.block_frame()) {
             (Some(a), frame) => {
-                w.u8(if frame != 0 { 2 } else { 1 });
+                w.u8(attachment | if frame != 0 { 2 } else { 1 });
                 for v in a.to_array() {
                     w.u32(v as u32);
                 }
@@ -107,7 +111,28 @@ pub fn write(c: &Content, out: &mut Vec<u8>, list: &[ToSave<'_>], now: u64) {
                     w.u64(frame);
                 }
             }
-            (None, _) => w.u8(0),
+            (None, _) => w.u8(attachment),
+        }
+        if let Some(m) = &e.mount {
+            for v in m.block.to_array() {
+                w.u32(v as u32);
+            }
+            w.u8(m.face);
+            w.u8(m.speed);
+            w.f64(m.angle);
+            w.f64(m.last_grid);
+            w.f64(m.stop.unwrap_or(-1.0));
+        }
+        if let Some(ship) = &e.ship {
+            w.u8(ship.front);
+            for v in ship
+                .rotation
+                .to_array()
+                .into_iter()
+                .chain(ship.spin.to_array())
+            {
+                w.f64(v);
+            }
         }
         match inv {
             Some(inv) => {
@@ -231,9 +256,31 @@ fn read_one(c: &Content, r: &mut R, now: u64) -> Option<Option<Saved>> {
     let mode = crate::world::GameMode::parse(&r.str()?).unwrap_or(crate::world::GameMode::SURVIVAL);
     let age = r.u64()?;
     let item = r.stack(c)?;
-    let anchor_kind = r.u8()?;
+    let attachment = r.u8()?;
+    let anchor_kind = attachment & !(MOUNTED_BODY | FLOATING_BODY);
     let anchor = if anchor_kind != 0 { Some(IVec3::new(r.u32()? as i32, r.u32()? as i32, r.u32()? as i32)) } else { None };
     let frame = if anchor_kind == 2 { Some(r.u64()?) } else { None };
+    let mount = if attachment & MOUNTED_BODY != 0 {
+        let block = IVec3::new(r.u32()? as i32, r.u32()? as i32, r.u32()? as i32);
+        let face = r.u8()?;
+        let speed = r.u8()?.clamp(1, 15);
+        let angle = r.f64()?;
+        let last_grid = r.f64()?;
+        let stop = r.f64()?;
+        (face < 6 && angle.is_finite() && last_grid.is_finite() && stop.is_finite())
+            .then(|| Box::new(BodyMount { block, face, speed, angle, last_grid, stop: (stop >= 0.0).then_some(stop) }))
+    } else {
+        None
+    };
+    let ship = if attachment & FLOATING_BODY != 0 {
+        let front = r.u8()?;
+        let rotation = DQuat::from_xyzw(r.f64()?, r.f64()?, r.f64()?, r.f64()?);
+        let spin = DVec3::new(r.f64()?, r.f64()?, r.f64()?);
+        (front < 6 && rotation.is_finite() && rotation.length_squared() > 1e-9 && spin.is_finite())
+            .then(|| Box::new(super::buoyancy::Ship::new(front, rotation.normalize(), spin)))
+    } else {
+        None
+    };
     let inv_len = r.u16()?;
     let inv = if inv_len == u16::MAX {
         None
@@ -289,6 +336,8 @@ fn read_one(c: &Content, r: &mut R, now: u64) -> Option<Option<Saved>> {
     e.item = item;
     e.anchor = anchor;
     e.frame = frame;
+    e.mount = mount;
+    e.ship = ship;
     if kind == c.game.item_kind && item.is_empty() {
         return Some(None);
     }

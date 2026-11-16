@@ -186,6 +186,24 @@ impl World {
     pub fn despawn(&self, id: u64) {
         unsafe { (host().entity_despawn)(self.raw(), id) }
     }
+    fn player_info(&self, entity: u64) -> Option<abi::PlayerInfo> {
+        let mut info = abi::PlayerInfo { name: Str::EMPTY, key: Str::EMPTY };
+        (unsafe { (host().player_info)(self.raw(), entity, &mut info) } != 0).then_some(info)
+    }
+
+    /// The connected player's display name. Several players may share a name.
+    pub fn player_name(&self, entity: u64) -> Option<String> {
+        self.player_info(entity)
+            .map(|info| unsafe { info.name.as_str() }.to_string())
+    }
+
+    /// The player's persistent public identity, shared with player saves and permissions.
+    /// Store it to identify the same player after reconnecting, respawning or restarting a server.
+    pub fn player_key(&self, entity: u64) -> Option<String> {
+        self.player_info(entity)
+            .map(|info| unsafe { info.key.as_str() }.to_string())
+    }
+
     pub fn entity(&self, id: u64) -> Option<EntityState> {
         let mut s = EntityState::default();
         (unsafe { (host().entity_get)(self.raw(), id, &mut s) } != 0).then_some(s)
@@ -331,6 +349,7 @@ impl World {
 
     /// Whether that point is under a liquid's surface, which a block that isn't full lies below
     /// its top: for what the block alone can't tell, like a head above shallow water.
+    /// World-space queries account for dry hulls; inside `on_body` this reads the body's own liquid cells.
     pub fn in_liquid(&self, pos: impl Into<Vec3>) -> bool {
         let pos = pos.into();
         unsafe { (host().in_liquid)(self.raw(), &pos) != 0 }
@@ -1010,7 +1029,7 @@ impl EntityBuilder<'_> {
     pub fn solid(self) -> Self {
         self.tag(abi::comp::entity::SOLID).unpushable()
     }
-    /// Takes no damage (no hurt flash, health stays); `/clear` and the void still remove it.
+    /// Takes no damage (no hurt flash, health stays); `/clear entity` and the void still remove it.
     pub fn invulnerable(self) -> Self {
         self.modifier(crate::Modifier::set(&crate::attribute::INVULNERABLE, 1.0))
     }

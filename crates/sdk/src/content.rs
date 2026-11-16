@@ -1522,6 +1522,7 @@ macro_rules! state_setters {
         }
         /// Every face shows this picture (relative names are under `block/`; without any:
         /// `block/<name>`), and every face is picked: what `layer`, `tint` and `tint_kind` go on.
+        /// Texture arguments also accept layer text (`name#RRGGBB@kind`, separated by spaces).
         /// The other presets pick some faces the same way, the last one said wins:
         /// `.texture("dirt").top("grass_top").tint_kind(&tints::GRASS).sides("dirt").layer("grass_side_overlay").tint_kind(&tints::GRASS)`.
         pub fn texture(self, t: &str) -> Self {
@@ -1741,6 +1742,7 @@ macro_rules! state_setters {
         /// in -X, +X, -Y, +Y, -Z, +Z order, as a model file's element has; `UV_FROM_BOX` takes it
         /// from where the box is, `UV_NO_FACE` leaves a face out. An empty texture is the block's
         /// own on that side, with its layers and tint.
+        /// Each texture can use the same layer text as `texture`.
         pub fn model_box_faces(self, min: [f32; 3], max: [f32; 3], faces: [(&str, [f32; 4]); 6]) -> Self {
             let textures = std::array::from_fn(|i| if faces[i].0.is_empty() { String::new() } else { crate::asset("block", faces[i].0) });
             self.add_box(min, max, textures, faces.map(|f| f.1))
@@ -2435,6 +2437,27 @@ impl<'a> BlockBuilder<'a> {
         self.signal = Some(SignalBuild { flags, ..SignalBuild::default() });
         self.signal_props(abi::signal_kind::FLOATER, 3, false, false)
     }
+    /// Assembles the blocks attached to its front while powered. If `rotates`, power sets
+    /// the speed around its facing axis. The `mode` is `disassemble` by default, or `hold` to
+    /// keep the contraption assembled at its current angle when it stops.
+    pub fn signal_body_mount(mut self, rotates: bool) -> Self {
+        let flags = if rotates { abi::signal_flags::ROTATES } else { 0 };
+        self.signal = Some(SignalBuild { flags, ..SignalBuild::default() });
+        self = self.signal_props(abi::signal_kind::BODY_MOUNT, 3, false, false);
+        if rotates {
+            self = self.prop("mode", ["disassemble", "hold"]);
+        }
+        self
+    }
+    /// A controller that assembles a free, buoyant body and provides its steering seat.
+    pub fn body_helm(mut self) -> Self {
+        self.signal = Some(SignalBuild { flags: abi::signal_flags::HELM, ..SignalBuild::default() });
+        self.signal_props(abi::signal_kind::BODY_MOUNT, 0, false, false)
+    }
+    /// Mass per cubic block for a freely moving body, in units of water density.
+    pub fn density(self, density: f32) -> Self {
+        self.set(&c::DENSITY, density)
+    }
     /// Pushes blocks at its `facing` with power from any other side (after `facing`). Its `power`
     /// property: `off` in, `moving` while its head is on the way, `on` out, the head being the
     /// state's own cell in front (`.cells`). `head`: what the head looks like on the way, a block
@@ -2450,6 +2473,13 @@ impl<'a> BlockBuilder<'a> {
         self.tag(abi::comp::block::NOT_STOOD_ON)
             .signal_props(abi::signal_kind::PISTON_HEAD, 0, false, false)
     }
+    /// A logic gate with configurable input faces, output faces, delay and operation.
+    pub fn logic_gate(self, gate: Gate, logic: GateLogic) -> Self {
+        let inputs = gate.inputs;
+        self.set_text(&crate::Component::<crate::Text>::named("signal_logic"), logic.name())
+            .signal_gate(gate, move |g| logic.output(inputs, g))
+    }
+
     /// A gate with logic of your own, on the clicked face: what comes out of its outputs a
     /// `gate`'s delay after what goes in at its inputs calls for it. Runs only when something
     /// around it changes.
@@ -2510,10 +2540,11 @@ impl BlockBuilder<'_> {
                 .push(element(&bc::PROPS, &p, abi::value_op::PUSH, ""));
         }
         // A part per combination of its own properties' values, from `.states(..)` and its signal.
-        let block_faces = self.faces_now();
         let looks = self.looks.take();
         let (signal, turns) = (self.signal, self.turns);
-        if looks.is_some() || signal.is_some() || turns.is_some() {
+        let generates_states = looks.is_some() || signal.is_some() || turns.is_some();
+        let block_faces = if generates_states || !self.keyed.is_empty() { self.faces_now() } else { Default::default() };
+        if generates_states {
             for p in state_combinations(&self.props) {
                 let mut ops = Vec::new();
                 let mut s = State::new(&mut ops, &block_faces);
@@ -2673,6 +2704,11 @@ crate::entry::entry_builder!(
 );
 
 impl ItemBuilder<'_> {
+    /// A model asset, including its folder (`mod:item/model`).
+    pub fn model_file(self, model: &str) -> Self {
+        self.set_text(&crate::comps::item::MODEL_FILE, &crate::full_name(model))
+    }
+
     /// An attribute modifier its holder gets while it is in the main hand, or `.worn()` in an equipment slot (`Modifier`).
     pub fn modifier(self, m: crate::Modifier) -> Self {
         self.push(&crate::component::MODIFIERS, m.0)
@@ -2812,6 +2848,7 @@ impl ItemBuilder<'_> {
         });
         self.set(&crate::comps::item::ON_RELEASE, cb)
     }
+
     /// What is left of it when it is used up (a potion's bottle, fuel's bucket).
     pub fn remainder(self, item: &crate::Item) -> Self {
         self.set_text(&c::REMAINDER, item.name())
@@ -2886,6 +2923,15 @@ impl ItemBuilder<'_> {
             a.handled = handled as u32;
         });
         self.set(&crate::comps::item::ON_USE, cb)
+    }
+
+    /// Takes over melee and mining while in the main hand. Runs once per attack press.
+    /// Return true to apply stack changes and play the swing.
+    pub fn on_attack(self, f: impl Fn(&mut ItemUse) -> bool + Send + Sync + 'static) -> Self {
+        let cb = callback(move |a: &mut abi::ItemUseArgs| {
+            a.handled = f(ItemUse::wrap(a)) as u32;
+        });
+        self.set(&crate::comps::item::ON_ATTACK, cb)
     }
 }
 
@@ -3335,10 +3381,13 @@ impl SignalBuild {
             }
             k::SINK => sig.inputs = 0x3F,
             // Their front is stuck to what they take along, or is where the head goes.
-            k::PISTON | k::FLOATER | k::PISTON_HEAD => {
+            k::PISTON | k::FLOATER | k::BODY_MOUNT | k::PISTON_HEAD => {
                 let f = turn.own(facing.unwrap_or(crate::Dir::Up)).face();
                 sig.front = f;
-                sig.inputs = if self.kind == k::PISTON_HEAD { 0 } else { 0x3F & !(1 << f) };
+                sig.inputs = if self.kind == k::PISTON_HEAD || sig.flags & abi::signal_flags::HELM != 0 { 0 } else { 0x3F & !(1 << f) };
+                if sig.flags & abi::signal_flags::ROTATES != 0 && p.is("mode", "hold") {
+                    sig.flags |= abi::signal_flags::HOLD;
+                }
             }
             _ => {}
         }
@@ -3472,6 +3521,59 @@ impl Gate {
 impl Default for Gate {
     fn default() -> Gate {
         Gate::new()
+    }
+}
+
+/// Common gate operations, usable through `BlockBuilder::logic_gate`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum GateLogic {
+    And,
+    Or,
+    Xor,
+    Not,
+    Nand,
+    Nor,
+    Xnor,
+    Max,
+    Min,
+}
+
+impl GateLogic {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::And => "and",
+            Self::Or => "or",
+            Self::Xor => "xor",
+            Self::Not => "not",
+            Self::Nand => "nand",
+            Self::Nor => "nor",
+            Self::Xnor => "xnor",
+            Self::Max => "max",
+            Self::Min => "min",
+        }
+    }
+
+    fn output(self, inputs: u32, g: &GateInputs) -> u8 {
+        let values = [Side::Front, Side::Rear, Side::Left, Side::Right, Side::Top, Side::Bottom]
+            .into_iter()
+            .filter(|s| inputs & (1 << *s as u32) != 0)
+            .map(|s| g.side(s));
+        let count = values.clone().count();
+        if count == 0 {
+            return 0;
+        }
+        let on = values.clone().filter(|&v| v > 0).count();
+        let yes = match self {
+            Self::And => on == count,
+            Self::Or => on > 0,
+            Self::Xor => on % 2 == 1,
+            Self::Not | Self::Nor => on == 0,
+            Self::Nand => on != count,
+            Self::Xnor => on % 2 == 0,
+            Self::Max => return values.max().unwrap_or(0),
+            Self::Min => return values.min().unwrap_or(0),
+        };
+        if yes { 15 } else { 0 }
     }
 }
 

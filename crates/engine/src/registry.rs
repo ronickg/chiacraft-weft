@@ -30,6 +30,7 @@ pub const FALLING: &str = "core:falling_block";
 pub const MOVING: &str = "core:moving_blocks";
 /// What a floater carries, and what `World::lift` makes.
 pub const PLATFORM: &str = "core:platform";
+pub const SHIP: &str = "core:ship";
 
 #[derive(Clone, Debug)]
 pub struct Cuboid {
@@ -421,9 +422,12 @@ pub struct Game {
     /// Blocks a piston is moving, an entity while they do.
     pub moving_kind: u32,
     pub platform_kind: u32,
+    pub ship_kind: u32,
     pub energy: u32,
     /// `Host::reg_client_frame`, in mod order.
     pub client_frames: Vec<(ModId, Callback)>,
+    /// Camera modifiers after the active mode, in mod order.
+    pub camera_frames: Vec<(ModId, Callback)>,
     /// (model, bone, how it moves), from `entry_kind::BONE_MOTION`.
     pub bone_motions: Vec<(String, String, crate::model::BoneMotion)>,
     /// Who says which model a stack of an item shows as (`comp::item::CONDITION`).
@@ -473,6 +477,10 @@ pub struct Game {
     pub max_cramming: u32,
     /// Config id of `core:simulation_distance`.
     pub simulation_distance: u32,
+    /// Config IDs for ship motion.
+    pub ship_thrust: u32,
+    pub ship_water_drag: u32,
+    pub ship_max_speed: u32,
     /// (owner, component, system) in mod order.
     pub systems: Vec<(ModId, u32, Callback)>,
     /// `{if:name}` conditions mods answer.
@@ -709,10 +717,11 @@ fn engine_components() -> Vec<RawEntry> {
         (abi::comp::ENERGY, energy.0, energy.1, energy.2),
         (MODIFIERS, "bytes", cf::SAVE, Vec::new()),
         (TIMERS, "bytes", cf::SAVE, Vec::new()),
+        (crate::server::assembly::BOUNDS, "bytes", cf::SAVE, Vec::new()),
         (abi::comp::NAME, "bytes", cf::SAVE | cf::CARRIED, Vec::new()),
         (abi::comp::PERSISTENT, "bytes", cf::SAVE, Vec::new()),
         (HEALTH, health_schema.as_str(), own, crate::net::HealthField::default().to_bytes()),
-        (BURNING, "u8", shown, vec![0]),
+        (BURNING, "u8", own, vec![0]),
         (abi::comp::LIGHT, "[u8;3]", own, vec![0; 3]),
         (SHOWN, "bytes", shown, Vec::new()),
         (GROUND, "bytes", shown, Vec::new()),
@@ -798,6 +807,7 @@ pub struct RawGame {
     pub client_commands: Vec<(ModId, String, String, Callback)>,
     pub command_extensions: Vec<(ModId, CommandExtension)>,
     pub client_frames: Vec<(ModId, Callback)>,
+    pub camera_frames: Vec<(ModId, Callback)>,
     /// (owner, name, side, callback).
     /// (owner, channel, schema, side, callback).
     pub packets: Vec<(ModId, String, String, u32, Callback)>,
@@ -942,20 +952,19 @@ impl PlayerLayout {
     }
 }
 
-/// A sound category: its volume setting and whether caves and water change it.
+/// A sound category and its volume setting.
 #[derive(Clone, Debug)]
 pub struct SoundCategory {
     pub name: String,
     /// `<ns>:volume_<name>`, none for `core:ui`.
     pub setting: Option<String>,
-    pub world: bool,
 }
 
 impl SoundCategory {
-    pub fn new(name: &str, world: bool) -> SoundCategory {
+    pub fn new(name: &str) -> SoundCategory {
         let (ns, short) = name.split_once(':').unwrap_or(("core", name));
         let setting = (name != "core:ui").then(|| format!("{ns}:volume_{short}"));
-        SoundCategory { name: name.to_string(), setting, world }
+        SoundCategory { name: name.to_string(), setting }
     }
 }
 
@@ -963,10 +972,7 @@ impl SoundCategory {
 fn engine_sound_categories() -> Vec<RawEntry> {
     ["music", "blocks", "creatures", "players", "ambient", "ui"]
         .iter()
-        .map(|n| {
-            let e = RawEntry::engine(abi::entry_kind::SOUND_CATEGORY, &format!("core:{n}"));
-            if *n == "music" || *n == "ui" { e } else { e.tag(abi::comp::SOUND_CATEGORY_WORLD) }
-        })
+        .map(|n| RawEntry::engine(abi::entry_kind::SOUND_CATEGORY, &format!("core:{n}")))
         .collect()
 }
 
@@ -1262,6 +1268,7 @@ fn engine_game_modes() -> Vec<RawEntry> {
     };
     let flies = || modifier(abi::attribute::CAN_FLY, abi::step::ADD, 1.0);
     let spared = || modifier(abi::attribute::INVULNERABLE, abi::step::SET, 1.0);
+    let fireproof = || modifier(abi::attribute::BURNING_TIME, abi::step::SET, 0.0);
     use crate::tag_bits::game_mode as f;
     // Unseen by mobs outside survival; creative reaches further.
     let unseen = || modifier(abi::attribute::VISIBILITY, abi::step::MUL, 0.0);
@@ -1276,12 +1283,13 @@ fn engine_game_modes() -> Vec<RawEntry> {
                 unseen(),
                 flies(),
                 spared(),
+                fireproof(),
             ],
         ),
         mode(
             "core:spectator",
             &[f::ALWAYS_FLY, f::NOCLIP, f::NO_INTERACT, f::HIDDEN, f::NO_HUD, f::NO_COSTS],
-            vec![unseen(), flies(), spared()],
+            vec![unseen(), flies(), spared(), fireproof()],
         ),
     ]
 }
@@ -1536,6 +1544,7 @@ pub const ENGINE_EVENTS: &[(&str, &str, u32)] = {
         (abi::action::INTERACT_ENTITY, abi::Interaction::SCHEMA, size_of::<abi::Interaction>() as u32),
         (abi::action::MOUNT, abi::Mounting::SCHEMA, size_of::<abi::Mounting>() as u32),
         (abi::action::DISMOUNT, abi::Mounting::SCHEMA, size_of::<abi::Mounting>() as u32),
+        (abi::event::SHIP_COLLISION, abi::ShipCollision::SCHEMA, size_of::<abi::ShipCollision>() as u32),
         (abi::action::ENTER_DIMENSION, abi::DimensionChange::SCHEMA, size_of::<abi::DimensionChange>() as u32),
         (abi::action::SPAWN, abi::Spawned::SCHEMA, size_of::<abi::Spawned>() as u32),
         (abi::event::ENTITY_REMOVED, abi::Removed::SCHEMA, size_of::<abi::Removed>() as u32),
@@ -1585,6 +1594,7 @@ pub fn engine_entries(kind: u32) -> Vec<RawEntry> {
 /// An action players bind keys to (`entry_kind::KEY`).
 pub struct KeyDef {
     pub name: String,
+    pub while_held: Vec<usize>,
     pub default: crate::input::Slots,
     /// `input::context` bits.
     pub contexts: u32,
@@ -1831,6 +1841,14 @@ fn engine_entities() -> Vec<RawEntry> {
             .tag(k::SOLID)
             .tag(k::KINEMATIC)
             .set(k::CARRY_HEIGHT, 3.0f32),
+        thing(SHIP, 1.0, 1.0)
+            .tag(k::SOLID)
+            .tag(k::KINEMATIC)
+            .set(k::CARRY_HEIGHT, 3.0f32)
+            .set(
+                k::SEATS,
+                vec![abi::Seat { pos: [0.0, 1.0, 0.0].into(), steers: false, exit: abi::seat_exit::STAY, exit_at: abi::Vec3::default() }],
+            ),
     ]
 }
 
@@ -2026,6 +2044,7 @@ pub fn freeze(
         .collect();
     for r in raws {
         g.client_frames.extend(r.client_frames);
+        g.camera_frames.extend(r.camera_frames);
         packets.extend(r.packets);
         event_handlers.extend(r.event_handlers);
         systems.extend(r.systems);
@@ -2039,7 +2058,9 @@ pub fn freeze(
     g.falling_kind = tables.1.ids(ek::ENTITY)[FALLING];
     g.moving_kind = tables.1.ids(ek::ENTITY)[MOVING];
     g.platform_kind = tables.1.ids(ek::ENTITY)[PLATFORM];
+    g.ship_kind = tables.1.ids(ek::ENTITY)[SHIP];
     g.client_frames.sort_by_key(|h| order(h.0));
+    g.camera_frames.sort_by_key(|h| order(h.0));
     let configs = take_kind(&mut entries, ek::CONFIG);
     let mut kind = |kind: u32| {
         let mut all = engine_entries(kind);
@@ -2089,9 +2110,8 @@ pub fn freeze(
     for (i, r) in recipes.iter_mut().enumerate() {
         r.entry = i as u32;
     }
-    (g.sound_categories, _) = tables.bake(kind(ek::SOUND_CATEGORY), ek::SOUND_CATEGORY, mod_name, errors, |e, _| {
-        SoundCategory::new(&e.name, e.has(abi::comp::SOUND_CATEGORY_WORLD))
-    });
+    (g.sound_categories, _) =
+        tables.bake(kind(ek::SOUND_CATEGORY), ek::SOUND_CATEGORY, mod_name, errors, |e, _| SoundCategory::new(&e.name));
     let (sounds, sound_names) = tables.bake_by(
         kind(ek::SOUND),
         ek::SOUND,
@@ -2101,14 +2121,21 @@ pub fn freeze(
         |e, errors| bake_sound(e, &g.sound_categories, errors),
     );
     g.sounds = sounds;
+    let mut key_modifiers = Vec::new();
     (g.keys, _) = tables.bake(kind(ek::KEY), ek::KEY, mod_name, errors, |e, errors| {
         let key = e.text(abi::comp::KEY_DEFAULT).unwrap_or_default();
         let slots = crate::input::Binding::parse_slots(key).unwrap_or_else(|| {
             errors.push(format!("key {}: unknown key {key:?}", e.name));
             [None; crate::input::SLOTS]
         });
-        KeyDef { name: e.name.clone(), default: slots, contexts: e.flags(crate::input::context::TAGS) }
+        key_modifiers.push(e.text(abi::comp::key::WHILE_HELD).map(str::to_owned));
+        KeyDef { name: e.name.clone(), default: slots, contexts: e.flags(crate::input::context::TAGS), while_held: Vec::new() }
     });
+    let key_names: Vec<_> = g.keys.iter().map(|k| k.name.as_str()).collect();
+    let modifiers = crate::input::resolve_modifiers(&key_names, &key_modifiers, errors);
+    for (key, modifiers) in g.keys.iter_mut().zip(modifiers) {
+        key.while_held = modifiers;
+    }
     (g.attributes, _) = tables.bake(kind(ek::ATTRIBUTE), ek::ATTRIBUTE, mod_name, errors, |e, _| {
         let [min, max] = e.or(abi::comp::attribute::RANGE, [f64::NEG_INFINITY, f64::INFINITY]);
         let default = e.or(abi::comp::attribute::DEFAULT, 0.0);
@@ -2188,6 +2215,9 @@ pub fn freeze(
     g.keep_inventory = tables.1.ids(ek::CONFIG)["core:keep_inventory"];
     g.max_cramming = tables.1.ids(ek::CONFIG)["core:max_entity_cramming"];
     g.simulation_distance = tables.1.ids(ek::CONFIG)["core:simulation_distance"];
+    g.ship_thrust = tables.1.ids(ek::CONFIG)["core:ship_thrust"];
+    g.ship_water_drag = tables.1.ids(ek::CONFIG)["core:ship_water_drag"];
+    g.ship_max_speed = tables.1.ids(ek::CONFIG)["core:ship_max_speed"];
     (g.categories, _) = tables.bake(kind(ek::ENTITY_CATEGORY), ek::ENTITY_CATEGORY, mod_name, errors, |e, _| bake_category(e));
     for k in g
         .entities

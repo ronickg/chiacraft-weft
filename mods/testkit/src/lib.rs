@@ -63,9 +63,15 @@ pub(crate) fn same_conditions(c: &Client) {
     use weft_sdk::settings::*;
     // Tests look at what the hands hold, in the view.
     static FIRST_PERSON_MODEL: Config<bool> = Config::named("core:first_person_model");
+    static AUTO_JUMP: Config<bool> = Config::named("core:auto_jump");
     let scripted = PLAN.get().is_some_and(|p| p.1.is_some());
-    if FIRST_PERSON_MODEL.get() && !scripted {
-        FIRST_PERSON_MODEL.set(false);
+    if !scripted {
+        if FIRST_PERSON_MODEL.get() {
+            FIRST_PERSON_MODEL.set(false);
+        }
+        if AUTO_JUMP.get() {
+            AUTO_JUMP.set(false);
+        }
     }
     // The player's packs would change every picture.
     let packs = !RESOURCE_PACKS.get().is_empty() || !SHADER_PACK.get().is_empty();

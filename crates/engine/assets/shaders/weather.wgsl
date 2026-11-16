@@ -11,6 +11,7 @@ struct VOut {
     @location(1) @interpolate(flat) data: vec4<u32>,
     @location(2) alpha: f32,
     @location(3) dist: f32,
+    @location(4) rel: vec3<f32>,
 }
 
 @vertex
@@ -25,6 +26,7 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
     out.data = w.data;
     out.alpha = w.uv.w;
     out.dist = length(world);
+    out.rel = world;
     return out;
 }
 
@@ -41,5 +43,6 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
     }
     let light = lightmap(unpack_light(in.data.y), scene.params.z, scene.light.x, scene.light.y, scene.light.w, scene.environment.x);
     let fog = fog_amount(in.dist, scene.params.x, scene.params.y);
-    return vec4(mix(color.rgb * pow(light, vec3(2.2)), scene.fog_color.rgb, fog), color.a * in.alpha);
+    let lit = vec4(mix(color.rgb * pow(light, vec3(2.2)), scene.fog_color.rgb, fog), color.a * in.alpha);
+    return through_cloud(lit, in.rel, scene);
 }

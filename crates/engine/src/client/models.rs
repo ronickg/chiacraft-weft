@@ -380,10 +380,18 @@ pub enum Batch {
     Icon,
 }
 
+#[derive(Clone, Copy)]
+pub struct SkinModels {
+    pub classic: u32,
+    pub slim: u32,
+}
+
 pub struct Models {
     pub kinds: Vec<KindModel>,
     /// Items with a model of bones: their place in `kinds`, past the entities'.
     pub item_kinds: FxHashMap<u32, u32>,
+    /// The player's model for 64 x 64 skins, past the entities': with normal arms and with slim ones.
+    pub skinned: Option<SkinModels>,
     /// Models read from files, by name, also those that aren't there.
     files: FxHashMap<String, Option<u32>>,
     stock: FxHashMap<&'static str, Vec<Arc<Animation>>>,
@@ -595,9 +603,11 @@ fn add_worn_geometry(parts: &[Part], worn_on: &[Option<usize>], cuboids: &mut Ve
             }
         } else if let (Some((uv, size)), Some(main)) = (
             model::armor_unwrap(p),
-            p.cuboids
-                .iter()
-                .max_by(|a, b| volume(a).total_cmp(&volume(b))),
+            p.cuboids.iter().max_by(|a, b| {
+                volume(a)
+                    .total_cmp(&volume(b))
+                    .then_with(|| b.inflate.total_cmp(&a.inflate))
+            }),
         ) {
             // Limbs at -x have their unwrap mirrored, as vanilla's.
             let mirror = p.pivot[0] + main.origin[0] + main.size[0] / 2.0 < 0.0;
@@ -1011,6 +1021,7 @@ impl Models {
         let mut m = Models {
             kinds: Vec::new(),
             item_kinds: FxHashMap::default(),
+            skinned: None,
             files: FxHashMap::default(),
             stock: FxHashMap::default(),
             item_clips: Vec::new(),
@@ -1070,12 +1081,17 @@ impl Models {
                 (!clips.is_empty()).then(|| (i as u32, clips.into_iter().map(Arc::new).collect()))
             })
             .collect();
+        let mut player = None;
         for k in 0..c.game.entities.len() as u32 {
-            let (parts, texture, own) = load_kind(assets, k);
+            let (mut parts, texture, own) = load_kind(assets, k);
             let own: Vec<Arc<Animation>> = own.into_iter().map(Arc::new).collect();
-            let at = self.push_with_stock(parts, texture, &own);
             let kind = &c.game.entities[k as usize];
             let file = file_named(ENTITY, k, comp::MODEL, &kind.name).unwrap_or_else(|| kind.name.clone());
+            if k == c.game.player_kind {
+                model::skin_layers(&mut parts, false);
+                player = Some((parts.clone(), texture, own.clone(), file.clone()));
+            }
+            let at = self.push_with_stock(parts, texture, &own);
             self.kinds[at as usize].live = live_bones(&file, &self.kinds[at as usize].parts, &motions_of(assets, &file));
         }
         // Items: where they sit in the hand, and those made of bones like an entity. Such a model
@@ -1084,8 +1100,8 @@ impl Models {
         self.displays.clear();
         let model_comp = c.components.id(comp::MODEL);
         for (i, d) in c.items.iter().enumerate().skip(1) {
-            let Some((ns, path)) = d.name.split_once(':') else { continue };
-            let default = format!("{ns}:item/{path}");
+            let Some((_, path)) = d.name.split_once(':') else { continue };
+            let default = c.item_model_file(i as u32).into_owned();
             let source = |name: &str| read(assets, name, "models", "json");
             if let Some(display) = block_model::load(&default, &source)
                 .ok()
@@ -1114,7 +1130,20 @@ impl Models {
                 self.carry(holder as u32, kind, bone);
             }
         }
-
+        // The player again for 64 x 64 skins, after all it carries is known; what is worn comes with `prepare_worn`.
+        self.skinned = player.map(|(mut parts, texture, own, file)| {
+            model::skin_layers(&mut parts, true);
+            let mut slim = parts.clone();
+            model::slim_arms(&mut slim);
+            let motions = motions_of(assets, &file);
+            let [classic, slim] = [parts, slim].map(|parts| {
+                let k = self.push_with_stock(parts, texture, &own);
+                self.kinds[k as usize].live = live_bones(&file, &self.kinds[k as usize].parts, &motions);
+                self.equip(k);
+                k
+            });
+            SkinModels { classic, slim }
+        });
         {
             let mut i = ICONS.lock().unwrap();
             *i = Icons::default();
@@ -1222,11 +1251,20 @@ impl Models {
         let (parts, texture, clips) = checked_avatar(f)?;
         let clips: Vec<Arc<Animation>> = clips.into_iter().map(Arc::new).collect();
         let k = self.push_with_stock(parts, texture, &clips);
-        let c = content();
         let mut said = model::load_bones(&String::from_utf8_lossy(&f.bones));
         said.truncate(AVATAR_BONES);
         let m = &mut self.kinds[k as usize];
         m.live = live_bones("of an avatar", &m.parts, &said);
+        self.equip(k);
+        self.files.insert(key, Some(k));
+        self.stale = true;
+        Ok(k)
+    }
+
+    /// `k`, a model of the player's bones past the entities', carries what the player does, where
+    /// it has the bones for it. What is worn is brought by `prepare_worn`, for who wears it.
+    fn equip(&mut self, k: u32) {
+        let c = content();
         for (file, bone) in &c.game.entities[c.game.player_kind as usize].bone_models {
             if let (Some(Some(model)), true) =
                 (self.files.get(file).copied(), model::bone_named(&self.kinds[k as usize].parts, bone).is_some())
@@ -1234,9 +1272,6 @@ impl Models {
                 self.carry(k, model, bone);
             }
         }
-        self.files.insert(key, Some(k));
-        self.stale = true;
-        Ok(k)
     }
 
     /// New models' boxes and triangles to the GPU. Before anything is drawn this frame: lists
@@ -1420,7 +1455,7 @@ impl Models {
                 .filter(|(i, _)| m.worn_on[*i].is_none())
             {
                 // In the bone's pixels the ray goes by the same steps: its own length stays the world's.
-                let back = self.bone(first as usize + i).inverse();
+                let Some(back) = self.bone_inverse(first as usize + i) else { continue };
                 let o = back
                     .transform_point3((from - self.located_from).as_vec3())
                     .as_dvec3();
@@ -1455,7 +1490,7 @@ impl Models {
     /// `kind` last frame, in its pixels.
     pub fn to_bone(&self, entity: u64, kind: u32, part: usize, p: glam::DVec3, d: glam::DVec3) -> Option<(Vec3, Vec3)> {
         let &(.., first) = self.located.iter().find(|l| l.0 == entity && l.1 == kind)?;
-        let back = self.bone(first as usize + part).inverse();
+        let back = self.bone_inverse(first as usize + part)?;
         Some((back.transform_point3((p - self.located_from).as_vec3()), back.transform_vector3(d.as_vec3())))
     }
 
@@ -1550,6 +1585,17 @@ impl Models {
     pub fn bone(&self, at: usize) -> Mat4 {
         let [a, b, c] = self.rows[at];
         Mat4::from_cols_array_2d(&[a, b, c, [0.0, 0.0, 0.0, 1.0]]).transpose()
+    }
+
+    fn bone_inverse(&self, at: usize) -> Option<Mat4> {
+        let bone = self.bone(at);
+        let det = bone.determinant();
+        // Clips can hide geometry by scaling a bone to zero.
+        if det == 0.0 || !det.is_finite() {
+            return None;
+        }
+        let inverse = bone.inverse();
+        inverse.is_finite().then_some(inverse)
     }
 
     /// The clips of model `to` that go with what plays on `holder` for the hand it is in, by

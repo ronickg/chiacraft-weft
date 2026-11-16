@@ -62,3 +62,10 @@ riding: `.seat(Seat::at([0.0, 1.0, 0.0]).steers())` is a place to sit, as many a
 
 Moving platforms: `solid()`, `kinematic()`, `carry_height(..)`, and
 `body(&DECK)` with a template (`r.template(&DECK).fill("base:oak_planks", from, to)`) makes a flying structure players can build on; its box is what the blocks fill, no `size` needed. `EntityState.size` is an entity's box and eye height as they are now (crouching and `w.set_size` included), so `st.pos.y + st.size.eye` is where its eyes are (or just `st.eye()`).
+
+
+## Player identity
+
+`w.player_name(entity)` reads a player's display name and `w.player_key(entity)` reads their persistent public ID. Both return `Option<String>` and work across regions and dimensions. A missing or disconnected player returns `None`.
+
+Names can repeat. The key is the same identity used for player saves and permissions, and survives reconnects, respawns and server restarts. Save it with your mod's records to associate permissions or ownership with an offline player. Read the current entity's key again when the player joins to find those records.

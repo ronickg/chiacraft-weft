@@ -5,7 +5,7 @@ use glam::Vec2;
 
 use crate::app::{Ctx, Request};
 use crate::hud::{self, Edit, Hud};
-use crate::screens::{BuildCx, Screen, button, frame, label};
+use crate::screens::{BuildCx, Screen, back_button, button, frame, label};
 use crate::ui::text::Arg;
 use crate::ui::{Justify, Kind, Style, Ui};
 
@@ -214,7 +214,7 @@ impl Screen for HudEditor {
                     }
                     c.requests.push(Request::Rebuild);
                 });
-                button(ui, cx, "menu.done", &[], 104.0, |c| c.requests.push(Request::Close));
+                back_button(ui, cx, "menu.done", &[], 104.0, |c| c.requests.push(Request::Close));
             });
         });
         ui.set_id(tools, "hud_tools");
@@ -303,7 +303,7 @@ impl Screen for DebugOptions {
                     hud::reset_debug_lines();
                     c.requests.push(Request::Rebuild);
                 });
-                button(ui, cx, "menu.done", &[], 120.0, |c| c.requests.push(Request::Close));
+                back_button(ui, cx, "menu.done", &[], 120.0, |c| c.requests.push(Request::Close));
             });
         });
     }

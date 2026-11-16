@@ -725,7 +725,7 @@ impl Layers {
     }
     /// One more picture on top (under `item/`, `"other:x"` another mod's).
     pub fn layer(mut self, texture: &str) -> Layers {
-        self.0.push((crate::asset("item", texture), None, None));
+        self.0.extend(Self::parse(&crate::asset("item", texture)).0);
         self
     }
     /// Tints the layer just added `0xRRGGBB` (multiplied: white parts take the color).
@@ -874,6 +874,7 @@ pub static USE_PRIORITY: Component<i32> = Component::named(abi::comp::USE_PRIORI
 pub static DAMAGE: Component<u32> = Component::named(abi::comp::WEAR);
 pub static LOOT_ROLLS: Component<u32> = Component::named(abi::comp::LOOT_ROLLS);
 pub static HARDNESS: Component<f32> = Component::named(abi::comp::HARDNESS);
+pub static DENSITY: Component<f32> = Component::named(abi::comp::block::DENSITY);
 pub static FRICTION: Component<f32> = Component::named(abi::comp::FRICTION);
 pub static DRAG: Component<f32> = Component::named(abi::comp::DRAG);
 pub static LIGHT: Component<[u8; 3]> = Component::named(abi::comp::LIGHT);

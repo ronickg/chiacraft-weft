@@ -24,6 +24,7 @@ pub struct ConfigDef {
     pub step: f64,
     pub choices: Vec<String>,
     pub flags: u32,
+    pub logarithmic: bool,
     pub scope: u32,
     /// The default of a `TEXT` setting.
     pub text: String,
@@ -65,6 +66,37 @@ impl ConfigDef {
         ((self.max - self.min).abs() / self.step.max(unit))
             .round()
             .clamp(1.0, u32::MAX as f64) as u32
+    }
+
+    pub fn slider_step(&self) -> f64 {
+        if self.step > 0.0 {
+            self.step
+        } else if self.kind == ck::INT {
+            1.0
+        } else {
+            ((self.max - self.min).abs() / 100.0).max(f64::EPSILON)
+        }
+    }
+
+    pub fn slider_value(&self, fraction: f32) -> f64 {
+        let range = self.max - self.min;
+        let value = if self.logarithmic {
+            let unit = self.slider_step();
+            self.min + unit * ((1.0 + range / unit).ln() * fraction as f64).exp_m1()
+        } else {
+            self.min + fraction as f64 * range
+        };
+        self.fit(value)
+    }
+
+    pub fn slider_position(&self, value: f64) -> f32 {
+        let range = (self.max - self.min).max(1e-9);
+        if self.logarithmic {
+            let unit = self.slider_step();
+            (((value - self.min).max(0.0) / unit).ln_1p() / (range / unit).ln_1p()) as f32
+        } else {
+            ((value - self.min) / range) as f32
+        }
     }
 
     fn parse(&self, s: &str) -> Option<f64> {
@@ -363,7 +395,7 @@ pub fn load_world(saved: &[(String, f64)]) {
     }
 }
 
-/// Settings the engine itself reads: the client's options, `core:mob_spawning` for worlds, and
+/// Settings the engine itself reads: the client's options, world rules, and
 /// a binding per key (`core:key.<action>`, from `keys`: action and default key); each sound
 /// category adds its volume (`volume`).
 pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
@@ -382,8 +414,8 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         number("core:render_scale", ck::FLOAT, if phone { 0.6 } else { 1.0 }, 0.25, 1.0, 0.05),
         number("core:view_distance", ck::INT, 12.0, 2.0, 64.0, 1.0),
         // Distant terrain beyond the view (`client::lod`), in cubes; 0 off.
-        number("core:lod_distance", ck::INT, if phone { 32.0 } else { 256.0 }, 0.0, 2048.0, 16.0),
-        // How near distant terrain's tiles split into finer ones, in tile widths (`client::lod`).
+        number("core:lod_distance", ck::INT, if phone { 32.0 } else { 256.0 }, 0.0, 1_048_576.0, 16.0).tag("config.logarithmic"),
+        // Quality maps to a target cell size of 24 / quality render pixels.
         number("core:lod_detail", ck::FLOAT, if phone { 2.0 } else { 4.0 }, 1.0, 4.0, 0.5),
         // Blocks clouds float above where their dimension puts them.
         number("core:cloud_height", ck::INT, 0.0, 0.0, 512.0, 16.0),
@@ -412,6 +444,7 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         number("core:invert_y", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         // Buttons and steering for fingers (`touch`), on where the screen is the only input.
         number("core:touch_controls", ck::BOOL, cfg!(target_os = "android") as u8 as f64, 0.0, 1.0, 0.0),
+        number("core:auto_jump", ck::BOOL, cfg!(target_os = "android") as u8 as f64, 0.0, 1.0, 0.0),
         string("core:debug_lines", ""),
         string("core:name", &user),
         string("core:relays", ""),
@@ -425,11 +458,15 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         number("core:max_forced_cubes", ck::INT, 4096.0, 0.0, 1048576.0, 1.0).set(c::SCOPE, scope::WORLD),
         number("core:first_person_model", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         number("core:show_avatars", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
+        number("core:skin_model", ck::CHOICE, 0.0, 0.0, 1.0, 0.0).set(c::CHOICES, ["classic", "slim"].map(String::from).to_vec()),
         number("core:occlusion_culling", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         // Off, what is behind the camera is drawn too: for shaders that bend the world around.
         number("core:frustum_culling", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         number("core:allow_avatars", ck::BOOL, 1.0, 0.0, 1.0, 0.0).set(c::SCOPE, scope::WORLD),
         number("core:keep_inventory", ck::BOOL, 0.0, 0.0, 1.0, 0.0).set(c::SCOPE, scope::WORLD),
+        rule("core:ship_thrust", ck::FLOAT, 7.0, 0.0, 64.0),
+        rule("core:ship_water_drag", ck::FLOAT, 1.8, 0.0, 16.0),
+        rule("core:ship_max_speed", ck::FLOAT, 4.5, 0.0, 32.0),
         // Vanilla's: more than this many pushing on one hurt it (0: never).
         rule("core:max_entity_cramming", ck::INT, 24.0, 0.0, 1000.0),
         // Deaths a player has before staying a spectator (0: no end); 1 is hardcore.
@@ -460,9 +497,9 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
                 "renderer",
             ],
         ),
-        ("core:controls", &["sensitivity", "invert_y", "touch_controls"]),
+        ("core:controls", &["sensitivity", "invert_y", "touch_controls", "auto_jump"]),
         ("core:accessibility", &["fov_effects"]),
-        ("core:profile", &["first_person_model", "show_avatars"]),
+        ("core:profile", &["skin_model", "first_person_model", "show_avatars"]),
         ("core:chat_settings", &["chat_width", "chat_height", "chat_height_closed", "chat_opacity", "chat_visibility"]),
     ];
     let percent = ["core:sensitivity", "core:brightness", "core:fov_effects", "core:render_scale"];
@@ -527,6 +564,7 @@ pub fn bake(e: &Entry, errors: &mut Vec<String>) -> ConfigDef {
         text: e.text(c::TEXT).unwrap_or_default().to_string(),
         page: e.text(c::PAGE).unwrap_or_default().to_string(),
         order: e.or(c::ORDER, 0),
+        logarithmic: e.has("config.logarithmic"),
     };
     if d.kind == ck::TEXT && d.scope != scope::CLIENT {
         errors.push(format!("setting {}: text settings are the client's own", d.name));
@@ -549,6 +587,11 @@ mod tests {
         assert_eq!((d.fit(3.2), d.fit(99.0), d.fit(f64::NAN)), (4.0, 10.0, 5.0));
         let c = ConfigDef { kind: ck::CHOICE, choices: vec!["low".into(), "high".into()], ..d.clone() };
         assert_eq!((c.parse("high"), c.parse("mid"), c.show(0.0)), (Some(1.0), None, "low".into()));
+        let logarithmic = ConfigDef { max: 1_048_576.0, step: 16.0, logarithmic: true, ..d.clone() };
+        for value in [0.0, 16.0, 32.0, 256.0, 2048.0, 1_048_576.0] {
+            assert_eq!(logarithmic.slider_value(logarithmic.slider_position(value)), value);
+        }
+        assert!(logarithmic.slider_position(2048.0) < 0.5);
         let b = ConfigDef { kind: ck::BOOL, ..d };
         assert_eq!((b.parse("on"), b.show(1.0)), (Some(1.0), "true".into()));
     }

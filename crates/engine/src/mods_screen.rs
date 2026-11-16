@@ -277,10 +277,6 @@ impl Screen for DisabledMods {
         "core:disabled_mods"
     }
 
-    fn draws_close(&self) -> bool {
-        true
-    }
-
     fn overlays(&self) -> bool {
         true
     }
@@ -309,7 +305,7 @@ impl Screen for DisabledMods {
                             c.requests.push(Request::Close);
                             c.requests.push(Request::Screen("core:mods".into()));
                         });
-                        crate::screens::button(ui, cx, "menu.done", &[], 120.0, |c| c.requests.push(Request::Close));
+                        crate::screens::back_button(ui, cx, "menu.done", &[], 120.0, |c| c.requests.push(Request::Close));
                     });
                 },
             );
@@ -362,7 +358,7 @@ impl Screen for InstallMods {
                     label(ui, cx, "mods.failed", &[Arg::Text(e.clone())], "warning");
                 }
             }
-            crate::screens::button(ui, cx, "menu.cancel", &[], 120.0, |c| c.requests.push(Request::Close));
+            crate::screens::back_button(ui, cx, "menu.cancel", &[], 120.0, |c| c.requests.push(Request::Close));
         });
     }
 }
@@ -411,10 +407,6 @@ impl Screen for ModsScreen {
         "core:mods"
     }
 
-    fn draws_close(&self) -> bool {
-        true
-    }
-
     /// Built again when the background work moves on.
     fn pointer(&mut self, _cursor: glam::Vec2, _ui: &mut Ui, ctx: &mut Ctx, _hud: &mut crate::hud::Hud) -> bool {
         if mod_index::generation() != self.seen {
@@ -446,8 +438,58 @@ impl Screen for ModsScreen {
                     .position(|r| crate::modloader::load_error(&r.id).is_some())
             })
             .unwrap_or(0);
-        let tall = (cx.size.y - 110.0).clamp(120.0, 330.0);
-        let wide = (cx.size.x - 40.0).clamp(480.0, 680.0);
+        let wide = (cx.size.x - 24.0).min(680.0);
+        let content_w = wide - 20.0;
+        let compact = wide < 480.0;
+        let stacked = content_w < 345.0;
+        let extra_header = if compact && tab == Tab::Browse { 23.0 } else { 0.0 };
+        let tall = (cx.size.y - 110.0 - extra_header).clamp(50.0, 330.0);
+        let gap = Scrollbar::HANDLE[0] + Scrollbar::OUTSIDE_GAP * 2.0;
+        let (list_w, detail_w, list_h, detail_h, panes) = if stacked {
+            let list_h = tall * 0.45;
+            (content_w - gap, content_w, list_h, tall - list_h - 6.0, Style::default().gap(6.0))
+        } else {
+            let columns = content_w - gap;
+            let list_w = (columns * 0.55).min(LIST_W);
+            (list_w, columns - list_w, tall, tall, Style::row().gap(gap))
+        };
+        let browse_tools = |ui: &mut Ui| {
+            ui.container(Style::row().gap(3.0).align(Align::Center), |ui| {
+                ui.add(Kind::Image { texture: "core:gui/icon_search".into(), color: 0xFFFFFFFF }, Style::default().size(9.0, 9.0));
+                let query = self.query.clone();
+                let input = ui.add(crate::ui::Kind::input(&self.query.borrow(), 40), Style::default().w(130.0).h(14.0));
+                if let Kind::Input { on_change, .. } = &mut ui.nodes[input].kind {
+                    *on_change = Some(Rc::new(move |c: &mut Ctx, v: &str| {
+                        *query.borrow_mut() = v.to_string();
+                        c.requests.push(Request::Rebuild);
+                    }));
+                }
+                ui.set_id(input, "mods_search");
+                ui.nodes[input].tooltip = Some(cx.t("mods.search", &[]));
+            });
+            let all = self.unverified.clone();
+            let (class, tip) =
+                if self.unverified.get() { ("button", "mods.showing_all") } else { ("button_install", "mods.showing_verified") };
+            let hidden = mod_index::index()
+                .unwrap_or_default()
+                .iter()
+                .filter(|m| !m.builds.iter().any(|b| b.verified))
+                .count();
+            let filter = icon_button(ui, cx, class, "icon_verified", tip, &[Arg::Int(hidden as i64)], move |c| {
+                all.set(!all.get());
+                c.requests.push(Request::Rebuild);
+            });
+            if let Kind::Button { selected, .. } = &mut ui.nodes[filter].kind {
+                *selected = !self.unverified.get();
+            }
+            ui.set_id(filter, "mods_verified_filter");
+            let to = cache.clone();
+            let b = icon_button(ui, cx, "button", "icon_refresh", "mods.refresh", &[], move |c| {
+                mod_index::refresh(&to);
+                c.requests.push(Request::Rebuild);
+            });
+            set_enabled(ui, b, !busy);
+        };
         let bg = if cx.in_game { "overlay" } else { "background" };
         ui.root_style(Style::default().stretch());
         ui.panel(bg, Style::default().grow().center().pad(10.0), |ui| {
@@ -491,65 +533,26 @@ impl Screen for ModsScreen {
                             });
                         });
                         ui.spacer();
-                        if tab == Tab::Browse {
-                            ui.container(Style::row().gap(3.0).align(Align::Center), |ui| {
-                                ui.add(
-                                    Kind::Image { texture: "core:gui/icon_search".into(), color: 0xFFFFFFFF },
-                                    Style::default().size(9.0, 9.0),
-                                );
-                                let query = self.query.clone();
-                                let input = ui.add(crate::ui::Kind::input(&self.query.borrow(), 40), Style::default().w(130.0).h(14.0));
-                                if let Kind::Input { on_change, .. } = &mut ui.nodes[input].kind {
-                                    *on_change = Some(Rc::new(move |c: &mut Ctx, v: &str| {
-                                        *query.borrow_mut() = v.to_string();
-                                        c.requests.push(Request::Rebuild);
-                                    }));
-                                }
-                                ui.set_id(input, "mods_search");
-                                ui.nodes[input].tooltip = Some(cx.t("mods.search", &[]));
-                            });
-                            let all = self.unverified.clone();
-                            let (class, tip) = if self.unverified.get() {
-                                ("button", "mods.showing_all")
-                            } else {
-                                ("button_install", "mods.showing_verified")
-                            };
-                            let hidden = mod_index::index()
-                                .unwrap_or_default()
-                                .iter()
-                                .filter(|m| !m.builds.iter().any(|b| b.verified))
-                                .count();
-                            let filter = icon_button(ui, cx, class, "icon_verified", tip, &[Arg::Int(hidden as i64)], move |c| {
-                                all.set(!all.get());
-                                c.requests.push(Request::Rebuild);
-                            });
-                            if let Kind::Button { selected, .. } = &mut ui.nodes[filter].kind {
-                                *selected = !self.unverified.get();
-                            }
-                            ui.set_id(filter, "mods_verified_filter");
-                            let to = cache.clone();
-                            let b = icon_button(ui, cx, "button", "icon_refresh", "mods.refresh", &[], move |c| {
-                                mod_index::refresh(&to);
-                                c.requests.push(Request::Rebuild);
-                            });
-                            set_enabled(ui, b, !busy);
+                        if tab == Tab::Browse && !compact {
+                            browse_tools(ui);
                         }
                         let folder = dir.clone();
                         icon_button(ui, cx, "button", "icon_folder", "mods.folder", &[], move |_| crate::packs::open_folder(&folder));
                         close_button(ui, 15.0);
                     },
                 );
-                // The list's scroll bar is in the gap beside it, with room on both sides.
-                let gap = Scrollbar::HANDLE[0] + Scrollbar::OUTSIDE_GAP * 2.0;
-                ui.container(Style::row().gap(gap), |ui| {
+                if tab == Tab::Browse && compact {
+                    ui.container(Style::row().gap(6.0).align(Align::Center), browse_tools);
+                }
+                ui.container(panes, |ui| {
                     // The tiles.
                     let list = ui.panel(
                         "well",
                         Style::default()
                             .pad(4.0)
                             .gap(3.0)
-                            .w(LIST_W)
-                            .h(tall)
+                            .w(list_w)
+                            .h(list_h)
                             .scroll_outside()
                             .stretch(),
                         |ui| {
@@ -570,7 +573,7 @@ impl Screen for ModsScreen {
                                         .gap(6.0)
                                         .pad(4.0)
                                         .min_h(TILE_H)
-                                        .w(LIST_W - 8.0)
+                                        .w(list_w - 8.0)
                                         .align(Align::Center),
                                     Rc::new(move |c: &mut Ctx| {
                                         picked.borrow_mut()[slot] = id.clone();
@@ -630,19 +633,18 @@ impl Screen for ModsScreen {
                     );
                     ui.set_id(list, "mod_list");
                     // The one picked.
-                    let detail_w = wide - LIST_W - 20.0 - gap;
                     ui.panel(
                         "well",
                         Style::default()
                             .pad(8.0)
                             .gap(4.0)
                             .w(detail_w)
-                            .h(tall)
+                            .h(detail_h)
                             .scroll()
                             .stretch(),
                         |ui| {
                             let Some(r) = rows.get(sel) else { return };
-                            detail(ui, cx, r, &dir, busy, detail_w - 16.0);
+                            detail(ui, cx, r, &dir, busy, detail_w - 16.0 - Scrollbar::ROOM);
                         },
                     );
                 });

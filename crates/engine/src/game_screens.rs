@@ -9,7 +9,7 @@ use crate::app::{Ctx, Request};
 use crate::client::modui;
 use crate::content::content;
 use crate::input::Key;
-use crate::screens::{BuildCx, Screen, button, label};
+use crate::screens::{BuildCx, Screen, back_button, button, label};
 use crate::ui::text::{self, Span};
 use crate::ui::{Kind, Style, Ui};
 
@@ -20,13 +20,11 @@ pub struct MenuScreen {
     /// Creative inventory filter and open tab.
     search: Rc<RefCell<String>>,
     tab: Rc<std::cell::Cell<usize>>,
-    /// Its panel has its X in the corner (`Screen::draws_close`).
-    closes: bool,
 }
 
 impl MenuScreen {
     pub fn new(kind: u32) -> MenuScreen {
-        MenuScreen { kind, effects: Vec::new(), search: Default::default(), tab: Default::default(), closes: false }
+        MenuScreen { kind, effects: Vec::new(), search: Default::default(), tab: Default::default() }
     }
 }
 
@@ -192,10 +190,6 @@ impl Screen for MenuScreen {
         "core:menu"
     }
 
-    fn draws_close(&self) -> bool {
-        self.closes
-    }
-
     /// Built again when an effect comes, goes or changes level while it is open.
     fn pointer(&mut self, _cursor: glam::Vec2, _ui: &mut Ui, ctx: &mut Ctx, _hud: &mut crate::hud::Hud) -> bool {
         let c = content();
@@ -236,8 +230,7 @@ impl Screen for MenuScreen {
                         // What mods add in the top right corner inside the menu's panel: this
                         // menu's place, then every menu's, then the X closing it.
                         let corner = [(def.name.as_str(), "corner"), (MENUS, "corner")];
-                        self.closes = first < ui.nodes.len();
-                        if self.closes {
+                        if first < ui.nodes.len() {
                             ui.open_existing(first);
                             ui.container(
                                 Style::row()
@@ -499,6 +492,10 @@ impl Screen for Chat {
             let stem = st.stem.get_or_insert_with(|| st.text.clone()).clone();
             let comp = st.completion.as_ref().unwrap();
             let text = format!("{}{}", &stem[..comp.from.min(stem.len())], comp.suggestions[st.selected.min(n - 1)]);
+            if n == 1 && text != stem {
+                set(st, text, ctx);
+                return;
+            }
             st.text = text.clone();
             ctx.set_input("chat", text);
             ctx.requests.push(Request::Rebuild);
@@ -664,11 +661,11 @@ impl Screen for RecipeView {
     }
 
     fn pointer(&mut self, _cursor: glam::Vec2, _ui: &mut Ui, ctx: &mut Ctx, _hud: &mut crate::hud::Hud) -> bool {
-        if ctx.input.scroll == 0.0 {
+        if ctx.input.scroll() == 0.0 {
             return false;
         }
-        let steps = ctx.input.scroll.abs().round().max(1.0) as isize;
-        Self::turn(&self.state, self.pages, -ctx.input.scroll.signum() as isize * steps, ctx);
+        let steps = ctx.input.scroll().abs().round().max(1.0) as isize;
+        Self::turn(&self.state, self.pages, -ctx.input.scroll().signum() as isize * steps, ctx);
         true
     }
 
@@ -756,7 +753,7 @@ impl Screen for RecipeView {
                 ui.set_id(next, "page_next");
                 ui.add(Kind::Container { class: None }, Style::default().w(12.0));
                 button(ui, cx, "recipes.tags", &[], 70.0, |c| c.requests.push(Request::Open(Box::new(TagList::default()))));
-                button(ui, cx, "menu.back", &[], 70.0, |c| c.requests.push(Request::Close));
+                back_button(ui, cx, "menu.back", &[], 70.0, |c| c.requests.push(Request::Close));
             });
         });
     }
@@ -1074,7 +1071,7 @@ impl Screen for TagList {
                 },
             );
             ui.set_id(list, "tags");
-            button(ui, cx, "menu.back", &[], 160.0, |c| c.requests.push(Request::Close));
+            back_button(ui, cx, "menu.back", &[], 160.0, |c| c.requests.push(Request::Close));
         });
     }
 }
@@ -1113,7 +1110,7 @@ impl Screen for TagView {
                     });
                 }
             });
-            button(ui, cx, "menu.back", &[], 160.0, |c| c.requests.push(Request::Close));
+            back_button(ui, cx, "menu.back", &[], 160.0, |c| c.requests.push(Request::Close));
         });
     }
 }

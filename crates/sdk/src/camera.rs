@@ -15,6 +15,33 @@ use crate::{CameraMode, Key, Registry, WithComponents, World, callback, host};
 
 pub use abi::easing;
 
+/// A camera callback's pose and input, borrowed for this frame only.
+/// Pose fields are the same as `abi::CameraArgs`.
+pub struct CameraFrame<'a> {
+    args: &'a mut CameraArgs,
+    keys: crate::client::Keys,
+}
+
+impl CameraFrame<'_> {
+    /// Actions available to this camera, including per-frame amounts.
+    pub fn keys(&self) -> &crate::client::Keys {
+        &self.keys
+    }
+}
+
+impl std::ops::Deref for CameraFrame<'_> {
+    type Target = CameraArgs;
+    fn deref(&self) -> &CameraArgs {
+        self.args
+    }
+}
+
+impl std::ops::DerefMut for CameraFrame<'_> {
+    fn deref_mut(&mut self) -> &mut CameraArgs {
+        self.args
+    }
+}
+
 /// The engine's camera modes.
 pub mod cameras {
     use crate::CameraMode;
@@ -36,13 +63,13 @@ pub fn ease(kind: u32, t: f32) -> f32 {
 /// last frame's camera (`CameraArgs`), it sets `out`. It brings the tags it needs along
 /// (`comp::camera`: a free camera is `DETACHED`), `CameraBuilder::shot` adds them.
 pub struct Shot {
-    f: Box<dyn Fn(&mut CameraArgs) + Send + Sync>,
+    f: Box<dyn Fn(&mut CameraFrame<'_>) + Send + Sync>,
     tags: &'static [&'static str],
 }
 
 impl Shot {
     /// Yours: `|a| a.out.pos = ..`, with these tags (`comp::camera`).
-    pub fn new(tags: &'static [&'static str], f: impl Fn(&mut CameraArgs) + Send + Sync + 'static) -> Shot {
+    pub fn new(tags: &'static [&'static str], f: impl Fn(&mut CameraFrame<'_>) + Send + Sync + 'static) -> Shot {
         Shot { f: Box::new(f), tags }
     }
 }
@@ -120,7 +147,7 @@ pub mod shot {
                 *vel = [0.0; 3];
             }
             use crate::client::keys;
-            let k = crate::client::Keys::of(a.keys, a.yaw, a.pitch);
+            let k = a.keys();
             let ahead = look_dir(k.yaw, k.pitch);
             let right = [k.yaw.cos() as f64, 0.0, -k.yaw.sin() as f64];
             let (forward, aside, up) = (
@@ -195,6 +222,17 @@ pub struct CameraBuilder<'a> {
 crate::entry::entry_builder!(CameraMode => CameraBuilder, camera;);
 
 impl Registry {
+    /// Modifies every camera mode after its shot, in mod order, before collision and transitions.
+    /// `a.out` contains the computed pose. FOV edits do not feed back into the shot's
+    /// previous multiplier. Use this for effects shared by built-in and custom cameras.
+    pub fn camera_frame(&mut self, f: impl Fn(&mut CameraFrame<'_>) + Send + Sync + 'static) {
+        let cb = callback(move |a: &mut CameraArgs| {
+            let keys = crate::client::Keys::of(a.keys, a.yaw, a.pitch);
+            f(&mut CameraFrame { args: a, keys });
+        });
+        unsafe { (host().reg_camera_frame)(self.raw, cb) }
+    }
+
     /// A camera mode; `r.edit(&cameras::FRONT)` changes one already there (the engine's,
     /// another mod's): flags added and taken away, its shot, key and change replaced.
     pub fn camera(&mut self, mode: &'static CameraMode) -> CameraBuilder<'_> {
@@ -206,7 +244,10 @@ impl CameraBuilder<'_> {
     /// How it moves, with the tags that takes.
     pub fn shot(self, shot: Shot) -> Self {
         let tags = shot.tags;
-        let call = callback(move |a: &mut CameraArgs| (shot.f)(a));
+        let call = callback(move |a: &mut CameraArgs| {
+            let keys = crate::client::Keys::of(a.keys, a.yaw, a.pitch);
+            (shot.f)(&mut CameraFrame { args: a, keys });
+        });
         tags.iter()
             .fold(self, |b, t| b.tag(t))
             .set(&crate::comps::camera::CALL, call)

@@ -13,6 +13,9 @@ pub fn register(r: &mut Registry) {
     r.recipe_kind(S).inputs(1, 1).outputs(1, 1);
     r.shapeless(C, "#planks/{m}", 4, &["#logs/{m}"], 0);
     r.shaped(C, "stick", 4, &["#", "#"], &[('#', "#planks")]);
+    r.shaped(C, "assembly_tool", 1, &["i", "s"], &[('i', "#ingots/iron"), ('s', "#stick")]);
+    r.shaped(C, "helm", 1, &[" s ", "sps", "ppp"], &[('s', "#stick"), ('p', "#planks")]);
+    r.shaped(C, "music_player", 1, &["ppp", "pip", "ppp"], &[('p', "#planks"), ('i', "#ingots/iron")]);
     // Shapes and back, by eighths of a block with nothing lost: stairs 6, slabs 4, beams 2.
     r.shaped(C, "#stairs/{m}", 4, &["# ", "##"], &[('#', "#stairs_of/{m}")]);
     r.shapeless(C, "#stairs_of/{m}", 3, &["#stairs/{m}"; 4], 0);

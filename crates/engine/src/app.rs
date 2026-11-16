@@ -11,7 +11,7 @@ use weft_render::{Backend, BackendDesc, Cmd, CommandList, Format, Target, Textur
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, DeviceId, ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
-use winit::keyboard::{KeyCode, PhysicalKey};
+use winit::keyboard::{KeyCode, NamedKey, PhysicalKey};
 use winit::window::{CursorGrabMode, Window, WindowId};
 
 use crate::assets::Assets;
@@ -67,7 +67,7 @@ pub enum Request {
     Screen(String),
     /// A mod's button was clicked: its callback (`UiArgs`) runs with the whole client API, like
     /// a frame hook, after the input is handled.
-    ModCall(weft_abi::ModId, weft_abi::Callback),
+    ModCall(weft_abi::ModId, weft_abi::Callback, u32),
     /// A mod's input or slider changed: its `on_change` with the text or value.
     ModChange(weft_abi::ModId, weft_abi::Callback, String, f32),
     /// A key for a mod's screen (`on_key`), by its settings name.
@@ -77,6 +77,7 @@ pub enum Request {
     /// Starts the game anew the way it was started, then leaves: what mods are on takes effect.
     Restart,
     Rebuild,
+    Sound(crate::audio::Play),
     Rebind(String, crate::input::Slots),
     ResetBinds,
     StartWorld(WorldMeta),
@@ -117,6 +118,18 @@ const HUD_FADE: f32 = 0.5;
 /// Seconds the picture takes to fill the window, and to fade into the world.
 const ENTER_GROW: f32 = 0.35;
 const ENTER_FADE: f32 = 0.3;
+
+#[derive(Clone, Copy)]
+enum PreviewKind {
+    Player,
+    Block(u64),
+}
+
+#[derive(Clone, Copy)]
+struct ModelPreview {
+    rect: crate::ui::Rect,
+    kind: PreviewKind,
+}
 
 /// What UI actions and bindings can see and change.
 pub struct Ctx<'a> {
@@ -288,9 +301,11 @@ pub(crate) struct Running {
     ui_cached: Vec<crate::ui::render::Quad>,
     ui_animated: Vec<crate::ui::render::Animated>,
     /// Where UI asked for the player model, physical pixels.
-    previews: Vec<[f32; 4]>,
+    previews: Vec<ModelPreview>,
     /// Texture holding the rendered inventory figure, drawn by the UI.
     preview_tex: Option<u32>,
+    menu_entities: Option<crate::client::entity_render::EntityRenderer>,
+    menu_preview_failed: bool,
     shot_path: Option<PathBuf>,
     /// Image id the pending screenshot is stored under for mods.
     shot_image: Option<u64>,
@@ -480,6 +495,7 @@ impl App {
         let mut input = Input::default();
         for k in &content().game.keys {
             input.register(&k.name, k.default, k.contexts);
+            input.binds.last_mut().unwrap().while_held = k.while_held.clone();
         }
         crate::settings::apply_binds(&mut input);
         settings.read_only = self.opts.automated;
@@ -556,6 +572,8 @@ impl App {
             ui_animated: Vec::new(),
             previews: Vec::new(),
             preview_tex: None,
+            menu_entities: None,
+            menu_preview_failed: false,
             shot_path: None,
             shot_image: None,
             mod_held: Vec::new(),
@@ -645,18 +663,31 @@ impl Running {
         self.set_capture(false);
     }
 
-    /// A screen's tree, and over it an X closing it as Escape would (`escape`): there is no Escape
-    /// on a phone, and on a computer it is one more way.
+    /// A screen's tree, with a fallback close icon when it has no control to leave it.
     fn build_screen(&self, s: &mut dyn Screen, ui: &mut Ui, depth: usize) {
         s.build(ui, &self.build_cx());
-        if s.escape_closes() && !s.draws_close() && (depth > 1 || self.game.is_some()) {
+        if s.escape_closes() && !ui.has_close && (depth > 1 || self.game.is_some()) {
             ui.container(Style::default().at_from([1.0, 0.0], -4.0, 4.0, [1.0, 0.0]), |ui| screens::close_button(ui, 16.0));
         }
     }
 
     fn rebuild_all(&mut self) {
+        self.rebuild_screens(|_| true);
+        self.hud.invalidate();
+    }
+
+    fn rebuild_music_screens(&mut self) {
+        if self.screens.iter().any(|(_, ui)| ui.read_music) {
+            self.rebuild_screens(|ui| ui.read_music);
+        }
+    }
+
+    fn rebuild_screens(&mut self, rebuild: impl Fn(&Ui) -> bool) {
         let mut screens = std::mem::take(&mut self.screens);
         for (depth, (s, ui)) in screens.iter_mut().enumerate() {
+            if !rebuild(ui) {
+                continue;
+            }
             let (hover, focus) = (ui.hovered, ui.focused);
             let focus_id = focus
                 .and_then(|f| ui.nodes.get(f))
@@ -689,7 +720,6 @@ impl Running {
             }
         }
         self.screens = screens;
-        self.hud.invalidate();
         self.quads_dirty = true;
     }
 
@@ -810,7 +840,7 @@ impl Running {
             &crate::settings::name(),
             &key,
             crate::settings::view_distance(),
-            std::fs::read(self.settings.run_dir.join("skins").join("skin.png")).ok(),
+            read_skin(&self.settings.run_dir),
             read_avatar(&self.settings.run_dir),
         ) {
             Ok(mut client) => {
@@ -921,9 +951,10 @@ impl Running {
                     }
                 }
                 Request::Rebuild => self.rebuild_all(),
-                Request::ModCall(owner, cb) => {
+                Request::Sound(play) => self.ui_sounds.push(play),
+                Request::ModCall(owner, cb, data) => {
                     let mut v = self.frame_view();
-                    let mut a = weft_abi::UiArgs { ui: std::ptr::null_mut(), client: v.raw() };
+                    let mut a = weft_abi::UiArgs { ui: std::ptr::null_mut(), client: v.raw(), data };
                     crate::host::invoke(owner, cb, &mut a);
                 }
                 Request::ModChange(owner, cb, text, value) => {
@@ -1012,7 +1043,7 @@ impl Running {
                             &crate::settings::name(),
                             &key,
                             crate::settings::view_distance(),
-                            std::fs::read(self.settings.run_dir.join("skins").join("skin.png")).ok(),
+                            read_skin(&self.settings.run_dir),
                             read_avatar(&self.settings.run_dir),
                         ) {
                             Ok(mut client) => {
@@ -1054,7 +1085,7 @@ impl Running {
             && ui
                 .hit(cursor)
                 .is_some_and(|h| matches!(ui.nodes[h].kind, Kind::Custom { tag: crate::client::modui::TAG_SLOT, .. }));
-        if self.input.scroll != 0.0 && !over_slot && ui.scroll_at(cursor, self.input.scroll) {
+        if self.input.scroll() != 0.0 && !over_slot && ui.scroll_at(cursor, self.input.scroll()) {
             self.quads_dirty = true;
         }
         // A scroll bar takes the mouse before anything under it.
@@ -1119,9 +1150,9 @@ impl Running {
                 .is_some_and(|f| matches!(ui.nodes[f].kind, Kind::Input { .. }));
             // The wheel over a slot (Mouse Tweaks'): a notch up brings an item in from the other
             // side, down sends one there; with shift a stack.
-            if let Some(s) = slot.filter(|_| self.input.scroll != 0.0) {
-                let button = if self.input.scroll > 0.0 { WHEEL_UP } else { WHEEL_DOWN };
-                for _ in 0..(self.input.scroll.abs().round() as u32).max(1) {
+            if let Some(s) = slot.filter(|_| self.input.scroll() != 0.0) {
+                let button = if self.input.scroll() > 0.0 { WHEEL_UP } else { WHEEL_DOWN };
+                for _ in 0..(self.input.scroll().abs().round() as u32).max(1) {
                     g.client
                         .send(net::ToServer::Click { slot: s, button, shift });
                 }
@@ -1305,13 +1336,16 @@ impl Running {
         let Some((_, ui)) = self.screens.last_mut() else { return UiCallbacks::default() };
         if self.input.pressed_button(0) {
             ui.pressed = hovered;
-            ui.focused = hovered.filter(|&h| matches!(ui.nodes[h].kind, Kind::Input { .. } | Kind::Slider { .. }));
+            ui.focused = hovered.filter(|&h| matches!(ui.nodes[h].kind, Kind::Input { .. } | Kind::Slider { enabled: true, .. }));
             ui.anchor = None;
             if let Some(f) = ui.focused
                 && let Some(at) = self.ui.caret_at(ui, f, cursor)
-                && let Kind::Input { caret, .. } = &mut ui.nodes[f].kind
+                && let Kind::Input { caret, area, .. } = &mut ui.nodes[f].kind
             {
                 *caret = at;
+                if let Some(area) = area {
+                    area.follow_caret.set(true);
+                }
                 self.quads_dirty = true;
             }
             if let Some(h) = hovered {
@@ -1353,7 +1387,7 @@ impl Running {
         if self.input.held_button(0) {
             if let Some(p) = ui.pressed {
                 let r = ui.nodes[p].rect;
-                if let Kind::Slider { value, on_change, .. } = &mut ui.nodes[p].kind {
+                if let Kind::Slider { value, on_change, enabled: true, .. } = &mut ui.nodes[p].kind {
                     let v = ((cursor.x - r.x) / r.w).clamp(0.0, 1.0);
                     if (v - *value).abs() > 1e-4 {
                         *value = v;
@@ -1363,7 +1397,7 @@ impl Running {
                 }
             }
         } else if let Some(p) = ui.pressed.take() {
-            if let Kind::Slider { value, on_release: Some(f), .. } = &ui.nodes[p].kind {
+            if let Kind::Slider { value, on_release: Some(f), enabled: true, .. } = &ui.nodes[p].kind {
                 slider.push((f.clone(), *value));
             }
             if Some(p) == hovered {
@@ -1391,6 +1425,11 @@ impl Running {
                 let lines = area.is_some();
                 let outcome = crate::ui::edit::Field { value, caret, anchor: &mut ui.anchor, max: *max, lines }.handle(&self.input);
                 let (changed, moved) = (outcome.changed, outcome.moved);
+                if changed || moved {
+                    if let Some(area) = area {
+                        area.follow_caret.set(true);
+                    }
+                }
                 if moved {
                     self.quads_dirty = true;
                 }
@@ -1401,7 +1440,7 @@ impl Running {
                         text_changed = Some((cb.clone(), value.clone()));
                     }
                 }
-            } else if let Kind::Slider { value, on_change, on_release, steps, .. } = &mut ui.nodes[f].kind {
+            } else if let Kind::Slider { value, on_change, on_release, steps, step_value, enabled: true, .. } = &mut ui.nodes[f].kind {
                 let by: f32 = [(KeyCode::ArrowLeft, -1.0), (KeyCode::ArrowRight, 1.0)]
                     .into_iter()
                     .filter(|(k, _)| self.input.pressed_or_repeated(Key::Code(*k)))
@@ -1409,7 +1448,9 @@ impl Running {
                     .sum();
                 if by != 0.0 {
                     let n = (*steps).max(1) as f32;
-                    let v = (((*value * n).round() + by) / n).clamp(0.0, 1.0);
+                    let v = step_value
+                        .as_ref()
+                        .map_or_else(|| (((*value * n).round() + by) / n).clamp(0.0, 1.0), |step| step(*value, by).clamp(0.0, 1.0));
                     *value = v;
                     slider.push((on_change.clone(), v));
                     slider.extend(on_release.clone().map(|f| (f, v)));
@@ -1536,6 +1577,12 @@ impl Running {
             self.look = Look::new(&self.assets, &mod_ids(), &self.lang);
         }
         s::apply_binds(&mut self.input);
+        if let Some(g) = &mut self.game {
+            g.client.set_skin_model(s::slim_skin());
+        }
+        if let Some(entities) = &mut self.menu_entities {
+            entities.set_preview_model(s::slim_skin());
+        }
         if relang || now.gui_scale != self.applied.gui_scale || now.advanced_tooltips != self.applied.advanced_tooltips {
             self.rebuild_all();
         }
@@ -1706,6 +1753,11 @@ impl Running {
                     redraw |= text::refresh(tip, &test);
                 }
                 match &mut n.kind {
+                    Kind::Button { selected, selected_bind: Some(bind), .. } => {
+                        let next = bind(&ctx);
+                        redraw |= *selected != next;
+                        *selected = next;
+                    }
                     Kind::Text(t) => {
                         if let Some(b) = &t.bind {
                             let v = b(&ctx);
@@ -1787,6 +1839,9 @@ impl ApplicationHandler for App {
     fn resumed(&mut self, el: &ActiveEventLoop) {
         if let Some(r) = &mut self.run {
             r.gpu.set_surface(Some(&*r.window));
+            if let Some(a) = &mut r.audio {
+                a.set_active(self.opts.automated || r.window.has_focus());
+            }
             return;
         }
         match self.start(el) {
@@ -1801,6 +1856,9 @@ impl ApplicationHandler for App {
     /// An Android app sent to the background: its window has no surface until it comes back.
     fn suspended(&mut self, _el: &ActiveEventLoop) {
         if let Some(r) = &mut self.run {
+            if let Some(a) = &mut r.audio {
+                a.set_active(false);
+            }
             r.input.release_all();
             r.touches = Default::default();
             // At once: `pause` waits for a frame to take the world's picture, and none comes now.
@@ -1828,11 +1886,19 @@ impl ApplicationHandler for App {
                 r.rebuild_all();
             }
             // Windows lets go of a confined cursor while another window has the focus.
-            WindowEvent::Focused(true) if !self.opts.automated && r.input.captured && !r.settings.read_only => {
-                r.center_cursor();
-                r.grab_cursor();
+            WindowEvent::Focused(true) if !self.opts.automated => {
+                if let Some(a) = &mut r.audio {
+                    a.set_active(true);
+                }
+                if r.input.captured && !r.settings.read_only {
+                    r.center_cursor();
+                    r.grab_cursor();
+                }
             }
             WindowEvent::Focused(false) if !self.opts.automated => {
+                if let Some(a) = &mut r.audio {
+                    a.set_active(false);
+                }
                 r.input.release_all();
                 r.touches = Default::default();
                 if r.game.is_some() && r.screens.is_empty() {
@@ -1842,9 +1908,14 @@ impl ApplicationHandler for App {
             }
             WindowEvent::Touch(t) => r.touch(t),
             WindowEvent::KeyboardInput { event, .. } => {
-                if let PhysicalKey::Code(code) = event.physical_key {
-                    // A phone's back button: what Escape does.
-                    let code = if code == KeyCode::BrowserBack { KeyCode::Escape } else { code };
+                // Android Back arrives as a logical key with no physical code.
+                let code = match event.physical_key {
+                    PhysicalKey::Code(KeyCode::BrowserBack) => Some(KeyCode::Escape),
+                    PhysicalKey::Code(code) => Some(code),
+                    _ if event.logical_key == winit::keyboard::Key::Named(NamedKey::BrowserBack) => Some(KeyCode::Escape),
+                    _ => None,
+                };
+                if let Some(code) = code {
                     match event.state {
                         ElementState::Pressed if event.repeat => r.input.key_repeat(Key::Code(code)),
                         ElementState::Pressed => r.input.key_down(Key::Code(code)),
@@ -2151,6 +2222,11 @@ fn toggle_keys(r: &mut Running) {
 }
 
 fn reload_assets(r: &mut Running, opts: &Options) {
+    r.menu_preview_failed = false;
+    if let Some(mut entities) = r.menu_entities.take() {
+        entities.destroy(&mut *r.gpu);
+        r.preview_tex = None;
+    }
     r.assets
         .set_packs(crate::packs::enabled(&opts.run_dir, &crate::settings::resource_packs()));
     crate::packs::set_shader_pack(
@@ -2216,7 +2292,9 @@ fn update_game(r: &mut Running, dt: f64, frame_start: Instant) {
         g.client.fov_effects = crate::settings::fov_effects();
         g.client.brightness = crate::settings::brightness();
         g.client.first_person_model = crate::settings::first_person_model();
-        g.client.entity_render.show_avatars = crate::settings::show_avatars();
+        g.client
+            .entity_render
+            .set_show_avatars(crate::settings::show_avatars());
         g.client.render.occlusion.on = crate::settings::occlusion_culling();
         let t = Instant::now();
         if world_input {
@@ -2231,9 +2309,22 @@ fn update_game(r: &mut Running, dt: f64, frame_start: Instant) {
 }
 
 fn play_sounds(r: &mut Running) {
+    let mut music_ended = false;
     if let Some(a) = &mut r.audio {
+        if let Some(g) = &mut r.game {
+            let cl = &mut g.client;
+            let pos = cl
+                .local_music
+                .source()
+                .and_then(|source| cl.music_source_position(source));
+            music_ended = cl.local_music.update(pos);
+        }
         let listener = r.game.as_ref().map(|g| g.client.listener());
-        a.update(&r.assets, listener.as_ref());
+        let local_playing = r
+            .game
+            .as_ref()
+            .is_some_and(|g| g.client.local_music.source().is_some());
+        a.update(&r.assets, listener.as_ref(), local_playing);
         if let Some(g) = &mut r.game {
             for p in g.client.sounds.drain(..) {
                 a.play(&r.assets, p);
@@ -2242,6 +2333,9 @@ fn play_sounds(r: &mut Running) {
         for p in r.ui_sounds.drain(..) {
             a.play(&r.assets, p);
         }
+    }
+    if music_ended {
+        r.rebuild_music_screens();
     }
 }
 
@@ -2473,11 +2567,23 @@ fn build_ui_quads(r: &mut Running, scale: f32) {
         let textures = &r.textures;
         let mut custom = |ren: &mut UiRenderer, tag: u32, data: u64, rect: crate::ui::Rect, hovered: bool, icon: Option<u32>| {
             crate::hud::draw_custom(ren, look, textures, client, tag, data, rect, hovered, icon, scale);
-            if tag == crate::client::modui::TAG_ENTITY {
-                let inner = crate::ui::Rect { x: rect.x + scale, y: rect.y + scale, w: rect.w - 2.0 * scale, h: rect.h - 2.0 * scale };
-                previews.push([inner.x, inner.y, inner.w, inner.h]);
+            let preview = match tag {
+                crate::client::modui::TAG_ENTITY => Some(ModelPreview {
+                    rect: crate::ui::Rect { x: rect.x + scale, y: rect.y + scale, w: rect.w - 2.0 * scale, h: rect.h - 2.0 * scale },
+                    kind: PreviewKind::Player,
+                }),
+                crate::editor::TAG_PREVIEW if crate::editor::is_block_preview(data) => {
+                    Some(ModelPreview { rect, kind: PreviewKind::Block(data) })
+                }
+                _ => None,
+            };
+            if let Some(preview) = preview {
+                previews.push(preview);
                 if let Some(t) = preview_tex {
-                    ren.image(inner, t, [0.0, 0.0, 1.0, 1.0], 0xFFFFFFFF);
+                    match preview.kind {
+                        PreviewKind::Player => ren.image(preview.rect, t, [0.0, 0.0, 1.0, 1.0], 0xFFFFFFFF),
+                        PreviewKind::Block(_) => ren.premultiplied_image(preview.rect, t, [0.0, 0.0, 1.0, 1.0], 0xFFFFFFFF),
+                    }
                 }
             }
         };
@@ -2581,6 +2687,10 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
     draw_entering(r, info, scale);
 }
 
+fn read_skin(run_dir: &std::path::Path) -> Option<crate::net::Skin> {
+    Some(crate::net::Skin { png: std::fs::read(run_dir.join("skins/skin.png")).ok()?, slim: crate::settings::slim_skin() })
+}
+
 /// The player's own model, if `skins/avatar` has one: a Blockbench geometry and its picture, and
 /// if they like clips, what bones do by themselves and a glow mask.
 fn read_avatar(run_dir: &std::path::Path) -> Option<crate::net::AvatarData> {
@@ -2605,6 +2715,16 @@ fn read_avatar(run_dir: &std::path::Path) -> Option<crate::net::AvatarData> {
 
 fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
     r.list.clear();
+    if r.previews.is_empty() {
+        r.menu_preview_failed = false;
+    }
+    if (r.game.is_some() || r.previews.is_empty())
+        && let Some(mut entities) = r.menu_entities.take()
+    {
+        entities.destroy(&mut *r.gpu);
+        r.preview_tex = None;
+        r.quads_dirty = true;
+    }
     if let Some(g) = &mut r.game {
         g.client
             .entity_render
@@ -2616,20 +2736,45 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
             r.quads_dirty = true;
         }
     }
-    if let Some(g) = r.game.as_mut().filter(|_| !r.screens.is_empty()) {
-        if let Some(&[x, y, w, h]) = r.previews.first() {
-            let look = r.input.cursor - Vec2::new(x, y);
-            let tex = g.client.entity_render.draw_preview(
-                &mut *r.gpu,
-                &mut r.list,
-                info,
-                [w.round() as u32, h.round() as u32],
-                look,
-                &g.client.me.worn,
-            );
-            if tex != r.preview_tex {
-                r.preview_tex = tex;
-                r.quads_dirty = true;
+    if !r.screens.is_empty() {
+        if let Some(preview) = r.previews.first().copied() {
+            let crate::ui::Rect { x, y, w, h } = preview.rect;
+            if r.game.is_none() && r.menu_entities.is_none() && !r.menu_preview_failed {
+                match crate::client::entity_render::EntityRenderer::new(&mut *r.gpu, &r.assets) {
+                    Ok(mut entities) => {
+                        entities.prepare_preview(
+                            &mut *r.gpu,
+                            &r.assets,
+                            read_skin(&r.settings.run_dir).as_ref(),
+                            read_avatar(&r.settings.run_dir),
+                        );
+                        r.menu_entities = Some(entities);
+                    }
+                    Err(e) => {
+                        log::error!("player preview: {e}");
+                        r.menu_preview_failed = true;
+                    }
+                }
+            }
+            let renderer = match (&mut r.game, &mut r.menu_entities) {
+                (Some(g), _) => Some((&mut g.client.entity_render, g.client.me.worn.as_slice())),
+                (_, Some(entities)) => Some((entities, &[][..])),
+                _ => None,
+            };
+            if let Some((entities, worn)) = renderer {
+                let size = [w.round() as u32, h.round() as u32];
+                let tex = match preview.kind {
+                    PreviewKind::Player => {
+                        entities.draw_preview(&mut *r.gpu, &mut r.list, info, size, r.input.cursor - Vec2::new(x, y), worn)
+                    }
+                    PreviewKind::Block(index) => {
+                        crate::editor::render_block_preview(entities, &mut *r.gpu, &mut r.list, info, size, &r.textures, index)
+                    }
+                };
+                if tex != r.preview_tex {
+                    r.preview_tex = tex;
+                    r.quads_dirty = true;
+                }
             }
         }
     }

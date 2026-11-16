@@ -28,7 +28,7 @@ pub struct Gizmos {
 
 impl Gizmos {
     pub fn on(&self, group: &str) -> bool {
-        self.enabled.iter().any(|g| g == group)
+        group.is_empty() || group == GizmoShape::ASSEMBLY || self.enabled.iter().any(|g| g == group)
     }
 
     /// Switches a group; returns whether it is on now.
@@ -65,13 +65,13 @@ impl Gizmos {
         let mut lines = Vec::new();
         let mut fills = Vec::new();
         let mut labels = Vec::new();
-        if self.enabled.is_empty() {
-            return (lines, fills, labels);
-        }
         let now = Instant::now();
         self.shapes.retain(|s| s.1 > now);
         for (s, _) in &self.shapes {
             shape(s, &mut lines, &mut fills, &mut labels);
+        }
+        if self.enabled.is_empty() {
+            return (lines, fills, labels);
         }
         let c = content();
         let me = client.player.pos;

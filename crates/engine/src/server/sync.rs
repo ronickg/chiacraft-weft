@@ -85,7 +85,16 @@ impl Server {
                         })
                     {
                         if e.sent.is_some() {
-                            m.push((e.id, e.pos, e.yaw, e.pitch, e.pose, e.sprinting, e.frame.unwrap_or(0)));
+                            m.push(crate::net::Move {
+                                id: e.id,
+                                pos: e.pos,
+                                yaw: e.yaw,
+                                pitch: e.pitch,
+                                pose: e.pose,
+                                sprinting: e.sprinting,
+                                frame: e.frame.unwrap_or(0),
+                                rotation: e.wire_rotation(),
+                            });
                         }
                         e.sent = Some(now);
                     }
@@ -109,6 +118,7 @@ impl Server {
                     st.signals.level_changes.clear();
                     st.edited.clear();
                     st.world_light_changed = false;
+                    st.dry_changed = false;
                 }
                 r.space.resend.clear();
                 r.space.body_light_changes.clear();
@@ -257,6 +267,7 @@ fn send_entities(
                     body_yaw: e.body_yaw,
                     strode: e.strode,
                     stride: e.stride,
+                    rotation: e.wire_rotation(),
                 });
             }
         }
@@ -315,7 +326,12 @@ fn send_entities(
     let mut bodies = Vec::new();
     for reg in &dim.regions {
         for (&id, st) in &reg.bodies {
-            if spawn.iter().any(|v| v.id == id) {
+            let new = spawn.iter().any(|v| v.id == id);
+            let known = p.known.contains(&id) && visible.contains(&id);
+            if (new && !st.dry_boxes.is_empty()) || (known && st.dry_changed) {
+                bodies.push(ToClient::BodyAir { frame: id, boxes: st.dry_boxes.clone() });
+            }
+            if new {
                 bodies.push(ToClient::BodyLight { frame: id, lights: st.world_light.iter().map(|(p, l)| (*p, *l)).collect() });
                 for (pos, cube) in &st.cubes {
                     bodies.push(ToClient::Cube { dim: p.dim, frame: id, pos: *pos, cube: cube.clone(), edit: false });
@@ -324,7 +340,7 @@ fn send_entities(
                         bodies.push(ToClient::Signals { dim: p.dim, frame: id, changes });
                     }
                 }
-            } else if p.known.contains(&id) && visible.contains(&id) {
+            } else if known {
                 bodies.extend(st.resend.iter().map(|(pos, cube)| ToClient::Cube {
                     dim: p.dim,
                     frame: id,
@@ -355,7 +371,7 @@ fn send_entities(
     }
     let moves: Vec<crate::net::Move> = moved
         .iter()
-        .filter(|m| p.known.contains(&m.0) && visible.contains(&m.0))
+        .filter(|m| p.known.contains(&m.id) && visible.contains(&m.id))
         .copied()
         .collect();
     // Every tick, moving or not: clients show what they see by its timeline, clips included.
@@ -512,7 +528,7 @@ pub(super) fn gizmos_for(p: &Player, dim: &DimSet, tick: u64, me: DVec3) -> Vec<
             r.gizmos
                 .iter()
                 .filter(|(who, g)| {
-                    (g.group.is_empty() || p.gizmos.contains(&g.group))
+                    (g.group.is_empty() || g.group == GizmoShape::ASSEMBLY || p.gizmos.contains(&g.group))
                         && super::reaches(*who, p.entity, p.dim, || Some(me), dim.id, |_| true)
                 })
                 .map(|(_, g)| g.clone()),

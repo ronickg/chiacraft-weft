@@ -17,6 +17,9 @@ pub mod codec;
 pub mod p2p;
 pub mod screens;
 
+/// An attack press handled by the held item without an entity target.
+pub const ITEM_ATTACK: u64 = 0;
+
 /// Ticket others can use to join this host, once hosting is online.
 pub fn current_ticket() -> Option<String> {
     p2p::HOSTING.lock().as_ref().and_then(|h| h.ticket.clone())
@@ -93,6 +96,11 @@ wire_struct! {
 wire_struct! {
     #[derive(Default)]
     pub struct UsingField { pub ticks: u32, pub offhand: bool }
+}
+
+wire_struct! {
+    #[derive(Clone)]
+    pub struct Skin { pub png: Vec<u8>, pub slim: bool }
 }
 
 /// One variant's fields written or read in order.
@@ -281,6 +289,7 @@ wire_struct! {
         pub body_yaw: f32,
         pub strode: f32,
         pub stride: f32,
+        pub rotation: Option<[f32; 4]>,
     }
 }
 
@@ -302,6 +311,7 @@ wire_struct! {
 }
 
 impl GizmoShape {
+    pub const ASSEMBLY: &'static str = "core:assembly_preview";
     /// Not a `gizmo_kind`: a label.
     pub const TEXT: u8 = u8::MAX;
 
@@ -317,10 +327,19 @@ impl GizmoShape {
 /// Someone's mining as others see it: who, the cell, which of what is in it, how far along (0..1).
 pub type Crack = (u64, IVec3, u32, f32);
 
-/// An entity's move: id, position, yaw, pitch, crouching, and its frame: the solid body it
-/// stands on (0: the world), which clients draw it relative to.
-/// An entity, where it is, its look, pose, whether it sprints, and the body it stands on.
-pub type Move = (u64, DVec3, f32, f32, crate::world::Pose, bool, u64);
+wire_struct! {
+    #[derive(Clone, Copy, Debug)]
+    pub struct Move {
+        pub id: u64,
+        pub pos: DVec3,
+        pub yaw: f32,
+        pub pitch: f32,
+        pub pose: crate::world::Pose,
+        pub sprinting: bool,
+        pub frame: u64,
+        pub rotation: Option<[f32; 4]>,
+    }
+}
 
 /// The longest message a connection takes.
 pub const MAX_MESSAGE: usize = 64 << 20;
@@ -351,6 +370,8 @@ messages! {
         BodyGlow { dim: u32, cells: Vec<(IVec3, [u8; 3])> },
         /// The world's light on body `frame`, by its cubes.
         BodyLight { frame: u64, lights: Vec<(IVec3, u32)> },
+        /// Dry sections of a body's hull, as local half-open box bounds.
+        BodyAir { frame: u64, boxes: Vec<(IVec3, IVec3)> },
         /// Power of pieces of wire: (cell, face, level), of the world or of body `frame`.
         Signals { dim: u32, frame: u64, changes: Vec<(IVec3, u8, u8)> },
         /// The dimension's time of day, the ticks it ran (what entity effects end by, unlike the time
@@ -429,7 +450,7 @@ messages! {
         /// Keyframe animations started on entities: (entity, name, looping); empty name = none.
         PlayAction(Vec<(u64, String, bool)>),
         /// A player's own skin (PNG), for their entity.
-        Skin { entity: u64, png: Vec<u8> },
+        Skin { entity: u64, skin: Skin },
         /// A player's own model, for their entity.
         Avatar { entity: u64, avatar: AvatarData },
         /// That player left: what they brought can go.
@@ -497,7 +518,7 @@ messages! {
         Gizmos(Vec<String>),
         Packet { channel: u32, data: Vec<u8> },
         /// The player's skin (PNG, 64 x 64 or 64 x 32).
-        Skin(Vec<u8>),
+        Skin(Skin),
         /// The player's own model.
         Avatar(AvatarData),
         /// The client's view distance in cubes: what the server announces edited cubes in.

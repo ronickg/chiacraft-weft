@@ -3,12 +3,13 @@
 
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, VecDeque};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use glam::IVec3;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::content::{AIR, Content};
+use crate::physics::Aabb;
 use crate::world::{Cube, cube_of, local_index};
 
 /// A timer on a block (`Host::timer`): when, where, the event and its value.
@@ -66,6 +67,13 @@ pub struct Space {
     pub(super) emitters_changed: bool,
     /// A moving structure's place among the world's cells: what counts as next to what.
     pub cell: Option<IVec3>,
+    pub(super) projected_pose: Option<crate::physics::Transform>,
+    /// Keeps the occupied cells of a mount in order for its per-tick sweep.
+    mounted_blocks: Option<Vec<(IVec3, u32)>>,
+    colliders: OnceLock<BodyColliders>,
+    pub(super) geometry_version: u64,
+    pub(super) dry_boxes: Vec<(IVec3, IVec3)>,
+    pub(super) dry_changed: bool,
     /// Its circuits and the world's have heard of each other.
     pub in_touch: bool,
     /// Going to a whole block, to land there.
@@ -77,6 +85,22 @@ pub struct Space {
     /// A moving structure's block bounds (inclusive) and cubes to light again.
     pub bounds: Option<(IVec3, IVec3)>,
     pub relight: FxHashSet<IVec3>,
+}
+
+pub(super) struct BodyColliders {
+    pub bounds: Option<Aabb>,
+    pub groups: Vec<ColliderGroup>,
+}
+
+pub(super) struct ColliderGroup {
+    pub area: Aabb,
+    pub boxes: Vec<Aabb>,
+}
+
+pub(super) fn block_collider(p: IVec3, bounds: [f32; 6]) -> Aabb {
+    let [x, y, z, x2, y2, z2] = bounds.map(f64::from);
+    let p = p.as_dvec3();
+    Aabb { min: p + glam::DVec3::new(x, y, z), max: p + glam::DVec3::new(x2, y2, z2) }
 }
 
 impl crate::physics::Blocks for Space {
@@ -94,6 +118,34 @@ impl crate::physics::Blocks for Space {
 /// The cubes of a world as physics reads them, on any thread while they stay put.
 #[derive(Clone, Copy)]
 pub struct CubeCells<'a>(pub &'a FxHashMap<IVec3, Arc<Cube>>);
+
+impl CubeCells<'_> {
+    pub(super) fn may_collide(&self, c: &Content, area: crate::physics::Aabb) -> bool {
+        let lo = cube_of(area.min.floor().as_ivec3() - IVec3::Y);
+        let hi = cube_of(area.max.floor().as_ivec3());
+        let solid = |s: u32| !c.states[s as usize].collision.is_empty() || c.covered_step(s).is_some();
+        for z in lo.z..=hi.z {
+            for y in lo.y..=hi.y {
+                for x in lo.x..=hi.x {
+                    let Some(cube) = self.0.get(&IVec3::new(x, y, z)) else { return true };
+                    if cube.uniform_state().map_or_else(
+                        || {
+                            cube.palette().iter().copied().any(solid)
+                                || cube
+                                    .all_extras()
+                                    .flat_map(|(_, s)| s.iter().copied())
+                                    .any(solid)
+                        },
+                        solid,
+                    ) {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+}
 
 impl crate::physics::Cells for CubeCells<'_> {
     fn main(&self, p: IVec3) -> Option<u32> {
@@ -140,6 +192,24 @@ impl Space {
         s
     }
 
+    pub fn from_saved(c: &Content, blocks: Vec<(IVec3, u32)>) -> Space {
+        let mut body = Self::default();
+        let mut main = Vec::new();
+        let mut extras: FxHashMap<IVec3, Vec<u32>> = FxHashMap::default();
+        for (at, state) in blocks {
+            if main.last().is_some_and(|&(p, _)| p == at) {
+                extras.entry(at).or_default().push(state);
+            } else {
+                main.push((at, state));
+            }
+        }
+        body.build(c, &main);
+        for (at, states) in extras {
+            body.put_extras(at, states);
+        }
+        body
+    }
+
     /// Its blocks to begin with, with what comes with them there already.
     pub fn build(&mut self, c: &Content, blocks: &[(IVec3, u32)]) {
         for &(p, state) in blocks {
@@ -159,6 +229,46 @@ impl Space {
 
     /// All its blocks but air.
     pub fn all_blocks(&self) -> Vec<(IVec3, u32)> {
+        self.block_snapshot().into_owned()
+    }
+
+    pub(super) fn track_mounted_blocks(&mut self) {
+        self.mounted_blocks = Some(self.all_blocks());
+    }
+
+    pub(super) fn colliders(&self, c: &Content) -> &BodyColliders {
+        self.colliders.get_or_init(|| {
+            let mut groups = std::collections::BTreeMap::new();
+            for &(p, state) in self.block_snapshot().iter() {
+                for part in std::iter::once(state).chain(self.extras(p).iter().copied()) {
+                    let info = &c.states[part as usize];
+                    if info.liquid.is_some() || c.covered_step(part).is_some() {
+                        continue;
+                    }
+                    for &bounds in &info.collision {
+                        let shape = block_collider(p, bounds);
+                        let group = groups
+                            .entry((p >> 2_i32).to_array())
+                            .or_insert_with(|| ColliderGroup { area: shape, boxes: Vec::new() });
+                        group.area.min = group.area.min.min(shape.min);
+                        group.area.max = group.area.max.max(shape.max);
+                        group.boxes.push(shape);
+                    }
+                }
+            }
+            let groups: Vec<_> = groups.into_values().collect();
+            let bounds = groups
+                .iter()
+                .map(|g| g.area)
+                .reduce(|a, b| Aabb { min: a.min.min(b.min), max: a.max.max(b.max) });
+            BodyColliders { bounds, groups }
+        })
+    }
+
+    pub(super) fn block_snapshot(&self) -> std::borrow::Cow<'_, [(IVec3, u32)]> {
+        if let Some(cells) = &self.mounted_blocks {
+            return std::borrow::Cow::Borrowed(cells);
+        }
         let mut out = Vec::new();
         for (&cp, cube) in &self.cubes {
             if cube.uniform_state() == Some(AIR) {
@@ -172,7 +282,7 @@ impl Space {
             }
         }
         out.sort_unstable_by_key(|b| b.0.to_array());
-        out
+        std::borrow::Cow::Owned(out)
     }
 
     pub fn get(&self, p: IVec3) -> Option<u32> {
@@ -192,6 +302,7 @@ impl Space {
     pub(super) fn put_extras(&mut self, p: IVec3, extras: Vec<u32>) {
         if let Some(cube) = self.cubes.get_mut(&cube_of(p)) {
             Arc::make_mut(cube).set_extras(local_index(p), extras);
+            self.geometry_changed();
         }
     }
 
@@ -216,7 +327,23 @@ impl Space {
         }
     }
 
+    pub(super) fn geometry_changed(&mut self) {
+        self.geometry_version = self.geometry_version.wrapping_add(1);
+        self.colliders.take();
+    }
+
     pub fn grow_bounds(&mut self, p: IVec3, state: u32) {
+        self.geometry_changed();
+        if let Some(cells) = &mut self.mounted_blocks {
+            match cells.binary_search_by_key(&p.to_array(), |(at, _)| at.to_array()) {
+                Ok(i) if state == AIR => {
+                    cells.remove(i);
+                }
+                Ok(i) => cells[i].1 = state,
+                Err(i) if state != AIR => cells.insert(i, (p, state)),
+                Err(_) => {}
+            }
+        }
         if state == AIR {
             // Shrinking needs a look over everything (only when the edge itself went).
             if self
@@ -255,7 +382,11 @@ impl Space {
     pub fn structure_blocks(&self, c: &Content) -> Vec<(IVec3, String)> {
         self.all_blocks()
             .into_iter()
-            .map(|(p, s)| (p, c.state_name(s)))
+            .flat_map(|(p, s)| {
+                std::iter::once(s)
+                    .chain(self.extras(p).iter().copied())
+                    .map(move |s| (p, c.state_name(s)))
+            })
             .collect()
     }
 }

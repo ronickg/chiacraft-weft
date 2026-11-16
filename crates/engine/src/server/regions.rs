@@ -32,6 +32,7 @@ pub struct DimSet {
     pub weather_moved: bool,
     seed: u64,
     next_id: Arc<AtomicU64>,
+    identities: super::PlayerIdentities,
     owner: FxHashMap<IVec3, usize>,
     pub dirty: bool,
     /// Area edits made in this dimension, in order (`server::area`); saved with the world.
@@ -45,7 +46,7 @@ impl DimSet {
         self.seed
     }
 
-    pub fn new(id: u32, seed: u64, next_id: Arc<AtomicU64>) -> DimSet {
+    pub fn new(id: u32, seed: u64, next_id: Arc<AtomicU64>, identities: super::PlayerIdentities) -> DimSet {
         DimSet {
             id,
             regions: Vec::new(),
@@ -58,6 +59,7 @@ impl DimSet {
             weather_moved: false,
             seed,
             next_id,
+            identities,
             owner: FxHashMap::default(),
             dirty: false,
             edits: Arc::default(),
@@ -66,7 +68,7 @@ impl DimSet {
     }
 
     fn new_region(&mut self, section: IVec3) -> usize {
-        let mut d = Dim::new(self.id, self.seed, self.next_id.clone());
+        let mut d = Dim::new(self.id, self.seed, self.next_id.clone(), self.identities.clone());
         d.set_rng(weft_noise::hash(self.seed ^ self.time, section.x as i64, section.y as i64, section.z as i64));
         d.time = self.time;
         d.day_offset = self.day_offset;
@@ -257,8 +259,11 @@ impl DimSet {
                 continue;
             }
             if let Some(blocks) = blocks {
-                d.bodies
-                    .insert(id, Box::new(super::space::Space::with_blocks(c, &blocks)));
+                let mut body = super::space::Space::from_saved(c, blocks);
+                if e.mount.is_some() || e.ship.is_some() {
+                    body.track_mounted_blocks();
+                }
+                d.bodies.insert(id, Box::new(body));
                 bodies.push(id);
             }
             d.entities.insert_with(c, e, inv, comps);

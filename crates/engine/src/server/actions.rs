@@ -1,6 +1,14 @@
 //! What players ask for, one list of what each message takes (`allowed`), then the actions.
 
 use super::*;
+
+fn landed_part(c: &Content, state: u32, turn: abi::Turn) -> u32 {
+    if turn == abi::Turn::NONE || state as usize >= c.states.len() { state } else { c.turned_state(state, turn) }
+}
+
+fn landed_hit(turn: abi::Turn, face: u8, hit: [f32; 3]) -> (u8, [f32; 3]) {
+    if turn == abi::Turn::NONE || face >= 6 { (face, hit) } else { (turn.face(face as usize) as u8, turn.point(hit, 1.0)) }
+}
 use weft_abi::entry_kind as ek;
 
 impl Server {
@@ -52,8 +60,12 @@ impl Server {
             // Items used on a block (buckets) work on the world's blocks only, so far.
             return self.use_in_hand(c, pi, slot, (frame == 0).then_some((pos, face)));
         };
-        let placed = r.with_space(c, frame, |d, _| {
+        let placed = r.with_space(c, frame, |d, o| {
             let hit = hit.map(|v| v.clamp(0.0, 1.0));
+            let look = o
+                .vector_to_local(glam::Vec3::from_array(look).as_dvec3())
+                .as_vec3()
+                .to_array();
             let target = d.place_clicked(c, pos, face, state, look, hit, entity, held.item)?;
             // What the stack carries goes onto the block entity it becomes (a renamed chest).
             if let Some(id) = d.anchored_part(c, target, state) {
@@ -123,19 +135,19 @@ impl Server {
 
     pub(super) fn handle(&mut self, c: &'static Content, pi: usize, msg: ToServer) {
         if !self.allowed(pi, &msg) {
-            log::debug!(target: "net", "refused {} from {}", crate::net::Message::kind(&msg), self.players[pi].name);
+            log::debug!(target: "net", "refused {} from {}", crate::net::Message::kind(&msg), self.players[pi].identity.name);
             return;
         }
         match msg {
             ToServer::Join { name, key } => self.join(c, pi, name, key),
             ToServer::StartBreak { pos, part, frame } => {
                 let Some((r, entity)) = self.region(pi) else { return };
-                let (frame, pos) = r.landed_as(frame, pos);
+                let request = ToClient::BreakRefused { frame, pos };
+                let (frame, pos, turn) = r.landed_as(frame, pos);
+                let part = landed_part(c, part, turn);
                 // Said now, or it would mine all that time for nothing.
                 if !r.start_mining(c, entity, frame, pos, part) {
-                    self.players[pi]
-                        .conn
-                        .send(ToClient::BreakRefused { frame, pos });
+                    self.players[pi].conn.send(request);
                 }
             }
             ToServer::StopBreak => {
@@ -209,7 +221,7 @@ impl Server {
                 let on = frame.filter(|f| f.1.is_finite()).and_then(|(b, rel)| {
                     dim.entity_region_ref(b)
                         .and_then(|r| r.entities.get(b))
-                        .map(|e| (b, e.pos + rel, rel))
+                        .map(|e| (b, e.body_place().to_world(rel), rel))
                 });
                 let pos = on.map_or(pos, |o| o.1);
                 let place = on.map_or((None, pos), |o| (Some(o.0), o.2));
@@ -233,7 +245,11 @@ impl Server {
                     return;
                 }
                 e.pose = pose;
-                let here = crate::physics::around(c, &*r.space, pos, e.height(c));
+                let height = e.height(c);
+                let dry = r.dry_volumes();
+                let seen = crate::physics::ObservedCells { cells: super::space::CubeCells(&r.space.cubes), dry: &dry };
+                let here = crate::physics::around(c, &seen, pos, height);
+                let Some(e) = r.entities.get_mut(entity) else { return };
                 let splash = entity::splashes(e.in_liquid, here.in_liquid, -walked.y);
                 let fell = entity::track_fall(&mut e.fall, walked.y, on_ground, here.in_liquid || here.climbing);
                 e.sprinting = sprint;
@@ -282,7 +298,10 @@ impl Server {
 
             ToServer::Break { pos, part, face, hit, frame } => {
                 let Some((r, entity)) = self.region(pi) else { return };
-                let (frame, pos) = r.landed_as(frame, pos);
+                let request = ToClient::BreakRefused { frame, pos };
+                let (frame, pos, turn) = r.landed_as(frame, pos);
+                let part = landed_part(c, part, turn);
+                let (face, hit) = landed_hit(turn, face, hit);
                 let mining = r.entities.get_mut(entity).and_then(|e| e.mining.take());
                 let rate = r.mining_rate_of(c, entity, frame, pos, part);
                 let progress = mining
@@ -292,9 +311,7 @@ impl Server {
                 // that it is, and a modified one could say anything.
                 let too_soon = rate < 1.0 && progress + 2.0 * rate < 0.7;
                 if r.break_mined(c, entity, frame, pos, part, face, hit, too_soon) {
-                    self.players[pi]
-                        .conn
-                        .send(ToClient::BreakRefused { frame, pos });
+                    self.players[pi].conn.send(request);
                 }
             }
 
@@ -306,7 +323,9 @@ impl Server {
                         r.resend_cell(p);
                     }
                 }
-                let (frame, pos) = r.landed_as(frame, pos);
+                let (frame, pos, turn) = r.landed_as(frame, pos);
+                let part = landed_part(c, part, turn);
+                let (face, hit) = landed_hit(turn, face, hit);
                 let Some((r, entity)) = self.region(pi) else { return };
                 let Some(e) = r.entities.get(entity) else { return };
                 let eye = e.pos + DVec3::Y * e.eye(c);
@@ -380,6 +399,19 @@ impl Server {
 
             ToServer::Attack(target) => {
                 let Some((r, entity)) = self.region(pi) else { return };
+                let held = r.entities.held(entity);
+                if let Some((owner, callback)) = c
+                    .items
+                    .get(held.item as usize)
+                    .and_then(|item| item.on_attack)
+                {
+                    if target == crate::net::ITEM_ATTACK && r.attack_with_item(entity, held, owner, callback) {
+                        self.players[pi]
+                            .conn
+                            .send(ToClient::Swing { used_item: false, off_hand: false });
+                    }
+                    return;
+                }
                 if !in_reach(c, r, entity, target) {
                     return;
                 }
@@ -528,7 +560,7 @@ impl Server {
                 }
             }
             ToServer::Chat(text) => {
-                let name = self.players[pi].name.clone();
+                let name = self.players[pi].identity.name.clone();
                 if let Some(cmd) = text.strip_prefix('/') {
                     for line in self.command(c, pi, cmd) {
                         let from = crate::net::Shown::REPLY;
@@ -568,17 +600,18 @@ impl Server {
                 let slice = abi::Slice::new(&data);
                 r.call(owner, cb, |w| abi::PacketArgs { world: w, player, data: slice });
             }
-            ToServer::Skin(png) => {
+            ToServer::Skin(skin) => {
                 // Only a skin's size of PNG: everyone else stores and uploads it.
-                let size = crate::assets::png_size(&png).filter(|_| png.len() <= 65536);
+                let size = crate::assets::png_size(&skin.png).filter(|_| skin.png.len() <= 65536);
                 if !matches!(size, Some((64, 64) | (64, 32))) {
                     return;
                 }
-                let png = Arc::new(png);
+                let skin = Arc::new(skin);
                 let entity = self.players[pi].entity;
-                self.players[pi].skin = Some(png.clone());
+                self.players[pi].skin = Some(skin.clone());
                 for p in self.players.iter_mut().filter(|p| p.joined) {
-                    p.conn.send(ToClient::Skin { entity, png: png.to_vec() });
+                    p.conn
+                        .send(ToClient::Skin { entity, skin: (*skin).clone() });
                 }
             }
             ToServer::Avatar(avatar) => {
@@ -609,15 +642,15 @@ impl Server {
                 if !self.players[pi].joined {
                     return;
                 }
-                log::info!("{} left", self.players[pi].name);
-                let line = Msg::new("multiplayer.left", vec![Arg::Text(self.players[pi].name.clone())]);
+                log::info!("{} left", self.players[pi].identity.name);
+                let line = Msg::new("multiplayer.left", vec![Arg::Text(self.players[pi].identity.name.clone())]);
                 let entity = self.players[pi].entity;
                 for q in self.players.iter_mut().filter(|q| q.joined) {
                     q.conn
                         .send(ToClient::Show(crate::net::Shown::chat(line.clone())));
                     q.conn.send(ToClient::PlayerGone { entity });
                 }
-                let Server { players, dims, storage, .. } = self;
+                let Server { players, dims, storage, identities, .. } = self;
                 let p = &mut players[pi];
                 if let Some(r) = dims[p.dim as usize].entity_region(p.entity) {
                     if let Some(m) = p.menu.take() {
@@ -638,6 +671,7 @@ impl Server {
                     r.entities.remove(p.entity, abi::removal::LEFT);
                 }
                 p.conn.send(ToClient::Disconnect("bye".into()));
+                identities.write().remove(&p.entity);
                 p.joined = false;
             }
         }
@@ -824,6 +858,31 @@ impl Dim {
         used
     }
 
+    fn attack_with_item(&mut self, entity: u64, held: ItemStack, owner: abi::ModId, callback: abi::Callback) -> bool {
+        let Some(e) = self.entities.get(entity) else { return false };
+        let slot = e.selected;
+        let a = self.call(owner, callback, |w| abi::ItemUseArgs {
+            world: w,
+            entity,
+            stack: held,
+            slot,
+            pos: [0; 3].into(),
+            face: 0,
+            has_target: 0,
+            handled: 0,
+            held_ticks: 0,
+        });
+        if a.handled == 0 {
+            return false;
+        }
+        if a.stack != held && crate::host::known_item("on_attack", &a.stack) {
+            self.entities.set_slot(entity, slot, a.stack);
+        }
+        self.events
+            .push(DimEvent::EntitySwing { id: entity, off: false });
+        true
+    }
+
     /// One tick of using items: held long enough they take effect; another item in hand ends
     /// their use. `players_only` while the world is frozen: players still act.
     pub fn finish_uses(&mut self, c: &'static Content, players_only: bool) {
@@ -900,6 +959,13 @@ impl Dim {
     /// it may not (`actions::BREAK_BLOCK`), said now so it doesn't mine all that time for nothing.
     pub fn start_mining(&mut self, c: &'static Content, entity: u64, frame: u64, pos: IVec3, part: u32) -> bool {
         let held = self.entities.held(entity).item;
+        if c.items
+            .get(held as usize)
+            .is_some_and(|item| item.on_attack.is_some())
+        {
+            self.stop_mining(entity);
+            return false;
+        }
         let aimed = self.with_space(c, frame, |d, _| {
             let state = d.aimed_part(c, pos, part);
             (d.get(pos).is_none() || d.may_break(c, pos, state, held, entity)).then_some(state)
@@ -974,7 +1040,11 @@ impl Dim {
         let mut refused = false;
         let worn = self.with_space(c, frame, |d, o| {
             let part = d.aimed_part(c, pos, part);
-            let keeps = (creative && c.no_creative_break(held.item)) || no_break;
+            let keeps = (creative && c.no_creative_break(held.item))
+                || no_break
+                || c.items
+                    .get(held.item as usize)
+                    .is_some_and(|item| item.on_attack.is_some());
             let free = c
                 .states
                 .get(part as usize)

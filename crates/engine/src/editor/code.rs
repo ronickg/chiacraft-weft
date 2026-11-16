@@ -14,8 +14,8 @@ impl What {
     /// Its bit in `Method::on`.
     fn bit(self) -> u8 {
         match self {
-            What::Block => 1,
-            What::Item => 2,
+            What::Block => weft_abi::editor::BLOCK,
+            What::Item => weft_abi::editor::ITEM,
         }
     }
 
@@ -76,18 +76,6 @@ impl Thing {
         let t = unquote(self.args_of("texture").next()?.first()?)?;
         picture_name(&t, self.kind.folder())
     }
-
-    /// Its model's boxes, `[min, max]` in 1/16; a whole cube without any.
-    pub fn boxes(&self) -> Vec<[f32; 6]> {
-        let v: Vec<[f32; 6]> = self
-            .args_of("model_box")
-            .filter_map(|a| {
-                let (lo, hi) = (three(a.first()?)?, three(a.get(1)?)?);
-                Some([lo[0], lo[1], lo[2], hi[0], hi[1], hi[2]])
-            })
-            .collect();
-        if v.is_empty() { vec![[0.0, 0.0, 0.0, 16.0, 16.0, 16.0]] } else { v }
-    }
 }
 
 /// The tool tiers `mined_by` names, as `abi::tool_tier::<name>`.
@@ -96,31 +84,56 @@ pub const TIERS: [&str; 5] = ["HAND", "WOOD", "STONE", "IRON", "DIAMOND"];
 /// A builder's picture argument (`base:stone`) as the content names it (`base:block/stone`).
 /// Relative names are the mod's own, which the game running the editor doesn't have.
 pub fn picture_name(arg: &str, folder: &str) -> Option<String> {
-    let (ns, path) = arg.split_once(':')?;
-    Some(format!("{ns}:{folder}/{path}"))
+    let mut valid = true;
+    let name = weft_abi::map_layer_names(arg, |name| {
+        let Some((ns, path)) = name.split_once(':') else {
+            valid = false;
+            return name.into();
+        };
+        if path.starts_with(&format!("{folder}/")) { name.into() } else { format!("{ns}:{folder}/{path}") }
+    });
+    valid.then_some(name)
 }
 
-/// A parameter of a builder method, as the SDK writes it.
-pub struct Param {
-    pub name: &'static str,
-    pub ty: &'static str,
-    /// The folder of the picture it names (`block`, `item`, `entity`), empty if it names none.
-    pub picture: &'static str,
-}
-
-/// A builder method: `on` is which builders have it (1 blocks, 2 items).
-pub struct Method {
-    pub on: u8,
-    pub name: &'static str,
-    pub params: &'static [Param],
-    pub doc: &'static str,
-}
+pub use weft_abi::editor::{Method, Param};
 
 include!(concat!(env!("OUT_DIR"), "/sdk_methods.rs"));
 
 /// What `kind`'s builder can be told, by name.
 pub fn methods(kind: What) -> impl Iterator<Item = &'static Method> {
-    METHODS.iter().filter(move |m| m.on & kind.bit() != 0)
+    static EXTRA: std::sync::OnceLock<Vec<Method>> = std::sync::OnceLock::new();
+    let extra = if let Some(c) = crate::content::try_content() {
+        EXTRA
+            .get_or_init(|| {
+                let mut found = Vec::new();
+                if let Some(component) = c.components.id(weft_abi::comp::EDITOR_METHOD) {
+                    let mut records: Vec<_> = c
+                        .game
+                        .catalog
+                        .ids(weft_abi::entry_kind::RECORD)
+                        .iter()
+                        .collect();
+                    records.sort_by_key(|(name, _)| *name);
+                    for (_, &id) in records {
+                        if let Some(method) = c
+                            .components
+                            .bytes(weft_abi::entry_kind::RECORD as usize, id, component)
+                            .and_then(weft_abi::data::from_bytes::<Method>)
+                        {
+                            found.push(method);
+                        }
+                    }
+                }
+                found
+            })
+            .as_slice()
+    } else {
+        &[]
+    };
+    METHODS
+        .iter()
+        .chain(extra)
+        .filter(move |m| m.on & kind.bit() != 0)
 }
 
 pub fn method(kind: What, name: &str) -> Option<&'static Method> {
@@ -129,13 +142,20 @@ pub fn method(kind: What, name: &str) -> Option<&'static Method> {
 
 /// A value of a parameter's type to start a new call with.
 pub fn default_arg(p: &Param) -> String {
-    match p.ty {
+    if !p.default.is_empty() {
+        return p.default.clone();
+    }
+    match p.ty.as_str() {
         "&str" => "\"\"".into(),
+        "Gate" => "Gate::new()".into(),
+        "GateLogic" => "GateLogic::And".into(),
         "f32" | "f64" => "1.0".into(),
         "bool" => "true".into(),
         // A box's far corner starts at the block's, so a new box is the whole block.
         "[f32;3]" if p.name == "max" => "[16.0, 16.0, 16.0]".into(),
         "[f32;3]" => "[0.0, 0.0, 0.0]".into(),
+        "[(&str,[f32;4]);6]" => "[(\"\", abi::UV_FROM_BOX); 6]".into(),
+        "[u8;6]" => "[0; 6]".into(),
         t if t.starts_with('[') => "[]".into(),
         t if t.starts_with("&[") => "&[]".into(),
         "&CreativeTab" => "&CreativeTab::named(\"base:building\")".into(),
@@ -145,10 +165,78 @@ pub fn default_arg(p: &Param) -> String {
 }
 
 pub fn unquote(a: &str) -> Option<String> {
-    a.trim()
-        .strip_prefix('"')?
-        .strip_suffix('"')
-        .map(String::from)
+    serde_json::from_str(a.trim()).ok()
+}
+
+/// Comma-separated Rust literals, preserving nested arrays, tuples and strings.
+pub fn parts(s: &str) -> Option<Vec<&str>> {
+    split_top(s, ',')
+}
+
+fn split_top(s: &str, separator: char) -> Option<Vec<&str>> {
+    let mut out = Vec::new();
+    let (mut depth, mut quoted, mut escaped, mut start) = (0i32, false, false, 0);
+    for (i, c) in s.char_indices() {
+        if quoted {
+            if !escaped && c == '"' {
+                quoted = false;
+            }
+            escaped = !escaped && c == '\\';
+            continue;
+        }
+        match c {
+            '"' => quoted = true,
+            '[' | '(' | '{' => depth += 1,
+            ']' | ')' | '}' => {
+                depth -= 1;
+                if depth < 0 {
+                    return None;
+                }
+            }
+            c if c == separator && depth == 0 => {
+                out.push(s[start..i].trim());
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    if depth != 0 || quoted {
+        return None;
+    }
+    if !s[start..].trim().is_empty() {
+        out.push(s[start..].trim());
+    }
+    Some(out)
+}
+
+pub fn array<T, const N: usize>(s: &str, read: impl Fn(&str) -> Option<T>) -> Option<[T; N]> {
+    let inner = s.trim().strip_prefix('[')?.strip_suffix(']')?;
+    let repeated = split_top(inner, ';')?;
+    if repeated.len() == 2 {
+        if repeated[1].parse::<usize>().ok()? != N {
+            return None;
+        }
+        return (0..N)
+            .map(|_| read(repeated[0]))
+            .collect::<Option<Vec<_>>>()?
+            .try_into()
+            .ok();
+    }
+    parts(inner)?
+        .into_iter()
+        .map(read)
+        .collect::<Option<Vec<_>>>()?
+        .try_into()
+        .ok()
+}
+
+pub fn number(s: &str) -> Option<f32> {
+    let s = s.trim().replace('_', "");
+    let s = s
+        .strip_suffix("f32")
+        .or_else(|| s.strip_suffix("f64"))
+        .unwrap_or(&s);
+    s.parse::<f32>().ok().filter(|v| v.is_finite())
 }
 
 pub fn quote(s: &str) -> String {
@@ -163,17 +251,7 @@ pub fn num(v: f32) -> String {
 }
 
 pub fn three(a: &str) -> Option<[f32; 3]> {
-    let inner = a.trim().strip_prefix('[')?.strip_suffix(']')?;
-    if let Some((v, n)) = inner.split_once(';') {
-        return (n.trim() == "3")
-            .then(|| v.trim().parse().ok().map(|v| [v; 3]))
-            .flatten();
-    }
-    let v: Vec<f32> = inner
-        .split(',')
-        .map(|x| x.trim().trim_end_matches("f32").parse().ok())
-        .collect::<Option<_>>()?;
-    (v.len() == 3).then(|| [v[0], v[1], v[2]])
+    array(a, number)
 }
 
 fn handle(t: &Thing) -> String {
@@ -183,6 +261,21 @@ fn handle(t: &Thing) -> String {
 /// The code for everything: the handles, then each one's calls in the order they were made.
 pub fn write(things: &[Thing]) -> String {
     let mut out = String::from("// Made in the editor\n");
+    let mut imports: Vec<_> = things
+        .iter()
+        .flat_map(|t| {
+            t.calls
+                .iter()
+                .filter_map(|call| method(t.kind, &call.method))
+        })
+        .map(|m| m.import.as_str())
+        .filter(|name| !name.is_empty())
+        .collect();
+    imports.sort_unstable();
+    imports.dedup();
+    for import in imports {
+        out += &format!("use {import};\n");
+    }
     for t in things {
         let ty = if t.kind == What::Block { "Block" } else { "Item" };
         out += &format!("pub static {}: {ty} = {ty}::named({});\n", handle(t), quote(&t.name));
@@ -224,6 +317,9 @@ fn strip_comments(src: &str) -> String {
 /// `static X: Block = Block::named("x")`; a mistake says which line.
 pub fn read(src: &str) -> Result<Vec<Thing>, String> {
     let src = strip_comments(src);
+    if src.trim().is_empty() {
+        return Ok(Vec::new());
+    }
     let line_of = |at: usize| src[..at].matches('\n').count() + 1;
     let mut names: Vec<(String, String)> = Vec::new();
     for decl in src.split(';') {
@@ -399,10 +495,11 @@ mod tests {
         b.calls.push(Call::new("falling", &[]));
         b.calls
             .push(Call::new("tab", &["&CreativeTab::named(\"base:building\")"]));
+        assert!(read(&write(&[])).unwrap().is_empty());
         let things = vec![b, Thing::new(What::Item, "ruby")];
         let code = write(&things);
         assert_eq!(read(&code).unwrap(), things, "{code}");
-        assert_eq!(things[0].boxes(), vec![[0.0, 0.0, 0.0, 16.0, 8.0, 16.0]]);
+        assert_eq!(three(&things[0].args_of("model_box").next().unwrap()[1]), Some([16.0, 8.0, 16.0]));
         assert_eq!(things[0].picture().as_deref(), Some("base:block/stone"));
         // Written by hand: comments, other spacing.
         let hand = "pub static X: Block = Block::named(\"x\"); // mine\nr.block(&X).hardness(7.5) .light(15)\n  .tag(\"a, b\");";
@@ -423,7 +520,7 @@ mod tests {
     #[test]
     fn the_sdk_is_listed() {
         let tex = method(What::Block, "texture").unwrap();
-        assert_eq!((tex.params[0].ty, tex.params[0].picture), ("&str", "block"));
+        assert_eq!((tex.params[0].ty.as_str(), tex.params[0].picture.as_str()), ("&str", "block"));
         assert!(method(What::Block, "tint").is_some() && method(What::Item, "max_stack").is_some());
         assert!(method(What::Item, "hardness").is_none());
     }
@@ -433,5 +530,146 @@ mod tests {
         assert_eq!(num(7.500005), "7.5");
         assert_eq!(num(2.0), "2.0");
         assert_eq!(three("[0.0; 3]"), Some([0.0; 3]));
+        assert_eq!(array::<u8, 6>("[0; 6]", |v| v.parse().ok()), Some([0; 6]));
+        assert_eq!(parts("[0.0; 3], (\"a,b\", [1.0; 4])"), Some(vec!["[0.0; 3]", "(\"a,b\", [1.0; 4])"]));
+        assert_eq!(unquote(&quote("a\\b\"c")), Some("a\\b\"c".into()));
+        assert!(number("NaN").is_none());
+    }
+}
+
+/// Fields of a literal struct argument, in the schema's order.
+pub fn struct_values(value: &str, p: &Param) -> Option<Vec<(String, String, String)>> {
+    let fields = p
+        .schema
+        .strip_prefix('{')
+        .and_then(|s| s.strip_suffix('}'))
+        .or_else(|| p.schema.strip_prefix('<').and_then(|s| s.strip_suffix('>')))?;
+    let open = value.find('{')?;
+    let body = value[open + 1..].trim().strip_suffix('}')?;
+    let values: Vec<_> = parts(body)?
+        .into_iter()
+        .map(|s| s.split_once(':'))
+        .collect::<Option<_>>()?;
+    weft_abi::data::fields(fields)?
+        .into_iter()
+        .map(|(name, ty)| {
+            let value = values.iter().find(|(n, _)| n.trim() == name)?.1.trim();
+            Some((name.into(), ty.into(), value.into()))
+        })
+        .collect()
+}
+
+pub fn struct_code(ty: &str, values: &[(String, String, String)]) -> String {
+    format!(
+        "{ty} {{ {} }}",
+        values
+            .iter()
+            .map(|(name, _, value)| format!("{name}: {value}"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
+}
+
+pub const LOGIC_NAMES: [&str; 9] = ["And", "Or", "Xor", "Not", "Nand", "Nor", "Xnor", "Max", "Min"];
+
+pub const SIDES: [&str; 6] = ["Left", "Right", "Bottom", "Top", "Front", "Rear"];
+
+#[derive(Clone)]
+pub struct GateArgs {
+    pub inputs: u8,
+    pub outputs: u8,
+    pub delay: u32,
+}
+
+impl GateArgs {
+    pub fn read(value: &str) -> Option<Self> {
+        let bits = |names: &[&str]| {
+            SIDES
+                .iter()
+                .enumerate()
+                .filter(|(_, side)| names.contains(side))
+                .fold(0, |bits, (i, _)| bits | 1 << i)
+        };
+        let mut args = Self { inputs: bits(&["Left", "Right", "Rear"]), outputs: bits(&["Front"]), delay: 1 };
+        let mut rest = value.trim().strip_prefix("Gate::new()")?;
+        while !rest.is_empty() {
+            rest = rest.strip_prefix('.')?;
+            let open = rest.find('(')?;
+            let end = rest.find(')')?;
+            let (name, value) = (rest.get(..open)?, rest.get(open + 1..end)?);
+            match name {
+                "inputs" | "outputs" => {
+                    let values = value
+                        .trim()
+                        .strip_prefix('&')?
+                        .strip_prefix('[')?
+                        .strip_suffix(']')?;
+                    let mut bits = 0;
+                    for side in parts(values)? {
+                        let side = side.trim().strip_prefix("Side::")?;
+                        bits |= 1 << SIDES.iter().position(|s| *s == side)?;
+                    }
+                    if name == "inputs" {
+                        args.inputs = bits & !args.outputs;
+                    } else {
+                        args.outputs = bits;
+                        args.inputs &= !bits;
+                    }
+                }
+                "delay" => args.delay = value.trim().parse().ok()?,
+                _ => return None,
+            }
+            rest = &rest[end + 1..];
+        }
+        Some(args)
+    }
+
+    pub fn code(&self) -> String {
+        let sides = |bits: u8| {
+            SIDES
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| bits & (1 << i) != 0)
+                .map(|(_, name)| format!("Side::{name}"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        format!("Gate::new().outputs(&[{}]).inputs(&[{}]).delay({})", sides(self.outputs), sides(self.inputs), self.delay)
+    }
+}
+
+/// A registered component value as the same typed literal used by its builder argument.
+pub fn literal(ty: &str, schema: &str, bytes: &[u8]) -> Option<String> {
+    if let Some(fields) = schema
+        .strip_prefix('{')
+        .and_then(|s| s.strip_suffix('}'))
+        .or_else(|| schema.strip_prefix('<').and_then(|s| s.strip_suffix('>')))
+    {
+        let mut values = Vec::new();
+        for (name, _) in weft_abi::data::fields(fields)? {
+            let (field_type, range) = weft_abi::data::field(schema, bytes, name)?;
+            values.push(format!("{name}: {}", literal(field_type, field_type, bytes.get(range)?)?));
+        }
+        return Some(format!("{ty} {{ {} }}", values.join(", ")));
+    }
+    macro_rules! number {
+        ($t:ty) => {
+            weft_abi::data::from_bytes::<$t>(bytes).map(|n| format!("{n:?}"))
+        };
+    }
+    match schema {
+        "u8" => number!(u8),
+        "i8" => number!(i8),
+        "u16" => number!(u16),
+        "i16" => number!(i16),
+        "u32" => number!(u32),
+        "i32" => number!(i32),
+        "u64" => number!(u64),
+        "i64" => number!(i64),
+        "f32" => number!(f32),
+        "f64" => number!(f64),
+        "bool" => number!(bool),
+        "str" => weft_abi::data::from_bytes::<String>(bytes).map(|s| quote(&s)),
+        _ => None,
     }
 }

@@ -259,7 +259,7 @@ struct Placed {
 pub struct Hud {
     pub ui: Ui,
     revisions: Vec<u64>,
-    key: Option<(bool, usize, [u32; 3], bool, bool, u32, u8, (i32, i32), (u32, u32, u8), u64, (bool, [i32; 2], u64))>,
+    key: Option<(bool, usize, [u32; 3], bool, bool, u32, u8, (i32, i32), (u32, u32, u8, bool), u64, (bool, [i32; 2], u64))>,
     /// Player overrides from `config/hud.txt` by element name.
     layout: rustc_hash::FxHashMap<String, Placement>,
     file: std::path::PathBuf,
@@ -389,7 +389,14 @@ impl Hud {
         };
         // The held item's name shows for two seconds after a change, fading for the last half.
         let (held, since) = client.held_name;
-        let fade = if held.is_empty() { 0 } else { ((2.0 - since.elapsed().as_secs_f32()) / 0.5 * 16.0).clamp(0.0, 16.0) as u8 };
+        let blocked = client.blocked_hand_slot(client.selected);
+        let fade = if blocked {
+            16
+        } else if held.is_empty() {
+            0
+        } else {
+            ((2.0 - since.elapsed().as_secs_f32()) / 0.5 * 16.0).clamp(0.0, 16.0) as u8
+        };
         // Text on the screen: what is up now, with how far it faded, in 16 steps like the held
         // name's. Rounded up: step 0 has to mean gone, or the last rebuild leaves it there faint.
         let up = |place: Option<usize>| -> Vec<(&crate::net::Shown, f32)> {
@@ -430,7 +437,7 @@ impl Hud {
             groups,
             client.mode.0 as u8,
             size,
-            (held.item, held.data, fade),
+            (held.item, held.data, fade, blocked),
             shown_steps,
             (touch, knob.round().as_ivec2().to_array(), crate::touch::generation()),
         );
@@ -541,6 +548,9 @@ impl Hud {
                 if let Kind::Text(t) = &mut ui.nodes[id].kind {
                     t.wrap = false;
                     t.color = Some(0xFFFFFF00 | (fade as u32 * 255 / 16));
+                }
+                if blocked {
+                    ui.text(text::rich(lang.get("tooltip.both_hands"), lang, Some(input)), "warning");
                 }
             }
             Part::HeldName if editing => drop(ui.text(text::rich(lang.get("hud.edit.sample_name"), lang, None), "label")),
@@ -1106,6 +1116,9 @@ pub fn draw_custom(
                 .copied()
                 .unwrap_or_default();
             ren.defer_stack(r, stack);
+            if client.blocked_hand_slot(data as usize) {
+                blocked_slot(ren, look, r, scale);
+            }
         }
         TAG_ENTITY => {
             // Inset frame; the model itself is drawn in a later pass.
@@ -1117,6 +1130,11 @@ pub fn draw_custom(
             }
         }
         crate::editor::TAG_PICTURE => ren.picture_icon(textures, r, data as u32),
+        crate::editor::TAG_PREVIEW => {
+            if let Some(c) = crate::content::try_content() {
+                crate::editor::draw_preview(ren, c, textures, look, r, data);
+            }
+        }
         modui::TAG_ICON => ren.defer_stack(r, ItemStack::new(data as u32, 1)),
         modui::TAG_CREATIVE => {
             slot_background(ren, look, "slot", r, false, scale);
@@ -1146,9 +1164,34 @@ pub fn draw_custom(
                 ren.image(Rect { x: r.x + (r.w - s) / 2.0, y: r.y + (r.h - s) / 2.0, w: s, h: s }, t, [0.0, 0.0, 1.0, 1.0], 0xFFFFFFFF);
             }
             ren.defer_stack(r, stack);
+            let c = content();
+            let blocked = client
+                .menu
+                .as_ref()
+                .and_then(|m| c.game.menus.get(m.kind as usize))
+                .and_then(|m| m.group_of(&c.game.player_layout, data as u32))
+                .is_some_and(|(group, index)| {
+                    matches!(
+                        group.owner,
+                        weft_abi::slot_owner::PLAYER | weft_abi::slot_owner::PLAYER_MAIN | weft_abi::slot_owner::PLAYER_HOTBAR
+                    ) && client.blocked_hand_slot(group.index(&c.game.player_layout, index) as usize)
+                });
+            if blocked {
+                blocked_slot(ren, look, r, scale);
+            }
         }
         _ => {}
     }
+}
+
+fn blocked_slot(ren: &mut UiRenderer, look: &Look, r: Rect, scale: f32) {
+    let side = 9.0 * scale;
+    let rect = Rect { x: r.x + (r.w - side) / 2.0, y: r.y + (r.h - side) / 2.0, w: side, h: side };
+    ren.defer_overlay(|ren| {
+        if let Some(texture) = look.texture("close", "") {
+            ren.draw_loaded(&texture, rect, scale, look.text("warning", ""));
+        }
+    });
 }
 
 /// A slot under the cursor or dragged over: lit inside its frame, behind what it holds.
@@ -1214,6 +1257,9 @@ pub fn item_tooltip(lang: &Lang, input: &crate::input::Input, stack: weft_abi::I
             .collect();
         out[break_at].when = common;
     };
+    if !crate::content::fits_one_hand(content(), stack.item) {
+        line(lang.get("tooltip.both_hands"), &[], None, &mut out);
+    }
     // With additions by mods, one group per mod in load order: `<key>.<mod id>`.
     let mut mods: Vec<_> = content().mods.iter().collect();
     mods.sort_by_key(|m| m.order);

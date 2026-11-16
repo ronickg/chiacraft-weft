@@ -103,80 +103,15 @@ fn vs_clouds(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -
     return out;
 }
 
-fn cloud_at(s: Sky, cell: vec2<f32>, dims: vec2<f32>) -> bool {
-    let at = fract((cell + s.uv.zw + vec2(0.5)) / dims);
-    return textureSampleLevel(textures[s.ids.x], nearest_clamp, at, 0.0).a >= 0.5;
-}
-
 @fragment
 fn fs_clouds(in: CloudOut) -> CloudPixel {
-    let s = sky[in.index];
     let dir = normalize(mat(sky[0]) * in.at);
-    let size = s.extra.x;
-    let low = s.extra.z;
-    let reach = scene.environment.z;
-    let high = low + s.extra.y;
-    var near = 0.0;
-    var far = reach;
-    if abs(dir.y) > 0.00001 {
-        near = max(near, min(low / dir.y, high / dir.y));
-        far = min(far, max(low / dir.y, high / dir.y));
-    } else if low > 0.0 || high < 0.0 {
+    let hit = trace_cloud(sky[in.index], dir, scene.environment.z, scene);
+    if hit.color.a <= 0.0 {
         discard;
     }
-    if near >= far {
-        discard;
-    }
-    let dims = vec2<f32>(f32(s.ids.z), f32(s.ids.w));
-    let start = s.uv.xy + dir.xz * near / size;
-    var cell = floor(start);
-    let turn = sign(dir.xz);
-    let delta = size / max(abs(dir.xz), vec2(0.000001));
-    var next = near + select(start - cell, cell + vec2(1.0) - start, dir.xz > vec2(0.0)) * delta;
-    var t = near;
-    // 0: came in through a plane, 1 and 2: through a side along x or z.
-    var side = 0u;
-    // From inside a cloud, it isn't what is seen.
-    var within = near == 0.0 && cloud_at(s, cell, dims);
-    var hit = false;
-    let steps = u32(ceil((far - near) / size * (abs(dir.x) + abs(dir.z)))) + 2u;
-    for (var i = 0u; i < steps; i++) {
-        let filled = cloud_at(s, cell, dims);
-        if filled && !within {
-            hit = true;
-            break;
-        }
-        within = within && filled;
-        if next.x < next.y {
-            t = next.x;
-            next.x += delta.x;
-            cell.x += turn.x;
-            side = 1u;
-        } else {
-            t = next.y;
-            next.y += delta.y;
-            cell.y += turn.y;
-            side = 2u;
-        }
-        if t >= far {
-            break;
-        }
-    }
-    if !hit {
-        discard;
-    }
-    // Lit from above, like blocks.
-    var shade = select(0.9, 0.8, side == 1u);
-    if side == 0u {
-        shade = select(1.0, 0.7, dir.y > 0.0);
-    }
-    let rel = dir * t;
-    let fog = fog_amount(t, scene.environment.y, reach);
-    let color = mix(s.color.rgb * shade, scene.fog_color.rgb, smoothstep(0.0, 1.0, fog));
-    let alpha = s.color.a * (1.0 - smoothstep(0.6, 1.0, fog));
-    if alpha <= 0.0 { discard; }
-    let clip = scene.view_proj * vec4(rel, 1.0);
-    return CloudPixel(vec4(color * alpha, alpha), clip.z / clip.w);
+    let clip = scene.view_proj * vec4(dir * hit.distance, 1.0);
+    return CloudPixel(vec4(hit.color.rgb * hit.color.a, hit.color.a), clip.z / clip.w);
 }
 
 // Vanilla's sky is a disc 16 blocks above the eye fading into fog with distance.

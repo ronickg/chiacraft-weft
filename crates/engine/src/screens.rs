@@ -83,11 +83,6 @@ pub trait Screen: std::any::Any {
     fn escape_closes(&self) -> bool {
         true
     }
-    /// It puts its X (`close_button`) in a place of its own; others get one in the window's
-    /// corner.
-    fn draws_close(&self) -> bool {
-        false
-    }
     fn closes_on_respawn(&self) -> bool {
         false
     }
@@ -164,7 +159,7 @@ pub fn mod_name(lang: &Lang, id: &str) -> Vec<text::Span> {
 
 // ---------------------------------------------------------------- profile
 
-/// Who the player is everywhere: the name, the key servers know them by, and the skin.
+/// The player's name, appearance and model visibility.
 #[derive(Default)]
 pub struct Profile;
 
@@ -174,38 +169,94 @@ impl Screen for Profile {
     }
 
     fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
-        let key = crate::net::p2p::player_key(&cx.settings.run_dir);
         frame(ui, cx, "profile.title", |ui| {
-            ui.panel("panel", Style::default().pad(8.0).gap(4.0).w(320.0), |ui| {
-                label(ui, cx, "profile.name", &[], "default");
-                let input = ui.add(
-                    Kind::Input {
-                        value: crate::settings::name(),
-                        caret: crate::settings::name().chars().count(),
-                        max: 16,
-                        on_change: Some(Rc::new(|_: &mut Ctx, v: &str| crate::settings::set_text("name", v))),
-                        area: None,
-                    },
-                    Style::default().h(16.0).w(300.0),
-                );
-                ui.set_id(input, "profile_name");
-                ui.add(Kind::Container { class: None }, Style::default().h(4.0));
-                label(ui, cx, "profile.key", &[], "default");
-                ui.text(text::plain(if key.is_empty() { "-" } else { &key }), "dim");
-                let copy = key.clone();
-                button(ui, cx, "profile.copy", &[], 120.0, move |_| {
-                    crate::clipboard::set(&copy);
-                });
-                ui.add(Kind::Container { class: None }, Style::default().h(4.0));
-                label(ui, cx, "profile.skin", &[], "default");
-                label(ui, cx, "profile.skin_hint", &[], "dim");
-                label(ui, cx, "profile.avatar_hint", &[], "dim");
-                let dir = cx.settings.run_dir.join("skins");
-                button(ui, cx, "profile.skins_folder", &[], 120.0, move |_| crate::packs::open_folder(&dir));
-                ui.add(Kind::Container { class: None }, Style::default().h(4.0));
-                config_rows(ui, cx, "core:profile");
-            });
-            button(ui, cx, "menu.done", &[], 200.0, |c| c.requests.push(Request::Close));
+            ui.panel(
+                "panel",
+                Style {
+                    max_h: (cx.size.y - 64.0).max(100.0),
+                    ..Style::default()
+                        .pad(8.0)
+                        .gap(8.0)
+                        .w(340.0_f32.min(cx.size.x - 24.0))
+                        .stretch()
+                },
+                |ui| {
+                    ui.container(Style::default().gap(8.0).stretch().scroll(), |ui| {
+                        ui.container(Style::row().gap(12.0).stretch(), |ui| {
+                            ui.add(Kind::Custom { tag: crate::client::modui::TAG_ENTITY, data: 0 }, Style::default().size(94.0, 120.0));
+                            ui.container(Style::default().grow().gap(5.0).stretch(), |ui| {
+                                label(ui, cx, "profile.name", &[], "default");
+                                let input = ui.add(
+                                    Kind::Input {
+                                        value: crate::settings::name(),
+                                        caret: crate::settings::name().chars().count(),
+                                        max: 16,
+                                        on_change: Some(Rc::new(|_: &mut Ctx, v: &str| crate::settings::set_text("name", v))),
+                                        area: None,
+                                    },
+                                    Style::default().h(20.0).stretch(),
+                                );
+                                ui.set_id(input, "profile_name");
+                                let dir = cx.settings.run_dir.join("skins");
+                                let b = icon_button(ui, cx, "button", "icon_folder", "profile.change_skin", &[], 120.0, move |_| {
+                                    crate::packs::open_folder(&dir);
+                                });
+                                ui.set_id(b, "change_skin");
+                                ui.nodes[b].tooltip = Some(cx.t("profile.skin_hint", &[]));
+                                label(ui, cx, "config.core.skin_model", &[], "default");
+                                ui.container(Style::row().stretch(), |ui| {
+                                    for (slim, key) in [(false, "classic"), (true, "slim")] {
+                                        let b = button(ui, cx, &format!("config.core.skin_model.{key}"), &[], 0.0, move |_| {
+                                            crate::settings::set("skin_model", slim as u32 as f64);
+                                        });
+                                        ui.nodes[b].style.grow = 1.0;
+                                        ui.nodes[b].style.w = crate::ui::Len::Px(0.0);
+                                        if let Kind::Button { selected_bind, .. } = &mut ui.nodes[b].kind {
+                                            *selected_bind = Some(Box::new(move |_| crate::settings::slim_skin() == slim));
+                                        }
+                                        ui.nodes[b].tooltip = Some(cx.t("config.core.skin_model.tooltip", &[]));
+                                        ui.set_id(b, &format!("skin_{key}"));
+                                    }
+                                });
+                            });
+                        });
+                        label(ui, cx, "profile.visibility", &[], "default");
+                        for (name, key) in [("first_person_model", "profile.first_person"), ("show_avatars", "profile.other_models")] {
+                            let id = crate::config::by_name(&format!("core:{name}")).unwrap();
+                            let b = ui.button(
+                                "",
+                                Style::row().min_h(20.0).gap(8.0),
+                                Rc::new(move |_| {
+                                    crate::config::set(id, 1.0 - crate::config::get(id));
+                                }),
+                                |ui| {
+                                    let label = label(ui, cx, key, &[], "default");
+                                    ui.nodes[label].style.grow = 1.0;
+                                    ui.panel("button", Style::default().size(17.0, 17.0).center(), |ui| {
+                                        ui.text_bound(
+                                            "default",
+                                            Box::new(move |_| {
+                                                let led = text::Msg::template(if crate::config::get(id) != 0.0 {
+                                                    "{img:core:led_on 7x7}"
+                                                } else {
+                                                    "{img:core:led_off 7x7}"
+                                                });
+                                                (led.key, led.args)
+                                            }),
+                                        );
+                                    });
+                                },
+                            );
+                            ui.set_id(b, name);
+                            crate::mods_screen::separator(ui);
+                        }
+                        config_rows(ui, cx, "core:profile", &["core:skin_model", "core:first_person_model", "core:show_avatars"]);
+                    });
+                    ui.container(Style::row().justify(Justify::End), |ui| {
+                        back_button(ui, cx, "menu.done", &[], 80.0, |c| c.requests.push(Request::Close));
+                    });
+                },
+            );
         });
     }
 }
@@ -293,15 +344,23 @@ pub fn button(ui: &mut Ui, cx: &BuildCx, key: &str, args: &[Arg], width: f32, ac
     })
 }
 
+/// A Back, Done or Cancel button that replaces the automatic close icon.
+pub fn back_button(ui: &mut Ui, cx: &BuildCx, key: &str, args: &[Arg], width: f32, action: impl Fn(&mut Ctx) + 'static) -> NodeId {
+    ui.has_close = true;
+    button(ui, cx, key, args, width, action)
+}
+
 /// The X that closes a screen as Escape does, its picture `side` GUI pixels.
 pub fn close_button(ui: &mut Ui, side: f32) {
+    ui.has_close = true;
     let style = Style::default()
         .size(side + 2.0, side + 2.0)
         .pad(1.0)
         .center();
-    ui.button("button", style, Rc::new(|c: &mut Ctx| c.requests.push(Request::Close)), |ui| {
+    let b = ui.button("button", style, Rc::new(|c: &mut Ctx| c.requests.push(Request::Close)), |ui| {
         ui.add(Kind::Image { texture: "core:gui/close".into(), color: 0xFFFFFFFF }, Style::default().size(side, side));
     });
+    ui.set_id(b, "screen_close");
 }
 
 /// A menu button with an icon (class `icon`, 9x9 like a glyph and its shadow) at its left edge;
@@ -454,10 +513,9 @@ impl Screen for Pause {
 
     fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
         frame(ui, cx, "menu.paused", |ui| {
-            button(ui, cx, "menu.resume", &[], 200.0, |c| c.requests.push(Request::Close));
+            back_button(ui, cx, "menu.resume", &[], 200.0, |c| c.requests.push(Request::Close));
             button(ui, cx, "menu.multiplayer", &[], 200.0, |c| open(c, "core:multiplayer"));
             button(ui, cx, "menu.settings", &[], 200.0, |c| open(c, "core:settings"));
-            button(ui, cx, "menu.editor", &[], 200.0, |c| open(c, "core:editor"));
             parts(ui, cx, "core:pause", "buttons");
             button(ui, cx, "menu.save_quit", &[], 200.0, |c| c.requests.push(Request::LeaveWorld));
         });
@@ -511,7 +569,7 @@ impl Screen for ModSettings {
                         .push(Request::Open(Box::new(ConfigScreen { shown: Shown::Mod(ns.clone()) })))
                 });
             }
-            button(ui, cx, "menu.done", &[], 200.0, |c| c.requests.push(Request::Close));
+            back_button(ui, cx, "menu.done", &[], 200.0, |c| c.requests.push(Request::Close));
         });
     }
 }
@@ -643,18 +701,24 @@ fn config_row(ui: &mut Ui, cx: &BuildCx, id: u32, d: &crate::config::ConfigDef, 
                 }),
             );
             if !locked {
-                let (min, range) = (d.min, (d.max - d.min).max(1e-9));
+                let range = (d.max - d.min).max(1e-9);
                 let unit = if d.kind == weft_abi::config_kind::INT { 1.0 } else { range / 100.0 };
                 let steps = d.steps(unit);
-                // A slider's place as a value its steps allow.
+                let definition = d.clone();
                 let at = move |f: f32| {
-                    let n = steps.max(1) as f64;
-                    min + (f as f64 * n).round() / n * range
+                    if definition.logarithmic {
+                        definition.slider_value(f)
+                    } else {
+                        let n = steps.max(1) as f64;
+                        definition.min + (f as f64 * n).round() / n * range
+                    }
                 };
-                let set: Rc<dyn Fn(&mut Ctx, f32)> = Rc::new(move |_: &mut Ctx, f: f32| crate::config::set(id, min + f as f64 * range));
+                let apply = d.clone();
+                let set: Rc<dyn Fn(&mut Ctx, f32)> = Rc::new(move |_: &mut Ctx, f: f32| crate::config::set(id, apply.slider_value(f)));
                 let (on_change, on_release) = if d.flags & crate::tag_bits::config::ON_RELEASE != 0 {
                     let (show, done) = (dragged.clone(), dragged.clone());
-                    let shown: Rc<dyn Fn(&mut Ctx, f32)> = Rc::new(move |_: &mut Ctx, f: f32| show.set(Some(at(f))));
+                    let preview = at.clone();
+                    let shown: Rc<dyn Fn(&mut Ctx, f32)> = Rc::new(move |_: &mut Ctx, f: f32| show.set(Some(preview(f))));
                     let apply: Rc<dyn Fn(&mut Ctx, f32)> = Rc::new(move |_: &mut Ctx, f: f32| {
                         done.set(None);
                         crate::config::set(id, at(f));
@@ -663,13 +727,23 @@ fn config_row(ui: &mut Ui, cx: &BuildCx, id: u32, d: &crate::config::ConfigDef, 
                 } else {
                     (set, None)
                 };
+                let step = d.clone();
+                let step_value = d.logarithmic.then(|| {
+                    Box::new(move |fraction: f32, by: f32| {
+                        let value = step.fit(step.slider_value(fraction) + by as f64 * step.slider_step());
+                        step.slider_position(value)
+                    }) as Box<dyn Fn(f32, f32) -> f32>
+                });
+                let definition = d.clone();
                 ui.add(
                     Kind::Slider {
+                        enabled: true,
                         value: 0.0,
-                        bind: Box::new(move |_: &Ctx| ((crate::config::get(id) - min) / range) as f32),
+                        bind: Box::new(move |_: &Ctx| definition.slider_position(crate::config::get(id))),
                         on_change,
                         on_release,
                         steps,
+                        step_value,
                     },
                     Style::default().h(20.0).stretch(),
                 );
@@ -694,14 +768,14 @@ fn config_row(ui: &mut Ui, cx: &BuildCx, id: u32, d: &crate::config::ConfigDef, 
 }
 
 /// The rows of the settings on `page` (`config.page`), in their order.
-fn config_rows(ui: &mut Ui, cx: &BuildCx, page: &str) {
+fn config_rows(ui: &mut Ui, cx: &BuildCx, page: &str, skip: &[&str]) {
     let c = crate::content::content();
     let mut listed: Vec<_> = c
         .game
         .configs
         .iter()
         .enumerate()
-        .filter(|(_, d)| d.page == page)
+        .filter(|(_, d)| d.page == page && !skip.contains(&d.name.as_str()))
         .collect();
     listed.sort_by(|a, b| (a.1.order, &a.1.name).cmp(&(b.1.order, &b.1.name)));
     ui.container(
@@ -797,7 +871,7 @@ impl Screen for ConfigScreen {
                 },
             );
             ui.set_id(list, "config");
-            button(ui, cx, "menu.done", &[], 200.0, |c| c.requests.push(Request::Close));
+            back_button(ui, cx, "menu.done", &[], 200.0, |c| c.requests.push(Request::Close));
         });
     }
 }
@@ -846,7 +920,7 @@ impl Screen for LanguageScreen {
                     }
                 }
             });
-            button(ui, cx, "menu.done", &[], 200.0, |c| c.requests.push(Request::Close));
+            back_button(ui, cx, "menu.done", &[], 200.0, |c| c.requests.push(Request::Close));
         });
     }
 }
@@ -991,7 +1065,7 @@ impl Screen for Controls {
                     .min_h(60.0)
                     .scroll(),
                 |ui| {
-                    config_rows(ui, cx, "core:controls");
+                    config_rows(ui, cx, "core:controls", &[]);
                     for b in &cx.input.binds {
                         let name = text::Name::Key(b.action.clone());
                         let clash: Vec<String> = conflicts
@@ -1032,7 +1106,7 @@ impl Screen for Controls {
                             .push(Request::Screen("core:touch_buttons".into()))
                     });
                 }
-                button(ui, cx, "menu.done", &[], 120.0, |c| c.requests.push(Request::Close));
+                back_button(ui, cx, "menu.done", &[], 120.0, |c| c.requests.push(Request::Close));
             });
         });
     }
@@ -1109,7 +1183,7 @@ impl Screen for Message {
         ui.panel(if cx.in_game { "overlay" } else { "background" }, Style::default().grow().center().pad(12.0).gap(10.0), |ui| {
             label(ui, cx, &title, &args, "title");
             let in_game = cx.in_game;
-            button(ui, cx, "menu.back", &[], 200.0, move |c| {
+            back_button(ui, cx, "menu.back", &[], 200.0, move |c| {
                 c.requests.push(Request::Close);
                 if !in_game {
                     open(c, "core:title");

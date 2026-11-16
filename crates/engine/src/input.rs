@@ -236,6 +236,8 @@ pub struct Bind {
     pub keys: Slots,
     /// `context` bits.
     pub contexts: u32,
+    /// Resolved action modifiers, including their ancestors.
+    pub while_held: Vec<usize>,
     /// Per slot: switched on (a toggle, or a double tap while its key stays down), set off this
     /// frame, and a double tap's first press (a tap's press while it may still count).
     on: [bool; SLOTS],
@@ -250,6 +252,7 @@ impl Bind {
             default,
             keys: default,
             contexts,
+            while_held: Vec::new(),
             on: [false; SLOTS],
             fired: [false; SLOTS],
             tapped: [None; SLOTS],
@@ -264,7 +267,8 @@ pub struct Input {
     pub muted: u32,
     pub mouse_delta: Vec2,
     pub cursor: Vec2,
-    pub scroll: f32,
+    wheel_up: f32,
+    wheel_down: f32,
     pub sensitivity: f32,
     pub invert_y: bool,
     pub typed: String,
@@ -283,7 +287,8 @@ impl Default for Input {
             muted: 0,
             mouse_delta: Vec2::ZERO,
             cursor: Vec2::ZERO,
-            scroll: 0.0,
+            wheel_up: 0.0,
+            wheel_down: 0.0,
             sensitivity: 1.0,
             invert_y: false,
             typed: String::new(),
@@ -311,7 +316,7 @@ impl Input {
         if let Some(&i) = self.lookup.get(action) {
             let b = &self.binds[i];
             if b.keys != keys {
-                self.binds[i] = Bind { keys, ..Bind::new(action, b.default, b.contexts) };
+                self.binds[i] = Bind { keys, while_held: b.while_held.clone(), ..Bind::new(action, b.default, b.contexts) };
             }
         }
     }
@@ -322,7 +327,9 @@ impl Input {
         let mut out = Vec::new();
         for (i, a) in self.binds.iter().enumerate() {
             for b in &self.binds[i + 1..] {
-                if reach(a) & reach(b) != 0 && a.keys.iter().flatten().any(|k| b.keys.contains(&Some(*k))) {
+                let ordered =
+                    a.while_held != b.while_held && (b.while_held.starts_with(&a.while_held) || a.while_held.starts_with(&b.while_held));
+                if !ordered && reach(a) & reach(b) != 0 && a.keys.iter().flatten().any(|k| b.keys.contains(&Some(*k))) {
                     out.push((a.action.clone(), b.action.clone()));
                 }
             }
@@ -337,40 +344,113 @@ impl Input {
             .and_then(|&i| self.binds[i].keys.iter().flatten().next().copied())
     }
 
-    /// Whether a camera mode has `action` for itself now (`muted`).
-    fn muted(&self, action: &str) -> bool {
-        self.lookup
-            .get(action)
-            .is_some_and(|&i| self.binds[i].contexts & self.muted != 0)
+    /// Physical keys for an action and its modifiers, in press order.
+    pub fn keys_of(&self, action: &str, for_press: bool) -> Vec<Key> {
+        let Some(&i) = self.lookup.get(action) else { return Vec::new() };
+        let mut out = Vec::new();
+        for &j in self.binds[i].while_held.iter().chain(std::iter::once(&i)) {
+            if for_press
+                && j != i
+                && self.binds[j]
+                    .keys
+                    .iter()
+                    .enumerate()
+                    .any(|(s, k)| k.is_some_and(|k| k.trigger == Trigger::Toggle) && self.binds[j].on[s])
+            {
+                continue;
+            }
+            let Some(binding) = self.binds[j].keys.iter().flatten().next() else { return Vec::new() };
+            let c = binding.chord;
+            for k in MODIFIERS
+                .iter()
+                .filter(|m| c.mods & m.0 != 0)
+                .map(|m| Key::Code(m.2))
+                .chain(c.with)
+                .chain([c.key])
+            {
+                if !out.contains(&k) {
+                    out.push(k);
+                }
+            }
+        }
+        out
     }
 
     pub fn held(&self, action: &str) -> bool {
-        !self.muted(action) && self.held_raw(action)
+        self.read(action, false, false) != 0.0
     }
 
     pub fn pressed(&self, action: &str) -> bool {
-        !self.muted(action) && self.pressed_raw(action)
-    }
-
-    /// `held` even while muted: the camera's own reading of the keys.
-    pub fn held_raw(&self, action: &str) -> bool {
-        self.raw(action, &self.held, |b| &b.on)
+        self.read(action, true, false) != 0.0
     }
 
     pub fn pressed_raw(&self, action: &str) -> bool {
-        self.raw(action, &self.pressed, |b| &b.fired)
+        self.read(action, true, true) != 0.0
     }
 
-    /// A held key's chord read in `keys`, another trigger's slot from `latched`.
-    fn raw(&self, action: &str, keys: &FxHashSet<Key>, latched: fn(&Bind) -> &[bool; SLOTS]) -> bool {
-        self.lookup.get(action).is_some_and(|&i| {
-            let b = &self.binds[i];
-            (0..SLOTS).any(|s| match b.keys[s] {
-                Some(Binding { chord, trigger: Trigger::Hold }) => self.active(chord, keys),
-                Some(_) => latched(b)[s],
-                None => false,
+    fn chord_down(&self, c: Chord) -> bool {
+        self.mods() & c.mods == c.mods && c.with.is_none_or(|w| self.held.contains(&w))
+    }
+
+    fn enabled(&self, i: usize, raw: bool) -> bool {
+        let b = &self.binds[i];
+        (raw || b.contexts & self.muted == 0)
+            && b.while_held.iter().all(|&m| {
+                let modifier = &self.binds[m];
+                // A modifier reads its held bindings, just as a physical chord modifier does.
+                self.captured
+                    && (raw || modifier.contexts & self.muted == 0)
+                    && modifier.keys.iter().enumerate().any(|(s, k)| match k {
+                        Some(Binding { chord, trigger: Trigger::Hold }) => self.held.contains(&chord.key) && self.chord_down(*chord),
+                        Some(_) => modifier.on[s],
+                        None => false,
+                    })
             })
-        })
+    }
+
+    /// One resolution for held state, press edges and per-frame amounts.
+    fn read(&self, action: &str, pressed: bool, raw: bool) -> f32 {
+        let Some(&i) = self.lookup.get(action) else { return 0.0 };
+        if !self.enabled(i, raw) {
+            return 0.0;
+        }
+        let b = &self.binds[i];
+        let keys = if pressed { &self.pressed } else { &self.held };
+        let mut seen = [None; SLOTS];
+        let mut amount = 0.0;
+        for (s, binding) in b.keys.iter().enumerate() {
+            let Some(binding) = binding else { continue };
+            let active = match binding.trigger {
+                Trigger::Hold => self.active(i, binding.chord, keys, raw),
+                _ => {
+                    if pressed {
+                        b.fired[s]
+                    } else {
+                        b.on[s]
+                    }
+                }
+            };
+            if !active {
+                continue;
+            }
+            if !pressed {
+                return 1.0;
+            }
+            if seen.contains(&Some(binding.chord.key)) {
+                continue;
+            }
+            seen[s] = Some(binding.chord.key);
+            amount += match binding.chord.key {
+                Key::Wheel(true) => self.wheel_up,
+                Key::Wheel(false) => self.wheel_down,
+                _ => 1.0,
+            };
+        }
+        amount
+    }
+
+    pub fn scroll(&self) -> f32 {
+        self.wheel_up - self.wheel_down
     }
 
     /// Switches the action off until its key is pressed again (a toggled sprint the server
@@ -386,21 +466,24 @@ impl Input {
         self.held.iter().fold(0, |m, &k| m | modifier(k))
     }
 
-    /// The chord is down: its key in `keys`, its modifiers held, and no binding of the same key
-    /// with more of them, all held, takes it over (`ctrl+T` or `F3+T` rather than `T`).
-    fn active(&self, c: Chord, keys: &FxHashSet<Key>) -> bool {
-        let held = self.mods();
-        let down = |c: Chord| held & c.mods == c.mods && c.with.is_none_or(|w| self.held.contains(&w));
+    /// More specific active bindings take precedence, before any caller reads an action.
+    fn active(&self, i: usize, c: Chord, keys: &FxHashSet<Key>, raw: bool) -> bool {
+        let own = &self.binds[i];
         keys.contains(&c.key)
-            && down(c)
-            && !self
-                .binds
-                .iter()
-                .flat_map(|b| b.keys.iter().flatten())
-                .any(|b| {
-                    let more = b.chord.mods & c.mods == c.mods && (c.with.is_none() || b.chord.with == c.with);
-                    b.chord.key == c.key && b.chord != c && more && down(b.chord)
+            && self.chord_down(c)
+            && self.enabled(i, raw)
+            && !self.binds.iter().enumerate().any(|(j, b)| {
+                b.keys.iter().flatten().any(|other| {
+                    let d = other.chord;
+                    let more =
+                        d.mods & c.mods == c.mods && (c.with.is_none() || d.with == c.with) && b.while_held.starts_with(&own.while_held);
+                    d.key == c.key
+                        && more
+                        && (d != c || own.while_held.len() < b.while_held.len())
+                        && self.chord_down(d)
+                        && self.enabled(j, raw)
                 })
+            })
     }
 
     /// Toggles and double taps see a key go down. They switch only while the game has the
@@ -413,7 +496,8 @@ impl Input {
         for i in 0..self.binds.len() {
             for s in 0..SLOTS {
                 let Some(b) = self.binds[i].keys[s].filter(|b| b.chord.key == k && b.trigger != Trigger::Hold) else { continue };
-                if !self.active(b.chord, &self.held) {
+                let raw = self.binds[i].contexts & self.muted != 0;
+                if !self.active(i, b.chord, &self.held, raw) {
                     continue;
                 }
                 let bind = &mut self.binds[i];
@@ -480,7 +564,16 @@ impl Input {
     }
 
     pub fn key_down(&mut self, k: Key) {
+        self.press_key(k, 1.0);
+    }
+
+    fn press_key(&mut self, k: Key, amount: f32) {
         if self.held.insert(k) {
+            match k {
+                Key::Wheel(true) => self.wheel_up += amount,
+                Key::Wheel(false) => self.wheel_down += amount,
+                _ => {}
+            }
             self.pressed.insert(k);
             // Another key down: what is held now is a modifier, not a tap.
             for b in &mut self.binds {
@@ -496,10 +589,12 @@ impl Input {
 
     /// Notches of the wheel: also the wheel's key, pressed and let go.
     pub fn wheel(&mut self, notches: f32) {
-        self.scroll += notches;
+        if !notches.is_finite() {
+            return;
+        }
         if notches != 0.0 {
             let k = Key::Wheel(notches > 0.0);
-            self.key_down(k);
+            self.press_key(k, notches.abs());
             self.key_up(k);
         }
     }
@@ -526,9 +621,41 @@ impl Input {
         self.released.clear();
         self.repeated.clear();
         self.mouse_delta = Vec2::ZERO;
-        self.scroll = 0.0;
+        self.wheel_up = 0.0;
+        self.wheel_down = 0.0;
         self.typed.clear();
     }
+}
+
+/// Resolve modifier chains once; missing actions and cycles are registration errors.
+pub fn resolve_modifiers(names: &[&str], modifiers: &[Option<String>], errors: &mut Vec<String>) -> Vec<Vec<usize>> {
+    let lookup: FxHashMap<_, _> = names
+        .iter()
+        .enumerate()
+        .map(|(i, &name)| (name, i))
+        .collect();
+    names
+        .iter()
+        .enumerate()
+        .map(|(i, name)| {
+            let mut chain = Vec::new();
+            let mut at = i;
+            while let Some(parent) = &modifiers[at] {
+                let Some(&next) = lookup.get(parent.as_str()) else {
+                    errors.push(format!("key {name}: unknown while_held action {parent}"));
+                    break;
+                };
+                if next == i || chain.contains(&next) {
+                    errors.push(format!("key {name}: cyclic while_held action {parent}"));
+                    break;
+                }
+                chain.push(next);
+                at = next;
+            }
+            chain.reverse();
+            chain
+        })
+        .collect()
 }
 
 /// The keys as steering and camera modes read them (`abi::KeysCtx`): each action's, with the
@@ -545,14 +672,15 @@ impl Keys<'_> {
         if !i.captured {
             return Default::default();
         }
-        let (held, pressed) = if self.raw { (i.held_raw(action), i.pressed_raw(action)) } else { (i.held(action), i.pressed(action)) };
+        let held = i.read(action, false, self.raw) != 0.0;
+        let amount = i.read(action, true, self.raw);
         let (held_ticks, released) = i
             .lookup
             .get(action)
             .and_then(|&n| self.ticks.get(n))
             .copied()
             .unwrap_or_default();
-        weft_abi::KeyState { pressed: pressed as u32, held: held as u32, held_ticks, released }
+        weft_abi::KeyState { amount, pressed: (amount != 0.0) as u32, held: held as u32, held_ticks, released }
     }
 
     /// -1..1 from `minus` to `plus` held.
@@ -860,6 +988,25 @@ mod key_tests {
         tap(&mut i, KeyCode::ControlLeft);
         i.stop("core:sprint");
         assert!(!i.held("core:sprint"));
+        for binding in ["toggle ControlLeft", "double ControlLeft", "tap ControlLeft"] {
+            let mut i = input("camera_move", binding);
+            i.binds[0].contexts = context::MOVEMENT;
+            i.muted = context::MOVEMENT;
+            if binding.starts_with("double") {
+                tap(&mut i, KeyCode::ControlLeft);
+            }
+            i.key_down(Key::Code(KeyCode::ControlLeft));
+            if binding.starts_with("tap") {
+                i.key_up(Key::Code(KeyCode::ControlLeft));
+            }
+            assert!(!i.pressed("camera_move"));
+            assert!(
+                Keys { input: &i, ticks: &[], raw: true }
+                    .state("camera_move")
+                    .pressed
+                    != 0
+            );
+        }
     }
 
     #[test]
@@ -878,6 +1025,124 @@ mod key_tests {
         i.key_up(Key::Code(KeyCode::KeyG));
         i.key_up(Key::Code(KeyCode::F3));
         assert!(!i.pressed("core:debug"), "a modifier this time");
+    }
+
+    #[test]
+    fn action_modifiers_follow_rebinding_and_do_not_consume_input() {
+        let mut i = input("mode", "KeyZ, mouse3");
+        i.register("up", Binding::parse_slots("wheel_up").unwrap(), context::HANDS);
+        i.register("adjust", Binding::parse_slots("wheel_up").unwrap(), context::DEBUG);
+        i.binds[2].while_held = vec![0];
+        let amount = |i: &Input, action| {
+            Keys { input: i, ticks: &[], raw: false }
+                .state(action)
+                .amount
+        };
+        assert!(i.conflicts().is_empty());
+        for modifier in [Key::Code(KeyCode::KeyZ), Key::Mouse(3), Key::Code(KeyCode::KeyC)] {
+            if modifier == Key::Code(KeyCode::KeyC) {
+                i.rebind("mode", Binding::parse_slots("KeyC").unwrap());
+            }
+            i.key_down(modifier);
+            i.wheel(0.25);
+            i.wheel(2.0);
+            for _ in 0..2 {
+                assert_eq!(amount(&i, "up"), 0.0);
+                assert_eq!(amount(&i, "adjust"), 2.25);
+                assert!(!i.pressed("up"));
+                assert!(i.pressed("adjust"));
+            }
+            i.end_frame();
+            assert_eq!(amount(&i, "adjust"), 0.0);
+            i.key_up(modifier);
+            i.wheel(0.5);
+            assert_eq!(amount(&i, "up"), 0.5);
+            assert_eq!(amount(&i, "adjust"), 0.0);
+            i.end_frame();
+        }
+        i.key_down(Key::Code(KeyCode::KeyZ));
+        i.wheel(1.0);
+        assert_eq!(amount(&i, "up"), 1.0, "old binding no longer acts as a modifier");
+        i.key_down(Key::Code(KeyCode::KeyC));
+        i.muted = context::DEBUG;
+        assert_eq!(amount(&i, "adjust"), 0.0);
+        assert_eq!(amount(&i, "up"), 1.0, "unavailable actions cannot take the wheel");
+        let raw = Keys { input: &i, ticks: &[], raw: true };
+        assert_eq!(raw.state("adjust").amount, 1.0, "camera can read its own actions");
+        i.captured = false;
+        assert_eq!(amount(&i, "adjust"), 0.0);
+    }
+
+    #[test]
+    fn input_amounts_keep_both_directions_and_deduplicate_alternate_bindings() {
+        let mut i = input("up", "wheel_up, wheel_up");
+        i.register("down", Binding::parse_slots("wheel_down").unwrap(), 0);
+        i.register("button", Binding::parse_slots("KeyR, KeyR").unwrap(), 0);
+        i.wheel(1.25);
+        i.wheel(-0.75);
+        i.wheel(f32::NAN);
+        i.key_down(Key::Code(KeyCode::KeyR));
+        assert_eq!(i.read("up", true, false), 1.25);
+        assert_eq!(i.read("down", true, false), 0.75);
+        assert_eq!(i.scroll(), 0.5);
+        assert_eq!(i.read("button", true, false), 1.0);
+        i.end_frame();
+        assert_eq!(i.read("up", true, false), 0.0);
+        assert_eq!(i.read("button", true, false), 0.0);
+        assert!(i.held("button"));
+        for k in i.keys_of("up", true) {
+            i.key_down(k);
+            i.key_up(k);
+        }
+        assert_eq!(i.read("up", true, false), 1.0, "injected wheel is one notch");
+    }
+
+    #[test]
+    fn modifier_chains_validate_and_more_specific_bindings_win() {
+        let names = ["mode", "fine", "adjust", "plain"];
+        let modifiers = [None, Some("mode".into()), Some("fine".into()), None];
+        let mut errors = Vec::new();
+        let chains = resolve_modifiers(&names, &modifiers, &mut errors);
+        assert!(errors.is_empty());
+        assert_eq!(chains[2], vec![0, 1]);
+        let mut i = input("mode", "toggle KeyZ");
+        i.register("fine", Binding::parse_slots("KeyF").unwrap(), 0);
+        i.register("adjust", Binding::parse_slots("wheel_up").unwrap(), 0);
+        i.register("plain", Binding::parse_slots("wheel_up").unwrap(), 0);
+        for (b, chain) in i.binds.iter_mut().zip(chains) {
+            b.while_held = chain;
+        }
+        assert_eq!(i.keys_of("adjust", false), vec![Key::Code(KeyCode::KeyZ), Key::Code(KeyCode::KeyF), Key::Wheel(true)]);
+        tap(&mut i, KeyCode::KeyZ);
+        assert_eq!(i.keys_of("adjust", true), vec![Key::Code(KeyCode::KeyF), Key::Wheel(true)]);
+        for _ in 0..2 {
+            let keys = i.keys_of("adjust", true);
+            for &k in &keys {
+                i.key_down(k);
+            }
+            assert_eq!(i.read("adjust", true, false), 1.0);
+            for &k in keys.iter().rev() {
+                i.key_up(k);
+            }
+            i.end_frame();
+        }
+        i.key_down(Key::Code(KeyCode::KeyF));
+        i.wheel(0.5);
+        assert_eq!(i.read("adjust", true, false), 0.5);
+        assert_eq!(i.read("plain", true, false), 0.0);
+        i.key_up(Key::Code(KeyCode::KeyF));
+        assert_eq!(i.read("plain", true, false), 0.5);
+        i.end_frame();
+        tap(&mut i, KeyCode::KeyZ);
+        i.key_down(Key::Code(KeyCode::KeyF));
+        i.wheel(1.0);
+        assert_eq!(i.read("adjust", true, false), 0.0);
+        assert_eq!(i.read("plain", true, false), 1.0);
+        for bad in [[Some("missing".into()), None], [Some("a".into()), None], [Some("b".into()), Some("a".into())]] {
+            errors.clear();
+            resolve_modifiers(&["a", "b"], &bad, &mut errors);
+            assert!(!errors.is_empty());
+        }
     }
 
     #[test]

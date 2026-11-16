@@ -19,6 +19,7 @@ mod camera;
 mod looks;
 mod mace;
 mod riding;
+mod scoped_blaster;
 
 use weft_sdk::terrain::*;
 use weft_sdk::*;
@@ -98,6 +99,7 @@ const FURNACE_USE: i64 = 20;
 
 fn init(r: &mut Registry) {
     looks::register(r);
+    scoped_blaster::register(r);
     mace::register(r);
     riding::register(r);
     camera::register(r);
@@ -115,9 +117,7 @@ fn init(r: &mut Registry) {
     r.block(&AND_GATE)
         .texture("machine_top")
         .model_box([0.0, 0.0, 0.0], [16.0, 2.0, 16.0])
-        .signal_gate(Gate::new().inputs(&[Side::Left, Side::Right]), |g| {
-            if g.side(Side::Left) > 0 && g.side(Side::Right) > 0 { 15 } else { 0 }
-        });
+        .logic_gate(Gate::new().inputs(&[Side::Left, Side::Right]), GateLogic::And);
     // Joins whatever pipe is next to it, any mod's, by the shared tag.
     r.block(&PIPE)
         .tag("pipes")
@@ -222,7 +222,7 @@ fn init(r: &mut Registry) {
     r.system(&BURNER, tick_generators);
     r.system(&WORK, tick_furnaces);
     // Machines' sounds have their own category (and volume setting `testmod:volume_machines`).
-    r.sound_category(&MACHINES, true);
+    r.sound_category(&MACHINES);
     r.sound(&HUM)
         .files(&["test/thump"])
         .category(&MACHINES)

@@ -80,6 +80,9 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         return t * in.color;
     }
     let t = strip_pixel(in);
+    if in.mode == UI_MODE_PREMULTIPLIED {
+        return vec4(t.rgb / max(t.a, 0.00001), t.a) * in.color;
+    }
     if in.mode == UI_MODE_FONT {
         return vec4(in.color.rgb, in.color.a * t.r);
     }

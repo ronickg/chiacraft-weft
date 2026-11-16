@@ -125,9 +125,9 @@ impl Client {
                 .world
                 .block_or_air(point.floor().as_ivec3())
                 .unwrap_or(0);
-            let in_liquid =
-                crate::physics::liquid_at(content(), &super::world::SeenCells { world: &self.world, air_if_missing: false }, point)
-                    .is_some_and(|l| self.player.swims_in.get(l as usize) == Some(&true));
+            let in_liquid = self
+                .visible_liquid(point)
+                .is_some_and(|l| self.player.swims_in.get(l as usize) == Some(&true));
             let ask = crate::conditions::Ask {
                 pos: point,
                 state,
@@ -236,9 +236,7 @@ impl Client {
             for layer in block_layers.iter().filter(|l| l.observer == observer) {
                 self.environment_source(&mut env, format!("block/{observer}/{block}/{}", layer.name), layer.clone(), 0, point);
             }
-            if let Some(liquid) =
-                crate::physics::liquid_at(c, &super::world::SeenCells { world: &self.world, air_if_missing: false }, point)
-            {
+            if let Some(liquid) = self.visible_liquid(point) {
                 for layer in c.liquids[liquid as usize]
                     .environment
                     .iter()

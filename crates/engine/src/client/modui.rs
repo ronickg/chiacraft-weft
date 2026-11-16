@@ -46,11 +46,16 @@ struct TextSink {
 pub struct ClientView {
     pub client: *const Client,
     pub run: *mut std::ffi::c_void,
+    pub read_music: std::cell::Cell<bool>,
 }
 
 impl ClientView {
     pub fn new(client: Option<&Client>) -> ClientView {
-        ClientView { client: client.map_or(std::ptr::null(), |c| c as *const Client), run: std::ptr::null_mut() }
+        ClientView {
+            client: client.map_or(std::ptr::null(), |c| c as *const Client),
+            run: std::ptr::null_mut(),
+            read_music: std::cell::Cell::new(false),
+        }
     }
 
     /// For a binding run with `ctx`.
@@ -72,8 +77,9 @@ pub fn build(ui: &mut Ui, lang: &Lang, input: Option<&crate::input::Input>, owne
     let menu = client.and_then(|c| c.menu.as_ref()).map(|m| m.kind);
     let mut b = UiBuild { tag: 1, owner, ui, lang, input, depth: 0, menu, recipe: None, client };
     let mut v = ClientView::new(client);
-    let mut args = abi::UiArgs { ui: &mut b as *mut UiBuild as *mut abi::UiCtx, client: v.raw() };
+    let mut args = abi::UiArgs { ui: &mut b as *mut UiBuild as *mut abi::UiCtx, client: v.raw(), data: 0 };
     host::invoke(owner, cb, &mut args);
+    b.ui.read_music |= v.read_music.get();
     for _ in 0..b.depth {
         b.ui.close();
     }
@@ -199,6 +205,7 @@ pub unsafe extern "C" fn ui_open(u: *mut abi::UiCtx, node: *const abi::UiNode) {
             self_align: (n.self_align != u32::MAX).then(|| align(n.self_align)),
             scroll: flag(abi::ui_flags::SCROLL),
             bar_outside: false,
+            bar_thin: flag(abi::ui_flags::THIN_SCROLLBAR),
             fill: None,
             max_h: f32::INFINITY,
             at: None,
@@ -262,8 +269,14 @@ pub unsafe extern "C" fn ui_open(u: *mut abi::UiCtx, node: *const abi::UiNode) {
             uk::SLIDER => {
                 let bind = float_bind(owner, n.bind);
                 let on_change: Rc<dyn Fn(&mut Ctx, f32)> = Rc::new(move |ctx: &mut Ctx, v: f32| on_change(ctx, String::new(), v));
+                let (on_change, on_release) = if flag(abi::ui_flags::SLIDER_RELEASE) {
+                    (Rc::new(|_: &mut Ctx, _: f32| {}) as Rc<dyn Fn(&mut Ctx, f32)>, Some(on_change))
+                } else {
+                    (on_change, None)
+                };
                 let steps = if n.count == 0 { 100 } else { n.count };
-                b.ui.open(Kind::Slider { value: 0.0, bind, on_change, on_release: None, steps }, style)
+                let enabled = !flag(abi::ui_flags::DISABLED);
+                b.ui.open(Kind::Slider { enabled, value: 0.0, bind, on_change, on_release, steps, step_value: None }, style)
             }
             uk::ITEM => {
                 let (item, count) = (n.data, n.count);
@@ -271,9 +284,13 @@ pub unsafe extern "C" fn ui_open(u: *mut abi::UiCtx, node: *const abi::UiNode) {
             }
             uk::BUTTON => {
                 let cb = n.on_click;
+                let data = n.data;
                 // Run after the input with the whole client API: a mod's menu can open screens,
                 // worlds or quit like the engine's.
-                let action: crate::ui::Action = Rc::new(move |ctx: &mut Ctx| ctx.requests.push(crate::app::Request::ModCall(owner, cb)));
+                let action: crate::ui::Action = Rc::new(move |ctx: &mut Ctx| {
+                    ctx.requests
+                        .push(crate::app::Request::ModCall(owner, cb, data))
+                });
                 let (enabled, selected) = (!flag(abi::ui_flags::DISABLED), flag(abi::ui_flags::SELECTED));
                 // Unless the mod sizes it, as high and padded as the engine's buttons.
                 let mut style = style;
@@ -288,10 +305,13 @@ pub unsafe extern "C" fn ui_open(u: *mut abi::UiCtx, node: *const abi::UiNode) {
                 let on_double: Option<crate::ui::Action> = double.is_some().then(|| {
                     Rc::new(move |ctx: &mut Ctx| {
                         ctx.requests
-                            .push(crate::app::Request::ModCall(owner, double))
+                            .push(crate::app::Request::ModCall(owner, double, data))
                     }) as crate::ui::Action
                 });
-                b.ui.open(Kind::Button { class: class_or("button"), action: Some(action), on_double, enabled, selected }, style.center())
+                b.ui.open(
+                    Kind::Button { class: class_or("button"), action: Some(action), on_double, enabled, selected, selected_bind: None },
+                    style.center(),
+                )
             }
             uk::TITLE => {
                 let c = crate::content::content();
@@ -632,6 +652,10 @@ pub unsafe extern "C" fn client_entity(c: *mut abi::ClientCtx, id: u64, out: *mu
                 max_health: cl.max_health,
                 size: cl.player.dims().size(),
                 selected: cl.selected as u32,
+                using: cl
+                    .using
+                    .map_or(0, |_| if cl.using_off { cl.off_held().item } else { cl.held().item }),
+                using_ticks: cl.using.map_or(0, |(ticks, _)| ticks as u32),
                 ..Default::default()
             };
             *out = state;

@@ -204,8 +204,8 @@ impl Sky {
                         topology: Topology::Triangles,
                     })
                     .map_err(|e| e.0)?;
-                // Clouds are things in the world: they hide what is behind them, and the shader says
-                // how far each pixel is. At the far end of their reach they fade out.
+                // The shader supplies depth for testing against solid geometry. Translucent
+                // geometry mixes with the cloud color instead of being rejected by its depth.
                 let clouds = gpu
                     .create_pipeline(&PipelineDesc {
                         label: "clouds",
@@ -213,7 +213,7 @@ impl Sky {
                         vertex: "vs_clouds",
                         fragment: Some("fs_clouds"),
                         color: Some(Format::Surface),
-                        depth: Some(DepthState { write: true, compare: Compare::GreaterEqual }),
+                        depth: Some(DepthState { write: false, compare: Compare::GreaterEqual }),
                         blend: Blend::Premultiplied,
                         cull_back: false,
                         topology: Topology::Triangles,
@@ -350,9 +350,9 @@ impl Sky {
         environment: &weft_abi::environment::EnvironmentValues,
         weights: &FxHashMap<String, f32>,
         overlays: &[Overlay],
-    ) {
+    ) -> GpuSky {
         self.overlay = None;
-        let Some(pipe) = self.pipe else { return };
+        let Some(pipe) = self.pipe else { return GpuSky::default() };
         let c = content();
         let d = &c.dims[dim];
         if environment.sky_opacity <= 0.0 {
@@ -371,7 +371,7 @@ impl Sky {
                 gpu.mapped(buf)[..self.list.len() * size_of::<GpuSky>()].copy_from_slice(bytemuck::cast_slice(&self.list));
                 self.overlay = Some((buf, 0, n));
             }
-            return;
+            return GpuSky::default();
         }
         let turn = d.day_turn(time);
         let height = (turn * std::f64::consts::TAU).sin() as f32;
@@ -529,6 +529,8 @@ impl Sky {
             list.bind(bind::sky::OBJECTS, buf);
             list.bind(bind::sky::SCENE, scene);
             list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance });
+            return self.list[first_instance as usize];
         }
+        GpuSky::default()
     }
 }

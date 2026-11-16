@@ -178,21 +178,11 @@ pub fn place(action: &str, index: usize) -> (&'static str, i32) {
 
 /// The keys that set `action` off, to press on the player's behalf: its first bind's key with
 /// the modifiers and the key held with it (`F3+KeyG`).
-pub fn keys_of(input: &Input, action: &str) -> Vec<Key> {
+pub fn keys_of(input: &Input, action: &str, for_press: bool) -> Vec<Key> {
     if action == ESCAPE {
         return vec![Key::Code(KeyCode::Escape)];
     }
-    let Some(b) = input.binding_of(action) else { return Vec::new() };
-    let mods = crate::input::MODIFIERS
-        .iter()
-        .filter(|m| b.chord.mods & m.0 != 0)
-        .map(|m| Key::Code(m.2));
-    b.chord
-        .with
-        .into_iter()
-        .chain(mods)
-        .chain([b.chord.key])
-        .collect()
+    input.keys_of(action, for_press)
 }
 
 /// What an action is called, for players to read: its bind's name (`key.<action>`).
@@ -211,7 +201,7 @@ pub enum Label {
 }
 
 pub fn label(input: &Input, action: &str) -> Label {
-    let keys = keys_of(input, action);
+    let keys = keys_of(input, action, false);
     if let [k] = keys[..]
         && let Some(icon) = icon(k)
     {
@@ -318,7 +308,7 @@ fn steer(input: &mut Input, off: Vec2, side: f32, held: &[Key]) -> Vec<Key> {
     ]
     .into_iter()
     .filter(|w| w.0)
-    .flat_map(|w| keys_of(input, w.1))
+    .flat_map(|w| keys_of(input, w.1, true))
     .collect();
     want.dedup();
     for &k in held.iter().filter(|k| !want.contains(k)) {
@@ -376,7 +366,7 @@ impl Touches {
                     input.key_down(Key::Mouse(0));
                     Role::Mouse
                 } else if let Some(b) = button {
-                    let keys = keys_of(input, &b.action);
+                    let keys = keys_of(input, &b.action, true);
                     if b.toggle && !keys.is_empty() && keys.iter().all(|&k| input.held_key(k)) {
                         keys.iter().rev().for_each(|&k| input.key_up(k));
                     } else {
@@ -388,7 +378,7 @@ impl Touches {
                     let slot = (((gui.x - r.x) / r.w * slots as f32) as usize).min(slots.saturating_sub(1));
                     let keys = crate::input::HOTBAR
                         .get(slot)
-                        .map_or(Vec::new(), |a| keys_of(input, a));
+                        .map_or(Vec::new(), |a| keys_of(input, a, true));
                     keys.iter().for_each(|&k| input.key_down(k));
                     Role::Button { keys, toggle: false }
                 } else if let Some(r) = stick.filter(|r| {
@@ -440,7 +430,7 @@ impl Touches {
                             None
                         };
                         if let Some(action) = action {
-                            tap(input, &keys_of(input, action));
+                            tap(input, &keys_of(input, action, true));
                         }
                     }
                     Role::Look { .. } => {}
@@ -457,7 +447,7 @@ impl Touches {
                 && f.since.elapsed() >= HOLD
             {
                 let action = if aim.block && !aim.holding_item { "core:attack" } else { "core:use" };
-                let keys = keys_of(input, action);
+                let keys = keys_of(input, action, true);
                 keys.iter().for_each(|&k| input.key_down(k));
                 *held = Some(keys);
             }
@@ -499,7 +489,7 @@ impl crate::screens::Screen for TouchButtons {
     }
 
     fn build(&mut self, ui: &mut crate::ui::Ui, cx: &crate::screens::BuildCx) {
-        use crate::screens::{button, frame};
+        use crate::screens::{back_button, button, frame};
         use crate::ui::{Align, Style, text};
         let choosing = self.choosing;
         let row = |ui: &mut crate::ui::Ui, action: &str| {
@@ -565,11 +555,11 @@ impl crate::screens::Screen for TouchButtons {
             );
             ui.container(Style::row().gap(6.0), |ui| {
                 if choosing {
-                    button(ui, cx, "menu.back", &[], 120.0, |c| Self::choose(c, false));
+                    back_button(ui, cx, "menu.back", &[], 120.0, |c| Self::choose(c, false));
                 } else {
                     button(ui, cx, "touch.add_button", &[], 120.0, |c| Self::choose(c, true));
                     button(ui, cx, "controls.reset", &[], 120.0, |c| Self::change(c, |all| *all = defaults()));
-                    button(ui, cx, "menu.done", &[], 120.0, |c| c.requests.push(crate::app::Request::Close));
+                    back_button(ui, cx, "menu.done", &[], 120.0, |c| c.requests.push(crate::app::Request::Close));
                 }
             });
         });

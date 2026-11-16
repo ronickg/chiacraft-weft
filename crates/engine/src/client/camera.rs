@@ -245,23 +245,23 @@ impl Client {
         let cams_since = cams.since;
         let (vehicle, back) = self.camera_back();
         let cams = &mut self.cameras;
+        let mut args = abi::CameraArgs {
+            keys: keys.ctx(),
+            yaw,
+            pitch,
+            eye: eye_v,
+            eye_yaw: eye.yaw,
+            eye_pitch: eye.pitch,
+            vehicle,
+            back,
+            dt,
+            time: cams_since,
+            first: first as u32,
+            anchor,
+            out: pose,
+        };
         match (m.call, cams.mode) {
             (Some((owner, cb)), _) => {
-                let mut args = abi::CameraArgs {
-                    keys: keys.ctx(),
-                    yaw,
-                    pitch,
-                    eye: eye_v,
-                    eye_yaw: eye.yaw,
-                    eye_pitch: eye.pitch,
-                    vehicle,
-                    back,
-                    dt,
-                    time: cams_since,
-                    first: first as u32,
-                    anchor,
-                    out: pose,
-                };
                 crate::host::invoke(owner, cb, &mut args);
                 (pose, anchor) = (args.out, args.anchor);
             }
@@ -294,6 +294,12 @@ impl Client {
             }
         }
         cams.pose = pose;
+        args.out = pose;
+        args.anchor = anchor;
+        for &(owner, cb) in &c.game.camera_frames {
+            crate::host::invoke(owner, cb, &mut args);
+        }
+        (pose, anchor) = (args.out, args.anchor);
         let want = DVec3::new(pose.pos.x, pose.pos.y, pose.pos.z);
         let world = &self.world;
         let pos = if m.has(cf::SOLID) {

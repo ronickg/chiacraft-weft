@@ -9,6 +9,7 @@
 extern crate alloc;
 
 pub mod data;
+pub mod editor;
 pub mod environment;
 
 use core::ffi::c_void;
@@ -16,7 +17,7 @@ use core::sync::atomic::AtomicU32;
 
 /// FNV-1a of this file: any change to it (layouts included) makes mods built before it refuse
 /// to load instead of reading the wrong memory.
-pub const ABI_VERSION: u64 = fnv(concat!(include_str!("lib.rs"), include_str!("data.rs")).as_bytes());
+pub const ABI_VERSION: u64 = fnv(concat!(include_str!("lib.rs"), include_str!("data.rs"), include_str!("editor.rs")).as_bytes());
 /// Symbol every mod library exports: `extern "C" fn() -> *const ModDecl`.
 pub const ENTRY_SYMBOL: &[u8] = b"weft_mod\0";
 
@@ -173,6 +174,14 @@ impl core::ops::Mul<f64> for Vec3 {
     fn mul(self, k: f64) -> Vec3 {
         Vec3 { x: self.x * k, y: self.y * k, z: self.z * k }
     }
+}
+
+/// Identity strings borrowed for the current host call.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct PlayerInfo {
+    pub name: Str,
+    pub key: Str,
 }
 
 #[repr(C)]
@@ -580,6 +589,8 @@ pub struct ItemInfo {
 /// (`*` any text) and states `name[prop=value]` apart by spaces, `!` before one to leave what it
 /// names out; only `!` ones: anything but those.
 pub mod comp {
+    /// RECORD metadata for a mod-defined builder method in the content editor.
+    pub const EDITOR_METHOD: &str = "core:editor_method";
     /// A damage cause's: tags `BYPASSES_ARMOR`, `PIERCES_INVULNERABLE` (outside survival too),
     /// `IGNORES_COOLDOWN`, `BURNING` (cooked drops), `NO_KNOCKBACK`, `SILENT`; `DEATH_MESSAGE` and
     /// `DEATH_MESSAGE_BY` (`str` translation keys, `{0}` the one who died, `{1}` who did it).
@@ -825,7 +836,6 @@ pub mod comp {
     /// 0xRRGGBB where the biome sets none and on items, white); a key's `DEFAULT` (`str`, the
     /// key by its settings name, `KeyJ`, `mouse3`).
     pub const CREATIVE_TAB_ICON: &str = "creative_tab.icon";
-    pub const SOUND_CATEGORY_WORLD: &str = "sound_category.world";
     pub const TINT_KIND_DEFAULT: &str = "tint_kind.default";
     pub const KEY_DEFAULT: &str = "key.default";
     /// Attribute modifiers (`[Modifier]`) of a game mode, an item, a pose, an entity kind or
@@ -842,6 +852,8 @@ pub mod comp {
     /// (all but `SCREEN`). A camera that takes the moves (`camera::DETACHED`) has `MOVEMENT` and
     /// `RIDING` for itself, one that doesn't interact (`camera::NO_INTERACT`) `HANDS`.
     pub mod key {
+        /// Action whose held bindings act as a modifier for this key (`str`).
+        pub const WHILE_HELD: &str = "key.while_held";
         pub const MOVEMENT: &str = "key.movement";
         pub const HANDS: &str = "key.hands";
         pub const RIDING: &str = "key.riding";
@@ -1172,9 +1184,13 @@ pub mod comp {
     /// (`callback`, `ItemModelArgs`: how a stack looks by what is in it, asked once per kind of
     /// stack).
     pub mod item {
+        /// Explicit model asset, including its `item/` folder. Defaults to the item's own name.
+        pub const MODEL_FILE: &str = "item.model_file";
         pub const BLOCK: &str = "item.block";
         pub const ON_USE: &str = "item.on_use";
         pub const ON_RELEASE: &str = "item.on_release";
+        /// Main-hand item action on an attack press (`ItemUseArgs`).
+        pub const ON_ATTACK: &str = "item.on_attack";
         pub const CONDITION: &str = "item.condition";
     }
 
@@ -1217,6 +1233,8 @@ pub mod comp {
     /// goes in its component table, per state; its item gets the first state's unless it sets
     /// its own.
     pub mod block {
+        /// Mass per full block relative to a block of water (`f32`).
+        pub const DENSITY: &str = "density";
         pub const ON_SIDES: &str = "on_sides";
         pub const PROPS: &str = "block.props";
         pub const ON_USE: &str = "block.on_use";
@@ -1925,6 +1943,18 @@ pub fn layers_text<'a>(layers: impl IntoIterator<Item = Layer<'a>>) -> alloc::st
     text
 }
 
+/// Changes the asset names of layer text, retaining each layer's tint and tint kind.
+pub fn map_layer_names(text: &str, mut name: impl FnMut(&str) -> alloc::string::String) -> alloc::string::String {
+    let mapped: alloc::vec::Vec<_> = layers(text)
+        .map(|layer| (name(layer.name), layer.tint, layer.kind))
+        .collect();
+    layers_text(
+        mapped
+            .iter()
+            .map(|(name, tint, kind)| Layer { name, tint: *tint, kind: *kind }),
+    )
+}
+
 /// The texels a box between `min` and `max` (texels too) shows on a face when it says nothing, a
 /// box reaching out of its cell going on with the edge of the picture.
 pub fn box_face_uv(face: usize, min: [f32; 3], max: [f32; 3]) -> [f32; 4] {
@@ -2076,6 +2106,8 @@ pub mod signal_kind {
     /// With power it takes all it is stuck to and carries it along `front`, faster the more power;
     /// without, that lands. `BREAKS` breaks what is in the way, instead of stopping at it.
     pub const FLOATER: u32 = 11;
+    /// Holds the blocks attached to its front in a body while powered.
+    pub const BODY_MOUNT: u32 = 12;
 }
 
 pub mod signal_flags {
@@ -2085,6 +2117,25 @@ pub mod signal_flags {
     pub const STICKY: u32 = 2;
     /// A floater breaks what is in its way.
     pub const BREAKS: u32 = 4;
+    /// A body mount turns around its front axis while powered.
+    pub const ROTATES: u32 = 8;
+    /// A rotor holds its current pose when power cuts out or its path is blocked.
+    pub const HOLD: u32 = 16;
+    /// The controller rides in a freely moving structure and can be piloted from a seat.
+    pub const HELM: u32 = 32;
+}
+
+pub mod assembly_result {
+    pub const UNHANDLED: u32 = 0;
+    pub const FIRST_CORNER: u32 = 1;
+    pub const BOUNDS: u32 = 2;
+    pub const PREVIEW: u32 = 3;
+    pub const CONFIRMED: u32 = 4;
+    pub const TOO_LARGE: u32 = 5;
+    pub const UNAVAILABLE: u32 = 6;
+    pub const CLEARED: u32 = 7;
+    pub const SEATED: u32 = 8;
+    pub const DOCKING: u32 = 9;
 }
 
 crate::data! {
@@ -2685,6 +2736,9 @@ pub mod seat_exit {
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct KeyState {
+    /// Client-frame activations: 1 for a button press, fractional notches for a wheel.
+    /// Zero on the server; repeated reads do not consume it.
+    pub amount: f32,
     /// Set off this frame.
     pub pressed: u32,
     pub held: u32,
@@ -2753,6 +2807,78 @@ impl Schema for Mounting {
     const SCHEMA: &'static str = "{rider:u64,mount:u64,seat:u32,pad:u32}";
 }
 
+/// Normalized ship inputs. Positive throttle goes forward; positive steering turns right.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ShipControls {
+    pub throttle: f32,
+    pub steering: f32,
+}
+
+/// The block emitting a client's local music. `frame` is zero for a world block.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MusicSource {
+    pub frame: u64,
+    pub pos: BlockPos,
+    pub state: u32,
+    pub dimension: u32,
+    pub pad: u32,
+}
+impl Schema for MusicSource {
+    const SCHEMA: &'static str = "{frame:u64,pos:[i32;3],state:u32,dimension:u32,pad:u32}";
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct MusicStatus {
+    pub track: Str,
+    pub position: f64,
+    pub duration: f64,
+    pub volume: f32,
+    pub state: u32,
+}
+
+#[repr(C)]
+pub struct MusicTrack {
+    pub file: Str,
+    /// Seconds, or zero when the duration could not be read.
+    pub duration: f64,
+}
+
+pub mod local_music {
+    pub const PLAY: u32 = 0;
+    pub const TOGGLE_PAUSE: u32 = 1;
+    pub const STOP: u32 = 2;
+    pub const SEEK: u32 = 3;
+    pub const VOLUME: u32 = 4;
+    pub const REFRESH: u32 = 5;
+    pub const OPEN_FOLDER: u32 = 6;
+
+    pub const STOPPED: u32 = 0;
+    pub const PLAYING: u32 = 1;
+    pub const PAUSED: u32 = 2;
+    pub const ERROR: u32 = 3;
+}
+
+/// The strongest contact with this obstacle in the ship's step (`event::SHIP_COLLISION`).
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct ShipCollision {
+    pub ship: u64,
+    /// Other body, or zero for the world's terrain.
+    pub other: u64,
+    pub point: Vec3,
+    /// Unit normal in world coordinates, from the obstacle toward the ship.
+    pub normal: Vec3,
+    /// Approach speed along the normal, in blocks per second before the impulse.
+    pub speed: f64,
+    pub impulse: f64,
+}
+impl Schema for ShipCollision {
+    const SCHEMA: &'static str = "{ship:u64,other:u64,point:[f64;3],normal:[f64;3],speed:f64,impulse:f64}";
+}
+
 /// What a camera mode (`entry_kind::CAMERA`, `comp::camera`) is and does: each frame on the
 /// client its `call` (`CameraArgs`) says where the camera is, and these what goes with it. The
 /// engine's are `core:first_person`, `core:behind`, `core:front` (F5 goes through those with
@@ -2808,7 +2934,7 @@ pub struct CameraPose {
 
 defaults!(CameraPose { pos: Vec3 { x: 0.0, y: 0.0, z: 0.0 }, yaw: 0.0, pitch: 0.0, roll: 0.0, fov: 1.0 });
 
-/// A camera mode's frame (`comp::camera::CALL`), on the client.
+/// A camera mode or global camera modifier frame, on the client.
 #[repr(C)]
 pub struct CameraArgs {
     /// The keys, and the look: the camera's own, turned by the mouse, when it's
@@ -2831,7 +2957,7 @@ pub struct CameraArgs {
     pub first: u32,
     /// Where a `comp::camera::CLIP` camera is pulled in towards; the eyes unless changed.
     pub anchor: Vec3,
-    /// Comes in as last frame's, to be changed.
+    /// Previous mode pose for a shot, current computed pose for a global modifier.
     pub out: CameraPose,
 }
 
@@ -3854,6 +3980,8 @@ defaults!(UiNode {
 pub struct UiArgs {
     pub ui: *mut UiCtx,
     pub client: *mut ClientCtx,
+    /// Button's user data, zero for screen construction.
+    pub data: u32,
 }
 
 #[repr(C)]
@@ -3887,10 +4015,14 @@ pub mod ui_flags {
     pub const NO_WRAP: u32 = 2;
     /// Text with digit-wide cells, so changing numbers don't move what follows.
     pub const MONO: u32 = 4;
-    /// A button that can't be pressed.
+    /// A button or slider that can't be used.
     pub const DISABLED: u32 = 8;
     /// A button shown as chosen (the open tab).
     pub const SELECTED: u32 = 16;
+    /// Commit a slider's value on release, keeping its handle under the pointer while dragging.
+    pub const SLIDER_RELEASE: u32 = 32;
+    /// A scrolling container uses a narrow bar.
+    pub const THIN_SCROLLBAR: u32 = 64;
 }
 
 #[repr(C)]
@@ -4019,6 +4151,7 @@ pub struct Host {
     /// The riders of `mount`, one per seat (0 for an empty one), up to `cap`; returns its seats.
     pub entity_riders: unsafe extern "C" fn(world: *mut WorldCtx, mount: u64, out: *mut u64, cap: u32) -> u32,
     pub entity_get: unsafe extern "C" fn(world: *mut WorldCtx, id: u64, out: *mut EntityState) -> u32,
+    pub player_info: unsafe extern "C" fn(world: *mut WorldCtx, id: u64, out: *mut PlayerInfo) -> u32,
     /// Adds `v` (blocks per second) to the entity's velocity: a mob's here, a player's on its
     /// client, the way a hit's knockback goes.
     pub entity_push: unsafe extern "C" fn(world: *mut WorldCtx, id: u64, v: *const Vec3),
@@ -4177,6 +4310,7 @@ pub struct Host {
     // ------------------------------------------------ client side and mod channels
     /// `ClientFrameArgs`, every frame on the client before input is handled; may drive the client.
     pub reg_client_frame: unsafe extern "C" fn(reg: *mut Registrar, cb: Callback),
+    pub reg_camera_frame: unsafe extern "C" fn(reg: *mut Registrar, cb: Callback),
     /// Moves a bone of what `entity` is or has on, for the next frame: radians about x, y, z, pixels, scale.
     pub client_pose_bone:
         unsafe extern "C" fn(c: *mut ClientCtx, entity: u64, bone: Str, turn: *const [f32; 3], by: *const [f32; 3], scale: *const [f32; 3]),
@@ -4238,6 +4372,9 @@ pub struct Host {
     pub client_op: unsafe extern "C" fn(client: *mut ClientCtx, op: u32, text: Str, num: f64) -> u64,
     /// Texts the client knows, see `client_text`. Valid until the next call.
     pub client_text: unsafe extern "C" fn(client: *mut ClientCtx, which: u32, index: u32) -> Str,
+    pub client_music: unsafe extern "C" fn(client: *mut ClientCtx, source: MusicSource, op: u32, track: Str, value: f64) -> u32,
+    pub client_music_status: unsafe extern "C" fn(client: *mut ClientCtx, source: MusicSource, out: *mut MusicStatus),
+    pub client_music_track: unsafe extern "C" fn(client: *mut ClientCtx, index: u32, out: *mut MusicTrack),
     /// 1 and the answer's lines (in the client's language, joined by `\n`) once command `id`
     /// (`client_op::RUN_COMMAND`) was answered, 0 before. An answer is read once.
     pub client_command_reply: unsafe extern "C" fn(client: *mut ClientCtx, id: u32, out: *mut Str) -> u32,
@@ -4438,6 +4575,11 @@ pub struct Host {
     /// Takes blocks of the world out into a new moving body: `center` is its block
     /// (0, 0, 0), they keep their places around that. Returns its entity, 0 if nothing came.
     pub body_from_blocks: unsafe extern "C" fn(world: *mut WorldCtx, center: *const BlockPos, cells: *const BlockPos, count: usize) -> u64,
+    pub assembly_select: unsafe extern "C" fn(world: *mut WorldCtx, player: u64, cell: *const BlockPos, tool: u8) -> u32,
+    /// An active ship's inputs until replaced, or null to return control to the helm.
+    pub ship_controls: unsafe extern "C" fn(world: *mut WorldCtx, ship: u64, input: *const ShipControls) -> u32,
+    /// Flooded hull cells, in the ship's coordinates. Returns their count, or `usize::MAX` if absent.
+    pub ship_flooded_cells: unsafe extern "C" fn(world: *mut WorldCtx, ship: u64, out: *mut BlockPos, cap: usize) -> usize,
     /// A moving body's blocks go back into the world where it is, at the nearest whole block.
     pub body_to_blocks: unsafe extern "C" fn(world: *mut WorldCtx, entity: u64),
     /// A moving body goes to `pos` in exactly `ticks`, whatever it was doing.
@@ -4451,6 +4593,8 @@ pub struct Host {
     /// `world_leave_body`; they nest. 0 if it isn't a body here.
     pub world_enter_body: unsafe extern "C" fn(world: *mut WorldCtx, entity: u64) -> u32,
     pub world_leave_body: unsafe extern "C" fn(world: *mut WorldCtx),
+    /// The current body's entity id, zero in the world frame.
+    pub world_frame: unsafe extern "C" fn(world: *mut WorldCtx) -> u64,
     pub body_move_to: unsafe extern "C" fn(world: *mut WorldCtx, entity: u64, pos: *const Vec3, ticks: u32),
     /// What a comparator would read of the block at `pos` may be different now.
     pub signal_read_changed: unsafe extern "C" fn(world: *mut WorldCtx, pos: *const BlockPos),
@@ -4871,6 +5015,8 @@ pub struct SystemArgs {
 
 /// Engine events (`Host::reg_event_handler`); values are the structs named in each line.
 pub mod event {
+    /// `ShipCollision`, after a positive contact impulse is applied.
+    pub const SHIP_COLLISION: &str = "core:ship_collision";
     /// `[i32; 3]`, the block: its tick (liquids flowing, block rules, `block.on_scheduled`), when a
     /// timer on a block with this event is due (`Host::timer`).
     pub const BLOCK_TICK: &str = "core:block_tick";

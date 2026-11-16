@@ -24,6 +24,7 @@ pub type NodeId = usize;
 pub type Action = Rc<dyn Fn(&mut Ctx)>;
 pub type TextBind = Box<dyn Fn(&Ctx) -> (String, Vec<Arg>)>;
 pub type FloatBind = Box<dyn Fn(&Ctx) -> f32>;
+pub type BoolBind = Box<dyn Fn(&Ctx) -> bool>;
 
 /// One of a row of icons' `abi::icon_effect`s, with its value this frame.
 pub struct IconEffect {
@@ -89,6 +90,7 @@ pub struct Style {
     pub scroll: bool,
     /// Its scroll bar goes just past its right edge, taking nothing from what it holds.
     pub bar_outside: bool,
+    pub bar_thin: bool,
     /// A plain color behind the node, RGBA.
     pub fill: Option<u32>,
     /// Placed at a point instead of in the flow: (x, y) in GUI pixels from the parent's inner
@@ -116,6 +118,7 @@ impl Default for Style {
             self_align: None,
             scroll: false,
             bar_outside: false,
+            bar_thin: false,
             fill: None,
             at: None,
             at_from: [0.0; 2],
@@ -257,6 +260,7 @@ pub enum Kind {
         on_double: Option<Action>,
         enabled: bool,
         selected: bool,
+        selected_bind: Option<BoolBind>,
     },
     Image {
         texture: String,
@@ -296,6 +300,7 @@ pub enum Kind {
     },
     /// Focused by a click, the arrow keys move it a step of `steps` across.
     Slider {
+        enabled: bool,
         value: f32,
         bind: FloatBind,
         on_change: Rc<dyn Fn(&mut Ctx, f32)>,
@@ -303,6 +308,7 @@ pub enum Kind {
         /// GUI scale that would change under the cursor on its way.
         on_release: Option<Rc<dyn Fn(&mut Ctx, f32)>>,
         steps: u32,
+        step_value: Option<Box<dyn Fn(f32, f32) -> f32>>,
     },
     /// Engine-drawn content (slots, 3D previews) identified by a tag.
     Custom {
@@ -349,9 +355,9 @@ impl Scrollbar {
 
     /// The handle's rect.
     pub fn handle(&self) -> Rect {
-        let [w, h] = Self::HANDLE;
+        let (w, h) = (self.track.w, Self::HANDLE[1]);
         let y = self.track.y + (self.track.h - h).max(0.0) * (self.offset / self.max.max(1.0)).clamp(0.0, 1.0);
-        Rect { x: self.track.x + (self.track.w - w) / 2.0, y, w, h }
+        Rect { x: self.track.x, y, w, h }
     }
 
     /// Offset that puts the handle's center at height `y`.
@@ -364,10 +370,16 @@ impl Scrollbar {
 
 pub struct Ui {
     pub nodes: Vec<Node>,
+    /// The layout was built from the local music library or transport state.
+    pub read_music: bool,
+    /// The screen supplies a Back/Done button or a close icon of its own.
+    pub has_close: bool,
     stack: Vec<NodeId>,
     pub hovered: Option<NodeId>,
     pub pressed: Option<NodeId>,
     pub focused: Option<NodeId>,
+    /// An open popup confines pointer hit testing to its subtree.
+    pub modal: Option<NodeId>,
     /// Selection end in the focused text field, the caret being the other.
     pub anchor: Option<usize>,
     pub dirty: bool,
@@ -396,7 +408,14 @@ impl Kind {
     /// A field of several lines (Enter breaks the line), its text shown through `format` if given
     /// (colors, `mono`; the glyphs' widths must not depend on what comes before them).
     pub fn text_area(value: &str, max: usize, format: Option<Format>) -> Kind {
-        let area = Area { format, scroll: Rc::default(), wrap: true, inset: 0.0 };
+        let area = Area {
+            format,
+            scroll: Rc::default(),
+            wrap: true,
+            inset: 0.0,
+            follow_caret: std::cell::Cell::new(true),
+            max_scroll: std::cell::Cell::new(0.0),
+        };
         Kind::Input { value: value.to_string(), caret: 0, max, on_change: None, area: Some(area) }
     }
 }
@@ -413,6 +432,8 @@ pub struct Area {
     pub wrap: bool,
     /// Room kept free on the right (a button over the field's corner), GUI units.
     pub inset: f32,
+    pub follow_caret: std::cell::Cell<bool>,
+    pub max_scroll: std::cell::Cell<f32>,
 }
 
 /// One row of a field's text as drawn: chars `start..end` of line `line`, `at` the first one's
@@ -439,6 +460,10 @@ impl Row {
 }
 
 impl Area {
+    pub fn room(&self, width: f32) -> f32 {
+        (width - 8.0 - self.inset - Scrollbar::ROOM).max(1.0)
+    }
+
     pub fn spans(&self, s: &str) -> Vec<Span> {
         self.format
             .as_ref()
@@ -540,10 +565,13 @@ impl Ui {
         };
         Ui {
             nodes: vec![root],
+            has_close: false,
+            read_music: false,
             stack: vec![0],
             hovered: None,
             pressed: None,
             focused: None,
+            modal: None,
             anchor: None,
             dirty: true,
             scroll: Default::default(),
@@ -569,12 +597,22 @@ impl Ui {
 
     /// Scrolls the innermost scrolling node under `p` by `lines` wheel steps; true if one moved.
     pub fn scroll_at(&mut self, p: Vec2, lines: f32) -> bool {
-        let Some(id) = (0..self.nodes.len())
-            .rev()
-            .find(|&i| self.nodes[i].style.scroll && self.nodes[i].rect.contains(p) && self.nodes[i].clip.is_none_or(|c| c.contains(p)))
-        else {
+        let Some(id) = (0..self.nodes.len()).rev().find(|&i| {
+            (self.nodes[i].style.scroll || matches!(self.nodes[i].kind, Kind::Input { area: Some(_), .. }))
+                && self.nodes[i].rect.contains(p)
+                && self.nodes[i].clip.is_none_or(|c| c.contains(p))
+                && self.in_modal(i)
+        }) else {
             return false;
         };
+        if let Kind::Input { area: Some(area), .. } = &self.nodes[id].kind {
+            let [x, y] = area.scroll.get();
+            area.scroll
+                .set([x, (y - lines * 20.0).clamp(0.0, area.max_scroll.get())]);
+            area.follow_caret.set(false);
+            self.dirty = true;
+            return true;
+        }
         // Held to its end, a node counts from there: up is further from it.
         let by = if self.nodes[id].style.justify == Justify::End { lines } else { -lines };
         let key = self.scroll_key(id);
@@ -587,9 +625,11 @@ impl Ui {
     /// Mouse pressed at `p`: on a scroll bar it starts dragging (a click on the track jumps
     /// there). True if a bar took the click.
     pub fn bar_press(&mut self, p: Vec2) -> bool {
-        let hit = (0..self.nodes.len())
-            .rev()
-            .find(|&i| self.nodes[i].scrollbar.is_some_and(|b| b.track.contains(p)) && self.nodes[i].clip.is_none_or(|c| c.contains(p)));
+        let hit = (0..self.nodes.len()).rev().find(|&i| {
+            self.nodes[i].scrollbar.is_some_and(|b| b.track.contains(p))
+                && self.nodes[i].clip.is_none_or(|c| c.contains(p))
+                && self.in_modal(i)
+        });
         let Some(id) = hit else { return false };
         self.dragging = Some(id);
         self.bar_drag(p);
@@ -603,10 +643,16 @@ impl Ui {
             self.dragging = None;
             return false;
         };
-        let key = self.scroll_key(id);
         let at = bar.offset_at(p.y);
-        let at = if self.nodes[id].style.justify == Justify::End { bar.max - at } else { at };
-        self.scroll.insert(key, at);
+        if let Kind::Input { area: Some(area), .. } = &self.nodes[id].kind {
+            let [x, _] = area.scroll.get();
+            area.scroll.set([x, at]);
+            area.follow_caret.set(false);
+        } else {
+            let key = self.scroll_key(id);
+            let at = if self.nodes[id].style.justify == Justify::End { bar.max - at } else { at };
+            self.scroll.insert(key, at);
+        }
         self.dirty = true;
         true
     }
@@ -728,7 +774,14 @@ impl Ui {
 
     pub fn button(&mut self, class: &str, style: Style, action: Action, f: impl FnOnce(&mut Ui)) -> NodeId {
         self.with(
-            Kind::Button { class: class.to_string(), action: Some(action), on_double: None, enabled: true, selected: false },
+            Kind::Button {
+                class: class.to_string(),
+                action: Some(action),
+                on_double: None,
+                enabled: true,
+                selected: false,
+                selected_bind: None,
+            },
             style.center(),
             f,
         )
@@ -878,6 +931,25 @@ impl Ui {
             }
             return;
         }
+        if let Kind::Input { value, area: Some(area), .. } = &self.nodes[id].kind {
+            let room = area.room(rect.w).max(unit);
+            let rows = area.rows(value, font, Some(room / unit));
+            let max = (rows.len() as f32 * font.line_height * unit - (rect.h - 8.0)).max(0.0);
+            area.max_scroll.set(max);
+            let [x, y] = area.scroll.get();
+            let offset = y.clamp(0.0, max);
+            area.scroll.set([x, offset]);
+            self.nodes[id].scrollbar = (max > 0.0).then_some(Scrollbar {
+                track: Rect {
+                    x: rect.x + rect.w - 4.0 - Scrollbar::HANDLE[0],
+                    y: rect.y + 4.0,
+                    w: Scrollbar::HANDLE[0],
+                    h: (rect.h - 8.0).max(0.0),
+                },
+                offset,
+                max,
+            });
+        }
         let children = self.nodes[id].children.clone();
         let placed: Vec<NodeId> = children
             .iter()
@@ -951,13 +1023,15 @@ impl Ui {
             scrolled = *v;
             past_end = max - scrolled;
             free = free.max(0.0);
-            if max > 0.0 && !style.row && cross_size > Scrollbar::ROOM * 2.0 {
+            let bar_width = if style.bar_thin { 5.0 } else { Scrollbar::HANDLE[0] };
+            let bar_room = bar_width + Scrollbar::ROOM - Scrollbar::HANDLE[0];
+            if max > 0.0 && !style.row && cross_size > bar_room * 2.0 {
                 let r = self.nodes[id].rect;
                 let track = if style.bar_outside {
-                    Rect { x: r.x + r.w + Scrollbar::OUTSIDE_GAP, y: r.y, w: Scrollbar::HANDLE[0], h: r.h }
+                    Rect { x: r.x + r.w + Scrollbar::OUTSIDE_GAP, y: r.y, w: bar_width, h: r.h }
                 } else {
-                    cross_size -= Scrollbar::ROOM;
-                    Rect { x: inner.x + inner.w - Scrollbar::HANDLE[0], y: inner.y, w: Scrollbar::HANDLE[0], h: inner.h }
+                    cross_size -= bar_room;
+                    Rect { x: inner.x + inner.w - bar_width, y: inner.y, w: bar_width, h: inner.h }
                 };
                 let offset = if style.justify == Justify::End { max - scrolled } else { scrolled };
                 self.nodes[id].scrollbar = Some(Scrollbar { track, offset, max });
@@ -1007,7 +1081,7 @@ impl Ui {
                 return;
             }
             let button = matches!(n.kind, Kind::Button { .. });
-            let interactive = matches!(n.kind, Kind::Input { .. } | Kind::Slider { .. } | Kind::Custom { .. })
+            let interactive = matches!(n.kind, Kind::Input { .. } | Kind::Slider { enabled: true, .. } | Kind::Custom { .. })
                 || n.tooltip.is_some()
                 || matches!(&n.kind, Kind::Text(t) if !t.layout.links.is_empty());
             // What a button contains (labels, icons) is part of the button, but for another button.
@@ -1019,7 +1093,18 @@ impl Ui {
             }
         }
         let mut best = None;
-        walk(self, 0, p, false, &mut best);
+        walk(self, self.modal.unwrap_or(0), p, false, &mut best);
         best
+    }
+
+    fn in_modal(&self, node: NodeId) -> bool {
+        fn contains(ui: &Ui, root: NodeId, node: NodeId) -> bool {
+            root == node
+                || ui.nodes[root]
+                    .children
+                    .iter()
+                    .any(|&child| contains(ui, child, node))
+        }
+        self.modal.is_none_or(|root| contains(self, root, node))
     }
 }

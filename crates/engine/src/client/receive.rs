@@ -2,6 +2,10 @@
 
 use super::*;
 
+fn entity_rotation(rotation: Option<[f32; 4]>) -> glam::DQuat {
+    rotation.map_or(glam::DQuat::IDENTITY, |q| glam::Quat::from_array(q).as_dquat().normalize())
+}
+
 impl Client {
     pub(super) fn receive(&mut self) {
         // World messages go to the terrain thread, all of a frame together.
@@ -85,6 +89,11 @@ impl Client {
             ToClient::BodyLight { frame, lights } => {
                 if let Some(e) = self.entities.get_mut(&frame) {
                     e.world_light = lights.into_iter().collect();
+                }
+            }
+            ToClient::BodyAir { frame, boxes } => {
+                if let Some(e) = self.entities.get_mut(&frame) {
+                    e.dry_boxes = boxes;
                 }
             }
             ToClient::Swing { used_item, off_hand } => {
@@ -247,7 +256,7 @@ impl Client {
                     crate::config::put_from_server(id, v);
                 }
             }
-            ToClient::Skin { entity, png } => self.entity_render.skin_pending.push((entity, png)),
+            ToClient::Skin { entity, skin } => self.entity_render.skin_pending.push((entity, skin)),
             ToClient::Avatar { entity, avatar } => self
                 .entity_render
                 .avatar_pending
@@ -288,7 +297,11 @@ impl Client {
             self.entity_components.clear();
         }
         let at = self.body_tick(self.body_clock);
-        let on = frame.and_then(|(id, rel)| self.entities.get(&id).map(|b| (id, b.known(at) + rel)));
+        let on = frame.and_then(|(id, rel)| {
+            self.entities
+                .get(&id)
+                .map(|b| (id, b.known(at).to_world(rel)))
+        });
         let pos = on.map_or(pos, |o| o.1);
         self.player.support = on.map(|o| o.0);
         // Off whatever it rode, or the next step would put it back there.
@@ -315,6 +328,7 @@ impl Client {
             let to = if content().game.is_block_entity(e.kind) { &mut self.showing_blocks } else { &mut self.entities };
             self.entity_render.changed_items.insert(e.id);
             let mut shown = ClientEntity::new(e.kind, e.pos, e.yaw, e.pitch);
+            shown.target_rotation = entity_rotation(e.rotation);
             (shown.born, shown.body_yaw, shown.body_target) = (e.born as f64, e.body_yaw, e.body_yaw);
             (shown.walk, shown.walk_target, shown.swing, shown.swing_target) = (e.strode, e.strode, e.stride, e.stride);
             to.insert(e.id, shown);
@@ -332,15 +346,22 @@ impl Client {
         // Physics looks a step of its own back, many ticks at a high `/tick rate`.
         let keep = ((self.tick_rate * STEP).ceil() as usize * 2 + 4).max(8);
         // The mount this client steers goes where it moves it.
-        let driving = self.me.vehicle.map(|v| v.0);
+        let driving = self.me.vehicle.and_then(|(id, seat)| {
+            let mount = self.entities.get(&id)?;
+            content().game.entities[mount.kind as usize]
+                .seats
+                .get(seat as usize)?
+                .steers
+                .then_some(id)
+        });
         // Bodies turn by the tick from these moves (`physics::turn_body`), as the server turned
         // them, by how they moved on what they stand on.
         let deltas: rustc_hash::FxHashMap<u64, DVec3> = list
             .iter()
-            .filter_map(|&(id, pos, ..)| self.entities.get(&id).map(|e| (id, pos - e.target)))
+            .filter_map(|m| self.entities.get(&m.id).map(|e| (m.id, m.pos - e.target)))
             .collect();
         // Limbs swing and crouching turns by the tick too, the clips' clock.
-        for &(id, _, yaw, _, pose, _, frame) in &list {
+        for &crate::net::Move { id, yaw, pose, frame, .. } in &list {
             let Some(&d) = deltas.get(&id) else { continue };
             let carried = deltas
                 .get(&frame)
@@ -358,13 +379,15 @@ impl Client {
                 }
             }
         }
-        for &(id, pos, yaw, pitch, pose, sprinting, frame) in &list {
+        for &crate::net::Move { id, pos, yaw, pitch, pose, sprinting, frame, rotation } in &list {
             if Some(id) == driving {
                 continue;
             }
             if let Some(e) = self.entities.get_mut(&id) {
                 (e.pose, e.sprinting) = (pose, sprinting);
                 let was = e.target;
+                let rot = entity_rotation(rotation);
+                let was_rotation = std::mem::replace(&mut e.target_rotation, rot);
                 e.target = pos;
                 e.target_yaw = yaw;
                 e.target_pitch = pitch;
@@ -375,15 +398,15 @@ impl Client {
                     let t = tick as f64;
                     // It starts from where it appeared, or its first move is a jump.
                     if e.track.is_empty() {
-                        e.track.push_back((t - 1.0, was));
+                        e.track.push_back((t - 1.0, was, was_rotation));
                     }
                     match e.track.back_mut() {
-                        Some(last) if last.0 == t => last.1 = pos,
+                        Some(last) if last.0 == t => *last = (t, pos, rot),
                         Some(last) if last.0 > t => {
                             e.track.clear();
-                            e.track.push_back((t, pos));
+                            e.track.push_back((t, pos, rot));
                         }
-                        _ => e.track.push_back((t, pos)),
+                        _ => e.track.push_back((t, pos, rot)),
                     }
                     while e.track.len() > keep {
                         e.track.pop_front();
@@ -392,19 +415,20 @@ impl Client {
             }
         }
         // Riders relative to their body, both where the server had them this tick.
-        for &(id, pos, .., frame) in &list {
+        let drawn_at = self.anim_tick();
+        for &crate::net::Move { id, pos, frame, .. } in &list {
             let body = self
                 .entities
                 .get(&frame)
                 .filter(|_| frame != 0)
-                .map(|b| (b.target, b.pos));
+                .map(|b| (crate::physics::Transform::rotated(b.target, b.target_rotation), b.place_at(drawn_at)));
             let Some(e) = self.entities.get_mut(&id) else { continue };
             match body {
                 Some((target, shown)) => {
                     if e.rel_target.is_none() {
-                        e.rel = e.pos - shown;
+                        e.rel = shown.to_local(e.pos);
                     }
-                    e.rel_target = Some(pos - target);
+                    e.rel_target = Some(target.to_local(pos));
                 }
                 None => e.rel_target = None,
             }

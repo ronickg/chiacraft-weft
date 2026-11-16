@@ -1,3 +1,4 @@
+use base_api::FoodItem as _;
 use weft_sdk::*;
 
 pub static STICK: Item = Item::named("stick");
@@ -110,9 +111,7 @@ pub fn register(r: &mut Registry) {
     ] {
         let i = r
             .item(Item::generated(name.into()))
-            .set(&FOOD, Food { hunger, saturation })
-            .use_ticks(if tag == "mushrooms" { 16 } else { 32 })
-            .on_use(base_api::eat)
+            .food(Food { hunger, saturation })
             .tab(&crate::tabs::FOOD);
         let i = if tag.starts_with("cooked_meat/") { i.tag("cooked_meat") } else { i };
         if !tag.is_empty() {
@@ -203,8 +202,17 @@ pub fn register(r: &mut Registry) {
             let points = points[slot];
             let tag = ARMOR_SLOTS[slot];
             // Leggings are the inner layer, drawn closer to the body.
-            let (inflate, layer) =
-                if mat == "leather" { if slot == 2 { (0.2, 2) } else { (0.4, 1) } } else { if slot == 2 { (0.5, 2) } else { (0.75, 1) } };
+            let (inflate, layer) = if mat == "leather" {
+                match slot {
+                    0 => (0.65, 1),
+                    2 => (0.35, 2),
+                    _ => (0.5, 1),
+                }
+            } else if slot == 2 {
+                (0.5, 2)
+            } else {
+                (0.75, 1)
+            };
             let item = r.item(Item::generated(format!("{mat}_{piece}")));
             let item = if mat == "gold" { item.light_rgb(5, 5, 0) } else { item };
             let mut b = item

@@ -675,15 +675,18 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
         let ng = u32(desc[table + nb * WORDS_SCATTER_BIOME]);
         let ground = table + nb * WORDS_SCATTER_BIOME + 1u;
         at = ground + ng * 2u;
-        let c0 = div_floor(ox - s - reach, cell).x;
+        // A bounded, world-aligned sample of sites at coarse levels.
+        let stride = max(s / i32(LOD_SCATTER_STEP), 1);
+        let weight = f32(stride) / f32(s);
+        let c0 = div_floor(div_floor(ox - s - reach, cell).x, stride).x * stride;
         let c1 = div_floor(ox + LOD_LAST * s + reach, cell).x;
-        let d0 = div_floor(oz - s - reach, cell).x;
+        let d0 = div_floor(div_floor(oz - s - reach, cell).x, stride).x * stride;
         let d1 = div_floor(oz + LOD_LAST * s + reach, cell).x;
-        let wide = u32(c1 - c0 + 1);
-        let cells = wide * u32(d1 - d0 + 1);
+        let wide = u32((c1 - c0) / stride + 1);
+        let cells = wide * u32((d1 - d0) / stride + 1);
         for (var k = t; k < cells; k += 256u) {
-            let cx = c0 + i32(k % wide);
-            let cz = d0 + i32(k / wide);
+            let cx = c0 + i32(k % wide) * stride;
+            let cz = d0 + i32(k / wide) * stride;
             let h = hash64(key, cx, cz);
             let px = cx * cell + i32(mod64(h, u32(cell)));
             let pz = cz * cell + i32(mod64(shr64(h, 8u), u32(cell)));
@@ -729,7 +732,8 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
                     let wz = min(pz + r + 1, z0 + s) - max(pz - r, z0);
                     if (wx > 0 && wz > 0) {
                         let q = u32(j) * LOD_SIDE + u32(i);
-                        atomicAdd(&cover[q], u32(wx * wz));
+                        let area = f32(wx) * weight * f32(wz) * weight;
+                        atomicAdd(&cover[q], u32(round(area * f32(LOD_COVER_SCALE))));
                         atomicMax(&canopy[q], packed);
                     }
                 }
@@ -741,7 +745,7 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
     // close), as high as the highest.
     for (var k = t; k < LOD_SAMPLES; k += 256u) {
         let p = atomicLoad(&canopy[k]);
-        if (p != 0u && atomicLoad(&cover[k]) * 3u >= u32(s * s)) {
+        if (p != 0u && atomicLoad(&cover[k]) >= (LOD_COVER_SCALE + 2u) / 3u) {
             let o = (tile * LOD_SAMPLES + k) * LOD_WORDS;
             let leaves = p & 65535u;
             outp[o] = ((u32(i32(p >> 16u) - 32768)) & 65535u) | (leaves << 16u);

@@ -6,7 +6,11 @@ use weft_abi::entry_kind as ek;
 impl Server {
     pub(super) fn join(&mut self, c: &'static Content, pi: usize, name: String, key: String) {
         let key = if key.is_empty() { name.clone() } else { key };
-        if self.players.iter().any(|p| p.joined && p.key == key) {
+        if self
+            .players
+            .iter()
+            .any(|p| p.joined && p.identity.key == key)
+        {
             self.players[pi]
                 .conn
                 .send(ToClient::Disconnect(format!("{name} is already playing")));
@@ -67,6 +71,8 @@ impl Server {
                 .unwrap_or(abi::permission::EVERYONE)
         };
         e.permission = permission;
+        let identity = std::sync::Arc::new(super::PlayerIdentity { name, key });
+        self.identities.write().insert(id, identity.clone());
         e.selected = e
             .selected
             .min(c.game.player_layout.hotbar.saturating_sub(1));
@@ -84,8 +90,7 @@ impl Server {
         }
         r.emit_engine(c, abi::event::PLAYER_JOINED, &abi::PlayerEvent { player: id });
         let p = &mut self.players[pi];
-        p.name = name;
-        p.key = key;
+        p.identity = identity;
         p.joined = true;
         p.dim = dim;
         p.entity = id;
@@ -93,8 +98,8 @@ impl Server {
         p.deaths = deaths;
         p.first_sync = true;
         p.glow_sent = false;
-        log::info!("{} joined", p.name);
-        let line = Msg::new("multiplayer.joined", vec![Arg::Text(p.name.clone())]);
+        log::info!("{} joined", p.identity.name);
+        let line = Msg::new("multiplayer.joined", vec![Arg::Text(p.identity.name.clone())]);
         for q in self.players.iter_mut().filter(|q| q.joined) {
             q.conn
                 .send(ToClient::Show(crate::net::Shown::chat(line.clone())));
@@ -123,16 +128,16 @@ impl Server {
                 .send(ToClient::Show(crate::net::Shown::chat(void_note(c))));
         }
         // The skins of who is here already.
-        let skins: Vec<(u64, Arc<Vec<u8>>)> = self
+        let skins: Vec<(u64, Arc<crate::net::Skin>)> = self
             .players
             .iter()
             .filter(|o| o.joined && o.entity != id)
             .filter_map(|o| o.skin.clone().map(|s| (o.entity, s)))
             .collect();
-        for (entity, png) in skins {
+        for (entity, skin) in skins {
             self.players[pi]
                 .conn
-                .send(ToClient::Skin { entity, png: png.to_vec() });
+                .send(ToClient::Skin { entity, skin: (*skin).clone() });
         }
         let avatars: Vec<(u64, Arc<crate::net::AvatarData>)> = self
             .players
@@ -150,7 +155,7 @@ impl Server {
 
 pub(super) fn save_player(s: &Storage, p: &Player, d: &Dim) {
     let c = content();
-    let path = s.player_path(&p.key);
+    let path = s.player_path(&p.identity.key);
     if let Some(dir) = path.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
@@ -164,12 +169,17 @@ pub(super) fn save_player(s: &Storage, p: &Player, d: &Dim) {
         .collect();
     let mut bytes = Vec::new();
     super::persist::write(c, &mut bytes, &[(e, d.entities.inventories.get(&p.entity), comps, None)], d.time);
-    let text =
-        format!("name = {}\ndim = {}\ndeaths = {}\nentity = {}\n", p.name, c.dims[p.dim as usize].name, p.deaths, crate::kv::hex(&bytes));
+    let text = format!(
+        "name = {}\ndim = {}\ndeaths = {}\nentity = {}\n",
+        p.identity.name,
+        c.dims[p.dim as usize].name,
+        p.deaths,
+        crate::kv::hex(&bytes)
+    );
     // Whole or not at all: a crash in the middle must not leave half a player.
     let tmp = path.with_extension("new");
     if let Err(err) = std::fs::write(&tmp, text).and_then(|_| std::fs::rename(&tmp, &path)) {
-        log::error!("saving player {}: {err}", p.name);
+        log::error!("saving player {}: {err}", p.identity.name);
     }
 }
 
