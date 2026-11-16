@@ -1,8 +1,8 @@
 // use crate::worldgen::tree_kinds;
 
+use crate::blocks::{DRYADS_SADDLE_MUSHROOM, MUSHROOMS};
 use crate::worldgen::util::sphere;
 use crate::worldgen::{TreePlaceData, register_tree};
-use crate::blocks::{MUSHROOMS, DRYADS_SADDLE_MUSHROOM};
 
 use weft_sdk::*;
 
@@ -264,10 +264,13 @@ fn place_log(d: &mut TreePlaceData, log_block: &Block, length: u16) {
     };
     let direction = DIRECTIONS[dir_index];
     dbg!(direction.2);
-    let block = log_block.with(&[("axis", match direction.2 {
-        "east" | "west" => "x",
-        _ => "z",
-    })]);
+    let block = log_block.with(&[(
+        "axis",
+        match direction.2 {
+            "east" | "west" => "x",
+            _ => "z",
+        },
+    )]);
     for i in 3..(length + 3) {
         let dx = direction.0 * i as i32;
         let dz = direction.1 * i as i32;
@@ -288,16 +291,24 @@ fn place_log(d: &mut TreePlaceData, log_block: &Block, length: u16) {
             let mut facing = "east";
             let x = x + if dx == 0 {
                 let mut d = d.rng.next() as i32 % 2;
-                if d == 0 { d = -1 }
-                facing = if d < 0 {"east"} else {"west"};
+                if d == 0 {
+                    d = -1
+                }
+                facing = if d < 0 { "east" } else { "west" };
                 d
-            } else { 0 };
+            } else {
+                0
+            };
             let z = z + if dz == 0 {
                 let mut d = d.rng.next() as i32 % 2;
-                if d == 0 { d = -1 }
-                facing = if d < 0 {"north"} else {"south"};
+                if d == 0 {
+                    d = -1
+                }
+                facing = if d < 0 { "north" } else { "south" };
                 d
-            } else { 0 };
+            } else {
+                0
+            };
             let block = DRYADS_SADDLE_MUSHROOM.with(&[("facing", facing)]);
             (d.place)(x, y, z, block, false);
         }
@@ -313,7 +324,7 @@ fn place_stump(d: &mut TreePlaceData, log_block: &Block, hollow_log_block: &Bloc
     if d.rng.float() > 0.5 {
         (d.place)(x, y + 2, z, log_block.id(), true);
     }
-    let log = if d.rng.float() > 0.5 {log_block} else {hollow_log_block};
+    let log = if d.rng.float() > 0.5 { log_block } else { hollow_log_block };
     place_log(d, log, log_length);
 }
 fn place_oak(data: &mut TreePlaceData) {
