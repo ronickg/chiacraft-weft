@@ -125,6 +125,7 @@ pub fn register(r: &mut Registry) {
         .on_use(base_api::eat)
         .gives_effect(&crate::effects::NAUSEA, 1, 10.0)
         .gives_effect(&crate::effects::POISON, 1, 15.0)
+        .tag("mushrooms")
         .tab(&crate::tabs::FOOD);
     r.item(&SNOWBERRY)
         .set(&FOOD, Food { hunger: 1, saturation: 1.0 })

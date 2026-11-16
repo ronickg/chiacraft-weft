@@ -295,7 +295,7 @@ pub fn register(r: &mut Registry) {
     // Trees wherever a biome asks for them, in any dimension.
     r.scatter(&TREE_SITES)
         .spacing(5)
-        .reach(7)
+        .reach(20)
         .density(&TREES)
         .ground("#plant_soil")
         .plan(|s| {

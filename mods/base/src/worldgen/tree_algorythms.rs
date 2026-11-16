@@ -2,6 +2,7 @@
 
 use crate::worldgen::util::sphere;
 use crate::worldgen::{TreePlaceData, register_tree};
+use crate::blocks::MUSHROOMS;
 
 use weft_sdk::*;
 
@@ -215,10 +216,78 @@ fn decorate_trunk(skeleton: &TreeSkeleton, d: &mut TreePlaceData) {
         (d.place)(bx, y, bz, state, false);
     }
 }
-fn check_stump(data: &mut TreePlaceData) -> bool {
-    data.rng.float() < 0.1
+fn gentle(d: &mut TreePlaceData, r: i32, max_range: i32) -> bool {
+    let (x, _, z) = d.pos;
+    let mut lo = i32::MAX;
+    let mut hi = i32::MIN;
+    for dz in -r..=r {
+        for dx in -r..=r {
+            let h = (d.ground)(x + dx, z + dz);
+            if h == i32::MIN {
+                return false;
+            }
+            lo = lo.min(h);
+            hi = hi.max(h);
+        }
+    }
+    hi - lo <= max_range
 }
-fn place_stump(d: &mut TreePlaceData, log_block: &Block, wood_block: &Block, allow_roots: bool) {
+fn check_stump(data: &mut TreePlaceData, log_length: u16) -> bool {
+    data.rng.float() < 0.1 && gentle(data, log_length as i32 + 3, 3)
+}
+fn calculate_mean_height_diff(d: &mut TreePlaceData, direction: (i32, i32), log_length: u16) -> (i32, i32) {
+    let mut heights = Vec::new();
+    for i in 3..(log_length + 3) {
+        let log_x = d.pos.0 + direction.0 * (i as i32);
+        let log_z = d.pos.2 + direction.1 * (i as i32);
+        heights.push((d.ground)(log_x, log_z));
+    }
+    let mut diffs = Vec::new();
+    let mut last: Option<i32> = None;
+    for &height in &heights {
+        if let Some(previous) = last {
+            diffs.push((height - previous).abs());
+        }
+        last = Some(height);
+    }
+    (diffs.iter().sum::<i32>() / diffs.len() as i32, *heights.iter().max().unwrap())
+}
+fn place_log(d: &mut TreePlaceData, log_block: &Block, length: u16) {
+    let (dir_index, y) = {
+        let mut result = [(0, 0, 0); DIRECTIONS.len()];
+        for (i, dir) in DIRECTIONS.iter().enumerate() {
+            let (mean, max_y) = calculate_mean_height_diff(d, (dir.0, dir.1), length);
+            result[i] = (i, mean, max_y)
+        }
+        result.sort_by(|a, b| a.1.cmp(&b.1));
+        (result[0].0, result[0].2 + 1)
+    };
+    let direction = DIRECTIONS[dir_index];
+    dbg!(direction.2);
+    let block = log_block.with(&[("axis", match direction.2 {
+        "east" | "west" => "x",
+        _ => "z",
+    })]);
+    for i in 3..(length + 3) {
+        let dx = direction.0 * i as i32;
+        let dz = direction.1 * i as i32;
+        let x = d.pos.0 + dx;
+        let z = d.pos.2 + dz;
+        (d.place)(x, y, z, block, false);
+        let roll = d.rng.float();
+        let deco = if roll < 0.15 {
+            MUSHROOMS[d.rng.next() as usize % MUSHROOMS.len()].id()
+        } else if roll < 0.25 {
+            moss_on_side(Dir::Down)
+        } else {
+            0
+        };
+        if deco != 0 {
+            (d.place)(x, y + 1, z, deco, false);
+        }
+    }
+}
+fn place_stump(d: &mut TreePlaceData, log_block: &Block, hollow_log_block: &Block, wood_block: &Block, log_length: u16, allow_roots: bool) {
     if allow_roots {
         place_roots(d, log_block, wood_block);
     }
@@ -228,16 +297,19 @@ fn place_stump(d: &mut TreePlaceData, log_block: &Block, wood_block: &Block, all
     if d.rng.float() > 0.5 {
         (d.place)(x, y + 2, z, log_block.id(), true);
     }
+    let log = if d.rng.float() > 0.5 {log_block} else {hollow_log_block};
+    place_log(d, log, log_length);
 }
 fn place_oak(data: &mut TreePlaceData) {
     static LOG: &Block = &OAK_LOG;
+    static HOLLOW_LOG: Block = Block::named("oak_log_hollow");
     static WOOD: &Block = &OAK_WOOD;
     static ALLOW_ROOTS: bool = true;
-    if check_stump(data) {
-        place_stump(data, LOG, WOOD, ALLOW_ROOTS);
+    let height = 6u16 + (data.rng.next() as u16) % 3u16;
+    if check_stump(data, height) {
+        place_stump(data, LOG, &HOLLOW_LOG, WOOD, height, ALLOW_ROOTS);
         return;
     }
-    let height = 6u16 + (data.rng.next() as u16) % 3u16;
     let skeleton = place_trunk(data, height, LOG, WOOD, true, ALLOW_ROOTS);
     place_foliage(&skeleton, data, height, OAK_LEAVES.id());
     decorate_trunk(&skeleton, data);

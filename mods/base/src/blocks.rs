@@ -74,6 +74,8 @@ pub static BLUEGRASS: Block = Block::named("bluegrass");
 pub static INULA: Block = Block::named("inula");
 pub static VERBASCUM: Block = Block::named("verbascum");
 
+pub static MUSHROOMS: [&Block; 3] = [&PORCINI_MUSHROOM, &CHANTERELLE_MUSHROOM, &TOADSTOOL_MUSHROOM];
+
 static TILLABLE: Tag = Tag::named("tillable");
 
 /// A log that grows into a tree of `leaves` (a cone, like a spruce, when `cone`).
