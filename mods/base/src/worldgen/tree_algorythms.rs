@@ -315,8 +315,16 @@ fn place_oak(data: &mut TreePlaceData) {
     decorate_trunk(&skeleton, data);
 }
 fn place_birch(data: &mut TreePlaceData) {
+    static LOG: &Block = &BIRCH_LOG;
+    static HOLLOW_LOG: Block = Block::named("birch_log_hollow");
+    static WOOD: &Block = &BIRCH_WOOD;
+    static ALLOW_ROOTS: bool = false;
     let height = 6u16 + (data.rng.next() as u16) % 4u16;
-    let skeleton = place_trunk(data, height, &BIRCH_LOG, &BIRCH_WOOD, true, false);
+    if check_stump(data, height) {
+        place_stump(data, LOG, &HOLLOW_LOG, WOOD, height, ALLOW_ROOTS);
+        return;
+    }
+    let skeleton = place_trunk(data, height, LOG, WOOD, true, ALLOW_ROOTS);
     place_foliage(&skeleton, data, height, BIRCH_LEAVES.id());
     decorate_trunk(&skeleton, data);
 }
