@@ -13,12 +13,22 @@ pub(super) struct Ship {
     pub rotation: DQuat,
     pub spin: DVec3,
     pub front: u8,
+    pub(super) controls: Option<abi::ShipControls>,
     geometry: Option<Hull>,
 }
 
 impl Ship {
     pub fn new(front: u8, rotation: DQuat, spin: DVec3) -> Self {
-        Self { rotation, spin, front, geometry: None }
+        Self { rotation, spin, front, controls: None, geometry: None }
+    }
+
+    pub(super) fn flooded_cells(&self) -> impl Iterator<Item = IVec3> + '_ {
+        self.geometry.iter().flat_map(|hull| {
+            hull.air
+                .iter()
+                .zip(&hull.flooded)
+                .filter_map(|(cell, &wet)| wet.then_some(cell.pos))
+        })
     }
 }
 
@@ -280,6 +290,30 @@ impl Hull {
 }
 
 impl Dim {
+    pub(crate) fn set_ship_controls(&mut self, id: u64, input: Option<abi::ShipControls>) -> bool {
+        let Some(ship) = self
+            .entities
+            .get_mut(id)
+            .filter(|e| !e.removed && e.motion != Motion::Parked)
+            .and_then(|e| e.ship.as_mut())
+        else {
+            return false;
+        };
+        if input.is_some_and(|i| !i.throttle.is_finite() || !i.steering.is_finite()) {
+            return false;
+        }
+        ship.controls = input.map(|i| abi::ShipControls { throttle: i.throttle.clamp(-1.0, 1.0), steering: i.steering.clamp(-1.0, 1.0) });
+        true
+    }
+
+    pub(crate) fn ship_flooded_cells(&self, id: u64) -> Option<impl Iterator<Item = IVec3> + '_> {
+        let e = self
+            .entities
+            .get(id)
+            .filter(|e| !e.removed && e.motion != Motion::Parked)?;
+        Some(e.ship.as_ref()?.flooded_cells())
+    }
+
     pub(super) fn float_ship(&mut self, id: u64, front: u8) {
         if let Some(e) = self.entities.get_mut(id) {
             e.ship = Some(Box::new(Ship::new(front, DQuat::IDENTITY, DVec3::ZERO)));
@@ -290,7 +324,7 @@ impl Dim {
     }
 
     pub(super) fn advance_ships(&mut self, c: &'static Content, before: &mut FxHashMap<u64, Transform>) {
-        let ships: Vec<_> = self
+        let mut ships: Vec<_> = self
             .bodies
             .keys()
             .copied()
@@ -300,6 +334,12 @@ impl Dim {
                     .is_some_and(|e| e.ship.is_some() && e.motion != Motion::Parked)
             })
             .collect();
+        ships.sort_unstable();
+        let watch_hits = c
+            .game
+            .event_names
+            .get(abi::event::SHIP_COLLISION)
+            .is_some_and(|&event| !c.game.events[event as usize].handlers.is_empty());
         for id in ships {
             if self.bodies.get(&id).is_some_and(|b| b.stopping) && self.try_dock(c, id) {
                 continue;
@@ -318,9 +358,21 @@ impl Dim {
             }
             let hull = ship.geometry.as_mut().unwrap();
             let dry = (hull.flood(c, &CubeCells(&self.space.cubes), old) || edited).then(|| dry_boxes(&hull.air, &hull.flooded));
-            let (drive, steer) = self.ship_input(c, id);
-            let (pos, vel, spin, rotation) =
-                self.step_ship(c, id, hull, space.colliders(c), ShipStep { old, pos, vel, spin: ship.spin }, ship.front, drive, steer);
+            let (drive, steer) = ship
+                .controls
+                .map_or_else(|| self.ship_input(c, id), |input| (f64::from(input.throttle), -f64::from(input.steering)));
+            let mut collisions = Vec::new();
+            let (pos, vel, spin, rotation) = self.step_ship(
+                c,
+                id,
+                hull,
+                space.colliders(c),
+                ShipStep { old, pos, vel, spin: ship.spin },
+                ship.front,
+                drive,
+                steer,
+                watch_hits.then_some(&mut collisions),
+            );
             if let Some(space) = self.bodies.get_mut(&id) {
                 space.dry_changed = dry.as_ref().is_some_and(|boxes| *boxes != space.dry_boxes);
                 if let Some(boxes) = dry {
@@ -336,6 +388,9 @@ impl Dim {
                 if old != e.body_place() {
                     before.insert(id, old);
                 }
+            }
+            for collision in collisions {
+                self.emit_engine(c, abi::event::SHIP_COLLISION, &collision);
             }
         }
     }
@@ -419,6 +474,7 @@ impl Dim {
         front: u8,
         drive: f64,
         steer: f64,
+        mut collisions: Option<&mut Vec<abi::ShipCollision>>,
     ) -> (DVec3, DVec3, DVec3, DQuat) {
         let ShipStep { old, pos, vel, spin } = step;
         let Some(bounds) = colliders.bounds else {
@@ -437,18 +493,22 @@ impl Dim {
             .vector_to_world(DIRS[front as usize].as_dvec3())
             .with_y(0.0)
             .normalize_or_zero();
-        let acceleration = DVec3::Y * (gravity * (wet / hull.mass - 1.0)) + forward * drive * contact * 7.0;
-        let vel = ((vel + acceleration * TICK) * (-TICK * (0.05 + contact * 1.8)).exp()).clamp_length_max(4.5);
+        let thrust = crate::config::get(c.game.ship_thrust);
+        let water_drag = crate::config::get(c.game.ship_water_drag);
+        let max_speed = crate::config::get(c.game.ship_max_speed);
+        let acceleration = DVec3::Y * (gravity * (wet / hull.mass - 1.0)) + forward * drive * contact * thrust;
+        let vel = ((vel + acceleration * TICK) * (-TICK * (0.05 + contact * water_drag)).exp()).clamp_length_max(max_speed);
         let torque = old.vector_to_world(old.vector_to_local(moment * gravity) / hull.inertia) + DVec3::Y * steer * contact * 2.7;
-        let spin =
-            ((spin + torque * TICK) * (-TICK * (0.1 + contact * 2.8)).exp()).clamp_length_max((0.22 / (hull.radius * TICK)).min(2.5));
+        let turn_travel = 0.22;
+        let spin = ((spin + torque * TICK) * (-TICK * (0.1 + contact * 2.8)).exp())
+            .clamp_length_max((turn_travel / (hull.radius * TICK)).min(2.5));
         let at = |center, rotation| center - rotation * (hull.center - DVec3::splat(0.5)) - DVec3::Y * 0.5;
         let started = trace.then(std::time::Instant::now);
         let probes = std::cell::Cell::new(0);
         let envelope = old.box_to_world(bounds);
-        let margin = DVec3::splat(0.5);
+        let margin = DVec3::splat((vel.length() * TICK + turn_travel).max(0.5));
         let swept = Aabb { min: envelope.min - margin, max: envelope.max + margin };
-        let others: Vec<_> = self
+        let mut others: Vec<_> = self
             .bodies
             .iter()
             .filter_map(|(&other, space)| {
@@ -460,16 +520,17 @@ impl Dim {
                 let bounds = place.box_to_world(space.colliders(c).bounds?);
                 swept
                     .intersects(&bounds)
-                    .then_some((place, bounds, &**space))
+                    .then_some((other, place, bounds, &**space))
             })
             .collect();
+        others.sort_unstable_by_key(|entry| entry.0);
         let contacts = |center, rotation, delta: DVec3, angular: DVec3| {
             let place = Transform::rotated(at(center, rotation), rotation);
             let mut impact = Impact::default();
-            let mut report = |hit: BoxContact| {
+            let mut report = |other, hit: BoxContact| {
                 let arm = hit.point - (center + delta * hit.fraction);
                 if delta == DVec3::ZERO || hit.depth > 0.0 || (delta + angular.cross(arm)).dot(hit.normal) < -1e-9 {
-                    impact.add(hit);
+                    impact.add(other, hit);
                 }
             };
             ship_collision_shapes(c, &world, solid, &others, place, delta, |b, place, delta, peer| {
@@ -477,12 +538,12 @@ impl Dim {
                     probes.set(probes.get() + 1);
                 }
                 match peer {
-                    None => crate::physics::rotated_contacts(c, &world, b, place, delta, &mut report),
-                    Some((other, body)) => {
+                    None => crate::physics::rotated_contacts(c, &world, b, place, delta, |hit| report(0, hit)),
+                    Some((id, other, body)) => {
                         crate::physics::rotated_contacts(c, &DeckCells(body), b, place, delta, |mut hit| {
                             hit.normal = other.vector_to_world(hit.normal);
                             hit.point = other.to_world(hit.point);
-                            report(hit);
+                            report(id, hit);
                         });
                     }
                 }
@@ -498,7 +559,7 @@ impl Dim {
                 }
                 match peer {
                     None => crate::physics::rotated_collides(c, &world, b, place),
-                    Some((_, body)) => crate::physics::rotated_collides(c, &DeckCells(body), b, place),
+                    Some((_, _, body)) => crate::physics::rotated_collides(c, &DeckCells(body), b, place),
                 }
             })
         };
@@ -513,7 +574,7 @@ impl Dim {
             let angle = spin * time;
             let pose = |f| (DQuat::from_scaled_axis(angle * f) * rotation).normalize();
             let mut hit = if delta.length_squared() > 1e-16 { contacts(moved, rotation, delta, angle) } else { None };
-            let mut fraction = hit.map_or(1.0, |h| h.fraction);
+            let mut fraction = hit.map_or(1.0, |(_, h)| h.fraction);
             if angle.length_squared() > 1e-16 && fraction > 0.0 {
                 let mut free = 0.0;
                 for t in [fraction * 0.5, fraction] {
@@ -536,13 +597,32 @@ impl Dim {
             }
             moved += delta * fraction;
             rotation = pose(fraction);
-            let Some(hit) = hit else { break };
+            let Some((other, hit)) = hit else { break };
             impacts += 1;
             let arm = hit.point - moved;
             let axis = arm.cross(hit.normal);
             let turn = rotation * ((rotation.conjugate() * axis) / hull.inertia);
             let normal_speed = (vel + spin.cross(arm)).dot(hit.normal);
             let impulse = (-normal_speed).max(0.0) / (hull.mass.recip() + axis.dot(turn));
+            if impulse > 0.0
+                && let Some(collisions) = collisions.as_mut()
+            {
+                let event = abi::ShipCollision {
+                    ship: id,
+                    other,
+                    point: hit.point.to_array().into(),
+                    normal: hit.normal.to_array().into(),
+                    speed: -normal_speed,
+                    impulse,
+                };
+                if let Some(last) = collisions.iter_mut().find(|e| e.other == other) {
+                    if impulse > last.impulse {
+                        *last = event;
+                    }
+                } else {
+                    collisions.push(event);
+                }
+            }
             vel += hit.normal * (impulse / hull.mass);
             spin += turn * impulse;
             moved += hit.normal * (hit.depth.clamp(0.0, 0.025) + 1e-5);
@@ -564,10 +644,10 @@ fn ship_collision_shapes(
     c: &Content,
     world: &CubeCells<'_>,
     solid: &[ColliderGroup],
-    others: &[(Transform, Aabb, &Space)],
+    others: &[(u64, Transform, Aabb, &Space)],
     place: Transform,
     delta: DVec3,
-    mut visit: impl FnMut(Aabb, Transform, DVec3, Option<(Transform, &Space)>) -> bool,
+    mut visit: impl FnMut(Aabb, Transform, DVec3, Option<(u64, Transform, &Space)>) -> bool,
 ) -> bool {
     for group in solid {
         let area = place.box_to_world(group.area).swept(delta);
@@ -577,16 +657,16 @@ fn ship_collision_shapes(
         {
             return true;
         }
-        for &(other, bounds, body) in others
+        for &(id, other, bounds, body) in others
             .iter()
-            .filter(|(_, bounds, _)| bounds.intersects(&area))
+            .filter(|(_, _, bounds, _)| bounds.intersects(&area))
         {
             let relative = place.relative_to(other);
             let moved = other.vector_to_local(delta);
             if group
                 .boxes
                 .iter()
-                .any(|&b| bounds.intersects(&place.box_to_world(b).swept(delta)) && visit(b, relative, moved, Some((other, body))))
+                .any(|&b| bounds.intersects(&place.box_to_world(b).swept(delta)) && visit(b, relative, moved, Some((id, other, body))))
             {
                 return true;
             }
@@ -598,28 +678,31 @@ fn ship_collision_shapes(
 #[derive(Default)]
 struct Impact {
     first: Option<BoxContact>,
+    other: u64,
     point_sum: DVec3,
     count: u32,
 }
 
 impl Impact {
-    fn add(&mut self, hit: BoxContact) {
+    fn add(&mut self, other: u64, hit: BoxContact) {
         let better = self.first.is_none_or(|old| {
             hit.fraction < old.fraction - 1e-5 || (hit.fraction - old.fraction).abs() <= 1e-5 && hit.depth > old.depth + 1e-4
         });
         if better {
-            *self = Self { first: Some(hit), point_sum: hit.point, count: 1 };
-        } else if self.first.is_some_and(|old| {
-            (hit.fraction - old.fraction).abs() <= 1e-5 && (hit.depth - old.depth).abs() <= 1e-4 && hit.normal.dot(old.normal) > 0.999
-        }) {
+            *self = Self { first: Some(hit), other, point_sum: hit.point, count: 1 };
+        } else if self.other == other
+            && self.first.is_some_and(|old| {
+                (hit.fraction - old.fraction).abs() <= 1e-5 && (hit.depth - old.depth).abs() <= 1e-4 && hit.normal.dot(old.normal) > 0.999
+            })
+        {
             self.point_sum += hit.point;
             self.count += 1;
         }
     }
 
-    fn contact(self) -> Option<BoxContact> {
+    fn contact(self) -> Option<(u64, BoxContact)> {
         self.first
-            .map(|hit| BoxContact { point: self.point_sum / self.count as f64, ..hit })
+            .map(|hit| (self.other, BoxContact { point: self.point_sum / self.count as f64, ..hit }))
     }
 }
 

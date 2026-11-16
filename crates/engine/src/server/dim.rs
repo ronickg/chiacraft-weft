@@ -611,7 +611,7 @@ impl Dim {
         self.entities.get(id).map(|e| (id, e.body_place()))
     }
 
-    pub(super) fn dry_volumes(&self) -> Vec<crate::physics::DryVolume<'_>> {
+    fn dry_volume_iter(&self) -> impl Iterator<Item = crate::physics::DryVolume<'_>> {
         self.bodies
             .iter()
             .filter(|(_, b)| !b.dry_boxes.is_empty())
@@ -619,7 +619,19 @@ impl Dim {
                 let place = self.entities.get(*id)?.body_place();
                 Some((place, b.dry_boxes.as_slice()))
             })
-            .collect()
+    }
+
+    pub(super) fn dry_volumes(&self) -> Vec<crate::physics::DryVolume<'_>> {
+        self.dry_volume_iter().collect()
+    }
+
+    pub(crate) fn observed_liquid_at(&self, c: &Content, pos: DVec3) -> Option<u16> {
+        let liquid = crate::physics::liquid_at(c, &*self.space, pos)?;
+        let dry = self.frame == 0
+            && self
+                .dry_volume_iter()
+                .any(|volume| crate::physics::inside_dry_volume(volume, pos));
+        (!dry).then_some(liquid)
     }
 
     pub fn has(&self, pos: IVec3) -> bool {
@@ -3048,9 +3060,8 @@ impl Dim {
 
     /// The surface of a liquid counts, not only the block it is in.
     pub fn head_in_liquid(&self, c: &Content, e: &super::entity::Entity) -> bool {
-        let dry = self.dry_volumes();
-        let seen = crate::physics::ObservedCells { cells: super::space::CubeCells(&self.space.cubes), dry: &dry };
-        crate::physics::liquid_at(c, &seen, e.pos + DVec3::Y * e.eye(c)).is_some()
+        self.observed_liquid_at(c, e.pos + DVec3::Y * e.eye(c))
+            .is_some()
     }
 
     /// The share of `part` of the cell at `pos` in `frame` an entity's mining does this tick, by

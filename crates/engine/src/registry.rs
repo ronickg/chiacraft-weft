@@ -477,6 +477,10 @@ pub struct Game {
     pub max_cramming: u32,
     /// Config id of `core:simulation_distance`.
     pub simulation_distance: u32,
+    /// Config IDs for ship motion.
+    pub ship_thrust: u32,
+    pub ship_water_drag: u32,
+    pub ship_max_speed: u32,
     /// (owner, component, system) in mod order.
     pub systems: Vec<(ModId, u32, Callback)>,
     /// `{if:name}` conditions mods answer.
@@ -1540,6 +1544,7 @@ pub const ENGINE_EVENTS: &[(&str, &str, u32)] = {
         (abi::action::INTERACT_ENTITY, abi::Interaction::SCHEMA, size_of::<abi::Interaction>() as u32),
         (abi::action::MOUNT, abi::Mounting::SCHEMA, size_of::<abi::Mounting>() as u32),
         (abi::action::DISMOUNT, abi::Mounting::SCHEMA, size_of::<abi::Mounting>() as u32),
+        (abi::event::SHIP_COLLISION, abi::ShipCollision::SCHEMA, size_of::<abi::ShipCollision>() as u32),
         (abi::action::ENTER_DIMENSION, abi::DimensionChange::SCHEMA, size_of::<abi::DimensionChange>() as u32),
         (abi::action::SPAWN, abi::Spawned::SCHEMA, size_of::<abi::Spawned>() as u32),
         (abi::event::ENTITY_REMOVED, abi::Removed::SCHEMA, size_of::<abi::Removed>() as u32),
@@ -2210,6 +2215,9 @@ pub fn freeze(
     g.keep_inventory = tables.1.ids(ek::CONFIG)["core:keep_inventory"];
     g.max_cramming = tables.1.ids(ek::CONFIG)["core:max_entity_cramming"];
     g.simulation_distance = tables.1.ids(ek::CONFIG)["core:simulation_distance"];
+    g.ship_thrust = tables.1.ids(ek::CONFIG)["core:ship_thrust"];
+    g.ship_water_drag = tables.1.ids(ek::CONFIG)["core:ship_water_drag"];
+    g.ship_max_speed = tables.1.ids(ek::CONFIG)["core:ship_max_speed"];
     (g.categories, _) = tables.bake(kind(ek::ENTITY_CATEGORY), ek::ENTITY_CATEGORY, mod_name, errors, |e, _| bake_category(e));
     for k in g
         .entities

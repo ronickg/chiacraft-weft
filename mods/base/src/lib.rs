@@ -12,6 +12,7 @@ mod doors;
 mod effects;
 mod items;
 mod mobs;
+mod music_player;
 mod player;
 mod recipes;
 mod redstone;
@@ -59,6 +60,7 @@ fn init(r: &mut Registry) {
     effects::register(r);
     redstone::register(r);
     assembly::register(r);
+    music_player::register(r);
     woodcutter::register(r);
     storage::register(r);
     target_info::register(r);

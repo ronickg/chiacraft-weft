@@ -1,6 +1,7 @@
 use crate::abi::{self, Str};
 use crate::abi::{BlockPos, Vec3};
 use crate::host;
+pub use abi::ShipControls;
 
 /// A dimension as seen from a callback. Only valid for the duration of that callback.
 #[derive(Clone, Copy)]
@@ -34,6 +35,12 @@ impl World {
         unsafe { (host().world_dimension)(self.raw) }
     }
 
+    /// The moving body whose local blocks this world view addresses, or `None` in the world frame.
+    pub fn frame(&self) -> Option<u64> {
+        let id = unsafe { (host().world_frame)(self.raw) };
+        (id != 0).then_some(id)
+    }
+
     /// False if the position is not loaded.
     pub fn set_block(&self, pos: impl Into<BlockPos>, state: u32) -> bool {
         let pos = pos.into();
@@ -63,6 +70,31 @@ impl World {
     pub fn assembly_select(&self, player: u64, cell: Option<BlockPos>, tool: bool) -> u32 {
         let cell = cell.as_ref().map_or(std::ptr::null(), std::ptr::from_ref);
         unsafe { (host().assembly_select)(self.raw, player, cell, tool as u8) }
+    }
+
+    /// Overrides the helm of an active ship. Each axis is clamped to -1..1; `None` gives control
+    /// back to the seated pilot. The override lasts until cleared or the ship is unloaded.
+    /// Returns false for a missing ship or non-finite input.
+    pub fn set_ship_controls(&self, ship: u64, input: Option<ShipControls>) -> bool {
+        let input = input.as_ref().map_or(std::ptr::null(), std::ptr::from_ref);
+        unsafe { (host().ship_controls)(self.raw, ship, input) != 0 }
+    }
+
+    /// Cells reached by water in the last ship step, in the coordinate system of `on_body`.
+    /// A dry ship returns an empty list, and an absent or disassembled ship returns `None`.
+    pub fn ship_flooded_cells(&self, ship: u64) -> Option<Vec<BlockPos>> {
+        let read = host().ship_flooded_cells;
+        let count = unsafe { read(self.raw, ship, std::ptr::null_mut(), 0) };
+        if count == usize::MAX {
+            return None;
+        }
+        let mut cells = Vec::with_capacity(count);
+        let written = unsafe { read(self.raw, ship, cells.as_mut_ptr(), count) };
+        if written > count {
+            return None;
+        }
+        unsafe { cells.set_len(written) };
+        Some(cells)
     }
 
     /// A moving body goes back into the world at the nearest whole block. What found its

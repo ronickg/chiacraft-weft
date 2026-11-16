@@ -349,6 +349,7 @@ impl World {
 
     /// Whether that point is under a liquid's surface, which a block that isn't full lies below
     /// its top: for what the block alone can't tell, like a head above shallow water.
+    /// World-space queries account for dry hulls; inside `on_body` this reads the body's own liquid cells.
     pub fn in_liquid(&self, pos: impl Into<Vec3>) -> bool {
         let pos = pos.into();
         unsafe { (host().in_liquid)(self.raw(), &pos) != 0 }

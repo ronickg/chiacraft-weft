@@ -67,7 +67,7 @@ pub enum Request {
     Screen(String),
     /// A mod's button was clicked: its callback (`UiArgs`) runs with the whole client API, like
     /// a frame hook, after the input is handled.
-    ModCall(weft_abi::ModId, weft_abi::Callback),
+    ModCall(weft_abi::ModId, weft_abi::Callback, u32),
     /// A mod's input or slider changed: its `on_change` with the text or value.
     ModChange(weft_abi::ModId, weft_abi::Callback, String, f32),
     /// A key for a mod's screen (`on_key`), by its settings name.
@@ -672,8 +672,22 @@ impl Running {
     }
 
     fn rebuild_all(&mut self) {
+        self.rebuild_screens(|_| true);
+        self.hud.invalidate();
+    }
+
+    fn rebuild_music_screens(&mut self) {
+        if self.screens.iter().any(|(_, ui)| ui.read_music) {
+            self.rebuild_screens(|ui| ui.read_music);
+        }
+    }
+
+    fn rebuild_screens(&mut self, rebuild: impl Fn(&Ui) -> bool) {
         let mut screens = std::mem::take(&mut self.screens);
         for (depth, (s, ui)) in screens.iter_mut().enumerate() {
+            if !rebuild(ui) {
+                continue;
+            }
             let (hover, focus) = (ui.hovered, ui.focused);
             let focus_id = focus
                 .and_then(|f| ui.nodes.get(f))
@@ -706,7 +720,6 @@ impl Running {
             }
         }
         self.screens = screens;
-        self.hud.invalidate();
         self.quads_dirty = true;
     }
 
@@ -939,9 +952,9 @@ impl Running {
                 }
                 Request::Rebuild => self.rebuild_all(),
                 Request::Sound(play) => self.ui_sounds.push(play),
-                Request::ModCall(owner, cb) => {
+                Request::ModCall(owner, cb, data) => {
                     let mut v = self.frame_view();
-                    let mut a = weft_abi::UiArgs { ui: std::ptr::null_mut(), client: v.raw() };
+                    let mut a = weft_abi::UiArgs { ui: std::ptr::null_mut(), client: v.raw(), data };
                     crate::host::invoke(owner, cb, &mut a);
                 }
                 Request::ModChange(owner, cb, text, value) => {
@@ -1323,7 +1336,7 @@ impl Running {
         let Some((_, ui)) = self.screens.last_mut() else { return UiCallbacks::default() };
         if self.input.pressed_button(0) {
             ui.pressed = hovered;
-            ui.focused = hovered.filter(|&h| matches!(ui.nodes[h].kind, Kind::Input { .. } | Kind::Slider { .. }));
+            ui.focused = hovered.filter(|&h| matches!(ui.nodes[h].kind, Kind::Input { .. } | Kind::Slider { enabled: true, .. }));
             ui.anchor = None;
             if let Some(f) = ui.focused
                 && let Some(at) = self.ui.caret_at(ui, f, cursor)
@@ -1374,7 +1387,7 @@ impl Running {
         if self.input.held_button(0) {
             if let Some(p) = ui.pressed {
                 let r = ui.nodes[p].rect;
-                if let Kind::Slider { value, on_change, .. } = &mut ui.nodes[p].kind {
+                if let Kind::Slider { value, on_change, enabled: true, .. } = &mut ui.nodes[p].kind {
                     let v = ((cursor.x - r.x) / r.w).clamp(0.0, 1.0);
                     if (v - *value).abs() > 1e-4 {
                         *value = v;
@@ -1384,7 +1397,7 @@ impl Running {
                 }
             }
         } else if let Some(p) = ui.pressed.take() {
-            if let Kind::Slider { value, on_release: Some(f), .. } = &ui.nodes[p].kind {
+            if let Kind::Slider { value, on_release: Some(f), enabled: true, .. } = &ui.nodes[p].kind {
                 slider.push((f.clone(), *value));
             }
             if Some(p) == hovered {
@@ -1427,7 +1440,7 @@ impl Running {
                         text_changed = Some((cb.clone(), value.clone()));
                     }
                 }
-            } else if let Kind::Slider { value, on_change, on_release, steps, step_value, .. } = &mut ui.nodes[f].kind {
+            } else if let Kind::Slider { value, on_change, on_release, steps, step_value, enabled: true, .. } = &mut ui.nodes[f].kind {
                 let by: f32 = [(KeyCode::ArrowLeft, -1.0), (KeyCode::ArrowRight, 1.0)]
                     .into_iter()
                     .filter(|(k, _)| self.input.pressed_or_repeated(Key::Code(*k)))
@@ -2296,9 +2309,22 @@ fn update_game(r: &mut Running, dt: f64, frame_start: Instant) {
 }
 
 fn play_sounds(r: &mut Running) {
+    let mut music_ended = false;
     if let Some(a) = &mut r.audio {
+        if let Some(g) = &mut r.game {
+            let cl = &mut g.client;
+            let pos = cl
+                .local_music
+                .source()
+                .and_then(|source| cl.music_source_position(source));
+            music_ended = cl.local_music.update(pos);
+        }
         let listener = r.game.as_ref().map(|g| g.client.listener());
-        a.update(&r.assets, listener.as_ref());
+        let local_playing = r
+            .game
+            .as_ref()
+            .is_some_and(|g| g.client.local_music.source().is_some());
+        a.update(&r.assets, listener.as_ref(), local_playing);
         if let Some(g) = &mut r.game {
             for p in g.client.sounds.drain(..) {
                 a.play(&r.assets, p);
@@ -2307,6 +2333,9 @@ fn play_sounds(r: &mut Running) {
         for p in r.ui_sounds.drain(..) {
             a.play(&r.assets, p);
         }
+    }
+    if music_ended {
+        r.rebuild_music_screens();
     }
 }
 

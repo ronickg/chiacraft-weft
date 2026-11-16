@@ -552,6 +552,7 @@ pub struct Client {
     conn: ClientConn,
     skin: Option<crate::net::Skin>,
     pub world: ClientWorld,
+    pub(crate) local_music: crate::audio::LocalMusic,
     pub render: WorldRenderer,
     pub entity_render: EntityRenderer,
     pub player: LocalPlayer,
@@ -758,6 +759,19 @@ impl LookOnce {
 }
 
 impl Client {
+    pub(crate) fn music_source_position(&self, source: weft_abi::MusicSource) -> Option<DVec3> {
+        if source.dimension != self.world.dim {
+            return None;
+        }
+        let p = crate::world::ivec(source.pos);
+        let center = p.as_dvec3() + DVec3::splat(0.5);
+        if source.frame == 0 {
+            return (self.world.block_or_air(p)? == source.state).then_some(center);
+        }
+        let body = self.entities.get(&source.frame)?;
+        (body.structure.as_ref()?.block_or_air(p)? == source.state).then(|| body.place_at(self.anim_tick()).to_world(center))
+    }
+
     pub fn toggle_gizmo(&mut self, group: &str) -> bool {
         let on = self.gizmos.toggle(group);
         self.send(ToServer::Gizmos(self.gizmos.enabled.clone()));
@@ -882,6 +896,7 @@ impl Client {
             conn,
             skin,
             world: ClientWorld::new(0),
+            local_music: crate::audio::LocalMusic::default(),
             render,
             entity_render,
             player: LocalPlayer {

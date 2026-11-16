@@ -146,6 +146,9 @@ pub static HOST: Host = Host {
     client_control: crate::app::api::client_set_player,
     client_op: crate::app::api::client_command,
     client_text: crate::app::api::client_text,
+    client_music: crate::app::api::client_music,
+    client_music_status: crate::app::api::client_music_status,
+    client_music_track: crate::app::api::client_music_track,
     client_command_reply: crate::app::api::client_command_reply,
     client_block_in: crate::app::api::client_block_in,
     client_cube_shown: crate::app::api::client_cube_shown,
@@ -220,11 +223,14 @@ pub static HOST: Host = Host {
     entity_kind_size,
     body_from_blocks,
     assembly_select,
+    ship_controls,
+    ship_flooded_cells,
     body_to_blocks,
     body_fall,
     push_blocks,
     world_enter_body,
     world_leave_body,
+    world_frame,
     body_move_to,
     signal_read_changed,
     dim_column,
@@ -611,6 +617,25 @@ unsafe extern "C" fn assembly_select(w: *mut abi::WorldCtx, player: u64, cell: *
     unsafe { dim(w).assembly_select(content(), player, cell.as_ref().map(|p| IVec3::from_array(p.to_array())), tool != 0) }
 }
 
+unsafe extern "C" fn ship_controls(w: *mut abi::WorldCtx, ship: u64, input: *const abi::ShipControls) -> u32 {
+    unsafe { dim(w).set_ship_controls(ship, input.as_ref().copied()) as u32 }
+}
+
+unsafe extern "C" fn ship_flooded_cells(w: *mut abi::WorldCtx, ship: u64, out: *mut abi::BlockPos, cap: usize) -> usize {
+    let Some(cells) = (unsafe { dim(w) }).ship_flooded_cells(ship) else { return usize::MAX };
+    if out.is_null() || cap == 0 {
+        return cells.count();
+    }
+    let mut count = 0;
+    for cell in cells {
+        if count < cap {
+            unsafe { out.add(count).write(cell.to_array().into()) };
+        }
+        count += 1;
+    }
+    count
+}
+
 unsafe extern "C" fn body_to_blocks(w: *mut abi::WorldCtx, entity: u64) {
     unsafe { dim(w).ask_put_down(entity) }
 }
@@ -621,6 +646,10 @@ unsafe extern "C" fn world_enter_body(w: *mut abi::WorldCtx, entity: u64) -> u32
 
 unsafe extern "C" fn world_leave_body(w: *mut abi::WorldCtx) {
     unsafe { dim(w).leave_frame() }
+}
+
+unsafe extern "C" fn world_frame(w: *mut abi::WorldCtx) -> u64 {
+    unsafe { dim(w).frame }
 }
 
 unsafe extern "C" fn push_blocks(w: *mut abi::WorldCtx, pos: *const abi::BlockPos, dir: u32) -> u32 {
@@ -918,8 +947,9 @@ unsafe extern "C" fn entity_attack(w: *mut abi::WorldCtx, attacker: u64, target:
 
 unsafe extern "C" fn in_liquid(w: *mut abi::WorldCtx, pos: *const abi::Vec3) -> u32 {
     unsafe {
-        let d = dim(w);
-        crate::physics::liquid_at(content(), &*d.space, crate::world::dvec(*pos)).is_some() as u32
+        dim(w)
+            .observed_liquid_at(content(), crate::world::dvec(*pos))
+            .is_some() as u32
     }
 }
 

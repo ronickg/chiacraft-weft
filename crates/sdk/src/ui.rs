@@ -269,6 +269,11 @@ impl S {
         self.flags |= abi::ui_flags::SCROLL;
         self
     }
+    /// Children scroll, with a narrow bar for a compact panel.
+    pub fn scroll_thin(mut self) -> S {
+        self.flags |= abi::ui_flags::SCROLL | abi::ui_flags::THIN_SCROLLBAR;
+        self
+    }
     /// Text on one line.
     pub fn no_wrap(mut self) -> S {
         self.flags |= abi::ui_flags::NO_WRAP;
@@ -285,7 +290,7 @@ impl S {
         self.scale = s;
         self
     }
-    /// A button that can't be pressed now.
+    /// A button or slider that can't be used now.
     pub fn disabled(mut self, yes: bool) -> S {
         if yes {
             self.flags |= abi::ui_flags::DISABLED;
@@ -641,12 +646,23 @@ impl Ui {
 
     /// A button whose label has arguments (`settings.gui_scale` with the scale).
     pub fn button_args(&mut self, key: &str, args: &[Arg], s: S, f: impl Fn(&ClientView) + Send + Sync + 'static) {
+        self.button_data(key, args, s, 0, move |c, _| f(c));
+    }
+
+    /// A button with an index or other small value passed to its callback.
+    pub fn button_data(&mut self, key: &str, args: &[Arg], s: S, data: u32, f: impl Fn(&ClientView, u32) + Send + Sync + 'static) {
+        self.button_content(s, data, f, |ui| ui.text_styled(S::column().class("button").no_wrap(), key, args));
+    }
+
+    /// A button with custom content and a small value passed to its callback.
+    pub fn button_content(&mut self, s: S, data: u32, f: impl Fn(&ClientView, u32) + Send + Sync + 'static, content: impl FnOnce(&mut Ui)) {
         let mut n = node(k::BUTTON, s);
-        n.on_click = callback(move |a: &mut abi::UiArgs| f(&ClientView { raw: a.client }));
+        n.data = data;
+        n.on_click = callback(move |a: &mut abi::UiArgs| f(&ClientView { raw: a.client }, a.data));
         if n.class.len == 0 {
             n.class = Str::new("button");
         }
-        self.with(n, |ui| ui.text_styled(S::column().class("button").no_wrap(), key, args));
+        self.with(n, content);
     }
 
     /// A one-line text field starting with `value` (at most `max` characters, 0 for any);
@@ -666,7 +682,30 @@ impl Ui {
         value: impl Fn(&ClientView) -> f32 + Send + Sync + 'static,
         on_change: impl Fn(&ClientView, f32) + Send + Sync + 'static,
     ) {
+        self.make_slider(s, value, on_change, false);
+    }
+
+    /// A slider whose bound value is committed once when the pointer is released.
+    pub fn slider_on_release(
+        &mut self,
+        s: S,
+        value: impl Fn(&ClientView) -> f32 + Send + Sync + 'static,
+        on_release: impl Fn(&ClientView, f32) + Send + Sync + 'static,
+    ) {
+        self.make_slider(s, value, on_release, true);
+    }
+
+    fn make_slider(
+        &mut self,
+        s: S,
+        value: impl Fn(&ClientView) -> f32 + Send + Sync + 'static,
+        on_change: impl Fn(&ClientView, f32) + Send + Sync + 'static,
+        release: bool,
+    ) {
         let mut n = node(k::SLIDER, s);
+        if release {
+            n.flags |= abi::ui_flags::SLIDER_RELEASE;
+        }
         n.bind = bind_cb(value);
         n.on_change = callback(move |a: &mut abi::UiChangeArgs| on_change(&ClientView { raw: a.client }, a.value));
         self.leaf(n)

@@ -4,16 +4,20 @@
 //! Music streams on its own track after quiet stretches. Without an audio device everything
 //! here does nothing.
 
-use std::time::{Duration, Instant};
+use std::{
+    path::{Path, PathBuf},
+    time::{Duration, Instant},
+};
 
 use glam::{DVec3, Quat};
 use kira::effect::filter::{FilterBuilder, FilterHandle};
 use kira::effect::reverb::ReverbBuilder;
 use kira::sound::static_sound::StaticSoundData;
 use kira::sound::streaming::{StreamingSoundData, StreamingSoundHandle};
-use kira::track::{SendTrackBuilder, SendTrackHandle, SpatialTrackBuilder, TrackBuilder, TrackHandle};
+use kira::track::{SendTrackBuilder, SendTrackHandle, SpatialTrackBuilder, SpatialTrackHandle, TrackBuilder, TrackHandle};
 use kira::{AudioManager, AudioManagerSettings, Decibels, DefaultBackend, Mix, Tween};
 use rustc_hash::FxHashMap;
+use weft_abi::{MusicSource, MusicStatus, Str, local_music as op};
 
 use crate::assets::Assets;
 use crate::content::content;
@@ -76,6 +80,170 @@ pub struct Audio {
     active: bool,
     /// Each category's volume setting id, then the master volume's, looked up once.
     volume_ids: Option<Vec<Option<u32>>>,
+}
+
+pub(crate) struct LocalMusic {
+    tracks: Vec<LocalTrack>,
+    volume: f32,
+    playing: Option<LocalPlayback>,
+    failed: Option<MusicSource>,
+}
+
+#[derive(PartialEq)]
+struct LocalTrack {
+    name: String,
+    stamp: (u64, Option<std::time::SystemTime>),
+    duration: f64,
+}
+
+struct LocalPlayback {
+    source: MusicSource,
+    name: String,
+    duration: f64,
+    paused: bool,
+    sound: StreamingSoundHandle<kira::sound::FromFileError>,
+    track: SpatialTrackHandle,
+}
+
+impl Default for LocalMusic {
+    fn default() -> Self {
+        Self { tracks: Vec::new(), volume: 1.0, playing: None, failed: None }
+    }
+}
+
+pub(crate) fn music_folder(run: &Path) -> PathBuf {
+    run.join("music")
+}
+
+impl LocalMusic {
+    pub fn refresh(&mut self, folder: &Path) -> std::io::Result<bool> {
+        std::fs::create_dir_all(folder)?;
+        let mut tracks: Vec<_> = std::fs::read_dir(folder)?
+            .flatten()
+            .filter_map(|entry| {
+                if !entry.file_type().ok()?.is_file() {
+                    return None;
+                }
+                let path = entry.path();
+                let format = path.extension()?.to_str()?;
+                if !["mp3", "flac", "ogg", "wav"]
+                    .iter()
+                    .any(|ext| format.eq_ignore_ascii_case(ext))
+                {
+                    return None;
+                }
+                let name = entry.file_name().into_string().ok()?;
+                let metadata = entry.metadata().ok()?;
+                let stamp = (metadata.len(), metadata.modified().ok());
+                let duration = self
+                    .tracks
+                    .binary_search_by(|track| track.name.cmp(&name))
+                    .ok()
+                    .map(|i| &self.tracks[i])
+                    .filter(|track| track.stamp == stamp)
+                    .map_or_else(
+                        || StreamingSoundData::from_file(&path).map_or(0.0, |data| data.duration().as_secs_f64()),
+                        |track| track.duration,
+                    );
+                Some(LocalTrack { name, stamp, duration })
+            })
+            .collect();
+        tracks.sort_unstable_by(|a, b| a.name.cmp(&b.name));
+        let changed = self.tracks != tracks;
+        self.tracks = tracks;
+        Ok(changed)
+    }
+
+    pub fn track(&self, index: u32) -> weft_abi::MusicTrack {
+        self.tracks
+            .get(index as usize)
+            .map_or(weft_abi::MusicTrack { file: Str::EMPTY, duration: 0.0 }, |track| weft_abi::MusicTrack {
+                file: Str::new(&track.name),
+                duration: track.duration,
+            })
+    }
+
+    pub fn status(&self, source: MusicSource) -> MusicStatus {
+        let empty = MusicStatus { track: Str::EMPTY, position: 0.0, duration: 0.0, volume: self.volume, state: op::STOPPED };
+        if self.failed == Some(source) {
+            return MusicStatus { state: op::ERROR, ..empty };
+        }
+        self.playing
+            .as_ref()
+            .filter(|p| p.source == source)
+            .map_or(empty, |p| MusicStatus {
+                track: Str::new(&p.name),
+                position: p.sound.position(),
+                duration: p.duration,
+                volume: self.volume,
+                state: if p.paused { op::PAUSED } else { op::PLAYING },
+            })
+    }
+
+    pub fn source(&self) -> Option<MusicSource> {
+        self.playing.as_ref().map(|p| p.source)
+    }
+
+    pub fn fail(&mut self, source: MusicSource) {
+        if self.source() == Some(source) {
+            self.playing = None;
+        }
+        self.failed = Some(source);
+    }
+
+    pub fn update(&mut self, position: Option<DVec3>) -> bool {
+        let Some(playback) = &mut self.playing else { return false };
+        if let Some(error) = playback.sound.pop_error() {
+            log::warn!("local music {}: {error}", playback.name);
+            self.failed = Some(playback.source);
+        } else if let Some(position) = position.filter(|_| playback.sound.state() != kira::sound::PlaybackState::Stopped) {
+            playback
+                .track
+                .set_position(position.as_vec3(), Tween::default());
+            return false;
+        }
+        self.playing = None;
+        true
+    }
+
+    pub fn control(&mut self, source: MusicSource, op: u32, value: f64) -> bool {
+        if op == op::VOLUME && value.is_finite() {
+            self.volume = value.clamp(0.0, 1.0) as f32;
+            if let Some(playback) = &mut self.playing {
+                playback
+                    .sound
+                    .set_volume(db(f64::from(self.volume)), Tween::default());
+            }
+            return true;
+        }
+        if op == op::STOP {
+            let failed = self.failed == Some(source);
+            if failed {
+                self.failed = None;
+            }
+            let active = self.playing.as_ref().is_some_and(|p| p.source == source);
+            if active {
+                self.playing = None;
+            }
+            return active || failed;
+        }
+        let Some(playback) = self.playing.as_mut().filter(|p| p.source == source) else { return false };
+        match op {
+            op::TOGGLE_PAUSE => {
+                if playback.paused {
+                    playback.sound.resume(Tween::default());
+                } else {
+                    playback.sound.pause(Tween::default());
+                }
+                playback.paused = !playback.paused;
+            }
+            op::SEEK if value.is_finite() => playback
+                .sound
+                .seek_to(playback.duration * value.clamp(0.0, 1.0)),
+            _ => return false,
+        }
+        true
+    }
 }
 
 fn sound_path(assets: &Assets, name: &str) -> Option<std::path::PathBuf> {
@@ -205,7 +373,7 @@ impl Audio {
     }
 
     /// Settings, listener, environment and music, once a frame.
-    pub fn update(&mut self, assets: &Assets, l: Option<&Listener>) {
+    pub fn update(&mut self, assets: &Assets, l: Option<&Listener>, local_playing: bool) {
         let ids = self.volume_ids.get_or_insert_with(|| {
             let mut ids: Vec<Option<u32>> = crate::content::content()
                 .game
@@ -252,8 +420,54 @@ impl Audio {
         self.listener
             .set_position(l.pos.as_vec3(), Tween::default());
         self.listener.set_orientation(orientation, Tween::default());
-        if self.active {
+        if self.active && !local_playing {
             self.music(assets, l);
+        }
+    }
+
+    pub(crate) fn start_local(&mut self, local: &mut LocalMusic, folder: &Path, source: MusicSource, pos: DVec3, name: &str) -> bool {
+        if local
+            .tracks
+            .binary_search_by(|track| track.name.as_str().cmp(name))
+            .is_err()
+        {
+            local.fail(source);
+            return false;
+        }
+        let result = (|| -> Result<LocalPlayback, String> {
+            let data = StreamingSoundData::from_file(folder.join(name)).map_err(|err| err.to_string())?;
+            let duration = data.duration().as_secs_f64();
+            let mut track = self.groups[crate::registry::MUSIC_CATEGORY as usize]
+                .add_spatial_sub_track(
+                    &self.listener,
+                    pos.as_vec3(),
+                    SpatialTrackBuilder::new()
+                        .distances((4.0, 48.0))
+                        .sound_capacity(1),
+                )
+                .map_err(|err| format!("{err:?}"))?;
+            let sound = track
+                .play(data.volume(db(f64::from(local.volume))))
+                .map_err(|err| err.to_string())?;
+            Ok(LocalPlayback { source, name: name.to_owned(), duration, paused: false, sound, track })
+        })();
+        match result {
+            Ok(playback) => {
+                if let Some(mut music) = self.music.take() {
+                    music.stop(Tween::default());
+                }
+                self.next_music = Instant::now() + Duration::from_secs(20);
+                self.played += 1;
+                local.failed = None;
+                local.playing = Some(playback);
+                log::debug!("local music: {name}");
+                true
+            }
+            Err(err) => {
+                log::warn!("local music {name}: {err}");
+                local.fail(source);
+                false
+            }
         }
     }
 

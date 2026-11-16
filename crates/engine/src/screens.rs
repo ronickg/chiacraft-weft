@@ -737,6 +737,7 @@ fn config_row(ui: &mut Ui, cx: &BuildCx, id: u32, d: &crate::config::ConfigDef, 
                 let definition = d.clone();
                 ui.add(
                     Kind::Slider {
+                        enabled: true,
                         value: 0.0,
                         bind: Box::new(move |_: &Ctx| definition.slider_position(crate::config::get(id))),
                         on_change,
