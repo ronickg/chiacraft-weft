@@ -485,6 +485,7 @@ impl Dim {
         let center = old.to_world(hull.center);
         let gravity = c.dims[self.id as usize].gravity as f64;
         let trace = crate::log::on(crate::log::Channel::Physics, log::Level::Debug);
+        let trace_contacts = crate::log::on(crate::log::Channel::Physics, log::Level::Trace);
         let water_started = trace.then(std::time::Instant::now);
         let (wet, moment) = hull.submerged(c, &world, solid, old, center);
         let water_time = water_started.map_or(0.0, |start| start.elapsed().as_secs_f64() * 1000.0);
@@ -604,6 +605,10 @@ impl Dim {
             let turn = rotation * ((rotation.conjugate() * axis) / hull.inertia);
             let normal_speed = (vel + spin.cross(arm)).dot(hit.normal);
             let impulse = (-normal_speed).max(0.0) / (hull.mass.recip() + axis.dot(turn));
+            if trace_contacts {
+                log::trace!(target: "physics", "ship {id} contact: other={other} fraction={fraction:.5} depth={:.5} normal={:?} point={:?} remaining={time:.5} impulse={impulse:.5}",
+                    hit.depth, hit.normal, hit.point);
+            }
             if impulse > 0.0
                 && let Some(collisions) = collisions.as_mut()
             {

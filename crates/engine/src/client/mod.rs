@@ -3171,8 +3171,10 @@ fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, 
             && d.when
                 .is_none_or(|w| crate::conditions::on_client(None, w, &ask))
     };
-    let fits =
-        |pose: Pose| p.noclip || !physics::collides(c, block, physics::Aabb::around(p.pos, hw - 1e-3, physics::posed(p.size, pose).height));
+    let fits = |pose: Pose| {
+        let dims = physics::posed(p.size, pose);
+        p.noclip || !physics::occupied(c, block, bodies, 0, physics::Aabb::around(p.pos, dims.half_width - 1e-3, dims.height))
+    };
     p.pose = Pose::choose(p.forced.map(|f| f.0), holds, fits);
     // Sprinting swims in a pose for it, lying down; in a liquid it is no use otherwise.
     let swimming = sprint && in_swim_liquid && p.pose.def().tilt != weft_abi::pose_tilt::UPRIGHT;
@@ -3196,7 +3198,7 @@ fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, 
     let wish = forward * fwd_in + right * side_in;
     let g = physics::gravity_per_tick(gravity) * p.moves.gravity;
 
-    let height = p.dims().height;
+    let physics::Dims { half_width: hw, height, .. } = p.dims();
     let before = p.pos;
 
     if p.flying || p.noclip {
