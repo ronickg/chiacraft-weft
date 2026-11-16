@@ -1261,6 +1261,7 @@ fn engine_game_modes() -> Vec<RawEntry> {
     };
     let flies = || modifier(abi::attribute::CAN_FLY, abi::step::ADD, 1.0);
     let spared = || modifier(abi::attribute::INVULNERABLE, abi::step::SET, 1.0);
+    let fireproof = || modifier(abi::attribute::BURNING_TIME, abi::step::SET, 0.0);
     use crate::tag_bits::game_mode as f;
     // Unseen by mobs outside survival; creative reaches further.
     let unseen = || modifier(abi::attribute::VISIBILITY, abi::step::MUL, 0.0);
@@ -1275,12 +1276,13 @@ fn engine_game_modes() -> Vec<RawEntry> {
                 unseen(),
                 flies(),
                 spared(),
+                fireproof(),
             ],
         ),
         mode(
             "core:spectator",
             &[f::ALWAYS_FLY, f::NOCLIP, f::NO_INTERACT, f::HIDDEN, f::NO_HUD, f::NO_COSTS],
-            vec![unseen(), flies(), spared()],
+            vec![unseen(), flies(), spared(), fireproof()],
         ),
     ]
 }

@@ -414,11 +414,16 @@ impl Dim {
                 )
             })
             .collect();
-        // A maximum that dropped (health boost ending) takes health down with it.
+        use crate::registry::attr;
         for (&id, a) in &attrs {
-            let max = a[crate::registry::attr::MAX_HEALTH as usize];
-            if let Some(e) = self.entities.get_mut(id).filter(|e| e.health > max) {
-                e.health = max;
+            if let Some(e) = self.entities.get_mut(id) {
+                let max = a[attr::MAX_HEALTH as usize];
+                if e.health > max {
+                    e.health = max;
+                }
+                if a[attr::BURNING_TIME as usize] == 0.0 {
+                    e.fire = 0;
+                }
             }
         }
         let Entities { list, comps, inventories, .. } = &mut self.entities;
