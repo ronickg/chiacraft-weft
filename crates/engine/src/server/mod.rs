@@ -1157,7 +1157,9 @@ impl Server {
         p.last_place = (None, pos);
         p.teleported = Some(pos);
         p.conn.send(ToClient::Teleport { dim: to, pos, frame });
-        if let Some(s) = storage {
+        if from != to as usize
+            && let Some(s) = storage
+        {
             let cols = s.lock().lod[to as usize]
                 .columns
                 .values()

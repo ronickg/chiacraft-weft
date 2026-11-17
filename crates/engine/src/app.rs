@@ -227,6 +227,7 @@ pub(crate) const CLIENT_COMMANDS: &[(&str, &str, fn(&mut Running, &crate::comman
 
 pub(crate) struct Running {
     gpu: Box<dyn Backend>,
+    cache_dir: PathBuf,
     /// Which of the game's renderers `gpu` is.
     renderer: &'static str,
     window: Arc<Window>,
@@ -505,6 +506,7 @@ impl App {
         let gpu_name = format!("{} ({})", gpu.device_name(), gpu.name());
         let mut r = Running {
             gpu,
+            cache_dir: self.opts.cache_dir.clone(),
             renderer,
             window,
             depth,
@@ -837,6 +839,7 @@ impl Running {
             &mut *self.gpu,
             &self.assets,
             &self.textures,
+            &self.cache_dir,
             client_conn,
             &crate::settings::name(),
             &key,
@@ -1059,6 +1062,7 @@ impl Running {
                             &mut *self.gpu,
                             &self.assets,
                             &self.textures,
+                            &self.cache_dir,
                             conn,
                             &crate::settings::name(),
                             &key,
@@ -2289,6 +2293,7 @@ fn reload_assets(r: &mut Running, opts: &Options) {
         g.client.wake_render.reload(&mut *r.gpu, &r.assets);
         g.client.sky.reload(&mut *r.gpu, &r.assets);
         g.client.world.remesh_all();
+        g.client.lod.reload();
         g.client
             .entities
             .values_mut()

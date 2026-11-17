@@ -610,7 +610,7 @@ pub struct Client {
     pub terrain: terrain::TerrainHandle,
     pub gpu_terrain: terrain_gpu::GpuTerrain,
     /// Distant terrain beyond the view.
-    lod: lod::Lod,
+    pub(crate) lod: lod::Lod,
     seed: u64,
     /// Resets sent to the terrain thread: batches of an older one are dropped.
     terrain_resets: u64,
@@ -880,6 +880,7 @@ impl Client {
         gpu: &mut dyn Backend,
         assets: &crate::assets::Assets,
         textures: &GameTextures,
+        cache_dir: &std::path::Path,
         mut conn: ClientConn,
         name: &str,
         key: &str,
@@ -977,7 +978,7 @@ impl Client {
             controller_edit: None,
             view_radius,
             terrain: terrain::spawn(gpu_tx, gpu_on.clone()),
-            lod: lod::Lod::new(gpu_terrain.lod_tx.clone()),
+            lod: lod::Lod::new(gpu_terrain.lod_tx.clone(), cache_dir.join("lod"), gpu_terrain.lod_shader),
             gpu_terrain,
             seed: 0,
             terrain_resets: 0,
@@ -3039,6 +3040,7 @@ impl Client {
         }
         let cam = self.render_camera();
         if self.joined {
+            let remaining = (self.budget * 2).saturating_sub(std::time::Duration::from_secs_f64(self.spent));
             self.lod.update(
                 gpu,
                 &mut self.render,
@@ -3048,6 +3050,7 @@ impl Client {
                 &cam,
                 (frame.width, frame.height),
                 self.view_radius,
+                self.budget.min(remaining),
             );
         }
         let mut scene = self.scene(&cam, frame);

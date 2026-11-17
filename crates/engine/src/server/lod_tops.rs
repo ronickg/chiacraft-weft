@@ -21,7 +21,7 @@ use crate::world::cube::index;
 
 /// One block's vertical run, inclusive, and the block light by it (`abi::light` without the sky,
 /// a byte a channel).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Span {
     pub bottom: i32,
     pub top: i32,
@@ -32,7 +32,7 @@ pub struct Span {
 /// A column that differs from the terrain: its ground's height, top block, the one under it and
 /// the light on it, and what stands above the ground. `top` `u32::MAX`: as the terrain says
 /// again; 0: the terrain's ground, only spans or light of its own.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct LodColumn {
     pub x: i32,
     pub z: i32,

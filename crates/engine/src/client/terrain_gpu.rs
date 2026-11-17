@@ -231,7 +231,7 @@ struct Slot {
     reading: [Option<Arc<Readback>>; 2],
     /// The same for distant terrain tiles (`lod`), read back right away (a few kilobytes each).
     lod_desc: Option<(BufferId, usize)>,
-    lod_desc_key: Option<(u32, u64)>,
+    lod_desc_key: Option<u64>,
     lod_jobs: Option<(BufferId, usize)>,
     lod_out: Option<(BufferId, usize)>,
     lod_flight: Vec<super::lod::LodJob>,
@@ -260,12 +260,12 @@ pub struct GpuTerrain {
     queue: VecDeque<Job>,
     /// Distant terrain tiles asked for (`lod::Lod`).
     pub lod_tx: Sender<super::lod::LodJob>,
+    pub lod_shader: Option<u64>,
     lod_rx: Receiver<super::lod::LodJob>,
     lod_queue: VecDeque<super::lod::LodJob>,
     slots: Vec<Slot>,
     /// (dim, seed) and its description, for cubes and for tiles.
     desc: Option<((u32, u64), Vec<i32>)>,
-    lod_desc: Option<((u32, u64), Vec<i32>)>,
     /// Set once the pipeline works: the terrain thread sends jobs here instead of to the CPU.
     pub on: Arc<AtomicBool>,
 }
@@ -301,13 +301,13 @@ impl GpuTerrain {
                 gpu.create_compute(&ComputeDesc { label, shader: &s, entry })
                     .map_err(|e| e.0)
             });
-            Ok((terrain?, lod?))
+            Ok((terrain?, lod?, s.hash))
         });
-        let (pipeline, lod_pipeline) = match pipelines {
-            Ok((p, l)) => (Some(p), Some(l)),
+        let (pipeline, lod_pipeline, lod_shader) = match pipelines {
+            Ok((p, l, hash)) => (Some(p), Some(l), Some(hash)),
             Err(e) => {
                 log::error!("terrain on the GPU unavailable, generating on the CPU: {e}");
-                (None, None)
+                (None, None, None)
             }
         };
         on.store(pipeline.is_some() && enabled(), Ordering::Relaxed);
@@ -318,11 +318,11 @@ impl GpuTerrain {
             rx,
             queue: VecDeque::new(),
             lod_tx,
+            lod_shader,
             lod_rx,
             lod_queue: VecDeque::new(),
             slots: Vec::new(),
             desc: None,
-            lod_desc: None,
             on,
         }
     }
@@ -373,29 +373,23 @@ impl GpuTerrain {
         }
         self.lod_queue.extend(self.lod_rx.try_iter());
         let Some(first) = self.lod_queue.front() else { return };
-        let key = (first.dim, first.seed);
-        if self.lod_desc.as_ref().is_none_or(|d| d.0 != key) {
-            let Some(words) = describe_lod(content(), key.0, key.1) else {
-                self.lod_queue.clear();
-                return;
-            };
-            self.lod_desc = Some((key, words));
-        }
-        let (_, words) = self.lod_desc.as_ref().unwrap();
+        let key = first.description().0;
         let mut batch = Vec::new();
         while batch.len() < LOD_BATCH
             && self
                 .lod_queue
                 .front()
-                .is_some_and(|j| (j.dim, j.seed) == key)
+                .is_some_and(|j| j.description().0 == key)
         {
             batch.push(self.lod_queue.pop_front().unwrap());
         }
         let mut jobs = vec![0i32; batch.len() * JOB_WORDS];
+        log::debug!(target: "load", "lod dispatch {} tiles", batch.len());
         for (i, j) in batch.iter().enumerate() {
             let o = j.key.origin();
             jobs[i * JOB_WORDS..i * JOB_WORDS + 3].copy_from_slice(&[o.x, o.y, j.key.level as i32]);
         }
+        let words = batch[0].description().1;
         let desc = sized(gpu, &mut s.lod_desc, words.len() * 4, usage::STORAGE | usage::HOST, "terrain lod desc");
         if s.lod_desc_key != Some(key) {
             gpu.mapped(desc)[..words.len() * 4].copy_from_slice(bytemuck::cast_slice(words));

@@ -309,6 +309,7 @@ pub struct WorldRenderer {
     /// and the heights they span; the ones to draw this frame; and the columns whose cubes show
     /// their ground (`Lod::mask`, half its width), where their pixels are left to the cubes.
     lod: FxHashMap<super::lod::TileKey, (Alloc, super::lod::Counts, (i32, i32))>,
+    lod_quads: usize,
     pub lod_draw: Vec<(super::lod::TileKey, f32)>,
     pub lod_half: u32,
     lod_mask: (BufferId, usize),
@@ -453,6 +454,7 @@ impl WorldRenderer {
             quad_pipes,
             lod_pipes,
             lod: FxHashMap::default(),
+            lod_quads: 0,
             lod_draw: Vec::new(),
             lod_half: 0,
             lod_mask: (gpu.create_buffer(4, usage::STORAGE, "lod mask"), 1),
@@ -645,6 +647,7 @@ impl WorldRenderer {
         self.table_only.clear();
         self.table.destroy(gpu);
         self.lod.clear();
+        self.lod_quads = 0;
         for (b, _) in self.faces.pages.drain(..).chain(self.quads.pages.drain(..)) {
             gpu.destroy_buffer(b);
         }
@@ -749,16 +752,16 @@ impl WorldRenderer {
         if quads.is_empty() {
             return;
         }
-        let mut used: Vec<u32> = quads
-            .iter()
-            .map(|q| q[1] & crate::gpu_layout::face::TEX_MASK)
-            .collect();
-        used.sort_unstable();
-        used.dedup();
-        textures.ensure_blocks(gpu, used);
+        textures.ensure_blocks(
+            gpu,
+            quads
+                .iter()
+                .map(|q| q[1] & crate::gpu_layout::face::TEX_MASK),
+        );
         let a = self.faces.alloc(gpu, quads.len() as u32);
         gpu.write_buffer(self.faces.pages[a.page as usize].0, a.offset as u64 * 16, bytemuck::cast_slice(quads));
         self.lod.insert(key, (a, counts, y));
+        self.lod_quads += quads.len();
     }
 
     /// The columns shown by cubes (`Lod::mask`).
@@ -772,17 +775,12 @@ impl WorldRenderer {
 
     /// Distant terrain tiles held and their quads.
     pub fn lod_counts(&self) -> (usize, usize) {
-        (
-            self.lod.len(),
-            self.lod
-                .values()
-                .map(|t| t.1.iter().flatten().sum::<u32>() as usize)
-                .sum(),
-        )
+        (self.lod.len(), self.lod_quads)
     }
 
     pub fn remove_lod(&mut self, key: super::lod::TileKey) {
         if let Some((a, _, _)) = self.lod.remove(&key) {
+            self.lod_quads -= a.len as usize;
             self.faces.free(a);
         }
     }
@@ -849,7 +847,7 @@ impl WorldRenderer {
             return;
         }
         // The textures it shows are loaded before it is drawn.
-        let mut used: Vec<u32> = mesh
+        let used = mesh
             .faces
             .iter()
             .flatten()
@@ -859,10 +857,7 @@ impl WorldRenderer {
                     .iter()
                     .flatten()
                     .map(|q| q[4] & crate::gpu_layout::face::TEX_MASK),
-            )
-            .collect();
-        used.sort_unstable();
-        used.dedup();
+            );
         textures.ensure_blocks(gpu, used);
         let face_counts = mesh.faces.each_ref().map(|v| {
             let mut n = [0u32; 6];
@@ -1018,18 +1013,23 @@ impl WorldRenderer {
         let pages = self.faces.pages.len().max(self.quads.pages.len()).max(1);
         // Opaque, cutout and upper layers' runs; translucent ones are sorted far to near over all
         // of them.
-        let nb = 8 * pages;
+        // CubeTable owns the world's opaque draws. Only moving structures can add CPU runs.
+        let nb = if frames.is_empty() { 0 } else { 8 * pages };
         let bucket = |d: &DrawRecord| (d.1 as usize * 2 + d.0 as usize) * pages + d.2 as usize;
-        let counts: Vec<Vec<u32>> = seen_parts
-            .par_iter()
-            .map(|p| {
-                let mut c = vec![0u32; nb];
-                for d in p.iter().filter(|d| d.1 != 2) {
-                    c[bucket(d)] += 1;
-                }
-                c
-            })
-            .collect();
+        let counts: Vec<Vec<u32>> = if nb == 0 {
+            Vec::new()
+        } else {
+            seen_parts
+                .par_iter()
+                .map(|p| {
+                    let mut c = vec![0u32; nb];
+                    for d in p.iter().filter(|d| d.1 != 2) {
+                        c[bucket(d)] += 1;
+                    }
+                    c
+                })
+                .collect()
+        };
         let mut totals = vec![0u32; nb];
         for c in &counts {
             for (t, v) in totals.iter_mut().zip(c) {
@@ -1162,16 +1162,18 @@ impl WorldRenderer {
                 std::ptr::copy_nonoverlapping(bytemuck::bytes_of(&a).as_ptr(), indirect.at(k as usize * 20), 20);
             }
         };
-        seen_parts
-            .par_iter()
-            .zip(starts.par_iter_mut())
-            .for_each(|(p, at)| {
-                for d in p.iter().filter(|d| d.1 != 2) {
-                    let b = bucket(d);
-                    put(at[b], d);
-                    at[b] += 1;
-                }
-            });
+        if opaque != 0 {
+            seen_parts
+                .par_iter()
+                .zip(starts.par_iter_mut())
+                .for_each(|(p, at)| {
+                    for d in p.iter().filter(|d| d.1 != 2) {
+                        let b = bucket(d);
+                        put(at[b], d);
+                        at[b] += 1;
+                    }
+                });
+        }
         for (j, d) in lod.iter().enumerate() {
             put(opaque + j as u32, d);
         }
