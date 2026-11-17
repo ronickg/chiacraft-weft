@@ -26,6 +26,43 @@ async fn pos_of(t: &T, id: &str) -> Result<[f64; 3], String> {
     v.try_into().map_err(|_| format!("entity #{id}: {line}"))
 }
 
+pub async fn spring_wire(t: T) -> R {
+    t.flat().await?;
+    let base = add(t.feet(), [0, 4, -5]);
+    let at = |p| add(base, p);
+    t.set(base, "base:linear_guide[facing=up]").await?;
+    for y in 1..=3 {
+        t.set(at([0, y, 0]), "base:guide_rail").await?;
+        t.set(at([-1, y, 0]), "base:redstone[east=true]").await?;
+    }
+    t.fill(at([0, 3, 1]), at([0, 3, 2]), "base:gold_block")
+        .await?;
+    t.set(at([-1, 3, 1]), "base:redstone[east=true]").await?;
+    t.set(at([-1, 3, 2]), "base:redstone_lamp").await?;
+    let (source, activation) = (at([-1, 0, 0]), at([1, 0, 0]));
+    t.set(source, "base:redstone_block").await?;
+    t.set(activation, "base:redstone_block").await?;
+    t.secs(1.2).await?;
+
+    let list = t
+        .op(&format!("near {} {} {} 8", base[0], base[1], base[2]))
+        .await?;
+    let body = list
+        .split_whitespace()
+        .find_map(|entry| entry.strip_suffix(":core:platform"))
+        .ok_or_else(|| format!("no guide carriage among {list}"))?;
+    let [_, y, _] = pos_of(&t, body).await?;
+    t.check(y >= f64::from(base[1] + 1) - 0.01 && y < f64::from(base[1] + 2), format!("the load compressed the guide: {y}"));
+    let lamp = format!("sblock {body} -1 0 1");
+    t.check(t.op(&lamp).await?.contains("power=on"), "dust powers the lamp across the compressed joint");
+
+    t.set(activation, "core:air").await?;
+    t.set(source, "core:air").await?;
+    t.secs(1.0).await?;
+    t.check(t.op(&lamp).await?.contains("power=off"), "without a source neither side keeps the other powered");
+    Ok(())
+}
+
 /// A chest on a flying structure is a chest: it keeps what is in it, opens, goes with the structure,
 /// is saved with it, and spills where it is when it breaks.
 pub async fn body_chest(t: T) -> R {

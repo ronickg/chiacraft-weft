@@ -65,11 +65,21 @@ impl World {
         unsafe { (host().body_from_blocks)(self.raw, &center, cells.as_ptr(), cells.len()) }
     }
 
-    /// Selects a boundary corner, previews or confirms connected blocks at a controller,
-    /// or uses a helm already in a body. See `abi::assembly_result` for the outcome.
+    /// Previews or confirms a controller's connected blocks, or uses a helm already in a body.
+    /// With `tool`, clicks away from a controller select opposite corners and `None` confirms
+    /// the selected volume. Without `tool`, `None` clears the selection.
+    /// See `abi::assembly_result` for the outcome.
     pub fn assembly_select(&self, player: u64, cell: Option<BlockPos>, tool: bool) -> u32 {
         let cell = cell.as_ref().map_or(std::ptr::null(), std::ptr::from_ref);
-        unsafe { (host().assembly_select)(self.raw, player, cell, tool as u8) }
+        let flags = if tool { abi::assembly_flags::TOOL } else { 0 };
+        unsafe { (host().assembly_select)(self.raw, player, cell, flags) }
+    }
+
+    /// Confirm the player's wand preview as a free body affected by gravity and buoyancy.
+    /// Returns an `abi::assembly_result` code, as with `assembly_select`.
+    pub fn assembly_confirm_physical(&self, player: u64) -> u32 {
+        let flags = abi::assembly_flags::TOOL | abi::assembly_flags::PHYSICS;
+        unsafe { (host().assembly_select)(self.raw, player, std::ptr::null(), flags) }
     }
 
     /// Overrides the helm of an active ship. Each axis is clamped to -1..1; `None` gives control

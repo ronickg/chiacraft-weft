@@ -17,6 +17,7 @@ pub type BlockTimer = (u64, [i32; 3], u32, Box<[u8]>);
 
 #[derive(Default)]
 pub struct Space {
+    pub(super) mass: std::sync::OnceLock<f64>,
     pub cubes: FxHashMap<IVec3, Arc<Cube>>,
     pub(super) scheduled: BinaryHeap<Reverse<BlockTimer>>,
     /// Next growth step of every growing block (the source of truth) and the queue ordering
@@ -68,6 +69,8 @@ pub struct Space {
     /// A moving structure's place among the world's cells: what counts as next to what.
     pub cell: Option<IVec3>,
     pub(super) projected_pose: Option<crate::physics::Transform>,
+    pub(super) junction_pose: Option<(crate::physics::Transform, bool)>,
+    pub(super) live_helm: Option<IVec3>,
     /// Keeps the occupied cells of a mount in order for its per-tick sweep.
     mounted_blocks: Option<Vec<(IVec3, u32)>>,
     colliders: OnceLock<BodyColliders>,
@@ -78,13 +81,19 @@ pub struct Space {
     pub in_touch: bool,
     /// Going to a whole block, to land there.
     pub(super) stopping: bool,
-    /// Floaters set it off: without any left it stops, as without power.
-    pub(super) floated: bool,
-    /// Where it was and which way it was going when it last looked at what is ahead.
-    pub(super) looked_from: Option<(IVec3, IVec3)>,
+    pub(super) floater_path: Option<FloaterPath>,
     /// A moving structure's block bounds (inclusive) and cubes to light again.
     pub bounds: Option<(IVec3, IVec3)>,
     pub relight: FxHashSet<IVec3>,
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct FloaterPath {
+    pub cell: IVec3,
+    pub direction: IVec3,
+    pub geometry: u64,
+    pub breaks: bool,
+    pub blocked: Option<IVec3>,
 }
 
 pub(super) struct BodyColliders {
@@ -330,6 +339,7 @@ impl Space {
     pub(super) fn geometry_changed(&mut self) {
         self.geometry_version = self.geometry_version.wrapping_add(1);
         self.colliders.take();
+        self.mass.take();
     }
 
     pub fn grow_bounds(&mut self, p: IVec3, state: u32) {

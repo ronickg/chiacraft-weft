@@ -150,7 +150,7 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     out.dist = length(pos.xyz);
     out.rel = pos.xyz;
     out.world_liquid = 0u;
-    out.uv = UVS[(c + ((w0 >> FACE_TURN_SHIFT) & FACE_TURN_MASK)) % 4u];
+    out.uv = UVS[(c + 4u - ((w0 >> FACE_TURN_SHIFT) & FACE_TURN_MASK)) % 4u];
     let tex_id = w1 & FACE_TEX_MASK;
     let fr = texture_frame(tex_id);
     out.size = fr.size;

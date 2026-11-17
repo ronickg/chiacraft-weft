@@ -158,6 +158,9 @@ impl Transform {
     pub fn relative_to(self, parent: Transform) -> Transform {
         Transform { origin: parent.to_local(self.origin), rotation: parent.rotation.conjugate() * self.rotation }
     }
+    pub fn in_frame(self, parent: Transform) -> Transform {
+        Transform { origin: parent.to_world(self.origin), rotation: (parent.rotation * self.rotation).normalize() }
+    }
     pub fn turn(self) -> weft_abi::Turn {
         let face = |v| {
             let v = self.vector_to_world(v);
@@ -524,15 +527,15 @@ impl<'a> Body<'a> {
     }
 
     /// Its solid boxes something with feet at `pos` could stand on, at most `reach` below the feet.
-    fn under(&self, c: &Content, pos: DVec3, half_width: f64, below: f64, above: f64, before: bool, mut f: impl FnMut(Aabb)) {
+    fn under(&self, c: &Content, pos: DVec3, half_width: f64, below: f64, above: f64, before: bool, mut f: impl FnMut(Aabb, f64)) {
         let area = Aabb {
             min: DVec3::new(pos.x - half_width, pos.y - below - 1e-3, pos.z - half_width),
             max: DVec3::new(pos.x + half_width, pos.y + above + 1e-3, pos.z + half_width),
         };
-        let mut look = |b: Aabb| {
+        let mut look = |b: Aabb, slip| {
             let inside = b.min.x < area.max.x && b.max.x > area.min.x && b.min.z < area.max.z && b.max.z > area.min.z;
             if inside && b.max.y <= area.max.y && b.max.y >= area.min.y {
-                f(b);
+                f(b, slip);
             }
             false
         };
@@ -545,12 +548,10 @@ impl<'a> Body<'a> {
                 if !place.box_to_world(bounds).intersects(&area) {
                     return;
                 }
-                let solid = |p: IVec3| {
-                    Some(blocks.block(p))
-                        .filter(|s| c.states[*s as usize].flags & bf::NOT_STOOD_ON == 0)
-                        .or(Some(crate::content::AIR))
-                };
-                each_solid(c, &solid, place.box_to_local(area), |b| {
+                each_solid_with_state(c, &BodyCells(blocks), place.box_to_local(area), |b, state| {
+                    if c.states[state as usize].flags & bf::NOT_STOOD_ON != 0 {
+                        return false;
+                    }
                     let mut world = place.box_to_world(b);
                     if place.rotation() != DQuat::IDENTITY {
                         let probe = Aabb::around(pos.with_y(area.max.y), half_width, 1e-3);
@@ -560,13 +561,14 @@ impl<'a> Body<'a> {
                         }
                         world.max.y = probe.min.y - hit.enter;
                     }
-                    look(world)
+                    look(world, c.states[state as usize].friction as f64)
                 });
             }
             _ => {
                 look(
                     self.aabb
                         .shifted(if before { -self.delta } else { DVec3::ZERO }),
+                    0.6,
                 );
             }
         }
@@ -575,20 +577,60 @@ impl<'a> Body<'a> {
     /// How much of it a box with feet at `pos` stands on.
     fn contact(&self, c: &Content, pos: DVec3, half_width: f64, reach: f64, before: bool) -> f64 {
         let mut area = 0.0;
-        self.under(c, pos, half_width, reach, 0.0, before, |b| {
-            let width = |lo: f64, hi: f64, at: f64| (hi.min(at + half_width) - lo.max(at - half_width)).max(0.0);
-            area += width(b.min.x, b.max.x, pos.x) * width(b.min.z, b.max.z, pos.z);
+        self.under(c, pos, half_width, reach, 0.0, before, |b, _| {
+            area += footprint_area(b, pos, half_width);
         });
         area
     }
 
     pub fn deck_height(&self, c: &Content, pos: DVec3, half_width: f64) -> Option<f64> {
         let mut top = None::<f64>;
-        self.under(c, pos, half_width, 0.45, 0.45, false, |b| {
+        self.under(c, pos, half_width, 0.45, 0.45, false, |b, _| {
             top = Some(top.map_or(b.max.y, |y| y.max(b.max.y)));
         });
         top
     }
+}
+
+fn footprint_area(b: Aabb, pos: DVec3, half_width: f64) -> f64 {
+    let width = |lo: f64, hi: f64, at: f64| (hi.min(at + half_width) - lo.max(at - half_width)).max(0.0);
+    width(b.min.x, b.max.x, pos.x) * width(b.min.z, b.max.z, pos.z)
+}
+
+fn ground_material(c: &Content, block: &impl Cells, bodies: &[Body<'_>], skip: u64, pos: DVec3, half_width: f64) -> f64 {
+    let mut top = None::<(f64, f64, f64)>;
+    let mut consider = |shape: Aabb, slip| {
+        let y = shape.max.y;
+        let area = footprint_area(shape, pos, half_width);
+        if area > 0.0 && top.is_none_or(|(height, coverage, _)| y > height + 1e-7 || (y - height).abs() <= 1e-7 && area > coverage) {
+            top = Some((y, area, slip));
+        }
+    };
+    let mut body_underfoot = false;
+    for b in bodies.iter().filter(|b| b.id != skip) {
+        b.under(c, pos, half_width, 0.0, 0.0, false, |shape, slip| {
+            body_underfoot = true;
+            consider(shape, slip);
+        });
+    }
+    if body_underfoot {
+        // At the junction with a deck the world can still be bearing most of the footprint.
+        let probe = Aabb::around(pos - DVec3::Y * 1e-3, half_width, 2e-3);
+        each_solid_with_state(c, block, probe, |shape, state| {
+            if shape.max.y >= probe.min.y && shape.max.y <= probe.max.y {
+                consider(shape, c.states[state as usize].friction as f64);
+            }
+            false
+        });
+    }
+    top.map_or_else(
+        || {
+            block
+                .main((pos - DVec3::Y * 0.5).floor().as_ivec3())
+                .map_or(0.6, |s| c.states[s as usize].friction as f64)
+        },
+        |(_, _, slip)| slip,
+    )
 }
 
 /// What a box stands on, given where its feet are against each body: the one it has most under it.
@@ -703,7 +745,7 @@ pub fn carried(
 ) -> Carried {
     let rode = ride(c, *pos, half_width, on_ground, support, bodies, skip);
     if rode.carry != DVec3::ZERO {
-        *pos = move_box_excluding(c, block, bodies, [skip, support.unwrap_or(0)], *pos, half_width, height, rode.carry, 0.0).pos;
+        *pos = move_box_excluding(c, block, bodies, [skip, support.unwrap_or(0)], *pos, half_width, height, rode.carry, 0.0, 0.0).pos;
     }
     let (shift, crushes) = push(c, *pos, half_width, height, bodies, skip, *support);
     let mut crushed = Vec::new();
@@ -822,6 +864,10 @@ pub fn push<'a>(
 /// as full blocks) until it returns true; true if it did. Nothing is collected: thousands of mobs
 /// move every tick.
 fn each_solid(c: &Content, block: &impl Cells, area: Aabb, mut f: impl FnMut(Aabb) -> bool) -> bool {
+    each_solid_with_state(c, block, area, |b, _| f(b))
+}
+
+fn each_solid_with_state(c: &Content, block: &impl Cells, area: Aabb, mut f: impl FnMut(Aabb, u32) -> bool) -> bool {
     // One extra layer below for collision boxes taller than a block (fences); everything else
     // stays inside its own block.
     let lo = area.min.floor().as_ivec3() - IVec3::Y;
@@ -833,7 +879,7 @@ fn each_solid(c: &Content, block: &impl Cells, area: Aabb, mut f: impl FnMut(Aab
                 let b = p.as_dvec3();
                 let full = Aabb { min: b, max: b + DVec3::ONE };
                 let Some((s, extras)) = block.cell(p) else {
-                    if f(full) {
+                    if f(full, crate::content::AIR) {
                         return true;
                     }
                     continue;
@@ -843,7 +889,7 @@ fn each_solid(c: &Content, block: &impl Cells, area: Aabb, mut f: impl FnMut(Aab
                 for s in std::iter::once(s).chain(extras.iter().copied()) {
                     for bx in &c.states[s as usize].collision {
                         let bx = bx.map(|v| v as f64);
-                        if f(Aabb { min: b + DVec3::new(bx[0], bx[1], bx[2]), max: b + DVec3::new(bx[3], bx[4], bx[5]) }) {
+                        if f(Aabb { min: b + DVec3::new(bx[0], bx[1], bx[2]), max: b + DVec3::new(bx[3], bx[4], bx[5]) }, s) {
                             return true;
                         }
                     }
@@ -975,7 +1021,7 @@ pub fn move_box_with(
     delta: DVec3,
     step_height: f64,
 ) -> MoveResult {
-    move_box_excluding(c, block, bodies, [skip, 0], pos, half_width, height, delta, step_height)
+    move_box_excluding(c, block, bodies, [skip, 0], pos, half_width, height, delta, step_height, 0.0)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -989,6 +1035,7 @@ fn move_box_excluding(
     height: f64,
     delta: DVec3,
     step_height: f64,
+    grip: f64,
 ) -> MoveResult {
     let start = Aabb::around(pos, half_width, height);
     let bodies = || bodies.iter().filter(|b| !skip.contains(&b.id));
@@ -1032,7 +1079,7 @@ fn move_box_excluding(
     let sweep = Sweep { aligned: &solids, structures: &body_shapes };
     let start = if has_structure { sweep.recover(start) } else { start };
     let travel = |from, wish| {
-        if has_structure { sweep.travel(from, wish) } else { axis_travel(&solids, from, wish) }
+        if has_structure { sweep.travel(from, wish, grip) } else { axis_travel(&solids, from, wish) }
     };
     let mut path = travel(start, delta);
     if step_height > 0.0 && (path.hit[0] || path.hit[2]) && delta.y <= 0.0 {
@@ -1437,12 +1484,7 @@ pub fn walk(
         })
         .map_or(1.0, |s| c.states[s as usize].drag as f64);
     // Never quite all of the speed kept, however slippery it is made.
-    let slip_at = |y: f64| {
-        let ground = block
-            .main(IVec3::new(feet.x, (y - 0.5).floor() as i32, feet.z))
-            .map_or(0.6, |s| c.states[s as usize].friction as f64);
-        (ground * f.moves.slip).min(0.999)
-    };
+    let slip = if on_ground { (ground_material(c, block, bodies, skip, *pos, f.half_width) * f.moves.slip).clamp(0.0, 0.999) } else { 1.0 };
     let accelerate = |vel: &mut DVec3, k: f64| {
         let len2 = ctl.wish.length_squared();
         if len2 > 1e-7 {
@@ -1465,8 +1507,7 @@ pub fn walk(
             }
         }
     } else {
-        let slip = slip_at(pos.y);
-        let accel = if on_ground { ctl.ground * (0.216 / (slip * slip * slip)) } else { ctl.air * f.moves.air };
+        let accel = if on_ground { ctl.ground * (0.216 / slip.max(0.1).powi(3)) } else { ctl.air * f.moves.air };
         if ctl.jump > 0.0 && on_ground {
             vel.y = ctl.jump;
             *vel += ctl.jump_boost;
@@ -1500,7 +1541,10 @@ pub fn walk(
         }
     }
     let before = *pos;
-    let move_by = |delta, step| move_box_with(c, block, bodies, skip, before, f.half_width, f.height, delta, step);
+    // Slipperiness is the retained speed. A quadratic conversion gives ordinary blocks
+    // static grip on a gentle slope while leaving nearly all of the slope force on ice.
+    let grip = 2.5 * (1.0 - slip).powi(2);
+    let move_by = |delta, step| move_box_excluding(c, block, bodies, [skip, 0], before, f.half_width, f.height, delta, step, grip);
     let step = if on_ground { f.moves.step } else { 0.0 };
     let travel = *vel;
     let mut r = move_by(travel, step);
@@ -1538,7 +1582,6 @@ pub fn walk(
             }
         }
     } else {
-        let slip = if on_ground { slip_at(before.y) } else { 1.0 };
         vel.y = falling_speed(vel.y, f.gravity);
         vel.x *= slip * 0.91;
         vel.z *= slip * 0.91;

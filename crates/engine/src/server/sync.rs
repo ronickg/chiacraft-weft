@@ -237,6 +237,10 @@ fn send_entities(
     (me, me_mode): (DVec3, GameMode),
 ) {
     let range2 = ((radius * 16) as f64).powi(2);
+    let mount = dim
+        .entity(p.entity)
+        .and_then(|e| e.vehicle)
+        .map(|(id, _)| id);
     let mut spawn = Vec::new();
     let mut visible = FxHashSet::default();
     for reg in &dim.regions {
@@ -252,8 +256,20 @@ fn send_entities(
             .filter(|e| e.seen(c) && e.id != p.entity && (!e.player || e.alive()))
             .filter(shown)
         {
-            if (e.pos - me).length_squared() > range2 {
-                continue;
+            if Some(e.id) != mount && (e.pos - me).length_squared() > range2 {
+                let near_body = reg
+                    .bodies
+                    .get(&e.id)
+                    .and_then(|b| b.bounds)
+                    .is_some_and(|(lo, hi)| {
+                        let bounds = e
+                            .body_place()
+                            .box_to_world(crate::physics::Aabb { min: lo.as_dvec3(), max: (hi + IVec3::ONE).as_dvec3() });
+                        (me - me.clamp(bounds.min, bounds.max)).length_squared() <= range2
+                    });
+                if !near_body {
+                    continue;
+                }
             }
             visible.insert(e.id);
             if !p.known.contains(&e.id) {

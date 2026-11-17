@@ -163,6 +163,7 @@ pub fn all() -> Vec<TestDef> {
         gameplay::respawn,
         bodies::skiff_blocks,
         bodies::body_chest,
+        bodies::spring_wire,
         bodies::body_sneak_edge,
         bodies::body_place,
         redstone::body_walking,

@@ -481,6 +481,8 @@ pub struct Game {
     pub ship_thrust: u32,
     pub ship_water_drag: u32,
     pub ship_max_speed: u32,
+    pub thrust_comp: u32,
+    pub guide_rail_comp: u32,
     /// (owner, component, system) in mod order.
     pub systems: Vec<(ModId, u32, Callback)>,
     /// `{if:name}` conditions mods answer.
@@ -736,6 +738,8 @@ fn engine_components() -> Vec<RawEntry> {
         (EFFECT, "bytes", own | cf::SAVE, Vec::new()),
         (FORCED_POSE, "bytes", own | shown, Vec::new()),
         (RIDING, "bytes", own | shown | cf::SAVE, Vec::new()),
+        (HELM, "bytes", shown | cf::SAVE, Vec::new()),
+        (crate::controller::SETTINGS, "bytes", cf::SAVE, Vec::new()),
         (STUCK, "bytes", shown, Vec::new()),
         (GAME_MODE, "u32", cf::SYNC_OWNER, vec![0; 4]),
         (PERMISSION, "u32", cf::SYNC_OWNER, vec![0; 4]),
@@ -1930,6 +1934,8 @@ pub const EFFECT: &str = "core:effect";
 pub const FORCED_POSE: &str = "core:forced_pose";
 /// What it rides and its seat; empty: nothing. Saved, and seen by everyone.
 pub const RIDING: &str = "core:riding";
+/// The active helm in the body's block coordinates.
+pub const HELM: &str = "core:helm";
 /// A projectile attached to an entity, placed on its model by the client.
 pub const STUCK: &str = "core:stuck";
 /// Entity component (stack list wire codec, synced to watchers): its kind's `SHOWN_SLOTS`.
@@ -1957,6 +1963,8 @@ pub struct FieldComps {
     pub effect: u32,
     pub forced: u32,
     pub riding: u32,
+    pub helm: u32,
+    pub controller: u32,
     pub stuck: u32,
     pub game_mode: u32,
     pub permission: u32,
@@ -2458,6 +2466,8 @@ fn freeze_entity_storage(
         }
     }
     g.energy = c.id(abi::comp::ENERGY).unwrap();
+    g.thrust_comp = c.id(abi::comp::block::THRUST).unwrap();
+    g.guide_rail_comp = c.id(abi::comp::block::GUIDE_RAIL).unwrap();
     g.modifiers_comp = c.id(MODIFIERS).unwrap();
     g.timers_comp = c.id(TIMERS).unwrap();
     g.name_comp = c.id(abi::comp::NAME).unwrap();
@@ -2483,6 +2493,8 @@ fn freeze_entity_storage(
         effect: id(EFFECT),
         forced: id(FORCED_POSE),
         riding: id(RIDING),
+        helm: id(HELM),
+        controller: id(crate::controller::SETTINGS),
         stuck: id(STUCK),
         game_mode: id(GAME_MODE),
         permission: id(PERMISSION),

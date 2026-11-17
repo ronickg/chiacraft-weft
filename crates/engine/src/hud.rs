@@ -24,6 +24,7 @@ enum Part {
     Hotbar,
     Effects,
     HeldName,
+    HelmKeys,
     Crosshair,
     PlayerList,
     Chat,
@@ -260,6 +261,7 @@ pub struct Hud {
     pub ui: Ui,
     revisions: Vec<u64>,
     key: Option<(bool, usize, [u32; 3], bool, bool, u32, u8, (i32, i32), (u32, u32, u8, bool), u64, (bool, [i32; 2], u64))>,
+    helm_held: u64,
     /// Player overrides from `config/hud.txt` by element name.
     layout: rustc_hash::FxHashMap<String, Placement>,
     file: std::path::PathBuf,
@@ -441,10 +443,13 @@ impl Hud {
             shown_steps,
             (touch, knob.round().as_ivec2().to_array(), crate::touch::generation()),
         );
-        if self.key == Some(key) {
+        let pilot = client.active_helm_pilot();
+        let helm_held = pilot.map_or(0, |p| p.held);
+        if self.key == Some(key) && self.helm_held == helm_held {
             return false;
         }
         self.key = Some(key);
+        self.helm_held = helm_held;
         let c = content();
         use weft_abi::hud_anchor as a;
         let mods_debug = mod_debug_groups();
@@ -471,6 +476,7 @@ impl Hud {
         let mut all: Vec<(String, String, i32, Part)> = vec![
             ("core:hotbar".into(), a::HOTBAR.into(), 0, Part::Hotbar),
             ("core:effects".into(), a::TOP_RIGHT.into(), 0, Part::Effects),
+            ("core:helm_keys".into(), a::TOP_RIGHT.into(), 1, Part::HelmKeys),
             ("core:held_name".into(), a::ABOVE_HOTBAR.into(), 0, Part::HeldName),
             ("core:crosshair".into(), CENTER.into(), 0, Part::Crosshair),
             ("core:player_list".into(), CENTER.into(), 2, Part::PlayerList),
@@ -555,6 +561,35 @@ impl Hud {
             }
             Part::HeldName if editing => drop(ui.text(text::rich(lang.get("hud.edit.sample_name"), lang, None), "label")),
             Part::HeldName => {}
+            Part::HelmKeys if helm_held != 0 => {
+                let pilot = pilot.unwrap();
+                ui.container(Style::default().align(align).gap(2.0), |ui| {
+                    for (face, slots) in pilot
+                        .profile
+                        .output
+                        .chunks_exact(crate::controller::BINDS_PER_FACE)
+                        .enumerate()
+                    {
+                        let keys = slots
+                            .iter()
+                            .enumerate()
+                            .filter_map(|(i, bind)| {
+                                let bit = 1 << (face * crate::controller::BINDS_PER_FACE + i);
+                                bind.filter(|_| pilot.held & bit != 0)
+                                    .map(|bind| format!("{} {}", crate::input::key_name(bind.key), bind.level))
+                            })
+                            .collect::<Vec<_>>();
+                        if !keys.is_empty() {
+                            let face = lang.get(crate::controller::FACE_LABELS[face]);
+                            let row = ui.text(text::rich(&format!("{face} · {}", keys.join("  ")), lang, None), "label");
+                            if let Some(text) = ui.text_mut(row) {
+                                text.wrap = false;
+                            }
+                        }
+                    }
+                });
+            }
+            Part::HelmKeys => {}
             Part::Hotbar if client.mode.has(crate::tag_bits::game_mode::NO_HUD) => {}
             Part::Hotbar => {
                 ui.container(Style::row().gap(0.0), |ui| {

@@ -88,7 +88,7 @@ impl Sweep<'_> {
             let delta = -hit.overlap_normal * (hit.depth + SKIN).min(budget);
             // The shortest separation from a tilted wall can point into the floor.
             // Constrain the correction by other solids and keep its lateral component.
-            let next = self.advance(area, delta, false).area;
+            let next = self.advance(area, delta, false, 0.0).area;
             let distance = (next.min - area.min).length();
             if distance < EPSILON {
                 break;
@@ -102,14 +102,15 @@ impl Sweep<'_> {
         area
     }
 
-    pub fn travel(&self, area: Aabb, delta: DVec3) -> Travel {
-        self.advance(area, delta, true)
+    pub fn travel(&self, area: Aabb, delta: DVec3, grip: f64) -> Travel {
+        self.advance(area, delta, true, grip)
     }
 
-    fn advance(&self, mut area: Aabb, delta: DVec3, overlaps: bool) -> Travel {
+    fn advance(&self, mut area: Aabb, delta: DVec3, overlaps: bool, grip: f64) -> Travel {
         let (mut planes, mut count) = ([DVec3::ZERO; CONTACTS], 0);
         let mut remaining = 1.0;
         let mut velocity = delta;
+        let mut wish = delta;
         let mut hit = [false; 3];
         let mut floor = false;
         for _ in 0..CONTACTS {
@@ -125,7 +126,14 @@ impl Sweep<'_> {
             area = area.shifted(motion * safe);
             remaining *= 1.0 - contact.fraction;
             let normal = contact.normal;
-            floor |= normal.y >= WALKABLE_Y && delta.y <= 0.0;
+            if normal.y >= WALKABLE_Y && delta.y <= 0.0 {
+                floor = true;
+                if grip > 0.0 {
+                    let slope = normal.with_y(0.0).length() / normal.y;
+                    let slide = if slope <= grip { 0.0 } else { 1.0 - grip / slope };
+                    wish.y = wish.y.max(delta.y * slide);
+                }
+            }
             if normal.y.abs() < WALKABLE_Y {
                 hit[0] |= normal.x.abs() > EPSILON;
                 hit[2] |= normal.z.abs() > EPSILON;
@@ -140,7 +148,7 @@ impl Sweep<'_> {
             }
             planes[count] = normal;
             count += 1;
-            velocity = clip(delta, &planes[..count]);
+            velocity = clip(wish, &planes[..count]);
         }
         Travel { area, velocity, hit, floor }
     }
@@ -213,7 +221,7 @@ mod tests {
         let sweep = Sweep { aligned: &[floor], structures: &[wall] };
         for sign in [-1.0, 1.0] {
             let wish = tangent * sign - normal * 0.6 - DVec3::Y * 0.08;
-            let travel = sweep.travel(body, wish);
+            let travel = sweep.travel(body, wish, 0.0);
             assert!(((travel.area.min - body.min).dot(tangent) - sign).abs() < 1e-4);
             assert!((travel.velocity.dot(tangent) - sign).abs() < 1e-6);
             assert!(travel.floor && travel.hit[0] && travel.hit[2]);
@@ -232,7 +240,7 @@ mod tests {
                 .near(recovered)
                 .all(|shape| shape.project::<false>(recovered, DVec3::ZERO).is_none())
         );
-        let moved = sweep.travel(body, -normal * 0.1);
+        let moved = sweep.travel(body, -normal * 0.1, 0.0);
         assert!((moved.area.min - body.min).dot(normal) >= -1e-7);
     }
 
@@ -260,7 +268,7 @@ mod tests {
         let deck = Aabb { min: DVec3::new(-1.0, 7.0, -1.0), max: DVec3::new(1.0, 8.0, 1.0) };
         let sweep = Sweep { aligned: &[], structures: &[Collider { bounds: deck, shape: RotatedBox::axis_aligned(deck) }] };
         let body = Aabb::around(DVec3::Y * 8.05, 0.3, 1.8);
-        let travel = sweep.travel(body, -DVec3::Y * 0.08);
+        let travel = sweep.travel(body, -DVec3::Y * 0.08, 0.0);
         assert!(travel.floor);
         let landed = sweep.floor(travel.area, 0.0).unwrap();
         assert!((landed.min.y - deck.max.y).abs() < EPSILON);
@@ -272,7 +280,7 @@ mod tests {
         let normal = -wall.shape.axes.x_axis;
         let start = Aabb::around(normal * 3.0, 0.3, 1.8);
         let sweep = Sweep { aligned: &[], structures: &[wall] };
-        let travel = sweep.travel(start, -normal * 8.0);
+        let travel = sweep.travel(start, -normal * 8.0, 0.0);
         assert!(travel.hit[0] && travel.hit[2]);
         assert!(travel.velocity.length_squared() < EPSILON * EPSILON);
         let feet = travel.area.min + DVec3::new(0.3, 0.0, 0.3);

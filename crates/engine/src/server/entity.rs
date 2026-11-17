@@ -69,6 +69,7 @@ pub struct Entity {
     pub mount: Option<Box<BodyMount>>,
     pub(super) assembly_edit: Option<Box<super::assembly::Edit>>,
     pub(super) ship: Option<Box<super::buoyancy::Ship>>,
+    pub(super) floater_driven: bool,
     pub frame_rotation: Option<Box<DQuat>>,
     /// A body that falls under its weight and is put down as blocks where it lands, whatever
     /// its kind would do otherwise (`World::body_fall`, every falling block).
@@ -110,6 +111,7 @@ pub struct Entity {
     pub stuck: Option<Stuck>,
     /// A player's actions held down, by key id, with the tick each went down at.
     pub keys: Vec<(u32, u64)>,
+    pub helm_pilot: Option<Box<crate::controller::Pilot>>,
 }
 
 /// Where a projectile sits stuck, where it is in the frame of what holds it, its yaw there,
@@ -179,6 +181,8 @@ pub enum Motion {
 
 #[derive(Clone, Copy)]
 pub struct BodyMount {
+    pub drive: Option<crate::controller::Drive>,
+    pub slide: Option<crate::controller::Slide>,
     pub block: IVec3,
     pub face: u8,
     pub angle: f64,
@@ -195,6 +199,28 @@ impl BodyMount {
     pub fn rotation_at(&self, angle: f64) -> DQuat {
         if angle == 0.0 { DQuat::IDENTITY } else { DQuat::from_axis_angle(crate::world::DIRS[self.face as usize].as_dvec3(), angle) }
     }
+
+    pub fn place_at(&self, angle: f64) -> physics::Transform {
+        if let Some(slide) = self.slide {
+            return self.slide_place(slide.length);
+        }
+        let pivot = (self.block + crate::world::DIRS[self.face as usize]).as_dvec3() + physics::Transform::FEET;
+        physics::Transform::rotated(pivot, self.rotation_at(angle))
+    }
+
+    pub fn slide_place(&self, length: f64) -> physics::Transform {
+        let dirs = &crate::world::DIRS;
+        let side = self.slide.map_or(IVec3::ZERO, |s| dirs[s.side as usize]);
+        physics::Transform::of((self.block + side).as_dvec3() + dirs[self.face as usize].as_dvec3() * length + physics::Transform::FEET)
+    }
+
+    pub fn wire_place(&self) -> (physics::Transform, bool) {
+        if let Some(slide) = self.slide {
+            (self.slide_place(slide.length.round()), true)
+        } else {
+            (self.place_at(self.last_grid), self.angle == self.last_grid)
+        }
+    }
 }
 
 impl Entity {
@@ -210,7 +236,15 @@ impl Entity {
     fn body_rotation(&self) -> Option<DQuat> {
         self.mount
             .as_ref()
-            .map(|m| m.rotation())
+            .map(|m| {
+                (self
+                    .frame_rotation
+                    .as_deref()
+                    .copied()
+                    .unwrap_or(DQuat::IDENTITY)
+                    * m.rotation())
+                .normalize()
+            })
             .or_else(|| self.ship.as_ref().map(|s| s.rotation))
             .or(self.frame_rotation.as_deref().copied())
     }
@@ -279,6 +313,7 @@ impl Entity {
             mount: None,
             assembly_edit: None,
             ship: None,
+            floater_driven: false,
             frame_rotation: None,
             falls: false,
             size: None,
@@ -300,6 +335,7 @@ impl Entity {
             projectile: false,
             stuck: None,
             keys: Vec::new(),
+            helm_pilot: None,
         }
     }
 
@@ -390,7 +426,12 @@ impl Entity {
     /// It comes and goes with the world's cube it is in: players have a file of their own, what is
     /// on a body goes with the body.
     pub fn saved_with_cube(&self) -> bool {
-        !self.removed && !self.player && self.block_frame() == 0
+        !self.removed && !self.player && self.structure_parent().is_none()
+    }
+
+    pub fn structure_parent(&self) -> Option<u64> {
+        self.frame
+            .filter(|_| self.anchor.is_some() || self.mount.is_some())
     }
 
     pub fn state(&self, c: &Content, max_health: f32) -> weft_abi::EntityState {
@@ -469,6 +510,21 @@ fn starting_value(c: &Content, kind: &crate::registry::EntityKind, comp: u32) ->
 }
 
 impl Entities {
+    pub(super) fn update_mount_pose(&mut self, id: u64) {
+        let Some((parent, local)) = self.get(id).and_then(|e| {
+            let mount = e.mount.as_ref()?;
+            Some((e.frame, mount.place_at(mount.angle)))
+        }) else {
+            return;
+        };
+        let parent = parent
+            .and_then(|f| self.get(f))
+            .map_or_else(physics::Transform::default, Entity::body_place);
+        if let Some(e) = self.get_mut(id) {
+            e.pos = local.in_frame(parent).position();
+            e.set_frame_rotation(parent.rotation());
+        }
+    }
     /// What is in its selected slot, whether it can do anything with it or not.
     pub fn in_selected_slot(&self, id: u64) -> weft_abi::ItemStack {
         self.get(id)
@@ -603,19 +659,33 @@ impl Entities {
 
     /// Who decides which region `e` is in: the body holding it, if it is a block on one.
     pub fn follows<'a>(&'a self, e: &'a Entity) -> &'a Entity {
-        e.frame
-            .filter(|_| e.anchor.is_some())
-            .and_then(|f| self.get(f))
-            .unwrap_or(e)
+        let mut root = e;
+        while let Some(parent) = root.structure_parent().and_then(|id| self.get(id)) {
+            root = parent;
+        }
+        root
     }
 
-    /// Block entities on body `id`.
-    pub fn on_body(&self, id: u64) -> Vec<u64> {
-        self.list
-            .iter()
-            .filter(|e| !e.removed && e.anchor.is_some() && e.frame == Some(id))
-            .map(|e| e.id)
-            .collect()
+    /// Each structure before its blocks and attached structures.
+    pub fn structure_tree(&self, roots: &[u64]) -> Vec<u64> {
+        if roots.is_empty() {
+            return Vec::new();
+        }
+        let mut children: FxHashMap<u64, Vec<u64>> = FxHashMap::default();
+        for e in self.list.iter().filter(|e| !e.removed) {
+            if let Some(parent) = e.structure_parent() {
+                children.entry(parent).or_default().push(e.id);
+            }
+        }
+        let mut pending: Vec<_> = roots.iter().rev().copied().collect();
+        let mut order = Vec::new();
+        while let Some(id) = pending.pop() {
+            order.push(id);
+            if let Some(attached) = children.remove(&id) {
+                pending.extend(attached.into_iter().rev());
+            }
+        }
+        order
     }
 
     /// Takes `id` out of the world for `why` (`abi::removal`).

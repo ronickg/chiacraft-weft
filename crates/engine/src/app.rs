@@ -69,7 +69,7 @@ pub enum Request {
     /// a frame hook, after the input is handled.
     ModCall(weft_abi::ModId, weft_abi::Callback, u32),
     /// A mod's input or slider changed: its `on_change` with the text or value.
-    ModChange(weft_abi::ModId, weft_abi::Callback, String, f32),
+    ModChange(weft_abi::ModId, weft_abi::Callback, String, f32, u32),
     /// A key for a mod's screen (`on_key`), by its settings name.
     ModKey(weft_abi::ModId, weft_abi::Callback, String),
     Close,
@@ -923,6 +923,24 @@ impl Running {
 
     /// Closes the top screen, and the menu it shows if it does.
     pub(crate) fn close_top(&mut self) {
+        let mut requests = Vec::new();
+        if let Some((screen, ui)) = self.screens.last_mut()
+            && let Some(action) = screen.close_action()
+        {
+            let close = action(&mut Ctx {
+                settings: &mut self.settings,
+                client: self.game.as_mut().map(|g| &mut g.client),
+                input: &self.input,
+                requests: &mut requests,
+                stats: &self.stats,
+                debug: self.debug,
+                top: Some(Top { screen: Some(&mut **screen), ui }),
+            });
+            if !close {
+                self.handle(requests);
+                return;
+            }
+        }
         if self.screens.last().is_some_and(|(s, _)| s.shows_menu()) {
             if let Some(g) = &mut self.game {
                 g.client.close_menu();
@@ -930,6 +948,7 @@ impl Running {
         }
         self.screens.pop();
         self.screens_gone();
+        self.handle(requests);
     }
 
     pub(crate) fn handle(&mut self, reqs: Vec<Request>) {
@@ -957,9 +976,9 @@ impl Running {
                     let mut a = weft_abi::UiArgs { ui: std::ptr::null_mut(), client: v.raw(), data };
                     crate::host::invoke(owner, cb, &mut a);
                 }
-                Request::ModChange(owner, cb, text, value) => {
+                Request::ModChange(owner, cb, text, value, handle) => {
                     let mut v = self.frame_view();
-                    let mut a = weft_abi::UiChangeArgs { client: v.raw(), text: weft_abi::Str::new(&text), value };
+                    let mut a = weft_abi::UiChangeArgs { client: v.raw(), text: weft_abi::Str::new(&text), value, handle };
                     crate::host::invoke(owner, cb, &mut a);
                 }
                 Request::ModKey(owner, cb, key) => {
@@ -1336,7 +1355,13 @@ impl Running {
         let Some((_, ui)) = self.screens.last_mut() else { return UiCallbacks::default() };
         if self.input.pressed_button(0) {
             ui.pressed = hovered;
-            ui.focused = hovered.filter(|&h| matches!(ui.nodes[h].kind, Kind::Input { .. } | Kind::Slider { enabled: true, .. }));
+            ui.focused = hovered.filter(|&h| matches!(ui.nodes[h].kind, Kind::Input { .. } | Kind::Slider(crate::ui::slider::Slider { enabled: true, .. })));
+            if let Some(h) = hovered {
+                let r = ui.nodes[h].rect;
+                if let Kind::Slider(s) = &mut ui.nodes[h].kind {
+                    s.begin(crate::ui::slider::Slider::value_at(cursor.x - r.x, r.w));
+                }
+            }
             ui.anchor = None;
             if let Some(f) = ui.focused
                 && let Some(at) = self.ui.caret_at(ui, f, cursor)
@@ -1387,18 +1412,17 @@ impl Running {
         if self.input.held_button(0) {
             if let Some(p) = ui.pressed {
                 let r = ui.nodes[p].rect;
-                if let Kind::Slider { value, on_change, enabled: true, .. } = &mut ui.nodes[p].kind {
-                    let v = ((cursor.x - r.x) / r.w).clamp(0.0, 1.0);
-                    if (v - *value).abs() > 1e-4 {
-                        *value = v;
-                        slider.push((on_change.clone(), v));
-                        self.quads_dirty = true;
-                    }
+                if let Kind::Slider(s) = &mut ui.nodes[p].kind
+                    && s.enabled
+                    && let Some((change, value)) = s.drag(crate::ui::slider::Slider::value_at(cursor.x - r.x, r.w))
+                {
+                    slider.extend(change.map(|f| (f, value)));
+                    self.quads_dirty = true;
                 }
             }
         } else if let Some(p) = ui.pressed.take() {
-            if let Kind::Slider { value, on_release: Some(f), enabled: true, .. } = &ui.nodes[p].kind {
-                slider.push((f.clone(), *value));
+            if let Kind::Slider(s) = &ui.nodes[p].kind && s.enabled && let Some(t) = s.thumbs.get(s.active) {
+                slider.extend(t.release.clone().map(|f| (f, t.value)));
             }
             if Some(p) == hovered {
                 if let Kind::Button { action, on_double, enabled: true, .. } = &ui.nodes[p].kind {
@@ -1440,20 +1464,23 @@ impl Running {
                         text_changed = Some((cb.clone(), value.clone()));
                     }
                 }
-            } else if let Kind::Slider { value, on_change, on_release, steps, step_value, enabled: true, .. } = &mut ui.nodes[f].kind {
+            } else if let Kind::Slider(s) = &mut ui.nodes[f].kind && s.enabled && ui.pressed != Some(f) {
+                if self.input.pressed_key(Key::Code(KeyCode::ArrowUp)) && s.active > 0 {
+                    s.active -= 1;
+                    self.quads_dirty = true;
+                }
+                if self.input.pressed_key(Key::Code(KeyCode::ArrowDown)) && s.active + 1 < s.thumbs.len() {
+                    s.active += 1;
+                    self.quads_dirty = true;
+                }
                 let by: f32 = [(KeyCode::ArrowLeft, -1.0), (KeyCode::ArrowRight, 1.0)]
                     .into_iter()
                     .filter(|(k, _)| self.input.pressed_or_repeated(Key::Code(*k)))
                     .map(|(_, by)| by)
                     .sum();
-                if by != 0.0 {
-                    let n = (*steps).max(1) as f32;
-                    let v = step_value
-                        .as_ref()
-                        .map_or_else(|| (((*value * n).round() + by) / n).clamp(0.0, 1.0), |step| step(*value, by).clamp(0.0, 1.0));
-                    *value = v;
-                    slider.push((on_change.clone(), v));
-                    slider.extend(on_release.clone().map(|f| (f, v)));
+                if by != 0.0 && let Some((change, value)) = s.nudge(by) {
+                    slider.extend(change.map(|f| (f, value)));
+                    slider.extend(s.thumbs[s.active].release.clone().map(|f| (f, value)));
                     self.quads_dirty = true;
                 }
             }
@@ -1793,15 +1820,7 @@ impl Running {
                             redraw = true;
                         }
                     }
-                    // One that applies when let go stays where it is dragged meanwhile.
-                    Kind::Slider { on_release: Some(_), .. } if held == Some(i) => {}
-                    Kind::Slider { bind, value, .. } => {
-                        let v = bind(&ctx);
-                        if v.is_finite() && (v - *value).abs() > 1e-4 {
-                            *value = v;
-                            redraw = true;
-                        }
-                    }
+                    Kind::Slider(s) => redraw |= s.poll(&ctx, held == Some(i)),
                     Kind::Item { bind, last } => {
                         let v = bind(&ctx);
                         if v != *last {
@@ -2347,6 +2366,7 @@ fn client_events(r: &mut Running) {
         .unwrap_or_default();
     for ev in events {
         match ev {
+            crate::client::ClientEvent::ControllerEdit => r.open(screens::engine(crate::controller::SCREEN)),
             crate::client::ClientEvent::OpenMenu => {
                 let kind = r
                     .game

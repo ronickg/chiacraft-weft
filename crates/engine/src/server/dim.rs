@@ -28,6 +28,18 @@ const ITEM_LIFETIME: u64 = crate::world::TPS as u64 * 60 * 5;
 pub const UNTOLD: u32 = u32::MAX;
 
 pub enum DimEvent {
+    Controller {
+        player: u64,
+        controller: u64,
+        face: u8,
+        data: Vec<u8>,
+    },
+    HelmProfile {
+        player: u64,
+        mount: u64,
+        controller: u64,
+        data: Vec<u8>,
+    },
     /// An entity started using an item that takes time (ticks, off hand), or stopped.
     Using {
         entity: u64,
@@ -1809,8 +1821,10 @@ impl Dim {
         self.tick_effects(c);
         self.source_modifiers(c);
         self.natural_spawns(c);
-        let (mut before_turn, landing) = self.advance_mounts(c);
-        self.advance_ships(c, &mut before_turn);
+        let children = self.mount_children();
+        let order = self.mount_order(&children);
+        let (mut before_turn, landing) = self.advance_mounts(c, &children, &order);
+        self.advance_ships(c, &mut before_turn, &children);
         self.tick_entities(c, &before_turn);
         for id in landing {
             self.land_mount(c, id);
@@ -1927,11 +1941,17 @@ impl Dim {
             .entities
             .list
             .iter()
-            .filter(|e| e.anchor.is_some() && e.frame.is_some_and(|f| !bodies.contains_key(&f)))
+            .filter(|e| {
+                e.structure_parent()
+                    .is_some_and(|f| !bodies.contains_key(&f))
+            })
             .map(|e| e.id)
             .collect();
-        for id in orphans {
-            self.entities.remove(id, UNTOLD);
+        if !orphans.is_empty() {
+            for id in self.entities.structure_tree(&orphans) {
+                self.entities.remove(id, UNTOLD);
+                self.bodies.remove(&id);
+            }
         }
         for b in self.bodies.values_mut() {
             b.signals.now = self.time;
@@ -2320,15 +2340,39 @@ impl Dim {
             .collect();
         let cubes = &self.space.cubes;
         let block = super::space::CubeCells(cubes);
-        // Solid bodies move first, in list order, so riders and whatever they run into see where
-        // they ended up; a body may ride one moved before it.
+        // Solid supports move before the bodies that ride them.
         let mut bodies: Vec<crate::physics::Body> = Vec::new();
         let body_blocks = &self.bodies;
-        for e in self.entities.list.iter_mut() {
-            let k = &c.game.entities[e.kind as usize];
-            if e.removed || e.player || !k.is(ef::SOLID) {
-                continue;
+        let mut moving: Vec<_> = self
+            .entities
+            .list
+            .iter()
+            .filter(|e| !e.removed && !e.player && c.game.entities[e.kind as usize].is(ef::SOLID))
+            .map(|e| e.id)
+            .collect();
+        if !body_blocks.is_empty() {
+            let mut remaining: FxHashSet<_> = moving.iter().copied().collect();
+            let mut order = Vec::with_capacity(moving.len());
+            let mut branch = Vec::new();
+            for id in moving {
+                let mut parent = Some(id);
+                while let Some(id) = parent.filter(|id| remaining.remove(id)) {
+                    branch.push(id);
+                    parent = self.entities.get(id).and_then(|e| e.frame);
+                }
+                order.extend(branch.drain(..).rev());
             }
+            moving = order;
+        }
+        for id in moving {
+            if self
+                .entities
+                .get(id)
+                .is_some_and(|e| e.motion != Motion::Parked && e.mount.is_some())
+            {
+                self.entities.update_mount_pose(id);
+            }
+            let Some(e) = self.entities.get_mut(id) else { continue };
             let before = before_turn
                 .get(&e.id)
                 .copied()
@@ -3438,6 +3482,9 @@ impl Dim {
             }
             let item = self.entities.held(player).item;
             self.emit_engine(c, abi::action::USE_BLOCK, &abi::BlockChange { player, pos: p.to_array().into(), state, item });
+        }
+        if sneaking && self.edit_controller(c, p, state, face, player) {
+            return true;
         }
         if let Some(menu) = opens {
             // Its block entity's menu, or one of its own (a crafting table).

@@ -12,7 +12,7 @@ use weft_abi as abi;
 use super::dim::Dim;
 use super::entity::{BodyMount, Motion};
 use super::signal::{Moved, RiderMeets};
-use super::space::Space;
+use super::space::{CubeCells, FloaterPath, Space};
 use crate::content::{AIR, Content};
 use crate::physics::{Aabb, Transform};
 use crate::world::{cube_of, local_index};
@@ -26,10 +26,70 @@ const REST_TICKS: u8 = 2;
 const LINGER_TICKS: u8 = 2;
 
 /// A floater's speed: blocks a second per level of power.
-const SPEED_PER_LEVEL: f64 = 0.5;
+pub(super) const SPEED_PER_LEVEL: f64 = 0.5;
 /// However many floaters, on each axis: it looks one block ahead for each it comes to, so less
 /// than one a tick.
-const MOST_SPEED: f64 = 15.0;
+pub(super) const MOST_SPEED: f64 = 15.0;
+
+pub(super) fn is_guide_rail(c: &Content, state: u32) -> bool {
+    c.components
+        .has(crate::components::BLOCK, state, c.game.guide_rail_comp)
+}
+
+pub(super) fn guide_length(c: &Content, space: &Space, at: IVec3, axis: IVec3) -> i32 {
+    (1..=crate::controller::MAX_RAILS)
+        .take_while(|&n| {
+            space
+                .get(at + axis * n)
+                .is_some_and(|s| is_guide_rail(c, s))
+        })
+        .count() as i32
+}
+
+pub(super) struct MountedPart<'a> {
+    pub id: u64,
+    pub space: &'a Space,
+    pub relative: Transform,
+}
+
+pub(super) fn visit_structure_shapes(
+    c: &Content,
+    world: &CubeCells<'_>,
+    parts: &[MountedPart<'_>],
+    others: &[(u64, Transform, Aabb, &Space)],
+    place: Transform,
+    delta: DVec3,
+    mut visit: impl FnMut(u64, Aabb, Transform, DVec3, Option<(u64, Transform, &Space)>) -> bool,
+) -> bool {
+    for part in parts {
+        let place = part.relative.in_frame(place);
+        for group in &part.space.colliders(c).groups {
+            let area = place.box_to_world(group.area).swept(delta);
+            if world.may_collide(c, area)
+                && crate::physics::collides(c, world, area)
+                && group
+                    .boxes
+                    .iter()
+                    .any(|&b| visit(part.id, b, place, delta, None))
+            {
+                return true;
+            }
+            for &(id, other, bounds, body) in others
+                .iter()
+                .filter(|(_, _, bounds, _)| bounds.intersects(&area))
+            {
+                let relative = place.relative_to(other);
+                let moved = other.vector_to_local(delta);
+                if group.boxes.iter().any(|&b| {
+                    bounds.intersects(&place.box_to_world(b).swept(delta)) && visit(part.id, b, relative, moved, Some((id, other, body)))
+                }) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
 /// Radians per tick per signal level. Long arms also have a limit on tip travel.
 const TURN_PER_LEVEL: f64 = TAU / (8.0 * crate::world::TPS as f64 * 15.0);
 const TURN_PROBE_TRAVEL: f64 = 0.125;
@@ -49,7 +109,8 @@ pub struct FloaterPlan {
     pub floaters: Vec<IVec3>,
     pub cells: FxHashSet<IVec3>,
     pub broken: Vec<IVec3>,
-    mount: Option<(IVec3, u8, Option<Vec<Lifted>>)>,
+    mount: Option<(IVec3, u8)>,
+    lifted: Vec<Lifted>,
 }
 
 /// What `Dim::lift` takes: from where, to where in the body and where it is meant to end up, and
@@ -115,6 +176,9 @@ impl Dim {
     /// Takes the block at `p` out: nothing of it is broken, what is next to it just hears it is gone.
     /// What it has as an entity comes along, not attached to any place for now.
     pub fn take_block(&mut self, c: &'static Content, p: IVec3) -> Option<(u32, Option<u64>, Moved)> {
+        if !c.dims[self.id as usize].editable {
+            return None;
+        }
         let state = self.get(p)?;
         let entity = self.anchored(p);
         if let Some(id) = entity {
@@ -214,13 +278,35 @@ impl Dim {
         }
         // On a body itself, it goes with that.
         let on = (self.frame != 0).then_some(self.frame);
+        let place = Transform::of(at).in_frame(self.place);
         if let Some(e) = self.entities.get_mut(body) {
             e.frame = on;
+            e.pos = place.position();
             e.set_frame_rotation(self.place.rotation());
+        }
+        let moved: FxHashMap<_, _> = carried.iter().map(|b| (b.to, b.local)).collect();
+        let mut reparented = Vec::new();
+        for e in &mut self.entities.list {
+            if e.frame.unwrap_or(0) == self.frame
+                && e.motion != Motion::Parked
+                && let Some(mount) = e.mount.as_mut()
+                && let Some(&local) = moved.get(&mount.block)
+            {
+                self.space.signals.set_outside(e.id, Default::default());
+                e.frame = Some(body);
+                mount.block = local;
+                reparented.push(e.id);
+            }
+        }
+        for child in reparented {
+            self.entities.update_mount_pose(child);
+            if let Some(space) = self.bodies.get_mut(&child) {
+                space.junction_pose = None;
+            }
         }
         for b in &carried {
             if let Some(id) = b.entity {
-                let pos = crate::physics::Transform::of(self.place.to_world(at)).to_world(b.local.as_dvec3() + DVec3::splat(0.5));
+                let pos = place.to_world(b.local.as_dvec3() + DVec3::splat(0.5));
                 self.entities.attach(id, body, b.local, pos);
             }
         }
@@ -249,28 +335,29 @@ impl Dim {
         let mut held = Vec::new();
         let mut mounted = Vec::new();
         for p in floaters {
-            let Some(info) = self.get(p).map(|s| c.states[s as usize].signal) else { continue };
-            let moving_driver = info.kind != abi::signal_kind::BODY_MOUNT;
+            let Some(controller) = super::assembly::Controller::at(c, self, p) else { continue };
             let bounds = self.assembly_bounds(c, p);
-            let cells = if let Some(bounds) = bounds {
-                self.connected_assembly(c, p, Some(bounds)).ok()
-            } else {
-                self.attached_blocks(c, p, moving_driver)
-            };
-            let Some(cells) = cells.filter(|v| !v.is_empty()) else {
+            let Ok(cells) = self.assembly_blocks(c, Some(controller), bounds) else {
                 held.push(p);
                 continue;
             };
-            if !moving_driver {
-                let center = p + crate::world::DIRS[info.front as usize];
-                let lifted = bounds.map(|b| self.connected_lifted(c, p, center, cells.clone(), Some(b)));
-                let claims = lifted
-                    .as_ref()
-                    .map_or_else(|| cells.into_iter().collect(), |v| v.iter().map(|l| l.from).collect());
-                mounted.push(FloaterPlan { floaters: vec![p], cells: claims, broken: Vec::new(), mount: Some((p, info.front, lifted)) });
+            let lifted = self.assembly_lifted(c, Some(controller), controller.center(), &cells, bounds);
+            if lifted.len() > super::signal::BODY_LIMIT {
+                held.push(p);
                 continue;
             }
-            let mut plan = FloaterPlan { floaters: vec![p], cells: cells.into_iter().collect(), broken: Vec::new(), mount: None };
+            if !controller.floater {
+                let claims = lifted.iter().map(|l| l.from).collect();
+                mounted.push(FloaterPlan {
+                    floaters: vec![p],
+                    cells: claims,
+                    broken: Vec::new(),
+                    mount: Some((p, controller.face)),
+                    lifted,
+                });
+                continue;
+            }
+            let mut plan = FloaterPlan { floaters: vec![p], cells: cells.into_iter().collect(), broken: Vec::new(), mount: None, lifted };
             // It and those it shares a block with are one, whichever came first.
             let (joined, others): (Vec<FloaterPlan>, Vec<FloaterPlan>) = plans
                 .into_iter()
@@ -278,30 +365,58 @@ impl Dim {
             for o in joined {
                 plan.floaters.extend(o.floaters);
                 plan.cells.extend(o.cells);
+                plan.lifted.extend(o.lifted);
             }
             plans = others;
             plans.push(plan);
         }
         let mut going = Vec::new();
         for mut plan in plans {
+            plan.lifted
+                .sort_unstable_by_key(|l| (l.from.to_array(), l.part));
+            plan.lifted.dedup_by(|duplicate, first| {
+                if duplicate.from != first.from {
+                    return false;
+                }
+                if let (Some(a), Some(b)) = (first.part, duplicate.part) {
+                    if c.states[a as usize].signal.kind == abi::signal_kind::WIRE {
+                        first.part = Some(
+                            c.block_of(a)
+                                .with_sides(a, crate::wire::mask(c, a) | crate::wire::mask(c, b)),
+                        );
+                    }
+                }
+                true
+            });
+            if plan.lifted.len() > super::signal::BODY_LIMIT {
+                held.extend(plan.floaters);
+                continue;
+            }
             let steps = self.floaters_way(c, &plan.floaters);
             let ahead = (steps.0 != IVec3::ZERO)
-                .then(|| self.ahead_every_way(c, plan.cells.iter().copied(), &plan.cells, steps.0, steps.1))
+                .then(|| {
+                    self.ahead_every_way(c, plan.cells.iter().copied(), &plan.cells, steps.0, steps.1)
+                        .ok()
+                })
                 .flatten();
             match ahead {
                 Some(mut broken) => {
                     // What is fixed to them comes along, unless it can't.
                     let list: Vec<IVec3> = plan.cells.iter().copied().collect();
-                    let riders: FxHashSet<IVec3> = self
-                        .who_rides(c, &list, None, IVec3::ZERO)
-                        .0
-                        .into_iter()
-                        .map(|r| r.0)
+                    let riders: FxHashSet<IVec3> = plan
+                        .lifted
+                        .iter()
+                        .filter(|l| l.part.is_some())
+                        .map(|l| l.from)
                         .collect();
                     broken.retain(|b| !riders.contains(b));
                     broken.extend(ways(steps.0).flat_map(|step| self.who_rides(c, &list, None, step).1));
                     broken.sort_unstable_by_key(|b| b.to_array());
                     broken.dedup();
+                    plan.lifted
+                        .retain(|l| l.part.is_none() || !broken.contains(&l.from));
+                    plan.cells
+                        .extend(riders.into_iter().filter(|p| !broken.contains(p)));
                     plan.broken = broken;
                     going.push(plan);
                 }
@@ -334,17 +449,29 @@ impl Dim {
 
     /// Off with them.
     pub(super) fn run_floater_plan(&mut self, c: &'static Content, plan: FloaterPlan) {
-        if let Some((block, face, lifted)) = plan.mount {
-            let center = block + crate::world::DIRS[face as usize];
-            let live = if lifted.is_some() { Liveness::Assembly } else { Liveness::Free };
-            let cells = lifted.unwrap_or_else(|| self.with_riders(c, center, plan.cells.into_iter().collect()));
-            let (body, _) = self.lift(c, c.game.platform_kind, center.as_dvec3() + Transform::FEET, cells, &[], live);
+        if let Some((block, face)) = plan.mount {
+            let Some(ctrl) = super::assembly::Controller::at(c, self, block) else { return };
+            let center = ctrl.center();
+            if ctrl.face != face || plan.lifted.iter().any(|l| l.from - l.local != center) {
+                return;
+            }
+            let (body, _) = self.lift(c, c.game.platform_kind, center.as_dvec3() + Transform::FEET, plan.lifted, &[], Liveness::Assembly);
             if let Some(e) = self.entities.get_mut(body) {
-                e.mount = Some(Box::new(BodyMount { block, face, speed: 1, angle: 0.0, last_grid: 0.0, stop: None }));
+                e.mount = Some(Box::new(BodyMount {
+                    block,
+                    face,
+                    speed: 1,
+                    angle: 0.0,
+                    last_grid: 0.0,
+                    stop: None,
+                    drive: None,
+                    slide: ctrl.slide,
+                }));
             }
             if let Some(space) = self.bodies.get_mut(&body) {
                 space.track_mounted_blocks();
             }
+            self.entities.update_mount_pose(body);
             self.floater_shows(c, block, 1);
             return;
         }
@@ -356,10 +483,13 @@ impl Dim {
             .min_by_key(|p| p.to_array())
             .unwrap_or(IVec3::ZERO);
         log::debug!("floaters at {:?} set off with {} blocks", plan.floaters, plan.cells.len());
-        let cells = self.with_riders(c, center, plan.cells.into_iter().collect());
-        let (id, _) = self.lift(c, c.game.platform_kind, center.as_dvec3() + DVec3::new(0.5, 0.0, 0.5), cells, &[], Liveness::Free);
-        if let Some(b) = self.bodies.get_mut(&id) {
-            b.floated = true;
+        let cells = plan
+            .lifted
+            .into_iter()
+            .map(|l| Lifted { local: l.from - center, ..l });
+        let (id, _) = self.lift(c, c.game.platform_kind, center.as_dvec3() + Transform::FEET, cells, &[], Liveness::Assembly);
+        if let Some(e) = self.entities.get_mut(id) {
+            e.floater_driven = true;
         }
     }
 
@@ -371,16 +501,16 @@ impl Dim {
         own: &FxHashSet<IVec3>,
         sign: IVec3,
         breaks: bool,
-    ) -> Option<Vec<IVec3>> {
+    ) -> Result<Vec<IVec3>, IVec3> {
         let mut out = Vec::new();
         for step in ways(sign) {
             out.extend(self.what_is_ahead(c, cells.clone(), own, step, breaks)?);
         }
-        Some(out)
+        Ok(out)
     }
 
     /// What is in the way of `cells`, whichever of them `own` has not one step along `step`:
-    /// what they break going on. `None`: it can't go on, or there is no telling.
+    /// What they break, or the first blocked or unloaded cell.
     fn what_is_ahead(
         &self,
         c: &Content,
@@ -388,24 +518,24 @@ impl Dim {
         own: &FxHashSet<IVec3>,
         step: IVec3,
         breaks: bool,
-    ) -> Option<Vec<IVec3>> {
+    ) -> Result<Vec<IVec3>, IVec3> {
         let mut out = Vec::new();
         for at in cells {
             let n = at + step;
             if own.contains(&n) {
                 continue;
             }
-            let s = self.get(n)?;
+            let s = self.get(n).ok_or(n)?;
             let info = &c.states[s as usize];
             if s == AIR || info.liquid.is_some() {
                 continue;
             }
             if info.solid() && (!breaks || info.hardness < 0.0) {
-                return None;
+                return Err(n);
             }
             out.push(n);
         }
-        Some(out)
+        Ok(out)
     }
 
     pub(super) fn break_for_body(&mut self, c: &'static Content, cells: Vec<IVec3>) {
@@ -418,24 +548,88 @@ impl Dim {
     }
 
     pub(super) fn has_mount(&self, at: IVec3) -> bool {
-        self.bodies.keys().any(|&id| {
-            self.entities
-                .get(id)
-                .is_some_and(|e| e.motion != Motion::Parked && e.mount.as_ref().is_some_and(|m| m.block == at))
+        self.mount_at(at).is_some()
+    }
+
+    pub(super) fn mount_at(&self, at: IVec3) -> Option<u64> {
+        self.bodies.keys().copied().find(|&id| {
+            self.entities.get(id).is_some_and(|e| {
+                e.motion != Motion::Parked && e.frame.unwrap_or(0) == self.frame && e.mount.as_ref().is_some_and(|m| m.block == at)
+            })
         })
     }
 
-    pub(super) fn advance_mounts(&mut self, c: &Content) -> (FxHashMap<u64, Transform>, Vec<u64>) {
-        let mut before = FxHashMap::default();
-        let mut landing = Vec::new();
-        for &id in self.bodies.keys() {
-            let Some(e) = self.entities.get(id).filter(|e| e.motion != Motion::Parked) else { continue };
-            let Some(mut mount) = e.mount.as_deref().copied() else { continue };
-            if self.turn_body_mount(c, id, e.pos, &mut mount) {
-                landing.push(id);
+    pub(super) fn mount_children(&self) -> FxHashMap<u64, Vec<u64>> {
+        let mut children: FxHashMap<u64, Vec<u64>> = FxHashMap::default();
+        for e in &self.entities.list {
+            if !e.removed && e.motion != Motion::Parked && e.mount.is_some() {
+                children.entry(e.frame.unwrap_or(0)).or_default().push(e.id);
             }
-            if Some(mount.angle) != e.mount.as_ref().map(|m| m.angle) {
-                before.insert(id, e.body_place());
+        }
+        children
+    }
+
+    pub(super) fn mount_order(&self, children: &FxHashMap<u64, Vec<u64>>) -> Vec<u64> {
+        let mut order = children.get(&0).cloned().unwrap_or_default();
+        if children.is_empty() {
+            return order;
+        }
+        for e in &self.entities.list {
+            if !e.removed && e.mount.is_none() && self.bodies.contains_key(&e.id) {
+                order.extend(children.get(&e.id).into_iter().flatten().copied());
+            }
+        }
+        let mut i = 0;
+        while let Some(&id) = order.get(i) {
+            order.extend(children.get(&id).into_iter().flatten().copied());
+            i += 1;
+        }
+        order
+    }
+
+    pub(super) fn mounted_parts<'a>(&'a self, id: u64, pose: Transform, children: &FxHashMap<u64, Vec<u64>>) -> Vec<MountedPart<'a>> {
+        let mut parts = Vec::new();
+        let root = id;
+        let mut pending = vec![id];
+        while let Some(id) = pending.pop() {
+            let (Some(space), Some(e)) = (self.bodies.get(&id), self.entities.get(id)) else { continue };
+            let relative = if id == root { Transform::default() } else { e.body_place().relative_to(pose) };
+            parts.push(MountedPart { id, space, relative });
+            pending.extend(children.get(&id).into_iter().flatten().rev().copied());
+        }
+        parts
+    }
+
+    pub(super) fn advance_mounts(
+        &mut self,
+        c: &Content,
+        children: &FxHashMap<u64, Vec<u64>>,
+        order: &[u64],
+    ) -> (FxHashMap<u64, Transform>, Vec<u64>) {
+        let before = order
+            .iter()
+            .filter_map(|&id| self.entities.get(id).map(|e| (id, e.body_place())))
+            .collect();
+        for &id in order {
+            self.entities.update_mount_pose(id);
+        }
+        let mut landing = Vec::new();
+        for &id in order {
+            let Some(e) = self.entities.get(id) else { continue };
+            let Some(mut mount) = e.mount.as_deref().copied() else { continue };
+            let parent_id = e.frame.unwrap_or(0);
+            let parent = if parent_id == 0 { None } else { self.bodies.get(&parent_id) };
+            let pose = self
+                .entities
+                .get(parent_id)
+                .map_or_else(Transform::default, |e| e.body_place());
+            let old_place = mount.place_at(mount.angle);
+            if self.turn_body_mount(c, id, parent.map_or(&self.space, |s| s), parent_id != 0, pose, &mut mount, children) {
+                if children.contains_key(&id) {
+                    self.stop_mounted_children(id, children);
+                } else {
+                    landing.push(id);
+                }
             }
             if let Some(saved) = self
                 .entities
@@ -444,70 +638,161 @@ impl Dim {
             {
                 *saved = mount;
             }
+            if old_place != mount.place_at(mount.angle) {
+                self.entities.update_mount_pose(id);
+                let mut pending = children.get(&id).cloned().unwrap_or_default();
+                while let Some(child) = pending.pop() {
+                    self.entities.update_mount_pose(child);
+                    pending.extend(children.get(&child).into_iter().flatten().copied());
+                }
+            }
         }
-        landing.sort_unstable();
         (before, landing)
     }
 
+    pub(super) fn stop_mounted_children(&mut self, id: u64, children: &FxHashMap<u64, Vec<u64>>) {
+        let mut pending = children.get(&id).cloned().unwrap_or_default();
+        while let Some(child) = pending.pop() {
+            if let Some(space) = self.bodies.get_mut(&child) {
+                space.stopping = true;
+            }
+            pending.extend(children.get(&child).into_iter().flatten().copied());
+        }
+    }
+
     /// Advance before entity physics so riders see both poses of this tick.
-    fn turn_body_mount(&self, c: &Content, id: u64, pos: DVec3, mount: &mut BodyMount) -> bool {
+    fn turn_body_mount(
+        &self,
+        c: &Content,
+        id: u64,
+        parent: &Space,
+        nested: bool,
+        pose: Transform,
+        mount: &mut BodyMount,
+        children: &FxHashMap<u64, Vec<u64>>,
+    ) -> bool {
         let Some(body) = self.bodies.get(&id) else { return false };
         if body.bounds.is_none() {
             return true;
         }
-        let Some(state) = self.get(mount.block) else { return false };
+        let Some(state) = parent.get(mount.block).or(nested.then_some(AIR)) else { return false };
         let info = c.states[state as usize].signal;
         let valid = info.kind == abi::signal_kind::BODY_MOUNT && info.front == mount.face;
+        if mount.slide.is_some() {
+            let valid = valid && info.flags as u32 & abi::signal_flags::SLIDES != 0;
+            return self.step_slide(c, id, parent, nested, pose, mount, children, valid);
+        }
         let power = if valid {
-            let Some(power) = self.space.signals.level_into(mount.block) else { return false };
+            let Some(power) = parent.signals.level_into(mount.block) else { return false };
             power
         } else {
             0
         };
         let rotates = valid && info.flags as u32 & abi::signal_flags::ROTATES != 0;
+        let frame = self.entities.get(id).and_then(|e| e.frame).unwrap_or(0);
+        let program = rotates
+            .then(|| self.rotor_program(c, frame, mount.block))
+            .flatten();
+        let programmable = program.is_some();
+        let command = program
+            .and_then(|p| p.rule(power))
+            .filter(|_| !body.stopping);
+        let drive = command.map(|rule| {
+            mount
+                .drive
+                .filter(|d| d.rule == rule)
+                .unwrap_or_else(|| crate::controller::Drive::new(rule, mount.angle))
+        });
+        let releasing_drive = mount.drive.is_some() && drive.is_none();
+        mount.drive = drive;
+        let powered = if programmable { command.is_some() } else { power != 0 };
         let hold = rotates && info.flags as u32 & abi::signal_flags::HOLD != 0 && !body.stopping;
-        if hold {
+        if hold || drive.is_some() {
             mount.stop = None;
-            if power == 0 {
+            if !powered {
                 return false;
             }
         }
-        let stopping = body.stopping || power == 0;
+        let stopping = body.stopping || !powered;
         if !rotates && !stopping && mount.stop.is_none() {
             return false;
         }
         let next_grid = mount.last_grid + FRAC_PI_2;
         if stopping && mount.stop.is_none() {
-            mount.stop = Some(if mount.angle == mount.last_grid { mount.last_grid } else { next_grid });
+            mount.stop = Some(if releasing_drive || programmable {
+                let turns = mount.angle / FRAC_PI_2;
+                (if mount.angle < mount.last_grid { turns.floor() } else { turns.ceil() }) * FRAC_PI_2
+            } else if mount.angle == mount.last_grid {
+                mount.last_grid
+            } else {
+                next_grid
+            });
         }
-        if power > 0 && mount.stop.is_none() {
+        if powered && mount.stop.is_none() {
             mount.speed = power;
         }
-        let goal = mount.stop.unwrap_or(next_grid);
+        let goal = match drive {
+            Some(d) => match d.rule.motion {
+                crate::controller::Motion::Absolute | crate::controller::Motion::Relative => d.target,
+                crate::controller::Motion::Clockwise => mount.angle + FRAC_PI_2,
+                crate::controller::Motion::Counterclockwise => mount.angle - FRAC_PI_2,
+            },
+            None => mount.stop.unwrap_or(next_grid),
+        };
+        if drive.is_some() && mount.angle == goal {
+            return false;
+        }
         let blocks = body.block_snapshot();
         let initial = *mount;
-        let fits = |turn: f64| {
-            let place = Transform::rotated(pos, initial.rotation_at(turn));
-            self.mount_fits(c, place, &blocks)
-        };
+        let Some(current) = self.entities.get(id).map(|e| e.body_place()) else { return false };
+        let parts = self.mounted_parts(id, current, children);
+        let fits = |turn: f64| Self::mount_fits_in(c, parent, nested, initial.place_at(turn), &blocks);
         let axis = crate::world::DIRS[mount.face as usize].as_dvec3().abs();
-        let radius = body.bounds.map_or(1.0, |(lo, hi)| {
-            let far = lo.abs().max(hi.abs()).as_dvec3() + DVec3::splat(0.5);
-            (far * (DVec3::ONE - axis)).length().max(1.0)
-        });
-        let step = (TURN_PER_LEVEL * mount.speed as f64).min(2.0 * TURN_PROBE_TRAVEL / radius);
+        let radius = parts
+            .iter()
+            .filter_map(|part| {
+                let bounds = part.relative.box_to_world(part.space.colliders(c).bounds?);
+                let center = DVec3::splat(0.5);
+                let far = (bounds.min - center).abs().max((bounds.max - center).abs());
+                Some((far * (DVec3::ONE - axis)).length())
+            })
+            .fold(1.0, f64::max);
+        let speed = drive.map_or(TURN_PER_LEVEL * mount.speed.max(1) as f64, |d| f64::from(d.rule.speed).to_radians() * crate::world::TICK);
+        let step = speed.min(2.0 * TURN_PROBE_TRAVEL / radius);
+        if step == 0.0 {
+            return false;
+        }
         let diff = goal - mount.angle;
         let next = if diff.abs() <= step { goal } else { mount.angle + step.copysign(diff) };
-        let clear = |angle| self.mount_clear(c, id, Transform::rotated(pos, initial.rotation_at(angle)), body);
+        let clear = |angle| self.mount_clear(c, initial.place_at(angle).in_frame(pose), &parts);
         if mount.angle == goal && mount.stop.is_some() {
-            return clear(goal) && fits(goal);
+            if clear(goal) && fits(goal) {
+                return true;
+            }
+            mount.stop = Some(mount.last_grid);
+            return false;
         }
-        if !clear((mount.angle + next) * 0.5) || !clear(next) || next == goal && !fits(goal) {
-            if hold {
+        if !clear((mount.angle + next) * 0.5) || !clear(next) || drive.is_none() && next == goal && !fits(goal) {
+            if hold || drive.is_some() {
                 return false;
             }
             mount.stop = Some(mount.last_grid);
             return mount.angle == mount.last_grid && clear(mount.last_grid) && fits(mount.last_grid);
+        }
+        if let Some(mut d) = drive {
+            let grid = if next >= mount.angle { (next / FRAC_PI_2).floor() } else { (next / FRAC_PI_2).ceil() } * FRAC_PI_2;
+            if grid >= next.min(mount.angle) && grid <= next.max(mount.angle) && fits(grid) {
+                mount.last_grid = grid;
+            }
+            let shift = (next / TAU).trunc() * TAU;
+            d.target -= shift;
+            if matches!(d.rule.motion, crate::controller::Motion::Clockwise | crate::controller::Motion::Counterclockwise) {
+                d.target = next - shift;
+            }
+            mount.drive = Some(d);
+            mount.angle = next - shift;
+            mount.last_grid -= shift;
+            return false;
         }
         mount.angle = next;
         if next != goal {
@@ -521,55 +806,148 @@ impl Dim {
         false
     }
 
-    fn mount_clear(&self, c: &Content, id: u64, place: Transform, body: &Space) -> bool {
-        let colliders = body.colliders(c);
-        let Some(bounds) = colliders.bounds else { return true };
-        let hull = place.box_to_world(bounds);
-        let other_bodies: Vec<_> = self
-            .bodies
+    fn step_slide(
+        &self,
+        c: &Content,
+        id: u64,
+        parent: &Space,
+        nested: bool,
+        pose: Transform,
+        mount: &mut BodyMount,
+        children: &FxHashMap<u64, Vec<u64>>,
+        valid: bool,
+    ) -> bool {
+        let Some(mut slide) = mount.slide else { return false };
+        let Some(e) = self.entities.get(id) else { return false };
+        let Some(space) = self.bodies.get(&id) else { return false };
+        let axis = crate::world::DIRS[mount.face as usize];
+        let rail_end = if valid { guide_length(c, parent, mount.block, axis) } else { 0 };
+        let config = self.guide_settings(c, e.frame.unwrap_or(0), mount.block);
+        let stopping = space.stopping || rail_end == 0;
+        let parts = self.mounted_parts(id, e.body_place(), children);
+        let max = f64::from(config.max).min(f64::from(rail_end.max(1)));
+        let min = f64::from(config.min).min(max);
+        let place = mount.slide_place(slide.length).in_frame(pose);
+        let direction = pose.vector_to_world(axis.as_dvec3());
+        let current = slide.length;
+        let step = if stopping {
+            let goal = if rail_end > 0 { f64::from(rail_end) } else { slide.length.round() };
+            if current == goal {
+                let local = mount.slide_place(goal);
+                return Self::mount_fits_in(c, parent, nested, local, &space.block_snapshot()) && self.mount_clear(c, place, &parts);
+            }
+            (goal - current).clamp(-0.1, 0.1)
+        } else {
+            let dt = crate::world::TICK;
+            let mass: f64 = parts
+                .iter()
+                .map(|part| super::buoyancy::structure_mass(c, part.space))
+                .sum();
+            let parent_velocity = e
+                .frame
+                .and_then(|id| self.entities.get(id))
+                .map_or(DVec3::ZERO, |p| self.entities.follows(p).vel);
+            let acceleration = slide
+                .parent_velocity
+                .map_or(DVec3::ZERO, |old| (parent_velocity - old) / dt);
+            slide.parent_velocity = Some(parent_velocity);
+            let projected = (DVec3::NEG_Y * f64::from(c.dims[self.id as usize].gravity) - acceleration).dot(direction);
+            let rest = f64::from(config.rest).clamp(min, max);
+            let spring = f64::from(config.stiffness) / mass.max(0.01);
+            let damping = f64::from(config.damping) / mass.max(0.01);
+            // Integrate the spring implicitly so stiff settings remain stable at the tick rate.
+            slide.velocity = (slide.velocity + dt * (projected + spring * (rest - current))) / (1.0 + dt * damping + dt * dt * spring);
+            let limit = (current + slide.velocity * dt).clamp(min, max);
+            if limit != current + slide.velocity * dt {
+                slide.velocity = 0.0;
+            }
+            (limit - current).clamp(-TURN_PROBE_TRAVEL * 2.0, TURN_PROBE_TRAVEL * 2.0)
+        };
+        if step.abs() > 1e-8 {
+            let delta = direction * step;
+            let others = self.mount_obstacles(c, place, &parts, delta);
+            let world = CubeCells(&self.space.cubes);
+            let mut fraction = 1.0_f64;
+            visit_structure_shapes(c, &world, &parts, &others, place, delta, |_, shape, place, delta, peer| {
+                let mut contact = |hit: crate::physics::BoxContact| {
+                    if delta.dot(hit.normal) < -1e-9 {
+                        fraction = fraction.min(hit.fraction);
+                    }
+                };
+                if let Some((_, _, body)) = peer {
+                    crate::physics::rotated_contacts(c, &super::space::DeckCells(body), shape, place, delta, &mut contact);
+                } else {
+                    crate::physics::rotated_contacts(c, &world, shape, place, delta, &mut contact);
+                }
+                false
+            });
+            slide.length += step * fraction;
+            if fraction < 1.0 {
+                slide.velocity = 0.0;
+            }
+        }
+        mount.slide = Some(slide);
+        false
+    }
+
+    fn mount_obstacles<'a>(
+        &'a self,
+        c: &Content,
+        place: Transform,
+        parts: &[MountedPart<'_>],
+        delta: DVec3,
+    ) -> Vec<(u64, Transform, Aabb, &'a Space)> {
+        let moving: FxHashSet<_> = parts.iter().map(|p| p.id).collect();
+        let Some(envelope) = parts
+            .iter()
+            .filter_map(|p| {
+                Some(
+                    p.relative
+                        .in_frame(place)
+                        .box_to_world(p.space.colliders(c).bounds?),
+                )
+            })
+            .reduce(|a, b| Aabb { min: a.min.min(b.min), max: a.max.max(b.max) })
+        else {
+            return Vec::new();
+        };
+        let envelope = envelope.swept(delta);
+        self.bodies
             .iter()
             .filter_map(|(&other, space)| {
                 let e = self.entities.get(other)?;
-                if other == id || e.frame == Some(id) || e.motion == Motion::Parked {
+                if moving.contains(&other) || e.motion == Motion::Parked || e.removed {
                     return None;
                 }
                 let other = e.body_place();
                 let area = other.box_to_world(space.colliders(c).bounds?);
-                hull.intersects(&area)
-                    .then(|| (place.relative_to(other), area, super::space::DeckCells(space)))
+                envelope
+                    .intersects(&area)
+                    .then_some((e.id, other, area, &**space))
             })
-            .collect();
+            .collect()
+    }
+
+    fn mount_clear(&self, c: &Content, place: Transform, parts: &[MountedPart<'_>]) -> bool {
+        let other_bodies = self.mount_obstacles(c, place, parts, DVec3::ZERO);
         let world = super::space::CubeCells(&self.space.cubes);
-        colliders.groups.iter().all(|group| {
-            let area = place.box_to_world(group.area);
-            if world.may_collide(c, area)
-                && crate::physics::collides(c, &world, area)
-                && group
-                    .boxes
-                    .iter()
-                    .any(|&shape| crate::physics::rotated_collides(c, &world, shape, place))
-            {
-                return false;
-            }
-            other_bodies
-                .iter()
-                .filter(|(_, bounds, _)| bounds.intersects(&area))
-                .all(|(relative, bounds, deck)| {
-                    group.boxes.iter().all(|&shape| {
-                        !bounds.intersects(&place.box_to_world(shape)) || !crate::physics::rotated_collides(c, deck, shape, *relative)
-                    })
-                })
+        !visit_structure_shapes(c, &world, parts, &other_bodies, place, DVec3::ZERO, |_, shape, place, _, other| match other {
+            None => crate::physics::rotated_collides(c, &world, shape, place),
+            Some((_, _, space)) => crate::physics::rotated_collides(c, &super::space::DeckCells(space), shape, place),
         })
     }
 
     pub(super) fn mount_fits(&self, c: &Content, place: Transform, blocks: &[(IVec3, u32)]) -> bool {
+        Self::mount_fits_in(c, &self.space, self.frame != 0, place, blocks)
+    }
+
+    fn mount_fits_in(c: &Content, space: &Space, nested: bool, place: Transform, blocks: &[(IVec3, u32)]) -> bool {
         let turn = place.turn();
         let free = |p| {
-            !self.space.signals.reserved(p)
-                && self.get(p).is_some_and(|s| {
+            !space.signals.reserved(p)
+                && space.get(p).or(nested.then_some(AIR)).is_some_and(|s| {
                     (s == AIR || c.states[s as usize].flags & abi::block_flags::REPLACEABLE != 0)
-                        && self
-                            .space
+                        && space
                             .extras(p)
                             .iter()
                             .all(|s| c.states[*s as usize].flags & abi::block_flags::REPLACEABLE != 0)
@@ -594,7 +972,13 @@ impl Dim {
         let Some(e) = self.entities.get(id) else { return };
         let Some(m) = e.mount.as_ref() else { return };
         let Some(space) = self.bodies.get(&id) else { return };
-        if !self.mount_fits(c, e.body_place(), &space.block_snapshot()) || !self.mount_clear(c, id, e.body_place(), space) {
+        let parent = e.frame.unwrap_or(0);
+        let local = m.place_at(m.angle);
+        let parent_space = self.bodies.get(&parent).map_or(&self.space, |s| s);
+        let parts = [MountedPart { id, space, relative: Transform::default() }];
+        if !Self::mount_fits_in(c, parent_space, parent != 0, local, &space.block_snapshot())
+            || !self.mount_clear(c, e.body_place(), &parts)
+        {
             if let Some(m) = self
                 .entities
                 .get_mut(id)
@@ -605,21 +989,23 @@ impl Dim {
             return;
         }
         let at = m.block;
-        self.turn_assembly_bounds(c, at, e.body_place());
-        let power = self.space.signals.level_into(at).unwrap_or(0);
         self.put_down_whole(c, id);
-        if self
-            .get(at)
-            .is_some_and(|s| c.states[s as usize].signal.kind == abi::signal_kind::BODY_MOUNT)
-        {
-            self.floater_shows(c, at, if power == 0 { 0 } else { 2 });
-            self.space.signals.stop_mount(at);
-        }
+        self.in_frame(parent, |d| {
+            d.turn_assembly_bounds(c, at, local);
+            let power = d.space.signals.level_into(at).unwrap_or(0);
+            if d.get(at)
+                .is_some_and(|s| c.states[s as usize].signal.kind == abi::signal_kind::BODY_MOUNT)
+            {
+                d.floater_shows(c, at, if power == 0 { 0 } else { 2 });
+                d.space.signals.stop_mount(at);
+            }
+        });
     }
 
     /// Platforms: their floaters say how they go. Coming to a stop, they go on to a whole block.
     pub(super) fn drive_bodies(&mut self, c: &'static Content) {
         let bodies = &self.bodies;
+        let children = self.mount_children();
         let ids: Vec<u64> = self
             .entities
             .list
@@ -634,11 +1020,11 @@ impl Dim {
             .map(|e| e.id)
             .collect();
         for id in ids {
-            self.drive(c, id);
+            self.drive(c, id, &children);
         }
     }
 
-    fn drive(&mut self, c: &'static Content, id: u64) {
+    fn drive(&mut self, c: &'static Content, id: u64, children: &FxHashMap<u64, Vec<u64>>) {
         let Some(b) = self.bodies.get(&id) else { return };
         let Some(e) = self.entities.get(id) else { return };
         if b.stopping {
@@ -647,33 +1033,36 @@ impl Dim {
             }
             return;
         }
-        let Some(cell) = b.cell else { return };
-        let Some(floaters) = b.signals.floaters(c) else { return };
-        // Without any it is a mod's, unless they were broken off it.
-        if floaters.is_empty() {
-            if b.floated {
-                log::debug!("a platform at {cell} has no floaters left");
-                let (pos, vel) = (e.pos, e.vel);
-                self.bring_to_stop(id, pos, vel, None);
-            }
+        if matches!(e.motion, Motion::To { .. }) {
             return;
         }
-        let v: DVec3 = floaters
-            .iter()
-            .filter_map(|&(f, level, _)| {
-                crate::world::DIRS
-                    .get(f as usize)
-                    .map(|d| d.as_dvec3() * level as f64 * SPEED_PER_LEVEL)
-            })
-            .sum();
-        let v = v.clamp(DVec3::splat(-MOST_SPEED), DVec3::splat(MOST_SPEED));
-        let breaks = floaters.iter().any(|m| m.2);
+        let Some(cell) = b.cell else { return };
+        let Some(drive) = b.signals.floater_drive(c) else { return };
+        let (v, breaks) = (drive.velocity, drive.breaks);
         let pos = e.pos;
         let vel = e.vel;
         if v == DVec3::ZERO {
-            log::debug!("a platform at {cell} has no power: {floaters:?}");
-            self.bring_to_stop(id, pos, vel, None);
+            if e.floater_driven || drive.axes.any() && vel != DVec3::ZERO {
+                self.stop_floater(id, pos, vel, None, drive.hold);
+            }
             return;
+        }
+        if children.contains_key(&id) {
+            let place = e.body_place();
+            let parts = self.mounted_parts(id, place, children);
+            let world = CubeCells(&self.space.cubes);
+            let blocked =
+                visit_structure_shapes(c, &world, &parts[1..], &[], place, v * crate::world::TICK, |_, shape, place, delta, _| {
+                    let mut hit = false;
+                    crate::physics::rotated_contacts(c, &world, shape, place, delta, |contact| {
+                        hit |= contact.depth > 1e-6 || delta.dot(contact.normal) < -1e-9;
+                    });
+                    hit
+                });
+            if blocked {
+                self.stop_floater(id, pos, vel, (!drive.hold).then_some(cell), drive.hold);
+                return;
+            }
         }
         // On coming to a new cell, a look at the next one.
         let sign = IVec3::from_array([0, 1, 2].map(|a| if v[a].abs() > 1e-9 { v[a].signum() as i32 } else { 0 }));
@@ -685,10 +1074,25 @@ impl Dim {
             .any(|p| ways(sign).any(|step| solid(p - step)))
         {
             log::debug!("a platform at {cell} going {sign} is held by what it carries");
-            self.bring_to_stop(id, pos, vel, None);
+            self.stop_floater(id, pos, vel, None, drive.hold);
             return;
         }
-        if b.looked_from != Some((cell, sign)) {
+        let scan = FloaterPath { cell, direction: sign, geometry: b.geometry_version, breaks, blocked: None };
+        let previous = b
+            .floater_path
+            .filter(|p| p.cell == cell && p.direction == sign && p.geometry == scan.geometry && p.breaks == breaks);
+        if let Some(blocked) = previous.and_then(|p| p.blocked) {
+            if self.get(blocked).is_none_or(|s| {
+                let info = &c.states[s as usize];
+                info.solid() && info.liquid.is_none() && (!breaks || info.hardness < 0.0)
+            }) {
+                if !drive.hold || vel != DVec3::ZERO {
+                    self.stop_floater(id, pos, vel, Some(cell), drive.hold);
+                }
+                return;
+            }
+        }
+        if previous.is_none_or(|p| p.blocked.is_some()) {
             let all = b.all_blocks();
             let own: FxHashSet<IVec3> = all.iter().map(|(p, _)| *p + cell).collect();
             let at: Vec<IVec3> = all
@@ -696,10 +1100,15 @@ impl Dim {
                 .filter(|(_, s)| c.solid(*s))
                 .map(|(p, _)| *p + cell)
                 .collect();
-            let Some(mut broken) = self.ahead_every_way(c, at.iter().copied(), &own, sign, breaks) else {
-                log::debug!("a platform at {cell} going {sign} has something in its way");
-                self.bring_to_stop(id, pos, vel, Some(cell));
-                return;
+            let mut broken = match self.ahead_every_way(c, at.iter().copied(), &own, sign, breaks) {
+                Ok(broken) => broken,
+                Err(blocked) => {
+                    if let Some(b) = self.bodies.get_mut(&id) {
+                        b.floater_path = Some(FloaterPath { blocked: Some(blocked), ..scan });
+                    }
+                    self.stop_floater(id, pos, vel, Some(cell), drive.hold);
+                    return;
+                }
             };
             // What it carries that isn't solid doesn't hold it up.
             let mut off = Vec::new();
@@ -732,11 +1141,30 @@ impl Dim {
             }
             self.break_for_body(c, broken);
             if let Some(b) = self.bodies.get_mut(&id) {
-                b.looked_from = Some((cell, sign));
+                b.floater_path = Some(scan);
             }
         }
         if let Some(e) = self.entities.get_mut(id) {
             e.vel = v;
+            e.floater_driven = true;
+        }
+    }
+
+    fn stop_floater(&mut self, id: u64, pos: DVec3, vel: DVec3, at: Option<IVec3>, hold: bool) {
+        if hold {
+            if at.is_some() {
+                self.bring_to_stop(id, pos, vel, at);
+            } else if let Some(e) = self.entities.get_mut(id) {
+                e.vel = DVec3::ZERO;
+            }
+            if let Some(body) = self.bodies.get_mut(&id) {
+                body.stopping = false;
+                if at.is_none() {
+                    body.floater_path = None;
+                }
+            }
+        } else {
+            self.bring_to_stop(id, pos, vel, at);
         }
     }
 
@@ -781,10 +1209,19 @@ impl Dim {
     /// All a body has goes back to where it is, as blocks of what it is on: at the whole block it
     /// is at, which it may have been on its way to. Anything else moving on it lands first.
     pub(super) fn put_down_whole(&mut self, c: &'static Content, id: u64) {
+        let children = self.mount_children();
+        if children.contains_key(&id) {
+            self.stop_mounted_children(id, &children);
+            return;
+        }
         self.in_frame(id, |d| d.finish_moving_here(c));
         let Some(e) = self.entities.get(id).filter(|e| e.motion != Motion::Parked) else { return };
         let (pos, on) = (e.pos, e.frame);
-        let oriented = (e.mount.is_some() || e.ship.is_some()).then(|| e.body_place());
+        let oriented = e
+            .mount
+            .as_ref()
+            .map(|m| m.place_at(m.angle))
+            .or_else(|| e.ship.as_ref().map(|_| e.body_place()));
         let Some(b) = self.bodies.get(&id) else { return };
         let (all, was) = (b.all_blocks(), b.cell);
         let blocks: Vec<(IVec3, u32, Option<u64>)> = all
@@ -818,8 +1255,13 @@ impl Dim {
         let turn = self
             .entities
             .get(body)
-            .filter(|e| e.mount.is_some() || e.ship.is_some())
-            .map_or(abi::Turn::NONE, |e| e.body_place().turn());
+            .and_then(|e| {
+                e.mount
+                    .as_ref()
+                    .map(|m| m.place_at(m.angle))
+                    .or_else(|| e.ship.as_ref().map(|_| e.body_place()))
+            })
+            .map_or(abi::Turn::NONE, Transform::turn);
         if let Some(e) = self.entities.get_mut(body) {
             e.motion = Motion::Parked;
             e.vel = DVec3::ZERO;
@@ -842,6 +1284,9 @@ impl Dim {
                     continue;
                 }
                 b.state = c.turned_state(b.state, turn);
+                if let Some(entity) = b.entity {
+                    self.turn_assembly_offsets(c, entity, turn);
+                }
             }
             let was = self.get(b.to);
             let signal = self
@@ -867,8 +1312,8 @@ impl Dim {
             landed.push(b);
         }
         // Its circuits and light are the world's again: at once here, in a moment from on a body.
+        self.space.signals.set_outside(body, Default::default());
         if self.frame == 0 {
-            self.space.signals.set_outside(body, Default::default());
             self.set_body_lights(c, body, Vec::new());
         }
         if let Some(b) = self.bodies.get_mut(&body) {
@@ -961,12 +1406,18 @@ impl Dim {
             let Some(e) = self.entities.get(id).filter(|e| e.motion != Motion::Parked) else { continue };
             let place = Transform::of(e.pos);
             let pose = (e.mount.is_some() || e.ship.is_some()).then(|| e.body_place());
+            let junction = e
+                .mount
+                .as_ref()
+                .filter(|m| m.slide.is_some() || e.frame.is_some())
+                .map(|m| m.wire_place());
             let Some(b) = self.bodies.get_mut(&id) else { continue };
             let was = b.cell;
             let now = place.cell(was);
             let old = std::mem::replace(&mut b.projected_pose, pose);
             let in_touch = std::mem::replace(&mut b.in_touch, true);
-            if in_touch && was == Some(now) && old == pose {
+            let junction_changed = std::mem::replace(&mut b.junction_pose, junction) != junction;
+            if in_touch && was == Some(now) && old == pose && !junction_changed {
                 continue;
             }
             b.cell = Some(now);
@@ -983,7 +1434,9 @@ impl Dim {
                 self.light_from_body(c, id, now);
                 self.see_world_light(id);
             }
-            self.exchange_signals(c, id);
+            if junction.is_none() || !in_touch || junction_changed {
+                self.exchange_signals(c, id);
+            }
         }
     }
 
@@ -1192,19 +1645,45 @@ impl Dim {
 
     /// What body `id` and the world give each other, as they are next to each other now.
     pub(super) fn exchange_signals(&mut self, c: &'static Content, id: u64) {
+        let parent = self
+            .entities
+            .get(id)
+            .and_then(|e| e.mount.as_ref().and(e.frame));
+        if let Some(parent) = parent.filter(|&parent| parent != self.frame) {
+            self.in_frame(parent, |d| d.exchange_signals(c, id));
+            return;
+        }
+        let shaft = self
+            .entities
+            .get(id)
+            .and_then(|e| e.mount.as_deref().copied());
         let mount = self.entities.get(id).and_then(|e| {
             let place = e.body_place();
-            if let Some(m) = &e.mount {
-                Some((place, m.angle == m.last_grid))
-            } else {
-                e.ship.as_ref().map(|_| (place, place.grid_aligned()))
-            }
+            if let Some(m) = &e.mount { Some(m.wire_place()) } else { e.ship.as_ref().map(|_| (place, place.grid_aligned())) }
         });
         let Some(b) = self.bodies.get_mut(&id) else { return };
         let Some(cell) = b.cell else { return };
         if mount.is_some_and(|(_, aligned)| !aligned) {
-            b.signals.set_outside(0, Default::default());
-            self.space.signals.set_outside(id, Default::default());
+            let (mut into, mut out) = (FxHashMap::default(), FxHashMap::default());
+            if self.frame != 0
+                && let Some(shaft) = shaft
+            {
+                use super::signal::{Gives, View};
+                let world = View { cubes: &self.space.cubes, on_body: true };
+                let child = View { cubes: &b.cubes, on_body: true };
+                let face = shaft.face as usize;
+                let axis = crate::world::DIRS[face];
+                let from_parent = self.space.signals.gives(c, world, shaft.block).only(face);
+                let from_child = b.signals.gives(c, child, IVec3::ZERO).only(face ^ 1);
+                if from_parent != Gives::default() {
+                    into.insert(-axis, from_parent);
+                }
+                if from_child != Gives::default() {
+                    out.insert(shaft.block + axis, from_child);
+                }
+            }
+            b.signals.set_outside(0, into);
+            self.space.signals.set_outside(id, out);
             return;
         }
         let place = mount.map(|(place, _)| place);
@@ -1220,7 +1699,7 @@ impl Dim {
                 .collect();
             (b.signals.giving(c, view, project, turn), around)
         };
-        let world = super::signal::View { cubes: &self.space.cubes, on_body: false };
+        let world = super::signal::View { cubes: &self.space.cubes, on_body: self.frame != 0 };
         let got = self
             .space
             .signals
@@ -1232,10 +1711,21 @@ impl Dim {
     /// Those that have anything to say, after circuits have gone.
     pub(super) fn exchange_all_signals(&mut self, c: &'static Content) {
         let world_changed = std::mem::take(&mut self.space.signals.outputs_changed);
+        let changed: FxHashSet<_> = self
+            .bodies
+            .iter()
+            .filter_map(|(&id, b)| b.signals.outputs_changed.then_some(id))
+            .collect();
         let ids: Vec<u64> = self
             .bodies
             .iter()
-            .filter(|(_, b)| b.signals.has_cells() && (world_changed || b.signals.outputs_changed))
+            .filter(|&(id, b)| {
+                let parent = self
+                    .entities
+                    .get(*id)
+                    .and_then(|e| e.mount.as_ref().and(e.frame));
+                b.signals.has_cells() && (changed.contains(id) || parent.map_or(world_changed, |p| changed.contains(&p)))
+            })
             .map(|(id, _)| *id)
             .collect();
         for id in ids {
@@ -1311,15 +1801,31 @@ impl Dim {
     /// Where blocks a client saw on body `frame` really are: one that has landed only looks like
     /// it is still there, and its blocks are in what it landed on.
     pub fn landed_as(&self, frame: u64, pos: IVec3) -> (u64, IVec3, abi::Turn) {
-        let landed = self
+        let (mut frame, mut pos, mut turn) = (frame, pos, abi::Turn::NONE);
+        while let Some(e) = self
             .entities
             .get(frame)
-            .filter(|e| e.motion == Motion::Parked);
-        match (landed, self.bodies.get(&frame).and_then(|b| b.cell)) {
-            (Some(e), _) if e.mount.is_some() || e.ship.is_some() => (0, e.body_place().cell_at(pos), e.body_place().turn()),
-            (Some(e), Some(cell)) if e.frame.is_none() => (0, pos + cell, abi::Turn::NONE),
-            _ => (frame, pos, abi::Turn::NONE),
+            .filter(|e| e.motion == Motion::Parked)
+        {
+            if let Some(m) = &e.mount {
+                let place = m.place_at(m.angle);
+                pos = place.cell_at(pos);
+                turn = turn.then(place.turn());
+                frame = e.frame.unwrap_or(0);
+            } else {
+                if e.ship.is_some() {
+                    let place = e.body_place();
+                    return (0, place.cell_at(pos), turn.then(place.turn()));
+                }
+                if e.frame.is_none()
+                    && let Some(cell) = self.bodies.get(&frame).and_then(|b| b.cell)
+                {
+                    return (0, pos + cell, turn);
+                }
+                break;
+            }
         }
+        (frame, pos, turn)
     }
 
     /// Runs `f` on the space blocks at `frame` are in: this region (0) or the blocks of body

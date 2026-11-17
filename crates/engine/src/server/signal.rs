@@ -38,6 +38,14 @@ const PUSH_LIMIT: usize = 12;
 const FLOATER_IDLE: u8 = 0;
 const FLOATER_GOING: u8 = 1;
 const FLOATER_STUCK: u8 = 2;
+
+#[derive(Default)]
+pub(super) struct FloaterDrive {
+    pub velocity: DVec3,
+    pub axes: glam::BVec3,
+    pub breaks: bool,
+    pub hold: bool,
+}
 /// More than that stuck to a floater and it doesn't go.
 pub(super) const BODY_LIMIT: usize = 4096;
 /// Vanilla's: a piston's blocks take two ticks to get there.
@@ -74,18 +82,26 @@ enum Port {
     /// A block the piece touches that a device may power strongly.
     Strong(IVec3),
     /// A cell with something of another space in it, its direction toward the piece.
-    Outside(IVec3, u8),
+    Outside(IVec3, u8, Option<u8>),
 }
 
 /// What a cell of one space gives another, per direction out of it: to what reads power, and to
-/// wire, which isn't fed by other wire.
+/// wire. A grid contact can also join two coplanar wire faces with normal attenuation.
 #[derive(Clone, Copy, PartialEq, Default)]
 pub struct Gives {
     all: [u8; 6],
     to_wire: [u8; 6],
+    wire_face: [u8; 6],
 }
 
 impl Gives {
+    pub(super) fn only(self, face: usize) -> Self {
+        let mut limited = Self::default();
+        limited.all[face] = self.all[face];
+        limited.to_wire[face] = self.to_wire[face];
+        limited
+    }
+
     fn turned(self, turn: abi::Turn) -> Self {
         if turn == abi::Turn::NONE {
             return self;
@@ -95,6 +111,7 @@ impl Gives {
             let to = turn.face(from);
             out.all[to] = self.all[from];
             out.to_wire[to] = self.to_wire[from];
+            out.wire_face[to] = self.wire_face[from];
         }
         out
     }
@@ -168,6 +185,8 @@ enum Effect {
 pub struct Signals {
     wires: FxHashMap<IVec3, WireCell>,
     devices: FxHashMap<IVec3, Device>,
+    outputs: FxHashMap<IVec3, [u8; 6]>,
+    propulsion: FxHashSet<IVec3>,
     nets: Vec<Option<Net>>,
     free: Vec<u32>,
     /// Block changes not yet looked at: (where, old, new).
@@ -256,10 +275,6 @@ fn direct(s: &Signal, dir: u8) -> u8 {
 }
 
 /// What a device gives a block in direction `dir`, strongly: its power goes on through that block.
-fn strong(s: &Signal, dir: u8) -> u8 {
-    if s.strong & (1 << dir) != 0 { s.level } else { 0 }
-}
-
 fn can_give(s: &Signal) -> bool {
     s.gives != 0
 }
@@ -313,6 +328,23 @@ pub fn with_level(s: &Signal, state: u32, level: u8) -> u32 {
 }
 
 impl Signals {
+    pub(super) fn set_outputs(&mut self, p: IVec3, levels: [u8; 6]) {
+        let previous = if levels == [0; 6] { self.outputs.remove(&p) } else { self.outputs.insert(p, levels) };
+        if previous.unwrap_or_default() != levels {
+            self.output_changed(p);
+        }
+    }
+
+    fn output_at(&self, p: IVec3, dir: u8, s: &Signal, mask: u8) -> u8 {
+        if mask & (1 << dir) == 0 {
+            0
+        } else {
+            self.outputs
+                .get(&p)
+                .map_or(s.level, |levels| levels[dir as usize])
+        }
+    }
+
     fn device_signal<'c>(&self, c: &'c Content, p: IVec3) -> Option<&'c Signal> {
         self.devices
             .get(&p)
@@ -324,7 +356,7 @@ impl Signals {
         let mut most = 0;
         for d in 0..6u8 {
             if let Some(s) = self.device_signal(c, b + DIRS[d as usize]) {
-                most = most.max(strong(s, d ^ 1));
+                most = most.max(self.output_at(b + DIRS[d as usize], d ^ 1, s, s.strong));
             }
         }
         most
@@ -387,7 +419,7 @@ impl Signals {
 
     pub(super) fn stop_mount(&mut self, p: IVec3) {
         if let Some(d) = self.devices.get_mut(&p) {
-            d.stopped_mount = d.input != 0;
+            d.stopped_mount = true;
         }
     }
 
@@ -413,7 +445,9 @@ impl Signals {
             }
             return Some(most);
         }
-        let given = self.device_signal(c, n).map_or(0, |s| direct(s, toward));
+        let given = self
+            .device_signal(c, n)
+            .map_or(0, |s| self.output_at(n, toward, s, s.gives));
         let state = cubes.state(n)?;
         if wire::conducts(c, state) {
             // What feeds a block may be on any side of it.
@@ -436,7 +470,7 @@ impl Signals {
     }
 
     /// What `cell` gives in each direction out of it, for another space.
-    fn gives(&self, c: &Content, cubes: View, cell: IVec3) -> Gives {
+    pub(super) fn gives(&self, c: &Content, cubes: View, cell: IVec3) -> Gives {
         let mut out = Gives::default();
         if let Some(w) = self.wires.get(&cell) {
             for f in 0..6u8 {
@@ -444,14 +478,15 @@ impl Signals {
                     for d in (0..6u8).filter(|d| wire::touches(f, *d)) {
                         out.all[d as usize] = out.all[d as usize].max(w.level[f as usize]);
                     }
+                    out.wire_face[f as usize] = w.level[f as usize].saturating_sub(1);
                 }
             }
             return out;
         }
         if let Some(s) = self.device_signal(c, cell) {
             for d in 0..6u8 {
-                out.all[d as usize] = direct(s, d);
-                out.to_wire[d as usize] = direct(s, d);
+                out.all[d as usize] = self.output_at(cell, d, s, s.gives);
+                out.to_wire[d as usize] = out.all[d as usize];
             }
         }
         if cubes.state(cell).is_some_and(|s| wire::conducts(c, s)) {
@@ -580,20 +615,42 @@ impl Signals {
         self.dirty_devices.extend(those);
     }
 
-    /// The floaters here, by the way each goes and how fast, and whether it breaks through. `None`
-    /// until they have all been told what power they have.
-    pub(super) fn floaters(&self, c: &Content) -> Option<Vec<(u8, u8, bool)>> {
-        let mut out = Vec::new();
-        for d in self.devices.values() {
+    /// The combined drive in body coordinates. `None` until its redstone inputs are known.
+    pub(super) fn floater_drive(&self, c: &Content) -> Option<FloaterDrive> {
+        let mut drive = FloaterDrive::default();
+        for p in &self.propulsion {
+            let d = &self.devices[p];
             let s = &c.states[d.state as usize].signal;
             if s.kind == sk::FLOATER {
                 if d.input == u8::MAX {
                     return None;
                 }
-                out.push((s.front, d.input, s.flags as u32 & abi::signal_flags::BREAKS != 0));
+                let axis = DIRS[s.front as usize].as_dvec3();
+                drive.axes |= axis.cmpne(DVec3::ZERO);
+                drive.velocity += axis * d.input as f64 * super::structure::SPEED_PER_LEVEL;
+                drive.breaks |= s.flags as u32 & abi::signal_flags::BREAKS != 0;
+                drive.hold |= s.flags as u32 & abi::signal_flags::HOLD != 0;
             }
         }
-        Some(out)
+        drive.velocity = drive
+            .velocity
+            .clamp(DVec3::splat(-super::structure::MOST_SPEED), DVec3::splat(super::structure::MOST_SPEED));
+        Some(drive)
+    }
+
+    pub(super) fn thrusters<'a>(&'a self, c: &'a Content) -> impl Iterator<Item = (IVec3, DVec3)> + 'a {
+        self.propulsion.iter().filter_map(move |&pos| {
+            let dev = &self.devices[&pos];
+            if !(1..=15).contains(&dev.input) {
+                return None;
+            }
+            let force = c.block_value::<f32>(dev.state, Some(c.game.thrust_comp))?;
+            if !force.is_finite() || force <= 0.0 {
+                return None;
+            }
+            let dir = DIRS.get(c.states[dev.state as usize].signal.front as usize)?;
+            Some((pos, dir.as_dvec3() * (f64::from(force) * f64::from(dev.input) / 15.0)))
+        })
     }
 
     /// Its devices that can't be moved just now: an anchor with power.
@@ -652,6 +709,7 @@ impl Signals {
 
     fn add_device(&mut self, c: &Content, p: IVec3, state: u32) {
         let s = &c.states[state as usize].signal;
+        self.index_propulsion(c, p, state);
         for d in wire::dirs(s.watches) {
             self.watchers
                 .entry(p + DIRS[d as usize])
@@ -679,6 +737,7 @@ impl Signals {
     }
 
     fn remove_device(&mut self, c: &Content, p: IVec3) {
+        self.set_outputs(p, [0; 6]);
         if let Some(d) = self.devices.remove(&p) {
             self.count_out(p);
             let s = &c.states[d.state as usize].signal;
@@ -694,8 +753,20 @@ impl Signals {
         }
         self.polled.remove(&p);
         self.readers.remove(&p);
+        self.propulsion.remove(&p);
         self.held.remove(&p);
         self.dirty_devices.remove(&p);
+    }
+
+    fn index_propulsion(&mut self, c: &Content, p: IVec3, state: u32) {
+        if c.states[state as usize].signal.kind == sk::FLOATER
+            || c.block_value::<f32>(state, Some(c.game.thrust_comp))
+                .is_some_and(|force| force.is_finite() && force > 0.0)
+        {
+            self.propulsion.insert(p);
+        } else {
+            self.propulsion.remove(&p);
+        }
     }
 
     fn count_out(&mut self, p: IVec3) {
@@ -782,6 +853,7 @@ impl Signals {
                 if let Some(d) = self.devices.get_mut(&p) {
                     let was = c.states[d.state as usize].signal.level;
                     d.state = new;
+                    self.index_propulsion(c, p, new);
                     if was != b.signal.level {
                         self.output_changed(p);
                     }
@@ -978,7 +1050,9 @@ impl Signals {
                 }
                 let at = p + DIRS[e as usize];
                 if self.outside.values().any(|m| m.contains_key(&at)) {
-                    net.ports.push((i as u32, Port::Outside(at, e ^ 1)));
+                    let wire_face = (e != f && cubes.state(at) == Some(AIR)).then_some(f);
+                    net.ports
+                        .push((i as u32, Port::Outside(at, e ^ 1, wire_face)));
                 }
                 if self.device_signal(c, at).is_some_and(can_give) {
                     net.ports.push((i as u32, Port::Direct(at, e ^ 1)));
@@ -1035,9 +1109,14 @@ impl Signals {
         let mut buckets = std::mem::take(&mut self.buckets);
         for &(i, port) in &net.ports {
             let v = match port {
-                Port::Direct(at, dir) => self.device_signal(c, at).map_or(0, |s| direct(s, dir)),
+                Port::Direct(at, dir) => self
+                    .device_signal(c, at)
+                    .map_or(0, |s| self.output_at(at, dir, s, s.gives)),
                 Port::Strong(at) => self.strong_in(c, at),
-                Port::Outside(at, dir) => self.outside_gives(at, dir, |g| &g.to_wire),
+                Port::Outside(at, dir, face) => {
+                    let direct = self.outside_gives(at, dir, |g| &g.to_wire);
+                    direct.max(face.map_or(0, |f| self.outside_gives(at, f, |g| &g.wire_face)))
+                }
             };
             if v > net.next[i as usize] {
                 net.next[i as usize] = v;
@@ -1472,19 +1551,26 @@ impl Dim {
                     }
                 }
                 Effect::Floater { p, level } => {
+                    let program = self.rotor_program(c, self.frame, p);
                     let Some(dev) = self.space.signals.devices.get_mut(&p) else { continue };
+                    let previous = dev.input;
                     dev.input = level;
                     let info = c.states[dev.state as usize].signal;
                     if info.kind == sk::BODY_MOUNT {
                         if info.flags as u32 & abi::signal_flags::HELM != 0 {
                             continue;
                         }
-                        dev.stopped_mount &= level != 0;
+                        dev.stopped_mount &= program
+                            .as_ref()
+                            .map_or(level != 0, |p| p.rule(level) == p.rule(previous));
                         let stopped = dev.stopped_mount;
-                        if self.frame == 0 && !self.has_mount(p) {
-                            if level == 0 {
+                        if !self.has_mount(p) {
+                            let active = program
+                                .as_ref()
+                                .map_or(level != 0, |p| p.rule(level).is_some());
+                            if !active {
                                 self.floater_shows(c, p, FLOATER_IDLE);
-                            } else if !stopped {
+                            } else if !stopped && !self.space.stopping {
                                 floaters.push(p);
                             }
                         }
@@ -1764,50 +1850,6 @@ impl Dim {
         );
         plan.riding = riding;
         Some(plan)
-    }
-
-    /// What a floater takes along: what is in front of it, and on from that what touches anything
-    /// sticky. Nothing else it touches comes into it. `None`: it can't.
-    pub(super) fn attached_blocks(&self, c: &Content, p: IVec3, moving_driver: bool) -> Option<Vec<IVec3>> {
-        let info = c.states[self.get(p)? as usize].signal;
-        let grip = p + *DIRS.get(info.front as usize)?;
-        let mut moved = Vec::new();
-        if moving_driver {
-            moved.push(p);
-        }
-        let mut seen: FxHashSet<IVec3> = [p, grip].into_iter().collect();
-        let mut todo = Vec::new();
-        let held = self.get(grip)?;
-        if held != AIR && c.solid(held) {
-            if !self.movable(c, held) {
-                log::debug!("a floater at {p} has in front of it what can't be moved");
-                return None;
-            }
-            moved.push(grip);
-            todo.push(grip);
-        }
-        while let Some(at) = todo.pop() {
-            let here = self.get(at)?;
-            if c.states[here as usize].flags & bf::STICKY == 0 {
-                continue;
-            }
-            for d in DIRS {
-                let n = at + d;
-                if !seen.insert(n) {
-                    continue;
-                }
-                let s = self.get(n)?;
-                if s != AIR && c.solid(s) && self.movable(c, s) {
-                    if moved.len() == BODY_LIMIT {
-                        log::debug!("too much for a floater at {p}");
-                        return None;
-                    }
-                    moved.push(n);
-                    todo.push(n);
-                }
-            }
-        }
-        Some(moved)
     }
 
     /// `moved` with what stands on it, as cells of a new body around `center`.

@@ -96,6 +96,7 @@ pub struct LocalPlayer {
 
 pub struct ClientEntity {
     pub kind: u32,
+    helm: Option<IVec3>,
     /// What it rides and in which seat: it is drawn there.
     pub vehicle: Option<(u64, u8)>,
     pub pos: DVec3,
@@ -293,7 +294,7 @@ fn ride_step(
         .iter()
         .find(|b| b.id == mount)
         .and_then(|b| b.blocks.map(|(_, place)| place));
-    if let Some(at) = seat_at(c, m.kind, pos, yaw, seat, place) {
+    if let Some(at) = seat_at(c, m.kind, pos, yaw, seat, place, m.helm) {
         (player.pos, player.vel, player.on_ground) = (at, DVec3::ZERO, false);
     }
     moved
@@ -308,11 +309,24 @@ struct Drive {
 }
 
 /// Where a rider's feet go in seat `seat` of a mount of `kind` at `pos` facing `yaw`.
-fn seat_at(c: &crate::content::Content, kind: u32, pos: DVec3, yaw: f32, seat: u8, place: Option<physics::Transform>) -> Option<DVec3> {
-    let s = c.game.entities[kind as usize].seats.get(seat as usize)?;
-    if let Some(place) = place.filter(|_| kind == c.game.ship_kind) {
-        return Some(place.to_world(physics::Transform::FEET + s.pos));
+fn seat_at(
+    c: &crate::content::Content,
+    kind: u32,
+    pos: DVec3,
+    yaw: f32,
+    seat: u8,
+    place: Option<physics::Transform>,
+    helm: Option<IVec3>,
+) -> Option<DVec3> {
+    if let Some(place) = place
+        && let Some(helm) = helm.or_else(|| (kind == c.game.ship_kind).then_some(IVec3::ZERO))
+    {
+        let s = c.game.entities[c.game.ship_kind as usize]
+            .seats
+            .get(seat as usize)?;
+        return Some(place.to_world(helm.as_dvec3() + physics::Transform::FEET + s.pos));
     }
+    let s = c.game.entities[kind as usize].seats.get(seat as usize)?;
     Some(pos + crate::world::turned(s.pos, yaw))
 }
 
@@ -351,6 +365,7 @@ impl ClientEntity {
     pub fn new(kind: u32, pos: DVec3, yaw: f32, pitch: f32) -> ClientEntity {
         ClientEntity {
             kind,
+            helm: None,
             pos,
             target: pos,
             yaw,
@@ -531,6 +546,7 @@ pub struct ClientMenu {
 }
 
 pub enum ClientEvent {
+    ControllerEdit,
     OpenMenu,
     CloseMenu,
 }
@@ -595,6 +611,8 @@ pub struct Client {
     use_delay: f32,
     /// Each action as the server last heard of it (`send_keys`).
     keys_down: Vec<bool>,
+    helm_pilot: Option<crate::controller::Pilot>,
+    pub(crate) controller_edit: Option<(u64, u8, crate::controller::Settings)>,
     pub view_radius: i32,
     /// Makes the world in view from the seed (`terrain`); the server's cubes go through it.
     pub terrain: terrain::TerrainHandle,
@@ -954,6 +972,8 @@ impl Client {
             break_delay: 0.0,
             use_delay: 0.0,
             keys_down: Vec::new(),
+            helm_pilot: None,
+            controller_edit: None,
             view_radius,
             terrain: terrain::spawn(gpu_tx, gpu_on.clone()),
             lod: lod::Lod::new(gpu_terrain.lod_tx.clone()),
@@ -1140,7 +1160,8 @@ impl Client {
 
     /// The key that swaps what is in the two hands.
     fn swap_hands(&mut self, input: &Input) {
-        if input.captured && !self.mode.has(crate::tag_bits::game_mode::NO_INTERACT) && input.pressed("core:swap_hands") {
+        if input.captured && !self.mode.has(crate::tag_bits::game_mode::NO_INTERACT) && self.pressed_without_helm(input, "core:swap_hands")
+        {
             self.conn.send(ToServer::SwapHands);
         }
     }
@@ -1179,11 +1200,11 @@ impl Client {
             .clamp(0.0, 1.0);
         self.night_vision += (night - self.night_vision) * (dt as f32 * 4.0).min(1.0);
         self.sync_me();
-        let all = input.pressed("core:drop_all");
-        if (all || input.pressed("core:drop")) && !self.mode.has(crate::tag_bits::game_mode::NO_INTERACT) {
+        let all = self.pressed_without_helm(input, "core:drop_all");
+        if (all || self.pressed_without_helm(input, "core:drop")) && !self.mode.has(crate::tag_bits::game_mode::NO_INTERACT) {
             self.conn.send(ToServer::Drop { all });
         }
-        if input.pressed("core:inventory") && input.captured {
+        if self.pressed_without_helm(input, "core:inventory") && input.captured {
             self.conn.send(ToServer::OpenInventory);
         }
         self.step_physics(input, dt);
@@ -1236,12 +1257,59 @@ impl Client {
 
     /// Flying goes on and off where the game mode lets it; on a mount the dismount key gets off.
     fn read_controls(&mut self, input: &Input) {
-        if self.me.vehicle.is_some() && input.captured && input.pressed("core:dismount") {
+        let active = self
+            .helm_pilot
+            .as_mut()
+            .filter(|p| self.me.vehicle == Some((p.mount, 0)));
+        let world = input.captured && !self.dead;
+        let exit = active.as_ref().and_then(|p| p.profile.exit);
+        let dismount = exit.map_or_else(|| input.pressed("core:dismount"), |key| input.pressed_key(key));
+        if self.me.vehicle.is_some() && world && dismount {
             self.conn.send(ToServer::Dismount);
         }
-        if self.can_fly() && input.captured && input.pressed("core:fly") {
+        if let Some(p) = active {
+            let mut held = 0;
+            let mut pulses = 0;
+            if world && !dismount {
+                for (i, bind) in p.profile.output.iter().enumerate() {
+                    if let Some(bind) = bind.filter(|b| input.active_key(b.key)) {
+                        held |= 1 << i;
+                        if matches!(bind.key, crate::input::Key::Wheel(_)) {
+                            pulses |= 1 << i;
+                        }
+                    }
+                }
+            }
+            if held != p.held || pulses != 0 {
+                p.held = held;
+                self.conn
+                    .send(ToServer::HelmHeld { mount: p.mount, controller: p.controller, held });
+            }
+        }
+        if self.can_fly() && input.captured && self.pressed_without_helm(input, "core:fly") {
             self.player.flying = !self.player.flying;
         }
+    }
+
+    fn pressed_without_helm(&self, input: &Input, action: &str) -> bool {
+        self.action_without_helm(input, action, true)
+    }
+
+    fn held_without_helm(&self, input: &Input, action: &str) -> bool {
+        self.action_without_helm(input, action, false)
+    }
+
+    fn action_without_helm(&self, input: &Input, action: &str, pressed: bool) -> bool {
+        let pilot = self.active_helm_pilot();
+        input.read_except(action, pressed, false, |key| {
+            pilot.is_some_and(|p| p.profile.exit == Some(key) || p.profile.output.iter().flatten().any(|b| b.key == key))
+        }) != 0.0
+    }
+
+    pub(crate) fn active_helm_pilot(&self) -> Option<&crate::controller::Pilot> {
+        self.helm_pilot
+            .as_ref()
+            .filter(|p| self.me.vehicle == Some((p.mount, 0)))
     }
 
     /// How fast a spectator flies.
@@ -1275,7 +1343,7 @@ impl Client {
                 }
             }
         }
-        let step = input.pressed("core:hotbar_next") as i32 - input.pressed("core:hotbar_prev") as i32;
+        let step = self.pressed_without_helm(input, "core:hotbar_next") as i32 - self.pressed_without_helm(input, "core:hotbar_prev") as i32;
         if input.captured && step != 0 {
             self.selected = (self.selected as i32 + step).rem_euclid(content().game.player_layout.hotbar.max(1) as i32) as usize;
         }
@@ -1359,7 +1427,11 @@ impl Client {
         advance_swing(&mut self.hand_swing, dt as f32);
         self.swap_hands(input);
         // A use swings only when the server says it did something (`ToClient::Swing`).
-        if input.captured && !spectator && (input.pressed("core:attack") || (input.held("core:attack") && self.breaking.is_some())) {
+        if input.captured
+            && !spectator
+            && (self.pressed_without_helm(input, "core:attack")
+                || (self.held_without_helm(input, "core:attack") && self.breaking.is_some()))
+        {
             self.swing_arm();
         }
         // Vanilla's 0.4 per tick: the old item goes down, the new one comes up. More of the same
@@ -1539,7 +1611,7 @@ impl Client {
         if self.target_entity.is_some() {
             self.target = None;
         }
-        if input.captured && !spectator && input.pressed("core:pick") {
+        if input.captured && !spectator && self.pressed_without_helm(input, "core:pick") {
             // In creative a mob gives its egg, there being no other way to get what stands there.
             let egg = || {
                 self.target_entity
@@ -1629,7 +1701,7 @@ impl Client {
         let target = self.target;
         self.refused_break = self
             .refused_break
-            .filter(|&r| input.held("core:attack") && target.is_some_and(|h| (h.frame, h.origin) == r));
+            .filter(|&r| self.held_without_helm(input, "core:attack") && target.is_some_and(|h| (h.frame, h.origin) == r));
         let keeps = (self.mode.has(crate::tag_bits::game_mode::INSTANT_BREAK) && c.no_creative_break(self.held().item))
             || self.mode.has(crate::tag_bits::game_mode::NO_BREAK);
         let refused = keeps || self.refused_break.is_some();
@@ -1638,16 +1710,16 @@ impl Client {
             .get(self.held().item as usize)
             .is_some_and(|item| item.on_attack.is_some());
         if item_attack {
-            if input.pressed("core:attack") {
+            if self.pressed_without_helm(input, "core:attack") {
                 send_look.send(&mut self.conn);
                 self.conn.send(ToServer::Attack(crate::net::ITEM_ATTACK));
             }
             self.breaking = None;
-        } else if input.held("core:attack") {
+        } else if self.held_without_helm(input, "core:attack") {
             if let Some(id) = self.target_entity {
                 // A hit is a press, as often as you like; holding hits nothing. How much it
                 // does depends on how charged the swing was.
-                if input.pressed("core:attack") {
+                if self.pressed_without_helm(input, "core:attack") {
                     send_look.send(&mut self.conn);
                     self.conn.send(ToServer::Attack(id));
                     self.conn.send(ToServer::Swing);
@@ -1668,7 +1740,7 @@ impl Client {
                 };
                 self.breaking_part = hit.state;
                 let progress = if rate >= 1.0 { 1.0 } else { done + dt as f32 * self.tick_rate as f32 * rate };
-                if progress >= 1.0 && (input.pressed("core:attack") || self.break_delay <= 0.0) {
+                if progress >= 1.0 && (self.pressed_without_helm(input, "core:attack") || self.break_delay <= 0.0) {
                     send_look.send(&mut self.conn);
                     let at = self.hit_point(&hit, hit.origin);
                     self.conn
@@ -1699,7 +1771,7 @@ impl Client {
             self.breaking = None;
         }
         // Hitting nothing still spends the swing.
-        if !item_attack && input.pressed("core:attack") && self.target_entity.is_none() && self.target.is_none() {
+        if !item_attack && self.pressed_without_helm(input, "core:attack") && self.target_entity.is_none() && self.target.is_none() {
             self.conn.send(ToServer::Swing);
             self.swing_since = 0.0;
         }
@@ -1828,10 +1900,10 @@ impl Client {
         if let Some((held, _)) = &mut self.using {
             *held += dt as f32 * self.tick_rate as f32;
             // The server hears the button go up with the other keys (`send_keys`).
-            if !input.held("core:use") {
+            if !self.held_without_helm(input, "core:use") {
                 self.using = None;
             }
-        } else if input.pressed("core:use") || (input.held("core:use") && self.use_delay <= 0.0) {
+        } else if self.pressed_without_helm(input, "core:use") || (self.held_without_helm(input, "core:use") && self.use_delay <= 0.0) {
             send_look.send(&mut self.conn);
             if let Some(id) = self.target_entity {
                 self.conn.send(ToServer::Interact(id));
@@ -2056,7 +2128,7 @@ impl Client {
                 let Some(at) = self
                     .entities
                     .get(&mount)
-                    .and_then(|m| seat_at(c, m.kind, m.pos, m.yaw, seat, Some(m.place_at(tick))))
+                    .and_then(|m| seat_at(c, m.kind, m.pos, m.yaw, seat, Some(m.place_at(tick)), m.helm))
                 else {
                     continue;
                 };
@@ -2500,6 +2572,8 @@ impl Client {
             effect,
             forced,
             riding,
+            helm,
+            controller: _,
             stuck,
             game_mode,
             permission,
@@ -2540,6 +2614,8 @@ impl Client {
                 e.hurt = HURT_FLASH;
             }
             e.health = hp.current;
+        } else if comp == helm {
+            e.helm = IVec3::from_bytes(bytes);
         } else if comp == riding {
             let seat = crate::net::RidingField::from_bytes(bytes).map(|r| (r.mount, r.seat as u8));
             if mine && seat.is_some() && e.vehicle != seat {
@@ -2725,7 +2801,7 @@ impl Client {
     pub fn smooth_pos(&self) -> DVec3 {
         if let Some((id, seat)) = self.me.vehicle
             && let Some(mount) = self.entities.get(&id).filter(|m| m.structure.is_some())
-            && let Some(at) = seat_at(content(), mount.kind, mount.pos, mount.yaw, seat, Some(mount.place_at(self.anim_tick())))
+            && let Some(at) = seat_at(content(), mount.kind, mount.pos, mount.yaw, seat, Some(mount.place_at(self.anim_tick())), mount.helm)
         {
             return at;
         }

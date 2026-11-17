@@ -650,7 +650,7 @@ pub unsafe extern "C" fn client_ui_rect(c: *mut abi::ClientCtx, query: Str, out:
         } else if q == "slider" {
             ui.nodes
                 .iter()
-                .position(|node| matches!(node.kind, Kind::Slider { .. }))
+                .position(|node| matches!(node.kind, Kind::Slider(_)))
         } else if q == "entity" {
             ui.nodes
                 .iter()

@@ -2,7 +2,7 @@
 //! A rider goes where its seat is after everything moved; a mob in a seat that steers walks
 //! its mount with its own AI, a player in one moves it from its client (`ToServer::MountMove`).
 
-use glam::DVec3;
+use glam::{DVec3, IVec3};
 use weft_abi as abi;
 
 use super::dim::Dim;
@@ -12,16 +12,32 @@ use crate::content::Content;
 const MOST_RIDING: usize = 32;
 
 impl Dim {
+    fn seats_for<'a>(&self, c: &'a Content, mount: &super::entity::Entity) -> &'a [crate::registry::Seat] {
+        let kind = if mount.ship.is_some() {
+            if self.active_helm(c, mount.id).is_none() {
+                return &[];
+            }
+            c.game.ship_kind
+        } else {
+            mount.kind
+        };
+        &c.game.entities[kind as usize].seats
+    }
+
     /// Where a rider's feet go in seat `seat` of `mount`, if it has that seat.
     pub fn seat_pos(&self, c: &Content, mount: u64, seat: u8) -> Option<DVec3> {
         let m = self.entities.get(mount)?;
-        let s = c.game.entities[m.kind as usize].seats.get(seat as usize)?;
         if m.ship.is_some() {
+            let (helm, _) = self.active_helm(c, mount)?;
+            let s = c.game.entities[c.game.ship_kind as usize]
+                .seats
+                .get(seat as usize)?;
             return Some(
                 m.body_place()
-                    .to_world(crate::physics::Transform::FEET + s.pos),
+                    .to_world(helm.as_dvec3() + crate::physics::Transform::FEET + s.pos),
             );
         }
+        let s = c.game.entities[m.kind as usize].seats.get(seat as usize)?;
         Some(m.pos + crate::world::turned(s.pos, m.yaw))
     }
 
@@ -49,11 +65,34 @@ impl Dim {
 
     /// Puts `rider` in `seat` of `mount` (`None`: the first free one), asking mods first.
     pub fn mount(&mut self, c: &'static Content, rider: u64, mount: u64, seat: Option<u8>) -> bool {
+        self.mount_in(c, rider, mount, seat, None)
+    }
+
+    pub(super) fn mount_helm(&mut self, c: &'static Content, rider: u64, mount: u64, at: IVec3, face: u8) -> bool {
+        let Some(r) = self.entities.get(rider) else { return false };
+        let Some(seat) = c.game.entities[c.game.ship_kind as usize].seats.first() else { return false };
+        let dims = r.dims(c);
+        let feet = at.as_dvec3() + crate::physics::Transform::FEET + seat.pos;
+        let area = crate::physics::Aabb::around(feet, dims.half_width, dims.height);
+        let space = if self.frame == mount {
+            &self.space
+        } else if let Some(body) = self.bodies.get(&mount) {
+            body
+        } else {
+            return false;
+        };
+        if crate::physics::collides(c, &super::space::DeckCells(space), area) {
+            return false;
+        }
+        self.mount_in(c, rider, mount, Some(0), Some((at, face)))
+    }
+
+    fn mount_in(&mut self, c: &'static Content, rider: u64, mount: u64, seat: Option<u8>, helm: Option<(IVec3, u8)>) -> bool {
         let (Some(r), Some(m)) = (self.entities.get(rider), self.entities.get(mount)) else { return false };
         if r.removed || m.removed || !r.alive() || self.carries(rider, mount) {
             return false;
         }
-        let seats = &c.game.entities[m.kind as usize].seats;
+        let seats = if helm.is_some() { &c.game.entities[c.game.ship_kind as usize].seats } else { self.seats_for(c, m) };
         let free = |s: u8| (s as usize) < seats.len() && self.rider_in(mount, s).is_none_or(|o| o == rider);
         let Some(seat) = (match seat {
             Some(s) => free(s).then_some(s),
@@ -64,6 +103,12 @@ impl Dim {
         let mut q = abi::Query { entity: rider, other: mount, amount: seat as f64, ..abi::Query::DEFAULT };
         if !self.ask(c, abi::action::MOUNT, &mut q) {
             return false;
+        }
+        if let Some((at, face)) = helm {
+            if !self.float_ship(mount, face) {
+                return false;
+            }
+            self.set_helm(c, mount, at);
         }
         if self.entities.get(rider).and_then(|e| e.vehicle).is_some() {
             self.leave(c, rider);
@@ -79,6 +124,9 @@ impl Dim {
             }
         }
         self.seat_riders(c);
+        if player && seat == 0 && self.active_helm(c, mount).is_some() {
+            self.refresh_helm(c, mount, rider);
+        }
         self.emit_engine(c, abi::action::MOUNT, &abi::Mounting { rider, mount, seat: seat as u32, pad: 0 });
         true
     }
@@ -130,7 +178,12 @@ impl Dim {
     /// Off its seat, without asking or moving it (its mount went, it died, it got on another,
     /// it was teleported away).
     pub fn leave(&mut self, c: &Content, rider: u64) {
-        let Some((mount, _)) = self.entities.get_mut(rider).and_then(|e| e.vehicle.take()) else { return };
+        let Some((mount, _)) = self.entities.get_mut(rider).and_then(|e| {
+            e.helm_pilot = None;
+            e.vehicle.take()
+        }) else {
+            return;
+        };
         // What it is saved and moved between regions with says so too, at once.
         self.entities
             .comps
@@ -152,7 +205,7 @@ impl Dim {
             .unwrap_or(DVec3::ZERO);
         let Some(m) = self.entities.get(mount) else { return sat };
         let k = &c.game.entities[m.kind as usize];
-        let Some(s) = k.seats.get(seat as usize).copied() else { return sat };
+        let Some(s) = self.seats_for(c, m).get(seat as usize).copied() else { return sat };
         let (mpos, myaw) = (m.pos, m.yaw);
         let nearest = |d: &Dim, reach: f64| {
             d.free_spot(c, rider, mpos, k.width as f64 / 2.0, reach)

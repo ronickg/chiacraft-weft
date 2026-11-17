@@ -128,6 +128,7 @@ impl Server {
             M::Break { .. } | M::Use { .. } | M::UseItem { .. } | M::Attack(_) | M::Swing | M::Interact(_) | M::Drop { .. } => {
                 e.alive() && !e.mode.has(crate::tag_bits::game_mode::NO_INTERACT)
             }
+            M::ControllerSave { .. } | M::HelmHeld { .. } => e.alive() && !e.mode.has(crate::tag_bits::game_mode::NO_INTERACT),
             M::Move { .. } | M::OpenInventory | M::Click { .. } | M::Drag { .. } | M::CreativeTake { .. } | M::Pick { .. } => e.alive(),
             _ => true,
         }
@@ -153,6 +154,18 @@ impl Server {
             ToServer::StopBreak => {
                 if let Some((r, id)) = self.region(pi) {
                     r.stop_mining(id);
+                }
+            }
+            ToServer::ControllerSave { controller, data } => {
+                if self.players[pi].controller_edit.take() == Some(controller)
+                    && let Some((d, player)) = self.region(pi)
+                {
+                    d.save_controller(c, player, controller, &data);
+                }
+            }
+            ToServer::HelmHeld { mount, controller, held } => {
+                if let Some((d, player)) = self.region(pi) {
+                    d.helm_held(player, mount, controller, held);
                 }
             }
             ToServer::Keys { down, up } => {
@@ -357,6 +370,14 @@ impl Server {
             }
 
             ToServer::UseItem { target } => {
+                if let Some((pos, _)) = target {
+                    let Some((r, entity)) = self.region(pi) else { return };
+                    let Some(e) = r.entities.get(entity) else { return };
+                    let eye = e.pos + DVec3::Y * e.eye(c);
+                    if !within(eye, pos, r.block_reach(c, entity)) {
+                        return;
+                    }
+                }
                 for slot in self.hands(c, pi) {
                     if self.use_in_hand(c, pi, slot, target) {
                         break;

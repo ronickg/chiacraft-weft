@@ -613,8 +613,8 @@ unsafe extern "C" fn body_from_blocks(
     }
 }
 
-unsafe extern "C" fn assembly_select(w: *mut abi::WorldCtx, player: u64, cell: *const abi::BlockPos, tool: u8) -> u32 {
-    unsafe { dim(w).assembly_select(content(), player, cell.as_ref().map(|p| IVec3::from_array(p.to_array())), tool != 0) }
+unsafe extern "C" fn assembly_select(w: *mut abi::WorldCtx, player: u64, cell: *const abi::BlockPos, flags: u8) -> u32 {
+    unsafe { dim(w).assembly_select(content(), player, cell.as_ref().map(|p| IVec3::from_array(p.to_array())), flags) }
 }
 
 unsafe extern "C" fn ship_controls(w: *mut abi::WorldCtx, ship: u64, input: *const abi::ShipControls) -> u32 {

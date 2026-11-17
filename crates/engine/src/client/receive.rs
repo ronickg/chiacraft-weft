@@ -1,6 +1,7 @@
 //! What the server said and what the terrain thread finished, taken once a frame.
 
 use super::*;
+use crate::net::codec::Wire;
 
 fn entity_rotation(rotation: Option<[f32; 4]>) -> glam::DQuat {
     rotation.map_or(glam::DQuat::IDENTITY, |q| glam::Quat::from_array(q).as_dquat().normalize())
@@ -27,6 +28,20 @@ impl Client {
 
     fn receive_message(&mut self, msg: ToClient, fwd: &mut Vec<terrain::In>) {
         match msg {
+            ToClient::ControllerEdit { controller, face, data } => {
+                if let Some(settings) = crate::controller::Settings::from_bytes(&data) {
+                    self.controller_edit = Some((controller, face, settings));
+                    self.events.push(ClientEvent::ControllerEdit);
+                }
+            }
+            ToClient::HelmProfile { mount, controller, data } => {
+                self.helm_pilot = match crate::controller::Settings::from_bytes(&data) {
+                    Some(crate::controller::Settings::Helm(profile)) => {
+                        Some(crate::controller::Pilot { mount, controller, profile, held: u64::MAX, pulses: 0 })
+                    }
+                    _ => None,
+                };
+            }
             ToClient::Welcome { player, dim, pos, seed, look, selected, flying } => {
                 self.player.flying = flying;
                 self.player_id = player;

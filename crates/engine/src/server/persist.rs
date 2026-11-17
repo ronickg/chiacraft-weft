@@ -6,7 +6,7 @@ use weft_abi::{ItemStack, component_flags as cf, entry_kind as ek};
 
 use super::entity::{BodyMount, Entity};
 use crate::content::Content;
-use crate::net::codec::{self, R};
+use crate::net::codec::{self, R, Wire};
 
 /// An entity read back: itself, its inventory, components and, for a moving structure, its
 /// blocks.
@@ -16,6 +16,10 @@ pub type ToSave<'a> = (&'a Entity, Option<&'a Vec<ItemStack>>, Vec<(u32, &'a [u8
 const ENTITY_FORMAT: u32 = 0x3254_4E45;
 const MOUNTED_BODY: u8 = 0x80;
 const FLOATING_BODY: u8 = 0x40;
+const FLOATER_DRIVEN: u8 = 0x20;
+const NESTED_MOUNT: u8 = 0x10;
+const MOUNT_DRIVE: u8 = 0x08;
+const MOUNT_SLIDE: u8 = 0x04;
 
 struct W<'a>(&'a mut Vec<u8>);
 
@@ -100,7 +104,13 @@ pub fn write(c: &Content, out: &mut Vec<u8>, list: &[ToSave<'_>], now: u64) {
         w.stack(c, e.item);
         // 2: on a body, which it says.
         let mounted = if e.mount.is_some() { MOUNTED_BODY } else { 0 };
-        let attachment = mounted | if e.ship.is_some() { FLOATING_BODY } else { 0 };
+        let parent_mount = e.frame.filter(|_| e.mount.is_some());
+        let attachment = mounted
+            | if e.ship.is_some() { FLOATING_BODY } else { 0 }
+            | if e.floater_driven { FLOATER_DRIVEN } else { 0 }
+            | if parent_mount.is_some() { NESTED_MOUNT } else { 0 }
+            | if e.mount.as_ref().is_some_and(|m| m.drive.is_some()) { MOUNT_DRIVE } else { 0 }
+            | if e.mount.as_ref().is_some_and(|m| m.slide.is_some()) { MOUNT_SLIDE } else { 0 };
         match (e.anchor, e.block_frame()) {
             (Some(a), frame) => {
                 w.u8(attachment | if frame != 0 { 2 } else { 1 });
@@ -113,6 +123,9 @@ pub fn write(c: &Content, out: &mut Vec<u8>, list: &[ToSave<'_>], now: u64) {
             }
             (None, _) => w.u8(attachment),
         }
+        if let Some(parent) = parent_mount {
+            w.u64(parent);
+        }
         if let Some(m) = &e.mount {
             for v in m.block.to_array() {
                 w.u32(v as u32);
@@ -122,6 +135,12 @@ pub fn write(c: &Content, out: &mut Vec<u8>, list: &[ToSave<'_>], now: u64) {
             w.f64(m.angle);
             w.f64(m.last_grid);
             w.f64(m.stop.unwrap_or(-1.0));
+            if let Some(drive) = m.drive {
+                w.0.extend(drive.to_bytes());
+            }
+            if let Some(slide) = m.slide {
+                w.0.extend(slide.to_bytes());
+            }
         }
         if let Some(ship) = &e.ship {
             w.u8(ship.front);
@@ -257,9 +276,9 @@ fn read_one(c: &Content, r: &mut R, now: u64) -> Option<Option<Saved>> {
     let age = r.u64()?;
     let item = r.stack(c)?;
     let attachment = r.u8()?;
-    let anchor_kind = attachment & !(MOUNTED_BODY | FLOATING_BODY);
+    let anchor_kind = attachment & 0x03;
     let anchor = if anchor_kind != 0 { Some(IVec3::new(r.u32()? as i32, r.u32()? as i32, r.u32()? as i32)) } else { None };
-    let frame = if anchor_kind == 2 { Some(r.u64()?) } else { None };
+    let frame = if anchor_kind == 2 || attachment & NESTED_MOUNT != 0 { Some(r.u64()?) } else { None };
     let mount = if attachment & MOUNTED_BODY != 0 {
         let block = IVec3::new(r.u32()? as i32, r.u32()? as i32, r.u32()? as i32);
         let face = r.u8()?;
@@ -267,8 +286,10 @@ fn read_one(c: &Content, r: &mut R, now: u64) -> Option<Option<Saved>> {
         let angle = r.f64()?;
         let last_grid = r.f64()?;
         let stop = r.f64()?;
+        let drive = if attachment & MOUNT_DRIVE != 0 { Some(crate::controller::Drive::get(r)?) } else { None };
+        let slide = if attachment & MOUNT_SLIDE != 0 { Some(crate::controller::Slide::get(r)?) } else { None };
         (face < 6 && angle.is_finite() && last_grid.is_finite() && stop.is_finite())
-            .then(|| Box::new(BodyMount { block, face, speed, angle, last_grid, stop: (stop >= 0.0).then_some(stop) }))
+            .then(|| Box::new(BodyMount { block, face, speed, angle, last_grid, stop: (stop != -1.0).then_some(stop), drive, slide }))
     } else {
         None
     };
@@ -338,6 +359,7 @@ fn read_one(c: &Content, r: &mut R, now: u64) -> Option<Option<Saved>> {
     e.frame = frame;
     e.mount = mount;
     e.ship = ship;
+    e.floater_driven = attachment & FLOATER_DRIVEN != 0;
     if kind == c.game.item_kind && item.is_empty() {
         return Some(None);
     }

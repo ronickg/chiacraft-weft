@@ -1235,6 +1235,9 @@ pub mod comp {
     pub mod block {
         /// Mass per full block relative to a block of water (`f32`).
         pub const DENSITY: &str = "density";
+        /// The force a block puts on its body when fully powered.
+        pub const THRUST: &str = "thrust";
+        pub const GUIDE_RAIL: &str = "guide_rail";
         pub const ON_SIDES: &str = "on_sides";
         pub const PROPS: &str = "block.props";
         pub const ON_USE: &str = "block.on_use";
@@ -2119,10 +2122,17 @@ pub mod signal_flags {
     pub const BREAKS: u32 = 4;
     /// A body mount turns around its front axis while powered.
     pub const ROTATES: u32 = 8;
-    /// A rotor holds its current pose when power cuts out or its path is blocked.
+    /// A rotor or floater holds its current pose when power cuts out or its path is blocked.
     pub const HOLD: u32 = 16;
     /// The controller rides in a freely moving structure and can be piloted from a seat.
     pub const HELM: u32 = 32;
+    /// A body mount slides alongside a run of guide rails.
+    pub const SLIDES: u32 = 64;
+}
+
+pub mod assembly_flags {
+    pub const TOOL: u8 = 1;
+    pub const PHYSICS: u8 = 2;
 }
 
 pub mod assembly_result {
@@ -2136,6 +2146,7 @@ pub mod assembly_result {
     pub const CLEARED: u32 = 7;
     pub const SEATED: u32 = 8;
     pub const DOCKING: u32 = 9;
+    pub const ALREADY_ASSEMBLED: u32 = 10;
 }
 
 crate::data! {
@@ -3827,8 +3838,8 @@ pub mod ui_kind {
     /// A one-line text field showing `text` (a ready value, not a key), at most `count`
     /// characters (0: any); `on_change` gets each edit.
     pub const INPUT: u32 = 15;
-    /// A slider at `bind` (0..1); `on_change` gets the value the player drags it to. Clicked, the
-    /// arrow keys move it one of `count` steps across (0: a hundred).
+    /// A track with normalized handles in `slider_values`. `bind` uses `UiSliderBindArgs` and
+    /// `on_change` receives the changed handle in `UiChangeArgs`.
     pub const SLIDER: u32 = 16;
     /// Item `data` as its icon, with `count` under it when above 1.
     pub const ITEM: u32 = 17;
@@ -3903,6 +3914,10 @@ pub struct UiNode {
     pub dir: u32,
     /// ICONS: how the row moves and lights up (`IconEffect`).
     pub effects: Slice<IconEffect>,
+    /// SLIDER: initial positions of its handles (0..1) in stable index order.
+    pub slider_values: Slice<f32>,
+    /// SLIDER: the indices delimiting a highlighted span, or `u32::MAX` for none.
+    pub slider_fill: [u32; 2],
 }
 
 /// Something a row of icons does (`UiNode::effects`), each by its own value read every frame.
@@ -3974,6 +3989,8 @@ defaults!(UiNode {
     tooltip: Str::EMPTY,
     dir: 0,
     effects: Slice::EMPTY,
+    slider_values: Slice::EMPTY,
+    slider_fill: [u32::MAX; 2],
 });
 
 #[repr(C)]
@@ -4005,6 +4022,15 @@ pub struct UiChangeArgs {
     pub client: *mut ClientCtx,
     pub text: Str,
     pub value: f32,
+    pub handle: u32,
+}
+
+/// Updates all bound slider positions together. The buffer is valid during the callback.
+#[repr(C)]
+pub struct UiSliderBindArgs {
+    pub client: *mut ClientCtx,
+    pub values: *mut f32,
+    pub len: usize,
 }
 
 /// `UiNode::flags`.
@@ -4023,6 +4049,10 @@ pub mod ui_flags {
     pub const SLIDER_RELEASE: u32 = 32;
     /// A scrolling container uses a narrow bar.
     pub const THIN_SCROLLBAR: u32 = 64;
+    /// Keep slider handles in index order.
+    pub const SLIDER_ORDERED: u32 = 128;
+    /// Use `count` equally spaced intervals for pointer input as well as arrow keys.
+    pub const SLIDER_SNAP: u32 = 256;
 }
 
 #[repr(C)]
@@ -4575,7 +4605,7 @@ pub struct Host {
     /// Takes blocks of the world out into a new moving body: `center` is its block
     /// (0, 0, 0), they keep their places around that. Returns its entity, 0 if nothing came.
     pub body_from_blocks: unsafe extern "C" fn(world: *mut WorldCtx, center: *const BlockPos, cells: *const BlockPos, count: usize) -> u64,
-    pub assembly_select: unsafe extern "C" fn(world: *mut WorldCtx, player: u64, cell: *const BlockPos, tool: u8) -> u32,
+    pub assembly_select: unsafe extern "C" fn(world: *mut WorldCtx, player: u64, cell: *const BlockPos, flags: u8) -> u32,
     /// An active ship's inputs until replaced, or null to return control to the helm.
     pub ship_controls: unsafe extern "C" fn(world: *mut WorldCtx, ship: u64, input: *const ShipControls) -> u32,
     /// Flooded hull cells, in the ship's coordinates. Returns their count, or `usize::MAX` if absent.

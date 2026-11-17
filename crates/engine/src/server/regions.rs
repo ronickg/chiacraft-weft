@@ -244,7 +244,11 @@ impl DimSet {
         let now = d.time;
         for (e, inv, comps, blocks) in super::persist::read(c, entities, now) {
             let id = e.id;
-            if d.entities.get(id).is_some() {
+            if d.entities.get(id).is_some()
+                || e.mount.is_some()
+                    && e.frame
+                        .is_some_and(|parent| !d.bodies.contains_key(&parent))
+            {
                 continue;
             }
             if c.game.is_block_entity(e.kind)
@@ -267,6 +271,7 @@ impl DimSet {
                 bodies.push(id);
             }
             d.entities.insert_with(c, e, inv, comps);
+            d.entities.update_mount_pose(id);
         }
         for id in bodies {
             d.add_missing_on_body(c, id);

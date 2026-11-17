@@ -455,6 +455,8 @@ messages! {
         Avatar { entity: u64, avatar: AvatarData },
         /// That player left: what they brought can go.
         PlayerGone { entity: u64 },
+        ControllerEdit { controller: u64, face: u8, data: Vec<u8> },
+        HelmProfile { mount: u64, controller: u64, data: Vec<u8> },
     }
 }
 
@@ -479,6 +481,8 @@ messages! {
         StopBreak,
         /// Actions (key ids) that went down and up since the last.
         Keys { down: Vec<u32>, up: Vec<u32> },
+        HelmHeld { mount: u64, controller: u64, held: u64 },
+        ControllerSave { controller: u64, data: Vec<u8> },
         /// The main hand's item goes to the other hand and back.
         SwapHands,
         /// `frame`: the structure (entity) the block is part of, its position in the structure's

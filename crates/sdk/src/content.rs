@@ -2427,15 +2427,24 @@ impl<'a> BlockBuilder<'a> {
         let cb = callback(move |a: &mut abi::SignalReadArgs| a.output = f(&World::from_raw(a.world), a.pos) as u32);
         self.set(&bc::SIGNAL_READ, cb)
     }
-    /// Goes along its `facing` (after `facing`), any of the six ways. Its front is what sticks: with
-    /// power from any other side it carries itself, the block in front of it and what is stuck to
-    /// that the way slime does, half a block a second per level of power. Circuits on it go on.
-    /// Without power, or against what it can't go through, it all lands on a whole block.
+    /// Goes along its `facing` (after `facing`), any of the six ways. With power from any other
+    /// side it carries itself and the structure connected to its front, half a block a second
+    /// per level of power. Circuits on it go on.
+    /// On stopping, the default `mode` of `disassemble` lands the platform on whole blocks.
+    /// `hold` keeps it assembled.
     /// `power`: 0 idle, 1 going, 2 stuck. `breaks`: it breaks what is in its way instead.
     pub fn signal_floater(mut self, breaks: bool) -> Self {
         let flags = if breaks { abi::signal_flags::BREAKS } else { 0 };
         self.signal = Some(SignalBuild { flags, ..SignalBuild::default() });
+        self.entity.get_or_insert_with(|| Box::new(|e| e));
         self.signal_props(abi::signal_kind::FLOATER, 3, false, false)
+            .prop("mode", ["disassemble", "hold"])
+    }
+    /// After `facing`, applies force in that direction on a free assembled body. Its lever arm
+    /// from the center of mass also turns the body. `power` scales from zero to `force`.
+    pub fn signal_thruster(self, force: f32) -> Self {
+        self.signal_props(abi::signal_kind::SINK, 16, false, false)
+            .set(&crate::THRUST, force)
     }
     /// Assembles the blocks attached to its front while powered. If `rotates`, power sets
     /// the speed around its facing axis. The `mode` is `disassemble` by default, or `hold` to
@@ -2443,15 +2452,29 @@ impl<'a> BlockBuilder<'a> {
     pub fn signal_body_mount(mut self, rotates: bool) -> Self {
         let flags = if rotates { abi::signal_flags::ROTATES } else { 0 };
         self.signal = Some(SignalBuild { flags, ..SignalBuild::default() });
+        self.entity.get_or_insert_with(|| Box::new(|e| e));
         self = self.signal_props(abi::signal_kind::BODY_MOUNT, 3, false, false);
         if rotates {
             self = self.prop("mode", ["disassemble", "hold"]);
         }
         self
     }
+    /// Holds a carriage beside the guide rails in its facing direction. A signal
+    /// assembles the carriage, which then travels along the rails under load.
+    pub fn signal_guide(mut self) -> Self {
+        self.signal = Some(SignalBuild { flags: abi::signal_flags::SLIDES, ..SignalBuild::default() });
+        self.entity.get_or_insert_with(|| Box::new(|e| e));
+        self.signal_props(abi::signal_kind::BODY_MOUNT, 3, false, false)
+    }
+
+    /// A section of track for a linear guide.
+    pub fn guide_rail(self) -> Self {
+        self.tag(abi::comp::block::GUIDE_RAIL)
+    }
     /// A controller that assembles a free, buoyant body and provides its steering seat.
     pub fn body_helm(mut self) -> Self {
         self.signal = Some(SignalBuild { flags: abi::signal_flags::HELM, ..SignalBuild::default() });
+        self.entity.get_or_insert_with(|| Box::new(|e| e));
         self.signal_props(abi::signal_kind::BODY_MOUNT, 0, false, false)
     }
     /// Mass per cubic block for a freely moving body, in units of water density.
@@ -3379,13 +3402,21 @@ impl SignalBuild {
                 let f = facing.unwrap_or(crate::Dir::North);
                 (sig.watches, sig.gives, sig.strong) = (own(f), own(f.opposite()), own(f.opposite()));
             }
-            k::SINK => sig.inputs = 0x3F,
+            k::SINK => {
+                sig.inputs = 0x3F;
+                if let Some(f) = facing {
+                    sig.front = turn.own(f).face();
+                }
+            }
             // Their front is stuck to what they take along, or is where the head goes.
             k::PISTON | k::FLOATER | k::BODY_MOUNT | k::PISTON_HEAD => {
                 let f = turn.own(facing.unwrap_or(crate::Dir::Up)).face();
                 sig.front = f;
                 sig.inputs = if self.kind == k::PISTON_HEAD || sig.flags & abi::signal_flags::HELM != 0 { 0 } else { 0x3F & !(1 << f) };
-                if sig.flags & abi::signal_flags::ROTATES != 0 && p.is("mode", "hold") {
+                if sig.flags & abi::signal_flags::HELM != 0 {
+                    (sig.gives, sig.strong) = (0x3F, 0x3F);
+                }
+                if p.is("mode", "hold") && (self.kind == k::FLOATER || sig.flags & abi::signal_flags::ROTATES != 0) {
                     sig.flags |= abi::signal_flags::HOLD;
                 }
             }

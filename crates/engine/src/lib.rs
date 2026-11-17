@@ -14,6 +14,8 @@ pub mod components;
 pub mod conditions;
 pub mod config;
 pub mod content;
+mod controller;
+mod controller_screen;
 pub mod dedicated;
 pub mod diag;
 pub mod editor;
