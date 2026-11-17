@@ -364,7 +364,7 @@ fn run_on(event_loop: EventLoop<()>, renderers: Renderers, opts: Options) -> Res
 
 /// The engine's own assets: those a distribution ships, else (a build run from the source tree, or
 /// `--dev`) the source tree's.
-fn engine_assets(dev: bool) -> PathBuf {
+pub(crate) fn engine_assets(dev: bool) -> PathBuf {
     let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("assets");
     let shipped = crate::paths::shipped().map(|d| d.join("assets").join("core"));
     match shipped {
@@ -407,7 +407,8 @@ impl App {
     fn start(&mut self, el: &ActiveEventLoop) -> Result<Running, String> {
         // Mods first: the engine's settings are `core:` configs like theirs.
         let off = modloader::off_file(&self.opts.run_dir, self.opts.automated);
-        let mods = modloader::load(&self.opts.mod_dirs, &self.opts.cache_dir, &off, &self.opts.mods_off)?;
+        let core_assets = engine_assets(self.opts.dev);
+        let mods = modloader::load(&self.opts.mod_dirs, &self.opts.cache_dir, &off, &self.opts.mods_off, &core_assets)?;
         crate::config::set_automated(self.opts.automated);
         crate::config::load(&self.opts.run_dir);
         if self.opts.no_vsync {
@@ -420,7 +421,7 @@ impl App {
             crate::config::override_for_run("core:renderer", r);
         }
         let mut settings = Settings::new(&self.opts.run_dir);
-        let icon = crate::assets::decode_png_file(&engine_assets(self.opts.dev).join("icon.png"))
+        let icon = crate::assets::decode_png_file(&core_assets.join("icon.png"))
             .and_then(|(w, h, px)| winit::window::Icon::from_rgba(px, w, h).ok());
         let mut attrs = Window::default_attributes()
             .with_title("Weft")
@@ -471,7 +472,7 @@ impl App {
         }
         let (mut gpu, renderer) = gpu.ok_or_else(|| failed.join("; "))?;
 
-        let mut roots: Vec<(String, PathBuf)> = vec![("core".into(), engine_assets(self.opts.dev))];
+        let mut roots: Vec<(String, PathBuf)> = vec![("core".into(), core_assets)];
         roots.extend(mods.iter().map(|m| (m.id.clone(), m.assets.clone())));
         // Not in automated runs: their pictures are compared against fixed expectations.
         if !self.opts.automated {

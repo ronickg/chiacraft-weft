@@ -3155,6 +3155,8 @@ crate::data! {
     /// `swing` radians at a full stride, `phase` (radians) after the stride's own beat.
     pub struct HitboxPart {
         pub name: crate::data::String,
+        /// If named, the entity's gameplay skeleton moves this box from its rest pose.
+        pub bone: crate::data::String,
         pub min: [f32; 3],
         pub max: [f32; 3],
         pub pivot: [f32; 3],

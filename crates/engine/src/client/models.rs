@@ -177,13 +177,7 @@ impl KindModel {
     pub fn play(&self, out: &mut Clips, clips: &[u32], how: &Play) {
         for &i in clips {
             let Some(b) = self.anims.get(i as usize) else { continue };
-            let t = match b.anim.drive.unwrap_or(how.drive) {
-                Drive::Clock => b.at(how.clock, how.looping),
-                Drive::Distance => b.at(how.distance, true),
-                Drive::Progress => how.progress.clamp(0.0, 1.0) * b.anim.length,
-            };
-            let speed = if how.by_speed || b.anim.by_speed { how.speed } else { 1.0 };
-            let w = how.weight * b.anim.weight * speed;
+            let (t, w) = b.sample(how);
             if w > 0.0 {
                 out.push(PlayClip {
                     anim: i,
@@ -200,42 +194,9 @@ impl KindModel {
 }
 
 /// How the clips of an action play this frame.
-#[derive(Clone, Copy)]
-pub struct Play {
-    pub drive: Drive,
-    pub clock: f32,
-    pub distance: f32,
-    pub progress: f32,
-    pub looping: bool,
-    pub weight: f32,
-    pub speed: f32,
-    pub by_speed: bool,
-    pub mirror: bool,
-    pub aim: bool,
-    /// One hand's and what it holds, not the whole body's.
-    pub hand: bool,
-}
+pub use crate::model::Play;
 
-impl Default for Play {
-    fn default() -> Play {
-        Play {
-            drive: Drive::Clock,
-            clock: 0.0,
-            distance: 0.0,
-            progress: 0.0,
-            looping: false,
-            weight: 1.0,
-            speed: 1.0,
-            by_speed: false,
-            mirror: false,
-            aim: false,
-            hand: false,
-        }
-    }
-}
-
-/// How many clips play on one entity at most: more than come at once, for those on their way out.
-pub const MAX_CLIPS: usize = 16;
+pub use crate::model::MAX_CLIPS;
 
 #[derive(Clone, Copy, Default)]
 pub struct PlayClip {
@@ -472,12 +433,7 @@ pub fn icon_done(stack: ItemStack, icon: Option<(u32, [f32; 4])>) {
 
 /// The text of a component of an item or an entity, with `{name}` as the entry's path.
 fn file_named(kind: usize, entry: u32, key: &str, name: &str) -> Option<String> {
-    let c = content();
-    let t = c
-        .components
-        .id(key)
-        .and_then(|id| c.components.text(kind, entry, id))?;
-    Some(t.replace("{name}", name.split_once(':').map_or(name, |n| n.1)))
+    model::asset_name(&content().components, kind, entry, key, name)
 }
 
 /// The kind's model: the file named by its `model` component, else `<ns>:<name>` if a model
@@ -486,17 +442,11 @@ fn load_kind(assets: &Assets, k: u32) -> (Vec<Part>, Option<[u32; 2]>, Vec<Anima
     let c = content();
     let kind = &c.game.entities[k as usize];
     let named = |key: &str| file_named(ENTITY, k, key, &kind.name);
-    let (mut parts, mut texture) = (kind.parts.clone(), None);
     if let Some(file) = named(comp::ANIMATIONS) {
         warn_no_clips(assets, &kind.name, &file);
     }
     let model_name = named(comp::MODEL).unwrap_or_else(|| kind.name.clone());
-    if let Some(src) = read(assets, &model_name, "models", "geo.json") {
-        match model::load_geo(&src) {
-            Ok(g) => (parts, texture) = (g.parts, g.texture),
-            Err(e) => log::error!("model {model_name}: {e}"),
-        }
-    }
+    let (parts, texture) = model::entity_geometry(|n, k, x| read(assets, n, k, x), &model_name, &kind.parts);
     let anim_name = named(comp::ANIMATIONS).unwrap_or_else(|| kind.name.clone());
     (parts, texture, animations(assets, &anim_name))
 }
@@ -523,29 +473,6 @@ fn animations(assets: &Assets, name: &str) -> Vec<Animation> {
         None => Vec::new(),
     }
 }
-
-/// The engine's own animations for a model of this shape, which any of its bones go by unless
-/// the kind has clips of its own for them.
-fn stock_file(parts: &[Part]) -> &'static str {
-    let has = |r: u32| parts.iter().any(|p| p.role == r);
-    let arms = parts
-        .iter()
-        .filter(|p| p.role == role::ARM_LEFT || p.role == role::ARM_RIGHT);
-    if has(role::LEG_SWEEP) {
-        "core:stock_spider"
-    } else if has(role::LEG_FRONT_LEFT) || has(role::LEG_FRONT_RIGHT) {
-        "core:stock_quadruped"
-    } else if arms.clone().any(|p| p.rest[0].abs() > 1.0) {
-        "core:stock_biped_arms_out"
-    } else if arms.count() > 0 || has(role::LEG_LEFT) || has(role::LEG_RIGHT) {
-        "core:stock_biped"
-    } else {
-        "core:stock_other"
-    }
-}
-
-const STOCK_FILES: [&str; 5] =
-    ["core:stock_biped", "core:stock_biped_arms_out", "core:stock_quadruped", "core:stock_spider", "core:stock_other"];
 
 /// A box of bone `bone` for the table, drawn when bone `cover` (of role `role`) is.
 fn gpu_cuboid(cu: &Cuboid, p: &Part, bone: usize, cover: usize, role: u32) -> GpuCuboid {
@@ -701,20 +628,6 @@ fn live_bones(model_name: &str, parts: &[Part], said: &[(String, BoneMotion)]) -
         .collect()
 }
 
-/// Binds one action's clips: `over` wins on the bones it names, `under` plays the rest.
-fn bind(anims: &mut Vec<Bound>, parts: &[Part], over: &Arc<Animation>, under: &[u32]) -> Vec<u32> {
-    let top = Bound::new(over.clone(), parts);
-    let mut out = Vec::new();
-    for &i in under {
-        let rest = anims[i as usize].without(&top);
-        out.push(anims.len() as u32);
-        anims.push(rest);
-    }
-    out.push(anims.len() as u32);
-    anims.push(top);
-    out
-}
-
 /// A kind's clips, by action, from its own file over the stock one, then what items bring.
 fn bind_kind(
     parts: &[Part],
@@ -722,24 +635,14 @@ fn bind_kind(
     stock: &[Arc<Animation>],
     items: &[(u32, Vec<Arc<Animation>>)],
 ) -> (Vec<Bound>, FxHashMap<String, Vec<u32>>, FxHashMap<u32, FxHashMap<String, Vec<u32>>>) {
-    let mut anims: Vec<Bound> = Vec::new();
-    let mut actions: FxHashMap<String, Vec<u32>> = FxHashMap::default();
-    for a in stock {
-        actions.insert(a.name.clone(), vec![anims.len() as u32]);
-        anims.push(Bound::new(a.clone(), parts));
-    }
-    for a in own {
-        let under = actions.remove(&a.name).unwrap_or_default();
-        let top = bind(&mut anims, parts, a, &under);
-        actions.insert(a.name.clone(), top);
-    }
+    let (mut anims, actions) = model::bind_actions(parts, own, stock);
     let mut by_item = FxHashMap::default();
     if parts.iter().any(|p| p.role == role::ARM_RIGHT) {
         for (item, clips) in items {
             let mut table: FxHashMap<String, Vec<u32>> = FxHashMap::default();
             for a in clips {
                 let under = actions.get(&a.name).cloned().unwrap_or_default();
-                table.insert(a.name.clone(), bind(&mut anims, parts, a, &under));
+                table.insert(a.name.clone(), model::bind(&mut anims, parts, a, &under));
             }
             by_item.insert(*item, table);
         }
@@ -1062,7 +965,7 @@ impl Models {
         self.kept.clear();
         self.new_skins.clear();
         let c = content();
-        self.stock = STOCK_FILES
+        self.stock = model::STOCK_FILES
             .into_iter()
             .map(|n| (n, animations(assets, n).into_iter().map(Arc::new).collect()))
             .collect();
@@ -1157,7 +1060,7 @@ impl Models {
     fn push_with_stock(&mut self, parts: Vec<Part>, texture: Option<[u32; 2]>, own: &[Arc<Animation>]) -> u32 {
         let stocked = self
             .stock
-            .get(stock_file(&parts))
+            .get(model::stock_file(&parts))
             .map_or(&[][..], Vec::as_slice);
         push_kind(&mut self.kinds, &mut self.tables, parts, texture, (own, stocked, &self.item_clips))
     }

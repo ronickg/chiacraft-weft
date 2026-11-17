@@ -1348,7 +1348,7 @@ impl Dim {
         let ((sy, cy), (sp, cp)) = ((me.yaw as f64).sin_cos(), (me.pitch as f64).sin_cos());
         let look = DVec3::new(-sy * cp, sp, -cy * cp);
         let parts = c.game.entities[t.kind as usize].hitboxes.as_ref();
-        crate::hitbox::ray_entity(parts, &t.hit_body(c, t.pos), eye, look, 16.0, &mut Vec::new()).map_or(0, |h| h.0)
+        crate::hitbox::ray_entity(parts, &t.hit_body(c, t.pos), eye, look, 16.0, &mut Default::default()).map_or(0, |h| h.0)
     }
 
     pub fn attack(&mut self, c: &'static Content, attacker: u64, target: u64, held: ItemStack) -> bool {

@@ -71,30 +71,37 @@ impl Server {
                     .iter_mut()
                     .filter(|e| !e.removed && e.anchor.is_none())
                 {
-                    let now = (e.pos, e.yaw, e.pitch, e.pose, e.sprinting);
+                    let now = crate::net::Move {
+                        id: e.id,
+                        pos: e.pos,
+                        yaw: e.yaw,
+                        pitch: e.pitch,
+                        body_yaw: e.body_yaw,
+                        strode: e.strode,
+                        stride: e.stride,
+                        pose: e.pose,
+                        sprinting: e.sprinting,
+                        frame: e.frame.unwrap_or(0),
+                        rotation: e.wire_rotation(),
+                    };
                     // Solid bodies every tick: clients show them between server positions, and a
                     // body that stops must say so (two equal positions).
                     let solid = c.game.entities[e.kind as usize].is(crate::tag_bits::entity::SOLID);
                     if solid
                         || e.sent.is_none_or(|s| {
-                            (s.0 - now.0).length_squared() > 1e-6
-                                || (s.1 - now.1).abs() > 0.01
-                                || (s.2 - now.2).abs() > 0.01
-                                || s.3 != now.3
-                                || s.4 != now.4
+                            (s.pos - now.pos).length_squared() > 1e-6
+                                || (s.yaw - now.yaw).abs() > 0.01
+                                || (s.pitch - now.pitch).abs() > 0.01
+                                || s.body_yaw != now.body_yaw
+                                || s.strode != now.strode
+                                || s.stride != now.stride
+                                || s.pose != now.pose
+                                || s.sprinting != now.sprinting
+                                || s.frame != now.frame
                         })
                     {
                         if e.sent.is_some() {
-                            m.push(crate::net::Move {
-                                id: e.id,
-                                pos: e.pos,
-                                yaw: e.yaw,
-                                pitch: e.pitch,
-                                pose: e.pose,
-                                sprinting: e.sprinting,
-                                frame: e.frame.unwrap_or(0),
-                                rotation: e.wire_rotation(),
-                            });
+                            m.push(now);
                         }
                         e.sent = Some(now);
                     }

@@ -381,36 +381,16 @@ impl Client {
                 .steers
                 .then_some(id)
         });
-        // Bodies turn by the tick from these moves (`physics::turn_body`), as the server turned
-        // them, by how they moved on what they stand on.
-        let deltas: rustc_hash::FxHashMap<u64, DVec3> = list
-            .iter()
-            .filter_map(|m| self.entities.get(&m.id).map(|e| (m.id, m.pos - e.target)))
-            .collect();
-        // Limbs swing and crouching turns by the tick too, the clips' clock.
-        for &crate::net::Move { id, yaw, pose, frame, .. } in &list {
-            let Some(&d) = deltas.get(&id) else { continue };
-            let carried = deltas
-                .get(&frame)
-                .filter(|_| frame != 0)
-                .copied()
-                .unwrap_or_default();
+        for crate::net::Move { id, pos, yaw, pitch, body_yaw, strode, stride, pose, sprinting, frame, rotation } in list.iter().copied() {
             if let Some(e) = self.entities.get_mut(&id) {
-                let walked = d - carried;
-                e.body_target = crate::physics::turn_body(e.body_target, yaw, walked);
-                let speed = (walked.with_y(0.0).length() * crate::world::TPS as f64) as f32;
-                crate::model::walk_limbs(&mut e.walk_target, &mut e.swing_target, speed, crate::world::TICK as f32);
+                (e.body_target, e.walk_target, e.swing_target) = (body_yaw, strode, stride);
                 let crouching = pose == Pose::CROUCH;
                 if crouching != e.crouch_at.2 {
                     e.crouch_at = (tick as f64, e.crouched, crouching);
                 }
-            }
-        }
-        for &crate::net::Move { id, pos, yaw, pitch, pose, sprinting, frame, rotation } in &list {
-            if Some(id) == driving {
-                continue;
-            }
-            if let Some(e) = self.entities.get_mut(&id) {
+                if Some(id) == driving {
+                    continue;
+                }
                 (e.pose, e.sprinting) = (pose, sprinting);
                 let was = e.target;
                 let rot = entity_rotation(rotation);

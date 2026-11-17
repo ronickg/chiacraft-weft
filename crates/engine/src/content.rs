@@ -1993,7 +1993,12 @@ struct Lookups<'a> {
 /// depend on which mod finished registering first. The order of the stages is the meaning here:
 /// each one reads what the ones before it settled.
 /// `step_order` is the pack's own order of steps (`config/step_order.txt`).
-pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>, step_order: &str) -> Result<Content, Vec<String>> {
+pub fn freeze(
+    mut mods: Vec<ModMeta>,
+    regs: Vec<RawRegistrar>,
+    step_order: &str,
+    core_assets: &std::path::Path,
+) -> Result<Content, Vec<String>> {
     let order = load_order(&mods);
     for (m, o) in mods.iter_mut().zip(&order) {
         m.order = *o;
@@ -2256,6 +2261,7 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>, step_order: &str)
     );
     check_loot_smelting(&loot, &game, &mut errors);
     resolve_effects(&mut states, &mut game, &block_defs, &components, &mut errors);
+    crate::hitbox::bind_rigs(core_assets, &mods, &components, &mut game.entities, &mut errors);
     let face_layers = face_layers(&mut textures, &tint_kinds, &mut errors);
     if !errors.is_empty() {
         return Err(errors);

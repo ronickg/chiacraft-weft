@@ -145,7 +145,7 @@ pub struct EntityKind {
     /// How it flies when it is a projectile (`comp::entity::PROJECTILE`).
     pub projectile: Option<abi::Projectile>,
     /// What hits land on, part by part (`comp::entity::HITBOXES`); none: its box.
-    pub hitboxes: Option<abi::Hitboxes>,
+    pub hitboxes: Option<crate::hitbox::Rig>,
     /// What the keys of a player steering it do (`abi::SteerArgs`), and where riders get off
     /// when a seat asks it (`abi::DismountArgs`).
     pub steer: Option<(ModId, Callback)>,
@@ -1746,7 +1746,8 @@ fn bake_entity(e: &Entry) -> EntityKind {
         projectile: e.get::<abi::Projectile>(k::PROJECTILE),
         hitboxes: e
             .get::<abi::Hitboxes>(k::HITBOXES)
-            .filter(|h| !h.parts.is_empty()),
+            .filter(|h| !h.parts.is_empty())
+            .map(crate::hitbox::Rig::new),
         steer: e.callback(k::STEER),
         dismount: e.callback(k::DISMOUNT),
         ride_camera: e.or(k::RIDE_CAMERA, f32::NAN),

@@ -2337,9 +2337,8 @@ impl Projectile {
 
 /// What hits land on, part by part (`EntityBuilder::hitboxes`): boxes in pixels (1/16 block, its
 /// feet at 0, -Z its front, -X its right) at the kind's size; one made bigger is hit bigger. Rays, arrows and blows tell the part they hit (`RayHit::part`, `Damage::part`, the
-/// `part` a chain step reads in its query). They go with the body, a head with the look, arms
-/// and legs swing as it walks: run and an arrow may pass between them. Not the model's boxes:
-/// how a mob looks never changes where it can be hit.
+/// `part` a chain step reads in its query). A box bound to a bone follows the registered model's
+/// base pose on the server and client. Its dimensions are authored independently of the model's mesh.
 #[derive(Clone)]
 pub struct Hitboxes(abi::Hitboxes);
 
@@ -2350,12 +2349,20 @@ impl Hitboxes {
     fn add(mut self, name: &str, min: [f32; 3], max: [f32; 3], pivot: [f32; 3], follows: u32, swing: f32, phase: f32) -> Self {
         self.0
             .parts
-            .push(abi::HitboxPart { name: name.into(), min, max, pivot, follows, swing, phase });
+            .push(abi::HitboxPart { name: name.into(), bone: String::new(), min, max, pivot, follows, swing, phase });
         self
     }
     /// A part going with the body.
     pub fn part(self, name: &str, min: [f32; 3], max: [f32; 3]) -> Self {
         self.add(name, min, max, [0.0; 3], abi::hitbox_follows::BODY, 0.0, 0.0)
+    }
+    fn on_bone(mut self, bone: &str) -> Self {
+        self.0.parts.last_mut().unwrap().bone = bone.into();
+        self
+    }
+    /// A box in rest-pose model pixels that follows a bone of the registered entity model.
+    pub fn bone(self, name: &str, bone: &str, min: [f32; 3], max: [f32; 3]) -> Self {
+        self.part(name, min, max).on_bone(bone)
     }
     /// A head: it turns with the look about `pivot`, its neck.
     pub fn head(self, name: &str, min: [f32; 3], max: [f32; 3], pivot: [f32; 3]) -> Self {
@@ -2371,22 +2378,32 @@ impl Hitboxes {
         let pi = std::f32::consts::PI;
         Hitboxes::new()
             .head("head", [-4.0, 24.0, -4.0], [4.0, 32.0, 4.0], [0.0, 24.0, 0.0])
-            .part("body", [-4.0, 12.0, -2.0], [4.0, 24.0, 2.0])
+            .on_bone("head")
+            .bone("body", "body", [-4.0, 12.0, -2.0], [4.0, 24.0, 2.0])
             .limb("right_arm", [-8.0, 12.0, -2.0], [-4.0, 24.0, 2.0], [-5.0, 22.0, 0.0], 0.8, pi)
+            .on_bone("rightArm")
             .limb("left_arm", [4.0, 12.0, -2.0], [8.0, 24.0, 2.0], [5.0, 22.0, 0.0], 0.8, 0.0)
+            .on_bone("leftArm")
             .limb("right_leg", [-4.0, 0.0, -2.0], [0.0, 12.0, 2.0], [-2.0, 12.0, 0.0], 0.8, 0.0)
+            .on_bone("rightLeg")
             .limb("left_leg", [0.0, 0.0, -2.0], [4.0, 12.0, 2.0], [2.0, 12.0, 0.0], 0.8, pi)
+            .on_bone("leftLeg")
     }
     /// A body on four legs with a head ahead, 25 pixels tall: a cow's.
     pub fn quadruped() -> Hitboxes {
         let pi = std::f32::consts::PI;
         Hitboxes::new()
             .head("head", [-5.0, 16.0, -15.0], [5.0, 25.0, -8.0], [0.0, 20.0, -8.0])
-            .part("body", [-6.0, 11.0, -8.0], [6.0, 22.0, 10.0])
+            .on_bone("head")
+            .bone("body", "body", [-6.0, 11.0, -8.0], [6.0, 22.0, 10.0])
             .limb("front_right_leg", [-6.0, 0.0, -7.0], [-2.0, 12.0, -3.0], [-4.0, 12.0, -5.0], 0.8, pi)
+            .on_bone("leg3")
             .limb("front_left_leg", [2.0, 0.0, -7.0], [6.0, 12.0, -3.0], [4.0, 12.0, -5.0], 0.8, 0.0)
+            .on_bone("leg2")
             .limb("back_right_leg", [-6.0, 0.0, 5.0], [-2.0, 12.0, 9.0], [-4.0, 12.0, 7.0], 0.8, 0.0)
+            .on_bone("leg0")
             .limb("back_left_leg", [2.0, 0.0, 5.0], [6.0, 12.0, 9.0], [4.0, 12.0, 7.0], 0.8, pi)
+            .on_bone("leg1")
     }
     /// Its arms held out ahead, not swinging, as a zombie's.
     pub fn reaching(mut self) -> Self {

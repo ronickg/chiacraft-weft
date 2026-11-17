@@ -54,7 +54,7 @@ pub struct Entity {
     /// The block it is breaking.
     pub mining: Option<Mining>,
     pub anchor: Option<IVec3>,
-    pub sent: Option<(DVec3, f32, f32, crate::world::Pose, bool)>,
+    pub sent: Option<crate::net::Move>,
     /// The solid body it rides (stands on, or flies above within its carry height).
     /// The body it is on: what it rides, or whose blocks hold it if it has an `anchor`.
     pub frame: Option<u64>,
@@ -360,15 +360,20 @@ impl Entity {
             body_yaw: self.body_yaw,
             yaw: self.yaw,
             pitch: self.pitch,
-            walk: self.strode,
-            stride: self.stride,
+            posture: crate::model::Posture {
+                pose: self.pose,
+                riding: self.vehicle.is_some(),
+                age: self.age as f32 * crate::world::TICK as f32,
+                walk: self.strode,
+                stride: self.stride,
+                crouched: if self.pose == crate::world::Pose::CROUCH { 1.0 } else { 0.0 },
+            },
             size: self
                 .size
                 .unwrap_or(c.game.entities[self.kind as usize].size()),
             scale: self
                 .size
                 .map_or(1.0, |s| (s.height / c.game.entities[self.kind as usize].size().height.max(1e-3)) as f64),
-            pose: self.pose,
         }
     }
 

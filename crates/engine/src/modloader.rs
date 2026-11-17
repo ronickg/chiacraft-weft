@@ -415,7 +415,13 @@ pub fn restart_pending() -> bool {
 pub const ABI_VERSION: u64 = abi::ABI_VERSION;
 
 /// `also_off`: off for this run only, besides what the player turned off (a launcher's choice).
-pub fn load(mod_dirs: &[PathBuf], cache: &Path, off_file: &Path, also_off: &[String]) -> Result<Vec<LoadedMod>, String> {
+pub fn load(
+    mod_dirs: &[PathBuf],
+    cache: &Path,
+    off_file: &Path,
+    also_off: &[String],
+    core_assets: &Path,
+) -> Result<Vec<LoadedMod>, String> {
     let start = Instant::now();
     let mut wanted: Vec<String> = std::fs::read_to_string(off_file)
         .unwrap_or_default()
@@ -601,7 +607,7 @@ pub fn load(mod_dirs: &[PathBuf], cache: &Path, off_file: &Path, also_off: &[Str
         .collect();
 
     let step_order = std::fs::read_to_string(off_file.with_file_name("step_order.txt")).unwrap_or_default();
-    let content = content::freeze(metas, regs, &step_order).map_err(|e| e.join("\n"))?;
+    let content = content::freeze(metas, regs, &step_order, core_assets).map_err(|e| e.join("\n"))?;
     log::info!(
         "{} mods, {} blocks ({} states), {} items, {} dimensions in {:.1} ms",
         mods.len(),

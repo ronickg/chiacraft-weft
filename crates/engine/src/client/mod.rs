@@ -467,8 +467,7 @@ impl ClientEntity {
             body_yaw: self.body_yaw,
             yaw: self.yaw,
             pitch: self.pitch,
-            walk: self.walk,
-            stride: self.swing,
+            posture: self.posture(),
             size: self
                 .size
                 .unwrap_or(content().game.entities[self.kind as usize].size()),
@@ -479,7 +478,17 @@ impl ClientEntity {
                         .height
                         .max(1e-3)) as f64
             }),
+        }
+    }
+
+    pub fn posture(&self) -> crate::model::Posture {
+        crate::model::Posture {
             pose: self.pose,
+            riding: self.vehicle.is_some(),
+            age: self.age,
+            walk: self.walk,
+            stride: self.swing,
+            crouched: self.crouched,
         }
     }
 
@@ -2170,7 +2179,7 @@ impl Client {
                     continue;
                 };
                 if let Some(e) = self.entities.get_mut(&id) {
-                    (e.pos, e.target) = (at, at);
+                    e.pos = at;
                 }
             }
         }
@@ -2575,7 +2584,7 @@ impl Client {
 
     fn pick_entity(&self, eye: DVec3, dir: DVec3, max: f64) -> Option<u64> {
         let mut best: Option<(f64, u64)> = None;
-        let mut scratch = Vec::new();
+        let mut scratch = crate::hitbox::Scratch::default();
         for (&id, e) in &self.entities {
             // Structures are aimed at by their blocks.
             if !e.is_body() || id == self.player_id || e.structure.is_some() {

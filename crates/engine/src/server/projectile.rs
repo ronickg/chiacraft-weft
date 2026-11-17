@@ -48,9 +48,10 @@ impl Dim {
             // Only what stands near the line's box is looked at closely: no mob is wider than this.
             const WIDEST: f64 = 4.0;
             let (to, world_from) = (self.place.to_world(from + dir * reach), self.place.to_world(from));
+            let world_dir = self.place.vector_to_world(dir);
             let (lo, hi) = (world_from.min(to) - DVec3::splat(WIDEST), world_from.max(to) + DVec3::splat(WIDEST));
             let mut near: Option<(f64, u8, u64, DVec3, u32)> = None;
-            let mut scratch = Vec::new();
+            let mut scratch = crate::hitbox::Scratch::default();
             for e in &self.entities.list {
                 if e.pos.cmplt(lo).any() || e.pos.cmpgt(hi).any() {
                     continue;
@@ -60,9 +61,9 @@ impl Dim {
                     continue;
                 }
                 // The parts of its hitbox where they are this tick, else its box.
-                let body = e.hit_body(c, self.place.to_local(e.pos));
+                let body = e.hit_body(c, e.pos);
                 let parts = c.game.entities[e.kind as usize].hitboxes.as_ref();
-                if let Some((part, t, face, on)) = crate::hitbox::ray_entity(parts, &body, from, dir, reach, &mut scratch) {
+                if let Some((part, t, face, on)) = crate::hitbox::ray_entity(parts, &body, world_from, world_dir, reach, &mut scratch) {
                     if near.is_none_or(|n| t < n.0) {
                         near = Some((t, face, e.id, on, part));
                     }
