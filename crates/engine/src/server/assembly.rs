@@ -90,6 +90,15 @@ pub(super) struct Edit {
 }
 
 impl Dim {
+    pub(crate) fn set_assembly_bounds(&mut self, c: &Content, at: IVec3, min: IVec3, max: IVec3) -> bool {
+        if !c.dims[self.id as usize].editable || Controller::at(c, self, at).is_none() {
+            return false;
+        }
+        let saved = self.save_assembly_bounds(c, at, Bounds::new(min, max));
+        if saved { self.space.signals.recheck_device(at); }
+        saved
+    }
+
     pub(super) fn assembly_bounds(&self, c: &Content, p: IVec3) -> Option<Bounds> {
         let id = self.anchored(p)?;
         let data = self.entities.comps.get(&(id, c.component(BOUNDS)?))?;
@@ -243,6 +252,11 @@ impl Dim {
             return result::UNAVAILABLE;
         }
         let controller = at.and_then(|p| Controller::at(c, self, p));
+        if flags & abi::assembly_flags::DIRECT != 0 {
+            let Some(ctrl) = controller.filter(|ctrl| self.frame == 0 || !ctrl.helm) else { return result::UNAVAILABLE };
+            let bounds = self.assembly_bounds(c, ctrl.block);
+            return self.confirm_assembly(c, player, &mut Edit::default(), Some(ctrl), bounds, ctrl.center(), flags);
+        }
         if self.frame != 0
             && let Some(ctrl) = controller.filter(|ctrl| ctrl.helm)
         {
@@ -297,14 +311,14 @@ impl Dim {
                     result::UNAVAILABLE
                 }
             } else {
-                self.confirm_assembly(c, player, &mut edit, Some(ctrl), bounds, ctrl.center(), false)
+                self.confirm_assembly(c, player, &mut edit, Some(ctrl), bounds, ctrl.center(), 0)
             }
         } else if let Some(at) = at {
             edit.preview = None;
             if let Some(first) = edit.corner.take() {
                 let bounds = Bounds::new(first, at);
                 edit.bounds = Some(bounds);
-                self.confirm_assembly(c, player, &mut edit, None, Some(bounds), bounds.lo, false)
+                self.confirm_assembly(c, player, &mut edit, None, Some(bounds), bounds.lo, 0)
             } else {
                 edit.bounds = None;
                 edit.corner = Some(at);
@@ -312,8 +326,7 @@ impl Dim {
                 result::FIRST_CORNER
             }
         } else if let Some(bounds) = edit.bounds.filter(|_| tool) {
-            let physics = flags & abi::assembly_flags::PHYSICS != 0;
-            self.confirm_assembly(c, player, &mut edit, None, Some(bounds), bounds.lo, physics)
+            self.confirm_assembly(c, player, &mut edit, None, Some(bounds), bounds.lo, flags)
         } else {
             self.draw_assembly(player, None, &[]);
             return result::CLEARED;
@@ -334,13 +347,14 @@ impl Dim {
         controller: Option<Controller>,
         bounds: Option<Bounds>,
         center: IVec3,
-        physics: bool,
+        flags: u8,
     ) -> u32 {
+        let direct = flags & abi::assembly_flags::DIRECT != 0;
         let cells = match self.assembly_blocks(c, controller, bounds) {
             Ok(cells) => cells,
             Err(code) => {
                 edit.preview = None;
-                self.draw_assembly(player, bounds, &[]);
+                if !direct { self.draw_assembly(player, bounds, &[]); }
                 return code;
             }
         };
@@ -349,7 +363,7 @@ impl Dim {
             return result::TOO_LARGE;
         }
         let at = controller.map(|ctrl| ctrl.block);
-        if !edit
+        if !direct && !edit
             .preview
             .as_ref()
             .is_some_and(|p| p.controller == at && p.expires > self.time && p.cells == lifted)
@@ -368,7 +382,7 @@ impl Dim {
                     return result::UNAVAILABLE;
                 }
                 self.space.signals.recheck_device(ctrl.block);
-                self.draw_assembly(player, None, &[]);
+                if !direct { self.draw_assembly(player, None, &[]); }
                 return result::CONFIRMED;
             }
             None if self.frame == 0 => c.game.platform_kind,
@@ -378,10 +392,10 @@ impl Dim {
         if let Some(ctrl) = controller {
             self.float_ship(id, ctrl.face);
             self.set_helm(c, id, IVec3::ZERO);
-        } else if physics {
+        } else if flags & abi::assembly_flags::PHYSICS != 0 {
             self.float_ship(id, 4);
         }
-        self.draw_assembly(player, None, &[]);
+        if !direct { self.draw_assembly(player, None, &[]); }
         result::CONFIRMED
     }
 

@@ -82,6 +82,27 @@ impl World {
         unsafe { (host().assembly_select)(self.raw, player, std::ptr::null(), flags) }
     }
 
+    /// Assemble a Controller or save the bounds of a mount without opening a player preview.
+    pub fn assemble_controller(&self, player: u64, at: impl Into<BlockPos>) -> u32 {
+        unsafe { (host().assembly_select)(self.raw, player, &at.into(), abi::assembly_flags::DIRECT) }
+    }
+
+    /// Replace the redstone key bindings on a Controller, keeping the exit key and debug mode.
+    pub fn set_controller_bindings(&self, at: impl Into<BlockPos>, bindings: &[(crate::Dir, &str, u8)]) -> bool {
+        let bindings: Vec<_> = bindings.iter().map(|&(face, key, level)| abi::ControllerBinding { face: face.face() as u8, key: Str::new(key), level }).collect();
+        unsafe { (host().controller_bindings)(self.raw, &at.into(), abi::Slice::new(&bindings)) != 0 }
+    }
+
+    /// Program a rotor's signal ranges in the current block frame. A gap is an unmatched signal.
+    pub fn set_rotor_program(&self, at: impl Into<BlockPos>, rules: &[abi::RotorRule], hold: bool) -> bool {
+        unsafe { (host().rotor_program)(self.raw, &at.into(), abi::Slice::new(rules), hold as u8) != 0 }
+    }
+
+    /// Limit what a mount can assemble. Both corners are inclusive and use the current frame.
+    pub fn set_assembly_bounds(&self, at: impl Into<BlockPos>, min: impl Into<BlockPos>, max: impl Into<BlockPos>) -> bool {
+        unsafe { (host().assembly_bounds)(self.raw, &at.into(), &min.into(), &max.into()) != 0 }
+    }
+
     /// Overrides the helm of an active ship. Each axis is clamped to -1..1; `None` gives control
     /// back to the seated pilot. The override lasts until cleared or the ship is unloaded.
     /// Returns false for a missing ship or non-finite input.

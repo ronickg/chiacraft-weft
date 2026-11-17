@@ -572,6 +572,7 @@ pub mod block {
     pub static TURN: Component<u8, Block> = Component::named(b::TURN);
     pub static BOXES: Component<Vec<abi::ModelBox>, Block> = Component::named(b::BOXES);
     pub static HITBOX: Component<Vec<[f32; 6]>, Block> = Component::named(b::HITBOX);
+    pub static CYLINDER: Component<[f32; 3], Block> = Component::named(b::CYLINDER);
     pub static OUTLINE: Component<Vec<[f32; 6]>, Block> = Component::named(b::OUTLINE);
     pub static SIGNAL: Component<abi::SignalDesc, Block> = Component::named(b::SIGNAL);
     pub static LIQUID_WALLS: Component<u8, Block> = Component::named(b::LIQUID_WALLS);

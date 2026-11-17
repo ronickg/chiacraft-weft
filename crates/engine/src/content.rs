@@ -139,6 +139,7 @@ pub struct StateInfo {
     pub boxes: Vec<ModelBox>,
     /// In block units.
     pub collision: Vec<[f32; 6]>,
+    pub cylinder: Option<crate::physics::Cylinder>,
     /// `abi::comp::block::LIQUID_WALLS`; `Content::liquid_walls` has them worked out.
     pub liquid_walls: u8,
     /// What rays pick and the room it takes in its cell, in block units: its hitbox, else its

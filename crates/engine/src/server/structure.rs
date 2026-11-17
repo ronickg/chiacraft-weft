@@ -14,7 +14,7 @@ use super::entity::{BodyMount, Motion};
 use super::signal::{Moved, RiderMeets};
 use super::space::{CubeCells, FloaterPath, Space};
 use crate::content::{AIR, Content};
-use crate::physics::{Aabb, Transform};
+use crate::physics::{Aabb, Solid, Transform};
 use crate::world::{cube_of, local_index};
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -52,14 +52,23 @@ pub(super) struct MountedPart<'a> {
     pub relative: Transform,
 }
 
+#[derive(Clone, Copy)]
+pub(super) struct StructurePeer<'a> {
+    pub id: u64,
+    pub place: Transform,
+    pub bounds: Aabb,
+    pub space: &'a Space,
+    pub delta: DVec3,
+}
+
 pub(super) fn visit_structure_shapes(
     c: &Content,
     world: &CubeCells<'_>,
     parts: &[MountedPart<'_>],
-    others: &[(u64, Transform, Aabb, &Space)],
+    others: &[StructurePeer<'_>],
     place: Transform,
     delta: DVec3,
-    mut visit: impl FnMut(u64, Aabb, Transform, DVec3, Option<(u64, Transform, &Space)>) -> bool,
+    mut visit: impl FnMut(u64, Solid, Transform, DVec3, Option<StructurePeer<'_>>) -> bool,
 ) -> bool {
     for part in parts {
         let place = part.relative.in_frame(place);
@@ -68,20 +77,21 @@ pub(super) fn visit_structure_shapes(
             if world.may_collide(c, area)
                 && crate::physics::collides(c, world, area)
                 && group
-                    .boxes
+                    .shapes
                     .iter()
                     .any(|&b| visit(part.id, b, place, delta, None))
             {
                 return true;
             }
-            for &(id, other, bounds, body) in others
+            for &peer in others
                 .iter()
-                .filter(|(_, _, bounds, _)| bounds.intersects(&area))
+                .filter(|peer| peer.bounds.swept(peer.delta).intersects(&area))
             {
-                let relative = place.relative_to(other);
-                let moved = other.vector_to_local(delta);
-                if group.boxes.iter().any(|&b| {
-                    bounds.intersects(&place.box_to_world(b).swept(delta)) && visit(part.id, b, relative, moved, Some((id, other, body)))
+                let relative = place.relative_to(peer.place);
+                let relative_delta = delta - peer.delta;
+                let moved = peer.place.vector_to_local(relative_delta);
+                if group.shapes.iter().any(|&b| {
+                    peer.bounds.intersects(&b.world_bounds(place).swept(relative_delta)) && visit(part.id, b, relative, moved, Some(peer))
                 }) {
                     return true;
                 }
@@ -109,7 +119,7 @@ pub struct FloaterPlan {
     pub floaters: Vec<IVec3>,
     pub cells: FxHashSet<IVec3>,
     pub broken: Vec<IVec3>,
-    mount: Option<(IVec3, u8)>,
+    pub(super) mount: Option<(IVec3, u8)>,
     lifted: Vec<Lifted>,
 }
 
@@ -458,6 +468,7 @@ impl Dim {
             let (body, _) = self.lift(c, c.game.platform_kind, center.as_dvec3() + Transform::FEET, plan.lifted, &[], Liveness::Assembly);
             if let Some(e) = self.entities.get_mut(body) {
                 e.mount = Some(Box::new(BodyMount {
+                    coast_rate: 0.0,
                     block,
                     face,
                     speed: 1,
@@ -736,6 +747,7 @@ impl Dim {
                 crate::controller::Motion::Absolute | crate::controller::Motion::Relative => d.target,
                 crate::controller::Motion::Clockwise => mount.angle + FRAC_PI_2,
                 crate::controller::Motion::Counterclockwise => mount.angle - FRAC_PI_2,
+                crate::controller::Motion::Freewheel => return false,
             },
             None => mount.stop.unwrap_or(next_grid),
         };
@@ -748,6 +760,7 @@ impl Dim {
         let parts = self.mounted_parts(id, current, children);
         let fits = |turn: f64| Self::mount_fits_in(c, parent, nested, initial.place_at(turn), &blocks);
         let axis = crate::world::DIRS[mount.face as usize].as_dvec3().abs();
+        let coaxial = drive.is_some() && parts.len() == 1 && body.coaxial_tire(c, axis);
         let radius = parts
             .iter()
             .filter_map(|part| {
@@ -758,13 +771,13 @@ impl Dim {
             })
             .fold(1.0, f64::max);
         let speed = drive.map_or(TURN_PER_LEVEL * mount.speed.max(1) as f64, |d| f64::from(d.rule.speed).to_radians() * crate::world::TICK);
-        let step = speed.min(2.0 * TURN_PROBE_TRAVEL / radius);
+        let step = if coaxial { speed } else { speed.min(2.0 * TURN_PROBE_TRAVEL / radius) };
         if step == 0.0 {
             return false;
         }
         let diff = goal - mount.angle;
-        let next = if diff.abs() <= step { goal } else { mount.angle + step.copysign(diff) };
-        let clear = |angle| self.mount_clear(c, initial.place_at(angle).in_frame(pose), &parts);
+        let mut next = if diff.abs() <= step { goal } else { mount.angle + step.copysign(diff) };
+        let clear = |angle| coaxial || self.mount_clear(c, initial.place_at(angle).in_frame(pose), &parts);
         if mount.angle == goal && mount.stop.is_some() {
             if clear(goal) && fits(goal) {
                 return true;
@@ -772,7 +785,44 @@ impl Dim {
             mount.stop = Some(mount.last_grid);
             return false;
         }
-        if !clear((mount.angle + next) * 0.5) || !clear(next) || drive.is_none() && next == goal && !fits(goal) {
+        if !coaxial && next != mount.angle {
+            let start = initial.place_at(mount.angle).in_frame(pose);
+            let world = super::space::CubeCells(&self.space.cubes);
+            let others = self.mount_obstacles(c, start, &parts, DVec3::ZERO, radius * (next - mount.angle).abs());
+            let closes = |angle| {
+                let sample = initial.place_at(angle).in_frame(pose);
+                visit_structure_shapes(c, &world, &parts, &others, sample, DVec3::ZERO, |_, shape, place, _, peer| {
+                    let mut closing = false;
+                    let mut contact = |point, normal| {
+                        let travel: DVec3 = point - start.to_world(sample.to_local(point));
+                        closing |= travel.dot(normal) < -1e-8;
+                    };
+                    if let Some(peer) = peer {
+                        crate::physics::rotated_contacts(c, &super::space::DeckCells(peer.space), shape, place, DVec3::ZERO, |hit| {
+                            contact(peer.place.to_world(hit.point), peer.place.vector_to_world(hit.normal));
+                        });
+                    } else {
+                        crate::physics::rotated_contacts(c, &world, shape, place, DVec3::ZERO, |hit| contact(hit.point, hit.normal));
+                    }
+                    closing
+                })
+            };
+            let mut free = mount.angle;
+            for sample in [(mount.angle + next) * 0.5, next] {
+                if !closes(sample) {
+                    free = sample;
+                    continue;
+                }
+                let mut blocked = sample;
+                for _ in 0..7 {
+                    let mid = (free + blocked) * 0.5;
+                    if closes(mid) { blocked = mid; } else { free = mid; }
+                }
+                next = free;
+                break;
+            }
+        }
+        if next == mount.angle || drive.is_none() && next == goal && !fits(goal) {
             if hold || drive.is_some() {
                 return false;
             }
@@ -865,7 +915,7 @@ impl Dim {
         };
         if step.abs() > 1e-8 {
             let delta = direction * step;
-            let others = self.mount_obstacles(c, place, &parts, delta);
+            let others = self.mount_obstacles(c, place, &parts, delta, 0.0);
             let world = CubeCells(&self.space.cubes);
             let mut fraction = 1.0_f64;
             visit_structure_shapes(c, &world, &parts, &others, place, delta, |_, shape, place, delta, peer| {
@@ -874,8 +924,8 @@ impl Dim {
                         fraction = fraction.min(hit.fraction);
                     }
                 };
-                if let Some((_, _, body)) = peer {
-                    crate::physics::rotated_contacts(c, &super::space::DeckCells(body), shape, place, delta, &mut contact);
+                if let Some(peer) = peer {
+                    crate::physics::rotated_contacts(c, &super::space::DeckCells(peer.space), shape, place, delta, &mut contact);
                 } else {
                     crate::physics::rotated_contacts(c, &world, shape, place, delta, &mut contact);
                 }
@@ -896,7 +946,8 @@ impl Dim {
         place: Transform,
         parts: &[MountedPart<'_>],
         delta: DVec3,
-    ) -> Vec<(u64, Transform, Aabb, &'a Space)> {
+        margin: f64,
+    ) -> Vec<StructurePeer<'a>> {
         let moving: FxHashSet<_> = parts.iter().map(|p| p.id).collect();
         let Some(envelope) = parts
             .iter()
@@ -911,7 +962,8 @@ impl Dim {
         else {
             return Vec::new();
         };
-        let envelope = envelope.swept(delta);
+        let padding = DVec3::splat(margin);
+        let envelope = Aabb { min: envelope.min - padding, max: envelope.max + padding }.swept(delta);
         self.bodies
             .iter()
             .filter_map(|(&other, space)| {
@@ -923,17 +975,17 @@ impl Dim {
                 let area = other.box_to_world(space.colliders(c).bounds?);
                 envelope
                     .intersects(&area)
-                    .then_some((e.id, other, area, &**space))
+                    .then_some(StructurePeer { id: e.id, place: other, bounds: area, space, delta: DVec3::ZERO })
             })
             .collect()
     }
 
     fn mount_clear(&self, c: &Content, place: Transform, parts: &[MountedPart<'_>]) -> bool {
-        let other_bodies = self.mount_obstacles(c, place, parts, DVec3::ZERO);
+        let other_bodies = self.mount_obstacles(c, place, parts, DVec3::ZERO, 0.0);
         let world = super::space::CubeCells(&self.space.cubes);
         !visit_structure_shapes(c, &world, parts, &other_bodies, place, DVec3::ZERO, |_, shape, place, _, other| match other {
             None => crate::physics::rotated_collides(c, &world, shape, place),
-            Some((_, _, space)) => crate::physics::rotated_collides(c, &super::space::DeckCells(space), shape, place),
+            Some(peer) => crate::physics::rotated_collides(c, &super::space::DeckCells(peer.space), shape, place),
         })
     }
 

@@ -223,6 +223,9 @@ pub static HOST: Host = Host {
     entity_kind_size,
     body_from_blocks,
     assembly_select,
+    controller_bindings,
+    rotor_program,
+    assembly_bounds,
     ship_controls,
     ship_flooded_cells,
     body_to_blocks,
@@ -615,6 +618,18 @@ unsafe extern "C" fn body_from_blocks(
 
 unsafe extern "C" fn assembly_select(w: *mut abi::WorldCtx, player: u64, cell: *const abi::BlockPos, flags: u8) -> u32 {
     unsafe { dim(w).assembly_select(content(), player, cell.as_ref().map(|p| IVec3::from_array(p.to_array())), flags) }
+}
+
+unsafe extern "C" fn controller_bindings(w: *mut abi::WorldCtx, at: *const abi::BlockPos, bindings: abi::Slice<abi::ControllerBinding>) -> u8 {
+    unsafe { dim(w).set_controller_bindings(content(), ip(at), bindings.as_slice()) as u8 }
+}
+
+unsafe extern "C" fn rotor_program(w: *mut abi::WorldCtx, at: *const abi::BlockPos, rules: abi::Slice<abi::RotorRule>, hold: u8) -> u8 {
+    unsafe { dim(w).set_rotor_program(content(), ip(at), rules.as_slice(), hold != 0) as u8 }
+}
+
+unsafe extern "C" fn assembly_bounds(w: *mut abi::WorldCtx, at: *const abi::BlockPos, min: *const abi::BlockPos, max: *const abi::BlockPos) -> u8 {
+    unsafe { dim(w).set_assembly_bounds(content(), ip(at), ip(min), ip(max)) as u8 }
 }
 
 unsafe extern "C" fn ship_controls(w: *mut abi::WorldCtx, ship: u64, input: *const abi::ShipControls) -> u32 {

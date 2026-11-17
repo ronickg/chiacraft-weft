@@ -700,7 +700,18 @@ fn bake_state(
             })
             .collect()
     };
-    let (hitbox, outline) = (sixteenths(b::HITBOX), sixteenths(b::OUTLINE));
+    let (mut hitbox, outline) = (sixteenths(b::HITBOX), sixteenths(b::OUTLINE));
+    let cylinder = s.get::<[f32; 3]>(b::CYLINDER).and_then(|[radius, half, grip]| {
+        if !(0.0 < radius && radius <= 1.5 && 0.0 < half && half <= 0.5 && (0.0..=4.0).contains(&grip)) {
+            errors.push(format!("{name}: invalid cylinder radius, half length or grip"));
+            return None;
+        }
+        let axis = glam::DVec3::from_array(turn.vector([0, 0, 1]).map(f64::from));
+        let shape = crate::physics::Cylinder { center: glam::DVec3::splat(0.5), axis, radius: f64::from(radius), half: f64::from(half), grip: f64::from(grip) };
+        let b = shape.bounds();
+        hitbox = vec![[b.min.x as f32, b.min.y as f32, b.min.z as f32, b.max.x as f32, b.max.y as f32, b.max.z as f32]];
+        (flags & bf::SOLID != 0).then_some(shape)
+    });
     let rules = s.or::<Vec<abi::BlockRule>>(b::RULES, Vec::new());
     let pieces = s
         .or::<Vec<abi::Piece>>(b::PIECES, Vec::new())
@@ -760,6 +771,21 @@ fn bake_state(
     let own_cells = s.or::<Vec<[i32; 3]>>(b::CELLS, Vec::new());
     let tall = own_cells.contains(&[0, 1, 0]);
     let cells = cells_of(name, turn, own_cells, errors);
+    if let Some(cylinder) = cylinder {
+        let bounds = cylinder.bounds();
+        let lo = bounds.min.floor().as_ivec3();
+        let hi = bounds.max.ceil().as_ivec3();
+        for x in lo.x..hi.x {
+            for y in lo.y..hi.y {
+                for z in lo.z..hi.z {
+                    let p = IVec3::new(x, y, z);
+                    if p != IVec3::ZERO && !cells.iter().any(|(cell, _)| *cell == p) {
+                        errors.push(format!("{name}: cylinder bounds reach undeclared cell {p}"));
+                    }
+                }
+            }
+        }
+    }
     // A big block's reach out of its cell is its cells.
     let (lo, hi) = cells
         .iter()
@@ -846,6 +872,7 @@ fn bake_state(
         textures: crate::content::turned_faces(turn, own),
         boxes,
         collision,
+        cylinder,
         selection,
         outline,
         hardness: 1.0,
@@ -926,6 +953,7 @@ fn cells_of(name: &str, turn: weft_abi::Turn, own: Vec<[i32; 3]>, errors: &mut V
 
 fn air() -> StateInfo {
     StateInfo {
+        cylinder: None,
         turn: weft_abi::Turn::NONE,
         sides: 0,
         liquid_walls: u8::MAX,

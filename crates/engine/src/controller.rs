@@ -53,10 +53,11 @@ pub enum Motion {
     Relative,
     Clockwise,
     Counterclockwise,
+    Freewheel,
 }
 
 impl Motion {
-    pub const ALL: [Self; 4] = [Self::Absolute, Self::Relative, Self::Clockwise, Self::Counterclockwise];
+    pub const ALL: [Self; 5] = [Self::Absolute, Self::Relative, Self::Clockwise, Self::Counterclockwise, Self::Freewheel];
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -281,7 +282,7 @@ impl Drive {
                 current + if turn > std::f64::consts::PI { turn - std::f64::consts::TAU } else { turn }
             }
             Motion::Relative => current + degrees,
-            Motion::Clockwise | Motion::Counterclockwise => current,
+            Motion::Clockwise | Motion::Counterclockwise | Motion::Freewheel => current,
         };
         Self { rule, target }
     }

@@ -12,7 +12,7 @@ use crate::ui::{
 };
 use crate::world::GameMode;
 
-const MOTIONS: [&str; 4] = ["controller.absolute", "controller.relative", "controller.forward", "controller.reverse"];
+const MOTIONS: [&str; 5] = ["controller.absolute", "controller.relative", "controller.forward", "controller.reverse", "controller.freewheel"];
 const PANEL_WIDTH: f32 = 334.0;
 const PANEL_PADDING: f32 = 10.0;
 const PANEL_CONTENT: f32 = PANEL_WIDTH - 2.0 * PANEL_PADDING;

@@ -2,7 +2,7 @@ use glam::{DVec3, IVec3};
 use weft_abi as abi;
 
 use crate::content::Content;
-use crate::controller::{Guide, Helm, Pilot, Rotor, Settings};
+use crate::controller::{self, Bind, Guide, Helm, Motion, Pilot, Rotor, Rule, Settings};
 use crate::net::codec::Wire;
 use crate::world::GameMode;
 
@@ -60,6 +60,57 @@ impl Dim {
         true
     }
 
+    pub(crate) fn set_controller_bindings(&mut self, c: &'static Content, at: IVec3, bindings: &[abi::ControllerBinding]) -> bool {
+        let Some(state) = self.get(at) else { return false };
+        let Some(Settings::Helm(default)) = default_for(c, state) else { return false };
+        let Some(id) = self.anchored_part(c, at, state) else { return false };
+        let mut profile = match self.controller_settings(c, id) {
+            Some(Settings::Helm(helm)) => helm,
+            _ => default,
+        };
+        profile.output.fill(None);
+        for bind in bindings {
+            let face = usize::from(bind.face);
+            if face >= 6 || usize::from(bind.level) >= controller::LEVELS { return false; }
+            let Some(key) = crate::input::Key::parse(unsafe { bind.key.as_str() }) else { return false };
+            let start = face * controller::BINDS_PER_FACE;
+            let Some(slot) = profile.output[start..start + controller::BINDS_PER_FACE].iter_mut().find(|slot| slot.is_none()) else { return false };
+            *slot = Some(Bind { key, level: bind.level });
+        }
+        if !self.write_controller(c, at, id, state, Settings::Helm(profile)) { return false; }
+        if let Some(player) = self.rider_in(self.frame, 0) {
+            self.refresh_helm(c, self.frame, player);
+        }
+        true
+    }
+
+    pub(crate) fn set_rotor_program(&mut self, c: &'static Content, at: IVec3, rules: &[abi::RotorRule], hold: bool) -> bool {
+        let Some(state) = self.get(at) else { return false };
+        let Some(Settings::Rotor(_)) = default_for(c, state) else { return false };
+        let Some(id) = self.anchored_part(c, at, state) else { return false };
+        let mut rotor = Rotor { hold, ..Rotor::default() };
+        for r in rules {
+            let Some(&motion) = Motion::ALL.get(r.motion as usize) else { return false };
+            let rule = Rule { min: r.min, max: r.max, motion, degrees: r.degrees, speed: r.speed };
+            if !rule.valid() || rotor.rules.iter().any(|r| r.min <= rule.max && rule.min <= r.max) { return false; }
+            rotor.rules.push(rule);
+        }
+        self.write_controller(c, at, id, state, Settings::Rotor(rotor))
+    }
+
+    fn write_controller(&mut self, c: &'static Content, at: IVec3, id: u64, state: u32, settings: Settings) -> bool {
+        if !c.dims[self.id as usize].editable { return false; }
+        if let Settings::Rotor(rotor) = &settings {
+            let mode = if rotor.hold { "hold" } else { "disassemble" };
+            if let Some(state) = c.state_with(state, "mode", mode) {
+                self.set(c, at, state);
+            }
+            self.space.signals.recheck_device(at);
+        }
+        self.entities.comps.insert((id, c.game.fields.controller), settings.to_bytes().into_boxed_slice());
+        true
+    }
+
     pub(super) fn save_controller(&mut self, c: &'static Content, player: u64, controller: u64, bytes: &[u8]) {
         if bytes.len() > 2048 {
             return;
@@ -92,17 +143,7 @@ impl Dim {
             if !d.ask(c, abi::action::USE_BLOCK, &mut q) {
                 return false;
             }
-            if let Settings::Rotor(rotor) = &settings {
-                let mode = if rotor.hold { "hold" } else { "disassemble" };
-                if let Some(state) = c.state_with(state, "mode", mode) {
-                    d.set(c, at, state);
-                }
-                d.space.signals.recheck_device(at);
-            }
-            d.entities
-                .comps
-                .insert((controller, c.game.fields.controller), settings.to_bytes().into_boxed_slice());
-            true
+            d.write_controller(c, at, controller, state, settings)
         });
         if saved == Some(true)
             && let Some(pilot) = self.rider_in(frame, 0)

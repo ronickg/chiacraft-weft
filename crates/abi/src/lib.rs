@@ -1268,6 +1268,7 @@ pub mod comp {
         pub const TURN: &str = "block.turn";
         pub const BOXES: &str = "block.boxes";
         pub const HITBOX: &str = "block.hitbox";
+        pub const CYLINDER: &str = "block.cylinder";
         pub const OUTLINE: &str = "block.outline";
         pub const SIGNAL: &str = "block.signal";
         pub const LIQUID_WALLS: &str = "block.liquid_walls";
@@ -2133,6 +2134,34 @@ pub mod signal_flags {
 pub mod assembly_flags {
     pub const TOOL: u8 = 1;
     pub const PHYSICS: u8 = 2;
+    pub const DIRECT: u8 = 4;
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct ControllerBinding {
+    pub key: Str,
+    pub face: u8,
+    pub level: u8,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct RotorRule {
+    pub min: u8,
+    pub max: u8,
+    /// A `rotor_motion` value.
+    pub motion: u8,
+    pub degrees: f32,
+    pub speed: f32,
+}
+
+pub mod rotor_motion {
+    pub const ABSOLUTE: u8 = 0;
+    pub const RELATIVE: u8 = 1;
+    pub const CLOCKWISE: u8 = 2;
+    pub const COUNTERCLOCKWISE: u8 = 3;
+    pub const FREEWHEEL: u8 = 4;
 }
 
 pub mod assembly_result {
@@ -4606,6 +4635,9 @@ pub struct Host {
     /// (0, 0, 0), they keep their places around that. Returns its entity, 0 if nothing came.
     pub body_from_blocks: unsafe extern "C" fn(world: *mut WorldCtx, center: *const BlockPos, cells: *const BlockPos, count: usize) -> u64,
     pub assembly_select: unsafe extern "C" fn(world: *mut WorldCtx, player: u64, cell: *const BlockPos, flags: u8) -> u32,
+    pub controller_bindings: unsafe extern "C" fn(world: *mut WorldCtx, at: *const BlockPos, bindings: Slice<ControllerBinding>) -> u8,
+    pub rotor_program: unsafe extern "C" fn(world: *mut WorldCtx, at: *const BlockPos, rules: Slice<RotorRule>, hold: u8) -> u8,
+    pub assembly_bounds: unsafe extern "C" fn(world: *mut WorldCtx, at: *const BlockPos, min: *const BlockPos, max: *const BlockPos) -> u8,
     /// An active ship's inputs until replaced, or null to return control to the helm.
     pub ship_controls: unsafe extern "C" fn(world: *mut WorldCtx, ship: u64, input: *const ShipControls) -> u32,
     /// Flooded hull cells, in the ship's coordinates. Returns their count, or `usize::MAX` if absent.

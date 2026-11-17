@@ -1811,6 +1811,12 @@ macro_rules! state_setters {
         pub fn hitbox(self, min: [f32; 3], max: [f32; 3]) -> Self {
             self.push(&bc::HITBOX, [min[0], min[1], min[2], max[0], max[1], max[2]])
         }
+        /// A solid cylinder centered in its cell, along the model's north-south axis.
+        /// Radius and half length are in blocks. Reserve every extra cell of its bounds with
+        /// `cells`. Grip is the friction coefficient for rolling contact on an assembled body.
+        pub fn cylinder(self, radius: f32, half_length: f32, grip: f32) -> Self {
+            self.set(&bc::CYLINDER, [radius, half_length, grip])
+        }
         /// What the crosshair outlines and cracks, one box a call, when it shouldn't be the
         /// hitbox's: a hollow log stopped by its walls and outlined whole.
         pub fn outline(self, min: [f32; 3], max: [f32; 3]) -> Self {

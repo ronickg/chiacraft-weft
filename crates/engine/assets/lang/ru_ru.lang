@@ -671,6 +671,7 @@ controller.absolute = Абсолютный угол
 controller.relative = Относительный поворот
 controller.forward = Вращаться вперёд
 controller.reverse = Вращаться назад
+controller.freewheel = Свободное качение
 controller.key = Клавиша
 controller.power = Сила сигнала
 controller.press = Нажмите клавишу

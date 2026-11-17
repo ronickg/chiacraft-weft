@@ -19,6 +19,7 @@ mod redstone;
 mod sounds;
 mod storage;
 mod target_info;
+mod vehicles;
 mod woodcutter;
 mod worldgen;
 
@@ -60,6 +61,7 @@ fn init(r: &mut Registry) {
     effects::register(r);
     redstone::register(r);
     assembly::register(r);
+    vehicles::register(r);
     music_player::register(r);
     woodcutter::register(r);
     storage::register(r);

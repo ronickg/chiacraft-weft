@@ -710,6 +710,7 @@ controller.absolute = Angle absolu
 controller.relative = Rotation relative
 controller.forward = Rotation continue vers l’avant
 controller.reverse = Rotation continue vers l’arrière
+controller.freewheel = Roue libre
 controller.key = Touche
 controller.power = Niveau du signal
 controller.press = Appuyez sur une touche

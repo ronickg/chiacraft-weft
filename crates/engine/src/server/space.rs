@@ -9,7 +9,7 @@ use glam::IVec3;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::content::{AIR, Content};
-use crate::physics::Aabb;
+use crate::physics::{Aabb, Solid, block_solids};
 use crate::world::{Cube, cube_of, local_index};
 
 /// A timer on a block (`Host::timer`): when, where, the event and its value.
@@ -99,17 +99,12 @@ pub(super) struct FloaterPath {
 pub(super) struct BodyColliders {
     pub bounds: Option<Aabb>,
     pub groups: Vec<ColliderGroup>,
+    pub grip_radius: f64,
 }
 
 pub(super) struct ColliderGroup {
     pub area: Aabb,
-    pub boxes: Vec<Aabb>,
-}
-
-pub(super) fn block_collider(p: IVec3, bounds: [f32; 6]) -> Aabb {
-    let [x, y, z, x2, y2, z2] = bounds.map(f64::from);
-    let p = p.as_dvec3();
-    Aabb { min: p + glam::DVec3::new(x, y, z), max: p + glam::DVec3::new(x2, y2, z2) }
+    pub shapes: Vec<Solid>,
 }
 
 impl crate::physics::Blocks for Space {
@@ -248,20 +243,24 @@ impl Space {
     pub(super) fn colliders(&self, c: &Content) -> &BodyColliders {
         self.colliders.get_or_init(|| {
             let mut groups = std::collections::BTreeMap::new();
+            let mut grip_radius = 0.0_f64;
             for &(p, state) in self.block_snapshot().iter() {
                 for part in std::iter::once(state).chain(self.extras(p).iter().copied()) {
                     let info = &c.states[part as usize];
                     if info.liquid.is_some() || c.covered_step(part).is_some() {
                         continue;
                     }
-                    for &bounds in &info.collision {
-                        let shape = block_collider(p, bounds);
+                    for shape in block_solids(p, info) {
+                        if let Solid::Cylinder(wheel) = shape && wheel.grip > 0.0 {
+                            grip_radius = grip_radius.max(wheel.radius);
+                        }
+                        let bounds = shape.bounds();
                         let group = groups
                             .entry((p >> 2_i32).to_array())
-                            .or_insert_with(|| ColliderGroup { area: shape, boxes: Vec::new() });
-                        group.area.min = group.area.min.min(shape.min);
-                        group.area.max = group.area.max.max(shape.max);
-                        group.boxes.push(shape);
+                            .or_insert_with(|| ColliderGroup { area: bounds, shapes: Vec::new() });
+                        group.area.min = group.area.min.min(bounds.min);
+                        group.area.max = group.area.max.max(bounds.max);
+                        group.shapes.push(shape);
                     }
                 }
             }
@@ -270,8 +269,13 @@ impl Space {
                 .iter()
                 .map(|g| g.area)
                 .reduce(|a, b| Aabb { min: a.min.min(b.min), max: a.max.max(b.max) });
-            BodyColliders { bounds, groups }
+            BodyColliders { bounds, groups, grip_radius }
         })
+    }
+
+    pub(super) fn coaxial_tire(&self, c: &Content, axis: glam::DVec3) -> bool {
+        matches!(self.colliders(c).groups.as_slice(), [g] if matches!(g.shapes.as_slice(), [Solid::Cylinder(tire)]
+            if tire.axis.dot(axis).abs() > 1.0 - 1e-8 && (tire.center - glam::DVec3::splat(0.5)).cross(axis).length_squared() < 1e-12))
     }
 
     pub(super) fn block_snapshot(&self) -> std::borrow::Cow<'_, [(IVec3, u32)]> {

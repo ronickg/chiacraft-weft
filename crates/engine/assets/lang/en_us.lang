@@ -724,6 +724,7 @@ controller.absolute = Absolute angle
 controller.relative = Relative turn
 controller.forward = Spin forward
 controller.reverse = Spin in reverse
+controller.freewheel = Freewheel
 controller.key = Key
 controller.power = Signal level
 controller.press = Press a key

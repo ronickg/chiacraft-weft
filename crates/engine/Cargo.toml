@@ -10,6 +10,7 @@ weft_noise.workspace = true
 weft_render.workspace = true
 winit.workspace = true
 glam.workspace = true
+parry3d-f64 = { version = "0.31.1", default-features = false, features = ["required-features", "std", "alloc"] }
 bytemuck.workspace = true
 log.workspace = true
 rayon.workspace = true

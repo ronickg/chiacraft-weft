@@ -182,6 +182,7 @@ pub enum Motion {
 #[derive(Clone, Copy)]
 pub struct BodyMount {
     pub drive: Option<crate::controller::Drive>,
+    pub coast_rate: f64,
     pub slide: Option<crate::controller::Slide>,
     pub block: IVec3,
     pub face: u8,

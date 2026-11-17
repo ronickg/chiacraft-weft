@@ -82,6 +82,14 @@ Powered thrusters have five times the configured ship speed limit, or 22.5 block
 
 Wood usually floats and stone and metal usually sink. A compartment with a floor and watertight sides displaces water even with an open deck. It stays dry below the waterline until water reaches an opening, such as a submerged breach or a low edge of the hull. Blocks placed away from the center of mass can change the ship's trim or roll. A hit away from the center of mass can turn the ship, and turning into an obstacle can push it sideways.
 
+### Wheels and a starter car
+
+Wheels come in 1, 1.5, and 2 block diameters. Place a wheel with its axle in line with a rotor to drive it. The tread grips the ground and other contraptions, including moving decks. Smooth blocks such as ice give less traction.
+
+Use the rotor's **Freewheel** program to let a single wheel centered on its axle turn with the surface. Its speed setting limits the wheel's coasting speed. Mount another rotor across the axle to steer. The wheel can keep rolling as the steering rotor turns it.
+
+Use `/spawncar [x y z]` on a clear flat area to assemble a car with a Controller, rear drive rotors and a steerable front axle with free-rolling wheels. Right-click the Controller with an empty hand. W and S drive the rear wheels, A and D turn the front axle, Space lifts the car, Q and E roll it with side thrusters, and left Ctrl fires the rear booster. Shift dismounts.
+
 ## Making your own
 
 Say what a block is and the engine runs it. No ticking and no neighbor callbacks to write.

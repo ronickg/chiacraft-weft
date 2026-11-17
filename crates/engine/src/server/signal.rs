@@ -1620,7 +1620,19 @@ impl Dim {
             !moved
         });
         let mut lost = vec![false; plans.len()];
-        let mut lost_floaters = vec![false; floater_plans.len()];
+        let mut lost_floaters: Vec<_> = floater_plans.iter().map(|child| {
+            // An enclosing assembly carries the controller and its selected blocks.
+            // The child can assemble in its new frame on the next signal pass.
+            child.mount.is_some_and(|(block, _)| {
+                floater_plans.iter().any(|parent| parent.cells.len() > child.cells.len()
+                    && parent.cells.contains(&block) && child.cells.is_subset(&parent.cells))
+            })
+        }).collect();
+        for (plan, &deferred) in floater_plans.iter().zip(&lost_floaters) {
+            if deferred {
+                self.space.signals.polled.extend(plan.floaters.iter().copied());
+            }
+        }
         let waiting = loop {
             let waiting = being_moved(&plans, &lost);
             let mut claims: FxHashMap<IVec3, u32> = FxHashMap::default();
