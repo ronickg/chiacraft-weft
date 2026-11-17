@@ -19,14 +19,16 @@ pub enum At {
     },
 }
 
-pub fn resolve(d: &Dim, h: &abi::Holder) -> Option<At> {
+pub fn resolve(d: &Dim, space_id: u64, h: &abi::Holder) -> Option<At> {
     match h.kind {
         abi::holder::ENTITY => d
             .entities
             .get(h.entity)
             .filter(|e| !e.removed)
             .map(|_| At::Entity(h.entity)),
-        abi::holder::BLOCK => d.anchored(crate::world::ivec(h.pos)).map(At::Entity),
+        abi::holder::BLOCK => d
+            .anchored(space_id, crate::world::ivec(h.pos))
+            .map(At::Entity),
         abi::holder::HELD => d
             .entities
             .inventories
@@ -52,8 +54,8 @@ impl Inv {
 
 /// The inventory `h` points at, `None` when it isn't there: a storage that isn't one, or an
 /// entity that doesn't carry it. Stacks can carry any storage.
-pub fn inventory(d: &Dim, c: &Content, h: &abi::Holder) -> Option<Inv> {
-    let inv = Inv { at: resolve(d, h)?, storage: h.storage };
+pub fn inventory(d: &Dim, space_id: u64, c: &Content, h: &abi::Holder) -> Option<Inv> {
+    let inv = Inv { at: resolve(d, space_id, h)?, storage: h.storage };
     let carried = match inv.at {
         _ if h.storage == 0 => true,
         At::Entity(id) => storage_slots(c, h.storage).is_some() && d.entities.comps.contains_key(&(id, h.storage)),

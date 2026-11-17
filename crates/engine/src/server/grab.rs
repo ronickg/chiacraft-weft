@@ -54,8 +54,8 @@ impl Dim {
             return None;
         }
         let (eye, look) = self.grab_eye(c, player)?;
-        let reach = self.block_reach(c, player);
-        let hit = self.ray(c, eye, look, reach, 0)?;
+        let reach = self.block_reach(0, c, player);
+        let hit = self.ray(0, c, eye, look, reach, 0)?;
         let root = self.entities.follows(self.entities.get(hit.frame)?);
         let space = self.bodies.get(&root.id)?;
         if root.removed || root.motion == Motion::Parked || root.grab.is_some() || space.signals.on_the_way {
@@ -67,9 +67,7 @@ impl Dim {
         let id = root.id;
         let place = root.body_place();
         let e = self.entities.get_mut(id)?;
-        if e.mount.take().is_some() {
-            e.set_frame_rotation(place.rotation());
-        }
+        let detached = e.mount.take().is_some() || e.floater_driven;
         e.frame = None;
         e.motion = Motion::Free;
         e.vel = DVec3::ZERO;
@@ -77,6 +75,9 @@ impl Dim {
             ship.spin = DVec3::ZERO;
         }
         e.grab = Some(Box::new(Grab { player, point: place.to_local(eye + look * hit.dist), depth: hit.dist, rotation: place.rotation() }));
+        if detached {
+            self.enable_dynamics(id, None);
+        }
         log::debug!(target: "physics", "grab {id} by {player}, depth {:.3}", hit.dist);
         Some(id)
     }
@@ -94,7 +95,7 @@ impl Dim {
         grab.rotation = (DQuat::from_scaled_axis(drag) * grab.rotation).normalize();
     }
 
-    pub(super) fn advance_grabs(&mut self, c: &Content, before: &mut FxHashMap<u64, Transform>, children: &FxHashMap<u64, Vec<u64>>) {
+    pub(super) fn advance_grabs(&mut self, c: &Content, children: &FxHashMap<u64, Vec<u64>>) {
         let active: Vec<_> = self
             .bodies
             .keys()
@@ -173,13 +174,7 @@ impl Dim {
             let target = pose(clear);
             let mounts: Vec<_> = parts.iter().skip(1).map(|p| p.id).collect();
             let e = self.entities.get_mut(id).unwrap();
-            e.pos = target.position();
-            if let Some(ship) = e.ship.as_mut() {
-                ship.rotation = target.rotation();
-            } else {
-                e.set_frame_rotation(target.rotation());
-            }
-            before.entry(id).or_insert(old);
+            e.set_body_pose(target);
             for child in mounts {
                 self.entities.update_mount_pose(child);
             }

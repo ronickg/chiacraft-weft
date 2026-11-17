@@ -196,6 +196,11 @@ impl AreaFill {
             }
             (Cube::from_states(&states), edges)
         };
+        for (index, parts) in cube.all_extras() {
+            if out.0.get(index) == cube.get(index) {
+                out.0.set_extras(index, parts.to_vec());
+            }
+        }
         out.0.biomes = cube.biomes.clone();
         out.0.ticked = cube.ticked;
         out.0.edits = cube.edits;
@@ -254,7 +259,7 @@ impl Dim {
                     let i = crate::world::local_index(*p);
                     *frame == 0
                         && crate::world::cube_of(*p) == cp
-                        && (cube.get(i) != self.get(*p).unwrap_or(u32::MAX) || cube.extras(i) != self.space.extras(*p))
+                        && (cube.get(i) != self.get(0, *p).unwrap_or(u32::MAX) || cube.extras(i) != self.space.extras(*p))
                 })
                 .flat_map(|((_, p), ids)| ids.iter().map(|id| (*p, *id)))
                 .collect();
@@ -317,22 +322,22 @@ impl Dim {
                 }
                 if c.covered_step(s).is_some() {
                     reached.push(p);
-                } else if self.get(p) != Some(s) {
+                } else if self.get(0, p) != Some(s) {
                     left.extend(c.states[s as usize].cells.iter().map(|(o, _)| p + *o));
                 }
             }
         }
         for p in reached {
             if let Some((at, _)) = self
-                .block_at(c, p)
+                .block_at(0, c, p)
                 .filter(|(at, s)| *at != p && *s != AIR && !fill.keeps(*s))
             {
-                self.set(c, at, if fill.inside(at) { fill.state } else { AIR });
+                self.set(0, c, at, if fill.inside(at) { fill.state } else { AIR });
             }
         }
         for p in left {
-            if self.get(p).is_some_and(|s| c.covered_step(s).is_some()) && self.block_at(c, p).is_some_and(|b| b.0 == p) {
-                self.set(c, p, if fill.inside(p) { fill.state } else { AIR });
+            if self.get(0, p).is_some_and(|s| c.covered_step(s).is_some()) && self.block_at(0, c, p).is_some_and(|b| b.0 == p) {
+                self.set(0, c, p, if fill.inside(p) { fill.state } else { AIR });
             }
         }
     }

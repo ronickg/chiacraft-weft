@@ -70,10 +70,9 @@ pub struct Entity {
     pub(super) assembly_edit: Option<Box<super::assembly::Edit>>,
     pub(super) ship: Option<Box<super::buoyancy::Ship>>,
     pub(super) floater_driven: bool,
+    /// Resolved world orientation, shared by all the operations that move a frame.
     pub frame_rotation: Option<Box<DQuat>>,
-    /// A body that falls under its weight and is put down as blocks where it lands, whatever
-    /// its kind would do otherwise (`World::body_fall`, every falling block).
-    pub falls: bool,
+    pub(super) completion: Completion,
     /// Its own box (width, height, eye) and another kind it looks like, set by mods.
     pub size: Option<weft_abi::EntitySize>,
     pub look: Option<u32>,
@@ -180,6 +179,22 @@ pub enum Motion {
     Parked,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum BodyMotion {
+    Kinematic,
+    Dynamic,
+    Joint,
+    Held,
+    Parked,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum Completion {
+    Stay,
+    LandOnSupport,
+    Dock,
+}
+
 #[derive(Clone, Copy)]
 pub struct BodyMount {
     pub drive: Option<crate::controller::Drive>,
@@ -194,10 +209,6 @@ pub struct BodyMount {
 }
 
 impl BodyMount {
-    pub fn rotation(&self) -> DQuat {
-        self.rotation_at(self.angle)
-    }
-
     pub fn rotation_at(&self, angle: f64) -> DQuat {
         if angle == 0.0 { DQuat::IDENTITY } else { DQuat::from_axis_angle(crate::world::DIRS[self.face as usize].as_dvec3(), angle) }
     }
@@ -226,33 +237,32 @@ impl BodyMount {
 }
 
 impl Entity {
+    pub(super) fn body_motion(&self) -> BodyMotion {
+        match self.motion {
+            Motion::Parked => BodyMotion::Parked,
+            _ if self.grab.is_some() => BodyMotion::Held,
+            _ if self.mount.is_some() => BodyMotion::Joint,
+            Motion::Free if self.ship.is_some() => BodyMotion::Dynamic,
+            _ => BodyMotion::Kinematic,
+        }
+    }
+
     pub fn body_place(&self) -> physics::Transform {
         self.oriented_place()
             .unwrap_or_else(|| physics::Transform::of(self.pos))
     }
 
     pub(super) fn oriented_place(&self) -> Option<physics::Transform> {
-        Some(physics::Transform::rotated(self.pos, self.body_rotation()?))
+        Some(physics::Transform::rotated(self.pos, **self.frame_rotation.as_ref()?))
     }
 
     pub fn wire_rotation(&self) -> Option<[f32; 4]> {
-        let rotation = self.body_rotation()?;
+        let rotation = **self.frame_rotation.as_ref()?;
         (rotation != DQuat::IDENTITY).then(|| rotation.as_quat().to_array())
     }
-    fn body_rotation(&self) -> Option<DQuat> {
-        self.mount
-            .as_ref()
-            .map(|m| {
-                (self
-                    .frame_rotation
-                    .as_deref()
-                    .copied()
-                    .unwrap_or(DQuat::IDENTITY)
-                    * m.rotation())
-                .normalize()
-            })
-            .or_else(|| self.ship.as_ref().map(|s| s.rotation))
-            .or(self.frame_rotation.as_deref().copied())
+    pub(super) fn set_body_pose(&mut self, place: physics::Transform) {
+        self.pos = place.position();
+        self.set_frame_rotation(place.rotation());
     }
 
     pub fn set_frame_rotation(&mut self, rotation: DQuat) {
@@ -322,7 +332,7 @@ impl Entity {
             floater_driven: false,
             frame_rotation: None,
             grab: None,
-            falls: false,
+            completion: Completion::Stay,
             size: None,
             look: None,
             pose: Default::default(),
@@ -533,8 +543,7 @@ impl Entities {
             .and_then(|f| self.get(f))
             .map_or_else(physics::Transform::default, Entity::body_place);
         if let Some(e) = self.get_mut(id) {
-            e.pos = local.in_frame(parent).position();
-            e.set_frame_rotation(parent.rotation());
+            e.set_body_pose(local.in_frame(parent));
         }
     }
     /// What is in its selected slot, whether it can do anything with it or not.
@@ -568,7 +577,9 @@ impl Entities {
     pub fn insert(&mut self, c: &Content, mut e: Entity) {
         let id = e.id;
         // Saved mid-fall, it still lands.
-        e.falls |= e.kind == c.game.falling_kind;
+        if e.kind == c.game.falling_kind && e.completion == Completion::Stay {
+            e.completion = Completion::LandOnSupport;
+        }
         let kind = &c.game.entities[e.kind as usize];
         e.projectile = kind.projectile.is_some();
         for &comp in &kind.components {
@@ -921,10 +932,13 @@ pub fn step(c: &Content, e: &mut Entity, gravity: f64, block: &impl physics::Cel
     if e.anchor.is_some() || e.vehicle.is_some() || e.driver.is_some() {
         return out;
     }
-    if e.mount.is_some() || e.ship.is_some() || e.grab.is_some() {
-        return out;
+    match e.body_motion() {
+        BodyMotion::Joint | BodyMotion::Dynamic | BodyMotion::Held => return out,
+        BodyMotion::Parked if e.mount.is_some() => return out,
+        _ => {}
     }
-    if (k.is(ef::KINEMATIC) && !e.falls) || e.motion == Motion::Parked {
+    let falls = e.completion == Completion::LandOnSupport;
+    if (k.is(ef::KINEMATIC) && !falls) || !matches!(e.motion, Motion::Free) {
         // On another body, it goes with that too (a piston on a platform moving blocks).
         let frame = e.frame.and_then(|f| bodies.iter().find(|b| b.id == f));
         let carried = frame.map_or(DVec3::ZERO, |b| b.carry_from(e.pos));
@@ -1014,7 +1028,7 @@ pub fn step(c: &Content, e: &mut Entity, gravity: f64, block: &impl physics::Cel
     let frame = physics::Frame {
         half_width: hw,
         height: h,
-        gravity: if k.is(ef::NO_GRAVITY) && !e.falls { 0.0 } else { physics::gravity_per_tick(gravity) * e.moves.gravity },
+        gravity: if k.is(ef::NO_GRAVITY) && !falls { 0.0 } else { physics::gravity_per_tick(gravity) * e.moves.gravity },
         moves: physics::Moves { step: if e.item.is_empty() { e.moves.step } else { 0.0 }, ..e.moves },
     };
     let mut v = e.vel * DT;

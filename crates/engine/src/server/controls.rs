@@ -48,9 +48,9 @@ impl Dim {
         }
     }
 
-    pub(super) fn edit_controller(&mut self, c: &Content, at: IVec3, state: u32, face: u8, player: u64) -> bool {
+    pub(super) fn edit_controller(&mut self, space_id: u64, c: &Content, at: IVec3, state: u32, face: u8, player: u64) -> bool {
         let Some(default) = default_for(c, state) else { return false };
-        let Some(controller) = self.anchored_part(c, at, state) else { return false };
+        let Some(controller) = self.anchored_part(space_id, c, at, state) else { return false };
         let data = self
             .controller_settings(c, controller)
             .unwrap_or(default)
@@ -64,10 +64,16 @@ impl Dim {
         true
     }
 
-    pub(crate) fn set_controller_bindings(&mut self, c: &'static Content, at: IVec3, bindings: &[abi::ControllerBinding]) -> bool {
-        let Some(state) = self.get(at) else { return false };
+    pub(crate) fn set_controller_bindings(
+        &mut self,
+        space_id: u64,
+        c: &'static Content,
+        at: IVec3,
+        bindings: &[abi::ControllerBinding],
+    ) -> bool {
+        let Some(state) = self.get(space_id, at) else { return false };
         let Some(Settings::Helm(default)) = default_for(c, state) else { return false };
-        let Some(id) = self.anchored_part(c, at, state) else { return false };
+        let Some(id) = self.anchored_part(space_id, c, at, state) else { return false };
         let mut profile = match self.controller_settings(c, id) {
             Some(Settings::Helm(helm)) => helm,
             _ => default,
@@ -88,19 +94,26 @@ impl Dim {
             };
             *slot = Some(Bind { key, level: bind.level });
         }
-        if !self.write_controller(c, at, id, state, Settings::Helm(profile)) {
+        if !self.write_controller(space_id, c, at, id, state, Settings::Helm(profile)) {
             return false;
         }
-        if let Some(player) = self.rider_in(self.frame, 0) {
-            self.refresh_helm(c, self.frame, player);
+        if let Some(player) = self.rider_in(space_id, 0) {
+            self.refresh_helm(c, space_id, player);
         }
         true
     }
 
-    pub(crate) fn set_rotor_program(&mut self, c: &'static Content, at: IVec3, rules: &[abi::RotorRule], hold: bool) -> bool {
-        let Some(state) = self.get(at) else { return false };
+    pub(crate) fn set_rotor_program(
+        &mut self,
+        space_id: u64,
+        c: &'static Content,
+        at: IVec3,
+        rules: &[abi::RotorRule],
+        hold: bool,
+    ) -> bool {
+        let Some(state) = self.get(space_id, at) else { return false };
         let Some(Settings::Rotor(_)) = default_for(c, state) else { return false };
-        let Some(id) = self.anchored_part(c, at, state) else { return false };
+        let Some(id) = self.anchored_part(space_id, c, at, state) else { return false };
         let mut rotor = Rotor { hold, ..Rotor::default() };
         for r in rules {
             let Some(&motion) = Motion::ALL.get(r.motion as usize) else { return false };
@@ -115,19 +128,19 @@ impl Dim {
             }
             rotor.rules.push(rule);
         }
-        self.write_controller(c, at, id, state, Settings::Rotor(rotor))
+        self.write_controller(space_id, c, at, id, state, Settings::Rotor(rotor))
     }
 
-    fn write_controller(&mut self, c: &'static Content, at: IVec3, id: u64, state: u32, settings: Settings) -> bool {
+    fn write_controller(&mut self, space_id: u64, c: &'static Content, at: IVec3, id: u64, state: u32, settings: Settings) -> bool {
         if !c.dims[self.id as usize].editable {
             return false;
         }
         if let Settings::Rotor(rotor) = &settings {
             let mode = if rotor.hold { "hold" } else { "disassemble" };
             if let Some(state) = c.state_with(state, "mode", mode) {
-                self.set(c, at, state);
+                self.set(space_id, c, at, state);
             }
-            self.space.signals.recheck_device(at);
+            self.space_mut(space_id).signals.recheck_device(at);
         }
         self.entities
             .comps
@@ -154,22 +167,24 @@ impl Dim {
             profile.debug_drive = matches!(self.controller_settings(c, controller), Some(Settings::Helm(previous)) if previous.debug_drive);
         }
         let eye = e.pos + DVec3::Y * e.eye(c);
-        let reach = self.block_reach(c, player);
-        let saved = self.with_space(c, frame, |d, pose| {
+        let reach = self.block_reach(0, c, player);
+        let saved = self.with_space(c, frame, |d, space_id, pose| {
             let center = at.as_dvec3() + DVec3::splat(0.5);
             if (pose.to_local(eye) - center).length_squared() > (reach + 0.9).powi(2) {
                 return false;
             }
-            let Some(state) = d.get(at) else { return false };
+            let Some(state) = d.get(space_id, at) else { return false };
             let Some(expected) = default_for(c, state) else { return false };
-            if std::mem::discriminant(&expected) != std::mem::discriminant(&settings) || d.anchored_part(c, at, state) != Some(controller) {
+            if std::mem::discriminant(&expected) != std::mem::discriminant(&settings)
+                || d.anchored_part(space_id, c, at, state) != Some(controller)
+            {
                 return false;
             }
             let mut q = abi::Query { entity: player, pos: at.to_array().into(), state, ..abi::Query::DEFAULT };
-            if !d.ask(c, abi::action::USE_BLOCK, &mut q) {
+            if !d.ask(space_id, c, abi::action::USE_BLOCK, &mut q) {
                 return false;
             }
-            d.write_controller(c, at, controller, state, settings)
+            d.write_controller(space_id, c, at, controller, state, settings)
         });
         if saved == Some(true)
             && let Some(pilot) = self.rider_in(frame, 0)

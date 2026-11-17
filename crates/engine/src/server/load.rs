@@ -335,7 +335,7 @@ impl Server {
                         r.bodies.remove(&id);
                     }
                 }
-                r.compact(c);
+                r.compact(0, c);
             }
             d.dirty |= d.regions.iter().map(|r| r.space.cubes.len()).sum::<usize>() != before;
         }
@@ -465,9 +465,7 @@ pub(super) fn send_far(
                 Arc::new(cube)
             }
         };
-        p.conn
-            .send(ToClient::Cube { dim: p.dim, frame: 0, pos, cube, edit: false });
-        p.send_levels(dim, pos);
+        p.send_terrain_cube(dim, pos, cube);
         p.sent.insert(pos);
     }
 }

@@ -10,6 +10,64 @@ mod character;
 use character::{Collider, Sweep, Travel};
 
 const WALKABLE_Y: f64 = std::f64::consts::FRAC_1_SQRT_2;
+pub(crate) const LIQUID_SOURCES: u32 = 1 << 31;
+
+pub(crate) fn seat_at(
+    c: &Content,
+    kind: u32,
+    pos: DVec3,
+    yaw: f32,
+    seat: u8,
+    place: Option<Transform>,
+    helm: Option<IVec3>,
+) -> Option<DVec3> {
+    let offset = c.game.seats(kind, helm.is_some()).get(seat as usize)?.pos;
+    Some(if let Some(helm) = helm {
+        place?.to_world(helm.as_dvec3() + Transform::FEET + offset)
+    } else {
+        pos + crate::world::turned(offset, yaw)
+    })
+}
+
+pub(crate) fn placement_cells(
+    c: &Content,
+    clicked: IVec3,
+    face: u8,
+    mut hit: [f32; 3],
+    main: u32,
+    extras: &[u32],
+) -> impl Iterator<Item = (IVec3, [f32; 3])> + use<> {
+    const OUTSIDE: f32 = 1e-3;
+    let (axis, up) = (face as usize / 2, face % 2 == 1);
+    let replacing = std::iter::once(&main)
+        .chain(extras)
+        .all(|&state| c.states[state as usize].flags & bf::REPLACEABLE != 0);
+    let normal = crate::world::DIRS[face as usize];
+    let choices = if replacing {
+        hit[axis] = if up { OUTSIDE } else { 1.0 - OUTSIDE };
+        [Some((clicked, hit)), None]
+    } else {
+        hit[axis] += if up { OUTSIDE } else { -OUTSIDE };
+        let inside = (0.0..1.0).contains(&hit[axis]).then_some((clicked, hit));
+        [inside, Some((clicked + normal, std::array::from_fn(|i| hit[i] - normal[i] as f32)))]
+    };
+    choices.into_iter().flatten()
+}
+
+pub(crate) fn placement_state(def: &crate::content::BlockDef, pos: IVec3, face: u8, look: [f32; 3], hit: [f32; 3]) -> Result<u32, u32> {
+    let Some((owner, cb)) = def.cb.placement else { return Ok(def.first_state) };
+    let mut args = weft_abi::PlaceArgs {
+        pos: pos.to_array().into(),
+        face: face as u32,
+        look,
+        state: def.first_state,
+        first: def.first_state,
+        hit,
+        placed: 0,
+    };
+    crate::host::invoke(owner, cb, &mut args);
+    if (def.first_state..def.first_state + def.states).contains(&args.state) { Ok(args.state) } else { Err(args.state) }
+}
 
 /// The box of an entity in a pose (modern vanilla), on client and server
 /// alike, from its width, height and eyes standing: crouching lowers them like the player's 1.8 to
@@ -1352,7 +1410,8 @@ fn slab(o: DVec3, d: DVec3, lo: DVec3, hi: DVec3, max: f64) -> Option<(f64, f64,
 /// First targetable block along the ray; with `abi::ray::LIQUIDS` liquids stop it too, with
 /// `SOLID` blocks are hit by their collision instead, what stops a body.
 pub fn raycast(c: &Content, block: &impl Cells, origin: DVec3, dir: DVec3, max: f64, flags: u32) -> Option<Hit> {
-    let (liquids, solid) = (flags & weft_abi::ray::LIQUIDS != 0, flags & weft_abi::ray::SOLID != 0);
+    let sources = flags & LIQUID_SOURCES != 0;
+    let (liquids, solid) = (sources || flags & weft_abi::ray::LIQUIDS != 0, flags & weft_abi::ray::SOLID != 0);
     let dir = dir.normalize();
     let mut p = origin.floor().as_ivec3();
     let step = dir.signum().as_ivec3();
@@ -1373,6 +1432,12 @@ pub fn raycast(c: &Content, block: &impl Cells, origin: DVec3, dir: DVec3, max: 
             let mut best: Option<Hit> = None;
             for state in std::iter::once(main).chain(extras.iter().copied()) {
                 let s = &c.states[state as usize];
+                if sources
+                    && s.liquid
+                        .is_some_and(|liquid| state != c.liquids[liquid as usize].first_state)
+                {
+                    continue;
+                }
                 let wanted = liquids && s.liquid.is_some();
                 if s.flags & bf::NOT_TARGETABLE != 0 && !wanted && !solid {
                     continue;

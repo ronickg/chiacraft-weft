@@ -4,14 +4,20 @@
 use glam::{DQuat, DVec3, IVec3};
 use weft_abi::{ItemStack, component_flags as cf, entry_kind as ek};
 
-use super::entity::{BodyMount, Entity};
+use super::entity::{BodyMount, Completion, Entity};
+use super::space::{BlockTimer, Space};
 use crate::content::Content;
 use crate::net::codec::{self, R, Wire};
 
 /// An entity read back: itself, its inventory, components and, for a moving structure, its
 /// blocks.
-pub type Saved = (Entity, Option<Vec<ItemStack>>, Vec<(u32, Box<[u8]>)>, Option<Vec<(IVec3, u32)>>);
-pub type ToSave<'a> = (&'a Entity, Option<&'a Vec<ItemStack>>, Vec<(u32, &'a [u8])>, Option<Vec<(IVec3, String)>>);
+pub type Saved = (Entity, Option<Vec<ItemStack>>, Vec<(u32, Box<[u8]>)>, Option<SavedSpace>);
+pub type ToSave<'a> = (&'a Entity, Option<&'a Vec<ItemStack>>, Vec<(u32, &'a [u8])>, Option<&'a Space>);
+
+pub struct SavedSpace {
+    pub blocks: Vec<(IVec3, u32)>,
+    pub timers: Vec<BlockTimer>,
+}
 
 const ENTITY_FORMAT_V2: u32 = 0x3254_4E45;
 const ENTITY_FORMAT: u32 = 0x3354_4E45;
@@ -22,6 +28,8 @@ const NESTED_MOUNT: u16 = 0x10;
 const MOUNT_DRIVE: u16 = 0x08;
 const MOUNT_SLIDE: u16 = 0x04;
 const ROTATED_BODY: u16 = 0x100;
+const LAND_ON_SUPPORT: u16 = 0x200;
+const DOCK_BODY: u16 = 0x400;
 
 struct W<'a>(&'a mut Vec<u8>);
 
@@ -93,9 +101,14 @@ pub fn write(c: &Content, out: &mut Vec<u8>, list: &[ToSave<'_>], now: u64) {
             .copied()
             .filter(|&q| has_blocks && e.mount.is_none() && e.ship.is_none() && q != DQuat::IDENTITY)
     };
+    let completion = |e: &Entity| match e.completion {
+        Completion::LandOnSupport if e.kind != c.game.falling_kind => LAND_ON_SUPPORT,
+        Completion::Dock => DOCK_BODY,
+        _ => 0,
+    };
     let extended = list
         .iter()
-        .any(|(e, _, _, blocks)| orientation(e, blocks.is_some()).is_some());
+        .any(|(e, _, _, space)| orientation(e, space.is_some()).is_some() || completion(e) != 0);
     w.u32(if extended { ENTITY_FORMAT } else { ENTITY_FORMAT_V2 });
     w.u32(list.len() as u32);
     for (e, inv, comps, blocks) in list {
@@ -123,7 +136,8 @@ pub fn write(c: &Content, out: &mut Vec<u8>, list: &[ToSave<'_>], now: u64) {
             | if parent_mount.is_some() { NESTED_MOUNT } else { 0 }
             | if e.mount.as_ref().is_some_and(|m| m.drive.is_some()) { MOUNT_DRIVE } else { 0 }
             | if e.mount.as_ref().is_some_and(|m| m.slide.is_some()) { MOUNT_SLIDE } else { 0 }
-            | if rotation.is_some() { ROTATED_BODY } else { 0 };
+            | if rotation.is_some() { ROTATED_BODY } else { 0 }
+            | completion(e);
         let frame = e.block_frame();
         let attachment = attachment | e.anchor.map_or(0, |_| if frame != 0 { 2 } else { 1 });
         if extended {
@@ -160,8 +174,9 @@ pub fn write(c: &Content, out: &mut Vec<u8>, list: &[ToSave<'_>], now: u64) {
         }
         if let Some(ship) = &e.ship {
             w.u8(ship.front);
-            for v in ship
-                .rotation
+            for v in e
+                .body_place()
+                .rotation()
                 .to_array()
                 .into_iter()
                 .chain(ship.spin.to_array())
@@ -206,25 +221,51 @@ pub fn write(c: &Content, out: &mut Vec<u8>, list: &[ToSave<'_>], now: u64) {
             w.0.extend_from_slice(bytes);
         }
         match blocks {
-            Some(list) => {
+            Some(space) => {
+                let list = space.structure_blocks(c);
                 w.u32(list.len() as u32);
                 for (p, name) in list {
                     for v in p.to_array() {
                         w.u32(v as u32);
                     }
-                    w.str(name);
+                    w.str(&name);
                 }
             }
             None => w.u32(u32::MAX),
         }
+    }
+    let timed = list.iter().filter_map(|(entity, _, _, space)| {
+        space
+            .filter(|space| !space.scheduled.is_empty())
+            .map(|space| (entity.id, space))
+    });
+    let count = timed.clone().count();
+    if count != 0 {
+        w.u32(BODY_TIMERS_MAGIC);
+        w.u32(count as u32);
+        for (frame, space) in timed {
+            w.u64(frame);
+            let length = w.0.len();
+            w.u32(0);
+            let mut timers: Vec<_> = space.scheduled.iter().map(|timer| &timer.0).collect();
+            timers.sort_unstable();
+            timers.dedup();
+            append_timers(w.0, c, timers);
+            let bytes = (w.0.len() - length - 4) as u32;
+            w.0[length..length + 4].copy_from_slice(&bytes.to_le_bytes());
+        }
+        w.u32(BODY_TIMERS_MAGIC);
     }
 }
 
 /// Marks the trailer of a cube's saved data that holds the timers on its blocks: each the block,
 /// then as `dim::push_timer` writes it; their length in bytes, this.
 const TIMERS_MAGIC: u32 = 0x5352_4D54;
+/// After the entity list, before any terrain timers. The trailing marker keeps a body's timer
+/// record from looking like the terrain timer trailer to old readers.
+const BODY_TIMERS_MAGIC: u32 = 0x5442_4D54;
 
-pub fn append_timers(out: &mut Vec<u8>, c: &Content, timers: &[super::space::BlockTimer]) {
+pub fn append_timers<'a>(out: &mut Vec<u8>, c: &Content, timers: impl IntoIterator<Item = &'a BlockTimer>) {
     let start = out.len();
     for (at, p, event, data) in timers {
         p.iter()
@@ -236,7 +277,7 @@ pub fn append_timers(out: &mut Vec<u8>, c: &Content, timers: &[super::space::Blo
 }
 
 /// The timers `append_timers` wrote, but those of events no mod has now.
-pub fn read_timers(c: &Content, data: &[u8]) -> Vec<super::space::BlockTimer> {
+pub fn read_timers(c: &Content, data: &[u8]) -> Vec<BlockTimer> {
     let word = |at: usize| {
         data.get(at..at + 4)
             .map(|b| u32::from_le_bytes(b.try_into().unwrap()))
@@ -279,6 +320,22 @@ pub fn read(c: &Content, data: &[u8], now: u64) -> Vec<Saved> {
         let Some(e) = read_one(c, &mut r, now, extended) else { break };
         if let Some(e) = e {
             out.push(e);
+        }
+    }
+    if r.u32() == Some(BODY_TIMERS_MAGIC) {
+        let count = r.u32().unwrap_or(0);
+        let mut timers = rustc_hash::FxHashMap::default();
+        for _ in 0..count {
+            let Some((id, bytes)) = r.u64().zip(r.u32()) else { break };
+            let Some(data) = r.take(bytes as usize) else { break };
+            timers.insert(id, read_timers(c, data));
+        }
+        for (entity, _, _, space) in &mut out {
+            if let Some(space) = space
+                && let Some(timers) = timers.remove(&entity.id)
+            {
+                space.timers = timers;
+            }
         }
     }
     out
@@ -329,12 +386,12 @@ fn read_one(c: &Content, r: &mut R, now: u64, extended: bool) -> Option<Option<S
     } else {
         None
     };
-    let ship = if attachment & FLOATING_BODY != 0 {
+    let dynamic = if attachment & FLOATING_BODY != 0 {
         let front = r.u8()?;
         let rotation = DQuat::from_xyzw(r.f64()?, r.f64()?, r.f64()?, r.f64()?);
         let spin = DVec3::new(r.f64()?, r.f64()?, r.f64()?);
         (front < 6 && rotation.is_finite() && rotation.length_squared() > 1e-9 && spin.is_finite())
-            .then(|| Box::new(super::buoyancy::Ship::new(front, rotation.normalize(), spin)))
+            .then(|| (Box::new(super::buoyancy::Ship::new(front, spin)), rotation.normalize()))
     } else {
         None
     };
@@ -384,9 +441,20 @@ fn read_one(c: &Content, r: &mut R, now: u64, extended: bool) -> Option<Option<S
                 v.push((p, s));
             }
         }
-        Some(v)
+        Some(SavedSpace { blocks: v, timers: Vec::new() })
     };
     let Some(kind) = c.game.catalog.find(ek::ENTITY, &kind_name) else { return Some(None) };
+    if kind == c.game.ship_kind
+        && !comps.iter().any(|(id, _)| *id == c.game.fields.helm)
+        && blocks.as_ref().is_some_and(|space| {
+            space
+                .blocks
+                .iter()
+                .any(|&(pos, state)| pos == IVec3::ZERO && c.states[state as usize].signal.flags as u32 & weft_abi::signal_flags::HELM != 0)
+        })
+    {
+        comps.push((c.game.fields.helm, IVec3::ZERO.to_bytes().into_boxed_slice()));
+    }
     let mut e = Entity::new(id, kind, DVec3::new(v[0], v[1], v[2]), health);
     e.selected = selected;
     e.flying = flying;
@@ -400,8 +468,15 @@ fn read_one(c: &Content, r: &mut R, now: u64, extended: bool) -> Option<Option<S
     e.anchor = anchor;
     e.frame = frame;
     e.mount = mount;
-    e.ship = ship;
-    if let Some(rotation) = rotation {
+    e.completion = match attachment {
+        flags if flags & LAND_ON_SUPPORT != 0 => Completion::LandOnSupport,
+        flags if flags & DOCK_BODY != 0 => Completion::Dock,
+        _ => Completion::Stay,
+    };
+    if let Some((ship, rotation)) = dynamic {
+        e.ship = Some(ship);
+        e.set_frame_rotation(rotation);
+    } else if let Some(rotation) = rotation {
         e.set_frame_rotation(rotation);
     }
     e.floater_driven = attachment & FLOATER_DRIVEN != 0;

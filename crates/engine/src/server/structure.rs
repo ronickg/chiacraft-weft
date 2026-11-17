@@ -1,8 +1,7 @@
 //! Moving structures: blocks that move together, a `Space` in its own coordinates owned by an
 //! entity whose position places it: block (0, 0, 0) is centered on the entity. Whatever the
-//! world does with blocks works on it as it is (placement, support, callbacks, loot, events),
-//! in `Dim::in_frame`; what comes out (dropped items, sounds, particles) is in the world, through
-//! `Dim::place`, and block entities on it are entities of the region like any.
+//! world does with blocks works in its addressed space. `Transform` takes points and vectors
+//! to the world when an effect or entity crosses that boundary.
 
 use glam::{DVec3, IVec3};
 use std::f64::consts::{FRAC_PI_2, TAU};
@@ -10,7 +9,7 @@ use std::f64::consts::{FRAC_PI_2, TAU};
 use weft_abi as abi;
 
 use super::dim::Dim;
-use super::entity::{BodyMount, Motion};
+use super::entity::{BodyMotion, BodyMount, Completion, Motion};
 use super::signal::{Moved, RiderMeets};
 use super::space::{CubeCells, FloaterPath, Space};
 use crate::content::{AIR, Content};
@@ -115,7 +114,7 @@ pub(super) fn structure_pose_clear(
 ) -> bool {
     !visit_structure_shapes(c, world, parts, peers, place, DVec3::ZERO, |_, shape, place, _, other| match other {
         None => crate::physics::rotated_collides(c, world, shape, place),
-        Some(peer) => crate::physics::rotated_collides(c, &super::space::DeckCells(peer.space), shape, place),
+        Some(peer) => crate::physics::rotated_collides(c, peer.space, shape, place),
     })
 }
 
@@ -126,7 +125,6 @@ pub struct Carried {
     pub local: IVec3,
     pub to: IVec3,
     pub state: u32,
-    pub entity: Option<u64>,
 }
 
 /// Floaters going together, and what that takes.
@@ -159,12 +157,16 @@ pub enum Liveness {
 /// A body whose blocks have landed, waiting for clients to catch up with them.
 pub struct Landing {
     body: u64,
-    rests: u8,
-    blocks: Vec<Carried>,
-    /// Cells clients aren't told of yet.
-    cells: Vec<IVec3>,
+    ticks: u8,
     /// A block in the body that turns into another a tick in: (where, into).
     turns: Option<(IVec3, u32)>,
+}
+
+pub(super) struct Transfer {
+    pub(super) destination: u64,
+    turn: abi::Turn,
+    pub(super) cells: FxHashMap<IVec3, (IVec3, u32)>,
+    pub(super) shown_at: Option<u64>,
 }
 
 /// The box a structure's blocks fill around its entity: (width, height). Block (0, 0, 0) is
@@ -198,37 +200,10 @@ pub fn template(c: &Content, kind: u32) -> Option<&[(IVec3, u32)]> {
 }
 
 impl Dim {
-    /// Takes the block at `p` out: nothing of it is broken, what is next to it just hears it is gone.
-    /// What it has as an entity comes along, not attached to any place for now.
-    pub fn take_block(&mut self, c: &'static Content, p: IVec3) -> Option<(u32, Option<u64>, Moved)> {
-        if !c.dims[self.id as usize].editable {
-            return None;
-        }
-        let state = self.get(p)?;
-        let entity = self.anchored(p);
-        if let Some(id) = entity {
-            self.entities.unanchor((self.frame, p), id);
-        }
-        let signal = self.space.signals.carry_out(p);
-        self.carry_block(c, p, AIR);
-        Some((state, entity, signal))
-    }
-
-    /// Puts a block taken out with `take_block` at `p`, its entity with it, its circuit going on.
-    pub fn put_block(&mut self, c: &'static Content, p: IVec3, state: u32, entity: Option<u64>, signal: Moved) {
-        if !signal.is_empty() {
-            self.space.signals.arriving.insert(p, signal);
-        }
-        self.carry_block(c, p, state);
-        if let Some(id) = entity {
-            self.entities
-                .attach(id, self.frame, p, self.place.to_world(p.as_dvec3() + DVec3::splat(0.5)));
-        }
-    }
-
     /// Takes `cells` out of here into a new body of `kind` with its entity at `at`.
     pub fn lift(
         &mut self,
+        space_id: u64,
         c: &'static Content,
         kind: u32,
         at: DVec3,
@@ -236,90 +211,105 @@ impl Dim {
         also: &[(IVec3, u32)],
         live: Liveness,
     ) -> (u64, Vec<Carried>) {
+        if !c.dims[self.id as usize].editable {
+            return (0, Vec::new());
+        }
         let mut carried = Vec::new();
         let mut blocks: Vec<(IVec3, u32)> = also.to_vec();
         let mut arriving = FxHashMap::default();
-        let mut extras: Vec<(IVec3, Vec<u32>)> = Vec::new();
+        let mut extras = Vec::new();
+        let mut anchors = Vec::new();
+        let mut moved = FxHashMap::default();
         // Read first: taking a big block's own cell takes its other cells along.
         let cells: Vec<Lifted> = cells.into_iter().collect();
-        let wholes: Vec<Option<u32>> = cells.iter().map(|l| self.get(l.from)).collect();
+        let wholes: Vec<Option<u32>> = cells.iter().map(|l| self.get(space_id, l.from)).collect();
         for (l, whole) in cells.into_iter().zip(wholes) {
+            let Some(whole) = whole.filter(|&state| state != AIR) else { continue };
             // A big block's other cells come as they were read.
-            if let Some(s) = whole.filter(|&s| c.covered_step(s).is_some()) {
-                blocks.push((l.local, s));
-                carried.push(Carried { local: l.local, to: l.to, state: s, entity: None });
+            if c.covered_step(whole).is_some() {
+                blocks.push((l.local, whole));
+                carried.push(Carried { local: l.local, to: l.to, state: whole });
                 continue;
             }
-            let mut wet = Vec::new();
-            if !self.space.extras(l.from).is_empty() {
-                let (water, on_body): (Vec<_>, Vec<_>) = self
-                    .space
-                    .extras(l.from)
-                    .iter()
-                    .copied()
-                    .partition(|&s| live == Liveness::Assembly && c.states[s as usize].liquid.is_some());
-                wet = water;
-                if !on_body.is_empty() {
-                    extras.push((l.local, on_body));
-                }
+            let (mut wet, on_body): (Vec<_>, Vec<_>) = self
+                .space(space_id)
+                .extras(l.from)
+                .iter()
+                .copied()
+                .partition(|&state| live == Liveness::Assembly && c.states[state as usize].liquid.is_some());
+            if !on_body.is_empty() {
+                extras.push((l.local, on_body));
             }
-            let Some((state, entity, signal)) = self.take_block(c, l.from) else { continue };
+            if let Some(id) = self.entities.anchored(space_id, l.from) {
+                self.entities.unanchor((space_id, l.from), id);
+                anchors.push((l.local, id));
+            }
+            let signal = self.space_mut(space_id).signals.carry_out(l.from);
+            self.carry_block(space_id, c, l.from, AIR);
             if !wet.is_empty() {
-                self.write_cell(c, l.from, wet.remove(0), Some(wet), false);
+                self.write_cell(space_id, c, l.from, wet.remove(0), Some(wet), false);
             }
-            let state = l.part.unwrap_or(state);
+            let state = l.part.unwrap_or(whole);
             // Pieces of wire on what stays, stay.
-            if let (Some(part), Some(whole)) = (l.part, whole) {
-                if part != whole {
-                    let first = c.block_of(whole).first_state;
-                    self.carry_block(c, l.from, first + ((whole - first) & !(part - first)));
-                }
+            if state != whole {
+                let first = c.block_of(whole).first_state;
+                self.carry_block(space_id, c, l.from, first + ((whole - first) & !(state - first)));
             }
             blocks.push((l.local, state));
             if !signal.is_empty() {
                 arriving.insert(l.local, signal);
             }
-            carried.push(Carried { local: l.local, to: l.to, state, entity });
+            carried.push(Carried { local: l.local, to: l.to, state });
+            moved.insert(l.from, l.local);
         }
-        let body = self.spawn(c, kind, at);
-        let mut space = Space::default();
+        let body = self.spawn(space_id, c, kind, at);
+        let mut space = Space::finite();
         space.signals.arriving = arriving;
         space.signals.now = self.time;
         space.signals.on_the_way = live == Liveness::OnTheWay;
         // Where it starts: it moves before anything looks, and half a block on it could count as
         // either cell.
-        let cell = Transform::of(self.place.to_world(at)).cell(None);
+        let cell = Transform::of(self.space_pose(space_id).to_world(at)).cell(None);
         space.cell = Some(cell);
-        space.build(c, &blocks);
-        for (at, parts) in extras {
-            space.put_extras(at, parts);
-        }
+        space.build(c, &blocks, extras);
         self.bodies.insert(body, Box::new(space));
         // What it lit with doesn't go off for a moment. Its light is in the world's, from there on
         // a body too; that gets to it when it looks.
-        if self.frame == 0 {
+        if space_id == 0 {
             self.light_from_body(c, body, cell);
             self.see_world_light(body);
         }
         // On a body itself, it goes with that.
-        let on = (self.frame != 0).then_some(self.frame);
-        let place = Transform::of(at).in_frame(self.place);
+        let on = (space_id != 0).then_some(space_id);
+        let place = Transform::of(at).in_frame(self.space_pose(space_id));
         if let Some(e) = self.entities.get_mut(body) {
             e.frame = on;
-            e.pos = place.position();
-            e.set_frame_rotation(self.place.rotation());
+            e.set_body_pose(place);
         }
-        let moved: FxHashMap<_, _> = carried.iter().map(|b| (b.to, b.local)).collect();
+        self.reparent_mounts(space_id, body, abi::Turn::NONE, |at| moved.get(&at).copied());
+        for (local, id) in anchors {
+            self.entities
+                .attach(id, body, local, place.to_world(local.as_dvec3() + DVec3::splat(0.5)));
+        }
+        (body, carried)
+    }
+
+    fn reparent_mounts(&mut self, source: u64, destination: u64, turn: abi::Turn, moved: impl Fn(IVec3) -> Option<IVec3>) {
         let mut reparented = Vec::new();
-        for e in &mut self.entities.list {
-            if e.frame.unwrap_or(0) == self.frame
+        let (space, entities) = self.space_entities(source);
+        for e in &mut entities.list {
+            if e.frame.unwrap_or(0) == source
                 && e.motion != Motion::Parked
                 && let Some(mount) = e.mount.as_mut()
-                && let Some(&local) = moved.get(&mount.block)
+                && let Some(local) = moved(mount.block)
             {
-                self.space.signals.set_outside(e.id, Default::default());
-                e.frame = Some(body);
+                space.signals.set_outside(e.id, Default::default());
+                e.frame = (destination != 0).then_some(destination);
                 mount.block = local;
+                mount.face = turn.face(mount.face as usize) as u8;
+                if let Some(slide) = &mut mount.slide {
+                    slide.side = turn.face(slide.side as usize) as u8;
+                }
                 reparented.push(e.id);
             }
         }
@@ -329,44 +319,37 @@ impl Dim {
                 space.junction_pose = None;
             }
         }
-        for b in &carried {
-            if let Some(id) = b.entity {
-                let pos = place.to_world(b.local.as_dvec3() + DVec3::splat(0.5));
-                self.entities.attach(id, body, b.local, pos);
-            }
-        }
-        (body, carried)
     }
 
     /// `cells` out of here into a platform, for a mod.
-    pub fn lift_for_mod(&mut self, c: &'static Content, center: IVec3, cells: &[IVec3]) -> u64 {
+    pub fn lift_for_mod(&mut self, space_id: u64, c: &'static Content, center: IVec3, cells: &[IVec3]) -> u64 {
         let cells: Vec<IVec3> = cells
             .iter()
             .copied()
-            .filter(|p| self.get(*p).is_some_and(|s| s != AIR))
+            .filter(|p| self.get(space_id, *p).is_some_and(|s| s != AIR))
             .collect();
         if cells.is_empty() {
             return 0;
         }
-        let lifted = self.with_riders(c, center, cells);
-        self.lift(c, c.game.platform_kind, center.as_dvec3() + DVec3::new(0.5, 0.0, 0.5), lifted, &[], Liveness::Free)
+        let lifted = self.with_riders(space_id, c, center, cells);
+        self.lift(space_id, c, c.game.platform_kind, center.as_dvec3() + DVec3::new(0.5, 0.0, 0.5), lifted, &[], Liveness::Free)
             .0
     }
 
     /// Floaters with power in the world, to go together: those stuck to each other are one body, and
     /// can't go if their ways add up to nothing or something is in that way.
-    pub(super) fn floater_plans(&self, c: &Content, floaters: Vec<IVec3>) -> (Vec<FloaterPlan>, Vec<IVec3>) {
+    pub(super) fn floater_plans(&self, space_id: u64, c: &Content, floaters: Vec<IVec3>) -> (Vec<FloaterPlan>, Vec<IVec3>) {
         let mut plans: Vec<FloaterPlan> = Vec::new();
         let mut held = Vec::new();
         let mut mounted = Vec::new();
         for p in floaters {
-            let Some(controller) = super::assembly::Controller::at(c, self, p) else { continue };
-            let bounds = self.assembly_bounds(c, p);
-            let Ok(cells) = self.assembly_blocks(c, Some(controller), bounds) else {
+            let Some(controller) = super::assembly::Controller::at(c, self, space_id, p) else { continue };
+            let bounds = self.assembly_bounds(space_id, c, p);
+            let Ok(cells) = self.assembly_blocks(space_id, c, Some(controller), bounds) else {
                 held.push(p);
                 continue;
             };
-            let lifted = self.assembly_lifted(c, Some(controller), controller.center(), &cells, bounds);
+            let lifted = self.assembly_lifted(space_id, c, Some(controller), controller.center(), &cells, bounds);
             if lifted.len() > super::signal::BODY_LIMIT {
                 held.push(p);
                 continue;
@@ -417,10 +400,10 @@ impl Dim {
                 held.extend(plan.floaters);
                 continue;
             }
-            let steps = self.floaters_way(c, &plan.floaters);
+            let steps = self.floaters_way(space_id, c, &plan.floaters);
             let ahead = (steps.0 != IVec3::ZERO)
                 .then(|| {
-                    self.ahead_every_way(c, plan.cells.iter().copied(), &plan.cells, steps.0, steps.1)
+                    self.ahead_every_way(space_id, c, plan.cells.iter().copied(), &plan.cells, steps.0, steps.1)
                         .ok()
                 })
                 .flatten();
@@ -435,7 +418,7 @@ impl Dim {
                         .map(|l| l.from)
                         .collect();
                     broken.retain(|b| !riders.contains(b));
-                    broken.extend(ways(steps.0).flat_map(|step| self.who_rides(c, &list, None, step).1));
+                    broken.extend(ways(steps.0).flat_map(|step| self.who_rides(space_id, c, &list, None, step).1));
                     broken.sort_unstable_by_key(|b| b.to_array());
                     broken.dedup();
                     plan.lifted
@@ -456,12 +439,12 @@ impl Dim {
     }
 
     /// Which way these floaters in the world add up to, by axis, and whether they break through.
-    fn floaters_way(&self, c: &Content, floaters: &[IVec3]) -> (IVec3, bool) {
+    fn floaters_way(&self, space_id: u64, c: &Content, floaters: &[IVec3]) -> (IVec3, bool) {
         let mut sum = IVec3::ZERO;
         let mut breaks = false;
         for p in floaters {
-            let Some(s) = self.get(*p).map(|s| c.states[s as usize].signal) else { continue };
-            let Some(level) = self.space.signals.level_into(*p) else { continue };
+            let Some(s) = self.get(space_id, *p).map(|s| c.states[s as usize].signal) else { continue };
+            let Some(level) = self.space(space_id).signals.level_into(*p) else { continue };
             sum += crate::world::DIRS
                 .get(s.front as usize)
                 .copied()
@@ -473,14 +456,15 @@ impl Dim {
     }
 
     /// Off with them.
-    pub(super) fn run_floater_plan(&mut self, c: &'static Content, plan: FloaterPlan) {
+    pub(super) fn run_floater_plan(&mut self, space_id: u64, c: &'static Content, plan: FloaterPlan) {
         if let Some((block, face)) = plan.mount {
-            let Some(ctrl) = super::assembly::Controller::at(c, self, block) else { return };
+            let Some(ctrl) = super::assembly::Controller::at(c, self, space_id, block) else { return };
             let center = ctrl.center();
             if ctrl.face != face || plan.lifted.iter().any(|l| l.from - l.local != center) {
                 return;
             }
-            let (body, _) = self.lift(c, c.game.platform_kind, center.as_dvec3() + Transform::FEET, plan.lifted, &[], Liveness::Assembly);
+            let (body, _) =
+                self.lift(space_id, c, c.game.platform_kind, center.as_dvec3() + Transform::FEET, plan.lifted, &[], Liveness::Assembly);
             if let Some(e) = self.entities.get_mut(body) {
                 e.mount = Some(Box::new(BodyMount {
                     coast_rate: 0.0,
@@ -498,10 +482,10 @@ impl Dim {
                 space.track_mounted_blocks();
             }
             self.entities.update_mount_pose(body);
-            self.floater_shows(c, block, 1);
+            self.floater_shows(space_id, c, block, 1);
             return;
         }
-        self.break_for_body(c, plan.broken);
+        self.break_for_body(space_id, c, plan.broken);
         let center = plan
             .floaters
             .iter()
@@ -513,7 +497,7 @@ impl Dim {
             .lifted
             .into_iter()
             .map(|l| Lifted { local: l.from - center, ..l });
-        let (id, _) = self.lift(c, c.game.platform_kind, center.as_dvec3() + Transform::FEET, cells, &[], Liveness::Assembly);
+        let (id, _) = self.lift(space_id, c, c.game.platform_kind, center.as_dvec3() + Transform::FEET, cells, &[], Liveness::Assembly);
         if let Some(e) = self.entities.get_mut(id) {
             e.floater_driven = true;
         }
@@ -522,6 +506,7 @@ impl Dim {
     /// `what_is_ahead` along each axis `sign` has and across the corners between them.
     fn ahead_every_way(
         &self,
+        space_id: u64,
         c: &Content,
         cells: impl Iterator<Item = IVec3> + Clone,
         own: &FxHashSet<IVec3>,
@@ -530,7 +515,7 @@ impl Dim {
     ) -> Result<Vec<IVec3>, IVec3> {
         let mut out = Vec::new();
         for step in ways(sign) {
-            out.extend(self.what_is_ahead(c, cells.clone(), own, step, breaks)?);
+            out.extend(self.what_is_ahead(space_id, c, cells.clone(), own, step, breaks)?);
         }
         Ok(out)
     }
@@ -539,6 +524,7 @@ impl Dim {
     /// What they break, or the first blocked or unloaded cell.
     fn what_is_ahead(
         &self,
+        space_id: u64,
         c: &Content,
         cells: impl Iterator<Item = IVec3>,
         own: &FxHashSet<IVec3>,
@@ -551,7 +537,7 @@ impl Dim {
             if own.contains(&n) {
                 continue;
             }
-            let s = self.get(n).ok_or(n)?;
+            let s = self.get(space_id, n).ok_or(n)?;
             let info = &c.states[s as usize];
             if s == AIR || info.liquid.is_some() {
                 continue;
@@ -564,23 +550,23 @@ impl Dim {
         Ok(out)
     }
 
-    pub(super) fn break_for_body(&mut self, c: &'static Content, cells: Vec<IVec3>) {
+    pub(super) fn break_for_body(&mut self, space_id: u64, c: &'static Content, cells: Vec<IVec3>) {
         for p in cells {
-            if let Some(s) = self.get(p).filter(|s| *s != AIR) {
-                self.drop_block_loot(c, p, s, abi::ItemStack::EMPTY, false, 0);
-                self.set(c, p, AIR);
+            if let Some(s) = self.get(space_id, p).filter(|s| *s != AIR) {
+                self.drop_block_loot(space_id, c, p, s, abi::ItemStack::EMPTY, false, 0);
+                self.set(space_id, c, p, AIR);
             }
         }
     }
 
-    pub(super) fn has_mount(&self, at: IVec3) -> bool {
-        self.mount_at(at).is_some()
+    pub(super) fn has_mount(&self, space_id: u64, at: IVec3) -> bool {
+        self.mount_at(space_id, at).is_some()
     }
 
-    pub(super) fn mount_at(&self, at: IVec3) -> Option<u64> {
+    pub(super) fn mount_at(&self, space_id: u64, at: IVec3) -> Option<u64> {
         self.bodies.keys().copied().find(|&id| {
             self.entities.get(id).is_some_and(|e| {
-                e.motion != Motion::Parked && e.frame.unwrap_or(0) == self.frame && e.mount.as_ref().is_some_and(|m| m.block == at)
+                e.motion != Motion::Parked && e.frame.unwrap_or(0) == space_id && e.mount.as_ref().is_some_and(|m| m.block == at)
             })
         })
     }
@@ -588,7 +574,7 @@ impl Dim {
     pub(super) fn mount_children(&self) -> FxHashMap<u64, Vec<u64>> {
         let mut children: FxHashMap<u64, Vec<u64>> = FxHashMap::default();
         for e in &self.entities.list {
-            if !e.removed && e.motion != Motion::Parked && e.mount.is_some() {
+            if !e.removed && e.body_motion() == BodyMotion::Joint {
                 children.entry(e.frame.unwrap_or(0)).or_default().push(e.id);
             }
         }
@@ -626,16 +612,7 @@ impl Dim {
         parts
     }
 
-    pub(super) fn advance_mounts(
-        &mut self,
-        c: &Content,
-        children: &FxHashMap<u64, Vec<u64>>,
-        order: &[u64],
-    ) -> (FxHashMap<u64, Transform>, Vec<u64>) {
-        let before = order
-            .iter()
-            .filter_map(|&id| self.entities.get(id).map(|e| (id, e.body_place())))
-            .collect();
+    pub(super) fn advance_mounts(&mut self, c: &Content, children: &FxHashMap<u64, Vec<u64>>, order: &[u64]) -> Vec<u64> {
         for &id in order {
             self.entities.update_mount_pose(id);
         }
@@ -673,15 +650,13 @@ impl Dim {
                 }
             }
         }
-        (before, landing)
+        landing
     }
 
     pub(super) fn stop_mounted_children(&mut self, id: u64, children: &FxHashMap<u64, Vec<u64>>) {
         let mut pending = children.get(&id).cloned().unwrap_or_default();
         while let Some(child) = pending.pop() {
-            if let Some(space) = self.bodies.get_mut(&child) {
-                space.stopping = true;
-            }
+            self.ask_put_down(child);
             pending.extend(children.get(&child).into_iter().flatten().copied());
         }
     }
@@ -720,9 +695,8 @@ impl Dim {
             .then(|| self.rotor_program(c, frame, mount.block))
             .flatten();
         let programmable = program.is_some();
-        let command = program
-            .and_then(|p| p.rule(power))
-            .filter(|_| !body.stopping);
+        let docking = self.docking(id);
+        let command = program.and_then(|p| p.rule(power)).filter(|_| !docking);
         let drive = command.map(|rule| {
             mount
                 .drive
@@ -732,14 +706,14 @@ impl Dim {
         let releasing_drive = mount.drive.is_some() && drive.is_none();
         mount.drive = drive;
         let powered = if programmable { command.is_some() } else { power != 0 };
-        let hold = rotates && info.flags as u32 & abi::signal_flags::HOLD != 0 && !body.stopping;
+        let hold = rotates && info.flags as u32 & abi::signal_flags::HOLD != 0 && !docking;
         if hold || drive.is_some() {
             mount.stop = None;
             if !powered {
                 return false;
             }
         }
-        let stopping = body.stopping || !powered;
+        let stopping = docking || !powered;
         if !rotates && !stopping && mount.stop.is_none() {
             return false;
         }
@@ -813,7 +787,7 @@ impl Dim {
                         closing |= travel.dot(normal) < -1e-8;
                     };
                     if let Some(peer) = peer {
-                        crate::physics::rotated_contacts(c, &super::space::DeckCells(peer.space), shape, place, DVec3::ZERO, |hit| {
+                        crate::physics::rotated_contacts(c, peer.space, shape, place, DVec3::ZERO, |hit| {
                             contact(peer.place.to_world(hit.point), peer.place.vector_to_world(hit.normal));
                         });
                     } else {
@@ -892,7 +866,7 @@ impl Dim {
         let axis = crate::world::DIRS[mount.face as usize];
         let rail_end = if valid { guide_length(c, parent, mount.block, axis) } else { 0 };
         let config = self.guide_settings(c, e.frame.unwrap_or(0), mount.block);
-        let stopping = space.stopping || rail_end == 0;
+        let stopping = e.completion == Completion::Dock || rail_end == 0;
         let parts = self.mounted_parts(id, e.body_place(), children);
         let max = f64::from(config.max).min(f64::from(rail_end.max(1)));
         let min = f64::from(config.min).min(max);
@@ -944,7 +918,7 @@ impl Dim {
                     }
                 };
                 if let Some(peer) = peer {
-                    crate::physics::rotated_contacts(c, &super::space::DeckCells(peer.space), shape, place, delta, &mut contact);
+                    crate::physics::rotated_contacts(c, peer.space, shape, place, delta, &mut contact);
                 } else {
                     crate::physics::rotated_contacts(c, &world, shape, place, delta, &mut contact);
                 }
@@ -1005,8 +979,8 @@ impl Dim {
         structure_pose_clear(c, &world, parts, &other_bodies, place)
     }
 
-    pub(super) fn mount_fits(&self, c: &Content, place: Transform, blocks: &[(IVec3, u32)]) -> bool {
-        Self::mount_fits_in(c, &self.space, self.frame != 0, place, blocks)
+    pub(super) fn mount_fits(&self, space_id: u64, c: &Content, place: Transform, blocks: &[(IVec3, u32)]) -> bool {
+        Self::mount_fits_in(c, &self.space(space_id), space_id != 0, place, blocks)
     }
 
     fn mount_fits_in(c: &Content, space: &Space, nested: bool, place: Transform, blocks: &[(IVec3, u32)]) -> bool {
@@ -1036,7 +1010,7 @@ impl Dim {
     }
 
     pub(super) fn land_mount(&mut self, c: &'static Content, id: u64) {
-        self.in_frame(id, |d| d.finish_moving_here(c));
+        self.finish_moving_here(id, c);
         let Some(e) = self.entities.get(id) else { return };
         let Some(m) = e.mount.as_ref() else { return };
         let Some(space) = self.bodies.get(&id) else { return };
@@ -1058,35 +1032,31 @@ impl Dim {
         }
         let at = m.block;
         self.put_down_whole(c, id);
-        self.in_frame(parent, |d| {
-            d.turn_assembly_bounds(c, at, local);
-            let power = d.space.signals.level_into(at).unwrap_or(0);
-            if d.get(at)
+        if self.active_space(parent) {
+            self.turn_assembly_bounds(parent, c, at, local);
+            let power = self.space(parent).signals.level_into(at).unwrap_or(0);
+            if self
+                .get(parent, at)
                 .is_some_and(|s| c.states[s as usize].signal.kind == abi::signal_kind::BODY_MOUNT)
             {
-                d.floater_shows(c, at, if power == 0 { 0 } else { 2 });
-                d.space.signals.stop_mount(at);
+                self.floater_shows(parent, c, at, if power == 0 { 0 } else { 2 });
+                self.space_mut(parent).signals.stop_mount(at);
             }
-        });
+        }
     }
 
     /// Platforms: their floaters say how they go. Coming to a stop, they go on to a whole block.
     pub(super) fn drive_bodies(&mut self, c: &'static Content) {
-        let bodies = &self.bodies;
         let children = self.mount_children();
         let ids: Vec<u64> = self
-            .entities
-            .list
-            .iter()
-            .filter(|e| {
-                (e.kind == c.game.platform_kind || bodies.get(&e.id).is_some_and(|b| b.stopping))
-                    && !e.removed
-                    && e.mount.is_none()
-                    && e.ship.is_none()
-                    && e.grab.is_none()
-                    && e.motion != Motion::Parked
+            .bodies
+            .keys()
+            .copied()
+            .filter(|&id| {
+                self.entities
+                    .get(id)
+                    .is_some_and(|e| e.body_motion() == BodyMotion::Kinematic)
             })
-            .map(|e| e.id)
             .collect();
         for id in ids {
             self.drive(c, id, &children);
@@ -1096,7 +1066,7 @@ impl Dim {
     fn drive(&mut self, c: &'static Content, id: u64, children: &FxHashMap<u64, Vec<u64>>) {
         let Some(b) = self.bodies.get(&id) else { return };
         let Some(e) = self.entities.get(id) else { return };
-        if b.stopping {
+        if e.completion == Completion::Dock {
             if !matches!(e.motion, Motion::To { .. }) {
                 if e.oriented_place().is_some() && e.frame.is_none() && !children.contains_key(&id) {
                     self.try_dock(c, id);
@@ -1121,7 +1091,7 @@ impl Dim {
             return;
         }
         if e.frame.is_none() && e.body_place().rotation() != glam::DQuat::IDENTITY {
-            self.float_ship(id, 4);
+            self.enable_dynamics(id, None);
             return;
         }
         if children.contains_key(&id) {
@@ -1159,7 +1129,7 @@ impl Dim {
             .floater_path
             .filter(|p| p.cell == cell && p.direction == sign && p.geometry == scan.geometry && p.breaks == breaks);
         if let Some(blocked) = previous.and_then(|p| p.blocked) {
-            if self.get(blocked).is_none_or(|s| {
+            if self.get(0, blocked).is_none_or(|s| {
                 let info = &c.states[s as usize];
                 info.solid() && info.liquid.is_none() && (!breaks || info.hardness < 0.0)
             }) {
@@ -1177,7 +1147,7 @@ impl Dim {
                 .filter(|(_, s)| c.solid(*s))
                 .map(|(p, _)| *p + cell)
                 .collect();
-            let mut broken = match self.ahead_every_way(c, at.iter().copied(), &own, sign, breaks) {
+            let mut broken = match self.ahead_every_way(0, c, at.iter().copied(), &own, sign, breaks) {
                 Ok(broken) => broken,
                 Err(blocked) => {
                     if let Some(b) = self.bodies.get_mut(&id) {
@@ -1195,7 +1165,7 @@ impl Dim {
                     .filter(|to| !own.contains(to))
                 {
                     match self
-                        .get(to)
+                        .get(0, to)
                         .map(|there| super::signal::rider_meets(c, there))
                     {
                         Some(RiderMeets::Wall) => off.push(*p),
@@ -1206,17 +1176,17 @@ impl Dim {
             }
             off.dedup();
             if !off.is_empty() {
-                self.with_space(c, id, |d, _| {
+                self.with_space(c, id, |d, space_id, _| {
                     for p in off {
-                        if let Some(s) = d.get(p).filter(|s| *s != AIR) {
+                        if let Some(s) = d.get(space_id, p).filter(|s| *s != AIR) {
                             log::debug!("{} riding on a platform at {p} came off", c.state_name(s));
-                            d.drop_block_loot(c, p, s, abi::ItemStack::EMPTY, false, 0);
-                            d.set(c, p, AIR);
+                            d.drop_block_loot(space_id, c, p, s, abi::ItemStack::EMPTY, false, 0);
+                            d.set(space_id, c, p, AIR);
                         }
                     }
                 });
             }
-            self.break_for_body(c, broken);
+            self.break_for_body(0, c, broken);
             if let Some(b) = self.bodies.get_mut(&id) {
                 b.floater_path = Some(scan);
             }
@@ -1234,11 +1204,13 @@ impl Dim {
             } else if let Some(e) = self.entities.get_mut(id) {
                 e.vel = DVec3::ZERO;
             }
-            if let Some(body) = self.bodies.get_mut(&id) {
-                body.stopping = false;
-                if at.is_none() {
-                    body.floater_path = None;
-                }
+            if let Some(entity) = self.entities.get_mut(id) {
+                entity.completion = Completion::Stay;
+            }
+            if at.is_none()
+                && let Some(body) = self.bodies.get_mut(&id)
+            {
+                body.floater_path = None;
             }
         } else {
             self.bring_to_stop(id, pos, vel, at);
@@ -1267,20 +1239,27 @@ impl Dim {
         if let Some(e) = self.entities.get_mut(id) {
             e.vel = DVec3::ZERO;
             e.motion = Motion::To { to, left: ticks };
-        }
-        if let Some(b) = self.bodies.get_mut(&id) {
-            b.stopping = true;
+            e.completion = Completion::Dock;
         }
     }
 
     /// A mod wants a body back as blocks, which happens when its tick comes: it may be the one
     /// whose block is asking.
     pub fn ask_put_down(&mut self, id: u64) {
-        if id == self.frame {
-            self.space.stopping = true;
-        } else if let Some(b) = self.bodies.get_mut(&id) {
-            b.stopping = true;
+        if self.bodies.contains_key(&id)
+            && let Some(entity) = self
+                .entities
+                .get_mut(id)
+                .filter(|entity| entity.motion != Motion::Parked)
+        {
+            entity.completion = Completion::Dock;
         }
+    }
+
+    pub(super) fn docking(&self, id: u64) -> bool {
+        self.entities
+            .get(id)
+            .is_some_and(|entity| entity.completion == Completion::Dock)
     }
 
     /// All a body has goes back to where it is, as blocks of what it is on: at the whole block it
@@ -1291,65 +1270,70 @@ impl Dim {
             self.stop_mounted_children(id, &children);
             return;
         }
-        self.in_frame(id, |d| d.finish_moving_here(c));
+        self.finish_moving_here(id, c);
         let Some(e) = self.entities.get(id).filter(|e| e.motion != Motion::Parked) else { return };
-        let (pos, on) = (e.pos, e.frame);
-        let oriented = e.mount.as_ref().map(|m| m.place_at(m.angle)).or_else(|| {
-            e.oriented_place().map(|pose| {
-                self.entities
-                    .get(on.unwrap_or(0))
-                    .map_or(pose, |parent| pose.relative_to(parent.body_place()))
-            })
-        });
+        let space_id = e.frame.unwrap_or(0);
+        let parent = self.space_pose(space_id);
+        let pos = parent.to_local(e.pos);
+        let oriented = e
+            .mount
+            .as_ref()
+            .map(|m| m.place_at(m.angle))
+            .or_else(|| e.oriented_place().map(|pose| pose.relative_to(parent)));
         let Some(b) = self.bodies.get(&id) else { return };
-        let (all, was) = (b.all_blocks(), b.cell);
-        let blocks: Vec<(IVec3, u32, Option<u64>)> = all
-            .into_iter()
-            .map(|(local, state)| (local, state, self.entities.anchored(id, local)))
+        let cell = Transform::of(pos).cell(if space_id == 0 { b.cell } else { None });
+        let blocks = b
+            .block_snapshot()
+            .iter()
+            .map(|&(local, state)| {
+                let to = oriented.map_or(local + cell, |place| place.cell_at(local));
+                Carried { local, to, state }
+            })
             .collect();
-        self.in_frame(on.unwrap_or(0), |d| {
-            let place = Transform::of(d.place.to_local(pos));
-            let cell = place.cell(if d.frame == 0 { was } else { None });
-            d.put_down(
-                c,
-                id,
-                blocks
-                    .into_iter()
-                    .map(|(local, state, entity)| {
-                        let to = oriented.map_or(local + cell, |p| p.cell_at(local));
-                        Carried { local, to, state, entity }
-                    })
-                    .collect(),
-                Vec::new(),
-                None,
-            );
-        });
+        self.put_down(space_id, c, id, blocks, Vec::new(), None);
     }
 
     /// Puts what a body carried where it is going: there for circuits now, and for clients when
     /// they see the body there. It stays until then and a little more, not moving. What found
     /// its place taken drops as it would broken. `also`: other cells that changed with it, and
     /// what they were.
-    pub fn put_down(&mut self, c: &'static Content, body: u64, blocks: Vec<Carried>, also: Vec<(IVec3, u32)>, turns: Option<(IVec3, u32)>) {
+    pub fn put_down(
+        &mut self,
+        space_id: u64,
+        c: &'static Content,
+        body: u64,
+        blocks: Vec<Carried>,
+        also: Vec<(IVec3, u32)>,
+        turns: Option<(IVec3, u32)>,
+    ) {
+        if !self.active_space(body) || !self.active_space(space_id) {
+            return;
+        }
         let turn = self
             .entities
             .get(body)
             .and_then(|e| {
-                e.mount
-                    .as_ref()
-                    .map(|m| m.place_at(m.angle))
-                    .or_else(|| e.oriented_place().map(|pose| pose.relative_to(self.place)))
+                e.mount.as_ref().map(|m| m.place_at(m.angle)).or_else(|| {
+                    e.oriented_place()
+                        .map(|pose| pose.relative_to(self.space_pose(space_id)))
+                })
             })
             .map_or(abi::Turn::NONE, Transform::turn);
         if let Some(e) = self.entities.get_mut(body) {
             e.motion = Motion::Parked;
             e.vel = DVec3::ZERO;
         }
-        let mark = self.space.changes.len();
-        let mut cells = also;
-        let mut landed = Vec::with_capacity(blocks.len());
-        for mut b in blocks {
-            let there = self.bodies.get(&body).and_then(|s| s.get(b.local));
+        let mut cells: FxHashMap<_, _> = also
+            .into_iter()
+            .map(|(pos, state)| (pos, (state, self.space(space_id).extras(pos).to_vec())))
+            .collect();
+        let before: Vec<_> = blocks
+            .iter()
+            .map(|block| (self.get(space_id, block.to), self.space(space_id).extras(block.to).to_vec()))
+            .collect();
+        let mut landed = FxHashMap::default();
+        for (mut b, (was, parts)) in blocks.into_iter().zip(before) {
+            let there = self.space(body).get(b.local);
             // Broken off on its way.
             if there == Some(AIR) {
                 continue;
@@ -1363,116 +1347,138 @@ impl Dim {
                     continue;
                 }
                 b.state = c.turned_state(b.state, turn);
-                if let Some(entity) = b.entity {
+            }
+            let entity = self.entities.anchored(body, b.local);
+            let source = self.space(body);
+            let signal = source.signals.carry_out(b.local);
+            let extras = source
+                .extras(b.local)
+                .iter()
+                .map(|&state| c.turned_state(state, turn))
+                .collect();
+            let signal = if turn == abi::Turn::NONE { signal } else { signal.turned(turn) };
+            if self.land_block(space_id, c, b.to, b.state, extras, entity, signal) {
+                if let Some(entity) = entity {
                     self.turn_assembly_offsets(c, entity, turn);
                 }
+                if let Some(state) = self.get(space_id, b.to) {
+                    landed.insert(b.local, (b.to, state));
+                }
             }
-            let was = self.get(b.to);
-            let signal = self
-                .bodies
-                .get(&body)
-                .map_or_else(Moved::default, |s| s.signals.carry_out(b.local));
-            let mut extras = self
-                .bodies
-                .get(&body)
-                .map_or(Vec::new(), |s| s.extras(b.local).to_vec());
-            if turn != abi::Turn::NONE {
-                extras
-                    .iter_mut()
-                    .for_each(|s| *s = c.turned_state(*s, turn));
+            if let Some(was) = was.filter(|was| self.get(space_id, b.to) != Some(*was) || self.space(space_id).extras(b.to) != parts) {
+                cells.insert(b.to, (was, parts));
             }
-            self.land_block(c, b.to, b.state, b.entity, if turn == abi::Turn::NONE { signal } else { signal.turned(turn) });
-            if self.get(b.to) == Some(b.state) {
-                self.write_cell(c, b.to, b.state, Some(extras), true);
-            }
-            if let Some(was) = was.filter(|was| self.get(b.to) != Some(*was)) {
-                cells.push((b.to, was));
-            }
-            landed.push(b);
+        }
+        self.reparent_mounts(body, space_id, turn, |pos| landed.get(&pos).map(|&(at, _)| at));
+        {
+            let source = self.space_mut(body);
+            source.signals = Default::default();
+            source.transfer = Some(Box::new(Transfer { destination: space_id, turn, cells: landed, shown_at: None }));
         }
         // Its circuits and light are the world's again: at once here, in a moment from on a body.
-        self.space.signals.set_outside(body, Default::default());
-        if self.frame == 0 {
+        self.space_mut(space_id)
+            .signals
+            .set_outside(body, Default::default());
+        if space_id == 0 {
             self.set_body_lights(c, body, Vec::new());
         }
-        if let Some(b) = self.bodies.get_mut(&body) {
-            b.signals = Default::default();
-        }
-        let tail = self.space.changes.split_off(mark);
-        self.space.changes.extend(
-            tail.into_iter()
-                .filter(|(p, _)| !cells.iter().any(|(at, _)| at == p)),
+        let destination = self.space_mut(space_id);
+        destination
+            .changes
+            .retain(|(pos, _)| !cells.contains_key(pos));
+        destination.not_shown.extend(
+            cells
+                .into_iter()
+                .map(|(pos, (state, parts))| (pos, (state, parts, body))),
         );
-        for &(at, was) in &cells {
-            self.space.not_shown.insert(at, (was, body));
-        }
-        let cells = cells.into_iter().map(|(at, _)| at).collect();
-        self.space
+        destination
             .landings
-            .push(Landing { body, rests: REST_TICKS, blocks: landed, cells, turns });
+            .push(Landing { body, ticks: REST_TICKS + LINGER_TICKS, turns });
     }
 
     /// Goes where it was going, if that is free: otherwise it breaks there, what it holds with it.
-    fn land_block(&mut self, c: &'static Content, at: IVec3, state: u32, entity: Option<u64>, signal: Moved) {
-        match self.get(at) {
+    fn land_block(
+        &mut self,
+        space_id: u64,
+        c: &'static Content,
+        at: IVec3,
+        state: u32,
+        extras: Vec<u32>,
+        entity: Option<u64>,
+        signal: Moved,
+    ) -> bool {
+        match self.get(space_id, at) {
             // Sides join the sides there, each holding on by itself.
             Some(there) if c.states[there as usize].block == c.states[state as usize].block && c.states[state as usize].sides != 0 => {
                 let sides = c.states[there as usize].sides | c.states[state as usize].sides;
-                self.carry_block(c, at, c.block_of(state).with_sides(state, sides));
+                let joined = c.block_of(state).with_sides(state, sides);
+                return self
+                    .write_cell(space_id, c, at, joined, (joined == state).then_some(extras), true)
+                    .is_some();
             }
             Some(there) if there == AIR || c.states[there as usize].flags & abi::block_flags::REPLACEABLE != 0 => {
                 if c.states[state as usize].signal.kind == abi::signal_kind::OBSERVER {
-                    self.space.signals.moved_observers.insert(at);
+                    self.space_mut(space_id).signals.moved_observers.insert(at);
                 }
-                self.put_block(c, at, state, entity, signal);
+                if !signal.is_empty() {
+                    self.space_mut(space_id).signals.arriving.insert(at, signal);
+                }
+                if self
+                    .write_cell(space_id, c, at, state, Some(extras), true)
+                    .is_some()
+                {
+                    if let Some(id) = entity {
+                        self.entities.attach(
+                            id,
+                            space_id,
+                            at,
+                            self.space_pose(space_id)
+                                .to_world(at.as_dvec3() + DVec3::splat(0.5)),
+                        );
+                    }
+                    return true;
+                }
+                self.space_mut(space_id).signals.arriving.remove(&at);
             }
-            _ => self.broke_landing(c, at, state, entity),
+            _ => {}
         }
+        self.broke_landing(space_id, c, at, state, entity);
+        false
     }
 
     /// A block that couldn't land drops what it does, and what it held.
-    pub(super) fn broke_landing(&mut self, c: &'static Content, at: IVec3, state: u32, entity: Option<u64>) {
+    pub(super) fn broke_landing(&mut self, space_id: u64, c: &'static Content, at: IVec3, state: u32, entity: Option<u64>) {
         if let Some(id) = entity {
-            self.drop_inventory(c, id);
+            self.drop_inventory(space_id, c, id);
             self.entities.remove(id, super::dim::UNTOLD);
         }
-        self.drop_block_loot(c, at, state, abi::ItemStack::EMPTY, false, 0);
+        self.drop_block_loot(space_id, c, at, state, abi::ItemStack::EMPTY, false, 0);
     }
 
     /// Landed bodies, a tick on: they get shown, and go.
-    pub(super) fn tick_landings(&mut self, c: &'static Content) {
-        if self.space.landings.is_empty() && self.space.lingering.is_empty() {
-            return;
-        }
-        let mut lingering = std::mem::take(&mut self.space.lingering);
-        lingering.retain_mut(|(body, ticks)| {
-            *ticks -= 1;
-            if *ticks == 0 {
-                self.entities.remove(*body, super::dim::UNTOLD);
-                self.bodies.remove(body);
+    pub(super) fn tick_landings(&mut self, space_id: u64, c: &'static Content) {
+        let mut landings = std::mem::take(&mut self.space_mut(space_id).landings);
+        landings.retain_mut(|landing| {
+            landing.ticks -= 1;
+            match landing.ticks {
+                0 => {
+                    self.entities.remove(landing.body, super::dim::UNTOLD);
+                    self.bodies.remove(&landing.body);
+                }
+                LINGER_TICKS => self.show_landed(space_id, c, landing.body),
+                _ => {
+                    if let Some((at, state)) = landing
+                        .turns
+                        .take()
+                        .filter(|_| self.has_space(landing.body))
+                    {
+                        self.carry_block(landing.body, c, at, state);
+                    }
+                }
             }
-            *ticks > 0
+            landing.ticks != 0
         });
-        self.space.lingering = lingering;
-        let mut turning = Vec::new();
-        let mut shown = Vec::new();
-        for s in &mut self.space.landings {
-            if s.rests > 1 {
-                s.rests -= 1;
-                turning.extend(s.turns.take().map(|t| (s.body, t)));
-            } else {
-                shown.push(s.body);
-            }
-        }
-        for (body, (at, state)) in turning {
-            self.set_in_body(c, body, at, state);
-        }
-        for body in shown {
-            if let Some(i) = self.space.landings.iter().position(|s| s.body == body) {
-                let s = self.space.landings.swap_remove(i);
-                self.show_landed(c, s);
-            }
-        }
+        self.space_mut(space_id).landings = landings;
     }
 
     /// Bodies' places against the world's cells: one moved past the middle of a cell, by more than
@@ -1550,7 +1556,7 @@ impl Dim {
                 .on_carried
                 .filter(|_| was(at) != Some(cell))
             {
-                self.call(owner, cb, |w| abi::BlockEventArgs {
+                self.call(0, owner, cb, |w| abi::BlockEventArgs {
                     world: w,
                     pos: cell.to_array().into(),
                     state,
@@ -1628,7 +1634,12 @@ impl Dim {
             b.block_snapshot()
                 .iter()
                 .copied()
-                .filter(|(_, s)| c.states[*s as usize].light != [0; 3])
+                .flat_map(|(at, state)| {
+                    std::iter::once(state)
+                        .chain(b.extras(at).iter().copied())
+                        .map(move |part| (at, part))
+                })
+                .filter(|&(_, state)| c.states[state as usize].light != [0; 3])
                 .map(|(at, s)| (turned.map_or(at + cell, |t| t.cell_at(at)), c.states[s as usize].light))
                 .collect()
         });
@@ -1717,11 +1728,8 @@ impl Dim {
         let parent = self
             .entities
             .get(id)
-            .and_then(|e| e.mount.as_ref().and(e.frame));
-        if let Some(parent) = parent.filter(|&parent| parent != self.frame) {
-            self.in_frame(parent, |d| d.exchange_signals(c, id));
-            return;
-        }
+            .and_then(|e| e.mount.as_ref().and(e.frame))
+            .unwrap_or(0);
         let shaft = self
             .entities
             .get(id)
@@ -1730,19 +1738,25 @@ impl Dim {
             let place = e.body_place();
             if let Some(m) = &e.mount { Some(m.wire_place()) } else { e.oriented_place().map(|_| (place, place.grid_aligned())) }
         });
-        let Some(b) = self.bodies.get_mut(&id) else { return };
+        let (outer, child) = if parent == 0 {
+            (&mut *self.space, self.bodies.get_mut(&id))
+        } else {
+            let [Some(outer), child] = self.bodies.get_disjoint_mut([&parent, &id]) else { return };
+            (&mut **outer, child)
+        };
+        let Some(b) = child else { return };
         let Some(cell) = b.cell else { return };
         if mount.is_some_and(|(_, aligned)| !aligned) {
             let (mut into, mut out) = (FxHashMap::default(), FxHashMap::default());
-            if self.frame != 0
+            if parent != 0
                 && let Some(shaft) = shaft
             {
                 use super::signal::{Gives, View};
-                let world = View { cubes: &self.space.cubes, on_body: true };
+                let world = View { cubes: &outer.cubes, on_body: true };
                 let child = View { cubes: &b.cubes, on_body: true };
                 let face = shaft.face as usize;
                 let axis = crate::world::DIRS[face];
-                let from_parent = self.space.signals.gives(c, world, shaft.block).only(face);
+                let from_parent = outer.signals.gives(c, world, shaft.block).only(face);
                 let from_child = b.signals.gives(c, child, IVec3::ZERO).only(face ^ 1);
                 if from_parent != Gives::default() {
                     into.insert(-axis, from_parent);
@@ -1752,7 +1766,7 @@ impl Dim {
                 }
             }
             b.signals.set_outside(0, into);
-            self.space.signals.set_outside(id, out);
+            outer.signals.set_outside(id, out);
             return;
         }
         let place = mount.map(|(place, _)| place);
@@ -1768,13 +1782,12 @@ impl Dim {
                 .collect();
             (b.signals.giving(c, view, project, turn), around)
         };
-        let world = super::signal::View { cubes: &self.space.cubes, on_body: self.frame != 0 };
-        let got = self
-            .space
+        let world = super::signal::View { cubes: &outer.cubes, on_body: parent != 0 };
+        let got = outer
             .signals
             .giving_at(c, world, around.into_iter(), project, turn.inverse());
         b.signals.set_outside(0, got);
-        self.space.signals.set_outside(id, giving);
+        outer.signals.set_outside(id, giving);
     }
 
     /// Those that have anything to say, after circuits have gone.
@@ -1820,102 +1833,114 @@ impl Dim {
         }
     }
 
-    pub(super) fn set_in_body(&mut self, c: &'static Content, body: u64, at: IVec3, state: u32) {
-        self.in_frame(body, |d| {
-            d.carry_block(c, at, state);
-            d.space.relight();
+    fn show_landed(&mut self, space_id: u64, c: &'static Content, frame: u64) {
+        let hidden = &mut self.space_mut(space_id).not_shown;
+        let mut shown = Vec::new();
+        hidden.retain(|&pos, (_, _, body)| {
+            if *body != frame {
+                return true;
+            }
+            shown.push(pos);
+            false
         });
-    }
-
-    fn show_landed(&mut self, c: &'static Content, s: Landing) {
-        for at in s.cells {
-            if self.space.not_shown.get(&at).is_some_and(|n| n.1 == s.body) {
-                self.space.not_shown.remove(&at);
-                self.resend_cell(at);
+        for pos in shown {
+            self.resend_cell(space_id, pos);
+        }
+        if let Some(source) = self.bodies.get(&frame)
+            && let Some(transfer) = &source.transfer
+        {
+            let gone: Vec<_> = source
+                .block_snapshot()
+                .iter()
+                .filter_map(|&(pos, state)| {
+                    (c.covered_step(state).is_none()
+                        && transfer
+                            .cells
+                            .get(&pos)
+                            .is_none_or(|&(at, state)| self.get(space_id, at) != Some(state)))
+                    .then_some(pos)
+                })
+                .collect();
+            for pos in gone {
+                self.carry_block(frame, c, pos, AIR);
             }
         }
-        // What has already moved on doesn't stay behind in the body.
-        let gone: Vec<IVec3> = s
-            .blocks
-            .iter()
-            .filter(|b| self.get(b.to) != Some(b.state))
-            .map(|b| b.local)
-            .collect();
-        if !gone.is_empty() {
-            self.in_frame(s.body, |d| {
-                for at in gone {
-                    d.carry_block(c, at, AIR);
-                }
-                d.space.relight();
-            });
+        if let Some(transfer) = self
+            .bodies
+            .get_mut(&frame)
+            .and_then(|space| space.transfer.as_mut())
+        {
+            transfer.shown_at = Some(self.time);
         }
-        self.space.lingering.push((s.body, LINGER_TICKS));
     }
 
     /// Bodies waiting to be shown go now.
-    pub(super) fn finish_landings(&mut self) {
-        for s in std::mem::take(&mut self.space.landings) {
+    pub(super) fn finish_landings(&mut self, space_id: u64) {
+        for s in std::mem::take(&mut self.space_mut(space_id).landings) {
             self.entities.remove(s.body, super::dim::UNTOLD);
             self.bodies.remove(&s.body);
         }
-        for (at, _) in std::mem::take(&mut self.space.not_shown) {
-            self.resend_cell(at);
-        }
-        for (body, _) in std::mem::take(&mut self.space.lingering) {
-            self.entities.remove(body, super::dim::UNTOLD);
-            self.bodies.remove(&body);
+        for (at, _) in std::mem::take(&mut self.space_mut(space_id).not_shown) {
+            self.resend_cell(space_id, at);
         }
     }
 
-    /// Where blocks a client saw on body `frame` really are: one that has landed only looks like
-    /// it is still there, and its blocks are in what it landed on.
-    pub fn landed_as(&self, frame: u64, pos: IVec3) -> (u64, IVec3, abi::Turn) {
-        let (mut frame, mut pos, mut turn) = (frame, pos, abi::Turn::NONE);
-        while let Some(e) = self
-            .entities
-            .get(frame)
-            .filter(|e| e.motion == Motion::Parked)
-        {
-            if let Some(m) = &e.mount {
-                let place = m.place_at(m.angle);
-                pos = place.cell_at(pos);
-                turn = turn.then(place.turn());
-                frame = e.frame.unwrap_or(0);
-            } else {
-                if e.ship.is_some() {
-                    let place = e.body_place();
-                    return (0, place.cell_at(pos), turn.then(place.turn()));
-                }
-                if e.frame.is_none()
-                    && let Some(cell) = self.bodies.get(&frame).and_then(|b| b.cell)
-                {
-                    return (0, pos + cell, turn);
-                }
-                break;
+    /// A replacement at the destination ends the old cell's route from its source.
+    pub(super) fn invalidate_arrival(&mut self, space_id: u64, pos: IVec3) {
+        let frames: Vec<_> = self
+            .space(space_id)
+            .landings
+            .iter()
+            .map(|landing| landing.body)
+            .collect();
+        for frame in frames {
+            if let Some(transfer) = self
+                .bodies
+                .get_mut(&frame)
+                .and_then(|space| space.transfer.as_mut())
+            {
+                transfer
+                    .cells
+                    .retain(|_, (destination, _)| *destination != pos);
             }
         }
-        (frame, pos, turn)
+    }
+
+    /// Resolves a late click through cells that were committed to another space.
+    pub fn landed_as(&self, c: &Content, frame: u64, pos: IVec3) -> Option<(u64, IVec3, abi::Turn)> {
+        let (mut frame, mut pos, mut turn) = (frame, pos, abi::Turn::NONE);
+        let mut block = None;
+        while !self.active_space(frame) {
+            let transfer = self.bodies.get(&frame)?.transfer.as_ref()?;
+            let &(at, state) = transfer.cells.get(&pos)?;
+            let kind = c.states[state as usize].block;
+            if block.is_some_and(|previous| previous != kind) {
+                return None;
+            }
+            block = Some(kind);
+            (frame, pos, turn) = (transfer.destination, at, turn.then(transfer.turn));
+        }
+        if let Some(block) = block
+            && self
+                .get(frame, pos)
+                .is_none_or(|state| c.states[state as usize].block != block)
+        {
+            return None;
+        }
+        Some((frame, pos, turn))
     }
 
     /// Runs `f` on the space blocks at `frame` are in: this region (0) or the blocks of body
     /// `frame`, with where that is in the world. It settles after; the world's with the rest of
     /// the action (`Server::settle`).
-    pub fn with_space<R>(&mut self, c: &'static Content, frame: u64, f: impl FnOnce(&mut Dim, Transform) -> R) -> Option<R> {
-        if frame == 0 {
-            return Some(f(self, Transform::default()));
-        }
-        if self
-            .entities
-            .get(frame)
-            .is_some_and(|e| e.motion == Motion::Parked)
-        {
+    pub fn with_space<R>(&mut self, c: &'static Content, frame: u64, f: impl FnOnce(&mut Dim, u64, Transform) -> R) -> Option<R> {
+        if !self.active_space(frame) {
             return None;
         }
-        self.in_frame(frame, |d| {
-            let place = d.place;
-            let out = f(d, place);
-            d.settle(c);
-            out
-        })
+        let out = f(self, frame, self.space_pose(frame));
+        if frame != 0 {
+            self.settle(frame, c);
+        }
+        Some(out)
     }
 }

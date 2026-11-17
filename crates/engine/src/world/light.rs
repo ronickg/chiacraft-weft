@@ -96,19 +96,42 @@ pub fn sky_below(above: Option<&Cube>, open: bool) -> SkyBelow {
 /// Channel index: 0 sky, 1..4 red, green, blue.
 const SKY: usize = 0;
 
-/// What a change `change` tells the lighter about (`Lighter::block_changed`, `source_changed`)
-/// does to the light around it, what bodies' lights give included, on the server and in a
-/// client's guess alike. Returns the cubes that changed.
+#[derive(Clone, Copy)]
+pub enum Sky {
+    Dark,
+    Loaded,
+    Open,
+}
+
+impl Sky {
+    pub fn local(finite: bool, sky_light: bool) -> Self {
+        if finite {
+            Self::Open
+        } else if sky_light {
+            Self::Loaded
+        } else {
+            Self::Dark
+        }
+    }
+}
+
+/// Relights a cell edit, with light from outside the grid included. `old` is the previous main
+/// state, or `None` for a change to the emitters only.
 pub fn relight<M: CubeMap>(
     map: &mut M,
     c: &crate::content::Content,
-    sky: bool,
+    sky: Sky,
     glow: &rustc_hash::FxHashMap<IVec3, [u8; 3]>,
-    change: impl FnOnce(&mut Lighter<M>),
+    pos: IVec3,
+    old: Option<u32>,
 ) -> Vec<IVec3> {
-    let mut lighter = Lighter::new(map, c, sky).with_extra(glow);
-    change(&mut lighter);
-    std::mem::take(&mut lighter.changed).into_iter().collect()
+    let mut lighter = Lighter::new(map, c, !matches!(sky, Sky::Dark)).with_extra(glow);
+    lighter.open_sky = matches!(sky, Sky::Open);
+    match old {
+        Some(old) => lighter.block_changed(pos, old),
+        None => lighter.source_changed(pos),
+    }
+    lighter.changed.into_iter().collect()
 }
 
 fn ch(v: u32, c: usize) -> u8 {
@@ -124,6 +147,7 @@ pub struct Lighter<'a, M: CubeMap> {
     pub map: &'a mut M,
     c: &'a Content,
     sky: bool,
+    open_sky: bool,
     /// Cubes whose light changed, the caller resends them.
     pub changed: FxHashSet<IVec3>,
     add: VecDeque<(IVec3, u8)>,
@@ -148,6 +172,7 @@ impl<'a, M: CubeMap> Lighter<'a, M> {
             map,
             c,
             sky,
+            open_sky: false,
             changed: FxHashSet::default(),
             add: VecDeque::new(),
             remove: VecDeque::new(),
@@ -222,6 +247,9 @@ impl<'a, M: CubeMap> Lighter<'a, M> {
     #[inline]
     fn emit(&self, p: IVec3, state: u32, c: usize) -> u8 {
         if c == SKY {
+            if self.open_sky && p.y & 15 == 15 && self.lookup((p + IVec3::Y) >> 4).is_none() {
+                return passed(self.tight(crate::content::AIR), self.tight(state), 2, SKY_FULL, SKY);
+            }
             return 0;
         }
         let (cp, i) = split(p);

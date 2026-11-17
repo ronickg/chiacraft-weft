@@ -63,6 +63,7 @@ impl Server {
         for d in &mut self.dims {
             let mut m = Vec::new();
             for r in &mut d.regions {
+                r.publish_spaces();
                 r.mirror_fields(c);
                 r.entities.find_changes(&c.game.synced_comps);
                 for e in r
@@ -118,20 +119,16 @@ impl Server {
             d.day_moved = false;
             d.weather_moved = false;
             for r in &mut d.regions {
-                for st in r.bodies.values_mut() {
-                    st.resend.clear();
-                    st.changes.clear();
-                    st.extra_changes.clear();
-                    st.signals.level_changes.clear();
-                    st.edited.clear();
-                    st.world_light_changed = false;
-                    st.dry_changed = false;
+                for space in std::iter::once(&mut r.space).chain(r.bodies.values_mut()) {
+                    space.resend.clear();
+                    space.changes.clear();
+                    space.extra_changes.clear();
+                    space.signals.level_changes.clear();
+                    space.body_light_changes.clear();
+                    space.world_light_changed = false;
+                    space.dry_changed = false;
                 }
-                r.space.resend.clear();
-                r.space.body_light_changes.clear();
-                r.space.changes.clear();
-                r.space.extra_changes.clear();
-                r.space.signals.level_changes.clear();
+                r.bodies.values_mut().for_each(|space| space.edited.clear());
                 r.entities.killed.clear();
                 r.entities.taken.clear();
                 r.entities.told.clear();
@@ -160,48 +157,42 @@ fn send_block_changes(p: &mut Player, dim: &DimSet) {
         if !glow.is_empty() {
             p.conn.send(ToClient::BodyGlow { dim: p.dim, cells: glow });
         }
-        for (pos, cube) in &reg.space.resend {
-            if p.sent.contains(pos) {
-                p.conn
-                    .send(ToClient::Cube { dim: p.dim, frame: 0, pos: *pos, cube: cube.clone(), edit: true });
-            }
-        }
-        if !reg.space.changes.is_empty() || !reg.space.extra_changes.is_empty() {
-            let changes: Vec<(IVec3, u32)> = reg
-                .space
-                .changes
-                .iter()
-                .filter(|(b, _)| p.sent.contains(&(*b >> 4)))
-                .copied()
-                .collect();
-            let extras: Vec<(IVec3, Vec<u32>)> = reg
-                .space
-                .extra_changes
-                .iter()
-                .filter(|(b, _)| p.sent.contains(&(*b >> 4)))
-                .cloned()
-                .collect();
-            if !changes.is_empty() || !extras.is_empty() {
-                p.conn
-                    .send(ToClient::Blocks { dim: p.dim, frame: 0, changes, extras });
-            }
-        }
-        if !reg.space.signals.level_changes.is_empty() {
-            let changes: Vec<(IVec3, u8, u8)> = reg
-                .space
-                .signals
-                .level_changes
-                .iter()
-                .filter(|(b, ..)| p.sent.contains(&(*b >> 4)))
-                .copied()
-                .collect();
-            if !changes.is_empty() {
-                p.conn
-                    .send(ToClient::Signals { dim: p.dim, frame: 0, changes });
-            }
-        }
+        send_space_changes(&mut p.conn, p.dim, 0, &reg.space, |cube| p.sent.contains(&cube));
     }
     p.glow_sent = true;
+}
+
+fn send_space_changes(conn: &mut crate::net::ServerConn, dim: u32, frame: u64, space: &super::space::Space, sent: impl Fn(IVec3) -> bool) {
+    for (pos, cube) in &space.resend {
+        if sent(*pos) {
+            conn.send(ToClient::Cube { dim, frame, pos: *pos, cube: cube.clone(), edit: true });
+        }
+    }
+    let changes: Vec<_> = space
+        .changes
+        .iter()
+        .filter(|(pos, _)| sent(cube_of(*pos)))
+        .copied()
+        .collect();
+    let extras: Vec<_> = space
+        .extra_changes
+        .iter()
+        .filter(|(pos, _)| sent(cube_of(*pos)))
+        .cloned()
+        .collect();
+    if !changes.is_empty() || !extras.is_empty() {
+        conn.send(ToClient::Blocks { dim, frame, changes, extras });
+    }
+    let changes: Vec<_> = space
+        .signals
+        .level_changes
+        .iter()
+        .filter(|(pos, ..)| sent(cube_of(*pos)))
+        .copied()
+        .collect();
+    if !changes.is_empty() {
+        conn.send(ToClient::Signals { dim, frame, changes });
+    }
 }
 
 /// Everyone else's mining in this dimension: cracks for those near, and their arms.
@@ -263,6 +254,15 @@ fn send_entities(
             .filter(|e| e.seen(c) && e.id != p.entity && (!e.player || e.alive()))
             .filter(shown)
         {
+            if !p.known.contains(&e.id)
+                && reg
+                    .bodies
+                    .get(&e.id)
+                    .and_then(|space| space.transfer.as_ref())
+                    .is_some_and(|transfer| transfer.shown_at.is_some())
+            {
+                continue;
+            }
             if Some(e.id) != mount && (e.pos - me).length_squared() > range2 {
                 let near_body = reg
                     .bodies
@@ -283,6 +283,7 @@ fn send_entities(
                 spawn.push(EntityView {
                     id: e.id,
                     kind: e.kind,
+                    has_space: reg.bodies.contains_key(&e.id),
                     pos: e.pos,
                     yaw: e.yaw,
                     pitch: e.pitch,
@@ -345,49 +346,59 @@ fn send_entities(
             }
         }
     }
-    // Bodies: all their cubes with the entity, then what changes.
-    let mut bodies = Vec::new();
-    for reg in &dim.regions {
-        for (&id, st) in &reg.bodies {
-            let new = spawn.iter().any(|v| v.id == id);
-            let known = p.known.contains(&id) && visible.contains(&id);
-            if (new && !st.dry_boxes.is_empty()) || (known && st.dry_changed) {
-                bodies.push(ToClient::BodyAir { frame: id, boxes: st.dry_boxes.clone() });
-            }
-            if new {
-                bodies.push(ToClient::BodyLight { frame: id, lights: st.world_light.iter().map(|(p, l)| (*p, *l)).collect() });
-                for (pos, cube) in &st.cubes {
-                    bodies.push(ToClient::Cube { dim: p.dim, frame: id, pos: *pos, cube: cube.clone(), edit: false });
-                    let changes = st.signals.levels_in(c, *pos, cube);
-                    if !changes.is_empty() {
-                        bodies.push(ToClient::Signals { dim: p.dim, frame: id, changes });
-                    }
-                }
-            } else if known {
-                bodies.extend(st.resend.iter().map(|(pos, cube)| ToClient::Cube {
-                    dim: p.dim,
-                    frame: id,
-                    pos: *pos,
-                    cube: cube.clone(),
-                    edit: true,
-                }));
-                if st.world_light_changed {
-                    bodies.push(ToClient::BodyLight { frame: id, lights: st.world_light.iter().map(|(p, l)| (*p, *l)).collect() });
-                }
-                if !st.changes.is_empty() || !st.extra_changes.is_empty() {
-                    bodies.push(ToClient::Blocks { dim: p.dim, frame: id, changes: st.changes.clone(), extras: st.extra_changes.clone() });
-                }
-                if !st.signals.level_changes.is_empty() {
-                    bodies.push(ToClient::Signals { dim: p.dim, frame: id, changes: st.signals.level_changes.clone() });
-                }
-            }
-        }
-    }
     if !spawn.is_empty() {
         p.conn.send(ToClient::Spawn(spawn));
     }
-    for m in bodies {
-        p.conn.send(m);
+    for reg in &dim.regions {
+        for (&frame, space) in &reg.bodies {
+            if !visible.contains(&frame) {
+                continue;
+            }
+            let new = !p.known.contains(&frame);
+            if if new { !space.dry_boxes.is_empty() } else { space.dry_changed } {
+                p.conn
+                    .send(ToClient::BodyAir { frame, boxes: space.dry_boxes.clone() });
+            }
+            if new || space.world_light_changed {
+                p.conn.send(ToClient::BodyLight {
+                    frame,
+                    lights: space
+                        .world_light
+                        .iter()
+                        .map(|(&pos, &light)| (pos, light))
+                        .collect(),
+                });
+            }
+            if new {
+                for (&pos, cube) in &space.cubes {
+                    p.send_space_cube(c, frame, pos, cube.clone(), Some(space));
+                }
+            } else {
+                send_space_changes(&mut p.conn, p.dim, frame, space, |_| true);
+            }
+        }
+    }
+    for reg in &dim.regions {
+        for (&frame, space) in &reg.bodies {
+            let Some(transfer) = space
+                .transfer
+                .as_ref()
+                .filter(|transfer| transfer.shown_at == Some(reg.time) && visible.contains(&frame))
+            else {
+                continue;
+            };
+            let destination = transfer.destination;
+            let mut cubes: Vec<_> = transfer
+                .cells
+                .values()
+                .map(|&(pos, _)| cube_of(pos))
+                .filter(|pos| if destination == 0 { p.sent.contains(pos) } else { visible.contains(&destination) })
+                .collect();
+            cubes.sort_unstable_by_key(|pos| pos.to_array());
+            cubes.dedup();
+            p.conn
+                .send(ToClient::SpaceLanded { dim: p.dim, frame, destination, cubes });
+        }
     }
     if !shared.is_empty() {
         p.conn.send(ToClient::EntityComponents(shared));
@@ -518,9 +529,7 @@ fn send_cubes(p: &mut Player, dim: &DimSet, def: &crate::content::DimensionDef, 
     let unsent = to_send.len().saturating_sub(SEND_PER_TICK) as u64;
     for &(_, pos) in to_send.iter().take(SEND_PER_TICK) {
         if let Some(cube) = dim.snapshot(pos) {
-            p.conn
-                .send(ToClient::Cube { frame: 0, dim: p.dim, pos, cube, edit: false });
-            p.send_levels(dim, pos);
+            p.send_terrain_cube(dim, pos, cube);
             p.sent.insert(pos);
             p.unsent.remove(&pos);
         }
@@ -592,20 +601,29 @@ pub(super) fn gizmos_for(p: &Player, dim: &DimSet, tick: u64, me: DVec3) -> Vec<
 
 impl Player {
     /// What has power in a cube this player just got.
-    pub(super) fn send_levels(&mut self, dim: &DimSet, pos: IVec3) {
-        if let Some(r) = dim
-            .regions
-            .iter()
-            .find(|r| r.space.cubes.contains_key(&pos))
-        {
-            let changes = r
-                .space
-                .signals
-                .levels_in(crate::content::content(), pos, r.space.cubes[&pos].as_ref());
-            if !changes.is_empty() {
-                self.conn
-                    .send(ToClient::Signals { dim: self.dim, frame: 0, changes });
-            }
+    pub(super) fn send_terrain_cube(&mut self, dim: &DimSet, pos: IVec3, cube: Arc<Cube>) {
+        let space = dim
+            .region_index(pos * 16)
+            .map(|index| &*dim.regions[index].space);
+        self.send_space_cube(crate::content::content(), 0, pos, cube, space);
+    }
+
+    fn send_space_cube(&mut self, c: &Content, frame: u64, pos: IVec3, cube: Arc<Cube>, space: Option<&super::space::Space>) {
+        let (cube, changes) = if let Some(space) = space {
+            let changes = space
+                .cubes
+                .get(&pos)
+                .map(|actual| space.signals.levels_in(c, pos, actual))
+                .unwrap_or_default();
+            (space.visible_cube(pos, cube), changes)
+        } else {
+            (cube, Vec::new())
+        };
+        self.conn
+            .send(ToClient::Cube { dim: self.dim, frame, pos, cube, edit: false });
+        if !changes.is_empty() {
+            self.conn
+                .send(ToClient::Signals { dim: self.dim, frame, changes });
         }
     }
 }

@@ -2814,6 +2814,14 @@ fn freeze_recipes(
 }
 
 impl Game {
+    pub(crate) fn helm_seats(&self) -> &[Seat] {
+        &self.entities[self.ship_kind as usize].seats
+    }
+
+    pub(crate) fn seats(&self, kind: u32, helm: bool) -> &[Seat] {
+        if helm { self.helm_seats() } else { &self.entities[kind as usize].seats }
+    }
+
     /// Entities of `kind` belong to a block (machines, chests): they come and go with it.
     pub fn is_block_entity(&self, kind: u32) -> bool {
         self.block_entities.values().any(|&k| k == kind)

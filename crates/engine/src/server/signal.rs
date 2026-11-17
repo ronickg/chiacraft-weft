@@ -20,7 +20,7 @@ use weft_abi::block_flags as bf;
 use weft_abi::signal_kind as sk;
 
 use super::dim::Dim;
-use super::entity::{Entities, Motion};
+use super::entity::{Completion, Entities, Motion};
 use super::structure::{Carried, Lifted, Liveness};
 use crate::content::{AIR, Content, Signal};
 use crate::wire::{self, Link};
@@ -1200,14 +1200,15 @@ impl Signals {
     }
 
     /// What a device should do, from what is around it now.
-    fn evaluate(&mut self, c: &'static Content, d: &Dim, p: IVec3, now: u64, effects: &mut Vec<Effect>) {
+    fn evaluate(&mut self, c: &'static Content, d: &Dim, space_id: u64, p: IVec3, now: u64, effects: &mut Vec<Effect>) {
         let Some(dev) = self.devices.get(&p) else { return };
         let state = dev.state;
         let s = c.states[state as usize].signal;
+        let view = d.signal_view(space_id);
         // What can't be told keeps things as they are.
         macro_rules! read {
             ($dir:expr) => {
-                match self.read(c, d.signal_view(), p, $dir) {
+                match self.read(c, view, p, $dir) {
                     Some(v) => v,
                     None => {
                         self.held.insert(p);
@@ -1246,7 +1247,7 @@ impl Signals {
             }
             sk::REPEATER => {
                 // A gate pointing into a lock holds it where it is.
-                if wire::dirs(s.locks).any(|side| d.signal_view().state(p + DIRS[side as usize]).is_none()) {
+                if wire::dirs(s.locks).any(|side| view.state(p + DIRS[side as usize]).is_none()) {
                     self.held.insert(p);
                     return;
                 }
@@ -1264,9 +1265,9 @@ impl Signals {
             sk::COMPARATOR => {
                 let behind = p + DIRS[rear(&s) as usize];
                 let reads_itself = d
-                    .get(behind)
+                    .get(space_id, behind)
                     .is_some_and(|b| c.block_of(b).cb.signal_read.is_some());
-                let container = self.fullness(c, &d.entities, d.frame, behind);
+                let container = self.fullness(c, &d.entities, space_id, behind);
                 if reads_itself || container.is_some() {
                     self.readers.insert(p);
                 } else {
@@ -1309,7 +1310,7 @@ impl Signals {
                 // A big block takes power at any of its cells.
                 for &(o, _) in &c.states[state as usize].cells {
                     for dir in 0..6u8 {
-                        match self.read(c, d.signal_view(), p + o, dir) {
+                        match self.read(c, view, p + o, dir) {
                             Some(v) => most = most.max(v),
                             None => {
                                 self.held.insert(p);
@@ -1396,29 +1397,29 @@ struct PushPlan {
 }
 
 impl Dim {
-    pub fn signal_view(&self) -> View<'_> {
-        View { cubes: &self.space.cubes, on_body: self.frame != 0 }
+    pub fn signal_view(&self, space_id: u64) -> View<'_> {
+        View { cubes: &self.space(space_id).cubes, on_body: space_id != 0 }
     }
 
     /// A change of a gate's look that nothing around it needs to hear: no lighting, no neighbors.
-    fn set_signal_state(&mut self, c: &'static Content, p: IVec3, old: u32, new: u32) {
-        if !self.space.extras(p).is_empty() || c.states[old as usize].light != c.states[new as usize].light {
-            self.set(c, p, new);
+    fn set_signal_state(&mut self, space_id: u64, c: &'static Content, p: IVec3, old: u32, new: u32) {
+        if !self.space(space_id).extras(p).is_empty() || c.states[old as usize].light != c.states[new as usize].light {
+            self.set(space_id, c, p, new);
             return;
         }
         let cp = cube_of(p);
-        let Some(cube) = self.space.cubes.get_mut(&cp) else { return };
+        let Some(cube) = self.space_mut(space_id).cubes.get_mut(&cp) else { return };
         Arc::make_mut(cube).set(local_index(p), new);
-        self.space.changes.push((p, new));
-        self.space.modified.insert(cp);
-        self.space.edited.insert(cp);
+        self.space_mut(space_id).changes.push((p, new));
+        self.space_mut(space_id).modified.insert(cp);
+        self.space_mut(space_id).edited.insert(cp);
     }
 
-    pub fn signal_tick(&mut self, c: &'static Content) {
+    pub fn signal_tick(&mut self, space_id: u64, c: &'static Content) {
         let now = self.time;
-        self.space.signals.now = now;
-        if !self.space.signals.readers.is_empty() && !self.entities.dirty_inv.is_empty() {
-            let frame = self.frame;
+        self.space_mut(space_id).signals.now = now;
+        if !self.space(space_id).signals.readers.is_empty() && !self.entities.dirty_inv.is_empty() {
+            let frame = space_id;
             let changed: Vec<IVec3> = self
                 .entities
                 .dirty_inv
@@ -1431,16 +1432,16 @@ impl Dim {
                 })
                 .collect();
             for p in changed {
-                self.space.signals.read_changed(c, p);
+                self.space_mut(space_id).signals.read_changed(c, p);
             }
         }
-        if self.space.signals.idle(now) {
+        if self.space(space_id).signals.idle(now) {
             return;
         }
-        let mut s = std::mem::take(&mut self.space.signals);
-        self.space.signals.in_tick = true;
+        let mut s = std::mem::take(&mut self.space_mut(space_id).signals);
+        self.space_mut(space_id).signals.in_tick = true;
         s.apply_events(c);
-        s.rebuild(c, self.signal_view());
+        s.rebuild(c, self.signal_view(space_id));
         // What was on its way comes out now.
         for p in std::mem::take(&mut s.wheel[now as usize % WHEEL]) {
             let Some(dev) = s.devices.get_mut(&p) else { continue };
@@ -1464,7 +1465,7 @@ impl Dim {
                 }
             }
             if new != old {
-                self.set_signal_state(c, p, old, new);
+                self.set_signal_state(space_id, c, p, old, new);
                 s.events.push((p, old, new));
                 s.output_changed(p);
             }
@@ -1484,37 +1485,40 @@ impl Dim {
         dirty.sort_unstable_by_key(|p| p.to_array());
         let mut effects = Vec::new();
         for p in dirty {
-            s.evaluate(c, self, p, now, &mut effects);
+            s.evaluate(c, self, space_id, p, now, &mut effects);
         }
         // What mods changed while the tick was going.
-        let during = std::mem::replace(&mut self.space.signals, s);
-        self.space.signals.events.extend(during.events);
-        self.signal_effects(c, effects);
+        let during = std::mem::replace(&mut self.space_mut(space_id).signals, s);
+        self.space_mut(space_id)
+            .signals
+            .events
+            .extend(during.events);
+        self.signal_effects(space_id, c, effects);
         // What changed in this tick is looked at in the next, but observers count from now.
-        let s = &mut self.space.signals;
+        let s = &mut self.space_mut(space_id).signals;
         for i in 0..s.events.len() {
             s.seen(s.events[i].0, now);
         }
     }
 
-    fn signal_effects(&mut self, c: &'static Content, effects: Vec<Effect>) {
+    fn signal_effects(&mut self, space_id: u64, c: &'static Content, effects: Vec<Effect>) {
         let mut plans = Vec::new();
         let mut floaters = Vec::new();
         for e in effects {
             match e {
                 Effect::Sink { p, level } => {
-                    let Some(dev) = self.space.signals.devices.get_mut(&p) else { continue };
+                    let Some(dev) = self.space_mut(space_id).signals.devices.get_mut(&p) else { continue };
                     // One just placed or loaded has nothing to tell yet.
                     let was = std::mem::replace(&mut dev.input, level);
                     let state = dev.state;
                     let info = c.states[state as usize].signal;
                     let new = with_level(&info, state, level);
                     if new != state {
-                        self.set(c, p, new);
+                        self.set(space_id, c, p, new);
                     }
                     let block = c.block_of(state);
                     if let (Some((owner, cb)), true) = (block.cb.on_signal, was != u8::MAX) {
-                        self.call(owner, cb, |w| abi::SignalArgs {
+                        self.call(space_id, owner, cb, |w| abi::SignalArgs {
                             world: w,
                             pos: p.to_array().into(),
                             state: new,
@@ -1525,34 +1529,55 @@ impl Dim {
                 }
                 Effect::Piston { p, extend } => {
                     // One at it finishes first, and looks again, and so does one being moved.
-                    if self.space.signals.on_the_way || self.space.signals.moving.iter().any(|m| m.piston == p) {
+                    if self.space(space_id).signals.on_the_way
+                        || self
+                            .space(space_id)
+                            .signals
+                            .moving
+                            .iter()
+                            .any(|m| m.piston == p)
+                    {
                         continue;
                     }
-                    match self.push_plan(c, p, extend) {
+                    match self.push_plan(space_id, c, p, extend) {
                         Some(plan) => plans.push(plan),
                         None => {
                             log::debug!("piston at {p} can't move");
-                            self.space.signals.held.insert(p);
+                            self.space_mut(space_id).signals.held.insert(p);
                         }
                     }
                 }
                 Effect::Compare { p, behind, side } => {
-                    let (Some(state), Some(there)) = (self.space.signals.devices.get(&p).map(|d| d.state), self.get(behind)) else {
+                    let (Some(state), Some(there)) = (
+                        self.space(space_id)
+                            .signals
+                            .devices
+                            .get(&p)
+                            .map(|d| d.state),
+                        self.get(space_id, behind),
+                    ) else {
                         continue;
                     };
                     let info = c.states[state as usize].signal;
                     let block = c.block_of(there);
                     let Some((owner, cb)) = block.cb.signal_read else { continue };
-                    let out =
-                        self.call(owner, cb, |w| abi::SignalReadArgs { world: w, pos: behind.to_array().into(), state: there, output: 0 });
+                    let out = self.call(space_id, owner, cb, |w| abi::SignalReadArgs {
+                        world: w,
+                        pos: behind.to_array().into(),
+                        state: there,
+                        output: 0,
+                    });
                     let want = compared(info.flags, out.output.min(15) as u8, side);
                     if want != info.level {
-                        self.space.signals.schedule(p, want, info.delay, self.time);
+                        let now = self.time;
+                        self.space_mut(space_id)
+                            .signals
+                            .schedule(p, want, info.delay, now);
                     }
                 }
                 Effect::Floater { p, level } => {
-                    let program = self.rotor_program(c, self.frame, p);
-                    let Some(dev) = self.space.signals.devices.get_mut(&p) else { continue };
+                    let program = self.rotor_program(c, space_id, p);
+                    let Some(dev) = self.space_mut(space_id).signals.devices.get_mut(&p) else { continue };
                     let previous = dev.input;
                     dev.input = level;
                     let info = c.states[dev.state as usize].signal;
@@ -1564,32 +1589,40 @@ impl Dim {
                             .as_ref()
                             .map_or(level != 0, |p| p.rule(level) == p.rule(previous));
                         let stopped = dev.stopped_mount;
-                        if !self.has_mount(p) {
+                        if !self.has_mount(space_id, p) {
                             let active = program
                                 .as_ref()
                                 .map_or(level != 0, |p| p.rule(level).is_some());
                             if !active {
-                                self.floater_shows(c, p, FLOATER_IDLE);
-                            } else if !stopped && !self.space.stopping {
+                                self.floater_shows(space_id, c, p, FLOATER_IDLE);
+                            } else if !stopped && !self.docking(space_id) {
                                 floaters.push(p);
                             }
                         }
                         continue;
                     }
-                    if self.frame != 0 {
-                        self.floater_shows(c, p, FLOATER_GOING * (level > 0) as u8);
+                    if space_id != 0 {
+                        self.floater_shows(space_id, c, p, FLOATER_GOING * (level > 0) as u8);
                     } else if level > 0 {
                         floaters.push(p);
                     } else {
-                        self.floater_shows(c, p, FLOATER_IDLE);
+                        self.floater_shows(space_id, c, p, FLOATER_IDLE);
                     }
                 }
                 Effect::Gate { p, inputs } => {
-                    let Some(state) = self.space.signals.devices.get(&p).map(|d| d.state) else { continue };
+                    let Some(state) = self
+                        .space(space_id)
+                        .signals
+                        .devices
+                        .get(&p)
+                        .map(|d| d.state)
+                    else {
+                        continue;
+                    };
                     let info = c.states[state as usize].signal;
                     let block = c.block_of(state);
                     let Some((owner, cb)) = block.cb.signal_gate else { continue };
-                    let out = self.call(owner, cb, |w| abi::GateArgs {
+                    let out = self.call(space_id, owner, cb, |w| abi::GateArgs {
                         world: w,
                         pos: p.to_array().into(),
                         state,
@@ -1598,7 +1631,10 @@ impl Dim {
                     });
                     let want = out.output.min(15) as u8;
                     if want != info.level {
-                        self.space.signals.schedule(p, want, info.delay, self.time);
+                        let now = self.time;
+                        self.space_mut(space_id)
+                            .signals
+                            .schedule(p, want, info.delay, now);
                     }
                 }
             }
@@ -1607,15 +1643,15 @@ impl Dim {
         // a build to behave the same whichever way it is turned. A floater moving a piston is
         // like a piston moving one; what floaters and pistons both want, neither gets.
         floaters.sort_unstable_by_key(|p| p.to_array());
-        let (mut floater_plans, held) = self.floater_plans(c, floaters);
+        let (mut floater_plans, held) = self.floater_plans(space_id, c, floaters);
         for p in held {
-            self.space.signals.held.insert(p);
-            self.floater_shows(c, p, FLOATER_STUCK);
+            self.space_mut(space_id).signals.held.insert(p);
+            self.floater_shows(space_id, c, p, FLOATER_STUCK);
         }
         plans.retain(|plan: &PushPlan| {
             let moved = floater_plans.iter().any(|m| m.cells.contains(&plan.p));
             if moved {
-                self.space.signals.held.insert(plan.p);
+                self.space_mut(space_id).signals.held.insert(plan.p);
             }
             !moved
         });
@@ -1634,7 +1670,7 @@ impl Dim {
             .collect();
         for (plan, &deferred) in floater_plans.iter().zip(&lost_floaters) {
             if deferred {
-                self.space
+                self.space_mut(space_id)
                     .signals
                     .polled
                     .extend(plan.floaters.iter().copied());
@@ -1695,39 +1731,39 @@ impl Dim {
                         .collect::<Vec<_>>()
                 );
                 lost[i] = true;
-                self.space.signals.polled.insert(plans[i].p);
+                self.space_mut(space_id).signals.polled.insert(plans[i].p);
             }
             for m in floater_losers {
                 lost_floaters[m] = true;
-                self.space
+                self.space_mut(space_id)
                     .signals
                     .polled
                     .extend(floater_plans[m].floaters.iter().copied());
                 for &p in &floater_plans[m].floaters {
-                    self.floater_shows(c, p, FLOATER_STUCK);
+                    self.floater_shows(space_id, c, p, FLOATER_STUCK);
                 }
             }
         };
         for (i, plan) in plans.into_iter().enumerate() {
             if waiting[i] {
-                self.space.signals.held.insert(plan.p);
+                self.space_mut(space_id).signals.held.insert(plan.p);
             } else if !lost[i] {
-                self.run_plan(c, plan);
+                self.run_plan(space_id, c, plan);
             }
         }
         for (m, plan) in std::mem::take(&mut floater_plans).into_iter().enumerate() {
             if !lost_floaters[m] {
-                self.run_floater_plan(c, plan);
+                self.run_floater_plan(space_id, c, plan);
             }
         }
     }
 
     /// What a floater shows and a comparator reads of it (`power`: 0 idle, 1 going, 2 stuck).
-    pub(super) fn floater_shows(&mut self, c: &'static Content, p: IVec3, level: u8) {
-        let Some(state) = self.get(p) else { return };
+    pub(super) fn floater_shows(&mut self, space_id: u64, c: &'static Content, p: IVec3, level: u8) {
+        let Some(state) = self.get(space_id, p) else { return };
         let info = c.states[state as usize].signal;
         if matches!(info.kind, sk::FLOATER | sk::BODY_MOUNT) && info.level != level {
-            self.set(c, p, with_level(&info, state, level));
+            self.set(space_id, c, p, with_level(&info, state, level));
         }
     }
 
@@ -1739,24 +1775,32 @@ impl Dim {
 
     /// What moving the block at `start` along `step` takes: blocks ahead of what moves go too, and
     /// what touches a sticky block. `None` if something can't.
-    fn gather_move(&self, c: &Content, base: IVec3, free: Option<IVec3>, start: IVec3, step: IVec3) -> Option<(Vec<IVec3>, Vec<IVec3>)> {
+    fn gather_move(
+        &self,
+        space_id: u64,
+        c: &Content,
+        base: IVec3,
+        free: Option<IVec3>,
+        start: IVec3,
+        step: IVec3,
+    ) -> Option<(Vec<IVec3>, Vec<IVec3>)> {
         let (mut moved, mut broken): (Vec<IVec3>, Vec<IVec3>) = (Vec::new(), Vec::new());
         let mut todo = vec![start];
         while let Some(at) = todo.pop() {
             if moved.contains(&at) || broken.contains(&at) || Some(at) == free {
                 continue;
             }
-            if self.space.signals.reserved(at) {
+            if self.space(space_id).signals.reserved(at) {
                 log::debug!("blocks are on their way to {at}");
                 return None;
             }
-            let here = self.get(at)?;
+            let here = self.get(space_id, at)?;
             if here == AIR {
                 continue;
             }
             // A big block moves whole, whichever of its cells is pushed.
             if let Some((own, s)) = self
-                .block_at(c, at)
+                .block_at(space_id, c, at)
                 .filter(|&(own, s)| own != at || !c.states[s as usize].cells.is_empty())
             {
                 if own == base || !self.movable(c, s) {
@@ -1800,7 +1844,7 @@ impl Dim {
                         continue;
                     }
                     // What can't come along stays behind, unlike what is in the way.
-                    let s = self.get(n)?;
+                    let s = self.get(space_id, n)?;
                     if s != AIR && c.solid(s) && self.movable(c, s) {
                         todo.push(n);
                     }
@@ -1812,31 +1856,29 @@ impl Dim {
 
     /// What a piston in front of `from` facing `dir` would push, moved one block that way as a
     /// body over a piston's time, then put down: for a mod's own movers. False if it can't go.
-    pub fn push_blocks(&mut self, c: &'static Content, from: IVec3, dir: u8) -> bool {
+    pub fn push_blocks(&mut self, space_id: u64, c: &'static Content, from: IVec3, dir: u8) -> bool {
         let Some(&step) = DIRS.get(dir as usize) else { return false };
-        let Some((moved, broken)) = self.gather_move(c, from - step, None, from, step) else { return false };
+        let Some((moved, broken)) = self.gather_move(space_id, c, from - step, None, from, step) else { return false };
         if moved.is_empty() {
             return false;
         }
-        self.break_for_body(c, broken);
-        let id = self.lift_for_mod(c, from, &moved);
+        self.break_for_body(space_id, c, broken);
+        let id = self.lift_for_mod(space_id, c, from, &moved);
         let Some(e) = self.entities.get_mut(id) else { return false };
         e.motion = super::entity::Motion::To { to: e.pos + step.as_dvec3(), left: MOVE_TICKS as u16 };
-        if let Some(b) = self.bodies.get_mut(&id) {
-            b.stopping = true;
-        }
+        e.completion = Completion::Dock;
         true
     }
 
-    fn push_plan(&mut self, c: &Content, p: IVec3, extend: bool) -> Option<PushPlan> {
-        let state = self.get(p)?;
+    fn push_plan(&mut self, space_id: u64, c: &Content, p: IVec3, extend: bool) -> Option<PushPlan> {
+        let state = self.get(space_id, p)?;
         let s = c.states[state as usize].signal;
         let dir = s.front;
         let step = *DIRS.get(dir as usize)?;
         let head = p + step;
         let mut plan = PushPlan { p, extend, dir, moved: Vec::new(), step, broken: Vec::new(), riding: Vec::new() };
         if extend {
-            (plan.moved, plan.broken) = self.gather_move(c, p, None, head, step)?;
+            (plan.moved, plan.broken) = self.gather_move(space_id, c, p, None, head, step)?;
         } else {
             // A sticky one brings back what is against its head, if it can; if not it comes back
             // without it. So it does when the power is gone before what it pushed has got there:
@@ -1844,22 +1886,22 @@ impl Dim {
             // reached however short the power was, which is how a flying machine's back half comes.
             plan.step = -step;
             let held_on = self
-                .space
+                .space(space_id)
                 .signals
                 .devices
                 .get(&p)
                 .is_some_and(|d| self.time > d.pushed_at + MOVE_TICKS as u64);
             if s.flags as u32 & abi::signal_flags::STICKY != 0 && held_on {
                 let beyond = head + step;
-                let here = self.get(beyond)?;
+                let here = self.get(space_id, beyond)?;
                 if here != AIR && c.solid(here) && self.movable(c, here) {
-                    if let Some((moved, broken)) = self.gather_move(c, p, Some(head), beyond, -step) {
+                    if let Some((moved, broken)) = self.gather_move(space_id, c, p, Some(head), beyond, -step) {
                         (plan.moved, plan.broken) = (moved, broken);
                     }
                 }
             }
         }
-        let (riding, broken) = self.who_rides(c, &plan.moved, Some(p), plan.step);
+        let (riding, broken) = self.who_rides(space_id, c, &plan.moved, Some(p), plan.step);
         plan.broken.retain(|b| !riding.iter().any(|r| r.0 == *b));
         plan.broken.extend(
             broken
@@ -1872,8 +1914,8 @@ impl Dim {
     }
 
     /// `moved` with what stands on it, as cells of a new body around `center`.
-    pub(super) fn with_riders(&self, c: &Content, center: IVec3, moved: Vec<IVec3>) -> Vec<Lifted> {
-        let (riding, _) = self.who_rides(c, &moved, None, IVec3::ZERO);
+    pub(super) fn with_riders(&self, space_id: u64, c: &Content, center: IVec3, moved: Vec<IVec3>) -> Vec<Lifted> {
+        let (riding, _) = self.who_rides(space_id, c, &moved, None, IVec3::ZERO);
         moved
             .iter()
             .map(|&m| (m, None))
@@ -1885,7 +1927,14 @@ impl Dim {
     /// What stands on `moved` goes with them along `step`, unless it would run into something:
     /// what rides, and what breaks instead, in its way or knocked off. Not what merely lies in the
     /// way of `moved`, which `gather_move` has broken. `not`: a cell that doesn't come into it.
-    pub(super) fn who_rides(&self, c: &Content, list: &[IVec3], not: Option<IVec3>, step: IVec3) -> (Vec<(IVec3, u32)>, Vec<IVec3>) {
+    pub(super) fn who_rides(
+        &self,
+        space_id: u64,
+        c: &Content,
+        list: &[IVec3],
+        not: Option<IVec3>,
+        step: IVec3,
+    ) -> (Vec<(IVec3, u32)>, Vec<IVec3>) {
         let moved: FxHashSet<IVec3> = list.iter().copied().collect();
         let mut riding: FxHashMap<IVec3, u32> = FxHashMap::default();
         let mut broken = Vec::new();
@@ -1895,7 +1944,7 @@ impl Dim {
                 if moved.contains(&n) || riding.contains_key(&n) || Some(n) == not {
                     continue;
                 }
-                let Some(state) = self.get(n) else { continue };
+                let Some(state) = self.get(space_id, n) else { continue };
                 let info = &c.states[state as usize];
                 if state == AIR || info.solid() || info.liquid.is_some() {
                     continue;
@@ -1919,7 +1968,7 @@ impl Dim {
         // what would have followed them may find it free, or run into something too. As many
         // rounds as that takes, none of it in any order.
         let free = |s: &Dim, to: IVec3| {
-            s.get(to)
+            s.get(space_id, to)
                 .is_some_and(|there| rider_meets(c, there) != RiderMeets::Wall)
         };
         loop {
@@ -1928,7 +1977,7 @@ impl Dim {
                 .copied()
                 .filter(|n| {
                     let to = *n + step;
-                    !moved.contains(&to) && !riding.contains_key(&to) && !free(self, to) || self.space.signals.reserved(to)
+                    !moved.contains(&to) && !riding.contains_key(&to) && !free(self, to) || self.space(space_id).signals.reserved(to)
                 })
                 .collect();
             if stuck.is_empty() {
@@ -1947,7 +1996,7 @@ impl Dim {
             .filter(|to| !moved.contains(to) && !riding.iter().any(|r| r.0 == *to));
         let in_their_way: Vec<IVec3> = in_their_way
             .filter(|to| {
-                self.get(*to)
+                self.get(space_id, *to)
                     .is_some_and(|there| rider_meets(c, there) == RiderMeets::Breaks)
             })
             .collect();
@@ -1957,16 +2006,16 @@ impl Dim {
 
     /// Takes the plan's blocks out of the world and sends them on their way as one body, which
     /// carries and shoves what is around it like any other. They land as blocks.
-    fn run_plan(&mut self, c: &'static Content, plan: PushPlan) {
-        let Some(state) = self.get(plan.p) else { return };
+    fn run_plan(&mut self, space_id: u64, c: &'static Content, plan: PushPlan) {
+        let Some(state) = self.get(space_id, plan.p) else { return };
         let info = c.states[state as usize].signal;
         let head = plan.p + DIRS[plan.dir as usize];
         for &b in &plan.broken {
-            if let Some(there) = self.get(b) {
+            if let Some(there) = self.get(space_id, b) {
                 if c.states[there as usize].liquid.is_none() {
-                    self.drop_block_loot(c, b, there, abi::ItemStack::EMPTY, false, 0);
+                    self.drop_block_loot(space_id, c, b, there, abi::ItemStack::EMPTY, false, 0);
                 }
-                self.set(c, b, AIR);
+                self.set(space_id, c, b, AIR);
             }
         }
         let short = |h: u32| c.state_with(h, "short", "true").unwrap_or(h);
@@ -1987,26 +2036,33 @@ impl Dim {
                 head_turns = Some((head - plan.p, short(h)));
             }
         }
-        self.set(c, plan.p, with_level(&info, state, 1));
+        self.set(space_id, c, plan.p, with_level(&info, state, 1));
         // Where they are going is taken from now on.
-        self.space.signals.reserved.insert(head);
+        self.space_mut(space_id).signals.reserved.insert(head);
         for &m in &plan.moved {
-            self.space.signals.reserved.insert(m + plan.step);
+            self.space_mut(space_id)
+                .signals
+                .reserved
+                .insert(m + plan.step);
         }
         if plan.extend {
+            let now = self.time;
             if let Some(d) = self
-                .space
+                .space_mut(space_id)
                 .signals
                 .devices
                 .get_mut(&plan.p)
                 .filter(|_| !plan.moved.is_empty())
             {
-                d.pushed_at = self.time;
+                d.pushed_at = now;
             }
         }
         // In the body, relative to the piston, as they start; and where they end up.
         for &(n, _) in &plan.riding {
-            self.space.signals.reserved.insert(n + plan.step);
+            self.space_mut(space_id)
+                .signals
+                .reserved
+                .insert(n + plan.step);
         }
         let cells = plan
             .moved
@@ -2015,15 +2071,16 @@ impl Dim {
             .chain(plan.riding.iter().map(|&(n, part)| (n, Some(part))))
             .map(|(m, part)| Lifted { from: m, local: m - plan.p, to: m + plan.step, part });
         let (body, blocks) =
-            self.lift(c, c.game.moving_kind, plan.p.as_dvec3() + DVec3::new(0.5, 0.0, 0.5), cells, &also, Liveness::OnTheWay);
+            self.lift(space_id, c, c.game.moving_kind, plan.p.as_dvec3() + DVec3::new(0.5, 0.0, 0.5), cells, &also, Liveness::OnTheWay);
         if let Some(e) = self.entities.get_mut(body) {
             e.motion = Motion::To { to: e.pos + plan.step.as_dvec3(), left: MOVE_TICKS as u16 };
         }
-        self.space
+        self.space_mut(space_id)
             .signals
             .moving
             .push(Moving { body, piston: plan.p, head, blocks, retracting: !plan.extend, head_turns });
         self.sound(
+            space_id,
             c.states[state as usize].effects[crate::content::block_event::PLACE].sound,
             plan.p.as_dvec3() + DVec3::splat(0.5),
             0.5,
@@ -2032,68 +2089,74 @@ impl Dim {
     }
 
     /// Bodies of pistons that got there turn back into blocks.
-    pub(super) fn land_moving(&mut self, c: &'static Content) {
-        self.tick_landings(c);
-        if self.space.signals.moving.is_empty() {
+    pub(super) fn land_moving(&mut self, space_id: u64, c: &'static Content) {
+        self.tick_landings(space_id, c);
+        if self.space(space_id).signals.moving.is_empty() {
             return;
         }
-        let entities = &self.entities;
-        let (done, going): (Vec<Moving>, Vec<Moving>) = std::mem::take(&mut self.space.signals.moving)
+        let (space, entities) = self.space_entities(space_id);
+        let (done, going): (Vec<Moving>, Vec<Moving>) = std::mem::take(&mut space.signals.moving)
             .into_iter()
             .partition(|m| {
                 entities
                     .get(m.body)
                     .is_none_or(|e| !matches!(e.motion, Motion::To { .. }))
             });
-        self.space.signals.moving = going;
+        space.signals.moving = going;
         for mut m in done {
             // Clients show this a tick and a half later, a quarter of the way out: past that a
             // long rod no longer shows behind the piston.
-            if !m.retracting {
-                if let Some((at, state)) = m.head_turns.take() {
-                    self.set_in_body(c, m.body, at, state);
-                }
+            if !m.retracting
+                && self.has_space(m.body)
+                && let Some((at, state)) = m.head_turns.take()
+            {
+                self.carry_block(m.body, c, at, state);
             }
-            self.land_piston(c, m);
+            self.land_piston(space_id, c, m);
         }
     }
 
-    fn land_piston(&mut self, c: &'static Content, m: Moving) {
-        let base = self.get(m.piston);
+    fn land_piston(&mut self, space_id: u64, c: &'static Content, m: Moving) {
+        let base = self.get(space_id, m.piston);
         let out = base.is_some_and(|s| c.states[s as usize].signal.kind == sk::PISTON && c.states[s as usize].signal.level > 0);
-        self.space.signals.reserved.remove(&m.head);
+        self.space_mut(space_id).signals.reserved.remove(&m.head);
         for b in &m.blocks {
-            self.space.signals.reserved.remove(&b.to);
+            self.space_mut(space_id).signals.reserved.remove(&b.to);
         }
-        let blocks = m.blocks.clone();
         // In, or out with its head: a piston gone meanwhile leaves the head with the body.
         let mut also = Vec::new();
         if let Some(s) = base.filter(|_| out) {
             let info = c.states[s as usize].signal;
-            self.set(c, m.piston, with_level(&info, s, if m.retracting { 0 } else { 15 }));
+            self.set(space_id, c, m.piston, with_level(&info, s, if m.retracting { 0 } else { 15 }));
             also.push((m.piston, s));
         }
-        self.space.signals.dirty_devices.insert(m.piston);
-        self.space.signals.give_another_go();
-        self.put_down(c, m.body, blocks, also, m.head_turns);
+        self.space_mut(space_id)
+            .signals
+            .dirty_devices
+            .insert(m.piston);
+        self.space_mut(space_id).signals.give_another_go();
+        self.put_down(space_id, c, m.body, m.blocks, also, m.head_turns);
     }
 
     /// All that is on its way gets there now: before a save, or before the blocks around it go
     /// to another region or out of memory. It isn't kept anywhere else.
     pub fn finish_moving(&mut self, c: &'static Content) {
-        self.finish_moving_here(c);
+        self.finish_moving_here(0, c);
         self.out_of_touch(c);
         let ids: Vec<u64> = self.bodies.keys().copied().collect();
         for id in ids {
-            self.in_frame(id, |d| d.finish_moving_here(c));
+            self.finish_moving_here(id, c);
         }
     }
 
-    pub(super) fn finish_moving_here(&mut self, c: &'static Content) {
-        for m in std::mem::take(&mut self.space.signals.moving) {
-            self.land_piston(c, m);
+    pub(super) fn finish_moving_here(&mut self, space_id: u64, c: &'static Content) {
+        if !self.has_space(space_id) {
+            return;
         }
-        self.finish_landings();
+        for m in std::mem::take(&mut self.space_mut(space_id).signals.moving) {
+            self.land_piston(space_id, c, m);
+        }
+        self.finish_landings(space_id);
     }
 }
 

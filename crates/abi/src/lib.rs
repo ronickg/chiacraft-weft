@@ -285,10 +285,12 @@ pub struct Registrar {
     _p: [u8; 0],
 }
 
-/// Opaque view of one world (dimension) handed to callbacks. Only valid during the call.
+/// View of a space in the callback's region. Only valid during the call.
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct WorldCtx {
-    _p: [u8; 0],
+    pub region: *mut core::ffi::c_void,
+    pub frame: u64,
 }
 
 #[repr(C)]
@@ -2133,7 +2135,6 @@ pub mod signal_flags {
 
 pub mod assembly_flags {
     pub const TOOL: u8 = 1;
-    pub const PHYSICS: u8 = 2;
     pub const DIRECT: u8 = 4;
 }
 
@@ -4174,8 +4175,7 @@ pub struct Host {
     /// What item `item` is; 0 if there is none.
     pub item_info: unsafe extern "C" fn(item: u32, out: *mut ItemInfo) -> u32,
 
-    /// The block where the running callback is: the world, or the body a block of it is on or
-    /// `world_enter_body` entered. `u32::MAX` for what isn't loaded.
+    /// The block in the selected space. `u32::MAX` for what isn't loaded.
     pub block_get: unsafe extern "C" fn(world: *mut WorldCtx, pos: *const BlockPos) -> u32,
     /// The id of the dimension this callback runs in.
     pub world_dimension: unsafe extern "C" fn(world: *mut WorldCtx) -> u32,
@@ -4653,13 +4653,10 @@ pub struct Host {
     /// What a piston behind `pos` facing `dir` (`FACE_DIRS` index) would push goes one block
     /// that way, slime and all, as a piston moves it. 0 if it can't.
     pub push_blocks: unsafe extern "C" fn(world: *mut WorldCtx, pos: *const BlockPos, dir: u32) -> u32,
-    /// Every call with this world addresses body `entity`'s blocks, in its coordinates, until
-    /// `world_leave_body`; they nest. 0 if it isn't a body here.
-    pub world_enter_body: unsafe extern "C" fn(world: *mut WorldCtx, entity: u64) -> u32,
-    pub world_leave_body: unsafe extern "C" fn(world: *mut WorldCtx),
-    /// The current body's entity id, zero in the world frame.
-    pub world_frame: unsafe extern "C" fn(world: *mut WorldCtx) -> u64,
+    pub world_has_space: unsafe extern "C" fn(world: *mut WorldCtx, frame: u64) -> u32,
     pub body_move_to: unsafe extern "C" fn(world: *mut WorldCtx, entity: u64, pos: *const Vec3, ticks: u32),
+    pub body_dynamics: unsafe extern "C" fn(world: *mut WorldCtx, body: u64) -> u32,
+    pub body_force: unsafe extern "C" fn(world: *mut WorldCtx, body: u64, at: *const Vec3, force: *const Vec3) -> u32,
     /// What a comparator would read of the block at `pos` may be different now.
     pub signal_read_changed: unsafe extern "C" fn(world: *mut WorldCtx, pos: *const BlockPos),
     /// Column (`x`, `z`) of dimension `dim` for `seed` (its terrain's or `comp::dimension::COLUMN`),

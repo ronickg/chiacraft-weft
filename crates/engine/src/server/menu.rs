@@ -170,8 +170,15 @@ fn call_times(
         Some(Inv { at: At::Stack { entity, slot }, storage }) => abi::Holder { storage, ..abi::Holder::held(entity, slot) },
     };
     let mut call = MenuCall { menu: m as *mut OpenMenu, dim: dim as *mut Dim, player };
-    let mut ctx = host::CallCtx { dim: dim as *mut Dim };
-    let mut args = abi::MenuArgs { world: ctx.raw(), menu: &mut call as *mut MenuCall as *mut abi::MenuCtx, player, owner, slot, times };
+    let frame = match m.on {
+        Some(Inv { at: At::Entity(id), .. }) => dim
+            .entities
+            .get(id)
+            .map_or(0, |entity| entity.block_frame()),
+        _ => 0,
+    };
+    let mut ctx = abi::WorldCtx { region: (dim as *mut Dim).cast(), frame };
+    let mut args = abi::MenuArgs { world: &mut ctx, menu: &mut call as *mut MenuCall as *mut abi::MenuCtx, player, owner, slot, times };
     host::invoke(by, cb, &mut args);
 }
 
@@ -274,7 +281,7 @@ pub fn close(m: OpenMenu, dim: &mut Dim, c: &'static Content, player: u64) {
         let rest = dim.entities.insert_item(c, player, s);
         if !rest.is_empty() {
             if let Some(p) = dim.entities.get(player).map(|e| e.pos) {
-                dim.spawn_item(c, p + glam::DVec3::Y, rest);
+                dim.spawn_item(0, c, p + glam::DVec3::Y, rest);
             }
         }
     }
@@ -635,7 +642,7 @@ pub fn click(m: &mut OpenMenu, dim: &mut Dim, c: &'static Content, player: u64, 
             }
             // A result comes out whole.
             let n = if button == THROW_ALL || output { cur.count } else { 1 };
-            dim.throw(c, player, ItemStack { count: n, ..cur });
+            dim.throw(0, c, player, ItemStack { count: n, ..cur });
             n
         };
         set(m, dim, player, slot, if n == cur.count { ItemStack::EMPTY } else { ItemStack { count: cur.count - n, ..cur } });
@@ -652,7 +659,7 @@ pub fn click(m: &mut OpenMenu, dim: &mut Dim, c: &'static Content, player: u64, 
             if m.cursor.count == 0 {
                 m.cursor = ItemStack::EMPTY;
             }
-            dim.throw(c, player, drop);
+            dim.throw(0, c, player, drop);
         }
         return;
     }
@@ -1035,7 +1042,7 @@ fn give(dim: &mut Dim, c: &'static Content, player: u64, stack: ItemStack, mut c
             .entities
             .insert_item(c, player, ItemStack { count: batch, ..stack });
         if !rest.is_empty() {
-            dim.throw(c, player, rest);
+            dim.throw(0, c, player, rest);
         }
         count -= batch as u64;
     }

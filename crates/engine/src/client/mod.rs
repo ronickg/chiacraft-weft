@@ -296,7 +296,7 @@ fn ride_step(
         .iter()
         .find(|b| b.id == mount)
         .and_then(|b| b.blocks.map(|(_, place)| place));
-    if let Some(at) = seat_at(c, m.kind, pos, yaw, seat, place, m.helm) {
+    if let Some(at) = physics::seat_at(c, m.kind, pos, yaw, seat, place, m.helm) {
         (player.pos, player.vel, player.on_ground) = (at, DVec3::ZERO, false);
     }
     moved
@@ -308,28 +308,6 @@ struct Drive {
     /// Blocks per tick.
     vel: DVec3,
     on_ground: bool,
-}
-
-/// Where a rider's feet go in seat `seat` of a mount of `kind` at `pos` facing `yaw`.
-fn seat_at(
-    c: &crate::content::Content,
-    kind: u32,
-    pos: DVec3,
-    yaw: f32,
-    seat: u8,
-    place: Option<physics::Transform>,
-    helm: Option<IVec3>,
-) -> Option<DVec3> {
-    if let Some(place) = place
-        && let Some(helm) = helm.or_else(|| (kind == c.game.ship_kind).then_some(IVec3::ZERO))
-    {
-        let s = c.game.entities[c.game.ship_kind as usize]
-            .seats
-            .get(seat as usize)?;
-        return Some(place.to_world(helm.as_dvec3() + physics::Transform::FEET + s.pos));
-    }
-    let s = c.game.entities[kind as usize].seats.get(seat as usize)?;
-    Some(pos + crate::world::turned(s.pos, yaw))
 }
 
 fn parse_swaps(bytes: &[u8]) -> Vec<(String, String)> {
@@ -604,6 +582,7 @@ pub struct Client {
     offset_target: f64,
     /// Structures whose cubes are uploaded for drawing.
     drawn_frames: FxHashSet<u64>,
+    landings: FxHashMap<u64, receive::Landing>,
     start: Instant,
     /// Ticks counted since the server last said the time (`Scene` ticks).
     since_time: f64,
@@ -791,17 +770,21 @@ impl LookOnce {
 }
 
 impl Client {
+    fn space(&self, frame: u64) -> Option<&ClientWorld> {
+        if frame == 0 { Some(&self.world) } else { self.entities.get(&frame)?.structure.as_deref() }
+    }
+
+    fn space_mut(&mut self, frame: u64) -> Option<&mut ClientWorld> {
+        if frame == 0 { Some(&mut self.world) } else { self.entities.get_mut(&frame)?.structure.as_deref_mut() }
+    }
+
     pub(crate) fn music_source_position(&self, source: weft_abi::MusicSource) -> Option<DVec3> {
         if source.dimension != self.world.dim {
             return None;
         }
         let p = crate::world::ivec(source.pos);
         let center = p.as_dvec3() + DVec3::splat(0.5);
-        if source.frame == 0 {
-            return (self.world.block_or_air(p)? == source.state).then_some(center);
-        }
-        let body = self.entities.get(&source.frame)?;
-        (body.structure.as_ref()?.block_or_air(p)? == source.state).then(|| body.place_at(self.anim_tick()).to_world(center))
+        (self.space(source.frame)?.block_or_air(p)? == source.state).then(|| self.frame_place(source.frame).to_world(center))
     }
 
     pub fn toggle_gizmo(&mut self, group: &str) -> bool {
@@ -975,6 +958,7 @@ impl Client {
             tick_offset: None,
             offset_target: 0.0,
             drawn_frames: FxHashSet::default(),
+            landings: FxHashMap::default(),
             start: Instant::now(),
             since_time: 0.0,
             tick_rate: crate::world::TPS as f64,
@@ -1151,6 +1135,7 @@ impl Client {
         self.world.clear();
         self.wires.clear();
         self.meshes.clear();
+        self.landings.clear();
         self.world.dim = dim;
         self.terrain_resets += 1;
         self.terrain_view = (IVec3::MAX, 0);
@@ -1790,13 +1775,8 @@ impl Client {
                     let after = c.states[hit.state as usize]
                         .piece_hit(at, hit.face)
                         .map_or(crate::content::AIR, |p| p.left);
-                    match hit.frame {
-                        0 => self.world.replace_part(hit.origin, hit.state, after),
-                        f => {
-                            if let Some(s) = self.entities.get_mut(&f).and_then(|e| e.structure.as_mut()) {
-                                s.replace_part(hit.origin, hit.state, after);
-                            }
-                        }
+                    if let Some(space) = self.space_mut(hit.frame) {
+                        space.replace_part(hit.origin, hit.state, after);
                     }
                     self.breaking = None;
                     self.break_delay = 0.25;
@@ -1863,51 +1843,26 @@ impl Client {
             .items
             .get(held.item as usize)
             .and_then(|i| i.block)
-            .filter(|_| hit.frame == 0 && !held.is_empty() && !self.mode.has(crate::tag_bits::game_mode::NO_PLACE))?;
+            .filter(|_| !held.is_empty() && !self.mode.has(crate::tag_bits::game_mode::NO_PLACE))?;
         // A block that takes the click itself goes first.
         let clicked = c.block_of(hit.state);
         if clicked.usable() && (!sneak || clicked.sneak_use == weft_abi::sneak_use::ALWAYS) {
             return None;
         }
         let replaceable = |s: u32| c.states[s as usize].flags & bf::REPLACEABLE != 0;
-        let cell = |p: IVec3| -> Option<Vec<u32>> {
-            let main = self.world.block_or_air(p)?;
-            Some(
-                std::iter::once(main)
-                    .chain(self.world.extras(p).iter().copied())
-                    .filter(|&s| s != AIR)
-                    .collect(),
-            )
-        };
-        let replacing = replaceable(self.world.block(hit.block)) && cell(hit.block)?.iter().all(|&s| replaceable(s));
-        let (axis, up) = ((hit.face / 2) as usize, hit.face % 2 == 1);
-        let mut point = at;
-        point[axis] = if replacing { if up { 1e-3 } else { 1.0 - 1e-3 } } else { at[axis] + if up { 1e-3 } else { -1e-3 } };
-        // Into the clicked cell's own room (a slab's other half): the server's to work out.
-        if !replacing && (0.0..1.0).contains(&point[axis]) {
+        let space = self.space(hit.frame)?;
+        let main = space.block_or_air(hit.block)?;
+        let mut choices = physics::placement_cells(c, hit.block, hit.face, at, main, space.extras(hit.block));
+        let (p, local) = choices.next()?;
+        if choices.next().is_some() {
             return None;
         }
-        let normal = crate::world::DIRS[hit.face as usize];
-        let (p, local) =
-            if replacing { (hit.block, point) } else { (hit.block + normal, std::array::from_fn(|a| point[a] - normal[a] as f32)) };
-        let def = c.block_of(state);
-        let mut chosen = def.first_state;
-        if let Some((owner, cb)) = def.cb.placement {
-            let mut args = weft_abi::PlaceArgs {
-                pos: p.to_array().into(),
-                face: hit.face as u32,
-                look,
-                state: def.first_state,
-                first: def.first_state,
-                hit: local,
-                placed: 0,
-            };
-            crate::host::invoke(owner, cb, &mut args);
-            chosen = args.state;
-            if !(def.first_state..def.first_state + def.states).contains(&chosen) {
-                return None;
-            }
-        }
+        let transform = self.frame_place(hit.frame);
+        let look = transform
+            .vector_to_local(glam::Vec3::from_array(look).as_dvec3())
+            .as_vec3()
+            .to_array();
+        let chosen = physics::placement_state(c.block_of(state), p, hit.face, look, local).ok()?;
         let st = &c.states[chosen as usize];
         let held_up = st
             .rules
@@ -1916,9 +1871,10 @@ impl Client {
         if !st.cells.is_empty() || held_up {
             return None;
         }
-        if cell(p)?
-            .iter()
-            .any(|&s| !replaceable(s) || c.states[s as usize].liquid.is_some() || c.states[s as usize].block == st.block)
+        space.cube(crate::world::cube_of(p))?;
+        if std::iter::once(space.block_or_air(p)?)
+            .chain(space.extras(p).iter().copied())
+            .any(|s| s != AIR && (!replaceable(s) || c.states[s as usize].liquid.is_some() || c.states[s as usize].block == st.block))
         {
             return None;
         }
@@ -1927,14 +1883,16 @@ impl Client {
         let d = self.player.dims();
         let me = physics::Aabb::around(self.player.pos, d.half_width, d.height);
         let at = p.as_dvec3();
-        if shape
-            .iter()
-            .any(|b| physics::Aabb { min: at + DVec3::new(b[0], b[1], b[2]), max: at + DVec3::new(b[3], b[4], b[5]) }.intersects(&me))
-        {
+        if shape.iter().any(|b| {
+            transform
+                .box_to_world(physics::Aabb { min: at + DVec3::new(b[0], b[1], b[2]), max: at + DVec3::new(b[3], b[4], b[5]) })
+                .intersects(&me)
+        }) {
             return None;
         }
-        self.world.set_block(p, chosen);
-        self.world.set_extras(p, Vec::new());
+        let space = self.space_mut(hit.frame)?;
+        space.set_block(p, chosen);
+        space.set_extras(p, Vec::new());
         Some(p)
     }
 
@@ -1965,7 +1923,7 @@ impl Client {
                     placed,
                 });
             } else {
-                self.conn.send(ToServer::UseItem { target: None });
+                self.conn.send(ToServer::UseItem);
             }
             self.use_delay = 0.2;
         }
@@ -2174,7 +2132,7 @@ impl Client {
                 let Some(at) = self
                     .entities
                     .get(&mount)
-                    .and_then(|m| seat_at(c, m.kind, m.pos, m.yaw, seat, Some(m.place_at(tick)), m.helm))
+                    .and_then(|m| physics::seat_at(c, m.kind, m.pos, m.yaw, seat, Some(m.place_at(tick)), m.helm))
                 else {
                     continue;
                 };
@@ -2239,20 +2197,23 @@ impl Client {
                 .send(terrain::In::View { center, radius: self.view_radius });
         }
         self.update_glow(crate::content::content());
-        // Enough jobs that meshing keeps up at 50 frames per second too (results are taken once
-        // a frame), not only at hundreds.
+        // Start the terrain jobs before updating the visibility data on the render thread.
         self.world
             .schedule_meshing(center, crate::meshing().current_num_threads() * 512);
         self.render.update_solid(gpu, &self.world, center);
         self.world.set_eye(center.y);
-        // Uploads too, oldest first; the rest wait for the next frame (dropped if their cube
-        // changed or left meanwhile). Edits and what is around the player go right away.
         let (now, later) = self.world.take_meshes(center);
-        for r in now {
-            self.render.upload(gpu, textures, (0, r.pos), &r.mesh);
-            self.world.mark_shown(r.pos);
+        for result in now {
+            self.render
+                .upload(gpu, textures, (0, result.pos), &result.mesh);
+            self.world.mark_shown(result.pos);
         }
         self.meshes.extend(later);
+        // Uploads too, oldest first; the rest wait for the next frame (dropped if their cube
+        // changed or left meanwhile). Edits and what is around the player go right away.
+        if !self.meshes.is_empty() {
+            gpu.prepare_uploads();
+        }
         let start = Instant::now();
         while start.elapsed() < self.budget {
             let Some(r) = self.meshes.pop_front() else { break };
@@ -2262,19 +2223,20 @@ impl Client {
             }
         }
         self.spent += start.elapsed().as_secs_f64();
-        // Structures: meshed in their own coordinates, a changed cube at a time.
-        for (&id, e) in self.entities.iter_mut() {
-            let Some(s) = e.structure.as_mut() else { continue };
-            s.schedule_meshing(IVec3::ZERO, 64);
-            let (now, later) = s.take_meshes(IVec3::ZERO);
-            for r in now.into_iter().chain(later) {
-                self.render.upload(gpu, textures, (id, r.pos), &r.mesh);
+        for (&id, entity) in &mut self.entities {
+            let Some(space) = entity.structure.as_mut() else { continue };
+            space.schedule_meshing(IVec3::ZERO, 64);
+            let (now, later) = space.take_meshes(IVec3::ZERO);
+            for result in now.into_iter().chain(later) {
+                self.render
+                    .upload(gpu, textures, (id, result.pos), &result.mesh);
             }
-            for pos in std::mem::take(&mut s.removed) {
+            for pos in space.removed.drain(..) {
                 self.render.remove((id, pos));
             }
             self.drawn_frames.insert(id);
         }
+        self.finish_landings();
         let entities = &self.entities;
         let gone: Vec<u64> = self
             .drawn_frames
@@ -2847,7 +2809,8 @@ impl Client {
     pub fn smooth_pos(&self) -> DVec3 {
         if let Some((id, seat)) = self.me.vehicle
             && let Some(mount) = self.entities.get(&id).filter(|m| m.structure.is_some())
-            && let Some(at) = seat_at(content(), mount.kind, mount.pos, mount.yaw, seat, Some(mount.place_at(self.anim_tick())), mount.helm)
+            && let Some(at) =
+                physics::seat_at(content(), mount.kind, mount.pos, mount.yaw, seat, Some(mount.place_at(self.anim_tick())), mount.helm)
         {
             return at;
         }

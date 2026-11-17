@@ -44,8 +44,8 @@ pub(super) struct Controller {
 }
 
 impl Controller {
-    pub fn at(c: &Content, dim: &Dim, block: IVec3) -> Option<Self> {
-        let state = &c.states[dim.get(block)? as usize];
+    pub fn at(c: &Content, dim: &Dim, space_id: u64, block: IVec3) -> Option<Self> {
+        let state = &c.states[dim.get(space_id, block)? as usize];
         let signal = state.signal;
         let floater = signal.kind == abi::signal_kind::FLOATER;
         if !floater && signal.kind != abi::signal_kind::BODY_MOUNT {
@@ -54,7 +54,7 @@ impl Controller {
         let slide = if signal.flags as u32 & abi::signal_flags::SLIDES != 0 {
             let axis = *DIRS.get(signal.front as usize)?;
             let side = state.turn.face(3) as u8;
-            let length = super::structure::guide_length(c, &dim.space, block, axis);
+            let length = super::structure::guide_length(c, dim.space(space_id), block, axis);
             if length == 0 {
                 return None;
             }
@@ -90,36 +90,36 @@ pub(super) struct Edit {
 }
 
 impl Dim {
-    pub(crate) fn set_assembly_bounds(&mut self, c: &Content, at: IVec3, min: IVec3, max: IVec3) -> bool {
-        if !c.dims[self.id as usize].editable || Controller::at(c, self, at).is_none() {
+    pub(crate) fn set_assembly_bounds(&mut self, space_id: u64, c: &Content, at: IVec3, min: IVec3, max: IVec3) -> bool {
+        if !c.dims[self.id as usize].editable || Controller::at(c, self, space_id, at).is_none() {
             return false;
         }
-        let saved = self.save_assembly_bounds(c, at, Bounds::new(min, max));
+        let saved = self.save_assembly_bounds(space_id, c, at, Bounds::new(min, max));
         if saved {
-            self.space.signals.recheck_device(at);
+            self.space_mut(space_id).signals.recheck_device(at);
         }
         saved
     }
 
-    pub(super) fn assembly_bounds(&self, c: &Content, p: IVec3) -> Option<Bounds> {
-        let id = self.anchored(p)?;
+    pub(super) fn assembly_bounds(&self, space_id: u64, c: &Content, p: IVec3) -> Option<Bounds> {
+        let id = self.anchored(space_id, p)?;
         let data = self.entities.comps.get(&(id, c.component(BOUNDS)?))?;
         let (lo, hi) = <(IVec3, IVec3)>::from_bytes(data)?;
         Some(Bounds::new(lo + p, hi + p))
     }
 
-    fn save_assembly_bounds(&mut self, c: &Content, p: IVec3, bounds: Bounds) -> bool {
-        let (Some(id), Some(comp)) = (self.anchored(p), c.component(BOUNDS)) else { return false };
+    fn save_assembly_bounds(&mut self, space_id: u64, c: &Content, p: IVec3, bounds: Bounds) -> bool {
+        let (Some(id), Some(comp)) = (self.anchored(space_id, p), c.component(BOUNDS)) else { return false };
         self.entities
             .comps
             .insert((id, comp), (bounds.lo - p, bounds.hi - p).to_bytes().into_boxed_slice());
         true
     }
 
-    pub(super) fn turn_assembly_bounds(&mut self, c: &Content, p: IVec3, place: Transform) {
-        let Some(bounds) = self.assembly_bounds(c, p) else { return };
+    pub(super) fn turn_assembly_bounds(&mut self, space_id: u64, c: &Content, p: IVec3, place: Transform) {
+        let Some(bounds) = self.assembly_bounds(space_id, c, p) else { return };
         let root = place.cell_at(IVec3::ZERO);
-        self.save_assembly_bounds(c, p, Bounds::new(place.cell_at(bounds.lo - root), place.cell_at(bounds.hi - root)));
+        self.save_assembly_bounds(space_id, c, p, Bounds::new(place.cell_at(bounds.lo - root), place.cell_at(bounds.hi - root)));
     }
 
     pub(super) fn turn_assembly_offsets(&mut self, c: &Content, entity: u64, turn: abi::Turn) {
@@ -131,7 +131,13 @@ impl Dim {
         *data = (bounds.lo, bounds.hi).to_bytes().into_boxed_slice();
     }
 
-    pub(super) fn assembly_blocks(&self, c: &Content, controller: Option<Controller>, bounds: Option<Bounds>) -> Result<Vec<IVec3>, u32> {
+    pub(super) fn assembly_blocks(
+        &self,
+        space_id: u64,
+        c: &Content,
+        controller: Option<Controller>,
+        bounds: Option<Bounds>,
+    ) -> Result<Vec<IVec3>, u32> {
         let grip = controller.map(Controller::grip);
         let allowed = |at| controller.is_none_or(|ctrl| ctrl.helm || at != ctrl.block) && bounds.is_none_or(|b| b.contains(at));
         let connected = controller.is_some();
@@ -141,7 +147,7 @@ impl Dim {
         if let Some(ctrl) = controller {
             pending.push(ctrl.grip());
             if ctrl.floater {
-                if self.space.signals.reserved(ctrl.block) {
+                if self.space(space_id).signals.reserved(ctrl.block) {
                     return Err(result::UNAVAILABLE);
                 }
                 cells.push(ctrl.block);
@@ -161,7 +167,7 @@ impl Dim {
             if !allowed(at) || !seen.insert(at) {
                 continue;
             }
-            let state = self.get(at).ok_or(result::UNAVAILABLE)?;
+            let state = self.get(space_id, at).ok_or(result::UNAVAILABLE)?;
             let info = &c.states[state as usize];
             if controller.is_some_and(|ctrl| ctrl.slide.is_some() && super::structure::is_guide_rail(c, state)) {
                 continue;
@@ -169,7 +175,7 @@ impl Dim {
             if state == AIR || info.liquid.is_some() {
                 continue;
             }
-            if self.space.signals.reserved(at) {
+            if self.space(space_id).signals.reserved(at) {
                 return Err(result::UNAVAILABLE);
             }
             if let Some(step) = c.covered_step(state) {
@@ -193,7 +199,7 @@ impl Dim {
             cells.push(at);
             for &(offset, _) in &info.cells {
                 let extra = at + offset;
-                if !allowed(extra) || self.space.signals.reserved(extra) || self.get(extra).is_none() {
+                if !allowed(extra) || self.space(space_id).signals.reserved(extra) || self.get(space_id, extra).is_none() {
                     return Err(result::UNAVAILABLE);
                 }
                 cells.push(extra);
@@ -219,6 +225,7 @@ impl Dim {
 
     pub(super) fn assembly_lifted(
         &self,
+        space_id: u64,
         c: &Content,
         controller: Option<Controller>,
         center: IVec3,
@@ -228,7 +235,7 @@ impl Dim {
         let fixed = controller
             .filter(|ctrl| !ctrl.helm && !ctrl.floater)
             .map(|ctrl| ctrl.block);
-        let (riders, _) = self.who_rides(c, cells, fixed, IVec3::ZERO);
+        let (riders, _) = self.who_rides(space_id, c, cells, fixed, IVec3::ZERO);
         let mut out: Vec<_> = cells
             .iter()
             .copied()
@@ -245,7 +252,7 @@ impl Dim {
         out
     }
 
-    pub(crate) fn assembly_select(&mut self, c: &'static Content, player: u64, at: Option<IVec3>, flags: u8) -> u32 {
+    pub(crate) fn assembly_select(&mut self, space_id: u64, c: &'static Content, player: u64, at: Option<IVec3>, flags: u8) -> u32 {
         let tool = flags & abi::assembly_flags::TOOL != 0;
         if !self.entities.get(player).is_some_and(|e| e.player) {
             return result::UNHANDLED;
@@ -253,31 +260,31 @@ impl Dim {
         if !c.dims[self.id as usize].editable {
             return result::UNAVAILABLE;
         }
-        let controller = at.and_then(|p| Controller::at(c, self, p));
+        let controller = at.and_then(|p| Controller::at(c, self, space_id, p));
         if flags & abi::assembly_flags::DIRECT != 0 {
-            let Some(ctrl) = controller.filter(|ctrl| self.frame == 0 || !ctrl.helm) else { return result::UNAVAILABLE };
-            let bounds = self.assembly_bounds(c, ctrl.block);
-            return self.confirm_assembly(c, player, &mut Edit::default(), Some(ctrl), bounds, ctrl.center(), flags);
+            let Some(ctrl) = controller.filter(|ctrl| space_id == 0 || !ctrl.helm) else { return result::UNAVAILABLE };
+            let bounds = self.assembly_bounds(space_id, c, ctrl.block);
+            return self.confirm_assembly(space_id, c, player, &mut Edit::default(), Some(ctrl), bounds, ctrl.center(), flags);
         }
-        if self.frame != 0
+        if space_id != 0
             && let Some(ctrl) = controller.filter(|ctrl| ctrl.helm)
         {
             if tool {
                 if !self
                     .entities
-                    .get(self.frame)
+                    .get(space_id)
                     .is_some_and(|e| e.ship.is_some())
                 {
                     return result::UNAVAILABLE;
                 }
-                self.space.stopping = true;
+                self.ask_put_down(space_id);
                 return result::DOCKING;
             }
-            return if self.mount_helm(c, player, self.frame, ctrl.block, ctrl.face) { result::SEATED } else { result::UNAVAILABLE };
+            return if self.mount_helm(c, player, space_id, ctrl.block, ctrl.face) { result::SEATED } else { result::UNAVAILABLE };
         }
         if tool
             && at.is_none()
-            && self.frame == 0
+            && space_id == 0
             && let Some(frame) = self
                 .entities
                 .get(player)
@@ -285,9 +292,7 @@ impl Dim {
                 .filter(|edit| edit.dimension == self.id && edit.frame != 0)
                 .map(|edit| edit.frame)
         {
-            return self
-                .in_frame(frame, |d| d.assembly_select(c, player, None, flags))
-                .unwrap_or(result::UNAVAILABLE);
+            return if self.active_space(frame) { self.assembly_select(frame, c, player, None, flags) } else { result::UNAVAILABLE };
         }
         if controller.is_none() && !tool && at.is_some() {
             return result::UNHANDLED;
@@ -296,13 +301,15 @@ impl Dim {
             .entities
             .get_mut(player)
             .and_then(|e| e.assembly_edit.take())
-            .filter(|d| d.dimension == self.id && d.frame == self.frame)
-            .unwrap_or_else(|| Box::new(Edit { dimension: self.id, frame: self.frame, ..Edit::default() }));
+            .filter(|d| d.dimension == self.id && d.frame == space_id)
+            .unwrap_or_else(|| Box::new(Edit { dimension: self.id, frame: space_id, ..Edit::default() }));
         let answer = if let Some(ctrl) = controller {
-            let bounds = edit.bounds.or_else(|| self.assembly_bounds(c, ctrl.block));
+            let bounds = edit
+                .bounds
+                .or_else(|| self.assembly_bounds(space_id, c, ctrl.block));
             if !ctrl.helm
                 && !ctrl.floater
-                && let Some(mount) = self.mount_at(ctrl.block)
+                && let Some(mount) = self.mount_at(space_id, ctrl.block)
             {
                 if ctrl.slide.is_some() && tool {
                     self.ask_put_down(mount);
@@ -313,24 +320,24 @@ impl Dim {
                     result::UNAVAILABLE
                 }
             } else {
-                self.confirm_assembly(c, player, &mut edit, Some(ctrl), bounds, ctrl.center(), 0)
+                self.confirm_assembly(space_id, c, player, &mut edit, Some(ctrl), bounds, ctrl.center(), 0)
             }
         } else if let Some(at) = at {
             edit.preview = None;
             if let Some(first) = edit.corner.take() {
                 let bounds = Bounds::new(first, at);
                 edit.bounds = Some(bounds);
-                self.confirm_assembly(c, player, &mut edit, None, Some(bounds), bounds.lo, 0)
+                self.confirm_assembly(space_id, c, player, &mut edit, None, Some(bounds), bounds.lo, 0)
             } else {
                 edit.bounds = None;
                 edit.corner = Some(at);
-                self.draw_assembly(player, Some(Bounds::new(at, at)), &[]);
+                self.draw_assembly(space_id, player, Some(Bounds::new(at, at)), &[]);
                 result::FIRST_CORNER
             }
         } else if let Some(bounds) = edit.bounds.filter(|_| tool) {
-            self.confirm_assembly(c, player, &mut edit, None, Some(bounds), bounds.lo, flags)
+            self.confirm_assembly(space_id, c, player, &mut edit, None, Some(bounds), bounds.lo, flags)
         } else {
-            self.draw_assembly(player, None, &[]);
+            self.draw_assembly(space_id, player, None, &[]);
             return result::CLEARED;
         };
         if answer != result::CONFIRMED
@@ -343,6 +350,7 @@ impl Dim {
 
     fn confirm_assembly(
         &mut self,
+        space_id: u64,
         c: &'static Content,
         player: u64,
         edit: &mut Edit,
@@ -352,17 +360,17 @@ impl Dim {
         flags: u8,
     ) -> u32 {
         let direct = flags & abi::assembly_flags::DIRECT != 0;
-        let cells = match self.assembly_blocks(c, controller, bounds) {
+        let cells = match self.assembly_blocks(space_id, c, controller, bounds) {
             Ok(cells) => cells,
             Err(code) => {
                 edit.preview = None;
                 if !direct {
-                    self.draw_assembly(player, bounds, &[]);
+                    self.draw_assembly(space_id, player, bounds, &[]);
                 }
                 return code;
             }
         };
-        let lifted = self.assembly_lifted(c, controller, center, &cells, bounds);
+        let lifted = self.assembly_lifted(space_id, c, controller, center, &cells, bounds);
         if lifted.len() > BODY_LIMIT {
             return result::TOO_LARGE;
         }
@@ -373,45 +381,43 @@ impl Dim {
                 .as_ref()
                 .is_some_and(|p| p.controller == at && p.expires > self.time && p.cells == lifted)
         {
-            self.draw_assembly(player, bounds, &lifted);
+            self.draw_assembly(space_id, player, bounds, &lifted);
             edit.preview = Some(Preview { controller: at, cells: lifted, expires: self.time + 160 });
             return if controller.is_some() { result::PREVIEW } else { result::BOUNDS };
         }
-        let kind = match controller {
-            Some(ctrl) if ctrl.helm => c.game.ship_kind,
-            Some(ctrl) => {
-                let fit = lifted
-                    .iter()
-                    .fold(Bounds::new(center, center), |b, l| Bounds::new(b.lo.min(l.from), b.hi.max(l.from)));
-                if !self.save_assembly_bounds(c, ctrl.block, bounds.unwrap_or(fit)) {
-                    return result::UNAVAILABLE;
-                }
-                self.space.signals.recheck_device(ctrl.block);
-                if !direct {
-                    self.draw_assembly(player, None, &[]);
-                }
-                return result::CONFIRMED;
+        if let Some(ctrl) = controller.filter(|ctrl| !ctrl.helm) {
+            let fit = lifted
+                .iter()
+                .fold(Bounds::new(center, center), |b, l| Bounds::new(b.lo.min(l.from), b.hi.max(l.from)));
+            if !self.save_assembly_bounds(space_id, c, ctrl.block, bounds.unwrap_or(fit)) {
+                return result::UNAVAILABLE;
             }
-            None if self.frame == 0 => c.game.platform_kind,
-            None => return result::UNAVAILABLE,
-        };
-        let (id, _) = self.lift(c, kind, center.as_dvec3() + Transform::FEET, lifted, &[], Liveness::Assembly);
-        if let Some(ctrl) = controller {
-            self.float_ship(id, ctrl.face);
+            self.space_mut(space_id).signals.recheck_device(ctrl.block);
+            if !direct {
+                self.draw_assembly(space_id, player, None, &[]);
+            }
+            return result::CONFIRMED;
+        }
+        if space_id != 0 {
+            return result::UNAVAILABLE;
+        }
+        let (id, _) = self.lift(space_id, c, c.game.platform_kind, center.as_dvec3() + Transform::FEET, lifted, &[], Liveness::Assembly);
+        if !self.enable_dynamics(id, controller.map(|ctrl| ctrl.face)) {
+            return result::UNAVAILABLE;
+        }
+        if controller.is_some() {
             self.set_helm(c, id, IVec3::ZERO);
-        } else if flags & abi::assembly_flags::PHYSICS != 0 {
-            self.float_ship(id, 4);
         }
         if !direct {
-            self.draw_assembly(player, None, &[]);
+            self.draw_assembly(space_id, player, None, &[]);
         }
         result::CONFIRMED
     }
 
-    fn draw_assembly(&mut self, player: u64, bounds: Option<Bounds>, cells: &[Lifted]) {
+    fn draw_assembly(&mut self, space_id: u64, player: u64, bounds: Option<Bounds>, cells: &[Lifted]) {
         let mut draw = |lo: IVec3, hi: IVec3, color| {
             let bounds = self
-                .place
+                .space_pose(space_id)
                 .box_to_world(crate::physics::Aabb { min: lo.as_dvec3(), max: (hi + IVec3::ONE).as_dvec3() });
             self.gizmos.push((
                 abi::Who::Player(player),

@@ -280,6 +280,7 @@ wire_struct! {
     pub struct EntityView {
         pub id: u64,
         pub kind: u32,
+        pub has_space: bool,
         pub pos: DVec3,
         pub yaw: f32,
         pub pitch: f32,
@@ -390,6 +391,7 @@ messages! {
         Moves { tick: u64, moves: Vec<Move> },
         /// Entities out of sight, and whether they were killed (they play the death animation).
         Despawn(Vec<(u64, bool)>),
+        SpaceLanded { dim: u32, frame: u64, destination: u64, cubes: Vec<IVec3> },
         /// Items picked up: (item entity, who took it). They fly to the taker before going.
         Taken(Vec<(u64, u64)>),
         /// A use (right click) did something: the arm swings, and dips if the held item was used.
@@ -498,7 +500,7 @@ messages! {
         /// `hit`: where on the block, from its corner. `placed`: the cell the client already
         /// shows the held block in, sent back as it really is whatever happens.
         Use { pos: IVec3, part: u32, face: u8, look: [f32; 3], hit: [f32; 3], sneak: bool, frame: u64, placed: Option<IVec3> },
-        UseItem { target: Option<(IVec3, u8)> },
+        UseItem,
         Select(u32),
         Attack(u64),
         /// A swing that spends its charge, whatever it hit, sent after any `Attack` of that swing.

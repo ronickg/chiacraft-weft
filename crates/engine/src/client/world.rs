@@ -127,7 +127,7 @@ struct Batch {
 }
 
 /// A batch waits no longer than this for its slowest cube.
-const HOLD_MAX: Duration = Duration::from_secs(5);
+pub(super) const HOLD_MAX: Duration = Duration::from_secs(5);
 
 /// Ready cubes this close to the player (in cubes) are meshed first and past the limit on jobs:
 /// what the player just placed or broke shows the next frame, whatever else waits.
@@ -238,8 +238,27 @@ impl ClientWorld {
         ClientWorld { bounded: true, ..ClientWorld::new(dim) }
     }
 
-    /// Recomputes `bounds` from the blocks (structures, after their cubes changed).
-    pub fn scan_bounds(&mut self) {
+    pub(super) fn apply_update(&mut self, update: super::terrain::Out) {
+        use super::terrain::Out;
+        match update {
+            Out::Cube { pos, cube, around } => self.insert(pos, cube, around),
+            Out::Blocks(changes, extras) => {
+                for (pos, state) in changes {
+                    self.set_block(pos, state);
+                }
+                for (pos, parts) in extras {
+                    self.set_extras(pos, parts);
+                }
+            }
+            Out::Unload(pos) => self.remove(pos),
+            Out::Range { lo, hi } => self.set_range(lo, hi),
+        }
+        if self.bounded {
+            self.scan_bounds();
+        }
+    }
+
+    pub(super) fn scan_bounds(&mut self) {
         self.bounds = crate::world::block_bounds(self.cubes.iter().map(|(p, s)| (p, &*s.cube)));
     }
 
@@ -658,15 +677,7 @@ impl ClientWorld {
         }
         let l = p & 15;
         self.touch(cp, around_mask(l.x, l.y, l.z));
-        // Its light with it, not when the server's word on that comes: a block broken doesn't
-        // leave a dark hole for a moment. What the server says after is the same. A moving
-        // structure's light is its own.
-        if !self.bounded {
-            let sky = c.dims[self.dim as usize].sky_light;
-            let changed =
-                crate::world::light::relight(&mut LitCubes(&mut self.cubes), c, sky, &self.body_glow, |l| l.block_changed(p, was));
-            self.relit(changed);
-        }
+        self.relight_at(p, Some(was));
     }
 
     /// Cubes whose light the client changed, to draw again.
@@ -703,11 +714,17 @@ impl ClientWorld {
         (slot.rev, slot.stamp) = (self.next_rev, self.next_rev);
         let l = p & 15;
         self.touch(cp, around_mask(l.x, l.y, l.z));
-        if relight && !self.bounded {
-            let sky = c.dims[self.dim as usize].sky_light;
-            let changed = crate::world::light::relight(&mut LitCubes(&mut self.cubes), c, sky, &self.body_glow, |l| l.source_changed(p));
-            self.relit(changed);
+        if relight {
+            self.relight_at(p, None);
         }
+    }
+
+    fn relight_at(&mut self, pos: IVec3, old: Option<u32>) {
+        use crate::world::light::{self, Sky};
+        let c = content();
+        let sky = Sky::local(self.bounded, c.dims[self.dim as usize].sky_light);
+        let changed = light::relight(&mut LitCubes(&mut self.cubes), c, sky, &self.body_glow, pos, old);
+        self.relit(changed);
     }
 
     /// One block of the cell at `p` becomes another state, as the server does it (`Dim::replace_part`):
@@ -1011,6 +1028,17 @@ impl ClientWorld {
         self.cubes
             .get(&r.pos)
             .is_some_and(|s| s.version == r.version)
+    }
+
+    pub(super) fn mesh_pending(&self, pos: IVec3) -> bool {
+        self.cubes.get(&pos).is_some_and(|slot| slot.dirty)
+            || self.in_flight.contains(&pos)
+            || self.batches.iter().any(|batch| {
+                batch
+                    .results
+                    .iter()
+                    .any(|mesh| mesh.pos == pos && self.current(mesh))
+            })
     }
 
     /// Jobs running plus dirty cubes that could be meshed now (edge cubes wait for neighbors

@@ -53,12 +53,7 @@ pub fn register(r: &mut Registry) {
             let w = u.world();
             let player = u.entity();
             let cell = u.target_block().map(|(p, _)| p);
-            let result = if cell.is_none() && w.key(player, &keys::SNEAK).held != 0 {
-                w.assembly_confirm_physical(player)
-            } else {
-                w.assembly_select(player, cell, true)
-            };
-            feedback(w, player, result)
+            feedback(w, player, w.assembly_select(player, cell, true))
         });
     r.block(&HELM)
         .facing(Facings::HORIZONTAL, Toward::Away)

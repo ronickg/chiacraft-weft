@@ -587,7 +587,7 @@ impl Server {
         let runs = !self.frozen || self.steps > 0 || self.sprint.is_some();
         // Hands go on while frozen for players, who still act.
         for r in self.dims.iter_mut().flat_map(|d| &mut d.regions) {
-            r.finish_uses(c, !runs);
+            r.finish_uses(0, c, !runs);
             r.mine(c, !runs);
         }
         self.steps -= (self.frozen && self.steps > 0) as u32;
@@ -710,7 +710,7 @@ impl Server {
     fn settle(&mut self, c: &'static Content) {
         for d in &mut self.dims {
             for r in &mut d.regions {
-                r.settle(c);
+                r.settle_actions(c);
             }
         }
         self.dim_events(c);
@@ -781,7 +781,7 @@ impl Server {
                             }
                             r.entities.comps.remove(&(entity, c.game.fields.trash));
                             if crate::config::get(c.game.keep_inventory) == 0.0 {
-                                r.drop_inventory(c, entity);
+                                r.drop_inventory(0, c, entity);
                             }
                         }
                         p.deaths += 1;
@@ -937,7 +937,7 @@ impl Server {
             r.entities
                 .get(owner)
                 .and_then(|e| e.anchor)
-                .and_then(|a| r.get(a))
+                .and_then(|a| r.get(0, a))
                 .unwrap_or(0)
         };
         p.conn
@@ -1230,7 +1230,7 @@ impl Server {
                 let values = crate::commands::abi_values(&args, &selected);
                 let mut reply: Vec<Msg> = Vec::new();
                 let reply_ptr = &mut reply as *mut Vec<Msg> as *mut core::ffi::c_void;
-                r.call(owner, cb, |w| abi::CommandArgs {
+                r.call(0, owner, cb, |w| abi::CommandArgs {
                     world: w,
                     player,
                     values: values.as_ptr(),
@@ -1355,13 +1355,13 @@ impl Server {
         if dim != to_dim {
             let Some(r) = self.dims[dim as usize].entity_region(id) else { return };
             let mut q = abi::Query { entity: id, dim: to_dim, ..abi::Query::DEFAULT };
-            if !r.ask(c, abi::action::ENTER_DIMENSION, &mut q) {
+            if !r.ask(0, c, abi::action::ENTER_DIMENSION, &mut q) {
                 return;
             }
         }
         if dim != to_dim {
             if let Some(r) = self.dims[dim as usize].entity_region(id) {
-                r.emit_engine(c, abi::action::ENTER_DIMENSION, &abi::DimensionChange { entity: id, from: dim, to: to_dim });
+                r.emit_engine(0, c, abi::action::ENTER_DIMENSION, &abi::DimensionChange { entity: id, from: dim, to: to_dim });
             }
         }
         // Off what it rides, as in vanilla; what rides it comes along.
@@ -1467,7 +1467,7 @@ pub(super) fn serialize_tree(c: &Content, d: &Dim, ids: &[u64]) -> Vec<u8> {
                 .filter(|((eid, _), _)| *eid == id)
                 .map(|((_, k), v)| (*k, &v[..]))
                 .collect();
-            Some((e, d.entities.inventories.get(&id), comps, d.bodies.get(&id).map(|s| s.structure_blocks(c))))
+            Some((e, d.entities.inventories.get(&id), comps, d.bodies.get(&id).map(Box::as_ref)))
         })
         .collect();
     let mut out = Vec::new();

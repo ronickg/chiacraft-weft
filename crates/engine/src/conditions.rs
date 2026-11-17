@@ -429,46 +429,46 @@ pub fn compile_all(texts: &Texts, look: &Look, errors: &mut Vec<String>) -> Vec<
 }
 
 /// Condition `id` (`Content::conds`) on the server.
-pub fn on_server(d: &mut Dim, c: &'static Content, id: u32, a: &Ask) -> bool {
+pub fn on_server(d: &mut Dim, space_id: u64, c: &'static Content, id: u32, a: &Ask) -> bool {
     c.conds
         .get(id as usize)
-        .is_some_and(|e| holds_server(d, c, e, a))
+        .is_some_and(|e| holds_server(d, space_id, c, e, a))
 }
 
 /// Whether condition `id` may hold there some time (`Ask::could`).
-pub fn may_server(d: &mut Dim, c: &'static Content, id: u32, a: &Ask) -> bool {
+pub fn may_server(d: &mut Dim, space_id: u64, c: &'static Content, id: u32, a: &Ask) -> bool {
     c.conds
         .get(id as usize)
-        .is_some_and(|e| server(d, c, e, &Ask { could: true, ..*a }) != Some(false))
+        .is_some_and(|e| server(d, space_id, c, e, &Ask { could: true, ..*a }) != Some(false))
 }
 
-pub fn holds_server(d: &mut Dim, c: &'static Content, e: &Expr, a: &Ask) -> bool {
-    server(d, c, e, a) == Some(true)
+pub fn holds_server(d: &mut Dim, space_id: u64, c: &'static Content, e: &Expr, a: &Ask) -> bool {
+    server(d, space_id, c, e, a) == Some(true)
 }
 
 enum Context<'a> {
-    Server(&'a mut Dim),
+    Server(&'a mut Dim, u64),
     Client(Option<&'a crate::client::Client>),
 }
 
 impl Context<'_> {
     fn grid_pos(&self, pos: DVec3) -> glam::IVec3 {
         match self {
-            Self::Server(d) => d.place.to_local(pos).floor().as_ivec3(),
+            Self::Server(d, space_id) => d.space_pose(*space_id).to_local(pos).floor().as_ivec3(),
             Self::Client(_) => pos.floor().as_ivec3(),
         }
     }
 
     fn cell(&self, p: glam::IVec3) -> Option<u32> {
         match self {
-            Self::Server(d) => d.get(p),
+            Self::Server(d, space_id) => d.get(*space_id, p),
             Self::Client(cl) => cl.and_then(|cl| cl.world.block_or_air(p)),
         }
     }
 
     fn parts(&self, p: glam::IVec3) -> Vec<u32> {
         match self {
-            Self::Server(d) => d.parts(p),
+            Self::Server(d, space_id) => d.parts(*space_id, p),
             Self::Client(cl) => cl.map_or_else(Vec::new, |cl| {
                 cl.world
                     .block_or_air(p)
@@ -481,21 +481,21 @@ impl Context<'_> {
 
     fn light(&self, p: glam::IVec3) -> u32 {
         match self {
-            Self::Server(d) => d.light(p),
+            Self::Server(d, space_id) => d.light(*space_id, p),
             Self::Client(cl) => cl.map_or(0, |cl| cl.world.light(p)),
         }
     }
 
     fn daylight(&self, c: &Content) -> Option<f32> {
         match self {
-            Self::Server(d) => Some(d.daylight(c)),
+            Self::Server(d, _) => Some(d.daylight(c)),
             Self::Client(cl) => cl.map(|cl| cl.daylight()),
         }
     }
 
     fn enclosed(&self, c: &Content, p: glam::IVec3) -> Option<bool> {
         let dim = match self {
-            Self::Server(d) => d.id,
+            Self::Server(d, _) => d.id,
             Self::Client(cl) => cl.as_ref()?.world.dim,
         };
         Some(crate::world::light::enclosed(&c.dims[dim as usize], self.light(p)))
@@ -527,13 +527,13 @@ impl Context<'_> {
                 (k::SURFACE, _) => !self.enclosed(c, p)?,
                 (k::LIGHT, _) => in_range(arg, light_for(arg, p, &|q| self.light(q), a.daylight.or_else(|| self.daylight(c))?)),
                 (k::CHANCE, Arg::Num(n)) => match self {
-                    Self::Server(d) => d.random_unit() < *n,
+                    Self::Server(d, _) => d.random_unit() < *n,
                     Self::Client(_) => false,
                 },
                 (k::SKY, _) => in_range(arg, abi::light::sky(self.light(p)) as f32),
                 (k::SHELTERED, _) => {
                     let weather = match self {
-                        Self::Server(d) => d.weather,
+                        Self::Server(d, _) => d.weather,
                         Self::Client(cl) => cl.as_ref()?.weather_id,
                     };
                     c.game.weathers[weather as usize].shelters()
@@ -541,13 +541,13 @@ impl Context<'_> {
                 (k::HEIGHT, _) => in_range(arg, a.pos.y as f32),
                 (k::ATTRIBUTE, _) => {
                     let value = match self {
-                        Self::Server(d) => d.attribute(c, a.entity, attr(arg), false) as f32,
+                        Self::Server(d, space_id) => d.attribute(*space_id, c, a.entity, attr(arg), false) as f32,
                         Self::Client(cl) => cl.as_ref()?.attribute(attr(arg)),
                     };
                     in_range(arg, value)
                 }
                 (k::WEARS, Arg::Slots(slots)) => match self {
-                    Self::Server(d) => {
+                    Self::Server(d, _) => {
                         let e = d.entities.get(a.entity)?;
                         wears(
                             &c.game.entities[e.kind as usize],
@@ -597,14 +597,14 @@ impl Context<'_> {
                 _ => false,
             },
             Answer::Mode(m) => match self {
-                Self::Server(d) => d.entities.get(a.entity)?.mode == m,
+                Self::Server(d, _) => d.entities.get(a.entity)?.mode == m,
                 Self::Client(cl) => cl.as_ref()?.mode == m,
             },
             Answer::Mod(owner, cb) => {
                 let text = if let Arg::Text(t) = arg { t.as_str() } else { "" };
                 match self {
-                    Self::Server(d) => {
-                        d.call(owner, cb, |w| abi::ConditionArgs {
+                    Self::Server(d, space_id) => {
+                        d.call(*space_id, owner, cb, |w| abi::ConditionArgs {
                             world: w,
                             client: std::ptr::null_mut(),
                             pos: a.pos.to_array().into(),
@@ -634,8 +634,8 @@ impl Context<'_> {
     }
 }
 
-fn server(d: &mut Dim, c: &'static Content, e: &Expr, a: &Ask) -> Option<bool> {
-    let mut context = Context::Server(d);
+fn server(d: &mut Dim, space_id: u64, c: &'static Content, e: &Expr, a: &Ask) -> Option<bool> {
+    let mut context = Context::Server(d, space_id);
     eval(e, &mut |id, arg| context.answer(c, id, arg, a))
 }
 

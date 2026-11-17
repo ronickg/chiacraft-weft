@@ -380,7 +380,7 @@ mod tests {
                 flying: false,
                 frame: Some((7, DVec3::ONE)),
             },
-            ToServer::UseItem { target: Some((IVec3::new(1, 2, 3), 4)) },
+            ToServer::UseItem,
             ToServer::Click { slot: 7, button: 1, shift: true },
             ToServer::Drag { slots: vec![3, 4, 9], button: 0 },
             ToServer::Chat("/give stone 5".into()),

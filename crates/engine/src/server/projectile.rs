@@ -8,7 +8,6 @@ use weft_abi as abi;
 use super::dim::Dim;
 use super::entity::{Stuck, StuckIn};
 use crate::content::Content;
-use crate::physics::Cells;
 
 /// At most this many hits refused in one tick before a projectile just flies on.
 const MAX_REFUSED: usize = 4;
@@ -16,18 +15,20 @@ const MAX_REFUSED: usize = 4;
 impl Dim {
     /// What a ray from `from` (this dimension's frame) along `dir` hits first within `max`, of
     /// what `flags` say (`abi::ray`), past the entities in `skip`.
-    pub fn raycast(&self, c: &Content, from: DVec3, dir: DVec3, max: f64, flags: u32, skip: &[u64]) -> Option<abi::RayHit> {
+    pub fn raycast(&self, space_id: u64, c: &Content, from: DVec3, dir: DVec3, max: f64, flags: u32, skip: &[u64]) -> Option<abi::RayHit> {
         let dir = dir.normalize_or_zero();
         if dir == DVec3::ZERO || !max.is_finite() {
             return None;
         }
         let mut best: Option<abi::RayHit> = None;
         if flags & (abi::ray::BLOCKS | abi::ray::LIQUIDS) != 0 {
-            if let Some(h) = self.ray(c, from, dir, max, flags) {
+            if let Some(h) = self.ray(space_id, c, from, dir, max, flags) {
                 let point = from + dir * h.dist;
                 // On a body's block, where in that body's blocks.
                 let on = match self.entities.get(h.frame).filter(|_| h.frame != 0) {
-                    Some(b) => b.body_place().to_local(self.place.to_world(point)),
+                    Some(b) => b
+                        .body_place()
+                        .to_local(self.space_pose(space_id).to_world(point)),
                     None => point,
                 };
                 best = Some(abi::RayHit {
@@ -47,8 +48,8 @@ impl Dim {
             let reach = best.map_or(max, |b| b.distance);
             // Only what stands near the line's box is looked at closely: no mob is wider than this.
             const WIDEST: f64 = 4.0;
-            let (to, world_from) = (self.place.to_world(from + dir * reach), self.place.to_world(from));
-            let world_dir = self.place.vector_to_world(dir);
+            let (to, world_from) = (self.space_pose(space_id).to_world(from + dir * reach), self.space_pose(space_id).to_world(from));
+            let world_dir = self.space_pose(space_id).vector_to_world(dir);
             let (lo, hi) = (world_from.min(to) - DVec3::splat(WIDEST), world_from.max(to) + DVec3::splat(WIDEST));
             let mut near: Option<(f64, u8, u64, DVec3, u32)> = None;
             let mut scratch = crate::hitbox::Scratch::default();
@@ -111,11 +112,11 @@ impl Dim {
                 self.stay_stuck(c, id, st, &p);
                 continue;
             }
-            let gravity = gravity * self.attribute(c, id, crate::registry::attr::GRAVITY, false);
+            let gravity = gravity * self.attribute(0, c, id, crate::registry::attr::GRAVITY, false);
             let Some(e) = self.entities.get(id) else { continue };
             let v = e.vel * crate::world::TICK;
             let speed = v.length();
-            let (pos, owner) = (self.place.to_local(e.pos), e.owner);
+            let (pos, owner) = (e.pos, e.owner);
             let mut skip = vec![id];
             // Its shooter can't be hit until it flew clear of them.
             if owner != 0 && !e.left_owner {
@@ -136,7 +137,7 @@ impl Dim {
             let mut after = Some(v);
             for _ in 0..MAX_REFUSED {
                 let flags = abi::ray::BLOCKS | abi::ray::SOLID | abi::ray::ENTITIES;
-                let Some(h) = self.raycast(c, pos, v, speed, flags, &skip) else { break };
+                let Some(h) = self.raycast(0, c, pos, v, speed, flags, &skip) else { break };
                 let q = abi::Query {
                     entity: id,
                     other: h.entity,
@@ -146,7 +147,7 @@ impl Dim {
                     part: h.part,
                     ..abi::Query::DEFAULT
                 };
-                if !self.ask(c, abi::action::PROJECTILE_HIT, &q) {
+                if !self.ask(0, c, abi::action::PROJECTILE_HIT, &q) {
                     if h.entity == 0 {
                         break;
                     }
@@ -156,9 +157,9 @@ impl Dim {
                 let point = DVec3::from_array(h.point.to_array());
                 let hit =
                     abi::ProjectileHit { projectile: id, target: h.entity, owner, pos: h.pos, face: h.face, part: h.part, point: h.point };
-                self.emit_engine(c, abi::action::PROJECTILE_HIT, &hit);
+                self.emit_engine(0, c, abi::action::PROJECTILE_HIT, &hit);
                 if h.entity != 0 {
-                    let amount = self.compute(c, abi::chain::PROJECTILE_DAMAGE, p.damage as f64, &q, false) as f32;
+                    let amount = self.compute(0, c, abi::chain::PROJECTILE_DAMAGE, p.damage as f64, &q, false) as f32;
                     let d = abi::Damage {
                         amount,
                         cause: abi::damage_cause::PROJECTILE,
@@ -173,8 +174,8 @@ impl Dim {
                     // A lethal hit removes its target; keep the target's frame while it exists.
                     let stuck = p
                         .sticks
-                        .then(|| self.stuck_at(StuckIn::Entity(h.entity), embedded, yaw));
-                    let outcome = self.damage_outcome(c, h.entity, &d);
+                        .then(|| self.stuck_at(0, StuckIn::Entity(h.entity), embedded, yaw));
+                    let outcome = self.damage_outcome(0, c, h.entity, &d);
                     if let super::guard::DamageOutcome::Blocked(slot) = outcome {
                         if p.sticks {
                             self.catch_projectile(c, h.entity, slot, id);
@@ -204,7 +205,7 @@ impl Dim {
                     to = point - v.normalize_or_zero() * 0.05;
                     let block = StuckIn::Block { body: h.body, block: IVec3::from_array(h.pos.to_array()) };
                     let yaw = self.entities.get(id).map_or(0.0, |e| e.yaw);
-                    let stuck = p.sticks.then(|| self.stuck_at(block, to, yaw));
+                    let stuck = p.sticks.then(|| self.stuck_at(0, block, to, yaw));
                     if let Some(e) = self.entities.get_mut(id) {
                         match stuck {
                             Some(st) => e.stuck = Some(st),
@@ -217,7 +218,7 @@ impl Dim {
             }
             let wet = crate::physics::Cells::liquid(&super::space::CubeCells(&self.space.cubes), c, to.floor().as_ivec3()).is_some();
             let Some(e) = self.entities.get_mut(id) else { continue };
-            e.pos = self.place.to_world(to);
+            e.pos = to;
             let v = after.map_or(DVec3::ZERO, |v| v * if wet { p.liquid_drag } else { p.drag } as f64 - DVec3::Y * gravity);
             e.vel = v * crate::world::TPS as f64;
             e.in_liquid = wet;
@@ -230,8 +231,8 @@ impl Dim {
     }
 
     /// Stuck at `to` (this dimension's frame) in what `into` says, pointing `yaw`.
-    fn stuck_at(&self, into: StuckIn, to: DVec3, yaw: f32) -> Stuck {
-        let world = self.place.to_world(to);
+    fn stuck_at(&self, space_id: u64, into: StuckIn, to: DVec3, yaw: f32) -> Stuck {
+        let world = self.space_pose(space_id).to_world(to);
         let (at, yaw) = match into {
             StuckIn::Block { body, .. } => match self.entities.get(body).filter(|_| body != 0) {
                 Some(b) => (b.body_place().to_local(world), yaw),
@@ -255,21 +256,13 @@ impl Dim {
         };
         // Where it is now, or `None` once nothing holds it.
         let now: Option<(Option<DVec3>, f32)> = match st.into {
-            StuckIn::Block { body: 0, block } => {
-                let cells = super::space::CubeCells(&self.space.cubes);
-                held(&|b| (cells.main(b), cells.extras(b).to_vec()), block).then_some((None, st.yaw))
-            }
-            StuckIn::Block { body, block } => {
-                let holds = self.bodies.get(&body).is_some_and(|d| {
-                    let cells = super::space::DeckCells(d);
-                    held(&|b| (cells.main(b), cells.extras(b).to_vec()), block)
-                });
-                let place = self
-                    .entities
-                    .get(body)
-                    .map(super::entity::Entity::body_place);
-                holds.then(|| (place.map(|t| t.to_world(st.at)), st.yaw))
-            }
+            StuckIn::Block { body, block } => self
+                .has_space(body)
+                .then(|| self.space(body))
+                .and_then(|space| {
+                    held(&|pos| (space.get(pos), space.extras(pos).to_vec()), block)
+                        .then(|| ((body != 0).then(|| self.space_pose(body).to_world(st.at)), st.yaw))
+                }),
             StuckIn::Entity(target) => self
                 .entities
                 .get(target)

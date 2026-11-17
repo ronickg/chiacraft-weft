@@ -193,9 +193,9 @@ pub async fn body_sneak_edge(t: T) -> R {
         ("the corners of a cross", &cross, &corners),
     ] {
         let Ok(body) = id.parse::<u64>() else { return Err(format!("no {name}")) };
-        for &(key, yaw) in walks {
-            // Off what it was on first.
-            t.cmd(&format!("/tp {} {} {}", f[0], f[1] + 20, f[2]))
+        for (step, &(key, yaw)) in walks.iter().enumerate() {
+            // Off what it was on first. The chat helper needs a distinct reply each time.
+            t.cmd(&format!("/tp {} {} {}", f[0], f[1] + 20 + step as i32, f[2]))
                 .await?;
             t.secs(0.2).await?;
             t.op(&format!("onto {id} 1.0")).await?;
@@ -258,6 +258,29 @@ pub async fn body_place(t: T) -> R {
     t.press("core:use");
     t.secs(0.5).await?;
     t.check_eq(t.op(&format!("sblock {id} 1 0 1")).await?, "base:oak_planks".to_string(), "and another");
+
+    t.op(&format!("sblock {id} 0 0 0 base:stone_slab")).await?;
+    t.op("put me 0 base:water_bucket 1").await?;
+    t.look_at(center);
+    t.frames(3).await?;
+    t.press("core:use");
+    t.secs(0.3).await?;
+    let parts = format!("parts 0 0 0 {id}");
+    let wet = t.op(&parts).await?;
+    t.check(wet.contains("stone_slab") && wet.contains("water[level=0]"), format!("deck slab holds water: {wet}"));
+    t.check_eq(t.slot("me", 0).await?.0, "base:water_bucket".into(), "creative keeps its filled bucket");
+    t.op("put me 0 base:bucket 1").await?;
+    t.cmd(&format!("/tp {} {} {}", f64::from(center[0]) + 0.5, center[1] + 1, f64::from(center[2]) + 1.2))
+        .await?;
+    t.secs(0.3).await?;
+    t.look_at(center);
+    t.until("aimed at the slab from above", Duration::from_secs(2), |t| t.state().target_body.to_string() == id)
+        .await?;
+    t.press("core:use");
+    t.secs(0.3).await?;
+    let dry = t.op(&parts).await?;
+    t.check(dry.contains("stone_slab") && !dry.contains("water"), format!("deck slab drained: {dry}"));
+    t.check_eq(t.slot("me", 0).await?.0, "base:bucket".into(), "creative keeps its empty bucket");
     Ok(())
 }
 
@@ -315,6 +338,31 @@ pub async fn ride_frames(t: T) -> R {
     t.check((i[0] - s[0]).abs() < 1.6 && (i[1] - (s[1] + 1.0)).abs() < 0.1, format!("the idol rides the skiff (idol {i:?}, skiff {s:?})"));
     let swing = t.c().entity(idol).map_or(1.0, |e| e.moved);
     t.check(swing < 0.15, format!("the riding idol does not walk ({swing:.2})"));
+
+    let at = add(f, [4, 5, 2]);
+    let support = add(at, [0, -1, 0]);
+    t.set(at, "base:oak_planks").await?;
+    t.set(support, "base:stone").await?;
+    let result = t
+        .op(&format!("assemble_one {} {} {}", at[0], at[1], at[2]))
+        .await?;
+    t.check_eq(result, abi::assembly_result::CONFIRMED.to_string(), "plain wand assembly");
+    let platform = |t: &T| {
+        t.c().entities().iter().copied().find(|&id| {
+            t.c()
+                .entity(id)
+                .is_some_and(|e| name_of(abi::entry_kind::ENTITY, e.kind) == "core:platform")
+        })
+    };
+    t.until("plain body", Duration::from_secs(4), |t| platform(t).is_some())
+        .await?;
+    let body = platform(&t).unwrap().to_string();
+    t.check((pos_of(&t, &body).await?[1] - f64::from(at[1])).abs() < 0.1, "the support holds the body");
+    t.set(support, "air").await?;
+    t.secs(2.0).await?;
+    let y = pos_of(&t, &body).await?[1];
+    t.check(y < f64::from(at[1] - 2), format!("body falls when the support goes away: y={y}"));
+    t.check_eq(t.op(&format!("sblock {body} 0 0 0")).await?, "base:oak_planks".into(), "the settled body keeps its cells and ID");
     Ok(())
 }
 

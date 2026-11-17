@@ -2166,7 +2166,7 @@ pub async fn permissions(t: T) -> R {
     t.cmd("/op @s 0").await?;
     let no = t.cmd("/time set 1000").await?;
     t.check(no.contains("permission level 2"), format!("/time at level 0: {no}"));
-    t.cmd("/rename shiny").await?;
+    t.c().say("/rename shiny");
     t.until("a command for everyone still works", Duration::from_secs(2), |t| t.c().inventory_slot(0).data != 0)
         .await?;
     let up = t.cmd("/op @s 4").await?;
