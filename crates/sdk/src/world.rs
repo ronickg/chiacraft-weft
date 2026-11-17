@@ -89,7 +89,10 @@ impl World {
 
     /// Replace the redstone key bindings on a Controller, keeping the exit key and debug mode.
     pub fn set_controller_bindings(&self, at: impl Into<BlockPos>, bindings: &[(crate::Dir, &str, u8)]) -> bool {
-        let bindings: Vec<_> = bindings.iter().map(|&(face, key, level)| abi::ControllerBinding { face: face.face() as u8, key: Str::new(key), level }).collect();
+        let bindings: Vec<_> = bindings
+            .iter()
+            .map(|&(face, key, level)| abi::ControllerBinding { face: face.face() as u8, key: Str::new(key), level })
+            .collect();
         unsafe { (host().controller_bindings)(self.raw, &at.into(), abi::Slice::new(&bindings)) != 0 }
     }
 

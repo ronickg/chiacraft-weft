@@ -1,4 +1,7 @@
-use weft_sdk::{abi::{RotorRule, assembly_result, rotor_motion}, *};
+use weft_sdk::{
+    abi::{RotorRule, assembly_result, rotor_motion},
+    *,
+};
 
 static WHEEL_SMALL: Block = Block::named("wheel_small");
 static WHEEL: Block = Block::named("wheel");
@@ -9,9 +12,7 @@ static GLASS: Block = Block::named("glass");
 static IRON: Block = Block::named("iron_block");
 static HELM: Block = Block::named("helm");
 static AIR: Block = Block::named("core:air");
-const TIRE_CELLS: [[i32; 3]; 8] = [
-    [-1,-1,0], [0,-1,0], [1,-1,0], [-1,0,0], [1,0,0], [-1,1,0], [0,1,0], [1,1,0],
-];
+const TIRE_CELLS: [[i32; 3]; 8] = [[-1, -1, 0], [0, -1, 0], [1, -1, 0], [-1, 0, 0], [1, 0, 0], [-1, 1, 0], [0, 1, 0], [1, 1, 0]];
 
 pub fn register(r: &mut Registry) {
     for (block, radius, half_length, recipe) in [
@@ -59,11 +60,19 @@ fn rule(min: u8, max: u8, motion: u8, degrees: f32, speed: f32) -> RotorRule {
 fn spawn_car(cmd: &mut ServerCommand) {
     let world = cmd.world();
     let player = cmd.player();
-    let Some(position) = cmd.pos("at").or_else(|| world.entity(player).map(|e| {
-        let [x, z] = yaw_dir(e.yaw);
-        [e.pos.x + 8.0 * f64::from(x), e.pos.y, e.pos.z + 8.0 * f64::from(z)].into()
-    })) else { return };
-    if position.to_array().iter().any(|&n| !n.is_finite() || n.abs() > f64::from(i32::MAX - 16)) {
+    let Some(position) = cmd.pos("at").or_else(|| {
+        world.entity(player).map(|e| {
+            let [x, z] = yaw_dir(e.yaw);
+            [e.pos.x + 8.0 * f64::from(x), e.pos.y, e.pos.z + 8.0 * f64::from(z)].into()
+        })
+    }) else {
+        return;
+    };
+    if position
+        .to_array()
+        .iter()
+        .any(|&n| !n.is_finite() || n.abs() > f64::from(i32::MAX - 16))
+    {
         cmd.reply("vehicle.base.no_space", &[]);
         return;
     }
@@ -117,7 +126,9 @@ fn spawn_car(cmd: &mut ServerCommand) {
 
     let mut placed = 0;
     for &(p, state) in &cells {
-        if !world.set_block(p, state) { break; }
+        if !world.set_block(p, state) {
+            break;
+        }
         placed += 1;
     }
     let steer_rules = [
@@ -126,10 +137,14 @@ fn spawn_car(cmd: &mut ServerCommand) {
         rule(10, 15, rotor_motion::ABSOLUTE, 28.0, 96.0),
     ];
     let controls = [
-        (Dir::South, "W", 15), (Dir::South, "S", 8),
-        (Dir::North, "A", 7), (Dir::North, "D", 15),
-        (Dir::East, "Q", 7), (Dir::West, "E", 7),
-        (Dir::East, "Space", 15), (Dir::West, "Space", 15),
+        (Dir::South, "W", 15),
+        (Dir::South, "S", 8),
+        (Dir::North, "A", 7),
+        (Dir::North, "D", 15),
+        (Dir::East, "Q", 7),
+        (Dir::West, "E", 7),
+        (Dir::East, "Space", 15),
+        (Dir::West, "Space", 15),
         (Dir::Down, "ControlLeft", 15),
     ];
     let programmed = placed == cells.len()
@@ -143,11 +158,11 @@ fn spawn_car(cmd: &mut ServerCommand) {
             } else {
                 (rotor_motion::CLOCKWISE, rotor_motion::COUNTERCLOCKWISE)
             };
-            world.set_rotor_program(motor, &[
-                rule(0, 0, rotor_motion::FREEWHEEL, 0.0, 720.0),
-                rule(1, 9, reverse, 0.0, 360.0),
-                rule(10, 15, forward, 0.0, 550.0),
-            ], true) && world.set_assembly_bounds(motor, at([2 * x, -2, 2]), at([2 * x, 0, 4]))
+            world.set_rotor_program(
+                motor,
+                &[rule(0, 0, rotor_motion::FREEWHEEL, 0.0, 720.0), rule(1, 9, reverse, 0.0, 360.0), rule(10, 15, forward, 0.0, 550.0)],
+                true,
+            ) && world.set_assembly_bounds(motor, at([2 * x, -2, 2]), at([2 * x, 0, 4]))
                 && world.set_rotor_program(at([x, -1, -2]), &[rule(0, 15, rotor_motion::FREEWHEEL, 0.0, 720.0)], true)
                 && world.set_assembly_bounds(at([x, -1, -2]), at([2 * x, -2, -3]), at([2 * x, 0, -1]))
         });

@@ -95,7 +95,9 @@ impl Dim {
             return false;
         }
         let saved = self.save_assembly_bounds(c, at, Bounds::new(min, max));
-        if saved { self.space.signals.recheck_device(at); }
+        if saved {
+            self.space.signals.recheck_device(at);
+        }
         saved
     }
 
@@ -354,7 +356,9 @@ impl Dim {
             Ok(cells) => cells,
             Err(code) => {
                 edit.preview = None;
-                if !direct { self.draw_assembly(player, bounds, &[]); }
+                if !direct {
+                    self.draw_assembly(player, bounds, &[]);
+                }
                 return code;
             }
         };
@@ -363,10 +367,11 @@ impl Dim {
             return result::TOO_LARGE;
         }
         let at = controller.map(|ctrl| ctrl.block);
-        if !direct && !edit
-            .preview
-            .as_ref()
-            .is_some_and(|p| p.controller == at && p.expires > self.time && p.cells == lifted)
+        if !direct
+            && !edit
+                .preview
+                .as_ref()
+                .is_some_and(|p| p.controller == at && p.expires > self.time && p.cells == lifted)
         {
             self.draw_assembly(player, bounds, &lifted);
             edit.preview = Some(Preview { controller: at, cells: lifted, expires: self.time + 160 });
@@ -382,7 +387,9 @@ impl Dim {
                     return result::UNAVAILABLE;
                 }
                 self.space.signals.recheck_device(ctrl.block);
-                if !direct { self.draw_assembly(player, None, &[]); }
+                if !direct {
+                    self.draw_assembly(player, None, &[]);
+                }
                 return result::CONFIRMED;
             }
             None if self.frame == 0 => c.game.platform_kind,
@@ -395,7 +402,9 @@ impl Dim {
         } else if flags & abi::assembly_flags::PHYSICS != 0 {
             self.float_ship(id, 4);
         }
-        if !direct { self.draw_assembly(player, None, &[]); }
+        if !direct {
+            self.draw_assembly(player, None, &[]);
+        }
         result::CONFIRMED
     }
 

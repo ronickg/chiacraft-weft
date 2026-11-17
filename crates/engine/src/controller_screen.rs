@@ -12,7 +12,8 @@ use crate::ui::{
 };
 use crate::world::GameMode;
 
-const MOTIONS: [&str; 5] = ["controller.absolute", "controller.relative", "controller.forward", "controller.reverse", "controller.freewheel"];
+const MOTIONS: [&str; 5] =
+    ["controller.absolute", "controller.relative", "controller.forward", "controller.reverse", "controller.freewheel"];
 const PANEL_WIDTH: f32 = 334.0;
 const PANEL_PADDING: f32 = 10.0;
 const PANEL_CONTENT: f32 = PANEL_WIDTH - 2.0 * PANEL_PADDING;
@@ -74,7 +75,9 @@ fn guide_travel(ctx: &Ctx) -> Option<controller::Guide> {
 
 fn refresh_guide(ctx: &mut Ctx) {
     let Some(travel) = guide_travel(ctx) else { return };
-    if let Some((_, Settings::Guide(guide))) = ctx.screen::<ControllerScreen>().and_then(|s| s.draft.as_mut())
+    if let Some((_, Settings::Guide(guide))) = ctx
+        .screen::<ControllerScreen>()
+        .and_then(|s| s.draft.as_mut())
         && (guide.min, guide.max, guide.rest) != (travel.min, travel.max, travel.rest)
     {
         (guide.min, guide.max, guide.rest) = (travel.min, travel.max, travel.rest);
@@ -91,13 +94,8 @@ fn current_values(ctx: &mut Ctx) -> bool {
     let has_rule = matches!(screen.draft, Some((_, Settings::Rotor(ref r))) if r.rules.get(row).is_some());
     let mut invalid = false;
     if guide {
-        let read = || {
-            Some(controller::Guide {
-                stiffness: parse(ctx, "stiffness")?,
-                damping: parse(ctx, "damping")?,
-                ..guide_travel(ctx)?
-            })
-        };
+        let read =
+            || Some(controller::Guide { stiffness: parse(ctx, "stiffness")?, damping: parse(ctx, "damping")?, ..guide_travel(ctx)? });
         let values = read().filter(|g| g.valid());
         if let Some((_, Settings::Guide(guide))) = ctx
             .screen::<ControllerScreen>()
@@ -176,10 +174,15 @@ fn save(ctx: &mut Ctx) -> bool {
     if !current_values(ctx) {
         return false;
     }
-    let draft = ctx.screen::<ControllerScreen>().and_then(|s| s.draft.clone());
+    let draft = ctx
+        .screen::<ControllerScreen>()
+        .and_then(|s| s.draft.clone());
     if let Some((controller, settings)) = draft
         && let Some(c) = &mut ctx.client
-        && !c.controller_edit.as_ref().is_some_and(|(id, _, original)| *id == controller && *original == settings)
+        && !c
+            .controller_edit
+            .as_ref()
+            .is_some_and(|(id, _, original)| *id == controller && *original == settings)
     {
         c.send(ToServer::ControllerSave { controller, data: settings.to_bytes() });
     }
@@ -255,30 +258,38 @@ impl Screen for ControllerScreen {
         };
         ui.root_style(Style::default().stretch());
         ui.panel("overlay", Style::default().grow().center().pad(8.0), |ui| {
-            ui.panel("panel", Style::default().w(PANEL_WIDTH).stretch().gap(9.0).pad(PANEL_PADDING), |ui| {
-                ui.container(Style::row().justify(Justify::Between).gap(6.0), |ui| {
-                    let heading = if matches!(settings, Settings::Helm(_)) { "controller.block_face" } else { title };
-                    let args = [Arg::Key(controller::FACE_LABELS[self.face].into())];
-                    let n = label(ui, cx, heading, &args, "title");
-                    if let Some(t) = ui.text_mut(n) {
-                        t.scale = 1.45;
-                        t.wrap = false;
+            ui.panel(
+                "panel",
+                Style::default()
+                    .w(PANEL_WIDTH)
+                    .stretch()
+                    .gap(9.0)
+                    .pad(PANEL_PADDING),
+                |ui| {
+                    ui.container(Style::row().justify(Justify::Between).gap(6.0), |ui| {
+                        let heading = if matches!(settings, Settings::Helm(_)) { "controller.block_face" } else { title };
+                        let args = [Arg::Key(controller::FACE_LABELS[self.face].into())];
+                        let n = label(ui, cx, heading, &args, "title");
+                        if let Some(t) = ui.text_mut(n) {
+                            t.scale = 1.45;
+                            t.wrap = false;
+                        }
+                        close_button(ui, 14.0);
+                        if let Some(n) = ui.find("screen_close") {
+                            ui.nodes[n].tooltip = Some(cx.t("controller.close", &[]));
+                        }
+                    });
+                    match settings {
+                        Settings::Helm(helm) => self.helm(ui, cx, helm),
+                        Settings::Rotor(rotor) => self.rotor(ui, cx, rotor),
+                        Settings::Guide(guide) => self.guide(ui, cx, *guide),
                     }
-                    close_button(ui, 14.0);
-                    if let Some(n) = ui.find("screen_close") {
-                        ui.nodes[n].tooltip = Some(cx.t("controller.close", &[]));
+                    if self.invalid {
+                        let key = if matches!(settings, Settings::Guide(_)) { "controller.guide_invalid" } else { "controller.invalid" };
+                        label(ui, cx, key, &[Arg::Int(i64::from(controller::MAX_RAILS))], "default");
                     }
-                });
-                match settings {
-                    Settings::Helm(helm) => self.helm(ui, cx, helm),
-                    Settings::Rotor(rotor) => self.rotor(ui, cx, rotor),
-                    Settings::Guide(guide) => self.guide(ui, cx, *guide),
-                }
-                if self.invalid {
-                    let key = if matches!(settings, Settings::Guide(_)) { "controller.guide_invalid" } else { "controller.invalid" };
-                    label(ui, cx, key, &[Arg::Int(i64::from(controller::MAX_RAILS))], "default");
-                }
-            });
+                },
+            );
         });
     }
 }
@@ -321,7 +332,10 @@ impl ControllerScreen {
             ] {
                 ui.container(Style::default().gap(4.0), |ui| {
                     ui.container(Style::row().gap(4.0), |ui| {
-                        let n = ui.add(Kind::Image { texture: icon.into(), color: cx.look.text("panel_dim", "") }, Style::default().size(9.0, 9.0));
+                        let n = ui.add(
+                            Kind::Image { texture: icon.into(), color: cx.look.text("panel_dim", "") },
+                            Style::default().size(9.0, 9.0),
+                        );
                         ui.nodes[n].tooltip = Some(cx.t(tip, &[]));
                         let n = label(ui, cx, name, &[], "default");
                         ui.nodes[n].tooltip = Some(cx.t(tip, &[]));
@@ -401,7 +415,11 @@ impl ControllerScreen {
         if cx.client.is_some_and(|c| c.mode == GameMode::CREATIVE) {
             ui.container(Style::row(), |ui| {
                 led(ui, cx, "controller.debug_drive", helm.debug_drive, |ctx| {
-                    if ctx.client.as_ref().is_some_and(|c| c.mode == GameMode::CREATIVE) {
+                    if ctx
+                        .client
+                        .as_ref()
+                        .is_some_and(|c| c.mode == GameMode::CREATIVE)
+                    {
                         change(ctx, |s| {
                             if let Some((_, Settings::Helm(helm))) = &mut s.draft {
                                 helm.debug_drive = !helm.debug_drive;
@@ -421,14 +439,17 @@ impl ControllerScreen {
             ui.panel("well", Style::default().w(77.0).stretch().pad(4.0).gap(4.0), |ui| {
                 ui.container(Style { bar_thin: true, ..Style::default().h(128.0).scroll().gap(2.0) }, |ui| {
                     for (i, rule) in rotor.rules.iter().enumerate() {
-                        let node = ui.button("button", Style::default().size(62.0, 20.0), Rc::new(move |ctx| change(ctx, |s| s.row = i)), |ui| {
-                            let n = ui.text(range_text(rule.min, rule.max), "button");
-                            if i == self.row {
-                                ui.set_id(n, "active_range");
-                            }
-                            let remove = glyph(ui, cx, "×", "controller.remove_range", 13.0, "", move |ctx| remove_rule(ctx, i));
-                            ui.nodes[remove].style = ui.nodes[remove].style.at_from([1.0, 0.5], -1.0, 0.0, [1.0, 0.5]);
-                        });
+                        let node =
+                            ui.button("button", Style::default().size(62.0, 20.0), Rc::new(move |ctx| change(ctx, |s| s.row = i)), |ui| {
+                                let n = ui.text(range_text(rule.min, rule.max), "button");
+                                if i == self.row {
+                                    ui.set_id(n, "active_range");
+                                }
+                                let remove = glyph(ui, cx, "×", "controller.remove_range", 13.0, "", move |ctx| remove_rule(ctx, i));
+                                ui.nodes[remove].style = ui.nodes[remove]
+                                    .style
+                                    .at_from([1.0, 0.5], -1.0, 0.0, [1.0, 0.5]);
+                            });
                         mark(ui, node, i == self.row);
                     }
                 });
@@ -540,7 +561,9 @@ fn guide_diagram(ui: &mut Ui, cx: &BuildCx, guide: controller::Guide) {
         bar(ui, rest, 0.0, 7.0, 22.0, steel);
         let left_label = if travel > 0.0 { left } else { left - 15.0 };
         let right_label = if travel > 0.0 { right } else { right + 15.0 };
-        for (key, x, y) in [("controller.minimum", left_label, 23.0), ("controller.maximum", right_label, 23.0), ("controller.rest", rest, -23.0)] {
+        for (key, x, y) in
+            [("controller.minimum", left_label, 23.0), ("controller.maximum", right_label, 23.0), ("controller.rest", rest, -23.0)]
+        {
             let n = label(ui, cx, key, &[], "dim");
             ui.nodes[n].style = point(x, y);
             if let Some(t) = ui.text_mut(n) {

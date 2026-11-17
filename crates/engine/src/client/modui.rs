@@ -271,30 +271,44 @@ pub unsafe extern "C" fn ui_open(u: *mut abi::UiCtx, node: *const abi::UiNode) {
                 let values = n.slider_values.as_slice();
                 let ordered = flag(abi::ui_flags::SLIDER_ORDERED);
                 let mut min = 0.0_f32;
-                let thumbs = values.iter().enumerate().map(|(i, &value)| {
-                    let value = if value.is_finite() { value.clamp(min, 1.0) } else { min };
-                    if ordered { min = value; }
-                    let callback: Option<Change> = change.is_some().then(|| Rc::new(move |ctx: &mut Ctx, value| {
-                        ctx.requests.push(crate::app::Request::ModChange(owner, change, String::new(), value, i as u32));
-                    }) as Change);
-                    let (change, release) = if flag(abi::ui_flags::SLIDER_RELEASE) { (None, callback) } else { (callback, None) };
-                    Thumb { value, change, release }
-                }).collect();
+                let thumbs = values
+                    .iter()
+                    .enumerate()
+                    .map(|(i, &value)| {
+                        let value = if value.is_finite() { value.clamp(min, 1.0) } else { min };
+                        if ordered {
+                            min = value;
+                        }
+                        let callback: Option<Change> = change.is_some().then(|| {
+                            Rc::new(move |ctx: &mut Ctx, value| {
+                                ctx.requests
+                                    .push(crate::app::Request::ModChange(owner, change, String::new(), value, i as u32));
+                            }) as Change
+                        });
+                        let (change, release) = if flag(abi::ui_flags::SLIDER_RELEASE) { (None, callback) } else { (callback, None) };
+                        Thumb { value, change, release }
+                    })
+                    .collect();
                 let mut slider = Slider::new(thumbs);
                 slider.enabled = !flag(abi::ui_flags::DISABLED) && !values.is_empty();
                 slider.ordered = ordered;
                 slider.snap = flag(abi::ui_flags::SLIDER_SNAP);
-                if n.count != 0 { slider.steps = n.count; }
+                if n.count != 0 {
+                    slider.steps = n.count;
+                }
                 slider.track = class_or("slider");
                 let fill = n.slider_fill.map(|i| i as usize);
                 slider.fill = fill.iter().all(|&i| i < values.len()).then_some(fill);
                 if n.bind.is_some() && !values.is_empty() {
                     let cb = n.bind;
-                    slider.binding = Some((vec![0.0; values.len()], Box::new(move |ctx, values| {
-                        let mut client = ClientView::bound(ctx);
-                        let mut args = abi::UiSliderBindArgs { client: client.raw(), values: values.as_mut_ptr(), len: values.len() };
-                        host::invoke(owner, cb, &mut args);
-                    })));
+                    slider.binding = Some((
+                        vec![0.0; values.len()],
+                        Box::new(move |ctx, values| {
+                            let mut client = ClientView::bound(ctx);
+                            let mut args = abi::UiSliderBindArgs { client: client.raw(), values: values.as_mut_ptr(), len: values.len() };
+                            host::invoke(owner, cb, &mut args);
+                        }),
+                    ));
                 }
                 b.ui.open(Kind::Slider(slider), style)
             }

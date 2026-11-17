@@ -31,7 +31,16 @@ pub(super) struct Ship {
 
 impl Ship {
     pub fn new(front: u8, rotation: DQuat, spin: DVec3) -> Self {
-        Self { rotation, spin, front, controls: None, geometry: None, mounted_hulls: FxHashMap::default(), floater_axes: BVec3::FALSE, contact_mass: None }
+        Self {
+            rotation,
+            spin,
+            front,
+            controls: None,
+            geometry: None,
+            mounted_hulls: FxHashMap::default(),
+            floater_axes: BVec3::FALSE,
+            contact_mass: None,
+        }
     }
 
     pub(super) fn flooded_cells(&self) -> impl Iterator<Item = IVec3> + '_ {
@@ -143,7 +152,8 @@ struct SolvedSurface {
 
 impl MovingSurface {
     fn center_at(self, time: f64) -> DVec3 {
-        self.solved.map_or_else(|| self.center + self.travel.linear * time, |end| self.center.lerp(end.center, time / TICK))
+        self.solved
+            .map_or_else(|| self.center + self.travel.linear * time, |end| self.center.lerp(end.center, time / TICK))
     }
 
     fn place_at(self, time: f64) -> Transform {
@@ -152,7 +162,11 @@ impl MovingSurface {
         }
         let rotation = self.solved.map_or_else(
             || (DQuat::from_scaled_axis(self.travel.angular * time) * self.place.rotation()).normalize(),
-            |end| self.place.rotation().slerp(end.place.rotation(), time / TICK),
+            |end| {
+                self.place
+                    .rotation()
+                    .slerp(end.place.rotation(), time / TICK)
+            },
         );
         let anchor = self.place.position() + DVec3::Y * 0.5;
         let anchor = self.center_at(time) + (rotation * self.place.rotation().conjugate()) * (anchor - self.center);
@@ -160,14 +174,21 @@ impl MovingSurface {
     }
 
     fn patch_velocity(self, point: DVec3, time: f64) -> DVec3 {
-        let (vel, spin) = self.solved.map_or((self.velocity, self.spin), |s| (s.velocity, s.spin));
+        let (vel, spin) = self
+            .solved
+            .map_or((self.velocity, self.spin), |s| (s.velocity, s.spin));
         vel + spin.cross(point - self.center_at(time))
     }
 
     fn turns(self) -> bool {
         self.solved.map_or_else(
             || self.travel.angular.length_squared() > 1e-8,
-            |s| (s.place.rotation() * self.place.rotation().conjugate()).to_scaled_axis().length_squared() > 1e-10,
+            |s| {
+                (s.place.rotation() * self.place.rotation().conjugate())
+                    .to_scaled_axis()
+                    .length_squared()
+                    > 1e-10
+            },
         )
     }
 }
@@ -187,8 +208,13 @@ impl ContactPeer {
         let Some(surface) = frames.get(&self.id) else { return DVec3::ZERO };
         let velocity = surface.patch_velocity(self.point, self.time);
         let Some(changes) = reactions.get(&surface.root) else { return velocity };
-        let center = frames.get(&surface.root).unwrap_or(surface).center_at(self.time);
-        changes.iter().filter(|(time, _)| *time <= self.time + 1e-7)
+        let center = frames
+            .get(&surface.root)
+            .unwrap_or(surface)
+            .center_at(self.time);
+        changes
+            .iter()
+            .filter(|(time, _)| *time <= self.time + 1e-7)
             .fold(velocity, |v, (_, change)| v + change.linear + change.angular.cross(self.point - center))
     }
 
@@ -203,9 +229,14 @@ impl ContactPeer {
     fn impart(self, frames: &ContactFrames, reactions: &mut Reactions, impulse: DVec3) {
         let Some(root) = frames.get(&self.id).and_then(|s| frames.get(&s.root)) else { return };
         let Some(mass) = root.mass else { return };
-        if impulse == DVec3::ZERO { return; }
+        if impulse == DVec3::ZERO {
+            return;
+        }
         let entries = reactions.entry(root.root).or_default();
-        if entries.last().is_none_or(|(time, _)| (self.time - time).abs() > 1e-7) {
+        if entries
+            .last()
+            .is_none_or(|(time, _)| (self.time - time).abs() > 1e-7)
+        {
             entries.push((self.time, VelocityChange::default()));
         }
         let (_, change) = entries.last_mut().unwrap();
@@ -535,48 +566,64 @@ impl Dim {
         for (&id, space) in &self.bodies {
             let Some(e) = self.entities.get(id) else { continue };
             let Some(ship) = &e.ship else { continue };
-            if e.motion == Motion::Parked { continue; }
+            if e.motion == Motion::Parked {
+                continue;
+            }
             let mass = ship.contact_mass.unwrap_or_else(|| {
                 let hull = Hull::new(c, space);
                 let parts = self.mounted_parts(id, e.body_place(), children);
-                let attached = parts.iter().skip(1).map(|p| (p.id, Hull::new(c, p.space))).collect();
+                let attached = parts
+                    .iter()
+                    .skip(1)
+                    .map(|p| (p.id, Hull::new(c, p.space)))
+                    .collect();
                 ShipMass::of(c, &parts, &hull, &attached)
             });
             masses.insert(id, mass);
         }
-        self.bodies.iter().filter_map(|(&id, space)| {
-            let e = self.entities.get(id)?;
-            if e.motion == Motion::Parked { return None; }
-            let root = self.entities.follows(e);
-            let place = e.body_place();
-            let mass = masses.get(&root.id).copied();
-            let root_center = root.body_place().to_world(mass.map_or(DVec3::splat(0.5), |m| m.center));
-            let (mut center, mut spin) = (root_center, root.ship.as_ref().map_or(DVec3::ZERO, |s| s.spin));
-            let mut velocity = match root.motion {
-                Motion::To { to, left } => (to - root.pos) / (f64::from(left.max(1)) * TICK),
-                _ => root.vel,
-            };
-            let mut travel = VelocityChange { linear: velocity, angular: spin };
-            if e.id != root.id || e.mount.is_some() {
-                if e.id != root.id {
-                    center = place.to_world(DVec3::splat(0.5));
-                    velocity += spin.cross(center - root_center);
-                    travel.linear = velocity;
+        self.bodies
+            .iter()
+            .filter_map(|(&id, space)| {
+                let e = self.entities.get(id)?;
+                if e.motion == Motion::Parked {
+                    return None;
                 }
-                // The joint already moved in advance_mounts. Its velocity drives friction,
-                // but its transform should not be extrapolated for a second tick.
-                if let Some(previous) = before.get(&id) {
-                    velocity += (center - previous.to_world(DVec3::splat(0.5))) / TICK;
-                    spin += (place.rotation() * previous.rotation().conjugate()).to_scaled_axis() / TICK;
+                let root = self.entities.follows(e);
+                let place = e.body_place();
+                let mass = masses.get(&root.id).copied();
+                let root_center = root
+                    .body_place()
+                    .to_world(mass.map_or(DVec3::splat(0.5), |m| m.center));
+                let (mut center, mut spin) = (root_center, root.ship.as_ref().map_or(DVec3::ZERO, |s| s.spin));
+                let mut velocity = match root.motion {
+                    Motion::To { to, left } => (to - root.pos) / (f64::from(left.max(1)) * TICK),
+                    _ => root.vel,
+                };
+                let mut travel = VelocityChange { linear: velocity, angular: spin };
+                if e.id != root.id || e.mount.is_some() {
+                    if e.id != root.id {
+                        center = place.to_world(DVec3::splat(0.5));
+                        velocity += spin.cross(center - root_center);
+                        travel.linear = velocity;
+                    }
+                    // The joint already moved in advance_mounts. Its velocity drives friction,
+                    // but its transform should not be extrapolated for a second tick.
+                    if let Some(previous) = before.get(&id) {
+                        velocity += (center - previous.to_world(DVec3::splat(0.5))) / TICK;
+                        spin += (place.rotation() * previous.rotation().conjugate()).to_scaled_axis() / TICK;
+                    }
                 }
-            }
-            let local_bounds = space.colliders(c).bounds?;
-            let area = place.box_to_world(local_bounds);
-            let far = (area.min - center).abs().max((area.max - center).abs()).length();
-            let padding = DVec3::splat(travel.angular.length() * far * TICK);
-            let swept = Aabb { min: area.min - padding, max: area.max + padding }.swept(travel.linear * TICK);
-            Some((id, MovingSurface { root: root.id, place, local_bounds, swept, center, velocity, spin, travel, mass, solved: None }))
-        }).collect()
+                let local_bounds = space.colliders(c).bounds?;
+                let area = place.box_to_world(local_bounds);
+                let far = (area.min - center)
+                    .abs()
+                    .max((area.max - center).abs())
+                    .length();
+                let padding = DVec3::splat(travel.angular.length() * far * TICK);
+                let swept = Aabb { min: area.min - padding, max: area.max + padding }.swept(travel.linear * TICK);
+                Some((id, MovingSurface { root: root.id, place, local_bounds, swept, center, velocity, spin, travel, mass, solved: None }))
+            })
+            .collect()
     }
 
     pub(super) fn advance_ships(
@@ -620,7 +667,9 @@ impl Dim {
             })
             .collect();
         ships.sort_unstable();
-        if ships.is_empty() { return; }
+        if ships.is_empty() {
+            return;
+        }
         let mut frames = self.contact_frames(c, before, children);
         let mut reactions = Reactions::default();
         let watch_hits = c
@@ -766,7 +815,8 @@ impl Dim {
                     let joint_spin = surface.spin - root.spin;
                     let part_center = if id == part { center } else { place.to_world(DVec3::splat(0.5)) };
                     surface.solved = Some(SolvedSurface {
-                        place, center: part_center,
+                        place,
+                        center: part_center,
                         velocity: vel + spin.cross(part_center - center) + turn * joint_vel,
                         spin: spin + turn * joint_spin,
                     });
@@ -781,7 +831,9 @@ impl Dim {
             }
         }
         for (id, changes) in reactions {
-            if let Some(e) = self.entities.get_mut(id) && let Some(ship) = &mut e.ship {
+            if let Some(e) = self.entities.get_mut(id)
+                && let Some(ship) = &mut e.ship
+            {
                 for (_, change) in changes {
                     e.vel += change.linear;
                     ship.spin += change.angular;
@@ -791,17 +843,40 @@ impl Dim {
     }
 
     fn roll_freewheel(&mut self, c: &Content, child: u64, rolling: &[(u64, f64)], children: &FxHashMap<u64, Vec<u64>>) {
-        if children.contains_key(&child) { return; }
-        let Some(mount) = self.entities.get_mut(child).and_then(|e| e.mount.as_deref_mut()) else { return };
-        let Some(drive) = mount.drive.filter(|d| d.rule.motion == crate::controller::Motion::Freewheel) else {
+        if children.contains_key(&child) {
+            return;
+        }
+        let Some(mount) = self
+            .entities
+            .get_mut(child)
+            .and_then(|e| e.mount.as_deref_mut())
+        else {
+            return;
+        };
+        let Some(drive) = mount
+            .drive
+            .filter(|d| d.rule.motion == crate::controller::Motion::Freewheel)
+        else {
             mount.coast_rate = 0.0;
             return;
         };
         let axis = DIRS[mount.face as usize].as_dvec3();
-        if !self.bodies.get(&child).is_some_and(|space| space.coaxial_tire(c, axis)) { return; }
+        if !self
+            .bodies
+            .get(&child)
+            .is_some_and(|space| space.coaxial_tire(c, axis))
+        {
+            return;
+        }
         let limit = f64::from(drive.rule.speed).to_radians();
-        mount.coast_rate = rolling.iter().find(|(id, _)| *id == child).map_or(mount.coast_rate, |(_, rate)| *rate).clamp(-limit, limit);
-        if mount.coast_rate == 0.0 { return; }
+        mount.coast_rate = rolling
+            .iter()
+            .find(|(id, _)| *id == child)
+            .map_or(mount.coast_rate, |(_, rate)| *rate)
+            .clamp(-limit, limit);
+        if mount.coast_rate == 0.0 {
+            return;
+        }
         mount.angle = (mount.angle + mount.coast_rate * TICK).rem_euclid(std::f64::consts::TAU);
         mount.last_grid = (mount.angle / std::f64::consts::FRAC_PI_2).round() * std::f64::consts::FRAC_PI_2;
         log::trace!(target: "physics", "wheel {child}: angle={:.3} degrees, roll={:.3} degrees/s",
@@ -906,8 +981,12 @@ impl Dim {
 
     fn ship_input(&self, c: &Content, ship: u64) -> (f64, f64) {
         let Some(e) = self.rider_in(ship, 0).and_then(|id| self.entities.get(id)) else { return (0.0, 0.0) };
-        if e.mode != crate::world::GameMode::CREATIVE || !e.alive()
-            || !e.helm_pilot.as_ref().is_some_and(|p| p.mount == ship && p.profile.debug_drive)
+        if e.mode != crate::world::GameMode::CREATIVE
+            || !e.alive()
+            || !e
+                .helm_pilot
+                .as_ref()
+                .is_some_and(|p| p.mount == ship && p.profile.debug_drive)
         {
             return (0.0, 0.0);
         }
@@ -943,7 +1022,10 @@ impl Dim {
     ) -> (DVec3, DVec3, DVec3, DQuat) {
         let ShipStep { old, pos, vel, spin } = step;
         let has_springs = joint_loads.is_some();
-        let grip_radius = parts.iter().map(|part| part.space.colliders(c).grip_radius).fold(0.0, f64::max);
+        let grip_radius = parts
+            .iter()
+            .map(|part| part.space.colliders(c).grip_radius)
+            .fold(0.0, f64::max);
         let has_grip = grip_radius > 0.0;
         let Some(bounds) = parts
             .iter()
@@ -979,7 +1061,8 @@ impl Dim {
                 resting
             });
         }
-        let resting = resting && !has_grip && old.vector_to_world(DVec3::Y).y > 1.0 - 1e-6 && !propulsion.powered && !propulsion.floater_axes.any();
+        let resting =
+            resting && !has_grip && old.vector_to_world(DVec3::Y).y > 1.0 - 1e-6 && !propulsion.powered && !propulsion.floater_axes.any();
         let drive_contact = if grounded { LAND_DRIVE_SHARE } else { contact };
         let forward = old
             .vector_to_world(DIRS[front as usize].as_dvec3())
@@ -992,7 +1075,8 @@ impl Dim {
         let max_speed = if propulsion.powered {
             flight_speed
         } else {
-            water_speed.max(grip_radius * f64::from(crate::controller::MAX_SPEED).to_radians())
+            water_speed
+                .max(grip_radius * f64::from(crate::controller::MAX_SPEED).to_radians())
                 .max(vel.length().min(flight_speed))
                 .max(propulsion.floater_velocity.length())
         };
@@ -1019,12 +1103,13 @@ impl Dim {
         let spin = spin + torque * TICK;
         let spin = if resting { DVec3::Y * spin.y } else { spin };
         let axis = old.vector_to_local(spin.normalize_or_zero());
-        let corners: [DVec3; 8] = std::array::from_fn(|i| DVec3::select(
-            BVec3::new(i & 1 != 0, i & 2 != 0, i & 4 != 0), bounds.max, bounds.min,
-        ));
-        let radius = corners.into_iter()
+        let corners: [DVec3; 8] =
+            std::array::from_fn(|i| DVec3::select(BVec3::new(i & 1 != 0, i & 2 != 0, i & 4 != 0), bounds.max, bounds.min));
+        let radius = corners
+            .into_iter()
             .map(|point| (point - mass.center).cross(axis).length())
-            .fold(1.0, f64::max).min(mass.radius);
+            .fold(1.0, f64::max)
+            .min(mass.radius);
         let max_spin = (turn_travel * 4.0 / (radius * TICK)).min(2.5);
         let spin = (spin * (-TICK * (0.1 + drive_contact * 2.8)).exp()).clamp_length_max(max_spin);
         let at = |center, rotation| center - rotation * (mass.center - DVec3::splat(0.5)) - DVec3::Y * 0.5;
@@ -1033,27 +1118,39 @@ impl Dim {
         let envelope = old.box_to_world(bounds);
         let margin = DVec3::splat((vel.length() * TICK + radius * max_spin * TICK).max(0.5));
         let swept = Aabb { min: envelope.min - margin, max: envelope.max + margin };
-        let mut others: Vec<_> = frames.iter().filter_map(|(&other, surface)| {
-            if surface.root == id || !swept.intersects(&surface.swept)
-                || self.entities.get(other).is_none_or(|e| e.removed || e.motion == Motion::Parked)
-            {
-                return None;
-            }
-            Some((other, *surface, self.bodies.get(&other)?.as_ref()))
-        }).collect();
+        let mut others: Vec<_> = frames
+            .iter()
+            .filter_map(|(&other, surface)| {
+                if surface.root == id
+                    || !swept.intersects(&surface.swept)
+                    || self
+                        .entities
+                        .get(other)
+                        .is_none_or(|e| e.removed || e.motion == Motion::Parked)
+                {
+                    return None;
+                }
+                Some((other, *surface, self.bodies.get(&other)?.as_ref()))
+            })
+            .collect();
         others.sort_unstable_by_key(|entry| entry.0);
 
         let peers = std::cell::RefCell::new(Vec::with_capacity(others.len()));
-        let query = |place, delta, elapsed, duration,
-                     report: &mut dyn FnMut(u64, Option<Cylinder>, u64, BoxContact)| {
+        let query = |place, delta, elapsed, duration, report: &mut dyn FnMut(u64, Option<Cylinder>, u64, BoxContact)| {
             let mut peers = peers.borrow_mut();
             peers.clear();
-            peers.extend(others.iter().filter(|(_, surface, _)| duration == 0.0 || !surface.turns()).map(|&(id, surface, space)| {
-                let place = surface.place_at(elapsed);
-                // Rotational travel is tested at the sampled poses below.
-                let delta = if duration == 0.0 { DVec3::ZERO } else { surface.place_at(elapsed + duration).position() - place.position() };
-                StructurePeer { id, place, bounds: place.box_to_world(surface.local_bounds), space, delta }
-            }));
+            peers.extend(
+                others
+                    .iter()
+                    .filter(|(_, surface, _)| duration == 0.0 || !surface.turns())
+                    .map(|&(id, surface, space)| {
+                        let place = surface.place_at(elapsed);
+                        // Rotational travel is tested at the sampled poses below.
+                        let delta =
+                            if duration == 0.0 { DVec3::ZERO } else { surface.place_at(elapsed + duration).position() - place.position() };
+                        StructurePeer { id, place, bounds: place.box_to_world(surface.local_bounds), space, delta }
+                    }),
+            );
             visit_structure_shapes(c, &world, parts, &peers, place, delta, |part, shape, relative, delta, peer| {
                 if trace {
                     probes.set(probes.get() + 1);
@@ -1090,7 +1187,10 @@ impl Dim {
                 }
                 let point = ImpactPoint::new(other, part, Some(wheel), hit);
                 let previous = contacts.iter_mut().find(|(old, _)| old.same_patch(&point));
-                if previous.as_ref().is_some_and(|entry| hit.fraction >= entry.0.hit.fraction) {
+                if previous
+                    .as_ref()
+                    .is_some_and(|entry| hit.fraction >= entry.0.hit.fraction)
+                {
                     return;
                 }
                 let peer = ContactPeer { id: other, point: hit.point, time };
@@ -1122,14 +1222,21 @@ impl Dim {
                 }
             }
             if let Some(loads) = &mut joint_loads {
-                loads.extend(supports.iter().filter(|(p, s)| p.part != id && s.load > 0.0)
-                    .map(|(p, s)| (p.part, s.normal * s.load + s.friction)));
+                loads.extend(
+                    supports
+                        .iter()
+                        .filter(|(p, s)| p.part != id && s.load > 0.0)
+                        .map(|(p, s)| (p.part, s.normal * s.load + s.friction)),
+                );
             }
         }
         let mut elapsed = 0.0_f64;
         let mut impacts = 0;
         while elapsed < TICK - 1e-6 && impacts < 8 {
-            while incoming.peek().is_some_and(|(time, _)| *time <= elapsed + 1e-7) {
+            while incoming
+                .peek()
+                .is_some_and(|(time, _)| *time <= elapsed + 1e-7)
+            {
                 let (_, change) = incoming.next().unwrap();
                 vel += change.linear;
                 spin += change.angular;
@@ -1155,7 +1262,9 @@ impl Dim {
             for (_, surface, _) in others.iter().filter(|(_, surface, _)| surface.turns()) {
                 let from = surface.place_at(elapsed);
                 let to = surface.place_at(end);
-                let peer_angle = (to.rotation() * from.rotation().conjugate()).to_scaled_axis().length();
+                let peer_angle = (to.rotation() * from.rotation().conjugate())
+                    .to_scaled_axis()
+                    .length();
                 let arm = surface.local_bounds.max - surface.local_bounds.min;
                 let relative = delta - (to.position() - from.position());
                 sample_distance = sample_distance.max(radius * angle.length() + relative.length() + peer_angle * arm.length());
@@ -1182,7 +1291,9 @@ impl Dim {
                     hits
                 };
                 let mut free = 0.0;
-                let samples = (2.0 * sample_distance * fraction / turn_travel).ceil().clamp(2.0, 24.0) as u32;
+                let samples = (2.0 * sample_distance * fraction / turn_travel)
+                    .ceil()
+                    .clamp(2.0, 24.0) as u32;
                 for sample in 1..=samples {
                     let t = fraction * f64::from(sample) / f64::from(samples);
                     let mut hits = angular_contacts(t);
@@ -1215,12 +1326,18 @@ impl Dim {
                 continue;
             }
             impacts += 1;
-            let mut manifold: Vec<_> = contact.points.iter().map(|point| {
-                let hit = point.hit;
-                let peer = ContactPeer { id: point.other, point: hit.point, time: started_at + time * witness };
-                let tire = point.wheel.map(|wheel| tire_at(point.part, wheel, peer, rotation, hit));
-                ContactConstraint::new(hit.point - moved, hit.normal, 1e-4, peer, tire)
-            }).collect();
+            let mut manifold: Vec<_> = contact
+                .points
+                .iter()
+                .map(|point| {
+                    let hit = point.hit;
+                    let peer = ContactPeer { id: point.other, point: hit.point, time: started_at + time * witness };
+                    let tire = point
+                        .wheel
+                        .map(|wheel| tire_at(point.part, wheel, peer, rotation, hit));
+                    ContactConstraint::new(hit.point - moved, hit.normal, 1e-4, peer, tire)
+                })
+                .collect();
             // Re-solve the floor and the obstacle together. A wheel hitting a wall can
             // drive the other wheels into the floor through the chassis.
             let pose = Transform::rotated(at(moved, rotation), rotation);
@@ -1238,8 +1355,12 @@ impl Dim {
                 }
             }
             if let Some(loads) = &mut joint_loads {
-                loads.extend(support.iter().filter(|(p, s)| p.part != id && s.load > 0.0)
-                    .map(|(p, s)| (p.part, s.normal * s.load + s.friction)));
+                loads.extend(
+                    support
+                        .iter()
+                        .filter(|(p, s)| p.part != id && s.load > 0.0)
+                        .map(|(p, s)| (p.part, s.normal * s.load + s.friction)),
+                );
             }
             let mut correction = DVec3::ZERO;
             for ((point, constraint), speed) in contact.points.into_iter().zip(manifold).zip(speeds) {
@@ -1249,10 +1370,16 @@ impl Dim {
                     log::trace!(target: "physics", "ship {id} contact: part={part} other={other} tread={} fraction={fraction:.5} depth={:.5} normal={:?} point={:?} remaining={time:.5} impulse={impulse:.5}",
                         wheel.is_some(), hit.depth, hit.normal, hit.point);
                 }
-                if impulse > 0.0 && let Some(collisions) = collisions.as_mut() {
+                if impulse > 0.0
+                    && let Some(collisions) = collisions.as_mut()
+                {
                     let event = abi::ShipCollision {
-                        ship: id, other, point: hit.point.to_array().into(), normal: hit.normal.to_array().into(),
-                        speed: speed.max(0.0), impulse,
+                        ship: id,
+                        other,
+                        point: hit.point.to_array().into(),
+                        normal: hit.normal.to_array().into(),
+                        speed: speed.max(0.0),
+                        impulse,
                     };
                     if let Some(last) = collisions.iter_mut().find(|e| e.other == other) {
                         if impulse > last.impulse {
@@ -1262,7 +1389,10 @@ impl Dim {
                         collisions.push(event);
                     }
                 }
-                if impulse > 0.0 && part != id && let Some(loads) = &mut joint_loads {
+                if impulse > 0.0
+                    && part != id
+                    && let Some(loads) = &mut joint_loads
+                {
                     loads.push((part, hit.normal * impulse + constraint.friction));
                 }
                 // Coplanar contacts share a correction. A row of voxels must not amplify it.
@@ -1282,7 +1412,10 @@ impl Dim {
                 && let Some(coast) = tire.coast
                 && !rolling.iter().any(|&(id, _)| id == point.part)
             {
-                let rate = support.patch_velocity(vel, spin, frames, reactions).dot(tire.roll) * coast;
+                let rate = support
+                    .patch_velocity(vel, spin, frames, reactions)
+                    .dot(tire.roll)
+                    * coast;
                 rolling.push((point.part, rate));
             }
         }
@@ -1310,29 +1443,48 @@ struct TireFriction {
 
 impl TireFriction {
     fn at(
-        c: &Content, entities: &Entities, world: &impl Cells, bodies: &FxHashMap<u64, Box<Space>>,
-        parts: &[MountedPart<'_>], before: &FxHashMap<u64, Transform>, part: u64, wheel: Cylinder,
-        old: Transform, rotation: DQuat, peer: ContactPeer, frames: &ContactFrames, hit: BoxContact,
+        c: &Content,
+        entities: &Entities,
+        world: &impl Cells,
+        bodies: &FxHashMap<u64, Box<Space>>,
+        parts: &[MountedPart<'_>],
+        before: &FxHashMap<u64, Transform>,
+        part: u64,
+        wheel: Cylinder,
+        old: Transform,
+        rotation: DQuat,
+        peer: ContactPeer,
+        frames: &ContactFrames,
+        hit: BoxContact,
     ) -> Self {
         let rel = parts.iter().find(|p| p.id == part).unwrap().relative;
         let axle = rotation * rel.vector_to_world(wheel.axis);
         let across = axle - hit.normal * axle.dot(hit.normal);
         let side = across.normalize_or_zero();
         let roll = side.cross(hit.normal);
-        let coast = entities.get(part).and_then(|e| e.mount.as_deref()).and_then(|mount| {
-            let drive = mount.drive?;
-            (drive.rule.motion == crate::controller::Motion::Freewheel)
-                .then(|| wheel.axis.dot(DIRS[mount.face as usize].as_dvec3()) / wheel.radius)
-        });
-        let tread_speed = if coast.is_some() { 0.0 } else { before.get(&part).map_or(0.0, |prev| {
-            let current = rel.in_frame(old);
-            let change = (current.rotation() * prev.rotation().conjugate()).to_scaled_axis();
-            change.dot(current.vector_to_world(wheel.axis)) * wheel.radius / TICK
-        }) };
+        let coast = entities
+            .get(part)
+            .and_then(|e| e.mount.as_deref())
+            .and_then(|mount| {
+                let drive = mount.drive?;
+                (drive.rule.motion == crate::controller::Motion::Freewheel)
+                    .then(|| wheel.axis.dot(DIRS[mount.face as usize].as_dvec3()) / wheel.radius)
+            });
+        let tread_speed = if coast.is_some() {
+            0.0
+        } else {
+            before.get(&part).map_or(0.0, |prev| {
+                let current = rel.in_frame(old);
+                let change = (current.rotation() * prev.rotation().conjugate()).to_scaled_axis();
+                change.dot(current.vector_to_world(wheel.axis)) * wheel.radius / TICK
+            })
+        };
         let inside = hit.point - hit.normal * 0.002;
         let ground = if let Some(surface) = frames.get(&peer.id) {
             let at = surface.place_at(peer.time).to_local(inside);
-            bodies.get(&peer.id).and_then(|space| DeckCells(space).main(at.floor().as_ivec3()))
+            bodies
+                .get(&peer.id)
+                .and_then(|space| DeckCells(space).main(at.floor().as_ivec3()))
         } else {
             world.main(inside.floor().as_ivec3())
         };
@@ -1373,14 +1525,22 @@ impl ContactConstraint {
         vel + spin.cross(self.arm) - self.peer.velocity(frames, reactions)
     }
 
-    fn solve(&mut self, mass: &ShipMass, rotation: DQuat, vel: &mut DVec3, spin: &mut DVec3,
-             frames: &ContactFrames, reactions: &mut Reactions) {
+    fn solve(
+        &mut self,
+        mass: &ShipMass,
+        rotation: DQuat,
+        vel: &mut DVec3,
+        spin: &mut DVec3,
+        frames: &ContactFrames,
+        reactions: &mut Reactions,
+    ) {
         let response = |dir| {
             let torque = self.arm.cross(dir);
-            (mass.weight.recip() + torque.dot(angular_response(mass, rotation, torque))
-                + self.peer.inverse_mass(frames, dir)).recip()
+            (mass.weight.recip() + torque.dot(angular_response(mass, rotation, torque)) + self.peer.inverse_mass(frames, dir)).recip()
         };
-        let patch_speed = self.patch_velocity(*vel, *spin, frames, reactions).dot(self.normal);
+        let patch_speed = self
+            .patch_velocity(*vel, *spin, frames, reactions)
+            .dot(self.normal);
         let loaded = (self.load + (self.min_speed - patch_speed) * response(self.normal)).max(0.0);
         let normal = self.normal * (loaded - self.load);
         self.load = loaded;

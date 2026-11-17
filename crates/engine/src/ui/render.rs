@@ -1322,11 +1322,17 @@ impl UiRenderer {
                 if let Some([a, b]) = s.fill {
                     let a = knob_x(s.thumbs[a].value) + width / 2.0;
                     let b = knob_x(s.thumbs[b].value) + width / 2.0;
-                    self.rect(Rect { x: a.min(b), y: r.y + r.h / 2.0 - scale, w: (b - a).abs(), h: 2.0 * scale }, look.text("slider_fill", ""));
+                    self.rect(
+                        Rect { x: a.min(b), y: r.y + r.h / 2.0 - scale, w: (b - a).abs(), h: 2.0 * scale },
+                        look.text("slider_fill", ""),
+                    );
                 }
                 if s.enabled {
                     let custom_knob = (s.track != "slider").then(|| format!("{}_knob", s.track));
-                    let knob = custom_knob.as_deref().filter(|class| look.texture(class, "").is_some()).unwrap_or("slider_knob");
+                    let knob = custom_knob
+                        .as_deref()
+                        .filter(|class| look.texture(class, "").is_some())
+                        .unwrap_or("slider_knob");
                     let active = ui.focused == Some(id) || ui.pressed == Some(id);
                     let draw = |me: &mut UiRenderer, index, t: &super::slider::Thumb| {
                         let k = Rect { x: knob_x(t.value), y: r.y, w: width, h: r.h };
@@ -1334,8 +1340,12 @@ impl UiRenderer {
                         me.class_background(gpu, assets, look, knob, highlight, k, scale);
                     };
                     let mut draw = draw;
-                    for (i, thumb) in s.thumbs.iter().enumerate().filter(|(i, _)| *i != s.active) { draw(self, i, thumb); }
-                    if let Some(thumb) = s.thumbs.get(s.active) { draw(self, s.active, thumb); }
+                    for (i, thumb) in s.thumbs.iter().enumerate().filter(|(i, _)| *i != s.active) {
+                        draw(self, i, thumb);
+                    }
+                    if let Some(thumb) = s.thumbs.get(s.active) {
+                        draw(self, s.active, thumb);
+                    }
                 }
             }
             Kind::Input { value, caret, area: Some(area), .. } => {

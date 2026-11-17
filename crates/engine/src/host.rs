@@ -620,7 +620,11 @@ unsafe extern "C" fn assembly_select(w: *mut abi::WorldCtx, player: u64, cell: *
     unsafe { dim(w).assembly_select(content(), player, cell.as_ref().map(|p| IVec3::from_array(p.to_array())), flags) }
 }
 
-unsafe extern "C" fn controller_bindings(w: *mut abi::WorldCtx, at: *const abi::BlockPos, bindings: abi::Slice<abi::ControllerBinding>) -> u8 {
+unsafe extern "C" fn controller_bindings(
+    w: *mut abi::WorldCtx,
+    at: *const abi::BlockPos,
+    bindings: abi::Slice<abi::ControllerBinding>,
+) -> u8 {
     unsafe { dim(w).set_controller_bindings(content(), ip(at), bindings.as_slice()) as u8 }
 }
 
@@ -628,7 +632,12 @@ unsafe extern "C" fn rotor_program(w: *mut abi::WorldCtx, at: *const abi::BlockP
     unsafe { dim(w).set_rotor_program(content(), ip(at), rules.as_slice(), hold != 0) as u8 }
 }
 
-unsafe extern "C" fn assembly_bounds(w: *mut abi::WorldCtx, at: *const abi::BlockPos, min: *const abi::BlockPos, max: *const abi::BlockPos) -> u8 {
+unsafe extern "C" fn assembly_bounds(
+    w: *mut abi::WorldCtx,
+    at: *const abi::BlockPos,
+    min: *const abi::BlockPos,
+    max: *const abi::BlockPos,
+) -> u8 {
     unsafe { dim(w).set_assembly_bounds(content(), ip(at), ip(min), ip(max)) as u8 }
 }
 

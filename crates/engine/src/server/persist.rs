@@ -288,8 +288,19 @@ fn read_one(c: &Content, r: &mut R, now: u64) -> Option<Option<Saved>> {
         let stop = r.f64()?;
         let drive = if attachment & MOUNT_DRIVE != 0 { Some(crate::controller::Drive::get(r)?) } else { None };
         let slide = if attachment & MOUNT_SLIDE != 0 { Some(crate::controller::Slide::get(r)?) } else { None };
-        (face < 6 && angle.is_finite() && last_grid.is_finite() && stop.is_finite())
-            .then(|| Box::new(BodyMount { block, face, speed, angle, last_grid, stop: (stop != -1.0).then_some(stop), drive, slide, coast_rate: 0.0 }))
+        (face < 6 && angle.is_finite() && last_grid.is_finite() && stop.is_finite()).then(|| {
+            Box::new(BodyMount {
+                block,
+                face,
+                speed,
+                angle,
+                last_grid,
+                stop: (stop != -1.0).then_some(stop),
+                drive,
+                slide,
+                coast_rate: 0.0,
+            })
+        })
     } else {
         None
     };

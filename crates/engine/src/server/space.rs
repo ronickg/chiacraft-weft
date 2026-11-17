@@ -251,7 +251,9 @@ impl Space {
                         continue;
                     }
                     for shape in block_solids(p, info) {
-                        if let Solid::Cylinder(wheel) = shape && wheel.grip > 0.0 {
+                        if let Solid::Cylinder(wheel) = shape
+                            && wheel.grip > 0.0
+                        {
                             grip_radius = grip_radius.max(wheel.radius);
                         }
                         let bounds = shape.bounds();

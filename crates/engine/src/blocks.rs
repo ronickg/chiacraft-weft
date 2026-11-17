@@ -701,17 +701,25 @@ fn bake_state(
             .collect()
     };
     let (mut hitbox, outline) = (sixteenths(b::HITBOX), sixteenths(b::OUTLINE));
-    let cylinder = s.get::<[f32; 3]>(b::CYLINDER).and_then(|[radius, half, grip]| {
-        if !(0.0 < radius && radius <= 1.5 && 0.0 < half && half <= 0.5 && (0.0..=4.0).contains(&grip)) {
-            errors.push(format!("{name}: invalid cylinder radius, half length or grip"));
-            return None;
-        }
-        let axis = glam::DVec3::from_array(turn.vector([0, 0, 1]).map(f64::from));
-        let shape = crate::physics::Cylinder { center: glam::DVec3::splat(0.5), axis, radius: f64::from(radius), half: f64::from(half), grip: f64::from(grip) };
-        let b = shape.bounds();
-        hitbox = vec![[b.min.x as f32, b.min.y as f32, b.min.z as f32, b.max.x as f32, b.max.y as f32, b.max.z as f32]];
-        (flags & bf::SOLID != 0).then_some(shape)
-    });
+    let cylinder = s
+        .get::<[f32; 3]>(b::CYLINDER)
+        .and_then(|[radius, half, grip]| {
+            if !(0.0 < radius && radius <= 1.5 && 0.0 < half && half <= 0.5 && (0.0..=4.0).contains(&grip)) {
+                errors.push(format!("{name}: invalid cylinder radius, half length or grip"));
+                return None;
+            }
+            let axis = glam::DVec3::from_array(turn.vector([0, 0, 1]).map(f64::from));
+            let shape = crate::physics::Cylinder {
+                center: glam::DVec3::splat(0.5),
+                axis,
+                radius: f64::from(radius),
+                half: f64::from(half),
+                grip: f64::from(grip),
+            };
+            let b = shape.bounds();
+            hitbox = vec![[b.min.x as f32, b.min.y as f32, b.min.z as f32, b.max.x as f32, b.max.y as f32, b.max.z as f32]];
+            (flags & bf::SOLID != 0).then_some(shape)
+        });
     let rules = s.or::<Vec<abi::BlockRule>>(b::RULES, Vec::new());
     let pieces = s
         .or::<Vec<abi::Piece>>(b::PIECES, Vec::new())

@@ -1343,7 +1343,8 @@ impl Client {
                 }
             }
         }
-        let step = self.pressed_without_helm(input, "core:hotbar_next") as i32 - self.pressed_without_helm(input, "core:hotbar_prev") as i32;
+        let step =
+            self.pressed_without_helm(input, "core:hotbar_next") as i32 - self.pressed_without_helm(input, "core:hotbar_prev") as i32;
         if input.captured && step != 0 {
             self.selected = (self.selected as i32 + step).rem_euclid(content().game.player_layout.hotbar.max(1) as i32) as usize;
         }

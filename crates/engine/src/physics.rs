@@ -125,11 +125,17 @@ pub enum Solid {
 
 impl Solid {
     pub fn bounds(self) -> Aabb {
-        match self { Self::Box(bounds) => bounds, Self::Cylinder(cylinder) => cylinder.bounds() }
+        match self {
+            Self::Box(bounds) => bounds,
+            Self::Cylinder(cylinder) => cylinder.bounds(),
+        }
     }
 
     pub fn world_bounds(self, place: Transform) -> Aabb {
-        match self { Self::Box(bounds) => place.box_to_world(bounds), Self::Cylinder(cylinder) => cylinder.placed(place).bounds() }
+        match self {
+            Self::Box(bounds) => place.box_to_world(bounds),
+            Self::Cylinder(cylinder) => cylinder.placed(place).bounds(),
+        }
     }
 
     pub fn volume(self) -> f64 {
@@ -142,12 +148,20 @@ impl Solid {
 
 pub fn block_solids(p: IVec3, state: &crate::content::StateInfo) -> impl Iterator<Item = Solid> + '_ {
     let offset = p.as_dvec3();
-    state.cylinder.map(|s| Solid::Cylinder(Cylinder { center: s.center + offset, ..s })).into_iter().chain(
-        state.collision.iter().filter(move |_| state.cylinder.is_none()).map(move |b| {
-            let b = b.map(f64::from);
-            Solid::Box(Aabb { min: offset + DVec3::new(b[0], b[1], b[2]), max: offset + DVec3::new(b[3], b[4], b[5]) })
-        }),
-    )
+    state
+        .cylinder
+        .map(|s| Solid::Cylinder(Cylinder { center: s.center + offset, ..s }))
+        .into_iter()
+        .chain(
+            state
+                .collision
+                .iter()
+                .filter(move |_| state.cylinder.is_none())
+                .map(move |b| {
+                    let b = b.map(f64::from);
+                    Solid::Box(Aabb { min: offset + DVec3::new(b[0], b[1], b[2]), max: offset + DVec3::new(b[3], b[4], b[5]) })
+                }),
+        )
 }
 
 mod convex;
@@ -333,11 +347,15 @@ pub fn rotated_collides(c: &Content, block: &impl Cells, local: Solid, place: Tr
     let area = local.world_bounds(place);
     let mut rotated = None;
     each_shape(c, block, area, |world, _| {
-        if !world.bounds().intersects(&area) { return false; }
+        if !world.bounds().intersects(&area) {
+            return false;
+        }
         match (local, world) {
             (Solid::Box(_), Solid::Box(_)) if place.rotation() == DQuat::IDENTITY => true,
-            (Solid::Box(local), Solid::Box(world)) => rotated.get_or_insert_with(|| RotatedBox::new(local, place))
-                .overlap_interval(world, DVec3::ZERO).is_some(),
+            (Solid::Box(local), Solid::Box(world)) => rotated
+                .get_or_insert_with(|| RotatedBox::new(local, place))
+                .overlap_interval(world, DVec3::ZERO)
+                .is_some(),
             _ => convex_contact(local, place, world, DVec3::ZERO).is_some(),
         }
     })
@@ -357,7 +375,9 @@ pub fn rotated_contacts(c: &Content, block: &impl Cells, local: Solid, place: Tr
     let mut rotated = None;
     each_merged_shape(c, block, area, |target| {
         let (Solid::Box(local), Solid::Box(world)) = (local, target) else {
-            if let Some(hit) = convex_contact(local, place, target, delta) { report(hit); }
+            if let Some(hit) = convex_contact(local, place, target, delta) {
+                report(hit);
+            }
             return;
         };
         let shape = rotated.get_or_insert_with(|| RotatedBox::new(local, place));
@@ -571,13 +591,17 @@ impl<'a> Body<'a> {
         }
         match self.blocks {
             None => f(self.aabb),
-            Some((blocks, place)) => each_shape(c, &BodyCells(blocks), place.box_to_local(area), |solid, _| {
-                match solid {
-                    Solid::Box(b) if place.rotation() != DQuat::IDENTITY
-                        && RotatedBox::new(b, place).overlap_interval(area, DVec3::ZERO).is_none() => false,
-                    Solid::Cylinder(_) if convex_contact(solid, place, Solid::Box(area), DVec3::ZERO).is_none() => false,
-                    _ => f(solid.world_bounds(place)),
+            Some((blocks, place)) => each_shape(c, &BodyCells(blocks), place.box_to_local(area), |solid, _| match solid {
+                Solid::Box(b)
+                    if place.rotation() != DQuat::IDENTITY
+                        && RotatedBox::new(b, place)
+                            .overlap_interval(area, DVec3::ZERO)
+                            .is_none() =>
+                {
+                    false
                 }
+                Solid::Cylinder(_) if convex_contact(solid, place, Solid::Box(area), DVec3::ZERO).is_none() => false,
+                _ => f(solid.world_bounds(place)),
             }),
         }
     }
@@ -613,13 +637,21 @@ impl<'a> Body<'a> {
                     match solid {
                         Solid::Box(b) if place.rotation() != DQuat::IDENTITY => {
                             let Some(hit) = RotatedBox::new(b, place).project::<true>(probe, -DVec3::Y) else { return false };
-                            if -hit.entry_normal.y < WALKABLE_Y { return false; }
+                            if -hit.entry_normal.y < WALKABLE_Y {
+                                return false;
+                            }
                             world.max.y = probe.min.y - hit.enter;
                         }
                         Solid::Cylinder(cylinder) => {
                             let delta = DVec3::NEG_Y * (area.max.y - area.min.y + 1e-3);
-                            let Some(hit) = convex_contact(Solid::Box(probe), Transform::default(), Solid::Cylinder(cylinder.placed(place)), delta) else { return false };
-                            if hit.normal.y < WALKABLE_Y { return false; }
+                            let Some(hit) =
+                                convex_contact(Solid::Box(probe), Transform::default(), Solid::Cylinder(cylinder.placed(place)), delta)
+                            else {
+                                return false;
+                            };
+                            if hit.normal.y < WALKABLE_Y {
+                                return false;
+                            }
                             world.max.y = probe.min.y + delta.y * hit.fraction;
                         }
                         _ => {}
@@ -948,7 +980,9 @@ fn each_shape(c: &Content, block: &impl Cells, area: Aabb, mut f: impl FnMut(Sol
                 let Some((at, s, extras)) = block_of_cell(c, block, p, s, extras) else { continue };
                 for s in std::iter::once(s).chain(extras.iter().copied()) {
                     if c.states[s as usize].cylinder.is_some() {
-                        if cylinders.contains(&(at, s)) { continue; }
+                        if cylinders.contains(&(at, s)) {
+                            continue;
+                        }
                         cylinders.push((at, s));
                     }
                     for shape in block_solids(at, &c.states[s as usize]) {
@@ -1136,15 +1170,17 @@ fn move_box_excluding(
     };
     let mut solids = SOLIDS.with_borrow_mut(std::mem::take);
     solids.clear();
-    let collect = |bounds: Aabb, wide: bool, solids: &mut Vec<Aabb>, body_shapes: &mut Vec<Collider>| each_shape(c, block, bounds, |solid, _| {
-        let b = solid.bounds();
-        match solid {
-            Solid::Box(_) if !wide || b.intersects(&bounds) => solids.push(b),
-            Solid::Cylinder(_) if b.intersects(&bounds) => body_shapes.push(Collider::new(solid, Transform::default())),
-            _ => {}
-        }
-        false
-    });
+    let collect = |bounds: Aabb, wide: bool, solids: &mut Vec<Aabb>, body_shapes: &mut Vec<Collider>| {
+        each_shape(c, block, bounds, |solid, _| {
+            let b = solid.bounds();
+            match solid {
+                Solid::Box(_) if !wide || b.intersects(&bounds) => solids.push(b),
+                Solid::Cylinder(_) if b.intersects(&bounds) => body_shapes.push(Collider::new(solid, Transform::default())),
+                _ => {}
+            }
+            false
+        })
+    };
     collect(bounds, has_structure, &mut solids, &mut body_shapes);
     if !has_structure && !body_shapes.is_empty() {
         bounds = area;
@@ -1341,7 +1377,8 @@ pub fn raycast(c: &Content, block: &impl Cells, origin: DVec3, dir: DVec3, max: 
                 if s.flags & bf::NOT_TARGETABLE != 0 && !wanted && !solid {
                     continue;
                 }
-                let stuck = s.cylinder.is_none() && t == 0.0
+                let stuck = s.cylinder.is_none()
+                    && t == 0.0
                     && s.collision
                         .iter()
                         .any(|b| (0..3).all(|i| (b[i] as f64..b[i + 3] as f64).contains(&local[i])));

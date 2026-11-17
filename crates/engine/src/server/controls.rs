@@ -55,8 +55,12 @@ impl Dim {
             .controller_settings(c, controller)
             .unwrap_or(default)
             .to_bytes();
-        let face = c.states[state as usize].turn.inverse().face(usize::from(face).min(5)) as u8;
-        self.events.push(DimEvent::Controller { player, controller, face, data });
+        let face = c.states[state as usize]
+            .turn
+            .inverse()
+            .face(usize::from(face).min(5)) as u8;
+        self.events
+            .push(DimEvent::Controller { player, controller, face, data });
         true
     }
 
@@ -71,13 +75,22 @@ impl Dim {
         profile.output.fill(None);
         for bind in bindings {
             let face = usize::from(bind.face);
-            if face >= 6 || usize::from(bind.level) >= controller::LEVELS { return false; }
+            if face >= 6 || usize::from(bind.level) >= controller::LEVELS {
+                return false;
+            }
             let Some(key) = crate::input::Key::parse(unsafe { bind.key.as_str() }) else { return false };
             let start = face * controller::BINDS_PER_FACE;
-            let Some(slot) = profile.output[start..start + controller::BINDS_PER_FACE].iter_mut().find(|slot| slot.is_none()) else { return false };
+            let Some(slot) = profile.output[start..start + controller::BINDS_PER_FACE]
+                .iter_mut()
+                .find(|slot| slot.is_none())
+            else {
+                return false;
+            };
             *slot = Some(Bind { key, level: bind.level });
         }
-        if !self.write_controller(c, at, id, state, Settings::Helm(profile)) { return false; }
+        if !self.write_controller(c, at, id, state, Settings::Helm(profile)) {
+            return false;
+        }
         if let Some(player) = self.rider_in(self.frame, 0) {
             self.refresh_helm(c, self.frame, player);
         }
@@ -92,14 +105,23 @@ impl Dim {
         for r in rules {
             let Some(&motion) = Motion::ALL.get(r.motion as usize) else { return false };
             let rule = Rule { min: r.min, max: r.max, motion, degrees: r.degrees, speed: r.speed };
-            if !rule.valid() || rotor.rules.iter().any(|r| r.min <= rule.max && rule.min <= r.max) { return false; }
+            if !rule.valid()
+                || rotor
+                    .rules
+                    .iter()
+                    .any(|r| r.min <= rule.max && rule.min <= r.max)
+            {
+                return false;
+            }
             rotor.rules.push(rule);
         }
         self.write_controller(c, at, id, state, Settings::Rotor(rotor))
     }
 
     fn write_controller(&mut self, c: &'static Content, at: IVec3, id: u64, state: u32, settings: Settings) -> bool {
-        if !c.dims[self.id as usize].editable { return false; }
+        if !c.dims[self.id as usize].editable {
+            return false;
+        }
         if let Settings::Rotor(rotor) = &settings {
             let mode = if rotor.hold { "hold" } else { "disassemble" };
             if let Some(state) = c.state_with(state, "mode", mode) {
@@ -107,7 +129,9 @@ impl Dim {
             }
             self.space.signals.recheck_device(at);
         }
-        self.entities.comps.insert((id, c.game.fields.controller), settings.to_bytes().into_boxed_slice());
+        self.entities
+            .comps
+            .insert((id, c.game.fields.controller), settings.to_bytes().into_boxed_slice());
         true
     }
 
@@ -124,7 +148,9 @@ impl Dim {
             return;
         };
         let Some(e) = self.entities.get(player) else { return };
-        if e.mode != GameMode::CREATIVE && let Settings::Helm(profile) = &mut settings {
+        if e.mode != GameMode::CREATIVE
+            && let Settings::Helm(profile) = &mut settings
+        {
             profile.debug_drive = matches!(self.controller_settings(c, controller), Some(Settings::Helm(previous)) if previous.debug_drive);
         }
         let eye = e.pos + DVec3::Y * e.eye(c);

@@ -1,10 +1,15 @@
 use glam::{DQuat, DVec3};
-use parry3d_f64::{math::{Pose, Rotation, Vector}, query, shape::{Cuboid, Cylinder, Shape}};
+use parry3d_f64::{
+    math::{Pose, Rotation, Vector},
+    query,
+    shape::{Cuboid, Cylinder, Shape},
+};
 
 use super::{BoxContact, Solid, Transform};
 
 fn geometry(solid: Solid, place: Transform) -> (Pose, Geometry) {
-    let pose = |center: DVec3, rotation: DQuat| Pose::from_parts(Vector::from_array(center.to_array()), Rotation::from_array(rotation.to_array()));
+    let pose =
+        |center: DVec3, rotation: DQuat| Pose::from_parts(Vector::from_array(center.to_array()), Rotation::from_array(rotation.to_array()));
     match solid {
         Solid::Box(b) => {
             let center = place.to_world((b.min + b.max) * 0.5);
@@ -36,7 +41,10 @@ pub(super) fn cylinder_ray(c: super::Cylinder, from: DVec3, direction: DVec3, ma
 
 impl Geometry {
     fn shape(&self) -> &dyn Shape {
-        match self { Self::Box(shape) => shape, Self::Cylinder(shape) => shape }
+        match self {
+            Self::Box(shape) => shape,
+            Self::Cylinder(shape) => shape,
+        }
     }
 }
 
@@ -55,13 +63,18 @@ pub(super) fn convex_contact(moving: Solid, place: Transform, target: Solid, del
         let hit = initial().filter(|hit| hit.dist < -1e-7)?;
         (0.0, engine(hit.normal2), engine(origin + (hit.point1 + hit.point2) * 0.5), -hit.dist)
     } else {
-        let options = query::ShapeCastOptions { max_time_of_impact: 1.0, compute_impact_geometry_on_penetration: true, ..Default::default() };
+        let options =
+            query::ShapeCastOptions { max_time_of_impact: 1.0, compute_impact_geometry_on_penetration: true, ..Default::default() };
         let velocity = Vector::from_array(delta.to_array());
-        let hit = query::cast_shapes(&a, velocity, shape_a, &b, Vector::ZERO, shape_b, options).ok().flatten()?;
+        let hit = query::cast_shapes(&a, velocity, shape_a, &b, Vector::ZERO, shape_b, options)
+            .ok()
+            .flatten()?;
         let fraction = hit.time_of_impact;
         let normal = engine(b.rotation * hit.normal2);
         let depth = if fraction < 1e-7 { initial().map_or(0.0, |hit| (-hit.dist).max(0.0)) } else { 0.0 };
-        if depth <= 1e-7 && delta.dot(normal) >= -1e-7 { return None; }
+        if depth <= 1e-7 && delta.dot(normal) >= -1e-7 {
+            return None;
+        }
         let point = (a * hit.witness1 + velocity * fraction + b * hit.witness2) * 0.5;
         (fraction, normal, engine(origin + point), depth)
     };

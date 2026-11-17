@@ -1355,7 +1355,9 @@ impl Running {
         let Some((_, ui)) = self.screens.last_mut() else { return UiCallbacks::default() };
         if self.input.pressed_button(0) {
             ui.pressed = hovered;
-            ui.focused = hovered.filter(|&h| matches!(ui.nodes[h].kind, Kind::Input { .. } | Kind::Slider(crate::ui::slider::Slider { enabled: true, .. })));
+            ui.focused = hovered.filter(|&h| {
+                matches!(ui.nodes[h].kind, Kind::Input { .. } | Kind::Slider(crate::ui::slider::Slider { enabled: true, .. }))
+            });
             if let Some(h) = hovered {
                 let r = ui.nodes[h].rect;
                 if let Kind::Slider(s) = &mut ui.nodes[h].kind {
@@ -1421,7 +1423,10 @@ impl Running {
                 }
             }
         } else if let Some(p) = ui.pressed.take() {
-            if let Kind::Slider(s) = &ui.nodes[p].kind && s.enabled && let Some(t) = s.thumbs.get(s.active) {
+            if let Kind::Slider(s) = &ui.nodes[p].kind
+                && s.enabled
+                && let Some(t) = s.thumbs.get(s.active)
+            {
                 slider.extend(t.release.clone().map(|f| (f, t.value)));
             }
             if Some(p) == hovered {
@@ -1464,7 +1469,10 @@ impl Running {
                         text_changed = Some((cb.clone(), value.clone()));
                     }
                 }
-            } else if let Kind::Slider(s) = &mut ui.nodes[f].kind && s.enabled && ui.pressed != Some(f) {
+            } else if let Kind::Slider(s) = &mut ui.nodes[f].kind
+                && s.enabled
+                && ui.pressed != Some(f)
+            {
                 if self.input.pressed_key(Key::Code(KeyCode::ArrowUp)) && s.active > 0 {
                     s.active -= 1;
                     self.quads_dirty = true;
@@ -1478,7 +1486,9 @@ impl Running {
                     .filter(|(k, _)| self.input.pressed_or_repeated(Key::Code(*k)))
                     .map(|(_, by)| by)
                     .sum();
-                if by != 0.0 && let Some((change, value)) = s.nudge(by) {
+                if by != 0.0
+                    && let Some((change, value)) = s.nudge(by)
+                {
                     slider.extend(change.map(|f| (f, value)));
                     slider.extend(s.thumbs[s.active].release.clone().map(|f| (f, value)));
                     self.quads_dirty = true;

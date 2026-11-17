@@ -91,7 +91,9 @@ pub(super) fn visit_structure_shapes(
                 let relative_delta = delta - peer.delta;
                 let moved = peer.place.vector_to_local(relative_delta);
                 if group.shapes.iter().any(|&b| {
-                    peer.bounds.intersects(&b.world_bounds(place).swept(relative_delta)) && visit(part.id, b, relative, moved, Some(peer))
+                    peer.bounds
+                        .intersects(&b.world_bounds(place).swept(relative_delta))
+                        && visit(part.id, b, relative, moved, Some(peer))
                 }) {
                     return true;
                 }
@@ -816,7 +818,11 @@ impl Dim {
                 let mut blocked = sample;
                 for _ in 0..7 {
                     let mid = (free + blocked) * 0.5;
-                    if closes(mid) { blocked = mid; } else { free = mid; }
+                    if closes(mid) {
+                        blocked = mid;
+                    } else {
+                        free = mid;
+                    }
                 }
                 next = free;
                 break;

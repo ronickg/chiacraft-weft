@@ -740,21 +740,17 @@ fn config_row(ui: &mut Ui, cx: &BuildCx, id: u32, d: &crate::config::ConfigDef, 
                     }) as Box<dyn Fn(f32, f32) -> f32>
                 });
                 let definition = d.clone();
-                let thumb = crate::ui::slider::Thumb {
-                    value: 0.0,
-                    change: Some(on_change),
-                    release: on_release,
-                };
+                let thumb = crate::ui::slider::Thumb { value: 0.0, change: Some(on_change), release: on_release };
                 let mut slider = crate::ui::slider::Slider::new(vec![thumb]);
-                slider.binding = Some((vec![0.0], Box::new(move |_, values| {
-                    values[0] = definition.slider_position(crate::config::get(id));
-                })));
+                slider.binding = Some((
+                    vec![0.0],
+                    Box::new(move |_, values| {
+                        values[0] = definition.slider_position(crate::config::get(id));
+                    }),
+                ));
                 slider.steps = steps;
                 slider.step_value = step_value;
-                ui.add(
-                    Kind::Slider(slider),
-                    Style::default().h(20.0).stretch(),
-                );
+                ui.add(Kind::Slider(slider), Style::default().h(20.0).stretch());
             }
         }),
     };
