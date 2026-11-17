@@ -13,13 +13,15 @@ use crate::net::codec::{self, R, Wire};
 pub type Saved = (Entity, Option<Vec<ItemStack>>, Vec<(u32, Box<[u8]>)>, Option<Vec<(IVec3, u32)>>);
 pub type ToSave<'a> = (&'a Entity, Option<&'a Vec<ItemStack>>, Vec<(u32, &'a [u8])>, Option<Vec<(IVec3, String)>>);
 
-const ENTITY_FORMAT: u32 = 0x3254_4E45;
-const MOUNTED_BODY: u8 = 0x80;
-const FLOATING_BODY: u8 = 0x40;
-const FLOATER_DRIVEN: u8 = 0x20;
-const NESTED_MOUNT: u8 = 0x10;
-const MOUNT_DRIVE: u8 = 0x08;
-const MOUNT_SLIDE: u8 = 0x04;
+const ENTITY_FORMAT_V2: u32 = 0x3254_4E45;
+const ENTITY_FORMAT: u32 = 0x3354_4E45;
+const MOUNTED_BODY: u16 = 0x80;
+const FLOATING_BODY: u16 = 0x40;
+const FLOATER_DRIVEN: u16 = 0x20;
+const NESTED_MOUNT: u16 = 0x10;
+const MOUNT_DRIVE: u16 = 0x08;
+const MOUNT_SLIDE: u16 = 0x04;
+const ROTATED_BODY: u16 = 0x100;
 
 struct W<'a>(&'a mut Vec<u8>);
 
@@ -85,7 +87,16 @@ impl R<'_> {
 /// `now`: the tick of the entities' dimension, what their effects' ends count from.
 pub fn write(c: &Content, out: &mut Vec<u8>, list: &[ToSave<'_>], now: u64) {
     let mut w = W(out);
-    w.u32(ENTITY_FORMAT);
+    let orientation = |e: &Entity, has_blocks: bool| {
+        e.frame_rotation
+            .as_deref()
+            .copied()
+            .filter(|&q| has_blocks && e.mount.is_none() && e.ship.is_none() && q != DQuat::IDENTITY)
+    };
+    let extended = list
+        .iter()
+        .any(|(e, _, _, blocks)| orientation(e, blocks.is_some()).is_some());
+    w.u32(if extended { ENTITY_FORMAT } else { ENTITY_FORMAT_V2 });
     w.u32(list.len() as u32);
     for (e, inv, comps, blocks) in list {
         w.str(&c.game.entities[e.kind as usize].name);
@@ -105,23 +116,28 @@ pub fn write(c: &Content, out: &mut Vec<u8>, list: &[ToSave<'_>], now: u64) {
         // 2: on a body, which it says.
         let mounted = if e.mount.is_some() { MOUNTED_BODY } else { 0 };
         let parent_mount = e.frame.filter(|_| e.mount.is_some());
+        let rotation = orientation(e, blocks.is_some());
         let attachment = mounted
             | if e.ship.is_some() { FLOATING_BODY } else { 0 }
             | if e.floater_driven { FLOATER_DRIVEN } else { 0 }
             | if parent_mount.is_some() { NESTED_MOUNT } else { 0 }
             | if e.mount.as_ref().is_some_and(|m| m.drive.is_some()) { MOUNT_DRIVE } else { 0 }
-            | if e.mount.as_ref().is_some_and(|m| m.slide.is_some()) { MOUNT_SLIDE } else { 0 };
-        match (e.anchor, e.block_frame()) {
-            (Some(a), frame) => {
-                w.u8(attachment | if frame != 0 { 2 } else { 1 });
-                for v in a.to_array() {
-                    w.u32(v as u32);
-                }
-                if frame != 0 {
-                    w.u64(frame);
-                }
+            | if e.mount.as_ref().is_some_and(|m| m.slide.is_some()) { MOUNT_SLIDE } else { 0 }
+            | if rotation.is_some() { ROTATED_BODY } else { 0 };
+        let frame = e.block_frame();
+        let attachment = attachment | e.anchor.map_or(0, |_| if frame != 0 { 2 } else { 1 });
+        if extended {
+            w.u16(attachment);
+        } else {
+            w.u8(attachment as u8);
+        }
+        if let Some(a) = e.anchor {
+            for v in a.to_array() {
+                w.u32(v as u32);
             }
-            (None, _) => w.u8(attachment),
+            if frame != 0 {
+                w.u64(frame);
+            }
         }
         if let Some(parent) = parent_mount {
             w.u64(parent);
@@ -150,6 +166,11 @@ pub fn write(c: &Content, out: &mut Vec<u8>, list: &[ToSave<'_>], now: u64) {
                 .into_iter()
                 .chain(ship.spin.to_array())
             {
+                w.f64(v);
+            }
+        }
+        if let Some(rotation) = rotation {
+            for v in rotation.to_array() {
                 w.f64(v);
             }
         }
@@ -245,13 +266,17 @@ pub fn read(c: &Content, data: &[u8], now: u64) -> Vec<Saved> {
     if data.is_empty() {
         return out;
     }
-    if r.u32() != Some(ENTITY_FORMAT) {
-        log::warn!("unsupported saved entity format");
-        return out;
-    }
+    let extended = match r.u32() {
+        Some(ENTITY_FORMAT) => true,
+        Some(ENTITY_FORMAT_V2) => false,
+        _ => {
+            log::warn!("unsupported saved entity format");
+            return out;
+        }
+    };
     let Some(n) = r.u32() else { return out };
     for _ in 0..n {
-        let Some(e) = read_one(c, &mut r, now) else { break };
+        let Some(e) = read_one(c, &mut r, now, extended) else { break };
         if let Some(e) = e {
             out.push(e);
         }
@@ -259,7 +284,7 @@ pub fn read(c: &Content, data: &[u8], now: u64) -> Vec<Saved> {
     out
 }
 
-fn read_one(c: &Content, r: &mut R, now: u64) -> Option<Option<Saved>> {
+fn read_one(c: &Content, r: &mut R, now: u64, extended: bool) -> Option<Option<Saved>> {
     let kind_name = r.str()?;
     let id = r.u64()?;
     let mut v = [0.0f64; 6];
@@ -275,7 +300,7 @@ fn read_one(c: &Content, r: &mut R, now: u64) -> Option<Option<Saved>> {
     let mode = crate::world::GameMode::parse(&r.str()?).unwrap_or(crate::world::GameMode::SURVIVAL);
     let age = r.u64()?;
     let item = r.stack(c)?;
-    let attachment = r.u8()?;
+    let attachment = if extended { r.u16()? } else { u16::from(r.u8()?) };
     let anchor_kind = attachment & 0x03;
     let anchor = if anchor_kind != 0 { Some(IVec3::new(r.u32()? as i32, r.u32()? as i32, r.u32()? as i32)) } else { None };
     let frame = if anchor_kind == 2 || attachment & NESTED_MOUNT != 0 { Some(r.u64()?) } else { None };
@@ -310,6 +335,12 @@ fn read_one(c: &Content, r: &mut R, now: u64) -> Option<Option<Saved>> {
         let spin = DVec3::new(r.f64()?, r.f64()?, r.f64()?);
         (front < 6 && rotation.is_finite() && rotation.length_squared() > 1e-9 && spin.is_finite())
             .then(|| Box::new(super::buoyancy::Ship::new(front, rotation.normalize(), spin)))
+    } else {
+        None
+    };
+    let rotation = if attachment & ROTATED_BODY != 0 {
+        let q = DQuat::from_xyzw(r.f64()?, r.f64()?, r.f64()?, r.f64()?);
+        (q.is_finite() && q.length_squared() > 1e-9).then(|| q.normalize())
     } else {
         None
     };
@@ -370,6 +401,9 @@ fn read_one(c: &Content, r: &mut R, now: u64) -> Option<Option<Saved>> {
     e.frame = frame;
     e.mount = mount;
     e.ship = ship;
+    if let Some(rotation) = rotation {
+        e.set_frame_rotation(rotation);
+    }
     e.floater_driven = attachment & FLOATER_DRIVEN != 0;
     if kind == c.game.item_kind && item.is_empty() {
         return Some(None);

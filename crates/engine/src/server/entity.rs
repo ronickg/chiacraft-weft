@@ -112,6 +112,7 @@ pub struct Entity {
     /// A player's actions held down, by key id, with the tick each went down at.
     pub keys: Vec<(u32, u64)>,
     pub helm_pilot: Option<Box<crate::controller::Pilot>>,
+    pub(super) grab: Option<Box<super::grab::Grab>>,
 }
 
 /// Where a projectile sits stuck, where it is in the frame of what holds it, its yaw there,
@@ -226,8 +227,12 @@ impl BodyMount {
 
 impl Entity {
     pub fn body_place(&self) -> physics::Transform {
-        let rotation = self.body_rotation();
-        physics::Transform::rotated(self.pos, rotation.unwrap_or(DQuat::IDENTITY))
+        self.oriented_place()
+            .unwrap_or_else(|| physics::Transform::of(self.pos))
+    }
+
+    pub(super) fn oriented_place(&self) -> Option<physics::Transform> {
+        Some(physics::Transform::rotated(self.pos, self.body_rotation()?))
     }
 
     pub fn wire_rotation(&self) -> Option<[f32; 4]> {
@@ -316,6 +321,7 @@ impl Entity {
             ship: None,
             floater_driven: false,
             frame_rotation: None,
+            grab: None,
             falls: false,
             size: None,
             look: None,
@@ -910,7 +916,7 @@ pub fn step(c: &Content, e: &mut Entity, gravity: f64, block: &impl physics::Cel
     if e.anchor.is_some() || e.vehicle.is_some() || e.driver.is_some() {
         return out;
     }
-    if e.mount.is_some() || e.ship.is_some() {
+    if e.mount.is_some() || e.ship.is_some() || e.grab.is_some() {
         return out;
     }
     if (k.is(ef::KINEMATIC) && !e.falls) || e.motion == Motion::Parked {

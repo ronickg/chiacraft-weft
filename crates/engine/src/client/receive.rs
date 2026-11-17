@@ -28,6 +28,10 @@ impl Client {
 
     fn receive_message(&mut self, msg: ToClient, fwd: &mut Vec<terrain::In>) {
         match msg {
+            ToClient::BodyGrab(body) => {
+                self.grabbed_body = body;
+                self.grab_turn = glam::Vec2::ZERO;
+            }
             ToClient::ControllerEdit { controller, face, data } => {
                 if let Some(settings) = crate::controller::Settings::from_bytes(&data) {
                     self.controller_edit = Some((controller, face, settings));
@@ -126,6 +130,13 @@ impl Client {
                 }
             }
             ToClient::Despawn(ids) => {
+                if self
+                    .grabbed_body
+                    .is_some_and(|body| ids.iter().any(|(id, _)| *id == body))
+                {
+                    self.grabbed_body = None;
+                    self.grab_turn = glam::Vec2::ZERO;
+                }
                 let arriving = self.arriving_tick();
                 self.entity_components
                     .retain(|(e, _), _| !ids.iter().any(|g| g.0 == *e));
@@ -309,6 +320,7 @@ impl Client {
             self.entities.clear();
             self.showing_blocks.clear();
             self.particles.clear();
+            self.wake_render.clear();
             self.entity_components.clear();
         }
         let at = self.body_tick(self.body_clock);

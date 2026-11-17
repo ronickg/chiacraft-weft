@@ -27,6 +27,7 @@ pub use builtin::COMMANDS as BUILTIN_COMMANDS;
 pub use extend::explanation;
 use load::send_far;
 use player_file::save_player;
+mod grab;
 pub mod menu;
 pub mod persist;
 mod placing;
@@ -826,6 +827,11 @@ impl Server {
                         .filter(|p| p.joined && p.entity != id && p.known.contains(&id))
                     {
                         p.conn.send(ToClient::EntitySwing { id, off });
+                    }
+                }
+                DimEvent::GrabReleased(player) => {
+                    if let Some(pi) = self.player_index(player) {
+                        self.players[pi].conn.send(ToClient::BodyGrab(None));
                     }
                 }
                 DimEvent::Controller { player, controller, face, data } => {

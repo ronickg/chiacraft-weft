@@ -28,6 +28,7 @@ const ITEM_LIFETIME: u64 = crate::world::TPS as u64 * 60 * 5;
 pub const UNTOLD: u32 = u32::MAX;
 
 pub enum DimEvent {
+    GrabReleased(u64),
     Controller {
         player: u64,
         controller: u64,
@@ -1824,6 +1825,7 @@ impl Dim {
         let children = self.mount_children();
         let order = self.mount_order(&children);
         let (mut before_turn, landing) = self.advance_mounts(c, &children, &order);
+        self.advance_grabs(c, &mut before_turn, &children);
         self.advance_ships(c, &mut before_turn, &children);
         self.tick_entities(c, &before_turn);
         for id in landing {

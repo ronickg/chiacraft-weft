@@ -1,6 +1,7 @@
 use weft_sdk::{abi::assembly_result as result, *};
 
 static TOOL: Item = Item::named("assembly_tool");
+static GRAB_TOOL: Item = Item::named("grab_tool");
 static HELM: Block = Block::named("helm");
 static GUIDE: Block = Block::named("linear_guide");
 static GUIDE_RAIL: Block = Block::named("guide_rail");
@@ -37,6 +38,12 @@ fn feedback(w: World, player: u64, result: u32) -> bool {
 }
 
 pub fn register(r: &mut Registry) {
+    r.item(&GRAB_TOOL)
+        .texture("grab_tool")
+        .handheld()
+        .max_stack(1)
+        .tag("body_grab")
+        .tab(&crate::tabs::TOOLS);
     r.item(&TOOL)
         .texture("assembly_tool")
         .handheld()

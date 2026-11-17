@@ -811,6 +811,19 @@ gpu_struct! {
 }
 
 gpu_struct! {
+    pub struct GpuWake as "WakeStrip" {
+        pub left_from: [f32; 4],
+        pub right_from: [f32; 4],
+        pub left_to: [f32; 4],
+        pub right_to: [f32; 4],
+        /// Wake distance and age at each end, or splash camera XZ (mod 256) and profile range.
+        pub course: [f32; 4],
+        /// x is one for a splash sheet, y is its normalized age as f32 bits.
+        pub style: [u32; 4],
+    }
+}
+
+gpu_struct! {
     pub struct GpuWeather as "WeatherColumn" {
         /// The column's middle relative to the camera in x and z, its strip's bottom and top in y.
         /// As x, bottom, z, top.
@@ -980,6 +993,10 @@ bindings! {
         COLUMNS "columns": "array<WeatherColumn>",
         SCENE "scene": "Scene",
     }
+    wake "wake.wgsl" {
+        STRIPS "strips": "array<WakeStrip>",
+        SCENE "scene": "Scene",
+    }
     sky "sky.wgsl" {
         OBJECTS "sky": "array<Sky>",
         SCENE "scene": "Scene",
@@ -1028,6 +1045,7 @@ fn structs() -> String {
         GpuParticleKind::wgsl(),
         GpuParticleRule::wgsl(),
         GpuWireQuad::wgsl(),
+        GpuWake::wgsl(),
         GpuWeather::wgsl(),
         GpuSky::wgsl(),
         Quad::wgsl(),

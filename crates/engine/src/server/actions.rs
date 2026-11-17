@@ -129,6 +129,7 @@ impl Server {
                 e.alive() && !e.mode.has(crate::tag_bits::game_mode::NO_INTERACT)
             }
             M::ControllerSave { .. } | M::HelmHeld { .. } => e.alive() && !e.mode.has(crate::tag_bits::game_mode::NO_INTERACT),
+            M::GrabBody | M::TurnGrab(_) => e.alive() && !e.mode.has(crate::tag_bits::game_mode::NO_INTERACT),
             M::Move { .. } | M::OpenInventory | M::Click { .. } | M::Drag { .. } | M::CreativeTake { .. } | M::Pick { .. } => e.alive(),
             _ => true,
         }
@@ -166,6 +167,23 @@ impl Server {
             ToServer::HelmHeld { mount, controller, held } => {
                 if let Some((d, player)) = self.region(pi) {
                     d.helm_held(player, mount, controller, held);
+                }
+            }
+            ToServer::GrabBody => {
+                let body = self
+                    .region(pi)
+                    .and_then(|(d, player)| d.toggle_grab(c, player));
+                self.players[pi].conn.send(ToClient::BodyGrab(body));
+            }
+            ToServer::ReleaseBody => {
+                if let Some((d, player)) = self.region(pi) {
+                    d.release_grab(player);
+                }
+                self.players[pi].conn.send(ToClient::BodyGrab(None));
+            }
+            ToServer::TurnGrab(turn) => {
+                if let Some((d, player)) = self.region(pi) {
+                    d.turn_grab(c, player, turn);
                 }
             }
             ToServer::Keys { down, up } => {

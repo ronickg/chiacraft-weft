@@ -306,6 +306,7 @@ music.base.empty = Нет треков
 music.base.folder.tooltip = Открыть папку\nДобавь сюда MP3, FLAC, OGG Vorbis или PCM WAV, затем нажми «Обновить».
 music.base.refresh = Обновить
 item.base.assembly_tool = Посох сборки
+item.base.grab_tool = Творческий посох захвата
 assembly.base.first_corner = Первый угол выбран. Укажи противоположный угол.
 assembly.base.bounds = ПКМ в воздухе соберёт блоки. Присядьте для сборки с физикой или нажмите ПКМ по управляющему блоку, чтобы задать границы.
 assembly.base.preview = Нажми на управляющий блок ещё раз, чтобы подтвердить сборку.

@@ -55,6 +55,7 @@ struct Slot {
 pub struct ClientWorld {
     pub dim: u32,
     cubes: FxHashMap<IVec3, Slot>,
+    exhaust: FxHashMap<IVec3, Vec<IVec3>>,
     pub time: u64,
     /// Ticks the dimension ran, what entity effects end by (`net::ToClient::Clock`).
     pub ticks: u64,
@@ -132,6 +133,14 @@ const HOLD_MAX: Duration = Duration::from_secs(5);
 /// what the player just placed or broke shows the next frame, whatever else waits.
 const URGENT: i32 = 2;
 
+fn emits_exhaust(c: &crate::content::Content, state: u32) -> bool {
+    let s = c.states[state as usize].signal;
+    s.kind == weft_abi::signal_kind::SINK
+        && s.level != 0
+        && c.block_value::<f32>(state, Some(c.game.thrust_comp))
+            .is_some_and(|force| force.is_finite() && force > 0.0)
+}
+
 impl crate::physics::Blocks for ClientWorld {
     fn block(&self, p: IVec3) -> u32 {
         match self.block(p) {
@@ -189,6 +198,7 @@ impl ClientWorld {
         ClientWorld {
             dim,
             cubes: FxHashMap::default(),
+            exhaust: FxHashMap::default(),
             time: 0,
             ticks: 0,
             ready: FxHashSet::default(),
@@ -366,6 +376,7 @@ impl ClientWorld {
     pub fn clear(&mut self) {
         self.removed.extend(self.cubes.keys().copied());
         self.cubes.clear();
+        self.exhaust.clear();
         self.ready.clear();
         self.changed_columns.clear();
         self.columns.clear();
@@ -478,6 +489,7 @@ impl ClientWorld {
     /// `around`: the cubes around it not to wait for.
     pub fn insert(&mut self, pos: IVec3, cube: Arc<Cube>, around: super::terrain::Around) {
         self.glow.changed(pos);
+        self.index_exhaust(pos, &cube);
         let wired = self.has_wire(&cube);
         self.wire_seen |= wired;
         if wired || self.wire_around(pos) {
@@ -535,6 +547,35 @@ impl ClientWorld {
         crate::wire::has_wire(crate::content::content(), cube)
     }
 
+    fn index_exhaust(&mut self, cube_pos: IVec3, cube: &Cube) {
+        let c = content();
+        if !cube.palette().iter().any(|&state| emits_exhaust(c, state)) {
+            self.exhaust.remove(&cube_pos);
+            return;
+        }
+        let cells = self.exhaust.entry(cube_pos).or_default();
+        cells.clear();
+        for i in 0..crate::world::cube::VOLUME {
+            if emits_exhaust(c, cube.get(i)) {
+                let p = crate::world::cube::offset(i);
+                cells.push((cube_pos << 4) + p);
+            }
+        }
+    }
+
+    pub(super) fn exhausts(&self, eye: glam::DVec3, range: f64) -> impl Iterator<Item = (IVec3, crate::content::Signal)> + '_ {
+        let c = content();
+        self.exhaust
+            .iter()
+            .filter(move |(at, _)| {
+                let min = (**at << 4i32).as_dvec3();
+                let nearest = eye.clamp(min, min + glam::DVec3::splat(16.0));
+                eye.distance_squared(nearest) < range * range
+            })
+            .flat_map(|(_, cells)| cells)
+            .map(|&p| (p, c.states[self.block(p) as usize].signal))
+    }
+
     /// Whether this cube or one next to it has wire. Most worlds have none, and asking for all the
     /// neighbors of each cube coming and going was a tenth of a frame while flying.
     fn wire_around(&self, pos: IVec3) -> bool {
@@ -551,6 +592,7 @@ impl ClientWorld {
     }
 
     pub fn remove(&mut self, pos: IVec3) {
+        self.exhaust.remove(&pos);
         if self.wire_around(pos) {
             self.wire_dirty.insert(pos);
         }
@@ -588,7 +630,20 @@ impl ClientWorld {
         let Some(slot) = self.cubes.get_mut(&cp) else { return };
         // The shape of wire near it may depend on it, if it is more than a gate going on or off.
         let c = crate::content::content();
-        let (old, new) = (&c.states[slot.cube.get(local_index(p)) as usize], &c.states[state as usize]);
+        let previous = slot.cube.get(local_index(p));
+        let (old, new) = (&c.states[previous as usize], &c.states[state as usize]);
+        match (emits_exhaust(c, previous), emits_exhaust(c, state)) {
+            (false, true) => self.exhaust.entry(cp).or_default().push(p),
+            (true, false) => {
+                if let std::collections::hash_map::Entry::Occupied(mut entry) = self.exhaust.entry(cp) {
+                    entry.get_mut().retain(|&cell| cell != p);
+                    if entry.get().is_empty() {
+                        entry.remove();
+                    }
+                }
+            }
+            _ => {}
+        }
         let wire = weft_abi::signal_kind::WIRE;
         self.wire_seen |= new.signal.kind == wire;
         if !crate::wire::same_shape(old, new) && (old.signal.kind == wire || new.signal.kind == wire || self.wire_around(cp)) {

@@ -919,6 +919,7 @@ pub struct Ids {
     pub use_ticks: Option<u32>,
     pub sweeps: Option<u32>,
     pub no_creative_break: Option<u32>,
+    pub body_grab: Option<u32>,
     pub inventory: Option<u32>,
     pub contents: Option<u32>,
     pub layers: Option<u32>,
@@ -1191,6 +1192,11 @@ impl Content {
         self.ids
             .no_creative_break
             .is_some_and(|t| self.components.has(comps::ITEM, item, t))
+    }
+
+    pub fn body_grab_tool(&self, item: abi::ItemStack, mode: crate::world::GameMode) -> bool {
+        use crate::tag_bits::game_mode as f;
+        !item.is_empty() && mode.has(f::CREATIVE_INVENTORY) && !mode.has(f::NO_INTERACT) && self.item_has(item.item, self.ids.body_grab)
     }
 
     /// `state` turned `toward` (`north`..) if its block has a `facing`: how a block item shows its
@@ -2837,6 +2843,7 @@ fn component_ids(components: &Components) -> Ids {
         use_ticks: id(abi::comp::USE_TICKS),
         sweeps: id(abi::comp::SWEEPS),
         no_creative_break: id(abi::comp::NO_CREATIVE_BREAK),
+        body_grab: id("body_grab"),
         inventory: id(abi::comp::INVENTORY),
         contents: id(abi::comp::CONTENTS),
         layers: id(abi::comp::LAYERS),

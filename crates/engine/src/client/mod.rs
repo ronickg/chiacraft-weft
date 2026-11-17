@@ -12,9 +12,11 @@ pub mod modui;
 pub mod particles;
 mod receive;
 pub mod sky;
+mod structure_effects;
 pub mod terrain;
 pub mod terrain_gpu;
 pub mod textures;
+pub(crate) mod wake;
 pub mod weather;
 pub mod wires;
 pub mod world;
@@ -23,7 +25,7 @@ pub mod world_render;
 use std::time::Instant;
 
 use crate::gpu_layout::Scene;
-use glam::{DVec3, IVec3, Vec3};
+use glam::{DVec3, IVec3, Vec2, Vec3};
 use rustc_hash::{FxHashMap, FxHashSet};
 use weft_abi::{ItemStack, block_flags as bf, entry_kind as ek};
 use weft_render::{Backend, BufferId, CommandList, FrameInfo};
@@ -612,6 +614,8 @@ pub struct Client {
     /// Each action as the server last heard of it (`send_keys`).
     keys_down: Vec<bool>,
     helm_pilot: Option<crate::controller::Pilot>,
+    grabbed_body: Option<u64>,
+    grab_turn: Vec2,
     pub(crate) controller_edit: Option<(u64, u8, crate::controller::Settings)>,
     pub view_radius: i32,
     /// Makes the world in view from the seed (`terrain`); the server's cubes go through it.
@@ -701,6 +705,7 @@ pub struct Client {
     pub particles: particles::Particles,
     pub wires: wires::Wires,
     pub weather_render: weather::Weather,
+    pub wake_render: wake::Wakes,
     pub sky: sky::Sky,
     /// Scratch: taken items and where they fly to this frame.
     pulls: Vec<(u64, DVec3)>,
@@ -910,6 +915,7 @@ impl Client {
         let gpu_terrain = terrain_gpu::GpuTerrain::new(gpu, assets, gpu_rx, gpu_on.clone());
         Ok(Client {
             weather_render,
+            wake_render: wake::Wakes::new(gpu, assets),
             frame_dt: 0.0,
             conn,
             skin,
@@ -973,6 +979,8 @@ impl Client {
             use_delay: 0.0,
             keys_down: Vec::new(),
             helm_pilot: None,
+            grabbed_body: None,
+            grab_turn: Vec2::ZERO,
             controller_edit: None,
             view_radius,
             terrain: terrain::spawn(gpu_tx, gpu_on.clone()),
@@ -1129,6 +1137,8 @@ impl Client {
 
     /// Starts the terrain over for dimension `dim` (joined, or moved to another dimension).
     fn reset_terrain(&mut self, dim: u32, fwd: &mut Vec<terrain::In>) {
+        self.grabbed_body = None;
+        self.grab_turn = Vec2::ZERO;
         self.world.clear();
         self.wires.clear();
         self.meshes.clear();
@@ -1249,8 +1259,13 @@ impl Client {
     fn read_look(&mut self, input: &Input) {
         if input.captured && input.muted & crate::input::context::MOVEMENT == 0 {
             let sens = 0.0022 * input.sensitivity;
-            self.player.yaw -= input.mouse_delta.x * sens;
             let look = input.mouse_delta.y * sens * if input.invert_y { -1.0 } else { 1.0 };
+            if self.grabbed_body.is_some() && content().body_grab_tool(self.held(), self.mode) && self.held_without_helm(input, "core:use")
+            {
+                self.grab_turn += Vec2::new(input.mouse_delta.x * sens, look);
+                return;
+            }
+            self.player.yaw -= input.mouse_delta.x * sens;
             self.player.pitch = (self.player.pitch - look).clamp(-1.55, 1.55);
         }
     }
@@ -1592,6 +1607,9 @@ impl Client {
         for _ in 0..ambient_steps {
             self.ambient();
         }
+        if ambient_steps != 0 {
+            self.structure_effects();
+        }
     }
 
     /// What the crosshair is on. Returns where the eye looks.
@@ -1689,8 +1707,22 @@ impl Client {
             self.joined
                 .then(|| self.move_message(self.player.landed, false)),
         );
+        let grab_tool = content().body_grab_tool(self.held(), self.mode);
+        if self.grabbed_body.is_some() && (!grab_tool || !input.captured || self.dead) {
+            self.grabbed_body = None;
+            self.grab_turn = Vec2::ZERO;
+            self.conn.send(ToServer::ReleaseBody);
+        }
         if !input.captured || self.dead {
             self.breaking = None;
+            return;
+        }
+        if grab_tool {
+            self.breaking = None;
+            if self.pressed_without_helm(input, "core:attack") {
+                send_look.send(&mut self.conn);
+                self.conn.send(ToServer::GrabBody);
+            }
             return;
         }
         self.attack(input, dt, &mut send_look);
@@ -1939,6 +1971,10 @@ impl Client {
                 let landed = std::mem::replace(&mut self.player.landed, false);
                 let jumped = std::mem::replace(&mut self.player.jumped, false);
                 self.conn.send(self.move_message(landed, jumped));
+                if self.grab_turn != Vec2::ZERO {
+                    self.conn
+                        .send(ToServer::TurnGrab(std::mem::take(&mut self.grab_turn).to_array()));
+                }
             }
         }
     }
@@ -2925,6 +2961,7 @@ impl Client {
         self.particles.destroy(gpu);
         self.wires.destroy(gpu);
         self.weather_render.destroy(gpu);
+        self.wake_render.destroy(gpu);
         self.sky.destroy(gpu);
         self.gpu_terrain.destroy(gpu);
     }
@@ -3107,6 +3144,9 @@ impl Client {
         );
         gpu.mapped(scene_buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
         self.render.draw_translucent(&mut late);
+        let tick = self.anim_tick();
+        self.wake_render
+            .draw(gpu, &mut late, frame.slot, &cam, scene_buf, tick);
         let alive = !self.dead && !self.mode.has(crate::tag_bits::game_mode::NO_INTERACT);
         let hand = (alive && self.camera_has(crate::tag_bits::camera::HAND) && !self.hide_gui).then(|| entity_render::Hand {
             lowered: 1.0 - self.hand_height,

@@ -342,6 +342,7 @@ music.base.play_icon = {img:base:music_play 8x8}
 music.base.pause_icon = {img:base:music_pause 8x8}
 music.base.stop_icon = {img:base:music_stop 8x8}
 item.base.assembly_tool = Assembly Wand
+item.base.grab_tool = Creative Grab Wand
 assembly.base.first_corner = First corner selected. Select the opposite corner.
 assembly.base.bounds = Right-click the air to assemble. Sneak to assemble with physics, or use the wand on a controller to set its bounds.
 assembly.base.preview = Use the controller again to confirm this assembly.

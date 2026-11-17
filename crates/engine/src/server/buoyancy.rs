@@ -11,9 +11,9 @@ use crate::net::codec::Wire;
 use crate::physics::{Aabb, BoxContact, Cells, Cylinder, Solid, Transform};
 use crate::world::{DIRS, TICK};
 
-const LAND_SPEED_SHARE: f64 = 0.2;
 const LAND_DRIVE_SHARE: f64 = 0.25;
 const LAND_DRAG: f64 = 2.0;
+const AIR_DRAG: f64 = 0.008;
 const SUPPORT_REACH: f64 = 0.08;
 const CONTACT_SKIN: f64 = 0.00015;
 const ROLLING_RESISTANCE: f64 = 0.04;
@@ -566,7 +566,7 @@ impl Dim {
         for (&id, space) in &self.bodies {
             let Some(e) = self.entities.get(id) else { continue };
             let Some(ship) = &e.ship else { continue };
-            if e.motion == Motion::Parked {
+            if e.motion == Motion::Parked || e.grab.is_some() {
                 continue;
             }
             let mass = ship.contact_mass.unwrap_or_else(|| {
@@ -600,7 +600,7 @@ impl Dim {
                     _ => root.vel,
                 };
                 let mut travel = VelocityChange { linear: velocity, angular: spin };
-                if e.id != root.id || e.mount.is_some() {
+                if e.id != root.id || e.mount.is_some() || root.grab.is_some() {
                     if e.id != root.id {
                         center = place.to_world(DVec3::splat(0.5));
                         velocity += spin.cross(center - root_center);
@@ -638,6 +638,7 @@ impl Dim {
             .filter_map(|(&id, body)| {
                 let e = self.entities.get(id)?;
                 (e.ship.is_none()
+                    && e.grab.is_none()
                     && e.mount.is_none()
                     && e.kind == c.game.platform_kind
                     && e.frame.is_none()
@@ -663,7 +664,7 @@ impl Dim {
             .filter(|id| {
                 self.entities
                     .get(*id)
-                    .is_some_and(|e| e.ship.is_some() && e.motion != Motion::Parked)
+                    .is_some_and(|e| e.ship.is_some() && e.grab.is_none() && e.motion != Motion::Parked)
             })
             .collect();
         ships.sort_unstable();
@@ -832,6 +833,7 @@ impl Dim {
         }
         for (id, changes) in reactions {
             if let Some(e) = self.entities.get_mut(id)
+                && e.grab.is_none()
                 && let Some(ship) = &mut e.ship
             {
                 for (_, change) in changes {
@@ -917,7 +919,7 @@ impl Dim {
         }
     }
 
-    fn try_dock(&mut self, c: &'static Content, id: u64) -> bool {
+    pub(super) fn try_dock(&mut self, c: &'static Content, id: u64) -> bool {
         self.in_frame(id, |d| d.finish_moving_here(c));
         let Some(e) = self.entities.get(id) else { return false };
         let Some(space) = self.bodies.get(&id) else { return false };
@@ -970,6 +972,8 @@ impl Dim {
         if let Some(ship) = &mut e.ship {
             ship.rotation = rotation;
             ship.spin = DVec3::ZERO;
+        } else {
+            e.set_frame_rotation(rotation);
         }
         self.put_down_whole(c, id);
         if let Some(space) = self.bodies.get_mut(&id) {
@@ -1070,24 +1074,19 @@ impl Dim {
             .normalize_or_zero();
         let thrust = crate::config::get(c.game.ship_thrust);
         let water_drag = crate::config::get(c.game.ship_water_drag);
-        let water_speed = crate::config::get(c.game.ship_max_speed);
-        let flight_speed = water_speed * 5.0;
-        let max_speed = if propulsion.powered {
-            flight_speed
-        } else {
-            water_speed
-                .max(grip_radius * f64::from(crate::controller::MAX_SPEED).to_radians())
-                .max(vel.length().min(flight_speed))
-                .max(propulsion.floater_velocity.length())
-        };
-        let drive_speed = if grounded { water_speed * LAND_SPEED_SHARE } else { water_speed };
-        let along = vel.dot(forward) * drive.signum();
-        let drive_accel = (drive.abs() * drive_contact * thrust).min(((drive_speed - along) / TICK).max(0.0)) * drive.signum();
+        let drive_accel = drive * drive_contact * thrust;
         // A level hull resting on a level floor is supported over its footprint.
         let (vel, gravity_accel) = if resting { (vel.with_y(vel.y.max(0.0)), 0.0) } else { (vel, gravity * (wet / mass.weight - 1.0)) };
         let acceleration = DVec3::Y * gravity_accel + forward * drive_accel;
-        let drag = (-TICK * (0.05 + contact * water_drag)).exp();
-        let mut free = (vel + acceleration * TICK) * drag;
+        let impulse = old.vector_to_world(propulsion.force) * (TICK / mass.weight);
+        let mut free = vel + acceleration * TICK;
+        // Integrate quadratic air drag without a speed-dependent explicit step limit.
+        let air_decay = 1.0 / (1.0 + TICK * AIR_DRAG * (1.0 - contact) * (free + impulse).length());
+        let drag = air_decay * (-TICK * (0.05 + contact * water_drag)).exp();
+        let side = DVec3::Y.cross(forward);
+        let side_drag = water_drag * crate::config::get(c.game.ship_water_side_drag);
+        let side_decay = air_decay * (-TICK * (0.05 + contact * side_drag)).exp();
+        free = free * drag + side * (free.dot(side) * (side_decay - drag));
         if grounded && !has_grip {
             free = (free * (-TICK * LAND_DRAG).exp()).with_y(free.y);
         }
@@ -1096,7 +1095,7 @@ impl Dim {
         } else {
             free
         };
-        let vel = (driven + old.vector_to_world(propulsion.force) * (TICK * drag / mass.weight)).clamp_length_max(max_speed);
+        let vel = driven + impulse * drag;
         let torque = old.vector_to_world((old.vector_to_local(moment * gravity) + propulsion.moment) / mass.inertia)
             + DVec3::Y * steer * drive_contact * 2.7;
         let turn_travel = 0.22;

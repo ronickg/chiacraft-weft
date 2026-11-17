@@ -72,13 +72,19 @@ Controllers can be placed on a structure after it was assembled. Using a new Con
 
 Rotors and assemblers also work on moving structures. Each attachment can carry more controllers. To select a smaller part of a moving structure, mark both corners on that structure with the Assembly Wand and confirm the selection on its controller. A thruster on a rotor turns its thrust together with the rotor. Attachments return to their parent grids before the parent disassembles.
 
+In Creative, take the Creative Grab Wand from the Tools tab. Left-click a contraption to grab it at the point you aimed at. Look or move to carry it. Hold right-click and move the mouse to rotate it around the grabbed point while the camera stays put. Left-click again to release. The wand can carry any mass and stops at obstacles. Grabbing a nested section carries the entire contraption. A section mounted directly in the world detaches from its mount.
+
 Place Guide Rails from the Linear Guide's socket along its arrows. A rail's long stripes run perpendicular to the face you click when placing it. The marked side of the guide shows which side of the last rail to put the carriage against. Power the guide to assemble the carriage. Sneak and right-click with an empty hand to edit its travel limits, unloaded rest position, stiffness and damping. Closing the screen saves valid settings. The available travel is limited by the length of the installed rails and the 32-block maximum.
 
-World Rules and `/rule` tune ship motion for the current world. `ship_thrust` defaults to `7` blocks/s², `ship_water_drag` to `1.8`, and `ship_max_speed` to `4.5` blocks/s. The limit includes vertical motion. Higher thrust or lower drag lets a ship reach a higher speed within that limit.
+World Rules and `/rule` tune ship motion for the current world. `ship_thrust` sets the Debug drive's maximum acceleration and defaults to `7` blocks/s². `ship_water_drag` defaults to `1.8`. More thrust or less drag makes a ship faster.
 
-In Creative, the Controller's optional Debug drive uses the forward and backward movement keys for thrust and the left and right movement keys to steer. Its facing sets forward. On land, the debug drive runs at reduced power, with a forward speed limit of one fifth of the water limit.
+`ship_water_side_drag` sets sideways drag as a fraction of the forward value. The default `0.4` lets the hull carry sideways momentum into a turn. Set it to `1` for equal drag along and across the hull.
 
-Powered thrusters have five times the configured ship speed limit, or 22.5 blocks/s by default. Load and thrust direction determine the acceleration and whether the body can lift off.
+Moving hulls leave a continuous foam wake that follows their path. The wake and bow wave span the submerged hull. A hard entry into the water throws an expanding splash along the waterline. Powered thrusters show exhaust at the nozzle, or bubbles when the nozzle is submerged in a liquid with bubbles.
+
+In Creative, the Controller's optional Debug drive uses the forward and backward movement keys for thrust and the left and right movement keys to steer. Its facing sets forward. On land, the Debug drive runs at reduced power and ground drag slows the body.
+
+Each thruster's force scales with its redstone input. The total force, the body's mass and its drag determine the resulting speed. Air resistance grows with speed, including during free fall.
 
 Wood usually floats and stone and metal usually sink. A compartment with a floor and watertight sides displaces water even with an open deck. It stays dry below the waterline until water reaches an opening, such as a submerged breach or a low edge of the hull. Blocks placed away from the center of mass can change the ship's trim or roll. A hit away from the center of mass can turn the ship, and turning into an obstacle can push it sideways.
 

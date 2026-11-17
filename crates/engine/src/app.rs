@@ -2285,6 +2285,7 @@ fn reload_assets(r: &mut Running, opts: &Options) {
         g.client.particles.reload(&mut *r.gpu, &r.assets);
         g.client.wires.reload(&mut *r.gpu, &r.assets);
         g.client.weather_render.reload(&mut *r.gpu, &r.assets);
+        g.client.wake_render.reload(&mut *r.gpu, &r.assets);
         g.client.sky.reload(&mut *r.gpu, &r.assets);
         g.client.world.remesh_all();
         g.client

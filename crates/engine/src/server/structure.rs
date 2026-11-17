@@ -104,7 +104,20 @@ pub(super) fn visit_structure_shapes(
 }
 /// Radians per tick per signal level. Long arms also have a limit on tip travel.
 const TURN_PER_LEVEL: f64 = TAU / (8.0 * crate::world::TPS as f64 * 15.0);
-const TURN_PROBE_TRAVEL: f64 = 0.125;
+pub(super) const TURN_PROBE_TRAVEL: f64 = 0.125;
+
+pub(super) fn structure_pose_clear(
+    c: &Content,
+    world: &CubeCells<'_>,
+    parts: &[MountedPart<'_>],
+    peers: &[StructurePeer<'_>],
+    place: Transform,
+) -> bool {
+    !visit_structure_shapes(c, world, parts, peers, place, DVec3::ZERO, |_, shape, place, _, other| match other {
+        None => crate::physics::rotated_collides(c, world, shape, place),
+        Some(peer) => crate::physics::rotated_collides(c, &super::space::DeckCells(peer.space), shape, place),
+    })
+}
 
 /// A block out of its place on its way to another: where in the body and where it ends up,
 /// with the entity it has, which stays the same one.
@@ -946,7 +959,7 @@ impl Dim {
         false
     }
 
-    fn mount_obstacles<'a>(
+    pub(super) fn mount_obstacles<'a>(
         &'a self,
         c: &Content,
         place: Transform,
@@ -989,10 +1002,7 @@ impl Dim {
     fn mount_clear(&self, c: &Content, place: Transform, parts: &[MountedPart<'_>]) -> bool {
         let other_bodies = self.mount_obstacles(c, place, parts, DVec3::ZERO, 0.0);
         let world = super::space::CubeCells(&self.space.cubes);
-        !visit_structure_shapes(c, &world, parts, &other_bodies, place, DVec3::ZERO, |_, shape, place, _, other| match other {
-            None => crate::physics::rotated_collides(c, &world, shape, place),
-            Some(peer) => crate::physics::rotated_collides(c, &super::space::DeckCells(peer.space), shape, place),
-        })
+        structure_pose_clear(c, &world, parts, &other_bodies, place)
     }
 
     pub(super) fn mount_fits(&self, c: &Content, place: Transform, blocks: &[(IVec3, u32)]) -> bool {
@@ -1073,6 +1083,7 @@ impl Dim {
                     && !e.removed
                     && e.mount.is_none()
                     && e.ship.is_none()
+                    && e.grab.is_none()
                     && e.motion != Motion::Parked
             })
             .map(|e| e.id)
@@ -1087,7 +1098,11 @@ impl Dim {
         let Some(e) = self.entities.get(id) else { return };
         if b.stopping {
             if !matches!(e.motion, Motion::To { .. }) {
-                self.put_down_whole(c, id);
+                if e.oriented_place().is_some() && e.frame.is_none() && !children.contains_key(&id) {
+                    self.try_dock(c, id);
+                } else {
+                    self.put_down_whole(c, id);
+                }
             }
             return;
         }
@@ -1103,6 +1118,10 @@ impl Dim {
             if e.floater_driven || drive.axes.any() && vel != DVec3::ZERO {
                 self.stop_floater(id, pos, vel, None, drive.hold);
             }
+            return;
+        }
+        if e.frame.is_none() && e.body_place().rotation() != glam::DQuat::IDENTITY {
+            self.float_ship(id, 4);
             return;
         }
         if children.contains_key(&id) {
@@ -1275,11 +1294,13 @@ impl Dim {
         self.in_frame(id, |d| d.finish_moving_here(c));
         let Some(e) = self.entities.get(id).filter(|e| e.motion != Motion::Parked) else { return };
         let (pos, on) = (e.pos, e.frame);
-        let oriented = e
-            .mount
-            .as_ref()
-            .map(|m| m.place_at(m.angle))
-            .or_else(|| e.ship.as_ref().map(|_| e.body_place()));
+        let oriented = e.mount.as_ref().map(|m| m.place_at(m.angle)).or_else(|| {
+            e.oriented_place().map(|pose| {
+                self.entities
+                    .get(on.unwrap_or(0))
+                    .map_or(pose, |parent| pose.relative_to(parent.body_place()))
+            })
+        });
         let Some(b) = self.bodies.get(&id) else { return };
         let (all, was) = (b.all_blocks(), b.cell);
         let blocks: Vec<(IVec3, u32, Option<u64>)> = all
@@ -1317,7 +1338,7 @@ impl Dim {
                 e.mount
                     .as_ref()
                     .map(|m| m.place_at(m.angle))
-                    .or_else(|| e.ship.as_ref().map(|_| e.body_place()))
+                    .or_else(|| e.oriented_place().map(|pose| pose.relative_to(self.place)))
             })
             .map_or(abi::Turn::NONE, Transform::turn);
         if let Some(e) = self.entities.get_mut(body) {
@@ -1463,7 +1484,7 @@ impl Dim {
         for id in ids {
             let Some(e) = self.entities.get(id).filter(|e| e.motion != Motion::Parked) else { continue };
             let place = Transform::of(e.pos);
-            let pose = (e.mount.is_some() || e.ship.is_some()).then(|| e.body_place());
+            let pose = e.oriented_place();
             let junction = e
                 .mount
                 .as_ref()
@@ -1546,11 +1567,7 @@ impl Dim {
     fn see_world_light(&mut self, id: u64) {
         let Some(b) = self.bodies.get(&id) else { return };
         let Some(cell) = b.cell else { return };
-        let turned = self
-            .entities
-            .get(id)
-            .filter(|e| e.mount.is_some() || e.ship.is_some())
-            .map(|e| e.body_place());
+        let turned = self.entities.get(id).and_then(|e| e.oriented_place());
         let mut lights: FxHashMap<IVec3, u32> = FxHashMap::default();
         for &(at, _) in b.block_snapshot().iter() {
             let w = turned.map_or(at + cell, |t| t.cell_at(at));
@@ -1586,11 +1603,9 @@ impl Dim {
                 let (lo, hi) = self
                     .entities
                     .get(**id)
-                    .filter(|e| e.mount.is_some() || e.ship.is_some())
-                    .map_or((lo + cell, hi + cell), |e| {
-                        let b = e
-                            .body_place()
-                            .box_to_world(Aabb { min: lo.as_dvec3(), max: (hi + IVec3::ONE).as_dvec3() });
+                    .and_then(|e| e.oriented_place())
+                    .map_or((lo + cell, hi + cell), |pose| {
+                        let b = pose.box_to_world(Aabb { min: lo.as_dvec3(), max: (hi + IVec3::ONE).as_dvec3() });
                         (b.min.floor().as_ivec3(), b.max.floor().as_ivec3())
                     });
                 let (lo, hi) = (cube_of(lo), cube_of(hi));
@@ -1608,11 +1623,7 @@ impl Dim {
 
     /// The world's light from body `id`, which is `cell` from the world's cells now.
     fn light_from_body(&mut self, c: &'static Content, id: u64, cell: IVec3) {
-        let turned = self
-            .entities
-            .get(id)
-            .filter(|e| e.mount.is_some() || e.ship.is_some())
-            .map(|e| e.body_place());
+        let turned = self.entities.get(id).and_then(|e| e.oriented_place());
         let lights: Vec<(IVec3, [u8; 3])> = self.bodies.get(&id).map_or(Vec::new(), |b| {
             b.block_snapshot()
                 .iter()
@@ -1717,7 +1728,7 @@ impl Dim {
             .and_then(|e| e.mount.as_deref().copied());
         let mount = self.entities.get(id).and_then(|e| {
             let place = e.body_place();
-            if let Some(m) = &e.mount { Some(m.wire_place()) } else { e.ship.as_ref().map(|_| (place, place.grid_aligned())) }
+            if let Some(m) = &e.mount { Some(m.wire_place()) } else { e.oriented_place().map(|_| (place, place.grid_aligned())) }
         });
         let Some(b) = self.bodies.get_mut(&id) else { return };
         let Some(cell) = b.cell else { return };

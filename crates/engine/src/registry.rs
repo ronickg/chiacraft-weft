@@ -480,7 +480,7 @@ pub struct Game {
     /// Config IDs for ship motion.
     pub ship_thrust: u32,
     pub ship_water_drag: u32,
-    pub ship_max_speed: u32,
+    pub ship_water_side_drag: u32,
     pub thrust_comp: u32,
     pub guide_rail_comp: u32,
     /// (owner, component, system) in mod order.
@@ -2225,7 +2225,7 @@ pub fn freeze(
     g.simulation_distance = tables.1.ids(ek::CONFIG)["core:simulation_distance"];
     g.ship_thrust = tables.1.ids(ek::CONFIG)["core:ship_thrust"];
     g.ship_water_drag = tables.1.ids(ek::CONFIG)["core:ship_water_drag"];
-    g.ship_max_speed = tables.1.ids(ek::CONFIG)["core:ship_max_speed"];
+    g.ship_water_side_drag = tables.1.ids(ek::CONFIG)["core:ship_water_side_drag"];
     (g.categories, _) = tables.bake(kind(ek::ENTITY_CATEGORY), ek::ENTITY_CATEGORY, mod_name, errors, |e, _| bake_category(e));
     for k in g
         .entities
@@ -2998,7 +2998,16 @@ fn engine_particles() -> Vec<RawEntry> {
         kind(k::POOF, generic.clone(), [[0.4, 1.1], [0.15, 0.3]], [-2.0, 0.9], [0xD0D0D0FF, 0x909090FF], 0),
         kind(k::CRIT, generic.clone(), [[0.3, 0.7], [0.1, 0.2]], [8.0, 0.8], [0xFFE9A0FF, 0xC08030FF], pf::FULLBRIGHT),
         kind(k::FLAME, one("flame"), [[0.3, 0.8], [0.08, 0.14]], [0.0, 0.96], white, pf::FULLBRIGHT | pf::SHRINK),
-        kind(k::SMOKE, generic, [[0.6, 1.4], [0.08, 0.16]], [-1.5, 0.96], [0x505050FF, 0x303030FF], 0),
+        kind(k::SMOKE, generic.clone(), [[0.6, 1.4], [0.08, 0.16]], [-1.5, 0.96], [0x505050FF, 0x303030FF], 0),
+        kind(
+            "core:thruster_exhaust",
+            generic.clone(),
+            [[0.18, 0.38], [0.13, 0.33]],
+            [0.0, 0.96],
+            [0xFFF3B2FF, 0xFF4B18CC],
+            pf::FULLBRIGHT | pf::TRANSLUCENT | pf::SHRINK,
+        ),
+        kind("core:thruster_smoke", generic, [[0.5, 0.85], [0.19, 0.44]], [-0.8, 0.9], [0xA0A6A9A8, 0x67696C00], pf::TRANSLUCENT),
         // Pops at the surface, as vanilla's does.
         kind(k::BUBBLE, one("bubble"), [[0.5, 1.5], [0.05, 0.1]], [-4.0, 0.85], white, 0)
             .set(p::RULES, rule(pe::LEAVE_LIQUID, pt::DIE, "")),

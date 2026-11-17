@@ -457,6 +457,7 @@ messages! {
         PlayerGone { entity: u64 },
         ControllerEdit { controller: u64, face: u8, data: Vec<u8> },
         HelmProfile { mount: u64, controller: u64, data: Vec<u8> },
+        BodyGrab(Option<u64>),
     }
 }
 
@@ -527,6 +528,9 @@ messages! {
         Avatar(AvatarData),
         /// The client's view distance in cubes: what the server announces edited cubes in.
         View(u32),
+        GrabBody,
+        ReleaseBody,
+        TurnGrab([f32; 2]),
     }
 }
 
