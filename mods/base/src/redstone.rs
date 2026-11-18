@@ -128,7 +128,6 @@ pub fn register(r: &mut Registry) {
         .not_solid()
         .hardness(0.0)
         .sound_group("stone")
-        .item_texture("repeater")
         .tab(&crate::tabs::REDSTONE);
 
     r.block(&COMPARATOR)
@@ -153,7 +152,6 @@ pub fn register(r: &mut Registry) {
         .not_solid()
         .hardness(0.0)
         .sound_group("stone")
-        .item_texture("comparator")
         .tab(&crate::tabs::REDSTONE);
 
     r.block(&LEVER)
@@ -179,7 +177,6 @@ pub fn register(r: &mut Registry) {
         .not_solid()
         .hardness(0.5)
         .sound_group("wood")
-        .item_texture("lever")
         .tab(&crate::tabs::REDSTONE);
 
     r.block(&BUTTON)
@@ -340,7 +337,7 @@ pub fn register(r: &mut Registry) {
         .states(|p, s| {
             let rear = if p.int("power") > 0 { "thruster_back_on" } else { "thruster_back" };
             let mut faces = [("thruster_side", UV_FROM_BOX); 6];
-            faces[Dir::North as usize].0 = "thruster_front";
+            faces[Dir::North as usize].0 = "iron_block";
             faces[Dir::South as usize].0 = rear;
             s.model_box_faces([0.0; 3], [16.0; 3], faces)
                 .turned([1, 3, 2, 0, 0, 0])
@@ -371,8 +368,8 @@ pub fn register(r: &mut Registry) {
                 };
                 let (front, back) = match (rotates, hold) {
                     (true, true) => ("rotor_hold_front", "rotor_hold_back"),
-                    (true, false) => ("rotor_front", "rotor_back"),
-                    (false, _) => ("assembler_front", "assembler_back"),
+                    (true, false) => ("piston_top_sticky", "furnace_top"),
+                    (false, _) => ("assembler_front", "iron_block"),
                 };
                 let faces = [
                     (side, UV_FROM_BOX),

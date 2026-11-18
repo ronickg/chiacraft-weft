@@ -21,8 +21,8 @@ pub fn register(r: &mut Registry) {
             let mut record = [("music_player_side", UV_FROM_BOX); 6];
             record[Dir::Up as usize] = ("music_player_record", full);
             s.orientation(Orientation::front(p.facing()))
-                .model_box_faces([0.0; 3], [16.0, 13.0, 16.0], faces)
-                .model_box_faces([1.0, 13.0, 1.0], [15.0, 14.0, 15.0], record)
+                .model_box_faces([0.0; 3], [16.0, 14.0, 16.0], faces)
+                .model_box_faces([1.0, 14.0, 1.0], [15.0, 15.0, 15.0], record)
         })
         .sound_group("wood")
         .hardness(2.0)

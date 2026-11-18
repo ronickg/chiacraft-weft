@@ -64,8 +64,9 @@ pub fn register(r: &mut Registry) {
             let mut faces = [("helm_side", UV_FROM_BOX); 6];
             faces[Dir::North as usize].0 = "helm_front";
             faces[Dir::Up as usize].0 = "helm_top";
+            faces[Dir::Down as usize].0 = "planks_oak";
             s.orientation(Orientation::front(p.facing()))
-                .model_box_faces([0.0; 3], [16.0; 3], faces)
+                .model_box_faces([0.0; 3], [16.0, 8.0, 16.0], faces)
         })
         .sound_group("wood")
         .hardness(2.0)
