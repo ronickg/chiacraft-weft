@@ -37,6 +37,7 @@ pub static PRICKED: DamageCause = DamageCause::named("cactus");
 pub static WATER: Block = Block::named("water");
 pub static LAVA: Block = Block::named("lava");
 pub static TALL_GRASS: Block = Block::named("tall_grass");
+pub static SHORT_GRASS: Block = Block::named("short_grass");
 pub static DANDELION: Block = Block::named("dandelion");
 pub static ROSE: Block = Block::named("rose");
 pub static SAPLING: Block = Block::named("sapling");
@@ -73,6 +74,7 @@ pub static LAVENDER: Block = Block::named("lavender");
 pub static BLUEGRASS: Block = Block::named("bluegrass");
 pub static INULA: Block = Block::named("inula");
 pub static VERBASCUM: Block = Block::named("verbascum");
+pub static CLOVER: Block = Block::named("clover");
 
 pub static MUSHROOMS: [&Block; 3] = [&PORCINI_MUSHROOM, &CHANTERELLE_MUSHROOM, &TOADSTOOL_MUSHROOM];
 
@@ -450,6 +452,14 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::NATURAL);
     r.loot(&TALL_GRASS)
         .pool(Pool::new().when(Cond::chance(0.125)).item("wheat_seeds"));
+    r.block(&SHORT_GRASS)
+        .sound_group("grass")
+        .texture("short_grass")
+        .plant()
+        .replaceable()
+        .needs_below("#plant_soil")
+        .tint_kind(&tints::GRASS)
+        .tab(&crate::tabs::NATURAL);
     r.block(&TALL_TALL_GRASS)
         .sound_group("grass")
         .texture("tall_tallgrass_bottom")
@@ -492,6 +502,40 @@ pub fn register(r: &mut Registry) {
         .tall_plant("lavender_bottom", "lavender_top")
         .replaceable()
         .needs_below("#plant_soil")
+        .tab(&crate::tabs::NATURAL);
+    r.block(&CLOVER)
+        .sound_group("grass")
+        .needs_below("#plant_soil")
+        .model_box_faces(
+            [0.0, 0.0, 0.0],
+            [16.0, 2.0, 16.0],
+            [
+                ("clover_bottom", UV_NO_FACE),
+                ("clover_bottom", UV_NO_FACE),
+                ("clover_bottom", UV_NO_FACE),
+                ("clover_bottom", [0.0, 0.0, 16.0, 16.0]),
+                ("clover_bottom", UV_NO_FACE),
+                ("clover_bottom", UV_NO_FACE),
+            ]
+        )
+        .model_box_faces(
+            [0.0, 0.0, 0.0],
+            [16.0, 4.0, 16.0],
+            [
+                ("clover_top", UV_NO_FACE),
+                ("clover_top", UV_NO_FACE),
+                ("clover_top", UV_NO_FACE),
+                ("clover_top", [0.0, 0.0, 16.0, 16.0]),
+                ("clover_top", UV_NO_FACE),
+                ("clover_top", UV_NO_FACE),
+            ]
+        )
+        .hitbox(
+            [0.0; 3],
+            [16.0, 4.0, 16.0]
+        )
+        .tint_kind(&tints::GRASS)
+        .not_solid()
         .tab(&crate::tabs::NATURAL);
 
     r.block(&SAPLING)

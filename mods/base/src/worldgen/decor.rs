@@ -54,13 +54,15 @@ pub fn decorate(g: &mut Gen) {
             let flower_chance = FLOWER_COVER.on_biome(b).unwrap_or(0.012) as f64;
             let fern_chance = FERN_COVER.on_biome(b).unwrap_or(0.0) as f64;
             let bluegrass_chance = BLUEGRASS_COVER.on_biome(b).unwrap_or(0.0) as f64;
+            let short_grass_chance = SHORT_GRASS_COVER.on_biome(b).unwrap_or(0.0) as f64;
+            let clover_chance = CLOVER_COVER.on_biome(b).unwrap_or(0.0) as f64;
             // What is under the lowest layer takes a look at the terrain: only if anything would grow.
             if y == 0 && roll >= grass_chance.max(0.08) && roll >= tall_grass_chance.max(0.08) {
                 continue;
             }
             let below = g.read([wx, oy + y as i32 - 1, wz]);
             if PLANT_SOIL.on_block(below) {
-                // roll ∈ [0; grass_chance)
+                // roll ∈ [0; flower_chance)
                 if roll < flower_chance {
                     let flower = FLOWERS
                         .on_biome(b)
@@ -68,15 +70,21 @@ pub fn decorate(g: &mut Gen) {
                     if flower != 0 {
                         g.set(x, y, z, flower);
                     }
-                // roll ∈ [grass_chance; fern_chance)
+                // roll ∈ [flower_chance; clover_chance)
                 } else if roll < fern_chance {
                     g.set(x, y, z, FERN.id());
+                // roll ∈ [clover_chance; fern_chance)
+                } else if roll < clover_chance {
+                    g.set(x, y, z, CLOVER.id());
                 // roll ∈ [fern_chance; bluegrass_chance)
                 } else if roll < bluegrass_chance {
                     let wave = fixed::fbm(fixed::seed32(seed, 0x7A11) + 1, wx * 16, wz * 16, 48 * 16, 3);
                     if wave < 0 {
                         g.set(x, y, z, BLUEGRASS.id());
                     }
+                // roll ∈ [bluegrass_chance; short_grass_chance)
+                } else if roll < short_grass_chance {
+                    g.set(x, y, z, SHORT_GRASS.id());
                 // roll ∈ [bluegrass_chance; tall_grass_chance)
                 } else if roll < tall_grass_chance {
                     place_tall_grass(g, x, y, z);

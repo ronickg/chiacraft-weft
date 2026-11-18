@@ -74,6 +74,7 @@ pub fn register(r: &mut Registry) {
     r.biome(&LAVENDER_FIELDS)
         .surface("grass", "dirt", 3)
         .tag("animals")
+        .tag("spawn_biome")
         .set(&GRASS_COVER, 0.7)
         .set(&TALL_GRASS_COVER, 0.25)
         .set(&BOULDER_COVER, 0.03)
@@ -85,6 +86,7 @@ pub fn register(r: &mut Registry) {
     r.biome(&HILLS)
         .surface("grass", "dirt", 3)
         .tag("animals")
+        .tag("spawn_biome")
         .tint(grass, 0x88bb67)
         .tint(foliage, 0x6ba941)
         .set(&TREES, 0.025)
@@ -108,6 +110,16 @@ pub fn register(r: &mut Registry) {
         .set(&SNOWBERRY_COVER, 0.002)
         .set_text(&FLOWERS, "base:dandelion base:inula base:verbascum")
         .set(&FLOWER_COVER, 0.1);
+    r.biome(&CLOVER_MEADOW)
+        .surface("grass", "dirt", 3)
+        .tag("animals")
+        .tag("spawn_biome")
+        .set(&TREES, 0.025)
+        .set(&CLOVER_COVER, 0.3)
+        .set(&SHORT_GRASS_COVER, 0.6)
+        .set(&GRASS_COVER, 0.7)
+        .set(&BOULDER_COVER, 0.03)
+        .set(&FLOWER_COVER, 0.0);
     r.biome(&FOREST)
         .humidity(0.25..)
         .surface("grass", "dirt", 3)
@@ -287,7 +299,8 @@ pub fn register(r: &mut Registry) {
                 .height(SEA + 30..),
         )
         .rule(BiomeRule::new("lavender_fields").field("base:weirdness", 1.0..))
-        .rule(BiomeRule::new("tallgrass_meadow").field("base:weirdness", 0.5..))
+        .rule(BiomeRule::new("tallgrass_meadow").field("base:weirdness", ..0.3))
+        .rule(BiomeRule::new("clover_meadow").field("base:weirdness", 0.6..0.9))
         .rule(BiomeRule::new("plains"))
         .cave_biome("deep_caves", 24, 96.0, 0.25)
         .caves(Caves::new("lava", i32::MIN, 11));

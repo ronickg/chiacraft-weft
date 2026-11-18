@@ -11,6 +11,8 @@ pub static FUNGI_COVER: Component<f32> = Component::named("fungi");
 pub static FLOWER_COVER: Component<f32> = Component::named("flower");
 pub static FERN_COVER: Component<f32> = Component::named("fern");
 pub static BLUEGRASS_COVER: Component<f32> = Component::named("bluegrass");
+pub static SHORT_GRASS_COVER: Component<f32> = Component::named("short_grass");
+pub static CLOVER_COVER: Component<f32> = Component::named("clover");
 /// Flowers a biome grows, picked evenly (`"base:dandelion base:rose"` where unset).
 pub static FLOWERS: Component<BlockList> = Component::named("flowers");
 /// On a log, the tree it grows into: `round <leaves>` (like oaks, 4-6 high) or `cone <leaves>`
@@ -25,6 +27,7 @@ pub static PLAINS: Biome = Biome::named("plains");
 pub static LAVENDER_FIELDS: Biome = Biome::named("lavender_fields");
 pub static HILLS: Biome = Biome::named("hills");
 pub static TALLGRASS_MEADOW: Biome = Biome::named("tallgrass_meadow");
+pub static CLOVER_MEADOW: Biome = Biome::named("clover_meadow");
 pub static FOREST: Biome = Biome::named("forest");
 pub static BIRCH_FOREST: Biome = Biome::named("birch_forest");
 pub static TAIGA: Biome = Biome::named("taiga");
