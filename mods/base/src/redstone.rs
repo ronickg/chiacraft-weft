@@ -340,7 +340,7 @@ pub fn register(r: &mut Registry) {
         .states(|p, s| {
             let rear = if p.int("power") > 0 { "thruster_back_on" } else { "thruster_back" };
             let mut faces = [("thruster_side", UV_FROM_BOX); 6];
-            faces[Dir::North as usize].0 = "thruster_front";
+            faces[Dir::North as usize].0 = "iron_block";
             faces[Dir::South as usize].0 = rear;
             s.model_box_faces([0.0; 3], [16.0; 3], faces)
                 .turned([1, 3, 2, 0, 0, 0])
