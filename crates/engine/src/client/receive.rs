@@ -347,6 +347,7 @@ impl Client {
         self.player.pos = pos;
         self.player.prev = pos;
         self.player.vel = DVec3::ZERO;
+        self.me.surface_pos = pos;
     }
 
     fn spawn_entities(&mut self, list: Vec<crate::net::EntityView>) {

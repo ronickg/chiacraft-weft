@@ -174,6 +174,7 @@ pub struct ClientEntity {
     /// Its own box (width, height, eye) and the kind it looks like, when a mod set them.
     pub size: Option<weft_abi::EntitySize>,
     pub look: Option<u32>,
+    surface_pos: DVec3,
     /// The solid body it stands on (0: the world), and its position relative to that body:
     /// shown and as the server last had it. Riders are drawn where the body is drawn.
     pub frame: u64,
@@ -394,6 +395,7 @@ impl ClientEntity {
             pulled: None,
             size: None,
             look: None,
+            surface_pos: pos,
             frame: 0,
             rel: DVec3::ZERO,
             rel_target: None,
@@ -1239,7 +1241,7 @@ impl Client {
         if self.pressed_without_helm(input, "core:inventory") && input.captured {
             self.conn.send(ToServer::OpenInventory);
         }
-        self.step_physics(input, dt);
+        let moved_for = self.step_physics(input, dt);
         // Where the camera goes by: placed before the physics step, the body would trail it by
         // part of a tick and catch up on each tick.
         let pos = self.smooth_pos();
@@ -1249,6 +1251,9 @@ impl Client {
         self.act(input, dt, look);
         self.send_move(dt);
         self.animate_entities(dt);
+        if moved_for != 0.0 {
+            self.motion_effects(moved_for);
+        }
         self.chip_block(dt);
         self.particles.update(dt as f32);
         // Its steps go by how far it walks on the ground (`entity_effects`).
@@ -1501,7 +1506,7 @@ impl Client {
         }
     }
 
-    fn step_physics(&mut self, input: &Input, dt: f64) {
+    fn step_physics(&mut self, input: &Input, dt: f64) -> f64 {
         let c = content();
         let world = &self.world;
         let block = world::SeenCells { world, air_if_missing: false };
@@ -1629,9 +1634,7 @@ impl Client {
         for _ in 0..ambient_steps {
             self.ambient();
         }
-        if ambient_steps != 0 {
-            self.structure_effects();
-        }
+        f64::from(ambient_steps) * STEP
     }
 
     /// What the crosshair is on. Returns where the eye looks.

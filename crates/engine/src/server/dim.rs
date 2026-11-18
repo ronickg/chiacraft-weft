@@ -1570,8 +1570,7 @@ impl Dim {
     }
 
     /// What everyone near sees of a fall: dust where entity `id` landed from `fell` blocks up
-    /// (vanilla's, from a fall that would hurt), and a splash where it fell into a liquid with
-    /// one (`comp::SPLASH`, `comp::BUBBLE`).
+    /// (vanilla's, from a fall that would hurt), and bubbles in the liquid it fell into.
     pub fn fall_effects(&mut self, space_id: u64, c: &'static Content, id: u64, fell: Option<f32>, splash: bool) {
         let safe = self.attribute(space_id, c, id, crate::registry::attr::SAFE_FALL, false) as f32;
         let hurts = fell
@@ -1602,26 +1601,21 @@ impl Dim {
             .then(|| crate::physics::liquid_at(c, self.space(space_id), pos))
             .flatten()
             .map(|l| c.liquids[l as usize].first_state);
-        if let Some(state) = liquid {
-            for (comp, count) in [(abi::comp::SPLASH, 24), (abi::comp::BUBBLE, 12)] {
-                let Some(&kind) = c
-                    .components
-                    .id(comp)
-                    .and_then(|id| c.components.text(comps::BLOCK, state, id))
-                    .and_then(|n| c.game.catalog.ids(ek::PARTICLE).get(n))
-                else {
-                    continue;
-                };
-                bursts.push(abi::ParticleBurst {
-                    kind,
-                    pos: pos.to_array().into(),
-                    count,
-                    spread: [w * 2.0, 0.2, w * 2.0].into(),
-                    speed: 3.0,
-                    velocity: [0.0, 3.0, 0.0].into(),
-                    ..abi::ParticleBurst::DEFAULT
-                });
-            }
+        if let Some(kind) = liquid.and_then(|state| {
+            c.components
+                .id(abi::comp::BUBBLE)
+                .and_then(|id| c.components.text(comps::BLOCK, state, id))
+                .and_then(|n| c.game.catalog.find(ek::PARTICLE, n))
+        }) {
+            bursts.push(abi::ParticleBurst {
+                kind,
+                pos: pos.to_array().into(),
+                count: 12,
+                spread: [w * 2.0, 0.2, w * 2.0].into(),
+                speed: 3.0,
+                velocity: [0.0, 3.0, 0.0].into(),
+                ..abi::ParticleBurst::DEFAULT
+            });
         }
         let dim = self.id;
         self.events.extend(

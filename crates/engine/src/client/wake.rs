@@ -55,8 +55,9 @@ impl Crest {
         } else {
             (1.0, 1.0)
         };
-        let height = (0.18 * energy + 0.025 * self.power).min(2.4) * rise * texture;
-        let width = (0.50 + 0.28 * energy).min(3.1) * expansion;
+        let scale = self.size.min(1.0);
+        let height = (0.18 * energy + 0.025 * self.power * scale).min(2.4) * rise * texture;
+        let width = (0.50 * scale + 0.28 * energy).min(3.1) * expansion;
         move |across| {
             let arc = (across / CREST_LIP).min((1.0 - across) / (1.0 - CREST_LIP));
             let arched = arc * arc * (3.0 - 2.0 * arc);

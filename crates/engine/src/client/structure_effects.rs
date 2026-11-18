@@ -2,7 +2,7 @@ use glam::{DVec3, IVec3};
 use weft_abi::{self as abi, ParticleBurst, entry_kind as ek, ray};
 
 use super::{
-    Client, ClientEntity,
+    Client,
     particles::Particles,
     wake::{Crest, Stern, SurfaceLine},
     world::{ClientWorld, SeenCells},
@@ -23,7 +23,7 @@ struct Kinds {
 }
 
 impl Client {
-    pub(super) fn structure_effects(&mut self) {
+    pub(super) fn motion_effects(&mut self, elapsed: f64) {
         let c = content();
         let kinds = c.game.catalog.ids(ek::PARTICLE);
         let kinds = Kinds { flame: kinds["core:thruster_exhaust"], smoke: kinds["core:thruster_smoke"] };
@@ -42,18 +42,44 @@ impl Client {
         let world_frame = Transform::default();
         self.wake_render.advance(tick);
         emit_exhaust(c, cells, &self.world, world_frame, world_frame, eye, &dry, &kinds, &mut self.particles, &mut exhaust);
-        for (&id, e) in self.entities.iter().filter(|(_, e)| e.structure.is_some()) {
-            if exhaust == 0 && samples == 0 {
-                break;
+        let mine = (!self.dead && !self.mode.has(crate::tag_bits::game_mode::HIDDEN))
+            .then_some((&self.player_id, &self.me));
+        for (&id, e) in mine.into_iter().chain(self.entities.iter()) {
+            let pos = e.surface_pos;
+            let body = e.structure.as_deref();
+            let (bounds, place, previous, seconds) = if let Some(body) = body {
+                let Some((min, max)) = body.bounds else { continue };
+                (
+                    Aabb { min: min.as_dvec3(), max: max.as_dvec3() + DVec3::ONE },
+                    e.place_at(tick), e.place_at(tick - MOTION_TICKS), MOTION_TICKS * TICK,
+                )
+            } else {
+                if samples == 0 || e.pulled.is_some() || pos.y - e.pos.y <= 0.8 * elapsed {
+                    continue;
+                }
+                let size = e.dims();
+                (
+                    Aabb::around(DVec3::ZERO, size.half_width, size.height),
+                    Transform::rotated(e.pos, glam::DQuat::IDENTITY), Transform::rotated(pos, glam::DQuat::IDENTITY), elapsed,
+                )
+            };
+            let world = place.box_to_world(bounds);
+            if eye.distance_squared(eye.clamp(world.min, world.max)) >= EFFECT_RANGE * EFFECT_RANGE {
+                continue;
             }
-            let Some((body, bounds, place, previous)) = visible_body(e, eye, tick) else { continue };
-            emit_exhaust(c, cells, body, place, previous, eye, &dry, &kinds, &mut self.particles, &mut exhaust);
+            if let Some(body) = body {
+                emit_exhaust(c, cells, body, place, previous, eye, &dry, &kinds, &mut self.particles, &mut exhaust);
+            }
             if samples > 0 {
-                let mut wake = Wake { c, cells, body, place, previous, eye, phase, samples: &mut samples };
-                let line = wake.sample(bounds, e.frame == 0);
+                let mut wake = Wake { c, cells, body, bounds, place, previous, seconds, eye, phase, samples: &mut samples };
+                let line = wake.sample(e.frame == 0);
+                if line.impact.is_empty() && line.bow.is_empty() && line.stern.is_none() {
+                    continue;
+                }
                 self.wake_render.waterline(id, line, tick, |at, liquid| {
                     exposed_surface(c, &cells, at.floor().as_ivec3())
                         .is_some_and(|(kind, height)| kind == liquid && (height + FOAM_HEIGHT - at.y).abs() < 0.27)
+                        && !dry.iter().any(|&volume| physics::inside_dry_volume(volume, at))
                 });
             }
         }
@@ -61,17 +87,11 @@ impl Client {
             self.particles
                 .spawn(&burst(kind, pos, velocity, 0.055, 0.9, 1), &self.world);
         });
+        self.me.surface_pos = self.me.pos;
+        for e in self.entities.values_mut() {
+            e.surface_pos = e.pos;
+        }
     }
-}
-
-fn visible_body(e: &ClientEntity, eye: DVec3, tick: f64) -> Option<(&ClientWorld, Aabb, Transform, Transform)> {
-    let body = e.structure.as_deref()?;
-    let (min, max) = body.bounds?;
-    let bounds = Aabb { min: min.as_dvec3(), max: max.as_dvec3() + DVec3::ONE };
-    let place = e.place_at(tick);
-    let world = place.box_to_world(bounds);
-    let nearest = eye.clamp(world.min, world.max);
-    (eye.distance_squared(nearest) < EFFECT_RANGE * EFFECT_RANGE).then(|| (body, bounds, place, e.place_at(tick - MOTION_TICKS)))
 }
 
 fn emit_exhaust(
@@ -159,9 +179,11 @@ fn spawn(particles: &mut Particles, world: &ClientWorld, remaining: &mut u32, mu
 struct Wake<'a> {
     c: &'a Content,
     cells: SeenCells<'a>,
-    body: &'a ClientWorld,
+    body: Option<&'a ClientWorld>,
+    bounds: Aabb,
     place: Transform,
     previous: Transform,
+    seconds: f64,
     eye: DVec3,
     phase: f64,
     samples: &'a mut u32,
@@ -185,14 +207,15 @@ impl Rim {
 }
 
 impl Wake<'_> {
-    fn sample(&mut self, bounds: Aabb, trail: bool) -> SurfaceLine {
+    fn sample(&mut self, trail: bool) -> SurfaceLine {
         let mut line = SurfaceLine::default();
+        let bounds = self.bounds;
         let mid = (bounds.min + bounds.max) * 0.5;
         let center = self.place.to_world(mid);
         let half = (bounds.max - bounds.min) * 0.5;
-        let motion = (center - self.previous.to_world(mid)) / (MOTION_TICKS * TICK);
+        let motion = (center - self.previous.to_world(mid)) / self.seconds;
         let rotation = self.place.rotation() * self.previous.rotation().conjugate();
-        let angular_travel = rotation.to_scaled_axis().length() * half.length() / (MOTION_TICKS * TICK);
+        let angular_travel = rotation.to_scaled_axis().length() * half.length() / self.seconds;
         if motion.length_squared() > 80.0 * 80.0 || motion.with_y(0.0).length() + angular_travel < 0.35 && motion.y > -0.8 {
             return line;
         }
@@ -214,7 +237,7 @@ impl Wake<'_> {
         let fall = self.previous.box_to_world(bounds).min.y - world.min.y;
         let h = world.max.y.min(world.min.y + 48.0) + fall.clamp(0.0, 4.0) + 0.15;
         let depth = h - world.min.y + 0.25;
-        let size = (2.0 * extent(across)).sqrt().clamp(1.0, 3.0);
+        let size = (2.0 * extent(across)).sqrt().clamp(0.25, 3.0);
         let speed = motion.with_y(0.0).length();
         let mut perimeter = Vec::new();
         'sides: for (span, outward) in [(run, -across), (across, run), (-run, across), (-across, -run)] {
@@ -232,11 +255,11 @@ impl Wake<'_> {
                 let jitter = if rear || i == 0 || i + 1 == lanes { 0.0 } else { 0.19 * (self.phase - 0.5) };
                 let along = ((f64::from(i) + jitter) / f64::from(lanes - 1) * 2.0 - 1.0) * width * (1.0 - margin);
                 let start = (center + span * along + outward * reach).with_y(h);
-                let hit = self.rim(start, outward, depth, (2.0 * reach).min(128.0), world.min.y, fall);
+                let hit = self.rim(start, outward, depth, (2.0 * reach).min(128.0), world.min.y, fall, size);
                 perimeter.push(hit);
             }
         }
-        if trail && speed > 0.6 {
+        if self.body.is_some() && trail && speed > 0.6 {
             let mut wet = perimeter.iter().flatten().map(|rim| rim.pos - center);
             if let Some(first) = wet.next() {
                 let (mut left, mut right) = (first.dot(across), first.dot(across));
@@ -264,6 +287,9 @@ impl Wake<'_> {
                 .filter(|rim| rim.drop > 0.0)
                 .map(|rim| (rim.liquid, rim.crest(rim.drop, size))),
         );
+        if self.body.is_none() {
+            return line;
+        }
         let max_gap = (extent(run).max(extent(across)) * 0.55).clamp(2.7, 16.0);
         for (a, b) in perimeter.iter().zip(perimeter.iter().cycle().skip(1)) {
             let (Some(a), Some(b)) = (a, b) else { continue };
@@ -282,25 +308,32 @@ impl Wake<'_> {
         line
     }
 
-    fn rim(&self, start: DVec3, outward: DVec3, depth: f64, reach: f64, keel_y: f64, fall: f64) -> Option<Rim> {
+    fn rim(&self, start: DVec3, outward: DVec3, depth: f64, reach: f64, keel_y: f64, fall: f64, size: f64) -> Option<Rim> {
         let surface = physics::raycast(self.c, &self.cells, start, DVec3::NEG_Y, depth, ray::LIQUIDS | ray::SOLID)?;
         let (liquid, y) = exposed_surface(self.c, &self.cells, surface.block)?;
         if self.c.states[surface.state as usize].liquid != Some(liquid) {
             return None;
         }
         let droplets = liquid_particle(self.c, liquid, abi::comp::SPLASH)?;
-        let body = SeenCells { world: self.body, air_if_missing: true };
-        let ray_origin = start.with_y(y - 0.08);
+        let immersion = ((self.bounds.max.y - self.bounds.min.y) * 0.5).min(0.18);
+        let ray_origin = start.with_y(y - (immersion * 0.5).min(0.08));
         let cast = |place: Transform, from| {
-            physics::raycast(self.c, &body, place.to_local(from), place.vector_to_local(-outward), reach, ray::SOLID)
+            let origin = place.to_local(from);
+            let direction = place.vector_to_local(-outward);
+            if let Some(world) = self.body {
+                let cells = SeenCells { world, air_if_missing: true };
+                physics::raycast(self.c, &cells, origin, direction, reach, ray::SOLID).map(|hit| hit.dist)
+            } else {
+                physics::ray_aabb(origin, direction, &self.bounds, reach).map(|hit| hit.0)
+            }
         };
         let entry = || {
             // Use the same entry pose along the contour, even if taller blocks still cross the waterline.
             if fall < 0.1 {
                 return None;
             }
-            let earlier = (y - keel_y - 0.18) / fall;
-            if !(0.0..=0.5).contains(&earlier) {
+            let earlier = (y - keel_y - immersion) / fall;
+            if !(0.0..=if self.body.is_some() { 0.5 } else { 1.0 }).contains(&earlier) {
                 return None;
             }
             let pos = self
@@ -313,21 +346,19 @@ impl Wake<'_> {
                 .slerp(self.previous.rotation(), earlier);
             let sample = Transform::rotated(pos, turn);
             let from = ray_origin + (pos - self.place.position()).with_y(0.0);
-            let hit = cast(sample, from)?;
-            Some((from - outward * hit.dist, sample))
+            Some((from - outward * cast(sample, from)?, sample))
         };
         let (rim, sample) = entry().or_else(|| {
-            let hit = cast(self.place, ray_origin)?;
-            Some((ray_origin - outward * hit.dist, self.place))
+            Some((ray_origin - outward * cast(self.place, ray_origin)?, self.place))
         })?;
-        let open = rim + outward * 0.38;
+        let open = rim + outward * (0.38 * size.min(1.0));
         let (here, y) = exposed_surface(self.c, &self.cells, open.floor().as_ivec3())?;
         if here != liquid || (y - rim.y).abs() > 0.25 || open.distance_squared(self.eye) > EFFECT_RANGE * EFFECT_RANGE {
             return None;
         }
         let local = sample.to_local(rim);
         let before = self.previous.to_world(local);
-        let velocity = (self.place.to_world(local) - before) / (MOTION_TICKS * TICK);
+        let velocity = (self.place.to_world(local) - before) / self.seconds;
         let travel = velocity.with_y(0.0);
         let drop = if before.y >= y { (-velocity.y - 0.75).clamp(0.0, 12.0) } else { 0.0 };
         Some(Rim {
