@@ -343,6 +343,7 @@ pub fn run(renderers: Renderers, opts: Options) -> Result<(), String> {
 #[cfg(target_os = "android")]
 pub fn run_android(app: winit::platform::android::activity::AndroidApp, renderers: Renderers, opts: Options) -> Result<(), String> {
     use winit::platform::android::EventLoopBuilderExtAndroid;
+    crate::clipboard::init(app.clone());
     run_on(
         EventLoop::builder()
             .with_android_app(app)
