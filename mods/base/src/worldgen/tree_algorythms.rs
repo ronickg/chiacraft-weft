@@ -263,7 +263,6 @@ fn place_log(d: &mut TreePlaceData, log_block: &Block, length: u16) {
         (result[0].0, result[0].2 + 1)
     };
     let direction = DIRECTIONS[dir_index];
-    dbg!(direction.2);
     let block = log_block.with(&[(
         "axis",
         match direction.2 {
