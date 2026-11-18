@@ -81,25 +81,9 @@ fn log(r: &mut Registry, handle: &'static Block, wood: &str, leaves: &str, cone:
 
 /// Dyed blocks' colors: name, glass tint, wool tint, the light the glass takes away per channel.
 const COLORS: &[(&str, u32, u32, [u8; 3], [u8; 3])] = &[
-    (
-        "red",
-        0xED3737,
-        0xB02E26,
-        [0, 12, 12],
-        [15u8, 3, 2]
-    ), (
-        "green",
-        0x37C837,
-        0x5E7C16,
-        [12, 0, 12],
-        [2, 15, 4]
-    ), (
-        "blue",
-        0x375BFF,
-        0x3C44AA,
-        [12, 12, 0],
-        [3, 6, 15]
-    )
+    ("red", 0xED3737, 0xB02E26, [0, 12, 12], [15u8, 3, 2]),
+    ("green", 0x37C837, 0x5E7C16, [12, 0, 12], [2, 15, 4]),
+    ("blue", 0x375BFF, 0x3C44AA, [12, 12, 0], [3, 6, 15]),
 ];
 
 fn leaves(r: &mut Registry, handle: &'static Block, tex: &str) {
