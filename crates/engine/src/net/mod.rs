@@ -64,6 +64,12 @@ macro_rules! wire_struct {
 }
 
 wire_struct! {
+    /// Capacity for the held item and the first menu slot showing this inventory slot.
+    #[derive(Clone)]
+    pub struct DragSlot { pub slot: u32, pub room: u32 }
+}
+
+wire_struct! {
     schema;
     #[derive(Default)]
     pub struct HealthField { pub current: f32, pub maximum: f32 }
@@ -434,7 +440,8 @@ messages! {
         /// `block`: the state it was opened on (0: none), `name`: what it belongs to is called.
         OpenMenu { kind: u32, window: u32, slots: u32, owner: u64, block: u32, name: String },
         MenuSlots(Vec<(u32, ItemStack)>),
-        Cursor(ItemStack),
+        /// The held stack and how many of it can go into each menu slot.
+        Cursor { stack: ItemStack, targets: Vec<DragSlot> },
         CloseMenu,
         Died,
         /// Formatted by the client in its own language.

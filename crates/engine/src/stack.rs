@@ -437,6 +437,19 @@ pub fn room_in(current: ItemStack, incoming: ItemStack, limit: u32) -> u32 {
     }
 }
 
+/// Eligible slots and how much of the cursor stack to offer each one.
+pub fn drag_slots(slots: &[u32], count: u32, button: u8, mut room: impl FnMut(u32) -> u32) -> (Vec<u32>, u32) {
+    let mut seen = rustc_hash::FxHashSet::default();
+    let valid: Vec<_> = slots
+        .iter()
+        .copied()
+        .filter(|&slot| (button == 1 || seen.insert(slot)) && room(slot) > 0)
+        .take(count as usize)
+        .collect();
+    let share = if button == 1 { 1 } else { count.checked_div(valid.len() as u32).unwrap_or(0) };
+    (valid, share)
+}
+
 /// Matching stacks first, then empty slots. Access reads on None and writes on Some.
 pub fn insert_into(
     mut incoming: ItemStack,

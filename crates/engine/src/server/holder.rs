@@ -9,7 +9,7 @@ use super::dim::Dim;
 use crate::content::Content;
 use crate::stack;
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum At {
     Entity(u64),
     /// The stack in `slot` of `entity`'s inventory.
@@ -40,7 +40,7 @@ pub fn resolve(d: &Dim, space_id: u64, h: &abi::Holder) -> Option<At> {
 }
 
 /// An inventory: the one a holder has itself (`storage` 0), or one of the storages it carries.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Inv {
     pub at: At,
     pub storage: u32,

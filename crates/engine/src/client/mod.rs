@@ -532,6 +532,33 @@ pub struct ClientMenu {
     pub name: String,
     pub slots: Vec<ItemStack>,
     pub cursor: ItemStack,
+    pub drag_targets: Vec<crate::net::DragSlot>,
+}
+
+pub struct DragPreview {
+    pub cursor: ItemStack,
+    pub slots: FxHashMap<u32, ItemStack>,
+}
+
+impl ClientMenu {
+    pub fn drag_preview(&self, button: u8, slots: &[u32]) -> DragPreview {
+        let room = |slot: u32| {
+            let i = slot as usize;
+            self.drag_targets.get(i).zip(self.slots.get(i)).map_or(0, |(target, _)| target.room)
+        };
+        let (valid, share) = crate::stack::drag_slots(slots, self.cursor.count, button, room);
+        let mut preview = DragPreview { cursor: self.cursor, slots: FxHashMap::default() };
+        for slot in valid {
+            let original = self.slots[slot as usize].count;
+            let target = &self.drag_targets[slot as usize];
+            let stack = preview.slots.entry(target.slot).or_insert(ItemStack { count: original, ..self.cursor });
+            let limit = original.saturating_add(target.room);
+            let take = share.min(limit.saturating_sub(stack.count));
+            stack.count += take;
+            preview.cursor.count -= take;
+        }
+        preview
+    }
 }
 
 pub enum ClientEvent {

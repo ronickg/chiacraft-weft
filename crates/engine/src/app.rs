@@ -15,7 +15,7 @@ use winit::keyboard::{KeyCode, NamedKey, PhysicalKey};
 use winit::window::{CursorGrabMode, Window, WindowId};
 
 use crate::assets::Assets;
-use crate::client::Client;
+use crate::client::{Client, DragPreview};
 use crate::client::textures::GameTextures;
 use crate::content::content;
 use crate::hud::Hud;
@@ -1205,7 +1205,10 @@ impl Running {
                                 .send(net::ToServer::Click { slot: s, button: GATHER, shift: false });
                             g.client.last_click = None;
                         }
-                        Some(s) if holding && !shift && g.client.drag.is_none() => g.client.drag = Some((button, vec![s])),
+                        Some(s) if holding && !shift && g.client.drag.is_none() => {
+                            g.client.drag = Some((button, vec![s]));
+                            self.quads_dirty = true;
+                        }
                         Some(s) => {
                             g.client
                                 .send(net::ToServer::Click { slot: s, button, shift });
@@ -1336,7 +1339,9 @@ impl Running {
                             .clone()?;
                         Some(crate::ui::text::rich(self.lang.get(&key), &self.lang, Some(&self.input)))
                     };
-                    let tip = if !stack.is_empty() {
+                    let tip = if g.client.drag.is_some() {
+                        None
+                    } else if !stack.is_empty() {
                         Some(crate::hud::item_tooltip(&self.lang, &self.input, stack))
                     } else if tag == crate::client::modui::TAG_SLOT {
                         hint()
@@ -2103,10 +2108,14 @@ fn frame(r: &mut Running, opts: &Options) -> bool {
         r.ui.biome = biome;
         r.quads_dirty = true;
     }
+    let drag = r.game.as_ref().and_then(|g| {
+        let (button, slots) = g.client.drag.as_ref()?;
+        Some(g.client.menu.as_ref()?.drag_preview(*button, slots))
+    });
     if r.quads_dirty {
-        build_ui_quads(r, scale);
+        build_ui_quads(r, scale, drag.as_ref());
     }
-    draw_overlays(r, &info, scale, text_unit);
+    draw_overlays(r, &info, scale, text_unit, drag.as_ref());
     record_passes(r, &info, scale);
     let capture_now = r.shot_pending;
     let t3 = Instant::now();
@@ -2522,6 +2531,11 @@ fn refresh_hud(r: &mut Running) {
         ) {
             h = crate::world::mix(h ^ ((s.item as u64) << 32 | s.count as u64) ^ (s.data as u64) << 48);
         }
+        if g.client.drag.is_some() && let Some(menu) = &g.client.menu {
+            for target in &menu.drag_targets {
+                h = crate::world::mix(h ^ ((u64::from(target.slot) << 32) | u64::from(target.room)));
+            }
+        }
         if h != r.client_hash {
             r.client_hash = h;
             r.quads_dirty = true;
@@ -2575,7 +2589,7 @@ fn visible_height(r: &Running) -> Option<f32> {
     }
 }
 
-fn build_ui_quads(r: &mut Running, scale: f32) {
+fn build_ui_quads(r: &mut Running, scale: f32, drag: Option<&DragPreview>) {
     let mut all = Vec::new();
     let game = crate::content::try_content().map(|c| (c, &r.textures));
     let client = r.game.as_ref().map(|g| &g.client);
@@ -2603,7 +2617,7 @@ fn build_ui_quads(r: &mut Running, scale: f32) {
         let look = &r.look;
         let textures = &r.textures;
         let mut custom = |ren: &mut UiRenderer, tag: u32, data: u64, rect: crate::ui::Rect, hovered: bool, icon: Option<u32>| {
-            crate::hud::draw_custom(ren, look, textures, client, tag, data, rect, hovered, icon, scale);
+            crate::hud::draw_custom(ren, look, textures, client, tag, data, rect, hovered, icon, scale, drag);
             let preview = match tag {
                 crate::client::modui::TAG_ENTITY => Some(ModelPreview {
                     rect: crate::ui::Rect { x: rect.x + scale, y: rect.y + scale, w: rect.w - 2.0 * scale, h: rect.h - 2.0 * scale },
@@ -2641,7 +2655,7 @@ fn build_ui_quads(r: &mut Running, scale: f32) {
     r.previews = previews;
 }
 
-fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, text_unit: f32) {
+fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, text_unit: f32, drag: Option<&DragPreview>) {
     // The stack held by the mouse follows it every frame, outside the cached quads.
     r.ui.quads.clear();
     r.ui.quads.extend_from_slice(&r.ui_cached);
@@ -2714,7 +2728,7 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
         .game
         .as_ref()
         .and_then(|g| g.client.menu.as_ref())
-        .map(|m| m.cursor)
+        .map(|m| drag.map_or(m.cursor, |preview| preview.cursor))
         .filter(|s| !s.is_empty())
     {
         let p = r.input.cursor;

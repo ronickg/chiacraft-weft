@@ -471,12 +471,12 @@ fn send_own_state(c: &'static Content, p: &mut Player, dim: &mut DimSet) {
         if !comps.is_empty() {
             p.conn.send(ToClient::EntityComponents(comps));
         }
-        let (slots, cursor) = menu::changes(m, reg, p.entity);
+        let (slots, cursor) = menu::changes(m, reg, c, p.entity);
         if !slots.is_empty() {
             p.conn.send(ToClient::MenuSlots(slots));
         }
-        if let Some(cur) = cursor {
-            p.conn.send(ToClient::Cursor(cur));
+        if let Some(message) = cursor {
+            p.conn.send(message);
         }
     }
 }

@@ -5,7 +5,7 @@ use weft_abi::ItemStack;
 use weft_abi::entry_kind as ek;
 
 use crate::app::Ctx;
-use crate::client::Client;
+use crate::client::{Client, DragPreview};
 use crate::client::modui::{self, TAG_ENTITY, TAG_SLOT};
 use crate::client::textures::GameTextures;
 use crate::content::content;
@@ -1120,6 +1120,7 @@ pub fn draw_custom(
     hovered: bool,
     icon: Option<u32>,
     scale: f32,
+    drag: Option<&DragPreview>,
 ) {
     match tag {
         TAG_CROSSHAIR => loaded(ren, look, "crosshair", r, scale),
@@ -1181,18 +1182,15 @@ pub fn draw_custom(
         TAG_SLOT => {
             let Some(client) = client else { return };
             slot_background(ren, look, "slot", r, false, scale);
-            let dragged = client
-                .drag
-                .as_ref()
-                .is_some_and(|d| d.1.contains(&(data as u32)));
-            if hovered || dragged {
+            let preview = drag.and_then(|p| {
+                let target = client.menu.as_ref()?.drag_targets.get(data as usize)?;
+                p.slots.get(&target.slot).copied()
+            });
+            if hovered || preview.is_some() {
                 slot_highlight(ren, look, r, scale);
             }
-            let stack = client
-                .menu
-                .as_ref()
-                .and_then(|m| m.slots.get(data as usize))
-                .copied()
+            let stack = preview
+                .or_else(|| client.menu.as_ref()?.slots.get(data as usize).copied())
                 .unwrap_or_default();
             if let (Some(t), true) = (icon, stack.is_empty()) {
                 let s = 16.0 * scale;

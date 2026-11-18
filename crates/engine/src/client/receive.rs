@@ -192,6 +192,7 @@ impl Client {
                 }
             }
             ToClient::OpenMenu { kind, window, slots, owner, block, name } => {
+                self.drag = None;
                 self.menu = Some(ClientMenu {
                     kind,
                     window,
@@ -200,6 +201,7 @@ impl Client {
                     name,
                     slots: vec![ItemStack::EMPTY; slots as usize],
                     cursor: ItemStack::EMPTY,
+                    drag_targets: Vec::new(),
                 });
                 self.events.push(ClientEvent::OpenMenu);
             }
@@ -212,9 +214,10 @@ impl Client {
                     }
                 }
             }
-            ToClient::Cursor(s) => {
+            ToClient::Cursor { stack, targets } => {
                 if let Some(m) = &mut self.menu {
-                    m.cursor = s;
+                    m.cursor = stack;
+                    m.drag_targets = targets;
                 }
             }
             ToClient::CloseMenu => {

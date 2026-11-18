@@ -9,10 +9,11 @@ use super::dim::Dim;
 use super::holder::{self, At, Inv};
 use crate::content::Content;
 use crate::host;
+use crate::net::ToClient;
 use crate::registry::{GroupDef, Use};
 use crate::stack::TransferTarget;
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Owner {
     Temp,
     Player,
@@ -20,6 +21,12 @@ pub enum Owner {
     Trash,
     /// The inventory the menu opened on.
     On(Inv),
+}
+
+impl Owner {
+    fn backing(self, player: u64) -> Self {
+        if self == Owner::On(Inv::own(At::Entity(player))) { Owner::Player } else { self }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -804,10 +811,9 @@ fn other_side(m: &OpenMenu, c: &Content, player: u64, slot: u32, stack: Option<I
     let mut container = Vec::new();
     let mut inventory = Vec::new();
     let max_stack = stack.map_or(0, |s| c.max_stack(&s));
-    let backing = |owner| if owner == Owner::On(Inv::own(At::Entity(player))) { Owner::Player } else { owner };
     for (i, s) in m.slots.iter().enumerate() {
         if s.flags & (sf::OUTPUT | sf::LOCKED) != 0 || s.owner == Owner::Trash
-            || (backing(s.owner) == backing(from.owner) && (s.index == from.index || std::ptr::eq(s.group, from.group)))
+            || (s.owner.backing(player) == from.owner.backing(player) && (s.index == from.index || std::ptr::eq(s.group, from.group)))
             || stack.is_some_and(|stack| !fits(c, s, stack.item))
         {
             continue;
@@ -1062,29 +1068,13 @@ pub fn drag(m: &mut OpenMenu, dim: &mut Dim, c: &'static Content, player: u64, s
     if cur.is_empty() {
         return;
     }
-    let mut seen = rustc_hash::FxHashSet::default();
-    let valid: Vec<u32> = slots
-        .iter()
-        .copied()
-        .filter(|&s| button == 1 || seen.insert(s))
-        .filter(|&s| {
-            let Some(r) = m.slots.get(s as usize) else { return false };
-            let t = get(m, dim, player, s);
-            r.flags & sf::OUTPUT == 0
-                && fits(c, r, cur.item)
-                && (t.is_empty() || (t.item == cur.item && t.data == cur.data && t.count < cap(c, r, &cur)))
-        })
-        .take(cur.count as usize)
-        .collect();
-    if valid.is_empty() {
-        return;
-    }
-    let per = if button == 1 { 1 } else { cur.count / valid.len() as u32 };
+    let (valid, share) = crate::stack::drag_slots(slots, cur.count, button, |slot| {
+        m.slots.get(slot as usize).map_or(0, |r| drag_room(c, r, get(m, dim, player, slot), cur))
+    });
     let mut left = cur.count;
     for &s in &valid {
         let t = get(m, dim, player, s);
-        let max = cap(c, &m.slots[s as usize], &cur);
-        let n = per.min(max - t.count.min(max)).min(left);
+        let n = share.min(drag_room(c, &m.slots[s as usize], t, cur));
         if n > 0 {
             set(m, dim, player, s, ItemStack { count: t.count + n, ..cur });
             left -= n;
@@ -1096,8 +1086,15 @@ pub fn drag(m: &mut OpenMenu, dim: &mut Dim, c: &'static Content, player: u64, s
     }
 }
 
+fn drag_room(c: &Content, slot: &SlotRef, stack: ItemStack, cursor: ItemStack) -> u32 {
+    if cursor.is_empty() || slot.flags & sf::OUTPUT != 0 || !fits(c, slot, cursor.item) {
+        return 0;
+    }
+    crate::stack::room_in(stack, cursor, cap(c, slot, &cursor))
+}
+
 /// Slots and cursor that changed since the last call.
-pub fn changes(m: &mut OpenMenu, dim: &Dim, player: u64) -> (Vec<(u32, ItemStack)>, Option<ItemStack>) {
+pub fn changes(m: &mut OpenMenu, dim: &Dim, c: &Content, player: u64) -> (Vec<(u32, ItemStack)>, Option<ToClient>) {
     let n = m.slots.len();
     m.sent_slots
         .resize(n, ItemStack { count: u32::MAX, ..ItemStack::EMPTY });
@@ -1109,9 +1106,17 @@ pub fn changes(m: &mut OpenMenu, dim: &Dim, player: u64) -> (Vec<(u32, ItemStack
             slots.push((i, crate::stack::for_client(s)));
         }
     }
-    let cursor = (m.sent_cursor != m.cursor).then(|| {
+    let cursor = (m.sent_cursor != m.cursor || (!m.cursor.is_empty() && !slots.is_empty())).then(|| {
         m.sent_cursor = m.cursor;
-        crate::stack::for_client(m.cursor)
+        // Two menu slots can show the same inventory index.
+        let mut backing = rustc_hash::FxHashMap::default();
+        let targets = m.slots.iter().zip(&m.sent_slots).enumerate().take(if m.cursor.is_empty() { 0 } else { n })
+            .map(|(i, (r, &s))| {
+                let slot = *backing.entry((r.owner.backing(player), r.index)).or_insert(i as u32);
+                crate::net::DragSlot { slot, room: drag_room(c, r, s, m.cursor) }
+            })
+            .collect();
+        ToClient::Cursor { stack: crate::stack::for_client(m.cursor), targets }
     });
     (slots, cursor)
 }
