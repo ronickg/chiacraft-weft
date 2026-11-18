@@ -378,9 +378,9 @@ pub unsafe extern "C" fn ui_open(u: *mut abi::UiCtx, node: *const abi::UiNode) {
                 for e in layout
                     .equipment
                     .iter()
-                    .filter(|e| e.name != weft_abi::OFF_HAND_SLOT)
+                    .filter(|e| e.group.flags & weft_abi::slot_flags::OFF_HAND == 0)
                 {
-                    if let Some((g, first, _)) = def.and_then(|d| d.group(layout, &e.name)) {
+                    if let Some((g, first, _)) = def.and_then(|d| d.group(layout, &e.group.name)) {
                         let s = b.ui.add(
                             Kind::Custom { tag: TAG_SLOT, data: first as u64 },
                             Style { w: Len::Px(g.size), h: Len::Px(g.size), ..Style::default() },

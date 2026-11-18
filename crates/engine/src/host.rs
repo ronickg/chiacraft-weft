@@ -1468,7 +1468,7 @@ unsafe extern "C" fn item_info(item: u32, out: *mut abi::ItemInfo) -> u32 {
     let worn = d
         .equip
         .and_then(|e| c.game.player_layout.equipment.get(e as usize))
-        .map_or(Str::EMPTY, |e| Str::new(&e.name));
+        .map_or(Str::EMPTY, |e| Str::new(&e.group.name));
     unsafe {
         *out = abi::ItemInfo {
             name: Str::new(&d.name),
@@ -1617,7 +1617,7 @@ unsafe extern "C" fn inventory_group(w: *mut abi::WorldCtx, h: *const abi::Holde
         if e.player {
             return match layout.group(name.as_str()) {
                 Some(g) => {
-                    *out = abi::SlotGroup { start: g.start, len: g.count, cols: g.cols };
+                    *out = g;
                     1
                 }
                 None => 0,
@@ -1628,7 +1628,7 @@ unsafe extern "C" fn inventory_group(w: *mut abi::WorldCtx, h: *const abi::Holde
         let slot = layout
             .equipment
             .iter()
-            .position(|q| q.name == name.as_str())
+            .position(|q| q.group.name == name.as_str())
             .map(|i| i as u32);
         let (start, len) = match slot {
             _ if name.as_str() == registry::EQUIPMENT_GROUP => (worn.start, worn.len() as u32),
@@ -1662,7 +1662,7 @@ unsafe extern "C" fn player_inventory_group(name: Str, out: *mut abi::SlotGroup)
     unsafe {
         match content().game.player_layout.group(name.as_str()) {
             Some(g) => {
-                *out = abi::SlotGroup { start: g.start, len: g.count, cols: g.cols };
+                *out = g;
                 1
             }
             None => 0,

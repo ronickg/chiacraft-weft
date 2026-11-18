@@ -177,6 +177,7 @@ pub mod equipment_slot {
     use crate::{Component, Text};
     pub static COVERS: Component<Vec<String>, EquipmentSlot> = Component::named(e::COVERS);
     pub static BACKGROUND: Component<Text, EquipmentSlot> = Component::named(e::BACKGROUND);
+    pub static PRIORITIES: Component<Vec<crate::abi::SlotPriority>, EquipmentSlot> = Component::named(e::PRIORITIES);
 }
 
 /// What an entity category is made of.

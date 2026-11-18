@@ -297,7 +297,7 @@ impl Parser<'_, '_> {
                     .equipment
                     .iter()
                     .enumerate()
-                    .filter(|(_, e)| e.name == what || e.bones.iter().any(|b| b == what))
+                    .filter(|(_, e)| e.group.name == what || e.bones.iter().any(|b| b == what))
                     .fold(0, |m, (i, _)| m | 1 << i);
                 if slots == 0 {
                     return Err(format!("condition {name}({text}): no equipment slot is or covers {what}"));

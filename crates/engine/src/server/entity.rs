@@ -5,7 +5,7 @@ use crate::tag_bits::entity as ef;
 use glam::{DQuat, DVec3, IVec3};
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
-use weft_abi::ItemStack;
+use weft_abi::{ItemStack, slot_flags as sf};
 
 use crate::content::Content;
 use crate::physics;
@@ -761,16 +761,14 @@ impl Entities {
 
     /// Space in each slot under the same rules as item insertion.
     fn item_space<'a>(&'a self, c: &'a Content, id: u64, stack: ItemStack) -> impl Iterator<Item = u32> + 'a {
-        let kind = self.get(id).map(|e| &c.game.entities[e.kind as usize]);
-        let max = c.max_stack(&stack);
+        let limit = self.pickup_limit(c, id, stack);
         self.inventories
             .get(&id)
             .into_iter()
             .flatten()
             .enumerate()
             .map(move |(i, &s)| {
-                let limit = kind.map_or(0, |k| Self::pickup_limit(k, i, s, max));
-                crate::stack::room_in(s, stack, limit)
+                crate::stack::room_in(s, stack, limit.as_ref().map_or(0, |f| f(i, s)))
             })
     }
 
@@ -782,8 +780,21 @@ impl Entities {
         self.item_space(c, id, stack).any(|room| room != 0)
     }
 
-    fn pickup_limit(k: &crate::registry::EntityKind, i: usize, current: ItemStack, max: u32) -> u32 {
-        if k.worn.contains(&(i as u32)) || (k.off == Some(i as u32) && current.is_empty()) { 0 } else { max }
+    fn pickup_limit<'a>(&self, c: &'a Content, owner: u64, stack: ItemStack) -> Option<impl Fn(usize, ItemStack) -> u32 + use<'a>> {
+        let entity = self.get(owner)?;
+        let k = &c.game.entities[entity.kind as usize];
+        let layout = entity.player.then_some(&c.game.player_layout);
+        let max = c.max_stack(&stack);
+        let liquid = c.item_fluid.contains_key(&stack.item);
+        Some(move |i: usize, current: ItemStack| {
+            let slot = i as u32;
+            if k.worn.contains(&slot) || (k.off == Some(slot) && current.is_empty()) { return 0; }
+            let Some(g) = layout.and_then(|layout| layout.storage_at(slot)) else { return max };
+            if g.flags & (sf::OUTPUT | sf::LOCKED | sf::TRASH) != 0 || !g.accepts(stack.item, liquid) {
+                return 0;
+            }
+            g.capacity(max)
+        })
     }
 
     pub fn take(&mut self, id: u64) -> Option<(Entity, Option<Vec<ItemStack>>, Vec<(u32, Box<[u8]>)>)> {
@@ -844,21 +855,36 @@ impl Entities {
 
     /// Merges into matching stacks, then empty slots. Returns the rest.
     pub fn insert_item(&mut self, c: &Content, owner: u64, stack: ItemStack) -> ItemStack {
-        let Some(e) = self.get(owner) else { return stack };
-        let k = &c.game.entities[e.kind as usize];
-        let max = c.max_stack(&stack);
+        self.insert_stack(c, owner, stack, false)
+    }
+
+    /// Menu results go into the player's storage even on screens which only show the result.
+    pub(super) fn insert_result(&mut self, c: &Content, player: u64, stack: ItemStack) -> ItemStack {
+        self.insert_stack(c, player, stack, true)
+    }
+
+    fn insert_stack(&mut self, c: &Content, owner: u64, stack: ItemStack, quick: bool) -> ItemStack {
+        let Some(limit) = self.pickup_limit(c, owner, stack) else { return stack };
         let Some(inv) = self.inventories.get_mut(&owner) else { return stack };
-        let rest = crate::stack::insert_into(
-            stack,
-            0..inv.len(),
-            |i, value| {
-                if let Some(value) = value {
-                    inv[i] = value;
-                }
-                inv[i]
-            },
-            |i, current| Self::pickup_limit(k, i, current, max),
-        );
+        let layout = &c.game.player_layout;
+        let count = inv.len();
+        let targets = (quick && layout.storage.iter().any(|g| g.priority(Some(stack.item)) != 0)).then(|| {
+            let mut targets: Vec<_> = inv.iter().enumerate().map(|(i, &s)| {
+                let slot = i as u32;
+                let priority = layout.storage_at(slot).map_or(0, |g| g.priority(Some(stack.item)));
+                crate::stack::TransferTarget { slot, priority, limit: limit(i, s) }
+            }).collect();
+            targets.sort_by_key(|t| std::cmp::Reverse(t.priority));
+            targets
+        });
+        let mut access = |i: usize, value| {
+            if let Some(s) = value { inv[i] = s; }
+            inv[i]
+        };
+        let rest = match targets {
+            Some(targets) => crate::stack::insert_by_priority(stack, &targets, |i, value| access(i as usize, value)),
+            None => crate::stack::insert_into(stack, 0..count, access, limit),
+        };
         if rest != stack {
             self.dirty_inv.insert(owner);
         }

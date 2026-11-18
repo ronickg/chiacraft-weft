@@ -2176,14 +2176,6 @@ pub fn freeze(
     game.item_model_for_stack = item_looks;
     link_particles(&mut game, &mut textures);
     check_ambient_particles(&game, &components, states.len() as u32, &mut errors);
-    for m in &mut game.menus {
-        for g in m.groups.iter_mut().filter(|g| !g.accepts.is_empty()) {
-            match crate::refs::bits(&g.accepts, comps::ITEM, &item_names, item_defs.len() as u32, &components, "item") {
-                Ok(bits) => g.accepted = Some(bits.into()),
-                Err(e) => errors.push(format!("menu {}: group {} accepts {}: {e}", m.name, g.name, g.accepts)),
-            }
-        }
-    }
     link_entity_templates(&mut game, &templates, &template_names, &mut errors);
     link_equipment(&game, &mut item_defs, &components);
     for d in &mut dim_defs {
@@ -3844,7 +3836,7 @@ fn link_entity_templates(
 /// Items worn in an equipment slot carry its `worn/<slot>` tag.
 fn link_equipment(game: &crate::registry::Game, item_defs: &mut [ItemDef], components: &Components) {
     for (e, slot) in game.player_layout.equipment.iter().enumerate() {
-        if let Some(t) = components.id(&format!("worn/{}", slot.name)) {
+        if let Some(t) = components.id(&format!("worn/{}", slot.group.name)) {
             for (i, d) in item_defs.iter_mut().enumerate() {
                 if components.has(comps::ITEM, i as u32, t) {
                     d.equip = Some(e as u32);

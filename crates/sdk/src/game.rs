@@ -723,7 +723,7 @@ pub struct PlayerInventoryBuilder<'a> {
 }
 
 impl PlayerInventoryBuilder<'_> {
-    /// A group of the player's inventory: its size from `slots` (`Slots::row(9).hotbar()`).
+    /// A named player storage group. Its menu slots inherit the group's filter, capacity, sorting and quick-transfer rules.
     pub fn group(mut self, name: &str, slots: Slots) -> Self {
         self.groups.push(slots.def(name, abi::slot_owner::PLAYER));
         self
@@ -1388,35 +1388,19 @@ pub const EQUIPMENT_GROUP: &str = "core:equipment";
 ///     .group("output", Slots::single().output().large());
 /// ```
 #[derive(Clone)]
-pub struct Slots {
-    owner: Option<u32>,
-    start: u32,
-    cols: u32,
-    rows: u32,
-    flags: u32,
-    accepts: String,
-    limit: u32,
-    size: f32,
-    background: String,
-    tooltip: String,
-    priority: i32,
-}
+pub struct Slots(abi::SlotGroupDef);
 
 impl Slots {
+    /// A sortable rectangular storage group.
     pub fn grid(cols: u32, rows: u32) -> Slots {
-        Slots {
-            owner: None,
+        Slots(abi::SlotGroupDef {
+            owner: u32::MAX,
             start: u32::MAX,
             cols,
             rows,
-            flags: 0,
-            accepts: String::new(),
-            limit: 0,
-            size: 0.0,
-            background: String::new(),
-            tooltip: String::new(),
-            priority: 0,
-        }
+            flags: slot_flags::ALLOW_SORTING,
+            ..Default::default()
+        })
     }
     pub fn row(n: u32) -> Slots {
         Slots::grid(n, 1)
@@ -1425,7 +1409,7 @@ impl Slots {
         Slots::grid(1, n)
     }
     pub fn single() -> Slots {
-        Slots::grid(1, 1)
+        Slots::grid(1, 1).allow_sorting(false)
     }
     /// Rows of nine, like a chest.
     pub fn chest(rows: u32) -> Slots {
@@ -1434,70 +1418,75 @@ impl Slots {
     /// The menu's own slots, given back to the player when it closes (crafting grids). The
     /// default for `MenuBuilder::group`.
     pub fn menu(mut self) -> Self {
-        self.owner = Some(abi::slot_owner::MENU);
+        self.0.owner = abi::slot_owner::MENU;
         self
     }
     /// The inventory of what the menu opened on: a block entity's (`.entity(|e| e.inventory(n))`), an
     /// entity's, a storage's.
     pub fn holder(mut self) -> Self {
-        self.owner = Some(abi::slot_owner::HOLDER);
+        self.0.owner = abi::slot_owner::HOLDER;
         self
     }
     /// The player's hotbar, in `Registry::player_slots`.
     pub fn hotbar(mut self) -> Self {
-        self.flags |= slot_flags::HOTBAR;
+        self.0.flags |= slot_flags::HOTBAR;
         self
     }
     /// From this index of the owner's inventory instead of right after the group before.
     pub fn at(mut self, start: u32) -> Self {
-        self.start = start;
+        self.0.start = start;
+        self
+    }
+    /// Allows or disables sorting within this group. Storage grids, rows and columns allow it by default.
+    pub fn allow_sorting(mut self, allow: bool) -> Self {
+        self.0.flags = if allow { self.0.flags | slot_flags::ALLOW_SORTING } else { self.0.flags & !slot_flags::ALLOW_SORTING };
         self
     }
     /// The player's trash (`slot_flags::TRASH`), one slot: it keeps the last thing put in until the
     /// next takes its place or the player leaves, and the trash key (Delete) over any slot sends
     /// that stack there.
     pub fn trash(mut self) -> Self {
-        self.flags |= abi::slot_flags::TRASH;
-        self
+        self.0.flags |= slot_flags::TRASH;
+        self.allow_sorting(false)
     }
     /// Items only go in (a machine uses them up).
     pub fn input(mut self) -> Self {
-        self.flags |= abi::slot_flags::INPUT;
-        self
+        self.0.flags |= slot_flags::INPUT;
+        self.allow_sorting(false)
     }
     /// Holds `capacity` millibuckets of one liquid: its item (`Item::named` the liquid's
     /// name), poured in and taken out with buckets by hand, read and set like any slot.
     pub fn liquid(mut self, capacity: u32) -> Self {
-        self.flags |= abi::slot_flags::LIQUID;
-        self.limit = capacity;
-        self
+        self.0.flags |= slot_flags::LIQUID;
+        self.0.limit = capacity;
+        self.allow_sorting(false)
     }
     /// A crafting grid of the menu's first `.recipes(..)` kind: the engine shows what it makes in
     /// the menu's `output()` group and uses it up when that is taken, as the recipe says
     /// (`RecipeBuilder::keep`, `wear`, `leaves`); a shift-click crafts all that fits at once.
     pub fn crafting(mut self) -> Self {
-        self.flags |= abi::slot_flags::GRID;
-        self
+        self.0.flags |= slot_flags::GRID;
+        self.allow_sorting(false)
     }
     /// Items only come out (results).
     pub fn output(mut self) -> Self {
-        self.flags |= abi::slot_flags::OUTPUT;
-        self
+        self.0.flags |= slot_flags::OUTPUT;
+        self.allow_sorting(false)
     }
     /// Only these items, a reference like everywhere else: `#fuel` (anything with the component),
     /// `#fuel #mymod:fire_starter` (either), `#fuel !base:lava_bucket` (but that one), names.
     pub fn accepts(mut self, items: &str) -> Self {
-        self.accepts = items.to_string();
+        self.0.accepts = items.to_string();
         self
     }
     /// At most this many items per slot.
     pub fn limit(mut self, n: u32) -> Self {
-        self.limit = n;
+        self.0.limit = n;
         self
     }
     /// Side of a slot in GUI pixels (18 by default).
     pub fn size(mut self, px: f32) -> Self {
-        self.size = px;
+        self.0.size = px;
         self
     }
     /// The big slot vanilla uses for results.
@@ -1506,36 +1495,28 @@ impl Slots {
     }
     /// A texture from `gui/` shown while a slot is empty (the armor silhouettes).
     pub fn background(mut self, texture: &str) -> Self {
-        self.background = crate::asset("gui", texture);
+        self.0.background = crate::asset("gui", texture);
         self
     }
     /// A translation shown over an empty slot.
     pub fn tooltip(mut self, key: &str) -> Self {
-        self.tooltip = key.to_string();
+        self.0.tooltip = key.to_string();
         self
     }
-    /// Shift-clicks from the player's inventory fill groups with a higher priority first.
-    pub fn priority(mut self, p: i32) -> Self {
-        self.priority = p;
+    /// Fills this group earlier for matching items on a quick transfer, e.g. `.priority(1, "#food")`.
+    /// The highest matching priority wins, zero by default. An empty reference matches every item.
+    pub fn priority(mut self, priority: i32, items: &str) -> Self {
+        self.0.priorities.push(abi::SlotPriority { priority, items: items.into() });
         self
     }
 
     /// As a menu or the player's inventory has it, owned by `default` unless it says.
-    fn def(self, name: &str, default: u32) -> abi::SlotGroupDef {
-        abi::SlotGroupDef {
-            name: name.to_string(),
-            owner: self.owner.unwrap_or(default),
-            start: self.start,
-            cols: self.cols,
-            rows: self.rows,
-            flags: self.flags,
-            accepts: self.accepts,
-            limit: self.limit,
-            size: self.size,
-            background: self.background,
-            tooltip: self.tooltip,
-            priority: self.priority,
+    fn def(mut self, name: &str, default: u32) -> abi::SlotGroupDef {
+        self.0.name = name.into();
+        if self.0.owner == u32::MAX {
+            self.0.owner = default;
         }
+        self.0
     }
 }
 
@@ -2043,6 +2024,13 @@ impl RecipeKindBuilder<'_> {
 pub struct EquipmentSlotBuilder<'a> {
     reg: &'a mut Registry,
     e: crate::entry::Entry,
+}
+
+impl EquipmentSlotBuilder<'_> {
+    /// Sets quick-transfer preferences like `Slots::priority`. Explicit rules replace the worn slot's default priority of one.
+    pub fn priority(self, priority: i32, items: &str) -> Self {
+        self.push(&comps::equipment_slot::PRIORITIES, abi::SlotPriority { priority, items: items.into() })
+    }
 }
 
 /// A tint kind being registered (`Registry::tint_kind`).

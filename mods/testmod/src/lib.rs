@@ -75,6 +75,7 @@ static TIN_INGOT: Item = Item::named("tin_ingot");
 static ANOTHER_STICK: Item = Item::named("another_stick");
 static POUCH: Item = Item::named("pouch");
 static POUCH_MENU: Menu = Menu::named("pouch");
+static SHELVES: Menu = Menu::named("shelves");
 static NOTES: TextPlace = TextPlace::named("notes");
 
 value! {
@@ -384,6 +385,11 @@ fn init(r: &mut Registry) {
                 ui.player_inventory(true);
             });
         });
+    r.menu(&SHELVES)
+        .group("stock", Slots::row(3).holder())
+        .group("fuel", Slots::row(2).holder().accepts("#fuel").limit(4).priority(1, "#stick"))
+        .group("display", Slots::row(2).holder().allow_sorting(false))
+        .default_screen();
 
     // A tier between vanilla's iron (200) and diamond (300): mines everything iron does plus
     // reinforced stone, which iron cannot.

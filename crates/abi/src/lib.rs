@@ -797,10 +797,11 @@ pub mod comp {
 
     /// An equipment slot's: `COVERS` (`[str]`, bones what is worn there covers; a name with a role,
     /// `head`, `leftArm`, `leg0`, covers every bone of that role) and `BACKGROUND` (`str`, the GUI
-    /// texture of the empty slot).
+    /// texture of the empty slot). `PRIORITIES` holds the group's quick-transfer rules.
     pub mod equipment_slot {
         pub const COVERS: &str = "equipment_slot.covers";
         pub const BACKGROUND: &str = "equipment_slot.background";
+        pub const PRIORITIES: &str = "equipment_slot.priorities";
     }
 
     /// An entity category's: `CAP` (`u32`, at most this many spawn naturally near a player, 0),
@@ -3747,6 +3748,8 @@ pub mod slot_flags {
     /// what it makes in the menu's output group, and taking that uses the grid up as the recipe
     /// says (`comp::recipe::USES`), with shift as many runs as fit in the player's inventory.
     pub const GRID: u32 = 128;
+    /// Sorting may rearrange stacks within this group.
+    pub const ALLOW_SORTING: u32 = 256;
 }
 
 /// The equipment slot of the second hand. Without it, players have one.
@@ -3772,6 +3775,14 @@ pub mod slot_owner {
 }
 
 crate::data! {
+    /// A quick-transfer priority for the items matching a reference. An empty reference matches all items.
+    pub struct SlotPriority {
+        pub priority: i32,
+        pub items: alloc::string::String,
+    }
+}
+
+crate::data! {
     /// Slots shown and handled together (`comp::menu::GROUPS`, the player's
     /// `comp::entity::SLOT_GROUPS`): a grid of `cols` by `rows` of one `owner`'s (`slot_owner`)
     /// inventory with the same rules, found by `name` by the screen and the menu's callbacks.
@@ -3779,8 +3790,7 @@ crate::data! {
     /// group of the same owner), `flags` are `slot_flags`; only the items reference `accepts`
     /// names go in (`#fuel #mymod:fire_starter`; empty: any), at most `limit` a slot (0: as many as the item stacks to);
     /// `size` is a slot's side in GUI pixels (0: 18), `background` a GUI texture and `tooltip` a
-    /// translation shown while it is empty. Shift-clicks from the player's inventory fill groups
-    /// with a higher `priority` first.
+    /// translation shown while it is empty. Quick transfers use the highest matching priority, or zero.
     pub struct SlotGroupDef {
         pub name: alloc::string::String,
         pub owner: u32,
@@ -3793,7 +3803,7 @@ crate::data! {
         pub size: f32,
         pub background: alloc::string::String,
         pub tooltip: alloc::string::String,
-        pub priority: i32,
+        pub priorities: alloc::vec::Vec<SlotPriority>,
     }
 }
 

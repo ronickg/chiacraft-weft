@@ -145,6 +145,8 @@ pub fn len(d: &Dim, c: &Content, inv: Inv) -> u32 {
             .get(&id)
             .map_or(0, |i| i.len() as u32),
         (At::Stack { entity, slot }, 0) => item_slots(c, stack_at(d, entity, slot).item),
+        (At::Entity(id), comp) if !d.entities.comps.contains_key(&(id, comp)) => 0,
+        (At::Stack { entity, slot }, _) if stack_at(d, entity, slot).is_empty() => 0,
         (_, comp) => storage_slots(c, comp).unwrap_or(0),
     }
 }

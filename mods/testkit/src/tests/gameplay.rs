@@ -145,6 +145,8 @@ pub async fn armor(t: T) -> R {
     for (slot, name) in [(0, "iron_helmet"), (1, "diamond_chestplate"), (2, "gold_leggings"), (3, "leather_boots")] {
         t.op(&format!("put me {slot} {name} 1")).await?;
     }
+    t.op("put me 4 shield 1").await?;
+    t.op("put me 5 dirt 3").await?;
     t.press("core:inventory");
     t.screen("core:menu").await?;
     for i in 36..40 {
@@ -155,10 +157,27 @@ pub async fn armor(t: T) -> R {
     }
     t.until("armor worn", Duration::from_secs(5), |t| (36..40).all(|s| !t.c().inventory_slot(s).is_empty()))
         .await?;
+    // Sweep from the dirt to the shield with Shift held.
+    let dirt = t.c().ui_rect("slot:41").ok_or("no dirt slot")?;
+    let shield = t.c().ui_rect("slot:40").ok_or("no shield slot")?;
+    t.c().input_cursor(dirt.x + dirt.w / 2.0, dirt.y + dirt.h / 2.0);
+    t.c().input_key("ShiftLeft", 1.0);
+    t.frames(2).await?;
+    t.c().input_click(0, 0.5);
+    t.frames(2).await?;
+    t.c().input_cursor(shield.x + shield.w / 2.0, shield.y + shield.h / 2.0);
+    t.until("shield in the other hand", Duration::from_secs(3), |t| t.c().inventory_slot(40).item == item("base:shield")).await?;
+    t.check_eq(t.slot("me", 9).await?.1, 3, "ordinary items go to main storage");
     // The player's inventory by group name: four equipment slots, all filled; the hotbar empty.
     t.check_eq(t.op("group me core:equipment").await?, "4 4".to_string(), "equipment group (slots, filled)");
     t.check_eq(t.op("group me base:head").await?, "1 1".to_string(), "the head slot");
     t.check_eq(t.op("group me hotbar").await?, "9 0".to_string(), "hotbar group");
+    t.op("put me 0 cobblestone 1").await?;
+    t.op("put me 17 dirt 5").await?;
+    t.c().menu_sort(None);
+    t.until("main stacks joined", Duration::from_secs(3), |t| t.c().inventory_slot(9).count == 8).await?;
+    t.check_eq(t.slot("me", 40).await?.0, "base:shield".into(), "sorting keeps the shield equipped");
+    t.check_eq(t.slot("me", 0).await?.0, "base:cobblestone".into(), "sorting main storage skips the hotbar");
     t.shot("worn").await?;
     t.c().menu_close();
     t.no_screen().await?;
@@ -1834,6 +1853,29 @@ pub async fn inventory_tools(t: T) -> R {
         n
     };
     t.check_eq(dirt, 15, "all the dirt in the chest");
+    t.c().menu_close();
+    t.no_screen().await?;
+    t.op(&format!("menu testmod:shelves {at}")).await?;
+    t.screen("core:menu").await?;
+    t.op(&format!("put {at} 2 stick 2")).await?;
+    t.op("put me 0 stick 11").await?;
+    t.c().input_key("ShiftLeft", 0.3);
+    t.frames(2).await?;
+    t.click_ui("slot:34", 0);
+    t.until("sticks transferred", Duration::from_secs(3), |t| t.c().menu_slot(2).count == 5).await?;
+    t.check_eq(t.slot(&at, 3).await?.1, 4, "preferred empty slots fill before an existing stack");
+    t.check_eq(t.slot(&at, 4).await?.1, 4, "priority applies up to each slot's limit");
+    t.op(&format!("put {at} 0 coal 0")).await?;
+    t.op(&format!("put {at} 1 stick 1")).await?;
+    t.op(&format!("put {at} 3 stick 1")).await?;
+    t.op(&format!("put {at} 6 dirt 3")).await?;
+    t.c().menu_sort(Some(2));
+    t.until("only stock sorted", Duration::from_secs(3), |t| t.c().menu_slot(0).count == 6).await?;
+    t.check_eq(t.slot(&at, 3).await?.1, 1, "sorting a particular group leaves its neighbor alone");
+    t.c().menu_sort(None);
+    t.until("fuel sorted to the slot limit", Duration::from_secs(3), |t| t.c().menu_slot(3).count == 4).await?;
+    t.check_eq(t.slot(&at, 4).await?.1, 1, "filtered stock stays on its shelf");
+    t.check_eq(t.slot(&at, 6).await?.1, 3, "the display keeps its arrangement");
     t.c().menu_close();
     Ok(())
 }

@@ -541,7 +541,7 @@ r.phase(&CRITS, &phase::MULTIPLY);
 ```
 
 ## Equipment slot
-A slot things are worn in. `r.equipment_slot(&S, covers, background)`. `comps::equipment_slot`: `COVERS` (`[str]` bones), `BACKGROUND` (`str`).
+A slot things are worn in. `r.equipment_slot(&S, covers, background)` registers it. Its components are `COVERS` (`[str]` bones), `BACKGROUND` (`str`) and `PRIORITIES` (`[SlotPriority]` for quick transfers).
 
 ```rust
 r.edit(&base_api::CHEST).push(&comps::equipment_slot::COVERS, "leftWing".to_string());

@@ -247,8 +247,8 @@ impl Server {
                     r.entities.set_slot(entity, off, main);
                 }
             }
-            ToServer::Move { pos, yaw, pitch, on_ground, pose, sprint, flying, jumped, frame } => {
-                if !pos.is_finite() {
+            ToServer::Move { pos, vel, yaw, pitch, on_ground, pose, sprint, flying, jumped, frame } => {
+                if !pos.is_finite() || !vel.is_finite() {
                     return;
                 }
                 // On a body: where the client has the player on it, on the body as it is here.
@@ -292,6 +292,7 @@ impl Server {
                 e.jumped |= jumped;
                 e.moved = walked.with_y(0.0).length() as f32;
                 e.pos = pos;
+                e.vel = vel;
                 e.frame = on.map(|o| o.0);
                 e.yaw = yaw;
                 e.pitch = pitch;

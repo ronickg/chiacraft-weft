@@ -4,7 +4,7 @@
 use glam::{DQuat, DVec3, IVec3};
 use weft_abi::{ItemStack, component_flags as cf, entry_kind as ek};
 
-use super::entity::{BodyMount, Completion, Entity};
+use super::entity::{BodyMount, Completion, Entity, Stuck, StuckIn};
 use super::space::{BlockTimer, Space};
 use crate::content::Content;
 use crate::net::codec::{self, R, Wire};
@@ -20,7 +20,8 @@ pub struct SavedSpace {
 }
 
 const ENTITY_FORMAT_V2: u32 = 0x3254_4E45;
-const ENTITY_FORMAT: u32 = 0x3354_4E45;
+const ENTITY_FORMAT_V3: u32 = 0x3354_4E45;
+const ENTITY_FORMAT: u32 = 0x3454_4E45;
 const MOUNTED_BODY: u16 = 0x80;
 const FLOATING_BODY: u16 = 0x40;
 const FLOATER_DRIVEN: u16 = 0x20;
@@ -30,6 +31,7 @@ const MOUNT_SLIDE: u16 = 0x04;
 const ROTATED_BODY: u16 = 0x100;
 const LAND_ON_SUPPORT: u16 = 0x200;
 const DOCK_BODY: u16 = 0x400;
+const STUCK: u16 = 0x800;
 
 struct W<'a>(&'a mut Vec<u8>);
 
@@ -106,10 +108,16 @@ pub fn write(c: &Content, out: &mut Vec<u8>, list: &[ToSave<'_>], now: u64) {
         Completion::Dock => DOCK_BODY,
         _ => 0,
     };
-    let extended = list
+    let format = if list.iter().any(|(e, ..)| e.stuck.is_some()) {
+        ENTITY_FORMAT
+    } else if list
         .iter()
-        .any(|(e, _, _, space)| orientation(e, space.is_some()).is_some() || completion(e) != 0);
-    w.u32(if extended { ENTITY_FORMAT } else { ENTITY_FORMAT_V2 });
+        .any(|(e, _, _, space)| orientation(e, space.is_some()).is_some() || completion(e) != 0) {
+        ENTITY_FORMAT_V3
+    } else {
+        ENTITY_FORMAT_V2
+    };
+    w.u32(format);
     w.u32(list.len() as u32);
     for (e, inv, comps, blocks) in list {
         w.str(&c.game.entities[e.kind as usize].name);
@@ -137,10 +145,11 @@ pub fn write(c: &Content, out: &mut Vec<u8>, list: &[ToSave<'_>], now: u64) {
             | if e.mount.as_ref().is_some_and(|m| m.drive.is_some()) { MOUNT_DRIVE } else { 0 }
             | if e.mount.as_ref().is_some_and(|m| m.slide.is_some()) { MOUNT_SLIDE } else { 0 }
             | if rotation.is_some() { ROTATED_BODY } else { 0 }
-            | completion(e);
+            | completion(e)
+            | if e.stuck.is_some() { STUCK } else { 0 };
         let frame = e.block_frame();
         let attachment = attachment | e.anchor.map_or(0, |_| if frame != 0 { 2 } else { 1 });
-        if extended {
+        if format != ENTITY_FORMAT_V2 {
             w.u16(attachment);
         } else {
             w.u8(attachment as u8);
@@ -188,6 +197,22 @@ pub fn write(c: &Content, out: &mut Vec<u8>, list: &[ToSave<'_>], now: u64) {
             for v in rotation.to_array() {
                 w.f64(v);
             }
+        }
+        if let Some(stuck) = e.stuck {
+            match stuck.into {
+                StuckIn::Block { body, block } => {
+                    w.u8(0);
+                    w.u64(body);
+                    for v in block.to_array() { w.u32(v as u32); }
+                }
+                StuckIn::Entity(id) => {
+                    w.u8(1);
+                    w.u64(id);
+                }
+            }
+            for v in stuck.at.to_array() { w.f64(v); }
+            w.f32(stuck.yaw);
+            w.u32(stuck.ticks);
         }
         match inv {
             Some(inv) => {
@@ -308,7 +333,7 @@ pub fn read(c: &Content, data: &[u8], now: u64) -> Vec<Saved> {
         return out;
     }
     let extended = match r.u32() {
-        Some(ENTITY_FORMAT) => true,
+        Some(ENTITY_FORMAT | ENTITY_FORMAT_V3) => true,
         Some(ENTITY_FORMAT_V2) => false,
         _ => {
             log::warn!("unsupported saved entity format");
@@ -401,6 +426,14 @@ fn read_one(c: &Content, r: &mut R, now: u64, extended: bool) -> Option<Option<S
     } else {
         None
     };
+    let stuck = if attachment & STUCK != 0 {
+        let into = match r.u8()? {
+            0 => StuckIn::Block { body: r.u64()?, block: IVec3::get(r)? },
+            1 => StuckIn::Entity(r.u64()?),
+            _ => return None,
+        };
+        Some(Stuck { into, at: DVec3::get(r)?, yaw: r.f32()?, ticks: r.u32()? })
+    } else { None };
     let inv_len = r.u16()?;
     let inv = if inv_len == u16::MAX {
         None
@@ -463,6 +496,7 @@ fn read_one(c: &Content, r: &mut R, now: u64, extended: bool) -> Option<Option<S
     e.vel = DVec3::new(v[3], v[4], v[5]);
     e.yaw = yaw;
     e.pitch = pitch;
+    e.stuck = stuck;
     e.age = age;
     e.item = item;
     e.anchor = anchor;

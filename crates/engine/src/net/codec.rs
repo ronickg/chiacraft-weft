@@ -372,6 +372,7 @@ mod tests {
             ToServer::Move {
                 jumped: false,
                 pos: DVec3::new(1.5, 64.0, -3.25),
+                vel: DVec3::new(-4.5, 0.0, 1.0),
                 yaw: 1.0,
                 pitch: -0.5,
                 on_ground: true,

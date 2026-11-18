@@ -1656,10 +1656,13 @@ impl Client {
     }
 
     fn move_message(&self, landed: bool, jumped: bool) -> ToServer {
+        // On the ground the next physics step already has gravity queued.
+        let vel = if self.player.on_ground { self.player.vel.with_y(0.0) } else { self.player.vel };
         ToServer::Move {
             jumped,
             frame: self.player.riding.map(|(b, _, now)| (b, now)),
             pos: self.player.pos,
+            vel: vel * crate::world::TPS as f64,
             yaw: self.player.yaw,
             pitch: self.player.pitch,
             on_ground: landed || self.player.on_ground || self.player.flying,
@@ -1671,7 +1674,7 @@ impl Client {
 
     /// The server hears every action go down and up (`event::KEY`), what the world has of the
     /// input: none while a screen has it.
-    fn send_keys(&mut self, input: &Input) {
+    fn send_keys(&mut self, input: &Input, send_look: &mut LookOnce) {
         let keys = &content().game.keys;
         self.keys_down.resize(keys.len(), false);
         let (mut down, mut up) = (Vec::new(), Vec::new());
@@ -1688,12 +1691,14 @@ impl Client {
             }
         }
         if self.joined && !(down.is_empty() && up.is_empty()) {
+            if up.iter().any(|&key| keys[key as usize].name == "core:use") {
+                send_look.send(&mut self.conn);
+            }
             self.conn.send(ToServer::Keys { down, up });
         }
     }
 
     fn act(&mut self, input: &Input, dt: f64, look: DVec3) {
-        self.send_keys(input);
         self.break_delay -= dt as f32;
         self.use_delay -= dt as f32;
         // The server judges actions by where the player looks, which it only hears 20 times a
@@ -1702,6 +1707,7 @@ impl Client {
             self.joined
                 .then(|| self.move_message(self.player.landed, false)),
         );
+        self.send_keys(input, &mut send_look);
         let grab_tool = content().body_grab_tool(self.held(), self.mode);
         if self.grabbed_body.is_some() && (!grab_tool || !input.captured || self.dead) {
             self.grabbed_body = None;

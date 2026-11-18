@@ -465,6 +465,25 @@ pub fn insert_into(
     if incoming.is_empty() { ItemStack::EMPTY } else { incoming }
 }
 
+pub struct TransferTarget {
+    pub slot: u32,
+    pub priority: i32,
+    pub limit: u32,
+}
+
+/// Targets are in descending priority. Finish one tier before merging into stacks in the next.
+pub fn insert_by_priority(
+    mut stack: ItemStack,
+    targets: &[TransferTarget],
+    mut access: impl FnMut(u32, Option<ItemStack>) -> ItemStack,
+) -> ItemStack {
+    for tier in targets.chunk_by(|a, b| a.priority == b.priority) {
+        stack = insert_into(stack, 0..tier.len(), |i, value| access(tier[i].slot, value), |i, _| tier[i].limit);
+        if stack.is_empty() { break; }
+    }
+    stack
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

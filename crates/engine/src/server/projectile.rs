@@ -113,9 +113,14 @@ impl Dim {
                 continue;
             }
             let gravity = gravity * self.attribute(0, c, id, crate::registry::attr::GRAVITY, false);
-            let Some(e) = self.entities.get(id) else { continue };
+            let Some(e) = self.entities.get_mut(id) else { continue };
             let v = e.vel * crate::world::TICK;
             let speed = v.length();
+            // A hit on the first tick must keep the incoming direction too.
+            if speed > 1e-4 {
+                e.yaw = (-v.x).atan2(-v.z) as f32;
+                e.pitch = v.y.atan2(v.with_y(0.0).length()) as f32;
+            }
             let (pos, owner) = (e.pos, e.owner);
             let mut skip = vec![id];
             // Its shooter can't be hit until it flew clear of them.
@@ -222,11 +227,6 @@ impl Dim {
             let v = after.map_or(DVec3::ZERO, |v| v * if wet { p.liquid_drag } else { p.drag } as f64 - DVec3::Y * gravity);
             e.vel = v * crate::world::TPS as f64;
             e.in_liquid = wet;
-            // Pointing where it flies.
-            if v.length_squared() > 1e-8 {
-                e.yaw = (-v.x).atan2(-v.z) as f32;
-                e.pitch = v.y.atan2(v.with_y(0.0).length()) as f32;
-            }
         }
     }
 
@@ -252,7 +252,8 @@ impl Dim {
         let solid = |s: u32| !c.states[s as usize].collision.is_empty();
         let held = |cells: &dyn Fn(IVec3) -> (Option<u32>, Vec<u32>), block: IVec3| {
             let (main, extras) = cells(block);
-            main.is_some_and(solid) || extras.iter().any(|&s| solid(s))
+            // The arrow can load before its supporting cube across a cube boundary.
+            main.is_none_or(solid) || extras.iter().any(|&s| solid(s))
         };
         // Where it is now, or `None` once nothing holds it.
         let now: Option<(Option<DVec3>, f32)> = match st.into {
